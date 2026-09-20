@@ -1,0 +1,16 @@
+# Scoped follow-up after QDCXX-007
+
+[Русская версия](NEXT-STEPS.ru.md). This English document is authoritative.
+
+All rows are **proposed backlog**, not assigned tasks or implementation authorization. The [ADR](decisions/ADR-0001-normalized-model-boundaries.md) remains proposed. Evidence limits are in [requirements](../spec/schema/NORMALIZED-MODEL.md).
+
+| Work item | Dependency / missing evidence | Reviewable exit |
+| --- | --- | --- |
+| B01 — Review compatibility profile and artifact ownership | Owner choices on provenance, copied main alias, structured errors and JSON | Accepted or revised ADR; explicit deviations and exclusions. No implementation required. |
+| B02 — Focused schema probes | Existing schema harness; before adding alias overlays capture collision/removal, defaulted attributes and copy docs/regionals/disabled; before repaired main alias capture known mapping/property/wire effects. SC-01/02/03/04/07 remain bounded separately. | Exact stimuli, two reproductions, negative/positive verify, paired coverage/validation; retain failures and stages. Only probes needed for the next importer subset, not all families. |
+| B03 — Minimal importer contract, then separately authorized importer | B01; B02 for any added constructs. Start with the 17 existing schema subcases, explicitly reject/report unsupported scope. Custom types/generators/imports require additional evidence before support. | Versioned interchange specification, original-input/profile provenance, proposed normalized projections reviewed against unchanged Java expectations; separate structured diagnostics. Code requires a new approved task. |
+| B04 — Primitive encoding evidence and contract | Existing encoding source inventory; P01 is insufficient. Probe compact width/sign boundaries, truncation/overlong forms, UTF null/empty/Unicode and bounded malformed lengths. | Source-linked byte vectors and acceptance/error/partial-input rules; no library choice. Enables a later explicitly approved first encoding component. |
+| B05 — Static protocol adaptation extension | B01/B04; capture LONG/WIDE_DECIMAL tails and missing time-index wire omission; requested y,x order, P06 numeric/object mismatches and supported skip paths. | Incoming versus outgoing mappings and exact bytes/values, no generic defaults/coercion claim. Existing P03/P04/P05 remain a regression subset. |
+| B06 — Session/layout lifetime contract | Before any dynamic layout/session reuse claim: requests before/after first writer use, re-description and reset; P09 negotiation and relevant P12 probes. | Measured cache/lifetime/error behavior and separate compatibility decision. No automatic preservation of source-observed cache retention. |
+
+Full dxFeed provider/property parity, generated/regional schemas, mapping getters, PART/auth/sockets/timing and broad rebuild sequences can remain outside the initial profile. They require independently scoped tasks, not silent extension of B03 or B05. qd-core stays transport-independent; no C++, importer, build system or dependency is introduced by this backlog.

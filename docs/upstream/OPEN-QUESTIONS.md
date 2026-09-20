@@ -1,5 +1,7 @@
 # Upstream open questions
 
+[Русская версия](OPEN-QUESTIONS.ru.md). This English document is authoritative.
+
 Record questions about Java QD behavior that cannot yet be answered confidently. Link each question to the task investigating it and close it with source or fixture evidence.
 
 ## Provenance
@@ -35,7 +37,7 @@ Remaining questions, all tied to [fixture proposals](../../tests/fixtures/schema
 | SC-06 | Open, environment profile: which service-provider set and property configuration defines required dxFeed parity? | RecordMappingFactoryHolder, DXFeedScheme, DXFeedPropertiesConverter and default-scheme tests; S13/S14/S16. Full legacy property matrix, Nuam coverage and third-party provider order remain follow-up work. |
 | SC-07 | Open, rebuild isolation: does a sequence of withProperties calls mutate shared base entities and affect later builds? | DXScheme.configureSchemeModel and SchemeModel.overrideEntityCollection share references; S20. Source sharing is observed; sequence-dependent oracle capture remains. |
 | SC-08 | Resolved for QDCXX-005 only: original tiny XML and Java harness; raw TSV retained, only input-directory URL and CRLF normalized. No upstream source/resources redistributed. | [Harness/profile/provenance](../../tools/upstream/schema-oracle/README.md), [validation](../../tests/fixtures/schema/VALIDATION.md). Future copied resources still require notice/provenance review; this observation format does not choose the normalized model. |
-| SC-09 | Open, normalized-model scope: retain resolved runtime descriptors only, or also source overlays, templates, disabled metadata, docs, enums, tags and bitfields? | Analysis follow-up section. This is a qd-cxx design decision for a separate task, not an upstream unknown or C++ design established here. |
+| SC-09 | Proposal available; owner decision open: source/overlays and metadata as importer provenance, resolved local schema and directional protocol state as separate first-class artifacts. | [QDCXX-007 requirements](../../spec/schema/NORMALIZED-MODEL.md), [ADR-0001](../decisions/ADR-0001-normalized-model-boundaries.md), status proposed. This is a qd-cxx design choice, not a resolved upstream semantic question. |
 
 QDCXX-005 supplies initial S01/S04/S05/S07/S08/S15 subcases; unlisted portions remain open. Follow-up scope includes the remaining S01-S12/S15 matrix, parser/alias/rebuild probes S18-S20, normalized-model requirements and compatibility decisions (QDCXX-007), and a separate dxFeed provider/property parity profile S13-S17. QDCXX-006 subsequently adds the bounded QTP captures below.
 
@@ -56,3 +58,13 @@ Initial answers are in [QTP boundaries](../../spec/protocol/README.md), [DataSch
 | QT-09 | Resolved for QDCXX-006: source-built harness, exact byte/callback captures and separate semantic expectations; only CRLF normalized; P05 uses real connection path with documented instrumentation. | [Coverage](../../tests/fixtures/protocol/COVERAGE.md), [validation/provenance](../../tests/fixtures/protocol/VALIDATION.md). Broader profiles and C++ conformance remain pending. |
 
 Suggested follow-up after QDCXX-006: P06 conversions/P09 negotiation and targeted error/reset/partition probes; then normative primitive/wire rules and a reviewed compatibility profile. QDCXX-006 does not start QDCXX-007. No transport runtime or C++ implementation is authorized by this research result.
+
+## QDCXX-007 decision gates and missing evidence
+
+QDCXX-007 is complete as documentation; [ADR-0001](../decisions/ADR-0001-normalized-model-boundaries.md) remains **proposed**. Earlier task-specific no-execution statements above retain their historical scope. No SC/QT runtime unknown is closed by a model proposal.
+
+- **NM-01 — Owner decision, gates importer contract:** approve three-layer ownership, source metadata retention and versioned JSON direction (SC-09). Alternatives and consequences are in the ADR.
+- **NM-02 — Owner decision, gates copy policy:** proposed pinned-profile preservation of measured main-alias loss (SC-02). Before choosing corrected copying, request a focused copy/known-mapping/property/wire probe. Copy doc/regionals/disabled, alias removal and collisions remain unmeasured. This does not block representing effective names independently of declarations.
+- **NM-03 — Owner decision, gates error contract:** approve structured unsupported-local-type diagnostics in place of BYTE/SHORT NullPointerException (SC-04), retaining successful model resolution and failed local construction. Other unsupported types/index shapes and factory wrappers need distinct probes; no universal exception parity.
+- **NM-04 — Evidence gate for broader protocol support:** LONG/time-index wire omission, requested y,x order/types and P06 conversions before extending static adaptation; before/after-first-writer requests and reset before dynamic layouts (QT-02/04). Existing P05 captures cover four fresh first-use connections only.
+- **NM-05 — Safely deferred outside initial profile:** SC-01/03/05/06/07 and QT-01/03/05/06/07/08 retain their unresolved portions. Primitive boundary probes gate an encoding contract; full dxFeed, mapping getters, generators, rebuilds, PART/auth/timing require separate tasks. [Scoped backlog](../NEXT-STEPS.md) records dependencies; exclusion is not a compatibility claim.

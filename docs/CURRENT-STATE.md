@@ -1,5 +1,7 @@
 # Current state
 
+[Русская версия](CURRENT-STATE.ru.md). This English document is authoritative.
+
 ## Phase
 
 **Specification baseline / repository bootstrap.**
@@ -14,13 +16,13 @@ The repository currently defines working and contribution rules, documentation a
 - Completed: `QDCXX-004`, source-linked QTP framing/protocol inventory and local DataScheme/wire-schema mapping; executable oracle validation remains follow-up work.
 - Completed: `QDCXX-005`, Java schema oracle tooling and 17 captured subcases, with independent reproducibility and positive/negative verify checks.
 - Completed: `QDCXX-006`, nine in-memory QTP P01/P03/P04/P05 captures, real connection requested-layout path and reproducibility/verify evidence.
-- Proposed: `QDCXX-007`, normalized-model requirements and proposed compatibility ADR, dependent on QDCXX-005/006 evidence.
+- Completed: `QDCXX-007`, documentation-only normalized-model requirements, proposed ADR and scoped follow-up backlog. ADR-0001 remains **proposed**, pending owner decisions.
 
 ## Next milestone: executable oracle baseline
 
 The schema portion now has an [executable oracle baseline](../tools/upstream/schema-oracle/README.md), scoped by [exact coverage](../tests/fixtures/schema/COVERAGE.md). Task-scoped Java tooling is permitted; production C++ and dependency selection remain deferred.
 
-QDCXX-006 now supplies protocol bytes/observations. QDCXX-007 model proposals remain a separate, unstarted task. Source findings alone do not establish executable compatibility. Remaining edge cases, negotiation, conversion matrices, reset/PART and dxFeed provider profiles stay open for later focused work.
+QDCXX-006 supplies protocol bytes/observations. QDCXX-007 now supplies reviewable model proposals, not accepted compatibility rules. Source findings alone do not establish executable compatibility. Remaining edge cases, negotiation, conversion matrices, reset/PART and dxFeed provider profiles stay open for later focused work.
 
 ## Near-term exit criteria
 
@@ -97,3 +99,12 @@ Recorded for `QDCXX-006` on 2026-09-20, High reasoning:
 - [Exact captures and separate semantic expectations](../tests/fixtures/protocol/expected/) preserve bytes, callbacks, raw values, local slots and chunk schedules. Fragmentation preserves ordered records while callback batching differs. Zero original fields selects all fields; nonempty absent-z selects zero outgoing fields but still delivers a record.
 - [Validation](../tests/fixtures/protocol/VALIDATION.md) records independent clean-build reproduction and negative/positive verify with unchanged expectations. Metadata identifies tool/input source hashes, upstream, commands, JDK and providers.
 - [Measured specification](../spec/protocol/CAPTURES.md) bounds the observations. P06 conversion, P09 negotiation, malformed/reset/PART, auth, sockets and timing remain pending; P05 metadata instrumentation is explicit. No QDCXX-007 or C++ work was performed.
+
+## Normalized-model proposal
+
+Recorded for `QDCXX-007` on 2026-09-21, High reasoning:
+
+- [Requirements](../spec/schema/NORMALIZED-MODEL.md) separate source/overlay provenance, resolved local schema and directional wire descriptions/state. Worked examples use actual subcases; source-derived VOID wire omission is labeled separately.
+- [ADR-0001](decisions/ADR-0001-normalized-model-boundaries.md) is **proposed**: retain measured copy-name results within a pinned profile, retain a Java slot projection without fixing C++ storage, and replace accidental BYTE/SHORT null dereferences with explicit diagnostics only if approved. Versioned JSON is a recommendation, not an adopted format/dependency.
+- [Backlog](NEXT-STEPS.md) identifies decision gates and missing probes for importer/encoding work. Dynamic requested layouts, provider/property parity and remaining SC/QT questions stay open.
+- [Documentation validation](QDCXX-007-VALIDATION.md) records evidence/link/status checks and bilingual review. No Java rerun, new runtime capture, C++ implementation, importer or dependency was added; existing fixtures remain unchanged. Completion of the documentation task does not accept the ADR.
