@@ -12,7 +12,7 @@ The repository currently defines working and contribution rules, documentation a
 
 Accepted by the project owner on 2026-09-21. The three boundaries are logical ownership boundaries; they do not require three file formats or three serialization subsystems. Core can consume a resolved local schema without loading XML or its history. Preserve copied-main-alias behavior only for XML import under the pinned QD 3.355 profile; it is not a requirement for future native C++ schema construction. Retain Java slot projection without prescribing C++ storage. Approve structured unsupported-local-type diagnostics for BYTE/SHORT while retaining local-construction rejection; this does not ban their wire codes. Keep original requests and selected layouts separate. JSON is accepted for schema-description interchange; libraries, canonical hashes and whole-session serialization remain undecided. Existing oracle evidence is unchanged.
 
-Next: QDCXX-008 — ready, JSON contract and examples; QDCXX-009 — ready, primitive encoding vectors. Earlier records below describe the state at each task's completion.
+Completed: QDCXX-008 — JSON contract and examples; next: QDCXX-009 — ready, primitive encoding vectors. Earlier records below describe the state at each task's completion.
 
 ## Task history
 
@@ -114,3 +114,7 @@ Recorded for `QDCXX-007` on 2026-09-21, High reasoning:
 - [ADR-0001](decisions/ADR-0001-normalized-model-boundaries.md) is **proposed**: retain measured copy-name results within a pinned profile, retain a Java slot projection without fixing C++ storage, and replace accidental BYTE/SHORT null dereferences with explicit diagnostics only if approved. Versioned JSON is a recommendation, not an adopted format/dependency.
 - [Backlog](NEXT-STEPS.md) identifies decision gates and missing probes for importer/encoding work. Dynamic requested layouts, provider/property parity and remaining SC/QT questions stay open.
 - [Documentation validation](QDCXX-007-VALIDATION.md) records evidence/link/status checks and bilingual review. No Java rerun, new runtime capture, C++ implementation, importer or dependency was added; existing fixtures remain unchanged. Completion of the documentation task does not accept the ADR.
+
+## JSON contract baseline
+
+Completed QDCXX-008 on 2026-09-21 with High reasoning. The [version 1 contract](../spec/schema/JSON-CONTRACT.md) defines resolved local schemas, scoped lookups, logical fields, Java slot ownership, ordered provenance references and structured construction diagnostics under accepted ADR-0001. [Coverage](../spec/schema/examples/COVERAGE.md) maps all 17 subcases to designed JSON projections; [validation](../spec/schema/examples/VALIDATION.md) records syntax, invariants, TSV comparisons and negative checks. EN/RU documents are synchronized. Original schema/protocol goldens are unchanged. No importer, production C++, dependency, Java rerun or QDCXX-009 work was added. Native construction, broader profiles and session serialization remain open.

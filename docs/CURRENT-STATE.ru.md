@@ -12,7 +12,7 @@
 
 Репозиторий определяет правила работы и участия, области документации и спецификаций, закрепление upstream и первые исследовательские задачи. Production C++ implementation, build configuration, dependency selection и опубликованного API нет.
 
-Следующие задачи: QDCXX-008 — ready, контракт JSON и примеры; QDCXX-009 — ready, primitive encoding vectors. Старые записи ниже описывают состояние при завершении соответствующих задач.
+Завершена: QDCXX-008 — контракт JSON и примеры; следующая задача: QDCXX-009 — ready, primitive encoding vectors. Старые записи ниже описывают состояние при завершении соответствующих задач.
 
 ## История задач
 
@@ -114,3 +114,7 @@ QDCXX-006 предоставляет protocol bytes/observations. QDCXX-007 пр
 - [ADR-0001](decisions/ADR-0001-normalized-model-boundaries.ru.md) имеет статус **proposed**: сохранить измеренные copy-name results в pinned profile, Java slot projection без фиксации C++ storage и заменить случайные BYTE/SHORT null dereferences явной диагностикой только после утверждения. Versioned JSON — рекомендация, а не принятый format/dependency.
 - [Backlog](NEXT-STEPS.ru.md) задаёт decision gates и недостающие probes для importer/encoding work. Dynamic requested layouts, provider/property parity и оставшиеся SC/QT questions открыты.
 - [Documentation validation](QDCXX-007-VALIDATION.ru.md) фиксирует evidence/link/status checks и bilingual review. Не добавлены Java rerun, runtime capture, C++ implementation, importer или dependency; существующие fixtures неизменны. Завершение документационной задачи не принимает ADR.
+
+## Baseline контракта JSON
+
+QDCXX-008 завершена 2026-09-21 с reasoning High. [Контракт версии 1](../spec/schema/JSON-CONTRACT.ru.md) определяет разрешённые локальные схемы, scoped lookups, логические поля, принадлежность Java slots, упорядоченные ссылки provenance и структурированную диагностику построения в рамках принятого ADR-0001. [Покрытие](../spec/schema/examples/COVERAGE.ru.md) сопоставляет все 17 подслучаев спроектированным JSON-проекциям; [валидация](../spec/schema/examples/VALIDATION.ru.md) фиксирует синтаксис, инварианты, сравнения с TSV и отрицательные проверки. Документы EN/RU синхронизированы. Исходные schema/protocol goldens неизменны. Importer, production C++, зависимости, повторный запуск Java и работа над QDCXX-009 не добавлялись. Программное построение, расширенные профили и сериализация сессии остаются открытыми.

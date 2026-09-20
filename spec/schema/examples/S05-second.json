@@ -1,0 +1,182 @@
+{
+  "formatVersion": 1,
+  "profile": {
+    "id": "qd-3.355-xml-captured",
+    "version": 1
+  },
+  "kind": "local-schema",
+  "provenance": {
+    "inputs": [
+      {
+        "ref": "../../../tests/fixtures/schema/inputs/index-second.xml",
+        "sha256": "04e4a55df2c9c59f1559ae6d7004fce9675ba4aa8be2e51917973ed55b33c469"
+      }
+    ],
+    "profileEvidence": [
+      "../../../tests/fixtures/schema/captures/final-a/metadata.json",
+      "../../../tests/fixtures/schema/captures/final-a/environment.tsv"
+    ],
+    "expectationRef": "../../../tests/fixtures/schema/expected/S05-second.tsv"
+  },
+  "records": [
+    {
+      "id": 0,
+      "name": "Indexed",
+      "hasTime": true,
+      "fields": [
+        {
+          "id": 0,
+          "semanticName": "Ordinary",
+          "effectiveName": "Ordinary",
+          "fullName": "Indexed.Ordinary",
+          "localName": "Ordinary",
+          "propertyName": "Ordinary",
+          "serialTypeId": 8
+        },
+        {
+          "id": 1,
+          "semanticName": "Second",
+          "effectiveName": "Second",
+          "fullName": "Indexed.Second",
+          "localName": "Second",
+          "propertyName": "Second",
+          "serialTypeId": 8
+        },
+        {
+          "id": 2,
+          "semanticName": "First",
+          "effectiveName": "First",
+          "fullName": "Indexed.First",
+          "localName": "First",
+          "propertyName": "First",
+          "serialTypeId": 8
+        }
+      ],
+      "indexes": [
+        {
+          "position": 0,
+          "fieldId": null
+        },
+        {
+          "position": 1,
+          "fieldId": 1
+        }
+      ],
+      "javaSlots": {
+        "int": [
+          {
+            "ordinal": 0,
+            "role": "index-placeholder",
+            "fieldId": null,
+            "fullName": "Indexed.$VoidTimeField",
+            "localName": "$VoidTimeField",
+            "propertyName": "$VoidTimeField",
+            "serialTypeId": 0
+          },
+          {
+            "ordinal": 1,
+            "role": "head",
+            "fieldId": 1,
+            "fullName": "Indexed.Second",
+            "localName": "Second",
+            "propertyName": "Second",
+            "serialTypeId": 8
+          },
+          {
+            "ordinal": 2,
+            "role": "head",
+            "fieldId": 0,
+            "fullName": "Indexed.Ordinary",
+            "localName": "Ordinary",
+            "propertyName": "Ordinary",
+            "serialTypeId": 8
+          },
+          {
+            "ordinal": 3,
+            "role": "head",
+            "fieldId": 2,
+            "fullName": "Indexed.First",
+            "localName": "First",
+            "propertyName": "First",
+            "serialTypeId": 8
+          }
+        ],
+        "obj": []
+      },
+      "lookups": [
+        {
+          "scope": "record",
+          "name": "Indexed.$VoidTimeField",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "scheme-int",
+          "name": "Indexed.$VoidTimeField",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "$VoidTimeField",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "Indexed.Second",
+          "category": "int",
+          "ordinal": 1
+        },
+        {
+          "scope": "scheme-int",
+          "name": "Indexed.Second",
+          "category": "int",
+          "ordinal": 1
+        },
+        {
+          "scope": "record",
+          "name": "Second",
+          "category": "int",
+          "ordinal": 1
+        },
+        {
+          "scope": "record",
+          "name": "Indexed.Ordinary",
+          "category": "int",
+          "ordinal": 2
+        },
+        {
+          "scope": "scheme-int",
+          "name": "Indexed.Ordinary",
+          "category": "int",
+          "ordinal": 2
+        },
+        {
+          "scope": "record",
+          "name": "Ordinary",
+          "category": "int",
+          "ordinal": 2
+        },
+        {
+          "scope": "record",
+          "name": "Indexed.First",
+          "category": "int",
+          "ordinal": 3
+        },
+        {
+          "scope": "scheme-int",
+          "name": "Indexed.First",
+          "category": "int",
+          "ordinal": 3
+        },
+        {
+          "scope": "record",
+          "name": "First",
+          "category": "int",
+          "ordinal": 3
+        }
+      ]
+    }
+  ]
+}

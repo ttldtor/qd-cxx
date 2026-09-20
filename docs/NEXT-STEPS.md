@@ -4,7 +4,7 @@
 
 Accepted by the project owner on 2026-09-21. The three boundaries are logical ownership boundaries; they do not require three file formats or three serialization subsystems. Core can consume a resolved local schema without loading XML or its history. Preserve copied-main-alias behavior only for XML import under the pinned QD 3.355 profile; it is not a requirement for future native C++ schema construction. Retain Java slot projection without prescribing C++ storage. Approve structured unsupported-local-type diagnostics for BYTE/SHORT while retaining local-construction rejection; this does not ban their wire codes. Keep original requests and selected layouts separate. JSON is accepted for schema-description interchange; libraries, canonical hashes and whole-session serialization remain undecided. Existing oracle evidence is unchanged.
 
-B01 is complete. The contract portion of B03 is assigned to QDCXX-008; B04 to QDCXX-009. Other rows remain backlog. Importer/C++ implementation requires a separate task.
+B01 is complete. The contract portion of B03 is complete in QDCXX-008, with [validation](../spec/schema/examples/VALIDATION.md); B04 to QDCXX-009. Other rows remain backlog. Importer/C++ implementation requires a separate task.
 
 | Work item | Dependency / missing evidence | Reviewable exit |
 | --- | --- | --- |

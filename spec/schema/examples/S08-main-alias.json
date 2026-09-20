@@ -1,0 +1,161 @@
+{
+  "formatVersion": 1,
+  "profile": {
+    "id": "qd-3.355-xml-captured",
+    "version": 1
+  },
+  "kind": "local-schema",
+  "provenance": {
+    "inputs": [
+      {
+        "ref": "../../../tests/fixtures/schema/inputs/copy-main-alias.xml",
+        "sha256": "105861077d2f50619aa17838ec9afa807e635d049e0e9805a1764dfa240be5f0"
+      }
+    ],
+    "profileEvidence": [
+      "../../../tests/fixtures/schema/captures/final-a/metadata.json",
+      "../../../tests/fixtures/schema/captures/final-a/environment.tsv"
+    ],
+    "expectationRef": "../../../tests/fixtures/schema/expected/S08-main-alias.tsv"
+  },
+  "records": [
+    {
+      "id": 0,
+      "name": "Base",
+      "hasTime": false,
+      "fields": [
+        {
+          "id": 0,
+          "semanticName": "Value",
+          "effectiveName": "Chosen.Name",
+          "fullName": "Base.Chosen.Name",
+          "localName": "Chosen.Name",
+          "propertyName": "Value",
+          "serialTypeId": 8
+        }
+      ],
+      "indexes": [],
+      "javaSlots": {
+        "int": [
+          {
+            "ordinal": 0,
+            "role": "head",
+            "fieldId": 0,
+            "fullName": "Base.Chosen.Name",
+            "localName": "Chosen.Name",
+            "propertyName": "Value",
+            "serialTypeId": 8
+          }
+        ],
+        "obj": []
+      },
+      "lookups": [
+        {
+          "scope": "record",
+          "name": "Base.Chosen.Name",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "scheme-int",
+          "name": "Base.Chosen.Name",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "Chosen.Name",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "Value",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "ChosenName",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "First.Name",
+          "category": "int",
+          "ordinal": 0
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "name": "Copy",
+      "hasTime": false,
+      "fields": [
+        {
+          "id": 0,
+          "semanticName": "Value",
+          "effectiveName": "First.Name",
+          "fullName": "Copy.First.Name",
+          "localName": "First.Name",
+          "propertyName": "Value",
+          "serialTypeId": 8
+        }
+      ],
+      "indexes": [],
+      "javaSlots": {
+        "int": [
+          {
+            "ordinal": 0,
+            "role": "head",
+            "fieldId": 0,
+            "fullName": "Copy.First.Name",
+            "localName": "First.Name",
+            "propertyName": "Value",
+            "serialTypeId": 8
+          }
+        ],
+        "obj": []
+      },
+      "lookups": [
+        {
+          "scope": "record",
+          "name": "Copy.First.Name",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "scheme-int",
+          "name": "Copy.First.Name",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "First.Name",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "Value",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "FirstName",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "Chosen.Name",
+          "category": "int",
+          "ordinal": 0
+        }
+      ]
+    }
+  ]
+}

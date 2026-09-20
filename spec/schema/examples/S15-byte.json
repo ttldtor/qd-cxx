@@ -1,0 +1,35 @@
+{
+  "formatVersion": 1,
+  "profile": {
+    "id": "qd-3.355-xml-captured",
+    "version": 1
+  },
+  "kind": "resolution-failure",
+  "provenance": {
+    "inputs": [
+      {
+        "ref": "../../../tests/fixtures/schema/inputs/byte.xml",
+        "sha256": "4bd580f241dc751a155cabdfc794304cd34b1a1d8a5869529b24558e09a0485b"
+      }
+    ],
+    "profileEvidence": [
+      "../../../tests/fixtures/schema/captures/final-a/metadata.json",
+      "../../../tests/fixtures/schema/captures/final-a/environment.tsv"
+    ],
+    "expectationRef": "../../../tests/fixtures/schema/expected/S15-byte.tsv"
+  },
+  "diagnostics": [
+    {
+      "code": "unsupported-local-type",
+      "stage": "local-construction",
+      "recognition": "succeeded",
+      "sourceRefs": [
+        "../../../tests/fixtures/schema/inputs/byte.xml"
+      ],
+      "subject": "Unsupported.Value",
+      "serialTypeId": 1,
+      "evidenceRef": "../../../tests/fixtures/schema/expected/S15-byte.tsv",
+      "oracleStage": "runtime.load"
+    }
+  ]
+}

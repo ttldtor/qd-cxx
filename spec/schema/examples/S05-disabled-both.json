@@ -1,0 +1,35 @@
+{
+  "formatVersion": 1,
+  "profile": {
+    "id": "qd-3.355-xml-captured",
+    "version": 1
+  },
+  "kind": "resolution-failure",
+  "provenance": {
+    "inputs": [
+      {
+        "ref": "../../../tests/fixtures/schema/inputs/index-disabled-both.xml",
+        "sha256": "1994652b6f9570c221603c91ad08f926c6614622982cf3417bd73883c4f56f6e"
+      }
+    ],
+    "profileEvidence": [
+      "../../../tests/fixtures/schema/captures/final-a/metadata.json",
+      "../../../tests/fixtures/schema/captures/final-a/environment.tsv"
+    ],
+    "expectationRef": "../../../tests/fixtures/schema/expected/S05-disabled-both.tsv"
+  },
+  "diagnostics": [
+    {
+      "code": "all-index-fields-disabled",
+      "stage": "local-construction",
+      "recognition": "succeeded",
+      "sourceRefs": [
+        "../../../tests/fixtures/schema/inputs/index-disabled-both.xml"
+      ],
+      "subject": "Indexed.indexes",
+      "serialTypeId": null,
+      "evidenceRef": "../../../tests/fixtures/schema/expected/S05-disabled-both.tsv",
+      "oracleStage": "runtime.load"
+    }
+  ]
+}

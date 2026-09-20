@@ -1,0 +1,234 @@
+{
+  "formatVersion": 1,
+  "profile": {
+    "id": "qd-3.355-xml-captured",
+    "version": 1
+  },
+  "kind": "local-schema",
+  "provenance": {
+    "inputs": [
+      {
+        "ref": "../../../tests/fixtures/schema/inputs/ordering.xml",
+        "sha256": "6470e666a5dfdd675d6febaada10e747d157f33a756e259f028c91fc63709d05"
+      }
+    ],
+    "profileEvidence": [
+      "../../../tests/fixtures/schema/captures/final-a/metadata.json",
+      "../../../tests/fixtures/schema/captures/final-a/environment.tsv"
+    ],
+    "expectationRef": "../../../tests/fixtures/schema/expected/S04-order-disabled.tsv"
+  },
+  "records": [
+    {
+      "id": 0,
+      "name": "Alpha",
+      "hasTime": false,
+      "fields": [
+        {
+          "id": 0,
+          "semanticName": "Text",
+          "effectiveName": "Text",
+          "fullName": "Alpha.Text",
+          "localName": "Text",
+          "propertyName": "Text",
+          "serialTypeId": 10
+        },
+        {
+          "id": 1,
+          "semanticName": "Count",
+          "effectiveName": "Count",
+          "fullName": "Alpha.Count",
+          "localName": "Count",
+          "propertyName": "Count",
+          "serialTypeId": 8
+        },
+        {
+          "id": 2,
+          "semanticName": "Blob",
+          "effectiveName": "Blob",
+          "fullName": "Alpha.Blob",
+          "localName": "Blob",
+          "propertyName": "Blob",
+          "serialTypeId": 9
+        },
+        {
+          "id": 3,
+          "semanticName": "Flags",
+          "effectiveName": "Flags",
+          "fullName": "Alpha.Flags",
+          "localName": "Flags",
+          "propertyName": "Flags",
+          "serialTypeId": 8
+        }
+      ],
+      "indexes": [],
+      "javaSlots": {
+        "int": [
+          {
+            "ordinal": 0,
+            "role": "head",
+            "fieldId": 1,
+            "fullName": "Alpha.Count",
+            "localName": "Count",
+            "propertyName": "Count",
+            "serialTypeId": 8
+          },
+          {
+            "ordinal": 1,
+            "role": "head",
+            "fieldId": 3,
+            "fullName": "Alpha.Flags",
+            "localName": "Flags",
+            "propertyName": "Flags",
+            "serialTypeId": 8
+          }
+        ],
+        "obj": [
+          {
+            "ordinal": 0,
+            "role": "head",
+            "fieldId": 0,
+            "fullName": "Alpha.Text",
+            "localName": "Text",
+            "propertyName": "Text",
+            "serialTypeId": 10
+          },
+          {
+            "ordinal": 1,
+            "role": "head",
+            "fieldId": 2,
+            "fullName": "Alpha.Blob",
+            "localName": "Blob",
+            "propertyName": "Blob",
+            "serialTypeId": 9
+          }
+        ]
+      },
+      "lookups": [
+        {
+          "scope": "record",
+          "name": "Alpha.Count",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "scheme-int",
+          "name": "Alpha.Count",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "Count",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "Alpha.Flags",
+          "category": "int",
+          "ordinal": 1
+        },
+        {
+          "scope": "scheme-int",
+          "name": "Alpha.Flags",
+          "category": "int",
+          "ordinal": 1
+        },
+        {
+          "scope": "record",
+          "name": "Flags",
+          "category": "int",
+          "ordinal": 1
+        },
+        {
+          "scope": "record",
+          "name": "Alpha.Text",
+          "category": "obj",
+          "ordinal": 0
+        },
+        {
+          "scope": "scheme-obj",
+          "name": "Alpha.Text",
+          "category": "obj",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "Text",
+          "category": "obj",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "Alpha.Blob",
+          "category": "obj",
+          "ordinal": 1
+        },
+        {
+          "scope": "scheme-obj",
+          "name": "Alpha.Blob",
+          "category": "obj",
+          "ordinal": 1
+        },
+        {
+          "scope": "record",
+          "name": "Blob",
+          "category": "obj",
+          "ordinal": 1
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "name": "Beta",
+      "hasTime": false,
+      "fields": [
+        {
+          "id": 0,
+          "semanticName": "Value",
+          "effectiveName": "Value",
+          "fullName": "Beta.Value",
+          "localName": "Value",
+          "propertyName": "Value",
+          "serialTypeId": 8
+        }
+      ],
+      "indexes": [],
+      "javaSlots": {
+        "int": [
+          {
+            "ordinal": 0,
+            "role": "head",
+            "fieldId": 0,
+            "fullName": "Beta.Value",
+            "localName": "Value",
+            "propertyName": "Value",
+            "serialTypeId": 8
+          }
+        ],
+        "obj": []
+      },
+      "lookups": [
+        {
+          "scope": "record",
+          "name": "Beta.Value",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "scheme-int",
+          "name": "Beta.Value",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "Value",
+          "category": "int",
+          "ordinal": 0
+        }
+      ]
+    }
+  ]
+}

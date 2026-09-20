@@ -1,0 +1,309 @@
+{
+  "formatVersion": 1,
+  "profile": {
+    "id": "qd-3.355-xml-captured",
+    "version": 1
+  },
+  "kind": "local-schema",
+  "provenance": {
+    "inputs": [
+      {
+        "ref": "../../../tests/fixtures/schema/inputs/slots.xml",
+        "sha256": "cc2bac49c389776415fc5d9370bf9021a4e3463e69b31505b00771fd45f264ae"
+      }
+    ],
+    "profileEvidence": [
+      "../../../tests/fixtures/schema/captures/final-a/metadata.json",
+      "../../../tests/fixtures/schema/captures/final-a/environment.tsv"
+    ],
+    "expectationRef": "../../../tests/fixtures/schema/expected/S15-slots.tsv"
+  },
+  "records": [
+    {
+      "id": 0,
+      "name": "Slots",
+      "hasTime": false,
+      "fields": [
+        {
+          "id": 0,
+          "semanticName": "Text",
+          "effectiveName": "Text",
+          "fullName": "Slots.Text",
+          "localName": "Text",
+          "propertyName": "Text",
+          "serialTypeId": 10
+        },
+        {
+          "id": 1,
+          "semanticName": "Count",
+          "effectiveName": "Count",
+          "fullName": "Slots.Count",
+          "localName": "Count",
+          "propertyName": "Count",
+          "serialTypeId": 8
+        },
+        {
+          "id": 2,
+          "semanticName": "Long",
+          "effectiveName": "Long",
+          "fullName": "Slots.Long",
+          "localName": "Long",
+          "propertyName": "Long",
+          "serialTypeId": 104
+        },
+        {
+          "id": 3,
+          "semanticName": "Blob",
+          "effectiveName": "Blob",
+          "fullName": "Slots.Blob",
+          "localName": "Blob",
+          "propertyName": "Blob",
+          "serialTypeId": 9
+        },
+        {
+          "id": 4,
+          "semanticName": "Wide",
+          "effectiveName": "Wide",
+          "fullName": "Slots.Wide",
+          "localName": "Wide",
+          "propertyName": "Wide",
+          "serialTypeId": 120
+        },
+        {
+          "id": 5,
+          "semanticName": "Last",
+          "effectiveName": "Last",
+          "fullName": "Slots.Last",
+          "localName": "Last",
+          "propertyName": "Last",
+          "serialTypeId": 8
+        }
+      ],
+      "indexes": [],
+      "javaSlots": {
+        "int": [
+          {
+            "ordinal": 0,
+            "role": "head",
+            "fieldId": 1,
+            "fullName": "Slots.Count",
+            "localName": "Count",
+            "propertyName": "Count",
+            "serialTypeId": 8
+          },
+          {
+            "ordinal": 1,
+            "role": "head",
+            "fieldId": 2,
+            "fullName": "Slots.Long",
+            "localName": "Long",
+            "propertyName": "Long",
+            "serialTypeId": 104
+          },
+          {
+            "ordinal": 2,
+            "role": "tail",
+            "fieldId": 2,
+            "fullName": "Slots.Long$VoidTail",
+            "localName": "Long$VoidTail",
+            "propertyName": "Long$VoidTail",
+            "serialTypeId": 0
+          },
+          {
+            "ordinal": 3,
+            "role": "head",
+            "fieldId": 4,
+            "fullName": "Slots.Wide",
+            "localName": "Wide",
+            "propertyName": "Wide",
+            "serialTypeId": 120
+          },
+          {
+            "ordinal": 4,
+            "role": "tail",
+            "fieldId": 4,
+            "fullName": "Slots.Wide$VoidTail",
+            "localName": "Wide$VoidTail",
+            "propertyName": "Wide$VoidTail",
+            "serialTypeId": 0
+          },
+          {
+            "ordinal": 5,
+            "role": "head",
+            "fieldId": 5,
+            "fullName": "Slots.Last",
+            "localName": "Last",
+            "propertyName": "Last",
+            "serialTypeId": 8
+          }
+        ],
+        "obj": [
+          {
+            "ordinal": 0,
+            "role": "head",
+            "fieldId": 0,
+            "fullName": "Slots.Text",
+            "localName": "Text",
+            "propertyName": "Text",
+            "serialTypeId": 10
+          },
+          {
+            "ordinal": 1,
+            "role": "head",
+            "fieldId": 3,
+            "fullName": "Slots.Blob",
+            "localName": "Blob",
+            "propertyName": "Blob",
+            "serialTypeId": 9
+          }
+        ]
+      },
+      "lookups": [
+        {
+          "scope": "record",
+          "name": "Slots.Count",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "scheme-int",
+          "name": "Slots.Count",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "Count",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "Slots.Long",
+          "category": "int",
+          "ordinal": 1
+        },
+        {
+          "scope": "scheme-int",
+          "name": "Slots.Long",
+          "category": "int",
+          "ordinal": 1
+        },
+        {
+          "scope": "record",
+          "name": "Long",
+          "category": "int",
+          "ordinal": 1
+        },
+        {
+          "scope": "record",
+          "name": "Slots.Long$VoidTail",
+          "category": "int",
+          "ordinal": 2
+        },
+        {
+          "scope": "scheme-int",
+          "name": "Slots.Long$VoidTail",
+          "category": "int",
+          "ordinal": 2
+        },
+        {
+          "scope": "record",
+          "name": "Long$VoidTail",
+          "category": "int",
+          "ordinal": 2
+        },
+        {
+          "scope": "record",
+          "name": "Slots.Wide",
+          "category": "int",
+          "ordinal": 3
+        },
+        {
+          "scope": "scheme-int",
+          "name": "Slots.Wide",
+          "category": "int",
+          "ordinal": 3
+        },
+        {
+          "scope": "record",
+          "name": "Wide",
+          "category": "int",
+          "ordinal": 3
+        },
+        {
+          "scope": "record",
+          "name": "Slots.Wide$VoidTail",
+          "category": "int",
+          "ordinal": 4
+        },
+        {
+          "scope": "scheme-int",
+          "name": "Slots.Wide$VoidTail",
+          "category": "int",
+          "ordinal": 4
+        },
+        {
+          "scope": "record",
+          "name": "Wide$VoidTail",
+          "category": "int",
+          "ordinal": 4
+        },
+        {
+          "scope": "record",
+          "name": "Slots.Last",
+          "category": "int",
+          "ordinal": 5
+        },
+        {
+          "scope": "scheme-int",
+          "name": "Slots.Last",
+          "category": "int",
+          "ordinal": 5
+        },
+        {
+          "scope": "record",
+          "name": "Last",
+          "category": "int",
+          "ordinal": 5
+        },
+        {
+          "scope": "record",
+          "name": "Slots.Text",
+          "category": "obj",
+          "ordinal": 0
+        },
+        {
+          "scope": "scheme-obj",
+          "name": "Slots.Text",
+          "category": "obj",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "Text",
+          "category": "obj",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "Slots.Blob",
+          "category": "obj",
+          "ordinal": 1
+        },
+        {
+          "scope": "scheme-obj",
+          "name": "Slots.Blob",
+          "category": "obj",
+          "ordinal": 1
+        },
+        {
+          "scope": "record",
+          "name": "Blob",
+          "category": "obj",
+          "ordinal": 1
+        }
+      ]
+    }
+  ]
+}

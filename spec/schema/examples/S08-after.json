@@ -1,0 +1,207 @@
+{
+  "formatVersion": 1,
+  "profile": {
+    "id": "qd-3.355-xml-captured",
+    "version": 1
+  },
+  "kind": "local-schema",
+  "provenance": {
+    "inputs": [
+      {
+        "ref": "../../../tests/fixtures/schema/inputs/copy-base.xml",
+        "sha256": "be88537d0557f136cb929d1765c4d2c992f2d4ba62f241a9e024a5909172a547"
+      },
+      {
+        "ref": "../../../tests/fixtures/schema/inputs/copy-overlay.xml",
+        "sha256": "e601298d2c2a9e8eb97b7cb046e104dbdd8b91f1d97b4ee70df268cdcd8329f9"
+      },
+      {
+        "ref": "../../../tests/fixtures/schema/inputs/copy-child.xml",
+        "sha256": "9ba6e3a1ef2989de4ecf1e2baa362e98624fccf500a3f0a5f43b6626c32999cb"
+      }
+    ],
+    "profileEvidence": [
+      "../../../tests/fixtures/schema/captures/final-a/metadata.json",
+      "../../../tests/fixtures/schema/captures/final-a/environment.tsv"
+    ],
+    "expectationRef": "../../../tests/fixtures/schema/expected/S08-after.tsv"
+  },
+  "records": [
+    {
+      "id": 0,
+      "name": "Base",
+      "hasTime": false,
+      "fields": [
+        {
+          "id": 0,
+          "semanticName": "Original",
+          "effectiveName": "Original",
+          "fullName": "Base.Original",
+          "localName": "Original",
+          "propertyName": "Original",
+          "serialTypeId": 8
+        },
+        {
+          "id": 1,
+          "semanticName": "Added",
+          "effectiveName": "Added",
+          "fullName": "Base.Added",
+          "localName": "Added",
+          "propertyName": "Added",
+          "serialTypeId": 10
+        }
+      ],
+      "indexes": [],
+      "javaSlots": {
+        "int": [
+          {
+            "ordinal": 0,
+            "role": "head",
+            "fieldId": 0,
+            "fullName": "Base.Original",
+            "localName": "Original",
+            "propertyName": "Original",
+            "serialTypeId": 8
+          }
+        ],
+        "obj": [
+          {
+            "ordinal": 0,
+            "role": "head",
+            "fieldId": 1,
+            "fullName": "Base.Added",
+            "localName": "Added",
+            "propertyName": "Added",
+            "serialTypeId": 10
+          }
+        ]
+      },
+      "lookups": [
+        {
+          "scope": "record",
+          "name": "Base.Original",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "scheme-int",
+          "name": "Base.Original",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "Original",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "Base.Added",
+          "category": "obj",
+          "ordinal": 0
+        },
+        {
+          "scope": "scheme-obj",
+          "name": "Base.Added",
+          "category": "obj",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "Added",
+          "category": "obj",
+          "ordinal": 0
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "name": "Copy",
+      "hasTime": false,
+      "fields": [
+        {
+          "id": 0,
+          "semanticName": "Original",
+          "effectiveName": "Original",
+          "fullName": "Copy.Original",
+          "localName": "Original",
+          "propertyName": "Original",
+          "serialTypeId": 8
+        },
+        {
+          "id": 1,
+          "semanticName": "Added",
+          "effectiveName": "Added",
+          "fullName": "Copy.Added",
+          "localName": "Added",
+          "propertyName": "Added",
+          "serialTypeId": 10
+        }
+      ],
+      "indexes": [],
+      "javaSlots": {
+        "int": [
+          {
+            "ordinal": 0,
+            "role": "head",
+            "fieldId": 0,
+            "fullName": "Copy.Original",
+            "localName": "Original",
+            "propertyName": "Original",
+            "serialTypeId": 8
+          }
+        ],
+        "obj": [
+          {
+            "ordinal": 0,
+            "role": "head",
+            "fieldId": 1,
+            "fullName": "Copy.Added",
+            "localName": "Added",
+            "propertyName": "Added",
+            "serialTypeId": 10
+          }
+        ]
+      },
+      "lookups": [
+        {
+          "scope": "record",
+          "name": "Copy.Original",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "scheme-int",
+          "name": "Copy.Original",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "Original",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "Copy.Added",
+          "category": "obj",
+          "ordinal": 0
+        },
+        {
+          "scope": "scheme-obj",
+          "name": "Copy.Added",
+          "category": "obj",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "Added",
+          "category": "obj",
+          "ordinal": 0
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,146 @@
+{
+  "formatVersion": 1,
+  "profile": {
+    "id": "qd-3.355-xml-captured",
+    "version": 1
+  },
+  "kind": "local-schema",
+  "provenance": {
+    "inputs": [
+      {
+        "ref": "../../../tests/fixtures/schema/inputs/index-disabled-first.xml",
+        "sha256": "5353e5f29f53ebb0483d73fcd6faa388a5f0144c73559f758dc0dbf07db44830"
+      }
+    ],
+    "profileEvidence": [
+      "../../../tests/fixtures/schema/captures/final-a/metadata.json",
+      "../../../tests/fixtures/schema/captures/final-a/environment.tsv"
+    ],
+    "expectationRef": "../../../tests/fixtures/schema/expected/S05-disabled-first.tsv"
+  },
+  "records": [
+    {
+      "id": 0,
+      "name": "Indexed",
+      "hasTime": true,
+      "fields": [
+        {
+          "id": 0,
+          "semanticName": "Ordinary",
+          "effectiveName": "Ordinary",
+          "fullName": "Indexed.Ordinary",
+          "localName": "Ordinary",
+          "propertyName": "Ordinary",
+          "serialTypeId": 8
+        },
+        {
+          "id": 1,
+          "semanticName": "Second",
+          "effectiveName": "Second",
+          "fullName": "Indexed.Second",
+          "localName": "Second",
+          "propertyName": "Second",
+          "serialTypeId": 8
+        }
+      ],
+      "indexes": [
+        {
+          "position": 0,
+          "fieldId": null
+        },
+        {
+          "position": 1,
+          "fieldId": 1
+        }
+      ],
+      "javaSlots": {
+        "int": [
+          {
+            "ordinal": 0,
+            "role": "index-placeholder",
+            "fieldId": null,
+            "fullName": "Indexed.$VoidTimeField",
+            "localName": "$VoidTimeField",
+            "propertyName": "$VoidTimeField",
+            "serialTypeId": 0
+          },
+          {
+            "ordinal": 1,
+            "role": "head",
+            "fieldId": 1,
+            "fullName": "Indexed.Second",
+            "localName": "Second",
+            "propertyName": "Second",
+            "serialTypeId": 8
+          },
+          {
+            "ordinal": 2,
+            "role": "head",
+            "fieldId": 0,
+            "fullName": "Indexed.Ordinary",
+            "localName": "Ordinary",
+            "propertyName": "Ordinary",
+            "serialTypeId": 8
+          }
+        ],
+        "obj": []
+      },
+      "lookups": [
+        {
+          "scope": "record",
+          "name": "Indexed.$VoidTimeField",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "scheme-int",
+          "name": "Indexed.$VoidTimeField",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "$VoidTimeField",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "Indexed.Second",
+          "category": "int",
+          "ordinal": 1
+        },
+        {
+          "scope": "scheme-int",
+          "name": "Indexed.Second",
+          "category": "int",
+          "ordinal": 1
+        },
+        {
+          "scope": "record",
+          "name": "Second",
+          "category": "int",
+          "ordinal": 1
+        },
+        {
+          "scope": "record",
+          "name": "Indexed.Ordinary",
+          "category": "int",
+          "ordinal": 2
+        },
+        {
+          "scope": "scheme-int",
+          "name": "Indexed.Ordinary",
+          "category": "int",
+          "ordinal": 2
+        },
+        {
+          "scope": "record",
+          "name": "Ordinary",
+          "category": "int",
+          "ordinal": 2
+        }
+      ]
+    }
+  ]
+}

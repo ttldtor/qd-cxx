@@ -1,0 +1,98 @@
+{
+  "formatVersion": 1,
+  "profile": {
+    "id": "qd-3.355-xml-captured",
+    "version": 1
+  },
+  "kind": "local-schema",
+  "provenance": {
+    "inputs": [
+      {
+        "ref": "../../../tests/fixtures/schema/inputs/alias-explicit.xml",
+        "sha256": "e19bc91ee71234ea4714aaa13ca7fc1c85bf81704d125804c8499420c299ac35"
+      }
+    ],
+    "profileEvidence": [
+      "../../../tests/fixtures/schema/captures/final-a/metadata.json",
+      "../../../tests/fixtures/schema/captures/final-a/environment.tsv"
+    ],
+    "expectationRef": "../../../tests/fixtures/schema/expected/S07-explicit.tsv"
+  },
+  "records": [
+    {
+      "id": 0,
+      "name": "Aliases",
+      "hasTime": false,
+      "fields": [
+        {
+          "id": 0,
+          "semanticName": "Value",
+          "effectiveName": "Chosen.Name",
+          "fullName": "Aliases.Chosen.Name",
+          "localName": "Chosen.Name",
+          "propertyName": "Value",
+          "serialTypeId": 8
+        }
+      ],
+      "indexes": [],
+      "javaSlots": {
+        "int": [
+          {
+            "ordinal": 0,
+            "role": "head",
+            "fieldId": 0,
+            "fullName": "Aliases.Chosen.Name",
+            "localName": "Chosen.Name",
+            "propertyName": "Value",
+            "serialTypeId": 8
+          }
+        ],
+        "obj": []
+      },
+      "lookups": [
+        {
+          "scope": "record",
+          "name": "Aliases.Chosen.Name",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "scheme-int",
+          "name": "Aliases.Chosen.Name",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "Chosen.Name",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "Value",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "ChosenName",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "First.Name",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "LastName",
+          "category": "int",
+          "ordinal": 0
+        }
+      ]
+    }
+  ]
+}

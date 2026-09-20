@@ -1,0 +1,128 @@
+{
+  "formatVersion": 1,
+  "profile": {
+    "id": "qd-3.355-xml-captured",
+    "version": 1
+  },
+  "kind": "local-schema",
+  "provenance": {
+    "inputs": [
+      {
+        "ref": "../../../tests/fixtures/schema/inputs/alias-fallback.xml",
+        "sha256": "2d33f3690a38928a7cdcde18d2b3b0a024e9eb595a5538930ae735e2dccaeea7"
+      }
+    ],
+    "profileEvidence": [
+      "../../../tests/fixtures/schema/captures/final-a/metadata.json",
+      "../../../tests/fixtures/schema/captures/final-a/environment.tsv"
+    ],
+    "expectationRef": "../../../tests/fixtures/schema/expected/S07-fallback.tsv"
+  },
+  "records": [
+    {
+      "id": 0,
+      "name": "Aliases",
+      "hasTime": false,
+      "fields": [
+        {
+          "id": 0,
+          "semanticName": "Value",
+          "effectiveName": "First.Name",
+          "fullName": "Aliases.First.Name",
+          "localName": "First.Name",
+          "propertyName": "Value",
+          "serialTypeId": 8
+        },
+        {
+          "id": 1,
+          "semanticName": "Plain",
+          "effectiveName": "Plain",
+          "fullName": "Aliases.Plain",
+          "localName": "Plain",
+          "propertyName": "Plain",
+          "serialTypeId": 8
+        }
+      ],
+      "indexes": [],
+      "javaSlots": {
+        "int": [
+          {
+            "ordinal": 0,
+            "role": "head",
+            "fieldId": 0,
+            "fullName": "Aliases.First.Name",
+            "localName": "First.Name",
+            "propertyName": "Value",
+            "serialTypeId": 8
+          },
+          {
+            "ordinal": 1,
+            "role": "head",
+            "fieldId": 1,
+            "fullName": "Aliases.Plain",
+            "localName": "Plain",
+            "propertyName": "Plain",
+            "serialTypeId": 8
+          }
+        ],
+        "obj": []
+      },
+      "lookups": [
+        {
+          "scope": "record",
+          "name": "Aliases.First.Name",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "scheme-int",
+          "name": "Aliases.First.Name",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "First.Name",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "Value",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "FirstName",
+          "category": "int",
+          "ordinal": 0
+        },
+        {
+          "scope": "record",
+          "name": "Aliases.Plain",
+          "category": "int",
+          "ordinal": 1
+        },
+        {
+          "scope": "scheme-int",
+          "name": "Aliases.Plain",
+          "category": "int",
+          "ordinal": 1
+        },
+        {
+          "scope": "record",
+          "name": "Plain",
+          "category": "int",
+          "ordinal": 1
+        },
+        {
+          "scope": "record",
+          "name": "LastName",
+          "category": "int",
+          "ordinal": 0
+        }
+      ]
+    }
+  ]
+}

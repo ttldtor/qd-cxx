@@ -1,0 +1,38 @@
+{
+  "formatVersion": 1,
+  "profile": {
+    "id": "qd-3.355-xml-captured",
+    "version": 1
+  },
+  "kind": "resolution-failure",
+  "provenance": {
+    "inputs": [],
+    "profileEvidence": [
+      "../../../tests/fixtures/schema/captures/final-a/metadata.json",
+      "../../../tests/fixtures/schema/captures/final-a/environment.tsv"
+    ],
+    "expectationRef": "../../../tests/fixtures/schema/expected/S01-no-urls.tsv"
+  },
+  "diagnostics": [
+    {
+      "code": "no-source-inputs",
+      "stage": "input",
+      "recognition": "not-reached",
+      "sourceRefs": [],
+      "subject": "inputs",
+      "serialTypeId": null,
+      "evidenceRef": "../../../tests/fixtures/schema/expected/S01-no-urls.tsv",
+      "oracleStage": "model.load"
+    },
+    {
+      "code": "no-source-inputs",
+      "stage": "input",
+      "recognition": "not-reached",
+      "sourceRefs": [],
+      "subject": "inputs",
+      "serialTypeId": null,
+      "evidenceRef": "../../../tests/fixtures/schema/expected/S01-no-urls.tsv",
+      "oracleStage": "runtime.load"
+    }
+  ]
+}
