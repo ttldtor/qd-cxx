@@ -112,7 +112,7 @@ flowchart TD
 
 **S:** Other hooks: Loader.withTypes, service-selected DocumentBuilderFactory, DataSchemeFactory, and DefaultScheme.getService with optional DataSchemeService.setScheme. Property conversion order is type overrides, regional visibility, Order fields, generators, generic visibility. Nuam regional coverage has an explicit FIXME. `SchemeModel.override` shares entity objects when adding absent entries; repeated withProperties isolation must not be assumed. [Properties](SOURCES.md#properties), [Model](SOURCES.md#model), [Runtime](SOURCES.md#runtime)
 
-**Boundary:** Analysis ends at local descriptors/mappings. Peer record IDs, schema exchange and QTP framing belong to QDCXX-004. DataScheme serialization wording does not establish equal IDs across independently constructed peers.
+**Boundary:** This analysis ends at local descriptors/mappings. QDCXX-004 now traces [DataScheme to QTP record descriptions](../protocol/SCHEMA-EXCHANGE.md): sender IDs map by record name to receiver-local IDs; property names and serial types define wire field layouts, with peer-requested adaptation. DataScheme serialization wording does not establish equal IDs across independently constructed peers.
 
 ## Scope for a normalized-model follow-up
 

@@ -15,11 +15,7 @@ Record questions about Java QD behavior that cannot yet be answered confidently.
 ## Initial questions
 
 - XML resources/loaders, rule layers, aliases, mappings, defaults and composition: initial source answers recorded by QDCXX-003 below; normative normalization and oracle captures remain pending.
-- Where are QTP frame boundaries established, and which layer owns message boundaries?
-- Which QTP negotiation and state transitions are version- or option-dependent?
-- Which encodings retain state across messages or connections?
-- What malformed-input behavior is externally observable and relied upon?
-- Which upstream tests are suitable as direct sources for conformance fixtures?
+- QTP framing, directional schema exchange, codec state and candidate upstream tests: initial source answers recorded by QDCXX-004 below; runtime verification remains pending.
 
 For each answer, distinguish explicit upstream contract from observed behavior and implementation accident.
 
@@ -41,4 +37,22 @@ Remaining questions, all tied to [fixture proposals](../../tests/fixtures/schema
 | SC-08 | Open, fixture provenance: choose capture harness/output normalization and review upstream resource redistribution before adding golden files. | Fixture policy and schema fixture proposals. No captured Java outputs or copied resources exist in QDCXX-003. |
 | SC-09 | Open, normalized-model scope: retain resolved runtime descriptors only, or also source overlays, templates, disabled metadata, docs, enums, tags and bitfields? | Analysis follow-up section. This is a qd-cxx design decision for a separate task, not an upstream unknown or C++ design established here. |
 
-Suggested follow-up tasks (proposed, not yet assigned task IDs): a Java oracle capture harness with S01-S12/S15; targeted parser/alias/rebuild probes S18-S20; normalized-model requirements and compatibility decisions; a dxFeed provider/property parity profile S13-S17. QDCXX-004 retains QTP schema-exchange and wire-boundary research.
+Suggested follow-up tasks (proposed, not yet assigned task IDs): a Java oracle capture harness with S01-S12/S15; targeted parser/alias/rebuild probes S18-S20; normalized-model requirements and compatibility decisions; a dxFeed provider/property parity profile S13-S17. QDCXX-004's initial schema-exchange and wire-boundary findings are recorded below.
+
+## QTP investigation QDCXX-004
+
+Initial answers are in [QTP boundaries](../../spec/protocol/README.md), [DataScheme/wire mapping](../../spec/protocol/SCHEMA-EXCHANGE.md) and [locked source index](../../spec/protocol/SOURCES.md). Source establishes sender-ID mapping by record name, ordered field descriptors, peer-requested outgoing adaptation, complete-frame buffering and message-local symbol state. These are descriptive findings, not captured compatibility guarantees.
+
+| ID | Status and remaining question | Evidence / next step |
+| --- | --- | --- |
+| QT-01 | Open: exact primitive acceptance/canonicalization and limits, including compact-int truncation, overlong encodings, malformed Unicode and huge counts/IDs. | BufferedInput/Output, IOUtil, PentaCodec; [encoding dependencies](../../spec/encoding/README.md); P01/P02/P08. Bound probes to avoid allocation hazards. |
+| QT-02 | Open: complete schema adaptation matrix, raw defaults, alias collisions, unconvertible representations and object/numeric mismatch behavior. | BinaryRecordDesc retries local representation bits rather than uniformly rejecting mismatches; FieldAdaptationTest covers selected numeric cases. P03–P06/P08. |
+| QT-03 | Open: unknown local record with built-in event metadata, nonzero externally supplied event time or field replacers: which null-cursor paths fail and how are failures surfaced? | BinaryRecordDesc.readFields and AbstractQTPParser postprocessing can dereference null. Normal skip path is source-established; optional-path outcome requires P07. |
+| QT-04 | Open: dynamic requested-layout changes and session reuse contract. Does intended compatibility preserve cached writer layout after resetSession? | BinaryQTPComposer.recordMap survives inherited reset; ConnectionQTPParser.schemeMap is reset. P05/P12 compare before/after first writer use and fresh instances. |
+| QT-05 | Open: PART reset/cancel lifetime, resource limits, excess fragment handling and error recovery policy. | BinaryQTPParser.resetSession does not clear partitionedMessages; assembly limit TODO; P10/P12. Do not silently copy a potential implementation accident into a normative rule. |
+| QT-06 | Open: which error/close behavior is required for default versus configured consumers, partial descriptor commits, final truncated streams and unchecked exceptions? | Parser callbacks, MessageAdapter skip flags, no final-EOF signal in base parse path. P02/P08/P13; file parser resync is a separate profile. |
+| QT-07 | Open: complete negotiation/auth/legacy and live aggregation transition profiles, including order of first data after opt/version updates. | ProtocolDescriptor deltas and adapter paths traced; hook Javadoc contradicts source call order. P09 plus focused auth/aggregation follow-up, not a full state-machine claim. |
+| QT-08 | Open: complete event flag/time matrix, message batching observable requirements and timing profiles. | AbstractQTPParser reorder masks, EventFlag, HeartbeatPayload and MessageAdapterConnection. P01/P11/P13; separate record order from callback grouping and clock values. |
+| QT-09 | Open: capture harness, normalization and provenance review before golden output. | [13 proposal families](../../tests/fixtures/protocol/README.md). No QTP Java execution, captured bytes or executable C++ conformance exists yet. |
+
+Suggested follow-up: a small Java in-memory QTP capture harness, first covering P01/P03–P06/P09; targeted error/reset/partition probes; then normative primitive/wire rules and a reviewed compatibility profile. No transport runtime or C++ implementation is authorized by this research result.
