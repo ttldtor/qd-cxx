@@ -11,7 +11,16 @@ The repository currently defines working and contribution rules, documentation a
 - Completed: `QDCXX-001`, repository and workflow bootstrap.
 - Completed: `QDCXX-002`, verified Java QD 3.355 provenance and documented reproducible upstream inspection.
 - Completed: `QDCXX-003`, initial source-linked XML schema and DataScheme investigation; runtime oracle captures and normalized-model decisions remain follow-up work.
-- Ready: `QDCXX-004`, inventory QTP framing and protocol boundaries.
+- Completed: `QDCXX-004`, source-linked QTP framing/protocol inventory and local DataScheme/wire-schema mapping; executable oracle validation remains follow-up work.
+- Ready: `QDCXX-005`, Java schema oracle tooling and initial captured subcases.
+- Proposed: `QDCXX-006`, in-memory QTP captures, dependent on QDCXX-005 tooling.
+- Proposed: `QDCXX-007`, normalized-model requirements and proposed compatibility ADR, dependent on QDCXX-005/006 evidence.
+
+## Next milestone: executable oracle baseline
+
+The next assigned session is QDCXX-005. Task-scoped Java harnesses and Java build configuration are permitted by QDCXX-005/006; production C++ and dependency selection remain deferred. No oracle tooling or captures have been implemented by this planning update.
+
+Proceed from the initial schema captures to QDCXX-006 protocol bytes/observations, then QDCXX-007 model proposals. Source findings alone do not establish executable compatibility. Remaining edge cases, negotiation, conversion matrices, reset/PART and dxFeed provider profiles stay open for later focused work.
 
 ## Near-term exit criteria
 
@@ -57,3 +66,13 @@ Recorded for `QDCXX-003` on 2026-09-20:
 - [Schema fixture proposals](../tests/fixtures/schema/README.md) identify 21 capture cases; no expected output or Java execution is claimed.
 - [Schema open questions](upstream/OPEN-QUESTIONS.md#schema-investigation-qdcxx-003) cover parser/default/alias quirks, runtime failures, property/provider profiles, rebuild isolation and normalization scope.
 - All five acceptance criteria for the initial investigation are addressed. No C++ code, build dependencies, normalized format or wire semantics were introduced.
+
+## QTP investigation baseline
+
+Recorded for `QDCXX-004` on 2026-09-20:
+
+- [QTP boundary inventory](../spec/protocol/README.md) separates stream/frame/message/session/transport responsibilities, partial input, batching, negotiation, heartbeat, PART and error handling.
+- [Local DataScheme and wire descriptions](../spec/protocol/SCHEMA-EXCHANGE.md) explains sender-ID to receiver-local-ID mapping by record name, ordered field names/types, requested outgoing layouts and differing schemas.
+- [Locked source index](../spec/protocol/SOURCES.md), [encoding dependencies](../spec/encoding/README.md), [13 proposed capture families](../tests/fixtures/protocol/README.md) and [QT-01–QT-09 questions](upstream/OPEN-QUESTIONS.md#qtp-investigation-qdcxx-004) distinguish source facts, documentation/test assertions, inferences and unknowns.
+- Source review identified non-atomic record-description errors, message-local symbol state, retained writer cache/PART state across resetSession, and protocol-hook documentation/source ordering disagreement. These need captures and compatibility review rather than silent normalization.
+- Verified locked upstream checkout and documentation links/diff; no Java build/test or runtime capture. All five inventory acceptance criteria are addressed. No production C++, dependencies, wire change or networking choice was added; byte-level compatibility is not yet demonstrated.
