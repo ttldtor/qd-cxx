@@ -1,0 +1,8 @@
+# Java QD compatibility baseline.
+#
+# Update deliberately: use a dedicated task, review upstream changes, refresh affected
+# specifications and fixtures, and document compatibility impact before changing this file.
+
+repository = "https://github.com/devexperts/QD.git"
+version = "3.355"
+commit = "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f"
