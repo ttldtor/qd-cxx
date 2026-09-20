@@ -10,7 +10,7 @@ The repository currently defines working and contribution rules, documentation a
 
 - Completed: `QDCXX-001`, repository and workflow bootstrap.
 - Completed: `QDCXX-002`, verified Java QD 3.355 provenance and documented reproducible upstream inspection.
-- Ready: `QDCXX-003`, analyze XML schema and DataScheme semantics without implementing them in C++.
+- Completed: `QDCXX-003`, initial source-linked XML schema and DataScheme investigation; runtime oracle captures and normalized-model decisions remain follow-up work.
 - Ready: `QDCXX-004`, inventory QTP framing and protocol boundaries.
 
 ## Near-term exit criteria
@@ -47,3 +47,13 @@ Checked for `QDCXX-002` on 2026-09-20:
 - [x] The public-GitHub/internal-SCM metadata ambiguity is recorded in `docs/upstream/OPEN-QUESTIONS.md`.
 
 Update this file whenever the project phase, active work, or major known limitation changes.
+
+## Schema investigation baseline
+
+Recorded for `QDCXX-003` on 2026-09-20:
+
+- [XML/DataScheme inventory](../spec/schema/README.md) traces the locked Java source from resource loading through runtime construction and separates XML syntax, model semantics and dxFeed conventions.
+- [Source inventory](../spec/schema/SOURCES.md) records immutable citations, relevant symbols and checkout verification.
+- [Schema fixture proposals](../tests/fixtures/schema/README.md) identify 21 capture cases; no expected output or Java execution is claimed.
+- [Schema open questions](upstream/OPEN-QUESTIONS.md#schema-investigation-qdcxx-003) cover parser/default/alias quirks, runtime failures, property/provider profiles, rebuild isolation and normalization scope.
+- All five acceptance criteria for the initial investigation are addressed. No C++ code, build dependencies, normalized format or wire semantics were introduced.
