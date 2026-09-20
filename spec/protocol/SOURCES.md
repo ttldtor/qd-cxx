@@ -68,3 +68,16 @@ Both hashes matched the lock, origin was https://github.com/devexperts/QD.git, s
 - [DescriptorDeltaEmissionTest.java](https://github.com/devexperts/QD/blob/0ddc0a09779fb61d74cc0b37c6449ff47dcb715f/qd-sample/src/test/java/com/devexperts/qd/qtp/test/DescriptorDeltaEmissionTest.java) — testFirstOutgoingIsFullHandshake, testClientRequestEmitsOnlyRequestedAggregationPeriodDelta.
 
 Tests above were inspected, not executed. ComposeParseTest transferBytes forwards available chunks despite its random-fraction comment; do not cite it as exhaustive fragmentation coverage. PART/reset/resource-limit captures are proposed independently.
+
+## Source-to-capture index (QDCXX-006)
+
+The no-execution statements above describe QDCXX-004. QDCXX-006 built the same locked source and executed the [protocol driver](../../tools/upstream/protocol-oracle/README.md); upstream tests listed above still were not run.
+
+| Source symbols | Executed evidence |
+| --- | --- |
+| BinaryQTPParser.parseImpl; AbstractQTPParser.processPending; PentaCodec Reader/Writer | [P01](../../tests/fixtures/protocol/expected/P01.tsv): 32 schedules, complete-frame buffering and callback grouping. |
+| BinaryQTPParser.remapRecord/parseSubscription; BinaryQTPComposer.describeRecord | [P03 A-B](../../tests/fixtures/protocol/expected/P03-A-B.tsv), [P03 B-A](../../tests/fixtures/protocol/expected/P03-B-A.tsv). |
+| BinaryRecordDesc field lookup; [DefaultRecord.addFieldAlias](https://github.com/devexperts/QD/blob/0ddc0a09779fb61d74cc0b37c6449ff47dcb715f/qd-core/src/main/java/com/devexperts/qd/kit/DefaultRecord.java); [AbstractDataField.getDefaultPropertyName](https://github.com/devexperts/QD/blob/0ddc0a09779fb61d74cc0b37c6449ff47dcb715f/qd-core/src/main/java/com/devexperts/qd/kit/AbstractDataField.java) | [P04 order](../../tests/fixtures/protocol/expected/P04-order.tsv), [P04 alias](../../tests/fixtures/protocol/expected/P04-alias.tsv). |
+| MessageAdapterConnection processChunks/retrieveChunks/getRequestedRecordDesc; ConnectionQTPParser.remapRecord; ConnectionQTPComposer.getRequestedRecordDesc; BinaryQTPComposer.getRecordDesc; BinaryRecordDesc.isEmpty | [P05 none](../../tests/fixtures/protocol/expected/P05-none.tsv), [zero](../../tests/fixtures/protocol/expected/P05-zero.tsv), [x](../../tests/fixtures/protocol/expected/P05-x.tsv), [z](../../tests/fixtures/protocol/expected/P05-z.tsv). |
+
+[Capture interpretation](CAPTURES.md) and [validation](../../tests/fixtures/protocol/VALIDATION.md) distinguish actual bytes/observations from remaining source-only assertions. No upstream source patch was made.

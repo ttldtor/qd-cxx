@@ -1,0 +1,969 @@
+{
+  "format": "qdcxx-protocol-validation-v1",
+  "runs": [
+    {
+      "run": "final-a",
+      "caseCount": 9,
+      "expectationFileCount": 18,
+      "normalized": [
+        {
+          "file": "P01.semantic.tsv",
+          "sha256": "6f2f823d7881e57a9425f670a014f2596cf034ae9e1c3e4e53de4f1c4a548388",
+          "baselineEqual": true
+        },
+        {
+          "file": "P01.tsv",
+          "sha256": "735d995b7f69ef7dfaf20ba80f6efeabd3109336e2e5315cf4214441af561566",
+          "baselineEqual": true
+        },
+        {
+          "file": "P03-A-B.semantic.tsv",
+          "sha256": "f460572b383abb05e7433c213c36bf330e19212fbce648eb46ddc2589cf765d3",
+          "baselineEqual": true
+        },
+        {
+          "file": "P03-A-B.tsv",
+          "sha256": "0b51ee8f251f7087e9edf520e891b39bff092c7c3b44f08311dd07fade9f7228",
+          "baselineEqual": true
+        },
+        {
+          "file": "P03-B-A.semantic.tsv",
+          "sha256": "b6e69d94d34e51234e04be9ec8f1b37fcaa20772483b5592fd6fdd73392e6fc4",
+          "baselineEqual": true
+        },
+        {
+          "file": "P03-B-A.tsv",
+          "sha256": "23908a6f7c0c9b4333b02550de4bb2859dc7d3c008f97c7982825e9b1c532d3c",
+          "baselineEqual": true
+        },
+        {
+          "file": "P04-alias.semantic.tsv",
+          "sha256": "3e5a0ee6bb38c95ba1b9f0150f4c959d4f94b0f1c6ec156f9689a20189f9d701",
+          "baselineEqual": true
+        },
+        {
+          "file": "P04-alias.tsv",
+          "sha256": "69c19e92b274a66e5a09e2108c93cefaade6112dcf04b472160c242c67ccde83",
+          "baselineEqual": true
+        },
+        {
+          "file": "P04-order.semantic.tsv",
+          "sha256": "3e5a0ee6bb38c95ba1b9f0150f4c959d4f94b0f1c6ec156f9689a20189f9d701",
+          "baselineEqual": true
+        },
+        {
+          "file": "P04-order.tsv",
+          "sha256": "119a8022158216cf6c4884d72f63f4d40c74b45ec08250f3e008ed8270be81c2",
+          "baselineEqual": true
+        },
+        {
+          "file": "P05-none.semantic.tsv",
+          "sha256": "257c9a95443dba8fab35ebc45f8938b5865f12a0d915dde3df3213baf8d69502",
+          "baselineEqual": true
+        },
+        {
+          "file": "P05-none.tsv",
+          "sha256": "05dd562ab1ea4f2fdffdc0f09b73cec90641d7485f69b5dc00fd315df5bd424a",
+          "baselineEqual": true
+        },
+        {
+          "file": "P05-x.semantic.tsv",
+          "sha256": "136e15d944f6af302f296d9317b1c2b2e9e98898767b60e79b1236dcd8601816",
+          "baselineEqual": true
+        },
+        {
+          "file": "P05-x.tsv",
+          "sha256": "440657557c5ad51598df7bb338c333b5412a87e5441ae99822a05f606600faa7",
+          "baselineEqual": true
+        },
+        {
+          "file": "P05-z.semantic.tsv",
+          "sha256": "ccc2ee33e30b2e6355ddcde1360a3a958ebd7b484b548e302dd6c0fc872bf1f1",
+          "baselineEqual": true
+        },
+        {
+          "file": "P05-z.tsv",
+          "sha256": "c90f8fee10712c0b0004af9de1f611bfddeecfbe24eda39531289396e41d0c8f",
+          "baselineEqual": true
+        },
+        {
+          "file": "P05-zero.semantic.tsv",
+          "sha256": "419190339ed3afec072c692a1c4e064fd40eedac5b4ece8009b0ee10f48393cd",
+          "baselineEqual": true
+        },
+        {
+          "file": "P05-zero.tsv",
+          "sha256": "42378d1d02f97f68da92779c45d49a1d857ab02dc12d7decab59ed62f9f5581a",
+          "baselineEqual": true
+        }
+      ],
+      "raw": [
+        {
+          "file": "P01.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P01.tsv",
+          "sha256": "6aef9c39c45e2c134bf80b7976d334116152d08055be5a5c3ab2e0dce89468b1",
+          "captureAEqual": true
+        },
+        {
+          "file": "P03-A-B.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P03-A-B.tsv",
+          "sha256": "b38b49d615e183ff7510394872d810c349101cd5649b5f1b593247d9829f6cc7",
+          "captureAEqual": true
+        },
+        {
+          "file": "P03-B-A.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P03-B-A.tsv",
+          "sha256": "ed775095c6852ef3ef0b1d2f222691493e5670537c4773d99239a170f072f5b9",
+          "captureAEqual": true
+        },
+        {
+          "file": "P04-alias.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P04-alias.tsv",
+          "sha256": "2c4a5fe95c2748c28edbee42e56c36418ffb8e734e2ccb25ada69b463591b2aa",
+          "captureAEqual": true
+        },
+        {
+          "file": "P04-order.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P04-order.tsv",
+          "sha256": "dac05f0bdb1100a4a46e884afbb1917bf6d0cbd3c9148521a5fb4209166013c4",
+          "captureAEqual": true
+        },
+        {
+          "file": "P05-none.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P05-none.tsv",
+          "sha256": "dc9cebdadd18cd85e639bbcb240ac5bb973cb64ae5e3ca5b7bd3d11f9f7e20c7",
+          "captureAEqual": true
+        },
+        {
+          "file": "P05-x.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P05-x.tsv",
+          "sha256": "0ebbadd7afb10b02d2285458a93ffb1667c1feb31e6fa127fc045592df07e56b",
+          "captureAEqual": true
+        },
+        {
+          "file": "P05-z.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P05-z.tsv",
+          "sha256": "bd1a21cb0c081008dbcedf5a1786d5083957272e56a516340fac928ed0046b2f",
+          "captureAEqual": true
+        },
+        {
+          "file": "P05-zero.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P05-zero.tsv",
+          "sha256": "911581913c0311f0c82718862cc0c6e0c0ffa8e610228d0e8101de48abe1b2ee",
+          "captureAEqual": true
+        }
+      ],
+      "currentToolAndInputHashesMatch": true,
+      "classpathComparisons": [
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\mars\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-promise\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-api\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib-qd-sandbox\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\auth\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-core\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto-ssl\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-rmi\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-impl\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-scheme\\target\\classes",
+          "captureAEqual": true
+        }
+      ],
+      "result": "CAPTURE COMPLETE: 9 cases; review normalized output before promotion."
+    },
+    {
+      "run": "final-b",
+      "caseCount": 9,
+      "expectationFileCount": 18,
+      "normalized": [
+        {
+          "file": "P01.semantic.tsv",
+          "sha256": "6f2f823d7881e57a9425f670a014f2596cf034ae9e1c3e4e53de4f1c4a548388",
+          "baselineEqual": true
+        },
+        {
+          "file": "P01.tsv",
+          "sha256": "735d995b7f69ef7dfaf20ba80f6efeabd3109336e2e5315cf4214441af561566",
+          "baselineEqual": true
+        },
+        {
+          "file": "P03-A-B.semantic.tsv",
+          "sha256": "f460572b383abb05e7433c213c36bf330e19212fbce648eb46ddc2589cf765d3",
+          "baselineEqual": true
+        },
+        {
+          "file": "P03-A-B.tsv",
+          "sha256": "0b51ee8f251f7087e9edf520e891b39bff092c7c3b44f08311dd07fade9f7228",
+          "baselineEqual": true
+        },
+        {
+          "file": "P03-B-A.semantic.tsv",
+          "sha256": "b6e69d94d34e51234e04be9ec8f1b37fcaa20772483b5592fd6fdd73392e6fc4",
+          "baselineEqual": true
+        },
+        {
+          "file": "P03-B-A.tsv",
+          "sha256": "23908a6f7c0c9b4333b02550de4bb2859dc7d3c008f97c7982825e9b1c532d3c",
+          "baselineEqual": true
+        },
+        {
+          "file": "P04-alias.semantic.tsv",
+          "sha256": "3e5a0ee6bb38c95ba1b9f0150f4c959d4f94b0f1c6ec156f9689a20189f9d701",
+          "baselineEqual": true
+        },
+        {
+          "file": "P04-alias.tsv",
+          "sha256": "69c19e92b274a66e5a09e2108c93cefaade6112dcf04b472160c242c67ccde83",
+          "baselineEqual": true
+        },
+        {
+          "file": "P04-order.semantic.tsv",
+          "sha256": "3e5a0ee6bb38c95ba1b9f0150f4c959d4f94b0f1c6ec156f9689a20189f9d701",
+          "baselineEqual": true
+        },
+        {
+          "file": "P04-order.tsv",
+          "sha256": "119a8022158216cf6c4884d72f63f4d40c74b45ec08250f3e008ed8270be81c2",
+          "baselineEqual": true
+        },
+        {
+          "file": "P05-none.semantic.tsv",
+          "sha256": "257c9a95443dba8fab35ebc45f8938b5865f12a0d915dde3df3213baf8d69502",
+          "baselineEqual": true
+        },
+        {
+          "file": "P05-none.tsv",
+          "sha256": "05dd562ab1ea4f2fdffdc0f09b73cec90641d7485f69b5dc00fd315df5bd424a",
+          "baselineEqual": true
+        },
+        {
+          "file": "P05-x.semantic.tsv",
+          "sha256": "136e15d944f6af302f296d9317b1c2b2e9e98898767b60e79b1236dcd8601816",
+          "baselineEqual": true
+        },
+        {
+          "file": "P05-x.tsv",
+          "sha256": "440657557c5ad51598df7bb338c333b5412a87e5441ae99822a05f606600faa7",
+          "baselineEqual": true
+        },
+        {
+          "file": "P05-z.semantic.tsv",
+          "sha256": "ccc2ee33e30b2e6355ddcde1360a3a958ebd7b484b548e302dd6c0fc872bf1f1",
+          "baselineEqual": true
+        },
+        {
+          "file": "P05-z.tsv",
+          "sha256": "c90f8fee10712c0b0004af9de1f611bfddeecfbe24eda39531289396e41d0c8f",
+          "baselineEqual": true
+        },
+        {
+          "file": "P05-zero.semantic.tsv",
+          "sha256": "419190339ed3afec072c692a1c4e064fd40eedac5b4ece8009b0ee10f48393cd",
+          "baselineEqual": true
+        },
+        {
+          "file": "P05-zero.tsv",
+          "sha256": "42378d1d02f97f68da92779c45d49a1d857ab02dc12d7decab59ed62f9f5581a",
+          "baselineEqual": true
+        }
+      ],
+      "raw": [
+        {
+          "file": "P01.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P01.tsv",
+          "sha256": "6aef9c39c45e2c134bf80b7976d334116152d08055be5a5c3ab2e0dce89468b1",
+          "captureAEqual": true
+        },
+        {
+          "file": "P03-A-B.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P03-A-B.tsv",
+          "sha256": "b38b49d615e183ff7510394872d810c349101cd5649b5f1b593247d9829f6cc7",
+          "captureAEqual": true
+        },
+        {
+          "file": "P03-B-A.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P03-B-A.tsv",
+          "sha256": "ed775095c6852ef3ef0b1d2f222691493e5670537c4773d99239a170f072f5b9",
+          "captureAEqual": true
+        },
+        {
+          "file": "P04-alias.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P04-alias.tsv",
+          "sha256": "2c4a5fe95c2748c28edbee42e56c36418ffb8e734e2ccb25ada69b463591b2aa",
+          "captureAEqual": true
+        },
+        {
+          "file": "P04-order.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P04-order.tsv",
+          "sha256": "dac05f0bdb1100a4a46e884afbb1917bf6d0cbd3c9148521a5fb4209166013c4",
+          "captureAEqual": true
+        },
+        {
+          "file": "P05-none.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P05-none.tsv",
+          "sha256": "dc9cebdadd18cd85e639bbcb240ac5bb973cb64ae5e3ca5b7bd3d11f9f7e20c7",
+          "captureAEqual": true
+        },
+        {
+          "file": "P05-x.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P05-x.tsv",
+          "sha256": "0ebbadd7afb10b02d2285458a93ffb1667c1feb31e6fa127fc045592df07e56b",
+          "captureAEqual": true
+        },
+        {
+          "file": "P05-z.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P05-z.tsv",
+          "sha256": "bd1a21cb0c081008dbcedf5a1786d5083957272e56a516340fac928ed0046b2f",
+          "captureAEqual": true
+        },
+        {
+          "file": "P05-zero.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P05-zero.tsv",
+          "sha256": "911581913c0311f0c82718862cc0c6e0c0ffa8e610228d0e8101de48abe1b2ee",
+          "captureAEqual": true
+        }
+      ],
+      "currentToolAndInputHashesMatch": true,
+      "classpathComparisons": [
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\mars\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-promise\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-api\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib-qd-sandbox\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\auth\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-core\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto-ssl\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-rmi\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-impl\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-scheme\\target\\classes",
+          "captureAEqual": true
+        }
+      ],
+      "result": "CAPTURE COMPLETE: 9 cases; review normalized output before promotion."
+    },
+    {
+      "run": "mismatch",
+      "caseCount": 9,
+      "expectationFileCount": 18,
+      "normalized": [
+        {
+          "file": "P01.semantic.tsv",
+          "sha256": "6f2f823d7881e57a9425f670a014f2596cf034ae9e1c3e4e53de4f1c4a548388",
+          "baselineEqual": true
+        },
+        {
+          "file": "P01.tsv",
+          "sha256": "735d995b7f69ef7dfaf20ba80f6efeabd3109336e2e5315cf4214441af561566",
+          "baselineEqual": true
+        },
+        {
+          "file": "P03-A-B.semantic.tsv",
+          "sha256": "f460572b383abb05e7433c213c36bf330e19212fbce648eb46ddc2589cf765d3",
+          "baselineEqual": true
+        },
+        {
+          "file": "P03-A-B.tsv",
+          "sha256": "0b51ee8f251f7087e9edf520e891b39bff092c7c3b44f08311dd07fade9f7228",
+          "baselineEqual": true
+        },
+        {
+          "file": "P03-B-A.semantic.tsv",
+          "sha256": "b6e69d94d34e51234e04be9ec8f1b37fcaa20772483b5592fd6fdd73392e6fc4",
+          "baselineEqual": true
+        },
+        {
+          "file": "P03-B-A.tsv",
+          "sha256": "23908a6f7c0c9b4333b02550de4bb2859dc7d3c008f97c7982825e9b1c532d3c",
+          "baselineEqual": true
+        },
+        {
+          "file": "P04-alias.semantic.tsv",
+          "sha256": "3e5a0ee6bb38c95ba1b9f0150f4c959d4f94b0f1c6ec156f9689a20189f9d701",
+          "baselineEqual": true
+        },
+        {
+          "file": "P04-alias.tsv",
+          "sha256": "69c19e92b274a66e5a09e2108c93cefaade6112dcf04b472160c242c67ccde83",
+          "baselineEqual": true
+        },
+        {
+          "file": "P04-order.semantic.tsv",
+          "sha256": "3e5a0ee6bb38c95ba1b9f0150f4c959d4f94b0f1c6ec156f9689a20189f9d701",
+          "baselineEqual": true
+        },
+        {
+          "file": "P04-order.tsv",
+          "sha256": "119a8022158216cf6c4884d72f63f4d40c74b45ec08250f3e008ed8270be81c2",
+          "baselineEqual": true
+        },
+        {
+          "file": "P05-none.semantic.tsv",
+          "sha256": "257c9a95443dba8fab35ebc45f8938b5865f12a0d915dde3df3213baf8d69502",
+          "baselineEqual": true
+        },
+        {
+          "file": "P05-none.tsv",
+          "sha256": "05dd562ab1ea4f2fdffdc0f09b73cec90641d7485f69b5dc00fd315df5bd424a",
+          "baselineEqual": true
+        },
+        {
+          "file": "P05-x.semantic.tsv",
+          "sha256": "136e15d944f6af302f296d9317b1c2b2e9e98898767b60e79b1236dcd8601816",
+          "baselineEqual": true
+        },
+        {
+          "file": "P05-x.tsv",
+          "sha256": "440657557c5ad51598df7bb338c333b5412a87e5441ae99822a05f606600faa7",
+          "baselineEqual": true
+        },
+        {
+          "file": "P05-z.semantic.tsv",
+          "sha256": "ccc2ee33e30b2e6355ddcde1360a3a958ebd7b484b548e302dd6c0fc872bf1f1",
+          "baselineEqual": true
+        },
+        {
+          "file": "P05-z.tsv",
+          "sha256": "c90f8fee10712c0b0004af9de1f611bfddeecfbe24eda39531289396e41d0c8f",
+          "baselineEqual": true
+        },
+        {
+          "file": "P05-zero.semantic.tsv",
+          "sha256": "419190339ed3afec072c692a1c4e064fd40eedac5b4ece8009b0ee10f48393cd",
+          "baselineEqual": true
+        },
+        {
+          "file": "P05-zero.tsv",
+          "sha256": "42378d1d02f97f68da92779c45d49a1d857ab02dc12d7decab59ed62f9f5581a",
+          "baselineEqual": true
+        }
+      ],
+      "raw": [
+        {
+          "file": "P01.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P01.tsv",
+          "sha256": "6aef9c39c45e2c134bf80b7976d334116152d08055be5a5c3ab2e0dce89468b1",
+          "captureAEqual": true
+        },
+        {
+          "file": "P03-A-B.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P03-A-B.tsv",
+          "sha256": "b38b49d615e183ff7510394872d810c349101cd5649b5f1b593247d9829f6cc7",
+          "captureAEqual": true
+        },
+        {
+          "file": "P03-B-A.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P03-B-A.tsv",
+          "sha256": "ed775095c6852ef3ef0b1d2f222691493e5670537c4773d99239a170f072f5b9",
+          "captureAEqual": true
+        },
+        {
+          "file": "P04-alias.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P04-alias.tsv",
+          "sha256": "2c4a5fe95c2748c28edbee42e56c36418ffb8e734e2ccb25ada69b463591b2aa",
+          "captureAEqual": true
+        },
+        {
+          "file": "P04-order.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P04-order.tsv",
+          "sha256": "dac05f0bdb1100a4a46e884afbb1917bf6d0cbd3c9148521a5fb4209166013c4",
+          "captureAEqual": true
+        },
+        {
+          "file": "P05-none.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P05-none.tsv",
+          "sha256": "dc9cebdadd18cd85e639bbcb240ac5bb973cb64ae5e3ca5b7bd3d11f9f7e20c7",
+          "captureAEqual": true
+        },
+        {
+          "file": "P05-x.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P05-x.tsv",
+          "sha256": "0ebbadd7afb10b02d2285458a93ffb1667c1feb31e6fa127fc045592df07e56b",
+          "captureAEqual": true
+        },
+        {
+          "file": "P05-z.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P05-z.tsv",
+          "sha256": "bd1a21cb0c081008dbcedf5a1786d5083957272e56a516340fac928ed0046b2f",
+          "captureAEqual": true
+        },
+        {
+          "file": "P05-zero.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P05-zero.tsv",
+          "sha256": "911581913c0311f0c82718862cc0c6e0c0ffa8e610228d0e8101de48abe1b2ee",
+          "captureAEqual": true
+        }
+      ],
+      "currentToolAndInputHashesMatch": true,
+      "classpathComparisons": [
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\mars\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-promise\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-api\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib-qd-sandbox\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\auth\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-core\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto-ssl\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-rmi\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-impl\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-scheme\\target\\classes",
+          "captureAEqual": true
+        }
+      ],
+      "result": "VERIFY FAILED: P04-order.semantic.tsv"
+    },
+    {
+      "run": "baseline",
+      "caseCount": 9,
+      "expectationFileCount": 18,
+      "normalized": [
+        {
+          "file": "P01.semantic.tsv",
+          "sha256": "6f2f823d7881e57a9425f670a014f2596cf034ae9e1c3e4e53de4f1c4a548388",
+          "baselineEqual": true
+        },
+        {
+          "file": "P01.tsv",
+          "sha256": "735d995b7f69ef7dfaf20ba80f6efeabd3109336e2e5315cf4214441af561566",
+          "baselineEqual": true
+        },
+        {
+          "file": "P03-A-B.semantic.tsv",
+          "sha256": "f460572b383abb05e7433c213c36bf330e19212fbce648eb46ddc2589cf765d3",
+          "baselineEqual": true
+        },
+        {
+          "file": "P03-A-B.tsv",
+          "sha256": "0b51ee8f251f7087e9edf520e891b39bff092c7c3b44f08311dd07fade9f7228",
+          "baselineEqual": true
+        },
+        {
+          "file": "P03-B-A.semantic.tsv",
+          "sha256": "b6e69d94d34e51234e04be9ec8f1b37fcaa20772483b5592fd6fdd73392e6fc4",
+          "baselineEqual": true
+        },
+        {
+          "file": "P03-B-A.tsv",
+          "sha256": "23908a6f7c0c9b4333b02550de4bb2859dc7d3c008f97c7982825e9b1c532d3c",
+          "baselineEqual": true
+        },
+        {
+          "file": "P04-alias.semantic.tsv",
+          "sha256": "3e5a0ee6bb38c95ba1b9f0150f4c959d4f94b0f1c6ec156f9689a20189f9d701",
+          "baselineEqual": true
+        },
+        {
+          "file": "P04-alias.tsv",
+          "sha256": "69c19e92b274a66e5a09e2108c93cefaade6112dcf04b472160c242c67ccde83",
+          "baselineEqual": true
+        },
+        {
+          "file": "P04-order.semantic.tsv",
+          "sha256": "3e5a0ee6bb38c95ba1b9f0150f4c959d4f94b0f1c6ec156f9689a20189f9d701",
+          "baselineEqual": true
+        },
+        {
+          "file": "P04-order.tsv",
+          "sha256": "119a8022158216cf6c4884d72f63f4d40c74b45ec08250f3e008ed8270be81c2",
+          "baselineEqual": true
+        },
+        {
+          "file": "P05-none.semantic.tsv",
+          "sha256": "257c9a95443dba8fab35ebc45f8938b5865f12a0d915dde3df3213baf8d69502",
+          "baselineEqual": true
+        },
+        {
+          "file": "P05-none.tsv",
+          "sha256": "05dd562ab1ea4f2fdffdc0f09b73cec90641d7485f69b5dc00fd315df5bd424a",
+          "baselineEqual": true
+        },
+        {
+          "file": "P05-x.semantic.tsv",
+          "sha256": "136e15d944f6af302f296d9317b1c2b2e9e98898767b60e79b1236dcd8601816",
+          "baselineEqual": true
+        },
+        {
+          "file": "P05-x.tsv",
+          "sha256": "440657557c5ad51598df7bb338c333b5412a87e5441ae99822a05f606600faa7",
+          "baselineEqual": true
+        },
+        {
+          "file": "P05-z.semantic.tsv",
+          "sha256": "ccc2ee33e30b2e6355ddcde1360a3a958ebd7b484b548e302dd6c0fc872bf1f1",
+          "baselineEqual": true
+        },
+        {
+          "file": "P05-z.tsv",
+          "sha256": "c90f8fee10712c0b0004af9de1f611bfddeecfbe24eda39531289396e41d0c8f",
+          "baselineEqual": true
+        },
+        {
+          "file": "P05-zero.semantic.tsv",
+          "sha256": "419190339ed3afec072c692a1c4e064fd40eedac5b4ece8009b0ee10f48393cd",
+          "baselineEqual": true
+        },
+        {
+          "file": "P05-zero.tsv",
+          "sha256": "42378d1d02f97f68da92779c45d49a1d857ab02dc12d7decab59ed62f9f5581a",
+          "baselineEqual": true
+        }
+      ],
+      "raw": [
+        {
+          "file": "P01.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P01.tsv",
+          "sha256": "6aef9c39c45e2c134bf80b7976d334116152d08055be5a5c3ab2e0dce89468b1",
+          "captureAEqual": true
+        },
+        {
+          "file": "P03-A-B.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P03-A-B.tsv",
+          "sha256": "b38b49d615e183ff7510394872d810c349101cd5649b5f1b593247d9829f6cc7",
+          "captureAEqual": true
+        },
+        {
+          "file": "P03-B-A.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P03-B-A.tsv",
+          "sha256": "ed775095c6852ef3ef0b1d2f222691493e5670537c4773d99239a170f072f5b9",
+          "captureAEqual": true
+        },
+        {
+          "file": "P04-alias.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P04-alias.tsv",
+          "sha256": "2c4a5fe95c2748c28edbee42e56c36418ffb8e734e2ccb25ada69b463591b2aa",
+          "captureAEqual": true
+        },
+        {
+          "file": "P04-order.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P04-order.tsv",
+          "sha256": "dac05f0bdb1100a4a46e884afbb1917bf6d0cbd3c9148521a5fb4209166013c4",
+          "captureAEqual": true
+        },
+        {
+          "file": "P05-none.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P05-none.tsv",
+          "sha256": "dc9cebdadd18cd85e639bbcb240ac5bb973cb64ae5e3ca5b7bd3d11f9f7e20c7",
+          "captureAEqual": true
+        },
+        {
+          "file": "P05-x.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P05-x.tsv",
+          "sha256": "0ebbadd7afb10b02d2285458a93ffb1667c1feb31e6fa127fc045592df07e56b",
+          "captureAEqual": true
+        },
+        {
+          "file": "P05-z.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P05-z.tsv",
+          "sha256": "bd1a21cb0c081008dbcedf5a1786d5083957272e56a516340fac928ed0046b2f",
+          "captureAEqual": true
+        },
+        {
+          "file": "P05-zero.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "captureAEqual": true
+        },
+        {
+          "file": "P05-zero.tsv",
+          "sha256": "911581913c0311f0c82718862cc0c6e0c0ffa8e610228d0e8101de48abe1b2ee",
+          "captureAEqual": true
+        }
+      ],
+      "currentToolAndInputHashesMatch": true,
+      "classpathComparisons": [
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\mars\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-promise\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-api\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib-qd-sandbox\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\auth\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-core\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto-ssl\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-rmi\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-impl\\target\\classes",
+          "captureAEqual": true
+        },
+        {
+          "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-scheme\\target\\classes",
+          "captureAEqual": true
+        }
+      ],
+      "result": "VERIFY PASS: 9 cases; expectations unchanged."
+    }
+  ]
+}

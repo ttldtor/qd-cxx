@@ -1,0 +1,30 @@
+case	P03-A-B
+options	describe=true; default protocol options; mixedSubscription=false; event flags/time=0; no field replacer; PentaCodec
+scheme.record	sender	0	R	false	[]
+scheme.field	sender	0	0	R.x	x	x	8
+scheme.field	sender	0	1	R.y	y	y	8
+scheme.record	sender	1	S	false	[]
+scheme.field	sender	1	0	S.x	x	x	8
+scheme.field	sender	1	1	S.y	y	y	8
+scheme.record	receiver	0	S	false	[]
+scheme.field	receiver	0	0	S.x	x	x	8
+scheme.field	receiver	0	1	S.y	y	y	8
+scheme.record	receiver	1	R	false	[]
+scheme.field	receiver	1	0	R.x	x	x	8
+scheme.field	receiver	1	1	R.y	y	y	8
+direction	P03-A-B
+wire	sender->receiver	0b0200015202017808017908060f0443000b160410044300
+frame	sender->receiver	0	12	2
+wire.record	sender->receiver	0	R	2
+wire.field	sender->receiver	0	0	x	8
+wire.field	sender->receiver	0	1	y	8
+frame	sender->receiver	12	19	15
+frame	sender->receiver	19	24	16
+replay	whole	[24]
+parse.begin	24
+record	0	STREAM_DATA|1|R|ABC|0=11(11)|1=22(22)
+callback	0	STREAM_DATA	1
+record	1	STREAM_ADD_SUBSCRIPTION|1|R|ABC
+callback	1	STREAM_ADD_SUBSCRIPTION	1
+parse.end	24	24	0	2	2	0
+complete	P03-A-B

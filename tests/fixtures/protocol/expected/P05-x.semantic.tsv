@@ -1,0 +1,3 @@
+incoming-request	record	0	STREAM_ADD_SUBSCRIPTION|0|R|ABC
+peer-whole	record	0	STREAM_DATA|1|R|ABC|0=11(11)
+audit-whole	record	0	STREAM_DATA|0|R|ABC|0=11(11)|1=0(0)|2=0(0)

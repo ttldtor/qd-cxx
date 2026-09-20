@@ -1,16 +1,16 @@
-# Proposed QTP oracle captures
+# QTP oracle captures and remaining proposals
 
-**Proposal only:** no captured output, golden bytes, Java execution or passing conformance test is included. Baseline: https://github.com/devexperts/QD.git, Java QD 3.355, commit `0ddc0a09779fb61d74cc0b37c6449ff47dcb715f`. Implements the evidence plan for [QTP boundaries](../../../spec/protocol/README.md) and [schema exchange](../../../spec/protocol/SCHEMA-EXCHANGE.md).
+**QDCXX-006 executed subset:** P01/P03/P04/P05 now have nine [captured subcases](COVERAGE.md), [exact and semantic expectations](expected/) and [validation/provenance](VALIDATION.md). Remaining rows and unlisted portions remain proposals; no C++ conformance is claimed. Baseline: https://github.com/devexperts/QD.git, Java QD 3.355, commit `0ddc0a09779fb61d74cc0b37c6449ff47dcb715f`. Implements the evidence plan for [QTP boundaries](../../../spec/protocol/README.md) and [schema exchange](../../../spec/protocol/SCHEMA-EXCHANGE.md).
 
 ## Capture contract
 
-Use tiny programmatic schemes (two named records, two or three fields) and in-memory BinaryQTPComposer/Parser first. Requested-layout and negotiation tests additionally need the actual connection parser/composer path: a bare composer/parser pair does not exercise schemeMap. Prefer an in-memory transport harness around MessageAdapterConnection; only timeout/reconnect integration needs transport scheduling. Do not add a harness/build dependency in QDCXX-004.
+Use tiny programmatic schemes (two named records, two or three fields) and in-memory BinaryQTPComposer/Parser first. Requested-layout and negotiation tests additionally need the actual connection parser/composer path: a bare composer/parser pair does not exercise schemeMap. Prefer an in-memory transport harness around MessageAdapterConnection; only timeout/reconnect integration needs transport scheduling. QDCXX-006 supplies the scoped [Java harness](../../../tools/upstream/protocol-oracle/README.md).
 
-Every future fixture should record commit/tag, harness revision/command, JDK, classpath/provider set, relevant JVM properties, both ordered local schemes (IDs, names, property/local/alias names, field types/slots), composer/parser options, direction, exact input/output bytes in hex, chunk split schedule and ordered callbacks/errors. Capture raw values as well as interpreted field strings; snapshot callbacks immediately because buffers are reused. Keep raw observations and normalized expectations separate. Record connection close/restart separately from parser corruption. Freeze or annotate clock/EndpointId variation. Do not store real auth secrets. Review provenance/licensing before retaining upstream-derived data.
+The executed harness records the following contract; future fixtures should also record commit/tag, harness revision/command, JDK, classpath/provider set, relevant JVM properties, both ordered local schemes (IDs, names, property/local/alias names, field types/slots), composer/parser options, direction, exact input/output bytes in hex, chunk split schedule and ordered callbacks/errors. Capture raw values as well as interpreted field strings; snapshot callbacks immediately because buffers are reused. Keep raw observations and normalized expectations separate. Record connection close/restart separately from parser corruption. Freeze or annotate clock/EndpointId variation. Do not store real auth secrets. Review provenance/licensing before retaining upstream-derived data.
 
 ## Minimal scenarios
 
-Each row is a small scenario family; start with P01, P03–P06 and P09, then add edge cases. Outcomes below are hypotheses to observe, not golden expectations.
+Each row is a small scenario family; start with P01, P03–P06 and P09, then add edge cases. Rows below retain the family proposal; measured outcomes are linked in [COVERAGE.md](COVERAGE.md) and [CAPTURES.md](../../../spec/protocol/CAPTURES.md).
 
 | ID | Smallest useful stimulus | Capture/compare | Source basis |
 | --- | --- | --- | --- |

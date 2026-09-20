@@ -13,14 +13,14 @@ The repository currently defines working and contribution rules, documentation a
 - Completed: `QDCXX-003`, initial source-linked XML schema and DataScheme investigation; runtime oracle captures and normalized-model decisions remain follow-up work.
 - Completed: `QDCXX-004`, source-linked QTP framing/protocol inventory and local DataScheme/wire-schema mapping; executable oracle validation remains follow-up work.
 - Completed: `QDCXX-005`, Java schema oracle tooling and 17 captured subcases, with independent reproducibility and positive/negative verify checks.
-- Proposed: `QDCXX-006`, in-memory QTP captures, dependent on QDCXX-005 tooling.
+- Completed: `QDCXX-006`, nine in-memory QTP P01/P03/P04/P05 captures, real connection requested-layout path and reproducibility/verify evidence.
 - Proposed: `QDCXX-007`, normalized-model requirements and proposed compatibility ADR, dependent on QDCXX-005/006 evidence.
 
 ## Next milestone: executable oracle baseline
 
 The schema portion now has an [executable oracle baseline](../tools/upstream/schema-oracle/README.md), scoped by [exact coverage](../tests/fixtures/schema/COVERAGE.md). Task-scoped Java tooling is permitted; production C++ and dependency selection remain deferred.
 
-QDCXX-006 protocol bytes/observations is a proposed next session, then QDCXX-007 model proposals. Neither was started in QDCXX-005. Source findings alone do not establish executable compatibility. Remaining edge cases, negotiation, conversion matrices, reset/PART and dxFeed provider profiles stay open for later focused work.
+QDCXX-006 now supplies protocol bytes/observations. QDCXX-007 model proposals remain a separate, unstarted task. Source findings alone do not establish executable compatibility. Remaining edge cases, negotiation, conversion matrices, reset/PART and dxFeed provider profiles stay open for later focused work.
 
 ## Near-term exit criteria
 
@@ -66,7 +66,7 @@ Recorded for `QDCXX-005` on 2026-09-20:
 - [Validation evidence](../tests/fixtures/schema/VALIDATION.md) retains original inputs, raw observations, normalized expectations, exact commands and provenance. Two independent captures reproduce all expectations; verify rejects a temporary 0-to-999 count mutation and passes the unchanged baseline.
 - Runtime confirms the source-predicted copy-main-alias quirk and distinct exception families. No unexplained semantic discrepancy remains in these subcases. The observation format is not a normalized-model decision.
 - Existing Zulu JDK 8 matches the upstream enforcer requirement. Maven cache location and JAXB temporary working directory are explicit accommodations; no upstream source/POM patch or substitute QD binary is used.
-- Upstream tests were skipped, and full schema/provider/property parity is not claimed. QTP captures, parser/rebuild edge cases, C++ implementation and C++ conformance remain unexecuted.
+- Upstream tests were skipped, and full schema/provider/property parity is not claimed. QTP captures were subsequently added by QDCXX-006 below; broader parser/rebuild edge cases, C++ implementation and C++ conformance remain unexecuted.
 
 ## Schema investigation baseline
 
@@ -87,3 +87,13 @@ Recorded for `QDCXX-004` on 2026-09-20:
 - [Locked source index](../spec/protocol/SOURCES.md), [encoding dependencies](../spec/encoding/README.md), [13 proposed capture families](../tests/fixtures/protocol/README.md) and [QT-01–QT-09 questions](upstream/OPEN-QUESTIONS.md#qtp-investigation-qdcxx-004) distinguish source facts, documentation/test assertions, inferences and unknowns.
 - Source review identified non-atomic record-description errors, message-local symbol state, retained writer cache/PART state across resetSession, and protocol-hook documentation/source ordering disagreement. These need captures and compatibility review rather than silent normalization.
 - Verified locked upstream checkout and documentation links/diff; no Java build/test or runtime capture. All five inventory acceptance criteria are addressed. No production C++, dependencies, wire change or networking choice was added; byte-level compatibility is not yet demonstrated.
+
+## Executable QTP baseline
+
+Recorded for `QDCXX-006` on 2026-09-20, High reasoning:
+
+- [Protocol harness](../tools/upstream/protocol-oracle/README.md) reuses locked-source clean builds, provenance and capture/verify conventions. All builds on the shared checkout ran sequentially.
+- [Nine cases](../tests/fixtures/protocol/COVERAGE.md) cover P01 (32 schedules), P03 both ID-remapping directions with data/subscription, P04 reordered/absent/alias-property fields, and P05 none/zero/x/absent-z requests using real MessageAdapterConnection parser/composer paths.
+- [Exact captures and separate semantic expectations](../tests/fixtures/protocol/expected/) preserve bytes, callbacks, raw values, local slots and chunk schedules. Fragmentation preserves ordered records while callback batching differs. Zero original fields selects all fields; nonempty absent-z selects zero outgoing fields but still delivers a record.
+- [Validation](../tests/fixtures/protocol/VALIDATION.md) records independent clean-build reproduction and negative/positive verify with unchanged expectations. Metadata identifies tool/input source hashes, upstream, commands, JDK and providers.
+- [Measured specification](../spec/protocol/CAPTURES.md) bounds the observations. P06 conversion, P09 negotiation, malformed/reset/PART, auth, sockets and timing remain pending; P05 metadata instrumentation is explicit. No QDCXX-007 or C++ work was performed.

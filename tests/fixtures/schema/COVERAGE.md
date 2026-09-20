@@ -1,5 +1,7 @@
 # Executed schema coverage — QDCXX-005
 
+[Русская версия](COVERAGE.ru.md). This English document is authoritative.
+
 The machine-readable ordered invocation list is [cases.json](cases.json); all XML in [inputs](inputs/) was independently authored for this task. Results are Java QD 3.355 observations, not C++ conformance tests. Each row below denotes one fresh JVM with separate model and runtime loads.
 
 | Subcase | Measured observation | Deferred in this family |

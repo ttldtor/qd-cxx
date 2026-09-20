@@ -2,7 +2,7 @@
 
 Initial descriptive result of QDCXX-004, Java QD **3.355**, commit **`0ddc0a09779fb61d74cc0b37c6449ff47dcb715f`**. This is research, not a complete normative wire specification or C++ API decision.
 
-Evidence: **S** = inspected source; **D** = upstream documentation/comment or test assertion (not a test run); **I** = inference/proposal; **U** = unresolved or unmeasured. All source names resolve through the immutable [source inventory](SOURCES.md). No Java execution or captured wire output is claimed.
+Evidence: **S** = inspected source; **D** = upstream documentation/comment or test assertion (not a test run); **I** = inference/proposal; **U** = unresolved or unmeasured. All source names resolve through the immutable [source inventory](SOURCES.md). **C** = executed capture, introduced by QDCXX-006 only for the bounded [measured cases](CAPTURES.md). The source inventory below remains source-level evidence unless linked to those captures.
 
 Read alongside [DataScheme and wire schema](SCHEMA-EXCHANGE.md), [encoding dependencies](../encoding/README.md), [capture proposals](../../tests/fixtures/protocol/README.md), and [open questions](../../docs/upstream/OPEN-QUESTIONS.md#qtp-investigation-qdcxx-004).
 
@@ -82,4 +82,4 @@ Sources: [framing/record classes](SOURCES.md#framing-and-records), [PentaCodec](
 
 ## Validation and limits
 
-HEAD and release tag matched upstream.lock; reused external checkout was clean. Source methods and test assertions were inspected; no Java build/test, socket experiment, benchmark or oracle capture was run. This does not fully specify primitive encodings, malformed resource limits, RMI, file resynchronization, TLS/compression, auth or every adapter transition. [Capture proposals](../../tests/fixtures/protocol/README.md) contain no invented golden bytes.
+QDCXX-004 verified the locked checkout and inspected source/tests without execution. QDCXX-006 adds source-built Java captures for P01/P03/P04/P05, with [exact scope, reproducibility and verification](../../tests/fixtures/protocol/VALIDATION.md); upstream tests, sockets and benchmarks remain unexecuted. This does not fully specify primitive encodings, malformed resource limits, RMI, file resynchronization, TLS/compression, auth or every adapter transition. [Capture inventory](../../tests/fixtures/protocol/README.md) distinguishes executed subsets from pending families.

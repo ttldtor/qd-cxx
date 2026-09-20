@@ -6,4 +6,4 @@ Each test should identify the specification rule it exercises and the fixture pr
 
 No test framework has been selected yet.
 
-QDCXX-004 supplies a [protocol capture plan](../fixtures/protocol/README.md) covering incremental framing, directional schema mappings, requested-field adaptation, negotiation and reset/error boundaries. These are proposals, not executable tests or reviewed golden outputs. Compare stream/record semantics separately from parser callback batching and transport close policy.
+QDCXX-004 supplies a [protocol capture plan](../fixtures/protocol/README.md) covering incremental framing, directional schema mappings, requested-field adaptation, negotiation and reset/error boundaries. QDCXX-006 now supplies [nine executed Java cases](../fixtures/protocol/COVERAGE.md) with exact captures and separate ordered-record semantic expectations. Unlisted families remain proposals; no C++ tests or framework have been introduced. Compare stream/record semantics separately from parser callback batching and transport close policy.

@@ -1,5 +1,7 @@
 # QDCXX-005 executed validation
 
+[Русская версия](VALIDATION.ru.md). This English document is authoritative.
+
 Executed on **2026-09-20**, Windows 11 amd64 / PowerShell 7.6.6, upstream QD 3.355 commit `0ddc0a09779fb61d74cc0b37c6449ff47dcb715f`. Zulu JDK 1.8.0_422-b05 and Maven 3.9.16 were already installed. JAXP is the JDK's Xerces DOM/SchemaFactory implementation. The native upstream reactor was rebuilt with tests and build-cache reuse disabled for each run; the enforcer remained enabled.
 
 ## Results

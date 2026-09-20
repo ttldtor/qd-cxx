@@ -56,3 +56,7 @@ Sources: [ConnectionQTPParser/Composer](SOURCES.md#connection-and-transport), [B
 Sources: [BinaryQTPParser; BinaryRecordDesc](SOURCES.md#framing-and-records), [RecordBuffer](SOURCES.md#encoding-and-core), [FieldAdaptationTest](SOURCES.md#upstream-tests).
 
 **I:** Future protocol state needs incoming ID/layout mappings and chosen outgoing layouts separately from the local scheme. This does not prescribe Java arrays, cache policy, locks or C++ types. See P03–P08/P12 [capture scenarios](../../tests/fixtures/protocol/README.md).
+
+## Executed subset (QDCXX-006)
+
+**C:** [Measured evidence](CAPTURES.md) now confirms bounded P03 directional ID mapping, P04 reordering/alias-property lookup/raw-zero slots, and P05 absent/zero/x/absent-z requested layouts through the actual connection path. The example above remains illustrative; exact R/S captures are separately linked. Originally empty and empty-intersection requests are observably different. No generic default-value, numeric conversion, dynamic layout or session-reset rule is inferred from these nine cases.

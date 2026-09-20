@@ -1,0 +1,2 @@
+whole	record	0	STREAM_DATA|0|R|ABC|0=11(11)|1=22(22)
+whole	record	1	STREAM_ADD_SUBSCRIPTION|0|R|ABC

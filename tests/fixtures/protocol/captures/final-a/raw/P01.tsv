@@ -1,0 +1,377 @@
+case	P01
+options	describe=true; default protocol options; mixedSubscription=false; event flags/time=0; no field replacer; PentaCodec
+scheme.record	sender	0	R	false	[]
+scheme.field	sender	0	0	R.x	x	x	8
+scheme.field	sender	0	1	R.y	y	y	8
+scheme.record	sender	1	S	false	[]
+scheme.field	sender	1	0	S.x	x	x	8
+scheme.field	sender	1	1	S.y	y	y	8
+scheme.record	receiver	0	S	false	[]
+scheme.field	receiver	0	0	S.x	x	x	8
+scheme.field	receiver	0	1	S.y	y	y	8
+scheme.record	receiver	1	R	false	[]
+scheme.field	receiver	1	0	R.x	x	x	8
+scheme.field	receiver	1	1	R.y	y	y	8
+direction	P01
+wire	sender->receiver	0b02000152020178080179080a0f0443000b16ff00212c070f044300378042
+frame	sender->receiver	0	12	2
+wire.record	sender->receiver	0	R	2
+wire.field	sender->receiver	0	0	x	8
+wire.field	sender->receiver	0	1	y	8
+frame	sender->receiver	12	23	15
+frame	sender->receiver	23	31	15
+replay	whole	[31]
+parse.begin	31
+record	0	STREAM_DATA|1|R|ABC|0=11(11)|1=22(22)
+record	1	STREAM_DATA|1|R|ABC|0=33(33)|1=44(44)
+record	2	STREAM_DATA|1|R|ABC|0=55(55)|1=66(66)
+callback	0	STREAM_DATA	3
+parse.end	31	31	0	3	1	0
+replay	split-1	[1, 30]
+parse.begin	1
+parse.end	1	0	1	0	0	0
+parse.begin	31
+record	0	STREAM_DATA|1|R|ABC|0=11(11)|1=22(22)
+record	1	STREAM_DATA|1|R|ABC|0=33(33)|1=44(44)
+record	2	STREAM_DATA|1|R|ABC|0=55(55)|1=66(66)
+callback	0	STREAM_DATA	3
+parse.end	31	31	0	3	1	0
+replay	split-2	[2, 29]
+parse.begin	2
+parse.end	2	0	2	0	0	0
+parse.begin	31
+record	0	STREAM_DATA|1|R|ABC|0=11(11)|1=22(22)
+record	1	STREAM_DATA|1|R|ABC|0=33(33)|1=44(44)
+record	2	STREAM_DATA|1|R|ABC|0=55(55)|1=66(66)
+callback	0	STREAM_DATA	3
+parse.end	31	31	0	3	1	0
+replay	split-3	[3, 28]
+parse.begin	3
+parse.end	3	0	3	0	0	0
+parse.begin	31
+record	0	STREAM_DATA|1|R|ABC|0=11(11)|1=22(22)
+record	1	STREAM_DATA|1|R|ABC|0=33(33)|1=44(44)
+record	2	STREAM_DATA|1|R|ABC|0=55(55)|1=66(66)
+callback	0	STREAM_DATA	3
+parse.end	31	31	0	3	1	0
+replay	split-4	[4, 27]
+parse.begin	4
+parse.end	4	0	4	0	0	0
+parse.begin	31
+record	0	STREAM_DATA|1|R|ABC|0=11(11)|1=22(22)
+record	1	STREAM_DATA|1|R|ABC|0=33(33)|1=44(44)
+record	2	STREAM_DATA|1|R|ABC|0=55(55)|1=66(66)
+callback	0	STREAM_DATA	3
+parse.end	31	31	0	3	1	0
+replay	split-5	[5, 26]
+parse.begin	5
+parse.end	5	0	5	0	0	0
+parse.begin	31
+record	0	STREAM_DATA|1|R|ABC|0=11(11)|1=22(22)
+record	1	STREAM_DATA|1|R|ABC|0=33(33)|1=44(44)
+record	2	STREAM_DATA|1|R|ABC|0=55(55)|1=66(66)
+callback	0	STREAM_DATA	3
+parse.end	31	31	0	3	1	0
+replay	split-6	[6, 25]
+parse.begin	6
+parse.end	6	0	6	0	0	0
+parse.begin	31
+record	0	STREAM_DATA|1|R|ABC|0=11(11)|1=22(22)
+record	1	STREAM_DATA|1|R|ABC|0=33(33)|1=44(44)
+record	2	STREAM_DATA|1|R|ABC|0=55(55)|1=66(66)
+callback	0	STREAM_DATA	3
+parse.end	31	31	0	3	1	0
+replay	split-7	[7, 24]
+parse.begin	7
+parse.end	7	0	7	0	0	0
+parse.begin	31
+record	0	STREAM_DATA|1|R|ABC|0=11(11)|1=22(22)
+record	1	STREAM_DATA|1|R|ABC|0=33(33)|1=44(44)
+record	2	STREAM_DATA|1|R|ABC|0=55(55)|1=66(66)
+callback	0	STREAM_DATA	3
+parse.end	31	31	0	3	1	0
+replay	split-8	[8, 23]
+parse.begin	8
+parse.end	8	0	8	0	0	0
+parse.begin	31
+record	0	STREAM_DATA|1|R|ABC|0=11(11)|1=22(22)
+record	1	STREAM_DATA|1|R|ABC|0=33(33)|1=44(44)
+record	2	STREAM_DATA|1|R|ABC|0=55(55)|1=66(66)
+callback	0	STREAM_DATA	3
+parse.end	31	31	0	3	1	0
+replay	split-9	[9, 22]
+parse.begin	9
+parse.end	9	0	9	0	0	0
+parse.begin	31
+record	0	STREAM_DATA|1|R|ABC|0=11(11)|1=22(22)
+record	1	STREAM_DATA|1|R|ABC|0=33(33)|1=44(44)
+record	2	STREAM_DATA|1|R|ABC|0=55(55)|1=66(66)
+callback	0	STREAM_DATA	3
+parse.end	31	31	0	3	1	0
+replay	split-10	[10, 21]
+parse.begin	10
+parse.end	10	0	10	0	0	0
+parse.begin	31
+record	0	STREAM_DATA|1|R|ABC|0=11(11)|1=22(22)
+record	1	STREAM_DATA|1|R|ABC|0=33(33)|1=44(44)
+record	2	STREAM_DATA|1|R|ABC|0=55(55)|1=66(66)
+callback	0	STREAM_DATA	3
+parse.end	31	31	0	3	1	0
+replay	split-11	[11, 20]
+parse.begin	11
+parse.end	11	0	11	0	0	0
+parse.begin	31
+record	0	STREAM_DATA|1|R|ABC|0=11(11)|1=22(22)
+record	1	STREAM_DATA|1|R|ABC|0=33(33)|1=44(44)
+record	2	STREAM_DATA|1|R|ABC|0=55(55)|1=66(66)
+callback	0	STREAM_DATA	3
+parse.end	31	31	0	3	1	0
+replay	split-12	[12, 19]
+parse.begin	12
+parse.end	12	12	0	0	0	0
+parse.begin	31
+record	0	STREAM_DATA|1|R|ABC|0=11(11)|1=22(22)
+record	1	STREAM_DATA|1|R|ABC|0=33(33)|1=44(44)
+record	2	STREAM_DATA|1|R|ABC|0=55(55)|1=66(66)
+callback	0	STREAM_DATA	3
+parse.end	31	31	0	3	1	0
+replay	split-13	[13, 18]
+parse.begin	13
+parse.end	13	12	1	0	0	0
+parse.begin	31
+record	0	STREAM_DATA|1|R|ABC|0=11(11)|1=22(22)
+record	1	STREAM_DATA|1|R|ABC|0=33(33)|1=44(44)
+record	2	STREAM_DATA|1|R|ABC|0=55(55)|1=66(66)
+callback	0	STREAM_DATA	3
+parse.end	31	31	0	3	1	0
+replay	split-14	[14, 17]
+parse.begin	14
+parse.end	14	12	2	0	0	0
+parse.begin	31
+record	0	STREAM_DATA|1|R|ABC|0=11(11)|1=22(22)
+record	1	STREAM_DATA|1|R|ABC|0=33(33)|1=44(44)
+record	2	STREAM_DATA|1|R|ABC|0=55(55)|1=66(66)
+callback	0	STREAM_DATA	3
+parse.end	31	31	0	3	1	0
+replay	split-15	[15, 16]
+parse.begin	15
+parse.end	15	12	3	0	0	0
+parse.begin	31
+record	0	STREAM_DATA|1|R|ABC|0=11(11)|1=22(22)
+record	1	STREAM_DATA|1|R|ABC|0=33(33)|1=44(44)
+record	2	STREAM_DATA|1|R|ABC|0=55(55)|1=66(66)
+callback	0	STREAM_DATA	3
+parse.end	31	31	0	3	1	0
+replay	split-16	[16, 15]
+parse.begin	16
+parse.end	16	12	4	0	0	0
+parse.begin	31
+record	0	STREAM_DATA|1|R|ABC|0=11(11)|1=22(22)
+record	1	STREAM_DATA|1|R|ABC|0=33(33)|1=44(44)
+record	2	STREAM_DATA|1|R|ABC|0=55(55)|1=66(66)
+callback	0	STREAM_DATA	3
+parse.end	31	31	0	3	1	0
+replay	split-17	[17, 14]
+parse.begin	17
+parse.end	17	12	5	0	0	0
+parse.begin	31
+record	0	STREAM_DATA|1|R|ABC|0=11(11)|1=22(22)
+record	1	STREAM_DATA|1|R|ABC|0=33(33)|1=44(44)
+record	2	STREAM_DATA|1|R|ABC|0=55(55)|1=66(66)
+callback	0	STREAM_DATA	3
+parse.end	31	31	0	3	1	0
+replay	split-18	[18, 13]
+parse.begin	18
+parse.end	18	12	6	0	0	0
+parse.begin	31
+record	0	STREAM_DATA|1|R|ABC|0=11(11)|1=22(22)
+record	1	STREAM_DATA|1|R|ABC|0=33(33)|1=44(44)
+record	2	STREAM_DATA|1|R|ABC|0=55(55)|1=66(66)
+callback	0	STREAM_DATA	3
+parse.end	31	31	0	3	1	0
+replay	split-19	[19, 12]
+parse.begin	19
+parse.end	19	12	7	0	0	0
+parse.begin	31
+record	0	STREAM_DATA|1|R|ABC|0=11(11)|1=22(22)
+record	1	STREAM_DATA|1|R|ABC|0=33(33)|1=44(44)
+record	2	STREAM_DATA|1|R|ABC|0=55(55)|1=66(66)
+callback	0	STREAM_DATA	3
+parse.end	31	31	0	3	1	0
+replay	split-20	[20, 11]
+parse.begin	20
+parse.end	20	12	8	0	0	0
+parse.begin	31
+record	0	STREAM_DATA|1|R|ABC|0=11(11)|1=22(22)
+record	1	STREAM_DATA|1|R|ABC|0=33(33)|1=44(44)
+record	2	STREAM_DATA|1|R|ABC|0=55(55)|1=66(66)
+callback	0	STREAM_DATA	3
+parse.end	31	31	0	3	1	0
+replay	split-21	[21, 10]
+parse.begin	21
+parse.end	21	12	9	0	0	0
+parse.begin	31
+record	0	STREAM_DATA|1|R|ABC|0=11(11)|1=22(22)
+record	1	STREAM_DATA|1|R|ABC|0=33(33)|1=44(44)
+record	2	STREAM_DATA|1|R|ABC|0=55(55)|1=66(66)
+callback	0	STREAM_DATA	3
+parse.end	31	31	0	3	1	0
+replay	split-22	[22, 9]
+parse.begin	22
+parse.end	22	12	10	0	0	0
+parse.begin	31
+record	0	STREAM_DATA|1|R|ABC|0=11(11)|1=22(22)
+record	1	STREAM_DATA|1|R|ABC|0=33(33)|1=44(44)
+record	2	STREAM_DATA|1|R|ABC|0=55(55)|1=66(66)
+callback	0	STREAM_DATA	3
+parse.end	31	31	0	3	1	0
+replay	split-23	[23, 8]
+parse.begin	23
+record	0	STREAM_DATA|1|R|ABC|0=11(11)|1=22(22)
+record	1	STREAM_DATA|1|R|ABC|0=33(33)|1=44(44)
+callback	0	STREAM_DATA	2
+parse.end	23	23	0	2	1	0
+parse.begin	31
+record	2	STREAM_DATA|1|R|ABC|0=55(55)|1=66(66)
+callback	1	STREAM_DATA	1
+parse.end	31	31	0	3	2	0
+replay	split-24	[24, 7]
+parse.begin	24
+record	0	STREAM_DATA|1|R|ABC|0=11(11)|1=22(22)
+record	1	STREAM_DATA|1|R|ABC|0=33(33)|1=44(44)
+callback	0	STREAM_DATA	2
+parse.end	24	23	1	2	1	0
+parse.begin	31
+record	2	STREAM_DATA|1|R|ABC|0=55(55)|1=66(66)
+callback	1	STREAM_DATA	1
+parse.end	31	31	0	3	2	0
+replay	split-25	[25, 6]
+parse.begin	25
+record	0	STREAM_DATA|1|R|ABC|0=11(11)|1=22(22)
+record	1	STREAM_DATA|1|R|ABC|0=33(33)|1=44(44)
+callback	0	STREAM_DATA	2
+parse.end	25	23	2	2	1	0
+parse.begin	31
+record	2	STREAM_DATA|1|R|ABC|0=55(55)|1=66(66)
+callback	1	STREAM_DATA	1
+parse.end	31	31	0	3	2	0
+replay	split-26	[26, 5]
+parse.begin	26
+record	0	STREAM_DATA|1|R|ABC|0=11(11)|1=22(22)
+record	1	STREAM_DATA|1|R|ABC|0=33(33)|1=44(44)
+callback	0	STREAM_DATA	2
+parse.end	26	23	3	2	1	0
+parse.begin	31
+record	2	STREAM_DATA|1|R|ABC|0=55(55)|1=66(66)
+callback	1	STREAM_DATA	1
+parse.end	31	31	0	3	2	0
+replay	split-27	[27, 4]
+parse.begin	27
+record	0	STREAM_DATA|1|R|ABC|0=11(11)|1=22(22)
+record	1	STREAM_DATA|1|R|ABC|0=33(33)|1=44(44)
+callback	0	STREAM_DATA	2
+parse.end	27	23	4	2	1	0
+parse.begin	31
+record	2	STREAM_DATA|1|R|ABC|0=55(55)|1=66(66)
+callback	1	STREAM_DATA	1
+parse.end	31	31	0	3	2	0
+replay	split-28	[28, 3]
+parse.begin	28
+record	0	STREAM_DATA|1|R|ABC|0=11(11)|1=22(22)
+record	1	STREAM_DATA|1|R|ABC|0=33(33)|1=44(44)
+callback	0	STREAM_DATA	2
+parse.end	28	23	5	2	1	0
+parse.begin	31
+record	2	STREAM_DATA|1|R|ABC|0=55(55)|1=66(66)
+callback	1	STREAM_DATA	1
+parse.end	31	31	0	3	2	0
+replay	split-29	[29, 2]
+parse.begin	29
+record	0	STREAM_DATA|1|R|ABC|0=11(11)|1=22(22)
+record	1	STREAM_DATA|1|R|ABC|0=33(33)|1=44(44)
+callback	0	STREAM_DATA	2
+parse.end	29	23	6	2	1	0
+parse.begin	31
+record	2	STREAM_DATA|1|R|ABC|0=55(55)|1=66(66)
+callback	1	STREAM_DATA	1
+parse.end	31	31	0	3	2	0
+replay	split-30	[30, 1]
+parse.begin	30
+record	0	STREAM_DATA|1|R|ABC|0=11(11)|1=22(22)
+record	1	STREAM_DATA|1|R|ABC|0=33(33)|1=44(44)
+callback	0	STREAM_DATA	2
+parse.end	30	23	7	2	1	0
+parse.begin	31
+record	2	STREAM_DATA|1|R|ABC|0=55(55)|1=66(66)
+callback	1	STREAM_DATA	1
+parse.end	31	31	0	3	2	0
+replay	bytewise	[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+parse.begin	1
+parse.end	1	0	1	0	0	0
+parse.begin	2
+parse.end	2	0	2	0	0	0
+parse.begin	3
+parse.end	3	0	3	0	0	0
+parse.begin	4
+parse.end	4	0	4	0	0	0
+parse.begin	5
+parse.end	5	0	5	0	0	0
+parse.begin	6
+parse.end	6	0	6	0	0	0
+parse.begin	7
+parse.end	7	0	7	0	0	0
+parse.begin	8
+parse.end	8	0	8	0	0	0
+parse.begin	9
+parse.end	9	0	9	0	0	0
+parse.begin	10
+parse.end	10	0	10	0	0	0
+parse.begin	11
+parse.end	11	0	11	0	0	0
+parse.begin	12
+parse.end	12	12	0	0	0	0
+parse.begin	13
+parse.end	13	12	1	0	0	0
+parse.begin	14
+parse.end	14	12	2	0	0	0
+parse.begin	15
+parse.end	15	12	3	0	0	0
+parse.begin	16
+parse.end	16	12	4	0	0	0
+parse.begin	17
+parse.end	17	12	5	0	0	0
+parse.begin	18
+parse.end	18	12	6	0	0	0
+parse.begin	19
+parse.end	19	12	7	0	0	0
+parse.begin	20
+parse.end	20	12	8	0	0	0
+parse.begin	21
+parse.end	21	12	9	0	0	0
+parse.begin	22
+parse.end	22	12	10	0	0	0
+parse.begin	23
+record	0	STREAM_DATA|1|R|ABC|0=11(11)|1=22(22)
+record	1	STREAM_DATA|1|R|ABC|0=33(33)|1=44(44)
+callback	0	STREAM_DATA	2
+parse.end	23	23	0	2	1	0
+parse.begin	24
+parse.end	24	23	1	2	1	0
+parse.begin	25
+parse.end	25	23	2	2	1	0
+parse.begin	26
+parse.end	26	23	3	2	1	0
+parse.begin	27
+parse.end	27	23	4	2	1	0
+parse.begin	28
+parse.end	28	23	5	2	1	0
+parse.begin	29
+parse.end	29	23	6	2	1	0
+parse.begin	30
+parse.end	30	23	7	2	1	0
+parse.begin	31
+record	2	STREAM_DATA|1|R|ABC|0=55(55)|1=66(66)
+callback	1	STREAM_DATA	1
+parse.end	31	31	0	3	2	0
+semantic.invariance	pass	32	schedules; callback grouping excluded
+complete	P01
