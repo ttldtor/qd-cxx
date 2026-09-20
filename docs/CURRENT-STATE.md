@@ -9,7 +9,7 @@ The repository currently defines working and contribution rules, documentation a
 ## Task status
 
 - Completed: `QDCXX-001`, repository and workflow bootstrap.
-- Ready: `QDCXX-002`, verify and document the pinned Java QD upstream.
+- Completed: `QDCXX-002`, verified Java QD 3.355 provenance and documented reproducible upstream inspection.
 - Ready: `QDCXX-003`, analyze XML schema and DataScheme semantics without implementing them in C++.
 - Ready: `QDCXX-004`, inventory QTP framing and protocol boundaries.
 
@@ -34,5 +34,16 @@ Checked for `QDCXX-001` on 2026-09-20:
 - [x] Relative Markdown links in tracked documentation resolve to repository files.
 - [x] Documentation-only validation and local-file ignore rules are recorded without introducing production code, build configuration, or dependencies.
 - [x] Deferred architecture and dependency choices remain explicitly undecided in `docs/ARCHITECTURE.md`; upstream semantic unknowns are listed in `docs/upstream/OPEN-QUESTIONS.md` and assigned research is scoped in `tasks/`.
+
+## Upstream baseline validation
+
+Checked for `QDCXX-002` on 2026-09-20:
+
+- [x] `https://github.com/devexperts/QD.git` is fetchable and contains the locked commit.
+- [x] Annotated tag `qd-qds-3.355` peels to `0ddc0a09779fb61d74cc0b37c6449ff47dcb715f`.
+- [x] The root POM and release notes at that commit identify version 3.355.
+- [x] Exact detached-checkout and lock-update review procedures are documented in `docs/UPSTREAM.md`.
+- [x] Relevant top-level modules are inventoried without attempting the schema or QTP semantic analysis assigned to later tasks.
+- [x] The public-GitHub/internal-SCM metadata ambiguity is recorded in `docs/upstream/OPEN-QUESTIONS.md`.
 
 Update this file whenever the project phase, active work, or major known limitation changes.
