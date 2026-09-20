@@ -16,10 +16,11 @@ Start with:
 4. `tasks/README.md`
 5. The assigned task under `tasks/`
 
+Contributor workflow and documentation-only validation are described in [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
 ## Initial workflow
 
 1. Pin and inspect the Java upstream recorded in `upstream.lock`.
 2. Extract observable contracts into `spec/` with source traceability.
 3. Capture representative Java behavior as reviewed fixtures.
 4. Add C++ components only after their boundaries and acceptance evidence are understood.
-
