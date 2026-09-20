@@ -1,0 +1,16 @@
+[
+  {
+    "name": "uncrustify",
+    "version": "0.83.0",
+    "url": "https://github.com/uncrustify/uncrustify/releases/download/uncrustify-0.83.0/uncrustify-0.83.0_f-win64.zip",
+    "sha256": "af017849b2002bb1d23ec72959450adeac00a274612e62029b175a37f4178805",
+    "executable": "uncrustify-0.83.0/bin/uncrustify.exe"
+  },
+  {
+    "name": "clang-format",
+    "version": "20.1.8",
+    "url": "https://files.pythonhosted.org/packages/bd/ee/656287efdf58dccc7a7299fab547fe1313b49ca1ea1607ea475b262d640f/clang_format-20.1.8-py2.py3-none-win_amd64.whl",
+    "sha256": "346ac8cab571eaba4d6b89dfa30fdbbc512db82a66ab0eeb1763cacc5977e325",
+    "executable": "clang-format-20.1.8/clang_format/data/bin/clang-format.exe"
+  }
+]

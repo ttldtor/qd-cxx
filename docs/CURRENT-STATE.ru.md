@@ -2,15 +2,19 @@
 
 [English version](CURRENT-STATE.md). Английский документ является основным.
 
+## Первый компонент C++
+
+QDCXX-010 — done, High: минимальная C++23-сборка, compact int/long codec, conformance по Java-векторам и закреплённый процесс форматирования. Реализовано и проверено на MSVC и ClangCL в Debug/Release: 832 выбранных Java observations, закреплённое форматирование и негативные проверки. [Сборка/API](CPP-BUILD.ru.md), [валидация](../tests/conformance/encoding/VALIDATION.ru.md). Существующие fixtures и upstream.lock неизменны. UTFString, importer и transport требуют последующих утверждённых задач.
+
 ## Утверждение ADR
 
 Утверждено владельцем проекта 2026-09-21. Три границы определяют логическое владение и не требуют трёх форматов файлов или трёх подсистем сериализации. Core может использовать разрешённую локальную схему без загрузки XML и его истории. Потеря copied main alias сохраняется только для XML-импорта в закреплённом профиле QD 3.355; это не требование к будущему программному созданию схем в C++. Java slot projection сохраняется без предписания физического хранения C++. Утверждена структурированная диагностика unsupported-local-type для BYTE/SHORT с сохранением отклонения локального построения; это не запрещает их wire-коды. Исходные requests и selected layouts остаются раздельными. JSON принят для обмена описаниями схем; библиотеки, канонические хеши и сериализация всей сессии остаются открытыми. Существующие oracle-доказательства неизменны.
 
 ## Фаза
 
-**Specification baseline / repository bootstrap.**
+**Specification baseline с ограниченной реализацией compact integer на C++23.**
 
-Репозиторий определяет правила работы и участия, области документации и спецификаций, закрепление upstream и первые исследовательские задачи. Production C++ implementation, build configuration, dependency selection и опубликованного API нет.
+Репозиторий содержит спецификации и Java oracle evidence, а также библиотеку compact int/long QDCXX-010, минимальные CMake/CTest и закреплённое форматирование C++. API предварительный; сторонние runtime-зависимости не выбраны.
 
 Завершены: QDCXX-008 — контракт JSON и примеры; QDCXX-009 — векторы и контракт примитивных кодировок. Дальнейшие C++/importer требуют отдельной утверждённой задачи. Старые записи ниже описывают состояние при завершении соответствующих задач.
 
@@ -36,8 +40,8 @@ QDCXX-006 предоставляет protocol bytes/observations. QDCXX-007 пр
 
 ## Текущие нецели
 
-- C++ source code или generated code;
-- CMake или dependency-manager configuration;
+- production-компоненты вне утверждённого compact integer scope или generated code;
+- dependency-manager configuration;
 - выбор Asio или другого transport runtime;
 - заявления о производительности;
 - стабильный публичный C++ API.
@@ -130,3 +134,10 @@ QDCXX-009 завершена 2026-09-21 с High reasoning. [Контракт](..
 ## Будущий стиль C++
 
 Владелец принял [контракт стиля C++](CPP-STYLE.ru.md) по образцу ttldtor/dxfcxx_event_test на commit d96ef76f3c4c6649437ac438bd0fa30f91c12f48. Правила имён, документации и организации кода дополняют скопированные корневые конфигурации форматтеров: типы UpperCamelCase, функции/публичные поля lowerCamelCase, инкапсулированные поля lowerCamelCase_, значения enum/именованные константы UPPER_SNAKE_CASE. Будущий полный процесс — Uncrustify 0.83.0, затем clang-format 20.1.8; сами конфигурации не проверяют именование. Сохранены provenance образца/настроек и лицензия копий. Обновление документации/конфигураций не начинает реализацию C++ и не выбирает build/test dependencies; C++-форматтеры не запускались.
+
+## Дополнение владельца к QDCXX-010
+
+Добавлены теги параметров/результатов Doxygen, тестовый doctest 2.4.12 через закреплённый FetchContent,
+conformance Ubuntu 24.04.4 WSL2 GCC 13.3 Debug/Release и журналы UTC. Windows MSVC/ClangCL также
+проходят тесты после миграции; все 832 выбранных Java observations и исходные fixtures неизменны.
+См. [валидацию](../tests/conformance/encoding/VALIDATION.ru.md).

@@ -1,0 +1,9 @@
+2026-09-20T23:49:29.241Z COMMAND ['ctest', '--test-dir', '.work/clang', '-C', 'Debug', '--output-on-failure']; cwd='C:\\qd-cxx'; TZ=UTC
+2026-09-20T23:49:29.267Z Test project C:/qd-cxx/.work/clang
+2026-09-20T23:49:29.269Z     Start 1: compact_java_vectors
+2026-09-20T23:49:29.331Z 1/1 Test #1: compact_java_vectors .............   Passed    0.06 sec
+2026-09-20T23:49:29.333Z 
+2026-09-20T23:49:29.333Z 100% tests passed out of 1
+2026-09-20T23:49:29.333Z 
+2026-09-20T23:49:29.333Z Total Test time (real) =   0.06 sec
+2026-09-20T23:49:29.339Z EXIT 0

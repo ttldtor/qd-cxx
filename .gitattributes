@@ -1,6 +1,10 @@
 * text=auto
 *.md text eol=lf
 *.lock text eol=lf
+*.cpp text eol=lf
+*.hpp text eol=lf
+tests/conformance/encoding/*.log -text
+tests/conformance/encoding/cases.tsv -text
 tools/upstream/schema-oracle/*.java text eol=lf
 tools/upstream/schema-oracle/*.ps1 text eol=lf
 tests/fixtures/schema/inputs/*.xml text eol=lf

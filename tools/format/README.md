@@ -58,3 +58,7 @@ For this migration, previous schema/protocol evidence remains historical and unc
 evidence is retained under evidence. Encoding's four current captures were refreshed
 from two independent clean builds and negative/positive Verify. Every existing expectation remains
 unchanged. See [executed validation](VALIDATION.md) for exact checks and links.
+
+## C++
+
+[QDCXX-010 C++ formatting](CPP.md) defines the separate pinned Uncrustify/clang-format workflow.

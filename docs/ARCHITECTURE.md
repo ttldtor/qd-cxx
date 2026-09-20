@@ -30,7 +30,9 @@ Dependency direction should point inward: transport may depend on protocol; prot
 
 ## Not decided yet
 
-No networking library, build system layout, package manager, test framework, public API, threading model, or binary compatibility policy has been selected. Those decisions require scoped tasks and evidence.
+No networking library, package manager, stable public API, threading model, or binary compatibility policy has been selected. The QDCXX-010 owner follow-up selects doctest as a test-only FetchContent dependency. Those decisions require scoped tasks and evidence.
+
+QDCXX-010 implements only the encoding boundary's compact int/long primitives, with a provisional span-based API, minimal CMake/CTest and no third-party runtime dependency. See [build/API](CPP-BUILD.md) and [validation](../tests/conformance/encoding/VALIDATION.md). This does not implement or change the other proposed boundaries.
 
 ## Accepted ADR-0001 boundaries
 

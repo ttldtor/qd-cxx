@@ -1,0 +1,9 @@
+2026-09-20T23:48:41.099Z COMMAND ['ctest', '--test-dir', '.work/msvc', '-C', 'Release', '--output-on-failure']; cwd='C:\\qd-cxx'; TZ=UTC
+2026-09-20T23:48:41.125Z Test project C:/qd-cxx/.work/msvc
+2026-09-20T23:48:41.129Z     Start 1: compact_java_vectors
+2026-09-20T23:48:41.148Z 1/1 Test #1: compact_java_vectors .............   Passed    0.02 sec
+2026-09-20T23:48:41.150Z 
+2026-09-20T23:48:41.150Z 100% tests passed out of 1
+2026-09-20T23:48:41.150Z 
+2026-09-20T23:48:41.150Z Total Test time (real) =   0.02 sec
+2026-09-20T23:48:41.155Z EXIT 0

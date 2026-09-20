@@ -30,7 +30,9 @@
 
 ## Пока не решено
 
-Не выбраны networking library, build system layout, package manager, test framework, public API, threading model или binary compatibility policy. Эти решения требуют ограниченных задач и доказательств.
+Не выбраны networking library, package manager, стабильный public API, threading model или binary compatibility policy. Дополнение владельца к QDCXX-010 выбирает doctest как тестовую зависимость FetchContent. Эти решения требуют ограниченных задач и доказательств.
+
+QDCXX-010 реализует только примитивы compact int/long границы encoding с предварительным API на span, минимальными CMake/CTest и без сторонних runtime-зависимостей. См. [сборку/API](CPP-BUILD.ru.md) и [валидацию](../tests/conformance/encoding/VALIDATION.ru.md). Это не реализует и не меняет остальные предложенные границы.
 
 ## Принятые границы ADR-0001
 

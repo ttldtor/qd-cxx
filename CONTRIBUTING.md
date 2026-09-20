@@ -18,13 +18,15 @@ then `-Mode Check` before review. The formatter version and artifact SHA-256 are
 the formatter JDK does not replace the Java QD oracle's JDK 8.
 See [commands, scope and provenance](tools/format/README.md) ([Russian](tools/format/README.ru.md)).
 
-## C++ style for future work
+## C++ style and checks
 
 Use the owner's reference-derived [C++ style contract](docs/CPP-STYLE.md)
 ([Russian](docs/CPP-STYLE.ru.md)). It covers naming, documentation and source organization as well
-as the root `.clang-format` and `.uncrustify.cfg`. The future complete formatting pipeline is
+as the root `.clang-format` and `.uncrustify.cfg`. The complete formatting pipeline is
 Uncrustify 0.83.0 followed by clang-format 20.1.8. This is separate from Google Java Style.
-No C++ implementation or build/test dependency is introduced by adopting the style.
+Use the [Format/Check workflow](tools/format/CPP.md) ([Russian](tools/format/CPP.ru.md)) and
+[build/conformance commands](docs/CPP-BUILD.md) ([Russian](docs/CPP-BUILD.ru.md)).
+QDCXX-010 implements only compact int/long with minimal CMake/CTest; additional components need approval.
 
 ## Documentation-only validation
 

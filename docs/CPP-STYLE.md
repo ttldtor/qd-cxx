@@ -82,7 +82,9 @@ Following the reference's [CONTRIBUTING.md](https://github.com/ttldtor/dxfcxx_ev
 write meaningful Doxygen comments for types, enumerators, public data fields, public methods/free
 functions and utility functions. Both `/** … */` and `///` occur in the reference. Explain contracts,
 units, lifetime, failure conditions and non-obvious constraints rather than restating an identifier.
-Use `@param` / `@return` where they clarify the interface.
+Document each parameter with `@param`, each template parameter with `@tparam`, and every non-void
+result with `@return`. Describe ownership, lifetime, byte counts and error outcomes where applicable.
+The QDCXX-010 owner follow-up makes these tags mandatory, including for utility functions.
 
 The reference also uses `std::format`, raw strings, standard C++20/23 facilities and doctest.
 For qd-cxx, readable standard C++23 remains the existing goal; choose raw strings when clearer and

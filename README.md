@@ -6,7 +6,7 @@ The project begins with specifications and conformance evidence, not a line-by-l
 
 ## Current phase
 
-The repository currently contains the project rules, documentation skeleton, specification areas, and the first analysis tasks. It intentionally contains no C++ implementation or build dependencies yet.
+The specification and Java-oracle baseline now includes the first bounded C++23 compact int/long component. See [build/API instructions](docs/CPP-BUILD.md) ([Russian](docs/CPP-BUILD.ru.md)) and [conformance validation](tests/conformance/encoding/VALIDATION.md) ([Russian](tests/conformance/encoding/VALIDATION.ru.md)). The API is provisional; UTFString, importer and transport require later approved tasks.
 
 Start with:
 

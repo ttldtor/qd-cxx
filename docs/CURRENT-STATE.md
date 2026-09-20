@@ -2,11 +2,15 @@
 
 [Русская версия](CURRENT-STATE.ru.md). This English document is authoritative.
 
+## First C++ component
+
+QDCXX-010 — done, High: minimal C++23 build, compact int/long codec, Java-vector conformance and pinned formatting workflow. Implemented and verified on MSVC and ClangCL in Debug/Release: 832 selected Java observations, pinned formatting and negative checks. [Build/API](CPP-BUILD.md), [validation](../tests/conformance/encoding/VALIDATION.md). Existing fixtures and upstream.lock are unchanged. UTFString, importer and transport require later approved tasks.
+
 ## Phase
 
-**Specification baseline / repository bootstrap.**
+**Specification baseline with bounded C++23 compact integer implementation.**
 
-The repository currently defines working and contribution rules, documentation and specification areas, upstream pinning, and the first research tasks. There is no production C++ implementation, build configuration, dependency selection, or published API.
+The repository defines specifications and Java oracle evidence, plus the QDCXX-010 compact int/long library, minimal CMake/CTest and pinned C++ formatting. The API is provisional; no third-party runtime dependency is selected.
 
 ## ADR approval and next tasks
 
@@ -36,8 +40,8 @@ This phase is complete when the repository workflow is reproducible, upstream pr
 
 ## Known non-goals for now
 
-- C++ source code or generated code;
-- CMake or dependency-manager configuration;
+- production components beyond the approved compact integer scope or generated code;
+- dependency-manager configuration;
 - selection of Asio or another transport runtime;
 - performance claims;
 - a stable public C++ API.
@@ -130,3 +134,10 @@ The owner adopted Google Java Style after QDCXX-009. AGENTS.md, [.editorconfig](
 ## Future C++ style
 
 The owner adopted the reference-derived [C++ style contract](CPP-STYLE.md), pinned to ttldtor/dxfcxx_event_test commit d96ef76f3c4c6649437ac438bd0fa30f91c12f48. Naming, documentation and source-layout rules supplement the copied root formatter configurations: UpperCamelCase types, lowerCamelCase functions/public fields, lowerCamelCase_ encapsulated members and UPPER_SNAKE_CASE enumerators/named constants. The future complete formatting pipeline is Uncrustify 0.83.0 followed by clang-format 20.1.8; the configurations alone cannot enforce naming. Reference/configuration provenance and copied-license notices are retained. This documentation/configuration update does not start C++ implementation or select a build/test dependency; no C++ formatter was run.
+
+## QDCXX-010 owner follow-up
+
+Doxygen parameter/return tags, test-only doctest 2.4.12 through pinned FetchContent, Ubuntu 24.04.4
+WSL2 GCC 13.3 Debug/Release conformance and UTC logs are implemented. Windows MSVC/ClangCL tests
+also pass after migration; all 832 selected Java observations and original fixtures remain unchanged.
+See [validation](../tests/conformance/encoding/VALIDATION.md).

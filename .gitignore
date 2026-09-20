@@ -9,3 +9,7 @@ Thumbs.db
 .vscode/
 *.swp
 *~
+
+# Local builds and acquired tools
+/.work/
+/build/
