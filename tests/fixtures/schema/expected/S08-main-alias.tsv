@@ -1,0 +1,47 @@
+case	S08-main-alias
+input	<INPUT>/copy-main-alias.xml
+options	sysprops	false	dxprops	false
+model	merged	1	empty	false
+model.source	<scheme>
+model.source	<INPUT>/copy-main-alias.xml
+generation	RECORD	Base
+generation	RECORD	Copy
+model.record	Copy	false	true	\N	\N	Base	false	Copy
+model.record.sources	[<INPUT>/copy-main-alias.xml]
+model.field	Value	compact_int	8	COMPACT_INT	false	true	First.Name
+model.field.sources	[<INPUT>/copy-main-alias.xml]
+model.alias	First.Name	false	ADD
+model.alias	Chosen.Name	true	ADD
+model.record	Base	false	true	\N	\N	\N	false	Base
+model.record.sources	[<INPUT>/copy-main-alias.xml]
+model.field	Value	compact_int	8	COMPACT_INT	false	true	Chosen.Name
+model.field.sources	[<INPUT>/copy-main-alias.xml]
+model.alias	First.Name	false	ADD
+model.alias	Chosen.Name	true	ADD
+runtime	2	iXGh46vrwmGMEoUvD8hKCaGgfX4nkYutGQPEhcXNT_o
+record.lookup	Copy	1
+record.lookup	Base	0
+record.lookup	MissingRecord	\N
+record	0	Base	com.devexperts.qd.kit.DefaultRecord	false	1	0
+mapping.default	\N
+slot	int	0	Base.Chosen.Name	Chosen.Name	Value	8	COMPACT_INT	com.devexperts.qd.kit.CompactIntField
+lookup	Base.Chosen.Name	Base.Chosen.Name	Base.Chosen.Name	\N
+lookup	Chosen.Name	Base.Chosen.Name	\N	\N
+lookup	Value	Base.Chosen.Name	\N	\N
+lookup	ChosenName	Base.Chosen.Name	\N	\N
+lookup	Base.Value	\N	\N	\N
+lookup	First.Name	Base.Chosen.Name	\N	\N
+lookup	Base.First.Name	\N	\N	\N
+lookup	Missing	\N	\N	\N
+record	1	Copy	com.devexperts.qd.kit.DefaultRecord	false	1	0
+mapping.default	\N
+slot	int	0	Copy.First.Name	First.Name	Value	8	COMPACT_INT	com.devexperts.qd.kit.CompactIntField
+lookup	Copy.First.Name	Copy.First.Name	Copy.First.Name	\N
+lookup	First.Name	Copy.First.Name	\N	\N
+lookup	Value	Copy.First.Name	\N	\N
+lookup	FirstName	Copy.First.Name	\N	\N
+lookup	Copy.Value	\N	\N	\N
+lookup	Chosen.Name	Copy.First.Name	\N	\N
+lookup	Copy.Chosen.Name	\N	\N	\N
+lookup	Missing	\N	\N	\N
+complete	S08-main-alias

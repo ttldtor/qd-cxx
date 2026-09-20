@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dxfeed xmlns="https://www.dxfeed.com/datascheme">
+<records>
+  <record name="Alpha">
+    <field name="Text" type="utf_char_array"/>
+    <field name="Count" type="compact_int"/>
+    <field name="Hidden" type="compact_int" disabled="true"/>
+    <field name="Blob" type="byte_array"/>
+    <field name="Flags" type="compact_int"/>
+  </record>
+  <record name="HiddenRecord" disabled="true"><field name="Value" type="compact_int"/></record>
+  <record name="Beta"><field name="Value" type="compact_int"/></record>
+</records>
+</dxfeed>

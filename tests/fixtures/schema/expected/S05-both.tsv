@@ -1,0 +1,31 @@
+case	S05-both
+input	<INPUT>/index-both.xml
+options	sysprops	false	dxprops	false
+model	merged	1	empty	false
+model.source	<scheme>
+model.source	<INPUT>/index-both.xml
+generation	RECORD	Indexed
+model.record	Indexed	false	true	First	Second	\N	false	Indexed
+model.record.sources	[<INPUT>/index-both.xml]
+model.field	Ordinary	compact_int	8	COMPACT_INT	false	true	Ordinary
+model.field.sources	[<INPUT>/index-both.xml]
+model.field	Second	compact_int	8	COMPACT_INT	false	true	Second
+model.field.sources	[<INPUT>/index-both.xml]
+model.field	First	compact_int	8	COMPACT_INT	false	true	First
+model.field.sources	[<INPUT>/index-both.xml]
+runtime	1	_RksXrmHvlMSaMYOO9Fpp8Lxwd81icFGxmRvGipPj4I
+record.lookup	Indexed	0
+record.lookup	MissingRecord	\N
+record	0	Indexed	com.devexperts.qd.kit.DefaultRecord	true	3	0
+mapping.default	\N
+slot	int	0	Indexed.First	First	First	8	COMPACT_INT	com.devexperts.qd.kit.CompactIntField
+slot	int	1	Indexed.Second	Second	Second	8	COMPACT_INT	com.devexperts.qd.kit.CompactIntField
+slot	int	2	Indexed.Ordinary	Ordinary	Ordinary	8	COMPACT_INT	com.devexperts.qd.kit.CompactIntField
+lookup	Indexed.First	Indexed.First	Indexed.First	\N
+lookup	First	Indexed.First	\N	\N
+lookup	Indexed.Second	Indexed.Second	Indexed.Second	\N
+lookup	Second	Indexed.Second	\N	\N
+lookup	Indexed.Ordinary	Indexed.Ordinary	Indexed.Ordinary	\N
+lookup	Ordinary	Indexed.Ordinary	\N	\N
+lookup	Missing	\N	\N	\N
+complete	S05-both

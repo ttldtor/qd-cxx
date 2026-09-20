@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dxfeed xmlns="https://www.dxfeed.com/datascheme">
+<records><record name="Unsupported"><field name="Value" type="byte"/></record></records>
+</dxfeed>

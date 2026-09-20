@@ -1,0 +1,15 @@
+case	S15-short
+input	<INPUT>/short.xml
+options	sysprops	false	dxprops	false
+model	merged	1	empty	false
+model.source	<scheme>
+model.source	<INPUT>/short.xml
+generation	RECORD	Unsupported
+model.record	Unsupported	false	true	\N	\N	\N	false	Unsupported
+model.record.sources	[<INPUT>/short.xml]
+model.field	Value	short	3	SHORT	false	true	Value
+model.field.sources	[<INPUT>/short.xml]
+error	runtime.load
+exception	java.lang.NullPointerException	\N
+origin	com.devexperts.qd.kit.DefaultRecord	<init>	64
+complete	S15-short

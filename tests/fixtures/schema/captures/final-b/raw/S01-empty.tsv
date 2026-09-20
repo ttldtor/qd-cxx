@@ -1,0 +1,9 @@
+case	S01-empty
+input	file:/C:/qd-cxx/tests/fixtures/schema/inputs/empty.xml
+options	sysprops	false	dxprops	false
+model	merged	1	empty	true
+model.source	<scheme>
+model.source	file:/C:/qd-cxx/tests/fixtures/schema/inputs/empty.xml
+runtime	0	47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU
+record.lookup	MissingRecord	\N
+complete	S01-empty

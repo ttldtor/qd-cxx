@@ -1,0 +1,106 @@
+[
+  {
+    "id": "S01-empty",
+    "inputs": [
+      "empty.xml"
+    ]
+  },
+  {
+    "id": "S01-no-urls",
+    "inputs": []
+  },
+  {
+    "id": "S04-order-disabled",
+    "inputs": [
+      "ordering.xml"
+    ]
+  },
+  {
+    "id": "S05-both",
+    "inputs": [
+      "index-both.xml"
+    ]
+  },
+  {
+    "id": "S05-first",
+    "inputs": [
+      "index-first.xml"
+    ]
+  },
+  {
+    "id": "S05-second",
+    "inputs": [
+      "index-second.xml"
+    ]
+  },
+  {
+    "id": "S05-disabled-first",
+    "inputs": [
+      "index-disabled-first.xml"
+    ]
+  },
+  {
+    "id": "S05-disabled-second",
+    "inputs": [
+      "index-disabled-second.xml"
+    ]
+  },
+  {
+    "id": "S05-disabled-both",
+    "inputs": [
+      "index-disabled-both.xml"
+    ]
+  },
+  {
+    "id": "S07-explicit",
+    "inputs": [
+      "alias-explicit.xml"
+    ]
+  },
+  {
+    "id": "S07-fallback",
+    "inputs": [
+      "alias-fallback.xml"
+    ]
+  },
+  {
+    "id": "S08-before",
+    "inputs": [
+      "copy-base.xml",
+      "copy-child.xml",
+      "copy-overlay.xml"
+    ]
+  },
+  {
+    "id": "S08-after",
+    "inputs": [
+      "copy-base.xml",
+      "copy-overlay.xml",
+      "copy-child.xml"
+    ]
+  },
+  {
+    "id": "S08-main-alias",
+    "inputs": [
+      "copy-main-alias.xml"
+    ]
+  },
+  {
+    "id": "S15-slots",
+    "inputs": [
+      "slots.xml"
+    ]
+  },
+  {
+    "id": "S15-byte",
+    "inputs": [
+      "byte.xml"
+    ]
+  },
+  {
+    "id": "S15-short",
+    "inputs": [
+      "short.xml"
+    ]
+  }
+]

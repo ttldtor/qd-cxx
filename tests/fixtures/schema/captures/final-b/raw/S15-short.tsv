@@ -1,0 +1,15 @@
+case	S15-short
+input	file:/C:/qd-cxx/tests/fixtures/schema/inputs/short.xml
+options	sysprops	false	dxprops	false
+model	merged	1	empty	false
+model.source	<scheme>
+model.source	file:/C:/qd-cxx/tests/fixtures/schema/inputs/short.xml
+generation	RECORD	Unsupported
+model.record	Unsupported	false	true	\N	\N	\N	false	Unsupported
+model.record.sources	[file:/C:/qd-cxx/tests/fixtures/schema/inputs/short.xml]
+model.field	Value	short	3	SHORT	false	true	Value
+model.field.sources	[file:/C:/qd-cxx/tests/fixtures/schema/inputs/short.xml]
+error	runtime.load
+exception	java.lang.NullPointerException	\N
+origin	com.devexperts.qd.kit.DefaultRecord	<init>	64
+complete	S15-short

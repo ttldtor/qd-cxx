@@ -1,0 +1,19 @@
+case	S05-disabled-both
+input	file:/C:/qd-cxx/tests/fixtures/schema/inputs/index-disabled-both.xml
+options	sysprops	false	dxprops	false
+model	merged	1	empty	false
+model.source	<scheme>
+model.source	file:/C:/qd-cxx/tests/fixtures/schema/inputs/index-disabled-both.xml
+generation	RECORD	Indexed
+model.record	Indexed	false	true	First	Second	\N	false	Indexed
+model.record.sources	[file:/C:/qd-cxx/tests/fixtures/schema/inputs/index-disabled-both.xml]
+model.field	Ordinary	compact_int	8	COMPACT_INT	false	true	Ordinary
+model.field.sources	[file:/C:/qd-cxx/tests/fixtures/schema/inputs/index-disabled-both.xml]
+model.field	Second	compact_int	8	COMPACT_INT	true	false	Second
+model.field.sources	[file:/C:/qd-cxx/tests/fixtures/schema/inputs/index-disabled-both.xml]
+model.field	First	compact_int	8	COMPACT_INT	true	false	First
+model.field.sources	[file:/C:/qd-cxx/tests/fixtures/schema/inputs/index-disabled-both.xml]
+error	runtime.load
+exception	com.dxfeed.scheme.SchemeException	Exception in scheme file "file:/C:/qd-cxx/tests/fixtures/schema/inputs/index-disabled-both.xml"\nScheme inconsistency with Record "Indexed": All index fields have been disabled
+origin	com.dxfeed.scheme.DXScheme	buildOneRecord	215
+complete	S05-disabled-both

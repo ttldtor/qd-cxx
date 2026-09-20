@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dxfeed xmlns="https://www.dxfeed.com/datascheme">
+<records><record name="Slots"><field name="Text" type="utf_char_array"/><field name="Count" type="compact_int"/><field name="Long" type="long"/><field name="Blob" type="byte_array"/><field name="Wide" type="wide_decimal"/><field name="Last" type="compact_int"/></record></records>
+</dxfeed>

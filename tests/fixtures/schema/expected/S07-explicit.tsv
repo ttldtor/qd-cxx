@@ -1,0 +1,31 @@
+case	S07-explicit
+input	<INPUT>/alias-explicit.xml
+options	sysprops	false	dxprops	false
+model	merged	1	empty	false
+model.source	<scheme>
+model.source	<INPUT>/alias-explicit.xml
+generation	RECORD	Aliases
+model.record	Aliases	false	true	\N	\N	\N	false	Aliases
+model.record.sources	[<INPUT>/alias-explicit.xml]
+model.field	Value	compact_int	8	COMPACT_INT	false	true	Chosen.Name
+model.field.sources	[<INPUT>/alias-explicit.xml]
+model.alias	First.Name	false	ADD
+model.alias	Chosen.Name	true	ADD
+model.alias	LastName	false	ADD
+runtime	1	yY4KiUPgMcmtjzoZemxGEWN-A2zHmTaWzSy9c0yAesc
+record.lookup	Aliases	0
+record.lookup	MissingRecord	\N
+record	0	Aliases	com.devexperts.qd.kit.DefaultRecord	false	1	0
+mapping.default	\N
+slot	int	0	Aliases.Chosen.Name	Chosen.Name	Value	8	COMPACT_INT	com.devexperts.qd.kit.CompactIntField
+lookup	Aliases.Chosen.Name	Aliases.Chosen.Name	Aliases.Chosen.Name	\N
+lookup	Chosen.Name	Aliases.Chosen.Name	\N	\N
+lookup	Value	Aliases.Chosen.Name	\N	\N
+lookup	ChosenName	Aliases.Chosen.Name	\N	\N
+lookup	Aliases.Value	\N	\N	\N
+lookup	First.Name	Aliases.Chosen.Name	\N	\N
+lookup	Aliases.First.Name	\N	\N	\N
+lookup	LastName	Aliases.Chosen.Name	\N	\N
+lookup	Aliases.LastName	\N	\N	\N
+lookup	Missing	\N	\N	\N
+complete	S07-explicit

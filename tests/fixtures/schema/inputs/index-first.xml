@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dxfeed xmlns="https://www.dxfeed.com/datascheme">
+<records><record name="Indexed">
+  <index field0="First"/>
+  <field name="Ordinary" type="compact_int"/>
+  <field name="Second" type="compact_int"/>
+  <field name="First" type="compact_int"/>
+</record></records>
+</dxfeed>

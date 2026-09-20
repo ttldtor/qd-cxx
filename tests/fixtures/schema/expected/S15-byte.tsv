@@ -1,0 +1,15 @@
+case	S15-byte
+input	<INPUT>/byte.xml
+options	sysprops	false	dxprops	false
+model	merged	1	empty	false
+model.source	<scheme>
+model.source	<INPUT>/byte.xml
+generation	RECORD	Unsupported
+model.record	Unsupported	false	true	\N	\N	\N	false	Unsupported
+model.record.sources	[<INPUT>/byte.xml]
+model.field	Value	byte	1	BYTE	false	true	Value
+model.field.sources	[<INPUT>/byte.xml]
+error	runtime.load
+exception	java.lang.NullPointerException	\N
+origin	com.devexperts.qd.kit.DefaultRecord	<init>	64
+complete	S15-byte

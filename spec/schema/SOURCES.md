@@ -17,6 +17,8 @@ HEAD and peeled tag must equal the commit above; origin must equal the locked re
 
 ## Entry points
 
+QDCXX-005 executable evidence: [harness and commands](../../tools/upstream/schema-oracle/README.md), [coverage](../../tests/fixtures/schema/COVERAGE.md), [run provenance and validation](../../tests/fixtures/schema/VALIDATION.md). The source-only reproduction note above describes QDCXX-003; subsequent captures use the same verified external checkout and immutable references below.
+
 - [qd-core/src/main/java/com/devexperts/qd/QDFactory.java](https://github.com/devexperts/QD/blob/0ddc0a09779fb61d74cc0b37c6449ff47dcb715f/qd-core/src/main/java/com/devexperts/qd/QDFactory.java) — createDefaultScheme(ClassLoader), getDefaultScheme.
 - [dxfeed-scheme/src/main/java/com/dxfeed/scheme/impl/DXSchemeFactory.java](https://github.com/devexperts/QD/blob/0ddc0a09779fb61d74cc0b37c6449ff47dcb715f/dxfeed-scheme/src/main/java/com/dxfeed/scheme/impl/DXSchemeFactory.java) — createDataScheme; prefix and error wrapping.
 - [dxfeed-scheme/src/main/resources/META-INF/services/com.devexperts.qd.DataSchemeFactory](https://github.com/devexperts/QD/blob/0ddc0a09779fb61d74cc0b37c6449ff47dcb715f/dxfeed-scheme/src/main/resources/META-INF/services/com.devexperts.qd.DataSchemeFactory) — XML factory service.

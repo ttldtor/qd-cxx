@@ -1,0 +1,47 @@
+case	S08-after
+input	file:/C:/qd-cxx/tests/fixtures/schema/inputs/copy-base.xml
+input	file:/C:/qd-cxx/tests/fixtures/schema/inputs/copy-overlay.xml
+input	file:/C:/qd-cxx/tests/fixtures/schema/inputs/copy-child.xml
+options	sysprops	false	dxprops	false
+model	merged	3	empty	false
+model.source	<scheme>
+model.source	file:/C:/qd-cxx/tests/fixtures/schema/inputs/copy-base.xml
+model.source	file:/C:/qd-cxx/tests/fixtures/schema/inputs/copy-overlay.xml
+model.source	file:/C:/qd-cxx/tests/fixtures/schema/inputs/copy-child.xml
+generation	RECORD	Base
+generation	RECORD	Copy
+model.record	Copy	false	true	\N	\N	Base	false	Copy
+model.record.sources	[file:/C:/qd-cxx/tests/fixtures/schema/inputs/copy-child.xml]
+model.field	Original	compact_int	8	COMPACT_INT	false	true	Original
+model.field.sources	[file:/C:/qd-cxx/tests/fixtures/schema/inputs/copy-child.xml]
+model.field	Added	utf_char_array	10	UTF_CHAR_ARRAY	false	true	Added
+model.field.sources	[file:/C:/qd-cxx/tests/fixtures/schema/inputs/copy-child.xml]
+model.record	Base	false	true	\N	\N	\N	false	Base
+model.record.sources	[file:/C:/qd-cxx/tests/fixtures/schema/inputs/copy-base.xml, file:/C:/qd-cxx/tests/fixtures/schema/inputs/copy-overlay.xml]
+model.field	Original	compact_int	8	COMPACT_INT	false	true	Original
+model.field.sources	[file:/C:/qd-cxx/tests/fixtures/schema/inputs/copy-base.xml]
+model.field	Added	utf_char_array	10	UTF_CHAR_ARRAY	false	true	Added
+model.field.sources	[file:/C:/qd-cxx/tests/fixtures/schema/inputs/copy-overlay.xml]
+runtime	2	3xMhVApeiJPqBV2Hl6HRQ-JqB7VJTpXE3AamsJ9O8oM
+record.lookup	Copy	1
+record.lookup	Base	0
+record.lookup	MissingRecord	\N
+record	0	Base	com.devexperts.qd.kit.DefaultRecord	false	1	1
+mapping.default	\N
+slot	int	0	Base.Original	Original	Original	8	COMPACT_INT	com.devexperts.qd.kit.CompactIntField
+slot	obj	0	Base.Added	Added	Added	10	UTF_CHAR_ARRAY	com.devexperts.qd.kit.StringField
+lookup	Base.Original	Base.Original	Base.Original	\N
+lookup	Original	Base.Original	\N	\N
+lookup	Base.Added	Base.Added	\N	Base.Added
+lookup	Added	Base.Added	\N	\N
+lookup	Missing	\N	\N	\N
+record	1	Copy	com.devexperts.qd.kit.DefaultRecord	false	1	1
+mapping.default	\N
+slot	int	0	Copy.Original	Original	Original	8	COMPACT_INT	com.devexperts.qd.kit.CompactIntField
+slot	obj	0	Copy.Added	Added	Added	10	UTF_CHAR_ARRAY	com.devexperts.qd.kit.StringField
+lookup	Copy.Original	Copy.Original	Copy.Original	\N
+lookup	Original	Copy.Original	\N	\N
+lookup	Copy.Added	Copy.Added	\N	Copy.Added
+lookup	Added	Copy.Added	\N	\N
+lookup	Missing	\N	\N	\N
+complete	S08-after

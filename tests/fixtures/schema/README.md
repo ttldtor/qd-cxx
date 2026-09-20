@@ -1,21 +1,23 @@
-# Proposed XML/DataScheme fixture cases
+# XML/DataScheme fixtures and remaining proposals
 
-Status: **proposals only** for QDCXX-003. No golden output, copied upstream XML, generated snapshot, or passing conformance claim is included. Oracle: devexperts/QD 3.355 at `0ddc0a09779fb61d74cc0b37c6449ff47dcb715f`.
+Status: **17 captured subcases** from S01/S04/S05/S07/S08/S15 for QDCXX-005; other entries below remain QDCXX-003 proposals. Oracle: devexperts/QD 3.355 at `0ddc0a09779fb61d74cc0b37c6449ff47dcb715f`. See [exact coverage](COVERAGE.md), [executed validation](VALIDATION.md), [ordered inputs](cases.json), [normalized expectations](expected/) and [raw captures/metadata](captures/). These are Java observations, not passing C++ conformance claims.
 
 Rules are in the [semantic inventory](../../../spec/schema/README.md); commit-qualified source/test citations are in its [source inventory](../../../spec/schema/SOURCES.md). Test resources below are relative to upstream `dxfeed-scheme/src/test/resources/`; they are references for a later licensed extraction or independently authored minimal input, not vendored files.
 
-## Capture protocol for a follow-up task
+## Capture protocol and current implementation
+
+[Harness instructions](../../../tools/upstream/schema-oracle/README.md) describe the implemented bounded subset of this protocol, provenance and the two permitted environmental normalizations. The broader protocol below still guides deferred cases; enums, tags, generators and other unexercised metadata are not serialized by the current harness.
 
 1. Verify checkout HEAD, origin and tag against upstream.lock. Record JDK/JAXP provider, OS, locale, classpath including service-provider resources, working directory, ordered URLs, loading options and relevant system/explicit properties. Use a fresh JVM for independent cases.
 2. Capture both `SchemeModel.newLoader().fromURLs(...).load()` and `DXScheme.newLoader().fromURLs(...).load()` where relevant; explicitly keep sysprops/dxprops disabled for pure XML cases. Invoke the factory separately for exception-wrapping cases. Do not substitute the diagnostic XML writer for a runtime observation.
 3. For the model, capture ordered generation sources, field order, resolved type names, index pair, main/all aliases, tags, visibility decisions, enum values, generator values/templates and provenance. Sort only semantically unordered sets in a normalized view, retaining the raw observation.
 4. For runtime, capture record array order/IDs/names/class/hasTime; separate int/object slot arrays with full/local/property names, serial type IDs and classes; explicit lookup probes; mapping class list/default mapping; digest. Include VOID slots. Avoid treating digest equality as sufficient evidence.
 5. For rejection, capture stage, exception type, causes and message; separately normalize environment-dependent URL paths. Do not invent a single expected exception family before capture.
-6. Review results against source. Label raw captured, normalized and hand-authored artifacts distinctly and record generation commands/input hashes. Review provenance/licensing before importing upstream material. A Java-only capture harness is proposed; none is implemented here.
+6. Review results against source. Label raw captured, normalized and hand-authored artifacts distinctly and record generation commands/input hashes. Review provenance/licensing before importing upstream material. QDCXX-005 provides a Java-only harness and original XML inputs, with no copied upstream material.
 
 ## Case matrix
 
-Every expected-output field is **pending capture/review**. The output column specifies what to observe, not a fabricated expected result.
+The output column retains the original family-level research scope. Only the explicit subcases in [COVERAGE.md](COVERAGE.md) now have captured/reviewed outputs; unlisted portions remain pending.
 
 | ID | Representative input / upstream seed | Outputs and distinctions to capture |
 | --- | --- | --- |

@@ -1,0 +1,33 @@
+case	S07-fallback
+input	file:/C:/qd-cxx/tests/fixtures/schema/inputs/alias-fallback.xml
+options	sysprops	false	dxprops	false
+model	merged	1	empty	false
+model.source	<scheme>
+model.source	file:/C:/qd-cxx/tests/fixtures/schema/inputs/alias-fallback.xml
+generation	RECORD	Aliases
+model.record	Aliases	false	true	\N	\N	\N	false	Aliases
+model.record.sources	[file:/C:/qd-cxx/tests/fixtures/schema/inputs/alias-fallback.xml]
+model.field	Value	compact_int	8	COMPACT_INT	false	true	First.Name
+model.field.sources	[file:/C:/qd-cxx/tests/fixtures/schema/inputs/alias-fallback.xml]
+model.alias	First.Name	false	ADD
+model.alias	LastName	false	ADD
+model.field	Plain	compact_int	8	COMPACT_INT	false	true	Plain
+model.field.sources	[file:/C:/qd-cxx/tests/fixtures/schema/inputs/alias-fallback.xml]
+runtime	1	kYBnZ2n6e0fCv_DI-b6nB63CiVPKxpWwBQdfw6rbFCU
+record.lookup	Aliases	0
+record.lookup	MissingRecord	\N
+record	0	Aliases	com.devexperts.qd.kit.DefaultRecord	false	2	0
+mapping.default	\N
+slot	int	0	Aliases.First.Name	First.Name	Value	8	COMPACT_INT	com.devexperts.qd.kit.CompactIntField
+slot	int	1	Aliases.Plain	Plain	Plain	8	COMPACT_INT	com.devexperts.qd.kit.CompactIntField
+lookup	Aliases.First.Name	Aliases.First.Name	Aliases.First.Name	\N
+lookup	First.Name	Aliases.First.Name	\N	\N
+lookup	Value	Aliases.First.Name	\N	\N
+lookup	FirstName	Aliases.First.Name	\N	\N
+lookup	Aliases.Plain	Aliases.Plain	Aliases.Plain	\N
+lookup	Plain	Aliases.Plain	\N	\N
+lookup	Aliases.Value	\N	\N	\N
+lookup	LastName	Aliases.First.Name	\N	\N
+lookup	Aliases.LastName	\N	\N	\N
+lookup	Missing	\N	\N	\N
+complete	S07-fallback

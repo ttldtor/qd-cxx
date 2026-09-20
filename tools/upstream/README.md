@@ -10,4 +10,4 @@ Tools must:
 - record invocation and relevant environment details;
 - keep generated artifacts separate from hand-maintained specifications.
 
-No tools are implemented yet.
+[schema-oracle](schema-oracle/README.md) implements QDCXX-005: verified locked-source Java builds, 17 bounded schema subcases, raw/normalized captures, provenance metadata and read-only golden verification. QTP tooling and production C++ remain outside this task.

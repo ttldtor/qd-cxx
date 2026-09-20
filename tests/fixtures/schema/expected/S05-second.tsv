@@ -1,0 +1,34 @@
+case	S05-second
+input	<INPUT>/index-second.xml
+options	sysprops	false	dxprops	false
+model	merged	1	empty	false
+model.source	<scheme>
+model.source	<INPUT>/index-second.xml
+generation	RECORD	Indexed
+model.record	Indexed	false	true	\N	Second	\N	false	Indexed
+model.record.sources	[<INPUT>/index-second.xml]
+model.field	Ordinary	compact_int	8	COMPACT_INT	false	true	Ordinary
+model.field.sources	[<INPUT>/index-second.xml]
+model.field	Second	compact_int	8	COMPACT_INT	false	true	Second
+model.field.sources	[<INPUT>/index-second.xml]
+model.field	First	compact_int	8	COMPACT_INT	false	true	First
+model.field.sources	[<INPUT>/index-second.xml]
+runtime	1	rxXuFu0pfYPb_pXAiNJ8Nz6eLM1bhvn6OA6RQkUveRg
+record.lookup	Indexed	0
+record.lookup	MissingRecord	\N
+record	0	Indexed	com.devexperts.qd.kit.DefaultRecord	true	4	0
+mapping.default	\N
+slot	int	0	Indexed.$VoidTimeField	$VoidTimeField	$VoidTimeField	0	VOID	com.devexperts.qd.kit.VoidIntField
+slot	int	1	Indexed.Second	Second	Second	8	COMPACT_INT	com.devexperts.qd.kit.CompactIntField
+slot	int	2	Indexed.Ordinary	Ordinary	Ordinary	8	COMPACT_INT	com.devexperts.qd.kit.CompactIntField
+slot	int	3	Indexed.First	First	First	8	COMPACT_INT	com.devexperts.qd.kit.CompactIntField
+lookup	Indexed.$VoidTimeField	Indexed.$VoidTimeField	Indexed.$VoidTimeField	\N
+lookup	$VoidTimeField	Indexed.$VoidTimeField	\N	\N
+lookup	Indexed.Second	Indexed.Second	Indexed.Second	\N
+lookup	Second	Indexed.Second	\N	\N
+lookup	Indexed.Ordinary	Indexed.Ordinary	Indexed.Ordinary	\N
+lookup	Ordinary	Indexed.Ordinary	\N	\N
+lookup	Indexed.First	Indexed.First	Indexed.First	\N
+lookup	First	Indexed.First	\N	\N
+lookup	Missing	\N	\N	\N
+complete	S05-second

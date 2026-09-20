@@ -1,0 +1,52 @@
+case	S15-slots
+input	file:/C:/qd-cxx/tests/fixtures/schema/inputs/slots.xml
+options	sysprops	false	dxprops	false
+model	merged	1	empty	false
+model.source	<scheme>
+model.source	file:/C:/qd-cxx/tests/fixtures/schema/inputs/slots.xml
+generation	RECORD	Slots
+model.record	Slots	false	true	\N	\N	\N	false	Slots
+model.record.sources	[file:/C:/qd-cxx/tests/fixtures/schema/inputs/slots.xml]
+model.field	Text	utf_char_array	10	UTF_CHAR_ARRAY	false	true	Text
+model.field.sources	[file:/C:/qd-cxx/tests/fixtures/schema/inputs/slots.xml]
+model.field	Count	compact_int	8	COMPACT_INT	false	true	Count
+model.field.sources	[file:/C:/qd-cxx/tests/fixtures/schema/inputs/slots.xml]
+model.field	Long	long	104	LONG	false	true	Long
+model.field.sources	[file:/C:/qd-cxx/tests/fixtures/schema/inputs/slots.xml]
+model.field	Blob	byte_array	9	BYTE_ARRAY	false	true	Blob
+model.field.sources	[file:/C:/qd-cxx/tests/fixtures/schema/inputs/slots.xml]
+model.field	Wide	wide_decimal	120	WIDE_DECIMAL	false	true	Wide
+model.field.sources	[file:/C:/qd-cxx/tests/fixtures/schema/inputs/slots.xml]
+model.field	Last	compact_int	8	COMPACT_INT	false	true	Last
+model.field.sources	[file:/C:/qd-cxx/tests/fixtures/schema/inputs/slots.xml]
+runtime	1	qjvB9V9quzkeZEDl4FNdHsJ93eh6E1M5gq-r6Nc6s1M
+record.lookup	Slots	0
+record.lookup	MissingRecord	\N
+record	0	Slots	com.devexperts.qd.kit.DefaultRecord	false	6	2
+mapping.default	\N
+slot	int	0	Slots.Count	Count	Count	8	COMPACT_INT	com.devexperts.qd.kit.CompactIntField
+slot	int	1	Slots.Long	Long	Long	104	LONG	com.devexperts.qd.kit.LongField
+slot	int	2	Slots.Long$VoidTail	Long$VoidTail	Long$VoidTail	0	VOID	com.devexperts.qd.kit.VoidIntField
+slot	int	3	Slots.Wide	Wide	Wide	120	WIDE_DECIMAL	com.devexperts.qd.kit.WideDecimalField
+slot	int	4	Slots.Wide$VoidTail	Wide$VoidTail	Wide$VoidTail	0	VOID	com.devexperts.qd.kit.VoidIntField
+slot	int	5	Slots.Last	Last	Last	8	COMPACT_INT	com.devexperts.qd.kit.CompactIntField
+slot	obj	0	Slots.Text	Text	Text	10	UTF_CHAR_ARRAY	com.devexperts.qd.kit.StringField
+slot	obj	1	Slots.Blob	Blob	Blob	9	BYTE_ARRAY	com.devexperts.qd.kit.ByteArrayField
+lookup	Slots.Count	Slots.Count	Slots.Count	\N
+lookup	Count	Slots.Count	\N	\N
+lookup	Slots.Long	Slots.Long	Slots.Long	\N
+lookup	Long	Slots.Long	\N	\N
+lookup	Slots.Long$VoidTail	Slots.Long$VoidTail	Slots.Long$VoidTail	\N
+lookup	Long$VoidTail	Slots.Long$VoidTail	\N	\N
+lookup	Slots.Wide	Slots.Wide	Slots.Wide	\N
+lookup	Wide	Slots.Wide	\N	\N
+lookup	Slots.Wide$VoidTail	Slots.Wide$VoidTail	Slots.Wide$VoidTail	\N
+lookup	Wide$VoidTail	Slots.Wide$VoidTail	\N	\N
+lookup	Slots.Last	Slots.Last	Slots.Last	\N
+lookup	Last	Slots.Last	\N	\N
+lookup	Slots.Text	Slots.Text	\N	Slots.Text
+lookup	Text	Slots.Text	\N	\N
+lookup	Slots.Blob	Slots.Blob	\N	Slots.Blob
+lookup	Blob	Slots.Blob	\N	\N
+lookup	Missing	\N	\N	\N
+complete	S15-slots

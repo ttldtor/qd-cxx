@@ -1,0 +1,15 @@
+case	S15-byte
+input	file:/C:/qd-cxx/tests/fixtures/schema/inputs/byte.xml
+options	sysprops	false	dxprops	false
+model	merged	1	empty	false
+model.source	<scheme>
+model.source	file:/C:/qd-cxx/tests/fixtures/schema/inputs/byte.xml
+generation	RECORD	Unsupported
+model.record	Unsupported	false	true	\N	\N	\N	false	Unsupported
+model.record.sources	[file:/C:/qd-cxx/tests/fixtures/schema/inputs/byte.xml]
+model.field	Value	byte	1	BYTE	false	true	Value
+model.field.sources	[file:/C:/qd-cxx/tests/fixtures/schema/inputs/byte.xml]
+error	runtime.load
+exception	java.lang.NullPointerException	\N
+origin	com.devexperts.qd.kit.DefaultRecord	<init>	64
+complete	S15-byte

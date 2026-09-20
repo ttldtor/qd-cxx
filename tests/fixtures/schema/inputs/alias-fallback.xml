@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dxfeed xmlns="https://www.dxfeed.com/datascheme">
+<records><record name="Aliases"><field name="Value" type="compact_int"><alias name="First.Name"/><alias name="LastName"/></field><field name="Plain" type="compact_int"/></record></records>
+</dxfeed>

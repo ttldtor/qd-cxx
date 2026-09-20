@@ -1,3 +1,10 @@
 * text=auto
 *.md text eol=lf
 *.lock text eol=lf
+tools/upstream/schema-oracle/*.java text eol=lf
+tools/upstream/schema-oracle/*.ps1 text eol=lf
+tests/fixtures/schema/inputs/*.xml text eol=lf
+tests/fixtures/schema/*.json text eol=lf
+tests/fixtures/schema/expected/*.tsv text eol=lf
+# Raw observations and environment/build metadata retain their captured bytes.
+tests/fixtures/schema/captures/** -text

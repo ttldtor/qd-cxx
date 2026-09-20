@@ -1,0 +1,58 @@
+case	S04-order-disabled
+input	<INPUT>/ordering.xml
+options	sysprops	false	dxprops	false
+model	merged	1	empty	false
+model.source	<scheme>
+model.source	<INPUT>/ordering.xml
+generation	RECORD	Alpha
+generation	RECORD	HiddenRecord
+generation	RECORD	Beta
+model.record	HiddenRecord	true	false	\N	\N	\N	false	HiddenRecord
+model.record.sources	[<INPUT>/ordering.xml]
+model.field	Value	compact_int	8	COMPACT_INT	false	true	Value
+model.field.sources	[<INPUT>/ordering.xml]
+model.record	Alpha	false	true	\N	\N	\N	false	Alpha
+model.record.sources	[<INPUT>/ordering.xml]
+model.field	Text	utf_char_array	10	UTF_CHAR_ARRAY	false	true	Text
+model.field.sources	[<INPUT>/ordering.xml]
+model.field	Count	compact_int	8	COMPACT_INT	false	true	Count
+model.field.sources	[<INPUT>/ordering.xml]
+model.field	Hidden	compact_int	8	COMPACT_INT	true	false	Hidden
+model.field.sources	[<INPUT>/ordering.xml]
+model.field	Blob	byte_array	9	BYTE_ARRAY	false	true	Blob
+model.field.sources	[<INPUT>/ordering.xml]
+model.field	Flags	compact_int	8	COMPACT_INT	false	true	Flags
+model.field.sources	[<INPUT>/ordering.xml]
+model.record	Beta	false	true	\N	\N	\N	false	Beta
+model.record.sources	[<INPUT>/ordering.xml]
+model.field	Value	compact_int	8	COMPACT_INT	false	true	Value
+model.field.sources	[<INPUT>/ordering.xml]
+runtime	2	B1T5_FIhpKHLiD8jiNyrjd8CLiUQnZj_5nziDZmHzsM
+record.lookup	HiddenRecord	\N
+record.lookup	Alpha	0
+record.lookup	Beta	1
+record.lookup	MissingRecord	\N
+record	0	Alpha	com.devexperts.qd.kit.DefaultRecord	false	2	2
+mapping.default	\N
+slot	int	0	Alpha.Count	Count	Count	8	COMPACT_INT	com.devexperts.qd.kit.CompactIntField
+slot	int	1	Alpha.Flags	Flags	Flags	8	COMPACT_INT	com.devexperts.qd.kit.CompactIntField
+slot	obj	0	Alpha.Text	Text	Text	10	UTF_CHAR_ARRAY	com.devexperts.qd.kit.StringField
+slot	obj	1	Alpha.Blob	Blob	Blob	9	BYTE_ARRAY	com.devexperts.qd.kit.ByteArrayField
+lookup	Alpha.Count	Alpha.Count	Alpha.Count	\N
+lookup	Count	Alpha.Count	\N	\N
+lookup	Alpha.Flags	Alpha.Flags	Alpha.Flags	\N
+lookup	Flags	Alpha.Flags	\N	\N
+lookup	Alpha.Text	Alpha.Text	\N	Alpha.Text
+lookup	Text	Alpha.Text	\N	\N
+lookup	Alpha.Blob	Alpha.Blob	\N	Alpha.Blob
+lookup	Blob	Alpha.Blob	\N	\N
+lookup	Hidden	\N	\N	\N
+lookup	Alpha.Hidden	\N	\N	\N
+lookup	Missing	\N	\N	\N
+record	1	Beta	com.devexperts.qd.kit.DefaultRecord	false	1	0
+mapping.default	\N
+slot	int	0	Beta.Value	Value	Value	8	COMPACT_INT	com.devexperts.qd.kit.CompactIntField
+lookup	Beta.Value	Beta.Value	Beta.Value	\N
+lookup	Value	Beta.Value	\N	\N
+lookup	Missing	\N	\N	\N
+complete	S04-order-disabled

@@ -1,0 +1,9 @@
+case	S01-no-urls
+options	sysprops	false	dxprops	false
+error	model.load
+exception	java.lang.IllegalStateException	Cannot load scheme model without URLs
+origin	com.dxfeed.scheme.model.SchemeModel$Loader	load	720
+error	runtime.load
+exception	java.lang.IllegalStateException	Cannot load scheme without URLs
+origin	com.dxfeed.scheme.DXScheme$Loader	load	487
+complete	S01-no-urls

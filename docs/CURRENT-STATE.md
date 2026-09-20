@@ -12,15 +12,15 @@ The repository currently defines working and contribution rules, documentation a
 - Completed: `QDCXX-002`, verified Java QD 3.355 provenance and documented reproducible upstream inspection.
 - Completed: `QDCXX-003`, initial source-linked XML schema and DataScheme investigation; runtime oracle captures and normalized-model decisions remain follow-up work.
 - Completed: `QDCXX-004`, source-linked QTP framing/protocol inventory and local DataScheme/wire-schema mapping; executable oracle validation remains follow-up work.
-- Ready: `QDCXX-005`, Java schema oracle tooling and initial captured subcases.
+- Completed: `QDCXX-005`, Java schema oracle tooling and 17 captured subcases, with independent reproducibility and positive/negative verify checks.
 - Proposed: `QDCXX-006`, in-memory QTP captures, dependent on QDCXX-005 tooling.
 - Proposed: `QDCXX-007`, normalized-model requirements and proposed compatibility ADR, dependent on QDCXX-005/006 evidence.
 
 ## Next milestone: executable oracle baseline
 
-The next assigned session is QDCXX-005. Task-scoped Java harnesses and Java build configuration are permitted by QDCXX-005/006; production C++ and dependency selection remain deferred. No oracle tooling or captures have been implemented by this planning update.
+The schema portion now has an [executable oracle baseline](../tools/upstream/schema-oracle/README.md), scoped by [exact coverage](../tests/fixtures/schema/COVERAGE.md). Task-scoped Java tooling is permitted; production C++ and dependency selection remain deferred.
 
-Proceed from the initial schema captures to QDCXX-006 protocol bytes/observations, then QDCXX-007 model proposals. Source findings alone do not establish executable compatibility. Remaining edge cases, negotiation, conversion matrices, reset/PART and dxFeed provider profiles stay open for later focused work.
+QDCXX-006 protocol bytes/observations is a proposed next session, then QDCXX-007 model proposals. Neither was started in QDCXX-005. Source findings alone do not establish executable compatibility. Remaining edge cases, negotiation, conversion matrices, reset/PART and dxFeed provider profiles stay open for later focused work.
 
 ## Near-term exit criteria
 
@@ -56,6 +56,17 @@ Checked for `QDCXX-002` on 2026-09-20:
 - [x] The public-GitHub/internal-SCM metadata ambiguity is recorded in `docs/upstream/OPEN-QUESTIONS.md`.
 
 Update this file whenever the project phase, active work, or major known limitation changes.
+
+## Executable schema baseline
+
+Recorded for `QDCXX-005` on 2026-09-20:
+
+- [Java harness and Windows launcher](../tools/upstream/schema-oracle/README.md) verify the locked origin/commit/tag/version and source cleanliness, rebuild the external source with JDK 8/Maven, and use fresh JVMs with optional property overlays disabled.
+- [17 subcases](../tests/fixtures/schema/COVERAGE.md) cover only S01/S04/S05/S07/S08/S15 portions: empty/no input, field ordering/disabled entities, index/VOID variants, aliases/lookups, copy timing/main-alias loss, storage slots and BYTE/SHORT rejection.
+- [Validation evidence](../tests/fixtures/schema/VALIDATION.md) retains original inputs, raw observations, normalized expectations, exact commands and provenance. Two independent captures reproduce all expectations; verify rejects a temporary 0-to-999 count mutation and passes the unchanged baseline.
+- Runtime confirms the source-predicted copy-main-alias quirk and distinct exception families. No unexplained semantic discrepancy remains in these subcases. The observation format is not a normalized-model decision.
+- Existing Zulu JDK 8 matches the upstream enforcer requirement. Maven cache location and JAXB temporary working directory are explicit accommodations; no upstream source/POM patch or substitute QD binary is used.
+- Upstream tests were skipped, and full schema/provider/property parity is not claimed. QTP captures, parser/rebuild edge cases, C++ implementation and C++ conformance remain unexecuted.
 
 ## Schema investigation baseline
 
