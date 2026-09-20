@@ -1,0 +1,602 @@
+profile	QD-3.355	ByteArrayInput	fresh input per read	UTF-16 hex units; exact decimal integers
+writer	I-zero	writeCompactInt	0	00
+reader	I-zero	readCompactInt	00	ok	0	1	0
+reader	I-zero/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+writer	I-minus1	writeCompactInt	-1	7f
+reader	I-minus1	readCompactInt	7f	ok	-1	1	0
+reader	I-minus1/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+writer	I-plus1	writeCompactInt	1	01
+reader	I-plus1	readCompactInt	01	ok	1	1	0
+reader	I-plus1/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+writer	I-minus2	writeCompactInt	-2	7e
+reader	I-minus2	readCompactInt	7e	ok	-2	1	0
+reader	I-minus2/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+writer	I-min	writeCompactInt	-2147483648	f780000000
+reader	I-min	readCompactInt	f780000000	ok	-2147483648	5	0
+reader	I-min/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	I-min/prefix-1	readCompactInt	f7	error	java.io.EOFException	1	0	End of buffer.
+reader	I-min/prefix-2	readCompactInt	f780	error	java.io.EOFException	2	0	End of buffer.
+reader	I-min/prefix-3	readCompactInt	f78000	error	java.io.EOFException	3	0	End of buffer.
+reader	I-min/prefix-4	readCompactInt	f7800000	error	java.io.EOFException	4	0	End of buffer.
+writer	I-max	writeCompactInt	2147483647	f07fffffff
+reader	I-max	readCompactInt	f07fffffff	ok	2147483647	5	0
+reader	I-max/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	I-max/prefix-1	readCompactInt	f0	error	java.io.EOFException	1	0	End of buffer.
+reader	I-max/prefix-2	readCompactInt	f07f	error	java.io.EOFException	2	0	End of buffer.
+reader	I-max/prefix-3	readCompactInt	f07fff	error	java.io.EOFException	3	0	End of buffer.
+reader	I-max/prefix-4	readCompactInt	f07fffff	error	java.io.EOFException	4	0	End of buffer.
+writer	I-b6-neg-d-1	writeCompactInt	-65	bfbf
+reader	I-b6-neg-d-1	readCompactInt	bfbf	ok	-65	2	0
+reader	I-b6-neg-d-1/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	I-b6-neg-d-1/prefix-1	readCompactInt	bf	error	java.io.EOFException	1	0	End of buffer.
+writer	I-b6-neg-d0	writeCompactInt	-64	40
+reader	I-b6-neg-d0	readCompactInt	40	ok	-64	1	0
+reader	I-b6-neg-d0/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+writer	I-b6-neg-d1	writeCompactInt	-63	41
+reader	I-b6-neg-d1	readCompactInt	41	ok	-63	1	0
+reader	I-b6-neg-d1/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+writer	I-b6-pos-d-1	writeCompactInt	63	3f
+reader	I-b6-pos-d-1	readCompactInt	3f	ok	63	1	0
+reader	I-b6-pos-d-1/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+writer	I-b6-pos-d0	writeCompactInt	64	8040
+reader	I-b6-pos-d0	readCompactInt	8040	ok	64	2	0
+reader	I-b6-pos-d0/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	I-b6-pos-d0/prefix-1	readCompactInt	80	error	java.io.EOFException	1	0	End of buffer.
+writer	I-b6-pos-d1	writeCompactInt	65	8041
+reader	I-b6-pos-d1	readCompactInt	8041	ok	65	2	0
+reader	I-b6-pos-d1/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	I-b6-pos-d1/prefix-1	readCompactInt	80	error	java.io.EOFException	1	0	End of buffer.
+writer	I-b13-neg-d-1	writeCompactInt	-8193	dfdfff
+reader	I-b13-neg-d-1	readCompactInt	dfdfff	ok	-8193	3	0
+reader	I-b13-neg-d-1/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	I-b13-neg-d-1/prefix-1	readCompactInt	df	error	java.io.EOFException	1	0	End of buffer.
+reader	I-b13-neg-d-1/prefix-2	readCompactInt	dfdf	error	java.io.EOFException	2	0	End of buffer.
+writer	I-b13-neg-d0	writeCompactInt	-8192	a000
+reader	I-b13-neg-d0	readCompactInt	a000	ok	-8192	2	0
+reader	I-b13-neg-d0/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	I-b13-neg-d0/prefix-1	readCompactInt	a0	error	java.io.EOFException	1	0	End of buffer.
+writer	I-b13-neg-d1	writeCompactInt	-8191	a001
+reader	I-b13-neg-d1	readCompactInt	a001	ok	-8191	2	0
+reader	I-b13-neg-d1/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	I-b13-neg-d1/prefix-1	readCompactInt	a0	error	java.io.EOFException	1	0	End of buffer.
+writer	I-b13-pos-d-1	writeCompactInt	8191	9fff
+reader	I-b13-pos-d-1	readCompactInt	9fff	ok	8191	2	0
+reader	I-b13-pos-d-1/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	I-b13-pos-d-1/prefix-1	readCompactInt	9f	error	java.io.EOFException	1	0	End of buffer.
+writer	I-b13-pos-d0	writeCompactInt	8192	c02000
+reader	I-b13-pos-d0	readCompactInt	c02000	ok	8192	3	0
+reader	I-b13-pos-d0/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	I-b13-pos-d0/prefix-1	readCompactInt	c0	error	java.io.EOFException	1	0	End of buffer.
+reader	I-b13-pos-d0/prefix-2	readCompactInt	c020	error	java.io.EOFException	2	0	End of buffer.
+writer	I-b13-pos-d1	writeCompactInt	8193	c02001
+reader	I-b13-pos-d1	readCompactInt	c02001	ok	8193	3	0
+reader	I-b13-pos-d1/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	I-b13-pos-d1/prefix-1	readCompactInt	c0	error	java.io.EOFException	1	0	End of buffer.
+reader	I-b13-pos-d1/prefix-2	readCompactInt	c020	error	java.io.EOFException	2	0	End of buffer.
+writer	I-b20-neg-d-1	writeCompactInt	-1048577	efefffff
+reader	I-b20-neg-d-1	readCompactInt	efefffff	ok	-1048577	4	0
+reader	I-b20-neg-d-1/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	I-b20-neg-d-1/prefix-1	readCompactInt	ef	error	java.io.EOFException	1	0	End of buffer.
+reader	I-b20-neg-d-1/prefix-2	readCompactInt	efef	error	java.io.EOFException	2	0	End of buffer.
+reader	I-b20-neg-d-1/prefix-3	readCompactInt	efefff	error	java.io.EOFException	3	0	End of buffer.
+writer	I-b20-neg-d0	writeCompactInt	-1048576	d00000
+reader	I-b20-neg-d0	readCompactInt	d00000	ok	-1048576	3	0
+reader	I-b20-neg-d0/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	I-b20-neg-d0/prefix-1	readCompactInt	d0	error	java.io.EOFException	1	0	End of buffer.
+reader	I-b20-neg-d0/prefix-2	readCompactInt	d000	error	java.io.EOFException	2	0	End of buffer.
+writer	I-b20-neg-d1	writeCompactInt	-1048575	d00001
+reader	I-b20-neg-d1	readCompactInt	d00001	ok	-1048575	3	0
+reader	I-b20-neg-d1/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	I-b20-neg-d1/prefix-1	readCompactInt	d0	error	java.io.EOFException	1	0	End of buffer.
+reader	I-b20-neg-d1/prefix-2	readCompactInt	d000	error	java.io.EOFException	2	0	End of buffer.
+writer	I-b20-pos-d-1	writeCompactInt	1048575	cfffff
+reader	I-b20-pos-d-1	readCompactInt	cfffff	ok	1048575	3	0
+reader	I-b20-pos-d-1/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	I-b20-pos-d-1/prefix-1	readCompactInt	cf	error	java.io.EOFException	1	0	End of buffer.
+reader	I-b20-pos-d-1/prefix-2	readCompactInt	cfff	error	java.io.EOFException	2	0	End of buffer.
+writer	I-b20-pos-d0	writeCompactInt	1048576	e0100000
+reader	I-b20-pos-d0	readCompactInt	e0100000	ok	1048576	4	0
+reader	I-b20-pos-d0/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	I-b20-pos-d0/prefix-1	readCompactInt	e0	error	java.io.EOFException	1	0	End of buffer.
+reader	I-b20-pos-d0/prefix-2	readCompactInt	e010	error	java.io.EOFException	2	0	End of buffer.
+reader	I-b20-pos-d0/prefix-3	readCompactInt	e01000	error	java.io.EOFException	3	0	End of buffer.
+writer	I-b20-pos-d1	writeCompactInt	1048577	e0100001
+reader	I-b20-pos-d1	readCompactInt	e0100001	ok	1048577	4	0
+reader	I-b20-pos-d1/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	I-b20-pos-d1/prefix-1	readCompactInt	e0	error	java.io.EOFException	1	0	End of buffer.
+reader	I-b20-pos-d1/prefix-2	readCompactInt	e010	error	java.io.EOFException	2	0	End of buffer.
+reader	I-b20-pos-d1/prefix-3	readCompactInt	e01000	error	java.io.EOFException	3	0	End of buffer.
+writer	I-b27-neg-d-1	writeCompactInt	-134217729	f7f7ffffff
+reader	I-b27-neg-d-1	readCompactInt	f7f7ffffff	ok	-134217729	5	0
+reader	I-b27-neg-d-1/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	I-b27-neg-d-1/prefix-1	readCompactInt	f7	error	java.io.EOFException	1	0	End of buffer.
+reader	I-b27-neg-d-1/prefix-2	readCompactInt	f7f7	error	java.io.EOFException	2	0	End of buffer.
+reader	I-b27-neg-d-1/prefix-3	readCompactInt	f7f7ff	error	java.io.EOFException	3	0	End of buffer.
+reader	I-b27-neg-d-1/prefix-4	readCompactInt	f7f7ffff	error	java.io.EOFException	4	0	End of buffer.
+writer	I-b27-neg-d0	writeCompactInt	-134217728	e8000000
+reader	I-b27-neg-d0	readCompactInt	e8000000	ok	-134217728	4	0
+reader	I-b27-neg-d0/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	I-b27-neg-d0/prefix-1	readCompactInt	e8	error	java.io.EOFException	1	0	End of buffer.
+reader	I-b27-neg-d0/prefix-2	readCompactInt	e800	error	java.io.EOFException	2	0	End of buffer.
+reader	I-b27-neg-d0/prefix-3	readCompactInt	e80000	error	java.io.EOFException	3	0	End of buffer.
+writer	I-b27-neg-d1	writeCompactInt	-134217727	e8000001
+reader	I-b27-neg-d1	readCompactInt	e8000001	ok	-134217727	4	0
+reader	I-b27-neg-d1/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	I-b27-neg-d1/prefix-1	readCompactInt	e8	error	java.io.EOFException	1	0	End of buffer.
+reader	I-b27-neg-d1/prefix-2	readCompactInt	e800	error	java.io.EOFException	2	0	End of buffer.
+reader	I-b27-neg-d1/prefix-3	readCompactInt	e80000	error	java.io.EOFException	3	0	End of buffer.
+writer	I-b27-pos-d-1	writeCompactInt	134217727	e7ffffff
+reader	I-b27-pos-d-1	readCompactInt	e7ffffff	ok	134217727	4	0
+reader	I-b27-pos-d-1/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	I-b27-pos-d-1/prefix-1	readCompactInt	e7	error	java.io.EOFException	1	0	End of buffer.
+reader	I-b27-pos-d-1/prefix-2	readCompactInt	e7ff	error	java.io.EOFException	2	0	End of buffer.
+reader	I-b27-pos-d-1/prefix-3	readCompactInt	e7ffff	error	java.io.EOFException	3	0	End of buffer.
+writer	I-b27-pos-d0	writeCompactInt	134217728	f008000000
+reader	I-b27-pos-d0	readCompactInt	f008000000	ok	134217728	5	0
+reader	I-b27-pos-d0/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	I-b27-pos-d0/prefix-1	readCompactInt	f0	error	java.io.EOFException	1	0	End of buffer.
+reader	I-b27-pos-d0/prefix-2	readCompactInt	f008	error	java.io.EOFException	2	0	End of buffer.
+reader	I-b27-pos-d0/prefix-3	readCompactInt	f00800	error	java.io.EOFException	3	0	End of buffer.
+reader	I-b27-pos-d0/prefix-4	readCompactInt	f0080000	error	java.io.EOFException	4	0	End of buffer.
+writer	I-b27-pos-d1	writeCompactInt	134217729	f008000001
+reader	I-b27-pos-d1	readCompactInt	f008000001	ok	134217729	5	0
+reader	I-b27-pos-d1/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	I-b27-pos-d1/prefix-1	readCompactInt	f0	error	java.io.EOFException	1	0	End of buffer.
+reader	I-b27-pos-d1/prefix-2	readCompactInt	f008	error	java.io.EOFException	2	0	End of buffer.
+reader	I-b27-pos-d1/prefix-3	readCompactInt	f00800	error	java.io.EOFException	3	0	End of buffer.
+reader	I-b27-pos-d1/prefix-4	readCompactInt	f0080000	error	java.io.EOFException	4	0	End of buffer.
+writer	L-zero	writeCompactLong	0	00
+reader	L-zero	readCompactLong	00	ok	0	1	0
+reader	L-zero/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+writer	L-minus1	writeCompactLong	-1	7f
+reader	L-minus1	readCompactLong	7f	ok	-1	1	0
+reader	L-minus1/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+writer	L-plus1	writeCompactLong	1	01
+reader	L-plus1	readCompactLong	01	ok	1	1	0
+reader	L-plus1/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+writer	L-minus2	writeCompactLong	-2	7e
+reader	L-minus2	readCompactLong	7e	ok	-2	1	0
+reader	L-minus2/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+writer	L-min	writeCompactLong	-9223372036854775808	ff8000000000000000
+reader	L-min	readCompactLong	ff8000000000000000	ok	-9223372036854775808	9	0
+reader	L-min/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-min/prefix-1	readCompactLong	ff	error	java.io.EOFException	1	0	End of buffer.
+reader	L-min/prefix-2	readCompactLong	ff80	error	java.io.EOFException	2	0	End of buffer.
+reader	L-min/prefix-3	readCompactLong	ff8000	error	java.io.EOFException	3	0	End of buffer.
+reader	L-min/prefix-4	readCompactLong	ff800000	error	java.io.EOFException	4	0	End of buffer.
+reader	L-min/prefix-5	readCompactLong	ff80000000	error	java.io.EOFException	5	0	End of buffer.
+reader	L-min/prefix-6	readCompactLong	ff8000000000	error	java.io.EOFException	6	0	End of buffer.
+reader	L-min/prefix-7	readCompactLong	ff800000000000	error	java.io.EOFException	7	0	End of buffer.
+reader	L-min/prefix-8	readCompactLong	ff80000000000000	error	java.io.EOFException	8	0	End of buffer.
+writer	L-max	writeCompactLong	9223372036854775807	ff7fffffffffffffff
+reader	L-max	readCompactLong	ff7fffffffffffffff	ok	9223372036854775807	9	0
+reader	L-max/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-max/prefix-1	readCompactLong	ff	error	java.io.EOFException	1	0	End of buffer.
+reader	L-max/prefix-2	readCompactLong	ff7f	error	java.io.EOFException	2	0	End of buffer.
+reader	L-max/prefix-3	readCompactLong	ff7fff	error	java.io.EOFException	3	0	End of buffer.
+reader	L-max/prefix-4	readCompactLong	ff7fffff	error	java.io.EOFException	4	0	End of buffer.
+reader	L-max/prefix-5	readCompactLong	ff7fffffff	error	java.io.EOFException	5	0	End of buffer.
+reader	L-max/prefix-6	readCompactLong	ff7fffffffff	error	java.io.EOFException	6	0	End of buffer.
+reader	L-max/prefix-7	readCompactLong	ff7fffffffffff	error	java.io.EOFException	7	0	End of buffer.
+reader	L-max/prefix-8	readCompactLong	ff7fffffffffffff	error	java.io.EOFException	8	0	End of buffer.
+writer	L-b6-neg-d-1	writeCompactLong	-65	bfbf
+reader	L-b6-neg-d-1	readCompactLong	bfbf	ok	-65	2	0
+reader	L-b6-neg-d-1/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b6-neg-d-1/prefix-1	readCompactLong	bf	error	java.io.EOFException	1	0	End of buffer.
+writer	L-b6-neg-d0	writeCompactLong	-64	40
+reader	L-b6-neg-d0	readCompactLong	40	ok	-64	1	0
+reader	L-b6-neg-d0/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+writer	L-b6-neg-d1	writeCompactLong	-63	41
+reader	L-b6-neg-d1	readCompactLong	41	ok	-63	1	0
+reader	L-b6-neg-d1/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+writer	L-b6-pos-d-1	writeCompactLong	63	3f
+reader	L-b6-pos-d-1	readCompactLong	3f	ok	63	1	0
+reader	L-b6-pos-d-1/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+writer	L-b6-pos-d0	writeCompactLong	64	8040
+reader	L-b6-pos-d0	readCompactLong	8040	ok	64	2	0
+reader	L-b6-pos-d0/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b6-pos-d0/prefix-1	readCompactLong	80	error	java.io.EOFException	1	0	End of buffer.
+writer	L-b6-pos-d1	writeCompactLong	65	8041
+reader	L-b6-pos-d1	readCompactLong	8041	ok	65	2	0
+reader	L-b6-pos-d1/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b6-pos-d1/prefix-1	readCompactLong	80	error	java.io.EOFException	1	0	End of buffer.
+writer	L-b13-neg-d-1	writeCompactLong	-8193	dfdfff
+reader	L-b13-neg-d-1	readCompactLong	dfdfff	ok	-8193	3	0
+reader	L-b13-neg-d-1/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b13-neg-d-1/prefix-1	readCompactLong	df	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b13-neg-d-1/prefix-2	readCompactLong	dfdf	error	java.io.EOFException	2	0	End of buffer.
+writer	L-b13-neg-d0	writeCompactLong	-8192	a000
+reader	L-b13-neg-d0	readCompactLong	a000	ok	-8192	2	0
+reader	L-b13-neg-d0/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b13-neg-d0/prefix-1	readCompactLong	a0	error	java.io.EOFException	1	0	End of buffer.
+writer	L-b13-neg-d1	writeCompactLong	-8191	a001
+reader	L-b13-neg-d1	readCompactLong	a001	ok	-8191	2	0
+reader	L-b13-neg-d1/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b13-neg-d1/prefix-1	readCompactLong	a0	error	java.io.EOFException	1	0	End of buffer.
+writer	L-b13-pos-d-1	writeCompactLong	8191	9fff
+reader	L-b13-pos-d-1	readCompactLong	9fff	ok	8191	2	0
+reader	L-b13-pos-d-1/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b13-pos-d-1/prefix-1	readCompactLong	9f	error	java.io.EOFException	1	0	End of buffer.
+writer	L-b13-pos-d0	writeCompactLong	8192	c02000
+reader	L-b13-pos-d0	readCompactLong	c02000	ok	8192	3	0
+reader	L-b13-pos-d0/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b13-pos-d0/prefix-1	readCompactLong	c0	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b13-pos-d0/prefix-2	readCompactLong	c020	error	java.io.EOFException	2	0	End of buffer.
+writer	L-b13-pos-d1	writeCompactLong	8193	c02001
+reader	L-b13-pos-d1	readCompactLong	c02001	ok	8193	3	0
+reader	L-b13-pos-d1/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b13-pos-d1/prefix-1	readCompactLong	c0	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b13-pos-d1/prefix-2	readCompactLong	c020	error	java.io.EOFException	2	0	End of buffer.
+writer	L-b20-neg-d-1	writeCompactLong	-1048577	efefffff
+reader	L-b20-neg-d-1	readCompactLong	efefffff	ok	-1048577	4	0
+reader	L-b20-neg-d-1/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b20-neg-d-1/prefix-1	readCompactLong	ef	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b20-neg-d-1/prefix-2	readCompactLong	efef	error	java.io.EOFException	2	0	End of buffer.
+reader	L-b20-neg-d-1/prefix-3	readCompactLong	efefff	error	java.io.EOFException	3	0	End of buffer.
+writer	L-b20-neg-d0	writeCompactLong	-1048576	d00000
+reader	L-b20-neg-d0	readCompactLong	d00000	ok	-1048576	3	0
+reader	L-b20-neg-d0/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b20-neg-d0/prefix-1	readCompactLong	d0	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b20-neg-d0/prefix-2	readCompactLong	d000	error	java.io.EOFException	2	0	End of buffer.
+writer	L-b20-neg-d1	writeCompactLong	-1048575	d00001
+reader	L-b20-neg-d1	readCompactLong	d00001	ok	-1048575	3	0
+reader	L-b20-neg-d1/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b20-neg-d1/prefix-1	readCompactLong	d0	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b20-neg-d1/prefix-2	readCompactLong	d000	error	java.io.EOFException	2	0	End of buffer.
+writer	L-b20-pos-d-1	writeCompactLong	1048575	cfffff
+reader	L-b20-pos-d-1	readCompactLong	cfffff	ok	1048575	3	0
+reader	L-b20-pos-d-1/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b20-pos-d-1/prefix-1	readCompactLong	cf	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b20-pos-d-1/prefix-2	readCompactLong	cfff	error	java.io.EOFException	2	0	End of buffer.
+writer	L-b20-pos-d0	writeCompactLong	1048576	e0100000
+reader	L-b20-pos-d0	readCompactLong	e0100000	ok	1048576	4	0
+reader	L-b20-pos-d0/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b20-pos-d0/prefix-1	readCompactLong	e0	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b20-pos-d0/prefix-2	readCompactLong	e010	error	java.io.EOFException	2	0	End of buffer.
+reader	L-b20-pos-d0/prefix-3	readCompactLong	e01000	error	java.io.EOFException	3	0	End of buffer.
+writer	L-b20-pos-d1	writeCompactLong	1048577	e0100001
+reader	L-b20-pos-d1	readCompactLong	e0100001	ok	1048577	4	0
+reader	L-b20-pos-d1/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b20-pos-d1/prefix-1	readCompactLong	e0	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b20-pos-d1/prefix-2	readCompactLong	e010	error	java.io.EOFException	2	0	End of buffer.
+reader	L-b20-pos-d1/prefix-3	readCompactLong	e01000	error	java.io.EOFException	3	0	End of buffer.
+writer	L-b27-neg-d-1	writeCompactLong	-134217729	f7f7ffffff
+reader	L-b27-neg-d-1	readCompactLong	f7f7ffffff	ok	-134217729	5	0
+reader	L-b27-neg-d-1/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b27-neg-d-1/prefix-1	readCompactLong	f7	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b27-neg-d-1/prefix-2	readCompactLong	f7f7	error	java.io.EOFException	2	0	End of buffer.
+reader	L-b27-neg-d-1/prefix-3	readCompactLong	f7f7ff	error	java.io.EOFException	3	0	End of buffer.
+reader	L-b27-neg-d-1/prefix-4	readCompactLong	f7f7ffff	error	java.io.EOFException	4	0	End of buffer.
+writer	L-b27-neg-d0	writeCompactLong	-134217728	e8000000
+reader	L-b27-neg-d0	readCompactLong	e8000000	ok	-134217728	4	0
+reader	L-b27-neg-d0/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b27-neg-d0/prefix-1	readCompactLong	e8	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b27-neg-d0/prefix-2	readCompactLong	e800	error	java.io.EOFException	2	0	End of buffer.
+reader	L-b27-neg-d0/prefix-3	readCompactLong	e80000	error	java.io.EOFException	3	0	End of buffer.
+writer	L-b27-neg-d1	writeCompactLong	-134217727	e8000001
+reader	L-b27-neg-d1	readCompactLong	e8000001	ok	-134217727	4	0
+reader	L-b27-neg-d1/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b27-neg-d1/prefix-1	readCompactLong	e8	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b27-neg-d1/prefix-2	readCompactLong	e800	error	java.io.EOFException	2	0	End of buffer.
+reader	L-b27-neg-d1/prefix-3	readCompactLong	e80000	error	java.io.EOFException	3	0	End of buffer.
+writer	L-b27-pos-d-1	writeCompactLong	134217727	e7ffffff
+reader	L-b27-pos-d-1	readCompactLong	e7ffffff	ok	134217727	4	0
+reader	L-b27-pos-d-1/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b27-pos-d-1/prefix-1	readCompactLong	e7	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b27-pos-d-1/prefix-2	readCompactLong	e7ff	error	java.io.EOFException	2	0	End of buffer.
+reader	L-b27-pos-d-1/prefix-3	readCompactLong	e7ffff	error	java.io.EOFException	3	0	End of buffer.
+writer	L-b27-pos-d0	writeCompactLong	134217728	f008000000
+reader	L-b27-pos-d0	readCompactLong	f008000000	ok	134217728	5	0
+reader	L-b27-pos-d0/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b27-pos-d0/prefix-1	readCompactLong	f0	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b27-pos-d0/prefix-2	readCompactLong	f008	error	java.io.EOFException	2	0	End of buffer.
+reader	L-b27-pos-d0/prefix-3	readCompactLong	f00800	error	java.io.EOFException	3	0	End of buffer.
+reader	L-b27-pos-d0/prefix-4	readCompactLong	f0080000	error	java.io.EOFException	4	0	End of buffer.
+writer	L-b27-pos-d1	writeCompactLong	134217729	f008000001
+reader	L-b27-pos-d1	readCompactLong	f008000001	ok	134217729	5	0
+reader	L-b27-pos-d1/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b27-pos-d1/prefix-1	readCompactLong	f0	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b27-pos-d1/prefix-2	readCompactLong	f008	error	java.io.EOFException	2	0	End of buffer.
+reader	L-b27-pos-d1/prefix-3	readCompactLong	f00800	error	java.io.EOFException	3	0	End of buffer.
+reader	L-b27-pos-d1/prefix-4	readCompactLong	f0080000	error	java.io.EOFException	4	0	End of buffer.
+writer	L-b34-neg-d-1	writeCompactLong	-17179869185	fbfbffffffff
+reader	L-b34-neg-d-1	readCompactLong	fbfbffffffff	ok	-17179869185	6	0
+reader	L-b34-neg-d-1/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b34-neg-d-1/prefix-1	readCompactLong	fb	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b34-neg-d-1/prefix-2	readCompactLong	fbfb	error	java.io.EOFException	2	0	End of buffer.
+reader	L-b34-neg-d-1/prefix-3	readCompactLong	fbfbff	error	java.io.EOFException	3	0	End of buffer.
+reader	L-b34-neg-d-1/prefix-4	readCompactLong	fbfbffff	error	java.io.EOFException	4	0	End of buffer.
+reader	L-b34-neg-d-1/prefix-5	readCompactLong	fbfbffffff	error	java.io.EOFException	5	0	End of buffer.
+writer	L-b34-neg-d0	writeCompactLong	-17179869184	f400000000
+reader	L-b34-neg-d0	readCompactLong	f400000000	ok	-17179869184	5	0
+reader	L-b34-neg-d0/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b34-neg-d0/prefix-1	readCompactLong	f4	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b34-neg-d0/prefix-2	readCompactLong	f400	error	java.io.EOFException	2	0	End of buffer.
+reader	L-b34-neg-d0/prefix-3	readCompactLong	f40000	error	java.io.EOFException	3	0	End of buffer.
+reader	L-b34-neg-d0/prefix-4	readCompactLong	f4000000	error	java.io.EOFException	4	0	End of buffer.
+writer	L-b34-neg-d1	writeCompactLong	-17179869183	f400000001
+reader	L-b34-neg-d1	readCompactLong	f400000001	ok	-17179869183	5	0
+reader	L-b34-neg-d1/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b34-neg-d1/prefix-1	readCompactLong	f4	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b34-neg-d1/prefix-2	readCompactLong	f400	error	java.io.EOFException	2	0	End of buffer.
+reader	L-b34-neg-d1/prefix-3	readCompactLong	f40000	error	java.io.EOFException	3	0	End of buffer.
+reader	L-b34-neg-d1/prefix-4	readCompactLong	f4000000	error	java.io.EOFException	4	0	End of buffer.
+writer	L-b34-pos-d-1	writeCompactLong	17179869183	f3ffffffff
+reader	L-b34-pos-d-1	readCompactLong	f3ffffffff	ok	17179869183	5	0
+reader	L-b34-pos-d-1/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b34-pos-d-1/prefix-1	readCompactLong	f3	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b34-pos-d-1/prefix-2	readCompactLong	f3ff	error	java.io.EOFException	2	0	End of buffer.
+reader	L-b34-pos-d-1/prefix-3	readCompactLong	f3ffff	error	java.io.EOFException	3	0	End of buffer.
+reader	L-b34-pos-d-1/prefix-4	readCompactLong	f3ffffff	error	java.io.EOFException	4	0	End of buffer.
+writer	L-b34-pos-d0	writeCompactLong	17179869184	f80400000000
+reader	L-b34-pos-d0	readCompactLong	f80400000000	ok	17179869184	6	0
+reader	L-b34-pos-d0/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b34-pos-d0/prefix-1	readCompactLong	f8	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b34-pos-d0/prefix-2	readCompactLong	f804	error	java.io.EOFException	2	0	End of buffer.
+reader	L-b34-pos-d0/prefix-3	readCompactLong	f80400	error	java.io.EOFException	3	0	End of buffer.
+reader	L-b34-pos-d0/prefix-4	readCompactLong	f8040000	error	java.io.EOFException	4	0	End of buffer.
+reader	L-b34-pos-d0/prefix-5	readCompactLong	f804000000	error	java.io.EOFException	5	0	End of buffer.
+writer	L-b34-pos-d1	writeCompactLong	17179869185	f80400000001
+reader	L-b34-pos-d1	readCompactLong	f80400000001	ok	17179869185	6	0
+reader	L-b34-pos-d1/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b34-pos-d1/prefix-1	readCompactLong	f8	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b34-pos-d1/prefix-2	readCompactLong	f804	error	java.io.EOFException	2	0	End of buffer.
+reader	L-b34-pos-d1/prefix-3	readCompactLong	f80400	error	java.io.EOFException	3	0	End of buffer.
+reader	L-b34-pos-d1/prefix-4	readCompactLong	f8040000	error	java.io.EOFException	4	0	End of buffer.
+reader	L-b34-pos-d1/prefix-5	readCompactLong	f804000000	error	java.io.EOFException	5	0	End of buffer.
+writer	L-b41-neg-d-1	writeCompactLong	-2199023255553	fdfdffffffffff
+reader	L-b41-neg-d-1	readCompactLong	fdfdffffffffff	ok	-2199023255553	7	0
+reader	L-b41-neg-d-1/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b41-neg-d-1/prefix-1	readCompactLong	fd	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b41-neg-d-1/prefix-2	readCompactLong	fdfd	error	java.io.EOFException	2	0	End of buffer.
+reader	L-b41-neg-d-1/prefix-3	readCompactLong	fdfdff	error	java.io.EOFException	3	0	End of buffer.
+reader	L-b41-neg-d-1/prefix-4	readCompactLong	fdfdffff	error	java.io.EOFException	4	0	End of buffer.
+reader	L-b41-neg-d-1/prefix-5	readCompactLong	fdfdffffff	error	java.io.EOFException	5	0	End of buffer.
+reader	L-b41-neg-d-1/prefix-6	readCompactLong	fdfdffffffff	error	java.io.EOFException	6	0	End of buffer.
+writer	L-b41-neg-d0	writeCompactLong	-2199023255552	fa0000000000
+reader	L-b41-neg-d0	readCompactLong	fa0000000000	ok	-2199023255552	6	0
+reader	L-b41-neg-d0/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b41-neg-d0/prefix-1	readCompactLong	fa	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b41-neg-d0/prefix-2	readCompactLong	fa00	error	java.io.EOFException	2	0	End of buffer.
+reader	L-b41-neg-d0/prefix-3	readCompactLong	fa0000	error	java.io.EOFException	3	0	End of buffer.
+reader	L-b41-neg-d0/prefix-4	readCompactLong	fa000000	error	java.io.EOFException	4	0	End of buffer.
+reader	L-b41-neg-d0/prefix-5	readCompactLong	fa00000000	error	java.io.EOFException	5	0	End of buffer.
+writer	L-b41-neg-d1	writeCompactLong	-2199023255551	fa0000000001
+reader	L-b41-neg-d1	readCompactLong	fa0000000001	ok	-2199023255551	6	0
+reader	L-b41-neg-d1/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b41-neg-d1/prefix-1	readCompactLong	fa	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b41-neg-d1/prefix-2	readCompactLong	fa00	error	java.io.EOFException	2	0	End of buffer.
+reader	L-b41-neg-d1/prefix-3	readCompactLong	fa0000	error	java.io.EOFException	3	0	End of buffer.
+reader	L-b41-neg-d1/prefix-4	readCompactLong	fa000000	error	java.io.EOFException	4	0	End of buffer.
+reader	L-b41-neg-d1/prefix-5	readCompactLong	fa00000000	error	java.io.EOFException	5	0	End of buffer.
+writer	L-b41-pos-d-1	writeCompactLong	2199023255551	f9ffffffffff
+reader	L-b41-pos-d-1	readCompactLong	f9ffffffffff	ok	2199023255551	6	0
+reader	L-b41-pos-d-1/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b41-pos-d-1/prefix-1	readCompactLong	f9	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b41-pos-d-1/prefix-2	readCompactLong	f9ff	error	java.io.EOFException	2	0	End of buffer.
+reader	L-b41-pos-d-1/prefix-3	readCompactLong	f9ffff	error	java.io.EOFException	3	0	End of buffer.
+reader	L-b41-pos-d-1/prefix-4	readCompactLong	f9ffffff	error	java.io.EOFException	4	0	End of buffer.
+reader	L-b41-pos-d-1/prefix-5	readCompactLong	f9ffffffff	error	java.io.EOFException	5	0	End of buffer.
+writer	L-b41-pos-d0	writeCompactLong	2199023255552	fc020000000000
+reader	L-b41-pos-d0	readCompactLong	fc020000000000	ok	2199023255552	7	0
+reader	L-b41-pos-d0/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b41-pos-d0/prefix-1	readCompactLong	fc	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b41-pos-d0/prefix-2	readCompactLong	fc02	error	java.io.EOFException	2	0	End of buffer.
+reader	L-b41-pos-d0/prefix-3	readCompactLong	fc0200	error	java.io.EOFException	3	0	End of buffer.
+reader	L-b41-pos-d0/prefix-4	readCompactLong	fc020000	error	java.io.EOFException	4	0	End of buffer.
+reader	L-b41-pos-d0/prefix-5	readCompactLong	fc02000000	error	java.io.EOFException	5	0	End of buffer.
+reader	L-b41-pos-d0/prefix-6	readCompactLong	fc0200000000	error	java.io.EOFException	6	0	End of buffer.
+writer	L-b41-pos-d1	writeCompactLong	2199023255553	fc020000000001
+reader	L-b41-pos-d1	readCompactLong	fc020000000001	ok	2199023255553	7	0
+reader	L-b41-pos-d1/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b41-pos-d1/prefix-1	readCompactLong	fc	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b41-pos-d1/prefix-2	readCompactLong	fc02	error	java.io.EOFException	2	0	End of buffer.
+reader	L-b41-pos-d1/prefix-3	readCompactLong	fc0200	error	java.io.EOFException	3	0	End of buffer.
+reader	L-b41-pos-d1/prefix-4	readCompactLong	fc020000	error	java.io.EOFException	4	0	End of buffer.
+reader	L-b41-pos-d1/prefix-5	readCompactLong	fc02000000	error	java.io.EOFException	5	0	End of buffer.
+reader	L-b41-pos-d1/prefix-6	readCompactLong	fc0200000000	error	java.io.EOFException	6	0	End of buffer.
+writer	L-b48-neg-d-1	writeCompactLong	-281474976710657	fefeffffffffffff
+reader	L-b48-neg-d-1	readCompactLong	fefeffffffffffff	ok	-281474976710657	8	0
+reader	L-b48-neg-d-1/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b48-neg-d-1/prefix-1	readCompactLong	fe	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b48-neg-d-1/prefix-2	readCompactLong	fefe	error	java.io.EOFException	2	0	End of buffer.
+reader	L-b48-neg-d-1/prefix-3	readCompactLong	fefeff	error	java.io.EOFException	3	0	End of buffer.
+reader	L-b48-neg-d-1/prefix-4	readCompactLong	fefeffff	error	java.io.EOFException	4	0	End of buffer.
+reader	L-b48-neg-d-1/prefix-5	readCompactLong	fefeffffff	error	java.io.EOFException	5	0	End of buffer.
+reader	L-b48-neg-d-1/prefix-6	readCompactLong	fefeffffffff	error	java.io.EOFException	6	0	End of buffer.
+reader	L-b48-neg-d-1/prefix-7	readCompactLong	fefeffffffffff	error	java.io.EOFException	7	0	End of buffer.
+writer	L-b48-neg-d0	writeCompactLong	-281474976710656	fd000000000000
+reader	L-b48-neg-d0	readCompactLong	fd000000000000	ok	-281474976710656	7	0
+reader	L-b48-neg-d0/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b48-neg-d0/prefix-1	readCompactLong	fd	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b48-neg-d0/prefix-2	readCompactLong	fd00	error	java.io.EOFException	2	0	End of buffer.
+reader	L-b48-neg-d0/prefix-3	readCompactLong	fd0000	error	java.io.EOFException	3	0	End of buffer.
+reader	L-b48-neg-d0/prefix-4	readCompactLong	fd000000	error	java.io.EOFException	4	0	End of buffer.
+reader	L-b48-neg-d0/prefix-5	readCompactLong	fd00000000	error	java.io.EOFException	5	0	End of buffer.
+reader	L-b48-neg-d0/prefix-6	readCompactLong	fd0000000000	error	java.io.EOFException	6	0	End of buffer.
+writer	L-b48-neg-d1	writeCompactLong	-281474976710655	fd000000000001
+reader	L-b48-neg-d1	readCompactLong	fd000000000001	ok	-281474976710655	7	0
+reader	L-b48-neg-d1/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b48-neg-d1/prefix-1	readCompactLong	fd	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b48-neg-d1/prefix-2	readCompactLong	fd00	error	java.io.EOFException	2	0	End of buffer.
+reader	L-b48-neg-d1/prefix-3	readCompactLong	fd0000	error	java.io.EOFException	3	0	End of buffer.
+reader	L-b48-neg-d1/prefix-4	readCompactLong	fd000000	error	java.io.EOFException	4	0	End of buffer.
+reader	L-b48-neg-d1/prefix-5	readCompactLong	fd00000000	error	java.io.EOFException	5	0	End of buffer.
+reader	L-b48-neg-d1/prefix-6	readCompactLong	fd0000000000	error	java.io.EOFException	6	0	End of buffer.
+writer	L-b48-pos-d-1	writeCompactLong	281474976710655	fcffffffffffff
+reader	L-b48-pos-d-1	readCompactLong	fcffffffffffff	ok	281474976710655	7	0
+reader	L-b48-pos-d-1/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b48-pos-d-1/prefix-1	readCompactLong	fc	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b48-pos-d-1/prefix-2	readCompactLong	fcff	error	java.io.EOFException	2	0	End of buffer.
+reader	L-b48-pos-d-1/prefix-3	readCompactLong	fcffff	error	java.io.EOFException	3	0	End of buffer.
+reader	L-b48-pos-d-1/prefix-4	readCompactLong	fcffffff	error	java.io.EOFException	4	0	End of buffer.
+reader	L-b48-pos-d-1/prefix-5	readCompactLong	fcffffffff	error	java.io.EOFException	5	0	End of buffer.
+reader	L-b48-pos-d-1/prefix-6	readCompactLong	fcffffffffff	error	java.io.EOFException	6	0	End of buffer.
+writer	L-b48-pos-d0	writeCompactLong	281474976710656	fe01000000000000
+reader	L-b48-pos-d0	readCompactLong	fe01000000000000	ok	281474976710656	8	0
+reader	L-b48-pos-d0/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b48-pos-d0/prefix-1	readCompactLong	fe	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b48-pos-d0/prefix-2	readCompactLong	fe01	error	java.io.EOFException	2	0	End of buffer.
+reader	L-b48-pos-d0/prefix-3	readCompactLong	fe0100	error	java.io.EOFException	3	0	End of buffer.
+reader	L-b48-pos-d0/prefix-4	readCompactLong	fe010000	error	java.io.EOFException	4	0	End of buffer.
+reader	L-b48-pos-d0/prefix-5	readCompactLong	fe01000000	error	java.io.EOFException	5	0	End of buffer.
+reader	L-b48-pos-d0/prefix-6	readCompactLong	fe0100000000	error	java.io.EOFException	6	0	End of buffer.
+reader	L-b48-pos-d0/prefix-7	readCompactLong	fe010000000000	error	java.io.EOFException	7	0	End of buffer.
+writer	L-b48-pos-d1	writeCompactLong	281474976710657	fe01000000000001
+reader	L-b48-pos-d1	readCompactLong	fe01000000000001	ok	281474976710657	8	0
+reader	L-b48-pos-d1/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b48-pos-d1/prefix-1	readCompactLong	fe	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b48-pos-d1/prefix-2	readCompactLong	fe01	error	java.io.EOFException	2	0	End of buffer.
+reader	L-b48-pos-d1/prefix-3	readCompactLong	fe0100	error	java.io.EOFException	3	0	End of buffer.
+reader	L-b48-pos-d1/prefix-4	readCompactLong	fe010000	error	java.io.EOFException	4	0	End of buffer.
+reader	L-b48-pos-d1/prefix-5	readCompactLong	fe01000000	error	java.io.EOFException	5	0	End of buffer.
+reader	L-b48-pos-d1/prefix-6	readCompactLong	fe0100000000	error	java.io.EOFException	6	0	End of buffer.
+reader	L-b48-pos-d1/prefix-7	readCompactLong	fe010000000000	error	java.io.EOFException	7	0	End of buffer.
+writer	L-b55-neg-d-1	writeCompactLong	-36028797018963969	ffff7fffffffffffff
+reader	L-b55-neg-d-1	readCompactLong	ffff7fffffffffffff	ok	-36028797018963969	9	0
+reader	L-b55-neg-d-1/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b55-neg-d-1/prefix-1	readCompactLong	ff	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b55-neg-d-1/prefix-2	readCompactLong	ffff	error	java.io.EOFException	2	0	End of buffer.
+reader	L-b55-neg-d-1/prefix-3	readCompactLong	ffff7f	error	java.io.EOFException	3	0	End of buffer.
+reader	L-b55-neg-d-1/prefix-4	readCompactLong	ffff7fff	error	java.io.EOFException	4	0	End of buffer.
+reader	L-b55-neg-d-1/prefix-5	readCompactLong	ffff7fffff	error	java.io.EOFException	5	0	End of buffer.
+reader	L-b55-neg-d-1/prefix-6	readCompactLong	ffff7fffffff	error	java.io.EOFException	6	0	End of buffer.
+reader	L-b55-neg-d-1/prefix-7	readCompactLong	ffff7fffffffff	error	java.io.EOFException	7	0	End of buffer.
+reader	L-b55-neg-d-1/prefix-8	readCompactLong	ffff7fffffffffff	error	java.io.EOFException	8	0	End of buffer.
+writer	L-b55-neg-d0	writeCompactLong	-36028797018963968	fe80000000000000
+reader	L-b55-neg-d0	readCompactLong	fe80000000000000	ok	-36028797018963968	8	0
+reader	L-b55-neg-d0/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b55-neg-d0/prefix-1	readCompactLong	fe	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b55-neg-d0/prefix-2	readCompactLong	fe80	error	java.io.EOFException	2	0	End of buffer.
+reader	L-b55-neg-d0/prefix-3	readCompactLong	fe8000	error	java.io.EOFException	3	0	End of buffer.
+reader	L-b55-neg-d0/prefix-4	readCompactLong	fe800000	error	java.io.EOFException	4	0	End of buffer.
+reader	L-b55-neg-d0/prefix-5	readCompactLong	fe80000000	error	java.io.EOFException	5	0	End of buffer.
+reader	L-b55-neg-d0/prefix-6	readCompactLong	fe8000000000	error	java.io.EOFException	6	0	End of buffer.
+reader	L-b55-neg-d0/prefix-7	readCompactLong	fe800000000000	error	java.io.EOFException	7	0	End of buffer.
+writer	L-b55-neg-d1	writeCompactLong	-36028797018963967	fe80000000000001
+reader	L-b55-neg-d1	readCompactLong	fe80000000000001	ok	-36028797018963967	8	0
+reader	L-b55-neg-d1/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b55-neg-d1/prefix-1	readCompactLong	fe	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b55-neg-d1/prefix-2	readCompactLong	fe80	error	java.io.EOFException	2	0	End of buffer.
+reader	L-b55-neg-d1/prefix-3	readCompactLong	fe8000	error	java.io.EOFException	3	0	End of buffer.
+reader	L-b55-neg-d1/prefix-4	readCompactLong	fe800000	error	java.io.EOFException	4	0	End of buffer.
+reader	L-b55-neg-d1/prefix-5	readCompactLong	fe80000000	error	java.io.EOFException	5	0	End of buffer.
+reader	L-b55-neg-d1/prefix-6	readCompactLong	fe8000000000	error	java.io.EOFException	6	0	End of buffer.
+reader	L-b55-neg-d1/prefix-7	readCompactLong	fe800000000000	error	java.io.EOFException	7	0	End of buffer.
+writer	L-b55-pos-d-1	writeCompactLong	36028797018963967	fe7fffffffffffff
+reader	L-b55-pos-d-1	readCompactLong	fe7fffffffffffff	ok	36028797018963967	8	0
+reader	L-b55-pos-d-1/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b55-pos-d-1/prefix-1	readCompactLong	fe	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b55-pos-d-1/prefix-2	readCompactLong	fe7f	error	java.io.EOFException	2	0	End of buffer.
+reader	L-b55-pos-d-1/prefix-3	readCompactLong	fe7fff	error	java.io.EOFException	3	0	End of buffer.
+reader	L-b55-pos-d-1/prefix-4	readCompactLong	fe7fffff	error	java.io.EOFException	4	0	End of buffer.
+reader	L-b55-pos-d-1/prefix-5	readCompactLong	fe7fffffff	error	java.io.EOFException	5	0	End of buffer.
+reader	L-b55-pos-d-1/prefix-6	readCompactLong	fe7fffffffff	error	java.io.EOFException	6	0	End of buffer.
+reader	L-b55-pos-d-1/prefix-7	readCompactLong	fe7fffffffffff	error	java.io.EOFException	7	0	End of buffer.
+writer	L-b55-pos-d0	writeCompactLong	36028797018963968	ff0080000000000000
+reader	L-b55-pos-d0	readCompactLong	ff0080000000000000	ok	36028797018963968	9	0
+reader	L-b55-pos-d0/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b55-pos-d0/prefix-1	readCompactLong	ff	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b55-pos-d0/prefix-2	readCompactLong	ff00	error	java.io.EOFException	2	0	End of buffer.
+reader	L-b55-pos-d0/prefix-3	readCompactLong	ff0080	error	java.io.EOFException	3	0	End of buffer.
+reader	L-b55-pos-d0/prefix-4	readCompactLong	ff008000	error	java.io.EOFException	4	0	End of buffer.
+reader	L-b55-pos-d0/prefix-5	readCompactLong	ff00800000	error	java.io.EOFException	5	0	End of buffer.
+reader	L-b55-pos-d0/prefix-6	readCompactLong	ff0080000000	error	java.io.EOFException	6	0	End of buffer.
+reader	L-b55-pos-d0/prefix-7	readCompactLong	ff008000000000	error	java.io.EOFException	7	0	End of buffer.
+reader	L-b55-pos-d0/prefix-8	readCompactLong	ff00800000000000	error	java.io.EOFException	8	0	End of buffer.
+writer	L-b55-pos-d1	writeCompactLong	36028797018963969	ff0080000000000001
+reader	L-b55-pos-d1	readCompactLong	ff0080000000000001	ok	36028797018963969	9	0
+reader	L-b55-pos-d1/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	L-b55-pos-d1/prefix-1	readCompactLong	ff	error	java.io.EOFException	1	0	End of buffer.
+reader	L-b55-pos-d1/prefix-2	readCompactLong	ff00	error	java.io.EOFException	2	0	End of buffer.
+reader	L-b55-pos-d1/prefix-3	readCompactLong	ff0080	error	java.io.EOFException	3	0	End of buffer.
+reader	L-b55-pos-d1/prefix-4	readCompactLong	ff008000	error	java.io.EOFException	4	0	End of buffer.
+reader	L-b55-pos-d1/prefix-5	readCompactLong	ff00800000	error	java.io.EOFException	5	0	End of buffer.
+reader	L-b55-pos-d1/prefix-6	readCompactLong	ff0080000000	error	java.io.EOFException	6	0	End of buffer.
+reader	L-b55-pos-d1/prefix-7	readCompactLong	ff008000000000	error	java.io.EOFException	7	0	End of buffer.
+reader	L-b55-pos-d1/prefix-8	readCompactLong	ff00800000000000	error	java.io.EOFException	8	0	End of buffer.
+writer	X0	writeCompactLong	-2147483648	f780000000
+reader	X0	readCompactLong	f780000000	ok	-2147483648	5	0
+reader	X0/as-int	readCompactInt	f780000000	ok	-2147483648	5	0
+reader	X0/as-int/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	X0/as-int/prefix-1	readCompactInt	f7	error	java.io.EOFException	1	0	End of buffer.
+reader	X0/as-int/prefix-2	readCompactInt	f780	error	java.io.EOFException	2	0	End of buffer.
+reader	X0/as-int/prefix-3	readCompactInt	f78000	error	java.io.EOFException	3	0	End of buffer.
+reader	X0/as-int/prefix-4	readCompactInt	f7800000	error	java.io.EOFException	4	0	End of buffer.
+writer	X1	writeCompactLong	2147483647	f07fffffff
+reader	X1	readCompactLong	f07fffffff	ok	2147483647	5	0
+reader	X1/as-int	readCompactInt	f07fffffff	ok	2147483647	5	0
+reader	X1/as-int/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	X1/as-int/prefix-1	readCompactInt	f0	error	java.io.EOFException	1	0	End of buffer.
+reader	X1/as-int/prefix-2	readCompactInt	f07f	error	java.io.EOFException	2	0	End of buffer.
+reader	X1/as-int/prefix-3	readCompactInt	f07fff	error	java.io.EOFException	3	0	End of buffer.
+reader	X1/as-int/prefix-4	readCompactInt	f07fffff	error	java.io.EOFException	4	0	End of buffer.
+writer	X2	writeCompactLong	-2147483649	f77fffffff
+reader	X2	readCompactLong	f77fffffff	ok	-2147483649	5	0
+reader	X2/as-int	readCompactInt	f77fffffff	ok	2147483647	5	0
+reader	X2/as-int/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	X2/as-int/prefix-1	readCompactInt	f7	error	java.io.EOFException	1	0	End of buffer.
+reader	X2/as-int/prefix-2	readCompactInt	f77f	error	java.io.EOFException	2	0	End of buffer.
+reader	X2/as-int/prefix-3	readCompactInt	f77fff	error	java.io.EOFException	3	0	End of buffer.
+reader	X2/as-int/prefix-4	readCompactInt	f77fffff	error	java.io.EOFException	4	0	End of buffer.
+writer	X3	writeCompactLong	2147483648	f080000000
+reader	X3	readCompactLong	f080000000	ok	2147483648	5	0
+reader	X3/as-int	readCompactInt	f080000000	ok	-2147483648	5	0
+reader	X3/as-int/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	X3/as-int/prefix-1	readCompactInt	f0	error	java.io.EOFException	1	0	End of buffer.
+reader	X3/as-int/prefix-2	readCompactInt	f080	error	java.io.EOFException	2	0	End of buffer.
+reader	X3/as-int/prefix-3	readCompactInt	f08000	error	java.io.EOFException	3	0	End of buffer.
+reader	X3/as-int/prefix-4	readCompactInt	f0800000	error	java.io.EOFException	4	0	End of buffer.
+writer	X4	writeCompactLong	4294967296	f100000000
+reader	X4	readCompactLong	f100000000	ok	4294967296	5	0
+reader	X4/as-int	readCompactInt	f100000000	ok	0	5	0
+reader	X4/as-int/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	X4/as-int/prefix-1	readCompactInt	f1	error	java.io.EOFException	1	0	End of buffer.
+reader	X4/as-int/prefix-2	readCompactInt	f100	error	java.io.EOFException	2	0	End of buffer.
+reader	X4/as-int/prefix-3	readCompactInt	f10000	error	java.io.EOFException	3	0	End of buffer.
+reader	X4/as-int/prefix-4	readCompactInt	f1000000	error	java.io.EOFException	4	0	End of buffer.
+writer	X5	writeCompactLong	-4294967297	f6ffffffff
+reader	X5	readCompactLong	f6ffffffff	ok	-4294967297	5	0
+reader	X5/as-int	readCompactInt	f6ffffffff	ok	-1	5	0
+reader	X5/as-int/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	X5/as-int/prefix-1	readCompactInt	f6	error	java.io.EOFException	1	0	End of buffer.
+reader	X5/as-int/prefix-2	readCompactInt	f6ff	error	java.io.EOFException	2	0	End of buffer.
+reader	X5/as-int/prefix-3	readCompactInt	f6ffff	error	java.io.EOFException	3	0	End of buffer.
+reader	X5/as-int/prefix-4	readCompactInt	f6ffffff	error	java.io.EOFException	4	0	End of buffer.
+writer	X6	writeCompactLong	-9223372036854775808	ff8000000000000000
+reader	X6	readCompactLong	ff8000000000000000	ok	-9223372036854775808	9	0
+reader	X6/as-int	readCompactInt	ff8000000000000000	ok	0	9	0
+reader	X6/as-int/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	X6/as-int/prefix-1	readCompactInt	ff	error	java.io.EOFException	1	0	End of buffer.
+reader	X6/as-int/prefix-2	readCompactInt	ff80	error	java.io.EOFException	2	0	End of buffer.
+reader	X6/as-int/prefix-3	readCompactInt	ff8000	error	java.io.EOFException	3	0	End of buffer.
+reader	X6/as-int/prefix-4	readCompactInt	ff800000	error	java.io.EOFException	4	0	End of buffer.
+reader	X6/as-int/prefix-5	readCompactInt	ff80000000	error	java.io.EOFException	5	0	End of buffer.
+reader	X6/as-int/prefix-6	readCompactInt	ff8000000000	error	java.io.EOFException	6	0	End of buffer.
+reader	X6/as-int/prefix-7	readCompactInt	ff800000000000	error	java.io.EOFException	7	0	End of buffer.
+reader	X6/as-int/prefix-8	readCompactInt	ff80000000000000	error	java.io.EOFException	8	0	End of buffer.
+writer	X7	writeCompactLong	9223372036854775807	ff7fffffffffffffff
+reader	X7	readCompactLong	ff7fffffffffffffff	ok	9223372036854775807	9	0
+reader	X7/as-int	readCompactInt	ff7fffffffffffffff	ok	-1	9	0
+reader	X7/as-int/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	X7/as-int/prefix-1	readCompactInt	ff	error	java.io.EOFException	1	0	End of buffer.
+reader	X7/as-int/prefix-2	readCompactInt	ff7f	error	java.io.EOFException	2	0	End of buffer.
+reader	X7/as-int/prefix-3	readCompactInt	ff7fff	error	java.io.EOFException	3	0	End of buffer.
+reader	X7/as-int/prefix-4	readCompactInt	ff7fffff	error	java.io.EOFException	4	0	End of buffer.
+reader	X7/as-int/prefix-5	readCompactInt	ff7fffffff	error	java.io.EOFException	5	0	End of buffer.
+reader	X7/as-int/prefix-6	readCompactInt	ff7fffffffff	error	java.io.EOFException	6	0	End of buffer.
+reader	X7/as-int/prefix-7	readCompactInt	ff7fffffffffff	error	java.io.EOFException	7	0	End of buffer.
+reader	X7/as-int/prefix-8	readCompactInt	ff7fffffffffffff	error	java.io.EOFException	8	0	End of buffer.
+writer	XI-2147483648	writeCompactInt	-2147483648	f780000000
+reader	XI-2147483648	readCompactInt	f780000000	ok	-2147483648	5	0
+reader	XI-2147483648/as-long	readCompactLong	f780000000	ok	-2147483648	5	0
+writer	XI-1	writeCompactInt	-1	7f
+reader	XI-1	readCompactInt	7f	ok	-1	1	0
+reader	XI-1/as-long	readCompactLong	7f	ok	-1	1	0
+writer	XI0	writeCompactInt	0	00
+reader	XI0	readCompactInt	00	ok	0	1	0
+reader	XI0/as-long	readCompactLong	00	ok	0	1	0
+writer	XI2147483647	writeCompactInt	2147483647	f07fffffff
+reader	XI2147483647	readCompactInt	f07fffffff	ok	2147483647	5	0
+reader	XI2147483647/as-long	readCompactLong	f07fffffff	ok	2147483647	5	0
+complete	integers

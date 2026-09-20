@@ -37,3 +37,7 @@ Reviewed outputs against `SchemeModel.Loader.load`, `DXScheme.Loader.load/buildO
 The captured failures confirm the source interpretation: BYTE/SHORT factory returns null, which DefaultRecord dereferences; all-disabled indexes explicitly throw SchemeException. Copied `main=true` metadata survives while the main-alias pointer does not, producing the observed fallback. Model HashMap traversal is preserved as an observation and clearly separated from generation/runtime order. No unexplained runtime disagreement was normalized away.
 
 The [coverage manifest](COVERAGE.md) lists deferred portions of every exercised family. This is not full schema coverage, dxFeed provider/property parity, parser-edge validation, an upstream test-suite run, QTP evidence, a normalized-model specification, or C++ conformance. QDCXX-006 and C++ were not started.
+
+## Later Google Java Style migration
+
+The original captures and their source hashes above remain historical evidence. The current harness and launcher were subsequently migrated to Google Java Style; a fresh JDK 8 clean-build Verify passed against these unchanged expectations. Current-source metadata and checks are in [style migration validation](../../../tools/format/VALIDATION.md). No original capture or expected file was rewritten.

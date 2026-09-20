@@ -12,7 +12,7 @@ The repository currently defines working and contribution rules, documentation a
 
 Accepted by the project owner on 2026-09-21. The three boundaries are logical ownership boundaries; they do not require three file formats or three serialization subsystems. Core can consume a resolved local schema without loading XML or its history. Preserve copied-main-alias behavior only for XML import under the pinned QD 3.355 profile; it is not a requirement for future native C++ schema construction. Retain Java slot projection without prescribing C++ storage. Approve structured unsupported-local-type diagnostics for BYTE/SHORT while retaining local-construction rejection; this does not ban their wire codes. Keep original requests and selected layouts separate. JSON is accepted for schema-description interchange; libraries, canonical hashes and whole-session serialization remain undecided. Existing oracle evidence is unchanged.
 
-Completed: QDCXX-008 — JSON contract and examples; next: QDCXX-009 — ready, primitive encoding vectors. Earlier records below describe the state at each task's completion.
+Completed: QDCXX-008 — JSON contract and examples; QDCXX-009 — primitive encoding vectors and contract. Further C++/importer work needs a separate approved task. Earlier records below describe the state at each task's completion.
 
 ## Task history
 
@@ -118,3 +118,15 @@ Recorded for `QDCXX-007` on 2026-09-21, High reasoning:
 ## JSON contract baseline
 
 Completed QDCXX-008 on 2026-09-21 with High reasoning. The [version 1 contract](../spec/schema/JSON-CONTRACT.md) defines resolved local schemas, scoped lookups, logical fields, Java slot ownership, ordered provenance references and structured construction diagnostics under accepted ADR-0001. [Coverage](../spec/schema/examples/COVERAGE.md) maps all 17 subcases to designed JSON projections; [validation](../spec/schema/examples/VALIDATION.md) records syntax, invariants, TSV comparisons and negative checks. EN/RU documents are synchronized. Original schema/protocol goldens are unchanged. No importer, production C++, dependency, Java rerun or QDCXX-009 work was added. Native construction, broader profiles and session serialization remain open.
+
+## Primitive encoding baseline
+
+Completed QDCXX-009 on 2026-09-21 with High reasoning. The [contract](../spec/encoding/PRIMITIVES.md) separates canonical writer output, additional reader forms and measured errors/consumed positions for compact int/long and QTP UTFString. [Coverage](../tests/fixtures/encoding/COVERAGE.md): 109 writer and 1037 reader observations, including 858 strict prefixes. [Validation](../tests/fixtures/encoding/VALIDATION.md) records two independent clean builds, negative/positive Verify, unchanged real/temporary expectations and unchanged earlier schema/protocol goldens. Results are synchronized EN/RU. Exact QTP methods are traced; JSON Unicode policy, other UTF codecs and PentaCodec remain separate. Huge accepted lengths, other buffer profiles and full protocol behavior remain unmeasured. No C++, importer or dependency was introduced.
+
+## Java tooling style
+
+The owner adopted Google Java Style after QDCXX-009. AGENTS.md, [.editorconfig](../.editorconfig) and the [pinned formatter wrapper](../tools/format/README.md) define the persistent workflow. All three Java harnesses now pass google-java-format 1.36.1; the formatter uses JDK 21+, while the oracle remains on JDK 8. [Validation](../tools/format/VALIDATION.md) records read-only negative/positive format checks, successful schema/protocol Verify and refreshed independent encoding captures/Verify. All expectation bytes remain unchanged; historical schema/protocol provenance is retained separately from current-source evidence.
+
+## Future C++ style
+
+The owner adopted the reference-derived [C++ style contract](CPP-STYLE.md), pinned to ttldtor/dxfcxx_event_test commit d96ef76f3c4c6649437ac438bd0fa30f91c12f48. Naming, documentation and source-layout rules supplement the copied root formatter configurations: UpperCamelCase types, lowerCamelCase functions/public fields, lowerCamelCase_ encapsulated members and UPPER_SNAKE_CASE enumerators/named constants. The future complete formatting pipeline is Uncrustify 0.83.0 followed by clang-format 20.1.8; the configurations alone cannot enforce naming. Reference/configuration provenance and copied-license notices are retained. This documentation/configuration update does not start C++ implementation or select a build/test dependency; no C++ formatter was run.

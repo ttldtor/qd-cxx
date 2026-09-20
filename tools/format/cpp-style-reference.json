@@ -1,0 +1,97 @@
+{
+  "repository": "https://github.com/ttldtor/dxfcxx_event_test.git",
+  "referenceBranch": "default",
+  "commit": "d96ef76f3c4c6649437ac438bd0fa30f91c12f48",
+  "inspectedOn": "2026-09-21",
+  "clangFormatVersion": "20.1.8",
+  "uncrustifyVersion": "0.83.0",
+  "pipeline": [
+    "uncrustify",
+    "clang-format"
+  ],
+  "files": [
+    {
+      "path": ".clang-format",
+      "gitBlob": "36898e2f72a4397440ad9857bb4ca335f23fa19e",
+      "sha256": "c37cfe55472bef75e3717a4c8060c4333ea5c0637f5fa7ce6907ca53eeae69a8",
+      "copiedTo": ".clang-format"
+    },
+    {
+      "path": ".uncrustify.cfg",
+      "gitBlob": "5fac40da1de6e654b9b0f77eeb2e07806bac242e",
+      "sha256": "8a42e09342669c7da2aa36865d1d407c1d331724cbcb08b81575dd85af4ae42e",
+      "copiedTo": ".uncrustify.cfg"
+    },
+    {
+      "path": "LICENSE.txt",
+      "gitBlob": "127a5bc39ba030c7cb99cc0aedc4f280ffe27310",
+      "sha256": "8d8291caf1cee26d23acf3eb67c9f9a2d58f1c681b16a4fbe8cbfb9e3c0b5a9b",
+      "copiedTo": "tools/format/licenses/dxfcxx_event_test-BSL-1.0.txt"
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "gitBlob": "331c116b79abe5b0e9a9c481515c2a0d01220b68",
+      "sha256": "465c3d1c4403899dcec64dda27fd993b0ac739168d3b1043198df2e81e35736f"
+    },
+    {
+      "path": "README.md",
+      "gitBlob": "8985a6dff6022b2dec820d4b8263aa04b9a3306e",
+      "sha256": "abacf0c968cbaeb1854b2f0fad4cbb3889686920bfb475a069dc35d84a81db52"
+    },
+    {
+      "path": "tools/format.cmake",
+      "gitBlob": "e4c01d5c71a1637b52eab2588d9d5c7b8087f05c",
+      "sha256": "6cba4e52383ae242645125a1c1e3d15db46cdaa79330106c84c141d9876a1699"
+    },
+    {
+      "path": "include/latency/core.hpp",
+      "gitBlob": "5177d60f63b626cf83af495747570a28901ee81f",
+      "sha256": "c5a1a86f2866dd7f0ee3861b0730406bc390d68124a0b005a034901b305e5b98"
+    },
+    {
+      "path": "include/latency/resources.hpp",
+      "gitBlob": "5f4daf309552380f27fb27458f78b46c1761740d",
+      "sha256": "210845257b200c83359b40ee8ce0c78ab52d35a25258f849a8e8144ed51265c8"
+    },
+    {
+      "path": "include/latency/runner.hpp",
+      "gitBlob": "c8844a0a699928f95ef46b86fa449e7960a8092b",
+      "sha256": "f617e4691a68cdd5183622b0a07e73502a148dee85cfab85a2a2361c61f39e62"
+    },
+    {
+      "path": "include/latency/monitoring.hpp",
+      "gitBlob": "2d39adf89f49af4e754513fb3600b59279cdbd1d",
+      "sha256": "18dbec76fe819e8d568fa96286bf75f8f9ac1e580e7c4183a3dfcd704f15b2fd"
+    },
+    {
+      "path": "src/core.cpp",
+      "gitBlob": "2d864972d4ab90f8770127e4884132116a274053",
+      "sha256": "eabb8b0c2ace2e2cacf79b20ee0e72ebd1b129f3ffe5b8d165472d65dc1ddedd"
+    },
+    {
+      "path": "src/client.cpp",
+      "gitBlob": "ac7d37bf9e3aca2041b6e9b69b06f25a3a48a48a",
+      "sha256": "85d4ed131a1d80a50515c29d06a22332b40685f797d5b2bc51807f3c3ea6444a"
+    },
+    {
+      "path": "src/runner.cpp",
+      "gitBlob": "5e1a5aee733d88c23c1c9f606f83a115265abf8c",
+      "sha256": "c6c4e7d31dff1fc56198bd5988a43609a5de2877939bf65ad60425624a86886c"
+    },
+    {
+      "path": "src/monitoring.cpp",
+      "gitBlob": "cfb15b9222a9c0b1d04bfcb31562d378286e9490",
+      "sha256": "8b81e3c8514ce958003846d42da0cbf15d454243d79fd2dc5223c6c6db0d40b0"
+    },
+    {
+      "path": "src/resources.cpp",
+      "gitBlob": "965d4931676b79a6f0ff806af0e54b4753c1d601",
+      "sha256": "3b17d5b6d97129ffb551026556ef5f550d9c271fc70d472927eef7697229b779"
+    },
+    {
+      "path": "tests/core_tests.cpp",
+      "gitBlob": "e9ed11635c105a6f9b526f3be8363841d2330343",
+      "sha256": "22c01f97c7c2f07b4eb3f5af608e048fe6fbcda0445b1c56329e215050bf15e1"
+    }
+  ]
+}

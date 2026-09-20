@@ -37,3 +37,7 @@ Reviewed exact descriptors, values and frame offsets against BinaryQTPParser/Com
 P05 uses the real connection parser/composer and in-memory transport. Only heartbeat scheduling and protocol-descriptor generation are suppressed as documented; clock/EndpointId bytes are not removed after capture. This validates first-use layout selection on fresh connections, not connection timing, negotiation, auth or dynamic cache/reset semantics.
 
 The [coverage manifest](COVERAGE.md) leaves P02, P06–P13 and unlisted portions pending. There is no independent primitive implementation, upstream test-suite result, complete Java wire-compatibility claim, C++ conformance or QDCXX-007 work.
+
+## Later Google Java Style migration
+
+The original captures and their source hashes above remain historical evidence. The current harness and launcher were subsequently migrated to Google Java Style; a fresh JDK 8 clean-build Verify passed against these unchanged expectations. Current-source metadata and checks are in [style migration validation](../../../tools/format/VALIDATION.md). No original capture or expected file was rewritten.

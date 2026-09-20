@@ -10,6 +10,22 @@ Keep each change tied to one task under `tasks/`. Before editing, read `AGENTS.m
 - Update specifications, documentation, fixtures, and conformance coverage together when protocol or schema behavior changes.
 - Keep changes within the assigned task and leave unrelated working-tree changes intact.
 
+## Java formatting
+
+Repository-owned Java uses [Google Java Style](https://google.github.io/styleguide/javaguide.html).
+Run `pwsh -File tools/format/Format-Java.ps1 -Mode Format -JavaHome <JDK-21-or-newer>` after edits,
+then `-Mode Check` before review. The formatter version and artifact SHA-256 are pinned;
+the formatter JDK does not replace the Java QD oracle's JDK 8.
+See [commands, scope and provenance](tools/format/README.md) ([Russian](tools/format/README.ru.md)).
+
+## C++ style for future work
+
+Use the owner's reference-derived [C++ style contract](docs/CPP-STYLE.md)
+([Russian](docs/CPP-STYLE.ru.md)). It covers naming, documentation and source organization as well
+as the root `.clang-format` and `.uncrustify.cfg`. The future complete formatting pipeline is
+Uncrustify 0.83.0 followed by clang-format 20.1.8. This is separate from Google Java Style.
+No C++ implementation or build/test dependency is introduced by adopting the style.
+
 ## Documentation-only validation
 
 Before declaring a documentation-only task complete:

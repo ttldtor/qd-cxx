@@ -1,0 +1,335 @@
+profile	QD-3.355	ByteArrayInput	fresh input per read	UTF-16 hex units; exact decimal integers
+reader	N0	readCompactInt	8000	ok	0	2	0
+reader	N0/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	N0/prefix-1	readCompactInt	80	error	java.io.EOFException	1	0	End of buffer.
+reader	N0	readCompactLong	8000	ok	0	2	0
+reader	N0/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	N0/prefix-1	readCompactLong	80	error	java.io.EOFException	1	0	End of buffer.
+reader	N1	readCompactInt	bfff	ok	-1	2	0
+reader	N1/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	N1/prefix-1	readCompactInt	bf	error	java.io.EOFException	1	0	End of buffer.
+reader	N1	readCompactLong	bfff	ok	-1	2	0
+reader	N1/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	N1/prefix-1	readCompactLong	bf	error	java.io.EOFException	1	0	End of buffer.
+reader	N2	readCompactInt	c00000	ok	0	3	0
+reader	N2/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	N2/prefix-1	readCompactInt	c0	error	java.io.EOFException	1	0	End of buffer.
+reader	N2/prefix-2	readCompactInt	c000	error	java.io.EOFException	2	0	End of buffer.
+reader	N2	readCompactLong	c00000	ok	0	3	0
+reader	N2/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	N2/prefix-1	readCompactLong	c0	error	java.io.EOFException	1	0	End of buffer.
+reader	N2/prefix-2	readCompactLong	c000	error	java.io.EOFException	2	0	End of buffer.
+reader	N3	readCompactInt	dfffff	ok	-1	3	0
+reader	N3/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	N3/prefix-1	readCompactInt	df	error	java.io.EOFException	1	0	End of buffer.
+reader	N3/prefix-2	readCompactInt	dfff	error	java.io.EOFException	2	0	End of buffer.
+reader	N3	readCompactLong	dfffff	ok	-1	3	0
+reader	N3/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	N3/prefix-1	readCompactLong	df	error	java.io.EOFException	1	0	End of buffer.
+reader	N3/prefix-2	readCompactLong	dfff	error	java.io.EOFException	2	0	End of buffer.
+reader	N4	readCompactInt	e0000000	ok	0	4	0
+reader	N4/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	N4/prefix-1	readCompactInt	e0	error	java.io.EOFException	1	0	End of buffer.
+reader	N4/prefix-2	readCompactInt	e000	error	java.io.EOFException	2	0	End of buffer.
+reader	N4/prefix-3	readCompactInt	e00000	error	java.io.EOFException	3	0	End of buffer.
+reader	N4	readCompactLong	e0000000	ok	0	4	0
+reader	N4/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	N4/prefix-1	readCompactLong	e0	error	java.io.EOFException	1	0	End of buffer.
+reader	N4/prefix-2	readCompactLong	e000	error	java.io.EOFException	2	0	End of buffer.
+reader	N4/prefix-3	readCompactLong	e00000	error	java.io.EOFException	3	0	End of buffer.
+reader	N5	readCompactInt	efffffff	ok	-1	4	0
+reader	N5/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	N5/prefix-1	readCompactInt	ef	error	java.io.EOFException	1	0	End of buffer.
+reader	N5/prefix-2	readCompactInt	efff	error	java.io.EOFException	2	0	End of buffer.
+reader	N5/prefix-3	readCompactInt	efffff	error	java.io.EOFException	3	0	End of buffer.
+reader	N5	readCompactLong	efffffff	ok	-1	4	0
+reader	N5/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	N5/prefix-1	readCompactLong	ef	error	java.io.EOFException	1	0	End of buffer.
+reader	N5/prefix-2	readCompactLong	efff	error	java.io.EOFException	2	0	End of buffer.
+reader	N5/prefix-3	readCompactLong	efffff	error	java.io.EOFException	3	0	End of buffer.
+reader	N6	readCompactInt	f000000000	ok	0	5	0
+reader	N6/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	N6/prefix-1	readCompactInt	f0	error	java.io.EOFException	1	0	End of buffer.
+reader	N6/prefix-2	readCompactInt	f000	error	java.io.EOFException	2	0	End of buffer.
+reader	N6/prefix-3	readCompactInt	f00000	error	java.io.EOFException	3	0	End of buffer.
+reader	N6/prefix-4	readCompactInt	f0000000	error	java.io.EOFException	4	0	End of buffer.
+reader	N6	readCompactLong	f000000000	ok	0	5	0
+reader	N6/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	N6/prefix-1	readCompactLong	f0	error	java.io.EOFException	1	0	End of buffer.
+reader	N6/prefix-2	readCompactLong	f000	error	java.io.EOFException	2	0	End of buffer.
+reader	N6/prefix-3	readCompactLong	f00000	error	java.io.EOFException	3	0	End of buffer.
+reader	N6/prefix-4	readCompactLong	f0000000	error	java.io.EOFException	4	0	End of buffer.
+reader	N7	readCompactInt	f7ffffffff	ok	-1	5	0
+reader	N7/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	N7/prefix-1	readCompactInt	f7	error	java.io.EOFException	1	0	End of buffer.
+reader	N7/prefix-2	readCompactInt	f7ff	error	java.io.EOFException	2	0	End of buffer.
+reader	N7/prefix-3	readCompactInt	f7ffff	error	java.io.EOFException	3	0	End of buffer.
+reader	N7/prefix-4	readCompactInt	f7ffffff	error	java.io.EOFException	4	0	End of buffer.
+reader	N7	readCompactLong	f7ffffffff	ok	-1	5	0
+reader	N7/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	N7/prefix-1	readCompactLong	f7	error	java.io.EOFException	1	0	End of buffer.
+reader	N7/prefix-2	readCompactLong	f7ff	error	java.io.EOFException	2	0	End of buffer.
+reader	N7/prefix-3	readCompactLong	f7ffff	error	java.io.EOFException	3	0	End of buffer.
+reader	N7/prefix-4	readCompactLong	f7ffffff	error	java.io.EOFException	4	0	End of buffer.
+reader	N8	readCompactInt	f80000000000	ok	0	6	0
+reader	N8/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	N8/prefix-1	readCompactInt	f8	error	java.io.EOFException	1	0	End of buffer.
+reader	N8/prefix-2	readCompactInt	f800	error	java.io.EOFException	2	0	End of buffer.
+reader	N8/prefix-3	readCompactInt	f80000	error	java.io.EOFException	3	0	End of buffer.
+reader	N8/prefix-4	readCompactInt	f8000000	error	java.io.EOFException	4	0	End of buffer.
+reader	N8/prefix-5	readCompactInt	f800000000	error	java.io.EOFException	5	0	End of buffer.
+reader	N8	readCompactLong	f80000000000	ok	0	6	0
+reader	N8/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	N8/prefix-1	readCompactLong	f8	error	java.io.EOFException	1	0	End of buffer.
+reader	N8/prefix-2	readCompactLong	f800	error	java.io.EOFException	2	0	End of buffer.
+reader	N8/prefix-3	readCompactLong	f80000	error	java.io.EOFException	3	0	End of buffer.
+reader	N8/prefix-4	readCompactLong	f8000000	error	java.io.EOFException	4	0	End of buffer.
+reader	N8/prefix-5	readCompactLong	f800000000	error	java.io.EOFException	5	0	End of buffer.
+reader	N9	readCompactInt	fbffffffffff	ok	-1	6	0
+reader	N9/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	N9/prefix-1	readCompactInt	fb	error	java.io.EOFException	1	0	End of buffer.
+reader	N9/prefix-2	readCompactInt	fbff	error	java.io.EOFException	2	0	End of buffer.
+reader	N9/prefix-3	readCompactInt	fbffff	error	java.io.EOFException	3	0	End of buffer.
+reader	N9/prefix-4	readCompactInt	fbffffff	error	java.io.EOFException	4	0	End of buffer.
+reader	N9/prefix-5	readCompactInt	fbffffffff	error	java.io.EOFException	5	0	End of buffer.
+reader	N9	readCompactLong	fbffffffffff	ok	-1	6	0
+reader	N9/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	N9/prefix-1	readCompactLong	fb	error	java.io.EOFException	1	0	End of buffer.
+reader	N9/prefix-2	readCompactLong	fbff	error	java.io.EOFException	2	0	End of buffer.
+reader	N9/prefix-3	readCompactLong	fbffff	error	java.io.EOFException	3	0	End of buffer.
+reader	N9/prefix-4	readCompactLong	fbffffff	error	java.io.EOFException	4	0	End of buffer.
+reader	N9/prefix-5	readCompactLong	fbffffffff	error	java.io.EOFException	5	0	End of buffer.
+reader	N10	readCompactInt	fc000000000000	ok	0	7	0
+reader	N10/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	N10/prefix-1	readCompactInt	fc	error	java.io.EOFException	1	0	End of buffer.
+reader	N10/prefix-2	readCompactInt	fc00	error	java.io.EOFException	2	0	End of buffer.
+reader	N10/prefix-3	readCompactInt	fc0000	error	java.io.EOFException	3	0	End of buffer.
+reader	N10/prefix-4	readCompactInt	fc000000	error	java.io.EOFException	4	0	End of buffer.
+reader	N10/prefix-5	readCompactInt	fc00000000	error	java.io.EOFException	5	0	End of buffer.
+reader	N10/prefix-6	readCompactInt	fc0000000000	error	java.io.EOFException	6	0	End of buffer.
+reader	N10	readCompactLong	fc000000000000	ok	0	7	0
+reader	N10/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	N10/prefix-1	readCompactLong	fc	error	java.io.EOFException	1	0	End of buffer.
+reader	N10/prefix-2	readCompactLong	fc00	error	java.io.EOFException	2	0	End of buffer.
+reader	N10/prefix-3	readCompactLong	fc0000	error	java.io.EOFException	3	0	End of buffer.
+reader	N10/prefix-4	readCompactLong	fc000000	error	java.io.EOFException	4	0	End of buffer.
+reader	N10/prefix-5	readCompactLong	fc00000000	error	java.io.EOFException	5	0	End of buffer.
+reader	N10/prefix-6	readCompactLong	fc0000000000	error	java.io.EOFException	6	0	End of buffer.
+reader	N11	readCompactInt	fdffffffffffff	ok	-1	7	0
+reader	N11/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	N11/prefix-1	readCompactInt	fd	error	java.io.EOFException	1	0	End of buffer.
+reader	N11/prefix-2	readCompactInt	fdff	error	java.io.EOFException	2	0	End of buffer.
+reader	N11/prefix-3	readCompactInt	fdffff	error	java.io.EOFException	3	0	End of buffer.
+reader	N11/prefix-4	readCompactInt	fdffffff	error	java.io.EOFException	4	0	End of buffer.
+reader	N11/prefix-5	readCompactInt	fdffffffff	error	java.io.EOFException	5	0	End of buffer.
+reader	N11/prefix-6	readCompactInt	fdffffffffff	error	java.io.EOFException	6	0	End of buffer.
+reader	N11	readCompactLong	fdffffffffffff	ok	-1	7	0
+reader	N11/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	N11/prefix-1	readCompactLong	fd	error	java.io.EOFException	1	0	End of buffer.
+reader	N11/prefix-2	readCompactLong	fdff	error	java.io.EOFException	2	0	End of buffer.
+reader	N11/prefix-3	readCompactLong	fdffff	error	java.io.EOFException	3	0	End of buffer.
+reader	N11/prefix-4	readCompactLong	fdffffff	error	java.io.EOFException	4	0	End of buffer.
+reader	N11/prefix-5	readCompactLong	fdffffffff	error	java.io.EOFException	5	0	End of buffer.
+reader	N11/prefix-6	readCompactLong	fdffffffffff	error	java.io.EOFException	6	0	End of buffer.
+reader	N12	readCompactInt	fe00000000000000	ok	0	8	0
+reader	N12/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	N12/prefix-1	readCompactInt	fe	error	java.io.EOFException	1	0	End of buffer.
+reader	N12/prefix-2	readCompactInt	fe00	error	java.io.EOFException	2	0	End of buffer.
+reader	N12/prefix-3	readCompactInt	fe0000	error	java.io.EOFException	3	0	End of buffer.
+reader	N12/prefix-4	readCompactInt	fe000000	error	java.io.EOFException	4	0	End of buffer.
+reader	N12/prefix-5	readCompactInt	fe00000000	error	java.io.EOFException	5	0	End of buffer.
+reader	N12/prefix-6	readCompactInt	fe0000000000	error	java.io.EOFException	6	0	End of buffer.
+reader	N12/prefix-7	readCompactInt	fe000000000000	error	java.io.EOFException	7	0	End of buffer.
+reader	N12	readCompactLong	fe00000000000000	ok	0	8	0
+reader	N12/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	N12/prefix-1	readCompactLong	fe	error	java.io.EOFException	1	0	End of buffer.
+reader	N12/prefix-2	readCompactLong	fe00	error	java.io.EOFException	2	0	End of buffer.
+reader	N12/prefix-3	readCompactLong	fe0000	error	java.io.EOFException	3	0	End of buffer.
+reader	N12/prefix-4	readCompactLong	fe000000	error	java.io.EOFException	4	0	End of buffer.
+reader	N12/prefix-5	readCompactLong	fe00000000	error	java.io.EOFException	5	0	End of buffer.
+reader	N12/prefix-6	readCompactLong	fe0000000000	error	java.io.EOFException	6	0	End of buffer.
+reader	N12/prefix-7	readCompactLong	fe000000000000	error	java.io.EOFException	7	0	End of buffer.
+reader	N13	readCompactInt	feffffffffffffff	ok	-1	8	0
+reader	N13/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	N13/prefix-1	readCompactInt	fe	error	java.io.EOFException	1	0	End of buffer.
+reader	N13/prefix-2	readCompactInt	feff	error	java.io.EOFException	2	0	End of buffer.
+reader	N13/prefix-3	readCompactInt	feffff	error	java.io.EOFException	3	0	End of buffer.
+reader	N13/prefix-4	readCompactInt	feffffff	error	java.io.EOFException	4	0	End of buffer.
+reader	N13/prefix-5	readCompactInt	feffffffff	error	java.io.EOFException	5	0	End of buffer.
+reader	N13/prefix-6	readCompactInt	feffffffffff	error	java.io.EOFException	6	0	End of buffer.
+reader	N13/prefix-7	readCompactInt	feffffffffffff	error	java.io.EOFException	7	0	End of buffer.
+reader	N13	readCompactLong	feffffffffffffff	ok	-1	8	0
+reader	N13/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	N13/prefix-1	readCompactLong	fe	error	java.io.EOFException	1	0	End of buffer.
+reader	N13/prefix-2	readCompactLong	feff	error	java.io.EOFException	2	0	End of buffer.
+reader	N13/prefix-3	readCompactLong	feffff	error	java.io.EOFException	3	0	End of buffer.
+reader	N13/prefix-4	readCompactLong	feffffff	error	java.io.EOFException	4	0	End of buffer.
+reader	N13/prefix-5	readCompactLong	feffffffff	error	java.io.EOFException	5	0	End of buffer.
+reader	N13/prefix-6	readCompactLong	feffffffffff	error	java.io.EOFException	6	0	End of buffer.
+reader	N13/prefix-7	readCompactLong	feffffffffffff	error	java.io.EOFException	7	0	End of buffer.
+reader	N14	readCompactInt	ff0000000000000000	ok	0	9	0
+reader	N14/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	N14/prefix-1	readCompactInt	ff	error	java.io.EOFException	1	0	End of buffer.
+reader	N14/prefix-2	readCompactInt	ff00	error	java.io.EOFException	2	0	End of buffer.
+reader	N14/prefix-3	readCompactInt	ff0000	error	java.io.EOFException	3	0	End of buffer.
+reader	N14/prefix-4	readCompactInt	ff000000	error	java.io.EOFException	4	0	End of buffer.
+reader	N14/prefix-5	readCompactInt	ff00000000	error	java.io.EOFException	5	0	End of buffer.
+reader	N14/prefix-6	readCompactInt	ff0000000000	error	java.io.EOFException	6	0	End of buffer.
+reader	N14/prefix-7	readCompactInt	ff000000000000	error	java.io.EOFException	7	0	End of buffer.
+reader	N14/prefix-8	readCompactInt	ff00000000000000	error	java.io.EOFException	8	0	End of buffer.
+reader	N14	readCompactLong	ff0000000000000000	ok	0	9	0
+reader	N14/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	N14/prefix-1	readCompactLong	ff	error	java.io.EOFException	1	0	End of buffer.
+reader	N14/prefix-2	readCompactLong	ff00	error	java.io.EOFException	2	0	End of buffer.
+reader	N14/prefix-3	readCompactLong	ff0000	error	java.io.EOFException	3	0	End of buffer.
+reader	N14/prefix-4	readCompactLong	ff000000	error	java.io.EOFException	4	0	End of buffer.
+reader	N14/prefix-5	readCompactLong	ff00000000	error	java.io.EOFException	5	0	End of buffer.
+reader	N14/prefix-6	readCompactLong	ff0000000000	error	java.io.EOFException	6	0	End of buffer.
+reader	N14/prefix-7	readCompactLong	ff000000000000	error	java.io.EOFException	7	0	End of buffer.
+reader	N14/prefix-8	readCompactLong	ff00000000000000	error	java.io.EOFException	8	0	End of buffer.
+reader	N15	readCompactInt	ffffffffffffffffff	ok	-1	9	0
+reader	N15/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	N15/prefix-1	readCompactInt	ff	error	java.io.EOFException	1	0	End of buffer.
+reader	N15/prefix-2	readCompactInt	ffff	error	java.io.EOFException	2	0	End of buffer.
+reader	N15/prefix-3	readCompactInt	ffffff	error	java.io.EOFException	3	0	End of buffer.
+reader	N15/prefix-4	readCompactInt	ffffffff	error	java.io.EOFException	4	0	End of buffer.
+reader	N15/prefix-5	readCompactInt	ffffffffff	error	java.io.EOFException	5	0	End of buffer.
+reader	N15/prefix-6	readCompactInt	ffffffffffff	error	java.io.EOFException	6	0	End of buffer.
+reader	N15/prefix-7	readCompactInt	ffffffffffffff	error	java.io.EOFException	7	0	End of buffer.
+reader	N15/prefix-8	readCompactInt	ffffffffffffffff	error	java.io.EOFException	8	0	End of buffer.
+reader	N15	readCompactLong	ffffffffffffffffff	ok	-1	9	0
+reader	N15/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	N15/prefix-1	readCompactLong	ff	error	java.io.EOFException	1	0	End of buffer.
+reader	N15/prefix-2	readCompactLong	ffff	error	java.io.EOFException	2	0	End of buffer.
+reader	N15/prefix-3	readCompactLong	ffffff	error	java.io.EOFException	3	0	End of buffer.
+reader	N15/prefix-4	readCompactLong	ffffffff	error	java.io.EOFException	4	0	End of buffer.
+reader	N15/prefix-5	readCompactLong	ffffffffff	error	java.io.EOFException	5	0	End of buffer.
+reader	N15/prefix-6	readCompactLong	ffffffffffff	error	java.io.EOFException	6	0	End of buffer.
+reader	N15/prefix-7	readCompactLong	ffffffffffffff	error	java.io.EOFException	7	0	End of buffer.
+reader	N15/prefix-8	readCompactLong	ffffffffffffffff	error	java.io.EOFException	8	0	End of buffer.
+reader	N16	readCompactInt	f100000000	ok	0	5	0
+reader	N16/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	N16/prefix-1	readCompactInt	f1	error	java.io.EOFException	1	0	End of buffer.
+reader	N16/prefix-2	readCompactInt	f100	error	java.io.EOFException	2	0	End of buffer.
+reader	N16/prefix-3	readCompactInt	f10000	error	java.io.EOFException	3	0	End of buffer.
+reader	N16/prefix-4	readCompactInt	f1000000	error	java.io.EOFException	4	0	End of buffer.
+reader	N16	readCompactLong	f100000000	ok	4294967296	5	0
+reader	N16/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	N16/prefix-1	readCompactLong	f1	error	java.io.EOFException	1	0	End of buffer.
+reader	N16/prefix-2	readCompactLong	f100	error	java.io.EOFException	2	0	End of buffer.
+reader	N16/prefix-3	readCompactLong	f10000	error	java.io.EOFException	3	0	End of buffer.
+reader	N16/prefix-4	readCompactLong	f1000000	error	java.io.EOFException	4	0	End of buffer.
+reader	N17	readCompactInt	f600000000	ok	0	5	0
+reader	N17/prefix-0	readCompactInt		error	java.io.EOFException	0	0	End of buffer.
+reader	N17/prefix-1	readCompactInt	f6	error	java.io.EOFException	1	0	End of buffer.
+reader	N17/prefix-2	readCompactInt	f600	error	java.io.EOFException	2	0	End of buffer.
+reader	N17/prefix-3	readCompactInt	f60000	error	java.io.EOFException	3	0	End of buffer.
+reader	N17/prefix-4	readCompactInt	f6000000	error	java.io.EOFException	4	0	End of buffer.
+reader	N17	readCompactLong	f600000000	ok	-8589934592	5	0
+reader	N17/prefix-0	readCompactLong		error	java.io.EOFException	0	0	End of buffer.
+reader	N17/prefix-1	readCompactLong	f6	error	java.io.EOFException	1	0	End of buffer.
+reader	N17/prefix-2	readCompactLong	f600	error	java.io.EOFException	2	0	End of buffer.
+reader	N17/prefix-3	readCompactLong	f60000	error	java.io.EOFException	3	0	End of buffer.
+reader	N17/prefix-4	readCompactLong	f6000000	error	java.io.EOFException	4	0	End of buffer.
+reader	F-overlong2	readUTFString	02c080	ok	0000	3	0
+reader	F-overlong2/prefix-0	readUTFString		error	java.io.EOFException	0	0	End of buffer.
+reader	F-overlong2/prefix-1	readUTFString	02	error	java.io.EOFException	1	0	End of buffer.
+reader	F-overlong2/prefix-2	readUTFString	02c0	error	java.io.EOFException	2	0	End of buffer.
+reader	F-overlong3	readUTFString	03e08080	ok	0000	4	0
+reader	F-overlong3/prefix-0	readUTFString		error	java.io.EOFException	0	0	End of buffer.
+reader	F-overlong3/prefix-1	readUTFString	03	error	java.io.EOFException	1	0	End of buffer.
+reader	F-overlong3/prefix-2	readUTFString	03e0	error	java.io.EOFException	2	0	End of buffer.
+reader	F-overlong3/prefix-3	readUTFString	03e080	error	java.io.EOFException	3	0	End of buffer.
+reader	F-overlong4	readUTFString	04f0808080	ok	0000	5	0
+reader	F-overlong4/prefix-0	readUTFString		error	java.io.EOFException	0	0	End of buffer.
+reader	F-overlong4/prefix-1	readUTFString	04	error	java.io.EOFException	1	0	End of buffer.
+reader	F-overlong4/prefix-2	readUTFString	04f0	error	java.io.EOFException	2	0	End of buffer.
+reader	F-overlong4/prefix-3	readUTFString	04f080	error	java.io.EOFException	3	0	End of buffer.
+reader	F-overlong4/prefix-4	readUTFString	04f08080	error	java.io.EOFException	4	0	End of buffer.
+reader	F-cesu-pair	readUTFString	06eda0bdedb880	ok	d83dde00	7	0
+reader	F-cesu-pair/prefix-0	readUTFString		error	java.io.EOFException	0	0	End of buffer.
+reader	F-cesu-pair/prefix-1	readUTFString	06	error	java.io.EOFException	1	0	End of buffer.
+reader	F-cesu-pair/prefix-2	readUTFString	06ed	error	java.io.EOFException	2	0	End of buffer.
+reader	F-cesu-pair/prefix-3	readUTFString	06eda0	error	java.io.EOFException	3	0	End of buffer.
+reader	F-cesu-pair/prefix-4	readUTFString	06eda0bd	error	java.io.EOFException	4	0	End of buffer.
+reader	F-cesu-pair/prefix-5	readUTFString	06eda0bded	error	java.io.EOFException	5	0	End of buffer.
+reader	F-cesu-pair/prefix-6	readUTFString	06eda0bdedb8	error	java.io.EOFException	6	0	End of buffer.
+reader	F-surrogate4	readUTFString	04f08da080	ok	d800	5	0
+reader	F-surrogate4/prefix-0	readUTFString		error	java.io.EOFException	0	0	End of buffer.
+reader	F-surrogate4/prefix-1	readUTFString	04	error	java.io.EOFException	1	0	End of buffer.
+reader	F-surrogate4/prefix-2	readUTFString	04f0	error	java.io.EOFException	2	0	End of buffer.
+reader	F-surrogate4/prefix-3	readUTFString	04f08d	error	java.io.EOFException	3	0	End of buffer.
+reader	F-surrogate4/prefix-4	readUTFString	04f08da0	error	java.io.EOFException	4	0	End of buffer.
+reader	F-bad-cont2	readUTFString	02c241	error	java.io.UTFDataFormatException	3	0	\N
+reader	F-bad-cont2/prefix-0	readUTFString		error	java.io.EOFException	0	0	End of buffer.
+reader	F-bad-cont2/prefix-1	readUTFString	02	error	java.io.EOFException	1	0	End of buffer.
+reader	F-bad-cont2/prefix-2	readUTFString	02c2	error	java.io.EOFException	2	0	End of buffer.
+reader	F-bad-cont3	readUTFString	03e24180	error	java.io.UTFDataFormatException	4	0	\N
+reader	F-bad-cont3/prefix-0	readUTFString		error	java.io.EOFException	0	0	End of buffer.
+reader	F-bad-cont3/prefix-1	readUTFString	03	error	java.io.EOFException	1	0	End of buffer.
+reader	F-bad-cont3/prefix-2	readUTFString	03e2	error	java.io.EOFException	2	0	End of buffer.
+reader	F-bad-cont3/prefix-3	readUTFString	03e241	error	java.io.EOFException	3	0	End of buffer.
+reader	F-bad-cont4	readUTFString	04f0418080	error	java.io.UTFDataFormatException	5	0	\N
+reader	F-bad-cont4/prefix-0	readUTFString		error	java.io.EOFException	0	0	End of buffer.
+reader	F-bad-cont4/prefix-1	readUTFString	04	error	java.io.EOFException	1	0	End of buffer.
+reader	F-bad-cont4/prefix-2	readUTFString	04f0	error	java.io.EOFException	2	0	End of buffer.
+reader	F-bad-cont4/prefix-3	readUTFString	04f041	error	java.io.EOFException	3	0	End of buffer.
+reader	F-bad-cont4/prefix-4	readUTFString	04f04180	error	java.io.EOFException	4	0	End of buffer.
+reader	F-continuation	readUTFString	0180	error	java.io.UTFDataFormatException	2	0	\N
+reader	F-continuation/prefix-0	readUTFString		error	java.io.EOFException	0	0	End of buffer.
+reader	F-continuation/prefix-1	readUTFString	01	error	java.io.EOFException	1	0	End of buffer.
+reader	F-lead-f8	readUTFString	01f8	error	java.io.UTFDataFormatException	2	0	\N
+reader	F-lead-f8/prefix-0	readUTFString		error	java.io.EOFException	0	0	End of buffer.
+reader	F-lead-f8/prefix-1	readUTFString	01	error	java.io.EOFException	1	0	End of buffer.
+reader	F-lead-ff	readUTFString	01ff	error	java.io.UTFDataFormatException	2	0	\N
+reader	F-lead-ff/prefix-0	readUTFString		error	java.io.EOFException	0	0	End of buffer.
+reader	F-lead-ff/prefix-1	readUTFString	01	error	java.io.EOFException	1	0	End of buffer.
+reader	F-too-large	readUTFString	04f4908080	error	java.io.UTFDataFormatException	5	0	\N
+reader	F-too-large/prefix-0	readUTFString		error	java.io.EOFException	0	0	End of buffer.
+reader	F-too-large/prefix-1	readUTFString	04	error	java.io.EOFException	1	0	End of buffer.
+reader	F-too-large/prefix-2	readUTFString	04f4	error	java.io.EOFException	2	0	End of buffer.
+reader	F-too-large/prefix-3	readUTFString	04f490	error	java.io.EOFException	3	0	End of buffer.
+reader	F-too-large/prefix-4	readUTFString	04f49080	error	java.io.EOFException	4	0	End of buffer.
+reader	F-short-declared	readUTFString	01c280	error	java.io.UTFDataFormatException	3	0	\N
+reader	F-short-declared/prefix-0	readUTFString		error	java.io.EOFException	0	0	End of buffer.
+reader	F-short-declared/prefix-1	readUTFString	01	error	java.io.EOFException	1	0	End of buffer.
+reader	F-short-declared/prefix-2	readUTFString	01c2	error	java.io.EOFException	2	0	End of buffer.
+reader	F-short-declared-eof	readUTFString	01c2	error	java.io.EOFException	2	0	End of buffer.
+reader	F-short-declared-eof/prefix-0	readUTFString		error	java.io.EOFException	0	0	End of buffer.
+reader	F-short-declared-eof/prefix-1	readUTFString	01	error	java.io.EOFException	1	0	End of buffer.
+reader	F-long-declared	readUTFString	0241	error	java.io.EOFException	2	0	End of buffer.
+reader	F-long-declared/prefix-0	readUTFString		error	java.io.EOFException	0	0	End of buffer.
+reader	F-long-declared/prefix-1	readUTFString	02	error	java.io.EOFException	1	0	End of buffer.
+reader	F-trailing	readUTFString	014142	ok	0041	2	1
+reader	F-trailing/prefix-0	readUTFString		error	java.io.EOFException	0	0	End of buffer.
+reader	F-trailing/prefix-1	readUTFString	01	error	java.io.EOFException	1	0	End of buffer.
+reader	F-trailing/prefix-2	readUTFString	0141	ok	0041	2	0
+reader	F-negative-length	readUTFString	7e	error	java.io.IOException	1	0	Illegal length: -2
+reader	F-negative-length/prefix-0	readUTFString		error	java.io.EOFException	0	0	End of buffer.
+reader	F-overlong-null	readUTFString	bfff	ok	\N	2	0
+reader	F-overlong-null/prefix-0	readUTFString		error	java.io.EOFException	0	0	End of buffer.
+reader	F-overlong-null/prefix-1	readUTFString	bf	error	java.io.EOFException	1	0	End of buffer.
+reader	F-overlong-empty	readUTFString	8000	ok		2	0
+reader	F-overlong-empty/prefix-0	readUTFString		error	java.io.EOFException	0	0	End of buffer.
+reader	F-overlong-empty/prefix-1	readUTFString	80	error	java.io.EOFException	1	0	End of buffer.
+reader	F-overlong-length	readUTFString	800141	ok	0041	3	0
+reader	F-overlong-length/prefix-0	readUTFString		error	java.io.EOFException	0	0	End of buffer.
+reader	F-overlong-length/prefix-1	readUTFString	80	error	java.io.EOFException	1	0	End of buffer.
+reader	F-overlong-length/prefix-2	readUTFString	8001	error	java.io.EOFException	2	0	End of buffer.
+reader	F-limit-plus1	readUTFString	f1fffffffd	error	java.io.IOException	5	0	Illegal length: 8589934589
+reader	F-limit-plus1/prefix-0	readUTFString		error	java.io.EOFException	0	0	End of buffer.
+reader	F-limit-plus1/prefix-1	readUTFString	f1	error	java.io.EOFException	1	0	End of buffer.
+reader	F-limit-plus1/prefix-2	readUTFString	f1ff	error	java.io.EOFException	2	0	End of buffer.
+reader	F-limit-plus1/prefix-3	readUTFString	f1ffff	error	java.io.EOFException	3	0	End of buffer.
+reader	F-limit-plus1/prefix-4	readUTFString	f1ffffff	error	java.io.EOFException	4	0	End of buffer.
+reader	F-longmax-length	readUTFString	ff7fffffffffffffff	error	java.io.IOException	9	0	Illegal length: 9223372036854775807
+reader	F-longmax-length/prefix-0	readUTFString		error	java.io.EOFException	0	0	End of buffer.
+reader	F-longmax-length/prefix-1	readUTFString	ff	error	java.io.EOFException	1	0	End of buffer.
+reader	F-longmax-length/prefix-2	readUTFString	ff7f	error	java.io.EOFException	2	0	End of buffer.
+reader	F-longmax-length/prefix-3	readUTFString	ff7fff	error	java.io.EOFException	3	0	End of buffer.
+reader	F-longmax-length/prefix-4	readUTFString	ff7fffff	error	java.io.EOFException	4	0	End of buffer.
+reader	F-longmax-length/prefix-5	readUTFString	ff7fffffff	error	java.io.EOFException	5	0	End of buffer.
+reader	F-longmax-length/prefix-6	readUTFString	ff7fffffffff	error	java.io.EOFException	6	0	End of buffer.
+reader	F-longmax-length/prefix-7	readUTFString	ff7fffffffffff	error	java.io.EOFException	7	0	End of buffer.
+reader	F-longmax-length/prefix-8	readUTFString	ff7fffffffffffff	error	java.io.EOFException	8	0	End of buffer.
+complete	forms

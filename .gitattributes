@@ -8,3 +8,16 @@ tests/fixtures/schema/*.json text eol=lf
 tests/fixtures/schema/expected/*.tsv text eol=lf
 # Raw observations and environment/build metadata retain their captured bytes.
 tests/fixtures/schema/captures/** -text
+# Encoding provenance hashes identify exact tool/input and captured bytes.
+tools/upstream/encoding-oracle/* -text
+tests/fixtures/encoding/cases.json -text
+tests/fixtures/encoding/expected/*.tsv text eol=lf
+tests/fixtures/encoding/captures/** -text
+tools/upstream/*-oracle/*.java text eol=lf
+tools/upstream/protocol-oracle/Invoke-Oracle.ps1 text eol=lf
+.clang-format text eol=lf
+.uncrustify.cfg text eol=lf
+tools/format/licenses/*.txt text eol=lf
+tools/format/*.ps1 text eol=lf
+tools/format/*.json text eol=lf
+tools/format/evidence/** -text

@@ -94,7 +94,7 @@ try {
     $cp = (@("$RunDirectory/harness") + $entries) -join ';'
     Native $javac @('-encoding','UTF-8','-cp',($entries -join ';'),'-d',"$RunDirectory/harness","$PSScriptRoot/SchemaOracle.java") `
         "$RunDirectory/javac.stdout" "$RunDirectory/javac.stderr"
-    $javaArgs = @('-Dfile.encoding=UTF-8','-Duser.language=en','-Duser.country=US','-Duser.timezone=UTC','-cp',$cp,'SchemaOracle')
+    $javaArgs = @('-Dfile.encoding=UTF-8','-Duser.language=en','-Duser.country=US','-Duser.timezone=UTC','-cp',$cp,'qdcxx.oracle.SchemaOracle')
     Native $java ($javaArgs + 'environment') "$RunDirectory/environment.tsv" "$RunDirectory/environment.stderr"
     $cases = Get-Content "$fixtures/cases.json" -Raw | ConvertFrom-Json
     $inputUri = ([uri]::new((Resolve-Path "$fixtures/inputs").Path + '\')).AbsoluteUri

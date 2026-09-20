@@ -1,0 +1,6 @@
+{
+  "version": "1.36.1",
+  "url": "https://github.com/google/google-java-format/releases/download/v1.36.1/google-java-format-1.36.1-all-deps.jar",
+  "sha256": "25b400f003089d23cc5320cdaf1a16cabee19b8aa3434d0ff021b3d9f42154b4",
+  "minimumJavaVersion": 21
+}

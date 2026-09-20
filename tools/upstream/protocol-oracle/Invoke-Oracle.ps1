@@ -95,7 +95,7 @@ try {
     Native $javac @('-encoding','UTF-8','-cp',($entries -join ';'),'-d',"$RunDirectory/harness","$PSScriptRoot/ProtocolOracle.java","$PSScriptRoot/../schema-oracle/SchemaOracle.java") `
         "$RunDirectory/javac.stdout" "$RunDirectory/javac.stderr"
     $javaArgs = @('-Dfile.encoding=UTF-8','-Duser.language=en','-Duser.country=US','-Duser.timezone=UTC','-cp',$cp,'com.devexperts.qd.qtp.ProtocolOracle')
-    Native $java (@('-Dfile.encoding=UTF-8','-Duser.language=en','-Duser.country=US','-Duser.timezone=UTC','-cp',$cp,'SchemaOracle','environment')) "$RunDirectory/environment.tsv" "$RunDirectory/environment.stderr"
+    Native $java (@('-Dfile.encoding=UTF-8','-Duser.language=en','-Duser.country=US','-Duser.timezone=UTC','-cp',$cp,'qdcxx.oracle.SchemaOracle','environment')) "$RunDirectory/environment.tsv" "$RunDirectory/environment.stderr"
     $cases = Get-Content "$fixtures/cases.json" -Raw | ConvertFrom-Json
     foreach ($case in $cases) {
         Native $java ($javaArgs + @($case.id)) "$RunDirectory/raw/$($case.id).tsv" "$RunDirectory/raw/$($case.id).stderr"

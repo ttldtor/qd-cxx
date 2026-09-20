@@ -1,0 +1,215 @@
+profile	QD-3.355	ByteArrayInput	fresh input per read	UTF-16 hex units; exact decimal integers
+writer	S-null	writeUTFString	\N	7f
+reader	S-null	readUTFString	7f	ok	\N	1	0
+reader	S-null/prefix-0	readUTFString		error	java.io.EOFException	0	0	End of buffer.
+writer	S-empty	writeUTFString		00
+reader	S-empty	readUTFString	00	ok		1	0
+reader	S-empty/prefix-0	readUTFString		error	java.io.EOFException	0	0	End of buffer.
+writer	S-ascii	writeUTFString	004100420043	03414243
+reader	S-ascii	readUTFString	03414243	ok	004100420043	4	0
+reader	S-ascii/prefix-0	readUTFString		error	java.io.EOFException	0	0	End of buffer.
+reader	S-ascii/prefix-1	readUTFString	03	error	java.io.EOFException	1	0	End of buffer.
+reader	S-ascii/prefix-2	readUTFString	0341	error	java.io.EOFException	2	0	End of buffer.
+reader	S-ascii/prefix-3	readUTFString	034142	error	java.io.EOFException	3	0	End of buffer.
+writer	S-nul	writeUTFString	004100000042	03410042
+reader	S-nul	readUTFString	03410042	ok	004100000042	4	0
+reader	S-nul/prefix-0	readUTFString		error	java.io.EOFException	0	0	End of buffer.
+reader	S-nul/prefix-1	readUTFString	03	error	java.io.EOFException	1	0	End of buffer.
+reader	S-nul/prefix-2	readUTFString	0341	error	java.io.EOFException	2	0	End of buffer.
+reader	S-nul/prefix-3	readUTFString	034100	error	java.io.EOFException	3	0	End of buffer.
+writer	S-bmp	writeUTFString	041620ac	05d096e282ac
+reader	S-bmp	readUTFString	05d096e282ac	ok	041620ac	6	0
+reader	S-bmp/prefix-0	readUTFString		error	java.io.EOFException	0	0	End of buffer.
+reader	S-bmp/prefix-1	readUTFString	05	error	java.io.EOFException	1	0	End of buffer.
+reader	S-bmp/prefix-2	readUTFString	05d0	error	java.io.EOFException	2	0	End of buffer.
+reader	S-bmp/prefix-3	readUTFString	05d096	error	java.io.EOFException	3	0	End of buffer.
+reader	S-bmp/prefix-4	readUTFString	05d096e2	error	java.io.EOFException	4	0	End of buffer.
+reader	S-bmp/prefix-5	readUTFString	05d096e282	error	java.io.EOFException	5	0	End of buffer.
+writer	S-supplementary	writeUTFString	d83dde00	04f09f9880
+reader	S-supplementary	readUTFString	04f09f9880	ok	d83dde00	5	0
+reader	S-supplementary/prefix-0	readUTFString		error	java.io.EOFException	0	0	End of buffer.
+reader	S-supplementary/prefix-1	readUTFString	04	error	java.io.EOFException	1	0	End of buffer.
+reader	S-supplementary/prefix-2	readUTFString	04f0	error	java.io.EOFException	2	0	End of buffer.
+reader	S-supplementary/prefix-3	readUTFString	04f09f	error	java.io.EOFException	3	0	End of buffer.
+reader	S-supplementary/prefix-4	readUTFString	04f09f98	error	java.io.EOFException	4	0	End of buffer.
+writer	S-high	writeUTFString	d800	03eda080
+reader	S-high	readUTFString	03eda080	ok	d800	4	0
+reader	S-high/prefix-0	readUTFString		error	java.io.EOFException	0	0	End of buffer.
+reader	S-high/prefix-1	readUTFString	03	error	java.io.EOFException	1	0	End of buffer.
+reader	S-high/prefix-2	readUTFString	03ed	error	java.io.EOFException	2	0	End of buffer.
+reader	S-high/prefix-3	readUTFString	03eda0	error	java.io.EOFException	3	0	End of buffer.
+writer	S-low	writeUTFString	dc00	03edb080
+reader	S-low	readUTFString	03edb080	ok	dc00	4	0
+reader	S-low/prefix-0	readUTFString		error	java.io.EOFException	0	0	End of buffer.
+reader	S-low/prefix-1	readUTFString	03	error	java.io.EOFException	1	0	End of buffer.
+reader	S-low/prefix-2	readUTFString	03ed	error	java.io.EOFException	2	0	End of buffer.
+reader	S-low/prefix-3	readUTFString	03edb0	error	java.io.EOFException	3	0	End of buffer.
+writer	S-reversed	writeUTFString	dc00d800	06edb080eda080
+reader	S-reversed	readUTFString	06edb080eda080	ok	dc00d800	7	0
+reader	S-reversed/prefix-0	readUTFString		error	java.io.EOFException	0	0	End of buffer.
+reader	S-reversed/prefix-1	readUTFString	06	error	java.io.EOFException	1	0	End of buffer.
+reader	S-reversed/prefix-2	readUTFString	06ed	error	java.io.EOFException	2	0	End of buffer.
+reader	S-reversed/prefix-3	readUTFString	06edb0	error	java.io.EOFException	3	0	End of buffer.
+reader	S-reversed/prefix-4	readUTFString	06edb080	error	java.io.EOFException	4	0	End of buffer.
+reader	S-reversed/prefix-5	readUTFString	06edb080ed	error	java.io.EOFException	5	0	End of buffer.
+reader	S-reversed/prefix-6	readUTFString	06edb080eda0	error	java.io.EOFException	6	0	End of buffer.
+writer	S-high-ascii	writeUTFString	d8000041	04eda08041
+reader	S-high-ascii	readUTFString	04eda08041	ok	d8000041	5	0
+reader	S-high-ascii/prefix-0	readUTFString		error	java.io.EOFException	0	0	End of buffer.
+reader	S-high-ascii/prefix-1	readUTFString	04	error	java.io.EOFException	1	0	End of buffer.
+reader	S-high-ascii/prefix-2	readUTFString	04ed	error	java.io.EOFException	2	0	End of buffer.
+reader	S-high-ascii/prefix-3	readUTFString	04eda0	error	java.io.EOFException	3	0	End of buffer.
+reader	S-high-ascii/prefix-4	readUTFString	04eda080	error	java.io.EOFException	4	0	End of buffer.
+writer	S-utf-boundaries	writeUTFString	007f008007ff0800ffffdbffdfff	0f7fc280dfbfe0a080efbfbff48fbfbf
+reader	S-utf-boundaries	readUTFString	0f7fc280dfbfe0a080efbfbff48fbfbf	ok	007f008007ff0800ffffdbffdfff	16	0
+reader	S-utf-boundaries/prefix-0	readUTFString		error	java.io.EOFException	0	0	End of buffer.
+reader	S-utf-boundaries/prefix-1	readUTFString	0f	error	java.io.EOFException	1	0	End of buffer.
+reader	S-utf-boundaries/prefix-2	readUTFString	0f7f	error	java.io.EOFException	2	0	End of buffer.
+reader	S-utf-boundaries/prefix-3	readUTFString	0f7fc2	error	java.io.EOFException	3	0	End of buffer.
+reader	S-utf-boundaries/prefix-4	readUTFString	0f7fc280	error	java.io.EOFException	4	0	End of buffer.
+reader	S-utf-boundaries/prefix-5	readUTFString	0f7fc280df	error	java.io.EOFException	5	0	End of buffer.
+reader	S-utf-boundaries/prefix-6	readUTFString	0f7fc280dfbf	error	java.io.EOFException	6	0	End of buffer.
+reader	S-utf-boundaries/prefix-7	readUTFString	0f7fc280dfbfe0	error	java.io.EOFException	7	0	End of buffer.
+reader	S-utf-boundaries/prefix-8	readUTFString	0f7fc280dfbfe0a0	error	java.io.EOFException	8	0	End of buffer.
+reader	S-utf-boundaries/prefix-9	readUTFString	0f7fc280dfbfe0a080	error	java.io.EOFException	9	0	End of buffer.
+reader	S-utf-boundaries/prefix-10	readUTFString	0f7fc280dfbfe0a080ef	error	java.io.EOFException	10	0	End of buffer.
+reader	S-utf-boundaries/prefix-11	readUTFString	0f7fc280dfbfe0a080efbf	error	java.io.EOFException	11	0	End of buffer.
+reader	S-utf-boundaries/prefix-12	readUTFString	0f7fc280dfbfe0a080efbfbf	error	java.io.EOFException	12	0	End of buffer.
+reader	S-utf-boundaries/prefix-13	readUTFString	0f7fc280dfbfe0a080efbfbff4	error	java.io.EOFException	13	0	End of buffer.
+reader	S-utf-boundaries/prefix-14	readUTFString	0f7fc280dfbfe0a080efbfbff48f	error	java.io.EOFException	14	0	End of buffer.
+reader	S-utf-boundaries/prefix-15	readUTFString	0f7fc280dfbfe0a080efbfbff48fbf	error	java.io.EOFException	15	0	End of buffer.
+writer	S-len63	writeUTFString	006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061	3f616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161
+reader	S-len63	readUTFString	3f616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	ok	006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061	64	0
+reader	S-len63/prefix-0	readUTFString		error	java.io.EOFException	0	0	End of buffer.
+reader	S-len63/prefix-1	readUTFString	3f	error	java.io.EOFException	1	0	End of buffer.
+reader	S-len63/prefix-2	readUTFString	3f61	error	java.io.EOFException	2	0	End of buffer.
+reader	S-len63/prefix-3	readUTFString	3f6161	error	java.io.EOFException	3	0	End of buffer.
+reader	S-len63/prefix-4	readUTFString	3f616161	error	java.io.EOFException	4	0	End of buffer.
+reader	S-len63/prefix-5	readUTFString	3f61616161	error	java.io.EOFException	5	0	End of buffer.
+reader	S-len63/prefix-6	readUTFString	3f6161616161	error	java.io.EOFException	6	0	End of buffer.
+reader	S-len63/prefix-7	readUTFString	3f616161616161	error	java.io.EOFException	7	0	End of buffer.
+reader	S-len63/prefix-8	readUTFString	3f61616161616161	error	java.io.EOFException	8	0	End of buffer.
+reader	S-len63/prefix-9	readUTFString	3f6161616161616161	error	java.io.EOFException	9	0	End of buffer.
+reader	S-len63/prefix-10	readUTFString	3f616161616161616161	error	java.io.EOFException	10	0	End of buffer.
+reader	S-len63/prefix-11	readUTFString	3f61616161616161616161	error	java.io.EOFException	11	0	End of buffer.
+reader	S-len63/prefix-12	readUTFString	3f6161616161616161616161	error	java.io.EOFException	12	0	End of buffer.
+reader	S-len63/prefix-13	readUTFString	3f616161616161616161616161	error	java.io.EOFException	13	0	End of buffer.
+reader	S-len63/prefix-14	readUTFString	3f61616161616161616161616161	error	java.io.EOFException	14	0	End of buffer.
+reader	S-len63/prefix-15	readUTFString	3f6161616161616161616161616161	error	java.io.EOFException	15	0	End of buffer.
+reader	S-len63/prefix-16	readUTFString	3f616161616161616161616161616161	error	java.io.EOFException	16	0	End of buffer.
+reader	S-len63/prefix-17	readUTFString	3f61616161616161616161616161616161	error	java.io.EOFException	17	0	End of buffer.
+reader	S-len63/prefix-18	readUTFString	3f6161616161616161616161616161616161	error	java.io.EOFException	18	0	End of buffer.
+reader	S-len63/prefix-19	readUTFString	3f616161616161616161616161616161616161	error	java.io.EOFException	19	0	End of buffer.
+reader	S-len63/prefix-20	readUTFString	3f61616161616161616161616161616161616161	error	java.io.EOFException	20	0	End of buffer.
+reader	S-len63/prefix-21	readUTFString	3f6161616161616161616161616161616161616161	error	java.io.EOFException	21	0	End of buffer.
+reader	S-len63/prefix-22	readUTFString	3f616161616161616161616161616161616161616161	error	java.io.EOFException	22	0	End of buffer.
+reader	S-len63/prefix-23	readUTFString	3f61616161616161616161616161616161616161616161	error	java.io.EOFException	23	0	End of buffer.
+reader	S-len63/prefix-24	readUTFString	3f6161616161616161616161616161616161616161616161	error	java.io.EOFException	24	0	End of buffer.
+reader	S-len63/prefix-25	readUTFString	3f616161616161616161616161616161616161616161616161	error	java.io.EOFException	25	0	End of buffer.
+reader	S-len63/prefix-26	readUTFString	3f61616161616161616161616161616161616161616161616161	error	java.io.EOFException	26	0	End of buffer.
+reader	S-len63/prefix-27	readUTFString	3f6161616161616161616161616161616161616161616161616161	error	java.io.EOFException	27	0	End of buffer.
+reader	S-len63/prefix-28	readUTFString	3f616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	28	0	End of buffer.
+reader	S-len63/prefix-29	readUTFString	3f61616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	29	0	End of buffer.
+reader	S-len63/prefix-30	readUTFString	3f6161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	30	0	End of buffer.
+reader	S-len63/prefix-31	readUTFString	3f616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	31	0	End of buffer.
+reader	S-len63/prefix-32	readUTFString	3f61616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	32	0	End of buffer.
+reader	S-len63/prefix-33	readUTFString	3f6161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	33	0	End of buffer.
+reader	S-len63/prefix-34	readUTFString	3f616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	34	0	End of buffer.
+reader	S-len63/prefix-35	readUTFString	3f61616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	35	0	End of buffer.
+reader	S-len63/prefix-36	readUTFString	3f6161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	36	0	End of buffer.
+reader	S-len63/prefix-37	readUTFString	3f616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	37	0	End of buffer.
+reader	S-len63/prefix-38	readUTFString	3f61616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	38	0	End of buffer.
+reader	S-len63/prefix-39	readUTFString	3f6161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	39	0	End of buffer.
+reader	S-len63/prefix-40	readUTFString	3f616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	40	0	End of buffer.
+reader	S-len63/prefix-41	readUTFString	3f61616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	41	0	End of buffer.
+reader	S-len63/prefix-42	readUTFString	3f6161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	42	0	End of buffer.
+reader	S-len63/prefix-43	readUTFString	3f616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	43	0	End of buffer.
+reader	S-len63/prefix-44	readUTFString	3f61616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	44	0	End of buffer.
+reader	S-len63/prefix-45	readUTFString	3f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	45	0	End of buffer.
+reader	S-len63/prefix-46	readUTFString	3f616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	46	0	End of buffer.
+reader	S-len63/prefix-47	readUTFString	3f61616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	47	0	End of buffer.
+reader	S-len63/prefix-48	readUTFString	3f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	48	0	End of buffer.
+reader	S-len63/prefix-49	readUTFString	3f616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	49	0	End of buffer.
+reader	S-len63/prefix-50	readUTFString	3f61616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	50	0	End of buffer.
+reader	S-len63/prefix-51	readUTFString	3f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	51	0	End of buffer.
+reader	S-len63/prefix-52	readUTFString	3f616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	52	0	End of buffer.
+reader	S-len63/prefix-53	readUTFString	3f61616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	53	0	End of buffer.
+reader	S-len63/prefix-54	readUTFString	3f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	54	0	End of buffer.
+reader	S-len63/prefix-55	readUTFString	3f616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	55	0	End of buffer.
+reader	S-len63/prefix-56	readUTFString	3f61616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	56	0	End of buffer.
+reader	S-len63/prefix-57	readUTFString	3f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	57	0	End of buffer.
+reader	S-len63/prefix-58	readUTFString	3f616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	58	0	End of buffer.
+reader	S-len63/prefix-59	readUTFString	3f61616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	59	0	End of buffer.
+reader	S-len63/prefix-60	readUTFString	3f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	60	0	End of buffer.
+reader	S-len63/prefix-61	readUTFString	3f616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	61	0	End of buffer.
+reader	S-len63/prefix-62	readUTFString	3f61616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	62	0	End of buffer.
+reader	S-len63/prefix-63	readUTFString	3f6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	63	0	End of buffer.
+writer	S-len64	writeUTFString	0061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061	804061616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161
+reader	S-len64	readUTFString	804061616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	ok	0061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061006100610061	66	0
+reader	S-len64/prefix-0	readUTFString		error	java.io.EOFException	0	0	End of buffer.
+reader	S-len64/prefix-1	readUTFString	80	error	java.io.EOFException	1	0	End of buffer.
+reader	S-len64/prefix-2	readUTFString	8040	error	java.io.EOFException	2	0	End of buffer.
+reader	S-len64/prefix-3	readUTFString	804061	error	java.io.EOFException	3	0	End of buffer.
+reader	S-len64/prefix-4	readUTFString	80406161	error	java.io.EOFException	4	0	End of buffer.
+reader	S-len64/prefix-5	readUTFString	8040616161	error	java.io.EOFException	5	0	End of buffer.
+reader	S-len64/prefix-6	readUTFString	804061616161	error	java.io.EOFException	6	0	End of buffer.
+reader	S-len64/prefix-7	readUTFString	80406161616161	error	java.io.EOFException	7	0	End of buffer.
+reader	S-len64/prefix-8	readUTFString	8040616161616161	error	java.io.EOFException	8	0	End of buffer.
+reader	S-len64/prefix-9	readUTFString	804061616161616161	error	java.io.EOFException	9	0	End of buffer.
+reader	S-len64/prefix-10	readUTFString	80406161616161616161	error	java.io.EOFException	10	0	End of buffer.
+reader	S-len64/prefix-11	readUTFString	8040616161616161616161	error	java.io.EOFException	11	0	End of buffer.
+reader	S-len64/prefix-12	readUTFString	804061616161616161616161	error	java.io.EOFException	12	0	End of buffer.
+reader	S-len64/prefix-13	readUTFString	80406161616161616161616161	error	java.io.EOFException	13	0	End of buffer.
+reader	S-len64/prefix-14	readUTFString	8040616161616161616161616161	error	java.io.EOFException	14	0	End of buffer.
+reader	S-len64/prefix-15	readUTFString	804061616161616161616161616161	error	java.io.EOFException	15	0	End of buffer.
+reader	S-len64/prefix-16	readUTFString	80406161616161616161616161616161	error	java.io.EOFException	16	0	End of buffer.
+reader	S-len64/prefix-17	readUTFString	8040616161616161616161616161616161	error	java.io.EOFException	17	0	End of buffer.
+reader	S-len64/prefix-18	readUTFString	804061616161616161616161616161616161	error	java.io.EOFException	18	0	End of buffer.
+reader	S-len64/prefix-19	readUTFString	80406161616161616161616161616161616161	error	java.io.EOFException	19	0	End of buffer.
+reader	S-len64/prefix-20	readUTFString	8040616161616161616161616161616161616161	error	java.io.EOFException	20	0	End of buffer.
+reader	S-len64/prefix-21	readUTFString	804061616161616161616161616161616161616161	error	java.io.EOFException	21	0	End of buffer.
+reader	S-len64/prefix-22	readUTFString	80406161616161616161616161616161616161616161	error	java.io.EOFException	22	0	End of buffer.
+reader	S-len64/prefix-23	readUTFString	8040616161616161616161616161616161616161616161	error	java.io.EOFException	23	0	End of buffer.
+reader	S-len64/prefix-24	readUTFString	804061616161616161616161616161616161616161616161	error	java.io.EOFException	24	0	End of buffer.
+reader	S-len64/prefix-25	readUTFString	80406161616161616161616161616161616161616161616161	error	java.io.EOFException	25	0	End of buffer.
+reader	S-len64/prefix-26	readUTFString	8040616161616161616161616161616161616161616161616161	error	java.io.EOFException	26	0	End of buffer.
+reader	S-len64/prefix-27	readUTFString	804061616161616161616161616161616161616161616161616161	error	java.io.EOFException	27	0	End of buffer.
+reader	S-len64/prefix-28	readUTFString	80406161616161616161616161616161616161616161616161616161	error	java.io.EOFException	28	0	End of buffer.
+reader	S-len64/prefix-29	readUTFString	8040616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	29	0	End of buffer.
+reader	S-len64/prefix-30	readUTFString	804061616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	30	0	End of buffer.
+reader	S-len64/prefix-31	readUTFString	80406161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	31	0	End of buffer.
+reader	S-len64/prefix-32	readUTFString	8040616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	32	0	End of buffer.
+reader	S-len64/prefix-33	readUTFString	804061616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	33	0	End of buffer.
+reader	S-len64/prefix-34	readUTFString	80406161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	34	0	End of buffer.
+reader	S-len64/prefix-35	readUTFString	8040616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	35	0	End of buffer.
+reader	S-len64/prefix-36	readUTFString	804061616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	36	0	End of buffer.
+reader	S-len64/prefix-37	readUTFString	80406161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	37	0	End of buffer.
+reader	S-len64/prefix-38	readUTFString	8040616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	38	0	End of buffer.
+reader	S-len64/prefix-39	readUTFString	804061616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	39	0	End of buffer.
+reader	S-len64/prefix-40	readUTFString	80406161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	40	0	End of buffer.
+reader	S-len64/prefix-41	readUTFString	8040616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	41	0	End of buffer.
+reader	S-len64/prefix-42	readUTFString	804061616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	42	0	End of buffer.
+reader	S-len64/prefix-43	readUTFString	80406161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	43	0	End of buffer.
+reader	S-len64/prefix-44	readUTFString	8040616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	44	0	End of buffer.
+reader	S-len64/prefix-45	readUTFString	804061616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	45	0	End of buffer.
+reader	S-len64/prefix-46	readUTFString	80406161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	46	0	End of buffer.
+reader	S-len64/prefix-47	readUTFString	8040616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	47	0	End of buffer.
+reader	S-len64/prefix-48	readUTFString	804061616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	48	0	End of buffer.
+reader	S-len64/prefix-49	readUTFString	80406161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	49	0	End of buffer.
+reader	S-len64/prefix-50	readUTFString	8040616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	50	0	End of buffer.
+reader	S-len64/prefix-51	readUTFString	804061616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	51	0	End of buffer.
+reader	S-len64/prefix-52	readUTFString	80406161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	52	0	End of buffer.
+reader	S-len64/prefix-53	readUTFString	8040616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	53	0	End of buffer.
+reader	S-len64/prefix-54	readUTFString	804061616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	54	0	End of buffer.
+reader	S-len64/prefix-55	readUTFString	80406161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	55	0	End of buffer.
+reader	S-len64/prefix-56	readUTFString	8040616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	56	0	End of buffer.
+reader	S-len64/prefix-57	readUTFString	804061616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	57	0	End of buffer.
+reader	S-len64/prefix-58	readUTFString	80406161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	58	0	End of buffer.
+reader	S-len64/prefix-59	readUTFString	8040616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	59	0	End of buffer.
+reader	S-len64/prefix-60	readUTFString	804061616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	60	0	End of buffer.
+reader	S-len64/prefix-61	readUTFString	80406161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	61	0	End of buffer.
+reader	S-len64/prefix-62	readUTFString	8040616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	62	0	End of buffer.
+reader	S-len64/prefix-63	readUTFString	804061616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	63	0	End of buffer.
+reader	S-len64/prefix-64	readUTFString	80406161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	64	0	End of buffer.
+reader	S-len64/prefix-65	readUTFString	8040616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161	error	java.io.EOFException	65	0	End of buffer.
+complete	strings
