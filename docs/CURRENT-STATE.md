@@ -8,7 +8,13 @@
 
 The repository currently defines working and contribution rules, documentation and specification areas, upstream pinning, and the first research tasks. There is no production C++ implementation, build configuration, dependency selection, or published API.
 
-## Task status
+## ADR approval and next tasks
+
+Accepted by the project owner on 2026-09-21. The three boundaries are logical ownership boundaries; they do not require three file formats or three serialization subsystems. Core can consume a resolved local schema without loading XML or its history. Preserve copied-main-alias behavior only for XML import under the pinned QD 3.355 profile; it is not a requirement for future native C++ schema construction. Retain Java slot projection without prescribing C++ storage. Approve structured unsupported-local-type diagnostics for BYTE/SHORT while retaining local-construction rejection; this does not ban their wire codes. Keep original requests and selected layouts separate. JSON is accepted for schema-description interchange; libraries, canonical hashes and whole-session serialization remain undecided. Existing oracle evidence is unchanged.
+
+Next: QDCXX-008 — ready, JSON contract and examples; QDCXX-009 — ready, primitive encoding vectors. Earlier records below describe the state at each task's completion.
+
+## Task history
 
 - Completed: `QDCXX-001`, repository and workflow bootstrap.
 - Completed: `QDCXX-002`, verified Java QD 3.355 provenance and documented reproducible upstream inspection.

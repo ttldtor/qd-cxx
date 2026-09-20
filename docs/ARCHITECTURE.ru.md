@@ -32,8 +32,6 @@
 
 Не выбраны networking library, build system layout, package manager, test framework, public API, threading model или binary compatibility policy. Эти решения требуют ограниченных задач и доказательств.
 
-## Предложение QDCXX-007
+## Принятые границы ADR-0001
 
-[Требования normalized model](../spec/schema/NORMALIZED-MODEL.ru.md) и [ADR-0001](decisions/ADR-0001-normalized-model-boundaries.ru.md), статус **proposed**, разделяют source declarations/overlays как importer provenance, resolved local schema как самостоятельный core artifact и incoming sender-ID mappings вместе с requested/selected outgoing layouts как самостоятельный protocol state. Local schema identity не включает peer/session state. Logical values и Java-compatible slot observations не определяют физическое хранение C++.
-
-Versioned JSON interchange рекомендован, но не принят; format/profile versions, immutable snapshots и scoped references предлагаются без выбора dependencies или public APIs. [Условия продолжения](NEXT-STEPS.ru.md) разделяют решения владельца, целевые пробы, importer contract и encoding work. Предложение не разрешает importer или C++ implementation.
+Утверждено владельцем проекта 2026-09-21. Три границы определяют логическое владение и не требуют трёх форматов файлов или трёх подсистем сериализации. Core может использовать разрешённую локальную схему без загрузки XML и его истории. Потеря copied main alias сохраняется только для XML-импорта в закреплённом профиле QD 3.355; это не требование к будущему программному созданию схем в C++. Java slot projection сохраняется без предписания физического хранения C++. Утверждена структурированная диагностика unsupported-local-type для BYTE/SHORT с сохранением отклонения локального построения; это не запрещает их wire-коды. Исходные requests и selected layouts остаются раздельными. JSON принят для обмена описаниями схем; библиотеки, канонические хеши и сериализация всей сессии остаются открытыми. Существующие oracle-доказательства неизменны.

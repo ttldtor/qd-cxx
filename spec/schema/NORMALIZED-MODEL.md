@@ -2,7 +2,7 @@
 
 [Русская версия](NORMALIZED-MODEL.ru.md). This English document is authoritative.
 
-Status: **proposal**, QDCXX-007; decision: [ADR-0001](../../docs/decisions/ADR-0001-normalized-model-boundaries.md), **proposed**. “Require” below means a proposed requirement, not accepted compatibility policy. No format, importer, public C++ API or changed oracle expectation is implemented here.
+Status: boundaries and policy accepted in [ADR-0001](../../docs/decisions/ADR-0001-normalized-model-boundaries.md), **accepted**, 2026-09-21. QDCXX-008 defines the detailed JSON contract. P distinguishes design requirements from Java observations, not the approval status of the ADR. Unmeasured U items remain open.
 
 ## Evidence and initial profile
 
@@ -55,7 +55,7 @@ Baseline: Java QD 3.355, `0ddc0a09779fb61d74cc0b37c6449ff47dcb715f`. **C** means
 
 **P — design example only:** A diagnostic envelope might contain `formatVersion`, `artifactKind`, `compatibilityProfile`, `oracleRevision`, `localSchemaRef`, and ordered `records` or `wireFields`. These names are illustrative, not a schema, captured JSON, or a C++ API. Source references and protocol session keys are distinct from local record IDs.
 
-## Compatibility dispositions pending ADR approval
+## Compatibility dispositions within accepted ADR-0001
 
 “Preserve” is the recommended target for the listed subcases only, not a current C++ conformance claim.
 
@@ -81,8 +81,13 @@ Alternatives: runtime-only JSON is smaller but loses overlay explanations; a uni
 
 ## Decision gates and scoped follow-up
 
-See [backlog](../../docs/NEXT-STEPS.md). Approval of layer ownership, metadata retention, pinned copy behavior, structured error deviation and JSON direction gates an importer contract, not this documentation task. The precise JSON schema/public API remains open.
+Accepted by the project owner on 2026-09-21. The three boundaries are logical ownership boundaries; they do not require three file formats or three serialization subsystems. Core can consume a resolved local schema without loading XML or its history. Preserve copied-main-alias behavior only for XML import under the pinned QD 3.355 profile; it is not a requirement for future native C++ schema construction. Retain Java slot projection without prescribing C++ storage. Approve structured unsupported-local-type diagnostics for BYTE/SHORT while retaining local-construction rejection; this does not ban their wire codes. Keep original requests and selected layouts separate. JSON is accepted for schema-description interchange; libraries, canonical hashes and whole-session serialization remain undecided. Existing oracle evidence is unchanged.
 
 Essential probes before widening scope: alias-copy plus known mapping/property/wire observation before choosing repaired semantics; alias collision/removal/defaulted-overlay order before supporting those overlays; LONG/time-index wire descriptions before claiming slot-to-wire conformance; requested y,x order/type mismatches and before/after-writer/reset changes before dynamic layouts; bounded primitive boundaries/malformed input and P06 before conversion support. None has been executed by QDCXX-007.
 
 Safely deferred by explicit exclusion: full dxFeed property/provider parity, generators/regional profiles, parser lexical edges, mapping getters, PART/auth/timing and broad rebuild behavior. They block claims about those features, not the three-layer representation. Existing [open questions](../../docs/upstream/OPEN-QUESTIONS.md) stay open until evidence and decisions actually resolve them.
+
+
+## Approval clarifications
+
+Accepted by the project owner on 2026-09-21. The three boundaries are logical ownership boundaries; they do not require three file formats or three serialization subsystems. Core can consume a resolved local schema without loading XML or its history. Preserve copied-main-alias behavior only for XML import under the pinned QD 3.355 profile; it is not a requirement for future native C++ schema construction. Retain Java slot projection without prescribing C++ storage. Approve structured unsupported-local-type diagnostics for BYTE/SHORT while retaining local-construction rejection; this does not ban their wire codes. Keep original requests and selected layouts separate. JSON is accepted for schema-description interchange; libraries, canonical hashes and whole-session serialization remain undecided. Existing oracle evidence is unchanged.

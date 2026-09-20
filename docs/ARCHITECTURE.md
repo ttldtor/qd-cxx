@@ -32,8 +32,6 @@ Dependency direction should point inward: transport may depend on protocol; prot
 
 No networking library, build system layout, package manager, test framework, public API, threading model, or binary compatibility policy has been selected. Those decisions require scoped tasks and evidence.
 
-## QDCXX-007 proposal
+## Accepted ADR-0001 boundaries
 
-[Normalized-model requirements](../spec/schema/NORMALIZED-MODEL.md) and [ADR-0001](decisions/ADR-0001-normalized-model-boundaries.md), status **proposed**, separate source declarations/overlays as importer provenance, resolved local schema as a first-class core artifact, and incoming sender-ID mappings plus requested/selected outgoing layouts as first-class protocol state. Local schema identity does not include peer/session state. Logical values and Java-compatible slot observations do not prescribe C++ physical storage.
-
-Versioned JSON interchange is recommended, not adopted; format/profile versions, immutable snapshots and scoped references are proposed without choosing dependencies or public APIs. [Follow-up gates](NEXT-STEPS.md) separate owner decisions, focused probes, importer contract and encoding work. No importer or C++ implementation is authorized by this proposal.
+Accepted by the project owner on 2026-09-21. The three boundaries are logical ownership boundaries; they do not require three file formats or three serialization subsystems. Core can consume a resolved local schema without loading XML or its history. Preserve copied-main-alias behavior only for XML import under the pinned QD 3.355 profile; it is not a requirement for future native C++ schema construction. Retain Java slot projection without prescribing C++ storage. Approve structured unsupported-local-type diagnostics for BYTE/SHORT while retaining local-construction rejection; this does not ban their wire codes. Keep original requests and selected layouts separate. JSON is accepted for schema-description interchange; libraries, canonical hashes and whole-session serialization remain undecided. Existing oracle evidence is unchanged.
