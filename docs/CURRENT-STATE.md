@@ -2,6 +2,10 @@
 
 [Русская версия](CURRENT-STATE.ru.md). This English document is authoritative.
 
+## Next task: DESCRIBE_RECORDS
+
+QDCXX-013 — ready, High: bounded Java description probes followed by a complete type-2 payload C++ parser. Results are owned ordered wire descriptions, without local schema binding. Structural validity, serialization support and local construction are separate. Only the task is created; implementation has not started. Transport, events and frame writing are excluded.
+
 ## Completed: QTP framing
 
 QDCXX-012 — done, High. First captured 17 Java P02 subcases / 117 schedules,

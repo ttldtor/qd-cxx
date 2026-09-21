@@ -2,6 +2,10 @@
 
 [English version](CURRENT-STATE.md). Английский документ является основным.
 
+## Следующая задача: DESCRIBE_RECORDS
+
+QDCXX-013 — ready, High: ограниченные Java-пробы описаний, затем C++ parser полного type-2 payload. Результат — владеющие ordered wire descriptions без привязки к local schema. Structural validity, поддержка serialization и local construction разделены. Создано только задание; реализация не начата. Transport, события и frame writer вне объёма.
+
 ## Завершено: QTP framing
 
 QDCXX-012 — done, High. Сначала получены 17 Java P02 подслучаев / 117 расписаний,
