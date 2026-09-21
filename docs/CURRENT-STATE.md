@@ -1,11 +1,14 @@
 # Current state
 
-## Next assigned scope
+## Completed: bounded static incoming binding
 
-QDCXX-014 is ready, not started: bounded static incoming binding for exact
-COMPACT_INT fields. Local schema input is independent of external/bundled XML or future JSON loading.
-Production-parser observable evidence is required beyond the diagnostic walk. QDCXX-013 follow-up
-review found no blocking defects in its checked scope; see its [validation](../tests/conformance/protocol/descriptions/VALIDATION.md).
+QDCXX-014 — done, High. Production BinaryQTPParser evidence came first:
+13 cases, two identical clean captures and negative/baseline Verify. The bounded planner accepts a
+validated immutable loader-independent local subset, returns owned ordered type-8 targets/skips and
+keeps unknown records distinct from invalid input. MSVC/ClangCL/GCC Debug/Release, GCC ASan+UBSan,
+BUILD_TESTING=OFF, four-target regressions and 11 negative fixture checks pass. Historical fixtures
+and upstream.lock are unchanged. [EN/RU validation](../tests/conformance/protocol/binding/VALIDATION.md).
+No importer, event decoder, conversions, session table or transport was added.
 
 [Русская версия](CURRENT-STATE.ru.md). This English document is authoritative.
 
@@ -47,9 +50,9 @@ QDCXX-010 — done, High: minimal C++23 build, compact int/long codec, Java-vect
 
 ## Phase
 
-**Specification baseline with bounded C++23 compact integer, UTFString, QTP framing and raw record-description implementation.**
+**Specification baseline with bounded C++23 encoding, QTP framing, raw descriptions and static type-8 binding.**
 
-The repository defines specifications and Java oracle evidence, plus QDCXX-010 compact int/long, QDCXX-011 UTFString, QDCXX-012 framing and QDCXX-013 raw descriptions, minimal CMake/CTest and pinned C++ formatting. The API is provisional; no third-party runtime dependency is selected.
+The repository defines specifications and Java oracle evidence, plus QDCXX-010 compact int/long, QDCXX-011 UTFString, QDCXX-012 framing, QDCXX-013 raw descriptions and QDCXX-014 static binding, minimal CMake/CTest and pinned C++ formatting. The API is provisional; no third-party runtime dependency is selected.
 
 ## ADR approval and next tasks
 

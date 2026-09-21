@@ -38,3 +38,13 @@ input waits; incomplete type inside a complete body is stream corruption. Unknow
 payload are distinct from framing, and adapter closure is distinct from returning-consumer policy.
 Java invalid-length diagnostics read extra bytes; that position is not C++ accepted. Earlier pending-P02
 statements above describe QDCXX-006; the remaining payload/session/transport matrix stays deferred.
+
+## QDCXX-014: ordinary static binding
+
+[Thirteen production-parser cases](../../tests/fixtures/protocol/binding/COVERAGE.md) add observed
+ID/name remapping, reorder, explicit alias/full-name lookup, unknown-field/record alignment, empty
+records, duplicate final values and sparse sender IDs; undescribed ID produces a distinct message
+error. [Validation](../../tests/fixtures/protocol/binding/VALIDATION.md) records two equal clean captures
+and negative/baseline Verify. Historical evidence is unchanged. [Static C++ plans](STATIC-BINDING.md)
+are designed projections; intermediate duplicate writes are source-supported, not externally observed.
+No application defaults, conversions, metadata/provider or session/transport parity is inferred.

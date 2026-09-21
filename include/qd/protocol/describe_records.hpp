@@ -6,6 +6,12 @@
 
 namespace qd::protocol {
 
+/** Largest structurally valid full DESCRIBE_RECORDS type ID in locked QD 3.355.
+ * Includes representation bits; this bound neither masks them nor guarantees type support.
+ * See spec/protocol/DESCRIBE-RECORDS.md and BinaryQTPParser.parseDescribeRecords.
+ */
+inline constexpr std::int32_t MAX_WIRE_SERIAL_TYPE_ID = 0xff;
+
 /** Required logical-element budgets; zero is valid, with no unlimited sentinel. */
 struct DescriptionLimits {
     std::size_t payloadBytes;         ///< Maximum complete payload bytes, excluding frame envelope.

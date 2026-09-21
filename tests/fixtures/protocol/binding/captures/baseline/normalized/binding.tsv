@@ -1,0 +1,171 @@
+profile	QD-3.355	builtin-metadata=false	field-replacers=null	event-time=0	programmatic-scheme	optional-properties=disabled
+case	reorder
+scheme.record	local	0	S	false	[]
+scheme.field	local	0	0	S.v	v	v	8
+scheme.record	local	1	R	false	[]
+scheme.field	local	1	0	R.y	y	y	8
+scheme.field	local	1	1	R.x	x	xdot	8
+scheme.field	local	1	2	R.z	z	z	8
+scheme.record	local	2	E	false	[]
+payload	07015202017808017908
+wire	0b0207015202017808017908080f044307806580ca
+record	0	STREAM_DATA|1|R|ABC|0=202(202)|1=101(101)|2=0(0)
+callback	0	STREAM_DATA	1
+end	21	0	1	0
+case	alias
+scheme.record	local	0	S	false	[]
+scheme.field	local	0	0	S.v	v	v	8
+scheme.record	local	1	R	false	[]
+scheme.field	local	1	0	R.y	y	y	8
+scheme.field	local	1	1	R.x	x	xdot	8
+scheme.field	local	1	2	R.z	z	z	8
+scheme.record	local	2	E	false	[]
+payload	090152020478646f7408017908
+wire	0e02090152020478646f7408017908080f044309812f8194
+record	0	STREAM_DATA|1|R|ABC|0=404(404)|1=303(303)|2=0(0)
+callback	0	STREAM_DATA	1
+end	24	0	1	0
+case	full
+scheme.record	local	0	S	false	[]
+scheme.field	local	0	0	S.v	v	v	8
+scheme.record	local	1	R	false	[]
+scheme.field	local	1	0	R.y	y	y	8
+scheme.field	local	1	1	R.x	x	xdot	8
+scheme.field	local	1	2	R.z	z	z	8
+scheme.record	local	2	E	false	[]
+payload	0a01520203522e7808017908
+wire	0d020a01520203522e7808017908080f04430a81f9825e
+record	0	STREAM_DATA|1|R|ABC|0=606(606)|1=505(505)|2=0(0)
+callback	0	STREAM_DATA	1
+end	23	0	1	0
+case	middle-skip
+scheme.record	local	0	S	false	[]
+scheme.field	local	0	0	S.v	v	v	8
+scheme.record	local	1	R	false	[]
+scheme.field	local	1	0	R.y	y	y	8
+scheme.field	local	1	1	R.x	x	xdot	8
+scheme.field	local	1	2	R.z	z	z	8
+scheme.record	local	2	E	false	[]
+payload	0b01520301780807756e6b6e6f776e08017908
+wire	14020b01520301780807756e6b6e6f776e080179080a0f04430b82c38328838d
+record	0	STREAM_DATA|1|R|ABC|0=909(909)|1=707(707)|2=0(0)
+callback	0	STREAM_DATA	1
+end	32	0	1	0
+case	missing-wire
+scheme.record	local	0	S	false	[]
+scheme.field	local	0	0	S.v	v	v	8
+scheme.record	local	1	R	false	[]
+scheme.field	local	1	0	R.y	y	y	8
+scheme.field	local	1	1	R.x	x	xdot	8
+scheme.field	local	1	2	R.z	z	z	8
+scheme.record	local	2	E	false	[]
+payload	0c015201017808
+wire	08020c015201017808060f04430c806f
+record	0	STREAM_DATA|1|R|ABC|0=0(0)|1=111(111)|2=0(0)
+callback	0	STREAM_DATA	1
+end	16	0	1	0
+case	zero
+scheme.record	local	0	S	false	[]
+scheme.field	local	0	0	S.v	v	v	8
+scheme.record	local	1	R	false	[]
+scheme.field	local	1	0	R.y	y	y	8
+scheme.field	local	1	1	R.x	x	xdot	8
+scheme.field	local	1	2	R.z	z	z	8
+scheme.record	local	2	E	false	[]
+payload	0d015200
+wire	05020d015200040f04430d
+record	0	STREAM_DATA|1|R|ABC|0=0(0)|1=0(0)|2=0(0)
+callback	0	STREAM_DATA	1
+end	11	0	1	0
+case	empty-local
+scheme.record	local	0	S	false	[]
+scheme.field	local	0	0	S.v	v	v	8
+scheme.record	local	1	R	false	[]
+scheme.field	local	1	0	R.y	y	y	8
+scheme.field	local	1	1	R.x	x	xdot	8
+scheme.field	local	1	2	R.z	z	z	8
+scheme.record	local	2	E	false	[]
+payload	0e014501017808
+wire	08020e014501017808060f04430e80de
+record	0	STREAM_DATA|2|E|ABC
+callback	0	STREAM_DATA	1
+end	16	0	1	0
+case	empty-both
+scheme.record	local	0	S	false	[]
+scheme.field	local	0	0	S.v	v	v	8
+scheme.record	local	1	R	false	[]
+scheme.field	local	1	0	R.y	y	y	8
+scheme.field	local	1	1	R.x	x	xdot	8
+scheme.field	local	1	2	R.z	z	z	8
+scheme.record	local	2	E	false	[]
+payload	0f014500
+wire	05020f014500040f04430f
+record	0	STREAM_DATA|2|E|ABC
+callback	0	STREAM_DATA	1
+end	11	0	1	0
+case	duplicate
+scheme.record	local	0	S	false	[]
+scheme.field	local	0	0	S.v	v	v	8
+scheme.record	local	1	R	false	[]
+scheme.field	local	1	0	R.y	y	y	8
+scheme.field	local	1	1	R.x	x	xdot	8
+scheme.field	local	1	2	R.z	z	z	8
+scheme.record	local	2	E	false	[]
+payload	100152040178080478646f7408017908017808
+wire	1402100152040178080478646f74080179080178080c0f044310814d81bc822b829a
+record	0	STREAM_DATA|1|R|ABC|0=555(555)|1=666(666)|2=0(0)
+callback	0	STREAM_DATA	1
+end	34	0	1	0
+case	sparse
+scheme.record	local	0	S	false	[]
+scheme.field	local	0	0	S.v	v	v	8
+scheme.record	local	1	R	false	[]
+scheme.field	local	1	0	R.y	y	y	8
+scheme.field	local	1	1	R.x	x	xdot	8
+scheme.field	local	1	2	R.z	z	z	8
+scheme.record	local	2	E	false	[]
+payload	9000015202017808017908
+wire	0c029000015202017808017908090f0443900083098378
+record	0	STREAM_DATA|1|R|ABC|0=888(888)|1=777(777)|2=0(0)
+callback	0	STREAM_DATA	1
+end	23	0	1	0
+case	alignment
+scheme.record	local	0	S	false	[]
+scheme.field	local	0	0	S.v	v	v	8
+scheme.record	local	1	R	false	[]
+scheme.field	local	1	0	R.y	y	y	8
+scheme.field	local	1	1	R.x	x	xdot	8
+scheme.field	local	1	2	R.z	z	z	8
+scheme.record	local	2	E	false	[]
+payload	1f07556e6b6e6f776e020178080179080201530101760800015202017908017808
+wire	22021f07556e6b6e6f776e020178080179080201530101760800015202017908017808120f04431f807b80eaff028159ff0081c88237
+record	0	STREAM_DATA|0|S|ABC|0=345(345)
+record	1	STREAM_DATA|1|R|ABC|0=456(456)|1=567(567)|2=0(0)
+callback	0	STREAM_DATA	2
+end	54	0	2	0
+case	case-sensitive
+scheme.record	local	0	S	false	[]
+scheme.field	local	0	0	S.v	v	v	8
+scheme.record	local	1	R	false	[]
+scheme.field	local	1	0	R.y	y	y	8
+scheme.field	local	1	1	R.x	x	xdot	8
+scheme.field	local	1	2	R.z	z	z	8
+scheme.record	local	2	E	false	[]
+payload	1101720101780812015202015808017908
+wire	120211017201017808120152020158080179080c0f04431182a6ff128315837a
+record	0	STREAM_DATA|1|R|ABC|0=890(890)|1=0(0)|2=0(0)
+callback	0	STREAM_DATA	1
+end	32	0	1	0
+case	undescribed
+scheme.record	local	0	S	false	[]
+scheme.field	local	0	0	S.v	v	v	8
+scheme.record	local	1	R	false	[]
+scheme.field	local	1	0	R.y	y	y	8
+scheme.field	local	1	1	R.x	x	xdot	8
+scheme.field	local	1	2	R.z	z	z	8
+scheme.record	local	2	E	false	[]
+payload	13015201017808
+wire	060f0443138385
+error	message	15
+end	7	0	0	1
+complete	binding

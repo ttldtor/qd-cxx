@@ -1,0 +1,17 @@
+{
+  "negativeExitCodes": {
+    "target": 1,
+    "order": 1,
+    "skip": 1,
+    "duplicate-target": 1,
+    "missing-case": 1,
+    "empty-coverage": 1,
+    "empty-file": 1,
+    "malformed-hex": 1,
+    "unknown-case": 1,
+    "trailing-row": 1,
+    "missing-file": 1
+  },
+  "baselinePass": true,
+  "baselineSha256": "f291825afecbaafbd8f3ac5869515341df697c7522096b2803ac70bba302a61e"
+}

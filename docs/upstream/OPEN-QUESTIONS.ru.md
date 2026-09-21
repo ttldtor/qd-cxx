@@ -94,3 +94,13 @@ QT-01/QT-06 теперь включают ограниченные [доказа
 [Контракт raw parser](../../spec/protocol/DESCRIBE-RECORDS.ru.md) разделяет диагностические сырые наблюдения,
 реальные Java mappings и ресурсную политику C++. Огромные ресурсы, local binding/conversions,
 опциональные профили, session recovery и transport остаются открыты; всеобщее равенство callbacks/exceptions не заявлено.
+
+## Обновление статического binding QDCXX-014
+
+QT-02/QT-03 частично измерены [наблюдениями штатного parser](../../tests/fixtures/protocol/binding/COVERAGE.md):
+точный type-8 remapping, field reorder/explicit lookup, итоговые duplicate values, отсутствующие поля,
+пустые записи, sparse ID и пропуск неизвестных записей/полей с продолжением доставки. Undescribed ID
+остаётся отдельной ошибкой сообщения. [Static binding](../../spec/protocol/STATIC-BINDING.md) — независимый
+владеющий план, не payload decoding/session state. Промежуточные повторные записи подтверждены исходниками;
+application defaults, conversion matrix, metadata/replacers/providers, огромные ресурсы, dynamic updates,
+reset/PART и transport остаются открытыми. Валидация локального подмножества не реализует JSON/XML import.

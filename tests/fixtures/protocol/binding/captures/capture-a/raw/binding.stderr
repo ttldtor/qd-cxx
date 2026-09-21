@@ -1,0 +1,20 @@
+I 260921 162019.465 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 162019.478 [main] BinaryQTPParser - Record #17 'r' is not found in data scheme. Incoming data and subscription will be skipped.
+E 260921 162019.479 [main] BinaryQTPParser - Corrupted QTP message: Unknown record #19
+++> === Last parsed data ===
+++> Last symbol: (1073742915, null) = ABC
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  0F|04 43 13!83 85                                 ..C.          
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.IOException: Unknown record #19
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseData(BinaryQTPParser.java:425)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:261)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.BindingOracle.observe(BindingOracle.java:69)
+	at com.devexperts.qd.qtp.BindingOracle.main(BindingOracle.java:103)

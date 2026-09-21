@@ -1,0 +1,82 @@
+#include "qd/protocol/static_binding.hpp"
+
+#include "qd/core/serial_field_type.hpp"
+
+#include <new>
+#include <stdexcept>
+#include <utility>
+
+namespace qd::protocol {
+
+std::expected<RecordBinding, BindingError> bindRecord(const WireRecordDescription &description,
+                                                      const core::LocalSchema &schema, BindingLimits limits) {
+    if (description.fields.size() > limits.fields) {
+        return std::unexpected(BindingError::RESOURCE_LIMIT);
+    }
+
+    if (description.senderId < 0 || description.name.empty()) {
+        return std::unexpected(BindingError::INVALID_DESCRIPTION);
+    }
+
+    if (description.name.size() > limits.nameUnits || description.name.size() > limits.totalNameUnits) {
+        return std::unexpected(BindingError::RESOURCE_LIMIT);
+    }
+
+    limits.totalNameUnits -= description.name.size();
+
+    for (const auto &field : description.fields) {
+        if (field.name.empty() || field.serialTypeId < 0 || field.serialTypeId > MAX_WIRE_SERIAL_TYPE_ID) {
+            return std::unexpected(BindingError::INVALID_DESCRIPTION);
+        }
+
+        if (field.name.size() > limits.nameUnits || field.name.size() > limits.totalNameUnits) {
+            return std::unexpected(BindingError::RESOURCE_LIMIT);
+        }
+
+        limits.totalNameUnits -= field.name.size();
+
+        if (field.serialTypeId != std::to_underlying(core::SerialFieldType::COMPACT_INT)) {
+            return std::unexpected(BindingError::UNSUPPORTED_PROFILE);
+        }
+    }
+
+    const core::LocalRecord *local = nullptr;
+
+    for (const auto &record : schema.records()) {
+        if (record.name == description.name) {
+            local = &record;
+            break;
+        }
+    }
+
+    try {
+        RecordBinding plan{description.senderId, std::nullopt, {}};
+
+        if (local != nullptr) {
+            plan.localRecordId = local->id;
+        }
+
+        for (const auto &field : description.fields) {
+            FieldBinding action{std::nullopt};
+
+            if (local != nullptr) {
+                for (const auto &key : local->lookups) {
+                    if (key.name == field.name) {
+                        action.targetFieldId = key.fieldId;
+                        break;
+                    }
+                }
+            }
+
+            plan.fields.push_back(action);
+        }
+
+        return plan;
+    } catch (const std::bad_alloc &) {
+        return std::unexpected(BindingError::ALLOCATION_FAILURE);
+    } catch (const std::length_error &) {
+        return std::unexpected(BindingError::ALLOCATION_FAILURE);
+    }
+}
+
+} // namespace qd::protocol

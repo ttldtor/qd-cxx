@@ -10,8 +10,13 @@ target_include_directories(qd_encoding PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/inclu
 target_compile_features(qd_encoding PUBLIC cxx_std_23)
 set_target_properties(qd_encoding PROPERTIES CXX_EXTENSIONS OFF)
 
-add_library(qd_protocol src/protocol/frame_reader.cpp src/protocol/describe_records.cpp)
-target_link_libraries(qd_protocol PUBLIC qd_encoding)
+add_library(qd_core src/core/local_schema.cpp)
+target_include_directories(qd_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
+target_compile_features(qd_core PUBLIC cxx_std_23)
+set_target_properties(qd_core PROPERTIES CXX_EXTENSIONS OFF)
+
+add_library(qd_protocol src/protocol/frame_reader.cpp src/protocol/describe_records.cpp src/protocol/static_binding.cpp)
+target_link_libraries(qd_protocol PUBLIC qd_encoding qd_core)
 set_target_properties(qd_protocol PROPERTIES CXX_EXTENSIONS OFF)
 
 include(CTest)
@@ -44,4 +49,10 @@ if(BUILD_TESTING)
     set(QD_DESCRIPTION_FIXTURES "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/protocol/p08/expected/descriptions.tsv"
         CACHE FILEPATH "Java description observations (temporary override for negative checks)")
     add_test(NAME protocol_java_descriptions COMMAND description_tests "${QD_DESCRIPTION_FIXTURES}")
+    add_executable(binding_tests tests/conformance/binding_tests.cpp)
+    target_link_libraries(binding_tests PRIVATE qd_protocol doctest::doctest)
+    set_target_properties(binding_tests PROPERTIES CXX_EXTENSIONS OFF)
+    set(QD_BINDING_FIXTURES "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/protocol/binding/plans.tsv"
+        CACHE FILEPATH "Reviewed static binding projections (temporary override for negative checks)")
+    add_test(NAME protocol_java_binding COMMAND binding_tests "${QD_BINDING_FIXTURES}")
 endif()

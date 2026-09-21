@@ -38,3 +38,13 @@ capture и immutable negative/baseline Verify. Прежние captures/expectati
 отделены от framing, политика закрытия adapter — от returning consumer. Диагностика неверной длины Java
 читает дополнительные байты; её позиция не равна C++ accepted. Старые утверждения о pending P02 выше
 относятся к QDCXX-006; остальная матрица payload/session/transport остаётся отложенной.
+
+## QDCXX-014: обычный статический binding
+
+[Тринадцать сценариев штатного parser](../../tests/fixtures/protocol/binding/COVERAGE.md) добавляют
+наблюдаемые ID/name remapping, reorder, explicit alias/full-name lookup, выравнивание при неизвестных
+полях/записях, пустые записи, итоговые duplicate values и sparse sender ID; undescribed ID даёт отдельную
+ошибку сообщения. [Валидация](../../tests/fixtures/protocol/binding/VALIDATION.md) фиксирует два равных
+чистых capture и negative/baseline Verify. Исторические evidence неизменны. [Статические C++ plans](STATIC-BINDING.md)
+являются разработанными проекциями; промежуточные повторные записи подтверждаются исходниками, не внешним
+наблюдением. Application defaults, conversions, metadata/provider и session/transport parity не выводятся.

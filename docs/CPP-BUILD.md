@@ -176,3 +176,21 @@ CTest's generated LastTest.log use UTC. It preserves child output text and exit 
 change the host timezone. Current C++ logs were freshly generated in UTC, not relabeled; historical
 Java oracle captures keep their original bytes/timezones. New JSON negative reports include `executedAtUtc`.
 Public functions and test utilities now document each parameter/template parameter and non-void result.
+
+## Static type-8 binding API (QDCXX-014)
+
+qd_core owns the validated immutable local subset and has no protocol/transport dependency.
+Include qd/core/local_schema.hpp; LocalSchema::create(records, {recordCount, fieldCount, lookupCount,
+nameUnits, totalNameUnits}) returns std::expected with an owned schema or explicit error. Records
+carry local ID/name/hasTime, full field types and explicit record lookup keys targeting field positions.
+Only hasTime=false and exact type 8 are supported. Input files/provenance are not required.
+
+Include qd/protocol/static_binding.hpp and link qd_protocol. bindRecord(raw, schema,
+{fieldCount, nameUnits, totalNameUnits}) returns an independent owning RecordBinding or explicit error.
+A missing localRecordId denotes a described unknown record; missing targetFieldId denotes a type-8 skip.
+No description creates no plan. No defaults, event decoder or session map is implied. All budgets are
+mandatory, finite logical-element counts; allocation failures publish no partial result.
+See [contract](../spec/protocol/STATIC-BINDING.md) and [validation](../tests/conformance/protocol/binding/VALIDATION.md).
+CTest now adds binding_tests/protocol_java_binding; QD_BINDING_FIXTURES selects reviewed plans.tsv.
+All four targets pass the documented compiler matrix, GCC sanitizers and negative checks. BUILD_TESTING=OFF
+builds qd_core/qd_encoding/qd_protocol without fetching doctest. Existing command examples apply unchanged.

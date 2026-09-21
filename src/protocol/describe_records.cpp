@@ -7,8 +7,6 @@
 
 namespace qd::protocol {
 namespace {
-constexpr std::int32_t MAX_SERIAL_TYPE_ID = 0xff; ///< Locked plain-type range, not an operations mask.
-
 /** Call-local bounded walk, publishing only completed descriptions into its owning result. */
 class DescriptionReader {
     std::span<const std::byte> payload_;
@@ -130,7 +128,7 @@ class DescriptionReader {
 
             checkpoint(DescriptionStage::FIELD_HEADER);
 
-            if (!fieldName || fieldName->empty() || type < 0 || type > MAX_SERIAL_TYPE_ID) {
+            if (!fieldName || fieldName->empty() || type < 0 || type > MAX_WIRE_SERIAL_TYPE_ID) {
                 return fail(DescriptionStatus::INVALID_FIELD);
             }
 

@@ -1,11 +1,15 @@
 # Текущее состояние
 
-## Следующая подготовленная задача
+## Завершено: ограниченный статический входящий binding
 
-QDCXX-014 готова, не начата: ограниченный статический входящий binding
-точных COMPACT_INT полей. Локальная схема независима от внешнего/встроенного XML и будущей загрузки JSON.
-Нужны наблюдаемые доказательства штатного parser, не только diagnostic walk. Последующее ревью QDCXX-013
-не выявило блокирующих дефектов в проверенном объёме; см. [валидацию](../tests/conformance/protocol/descriptions/VALIDATION.ru.md).
+QDCXX-014 — done, High. Сначала получены доказательства штатного
+BinaryQTPParser: 13 сценариев, два одинаковых чистых capture и negative/baseline Verify. Ограниченный
+planner принимает проверенное неизменяемое локальное подмножество, независимое от загрузчика, возвращает
+владеющие упорядоченные type-8 targets/skips и отличает неизвестные записи от некорректного входа.
+MSVC/ClangCL/GCC Debug/Release, GCC ASan+UBSan, BUILD_TESTING=OFF, регрессии четырёх targets и 11 negative
+fixture checks проходят. Исторические fixtures и upstream.lock неизменны.
+[Валидация EN/RU](../tests/conformance/protocol/binding/VALIDATION.ru.md).
+Importer, event decoder, conversions, session table и transport не добавлены.
 
 [English version](CURRENT-STATE.md). Английский документ является основным.
 
@@ -51,9 +55,9 @@ QDCXX-010 — done, High: минимальная C++23-сборка, compact int
 
 ## Фаза
 
-**Specification baseline с ограниченными реализациями compact integer, UTFString, QTP framing и сырых record descriptions на C++23.**
+**Specification baseline с ограниченными реализациями encoding, QTP framing, raw descriptions и статического type-8 binding на C++23.**
 
-Репозиторий содержит спецификации и Java oracle evidence, а также compact int/long QDCXX-010, UTFString QDCXX-011, framing QDCXX-012 и сырые descriptions QDCXX-013, минимальные CMake/CTest и закреплённое форматирование C++. API предварительный; сторонние runtime-зависимости не выбраны.
+Репозиторий содержит спецификации и Java oracle evidence, а также compact int/long QDCXX-010, UTFString QDCXX-011, framing QDCXX-012, сырые descriptions QDCXX-013 и static binding QDCXX-014, минимальные CMake/CTest и закреплённое форматирование C++. API предварительный; сторонние runtime-зависимости не выбраны.
 
 Завершены: QDCXX-008 — контракт JSON и примеры; QDCXX-009 — векторы и контракт примитивных кодировок. Дальнейшие C++/importer требуют отдельной утверждённой задачи. Старые записи ниже описывают состояние при завершении соответствующих задач.
 

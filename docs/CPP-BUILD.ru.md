@@ -184,3 +184,21 @@ cmake --build .work/linux-library
 в UTC, а не переобозначены; исторические Java oracle captures сохраняют исходные байты/часовые пояса.
 Новые JSON-отчёты негативных проверок содержат `executedAtUtc`. Публичные функции и тестовые утилиты
 теперь описывают каждый параметр/параметр шаблона и результат, отличный от void.
+
+## API статического type-8 binding (QDCXX-014)
+
+qd_core владеет проверенным неизменяемым локальным подмножеством и не зависит от protocol/transport.
+Подключить qd/core/local_schema.hpp; LocalSchema::create(records, {recordCount, fieldCount, lookupCount,
+nameUnits, totalNameUnits}) возвращает std::expected с владеющей схемой или явной ошибкой. Записи содержат
+local ID/name/hasTime, полные типы полей и явные record lookup keys с целями в позициях полей.
+Поддерживаются только hasTime=false и точный тип 8. Входные файлы/provenance не нужны.
+
+Подключить qd/protocol/static_binding.hpp и линковать qd_protocol. bindRecord(raw, schema,
+{fieldCount, nameUnits, totalNameUnits}) возвращает независимый владеющий RecordBinding или явную ошибку.
+Отсутствующий localRecordId означает описанную неизвестную запись; отсутствующий targetFieldId — type-8 skip.
+Нет описания — нет плана. Defaults, event decoder и session map не подразумеваются. Все бюджеты
+обязательны и конечны, считают логические элементы; allocation failure не публикует частичный результат.
+См. [контракт](../spec/protocol/STATIC-BINDING.md) и [валидацию](../tests/conformance/protocol/binding/VALIDATION.md).
+CTest теперь добавляет binding_tests/protocol_java_binding; QD_BINDING_FIXTURES выбирает проверенный plans.tsv.
+Все четыре targets проходят описанную compiler matrix, GCC sanitizers и negative checks. BUILD_TESTING=OFF
+собирает qd_core/qd_encoding/qd_protocol без загрузки doctest. Существующие примеры команд применимы без изменений.

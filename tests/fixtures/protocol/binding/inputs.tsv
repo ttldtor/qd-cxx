@@ -1,0 +1,17 @@
+# case	sender	record	fields	values
+reorder	7	R	x,y	101,202
+alias	9	R	xdot,y	303,404
+full	10	R	R.x,y	505,606
+middle-skip	11	R	x,unknown,y	707,808,909
+missing-wire	12	R	x	111
+zero	13	R	-	-
+empty-local	14	E	x	222
+empty-both	15	E	-	-
+duplicate	16	R	x,xdot,y,x	333,444,555,666
+sparse	4096	R	x,y	777,888
+alignment	31	Unknown	x,y	123,234
+alignment	2	S	v	345
+alignment	0	R	y,x	456,567
+case-sensitive	17	r	x	678
+case-sensitive	18	R	X,y	789,890
+undescribed	19	R	x	901

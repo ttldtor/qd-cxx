@@ -94,3 +94,13 @@ construction failures distinct from malformed descriptions and retained prior in
 The [raw parser contract](../../spec/protocol/DESCRIBE-RECORDS.md) separates diagnostic raw observations,
 actual Java mappings and C++ resource policy. Huge resources, local binding/conversions, optional
 profiles, session recovery and transport remain open; no universal callback/exception parity.
+
+## QDCXX-014 static binding update
+
+QT-02/QT-03 are partially measured by [production parser observations](../../tests/fixtures/protocol/binding/COVERAGE.md):
+exact type-8 remapping, field reorder/explicit lookup, duplicate final values, missing fields, empty
+records, sparse IDs and unknown-record/field skipping with continued delivery. Undescribed ID remains
+a distinct message error. [Static binding](../../spec/protocol/STATIC-BINDING.md) is an independent
+owned plan, not payload decoding/session state. Intermediate duplicate writes remain source-supported;
+application defaults, conversion matrix, metadata/replacers/providers, huge resources, dynamic updates,
+reset/PART and transport remain open. Local subset validation does not implement JSON/XML import.
