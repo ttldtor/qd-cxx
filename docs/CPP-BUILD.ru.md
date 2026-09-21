@@ -202,3 +202,14 @@ local ID/name/hasTime, полные типы полей и явные record loo
 CTest теперь добавляет binding_tests/protocol_java_binding; QD_BINDING_FIXTURES выбирает проверенный plans.tsv.
 Все четыре targets проходят описанную compiler matrix, GCC sanitizers и negative checks. BUILD_TESTING=OFF
 собирает qd_core/qd_encoding/qd_protocol без загрузки doctest. Существующие примеры команд применимы без изменений.
+
+## API символов QDCXX-015
+
+Подключить qd/encoding/symbol_reader.hpp и линковать qd_encoding. Создать
+`SymbolReader reader({4096, 1024, 1024}, 0);` с бюджетами входных байтов, возвращаемых и сохраняемых units
+и нулевой маской EMPTY_SET. `beginMessage(0)` сбрасывает символ/MRU/ошибку; вызывать между полными
+сообщениями. `read(remainingPayload)` возвращает одно собственное значение с UTF-16, cipher и raw flags,
+consumed count и явным status. Все ошибки read terminal; ненулевые маски не поддерживаются.
+[Контракт](../spec/encoding/SYMBOLS.ru.md) и [финальная валидация](../tests/conformance/encoding/symbols/VALIDATION.ru.md).
+CTest добавляет encoding_java_symbols / symbol_tests; QD_SYMBOL_FIXTURES выбирает неизменяемый Java TSV.
+Production dependency и event decoder не добавлены. Прежние исключения PentaCodec выше исторические.

@@ -104,3 +104,12 @@ QT-02/QT-03 частично измерены [наблюдениями штат
 владеющий план, не payload decoding/session state. Промежуточные повторные записи подтверждены исходниками;
 application defaults, conversion matrix, metadata/replacers/providers, огромные ресурсы, dynamic updates,
 reset/PART и transport остаются открытыми. Валидация локального подмножества не реализует JSON/XML import.
+
+## Уточнение символов QDCXX-015
+
+QT-01/QT-06 теперь включают [ограниченные доказательства символов](../../tests/fixtures/encoding/symbols/COVERAGE.ru.md):
+канонические/принимаемые формы, точные units/позиции, flags/MRU, repeat/reset и реальную production
+интеграцию двух сообщений. Частичное состояние Java после ошибки наблюдается отдельно от
+[terminal-политики C++](../../spec/encoding/SYMBOLS.ru.md). Огромные аллокации, resolver/другие буферы,
+negotiation опций, интерпретация event/time, полное восстановление, PART и транспорт остаются открытыми.
+Полный event decoder или совместимость протокола не подразумеваются.

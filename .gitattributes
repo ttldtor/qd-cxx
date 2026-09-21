@@ -42,3 +42,11 @@ tests/fixtures/protocol/p08/inputs.tsv -text
 tests/fixtures/protocol/p08/expected/*.tsv text eol=lf
 tests/fixtures/protocol/p08/captures/** -text
 tests/conformance/protocol/descriptions/logs/*.log -text
+
+# QDCXX-015 preserves exact hashed inputs/tools and raw evidence.
+tools/upstream/symbol-oracle/*.ps1 -text
+tools/upstream/symbol-oracle/*.md -text
+tests/fixtures/encoding/symbols/inputs.tsv -text
+tests/fixtures/encoding/symbols/expected/*.tsv text eol=lf
+tests/fixtures/encoding/symbols/captures/** -text
+tests/conformance/encoding/symbols/logs/*.log -text

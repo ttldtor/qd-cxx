@@ -104,3 +104,11 @@ a distinct message error. [Static binding](../../spec/protocol/STATIC-BINDING.md
 owned plan, not payload decoding/session state. Intermediate duplicate writes remain source-supported;
 application defaults, conversion matrix, metadata/replacers/providers, huge resources, dynamic updates,
 reset/PART and transport remain open. Local subset validation does not implement JSON/XML import.
+
+## QDCXX-015 symbol update
+
+QT-01/QT-06 now include [bounded symbol evidence](../../tests/fixtures/encoding/symbols/COVERAGE.md):
+canonical/accepted forms, exact units/positions, flags/MRU, repeat/reset and real two-message production
+integration. Java partial failure state is observed separately from [C++ terminal policy](../../spec/encoding/SYMBOLS.md).
+Huge allocations, resolver/other buffers, option negotiation, event/time interpretation, full recovery,
+PART and transport remain open. No full event decoder or protocol compatibility is inferred.

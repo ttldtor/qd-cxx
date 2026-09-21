@@ -1,0 +1,1 @@
+VERIFY FAILED: symbols.tsv

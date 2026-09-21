@@ -1,9 +1,16 @@
 # Current state
 
-## Next task
+## Completed: bounded QTP symbol reader
 
-QDCXX-015 is ready, not started: bounded QTP symbol reader, a prerequisite
-for later event decoding. The reviewed QDCXX-014 baseline is 36d2940df894ed43821de4c055adfc0b0ed8582f.
+QDCXX-015 — done, High; handed off for review without a commit. Java evidence preceded C++:
+156 inputs, 693 primary reads plus state probes, two equal clean captures and negative/baseline Verify.
+The qd_encoding reader owns exact UTF-16/cipher/raw flags, keeps explicit message-local repeat/MRU
+state and uses bounded atomic success / terminal failure. Real composer/parser integration confirms
+repeats and reset across two messages. Final MSVC/ClangCL/GCC Debug/Release, GCC ASan+UBSan,
+five CTest suites, production-only no-fetch, formatting and ten negative fixture checks pass.
+Historical fixtures/upstream.lock remain unchanged; EN/RU are synchronized.
+[Validation and limits](../tests/conformance/encoding/symbols/VALIDATION.md). API remains provisional; no writer, event decoder, negotiation,
+importer, incoming-ID installation, PART or transport. The next implementation task needs approval.
 
 ## Completed: bounded static incoming binding
 

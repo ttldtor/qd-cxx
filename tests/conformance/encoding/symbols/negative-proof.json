@@ -1,0 +1,16 @@
+{
+  "negativeExitCodes": {
+    "decoded-units": 1,
+    "consumed": 1,
+    "repeat-state": 1,
+    "mru-state": 1,
+    "cipher": 1,
+    "missing-case": 1,
+    "empty-file": 1,
+    "missing-completion": 1,
+    "malformed-units": 1,
+    "missing-file": 1
+  },
+  "baselinePass": true,
+  "baselineSha256": "8cf5e2b63b41b3a37118dd5e8b95c9842624095c90768519fc08c4471a48f076"
+}

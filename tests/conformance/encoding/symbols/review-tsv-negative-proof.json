@@ -1,0 +1,26 @@
+{
+  "negativeExitCodes": {
+    "decoded-units": 1,
+    "consumed": 1,
+    "repeat-state": 1,
+    "mru-state": 1,
+    "cipher": 1,
+    "missing-case": 1,
+    "empty-file": 1,
+    "missing-completion": 1,
+    "malformed-units": 1,
+    "unknown-row": 1,
+    "wrong-column-count": 1,
+    "duplicate-complete": 1,
+    "row-after-complete": 1,
+    "missing-file": 1
+  },
+  "baselinePass": true,
+  "newCaseDiagnostics": {
+    "unknown-row": "Unknown Java TSV row type: unknown-observation",
+    "wrong-column-count": "Wrong TSV column count",
+    "duplicate-complete": "No observations, including another complete, may follow complete",
+    "row-after-complete": "No observations, including another complete, may follow complete"
+  },
+  "baselineSha256": "8cf5e2b63b41b3a37118dd5e8b95c9842624095c90768519fc08c4471a48f076"
+}

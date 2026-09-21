@@ -194,3 +194,14 @@ See [contract](../spec/protocol/STATIC-BINDING.md) and [validation](../tests/con
 CTest now adds binding_tests/protocol_java_binding; QD_BINDING_FIXTURES selects reviewed plans.tsv.
 All four targets pass the documented compiler matrix, GCC sanitizers and negative checks. BUILD_TESTING=OFF
 builds qd_core/qd_encoding/qd_protocol without fetching doctest. Existing command examples apply unchanged.
+
+## QDCXX-015 symbol API
+
+Include qd/encoding/symbol_reader.hpp and link qd_encoding. Construct
+`SymbolReader reader({4096, 1024, 1024}, 0);` with input-byte, returned-unit and retained-unit budgets
+and EMPTY_SET mask zero. `beginMessage(0)` clears symbol/MRU/failure; call it between complete
+messages. `read(remainingPayload)` returns one owned value with UTF-16, cipher and raw flags,
+consumed count and explicit status. All read failures are terminal; nonzero option masks are
+unsupported. [Contract](../spec/encoding/SYMBOLS.md) and [final validation](../tests/conformance/encoding/symbols/VALIDATION.md).
+CTest adds encoding_java_symbols / symbol_tests; QD_SYMBOL_FIXTURES selects immutable Java TSV.
+No production dependency or event decoder is added. Earlier PentaCodec exclusions above are historical.

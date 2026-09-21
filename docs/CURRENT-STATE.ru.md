@@ -1,9 +1,16 @@
 # Текущее состояние
 
-## Следующая задача
+## Завершено: ограниченный reader символов QTP
 
-QDCXX-015 готова, не начата: ограниченный QTP symbol reader, предпосылка
-будущего event decoding. Проверенная база QDCXX-014 — 36d2940df894ed43821de4c055adfc0b0ed8582f.
+QDCXX-015 — done, High; передано на ревью без коммита. Java evidence получены до C++:
+156 входов, 693 основных чтения и пробы состояния, два одинаковых чистых capture и negative/baseline Verify.
+Reader в qd_encoding владеет точными UTF-16/cipher/raw flags, сохраняет явное message-local repeat/MRU
+состояние и применяет bounded atomic success / terminal failure. Реальная интеграция composer/parser
+подтверждает повторы и reset между двумя сообщениями. Финальные MSVC/ClangCL/GCC Debug/Release,
+GCC ASan+UBSan, пять CTest suites, production-only без fetch, форматирование и десять negative checks проходят.
+Исторические fixtures/upstream.lock неизменны; EN/RU синхронизированы.
+[Валидация и пределы](../tests/conformance/encoding/symbols/VALIDATION.ru.md). API предварительный; нет writer, event decoder, negotiation,
+importer, установки incoming-ID, PART и транспорта. Следующая задача реализации требует согласования.
 
 ## Завершено: ограниченный статический входящий binding
 

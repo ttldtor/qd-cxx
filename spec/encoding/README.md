@@ -1,5 +1,7 @@
 # Encoding specification
 
+[Русская версия](README.ru.md). English is authoritative.
+
 This area will describe primitive and stateful encodings used by schema and QTP, including canonical forms, ranges, state lifetime, malformed input, and partial-input behavior.
 
 Encoding rules must be backed by upstream source/test evidence and representative fixtures. Do not assume a codec is stateless merely because its public entry point looks functional.
@@ -20,3 +22,11 @@ Descriptive **S** (source) / **D** (documentation) observations for Java QD 3.35
 **S:** Primitive calls may consume bytes before throwing EOF. BinaryQTPParser's mark/reset and complete-frame check supply incremental stream behavior; a primitive decoder alone does not provide that contract. Description maps and PART assembly are protocol state, not primitive codec state. See [QTP boundaries](../protocol/README.md) and [schema exchange](../protocol/SCHEMA-EXCHANGE.md).
 
 QDCXX-006 adds [P01 exact Java bytes](../../tests/fixtures/protocol/expected/P01.tsv): ABC repeat marker ff within a frame and fresh 0443 symbol bytes in the subsequent frame, compact-int fields and framing. These are composed/parser observations, not an independent primitive fixture suite; upstream tests remain unexecuted. Scenarios refer to the [protocol capture plan](../../tests/fixtures/protocol/README.md); remaining decisions are tracked as [QT questions](../../docs/upstream/OPEN-QUESTIONS.md#qtp-investigation-qdcxx-004).
+
+## QDCXX-015 bounded symbols
+
+[SYMBOLS](SYMBOLS.md) defines the implemented EMPTY_SET reader in qd_encoding, with owned exact
+UTF-16/cipher/flags, message-local repeat/MRU, explicit reset, budgets and terminal errors.
+[Java coverage](../../tests/fixtures/encoding/symbols/COVERAGE.md) and
+[C++ validation](../../tests/conformance/encoding/symbols/VALIDATION.md) replace the symbol row's
+source-only status above for this bounded subset. No writer, event decoder, negotiation or transport.
