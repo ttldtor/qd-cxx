@@ -7,7 +7,28 @@ compact int/long и UTFString. QDCXX-010 добавил compact, QDCXX-011 до�
 [utf_string.hpp](../include/qd/encoding/utf_string.hpp). Неизменные
 [Java-свидетельства](../spec/encoding/PRIMITIVES.ru.md) определяют совместимость;
 [политика UTFString и решение о переиспользовании](../spec/encoding/UTFSTRING.ru.md) определяют
-явные границы C++. PentaCodec, importer, schema runtime, payload decoding, frame writer, transport и packaging вне объёма.
+явные границы C++. PentaCodec, importer, schema runtime, event payload decoding, frame writer, transport и packaging вне объёма.
+
+## API DESCRIBE_RECORDS и проверки QDCXX-013
+
+Подключите `qd/protocol/describe_records.hpp` и линкуйте qd_protocol. Вызывайте
+`parseDescribeRecords(payload, {4096, 64, 128, 1024, {256, 256}, 4096})` только для полного payload
+типа 2 без envelope. Бюджеты: байты payload, descriptions, поля/description, всего полей,
+для каждого имени {encoded body bytes, UTF-16 units} и суммарные units имён. Ноль допустим.
+Владеющий результат содержит descriptions, status, stage, consumed, errorOffset и primitiveStatus.
+Он сохраняет завершённые записи по порядку перед ошибкой, но не частичную текущую запись. Сохраняются
+точные UTF-16, повторные ID/имена, VOID и структурно допустимые полные типы 0..255, включая не
+поддерживаемые при Java descriptor construction. Это не обещает serialization operations или поддержки
+локальных фабрик полей. Schema lookup и map не строятся. Allocation errors сохраняют завершённый
+префикс; бросивший primitive не фиксирует consumption дальше своего начала. Точные приоритеты и
+позиции описывает [контракт](../spec/protocol/DESCRIBE-RECORDS.ru.md).
+
+CTest добавляет protocol_java_descriptions; description_tests линкует лишь qd_protocol и test-only doctest.
+QD_DESCRIPTION_FIXTURES по умолчанию указывает на отдельный P08 descriptions.tsv и допускает временный
+отрицательный выбор. Все прежние команды ниже включают новый target. [Покрытие/результаты](../tests/conformance/protocol/descriptions/VALIDATION.ru.md)
+фиксируют 81 Java-наблюдение, 50 841 новое assertion, MSVC/ClangCL/GCC Debug/Release, GCC ASan+UBSan,
+BUILD_TESTING=OFF без acquisition, регрессии и неизменность отрицательных проверок. API предварительный;
+event payloads, local binding, transport и writer вне объёма.
 
 ## API QTP frame reader и проверки QDCXX-012
 
@@ -71,7 +92,7 @@ python3 tools/run_utc.py --log .work/utf-asan-test.log -- ctest --test-dir .work
 MSBuild 17.14.51, MSVC 19.42.34444.0 (каталог инструментов 14.42.34433). Второй компилятор —
 установленный ClangCL 19.1.5 с той же стандартной библиотекой MSVC и SDK. Тесты используют
 doctest 2.4.12 через CMake FetchContent; URL архива и SHA-256 закреплены в
-[CMakeLists.txt](../CMakeLists.txt). Только `compact_tests` и `frame_tests` связываются с doctest; `BUILD_TESTING=OFF`
+[CMakeLists.txt](../CMakeLists.txt). Только `compact_tests`, `frame_tests` и `description_tests` связываются с doctest; `BUILD_TESTING=OFF`
 не загружает и не подключает его. Загрузки хранятся в `_deps/` игнорируемого каталога сборки;
 первая конфигурация тестов требует сети. Менеджер пакетов не нужен. doctest 2.4.12 выдаёт
 нефатальное предупреждение CMake об устаревшей минимальной версии policy; загруженный исходник не менялся. Требуется CMake 3.25+; цели наследуют `cxx_std_23` от библиотеки,

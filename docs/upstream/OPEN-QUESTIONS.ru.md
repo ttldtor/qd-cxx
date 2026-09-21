@@ -85,3 +85,12 @@ QT-01/QT-06 частично измерены новым [P02](../../tests/fixtu
 зависимость позиции Java от разбиения. [C++ контракт](../../spec/protocol/FRAMING.ru.md) задаёт отдельные
 terminal-first-error, ресурсы и finish; эквивалентность Java resetSession/EOF не заявляется. Полная
 матрица error flags, огромные ресурсы, другие buffers, PART/session/transport остаются открытыми.
+
+## Обновление descriptions QDCXX-013
+
+QT-01/QT-06 теперь включают ограниченные [доказательства P08](../../tests/fixtures/protocol/p08/COVERAGE.ru.md):
+проверки заголовков записи/поля после compact-проекции младших 32 бит, точные UTF-16, дубликаты,
+отказы построения отдельно от повреждённых descriptions и сохранение предыдущих установок.
+[Контракт raw parser](../../spec/protocol/DESCRIBE-RECORDS.ru.md) разделяет диагностические сырые наблюдения,
+реальные Java mappings и ресурсную политику C++. Огромные ресурсы, local binding/conversions,
+опциональные профили, session recovery и transport остаются открыты; всеобщее равенство callbacks/exceptions не заявлено.

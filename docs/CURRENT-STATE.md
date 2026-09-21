@@ -2,9 +2,16 @@
 
 [Русская версия](CURRENT-STATE.ru.md). This English document is authoritative.
 
-## Next task: DESCRIBE_RECORDS
+## Completed: DESCRIBE_RECORDS
 
-QDCXX-013 — ready, High: bounded Java description probes followed by a complete type-2 payload C++ parser. Results are owned ordered wire descriptions, without local schema binding. Structural validity, serialization support and local construction are separate. Only the task is created; implementation has not started. Transport, events and frame writing are excluded.
+QDCXX-013 — done, High. Java evidence was captured first: 81 bounded observations,
+two independent clean captures and negative/positive Verify. The complete type-2 payload parser
+returns owned ordered raw descriptions, exact UTF-16 and full type IDs, preserves completed records
+before later errors and enforces explicit budgets. Structural validity, serialization operations and
+local-field construction remain separate. MSVC/ClangCL/WSL GCC Debug/Release and GCC ASan+UBSan,
+primitive/framing regressions, BUILD_TESTING=OFF and negative fixture checks pass.
+[EN/RU results](../tests/conformance/protocol/descriptions/VALIDATION.md). Historical oracle files and upstream.lock are unchanged.
+No local binding, event decoding, transport or frame writer was added.
 
 ## Completed: QTP framing
 
@@ -33,9 +40,9 @@ QDCXX-010 — done, High: minimal C++23 build, compact int/long codec, Java-vect
 
 ## Phase
 
-**Specification baseline with bounded C++23 compact integer, UTFString and QTP framing implementation.**
+**Specification baseline with bounded C++23 compact integer, UTFString, QTP framing and raw record-description implementation.**
 
-The repository defines specifications and Java oracle evidence, plus QDCXX-010 compact int/long, QDCXX-011 UTFString and QDCXX-012 framing, minimal CMake/CTest and pinned C++ formatting. The API is provisional; no third-party runtime dependency is selected.
+The repository defines specifications and Java oracle evidence, plus QDCXX-010 compact int/long, QDCXX-011 UTFString, QDCXX-012 framing and QDCXX-013 raw descriptions, minimal CMake/CTest and pinned C++ formatting. The API is provisional; no third-party runtime dependency is selected.
 
 ## ADR approval and next tasks
 

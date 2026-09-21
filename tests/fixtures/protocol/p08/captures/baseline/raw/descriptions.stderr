@@ -1,0 +1,705 @@
+I 260921 153858.831 [main] BinaryQTPParser - Record #0 'R' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 153858.848 [main] BinaryQTPParser - Record #0 'R' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 153858.849 [main] BinaryQTPParser - Record #0 'R' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 153858.849 [main] BinaryQTPParser - Record #1 'S' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 153858.850 [main] BinaryQTPParser - Record #0 'R' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 153858.850 [main] BinaryQTPParser - Record #0 'S' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 153858.850 [main] BinaryQTPParser - Record #0 'R' is not found in data scheme. Incoming data and subscription will be skipped.
+E 260921 153858.851 [main] BinaryQTPParser - Corrupted QTP message: Corrupted record information
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|7F 01 52 00!                                   ..R.           
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.IOException: Corrupted record information
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseDescribeRecords(BinaryQTPParser.java:365)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseOther(BinaryQTPParser.java:283)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:267)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.DescriptionOracle.observe(DescriptionOracle.java:150)
+	at com.devexperts.qd.qtp.DescriptionOracle.main(DescriptionOracle.java:199)
+E 260921 153858.851 [main] BinaryQTPParser - Corrupted QTP message: Corrupted record information
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00 01 52 7F!                                   ...R           
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.IOException: Corrupted record information
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseDescribeRecords(BinaryQTPParser.java:365)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseOther(BinaryQTPParser.java:283)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:267)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.DescriptionOracle.observe(DescriptionOracle.java:150)
+	at com.devexperts.qd.qtp.DescriptionOracle.main(DescriptionOracle.java:199)
+E 260921 153858.852 [main] BinaryQTPParser - Corrupted QTP message: Corrupted record information
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00 7F 00!                                      ...            
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.IOException: Corrupted record information
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseDescribeRecords(BinaryQTPParser.java:365)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseOther(BinaryQTPParser.java:283)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:267)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.DescriptionOracle.observe(DescriptionOracle.java:150)
+	at com.devexperts.qd.qtp.DescriptionOracle.main(DescriptionOracle.java:199)
+E 260921 153858.852 [main] BinaryQTPParser - Corrupted QTP message: Corrupted record information
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00 00 00!                                      ....            
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.IOException: Corrupted record information
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseDescribeRecords(BinaryQTPParser.java:365)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseOther(BinaryQTPParser.java:283)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:267)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.DescriptionOracle.observe(DescriptionOracle.java:150)
+	at com.devexperts.qd.qtp.DescriptionOracle.main(DescriptionOracle.java:199)
+E 260921 153858.852 [main] BinaryQTPParser - Corrupted QTP message: Corrupted field information for field null, type 8 in record #0 R
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00 01 52 01 7F 08!                             ...R..         
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.IOException: Corrupted field information for field null, type 8 in record #0 R
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseDescribeRecords(BinaryQTPParser.java:375)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseOther(BinaryQTPParser.java:283)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:267)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.DescriptionOracle.observe(DescriptionOracle.java:150)
+	at com.devexperts.qd.qtp.DescriptionOracle.main(DescriptionOracle.java:199)
+E 260921 153858.853 [main] BinaryQTPParser - Corrupted QTP message: Corrupted field information for field , type 8 in record #0 R
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00 01 52 01 00 08!                             ...R...         
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.IOException: Corrupted field information for field , type 8 in record #0 R
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseDescribeRecords(BinaryQTPParser.java:375)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseOther(BinaryQTPParser.java:283)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:267)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.DescriptionOracle.observe(DescriptionOracle.java:150)
+	at com.devexperts.qd.qtp.DescriptionOracle.main(DescriptionOracle.java:199)
+E 260921 153858.853 [main] BinaryQTPParser - Corrupted QTP message: Corrupted field information for field x, type ffffffff in record #0 R
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00 01 52 01 01 78 7F!                          ...R..x        
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.IOException: Corrupted field information for field x, type ffffffff in record #0 R
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseDescribeRecords(BinaryQTPParser.java:375)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseOther(BinaryQTPParser.java:283)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:267)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.DescriptionOracle.observe(DescriptionOracle.java:150)
+	at com.devexperts.qd.qtp.DescriptionOracle.main(DescriptionOracle.java:199)
+E 260921 153858.853 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00 01 52 01 7F 80!                             ...R.         
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 153858.854 [main] BinaryQTPParser - Corrupted QTP message: Illegal length: 1
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|7F 01!                                         ..             
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.IOException: Illegal length: 1
+	at com.devexperts.io.BufferedInputPart.checkEncapsulatedLength(BufferedInputPart.java:255)
+	at com.devexperts.io.BufferedInput.readUTFString(BufferedInput.java:612)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseDescribeRecords(BinaryQTPParser.java:362)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseOther(BinaryQTPParser.java:283)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:267)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.DescriptionOracle.observe(DescriptionOracle.java:150)
+	at com.devexperts.qd.qtp.DescriptionOracle.main(DescriptionOracle.java:199)
+E 260921 153858.854 [main] BinaryQTPParser - Corrupted QTP message: Corrupted field information for field x, type 100 in record #0 R
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00 01 52 01 01 78 81 00!                       ...R..x.       
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.IOException: Corrupted field information for field x, type 100 in record #0 R
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseDescribeRecords(BinaryQTPParser.java:375)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseOther(BinaryQTPParser.java:283)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:267)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.DescriptionOracle.observe(DescriptionOracle.java:150)
+	at com.devexperts.qd.qtp.DescriptionOracle.main(DescriptionOracle.java:199)
+I 260921 153858.854 [main] BinaryQTPParser - Record #0 'R' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 153858.854 [main] BinaryQTPParser - Record #0 'R' cannot be parsed: Unsupported type 0xff for field 'x'
+I 260921 153858.855 [main] BinaryQTPParser - Record #0 'R' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 153858.855 [main] BinaryQTPParser - Record #0 'R' cannot be parsed: Unsupported type 0x5 for field 'x'
+I 260921 153858.855 [main] BinaryQTPParser - Record #0 'R' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 153858.856 [main] BinaryQTPParser - Record #0 'R' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 153858.856 [main] BinaryQTPParser - Record #0 'R' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 153858.856 [main] BinaryQTPParser - Record #0 'R' is not found in data scheme. Incoming data and subscription will be skipped.
+E 260921 153858.856 [main] BinaryQTPParser - Corrupted QTP message: Corrupted field information for field x, type ffffffff in record #1 S
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02 00 01 52 01 01 78 08|01 01 53 01 01 78 7F!     ...R..x...S..x 
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.IOException: Corrupted field information for field x, type ffffffff in record #1 S
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseDescribeRecords(BinaryQTPParser.java:375)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseOther(BinaryQTPParser.java:283)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:267)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.DescriptionOracle.observe(DescriptionOracle.java:150)
+	at com.devexperts.qd.qtp.DescriptionOracle.main(DescriptionOracle.java:199)
+I 260921 153858.857 [main] BinaryQTPParser - Record #0 'R' is not found in data scheme. Incoming data and subscription will be skipped.
+E 260921 153858.857 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02 00 01 52 01 01 78 08|01 01 53 01 01 78 80!     ...R..x...S..x 
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260921 153858.857 [main] BinaryQTPParser - Record #0 'R' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 153858.857 [main] BinaryQTPParser - Record #0 'R' cannot be parsed: Unsupported type 0x5 for field 'x'
+I 260921 153858.857 [main] BinaryQTPParser - Record #1 'S' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 153858.859 [main] BinaryQTPParser - Record #0 'R' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 153858.859 [main] BinaryQTPParser - Record #0 'R' is not found in data scheme. Incoming data and subscription will be skipped.
+E 260921 153858.859 [main] BinaryQTPParser - Corrupted QTP message: Corrupted record information
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|F1 FF FF FF FF 01 52 00!                       .ñÿÿÿÿ.R.       
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.IOException: Corrupted record information
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseDescribeRecords(BinaryQTPParser.java:365)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseOther(BinaryQTPParser.java:283)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:267)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.DescriptionOracle.observe(DescriptionOracle.java:150)
+	at com.devexperts.qd.qtp.DescriptionOracle.main(DescriptionOracle.java:199)
+I 260921 153858.859 [main] BinaryQTPParser - Record #0 'R' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 153858.860 [main] BinaryQTPParser - Record #0 'R' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 153858.860 [main] BinaryQTPParser - Record #0 '?' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 153858.860 [main] BinaryQTPParser - Record #0 ' ' is not found in data scheme. Incoming data and subscription will be skipped.
+E 260921 153858.860 [main] BinaryQTPParser - Corrupted QTP message: null
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00 01 C2 80!00                                 ...Â.          
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.UTFDataFormatException
+	at com.devexperts.io.BufferedInput.readUTFBody(BufferedInput.java:655)
+	at com.devexperts.io.BufferedInput.readUTFString(BufferedInput.java:618)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseDescribeRecords(BinaryQTPParser.java:362)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseOther(BinaryQTPParser.java:283)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:267)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.DescriptionOracle.observe(DescriptionOracle.java:150)
+	at com.devexperts.qd.qtp.DescriptionOracle.main(DescriptionOracle.java:199)
+E 260921 153858.861 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00 01 C2!                                      ...Â            
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 153858.861 [main] BinaryQTPParser - Corrupted QTP message: null
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00 01 FF!                                      ...ÿ            
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.UTFDataFormatException
+	at com.devexperts.io.BufferedInput.readUTFBody(BufferedInput.java:652)
+	at com.devexperts.io.BufferedInput.readUTFString(BufferedInput.java:618)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseDescribeRecords(BinaryQTPParser.java:362)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseOther(BinaryQTPParser.java:283)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:267)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.DescriptionOracle.observe(DescriptionOracle.java:150)
+	at com.devexperts.qd.qtp.DescriptionOracle.main(DescriptionOracle.java:199)
+E 260921 153858.861 [main] BinaryQTPParser - Corrupted QTP message: Illegal length: -2
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00 7E!                                         ..~             
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.IOException: Illegal length: -2
+	at com.devexperts.io.BufferedInputPart.checkEncapsulatedLength(BufferedInputPart.java:255)
+	at com.devexperts.io.BufferedInput.readUTFString(BufferedInput.java:612)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseDescribeRecords(BinaryQTPParser.java:362)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseOther(BinaryQTPParser.java:283)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:267)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.DescriptionOracle.observe(DescriptionOracle.java:150)
+	at com.devexperts.qd.qtp.DescriptionOracle.main(DescriptionOracle.java:199)
+E 260921 153858.861 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00!                                            ..              
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 153858.861 [main] BinaryQTPParser - Corrupted QTP message: Illegal length: 1
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00 01!                                         ...             
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.IOException: Illegal length: 1
+	at com.devexperts.io.BufferedInputPart.checkEncapsulatedLength(BufferedInputPart.java:255)
+	at com.devexperts.io.BufferedInput.readUTFString(BufferedInput.java:612)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseDescribeRecords(BinaryQTPParser.java:362)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseOther(BinaryQTPParser.java:283)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:267)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.DescriptionOracle.observe(DescriptionOracle.java:150)
+	at com.devexperts.qd.qtp.DescriptionOracle.main(DescriptionOracle.java:199)
+E 260921 153858.862 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00 01 52!                                      ...R            
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 153858.862 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00 01 52 01!                                   ...R.           
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 153858.862 [main] BinaryQTPParser - Corrupted QTP message: Illegal length: 1
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00 01 52 01 01!                                ...R..          
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.IOException: Illegal length: 1
+	at com.devexperts.io.BufferedInputPart.checkEncapsulatedLength(BufferedInputPart.java:255)
+	at com.devexperts.io.BufferedInput.readUTFString(BufferedInput.java:612)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseDescribeRecords(BinaryQTPParser.java:369)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseOther(BinaryQTPParser.java:283)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:267)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.DescriptionOracle.observe(DescriptionOracle.java:150)
+	at com.devexperts.qd.qtp.DescriptionOracle.main(DescriptionOracle.java:199)
+E 260921 153858.862 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00 01 52 01 01 78!                             ...R..x         
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 153858.862 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00!                                            ..              
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 153858.863 [main] BinaryQTPParser - Corrupted QTP message: Illegal length: 1
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00 01!                                         ...             
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.IOException: Illegal length: 1
+	at com.devexperts.io.BufferedInputPart.checkEncapsulatedLength(BufferedInputPart.java:255)
+	at com.devexperts.io.BufferedInput.readUTFString(BufferedInput.java:612)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseDescribeRecords(BinaryQTPParser.java:362)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseOther(BinaryQTPParser.java:283)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:267)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.DescriptionOracle.observe(DescriptionOracle.java:150)
+	at com.devexperts.qd.qtp.DescriptionOracle.main(DescriptionOracle.java:199)
+E 260921 153858.863 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00 01 52!                                      ...R            
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 153858.863 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00 01 52 01!                                   ...R.           
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 153858.863 [main] BinaryQTPParser - Corrupted QTP message: Illegal length: 1
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00 01 52 01 01!                                ...R..          
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.IOException: Illegal length: 1
+	at com.devexperts.io.BufferedInputPart.checkEncapsulatedLength(BufferedInputPart.java:255)
+	at com.devexperts.io.BufferedInput.readUTFString(BufferedInput.java:612)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseDescribeRecords(BinaryQTPParser.java:369)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseOther(BinaryQTPParser.java:283)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:267)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.DescriptionOracle.observe(DescriptionOracle.java:150)
+	at com.devexperts.qd.qtp.DescriptionOracle.main(DescriptionOracle.java:199)
+E 260921 153858.863 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00 01 52 01 01 78!                             ...R..x         
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260921 153858.864 [main] BinaryQTPParser - Record #0 'R' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 153858.864 [main] BinaryQTPParser - Record #0 'R' is not found in data scheme. Incoming data and subscription will be skipped.
+E 260921 153858.864 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02 00 01 52 01 01 78 08|01!                       ...R..x..       
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260921 153858.864 [main] BinaryQTPParser - Record #0 'R' is not found in data scheme. Incoming data and subscription will be skipped.
+E 260921 153858.864 [main] BinaryQTPParser - Corrupted QTP message: Illegal length: 1
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02 00 01 52 01 01 78 08|01 01!                    ...R..x...      
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.IOException: Illegal length: 1
+	at com.devexperts.io.BufferedInputPart.checkEncapsulatedLength(BufferedInputPart.java:255)
+	at com.devexperts.io.BufferedInput.readUTFString(BufferedInput.java:612)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseDescribeRecords(BinaryQTPParser.java:362)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseOther(BinaryQTPParser.java:283)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:267)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.DescriptionOracle.observe(DescriptionOracle.java:150)
+	at com.devexperts.qd.qtp.DescriptionOracle.main(DescriptionOracle.java:199)
+I 260921 153858.864 [main] BinaryQTPParser - Record #0 'R' is not found in data scheme. Incoming data and subscription will be skipped.
+E 260921 153858.864 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02 00 01 52 01 01 78 08|01 01 53!                 ...R..x...S     
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 153858.864 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00!                                            ..              
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 153858.864 [main] BinaryQTPParser - Corrupted QTP message: Illegal length: 3
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00 03!                                         ...             
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.IOException: Illegal length: 3
+	at com.devexperts.io.BufferedInputPart.checkEncapsulatedLength(BufferedInputPart.java:255)
+	at com.devexperts.io.BufferedInput.readUTFString(BufferedInput.java:612)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseDescribeRecords(BinaryQTPParser.java:362)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseOther(BinaryQTPParser.java:283)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:267)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.DescriptionOracle.observe(DescriptionOracle.java:150)
+	at com.devexperts.qd.qtp.DescriptionOracle.main(DescriptionOracle.java:199)
+E 260921 153858.865 [main] BinaryQTPParser - Corrupted QTP message: Illegal length: 3
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00 03!ED                                       ...í            
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.IOException: Illegal length: 3
+	at com.devexperts.io.BufferedInputPart.checkEncapsulatedLength(BufferedInputPart.java:255)
+	at com.devexperts.io.BufferedInput.readUTFString(BufferedInput.java:612)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseDescribeRecords(BinaryQTPParser.java:362)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseOther(BinaryQTPParser.java:283)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:267)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.DescriptionOracle.observe(DescriptionOracle.java:150)
+	at com.devexperts.qd.qtp.DescriptionOracle.main(DescriptionOracle.java:199)
+E 260921 153858.865 [main] BinaryQTPParser - Corrupted QTP message: Illegal length: 3
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00 03!ED A0                                    ...í            
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.IOException: Illegal length: 3
+	at com.devexperts.io.BufferedInputPart.checkEncapsulatedLength(BufferedInputPart.java:255)
+	at com.devexperts.io.BufferedInput.readUTFString(BufferedInput.java:612)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseDescribeRecords(BinaryQTPParser.java:362)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseOther(BinaryQTPParser.java:283)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:267)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.DescriptionOracle.observe(DescriptionOracle.java:150)
+	at com.devexperts.qd.qtp.DescriptionOracle.main(DescriptionOracle.java:199)
+E 260921 153858.865 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00 03 ED A0 80!                                ...í           
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 153858.865 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00 03 ED A0 80 01!                             ...í .         
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 153858.866 [main] BinaryQTPParser - Corrupted QTP message: Illegal length: 3
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00 03 ED A0 80 01 03!                          ...í ..        
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.IOException: Illegal length: 3
+	at com.devexperts.io.BufferedInputPart.checkEncapsulatedLength(BufferedInputPart.java:255)
+	at com.devexperts.io.BufferedInput.readUTFString(BufferedInput.java:612)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseDescribeRecords(BinaryQTPParser.java:369)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseOther(BinaryQTPParser.java:283)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:267)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.DescriptionOracle.observe(DescriptionOracle.java:150)
+	at com.devexperts.qd.qtp.DescriptionOracle.main(DescriptionOracle.java:199)
+E 260921 153858.866 [main] BinaryQTPParser - Corrupted QTP message: Illegal length: 3
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00 03 ED A0 80 01 03!ED                        ...í ..í       
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.IOException: Illegal length: 3
+	at com.devexperts.io.BufferedInputPart.checkEncapsulatedLength(BufferedInputPart.java:255)
+	at com.devexperts.io.BufferedInput.readUTFString(BufferedInput.java:612)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseDescribeRecords(BinaryQTPParser.java:369)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseOther(BinaryQTPParser.java:283)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:267)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.DescriptionOracle.observe(DescriptionOracle.java:150)
+	at com.devexperts.qd.qtp.DescriptionOracle.main(DescriptionOracle.java:199)
+E 260921 153858.866 [main] BinaryQTPParser - Corrupted QTP message: Illegal length: 3
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00 03 ED A0 80 01 03!ED B0                     ...í ..í°      
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.IOException: Illegal length: 3
+	at com.devexperts.io.BufferedInputPart.checkEncapsulatedLength(BufferedInputPart.java:255)
+	at com.devexperts.io.BufferedInput.readUTFString(BufferedInput.java:612)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseDescribeRecords(BinaryQTPParser.java:369)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseOther(BinaryQTPParser.java:283)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:267)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.DescriptionOracle.observe(DescriptionOracle.java:150)
+	at com.devexperts.qd.qtp.DescriptionOracle.main(DescriptionOracle.java:199)
+E 260921 153858.866 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00 03 ED A0 80 01 03 ED B0 80!                 ...í ..í°     
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 153858.867 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00!                                            ..              
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 153858.867 [main] BinaryQTPParser - Corrupted QTP message: Illegal length: 1
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00 01!                                         ...             
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.IOException: Illegal length: 1
+	at com.devexperts.io.BufferedInputPart.checkEncapsulatedLength(BufferedInputPart.java:255)
+	at com.devexperts.io.BufferedInput.readUTFString(BufferedInput.java:612)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseDescribeRecords(BinaryQTPParser.java:362)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseOther(BinaryQTPParser.java:283)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:267)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.DescriptionOracle.observe(DescriptionOracle.java:150)
+	at com.devexperts.qd.qtp.DescriptionOracle.main(DescriptionOracle.java:199)
+E 260921 153858.867 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00 01 C2!                                      ...Â            
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 153858.867 [main] BinaryQTPParser - Corrupted QTP message: null
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000001:  02|00 01 C2 80!                                   ...Â           
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.UTFDataFormatException
+	at com.devexperts.io.BufferedInput.readUTFBody(BufferedInput.java:655)
+	at com.devexperts.io.BufferedInput.readUTFString(BufferedInput.java:618)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseDescribeRecords(BinaryQTPParser.java:362)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseOther(BinaryQTPParser.java:283)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:267)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.DescriptionOracle.observe(DescriptionOracle.java:150)
+	at com.devexperts.qd.qtp.DescriptionOracle.main(DescriptionOracle.java:199)
+I 260921 153858.867 [main] BinaryQTPParser - Record #0 'R' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 153858.867 [main] BinaryQTPParser - Record #0 'R' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 153858.867 [main] BinaryQTPParser - Record #1 'R' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 153858.867 [main] BinaryQTPParser - Record #0 'R' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 153858.869 [main] BinaryQTPParser - Record #0 'R' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 153858.869 [main] BinaryQTPParser - Record #0 'R' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 153858.869 [main] BinaryQTPParser - Record #1 'R' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 153858.869 [main] BinaryQTPParser - Record #0 'R' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 153858.869 [main] BinaryQTPParser - Record #1 'R' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 153858.869 [main] BinaryQTPParser - Record #0 'R' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 153858.869 [main] BinaryQTPParser - Record #1 'R' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 153858.870 [main] BinaryQTPParser - Record #0 'R' is not found in data scheme. Incoming data and subscription will be skipped.

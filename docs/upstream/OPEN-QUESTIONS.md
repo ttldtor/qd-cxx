@@ -85,3 +85,12 @@ one default-adapter closure comparison. Header diagnostics read extra bytes, exp
 dependence on partitioning. The [C++ contract](../../spec/protocol/FRAMING.md) supplies separate terminal
 first-error, resource and finish policies; Java resetSession/EOF equivalence is not claimed. Full error
 flag combinations, huge resources, other buffers and PART/session/transport remain open.
+
+## QDCXX-013 description update
+
+QT-01/QT-06 now include bounded [P08 evidence](../../tests/fixtures/protocol/p08/COVERAGE.md):
+record/field header checks after compact low-32-bit projection, exact UTF-16, duplicates,
+construction failures distinct from malformed descriptions and retained prior installations.
+The [raw parser contract](../../spec/protocol/DESCRIBE-RECORDS.md) separates diagnostic raw observations,
+actual Java mappings and C++ resource policy. Huge resources, local binding/conversions, optional
+profiles, session recovery and transport remain open; no universal callback/exception parity.

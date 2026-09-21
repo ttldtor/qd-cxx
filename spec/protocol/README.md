@@ -83,3 +83,7 @@ Sources: [framing/record classes](SOURCES.md#framing-and-records), [PentaCodec](
 ## Validation and limits
 
 QDCXX-004 verified the locked checkout and inspected source/tests without execution. QDCXX-006 adds source-built Java captures for P01/P03/P04/P05, with [exact scope, reproducibility and verification](../../tests/fixtures/protocol/VALIDATION.md); upstream tests, sockets and benchmarks remain unexecuted. This does not fully specify primitive encodings, malformed resource limits, RMI, file resynchronization, TLS/compression, auth or every adapter transition. [Capture inventory](../../tests/fixtures/protocol/README.md) distinguishes executed subsets from pending families.
+
+## QDCXX-013 contract
+
+[DESCRIBE_RECORDS raw payload contract](DESCRIBE-RECORDS.md) / [Контракт сырого payload DESCRIBE_RECORDS](DESCRIBE-RECORDS.ru.md).

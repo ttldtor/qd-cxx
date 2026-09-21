@@ -1,0 +1,3 @@
+2026-09-21T15:35:50.881Z COMMAND ['pwsh', '-NoProfile', '-File', 'tools/upstream/description-oracle/Invoke-Oracle.ps1', '-Mode', 'Capture', '-Upstream', 'C:\\path\\to\\profile\\AppData\\Local\\Temp/qdcxx-003-qd', '-JavaHome', 'C:/Program Files/Zulu/zulu-8', '-Maven', 'C:\\path\\to\\profile\\.m2\\wrapper\\dists\\apache-maven-3.9.16\\0daed3be3ebd1c706f0e69e8b07c6b73f5cc4ea3dfce72a8d0ec2e849ca2ddb0\\bin\\mvn.cmd', '-RunDirectory', '.work/description-a']; cwd='C:\\qd-cxx'; TZ=UTC
+2026-09-21T15:36:29.466Z CAPTURE COMPLETE: 1 cases; review normalized output before promotion.
+2026-09-21T15:36:29.486Z EXIT 0

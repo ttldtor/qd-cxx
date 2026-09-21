@@ -33,3 +33,12 @@ tests/fixtures/protocol/expected/P02*.tsv text eol=lf
 tests/fixtures/protocol/p02/captures/** -text
 tests/conformance/protocol/logs/*.log -text
 tests/conformance/protocol/frames.tsv text eol=lf
+
+# QDCXX-013 retains exact hashed probe/input bytes and captured provenance.
+# Java is already formatter-canonical LF; PS scripts/docs retain their captured Windows bytes.
+tools/upstream/description-oracle/*.ps1 -text
+tools/upstream/description-oracle/*.md -text
+tests/fixtures/protocol/p08/inputs.tsv -text
+tests/fixtures/protocol/p08/expected/*.tsv text eol=lf
+tests/fixtures/protocol/p08/captures/** -text
+tests/conformance/protocol/descriptions/logs/*.log -text

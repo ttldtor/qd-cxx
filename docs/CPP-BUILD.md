@@ -7,7 +7,28 @@ and UTFString APIs. QDCXX-010 introduced compact; QDCXX-011 adds
 [utf_string.hpp](../include/qd/encoding/utf_string.hpp). The unchanged Java
 [primitive evidence](../spec/encoding/PRIMITIVES.md) defines compatibility;
 [UTFString policy and reuse decision](../spec/encoding/UTFSTRING.md) define explicit C++ bounds.
-PentaCodec, importer, schema runtime, payload decoding, frame writing, transport and packaging remain outside scope.
+PentaCodec, importer, schema runtime, event payload decoding, frame writing, transport and packaging remain outside scope.
+
+## DESCRIBE_RECORDS API and QDCXX-013 checks
+
+Include `qd/protocol/describe_records.hpp` and link qd_protocol. Call
+`parseDescribeRecords(payload, {4096, 64, 128, 1024, {256, 256}, 4096})` only for a complete type-2
+payload excluding the envelope. Budgets are payload bytes, descriptions, fields/description, total
+fields, per-name {encoded body bytes, UTF-16 units}, and aggregate name units. Zero is valid.
+The owning result provides descriptions, status, stage, consumed, errorOffset and primitiveStatus.
+It retains ordered complete records before an error, never the partial current record. It preserves
+exact UTF-16, duplicate IDs/names, VOID and structurally valid full types 0..255, including those
+unsupported by Java descriptor construction. This does not promise serialization operations or local
+field factory support. No schema lookup or map is built. Allocation errors preserve the completed
+prefix; a throwing primitive commits no consumption beyond its start. See the
+[contract](../spec/protocol/DESCRIBE-RECORDS.md) for precise precedence and positions.
+
+CTest adds protocol_java_descriptions; description_tests links only qd_protocol and test-only doctest.
+QD_DESCRIPTION_FIXTURES defaults to the additive P08 descriptions.tsv and permits temporary negative
+selection. All existing commands below include the new target. [Coverage/results](../tests/conformance/protocol/descriptions/VALIDATION.md)
+record 81 Java observations, 50,841 new assertions, MSVC/ClangCL/GCC Debug/Release, GCC ASan+UBSan,
+BUILD_TESTING=OFF with no acquisition, regressions and immutable negative checks. API is provisional;
+event payloads, local binding, transport and writer remain outside scope.
 
 ## QTP frame reader API and QDCXX-012 checks
 
@@ -70,7 +91,7 @@ Executed with CMake 4.4.2, generator `Visual Studio 17 2022`, x64, Windows SDK 1
 MSBuild 17.14.51, MSVC 19.42.34444.0 (tool directory 14.42.34433). The second compiler is the
 installed ClangCL 19.1.5 using the same MSVC standard library/SDK. Tests use doctest 2.4.12 via
 CMake FetchContent, pinned by archive URL and SHA-256 in [CMakeLists.txt](../CMakeLists.txt).
-Only `compact_tests` and `frame_tests` link doctest; `BUILD_TESTING=OFF` neither downloads nor links it. Downloads
+Only `compact_tests`, `frame_tests` and `description_tests` link doctest; `BUILD_TESTING=OFF` neither downloads nor links it. Downloads
 are stored under the ignored build directory `_deps/`; the first test configure needs network access.
 No package manager is needed. doctest 2.4.12 emits a non-fatal CMake deprecation warning for its
 old minimum policy version; the downloaded source is unmodified. CMake requires 3.25+; each target inherits `cxx_std_23` from the library,

@@ -1,0 +1,629 @@
+{
+  "format": "qdcxx-description-oracle-v1",
+  "mode": "Verify",
+  "upstream": {
+    "version": "3.355",
+    "repository": "https://github.com/devexperts/QD.git",
+    "commit": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f"
+  },
+  "upstreamDirectory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd",
+  "upstreamClean": true,
+  "powershell": "7.6.6",
+  "cwd": "C:\\qd-cxx",
+  "javaHome": "C:\\Program Files\\Zulu\\zulu-8",
+  "maven": "C:\\path\\to\\profile\\.m2\\wrapper\\dists\\apache-maven-3.9.16\\0daed3be3ebd1c706f0e69e8b07c6b73f5cc4ea3dfce72a8d0ec2e849ca2ddb0\\bin\\mvn.cmd",
+  "mavenOpts": "-Duser.timezone=UTC -Duser.home=C:/path/to/profile",
+  "classpath": "C:\\qd-cxx\\.work\\description-negative/harness;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\mars\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-promise\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-api\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib-qd-sandbox\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\auth\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-core\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto-ssl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-rmi\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-impl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-scheme\\target\\classes",
+  "toolHashes": [
+    {
+      "path": "DescriptionOracle.java",
+      "sha256": "e7c822339c512b0474fe1e23623a77855c04d4227b19d74b16f5b7a28b61e692"
+    },
+    {
+      "path": "Invoke-Oracle.ps1",
+      "sha256": "929ada5998b449234d479ea3ea5d8d5ef92ccbb956ddca4630dfc687be243d68"
+    }
+  ],
+  "harnessClasses": [
+    {
+      "path": "com/devexperts/qd/qtp/DescriptionOracle.class",
+      "sha256": "c7323c689e36aaa4772bc720c8717b2ae58103451716c059edbc5a28a578dab7"
+    },
+    {
+      "path": "com/devexperts/qd/qtp/DescriptionOracle$1.class",
+      "sha256": "3ea0f2a7de7944c306ac067b085e8c8ce099e225857d2a023d943022fc75d2dd"
+    },
+    {
+      "path": "com/devexperts/qd/qtp/DescriptionOracle$Parser.class",
+      "sha256": "28b0e8ea5459b5108ab95c5c975f21d5b13126880848df2c5867b3174036b465"
+    },
+    {
+      "path": "qdcxx/oracle/SchemaOracle.class",
+      "sha256": "adc4e7f263ec49664bfa5159557c21fbf7f1322ccd49061dcb82dc30a54ea4d3"
+    }
+  ],
+  "environmentToolSha256": "e719114b0f1964b23700526d775d6ce822b7a93797b61bbf671bc904eda9bf5e",
+  "inputsSha256": "e4eb55d19369e05975570ec1f656e1877acd7039914d58972939d1eca6d2b2e8",
+  "classpathContent": [
+    {
+      "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib\\target\\classes",
+      "fileCount": 147,
+      "sha256": "0aef2bcc3c67dd1a583ce26679f70392ff50ad9676ff50588df21996a6921ef6"
+    },
+    {
+      "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\mars\\target\\classes",
+      "fileCount": 49,
+      "sha256": "2748a5f913842d1f781dca20483162c5247d554f8d8e1a5993ff1e70651d1bea"
+    },
+    {
+      "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-promise\\target\\classes",
+      "fileCount": 5,
+      "sha256": "db514cb781d1bc5490e2e7deb7d9795466dc7c86094717c099c7b56d1f5b657b"
+    },
+    {
+      "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-api\\target\\classes",
+      "fileCount": 192,
+      "sha256": "19e80f878b540882d742c071de59a78aa7cb98c75c03e5a7fe090f3ae9103ee2"
+    },
+    {
+      "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib-qd-sandbox\\target\\classes",
+      "fileCount": 12,
+      "sha256": "d3943bd952bcb3dbfbe1dbd8422e7f25b5ecef0c519da85085417bd2704eaff5"
+    },
+    {
+      "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\auth\\target\\classes",
+      "fileCount": 2,
+      "sha256": "010e545358ef7492b22f3be6eee93a616cdd1199646af64858dd709a10a148c2"
+    },
+    {
+      "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto\\target\\classes",
+      "fileCount": 26,
+      "sha256": "502d580d30c2d1629ee6d7123a8d42d693e27f2c3227a3f3b535fd39adea662e"
+    },
+    {
+      "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-core\\target\\classes",
+      "fileCount": 461,
+      "sha256": "ef7a686e37248b108cc05a1fdb6de0d0dee9171ec0d167d41c201cac839fba51"
+    },
+    {
+      "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto-ssl\\target\\classes",
+      "fileCount": 7,
+      "sha256": "c3e223d23fa6501ba06d02e56b0011101ced0344d836595856170283bd3bfd4d"
+    },
+    {
+      "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-rmi\\target\\classes",
+      "fileCount": 146,
+      "sha256": "f335303285416a1a880dbb932c35b6b7924fcd392ae4dcebb0b4c40fff6ef84f"
+    },
+    {
+      "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-impl\\target\\classes",
+      "fileCount": 143,
+      "sha256": "15ed15fc2c36df9e1caaf22a5b9eba0a88f22345dd8ec7103e3f07f3be32cf3b"
+    },
+    {
+      "directory": "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-scheme\\target\\classes",
+      "fileCount": 58,
+      "sha256": "200a25d0c30db28c52e1afc1039c20c006406c04212ccd53eac4af21adc4eff8"
+    }
+  ],
+  "buildDependencyJars": [
+    {
+      "path": "com/devexperts/dgen/dgen/1.1/dgen-1.1.jar",
+      "sha256": "76a1ae897ad6c5d4a7eab711161a4441a2cf56f5f385a05a33386342a925b80f"
+    },
+    {
+      "path": "com/devexperts/qd/dxlib/3.355/dxlib-3.355-tests.jar",
+      "sha256": "687778fca7b8d06081376d70ef2c69e1224d72f41ce75f71ea1a916c9ea13dbf"
+    },
+    {
+      "path": "com/github/albfernandez/juniversalchardet/2.5.0/juniversalchardet-2.5.0.jar",
+      "sha256": "ceb271653ed99e15ffe52e4aedecdef8918434f19a4378a67f7ebe0ea8439058"
+    },
+    {
+      "path": "com/google/code/findbugs/jsr305/3.0.0/jsr305-3.0.0.jar",
+      "sha256": "bec0b24dcb23f9670172724826584802b80ae6cbdaba03bdebdef9327b962f6a"
+    },
+    {
+      "path": "com/google/code/findbugs/jsr305/3.0.2/jsr305-3.0.2.jar",
+      "sha256": "766ad2a0783f2687962c8ad74ceecc38a28b9f72a2d085ee438b7813e928d0c7"
+    },
+    {
+      "path": "com/jcraft/jzlib/1.1.1/jzlib-1.1.1.jar",
+      "sha256": "5cb1e9f9cf0be011487545694ff0a178237c6bfcbb21c97865cdc52c60b9347a"
+    },
+    {
+      "path": "com/sun/istack/istack-commons-runtime/3.0.8/istack-commons-runtime-3.0.8.jar",
+      "sha256": "4ffabb06be454a05e4398e20c77fa2b6308d4b88dfbef7ca30a76b5b7d5505ef"
+    },
+    {
+      "path": "com/sun/istack/istack-commons-tools/3.0.8/istack-commons-tools-3.0.8.jar",
+      "sha256": "3b0e0a85924ebb91303175f2a2183c7f9246fa00342be95205397e73434008ec"
+    },
+    {
+      "path": "com/sun/xml/bind/external/relaxng-datatype/2.3.2/relaxng-datatype-2.3.2.jar",
+      "sha256": "6a746e2e38eb08b755e1a6b1badc3ab99c1fce81159c1687974da868714a82f5"
+    },
+    {
+      "path": "com/sun/xml/bind/external/rngom/2.3.2/rngom-2.3.2.jar",
+      "sha256": "02165b9f0020160873f13e29e243b02e5c578792f9d1f2367fbadfcf8374fc78"
+    },
+    {
+      "path": "com/sun/xml/dtd-parser/dtd-parser/1.4.1/dtd-parser-1.4.1.jar",
+      "sha256": "7d02cf299162ed207df82a02079d1d9ac4569d34146b4c3ddc7f1de8f9711d46"
+    },
+    {
+      "path": "com/sun/xml/fastinfoset/FastInfoset/1.2.16/FastInfoset-1.2.16.jar",
+      "sha256": "056f3a1e144409f21ed16afc26805f58e9a21f3fce1543c42d400719d250c511"
+    },
+    {
+      "path": "com/thoughtworks/qdox/qdox/2.0-M10/qdox-2.0-M10.jar",
+      "sha256": "9e6142d64aa1d77597f9a6dde664688832b0a8a2ee4346a256fa693295b6365c"
+    },
+    {
+      "path": "com/thoughtworks/qdox/qdox/2.0.3/qdox-2.0.3.jar",
+      "sha256": "ff70c10165714fe9546c418a65d74ecd5d57623ba408cecde9428f0a609b5d1c"
+    },
+    {
+      "path": "commons-codec/commons-codec/1.15/commons-codec-1.15.jar",
+      "sha256": "b3e9f6d63a790109bf0d056611fbed1cf69055826defeb9894a71369d246ed63"
+    },
+    {
+      "path": "commons-codec/commons-codec/1.19.0/commons-codec-1.19.0.jar",
+      "sha256": "5c3881e4f556855e9c532927ee0c9dfde94cc66760d5805c031a59887070af5f"
+    },
+    {
+      "path": "commons-io/commons-io/2.11.0/commons-io-2.11.0.jar",
+      "sha256": "961b2f6d87dbacc5d54abf45ab7a6e2495f89b75598962d8c723cea9bc210908"
+    },
+    {
+      "path": "commons-io/commons-io/2.22.0/commons-io-2.22.0.jar",
+      "sha256": "2b9a7b1f726fb86216dbd2c8321eabe0221dbd5b1be81c18e1cb53811b104758"
+    },
+    {
+      "path": "commons-io/commons-io/2.6/commons-io-2.6.jar",
+      "sha256": "f877d304660ac2a142f3865badfc971dec7ed73c747c7f8d5d2f5139ca736513"
+    },
+    {
+      "path": "jakarta/activation/jakarta.activation-api/1.2.1/jakarta.activation-api-1.2.1.jar",
+      "sha256": "8b0a0f52fa8b05c5431921a063ed866efaa41dadf2e3a7ee3e1961f2b0d9645b"
+    },
+    {
+      "path": "jakarta/xml/bind/jakarta.xml.bind-api/2.3.2/jakarta.xml.bind-api-2.3.2.jar",
+      "sha256": "69156304079bdeed9fc0ae3b39389f19b3cc4ba4443bc80508995394ead742ea"
+    },
+    {
+      "path": "javax/inject/javax.inject/1/javax.inject-1.jar",
+      "sha256": "91c77044a50c481636c32d916fd89c9118a72195390452c81065080f957de7ff"
+    },
+    {
+      "path": "junit/junit/4.13.2/junit-4.13.2.jar",
+      "sha256": "8e495b634469d64fb8acfa3495a065cbacc8a0fff55ce1e31007be4c16dc57d3"
+    },
+    {
+      "path": "log4j/log4j/1.1.3/log4j-1.1.3.jar",
+      "sha256": "635d4be0003f9b24f560a7835db59fef04d1102bac75824c5f1c6ae48aa626a9"
+    },
+    {
+      "path": "net/openhft/zero-allocation-hashing/0.27ea1/zero-allocation-hashing-0.27ea1.jar",
+      "sha256": "67fbdbbec169e4621befcd9d82fe07a99c47c9090b2c10a807a63a96c0658790"
+    },
+    {
+      "path": "org/abego/treelayout/org.abego.treelayout.core/1.0.1/org.abego.treelayout.core-1.0.1.jar",
+      "sha256": "82b9e3631acc708c115216fa78f97780d8a81dbb7f15f8d82291a1dc3a83b1d0"
+    },
+    {
+      "path": "org/antlr/antlr4-runtime/4.5/antlr4-runtime-4.5.jar",
+      "sha256": "b5c40d55abe6ea4c5614f8f11e8372d98434ed3c1128d58b8eea1db9559737ab"
+    },
+    {
+      "path": "org/apache-extras/beanshell/bsh/2.0b6/bsh-2.0b6.jar",
+      "sha256": "a17955976070c0573235ee662f2794a78082758b61accffce8d3f8aedcd91047"
+    },
+    {
+      "path": "org/apache/ant/ant-launcher/1.10.12/ant-launcher-1.10.12.jar",
+      "sha256": "42a7ca7e7bb777fe7ee75a5ed4cc529c766bc43486367fdaad0ab4a32ee9c249"
+    },
+    {
+      "path": "org/apache/ant/ant-launcher/1.10.5/ant-launcher-1.10.5.jar",
+      "sha256": "0387dc76d0ac68ba08a8eac53bc175cb505cd5625cc1b6c49727dfe20def455b"
+    },
+    {
+      "path": "org/apache/ant/ant/1.10.12/ant-1.10.12.jar",
+      "sha256": "5c6a438c3ebe7a306eba452b09fa307b0e60314926177920bca896c4a504eaf6"
+    },
+    {
+      "path": "org/apache/ant/ant/1.10.5/ant-1.10.5.jar",
+      "sha256": "a31f74f3d00929ed0028f0d5c58c9a549c5885ef7d90db06f5ba1737e9c4520b"
+    },
+    {
+      "path": "org/apache/commons/commons-compress/1.28.0/commons-compress-1.28.0.jar",
+      "sha256": "e1522945218456f3649a39bc4afd70ce4bd466221519dba7d378f2141a4642ca"
+    },
+    {
+      "path": "org/apache/commons/commons-lang3/3.12.0/commons-lang3-3.12.0.jar",
+      "sha256": "d919d904486c037f8d193412da0c92e22a9fa24230b9d67a57855c5c31c7e94e"
+    },
+    {
+      "path": "org/apache/commons/commons-lang3/3.20.0/commons-lang3-3.20.0.jar",
+      "sha256": "69e5c9fa35da7a51a5fd2099dfe56a2d8d32cf233e2f6d770e796146440263f4"
+    },
+    {
+      "path": "org/apache/httpcomponents/httpclient/4.5.14/httpclient-4.5.14.jar",
+      "sha256": "c8bc7e1c51a6d4ce72f40d2ebbabf1c4b68bfe76e732104b04381b493478e9d6"
+    },
+    {
+      "path": "org/apache/httpcomponents/httpcore/4.4.16/httpcore-4.4.16.jar",
+      "sha256": "6c9b3dd142a09dc468e23ad39aad6f75a0f2b85125104469f026e52a474e464f"
+    },
+    {
+      "path": "org/apache/jackrabbit/jackrabbit-webdav/2.14.4/jackrabbit-webdav-2.14.4.jar",
+      "sha256": "1d876e7419e223dd90e921b3c122d0164b33c0e4f060b07aa761fcb0eb7bb5c8"
+    },
+    {
+      "path": "org/apache/logging/log4j/log4j-api/2.17.2/log4j-api-2.17.2.jar",
+      "sha256": "09351b5a03828f369cdcff76f4ed39e6a6fc20f24f046935d0b28ef5152f8ce4"
+    },
+    {
+      "path": "org/apache/logging/log4j/log4j-core/2.17.2/log4j-core-2.17.2.jar",
+      "sha256": "5adb34ff4197cd16a8d24f63035856a933cb59562a6888dde86e9450fcfef646"
+    },
+    {
+      "path": "org/apache/maven/enforcer/enforcer-api/3.2.1/enforcer-api-3.2.1.jar",
+      "sha256": "b51aadf28b5c23b3b2e0f12707c1a1a0b3c6f3595bafd5888146fe0424f5859c"
+    },
+    {
+      "path": "org/apache/maven/enforcer/enforcer-rules/3.2.1/enforcer-rules-3.2.1.jar",
+      "sha256": "e0cbee3d2a580778d084feea74964d67ccf27ea9f47f927adca1c5d18484d1d1"
+    },
+    {
+      "path": "org/apache/maven/extensions/maven-build-cache-extension/1.2.3/maven-build-cache-extension-1.2.3.jar",
+      "sha256": "f08534e6a024de1caf429e56b13c2cb8e3b0fd54d1c77cf65adb2e717bf5d5d6"
+    },
+    {
+      "path": "org/apache/maven/maven-aether-provider/3.0.5/maven-aether-provider-3.0.5.jar",
+      "sha256": "c74327cd5d7b137c8be3591c766271ac8ace1a617518f0410b8a95579f9839b0"
+    },
+    {
+      "path": "org/apache/maven/maven-artifact/3.0.5/maven-artifact-3.0.5.jar",
+      "sha256": "c6d5e244dd2329971f91b8df666ffe9e0b00a7dd014d6ee073b6f6cb82877f5c"
+    },
+    {
+      "path": "org/apache/maven/maven-core/3.0.5/maven-core-3.0.5.jar",
+      "sha256": "ac8e617f951ecde3c4f6bca4922fdd7861500fe7d58289f26ad5adac443075bc"
+    },
+    {
+      "path": "org/apache/maven/maven-model-builder/3.0.5/maven-model-builder-3.0.5.jar",
+      "sha256": "45a2c6ff76e12678eaf576bd7a68d028c5a5ba85fdc216a381ea86e9187e1b51"
+    },
+    {
+      "path": "org/apache/maven/maven-model/3.0.5/maven-model-3.0.5.jar",
+      "sha256": "876a76b663db6c7326ad234afe430c473d3261a06b3284f31d5eb4889d1c3084"
+    },
+    {
+      "path": "org/apache/maven/maven-plugin-api/3.0.5/maven-plugin-api-3.0.5.jar",
+      "sha256": "469505f75b8526a338cfd7e0ec841655ae52ddbcc1b36482e97d72f52ce7d890"
+    },
+    {
+      "path": "org/apache/maven/maven-repository-metadata/3.0.5/maven-repository-metadata-3.0.5.jar",
+      "sha256": "c867b4e075a4548bf27422542f96b159f94c4e7ffaaf6427b10433afd6a3a38c"
+    },
+    {
+      "path": "org/apache/maven/maven-settings-builder/3.0.5/maven-settings-builder-3.0.5.jar",
+      "sha256": "ac0e62e26b7f690e265ba75667531973b8a2da12b3b0ff102a612f05b42b6faf"
+    },
+    {
+      "path": "org/apache/maven/maven-settings/3.0.5/maven-settings-3.0.5.jar",
+      "sha256": "d8f9f237afc21d8202eedffa29cbf6e9d46c78b3c22b217d16267216988221b9"
+    },
+    {
+      "path": "org/apache/maven/plugin-tools/maven-plugin-annotations/3.5.1/maven-plugin-annotations-3.5.1.jar",
+      "sha256": "78601034e092750421dd6701102523bf63534bdadaee1d50f3cafe05b3889e46"
+    },
+    {
+      "path": "org/apache/maven/plugins/maven-antrun-plugin/3.1.0/maven-antrun-plugin-3.1.0.jar",
+      "sha256": "8ae8f570b8f4ea46fa7f3df27f22ce4c6b6c1f387a6eaeefae6c896aebae1455"
+    },
+    {
+      "path": "org/apache/maven/plugins/maven-clean-plugin/3.2.0/maven-clean-plugin-3.2.0.jar",
+      "sha256": "b657bef2e1eb11e029a70cd688bde6adad29e4e99dacb18516bf651ecca32435"
+    },
+    {
+      "path": "org/apache/maven/plugins/maven-compiler-plugin/3.11.0/maven-compiler-plugin-3.11.0.jar",
+      "sha256": "b806a9ddc7ed5cfd7623ecb044e6fa506831987ee0c3df7d1358fd7568c396f7"
+    },
+    {
+      "path": "org/apache/maven/plugins/maven-enforcer-plugin/3.2.1/maven-enforcer-plugin-3.2.1.jar",
+      "sha256": "2abe39a38b46da60a59753dae5c8ca74e457f6c5059bd6f4275ab978399b17c0"
+    },
+    {
+      "path": "org/apache/maven/plugins/maven-jar-plugin/3.3.0/maven-jar-plugin-3.3.0.jar",
+      "sha256": "17edc5d0289dc0a9b61bd5db15fdb5804b5fb73d7dbe458771e33fbc1d51fa94"
+    },
+    {
+      "path": "org/apache/maven/plugins/maven-javadoc-plugin/3.5.0/maven-javadoc-plugin-3.5.0.jar",
+      "sha256": "98046342ef3f9a9d1126bdd448176511dd19c0ef80fe945262bd7be8890a56fa"
+    },
+    {
+      "path": "org/apache/maven/plugins/maven-resources-plugin/3.3.0/maven-resources-plugin-3.3.0.jar",
+      "sha256": "9c7d0c7ffed082647a5fe0d0e4db9dede7dbb16dc7f34fc49c2f0ac07b9dba56"
+    },
+    {
+      "path": "org/apache/maven/plugins/maven-source-plugin/3.2.1/maven-source-plugin-3.2.1.jar",
+      "sha256": "436431c4aab177f95c08e6a78b4b38696d06cee6e33755641432ef78f464d4f4"
+    },
+    {
+      "path": "org/apache/maven/shared/maven-filtering/3.3.0/maven-filtering-3.3.0.jar",
+      "sha256": "4c24c4c39bef1daf283167414b158a7cb50145c9bfb858a00674b23c1f40e482"
+    },
+    {
+      "path": "org/apache/maven/shared/maven-shared-incremental/1.1/maven-shared-incremental-1.1.jar",
+      "sha256": "61988e54486a5dc38f06c70fdae5b108556c63bd433697b9f4305fcdb30fa40e"
+    },
+    {
+      "path": "org/apache/maven/shared/maven-shared-utils/3.3.4/maven-shared-utils-3.3.4.jar",
+      "sha256": "7925d9c5a0e2040d24b8fae3f612eb399cbffe5838b33ba368777dc7bddf6dda"
+    },
+    {
+      "path": "org/apache/maven/skins/maven-fluido-skin/1.6/maven-fluido-skin-1.6.jar",
+      "sha256": "5187cfcee18e92225cb0be348dd796c35115abbc072f779489a59f392f90f0e3"
+    },
+    {
+      "path": "org/apache/maven/wagon/wagon-http-shared/3.5.3/wagon-http-shared-3.5.3.jar",
+      "sha256": "8e7da766f55164fde8779aaaa125832506c2848cab4876b5305138873e28037f"
+    },
+    {
+      "path": "org/apache/maven/wagon/wagon-webdav-jackrabbit/3.5.3/wagon-webdav-jackrabbit-3.5.3.jar",
+      "sha256": "a7b739af5d2a759952eeee8290e33dc85a330a47e5d9a397e2f80276660d14fe"
+    },
+    {
+      "path": "org/aspectj/aspectjweaver/1.8.2/aspectjweaver-1.8.2.jar",
+      "sha256": "e1fae852f5ad42128213451155a6c0a28db7dc9b686700e5a43013ed370a2ebe"
+    },
+    {
+      "path": "org/codehaus/mojo/jaxb2-maven-plugin/2.5.0/jaxb2-maven-plugin-2.5.0.jar",
+      "sha256": "12e8c61e35af2a4df29202eb88bfb4982cca8ec173aa80a9e51b80b18343de4a"
+    },
+    {
+      "path": "org/codehaus/plexus/plexus-classworlds/2.4/plexus-classworlds-2.4.jar",
+      "sha256": "259d528a29722cab6349d7e7d432e3fd4877c087ffcb04985a6612e97023bba8"
+    },
+    {
+      "path": "org/codehaus/plexus/plexus-compiler-api/2.13.0/plexus-compiler-api-2.13.0.jar",
+      "sha256": "3acc24026612969cc83548f3f775ea2d3326cc0104a0aa3b8fa1e558ba4819d4"
+    },
+    {
+      "path": "org/codehaus/plexus/plexus-compiler-api/2.5/plexus-compiler-api-2.5.jar",
+      "sha256": "684cb4f2c373c58057d86079f44bdc2c415180a5362ec8daa64d2cafa482e5c8"
+    },
+    {
+      "path": "org/codehaus/plexus/plexus-compiler-javac/2.13.0/plexus-compiler-javac-2.13.0.jar",
+      "sha256": "f1f472a5c82a0632c0cde6ca2a10f765825cf47ab65816651e19e537f8e84bd4"
+    },
+    {
+      "path": "org/codehaus/plexus/plexus-compiler-manager/2.13.0/plexus-compiler-manager-2.13.0.jar",
+      "sha256": "4cd6f4bd5b84f3ff1d00e5f274eacfa4d0e812a508bb38e33bb826f12427d313"
+    },
+    {
+      "path": "org/codehaus/plexus/plexus-component-annotations/1.5.5/plexus-component-annotations-1.5.5.jar",
+      "sha256": "4df7a6a7be64b35bbccf60b5c115697f9ea3421d22674ae67135dde375fcca1f"
+    },
+    {
+      "path": "org/codehaus/plexus/plexus-interpolation/1.14/plexus-interpolation-1.14.jar",
+      "sha256": "7fc63378d3e84663619b9bedace9f9fe78b276c2be3c62ca2245449294c84176"
+    },
+    {
+      "path": "org/codehaus/plexus/plexus-interpolation/1.26/plexus-interpolation-1.26.jar",
+      "sha256": "b3b5412ce17889103ea564bcdfcf9fb3dfa540344ffeac6b538a73c9d7182662"
+    },
+    {
+      "path": "org/codehaus/plexus/plexus-java/1.1.2/plexus-java-1.1.2.jar",
+      "sha256": "83659e0d3fa0eda61dc4e8d78ea5a5fe05b7985f88b8557716c295409e64b7f5"
+    },
+    {
+      "path": "org/codehaus/plexus/plexus-utils/3.1.0/plexus-utils-3.1.0.jar",
+      "sha256": "0ffa0ad084ebff5712540a7b7ea0abda487c53d3a18f78c98d1a3675dab9bf61"
+    },
+    {
+      "path": "org/codehaus/plexus/plexus-utils/3.3.0/plexus-utils-3.3.0.jar",
+      "sha256": "76d174792540e2775af94d03d10fb2d3c776e2cd0ac0ebf427d3e570072bb9ce"
+    },
+    {
+      "path": "org/codehaus/plexus/plexus-utils/3.4.1/plexus-utils-3.4.1.jar",
+      "sha256": "52d85e04b3918722af11d12855b4a8257df96a0e76c8f4e3852e6faa851f357b"
+    },
+    {
+      "path": "org/codehaus/plexus/plexus-utils/3.5.0/plexus-utils-3.5.0.jar",
+      "sha256": "e5182eb3e5e73cf89d6426ca7f5cbae2e72819b9bed68d872f80f3b535269cb8"
+    },
+    {
+      "path": "org/codehaus/plexus/plexus-utils/4.0.3/plexus-utils-4.0.3.jar",
+      "sha256": "421ff6ed146c53a9d4eaade8f629b52b12af7187101f1bd06c2c64e904019f3c"
+    },
+    {
+      "path": "org/codehaus/plexus/plexus-xml/3.0.1/plexus-xml-3.0.1.jar",
+      "sha256": "c1a510a87a62bd2d74ac1472dd31c3f9e9b0b8b8568f37d77c0f135415bebd05"
+    },
+    {
+      "path": "org/eclipse/aether/aether-util/1.0.0.v20140518/aether-util-1.0.0.v20140518.jar",
+      "sha256": "aff0951639837c4e3a4699a421fa79f410032f603f5c6a5bba435e98531f3984"
+    },
+    {
+      "path": "org/glassfish/jaxb/codemodel/2.3.2/codemodel-2.3.2.jar",
+      "sha256": "8a89a76dffb491a3b2bcfcb6e8d9fb2e30ec0c36629a033f90c93182799af773"
+    },
+    {
+      "path": "org/glassfish/jaxb/jaxb-jxc/2.3.2/jaxb-jxc-2.3.2.jar",
+      "sha256": "4a8d27fb389d1ad5281d55be256b5bc8017f21122588af5cf0c78646370e0654"
+    },
+    {
+      "path": "org/glassfish/jaxb/jaxb-runtime/2.3.2/jaxb-runtime-2.3.2.jar",
+      "sha256": "e6e0a1e89fb6ff786279e6a0082d5cef52dc2ebe67053d041800737652b4fd1b"
+    },
+    {
+      "path": "org/glassfish/jaxb/jaxb-xjc/2.3.2/jaxb-xjc-2.3.2.jar",
+      "sha256": "b68ad7eeb5c0b514114897c37ff7efb8885419d03fd6e8e5fae2d4ce76f51d89"
+    },
+    {
+      "path": "org/glassfish/jaxb/txw2/2.3.2/txw2-2.3.2.jar",
+      "sha256": "4a6a9f483388d461b81aa9a28c685b8b74c0597993bf1884b04eddbca95f48fe"
+    },
+    {
+      "path": "org/glassfish/jaxb/xsom/2.3.2/xsom-2.3.2.jar",
+      "sha256": "598196320e56138f78895c9bbc3055983d25b76814f072dfcb836f8cc4437c73"
+    },
+    {
+      "path": "org/hamcrest/hamcrest-core/1.3/hamcrest-core-1.3.jar",
+      "sha256": "66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9"
+    },
+    {
+      "path": "org/jvnet/staxex/stax-ex/1.8.1/stax-ex-1.8.1.jar",
+      "sha256": "20522549056e9e50aa35ef0b445a2e47a53d06be0b0a9467d704e2483ffb049a"
+    },
+    {
+      "path": "org/ow2/asm/asm/9.4/asm-9.4.jar",
+      "sha256": "39d0e2b3dc45af65a09b097945750a94a126e052e124f93468443a1d0e15f381"
+    },
+    {
+      "path": "org/slf4j/jcl-over-slf4j/1.7.36/jcl-over-slf4j-1.7.36.jar",
+      "sha256": "ab57ca8fd223772c17365d121f59e94ecbf0ae59d08c03a3cb5b81071c019195"
+    },
+    {
+      "path": "org/slf4j/slf4j-api/1.7.36/slf4j-api-1.7.36.jar",
+      "sha256": "d3ef575e3e4979678dc01bf1dcce51021493b4d11fb7f1be8ad982877c16a1c0"
+    },
+    {
+      "path": "org/sonatype/aether/aether-api/1.13.1/aether-api-1.13.1.jar",
+      "sha256": "ae8dc80232771f8913febfa410c5719e9ba8ded81fb99788e214fd676dbbe13f"
+    },
+    {
+      "path": "org/sonatype/aether/aether-impl/1.13.1/aether-impl-1.13.1.jar",
+      "sha256": "865511994805827e88f327944a089142bb7f3d88cde271ba3dceb732cb137a93"
+    },
+    {
+      "path": "org/sonatype/aether/aether-spi/1.13.1/aether-spi-1.13.1.jar",
+      "sha256": "d5de4e299be5a79feb1dbe8ff3814034c6e44314b4c00b92ffa8d97576ded5b3"
+    },
+    {
+      "path": "org/sonatype/aether/aether-util/1.13.1/aether-util-1.13.1.jar",
+      "sha256": "687799a0ce988bee9e8eb9ae0ba870300adc0114248ad4a4327bdb625d27e010"
+    },
+    {
+      "path": "org/sonatype/plexus/plexus-build-api/0.0.7/plexus-build-api-0.0.7.jar",
+      "sha256": "934171640fbd3d2495c50b79b0d9adb11e2c83e65bad157df8fe34bcac0ff798"
+    },
+    {
+      "path": "org/sonatype/plexus/plexus-cipher/1.4/plexus-cipher-1.4.jar",
+      "sha256": "5a15fdba22669e0fdd06e10dcce6320879e1f7398fbc910cd0677b50672a78c4"
+    },
+    {
+      "path": "org/sonatype/plexus/plexus-sec-dispatcher/1.3/plexus-sec-dispatcher-1.3.jar",
+      "sha256": "3b0559bb8432f28937efe6ca193ef54a8506d0075d73fd7406b9b116c6a11063"
+    },
+    {
+      "path": "org/sonatype/sisu/sisu-guava/0.9.9/sisu-guava-0.9.9.jar",
+      "sha256": "9897e80ff6c08fc45b5b5ebd81d9e943a1087bdf0ad50cda457d616abbdaacd9"
+    },
+    {
+      "path": "org/sonatype/sisu/sisu-guice/3.1.0/sisu-guice-3.1.0-no_aop.jar",
+      "sha256": "4b76079f35407e5682aac1ecbe67afd5f430ae619044a9d6a413666a45750c25"
+    },
+    {
+      "path": "org/sonatype/sisu/sisu-inject-bean/2.3.0/sisu-inject-bean-2.3.0.jar",
+      "sha256": "75819b29737c2bee1bfbda1011d455c7036738e0ef32ffbf85ba1d8fa157ceb2"
+    },
+    {
+      "path": "org/sonatype/sisu/sisu-inject-plexus/2.3.0/sisu-inject-plexus-2.3.0.jar",
+      "sha256": "bf9083fb846993689409b2bdbc735048e53bac6cc32707cde7ef84817b6e9365"
+    }
+  ],
+  "normalization": [
+    "CRLF to LF"
+  ],
+  "commands": [
+    {
+      "executable": "C:\\Program Files\\Zulu\\zulu-8\\bin\\java.exe",
+      "arguments": [
+        "-version"
+      ],
+      "cwd": "C:\\qd-cxx",
+      "stdout": "C:\\qd-cxx\\.work\\description-negative/java-version.stdout",
+      "stderr": "C:\\qd-cxx\\.work\\description-negative/java-version.stderr"
+    },
+    {
+      "executable": "C:\\path\\to\\profile\\.m2\\wrapper\\dists\\apache-maven-3.9.16\\0daed3be3ebd1c706f0e69e8b07c6b73f5cc4ea3dfce72a8d0ec2e849ca2ddb0\\bin\\mvn.cmd",
+      "arguments": [
+        "-version"
+      ],
+      "cwd": "C:\\qd-cxx",
+      "stdout": "C:\\qd-cxx\\.work\\description-negative/maven-version.txt",
+      "stderr": "C:\\qd-cxx\\.work\\description-negative/maven-version.stderr"
+    },
+    {
+      "executable": "C:\\path\\to\\profile\\.m2\\wrapper\\dists\\apache-maven-3.9.16\\0daed3be3ebd1c706f0e69e8b07c6b73f5cc4ea3dfce72a8d0ec2e849ca2ddb0\\bin\\mvn.cmd",
+      "arguments": [
+        "-B",
+        "-f",
+        "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd/pom.xml",
+        "-pl",
+        "dxfeed-scheme",
+        "-am",
+        "-Dmaven.repo.local=C:\\qd-cxx\\tools\\upstream\\description-oracle/../schema-oracle/.work/m2",
+        "-Dmaven.build.cache.enabled=false",
+        "-Dmaven.test.skip=true",
+        "clean",
+        "compile"
+      ],
+      "cwd": "C:\\qd-cxx\\.work\\description-negative\\build-work",
+      "stdout": "C:\\qd-cxx\\.work\\description-negative/build.stdout",
+      "stderr": "C:\\qd-cxx\\.work\\description-negative/build.stderr"
+    },
+    {
+      "executable": "C:\\Program Files\\Zulu\\zulu-8\\bin\\javac.exe",
+      "arguments": [
+        "-encoding",
+        "UTF-8",
+        "-cp",
+        "C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\mars\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-promise\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-api\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib-qd-sandbox\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\auth\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-core\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto-ssl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-rmi\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-impl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-scheme\\target\\classes",
+        "-d",
+        "C:\\qd-cxx\\.work\\description-negative/harness",
+        "C:\\qd-cxx\\tools\\upstream\\description-oracle/DescriptionOracle.java",
+        "C:\\qd-cxx\\tools\\upstream\\description-oracle/../schema-oracle/SchemaOracle.java"
+      ],
+      "cwd": "C:\\qd-cxx",
+      "stdout": "C:\\qd-cxx\\.work\\description-negative/javac.stdout",
+      "stderr": "C:\\qd-cxx\\.work\\description-negative/javac.stderr"
+    },
+    {
+      "executable": "C:\\Program Files\\Zulu\\zulu-8\\bin\\java.exe",
+      "arguments": [
+        "-Dfile.encoding=UTF-8",
+        "-Duser.language=en",
+        "-Duser.country=US",
+        "-Duser.timezone=UTC",
+        "-cp",
+        "C:\\qd-cxx\\.work\\description-negative/harness;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\mars\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-promise\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-api\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib-qd-sandbox\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\auth\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-core\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto-ssl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-rmi\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-impl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-scheme\\target\\classes",
+        "qdcxx.oracle.SchemaOracle",
+        "environment"
+      ],
+      "cwd": "C:\\qd-cxx",
+      "stdout": "C:\\qd-cxx\\.work\\description-negative/environment.tsv",
+      "stderr": "C:\\qd-cxx\\.work\\description-negative/environment.stderr"
+    },
+    {
+      "executable": "C:\\Program Files\\Zulu\\zulu-8\\bin\\java.exe",
+      "arguments": [
+        "-Dfile.encoding=UTF-8",
+        "-Duser.language=en",
+        "-Duser.country=US",
+        "-Duser.timezone=UTC",
+        "-cp",
+        "C:\\qd-cxx\\.work\\description-negative/harness;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\mars\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-promise\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-api\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib-qd-sandbox\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\auth\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-core\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto-ssl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-rmi\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-impl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-scheme\\target\\classes",
+        "com.devexperts.qd.qtp.DescriptionOracle",
+        "C:\\qd-cxx\\tests\\fixtures\\protocol\\p08/inputs.tsv"
+      ],
+      "cwd": "C:\\qd-cxx",
+      "stdout": "C:\\qd-cxx\\.work\\description-negative/raw/descriptions.tsv",
+      "stderr": "C:\\qd-cxx\\.work\\description-negative/raw/descriptions.stderr"
+    }
+  ]
+}

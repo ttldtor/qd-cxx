@@ -10,7 +10,7 @@ target_include_directories(qd_encoding PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/inclu
 target_compile_features(qd_encoding PUBLIC cxx_std_23)
 set_target_properties(qd_encoding PROPERTIES CXX_EXTENSIONS OFF)
 
-add_library(qd_protocol src/protocol/frame_reader.cpp)
+add_library(qd_protocol src/protocol/frame_reader.cpp src/protocol/describe_records.cpp)
 target_link_libraries(qd_protocol PUBLIC qd_encoding)
 set_target_properties(qd_protocol PROPERTIES CXX_EXTENSIONS OFF)
 
@@ -38,4 +38,10 @@ if(BUILD_TESTING)
     set(QD_FRAME_PROJECTIONS "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/protocol/frames.tsv"
         CACHE FILEPATH "Reviewed frame-only expectations derived from Java inputs")
     add_test(NAME protocol_java_frames COMMAND frame_tests "${QD_PROTOCOL_FIXTURES}" "${QD_FRAME_PROJECTIONS}")
+    add_executable(description_tests tests/conformance/description_tests.cpp)
+    target_link_libraries(description_tests PRIVATE qd_protocol doctest::doctest)
+    set_target_properties(description_tests PROPERTIES CXX_EXTENSIONS OFF)
+    set(QD_DESCRIPTION_FIXTURES "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/protocol/p08/expected/descriptions.tsv"
+        CACHE FILEPATH "Java description observations (temporary override for negative checks)")
+    add_test(NAME protocol_java_descriptions COMMAND description_tests "${QD_DESCRIPTION_FIXTURES}")
 endif()
