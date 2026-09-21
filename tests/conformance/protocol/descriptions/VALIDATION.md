@@ -10,7 +10,7 @@ ASan+UBSan all pass three CTest targets: compact_java_vectors, protocol_java_fra
 protocol_java_descriptions. The new target passes 3 cases / 50,841 assertions / 81 Java observations.
 Compact/UTFString regressions retain 832+314 observations; framing retains its previous selected coverage.
 Initial sandbox access to Windows SDK and WSL was denied; authorized elevated runs passed. No compiler
-or semantic failure remains. BUILD_TESTING=OFF configures/builds both production libraries in a fresh
+or semantic failure was detected in the executed checks. BUILD_TESTING=OFF configures/builds both production libraries in a fresh
 WSL directory without creating _deps; FetchContent is not reached and no doctest acquisition occurs.
 No new production dependency was added.
 
@@ -33,3 +33,18 @@ Executed sanitizers are GCC ASan+UBSan only. Windows sanitizer configurations, a
 injection, huge allocations, 32-bit/macOS, other Java buffer/profile combinations, local binding,
 events and transport were not run or implemented. The API is provisional and full QTP compatibility
 is not claimed. Historical evidence remains unchanged; new results are additive.
+
+## Follow-up review, 2026-09-21
+
+Review covered compact, UTFString, framing and raw descriptions, tests and the Java description harness.
+MSVC Debug/Release rebuilds and all three CTest targets were rerun successfully. The encoding evidence
+audit, P08 audit and eight description negative checks passed, followed by the unchanged baseline.
+P08 audit verified 534 historical files. Its report write was suppressed to preserve the existing audit.json.
+These review runs are recorded in the review session; they do not replace the committed UTC logs above.
+ClangCL, GCC/WSL, sanitizers and Java captures were not rerun in this review. No blocking defect was found;
+this is not proof of absence of defects.
+
+Raw intermediate results/positions come from a source-checked diagnostic walk using Java primitives,
+not raw callbacks of the production parser. Agreement with that walk alone is not an independent
+end-to-end proof. QDCXX-014 requires binding evidence through observable
+production-parser results; diagnostic and internal inspection evidence must remain separately labeled.

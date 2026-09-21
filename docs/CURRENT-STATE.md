@@ -1,5 +1,12 @@
 # Current state
 
+## Next assigned scope
+
+QDCXX-014 is ready, not started: bounded static incoming binding for exact
+COMPACT_INT fields. Local schema input is independent of external/bundled XML or future JSON loading.
+Production-parser observable evidence is required beyond the diagnostic walk. QDCXX-013 follow-up
+review found no blocking defects in its checked scope; see its [validation](../tests/conformance/protocol/descriptions/VALIDATION.md).
+
 [Русская версия](CURRENT-STATE.ru.md). This English document is authoritative.
 
 ## Completed: DESCRIBE_RECORDS
