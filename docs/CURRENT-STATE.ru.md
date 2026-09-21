@@ -31,17 +31,21 @@ production-only сборку, 15 отрицательных случаев и ba
 MSVC Release, пять suites, исходную unknown-row репродукцию, negatives и evidence audit;
 остальные финальные профили доработки остаются результатами автора.
 
-### QDCXX-017 готова к независимому ревью
+### QDCXX-017 закрыта; QDCXX-018 готова к независимому ревью
 
-QDCXX-017 реализована и проверена автором без коммита. Необязательный ограниченный офлайн
-`qd-qtp-inspect` использует явный профиль oracle-sre-v1, начальные описания, один неизменяемый
-контекст, type-8/zero-flags данные, точный UTF-16 TSV и конечные бюджеты файла/сообщений.
-Владелец принял счётчики списанных записей/полей в API-GATE. Два clean Java captures composer/parser
-и negative/baseline Verify предшествовали реализации CLI. Все семь тестовых профилей
-MSVC/ClangCL/GCC/sanitizer прошли восемь suites; production сборки с инструментом ON/OFF,
-форматирование и negative проверки прошли.
-[Авторские доказательства и ограничения](../tests/conformance/protocol/offline-inspection/VALIDATION.ru.md), [usage](QTP-INSPECT.ru.md). Независимое ревью ожидается.
-Importer, transport, dynamic sessions и расширенные wire-типы остаются исключены.
+QDCXX-017 завершена и закоммичена как `a0944f0ac361202b298d2b2acf1edc6adb0e1f5a`.
+Её прежнее независимое ревью повторило MSVC Release и GCC ASan+UBSan (восемь suites), 17 мутаций
+и baseline, проверки хешей/diff. В этих проверках ошибок не обнаружено. Остальные профили и Java
+captures остаются проверками автора; [исторические доказательства автора](../tests/conformance/protocol/offline-inspection/VALIDATION.ru.md)
+сохранены. Принятый API-GATE добавил только счётчики списанных записей/полей.
+
+QDCXX-018 добавляет opt-in `--output-format human`, безопасный UTF-8 в кавычках без потерь, явные
+локальные метки, ограниченный учёт байтов и отдельное форматирование только в утилите. Default/explicit
+TSV, stderr, wire-профиль и библиотеки декодирования неизменны. [Авторская валидация](../tests/conformance/protocol/human-inspection/VALIDATION.ru.md)
+фиксирует семь профилей по десять suites, production tool ON/OFF, форматирование, 9 human и 17 прежних
+мутаций/baseline, исторические хеши и двуязычные проверки. Независимое ревью QDCXX-018 ожидается;
+новый коммит не создан. Это инспекция raw QTP, не QD tape и не общая поддержка dxFeed.
+Importer, сжатие/time-файлы, transport, динамические сессии и расширенные wire-типы исключены.
 
 ## Исторические записи о завершении
 

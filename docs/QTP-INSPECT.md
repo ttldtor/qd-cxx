@@ -80,3 +80,32 @@ Stderr marks output incomplete and supplies available frame/payload positions. E
 records may remain after failure. A failed physical write/flush can leave partial bytes, even a
 completion marker; always check exit status. This differs from Java malformed-message callback
 batching. See the contract for strict row arities and field meanings.
+
+## Readable output
+
+Add `--output-format human` to any invocation; omit it or use `--output-format tsv` for the
+unchanged version 1 TSV. Unknown, repeated or missing format operands are usage errors.
+There is no automatic TTY selection.
+
+```powershell
+.work/inspect/Release/qd-qtp-inspect.exe --profile oracle-sre-v1 --input tests/fixtures/protocol/offline-inspection/expected/composed.qtp --output-format human
+```
+
+Human version 1 shows a format/profile header, frame names/numeric IDs and actual byte boundaries,
+local record names/IDs, quoted symbols, local-order labeled values and a final summary. Labels are
+explicit `S.v`, `R.y`, `R.x`, `R.z`; independent tool callers without display metadata get
+`field[index]`. Lookup aliases are not canonical display names. Displayed identities are local,
+not reconstructed sender identities. Empty symbols (`""`) differ from zero fields (`fields={}`).
+
+Both modes are deterministic, BOM-free and LF-terminated. Human uses UTF-8, combines valid surrogate
+pairs, escapes lone surrogates losslessly and escapes quotes/backslashes, controls, line separators
+and bidi controls. The exact table and grammar are in the [contract](../spec/protocol/OFFLINE-INSPECTION.md).
+No Unicode normalization or silent replacement. `--max-output` counts actual encoded bytes including
+header/escaping/summary; format-specific costs differ. Rows are counted before allocating their
+expanded representation, so insufficient budgets never intentionally publish partial rows.
+Stderr and exit codes are unchanged; completed prefixes may remain on failure, and even a delivered
+summary does not supersede a failed write/final flush exit.
+
+This reads raw QTP, not QD tape: no tape containers, compression, time files, protocol descriptors,
+broader fields, importer, transport or dynamic sessions. [Human coverage and author validation](../tests/conformance/protocol/human-inspection/VALIDATION.md)
+reuse historical Java evidence; the presentation itself is a designed C++ policy.

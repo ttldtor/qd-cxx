@@ -1,0 +1,18 @@
+{
+  "ascii.qtp": "9f0739e33fc09302831933ad1e2eed896493ec0a49f8aec896fb6efb250dda47",
+  "c0.qtp": "e12418965b4330f9e532432a480a647595e52f1753812ed88296a195d3612c05",
+  "cyrillic.qtp": "1899637bf93cfaf3d80bce79b938952a66099f6d86ecb4736aa4b1f68f7f95c4",
+  "del-c1.qtp": "c5d564037c6eada9b89d77d7e75e4dbac547a0b79d0c453ab3b10f11725ded8f",
+  "designed.json": "3ae889d52e87c2a693f9ec4993aff61f81899cfbecffadd212f31dab1d50a04e",
+  "empty.qtp": "760bb4a12b9b71241bfd13f93dd99e962fa40cd0f58d8e7ba08b88190d9a30b1",
+  "injection.qtp": "a1d8f13aed277466a184915850f2f9d788238303916614e2aad7d5cf6c9839a9",
+  "line-bidi.qtp": "294efb2de747dec4c75fd44f71e06ab10a7538fdaf4f494d442f6b0fc5622243",
+  "lone-high.qtp": "9a7c85d48226360ea58dbf995af80473b3d8093e186b8f45ab57f24e1ca7d1b5",
+  "lone-low.qtp": "e5f0e9b24b2f11f1eb7daf1208664f686c0a0bbb8251249b39f44cc9b4270d67",
+  "lookalikes.qtp": "9ecbf8b309c3dd9af184d9992df66f18b3f3c80653b81ff74ea81c34ae34396f",
+  "no-normalization.qtp": "50a9fd8045ee6f0f9ce676a19d651bae1ec46d56ea196db69ccf5acc8cd66534",
+  "quotes.qtp": "efd1c148c6c80573af2e3ea053b9372aa940c45fc1d5dd5af52f72c6425ee272",
+  "supplementary.qtp": "3cecdbd709e23dcb73244db1e72587ee55c39b12f8581a0b0f1be52fc530cfe9",
+  "surrogate-order.qtp": "801993defc9e25378b3cd0b289143d2e13d1720ffe478c6a719bf2b7eabaf039",
+  "utf8-boundaries.qtp": "91c64b99b78c1c8c95d84fadd61b89eef0e4ddfa389dc7a40bdb256652b97605"
+}

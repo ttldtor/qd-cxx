@@ -115,3 +115,57 @@ production composer/parser workflow with raw .qtp bytes and observable records b
 Require two clean captures and negative/baseline Verify. Designed CLI fixtures define sequencing,
 budgets, diagnostics and TSV; Java does not define those policies. Final author validation and
 independent review must remain distinguishable. No timing or full protocol compatibility claim.
+
+## Opt-in human presentation, version 1
+
+`--output-format tsv|human` selects presentation only; omitted means `tsv`. Duplicate options,
+unknown values and missing operands are usage errors. No TTY detection. The existing TSV bytes,
+stderr contract, decoding, order, charged counters and all non-output budgets are unchanged.
+Human output is a designed C++ tool policy, not a Java observation.
+
+UTF-8 without BOM, LF only, locale-independent decimal numbers. Exact line grammar (one space
+between items) is illustrated below; braces contain comma-space separated local-order fields:
+
+```text
+qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local
+Frame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7
+Frame 1: STREAM_DATA (15) bytes=[9,14) payload=11 size=3
+Record 0: frame=1 local=0 name="S" symbol="" fields={S.v=1}
+Complete: bytes=14 frames=2 records=1 charged-records=1 wire-fields=1
+```
+
+Heartbeat name is `EMPTY_HEARTBEAT`, ID/payload `-`, size 0. Other types use `UNSUPPORTED`
+with their numeric ID, followed by the unchanged error. No success summary after detected failure.
+Names and symbols are quoted, empty symbol is `""`, zero fields are `fields={}`. Record IDs and
+fields are local, never reconstructed sender identities. Built-in display metadata explicitly uses
+`S.v`, `R.y`, `R.x`, `R.z` in local order. Lookup aliases and incoming descriptions never select
+labels. Independently supplied schemas default to profile `local-schema` and `field[index]` labels.
+This metadata stays in the tool, with no core/JSON changes.
+
+Exact escaping table for quoted text (uppercase hexadecimal, four digits in `\uXXXX`):
+
+| Input UTF-16 | Output |
+| --- | --- |
+| U+0022 quote | `\"` |
+| U+005C backslash | `\\` |
+| U+0009 TAB, U+000A LF, U+000D CR | `\t`, `\n`, `\r` |
+| Other U+0000–001F, U+007F–009F | `\uXXXX` (including NUL and ESC) |
+| U+2028–2029, U+061C, U+200E–200F, U+202A–202E, U+2066–206F | `\uXXXX` |
+| Lone U+D800–DFFF surrogate | `\uXXXX` |
+| Valid high/low surrogate pair | Matching Unicode scalar encoded in UTF-8 |
+| All other units | Their scalar encoded in UTF-8 |
+
+No normalization/replacement. Escaping backslashes distinguishes literal escape lookalikes.
+No quoted input can introduce terminal escapes, physical lines or apparent diagnostic/completion rows.
+
+`max-output` charges actual encoded bytes for every line including header and summary. Human costs
+vary with UTF-8 and escaping (up to six bytes per UTF-16 unit plus quotes); TSV costs remain four
+bytes per unit, or one for empty. Each row is first counted using checked subtraction against remaining
+output bytes, then allocated and composed with that exact size. No expansion-sized temporary is
+created before this check; at most one bounded row is retained. Insufficient row budget fails at
+`write` before publishing any of that row. Logical sizes, not allocator capacity/RSS, are bounded.
+Completed-prefix, first-error precedence and pre-summary/final flush checks remain unchanged.
+A physically delivered summary never overrides a failing exit status.
+
+Raw QTP envelopes are not QD tape. No tape reader, compression, time-file processing,
+protocol-descriptor handling, broader fields, importer, transport or dynamic sessions are added.

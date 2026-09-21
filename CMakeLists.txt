@@ -24,7 +24,7 @@ set_target_properties(qd_protocol PROPERTIES CXX_EXTENSIONS OFF)
 
 option(QD_BUILD_QTP_INSPECT "Build the bounded offline QTP diagnostic CLI" OFF)
 if(QD_BUILD_QTP_INSPECT)
-    add_library(qd_inspect_tool STATIC tools/qtp-inspect/inspect.cpp)
+    add_library(qd_inspect_tool STATIC tools/qtp-inspect/inspect.cpp tools/qtp-inspect/formatter.cpp)
     target_link_libraries(qd_inspect_tool PUBLIC qd_protocol)
     target_include_directories(qd_inspect_tool PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/tools/qtp-inspect")
     set_target_properties(qd_inspect_tool PROPERTIES CXX_EXTENSIONS OFF)
@@ -91,5 +91,13 @@ if(BUILD_TESTING)
         target_link_libraries(offline_io_tests PRIVATE qd_inspect_tool doctest::doctest)
         set_target_properties(offline_io_tests PROPERTIES CXX_EXTENSIONS OFF)
         add_test(NAME offline_inspection_injected_io COMMAND offline_io_tests)
+        add_test(NAME human_inspection_cli COMMAND "${Python3_EXECUTABLE}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/check_human_inspection.py"
+            "$<TARGET_FILE:qd-qtp-inspect>"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/protocol/human-inspection")
+        add_executable(human_io_tests tests/conformance/human_io_tests.cpp)
+        target_link_libraries(human_io_tests PRIVATE qd_inspect_tool doctest::doctest)
+        set_target_properties(human_io_tests PROPERTIES CXX_EXTENSIONS OFF)
+        add_test(NAME human_inspection_injected_io COMMAND human_io_tests)
     endif()
 endif()

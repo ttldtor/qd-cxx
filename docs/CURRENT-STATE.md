@@ -30,16 +30,21 @@ committed baseline: `8bc9838efa3be8c157ec7d9a9b13e476baeff385`. Its follow-up re
 MSVC Release, five suites, the original unknown-row reproduction, negatives and evidence audit;
 other final follow-up profiles remain author-run results.
 
-### QDCXX-017 ready for independent review
+### QDCXX-017 closed; QDCXX-018 ready for independent review
 
-QDCXX-017 is implemented and author-validated, without a commit. The optional bounded offline
-`qd-qtp-inspect` uses the explicit oracle-sre-v1 profile, initial descriptions, one immutable
-context, type-8/zero-flags data, exact UTF-16 TSV and finite file/message budgets. The owner accepted
-the charged record/field counters in API-GATE. Two clean Java composer/parser captures and
-negative/baseline Verify preceded CLI implementation. All seven MSVC/ClangCL/GCC/sanitizer test
-profiles passed eight suites; production builds with tool ON/OFF, formatting and negative checks
-passed. [Author evidence and limitations](../tests/conformance/protocol/offline-inspection/VALIDATION.md), [usage](QTP-INSPECT.md). Independent review is pending.
-Importer, transport, dynamic sessions and broader wire types remain excluded.
+QDCXX-017 is done and committed as `a0944f0ac361202b298d2b2acf1edc6adb0e1f5a`.
+Its prior independent review reran MSVC Release and GCC ASan+UBSan (eight suites), 17 mutations
+and baseline, hash/diff checks. No errors were detected in those checks. Other profiles and Java
+captures remain author checks; [historical author evidence](../tests/conformance/protocol/offline-inspection/VALIDATION.md)
+is preserved. The accepted API-GATE only added charged record/field counters.
+
+QDCXX-018 adds opt-in `--output-format human`, safe lossless quoted UTF-8, explicit local labels,
+bounded encoded-byte accounting and separate tool-only formatting. Default/explicit TSV, stderr,
+wire profile and decoder libraries are unchanged. [Author validation](../tests/conformance/protocol/human-inspection/VALIDATION.md)
+records the seven-profile, ten-suite matrix, production tool ON/OFF, formatting, 9 human and 17 legacy
+mutations/baselines, historical hashes and bilingual checks. Independent QDCXX-018 review is pending;
+no new commit was created. This is raw QTP inspection, not QD tape or general dxFeed support.
+Importer, compression/time files, transport, dynamic sessions and broader wire types remain excluded.
 
 ## Historical completion records
 

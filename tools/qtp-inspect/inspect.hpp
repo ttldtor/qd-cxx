@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "formatter.hpp"
 #include "qd/core/local_schema.hpp"
 
 #include <iosfwd>
@@ -45,14 +46,17 @@ std::expected<core::LocalSchema, core::SchemaError> oracleSchema();
 
 /** Inspect a raw binary QTP stream with independently supplied immutable local schema.
  * @param input Binary input; no data is retained after this call.
- * @param output Binary ASCII/LF TSV destination, flushed on completion.
+ * @param output Binary UTF-8/LF destination, flushed on completion.
  * @param diagnostic Binary ASCII/LF error destination.
  * @param schema Borrowed validated local schema; never inferred from wire descriptions.
  * @param limits Finite file and message budgets.
+ * @param format Output representation, TSV by default.
+ * @param profile Explicit display metadata matching the supplied schema.
  * @return Contract exit code; catches allocation and stream failures, never reports failed output as success.
  */
 int inspect(std::istream &input, std::ostream &output, std::ostream &diagnostic, const core::LocalSchema &schema,
-            Limits limits);
+            Limits limits, OutputFormat format = OutputFormat::TSV,
+            DisplayProfile profile = DisplayProfile::LOCAL_SCHEMA);
 
 /** Emit a context-free diagnostic, swallowing errors of the diagnostic destination itself.
  * @param diagnostic Binary stderr destination.

@@ -90,10 +90,11 @@ int main(int argc, char **argv) {
 #endif
     try {
         if (argc == 2 && std::string_view(argv[1]) == "--help") {
-            std::cout << "qd-qtp-inspect --profile oracle-sre-v1 --input PATH [LIMIT VALUE ...]\n"
-                         "Raw offline QTP, type 2 before type 15, type 8 fields, zero flags.\n"
-                         "Numeric limits: ASCII decimal, finite; chunk-size must be positive.\n"
-                         "Defaults:\n";
+            std::cout
+                << "qd-qtp-inspect --profile oracle-sre-v1 --input PATH [--output-format tsv|human] [LIMIT VALUE ...]\n"
+                   "Raw offline QTP (not QD tape), type 2 before type 15, type 8 fields, zero flags.\n"
+                   "Numeric limits: ASCII decimal, finite; chunk-size must be positive.\n"
+                   "Defaults:\n";
             const qd::inspect::Limits defaults;
 
             for (const auto &option : OPTIONS) {
@@ -101,7 +102,8 @@ int main(int argc, char **argv) {
             }
 
             std::cout << "Exit: 0 success; 2 usage; 3 I/O; 4 unsupported; 5 malformed; 6 resource.\n"
-                         "Output: version 1 TSV, exact UTF-16 hex, LF. Check exit status for completeness.\n";
+                         "Output: default tsv (exact UTF-16 hex) or human (quoted safe UTF-8), LF, no BOM.\n"
+                         "Human IDs/fields are local. No tape/compression/time-file support. Check exit status.\n";
             std::cout.flush();
 
             if (!std::cout) {
@@ -114,6 +116,7 @@ int main(int argc, char **argv) {
         }
 
         qd::inspect::Limits limits;
+        auto format = qd::inspect::OutputFormat::TSV;
         std::string path;
         std::string profile;
         std::set<std::string_view> seen;
@@ -133,6 +136,9 @@ int main(int argc, char **argv) {
                 path = operand;
             } else if (key == "--profile") {
                 profile = operand;
+            } else if (key == "--output-format") {
+                valid = operand == "tsv" || operand == "human";
+                format = operand == "human" ? qd::inspect::OutputFormat::HUMAN : qd::inspect::OutputFormat::TSV;
             } else {
                 const auto option = std::find_if(std::begin(OPTIONS), std::end(OPTIONS), [&](const auto &candidate) {
                     return candidate.name == key;
@@ -163,7 +169,8 @@ int main(int argc, char **argv) {
             return 6;
         }
 
-        return qd::inspect::inspect(input, std::cout, std::cerr, *schema, limits);
+        return qd::inspect::inspect(input, std::cout, std::cerr, *schema, limits, format,
+                                    qd::inspect::DisplayProfile::ORACLE_SRE_V1);
     } catch (const std::bad_alloc &) {
         qd::inspect::report(std::cerr, 6, "allocation");
 

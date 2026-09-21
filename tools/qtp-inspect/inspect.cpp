@@ -93,23 +93,6 @@ void diagnose(std::ostream &out, const Failure &failure, const Position &positio
     }
 }
 
-/** Convert exact UTF-16 units without normalization or surrogate replacement.
- * @param units Borrowed name or symbol.
- * @return Lowercase hexadecimal or '-' for empty.
- */
-std::string hex(std::u16string_view units) {
-    constexpr std::string_view DIGITS = "0123456789abcdef"; ///< Hex alphabet for individual UTF-16 nibbles.
-    std::string result;
-
-    for (auto unit : units) {
-        for (int shift : {12, 8, 4, 0}) {
-            result.push_back(DIGITS[(unit >> shift) & 0xf]);
-        }
-    }
-
-    return result.empty() ? "-" : result;
-}
-
 /** Translate planner failures without changing wire validation.
  * @param error Existing binding category.
  * @return Unsupported=4, invalid=5, resource/allocation=6.
@@ -156,7 +139,8 @@ void report(std::ostream &diagnostic, int code, std::string_view stage) noexcept
 }
 
 int inspect(std::istream &input, std::ostream &output, std::ostream &diagnostic, const core::LocalSchema &schema,
-            Limits limits) {
+            Limits limits, OutputFormat format, DisplayProfile profile) {
+    const Formatter formatter(format, profile);
     Position position;
     std::string_view operation = "allocation";
     try {
@@ -183,7 +167,7 @@ int inspect(std::istream &input, std::ostream &output, std::ostream &diagnostic,
         bool described = false;
 
         /** Write one complete logical row after its output-budget check.
-         * @param row Owned complete ASCII row; throws on budget or physical output failure.
+         * @param row Owned complete encoded row; throws on budget or physical output failure.
          */
         const auto emit = [&](const std::string &row) {
             if (row.size() > remaining.output) {
@@ -236,9 +220,7 @@ int inspect(std::istream &input, std::ostream &output, std::ostream &diagnostic,
             }
 
             ++frameCount;
-            emit("frame\t" + cell(position.index) + "\t" + decimal(frame.startOffset) + "\t" +
-                 decimal(frame.endOffset) + "\t" + cell(frame.type) + "\t" + cell(position.payload) + "\t" +
-                 decimal(frame.payload.size()) + "\n");
+            emit(formatter.frame(frame, frameCount - 1, remaining.output));
 
             if (frame.kind == protocol::FrameKind::EMPTY_HEARTBEAT) {
                 return;
@@ -331,19 +313,8 @@ int inspect(std::istream &input, std::ostream &output, std::ostream &diagnostic,
             for (const auto &record : decoded.records) {
                 remaining.values -= record.values.size();
                 remaining.symbolUnits -= record.symbol.units.size();
-                std::string values;
-
-                for (const auto value : record.values) {
-                    if (!values.empty()) {
-                        values += ',';
-                    }
-
-                    values += decimal(value);
-                }
-
-                emit("record\t" + cell(position.index) + "\t" + decimal(emitted) + "\t" + decimal(record.localId) +
-                     "\t" + hex(schema.records()[static_cast<std::size_t>(record.localId)].name) + "\t" +
-                     hex(record.symbol.units) + "\t" + (values.empty() ? "-" : values) + "\n");
+                emit(formatter.record(record, schema.records()[static_cast<std::size_t>(record.localId)].name,
+                                      *position.index, emitted, remaining.output));
                 ++emitted;
             }
 
@@ -357,7 +328,7 @@ int inspect(std::istream &input, std::ostream &output, std::ostream &diagnostic,
                               decoded.errorOffset};
             }
         };
-        emit("format\tqd-qtp-inspect\t1\n");
+        emit(formatter.header(remaining.output));
         bool eof = false;
 
         while (!eof) {
@@ -419,12 +390,15 @@ int inspect(std::istream &input, std::ostream &output, std::ostream &diagnostic,
         }
 
         flush();
-        emit("complete\t" + decimal(reader.totalAccepted()) + "\t" + decimal(frameCount) + "\t" + decimal(emitted) +
-             "\t" + decimal(limits.records - remaining.records) + "\t" + decimal(limits.fields - remaining.fields) +
-             "\n");
+        emit(formatter.complete(reader.totalAccepted(), frameCount, emitted, limits.records - remaining.records,
+                                limits.fields - remaining.fields, remaining.output));
         flush();
 
         return 0;
+    } catch (const OutputLimit &) {
+        diagnose(diagnostic, {6, "write", {}, {}}, position);
+
+        return 6;
     } catch (const Failure &failure) {
         diagnose(diagnostic, failure, position);
 

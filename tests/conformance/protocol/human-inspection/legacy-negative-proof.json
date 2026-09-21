@@ -1,0 +1,20 @@
+{
+  "value": "rejected; temporary expectation unchanged",
+  "symbol": "rejected; temporary expectation unchanged",
+  "local-id": "rejected; temporary expectation unchanged",
+  "name": "rejected; temporary expectation unchanged",
+  "offset": "rejected; temporary expectation unchanged",
+  "row-type": "rejected; temporary expectation unchanged",
+  "row-arity": "rejected; temporary expectation unchanged",
+  "number-syntax": "rejected; temporary expectation unchanged",
+  "hex-syntax": "rejected; temporary expectation unchanged",
+  "complete-count": "rejected; temporary expectation unchanged",
+  "missing-complete": "rejected; temporary expectation unchanged",
+  "double-complete": "rejected; temporary expectation unchanged",
+  "trailing-row": "rejected; temporary expectation unchanged",
+  "empty-selection": "rejected; temporary expectation unchanged",
+  "java-value": "rejected; temporary observation unchanged",
+  "java-unknown": "rejected; temporary observation unchanged",
+  "java-completion": "rejected; temporary observation unchanged",
+  "baseline": "passed; original fixtures unchanged"
+}

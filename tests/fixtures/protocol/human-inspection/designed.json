@@ -1,0 +1,816 @@
+{
+  "format": "qdcxx-human-designed-v1",
+  "provenance": "Designed presentation policy; historical TSV projections and explicit Unicode stimuli, not Java human output.",
+  "cases": [
+    {
+      "name": "legacy-empty",
+      "input": "../offline-inspection/designed/empty.qtp",
+      "args": [
+        "--max-input",
+        "0",
+        "--max-frames",
+        "0",
+        "--max-records",
+        "0",
+        "--max-fields",
+        "0"
+      ],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nComplete: bytes=0 frames=0 records=0 charged-records=0 wire-fields=0\n"
+    },
+    {
+      "name": "legacy-descriptions-only",
+      "input": "../offline-inspection/designed/descriptions-only.qtp",
+      "args": [],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: DESCRIBE_RECORDS (2) bytes=[9,36) payload=11 size=25\nFrame 2: DESCRIBE_RECORDS (2) bytes=[36,43) payload=38 size=5\nFrame 3: DESCRIBE_RECORDS (2) bytes=[43,61) payload=45 size=16\nComplete: bytes=61 frames=4 records=0 charged-records=0 wire-fields=0\n"
+    },
+    {
+      "name": "legacy-heartbeat-only",
+      "input": "../offline-inspection/designed/heartbeat-only.qtp",
+      "args": [],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: EMPTY_HEARTBEAT (-) bytes=[0,1) payload=- size=0\nComplete: bytes=1 frames=1 records=0 charged-records=0 wire-fields=0\n"
+    },
+    {
+      "name": "legacy-empty-description-data",
+      "input": "../offline-inspection/designed/empty-description-data.qtp",
+      "args": [],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,2) payload=2 size=0\nFrame 1: STREAM_DATA (15) bytes=[2,4) payload=4 size=0\nComplete: bytes=4 frames=2 records=0 charged-records=0 wire-fields=0\n"
+    },
+    {
+      "name": "legacy-heartbeat-anywhere",
+      "input": "../offline-inspection/designed/heartbeat-anywhere.qtp",
+      "args": [],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: EMPTY_HEARTBEAT (-) bytes=[0,1) payload=- size=0\nFrame 1: DESCRIBE_RECORDS (2) bytes=[1,10) payload=3 size=7\nFrame 2: EMPTY_HEARTBEAT (-) bytes=[10,11) payload=- size=0\nFrame 3: STREAM_DATA (15) bytes=[11,16) payload=13 size=3\nRecord 0: frame=3 local=0 name=\"S\" symbol=\"\" fields={S.v=1}\nFrame 4: EMPTY_HEARTBEAT (-) bytes=[16,17) payload=- size=0\nComplete: bytes=17 frames=5 records=1 charged-records=1 wire-fields=1\n"
+    },
+    {
+      "name": "legacy-two-data",
+      "input": "../offline-inspection/designed/two-data.qtp",
+      "args": [],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,15) payload=11 size=4\nRecord 0: frame=1 local=0 name=\"S\" symbol=\"ABC\" fields={S.v=1}\nFrame 2: STREAM_DATA (15) bytes=[15,21) payload=17 size=4\nRecord 1: frame=2 local=0 name=\"S\" symbol=\"ABC\" fields={S.v=2}\nComplete: bytes=21 frames=3 records=2 charged-records=2 wire-fields=2\n"
+    },
+    {
+      "name": "legacy-duplicate-target-skip",
+      "input": "../offline-inspection/designed/duplicate-target-skip.qtp",
+      "args": [],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,27) payload=2 size=25\nFrame 1: DESCRIBE_RECORDS (2) bytes=[27,45) payload=29 size=16\nFrame 2: DESCRIBE_RECORDS (2) bytes=[45,52) payload=47 size=5\nFrame 3: STREAM_DATA (15) bytes=[52,69) payload=54 size=15\nRecord 0: frame=3 local=1 name=\"R\" symbol=\"ABC\" fields={R.y=3, R.x=5, R.z=0}\nRecord 1: frame=3 local=2 name=\"E\" symbol=\"ABC\" fields={}\nComplete: bytes=69 frames=4 records=2 charged-records=3 wire-fields=7\n"
+    },
+    {
+      "name": "legacy-missing-fields",
+      "input": "../offline-inspection/designed/missing-fields.qtp",
+      "args": [],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,6) payload=2 size=4\nFrame 1: STREAM_DATA (15) bytes=[6,10) payload=8 size=2\nRecord 0: frame=1 local=1 name=\"R\" symbol=\"\" fields={R.y=0, R.x=0, R.z=0}\nComplete: bytes=10 frames=2 records=1 charged-records=1 wire-fields=0\n"
+    },
+    {
+      "name": "legacy-unknown-empty",
+      "input": "../offline-inspection/designed/unknown-empty.qtp",
+      "args": [],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,12) payload=2 size=10\nFrame 1: STREAM_DATA (15) bytes=[12,18) payload=14 size=4\nComplete: bytes=18 frames=2 records=0 charged-records=2 wire-fields=0\n"
+    },
+    {
+      "name": "legacy-noncanonical",
+      "input": "../offline-inspection/designed/noncanonical.qtp",
+      "args": [],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,11) payload=4 size=7\nFrame 1: STREAM_DATA (15) bytes=[11,18) payload=15 size=3\nRecord 0: frame=1 local=0 name=\"S\" symbol=\"\" fields={S.v=1}\nComplete: bytes=18 frames=2 records=1 charged-records=1 wire-fields=1\n"
+    },
+    {
+      "name": "legacy-data-before-description",
+      "input": "../offline-inspection/designed/data-before-description.qtp",
+      "args": [],
+      "exit": 4,
+      "stderr": "incomplete\t4\tsequence\t0\t15\t0\t2\t-\t-\t-\t-\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: STREAM_DATA (15) bytes=[0,2) payload=2 size=0\n"
+    },
+    {
+      "name": "legacy-description-after-data",
+      "input": "../offline-inspection/designed/description-after-data.qtp",
+      "args": [],
+      "exit": 4,
+      "stderr": "incomplete\t4\tsequence\t2\t2\t11\t13\t-\t-\t-\t-\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,11) payload=11 size=0\nFrame 2: DESCRIBE_RECORDS (2) bytes=[11,20) payload=13 size=7\n"
+    },
+    {
+      "name": "legacy-empty-description-after-data",
+      "input": "../offline-inspection/designed/empty-description-after-data.qtp",
+      "args": [],
+      "exit": 4,
+      "stderr": "incomplete\t4\tsequence\t2\t2\t11\t13\t-\t-\t-\t-\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,11) payload=11 size=0\nFrame 2: DESCRIBE_RECORDS (2) bytes=[11,13) payload=13 size=0\n"
+    },
+    {
+      "name": "legacy-duplicate-across",
+      "input": "../offline-inspection/designed/duplicate-across.qtp",
+      "args": [],
+      "exit": 5,
+      "stderr": "incomplete\t5\tduplicate-id\t1\t2\t9\t11\t7\t7\t18\t18\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: DESCRIBE_RECORDS (2) bytes=[9,18) payload=11 size=7\n"
+    },
+    {
+      "name": "legacy-duplicate-within",
+      "input": "../offline-inspection/designed/duplicate-within.qtp",
+      "args": [],
+      "exit": 5,
+      "stderr": "incomplete\t5\tduplicate-id\t0\t2\t0\t2\t14\t14\t16\t16\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,16) payload=2 size=14\n"
+    },
+    {
+      "name": "legacy-explicit-zero",
+      "input": "../offline-inspection/designed/explicit-zero.qtp",
+      "args": [],
+      "exit": 4,
+      "stderr": "incomplete\t4\ttype\t0\t0\t0\t2\t-\t-\t-\t-\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: UNSUPPORTED (0) bytes=[0,2) payload=2 size=0\n"
+    },
+    {
+      "name": "legacy-unknown-type",
+      "input": "../offline-inspection/designed/unknown-type.qtp",
+      "args": [],
+      "exit": 4,
+      "stderr": "incomplete\t4\ttype\t0\t62\t0\t2\t-\t-\t-\t-\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: UNSUPPORTED (62) bytes=[0,2) payload=2 size=0\n"
+    },
+    {
+      "name": "legacy-part",
+      "input": "../offline-inspection/designed/part.qtp",
+      "args": [],
+      "exit": 4,
+      "stderr": "incomplete\t4\ttype\t0\t4\t0\t2\t-\t-\t-\t-\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: UNSUPPORTED (4) bytes=[0,2) payload=2 size=0\n"
+    },
+    {
+      "name": "legacy-ticker",
+      "input": "../offline-inspection/designed/ticker.qtp",
+      "args": [],
+      "exit": 4,
+      "stderr": "incomplete\t4\ttype\t0\t10\t0\t2\t-\t-\t-\t-\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: UNSUPPORTED (10) bytes=[0,2) payload=2 size=0\n"
+    },
+    {
+      "name": "legacy-unsupported-description",
+      "input": "../offline-inspection/designed/unsupported-description.qtp",
+      "args": [],
+      "exit": 4,
+      "stderr": "incomplete\t4\tbinding.1\t0\t2\t0\t2\t7\t7\t9\t9\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\n"
+    },
+    {
+      "name": "legacy-unsupported-unknown-description",
+      "input": "../offline-inspection/designed/unsupported-unknown-description.qtp",
+      "args": [],
+      "exit": 4,
+      "stderr": "incomplete\t4\tbinding.1\t0\t2\t0\t2\t13\t13\t15\t15\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,15) payload=2 size=13\n"
+    },
+    {
+      "name": "legacy-unsupported-flags",
+      "input": "../offline-inspection/designed/unsupported-flags.qtp",
+      "args": [],
+      "exit": 4,
+      "stderr": "incomplete\t4\tdata.3\t1\t15\t9\t11\t3\t3\t14\t14\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,16) payload=11 size=5\n"
+    },
+    {
+      "name": "legacy-payload-truncated",
+      "input": "../offline-inspection/designed/payload-truncated.qtp",
+      "args": [],
+      "exit": 5,
+      "stderr": "incomplete\t5\tdata.5\t1\t15\t9\t11\t3\t2\t14\t13\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,14) payload=11 size=3\n"
+    },
+    {
+      "name": "legacy-wide-payload-truncated",
+      "input": "../offline-inspection/designed/wide-payload-truncated.qtp",
+      "args": [],
+      "exit": 5,
+      "stderr": "incomplete\t5\tdata.5\t1\t15\t11\t15\t3\t2\t18\t17\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,11) payload=4 size=7\nFrame 1: STREAM_DATA (15) bytes=[11,18) payload=15 size=3\n"
+    },
+    {
+      "name": "legacy-reset-repeat",
+      "input": "../offline-inspection/designed/reset-repeat.qtp",
+      "args": [],
+      "exit": 5,
+      "stderr": "incomplete\t5\tdata.2\t2\t15\t14\t16\t1\t0\t17\t16\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,14) payload=11 size=3\nRecord 0: frame=1 local=0 name=\"S\" symbol=\"\" fields={S.v=1}\nFrame 2: STREAM_DATA (15) bytes=[14,19) payload=16 size=3\n"
+    },
+    {
+      "name": "legacy-undescribed",
+      "input": "../offline-inspection/designed/undescribed.qtp",
+      "args": [],
+      "exit": 5,
+      "stderr": "incomplete\t5\tdata.4\t1\t15\t9\t11\t2\t2\t13\t13\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,13) payload=11 size=2\n"
+    },
+    {
+      "name": "legacy-bad-description",
+      "input": "../offline-inspection/designed/bad-description.qtp",
+      "args": [],
+      "exit": 5,
+      "stderr": "incomplete\t5\tdescription.3\t0\t2\t0\t2\t1\t1\t3\t3\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,3) payload=2 size=1\n"
+    },
+    {
+      "name": "legacy-completed-prefix",
+      "input": "../offline-inspection/designed/completed-prefix.qtp",
+      "args": [],
+      "exit": 5,
+      "stderr": "incomplete\t5\tdata.5\t1\t15\t9\t11\t6\t5\t17\t16\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,17) payload=11 size=6\nRecord 0: frame=1 local=0 name=\"S\" symbol=\"\" fields={S.v=1}\n"
+    },
+    {
+      "name": "legacy-stop-before-later",
+      "input": "../offline-inspection/designed/stop-before-later.qtp",
+      "args": [],
+      "exit": 5,
+      "stderr": "incomplete\t5\tdata.5\t1\t15\t9\t11\t6\t5\t17\t16\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,17) payload=11 size=6\nRecord 0: frame=1 local=0 name=\"S\" symbol=\"\" fields={S.v=1}\n"
+    },
+    {
+      "name": "legacy-truncated-frame",
+      "input": "../offline-inspection/designed/truncated-frame.qtp",
+      "args": [],
+      "exit": 5,
+      "stderr": "incomplete\t5\tframing.5\t0\t-\t0\t-\t-\t-\t3\t-\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\n"
+    },
+    {
+      "name": "legacy-truncated-prefix",
+      "input": "../offline-inspection/designed/truncated-prefix.qtp",
+      "args": [],
+      "exit": 5,
+      "stderr": "incomplete\t5\tframing.5\t0\t-\t0\t-\t-\t-\t1\t-\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\n"
+    },
+    {
+      "name": "legacy-excess-max-records",
+      "input": "../offline-inspection/designed/excess-max-records.qtp",
+      "args": [
+        "--max-records",
+        "1"
+      ],
+      "exit": 6,
+      "stderr": "incomplete\t6\tdata.1\t2\t15\t15\t17\t0\t0\t17\t17\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,15) payload=11 size=4\nRecord 0: frame=1 local=0 name=\"S\" symbol=\"ABC\" fields={S.v=1}\nFrame 2: STREAM_DATA (15) bytes=[15,21) payload=17 size=4\n"
+    },
+    {
+      "name": "legacy-excess-max-fields",
+      "input": "../offline-inspection/designed/excess-max-fields.qtp",
+      "args": [
+        "--max-fields",
+        "1"
+      ],
+      "exit": 6,
+      "stderr": "incomplete\t6\tdata.5\t2\t15\t15\t17\t3\t3\t20\t20\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,15) payload=11 size=4\nRecord 0: frame=1 local=0 name=\"S\" symbol=\"ABC\" fields={S.v=1}\nFrame 2: STREAM_DATA (15) bytes=[15,21) payload=17 size=4\n"
+    },
+    {
+      "name": "legacy-excess-max-values",
+      "input": "../offline-inspection/designed/excess-max-values.qtp",
+      "args": [
+        "--max-values",
+        "1"
+      ],
+      "exit": 6,
+      "stderr": "incomplete\t6\tdata.6\t2\t15\t15\t17\t3\t3\t20\t20\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,15) payload=11 size=4\nRecord 0: frame=1 local=0 name=\"S\" symbol=\"ABC\" fields={S.v=1}\nFrame 2: STREAM_DATA (15) bytes=[15,21) payload=17 size=4\n"
+    },
+    {
+      "name": "legacy-excess-max-symbol-units",
+      "input": "../offline-inspection/designed/excess-max-symbol-units.qtp",
+      "args": [
+        "--max-symbol-units",
+        "3"
+      ],
+      "exit": 6,
+      "stderr": "incomplete\t6\tdata.6\t2\t15\t15\t17\t3\t3\t20\t20\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,15) payload=11 size=4\nRecord 0: frame=1 local=0 name=\"S\" symbol=\"ABC\" fields={S.v=1}\nFrame 2: STREAM_DATA (15) bytes=[15,21) payload=17 size=4\n"
+    },
+    {
+      "name": "legacy-exact-max-records",
+      "input": "../offline-inspection/designed/exact-max-records.qtp",
+      "args": [
+        "--max-records",
+        "2"
+      ],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,15) payload=11 size=4\nRecord 0: frame=1 local=0 name=\"S\" symbol=\"ABC\" fields={S.v=1}\nFrame 2: STREAM_DATA (15) bytes=[15,21) payload=17 size=4\nRecord 1: frame=2 local=0 name=\"S\" symbol=\"ABC\" fields={S.v=2}\nComplete: bytes=21 frames=3 records=2 charged-records=2 wire-fields=2\n"
+    },
+    {
+      "name": "legacy-exact-max-fields",
+      "input": "../offline-inspection/designed/exact-max-fields.qtp",
+      "args": [
+        "--max-fields",
+        "2"
+      ],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,15) payload=11 size=4\nRecord 0: frame=1 local=0 name=\"S\" symbol=\"ABC\" fields={S.v=1}\nFrame 2: STREAM_DATA (15) bytes=[15,21) payload=17 size=4\nRecord 1: frame=2 local=0 name=\"S\" symbol=\"ABC\" fields={S.v=2}\nComplete: bytes=21 frames=3 records=2 charged-records=2 wire-fields=2\n"
+    },
+    {
+      "name": "legacy-exact-max-values",
+      "input": "../offline-inspection/designed/exact-max-values.qtp",
+      "args": [
+        "--max-values",
+        "2"
+      ],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,15) payload=11 size=4\nRecord 0: frame=1 local=0 name=\"S\" symbol=\"ABC\" fields={S.v=1}\nFrame 2: STREAM_DATA (15) bytes=[15,21) payload=17 size=4\nRecord 1: frame=2 local=0 name=\"S\" symbol=\"ABC\" fields={S.v=2}\nComplete: bytes=21 frames=3 records=2 charged-records=2 wire-fields=2\n"
+    },
+    {
+      "name": "legacy-exact-max-symbol-units",
+      "input": "../offline-inspection/designed/exact-max-symbol-units.qtp",
+      "args": [
+        "--max-symbol-units",
+        "6"
+      ],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,15) payload=11 size=4\nRecord 0: frame=1 local=0 name=\"S\" symbol=\"ABC\" fields={S.v=1}\nFrame 2: STREAM_DATA (15) bytes=[15,21) payload=17 size=4\nRecord 1: frame=2 local=0 name=\"S\" symbol=\"ABC\" fields={S.v=2}\nComplete: bytes=21 frames=3 records=2 charged-records=2 wire-fields=2\n"
+    },
+    {
+      "name": "legacy-exact-message-records",
+      "input": "../offline-inspection/designed/exact-message-records.qtp",
+      "args": [
+        "--message-records",
+        "1"
+      ],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,15) payload=11 size=4\nRecord 0: frame=1 local=0 name=\"S\" symbol=\"ABC\" fields={S.v=1}\nFrame 2: STREAM_DATA (15) bytes=[15,21) payload=17 size=4\nRecord 1: frame=2 local=0 name=\"S\" symbol=\"ABC\" fields={S.v=2}\nComplete: bytes=21 frames=3 records=2 charged-records=2 wire-fields=2\n"
+    },
+    {
+      "name": "legacy-exact-message-fields",
+      "input": "../offline-inspection/designed/exact-message-fields.qtp",
+      "args": [
+        "--message-fields",
+        "1"
+      ],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,15) payload=11 size=4\nRecord 0: frame=1 local=0 name=\"S\" symbol=\"ABC\" fields={S.v=1}\nFrame 2: STREAM_DATA (15) bytes=[15,21) payload=17 size=4\nRecord 1: frame=2 local=0 name=\"S\" symbol=\"ABC\" fields={S.v=2}\nComplete: bytes=21 frames=3 records=2 charged-records=2 wire-fields=2\n"
+    },
+    {
+      "name": "legacy-exact-message-values",
+      "input": "../offline-inspection/designed/exact-message-values.qtp",
+      "args": [
+        "--message-values",
+        "1"
+      ],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,15) payload=11 size=4\nRecord 0: frame=1 local=0 name=\"S\" symbol=\"ABC\" fields={S.v=1}\nFrame 2: STREAM_DATA (15) bytes=[15,21) payload=17 size=4\nRecord 1: frame=2 local=0 name=\"S\" symbol=\"ABC\" fields={S.v=2}\nComplete: bytes=21 frames=3 records=2 charged-records=2 wire-fields=2\n"
+    },
+    {
+      "name": "legacy-exact-message-symbol-units",
+      "input": "../offline-inspection/designed/exact-message-symbol-units.qtp",
+      "args": [
+        "--message-symbol-units",
+        "3"
+      ],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,15) payload=11 size=4\nRecord 0: frame=1 local=0 name=\"S\" symbol=\"ABC\" fields={S.v=1}\nFrame 2: STREAM_DATA (15) bytes=[15,21) payload=17 size=4\nRecord 1: frame=2 local=0 name=\"S\" symbol=\"ABC\" fields={S.v=2}\nComplete: bytes=21 frames=3 records=2 charged-records=2 wire-fields=2\n"
+    },
+    {
+      "name": "legacy-exact-symbol-units",
+      "input": "../offline-inspection/designed/exact-symbol-units.qtp",
+      "args": [
+        "--symbol-units",
+        "3"
+      ],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,15) payload=11 size=4\nRecord 0: frame=1 local=0 name=\"S\" symbol=\"ABC\" fields={S.v=1}\nFrame 2: STREAM_DATA (15) bytes=[15,21) payload=17 size=4\nRecord 1: frame=2 local=0 name=\"S\" symbol=\"ABC\" fields={S.v=2}\nComplete: bytes=21 frames=3 records=2 charged-records=2 wire-fields=2\n"
+    },
+    {
+      "name": "legacy-exact-max-input",
+      "input": "../offline-inspection/designed/exact-max-input.qtp",
+      "args": [
+        "--max-input",
+        "21"
+      ],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,15) payload=11 size=4\nRecord 0: frame=1 local=0 name=\"S\" symbol=\"ABC\" fields={S.v=1}\nFrame 2: STREAM_DATA (15) bytes=[15,21) payload=17 size=4\nRecord 1: frame=2 local=0 name=\"S\" symbol=\"ABC\" fields={S.v=2}\nComplete: bytes=21 frames=3 records=2 charged-records=2 wire-fields=2\n"
+    },
+    {
+      "name": "legacy-exact-max-frames",
+      "input": "../offline-inspection/designed/exact-max-frames.qtp",
+      "args": [
+        "--max-frames",
+        "3"
+      ],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,15) payload=11 size=4\nRecord 0: frame=1 local=0 name=\"S\" symbol=\"ABC\" fields={S.v=1}\nFrame 2: STREAM_DATA (15) bytes=[15,21) payload=17 size=4\nRecord 1: frame=2 local=0 name=\"S\" symbol=\"ABC\" fields={S.v=2}\nComplete: bytes=21 frames=3 records=2 charged-records=2 wire-fields=2\n"
+    },
+    {
+      "name": "legacy-zero-max-descriptions",
+      "input": "../offline-inspection/designed/zero-max-descriptions.qtp",
+      "args": [
+        "--max-descriptions",
+        "0"
+      ],
+      "exit": 6,
+      "stderr": "incomplete\t6\tdescription.1\t0\t2\t0\t2\t0\t0\t2\t2\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\n"
+    },
+    {
+      "name": "legacy-zero-max-actions",
+      "input": "../offline-inspection/designed/zero-max-actions.qtp",
+      "args": [
+        "--max-actions",
+        "0"
+      ],
+      "exit": 6,
+      "stderr": "incomplete\t6\tdescription.5\t0\t2\t0\t2\t4\t4\t6\t6\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\n"
+    },
+    {
+      "name": "legacy-zero-max-total-name-units",
+      "input": "../offline-inspection/designed/zero-max-total-name-units.qtp",
+      "args": [
+        "--max-total-name-units",
+        "0"
+      ],
+      "exit": 6,
+      "stderr": "incomplete\t6\tdescription.3\t0\t2\t0\t2\t3\t1\t5\t3\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\n"
+    },
+    {
+      "name": "legacy-zero-max-name-units",
+      "input": "../offline-inspection/designed/zero-max-name-units.qtp",
+      "args": [
+        "--max-name-units",
+        "0"
+      ],
+      "exit": 6,
+      "stderr": "incomplete\t6\tdescription.3\t0\t2\t0\t2\t3\t1\t5\t3\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\n"
+    },
+    {
+      "name": "legacy-excess-input",
+      "input": "../offline-inspection/designed/excess-input.qtp",
+      "args": [
+        "--max-input",
+        "0"
+      ],
+      "exit": 6,
+      "stderr": "incomplete\t6\tinput-limit\t-\t-\t-\t-\t-\t-\t-\t-\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\n"
+    },
+    {
+      "name": "legacy-zero-frames",
+      "input": "../offline-inspection/designed/zero-frames.qtp",
+      "args": [
+        "--max-frames",
+        "0"
+      ],
+      "exit": 6,
+      "stderr": "incomplete\t6\tframe-limit\t0\t-\t0\t-\t-\t-\t-\t-\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\n"
+    },
+    {
+      "name": "legacy-zero-frame-body",
+      "input": "../offline-inspection/designed/zero-frame-body.qtp",
+      "args": [
+        "--max-frame",
+        "0"
+      ],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: EMPTY_HEARTBEAT (-) bytes=[0,1) payload=- size=0\nComplete: bytes=1 frames=1 records=0 charged-records=0 wire-fields=0\n"
+    },
+    {
+      "name": "legacy-body-excess",
+      "input": "../offline-inspection/designed/body-excess.qtp",
+      "args": [
+        "--max-frame",
+        "0"
+      ],
+      "exit": 6,
+      "stderr": "incomplete\t6\tframing.2\t0\t-\t0\t-\t-\t-\t1\t-\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\n"
+    },
+    {
+      "name": "legacy-exact-description-budgets",
+      "input": "../offline-inspection/designed/exact-description-budgets.qtp",
+      "args": [
+        "--max-descriptions",
+        "1",
+        "--max-actions",
+        "1",
+        "--max-name-units",
+        "1",
+        "--max-total-name-units",
+        "2"
+      ],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nComplete: bytes=9 frames=1 records=0 charged-records=0 wire-fields=0\n"
+    },
+    {
+      "name": "legacy-aggregate-description-excess",
+      "input": "../offline-inspection/designed/aggregate-description-excess.qtp",
+      "args": [
+        "--max-descriptions",
+        "1"
+      ],
+      "exit": 6,
+      "stderr": "incomplete\t6\tdescription.1\t1\t2\t9\t11\t0\t0\t11\t11\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: DESCRIBE_RECORDS (2) bytes=[9,15) payload=11 size=4\n"
+    },
+    {
+      "name": "legacy-aggregate-actions-excess",
+      "input": "../offline-inspection/designed/aggregate-actions-excess.qtp",
+      "args": [
+        "--max-actions",
+        "1"
+      ],
+      "exit": 6,
+      "stderr": "incomplete\t6\tdescription.5\t1\t2\t9\t11\t4\t4\t15\t15\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: DESCRIBE_RECORDS (2) bytes=[9,18) payload=11 size=7\n"
+    },
+    {
+      "name": "legacy-aggregate-names-excess",
+      "input": "../offline-inspection/designed/aggregate-names-excess.qtp",
+      "args": [
+        "--max-total-name-units",
+        "2"
+      ],
+      "exit": 6,
+      "stderr": "incomplete\t6\tdescription.3\t1\t2\t9\t11\t3\t1\t14\t12\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: DESCRIBE_RECORDS (2) bytes=[9,18) payload=11 size=7\n"
+    },
+    {
+      "name": "legacy-zero-message-records",
+      "input": "../offline-inspection/designed/zero-message-records.qtp",
+      "args": [
+        "--message-records",
+        "0"
+      ],
+      "exit": 6,
+      "stderr": "incomplete\t6\tdata.1\t1\t15\t9\t11\t0\t0\t11\t11\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,14) payload=11 size=3\n"
+    },
+    {
+      "name": "legacy-zero-message-fields",
+      "input": "../offline-inspection/designed/zero-message-fields.qtp",
+      "args": [
+        "--message-fields",
+        "0"
+      ],
+      "exit": 6,
+      "stderr": "incomplete\t6\tdata.5\t1\t15\t9\t11\t2\t2\t13\t13\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,14) payload=11 size=3\n"
+    },
+    {
+      "name": "legacy-zero-message-values",
+      "input": "../offline-inspection/designed/zero-message-values.qtp",
+      "args": [
+        "--message-values",
+        "0"
+      ],
+      "exit": 6,
+      "stderr": "incomplete\t6\tdata.6\t1\t15\t9\t11\t2\t2\t13\t13\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,14) payload=11 size=3\n"
+    },
+    {
+      "name": "legacy-zero-message-symbol-units",
+      "input": "../offline-inspection/designed/zero-message-symbol-units.qtp",
+      "args": [
+        "--message-symbol-units",
+        "0"
+      ],
+      "exit": 6,
+      "stderr": "incomplete\t6\tdata.6\t1\t15\t9\t11\t3\t3\t14\t14\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,15) payload=11 size=4\n"
+    },
+    {
+      "name": "legacy-zero-symbol-units",
+      "input": "../offline-inspection/designed/zero-symbol-units.qtp",
+      "args": [
+        "--symbol-units",
+        "0"
+      ],
+      "exit": 6,
+      "stderr": "incomplete\t6\tdata.2\t1\t15\t9\t11\t2\t0\t13\t11\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,15) payload=11 size=4\n"
+    },
+    {
+      "name": "legacy-skip-total-record-excess",
+      "input": "../offline-inspection/designed/skip-total-record-excess.qtp",
+      "args": [
+        "--max-records",
+        "1"
+      ],
+      "exit": 6,
+      "stderr": "incomplete\t6\tdata.1\t2\t15\t24\t26\t0\t0\t26\t26\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,18) payload=2 size=16\nFrame 1: STREAM_DATA (15) bytes=[18,24) payload=20 size=4\nFrame 2: STREAM_DATA (15) bytes=[24,30) payload=26 size=4\n"
+    },
+    {
+      "name": "legacy-skip-total-field-excess",
+      "input": "../offline-inspection/designed/skip-total-field-excess.qtp",
+      "args": [
+        "--max-fields",
+        "2"
+      ],
+      "exit": 6,
+      "stderr": "incomplete\t6\tdata.5\t2\t15\t24\t26\t2\t2\t28\t28\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,18) payload=2 size=16\nFrame 1: STREAM_DATA (15) bytes=[18,24) payload=20 size=4\nFrame 2: STREAM_DATA (15) bytes=[24,30) payload=26 size=4\n"
+    },
+    {
+      "name": "legacy-skip-exact-totals",
+      "input": "../offline-inspection/designed/skip-exact-totals.qtp",
+      "args": [
+        "--max-records",
+        "2",
+        "--max-fields",
+        "4",
+        "--max-values",
+        "0",
+        "--max-symbol-units",
+        "0"
+      ],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,18) payload=2 size=16\nFrame 1: STREAM_DATA (15) bytes=[18,24) payload=20 size=4\nFrame 2: STREAM_DATA (15) bytes=[24,30) payload=26 size=4\nComplete: bytes=30 frames=3 records=0 charged-records=2 wire-fields=4\n"
+    },
+    {
+      "name": "legacy-duplicate-target-field-total",
+      "input": "../offline-inspection/designed/duplicate-target-field-total.qtp",
+      "args": [
+        "--max-fields",
+        "5"
+      ],
+      "exit": 6,
+      "stderr": "incomplete\t6\tdata.5\t2\t15\t36\t38\t2\t2\t40\t40\n",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,27) payload=2 size=25\nFrame 1: STREAM_DATA (15) bytes=[27,36) payload=29 size=7\nRecord 0: frame=1 local=1 name=\"R\" symbol=\"\" fields={R.y=3, R.x=5, R.z=0}\nFrame 2: STREAM_DATA (15) bytes=[36,45) payload=38 size=7\n"
+    },
+    {
+      "name": "legacy-zero-explicit-flags",
+      "input": "../offline-inspection/designed/zero-explicit-flags.qtp",
+      "args": [],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,16) payload=11 size=5\nRecord 0: frame=1 local=0 name=\"S\" symbol=\"\" fields={S.v=1}\nComplete: bytes=16 frames=2 records=1 charged-records=1 wire-fields=1\n"
+    },
+    {
+      "name": "legacy-zero-data-budgets",
+      "input": "../offline-inspection/designed/zero-data-budgets.qtp",
+      "args": [
+        "--max-records",
+        "0",
+        "--max-fields",
+        "0",
+        "--max-values",
+        "0",
+        "--max-symbol-units",
+        "0"
+      ],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,2) payload=2 size=0\nFrame 1: STREAM_DATA (15) bytes=[2,4) payload=4 size=0\nComplete: bytes=4 frames=2 records=0 charged-records=0 wire-fields=0\n"
+    },
+    {
+      "name": "ascii",
+      "input": "ascii.qtp",
+      "args": [],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,18) payload=11 size=7\nRecord 0: frame=1 local=0 name=\"S\" symbol=\"ABC\" fields={S.v=1}\nComplete: bytes=18 frames=2 records=1 charged-records=1 wire-fields=1\n"
+    },
+    {
+      "name": "empty",
+      "input": "empty.qtp",
+      "args": [],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,15) payload=11 size=4\nRecord 0: frame=1 local=0 name=\"S\" symbol=\"\" fields={S.v=1}\nComplete: bytes=15 frames=2 records=1 charged-records=1 wire-fields=1\n"
+    },
+    {
+      "name": "cyrillic",
+      "input": "cyrillic.qtp",
+      "args": [],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,27) payload=11 size=16\nRecord 0: frame=1 local=0 name=\"S\" symbol=\"\u041f\u0440\u0438\u0432\u0435\u0442\" fields={S.v=1}\nComplete: bytes=27 frames=2 records=1 charged-records=1 wire-fields=1\n"
+    },
+    {
+      "name": "supplementary",
+      "input": "supplementary.qtp",
+      "args": [],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,21) payload=11 size=10\nRecord 0: frame=1 local=0 name=\"S\" symbol=\"\ud83d\ude00\" fields={S.v=1}\nComplete: bytes=21 frames=2 records=1 charged-records=1 wire-fields=1\n"
+    },
+    {
+      "name": "lone-high",
+      "input": "lone-high.qtp",
+      "args": [],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,18) payload=11 size=7\nRecord 0: frame=1 local=0 name=\"S\" symbol=\"\\uD800\" fields={S.v=1}\nComplete: bytes=18 frames=2 records=1 charged-records=1 wire-fields=1\n"
+    },
+    {
+      "name": "lone-low",
+      "input": "lone-low.qtp",
+      "args": [],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,18) payload=11 size=7\nRecord 0: frame=1 local=0 name=\"S\" symbol=\"\\uDFFF\" fields={S.v=1}\nComplete: bytes=18 frames=2 records=1 charged-records=1 wire-fields=1\n"
+    },
+    {
+      "name": "surrogate-order",
+      "input": "surrogate-order.qtp",
+      "args": [],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,27) payload=11 size=16\nRecord 0: frame=1 local=0 name=\"S\" symbol=\"\\uD800\ud800\udc00\\uDFFF\" fields={S.v=1}\nComplete: bytes=27 frames=2 records=1 charged-records=1 wire-fields=1\n"
+    },
+    {
+      "name": "lookalikes",
+      "input": "lookalikes.qtp",
+      "args": [],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,31) payload=11 size=20\nRecord 0: frame=1 local=0 name=\"S\" symbol=\"\\\\uD800\\\\u0000\\\\n\\\\t\" fields={S.v=1}\nComplete: bytes=31 frames=2 records=1 charged-records=1 wire-fields=1\n"
+    },
+    {
+      "name": "quotes",
+      "input": "quotes.qtp",
+      "args": [],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,17) payload=11 size=6\nRecord 0: frame=1 local=0 name=\"S\" symbol=\"\\\"\\\\\" fields={S.v=1}\nComplete: bytes=17 frames=2 records=1 charged-records=1 wire-fields=1\n"
+    },
+    {
+      "name": "injection",
+      "input": "injection.qtp",
+      "args": [],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,51) payload=11 size=40\nRecord 0: frame=1 local=0 name=\"S\" symbol=\"\\u0000\\nComplete: bytes=0\\r\\tincomplete\\u001B[31m\" fields={S.v=1}\nComplete: bytes=51 frames=2 records=1 charged-records=1 wire-fields=1\n"
+    },
+    {
+      "name": "c0",
+      "input": "c0.qtp",
+      "args": [],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,47) payload=11 size=36\nRecord 0: frame=1 local=0 name=\"S\" symbol=\"\\u0000\\u0001\\u0002\\u0003\\u0004\\u0005\\u0006\\u0007\\u0008\\t\\n\\u000B\\u000C\\r\\u000E\\u000F\\u0010\\u0011\\u0012\\u0013\\u0014\\u0015\\u0016\\u0017\\u0018\\u0019\\u001A\\u001B\\u001C\\u001D\\u001E\\u001F\" fields={S.v=1}\nComplete: bytes=47 frames=2 records=1 charged-records=1 wire-fields=1\n"
+    },
+    {
+      "name": "del-c1",
+      "input": "del-c1.qtp",
+      "args": [],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,82) payload=12 size=70\nRecord 0: frame=1 local=0 name=\"S\" symbol=\"\\u007F\\u0080\\u0081\\u0082\\u0083\\u0084\\u0085\\u0086\\u0087\\u0088\\u0089\\u008A\\u008B\\u008C\\u008D\\u008E\\u008F\\u0090\\u0091\\u0092\\u0093\\u0094\\u0095\\u0096\\u0097\\u0098\\u0099\\u009A\\u009B\\u009C\\u009D\\u009E\\u009F\" fields={S.v=1}\nComplete: bytes=82 frames=2 records=1 charged-records=1 wire-fields=1\n"
+    },
+    {
+      "name": "line-bidi",
+      "input": "line-bidi.qtp",
+      "args": [],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,75) payload=12 size=63\nRecord 0: frame=1 local=0 name=\"S\" symbol=\"\\u061C\\u200E\\u200F\\u2028\\u2029\\u202A\\u202B\\u202C\\u202D\\u202E\\u2066\\u2067\\u2068\\u2069\\u206A\\u206B\\u206C\\u206D\\u206E\\u206F\" fields={S.v=1}\nComplete: bytes=75 frames=2 records=1 charged-records=1 wire-fields=1\n"
+    },
+    {
+      "name": "utf8-boundaries",
+      "input": "utf8-boundaries.qtp",
+      "args": [],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,41) payload=11 size=30\nRecord 0: frame=1 local=0 name=\"S\" symbol=\" ~\u00a0\u07ff\u0800\ud7ff\ue000\uffff\ud800\udc00\udbff\udfff\" fields={S.v=1}\nComplete: bytes=41 frames=2 records=1 charged-records=1 wire-fields=1\n"
+    },
+    {
+      "name": "no-normalization",
+      "input": "no-normalization.qtp",
+      "args": [],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "qd-qtp-inspect human 1 profile=oracle-sre-v1 identities=local\nFrame 0: DESCRIBE_RECORDS (2) bytes=[0,9) payload=2 size=7\nFrame 1: STREAM_DATA (15) bytes=[9,21) payload=11 size=10\nRecord 0: frame=1 local=0 name=\"S\" symbol=\"\u00e9 e\u0301\" fields={S.v=1}\nComplete: bytes=21 frames=2 records=1 charged-records=1 wire-fields=1\n"
+    }
+  ]
+}
