@@ -1,5 +1,10 @@
 # Current state
 
+## Next task
+
+QDCXX-015 is ready, not started: bounded QTP symbol reader, a prerequisite
+for later event decoding. The reviewed QDCXX-014 baseline is 36d2940df894ed43821de4c055adfc0b0ed8582f.
+
 ## Completed: bounded static incoming binding
 
 QDCXX-014 — done, High. Production BinaryQTPParser evidence came first:
