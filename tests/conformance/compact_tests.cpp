@@ -1,4 +1,5 @@
 #include "qd/encoding/compact.hpp"
+#include "qd/encoding/utf_string.hpp"
 
 #define DOCTEST_CONFIG_IMPLEMENT
 #include <doctest/doctest.h>
@@ -96,6 +97,114 @@ std::string hex(std::span<const std::byte> bytes) {
     }
 
     return text;
+}
+
+/// Explicit corpus budgets, larger than every captured body and UTF-16 value.
+constexpr qd::encoding::UtfStringLimits CORPUS_LIMITS{1024, 1024};
+
+/** Parse exact UTF-16 hex, preserving null, empty and isolated surrogates.
+ * @param text Oracle field containing four hex digits per unit or the null marker.
+ * @return Owned units, or disengaged for Java null; malformed fields fail the test.
+ */
+std::optional<std::u16string> parseUnits(const std::string &text) {
+    if (text == "\\N") {
+        return std::nullopt;
+    }
+
+    require(text.size() % 4 == 0, "invalid UTF-16 hex length");
+    const auto bytes = unhex(text);
+    std::u16string units;
+
+    for (std::size_t index = 0; index < bytes.size(); index += 2) {
+        units.push_back(static_cast<char16_t>((std::to_integer<unsigned int>(bytes[index]) << 8) |
+                                              std::to_integer<unsigned int>(bytes[index + 1])));
+    }
+
+    return units;
+}
+
+/** Render an owned result for exact oracle diagnostics.
+ * @param value Optional UTF-16 units; disengaged means null.
+ * @return Oracle UTF-16 hex or null marker.
+ */
+std::string unitsHex(const std::optional<std::u16string> &value) {
+    if (!value) {
+        return "\\N";
+    }
+
+    std::vector<std::byte> bytes;
+
+    for (const auto unit : *value) {
+        bytes.push_back(static_cast<std::byte>(unit >> 8));
+        bytes.push_back(static_cast<std::byte>(unit & 255));
+    }
+
+    return hex(bytes);
+}
+
+/** Compare UTFString reader category, exact units/null and Java consumed/remaining bytes.
+ * @param row Selected unchanged oracle observation; malformed fields fail the test.
+ */
+void checkUtfReader(const std::vector<std::string> &row) {
+    require(row.size() >= 5, "missing reader status");
+    const bool success = row[4] == "ok";
+    require(success || row[4] == "error", "unexpected status: " + row[4]);
+    require(row.size() == (success ? 8 : 9), "invalid reader field count");
+    const auto input = unhex(row[3]);
+    const auto consumed = decimal<std::size_t>(row[6]);
+    const auto remaining = decimal<std::size_t>(row[7]);
+    require(consumed <= input.size() && remaining == input.size() - consumed, "inconsistent fixture position");
+    auto status = Status::OK;
+
+    if (!success) {
+        if (row[5] == "java.io.EOFException") {
+            status = Status::INSUFFICIENT_INPUT;
+        } else if (row[5] == "java.io.UTFDataFormatException") {
+            status = Status::INVALID_ENCODING;
+        } else {
+            require(row[5] == "java.io.IOException", "unexpected exception category: " + row[5]);
+            status = Status::INVALID_LENGTH;
+        }
+    }
+
+    const auto expected = success ? parseUnits(row[5]) : std::nullopt;
+    const auto result = qd::encoding::readUtfString(input, CORPUS_LIMITS);
+    require(result.status == status, "UTF status expected " + row[4] + "/" + row[5]);
+    require(result.value == expected,
+            "value expected " + (success ? row[5] : "\\N") + " actual " + unitsHex(result.value));
+    require(result.consumed == consumed, "consumed expected " + row[6] + " actual " + std::to_string(result.consumed));
+    require(result.consumed <= input.size() && input.size() - result.consumed == remaining, "UTF remaining bytes");
+}
+
+/** Compare canonical UTFString bytes at every capacity with canaries and atomic failures.
+ * @param row Selected writer observation with exact raw UTF-16 input and Java output.
+ */
+void checkUtfWriter(const std::vector<std::string> &row) {
+    require(row.size() == 5, "invalid writer field count");
+    const auto expected = unhex(row[4]);
+    require(!expected.empty(), "empty writer bytes");
+    const auto units = parseUnits(row[3]);
+    const auto view = units ? std::optional<std::u16string_view>(*units) : std::nullopt;
+
+    for (std::size_t capacity = 0; capacity <= expected.size() + 2; ++capacity) {
+        std::vector<std::byte> storage(capacity + 2, std::byte{0x5a});
+        auto output = std::span(storage).subspan(1, capacity);
+        const auto result = qd::encoding::writeUtfString(view, output, CORPUS_LIMITS);
+        const bool fits = capacity >= expected.size();
+        require(result.status == (fits ? Status::OK : Status::INSUFFICIENT_OUTPUT), "UTF writer capacity status");
+        require(result.written == (fits ? expected.size() : 0), "UTF writer byte count");
+
+        if (fits) {
+            require(hex(output.first(result.written)) == row[4],
+                    "bytes expected " + row[4] + " actual " + hex(output.first(result.written)));
+        }
+
+        require(storage.front() == std::byte{0x5a}, "UTF leading guard");
+
+        for (std::size_t index = 1 + result.written; index < storage.size(); ++index) {
+            require(storage[index] == std::byte{0x5a}, "UTF changed bytes beyond written");
+        }
+    }
 }
 
 /** Compare reader value/category and position, then check trailing sentinel isolation.
@@ -224,13 +333,14 @@ void checkFile(const std::filesystem::path &path) {
             } else if (row[0] == "writer" && (row[2] == "writeCompactInt" || row[2] == "writeCompactLong")) {
                 checkWriter(row);
                 ++writers;
+            } else if (row[0] == "reader" && row[2] == "readUTFString") {
+                checkUtfReader(row);
+                ++readers;
+            } else if (row[0] == "writer" && row[2] == "writeUTFString") {
+                checkUtfWriter(row);
+                ++writers;
             } else {
-                require((row[0] == "reader" && row[2] == "readUTFString") ||
-                            (row[0] == "writer" && row[2] == "writeUTFString"),
-                        "unknown kind/method");
-                ++excluded;
-                std::cout << "EXCLUDED\t" << path.filename().string() << '\t' << identity << '\n';
-                continue;
+                require(false, "unknown kind/method");
             }
 
             std::cout << "PASS\t" << path.filename().string() << '\t' << identity << '\n';
@@ -238,7 +348,7 @@ void checkFile(const std::filesystem::path &path) {
     }
 
     require(stream.eof() && profile && complete && readers > 0, "incomplete/empty selected coverage");
-    require(path.stem() != "integers" || writers > 0, "empty writer coverage");
+    require(path.stem() == "forms" || writers > 0, "empty writer coverage");
     std::cout << "TOTAL\t" << path.filename().string() << "\twriters=" << writers << "\treaders=" << readers
               << "\texcluded=" << excluded << '\n';
 }
@@ -250,9 +360,83 @@ TEST_CASE("Java compact canonical and cross-width vectors") {
 TEST_CASE("Java compact overlong forms and prefixes") {
     checkFile(fixtureDirectory / "forms.tsv");
 }
+
+TEST_CASE("Java UTFString canonical vectors and strict prefixes") {
+    checkFile(fixtureDirectory / "strings.tsv");
+}
+
+TEST_CASE("UTFString explicit budgets and precedence") {
+    using qd::encoding::readUtfString;
+    using qd::encoding::UtfStringLimits;
+    using qd::encoding::writeUtfString;
+    /** Check one local resource-policy outcome without manufacturing a Java observation.
+     * @param bytes Hex input, including malformed or incomplete forms.
+     * @param limits Explicit byte/unit budgets for this operation.
+     * @param status Expected C++ operational or wire outcome.
+     * @param consumed Expected number of examined bytes.
+     */
+    const auto check = [](const std::string &bytes, UtfStringLimits limits, Status status, std::size_t consumed) {
+        const auto result = readUtfString(unhex(bytes), limits);
+        CHECK(result.status == status);
+        CHECK(result.consumed == consumed);
+
+        if (status != Status::OK) {
+            CHECK(!result.value);
+        }
+    };
+    check("", {0, 0}, Status::INSUFFICIENT_INPUT, 0);
+    check("ff0000", {0, 0}, Status::INSUFFICIENT_INPUT, 3);
+    check("7e", {0, 0}, Status::INVALID_LENGTH, 1);
+    check("7f", {0, 0}, Status::OK, 1);
+    check("00", {0, 0}, Status::OK, 1);
+    check("02", {1, 0}, Status::RESOURCE_LIMIT, 1);
+    check("02", {2, 0}, Status::INSUFFICIENT_INPUT, 1);
+    check("024142", {2, 1}, Status::RESOURCE_LIMIT, 3);
+    check("04f09f9880", {4, 1}, Status::RESOURCE_LIMIT, 5);
+    check("04f09f9880", {4, 2}, Status::OK, 5);
+    check("03eda080", {3, 1}, Status::OK, 4);
+    check("03e241", {3, 0}, Status::INSUFFICIENT_INPUT, 3);
+    check("03e24180", {3, 0}, Status::INVALID_ENCODING, 4);
+    check("01c280", {1, 1}, Status::INVALID_ENCODING, 3);
+    check("01c280", {1, 0}, Status::RESOURCE_LIMIT, 3);
+    check("01c2", {1, 1}, Status::INSUFFICIENT_INPUT, 2);
+    check("014142", {1, 1}, Status::OK, 2);
+    std::array<std::byte, 9> prefix{};
+
+    for (const auto length : {8589934588LL, 8589934589LL, std::numeric_limits<long long>::max()}) {
+        const auto written = qd::encoding::writeCompactLong(length, prefix).written;
+        const auto input = std::span(prefix).first(written);
+        const auto result = readUtfString(input, {0, 0});
+        CHECK(result.status == (length == 8589934588LL ? Status::RESOURCE_LIMIT : Status::INVALID_LENGTH));
+        CHECK(result.consumed == written);
+        CHECK(!result.value);
+    }
+
+    const auto maximum = std::numeric_limits<std::size_t>::max();
+    check("f1fffffffc", {maximum, maximum},
+          sizeof(std::size_t) >= 8 ? Status::INSUFFICIENT_INPUT : Status::RESOURCE_LIMIT, 5);
+    std::array<std::byte, 16> output;
+    output.fill(std::byte{0x5a});
+    const auto original = output;
+
+    for (const auto limits : {UtfStringLimits{0, 1}, UtfStringLimits{3, 0}}) {
+        const auto result = writeUtfString(u"\ud7ff", output, limits);
+        CHECK(result.status == Status::RESOURCE_LIMIT);
+        CHECK(result.written == 0);
+        CHECK(output == original);
+    }
+
+    CHECK(writeUtfString(std::nullopt, output, {0, 0}).status == Status::OK);
+    CHECK(writeUtfString(u"", output, {0, 0}).status == Status::OK);
+    CHECK(writeUtfString(u"A", output, {maximum, maximum}).status == Status::OK);
+    auto input = unhex("0141");
+    const auto owned = readUtfString(input, {1, 1});
+    input[1] = std::byte{0};
+    CHECK(owned.value == std::optional<std::u16string>(u"A"));
+}
 } // namespace
 
-/** Execute the two Java-vector doctest cases with a caller-selected fixture directory.
+/** Execute the Java-vector and resource-policy doctest cases with a caller-selected fixture directory.
  * @param argc Argument count, including executable, fixture directory and optional doctest flags.
  * @param argv Argument strings valid throughout this call; argv[1] identifies the fixture directory.
  * @return Zero if all selected tests pass, nonzero on usage or conformance failure.

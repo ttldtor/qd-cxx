@@ -1,0 +1,10 @@
+2026-09-21T13:40:17.518Z COMMAND ['.work/utf-reuse/build/probe']; cwd='/work/qd-cxx'; TZ=UTC
+2026-09-21T13:40:17.524Z S-supplementary Java-match: standard=1 utfcpp=1 simdutf=1
+2026-09-21T13:40:17.524Z S-high Java-match: standard=0 utfcpp=0 simdutf=0
+2026-09-21T13:40:17.525Z S-low Java-match: standard=0 utfcpp=0 simdutf=0
+2026-09-21T13:40:17.525Z F-overlong2 Java-match: standard=0 utfcpp=0 simdutf=0
+2026-09-21T13:40:17.525Z F-overlong3 Java-match: standard=0 utfcpp=0 simdutf=0
+2026-09-21T13:40:17.526Z F-overlong4 Java-match: standard=0 utfcpp=0 simdutf=0
+2026-09-21T13:40:17.526Z F-cesu-pair Java-match: standard=0 utfcpp=0 simdutf=0
+2026-09-21T13:40:17.527Z F-surrogate4 Java-match: standard=0 utfcpp=0 simdutf=0
+2026-09-21T13:40:17.527Z EXIT 0

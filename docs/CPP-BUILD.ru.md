@@ -1,12 +1,40 @@
-# Компонент compact integer на C++23
+# Ограниченные компоненты кодирования C++23
 
 [English version](CPP-BUILD.md). Английский документ является основным.
 
-QDCXX-010 добавляет только библиотеку `qd_encoding` без сторонних зависимостей с предварительным API
-в [compact.hpp](../include/qd/encoding/compact.hpp). Совместимость определяют
-[контракт примитивов](../spec/encoding/PRIMITIVES.ru.md) и неизменные Java QD 3.355 vectors.
-UTFString, PentaCodec, importer, schema runtime, QTP framing, transport, packaging и заявления
-о производительности остаются вне этого компонента.
+`qd_encoding` — production-библиотека C++23 без сторонних зависимостей с предварительными API
+compact int/long и UTFString. QDCXX-010 добавил compact, QDCXX-011 добавляет
+[utf_string.hpp](../include/qd/encoding/utf_string.hpp). Неизменные
+[Java-свидетельства](../spec/encoding/PRIMITIVES.ru.md) определяют совместимость;
+[политика UTFString и решение о переиспользовании](../spec/encoding/UTFSTRING.ru.md) определяют
+явные границы C++. PentaCodec, importer, schema runtime, QTP framing, transport и packaging вне объёма.
+
+## UTFString API и текущие проверки
+
+`readUtfString(input, {bodyBytes, codeUnits})` возвращает владеющие optional-единицы UTF-16, статус
+и consumed. Значение интерпретируется только при OK: отсутствие означает null, присутствующая
+пустая строка — empty. Ошибки не возвращают частичное значение; отказы выделения памяти могут
+выбрасывать исключения. `writeUtfString(value, output, limits)` заимствует optional UTF-16 view и
+атомарно записывает после preflight; вход/выход не должны пересекаться. Оба бюджета обязательны и
+являются конечными эксплуатационными границами. Нет нормализации или исправления суррогатов.
+Status дополнен INVALID_ENCODING, INVALID_LENGTH и RESOURCE_LIMIT без изменения compact.
+Точные приоритеты, Java body overrun и гарантии выделения описаны в контракте.
+
+Существующие команды ниже теперь собирают и проверяют оба codec. Имена executable/CTest сохранены
+`compact_tests`/`compact_java_vectors` для совместимости с инструментами; они выполняют четыре
+случая, 43 375 assertions и все 1146 Java observations (314 UTFString, 832 compact), без исключений.
+MSVC, ClangCL и WSL GCC проходят Debug/Release; GCC ASan+UBSan также проходит. Исторические числа
+QDCXX-010 ниже описывают прежний compact-only прогон. `BUILD_TESTING=OFF` по-прежнему ничего не
+загружает; production-зависимость UTF не выбрана. Reuse probes — отдельные необязательные
+игнорируемые проекты. [Текущая валидация](../tests/conformance/encoding/VALIDATION.ru.md) сохраняет UTC-свидетельства.
+
+Дополнительные команды sanitizer из корня репозитория в WSL (закреплённый doctest из кэша):
+
+```bash
+python3 tools/run_utc.py --log .work/utf-asan-configure.log -- cmake -S . -B .work/utf-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug '-DCMAKE_CXX_FLAGS=-fsanitize=address,undefined -fno-omit-frame-pointer' -DFETCHCONTENT_SOURCE_DIR_DOCTEST=/work/qd-cxx/.work/linux-debug/_deps/doctest-src
+python3 tools/run_utc.py --log .work/utf-asan-build.log -- cmake --build .work/utf-asan -j 4
+python3 tools/run_utc.py --log .work/utf-asan-test.log -- ctest --test-dir .work/utf-asan --output-on-failure
+```
 
 ## Сборка и тестирование на Windows
 

@@ -2,13 +2,20 @@
 
 [English version](CURRENT-STATE.md). Английский документ является основным.
 
-## Следующая задача: UTFString
+## Завершено: UTFString
 
-QDCXX-011 — ready, High. Утверждены UTF-16 code units, различие null/empty, Java-совместимые bytes/consumption в пределах явных caller-supplied resource limits и атомарная запись. Resource-policy outcomes отделены от Java wire validity; чтение всегда ограничено span. Создана задача, реализация UTFString ещё не начата. Compact codec сохраняется как регрессионная база; framing/importer/transport вне объёма.
+QDCXX-011 — done, High. До реализации оценены стандартные средства, UTF-CPP 4.0.6
+и simdutf 5.2.8; существующие Java-векторы показывают несовместимости. Небольшой QD-специфичный
+codec сохраняет UTF-16 units/null, Java-байты и consumed при явных бюджетах вызывающего и атомарной
+записи. Все 314 UTFString observations и 832 compact-регрессии проходят MSVC/ClangCL/WSL GCC
+Debug/Release и GCC ASan+UBSan. Нет production-зависимости или изменений oracle.
+[Контракт и решение о переиспользовании](../spec/encoding/UTFSTRING.ru.md),
+[валидация](../tests/conformance/encoding/VALIDATION.ru.md). API предварителен; огромные выделения,
+другие BufferedInput, framing/importer/transport вне объёма.
 
 ## Первый компонент C++
 
-QDCXX-010 — done, High: минимальная C++23-сборка, compact int/long codec, conformance по Java-векторам и закреплённый процесс форматирования. Реализовано и проверено на MSVC и ClangCL в Debug/Release: 832 выбранных Java observations, закреплённое форматирование и негативные проверки. [Сборка/API](CPP-BUILD.ru.md), [валидация](../tests/conformance/encoding/VALIDATION.ru.md). Существующие fixtures и upstream.lock неизменны. UTFString, importer и transport требуют последующих утверждённых задач.
+QDCXX-010 — done, High: минимальная C++23-сборка, compact int/long codec, conformance по Java-векторам и закреплённый процесс форматирования. Реализовано и проверено на MSVC и ClangCL в Debug/Release: 832 выбранных Java observations, закреплённое форматирование и негативные проверки. [Сборка/API](CPP-BUILD.ru.md), [валидация](../tests/conformance/encoding/VALIDATION.ru.md). Существующие fixtures и upstream.lock неизменны. UTFString завершён в QDCXX-011; importer и transport по-прежнему требуют отдельных утверждённых задач.
 
 ## Утверждение ADR
 
@@ -16,9 +23,9 @@ QDCXX-010 — done, High: минимальная C++23-сборка, compact int
 
 ## Фаза
 
-**Specification baseline с ограниченной реализацией compact integer на C++23.**
+**Specification baseline с ограниченными реализациями compact integer и UTFString на C++23.**
 
-Репозиторий содержит спецификации и Java oracle evidence, а также библиотеку compact int/long QDCXX-010, минимальные CMake/CTest и закреплённое форматирование C++. API предварительный; сторонние runtime-зависимости не выбраны.
+Репозиторий содержит спецификации и Java oracle evidence, а также библиотеку compact int/long QDCXX-010 и UTFString QDCXX-011, минимальные CMake/CTest и закреплённое форматирование C++. API предварительный; сторонние runtime-зависимости не выбраны.
 
 Завершены: QDCXX-008 — контракт JSON и примеры; QDCXX-009 — векторы и контракт примитивных кодировок. Дальнейшие C++/importer требуют отдельной утверждённой задачи. Старые записи ниже описывают состояние при завершении соответствующих задач.
 
@@ -44,7 +51,7 @@ QDCXX-006 предоставляет protocol bytes/observations. QDCXX-007 пр
 
 ## Текущие нецели
 
-- production-компоненты вне утверждённого compact integer scope или generated code;
+- production-компоненты вне утверждённого compact integer/UTFString scope или generated code;
 - dependency-manager configuration;
 - выбор Asio или другого transport runtime;
 - заявления о производительности;

@@ -1,0 +1,3 @@
+2026-09-21T13:38:47.870Z COMMAND ['python', 'tests/conformance/check_compact_negative.py', '.work/msvc/Release/compact_tests.exe', '--report', 'tests/conformance/encoding/utf-compact-negative-proof.json']; cwd='C:\\qd-cxx'; TZ=UTC
+2026-09-21T13:38:51.978Z PASS: fixture/parser/CTest negatives; formatting passed; real and temporary expectations unchanged
+2026-09-21T13:38:51.985Z EXIT 0

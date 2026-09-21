@@ -1,0 +1,5 @@
+2026-09-21T13:37:52.714Z COMMAND ['cmake', '--build', '.work/utf-library']; cwd='/work/qd-cxx'; TZ=UTC
+2026-09-21T13:37:52.893Z [1/3] Building CXX object CMakeFiles/qd_encoding.dir/src/encoding/compact.cpp.o
+2026-09-21T13:37:53.112Z [2/3] Building CXX object CMakeFiles/qd_encoding.dir/src/encoding/utf_string.cpp.o
+2026-09-21T13:37:53.306Z [3/3] Linking CXX static library libqd_encoding.a
+2026-09-21T13:37:53.309Z EXIT 0

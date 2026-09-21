@@ -1,11 +1,39 @@
-# Compact integer C++23 component
+# Bounded C++23 encoding components
 
 [Русская версия](CPP-BUILD.ru.md). English is authoritative.
 
-QDCXX-010 introduces only `qd_encoding`, a dependency-free library with provisional API in
-[compact.hpp](../include/qd/encoding/compact.hpp). The [primitive contract](../spec/encoding/PRIMITIVES.md)
-and unchanged Java QD 3.355 vectors define compatibility. UTFString, PentaCodec, importer, schema
-runtime, QTP framing, transport, packaging and performance claims remain outside this component.
+`qd_encoding` is a dependency-free C++23 production library with provisional compact int/long
+and UTFString APIs. QDCXX-010 introduced compact; QDCXX-011 adds
+[utf_string.hpp](../include/qd/encoding/utf_string.hpp). The unchanged Java
+[primitive evidence](../spec/encoding/PRIMITIVES.md) defines compatibility;
+[UTFString policy and reuse decision](../spec/encoding/UTFSTRING.md) define explicit C++ bounds.
+PentaCodec, importer, schema runtime, QTP framing, transport and packaging remain outside scope.
+
+## UTFString API and current checks
+
+`readUtfString(input, {bodyBytes, codeUnits})` returns owning optional UTF-16 units, status and
+consumed bytes. Only OK permits interpreting value: absent means null, engaged empty means empty.
+Errors have no partial value; allocation failures may throw. `writeUtfString(value, output, limits)`
+borrows an optional UTF-16 view and writes atomically after preflight; input/output must not overlap.
+Both budgets are mandatory, finite operational bounds. There is no normalization or surrogate repair.
+Status adds INVALID_ENCODING, INVALID_LENGTH and RESOURCE_LIMIT without changing compact behavior.
+See the contract for exact precedence, Java body overrun and allocation guarantees.
+
+Existing commands below now build and test both codecs. The executable/CTest names remain
+`compact_tests`/`compact_java_vectors` for compatibility with existing tooling; they execute four
+cases, 43,375 assertions and all 1146 Java observations (314 UTFString, 832 compact), zero exclusions.
+MSVC, ClangCL and WSL GCC pass Debug/Release; GCC ASan+UBSan also passes. Historical QDCXX-010 counts
+below describe the earlier compact-only run. `BUILD_TESTING=OFF` still fetches nothing; no production
+UTF dependency was selected. Reuse probes are optional, separate ignored projects.
+[Current validation](../tests/conformance/encoding/VALIDATION.md) retains UTC evidence.
+
+Additional WSL sanitizer commands from the repository root (cached pinned doctest):
+
+```bash
+python3 tools/run_utc.py --log .work/utf-asan-configure.log -- cmake -S . -B .work/utf-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug '-DCMAKE_CXX_FLAGS=-fsanitize=address,undefined -fno-omit-frame-pointer' -DFETCHCONTENT_SOURCE_DIR_DOCTEST=/work/qd-cxx/.work/linux-debug/_deps/doctest-src
+python3 tools/run_utc.py --log .work/utf-asan-build.log -- cmake --build .work/utf-asan -j 4
+python3 tools/run_utc.py --log .work/utf-asan-test.log -- ctest --test-dir .work/utf-asan --output-on-failure
+```
 
 ## Build and test on Windows
 

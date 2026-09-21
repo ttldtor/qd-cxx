@@ -5,7 +5,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
     message(FATAL_ERROR "Use an out-of-source build, for example -B .work/build")
 endif()
 
-add_library(qd_encoding src/encoding/compact.cpp)
+add_library(qd_encoding src/encoding/compact.cpp src/encoding/utf_string.cpp)
 target_include_directories(qd_encoding PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_compile_features(qd_encoding PUBLIC cxx_std_23)
 set_target_properties(qd_encoding PROPERTIES CXX_EXTENSIONS OFF)

@@ -1,6 +1,48 @@
-# QDCXX-010 validation
+# C++ encoding validation
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
+
+## QDCXX-011 current validation — 2026-09-21 UTC
+
+All 1146 unchanged Java observations pass, including 314 UTFString and 832 compact regressions;
+four doctest cases / 43,375 assertions. Earlier QDCXX-010 evidence below is historical.
+
+| Executed check | Evidence |
+| --- | --- |
+| MSVC 19.42.34444.0 Debug / Release | [Debug](utf-msvc-Debug.log), [Release](utf-msvc-Release.log) |
+| ClangCL 19.1.5 Debug / Release | [Debug](utf-clang-Debug.log), [Release](utf-clang-Release.log) |
+| WSL Ubuntu 24.04.4, GCC 13.3.0 Debug / Release | [Debug](utf-linux-Debug.log), [Release](utf-linux-Release.log) |
+| GCC Debug AddressSanitizer + UndefinedBehaviorSanitizer | [Actual execution](utf-asan.log), no reported errors |
+| UTF byte/value/parser/empty-coverage/CTest negatives, MSVC Release | [Report](utf-negative-proof.json), [log](utf-negative.log) |
+| Same UTF negatives, GCC Release | [Report](utf-linux-negative-proof.json), [log](utf-linux-negative.log) |
+| Compact negatives plus formatter mismatch/idempotence/missing-tool regression | [Report](utf-compact-negative-proof.json), [log](utf-compact-negative.log) |
+| Library-only build | [GCC build](utf-library.log), BUILD_TESTING=OFF, no `_deps` directory |
+| Reuse decision before implementation; exact candidate follow-up | [Initial](utf-reuse-initial.log), [exact probe](utf-reuse.log), [contract](../../../spec/encoding/UTFSTRING.md) |
+| Oracle evidence audit | [UTC log](utf-audit.log) |
+| Final Format → Check, links, diff and immutability | Report |
+
+All requested compiler environments were available. CMake 4.4.2, Windows VS 2022/SDK 10.0.26100.0
+and Linux Ninja 1.11.1 match the [build instructions](../../../docs/CPP-BUILD.md). Sandboxed WSL and
+Windows SDK access initially failed; approved elevated runs succeeded. One initial WSL shell loop
+lost its build-path argument before compilation; the corrected script performed the recorded runs.
+Sanitizer flags were `-fsanitize=address,undefined -fno-omit-frame-pointer`; the sanitizer configure
+used the existing pinned doctest source via `FETCHCONTENT_SOURCE_DIR_DOCTEST`, without changing it.
+
+No Java rerun: hashed Java tools and inputs are unchanged. Every original fixture file and
+upstream.lock matches the pre-change SHA-256 inventory. No golden was regenerated. New logs use
+`tools/run_utc.py`; historical logs retain their original timestamps. Naming, Doxygen, self-contained
+headers, integer arithmetic and borrowing/ownership were reviewed separately from formatting.
+
+Repeat UTF negatives with `python tests/conformance/check_utf_string_negative.py
+.work/msvc/Release/compact_tests.exe --report .work/utf-negative-proof.json` (one command), or the
+Linux executable path. Repeat the existing compact negative driver as documented below. Both mutate
+only temporary fixture copies, demand the expected diagnostic/case, verify unchanged copies and
+rerun the true baseline. S-ascii writer mutation is `03414243 → 03414244`; reader units change
+`004100420043 → 004100420044`. Release CTest must fail on the temporary mismatch.
+
+No huge allocation, allocator-failure injection, 32-bit target, macOS, other Linux distributions,
+other BufferedInput implementations, performance benchmark, full Unicode/QTP or transport/importer
+was tested. No production UTF dependency was added. The API remains provisional.
 
 Initial implementation: 2026-09-21 local date, High reasoning. Owner follow-up: 2026-09-20 UTC
 (exact UTC instants in the fresh logs below). [Build/API instructions](../../../docs/CPP-BUILD.md)

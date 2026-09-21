@@ -2,19 +2,26 @@
 
 [Русская версия](CURRENT-STATE.ru.md). This English document is authoritative.
 
-## Next task: UTFString
+## Completed: UTFString
 
-QDCXX-011 — ready, High. Approved: UTF-16 code units, distinct null/empty, Java-compatible bytes/consumption within explicit caller-supplied resource limits, and atomic writes. Resource-policy outcomes are separate from Java wire validity; reads always remain span-bounded. The task is created; UTFString implementation has not started. Compact codec remains the regression baseline; framing/importer/transport are excluded.
+QDCXX-011 — done, High. Standard facilities, UTF-CPP 4.0.6 and simdutf 5.2.8 were
+assessed before implementation; existing Java vectors demonstrate incompatibilities. A small
+QD-specific codec preserves UTF-16 units/null, Java bytes and consumed positions with explicit
+caller budgets and atomic writes. All 314 UTFString observations plus 832 compact regressions pass
+MSVC/ClangCL/WSL GCC Debug/Release and GCC ASan+UBSan. No production dependency or oracle change.
+[Contract and reuse decision](../spec/encoding/UTFSTRING.md),
+[validation](../tests/conformance/encoding/VALIDATION.md). API remains provisional; huge allocation,
+other BufferedInput profiles, framing/importer/transport remain outside scope.
 
 ## First C++ component
 
-QDCXX-010 — done, High: minimal C++23 build, compact int/long codec, Java-vector conformance and pinned formatting workflow. Implemented and verified on MSVC and ClangCL in Debug/Release: 832 selected Java observations, pinned formatting and negative checks. [Build/API](CPP-BUILD.md), [validation](../tests/conformance/encoding/VALIDATION.md). Existing fixtures and upstream.lock are unchanged. UTFString, importer and transport require later approved tasks.
+QDCXX-010 — done, High: minimal C++23 build, compact int/long codec, Java-vector conformance and pinned formatting workflow. Implemented and verified on MSVC and ClangCL in Debug/Release: 832 selected Java observations, pinned formatting and negative checks. [Build/API](CPP-BUILD.md), [validation](../tests/conformance/encoding/VALIDATION.md). Existing fixtures and upstream.lock are unchanged. UTFString is completed by QDCXX-011; importer and transport still require separate approved tasks.
 
 ## Phase
 
-**Specification baseline with bounded C++23 compact integer implementation.**
+**Specification baseline with bounded C++23 compact integer and UTFString implementation.**
 
-The repository defines specifications and Java oracle evidence, plus the QDCXX-010 compact int/long library, minimal CMake/CTest and pinned C++ formatting. The API is provisional; no third-party runtime dependency is selected.
+The repository defines specifications and Java oracle evidence, plus the QDCXX-010 compact int/long and QDCXX-011 UTFString library, minimal CMake/CTest and pinned C++ formatting. The API is provisional; no third-party runtime dependency is selected.
 
 ## ADR approval and next tasks
 
@@ -44,7 +51,7 @@ This phase is complete when the repository workflow is reproducible, upstream pr
 
 ## Known non-goals for now
 
-- production components beyond the approved compact integer scope or generated code;
+- production components beyond the approved compact integer/UTFString scope or generated code;
 - dependency-manager configuration;
 - selection of Asio or another transport runtime;
 - performance claims;

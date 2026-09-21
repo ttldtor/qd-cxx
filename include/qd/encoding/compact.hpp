@@ -8,9 +8,12 @@ namespace qd::encoding {
 
 /** Bounded-storage outcomes; Java EOF maps to INSUFFICIENT_INPUT. */
 enum class Status {
-    OK,                 ///< The complete value was read or written.
-    INSUFFICIENT_INPUT, ///< All supplied bytes were consumed; no value is available.
-    INSUFFICIENT_OUTPUT ///< No bytes were written and output is unchanged.
+    OK,                  ///< The complete value was read or written.
+    INSUFFICIENT_INPUT,  ///< All supplied bytes were consumed; no value is available.
+    INSUFFICIENT_OUTPUT, ///< No bytes were written and output is unchanged.
+    INVALID_ENCODING,    ///< UTFString body is malformed; no value is available.
+    INVALID_LENGTH,      ///< UTFString length is outside the Java wire domain.
+    RESOURCE_LIMIT       ///< Explicit UTFString byte or code-unit budget was exceeded.
 };
 
 /** Result owning a decoded value, without retaining the input span.
@@ -24,8 +27,8 @@ template <typename T> struct ReadResult {
 
 /** Result of an atomic bounded write. */
 struct WriteResult {
-    std::size_t written; ///< Encoded size on OK; zero on insufficient output.
-    Status status;       ///< Completion or insufficient-output outcome.
+    std::size_t written; ///< Encoded size on OK; zero on every failure.
+    Status status;       ///< Completion or failure outcome; compact writers only fail on capacity.
 };
 
 /** Read one Java compact int, accepting overlong forms and taking signed low 32 bits.

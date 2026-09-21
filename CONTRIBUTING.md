@@ -26,7 +26,7 @@ as the root `.clang-format` and `.uncrustify.cfg`. The complete formatting pipel
 Uncrustify 0.83.0 followed by clang-format 20.1.8. This is separate from Google Java Style.
 Use the [Format/Check workflow](tools/format/CPP.md) ([Russian](tools/format/CPP.ru.md)) and
 [build/conformance commands](docs/CPP-BUILD.md) ([Russian](docs/CPP-BUILD.ru.md)).
-QDCXX-010 implements only compact int/long with minimal CMake/CTest; additional components need approval.
+QDCXX-010/011 implement bounded compact int/long and UTFString with minimal CMake/CTest; additional components need approval.
 
 ## Documentation-only validation
 

@@ -1,0 +1,10 @@
+2026-09-21T13:31:41.241Z COMMAND ['.work/utf-reuse/build/probe']; cwd='/work/qd-cxx'; TZ=UTC
+2026-09-21T13:31:41.247Z S-supplementary utfcpp=1 simdutf=1 Java=accepted
+2026-09-21T13:31:41.247Z S-high utfcpp=0 simdutf=0 Java=accepted
+2026-09-21T13:31:41.248Z S-low utfcpp=0 simdutf=0 Java=accepted
+2026-09-21T13:31:41.248Z F-overlong2 utfcpp=0 simdutf=0 Java=accepted
+2026-09-21T13:31:41.249Z F-overlong3 utfcpp=0 simdutf=0 Java=accepted
+2026-09-21T13:31:41.249Z F-overlong4 utfcpp=0 simdutf=0 Java=accepted
+2026-09-21T13:31:41.250Z F-cesu-pair utfcpp=0 simdutf=0 Java=accepted
+2026-09-21T13:31:41.250Z F-surrogate4 utfcpp=0 simdutf=0 Java=accepted
+2026-09-21T13:31:41.250Z EXIT 0

@@ -1,0 +1,9 @@
+2026-09-21T13:37:24.209Z COMMAND ['ctest', '--test-dir', '.work/linux-debug', '--output-on-failure']; cwd='/work/qd-cxx'; TZ=UTC
+2026-09-21T13:37:24.234Z Test project /work/qd-cxx/.work/linux-debug
+2026-09-21T13:37:24.253Z     Start 1: compact_java_vectors
+2026-09-21T13:37:24.299Z 1/1 Test #1: compact_java_vectors .............   Passed    0.04 sec
+2026-09-21T13:37:24.309Z 
+2026-09-21T13:37:24.309Z 100% tests passed out of 1
+2026-09-21T13:37:24.310Z 
+2026-09-21T13:37:24.310Z Total Test time (real) =   0.07 sec
+2026-09-21T13:37:24.314Z EXIT 0

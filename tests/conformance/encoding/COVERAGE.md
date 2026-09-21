@@ -1,6 +1,40 @@
-# C++ compact integer conformance coverage
+# C++ encoding conformance coverage
 
 [Русская версия](COVERAGE.ru.md). English is authoritative.
+
+## QDCXX-011 current coverage
+
+The existing [doctest executable](../compact_tests.cpp) now selects every observation in
+integers.tsv, forms.tsv and strings.tsv: **1146 observations, zero exclusions**. The original
+832 compact observations and their capacity/sentinel regressions remain. The sections below
+this update retain QDCXX-010 historical counts; their UTFString exclusions no longer apply.
+[Fresh case log](utf-cases.log) lists every file/kind/ID/method and totals.
+
+| UTFString file | Writers | Readers | Strict prefixes | OK reads | EOF | Invalid encoding | Invalid length |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| strings.tsv | 13 | 200 | 187 | 13 | 187 | 0 | 0 |
+| forms.tsv | 0 | 101 | 79 | 10 | 80 | 8 | 3 |
+| Total | 13 | 301 | 266 | 23 | 267 | 8 | 3 |
+
+All 13 S IDs and 22 F IDs, including every captured strict prefix, are mapped in
+[Java coverage](../../fixtures/encoding/COVERAGE.md); the fresh log supplies exact expanded IDs.
+Each read compares exact UTF-16 units/null, status, consumed and remaining bytes against unchanged
+TSV. No C++ round trip supplies expectations. Malformed prefixes use actual Java categories.
+Every UTF writer exercises capacities zero through golden size + 2 with guards, untouched excess
+and unchanged failure buffers. No sentinel is appended to incomplete UTF input.
+
+The fourth doctest case covers zero budgets, null/empty, isolated surrogates, pair budgets,
+incremental limits, invalid-length-before-policy, incomplete/malformed-before-unit-budget,
+body overrun and trailing bytes, owning results, SIZE_MAX budgets and the maximum Java length,
+maximum + 1 and signed-long maximum without large allocation. Writer byte/unit policy failures
+are atomic. A maximum declared body with no body returns EOF under sufficient policy, without
+reserving the declaration. Fake huge spans are excluded; arithmetic safety is also source-reviewed.
+Four doctest cases execute **43,375 assertions**. Parsing rejects malformed units/hex/decimals,
+unknown methods/statuses/categories, duplicate IDs, incomplete files and empty selected coverage.
+
+The [UTFString contract](../../../spec/encoding/UTFSTRING.md) separates operational policy from
+Java observations. This is not huge-allocation, allocator-failure, 32-bit, universal Unicode,
+other BufferedInput, framing, importer or transport coverage.
 
 QDCXX-010, 2026-09-21. Oracle: Java QD 3.355, commit
 `0ddc0a09779fb61d74cc0b37c6449ff47dcb715f`. The doctest-based

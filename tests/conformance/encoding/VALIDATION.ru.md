@@ -1,6 +1,51 @@
-# Валидация QDCXX-010
+# Валидация кодирования C++
 
 [English version](VALIDATION.md). Английский документ является основным.
+
+## Текущая валидация QDCXX-011 — 2026-09-21 UTC
+
+Проходят все 1146 неизменных Java observations, включая 314 UTFString и 832 compact-регрессии;
+четыре doctest cases / 43 375 assertions. Свидетельства QDCXX-010 ниже являются историческими.
+
+| Выполненная проверка | Свидетельства |
+| --- | --- |
+| MSVC 19.42.34444.0 Debug / Release | [Debug](utf-msvc-Debug.log), [Release](utf-msvc-Release.log) |
+| ClangCL 19.1.5 Debug / Release | [Debug](utf-clang-Debug.log), [Release](utf-clang-Release.log) |
+| WSL Ubuntu 24.04.4, GCC 13.3.0 Debug / Release | [Debug](utf-linux-Debug.log), [Release](utf-linux-Release.log) |
+| GCC Debug AddressSanitizer + UndefinedBehaviorSanitizer | [Фактическое исполнение](utf-asan.log), ошибок не обнаружено |
+| UTF byte/value/parser/empty-coverage/CTest negatives, MSVC Release | [Отчёт](utf-negative-proof.json), [журнал](utf-negative.log) |
+| Те же UTF negatives, GCC Release | [Отчёт](utf-linux-negative-proof.json), [журнал](utf-linux-negative.log) |
+| Compact negatives и регрессии formatter mismatch/idempotence/missing-tool | [Отчёт](utf-compact-negative-proof.json), [журнал](utf-compact-negative.log) |
+| Сборка только библиотеки | [GCC build](utf-library.log), BUILD_TESTING=OFF, каталог `_deps` отсутствует |
+| Решение о переиспользовании до реализации; последующее точное сравнение | [Первоначальное](utf-reuse-initial.log), [точный probe](utf-reuse.log), [контракт](../../../spec/encoding/UTFSTRING.ru.md) |
+| Аудит oracle evidence | [UTC-журнал](utf-audit.log) |
+| Итоговые Format → Check, ссылки, diff и неизменность | Отчёт |
+
+Все запрошенные среды компиляторов были доступны. CMake 4.4.2, Windows VS 2022/SDK 10.0.26100.0
+и Linux Ninja 1.11.1 соответствуют [инструкциям сборки](../../../docs/CPP-BUILD.ru.md). Первоначально
+sandbox блокировал WSL и Windows SDK; разрешённые запуски с повышенным доступом успешны. Один
+начальный WSL shell loop потерял аргумент каталога сборки до компиляции; исправленный скрипт
+выполнил записанные прогоны. Флаги sanitizer: `-fsanitize=address,undefined -fno-omit-frame-pointer`;
+его configure использовал существующий закреплённый исходник doctest через
+`FETCHCONTENT_SOURCE_DIR_DOCTEST`, не изменяя его.
+
+Java повторно не запускалась: хэшируемые Java tools и входы неизменны. Каждый исходный fixture-файл
+и upstream.lock совпадает с инвентарём SHA-256 до изменений. Ни один эталон не пересоздан. Новые
+журналы используют `tools/run_utc.py`; исторические сохраняют исходные даты. Именование, Doxygen,
+самодостаточные заголовки, целочисленная арифметика и заимствование/владение проверены отдельно от
+форматирования.
+
+Повторить UTF negatives: `python tests/conformance/check_utf_string_negative.py
+.work/msvc/Release/compact_tests.exe --report .work/utf-negative-proof.json` (одна команда), либо
+путь Linux executable. Существующий compact negative driver повторяется по инструкции ниже.
+Оба изменяют только временные копии fixtures, требуют ожидаемые diagnostic/case, проверяют
+неизменность копий и повторяют настоящий baseline. Мутация S-ascii writer: `03414243 → 03414244`;
+единицы reader меняются `004100420043 → 004100420044`. Release CTest обязан отклонить временное
+несовпадение.
+
+Не проверены огромные выделения, инъекция отказов аллокатора, 32-bit target, macOS, другие Linux,
+другие BufferedInput, benchmark, полный Unicode/QTP или transport/importer. Production-зависимость
+UTF не добавлена. API остаётся предварительным.
 
 Исходная реализация: 2026-09-21 по местной дате, reasoning High. Дополнение владельца: 2026-09-20 UTC
 (точные моменты UTC указаны в новых журналах ниже). [Инструкции сборки/API](../../../docs/CPP-BUILD.ru.md)
