@@ -1,24 +1,44 @@
 # Текущее состояние
 
-## QDCXX-016: готово для независимого ревью
 
-Ограниченный STREAM_DATA decoder использует неизменяемый static snapshot, обычные точные type-8 поля,
-нулевые raw flags и свежие message-local symbols. Java-доказательства предшествовали реализации:
-35 production observations, два чистых совпавших capture и negative/baseline Verify. MSVC/ClangCL/GCC
-Debug/Release, GCC ASan+UBSan, все шесть suites, BUILD_TESTING=OFF, pinned formatting и 15 negative fixture
-checks успешны. Исторические fixtures и upstream.lock сохранены. Transport, dynamic session, nonzero
-flags, writer и importer не добавлены. Коммит не создан. [Валидация](../tests/conformance/protocol/stream-data/VALIDATION.md).
+## Актуальный статус
 
+QDCXX-010–016 реализованы. QDCXX-016 — **done**, независимое ревью завершено; коммит:
+`8c9e82223e9bd783e281babf3e791cfaf4767555`. Последующие коммиты `9562ec2`, `94f3542`
+и `128b8bf` обновляют правила комментариев, комментарии, лицензию и copyright-заголовки.
+Проверки ревью ниже предшествуют этим изменениям; эта правка статуса не означает новый запуск тестов.
 
-## Закрытие ревью и следующая задача
+Реализованы ограниченные C++23 compact int/long, UTFString, инкрементальный QTP framing, сырые
+DESCRIBE_RECORDS, проверяемые локальные type-8 схемы/статический binding, message-local EMPTY_SET
+символы и декодирование полного STREAM_DATA payload со статическим контекстом и нулевыми raw flags.
+API предварительные. Transport, динамические sessions/negotiation, importer, writer, conversions
+и расширенные профили событий не реализованы.
 
-QDCXX-015 проверена и закоммичена как 8bc9838efa3be8c157ec7d9a9b13e476baeff385, включая strict-fixture
-доработку (14 negative cases). Ревью доработки повторило MSVC Release, пять suites, исходную unknown-row
-репродукцию, negatives и evidence audit; остальные финальные профили доработки — проверки автора.
-Прежняя запись о handoff ниже сохраняет исторический смысл.
+### Доказательства и ревью QDCXX-016
 
-QDCXX-016 готова, не начата: полный STREAM_DATA payload, static validated
-context, точные type-8 поля и нулевые raw flags. Без transport/dynamic session.
+[Отчёт автора](../tests/conformance/protocol/stream-data/VALIDATION.ru.md) фиксирует 35 наблюдений
+штатного Java-пути, два совпавших чистых capture и negative/baseline Verify.
+Независимое ревью повторило MSVC/ClangCL/GCC Debug/Release, GCC ASan+UBSan, все шесть CTest suites,
+production-only сборку, 15 отрицательных случаев и baseline, форматирование и проверки доказательств.
+В этих проверках ошибок не обнаружено. Java captures независимо не перезапускались.
+Локальные логи ревью сохранены в `.work/review-016/` (не отслеживаются Git и не являются переносимыми
+доказательствами репозитория). Исторические fixtures и `upstream.lock` сохранены.
+
+Ревью QDCXX-015 закрыто, включая строгую проверку fixtures и **14** отрицательных случаев;
+коммит базы: `8bc9838efa3be8c157ec7d9a9b13e476baeff385`. Ревью доработки повторило
+MSVC Release, пять suites, исходную unknown-row репродукцию, negatives и evidence audit;
+остальные финальные профили доработки остаются результатами автора.
+
+### Следующий шаг
+
+QDCXX-017 (ограниченный офлайн-инструмент диагностики бинарного QTP) — только предложение:
+файл задачи не создан, реализация не назначена и не начата. Объём нужно определить и согласовать отдельно.
+
+## Исторические записи о завершении
+
+Разделы ниже сохраняют состояние на момент прежних передач результатов, а не текущий объём или статус.
+Фразы «коммит не создан», «proposed» и прежние отсутствующие компоненты относятся к тем этапам.
+Актуальная сводка выше имеет приоритет.
 
 ## Завершено: ограниченный reader символов QTP
 

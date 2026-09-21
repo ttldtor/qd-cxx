@@ -1,24 +1,43 @@
 # Current state
 
-## QDCXX-016: ready for independent review
 
-Bounded STREAM_DATA decoding now uses an immutable static snapshot, ordinary exact type-8 fields,
-zero raw flags and fresh message-local symbols. Java evidence preceded implementation: 35 production
-observations, two clean equal captures and negative/baseline Verify. MSVC/ClangCL/GCC Debug/Release,
-GCC ASan+UBSan, all six suites, BUILD_TESTING=OFF, pinned formatting and 15 negative fixture checks pass.
-Historical fixtures and upstream.lock are unchanged. No transport, dynamic session, nonzero flags,
-writer or importer was added. No commit created. [Validation](../tests/conformance/protocol/stream-data/VALIDATION.md).
+## Current status
 
+QDCXX-010–016 are implemented. QDCXX-016 is **done**, independently reviewed and committed as
+`8c9e82223e9bd783e281babf3e791cfaf4767555`. The subsequent commits `9562ec2`, `94f3542`
+and `128b8bf` update comment guidance, comments, licensing and copyright headers.
+The review checks below predate those follow-ups; this status update does not claim a new test run.
 
-## Review closure and next task
+Implemented: bounded C++23 compact int/long, UTFString, incremental QTP framing, raw DESCRIBE_RECORDS,
+validated local type-8 schemas/static binding, message-local EMPTY_SET symbols and complete STREAM_DATA
+payload decoding with a static context and zero raw flags. APIs remain provisional. Transport, dynamic
+sessions/negotiation, importer, writer, conversions and broader event profiles remain unimplemented.
 
-QDCXX-015 is reviewed and committed as 8bc9838efa3be8c157ec7d9a9b13e476baeff385, including the
-strict-fixture follow-up (14 negative cases). The follow-up review reran MSVC Release, all five suites,
-the original unknown-row reproduction, negatives and evidence audit; other final follow-up profiles
-remain author-run results. Earlier handoff text below retains its historical scope.
+### QDCXX-016 evidence and review
 
-QDCXX-016 is ready, not started: complete STREAM_DATA payload decoding with
-static validated context, exact type-8 fields and zero raw flags. No transport/dynamic session.
+The author's [validation report](../tests/conformance/protocol/stream-data/VALIDATION.md) records
+35 production Java observations, two matching clean captures and negative/baseline Verify.
+Independent review reran MSVC/ClangCL/GCC Debug/Release, GCC ASan+UBSan, all six CTest suites,
+production-only build, 15 negative cases and baseline, formatting and evidence checks.
+No errors were detected in those checks. Java captures were not independently rerun.
+Local review logs remain in `.work/review-016/` (untracked; not portable repository evidence).
+Historical fixtures and `upstream.lock` were preserved.
+
+QDCXX-015 review is closed, including strict fixture validation and **14** negative cases;
+committed baseline: `8bc9838efa3be8c157ec7d9a9b13e476baeff385`. Its follow-up review reran
+MSVC Release, five suites, the original unknown-row reproduction, negatives and evidence audit;
+other final follow-up profiles remain author-run results.
+
+### Next step
+
+QDCXX-017 (bounded offline binary-QTP diagnostic tool) is a proposal only: no task file has been
+created, and implementation is not assigned or started. Define and approve its scope separately.
+
+## Historical completion records
+
+The sections below preserve the state at each earlier handoff, not today's scope or task status.
+Statements such as “no commit”, “proposed”, and earlier missing components describe those milestones.
+The current summary above takes precedence.
 
 ## Completed: bounded QTP symbol reader
 
