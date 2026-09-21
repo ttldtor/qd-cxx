@@ -102,6 +102,20 @@ Document each parameter with `@param`, each template parameter with `@tparam`, a
 result with `@return`. Describe ownership, lifetime, byte counts and error outcomes where applicable.
 The QDCXX-010 owner follow-up makes these tags mandatory, including for utility functions.
 
+### Contract comments versus provenance
+
+Production-code comments explain the current contract, constraints and reasons for decisions, not
+the history of the project. Keep upstream versions/commits, task IDs and validation history in
+specifications, `upstream.lock` and provenance reports. Prefer a reference to the relevant specification
+instead of repeating its pinned upstream version next to every type or constant.
+
+Include a version or historical reference in code only when it explains version-specific behavior,
+a compatibility exception or a workaround; state why that reference matters. For example, an enum
+comment should explain that it is incomplete and that raw numeric IDs retain representation bits,
+without repeating the upstream release merely used to verify those IDs. Required copyright, license
+and attribution notices are unaffected. Apply this owner-requested rule to new or touched comments;
+it does not authorize bulk cleanup or rewriting historical evidence.
+
 The reference also uses `std::format`, raw strings, standard C++20/23 facilities and doctest.
 For qd-cxx, readable standard C++23 remains the existing goal; choose raw strings when clearer and
 `std::format` for composed human-readable text when appropriate. This style adoption does **not**
