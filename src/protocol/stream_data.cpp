@@ -1,3 +1,6 @@
+// Copyright (c) 2026 ttldtor.
+// SPDX-License-Identifier: BSL-1.0
+
 #include "qd/protocol/stream_data.hpp"
 
 #include "qd/encoding/compact.hpp"
