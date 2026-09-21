@@ -30,8 +30,10 @@ other final follow-up profiles remain author-run results.
 
 ### Next step
 
-QDCXX-017 (bounded offline binary-QTP diagnostic tool) is a proposal only: no task file has been
-created, and implementation is not assigned or started. Define and approve its scope separately.
+QDCXX-017 — ready, High: bounded offline binary-QTP inspection tool.
+Prepared for a separate session; implementation has not started. Explicit built-in diagnostic local
+schema profile, initial descriptions and static context, type-8/zero-flags data, deterministic output
+and finite budgets. No transport, importer or dynamic session.
 
 ## Historical completion records
 
