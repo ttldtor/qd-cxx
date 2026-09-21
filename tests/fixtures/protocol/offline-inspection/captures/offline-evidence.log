@@ -1,0 +1,4 @@
+2026-09-21T21:49:06.111Z COMMAND ['pwsh', '-NoProfile', '-File', '.work/offline_evidence.ps1']; cwd='C:\\qd-cxx'; TZ=UTC
+2026-09-21T21:49:44.785Z CAPTURE COMPLETE: 1 cases; review normalized output before promotion.
+2026-09-21T21:51:00.440Z VERIFY PASS: 1 cases; expectations unchanged.
+2026-09-21T21:51:00.467Z EXIT 0

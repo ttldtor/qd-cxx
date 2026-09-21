@@ -230,3 +230,14 @@ CTest добавляет `protocol_java_stream_data` / `stream_data_tests`; QD_S
 намеренные временные fixture overrides. Прежние build команды запускают все шесть suites. Полная compiler/
 sanitizer/production-only матрица и negative checks: [валидация](../tests/conformance/protocol/stream-data/VALIDATION.md).
 Transport, dynamic session, nonzero flags, importer и production dependency не добавлены.
+
+## Офлайн-инструмент QDCXX-017
+
+Включите `-DQD_BUILD_QTP_INSPECT=ON` для ограниченного executable `qd-qtp-inspect`; по умолчанию
+OFF сохраняет сборку только библиотек. `-DBUILD_TESTING=OFF` никогда не получает тестовые
+зависимости, в том числе при включённом инструменте. [CLI/профиль/лимиты](QTP-INSPECT.ru.md),
+[контракт](../spec/protocol/OFFLINE-INSPECTION.ru.md). При включённых тестах и инструменте Python 3
+обеспечивает process-level проверки CTest, doctest — переносимые инъекции ошибок I/O. Шесть
+прежних suites остаются включены. Новых production-зависимостей и публичного session framework нет.
+StreamDataResult теперь возвращает списанные `processedRecords`/`wireFields` согласно
+принятому решению, без изменения wire или позиций.

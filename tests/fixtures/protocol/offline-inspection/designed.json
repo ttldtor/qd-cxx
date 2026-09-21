@@ -1,0 +1,729 @@
+{
+  "format": "qdcxx-offline-designed-v1",
+  "provenance": "Designed CLI policy; not Java observations. Initial 53 cases specified before CLI implementation; 19 boundary cases added during validation.",
+  "cases": [
+    {
+      "name": "empty",
+      "input": "designed/empty.qtp",
+      "args": [
+        "--max-input",
+        "0",
+        "--max-frames",
+        "0",
+        "--max-records",
+        "0",
+        "--max-fields",
+        "0"
+      ],
+      "exit": 0,
+      "stdout": "format\tqd-qtp-inspect\t1\ncomplete\t0\t0\t0\t0\t0\n",
+      "stderr": ""
+    },
+    {
+      "name": "descriptions-only",
+      "input": "designed/descriptions-only.qtp",
+      "args": [],
+      "exit": 0,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\nframe\t1\t9\t36\t2\t11\t25\nframe\t2\t36\t43\t2\t38\t5\nframe\t3\t43\t61\t2\t45\t16\ncomplete\t61\t4\t0\t0\t0\n",
+      "stderr": ""
+    },
+    {
+      "name": "heartbeat-only",
+      "input": "designed/heartbeat-only.qtp",
+      "args": [],
+      "exit": 0,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t1\t-\t-\t0\ncomplete\t1\t1\t0\t0\t0\n",
+      "stderr": ""
+    },
+    {
+      "name": "empty-description-data",
+      "input": "designed/empty-description-data.qtp",
+      "args": [],
+      "exit": 0,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t2\t2\t2\t0\nframe\t1\t2\t4\t15\t4\t0\ncomplete\t4\t2\t0\t0\t0\n",
+      "stderr": ""
+    },
+    {
+      "name": "heartbeat-anywhere",
+      "input": "designed/heartbeat-anywhere.qtp",
+      "args": [],
+      "exit": 0,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t1\t-\t-\t0\nframe\t1\t1\t10\t2\t3\t7\nframe\t2\t10\t11\t-\t-\t0\nframe\t3\t11\t16\t15\t13\t3\nrecord\t3\t0\t0\t0053\t-\t1\nframe\t4\t16\t17\t-\t-\t0\ncomplete\t17\t5\t1\t1\t1\n",
+      "stderr": ""
+    },
+    {
+      "name": "two-data",
+      "input": "designed/two-data.qtp",
+      "args": [],
+      "exit": 0,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\nframe\t1\t9\t15\t15\t11\t4\nrecord\t1\t0\t0\t0053\t004100420043\t1\nframe\t2\t15\t21\t15\t17\t4\nrecord\t2\t1\t0\t0053\t004100420043\t2\ncomplete\t21\t3\t2\t2\t2\n",
+      "stderr": ""
+    },
+    {
+      "name": "duplicate-target-skip",
+      "input": "designed/duplicate-target-skip.qtp",
+      "args": [],
+      "exit": 0,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t27\t2\t2\t25\nframe\t1\t27\t45\t2\t29\t16\nframe\t2\t45\t52\t2\t47\t5\nframe\t3\t52\t69\t15\t54\t15\nrecord\t3\t0\t1\t0052\t004100420043\t3,5,0\nrecord\t3\t1\t2\t0045\t004100420043\t-\ncomplete\t69\t4\t2\t3\t7\n",
+      "stderr": ""
+    },
+    {
+      "name": "missing-fields",
+      "input": "designed/missing-fields.qtp",
+      "args": [],
+      "exit": 0,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t6\t2\t2\t4\nframe\t1\t6\t10\t15\t8\t2\nrecord\t1\t0\t1\t0052\t-\t0,0,0\ncomplete\t10\t2\t1\t1\t0\n",
+      "stderr": ""
+    },
+    {
+      "name": "unknown-empty",
+      "input": "designed/unknown-empty.qtp",
+      "args": [],
+      "exit": 0,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t12\t2\t2\t10\nframe\t1\t12\t18\t15\t14\t4\ncomplete\t18\t2\t0\t2\t0\n",
+      "stderr": ""
+    },
+    {
+      "name": "noncanonical",
+      "input": "designed/noncanonical.qtp",
+      "args": [],
+      "exit": 0,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t11\t2\t4\t7\nframe\t1\t11\t18\t15\t15\t3\nrecord\t1\t0\t0\t0053\t-\t1\ncomplete\t18\t2\t1\t1\t1\n",
+      "stderr": ""
+    },
+    {
+      "name": "data-before-description",
+      "input": "designed/data-before-description.qtp",
+      "args": [],
+      "exit": 4,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t2\t15\t2\t0\n",
+      "stderr": "incomplete\t4\tsequence\t0\t15\t0\t2\t-\t-\t-\t-\n"
+    },
+    {
+      "name": "description-after-data",
+      "input": "designed/description-after-data.qtp",
+      "args": [],
+      "exit": 4,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\nframe\t1\t9\t11\t15\t11\t0\nframe\t2\t11\t20\t2\t13\t7\n",
+      "stderr": "incomplete\t4\tsequence\t2\t2\t11\t13\t-\t-\t-\t-\n"
+    },
+    {
+      "name": "empty-description-after-data",
+      "input": "designed/empty-description-after-data.qtp",
+      "args": [],
+      "exit": 4,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\nframe\t1\t9\t11\t15\t11\t0\nframe\t2\t11\t13\t2\t13\t0\n",
+      "stderr": "incomplete\t4\tsequence\t2\t2\t11\t13\t-\t-\t-\t-\n"
+    },
+    {
+      "name": "duplicate-across",
+      "input": "designed/duplicate-across.qtp",
+      "args": [],
+      "exit": 5,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\nframe\t1\t9\t18\t2\t11\t7\n",
+      "stderr": "incomplete\t5\tduplicate-id\t1\t2\t9\t11\t7\t7\t18\t18\n"
+    },
+    {
+      "name": "duplicate-within",
+      "input": "designed/duplicate-within.qtp",
+      "args": [],
+      "exit": 5,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t16\t2\t2\t14\n",
+      "stderr": "incomplete\t5\tduplicate-id\t0\t2\t0\t2\t14\t14\t16\t16\n"
+    },
+    {
+      "name": "explicit-zero",
+      "input": "designed/explicit-zero.qtp",
+      "args": [],
+      "exit": 4,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t2\t0\t2\t0\n",
+      "stderr": "incomplete\t4\ttype\t0\t0\t0\t2\t-\t-\t-\t-\n"
+    },
+    {
+      "name": "unknown-type",
+      "input": "designed/unknown-type.qtp",
+      "args": [],
+      "exit": 4,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t2\t62\t2\t0\n",
+      "stderr": "incomplete\t4\ttype\t0\t62\t0\t2\t-\t-\t-\t-\n"
+    },
+    {
+      "name": "part",
+      "input": "designed/part.qtp",
+      "args": [],
+      "exit": 4,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t2\t4\t2\t0\n",
+      "stderr": "incomplete\t4\ttype\t0\t4\t0\t2\t-\t-\t-\t-\n"
+    },
+    {
+      "name": "ticker",
+      "input": "designed/ticker.qtp",
+      "args": [],
+      "exit": 4,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t2\t10\t2\t0\n",
+      "stderr": "incomplete\t4\ttype\t0\t10\t0\t2\t-\t-\t-\t-\n"
+    },
+    {
+      "name": "unsupported-description",
+      "input": "designed/unsupported-description.qtp",
+      "args": [],
+      "exit": 4,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\n",
+      "stderr": "incomplete\t4\tbinding.1\t0\t2\t0\t2\t7\t7\t9\t9\n"
+    },
+    {
+      "name": "unsupported-unknown-description",
+      "input": "designed/unsupported-unknown-description.qtp",
+      "args": [],
+      "exit": 4,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t15\t2\t2\t13\n",
+      "stderr": "incomplete\t4\tbinding.1\t0\t2\t0\t2\t13\t13\t15\t15\n"
+    },
+    {
+      "name": "unsupported-flags",
+      "input": "designed/unsupported-flags.qtp",
+      "args": [],
+      "exit": 4,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\nframe\t1\t9\t16\t15\t11\t5\n",
+      "stderr": "incomplete\t4\tdata.3\t1\t15\t9\t11\t3\t3\t14\t14\n"
+    },
+    {
+      "name": "payload-truncated",
+      "input": "designed/payload-truncated.qtp",
+      "args": [],
+      "exit": 5,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\nframe\t1\t9\t14\t15\t11\t3\n",
+      "stderr": "incomplete\t5\tdata.5\t1\t15\t9\t11\t3\t2\t14\t13\n"
+    },
+    {
+      "name": "wide-payload-truncated",
+      "input": "designed/wide-payload-truncated.qtp",
+      "args": [],
+      "exit": 5,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t11\t2\t4\t7\nframe\t1\t11\t18\t15\t15\t3\n",
+      "stderr": "incomplete\t5\tdata.5\t1\t15\t11\t15\t3\t2\t18\t17\n"
+    },
+    {
+      "name": "reset-repeat",
+      "input": "designed/reset-repeat.qtp",
+      "args": [],
+      "exit": 5,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\nframe\t1\t9\t14\t15\t11\t3\nrecord\t1\t0\t0\t0053\t-\t1\nframe\t2\t14\t19\t15\t16\t3\n",
+      "stderr": "incomplete\t5\tdata.2\t2\t15\t14\t16\t1\t0\t17\t16\n"
+    },
+    {
+      "name": "undescribed",
+      "input": "designed/undescribed.qtp",
+      "args": [],
+      "exit": 5,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\nframe\t1\t9\t13\t15\t11\t2\n",
+      "stderr": "incomplete\t5\tdata.4\t1\t15\t9\t11\t2\t2\t13\t13\n"
+    },
+    {
+      "name": "bad-description",
+      "input": "designed/bad-description.qtp",
+      "args": [],
+      "exit": 5,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t3\t2\t2\t1\n",
+      "stderr": "incomplete\t5\tdescription.3\t0\t2\t0\t2\t1\t1\t3\t3\n"
+    },
+    {
+      "name": "completed-prefix",
+      "input": "designed/completed-prefix.qtp",
+      "args": [],
+      "exit": 5,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\nframe\t1\t9\t17\t15\t11\t6\nrecord\t1\t0\t0\t0053\t-\t1\n",
+      "stderr": "incomplete\t5\tdata.5\t1\t15\t9\t11\t6\t5\t17\t16\n"
+    },
+    {
+      "name": "stop-before-later",
+      "input": "designed/stop-before-later.qtp",
+      "args": [],
+      "exit": 5,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\nframe\t1\t9\t17\t15\t11\t6\nrecord\t1\t0\t0\t0053\t-\t1\n",
+      "stderr": "incomplete\t5\tdata.5\t1\t15\t9\t11\t6\t5\t17\t16\n"
+    },
+    {
+      "name": "truncated-frame",
+      "input": "designed/truncated-frame.qtp",
+      "args": [],
+      "exit": 5,
+      "stdout": "format\tqd-qtp-inspect\t1\n",
+      "stderr": "incomplete\t5\tframing.5\t0\t-\t0\t-\t-\t-\t3\t-\n"
+    },
+    {
+      "name": "truncated-prefix",
+      "input": "designed/truncated-prefix.qtp",
+      "args": [],
+      "exit": 5,
+      "stdout": "format\tqd-qtp-inspect\t1\n",
+      "stderr": "incomplete\t5\tframing.5\t0\t-\t0\t-\t-\t-\t1\t-\n"
+    },
+    {
+      "name": "excess-max-records",
+      "input": "designed/excess-max-records.qtp",
+      "args": [
+        "--max-records",
+        "1"
+      ],
+      "exit": 6,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\nframe\t1\t9\t15\t15\t11\t4\nrecord\t1\t0\t0\t0053\t004100420043\t1\nframe\t2\t15\t21\t15\t17\t4\n",
+      "stderr": "incomplete\t6\tdata.1\t2\t15\t15\t17\t0\t0\t17\t17\n"
+    },
+    {
+      "name": "excess-max-fields",
+      "input": "designed/excess-max-fields.qtp",
+      "args": [
+        "--max-fields",
+        "1"
+      ],
+      "exit": 6,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\nframe\t1\t9\t15\t15\t11\t4\nrecord\t1\t0\t0\t0053\t004100420043\t1\nframe\t2\t15\t21\t15\t17\t4\n",
+      "stderr": "incomplete\t6\tdata.5\t2\t15\t15\t17\t3\t3\t20\t20\n"
+    },
+    {
+      "name": "excess-max-values",
+      "input": "designed/excess-max-values.qtp",
+      "args": [
+        "--max-values",
+        "1"
+      ],
+      "exit": 6,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\nframe\t1\t9\t15\t15\t11\t4\nrecord\t1\t0\t0\t0053\t004100420043\t1\nframe\t2\t15\t21\t15\t17\t4\n",
+      "stderr": "incomplete\t6\tdata.6\t2\t15\t15\t17\t3\t3\t20\t20\n"
+    },
+    {
+      "name": "excess-max-symbol-units",
+      "input": "designed/excess-max-symbol-units.qtp",
+      "args": [
+        "--max-symbol-units",
+        "3"
+      ],
+      "exit": 6,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\nframe\t1\t9\t15\t15\t11\t4\nrecord\t1\t0\t0\t0053\t004100420043\t1\nframe\t2\t15\t21\t15\t17\t4\n",
+      "stderr": "incomplete\t6\tdata.6\t2\t15\t15\t17\t3\t3\t20\t20\n"
+    },
+    {
+      "name": "exact-max-records",
+      "input": "designed/exact-max-records.qtp",
+      "args": [
+        "--max-records",
+        "2"
+      ],
+      "exit": 0,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\nframe\t1\t9\t15\t15\t11\t4\nrecord\t1\t0\t0\t0053\t004100420043\t1\nframe\t2\t15\t21\t15\t17\t4\nrecord\t2\t1\t0\t0053\t004100420043\t2\ncomplete\t21\t3\t2\t2\t2\n",
+      "stderr": ""
+    },
+    {
+      "name": "exact-max-fields",
+      "input": "designed/exact-max-fields.qtp",
+      "args": [
+        "--max-fields",
+        "2"
+      ],
+      "exit": 0,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\nframe\t1\t9\t15\t15\t11\t4\nrecord\t1\t0\t0\t0053\t004100420043\t1\nframe\t2\t15\t21\t15\t17\t4\nrecord\t2\t1\t0\t0053\t004100420043\t2\ncomplete\t21\t3\t2\t2\t2\n",
+      "stderr": ""
+    },
+    {
+      "name": "exact-max-values",
+      "input": "designed/exact-max-values.qtp",
+      "args": [
+        "--max-values",
+        "2"
+      ],
+      "exit": 0,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\nframe\t1\t9\t15\t15\t11\t4\nrecord\t1\t0\t0\t0053\t004100420043\t1\nframe\t2\t15\t21\t15\t17\t4\nrecord\t2\t1\t0\t0053\t004100420043\t2\ncomplete\t21\t3\t2\t2\t2\n",
+      "stderr": ""
+    },
+    {
+      "name": "exact-max-symbol-units",
+      "input": "designed/exact-max-symbol-units.qtp",
+      "args": [
+        "--max-symbol-units",
+        "6"
+      ],
+      "exit": 0,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\nframe\t1\t9\t15\t15\t11\t4\nrecord\t1\t0\t0\t0053\t004100420043\t1\nframe\t2\t15\t21\t15\t17\t4\nrecord\t2\t1\t0\t0053\t004100420043\t2\ncomplete\t21\t3\t2\t2\t2\n",
+      "stderr": ""
+    },
+    {
+      "name": "exact-message-records",
+      "input": "designed/exact-message-records.qtp",
+      "args": [
+        "--message-records",
+        "1"
+      ],
+      "exit": 0,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\nframe\t1\t9\t15\t15\t11\t4\nrecord\t1\t0\t0\t0053\t004100420043\t1\nframe\t2\t15\t21\t15\t17\t4\nrecord\t2\t1\t0\t0053\t004100420043\t2\ncomplete\t21\t3\t2\t2\t2\n",
+      "stderr": ""
+    },
+    {
+      "name": "exact-message-fields",
+      "input": "designed/exact-message-fields.qtp",
+      "args": [
+        "--message-fields",
+        "1"
+      ],
+      "exit": 0,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\nframe\t1\t9\t15\t15\t11\t4\nrecord\t1\t0\t0\t0053\t004100420043\t1\nframe\t2\t15\t21\t15\t17\t4\nrecord\t2\t1\t0\t0053\t004100420043\t2\ncomplete\t21\t3\t2\t2\t2\n",
+      "stderr": ""
+    },
+    {
+      "name": "exact-message-values",
+      "input": "designed/exact-message-values.qtp",
+      "args": [
+        "--message-values",
+        "1"
+      ],
+      "exit": 0,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\nframe\t1\t9\t15\t15\t11\t4\nrecord\t1\t0\t0\t0053\t004100420043\t1\nframe\t2\t15\t21\t15\t17\t4\nrecord\t2\t1\t0\t0053\t004100420043\t2\ncomplete\t21\t3\t2\t2\t2\n",
+      "stderr": ""
+    },
+    {
+      "name": "exact-message-symbol-units",
+      "input": "designed/exact-message-symbol-units.qtp",
+      "args": [
+        "--message-symbol-units",
+        "3"
+      ],
+      "exit": 0,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\nframe\t1\t9\t15\t15\t11\t4\nrecord\t1\t0\t0\t0053\t004100420043\t1\nframe\t2\t15\t21\t15\t17\t4\nrecord\t2\t1\t0\t0053\t004100420043\t2\ncomplete\t21\t3\t2\t2\t2\n",
+      "stderr": ""
+    },
+    {
+      "name": "exact-symbol-units",
+      "input": "designed/exact-symbol-units.qtp",
+      "args": [
+        "--symbol-units",
+        "3"
+      ],
+      "exit": 0,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\nframe\t1\t9\t15\t15\t11\t4\nrecord\t1\t0\t0\t0053\t004100420043\t1\nframe\t2\t15\t21\t15\t17\t4\nrecord\t2\t1\t0\t0053\t004100420043\t2\ncomplete\t21\t3\t2\t2\t2\n",
+      "stderr": ""
+    },
+    {
+      "name": "exact-max-input",
+      "input": "designed/exact-max-input.qtp",
+      "args": [
+        "--max-input",
+        "21"
+      ],
+      "exit": 0,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\nframe\t1\t9\t15\t15\t11\t4\nrecord\t1\t0\t0\t0053\t004100420043\t1\nframe\t2\t15\t21\t15\t17\t4\nrecord\t2\t1\t0\t0053\t004100420043\t2\ncomplete\t21\t3\t2\t2\t2\n",
+      "stderr": ""
+    },
+    {
+      "name": "exact-max-frames",
+      "input": "designed/exact-max-frames.qtp",
+      "args": [
+        "--max-frames",
+        "3"
+      ],
+      "exit": 0,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\nframe\t1\t9\t15\t15\t11\t4\nrecord\t1\t0\t0\t0053\t004100420043\t1\nframe\t2\t15\t21\t15\t17\t4\nrecord\t2\t1\t0\t0053\t004100420043\t2\ncomplete\t21\t3\t2\t2\t2\n",
+      "stderr": ""
+    },
+    {
+      "name": "zero-max-descriptions",
+      "input": "designed/zero-max-descriptions.qtp",
+      "args": [
+        "--max-descriptions",
+        "0"
+      ],
+      "exit": 6,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\n",
+      "stderr": "incomplete\t6\tdescription.1\t0\t2\t0\t2\t0\t0\t2\t2\n"
+    },
+    {
+      "name": "zero-max-actions",
+      "input": "designed/zero-max-actions.qtp",
+      "args": [
+        "--max-actions",
+        "0"
+      ],
+      "exit": 6,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\n",
+      "stderr": "incomplete\t6\tdescription.5\t0\t2\t0\t2\t4\t4\t6\t6\n"
+    },
+    {
+      "name": "zero-max-total-name-units",
+      "input": "designed/zero-max-total-name-units.qtp",
+      "args": [
+        "--max-total-name-units",
+        "0"
+      ],
+      "exit": 6,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\n",
+      "stderr": "incomplete\t6\tdescription.3\t0\t2\t0\t2\t3\t1\t5\t3\n"
+    },
+    {
+      "name": "zero-max-name-units",
+      "input": "designed/zero-max-name-units.qtp",
+      "args": [
+        "--max-name-units",
+        "0"
+      ],
+      "exit": 6,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\n",
+      "stderr": "incomplete\t6\tdescription.3\t0\t2\t0\t2\t3\t1\t5\t3\n"
+    },
+    {
+      "name": "zero-output",
+      "input": "designed/zero-output.qtp",
+      "args": [
+        "--max-output",
+        "0"
+      ],
+      "exit": 6,
+      "stdout": "",
+      "stderr": "incomplete\t6\twrite\t-\t-\t-\t-\t-\t-\t-\t-\n"
+    },
+    {
+      "name": "exact-output",
+      "input": "designed/exact-output.qtp",
+      "args": [
+        "--max-output",
+        "43"
+      ],
+      "exit": 0,
+      "stdout": "format\tqd-qtp-inspect\t1\ncomplete\t0\t0\t0\t0\t0\n",
+      "stderr": ""
+    },
+    {
+      "name": "excess-output",
+      "input": "designed/excess-output.qtp",
+      "args": [
+        "--max-output",
+        "42"
+      ],
+      "exit": 6,
+      "stdout": "format\tqd-qtp-inspect\t1\n",
+      "stderr": "incomplete\t6\twrite\t-\t-\t-\t-\t-\t-\t-\t-\n"
+    },
+    {
+      "name": "excess-input",
+      "input": "designed/excess-input.qtp",
+      "args": [
+        "--max-input",
+        "0"
+      ],
+      "exit": 6,
+      "stdout": "format\tqd-qtp-inspect\t1\n",
+      "stderr": "incomplete\t6\tinput-limit\t-\t-\t-\t-\t-\t-\t-\t-\n"
+    },
+    {
+      "name": "zero-frames",
+      "input": "designed/zero-frames.qtp",
+      "args": [
+        "--max-frames",
+        "0"
+      ],
+      "exit": 6,
+      "stdout": "format\tqd-qtp-inspect\t1\n",
+      "stderr": "incomplete\t6\tframe-limit\t0\t-\t0\t-\t-\t-\t-\t-\n"
+    },
+    {
+      "name": "zero-frame-body",
+      "input": "designed/zero-frame-body.qtp",
+      "args": [
+        "--max-frame",
+        "0"
+      ],
+      "exit": 0,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t1\t-\t-\t0\ncomplete\t1\t1\t0\t0\t0\n",
+      "stderr": ""
+    },
+    {
+      "name": "body-excess",
+      "input": "designed/body-excess.qtp",
+      "args": [
+        "--max-frame",
+        "0"
+      ],
+      "exit": 6,
+      "stdout": "format\tqd-qtp-inspect\t1\n",
+      "stderr": "incomplete\t6\tframing.2\t0\t-\t0\t-\t-\t-\t1\t-\n"
+    },
+    {
+      "name": "exact-description-budgets",
+      "input": "designed/exact-description-budgets.qtp",
+      "args": [
+        "--max-descriptions",
+        "1",
+        "--max-actions",
+        "1",
+        "--max-name-units",
+        "1",
+        "--max-total-name-units",
+        "2"
+      ],
+      "exit": 0,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\ncomplete\t9\t1\t0\t0\t0\n",
+      "stderr": ""
+    },
+    {
+      "name": "aggregate-description-excess",
+      "input": "designed/aggregate-description-excess.qtp",
+      "args": [
+        "--max-descriptions",
+        "1"
+      ],
+      "exit": 6,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\nframe\t1\t9\t15\t2\t11\t4\n",
+      "stderr": "incomplete\t6\tdescription.1\t1\t2\t9\t11\t0\t0\t11\t11\n"
+    },
+    {
+      "name": "aggregate-actions-excess",
+      "input": "designed/aggregate-actions-excess.qtp",
+      "args": [
+        "--max-actions",
+        "1"
+      ],
+      "exit": 6,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\nframe\t1\t9\t18\t2\t11\t7\n",
+      "stderr": "incomplete\t6\tdescription.5\t1\t2\t9\t11\t4\t4\t15\t15\n"
+    },
+    {
+      "name": "aggregate-names-excess",
+      "input": "designed/aggregate-names-excess.qtp",
+      "args": [
+        "--max-total-name-units",
+        "2"
+      ],
+      "exit": 6,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\nframe\t1\t9\t18\t2\t11\t7\n",
+      "stderr": "incomplete\t6\tdescription.3\t1\t2\t9\t11\t3\t1\t14\t12\n"
+    },
+    {
+      "name": "zero-message-records",
+      "input": "designed/zero-message-records.qtp",
+      "args": [
+        "--message-records",
+        "0"
+      ],
+      "exit": 6,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\nframe\t1\t9\t14\t15\t11\t3\n",
+      "stderr": "incomplete\t6\tdata.1\t1\t15\t9\t11\t0\t0\t11\t11\n"
+    },
+    {
+      "name": "zero-message-fields",
+      "input": "designed/zero-message-fields.qtp",
+      "args": [
+        "--message-fields",
+        "0"
+      ],
+      "exit": 6,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\nframe\t1\t9\t14\t15\t11\t3\n",
+      "stderr": "incomplete\t6\tdata.5\t1\t15\t9\t11\t2\t2\t13\t13\n"
+    },
+    {
+      "name": "zero-message-values",
+      "input": "designed/zero-message-values.qtp",
+      "args": [
+        "--message-values",
+        "0"
+      ],
+      "exit": 6,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\nframe\t1\t9\t14\t15\t11\t3\n",
+      "stderr": "incomplete\t6\tdata.6\t1\t15\t9\t11\t2\t2\t13\t13\n"
+    },
+    {
+      "name": "zero-message-symbol-units",
+      "input": "designed/zero-message-symbol-units.qtp",
+      "args": [
+        "--message-symbol-units",
+        "0"
+      ],
+      "exit": 6,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\nframe\t1\t9\t15\t15\t11\t4\n",
+      "stderr": "incomplete\t6\tdata.6\t1\t15\t9\t11\t3\t3\t14\t14\n"
+    },
+    {
+      "name": "zero-symbol-units",
+      "input": "designed/zero-symbol-units.qtp",
+      "args": [
+        "--symbol-units",
+        "0"
+      ],
+      "exit": 6,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\nframe\t1\t9\t15\t15\t11\t4\n",
+      "stderr": "incomplete\t6\tdata.2\t1\t15\t9\t11\t2\t0\t13\t11\n"
+    },
+    {
+      "name": "skip-total-record-excess",
+      "input": "designed/skip-total-record-excess.qtp",
+      "args": [
+        "--max-records",
+        "1"
+      ],
+      "exit": 6,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t18\t2\t2\t16\nframe\t1\t18\t24\t15\t20\t4\nframe\t2\t24\t30\t15\t26\t4\n",
+      "stderr": "incomplete\t6\tdata.1\t2\t15\t24\t26\t0\t0\t26\t26\n"
+    },
+    {
+      "name": "skip-total-field-excess",
+      "input": "designed/skip-total-field-excess.qtp",
+      "args": [
+        "--max-fields",
+        "2"
+      ],
+      "exit": 6,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t18\t2\t2\t16\nframe\t1\t18\t24\t15\t20\t4\nframe\t2\t24\t30\t15\t26\t4\n",
+      "stderr": "incomplete\t6\tdata.5\t2\t15\t24\t26\t2\t2\t28\t28\n"
+    },
+    {
+      "name": "skip-exact-totals",
+      "input": "designed/skip-exact-totals.qtp",
+      "args": [
+        "--max-records",
+        "2",
+        "--max-fields",
+        "4",
+        "--max-values",
+        "0",
+        "--max-symbol-units",
+        "0"
+      ],
+      "exit": 0,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t18\t2\t2\t16\nframe\t1\t18\t24\t15\t20\t4\nframe\t2\t24\t30\t15\t26\t4\ncomplete\t30\t3\t0\t2\t4\n",
+      "stderr": ""
+    },
+    {
+      "name": "duplicate-target-field-total",
+      "input": "designed/duplicate-target-field-total.qtp",
+      "args": [
+        "--max-fields",
+        "5"
+      ],
+      "exit": 6,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t27\t2\t2\t25\nframe\t1\t27\t36\t15\t29\t7\nrecord\t1\t0\t1\t0052\t-\t3,5,0\nframe\t2\t36\t45\t15\t38\t7\n",
+      "stderr": "incomplete\t6\tdata.5\t2\t15\t36\t38\t2\t2\t40\t40\n"
+    },
+    {
+      "name": "zero-explicit-flags",
+      "input": "designed/zero-explicit-flags.qtp",
+      "args": [],
+      "exit": 0,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t9\t2\t2\t7\nframe\t1\t9\t16\t15\t11\t5\nrecord\t1\t0\t0\t0053\t-\t1\ncomplete\t16\t2\t1\t1\t1\n",
+      "stderr": ""
+    },
+    {
+      "name": "zero-data-budgets",
+      "input": "designed/zero-data-budgets.qtp",
+      "args": [
+        "--max-records",
+        "0",
+        "--max-fields",
+        "0",
+        "--max-values",
+        "0",
+        "--max-symbol-units",
+        "0"
+      ],
+      "exit": 0,
+      "stdout": "format\tqd-qtp-inspect\t1\nframe\t0\t0\t2\t2\t2\t0\nframe\t1\t2\t4\t15\t4\t0\ncomplete\t4\t2\t0\t0\t0\n",
+      "stderr": ""
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+# Designed composer input: message, sender record name, UTF-16 hex symbol, int values.
+0	R	004100420043	11,99,22,44
+0	Unknown	004100420043	5,6
+0	S	004100420043	-7
+0	E	004100000042	-
+0	S	d800	2147483647
+1	R	004100420043	-1,0,-2,-3
+1	E	dc00	-
+1	S	-	-2147483648

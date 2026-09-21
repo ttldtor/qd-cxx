@@ -87,6 +87,8 @@ struct StreamDataRecord {
 
 /** Owned completed prefix with explicit first-error diagnostics. */
 struct StreamDataResult {
+    std::size_t processedRecords = 0; ///< Charged record attempts, including skips and subsequent failures.
+    std::size_t wireFields = 0; ///< Charged field attempts, including skips, repeated targets and subsequent failures.
     StreamDataStatus status = StreamDataStatus::OK;   ///< Completion or first failure.
     StreamDataStage stage = StreamDataStage::PAYLOAD; ///< Active checkpoint or END.
     std::size_t consumed = 0;                         ///< Committed examination position relative to payload start.

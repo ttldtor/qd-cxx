@@ -22,6 +22,17 @@ add_library(qd_protocol src/protocol/frame_reader.cpp src/protocol/describe_reco
 target_link_libraries(qd_protocol PUBLIC qd_encoding qd_core)
 set_target_properties(qd_protocol PROPERTIES CXX_EXTENSIONS OFF)
 
+option(QD_BUILD_QTP_INSPECT "Build the bounded offline QTP diagnostic CLI" OFF)
+if(QD_BUILD_QTP_INSPECT)
+    add_library(qd_inspect_tool STATIC tools/qtp-inspect/inspect.cpp)
+    target_link_libraries(qd_inspect_tool PUBLIC qd_protocol)
+    target_include_directories(qd_inspect_tool PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/tools/qtp-inspect")
+    set_target_properties(qd_inspect_tool PROPERTIES CXX_EXTENSIONS OFF)
+    add_executable(qd-qtp-inspect tools/qtp-inspect/main.cpp)
+    target_link_libraries(qd-qtp-inspect PRIVATE qd_inspect_tool)
+    set_target_properties(qd-qtp-inspect PROPERTIES CXX_EXTENSIONS OFF)
+endif()
+
 include(CTest)
 if(BUILD_TESTING)
     include(FetchContent)
@@ -70,4 +81,15 @@ if(BUILD_TESTING)
     set(QD_STREAM_DATA_FIXTURES "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/protocol/stream-data/expected/stream-data.tsv"
         CACHE FILEPATH "Java STREAM_DATA observations (temporary override for negative checks)")
     add_test(NAME protocol_java_stream_data COMMAND stream_data_tests "${QD_STREAM_DATA_FIXTURES}")
+    if(QD_BUILD_QTP_INSPECT)
+        find_package(Python3 REQUIRED COMPONENTS Interpreter)
+        add_test(NAME offline_inspection_cli COMMAND "${Python3_EXECUTABLE}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/check_offline_inspection.py"
+            "$<TARGET_FILE:qd-qtp-inspect>"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/protocol/offline-inspection")
+        add_executable(offline_io_tests tests/conformance/offline_io_tests.cpp)
+        target_link_libraries(offline_io_tests PRIVATE qd_inspect_tool doctest::doctest)
+        set_target_properties(offline_io_tests PROPERTIES CXX_EXTENSIONS OFF)
+        add_test(NAME offline_inspection_injected_io COMMAND offline_io_tests)
+    endif()
 endif()

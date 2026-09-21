@@ -83,3 +83,14 @@ outer frame positions and exceptions are observations, not C++ position/batching
 [conformance validation](../../tests/conformance/protocol/stream-data/VALIDATION.md) record executed checks
 and remaining limitations. No full
 QTP compatibility, event semantics, huge allocations, other architectures or transport is implied.
+
+## Charged work accounting
+
+The accepted accounting decision adds zero-initialized
+`processedRecords` and `wireFields` to StreamDataResult. They count budget charges, not only
+completed records/fields: increment after a successful budget check at the existing decrement,
+before reading the symbol or field. Skips, repeated targets and later-failing attempts count.
+Rejected budget checks do not count. All returns, including allocation errors, retain accumulated
+charges; each is bounded by the original limit. Existing check order, wire semantics, completed
+results and consumed/error positions are unchanged. A caller may carry file budgets across messages
+by passing min(message limit, remaining total) and subtracting the returned actual charges.

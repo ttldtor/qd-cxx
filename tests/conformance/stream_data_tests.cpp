@@ -713,6 +713,74 @@ TEST_CASE("exact budgets positions partial failure and message lifetime") {
     CHECK(result.records[2].values[1] == 3);
 }
 
+TEST_CASE("charged attempts survive success failures and exhausted budgets") {
+    const std::vector<WireRecordDescription> descriptions{
+        {7, u"R", {{u"x", 8}, {u"skip", 8}, {u"x", 8}}}, {9, u"E", {}}, {31, u"Unknown", {{u"a", 8}}}};
+    auto context = StreamDataContext::create(schema(), descriptions, CONTEXT_LIMITS);
+    REQUIRE(context);
+    auto empty = decodeStreamData({}, *context, LIMITS);
+    CHECK(empty.processedRecords == 0);
+    CHECK(empty.wireFields == 0);
+    auto input = bytes("fe07010203ff1f04ff09");
+    auto exact = LIMITS;
+    exact.processedRecords = 3;
+    exact.wireFields = 4;
+    auto result = decodeStreamData(input, *context, exact);
+    REQUIRE(result.status == StreamDataStatus::OK);
+    CHECK(result.processedRecords == 3);
+    CHECK(result.wireFields == 4);
+    REQUIRE(result.records.size() == 2);
+    CHECK(result.records[0].values[1] == 3);
+    exact.processedRecords = 2;
+    result = decodeStreamData(input, *context, exact);
+    CHECK(result.stage == StreamDataStage::RECORD);
+    CHECK(result.processedRecords == 2);
+    CHECK(result.wireFields == 4);
+    exact.processedRecords = 3;
+    exact.wireFields = 3;
+    result = decodeStreamData(input, *context, exact);
+    CHECK(result.stage == StreamDataStage::FIELD);
+    CHECK(result.processedRecords == 2);
+    CHECK(result.wireFields == 3);
+
+    for (const auto &text : {"fe0780", "fe1f80"}) {
+        result = decodeStreamData(bytes(text), *context, LIMITS);
+        CHECK(result.status == StreamDataStatus::TRUNCATED_PAYLOAD);
+        CHECK(result.processedRecords == 1);
+        CHECK(result.wireFields == 1);
+    }
+
+    result = decodeStreamData(bytes("fe070180"), *context, LIMITS);
+    CHECK(result.processedRecords == 1);
+    CHECK(result.wireFields == 2);
+    result = decodeStreamData(bytes("fe09ff07010280"), *context, LIMITS);
+    CHECK(result.processedRecords == 2);
+    CHECK(result.wireFields == 3);
+    CHECK(result.records.size() == 1);
+
+    for (const auto &text : {"c0", "fe80", "fe7f", "fe08", "f901fe"}) {
+        result = decodeStreamData(bytes(text), *context, LIMITS);
+        CHECK(result.processedRecords == 1);
+        CHECK(result.wireFields == 0);
+    }
+
+    exact = LIMITS;
+    exact.processedRecords = 0;
+    result = decodeStreamData(input, *context, exact);
+    CHECK(result.processedRecords == 0);
+    CHECK(result.wireFields == 0);
+    exact = LIMITS;
+    exact.wireFields = 0;
+    result = decodeStreamData(input, *context, exact);
+    CHECK(result.processedRecords == 1);
+    CHECK(result.wireFields == 0);
+    exact = LIMITS;
+    exact.payloadBytes = 0;
+    result = decodeStreamData(input, *context, exact);
+    CHECK(result.processedRecords == 0);
+    CHECK(result.wireFields == 0);
+}
+
 TEST_CASE("one failed complete payload cannot borrow the next frame") {
     const std::vector<WireRecordDescription> descriptions{{9, u"E", {}}};
     auto context = StreamDataContext::create(schema(), descriptions, CONTEXT_LIMITS);

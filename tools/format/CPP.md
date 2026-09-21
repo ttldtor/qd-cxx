@@ -33,3 +33,7 @@ Naming, braces, header self-containment, namespace comments and meaningful Doxyg
 reviewed; these formatters do not enforce all those rules. The combined pipeline's idempotence and
 read-only mismatch detection are recorded in [validation](../../tests/conformance/encoding/VALIDATION.md).
 Java formatting and oracle provenance rules in [README](README.md) remain separate and unchanged.
+
+QDCXX-017 extends discovery and explicit-file validation to `tools/qtp-inspect/*.cpp` and
+`*.hpp`. This keeps the optional tool under the same pinned two-stage pipeline; no upstream,
+fixture or generated source enters formatting scope.

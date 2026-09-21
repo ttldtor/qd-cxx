@@ -1,0 +1,9 @@
+2026-09-21T21:46:51.371Z COMMAND ['pwsh', '-NoProfile', '-File', 'tools/upstream/offline-inspection-oracle/Invoke-Oracle.ps1', '-Mode', 'Capture', '-Upstream', 'C:\\path\\to\\profile\\AppData\\Local\\Temp/qdcxx-003-qd', '-JavaHome', 'C:/Program Files/Zulu/zulu-8', '-Maven', 'C:\\path\\to\\profile\\.m2\\wrapper\\dists\\apache-maven-3.9.16\\0daed3be3ebd1c706f0e69e8b07c6b73f5cc4ea3dfce72a8d0ec2e849ca2ddb0\\bin\\mvn.cmd', '-RunDirectory', '.work/offline-a']; cwd='C:\\qd-cxx'; TZ=UTC
+2026-09-21T21:47:30.475Z Exception: C:\qd-cxx\tools\upstream\offline-inspection-oracle\Invoke-Oracle.ps1:57
+2026-09-21T21:47:30.475Z Line |
+2026-09-21T21:47:30.475Z   57 |  … DE -ne 0) { throw "Command failed ($LASTEXITCODE): $Exe; see $Stdout  …
+2026-09-21T21:47:30.475Z      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+2026-09-21T21:47:30.475Z      | Command failed (1): C:\Program Files\Zulu\zulu-8\bin\java.exe; see
+2026-09-21T21:47:30.475Z      | C:\qd-cxx\.work\offline-a/raw/offline-inspection.tsv and
+2026-09-21T21:47:30.475Z      | C:\qd-cxx\.work\offline-a/raw/offline-inspection.stderr
+2026-09-21T21:47:30.495Z EXIT 1

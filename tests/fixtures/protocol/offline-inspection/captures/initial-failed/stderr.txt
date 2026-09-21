@@ -1,0 +1,3 @@
+Exception in thread "main" java.lang.NullPointerException
+	at com.devexperts.qd.qtp.AbstractQTPComposer.visitHeartbeat(AbstractQTPComposer.java:287)
+	at com.devexperts.qd.qtp.OfflineInspectionOracle.main(OfflineInspectionOracle.java:129)

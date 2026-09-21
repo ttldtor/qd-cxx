@@ -20,7 +20,7 @@ foreach ($config in @('.uncrustify.cfg', '.clang-format')) {
     if (!(Test-Path -LiteralPath (Join-Path $repo $config))) { throw "Missing configuration: $config" }
 }
 if (!$Files) {
-    $Files = @(& git -C $repo ls-files --cached --others --exclude-standard -- 'include/*.hpp' 'src/*.cpp' 'tests/conformance/*.cpp')
+    $Files = @(& git -C $repo ls-files --cached --others --exclude-standard -- 'include/*.hpp' 'src/*.cpp' 'tests/conformance/*.cpp' 'tools/qtp-inspect/*.cpp' 'tools/qtp-inspect/*.hpp')
     if ($LASTEXITCODE -ne 0) { throw 'Source discovery failed' }
 }
 if ($Files.Count -eq 0) { throw 'No C++ source files selected' }
@@ -31,7 +31,7 @@ try {
     foreach ($file in $Files) {
         $source = [IO.Path]::GetFullPath($file, $repo)
         $relative = [IO.Path]::GetRelativePath($repo, $source).Replace('\', '/')
-        if ($relative -notmatch '^(include/|src/|tests/conformance/|\.work/)' -or $relative -match '(^|/)(upstream|generated|fixtures)/' -or [IO.Path]::GetExtension($source) -notin @('.cpp', '.hpp')) {
+        if ($relative -notmatch '^(include/|src/|tests/conformance/|tools/qtp-inspect/|\.work/)' -or $relative -match '(^|/)(upstream|generated|fixtures)/' -or [IO.Path]::GetExtension($source) -notin @('.cpp', '.hpp')) {
             throw "Outside formatting scope: $source"
         }
         $copy = Join-Path $tempRoot ([IO.Path]::GetFileName($source))

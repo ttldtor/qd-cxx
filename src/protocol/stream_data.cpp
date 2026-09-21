@@ -117,6 +117,7 @@ StreamDataResult decodeStreamData(std::span<const std::byte> payload, const Stre
             }
 
             --limits.processedRecords;
+            ++result.processedRecords;
             result.stage = StreamDataStage::SYMBOL;
             auto symbol = symbols.read(payload.subspan(result.consumed));
             result.consumed += symbol.consumed;
@@ -201,6 +202,7 @@ StreamDataResult decodeStreamData(std::span<const std::byte> payload, const Stre
                 }
 
                 --limits.wireFields;
+                ++result.wireFields;
                 const auto value = encoding::readCompactLong(payload.subspan(result.consumed));
                 result.consumed += value.consumed;
 

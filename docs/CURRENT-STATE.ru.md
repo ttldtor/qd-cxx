@@ -1,5 +1,7 @@
 # Текущее состояние
 
+[English version](CURRENT-STATE.md). Английская версия является нормативной.
+
 
 ## Актуальный статус
 
@@ -29,12 +31,17 @@ production-only сборку, 15 отрицательных случаев и ba
 MSVC Release, пять suites, исходную unknown-row репродукцию, negatives и evidence audit;
 остальные финальные профили доработки остаются результатами автора.
 
-### Следующий шаг
+### QDCXX-017 готова к независимому ревью
 
-QDCXX-017 — ready, High: ограниченный офлайн-инструмент диагностики бинарного QTP.
-Задача подготовлена для отдельной сессии; реализация не начата. Явный встроенный диагностический
-профиль локальной схемы, начальные descriptions и статический context, type-8/zero-flags data,
-детерминированный вывод и конечные бюджеты. Без transport, importer и dynamic session.
+QDCXX-017 реализована и проверена автором без коммита. Необязательный ограниченный офлайн
+`qd-qtp-inspect` использует явный профиль oracle-sre-v1, начальные описания, один неизменяемый
+контекст, type-8/zero-flags данные, точный UTF-16 TSV и конечные бюджеты файла/сообщений.
+Владелец принял счётчики списанных записей/полей в API-GATE. Два clean Java captures composer/parser
+и negative/baseline Verify предшествовали реализации CLI. Все семь тестовых профилей
+MSVC/ClangCL/GCC/sanitizer прошли восемь suites; production сборки с инструментом ON/OFF,
+форматирование и negative проверки прошли.
+[Авторские доказательства и ограничения](../tests/conformance/protocol/offline-inspection/VALIDATION.ru.md), [usage](QTP-INSPECT.ru.md). Независимое ревью ожидается.
+Importer, transport, dynamic sessions и расширенные wire-типы остаются исключены.
 
 ## Исторические записи о завершении
 

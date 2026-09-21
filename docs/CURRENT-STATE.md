@@ -1,5 +1,7 @@
 # Current state
 
+[Русская версия](CURRENT-STATE.ru.md). English is authoritative.
+
 
 ## Current status
 
@@ -28,12 +30,16 @@ committed baseline: `8bc9838efa3be8c157ec7d9a9b13e476baeff385`. Its follow-up re
 MSVC Release, five suites, the original unknown-row reproduction, negatives and evidence audit;
 other final follow-up profiles remain author-run results.
 
-### Next step
+### QDCXX-017 ready for independent review
 
-QDCXX-017 — ready, High: bounded offline binary-QTP inspection tool.
-Prepared for a separate session; implementation has not started. Explicit built-in diagnostic local
-schema profile, initial descriptions and static context, type-8/zero-flags data, deterministic output
-and finite budgets. No transport, importer or dynamic session.
+QDCXX-017 is implemented and author-validated, without a commit. The optional bounded offline
+`qd-qtp-inspect` uses the explicit oracle-sre-v1 profile, initial descriptions, one immutable
+context, type-8/zero-flags data, exact UTF-16 TSV and finite file/message budgets. The owner accepted
+the charged record/field counters in API-GATE. Two clean Java composer/parser captures and
+negative/baseline Verify preceded CLI implementation. All seven MSVC/ClangCL/GCC/sanitizer test
+profiles passed eight suites; production builds with tool ON/OFF, formatting and negative checks
+passed. [Author evidence and limitations](../tests/conformance/protocol/offline-inspection/VALIDATION.md), [usage](QTP-INSPECT.md). Independent review is pending.
+Importer, transport, dynamic sessions and broader wire types remain excluded.
 
 ## Historical completion records
 

@@ -222,3 +222,14 @@ CTest adds `protocol_java_stream_data` / `stream_data_tests`; QD_STREAM_DATA_FIX
 intentional temporary fixture overrides. Existing build commands run all six suites. The full compiler/
 sanitizer/production-only matrix and negative checks are in [validation](../tests/conformance/protocol/stream-data/VALIDATION.md).
 No transport, dynamic session, nonzero flags, importer or production dependency is introduced.
+
+## QDCXX-017 offline tool
+
+Enable `-DQD_BUILD_QTP_INSPECT=ON` for the bounded `qd-qtp-inspect` executable; default OFF
+keeps the library-only build. `-DBUILD_TESTING=OFF` never acquires test dependencies, including
+when the tool is enabled. [CLI/profile/limits](QTP-INSPECT.md),
+[contract](../spec/protocol/OFFLINE-INSPECTION.md). With testing and tool enabled, Python 3
+provides process-level CTest checks and doctest covers portable injected I/O failures. The six
+previous suites remain enabled. This adds no production dependency or public session framework.
+StreamDataResult now exposes charged `processedRecords`/`wireFields` under the
+accepted accounting decision, without wire or position changes.
