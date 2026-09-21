@@ -2,6 +2,10 @@
 
 [Русская версия](CURRENT-STATE.ru.md). This English document is authoritative.
 
+## Next task: UTFString
+
+QDCXX-011 — ready, High. Approved: UTF-16 code units, distinct null/empty, Java-compatible bytes/consumption within explicit caller-supplied resource limits, and atomic writes. Resource-policy outcomes are separate from Java wire validity; reads always remain span-bounded. The task is created; UTFString implementation has not started. Compact codec remains the regression baseline; framing/importer/transport are excluded.
+
 ## First C++ component
 
 QDCXX-010 — done, High: minimal C++23 build, compact int/long codec, Java-vector conformance and pinned formatting workflow. Implemented and verified on MSVC and ClangCL in Debug/Release: 832 selected Java observations, pinned formatting and negative checks. [Build/API](CPP-BUILD.md), [validation](../tests/conformance/encoding/VALIDATION.md). Existing fixtures and upstream.lock are unchanged. UTFString, importer and transport require later approved tasks.
