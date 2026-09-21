@@ -1,4 +1,4 @@
-# Ограниченные компоненты кодирования C++23
+# Ограниченные компоненты C++23
 
 [English version](CPP-BUILD.md). Английский документ является основным.
 
@@ -7,7 +7,36 @@ compact int/long и UTFString. QDCXX-010 добавил compact, QDCXX-011 до�
 [utf_string.hpp](../include/qd/encoding/utf_string.hpp). Неизменные
 [Java-свидетельства](../spec/encoding/PRIMITIVES.ru.md) определяют совместимость;
 [политика UTFString и решение о переиспользовании](../spec/encoding/UTFSTRING.ru.md) определяют
-явные границы C++. PentaCodec, importer, schema runtime, QTP framing, transport и packaging вне объёма.
+явные границы C++. PentaCodec, importer, schema runtime, payload decoding, frame writer, transport и packaging вне объёма.
+
+## API QTP frame reader и проверки QDCXX-012
+
+`qd_protocol` — production-компонент без внешних зависимостей, зависящий только от qd_encoding.
+Подключите `qd/protocol/frame_reader.hpp` и линкуйте qd_protocol. Создайте
+`qd::protocol::FrameReader reader({1024, 1033});`: это бюджеты body и pending, включая запас
+девяти байтов prefix. Несовместимые/переполняющиеся бюджеты дают invalid_argument; ошибка
+выделения в конструкторе распространяется как исключение. API однопоточный и нереентерабельный.
+
+`feed(input)` выдаёт не более одного владеющего кадра, status и точный accepted. Продвигайте
+вход на accepted и повторно подавайте непринятый суффикс. FRAME_READY содержит frame; NEED_INPUT
+означает отсутствие полного кадра, FAILED/FINISHED больше не принимают байты. `pending()` —
+заимствованный view точных сохранённых байтов до следующей изменяющей операции. Возвращённые кадры
+владеют payload и переживают feed/reset/уничтожение reader. `finish()` отличает чистую границу
+от усечённого ввода; пустой feed не EOF. `reset()` сбрасывает только framer.
+
+Первый framing error терминален; error()/errorOffset() дают причину и начало ошибочного кадра,
+totalAccepted() — принятую позицию. Неверный payload и неизвестный допустимый type выдаются
+непрозрачно. EMPTY_HEARTBEAT не содержит type, MESSAGE с type=0 отличается от него. Reader имеет
+постоянный буфер body+9, выдаваемый payload — отдельную ограниченную память; сохранённые вызывающим
+кадры не входят в суммарный бюджет reader. Ошибка выделения payload даёт ALLOCATION_FAILURE.
+Точные wire/ресурсные/lifecycle границы определяет [контракт EN/RU](../spec/protocol/FRAMING.ru.md).
+
+Команды ниже теперь собирают обе библиотеки и запускают также frame_tests/protocol_java_frames.
+Новые тесты читают прежний P01 и отдельно добавленный P02; QD_PROTOCOL_FIXTURES и QD_FRAME_PROJECTIONS
+позволяют временные отрицательные наборы. MSVC/ClangCL/GCC Debug/Release и GCC ASan+UBSan проходят;
+BUILD_TESTING=OFF не загружает doctest. [Покрытие](../tests/conformance/protocol/COVERAGE.ru.md),
+[результаты и UTC logs](../tests/conformance/protocol/VALIDATION.ru.md). Дальнейшие payload/transport/
+writer-компоненты требуют отдельной утверждённой задачи.
 
 ## UTFString API и текущие проверки
 
@@ -42,7 +71,7 @@ python3 tools/run_utc.py --log .work/utf-asan-test.log -- ctest --test-dir .work
 MSBuild 17.14.51, MSVC 19.42.34444.0 (каталог инструментов 14.42.34433). Второй компилятор —
 установленный ClangCL 19.1.5 с той же стандартной библиотекой MSVC и SDK. Тесты используют
 doctest 2.4.12 через CMake FetchContent; URL архива и SHA-256 закреплены в
-[CMakeLists.txt](../CMakeLists.txt). Только `compact_tests` связывается с doctest; `BUILD_TESTING=OFF`
+[CMakeLists.txt](../CMakeLists.txt). Только `compact_tests` и `frame_tests` связываются с doctest; `BUILD_TESTING=OFF`
 не загружает и не подключает его. Загрузки хранятся в `_deps/` игнорируемого каталога сборки;
 первая конфигурация тестов требует сети. Менеджер пакетов не нужен. doctest 2.4.12 выдаёт
 нефатальное предупреждение CMake об устаревшей минимальной версии policy; загруженный исходник не менялся. Требуется CMake 3.25+; цели наследуют `cxx_std_23` от библиотеки,
@@ -64,7 +93,7 @@ python tools/run_utc.py --log .work/clang-release-test.log -- ctest --test-dir .
 ```
 
 Сборка выполняется вне корня исходников; `.work/` и `build/` игнорируются. Конфигурация внутри
-корня исходников отклоняется. `BUILD_TESTING=OFF` собирает только библиотеку. `QD_ENCODING_FIXTURES`
+корня исходников отклоняется. `BUILD_TESTING=OFF` собирает только библиотеки qd_encoding и qd_protocol. `QD_ENCODING_FIXTURES`
 может указывать на временные копии fixtures для негативных проверок; по умолчанию используются
 эталоны репозитория. Первая попытка обнаружения SDK через MSBuild в песочнице получила отказ
 в доступе к локальному каталогу Microsoft SDKs; разрешённые configure/build выше успешно выполнены
@@ -84,7 +113,7 @@ big-endian; чтение не требует выравнивания.
   `consumed`. Это соответствует наблюдаемой категории/позиции Java EOF, но не строкам класса/сообщения
   исключения. Отката нет: сохраните исходные байты и повторите чтение с начала после поступления
   данных. Частично потреблённая позиция не является состоянием для продолжения; транзакционный
-  framing относится к будущему слою.
+  framing реализован отдельным слоем qd_protocol.
 - `writeCompactInt` / `writeCompactLong` возвращают `WriteResult`: `written`, `status`. Они создают
   канонические Java bytes (не более 5/9). Недостаточная ёмкость, включая нулевую, возвращает
   `INSUFFICIENT_OUTPUT`, нулевой written и оставляет весь выход неизменным. При успехе изменяются

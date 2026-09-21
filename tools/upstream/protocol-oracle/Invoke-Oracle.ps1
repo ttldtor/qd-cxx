@@ -70,7 +70,7 @@ $oldLocation = Get-Location
 try {
     Set-Location $repo
     $env:JAVA_HOME = $JavaHome
-    $env:MAVEN_OPTS = "-Duser.home=$($env:USERPROFILE.Replace('\','/'))"
+    $env:MAVEN_OPTS = "-Duser.timezone=UTC -Duser.home=$($env:USERPROFILE.Replace('\','/'))"
     $java = Join-Path $JavaHome 'bin/java.exe'
     $javac = Join-Path $JavaHome 'bin/javac.exe'
     Native $java @('-version') "$RunDirectory/java-version.stdout" "$RunDirectory/java-version.stderr"
@@ -92,7 +92,7 @@ try {
     $modules = @('dxlib','mars','dxfeed-promise','dxfeed-api','dxlib-qd-sandbox','auth','proto','qd-core','proto-ssl','qd-rmi','dxfeed-impl','dxfeed-scheme')
     $entries = @($modules | ForEach-Object { (Resolve-Path "$Upstream/$_/target/classes").Path })
     $cp = (@("$RunDirectory/harness") + $entries) -join ';'
-    Native $javac @('-encoding','UTF-8','-cp',($entries -join ';'),'-d',"$RunDirectory/harness","$PSScriptRoot/ProtocolOracle.java","$PSScriptRoot/../schema-oracle/SchemaOracle.java") `
+    Native $javac @('-encoding','UTF-8','-cp',($entries -join ';'),'-d',"$RunDirectory/harness","$PSScriptRoot/ProtocolOracle.java","$PSScriptRoot/FramingOracle.java","$PSScriptRoot/../schema-oracle/SchemaOracle.java") `
         "$RunDirectory/javac.stdout" "$RunDirectory/javac.stderr"
     $javaArgs = @('-Dfile.encoding=UTF-8','-Duser.language=en','-Duser.country=US','-Duser.timezone=UTC','-cp',$cp,'com.devexperts.qd.qtp.ProtocolOracle')
     Native $java (@('-Dfile.encoding=UTF-8','-Duser.language=en','-Duser.country=US','-Duser.timezone=UTC','-cp',$cp,'qdcxx.oracle.SchemaOracle','environment')) "$RunDirectory/environment.tsv" "$RunDirectory/environment.stderr"

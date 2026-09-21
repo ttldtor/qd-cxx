@@ -41,3 +41,13 @@ P05 использует реальные parser/composer соединения �
 ## Последующий переход на Google Java Style
 
 Исходные capture и их хеши кода выше остаются историческими доказательствами. Текущие harness и launcher позднее перенесены на Google Java Style; новый Verify с чистой сборкой JDK 8 прошёл относительно неизменных эталонов. Метаданные текущего кода и проверки — в [валидации переноса стиля](../../../tools/format/VALIDATION.ru.md). Исходные capture и эталоны не переписывались.
+
+## QDCXX-012: отдельный P02 baseline
+
+Добавлены 17 подслучаев P02 / 117 расписаний с точными байтами, позициями, callbacks и наблюдательными hooks.
+[Покрытие](p02/COVERAGE.ru.md) и [валидация/provenance](p02/VALIDATION.ru.md) фиксируют два независимых
+capture и immutable negative/baseline Verify. Прежние captures/expectations не изменены. Неполный внешний
+ввод ожидает байты; неполный type внутри полного body — stream error. Unknown type и неверный payload
+отделены от framing, политика закрытия adapter — от returning consumer. Диагностика неверной длины Java
+читает дополнительные байты; её позиция не равна C++ accepted. Старые утверждения о pending P02 выше
+относятся к QDCXX-006; остальная матрица payload/session/transport остаётся отложенной.

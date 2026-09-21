@@ -76,3 +76,12 @@ QDCXX-007 завершена как документация; [ADR-0001](../deci
 ## Обновление доказательств примитивов QDCXX-009
 
 QT-01 теперь частично измерен: [PRIMITIVES](../../spec/encoding/PRIMITIVES.ru.md) и [покрытие](../../tests/fixtures/encoding/COVERAGE.ru.md) устанавливают ограниченные переходы writer compact int/long, принимаемые избыточные формы reader, усечение между ширинами, кодовые единицы QTP UTFString, некорректные входы и consumed position прямого ByteArrayInput. Две независимые сборки и отрицательный/положительный Verify записаны в [валидации](../../tests/fixtures/encoding/VALIDATION.ru.md). Остаток QT-01: допустимые экстремальные длины/выделение ресурсов, другие подклассы BufferedInput и методы IOUtil, другие UTF/character codecs, PentaCodec, огромные протокольные counts/IDs и ошибки внешнего parser. Нельзя выводить rollback из EOF или переносить JSON Unicode policy на QTP. Нужны отдельные будущие задачи; эти доказательства не разрешают C++ или importer.
+
+## Обновление QDCXX-012: framing
+
+QT-01/QT-06 частично измерены новым [P02](../../tests/fixtures/protocol/p02/COVERAGE.ru.md): малые
+границы длины/type, overlong, удержание неполных кадров, ошибки type/payload, unknown type и одно
+сравнение закрытия стандартного adapter. Диагностика заголовка читает дополнительные байты, объясняя
+зависимость позиции Java от разбиения. [C++ контракт](../../spec/protocol/FRAMING.ru.md) задаёт отдельные
+terminal-first-error, ресурсы и finish; эквивалентность Java resetSession/EOF не заявляется. Полная
+матрица error flags, огромные ресурсы, другие buffers, PART/session/transport остаются открытыми.

@@ -28,3 +28,13 @@
 | Непустой запрос только z, отсутствующего локально | ноль полей | 0,0,0 |
 
 Пустое пересечение не становится сигналом «все поля»: R/ABC по-прежнему доставляется, но без полезной нагрузки полей. Входящий R с ID 1 у peer разрешается в R с ID 0 у издателя; ответ описывает ID 0 издателя, а парсер peer доставляет локальный ID 1. Это подтверждает ограниченную указанной областью интерпретацию исходников. Источники: ConnectionQTPParser.remapRecord/getRequestedRecordDesc, MessageAdapterConnection.getRequestedRecordDesc, ConnectionQTPComposer.getRequestedRecordDesc, BinaryQTPComposer.getRecordDesc и BinaryRecordDesc.isEmpty. Динамические изменения формата полей, кэш/сброс, преобразования P06 и согласование протокола P09 остаются неизмеренными.
+
+## QDCXX-012: отдельный P02 baseline
+
+Добавлены 17 подслучаев P02 / 117 расписаний с точными байтами, позициями, callbacks и наблюдательными hooks.
+[Покрытие](../../tests/fixtures/protocol/p02/COVERAGE.ru.md) и [валидация/provenance](../../tests/fixtures/protocol/p02/VALIDATION.ru.md) фиксируют два независимых
+capture и immutable negative/baseline Verify. Прежние captures/expectations не изменены. Неполный внешний
+ввод ожидает байты; неполный type внутри полного body — stream error. Unknown type и неверный payload
+отделены от framing, политика закрытия adapter — от returning consumer. Диагностика неверной длины Java
+читает дополнительные байты; её позиция не равна C++ accepted. Старые утверждения о pending P02 выше
+относятся к QDCXX-006; остальная матрица payload/session/transport остаётся отложенной.

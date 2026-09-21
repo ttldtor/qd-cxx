@@ -76,3 +76,12 @@ The owner accepted ADR-0001 on 2026-09-21. This supersedes the proposed/pending 
 ## QDCXX-009 primitive evidence update
 
 QT-01 is now partially measured: [PRIMITIVES](../../spec/encoding/PRIMITIVES.md) and [coverage](../../tests/fixtures/encoding/COVERAGE.md) establish bounded compact int/long writer transitions, accepted overlong reader forms, cross-width truncation, QTP UTFString code units, malformed inputs and direct ByteArrayInput consumed positions. Two independent builds and negative/positive Verify are recorded in [validation](../../tests/fixtures/encoding/VALIDATION.md). Remaining QT-01 work: accepted extreme lengths/resource allocation, other BufferedInput subclasses and IOUtil entry points, other UTF/character codecs, PentaCodec, huge protocol counts/IDs and outer parser errors. Do not infer rollback from EOF or transfer JSON Unicode policy to QTP. These need focused future tasks; no C++ or importer is authorized by this evidence.
+
+## QDCXX-012 framing update
+
+QT-01/QT-06 are partially measured by new [P02](../../tests/fixtures/protocol/p02/COVERAGE.md): small
+length/type limits, overlong forms, incomplete-frame retention, type/payload errors, unknown type and
+one default-adapter closure comparison. Header diagnostics read extra bytes, explaining Java position
+dependence on partitioning. The [C++ contract](../../spec/protocol/FRAMING.md) supplies separate terminal
+first-error, resource and finish policies; Java resetSession/EOF equivalence is not claimed. Full error
+flag combinations, huge resources, other buffers and PART/session/transport remain open.

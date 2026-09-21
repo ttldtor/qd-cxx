@@ -1,0 +1,39 @@
+case	P05-zero
+options	describe=true; default protocol options; mixedSubscription=false; event flags/time=0; no field replacer; PentaCodec
+scheme.record	publisher	0	R	false	[]
+scheme.field	publisher	0	0	R.x	x	x	8
+scheme.field	publisher	0	1	R.y	y	y	8
+scheme.record	peer	0	S	false	[]
+scheme.record	peer	1	R	false	[]
+transport	chunksAvailable
+transport	chunksAvailable
+instrumentation	heartbeat deadline and byte budget = Long.MAX_VALUE; adapter emits data only; no protocol descriptor/EndpointId; clock marks not serialized
+path	com.devexperts.qd.qtp.MessageAdapterConnection	processChunks -> ConnectionQTPParser; retrieveChunks -> ConnectionQTPComposer
+wire	peer->publisher	0502010152000410044301
+frame	peer->publisher	0	6	2
+wire.record	peer->publisher	1	R	0
+frame	peer->publisher	6	11	16
+chunks	request	11
+record	0	STREAM_ADD_SUBSCRIPTION|0|R|ABC
+callback	0	STREAM_ADD_SUBSCRIPTION	1
+processChunks	true
+requested	originally-empty
+wire	publisher->peer	0b0200015202017808017908060f0443000b16
+frame	publisher->peer	0	12	2
+wire.record	publisher->peer	0	R	2
+wire.field	publisher->peer	0	0	x	8
+wire.field	publisher->peer	0	1	y	8
+frame	publisher->peer	12	19	15
+replay	peer-whole	[19]
+parse.begin	19
+record	0	STREAM_DATA|1|R|ABC
+callback	0	STREAM_DATA	1
+parse.end	19	19	0	1	1	0
+replay	audit-whole	[19]
+parse.begin	19
+record	0	STREAM_DATA|0|R|ABC|0=11(11)|1=22(22)|2=0(0)
+callback	0	STREAM_DATA	1
+parse.end	19	19	0	1	1	0
+connection.state	true	false	false	0
+transport	closed
+complete	P05-zero

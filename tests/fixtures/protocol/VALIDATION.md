@@ -41,3 +41,13 @@ The [coverage manifest](COVERAGE.md) leaves P02, P06–P13 and unlisted portions
 ## Later Google Java Style migration
 
 The original captures and their source hashes above remain historical evidence. The current harness and launcher were subsequently migrated to Google Java Style; a fresh JDK 8 clean-build Verify passed against these unchanged expectations. Current-source metadata and checks are in [style migration validation](../../../tools/format/VALIDATION.md). No original capture or expected file was rewritten.
+
+## QDCXX-012: separate P02 baseline
+
+Added 17 P02 subcases / 117 schedules with exact bytes, positions, callbacks and observational hooks.
+[Coverage](p02/COVERAGE.md) and [validation/provenance](p02/VALIDATION.md) record two independent captures
+and immutable negative/baseline Verify. Historical captures/expectations are unchanged. Incomplete outer
+input waits; incomplete type inside a complete body is stream corruption. Unknown type and malformed
+payload are distinct from framing, and adapter closure is distinct from returning-consumer policy.
+Java invalid-length diagnostics read extra bytes; that position is not C++ accepted. Earlier pending-P02
+statements above describe QDCXX-006; the remaining payload/session/transport matrix stays deferred.

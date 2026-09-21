@@ -25,3 +25,11 @@ tools/format/licenses/*.txt text eol=lf
 tools/format/*.ps1 text eol=lf
 tools/format/*.json text eol=lf
 tools/format/evidence/** -text
+
+# QDCXX-012 hashes canonical harness/input bytes and preserves new raw evidence verbatim.
+tools/upstream/protocol-oracle/* text eol=lf
+tests/fixtures/protocol/cases.json text eol=lf
+tests/fixtures/protocol/expected/P02*.tsv text eol=lf
+tests/fixtures/protocol/p02/captures/** -text
+tests/conformance/protocol/logs/*.log -text
+tests/conformance/protocol/frames.tsv text eol=lf

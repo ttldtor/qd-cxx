@@ -10,6 +10,10 @@ target_include_directories(qd_encoding PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/inclu
 target_compile_features(qd_encoding PUBLIC cxx_std_23)
 set_target_properties(qd_encoding PROPERTIES CXX_EXTENSIONS OFF)
 
+add_library(qd_protocol src/protocol/frame_reader.cpp)
+target_link_libraries(qd_protocol PUBLIC qd_encoding)
+set_target_properties(qd_protocol PROPERTIES CXX_EXTENSIONS OFF)
+
 include(CTest)
 if(BUILD_TESTING)
     include(FetchContent)
@@ -26,4 +30,12 @@ if(BUILD_TESTING)
     set(QD_ENCODING_FIXTURES "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/encoding/expected"
         CACHE PATH "Java TSV directory (override only for temporary negative checks)")
     add_test(NAME compact_java_vectors COMMAND compact_tests "${QD_ENCODING_FIXTURES}")
+    add_executable(frame_tests tests/conformance/frame_tests.cpp)
+    target_link_libraries(frame_tests PRIVATE qd_protocol doctest::doctest)
+    set_target_properties(frame_tests PROPERTIES CXX_EXTENSIONS OFF)
+    set(QD_PROTOCOL_FIXTURES "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/protocol/expected"
+        CACHE PATH "Java protocol TSV directory (temporary overrides for negative checks)")
+    set(QD_FRAME_PROJECTIONS "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/protocol/frames.tsv"
+        CACHE FILEPATH "Reviewed frame-only expectations derived from Java inputs")
+    add_test(NAME protocol_java_frames COMMAND frame_tests "${QD_PROTOCOL_FIXTURES}" "${QD_FRAME_PROJECTIONS}")
 endif()

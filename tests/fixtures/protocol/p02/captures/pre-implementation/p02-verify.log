@@ -1,0 +1,4 @@
+2026-09-21T14:57:54.979Z COMMAND ['pwsh', '-NoProfile', '-File', 'tools/upstream/protocol-oracle/Test-Verify.ps1', '-Upstream', 'C:\\path\\to\\profile\\AppData\\Local\\Temp/qdcxx-003-qd', '-JavaHome', 'C:/Program Files/Zulu/zulu-8', '-Maven', 'C:\\path\\to\\profile\\.m2\\wrapper\\dists\\apache-maven-3.9.16\\0daed3be3ebd1c706f0e69e8b07c6b73f5cc4ea3dfce72a8d0ec2e849ca2ddb0\\bin\\mvn.cmd', '-TestDirectory', 'tools/upstream/protocol-oracle/.work/p02-verify']; cwd='C:\\qd-cxx'; TZ=UTC
+2026-09-21T14:59:16.386Z VERIFY PASS: 10 cases; expectations unchanged.
+2026-09-21T14:59:16.400Z VERIFY SELF-TEST PASS: deliberate mismatch detected; baseline passed; expectations unchanged.
+2026-09-21T14:59:16.419Z EXIT 0

@@ -1,0 +1,387 @@
+E 260921 152041.758 [main] BinaryQTPParser - Corrupted QTP byte stream: Invalid messageLength=-1
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000000:  7F!02 00 00                                       ...            
+++> 0x00000010:                                                                    
+++> === END ===
+E 260921 152041.775 [main] BinaryQTPParser - Corrupted QTP byte stream: Invalid messageLength=-1
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000000:  7F!                                                              
+++> 0x00000010:                                                                    
+++> === END ===
+E 260921 152041.775 [main] BinaryQTPParser - Corrupted QTP byte stream: Invalid messageLength=-1
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000000:  7F!02                                             .              
+++> 0x00000010:                                                                    
+++> === END ===
+E 260921 152041.776 [main] BinaryQTPParser - Corrupted QTP byte stream: Invalid messageLength=-1
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000000:  7F!02 00                                          ..             
+++> 0x00000010:                                                                    
+++> === END ===
+E 260921 152041.776 [main] BinaryQTPParser - Corrupted QTP byte stream: Invalid messageLength=-1
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000000:  7F!                                                              
+++> 0x00000010:                                                                    
+++> === END ===
+E 260921 152041.783 [main] BinaryQTPParser - Corrupted QTP byte stream: Invalid messageLength=9
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000000:  09!03 00 00 00 00 00 00 00 00 02 00 00            .............   
+++> 0x00000010:                                                                    
+++> === END ===
+E 260921 152041.783 [main] BinaryQTPParser - Corrupted QTP byte stream: Invalid messageLength=9
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000000:  09!                                               .               
+++> 0x00000010:                                                                    
+++> === END ===
+E 260921 152041.785 [main] BinaryQTPParser - Corrupted QTP byte stream: Invalid messageLength=9
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000000:  09!03                                             ..              
+++> 0x00000010:                                                                    
+++> === END ===
+E 260921 152041.785 [main] BinaryQTPParser - Corrupted QTP byte stream: Invalid messageLength=9
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000000:  09!03 00                                          ...             
+++> 0x00000010:                                                                    
+++> === END ===
+E 260921 152041.785 [main] BinaryQTPParser - Corrupted QTP byte stream: Invalid messageLength=9
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000000:  09!03 00 00                                       ....            
+++> 0x00000010:                                                                    
+++> === END ===
+E 260921 152041.786 [main] BinaryQTPParser - Corrupted QTP byte stream: Invalid messageLength=9
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000000:  09!03 00 00 00                                    .....           
+++> 0x00000010:                                                                    
+++> === END ===
+E 260921 152041.786 [main] BinaryQTPParser - Corrupted QTP byte stream: Invalid messageLength=9
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000000:  09!03 00 00 00 00                                 ......          
+++> 0x00000010:                                                                    
+++> === END ===
+E 260921 152041.786 [main] BinaryQTPParser - Corrupted QTP byte stream: Invalid messageLength=9
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000000:  09!03 00 00 00 00 00                              .......         
+++> 0x00000010:                                                                    
+++> === END ===
+E 260921 152041.787 [main] BinaryQTPParser - Corrupted QTP byte stream: Invalid messageLength=9
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000000:  09!03 00 00 00 00 00 00                           ........        
+++> 0x00000010:                                                                    
+++> === END ===
+E 260921 152041.787 [main] BinaryQTPParser - Corrupted QTP byte stream: Invalid messageLength=9
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000000:  09!03 00 00 00 00 00 00 00                        .........       
+++> 0x00000010:                                                                    
+++> === END ===
+E 260921 152041.787 [main] BinaryQTPParser - Corrupted QTP byte stream: Invalid messageLength=9
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000000:  09!03 00 00 00 00 00 00 00 00                     ..........      
+++> 0x00000010:                                                                    
+++> === END ===
+E 260921 152041.788 [main] BinaryQTPParser - Corrupted QTP byte stream: Invalid messageLength=9
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000000:  09!03 00 00 00 00 00 00 00 00 02                  ...........     
+++> 0x00000010:                                                                    
+++> === END ===
+E 260921 152041.788 [main] BinaryQTPParser - Corrupted QTP byte stream: Invalid messageLength=9
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000000:  09!03 00 00 00 00 00 00 00 00 02 00               ............    
+++> 0x00000010:                                                                    
+++> === END ===
+E 260921 152041.788 [main] BinaryQTPParser - Corrupted QTP byte stream: Invalid messageLength=9
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000000:  09!                                               .               
+++> 0x00000010:                                                                    
+++> === END ===
+E 260921 152041.790 [main] BinaryQTPParser - Corrupted QTP message: Not enough bytes in message to read message typeId
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  80!                                                              
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 152041.791 [main] BinaryQTPParser - Corrupted QTP message: Not enough bytes in message to read message typeId
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  80!                                                              
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 152041.791 [main] BinaryQTPParser - Corrupted QTP message: Not enough bytes in message to read message typeId
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  80!                                                              
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 152041.791 [main] BinaryQTPParser - Corrupted QTP message: Not enough bytes in message to read message typeId
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  80!                                                              
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 152041.791 [main] BinaryQTPParser - Corrupted QTP message: Not enough bytes in message to read message typeId
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  80!                                                              
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 152041.792 [main] BinaryQTPParser - Corrupted QTP message: Not enough bytes in message to read message typeId
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  80!                                                              
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 152041.792 [main] BinaryQTPParser - Corrupted QTP message: Invalid typeId=-1
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  7F!                                                              
+++> 0x00000011:                                                                    
+++> === END ===
+E 260921 152041.792 [main] BinaryQTPParser - Corrupted QTP message: Invalid typeId=-1
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  7F!                                                              
+++> 0x00000011:                                                                    
+++> === END ===
+E 260921 152041.792 [main] BinaryQTPParser - Corrupted QTP message: Invalid typeId=-1
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  7F!                                                              
+++> 0x00000011:                                                                    
+++> === END ===
+E 260921 152041.792 [main] BinaryQTPParser - Corrupted QTP message: Invalid typeId=-1
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  7F!                                                              
+++> 0x00000011:                                                                    
+++> === END ===
+E 260921 152041.793 [main] BinaryQTPParser - Corrupted QTP message: Invalid typeId=-1
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  7F!                                                              
+++> 0x00000011:                                                                    
+++> === END ===
+E 260921 152041.793 [main] BinaryQTPParser - Corrupted QTP message: Invalid typeId=-1
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  7F!                                                              
+++> 0x00000011:                                                                    
+++> === END ===
+E 260921 152041.793 [main] BinaryQTPParser - Corrupted QTP message: Invalid typeId=2147483648
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  F0 80 00 00 00!                                   ð...           
+++> 0x00000011:                                                                    
+++> === END ===
+E 260921 152041.793 [main] BinaryQTPParser - Corrupted QTP message: Invalid typeId=2147483648
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  F0 80 00 00 00!                                   ð...           
+++> 0x00000011:                                                                    
+++> === END ===
+E 260921 152041.794 [main] BinaryQTPParser - Corrupted QTP message: Invalid typeId=2147483648
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  F0 80 00 00 00!                                   ð...           
+++> 0x00000011:                                                                    
+++> === END ===
+E 260921 152041.794 [main] BinaryQTPParser - Corrupted QTP message: Invalid typeId=2147483648
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  F0 80 00 00 00!                                   ð...           
+++> 0x00000011:                                                                    
+++> === END ===
+E 260921 152041.794 [main] BinaryQTPParser - Corrupted QTP message: Invalid typeId=2147483648
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  F0 80 00 00 00!                                   ð...           
+++> 0x00000011:                                                                    
+++> === END ===
+E 260921 152041.794 [main] BinaryQTPParser - Corrupted QTP message: Invalid typeId=2147483648
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  F0 80 00 00 00!                                   ð...           
+++> 0x00000011:                                                                    
+++> === END ===
+E 260921 152041.794 [main] BinaryQTPParser - Corrupted QTP message: Invalid typeId=2147483648
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  F0 80 00 00 00!                                   ð...           
+++> 0x00000011:                                                                    
+++> === END ===
+E 260921 152041.794 [main] BinaryQTPParser - Corrupted QTP message: Invalid typeId=2147483648
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  F0 80 00 00 00!                                   ð...           
+++> 0x00000011:                                                                    
+++> === END ===
+E 260921 152041.795 [main] BinaryQTPParser - Corrupted QTP message: Invalid typeId=2147483648
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  F0 80 00 00 00!                                   ð...           
+++> 0x00000011:                                                                    
+++> === END ===
+E 260921 152041.795 [main] BinaryQTPParser - Corrupted QTP message: Invalid typeId=2147483648
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  F0 80 00 00 00!                                   ð...           
+++> 0x00000011:                                                                    
+++> === END ===
+E 260921 152041.798 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  00 01!                                            ..              
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 152041.798 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  00 01!                                            ..              
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 152041.798 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  00 01!                                            ..              
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 152041.798 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  00 01!                                            ..              
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 152041.799 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  00 01!                                            ..              
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 152041.799 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  00 01!                                            ..              
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 152041.799 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  00 01!                                            ..              
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 152041.799 [main] BinaryQTPParser - Corrupted QTP message: Not enough bytes in message to read message typeId
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000004:  80!                                                              
+++> 0x00000014:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 152041.800 [main] BinaryQTPParser - Corrupted QTP message: Not enough bytes in message to read message typeId
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000004:  80!                                                              
+++> 0x00000014:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 152041.800 [main] BinaryQTPParser - Corrupted QTP message: Not enough bytes in message to read message typeId
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000004:  80!                                                              
+++> 0x00000014:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 152041.800 [main] BinaryQTPParser - Corrupted QTP message: Not enough bytes in message to read message typeId
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000004:  80!                                                              
+++> 0x00000014:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 152041.800 [main] BinaryQTPParser - Corrupted QTP message: Not enough bytes in message to read message typeId
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000004:  80!                                                              
+++> 0x00000014:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 152041.801 [main] BinaryQTPParser - Corrupted QTP message: Not enough bytes in message to read message typeId
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000004:  80!                                                              
+++> 0x00000014:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 152041.801 [main] BinaryQTPParser - Corrupted QTP message: Not enough bytes in message to read message typeId
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000004:  80!                                                              
+++> 0x00000014:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 152041.801 [main] BinaryQTPParser - Corrupted QTP message: Not enough bytes in message to read message typeId
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000004:  80!                                                              
+++> 0x00000014:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 152041.801 [main] BinaryQTPParser - Corrupted QTP message: Not enough bytes in message to read message typeId
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000004:  80!                                                              
+++> 0x00000014:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+E 260921 152041.808 [main] MessageConsumerAdapter - Unknown QTP message #62!!!

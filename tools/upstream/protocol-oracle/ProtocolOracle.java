@@ -378,7 +378,9 @@ public class ProtocolOracle {
         "options",
         "describe=true; default protocol options; mixedSubscription=false; event flags/time=0; no"
             + " field replacer; PentaCodec");
-    if (id.startsWith("P05")) {
+    if (id.equals("P02")) {
+      FramingOracle.run();
+    } else if (id.startsWith("P05")) {
       p05(id);
     } else {
       boolean reverse = id.equals("P03-B-A");

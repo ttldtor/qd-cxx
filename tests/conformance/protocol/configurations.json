@@ -1,0 +1,88 @@
+{
+  "msvc": {
+    "cacheSettings": [
+      "BUILD_TESTING:BOOL=ON",
+      "CMAKE_CXX_FLAGS:STRING=/DWIN32 /D_WINDOWS /EHsc",
+      "CMAKE_GENERATOR:INTERNAL=Visual Studio 17 2022",
+      "CMAKE_GENERATOR_TOOLSET:INTERNAL="
+    ],
+    "compilerSettings": [
+      "set(CMAKE_CXX_COMPILER \"C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.42.34433/bin/Hostx64/x64/cl.exe\")",
+      "set(CMAKE_CXX_COMPILER_ID \"MSVC\")",
+      "set(CMAKE_CXX_COMPILER_VERSION \"19.42.34444.0\")"
+    ]
+  },
+  "clang": {
+    "cacheSettings": [
+      "BUILD_TESTING:BOOL=ON",
+      "CMAKE_CXX_FLAGS:STRING=/DWIN32 /D_WINDOWS /EHsc",
+      "CMAKE_GENERATOR:INTERNAL=Visual Studio 17 2022",
+      "CMAKE_GENERATOR_TOOLSET:INTERNAL=ClangCL"
+    ],
+    "compilerSettings": [
+      "set(CMAKE_CXX_COMPILER \"C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/Llvm/x64/bin/clang-cl.exe\")",
+      "set(CMAKE_CXX_COMPILER_ID \"Clang\")",
+      "set(CMAKE_CXX_COMPILER_VERSION \"19.1.5\")"
+    ]
+  },
+  "linux-debug": {
+    "cacheSettings": [
+      "BUILD_TESTING:BOOL=ON",
+      "CMAKE_BUILD_TYPE:STRING=Debug",
+      "CMAKE_CXX_COMPILER:FILEPATH=/usr/bin/c++",
+      "CMAKE_CXX_FLAGS:STRING=",
+      "CMAKE_GENERATOR:INTERNAL=Ninja",
+      "CMAKE_GENERATOR_TOOLSET:INTERNAL="
+    ],
+    "compilerSettings": [
+      "set(CMAKE_CXX_COMPILER \"/usr/bin/c++\")",
+      "set(CMAKE_CXX_COMPILER_ID \"GNU\")",
+      "set(CMAKE_CXX_COMPILER_VERSION \"13.3.0\")"
+    ]
+  },
+  "linux-release": {
+    "cacheSettings": [
+      "BUILD_TESTING:BOOL=ON",
+      "CMAKE_BUILD_TYPE:STRING=Release",
+      "CMAKE_CXX_COMPILER:FILEPATH=/usr/bin/c++",
+      "CMAKE_CXX_FLAGS:STRING=",
+      "CMAKE_GENERATOR:INTERNAL=Ninja",
+      "CMAKE_GENERATOR_TOOLSET:INTERNAL="
+    ],
+    "compilerSettings": [
+      "set(CMAKE_CXX_COMPILER \"/usr/bin/c++\")",
+      "set(CMAKE_CXX_COMPILER_ID \"GNU\")",
+      "set(CMAKE_CXX_COMPILER_VERSION \"13.3.0\")"
+    ]
+  },
+  "utf-asan": {
+    "cacheSettings": [
+      "BUILD_TESTING:BOOL=ON",
+      "CMAKE_BUILD_TYPE:STRING=Debug",
+      "CMAKE_CXX_COMPILER:FILEPATH=/usr/bin/c++",
+      "CMAKE_CXX_FLAGS:STRING=-fsanitize=address,undefined -fno-omit-frame-pointer",
+      "CMAKE_GENERATOR:INTERNAL=Ninja",
+      "CMAKE_GENERATOR_TOOLSET:INTERNAL="
+    ],
+    "compilerSettings": [
+      "set(CMAKE_CXX_COMPILER \"/usr/bin/c++\")",
+      "set(CMAKE_CXX_COMPILER_ID \"GNU\")",
+      "set(CMAKE_CXX_COMPILER_VERSION \"13.3.0\")"
+    ]
+  },
+  "framing-library": {
+    "cacheSettings": [
+      "BUILD_TESTING:BOOL=OFF",
+      "CMAKE_BUILD_TYPE:STRING=",
+      "CMAKE_CXX_COMPILER:FILEPATH=/usr/bin/c++",
+      "CMAKE_CXX_FLAGS:STRING=",
+      "CMAKE_GENERATOR:INTERNAL=Ninja",
+      "CMAKE_GENERATOR_TOOLSET:INTERNAL="
+    ],
+    "compilerSettings": [
+      "set(CMAKE_CXX_COMPILER \"/usr/bin/c++\")",
+      "set(CMAKE_CXX_COMPILER_ID \"GNU\")",
+      "set(CMAKE_CXX_COMPILER_VERSION \"13.3.0\")"
+    ]
+  }
+}

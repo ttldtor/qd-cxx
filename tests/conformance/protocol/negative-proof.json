@@ -1,0 +1,72 @@
+{
+  "executedAtUtc": "2026-09-21T15:24:08.352672Z",
+  "executable": ".work\\msvc\\Release\\frame_tests.exe",
+  "originalFilesUnchanged": true,
+  "fixtureHashes": {
+    "P01.semantic.tsv": "6f2f823d7881e57a9425f670a014f2596cf034ae9e1c3e4e53de4f1c4a548388",
+    "P01.tsv": "735d995b7f69ef7dfaf20ba80f6efeabd3109336e2e5315cf4214441af561566",
+    "P02.semantic.tsv": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "P02.tsv": "996f9127a926378bf4ae804ae9430b13ae738c2e89889eb1495493fd9b81e922",
+    "P03-A-B.semantic.tsv": "f460572b383abb05e7433c213c36bf330e19212fbce648eb46ddc2589cf765d3",
+    "P03-A-B.tsv": "0b51ee8f251f7087e9edf520e891b39bff092c7c3b44f08311dd07fade9f7228",
+    "P03-B-A.semantic.tsv": "b6e69d94d34e51234e04be9ec8f1b37fcaa20772483b5592fd6fdd73392e6fc4",
+    "P03-B-A.tsv": "23908a6f7c0c9b4333b02550de4bb2859dc7d3c008f97c7982825e9b1c532d3c",
+    "P04-alias.semantic.tsv": "3e5a0ee6bb38c95ba1b9f0150f4c959d4f94b0f1c6ec156f9689a20189f9d701",
+    "P04-alias.tsv": "69c19e92b274a66e5a09e2108c93cefaade6112dcf04b472160c242c67ccde83",
+    "P04-order.semantic.tsv": "3e5a0ee6bb38c95ba1b9f0150f4c959d4f94b0f1c6ec156f9689a20189f9d701",
+    "P04-order.tsv": "119a8022158216cf6c4884d72f63f4d40c74b45ec08250f3e008ed8270be81c2",
+    "P05-none.semantic.tsv": "257c9a95443dba8fab35ebc45f8938b5865f12a0d915dde3df3213baf8d69502",
+    "P05-none.tsv": "05dd562ab1ea4f2fdffdc0f09b73cec90641d7485f69b5dc00fd315df5bd424a",
+    "P05-x.semantic.tsv": "136e15d944f6af302f296d9317b1c2b2e9e98898767b60e79b1236dcd8601816",
+    "P05-x.tsv": "440657557c5ad51598df7bb338c333b5412a87e5441ae99822a05f606600faa7",
+    "P05-z.semantic.tsv": "ccc2ee33e30b2e6355ddcde1360a3a958ebd7b484b548e302dd6c0fc872bf1f1",
+    "P05-z.tsv": "c90f8fee10712c0b0004af9de1f611bfddeecfbe24eda39531289396e41d0c8f",
+    "P05-zero.semantic.tsv": "419190339ed3afec072c692a1c4e064fd40eedac5b4ece8009b0ee10f48393cd",
+    "P05-zero.tsv": "42378d1d02f97f68da92779c45d49a1d857ab02dc12d7decab59ed62f9f5581a"
+  },
+  "projectionSha256": "9934b4e2d1a26e208e62b2501a6afee08e44fa2dd4a731187a1fcbb510ad1caa",
+  "checks": [
+    {
+      "case": "baseline",
+      "exitCode": 0,
+      "temporaryFilesUnchanged": true,
+      "stdout": "[doctest] doctest version is \"2.4.12\"\n[doctest] run with \"--help\" for options\n===============================================================================\n[doctest] test cases:      3 |      3 passed | 0 failed | 0 skipped\n[doctest] assertions: 246166 | 246166 passed | 0 failed |\n[doctest] Status: SUCCESS!\n",
+      "stderr": ""
+    },
+    {
+      "case": "expected-byte",
+      "exitCode": 1,
+      "temporaryFilesUnchanged": true,
+      "stdout": "[doctest] doctest version is \"2.4.12\"\n[doctest] run with \"--help\" for options\n===============================================================================\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(334):\nTEST CASE:  P01/P02 reviewed frames are independent of stream partition\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(98): ERROR: CHECK( std::equal(actual.begin(), actual.end(), expected.begin()) ) is NOT correct!\n  values: CHECK( false )\n  logged: tiny-heartbeat\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(98): ERROR: CHECK( std::equal(actual.begin(), actual.end(), expected.begin()) ) is NOT correct!\n  values: CHECK( false )\n  logged: tiny-heartbeat\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(98): ERROR: CHECK( std::equal(actual.begin(), actual.end(), expected.begin()) ) is NOT correct!\n  values: CHECK( false )\n  logged: tiny-heartbeat\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(98): ERROR: CHECK( std::equal(actual.begin(), actual.end(), expected.begin()) ) is NOT correct!\n  values: CHECK( false )\n  logged: tiny-heartbeat\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(98): ERROR: CHECK( std::equal(actual.begin(), actual.end(), expected.begin()) ) is NOT correct!\n  values: CHECK( false )\n  logged: tiny-heartbeat\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(98): ERROR: CHECK( std::equal(actual.begin(), actual.end(), expected.begin()) ) is NOT correct!\n  values: CHECK( false )\n  logged: tiny-heartbeat\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(98): ERROR: CHECK( std::equal(actual.begin(), actual.end(), expected.begin()) ) is NOT correct!\n  values: CHECK( false )\n  logged: tiny-heartbeat\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(98): ERROR: CHECK( std::equal(actual.begin(), actual.end(), expected.begin()) ) is NOT correct!\n  values: CHECK( false )\n  logged: tiny-heartbeat\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(98): ERROR: CHECK( std::equal(actual.begin(), actual.end(), expected.begin()) ) is NOT correct!\n  values: CHECK( false )\n  logged: tiny-heartbeat\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(98): ERROR: CHECK( std::equal(actual.begin(), actual.end(), expected.begin()) ) is NOT correct!\n  values: CHECK( false )\n  logged: tiny-heartbeat\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(98): ERROR: CHECK( std::equal(actual.begin(), actual.end(), expected.begin()) ) is NOT correct!\n  values: CHECK( false )\n  logged: tiny-heartbeat\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(98): ERROR: CHECK( std::equal(actual.begin(), actual.end(), expected.begin()) ) is NOT correct!\n  values: CHECK( false )\n  logged: tiny-heartbeat\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(98): ERROR: CHECK( std::equal(actual.begin(), actual.end(), expected.begin()) ) is NOT correct!\n  values: CHECK( false )\n  logged: tiny-heartbeat\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(98): ERROR: CHECK( std::equal(actual.begin(), actual.end(), expected.begin()) ) is NOT correct!\n  values: CHECK( false )\n  logged: tiny-heartbeat\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(98): ERROR: CHECK( std::equal(actual.begin(), actual.end(), expected.begin()) ) is NOT correct!\n  values: CHECK( false )\n  logged: tiny-heartbeat\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(98): ERROR: CHECK( std::equal(actual.begin(), actual.end(), expected.begin()) ) is NOT correct!\n  values: CHECK( false )\n  logged: tiny-heartbeat\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(98): ERROR: CHECK( std::equal(actual.begin(), actual.end(), expected.begin()) ) is NOT correct!\n  values: CHECK( false )\n  logged: tiny-heartbeat\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(98): ERROR: CHECK( std::equal(actual.begin(), actual.end(), expected.begin()) ) is NOT correct!\n  values: CHECK( false )\n  logged: tiny-heartbeat\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(98): ERROR: CHECK( std::equal(actual.begin(), actual.end(), expected.begin()) ) is NOT correct!\n  values: CHECK( false )\n  logged: tiny-heartbeat\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(98): ERROR: CHECK( std::equal(actual.begin(), actual.end(), expected.begin()) ) is NOT correct!\n  values: CHECK( false )\n  logged: tiny-heartbeat\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(98): ERROR: CHECK( std::equal(actual.begin(), actual.end(), expected.begin()) ) is NOT correct!\n  values: CHECK( false )\n  logged: tiny-heartbeat\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(98): ERROR: CHECK( std::equal(actual.begin(), actual.end(), expected.begin()) ) is NOT correct!\n  values: CHECK( false )\n  logged: tiny-heartbeat\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(98): ERROR: CHECK( std::equal(actual.begin(), actual.end(), expected.begin()) ) is NOT correct!\n  values: CHECK( false )\n  logged: tiny-heartbeat\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(98): ERROR: CHECK( std::equal(actual.begin(), actual.end(), expected.begin()) ) is NOT correct!\n  values: CHECK( false )\n  logged: tiny-heartbeat\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(98): ERROR: CHECK( std::equal(actual.begin(), actual.end(), expected.begin()) ) is NOT correct!\n  values: CHECK( false )\n  logged: tiny-heartbeat\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(98): ERROR: CHECK( std::equal(actual.begin(), actual.end(), expected.begin()) ) is NOT correct!\n  values: CHECK( false )\n  logged: tiny-heartbeat\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(98): ERROR: CHECK( std::equal(actual.begin(), actual.end(), expected.begin()) ) is NOT correct!\n  values: CHECK( false )\n  logged: tiny-heartbeat\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(98): ERROR: CHECK( std::equal(actual.begin(), actual.end(), expected.begin()) ) is NOT correct!\n  values: CHECK( false )\n  logged: tiny-heartbeat\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(98): ERROR: CHECK( std::equal(actual.begin(), actual.end(), expected.begin()) ) is NOT correct!\n  values: CHECK( false )\n  logged: tiny-heartbeat\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(98): ERROR: CHECK( std::equal(actual.begin(), actual.end(), expected.begin()) ) is NOT correct!\n  values: CHECK( false )\n  logged: tiny-heartbeat\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(98): ERROR: CHECK( std::equal(actual.begin(), actual.end(), expected.begin()) ) is NOT correct!\n  values: CHECK( false )\n  logged: tiny-heartbeat\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(98): ERROR: CHECK( std::equal(actual.begin(), actual.end(), expected.begin()) ) is NOT correct!\n  values: CHECK( false )\n  logged: tiny-heartbeat\n\n===============================================================================\n[doctest] test cases:      3 |      2 passed |  1 failed | 0 skipped\n[doctest] assertions: 246166 | 246134 passed | 32 failed |\n[doctest] Status: FAILURE!\n",
+      "stderr": ""
+    },
+    {
+      "case": "invalid-hex",
+      "exitCode": 1,
+      "temporaryFilesUnchanged": true,
+      "stdout": "[doctest] doctest version is \"2.4.12\"\n[doctest] run with \"--help\" for options\n===============================================================================\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(334):\nTEST CASE:  P01/P02 reviewed frames are independent of stream partition\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(84): FATAL ERROR: REQUIRE( parsed.ec == std::errc{} ) is NOT correct!\n  values: REQUIRE( 22 == 0 )\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(132): FATAL ERROR: REQUIRE( inputs.emplace(id, unhex(fields[2])).second ) THREW exception: \"unknown exception\"\n\n===============================================================================\n[doctest] test cases:      3 |      2 passed | 1 failed | 0 skipped\n[doctest] assertions: 110390 | 110388 passed | 2 failed |\n[doctest] Status: FAILURE!\n",
+      "stderr": ""
+    },
+    {
+      "case": "missing-input",
+      "exitCode": 1,
+      "temporaryFilesUnchanged": true,
+      "stdout": "[doctest] doctest version is \"2.4.12\"\n[doctest] run with \"--help\" for options\n===============================================================================\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(334):\nTEST CASE:  P01/P02 reviewed frames are independent of stream partition\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(139): FATAL ERROR: REQUIRE( inputs.size() == SELECTED_CASE_COUNT ) is NOT correct!\n  values: REQUIRE( 17 == 18 )\n\n===============================================================================\n[doctest] test cases:      3 |      2 passed | 1 failed | 0 skipped\n[doctest] assertions: 110667 | 110666 passed | 1 failed |\n[doctest] Status: FAILURE!\n",
+      "stderr": ""
+    },
+    {
+      "case": "empty-selection",
+      "exitCode": 1,
+      "temporaryFilesUnchanged": true,
+      "stdout": "[doctest] doctest version is \"2.4.12\"\n[doctest] run with \"--help\" for options\n===============================================================================\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(334):\nTEST CASE:  P01/P02 reviewed frames are independent of stream partition\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(136): FATAL ERROR: REQUIRE( complete ) is NOT correct!\n  values: REQUIRE( false )\n\n===============================================================================\n[doctest] test cases:      3 |      2 passed | 1 failed | 0 skipped\n[doctest] assertions: 110385 | 110384 passed | 1 failed |\n[doctest] Status: FAILURE!\n",
+      "stderr": ""
+    },
+    {
+      "case": "empty-projections",
+      "exitCode": 1,
+      "temporaryFilesUnchanged": true,
+      "stdout": "[doctest] doctest version is \"2.4.12\"\n[doctest] run with \"--help\" for options\n===============================================================================\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(334):\nTEST CASE:  P01/P02 reviewed frames are independent of stream partition\n\nC:\\qd-cxx\\tests\\conformance\\frame_tests.cpp(218): FATAL ERROR: REQUIRE( result.size() == SELECTED_CASE_COUNT ) is NOT correct!\n  values: REQUIRE( 0 == 18 )\n\n===============================================================================\n[doctest] test cases:      3 |      2 passed | 1 failed | 0 skipped\n[doctest] assertions: 110676 | 110675 passed | 1 failed |\n[doctest] Status: FAILURE!\n",
+      "stderr": ""
+    }
+  ]
+}

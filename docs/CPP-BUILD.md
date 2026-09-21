@@ -1,4 +1,4 @@
-# Bounded C++23 encoding components
+# Bounded C++23 components
 
 [Русская версия](CPP-BUILD.ru.md). English is authoritative.
 
@@ -7,7 +7,36 @@ and UTFString APIs. QDCXX-010 introduced compact; QDCXX-011 adds
 [utf_string.hpp](../include/qd/encoding/utf_string.hpp). The unchanged Java
 [primitive evidence](../spec/encoding/PRIMITIVES.md) defines compatibility;
 [UTFString policy and reuse decision](../spec/encoding/UTFSTRING.md) define explicit C++ bounds.
-PentaCodec, importer, schema runtime, QTP framing, transport and packaging remain outside scope.
+PentaCodec, importer, schema runtime, payload decoding, frame writing, transport and packaging remain outside scope.
+
+## QTP frame reader API and QDCXX-012 checks
+
+`qd_protocol` is a production component without external dependencies, linking only qd_encoding.
+Include `qd/protocol/frame_reader.hpp` and link qd_protocol. Construct
+`qd::protocol::FrameReader reader({1024, 1033});`: these are body and pending budgets, allowing
+nine prefix bytes. Incompatible/overflowing budgets throw invalid_argument; constructor allocation
+failure propagates. The API is single-threaded and non-reentrant.
+
+`feed(input)` returns at most one owning frame, status and exact accepted count. Advance input by
+accepted and resubmit the unaccepted suffix. FRAME_READY carries a frame; NEED_INPUT means no
+complete frame, while FAILED/FINISHED accept nothing further. `pending()` borrows the exact retained
+bytes until the next mutating operation. Returned frames own payload and survive feed/reset/reader
+destruction. `finish()` distinguishes a clean boundary from truncated input; empty feed is not EOF.
+`reset()` clears only the framer.
+
+The first framing error is terminal; error()/errorOffset() give its cause and frame start,
+totalAccepted() gives the accepted position. Invalid payload syntax and unknown in-range type
+remain opaque output. EMPTY_HEARTBEAT has no type and differs from MESSAGE with type=0. Reader
+storage is fixed body+9, delivered payload owns separate bounded storage; caller-retained frames
+are outside the reader's aggregate budget. Payload allocation failure gives ALLOCATION_FAILURE.
+The [EN/RU contract](../spec/protocol/FRAMING.md) defines exact wire/resource/lifecycle boundaries.
+
+Commands below now build both libraries and also run frame_tests/protocol_java_frames. New tests
+read historical P01 and separately added P02; QD_PROTOCOL_FIXTURES and QD_FRAME_PROJECTIONS permit
+temporary negative selections. MSVC/ClangCL/GCC Debug/Release and GCC ASan+UBSan pass;
+BUILD_TESTING=OFF does not fetch doctest. [Coverage](../tests/conformance/protocol/COVERAGE.md),
+[results and UTC logs](../tests/conformance/protocol/VALIDATION.md). Further payload/transport/writer
+components require a separate approved task.
 
 ## UTFString API and current checks
 
@@ -41,7 +70,7 @@ Executed with CMake 4.4.2, generator `Visual Studio 17 2022`, x64, Windows SDK 1
 MSBuild 17.14.51, MSVC 19.42.34444.0 (tool directory 14.42.34433). The second compiler is the
 installed ClangCL 19.1.5 using the same MSVC standard library/SDK. Tests use doctest 2.4.12 via
 CMake FetchContent, pinned by archive URL and SHA-256 in [CMakeLists.txt](../CMakeLists.txt).
-Only `compact_tests` links doctest; `BUILD_TESTING=OFF` neither downloads nor links it. Downloads
+Only `compact_tests` and `frame_tests` link doctest; `BUILD_TESTING=OFF` neither downloads nor links it. Downloads
 are stored under the ignored build directory `_deps/`; the first test configure needs network access.
 No package manager is needed. doctest 2.4.12 emits a non-fatal CMake deprecation warning for its
 old minimum policy version; the downloaded source is unmodified. CMake requires 3.25+; each target inherits `cxx_std_23` from the library,
@@ -63,7 +92,7 @@ python tools/run_utc.py --log .work/clang-release-test.log -- ctest --test-dir .
 ```
 
 Build outside the source root; `.work/` and `build/` are ignored. In-source configure is rejected.
-`BUILD_TESTING=OFF` builds only the library. `QD_ENCODING_FIXTURES` may point at temporary fixture
+`BUILD_TESTING=OFF` builds only qd_encoding and qd_protocol libraries. `QD_ENCODING_FIXTURES` may point at temporary fixture
 copies for negative checks; it defaults to the checked-in expectations. Initial sandboxed MSBuild
 SDK discovery was denied access to the local Microsoft SDKs directory; the authorized configure/build
 runs above succeeded with sandbox elevation. This is an environment restriction, not a codec failure.

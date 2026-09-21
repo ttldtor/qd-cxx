@@ -2,9 +2,15 @@
 
 [Русская версия](CURRENT-STATE.ru.md). This English document is authoritative.
 
-## Next task: QTP framing
+## Completed: QTP framing
 
-QDCXX-012 — ready, High: bounded Java P02 probes followed by an in-memory incremental C++ frame reader. Complete frames expose opaque payload; incomplete input is retained. Limits, lifecycle/error policy and fragmentation checks are explicit. Only the task is created; implementation has not started. Transport, payload decoding and a frame writer are excluded.
+QDCXX-012 — done, High. First captured 17 Java P02 subcases / 117 schedules,
+two independent captures and negative/baseline Verify; then implemented a bounded incremental C++
+reader with opaque payload, retained incomplete input, exact accepted counts, owned frames,
+backpressure and explicit finish/terminal error. All MSVC/ClangCL/WSL GCC Debug/Release and GCC
+ASan+UBSan checks pass with compact/UTFString regressions. Historical oracle goldens and upstream.lock
+are unchanged. [EN/RU results](../tests/conformance/protocol/VALIDATION.md).
+Transport, payload decoding and a frame writer were not added.
 
 ## Completed: UTFString
 
@@ -23,9 +29,9 @@ QDCXX-010 — done, High: minimal C++23 build, compact int/long codec, Java-vect
 
 ## Phase
 
-**Specification baseline with bounded C++23 compact integer and UTFString implementation.**
+**Specification baseline with bounded C++23 compact integer, UTFString and QTP framing implementation.**
 
-The repository defines specifications and Java oracle evidence, plus the QDCXX-010 compact int/long and QDCXX-011 UTFString library, minimal CMake/CTest and pinned C++ formatting. The API is provisional; no third-party runtime dependency is selected.
+The repository defines specifications and Java oracle evidence, plus QDCXX-010 compact int/long, QDCXX-011 UTFString and QDCXX-012 framing, minimal CMake/CTest and pinned C++ formatting. The API is provisional; no third-party runtime dependency is selected.
 
 ## ADR approval and next tasks
 

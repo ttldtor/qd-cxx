@@ -19,3 +19,13 @@ QDCXX-006: nine cases, pinned QD 3.355; [driver](../../../tools/upstream/protoco
 All P05 replies use publisher ID 0 and deliver peer-local ID 1. No parser errors or premature close/restart occurred; each connection was closed explicitly after observation. Exact expectations and ordered-record semantic projections are separate files in [expected](expected/).
 
 P02, P06–P13 remain unexecuted, including conversion, negotiation, malformed/reset/PART, auth, sockets and timing integration. Unlisted portions of exercised families remain open. Upstream test suites are skipped. Java round trips are not independent encoding validation or proof of complete compatibility.
+
+## QDCXX-012: separate P02 baseline
+
+Added 17 P02 subcases / 117 schedules with exact bytes, positions, callbacks and observational hooks.
+[Coverage](p02/COVERAGE.md) and [validation/provenance](p02/VALIDATION.md) record two independent captures
+and immutable negative/baseline Verify. Historical captures/expectations are unchanged. Incomplete outer
+input waits; incomplete type inside a complete body is stream corruption. Unknown type and malformed
+payload are distinct from framing, and adapter closure is distinct from returning-consumer policy.
+Java invalid-length diagnostics read extra bytes; that position is not C++ accepted. Earlier pending-P02
+statements above describe QDCXX-006; the remaining payload/session/transport matrix stays deferred.

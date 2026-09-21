@@ -1,0 +1,30 @@
+case	P04-alias
+options	describe=true; default protocol options; mixedSubscription=false; event flags/time=0; no field replacer; PentaCodec
+alias	receiver	x	xdot
+lookup	xdot	1
+scheme.record	sender	0	R	false	[]
+scheme.field	sender	0	0	R.x.dot	x.dot	xdot	8
+scheme.field	sender	0	1	R.y	y	y	8
+scheme.record	sender	1	S	false	[]
+scheme.field	sender	1	0	S.x	x	x	8
+scheme.field	sender	1	1	S.y	y	y	8
+scheme.record	receiver	0	R	false	[]
+scheme.field	receiver	0	0	R.y	y	y	8
+scheme.field	receiver	0	1	R.x	x	xdot	8
+scheme.field	receiver	0	2	R.z	z	z	8
+direction	P04-alias
+wire	sender->receiver	0e02000152020478646f7408017908060f0443000b160410044300
+frame	sender->receiver	0	15	2
+wire.record	sender->receiver	0	R	2
+wire.field	sender->receiver	0	0	xdot	8
+wire.field	sender->receiver	0	1	y	8
+frame	sender->receiver	15	22	15
+frame	sender->receiver	22	27	16
+replay	whole	[27]
+parse.begin	27
+record	0	STREAM_DATA|0|R|ABC|0=22(22)|1=11(11)|2=0(0)
+callback	0	STREAM_DATA	1
+record	1	STREAM_ADD_SUBSCRIPTION|0|R|ABC
+callback	1	STREAM_ADD_SUBSCRIPTION	1
+parse.end	27	27	0	2	2	0
+complete	P04-alias

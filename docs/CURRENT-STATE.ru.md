@@ -2,9 +2,15 @@
 
 [English version](CURRENT-STATE.md). Английский документ является основным.
 
-## Следующая задача: QTP framing
+## Завершено: QTP framing
 
-QDCXX-012 — ready, High: ограниченные Java-пробы P02, затем инкрементальный C++ frame reader в памяти. Полные кадры выдаются как opaque payload; incomplete input сохраняется. Отдельно определены лимиты, lifecycle/error policy и проверки фрагментации. Создано только задание; реализация не начата. Transport, payload decoding и frame writer вне объёма.
+QDCXX-012 — done, High. Сначала получены 17 Java P02 подслучаев / 117 расписаний,
+два независимых capture и negative/baseline Verify; затем реализован ограниченный инкрементальный
+C++ reader с непрозрачным payload, сохранением неполного ввода, точным accepted, владеющими кадрами,
+обратным давлением и явным finish/terminal error. Все MSVC/ClangCL/WSL GCC Debug/Release и GCC
+ASan+UBSan проверки прошли вместе с compact/UTFString регрессиями. Прежние oracle-эталоны и
+upstream.lock неизменны. [Результаты EN/RU](../tests/conformance/protocol/VALIDATION.ru.md).
+Transport, payload decoding и frame writer не добавлены.
 
 ## Завершено: UTFString
 
@@ -27,9 +33,9 @@ QDCXX-010 — done, High: минимальная C++23-сборка, compact int
 
 ## Фаза
 
-**Specification baseline с ограниченными реализациями compact integer и UTFString на C++23.**
+**Specification baseline с ограниченными реализациями compact integer, UTFString и QTP framing на C++23.**
 
-Репозиторий содержит спецификации и Java oracle evidence, а также библиотеку compact int/long QDCXX-010 и UTFString QDCXX-011, минимальные CMake/CTest и закреплённое форматирование C++. API предварительный; сторонние runtime-зависимости не выбраны.
+Репозиторий содержит спецификации и Java oracle evidence, а также compact int/long QDCXX-010, UTFString QDCXX-011 и framing QDCXX-012, минимальные CMake/CTest и закреплённое форматирование C++. API предварительный; сторонние runtime-зависимости не выбраны.
 
 Завершены: QDCXX-008 — контракт JSON и примеры; QDCXX-009 — векторы и контракт примитивных кодировок. Дальнейшие C++/importer требуют отдельной утверждённой задачи. Старые записи ниже описывают состояние при завершении соответствующих задач.
 

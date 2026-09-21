@@ -28,3 +28,13 @@ The first data frame uses repeat-symbol `ff` for its second ABC record; the subs
 | Nonempty z only, absent locally | zero fields | 0,0,0 |
 
 The empty intersection does not become the all-fields signal: R/ABC is still delivered, but with no field payload. Incoming peer R ID 1 resolves to publisher R ID 0; reply describes publisher ID 0 and peer parser delivers local ID 1. This confirms the bounded source interpretation. Sources: ConnectionQTPParser.remapRecord/getRequestedRecordDesc, MessageAdapterConnection.getRequestedRecordDesc, ConnectionQTPComposer.getRequestedRecordDesc, BinaryQTPComposer.getRecordDesc and BinaryRecordDesc.isEmpty. Dynamic layout changes, cache/reset, P06 conversions and P09 negotiation remain unmeasured.
+
+## QDCXX-012: separate P02 baseline
+
+Added 17 P02 subcases / 117 schedules with exact bytes, positions, callbacks and observational hooks.
+[Coverage](../../tests/fixtures/protocol/p02/COVERAGE.md) and [validation/provenance](../../tests/fixtures/protocol/p02/VALIDATION.md) record two independent captures
+and immutable negative/baseline Verify. Historical captures/expectations are unchanged. Incomplete outer
+input waits; incomplete type inside a complete body is stream corruption. Unknown type and malformed
+payload are distinct from framing, and adapter closure is distinct from returning-consumer policy.
+Java invalid-length diagnostics read extra bytes; that position is not C++ accepted. Earlier pending-P02
+statements above describe QDCXX-006; the remaining payload/session/transport matrix stays deferred.
