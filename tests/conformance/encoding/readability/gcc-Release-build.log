@@ -1,0 +1,7 @@
+2026-09-21T14:38:08.318Z COMMAND ['cmake', '--build', '.work/linux-release', '-j', '4']; cwd='/work/qd-cxx'; TZ=UTC
+2026-09-21T14:38:08.585Z [1/5] Building CXX object CMakeFiles/qd_encoding.dir/src/encoding/compact.cpp.o
+2026-09-21T14:38:08.889Z [2/5] Building CXX object CMakeFiles/qd_encoding.dir/src/encoding/utf_string.cpp.o
+2026-09-21T14:38:09.096Z [3/5] Linking CXX static library libqd_encoding.a
+2026-09-21T14:38:13.880Z [4/5] Building CXX object CMakeFiles/compact_tests.dir/tests/conformance/compact_tests.cpp.o
+2026-09-21T14:38:14.627Z [5/5] Linking CXX executable compact_tests
+2026-09-21T14:38:14.631Z EXIT 0

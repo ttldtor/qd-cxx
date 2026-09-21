@@ -1,0 +1,8 @@
+2026-09-21T14:40:35.274Z COMMAND ['python', '.work/readability_final.py']; cwd='C:\\qd-cxx'; TZ=UTC
+2026-09-21T14:40:35.595Z warning: in the working copy of 'AGENTS.md', CRLF will be replaced by LF the next time Git touches it
+2026-09-21T14:40:35.595Z warning: in the working copy of 'docs/CPP-STYLE.md', CRLF will be replaced by LF the next time Git touches it
+2026-09-21T14:40:35.596Z warning: in the working copy of 'docs/CPP-STYLE.ru.md', CRLF will be replaced by LF the next time Git touches it
+2026-09-21T14:40:35.596Z warning: in the working copy of 'src/encoding/compact.cpp', CRLF will be replaced by LF the next time Git touches it
+2026-09-21T14:40:35.596Z warning: in the working copy of 'src/encoding/utf_string.cpp', CRLF will be replaced by LF the next time Git touches it
+2026-09-21T14:40:35.604Z PASS: 375 protected files unchanged; 7 configurations, each 1146 observations / 43375 assertions; 1128 relative links; git diff --check
+2026-09-21T14:40:35.611Z EXIT 0

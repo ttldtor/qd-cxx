@@ -35,6 +35,22 @@ where practical (`sourceTimeMs`, `initialCpu_`, `rssMaximum_`); preserve externa
 Standard-library customization points, required override names, C ABI names and external macros
 retain their prescribed names. Do not rename wire identifiers or JSON keys to satisfy C++ naming.
 
+
+## Numeric format semantics
+
+Numeric values expressing format semantics must have a meaningful name or a local explanation.
+Use named constants in `UPPER_SNAKE_CASE` for encoding sizes, bit masks, prefixes, range boundaries
+and Unicode values. Equal numbers may have different names when their semantic roles differ.
+Keep constants and small helpers in the narrowest useful scope; do not expand the public API or
+introduce a generic framework merely to share a literal. Explain nontrivial formulas briefly,
+such as compact payload growth, prefix-bit placement and full-width escape sizes.
+
+Obvious counters, indices and ordinary zero/one arithmetic need no named constant. Exact wire bytes
+in test examples should remain literal when naming them would obscure comparison with the oracle.
+This is an owner-requested qd-cxx rule, not an additional claim about the reference project.
+The [codec readability validation](../tests/conformance/encoding/readability/VALIDATION.md) records
+its initial application without changing the encoding contracts.
+
 ## Layout and complete formatter pipeline
 
 The root [.clang-format](../.clang-format) and [.uncrustify.cfg](../.uncrustify.cfg) are exact copies

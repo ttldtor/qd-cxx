@@ -1,0 +1,3 @@
+2026-09-21T14:37:33.211Z COMMAND ['pwsh', '-NoProfile', '-File', 'tools/format/Format-Cpp.ps1', '-Mode', 'Format']; cwd='C:\\qd-cxx'; TZ=UTC
+2026-09-21T14:37:34.178Z Format passed: 5 C++ files (Uncrustify 0.83.0 -> clang-format 20.1.8)
+2026-09-21T14:37:34.195Z EXIT 0

@@ -1,0 +1,10 @@
+2026-09-21T14:38:00.868Z COMMAND ['cmake', '--build', '.work/msvc', '--config', 'Release']; cwd='C:\\qd-cxx'; TZ=UTC
+2026-09-21T14:38:01.025Z MSBuild version 17.14.51+25f168cee for .NET Framework
+2026-09-21T14:38:01.076Z 
+2026-09-21T14:38:01.606Z   compact.cpp
+2026-09-21T14:38:01.850Z   utf_string.cpp
+2026-09-21T14:38:02.214Z   Generating Code...
+2026-09-21T14:38:02.419Z   qd_encoding.vcxproj -> C:\qd-cxx\.work\msvc\Release\qd_encoding.lib
+2026-09-21T14:38:02.523Z   compact_tests.cpp
+2026-09-21T14:38:05.969Z   compact_tests.vcxproj -> C:\qd-cxx\.work\msvc\Release\compact_tests.exe
+2026-09-21T14:38:06.025Z EXIT 0

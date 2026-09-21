@@ -1,0 +1,6 @@
+2026-09-21T14:38:06.248Z COMMAND ['cmake', '--build', '.work/clang', '--config', 'Debug']; cwd='C:\\qd-cxx'; TZ=UTC
+2026-09-21T14:38:06.401Z MSBuild version 17.14.51+25f168cee for .NET Framework
+2026-09-21T14:38:06.453Z 
+2026-09-21T14:38:08.021Z   qd_encoding.vcxproj -> C:\qd-cxx\.work\clang\Debug\qd_encoding.lib
+2026-09-21T14:38:11.056Z   compact_tests.vcxproj -> C:\qd-cxx\.work\clang\Debug\compact_tests.exe
+2026-09-21T14:38:11.112Z EXIT 0

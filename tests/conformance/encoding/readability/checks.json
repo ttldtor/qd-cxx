@@ -1,0 +1,53 @@
+{
+  "executedAtUtc": "2026-09-21T14:40:35.381311Z",
+  "protectedFiles": 375,
+  "fixturesAndLock": 340,
+  "allProtectedBytesUnchanged": true,
+  "inventorySha256": "5a7a91fea5a6b068966e2dcf02f656806c59ee1c1862e0e0efb72533180b445a",
+  "publicHeadersUnchanged": true,
+  "historicalEvidenceUnchanged": true,
+  "runs": {
+    "asan-test.log": {
+      "observations": 1146,
+      "assertions": 43375,
+      "passed": true
+    },
+    "clang-Debug-test.log": {
+      "observations": 1146,
+      "assertions": 43375,
+      "passed": true
+    },
+    "clang-Release-test.log": {
+      "observations": 1146,
+      "assertions": 43375,
+      "passed": true
+    },
+    "gcc-Debug-test.log": {
+      "observations": 1146,
+      "assertions": 43375,
+      "passed": true
+    },
+    "gcc-Release-test.log": {
+      "observations": 1146,
+      "assertions": 43375,
+      "passed": true
+    },
+    "msvc-Debug-test.log": {
+      "observations": 1146,
+      "assertions": 43375,
+      "passed": true
+    },
+    "msvc-Release-test.log": {
+      "observations": 1146,
+      "assertions": 43375,
+      "passed": true
+    }
+  },
+  "sanitizerFlags": "CMAKE_CXX_FLAGS:STRING=-fsanitize=address,undefined -fno-omit-frame-pointer",
+  "implementationSha256": {
+    "src\\encoding\\compact.cpp": "b825c5859e7d092902f93f1a471e607572820794d03178456667cfa8be05868a",
+    "src\\encoding\\utf_string.cpp": "c84341cb2312b2076093f97af3bac0d52191aef5b4cf32c39ae643880f0616e3"
+  },
+  "relativeLinksChecked": 1128,
+  "diffCheckPassed": true
+}
