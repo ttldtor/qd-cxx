@@ -1,5 +1,15 @@
 # Current state
 
+## Review closure and next task
+
+QDCXX-015 is reviewed and committed as 8bc9838efa3be8c157ec7d9a9b13e476baeff385, including the
+strict-fixture follow-up (14 negative cases). The follow-up review reran MSVC Release, all five suites,
+the original unknown-row reproduction, negatives and evidence audit; other final follow-up profiles
+remain author-run results. Earlier handoff text below retains its historical scope.
+
+QDCXX-016 is ready, not started: complete STREAM_DATA payload decoding with
+static validated context, exact type-8 fields and zero raw flags. No transport/dynamic session.
+
 ## Completed: bounded QTP symbol reader
 
 QDCXX-015 — done, High; handed off for review without a commit. Java evidence preceded C++:

@@ -1,5 +1,15 @@
 # Текущее состояние
 
+## Закрытие ревью и следующая задача
+
+QDCXX-015 проверена и закоммичена как 8bc9838efa3be8c157ec7d9a9b13e476baeff385, включая strict-fixture
+доработку (14 negative cases). Ревью доработки повторило MSVC Release, пять suites, исходную unknown-row
+репродукцию, negatives и evidence audit; остальные финальные профили доработки — проверки автора.
+Прежняя запись о handoff ниже сохраняет исторический смысл.
+
+QDCXX-016 готова, не начата: полный STREAM_DATA payload, static validated
+context, точные type-8 поля и нулевые raw flags. Без transport/dynamic session.
+
 ## Завершено: ограниченный reader символов QTP
 
 QDCXX-015 — done, High; передано на ревью без коммита. Java evidence получены до C++:
