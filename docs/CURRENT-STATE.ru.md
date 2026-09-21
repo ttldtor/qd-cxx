@@ -2,6 +2,10 @@
 
 [English version](CURRENT-STATE.md). Английский документ является основным.
 
+## Следующая задача: QTP framing
+
+QDCXX-012 — ready, High: ограниченные Java-пробы P02, затем инкрементальный C++ frame reader в памяти. Полные кадры выдаются как opaque payload; incomplete input сохраняется. Отдельно определены лимиты, lifecycle/error policy и проверки фрагментации. Создано только задание; реализация не начата. Transport, payload decoding и frame writer вне объёма.
+
 ## Завершено: UTFString
 
 QDCXX-011 — done, High. До реализации оценены стандартные средства, UTF-CPP 4.0.6

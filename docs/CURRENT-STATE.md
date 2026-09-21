@@ -2,6 +2,10 @@
 
 [Русская версия](CURRENT-STATE.ru.md). This English document is authoritative.
 
+## Next task: QTP framing
+
+QDCXX-012 — ready, High: bounded Java P02 probes followed by an in-memory incremental C++ frame reader. Complete frames expose opaque payload; incomplete input is retained. Limits, lifecycle/error policy and fragmentation checks are explicit. Only the task is created; implementation has not started. Transport, payload decoding and a frame writer are excluded.
+
 ## Completed: UTFString
 
 QDCXX-011 — done, High. Standard facilities, UTF-CPP 4.0.6 and simdutf 5.2.8 were
