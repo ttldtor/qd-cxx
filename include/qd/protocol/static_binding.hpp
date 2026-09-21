@@ -9,7 +9,7 @@ namespace qd::protocol {
 
 /** Planner failures, separate from a successfully described unknown record. */
 enum class BindingError {
-    INVALID_DESCRIPTION, ///< Manually supplied description violates QDCXX-013 structural invariants.
+    INVALID_DESCRIPTION, ///< Invalid sender ID, empty record/field name or out-of-range wire type ID.
     UNSUPPORTED_PROFILE, ///< A structurally valid full type is not exactly COMPACT_INT.
     RESOURCE_LIMIT,      ///< Explicit logical-element budget exceeded.
     ALLOCATION_FAILURE   ///< No plan published because allocation failed.

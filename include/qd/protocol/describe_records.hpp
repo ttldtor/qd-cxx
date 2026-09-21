@@ -6,7 +6,7 @@
 
 namespace qd::protocol {
 
-/** Largest structurally valid full DESCRIBE_RECORDS type ID in locked QD 3.355.
+/** Largest structurally valid full DESCRIBE_RECORDS type ID.
  * Includes representation bits; this bound neither masks them nor guarantees type support.
  * See spec/protocol/DESCRIBE-RECORDS.md and BinaryQTPParser.parseDescribeRecords.
  */
