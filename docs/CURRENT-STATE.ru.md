@@ -1,5 +1,15 @@
 # Текущее состояние
 
+## QDCXX-016: готово для независимого ревью
+
+Ограниченный STREAM_DATA decoder использует неизменяемый static snapshot, обычные точные type-8 поля,
+нулевые raw flags и свежие message-local symbols. Java-доказательства предшествовали реализации:
+35 production observations, два чистых совпавших capture и negative/baseline Verify. MSVC/ClangCL/GCC
+Debug/Release, GCC ASan+UBSan, все шесть suites, BUILD_TESTING=OFF, pinned formatting и 15 negative fixture
+checks успешны. Исторические fixtures и upstream.lock сохранены. Transport, dynamic session, nonzero
+flags, writer и importer не добавлены. Коммит не создан. [Валидация](../tests/conformance/protocol/stream-data/VALIDATION.md).
+
+
 ## Закрытие ревью и следующая задача
 
 QDCXX-015 проверена и закоммичена как 8bc9838efa3be8c157ec7d9a9b13e476baeff385, включая strict-fixture

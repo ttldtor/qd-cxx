@@ -1,0 +1,18 @@
+# Hand-authored bounded stimuli: case, complete payload(s) hex, strict-prefix mode. Descriptions are fixed in harness.
+mixed	0443070b83e716212cff1f806480c8ff0937fd034100420c8042ff9000fe0b	whole
+empty	-	whole
+small	04430c8080	prefix
+skip-prefix	fd01eda0801f01c02000ff0902	prefix
+late-failure	04430903ff0c80	whole
+undescribed	fe13	whole
+negative-id	fe7f	whole
+invalid-symbol	c0	whole
+truncated-id	fe80	whole
+nonzero-flags	f901fe0c07	whole
+remove-event	f902fe0c00	whole
+zero-flags	f900fe0c07	whole
+reset-valid	04430901;04430902	whole
+reset-repeat	04430901;ff0902	whole
+string-forms	fc034100420c01fd02eda0bdedb8800c02fd01edb0800c03	whole
+boundaries	fe0cf780000000ff0cdfdfffff0ca000ff0cbfbfff0c40ff0c3fff0c8040ff0c9fffff0cc02000ff0cf07fffffffff0cf100000000ff0cf100000001ff0cf6ffffffffff0cff7fffffffffffffffff0cff8000000000000000	whole
+overlong	fe800c8000ff0cff0000000100000001	whole

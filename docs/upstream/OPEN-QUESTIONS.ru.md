@@ -113,3 +113,12 @@ QT-01/QT-06 теперь включают [ограниченные доказа
 [terminal-политики C++](../../spec/encoding/SYMBOLS.ru.md). Огромные аллокации, resolver/другие буферы,
 negotiation опций, интерпретация event/time, полное восстановление, PART и транспорт остаются открытыми.
 Полный event decoder или совместимость протокола не подразумеваются.
+
+## Обновление QDCXX-016 STREAM_DATA
+
+QT-01/02/06/08 дополнены 35 ограниченными production-parser observations обычных type-8 payloads,
+точных UTF-16, пропуска записей/полей, повторов символов между record ID, сброса сообщений, cross-width
+values и повреждённых полных сообщений. [Доказательства](../../tests/fixtures/protocol/stream-data/COVERAGE.md).
+[Контракт decoder](../../spec/protocol/STREAM-DATA.md) отделяет удаление Java batches повреждённого
+сообщения от C++ completed-prefix retention и отклоняет любые ненулевые raw flags. Dynamic session,
+conversions, metadata/replacers, event/time, огромные ресурсы, recovery и transport остаются открытыми.

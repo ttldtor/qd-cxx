@@ -1,5 +1,15 @@
 # Current state
 
+## QDCXX-016: ready for independent review
+
+Bounded STREAM_DATA decoding now uses an immutable static snapshot, ordinary exact type-8 fields,
+zero raw flags and fresh message-local symbols. Java evidence preceded implementation: 35 production
+observations, two clean equal captures and negative/baseline Verify. MSVC/ClangCL/GCC Debug/Release,
+GCC ASan+UBSan, all six suites, BUILD_TESTING=OFF, pinned formatting and 15 negative fixture checks pass.
+Historical fixtures and upstream.lock are unchanged. No transport, dynamic session, nonzero flags,
+writer or importer was added. No commit created. [Validation](../tests/conformance/protocol/stream-data/VALIDATION.md).
+
+
 ## Review closure and next task
 
 QDCXX-015 is reviewed and committed as 8bc9838efa3be8c157ec7d9a9b13e476baeff385, including the

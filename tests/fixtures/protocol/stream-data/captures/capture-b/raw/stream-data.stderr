@@ -1,0 +1,304 @@
+I 260921 181310.340 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 181310.360 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 181310.361 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 181310.363 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 181310.364 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+E 260921 181310.364 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed data ===
+++> Last symbol: (0, null) = null
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000047:  0F|04!                                            ..              
+++> 0x00000057:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260921 181310.366 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+E 260921 181310.366 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed data ===
+++> Last symbol: (1073742915, null) = ABC
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000047:  0F|04 43!                                         ..C             
+++> 0x00000057:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260921 181310.366 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+E 260921 181310.366 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed data ===
+++> R	ABC	0	0	0
+++> Last symbol: (1073742915, null) = ABC
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000047:  0F|04 43 0C!                                      ..C.            
+++> 0x00000057:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260921 181310.367 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+E 260921 181310.367 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed data ===
+++> R	ABC	0	0	0
+++> Last symbol: (1073742915, null) = ABC
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000047:  0F|04 43 0C 80!                                   ..C.           
+++> 0x00000057:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260921 181310.368 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 181310.368 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 181310.369 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+E 260921 181310.369 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed data ===
+++> Last symbol: (0, null) = null
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000047:  0F|FD!                                            .ý              
+++> 0x00000057:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260921 181310.369 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+E 260921 181310.369 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed data ===
+++> Last symbol: (0, null) = null
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000047:  0F|FD 01!                                         .ý.             
+++> 0x00000057:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260921 181310.370 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+E 260921 181310.370 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed data ===
+++> Last symbol: (0, null) = null
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000047:  0F|FD 01 ED!                                      .ý.í            
+++> 0x00000057:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260921 181310.371 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+E 260921 181310.371 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed data ===
+++> Last symbol: (0, null) = null
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000047:  0F|FD 01 ED A0!                                   .ý.í            
+++> 0x00000057:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260921 181310.372 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+E 260921 181310.372 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed data ===
+++> Last symbol: (0, ?) = ?
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000047:  0F|FD 01 ED A0 80!                                .ý.í           
+++> 0x00000057:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260921 181310.372 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+E 260921 181310.372 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed data ===
+++> Last symbol: (0, ?) = ?
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000047:  0F|FD 01 ED A0 80 1F!                             .ý.í .         
+++> 0x00000057:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260921 181310.373 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+E 260921 181310.373 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed data ===
+++> Last symbol: (0, ?) = ?
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000047:  0F|FD 01 ED A0 80 1F 01!                          .ý.í ..        
+++> 0x00000057:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260921 181310.374 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+E 260921 181310.374 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed data ===
+++> Last symbol: (0, ?) = ?
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000047:  0F|FD 01 ED A0 80 1F 01 C0!                       .ý.í ..À       
+++> 0x00000057:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260921 181310.374 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+E 260921 181310.374 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed data ===
+++> Last symbol: (0, ?) = ?
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000047:  0F|FD 01 ED A0 80 1F 01 C0 20!                    .ý.í ..À       
+++> 0x00000057:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260921 181310.375 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 181310.375 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+E 260921 181310.375 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed data ===
+++> Last symbol: (0, ?) = ?
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000047:  0F FD 01 ED A0 80 1F 01 C0 20 00|FF!              .ý.í ..À .ÿ    
+++> 0x00000057:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260921 181310.376 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+E 260921 181310.376 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed data ===
+++> S	?	0
+++> Last symbol: (0, ?) = ?
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000047:  0F FD 01 ED A0 80 1F 01 C0 20 00|FF 09!           .ý.í ..À .ÿ.   
+++> 0x00000057:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260921 181310.376 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+E 260921 181310.376 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed data ===
+++> S	ABC	3
+++> R	ABC	0	0	0
+++> Last symbol: (1073742915, null) = ABC
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000047:  0F 04 43 09 03|FF 0C 80!                          ..C..ÿ.        
+++> 0x00000057:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260921 181310.377 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+E 260921 181310.377 [main] BinaryQTPParser - Corrupted QTP message: Unknown record #19
+++> === Last parsed data ===
+++> Last symbol: (1073741824, null) = 
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000047:  0F|FE 13!                                         .þ.             
+++> 0x00000057:                                                                    
+++> === END ===
+java.io.IOException: Unknown record #19
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseData(BinaryQTPParser.java:425)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:261)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.StreamDataOracle.observe(StreamDataOracle.java:137)
+	at com.devexperts.qd.qtp.StreamDataOracle.main(StreamDataOracle.java:175)
+I 260921 181310.377 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+E 260921 181310.378 [main] BinaryQTPParser - Corrupted QTP message: Unknown record #-1
+++> === Last parsed data ===
+++> Last symbol: (1073741824, null) = 
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000047:  0F|FE 7F!                                         .þ             
+++> 0x00000057:                                                                    
+++> === END ===
+java.io.IOException: Unknown record #-1
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseData(BinaryQTPParser.java:425)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:261)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.StreamDataOracle.observe(StreamDataOracle.java:137)
+	at com.devexperts.qd.qtp.StreamDataOracle.main(StreamDataOracle.java:175)
+I 260921 181310.378 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+E 260921 181310.378 [main] BinaryQTPParser - Corrupted QTP message: Reserved bit sequence
+++> === Last parsed data ===
+++> Last symbol: (0, null) = null
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000047:  0F|C0!                                            .À              
+++> 0x00000057:                                                                    
+++> === END ===
+java.io.IOException: Reserved bit sequence
+	at com.devexperts.qd.kit.PentaCodec$ReaderImpl.readSymbol(PentaCodec.java:335)
+	at com.devexperts.qd.qtp.BinaryQTPParser.readSymbol(BinaryQTPParser.java:485)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseData(BinaryQTPParser.java:421)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:261)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.StreamDataOracle.observe(StreamDataOracle.java:137)
+	at com.devexperts.qd.qtp.StreamDataOracle.main(StreamDataOracle.java:175)
+I 260921 181310.378 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+E 260921 181310.378 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed data ===
+++> Last symbol: (1073741824, null) = 
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000047:  0F|FE 80!                                         .þ             
+++> 0x00000057:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260921 181310.379 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 181310.379 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 181310.380 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 181310.380 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 181310.381 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+E 260921 181310.381 [main] BinaryQTPParser - Corrupted QTP message: Symbol is undefined
+++> === Last parsed data ===
+++> S	ABC	1
+++> Last symbol: (0, null) = null
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x0000004d:  0F|FF!09 02                                       .ÿ..            
+++> 0x0000005d:                                                                    
+++> === END ===
+java.io.IOException: Symbol is undefined
+	at com.devexperts.qd.kit.PentaCodec$ReaderImpl.readSymbol(PentaCodec.java:366)
+	at com.devexperts.qd.qtp.BinaryQTPParser.readSymbol(BinaryQTPParser.java:485)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseData(BinaryQTPParser.java:421)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:261)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.StreamDataOracle.observe(StreamDataOracle.java:137)
+	at com.devexperts.qd.qtp.StreamDataOracle.main(StreamDataOracle.java:175)
+I 260921 181310.382 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 181310.382 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260921 181310.383 [main] BinaryQTPParser - Record #31 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.

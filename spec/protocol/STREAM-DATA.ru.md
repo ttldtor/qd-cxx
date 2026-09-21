@@ -1,0 +1,87 @@
+# Ограниченный декодер STREAM_DATA
+
+[English version](STREAM-DATA.md). Английский документ является нормативным.
+
+QDCXX-016 принимает один полный payload type-15 без внешней оболочки. Поддерживаются только обычный
+точный COMPACT_INT (8), EMPTY_SET, raw eventFlags=0, без временных индексов, metadata и replacers.
+Transport, writer, dynamic session, диспетчеризация описаний, importer и event API не реализованы.
+
+## Доказательства
+
+Добавленный [production oracle](../../tools/upstream/stream-data-oracle/StreamDataOracle.java)
+использует закреплённый QD 3.355 BinaryQTPParser с настоящей схемой S/R/E и предшествующими полными
+описаниями. [Inputs](../../tests/fixtures/protocol/stream-data/inputs.tsv) — вручную заданные воздействия,
+а не ожидаемые результаты. Каждый строгий префикс получает собственный полный кадр type-15. Callbacks
+дают локальные ID, UTF-16 hex без потерь, упорядоченные int values, flags, числа batches и ошибки.
+P01/P03/P04 и существующие [binding evidence](../../tests/fixtures/protocol/binding/COVERAGE.md) сохранены.
+
+BinaryQTPParser.parseData сбрасывает символы на сообщение, читает символ, затем readCompactInt sender ID.
+BinaryRecordDesc.readFields использует readCompactLong для SER_COMPACT_INT, включая skip actions;
+FLD_INT приводит к знаковым младшим 32 битам. C++ воспроизводит эту проекцию без signed cast вне диапазона.
+Повторные назначения применяются в wire order. Свежие отсутствующие обычные int slots содержат raw zero;
+это не прикладное значение по умолчанию. readRecord выбирает readRemoveEventFields для REMOVE_EVENT и
+читает compact-long time вместо обычных полей. C++ отклоняет любые ненулевые raw flags до sender ID,
+включая принимаемые Java flags; явные нулевые flags допустимы. Composer writeMessageHeader сбрасывает
+writer, а writeRecordPayload вызывает BinaryRecordDesc.writeRecord. Источники закреплены в
+[SOURCES](SOURCES.md). Первый capture предшествовал C++ реализации; см. парные fixture reports.
+
+## Неизменяемый контекст
+
+StreamDataContext::create принимает проверенную LocalSchema и уникальные raw descriptions, никогда
+не принимает mutable RecordBinding plans. SchemaLimits ограничивает записи/поля/lookups/отдельные и
+суммарные имена схемы; ContextLimits и bindRecord ограничивают описания, суммарные actions и имена.
+Хранилище схемы проверяется, но не копируется: snapshot владеет только планами и числом выходных полей
+каждой локальной записи. Указатели и имена не сохраняются, массивы не индексируются sender ID. Пустой
+контекст допустим. Отрицательные/повторные sender ID и неверные описания дают INVALID_DESCRIPTION;
+не-8 описания дают UNSUPPORTED_PROFILE. Неудачное создание ничего не публикует. Запрет дубликатов —
+ограничение API, а не Java replacement semantics. Нет конструктора по умолчанию; перемещение сохраняет
+инварианты контекста. Read-only lookup заимствует план только на время жизни контекста.
+
+Порядок валидации: бюджеты схемы в порядке записей, число описаний, затем для каждого описания duplicate
+ID, bindRecord с оставшимися суммарными actions/names, учёт проверенных имён/actions, добавление полного
+плана. Категории binding errors сохраняются. bad_alloc/length_error дают ALLOCATION_FAILURE.
+Новые schema semantics или loader не добавлены.
+
+## Результаты, приоритеты и ресурсы
+
+StreamDataLimits требует конечные payloadBytes, processedRecords (включая skipped/zero-field),
+wireFields, emittedRecords, emittedValues, ownedSymbolUnits и SymbolLimits. Ноль допустим.
+SymbolLimits.inputBytes означает остаток payload span, а не длину кодировки символа. Логические счётчики
+ограничивают элементы, а не allocator overhead/capacity. Суммарные symbol units учитывают каждую выходную
+копию, включая repeat; временный текущий символ и состояние reader отдельно ограничены SymbolLimits.
+
+1. Превышение размера payload даёт ошибку PAYLOAD в позиции ноль. Корректность контекста обеспечена созданием.
+2. В начале каждой непустой записи учитывается processedRecords на RECORD до чтения символа.
+3. Символ читается на SYMBOL с сохранением SymbolStatus. Truncation даёт TRUNCATED_PAYLOAD,
+   неверная кодировка/длина — INVALID_SYMBOL; resource/allocation сохраняют свои категории.
+4. Ненулевые flags отклоняются на FLAGS после символа, до любых record-specific данных.
+5. Compact-int sender ID читается на RECORD_ID. Отрицательный даёт INVALID_ID, отсутствие mapping —
+   UNDESCRIBED_ID после полного ID. Обрезанный primitive потребляет доступный префикс.
+6. Для emitting plan оставшиеся бюджеты выходных записей/values/symbol проверяются на OUTPUT до выделения
+   нулевых локальных values. Unknown records не выделяют выходные values и потребляют все поля.
+7. До каждого поля проверяется/учитывается wireFields на FIELD; readCompactLong и назначение младших
+   32 бит целевому полю. Skipped fields используют тот же primitive и truncation. Ширины не угадываются.
+8. Только полная текущая запись добавляется на OUTPUT; выходные счётчики обновляются после успешного append.
+   При успехе stage END и consumed/errorOffset равны payload.size(). Пустой вход успешен.
+
+Первая ошибка возвращает status, stage, payload-relative consumed, errorOffset и завершённые записи.
+Primitive errorOffset — начало primitive; проверки validation/resource используют текущий consumed.
+Symbol cause заполнен только для чтения символа; stage определяет compact primitive при других truncations.
+Перехваченные ошибки выделения на активном checkpoint сохраняют предыдущие записи; частичная текущая
+запись не выходит наружу. SymbolReader сообщает committed examination positions. Ошибка выделения vector
+указывает checkpoint без дальнейшего чтения байтов. Allocation-failure injection и точная гарантия объёма
+памяти allocator не заявляются.
+
+Каждый вызов создаёт новый SymbolReader; нет continuation/recovery state или заимствования между кадрами.
+Результаты владеют local ID, точным SymbolValue и int32 values в локальном порядке; переживают input/context
+и следующие вызовы. Сохранение completed-prefix в C++ — явно разрешённая задачей политика: Java удаляет batch
+текущего повреждённого сообщения (late-failure), но может доставить предыдущие валидные сообщения
+(reset-repeat). Java callbacks, внешние позиции кадров и исключения — наблюдения, а не ожидаемые C++
+позиции/batching.
+
+## Валидация
+
+[Fixture validation](../../tests/fixtures/protocol/stream-data/VALIDATION.md) и
+[conformance validation](../../tests/conformance/protocol/stream-data/VALIDATION.md) фиксируют выполненные
+проверки и оставшиеся ограничения. Полная
+QTP-совместимость, event semantics, огромные allocations, другие архитектуры и transport не подразумеваются.

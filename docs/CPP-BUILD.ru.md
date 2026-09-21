@@ -213,3 +213,20 @@ consumed count и явным status. Все ошибки read terminal; нену
 [Контракт](../spec/encoding/SYMBOLS.ru.md) и [финальная валидация](../tests/conformance/encoding/symbols/VALIDATION.ru.md).
 CTest добавляет encoding_java_symbols / symbol_tests; QD_SYMBOL_FIXTURES выбирает неизменяемый Java TSV.
 Production dependency и event decoder не добавлены. Прежние исключения PentaCodec выше исторические.
+
+## STREAM_DATA API (QDCXX-016)
+
+Подключить `qd/protocol/stream_data.hpp` и линковать qd_protocol. Сначала вызвать
+`StreamDataContext::create(schema, descriptions, limits)` с проверенной LocalSchema и уникальными raw
+ordinary type-8 descriptions. Неизменяемый результат владеет планами и числом локальных полей. Затем
+вызвать `decodeStreamData(payload, context, limits)` для одного полного type-15 payload без оболочки.
+ContextLimits ограничивает schema storage и aggregate descriptions/actions/names. StreamDataLimits
+ограничивает payload, processed records включая skips, wire fields, emitted records/values/symbol units
+и SymbolLimits. Unlimited defaults нет. Ненулевые raw flags ошибочны до sender ID; каждый вызов сбрасывает
+символы. Результаты владеют local ID/symbols/values и сохраняют полный префикс при поздней ошибке.
+Точные приоритеты и позиции: [контракт](../spec/protocol/STREAM-DATA.md). Frame overload не предоставляется.
+
+CTest добавляет `protocol_java_stream_data` / `stream_data_tests`; QD_STREAM_DATA_FIXTURES допускает
+намеренные временные fixture overrides. Прежние build команды запускают все шесть suites. Полная compiler/
+sanitizer/production-only матрица и negative checks: [валидация](../tests/conformance/protocol/stream-data/VALIDATION.md).
+Transport, dynamic session, nonzero flags, importer и production dependency не добавлены.

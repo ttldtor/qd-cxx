@@ -112,3 +112,12 @@ canonical/accepted forms, exact units/positions, flags/MRU, repeat/reset and rea
 integration. Java partial failure state is observed separately from [C++ terminal policy](../../spec/encoding/SYMBOLS.md).
 Huge allocations, resolver/other buffers, option negotiation, event/time interpretation, full recovery,
 PART and transport remain open. No full event decoder or protocol compatibility is inferred.
+
+## QDCXX-016 STREAM_DATA update
+
+QT-01/02/06/08 now include 35 bounded production-parser observations of ordinary type-8 payloads,
+exact UTF-16, skipped records/fields, repeated symbols across record IDs, message reset, cross-width
+values and malformed complete messages. [Evidence](../../tests/fixtures/protocol/stream-data/COVERAGE.md).
+The [decoder contract](../../spec/protocol/STREAM-DATA.md) separates Java dropped malformed-message
+batches from C++ completed-prefix retention and rejects all nonzero raw flags. Dynamic session,
+conversions, metadata/replacers, event/time, huge resources, recovery and transport remain open.

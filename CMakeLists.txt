@@ -15,7 +15,7 @@ target_include_directories(qd_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_compile_features(qd_core PUBLIC cxx_std_23)
 set_target_properties(qd_core PROPERTIES CXX_EXTENSIONS OFF)
 
-add_library(qd_protocol src/protocol/frame_reader.cpp src/protocol/describe_records.cpp src/protocol/static_binding.cpp)
+add_library(qd_protocol src/protocol/frame_reader.cpp src/protocol/describe_records.cpp src/protocol/static_binding.cpp src/protocol/stream_data.cpp)
 target_link_libraries(qd_protocol PUBLIC qd_encoding qd_core)
 set_target_properties(qd_protocol PROPERTIES CXX_EXTENSIONS OFF)
 
@@ -61,4 +61,10 @@ if(BUILD_TESTING)
     set(QD_SYMBOL_FIXTURES "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/encoding/symbols/expected/symbols.tsv"
         CACHE FILEPATH "Java symbol observations (temporary override for negative checks)")
     add_test(NAME encoding_java_symbols COMMAND symbol_tests "${QD_SYMBOL_FIXTURES}")
+    add_executable(stream_data_tests tests/conformance/stream_data_tests.cpp)
+    target_link_libraries(stream_data_tests PRIVATE qd_protocol doctest::doctest)
+    set_target_properties(stream_data_tests PROPERTIES CXX_EXTENSIONS OFF)
+    set(QD_STREAM_DATA_FIXTURES "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/protocol/stream-data/expected/stream-data.tsv"
+        CACHE FILEPATH "Java STREAM_DATA observations (temporary override for negative checks)")
+    add_test(NAME protocol_java_stream_data COMMAND stream_data_tests "${QD_STREAM_DATA_FIXTURES}")
 endif()

@@ -48,3 +48,11 @@ error. [Validation](../../tests/fixtures/protocol/binding/VALIDATION.md) records
 and negative/baseline Verify. Historical evidence is unchanged. [Static C++ plans](STATIC-BINDING.md)
 are designed projections; intermediate duplicate writes are source-supported, not externally observed.
 No application defaults, conversions, metadata/provider or session/transport parity is inferred.
+
+## QDCXX-016: bounded STREAM_DATA
+
+[35 production observations](../../tests/fixtures/protocol/stream-data/COVERAGE.md) add exact UTF-16,
+field/record skips, message reset, long-to-int projection and malformed complete payloads. Java drops
+the malformed current message batch; C++ retains a completed prefix as an explicit policy. Nonzero
+flags remain unsupported. [Validation/provenance](../../tests/fixtures/protocol/stream-data/VALIDATION.md)
+records two independent clean captures, negative/baseline Verify and unchanged historical evidence.

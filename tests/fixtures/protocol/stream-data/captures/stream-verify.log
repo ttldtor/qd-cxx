@@ -1,0 +1,3 @@
+2026-09-21T18:15:33.347Z COMMAND ['pwsh', '-NoProfile', '-File', '.work/stream_evidence.ps1']; cwd='C:\\qd-cxx'; TZ=UTC
+2026-09-21T18:16:47.887Z VERIFY PASS: 1 cases; expectations unchanged.
+2026-09-21T18:16:47.913Z EXIT 0

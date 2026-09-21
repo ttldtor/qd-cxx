@@ -205,3 +205,20 @@ consumed count and explicit status. All read failures are terminal; nonzero opti
 unsupported. [Contract](../spec/encoding/SYMBOLS.md) and [final validation](../tests/conformance/encoding/symbols/VALIDATION.md).
 CTest adds encoding_java_symbols / symbol_tests; QD_SYMBOL_FIXTURES selects immutable Java TSV.
 No production dependency or event decoder is added. Earlier PentaCodec exclusions above are historical.
+
+## STREAM_DATA API (QDCXX-016)
+
+Include `qd/protocol/stream_data.hpp` and link qd_protocol. First call
+`StreamDataContext::create(schema, descriptions, limits)` with validated LocalSchema and unique raw
+ordinary type-8 descriptions. The immutable result owns plans and local field counts. Then call
+`decodeStreamData(payload, context, limits)` for one complete type-15 payload, excluding its envelope.
+ContextLimits bounds schema storage and aggregate descriptions/actions/names. StreamDataLimits bounds
+payload, processed records including skips, wire fields, emitted records/values/symbol units and
+SymbolLimits. No unlimited defaults. Nonzero raw flags fail before sender ID; every call resets symbols.
+Results own local IDs/symbols/values and retain the complete prefix on later failure. See the
+[contract](../spec/protocol/STREAM-DATA.md) for exact precedence and positions. No Frame overload is supplied.
+
+CTest adds `protocol_java_stream_data` / `stream_data_tests`; QD_STREAM_DATA_FIXTURES permits only
+intentional temporary fixture overrides. Existing build commands run all six suites. The full compiler/
+sanitizer/production-only matrix and negative checks are in [validation](../tests/conformance/protocol/stream-data/VALIDATION.md).
+No transport, dynamic session, nonzero flags, importer or production dependency is introduced.

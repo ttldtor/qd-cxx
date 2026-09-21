@@ -48,3 +48,11 @@ capture и immutable negative/baseline Verify. Прежние captures/expectati
 чистых capture и negative/baseline Verify. Исторические evidence неизменны. [Статические C++ plans](STATIC-BINDING.md)
 являются разработанными проекциями; промежуточные повторные записи подтверждаются исходниками, не внешним
 наблюдением. Application defaults, conversions, metadata/provider и session/transport parity не выводятся.
+
+## QDCXX-016: ограниченный STREAM_DATA
+
+[35 production observations](../../tests/fixtures/protocol/stream-data/COVERAGE.md) добавляют точные UTF-16,
+пропуск полей/записей, сброс сообщений, long-to-int проекцию и повреждённые полные payloads. Java удаляет
+batch текущего повреждённого сообщения; C++ сохраняет завершённый префикс как явную политику. Ненулевые
+flags остаются неподдерживаемыми. [Валидация/provenance](../../tests/fixtures/protocol/stream-data/VALIDATION.md)
+фиксирует два независимых чистых capture, negative/baseline Verify и неизменённые исторические доказательства.

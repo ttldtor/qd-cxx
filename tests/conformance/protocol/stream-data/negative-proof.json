@@ -1,0 +1,82 @@
+{
+  "executedAtUtc": "2026-09-21T18:30:52.631529+00:00",
+  "baselineSha256": "64a428c4a266de9fde5d870dd5c332980884f3f22c012619b15d9bee71cb5fa7",
+  "baselineUnchanged": true,
+  "baselinePassed": true,
+  "negatives": [
+    {
+      "case": "symbol",
+      "exit": 1,
+      "temporaryUnchanged": true
+    },
+    {
+      "case": "value",
+      "exit": 1,
+      "temporaryUnchanged": true
+    },
+    {
+      "case": "id",
+      "exit": 1,
+      "temporaryUnchanged": true
+    },
+    {
+      "case": "order",
+      "exit": 1,
+      "temporaryUnchanged": true
+    },
+    {
+      "case": "failure",
+      "exit": 1,
+      "temporaryUnchanged": true
+    },
+    {
+      "case": "failure-outcome",
+      "exit": 1,
+      "temporaryUnchanged": true
+    },
+    {
+      "case": "unknown-row",
+      "exit": 1,
+      "temporaryUnchanged": true
+    },
+    {
+      "case": "wrong-arity",
+      "exit": 1,
+      "temporaryUnchanged": true
+    },
+    {
+      "case": "duplicate-complete",
+      "exit": 1,
+      "temporaryUnchanged": true
+    },
+    {
+      "case": "trailing-data",
+      "exit": 1,
+      "temporaryUnchanged": true
+    },
+    {
+      "case": "missing-complete",
+      "exit": 1,
+      "temporaryUnchanged": true
+    },
+    {
+      "case": "required-coverage",
+      "exit": 1,
+      "temporaryUnchanged": true
+    },
+    {
+      "case": "bad-value",
+      "exit": 1,
+      "temporaryUnchanged": true
+    },
+    {
+      "case": "wire",
+      "exit": 1,
+      "temporaryUnchanged": true
+    },
+    {
+      "case": "missing-file",
+      "exit": 1
+    }
+  ]
+}
