@@ -16,3 +16,6 @@ Thumbs.db
 # Local builds and acquired tools
 /.work/
 /build/
+
+__pycache__/
+*.pyc
