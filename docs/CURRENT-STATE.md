@@ -6,8 +6,8 @@
 ## Owner-requested naming migration
 
 Current C++ namespaces use `org::ttldtor::qdcxx`, project CMake targets use `qdcxx_`, and owned
-cache variables/options use `ORG_TTLDTOR_QDCXX_`. Include paths `qd/...`, the executable filename
-and fixed output identifiers are unchanged. [Migration and future rules](NAMING.md).
+cache variables/options use `ORG_TTLDTOR_QDCXX_`. Include paths `qd/...` and fixed output identifiers are unchanged; the utility executable
+is now `qdcxx-qtp-inspect`. [Migration and future rules](NAMING.md).
 The preceding human-output work is now committed as `e1e19e5`; earlier no-commit statements below
 are historical. This naming migration adds no independent review claim for that commit.
 

@@ -30,7 +30,7 @@ if(ORG_TTLDTOR_QDCXX_BUILD_QTP_INSPECT)
     set_target_properties(qdcxx_inspect_tool PROPERTIES CXX_EXTENSIONS OFF)
     add_executable(qdcxx_qtp_inspect tools/qtp-inspect/main.cpp)
     target_link_libraries(qdcxx_qtp_inspect PRIVATE qdcxx_inspect_tool)
-    set_target_properties(qdcxx_qtp_inspect PROPERTIES CXX_EXTENSIONS OFF OUTPUT_NAME "qd-qtp-inspect")
+    set_target_properties(qdcxx_qtp_inspect PROPERTIES CXX_EXTENSIONS OFF OUTPUT_NAME "qdcxx-qtp-inspect")
 endif()
 
 include(CTest)

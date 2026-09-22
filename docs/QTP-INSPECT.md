@@ -2,7 +2,7 @@
 
 [Русская версия](QTP-INSPECT.ru.md). English is authoritative.
 
-`qd-qtp-inspect` is an optional bounded diagnostic executable, not a tape reader or client.
+`qdcxx-qtp-inspect` is an optional bounded diagnostic executable, not a tape reader or client.
 The [version 1 contract](../spec/protocol/OFFLINE-INSPECTION.md) defines sequencing, exact TSV,
 offsets, exits and resource accounting. No importer, transport, dynamic session, nonzero flags,
 conversions or general schema loader is included. Raw QTP is not a tape container.
@@ -10,13 +10,13 @@ conversions or general schema loader is included. Raw QTP is not a tape containe
 ## Build and run
 
 ```powershell
-cmake -S . -B .work/inspect -DQD_BUILD_QTP_INSPECT=ON -DBUILD_TESTING=OFF
+cmake -S . -B .work/inspect -DORG_TTLDTOR_QDCXX_BUILD_QTP_INSPECT=ON -DBUILD_TESTING=OFF
 cmake --build .work/inspect --config Release
-.work/inspect/Release/qd-qtp-inspect.exe --profile oracle-sre-v1 --input tests/fixtures/protocol/offline-inspection/expected/composed.qtp
-.work/inspect/Release/qd-qtp-inspect.exe --help
+.work/inspect/Release/qdcxx-qtp-inspect.exe --profile oracle-sre-v1 --input tests/fixtures/protocol/offline-inspection/expected/composed.qtp
+.work/inspect/Release/qdcxx-qtp-inspect.exe --help
 ```
 
-With Ninja/Makefiles use `.work/inspect/qd-qtp-inspect` (or `.exe` on Windows).
+With Ninja/Makefiles use `.work/inspect/qdcxx-qtp-inspect` (or `.exe` on Windows).
 `ORG_TTLDTOR_QDCXX_BUILD_QTP_INSPECT` defaults OFF; library-only builds remain available. BUILD_TESTING=OFF
 does not fetch doctest or require Python. With tests and tool enabled, CTest includes executable
 integration and portable injected I/O failures; Python 3 is test-only. Production links only
@@ -88,7 +88,7 @@ unchanged version 1 TSV. Unknown, repeated or missing format operands are usage 
 There is no automatic TTY selection.
 
 ```powershell
-.work/inspect/Release/qd-qtp-inspect.exe --profile oracle-sre-v1 --input tests/fixtures/protocol/offline-inspection/expected/composed.qtp --output-format human
+.work/inspect/Release/qdcxx-qtp-inspect.exe --profile oracle-sre-v1 --input tests/fixtures/protocol/offline-inspection/expected/composed.qtp --output-format human
 ```
 
 Human version 1 shows a format/profile header, frame names/numeric IDs and actual byte boundaries,

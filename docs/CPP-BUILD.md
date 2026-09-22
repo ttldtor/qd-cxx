@@ -225,7 +225,7 @@ No transport, dynamic session, nonzero flags, importer or production dependency 
 
 ## QDCXX-017 offline tool
 
-Enable `-DQD_BUILD_QTP_INSPECT=ON` for the bounded `qd-qtp-inspect` executable; default OFF
+Enable `-DORG_TTLDTOR_QDCXX_BUILD_QTP_INSPECT=ON` for the bounded `qdcxx-qtp-inspect` executable; default OFF
 keeps the library-only build. `-DBUILD_TESTING=OFF` never acquires test dependencies, including
 when the tool is enabled. [CLI/profile/limits](QTP-INSPECT.md),
 [contract](../spec/protocol/OFFLINE-INSPECTION.md). With testing and tool enabled, Python 3

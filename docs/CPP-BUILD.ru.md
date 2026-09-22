@@ -233,7 +233,7 @@ Transport, dynamic session, nonzero flags, importer и production dependency н�
 
 ## Офлайн-инструмент QDCXX-017
 
-Включите `-DQD_BUILD_QTP_INSPECT=ON` для ограниченного executable `qd-qtp-inspect`; по умолчанию
+Включите `-DORG_TTLDTOR_QDCXX_BUILD_QTP_INSPECT=ON` для ограниченного executable `qdcxx-qtp-inspect`; по умолчанию
 OFF сохраняет сборку только библиотек. `-DBUILD_TESTING=OFF` никогда не получает тестовые
 зависимости, в том числе при включённом инструменте. [CLI/профиль/лимиты](QTP-INSPECT.ru.md),
 [контракт](../spec/protocol/OFFLINE-INSPECTION.ru.md). При включённых тестах и инструменте Python 3

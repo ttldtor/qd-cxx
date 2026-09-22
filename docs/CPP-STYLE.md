@@ -146,3 +146,7 @@ variables and externally visible macros use `ORG_TTLDTOR_QDCXX_`. Standard/depen
 upstream Java names and fixed output-format identifiers are not renamed by a C++ source migration.
 See [migration and current names](NAMING.md). This owner rule supplements the reference style;
 it is not a claim about the reference project's namespace.
+
+User-facing utility executable filenames use `qdcxx-` and hyphen-separated words (e.g. `qdcxx-qtp-inspect`);
+CMake target names retain `qdcxx_`. Set OUTPUT_NAME to distinguish the two. Internal test binaries retain
+their target names. Fixed output-format identifiers and historical evidence are preserved.

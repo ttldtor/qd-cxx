@@ -2,9 +2,9 @@
 
 [Русская версия](NAMING.ru.md). English is authoritative.
 
-The owner selected `qdcxx`, scoped to `ttldtor.org`. This migration changes only C++ namespaces,
+The owner selected `qdcxx`, scoped to `ttldtor.org`. The naming policy covers C++ namespaces,
 CMake project/targets and project-owned cache variables/options. Public include paths remain
-`qd/...`; the executable stays `qd-qtp-inspect`, with unchanged TSV/human identifiers and bytes.
+`qd/...`; the executable is now `qdcxx-qtp-inspect`, with unchanged TSV/human identifiers and bytes.
 No forwarding namespace aliases or duplicate legacy targets/options are introduced.
 
 | Surface | Current name |
@@ -14,7 +14,7 @@ No forwarding namespace aliases or duplicate legacy targets/options are introduc
 | CMake project | `qdcxx` |
 | Libraries | `qdcxx_core`, `qdcxx_encoding`, `qdcxx_protocol` |
 | Tool library / executable target | `qdcxx_inspect_tool` / `qdcxx_qtp_inspect` |
-| Executable filename | `qd-qtp-inspect` (unchanged through OUTPUT_NAME) |
+| Executable filename | `qdcxx-qtp-inspect` (selected through OUTPUT_NAME) |
 | Test executable targets | `qdcxx_compact_tests`, `qdcxx_frame_tests`, `qdcxx_description_tests`, `qdcxx_binding_tests`, `qdcxx_symbol_tests`, `qdcxx_stream_data_tests`, `qdcxx_offline_io_tests`, `qdcxx_human_io_tests` |
 | Tool option | `ORG_TTLDTOR_QDCXX_BUILD_QTP_INSPECT` (default OFF) |
 | Fixture cache variables | `ORG_TTLDTOR_QDCXX_ENCODING_FIXTURES`, `ORG_TTLDTOR_QDCXX_PROTOCOL_FIXTURES`, `ORG_TTLDTOR_QDCXX_FRAME_PROJECTIONS`, `ORG_TTLDTOR_QDCXX_DESCRIPTION_FIXTURES`, `ORG_TTLDTOR_QDCXX_BINDING_FIXTURES`, `ORG_TTLDTOR_QDCXX_SYMBOL_FIXTURES`, `ORG_TTLDTOR_QDCXX_STREAM_DATA_FIXTURES` |
@@ -46,3 +46,13 @@ names and commands; they describe earlier revisions. Current build examples use 
 Java QD/package names, protocol/schema semantics and fixtures remain untouched. This change does
 not rename the repository directory or add tape/transport support. [New validation](../tests/conformance/naming/VALIDATION.md)
 records checks against the renamed sources separately from historical evidence.
+
+## Utility executable filenames
+
+The owner extended the migration to utility filenames: `qdcxx-qtp-inspect` replaces `qd-qtp-inspect`.
+Use `qdcxx-` and hyphen-separated words for future user-facing utility binaries; keep CMake targets
+as `qdcxx_*` and set OUTPUT_NAME. Internal test binaries retain their qdcxx_ target names.
+Update shell commands/shortcuts and rebuild. No legacy alias binary is built. Old binaries may remain
+in reused build directories; their presence does not mean they were rebuilt. Version 1 TSV/human
+headers still contain `qd-qtp-inspect` as the fixed format identifier, preserving exact output bytes.
+Help advertises the new executable name. [Validation](../tests/conformance/executable-naming/VALIDATION.md).

@@ -90,11 +90,11 @@ int main(int argc, char **argv) {
 #endif
     try {
         if (argc == 2 && std::string_view(argv[1]) == "--help") {
-            std::cout
-                << "qd-qtp-inspect --profile oracle-sre-v1 --input PATH [--output-format tsv|human] [LIMIT VALUE ...]\n"
-                   "Raw offline QTP (not QD tape), type 2 before type 15, type 8 fields, zero flags.\n"
-                   "Numeric limits: ASCII decimal, finite; chunk-size must be positive.\n"
-                   "Defaults:\n";
+            std::cout << "qdcxx-qtp-inspect --profile oracle-sre-v1 --input PATH [--output-format tsv|human] [LIMIT "
+                         "VALUE ...]\n"
+                         "Raw offline QTP (not QD tape), type 2 before type 15, type 8 fields, zero flags.\n"
+                         "Numeric limits: ASCII decimal, finite; chunk-size must be positive.\n"
+                         "Defaults:\n";
             const org::ttldtor::qdcxx::inspect::Limits defaults;
 
             for (const auto &option : OPTIONS) {

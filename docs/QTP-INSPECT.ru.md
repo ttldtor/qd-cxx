@@ -2,7 +2,7 @@
 
 [English version](QTP-INSPECT.md). Английская версия является нормативной.
 
-`qd-qtp-inspect` — необязательный ограниченный диагностический executable, не tape reader и не
+`qdcxx-qtp-inspect` — необязательный ограниченный диагностический executable, не tape reader и не
 клиент. [Контракт версии 1](../spec/protocol/OFFLINE-INSPECTION.ru.md) определяет порядок, точный
 TSV, смещения, коды выхода и учёт ресурсов. Нет importer, transport, dynamic session, ненулевых
 flags, conversions или общего загрузчика схем. Сырой QTP не является tape-контейнером.
@@ -10,13 +10,13 @@ flags, conversions или общего загрузчика схем. Сырой
 ## Сборка и запуск
 
 ```powershell
-cmake -S . -B .work/inspect -DQD_BUILD_QTP_INSPECT=ON -DBUILD_TESTING=OFF
+cmake -S . -B .work/inspect -DORG_TTLDTOR_QDCXX_BUILD_QTP_INSPECT=ON -DBUILD_TESTING=OFF
 cmake --build .work/inspect --config Release
-.work/inspect/Release/qd-qtp-inspect.exe --profile oracle-sre-v1 --input tests/fixtures/protocol/offline-inspection/expected/composed.qtp
-.work/inspect/Release/qd-qtp-inspect.exe --help
+.work/inspect/Release/qdcxx-qtp-inspect.exe --profile oracle-sre-v1 --input tests/fixtures/protocol/offline-inspection/expected/composed.qtp
+.work/inspect/Release/qdcxx-qtp-inspect.exe --help
 ```
 
-Для Ninja/Makefiles используйте `.work/inspect/qd-qtp-inspect` (или `.exe` в Windows).
+Для Ninja/Makefiles используйте `.work/inspect/qdcxx-qtp-inspect` (или `.exe` в Windows).
 `ORG_TTLDTOR_QDCXX_BUILD_QTP_INSPECT` по умолчанию OFF; доступна сборка только библиотек. BUILD_TESTING=OFF
 не скачивает doctest и не требует Python. При включённых тестах и инструменте CTest включает
 интеграцию executable и переносимые инъекции ошибок I/O; Python 3 нужен только тестам.
@@ -89,7 +89,7 @@ write/flush может оставить частичные байты, даже 
 Автоматического выбора по TTY нет.
 
 ```powershell
-.work/inspect/Release/qd-qtp-inspect.exe --profile oracle-sre-v1 --input tests/fixtures/protocol/offline-inspection/expected/composed.qtp --output-format human
+.work/inspect/Release/qdcxx-qtp-inspect.exe --profile oracle-sre-v1 --input tests/fixtures/protocol/offline-inspection/expected/composed.qtp --output-format human
 ```
 
 Human версии 1 показывает заголовок формата/профиля, имена/числовые ID кадров и фактические границы
