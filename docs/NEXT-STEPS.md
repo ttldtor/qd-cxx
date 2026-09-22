@@ -8,11 +8,11 @@ The owner requested continued implementation toward real tape support, not perma
 coverage. Independent review accepts QDCXX-021's
 bounded scope. QDCXX-022 started from committed HEAD `fa5a0b967e9c021e656846cdd3d6faee5faa4776`.
 
-1. QDCXX-022, implemented; independent review pending: exact UTF_CHAR/TIME_SECONDS/WIDE_DECIMAL and default
+1. QDCXX-022, done; independent review complete: exact UTF_CHAR/TIME_SECONDS/WIDE_DECIMAL and default
    composite Quote end to end, Java production observations then C++, explicit Quote profile and
-   useful rejection diagnostics. Existing profile/output compatibility is retained. No commit created;
-   [author validation](../tests/conformance/protocol/quote/VALIDATION.md) is ready for independent review.
-2. Real tape mode: production Java evidence and bounded C++ support for RAW_DATA, MESSAGE timing /
+   useful rejection diagnostics. Existing profile/output compatibility is retained. Implementation commit:
+   `c26aed28f84db5c574ec5fbb9e4e5160e9dbbd8e` in master; author evidence remains separate from independent checks.
+2. QDCXX-023, ready, High — real tape mode: production Java evidence and bounded C++ support for RAW_DATA, MESSAGE timing /
    nonempty heartbeat and measured missing-opt semantics. Distinguish replay timing from business
    timestamps and event-time metadata; do not merely relabel RAW_DATA as STREAM_DATA or drop timing.
 3. Broader actual records/types: enumerate all descriptions and message types in the owner's sample
@@ -25,7 +25,7 @@ bounded scope. QDCXX-022 started from committed HEAD `fa5a0b967e9c021e656846cdd3
 5. Operational replay/publication/feed/multiplexer tools follow the existing 20-tool inventory and
    separately specified transport/core semantics. Python removal remains a parallel staged workstream.
 
-Stages 2–5 require bounded tasks and evidence before each implementation, not permission to weaken
+Stage 2 is scoped by QDCXX-023; stages 3–5 still require separate tasks. Every implementation requires evidence, not permission to weaken
 current strictness. Compression, sidecars and broader session updates get explicit profiles when needed.
 The local `external-input.tape` is optional private integration input, never a required CI fixture;
 do not commit/upload it without separate permission. Its header version is diagnostic, not proof of

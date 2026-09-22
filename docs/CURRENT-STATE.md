@@ -2,23 +2,30 @@
 
 [Русская версия](CURRENT-STATE.ru.md). English is authoritative.
 
-## QDCXX-022 author handoff — independent review pending
+## Reviewed baseline: QDCXX-022; next task: QDCXX-023
 
 The independent review's presentation-boundary finding has been addressed: diagnostic names/advice
 now live in tools/tape-inspect, while protocol retains only refusal data. Added per-slot mapQuote
 tag rejection and exact DESCRIPTOR/event-flags CLI diagnostics tests.
 Follow-up author checks are separate from the
-initial matrix; independent re-review remains pending. No wire/profile/decoder change or agent commit.
+initial matrix. Independent re-review accepted the fix.
+Implementation commit: `c26aed28f84db5c574ec5fbb9e4e5160e9dbbd8e`, included in master.
+This status update records earlier checks; it does not claim new runtime verification.
 
 Implemented unchanged default composite Quote through the bounded tape reader: exact 2/56/120
 values in an explicit local profile, owned Quote mapping, default-quote-v1 inspection and versioned
 diagnostics. Java production evidence and EN/RU contracts preceded C++ implementation. Starting HEAD
-was `fa5a0b967e9c021e656846cdd3d6faee5faa4776`; this work creates no commit.
+was `fa5a0b967e9c021e656846cdd3d6faee5faa4776`.
 [Author validation](../tests/conformance/protocol/quote/VALIDATION.md) records the compiler/sanitizer
-matrix, old-profile regressions, negative checks and evidence audit. Independent review is pending.
+matrix, old-profile regressions, negative checks and evidence audit. Independent review is complete.
 No new Python or runtime dependency. RAW_DATA, MESSAGE timing, broader records/types, importer,
 compression, regional Quote and transport remain outside this increment; follow [NEXT-STEPS](NEXT-STEPS.md).
 Earlier state/handoff sections below are historical and superseded within this bounded scope.
+
+QDCXX-023 is ready, High: characterize and implement bounded RAW_DATA/MESSAGE
+tape inspection for the existing field profiles, with exact timing and measured missing-opt behavior.
+The task also requires a bounded inventory of remaining private-sample gaps; it does not promise
+full sample decoding. Implementation has not started. Broader records/types remain the next increment.
 
 ## Historical decision: QDCXX-021 reviewed; QDCXX-022 ready
 

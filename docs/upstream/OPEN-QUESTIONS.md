@@ -11,10 +11,14 @@ default Quote schema, production round trip, missing raw-zero fields, repeated t
 positions, signed-second mapping and finite decimal raw/text/binary64/loss observations.
 [Contracts](../../spec/protocol/DEFAULT-QUOTE.md) and
 [C++ author validation](../../tests/conformance/protocol/quote/VALIDATION.md) implement only the
-explicit 2/8/56/120 exact-match local profile. Independent review remains pending.
+explicit 2/8/56/120 exact-match local profile. Independent review is complete; implementation commit c26aed28f84db5c574ec5fbb9e4e5160e9dbbd8e.
 TF-04 exclusions, RAW_DATA/MESSAGE, missing-opt policy, other events, conversions, regional mapping,
 compression, importer and transport remain open. Earlier Quote runtime/code gates below are historical
 and superseded only for this bounded increment; no exhaustive decimal/Unicode claim is made.
+
+QDCXX-023 investigates RAW delivery, heartbeat timing propagation and absent-opt semantics before implementation.
+It must distinguish replay timing, event-time sequence and Quote business fields; no answer is assumed from descriptor omission alone.
+The private sample's remaining descriptions/types are inventoried without authorizing broader field decoding or publishing the sample.
 
 ## QDCXX-021 bounded resolution
 
