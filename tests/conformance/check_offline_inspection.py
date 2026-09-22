@@ -1,6 +1,7 @@
 """Strict process-level CLI contract checks; designed policy and Java observations stay separate."""
 import argparse
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -148,7 +149,7 @@ def check(exe, root, manifest, quick=False):
         invocations+=1
     if not quick:
         good=['--profile','oracle-sre-v1','--input',str(root/'expected/composed.qtp')]
-        bad=[[],['--help','x'],good+['--bogus','1'],good+['--profile','oracle-sre-v1'],good+['--max-input'],
+        bad=[['--help','x'],good+['--bogus','1'],good+['--profile','oracle-sre-v1'],good+['--max-input'],
              good+['--max-input','-1'],good+['--max-input','+1'],good+['--max-input','1x'],good+['--max-input',''],
              good+['--max-input','18446744073709551616'],good+['--chunk-size','0'],good+['--max-frame','18446744073709551615'],
              good+['--chunk-size','18446744073709551615'],['--profile','wrong','--input','x'],['--input','x'],
@@ -158,6 +159,21 @@ def check(exe, root, manifest, quick=False):
             p=run(exe,arguments);assert p.returncode==2 and p.stdout==b'',(arguments,p)
             validate_diagnostic(p.stderr,2);invocations+=1
         p=run(exe,['--help']);assert p.returncode==0 and b'--max-output' in p.stdout and not p.stderr
+        no_arguments=run(exe,[])
+        assert (no_arguments.returncode,no_arguments.stdout,no_arguments.stderr)==(0,p.stdout,b'')
+        assert p.stdout.startswith(b'qdcxx-qtp-inspect --profile ') and b'complete\t' not in p.stdout
+        invocations+=1
+        # Close the reader before launch so help-output failure does not depend on process scheduling.
+        for arguments in ([],['--help']):
+            read_fd,write_fd=os.pipe()
+            os.close(read_fd)
+            try:
+                failed=subprocess.run([str(exe),*arguments],stdout=write_fd,stderr=subprocess.PIPE,timeout=30)
+            finally:
+                os.close(write_fd)
+            assert failed.returncode==3,(arguments,failed.returncode,failed.stderr)
+            validate_diagnostic(failed.stderr,3)
+
         with tempfile.TemporaryDirectory() as tmp:
             p=run(exe,['--profile','oracle-sre-v1','--input',str(Path(tmp)/'absent.qtp')])
             assert p.returncode==3 and not p.stdout;validate_diagnostic(p.stderr,3)

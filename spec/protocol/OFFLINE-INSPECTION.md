@@ -169,3 +169,11 @@ A physically delivered summary never overrides a failing exit status.
 
 Raw QTP envelopes are not QD tape. No tape reader, compression, time-file processing,
 protocol-descriptor handling, broader fields, importer, transport or dynamic sessions are added.
+
+## No-argument invocation
+
+An invocation with no arguments is equivalent to standalone `--help`: identical help bytes on stdout,
+empty stderr and exit 0 when writing/flushing succeeds. No file is opened and no inspection format or
+completion row is emitted. Output failure still returns I/O exit 3. A nonempty incomplete/invalid
+argument list remains usage exit 2; `--help` combined with other arguments remains invalid.
+This is CLI policy only; supplied-input TSV/human output and wire semantics are unchanged.

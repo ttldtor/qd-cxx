@@ -89,7 +89,7 @@ int main(int argc, char **argv) {
     std::signal(SIGPIPE, SIG_IGN);
 #endif
     try {
-        if (argc == 2 && std::string_view(argv[1]) == "--help") {
+        if (argc == 1 || (argc == 2 && std::string_view(argv[1]) == "--help")) {
             std::cout << "qdcxx-qtp-inspect --profile oracle-sre-v1 --input PATH [--output-format tsv|human] [LIMIT "
                          "VALUE ...]\n"
                          "Raw offline QTP (not QD tape), type 2 before type 15, type 8 fields, zero flags.\n"

@@ -9,6 +9,9 @@ flags, conversions или общего загрузчика схем. Сырой
 
 ## Сборка и запуск
 
+Запуск без аргументов печатает ту же справку, что `--help` (stdout, exit 0, пустой stderr).
+Непустые неполные или неверные аргументы дают usage exit 2; ошибки вывода — exit 3.
+
 ```powershell
 cmake -S . -B .work/inspect -DORG_TTLDTOR_QDCXX_BUILD_QTP_INSPECT=ON -DBUILD_TESTING=OFF
 cmake --build .work/inspect --config Release

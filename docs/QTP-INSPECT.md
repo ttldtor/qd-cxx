@@ -9,6 +9,9 @@ conversions or general schema loader is included. Raw QTP is not a tape containe
 
 ## Build and run
 
+Running without arguments prints the same help as `--help` (stdout, exit 0, empty stderr).
+Incomplete or invalid nonempty arguments still fail with usage exit 2; output errors return exit 3.
+
 ```powershell
 cmake -S . -B .work/inspect -DORG_TTLDTOR_QDCXX_BUILD_QTP_INSPECT=ON -DBUILD_TESTING=OFF
 cmake --build .work/inspect --config Release
