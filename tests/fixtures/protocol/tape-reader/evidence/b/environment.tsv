@@ -1,0 +1,29 @@
+property	java.version	1.8.0_422
+property	java.vendor	Azul Systems, Inc.
+property	java.home	C:\\Program Files\\Zulu\\zulu-8\\jre
+property	java.class.path	C:\\qd-cxx\\.work\\tape-reader-final-b/harness;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\mars\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-promise\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-api\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib-qd-sandbox\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\auth\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-core\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto-ssl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-rmi\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-impl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-scheme\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-ipf-filter\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qds-file\\target\\classes
+property	os.name	Windows 11
+property	os.version	10.0
+property	os.arch	amd64
+property	user.language	en
+property	user.country	US
+property	user.timezone	UTC
+property	file.encoding	UTF-8
+jaxp.dom	com.sun.org.apache.xerces.internal.jaxp.DocumentBuilderFactoryImpl
+jaxp.xsd	com.sun.org.apache.xerces.internal.jaxp.validation.XMLSchemaFactory
+service.resource	com.devexperts.qd.ng.RecordMappingFactory	file:/C:/path/to/profile/AppData/Local/Temp/qdcxx-003-qd/dxfeed-impl/target/classes/META-INF/services/com.devexperts.qd.ng.RecordMappingFactory
+service.entry	com.devexperts.qd.ng.RecordMappingFactory	com.dxfeed.event.market.MarketFactoryImpl
+service.entry	com.devexperts.qd.ng.RecordMappingFactory	com.dxfeed.event.candle.CandleFactoryImpl
+service.entry	com.devexperts.qd.ng.RecordMappingFactory	com.dxfeed.event.misc.MiscFactoryImpl
+service.entry	com.devexperts.qd.ng.RecordMappingFactory	com.dxfeed.event.option.OptionFactoryImpl
+service.entry	com.devexperts.qd.ng.RecordMappingFactory	com.dxfeed.event.custom.CustomFactoryImpl
+service.resource	com.devexperts.qd.DataScheme	file:/C:/path/to/profile/AppData/Local/Temp/qdcxx-003-qd/dxfeed-impl/target/classes/META-INF/services/com.devexperts.qd.DataScheme
+service.entry	com.devexperts.qd.DataScheme	com.dxfeed.api.impl.DXFeedScheme
+service.resource	com.devexperts.qd.DataSchemeFactory	file:/C:/path/to/profile/AppData/Local/Temp/qdcxx-003-qd/dxfeed-scheme/target/classes/META-INF/services/com.devexperts.qd.DataSchemeFactory
+service.entry	com.devexperts.qd.DataSchemeFactory	com.dxfeed.scheme.impl.DXSchemeFactory
+service.resource	com.dxfeed.api.impl.EventDelegateFactory	file:/C:/path/to/profile/AppData/Local/Temp/qdcxx-003-qd/dxfeed-impl/target/classes/META-INF/services/com.dxfeed.api.impl.EventDelegateFactory
+service.entry	com.dxfeed.api.impl.EventDelegateFactory	com.dxfeed.event.market.MarketFactoryImpl
+service.entry	com.dxfeed.api.impl.EventDelegateFactory	com.dxfeed.event.candle.CandleFactoryImpl
+service.entry	com.dxfeed.api.impl.EventDelegateFactory	com.dxfeed.event.misc.MiscFactoryImpl
+service.entry	com.dxfeed.api.impl.EventDelegateFactory	com.dxfeed.event.option.OptionFactoryImpl
+service.entry	com.dxfeed.api.impl.EventDelegateFactory	com.dxfeed.event.custom.CustomFactoryImpl

@@ -4,6 +4,19 @@
 
 Record questions about Java QD behavior that cannot yet be answered confidently. Link each question to the task investigating it and close it with source or fixture evidence.
 
+## QDCXX-021 bounded resolution
+
+TF-01 is implemented only for the explicit constrained BINARY/NONE/EMPTY_SET/STREAM_DATA/type-8 profile.
+TF-02/03 now have [51 production FileReader probes](../../tests/fixtures/protocol/tape-reader/COVERAGE.md),
+[TAPE-READER policy](../../spec/protocol/TAPE-READER.md) and [ADR-0002](../decisions/ADR-0002-bounded-tape-reader.md).
+Unknown/duplicate properties, repeated headers/IDs, partial Java installations, missing descriptions,
+unknown records and malformed/truncated EOF have bounded evidence; the C++ strict/atomic/terminal
+policies are task-authorized differences. Clean EOF does not authenticate a complete recording.
+Broader TF-02/03 sessions, recovery, extreme resources and all TF-04 exclusions remain open. No default
+TapeConnector/RAW_DATA, Quote, compression, importer or transport claim. Author matrix passed;
+[independent review is pending](../../tests/conformance/protocol/tape/VALIDATION.md). Earlier gates below
+retain their historical scope and are superseded only for this assigned bounded implementation.
+
 ## QDCXX-019 tape evidence and next-task gates
 
 QDCXX-020 update: [inventory](QDS-TOOLS.md) and [default Quote](../REAL-EVENT-BASELINE.md)

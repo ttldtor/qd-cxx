@@ -8,8 +8,9 @@
 
 namespace org::ttldtor::qdcxx::inspect {
 namespace {
-constexpr std::int32_t DESCRIBE_RECORDS = 2; ///< Initial wire descriptions.
-constexpr std::int32_t STREAM_DATA = 15;     ///< Supported data message type.
+constexpr std::int32_t DESCRIBE_PROTOCOL = 1; ///< Tape header, named only by tape presentation.
+constexpr std::int32_t DESCRIBE_RECORDS = 2;  ///< Initial wire descriptions.
+constexpr std::int32_t STREAM_DATA = 15;      ///< Supported data message type.
 
 /** Counting/writing cursor: every append checks subtraction before any expansion. */
 class Row {
@@ -325,6 +326,69 @@ std::string Formatter::complete(std::uint64_t bytes, std::size_t frames, std::si
         row.add(tsv ? "\t" : " wire-fields=");
         row.number(fields);
         row.add("\n");
+    });
+}
+
+std::string Formatter::tapeHeader(std::size_t budget) const {
+    return build(budget, [&](Row &row) {
+        if (format_ == OutputFormat::TSV) {
+            row.add("format\tqdcxx-tape-inspect\t1\n");
+        } else {
+            row.add("qdcxx-tape-inspect human 1 profile=");
+            row.add(profile_ == DisplayProfile::ORACLE_SRE_V1 ? "oracle-sre-v1" : "local-schema");
+            row.add(" identities=local\n");
+        }
+    });
+}
+
+std::string Formatter::tapeDescriptor(const protocol::TapeDescriptor &descriptor, std::size_t budget) const {
+    return build(budget, [&](Row &row) {
+        const bool tsv = format_ == OutputFormat::TSV;
+        row.add(tsv ? "descriptor\t" : "Descriptor: type=tape opt=EMPTY_SET version=");
+
+        if (tsv) {
+            row.number(descriptor.version ? 1 : 0);
+            row.add("\t");
+            row.units(descriptor.version ? *descriptor.version : std::u16string_view{});
+        } else if (descriptor.version) {
+            row.quote(*descriptor.version);
+        } else {
+            row.add("absent");
+        }
+
+        row.add(tsv ? "\t" : " time=");
+        row.add(descriptor.explicitTimeNone ? "NONE" : "absent");
+        row.add(tsv ? "\t" : " send=");
+        row.add(descriptor.explicitStreamSend ? "15" : "-");
+        row.add(tsv ? "\t-\n" : " receive=-\n");
+    });
+}
+
+std::string Formatter::tapeFrame(const protocol::Frame &value, std::size_t index, std::size_t budget) const {
+    if (format_ == OutputFormat::TSV || value.type != DESCRIBE_PROTOCOL) {
+        return frame(value, index, budget);
+    }
+
+    return build(budget, [&](Row &row) {
+        row.add("Frame ");
+        row.number(index);
+        row.add(": DESCRIBE_PROTOCOL (1) bytes=[");
+        row.number(value.startOffset);
+        row.add(",");
+        row.number(value.endOffset);
+        row.add(") payload=");
+        row.number(value.endOffset - value.payload.size());
+        row.add(" size=");
+        row.number(value.payload.size());
+        row.add("\n");
+    });
+}
+
+std::string Formatter::tapeMarkers(std::size_t markers, std::size_t budget) const {
+    return build(budget, [&](Row &row) {
+        row.add(format_ == OutputFormat::TSV ? "markers\t" : "Markers: count=");
+        row.number(markers);
+        row.add(format_ == OutputFormat::TSV ? "\n" : " authenticated-footer=no\n");
     });
 }
 } // namespace org::ttldtor::qdcxx::inspect

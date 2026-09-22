@@ -1,0 +1,4 @@
+case	negative-send	9
+error	message	1
+end	0	1	returned
+complete	negative-send

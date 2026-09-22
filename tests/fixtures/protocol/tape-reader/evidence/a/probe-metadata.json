@@ -1,0 +1,456 @@
+{
+  "startedUtc": "2026-09-22T15:22:22.4990372Z",
+  "finishedUtc": "2026-09-22T15:22:28.0364740Z",
+  "executable": "C:\\Program Files\\Zulu\\zulu-8\\bin\\java.exe",
+  "arguments": [
+    "-Dfile.encoding=UTF-8",
+    "-Duser.language=en",
+    "-Duser.country=US",
+    "-Duser.timezone=UTC",
+    "-cp",
+    "C:\\qd-cxx\\.work\\tape-reader-final-a/harness;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\mars\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-promise\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-api\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib-qd-sandbox\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\auth\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-core\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto-ssl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-rmi\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-impl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-scheme\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-ipf-filter\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qds-file\\target\\classes",
+    "qdcxx.oracle.TapeReaderOracle",
+    "C:\\qd-cxx/tests/fixtures/protocol/tape/expected/constrained.qtp",
+    "C:\\qd-cxx\\.work\\tape-reader-final-a/probes"
+  ],
+  "exit": 0,
+  "baselineMetadata": "metadata.json",
+  "sourceSha256": "F9C3EAD3B12F207E6C43A2D2AF4FA218BFF48F51E80E37C7045292448F74AF8C",
+  "harnessClasses": [
+    {
+      "path": "qdcxx\\oracle\\SchemaOracle.class",
+      "sha256": "ADC4E7F263EC49664BFA5159557C21FBF7F1322CCD49061DCB82DC30A54EA4D3"
+    },
+    {
+      "path": "qdcxx\\oracle\\TapeOracle.class",
+      "sha256": "BAF1E9501BAD2B95507EEBC2D07A53D7BE388B57A898C254670DEE56B1C0FACB"
+    },
+    {
+      "path": "qdcxx\\oracle\\TapeOracle$Observer.class",
+      "sha256": "F0412F386C9F0EAB4CEC6481F4491831799BF20F11F0F4AA5FC1DB43B24923F2"
+    },
+    {
+      "path": "qdcxx\\oracle\\TapeReaderOracle.class",
+      "sha256": "03815FCE7B5C3FBE23D78CBB3FFD8420A58321EE7DAF0299A89A508B999CE836"
+    },
+    {
+      "path": "qdcxx\\oracle\\TapeReaderOracle$Observer.class",
+      "sha256": "CDA019CB4F6B096635C6B42D77F828540590AEAD97DE0E7289F229F88C2E971B"
+    },
+    {
+      "path": "qdcxx\\oracle\\TapeVerify.class",
+      "sha256": "02A6C3C6304D61E55A8E6C8D9F13A49E8F81BA79B9A0902AA77C6BA0A983D049"
+    }
+  ],
+  "launcherSha256": "90BFADAEFDBE3BB4E12611B501959D85F677C3D4F08B72A50E6956E0F1326B48",
+  "artifacts": [
+    {
+      "name": "bad-magic.qtp",
+      "sha256": "6C4032F151C769C586FD88324CCE7B46270EA0414AE291963EEEED294EDB6DC6"
+    },
+    {
+      "name": "bad-magic.tsv",
+      "sha256": "7220C6849C7F09EBF5FD3FC3F4644A0697B443DAC7318C56B3B67966063EDA75"
+    },
+    {
+      "name": "duplicate-id.qtp",
+      "sha256": "8546F4383464E9279E051D366D7C0D7CAACECE0ABC6D3E1A22DF81B9E6C0CCD6"
+    },
+    {
+      "name": "duplicate-id.tsv",
+      "sha256": "63B1798A2BFA6B0A6B5B55965CCCFD1E791C949F6E71EAC297C81B760A52100E"
+    },
+    {
+      "name": "empty.qtp",
+      "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+    },
+    {
+      "name": "empty.tsv",
+      "sha256": "A84632AF442F6E0DA2B00BFDEF4EF51468EACB30AF48CB1D596710FCD081800C"
+    },
+    {
+      "name": "explicit-zero.qtp",
+      "sha256": "59B4389487DE2F4FCAFEF4CFB781F70169385F8AEB470A7C5A5704F4F131059C"
+    },
+    {
+      "name": "explicit-zero.tsv",
+      "sha256": "39C6FE4995E9CFA59F7C5FB844DED45BCC0A9F8EB849927015FE4D1C1DA1D247"
+    },
+    {
+      "name": "extension.qtp",
+      "sha256": "56F49820F7AC3C7EB2F9671FF712C0F9112C7A6F90DE765269C35116F9A86B02"
+    },
+    {
+      "name": "extension.tsv",
+      "sha256": "0CC6341D82134CB21012EF6FA5CA641416D1055AA38CEA02220D2447F398D9C3"
+    },
+    {
+      "name": "footer-then-data.qtp",
+      "sha256": "50DC3EC21F8AF39F6806022A6194941C44072F0A0F34AA3CA323FEB8CBCE57F8"
+    },
+    {
+      "name": "footer-then-data.tsv",
+      "sha256": "D7D381801BF60EC034CFC1C15663F428026376F716FAEE088B10B75CB0E15E6F"
+    },
+    {
+      "name": "header-only.qtp",
+      "sha256": "AE5549E39F7CCC1B8301A920069928F3D86048BC342C6F3E916026DEA1839534"
+    },
+    {
+      "name": "header-only.tsv",
+      "sha256": "CE42BDBE0868949DCA1F584919153972BDF516469531C131BE612118BEE29218"
+    },
+    {
+      "name": "malformed-data.qtp",
+      "sha256": "4250143CB71C03C4D8C9C4E60A1CA009C465A8E6D136DC4719326ED3BD2E035D"
+    },
+    {
+      "name": "malformed-data.tsv",
+      "sha256": "C44581A492DA6D8BCC8CF610C6C8018265E890644808D91EAD61107A3CFCCCFA"
+    },
+    {
+      "name": "malformed-header-0.qtp",
+      "sha256": "9DCF97A184F32623D11A73124CEB99A5709B083721E878A16D78F596718BA7B2"
+    },
+    {
+      "name": "malformed-header-0.tsv",
+      "sha256": "D0BFD174A882D315F761437512881D503C5E7D5121E5B2A9266A598392C697B7"
+    },
+    {
+      "name": "malformed-header-1.qtp",
+      "sha256": "A89E88A10E9904393BD0C3A918C69DC4CD5458B65E0B8FF5931325F20C7535D0"
+    },
+    {
+      "name": "malformed-header-1.tsv",
+      "sha256": "48666D99099D5C17FA3FFC0B530ABA9D16DB140832074AB693FA6C8DEF678D2E"
+    },
+    {
+      "name": "malformed-header-4.qtp",
+      "sha256": "5175E146D67DAA658EFC29BD01C40FEB679513BB30F1DC77B53F17D3F827EA5B"
+    },
+    {
+      "name": "malformed-header-4.tsv",
+      "sha256": "22A4457D95B6E9CE7D0F536B5759371F24F36101616CE1697F584F662F5F6754"
+    },
+    {
+      "name": "malformed-header-49.qtp",
+      "sha256": "749DFF39872EDB0C73074F03F5CF016A8BDEAF077D0E0F3606B9D28F8585C96C"
+    },
+    {
+      "name": "malformed-header-49.tsv",
+      "sha256": "CC4230AA8928DD9490F14B3921AAE96F1E32E58A33654F4CB0947DED658EC0FF"
+    },
+    {
+      "name": "malformed-header-5.qtp",
+      "sha256": "67FF10F2B38C179B8C23E4E6212D20CE57E606FB4765FAD5F79BA658C6B1E227"
+    },
+    {
+      "name": "malformed-header-5.tsv",
+      "sha256": "DDE0C200FDAE8E93FC9B89C2EDD073DFB280296F21CEFEBE3C26522E424F3B7E"
+    },
+    {
+      "name": "missing-header.qtp",
+      "sha256": "AD5F4A6A2D44810F51A771CA75B833150BFF1B94EDEDC103EACFA431808A0BDD"
+    },
+    {
+      "name": "missing-header.tsv",
+      "sha256": "E85771477B2FC5ACA8BDB52CE5D21635616164DC085DCBC517D352A61DD405DC"
+    },
+    {
+      "name": "negative-properties.qtp",
+      "sha256": "DEE45CCAFEF3A80C6B947348396C7AEF76BA662D38019F98954C790865739B21"
+    },
+    {
+      "name": "negative-properties.tsv",
+      "sha256": "29E1A29D35F39171990C3B8303DED0C493692FACC3CFFA4E763EF54849FBE971"
+    },
+    {
+      "name": "negative-receive.qtp",
+      "sha256": "840E799DDA56CDCF429D614D349729614452360712FF2A3A6AB8A50F2486D363"
+    },
+    {
+      "name": "negative-receive.tsv",
+      "sha256": "5C354804A1BF5AF538C670F3180BA53F7D286A54D3FB4FD87EC67BFD1BFB3B95"
+    },
+    {
+      "name": "negative-send.qtp",
+      "sha256": "7B92A10272B5384E4023209781E29264F25FC65200FDEF60CD18B6CAF09B04EB"
+    },
+    {
+      "name": "negative-send.tsv",
+      "sha256": "7EADE045F41A29EE43A2942337436C2FC9705C8065D9EF795DAA00D5A6AB3EEF"
+    },
+    {
+      "name": "no-footer.qtp",
+      "sha256": "9F202428782FECB935E40DA0F86D6995C43AF407D0198EC5B5C624927174C19F"
+    },
+    {
+      "name": "no-footer.tsv",
+      "sha256": "C89C4350BB58352241AC51D21674CA829EE71A3D6A0F5D6BC6F9BABD5E89B7C7"
+    },
+    {
+      "name": "original.qtp",
+      "sha256": "AFEEC40E8A1BBDA8A8E73C7752D19063C4068D2346B9EB78E735ECE2061C919E"
+    },
+    {
+      "name": "original.tsv",
+      "sha256": "A44D40FAD7328E7D102E88EE8C8CA597439C15E7A2D56F592EEBC30B9AD993BD"
+    },
+    {
+      "name": "partial-update.qtp",
+      "sha256": "9208088B1090AF9EC521309B194CEB1F5B373607EB37475AAD2FCF7987CB12AE"
+    },
+    {
+      "name": "partial-update.tsv",
+      "sha256": "F1312982AB2DE89EB3546CDD46E91E80F754A31458A89CE4BC7265343ED9AC0E"
+    },
+    {
+      "name": "properties-0.qtp",
+      "sha256": "51F88DCF70BA09FC9DBDC7E74224E41C91B02FF81F72277F469DD92D1E309ACC"
+    },
+    {
+      "name": "properties-0.tsv",
+      "sha256": "4A35A03AA9D633BC00BC1B9AD7A0E6C4049E033EC960C0FEFA30697C185E3715"
+    },
+    {
+      "name": "properties-1.qtp",
+      "sha256": "A793615134CFE49388AAD16716C6484DABC6DBCA5D1B55510BA92D161FC37C09"
+    },
+    {
+      "name": "properties-1.tsv",
+      "sha256": "1C19B8D2683504259A8DA361894682E87E7C48781FB4F6040587214D07493B92"
+    },
+    {
+      "name": "properties-10.qtp",
+      "sha256": "E519727F5676CFA6A81333C007B5918E268BFE9EF9930D45AF944D5F7B28902C"
+    },
+    {
+      "name": "properties-10.tsv",
+      "sha256": "D5C98E6F9B03E46C5DFC4E13AD7849DDCBD6F430B38E9303B77B7B4EB9D65790"
+    },
+    {
+      "name": "properties-11.qtp",
+      "sha256": "31C2D968C492D5118AEBC67C9664B7AC6DC0F837BCFD39DDEF64BB19683979CC"
+    },
+    {
+      "name": "properties-11.tsv",
+      "sha256": "864F819E138CE27392645D6A643C4F1B47578C73161F78AD125EE46393419FD8"
+    },
+    {
+      "name": "properties-12.qtp",
+      "sha256": "B9D7D0B70F41B3DC168C08E3E22835CD7C64F30B8D0B6E5938B4CC9AEBFE6027"
+    },
+    {
+      "name": "properties-12.tsv",
+      "sha256": "B56DFC19A58D43474373323D23012995FFA2782A4F7272DEE636AC83373A51C9"
+    },
+    {
+      "name": "properties-2.qtp",
+      "sha256": "5F54958092F56191B6669B1C5A732A7338C8824C8949E9884C91C9F8E6F3F780"
+    },
+    {
+      "name": "properties-2.tsv",
+      "sha256": "C5EC2B149CE9076F850C05D74B54F52DA23E70CDA2A7C9836A5A061782780FA6"
+    },
+    {
+      "name": "properties-3.qtp",
+      "sha256": "C996414FA517B4DDB61381C725910CF8AA0B4CE5B634322DE010B9F1B650507A"
+    },
+    {
+      "name": "properties-3.tsv",
+      "sha256": "D6F90F8631EFE21F343E7DDB024AD1547A72E47AF77D386F80E39CBC932E34A7"
+    },
+    {
+      "name": "properties-4.qtp",
+      "sha256": "7D52386F1A907C373771AEBF20AE7DF413F29535C783CC9802D912559227FFCD"
+    },
+    {
+      "name": "properties-4.tsv",
+      "sha256": "945C0A4CDEA8FB008BD875BCDCC50543BDB2AB6B3DA281A86376EE3DA0C1575C"
+    },
+    {
+      "name": "properties-5.qtp",
+      "sha256": "C5FCE675401CAE1A268E62A5A08089F8B1D4A3F1246B6800AEDC2E9D2FC0388A"
+    },
+    {
+      "name": "properties-5.tsv",
+      "sha256": "BC549A273404638B0190505AC93376151E16B3A4A4F64585EEC85DCED1FBAFB1"
+    },
+    {
+      "name": "properties-6.qtp",
+      "sha256": "7FA83B0E6B50CD66047114E579C039915708614353F04E8CB1D3B8AA1CEC1F90"
+    },
+    {
+      "name": "properties-6.tsv",
+      "sha256": "06D698F9CB3CAE60B75CB4CC28C8BA9FFDFE81F563B66D5C14ABECCF9A437304"
+    },
+    {
+      "name": "properties-7.qtp",
+      "sha256": "A950000E51220B02FAB4FB37699B1875C0C142521568ECEFFB9517DC023D1CC4"
+    },
+    {
+      "name": "properties-7.tsv",
+      "sha256": "9C9FEACAA5E647172221969FA3293E5AE3F108ED4863314247DA302775EB6233"
+    },
+    {
+      "name": "properties-8.qtp",
+      "sha256": "3A086D5A700FA70487604965501BE6FC8301A436DD36F77141BA68AE9AAD5B48"
+    },
+    {
+      "name": "properties-8.tsv",
+      "sha256": "EDA65B4979B259D041F64B6A1BD58FFCF6D5C789AB6D82E64D8712B3F6AC45C3"
+    },
+    {
+      "name": "properties-9.qtp",
+      "sha256": "2F71AF49CE3B5859CFE9ED356AEBEE54DACBCF3788EAC183C936CA93AF7235B5"
+    },
+    {
+      "name": "properties-9.tsv",
+      "sha256": "B36F2984A39626168EF4B0F4A25FDD5E2BDFED00B8F87B4A166FC4E5B86779B0"
+    },
+    {
+      "name": "receive-stream.qtp",
+      "sha256": "90976A24EC2ACA81DA9449B930D8328E94DF786A88182F60F0FC87F020BF5D07"
+    },
+    {
+      "name": "receive-stream.tsv",
+      "sha256": "0D3D9C6C202E4508B046AB9892F3CE5FEEDF6AB7D60FC54116335B1076042B79"
+    },
+    {
+      "name": "redefined-id.qtp",
+      "sha256": "071E83A44609300F1D4F8B2C55958C6280BAB4FEBC09C03BE68514772FDD3CD4"
+    },
+    {
+      "name": "redefined-id.tsv",
+      "sha256": "82B11AA241D5BF35F451B96244738B1B1259805E20BFC3C322C1CF9016200824"
+    },
+    {
+      "name": "repeated-header.qtp",
+      "sha256": "DEF5498FA198052E23982ABFBF0E59021B7EDFA010A299C5D31927CCB7C43F99"
+    },
+    {
+      "name": "repeated-header.tsv",
+      "sha256": "FDEBCEF50FE52BAC2DD72248C3B1C0D25607D504882E9963A00B15AB41556ED1"
+    },
+    {
+      "name": "send-empty.qtp",
+      "sha256": "75DAF7153D98369C780E3384D84F620D77D0099A0C08F64FC560CEEBF856AC75"
+    },
+    {
+      "name": "send-empty.tsv",
+      "sha256": "3DDE81B08F14FAC53DD67B918B42670F1BA1A3A31A62BC2D26623B43A680D3C7"
+    },
+    {
+      "name": "send-raw.qtp",
+      "sha256": "E9D949390A018E1ECF99841D905E5404270C7D6C6EAD019F8CE5FE50CCD72F05"
+    },
+    {
+      "name": "send-raw.tsv",
+      "sha256": "D5402FCDB5014383C4D435C65AC0B3C85958F1ECD1D3BAEB64659BE7FC33BC78"
+    },
+    {
+      "name": "truncated-1.qtp",
+      "sha256": "19581E27DE7CED00FF1CE50B2047E7A567C76B1CBAEBABE5EF03F7C3017BB5B7"
+    },
+    {
+      "name": "truncated-1.tsv",
+      "sha256": "358A3529CA9474FB3D60A259864BD1A6210164661BF2748276588D12E4AA0EA6"
+    },
+    {
+      "name": "truncated-100.qtp",
+      "sha256": "F2849D6F793527CCB4CDC8F5265F607AB73093C2F30FDDFB322A5D583F6C9E0E"
+    },
+    {
+      "name": "truncated-100.tsv",
+      "sha256": "47F7C21BF643E8DDDA25ADA7464D6FF9BB6A544DE25AC3370E67C4EBBDA762B1"
+    },
+    {
+      "name": "truncated-135.qtp",
+      "sha256": "D05B7061A7370586D4441610ACA32C13F8E0D8A18C2011C678D01B6A5B282820"
+    },
+    {
+      "name": "truncated-135.tsv",
+      "sha256": "75B4398805241AB8852B1B072315684D14549D05CC96D74B6E10C8D1A5255462"
+    },
+    {
+      "name": "truncated-2.qtp",
+      "sha256": "C4EE513586CFFCCC932FD0A6A617FE0015DFDD58DA3007FB3B008CF01F3C66D0"
+    },
+    {
+      "name": "truncated-2.tsv",
+      "sha256": "A2EF645715050842419E61BC3C1D7EB3CA28F09C3FB9F1640394B20E1BFCF7C5"
+    },
+    {
+      "name": "truncated-20.qtp",
+      "sha256": "03C7727AC4C03F14CA9BB247B7ED72E469DB2C7EA92BBBACC244113D58C9E54C"
+    },
+    {
+      "name": "truncated-20.tsv",
+      "sha256": "49DBBB162469140ECB5FA56E6D8EF7F81BFF0EFEADED3F358C17AC51889338BB"
+    },
+    {
+      "name": "truncated-57.qtp",
+      "sha256": "24BAD82A6B2A9B5BA522CB04764E7D06BC069A5F2EC241DE4017CD40B29EE71C"
+    },
+    {
+      "name": "truncated-57.tsv",
+      "sha256": "1321DCC7B7A17CA8458AADE7466A656442BC7AEE4EBC20C17B936D6CE179464F"
+    },
+    {
+      "name": "truncated-59.qtp",
+      "sha256": "E282C96B9C3D8E0BA45D9305D02D4C9C25661CD0FB1087978C15212FB3E211FD"
+    },
+    {
+      "name": "truncated-59.tsv",
+      "sha256": "39FCDD6EDDDA064273F17E6C562F0298D7AA4F4864D836678464D49DD6E669F4"
+    },
+    {
+      "name": "truncated-65.qtp",
+      "sha256": "ABE74C92A184BDE1ADA2C74152957EBEB3BB3A3CE27D2BF06F8B4BCE51CE5C5F"
+    },
+    {
+      "name": "truncated-65.tsv",
+      "sha256": "C008CC4F44E4DAA8C6F1C9DADDB397E28EF16D1D424ECC333208B5B8113365E4"
+    },
+    {
+      "name": "truncated-68.qtp",
+      "sha256": "363EF0675AF03F1127FC5216D17EAD4156165A115DE92D6CD4288FA2F50D7C84"
+    },
+    {
+      "name": "truncated-68.tsv",
+      "sha256": "1550CDD35E20296AE6CC9D867BF05DBC482333646D7F0F259E04DD242D3650F9"
+    },
+    {
+      "name": "truncated-74.qtp",
+      "sha256": "8E9E4DB3AC2C9A3A9EA72E7C08BE1748CFD50050F232D6E9B38C278024F77A23"
+    },
+    {
+      "name": "truncated-74.tsv",
+      "sha256": "FA45826C01006C72638D0168C81414937C118977E993CD3E6595137045BDE4C8"
+    },
+    {
+      "name": "truncated-80.qtp",
+      "sha256": "895A95299CDF677AAD7F474B9A09971E232E6A392A63C8019DFDDF1F76CFB010"
+    },
+    {
+      "name": "truncated-80.tsv",
+      "sha256": "29857CA0B7F11379F1F82ED2CEB8C128B59307D7C7250CE7C19940C46367DDA3"
+    },
+    {
+      "name": "undescribed-id.qtp",
+      "sha256": "628A21B7FB21790F1AB4094EA9DD31D4EE67C89DB3CBEF975A5430DE631D4777"
+    },
+    {
+      "name": "undescribed-id.tsv",
+      "sha256": "5F74A7E905298E4FEDBB17E894FEA57713EDEB02870DCDC31DC0DE519C0BD52E"
+    },
+    {
+      "name": "unknown-record.qtp",
+      "sha256": "94B873AF572972962C796CB9AEC0298D554B41992A7BAED17EC68742B9E3D51D"
+    },
+    {
+      "name": "unknown-record.tsv",
+      "sha256": "FF2FC969056C8445BB62DABADD3CF3E9645C353759AA7BA9DB6144D28F36821C"
+    }
+  ]
+}

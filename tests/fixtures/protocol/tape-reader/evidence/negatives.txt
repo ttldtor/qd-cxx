@@ -1,0 +1,11 @@
+REJECTED: value
+REJECTED: type
+REJECTED: id
+REJECTED: position
+REJECTED: unknown-row
+REJECTED: missing-complete
+REJECTED: duplicate-complete
+REJECTED: empty
+REJECTED: missing-file
+REJECTED: empty-coverage
+PASS: 51 strictly validated cases, 102 exact artifacts

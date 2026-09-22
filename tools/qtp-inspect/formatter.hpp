@@ -5,6 +5,7 @@
 
 #include "qd/protocol/frame_reader.hpp"
 #include "qd/protocol/stream_data.hpp"
+#include "qd/protocol/tape_reader.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -40,6 +41,30 @@ class Formatter {
     Formatter(OutputFormat format, DisplayProfile profile) : format_(format), profile_(profile) {
     }
 
+    /** Compose the separate tape format identity.
+     * @param budget Remaining output bytes.
+     * @return Complete bounded row or OutputLimit.
+     */
+    std::string tapeHeader(std::size_t budget) const;
+    /** Compose validated tape diagnostic text, escaping untrusted version text.
+     * @param descriptor Accepted owning descriptor.
+     * @param budget Remaining encoded bytes.
+     * @return Complete bounded row or OutputLimit.
+     */
+    std::string tapeDescriptor(const protocol::TapeDescriptor &descriptor, std::size_t budget) const;
+    /** Compose a tape frame with the header type named separately.
+     * @param frame Owning envelope borrowed for this call.
+     * @param index Zero-based envelope index.
+     * @param budget Remaining bytes.
+     * @return Complete bounded row or OutputLimit.
+     */
+    std::string tapeFrame(const protocol::Frame &frame, std::size_t index, std::size_t budget) const;
+    /** Describe marker presence without asserting an authenticated footer.
+     * @param markers Number of accepted empty envelopes.
+     * @param budget Remaining bytes.
+     * @return Complete bounded row or OutputLimit.
+     */
+    std::string tapeMarkers(std::size_t markers, std::size_t budget) const;
     /** Compose the format/profile header.
      * @param budget Remaining stdout bytes.
      * @return Complete line; throws OutputLimit before expansion if it cannot fit.

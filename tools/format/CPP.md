@@ -37,3 +37,6 @@ Java formatting and oracle provenance rules in [README](README.md) remain separa
 QDCXX-017 extends discovery and explicit-file validation to `tools/qtp-inspect/*.cpp` and
 `*.hpp`. This keeps the optional tool under the same pinned two-stage pipeline; no upstream,
 fixture or generated source enters formatting scope.
+
+QDCXX-021 additionally includes tools/tape-inspect/*.cpp and *.hpp in the same pinned Format/Check
+scope. Existing inspector methods remain unchanged; tape presentation reuses bounded row helpers.

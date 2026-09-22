@@ -1,0 +1,275 @@
+I 260922 152414.086 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\original.qtp
+I 260922 152414.147 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\empty.qtp
+I 260922 152414.149 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\header-only.qtp
+I 260922 152414.150 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\no-footer.qtp
+I 260922 152414.155 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\missing-header.qtp
+I 260922 152414.157 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\repeated-header.qtp
+I 260922 152414.160 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\duplicate-id.qtp
+I 260922 152414.162 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\redefined-id.qtp
+I 260922 152414.162 [main] BinaryQTPParser - Record #1 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260922 152414.164 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\unknown-record.qtp
+I 260922 152414.164 [main] BinaryQTPParser - Record #1 'Unknown' is not found in data scheme. Incoming data and subscription will be skipped.
+I 260922 152414.166 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\undescribed-id.qtp
+E 260922 152414.168 [main] BinaryQTPParser - Corrupted QTP message: Unknown record #1
+++> === Last parsed data ===
+++> Last symbol: (1073742915, null) = ABC
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000035:  0F|04 43 01!07 FF 01 78                           ..C..ÿ.x        
+++> 0x00000045:                                                                    
+++> === END ===
+java.io.IOException: Unknown record #1
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseData(BinaryQTPParser.java:425)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:261)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.file.FileReader.processChunkPart(FileReader.java:551)
+	at com.devexperts.qd.qtp.file.FileReader.process(FileReader.java:456)
+	at com.devexperts.qd.qtp.file.FileReader.readInto(FileReader.java:372)
+	at qdcxx.oracle.TapeReaderOracle.main(TapeReaderOracle.java:278)
+I 260922 152414.169 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\partial-update.qtp
+E 260922 152414.171 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x00000035:  02 01 01 53 01 01 76 08|02!                       ...S..v..       
+++> 0x00000045:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260922 152414.172 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\footer-then-data.qtp
+I 260922 152414.174 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\explicit-zero.qtp
+I 260922 152414.175 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\properties-0.qtp
+I 260922 152414.178 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\properties-1.qtp
+I 260922 152414.179 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\properties-2.qtp
+I 260922 152414.180 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\properties-3.qtp
+I 260922 152414.182 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\properties-4.qtp
+I 260922 152414.184 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\properties-5.qtp
+E 260922 152414.184 [main] FileReader - Unrecognized timestamps type in time property: ""
+I 260922 152414.186 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\properties-6.qtp
+I 260922 152414.188 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\properties-7.qtp
+I 260922 152414.190 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\properties-8.qtp
+I 260922 152414.191 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\properties-9.qtp
+I 260922 152414.193 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\properties-10.qtp
+I 260922 152414.195 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\properties-11.qtp
+I 260922 152414.196 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\properties-12.qtp
+I 260922 152414.198 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\send-empty.qtp
+I 260922 152414.199 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\send-raw.qtp
+I 260922 152414.201 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\receive-stream.qtp
+I 260922 152414.203 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\extension.qtp
+E 260922 152419.219 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  01 44 58 50 33 03 04 74 79 70 65 04 74 61 70 65   .DXP3..type.tape
+++> 0x00000011:  03 6F 70 74 00 07 76 65 72 73 69 6F 6E 05 70 72   .opt..version.pr
+++> 0x00000021:  6F 62 65 01 0F 0B 53 54 52 45 41 4D 5F 44 41 54   obe...STREAM_DAT
+++> 0x00000031:  41 00 00 00!                                      A...            
+++> 0x00000041:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260922 152419.222 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\negative-properties.qtp
+E 260922 152419.222 [main] BinaryQTPParser - Corrupted QTP message: Illegal length: -1
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  01 44 58 50 33 7F!                                .DXP3          
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.IOException: Illegal length: -1
+	at com.devexperts.io.BufferedInputPart.checkEncapsulatedLength(BufferedInputPart.java:255)
+	at com.devexperts.io.BufferedInput.readProperties(BufferedInput.java:567)
+	at com.devexperts.qd.qtp.ProtocolDescriptor.parseFrom(ProtocolDescriptor.java:380)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseDescribeProtocol(BinaryQTPParser.java:310)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseOther(BinaryQTPParser.java:287)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:267)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.file.FileReader.processChunkPart(FileReader.java:551)
+	at com.devexperts.qd.qtp.file.FileReader.process(FileReader.java:456)
+	at com.devexperts.qd.qtp.file.FileReader.readInto(FileReader.java:372)
+	at qdcxx.oracle.TapeReaderOracle.main(TapeReaderOracle.java:278)
+I 260922 152419.223 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\negative-send.qtp
+E 260922 152419.224 [main] BinaryQTPParser - Corrupted QTP message: Invalid size: -1
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  01 44 58 50 33 00 7F!00                           .DXP3..        
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.IOException: Invalid size: -1
+	at com.devexperts.qd.qtp.ProtocolDescriptor.parseMessageListFrom(ProtocolDescriptor.java:421)
+	at com.devexperts.qd.qtp.ProtocolDescriptor.parseFrom(ProtocolDescriptor.java:381)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseDescribeProtocol(BinaryQTPParser.java:310)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseOther(BinaryQTPParser.java:287)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:267)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.file.FileReader.processChunkPart(FileReader.java:551)
+	at com.devexperts.qd.qtp.file.FileReader.process(FileReader.java:456)
+	at com.devexperts.qd.qtp.file.FileReader.readInto(FileReader.java:372)
+	at qdcxx.oracle.TapeReaderOracle.main(TapeReaderOracle.java:278)
+I 260922 152419.226 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\negative-receive.qtp
+E 260922 152419.226 [main] BinaryQTPParser - Corrupted QTP message: Invalid size: -1
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  01 44 58 50 33 00 00 7F!                          .DXP3..        
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.IOException: Invalid size: -1
+	at com.devexperts.qd.qtp.ProtocolDescriptor.parseMessageListFrom(ProtocolDescriptor.java:421)
+	at com.devexperts.qd.qtp.ProtocolDescriptor.parseFrom(ProtocolDescriptor.java:382)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseDescribeProtocol(BinaryQTPParser.java:310)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseOther(BinaryQTPParser.java:287)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:267)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.file.FileReader.processChunkPart(FileReader.java:551)
+	at com.devexperts.qd.qtp.file.FileReader.process(FileReader.java:456)
+	at com.devexperts.qd.qtp.file.FileReader.readInto(FileReader.java:372)
+	at qdcxx.oracle.TapeReaderOracle.main(TapeReaderOracle.java:278)
+I 260922 152419.227 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\bad-magic.qtp
+E 260922 152419.227 [main] BinaryQTPParser - Corrupted QTP message: Invalid protocol descriptor magic. Wrong protocol.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  01 44 58 50 32!00 00 00                           .DXP2...        
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.IOException: Invalid protocol descriptor magic. Wrong protocol.
+	at com.devexperts.qd.qtp.ProtocolDescriptor.parseFrom(ProtocolDescriptor.java:378)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseDescribeProtocol(BinaryQTPParser.java:310)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseOther(BinaryQTPParser.java:287)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:267)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.file.FileReader.processChunkPart(FileReader.java:551)
+	at com.devexperts.qd.qtp.file.FileReader.process(FileReader.java:456)
+	at com.devexperts.qd.qtp.file.FileReader.readInto(FileReader.java:372)
+	at qdcxx.oracle.TapeReaderOracle.main(TapeReaderOracle.java:278)
+I 260922 152419.228 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\truncated-1.qtp
+E 260922 152419.228 [main] FileReader - File was not completely parsed, 1 bytes remaining
+I 260922 152419.230 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\truncated-2.qtp
+E 260922 152419.230 [main] FileReader - File was not completely parsed, 2 bytes remaining
+I 260922 152419.231 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\truncated-20.qtp
+E 260922 152419.231 [main] FileReader - File was not completely parsed, 20 bytes remaining
+I 260922 152419.232 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\truncated-57.qtp
+E 260922 152419.233 [main] FileReader - File was not completely parsed, 57 bytes remaining
+I 260922 152419.234 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\truncated-59.qtp
+E 260922 152419.235 [main] FileReader - File was not completely parsed, 1 bytes remaining
+I 260922 152419.237 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\truncated-65.qtp
+E 260922 152419.237 [main] FileReader - File was not completely parsed, 7 bytes remaining
+I 260922 152419.239 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\truncated-68.qtp
+E 260922 152419.239 [main] FileReader - File was not completely parsed, 1 bytes remaining
+I 260922 152419.240 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\truncated-74.qtp
+E 260922 152419.241 [main] FileReader - File was not completely parsed, 7 bytes remaining
+I 260922 152419.242 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\truncated-80.qtp
+E 260922 152419.243 [main] FileReader - File was not completely parsed, 4 bytes remaining
+I 260922 152419.244 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\truncated-100.qtp
+E 260922 152419.244 [main] FileReader - File was not completely parsed, 9 bytes remaining
+I 260922 152419.246 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\truncated-135.qtp
+E 260922 152419.246 [main] FileReader - File was not completely parsed, 13 bytes remaining
+I 260922 152419.247 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\malformed-header-0.qtp
+E 260922 152419.248 [main] BinaryQTPParser - Corrupted QTP message: Invalid protocol descriptor magic. Wrong protocol.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  01!                                               .               
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.IOException: Invalid protocol descriptor magic. Wrong protocol.
+	at com.devexperts.qd.qtp.ProtocolDescriptor.parseFrom(ProtocolDescriptor.java:378)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseDescribeProtocol(BinaryQTPParser.java:310)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseOther(BinaryQTPParser.java:287)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:267)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.file.FileReader.processChunkPart(FileReader.java:551)
+	at com.devexperts.qd.qtp.file.FileReader.process(FileReader.java:456)
+	at com.devexperts.qd.qtp.file.FileReader.readInto(FileReader.java:372)
+	at qdcxx.oracle.TapeReaderOracle.main(TapeReaderOracle.java:278)
+I 260922 152419.248 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\malformed-header-1.qtp
+E 260922 152419.250 [main] BinaryQTPParser - Corrupted QTP message: Invalid protocol descriptor magic. Wrong protocol.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  01 44!                                            .D              
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.IOException: Invalid protocol descriptor magic. Wrong protocol.
+	at com.devexperts.qd.qtp.ProtocolDescriptor.parseFrom(ProtocolDescriptor.java:378)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseDescribeProtocol(BinaryQTPParser.java:310)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseOther(BinaryQTPParser.java:287)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:267)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.file.FileReader.processChunkPart(FileReader.java:551)
+	at com.devexperts.qd.qtp.file.FileReader.process(FileReader.java:456)
+	at com.devexperts.qd.qtp.file.FileReader.readInto(FileReader.java:372)
+	at qdcxx.oracle.TapeReaderOracle.main(TapeReaderOracle.java:278)
+I 260922 152419.250 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\malformed-header-4.qtp
+E 260922 152419.251 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  01 44 58 50 33!                                   .DXP3           
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260922 152419.253 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\malformed-header-5.qtp
+E 260922 152419.253 [main] BinaryQTPParser - Corrupted QTP message: Illegal length: 3
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  01 44 58 50 33 03!                                .DXP3.          
+++> 0x00000011:                                                                    
+++> === END ===
+java.io.IOException: Illegal length: 3
+	at com.devexperts.io.BufferedInputPart.checkEncapsulatedLength(BufferedInputPart.java:255)
+	at com.devexperts.io.BufferedInput.readProperties(BufferedInput.java:567)
+	at com.devexperts.qd.qtp.ProtocolDescriptor.parseFrom(ProtocolDescriptor.java:380)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseDescribeProtocol(BinaryQTPParser.java:310)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseOther(BinaryQTPParser.java:287)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessagePayload(BinaryQTPParser.java:267)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseMessageBody(BinaryQTPParser.java:219)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:162)
+	at com.devexperts.qd.qtp.BinaryQTPParser.parseImpl(BinaryQTPParser.java:113)
+	at com.devexperts.qd.qtp.AbstractQTPParser.parse(AbstractQTPParser.java:176)
+	at com.devexperts.qd.qtp.file.FileReader.processChunkPart(FileReader.java:551)
+	at com.devexperts.qd.qtp.file.FileReader.process(FileReader.java:456)
+	at com.devexperts.qd.qtp.file.FileReader.readInto(FileReader.java:372)
+	at qdcxx.oracle.TapeReaderOracle.main(TapeReaderOracle.java:278)
+I 260922 152419.255 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\malformed-header-49.qtp
+E 260922 152419.255 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000001:  01 44 58 50 33 03 04 74 79 70 65 04 74 61 70 65   .DXP3..type.tape
+++> 0x00000011:  03 6F 70 74 00 07 76 65 72 73 69 6F 6E 05 70 72   .opt..version.pr
+++> 0x00000021:  6F 62 65 01 0F 0B 53 54 52 45 41 4D 5F 44 41 54   obe...STREAM_DAT
+++> 0x00000031:  41 00!                                            A.              
+++> 0x00000041:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260922 152419.256 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-reader-final-negative\probes\malformed-data.qtp
+E 260922 152419.257 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed data ===
+++> S		0
+++> Last symbol: (1073741824, null) = 
+++> === Last parsed bytes ===
+++> '|' shows where to last record was successfully parsed
+++> '!' shows where to last byte was read
+++> 0x0000003e:  0F|FE 01!                                         .þ.             
+++> 0x0000004e:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)

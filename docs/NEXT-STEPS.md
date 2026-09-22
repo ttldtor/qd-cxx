@@ -2,6 +2,43 @@
 
 [Русская версия](NEXT-STEPS.ru.md). English is authoritative.
 
+## Current sequence after independent QDCXX-021 review
+
+The owner requested continued implementation toward real tape support, not permanent synthetic-only
+coverage. Independent review accepts QDCXX-021's
+bounded scope. Commit that baseline before the next implementation.
+
+1. QDCXX-022, ready: exact UTF_CHAR/TIME_SECONDS/WIDE_DECIMAL and default
+   composite Quote end to end, Java production observations then C++, explicit Quote profile and
+   useful rejection diagnostics. Keep existing profile/output compatibility. This includes implementation.
+2. Real tape mode: production Java evidence and bounded C++ support for RAW_DATA, MESSAGE timing /
+   nonempty heartbeat and measured missing-opt semantics. Distinguish replay timing from business
+   timestamps and event-time metadata; do not merely relabel RAW_DATA as STREAM_DATA or drop timing.
+3. Broader actual records/types: enumerate all descriptions and message types in the owner's sample
+   with a bounded diagnostic inventory, replay through locked Java where supported, derive minimal
+   reproducible standard-event cases. Implement required types/conversions/skips in explicit increments,
+   including Profile and other observed records, not just the first encountered failure. Keep synthetic
+   boundary tests and whole-file semantic comparisons; report unsupported parts explicitly.
+4. External schema adapters: normalized JSON and then scoped XML/import/overlay/provider behavior,
+   feeding validated loader-independent core. Wire descriptions alone are not a complete local schema.
+5. Operational replay/publication/feed/multiplexer tools follow the existing 20-tool inventory and
+   separately specified transport/core semantics. Python removal remains a parallel staged workstream.
+
+Stages 2–5 require bounded tasks and evidence before each implementation, not permission to weaken
+current strictness. Compression, sidecars and broader session updates get explicit profiles when needed.
+The local `external-input.tape` is optional private integration input, never a required CI fixture;
+do not commit/upload it without separate permission. Its header version is diagnostic, not proof of
+producer identity or authorization to change upstream.lock. Reproduce relevant cases with locked Java;
+if genuine version differences arise, document them and seek a compatibility decision.
+
+## Historical QDCXX-021 author implementation checkpoint
+
+The owner assigned QDCXX-021 after QDCXX-020. The bounded reader and qdcxx-tape-inspect are now
+implemented and author-validated; [independent review remains pending](../tests/conformance/protocol/tape/VALIDATION.md).
+The first row below has reached its bounded author acceptance endpoint. The next real-event milestone
+remains the unmodified default Quote with 56/2/120; it still requires its own task. The unassigned
+proposal below is retained as historical QDCXX-020 text, superseded by the QDCXX-021 assignment.
+
 ## QDCXX-020 result and dependency order
 
 The [locked inventory](upstream/QDS-TOOLS.md) accounts for 20 registered tools plus the separate

@@ -50,3 +50,11 @@ tests/fixtures/encoding/symbols/inputs.tsv -text
 tests/fixtures/encoding/symbols/expected/*.tsv text eol=lf
 tests/fixtures/encoding/symbols/captures/** -text
 tests/conformance/encoding/symbols/logs/*.log -text
+
+# Additive tape-reader observations and hashed tools retain exact captured bytes.
+tools/upstream/tape-reader-oracle/*.ps1 -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+tests/fixtures/protocol/tape-reader/expected/** -text
+# Raw captured logs contain significant CRLF and padded diagnostic dumps; never trim them.
+# This exception does not apply to authored code, documentation or expected TSV rows.
+tests/fixtures/protocol/tape-reader/evidence/** -text -whitespace
+tests/conformance/protocol/tape/logs/** -text -whitespace

@@ -2,7 +2,30 @@
 
 [Русская версия](CURRENT-STATE.ru.md). English is authoritative.
 
+## Current decision: QDCXX-021 reviewed; QDCXX-022 ready
 
+The uncommitted QDCXX-021 implementation above HEAD 3e91295 is independently reviewed within its
+explicit bounded profile. Review and freshly executed checks
+are separate from the author matrix. No blocking defect found; no general real-tape support claimed.
+QDCXX-022 is ready after committing this baseline: real default Quote,
+exact types 2/56/120, production-path evidence and C++ implementation. No QDCXX-022 code was added
+in this review. The private owner tape remains outside current scope and outside Git; the
+[roadmap](NEXT-STEPS.md) explicitly includes RAW_DATA, message timing, broader types and schema loading.
+Earlier review-pending/handoff sections below are historical and superseded by this decision.
+
+
+
+## QDCXX-021 author handoff — review pending
+
+Implemented the bounded BINARY/NONE/EMPTY_SET/type-8 tape reader and optional qdcxx-tape-inspect.
+[Contract](../spec/protocol/TAPE-READER.md), [ADR-0002](decisions/ADR-0002-bounded-tape-reader.md),
+[CLI](TAPE-INSPECT.md), [author validation](../tests/conformance/protocol/tape/VALIDATION.md).
+Java evidence preceded implementation: 51 production FileReader probes, two clean matching captures,
+negative/baseline Verify. All 13 suites pass MSVC/ClangCL/GCC Debug/Release and GCC ASan+UBSan;
+four production option combinations build without test fetch/Python discovery. Existing ten suites
+and old raw-inspector behavior remain. No new Python/runtime dependency, commit or independent review.
+General tape/default RAW_DATA connector, Quote, transport and importer remain excluded. Next real-event
+milestone is unchanged default Quote 56/2/120. Earlier baseline/handoff descriptions below are historical.
 
 ## Latest reviewed baseline and next task
 

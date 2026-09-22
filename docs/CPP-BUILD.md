@@ -9,6 +9,28 @@ and UTFString APIs. QDCXX-010 introduced compact; QDCXX-011 adds
 [UTFString policy and reuse decision](../spec/encoding/UTFSTRING.md) define explicit C++ bounds.
 PentaCodec, importer, schema runtime, event payload decoding, frame writing, transport and packaging remain outside scope.
 
+## Bounded tape API and optional utility
+
+QDCXX-021 adds qd/protocol/tape_reader.hpp to qdcxx_protocol. Construct TapeReader(schema, limits)
+with finite TapeLimits; the reader owns a bounded schema copy and immutable contexts. feed returns
+at most one owning frame event plus completed data prefix; resubmit the unaccepted suffix. finish
+requires actual EOF and one accepted initial header. No reset/replacement or IO is in the library.
+The [contract](../spec/protocol/TAPE-READER.md) specifies descriptor grammar, atomic updates, construction
+work accounting, positions and EOF. API is provisional. All older component contracts remain unchanged.
+
+```powershell
+cmake -S . -B .work/tape -DORG_TTLDTOR_QDCXX_BUILD_TAPE_INSPECT=ON -DORG_TTLDTOR_QDCXX_BUILD_QTP_INSPECT=ON
+cmake --build .work/tape --config Release
+ctest --test-dir .work/tape -C Release --output-on-failure
+.work/tape/Release/qdcxx-tape-inspect --profile oracle-sre-v1 --input tests/fixtures/protocol/tape/expected/constrained.qtp
+```
+
+Targets qdcxx_tape_inspect_tool/qdcxx_tape_inspect keep IO/presentation outside protocol/core. Either
+inspector can be enabled separately with BUILD_TESTING=OFF; all four option combinations were built
+without doctest fetch or Python discovery. New tests are protocol_binary_tape, tape_inspection_io and
+tape_inspection_cli (CMake process checks, no new Python); all ten old suites remain when the old tool
+is enabled. [CLI contract](TAPE-INSPECT.md), [executed matrix and limits](../tests/conformance/protocol/tape/VALIDATION.md).
+
 ## DESCRIBE_RECORDS API and QDCXX-013 checks
 
 Include `qd/protocol/describe_records.hpp` and link qdcxx_protocol. Call
