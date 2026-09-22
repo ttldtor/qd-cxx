@@ -1,0 +1,9 @@
+2026-09-22T12:56:23.571Z COMMAND ['cmake', '--build', '.work/naming-final-msvc', '--config', 'Release', '--target', 'qdcxx_qtp_inspect']; cwd='C:\\qd-cxx'; TZ=UTC
+2026-09-22T12:56:23.723Z MSBuild version 17.14.51+25f168cee for .NET Framework
+2026-09-22T12:56:23.771Z 
+2026-09-22T12:56:24.192Z   qdcxx_core.vcxproj -> C:\qd-cxx\.work\naming-final-msvc\Release\qdcxx_core.lib
+2026-09-22T12:56:24.259Z   qdcxx_encoding.vcxproj -> C:\qd-cxx\.work\naming-final-msvc\Release\qdcxx_encoding.lib
+2026-09-22T12:56:24.352Z   qdcxx_protocol.vcxproj -> C:\qd-cxx\.work\naming-final-msvc\Release\qdcxx_protocol.lib
+2026-09-22T12:56:24.388Z   qdcxx_inspect_tool.vcxproj -> C:\qd-cxx\.work\naming-final-msvc\Release\qdcxx_inspect_tool.lib
+2026-09-22T12:56:24.449Z   qdcxx_qtp_inspect.vcxproj -> C:\qd-cxx\.work\naming-final-msvc\Release\qdcxx-qtp-inspect.exe
+2026-09-22T12:56:24.484Z EXIT 0

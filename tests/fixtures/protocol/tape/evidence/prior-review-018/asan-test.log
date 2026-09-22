@@ -1,0 +1,27 @@
+2026-09-21T23:13:05.404Z COMMAND ['ctest', '--test-dir', '.work/utf-asan', '--output-on-failure']; cwd='/work/qd-cxx'; TZ=UTC
+2026-09-21T23:13:05.426Z Test project /work/qd-cxx/.work/utf-asan
+2026-09-21T23:13:05.444Z       Start  1: compact_java_vectors
+2026-09-21T23:13:05.634Z  1/10 Test  #1: compact_java_vectors .............   Passed    0.18 sec
+2026-09-21T23:13:05.638Z       Start  2: protocol_java_frames
+2026-09-21T23:13:05.948Z  2/10 Test  #2: protocol_java_frames .............   Passed    0.31 sec
+2026-09-21T23:13:05.952Z       Start  3: protocol_java_descriptions
+2026-09-21T23:13:06.092Z  3/10 Test  #3: protocol_java_descriptions .......   Passed    0.14 sec
+2026-09-21T23:13:06.096Z       Start  4: protocol_java_binding
+2026-09-21T23:13:06.159Z  4/10 Test  #4: protocol_java_binding ............   Passed    0.06 sec
+2026-09-21T23:13:06.163Z       Start  5: encoding_java_symbols
+2026-09-21T23:13:06.397Z  5/10 Test  #5: encoding_java_symbols ............   Passed    0.23 sec
+2026-09-21T23:13:06.401Z       Start  6: protocol_java_stream_data
+2026-09-21T23:13:06.621Z  6/10 Test  #6: protocol_java_stream_data ........   Passed    0.22 sec
+2026-09-21T23:13:06.624Z       Start  7: offline_inspection_cli
+2026-09-21T23:13:31.591Z  7/10 Test  #7: offline_inspection_cli ...........   Passed   22.57 sec
+2026-09-21T23:13:31.595Z       Start  8: offline_inspection_injected_io
+2026-09-21T23:13:31.663Z  8/10 Test  #8: offline_inspection_injected_io ...   Passed    0.06 sec
+2026-09-21T23:13:31.670Z       Start  9: human_inspection_cli
+2026-09-21T23:14:23.463Z  9/10 Test  #9: human_inspection_cli .............   Passed   47.35 sec
+2026-09-21T23:14:23.467Z       Start 10: human_inspection_injected_io
+2026-09-21T23:14:23.529Z 10/10 Test #10: human_inspection_injected_io .....   Passed    0.06 sec
+2026-09-21T23:14:23.539Z 
+2026-09-21T23:14:23.540Z 100% tests passed out of 10
+2026-09-21T23:14:23.540Z 
+2026-09-21T23:14:23.541Z Total Test time (real) =  71.27 sec
+2026-09-21T23:14:23.545Z EXIT 0

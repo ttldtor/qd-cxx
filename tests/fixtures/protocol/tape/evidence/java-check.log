@@ -1,0 +1,3 @@
+2026-09-22T13:12:34.050Z COMMAND ['pwsh', '-NoProfile', '-File', 'tools/format/Format-Java.ps1', '-Mode', 'Check', '-JavaHome', 'C:/Program Files/Microsoft/jdk-21.0.4.7-hotspot']; cwd='C:\\qd-cxx'; TZ=UTC
+2026-09-22T13:12:36.601Z Java formatting Check: PASS (11 files; google-java-format 1.36.1).
+2026-09-22T13:12:36.623Z EXIT 0

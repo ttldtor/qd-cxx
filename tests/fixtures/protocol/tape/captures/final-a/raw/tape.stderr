@@ -1,0 +1,8 @@
+I 260922 130251.576 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\tape-019\final-a\artifacts\default.qtp
+I 260922 130251.606 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-019\final-a\artifacts\default.qtp
+I 260922 130251.620 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\tape-019\final-a\artifacts\constrained.qtp
+I 260922 130251.622 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-019\final-a\artifacts\constrained.qtp
+I 260922 130251.641 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\tape-019\final-a\artifacts\text.txt
+I 260922 130251.643 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-019\final-a\artifacts\text.txt
+I 260922 130251.650 [main] FileReader - Reading data from C:\qd-cxx\.work\tape-019\final-a\artifacts\truncated.qtp
+E 260922 130251.651 [main] FileReader - File was not completely parsed, 13 bytes remaining

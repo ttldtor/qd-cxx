@@ -1,0 +1,5 @@
+2026-09-22T12:55:59.479Z COMMAND ['cmake', '--build', '.work/naming-final-msvc', '--config', 'Release']; cwd='C:\\qd-cxx'; TZ=UTC
+2026-09-22T12:55:59.678Z Версия MSBuild 17.14.51+25f168cee для .NET Framework
+2026-09-22T12:55:59.733Z 
+2026-09-22T12:55:59.780Z C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.Cpp.WindowsSDK.props(122,5): error MSB4184: не удается вычислить выражение "[Microsoft.Build.Utilities.ToolLocationHelper]::GetLatestSDKTargetPlatformVersion(Windows, 10.0)". Отказано в доступе по пути "C:\path\to\profile\AppData\Local\Microsoft SDKs". [C:\qd-cxx\.work\naming-final-msvc\ALL_BUILD.vcxproj]
+2026-09-22T12:55:59.799Z EXIT 1

@@ -1,0 +1,8 @@
+2026-09-22T13:25:04.3035207Z QDCXX-019 read-only evidence audit; author check, not independent review
+2026-09-22T13:25:04.8810712Z Historical hashes preserved: 1530; CheckPreexistingState=True (cache state is checked only when requested)
+2026-09-22T13:25:04.9579305Z final-a: raw 22-file parity, current sources, clean build, bounded capture/inspector and expected exits PASS
+2026-09-22T13:25:04.9853704Z final-b: raw 22-file parity, current sources, clean build, bounded capture/inspector and expected exits PASS
+2026-09-22T13:25:05.0152290Z negative-verify: raw 22-file parity, current sources, clean build, bounded capture/inspector and expected exits PASS
+2026-09-22T13:25:05.0400063Z baseline-verify: raw 22-file parity, current sources, clean build, bounded capture/inspector and expected exits PASS
+2026-09-22T13:25:05.2453868Z Relative links PASS (392); 8 reciprocal EN/RU pairs share non-document evidence links; translation meaning reviewed manually
+2026-09-22T13:25:05.4915482Z Diff/protected sources/no new Python PASS; no errors detected in these checks

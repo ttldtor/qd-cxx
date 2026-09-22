@@ -1,0 +1,27 @@
+2026-09-21T23:12:31.654Z COMMAND ['ctest', '--test-dir', '.work/msvc', '-C', 'Release', '--output-on-failure']; cwd='C:\\qd-cxx'; TZ=UTC
+2026-09-21T23:12:31.687Z Test project C:/qd-cxx/.work/msvc
+2026-09-21T23:12:31.692Z       Start  1: compact_java_vectors
+2026-09-21T23:12:31.715Z  1/10 Test  #1: compact_java_vectors .............   Passed    0.02 sec
+2026-09-21T23:12:31.715Z       Start  2: protocol_java_frames
+2026-09-21T23:12:31.740Z  2/10 Test  #2: protocol_java_frames .............   Passed    0.02 sec
+2026-09-21T23:12:31.740Z       Start  3: protocol_java_descriptions
+2026-09-21T23:12:31.757Z  3/10 Test  #3: protocol_java_descriptions .......   Passed    0.02 sec
+2026-09-21T23:12:31.758Z       Start  4: protocol_java_binding
+2026-09-21T23:12:31.771Z  4/10 Test  #4: protocol_java_binding ............   Passed    0.01 sec
+2026-09-21T23:12:31.772Z       Start  5: encoding_java_symbols
+2026-09-21T23:12:31.799Z  5/10 Test  #5: encoding_java_symbols ............   Passed    0.03 sec
+2026-09-21T23:12:31.800Z       Start  6: protocol_java_stream_data
+2026-09-21T23:12:31.819Z  6/10 Test  #6: protocol_java_stream_data ........   Passed    0.02 sec
+2026-09-21T23:12:31.820Z       Start  7: offline_inspection_cli
+2026-09-21T23:12:38.861Z  7/10 Test  #7: offline_inspection_cli ...........   Passed    7.04 sec
+2026-09-21T23:12:38.861Z       Start  8: offline_inspection_injected_io
+2026-09-21T23:12:38.873Z  8/10 Test  #8: offline_inspection_injected_io ...   Passed    0.01 sec
+2026-09-21T23:12:38.874Z       Start  9: human_inspection_cli
+2026-09-21T23:12:51.653Z  9/10 Test  #9: human_inspection_cli .............   Passed   12.78 sec
+2026-09-21T23:12:51.654Z       Start 10: human_inspection_injected_io
+2026-09-21T23:12:51.667Z 10/10 Test #10: human_inspection_injected_io .....   Passed    0.01 sec
+2026-09-21T23:12:51.669Z 
+2026-09-21T23:12:51.669Z 100% tests passed out of 10
+2026-09-21T23:12:51.669Z 
+2026-09-21T23:12:51.669Z Total Test time (real) =  19.98 sec
+2026-09-21T23:12:51.677Z EXIT 0

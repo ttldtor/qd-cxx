@@ -1,0 +1,3 @@
+2026-09-22T13:18:37.866Z COMMAND ['C:/Program Files/Zulu/zulu-8/bin/java.exe', '-cp', '.work/tape-019/final-b/harness', 'qdcxx.oracle.TapeVerify', 'compare', 'tests/fixtures/protocol/tape/captures/final-a/artifacts', 'tests/fixtures/protocol/tape/captures/final-b/artifacts']; cwd='C:\\qd-cxx'; TZ=UTC
+2026-09-22T13:18:38.018Z VERIFY PASS: compare
+2026-09-22T13:18:38.039Z EXIT 0

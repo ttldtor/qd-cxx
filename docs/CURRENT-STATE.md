@@ -14,6 +14,14 @@ are historical. This naming migration adds no independent review claim for that 
 
 ## Current status
 
+QDCXX-019 research is complete and ready for independent review, without a commit. Real Java
+FileWriter/FileReader captures cover default/constrained BINARY, TEXT and truncated EOF; two clean
+runs match all 22 raw artifacts, 19 negative cases and negative/baseline Verify behave as expected.
+[Inventory, gap table and proposed next profile](../spec/protocol/TAPE-FILES.md),
+[author validation](../tests/fixtures/protocol/tape/VALIDATION.md). C++ and inspector capabilities,
+historical fixtures and upstream.lock are unchanged. New oracle work uses Java/PowerShell; no new
+Python script/dependency. The bounded future reader and runtime dependencies still require approval.
+
 QDCXX-010–016 are implemented. QDCXX-016 is **done**, independently reviewed and committed as
 `8c9e82223e9bd783e281babf3e791cfaf4767555`. The subsequent commits `9562ec2`, `94f3542`
 and `128b8bf` update comment guidance, comments, licensing and copyright headers.
@@ -39,7 +47,7 @@ committed baseline: `8bc9838efa3be8c157ec7d9a9b13e476baeff385`. Its follow-up re
 MSVC Release, five suites, the original unknown-row reproduction, negatives and evidence audit;
 other final follow-up profiles remain author-run results.
 
-### QDCXX-017 closed; QDCXX-018 ready for independent review
+### QDCXX-017 and QDCXX-018 reviewed
 
 QDCXX-017 is done and committed as `a0944f0ac361202b298d2b2acf1edc6adb0e1f5a`.
 Its prior independent review reran MSVC Release and GCC ASan+UBSan (eight suites), 17 mutations
@@ -51,8 +59,11 @@ QDCXX-018 adds opt-in `--output-format human`, safe lossless quoted UTF-8, expli
 bounded encoded-byte accounting and separate tool-only formatting. Default/explicit TSV, stderr,
 wire profile and decoder libraries are unchanged. [Author validation](../tests/conformance/protocol/human-inspection/VALIDATION.md)
 records the seven-profile, ten-suite matrix, production tool ON/OFF, formatting, 9 human and 17 legacy
-mutations/baselines, historical hashes and bilingual checks. Independent QDCXX-018 review is pending;
-no new commit was created. This is raw QTP inspection, not QD tape or general dxFeed support.
+mutations/baselines, historical hashes and bilingual checks. QDCXX-018 is independently reviewed and
+committed as `e1e19e5`: prior review reran MSVC Release and GCC ASan+UBSan, ten suites each,
+format Check and hash/diff checks. Migration review at `4cb1d8c` reran MSVC Release ten suites only;
+other author checks remain author checks. This status correction does not claim new review runs.
+This is raw QTP inspection, not QD tape or general dxFeed support.
 Importer, compression/time files, transport, dynamic sessions and broader wire types remain excluded.
 
 ## Historical completion records

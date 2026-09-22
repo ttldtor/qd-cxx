@@ -1,0 +1,4 @@
+Exception in thread "main" java.lang.IllegalArgumentException: byte mismatch: default.tsv
+	at qdcxx.oracle.TapeVerify.require(TapeVerify.java:22)
+	at qdcxx.oracle.TapeVerify.compare(TapeVerify.java:260)
+	at qdcxx.oracle.TapeVerify.main(TapeVerify.java:368)

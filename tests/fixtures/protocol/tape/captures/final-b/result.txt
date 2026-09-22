@@ -1,0 +1,1 @@
+CAPTURE COMPLETE: three writer profiles and truncated probe; review raw artifacts before promotion.

@@ -1,0 +1,23 @@
+2026-09-22T13:18:36.955Z COMMAND ['C:/Program Files/Zulu/zulu-8/bin/java.exe', '-cp', '.work/tape-019/final-b/harness', 'qdcxx.oracle.TapeVerify', 'negative', 'tests/fixtures/protocol/tape/expected', '.work/tape-019/negative-confirmed']; cwd='C:\\qd-cxx'; TZ=UTC
+2026-09-22T13:18:37.138Z REJECT	byte	byte mismatch: default.qtp
+2026-09-22T13:18:37.186Z REJECT	value	byte mismatch: default.tsv
+2026-09-22T13:18:37.226Z REJECT	empty	artifact size/type default.tsv
+2026-09-22T13:18:37.256Z REJECT	missing	artifact file set
+2026-09-22T13:18:37.284Z REJECT	extra	artifact file set
+2026-09-22T13:18:37.316Z REJECT	unknown	unknown observation row unknown
+2026-09-22T13:18:37.349Z REJECT	completion	completion
+2026-09-22T13:18:37.383Z REJECT	inspector-stdout	inspector stdout
+2026-09-22T13:18:37.415Z REJECT	inspector-stderr	inspector diagnostic
+2026-09-22T13:18:37.447Z REJECT	inspector-exit	inspector exit
+2026-09-22T13:18:37.478Z REJECT	arity-profile	profile
+2026-09-22T13:18:37.528Z REJECT	arity-descriptor	arity: descriptor
+2026-09-22T13:18:37.560Z REJECT	arity-property	arity: property
+2026-09-22T13:18:37.591Z REJECT	arity-heartbeat	arity: heartbeat
+2026-09-22T13:18:37.625Z REJECT	arity-record	arity: record
+2026-09-22T13:18:37.657Z REJECT	arity-end	arity: end
+2026-09-22T13:18:37.688Z REJECT	arity-complete	completion
+2026-09-22T13:18:37.722Z REJECT	arity-error	arity: error
+2026-09-22T13:18:37.757Z REJECT	arity-frame	arity: frame
+2026-09-22T13:18:37.778Z PASS	19 mutations rejected; baseline passes; expectations unchanged
+2026-09-22T13:18:37.778Z VERIFY PASS: negative
+2026-09-22T13:18:37.800Z EXIT 0

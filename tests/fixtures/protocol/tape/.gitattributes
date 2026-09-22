@@ -1,0 +1,4 @@
+inputs.tsv -text
+expected/** -text
+captures/** -text
+evidence/** -text

@@ -4,6 +4,24 @@
 
 Record questions about Java QD behavior that cannot yet be answered confidently. Link each question to the task investigating it and close it with source or fixture evidence.
 
+## QDCXX-019 tape evidence and next-task gates
+
+[Tape inventory/gaps](../../spec/protocol/TAPE-FILES.md) and
+[author validation](../../tests/fixtures/protocol/tape/VALIDATION.md) add real FileWriter/FileReader
+evidence: default/constrained BINARY and TEXT preserve seven local records; truncated constrained
+input delivers four records and one EOF stream error. Two clean captures match without normalization.
+
+| ID | Status / remaining question | Required next step |
+| --- | --- | --- |
+| TF-01 | Measured for direct writer only: header type 1 and late first-use descriptions block the current inspector even with EMPTY_SET/time NONE. TapeConnector defaults to RAW_DATA by source, not measured here. | Approve a separate uncompressed BINARY/NONE/EMPTY_SET/STREAM_DATA task; no general tape/connector claim. |
+| TF-02 | Open policy: descriptor unknown properties, empty opt, absent time, version diagnostics, append-only ID declarations and plan ownership. | ADR and descriptor/redeclaration/missing-description Java evidence before C++ implementation. |
+| TF-03 | Partial EOF measured; corruption recovery, follow, budgets and boundary behavior remain open. | Additional finite header/description/data truncation and malformed-frame probes; explicit terminal/completed-prefix policy, no implicit resync. |
+| TF-04 | Source only: CSV/BLOB, GZIP/ZIP, time sidecars, split/cycle/retention and broader flag/time combinations. Packaged JAR version metadata and real dxFeed schemas remain unmeasured. | Separate evidence before widening the profile; no new runtime dependency is approved. |
+
+QDCXX-019 is research only. Existing QT unknowns retain their unmeasured portions; no C++/inspector
+capability, importer or transport was added. New oracle tooling is Java launched through PowerShell,
+with no new Python script/dependency. Independent review is pending.
+
 ## Provenance
 
 - **QDCXX-002 — GitHub repository authority**
