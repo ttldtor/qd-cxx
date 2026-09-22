@@ -164,3 +164,11 @@ and every timing-only row. Presentation remains outside protocol/core and never 
 
 This contract does not claim full support of any private tape; remaining structural gaps require the
 separate bounded inventory and cannot be inferred from successful generated fixtures.
+
+## Explicit additional field profile
+
+[FIELD-TYPES](../encoding/FIELD-TYPES.md) defines EXTENDED_FIELDS_V1 with exact 2/8/10/40/56/72/88/120,
+owned nullable UTF-16, logical field positions independent of Java slots, and cumulative string work/ownership bounds.
+Both existing tape modes keep their descriptor, flags, timing, terminal-error and append-only policies.
+Earlier type exclusions below describe the older profiles; only this explicit profile extends them.
+No Profile event adapter, indexed schema, importer or implicit discovery is added.

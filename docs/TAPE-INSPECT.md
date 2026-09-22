@@ -1,5 +1,49 @@
 # Tape inspection, version 1
 
+## Explicit oracle-field-types-v1 and output version 4
+
+`--profile oracle-field-types-v1` selects the fixed diagnostic `FieldTypes` local schema:
+Text(10), Short(40), Sequence(72), Date(88), Count(8), Char(2), Seconds(56), Wide(120), Tail(10).
+It works with omitted/explicit `--tape-mode legacy` and explicit `--tape-mode raw-message-v1`.
+The local policy is `EXTENDED_FIELDS_V1`; container selection remains independent. This adapter
+neither discovers a schema nor maps a Profile event. [FIELD-TYPES](../spec/encoding/FIELD-TYPES.md)
+defines exact values, schema lookup names, row grammar, charging and Java evidence.
+
+Both TSV and human output use version 4 for this profile. TSV records have seven cells:
+`field-record`, frame index, emitted index, local ID, name UTF-16 hex, symbol UTF-16 hex, values.
+Each comma-separated value is `type:raw:payload`: scalar payload is `-`; type 10 uses
+`null`, `empty` or exact lowercase four-digit UTF-16 units with raw zero.
+Human output preserves the same tags/raw values and safely quotes string contents, escaping
+controls and lone surrogates. No ShortString, calendar or event-time conversion is applied.
+RAW frame timing remains separate from field SEQUENCE. Descriptor/frame/timing/completion rows
+keep their existing mode-specific grammar. Diagnostic version defaults to 2; explicit 1/2 remains available.
+
+Five additional unsigned decimal limits bound field strings independently of symbols and names:
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `--field-string-bytes` | 65536 | One string's examined prefix and body bytes |
+| `--field-string-units` | 16384 | One string's admitted UTF-16 units |
+| `--max-field-bytes` | 16777216 | File-wide examined string bytes |
+| `--max-field-units` | 4194304 | File-wide admitted decoding units |
+| `--max-owned-field-units` | 4194304 | Completed output plus current/temporary string units |
+
+Zero means zero allowance. Decoding work is charged for skipped/repeated/failed values without refund;
+owned units bound logical UTF-16 storage, not allocator overhead. Complete rows fit the remaining
+output-byte budget before allocation and first write. Detected output failure suppresses subsequent
+completion; a final-flush error can follow an already written completion row. Success requires exit 0.
+
+```powershell
+.work/field-types-msvc-024/Release/qdcxx-tape-inspect --input tests/fixtures/encoding/field-types/expected/mixed-stream.qtp --profile oracle-field-types-v1 --output-format human
+.work/field-types-msvc-024/Release/qdcxx-tape-inspect --input tests/fixtures/encoding/field-types/expected/mixed-raw.qtp --profile oracle-field-types-v1 --tape-mode raw-message-v1 --output-format tsv
+```
+
+Existing profiles retain their output/diagnostic versions and behavior except the expanded tape help.
+No arguments and standalone `--help` remain identical without input IO. Invalid, missing or duplicate
+profile arguments are usage errors before opening input. [Coverage](../tests/conformance/protocol/field-types/COVERAGE.md)
+and [author validation](../tests/conformance/protocol/field-types/VALIDATION.md) describe checks and limits;
+independent review remains pending. Historical sections below describe their original increments.
+
 ## Explicit raw-message-v1 and timed output version 3
 
 `--tape-mode raw-message-v1` selects bounded uncompressed RAW_DATA/MESSAGE independently from

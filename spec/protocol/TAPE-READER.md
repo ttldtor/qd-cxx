@@ -131,3 +131,11 @@ errors preserve raw-parser positions but publish no part of that message. Candid
 use the description payload end and retain the previous context. Returned frames and completed data own
 all their storage. Context views are borrowed only until the next successful update or reader destruction;
 a failed update does not invalidate them. Caller-retained frames/results remain the caller's responsibility.
+
+## Explicit additional field profile
+
+[FIELD-TYPES](../encoding/FIELD-TYPES.md) defines EXTENDED_FIELDS_V1 with exact 2/8/10/40/56/72/88/120,
+owned nullable UTF-16, logical field positions independent of Java slots, and cumulative string work/ownership bounds.
+Both existing tape modes keep their descriptor, flags, timing, terminal-error and append-only policies.
+Earlier type exclusions below describe the older profiles; only this explicit profile extends them.
+No Profile event adapter, indexed schema, importer or implicit discovery is added.

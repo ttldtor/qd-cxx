@@ -16,9 +16,25 @@ struct Limits {
                               {16, 8, {4096, 1024}, 8192},
                               {{1024, 65536, 65536, 1024, 1048576}, 1024, {65536, 1024, 1048576}},
                               16777216,
-                              {1048576, 1048576, 4194304, 1048576, 4194304, 4194304, {1048576, 4096, 4096}},
+                              {1048576,
+                               1048576,
+                               4194304,
+                               1048576,
+                               4194304,
+                               4194304,
+                               {1048576, 4096, 4096},
+                               {65536, 16384},
+                               16777216,
+                               4194304,
+                               4194304},
                               4096}; ///< Explicit finite defaults, including RAW timing attempts.
 };
+
+/** Construct the fixed diagnostic mixed schema from FIELD-TYPES, without wire discovery.
+ * @param limits Finite schema validation bounds.
+ * @return Owned ordinary extended-field schema, or explicit validation/allocation failure.
+ */
+[[nodiscard]] std::expected<core::LocalSchema, core::SchemaError> oracleFieldTypesSchema(core::SchemaLimits limits);
 
 /** Validate IO representability and synchronize derived primitive limits.
  * @param limits Explicit user limits, updated only for derived bounds.

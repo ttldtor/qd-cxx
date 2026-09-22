@@ -264,6 +264,87 @@ std::string Formatter::frame(const protocol::Frame &frame, std::size_t index, st
 std::string Formatter::record(const protocol::StreamDataRecord &record, std::u16string_view name,
                               std::size_t frameIndex, std::size_t index, std::size_t budget,
                               const protocol::TapeTiming *timing) const {
+    if (profile_ == DisplayProfile::ORACLE_FIELD_TYPES_V1) {
+        if (!record.values.empty()) {
+            throw std::invalid_argument("typed field representation");
+        }
+
+        for (const auto &field : record.typedValues) {
+            if (!core::validFieldValue(field)) {
+                throw std::invalid_argument("noncanonical field value");
+            }
+        }
+
+        return build(budget, [&](Row &row) {
+            const bool tsv = format_ == OutputFormat::TSV;
+            row.add(tsv ? "field-record\t" : "Fields ");
+            row.number(tsv ? frameIndex : index);
+            row.add(tsv ? "\t" : ": frame=");
+            row.number(tsv ? index : frameIndex);
+            row.add(tsv ? "\t" : " local=");
+            row.number(record.localId);
+            row.add(tsv ? "\t" : " name=");
+
+            if (tsv) {
+                row.units(name);
+            } else {
+                row.quote(name);
+            }
+
+            row.add(tsv ? "\t" : " symbol=");
+
+            if (tsv) {
+                row.units(record.symbol.units);
+            } else {
+                row.quote(record.symbol.units);
+            }
+
+            row.add(tsv ? "\t" : " fields={");
+
+            for (std::size_t i = 0; i < record.typedValues.size(); ++i) {
+                const auto &field = record.typedValues[i];
+
+                if (i) {
+                    row.add(tsv ? "," : ", ");
+                }
+
+                if (!tsv) {
+                    row.add("field[");
+                    row.number(i);
+                    row.add("]=(type:");
+                }
+
+                row.number(static_cast<std::int32_t>(field.type));
+                row.add(tsv ? ":" : " raw:");
+                row.number(field.raw);
+
+                if (field.type == core::SerialFieldType::UTF_CHAR_ARRAY) {
+                    row.add(tsv ? ":" : " units:");
+
+                    if (!field.units) {
+                        row.add("null");
+                    } else if (tsv) {
+                        if (field.units->empty()) {
+                            row.add("empty");
+                        } else {
+                            row.units(*field.units);
+                        }
+                    } else {
+                        row.quote(*field.units);
+                    }
+                } else if (tsv) {
+                    row.add(":-");
+                }
+
+                if (!tsv) {
+                    row.add(")");
+                }
+            }
+
+            row.add(tsv ? "\n" : "}\n");
+        });
+    }
+
     if (profile_ == DisplayProfile::DEFAULT_QUOTE_V1) {
         // Mapping scalar fields needs no second owned copy of the decoded symbol.
         const auto quote = events::mapQuote({}, record.typedValues, 0);
@@ -455,7 +536,12 @@ std::string Formatter::complete(std::uint64_t bytes, std::size_t frames, std::si
 
 std::string Formatter::tapeHeader(std::size_t budget) const {
     return build(budget, [&](Row &row) {
-        if (profile_ == DisplayProfile::DEFAULT_QUOTE_V1) {
+        if (profile_ == DisplayProfile::ORACLE_FIELD_TYPES_V1) {
+            row.add(
+                format_ == OutputFormat::TSV
+                    ? "format\tqdcxx-tape-inspect\t4\toracle-field-types-v1\tlegacy\n"
+                    : "qdcxx-tape-inspect human 4 profile=oracle-field-types-v1 tape-mode=legacy identities=local\n");
+        } else if (profile_ == DisplayProfile::DEFAULT_QUOTE_V1) {
             row.add(format_ == OutputFormat::TSV
                         ? "format\tqdcxx-tape-inspect\t2\tdefault-quote-v1\n"
                         : "qdcxx-tape-inspect human 2 profile=default-quote-v1 identities=local\n");
@@ -523,6 +609,15 @@ std::string Formatter::tapeFrame(const protocol::Frame &value, std::size_t index
 std::string Formatter::rawTapeHeader(std::size_t budget) const {
     return build(budget, [&](Row &row) {
         const bool tsv = format_ == OutputFormat::TSV;
+
+        if (profile_ == DisplayProfile::ORACLE_FIELD_TYPES_V1) {
+            row.add(tsv ? "format\tqdcxx-tape-inspect\t4\toracle-field-types-v1\traw-message-v1\n"
+                        : "qdcxx-tape-inspect human 4 profile=oracle-field-types-v1 tape-mode=raw-message-v1 "
+                          "identities=local\n");
+
+            return;
+        }
+
         row.add(tsv ? "format\tqdcxx-tape-inspect\t3\t" : "qdcxx-tape-inspect human 3 profile=");
         row.add(profile_ == DisplayProfile::DEFAULT_QUOTE_V1 ? "default-quote-v1"
                 : profile_ == DisplayProfile::ORACLE_SRE_V1  ? "oracle-sre-v1"

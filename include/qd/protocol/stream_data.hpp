@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "qd/encoding/char_array.hpp"
 #include "qd/encoding/symbol_reader.hpp"
 #include "qd/protocol/static_binding.hpp"
 
@@ -72,7 +73,7 @@ enum class StreamDataStatus {
     UNSUPPORTED_PROFILE, ///< Nonzero raw event flags.
     RESOURCE_LIMIT,      ///< Mandatory logical budget exceeded.
     ALLOCATION_FAILURE,  ///< Allocation failed; completed prefix retained.
-    INVALID_FIELD        ///< UTF_CHAR primitive has an invalid lead, tail or code point.
+    INVALID_FIELD        ///< Character or array primitive has invalid encoding or length.
 };
 /** Checkpoint identifying failure location or successful completion. */
 enum class StreamDataStage {
@@ -88,13 +89,17 @@ enum class StreamDataStage {
 
 /** Mandatory finite per-message budgets; zero is valid. */
 struct StreamDataLimits {
-    std::size_t payloadBytes;      ///< Maximum complete payload size.
-    std::size_t processedRecords;  ///< Maximum records, including skipped and zero-field records.
-    std::size_t wireFields;        ///< Maximum fields read, including skips and repeated targets.
-    std::size_t emittedRecords;    ///< Maximum completed output records.
-    std::size_t emittedValues;     ///< Aggregate logical local values, including absent fields.
-    std::size_t ownedSymbolUnits;  ///< Aggregate units in output symbols, including repeat copies.
-    encoding::SymbolLimits symbol; ///< Remaining-span, per-symbol and retained-state limits.
+    std::size_t payloadBytes;                ///< Maximum complete payload size.
+    std::size_t processedRecords;            ///< Maximum records, including skipped and zero-field records.
+    std::size_t wireFields;                  ///< Maximum fields read, including skips and repeated targets.
+    std::size_t emittedRecords;              ///< Maximum completed output records.
+    std::size_t emittedValues;               ///< Aggregate logical local values, including absent fields.
+    std::size_t ownedSymbolUnits;            ///< Aggregate units in output symbols, including repeat copies.
+    encoding::SymbolLimits symbol;           ///< Remaining-span, per-symbol and retained-state limits.
+    encoding::CharArrayLimits fieldString{}; ///< Maximum encoded bytes and units in one string, including skips.
+    std::size_t fieldBytes = 0;              ///< Aggregate examined string bytes, including prefixes and failed reads.
+    std::size_t fieldUnits = 0;      ///< Aggregate admitted string units, without refunds for skips or replacements.
+    std::size_t ownedFieldUnits = 0; ///< Completed plus current and temporary string units; logical storage only.
 };
 
 /** Owned local record; missing fields contain measured fresh-storage raw zero with their type. */
@@ -115,6 +120,9 @@ struct StreamDataResult {
     std::size_t errorOffset = 0; ///< Primitive start or validation checkpoint; payload size on success.
     encoding::SymbolStatus symbolStatus = encoding::SymbolStatus::OK; ///< Symbol cause when applicable.
     std::vector<StreamDataRecord> records; ///< Completed records only; retained on later failure.
+    std::size_t fieldBytes = 0;            ///< Charged string bytes examined, including failed reads.
+    std::size_t fieldUnits = 0;      ///< Charged admitted string units, including skips, replacements and failures.
+    std::size_t ownedFieldUnits = 0; ///< String units retained by completed records only.
 };
 
 /** Decode one complete type-15 payload with fresh message-local symbol state.

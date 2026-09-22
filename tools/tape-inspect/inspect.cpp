@@ -5,6 +5,7 @@
 #include "qd/events/quote.hpp"
 
 #include <algorithm>
+#include <array>
 #include <istream>
 #include <limits>
 #include <ostream>
@@ -13,6 +14,12 @@
 
 namespace org::ttldtor::qdcxx::tape_inspect {
 namespace {
+constexpr std::array<std::int32_t, 9> FIELD_TYPE_IDS{10, 40, 72,  88, 8,
+                                                     2,  56, 120, 10}; ///< Exact diagnostic schema identities.
+constexpr std::array<std::u16string_view, 9> FIELD_NAMES{
+    u"Text", u"Short",   u"Sequence", u"Date", u"Count",
+    u"Char", u"Seconds", u"Wide",     u"Tail"}; ///< Exact logical lookup names.
+
 /** Internal IO/resource exit, with no parser state. */
 struct Failure {
     int code; ///< Native exit code.
@@ -24,6 +31,26 @@ struct Failure {
  * @return True for a legacy schema/display pair or the exact default Quote field shape.
  */
 bool compatibleProfile(const core::LocalSchema &schema, inspect::DisplayProfile profile) noexcept {
+    if (profile == inspect::DisplayProfile::ORACLE_FIELD_TYPES_V1) {
+        if (schema.profile() != core::LocalProfile::EXTENDED_FIELDS_V1 || schema.records().size() != 1) {
+            return false;
+        }
+
+        const auto &record = schema.records().front();
+
+        if (record.name != u"FieldTypes" || record.fields.size() != FIELD_TYPE_IDS.size()) {
+            return false;
+        }
+
+        for (std::size_t i = 0; i < FIELD_TYPE_IDS.size(); ++i) {
+            if (record.fields[i].serialTypeId != FIELD_TYPE_IDS[i]) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     if (profile != inspect::DisplayProfile::DEFAULT_QUOTE_V1) {
         return schema.profile() == core::LocalProfile::COMPACT_INT_V1;
     }
@@ -117,6 +144,23 @@ int diagnose(std::ostream &out, const protocol::TapeDiagnostic &d, unsigned vers
     return code;
 }
 } // namespace
+
+std::expected<core::LocalSchema, core::SchemaError> oracleFieldTypesSchema(core::SchemaLimits limits) {
+    try {
+        core::LocalRecord record{0, u"FieldTypes", false, {}, {}};
+
+        for (std::size_t i = 0; i < FIELD_TYPE_IDS.size(); ++i) {
+            record.fields.push_back({FIELD_TYPE_IDS[i]});
+            record.lookups.push_back({std::u16string(FIELD_NAMES[i]), i});
+        }
+
+        return core::LocalSchema::create(std::span(&record, 1), limits, core::LocalProfile::EXTENDED_FIELDS_V1);
+    } catch (const std::bad_alloc &) {
+        return std::unexpected(core::SchemaError::ALLOCATION_FAILURE);
+    } catch (const std::length_error &) {
+        return std::unexpected(core::SchemaError::ALLOCATION_FAILURE);
+    }
+}
 
 bool prepareLimits(Limits &limits) noexcept {
     constexpr std::size_t MAX_PREFIX = 9; // Maximum compact-long envelope prefix.

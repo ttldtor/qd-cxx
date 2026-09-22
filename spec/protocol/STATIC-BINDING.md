@@ -103,3 +103,11 @@ Literal oracle IDs in tests remain independent expected values.
 The structural upper bound is shared separately as MAX_WIRE_SERIAL_TYPE_ID=0xff in
 [describe_records.hpp](../../include/qd/protocol/describe_records.hpp). Both raw parsing and binding
 use it. It is a protocol validation bound, not an enumerator or a promise to support every type.
+
+## Explicit additional field profile
+
+[FIELD-TYPES](../encoding/FIELD-TYPES.md) defines EXTENDED_FIELDS_V1 with exact 2/8/10/40/56/72/88/120,
+owned nullable UTF-16, logical field positions independent of Java slots, and cumulative string work/ownership bounds.
+Both existing tape modes keep their descriptor, flags, timing, terminal-error and append-only policies.
+Earlier type exclusions below describe the older profiles; only this explicit profile extends them.
+No Profile event adapter, indexed schema, importer or implicit discovery is added.

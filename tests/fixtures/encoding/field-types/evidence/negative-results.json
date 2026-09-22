@@ -1,0 +1,87 @@
+[
+  {
+    "mutation": "type",
+    "rejected": true,
+    "utc": "2026-09-22T22:41:04.2745404Z"
+  },
+  {
+    "mutation": "value",
+    "rejected": true,
+    "utc": "2026-09-22T22:41:05.6965982Z"
+  },
+  {
+    "mutation": "unit",
+    "rejected": true,
+    "utc": "2026-09-22T22:41:07.0306665Z"
+  },
+  {
+    "mutation": "null-empty",
+    "rejected": true,
+    "utc": "2026-09-22T22:41:08.1984287Z"
+  },
+  {
+    "mutation": "order",
+    "rejected": true,
+    "utc": "2026-09-22T22:41:08.5266665Z"
+  },
+  {
+    "mutation": "record",
+    "rejected": true,
+    "utc": "2026-09-22T22:41:08.8615239Z"
+  },
+  {
+    "mutation": "arity",
+    "rejected": true,
+    "utc": "2026-09-22T22:41:09.1949161Z"
+  },
+  {
+    "mutation": "missing-field",
+    "rejected": true,
+    "utc": "2026-09-22T22:41:09.5423227Z"
+  },
+  {
+    "mutation": "missing-record",
+    "rejected": true,
+    "utc": "2026-09-22T22:41:09.8759390Z"
+  },
+  {
+    "mutation": "unknown-row",
+    "rejected": true,
+    "utc": "2026-09-22T22:41:10.2042901Z"
+  },
+  {
+    "mutation": "duplicate-row",
+    "rejected": true,
+    "utc": "2026-09-22T22:41:10.5219448Z"
+  },
+  {
+    "mutation": "missing-completion",
+    "rejected": true,
+    "utc": "2026-09-22T22:41:10.8320839Z"
+  },
+  {
+    "mutation": "duplicate-completion",
+    "rejected": true,
+    "utc": "2026-09-22T22:41:11.1513140Z"
+  },
+  {
+    "mutation": "misplaced-completion",
+    "rejected": true,
+    "utc": "2026-09-22T22:41:11.4584807Z"
+  },
+  {
+    "mutation": "extra-file",
+    "rejected": true,
+    "utc": "2026-09-22T22:41:11.7438312Z"
+  },
+  {
+    "mutation": "binary",
+    "rejected": true,
+    "utc": "2026-09-22T22:41:12.3008370Z"
+  },
+  {
+    "mutation": "primitive-consumption",
+    "rejected": true,
+    "utc": "2026-09-22T22:41:12.8608834Z"
+  }
+]

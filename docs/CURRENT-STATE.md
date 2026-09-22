@@ -2,14 +2,24 @@
 
 [Русская версия](CURRENT-STATE.ru.md). English is authoritative.
 
-## Next assignment: QDCXX-024
+## QDCXX-024 implemented — independent review pending
 
-QDCXX-024 is ready, High: exact field types 10/40/72/88,
-Java evidence before bounded C++, owned nullable UTF-16, cumulative field budgets and explicit typed inspection.
-The owner approved field support separately from full Profile event mapping. Standard Profile field-level
-evidence remains required; the private tape is not an acceptance input. Implementation has not started.
-QDCXX-023 and its acceptance are committed as `48fd76bfc1b7c8fd8d32fba9159e91c4cafe1176`.
-This planning update adds no runtime verification; previous reports remain historical evidence.
+Starting HEAD: `a9299317c1d4e7f3202ed8136916fd3ee94b9f3f`. The explicit
+`LocalProfile::EXTENDED_FIELDS_V1` accepts exactly 2/8/10/40/56/72/88/120 without widening old profiles.
+[Java production evidence](../tests/fixtures/encoding/field-types/COVERAGE.md) and the
+[contract](../spec/encoding/FIELD-TYPES.md) preceded C++ implementation. Nullable type-10 values own
+exact UTF-16; types 40/72/88 retain signed raw integers without business conversions. String work and
+owned-unit budgets extend both existing STREAM and RAW/MESSAGE paths. Generic
+`oracle-field-types-v1` inspection uses version 4 TSV/human output in either mode.
+
+The unchanged standard Profile is tested through an explicit caller-local field schema, retaining
+all logical fields and Java slot projection. This does not implement a Profile event adapter.
+[Coverage](../tests/conformance/protocol/field-types/COVERAGE.md) and
+[author validation](../tests/conformance/protocol/field-types/VALIDATION.md) describe executed checks
+and their limits; independent review remains pending. No staging, commit or next task is included.
+The private tape was not an input. Importer, indexed schemas, other identities/conversions,
+compression, nonzero flags, broader sessions, replay scheduling and transport remain separate work.
+Earlier exclusions below are superseded only within this bounded field profile.
 
 ## QDCXX-023 independently accepted
 

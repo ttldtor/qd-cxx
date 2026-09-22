@@ -128,6 +128,9 @@ class TapeReader {
     std::size_t emitted_ = 0;
     std::size_t values_ = 0;
     std::size_t symbols_ = 0;
+    std::size_t fieldBytes_ = 0;
+    std::size_t fieldUnits_ = 0;
+    std::size_t ownedFieldUnits_ = 0;
     TapeTiming timing_;
     std::size_t timingEvents_ = 0;
     /** Set the first failure.
@@ -227,6 +230,27 @@ class TapeReader {
      */
     [[nodiscard]] std::size_t wireFields() const noexcept {
         return fields_;
+    }
+
+    /** Inspect cumulative string-byte work.
+     * @return Examined bytes including prefixes, skips, replacements and failed reads.
+     */
+    [[nodiscard]] std::size_t fieldBytes() const noexcept {
+        return fieldBytes_;
+    }
+
+    /** Inspect cumulative string-unit work.
+     * @return Admitted units, never refunded for skipped, replaced or failed values.
+     */
+    [[nodiscard]] std::size_t fieldUnits() const noexcept {
+        return fieldUnits_;
+    }
+
+    /** Inspect cumulative published string storage.
+     * @return Logical UTF-16 units in all completed output records, including earlier returned events.
+     */
+    [[nodiscard]] std::size_t ownedFieldUnits() const noexcept {
+        return ownedFieldUnits_;
     }
 
     /** Inspect reconstruction work.

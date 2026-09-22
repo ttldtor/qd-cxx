@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/events/quote.hpp"
 #include <algorithm>
-#include <limits>
 #include <new>
 #include <stdexcept>
 #include <utility>
@@ -33,7 +32,6 @@ std::expected<core::LocalSchema, core::SchemaError> defaultQuoteSchema(core::Sch
 
 std::expected<Quote, QuoteError> mapQuote(std::u16string_view symbol, std::span<const core::FieldValue> fields,
                                           std::size_t symbolUnits) {
-    constexpr std::int64_t MAX_CODE_POINT = 0x10ffff;
     constexpr std::int64_t MILLISECONDS_PER_SECOND = 1000;
     constexpr std::uint64_t UTF16_UNIT_MASK = 0xffff;
 
@@ -44,11 +42,7 @@ std::expected<Quote, QuoteError> mapQuote(std::u16string_view symbol, std::span<
     for (std::size_t i = 0; i < fields.size(); ++i) {
         const auto &value = fields[i];
 
-        if (value.type != QUOTE_FIELD_TYPES[i] ||
-            (value.type == core::SerialFieldType::TIME_SECONDS &&
-             (value.raw < std::numeric_limits<std::int32_t>::min() ||
-              value.raw > std::numeric_limits<std::int32_t>::max())) ||
-            (value.type == core::SerialFieldType::UTF_CHAR && (value.raw < 0 || value.raw > MAX_CODE_POINT))) {
+        if (value.type != QUOTE_FIELD_TYPES[i] || !core::validFieldValue(value)) {
             return std::unexpected(QuoteError::INVALID_SHAPE);
         }
     }

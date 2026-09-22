@@ -76,3 +76,10 @@ Peer/direction bindings, sender IDs, original requests and selected outgoing lay
 Imports, generators, alias collisions/removal, parser/default edge cases, known-event mappings, dxFeed properties/providers, rebuild isolation, conversions and dynamic/reset/PART/session behavior remain unsupported/deferred as bounded in [NORMALIZED-MODEL](NORMALIZED-MODEL.md) and [open questions](../../docs/upstream/OPEN-QUESTIONS.md). Preserve source metadata without approximating these behaviors. Native C++ construction semantics remain open.
 
 No formal JSON Schema or new dependency is supplied. The standard-library [checker](../../tests/conformance/check_json_contract.py) checks this example corpus against TSV and exercises selected invalid mutations; it is neither a general importer nor a production validator. The rules above define the contract; exact executed checks and limitations are in [VALIDATION](examples/VALIDATION.md).
+
+## Separate native field policy
+
+The native C++ [FIELD-TYPES](../encoding/FIELD-TYPES.md) profile accepts exact 2/8/10/40/56/72/88/120
+for ordinary hasTime=false records supplied by the caller. Logical positions remain independent of
+Java int/object slots and VOID tails. This does not widen this XML-captured JSON profile, implement
+a JSON/XML loader, or infer local semantics from incoming descriptions.

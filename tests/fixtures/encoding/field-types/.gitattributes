@@ -1,0 +1,5 @@
+*.qtp binary
+*.tsv text eol=lf
+*.json text eol=lf
+*.stdout text eol=lf
+*.stderr text eol=lf

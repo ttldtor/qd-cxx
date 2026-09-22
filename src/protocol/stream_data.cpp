@@ -6,6 +6,7 @@
 #include "qd/encoding/compact.hpp"
 #include "qd/encoding/utf_char.hpp"
 
+#include <algorithm>
 #include <bit>
 #include <new>
 #include <stdexcept>
@@ -59,7 +60,7 @@ StreamDataContext::create(const core::LocalSchema &schema, std::span<const WireR
     try {
         std::vector<std::vector<core::FieldValue>> defaults;
 
-        if (schema.profile() == core::LocalProfile::QUOTE_FIELDS_V1) {
+        if (schema.profile() != core::LocalProfile::COMPACT_INT_V1) {
             for (const auto &record : schema.records()) {
                 std::vector<core::FieldValue> shape;
 
@@ -213,7 +214,8 @@ StreamDataResult decodeDataPayload(std::span<const std::byte> payload, const Str
             result.stage = StreamDataStage::OUTPUT;
             std::vector<std::int32_t> values;
             std::vector<core::FieldValue> typedValues;
-            const bool typed = context.profile() == core::LocalProfile::QUOTE_FIELDS_V1;
+            const bool typed = context.profile() != core::LocalProfile::COMPACT_INT_V1;
+            std::size_t currentFieldUnits = 0;
 
             if (plan->binding.localRecordId) {
                 if (limits.emittedRecords == 0 || plan->localFieldCount > limits.emittedValues ||
@@ -244,8 +246,42 @@ StreamDataResult decodeDataPayload(std::span<const std::byte> payload, const Str
                 --limits.wireFields;
                 ++result.wireFields;
                 std::int64_t raw = 0;
+                std::optional<std::u16string> units;
 
-                if (field.type == core::SerialFieldType::UTF_CHAR) {
+                if (field.type == core::SerialFieldType::UTF_CHAR_ARRAY) {
+                    const encoding::CharArrayLimits allowance{
+                        std::min(limits.fieldString.encodedBytes, limits.fieldBytes),
+                        std::min({limits.fieldString.codeUnits, limits.fieldUnits,
+                                  limits.ownedFieldUnits - currentFieldUnits})};
+                    auto value = encoding::readCharArray(payload.subspan(result.consumed), allowance,
+                                                         encoding::CharArrayBoundary::MESSAGE);
+                    result.consumed += value.consumed;
+                    limits.fieldBytes -= value.consumed;
+                    result.fieldBytes += value.consumed;
+                    limits.fieldUnits -= value.chargedUnits;
+                    result.fieldUnits += value.chargedUnits;
+
+                    if (value.status != encoding::Status::OK) {
+                        switch (value.status) {
+                        case encoding::Status::INSUFFICIENT_INPUT:
+                            result.status = StreamDataStatus::TRUNCATED_PAYLOAD;
+                            break;
+                        case encoding::Status::RESOURCE_LIMIT:
+                            result.status = StreamDataStatus::RESOURCE_LIMIT;
+                            break;
+                        case encoding::Status::ALLOCATION_FAILURE:
+                            result.status = StreamDataStatus::ALLOCATION_FAILURE;
+                            break;
+                        default:
+                            result.status = StreamDataStatus::INVALID_FIELD;
+                            break;
+                        }
+
+                        return result;
+                    }
+
+                    units = std::move(value.units);
+                } else if (field.type == core::SerialFieldType::UTF_CHAR) {
                     const auto value = encoding::readUtfChar(payload.subspan(result.consumed));
                     result.consumed += value.consumed;
 
@@ -275,7 +311,11 @@ StreamDataResult decodeDataPayload(std::span<const std::byte> payload, const Str
 
                 if (field.targetFieldId) {
                     if (typed) {
-                        typedValues[*field.targetFieldId] = {field.type, raw};
+                        auto &target = typedValues[*field.targetFieldId];
+                        // Replacement decoding must fit while the old value is still owned.
+                        currentFieldUnits -= target.units ? target.units->size() : 0;
+                        currentFieldUnits += units ? units->size() : 0;
+                        target = {field.type, raw, std::move(units)};
                     } else {
                         values[*field.targetFieldId] = static_cast<std::int32_t>(raw);
                     }
@@ -292,6 +332,8 @@ StreamDataResult decodeDataPayload(std::span<const std::byte> payload, const Str
                 --limits.emittedRecords;
                 limits.emittedValues -= plan->localFieldCount;
                 limits.ownedSymbolUnits -= units;
+                limits.ownedFieldUnits -= currentFieldUnits;
+                result.ownedFieldUnits += currentFieldUnits;
             }
         }
 

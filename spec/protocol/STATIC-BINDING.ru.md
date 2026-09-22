@@ -101,3 +101,11 @@ std::to_underlying(SerialFieldType::COMPACT_INT). Enum намеренно неп
 Структурная верхняя граница отдельно задана общей константой MAX_WIRE_SERIAL_TYPE_ID=0xff в
 [describe_records.hpp](../../include/qd/protocol/describe_records.hpp). Её используют raw parser и binding.
 Это граница протокольной валидации, не элемент enum и не обещание поддержки каждого типа.
+
+## Явный профиль дополнительных полей
+
+[FIELD-TYPES](../encoding/FIELD-TYPES.ru.md) определяет EXTENDED_FIELDS_V1 с точными 2/8/10/40/56/72/88/120,
+владеющим nullable UTF-16, логическими позициями полей независимо от Java slots и накопленными бюджетами строковой работы/хранения.
+Оба прежних tape modes сохраняют политики descriptor, flags, времени, терминальных ошибок и append-only updates.
+Прежние исключения типов ниже описывают старые профили; только этот явный профиль расширяет их.
+Profile event adapter, indexed schema, импортер и неявное обнаружение схемы не добавляются.

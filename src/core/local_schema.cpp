@@ -65,7 +65,8 @@ std::span<const LocalRecord> LocalSchema::records() const noexcept {
 
 std::expected<LocalSchema, SchemaError> LocalSchema::create(std::span<const LocalRecord> records, SchemaLimits limits,
                                                             LocalProfile profile) {
-    if (profile != LocalProfile::COMPACT_INT_V1 && profile != LocalProfile::QUOTE_FIELDS_V1) {
+    if (profile != LocalProfile::COMPACT_INT_V1 && profile != LocalProfile::QUOTE_FIELDS_V1 &&
+        profile != LocalProfile::EXTENDED_FIELDS_V1) {
         return std::unexpected(SchemaError::UNSUPPORTED_PROFILE);
     }
 

@@ -551,10 +551,16 @@ void TapeReader::dispatch(TapeFeedResult &result) {
     budget.emittedRecords = std::min(budget.emittedRecords - emitted_, budget.processedRecords);
     budget.emittedValues -= values_;
     budget.ownedSymbolUnits -= symbols_;
+    budget.fieldBytes -= fieldBytes_;
+    budget.fieldUnits -= fieldUnits_;
+    budget.ownedFieldUnits -= ownedFieldUnits_;
     auto decoded = mode_ == TapeMode::LEGACY ? decodeStreamData(frame.payload, *context_, budget)
                                              : decodeRawData(frame.payload, *context_, budget);
     records_ += decoded.processedRecords;
     fields_ += decoded.wireFields;
+    fieldBytes_ += decoded.fieldBytes;
+    fieldUnits_ += decoded.fieldUnits;
+    ownedFieldUnits_ += decoded.ownedFieldUnits;
 
     for (const auto &r : decoded.records) {
         values_ += r.values.size() + r.typedValues.size();

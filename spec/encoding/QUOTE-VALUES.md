@@ -66,3 +66,9 @@ plans retain exact incoming field types and no borrowed schema. Extended results
 only; legacy results use values only. Both count one logical value per local field, including missing
 fields. Existing output-value and schema/construction budgets apply; no unbounded second copy exists.
 All existing terminal/prefix/atomic publication and precise position rules remain in force.
+
+## Additive owned-value invariant
+
+[FIELD-TYPES](FIELD-TYPES.md) adds nullable UTF-16 storage to FieldValue. Every scalar value here requires
+absent units; mapQuote rejects a present string payload even with an otherwise correct tag/raw value.
+QUOTE_FIELDS_V1 acceptance and default output remain unchanged; the new tags require EXTENDED_FIELDS_V1.

@@ -1,5 +1,41 @@
 # Ограниченные компоненты C++23
 
+## Точные расширенные значения полей и ограниченные char arrays
+
+`LocalProfile::EXTENDED_FIELDS_V1` принимает только полные ID 2/8/10/40/56/72/88/120. Старые локальные
+профили сохраняют точные наборы. `FieldValue::units` — владеющий optional UTF-16: тип 10 имеет нулевой
+raw и null/empty/content в units; скаляры не имеют units payload. `validFieldValue` проверяет эту форму
+и инварианты тега/диапазона. Типы 40/72/88 сохраняют знаковые raw low-32-bit значения без текстовых/
+календарных преобразований. [FIELD-TYPES](../spec/encoding/FIELD-TYPES.ru.md) задаёт точный контракт.
+
+Подключить `qd/encoding/char_array.hpp` и линковать `qdcxx_encoding`.
+`readCharArray(input, limits, boundary)` возвращает владеющие units, потреблённые байты, учтённые units
+и явный статус; не сохраняет вход или частичное значение при ошибке. `CharArrayLimits` задаёт
+encoded bytes вместе с префиксом и UTF-16 units. Значение по умолчанию `CharArrayBoundary::PRIMITIVE`
+соответствует наблюдениям прямых примитивов; `MESSAGE` выбирает production-проверку оставшихся
+байтов сообщения. Этот reader отделён от UTFString.
+
+Для данных со строками явно задать последние параметры `StreamDataLimits::fieldString`,
+`fieldBytes`, `fieldUnits` и `ownedFieldUnits`. По умолчанию допуск нулевой, старые агрегатные
+инициализации сохранены. `StreamDataResult` предоставляет три соответствующих счётчика;
+`TapeReader::fieldBytes()`, `fieldUnits()` и `ownedFieldUnits()` — накопленные расходы tape.
+Байты/units учитывают пропущенные, повторные и неуспешные попытки; владеющие units считают
+завершённый вывод, а допуск дополнительно ограничивает текущую запись и временную замену.
+Символы/имена имеют отдельные бюджеты. Типизированные значения читаются из
+`StreamDataRecord::typedValues` в STREAM и RAW; прежний `values` не изменён.
+Все возвращённые строки владеющие и не зависят от времени жизни входа/контекста/reader.
+Публикуются только полные записи; терминальная ошибка сохраняет завершённый префикс.
+
+Локальный для инструмента `oracleFieldTypesSchema` предоставляет только фиксированную синтетическую
+схему для `--profile oracle-field-types-v1`; [CLI и пять лимитов](TAPE-INSPECT.ru.md) описывают версию 4.
+Неизменённый стандартный Profile проверяется с полной локальной проекцией полей вызывающего кода,
+без адаптера события Profile. Новые наборы: `field_type_java_values`, `field_type_fixture_negatives`, `field_type_java_tape`,
+`field_type_inspection_io`, `field_type_inspection_cli`; последние два требуют tape inspector.
+Цели/параметры сборки и политика зависимостей не изменены.
+[Покрытие](../tests/conformance/protocol/field-types/COVERAGE.ru.md) и
+[авторская валидация](../tests/conformance/protocol/field-types/VALIDATION.ru.md) фиксируют фактические
+проверки; независимое ревью ожидается. Прежние разделы компонентов ниже сохраняют исторические границы.
+
 ## API tape RAW/MESSAGE
 
 QDCXX-023 добавляет явный `TapeMode::RAW_MESSAGE_V1` третьим параметром конструктора TapeReader.

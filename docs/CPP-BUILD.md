@@ -1,5 +1,38 @@
 # Bounded C++23 components
 
+## Exact extended field values and bounded char arrays
+
+`LocalProfile::EXTENDED_FIELDS_V1` accepts exactly full IDs 2/8/10/40/56/72/88/120. Old local profiles
+retain their exact sets. `FieldValue::units` is owned optional UTF-16: type 10 has raw zero and
+null/empty/content in units; scalars have no units payload. `validFieldValue` validates this shape and
+tag/range invariants. Types 40/72/88 retain signed raw low-32-bit values, without text/calendar conversion.
+[FIELD-TYPES](../spec/encoding/FIELD-TYPES.md) defines the exact contract.
+
+Include `qd/encoding/char_array.hpp` and link `qdcxx_encoding`. `readCharArray(input, limits, boundary)`
+returns owned units, consumed bytes, charged units and explicit status; it retains no input or partial
+failed value. `CharArrayLimits` supplies encoded bytes including prefix and UTF-16 units.
+The default `CharArrayBoundary::PRIMITIVE` matches direct primitive observations; `MESSAGE` selects
+the production message remaining-byte check. This reader is separate from UTFString.
+
+Set the trailing `StreamDataLimits::fieldString`, `fieldBytes`, `fieldUnits` and `ownedFieldUnits`
+explicitly for string-bearing data. Defaults are zero allowance, preserving old aggregate call sites.
+`StreamDataResult` exposes the three corresponding counters; `TapeReader::fieldBytes()`,
+`fieldUnits()` and `ownedFieldUnits()` expose cumulative tape charges. Bytes/units count skipped,
+repeated and failed attempts; owned units count completed output, while admission also bounds the
+current record and temporary replacement. Symbols/names keep separate budgets. Read typed values
+from `StreamDataRecord::typedValues` in both STREAM and RAW paths; legacy `values` remains unchanged.
+All returned strings are owned independently of input/context/reader lifetime. Only complete records
+are published; terminal failure keeps the completed prefix.
+
+The tool-local `oracleFieldTypesSchema` supplies only the fixed synthetic schema for
+`--profile oracle-field-types-v1`; [CLI usage and five limits](TAPE-INSPECT.md) describe version 4.
+The unchanged standard Profile is tested with a complete caller-local field projection, without a
+Profile event adapter. New suites are `field_type_java_values`, `field_type_fixture_negatives`, `field_type_java_tape`,
+`field_type_inspection_io` and `field_type_inspection_cli`; the last two require the tape inspector.
+Build targets/options and dependency policy are unchanged. [Coverage](../tests/conformance/protocol/field-types/COVERAGE.md)
+and [author validation](../tests/conformance/protocol/field-types/VALIDATION.md) record actual checks;
+independent review remains pending. The earlier component sections below retain their historical scope.
+
 ## RAW/MESSAGE tape API
 
 QDCXX-023 adds explicit `TapeMode::RAW_MESSAGE_V1` as the third TapeReader constructor argument.

@@ -76,3 +76,10 @@ Peer/direction bindings, sender IDs, исходные requests и выбранн
 Imports, generators, alias collisions/removal, parser/default edge cases, known-event mappings, dxFeed properties/providers, rebuild isolation, conversions и dynamic/reset/PART/session behavior остаются неподдерживаемыми/отложенными в границах [NORMALIZED-MODEL](NORMALIZED-MODEL.ru.md) и [открытых вопросов](../../docs/upstream/OPEN-QUESTIONS.ru.md). Исходные метаданные сохраняются без приближённой реализации этих возможностей. Семантика программного построения C++ остаётся открытой.
 
 Формальная JSON Schema и новые зависимости не добавлены. [Проверка](../../tests/conformance/check_json_contract.py) на стандартной библиотеке сверяет этот корпус примеров с TSV и проверяет выбранные недопустимые мутации; это не универсальный importer и не production validator. Контракт задают правила выше; точные выполненные проверки и ограничения находятся в [VALIDATION](examples/VALIDATION.ru.md).
+
+## Отдельная native-политика полей
+
+Native C++ профиль [FIELD-TYPES](../encoding/FIELD-TYPES.ru.md) принимает точные 2/8/10/40/56/72/88/120
+для обычных records с hasTime=false, переданных вызывающим. Логические позиции независимы от
+Java int/object slots и VOID tails. Это не расширяет данный XML-captured JSON профиль, не реализует
+JSON/XML loader и не выводит локальную семантику из входящих descriptions.

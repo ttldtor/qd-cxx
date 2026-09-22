@@ -16,7 +16,8 @@ enum class Status {
     INSUFFICIENT_OUTPUT, ///< No bytes were written and output is unchanged.
     INVALID_ENCODING,    ///< UTFString body is malformed; no value is available.
     INVALID_LENGTH,      ///< UTFString length is outside the Java wire domain.
-    RESOURCE_LIMIT       ///< Explicit UTFString byte or code-unit budget was exceeded.
+    RESOURCE_LIMIT,      ///< Explicit UTFString byte or code-unit budget was exceeded.
+    ALLOCATION_FAILURE   ///< Owned character-array storage could not be allocated.
 };
 
 /** Result owning a decoded value, without retaining the input span.

@@ -71,6 +71,11 @@ int main(int argc, char **argv) {
             {"--max-total-name-units", &t.context.bindings.totalNameUnits},
             {"--max-records", &t.data.processedRecords},
             {"--max-fields", &t.data.wireFields},
+            {"--field-string-bytes", &t.data.fieldString.encodedBytes},
+            {"--field-string-units", &t.data.fieldString.codeUnits},
+            {"--max-field-bytes", &t.data.fieldBytes},
+            {"--max-field-units", &t.data.fieldUnits},
+            {"--max-owned-field-units", &t.data.ownedFieldUnits},
             {"--max-values", &t.data.emittedValues},
             {"--max-symbol-units", &t.data.ownedSymbolUnits},
             {"--symbol-units", &t.data.symbol.codeUnits},
@@ -82,14 +87,17 @@ int main(int argc, char **argv) {
             {"--max-timing-events", &t.timingEvents}};
 
         if (argc == 1 || (argc == 2 && std::string_view(argv[1]) == "--help")) {
-            std::cout << "qdcxx-tape-inspect --input PATH --profile oracle-sre-v1|default-quote-v1 [--output-format "
+            std::cout << "qdcxx-tape-inspect --input PATH --profile "
+                         "oracle-sre-v1|default-quote-v1|oracle-field-types-v1 [--output-format "
                          "tsv|human] [--diagnostics-version 1|2] [--tape-mode legacy|raw-message-v1] [LIMIT "
                          "VALUE ...]\n"
                          "Explicit BINARY, uncompressed, time NONE, EMPTY_SET, STREAM_DATA, zero flags.\n"
                          "oracle-sre-v1: diagnostic S/R/E, exact type 8, diagnostics default 1.\n"
                          "default-quote-v1: composite Quote, exact types 2/8/56/120, diagnostics default 2.\n"
+                         "oracle-field-types-v1: diagnostic FieldTypes, exact 2/8/10/40/56/72/88/120; output 4, "
+                         "diagnostics default 2.\n"
                          "--tape-mode raw-message-v1: explicit BINARY/RAW_DATA/MESSAGE, opt absent/empty/hs, zero "
-                         "flags; timed output 3.\n"
+                         "flags; timed output 3 (4 for oracle-field-types-v1).\n"
                          "Omitted tape-mode or legacy preserves the restricted NONE/STREAM_DATA policy.\n"
                          "No stdin, network, recovery or general tape support.\n"
                          "Numeric limits are finite unsigned decimal; chunk-size must be positive. Defaults:\n";
@@ -146,9 +154,10 @@ int main(int argc, char **argv) {
         }
 
         const bool quoteProfile = profile == "default-quote-v1";
-        const bool knownProfile = quoteProfile || profile == "oracle-sre-v1";
+        const bool fieldProfile = profile == "oracle-field-types-v1";
+        const bool knownProfile = quoteProfile || fieldProfile || profile == "oracle-sre-v1";
 
-        if (quoteProfile && !seen.contains("--diagnostics-version")) {
+        if ((quoteProfile || fieldProfile) && !seen.contains("--diagnostics-version")) {
             diagnosticsVersion = 2;
         }
 
@@ -167,8 +176,9 @@ int main(int argc, char **argv) {
             return 3;
         }
 
-        auto schema = quoteProfile ? org::ttldtor::qdcxx::events::defaultQuoteSchema(limits.tape.context.schema)
-                                   : presentation::oracleSchema();
+        auto schema = fieldProfile   ? ti::oracleFieldTypesSchema(limits.tape.context.schema)
+                      : quoteProfile ? org::ttldtor::qdcxx::events::defaultQuoteSchema(limits.tape.context.schema)
+                                     : presentation::oracleSchema();
 
         if (!schema) {
             ti::report(std::cerr, 6, "allocation", diagnosticsVersion, protocol::TapeRejection::NONE, format);
@@ -177,8 +187,9 @@ int main(int argc, char **argv) {
         }
 
         return ti::inspect(input, std::cout, std::cerr, *schema, limits, format,
-                           quoteProfile ? presentation::DisplayProfile::DEFAULT_QUOTE_V1
-                                        : presentation::DisplayProfile::ORACLE_SRE_V1,
+                           fieldProfile   ? presentation::DisplayProfile::ORACLE_FIELD_TYPES_V1
+                           : quoteProfile ? presentation::DisplayProfile::DEFAULT_QUOTE_V1
+                                          : presentation::DisplayProfile::ORACLE_SRE_V1,
                            diagnosticsVersion, mode);
     } catch (const std::bad_alloc &) {
         ti::report(std::cerr, 6, "allocation", diagnosticsVersion, protocol::TapeRejection::NONE, format);

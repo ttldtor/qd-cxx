@@ -1,0 +1,395 @@
+{
+  "format": "qdcxx-field-types-oracle-v1",
+  "mode": "Verify",
+  "startedUtc": "2026-09-22T22:43:26.9662076Z",
+  "finishedUtc": "2026-09-22T22:43:27.6607590Z",
+  "executable": "C:\\Program Files\\Zulu\\zulu-8\\bin\\java.exe",
+  "arguments": [
+    "-Xmx128m",
+    "-Dfile.encoding=UTF-8",
+    "-Duser.language=en",
+    "-Duser.country=US",
+    "-Duser.timezone=UTC",
+    "-cp",
+    "C:\\qd-cxx\\.work\\field-types-baseline-verify/harness;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\mars\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-promise\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-api\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib-qd-sandbox\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\auth\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-core\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto-ssl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-rmi\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-impl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-scheme\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-ipf-filter\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qds-file\\target\\classes",
+    "qdcxx.oracle.FieldTypesOracle",
+    "C:\\qd-cxx\\.work\\field-types-baseline-verify/field-types"
+  ],
+  "exit": 0,
+  "baselineMetadata": "metadata.json",
+  "sourceSha256": "4AE4B42AD5441C7CF950B2246A584F2077373883445CC51E0D66B1003821616D",
+  "harnessClasses": [
+    {
+      "path": "qdcxx\\oracle\\FieldTypesOracle.class",
+      "sha256": "77E7985DE94A43ED4A91DC4AD9C2327135CB5528CCF661FC4BF8C38F761E5CCB"
+    },
+    {
+      "path": "qdcxx\\oracle\\FieldTypesOracle$Observer.class",
+      "sha256": "5980184A82A5E97D4EFB43365DB70CBA0C947CCEC9C36AEA0C20976148251E68"
+    },
+    {
+      "path": "qdcxx\\oracle\\SchemaOracle.class",
+      "sha256": "ADC4E7F263EC49664BFA5159557C21FBF7F1322CCD49061DCB82DC30A54EA4D3"
+    },
+    {
+      "path": "qdcxx\\oracle\\TapeOracle.class",
+      "sha256": "BAF1E9501BAD2B95507EEBC2D07A53D7BE388B57A898C254670DEE56B1C0FACB"
+    },
+    {
+      "path": "qdcxx\\oracle\\TapeOracle$Observer.class",
+      "sha256": "F0412F386C9F0EAB4CEC6481F4491831799BF20F11F0F4AA5FC1DB43B24923F2"
+    },
+    {
+      "path": "qdcxx\\oracle\\TapeVerify.class",
+      "sha256": "02A6C3C6304D61E55A8E6C8D9F13A49E8F81BA79B9A0902AA77C6BA0A983D049"
+    }
+  ],
+  "tools": [
+    {
+      "sha256": "DD6DB4176275AC59AF5B60319E7475113A931BBBA83E510E77AC7D920EAB8097",
+      "name": "Compare-FieldTypes.ps1"
+    },
+    {
+      "sha256": "4AE4B42AD5441C7CF950B2246A584F2077373883445CC51E0D66B1003821616D",
+      "name": "FieldTypesOracle.java"
+    },
+    {
+      "sha256": "415C28F3D97B6ADFD7FAF5DA48FB2CA27B2B63C081E057E677BEB3E824C50A24",
+      "name": "Invoke-Oracle.ps1"
+    },
+    {
+      "sha256": "02A72AFFC97D9ABEA9C088EF253007D2774BE670C014B0B859B6341340BF3A06",
+      "name": "Test-Negatives.ps1"
+    }
+  ],
+  "artifacts": [
+    {
+      "sha256": "E44D3BE5274091BBC7A3BDEA4F3BB70D645E106A8890C8CD80079760ABCAE82A",
+      "name": "composer.qtp"
+    },
+    {
+      "sha256": "5D1CBFBB958B86E5445F74668F8F4E0F9610A0674B37B63D1FE1DD5D4C6FAA58",
+      "name": "composer.tsv"
+    },
+    {
+      "sha256": "E6A051B19D86FBAEE6819842DD8FCCF1BB4E89C3063652FDAAC0D2323BC42899",
+      "name": "malformed-skipped.qtp"
+    },
+    {
+      "sha256": "99976DCACB05DAC99E9BE71F41111B2A0113B6E00F9B31D50813470ACEC1F4EB",
+      "name": "malformed-skipped.tsv"
+    },
+    {
+      "sha256": "05F4B984EFE8D5C20368C2ACF78E67BF17E481DBADF48C266441584EB7CF87FC",
+      "name": "malformed-unknown-record.qtp"
+    },
+    {
+      "sha256": "C2F14E5407E46FAFF2E765068F82F8DC5D65753058918A1D25B927E9E997C926",
+      "name": "malformed-unknown-record.tsv"
+    },
+    {
+      "sha256": "C70FE540B1A9566468677D0FBB7B0548929A76E957A95C59AB4D931CE0351896",
+      "name": "mismatch-int.qtp"
+    },
+    {
+      "sha256": "80F87EB7A53714669E6142AB13F41F9EC7A55645DFCED87722C7D4DF5CE0C969",
+      "name": "mismatch-int.tsv"
+    },
+    {
+      "sha256": "05C20B221A256090A0CE659128759ACAE65530C985D6EC8B25FAC5CD3EDA6F96",
+      "name": "mismatch-object.qtp"
+    },
+    {
+      "sha256": "F94C930B34ED5062EB2798BAEB1B65A22DC9D9CD6A84ED28DC34240489102270",
+      "name": "mismatch-object.tsv"
+    },
+    {
+      "sha256": "1A4D0EFB30EC96FBF9AC689FB3C4BE504D83341AD000D2D10128001CDB108E7D",
+      "name": "missing.qtp"
+    },
+    {
+      "sha256": "2AE1EEBEFC0EFFBA8B1D3B991B0F200165A99A3706B05E319921247EC82A51CA",
+      "name": "missing.tsv"
+    },
+    {
+      "sha256": "B2A07530803776133F5524DEDAC0D5BB2D86344AFE0C201412FB08812785148B",
+      "name": "mixed-order.qtp"
+    },
+    {
+      "sha256": "2843EAA1129EF4FCF20CFA63D0292EB8DAB9136998AC0B5AE01146428C59A6A1",
+      "name": "mixed-order.tsv"
+    },
+    {
+      "sha256": "DA482404C0F58044030FC0DAB53F55CE68D734BED6A4EF599AED2525EBB6B48E",
+      "name": "mixed-raw.qtp"
+    },
+    {
+      "sha256": "CF7D1E3DFF2154D3AFE0551A9C2B4994F455D643AF804075A91A36B6AE9C158C",
+      "name": "mixed-raw.tsv"
+    },
+    {
+      "sha256": "8DFD22940A4A01B299BFEEFDB81F37C02BC6DF64637C1D5811F523824C9919F3",
+      "name": "mixed-stream.qtp"
+    },
+    {
+      "sha256": "1E8B2C38901FEB0F60BFBAA6FD238FE9C4376A575B0E7B062716CAB8C3501276",
+      "name": "mixed-stream.tsv"
+    },
+    {
+      "sha256": "1E7C449AB1736E002680A8A920029913BF4B3E95A4C066004AE0B0A1DA432EA3",
+      "name": "oversized-skipped.qtp"
+    },
+    {
+      "sha256": "E42435208147E3F804FE2F96E011C3B8AF345C1A728CC6C6DC0AA9670C236D7A",
+      "name": "oversized-skipped.tsv"
+    },
+    {
+      "sha256": "768DD9362EFCBD53F5786CA91741CD5B0C1E22DCE9CBED0C7FB9834CC3EC876A",
+      "name": "primitives.tsv"
+    },
+    {
+      "sha256": "8E53832AD9518A6F65ACCB4C591B8AA443DCB73AD597F3975DC912ED4DC1C9FC",
+      "name": "profile-raw.qtp"
+    },
+    {
+      "sha256": "848E3CC5769AE4FF176FCC0E72AD1AD0216EB6F6DD3F209FFFFE508864267F3F",
+      "name": "profile-raw.tsv"
+    },
+    {
+      "sha256": "CA379C600867EEF4E9332C337AEBF6393070D0A7FA11B01F1B9CBC84AF3409F9",
+      "name": "profile-stream.qtp"
+    },
+    {
+      "sha256": "79F18FEA83874D150EB657C2B41F14AD4D2423DAC2575BFC48F494D8B4730C5D",
+      "name": "profile-stream.tsv"
+    },
+    {
+      "sha256": "C0EF995752AC091E9A12ACB38EF12895A66C9BF8BC03CE9D30E1B164FDF80BB9",
+      "name": "repeat-0.qtp"
+    },
+    {
+      "sha256": "DE01EBADC3F1FCD4487F7554DF727B6D0ECC7D11C7FDE6A61B3A5459AD13DC8E",
+      "name": "repeat-0.tsv"
+    },
+    {
+      "sha256": "79700F8F417E772CAE2AE1D767F6F343E635BEFB73B1311CC32B4DF48D114956",
+      "name": "repeat-1.qtp"
+    },
+    {
+      "sha256": "D653F8EC41F4D3FC95EE4CC0C089A5147340E3B9DC99275C950B4F59DBF204E7",
+      "name": "repeat-1.tsv"
+    },
+    {
+      "sha256": "7CB61A51B211A3B45AB849202D9710E4D62704D46D6719754B3AAD7CABBC5147",
+      "name": "repeat-2.qtp"
+    },
+    {
+      "sha256": "3979E9B4EE673999A947DC437CB448EB78056535C497E4D1B3E51259D329103A",
+      "name": "repeat-2.tsv"
+    },
+    {
+      "sha256": "76EE3003F214B99213C6CE18939B6ADA8675C10F6D61BD61909F7C2300FA53CD",
+      "name": "schema.tsv"
+    },
+    {
+      "sha256": "134FCE0DBF7506CC5219BDEF3C4325DE17F95F8BA19D7C29E95A1B725F63A2F6",
+      "name": "string-wire-0.qtp"
+    },
+    {
+      "sha256": "38500C8257F39D5248EA4761658819B4A659FCC8A216B6F0D00C44EE505F310D",
+      "name": "string-wire-0.tsv"
+    },
+    {
+      "sha256": "486B01659CBCC5EF7A682D6EC211B6E7F2BD17870CE7E8EA01E1F807B40AF356",
+      "name": "string-wire-1.qtp"
+    },
+    {
+      "sha256": "C26EF84E09C46317CFB4D44ACDD5CCC45FFAEDFB1800BFFDA3D621700971965F",
+      "name": "string-wire-1.tsv"
+    },
+    {
+      "sha256": "A301BFEF34CAB5C32DEC4D5F9CE1451128F2E3DC14F6CB5E4F179CACF5A0123D",
+      "name": "string-wire-10.qtp"
+    },
+    {
+      "sha256": "88A13E746398C0902520D8C481F39F62EC1BF08AF851DCD6CFACC30A90877D8C",
+      "name": "string-wire-10.tsv"
+    },
+    {
+      "sha256": "4B698C00CD53D12D6A14D1C260EF8464D8BF0433088C6C38E6ACFB3BB72B70CC",
+      "name": "string-wire-2.qtp"
+    },
+    {
+      "sha256": "38203D465AE7CCB505FB11F88B2A4E5E475770DFF724C42150387384A6914394",
+      "name": "string-wire-2.tsv"
+    },
+    {
+      "sha256": "49EBFCCBA03F2982BA5C6C78D28BE2D1DC8FC2AE9D0A1836DB61FBA799850979",
+      "name": "string-wire-3.qtp"
+    },
+    {
+      "sha256": "0A7358A5B20F7A07ADF1B64E7FE7366825625F0013C7C7608E92716B18F24FA5",
+      "name": "string-wire-3.tsv"
+    },
+    {
+      "sha256": "63FECF8FFA8A8FDCC43AF16C388F7E1D44B9564730D4535E65698F6CD837D530",
+      "name": "string-wire-4.qtp"
+    },
+    {
+      "sha256": "13A86F8FD7109765E0B71FEE645195CC9368DD2642B948F0018A311248F7B5C4",
+      "name": "string-wire-4.tsv"
+    },
+    {
+      "sha256": "6F6406C02F333E5AB6147A6DDAFD5F4C023A8AC26664079CDC7B50FCEFF02660",
+      "name": "string-wire-5.qtp"
+    },
+    {
+      "sha256": "29887C8C4947226417F29B6A38E8CAF61D08FC129146B3F0C4E31A7D3832ECF1",
+      "name": "string-wire-5.tsv"
+    },
+    {
+      "sha256": "6CB89236C5CBF4E7830356F08E802003FA3EEA338B95D2A6118AB51BE9D49C5E",
+      "name": "string-wire-6.qtp"
+    },
+    {
+      "sha256": "C7C2FCD2266EFEDF6B96154C0FAAFB128566B6EF84A18160D1FF79CFB2321B38",
+      "name": "string-wire-6.tsv"
+    },
+    {
+      "sha256": "7BC26CA7E5AA09471F6F356F98D712090582DEEA05AF062E94FC7E7272DD6722",
+      "name": "string-wire-7.qtp"
+    },
+    {
+      "sha256": "0570325E0B8B179F0AFA64B59FD3890563A79EE6AE099095D78F25D1C5D863E4",
+      "name": "string-wire-7.tsv"
+    },
+    {
+      "sha256": "58BB8D1A0C792142A837A6047320342E43437CA9A05A05BC7EC7D2146B562BF6",
+      "name": "string-wire-8.qtp"
+    },
+    {
+      "sha256": "C4189E9748FC1E0401590EA7B28DA6E2C943B6B29112D6274B75911C61CEED70",
+      "name": "string-wire-8.tsv"
+    },
+    {
+      "sha256": "C22F584FA411748195C41A7BBB2D0595BDE5255B2A4A906261A7083D3AEF9FCA",
+      "name": "string-wire-9.qtp"
+    },
+    {
+      "sha256": "8E4ED990E0F38C9FE9766385EB1DACBBE36ABD5BE00037E18B83761B1EDD6548",
+      "name": "string-wire-9.tsv"
+    },
+    {
+      "sha256": "3D0BDA01E8E2521F66A346F318433006726BCF1CFDD69F1B74BFD2A81DE9978C",
+      "name": "unknown-field.qtp"
+    },
+    {
+      "sha256": "F7EC5FC9D1FBF102DACE7DCB83E6FAEB340D12F7BD4B791F5798E69B2DDABDB6",
+      "name": "unknown-field.tsv"
+    },
+    {
+      "sha256": "C3B50820CE40FEBBA9493D7B0C1504B3482DCF40F9B77E8B344984DFF329F1E7",
+      "name": "unknown-record.qtp"
+    },
+    {
+      "sha256": "99F5D4949174301FCE9FFDBE8BCFEA7B10AD5AD198C0DFB7E86E920DEDE36720",
+      "name": "unknown-record.tsv"
+    },
+    {
+      "sha256": "25F190082353097BA6ABADBF7D97695FBDC7488CC003684A7D4E0AF5624CED54",
+      "name": "wide-40--9223372036854775808.qtp"
+    },
+    {
+      "sha256": "A01369C64D5CEC51CAA72A46BB6951951D8AF15FF226371088F1F7C66CD3BF29",
+      "name": "wide-40--9223372036854775808.tsv"
+    },
+    {
+      "sha256": "9F812152FB53178DCBD550B6F00E09E39F5865A7732FC99464B080474D96B18D",
+      "name": "wide-40-2147483648.qtp"
+    },
+    {
+      "sha256": "858481639AA8D99A8E215C61C70ACEA5B871AD8380FFAED8456C08734B2C802D",
+      "name": "wide-40-2147483648.tsv"
+    },
+    {
+      "sha256": "79A7D6C76A2FF33EE23D5F9DF1ACD47C84DD2E5CF0314BC61BF019ECEE46161B",
+      "name": "wide-40-4294967295.qtp"
+    },
+    {
+      "sha256": "50C92A776380D6B0F72C9274CFEF39AA0C23491C80953944D220B8FD830D805C",
+      "name": "wide-40-4294967295.tsv"
+    },
+    {
+      "sha256": "8EA9C6988C3C73473F8D03EA1BC098DF29B7712CB1073A2BB907D9EDD3C46ED1",
+      "name": "wide-40-9223372036854775807.qtp"
+    },
+    {
+      "sha256": "73B5DF625222AC8DC0A0C72EBEDDF216E36421CAB2A0DAD0CCCB787732D1EBE0",
+      "name": "wide-40-9223372036854775807.tsv"
+    },
+    {
+      "sha256": "0E4B11910ACAB0FA9DAC9EAAECDF44144AB801E477C0188CC6DF32CE62F06A47",
+      "name": "wide-72--9223372036854775808.qtp"
+    },
+    {
+      "sha256": "B5DC4CBDADEE43B743AE33A262ACFBFE6F5A9175555FFE170932C3B04016FB2B",
+      "name": "wide-72--9223372036854775808.tsv"
+    },
+    {
+      "sha256": "BFF5693F00C9C6B5DA110DE85653573642731B7B2D86838D5C11662CF0396A92",
+      "name": "wide-72-2147483648.qtp"
+    },
+    {
+      "sha256": "99BA9E80B92319DEA5E196EC73DD016C78881CB9D35B33D25BA57F279731E387",
+      "name": "wide-72-2147483648.tsv"
+    },
+    {
+      "sha256": "1A0A9E8FA73BE22E4E7777A4C2144047341635F80A068D5CA9AF7EF1902CA454",
+      "name": "wide-72-4294967295.qtp"
+    },
+    {
+      "sha256": "E37C0BF3C3AC3A5952693442F91E2163EBCDDDDCA0F1F77B85EA7834A9FD69BA",
+      "name": "wide-72-4294967295.tsv"
+    },
+    {
+      "sha256": "676990526E45EE5C4DEEBCAC9EA9EB564FAE59AB12B904F39CFFC1CABFA0380E",
+      "name": "wide-72-9223372036854775807.qtp"
+    },
+    {
+      "sha256": "8CA6F8769B71DE046F59A60CD194A1C58D5DEB897FABB3ABF921C162B0E92E1A",
+      "name": "wide-72-9223372036854775807.tsv"
+    },
+    {
+      "sha256": "139D3571BEB8B7B0391E8E16919917F0B4E17B83CDA3E67E2E7FB390E0FBD088",
+      "name": "wide-88--9223372036854775808.qtp"
+    },
+    {
+      "sha256": "97E5C07F207B15AE79737BAD7B1103BEC84C90D9041F690223CBEAD0FB998292",
+      "name": "wide-88--9223372036854775808.tsv"
+    },
+    {
+      "sha256": "6FE03F63BA24EBADB8D49DB03C8FF0F27E878C48D075572A4C9CC8018C04D93D",
+      "name": "wide-88-2147483648.qtp"
+    },
+    {
+      "sha256": "92B8522DB1BEBB0A7277AF4E5DFCB7D4D8D511277174B9D12B29EDBA2EE3CB95",
+      "name": "wide-88-2147483648.tsv"
+    },
+    {
+      "sha256": "AE30321F294FF96278C0A724CCB3AFAC24CC29DB666390527DE579D28DBFC5E3",
+      "name": "wide-88-4294967295.qtp"
+    },
+    {
+      "sha256": "C216B9284596BE217592C46D8912D976E725F16570D99324F4B5DC7059A14118",
+      "name": "wide-88-4294967295.tsv"
+    },
+    {
+      "sha256": "FB98CA38983456B539881820CB4238B9AAB14E412999443644FB7134A0BEFB9E",
+      "name": "wide-88-9223372036854775807.qtp"
+    },
+    {
+      "sha256": "FC38D9DF4402CA6B6D80CC836AF5D8A09FD71D82A059237481910650B9B8FA93",
+      "name": "wide-88-9223372036854775807.tsv"
+    }
+  ]
+}

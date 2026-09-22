@@ -18,10 +18,13 @@ bounded scope. QDCXX-022 started from committed HEAD `fa5a0b967e9c021e656846cdd3
    [remaining gaps](REAL-TAPE-GAPS.md) retain the distinction between replay/business/event time and
    structural inventory versus full-file compatibility. Independent acceptance
    records separate fresh checks. Committed by the owner as `48fd76bfc1b7c8fd8d32fba9159e91c4cafe1176`.
-3. QDCXX-024, ready, High: exact UTF_CHAR_ARRAY/SHORT_STRING/SEQUENCE/DATE
-   (10/40/72/88), Java production evidence then bounded C++, nullable owned fields, cumulative budgets
-   and opt-in generic typed inspection. Preserve current profiles and require unchanged standard Profile
-   field-level evidence alongside synthetic boundaries. Full Profile event mapping is deliberately separate.
+3. QDCXX-024, implemented, High; independent review pending: exact
+   UTF_CHAR_ARRAY/SHORT_STRING/SEQUENCE/DATE (10/40/72/88), production Java evidence followed by bounded
+   C++, owned nullable fields, cumulative budgets and explicit generic version-4 inspection.
+   [Coverage](../tests/conformance/protocol/field-types/COVERAGE.md) and
+   [author validation](../tests/conformance/protocol/field-types/VALIDATION.md) separate executed checks
+   from review. Existing profiles are preserved; unchanged standard Profile is field-level evidence.
+   Full Profile event mapping remains separate. The next task has not started.
 4. Profile and further real-event adapters: build on reviewed field support and the remaining-gap inventory.
    Assign their actual schemas, mappings, optional fields and business-value comparisons explicitly;
    additional types, indexed records or conversions need their own scope. Do not claim whole-file support

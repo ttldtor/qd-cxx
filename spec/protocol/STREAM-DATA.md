@@ -114,3 +114,11 @@ Rejected budget checks do not count. All returns, including allocation errors, r
 charges; each is bounded by the original limit. Existing check order, wire semantics, completed
 results and consumed/error positions are unchanged. A caller may carry file budgets across messages
 by passing min(message limit, remaining total) and subtracting the returned actual charges.
+
+## Explicit additional field profile
+
+[FIELD-TYPES](../encoding/FIELD-TYPES.md) defines EXTENDED_FIELDS_V1 with exact 2/8/10/40/56/72/88/120,
+owned nullable UTF-16, logical field positions independent of Java slots, and cumulative string work/ownership bounds.
+Both existing tape modes keep their descriptor, flags, timing, terminal-error and append-only policies.
+Earlier type exclusions below describe the older profiles; only this explicit profile extends them.
+No Profile event adapter, indexed schema, importer or implicit discovery is added.

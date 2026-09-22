@@ -4,14 +4,24 @@
 
 Record questions about Java QD behavior that cannot yet be answered confidently. Link each question to the task investigating it and close it with source or fixture evidence.
 
-## Assigned to QDCXX-024; not yet measured
+## QDCXX-024 bounded field resolution
 
-QDCXX-024 assigns exact 10/40/72/88 field decoding, not event adapters.
-Open until its Java evidence: type-10 count/Unicode/error consumption versus UTFString; signed raw
-projection of 40/72/88; missing object defaults; mixed Java int/object indexing; malformed skips and
-repeated targets. The task also defines finite owned-string/work accounting and opt-in output.
-Standard Profile field-level evidence must retain the actual default schema; unsupported extra
-requirements trigger a decision, not schema simplification. No new runtime observation is claimed here.
+[Production Java evidence](../../tests/fixtures/encoding/field-types/COVERAGE.md) and
+[FIELD-TYPES](../../spec/encoding/FIELD-TYPES.md) resolve the measured type-10 count/UTFChar/consumption
+behavior separately from UTFString, signed low-32-bit raw projection for 40/72/88, null object defaults,
+mixed int/object slot projection, repeated targets and malformed skips. The production message reader
+checks a positive character count against all remaining message bytes before decoding; direct primitives
+have a different exhaustion checkpoint. The C++ boundary selection and finite work/ownership policy
+make that distinction explicit. Java's broader recovery does not authorize C++ recovery after a terminal error.
+
+The unchanged default Profile requires 16 logical fields, 24 Java int slots including ten VOID tails,
+and two object slots; the field-level library projection retains all of them. No excluded identity or
+indexed schema was needed for this witness. SHORT_STRING/SEQUENCE standard-event witnesses remain open;
+their synthetic coverage does not establish broader standard schemas or business conversions.
+[Author checks](../../tests/conformance/protocol/field-types/VALIDATION.md) remain separate from
+pending independent review. Full Profile mapping, other events/types, importer, indexed records,
+compression, nonzero flags and transport remain open. The private tape was not used; historical
+aggregate gaps and generated captures do not establish whole-file support.
 
 ## QDCXX-023 bounded resolution
 
