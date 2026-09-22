@@ -40,6 +40,18 @@ enum class TapeStatus {
     FINISHED    ///< Clean explicit EOF with an accepted header.
 };
 
+/** Bounded profile refusal detail, independent of numeric diagnostics and offsets. */
+enum class TapeRejection {
+    NONE,          ///< No additional profile reason.
+    TIME,          ///< Unsupported tape timing.
+    OPTIONS,       ///< Required explicit empty protocol options are absent or incompatible.
+    MESSAGE,       ///< Unsupported message or message-set policy.
+    TYPE,          ///< Unsupported full serial identity or excluded field conversion.
+    LOCAL_PROFILE, ///< Unsupported caller local schema profile.
+    DESCRIPTOR,    ///< Unsupported descriptor property or extension.
+    SEQUENCE       ///< Initial/repeated header or other sequencing violation.
+};
+
 /** Owning diagnostic header text; missing version is distinct from empty. */
 struct TapeDescriptor {
     std::optional<std::u16string> version; ///< Opaque text, never a support test.
@@ -57,6 +69,8 @@ struct TapeDiagnostic {
     std::optional<std::uint64_t> payloadStart; ///< Actual payload start for complete messages.
     std::optional<std::size_t> consumed;       ///< Payload-relative committed examination.
     std::optional<std::size_t> errorOffset;    ///< Payload-relative primitive/checkpoint position.
+    TapeRejection rejection =
+        TapeRejection::NONE; ///< Additive bounded reason; legacy serialized fields stay unchanged.
 };
 
 /** At most one owning event and its completed data prefix. */

@@ -1,5 +1,30 @@
 # Tape inspection, version 1
 
+## Explicit default-quote-v1 and diagnostic version 2
+
+Diagnostic names and human explanations are implemented in tools/tape-inspect/diagnostics.hpp/.cpp
+(qdcxx_tape_inspect_tool). Protocol retains TapeRejection/TapeDiagnostic data and exact checkpoints,
+without CLI profile names or selection advice. The presentation move preserves stdout/stderr bytes,
+format versions and exit codes. Review-fix author checks
+are separate from historical validation; independent re-review remains pending.
+
+QDCXX-022 adds --profile default-quote-v1 with all eight unchanged default composite Quote fields.
+It uses the same BINARY/uncompressed/NONE/EMPTY_SET/STREAM_DATA transport policy. TSV default and
+--output-format human now have a separate version 2 identity for this profile: exact type:raw fields,
+mapped binary64 bits and millisecond times; human prices/sizes use decimal text, never raw integers.
+[Complete row grammar, safe explanations and mapping losses](../spec/protocol/DEFAULT-QUOTE.md).
+
+--diagnostics-version 1|2 selects legacy nine-cell or new ten-cell diagnostics. Defaults are 1 for
+oracle-sre-v1 and 2 for default-quote-v1. Version 2 adds the static reason name; human mode adds a
+fixed explanation while retaining exact offsets. Explicit version 2 also explains unsupported local
+profiles before opening a file. All existing S/R/E output and errors remain exact without the opt-in;
+the old QTP inspector is unchanged. Help lists both profiles; no-argument/--help equivalence remains.
+All prior numeric limits apply, with each typed field charged once. No automatic profile detection.
+The stream inspection API checks schema/display compatibility before reading or emitting output;
+a mismatch returns 4 with stage profile and version 2 reason LOCAL_PROFILE. Quote display requires
+one Quote record with the eight exact ordered types; explicit lookup mappings remain the caller's contract.
+[Executed checks](../tests/conformance/protocol/quote/VALIDATION.md); independent review pending.
+
 [Русская версия](TAPE-INSPECT.ru.md). English is authoritative.
 
 The optional qdcxx-tape-inspect consumes [bounded tape](../spec/protocol/TAPE-READER.md).

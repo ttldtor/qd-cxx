@@ -21,8 +21,9 @@ enum class OutputFormat {
 
 /** Explicit display metadata selection, unrelated to schema lookup aliases. */
 enum class DisplayProfile {
-    LOCAL_SCHEMA, ///< Independent schema with field[index] labels.
-    ORACLE_SRE_V1 ///< Built-in adapter with S.v and R.y/R.x/R.z labels.
+    LOCAL_SCHEMA,    ///< Independent schema with field[index] labels.
+    ORACLE_SRE_V1,   ///< Built-in adapter with S.v and R.y/R.x/R.z labels.
+    DEFAULT_QUOTE_V1 ///< Explicit eight-field composite Quote with exact typed values.
 };
 
 /** Logical row exceeds remaining output bytes; translated to the existing write resource error. */

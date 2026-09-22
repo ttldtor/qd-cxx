@@ -4,6 +4,7 @@
 #include "qd/protocol/stream_data.hpp"
 
 #include "qd/encoding/compact.hpp"
+#include "qd/encoding/utf_char.hpp"
 
 #include <bit>
 #include <new>
@@ -11,7 +12,18 @@
 #include <utility>
 
 namespace org::ttldtor::qdcxx::protocol {
-StreamDataContext::StreamDataContext(std::vector<StreamRecordPlan> plans) noexcept : plans_(std::move(plans)) {
+StreamDataContext::StreamDataContext(std::vector<StreamRecordPlan> plans,
+                                     std::vector<std::vector<core::FieldValue>> defaults,
+                                     core::LocalProfile profile) noexcept
+    : plans_(std::move(plans)), defaults_(std::move(defaults)), profile_(profile) {
+}
+
+std::span<const core::FieldValue> StreamDataContext::defaults(std::int32_t localId) const noexcept {
+    if (localId < 0 || static_cast<std::size_t>(localId) >= defaults_.size()) {
+        return {};
+    }
+
+    return defaults_[static_cast<std::size_t>(localId)];
 }
 
 std::expected<StreamDataContext, BindingError>
@@ -45,6 +57,20 @@ StreamDataContext::create(const core::LocalSchema &schema, std::span<const WireR
     }
 
     try {
+        std::vector<std::vector<core::FieldValue>> defaults;
+
+        if (schema.profile() == core::LocalProfile::QUOTE_FIELDS_V1) {
+            for (const auto &record : schema.records()) {
+                std::vector<core::FieldValue> shape;
+
+                for (const auto &field : record.fields) {
+                    shape.push_back({static_cast<core::SerialFieldType>(field.serialTypeId), 0});
+                }
+
+                defaults.push_back(std::move(shape));
+            }
+        }
+
         std::vector<StreamRecordPlan> plans;
 
         for (const auto &description : descriptions) {
@@ -76,7 +102,7 @@ StreamDataContext::create(const core::LocalSchema &schema, std::span<const WireR
             plans.push_back({std::move(*bound), count});
         }
 
-        return StreamDataContext(std::move(plans));
+        return StreamDataContext(std::move(plans), std::move(defaults), schema.profile());
     } catch (const std::bad_alloc &) {
         return std::unexpected(BindingError::ALLOCATION_FAILURE);
     } catch (const std::length_error &) {
@@ -179,6 +205,8 @@ StreamDataResult decodeStreamData(std::span<const std::byte> payload, const Stre
 
             result.stage = StreamDataStage::OUTPUT;
             std::vector<std::int32_t> values;
+            std::vector<core::FieldValue> typedValues;
+            const bool typed = context.profile() == core::LocalProfile::QUOTE_FIELDS_V1;
 
             if (plan->binding.localRecordId) {
                 if (limits.emittedRecords == 0 || plan->localFieldCount > limits.emittedValues ||
@@ -188,7 +216,12 @@ StreamDataResult decodeStreamData(std::span<const std::byte> payload, const Stre
                     return result;
                 }
 
-                values.resize(plan->localFieldCount, 0);
+                if (typed) {
+                    const auto shape = context.defaults(*plan->binding.localRecordId);
+                    typedValues.assign(shape.begin(), shape.end());
+                } else {
+                    values.resize(plan->localFieldCount, 0);
+                }
             }
 
             for (const auto &field : plan->binding.fields) {
@@ -203,18 +236,42 @@ StreamDataResult decodeStreamData(std::span<const std::byte> payload, const Stre
 
                 --limits.wireFields;
                 ++result.wireFields;
-                const auto value = encoding::readCompactLong(payload.subspan(result.consumed));
-                result.consumed += value.consumed;
+                std::int64_t raw = 0;
 
-                if (value.status != encoding::Status::OK) {
-                    result.status = StreamDataStatus::TRUNCATED_PAYLOAD;
+                if (field.type == core::SerialFieldType::UTF_CHAR) {
+                    const auto value = encoding::readUtfChar(payload.subspan(result.consumed));
+                    result.consumed += value.consumed;
 
-                    return result;
+                    if (value.status != encoding::Status::OK) {
+                        result.status = value.status == encoding::Status::INSUFFICIENT_INPUT
+                                            ? StreamDataStatus::TRUNCATED_PAYLOAD
+                                            : StreamDataStatus::INVALID_FIELD;
+
+                        return result;
+                    }
+
+                    raw = value.value;
+                } else {
+                    const auto value = encoding::readCompactLong(payload.subspan(result.consumed));
+                    result.consumed += value.consumed;
+
+                    if (value.status != encoding::Status::OK) {
+                        result.status = StreamDataStatus::TRUNCATED_PAYLOAD;
+
+                        return result;
+                    }
+
+                    raw = field.type == core::SerialFieldType::WIDE_DECIMAL
+                              ? value.value
+                              : std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(value.value));
                 }
 
                 if (field.targetFieldId) {
-                    // Java FLD_INT stores the signed low 32 bits of the compact-long value.
-                    values[*field.targetFieldId] = std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(value.value));
+                    if (typed) {
+                        typedValues[*field.targetFieldId] = {field.type, raw};
+                    } else {
+                        values[*field.targetFieldId] = static_cast<std::int32_t>(raw);
+                    }
                 }
             }
 
@@ -223,7 +280,8 @@ StreamDataResult decodeStreamData(std::span<const std::byte> payload, const Stre
 
             if (plan->binding.localRecordId) {
                 const auto units = symbol.value->units.size();
-                result.records.push_back({*plan->binding.localRecordId, std::move(*symbol.value), std::move(values)});
+                result.records.push_back({*plan->binding.localRecordId, std::move(*symbol.value), std::move(values),
+                                          std::move(typedValues)});
                 --limits.emittedRecords;
                 limits.emittedValues -= plan->localFieldCount;
                 limits.ownedSymbolUnits -= units;

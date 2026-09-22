@@ -1,0 +1,47 @@
+[
+  {
+    "utc": "2026-09-22T17:13:41.3295810Z",
+    "rejected": true,
+    "mutation": "type"
+  },
+  {
+    "utc": "2026-09-22T17:13:44.6274527Z",
+    "rejected": true,
+    "mutation": "value"
+  },
+  {
+    "utc": "2026-09-22T17:13:45.0772436Z",
+    "rejected": true,
+    "mutation": "order"
+  },
+  {
+    "utc": "2026-09-22T17:13:45.5300223Z",
+    "rejected": true,
+    "mutation": "record"
+  },
+  {
+    "utc": "2026-09-22T17:13:45.9711889Z",
+    "rejected": true,
+    "mutation": "arity"
+  },
+  {
+    "utc": "2026-09-22T17:13:46.3713004Z",
+    "rejected": true,
+    "mutation": "missing-completion"
+  },
+  {
+    "utc": "2026-09-22T17:13:46.7725210Z",
+    "rejected": true,
+    "mutation": "extra-file"
+  },
+  {
+    "utc": "2026-09-22T17:13:47.8387988Z",
+    "rejected": true,
+    "mutation": "decimal-bits"
+  },
+  {
+    "utc": "2026-09-22T17:13:49.5488769Z",
+    "rejected": true,
+    "mutation": "binary"
+  }
+]

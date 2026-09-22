@@ -1,0 +1,6 @@
+Exception: C:\qd-cxx\tools\upstream\quote-oracle\Compare-Quote.ps1:7
+Line |
+   7 |  … sert([bool]$Value,[string]$Reason) { if (!$Value) { throw $Reason } }
+     |                                                        ~~~~~~~~~~~~~
+     | production put/replay raw or mapped mismatch
+exit=1

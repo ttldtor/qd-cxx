@@ -1,5 +1,15 @@
 # Bounded static incoming binding
 
+## Explicit Quote field extension
+
+QDCXX-022 adds opt-in LocalProfile::QUOTE_FIELDS_V1 alongside the unchanged default
+COMPACT_INT_V1. [Exact tagged values](../encoding/QUOTE-VALUES.md) and
+[default Quote mapping](DEFAULT-QUOTE.md) define supported full types 2/8/56/120, raw-zero defaults,
+ordered repeated targets and exact-match-only binding. Each action owns its full type, including
+skips; known targets with a different full type fail UNSUPPORTED_PROFILE. Existing schema/name/work
+bounds and atomic plan ownership remain. The type-8 descriptions below remain the legacy profile
+contract; the opt-in extension supersedes their exclusion of these three identities only.
+
 [Русская версия](STATIC-BINDING.ru.md). English is authoritative.
 
 QDCXX-014. This provisional API plans one QDCXX-013 raw description against an explicitly supplied,

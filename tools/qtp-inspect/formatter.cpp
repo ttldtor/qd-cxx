@@ -3,8 +3,13 @@
 
 #include "formatter.hpp"
 
+#include "qd/events/quote.hpp"
+
 #include <array>
+#include <bit>
 #include <charconv>
+#include <optional>
+#include <stdexcept>
 
 namespace org::ttldtor::qdcxx::inspect {
 namespace {
@@ -83,6 +88,18 @@ class Row {
 
         for (auto unit : text) {
             hex(unit, false);
+        }
+    }
+
+    /** Append exact binary64 bits, most significant nibble first.
+     * @param value WideDecimal numeric view, whose NaN representation is already canonical.
+     */
+    void doubleBits(double value) {
+        const auto bits = std::bit_cast<std::uint64_t>(value);
+
+        // Four UTF-16-sized groups cover all 64 bits without temporary allocation.
+        for (int shift = 48; shift >= 0; shift -= 16) {
+            hex(static_cast<char16_t>(bits >> shift), false);
         }
     }
 
@@ -246,6 +263,112 @@ std::string Formatter::frame(const protocol::Frame &frame, std::size_t index, st
 
 std::string Formatter::record(const protocol::StreamDataRecord &record, std::u16string_view name,
                               std::size_t frameIndex, std::size_t index, std::size_t budget) const {
+    if (profile_ == DisplayProfile::DEFAULT_QUOTE_V1) {
+        // Mapping scalar fields needs no second owned copy of the decoded symbol.
+        const auto quote = events::mapQuote({}, record.typedValues, 0);
+
+        if (!quote) {
+            throw std::invalid_argument("default Quote field shape");
+        }
+
+        const std::array<double, 4> decimalViews{quote->bidPrice.toDouble(), quote->bidSize.toDouble(),
+                                                 quote->askPrice.toDouble(), quote->askSize.toDouble()};
+        // Populate only when the count pass reaches the field, preserving output-budget precedence.
+        std::array<std::optional<std::string>, events::QUOTE_FIELD_TYPES.size()> decimalText;
+
+        return build(budget, [&](Row &row) {
+            const bool tsv = format_ == OutputFormat::TSV;
+            row.add(tsv ? "typed-record\t" : "Record ");
+            row.number(tsv ? frameIndex : index);
+            row.add(tsv ? "\t" : ": frame=");
+            row.number(tsv ? index : frameIndex);
+            row.add(tsv ? "\t" : " local=");
+            row.number(record.localId);
+            row.add(tsv ? "\t" : " name=");
+
+            if (tsv) {
+                row.units(name);
+            } else {
+                row.quote(name);
+            }
+
+            row.add(tsv ? "\t" : " symbol=");
+
+            if (tsv) {
+                row.units(record.symbol.units);
+            } else {
+                row.quote(record.symbol.units);
+            }
+
+            row.add(tsv ? "\t" : " fields={");
+
+            for (std::size_t i = 0; i < record.typedValues.size(); ++i) {
+                const auto &field = record.typedValues[i];
+
+                if (i) {
+                    row.add(tsv ? "," : ", ");
+                }
+
+                if (!tsv) {
+                    row.add(events::QUOTE_FIELD_NAMES[i]);
+                    row.add("=");
+
+                    if (i == 0 || i == 4) {
+                        row.number(i == 0 ? quote->bidTimeMs : quote->askTimeMs);
+                        row.add(" ms");
+                    } else if (i == 1 || i == 5) {
+                        const auto exchange = i == 1 ? quote->bidExchangeCode : quote->askExchangeCode;
+                        row.quote(std::u16string_view(&exchange, 1));
+                    } else {
+                        if (!decimalText[i]) {
+                            decimalText[i] = core::WideDecimal{field.raw}.toString();
+                        }
+
+                        row.add(*decimalText[i]);
+                    }
+
+                    row.add(" (type:");
+                }
+
+                row.number(static_cast<std::int32_t>(field.type));
+                row.add(tsv ? ":" : " raw:");
+                row.number(field.raw);
+
+                if (!tsv) {
+                    row.add(")");
+                }
+            }
+
+            row.add(tsv ? "\nquote\t" : "}\nQuote ");
+            row.number(index);
+            row.add(tsv ? "\t" : ": bidTimeMs=");
+            row.number(quote->bidTimeMs);
+            row.add(tsv ? "\t" : " bidExchangeCode=");
+            row.number(static_cast<std::uint16_t>(quote->bidExchangeCode));
+            row.add(tsv ? "\t" : " bidPriceBits=");
+            row.doubleBits(decimalViews[0]);
+            row.add(tsv ? "\t" : " bidSizeBits=");
+            row.doubleBits(decimalViews[1]);
+            row.add(tsv ? "\t" : " askTimeMs=");
+            row.number(quote->askTimeMs);
+            row.add(tsv ? "\t" : " askExchangeCode=");
+            row.number(static_cast<std::uint16_t>(quote->askExchangeCode));
+            row.add(tsv ? "\t" : " askPriceBits=");
+            row.doubleBits(decimalViews[2]);
+            row.add(tsv ? "\t" : " askSizeBits=");
+            row.doubleBits(decimalViews[3]);
+            row.add(tsv ? "\t" : " timeMs=");
+            row.number(quote->timeMs);
+            row.add(tsv ? "\t" : " sequence=");
+            row.number(quote->sequence);
+            row.add(tsv ? "\t" : " timeNanoPart=");
+            row.number(quote->timeNanoPart);
+            row.add(tsv ? "\t" : " eventTime=");
+            row.number(quote->eventTime);
+            row.add("\n");
+        });
+    }
+
     return build(budget, [&](Row &row) {
         if (format_ == OutputFormat::TSV) {
             row.add("record\t");
@@ -331,7 +454,11 @@ std::string Formatter::complete(std::uint64_t bytes, std::size_t frames, std::si
 
 std::string Formatter::tapeHeader(std::size_t budget) const {
     return build(budget, [&](Row &row) {
-        if (format_ == OutputFormat::TSV) {
+        if (profile_ == DisplayProfile::DEFAULT_QUOTE_V1) {
+            row.add(format_ == OutputFormat::TSV
+                        ? "format\tqdcxx-tape-inspect\t2\tdefault-quote-v1\n"
+                        : "qdcxx-tape-inspect human 2 profile=default-quote-v1 identities=local\n");
+        } else if (format_ == OutputFormat::TSV) {
             row.add("format\tqdcxx-tape-inspect\t1\n");
         } else {
             row.add("qdcxx-tape-inspect human 1 profile=");

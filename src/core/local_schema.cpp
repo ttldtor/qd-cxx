@@ -55,14 +55,20 @@ bool charge(std::size_t count, std::size_t &remaining) {
 
 } // namespace
 
-LocalSchema::LocalSchema(std::span<const LocalRecord> records) : records_(records.begin(), records.end()) {
+LocalSchema::LocalSchema(std::span<const LocalRecord> records, LocalProfile profile)
+    : records_(records.begin(), records.end()), profile_(profile) {
 }
 
 std::span<const LocalRecord> LocalSchema::records() const noexcept {
     return records_;
 }
 
-std::expected<LocalSchema, SchemaError> LocalSchema::create(std::span<const LocalRecord> records, SchemaLimits limits) {
+std::expected<LocalSchema, SchemaError> LocalSchema::create(std::span<const LocalRecord> records, SchemaLimits limits,
+                                                            LocalProfile profile) {
+    if (profile != LocalProfile::COMPACT_INT_V1 && profile != LocalProfile::QUOTE_FIELDS_V1) {
+        return std::unexpected(SchemaError::UNSUPPORTED_PROFILE);
+    }
+
     if (records.size() > limits.records) {
         return std::unexpected(SchemaError::RESOURCE_LIMIT);
     }
@@ -94,7 +100,7 @@ std::expected<LocalSchema, SchemaError> LocalSchema::create(std::span<const Loca
         }
 
         for (const auto &field : record.fields) {
-            if (field.serialTypeId != std::to_underlying(SerialFieldType::COMPACT_INT)) {
+            if (!supportsSerialType(field.serialTypeId, profile)) {
                 return std::unexpected(SchemaError::UNSUPPORTED_PROFILE);
             }
         }
@@ -131,7 +137,7 @@ std::expected<LocalSchema, SchemaError> LocalSchema::create(std::span<const Loca
     }
 
     try {
-        return LocalSchema(records);
+        return LocalSchema(records, profile);
     } catch (const std::bad_alloc &) {
         return std::unexpected(SchemaError::ALLOCATION_FAILURE);
     } catch (const std::length_error &) {

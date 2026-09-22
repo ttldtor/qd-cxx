@@ -33,10 +33,12 @@ class DescriptorParser {
 
     /** Raise a validation error at the current checkpoint.
      * @param error Terminal classification.
+     * @param reason Additional static policy reason, without changing numeric diagnostics.
      */
-    [[noreturn]] void reject(TapeError error) {
+    [[noreturn]] void reject(TapeError error, TapeRejection reason = TapeRejection::NONE) {
         position_.consumed = cursor_;
         position_.errorOffset = cursor_;
+        position_.rejection = reason;
         throw DescriptorFailure{error};
     }
 
@@ -158,7 +160,9 @@ class DescriptorParser {
             auto value = text();
 
             if (!key || key->empty() || !value) {
-                reject(TapeError::MALFORMED);
+                reject(TapeError::MALFORMED, key == u"time"  ? TapeRejection::TIME
+                                             : key == u"opt" ? TapeRejection::OPTIONS
+                                                             : TapeRejection::NONE);
             }
 
             if (std::find(keys.begin(), keys.end(), *key) != keys.end()) {
@@ -169,26 +173,26 @@ class DescriptorParser {
 
             if (*key == u"type") {
                 if (*value != u"tape") {
-                    reject(TapeError::UNSUPPORTED);
+                    reject(TapeError::UNSUPPORTED, TapeRejection::DESCRIPTOR);
                 }
 
                 type = true;
             } else if (*key == u"opt") {
                 if (!value->empty()) {
-                    reject(TapeError::UNSUPPORTED);
+                    reject(TapeError::UNSUPPORTED, TapeRejection::OPTIONS);
                 }
 
                 opt = true;
             } else if (*key == u"time") {
                 if (*value != u"NONE") {
-                    reject(TapeError::UNSUPPORTED);
+                    reject(TapeError::UNSUPPORTED, TapeRejection::TIME);
                 }
 
                 result.explicitTimeNone = true;
             } else if (*key == u"version") {
                 result.version = std::move(value);
             } else {
-                reject(TapeError::UNSUPPORTED);
+                reject(TapeError::UNSUPPORTED, TapeRejection::DESCRIPTOR);
             }
         }
 
@@ -206,7 +210,7 @@ class DescriptorParser {
                 auto props = count(true, properties_, limits_.properties);
 
                 if (props != 0 || direction != 0 || entries != 1 || id != STREAM_DATA || *name != u"STREAM_DATA") {
-                    reject(TapeError::UNSUPPORTED);
+                    reject(TapeError::UNSUPPORTED, TapeRejection::MESSAGE);
                 }
 
                 result.explicitStreamSend = true;
@@ -214,7 +218,8 @@ class DescriptorParser {
         }
 
         if (cursor_ != payload_.size() || !type || !opt) {
-            reject(TapeError::UNSUPPORTED);
+            reject(TapeError::UNSUPPORTED,
+                   cursor_ == payload_.size() && type && !opt ? TapeRejection::OPTIONS : TapeRejection::DESCRIPTOR);
         }
 
         position_.consumed = cursor_;
@@ -230,7 +235,7 @@ class DescriptorParser {
  * @return Owned schema, or constructor exception before input is accepted.
  */
 core::LocalSchema copySchema(const core::LocalSchema &schema, core::SchemaLimits limits) {
-    auto result = core::LocalSchema::create(schema.records(), limits);
+    auto result = core::LocalSchema::create(schema.records(), limits, schema.profile());
 
     if (!result) {
         if (result.error() == core::SchemaError::ALLOCATION_FAILURE) {
@@ -295,6 +300,7 @@ void TapeReader::dispatch(TapeFeedResult &result) {
 
     if (!descriptor_) {
         if (frame.type != DESCRIBE_PROTOCOL) {
+            diagnostic_.rejection = TapeRejection::SEQUENCE;
             fail(TapeError::UNSUPPORTED, "header");
 
             return;
@@ -385,6 +391,10 @@ void TapeReader::dispatch(TapeFeedResult &result) {
         auto next = StreamDataContext::create(schema_, candidate, limits_.context);
 
         if (!next) {
+            if (next.error() == BindingError::UNSUPPORTED_PROFILE) {
+                diagnostic_.rejection = TapeRejection::TYPE;
+            }
+
             fail(bindingError(next.error()), "binding", static_cast<std::size_t>(next.error()));
 
             return;
@@ -397,6 +407,7 @@ void TapeReader::dispatch(TapeFeedResult &result) {
     }
 
     if (frame.type != STREAM_DATA) {
+        diagnostic_.rejection = frame.type == DESCRIBE_PROTOCOL ? TapeRejection::SEQUENCE : TapeRejection::MESSAGE;
         fail(TapeError::UNSUPPORTED, "type");
 
         return;
@@ -414,7 +425,7 @@ void TapeReader::dispatch(TapeFeedResult &result) {
     fields_ += decoded.wireFields;
 
     for (const auto &r : decoded.records) {
-        values_ += r.values.size();
+        values_ += r.values.size() + r.typedValues.size();
         symbols_ += r.symbol.units.size();
     }
 
@@ -424,6 +435,10 @@ void TapeReader::dispatch(TapeFeedResult &result) {
     diagnostic_.errorOffset = decoded.errorOffset;
 
     if (decoded.status != StreamDataStatus::OK) {
+        if (decoded.status == StreamDataStatus::UNSUPPORTED_PROFILE) {
+            diagnostic_.rejection = TapeRejection::OPTIONS;
+        }
+
         auto error = decoded.status == StreamDataStatus::RESOURCE_LIMIT        ? TapeError::RESOURCE_LIMIT
                      : decoded.status == StreamDataStatus::ALLOCATION_FAILURE  ? TapeError::ALLOCATION_FAILURE
                      : decoded.status == StreamDataStatus::UNSUPPORTED_PROFILE ? TapeError::UNSUPPORTED

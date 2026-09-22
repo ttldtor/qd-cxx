@@ -13,7 +13,7 @@ namespace org::ttldtor::qdcxx::protocol {
 /** Planner failures, separate from a successfully described unknown record. */
 enum class BindingError {
     INVALID_DESCRIPTION, ///< Invalid sender ID, empty record/field name or out-of-range wire type ID.
-    UNSUPPORTED_PROFILE, ///< A structurally valid full type is not exactly COMPACT_INT.
+    UNSUPPORTED_PROFILE, ///< Unsupported full type or a known target requiring a representation conversion.
     RESOURCE_LIMIT,      ///< Explicit logical-element budget exceeded.
     ALLOCATION_FAILURE   ///< No plan published because allocation failed.
 };
@@ -25,9 +25,10 @@ struct BindingLimits {
     std::size_t totalNameUnits; ///< Aggregate record/field UTF-16 units, including repeats.
 };
 
-/** One ordered COMPACT_INT action; it contains no schema reference or decoder. */
+/** One ordered exact-type action; it contains no schema reference or decoder. */
 struct FieldBinding {
     std::optional<std::size_t> targetFieldId; ///< Assign this logical local field, or consume/skip when absent.
+    core::SerialFieldType type = core::SerialFieldType::COMPACT_INT; ///< Exact incoming primitive/value identity.
 };
 
 /** Owned independent description plan, not an incoming-ID table or delivered event. */

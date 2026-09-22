@@ -2,15 +2,16 @@
 
 [Русская версия](NEXT-STEPS.ru.md). English is authoritative.
 
-## Current sequence after independent QDCXX-021 review
+## Current sequence after QDCXX-022 implementation
 
 The owner requested continued implementation toward real tape support, not permanent synthetic-only
 coverage. Independent review accepts QDCXX-021's
-bounded scope. Commit that baseline before the next implementation.
+bounded scope. QDCXX-022 started from committed HEAD `fa5a0b967e9c021e656846cdd3d6faee5faa4776`.
 
-1. QDCXX-022, ready: exact UTF_CHAR/TIME_SECONDS/WIDE_DECIMAL and default
+1. QDCXX-022, implemented; independent review pending: exact UTF_CHAR/TIME_SECONDS/WIDE_DECIMAL and default
    composite Quote end to end, Java production observations then C++, explicit Quote profile and
-   useful rejection diagnostics. Keep existing profile/output compatibility. This includes implementation.
+   useful rejection diagnostics. Existing profile/output compatibility is retained. No commit created;
+   [author validation](../tests/conformance/protocol/quote/VALIDATION.md) is ready for independent review.
 2. Real tape mode: production Java evidence and bounded C++ support for RAW_DATA, MESSAGE timing /
    nonempty heartbeat and measured missing-opt semantics. Distinguish replay timing from business
    timestamps and event-time metadata; do not merely relabel RAW_DATA as STREAM_DATA or drop timing.

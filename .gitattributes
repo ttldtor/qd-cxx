@@ -58,3 +58,10 @@ tests/fixtures/protocol/tape-reader/expected/** -text
 # This exception does not apply to authored code, documentation or expected TSV rows.
 tests/fixtures/protocol/tape-reader/evidence/** -text -whitespace
 tests/conformance/protocol/tape/logs/** -text -whitespace
+
+# Quote evidence and its recorded hashes retain original bytes.
+tools/upstream/quote-oracle/*.ps1 text eol=lf
+tests/fixtures/protocol/quote/expected/*.qtp -text
+tests/fixtures/protocol/quote/expected/*.tsv text eol=lf
+tests/fixtures/protocol/quote/evidence/** -text -whitespace
+tests/conformance/protocol/quote/logs/** -text -whitespace

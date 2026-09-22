@@ -1,5 +1,15 @@
 # Bounded STREAM_DATA decoder
 
+## Explicit typed profile
+
+QDCXX-022 adds the opt-in [Quote field contract](../encoding/QUOTE-VALUES.md). The snapshot copies
+one bounded tagged raw-zero shape per local record and keeps the validated profile. Exact incoming
+types select UTF_CHAR or compact-long reads even for skips. UTF_CHAR malformed input reports the
+additive INVALID_FIELD status at FIELD with the primitive start and actual consumed count; existing
+enum ordinals are preserved. Extended records populate typedValues only; legacy records populate
+values only. emittedValues still counts logical fields once. Default context, symbols, flags, error
+precedence and all legacy behavior below remain unchanged; no type coercion or dynamic session added.
+
 [Русская версия](STREAM-DATA.ru.md). English is authoritative.
 
 QDCXX-016 accepts one complete type-15 payload without its outer envelope. Only ordinary exact

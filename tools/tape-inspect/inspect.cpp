@@ -1,6 +1,8 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #include "inspect.hpp"
+#include "diagnostics.hpp"
+#include "qd/events/quote.hpp"
 
 #include <algorithm>
 #include <istream>
@@ -15,6 +17,35 @@ namespace {
 struct Failure {
     int code; ///< Native exit code.
 };
+
+/** Check that presentation can represent every field in the selected local schema.
+ * @param schema Validated immutable schema.
+ * @param profile Selected output grammar.
+ * @return True for a legacy schema/display pair or the exact default Quote field shape.
+ */
+bool compatibleProfile(const core::LocalSchema &schema, inspect::DisplayProfile profile) noexcept {
+    if (profile != inspect::DisplayProfile::DEFAULT_QUOTE_V1) {
+        return schema.profile() == core::LocalProfile::COMPACT_INT_V1;
+    }
+
+    if (schema.profile() != core::LocalProfile::QUOTE_FIELDS_V1 || schema.records().size() != 1) {
+        return false;
+    }
+
+    const auto &record = schema.records().front();
+
+    if (record.name != u"Quote" || record.fields.size() != events::QUOTE_FIELD_TYPES.size()) {
+        return false;
+    }
+
+    for (std::size_t i = 0; i < record.fields.size(); ++i) {
+        if (record.fields[i].serialTypeId != static_cast<std::int32_t>(events::QUOTE_FIELD_TYPES[i])) {
+            return false;
+        }
+    }
+
+    return true;
+}
 
 /** Map a protocol failure to the native exit contract.
  * @param error Terminal category.
@@ -35,13 +66,16 @@ int exitCode(protocol::TapeError error) {
 /** Emit exact structured parser diagnostics without throwing on broken stderr.
  * @param out Binary error destination.
  * @param d First parser failure.
+ * @param version Diagnostic grammar, 1 or 2.
+ * @param format Whether a bounded human explanation follows the structured row.
  * @return Native nonzero error code.
  */
-int diagnose(std::ostream &out, const protocol::TapeDiagnostic &d) noexcept {
+int diagnose(std::ostream &out, const protocol::TapeDiagnostic &d, unsigned version,
+             inspect::OutputFormat format) noexcept {
     auto code = exitCode(d.error);
     try {
-        out << "incomplete\t" << code << '\t' << d.stage << '\t' << d.detail << '\t' << d.frameStart << '\t'
-            << d.accepted << '\t';
+        out << (version == 2 ? "incomplete-v2\t" : "incomplete\t") << code << '\t' << d.stage << '\t' << d.detail
+            << '\t' << d.frameStart << '\t' << d.accepted << '\t';
 
         if (d.payloadStart) {
             out << *d.payloadStart;
@@ -65,7 +99,16 @@ int diagnose(std::ostream &out, const protocol::TapeDiagnostic &d) noexcept {
             out << '-';
         }
 
+        if (version == 2) {
+            out << '\t' << tapeRejectionName(d.rejection);
+        }
+
         out << '\n';
+
+        if (version == 2 && format == inspect::OutputFormat::HUMAN) {
+            out << "Reason: " << tapeRejectionExplanation(d.rejection) << '\n';
+        }
+
         out.flush();
     } catch (...) {
     }
@@ -93,22 +136,41 @@ bool prepareLimits(Limits &limits) noexcept {
     return true;
 }
 
-void report(std::ostream &output, int code, std::string_view stage) noexcept {
+void report(std::ostream &output, int code, std::string_view stage, unsigned diagnosticsVersion,
+            protocol::TapeRejection reason, inspect::OutputFormat format) noexcept {
     try {
-        output << "incomplete\t" << code << '\t' << stage << "\t0\t-\t-\t-\t-\t-\n";
+        output << (diagnosticsVersion == 2 ? "incomplete-v2\t" : "incomplete\t") << code << '\t' << stage
+               << "\t0\t-\t-\t-\t-\t-";
+
+        if (diagnosticsVersion == 2) {
+            output << '\t' << tapeRejectionName(reason);
+        }
+
+        output << '\n';
+
+        if (diagnosticsVersion == 2 && format == inspect::OutputFormat::HUMAN) {
+            output << "Reason: " << tapeRejectionExplanation(reason) << '\n';
+        }
+
         output.flush();
     } catch (...) {
     }
 }
 
 int inspect(std::istream &input, std::ostream &output, std::ostream &diagnostic, const core::LocalSchema &schema,
-            Limits limits, inspect::OutputFormat format, inspect::DisplayProfile profile) {
+            Limits limits, inspect::OutputFormat format, inspect::DisplayProfile profile, unsigned diagnosticsVersion) {
     std::string_view operation = "configuration";
     try {
-        if (!prepareLimits(limits)) {
-            report(diagnostic, 2, "usage");
+        if (!prepareLimits(limits) || (diagnosticsVersion != 1 && diagnosticsVersion != 2)) {
+            report(diagnostic, 2, "usage", diagnosticsVersion, protocol::TapeRejection::NONE, format);
 
             return 2;
+        }
+
+        if (!compatibleProfile(schema, profile)) {
+            report(diagnostic, 4, "profile", diagnosticsVersion, protocol::TapeRejection::LOCAL_PROFILE, format);
+
+            return 4;
         }
 
         protocol::TapeReader reader(schema, limits.tape);
@@ -192,13 +254,13 @@ int inspect(std::istream &input, std::ostream &output, std::ostream &diagnostic,
                 }
 
                 if (result.status == protocol::TapeStatus::FAILED) {
-                    return diagnose(diagnostic, reader.diagnostic());
+                    return diagnose(diagnostic, reader.diagnostic(), diagnosticsVersion, format);
                 }
             }
         }
 
         if (reader.finish() != protocol::TapeStatus::FINISHED) {
-            return diagnose(diagnostic, reader.diagnostic());
+            return diagnose(diagnostic, reader.diagnostic(), diagnosticsVersion, format);
         }
 
         flush();
@@ -209,27 +271,27 @@ int inspect(std::istream &input, std::ostream &output, std::ostream &diagnostic,
 
         return 0;
     } catch (const org::ttldtor::qdcxx::inspect::OutputLimit &) {
-        report(diagnostic, 6, "write");
+        report(diagnostic, 6, "write", diagnosticsVersion, protocol::TapeRejection::NONE, format);
 
         return 6;
     } catch (const Failure &f) {
-        report(diagnostic, f.code, operation);
+        report(diagnostic, f.code, operation, diagnosticsVersion, protocol::TapeRejection::NONE, format);
 
         return f.code;
     } catch (const std::bad_alloc &) {
-        report(diagnostic, 6, "allocation");
+        report(diagnostic, 6, "allocation", diagnosticsVersion, protocol::TapeRejection::NONE, format);
 
         return 6;
     } catch (const std::length_error &) {
-        report(diagnostic, 6, "allocation");
+        report(diagnostic, 6, "allocation", diagnosticsVersion, protocol::TapeRejection::NONE, format);
 
         return 6;
     } catch (const std::invalid_argument &) {
-        report(diagnostic, 6, "configuration");
+        report(diagnostic, 6, "configuration", diagnosticsVersion, protocol::TapeRejection::NONE, format);
 
         return 6;
     } catch (const std::ios_base::failure &) {
-        report(diagnostic, 3, operation);
+        report(diagnostic, 3, operation, diagnosticsVersion, protocol::TapeRejection::NONE, format);
 
         return 3;
     }

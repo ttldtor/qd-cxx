@@ -1,5 +1,15 @@
 # Bounded binary tape reader
 
+## Explicit default Quote extension
+
+QDCXX-022 adds [default-quote-v1](DEFAULT-QUOTE.md) with exact field identities 2/8/56/120 through
+the explicitly selected local schema. Transport/descriptor acceptance below is unchanged. The
+reader copies the local profile, rebuilds one typed default shape per local record within existing
+schema/construction charges, and accumulates typed output values across messages. All snapshot,
+terminal, prefix and offset rules remain. TapeDiagnostic adds bounded static refusal reasons;
+legacy diagnostic fields and serialized version 1 output remain unchanged. The type-8-only text
+below describes the preserved legacy profile, not the new explicitly selected Quote profile.
+
 [Русская версия](TAPE-READER.ru.md). English is authoritative.
 
 QDCXX-021 author contract, specified after Java probes and before C++ implementation.

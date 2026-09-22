@@ -17,14 +17,14 @@ namespace org::ttldtor::qdcxx::core {
 /** Validation failures for the bounded resolved local input. */
 enum class SchemaError {
     INVALID_SCHEMA,      ///< Invalid identity, name, duplicate key or dangling target.
-    UNSUPPORTED_PROFILE, ///< Time or non-COMPACT_INT shape.
+    UNSUPPORTED_PROFILE, ///< Time or field/profile identity outside the explicitly selected subset.
     RESOURCE_LIMIT,      ///< Caller logical-element budget exceeded.
     ALLOCATION_FAILURE   ///< Owned copy could not be allocated.
 };
 
 /** One ordinary logical field; its position is its record-local identity. */
 struct LocalField {
-    std::int32_t serialTypeId; ///< Full type, accepted only when exactly COMPACT_INT (8).
+    std::int32_t serialTypeId; ///< Full type, validated against the explicitly selected local profile.
 };
 
 /** Explicit record-scoped key, already resolved by the caller. */
@@ -54,20 +54,31 @@ struct SchemaLimits {
 /** Validated owned immutable subset; no protocol or loading dependency. */
 class LocalSchema {
     std::vector<LocalRecord> records_;
+    LocalProfile profile_;
 
     /** Copy a fully validated input.
      * @param records Borrowed validated records, copied into this object.
+     * @param profile Validated exact-type policy retained with the schema.
      */
-    explicit LocalSchema(std::span<const LocalRecord> records);
+    explicit LocalSchema(std::span<const LocalRecord> records, LocalProfile profile);
 
     public:
     /** Validate all input before publishing an owned schema.
      * @param records Borrowed input, unchanged during the call; may be empty.
      * @param limits Required logical-element bounds, including zero.
+     * @param profile Explicit exact-type subset; omission preserves the type-8 contract.
      * @return Owned immutable schema or first error; allocation exceptions are translated.
      */
-    [[nodiscard]] static std::expected<LocalSchema, SchemaError> create(std::span<const LocalRecord> records,
-                                                                        SchemaLimits limits);
+    [[nodiscard]] static std::expected<LocalSchema, SchemaError>
+    create(std::span<const LocalRecord> records, SchemaLimits limits,
+           LocalProfile profile = LocalProfile::COMPACT_INT_V1);
+
+    /** Inspect the immutable exact-type policy.
+     * @return The profile selected during validation.
+     */
+    [[nodiscard]] LocalProfile profile() const noexcept {
+        return profile_;
+    }
 
     /** Inspect validated records without permitting mutation.
      * @return View valid until this schema is destroyed, moved from or assigned.

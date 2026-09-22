@@ -1,5 +1,27 @@
 # Ограниченные компоненты C++23
 
+## API default composite Quote
+
+QDCXX-022 добавляет qd/encoding/utf_char.hpp в qdcxx_encoding, qd/core/wide_decimal.hpp в qdcxx_core,
+а qd/events/quote.hpp — в qdcxx_quote (зависит только от core). Адаптер Quote возвращает проверенную
+собственную LocalSchema с LocalProfile::QUOTE_FIELDS_V1. Передайте её TapeReader с прежними конечными
+TapeLimits; прочитайте StreamDataRecord::typedValues и вызовите
+events::mapQuote(record.symbol.units, record.typedValues, maxSymbolUnits). Результат владеет символом,
+временами в миллисекундах, единицами кодов бирж и четырьмя raw WideDecimal с toDouble/toString.
+Прежние схемы по умолчанию используют COMPACT_INT_V1 и сохраняют StreamDataRecord::values.
+
+Опции сборки неизменны. Пример после сборки обоих инструментов:
+
+```powershell
+.work/tape/Release/qdcxx-tape-inspect --profile default-quote-v1 --input tests/fixtures/protocol/quote/expected/default-quote.qtp --output-format human
+```
+
+[Контракт](../spec/protocol/DEFAULT-QUOTE.ru.md), [CLI](TAPE-INSPECT.ru.md),
+[авторская валидация и ограничения](../tests/conformance/protocol/quote/VALIDATION.ru.md).
+Новые наборы: quote_java_values, quote_java_tape, quote_inspection_io и quote_inspection_cli.
+IO/CLI требуют включённой опции tape tool. Прежние наборы и production-only конфигурация без
+fetch/Python поддерживаются. Общий tape, RAW_DATA, время MESSAGE и загрузка схем не добавлены.
+
 [English version](CPP-BUILD.md). Английский документ является основным.
 
 `qdcxx_encoding` — production-библиотека C++23 без сторонних зависимостей с предварительными API

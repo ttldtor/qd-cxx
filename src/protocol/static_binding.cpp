@@ -38,7 +38,7 @@ std::expected<RecordBinding, BindingError> bindRecord(const WireRecordDescriptio
 
         limits.totalNameUnits -= field.name.size();
 
-        if (field.serialTypeId != std::to_underlying(core::SerialFieldType::COMPACT_INT)) {
+        if (!core::supportsSerialType(field.serialTypeId, schema.profile())) {
             return std::unexpected(BindingError::UNSUPPORTED_PROFILE);
         }
     }
@@ -60,11 +60,15 @@ std::expected<RecordBinding, BindingError> bindRecord(const WireRecordDescriptio
         }
 
         for (const auto &field : description.fields) {
-            FieldBinding action{std::nullopt};
+            FieldBinding action{std::nullopt, static_cast<core::SerialFieldType>(field.serialTypeId)};
 
             if (local != nullptr) {
                 for (const auto &key : local->lookups) {
                     if (key.name == field.name) {
+                        if (local->fields[key.fieldId].serialTypeId != field.serialTypeId) {
+                            return std::unexpected(BindingError::UNSUPPORTED_PROFILE);
+                        }
+
                         action.targetFieldId = key.fieldId;
                         break;
                     }

@@ -29,8 +29,13 @@ bool prepareLimits(Limits &limits) noexcept;
  * @param output Error destination.
  * @param code Nonzero process code.
  * @param stage Static operation.
+ * @param diagnosticsVersion Explicit diagnostic grammar, 1 or 2.
+ * @param reason Bounded protocol reason, never input text.
+ * @param format TSV or safe human explanation selection.
  */
-void report(std::ostream &output, int code, std::string_view stage) noexcept;
+void report(std::ostream &output, int code, std::string_view stage, unsigned diagnosticsVersion = 1,
+            protocol::TapeRejection reason = protocol::TapeRejection::NONE,
+            inspect::OutputFormat format = inspect::OutputFormat::TSV) noexcept;
 /** Read one bounded binary stream, retaining completed data prefix on errors.
  * @param input Binary source, borrowed for the call.
  * @param output Binary LF destination.
@@ -38,10 +43,11 @@ void report(std::ostream &output, int code, std::string_view stage) noexcept;
  * @param schema Validated explicit local schema.
  * @param limits Finite IO/protocol budgets.
  * @param format TSV or safe quoted human output.
- * @param profile Explicit display metadata; independent callers default to local-schema.
+ * @param profile Explicit display grammar matching the schema; mismatch fails before input/output work.
+ * @param diagnosticsVersion Explicit diagnostic grammar, defaulting to the legacy contract.
  * @return Native contract exit code; IO failure cannot be success.
  */
 int inspect(std::istream &input, std::ostream &output, std::ostream &diagnostic, const core::LocalSchema &schema,
             Limits limits, inspect::OutputFormat format = inspect::OutputFormat::TSV,
-            inspect::DisplayProfile profile = inspect::DisplayProfile::LOCAL_SCHEMA);
+            inspect::DisplayProfile profile = inspect::DisplayProfile::LOCAL_SCHEMA, unsigned diagnosticsVersion = 1);
 } // namespace org::ttldtor::qdcxx::tape_inspect

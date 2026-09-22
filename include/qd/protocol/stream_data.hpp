@@ -17,16 +17,21 @@ struct ContextLimits {
 /** Owned validated plan with the output shape needed after schema destruction. */
 struct StreamRecordPlan {
     RecordBinding binding;       ///< Owned ordered actions derived only by bindRecord.
-    std::size_t localFieldCount; ///< Number of zero-initialized local int slots, zero for unknown records.
+    std::size_t localFieldCount; ///< Number of local logical values, zero for unknown records.
 };
 
 /** Immutable static decoding snapshot; not a dynamic session table. */
 class StreamDataContext {
     std::vector<StreamRecordPlan> plans_;
+    std::vector<std::vector<core::FieldValue>> defaults_;
+    core::LocalProfile profile_;
     /** Adopt validated plans.
      * @param plans Fully validated owned plans.
+     * @param defaults One bounded tagged shape per local record; empty for the legacy profile.
+     * @param profile Validated exact-type policy.
      */
-    explicit StreamDataContext(std::vector<StreamRecordPlan> plans) noexcept;
+    explicit StreamDataContext(std::vector<StreamRecordPlan> plans, std::vector<std::vector<core::FieldValue>> defaults,
+                               core::LocalProfile profile) noexcept;
 
     public:
     /** Validate and own a complete snapshot; failure publishes no partial state.
@@ -42,6 +47,19 @@ class StreamDataContext {
      * @return Borrowed immutable plan until context mutation/destruction, or null if undescribed.
      */
     [[nodiscard]] const StreamRecordPlan *find(std::int32_t senderId) const noexcept;
+
+    /** Inspect the exact-type policy owned by this snapshot.
+     * @return Immutable profile selected by the validated schema.
+     */
+    [[nodiscard]] core::LocalProfile profile() const noexcept {
+        return profile_;
+    }
+
+    /** Inspect raw-zero defaults in local logical order.
+     * @param localId Local record identity from a plan returned by this context.
+     * @return Borrowed shape until context destruction/move; empty for legacy or unknown IDs.
+     */
+    [[nodiscard]] std::span<const core::FieldValue> defaults(std::int32_t localId) const noexcept;
 };
 
 /** Complete-payload decoding outcomes; no recovery or continuation is provided. */
@@ -53,7 +71,8 @@ enum class StreamDataStatus {
     UNDESCRIBED_ID,      ///< Sender ID has no static description.
     UNSUPPORTED_PROFILE, ///< Nonzero raw event flags.
     RESOURCE_LIMIT,      ///< Mandatory logical budget exceeded.
-    ALLOCATION_FAILURE   ///< Allocation failed; completed prefix retained.
+    ALLOCATION_FAILURE,  ///< Allocation failed; completed prefix retained.
+    INVALID_FIELD        ///< UTF_CHAR primitive has an invalid lead, tail or code point.
 };
 /** Checkpoint identifying failure location or successful completion. */
 enum class StreamDataStage {
@@ -62,7 +81,7 @@ enum class StreamDataStage {
     SYMBOL,    ///< Message-local symbol primitive.
     FLAGS,     ///< Raw flag profile validation.
     RECORD_ID, ///< Compact ID primitive and lookup.
-    FIELD,     ///< Wire-field budget or compact-long primitive.
+    FIELD,     ///< Wire-field budget or exact selected primitive.
     OUTPUT,    ///< Output budgets, initialization or publication.
     END        ///< Successful completion.
 };
@@ -73,16 +92,17 @@ struct StreamDataLimits {
     std::size_t processedRecords;  ///< Maximum records, including skipped and zero-field records.
     std::size_t wireFields;        ///< Maximum fields read, including skips and repeated targets.
     std::size_t emittedRecords;    ///< Maximum completed output records.
-    std::size_t emittedValues;     ///< Aggregate local int slots, including absent fields.
+    std::size_t emittedValues;     ///< Aggregate logical local values, including absent fields.
     std::size_t ownedSymbolUnits;  ///< Aggregate units in output symbols, including repeat copies.
     encoding::SymbolLimits symbol; ///< Remaining-span, per-symbol and retained-state limits.
 };
 
-/** Owned ordinary local record; missing slots contain measured fresh-storage raw zero. */
+/** Owned local record; missing fields contain measured fresh-storage raw zero with their type. */
 struct StreamDataRecord {
-    std::int32_t localId;             ///< Local schema ID, never sender identity.
-    encoding::SymbolValue symbol;     ///< Exact owned UTF-16 and raw encoding metadata.
-    std::vector<std::int32_t> values; ///< Local field order, repeated writes applied in wire order.
+    std::int32_t localId;                      ///< Local schema ID, never sender identity.
+    encoding::SymbolValue symbol;              ///< Exact owned UTF-16 and raw encoding metadata.
+    std::vector<std::int32_t> values;          ///< Legacy profile only, local order; empty for the extended profile.
+    std::vector<core::FieldValue> typedValues; ///< Extended profile only, exact local tags/raw values.
 };
 
 /** Owned completed prefix with explicit first-error diagnostics. */

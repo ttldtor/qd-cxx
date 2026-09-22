@@ -1,0 +1,80 @@
+case	primitives
+char-write	-1	-	UTFDataFormatException	0
+char-write	0	00	ok	1
+char-write	127	7f	ok	1
+char-write	128	c280	ok	2
+char-write	2047	dfbf	ok	2
+char-write	2048	e0a080	ok	3
+char-write	55295	ed9fbf	ok	3
+char-write	55296	eda080	ok	3
+char-write	57343	edbfbf	ok	3
+char-write	57344	ee8080	ok	3
+char-write	65535	efbfbf	ok	3
+char-write	65536	f0908080	ok	4
+char-write	1114111	f48fbfbf	ok	4
+char-write	1114112	-	UTFDataFormatException	0
+char-read	0	-	-	EOFException	0
+char-read	1	00	0	ok	1
+char-read	2	7f	127	ok	1
+char-read	3	c080	0	ok	2
+char-read	4	c1bf	127	ok	2
+char-read	5	e08080	0	ok	3
+char-read	6	eda080	55296	ok	3
+char-read	7	edbfbf	57343	ok	3
+char-read	8	efbfbf	65535	ok	3
+char-read	9	f0808080	0	ok	4
+char-read	10	f0908080	65536	ok	4
+char-read	11	f48fbfbf	1114111	ok	4
+char-read	12	f4908080	-	UTFDataFormatException	4
+char-read	13	80	-	UTFDataFormatException	1
+char-read	14	ff	-	UTFDataFormatException	1
+char-read	15	c2	-	EOFException	1
+char-read	16	c200	-	UTFDataFormatException	2
+char-read	17	e0	-	EOFException	1
+char-read	18	e080	-	EOFException	2
+char-read	19	e00080	-	UTFDataFormatException	3
+char-read	20	e08000	-	UTFDataFormatException	3
+char-read	21	f0	-	EOFException	1
+char-read	22	f080	-	EOFException	2
+char-read	23	f08080	-	EOFException	3
+char-read	24	f0008080	-	UTFDataFormatException	4
+char-read	25	f0800080	-	UTFDataFormatException	4
+char-read	26	f0808000	-	UTFDataFormatException	4
+time	-2147483648	f780000000	-2147483648000
+time	-1	7f	-1000
+time	0	00	0
+time	1	01	1000
+time	2147483647	f07fffffff	2147483647000
+decimal-raw	0	0	00	NaN	7ff8000000000000
+decimal-raw	1	128	8080	0	0000000000000000
+decimal-raw	2	1	01	0	0000000000000000
+decimal-raw	3	255	80ff	0	0000000000000000
+decimal-raw	4	256	8100	Infinity	7ff0000000000000
+decimal-raw	5	-256	bf00	-Infinity	fff0000000000000
+decimal-raw	6	512	8200	Infinity	7ff0000000000000
+decimal-raw	7	-512	be00	-Infinity	fff0000000000000
+decimal-raw	8	384	8180	1	3ff0000000000000
+decimal-raw	9	-128	bf80	-1	bff0000000000000
+decimal-raw	10	257	8101	1E127	5a4d8ba7f519c84f
+decimal-raw	11	511	81ff	1E-127	2591544581b7dec2
+decimal-raw	12	-255	bf01	-1E127	da4d8ba7f519c84f
+decimal-raw	13	-1	7f	-1E-127	a591544581b7dec2
+decimal-raw	14	-9223372036854775808	ff8000000000000000	-Infinity	fff0000000000000
+decimal-raw	15	9223372036854775807	ff7fffffffffffffff	3.6028797018963967E-111	2901544581b7dec2
+decimal-raw	16	2305843009213693846	ff1fffffffffffff96	0.0000009007199254740991	3eae392010175ee5
+decimal-raw	17	2305843009213694359	ff2000000000000197	9.007199254740993E-8	3e782db34012b252
+decimal-raw	18	9223372036854775807	ff7fffffffffffffff	3.6028797018963967E-111	2901544581b7dec2
+decimal-compose	0	0000000000000000	128	0	0000000000000000
+decimal-compose	1	8000000000000000	128	0	0000000000000000
+decimal-compose	2	7ff8000000000000	0	NaN	7ff8000000000000
+decimal-compose	3	7ff0000000000000	256	Infinity	7ff0000000000000
+decimal-compose	4	fff0000000000000	-256	-Infinity	fff0000000000000
+decimal-compose	5	3fb999999999999a	2690	0.1	3fb999999999999a
+decimal-compose	6	4025000000000000	268930	10.5	4025000000000000
+decimal-compose	7	4028800000000000	313730	12.25	4028800000000000
+decimal-compose	8	3ff3c0ca428c59fb	316049379871605135	1.234567890123457	3ff3c0ca428c59fc
+decimal-compose	9	0000000000000001	128	0	0000000000000000
+decimal-compose	10	7fefffffffffffff	256	Infinity	7ff0000000000000
+decimal-compose	11	2591544581b7dec2	511	1E-127	2591544581b7dec2
+decimal-compose	12	5a4d8ba7f519c84f	2560000000000000017	1E127	5a4d8ba7f519c84f
+complete	primitives

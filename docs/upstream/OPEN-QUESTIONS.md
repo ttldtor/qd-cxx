@@ -4,6 +4,18 @@
 
 Record questions about Java QD behavior that cannot yet be answered confidently. Link each question to the task investigating it and close it with source or fixture evidence.
 
+## QDCXX-022 bounded resolution
+
+The [Java runtime evidence](../../tests/fixtures/protocol/quote/COVERAGE.md) resolves the selected
+default Quote schema, production round trip, missing raw-zero fields, repeated targets, UTF_CHAR
+positions, signed-second mapping and finite decimal raw/text/binary64/loss observations.
+[Contracts](../../spec/protocol/DEFAULT-QUOTE.md) and
+[C++ author validation](../../tests/conformance/protocol/quote/VALIDATION.md) implement only the
+explicit 2/8/56/120 exact-match local profile. Independent review remains pending.
+TF-04 exclusions, RAW_DATA/MESSAGE, missing-opt policy, other events, conversions, regional mapping,
+compression, importer and transport remain open. Earlier Quote runtime/code gates below are historical
+and superseded only for this bounded increment; no exhaustive decimal/Unicode claim is made.
+
 ## QDCXX-021 bounded resolution
 
 TF-01 is implemented only for the explicit constrained BINARY/NONE/EMPTY_SET/STREAM_DATA/type-8 profile.

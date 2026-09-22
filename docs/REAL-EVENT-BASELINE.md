@@ -2,6 +2,18 @@
 
 [Русская версия](REAL-EVENT-BASELINE.ru.md). English is authoritative.
 
+## QDCXX-022 runtime and implementation result
+
+The [production capture](../tests/fixtures/protocol/quote/CAPTURES.md) now confirms the unchanged
+331-record default scheme, composite Quote ID 0, twelve int slots and eight logical fields with
+full identities 56/2/120. Actual putEvent/FileWriter/FileReader/getEvent output establishes raw values,
+decimal views and default-scheme time/sequence/nano losses. The separate
+[C++ validation](../tests/conformance/protocol/quote/VALIDATION.md) covers the bounded implementation;
+independent review is pending. The source-only statements below describe earlier QDCXX-020 research,
+not the current evidence level. No broader tape or event support follows from this result.
+
+## Historical source baseline
+
 QDCXX-020 research; QD 3.355 at `0ddc0a09779fb61d74cc0b37c6449ff47dcb715f`.
 All event findings here are **source-only**. No new event generation, schema dump, publication or
 replay was executed. The earlier [tape observations](../spec/protocol/TAPE-FILES.md) use synthetic

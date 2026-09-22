@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 #include "../qtp-inspect/inspect.hpp"
 #include "inspect.hpp"
+#include "qd/events/quote.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -42,6 +43,9 @@ bool number(std::string_view text, std::size_t &value) {
 int main(int argc, char **argv) {
     namespace ti = org::ttldtor::qdcxx::tape_inspect;
     namespace presentation = org::ttldtor::qdcxx::inspect;
+    namespace protocol = org::ttldtor::qdcxx::protocol;
+    unsigned diagnosticsVersion = 1;
+    auto format = presentation::OutputFormat::TSV;
 #ifdef _WIN32
 
     if (_setmode(_fileno(stdout), _O_BINARY) == -1 || _setmode(_fileno(stderr), _O_BINARY) == -1) {
@@ -76,10 +80,13 @@ int main(int argc, char **argv) {
             {"--max-text-units", &t.descriptor.text.codeUnits}};
 
         if (argc == 1 || (argc == 2 && std::string_view(argv[1]) == "--help")) {
-            std::cout << "qdcxx-tape-inspect --input PATH --profile oracle-sre-v1 [--output-format tsv|human] [LIMIT "
+            std::cout << "qdcxx-tape-inspect --input PATH --profile oracle-sre-v1|default-quote-v1 [--output-format "
+                         "tsv|human] [--diagnostics-version 1|2] [LIMIT "
                          "VALUE ...]\n"
-                         "Explicit BINARY, uncompressed, time NONE, EMPTY_SET, STREAM_DATA, exact type 8, zero flags.\n"
-                         "Diagnostic local S/R/E schema; no Quote, stdin, network, recovery or general tape support.\n"
+                         "Explicit BINARY, uncompressed, time NONE, EMPTY_SET, STREAM_DATA, zero flags.\n"
+                         "oracle-sre-v1: diagnostic S/R/E, exact type 8, diagnostics default 1.\n"
+                         "default-quote-v1: composite Quote, exact types 2/8/56/120, diagnostics default 2.\n"
+                         "No stdin, network, recovery, RAW_DATA, MESSAGE time or general tape support.\n"
                          "Numeric limits are finite unsigned decimal; chunk-size must be positive. Defaults:\n";
 
             for (const auto &[name, value] : options) {
@@ -101,7 +108,6 @@ int main(int argc, char **argv) {
 
         std::string path;
         std::string profile;
-        auto format = presentation::OutputFormat::TSV;
         std::set<std::string_view> seen;
         bool valid = true;
 
@@ -122,14 +128,25 @@ int main(int argc, char **argv) {
             } else if (key == "--output-format") {
                 valid = operand == "tsv" || operand == "human";
                 format = operand == "human" ? presentation::OutputFormat::HUMAN : presentation::OutputFormat::TSV;
+            } else if (key == "--diagnostics-version") {
+                valid = operand == "1" || operand == "2";
+                diagnosticsVersion = operand == "2" ? 2U : 1U;
             } else {
                 auto option = options.find(key);
                 valid = option != options.end() && number(operand, *option->second);
             }
         }
 
-        if (!valid || path.empty() || path == "-" || profile != "oracle-sre-v1" || !ti::prepareLimits(limits)) {
-            ti::report(std::cerr, 2, "usage");
+        const bool quoteProfile = profile == "default-quote-v1";
+        const bool knownProfile = quoteProfile || profile == "oracle-sre-v1";
+
+        if (quoteProfile && !seen.contains("--diagnostics-version")) {
+            diagnosticsVersion = 2;
+        }
+
+        if (!valid || path.empty() || path == "-" || !knownProfile || !ti::prepareLimits(limits)) {
+            ti::report(std::cerr, 2, "usage", diagnosticsVersion,
+                       knownProfile ? protocol::TapeRejection::NONE : protocol::TapeRejection::LOCAL_PROFILE, format);
 
             return 2;
         }
@@ -137,31 +154,34 @@ int main(int argc, char **argv) {
         std::ifstream input(path, std::ios::binary);
 
         if (!input) {
-            ti::report(std::cerr, 3, "open");
+            ti::report(std::cerr, 3, "open", diagnosticsVersion, protocol::TapeRejection::NONE, format);
 
             return 3;
         }
 
-        auto schema = presentation::oracleSchema();
+        auto schema = quoteProfile ? org::ttldtor::qdcxx::events::defaultQuoteSchema(limits.tape.context.schema)
+                                   : presentation::oracleSchema();
 
         if (!schema) {
-            ti::report(std::cerr, 6, "allocation");
+            ti::report(std::cerr, 6, "allocation", diagnosticsVersion, protocol::TapeRejection::NONE, format);
 
             return 6;
         }
 
         return ti::inspect(input, std::cout, std::cerr, *schema, limits, format,
-                           presentation::DisplayProfile::ORACLE_SRE_V1);
+                           quoteProfile ? presentation::DisplayProfile::DEFAULT_QUOTE_V1
+                                        : presentation::DisplayProfile::ORACLE_SRE_V1,
+                           diagnosticsVersion);
     } catch (const std::bad_alloc &) {
-        ti::report(std::cerr, 6, "allocation");
+        ti::report(std::cerr, 6, "allocation", diagnosticsVersion, protocol::TapeRejection::NONE, format);
 
         return 6;
     } catch (const std::length_error &) {
-        ti::report(std::cerr, 6, "allocation");
+        ti::report(std::cerr, 6, "allocation", diagnosticsVersion, protocol::TapeRejection::NONE, format);
 
         return 6;
     } catch (const std::ios_base::failure &) {
-        ti::report(std::cerr, 3, "write");
+        ti::report(std::cerr, 3, "write", diagnosticsVersion, protocol::TapeRejection::NONE, format);
 
         return 3;
     }

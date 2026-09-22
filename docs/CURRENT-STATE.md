@@ -2,7 +2,25 @@
 
 [Русская версия](CURRENT-STATE.ru.md). English is authoritative.
 
-## Current decision: QDCXX-021 reviewed; QDCXX-022 ready
+## QDCXX-022 author handoff — independent review pending
+
+The independent review's presentation-boundary finding has been addressed: diagnostic names/advice
+now live in tools/tape-inspect, while protocol retains only refusal data. Added per-slot mapQuote
+tag rejection and exact DESCRIPTOR/event-flags CLI diagnostics tests.
+Follow-up author checks are separate from the
+initial matrix; independent re-review remains pending. No wire/profile/decoder change or agent commit.
+
+Implemented unchanged default composite Quote through the bounded tape reader: exact 2/56/120
+values in an explicit local profile, owned Quote mapping, default-quote-v1 inspection and versioned
+diagnostics. Java production evidence and EN/RU contracts preceded C++ implementation. Starting HEAD
+was `fa5a0b967e9c021e656846cdd3d6faee5faa4776`; this work creates no commit.
+[Author validation](../tests/conformance/protocol/quote/VALIDATION.md) records the compiler/sanitizer
+matrix, old-profile regressions, negative checks and evidence audit. Independent review is pending.
+No new Python or runtime dependency. RAW_DATA, MESSAGE timing, broader records/types, importer,
+compression, regional Quote and transport remain outside this increment; follow [NEXT-STEPS](NEXT-STEPS.md).
+Earlier state/handoff sections below are historical and superseded within this bounded scope.
+
+## Historical decision: QDCXX-021 reviewed; QDCXX-022 ready
 
 The uncommitted QDCXX-021 implementation above HEAD 3e91295 is independently reviewed within its
 explicit bounded profile. Review and freshly executed checks
