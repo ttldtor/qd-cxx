@@ -2,6 +2,17 @@
 
 [Русская версия](ARCHITECTURE.ru.md). This English document is authoritative.
 
+
+## Clarified goal: library and operational programs
+
+The project includes equivalents of the necessary qds-tools utilities, not just a library/inspector.
+QDCXX-020 establishes the actual inventory and order. Feeds, multiplexing, recording/replay and
+diagnostics are use categories, not preapproved command names. Shared data/subscription behavior
+belongs in libraries; transport handles connections; programs compose components, configuration,
+management and observability. Do not turn the inspector into a universal server or duplicate shared
+logic. Transport/threading and CLI/properties compatibility remain separate decisions.
+[Roadmap and migration policies](NEXT-STEPS.md).
+
 ## Intent
 
 `qd-cxx` will reproduce the externally observable contracts of Java QD without mechanically reproducing its class hierarchy or historical implementation choices. The design target is a modular, testable C++23 system.

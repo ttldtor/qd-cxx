@@ -3,6 +3,22 @@
 [Русская версия](CURRENT-STATE.ru.md). English is authoritative.
 
 
+
+## Latest reviewed baseline and next task
+
+QDCXX-019 is reviewed and committed as `e35fae2`; cache cleanup is `1bf82a4`.
+Independent review performed one new clean upstream build and full Verify (22 artifacts), all
+19 negative comparator checks plus baseline, and evidence/hash/link/diff audit. The initial attempt
+stopped at Git ownership validation before capture; the successful retry trusted only that checkout
+for that process. Local review artifacts are in `.work/review-019-verify` and
+`.work/review-019-negatives`, not portable tracked evidence. C++ tests were not rerun in this research review.
+
+QDCXX-018 (`e1e19e5`) and naming/help (`4cb1d8c`) are reviewed. Current tools include bounded
+raw-QTP inspection with TSV/human output; general tape reading, production feeds/multiplexers and
+real dxFeed event support are not implemented. [Current roadmap](NEXT-STEPS.md) records owner decisions.
+QDCXX-020 is ready for research, not started. No new implementation is authorized
+by this status update. Earlier author handoffs below are historical.
+
 ## Owner-requested naming migration
 
 Current C++ namespaces use `org::ttldtor::qdcxx`, project CMake targets use `qdcxx_`, and owned
@@ -14,7 +30,7 @@ are historical. This naming migration adds no independent review claim for that 
 
 ## Current status
 
-QDCXX-019 research is complete and ready for independent review, without a commit. Real Java
+Historical author handoff for QDCXX-019 before review and commit: Real Java
 FileWriter/FileReader captures cover default/constrained BINARY, TEXT and truncated EOF; two clean
 runs match all 22 raw artifacts, 19 negative cases and negative/baseline Verify behave as expected.
 [Inventory, gap table and proposed next profile](../spec/protocol/TAPE-FILES.md),
