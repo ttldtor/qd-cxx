@@ -2,6 +2,15 @@
 
 [Русская версия](CURRENT-STATE.ru.md). English is authoritative.
 
+## Next assignment: QDCXX-024
+
+QDCXX-024 is ready, High: exact field types 10/40/72/88,
+Java evidence before bounded C++, owned nullable UTF-16, cumulative field budgets and explicit typed inspection.
+The owner approved field support separately from full Profile event mapping. Standard Profile field-level
+evidence remains required; the private tape is not an acceptance input. Implementation has not started.
+QDCXX-023 and its acceptance are committed as `48fd76bfc1b7c8fd8d32fba9159e91c4cafe1176`.
+This planning update adds no runtime verification; previous reports remain historical evidence.
+
 ## QDCXX-023 independently accepted
 
 Starting HEAD: `c1654f2dbb5163917b848d1b84b17dfb9d0999fc`. The opt-in `raw-message-v1` mode now
@@ -11,7 +20,8 @@ evidence preceded the C++ work. See [coverage](../tests/conformance/protocol/raw
 and [author validation](../tests/conformance/protocol/raw-tape/VALIDATION.md).
 Independent acceptance found no actionable
 defect and freshly passed all 20 suites in clean MSVC Release and GCC ASan+UBSan builds, negative
-checks and evidence audits. No staging or commit was performed, and the next task has not started.
+checks and evidence audits. That review performed no staging or commit; the owner subsequently committed
+the result as recorded above.
 
 The [private-sample inventory](REAL-TAPE-GAPS.md) found additional full types 10/40/72/88 and Profile.
 Structural enumeration completed, but bounded Java replay stopped at its delivery budget.

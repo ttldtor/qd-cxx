@@ -17,18 +17,21 @@ bounded scope. QDCXX-022 started from committed HEAD `fa5a0b967e9c021e656846cdd3
    semantics. [Author validation](../tests/conformance/protocol/raw-tape/VALIDATION.md) and
    [remaining gaps](REAL-TAPE-GAPS.md) retain the distinction between replay/business/event time and
    structural inventory versus full-file compatibility. Independent acceptance
-   records separate fresh checks. No staging, commit or next-task work occurred.
-3. Broader actual records/types: use the completed bounded description/message inventory and the
-   incomplete budget-limited Java replay documented in REAL-TAPE-GAPS. Derive minimal
-   reproducible standard-event cases. Implement required types/conversions/skips in explicit increments,
-   including Profile and other observed records, not just the first encountered failure. Keep synthetic
-   boundary tests and whole-file semantic comparisons; report unsupported parts explicitly.
-4. External schema adapters: normalized JSON and then scoped XML/import/overlay/provider behavior,
+   records separate fresh checks. Committed by the owner as `48fd76bfc1b7c8fd8d32fba9159e91c4cafe1176`.
+3. QDCXX-024, ready, High: exact UTF_CHAR_ARRAY/SHORT_STRING/SEQUENCE/DATE
+   (10/40/72/88), Java production evidence then bounded C++, nullable owned fields, cumulative budgets
+   and opt-in generic typed inspection. Preserve current profiles and require unchanged standard Profile
+   field-level evidence alongside synthetic boundaries. Full Profile event mapping is deliberately separate.
+4. Profile and further real-event adapters: build on reviewed field support and the remaining-gap inventory.
+   Assign their actual schemas, mappings, optional fields and business-value comparisons explicitly;
+   additional types, indexed records or conversions need their own scope. Do not claim whole-file support
+   from a structural inventory or a budget-limited replay.
+5. External schema adapters: normalized JSON and then scoped XML/import/overlay/provider behavior,
    feeding validated loader-independent core. Wire descriptions alone are not a complete local schema.
-5. Operational replay/publication/feed/multiplexer tools follow the existing 20-tool inventory and
+6. Operational replay/publication/feed/multiplexer tools follow the existing 20-tool inventory and
    separately specified transport/core semantics. Python removal remains a parallel staged workstream.
 
-Stage 2 is scoped by QDCXX-023; stages 3–5 still require separate tasks. Every implementation requires evidence, not permission to weaken
+Stages 2 and 3 are scoped by QDCXX-023 and QDCXX-024; stages 4–6 require separate tasks. Every implementation requires evidence, not permission to weaken
 current strictness. Compression, sidecars and broader session updates get explicit profiles when needed.
 The local `external-input.tape` is optional private integration input, never a required CI fixture;
 do not commit/upload it without separate permission. Its header version is diagnostic, not proof of

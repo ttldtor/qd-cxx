@@ -4,6 +4,15 @@
 
 Record questions about Java QD behavior that cannot yet be answered confidently. Link each question to the task investigating it and close it with source or fixture evidence.
 
+## Assigned to QDCXX-024; not yet measured
+
+QDCXX-024 assigns exact 10/40/72/88 field decoding, not event adapters.
+Open until its Java evidence: type-10 count/Unicode/error consumption versus UTFString; signed raw
+projection of 40/72/88; missing object defaults; mixed Java int/object indexing; malformed skips and
+repeated targets. The task also defines finite owned-string/work accounting and opt-in output.
+Standard Profile field-level evidence must retain the actual default schema; unsupported extra
+requirements trigger a decision, not schema simplification. No new runtime observation is claimed here.
+
 ## QDCXX-023 bounded resolution
 
 [Production Java captures](../../tests/fixtures/protocol/raw-tape/COVERAGE.md) and the
@@ -33,7 +42,8 @@ compression, importer and transport remain open. Earlier Quote runtime/code gate
 and superseded only for this bounded increment; no exhaustive decimal/Unicode claim is made.
 
 QDCXX-023 supersedes the preceding RAW/MESSAGE and missing-opt questions
-only within its measured bounded contract above; broader field decoding and publishing the private sample remain unauthorized.
+only within its measured bounded contract above. QDCXX-024 separately authorizes its exact field subset;
+other field extensions and publishing the private sample remain unauthorized.
 
 ## QDCXX-021 bounded resolution
 
