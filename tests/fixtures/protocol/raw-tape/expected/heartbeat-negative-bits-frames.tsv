@@ -1,0 +1,5 @@
+frame	0	0	48	1
+frame	1	48	57	2
+frame	2	57	64	0
+frame	3	64	70	5
+complete	frames	4	70

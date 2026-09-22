@@ -38,3 +38,21 @@ compression, time, Quote, importer and transport remain excluded. Public API is 
 Two clean Java captures and nine mutation rejections preceded this decision. C++ matrix, ownership,
 atomicity, resource boundaries, EOF and process IO tests are required before completion; no executed
 C++ result is claimed by this pre-implementation ADR. Review remains open until separately performed.
+
+## QDCXX-023 amendment: explicit RAW/MESSAGE policy
+
+The owner-authorized task permits an independent container-mode parameter,
+fixed-size owning timing state and returned heartbeat/data timing metadata. Keep the existing
+append-only immutable snapshots and terminal failure policy; do not introduce a scheduler or
+mutable sessions. [RAW-TAPE](../../spec/protocol/RAW-TAPE.md) records production Java evidence,
+the exact option/descriptor acceptance matrix, packing/saturation, atomic timing publication and
+the additional cumulative metadata charge. The default legacy mode is unchanged.
+
+Java RAW delivery fans out to three contract callbacks. Inspection emits each wire record once,
+using the observed STREAM projection for comparison. Reusing a private exact payload decoder through
+an explicit `decodeRawData` entry point avoids duplicating field parsing without broadening the
+meaning of `decodeStreamData`. Replay timestamp and cursor event-time remain distinct from Quote
+business fields. The opt-in version-3 output exposes each heartbeat even without following data.
+Unknown timing fields/extensions are refused, preserving unrepresented information rather than
+silently dropping it. All presentation remains in tools. No new field identities, transport or
+complete private-tape support are authorized; [aggregate gaps](../REAL-TAPE-GAPS.md) remain separate.

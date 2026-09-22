@@ -24,7 +24,20 @@ std::string_view tapeRejectionName(protocol::TapeRejection reason) noexcept {
     }
 }
 
-std::string_view tapeRejectionExplanation(protocol::TapeRejection reason) noexcept {
+std::string_view tapeRejectionExplanation(protocol::TapeRejection reason, protocol::TapeMode mode) noexcept {
+    if (mode == protocol::TapeMode::RAW_MESSAGE_V1) {
+        switch (reason) {
+        case protocol::TapeRejection::TIME:
+            return "RAW mode requires MESSAGE timing and supports only empty or timestamp-only heartbeats.";
+        case protocol::TapeRejection::OPTIONS:
+            return "RAW mode requires absent, empty or hs options and zero raw event flags.";
+        case protocol::TapeRejection::MESSAGE:
+            return "RAW mode accepts RAW_DATA with an empty or singleton RAW_DATA send set.";
+        default:
+            break;
+        }
+    }
+
     switch (reason) {
     case protocol::TapeRejection::TIME:
         return "Only absent time or explicit NONE timing is supported.";

@@ -4,7 +4,23 @@
 
 Record questions about Java QD behavior that cannot yet be answered confidently. Link each question to the task investigating it and close it with source or fixture evidence.
 
-## QDCXX-022 bounded resolution
+## QDCXX-023 bounded resolution
+
+[Production Java captures](../../tests/fixtures/protocol/raw-tape/COVERAGE.md) and the
+[RAW-TAPE contract](../../spec/protocol/RAW-TAPE.md) establish type-5 production delivery,
+absent/empty/null/nonempty option observations and heartbeat propagation before C++ implementation.
+Replay timestamp retains signed int64 milliseconds; the delivered event-time sequence uses saturated
+signed seconds plus milliseconds, independently of Quote business fields. The C++ policy accepts
+only absent/empty/hs options, MESSAGE/message time and the documented heartbeat subset; Java's broader
+acceptance does not authorize more C++ behavior. [Author checks](../../tests/conformance/protocol/raw-tape/VALIDATION.md)
+remain separate from the completed independent acceptance.
+
+[Remaining private-sample gaps](../REAL-TAPE-GAPS.md) include full types 10/40/72/88 and Profile;
+the generated inventory tests are reproducible without that file. Complete structural inventory and
+budget-limited Java replay do not settle full-file compatibility. Broader heartbeat fields/options,
+event flags, time modes, conversion, compression, sessions, adapters and transport remain open.
+
+## Historical QDCXX-022 bounded resolution
 
 The [Java runtime evidence](../../tests/fixtures/protocol/quote/COVERAGE.md) resolves the selected
 default Quote schema, production round trip, missing raw-zero fields, repeated targets, UTF_CHAR
@@ -16,9 +32,8 @@ TF-04 exclusions, RAW_DATA/MESSAGE, missing-opt policy, other events, conversion
 compression, importer and transport remain open. Earlier Quote runtime/code gates below are historical
 and superseded only for this bounded increment; no exhaustive decimal/Unicode claim is made.
 
-QDCXX-023 investigates RAW delivery, heartbeat timing propagation and absent-opt semantics before implementation.
-It must distinguish replay timing, event-time sequence and Quote business fields; no answer is assumed from descriptor omission alone.
-The private sample's remaining descriptions/types are inventoried without authorizing broader field decoding or publishing the sample.
+QDCXX-023 supersedes the preceding RAW/MESSAGE and missing-opt questions
+only within its measured bounded contract above; broader field decoding and publishing the private sample remain unauthorized.
 
 ## QDCXX-021 bounded resolution
 

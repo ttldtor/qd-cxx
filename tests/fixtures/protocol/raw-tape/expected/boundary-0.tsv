@@ -1,0 +1,17 @@
+case	boundary-0	diagnostic-wire
+descriptor	0	[RAW_DATA]	[]	-	-
+property	006f00700074	-
+property	00740069006d0065	004d004500530053004100470045
+property	0074007900700065	0074006100700065
+heartbeat	1	0	-	-	-	false
+callback	2	10
+record	0	10	0	0053	004100420043	0	0
+field	0	0	8	0
+callback	3	15
+record	1	15	0	0053	004100420043	0	0
+field	1	0	8	0
+callback	4	20
+record	2	20	0	0053	004100420043	0	0
+field	2	0	8	0
+end	3	0	5
+complete	boundary-0

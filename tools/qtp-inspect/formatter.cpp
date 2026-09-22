@@ -262,7 +262,8 @@ std::string Formatter::frame(const protocol::Frame &frame, std::size_t index, st
 }
 
 std::string Formatter::record(const protocol::StreamDataRecord &record, std::u16string_view name,
-                              std::size_t frameIndex, std::size_t index, std::size_t budget) const {
+                              std::size_t frameIndex, std::size_t index, std::size_t budget,
+                              const protocol::TapeTiming *timing) const {
     if (profile_ == DisplayProfile::DEFAULT_QUOTE_V1) {
         // Mapping scalar fields needs no second owned copy of the decoded symbol.
         const auto quote = events::mapQuote({}, record.typedValues, 0);
@@ -364,7 +365,7 @@ std::string Formatter::record(const protocol::StreamDataRecord &record, std::u16
             row.add(tsv ? "\t" : " timeNanoPart=");
             row.number(quote->timeNanoPart);
             row.add(tsv ? "\t" : " eventTime=");
-            row.number(quote->eventTime);
+            row.number(timing ? timing->eventTimeMs() : quote->eventTime);
             row.add("\n");
         });
     }
@@ -491,15 +492,23 @@ std::string Formatter::tapeDescriptor(const protocol::TapeDescriptor &descriptor
     });
 }
 
-std::string Formatter::tapeFrame(const protocol::Frame &value, std::size_t index, std::size_t budget) const {
-    if (format_ == OutputFormat::TSV || value.type != DESCRIBE_PROTOCOL) {
+std::string Formatter::tapeFrame(const protocol::Frame &value, std::size_t index, std::size_t budget,
+                                 protocol::TapeMode mode) const {
+    constexpr std::int32_t RAW_DATA = 5;  ///< The explicitly selected RAW tape data message.
+    constexpr std::int32_t HEARTBEAT = 0; ///< Explicit timing envelope, distinct from an empty marker.
+    const bool raw = mode == protocol::TapeMode::RAW_MESSAGE_V1;
+
+    if (format_ == OutputFormat::TSV ||
+        (value.type != DESCRIBE_PROTOCOL && !(raw && (value.type == RAW_DATA || value.type == HEARTBEAT)))) {
         return frame(value, index, budget);
     }
 
     return build(budget, [&](Row &row) {
         row.add("Frame ");
         row.number(index);
-        row.add(": DESCRIBE_PROTOCOL (1) bytes=[");
+        row.add(value.type == RAW_DATA    ? ": RAW_DATA (5) bytes=["
+                : value.type == HEARTBEAT ? ": HEARTBEAT (0) bytes=["
+                                          : ": DESCRIBE_PROTOCOL (1) bytes=[");
         row.number(value.startOffset);
         row.add(",");
         row.number(value.endOffset);
@@ -507,6 +516,99 @@ std::string Formatter::tapeFrame(const protocol::Frame &value, std::size_t index
         row.number(value.endOffset - value.payload.size());
         row.add(" size=");
         row.number(value.payload.size());
+        row.add("\n");
+    });
+}
+
+std::string Formatter::rawTapeHeader(std::size_t budget) const {
+    return build(budget, [&](Row &row) {
+        const bool tsv = format_ == OutputFormat::TSV;
+        row.add(tsv ? "format\tqdcxx-tape-inspect\t3\t" : "qdcxx-tape-inspect human 3 profile=");
+        row.add(profile_ == DisplayProfile::DEFAULT_QUOTE_V1 ? "default-quote-v1"
+                : profile_ == DisplayProfile::ORACLE_SRE_V1  ? "oracle-sre-v1"
+                                                             : "local-schema");
+        row.add(tsv ? "\traw-message-v1\n" : " tape-mode=raw-message-v1 identities=local\n");
+    });
+}
+
+std::string Formatter::rawTapeDescriptor(const protocol::TapeDescriptor &descriptor, std::size_t budget) const {
+    return build(budget, [&](Row &row) {
+        const bool tsv = format_ == OutputFormat::TSV;
+        const std::string_view options = !descriptor.options ? "absent" : descriptor.options->empty() ? "empty" : "hs";
+        row.add(tsv ? "descriptor-v3\t" : "Descriptor: type=tape opt=");
+
+        if (tsv) {
+            row.number(descriptor.version ? 1 : 0);
+            row.add("\t");
+            row.units(descriptor.version ? *descriptor.version : std::u16string_view{});
+        } else {
+            row.add(options);
+            row.add(" version=");
+
+            if (descriptor.version) {
+                row.quote(*descriptor.version);
+            } else {
+                row.add("absent");
+            }
+        }
+
+        row.add(tsv ? "\t" : " time=");
+        row.add(descriptor.time == u"message" ? "message" : "MESSAGE");
+        row.add(tsv ? "\t" : " send=");
+        row.add(descriptor.explicitRawSend ? "5" : "-");
+        row.add(tsv ? "\t-\t" : " receive=-");
+
+        if (tsv) {
+            row.add(options);
+        }
+
+        row.add("\n");
+    });
+}
+
+std::string Formatter::tapeHeartbeat(const protocol::TapeHeartbeat &heartbeat, std::size_t index,
+                                     std::size_t budget) const {
+    return build(budget, [&](Row &row) {
+        const bool tsv = format_ == OutputFormat::TSV;
+        row.add(tsv ? "heartbeat\t" : "Heartbeat: frame=");
+        row.number(index);
+        row.add(tsv ? "\t" : " content=");
+
+        if (heartbeat.content) {
+            row.number(*heartbeat.content);
+        } else {
+            row.add("-");
+        }
+
+        row.add(tsv ? "\t" : " timestampMs=");
+
+        if (heartbeat.timestampMs) {
+            row.number(*heartbeat.timestampMs);
+        } else {
+            row.add("-");
+        }
+
+        row.add("\n");
+    });
+}
+
+std::string Formatter::tapeTiming(const protocol::TapeTiming &timing, std::size_t index, std::size_t budget) const {
+    return build(budget, [&](Row &row) {
+        const bool tsv = format_ == OutputFormat::TSV;
+        row.add(tsv ? "timing\t" : "Timing: frame=");
+        row.number(index);
+        row.add(tsv ? "\t" : " timestampMs=");
+
+        if (timing.timestampMs) {
+            row.number(*timing.timestampMs);
+        } else {
+            row.add("-");
+        }
+
+        row.add(tsv ? "\t" : " eventTimeSequence=");
+        row.number(timing.eventTimeSequence);
+        row.add(tsv ? "\t" : " eventTimeMs=");
+        row.number(timing.eventTimeMs());
         row.add("\n");
     });
 }

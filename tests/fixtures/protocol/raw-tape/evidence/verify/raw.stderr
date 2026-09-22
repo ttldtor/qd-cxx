@@ -1,0 +1,357 @@
+I 260922 203317.311 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\raw-baseline-verify\raw-tape\raw-quote.qtp
+I 260922 203317.352 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\raw-quote.qtp
+I 260922 203317.370 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\raw-baseline-verify\raw-tape\raw-synthetic.qtp
+I 260922 203317.372 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\raw-synthetic.qtp
+I 260922 203317.374 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\raw-baseline-verify\raw-tape\raw-hs.qtp
+I 260922 203317.377 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\raw-hs.qtp
+I 260922 203317.379 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\raw-baseline-verify\raw-tape\stream-synthetic.qtp
+I 260922 203317.382 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\stream-synthetic.qtp
+I 260922 203317.434 [main] QDFactory - Using QDS-UNKNOWN, (C) Devexperts
+I 260922 203317.461 [main] QDFactory - Using scheme com.dxfeed.api.impl.DXFeedScheme JFhzUYbcPr_gDabkoYd4_S0tWsvvKpzBmiN2aRCDnkY
+I 260922 203322.481 [main] QDEndpoint - qd with collectors [Ticker, Stream, History]
+I 260922 203322.617 [main] DXEndpointImpl - qd DXEndpoint with dxendpoint.eventTime=true
+I 260922 203322.617 [main] DXEndpointImpl - qd DXEndpoint with dxfeed.wildcard.enable=true
+I 260922 203322.781 [main] Tape-Agent - Setting format=BINARY
+I 260922 203322.781 [main] Tape-Agent - Setting time=MESSAGE
+I 260922 203322.781 [main] Tape-Agent - Setting opt=
+I 260922 203322.784 [main] Tape-Agent - Starting TapeConnector to .work/raw-baseline-verify/raw-tape/connector-quote.qtp
+I 260922 203322.897 [Tape-Agent] FileWriterImpl - Writing tape data to .work/raw-baseline-verify/raw-tape/connector-quote.qtp
+I 260922 203322.899 [main] Tape-Agent - Stopping TapeConnector
+I 260922 203322.902 [Tape-Agent] FileWriterHandler - Writing stopped
+I 260922 203322.904 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\connector-quote.qtp
+I 260922 203322.914 [main] QDEndpoint - qd-1 with collectors [Ticker, Stream, History]
+I 260922 203322.920 [main] DXEndpointImpl - qd-1 DXEndpoint with dxendpoint.eventTime=true
+I 260922 203322.920 [main] DXEndpointImpl - qd-1 DXEndpoint with dxfeed.wildcard.enable=true
+I 260922 203322.932 [main] Tape-Agent - Setting format=BINARY
+I 260922 203322.932 [main] Tape-Agent - Setting time=MESSAGE
+I 260922 203322.932 [main] Tape-Agent - Starting TapeConnector to .work/raw-baseline-verify/raw-tape/connector-default.qtp
+I 260922 203322.936 [Tape-Agent] FileWriterImpl - Writing tape data to .work/raw-baseline-verify/raw-tape/connector-default.qtp
+I 260922 203322.936 [main] Tape-Agent - Stopping TapeConnector
+I 260922 203322.938 [Tape-Agent] FileWriterHandler - Writing stopped
+I 260922 203322.940 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\connector-default.qtp
+I 260922 203322.946 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\opt-absent.qtp
+I 260922 203322.949 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\opt-empty.qtp
+I 260922 203322.952 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\opt-null.qtp
+I 260922 203322.956 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\opt-hs.qtp
+I 260922 203322.958 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\opt-unknown.qtp
+I 260922 203322.961 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\opt-hs-unknown.qtp
+I 260922 203322.964 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\matrix-absent--1-5.qtp
+I 260922 203322.967 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\matrix-absent--1-15.qtp
+I 260922 203322.970 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\matrix-absent-5-5.qtp
+I 260922 203322.974 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\matrix-absent-5-15.qtp
+I 260922 203322.976 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\matrix-absent-15-5.qtp
+I 260922 203322.979 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\matrix-absent-15-15.qtp
+I 260922 203322.982 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\matrix-NONE--1-5.qtp
+I 260922 203322.985 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\matrix-NONE--1-15.qtp
+I 260922 203322.989 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\matrix-NONE-5-5.qtp
+I 260922 203322.992 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\matrix-NONE-5-15.qtp
+I 260922 203322.995 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\matrix-NONE-15-5.qtp
+I 260922 203322.997 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\matrix-NONE-15-15.qtp
+I 260922 203323.001 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\matrix-MESSAGE--1-5.qtp
+I 260922 203323.004 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\matrix-MESSAGE--1-15.qtp
+I 260922 203323.007 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\matrix-MESSAGE-5-5.qtp
+I 260922 203323.009 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\matrix-MESSAGE-5-15.qtp
+I 260922 203323.012 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\matrix-MESSAGE-15-5.qtp
+I 260922 203323.014 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\matrix-MESSAGE-15-15.qtp
+I 260922 203323.017 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\matrix-FIELD--1-5.qtp
+I 260922 203323.019 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\matrix-FIELD--1-15.qtp
+I 260922 203323.022 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\matrix-FIELD-5-5.qtp
+I 260922 203323.025 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\matrix-FIELD-5-15.qtp
+I 260922 203323.027 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\matrix-FIELD-15-5.qtp
+I 260922 203323.030 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\matrix-FIELD-15-15.qtp
+I 260922 203323.034 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\timing-sequence.qtp
+I 260922 203323.037 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\boundary--9223372036854775808.qtp
+I 260922 203323.041 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\boundary--2147483648001.qtp
+I 260922 203323.043 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\boundary--2147483648000.qtp
+I 260922 203323.047 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\boundary--1001.qtp
+I 260922 203323.049 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\boundary--1000.qtp
+I 260922 203323.052 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\boundary--999.qtp
+I 260922 203323.055 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\boundary--1.qtp
+I 260922 203323.058 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\boundary-0.qtp
+I 260922 203323.061 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\boundary-1.qtp
+I 260922 203323.063 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\boundary-999.qtp
+I 260922 203323.065 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\boundary-1000.qtp
+I 260922 203323.069 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\boundary-2147483647999.qtp
+I 260922 203323.071 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\boundary-2147483648000.qtp
+I 260922 203323.074 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\boundary-9223372036854775807.qtp
+I 260922 203323.077 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\empty-envelope.qtp
+I 260922 203323.080 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\explicit-zero-empty.qtp
+I 260922 203323.081 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\heartbeat-absent.qtp
+I 260922 203323.084 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\heartbeat-unknown-bit.qtp
+I 260922 203323.087 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\heartbeat-extension.qtp
+I 260922 203323.089 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\heartbeat-fields.qtp
+I 260922 203323.091 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\heartbeat-marks-no-time.qtp
+I 260922 203323.094 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\heartbeat-truncated-0.qtp
+I 260922 203323.096 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\heartbeat-truncated-1.qtp
+E 260922 203323.097 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000040:  00 0F!                                            ..              
+++> 0x00000050:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260922 203323.101 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\heartbeat-truncated-2.qtp
+E 260922 203323.102 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000040:  00 0F FF!                                         ..ÿ             
+++> 0x00000050:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260922 203323.105 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\heartbeat-truncated-3.qtp
+E 260922 203323.106 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000040:  00 0F FF 7F!                                      ..ÿ            
+++> 0x00000050:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260922 203323.108 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\heartbeat-truncated-4.qtp
+E 260922 203323.109 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000040:  00 0F FF 7F FF!                                   ..ÿÿ           
+++> 0x00000050:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260922 203323.112 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\heartbeat-truncated-5.qtp
+E 260922 203323.113 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000040:  00 0F FF 7F FF FF!                                ..ÿÿÿ          
+++> 0x00000050:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260922 203323.115 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\heartbeat-truncated-6.qtp
+E 260922 203323.115 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000040:  00 0F FF 7F FF FF FF!                             ..ÿÿÿÿ         
+++> 0x00000050:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260922 203323.117 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\heartbeat-truncated-7.qtp
+E 260922 203323.118 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000040:  00 0F FF 7F FF FF FF FF!                          ..ÿÿÿÿÿ        
+++> 0x00000050:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260922 203323.120 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\heartbeat-truncated-8.qtp
+E 260922 203323.120 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000040:  00 0F FF 7F FF FF FF FF FF!                       ..ÿÿÿÿÿÿ       
+++> 0x00000050:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260922 203323.122 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\heartbeat-truncated-9.qtp
+E 260922 203323.123 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000040:  00 0F FF 7F FF FF FF FF FF FF!                    ..ÿÿÿÿÿÿÿ      
+++> 0x00000050:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260922 203323.124 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\heartbeat-truncated-10.qtp
+E 260922 203323.124 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000040:  00 0F FF 7F FF FF FF FF FF FF FF!                 ..ÿÿÿÿÿÿÿÿ     
+++> 0x00000050:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260922 203323.128 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\heartbeat-truncated-11.qtp
+E 260922 203323.128 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000040:  00 0F FF 7F FF FF FF FF FF FF FF F7!              ..ÿÿÿÿÿÿÿÿ÷    
+++> 0x00000050:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260922 203323.131 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\heartbeat-truncated-12.qtp
+E 260922 203323.132 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000040:  00 0F FF 7F FF FF FF FF FF FF FF F7 80!           ..ÿÿÿÿÿÿÿÿ÷   
+++> 0x00000050:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260922 203323.135 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\heartbeat-truncated-13.qtp
+E 260922 203323.136 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000040:  00 0F FF 7F FF FF FF FF FF FF FF F7 80 00!        ..ÿÿÿÿÿÿÿÿ÷.  
+++> 0x00000050:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260922 203323.138 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\heartbeat-truncated-14.qtp
+E 260922 203323.139 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000040:  00 0F FF 7F FF FF FF FF FF FF FF F7 80 00 00!     ..ÿÿÿÿÿÿÿÿ÷.. 
+++> 0x00000050:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260922 203323.141 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\heartbeat-truncated-15.qtp
+E 260922 203323.142 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000040:  00 0F FF 7F FF FF FF FF FF FF FF F7 80 00 00 00   ..ÿÿÿÿÿÿÿÿ÷...
+++> 0x00000050: !                                                                  
+++> 0x00000060:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260922 203323.143 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\heartbeat-truncated-16.qtp
+E 260922 203323.145 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000040:  00 0F FF 7F FF FF FF FF FF FF FF F7 80 00 00 00   ..ÿÿÿÿÿÿÿÿ÷...
+++> 0x00000050:  F0!                                               ð               
+++> 0x00000060:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260922 203323.147 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\heartbeat-truncated-17.qtp
+E 260922 203323.148 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000040:  00 0F FF 7F FF FF FF FF FF FF FF F7 80 00 00 00   ..ÿÿÿÿÿÿÿÿ÷...
+++> 0x00000050:  F0 7F!                                            ð              
+++> 0x00000060:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260922 203323.150 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\heartbeat-truncated-18.qtp
+E 260922 203323.151 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000040:  00 0F FF 7F FF FF FF FF FF FF FF F7 80 00 00 00   ..ÿÿÿÿÿÿÿÿ÷...
+++> 0x00000050:  F0 7F FF!                                         ðÿ             
+++> 0x00000060:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260922 203323.152 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\heartbeat-truncated-19.qtp
+E 260922 203323.153 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000040:  00 0F FF 7F FF FF FF FF FF FF FF F7 80 00 00 00   ..ÿÿÿÿÿÿÿÿ÷...
+++> 0x00000050:  F0 7F FF FF!                                      ðÿÿ            
+++> 0x00000060:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260922 203323.155 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\heartbeat-truncated-20.qtp
+E 260922 203323.156 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000040:  00 0F FF 7F FF FF FF FF FF FF FF F7 80 00 00 00   ..ÿÿÿÿÿÿÿÿ÷...
+++> 0x00000050:  F0 7F FF FF FF!                                   ðÿÿÿ           
+++> 0x00000060:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260922 203323.158 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\timestamp-truncated-1.qtp
+E 260922 203323.158 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000040:  00 01!                                            ..              
+++> 0x00000050:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260922 203323.160 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\timestamp-truncated-2.qtp
+E 260922 203323.161 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000040:  00 01 FF!                                         ..ÿ             
+++> 0x00000050:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260922 203323.163 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\timestamp-truncated-3.qtp
+E 260922 203323.164 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000040:  00 01 FF 7F!                                      ..ÿ            
+++> 0x00000050:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260922 203323.165 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\timestamp-truncated-4.qtp
+E 260922 203323.167 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000040:  00 01 FF 7F FF!                                   ..ÿÿ           
+++> 0x00000050:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260922 203323.168 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\timestamp-truncated-5.qtp
+E 260922 203323.169 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000040:  00 01 FF 7F FF FF!                                ..ÿÿÿ          
+++> 0x00000050:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260922 203323.171 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\timestamp-truncated-6.qtp
+E 260922 203323.172 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000040:  00 01 FF 7F FF FF FF!                             ..ÿÿÿÿ         
+++> 0x00000050:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260922 203323.180 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\timestamp-truncated-7.qtp
+E 260922 203323.181 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000040:  00 01 FF 7F FF FF FF FF!                          ..ÿÿÿÿÿ        
+++> 0x00000050:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260922 203323.182 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\timestamp-truncated-8.qtp
+E 260922 203323.183 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000040:  00 01 FF 7F FF FF FF FF FF!                       ..ÿÿÿÿÿÿ       
+++> 0x00000050:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260922 203323.186 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\timestamp-truncated-9.qtp
+E 260922 203323.186 [main] BinaryQTPParser - Corrupted QTP message: End of buffer.
+++> === Last parsed bytes ===
+++> '!' shows where to last byte was read
+++> 0x00000040:  00 01 FF 7F FF FF FF FF FF FF!                    ..ÿÿÿÿÿÿÿ      
+++> 0x00000050:                                                                    
+++> === END ===
+java.io.EOFException: End of buffer.
+	at com.devexperts.io.BufferedInput.<clinit>(BufferedInput.java:903)
+I 260922 203323.188 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\heartbeat-preserves-time.qtp
+I 260922 203323.191 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\heartbeat-negative-bits.qtp
+I 260922 203323.193 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\mixed-raw-stream.qtp
+I 260922 203323.195 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\unsupported-message.qtp
+I 260922 203323.197 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\nonzero-flags.qtp
+I 260922 203323.200 [main] FileReader - Reading data from C:\qd-cxx\.work\raw-baseline-verify\raw-tape\nonzero-flags-empty-opt.qtp

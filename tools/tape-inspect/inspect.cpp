@@ -68,10 +68,11 @@ int exitCode(protocol::TapeError error) {
  * @param d First parser failure.
  * @param version Diagnostic grammar, 1 or 2.
  * @param format Whether a bounded human explanation follows the structured row.
+ * @param mode Selected container policy for the explanation.
  * @return Native nonzero error code.
  */
-int diagnose(std::ostream &out, const protocol::TapeDiagnostic &d, unsigned version,
-             inspect::OutputFormat format) noexcept {
+int diagnose(std::ostream &out, const protocol::TapeDiagnostic &d, unsigned version, inspect::OutputFormat format,
+             protocol::TapeMode mode) noexcept {
     auto code = exitCode(d.error);
     try {
         out << (version == 2 ? "incomplete-v2\t" : "incomplete\t") << code << '\t' << d.stage << '\t' << d.detail
@@ -106,7 +107,7 @@ int diagnose(std::ostream &out, const protocol::TapeDiagnostic &d, unsigned vers
         out << '\n';
 
         if (version == 2 && format == inspect::OutputFormat::HUMAN) {
-            out << "Reason: " << tapeRejectionExplanation(d.rejection) << '\n';
+            out << "Reason: " << tapeRejectionExplanation(d.rejection, mode) << '\n';
         }
 
         out.flush();
@@ -137,7 +138,7 @@ bool prepareLimits(Limits &limits) noexcept {
 }
 
 void report(std::ostream &output, int code, std::string_view stage, unsigned diagnosticsVersion,
-            protocol::TapeRejection reason, inspect::OutputFormat format) noexcept {
+            protocol::TapeRejection reason, inspect::OutputFormat format, protocol::TapeMode mode) noexcept {
     try {
         output << (diagnosticsVersion == 2 ? "incomplete-v2\t" : "incomplete\t") << code << '\t' << stage
                << "\t0\t-\t-\t-\t-\t-";
@@ -149,7 +150,7 @@ void report(std::ostream &output, int code, std::string_view stage, unsigned dia
         output << '\n';
 
         if (diagnosticsVersion == 2 && format == inspect::OutputFormat::HUMAN) {
-            output << "Reason: " << tapeRejectionExplanation(reason) << '\n';
+            output << "Reason: " << tapeRejectionExplanation(reason, mode) << '\n';
         }
 
         output.flush();
@@ -158,10 +159,12 @@ void report(std::ostream &output, int code, std::string_view stage, unsigned dia
 }
 
 int inspect(std::istream &input, std::ostream &output, std::ostream &diagnostic, const core::LocalSchema &schema,
-            Limits limits, inspect::OutputFormat format, inspect::DisplayProfile profile, unsigned diagnosticsVersion) {
+            Limits limits, inspect::OutputFormat format, inspect::DisplayProfile profile, unsigned diagnosticsVersion,
+            protocol::TapeMode mode) {
     std::string_view operation = "configuration";
     try {
-        if (!prepareLimits(limits) || (diagnosticsVersion != 1 && diagnosticsVersion != 2)) {
+        if (!prepareLimits(limits) || (diagnosticsVersion != 1 && diagnosticsVersion != 2) ||
+            (mode != protocol::TapeMode::LEGACY && mode != protocol::TapeMode::RAW_MESSAGE_V1)) {
             report(diagnostic, 2, "usage", diagnosticsVersion, protocol::TapeRejection::NONE, format);
 
             return 2;
@@ -173,7 +176,8 @@ int inspect(std::istream &input, std::ostream &output, std::ostream &diagnostic,
             return 4;
         }
 
-        protocol::TapeReader reader(schema, limits.tape);
+        protocol::TapeReader reader(schema, limits.tape, mode);
+        const bool timed = mode == protocol::TapeMode::RAW_MESSAGE_V1;
         org::ttldtor::qdcxx::inspect::Formatter formatter(format, profile);
         std::size_t remainingOutput = limits.output;
         std::size_t emitted = 0;
@@ -200,7 +204,7 @@ int inspect(std::istream &input, std::ostream &output, std::ostream &diagnostic,
                 throw Failure{3};
             }
         };
-        emit(formatter.tapeHeader(remainingOutput));
+        emit(timed ? formatter.rawTapeHeader(remainingOutput) : formatter.tapeHeader(remainingOutput));
         std::vector<char> buffer(limits.chunkSize);
         bool eof = false;
 
@@ -240,27 +244,37 @@ int inspect(std::istream &input, std::ostream &output, std::ostream &diagnostic,
 
                 if (result.frame) {
                     auto index = reader.frameCount() - 1;
-                    emit(formatter.tapeFrame(*result.frame, index, remainingOutput));
+                    emit(formatter.tapeFrame(*result.frame, index, remainingOutput, mode));
 
                     if (index == 0 && reader.descriptor()) {
-                        emit(formatter.tapeDescriptor(*reader.descriptor(), remainingOutput));
+                        emit(timed ? formatter.rawTapeDescriptor(*reader.descriptor(), remainingOutput)
+                                   : formatter.tapeDescriptor(*reader.descriptor(), remainingOutput));
+                    }
+
+                    if (result.heartbeat) {
+                        emit(formatter.tapeHeartbeat(*result.heartbeat, index, remainingOutput));
+                    }
+
+                    if (result.timing) {
+                        emit(formatter.tapeTiming(*result.timing, index, remainingOutput));
                     }
 
                     for (const auto &record : result.records) {
                         emit(formatter.record(record, schema.records()[static_cast<std::size_t>(record.localId)].name,
-                                              index, emitted, remainingOutput));
+                                              index, emitted, remainingOutput,
+                                              result.timing ? &*result.timing : nullptr));
                         ++emitted;
                     }
                 }
 
                 if (result.status == protocol::TapeStatus::FAILED) {
-                    return diagnose(diagnostic, reader.diagnostic(), diagnosticsVersion, format);
+                    return diagnose(diagnostic, reader.diagnostic(), diagnosticsVersion, format, mode);
                 }
             }
         }
 
         if (reader.finish() != protocol::TapeStatus::FINISHED) {
-            return diagnose(diagnostic, reader.diagnostic(), diagnosticsVersion, format);
+            return diagnose(diagnostic, reader.diagnostic(), diagnosticsVersion, format, mode);
         }
 
         flush();

@@ -1,5 +1,15 @@
 # Bounded STREAM_DATA decoder
 
+## Explicit RAW payload entry point
+
+QDCXX-023 adds `decodeRawData(payload, context, limits)` for a complete type-5 payload under
+[RAW-TAPE](RAW-TAPE.md). Production FileReader observations establish the same exact field layout,
+fresh symbols and zero-flags value projection for this bounded subset. Both public entry points
+share a private payload implementation and retain the same result, charging, positions and terminal
+prefix rules. `decodeStreamData` remains the type-15 entry point. Neither API dispatches arbitrary
+message kinds, applies heartbeat time, nor implements Java's ticker/stream/history callback fanout;
+the tape layer applies timing once per actual RAW frame.
+
 ## Explicit typed profile
 
 QDCXX-022 adds the opt-in [Quote field contract](../encoding/QUOTE-VALUES.md). The snapshot copies

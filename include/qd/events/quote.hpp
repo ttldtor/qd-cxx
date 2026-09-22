@@ -29,7 +29,7 @@ struct Quote {
     core::WideDecimal askPrice;    ///< Exact raw decimal, including NaN and infinities.
     core::WideDecimal askSize;     ///< Exact raw decimal size, including missing-field NaN.
     std::int64_t timeMs;           ///< Maximum bid/ask millisecond time, without a subsecond component.
-    std::int64_t eventTime = 0;    ///< Metadata is absent in the supported file profile.
+    std::int64_t eventTime = 0;    ///< Field mapping leaves metadata zero; explicit tape timing is separate.
     std::int32_t sequence = 0;     ///< Default schema has no Sequence field.
     std::int32_t timeNanoPart = 0; ///< Default schema has no TimeNanoPart field.
 };

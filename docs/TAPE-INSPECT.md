@@ -1,5 +1,29 @@
 # Tape inspection, version 1
 
+## Explicit raw-message-v1 and timed output version 3
+
+`--tape-mode raw-message-v1` selects bounded uncompressed RAW_DATA/MESSAGE independently from
+`--profile oracle-sre-v1|default-quote-v1`. The mode accepts only the measured option/header subset,
+zero event flags and existing exact field identities. Omitted mode or explicit `legacy` preserves
+all previous output, refusals and diagnostic defaults. No mode is inferred from input.
+
+[RAW-TAPE](../spec/protocol/RAW-TAPE.md) defines version-3 TSV/human rows: original frame boundaries,
+exact descriptor options/time, every heartbeat including the final one, shared data-frame timing,
+raw timestamp absence versus zero, packed cursor sequence and delivered event time. Quote business
+timestamps remain independent; its displayed eventTime now reflects cursor timing in this mode.
+`--max-timing-events` bounds cumulative explicit heartbeat/data metadata attempts (default 4096).
+All previous limits and diagnostic versions 1/2 remain available. Human refusal advice follows the
+selected mode; legacy advice is unchanged. No-argument/help equivalence and pre-IO usage validation
+remain mandatory. New mode does not wait for replay time.
+
+```powershell
+.work/raw-msvc/Release/qdcxx-tape-inspect --input tests/fixtures/protocol/raw-tape/expected/connector-quote.qtp --profile default-quote-v1 --tape-mode raw-message-v1 --output-format human
+```
+
+This reads the unchanged production Java fixture. The optional private tape has
+[additional field/schema gaps](REAL-TAPE-GAPS.md); successful generated fixtures do not establish
+full support. The historical sections below describe prior versions and their original checks.
+
 ## Explicit default-quote-v1 and diagnostic version 2
 
 Diagnostic names and human explanations are implemented in tools/tape-inspect/diagnostics.hpp/.cpp

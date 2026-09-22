@@ -4,15 +4,22 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <limits>
 #include <stdexcept>
 #include <utility>
 
 namespace org::ttldtor::qdcxx::protocol {
 namespace {
-constexpr std::int32_t DESCRIBE_PROTOCOL = 1; ///< Required initial header.
-constexpr std::int32_t DESCRIBE_RECORDS = 2;  ///< Append-only description update.
-constexpr std::int32_t STREAM_DATA = 15;      ///< Only accepted data message.
+constexpr std::int32_t DESCRIBE_PROTOCOL = 1;    ///< Required initial header.
+constexpr std::int32_t DESCRIBE_RECORDS = 2;     ///< Append-only description update.
+constexpr std::int32_t STREAM_DATA = 15;         ///< Legacy data message.
+constexpr std::int32_t RAW_DATA = 5;             ///< Opt-in raw wire records.
+constexpr std::int32_t HEARTBEAT = 0;            ///< Explicit timing message, distinct from an empty envelope.
+constexpr std::int64_t MILLIS_PER_SECOND = 1000; ///< Signed wire timestamp resolution.
+constexpr unsigned SECOND_SHIFT = 32;            ///< High signed seconds word in cursor timing.
+constexpr unsigned MILLIS_SHIFT = 22;            ///< Milliseconds above the reserved sequence bits.
+constexpr std::uint64_t MILLIS_MASK = 0x3FF;     ///< Ten-bit packed millisecond component.
 /** Exact protocol-descriptor signature, preceding property and message maps. */
 constexpr std::array<std::byte, 4> MAGIC{std::byte{'D'}, std::byte{'X'}, std::byte{'P'}, std::byte{'3'}};
 
@@ -25,6 +32,7 @@ struct DescriptorFailure {
 class DescriptorParser {
     std::span<const std::byte> payload_;
     TapeDescriptorLimits limits_;
+    TapeMode mode_;
     TapeDiagnostic &position_;
     std::size_t cursor_ = 0;
     std::size_t units_ = 0;
@@ -128,9 +136,11 @@ class DescriptorParser {
      * @param payload Complete descriptor bytes.
      * @param limits Finite text/collection bounds.
      * @param position Diagnostic checkpoints updated during examination.
+     * @param mode Explicit container policy.
      */
-    DescriptorParser(std::span<const std::byte> payload, TapeDescriptorLimits limits, TapeDiagnostic &position)
-        : payload_(payload), limits_(limits), position_(position) {
+    DescriptorParser(std::span<const std::byte> payload, TapeDescriptorLimits limits, TapeDiagnostic &position,
+                     TapeMode mode)
+        : payload_(payload), limits_(limits), mode_(mode), position_(position) {
     }
 
     /** Examine the entire restricted header.
@@ -178,17 +188,19 @@ class DescriptorParser {
 
                 type = true;
             } else if (*key == u"opt") {
-                if (!value->empty()) {
+                if (!value->empty() && !(mode_ == TapeMode::RAW_MESSAGE_V1 && *value == u"hs")) {
                     reject(TapeError::UNSUPPORTED, TapeRejection::OPTIONS);
                 }
 
                 opt = true;
+                result.options = std::move(value);
             } else if (*key == u"time") {
-                if (*value != u"NONE") {
+                if (mode_ == TapeMode::LEGACY ? *value != u"NONE" : (*value != u"MESSAGE" && *value != u"message")) {
                     reject(TapeError::UNSUPPORTED, TapeRejection::TIME);
                 }
 
-                result.explicitTimeNone = true;
+                result.explicitTimeNone = *value == u"NONE";
+                result.time = std::move(value);
             } else if (*key == u"version") {
                 result.version = std::move(value);
             } else {
@@ -209,17 +221,25 @@ class DescriptorParser {
 
                 auto props = count(true, properties_, limits_.properties);
 
-                if (props != 0 || direction != 0 || entries != 1 || id != STREAM_DATA || *name != u"STREAM_DATA") {
+                const bool acceptedMessage = mode_ == TapeMode::LEGACY ? id == STREAM_DATA && *name == u"STREAM_DATA"
+                                                                       : id == RAW_DATA && *name == u"RAW_DATA";
+
+                if (props != 0 || direction != 0 || entries != 1 || !acceptedMessage) {
                     reject(TapeError::UNSUPPORTED, TapeRejection::MESSAGE);
                 }
 
-                result.explicitStreamSend = true;
+                result.explicitStreamSend = mode_ == TapeMode::LEGACY;
+                result.explicitRawSend = mode_ == TapeMode::RAW_MESSAGE_V1;
             }
         }
 
-        if (cursor_ != payload_.size() || !type || !opt) {
+        if (cursor_ != payload_.size() || !type || (!opt && mode_ == TapeMode::LEGACY)) {
             reject(TapeError::UNSUPPORTED,
                    cursor_ == payload_.size() && type && !opt ? TapeRejection::OPTIONS : TapeRejection::DESCRIPTOR);
+        }
+
+        if (mode_ == TapeMode::RAW_MESSAGE_V1 && !result.time) {
+            reject(TapeError::UNSUPPORTED, TapeRejection::TIME);
         }
 
         position_.consumed = cursor_;
@@ -264,10 +284,44 @@ TapeError bindingError(BindingError error) {
         return TapeError::MALFORMED;
     }
 }
+
+/** Pack a signed wire timestamp without signed shifts or overflowing intermediate arithmetic.
+ * @param timestamp Exact signed milliseconds.
+ * @return Saturated Java cursor timing with reserved sequence bits zero.
+ */
+std::int64_t packTimestamp(std::int64_t timestamp) noexcept {
+    auto seconds = timestamp / MILLIS_PER_SECOND;
+    auto millis = timestamp % MILLIS_PER_SECOND;
+
+    if (millis < 0) {
+        --seconds;
+        millis += MILLIS_PER_SECOND;
+    }
+
+    seconds = std::clamp(seconds, static_cast<std::int64_t>(std::numeric_limits<std::int32_t>::min()),
+                         static_cast<std::int64_t>(std::numeric_limits<std::int32_t>::max()));
+    const auto secondsBits = static_cast<std::uint32_t>(seconds);
+    const auto packed = (static_cast<std::uint64_t>(secondsBits) << SECOND_SHIFT) |
+                        (static_cast<std::uint64_t>(millis) << MILLIS_SHIFT);
+
+    return std::bit_cast<std::int64_t>(packed);
+}
 } // namespace
 
-TapeReader::TapeReader(const core::LocalSchema &schema, TapeLimits limits)
-    : limits_(limits), schema_(copySchema(schema, limits.context.schema)), framer_(limits.frame) {
+std::int64_t TapeTiming::eventTimeMs() const noexcept {
+    const auto bits = std::bit_cast<std::uint64_t>(eventTimeSequence);
+    const auto seconds = std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(bits >> SECOND_SHIFT));
+
+    return static_cast<std::int64_t>(seconds) * MILLIS_PER_SECOND +
+           static_cast<std::int64_t>((bits >> MILLIS_SHIFT) & MILLIS_MASK);
+}
+
+TapeReader::TapeReader(const core::LocalSchema &schema, TapeLimits limits, TapeMode mode)
+    : limits_(limits), mode_(mode), schema_(copySchema(schema, limits.context.schema)), framer_(limits.frame) {
+    if (mode_ != TapeMode::LEGACY && mode_ != TapeMode::RAW_MESSAGE_V1) {
+        throw std::invalid_argument("invalid tape mode");
+    }
+
     auto empty = StreamDataContext::create(schema_, {}, limits_.context);
 
     if (!empty) {
@@ -306,7 +360,7 @@ void TapeReader::dispatch(TapeFeedResult &result) {
             return;
         }
 
-        DescriptorParser parser(frame.payload, limits_.descriptor, diagnostic_);
+        DescriptorParser parser(frame.payload, limits_.descriptor, diagnostic_, mode_);
         try {
             descriptor_ = parser.parse();
         } catch (const DescriptorFailure &failure) {
@@ -318,6 +372,78 @@ void TapeReader::dispatch(TapeFeedResult &result) {
 
     if (frame.kind == FrameKind::EMPTY_HEARTBEAT) {
         ++markers_;
+
+        return;
+    }
+
+    if (mode_ == TapeMode::RAW_MESSAGE_V1 && (frame.type == HEARTBEAT || frame.type == RAW_DATA)) {
+        diagnostic_.consumed = 0;
+        diagnostic_.errorOffset = 0;
+
+        if (timingEvents_ == limits_.timingEvents) {
+            fail(TapeError::RESOURCE_LIMIT, "timing");
+
+            return;
+        }
+
+        ++timingEvents_;
+    }
+
+    if (mode_ == TapeMode::RAW_MESSAGE_V1 && frame.type == HEARTBEAT) {
+        diagnostic_.stage = "heartbeat";
+        TapeHeartbeat heartbeat;
+        std::size_t cursor = 0;
+
+        if (!frame.payload.empty()) {
+            const auto content = encoding::readCompactInt(frame.payload);
+            cursor += content.consumed;
+            diagnostic_.consumed = cursor;
+
+            if (content.status != encoding::Status::OK) {
+                fail(TapeError::MALFORMED, "heartbeat");
+
+                return;
+            }
+
+            if (content.value != 0 && content.value != 1) {
+                diagnostic_.rejection = TapeRejection::TIME;
+                fail(TapeError::UNSUPPORTED, "heartbeat");
+
+                return;
+            }
+
+            heartbeat.content = content.value;
+
+            if (content.value == 1) {
+                diagnostic_.errorOffset = cursor;
+                const auto timestamp = encoding::readCompactLong(std::span(frame.payload).subspan(cursor));
+                cursor += timestamp.consumed;
+                diagnostic_.consumed = cursor;
+
+                if (timestamp.status != encoding::Status::OK) {
+                    fail(TapeError::MALFORMED, "heartbeat");
+
+                    return;
+                }
+
+                heartbeat.timestampMs = timestamp.value;
+            }
+        }
+
+        diagnostic_.errorOffset = cursor;
+
+        if (cursor != frame.payload.size()) {
+            diagnostic_.rejection = TapeRejection::TIME;
+            fail(TapeError::UNSUPPORTED, "heartbeat");
+
+            return;
+        }
+
+        if (heartbeat.timestampMs) {
+            timing_ = {heartbeat.timestampMs, packTimestamp(*heartbeat.timestampMs)};
+        }
+
+        result.heartbeat = heartbeat;
 
         return;
     }
@@ -406,7 +532,7 @@ void TapeReader::dispatch(TapeFeedResult &result) {
         return;
     }
 
-    if (frame.type != STREAM_DATA) {
+    if (frame.type != (mode_ == TapeMode::LEGACY ? STREAM_DATA : RAW_DATA)) {
         diagnostic_.rejection = frame.type == DESCRIBE_PROTOCOL ? TapeRejection::SEQUENCE : TapeRejection::MESSAGE;
         fail(TapeError::UNSUPPORTED, "type");
 
@@ -414,13 +540,19 @@ void TapeReader::dispatch(TapeFeedResult &result) {
     }
 
     diagnostic_.stage = "data";
+
+    if (mode_ == TapeMode::RAW_MESSAGE_V1) {
+        result.timing = timing_;
+    }
+
     auto budget = limits_.data;
     budget.processedRecords -= records_;
     budget.wireFields -= fields_;
     budget.emittedRecords = std::min(budget.emittedRecords - emitted_, budget.processedRecords);
     budget.emittedValues -= values_;
     budget.ownedSymbolUnits -= symbols_;
-    auto decoded = decodeStreamData(frame.payload, *context_, budget);
+    auto decoded = mode_ == TapeMode::LEGACY ? decodeStreamData(frame.payload, *context_, budget)
+                                             : decodeRawData(frame.payload, *context_, budget);
     records_ += decoded.processedRecords;
     fields_ += decoded.wireFields;
 

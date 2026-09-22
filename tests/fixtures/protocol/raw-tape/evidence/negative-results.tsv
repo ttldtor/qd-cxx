@@ -1,0 +1,12 @@
+byte	REJECTED	artifact mismatch: raw-quote.qtp
+value	REJECTED	artifact mismatch: raw-quote.tsv
+time	REJECTED	artifact mismatch: raw-quote.tsv
+order	REJECTED	record order
+arity	REJECTED	field order
+missing	REJECTED	exact artifact set
+extra	REJECTED	exact artifact set
+completion	REJECTED	completion
+noncanonical	REJECTED	canonical integer
+full-type	REJECTED	full type
+PASS: 94 cases; 284 exact artifacts, typed values/timing/structure and bytes
+BASELINE PASS; expectations unchanged

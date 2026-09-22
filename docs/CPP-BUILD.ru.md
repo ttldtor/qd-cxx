@@ -1,5 +1,23 @@
 # Ограниченные компоненты C++23
 
+## API tape RAW/MESSAGE
+
+QDCXX-023 добавляет явный `TapeMode::RAW_MESSAGE_V1` третьим параметром конструктора TapeReader.
+Задайте дополнительный конечный `TapeLimits::timingEvents` (по умолчанию ноль); CLI использует 4096.
+`TapeFeedResult::heartbeat` владеет принятым явным heartbeat, а `timing` — исходным timestamp
+и packed event-time sequence для всех возвращённых записей одного RAW frame.
+`TapeTiming::eventTimeMs()` даёт доставленные миллисекунды, которые на границах насыщения Java
+могут отличаться от исходного timestamp. Сохраняйте metadata вместе с записями. Состояние времени
+не заимствуется из входа. Прежние конструкторы используют LEGACY с прежним поведением.
+
+`decodeRawData` — отдельный метод для точного payload типа 5; `decodeStreamData` остаётся типом 15.
+Время и диспетчеризация принадлежат TapeReader, примитивы payload используются совместно внутри.
+Третий параметр `mapQuote` по-прежнему бюджет копирования символов, а не timestamp.
+[Точный контракт и владение](../spec/protocol/RAW-TAPE.ru.md), [вызов утилиты](TAPE-INSPECT.ru.md).
+Зависимости и параметры сборки неизменны. Новые raw tape conformance, IO и CLI suites дополняют
+существующие тесты; IO/CLI требуют включённый tape inspector. Остальные полные типы, адаптеры,
+импортер, транспорт и совместимость целого частного файла остаются вне границ.
+
 ## API default composite Quote
 
 QDCXX-022 добавляет qd/encoding/utf_char.hpp в qdcxx_encoding, qd/core/wide_decimal.hpp в qdcxx_core,

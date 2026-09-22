@@ -46,6 +46,7 @@ int main(int argc, char **argv) {
     namespace protocol = org::ttldtor::qdcxx::protocol;
     unsigned diagnosticsVersion = 1;
     auto format = presentation::OutputFormat::TSV;
+    auto mode = protocol::TapeMode::LEGACY;
 #ifdef _WIN32
 
     if (_setmode(_fileno(stdout), _O_BINARY) == -1 || _setmode(_fileno(stderr), _O_BINARY) == -1) {
@@ -77,16 +78,20 @@ int main(int argc, char **argv) {
             {"--max-properties", &t.descriptor.properties},
             {"--max-messages", &t.descriptor.messages},
             {"--max-descriptor-units", &t.descriptor.textUnits},
-            {"--max-text-units", &t.descriptor.text.codeUnits}};
+            {"--max-text-units", &t.descriptor.text.codeUnits},
+            {"--max-timing-events", &t.timingEvents}};
 
         if (argc == 1 || (argc == 2 && std::string_view(argv[1]) == "--help")) {
             std::cout << "qdcxx-tape-inspect --input PATH --profile oracle-sre-v1|default-quote-v1 [--output-format "
-                         "tsv|human] [--diagnostics-version 1|2] [LIMIT "
+                         "tsv|human] [--diagnostics-version 1|2] [--tape-mode legacy|raw-message-v1] [LIMIT "
                          "VALUE ...]\n"
                          "Explicit BINARY, uncompressed, time NONE, EMPTY_SET, STREAM_DATA, zero flags.\n"
                          "oracle-sre-v1: diagnostic S/R/E, exact type 8, diagnostics default 1.\n"
                          "default-quote-v1: composite Quote, exact types 2/8/56/120, diagnostics default 2.\n"
-                         "No stdin, network, recovery, RAW_DATA, MESSAGE time or general tape support.\n"
+                         "--tape-mode raw-message-v1: explicit BINARY/RAW_DATA/MESSAGE, opt absent/empty/hs, zero "
+                         "flags; timed output 3.\n"
+                         "Omitted tape-mode or legacy preserves the restricted NONE/STREAM_DATA policy.\n"
+                         "No stdin, network, recovery or general tape support.\n"
                          "Numeric limits are finite unsigned decimal; chunk-size must be positive. Defaults:\n";
 
             for (const auto &[name, value] : options) {
@@ -131,6 +136,9 @@ int main(int argc, char **argv) {
             } else if (key == "--diagnostics-version") {
                 valid = operand == "1" || operand == "2";
                 diagnosticsVersion = operand == "2" ? 2U : 1U;
+            } else if (key == "--tape-mode") {
+                valid = operand == "legacy" || operand == "raw-message-v1";
+                mode = operand == "raw-message-v1" ? protocol::TapeMode::RAW_MESSAGE_V1 : protocol::TapeMode::LEGACY;
             } else {
                 auto option = options.find(key);
                 valid = option != options.end() && number(operand, *option->second);
@@ -171,7 +179,7 @@ int main(int argc, char **argv) {
         return ti::inspect(input, std::cout, std::cerr, *schema, limits, format,
                            quoteProfile ? presentation::DisplayProfile::DEFAULT_QUOTE_V1
                                         : presentation::DisplayProfile::ORACLE_SRE_V1,
-                           diagnosticsVersion);
+                           diagnosticsVersion, mode);
     } catch (const std::bad_alloc &) {
         ti::report(std::cerr, 6, "allocation", diagnosticsVersion, protocol::TapeRejection::NONE, format);
 

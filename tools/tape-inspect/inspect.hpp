@@ -10,14 +10,14 @@ namespace org::ttldtor::qdcxx::tape_inspect {
 struct Limits {
     std::size_t chunkSize = 4096;  ///< Bounded read buffer, positive.
     std::size_t output = 67108864; ///< All encoded stdout bytes.
-    protocol::TapeLimits tape{
-        {1048576, 1048585},
-        67108864,
-        4096,
-        {16, 8, {4096, 1024}, 8192},
-        {{1024, 65536, 65536, 1024, 1048576}, 1024, {65536, 1024, 1048576}},
-        16777216,
-        {1048576, 1048576, 4194304, 1048576, 4194304, 4194304, {1048576, 4096, 4096}}}; ///< Explicit finite defaults.
+    protocol::TapeLimits tape{{1048576, 1048585},
+                              67108864,
+                              4096,
+                              {16, 8, {4096, 1024}, 8192},
+                              {{1024, 65536, 65536, 1024, 1048576}, 1024, {65536, 1024, 1048576}},
+                              16777216,
+                              {1048576, 1048576, 4194304, 1048576, 4194304, 4194304, {1048576, 4096, 4096}},
+                              4096}; ///< Explicit finite defaults, including RAW timing attempts.
 };
 
 /** Validate IO representability and synchronize derived primitive limits.
@@ -32,10 +32,12 @@ bool prepareLimits(Limits &limits) noexcept;
  * @param diagnosticsVersion Explicit diagnostic grammar, 1 or 2.
  * @param reason Bounded protocol reason, never input text.
  * @param format TSV or safe human explanation selection.
+ * @param mode Selected container policy for the explanation.
  */
 void report(std::ostream &output, int code, std::string_view stage, unsigned diagnosticsVersion = 1,
             protocol::TapeRejection reason = protocol::TapeRejection::NONE,
-            inspect::OutputFormat format = inspect::OutputFormat::TSV) noexcept;
+            inspect::OutputFormat format = inspect::OutputFormat::TSV,
+            protocol::TapeMode mode = protocol::TapeMode::LEGACY) noexcept;
 /** Read one bounded binary stream, retaining completed data prefix on errors.
  * @param input Binary source, borrowed for the call.
  * @param output Binary LF destination.
@@ -45,9 +47,11 @@ void report(std::ostream &output, int code, std::string_view stage, unsigned dia
  * @param format TSV or safe quoted human output.
  * @param profile Explicit display grammar matching the schema; mismatch fails before input/output work.
  * @param diagnosticsVersion Explicit diagnostic grammar, defaulting to the legacy contract.
+ * @param mode Explicit container policy, independent of local schema and presentation.
  * @return Native contract exit code; IO failure cannot be success.
  */
 int inspect(std::istream &input, std::ostream &output, std::ostream &diagnostic, const core::LocalSchema &schema,
             Limits limits, inspect::OutputFormat format = inspect::OutputFormat::TSV,
-            inspect::DisplayProfile profile = inspect::DisplayProfile::LOCAL_SCHEMA, unsigned diagnosticsVersion = 1);
+            inspect::DisplayProfile profile = inspect::DisplayProfile::LOCAL_SCHEMA, unsigned diagnosticsVersion = 1,
+            protocol::TapeMode mode = protocol::TapeMode::LEGACY);
 } // namespace org::ttldtor::qdcxx::tape_inspect

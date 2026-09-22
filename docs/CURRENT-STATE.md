@@ -2,7 +2,23 @@
 
 [Русская версия](CURRENT-STATE.ru.md). English is authoritative.
 
-## Reviewed baseline: QDCXX-022; next task: QDCXX-023
+## QDCXX-023 independently accepted
+
+Starting HEAD: `c1654f2dbb5163917b848d1b84b17dfb9d0999fc`. The opt-in `raw-message-v1` mode now
+implements the [bounded RAW/MESSAGE contract](../spec/protocol/RAW-TAPE.md), exact owned timing,
+type-5 decoding for the existing field profiles and version-3 timed inspection. Production Java
+evidence preceded the C++ work. See [coverage](../tests/conformance/protocol/raw-tape/COVERAGE.md)
+and [author validation](../tests/conformance/protocol/raw-tape/VALIDATION.md).
+Independent acceptance found no actionable
+defect and freshly passed all 20 suites in clean MSVC Release and GCC ASan+UBSan builds, negative
+checks and evidence audits. No staging or commit was performed, and the next task has not started.
+
+The [private-sample inventory](REAL-TAPE-GAPS.md) found additional full types 10/40/72/88 and Profile.
+Structural enumeration completed, but bounded Java replay stopped at its delivery budget.
+This does not establish full-file decoding or compatibility. Broader types, adapters, flags,
+compression, sessions, replay scheduling and transport remain separate work.
+
+## Historical reviewed baseline: QDCXX-022
 
 The independent review's presentation-boundary finding has been addressed: diagnostic names/advice
 now live in tools/tape-inspect, while protocol retains only refusal data. Added per-slot mapQuote
@@ -22,10 +38,8 @@ No new Python or runtime dependency. RAW_DATA, MESSAGE timing, broader records/t
 compression, regional Quote and transport remain outside this increment; follow [NEXT-STEPS](NEXT-STEPS.md).
 Earlier state/handoff sections below are historical and superseded within this bounded scope.
 
-QDCXX-023 is ready, High: characterize and implement bounded RAW_DATA/MESSAGE
-tape inspection for the existing field profiles, with exact timing and measured missing-opt behavior.
-The task also requires a bounded inventory of remaining private-sample gaps; it does not promise
-full sample decoding. Implementation has not started. Broader records/types remain the next increment.
+QDCXX-023 supersedes the RAW_DATA/MESSAGE exclusion only within its explicit
+measured profile. Broader records/types remain a separate increment.
 
 ## Historical decision: QDCXX-021 reviewed; QDCXX-022 ready
 

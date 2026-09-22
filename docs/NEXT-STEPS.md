@@ -2,7 +2,7 @@
 
 [Русская версия](NEXT-STEPS.ru.md). English is authoritative.
 
-## Current sequence after QDCXX-022 implementation
+## Current sequence after QDCXX-023 acceptance
 
 The owner requested continued implementation toward real tape support, not permanent synthetic-only
 coverage. Independent review accepts QDCXX-021's
@@ -12,11 +12,14 @@ bounded scope. QDCXX-022 started from committed HEAD `fa5a0b967e9c021e656846cdd3
    composite Quote end to end, Java production observations then C++, explicit Quote profile and
    useful rejection diagnostics. Existing profile/output compatibility is retained. Implementation commit:
    `c26aed28f84db5c574ec5fbb9e4e5160e9dbbd8e` in master; author evidence remains separate from independent checks.
-2. QDCXX-023, ready, High — real tape mode: production Java evidence and bounded C++ support for RAW_DATA, MESSAGE timing /
-   nonempty heartbeat and measured missing-opt semantics. Distinguish replay timing from business
-   timestamps and event-time metadata; do not merely relabel RAW_DATA as STREAM_DATA or drop timing.
-3. Broader actual records/types: enumerate all descriptions and message types in the owner's sample
-   with a bounded diagnostic inventory, replay through locked Java where supported, derive minimal
+2. QDCXX-023, done, independently accepted, High — production Java
+   evidence and bounded C++ RAW_DATA/MESSAGE support, owned heartbeat timing and measured missing-opt
+   semantics. [Author validation](../tests/conformance/protocol/raw-tape/VALIDATION.md) and
+   [remaining gaps](REAL-TAPE-GAPS.md) retain the distinction between replay/business/event time and
+   structural inventory versus full-file compatibility. Independent acceptance
+   records separate fresh checks. No staging, commit or next-task work occurred.
+3. Broader actual records/types: use the completed bounded description/message inventory and the
+   incomplete budget-limited Java replay documented in REAL-TAPE-GAPS. Derive minimal
    reproducible standard-event cases. Implement required types/conversions/skips in explicit increments,
    including Profile and other observed records, not just the first encountered failure. Keep synthetic
    boundary tests and whole-file semantic comparisons; report unsupported parts explicitly.

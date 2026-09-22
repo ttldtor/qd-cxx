@@ -125,4 +125,13 @@ struct StreamDataResult {
  */
 [[nodiscard]] StreamDataResult decodeStreamData(std::span<const std::byte> payload, const StreamDataContext &context,
                                                 StreamDataLimits limits);
+/** Decode one complete type-5 payload under RAW-TAPE's exact fields and zero-flags policy.
+ * This is one wire-record projection, without Java ticker/history callback fan-out or timing state.
+ * @param payload Borrowed payload excluding length/type, unchanged during this call.
+ * @param context Validated static snapshot, borrowed during this call.
+ * @param limits Required finite per-message budgets.
+ * @return Owned completed prefix and first-error positions, with fresh message-local symbols.
+ */
+[[nodiscard]] StreamDataResult decodeRawData(std::span<const std::byte> payload, const StreamDataContext &context,
+                                             StreamDataLimits limits);
 } // namespace org::ttldtor::qdcxx::protocol

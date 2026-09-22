@@ -1,0 +1,3 @@
+# Preserve captured command output and reviewer evidence; never trim or normalize it.
+logs/** -text -whitespace
+review-evidence/** -text -whitespace

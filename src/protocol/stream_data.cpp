@@ -120,8 +120,15 @@ const StreamRecordPlan *StreamDataContext::find(std::int32_t senderId) const noe
     return nullptr;
 }
 
-StreamDataResult decodeStreamData(std::span<const std::byte> payload, const StreamDataContext &context,
-                                  StreamDataLimits limits) {
+namespace {
+/** Decode the measured shared zero-flags wire record layout.
+ * @param payload Complete borrowed data payload.
+ * @param context Validated immutable bindings.
+ * @param limits Finite record, field and output bounds.
+ * @return Owned prefix and first-error diagnostics.
+ */
+StreamDataResult decodeDataPayload(std::span<const std::byte> payload, const StreamDataContext &context,
+                                   StreamDataLimits limits) {
     StreamDataResult result;
 
     if (payload.size() > limits.payloadBytes) {
@@ -297,5 +304,16 @@ StreamDataResult decodeStreamData(std::span<const std::byte> payload, const Stre
     }
 
     return result;
+}
+} // namespace
+
+StreamDataResult decodeStreamData(std::span<const std::byte> payload, const StreamDataContext &context,
+                                  StreamDataLimits limits) {
+    return decodeDataPayload(payload, context, limits);
+}
+
+StreamDataResult decodeRawData(std::span<const std::byte> payload, const StreamDataContext &context,
+                               StreamDataLimits limits) {
+    return decodeDataPayload(payload, context, limits);
 }
 } // namespace org::ttldtor::qdcxx::protocol

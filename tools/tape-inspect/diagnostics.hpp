@@ -12,8 +12,10 @@ namespace org::ttldtor::qdcxx::tape_inspect {
 [[nodiscard]] std::string_view tapeRejectionName(protocol::TapeRejection reason) noexcept;
 /** Inspect a safe fixed human explanation.
  * @param reason Bounded reason enum.
+ * @param mode Explicit container policy; legacy wording remains unchanged.
  * @return Static ASCII text with no untrusted input interpolation.
  */
-[[nodiscard]] std::string_view tapeRejectionExplanation(protocol::TapeRejection reason) noexcept;
+[[nodiscard]] std::string_view tapeRejectionExplanation(protocol::TapeRejection reason,
+                                                        protocol::TapeMode mode = protocol::TapeMode::LEGACY) noexcept;
 
 } // namespace org::ttldtor::qdcxx::tape_inspect

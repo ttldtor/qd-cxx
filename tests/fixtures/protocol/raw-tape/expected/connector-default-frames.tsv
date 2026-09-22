@@ -1,0 +1,10 @@
+frame	0	0	71	1
+frame	1	71	80	0
+frame	2	80	185	2
+frame	3	185	216	5
+frame	4	216	225	0
+frame	5	225	257	5
+frame	6	257	266	0
+frame	7	266	297	5
+frame	8	297	298	-1
+complete	frames	9	298

@@ -1,5 +1,29 @@
 # Инспекция tape, версия 1
 
+## Явный raw-message-v1 и вывод времени версии 3
+
+`--tape-mode raw-message-v1` выбирает ограниченный RAW_DATA/MESSAGE без сжатия независимо от
+`--profile oracle-sre-v1|default-quote-v1`. Режим допускает только измеренное подмножество
+options/заголовков, нулевые event flags и существующие точные полные типы. Отсутствующий режим
+и явный `legacy` сохраняют прежние вывод, отказы и стандартную диагностику. Режим не выводится из входа.
+
+[RAW-TAPE](../spec/protocol/RAW-TAPE.ru.md) определяет строки TSV/human версии 3: исходные границы
+frames, точные options/time дескриптора, каждый heartbeat, включая последний, общее время data
+frame, отсутствие исходного timestamp отдельно от нуля, packed cursor sequence и доставленное
+event time. Бизнес-время Quote независимо; отображаемый eventTime в новом режиме отражает время
+cursor. `--max-timing-events` ограничивает накопленные попытки metadata явных heartbeat/данных
+(по умолчанию 4096). Прежние бюджеты и версии диагностики 1/2 доступны. Human-объяснение отказа
+соответствует выбранному режиму; legacy-текст неизменен. Равенство no-argument/help и проверка
+аргументов до IO обязательны. Новый режим не ожидает времени воспроизведения.
+
+```powershell
+.work/raw-msvc/Release/qdcxx-tape-inspect --input tests/fixtures/protocol/raw-tape/expected/connector-quote.qtp --profile default-quote-v1 --tape-mode raw-message-v1 --output-format human
+```
+
+Команда читает неизменённый production Java fixture. Частный tape имеет
+[дополнительные ограничения полей/схем](REAL-TAPE-GAPS.ru.md); успех generated fixtures не
+подтверждает полную поддержку. Исторические разделы ниже описывают прежние версии и их проверки.
+
 ## Явный default-quote-v1 и диагностика version 2
 
 Имена и human-пояснения диагностики реализованы в tools/tape-inspect/diagnostics.hpp/.cpp

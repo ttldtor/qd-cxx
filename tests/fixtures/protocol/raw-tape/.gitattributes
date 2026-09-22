@@ -1,0 +1,3 @@
+expected/** -text
+# Captured UTC logs and provenance preserve exact bytes, including diagnostic padding.
+evidence/** -text -whitespace

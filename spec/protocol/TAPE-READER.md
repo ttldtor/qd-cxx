@@ -1,5 +1,13 @@
 # Bounded binary tape reader
 
+## Explicit RAW/MESSAGE extension
+
+[RAW-TAPE](RAW-TAPE.md) defines the independent opt-in `TapeMode::RAW_MESSAGE_V1` policy:
+actual type-5 RAW_DATA, measured MESSAGE timing, absent/empty/hs options, exact owning heartbeat
+and cursor timing, and an additional finite metadata budget. `TapeMode::LEGACY` is the default;
+all descriptor, dispatch and output statements below describe that preserved mode. Local schema
+selection remains independent. No broader types or full private-file compatibility follows.
+
 ## Explicit default Quote extension
 
 QDCXX-022 adds [default-quote-v1](DEFAULT-QUOTE.md) with exact field identities 2/8/56/120 through

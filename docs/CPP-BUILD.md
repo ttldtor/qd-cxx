@@ -1,5 +1,23 @@
 # Bounded C++23 components
 
+## RAW/MESSAGE tape API
+
+QDCXX-023 adds explicit `TapeMode::RAW_MESSAGE_V1` as the third TapeReader constructor argument.
+Set the additional finite `TapeLimits::timingEvents` (default zero); the CLI default is 4096.
+`TapeFeedResult::heartbeat` owns the accepted explicit heartbeat representation, and `timing`
+owns raw timestamp/packed event-time sequence for all returned records of one RAW frame.
+`TapeTiming::eventTimeMs()` exposes delivered milliseconds, which can differ from the raw timestamp
+at Java's saturated boundaries. Retain the metadata along with records. No timing state is borrowed
+from input. Existing constructor calls default to LEGACY and retain their behavior.
+
+`decodeRawData` is the separate exact type-5 payload entry point; `decodeStreamData` remains type 15.
+Timing and dispatch belong to TapeReader, while payload primitives remain shared internally.
+`mapQuote` still takes a symbol-copy budget as its third argument, never a timestamp.
+[Exact contract and ownership](../spec/protocol/RAW-TAPE.md), [tool invocation](TAPE-INSPECT.md).
+Build dependencies and options are unchanged. New raw tape conformance, IO and CLI suites augment
+the existing tests; the IO/CLI tests require the tape inspector option. Broader field types,
+adapters, importer, transport and whole private-file compatibility remain excluded.
+
 ## Default composite Quote API
 
 QDCXX-022 adds qd/encoding/utf_char.hpp to qdcxx_encoding, qd/core/wide_decimal.hpp to qdcxx_core,

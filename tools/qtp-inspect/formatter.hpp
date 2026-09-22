@@ -47,6 +47,31 @@ class Formatter {
      * @return Complete bounded row or OutputLimit.
      */
     std::string tapeHeader(std::size_t budget) const;
+    /** Compose the explicit timed tape format identity.
+     * @param budget Remaining output bytes.
+     * @return Complete version-3 row or OutputLimit.
+     */
+    std::string rawTapeHeader(std::size_t budget) const;
+    /** Compose a lossless accepted RAW descriptor.
+     * @param descriptor Accepted RAW/MESSAGE header.
+     * @param budget Remaining encoded bytes.
+     * @return Complete version-3 row or OutputLimit.
+     */
+    std::string rawTapeDescriptor(const protocol::TapeDescriptor &descriptor, std::size_t budget) const;
+    /** Compose one explicit heartbeat, including empty payload and absent timestamp.
+     * @param heartbeat Owned metadata borrowed for this call.
+     * @param index Zero-based frame index.
+     * @param budget Remaining output bytes.
+     * @return Complete row or OutputLimit.
+     */
+    std::string tapeHeartbeat(const protocol::TapeHeartbeat &heartbeat, std::size_t index, std::size_t budget) const;
+    /** Compose the timing shared by one RAW data frame's records.
+     * @param timing Owned wire and delivered timing.
+     * @param index Zero-based frame index.
+     * @param budget Remaining output bytes.
+     * @return Complete row or OutputLimit.
+     */
+    std::string tapeTiming(const protocol::TapeTiming &timing, std::size_t index, std::size_t budget) const;
     /** Compose validated tape diagnostic text, escaping untrusted version text.
      * @param descriptor Accepted owning descriptor.
      * @param budget Remaining encoded bytes.
@@ -57,9 +82,11 @@ class Formatter {
      * @param frame Owning envelope borrowed for this call.
      * @param index Zero-based envelope index.
      * @param budget Remaining bytes.
+     * @param mode Explicit tape policy; legacy presentation stays unchanged.
      * @return Complete bounded row or OutputLimit.
      */
-    std::string tapeFrame(const protocol::Frame &frame, std::size_t index, std::size_t budget) const;
+    std::string tapeFrame(const protocol::Frame &frame, std::size_t index, std::size_t budget,
+                          protocol::TapeMode mode = protocol::TapeMode::LEGACY) const;
     /** Describe marker presence without asserting an authenticated footer.
      * @param markers Number of accepted empty envelopes.
      * @param budget Remaining bytes.
@@ -86,10 +113,11 @@ class Formatter {
      * @param frameIndex Owning frame index.
      * @param index Zero-based emitted index.
      * @param budget Remaining stdout bytes.
+     * @param timing Optional delivered tape timing; null preserves untimed output.
      * @return Complete line or OutputLimit.
      */
     std::string record(const protocol::StreamDataRecord &record, std::u16string_view name, std::size_t frameIndex,
-                       std::size_t index, std::size_t budget) const;
+                       std::size_t index, std::size_t budget, const protocol::TapeTiming *timing = nullptr) const;
 
     /** Compose the success summary, whose physical delivery still requires a successful exit.
      * @param bytes Accepted input bytes.

@@ -6,6 +6,28 @@
 #include <string_view>
 
 namespace org::ttldtor::qdcxx::protocol {
+/** Explicit container policy, independent of the caller's local field profile. */
+enum class TapeMode {
+    LEGACY,        ///< Restricted untimed STREAM_DATA behavior.
+    RAW_MESSAGE_V1 ///< Bounded RAW_DATA with MESSAGE heartbeats; see RAW-TAPE.
+};
+
+/** Fixed-size owning timing state shared by all records in one data result. */
+struct TapeTiming {
+    std::optional<std::int64_t> timestampMs; ///< Exact signed wire milliseconds; absent before a timestamp.
+    std::int64_t eventTimeSequence = 0;      ///< Java-compatible saturated seconds and millisecond packing.
+    /** Recover the delivered event time, which can differ from a saturated wire timestamp.
+     * @return Signed milliseconds represented by the packed cursor sequence.
+     */
+    [[nodiscard]] std::int64_t eventTimeMs() const noexcept;
+};
+
+/** Accepted explicit type-zero heartbeat, distinct from an empty envelope marker. */
+struct TapeHeartbeat {
+    std::optional<std::int32_t> content;     ///< Absent for zero payload bytes, otherwise exact supported bits 0 or 1.
+    std::optional<std::int64_t> timestampMs; ///< Present only for content bit 1; exact wire milliseconds.
+};
+
 /** Required finite descriptor text and collection bounds. */
 struct TapeDescriptorLimits {
     std::size_t properties;         ///< Global and message property pairs combined.
@@ -23,6 +45,7 @@ struct TapeLimits {
     ContextLimits context;           ///< Schema and retained descriptions/actions/names.
     std::size_t constructionUnits;   ///< Cumulative full candidate and local schema elements.
     StreamDataLimits data;           ///< Aggregate file work/output bounds and per-symbol bounds.
+    std::size_t timingEvents = 0;    ///< RAW metadata attempts: explicit heartbeats and data frames; zero is finite.
 };
 /** Terminal categories, independent of Java exception classes. */
 enum class TapeError {
@@ -44,7 +67,7 @@ enum class TapeStatus {
 enum class TapeRejection {
     NONE,          ///< No additional profile reason.
     TIME,          ///< Unsupported tape timing.
-    OPTIONS,       ///< Required explicit empty protocol options are absent or incompatible.
+    OPTIONS,       ///< Protocol options or raw flags violate the selected bounded mode.
     MESSAGE,       ///< Unsupported message or message-set policy.
     TYPE,          ///< Unsupported full serial identity or excluded field conversion.
     LOCAL_PROFILE, ///< Unsupported caller local schema profile.
@@ -57,6 +80,9 @@ struct TapeDescriptor {
     std::optional<std::u16string> version; ///< Opaque text, never a support test.
     bool explicitTimeNone = false;         ///< Whether time=NONE was present.
     bool explicitStreamSend = false;       ///< Whether the send set explicitly contained STREAM_DATA.
+    std::optional<std::u16string> options; ///< Exact accepted option text; absent differs from empty.
+    std::optional<std::u16string> time;    ///< Exact accepted timing text, without case normalization.
+    bool explicitRawSend = false;          ///< Whether the send set explicitly contained RAW_DATA.
 };
 
 /** First error and exact separate framing/payload positions. */
@@ -79,11 +105,14 @@ struct TapeFeedResult {
     TapeStatus status = TapeStatus::NEED_INPUT; ///< Reader state after this call.
     std::optional<Frame> frame;                 ///< Owning envelope, also present on payload failure.
     std::vector<StreamDataRecord> records;      ///< Complete records, never a partial current record.
+    std::optional<TapeTiming> timing;           ///< Owned RAW data timing, including a completed prefix on failure.
+    std::optional<TapeHeartbeat> heartbeat;     ///< Accepted explicit heartbeat, even with no subsequent data.
 };
 
 /** Bounded single-threaded tape reader; no reset, replacement or recovery API. */
 class TapeReader {
     TapeLimits limits_;
+    TapeMode mode_;
     core::LocalSchema schema_;
     FrameReader framer_;
     std::vector<WireRecordDescription> descriptions_;
@@ -99,6 +128,8 @@ class TapeReader {
     std::size_t emitted_ = 0;
     std::size_t values_ = 0;
     std::size_t symbols_ = 0;
+    TapeTiming timing_;
+    std::size_t timingEvents_ = 0;
     /** Set the first failure.
      * @param error Category.
      * @param stage Static checkpoint.
@@ -114,9 +145,10 @@ class TapeReader {
     /** Copy a validated local schema within bounds and allocate framing storage.
      * @param schema Borrowed validated schema, copied before returning.
      * @param limits Mandatory finite bounds; invalid configuration throws invalid_argument.
+     * @param mode Explicit container policy; default preserves the original untimed behavior.
      * Allocation failure before input may throw bad_alloc.
      */
-    TapeReader(const core::LocalSchema &schema, TapeLimits limits);
+    TapeReader(const core::LocalSchema &schema, TapeLimits limits, TapeMode mode = TapeMode::LEGACY);
     /** Accept up to one envelope; caller resubmits any unaccepted suffix.
      * @param input Borrowed bytes, not retained by reference.
      * @return Owned event/prefix and exact accepted count; terminal failures accept zero later.
@@ -139,6 +171,20 @@ class TapeReader {
      */
     [[nodiscard]] const std::optional<TapeDescriptor> &descriptor() const noexcept {
         return descriptor_;
+    }
+
+    /** Inspect the last fully accepted timestamp.
+     * @return Fixed-size owning state, unchanged after a failed heartbeat.
+     */
+    [[nodiscard]] const TapeTiming &timing() const noexcept {
+        return timing_;
+    }
+
+    /** Inspect cumulative metadata work.
+     * @return Charged RAW data/explicit-heartbeat attempts, including later payload failures.
+     */
+    [[nodiscard]] std::size_t timingEvents() const noexcept {
+        return timingEvents_;
     }
 
     /** Inspect the current immutable snapshot.
