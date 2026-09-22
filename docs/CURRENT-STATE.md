@@ -16,8 +16,12 @@ for that process. Local review artifacts are in `.work/review-019-verify` and
 QDCXX-018 (`e1e19e5`) and naming/help (`4cb1d8c`) are reviewed. Current tools include bounded
 raw-QTP inspection with TSV/human output; general tape reading, production feeds/multiplexers and
 real dxFeed event support are not implemented. [Current roadmap](NEXT-STEPS.md) records owner decisions.
-QDCXX-020 is ready for research, not started. No new implementation is authorized
-by this status update. Earlier author handoffs below are historical.
+QDCXX-020 research and independent source/document review are complete: [20-tool inventory](upstream/QDS-TOOLS.md),
+[default Quote baseline](REAL-EVENT-BASELINE.md), [Python migration](PYTHON-MIGRATION.md) and
+one proposed next bounded tape-reader implementation in the roadmap. Independent source review
+and author document checks are recorded separately in [validation](upstream/QDCXX-020-VALIDATION.md).
+No event runtime capture, production change or implementation approval follows; no commit created.
+Earlier author handoffs below are historical.
 
 ## Owner-requested naming migration
 

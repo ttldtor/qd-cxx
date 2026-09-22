@@ -1,5 +1,63 @@
 # Project roadmap
 
+[Русская версия](NEXT-STEPS.ru.md). English is authoritative.
+
+## QDCXX-020 result and dependency order
+
+The [locked inventory](upstream/QDS-TOOLS.md) accounts for 20 registered tools plus the separate
+MICBuilder maintenance entry. [Default Quote](REAL-EVENT-BASELINE.md) needs TIME_SECONDS,
+UTF_CHAR and WIDE_DECIMAL (including sizes); it is not supported by the existing type-8 decoder.
+The earlier workstream table below records the owner's direction; this sequence refines its order.
+
+| Order | Bounded outcome and dependency | Acceptance endpoint |
+| --- | --- | --- |
+| 1 — recommended next implementation | Uncompressed constrained binary tape reader and optional qdcxx-tape-inspect, based on QDCXX-019; descriptor/additive binding/EOF decisions first | Read the unchanged constrained Java S/R/E file; reject excluded profiles explicitly; no claim of real-event support |
+| 2 — default Quote through the same reader | Capture actual default Java scheme and QuoteDelegate → FileWriter → FileReader → QuoteDelegate; specify and implement exact 56/2/120 fields, long slots, decimal conversion and bounded Quote mapping | Original default composite Quote tape → C++ API values/output compared to Java, plus synthetic boundary/negative cases; no schema simplification |
+| 3 — first record/replay and publication programs | Bounded writer, subscription/data composition, explicit stream contract and transport lifecycle; choose transport only in its own approved scope | qdcxx-connect/qdcxx-post with deterministic local source, recorded file and replay; finite drain, shutdown and failure checks |
+| 4 — subscription distribution | Core aggregation/isolation, wildcard/ticker/stream contracts, reconnect and bounded per-client buffers | qdcxx-feed/qdcxx-multiplexor with two clients, changing subscriptions, slow consumer and disconnect/reconnect cases |
+| 5 — operational diagnostics and separate domains | Reuse preceding schema/file/transport capabilities | Compare/FileAnalysis, subscription dump/replay and load tests; IPF separate; RMI/JVM/Launcher decisions remain deferred |
+
+Python removal follows the [ordered migration plan](PYTHON-MIGRATION.md) alongside these stages:
+logging/acquisition, CLI checkers, negative/evidence families, JSON/designed artifacts, then a clean
+no-Python validation. It does not authorize a bundled rewrite or delay working programs indefinitely.
+
+## One proposed next implementation task (unassigned)
+
+**Bounded uncompressed binary tape reader with qdcxx-tape-inspect.** No new task ID is assigned.
+This is a concrete proposal for owner assignment, not authorization supplied by QDCXX-020.
+
+Goal: consume the exact QDCXX-019 constrained file, without stripping the header/footer or moving
+late descriptions. Inputs: caller-provided immutable ordinary type-8 local schema, hasTime=false,
+BINARY/no compression/time NONE/EMPTY_SET/STREAM_DATA/zero raw flags. Reuse the current primitives
+and bindings; keep IO/CLI outside qdcxx_core and preserve qdcxx-qtp-inspect's exact behavior/output.
+
+Before C++: obtain focused Java production-parser evidence for descriptor variations, unknown
+properties, missing/duplicate/redefined IDs, late additions, malformed/truncated header/description/
+data and EOF. Review an ADR defining descriptor acceptance (version diagnostic, time/opt/send sets),
+one initial header, append-only ID mapping/owned plan lifetimes, completed-prefix errors and empty
+file/footer policy. Specification and fixtures accompany any protocol change.
+
+Implementation boundaries: finite file/frame/description/record/field/symbol/output budgets,
+terminal explicit errors, no ID replacement or general session reset. Add one optional executable
+qdcxx-tape-inspect with an explicit profile; define its own output/error contract, no Java CLI parity.
+No-args and standalone --help must match on stdout with empty stderr/exit 0 and no file IO; invalid
+nonempty args and failed output retain nonzero exits. New acceptance tooling must not add Python.
+
+Acceptance: unchanged QDCXX-019 constrained positive input and preserved hashes; Java-focused
+positive/negative Verify with two clean captures; C++ conformance and process/help/IO/budget/error
+tests; explicit default-BINARY timing/TEXT/unsupported-type rejection; production BUILD_TESTING=OFF
+without test dependencies; applicable formatting/build checks and paired EN/RU validation. Preserve
+all old synthetic fixtures. A later Quote acceptance is required for the first real-event milestone.
+
+Exclude compression/sidecars/follow/rotation/retention/resync, MESSAGE/FIELD time, RAW/TICKER/HISTORY,
+subscriptions/nonzero flags, writer/network, type conversion, importer and real-event schema support.
+No new runtime dependency without explicit approval. If the ADR requires wider semantics, narrow
+or split the task before implementation rather than silently extending this profile.
+
+Owner decisions: approve this bounded implementation and new executable/output contract; approve
+per-utility native CLI/configuration policy from the inventory separately. Quote adapter/public API,
+broader wire conversions and transport/threading remain later gates. Research does not grant them.
+
 
 ## Approved project direction and next work
 
@@ -14,7 +72,7 @@ address strings and properties compatibility are separate decisions, not automat
 
 | Order / workstream | Required result | Authorization |
 | --- | --- | --- |
-| Next: QDCXX-020, qds-tools inventory | Complete discovered utility/alias/entry-point inventory, Java-to-qdcxx mapping, priorities and dependencies; source-backed CLI/configuration compatibility choices | Research and planning only |
+| Completed research: QDCXX-020, qds-tools inventory | Complete discovered utility/alias/entry-point inventory, Java-to-qdcxx mapping, priorities and dependencies; source-backed CLI/configuration compatibility choices | Research and planning only |
 | Real event baseline | Select a standard event such as Quote or Trade after inspecting its actual locked scheme/mapping. Generate deterministic Java events and replay them through production tooling; enumerate every field/type/flag/time requirement and C++ gap | Separate task; do not simplify a schema and call it full event support |
 | Bounded binary tape reader | Use QDCXX-019 constrained file unchanged; define protocol descriptor, additive descriptions, EOF and resource policies with focused Java evidence/ADR before C++ | Separate approved task; no general tape support yet |
 | Remove mandatory Python | Inventory active dependencies; replace UTC logging, audits and process checks incrementally with C++/CTest, Java and small PowerShell/CMake scripts; demonstrate equivalent positive/negative coverage | Separate migration tasks |

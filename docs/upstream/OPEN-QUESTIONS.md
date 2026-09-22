@@ -6,6 +6,16 @@ Record questions about Java QD behavior that cannot yet be answered confidently.
 
 ## QDCXX-019 tape evidence and next-task gates
 
+QDCXX-020 update: [inventory](QDS-TOOLS.md) and [default Quote](../REAL-EVENT-BASELINE.md)
+resolve the tracked command list and source-derived schema selection only. Runtime help/classpath,
+full transitive option/default/error behavior, Quote production round trip (including wide decimal
+special values and time loss) remain unmeasured. No earlier runtime unknown is closed by this research.
+Owner gates: native per-utility CLI/configuration/output/exit policy; bounded tape descriptor,
+append-only binding and EOF ADR; later Quote adapter/API and type conversions; later transport/
+threading/subscriptions. [One next implementation proposal](../NEXT-STEPS.md) retains QDCXX-019's
+constrained type-8 profile as an enabler, not Quote support. RMI/IPF/Launcher scope is deferred;
+Python migration needs old/new negative equivalence before retiring active checks.
+
 [Tape inventory/gaps](../../spec/protocol/TAPE-FILES.md) and
 [author validation](../../tests/fixtures/protocol/tape/VALIDATION.md) add real FileWriter/FileReader
 evidence: default/constrained BINARY and TEXT preserve seven local records; truncated constrained
