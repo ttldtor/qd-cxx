@@ -7,7 +7,7 @@
 
 #include <vector>
 
-namespace qd::protocol {
+namespace org::ttldtor::qdcxx::protocol {
 
 /** Largest structurally valid full DESCRIBE_RECORDS type ID.
  * Includes representation bits; this bound neither masks them nor guarantees type support.
@@ -83,4 +83,4 @@ struct DescriptionResult {
  */
 [[nodiscard]] DescriptionResult parseDescribeRecords(std::span<const std::byte> payload, DescriptionLimits limits);
 
-} // namespace qd::protocol
+} // namespace org::ttldtor::qdcxx::protocol

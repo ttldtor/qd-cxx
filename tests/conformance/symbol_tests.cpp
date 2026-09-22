@@ -13,10 +13,10 @@
 #include <vector>
 
 namespace {
-using qd::encoding::SymbolReader;
-using qd::encoding::SymbolStatus;
-std::string fixturePath;                                       ///< Explicit immutable Java observation path.
-constexpr qd::encoding::SymbolLimits LIMITS{4096, 2048, 2048}; ///< Bounded corpus profile.
+using org::ttldtor::qdcxx::encoding::SymbolReader;
+using org::ttldtor::qdcxx::encoding::SymbolStatus;
+std::string fixturePath; ///< Explicit immutable Java observation path.
+constexpr org::ttldtor::qdcxx::encoding::SymbolLimits LIMITS{4096, 2048, 2048}; ///< Bounded corpus profile.
 
 /** Parse exact signed decimal or positive hex fixture numbers.
  * @param text Entire numeric cell.
@@ -368,14 +368,14 @@ TEST_CASE("Java symbols, strict prefixes and observable successful state") {
             std::size_t messages = 0;
 
             while (offset < wire.size()) {
-                const auto length = qd::encoding::readCompactLong(std::span(wire).subspan(offset));
-                REQUIRE(length.status == qd::encoding::Status::OK);
+                const auto length = org::ttldtor::qdcxx::encoding::readCompactLong(std::span(wire).subspan(offset));
+                REQUIRE(length.status == org::ttldtor::qdcxx::encoding::Status::OK);
                 REQUIRE(length.value > 0);
                 offset += length.consumed;
                 REQUIRE(static_cast<std::size_t>(length.value) <= wire.size() - offset);
                 const auto body = std::span(wire).subspan(offset, static_cast<std::size_t>(length.value));
-                const auto type = qd::encoding::readCompactInt(body);
-                REQUIRE(type.status == qd::encoding::Status::OK);
+                const auto type = org::ttldtor::qdcxx::encoding::readCompactInt(body);
+                REQUIRE(type.status == org::ttldtor::qdcxx::encoding::Status::OK);
 
                 if (type.value == 15) { // Captured STREAM_DATA with empty R records; test driver only.
                     REQUIRE(reader.beginMessage(0) == SymbolStatus::OK);
@@ -387,8 +387,8 @@ TEST_CASE("Java symbols, strict prefixes and observable successful state") {
                         REQUIRE(symbol.consumed > 0);
                         delivered.push_back(symbol.value->units);
                         position += symbol.consumed;
-                        auto record = qd::encoding::readCompactInt(body.subspan(position));
-                        REQUIRE(record.status == qd::encoding::Status::OK);
+                        auto record = org::ttldtor::qdcxx::encoding::readCompactInt(body.subspan(position));
+                        REQUIRE(record.status == org::ttldtor::qdcxx::encoding::Status::OK);
                         REQUIRE(record.value == 0);
                         position += record.consumed;
                     }
@@ -514,7 +514,7 @@ TEST_CASE("Complete payload boundaries, budgets, profiles and independent owners
     CHECK(reader.beginMessage(0) == SymbolStatus::OK);
     CHECK(reader.read(bytes("fd01eda080")).value->units == std::u16string(1, char16_t{0xd800}));
 
-    for (const auto limits : {qd::encoding::SymbolLimits{1, 9, 9}, {9, 0, 9}, {9, 9, 0}}) {
+    for (const auto limits : {org::ttldtor::qdcxx::encoding::SymbolLimits{1, 9, 9}, {9, 0, 9}, {9, 9, 0}}) {
         SymbolReader small(limits, 0);
         CHECK(small.read(bytes("0443")).status == SymbolStatus::RESOURCE_LIMIT);
         CHECK(small.read(bytes("fe")).status == SymbolStatus::FAILED);
@@ -537,7 +537,7 @@ TEST_CASE("Complete payload boundaries, budgets, profiles and independent owners
     CHECK(limited.read(bytes("fc0a")).status == SymbolStatus::RESOURCE_LIMIT);
     CHECK(limited.beginMessage(0) == SymbolStatus::OK);
     CHECK(limited.read(bytes("fd7f")).status == SymbolStatus::INVALID_LENGTH);
-    qd::encoding::SymbolResult owned;
+    org::ttldtor::qdcxx::encoding::SymbolResult owned;
     {
         SymbolReader temporary(LIMITS, 0);
         auto input = bytes("fd0141");

@@ -8,7 +8,7 @@
 #include <stdexcept>
 #include <utility>
 
-namespace qd::protocol {
+namespace org::ttldtor::qdcxx::protocol {
 namespace {
 /** Call-local bounded walk, publishing only completed descriptions into its owning result. */
 class DescriptionReader {
@@ -186,4 +186,4 @@ DescriptionResult parseDescribeRecords(std::span<const std::byte> payload, Descr
     return DescriptionReader(payload, limits).read();
 }
 
-} // namespace qd::protocol
+} // namespace org::ttldtor::qdcxx::protocol

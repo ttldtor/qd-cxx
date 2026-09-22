@@ -3,6 +3,15 @@
 [Русская версия](CURRENT-STATE.ru.md). English is authoritative.
 
 
+## Owner-requested naming migration
+
+Current C++ namespaces use `org::ttldtor::qdcxx`, project CMake targets use `qdcxx_`, and owned
+cache variables/options use `ORG_TTLDTOR_QDCXX_`. Include paths `qd/...`, the executable filename
+and fixed output identifiers are unchanged. [Migration and future rules](NAMING.md).
+The preceding human-output work is now committed as `e1e19e5`; earlier no-commit statements below
+are historical. This naming migration adds no independent review claim for that commit.
+
+
 ## Current status
 
 QDCXX-010–016 are implemented. QDCXX-016 is **done**, independently reviewed and committed as

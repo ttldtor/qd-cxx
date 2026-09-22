@@ -7,7 +7,7 @@
 #include <limits>
 #include <utility>
 
-namespace qd::encoding {
+namespace org::ttldtor::qdcxx::encoding {
 namespace {
 /// Null is distinct from the zero-length empty string in the compact-long envelope.
 constexpr std::int64_t NULL_LENGTH = -1;
@@ -255,4 +255,4 @@ WriteResult writeUtfString(std::optional<std::u16string_view> value, std::span<s
 
     return {position, Status::OK};
 }
-} // namespace qd::encoding
+} // namespace org::ttldtor::qdcxx::encoding

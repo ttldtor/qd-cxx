@@ -10,7 +10,7 @@
 #include <span>
 #include <vector>
 
-namespace qd::protocol {
+namespace org::ttldtor::qdcxx::protocol {
 
 /** Mandatory operational storage limits, independent of payload syntax. */
 struct FrameLimits {
@@ -144,4 +144,4 @@ class FrameReader {
     FrameReader &operator=(FrameReader &&other) = delete;
 };
 
-} // namespace qd::protocol
+} // namespace org::ttldtor::qdcxx::protocol

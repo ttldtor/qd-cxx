@@ -9,7 +9,7 @@
 #include <stdexcept>
 #include <utility>
 
-namespace qd::protocol {
+namespace org::ttldtor::qdcxx::protocol {
 
 std::expected<RecordBinding, BindingError> bindRecord(const WireRecordDescription &description,
                                                       const core::LocalSchema &schema, BindingLimits limits) {
@@ -82,4 +82,4 @@ std::expected<RecordBinding, BindingError> bindRecord(const WireRecordDescriptio
     }
 }
 
-} // namespace qd::protocol
+} // namespace org::ttldtor::qdcxx::protocol

@@ -6,7 +6,7 @@
 #include <array>
 #include <charconv>
 
-namespace qd::inspect {
+namespace org::ttldtor::qdcxx::inspect {
 namespace {
 constexpr std::int32_t DESCRIBE_RECORDS = 2; ///< Initial wire descriptions.
 constexpr std::int32_t STREAM_DATA = 15;     ///< Supported data message type.
@@ -327,4 +327,4 @@ std::string Formatter::complete(std::uint64_t bytes, std::size_t frames, std::si
         row.add("\n");
     });
 }
-} // namespace qd::inspect
+} // namespace org::ttldtor::qdcxx::inspect

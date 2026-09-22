@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 
-namespace qd::core {
+namespace org::ttldtor::qdcxx::core {
 
 /** Validation failures for the bounded resolved local input. */
 enum class SchemaError {
@@ -75,4 +75,4 @@ class LocalSchema {
     [[nodiscard]] std::span<const LocalRecord> records() const noexcept;
 };
 
-} // namespace qd::core
+} // namespace org::ttldtor::qdcxx::core

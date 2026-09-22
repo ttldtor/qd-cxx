@@ -11,7 +11,7 @@
 #include <utility>
 
 namespace {
-using namespace qd::protocol;
+using namespace org::ttldtor::qdcxx::protocol;
 std::string fixturePath; ///< Immutable oracle TSV path supplied by CTest.
 constexpr StreamDataLimits LIMITS{4096, 128, 512, 128, 512, 1024, {4096, 128, 128}};    ///< Bounded corpus profile.
 constexpr ContextLimits CONTEXT_LIMITS{{16, 64, 128, 128, 1024}, 32, {256, 128, 2048}}; ///< Snapshot corpus bounds.
@@ -112,8 +112,8 @@ std::u16string units(std::string_view hex) {
 /** Construct the same explicit lookup subset as the production Java scheme.
  * @return Owned validated local schema; throw on a broken test setup.
  */
-qd::core::LocalSchema schema() {
-    std::vector<qd::core::LocalRecord> records{
+org::ttldtor::qdcxx::core::LocalSchema schema() {
+    std::vector<org::ttldtor::qdcxx::core::LocalRecord> records{
         {0, u"S", false, {{8}}, {{u"v", 0}, {u"S.v", 0}}},
         {1,
          u"R",
@@ -121,7 +121,7 @@ qd::core::LocalSchema schema() {
          {{8}, {8}, {8}},
          {{u"y", 0}, {u"R.y", 0}, {u"x", 1}, {u"R.x", 1}, {u"xdot", 1}, {u"z", 2}, {u"R.z", 2}}},
         {2, u"E", false, {}, {}}};
-    auto result = qd::core::LocalSchema::create(records, CONTEXT_LIMITS.schema);
+    auto result = org::ttldtor::qdcxx::core::LocalSchema::create(records, CONTEXT_LIMITS.schema);
 
     if (!result) {
         throw std::runtime_error("schema setup");
@@ -571,8 +571,9 @@ TEST_CASE("snapshot validation ownership and sparse lookup") {
         CHECK(StreamDataContext::create(local, descriptions, small).error() == BindingError::RESOURCE_LIMIT);
     }
 
-    auto invalid = qd::core::LocalSchema::create(
-        std::vector<qd::core::LocalRecord>{{0, u"R", false, {{8}}, {{u"x", 1}}}}, CONTEXT_LIMITS.schema);
+    auto invalid = org::ttldtor::qdcxx::core::LocalSchema::create(
+        std::vector<org::ttldtor::qdcxx::core::LocalRecord>{{0, u"R", false, {{8}}, {{u"x", 1}}}},
+        CONTEXT_LIMITS.schema);
     CHECK_FALSE(invalid);
     auto empty = StreamDataContext::create(local, {}, CONTEXT_LIMITS);
     REQUIRE(empty);

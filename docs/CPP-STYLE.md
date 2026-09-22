@@ -135,3 +135,14 @@ This is source/configuration analysis and a future style decision, not an execut
 build, test or compatibility result. No production C++, importer, Java/oracle edit, fixture change
 or new build/test dependency is part of this update. Naming enforcement needs review now and a
 separately validated linter once C++ tooling is introduced; these two formatters cannot enforce it.
+
+## Project namespace and build prefixes
+
+The owner selects `qdcxx` and the namespace root `org::ttldtor::qdcxx`, reflecting ttldtor.org.
+Use subnamespaces such as `org::ttldtor::qdcxx::core`; do not add `qd` aliases. All project CMake
+targets, including tests, use `qdcxx_`; the project name is `qdcxx`. Project-owned options, cache
+variables and externally visible macros use `ORG_TTLDTOR_QDCXX_`. Standard/dependency identifiers
+(`BUILD_TESTING`, `CMAKE_*`, `Python3_*`, `doctest::doctest`) retain their names. Historical evidence,
+upstream Java names and fixed output-format identifiers are not renamed by a C++ source migration.
+See [migration and current names](NAMING.md). This owner rule supplements the reference style;
+it is not a claim about the reference project's namespace.

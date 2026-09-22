@@ -9,7 +9,7 @@
 #include <string>
 #include <string_view>
 
-namespace qd::encoding {
+namespace org::ttldtor::qdcxx::encoding {
 
 /** Explicit operational budgets, independent of Java wire validity; no unlimited default. */
 struct UtfStringLimits {
@@ -45,4 +45,4 @@ struct UtfStringResult {
 [[nodiscard]] WriteResult writeUtfString(std::optional<std::u16string_view> value, std::span<std::byte> output,
                                          UtfStringLimits limits) noexcept;
 
-} // namespace qd::encoding
+} // namespace org::ttldtor::qdcxx::encoding

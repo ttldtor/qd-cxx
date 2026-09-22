@@ -10,7 +10,7 @@
 #include <stdexcept>
 #include <utility>
 
-namespace qd::protocol {
+namespace org::ttldtor::qdcxx::protocol {
 StreamDataContext::StreamDataContext(std::vector<StreamRecordPlan> plans) noexcept : plans_(std::move(plans)) {
 }
 
@@ -240,4 +240,4 @@ StreamDataResult decodeStreamData(std::span<const std::byte> payload, const Stre
 
     return result;
 }
-} // namespace qd::protocol
+} // namespace org::ttldtor::qdcxx::protocol

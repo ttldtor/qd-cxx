@@ -64,7 +64,7 @@ class WriteFailure : public std::streambuf {
 } // namespace
 
 TEST_CASE("injected input failure differs from EOF including exact input budget") {
-    auto schema = qd::inspect::oracleSchema();
+    auto schema = org::ttldtor::qdcxx::inspect::oracleSchema();
     REQUIRE(schema);
 
     for (const auto inputLimit : {0, 100}) {
@@ -72,40 +72,40 @@ TEST_CASE("injected input failure differs from EOF including exact input budget"
         std::istream input(&buffer);
         std::ostringstream output;
         std::ostringstream diagnostic;
-        qd::inspect::Limits limits;
+        org::ttldtor::qdcxx::inspect::Limits limits;
         limits.input = inputLimit;
-        CHECK(qd::inspect::inspect(input, output, diagnostic, *schema, limits) == 3);
+        CHECK(org::ttldtor::qdcxx::inspect::inspect(input, output, diagnostic, *schema, limits) == 3);
         CHECK(output.str().find("complete\t") == std::string::npos);
         CHECK(diagnostic.str() == "incomplete\t3\tread\t-\t-\t-\t-\t-\t-\t-\t-\n");
     }
 }
 
 TEST_CASE("injected writes and flushes return I/O failure even if stderr is broken") {
-    auto schema = qd::inspect::oracleSchema();
+    auto schema = org::ttldtor::qdcxx::inspect::oracleSchema();
     REQUIRE(schema);
     std::istringstream input;
     WriteFailure broken;
     std::ostream output(&broken);
     std::ostringstream diagnostic;
-    CHECK(qd::inspect::inspect(input, output, diagnostic, *schema, {}) == 3);
+    CHECK(org::ttldtor::qdcxx::inspect::inspect(input, output, diagnostic, *schema, {}) == 3);
     CHECK(diagnostic.str() == "incomplete\t3\twrite\t-\t-\t-\t-\t-\t-\t-\t-\n");
     std::istringstream empty;
     FlushFailure buffered;
     std::ostream flushing(&buffered);
     std::ostringstream flushDiagnostic;
-    CHECK(qd::inspect::inspect(empty, flushing, flushDiagnostic, *schema, {}) == 3);
+    CHECK(org::ttldtor::qdcxx::inspect::inspect(empty, flushing, flushDiagnostic, *schema, {}) == 3);
     CHECK(buffered.str().find("complete\t") == std::string::npos);
     CHECK(flushDiagnostic.str() == "incomplete\t3\tflush\t-\t-\t-\t-\t-\t-\t-\t-\n");
     std::istringstream another;
     output.clear();
     std::ostream deadDiagnostic(&broken);
     deadDiagnostic.exceptions(std::ios::badbit | std::ios::failbit);
-    CHECK(qd::inspect::inspect(another, output, deadDiagnostic, *schema, {}) == 3);
+    CHECK(org::ttldtor::qdcxx::inspect::inspect(another, output, deadDiagnostic, *schema, {}) == 3);
 }
 
 TEST_CASE("integration accepts an independent validated local schema") {
-    auto schema =
-        qd::core::LocalSchema::create(std::vector<qd::core::LocalRecord>{{0, u"S", false, {}, {}}}, {1, 0, 0, 1, 1});
+    auto schema = org::ttldtor::qdcxx::core::LocalSchema::create(
+        std::vector<org::ttldtor::qdcxx::core::LocalRecord>{{0, u"S", false, {}, {}}}, {1, 0, 0, 1, 1});
     REQUIRE(schema);
     // Same sender S.v, independent local S has no fields: consume the value and emit no values.
     const char wire[]{0x08, 0x02, 0x09, 0x01, 0x53, 0x01, 0x01, 0x76, 0x08, 0x04, 0x0f, static_cast<char>(0xfe),
@@ -113,14 +113,14 @@ TEST_CASE("integration accepts an independent validated local schema") {
     std::istringstream input(std::string(wire, sizeof(wire)));
     std::ostringstream output;
     std::ostringstream diagnostic;
-    CHECK(qd::inspect::inspect(input, output, diagnostic, *schema, {}) == 0);
+    CHECK(org::ttldtor::qdcxx::inspect::inspect(input, output, diagnostic, *schema, {}) == 0);
     CHECK(diagnostic.str().empty());
     CHECK(output.str().find("record\t1\t0\t0\t0053\t-\t-\n") != std::string::npos);
     CHECK(output.str().ends_with("complete\t14\t2\t1\t1\t1\n"));
 }
 
 TEST_CASE("read failure after a completed record retains output but has no completion") {
-    auto schema = qd::inspect::oracleSchema();
+    auto schema = org::ttldtor::qdcxx::inspect::oracleSchema();
     REQUIRE(schema);
     const char wire[]{0x08, 0x02, 0x09, 0x01, 0x53, 0x01, 0x01, 0x76, 0x08, 0x04, 0x0f, static_cast<char>(0xfe),
                       0x09, 0x01};
@@ -128,39 +128,39 @@ TEST_CASE("read failure after a completed record retains output but has no compl
     std::istream input(&buffer);
     std::ostringstream output;
     std::ostringstream diagnostic;
-    qd::inspect::Limits limits;
+    org::ttldtor::qdcxx::inspect::Limits limits;
     limits.chunkSize = 1;
-    CHECK(qd::inspect::inspect(input, output, diagnostic, *schema, limits) == 3);
+    CHECK(org::ttldtor::qdcxx::inspect::inspect(input, output, diagnostic, *schema, limits) == 3);
     CHECK(output.str().find("record\t1\t0\t0\t0053\t-\t1\n") != std::string::npos);
     CHECK(output.str().find("complete\t") == std::string::npos);
     CHECK(diagnostic.str() == "incomplete\t3\tread\t1\t15\t9\t11\t-\t-\t-\t-\n");
 }
 
 TEST_CASE("final completion flush failure never reports success") {
-    auto schema = qd::inspect::oracleSchema();
+    auto schema = org::ttldtor::qdcxx::inspect::oracleSchema();
     REQUIRE(schema);
     std::istringstream input;
     FlushFailure buffer(1);
     std::ostream output(&buffer);
     output.exceptions(std::ios::badbit);
     std::ostringstream diagnostic;
-    CHECK(qd::inspect::inspect(input, output, diagnostic, *schema, {}) == 3);
+    CHECK(org::ttldtor::qdcxx::inspect::inspect(input, output, diagnostic, *schema, {}) == 3);
     CHECK(diagnostic.str() == "incomplete\t3\tflush\t-\t-\t-\t-\t-\t-\t-\t-\n");
     // Physical delivery is irreversible; exit status invalidates a marker already in the sink.
     CHECK(buffer.str().find("complete\t") != std::string::npos);
 }
 
 TEST_CASE("read failure inside a new envelope identifies that envelope") {
-    auto schema = qd::inspect::oracleSchema();
+    auto schema = org::ttldtor::qdcxx::inspect::oracleSchema();
     REQUIRE(schema);
     // One complete heartbeat followed by an incomplete two-byte length prefix.
     ReadFailure buffer(std::string("\x00\x80", 2));
     std::istream input(&buffer);
     std::ostringstream output;
     std::ostringstream diagnostic;
-    qd::inspect::Limits limits;
+    org::ttldtor::qdcxx::inspect::Limits limits;
     limits.chunkSize = 1;
-    CHECK(qd::inspect::inspect(input, output, diagnostic, *schema, limits) == 3);
+    CHECK(org::ttldtor::qdcxx::inspect::inspect(input, output, diagnostic, *schema, limits) == 3);
     CHECK(output.str() == "format\tqd-qtp-inspect\t1\nframe\t0\t0\t1\t-\t-\t0\n");
     CHECK(diagnostic.str() == "incomplete\t3\tread\t1\t-\t1\t-\t-\t-\t-\t-\n");
 }

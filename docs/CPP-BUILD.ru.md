@@ -2,7 +2,7 @@
 
 [English version](CPP-BUILD.md). Английский документ является основным.
 
-`qd_encoding` — production-библиотека C++23 без сторонних зависимостей с предварительными API
+`qdcxx_encoding` — production-библиотека C++23 без сторонних зависимостей с предварительными API
 compact int/long и UTFString. QDCXX-010 добавил compact, QDCXX-011 добавляет
 [utf_string.hpp](../include/qd/encoding/utf_string.hpp). Неизменные
 [Java-свидетельства](../spec/encoding/PRIMITIVES.ru.md) определяют совместимость;
@@ -11,7 +11,7 @@ compact int/long и UTFString. QDCXX-010 добавил compact, QDCXX-011 до�
 
 ## API DESCRIBE_RECORDS и проверки QDCXX-013
 
-Подключите `qd/protocol/describe_records.hpp` и линкуйте qd_protocol. Вызывайте
+Подключите `qd/protocol/describe_records.hpp` и линкуйте qdcxx_protocol. Вызывайте
 `parseDescribeRecords(payload, {4096, 64, 128, 1024, {256, 256}, 4096})` только для полного payload
 типа 2 без envelope. Бюджеты: байты payload, descriptions, поля/description, всего полей,
 для каждого имени {encoded body bytes, UTF-16 units} и суммарные units имён. Ноль допустим.
@@ -23,8 +23,8 @@ compact int/long и UTFString. QDCXX-010 добавил compact, QDCXX-011 до�
 префикс; бросивший primitive не фиксирует consumption дальше своего начала. Точные приоритеты и
 позиции описывает [контракт](../spec/protocol/DESCRIBE-RECORDS.ru.md).
 
-CTest добавляет protocol_java_descriptions; description_tests линкует лишь qd_protocol и test-only doctest.
-QD_DESCRIPTION_FIXTURES по умолчанию указывает на отдельный P08 descriptions.tsv и допускает временный
+CTest добавляет protocol_java_descriptions; qdcxx_description_tests линкует лишь qdcxx_protocol и test-only doctest.
+ORG_TTLDTOR_QDCXX_DESCRIPTION_FIXTURES по умолчанию указывает на отдельный P08 descriptions.tsv и допускает временный
 отрицательный выбор. Все прежние команды ниже включают новый target. [Покрытие/результаты](../tests/conformance/protocol/descriptions/VALIDATION.ru.md)
 фиксируют 81 Java-наблюдение, 50 841 новое assertion, MSVC/ClangCL/GCC Debug/Release, GCC ASan+UBSan,
 BUILD_TESTING=OFF без acquisition, регрессии и неизменность отрицательных проверок. API предварительный;
@@ -32,9 +32,9 @@ event payloads, local binding, transport и writer вне объёма.
 
 ## API QTP frame reader и проверки QDCXX-012
 
-`qd_protocol` — production-компонент без внешних зависимостей, зависящий только от qd_encoding.
-Подключите `qd/protocol/frame_reader.hpp` и линкуйте qd_protocol. Создайте
-`qd::protocol::FrameReader reader({1024, 1033});`: это бюджеты body и pending, включая запас
+`qdcxx_protocol` — production-компонент без внешних зависимостей, зависящий только от qdcxx_encoding.
+Подключите `qd/protocol/frame_reader.hpp` и линкуйте qdcxx_protocol. Создайте
+`org::ttldtor::qdcxx::protocol::FrameReader reader({1024, 1033});`: это бюджеты body и pending, включая запас
 девяти байтов prefix. Несовместимые/переполняющиеся бюджеты дают invalid_argument; ошибка
 выделения в конструкторе распространяется как исключение. API однопоточный и нереентерабельный.
 
@@ -52,8 +52,8 @@ totalAccepted() — принятую позицию. Неверный payload и
 кадры не входят в суммарный бюджет reader. Ошибка выделения payload даёт ALLOCATION_FAILURE.
 Точные wire/ресурсные/lifecycle границы определяет [контракт EN/RU](../spec/protocol/FRAMING.ru.md).
 
-Команды ниже теперь собирают обе библиотеки и запускают также frame_tests/protocol_java_frames.
-Новые тесты читают прежний P01 и отдельно добавленный P02; QD_PROTOCOL_FIXTURES и QD_FRAME_PROJECTIONS
+Команды ниже теперь собирают обе библиотеки и запускают также qdcxx_frame_tests/protocol_java_frames.
+Новые тесты читают прежний P01 и отдельно добавленный P02; ORG_TTLDTOR_QDCXX_PROTOCOL_FIXTURES и ORG_TTLDTOR_QDCXX_FRAME_PROJECTIONS
 позволяют временные отрицательные наборы. MSVC/ClangCL/GCC Debug/Release и GCC ASan+UBSan проходят;
 BUILD_TESTING=OFF не загружает doctest. [Покрытие](../tests/conformance/protocol/COVERAGE.ru.md),
 [результаты и UTC logs](../tests/conformance/protocol/VALIDATION.ru.md). Дальнейшие payload/transport/
@@ -71,7 +71,7 @@ Status дополнен INVALID_ENCODING, INVALID_LENGTH и RESOURCE_LIMIT бе�
 Точные приоритеты, Java body overrun и гарантии выделения описаны в контракте.
 
 Существующие команды ниже теперь собирают и проверяют оба codec. Имена executable/CTest сохранены
-`compact_tests`/`compact_java_vectors` для совместимости с инструментами; они выполняют четыре
+`qdcxx_compact_tests`/`compact_java_vectors` для совместимости с инструментами; они выполняют четыре
 случая, 43 375 assertions и все 1146 Java observations (314 UTFString, 832 compact), без исключений.
 MSVC, ClangCL и WSL GCC проходят Debug/Release; GCC ASan+UBSan также проходит. Исторические числа
 QDCXX-010 ниже описывают прежний compact-only прогон. `BUILD_TESTING=OFF` по-прежнему ничего не
@@ -92,7 +92,7 @@ python3 tools/run_utc.py --log .work/utf-asan-test.log -- ctest --test-dir .work
 MSBuild 17.14.51, MSVC 19.42.34444.0 (каталог инструментов 14.42.34433). Второй компилятор —
 установленный ClangCL 19.1.5 с той же стандартной библиотекой MSVC и SDK. Тесты используют
 doctest 2.4.12 через CMake FetchContent; URL архива и SHA-256 закреплены в
-[CMakeLists.txt](../CMakeLists.txt). Только `compact_tests`, `frame_tests` и `description_tests` связываются с doctest; `BUILD_TESTING=OFF`
+[CMakeLists.txt](../CMakeLists.txt). Только `qdcxx_compact_tests`, `qdcxx_frame_tests` и `qdcxx_description_tests` связываются с doctest; `BUILD_TESTING=OFF`
 не загружает и не подключает его. Загрузки хранятся в `_deps/` игнорируемого каталога сборки;
 первая конфигурация тестов требует сети. Менеджер пакетов не нужен. doctest 2.4.12 выдаёт
 нефатальное предупреждение CMake об устаревшей минимальной версии policy; загруженный исходник не менялся. Требуется CMake 3.25+; цели наследуют `cxx_std_23` от библиотеки,
@@ -114,7 +114,7 @@ python tools/run_utc.py --log .work/clang-release-test.log -- ctest --test-dir .
 ```
 
 Сборка выполняется вне корня исходников; `.work/` и `build/` игнорируются. Конфигурация внутри
-корня исходников отклоняется. `BUILD_TESTING=OFF` собирает только библиотеки qd_encoding и qd_protocol. `QD_ENCODING_FIXTURES`
+корня исходников отклоняется. `BUILD_TESTING=OFF` собирает только библиотеки qdcxx_encoding и qdcxx_protocol. `ORG_TTLDTOR_QDCXX_ENCODING_FIXTURES`
 может указывать на временные копии fixtures для негативных проверок; по умолчанию используются
 эталоны репозитория. Первая попытка обнаружения SDK через MSBuild в песочнице получила отказ
 в доступе к локальному каталогу Microsoft SDKs; разрешённые configure/build выше успешно выполнены
@@ -122,7 +122,7 @@ python tools/run_utc.py --log .work/clang-release-test.log -- ctest --test-dir .
 
 ## API и владение
 
-Все четыре функции находятся в `qd::encoding`, заимствуют принадлежащий вызывающему `std::span`
+Все четыре функции находятся в `org::ttldtor::qdcxx::encoding`, заимствуют принадлежащий вызывающему `std::span`
 только на время вызова, не выделяют память и не сохраняют указатели. Результаты владеют значениями
 и счётчиками. Вызывающий обеспечивает валидность span на протяжении вызова. Порядок байтов явно
 big-endian; чтение не требует выравнивания.
@@ -134,7 +134,7 @@ big-endian; чтение не требует выравнивания.
   `consumed`. Это соответствует наблюдаемой категории/позиции Java EOF, но не строкам класса/сообщения
   исключения. Отката нет: сохраните исходные байты и повторите чтение с начала после поступления
   данных. Частично потреблённая позиция не является состоянием для продолжения; транзакционный
-  framing реализован отдельным слоем qd_protocol.
+  framing реализован отдельным слоем qdcxx_protocol.
 - `writeCompactInt` / `writeCompactLong` возвращают `WriteResult`: `written`, `status`. Они создают
   канонические Java bytes (не более 5/9). Недостаточная ёмкость, включая нулевую, возвращает
   `INSUFFICIENT_OUTPUT`, нулевой written и оставляет весь выход неизменным. При успехе изменяются
@@ -172,7 +172,7 @@ for config in Debug Release; do
   python3 tools/run_utc.py --log "$build-build.log" -- cmake --build "$build"
   python3 tools/run_utc.py --log "$build-test.log" -- ctest --test-dir "$build" --output-on-failure
 done
-python3 tools/run_utc.py --log .work/linux-negative.log -- python3 tests/conformance/check_compact_negative.py .work/linux-release/compact_tests --skip-format --report .work/linux-negative-proof.json
+python3 tools/run_utc.py --log .work/linux-negative.log -- python3 tests/conformance/check_compact_negative.py .work/linux-release/qdcxx_compact_tests --skip-format --report .work/linux-negative-proof.json
 cmake -S . -B .work/linux-library -G Ninja -DBUILD_TESTING=OFF
 cmake --build .work/linux-library
 ```
@@ -187,36 +187,36 @@ cmake --build .work/linux-library
 
 ## API статического type-8 binding (QDCXX-014)
 
-qd_core владеет проверенным неизменяемым локальным подмножеством и не зависит от protocol/transport.
+qdcxx_core владеет проверенным неизменяемым локальным подмножеством и не зависит от protocol/transport.
 Подключить qd/core/local_schema.hpp; LocalSchema::create(records, {recordCount, fieldCount, lookupCount,
 nameUnits, totalNameUnits}) возвращает std::expected с владеющей схемой или явной ошибкой. Записи содержат
 local ID/name/hasTime, полные типы полей и явные record lookup keys с целями в позициях полей.
 Поддерживаются только hasTime=false и точный тип 8. Входные файлы/provenance не нужны.
 
-Подключить qd/protocol/static_binding.hpp и линковать qd_protocol. bindRecord(raw, schema,
+Подключить qd/protocol/static_binding.hpp и линковать qdcxx_protocol. bindRecord(raw, schema,
 {fieldCount, nameUnits, totalNameUnits}) возвращает независимый владеющий RecordBinding или явную ошибку.
 Отсутствующий localRecordId означает описанную неизвестную запись; отсутствующий targetFieldId — type-8 skip.
 Нет описания — нет плана. Defaults, event decoder и session map не подразумеваются. Все бюджеты
 обязательны и конечны, считают логические элементы; allocation failure не публикует частичный результат.
 См. [контракт](../spec/protocol/STATIC-BINDING.md) и [валидацию](../tests/conformance/protocol/binding/VALIDATION.md).
-CTest теперь добавляет binding_tests/protocol_java_binding; QD_BINDING_FIXTURES выбирает проверенный plans.tsv.
+CTest теперь добавляет qdcxx_binding_tests/protocol_java_binding; ORG_TTLDTOR_QDCXX_BINDING_FIXTURES выбирает проверенный plans.tsv.
 Все четыре targets проходят описанную compiler matrix, GCC sanitizers и negative checks. BUILD_TESTING=OFF
-собирает qd_core/qd_encoding/qd_protocol без загрузки doctest. Существующие примеры команд применимы без изменений.
+собирает qdcxx_core/qdcxx_encoding/qdcxx_protocol без загрузки doctest. Существующие примеры команд применимы без изменений.
 
 ## API символов QDCXX-015
 
-Подключить qd/encoding/symbol_reader.hpp и линковать qd_encoding. Создать
+Подключить qd/encoding/symbol_reader.hpp и линковать qdcxx_encoding. Создать
 `SymbolReader reader({4096, 1024, 1024}, 0);` с бюджетами входных байтов, возвращаемых и сохраняемых units
 и нулевой маской EMPTY_SET. `beginMessage(0)` сбрасывает символ/MRU/ошибку; вызывать между полными
 сообщениями. `read(remainingPayload)` возвращает одно собственное значение с UTF-16, cipher и raw flags,
 consumed count и явным status. Все ошибки read terminal; ненулевые маски не поддерживаются.
 [Контракт](../spec/encoding/SYMBOLS.ru.md) и [финальная валидация](../tests/conformance/encoding/symbols/VALIDATION.ru.md).
-CTest добавляет encoding_java_symbols / symbol_tests; QD_SYMBOL_FIXTURES выбирает неизменяемый Java TSV.
+CTest добавляет encoding_java_symbols / qdcxx_symbol_tests; ORG_TTLDTOR_QDCXX_SYMBOL_FIXTURES выбирает неизменяемый Java TSV.
 Production dependency и event decoder не добавлены. Прежние исключения PentaCodec выше исторические.
 
 ## STREAM_DATA API (QDCXX-016)
 
-Подключить `qd/protocol/stream_data.hpp` и линковать qd_protocol. Сначала вызвать
+Подключить `qd/protocol/stream_data.hpp` и линковать qdcxx_protocol. Сначала вызвать
 `StreamDataContext::create(schema, descriptions, limits)` с проверенной LocalSchema и уникальными raw
 ordinary type-8 descriptions. Неизменяемый результат владеет планами и числом локальных полей. Затем
 вызвать `decodeStreamData(payload, context, limits)` для одного полного type-15 payload без оболочки.
@@ -226,7 +226,7 @@ ContextLimits ограничивает schema storage и aggregate descriptions/
 символы. Результаты владеют local ID/symbols/values и сохраняют полный префикс при поздней ошибке.
 Точные приоритеты и позиции: [контракт](../spec/protocol/STREAM-DATA.md). Frame overload не предоставляется.
 
-CTest добавляет `protocol_java_stream_data` / `stream_data_tests`; QD_STREAM_DATA_FIXTURES допускает
+CTest добавляет `protocol_java_stream_data` / `qdcxx_stream_data_tests`; ORG_TTLDTOR_QDCXX_STREAM_DATA_FIXTURES допускает
 намеренные временные fixture overrides. Прежние build команды запускают все шесть suites. Полная compiler/
 sanitizer/production-only матрица и negative checks: [валидация](../tests/conformance/protocol/stream-data/VALIDATION.md).
 Transport, dynamic session, nonzero flags, importer и production dependency не добавлены.

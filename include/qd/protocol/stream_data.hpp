@@ -6,7 +6,7 @@
 #include "qd/encoding/symbol_reader.hpp"
 #include "qd/protocol/static_binding.hpp"
 
-namespace qd::protocol {
+namespace org::ttldtor::qdcxx::protocol {
 /** Finite bounds for building a static snapshot; no caller memory is retained. */
 struct ContextLimits {
     core::SchemaLimits schema; ///< Bounds inspected local schema, including names and lookup storage.
@@ -105,4 +105,4 @@ struct StreamDataResult {
  */
 [[nodiscard]] StreamDataResult decodeStreamData(std::span<const std::byte> payload, const StreamDataContext &context,
                                                 StreamDataLimits limits);
-} // namespace qd::protocol
+} // namespace org::ttldtor::qdcxx::protocol

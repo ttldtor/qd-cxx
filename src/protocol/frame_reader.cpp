@@ -11,7 +11,7 @@
 #include <stdexcept>
 #include <utility>
 
-namespace qd::protocol {
+namespace org::ttldtor::qdcxx::protocol {
 namespace {
 constexpr std::size_t MAX_COMPACT_PREFIX_BYTES = 9; ///< Full-width compact long escape plus eight bytes.
 
@@ -175,4 +175,4 @@ std::size_t FrameReader::storageBytes() const noexcept {
     return storageBytes_;
 }
 
-} // namespace qd::protocol
+} // namespace org::ttldtor::qdcxx::protocol

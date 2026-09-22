@@ -2,7 +2,7 @@
 
 [Русская версия](DESCRIBE-RECORDS.ru.md). English is authoritative.
 
-QDCXX-013 defines the provisional raw description layer of qd_protocol. Input is exactly one
+QDCXX-013 defines the provisional raw description layer of qdcxx_protocol. Input is exactly one
 complete type-2 payload, excluding length and type. No schema binding, event decoding, incoming-ID
 map, conversion, transport or session recovery is implemented.
 

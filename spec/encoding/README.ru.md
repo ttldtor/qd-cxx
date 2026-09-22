@@ -36,7 +36,7 @@ marker ff внутри frame и новые 0443 bytes в следующем fram
 
 ## Ограниченные символы QDCXX-015
 
-[SYMBOLS](SYMBOLS.ru.md) определяет реализованный reader EMPTY_SET в qd_encoding с собственными
+[SYMBOLS](SYMBOLS.ru.md) определяет реализованный reader EMPTY_SET в qdcxx_encoding с собственными
 точными UTF-16/cipher/flags, message-local repeat/MRU, явным reset, бюджетами и terminal errors.
 [Java coverage](../../tests/fixtures/encoding/symbols/COVERAGE.ru.md) и
 [валидация C++](../../tests/conformance/encoding/symbols/VALIDATION.ru.md) заменяют прежний source-only

@@ -9,7 +9,7 @@
 #include <string_view>
 #include <utility>
 
-namespace qd::core {
+namespace org::ttldtor::qdcxx::core {
 namespace {
 
 /** Check the local subset's nonempty, well-formed UTF-16 requirement.
@@ -139,4 +139,4 @@ std::expected<LocalSchema, SchemaError> LocalSchema::create(std::span<const Loca
     }
 }
 
-} // namespace qd::core
+} // namespace org::ttldtor::qdcxx::core

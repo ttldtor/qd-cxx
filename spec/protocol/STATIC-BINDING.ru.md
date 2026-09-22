@@ -38,7 +38,7 @@ BinaryQTPParser.parseDescribeRecords и BinaryRecordDesc.field2Desc/readFields �
 
 LocalSchema::create заимствует вход только на время вызова, полностью проверяет его и затем владеет копией.
 Доступны только const views; изменение требует новой валидации. При ошибке схема не публикуется.
-Схема находится в qd_core без зависимостей от protocol, файлов и транспорта.
+Схема находится в qdcxx_core без зависимостей от protocol, файлов и транспорта.
 
 ## Планирование и владение
 
@@ -83,7 +83,7 @@ Importers, event decoding, outgoing layouts, conversion matrices, динамич
 ## Общий идентификатор типа
 
 [SerialFieldType](../../include/qd/core/serial_field_type.hpp) единожды задаёт полный идентификатор
-реализованного типа COMPACT_INT=8 в qd_core. Локальная валидация и planner сравнивают числовые входы с
+реализованного типа COMPACT_INT=8 в qdcxx_core. Локальная валидация и planner сравнивают числовые входы с
 std::to_underlying(SerialFieldType::COMPACT_INT). Enum намеренно неполон: он не ограничивает структурное
 принятие raw и не отбрасывает биты представления. Входной serialTypeId остаётся int32_t.
 Литеральные oracle ID в тестах остаются независимыми ожидаемыми значениями.

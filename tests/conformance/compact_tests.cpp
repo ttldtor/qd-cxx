@@ -17,7 +17,7 @@
 #include <vector>
 
 namespace {
-using qd::encoding::Status;
+using org::ttldtor::qdcxx::encoding::Status;
 
 /// Fixture directory supplied by main before doctest executes any test case.
 std::filesystem::path fixtureDirectory;
@@ -100,7 +100,7 @@ std::string hex(std::span<const std::byte> bytes) {
 }
 
 /// Explicit corpus budgets, larger than every captured body and UTF-16 value.
-constexpr qd::encoding::UtfStringLimits CORPUS_LIMITS{1024, 1024};
+constexpr org::ttldtor::qdcxx::encoding::UtfStringLimits CORPUS_LIMITS{1024, 1024};
 
 /** Parse exact UTF-16 hex, preserving null, empty and isolated surrogates.
  * @param text Oracle field containing four hex digits per unit or the null marker.
@@ -168,7 +168,7 @@ void checkUtfReader(const std::vector<std::string> &row) {
     }
 
     const auto expected = success ? parseUnits(row[5]) : std::nullopt;
-    const auto result = qd::encoding::readUtfString(input, CORPUS_LIMITS);
+    const auto result = org::ttldtor::qdcxx::encoding::readUtfString(input, CORPUS_LIMITS);
     require(result.status == status, "UTF status expected " + row[4] + "/" + row[5]);
     require(result.value == expected,
             "value expected " + (success ? row[5] : "\\N") + " actual " + unitsHex(result.value));
@@ -189,7 +189,7 @@ void checkUtfWriter(const std::vector<std::string> &row) {
     for (std::size_t capacity = 0; capacity <= expected.size() + 2; ++capacity) {
         std::vector<std::byte> storage(capacity + 2, std::byte{0x5a});
         auto output = std::span(storage).subspan(1, capacity);
-        const auto result = qd::encoding::writeUtfString(view, output, CORPUS_LIMITS);
+        const auto result = org::ttldtor::qdcxx::encoding::writeUtfString(view, output, CORPUS_LIMITS);
         const bool fits = capacity >= expected.size();
         require(result.status == (fits ? Status::OK : Status::INSUFFICIENT_OUTPUT), "UTF writer capacity status");
         require(result.written == (fits ? expected.size() : 0), "UTF writer byte count");
@@ -224,12 +224,13 @@ void checkReader(const std::vector<std::string> &row) {
     require(success || row[5] == "java.io.EOFException", "unexpected exception category: " + row[5]);
     const auto read = [&row](std::span<const std::byte> bytes) {
         if (row[2] == "readCompactInt") {
-            const auto result = qd::encoding::readCompactInt(bytes);
+            const auto result = org::ttldtor::qdcxx::encoding::readCompactInt(bytes);
 
-            return qd::encoding::ReadResult<std::int64_t>{result.value, result.consumed, result.status};
+            return org::ttldtor::qdcxx::encoding::ReadResult<std::int64_t>{result.value, result.consumed,
+                                                                           result.status};
         }
 
-        return qd::encoding::readCompactLong(bytes);
+        return org::ttldtor::qdcxx::encoding::readCompactLong(bytes);
     };
     const auto result = read(input);
     require(result.status == (success ? Status::OK : Status::INSUFFICIENT_INPUT),
@@ -268,9 +269,10 @@ void checkWriter(const std::vector<std::string> &row) {
         std::array<std::byte, 12> storage;
         storage.fill(std::byte{0x5a});
         const auto output = std::span(storage).subspan(1, capacity);
-        const auto result = row[2] == "writeCompactInt"
-                                ? qd::encoding::writeCompactInt(static_cast<std::int32_t>(value), output)
-                                : qd::encoding::writeCompactLong(value, output);
+        const auto result =
+            row[2] == "writeCompactInt"
+                ? org::ttldtor::qdcxx::encoding::writeCompactInt(static_cast<std::int32_t>(value), output)
+                : org::ttldtor::qdcxx::encoding::writeCompactLong(value, output);
         const bool fits = capacity >= expected.size();
         require(result.status == (fits ? Status::OK : Status::INSUFFICIENT_OUTPUT), "writer capacity status");
         require(result.written == (fits ? expected.size() : 0), "writer byte count");
@@ -366,9 +368,9 @@ TEST_CASE("Java UTFString canonical vectors and strict prefixes") {
 }
 
 TEST_CASE("UTFString explicit budgets and precedence") {
-    using qd::encoding::readUtfString;
-    using qd::encoding::UtfStringLimits;
-    using qd::encoding::writeUtfString;
+    using org::ttldtor::qdcxx::encoding::readUtfString;
+    using org::ttldtor::qdcxx::encoding::UtfStringLimits;
+    using org::ttldtor::qdcxx::encoding::writeUtfString;
     /** Check one local resource-policy outcome without manufacturing a Java observation.
      * @param bytes Hex input, including malformed or incomplete forms.
      * @param limits Explicit byte/unit budgets for this operation.
@@ -404,7 +406,7 @@ TEST_CASE("UTFString explicit budgets and precedence") {
     std::array<std::byte, 9> prefix{};
 
     for (const auto length : {8589934588LL, 8589934589LL, std::numeric_limits<long long>::max()}) {
-        const auto written = qd::encoding::writeCompactLong(length, prefix).written;
+        const auto written = org::ttldtor::qdcxx::encoding::writeCompactLong(length, prefix).written;
         const auto input = std::span(prefix).first(written);
         const auto result = readUtfString(input, {0, 0});
         CHECK(result.status == (length == 8589934588LL ? Status::RESOURCE_LIMIT : Status::INVALID_LENGTH));

@@ -13,7 +13,7 @@
 #include <stdexcept>
 #include <utility>
 
-namespace qd::encoding {
+namespace org::ttldtor::qdcxx::encoding {
 namespace {
 /// Wire discriminator boundaries and standalone prefixes from the pinned PentaCodec grammar.
 constexpr unsigned PENTA_30 = 0x80, RESERVED_FIRST = 0xc0, PENTA_20 = 0xe0, PENTA_35 = 0xf0;
@@ -336,4 +336,4 @@ SymbolResult SymbolReader::read(std::span<const std::byte> input) {
         return fail(SymbolStatus::ALLOCATION_FAILURE);
     }
 }
-} // namespace qd::encoding
+} // namespace org::ttldtor::qdcxx::encoding

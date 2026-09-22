@@ -16,7 +16,7 @@
 #include <stdexcept>
 #include <utility>
 
-namespace qd::inspect {
+namespace org::ttldtor::qdcxx::inspect {
 namespace {
 constexpr core::SchemaLimits SCHEMA_LIMITS{1024, 65536, 65536, 1024, 1048576}; ///< Independent local schema bounds.
 constexpr std::size_t MAX_PREFIX_BYTES = 9;  ///< Maximum compact-long length-prefix width.
@@ -417,4 +417,4 @@ int inspect(std::istream &input, std::ostream &output, std::ostream &diagnostic,
         return 3;
     }
 }
-} // namespace qd::inspect
+} // namespace org::ttldtor::qdcxx::inspect

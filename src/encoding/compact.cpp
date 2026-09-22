@@ -5,7 +5,7 @@
 
 #include <bit>
 
-namespace qd::encoding {
+namespace org::ttldtor::qdcxx::encoding {
 namespace {
 /// Wire octets contain eight bits, independent of the signed value being encoded.
 constexpr unsigned int BITS_PER_BYTE = 8;
@@ -112,4 +112,4 @@ WriteResult writeCompactInt(std::int32_t value, std::span<std::byte> output) noe
     return writeCompactLong(value, output);
 }
 
-} // namespace qd::encoding
+} // namespace org::ttldtor::qdcxx::encoding

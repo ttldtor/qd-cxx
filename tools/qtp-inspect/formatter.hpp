@@ -11,7 +11,7 @@
 #include <string>
 #include <string_view>
 
-namespace qd::inspect {
+namespace org::ttldtor::qdcxx::inspect {
 /** Tool-only stdout representation; decoding and diagnostics do not depend on it. */
 enum class OutputFormat {
     TSV,  ///< Exact UTF-16 hexadecimal TSV, the default.
@@ -77,4 +77,4 @@ class Formatter {
     std::string complete(std::uint64_t bytes, std::size_t frames, std::size_t records, std::size_t chargedRecords,
                          std::size_t fields, std::size_t budget) const;
 };
-} // namespace qd::inspect
+} // namespace org::ttldtor::qdcxx::inspect

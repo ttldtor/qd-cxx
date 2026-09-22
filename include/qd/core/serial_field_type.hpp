@@ -5,7 +5,7 @@
 
 #include <cstdint>
 
-namespace qd::core {
+namespace org::ttldtor::qdcxx::core {
 
 /** Named full serial type identities supported by the local-schema profile.
  * See spec/schema/JSON-CONTRACT.md for the supported identities and upstream provenance.
@@ -16,4 +16,4 @@ enum class SerialFieldType : std::int32_t {
     COMPACT_INT = 8 ///< Ordinary compact integer with no representation flags; one logical int field.
 };
 
-} // namespace qd::core
+} // namespace org::ttldtor::qdcxx::core

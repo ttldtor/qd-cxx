@@ -2,8 +2,8 @@
 
 [Русская версия](SYMBOLS.ru.md). English is authoritative.
 
-QDCXX-015 implements one message-local PentaCodec reader in qd_encoding, with no dependencies on
-qd_core, qd_protocol, schema, binding, event delivery or transport. The provisional API returns
+QDCXX-015 implements one message-local PentaCodec reader in qdcxx_encoding, with no dependencies on
+qdcxx_core, qdcxx_protocol, schema, binding, event delivery or transport. The provisional API returns
 owned exact UTF-16 and raw encoding metadata; it does not normalize or convert to UTF-8.
 
 ## Evidence and profile

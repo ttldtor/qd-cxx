@@ -9,7 +9,7 @@
 #include <span>
 #include <string>
 
-namespace qd::encoding {
+namespace org::ttldtor::qdcxx::encoding {
 /** Outcomes of a complete-payload symbol read, distinct from stream framing. */
 enum class SymbolStatus {
     OK,                  ///< One owned symbol is available.
@@ -71,4 +71,4 @@ class SymbolReader {
      */
     [[nodiscard]] SymbolResult read(std::span<const std::byte> input);
 };
-} // namespace qd::encoding
+} // namespace org::ttldtor::qdcxx::encoding

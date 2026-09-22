@@ -2,7 +2,7 @@
 
 [Русская версия](CPP-BUILD.ru.md). English is authoritative.
 
-`qd_encoding` is a dependency-free C++23 production library with provisional compact int/long
+`qdcxx_encoding` is a dependency-free C++23 production library with provisional compact int/long
 and UTFString APIs. QDCXX-010 introduced compact; QDCXX-011 adds
 [utf_string.hpp](../include/qd/encoding/utf_string.hpp). The unchanged Java
 [primitive evidence](../spec/encoding/PRIMITIVES.md) defines compatibility;
@@ -11,7 +11,7 @@ PentaCodec, importer, schema runtime, event payload decoding, frame writing, tra
 
 ## DESCRIBE_RECORDS API and QDCXX-013 checks
 
-Include `qd/protocol/describe_records.hpp` and link qd_protocol. Call
+Include `qd/protocol/describe_records.hpp` and link qdcxx_protocol. Call
 `parseDescribeRecords(payload, {4096, 64, 128, 1024, {256, 256}, 4096})` only for a complete type-2
 payload excluding the envelope. Budgets are payload bytes, descriptions, fields/description, total
 fields, per-name {encoded body bytes, UTF-16 units}, and aggregate name units. Zero is valid.
@@ -23,8 +23,8 @@ field factory support. No schema lookup or map is built. Allocation errors prese
 prefix; a throwing primitive commits no consumption beyond its start. See the
 [contract](../spec/protocol/DESCRIBE-RECORDS.md) for precise precedence and positions.
 
-CTest adds protocol_java_descriptions; description_tests links only qd_protocol and test-only doctest.
-QD_DESCRIPTION_FIXTURES defaults to the additive P08 descriptions.tsv and permits temporary negative
+CTest adds protocol_java_descriptions; qdcxx_description_tests links only qdcxx_protocol and test-only doctest.
+ORG_TTLDTOR_QDCXX_DESCRIPTION_FIXTURES defaults to the additive P08 descriptions.tsv and permits temporary negative
 selection. All existing commands below include the new target. [Coverage/results](../tests/conformance/protocol/descriptions/VALIDATION.md)
 record 81 Java observations, 50,841 new assertions, MSVC/ClangCL/GCC Debug/Release, GCC ASan+UBSan,
 BUILD_TESTING=OFF with no acquisition, regressions and immutable negative checks. API is provisional;
@@ -32,9 +32,9 @@ event payloads, local binding, transport and writer remain outside scope.
 
 ## QTP frame reader API and QDCXX-012 checks
 
-`qd_protocol` is a production component without external dependencies, linking only qd_encoding.
-Include `qd/protocol/frame_reader.hpp` and link qd_protocol. Construct
-`qd::protocol::FrameReader reader({1024, 1033});`: these are body and pending budgets, allowing
+`qdcxx_protocol` is a production component without external dependencies, linking only qdcxx_encoding.
+Include `qd/protocol/frame_reader.hpp` and link qdcxx_protocol. Construct
+`org::ttldtor::qdcxx::protocol::FrameReader reader({1024, 1033});`: these are body and pending budgets, allowing
 nine prefix bytes. Incompatible/overflowing budgets throw invalid_argument; constructor allocation
 failure propagates. The API is single-threaded and non-reentrant.
 
@@ -52,8 +52,8 @@ storage is fixed body+9, delivered payload owns separate bounded storage; caller
 are outside the reader's aggregate budget. Payload allocation failure gives ALLOCATION_FAILURE.
 The [EN/RU contract](../spec/protocol/FRAMING.md) defines exact wire/resource/lifecycle boundaries.
 
-Commands below now build both libraries and also run frame_tests/protocol_java_frames. New tests
-read historical P01 and separately added P02; QD_PROTOCOL_FIXTURES and QD_FRAME_PROJECTIONS permit
+Commands below now build both libraries and also run qdcxx_frame_tests/protocol_java_frames. New tests
+read historical P01 and separately added P02; ORG_TTLDTOR_QDCXX_PROTOCOL_FIXTURES and ORG_TTLDTOR_QDCXX_FRAME_PROJECTIONS permit
 temporary negative selections. MSVC/ClangCL/GCC Debug/Release and GCC ASan+UBSan pass;
 BUILD_TESTING=OFF does not fetch doctest. [Coverage](../tests/conformance/protocol/COVERAGE.md),
 [results and UTC logs](../tests/conformance/protocol/VALIDATION.md). Further payload/transport/writer
@@ -70,7 +70,7 @@ Status adds INVALID_ENCODING, INVALID_LENGTH and RESOURCE_LIMIT without changing
 See the contract for exact precedence, Java body overrun and allocation guarantees.
 
 Existing commands below now build and test both codecs. The executable/CTest names remain
-`compact_tests`/`compact_java_vectors` for compatibility with existing tooling; they execute four
+`qdcxx_compact_tests`/`compact_java_vectors` for compatibility with existing tooling; they execute four
 cases, 43,375 assertions and all 1146 Java observations (314 UTFString, 832 compact), zero exclusions.
 MSVC, ClangCL and WSL GCC pass Debug/Release; GCC ASan+UBSan also passes. Historical QDCXX-010 counts
 below describe the earlier compact-only run. `BUILD_TESTING=OFF` still fetches nothing; no production
@@ -91,7 +91,7 @@ Executed with CMake 4.4.2, generator `Visual Studio 17 2022`, x64, Windows SDK 1
 MSBuild 17.14.51, MSVC 19.42.34444.0 (tool directory 14.42.34433). The second compiler is the
 installed ClangCL 19.1.5 using the same MSVC standard library/SDK. Tests use doctest 2.4.12 via
 CMake FetchContent, pinned by archive URL and SHA-256 in [CMakeLists.txt](../CMakeLists.txt).
-Only `compact_tests`, `frame_tests` and `description_tests` link doctest; `BUILD_TESTING=OFF` neither downloads nor links it. Downloads
+Only `qdcxx_compact_tests`, `qdcxx_frame_tests` and `qdcxx_description_tests` link doctest; `BUILD_TESTING=OFF` neither downloads nor links it. Downloads
 are stored under the ignored build directory `_deps/`; the first test configure needs network access.
 No package manager is needed. doctest 2.4.12 emits a non-fatal CMake deprecation warning for its
 old minimum policy version; the downloaded source is unmodified. CMake requires 3.25+; each target inherits `cxx_std_23` from the library,
@@ -113,14 +113,14 @@ python tools/run_utc.py --log .work/clang-release-test.log -- ctest --test-dir .
 ```
 
 Build outside the source root; `.work/` and `build/` are ignored. In-source configure is rejected.
-`BUILD_TESTING=OFF` builds only qd_encoding and qd_protocol libraries. `QD_ENCODING_FIXTURES` may point at temporary fixture
+`BUILD_TESTING=OFF` builds only qdcxx_encoding and qdcxx_protocol libraries. `ORG_TTLDTOR_QDCXX_ENCODING_FIXTURES` may point at temporary fixture
 copies for negative checks; it defaults to the checked-in expectations. Initial sandboxed MSBuild
 SDK discovery was denied access to the local Microsoft SDKs directory; the authorized configure/build
 runs above succeeded with sandbox elevation. This is an environment restriction, not a codec failure.
 
 ## API and ownership
 
-All four functions are in `qd::encoding`, borrow caller-owned `std::span` storage only for the call,
+All four functions are in `org::ttldtor::qdcxx::encoding`, borrow caller-owned `std::span` storage only for the call,
 allocate nothing and retain no pointer. Results own their values/counts. The caller keeps the span
 valid throughout the call. Byte order is explicitly big-endian; reads require no alignment.
 
@@ -165,7 +165,7 @@ for config in Debug Release; do
   python3 tools/run_utc.py --log "$build-build.log" -- cmake --build "$build"
   python3 tools/run_utc.py --log "$build-test.log" -- ctest --test-dir "$build" --output-on-failure
 done
-python3 tools/run_utc.py --log .work/linux-negative.log -- python3 tests/conformance/check_compact_negative.py .work/linux-release/compact_tests --skip-format --report .work/linux-negative-proof.json
+python3 tools/run_utc.py --log .work/linux-negative.log -- python3 tests/conformance/check_compact_negative.py .work/linux-release/qdcxx_compact_tests --skip-format --report .work/linux-negative-proof.json
 cmake -S . -B .work/linux-library -G Ninja -DBUILD_TESTING=OFF
 cmake --build .work/linux-library
 ```
@@ -179,36 +179,36 @@ Public functions and test utilities now document each parameter/template paramet
 
 ## Static type-8 binding API (QDCXX-014)
 
-qd_core owns the validated immutable local subset and has no protocol/transport dependency.
+qdcxx_core owns the validated immutable local subset and has no protocol/transport dependency.
 Include qd/core/local_schema.hpp; LocalSchema::create(records, {recordCount, fieldCount, lookupCount,
 nameUnits, totalNameUnits}) returns std::expected with an owned schema or explicit error. Records
 carry local ID/name/hasTime, full field types and explicit record lookup keys targeting field positions.
 Only hasTime=false and exact type 8 are supported. Input files/provenance are not required.
 
-Include qd/protocol/static_binding.hpp and link qd_protocol. bindRecord(raw, schema,
+Include qd/protocol/static_binding.hpp and link qdcxx_protocol. bindRecord(raw, schema,
 {fieldCount, nameUnits, totalNameUnits}) returns an independent owning RecordBinding or explicit error.
 A missing localRecordId denotes a described unknown record; missing targetFieldId denotes a type-8 skip.
 No description creates no plan. No defaults, event decoder or session map is implied. All budgets are
 mandatory, finite logical-element counts; allocation failures publish no partial result.
 See [contract](../spec/protocol/STATIC-BINDING.md) and [validation](../tests/conformance/protocol/binding/VALIDATION.md).
-CTest now adds binding_tests/protocol_java_binding; QD_BINDING_FIXTURES selects reviewed plans.tsv.
+CTest now adds qdcxx_binding_tests/protocol_java_binding; ORG_TTLDTOR_QDCXX_BINDING_FIXTURES selects reviewed plans.tsv.
 All four targets pass the documented compiler matrix, GCC sanitizers and negative checks. BUILD_TESTING=OFF
-builds qd_core/qd_encoding/qd_protocol without fetching doctest. Existing command examples apply unchanged.
+builds qdcxx_core/qdcxx_encoding/qdcxx_protocol without fetching doctest. Existing command examples apply unchanged.
 
 ## QDCXX-015 symbol API
 
-Include qd/encoding/symbol_reader.hpp and link qd_encoding. Construct
+Include qd/encoding/symbol_reader.hpp and link qdcxx_encoding. Construct
 `SymbolReader reader({4096, 1024, 1024}, 0);` with input-byte, returned-unit and retained-unit budgets
 and EMPTY_SET mask zero. `beginMessage(0)` clears symbol/MRU/failure; call it between complete
 messages. `read(remainingPayload)` returns one owned value with UTF-16, cipher and raw flags,
 consumed count and explicit status. All read failures are terminal; nonzero option masks are
 unsupported. [Contract](../spec/encoding/SYMBOLS.md) and [final validation](../tests/conformance/encoding/symbols/VALIDATION.md).
-CTest adds encoding_java_symbols / symbol_tests; QD_SYMBOL_FIXTURES selects immutable Java TSV.
+CTest adds encoding_java_symbols / qdcxx_symbol_tests; ORG_TTLDTOR_QDCXX_SYMBOL_FIXTURES selects immutable Java TSV.
 No production dependency or event decoder is added. Earlier PentaCodec exclusions above are historical.
 
 ## STREAM_DATA API (QDCXX-016)
 
-Include `qd/protocol/stream_data.hpp` and link qd_protocol. First call
+Include `qd/protocol/stream_data.hpp` and link qdcxx_protocol. First call
 `StreamDataContext::create(schema, descriptions, limits)` with validated LocalSchema and unique raw
 ordinary type-8 descriptions. The immutable result owns plans and local field counts. Then call
 `decodeStreamData(payload, context, limits)` for one complete type-15 payload, excluding its envelope.
@@ -218,7 +218,7 @@ SymbolLimits. No unlimited defaults. Nonzero raw flags fail before sender ID; ev
 Results own local IDs/symbols/values and retain the complete prefix on later failure. See the
 [contract](../spec/protocol/STREAM-DATA.md) for exact precedence and positions. No Frame overload is supplied.
 
-CTest adds `protocol_java_stream_data` / `stream_data_tests`; QD_STREAM_DATA_FIXTURES permits only
+CTest adds `protocol_java_stream_data` / `qdcxx_stream_data_tests`; ORG_TTLDTOR_QDCXX_STREAM_DATA_FIXTURES permits only
 intentional temporary fixture overrides. Existing build commands run all six suites. The full compiler/
 sanitizer/production-only matrix and negative checks are in [validation](../tests/conformance/protocol/stream-data/VALIDATION.md).
 No transport, dynamic session, nonzero flags, importer or production dependency is introduced.

@@ -18,11 +18,11 @@
 #include <vector>
 
 namespace {
-using qd::protocol::Frame;
-using qd::protocol::FrameError;
-using qd::protocol::FrameKind;
-using qd::protocol::FrameReader;
-using qd::protocol::FrameStatus;
+using org::ttldtor::qdcxx::protocol::Frame;
+using org::ttldtor::qdcxx::protocol::FrameError;
+using org::ttldtor::qdcxx::protocol::FrameKind;
+using org::ttldtor::qdcxx::protocol::FrameReader;
+using org::ttldtor::qdcxx::protocol::FrameStatus;
 
 constexpr std::size_t MAX_COMPACT_PREFIX_BYTES = 9; ///< Full-width long prefix storage requirement.
 constexpr std::size_t SELECTED_CASE_COUNT = 18;     ///< One historical P01 plus 17 new P02 subcases.

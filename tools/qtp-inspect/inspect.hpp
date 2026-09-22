@@ -9,7 +9,7 @@
 #include <iosfwd>
 #include <string_view>
 
-namespace qd::inspect {
+namespace org::ttldtor::qdcxx::inspect {
 
 /** Finite tool policy bounds; counts are logical elements rather than exact RSS. */
 struct Limits {
@@ -64,4 +64,4 @@ int inspect(std::istream &input, std::ostream &output, std::ostream &diagnostic,
  * @param stage Static ASCII checkpoint name.
  */
 void report(std::ostream &diagnostic, int code, std::string_view stage) noexcept;
-} // namespace qd::inspect
+} // namespace org::ttldtor::qdcxx::inspect

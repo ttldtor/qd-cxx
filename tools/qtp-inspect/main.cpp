@@ -20,29 +20,29 @@
 namespace {
 /** One numeric option and its policy storage member. */
 struct Option {
-    std::string_view name;                    ///< Full exact CLI spelling.
-    std::size_t qd::inspect::Limits::*member; ///< Finite size_t budget member.
+    std::string_view name;                                     ///< Full exact CLI spelling.
+    std::size_t org::ttldtor::qdcxx::inspect::Limits::*member; ///< Finite size_t budget member.
 };
 
 constexpr Option OPTIONS[]{
-    {"--chunk-size", &qd::inspect::Limits::chunkSize},
-    {"--max-input", &qd::inspect::Limits::input},
-    {"--max-frame", &qd::inspect::Limits::frame},
-    {"--max-frames", &qd::inspect::Limits::frames},
-    {"--max-descriptions", &qd::inspect::Limits::descriptions},
-    {"--max-actions", &qd::inspect::Limits::actions},
-    {"--max-name-units", &qd::inspect::Limits::nameUnits},
-    {"--max-total-name-units", &qd::inspect::Limits::totalNameUnits},
-    {"--max-records", &qd::inspect::Limits::records},
-    {"--max-fields", &qd::inspect::Limits::fields},
-    {"--max-values", &qd::inspect::Limits::values},
-    {"--max-symbol-units", &qd::inspect::Limits::symbolUnits},
-    {"--max-output", &qd::inspect::Limits::output},
-    {"--message-records", &qd::inspect::Limits::messageRecords},
-    {"--message-fields", &qd::inspect::Limits::messageFields},
-    {"--message-values", &qd::inspect::Limits::messageValues},
-    {"--message-symbol-units", &qd::inspect::Limits::messageSymbolUnits},
-    {"--symbol-units", &qd::inspect::Limits::symbol}}; ///< Supported exact numeric option spellings.
+    {"--chunk-size", &org::ttldtor::qdcxx::inspect::Limits::chunkSize},
+    {"--max-input", &org::ttldtor::qdcxx::inspect::Limits::input},
+    {"--max-frame", &org::ttldtor::qdcxx::inspect::Limits::frame},
+    {"--max-frames", &org::ttldtor::qdcxx::inspect::Limits::frames},
+    {"--max-descriptions", &org::ttldtor::qdcxx::inspect::Limits::descriptions},
+    {"--max-actions", &org::ttldtor::qdcxx::inspect::Limits::actions},
+    {"--max-name-units", &org::ttldtor::qdcxx::inspect::Limits::nameUnits},
+    {"--max-total-name-units", &org::ttldtor::qdcxx::inspect::Limits::totalNameUnits},
+    {"--max-records", &org::ttldtor::qdcxx::inspect::Limits::records},
+    {"--max-fields", &org::ttldtor::qdcxx::inspect::Limits::fields},
+    {"--max-values", &org::ttldtor::qdcxx::inspect::Limits::values},
+    {"--max-symbol-units", &org::ttldtor::qdcxx::inspect::Limits::symbolUnits},
+    {"--max-output", &org::ttldtor::qdcxx::inspect::Limits::output},
+    {"--message-records", &org::ttldtor::qdcxx::inspect::Limits::messageRecords},
+    {"--message-fields", &org::ttldtor::qdcxx::inspect::Limits::messageFields},
+    {"--message-values", &org::ttldtor::qdcxx::inspect::Limits::messageValues},
+    {"--message-symbol-units", &org::ttldtor::qdcxx::inspect::Limits::messageSymbolUnits},
+    {"--symbol-units", &org::ttldtor::qdcxx::inspect::Limits::symbol}}; ///< Supported exact numeric option spellings.
 
 /** Validate a whole unsigned decimal operand before narrowing.
  * @param text Borrowed operand.
@@ -79,7 +79,7 @@ int main(int argc, char **argv) {
 #ifdef _WIN32
 
     if (_setmode(_fileno(stdout), _O_BINARY) == -1 || _setmode(_fileno(stderr), _O_BINARY) == -1) {
-        qd::inspect::report(std::cerr, 3, "open");
+        org::ttldtor::qdcxx::inspect::report(std::cerr, 3, "open");
 
         return 3;
     }
@@ -95,7 +95,7 @@ int main(int argc, char **argv) {
                    "Raw offline QTP (not QD tape), type 2 before type 15, type 8 fields, zero flags.\n"
                    "Numeric limits: ASCII decimal, finite; chunk-size must be positive.\n"
                    "Defaults:\n";
-            const qd::inspect::Limits defaults;
+            const org::ttldtor::qdcxx::inspect::Limits defaults;
 
             for (const auto &option : OPTIONS) {
                 std::cout << option.name << ' ' << defaults.*(option.member) << '\n';
@@ -107,7 +107,7 @@ int main(int argc, char **argv) {
             std::cout.flush();
 
             if (!std::cout) {
-                qd::inspect::report(std::cerr, 3, "flush");
+                org::ttldtor::qdcxx::inspect::report(std::cerr, 3, "flush");
 
                 return 3;
             }
@@ -115,8 +115,8 @@ int main(int argc, char **argv) {
             return 0;
         }
 
-        qd::inspect::Limits limits;
-        auto format = qd::inspect::OutputFormat::TSV;
+        org::ttldtor::qdcxx::inspect::Limits limits;
+        auto format = org::ttldtor::qdcxx::inspect::OutputFormat::TSV;
         std::string path;
         std::string profile;
         std::set<std::string_view> seen;
@@ -138,7 +138,8 @@ int main(int argc, char **argv) {
                 profile = operand;
             } else if (key == "--output-format") {
                 valid = operand == "tsv" || operand == "human";
-                format = operand == "human" ? qd::inspect::OutputFormat::HUMAN : qd::inspect::OutputFormat::TSV;
+                format = operand == "human" ? org::ttldtor::qdcxx::inspect::OutputFormat::HUMAN
+                                            : org::ttldtor::qdcxx::inspect::OutputFormat::TSV;
             } else {
                 const auto option = std::find_if(std::begin(OPTIONS), std::end(OPTIONS), [&](const auto &candidate) {
                     return candidate.name == key;
@@ -147,8 +148,9 @@ int main(int argc, char **argv) {
             }
         }
 
-        if (!valid || profile != "oracle-sre-v1" || path.empty() || path == "-" || !qd::inspect::validLimits(limits)) {
-            qd::inspect::report(std::cerr, 2, "usage");
+        if (!valid || profile != "oracle-sre-v1" || path.empty() || path == "-" ||
+            !org::ttldtor::qdcxx::inspect::validLimits(limits)) {
+            org::ttldtor::qdcxx::inspect::report(std::cerr, 2, "usage");
 
             return 2;
         }
@@ -156,31 +158,31 @@ int main(int argc, char **argv) {
         std::ifstream input(path, std::ios::binary);
 
         if (!input) {
-            qd::inspect::report(std::cerr, 3, "open");
+            org::ttldtor::qdcxx::inspect::report(std::cerr, 3, "open");
 
             return 3;
         }
 
-        auto schema = qd::inspect::oracleSchema();
+        auto schema = org::ttldtor::qdcxx::inspect::oracleSchema();
 
         if (!schema) {
-            qd::inspect::report(std::cerr, 6, "allocation");
+            org::ttldtor::qdcxx::inspect::report(std::cerr, 6, "allocation");
 
             return 6;
         }
 
-        return qd::inspect::inspect(input, std::cout, std::cerr, *schema, limits, format,
-                                    qd::inspect::DisplayProfile::ORACLE_SRE_V1);
+        return org::ttldtor::qdcxx::inspect::inspect(input, std::cout, std::cerr, *schema, limits, format,
+                                                     org::ttldtor::qdcxx::inspect::DisplayProfile::ORACLE_SRE_V1);
     } catch (const std::bad_alloc &) {
-        qd::inspect::report(std::cerr, 6, "allocation");
+        org::ttldtor::qdcxx::inspect::report(std::cerr, 6, "allocation");
 
         return 6;
     } catch (const std::length_error &) {
-        qd::inspect::report(std::cerr, 6, "allocation");
+        org::ttldtor::qdcxx::inspect::report(std::cerr, 6, "allocation");
 
         return 6;
     } catch (const std::ios_base::failure &) {
-        qd::inspect::report(std::cerr, 3, "write");
+        org::ttldtor::qdcxx::inspect::report(std::cerr, 3, "write");
 
         return 3;
     }

@@ -7,7 +7,7 @@
 #include <cstdint>
 #include <span>
 
-namespace qd::encoding {
+namespace org::ttldtor::qdcxx::encoding {
 
 /** Bounded-storage outcomes; Java EOF maps to INSUFFICIENT_INPUT. */
 enum class Status {
@@ -70,4 +70,4 @@ struct WriteResult {
  */
 [[nodiscard]] WriteResult writeCompactLong(std::int64_t value, std::span<std::byte> output) noexcept;
 
-} // namespace qd::encoding
+} // namespace org::ttldtor::qdcxx::encoding

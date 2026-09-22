@@ -15,11 +15,11 @@
 #include <string>
 
 namespace {
-using qd::protocol::DescriptionLimits;
-using qd::protocol::DescriptionResult;
-using qd::protocol::DescriptionStage;
-using qd::protocol::DescriptionStatus;
-using qd::protocol::parseDescribeRecords;
+using org::ttldtor::qdcxx::protocol::DescriptionLimits;
+using org::ttldtor::qdcxx::protocol::DescriptionResult;
+using org::ttldtor::qdcxx::protocol::DescriptionStage;
+using org::ttldtor::qdcxx::protocol::DescriptionStatus;
+using org::ttldtor::qdcxx::protocol::parseDescribeRecords;
 
 constexpr DescriptionLimits LIMITS{256, 32, 16, 64, {64, 64}, 256}; ///< Bounded Java fixture profile.
 constexpr std::size_t CASE_COUNT = 81; ///< Exact selected P08 and historical payload observations.
@@ -128,15 +128,15 @@ std::string descriptions(const DescriptionResult &result) {
 
 /** Validated Java observation plus its explicitly raw-layer projection. */
 struct Observation {
-    std::string id;                 ///< Unique evidence scenario.
-    std::vector<std::byte> payload; ///< Exact Java-observed payload bytes.
-    std::vector<std::byte> frame;   ///< Newly completed Java-framed input.
-    DescriptionStatus status;       ///< Raw diagnostic category, not parser callback category.
-    DescriptionStage stage;         ///< Source-checked diagnostic stage.
-    std::size_t consumed;           ///< Diagnostic primitive examination count.
-    std::size_t offset;             ///< Primitive start or validation checkpoint.
-    std::string records;            ///< Ordered diagnostic completed records in UTF-16 hex.
-    qd::encoding::Status cause;     ///< Projection of the Java primitive exception class.
+    std::string id;                              ///< Unique evidence scenario.
+    std::vector<std::byte> payload;              ///< Exact Java-observed payload bytes.
+    std::vector<std::byte> frame;                ///< Newly completed Java-framed input.
+    DescriptionStatus status;                    ///< Raw diagnostic category, not parser callback category.
+    DescriptionStage stage;                      ///< Source-checked diagnostic stage.
+    std::size_t consumed;                        ///< Diagnostic primitive examination count.
+    std::size_t offset;                          ///< Primitive start or validation checkpoint.
+    std::string records;                         ///< Ordered diagnostic completed records in UTF-16 hex.
+    org::ttldtor::qdcxx::encoding::Status cause; ///< Projection of the Java primitive exception class.
 };
 
 /** Validate encoded descriptor/name/map grammar, including unused constructor observations.
@@ -189,11 +189,11 @@ std::vector<Observation> load() {
                                                          {"FIELD_NAME", DescriptionStage::FIELD_NAME},
                                                          {"FIELD_TYPE", DescriptionStage::FIELD_TYPE},
                                                          {"FIELD_HEADER", DescriptionStage::FIELD_HEADER}};
-    const std::map<std::string, qd::encoding::Status> causes{
-        {"-", qd::encoding::Status::OK},
-        {"java.io.EOFException", qd::encoding::Status::INSUFFICIENT_INPUT},
-        {"java.io.UTFDataFormatException", qd::encoding::Status::INVALID_ENCODING},
-        {"java.io.IOException", qd::encoding::Status::INVALID_LENGTH}};
+    const std::map<std::string, org::ttldtor::qdcxx::encoding::Status> causes{
+        {"-", org::ttldtor::qdcxx::encoding::Status::OK},
+        {"java.io.EOFException", org::ttldtor::qdcxx::encoding::Status::INSUFFICIENT_INPUT},
+        {"java.io.UTFDataFormatException", org::ttldtor::qdcxx::encoding::Status::INVALID_ENCODING},
+        {"java.io.IOException", org::ttldtor::qdcxx::encoding::Status::INVALID_LENGTH}};
     std::ifstream input(evidenceFile);
     REQUIRE(input.good());
     std::vector<Observation> out;
@@ -269,7 +269,7 @@ void replay(const Observation &expected, const std::vector<std::size_t> &chunks)
     auto stream = expected.frame;
     stream.push_back(std::byte{1}); // Complete following heartbeat, independent of payload validity.
     stream.push_back(std::byte{0});
-    qd::protocol::FrameReader reader({256, 265});
+    org::ttldtor::qdcxx::protocol::FrameReader reader({256, 265});
     std::size_t offset = 0;
     std::size_t count = 0;
     DescriptionResult saved{};
@@ -280,7 +280,7 @@ void replay(const Observation &expected, const std::vector<std::size_t> &chunks)
 
         do {
             const auto feed = reader.feed(std::span(stream).subspan(offset, end - offset));
-            REQUIRE(feed.status != qd::protocol::FrameStatus::FAILED);
+            REQUIRE(feed.status != org::ttldtor::qdcxx::protocol::FrameStatus::FAILED);
             REQUIRE(feed.accepted <= end - offset);
             offset += feed.accepted;
 
@@ -292,7 +292,7 @@ void replay(const Observation &expected, const std::vector<std::size_t> &chunks)
                     saved = parseDescribeRecords(feed.frame->payload, LIMITS);
                     compare(saved, expected);
                     CHECK(reader.totalAccepted() == accepted);
-                    CHECK(reader.error() == qd::protocol::FrameError::NONE);
+                    CHECK(reader.error() == org::ttldtor::qdcxx::protocol::FrameError::NONE);
                     CHECK(offset == expected.frame.size());
                 } else {
                     REQUIRE(count == 1);
@@ -309,7 +309,7 @@ void replay(const Observation &expected, const std::vector<std::size_t> &chunks)
 
     CHECK(offset == stream.size());
     CHECK(count == 2);
-    CHECK(reader.finish() == qd::protocol::FrameStatus::FINISHED);
+    CHECK(reader.finish() == org::ttldtor::qdcxx::protocol::FrameStatus::FINISHED);
     reader.reset();
     compare(saved, expected); // Frame/input buffers have already been destroyed or reset.
 }
@@ -374,7 +374,7 @@ TEST_CASE("small budget boundaries and completed prefix") {
                 CHECK(result.consumed == 10);
                 CHECK(result.errorOffset == 10);
                 CHECK(result.stage == DescriptionStage::END);
-                CHECK(result.primitiveStatus == qd::encoding::Status::OK);
+                CHECK(result.primitiveStatus == org::ttldtor::qdcxx::encoding::Status::OK);
             } else {
                 const std::size_t positions[] = {0, 0, 4, 4, 2, 3, 3 + limit * 3};
                 const std::size_t offsets[] = {0, 0, 4, 4, 1, 1, 1 + limit * 3};
@@ -389,8 +389,8 @@ TEST_CASE("small budget boundaries and completed prefix") {
                 CHECK(result.consumed == positions[budget]);
                 CHECK(result.errorOffset == offsets[budget]);
                 CHECK(result.stage == stages[budget]);
-                CHECK(result.primitiveStatus ==
-                      (budget < 4 ? qd::encoding::Status::OK : qd::encoding::Status::RESOURCE_LIMIT));
+                CHECK(result.primitiveStatus == (budget < 4 ? org::ttldtor::qdcxx::encoding::Status::OK
+                                                            : org::ttldtor::qdcxx::encoding::Status::RESOURCE_LIMIT));
             }
         }
     }
@@ -472,7 +472,7 @@ TEST_CASE("policy precedence sparse identities and ownership") {
     for (std::int32_t type = 0; type <= 255; ++type) {
         auto bytes = unhex("000152010178");
         std::byte encoded[5]{};
-        const auto written = qd::encoding::writeCompactInt(type, encoded);
+        const auto written = org::ttldtor::qdcxx::encoding::writeCompactInt(type, encoded);
         bytes.insert(bytes.end(), encoded, encoded + written.written);
         const auto parsed = parseDescribeRecords(bytes, LIMITS);
         REQUIRE(parsed.status == DescriptionStatus::OK);

@@ -8,7 +8,7 @@
 
 #include <optional>
 
-namespace qd::protocol {
+namespace org::ttldtor::qdcxx::protocol {
 
 /** Planner failures, separate from a successfully described unknown record. */
 enum class BindingError {
@@ -46,4 +46,4 @@ struct RecordBinding {
 [[nodiscard]] std::expected<RecordBinding, BindingError>
 bindRecord(const WireRecordDescription &description, const core::LocalSchema &schema, BindingLimits limits);
 
-} // namespace qd::protocol
+} // namespace org::ttldtor::qdcxx::protocol

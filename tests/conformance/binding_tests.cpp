@@ -11,17 +11,17 @@
 #include <stdexcept>
 
 namespace {
-using qd::core::FieldLookup;
-using qd::core::LocalRecord;
-using qd::core::LocalSchema;
-using qd::core::SchemaError;
-using qd::protocol::BindingError;
-using qd::protocol::bindRecord;
-using qd::protocol::WireRecordDescription;
+using org::ttldtor::qdcxx::core::FieldLookup;
+using org::ttldtor::qdcxx::core::LocalRecord;
+using org::ttldtor::qdcxx::core::LocalSchema;
+using org::ttldtor::qdcxx::core::SchemaError;
+using org::ttldtor::qdcxx::protocol::BindingError;
+using org::ttldtor::qdcxx::protocol::bindRecord;
+using org::ttldtor::qdcxx::protocol::WireRecordDescription;
 
 std::string fixturePath; ///< Explicit fixture location supplied by the test runner.
-constexpr qd::core::SchemaLimits SCHEMA_LIMITS{16, 64, 128, 128, 1024}; ///< Small test schema budgets.
-constexpr qd::protocol::BindingLimits BINDING_LIMITS{32, 128, 1024};    ///< Small test planner budgets.
+constexpr org::ttldtor::qdcxx::core::SchemaLimits SCHEMA_LIMITS{16, 64, 128, 128, 1024}; ///< Small test schema budgets.
+constexpr org::ttldtor::qdcxx::protocol::BindingLimits BINDING_LIMITS{32, 128, 1024}; ///< Small test planner budgets.
 
 /** Supply the explicitly resolved local subset used by the Java probe.
  * @return Owned S/R/E records with explicit full/local/property alias keys.
@@ -116,8 +116,9 @@ TEST_CASE("production Java description projections preserve ordered binding deci
         REQUIRE(cells.size() == 3);
         REQUIRE(cells[0] == names[caseIndex++]);
         const auto payload = bytes(cells[1]);
-        const auto raw = qd::protocol::parseDescribeRecords(payload, {4096, 16, 32, 128, {128, 128}, 1024});
-        REQUIRE(raw.status == qd::protocol::DescriptionStatus::OK);
+        const auto raw =
+            org::ttldtor::qdcxx::protocol::parseDescribeRecords(payload, {4096, 16, 32, 128, {128, 128}, 1024});
+        REQUIRE(raw.status == org::ttldtor::qdcxx::protocol::DescriptionStatus::OK);
         const auto expectedRecords = split(cells[2], ';');
         REQUIRE(raw.descriptions.size() == expectedRecords.size());
 

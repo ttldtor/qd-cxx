@@ -17,10 +17,10 @@ cmake --build .work/inspect --config Release
 ```
 
 Для Ninja/Makefiles используйте `.work/inspect/qd-qtp-inspect` (или `.exe` в Windows).
-`QD_BUILD_QTP_INSPECT` по умолчанию OFF; доступна сборка только библиотек. BUILD_TESTING=OFF
+`ORG_TTLDTOR_QDCXX_BUILD_QTP_INSPECT` по умолчанию OFF; доступна сборка только библиотек. BUILD_TESTING=OFF
 не скачивает doctest и не требует Python. При включённых тестах и инструменте CTest включает
 интеграцию executable и переносимые инъекции ошибок I/O; Python 3 нужен только тестам.
-Production линкует только существующие qd_protocol/qd_core/qd_encoding и стандартную библиотеку.
+Production линкует только существующие qdcxx_protocol/qdcxx_core/qdcxx_encoding и стандартную библиотеку.
 
 ## Аргументы и конечные значения по умолчанию
 

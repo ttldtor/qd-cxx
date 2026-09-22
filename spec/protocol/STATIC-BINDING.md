@@ -40,7 +40,7 @@ shape is representable as a supported field. Empty schemas and empty records are
 
 LocalSchema::create borrows input only during the call, validates it completely, then owns a copy.
 Only const views are exposed; mutation requires a new validation. Failure publishes no schema.
-The schema lives in qd_core without protocol, file or transport dependencies.
+The schema lives in qdcxx_core without protocol, file or transport dependencies.
 
 ## Planning and ownership
 
@@ -85,7 +85,7 @@ transport and full DataScheme behavior remain outside this task.
 ## Shared type identity
 
 [SerialFieldType](../../include/qd/core/serial_field_type.hpp) names the implemented full type identity
-COMPACT_INT=8 once in qd_core. Local validation and the planner compare numeric inputs with
+COMPACT_INT=8 once in qdcxx_core. Local validation and the planner compare numeric inputs with
 std::to_underlying(SerialFieldType::COMPACT_INT). The enum is intentionally partial; it does not restrict
 raw structural acceptance or discard representation bits. Input serialTypeId remains int32_t.
 Literal oracle IDs in tests remain independent expected values.

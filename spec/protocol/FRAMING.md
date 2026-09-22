@@ -3,7 +3,7 @@
 [Русская версия](FRAMING.ru.md). English is authoritative.
 
 QDCXX-012 separates frame extraction, payload dispatch and connection close policy. The provisional
-`qd_protocol` component depends inward on `qd_encoding`; encoding has no protocol dependency.
+`qdcxx_protocol` component depends inward on `qdcxx_encoding`; encoding has no protocol dependency.
 No transport, payload decoding, frame writer, PART assembly or session machinery is included.
 
 ## Evidence and wire contract

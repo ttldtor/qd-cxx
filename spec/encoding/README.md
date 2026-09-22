@@ -25,7 +25,7 @@ QDCXX-006 adds [P01 exact Java bytes](../../tests/fixtures/protocol/expected/P01
 
 ## QDCXX-015 bounded symbols
 
-[SYMBOLS](SYMBOLS.md) defines the implemented EMPTY_SET reader in qd_encoding, with owned exact
+[SYMBOLS](SYMBOLS.md) defines the implemented EMPTY_SET reader in qdcxx_encoding, with owned exact
 UTF-16/cipher/flags, message-local repeat/MRU, explicit reset, budgets and terminal errors.
 [Java coverage](../../tests/fixtures/encoding/symbols/COVERAGE.md) and
 [C++ validation](../../tests/conformance/encoding/symbols/VALIDATION.md) replace the symbol row's
