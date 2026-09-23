@@ -1,14 +1,20 @@
 # Current state
 
-## QDCXX-026 implemented; independent review pending
+## QDCXX-027 ready: Python-free development workflow
 
-QDCXX-026, High, started from `758303a66d5ed181d7123a2c665d858aba2e8834`.
-U1–U6 add behavior checks before bounded private C++/CLI/test reuse. Public API, wire semantics,
-ordered budgets, diagnostics and independent expected values remain unchanged in the executed checks.
-The audit records extraction and retention decisions; the bilingual
-[author validation and exact commit scope](../tests/conformance/refactor/VALIDATION.md) record evidence
-and limitations. Independent acceptance is pending. No staging, commit, merge, Python migration
-or following-task implementation was performed.
+QDCXX-027, High, is assigned for implementation.
+It removes mandatory Python from configure/build/CTest, UTC logging and existing Windows formatter acquisition,
+preserving named positive/negative checks. Remaining manual Python audits and generators stay in
+[the migration ledger](PYTHON-MIGRATION.md). No implementation has started in this planning change.
+
+## QDCXX-026 accepted and merged
+
+QDCXX-026 is accepted at master commit
+`d86c8a9842041f8876109285a33782d02e04018f`; the owner confirmed a clean working tree.
+Both review findings are closed; acceptance and verification boundaries
+are recorded separately from the unchanged [author validation](../tests/conformance/refactor/VALIDATION.md).
+The audit retains extraction/retention decisions.
+No C++ matrix or Java capture was rerun while preparing QDCXX-027.
 
 ## QDCXX-025 accepted and committed
 

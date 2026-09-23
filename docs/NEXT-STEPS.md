@@ -1,13 +1,14 @@
 # Project roadmap
 
-## Current priority: readability before Python migration
+## Current priority: remove mandatory Python
 
-1. Implement QDCXX-026: bounded readability/DRY refactoring after accepted QDCXX-025 at `2ec3e0f92f908a72cdae4d0e9ae434bb790ecca5`. Preserve behavior and independent tests; audit wider tooling but do not rewrite Java/PowerShell oracle infrastructure in this task.
-2. Assign the next bounded step of [Python migration](PYTHON-MIGRATION.md) after refactoring review. Preserve positive/negative coverage before removing mandatory Python; do not bundle the whole migration with refactoring.
-3. Inventory project-wide settings and specify typed configuration resolution before general loading or operational-tool configuration. Use the owner-supplied wiki, pinned source consumers and release history per [CONFIGURATION](CONFIGURATION.md); include initialization/file/API sources, aliases, precedence, read timing, units and sensitive values. QDCXX-025's schema subset feeds this ledger. Assign this follow-up separately; no blanket implementation of every Java property is authorized.
-4. Implement external schema/configuration sources against those contracts, then continue event coverage and the operational feed/replay/multiplexer tools. Arbitrary live reconfiguration and unsupported representations need explicit compatibility tasks.
+1. QDCXX-026 is accepted and merged at `d86c8a9842041f8876109285a33782d02e04018f`; review closure records both findings and verification limits.
+2. Implement QDCXX-027, High: Python-free configure/build/CTest, UTC logging and existing Windows formatter acquisition. Preserve every named case/mutation and prove the migrated path works without Python. This is implementation, not another inventory.
+3. Assign the remaining manual negative checks, schema JSON validation, evidence audits, fixture generators and tracked-bytecode cleanup from [PYTHON-MIGRATION](PYTHON-MIGRATION.md) separately. QDCXX-027 must not mark them retired without replacements.
+4. Inventory project-wide settings and specify typed configuration resolution before general loading or operational-tool configuration. Use the owner-supplied wiki, pinned consumers and release history per [CONFIGURATION](CONFIGURATION.md); include initialization/file/API sources, aliases, precedence, read timing, units and sensitive values. QDCXX-025's schema subset feeds this ledger; implementing every Java property at once is not authorized.
+5. Implement external schema/configuration sources against those contracts, then continue event coverage and feed/replay/multiplexer tools. Arbitrary live reconfiguration and unsupported representations need explicit compatibility tasks.
 
-QDCXX-026 does not authorize later tasks, staging or commit. Earlier sequencing below is historical where this section supersedes it; historical verification remains unchanged.
+QDCXX-027 does not authorize later tasks, staging or commit. Earlier sequencing below is historical where superseded; historical verification remains unchanged.
 
 [Русская версия](NEXT-STEPS.ru.md). English is authoritative.
 

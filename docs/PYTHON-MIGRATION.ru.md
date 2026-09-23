@@ -9,6 +9,18 @@
 
 ## Перечень и связи зависимостей
 
+### Текущее назначение: QDCXX-027
+
+QDCXX-027, ready, High, реализует шаги 1–2 ниже от принятого master
+`d86c8a9842041f8876109285a33782d02e04018f`: два обязательных CLI-набора с их мутациями,
+UTC-логирование и получение прежних Windows-форматтеров. Связанный план задаёт проверки эквивалентности и недоступности Python.
+Само назначение пока не удаляет зависимостей; реализация и независимое ревью ещё требуются.
+
+Ручные negatives примитивов/протокола, JSON-валидация схемы, аудит доказательств, генераторы и удаление
+отслеживаемого байткода остаются продолжением (шаги 3–4). Перенос обычного CTest не делает их устаревшими или необязательными.
+Старые скрипты сравнения и отслеживаемый байткод в QDCXX-027 неизменны; при сравнении отключить запись байткода.
+Исходная инвентаризация QDCXX-020 ниже сохранена; план QDCXX-027 уточняет актуальные границы переноса.
+
 Пути ниже относительно репозитория. Использованы `rg --files tools tests` с фильтром `.py`,
 затем ссылки CMake/PowerShell/документации и imports/запуски процессов скриптов. Обязательное
 текущее выполнение отделено от необязательного/ручного исторического воспроизведения;
@@ -16,7 +28,7 @@
 
 | Файлы / текущий вход | Назначение и место замены |
 | --- | --- |
-| `CMakeLists.txt:85–98` → `tests/conformance/check_offline_inspection.py`, `check_human_inspection.py` | Обязательны только при одновременных BUILD_TESTING и ORG_TTLDTOR_QDCXX_BUILD_QTP_INSPECT ON. Python3 Interpreter REQUIRED; human импортирует run/validate_diagnostic из offline. Управление процессами заменить небольшими PowerShell/CMake-сценариями, строгие проверки байтов/manifest/диагностики — тестовым C++/doctest. Общая валидация должна сохраниться. |
+| `CMakeLists.txt` → `tests/conformance/check_offline_inspection.py`, `check_human_inspection.py` | Обязательны только при одновременных BUILD_TESTING и ORG_TTLDTOR_QDCXX_BUILD_QTP_INSPECT ON. Python3 Interpreter REQUIRED; human импортирует run/validate_diagnostic из offline. Управление процессами заменить небольшими PowerShell/CMake-сценариями, строгие проверки байтов/manifest/диагностики — тестовым C++/doctest. Общая валидация должна сохраниться. |
 | `tools/run_utc.py`; команды `docs/CPP-BUILD.md` | Актуальное документированное логирование, включая WSL. Дочерний TZ=UTC, временные метки, объединённые UTF-8 stdout/stderr, ошибки запуска и передача кода завершения. Заменить небольшим PowerShell launcher с UTC и TZ только дочернего процесса; проверить Windows и Linux/WSL. Нынешний launcher декодирует UTF-8 с заменой ошибок и удаляет CR/LF на концах строк: это не захват сырых байтов. |
 | `tools/format/setup_cpp.py`; `tools/format/CPP.md` | Актуальное получение форматтеров: закреплённые архивы, SHA-256, проверка границ распаковки ZIP и executable. Заменить PowerShell с прежним cpp-tools.lock.json; сохранить Uncrustify 0.83.0, затем clang-format 20.1.8. Сам Format-Cpp.ps1 уже PowerShell. |
 | `tests/conformance/check_compact_negative.py`, `check_utf_string_negative.py`, `check_frame_negative.py`, `check_description_negative.py`, `check_binding_negative.py`, `check_symbol_negative.py`, `check_stream_data_negative.py` | Ручные отрицательные проверки фикстур/проекций запускают собранные C++-тесты на временных мутациях; часть включает форматирование/provenance. Мутации/assertions перенести в тестовый C++/doctest, управление процессами/форматированием — в PowerShell/CMake. Сохранить каждую метку мутации и стадию отклонения, не только число случаев. |

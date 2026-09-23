@@ -8,6 +8,18 @@ run without Python. Historical scripts, captures and recorded hashes remain hist
 
 ## Inventory and dependency edges
 
+### Current assignment: QDCXX-027
+
+QDCXX-027, ready, High, implements steps 1–2 below from accepted master
+`d86c8a9842041f8876109285a33782d02e04018f`: the two mandatory CLI suites and their mutations,
+UTC logging and existing Windows formatter acquisition. The linked plan defines parity and Python-denial checks.
+This assignment does not yet remove any dependency; implementation and independent review are still required.
+
+Manual primitive/protocol negatives, schema JSON validation, evidence audits, generators and tracked-bytecode
+cleanup remain follow-up work (steps 3–4). They are not retired or optional merely because normal CTest is migrated.
+Old comparison scripts and tracked bytecode stay unchanged in QDCXX-027; disable bytecode writing during parity runs.
+The original QDCXX-020 inventory below is retained; the QDCXX-027 plan refreshes the active migration scope.
+
 Paths below are repository-relative. Enumeration used `rg --files tools tests` filtered by `.py`,
 then CMake/PowerShell/document references and script imports/process calls. This distinguishes
 mandatory current execution from optional/manual historical reproduction; merely existing in Git
@@ -15,7 +27,7 @@ does not mean a script runs in CTest. None of these scripts is a production C++ 
 
 | Files / current entry | Role and replacement destination |
 | --- | --- |
-| `CMakeLists.txt:85–98` → `tests/conformance/check_offline_inspection.py`, `check_human_inspection.py` | Mandatory only when BUILD_TESTING and ORG_TTLDTOR_QDCXX_BUILD_QTP_INSPECT are both ON. Python3 Interpreter is REQUIRED; human imports run/validate_diagnostic from offline. Replace process supervision with small PowerShell/CMake launchers and strict byte/manifest/diagnostic assertions with test-only C++/doctest. Do not lose shared validation. |
+| `CMakeLists.txt` → `tests/conformance/check_offline_inspection.py`, `check_human_inspection.py` | Mandatory only when BUILD_TESTING and ORG_TTLDTOR_QDCXX_BUILD_QTP_INSPECT are both ON. Python3 Interpreter is REQUIRED; human imports run/validate_diagnostic from offline. Replace process supervision with small PowerShell/CMake launchers and strict byte/manifest/diagnostic assertions with test-only C++/doctest. Do not lose shared validation. |
 | `tools/run_utc.py`; commands in `docs/CPP-BUILD.md` | Active documented logging, including WSL. Child TZ=UTC, timestamped UTF-8 merged stdout/stderr, launch failures and child exit propagation. Replace with small PowerShell process launcher using UTC timestamps and child-only TZ; validate on Windows and Linux/WSL. Existing launcher decodes UTF-8 with replacement and strips CR/LF line ends: it is not a raw-byte capture tool. |
 | `tools/format/setup_cpp.py`; `tools/format/CPP.md` | Active formatter acquisition: locked archives, SHA-256, ZIP containment and expected executable checks. Replace with PowerShell using unchanged cpp-tools.lock.json; keep Uncrustify 0.83.0 then clang-format 20.1.8. Format-Cpp.ps1 itself is already PowerShell. |
 | `tests/conformance/check_compact_negative.py`, `check_utf_string_negative.py`, `check_frame_negative.py`, `check_description_negative.py`, `check_binding_negative.py`, `check_symbol_negative.py`, `check_stream_data_negative.py` | Manual negative fixture/projection drivers invoke built C++ tests against temporary mutations; some include formatting/provenance checks. Move mutations/assertions to test-only C++/doctest and process/format orchestration to PowerShell/CMake. Preserve every mutation label and expected rejection stage, not just case counts. |
