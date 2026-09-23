@@ -219,6 +219,14 @@ TEST_CASE("full field identities expose serialization and representation without
     CHECK(c::REPRESENTATION_MASK == 0xf0);
     CHECK(c::SERIAL_TYPE_MASK == ~std::int32_t{0xf0});
 
+    // Pin selectors directly: an extra base bit can disappear when composing the full identity.
+    CHECK(static_cast<std::int32_t>(R::PLAIN) == 0x00);
+    CHECK(static_cast<std::int32_t>(R::SHORT_STRING) == 0x20);
+    CHECK(static_cast<std::int32_t>(R::TIME_SECONDS) == 0x30);
+    CHECK(static_cast<std::int32_t>(R::SEQUENCE) == 0x40);
+    CHECK(static_cast<std::int32_t>(R::DATE) == 0x50);
+    CHECK(static_cast<std::int32_t>(R::WIDE_DECIMAL) == 0x70);
+
     for (std::size_t index = 0; index < TYPES.size(); ++index) {
         CAPTURE(index);
         CHECK(static_cast<std::int32_t>(TYPES[index]) == IDS[index]);
