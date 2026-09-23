@@ -1,6 +1,12 @@
 # Current state
 
-## QDCXX-025 implemented — independent review pending
+## Next: QDCXX-026 readability refactor
+
+QDCXX-026 is ready, High: audit repetition and implement bounded private C++/CLI/test reuse before Python migration.
+The plan distinguishes identical operations from different string, error and optional-field contracts.
+Only planning documents changed at assignment; implementation and runtime validation have not started.
+
+## QDCXX-025 accepted and committed
 
 Configurable schemas and event mappings, High, started at
 `e5a3764992ba3a90a07d3d092a4383e37a901de2`. New pinned Java production/configuration/XML evidence
@@ -11,7 +17,11 @@ and legacy Quote remain compatible. Generic extra fields and custom records rema
 [Coverage](../tests/conformance/protocol/profile/COVERAGE.md) and
 [author validation](../tests/conformance/protocol/profile/VALIDATION.md) separate executed checks
 from independent review. Built-in schemas remain defaults; general loaders, broader settings,
-new identities, indexed events and transport remain separate. No private tape, staging or commit.
+new identities, indexed events and transport remain separate. The private tape was not used.
+Independent review and the targeted Java-braces follow-up are closed in the preceding session.
+The author's fix evidence remains a historical report, not a new review result.
+The owner committed the result on master at `2ec3e0f92f908a72cdae4d0e9ae434bb790ecca5`; the tree was clean before this planning update.
+This records the completed handoff; no C++ matrix or Java captures were rerun during planning.
 
 [Русская версия](CURRENT-STATE.ru.md). English is authoritative.
 

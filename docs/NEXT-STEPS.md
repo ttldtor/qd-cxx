@@ -1,12 +1,13 @@
 # Project roadmap
 
-## Current priority: configurable schemas and settings
+## Current priority: readability before Python migration
 
-1. Independently review implemented QDCXX-025: schema-bound Quote/Profile under accepted [ADR-0003](decisions/ADR-0003-configurable-schemas-and-event-mappings.md), properties/external-XML Java evidence and existing tape integration. [Author validation](../tests/conformance/protocol/profile/VALIDATION.md) is separate from acceptance. Built-in defaults remain conveniences for configurable libraries.
-2. Inventory project-wide settings and specify typed configuration resolution before general loading or operational-tool configuration. Use the owner-supplied wiki, pinned source consumers and release history per [CONFIGURATION](CONFIGURATION.md); include initialization/file/API sources, aliases, precedence, read timing, units and sensitive values. QDCXX-025's schema subset feeds this ledger. Assign this follow-up separately; no blanket implementation of every Java property is authorized.
-3. Implement external schema/configuration sources against those contracts, then continue event coverage and the operational feed/replay/multiplexer tools. Arbitrary live reconfiguration and unsupported representations need explicit compatibility tasks.
+1. Implement QDCXX-026: bounded readability/DRY refactoring after accepted QDCXX-025 at `2ec3e0f92f908a72cdae4d0e9ae434bb790ecca5`. Preserve behavior and independent tests; audit wider tooling but do not rewrite Java/PowerShell oracle infrastructure in this task.
+2. Assign the next bounded step of [Python migration](PYTHON-MIGRATION.md) after refactoring review. Preserve positive/negative coverage before removing mandatory Python; do not bundle the whole migration with refactoring.
+3. Inventory project-wide settings and specify typed configuration resolution before general loading or operational-tool configuration. Use the owner-supplied wiki, pinned source consumers and release history per [CONFIGURATION](CONFIGURATION.md); include initialization/file/API sources, aliases, precedence, read timing, units and sensitive values. QDCXX-025's schema subset feeds this ledger. Assign this follow-up separately; no blanket implementation of every Java property is authorized.
+4. Implement external schema/configuration sources against those contracts, then continue event coverage and the operational feed/replay/multiplexer tools. Arbitrary live reconfiguration and unsupported representations need explicit compatibility tasks.
 
-QDCXX-025's implementation handoff does not authorize staging, commit or the next task. Earlier sequencing below is historical where this section supersedes it; historical verification remains unchanged.
+QDCXX-026 does not authorize later tasks, staging or commit. Earlier sequencing below is historical where this section supersedes it; historical verification remains unchanged.
 
 [Русская версия](NEXT-STEPS.ru.md). English is authoritative.
 
