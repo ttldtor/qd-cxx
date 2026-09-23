@@ -3,57 +3,14 @@
 
 #include "qd/core/local_schema.hpp"
 
+#include "schema_validation.hpp"
+
 #include <limits>
 #include <new>
 #include <stdexcept>
-#include <string_view>
 #include <utility>
 
 namespace org::ttldtor::qdcxx::core {
-namespace {
-
-/** Check the local subset's nonempty, well-formed UTF-16 requirement.
- * @param name Borrowed record or lookup name.
- * @return Whether every surrogate belongs to a complete pair.
- */
-bool validName(std::u16string_view name) {
-    constexpr char16_t HIGH_START = 0xd800;
-    constexpr char16_t LOW_START = 0xdc00;
-    constexpr char16_t SURROGATE_END = 0xdfff;
-
-    if (name.empty()) {
-        return false;
-    }
-
-    for (std::size_t i = 0; i < name.size(); ++i) {
-        if (name[i] >= HIGH_START && name[i] < LOW_START) {
-            if (++i == name.size() || name[i] < LOW_START || name[i] > SURROGATE_END) {
-                return false;
-            }
-        } else if (name[i] >= LOW_START && name[i] <= SURROGATE_END) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-/** Charge a logical count without overflowing arithmetic.
- * @param count Requested logical elements.
- * @param remaining Remaining caller budget, decreased only on success.
- * @return Whether the request fits.
- */
-bool charge(std::size_t count, std::size_t &remaining) {
-    if (count > remaining) {
-        return false;
-    }
-
-    remaining -= count;
-
-    return true;
-}
-
-} // namespace
 
 /** Fixed-size lifetime token; never retains source declarations or protocol state. */
 struct RecordContext::Identity {};
@@ -89,13 +46,15 @@ std::expected<LocalSchema, SchemaError> LocalSchema::boundedCopy(SchemaLimits li
     }
 
     for (const auto &record : records_) {
-        if (!charge(record.fields.size(), limits.fields) || !charge(record.lookups.size(), limits.lookups) ||
-            record.name.size() > limits.nameUnits || !charge(record.name.size(), limits.totalNameUnits)) {
+        if (!detail::chargeBudget(record.fields.size(), limits.fields) ||
+            !detail::chargeBudget(record.lookups.size(), limits.lookups) || record.name.size() > limits.nameUnits ||
+            !detail::chargeBudget(record.name.size(), limits.totalNameUnits)) {
             return std::unexpected(SchemaError::RESOURCE_LIMIT);
         }
 
         for (const auto &lookup : record.lookups) {
-            if (lookup.name.size() > limits.nameUnits || !charge(lookup.name.size(), limits.totalNameUnits)) {
+            if (lookup.name.size() > limits.nameUnits ||
+                !detail::chargeBudget(lookup.name.size(), limits.totalNameUnits)) {
                 return std::unexpected(SchemaError::RESOURCE_LIMIT);
             }
         }
@@ -129,11 +88,11 @@ std::expected<LocalSchema, SchemaError> LocalSchema::create(std::span<const Loca
         const auto &record = records[i];
 
         if (i > static_cast<std::size_t>(std::numeric_limits<std::int32_t>::max()) ||
-            record.id != static_cast<std::int32_t>(i) || !validName(record.name)) {
+            record.id != static_cast<std::int32_t>(i) || !detail::validSchemaKey(record.name)) {
             return std::unexpected(SchemaError::INVALID_SCHEMA);
         }
 
-        if (record.name.size() > limits.nameUnits || !charge(record.name.size(), limits.totalNameUnits)) {
+        if (record.name.size() > limits.nameUnits || !detail::chargeBudget(record.name.size(), limits.totalNameUnits)) {
             return std::unexpected(SchemaError::RESOURCE_LIMIT);
         }
 
@@ -147,7 +106,8 @@ std::expected<LocalSchema, SchemaError> LocalSchema::create(std::span<const Loca
             return std::unexpected(SchemaError::UNSUPPORTED_PROFILE);
         }
 
-        if (!charge(record.fields.size(), limits.fields) || !charge(record.lookups.size(), limits.lookups)) {
+        if (!detail::chargeBudget(record.fields.size(), limits.fields) ||
+            !detail::chargeBudget(record.lookups.size(), limits.lookups)) {
             return std::unexpected(SchemaError::RESOURCE_LIMIT);
         }
 
@@ -160,11 +120,11 @@ std::expected<LocalSchema, SchemaError> LocalSchema::create(std::span<const Loca
         for (std::size_t j = 0; j < record.lookups.size(); ++j) {
             const auto &key = record.lookups[j];
 
-            if (!validName(key.name) || key.fieldId >= record.fields.size()) {
+            if (!detail::validSchemaKey(key.name) || key.fieldId >= record.fields.size()) {
                 return std::unexpected(SchemaError::INVALID_SCHEMA);
             }
 
-            if (key.name.size() > limits.nameUnits || !charge(key.name.size(), limits.totalNameUnits)) {
+            if (key.name.size() > limits.nameUnits || !detail::chargeBudget(key.name.size(), limits.totalNameUnits)) {
                 return std::unexpected(SchemaError::RESOURCE_LIMIT);
             }
 

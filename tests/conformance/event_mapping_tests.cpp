@@ -132,7 +132,8 @@ TEST_CASE("missing ambiguous incompatible and malformed field requests reject at
     CHECK(prepare(local, wrong).error() == e::MappingError::INCOMPATIBLE_TYPE);
     CHECK(prepare(local, wrong, false).error() == e::MappingError::INCOMPATIBLE_TYPE);
 
-    for (const std::u16string &key : {std::u16string{}, std::u16string(1, 0xd800), std::u16string(1, 0xdc00)}) {
+    for (const std::u16string &key : {std::u16string{}, std::u16string(1, 0xd800), std::u16string(1, 0xdc00),
+                                      std::u16string{char16_t{0xdc00}, char16_t{0xd800}}}) {
         const std::array<std::u16string_view, 1> keys{key};
         CHECK(prepare(local, keys).error() == e::MappingError::INVALID_INPUT);
     }
@@ -148,6 +149,62 @@ TEST_CASE("missing ambiguous incompatible and malformed field requests reject at
 
     CHECK(e::EventMapping::prepare(local, -1, {}, MAPPING_LIMITS).error() == e::MappingError::INVALID_INPUT);
     CHECK(e::EventMapping::prepare(local, 2, {}, MAPPING_LIMITS).error() == e::MappingError::INVALID_INPUT);
+}
+
+TEST_CASE("schema and mapping keys preserve NUL and paired UTF-16 units") {
+    for (const std::u16string &name : {std::u16string(1, u'\0'), std::u16string{char16_t{0xd800}, char16_t{0xdc00}}}) {
+        const std::array<c::LocalRecord, 1> records{{{0, name, false, {{8}}, {{name, 0}}}}};
+        auto local = c::LocalSchema::create(records, SCHEMA_LIMITS);
+        REQUIRE(local);
+        CHECK(local->records()[0].name == name);
+        CHECK(local->records()[0].lookups[0].name == name);
+        const std::array<std::u16string_view, 1> keys{name};
+        const std::array requests{e::FieldRequest{keys, INTS, true}};
+        auto mapping = e::EventMapping::prepare(*local, 0, requests, MAPPING_LIMITS);
+        REQUIRE(mapping);
+        REQUIRE(mapping->selections().size() == 1);
+        CHECK(mapping->selections()[0] == 0);
+    }
+}
+
+TEST_CASE("schema rejects malformed record and lookup names before their text budgets") {
+    for (const std::u16string &name : {std::u16string{}, std::u16string(1, 0xd800), std::u16string(1, 0xdc00),
+                                       std::u16string{char16_t{0xdc00}, char16_t{0xd800}}}) {
+        for (const bool recordName : {true, false}) {
+            c::LocalRecord record{0, u"R", false, {{8}}, {{u"A", 0}}};
+
+            if (recordName) {
+                record.name = name;
+            } else {
+                record.lookups[0].name = name;
+            }
+
+            for (const bool exhausted : {false, true}) {
+                auto limits = SCHEMA_LIMITS;
+
+                if (exhausted) {
+                    // A valid record consumes the one available unit before the invalid lookup.
+                    limits.totalNameUnits = recordName ? 0 : 1;
+                }
+
+                const auto result = c::LocalSchema::create(std::span(&record, 1), limits);
+                REQUIRE_FALSE(result);
+                CHECK(result.error() == c::SchemaError::INVALID_SCHEMA);
+            }
+        }
+    }
+}
+
+TEST_CASE("mapping text budget precedes malformed request key validation") {
+    auto local = schema();
+    const std::u16string malformed(1, 0xd800);
+    const std::array<std::u16string_view, 1> keys{malformed};
+    auto limits = MAPPING_LIMITS;
+    // B, A, AliasA and Extra exhaust thirteen source lookup units before the request key.
+    limits.totalNameUnits = 13;
+    CHECK(prepare(local, keys, true, limits).error() == e::MappingError::RESOURCE_LIMIT);
+    limits.totalNameUnits = 14;
+    CHECK(prepare(local, keys, true, limits).error() == e::MappingError::INVALID_INPUT);
 }
 
 TEST_CASE("exact full identity alternatives are explicit and cannot use shared serialization bits") {

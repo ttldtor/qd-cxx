@@ -3,6 +3,7 @@
 
 #include "qd/protocol/frame_reader.hpp"
 
+#include "../encoding/compact_limits.hpp"
 #include "qd/encoding/compact.hpp"
 
 #include <algorithm>
@@ -13,19 +14,17 @@
 
 namespace org::ttldtor::qdcxx::protocol {
 namespace {
-constexpr std::size_t MAX_COMPACT_PREFIX_BYTES = 9; ///< Full-width compact long escape plus eight bytes.
-
 /** Validate arithmetic and storage compatibility before any allocation.
  * @param limits Caller-specified body and pending budgets.
  * @return Fixed byte-element allocation size; throws invalid_argument for incompatible budgets.
  */
 std::size_t checkedStorageBytes(FrameLimits limits) {
     if (limits.maximumBodyBytes > std::numeric_limits<std::int64_t>::max() ||
-        limits.maximumBodyBytes > std::numeric_limits<std::size_t>::max() - MAX_COMPACT_PREFIX_BYTES) {
+        limits.maximumBodyBytes > std::numeric_limits<std::size_t>::max() - encoding::detail::MAX_COMPACT_LONG_BYTES) {
         throw std::invalid_argument("Frame body budget cannot accommodate its compact prefix");
     }
 
-    const auto size = limits.maximumBodyBytes + MAX_COMPACT_PREFIX_BYTES;
+    const auto size = limits.maximumBodyBytes + encoding::detail::MAX_COMPACT_LONG_BYTES;
 
     if (limits.maximumPendingBytes < size) {
         throw std::invalid_argument("Pending budget must accommodate maximum body plus nine bytes");

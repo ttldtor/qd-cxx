@@ -3,6 +3,9 @@
 
 #include "qd/encoding/utf_string.hpp"
 
+#include "compact_limits.hpp"
+#include "qd/encoding/utf_char.hpp"
+
 #include <array>
 #include <limits>
 #include <utility>
@@ -13,21 +16,16 @@ namespace {
 constexpr std::int64_t NULL_LENGTH = -1;
 /// Java accepts Integer.MAX_VALUE * 4 encoded body bytes; this is not a local resource budget.
 constexpr std::uint64_t MAX_BODY_BYTES = 8589934588ULL;
-/// The compact-long length envelope needs at most one escape plus eight payload bytes.
-constexpr std::size_t MAX_LENGTH_PREFIX_BYTES = 9;
 /// Wire octet width, used when constructing a unary UTF lead prefix.
 constexpr unsigned int BITS_PER_BYTE = 8;
 /// Mask from which the leading ones of a multibyte UTF prefix are formed.
 constexpr unsigned int BYTE_MASK = 0xffU;
 /// ASCII occupies one byte and carries seven data bits.
 constexpr std::uint32_t ASCII_LIMIT = 0x80;
-constexpr unsigned int ASCII_PAYLOAD_MASK = 0x7f;
 /// First code point requiring three encoded bytes.
 constexpr std::uint32_t THREE_BYTE_MIN = 0x800;
 /// First supplementary code point; subtract it before splitting into a surrogate pair.
 constexpr std::uint32_t SUPPLEMENTARY_MIN = 0x10000;
-/// Largest accepted Unicode code point (surrogates below it remain accepted by QD).
-constexpr std::uint32_t MAX_CODE_POINT = 0x10ffff;
 /// Inclusive ranges of high and low UTF-16 surrogate units.
 constexpr std::uint32_t HIGH_SURROGATE_MIN = 0xd800;
 constexpr std::uint32_t HIGH_SURROGATE_MAX = 0xdbff;
@@ -43,44 +41,10 @@ constexpr std::size_t ASCII_BYTES = 1;
 constexpr std::size_t TWO_BYTE_SEQUENCE = 2;
 constexpr std::size_t THREE_BYTE_SEQUENCE = 3;
 constexpr std::size_t FOUR_BYTE_SEQUENCE = 4;
-/// Zero is the internal classification result for an invalid lead byte.
-constexpr std::size_t INVALID_SEQUENCE_SIZE = 0;
-/// Masks and prefixes classify lead bytes without rejecting QD's overlong forms.
-constexpr unsigned int TWO_BYTE_LEAD_MASK = 0xe0;
-constexpr unsigned int TWO_BYTE_LEAD_PREFIX = 0xc0;
-constexpr unsigned int THREE_BYTE_LEAD_MASK = 0xf0;
-constexpr unsigned int THREE_BYTE_LEAD_PREFIX = 0xe0;
-constexpr unsigned int FOUR_BYTE_LEAD_MASK = 0xf8;
-constexpr unsigned int FOUR_BYTE_LEAD_PREFIX = 0xf0;
 /// Continuation octets begin with 10 and contribute six low data bits.
-constexpr unsigned int CONTINUATION_MASK = 0xc0;
 constexpr unsigned int CONTINUATION_PREFIX = 0x80;
 constexpr unsigned int CONTINUATION_PAYLOAD_BITS = 6;
 constexpr unsigned int CONTINUATION_PAYLOAD_MASK = 0x3f;
-
-/** Classify a lead byte using Java's accepted UTFString grammar.
- * @param first Unsigned lead octet.
- * @return Sequence size including the lead, or INVALID_SEQUENCE_SIZE for a bad lead.
- */
-std::size_t sequenceSize(unsigned int first) noexcept {
-    if (first < ASCII_LIMIT) {
-        return ASCII_BYTES;
-    }
-
-    if ((first & TWO_BYTE_LEAD_MASK) == TWO_BYTE_LEAD_PREFIX) {
-        return TWO_BYTE_SEQUENCE;
-    }
-
-    if ((first & THREE_BYTE_LEAD_MASK) == THREE_BYTE_LEAD_PREFIX) {
-        return THREE_BYTE_SEQUENCE;
-    }
-
-    if ((first & FOUR_BYTE_LEAD_MASK) == FOUR_BYTE_LEAD_PREFIX) {
-        return FOUR_BYTE_SEQUENCE;
-    }
-
-    return INVALID_SEQUENCE_SIZE;
-}
 
 /** Read one writer character, combining only a valid adjacent surrogate pair.
  * @param value Borrowed input units.
@@ -135,36 +99,15 @@ UtfStringResult readUtfString(std::span<const std::byte> input, UtfStringLimits 
     std::u16string value;
 
     while (remaining > 0) {
-        if (position == input.size()) {
-            return {std::nullopt, position, Status::INSUFFICIENT_INPUT};
+        // The complete available remainder preserves full-tail consumption past the declared body.
+        const auto character = readUtfChar(input.subspan(position));
+        position += character.consumed;
+
+        if (character.status != Status::OK) {
+            return {std::nullopt, position, character.status};
         }
 
-        const auto first = std::to_integer<unsigned int>(input[position++]);
-        const auto size = sequenceSize(first);
-
-        if (size == INVALID_SEQUENCE_SIZE) {
-            return {std::nullopt, position, Status::INVALID_ENCODING};
-        }
-
-        // Java reads the entire tail before checking any continuation bits.
-        if (input.size() - position < size - 1) {
-            return {std::nullopt, input.size(), Status::INSUFFICIENT_INPUT};
-        }
-
-        // A multibyte lead spends size leading ones and a zero; the low (7 - size) bits carry data.
-        std::uint32_t point = first & (size == ASCII_BYTES ? ASCII_PAYLOAD_MASK : ASCII_PAYLOAD_MASK >> size);
-        bool valid = true;
-
-        for (std::size_t index = 1; index < size; ++index) {
-            const auto tail = std::to_integer<unsigned int>(input[position++]);
-            valid = valid && (tail & CONTINUATION_MASK) == CONTINUATION_PREFIX;
-            point = (point << CONTINUATION_PAYLOAD_BITS) | (tail & CONTINUATION_PAYLOAD_MASK);
-        }
-
-        if (!valid || point > MAX_CODE_POINT) {
-            return {std::nullopt, position, Status::INVALID_ENCODING};
-        }
-
+        const auto point = static_cast<std::uint32_t>(character.value);
         const std::size_t units = point >= SUPPLEMENTARY_MIN ? SURROGATE_PAIR_UNITS : 1;
 
         if (units > limits.codeUnits - value.size()) {
@@ -180,7 +123,7 @@ UtfStringResult readUtfString(std::span<const std::byte> input, UtfStringLimits 
             value.push_back(static_cast<char16_t>(point));
         }
 
-        remaining -= static_cast<std::int64_t>(size);
+        remaining -= static_cast<std::int64_t>(character.consumed);
     }
 
     if (remaining < 0) {
@@ -218,7 +161,7 @@ WriteResult writeUtfString(std::optional<std::u16string_view> value, std::span<s
         }
     }
 
-    std::array<std::byte, MAX_LENGTH_PREFIX_BYTES> prefix{};
+    std::array<std::byte, detail::MAX_COMPACT_LONG_BYTES> prefix{};
     const auto encoded = writeCompactLong(value ? static_cast<std::int64_t>(bodySize) : NULL_LENGTH, prefix);
 
     if (bodySize > std::numeric_limits<std::size_t>::max() - encoded.written || output.size() < encoded.written ||

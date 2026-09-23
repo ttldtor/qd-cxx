@@ -1,0 +1,11 @@
+# Assert the shared user-facing help contract; scenarios and expectations remain in each caller.
+function(qdcxx_assert_cli_help program)
+    execute_process(COMMAND "${program}" RESULT_VARIABLE code OUTPUT_VARIABLE help ERROR_VARIABLE error)
+    if(NOT code EQUAL 0 OR help STREQUAL "" OR NOT error STREQUAL "")
+        message(FATAL_ERROR "no-arg help")
+    endif()
+    execute_process(COMMAND "${program}" --help RESULT_VARIABLE code OUTPUT_VARIABLE out ERROR_VARIABLE error)
+    if(NOT code EQUAL 0 OR NOT out STREQUAL help OR NOT error STREQUAL "")
+        message(FATAL_ERROR "standalone help equivalence")
+    endif()
+endfunction()

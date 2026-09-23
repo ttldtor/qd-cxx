@@ -2,12 +2,16 @@
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/events/profile.hpp"
 
+#include "decimal_projection.hpp"
+
 #include <new>
 #include <stdexcept>
 #include <utility>
 
 namespace org::ttldtor::qdcxx::events {
 namespace {
+/// Required Description selection in the declared Profile property order.
+constexpr std::size_t DESCRIPTION_INDEX = 14;
 /** Measured property lookup names in default logical order. */
 constexpr std::array<std::u16string_view, 16> PROPERTY_NAMES{
     u"Beta",        u"Eps",    u"DivFreq",     u"ExdDivAmount",   u"ExdDivDate",    u"HighPrice52",
@@ -78,7 +82,6 @@ std::expected<PreparedProfile, MappingError> PreparedProfile::prepare(const core
     constexpr std::array timeTypes{Type::TIME_SECONDS};
     constexpr std::array flagTypes{Type::COMPACT_INT};
     constexpr std::array stringTypes{Type::UTF_CHAR_ARRAY};
-    constexpr std::size_t DESCRIPTION_INDEX = 14;
     std::array<std::array<std::u16string_view, 2>, PROFILE_FIELD_TYPES.size()> keys{};
     std::array<FieldRequest, PROFILE_FIELD_TYPES.size()> requests{};
 
@@ -129,11 +132,8 @@ std::expected<Profile, MappingError> PreparedProfile::map(std::u16string_view sy
         return std::unexpected(validation.error());
     }
 
-    constexpr std::size_t DESCRIPTION_INDEX = 14;
     constexpr std::size_t STATUS_REASON_INDEX = 15;
     constexpr std::int64_t MILLISECONDS_PER_SECOND = 1000;
-    constexpr std::int64_t DECIMAL_RANK_RADIX = 256;
-    constexpr std::int64_t INTEGER_DECIMAL_RANK = 128;
     const auto selections = mapping_.selections();
     const auto *description = &values.values[*selections[DESCRIPTION_INDEX]].units;
     const auto *statusReason =
@@ -165,9 +165,7 @@ std::expected<Profile, MappingError> PreparedProfile::map(std::u16string_view sy
 
         const auto &field = values.values[*selections[selection]];
 
-        // Exact integer event decimals leave the generic source representation untouched.
-        return {field.type == core::SerialFieldType::COMPACT_INT ? field.raw * DECIMAL_RANK_RADIX + INTEGER_DECIMAL_RANK
-                                                                 : field.raw};
+        return detail::projectPresentDecimal(field);
     };
     try {
         // Selection numbers follow the default declarations, independently of schema field positions.

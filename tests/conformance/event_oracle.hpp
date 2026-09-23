@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 #pragma once
 
+#include "evidence_cells.hpp"
 #include "qd/events/profile.hpp"
 #include "qd/events/quote.hpp"
 #include "qd/protocol/tape_reader.hpp"
@@ -16,6 +17,8 @@
 #include <stdexcept>
 
 namespace event_oracle {
+using org::ttldtor::qdcxx::test_support::hexUnits;
+using org::ttldtor::qdcxx::test_support::split;
 namespace c = org::ttldtor::qdcxx::core;
 namespace e = org::ttldtor::qdcxx::events;
 namespace p = org::ttldtor::qdcxx::protocol;
@@ -30,7 +33,7 @@ inline void ensure(bool condition, std::string_view message) {
     }
 }
 
-/** Parse one complete canonical integer cell.
+/** Parse one complete integer cell without requiring canonical decimal spelling.
  * @tparam T Integral destination.
  * @param text Complete cell.
  * @param base Radix.
@@ -44,66 +47,12 @@ template <typename T> T number(std::string_view text, int base = 10) {
     return value;
 }
 
-/** Split preserving empty cells.
- * @param text Complete row.
- * @param delimiter Cell separator.
- * @return Ordered cells.
- */
-inline std::vector<std::string> split(std::string_view text, char delimiter = '\t') {
-    std::vector<std::string> result;
-    std::size_t start = 0;
-
-    for (;;) {
-        const auto end = text.find(delimiter, start);
-        result.emplace_back(text.substr(start, end - start));
-
-        if (end == text.npos) {
-            return result;
-        }
-
-        start = end + 1;
-    }
-}
-
 /** Decode an exact oracle UTF-16 cell.
  * @param text Lowercase hex, or the empty sentinel.
  * @return Owned units including unpaired surrogates.
  */
 inline std::u16string units(std::string_view text) {
-    if (text == "-") {
-        return {};
-    }
-
-    ensure(!text.empty() && text.size() % 4 == 0 && text.find_first_not_of("0123456789abcdef") == text.npos,
-           "invalid UTF-16 cell");
-    std::u16string result;
-
-    for (std::size_t i = 0; i < text.size(); i += 4) {
-        result.push_back(static_cast<char16_t>(number<unsigned>(text.substr(i, 4), 16)));
-    }
-
-    return result;
-}
-
-/** Encode a comparison cell without Unicode normalization.
- * @param value Exact units.
- * @return Lowercase hex or the oracle empty sentinel.
- */
-inline std::string hexUnits(std::u16string_view value) {
-    if (value.empty()) {
-        return "-";
-    }
-
-    constexpr std::string_view DIGITS = "0123456789abcdef";
-    std::string result;
-
-    for (auto unit : value) {
-        for (int shift = 12; shift >= 0; shift -= 4) {
-            result += DIGITS[(unit >> shift) & 15];
-        }
-    }
-
-    return result;
+    return org::ttldtor::qdcxx::test_support::decodeUnits(text, "invalid UTF-16 cell");
 }
 
 /** Encode nullable oracle text.

@@ -1,12 +1,22 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/events/quote.hpp"
+
+#include "decimal_projection.hpp"
+
 #include <algorithm>
 #include <new>
 #include <stdexcept>
 #include <utility>
 
 namespace org::ttldtor::qdcxx::events {
+namespace {
+/// Conversion from signed wire seconds to event milliseconds.
+constexpr std::int64_t MILLISECONDS_PER_SECOND = 1000;
+/// Exchange-code projection retains the low UTF-16 unit.
+constexpr std::uint64_t UTF16_UNIT_MASK = 0xffff;
+} // namespace
+
 std::expected<core::LocalSchema, core::SchemaError> defaultQuoteSchema(core::SchemaLimits limits) {
     constexpr std::array<std::u16string_view, 8> PROPERTY_NAMES{u"BidTime",  u"BidExchangeCode", u"BidPrice",
                                                                 u"BidSize",  u"AskTime",         u"AskExchangeCode",
@@ -32,9 +42,6 @@ std::expected<core::LocalSchema, core::SchemaError> defaultQuoteSchema(core::Sch
 
 std::expected<Quote, QuoteError> mapQuote(std::u16string_view symbol, std::span<const core::FieldValue> fields,
                                           std::size_t symbolUnits) {
-    constexpr std::int64_t MILLISECONDS_PER_SECOND = 1000;
-    constexpr std::uint64_t UTF16_UNIT_MASK = 0xffff;
-
     if (fields.size() != QUOTE_FIELD_TYPES.size()) {
         return std::unexpected(QuoteError::INVALID_SHAPE);
     }
@@ -128,12 +135,8 @@ std::expected<Quote, MappingError> PreparedQuote::map(std::u16string_view symbol
         return std::unexpected(MappingError::RESOURCE_LIMIT);
     }
 
-    constexpr std::int64_t MILLISECONDS_PER_SECOND = 1000;
-    constexpr std::uint64_t UTF16_UNIT_MASK = 0xffff;
     constexpr unsigned SEQUENCE_BITS = 22;
     constexpr std::uint32_t SEQUENCE_MASK = (std::uint32_t{1} << SEQUENCE_BITS) - 1;
-    constexpr std::int64_t DECIMAL_RANK_RADIX = 256;
-    constexpr std::int64_t INTEGER_DECIMAL_RANK = 128;
     const auto selections = mapping_.selections();
     const auto raw = [&](std::size_t selection) -> std::int64_t {
         return selections[selection] ? values.values[*selections[selection]].raw : 0;
@@ -141,9 +144,7 @@ std::expected<Quote, MappingError> PreparedQuote::map(std::u16string_view symbol
     const auto decimal = [&](std::size_t selection) -> core::WideDecimal {
         const auto &field = values.values[*selections[selection]];
 
-        // An event numeric projection does not alter the generic field's original tag or bits.
-        return {field.type == core::SerialFieldType::COMPACT_INT ? field.raw * DECIMAL_RANK_RADIX + INTEGER_DECIMAL_RANK
-                                                                 : field.raw};
+        return detail::projectPresentDecimal(field);
     };
     // Selection numbers follow the request order above, independently of schema field positions.
     const auto bidTime = raw(0) * MILLISECONDS_PER_SECOND;

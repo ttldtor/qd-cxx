@@ -65,3 +65,49 @@ tests/fixtures/protocol/quote/expected/*.qtp -text
 tests/fixtures/protocol/quote/expected/*.tsv text eol=lf
 tests/fixtures/protocol/quote/evidence/** -text -whitespace
 tests/conformance/protocol/quote/logs/** -text -whitespace
+
+# QDCXX-026 raw captures, snapshots and hash inventories retain exact bytes.
+# Keep CRLF valid without relaxing whitespace checks on clean raw files.
+tests/conformance/refactor/evidence/**/*.log -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+tests/conformance/refactor/evidence/**/*.json -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+tests/conformance/refactor/evidence/**/*.sha256 -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+tests/conformance/refactor/evidence/**/*.txt -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+tests/conformance/refactor/evidence/**/*.patch -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+# Only these existing raw outputs contain captured trailing spaces or patch context.
+tests/conformance/refactor/evidence/baseline-build.log -whitespace
+tests/conformance/refactor/evidence/baseline-configure-cached.log -whitespace
+tests/conformance/refactor/evidence/baseline-configure-retry.log -whitespace
+tests/conformance/refactor/evidence/baseline-configure.log -whitespace
+tests/conformance/refactor/evidence/baseline-suites.json -whitespace
+tests/conformance/refactor/evidence/baseline-test.log -whitespace
+tests/conformance/refactor/evidence/characterization-build.log -whitespace
+tests/conformance/refactor/evidence/characterization-test.log -whitespace
+tests/conformance/refactor/evidence/clang-configure.log -whitespace
+tests/conformance/refactor/evidence/clang-Debug-build.log -whitespace
+tests/conformance/refactor/evidence/clang-Debug-test.log -whitespace
+tests/conformance/refactor/evidence/clang-Release-build.log -whitespace
+tests/conformance/refactor/evidence/clang-Release-test.log -whitespace
+tests/conformance/refactor/evidence/final-suites.json -whitespace
+tests/conformance/refactor/evidence/finding-1/baseline-rebuild.log -whitespace
+tests/conformance/refactor/evidence/finding-1/cli-ctest-final.log -whitespace
+tests/conformance/refactor/evidence/finding-1/cli-ctest.log -whitespace
+tests/conformance/refactor/evidence/finding-1/current-build.log -whitespace
+tests/conformance/refactor/evidence/finding-1/finding-1.patch -whitespace
+tests/conformance/refactor/evidence/gcc-Asan-configure.log -whitespace
+tests/conformance/refactor/evidence/gcc-Asan-test.log -whitespace
+tests/conformance/refactor/evidence/gcc-Debug-configure.log -whitespace
+tests/conformance/refactor/evidence/gcc-Debug-test.log -whitespace
+tests/conformance/refactor/evidence/gcc-Release-configure.log -whitespace
+tests/conformance/refactor/evidence/gcc-Release-test.log -whitespace
+tests/conformance/refactor/evidence/helper-mutations.log -whitespace
+tests/conformance/refactor/evidence/msvc-configure.log -whitespace
+tests/conformance/refactor/evidence/msvc-Debug-build.log -whitespace
+tests/conformance/refactor/evidence/msvc-Debug-test.log -whitespace
+tests/conformance/refactor/evidence/msvc-Release-build.log -whitespace
+tests/conformance/refactor/evidence/msvc-Release-test.log -whitespace
+tests/conformance/refactor/evidence/u2-u3-and-checker-test.log -whitespace
+tests/conformance/refactor/evidence/u2-u3-build.log -whitespace
+tests/conformance/refactor/evidence/u4-build.log -whitespace
+tests/conformance/refactor/evidence/u4-test.log -whitespace
+tests/conformance/refactor/evidence/u5-build.log -whitespace
+tests/conformance/refactor/evidence/u5-test.log -whitespace

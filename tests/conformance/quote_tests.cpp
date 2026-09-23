@@ -642,6 +642,35 @@ TEST_CASE("prepared Quote selects reordered explicit aliases and independent opt
     CHECK(prepared->map(u"IBM", {local->recordContext(0), fields}, 2).error() == q::MappingError::RESOURCE_LIMIT);
 }
 
+TEST_CASE("prepared Quote present integer decimals preserve literal boundary representations") {
+    c::LocalRecord record{0,
+                          u"Configured",
+                          false,
+                          {{8}, {8}, {8}, {120}},
+                          {{u"BidPrice", 0}, {u"BidSize", 1}, {u"AskPrice", 2}, {u"AskSize", 3}}};
+    auto local = c::LocalSchema::create(std::span(&record, 1), {1, 4, 4, 32, 128}, c::LocalProfile::QUOTE_FIELDS_V1);
+    REQUIRE(local);
+    auto prepared = q::PreparedQuote::prepare(*local, 0, {16, 32, 16, 32, 32, 64, 2048, 100000});
+    REQUIRE(prepared);
+
+    for (const auto wideBits :
+         {std::numeric_limits<std::int64_t>::min(), std::int64_t{0}, std::numeric_limits<std::int64_t>::max()}) {
+        const std::vector<c::FieldValue> fields{{c::SerialFieldType::COMPACT_INT, -2147483648LL},
+                                                {c::SerialFieldType::COMPACT_INT, 0},
+                                                {c::SerialFieldType::COMPACT_INT, 2147483647LL},
+                                                {c::SerialFieldType::WIDE_DECIMAL, wideBits}};
+        auto result = prepared->map(u"", {local->recordContext(0), fields}, 0);
+        REQUIRE(result);
+        CHECK(result->bidPrice.raw == -549755813760LL);
+        CHECK(result->bidSize.raw == 128);
+        CHECK(result->askPrice.raw == 549755813760LL);
+        CHECK(result->askSize.raw == wideBits);
+        CHECK(fields[0].raw == -2147483648LL);
+        CHECK(fields[1].raw == 0);
+        CHECK(fields[2].raw == 2147483647LL);
+    }
+}
+
 TEST_CASE("prepared Quote missing local required fields wrong types contexts and ambiguous keys reject") {
     auto local = schema();
     auto prepared = q::PreparedQuote::prepare(local, 0, {16, 32, 16, 32, 32, 64, 2048, 100000});

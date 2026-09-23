@@ -3,52 +3,17 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "../../tools/qtp-inspect/inspect.hpp"
 #include "../../tools/tape-inspect/inspect.hpp"
+#include "fault_buffer.hpp"
 #include <algorithm>
 #include <doctest/doctest.h>
 #include <sstream>
-#include <streambuf>
 
 namespace {
 namespace ti = org::ttldtor::qdcxx::tape_inspect;
 namespace presentation = org::ttldtor::qdcxx::inspect;
 
-/** IO fault at a selected operation. */
-class FaultBuffer : public std::streambuf {
-    int operation_;
-
-    public:
-    /** Select read, write or flush failure.
-     * @param operation Zero means read, one write, two flush.
-     */
-    explicit FaultBuffer(int operation) : operation_(operation) {
-    }
-
-    protected:
-    /** Inject read failure.
-     * @return Never returns normally.
-     */
-    int_type underflow() override {
-        throw std::ios_base::failure("injected read");
-    }
-
-    /** Inject write failure or accept bytes.
-     * @param data Borrowed output bytes.
-     * @param count Requested count.
-     * @return Zero for write failure, otherwise count.
-     */
-    std::streamsize xsputn(const char *data, std::streamsize count) override {
-        static_cast<void>(data);
-
-        return operation_ == 1 ? 0 : count;
-    }
-
-    /** Inject flush failure.
-     * @return Minus one for flush failure, otherwise zero.
-     */
-    int sync() override {
-        return operation_ == 2 ? -1 : 0;
-    }
-};
+using org::ttldtor::qdcxx::test_support::FaultBuffer;
+using org::ttldtor::qdcxx::test_support::FaultOperation;
 
 /** Build a minimal complete tape header with no version/send entries.
  * @return Exact binary bytes from documented grammar.
@@ -65,14 +30,14 @@ TEST_CASE("tape IO read write flush and encoded output boundaries") {
     auto schema = presentation::oracleSchema();
     REQUIRE(schema);
 
-    for (int mode = 0; mode < 3; ++mode) {
-        FaultBuffer bad(mode);
+    for (auto operation : {FaultOperation::READ, FaultOperation::WRITE, FaultOperation::FLUSH}) {
+        FaultBuffer bad(operation);
         std::istream failedInput(&bad);
         std::ostream failedOutput(&bad);
         std::istringstream goodInput(header());
         std::ostringstream goodOutput, diagnostic;
-        auto code = ti::inspect(mode == 0 ? failedInput : goodInput, mode == 0 ? goodOutput : failedOutput, diagnostic,
-                                *schema, {});
+        auto code = ti::inspect(operation == FaultOperation::READ ? failedInput : goodInput,
+                                operation == FaultOperation::READ ? goodOutput : failedOutput, diagnostic, *schema, {});
         CHECK(code == 3);
         CHECK(diagnostic.str().starts_with("incomplete\t3\t"));
     }

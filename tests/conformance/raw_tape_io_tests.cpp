@@ -3,13 +3,13 @@
 #define DOCTEST_CONFIG_IMPLEMENT
 #include "../../tools/qtp-inspect/inspect.hpp"
 #include "../../tools/tape-inspect/inspect.hpp"
+#include "fault_buffer.hpp"
 #include "qd/events/quote.hpp"
 #include <doctest/doctest.h>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <sstream>
-#include <streambuf>
 
 namespace {
 namespace ti = org::ttldtor::qdcxx::tape_inspect;
@@ -29,42 +29,8 @@ std::string read(std::string_view name) {
     return {std::istreambuf_iterator<char>(input), {}};
 }
 
-/** Inject independent stream operation failures. */
-class FaultBuffer : public std::streambuf {
-    int operation_; ///< Read, write or flush failure.
-    public:
-    /** Select failure.
-     * @param operation Zero read, one write, two flush.
-     */
-    explicit FaultBuffer(int operation) : operation_(operation) {
-    }
-
-    protected:
-    /** Fail an input read.
-     * @return Never returns normally.
-     */
-    int_type underflow() override {
-        throw std::ios_base::failure("injected read");
-    }
-
-    /** Accept or fail a write.
-     * @param data Borrowed bytes.
-     * @param count Requested count.
-     * @return Accepted count or zero for failure.
-     */
-    std::streamsize xsputn(const char *data, std::streamsize count) override {
-        static_cast<void>(data);
-
-        return operation_ == 1 ? 0 : count;
-    }
-
-    /** Inject flush error.
-     * @return Minus one for failure, zero otherwise.
-     */
-    int sync() override {
-        return operation_ == 2 ? -1 : 0;
-    }
-};
+using org::ttldtor::qdcxx::test_support::FaultBuffer;
+using org::ttldtor::qdcxx::test_support::FaultOperation;
 } // namespace
 
 TEST_CASE("RAW output crosses profiles formats diagnostics and exact output budgets") {
@@ -140,14 +106,15 @@ TEST_CASE("RAW IO failures and invalid mode do not announce completion") {
     REQUIRE(schema);
     const auto bytes = read("raw-synthetic.qtp");
 
-    for (int operation = 0; operation < 3; ++operation) {
+    for (auto operation : {FaultOperation::READ, FaultOperation::WRITE, FaultOperation::FLUSH}) {
         FaultBuffer fault(operation);
         std::istream badInput(&fault);
         std::ostream badOutput(&fault);
         std::istringstream input(bytes);
         std::ostringstream output, diagnostic;
-        CHECK(ti::inspect(operation == 0 ? badInput : input, operation == 0 ? output : badOutput, diagnostic, *schema,
-                          {}, view::OutputFormat::TSV, view::DisplayProfile::ORACLE_SRE_V1, 2,
+        CHECK(ti::inspect(operation == FaultOperation::READ ? badInput : input,
+                          operation == FaultOperation::READ ? output : badOutput, diagnostic, *schema, {},
+                          view::OutputFormat::TSV, view::DisplayProfile::ORACLE_SRE_V1, 2,
                           p::TapeMode::RAW_MESSAGE_V1) == 3);
         CHECK(diagnostic.str().starts_with("incomplete-v2\t3\t"));
     }

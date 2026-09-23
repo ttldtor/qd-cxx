@@ -1,10 +1,10 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #include "event_oracle.hpp"
+#include "evidence_cells.hpp"
 #include "qd/encoding/compact.hpp"
 #include "qd/encoding/utf_string.hpp"
 #include <array>
-#include <charconv>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -16,6 +16,7 @@
 
 namespace {
 namespace e = org::ttldtor::qdcxx::encoding;
+using org::ttldtor::qdcxx::test_support::hexUnits;
 using Cells = std::vector<std::string>; ///< Exact ordered observation cells.
 
 /** Require an independent expectation invariant.
@@ -44,42 +45,42 @@ std::string read(const std::filesystem::path &path) {
  * @return Exact owned units.
  */
 std::u16string units(const std::string &text) {
-    if (text == "-") {
-        return {};
-    }
-
-    need(!text.empty() && text.size() % 4 == 0 && text.find_first_not_of("0123456789abcdef") == std::string::npos,
-         "unit grammar");
-    std::u16string out;
-
-    for (std::size_t i = 0; i < text.size(); i += 4) {
-        unsigned value{};
-        const auto parsed = std::from_chars(text.data() + i, text.data() + i + 4, value, 16);
-        need(parsed.ec == std::errc{}, "hex parse");
-        out.push_back(static_cast<char16_t>(value));
-    }
-
-    return out;
+    return org::ttldtor::qdcxx::test_support::decodeUnits(text, "unit grammar");
 }
 
-/** Encode exact UTF-16 for the TSV expectation.
- * @param text Borrowed units.
- * @return Canonical hex or dash.
- */
-std::string hex(std::u16string_view text) {
-    if (text.empty()) {
-        return "-";
-    }
+/** Pin event and Profile checker policies independently of production formatting. */
+void checkCellGrammar() {
+    need(event_oracle::split("") == Cells{""}, "empty TSV row");
+    need(event_oracle::split("a\t\t") == Cells{"a", "", ""}, "trailing empty TSV cells");
+    const std::u16string exact{0, 0xd800, 0xdfff};
+    need(units("-").empty() && hexUnits(u"") == "-", "empty Profile UTF-16 sentinel");
+    need(event_oracle::units("-").empty() && event_oracle::hexUnits(u"") == "-", "empty event UTF-16 sentinel");
+    need(units("0000d800dfff") == exact && hexUnits(exact) == "0000d800dfff", "exact Profile UTF-16 units");
+    need(event_oracle::units("0000d800dfff") == exact && event_oracle::hexUnits(exact) == "0000d800dfff",
+         "exact event UTF-16 units");
 
-    std::string out;
+    for (const std::string malformed : {"", "000", "00000", "D800", "000g", "null"}) {
+        bool profileRejected = false, eventRejected = false;
 
-    for (auto unit : text) {
-        for (int shift : {12, 8, 4, 0}) {
-            out += "0123456789abcdef"[(unit >> shift) & 15];
+        try {
+            static_cast<void>(units(malformed));
+        } catch (const std::runtime_error &error) {
+            profileRejected = std::string_view(error.what()) == "unit grammar";
         }
+
+        try {
+            static_cast<void>(event_oracle::units(malformed));
+        } catch (const std::runtime_error &error) {
+            eventRejected = std::string_view(error.what()) == "invalid UTF-16 cell";
+        }
+
+        need(profileRejected && eventRejected, "malformed UTF-16 cell accepted or diagnostic changed");
     }
 
-    return out;
+    need(event_oracle::number<int>("01") == 1 && event_oracle::number<int>("-0") == 0,
+         "event integer cells need not be canonical");
+    need(event_oracle::nullable(std::nullopt) == "null" && event_oracle::nullable(std::u16string{}) == "-",
+         "event null and empty remain distinct");
 }
 
 /** Render only the measured fixed Profile-fixture text domain, independently of Formatter.
@@ -251,7 +252,8 @@ std::string expected(const std::filesystem::path &root, const std::string &stem,
                        " send=" + (raw ? "5" : "15") + " receive=-\n";
             } else {
                 out += std::string(raw ? "descriptor-v3\t" : "descriptor\t") + (version == props.end() ? "0" : "1") +
-                       "\t" + hex(v) + "\t" + t + "\t" + (raw ? "5" : "15") + "\t-" + (raw ? "\tempty" : "") + "\n";
+                       "\t" + hexUnits(v) + "\t" + t + "\t" + (raw ? "5" : "15") + "\t-" + (raw ? "\tempty" : "") +
+                       "\n";
             }
         } else if (f.type < 0) {
             ++markers;
@@ -314,7 +316,7 @@ std::string expected(const std::filesystem::path &root, const std::string &stem,
                            (type != "10"       ? "-"
                             : !v.units         ? "null"
                             : v.units->empty() ? "empty"
-                                               : hex(*v.units));
+                                               : hexUnits(*v.units));
                 }
             }
 
@@ -397,6 +399,7 @@ int main(int argc, char **argv) {
     }
 
     try {
+        checkCellGrammar();
         const std::string format = argv[3];
         need(format == "tsv" || format == "human", "format");
         const auto wanted = expected(argv[1], argv[2], format == "human");

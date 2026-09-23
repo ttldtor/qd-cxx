@@ -1,14 +1,13 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 
+#include "cli_number.hpp"
 #include "inspect.hpp"
 
 #include <algorithm>
-#include <charconv>
 #include <csignal>
 #include <fstream>
 #include <iostream>
-#include <limits>
 #include <set>
 #include <string>
 
@@ -44,30 +43,6 @@ constexpr Option OPTIONS[]{
     {"--message-symbol-units", &org::ttldtor::qdcxx::inspect::Limits::messageSymbolUnits},
     {"--symbol-units", &org::ttldtor::qdcxx::inspect::Limits::symbol}}; ///< Supported exact numeric option spellings.
 
-/** Validate a whole unsigned decimal operand before narrowing.
- * @param text Borrowed operand.
- * @param value Receives a valid count only on success.
- * @return True for digits-only input fitting size_t and uint64_t.
- */
-bool number(std::string_view text, std::size_t &value) {
-    if (text.empty() || !std::all_of(text.begin(), text.end(), [](char c) {
-            return c >= '0' && c <= '9';
-        })) {
-        return false;
-    }
-
-    std::uint64_t parsed{};
-    auto result = std::from_chars(text.data(), text.data() + text.size(), parsed);
-
-    if (result.ec != std::errc{} || result.ptr != text.data() + text.size() ||
-        parsed > std::numeric_limits<std::size_t>::max()) {
-        return false;
-    }
-
-    value = static_cast<std::size_t>(parsed);
-
-    return true;
-}
 } // namespace
 
 /** Run only the bounded file profile, with binary stdout/stderr on Windows.
@@ -144,7 +119,8 @@ int main(int argc, char **argv) {
                 const auto option = std::find_if(std::begin(OPTIONS), std::end(OPTIONS), [&](const auto &candidate) {
                     return candidate.name == key;
                 });
-                valid = option != std::end(OPTIONS) && number(operand, limits.*(option->member));
+                valid = option != std::end(OPTIONS) &&
+                        org::ttldtor::qdcxx::inspect::detail::parseUnsignedCount(operand, limits.*(option->member));
             }
         }
 

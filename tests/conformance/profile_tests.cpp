@@ -89,6 +89,7 @@ TEST_CASE("Profile preparation requires Description and defaults only absent loc
     auto result = prepared->map(u"", {schema->recordContext(0), fields}, {0, 0, 0});
     REQUIRE(result);
     CHECK(result->beta.kind() == c::DecimalKind::NAN_VALUE);
+    CHECK(result->beta.raw == 0);
     CHECK(result->high52WeekPrice.kind() == c::DecimalKind::NAN_VALUE);
     CHECK(result->haltStartTimeMs == 0);
     CHECK(result->flags == 0);
@@ -150,6 +151,32 @@ TEST_CASE("Profile reordered aliases and int numerics preserve generic extras an
     CHECK(fields[2].raw == 42);
     fields[2].units = u"invalid scalar";
     CHECK(prepared->map(u"", {retained, fields}, {0, 4, 4}).error() == q::MappingError::INVALID_VALUES);
+}
+
+TEST_CASE("Profile present integer decimals preserve literal boundary representations") {
+    c::LocalRecord record{
+        0, u"Configured", false, {{8}, {120}, {10}}, {{u"Beta", 0}, {u"Eps", 1}, {u"Description", 2}}};
+    auto schema =
+        c::LocalSchema::create(std::span(&record, 1), {1, 3, 3, 32, 128}, c::LocalProfile::EXTENDED_FIELDS_V1);
+    REQUIRE(schema);
+    auto prepared = q::PreparedProfile::prepare(*schema, 0, mappingLimits());
+    REQUIRE(prepared);
+    const std::array<std::int64_t, 3> integers{-2147483648LL, 0, 2147483647LL};
+    const std::array<std::int64_t, 3> decimalBits{-549755813760LL, 128, 549755813760LL};
+    const std::array<std::int64_t, 3> wideBits{std::numeric_limits<std::int64_t>::min(), 0,
+                                               std::numeric_limits<std::int64_t>::max()};
+
+    for (std::size_t i = 0; i < integers.size(); ++i) {
+        const std::vector<c::FieldValue> fields{{c::SerialFieldType::COMPACT_INT, integers[i]},
+                                                {c::SerialFieldType::WIDE_DECIMAL, wideBits[i]},
+                                                {c::SerialFieldType::UTF_CHAR_ARRAY, 0}};
+        auto result = prepared->map(u"", {schema->recordContext(0), fields}, {0, 0, 0});
+        REQUIRE(result);
+        CHECK(result->beta.raw == decimalBits[i]);
+        CHECK(result->earningsPerShare.raw == wideBits[i]);
+        CHECK(result->dividendFrequency.raw == 0);
+        CHECK(fields[0].raw == integers[i]);
+    }
 }
 
 TEST_CASE("Profile prepared plan survives source destruction and nonzero local record selection") {

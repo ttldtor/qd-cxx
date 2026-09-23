@@ -1,5 +1,6 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
+#include "evidence_cells.hpp"
 #include "qd/encoding/compact.hpp"
 #include "qd/encoding/utf_string.hpp"
 #include <array>
@@ -15,6 +16,8 @@
 
 namespace {
 namespace e = org::ttldtor::qdcxx::encoding;
+using org::ttldtor::qdcxx::test_support::hexUnits;
+using org::ttldtor::qdcxx::test_support::split;
 using Cells = std::vector<std::string>; ///< Exact ordered observation cells.
 
 /** Require an independent expectation invariant.
@@ -38,27 +41,6 @@ std::string read(const std::filesystem::path &path) {
     return {std::istreambuf_iterator<char>(input), {}};
 }
 
-/** Split without losing empty cells.
- * @param text Complete text.
- * @param delimiter Separator.
- * @return Ordered cells.
- */
-Cells split(const std::string &text, char delimiter) {
-    Cells out;
-    std::size_t start = 0;
-
-    for (;;) {
-        const auto end = text.find(delimiter, start);
-        out.push_back(text.substr(start, end - start));
-
-        if (end == std::string::npos) {
-            return out;
-        }
-
-        start = end + 1;
-    }
-}
-
 /** Parse canonical signed decimal.
  * @param text Whole decimal cell.
  * @return Exact int64 value or throw.
@@ -77,42 +59,42 @@ std::int64_t number(const std::string &text) {
  * @return Exact owned units.
  */
 std::u16string units(const std::string &text) {
-    if (text == "-") {
-        return {};
-    }
-
-    need(!text.empty() && text.size() % 4 == 0 && text.find_first_not_of("0123456789abcdef") == std::string::npos,
-         "unit grammar");
-    std::u16string out;
-
-    for (std::size_t i = 0; i < text.size(); i += 4) {
-        unsigned value{};
-        const auto parsed = std::from_chars(text.data() + i, text.data() + i + 4, value, 16);
-        need(parsed.ec == std::errc{}, "hex parse");
-        out.push_back(static_cast<char16_t>(value));
-    }
-
-    return out;
+    return org::ttldtor::qdcxx::test_support::decodeUnits(text, "unit grammar");
 }
 
-/** Encode exact UTF-16 for the TSV expectation.
- * @param text Borrowed units.
- * @return Canonical hex or dash.
- */
-std::string hex(std::u16string_view text) {
-    if (text.empty()) {
-        return "-";
-    }
+/** Pin checker grammar before sharing its mechanical TSV and UTF-16 operations. */
+void checkCellGrammar() {
+    need(split("", '\t') == Cells{""}, "empty TSV row");
+    need(split("a\t\t", '\t') == Cells{"a", "", ""}, "trailing empty TSV cells");
+    const std::u16string exact{0, 0xd800, 0xdfff};
+    need(units("-").empty() && hexUnits(u"") == "-", "empty UTF-16 sentinel");
+    need(units("0000d800dfff") == exact && hexUnits(exact) == "0000d800dfff", "exact UTF-16 units");
 
-    std::string out;
+    for (const std::string malformed : {"", "000", "00000", "D800", "000g", "null"}) {
+        bool rejected = false;
 
-    for (auto unit : text) {
-        for (int shift : {12, 8, 4, 0}) {
-            out += "0123456789abcdef"[(unit >> shift) & 15];
+        try {
+            static_cast<void>(units(malformed));
+        } catch (const std::runtime_error &error) {
+            rejected = std::string_view(error.what()) == "unit grammar";
         }
+
+        need(rejected, "malformed UTF-16 cell accepted or diagnostic changed");
     }
 
-    return out;
+    need(number("0") == 0 && number("-1") == -1, "canonical decimal cells");
+
+    for (const std::string malformed : {"01", "-0", "+1", " 1", "1 ", "1x", "", "9223372036854775808"}) {
+        bool rejected = false;
+
+        try {
+            static_cast<void>(number(malformed));
+        } catch (const std::runtime_error &error) {
+            rejected = std::string_view(error.what()) == "decimal grammar";
+        }
+
+        need(rejected, "noncanonical decimal cell accepted or diagnostic changed");
+    }
 }
 
 /** Render only the measured fixed mixed-fixture text domain, independently of Formatter.
@@ -355,7 +337,8 @@ std::string expected(const std::filesystem::path &root, const std::string &stem,
                        " send=" + (raw ? "5" : "15") + " receive=-\n";
             } else {
                 out += std::string(raw ? "descriptor-v3\t" : "descriptor\t") + (version == props.end() ? "0" : "1") +
-                       "\t" + hex(v) + "\t" + t + "\t" + (raw ? "5" : "15") + "\t-" + (raw ? "\tempty" : "") + "\n";
+                       "\t" + hexUnits(v) + "\t" + t + "\t" + (raw ? "5" : "15") + "\t-" + (raw ? "\tempty" : "") +
+                       "\n";
             }
         } else if (f.type < 0) {
             ++markers;
@@ -439,6 +422,7 @@ int main(int argc, char **argv) {
     }
 
     try {
+        checkCellGrammar();
         const std::string format = argv[3];
         need(format == "tsv" || format == "human", "format");
         const auto wanted = expected(argv[1], argv[2], format == "human");

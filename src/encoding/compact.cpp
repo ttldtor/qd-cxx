@@ -3,6 +3,8 @@
 
 #include "qd/encoding/compact.hpp"
 
+#include "compact_limits.hpp"
+
 #include <bit>
 
 namespace org::ttldtor::qdcxx::encoding {
@@ -21,15 +23,13 @@ constexpr unsigned int BYTE_MASK = 0xffU;
 constexpr unsigned int FULL_WIDTH_PREFIX = 0xffU;
 /// Width of the Java long bit pattern, including its sign bit.
 constexpr unsigned int LONG_BITS = 64;
-/// One escape prefix plus eight payload octets: the maximum compact long occupies nine bytes.
-constexpr std::size_t MAX_COMPACT_LONG_BYTES = 9;
 
 /** Choose the shortest compact representation of a signed long.
  * @param value Signed value to encode.
  * @return Encoded byte count, including the prefix byte.
  */
 std::size_t compactLongSize(std::int64_t value) noexcept {
-    for (std::size_t size = 1; size < MAX_COMPACT_LONG_BYTES; ++size) {
+    for (std::size_t size = 1; size < detail::MAX_COMPACT_LONG_BYTES; ++size) {
         // Each extra octet adds eight payload bits but spends one more prefix bit: net seven.
         // One payload bit carries the sign, giving the interval [-2^(width-1), 2^(width-1)).
         const auto limit = std::int64_t{1} << (PAYLOAD_BITS_PER_BYTE * size - 1);
@@ -39,7 +39,7 @@ std::size_t compactLongSize(std::int64_t value) noexcept {
         }
     }
 
-    return MAX_COMPACT_LONG_BYTES;
+    return detail::MAX_COMPACT_LONG_BYTES;
 }
 } // namespace
 
@@ -100,8 +100,9 @@ WriteResult writeCompactLong(std::int64_t value, std::span<std::byte> output) no
 
     // The prefix has (size - 1) leading ones followed by zero, except the all-one escape.
     // Remaining low prefix bits hold the highest payload bits; sizes eight/nine have none.
-    const auto prefix =
-        size == MAX_COMPACT_LONG_BYTES ? FULL_WIDTH_PREFIX : (BYTE_MASK << (BITS_PER_BYTE - (size - 1))) & BYTE_MASK;
+    const auto prefix = size == detail::MAX_COMPACT_LONG_BYTES
+                            ? FULL_WIDTH_PREFIX
+                            : (BYTE_MASK << (BITS_PER_BYTE - (size - 1))) & BYTE_MASK;
     const auto mask = size - 1 < PAYLOAD_BITS_PER_BYTE ? SINGLE_BYTE_PAYLOAD_MASK >> (size - 1) : 0;
     output[0] = static_cast<std::byte>(prefix | (bits & mask));
 

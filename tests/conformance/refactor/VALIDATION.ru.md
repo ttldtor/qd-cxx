@@ -1,0 +1,255 @@
+# QDCXX-026: авторская валидация и передача результата
+
+[English version](VALIDATION.md). Английская версия нормативна.
+
+Начальный HEAD: `758303a66d5ed181d7123a2c665d858aba2e8834`, исходно чистые рабочее дерево и индекс.
+Ветка: `task/qdcxx-026-readability`. Область и решения по каждому helper:
+аудит, задача,
+план.
+Это авторская проверка и самопроверка; независимая приёмка остаётся открытой.
+Staging, commit, merge, миграция с Python и реализация следующей задачи не выполнялись.
+
+## Доказательства до извлечения
+
+U1 пересобрал исходные production/checker sources в MSVC Release с обоими включёнными инспекторами.
+Baseline test log содержит все 31 набор и exit 0;
+аудит наборов сохраняет каждое имя и указывает два добавленных CLI argument suites.
+Начальные хеши получены до редактирования собственного кода.
+
+До production-изменений U2/U3 новые проверки descriptor и schema/event прошли вместе с существующими
+compact/symbol tests: сборка,
+прогон 6 наборов. Они фиксируют long и low-32-bit чтение descriptor,
+неканонические/оборванные префиксы, offsets начала примитива и конца проверки, приоритет malformed перед
+бюджетом, NUL/парные/одиночные/переставленные UTF-16 ключи, разный порядок ошибок schema/mapping,
+буквальные decimal representations для int32 min/zero/max, raw zero отсутствующего поля Profile и
+неизменность wide raw bits. Существующие проверки exact/excess/zero бюджетов и context identity сохранены.
+
+Существующие UTFString/symbol cases уже фиксируют просмотр полного хвоста, overlong BMP, одиночные
+суррогаты, разрешённые supplementary points и их отклонение в FD, `01c280`, `01c2`, сохранение sentinel
+и terminal/reset behavior. Прогон 16 наборов U2/U3 прошёл до U4 и
+также выполнил новые TSV/UTF-16/canonical-number проверки на прежних checker helpers.
+Прогон 10 наборов U4 прошёл после UTFChar reuse. Writer не менялся, поэтому
+новые переборы capacity не потребовались; существующие проверки атомарной записи остались активными.
+
+Исходные CLI mains прошли новые проверки аргументов до C07:
+QTP, tape.
+Они различают пустые operands, знаки, пробелы, суффиксы, overflow, разрешённые ведущие нули,
+отклонение нулевого chunk, help, неверные/повторные аргументы и буквальные пути с пробелами и `;`.
+Обе проверки теперь являются CTest suites. Полный прогон U5 прошёл все 33 набора.
+
+## Итоговая матрица компиляторов
+
+В каждой тестовой конфигурации включены оба инспектора. MSVC 19.42.34444 и ClangCL 19.1.5 используют
+Visual Studio 17 2022 x64 и Windows SDK 10.0.26100.0. GCC 13.3.0 выполняется в Ubuntu-24.04 WSL.
+CMake — 4.4.2 в Windows и 4.4.3 в WSL. Использованы существующие source caches doctest 2.4.12;
+новые зависимости и инструменты не устанавливались. Configure/build/test logs содержат реальные
+команды и ISO-8601 UTC timestamps каждой строки через неизменённый `tools/run_utc.py`.
+
+| Конфигурация | Результат | Доказательство |
+| --- | --- | --- |
+| MSVC Debug | 33/33; exit 0 | CTest |
+| MSVC Release | 33/33; exit 0 | CTest |
+| ClangCL Debug | 33/33; exit 0 | CTest |
+| ClangCL Release | 33/33; exit 0 | CTest |
+| GCC Debug | 33/33; exit 0 | CTest |
+| GCC Release | 33/33; exit 0 | CTest |
+| GCC Debug ASan+UBSan | 33/33; exit 0 | CTest |
+
+ASan+UBSan использует `-fsanitize=address,undefined -fno-omit-frame-pointer -fno-pie` и linker `-no-pie`.
+Раздельные каталоги исключают наложение конфигураций. `PYTHONDONTWRITEBYTECODE=1` явно задан
+в дочерних окружениях Windows и WSL; существующие Python checks выполняются без изменений.
+
+Все четыре configure/build завершились с exit 0.
+Четыре чистые GCC Release сборки `BUILD_TESTING=OFF` покрывают оба inspector options ON/OFF.
+Production audit проверяет отсутствие `_deps` и Python/doctest
+cache entries; `prod-<QTP>-<TAPE>-configure.log` и соответствующие build logs сохраняют команды.
+
+## Точный вывод и отрицательные контроли
+
+CLI snapshots и итоговый snapshot сохраняют
+точные stdout/stderr в base64 и каждый exit/argument vector для 264 запусков. Они покрывают оба
+инструмента, четыре профиля, legacy/RAW modes, TSV/human output versions, diagnostics 1/2, chunks
+1/7/137, нулевые бюджеты, unsupported inputs и неверные аргументы. Malformed/exit-5 случаев в них нет;
+finding #1 добавляет отдельное сравнение ниже без перезаписи исторических snapshots.
+Итоговое сравнение подтверждает побайтовое совпадение после упрощения.
+Snapshots дополняют независимые Java-derived comparisons; они не сертифицируют исходное поведение.
+Read/write/flush, partial-output и multiple-flush checks остаются в полных наборах.
+
+Итоговая CTest-матрица сохраняет configured-event, field-type и CLI mutation families, включая
+malformed TSV/UTF-16 и различие null/empty. Повторно выполнены неизменённые дополнительные negative runners:
+compact, UTFString,
+framing, descriptions,
+binding, symbols,
+STREAM_DATA, offline CLI.
+Соседний log каждого runner содержит exit 0 и проверку восстановленного baseline; compact также
+проверяет отрицательный контроль закреплённого formatter. Старые expected files не регенерировались.
+
+[Invoke-Mutations.ps1](Invoke-Mutations.ps1) копирует собственные build inputs в `.work/` и проверяет
+три независимых свидетельства: representation selector `0x20 → 0x28` (full type по-прежнему равен 40),
+consumed expectation для `01c280`: `3 → 2`, и decimal expectation присутствующего compact zero: `128 → 0`.
+Mutation log содержит exit 1 с нужным assertion для каждой мутации
+и exit 0 до и после восстановления каждой копии. Защищённые оригиналы никогда не мутируются.
+
+## Проверка, сохранность и ограничения
+
+Автор проверил полный diff/новые helpers, границы владения и исключений, порядок списания бюджетов,
+именованные widths, точный вывод и направление зависимостей. Проход `ce-simplify-code` использовал
+трёх reviewers только для чтения: reuse, quality и efficiency. Применены два улучшения: удалён
+лишний проход по цифрам CLI перед unsigned `from_chars`, сохранены empty guard и полное потребление;
+новый argument suite использует малую общую help assertion. Замечаний по эффективности, требующих
+изменения, не было. Итоговая матрица покрывает эти правки. Это не закрывает независимое ревью.
+
+Закреплённые Uncrustify 0.83.0, затем clang-format 20.1.8:
+Format/Check прошли 67 обнаруженных файлов.
+Семь private/test headers дополнительно отформатированы и проверены явно.
+Новые private helpers не добавляют public include/API. Production targets и зависимости не добавлены.
+
+Protected audit сверяет 3611 исходный защищённый файл с начальными
+хешами: fixtures/captures/исторические доказательства, public headers, locks и Java/Python/oracle
+tooling неизменны. Начальная инвентаризация также содержит редактируемые checker sources; их изменения
+указаны отдельно. Source hashes определяют итоговый собственный код.
+Document audit проверяет whitespace изменённых/untracked Markdown,
+взаимные языковые ссылки, локальные targets и пустой индекс. Исторические сырые доказательства не нормализованы.
+
+Начальные configure attempts завершились ошибкой из-за запрета sandbox на обнаружение Windows SDK,
+затем из-за несуществующего предполагаемого cache path. Исправленный разрешённый запуск использовал
+существующий кеш; все попытки сохранены в logs. Первая версия snapshot script выводила результаты
+асинхронных задач вместе со строками данных; это исправлено до нормативного capture 264 случаев.
+Эти неуспешные или заменённые попытки не считаются пройденными проверками. Compiler/CMake warnings
+не подавлены; GCC сохраняет существующее предупреждение о text buffer WideDecimal.
+Отсутствие предупреждений не утверждается.
+
+В перечисленных успешных проверках ошибок не обнаружено. Другие архитектуры, исчерпывающие входы,
+сценарии отказа аллокатора и полная Java/QTP-совместимость не проверялись. Java sources и oracle workflows
+не менялись, поэтому новый Java capture/Verify не требовался и не заявляется. Частный tape не читался.
+Переиспользование UTFString writer и более общая oracle-tool обвязка намеренно сохранены или отложены,
+как допускает план. Поведенческие ошибки не исправлялись под видом рефакторинга.
+
+`ce-compound` рассмотрен и пропущен: семантические различия уже восстанавливаются из нормативных
+контрактов, characterization tests и двуязычного аудита; ещё один learning дублировал бы их.
+
+## Finding #1: дополнительное сравнение malformed CLI
+
+В этом исправлении изменены только snapshot runner, этот отчёт EN/RU, точный манифест и новые
+файлы `evidence/finding-1/`. Прежнее утверждение о malformed-покрытии выше исправлено.
+[Invoke-CliSnapshot.ps1](Invoke-CliSnapshot.ps1) теперь поддерживает `Historical` (исходные 264 строки),
+`Malformed` (160 дополнительных строк) и `All` по умолчанию (424 строки). Каждый дополнительный
+случай обязан вернуть exit 5; одинаковые ошибки unsupported или бюджета не удовлетворяют этой проверке.
+
+Десять существующих fixtures покрывают некорректные QTP descriptions и payloads, обрыв frame/prefix,
+некорректные legacy tape headers/data и обрыв tape, а также обрыв RAW timestamp. Полное произведение
+вариантов: TSV/human и chunks default/1/7/137; для tape дополнительно diagnostics default/1/2.
+У QTP нет параметра diagnostics-version. Количество: QTP 40, tape legacy 72, tape RAW 48; везде
+используется `oracle-sre-v1`. Покрытие содержит точные пути fixtures
+и количества. Fixtures не создавались и не изменялись.
+
+Сохранённые EXE из `.work/refactor-026-baseline-bin` использованы непосредственно для
+дополнительного baseline. Их PE link timestamps
+18:23:12Z (QTP) и 18:23:09Z (tape) за 2026-09-23 соответствуют исходному
+журналу сборки. Новый исторический прогон
+точно воспроизвёл все исходные 264 строки. Для проверки происхождения помимо timestamps через
+`git archive` экспортирован исходный HEAD `758303a66d5ed181d7123a2c665d858aba2e8834` в отдельный
+`.work/refactor-026-finding-1/source`; configure
+и build выполнены в MSVC Release с обоими инструментами и testing OFF.
+Происхождение бинарников фиксирует SHA-256 полного EXE
+и секции `.text`: код сохранённой и повторной сборки совпадает у обеих CLI; код текущей сборки отличается.
+Malformed snapshot повторной сборки также точно совпадает
+с сохранёнными EXE. Новая сборка подтверждает сохранённый baseline, но не подменяет его. Хеши полных
+EXE до рефакторинга не записывались, а хеши полных повторно собранных EXE отличаются; это цепочка
+подтверждений происхождения, а не заявление о воспроизводимости целых бинарников или подписанной истории хранения.
+
+После сборки текущего кода все 160
+текущих результатов точно совпали с сохранёнными по
+байтам stdout/stderr (base64), exit, имени инструмента и аргументам; см.
+журнал сравнения. Все 160 exits равны 5.
+Проверка набора по умолчанию дополнительно сравнивает 424
+текущие строки с объединением исходных 264 и сохранённых 160. Исходные `cli-before.json`,
+`cli-after.json`, fixtures и все прежние доказательства побайтово сохранены.
+
+Затронутые CLI/CTest проверки MSVC Release прошли 9/9;
+Format и Check прошли для 67
+файлов закреплённой цепочкой форматирования без изменения байтов C++. Первая
+попытка CTest выполнила семь проверок, но не смогла запустить две
+существующие Python-проверки из-за sandbox; разрешённый повторный запуск выполнил все девять.
+Первоначальная проверка выбора fixtures отклонила
+`heartbeat-truncated-1.qtp`, поскольку он возвращает unsupported/exit 4; он заменён существующим
+`timestamp-truncated-1.qtp`. Неуспешные попытки сохранены и не засчитываются как пройденные проверки.
+
+Verify-Evidence.ps1 повторно проверяет происхождение,
+точность snapshots, количество exit-5, хеши до исправления
+и исходный hash/link/manifest audit с перенаправлением результатов в новый каталог доказательств.
+Журнал аудита фиксирует сохранность и пустой индекс. Исторические
+результаты аудита и хеши исходников сохранены; новые хеши
+идентифицируют обновлённые скрипты. Diff скрипта и отчётов: finding-1.patch.
+
+Повторная проверка из корня репозитория при наличии сохранённых бинарников (использовать новые имена вывода):
+
+```powershell
+$runner = 'tests/conformance/refactor/Invoke-CliSnapshot.ps1'
+$evidence = 'tests/conformance/refactor/evidence/finding-1'
+pwsh -NoProfile -File $runner -Bin .work/refactor-026-baseline-bin -Suite Malformed -Output .work/recheck-before.json
+pwsh -NoProfile -File $runner -Bin .work/refactor-026-msvc/Release -Suite Malformed -Output .work/recheck-after.json -Compare .work/recheck-before.json
+pwsh -NoProfile -File $runner -Bin .work/refactor-026-baseline-bin -Suite Historical -Output .work/recheck-historical.json -Compare tests/conformance/refactor/evidence/cli-before.json
+$env:PYTHONDONTWRITEBYTECODE = '1'
+ctest --test-dir .work/refactor-026-msvc -C Release --output-on-failure -R '(inspection_cli|argument_contract)$'
+pwsh -NoProfile -File tools/format/Format-Cpp.ps1 -Mode Format
+pwsh -NoProfile -File tools/format/Format-Cpp.ps1 -Mode Check
+```
+
+В перечисленных успешных проверках ошибок не обнаружено. Полная матрица семи конфигураций в этом
+исправлении не повторялась; production-код не меняется. Независимая повторная проверка finding #1
+ожидается. Java/Python, private tape и следующие задачи не затронуты; staging, commit и merge не
+выполнялись. `ce-compound` рассмотрен и пропущен: это локальное исправление покрытия, полностью
+описанное здесь, без нового знания о семантике проекта.
+
+## P2: сохранение raw evidence в Git
+
+По сообщению владельца независимая повторная проверка закрыла finding #1. Его исторический скрипт
+аудита сохраняет прежнюю проверку границ изменений и не перезапускается для перезаписи результатов. Это отдельное исправление
+касается только сохранности в Git; поведение CLI не пересматривается, матрица сборок не повторяется.
+
+[Корневые атрибуты](../../../.gitattributes) отключают преобразование текста только для `.log`, `.json`,
+`.sha256`, `.txt` и `.patch` внутри `tests/conformance/refactor/evidence/`. Для чистых raw-файлов
+whitespace-проверки сохранены с явным допуском CRLF. Ровно 37 существующих raw-путей с сохранёнными
+пробелами в конце строк или контекстом patch имеют индивидуальные исключения `-whitespace`.
+Исключения на весь каталог нет; обычные `.ps1`, `.md`, `.cpp` и `.hpp` сохраняют прежние правила,
+включая PowerShell-скрипт внутри каталога evidence. Исторические свидетельства не очищались и не переписывались.
+
+[Verify-RawEvidence.ps1](Verify-RawEvidence.ps1) проверяет весь обновлённый манифест, создаёт
+одноразовые репозитории внутри `.work/`, копирует только пути манифеста и выполняет `git add` и
+`git diff --cached --check` в этих копиях. Проверяются Git object IDs исходных raw-файлов против
+blobs индекса и SHA-256 против результата `checkout-index`, отдельно с `core.autocrlf=true` и `false`.
+Сохранённый результат содержит атрибуты каждого пути манифеста.
+Все 159 путей добавлены и прошли whitespace-проверку; все 108 raw blobs и извлечённых файлов совпали
+с исходными байтами в обеих конфигурациях. В каждой изолированной копии обнаружены четыре намеренных
+дефекта с пробелом в конце строки: `.ps1`, `.md`, C++ и чистый raw JSON; после восстановления проверки прошли.
+
+Хеши до исправления защищают все прежние файлы,
+кроме явно редактируемых `.gitattributes`, манифеста и отчётов EN/RU. Проверка сравнивает SHA-256
+индекса владельца до и после; ни одна команда не добавляет файлы в этот индекс. Итоговая проверка
+пишет отчёт вне манифеста, чтобы собственный вывод не менял проверяемые свидетельства:
+
+```powershell
+pwsh -NoProfile -File tests/conformance/refactor/Verify-RawEvidence.ps1 -Report .work/raw-evidence-final.json
+```
+
+[Манифест](changed-files.txt) включает атрибуты, проверочный скрипт и новые свидетельства. Итоговые
+документы и манифест повторно проверены после записи отчёта. В этих проверках ошибок не обнаружено.
+Production-код, Java/Python, fixtures и все прежние raw evidence сохранены; staging в индекс владельца,
+commit и merge не выполнялись. Независимая приёмка этого исправления P2 остаётся отдельным этапом.
+`ce-compound` рассмотрен и пропущен: узкая политика атрибутов и исполняемая проверка уже объясняют исправление.
+
+## Передача владельцу
+
+U1–U6 реализованы и проверены автором; независимое ревью ожидается.
+Точный состав будущего коммита — [changed-files.txt](changed-files.txt), включая сам манифест и все
+новые доказательства. Игнорируемые сборки и mutation copies исключены. Только предлагаемые команды
+после независимого ревью и проверки отсутствия более поздних параллельных изменений:
+
+```powershell
+git add --pathspec-from-file=tests/conformance/refactor/changed-files.txt
+git diff --cached --check
+git commit -m "refactor: clarify decoding and share bounded semantic helpers"
+```
+
+Эти команды не выполнялись. Удаление Python и последующие задачи здесь не назначены.

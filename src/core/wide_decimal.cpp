@@ -3,6 +3,8 @@
 
 #include "qd/core/wide_decimal.hpp"
 
+#include "wide_decimal_representation.hpp"
+
 #include <array>
 #include <bit>
 #include <charconv>
@@ -13,10 +15,6 @@ static_assert(std::numeric_limits<double>::is_iec559 && std::numeric_limits<doub
               "WideDecimal views require IEEE 754 binary64");
 
 namespace {
-/// Rank occupies the low octet; rank 128 represents an unscaled integer.
-constexpr unsigned int RANK_BITS = 8;
-constexpr std::uint64_t RANK_MASK = 0xff;
-constexpr int ZERO_EXPONENT_RANK = 128;
 /// Maximum significand digits plus sign, decimal point, E, exponent and spare capacity.
 constexpr std::size_t MAX_TEXT_BYTES = 32;
 /// Plain notation permits this many zeroes outside the significand digits.
@@ -28,15 +26,15 @@ constexpr std::uint64_t QUIET_NAN_BITS = 0x7ff8000000000000ULL;
 } // namespace
 
 std::int64_t WideDecimal::significand() const noexcept {
-    return raw >> RANK_BITS;
+    return raw >> detail::RANK_BITS;
 }
 
 int WideDecimal::exponent() const noexcept {
-    return ZERO_EXPONENT_RANK - static_cast<int>(static_cast<std::uint64_t>(raw) & RANK_MASK);
+    return detail::INTEGER_RANK - static_cast<int>(static_cast<std::uint64_t>(raw) & detail::RANK_MASK);
 }
 
 DecimalKind WideDecimal::kind() const noexcept {
-    if ((static_cast<std::uint64_t>(raw) & RANK_MASK) != 0) {
+    if ((static_cast<std::uint64_t>(raw) & detail::RANK_MASK) != 0) {
         return DecimalKind::FINITE;
     }
 

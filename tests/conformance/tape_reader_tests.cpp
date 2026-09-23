@@ -441,6 +441,77 @@ TEST_CASE("message-local reset, completed payload prefix, skip charges and atomi
     CHECK(old->find(1) != nullptr);
 }
 
+TEST_CASE("descriptor numeric widths preserve projection and primitive versus validation checkpoints") {
+    // Exact descriptor: two global properties, one STREAM_DATA send entry, no receive entries.
+    const std::vector<std::byte> descriptor{
+        std::byte{'D'}, std::byte{'X'}, std::byte{'P'}, std::byte{'3'}, std::byte{2},   std::byte{4},
+        std::byte{'t'}, std::byte{'y'}, std::byte{'p'}, std::byte{'e'}, std::byte{4},   std::byte{'t'},
+        std::byte{'a'}, std::byte{'p'}, std::byte{'e'}, std::byte{3},   std::byte{'o'}, std::byte{'p'},
+        std::byte{'t'}, std::byte{0},   std::byte{1},   std::byte{15},  std::byte{11},  std::byte{'S'},
+        std::byte{'T'}, std::byte{'R'}, std::byte{'E'}, std::byte{'A'}, std::byte{'M'}, std::byte{'_'},
+        std::byte{'D'}, std::byte{'A'}, std::byte{'T'}, std::byte{'A'}, std::byte{0},   std::byte{0}};
+
+    // These replacements are literal wire stimuli; no production encoder computes test inputs.
+    const auto observe = [&](std::size_t offset, std::initializer_list<unsigned int> replacement, p::TapeLimits budget,
+                             bool truncate = false) {
+        std::vector<std::byte> payload(descriptor.begin(), descriptor.begin() + offset);
+
+        for (auto value : replacement) {
+            payload.push_back(static_cast<std::byte>(value));
+        }
+
+        if (!truncate) {
+            payload.insert(payload.end(), descriptor.begin() + offset + 1, descriptor.end());
+        }
+
+        // Each bounded stimulus fits a positive one-byte compact frame length.
+        REQUIRE(payload.size() + 1 < 64);
+        std::vector<std::byte> bytes{static_cast<std::byte>(payload.size() + 1), std::byte{1}};
+        bytes.insert(bytes.end(), payload.begin(), payload.end());
+
+        return run(bytes, budget, 1);
+    };
+
+    // Full-width noncanonical values project low 32 bits for list counts and message IDs.
+    CHECK(observe(20, {0xff, 0, 0, 0, 1, 0, 0, 0, 1}, limits()).status == p::TapeStatus::FINISHED);
+    CHECK(observe(21, {0xff, 0, 0, 0, 1, 0, 0, 0, 15}, limits()).status == p::TapeStatus::FINISHED);
+    CHECK(observe(35, {0xff, 0, 0, 0, 1, 0, 0, 0, 0}, limits()).status == p::TapeStatus::FINISHED);
+    CHECK(observe(4, {0xff, 0, 0, 0, 0, 0, 0, 0, 2}, limits()).status == p::TapeStatus::FINISHED);
+    CHECK(observe(34, {0xff, 0, 0, 0, 0, 0, 0, 0, 0}, limits()).status == p::TapeStatus::FINISHED);
+
+    for (auto offset : {4U, 34U}) {
+        INFO(offset);
+        auto budget = limits();
+        // Both property maps use a long: high bits must survive even with no remaining budget.
+        budget.descriptor.properties = offset == 4 ? 0 : 2;
+        auto invalid = observe(offset, {0xff, 0, 0, 0, 1, 0, 0, 0, 0}, budget);
+        CHECK(invalid.diagnostic.error == p::TapeError::MALFORMED);
+        CHECK(invalid.diagnostic.consumed == offset + 9);
+        CHECK(invalid.diagnostic.errorOffset == offset + 9);
+    }
+
+    for (auto offset : {4U, 20U, 34U, 35U}) {
+        INFO(offset);
+        auto budget = limits();
+        budget.descriptor.properties = offset == 4 ? 0 : 2;
+        budget.descriptor.messages = offset == 20 ? 0 : 1;
+        auto negative = observe(offset, {0x7f}, budget);
+        CHECK(negative.diagnostic.error == p::TapeError::MALFORMED);
+        CHECK(negative.diagnostic.consumed == offset + 1);
+        CHECK(negative.diagnostic.errorOffset == offset + 1);
+        auto exhausted = observe(offset, {1}, budget);
+        CHECK(exhausted.diagnostic.error == p::TapeError::RESOURCE_LIMIT);
+        CHECK(exhausted.diagnostic.consumed == offset + 1);
+        CHECK(exhausted.diagnostic.errorOffset == offset + 1);
+        auto truncated = observe(offset, {0xff, 0, 0}, budget, true);
+        CHECK(truncated.diagnostic.error == p::TapeError::MALFORMED);
+        CHECK(truncated.diagnostic.consumed == offset + 3);
+        CHECK(truncated.diagnostic.errorOffset == offset);
+        CHECK(truncated.diagnostic.payloadStart == 2);
+        CHECK(truncated.diagnostic.accepted == offset + 5);
+    }
+}
+
 /** Run doctest with explicit fixture ownership.
  * @param argc Process argument count.
  * @param argv Fixture directory followed by doctest options.

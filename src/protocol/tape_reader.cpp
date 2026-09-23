@@ -28,6 +28,12 @@ struct DescriptorFailure {
     TapeError error; ///< Category, separate from checkpoint.
 };
 
+/** Numeric projection required by the descriptor field grammar. */
+enum class NumberWidth {
+    COMPACT_INT, ///< Signed low 32 bits, including full-width noncanonical encodings.
+    COMPACT_LONG ///< Full signed value before property-count validation.
+};
+
 /** Bounded exact descriptor cursor; all outputs are owned. */
 class DescriptorParser {
     std::span<const std::byte> payload_;
@@ -51,36 +57,30 @@ class DescriptorParser {
     }
 
     /** Read one numeric primitive preserving its actual width.
-     * @param wide True for property counts, false for projected int counts/IDs.
+     * @param width Compact-long property count or projected compact-int count/ID.
      * @return Signed projected value or a structured truncation failure.
      */
-    std::int64_t number(bool wide) {
+    std::int64_t number(NumberWidth width) {
         position_.consumed = cursor_;
         position_.errorOffset = cursor_;
-        std::int64_t value;
-        encoding::Status status;
-        std::size_t consumed;
+        /** Commit examined bytes while retaining the primitive's start error checkpoint.
+         * @param result Result from the selected integer-width reader.
+         * @return Signed value, or throw the descriptor's malformed-primitive failure.
+         */
+        const auto finishRead = [this](const auto &result) -> std::int64_t {
+            cursor_ += result.consumed;
+            position_.consumed = cursor_;
 
-        if (wide) {
-            auto r = encoding::readCompactLong(payload_.subspan(cursor_));
-            value = r.value;
-            status = r.status;
-            consumed = r.consumed;
-        } else {
-            auto r = encoding::readCompactInt(payload_.subspan(cursor_));
-            value = r.value;
-            status = r.status;
-            consumed = r.consumed;
-        }
+            if (result.status != encoding::Status::OK) {
+                throw DescriptorFailure{TapeError::MALFORMED};
+            }
 
-        cursor_ += consumed;
-        position_.consumed = cursor_;
+            return result.value;
+        };
+        const auto input = payload_.subspan(cursor_);
 
-        if (status != encoding::Status::OK) {
-            throw DescriptorFailure{TapeError::MALFORMED};
-        }
-
-        return value;
+        return width == NumberWidth::COMPACT_LONG ? finishRead(encoding::readCompactLong(input))
+                                                  : finishRead(encoding::readCompactInt(input));
     }
 
     /** Read exact text while charging aggregate units.
@@ -108,13 +108,13 @@ class DescriptorParser {
     }
 
     /** Read/validate a count before charging its cumulative allowance.
-     * @param wide Property counts use compact-long.
+     * @param width Property counts use compact-long; message lists use compact-int.
      * @param used Previously charged entries.
      * @param maximum Finite aggregate bound.
      * @return Valid count, charged before any entries are allocated.
      */
-    std::size_t count(bool wide, std::size_t &used, std::size_t maximum) {
-        auto value = number(wide);
+    std::size_t count(NumberWidth width, std::size_t &used, std::size_t maximum) {
+        auto value = number(width);
 
         if (value < 0 || value > std::numeric_limits<std::int32_t>::max()) {
             reject(TapeError::MALFORMED);
@@ -163,7 +163,7 @@ class DescriptorParser {
         std::vector<std::u16string> keys;
         bool type = false;
         bool opt = false;
-        auto n = count(true, properties_, limits_.properties);
+        auto n = count(NumberWidth::COMPACT_LONG, properties_, limits_.properties);
 
         for (std::size_t i = 0; i < n; ++i) {
             auto key = text();
@@ -209,17 +209,17 @@ class DescriptorParser {
         }
 
         for (std::size_t direction = 0; direction < 2; ++direction) {
-            auto entries = count(false, messages_, limits_.messages);
+            auto entries = count(NumberWidth::COMPACT_INT, messages_, limits_.messages);
 
             for (std::size_t i = 0; i < entries; ++i) {
-                auto id = number(false);
+                auto id = number(NumberWidth::COMPACT_INT);
                 auto name = text();
 
                 if (id < 0 || !name || name->empty()) {
                     reject(TapeError::MALFORMED);
                 }
 
-                auto props = count(true, properties_, limits_.properties);
+                auto props = count(NumberWidth::COMPACT_LONG, properties_, limits_.properties);
 
                 const bool acceptedMessage = mode_ == TapeMode::LEGACY ? id == STREAM_DATA && *name == u"STREAM_DATA"
                                                                        : id == RAW_DATA && *name == u"RAW_DATA";

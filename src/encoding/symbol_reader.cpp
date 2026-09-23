@@ -4,6 +4,7 @@
 #include "qd/encoding/symbol_reader.hpp"
 
 #include "qd/encoding/compact.hpp"
+#include "qd/encoding/utf_char.hpp"
 #include "qd/encoding/utf_string.hpp"
 
 #include <algorithm>
@@ -27,11 +28,8 @@ constexpr unsigned CIPHER_BITS = 30;
 constexpr std::uint32_t CIPHER_BASE = 0x40000000, CIPHER_LOW_MASK = 0x3fffffff;
 /// Symbol string lengths use a stricter nonnegative int domain than UTFString.
 constexpr std::int64_t MAX_SYMBOL_LENGTH = 2147483647;
-/// UTF character masks; QD accepts overlong sequences and isolated surrogates.
-constexpr unsigned ASCII_END = 0x80, TWO_MASK = 0xe0, TWO_LEAD = 0xc0;
-constexpr unsigned THREE_MASK = 0xf0, THREE_LEAD = 0xe0, FOUR_MASK = 0xf8, FOUR_LEAD = 0xf0;
-constexpr unsigned CONT_MASK = 0xc0, CONT_LEAD = 0x80, CONT_BITS = 6, CONT_PAYLOAD = 0x3f;
-constexpr unsigned ASCII_MASK = 0x7f, BMP_MAX = 0xffff;
+/// FD characters must fit one UTF-16 unit, even when their encoding uses four bytes.
+constexpr unsigned BMP_MAX = 0xffff;
 /// Every fixed penta tail is big endian in eight-bit octets.
 constexpr unsigned OCTET_BITS = 8;
 
@@ -90,42 +88,18 @@ SymbolStatus symbolStatus(Status status) noexcept {
  * @return OK, truncation or invalid encoding, including decoded values above BMP.
  */
 SymbolStatus readCesuUnit(std::span<const std::byte> input, std::size_t &position, char16_t &point) noexcept {
-    if (position == input.size()) {
-        return SymbolStatus::TRUNCATED_INPUT;
+    const auto character = readUtfChar(input.subspan(position));
+    position += character.consumed;
+
+    if (character.status != Status::OK) {
+        return symbolStatus(character.status);
     }
 
-    const auto first = std::to_integer<unsigned>(input[position++]);
-    // Lead classes select one, two, three or four bytes; zero marks an invalid lead.
-    const unsigned count = first < ASCII_END                    ? 1
-                           : (first & TWO_MASK) == TWO_LEAD     ? 2
-                           : (first & THREE_MASK) == THREE_LEAD ? 3
-                           : (first & FOUR_MASK) == FOUR_LEAD   ? 4
-                                                                : 0;
-
-    if (count == 0) {
+    if (static_cast<std::uint32_t>(character.value) > BMP_MAX) {
         return SymbolStatus::INVALID_ENCODING;
     }
 
-    if (input.size() - position < count - 1) {
-        position = input.size();
-
-        return SymbolStatus::TRUNCATED_INPUT;
-    }
-
-    unsigned decoded = first & (count == 1 ? ASCII_MASK : ASCII_MASK >> count);
-    bool valid = true;
-
-    for (unsigned i = 1; i < count; ++i) {
-        const auto tail = std::to_integer<unsigned>(input[position++]);
-        valid = valid && (tail & CONT_MASK) == CONT_LEAD;
-        decoded = (decoded << CONT_BITS) | (tail & CONT_PAYLOAD);
-    }
-
-    if (!valid || decoded > BMP_MAX) {
-        return SymbolStatus::INVALID_ENCODING;
-    }
-
-    point = static_cast<char16_t>(decoded);
+    point = static_cast<char16_t>(character.value);
 
     return SymbolStatus::OK;
 }

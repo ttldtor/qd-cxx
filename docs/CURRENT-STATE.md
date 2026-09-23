@@ -1,10 +1,14 @@
 # Current state
 
-## Next: QDCXX-026 readability refactor
+## QDCXX-026 implemented; independent review pending
 
-QDCXX-026 is ready, High: audit repetition and implement bounded private C++/CLI/test reuse before Python migration.
-The plan distinguishes identical operations from different string, error and optional-field contracts.
-Only planning documents changed at assignment; implementation and runtime validation have not started.
+QDCXX-026, High, started from `758303a66d5ed181d7123a2c665d858aba2e8834`.
+U1–U6 add behavior checks before bounded private C++/CLI/test reuse. Public API, wire semantics,
+ordered budgets, diagnostics and independent expected values remain unchanged in the executed checks.
+The audit records extraction and retention decisions; the bilingual
+[author validation and exact commit scope](../tests/conformance/refactor/VALIDATION.md) record evidence
+and limitations. Independent acceptance is pending. No staging, commit, merge, Python migration
+or following-task implementation was performed.
 
 ## QDCXX-025 accepted and committed
 

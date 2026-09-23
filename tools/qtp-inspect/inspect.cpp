@@ -3,6 +3,7 @@
 
 #include "inspect.hpp"
 
+#include "../../src/encoding/compact_limits.hpp"
 #include "qd/protocol/frame_reader.hpp"
 #include "qd/protocol/stream_data.hpp"
 
@@ -19,7 +20,6 @@
 namespace org::ttldtor::qdcxx::inspect {
 namespace {
 constexpr core::SchemaLimits SCHEMA_LIMITS{1024, 65536, 65536, 1024, 1048576}; ///< Independent local schema bounds.
-constexpr std::size_t MAX_PREFIX_BYTES = 9;  ///< Maximum compact-long length-prefix width.
 constexpr std::int32_t DESCRIBE_RECORDS = 2; ///< Only initial description messages are supported.
 constexpr std::int32_t STREAM_DATA = 15;     ///< Only ordinary stream data is supported.
 
@@ -113,7 +113,7 @@ bool validLimits(const Limits &limits) noexcept {
     return limits.chunkSize != 0 &&
            limits.chunkSize <= static_cast<std::uintmax_t>(std::numeric_limits<std::streamsize>::max()) &&
            limits.frame <= static_cast<std::uintmax_t>(std::numeric_limits<std::int64_t>::max()) &&
-           limits.frame <= std::numeric_limits<std::size_t>::max() - MAX_PREFIX_BYTES;
+           limits.frame <= std::numeric_limits<std::size_t>::max() - encoding::detail::MAX_COMPACT_LONG_BYTES;
 }
 
 std::expected<core::LocalSchema, core::SchemaError> oracleSchema() {
@@ -160,7 +160,7 @@ int inspect(std::istream &input, std::ostream &output, std::ostream &diagnostic,
 
         std::optional<protocol::StreamDataContext> context;
         std::vector<protocol::WireRecordDescription> descriptions;
-        protocol::FrameReader reader({limits.frame, limits.frame + MAX_PREFIX_BYTES});
+        protocol::FrameReader reader({limits.frame, limits.frame + encoding::detail::MAX_COMPACT_LONG_BYTES});
         std::vector<char> chunk(limits.chunkSize);
         std::size_t frameCount = 0;
         std::size_t emitted = 0;

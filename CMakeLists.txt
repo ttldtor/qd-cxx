@@ -169,12 +169,22 @@ if(BUILD_TESTING)
         set_target_properties(qdcxx_tape_io_tests PROPERTIES CXX_EXTENSIONS OFF)
         add_test(NAME tape_inspection_io COMMAND qdcxx_tape_io_tests)
         add_test(NAME tape_inspection_cli COMMAND "${CMAKE_COMMAND}" "-DPROGRAM=$<TARGET_FILE:qdcxx_tape_inspect>" "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}" -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/tape_cli.cmake")
+        add_test(NAME tape_argument_contract COMMAND "${CMAKE_COMMAND}"
+            "-DPROGRAM=$<TARGET_FILE:qdcxx_tape_inspect>"
+            "-DRUN=${CMAKE_CURRENT_BINARY_DIR}/tape-argument-contract"
+            "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/protocol/tape/expected/constrained.qtp"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/refactor/cli_arguments.cmake")
     endif()
     add_executable(qdcxx_tape_tests tests/conformance/tape_reader_tests.cpp)
     target_link_libraries(qdcxx_tape_tests PRIVATE qdcxx_protocol doctest::doctest)
     set_target_properties(qdcxx_tape_tests PROPERTIES CXX_EXTENSIONS OFF)
     add_test(NAME protocol_binary_tape COMMAND qdcxx_tape_tests "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/protocol/tape-reader/expected")
     if(ORG_TTLDTOR_QDCXX_BUILD_QTP_INSPECT)
+        add_test(NAME qtp_argument_contract COMMAND "${CMAKE_COMMAND}"
+            "-DPROGRAM=$<TARGET_FILE:qdcxx_qtp_inspect>"
+            "-DRUN=${CMAKE_CURRENT_BINARY_DIR}/qtp-argument-contract"
+            "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/protocol/offline-inspection/expected/composed.qtp"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/refactor/cli_arguments.cmake")
         find_package(Python3 REQUIRED COMPONENTS Interpreter)
         add_test(NAME offline_inspection_cli COMMAND "${Python3_EXECUTABLE}"
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/check_offline_inspection.py"

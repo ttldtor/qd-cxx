@@ -1,6 +1,7 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #include "inspect.hpp"
+#include "../../src/encoding/compact_limits.hpp"
 #include "diagnostics.hpp"
 #include "qd/events/quote.hpp"
 
@@ -196,16 +197,16 @@ std::expected<core::LocalSchema, core::SchemaError> oracleFieldTypesSchema(core:
 }
 
 bool prepareLimits(Limits &limits) noexcept {
-    constexpr std::size_t MAX_PREFIX = 9; // Maximum compact-long envelope prefix.
-
     if (limits.chunkSize == 0 ||
         limits.chunkSize > static_cast<std::uint64_t>(std::numeric_limits<std::streamsize>::max()) ||
-        limits.tape.frame.maximumBodyBytes > std::numeric_limits<std::size_t>::max() - MAX_PREFIX ||
+        limits.tape.frame.maximumBodyBytes >
+            std::numeric_limits<std::size_t>::max() - encoding::detail::MAX_COMPACT_LONG_BYTES ||
         limits.tape.frame.maximumBodyBytes > static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max())) {
         return false;
     }
 
-    limits.tape.frame.maximumPendingBytes = limits.tape.frame.maximumBodyBytes + MAX_PREFIX;
+    limits.tape.frame.maximumPendingBytes =
+        limits.tape.frame.maximumBodyBytes + encoding::detail::MAX_COMPACT_LONG_BYTES;
     limits.tape.data.payloadBytes = limits.tape.frame.maximumBodyBytes;
     limits.tape.data.symbol.inputBytes = limits.tape.frame.maximumBodyBytes;
     limits.tape.data.symbol.stateUnits = limits.tape.data.symbol.codeUnits;

@@ -1,40 +1,20 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
+#include "../qtp-inspect/cli_number.hpp"
 #include "../qtp-inspect/inspect.hpp"
 #include "inspect.hpp"
 #include "qd/events/quote.hpp"
 
 #include <algorithm>
-#include <charconv>
 #include <csignal>
 #include <fstream>
 #include <iostream>
-#include <limits>
 #include <map>
 #include <set>
 #ifdef _WIN32
 #    include <fcntl.h>
 #    include <io.h>
 #endif
-namespace {
-/** Validate a digits-only finite operand.
- * @param text Borrowed CLI value.
- * @param value Receives count on success.
- * @return True for a representable complete unsigned decimal.
- */
-bool number(std::string_view text, std::size_t &value) {
-    if (text.empty() || !std::all_of(text.begin(), text.end(), [](char c) {
-            return c >= '0' && c <= '9';
-        })) {
-        return false;
-    }
-
-    auto parsed = std::from_chars(text.data(), text.data() + text.size(), value);
-
-    return parsed.ec == std::errc{} && parsed.ptr == text.data() + text.size();
-}
-} // namespace
-
 /** Run one explicit local file profile.
  * @param argc Number of process arguments.
  * @param argv Native named input/profile and finite options.
@@ -152,7 +132,7 @@ int main(int argc, char **argv) {
                 mode = operand == "raw-message-v1" ? protocol::TapeMode::RAW_MESSAGE_V1 : protocol::TapeMode::LEGACY;
             } else {
                 auto option = options.find(key);
-                valid = option != options.end() && number(operand, *option->second);
+                valid = option != options.end() && presentation::detail::parseUnsignedCount(operand, *option->second);
             }
         }
 

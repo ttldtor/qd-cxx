@@ -3,54 +3,14 @@
 
 #include "qd/events/event_mapping.hpp"
 
+#include "../core/schema_validation.hpp"
+
 #include <algorithm>
 #include <new>
 #include <stdexcept>
 #include <utility>
 
 namespace org::ttldtor::qdcxx::events {
-namespace {
-/** Charge logical work without overflowing a cumulative sum.
- * @param count Requested count.
- * @param remaining Remaining allowance, decreased only on success.
- * @return Whether the complete charge fits.
- */
-bool charge(std::size_t count, std::size_t &remaining) noexcept {
-    if (count > remaining) {
-        return false;
-    }
-
-    remaining -= count;
-
-    return true;
-}
-
-/** Validate one borrowed lookup name with the same UTF-16 policy as local schema names.
- * @param name Nonempty exact UTF-16 key to inspect.
- * @return Whether every surrogate forms a complete pair.
- */
-bool validKey(std::u16string_view name) noexcept {
-    constexpr char16_t HIGH_START = 0xd800;
-    constexpr char16_t LOW_START = 0xdc00;
-    constexpr char16_t SURROGATE_END = 0xdfff;
-
-    if (name.empty()) {
-        return false;
-    }
-
-    for (std::size_t i = 0; i < name.size(); ++i) {
-        if (name[i] >= HIGH_START && name[i] < LOW_START) {
-            if (++i == name.size() || name[i] < LOW_START || name[i] > SURROGATE_END) {
-                return false;
-            }
-        } else if (name[i] >= LOW_START && name[i] <= SURROGATE_END) {
-            return false;
-        }
-    }
-
-    return true;
-}
-} // namespace
 
 EventMapping::EventMapping(core::RecordContext context, std::vector<core::SerialFieldType> shape,
                            std::vector<std::optional<std::size_t>> selections) noexcept
@@ -82,20 +42,22 @@ std::expected<EventMapping, MappingError> EventMapping::prepare(const core::Loca
     }
 
     for (const auto &request : requests) {
-        if (!charge(request.keys.size(), limits.keys) || !charge(request.types.size(), limits.typeAlternatives)) {
+        if (!core::detail::chargeBudget(request.keys.size(), limits.keys) ||
+            !core::detail::chargeBudget(request.types.size(), limits.typeAlternatives)) {
             return std::unexpected(MappingError::RESOURCE_LIMIT);
         }
     }
 
     for (const auto &lookup : record.lookups) {
-        if (lookup.name.size() > limits.nameUnits || !charge(lookup.name.size(), limits.totalNameUnits)) {
+        if (lookup.name.size() > limits.nameUnits ||
+            !core::detail::chargeBudget(lookup.name.size(), limits.totalNameUnits)) {
             return std::unexpected(MappingError::RESOURCE_LIMIT);
         }
     }
 
     for (const auto &request : requests) {
         for (const auto key : request.keys) {
-            if (key.size() > limits.nameUnits || !charge(key.size(), limits.totalNameUnits)) {
+            if (key.size() > limits.nameUnits || !core::detail::chargeBudget(key.size(), limits.totalNameUnits)) {
                 return std::unexpected(MappingError::RESOURCE_LIMIT);
             }
         }
@@ -107,7 +69,7 @@ std::expected<EventMapping, MappingError> EventMapping::prepare(const core::Loca
         }
 
         for (const auto key : request.keys) {
-            if (!validKey(key)) {
+            if (!core::detail::validSchemaKey(key)) {
                 return std::unexpected(MappingError::INVALID_INPUT);
             }
         }
@@ -135,8 +97,8 @@ std::expected<EventMapping, MappingError> EventMapping::prepare(const core::Loca
 
             for (const auto key : request.keys) {
                 for (const auto &lookup : record.lookups) {
-                    if (!charge(std::max(key.size(), lookup.name.size()), limits.comparisonWork) ||
-                        !charge(1, limits.comparisonWork)) {
+                    if (!core::detail::chargeBudget(std::max(key.size(), lookup.name.size()), limits.comparisonWork) ||
+                        !core::detail::chargeBudget(1, limits.comparisonWork)) {
                         return std::unexpected(MappingError::RESOURCE_LIMIT);
                     }
 
@@ -158,7 +120,7 @@ std::expected<EventMapping, MappingError> EventMapping::prepare(const core::Loca
                 bool compatible = false;
 
                 for (const auto type : request.types) {
-                    if (!charge(1, limits.comparisonWork)) {
+                    if (!core::detail::chargeBudget(1, limits.comparisonWork)) {
                         return std::unexpected(MappingError::RESOURCE_LIMIT);
                     }
 

@@ -3,11 +3,11 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "../../tools/tape-inspect/diagnostics.hpp"
 #include "../../tools/tape-inspect/inspect.hpp"
+#include "fault_buffer.hpp"
 #include "qd/events/quote.hpp"
 #include <algorithm>
 #include <doctest/doctest.h>
 #include <sstream>
-#include <streambuf>
 
 namespace {
 namespace ti = org::ttldtor::qdcxx::tape_inspect;
@@ -19,42 +19,8 @@ namespace events = org::ttldtor::qdcxx::events;
 /** Finite explicit schema limits for isolated presentation checks. */
 constexpr core::SchemaLimits SCHEMA_LIMITS{1, 8, 32, 64, 2048};
 
-/** IO fault at a selected operation; no filesystem dependency. */
-class FaultBuffer : public std::streambuf {
-    int operation_; ///< Zero read, one write, two flush.
-    public:
-    /** Select the failing operation.
-     * @param operation Zero read, one write, two flush.
-     */
-    explicit FaultBuffer(int operation) : operation_(operation) {
-    }
-
-    protected:
-    /** Inject read failure.
-     * @return Never returns normally.
-     */
-    int_type underflow() override {
-        throw std::ios_base::failure("injected read");
-    }
-
-    /** Inject write failure or accept bytes.
-     * @param data Borrowed output bytes.
-     * @param count Requested count.
-     * @return Zero for write failure, otherwise count.
-     */
-    std::streamsize xsputn(const char *data, std::streamsize count) override {
-        static_cast<void>(data);
-
-        return operation_ == 1 ? 0 : count;
-    }
-
-    /** Inject flush failure.
-     * @return Minus one for flush failure, otherwise zero.
-     */
-    int sync() override {
-        return operation_ == 2 ? -1 : 0;
-    }
-};
+using org::ttldtor::qdcxx::test_support::FaultBuffer;
+using org::ttldtor::qdcxx::test_support::FaultOperation;
 
 /** Build an accepted minimal tape header without version/send entries.
  * @return Exact binary bytes from the descriptor grammar.
@@ -122,15 +88,16 @@ TEST_CASE("Quote IO failures preserve nonzero exits and selected diagnostic gram
     const auto schema = events::defaultQuoteSchema(SCHEMA_LIMITS);
     REQUIRE(schema);
 
-    for (int mode = 0; mode < 3; ++mode) {
-        FaultBuffer bad(mode);
+    for (auto operation : {FaultOperation::READ, FaultOperation::WRITE, FaultOperation::FLUSH}) {
+        FaultBuffer bad(operation);
         std::istream failedInput(&bad);
         std::ostream failedOutput(&bad);
         std::istringstream goodInput(header());
         std::ostringstream goodOutput, diagnostic;
         const auto code =
-            ti::inspect(mode == 0 ? failedInput : goodInput, mode == 0 ? goodOutput : failedOutput, diagnostic, *schema,
-                        {}, presentation::OutputFormat::TSV, presentation::DisplayProfile::DEFAULT_QUOTE_V1, 2);
+            ti::inspect(operation == FaultOperation::READ ? failedInput : goodInput,
+                        operation == FaultOperation::READ ? goodOutput : failedOutput, diagnostic, *schema, {},
+                        presentation::OutputFormat::TSV, presentation::DisplayProfile::DEFAULT_QUOTE_V1, 2);
         CHECK(code == 3);
         CHECK(diagnostic.str().starts_with("incomplete-v2\t3\t"));
         CHECK(diagnostic.str().ends_with("\tNONE\n"));
