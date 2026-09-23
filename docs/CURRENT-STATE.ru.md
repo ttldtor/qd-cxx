@@ -1,11 +1,17 @@
 # Текущее состояние
 
-## Следующее назначение: QDCXX-025
+## QDCXX-025 реализована — независимое ревью ожидается
 
-Настраиваемые схемы и отображение событий назначены к реализации, но ещё не реализованы.
-[ADR-0003](decisions/ADR-0003-configurable-schemas-and-event-mappings.ru.md) закрепляет настраиваемость как общее требование, включая существующий Quote и новый Profile.
-Встроенные схемы остаются defaults; загрузка источников и [общая подсистема настроек](CONFIGURATION.ru.md) — отдельная работа.
-Это обновление плана не заявляет нового поведения C++, Java capture или runtime-проверки.
+Настраиваемые схемы и отображение событий, High, начаты от
+`e5a3764992ba3a90a07d3d092a4383e37a901de2`. Новые закреплённые Java production/configuration/XML
+доказательства предшествовали C++. Общая ограниченная подготовка и непрозрачные schema/record contexts
+поддерживают настраиваемый Quote и владеющий Profile с точным поведением optional/default/string/flags/time.
+Явный CLI preset `default-profile-v1` выводит версию 5 в обоих существующих режимах; старые профили
+и прежний Quote сохраняют совместимость. Generic extra fields и custom records остаются доступными.
+[Покрытие](../tests/conformance/protocol/profile/COVERAGE.ru.md) и
+[авторская проверка](../tests/conformance/protocol/profile/VALIDATION.ru.md) отделяют выполненные проверки
+от независимого ревью. Встроенные схемы остаются defaults; общие loaders, остальные настройки,
+новые identities, indexed events и transport остаются отдельными задачами. Частный tape, staging и коммит не использованы.
 
 [English version](CURRENT-STATE.md). Английская версия является нормативной.
 

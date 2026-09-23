@@ -1,0 +1,10 @@
+I 260923 142800.073 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-final-b\events\tiny-unsupported\Quote-stream.qtp
+I 260923 142800.108 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-final-b\events\tiny-unsupported\Quote-stream.qtp
+I 260923 142800.120 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-final-b\events\tiny-unsupported\Quote-raw.qtp
+I 260923 142800.122 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-final-b\events\tiny-unsupported\Quote-raw.qtp
+I 260923 142800.129 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-final-b\events\tiny-unsupported\Profile-stream.qtp
+I 260923 142800.131 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-final-b\events\tiny-unsupported\Profile-stream.qtp
+I 260923 142800.134 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-final-b\events\tiny-unsupported\Profile-raw.qtp
+I 260923 142800.136 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-final-b\events\tiny-unsupported\Profile-raw.qtp
+I 260923 142800.143 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-final-b\events\tiny-unsupported\Profile-wire-omitted.qtp
+I 260923 142800.146 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-final-b\events\tiny-unsupported\Quote-wire-omitted.qtp

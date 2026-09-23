@@ -1,5 +1,36 @@
 # Bounded C++23 components
 
+[Русская версия](CPP-BUILD.ru.md). English is authoritative.
+
+## Prepared Quote and Profile mappings
+
+Include `qd/events/quote.hpp` or `qd/events/profile.hpp` and link `qdcxx_quote` or `qdcxx_profile`.
+Both depend on `qdcxx_event_mapping`, which depends only on `qdcxx_core`; source acquisition,
+protocol and transport are outside these event libraries. No production dependency was added.
+`defaultProfileSchema(limits)` is a convenience for all sixteen default fields, while
+`PreparedQuote::prepare(schema, localId, mappingLimits)` and `PreparedProfile::prepare(...)`
+accept compatible caller-provided schemas, including reordered, extra and optional fields.
+The legacy `defaultQuoteSchema` and `mapQuote` contract stays unchanged.
+
+Prepare once against the same `LocalSchema` used by the decoder. Supply
+`{record.context, record.typedValues}` as `RecordValueView` to `map`, plus the symbol and explicit
+ownership bounds. Profile takes `EventValueLimits{symbolUnits, stringUnits, totalUnits}`;
+Quote takes `symbolUnits`. Both accept a separate optional `eventTime` argument in milliseconds.
+For RAW data pass `result.timing->eventTimeMs()`; the default is zero. Each returned event owns its
+symbol and strings. Callers retaining multiple events must bound their cumulative ownership/work.
+
+`LocalSchema::recordContext(id)` and the decoded record's context identify the immutable schema
+and record. Copies and `boundedCopy(limits)` retain identity; a fresh `create`, even with identical
+declarations, creates an independent identity. Preparation/decoder input destruction is safe.
+An untagged span or matching counts/types cannot authenticate a mapping. See the
+[shared API](../spec/events/EVENT-MAPPING.md), [Quote](../spec/events/QUOTE.md),
+[Profile](../spec/events/PROFILE.md) and [configuration evidence](../spec/schema/CONFIGURED-EVENTS.md).
+
+The explicit tape preset `--profile default-profile-v1` emits version 5 in both existing modes;
+[Profile inspection](PROFILE-INSPECT.md) defines CLI limits and output. Configured library schemas
+do not imply a C++ XML/properties loader or full dxlink support. Earlier sections below describe
+their historical component scope.
+
 ## Exact extended field values and bounded char arrays
 
 `LocalProfile::EXTENDED_FIELDS_V1` accepts exactly full IDs 2/8/10/40/56/72/88/120. Old local profiles

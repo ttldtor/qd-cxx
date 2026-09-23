@@ -1,5 +1,36 @@
 # Ограниченные компоненты C++23
 
+[English version](CPP-BUILD.md). Английская версия является нормативной.
+
+## Подготовленные отображения Quote и Profile
+
+Подключайте `qd/events/quote.hpp` или `qd/events/profile.hpp` и связывайте `qdcxx_quote` или `qdcxx_profile`.
+Обе библиотеки зависят от `qdcxx_event_mapping`, который зависит только от `qdcxx_core`; получение
+источников, протокол и транспорт находятся вне библиотек событий. Production-зависимости не добавлены.
+`defaultProfileSchema(limits)` предоставляет все шестнадцать стандартных полей, а
+`PreparedQuote::prepare(schema, localId, mappingLimits)` и `PreparedProfile::prepare(...)`
+принимают совместимые схемы вызывающей стороны, включая перестановки, дополнительные и необязательные поля.
+Прежние `defaultQuoteSchema` и контракт `mapQuote` сохранены.
+
+Подготавливайте отображение один раз по тому же `LocalSchema`, который использует декодер. Передавайте
+`{record.context, record.typedValues}` как `RecordValueView` в `map`, вместе с символом и явными
+бюджетами владения. Profile принимает `EventValueLimits{symbolUnits, stringUnits, totalUnits}`;
+Quote — `symbolUnits`. Оба метода принимают отдельный необязательный `eventTime` в миллисекундах.
+Для RAW передавайте `result.timing->eventTimeMs()`; значение по умолчанию — ноль. Возвращаемое событие
+владеет символом и строками. Вызывающая сторона, сохраняющая несколько событий, ограничивает суммарное владение/работу.
+
+`LocalSchema::recordContext(id)` и контекст декодированной записи идентифицируют неизменяемые схему
+и запись. Копии и `boundedCopy(limits)` сохраняют идентичность; новый `create`, даже с одинаковыми
+объявлениями, создаёт независимую идентичность. Уничтожение входов подготовки/декодера безопасно.
+Span без контекста или совпадение количества/типов не подтверждают совместимость. См.
+[общий API](../spec/events/EVENT-MAPPING.ru.md), [Quote](../spec/events/QUOTE.ru.md),
+[Profile](../spec/events/PROFILE.ru.md) и [доказательства конфигурации](../spec/schema/CONFIGURED-EVENTS.ru.md).
+
+Явный preset tape `--profile default-profile-v1` выводит версию 5 в обоих существующих режимах;
+[просмотр Profile](PROFILE-INSPECT.ru.md) определяет бюджеты CLI и вывод. Настраиваемые библиотечные схемы
+не означают наличия C++ XML/properties loader или полной поддержки dxlink. Разделы ниже описывают
+исторические границы своих компонентов.
+
 ## Точные расширенные значения полей и ограниченные char arrays
 
 `LocalProfile::EXTENDED_FIELDS_V1` принимает только полные ID 2/8/10/40/56/72/88/120. Старые локальные

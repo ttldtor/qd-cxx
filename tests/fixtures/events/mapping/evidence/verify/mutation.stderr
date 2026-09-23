@@ -1,0 +1,17 @@
+I 260923 144007.931 [main] DXEndpointImpl - DXEndpoint is loading properties from C:\qd-cxx\tests\fixtures\events\mapping\inputs\conflict.properties
+I 260923 144007.941 [main] QDFactory - Using QDS-UNKNOWN, (C) Devexperts
+I 260923 144007.960 [main] QDFactory - Using scheme com.dxfeed.api.impl.DXFeedScheme JFhzUYbcPr_gDabkoYd4_S0tWsvvKpzBmiN2aRCDnkY
+I 260923 144013.003 [main] QDEndpoint - qd with collectors [Ticker, Stream, History]
+I 260923 144013.186 [main] DXEndpointImpl - qd DXEndpoint with dxfeed.properties=C:\qd-cxx\tests\fixtures\events\mapping\inputs\conflict.properties
+I 260923 144013.186 [main] DXEndpointImpl - qd DXEndpoint with dxscheme.enabled.Sequence=Quote
+I 260923 144013.186 [main] DXEndpointImpl - qd DXEndpoint with dxscheme.nanoTime=true
+I 260923 144013.488 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-accepted-verify\events\mutation\Quote-stream.qtp
+I 260923 144013.513 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-accepted-verify\events\mutation\Quote-stream.qtp
+I 260923 144013.526 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-accepted-verify\events\mutation\Quote-raw.qtp
+I 260923 144013.528 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-accepted-verify\events\mutation\Quote-raw.qtp
+I 260923 144013.534 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-accepted-verify\events\mutation\Profile-stream.qtp
+I 260923 144013.543 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-accepted-verify\events\mutation\Profile-stream.qtp
+I 260923 144013.546 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-accepted-verify\events\mutation\Profile-raw.qtp
+I 260923 144013.549 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-accepted-verify\events\mutation\Profile-raw.qtp
+I 260923 144013.554 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-accepted-verify\events\mutation\Profile-wire-omitted.qtp
+I 260923 144013.556 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-accepted-verify\events\mutation\Quote-wire-omitted.qtp

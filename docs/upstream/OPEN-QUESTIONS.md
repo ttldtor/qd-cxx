@@ -4,6 +4,19 @@
 
 Record questions about Java QD behavior that cannot yet be answered confidently. Link each question to the task investigating it and close it with source or fixture evidence.
 
+## QDCXX-025 event and configuration subset
+
+QDCXX-025 resolves the selected default/configured Quote and Profile event questions through
+[new production observations](../../tests/fixtures/events/mapping/COVERAGE.md) and the
+[configuration ledger subset](../../spec/schema/CONFIGURED-EVENTS.md): required/optional selections,
+wire omission versus local absence, exact integer/wide numeric alternatives, flags, UTF-16 strings,
+packed Quote Sequence/TimeNanoPart and independent eventTime. Full24/full137 are retained as explicit
+unsupported witnesses; the positive cases need no new identity or container semantics.
+The [event contracts](../../spec/events/EVENT-MAPPING.md) define the bounded C++ application.
+General settings/loader parity, full dxlink, regional/indexed events, SHORT_STRING business views,
+additional identities, nonzero QTP flags and transport remain separate questions. The historical
+QDCXX-024 statements below retain their original scope; Profile mapping is superseded only here.
+
 ## QDCXX-024 bounded field resolution
 
 [Production Java evidence](../../tests/fixtures/encoding/field-types/COVERAGE.md) and

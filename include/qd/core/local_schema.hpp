@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <memory>
 #include <span>
 #include <string>
 #include <vector>
@@ -51,10 +52,38 @@ struct SchemaLimits {
     std::size_t totalNameUnits; ///< Maximum aggregate record/key units, counting repeats across scopes.
 };
 
+/** Owned opaque provenance for one immutable local record; default contexts never match. */
+class RecordContext {
+    struct Identity;
+    std::shared_ptr<const Identity> identity_;
+    std::int32_t localId_ = -1;
+
+    friend class LocalSchema;
+    /** Retain one validated schema identity and record selection.
+     * @param identity Fixed-size owned identity, independent of schema declarations.
+     * @param localId Validated local record ID.
+     */
+    RecordContext(std::shared_ptr<const Identity> identity, std::int32_t localId) noexcept;
+
+    public:
+    /** Construct an invalid context for untagged caller values. */
+    RecordContext() noexcept = default;
+    /** Inspect whether a source schema supplied this context.
+     * @return True only for a valid owned schema/record selection.
+     */
+    [[nodiscard]] bool valid() const noexcept;
+    /** Compare provenance without inspecting schema names or values.
+     * @param other Context to compare; invalid contexts never match.
+     * @return True only for the same live identity and local record ID.
+     */
+    [[nodiscard]] bool matches(const RecordContext &other) const noexcept;
+};
+
 /** Validated owned immutable subset; no protocol or loading dependency. */
 class LocalSchema {
     std::vector<LocalRecord> records_;
     LocalProfile profile_;
+    std::shared_ptr<const RecordContext::Identity> identity_;
 
     /** Copy a fully validated input.
      * @param records Borrowed validated records, copied into this object.
@@ -72,6 +101,18 @@ class LocalSchema {
     [[nodiscard]] static std::expected<LocalSchema, SchemaError>
     create(std::span<const LocalRecord> records, SchemaLimits limits,
            LocalProfile profile = LocalProfile::COMPACT_INT_V1);
+
+    /** Copy within explicit storage limits while preserving immutable provenance.
+     * @param limits Required logical counts and name limits for the complete copy.
+     * @return Independent owned declarations with the same identity, or resource/allocation error.
+     */
+    [[nodiscard]] std::expected<LocalSchema, SchemaError> boundedCopy(SchemaLimits limits) const;
+
+    /** Obtain owned provenance for manually supplied or decoded local values.
+     * @param localId Explicit record position in this schema.
+     * @return Owned context, or invalid context for an out-of-range ID or moved-from schema.
+     */
+    [[nodiscard]] RecordContext recordContext(std::int32_t localId) const noexcept;
 
     /** Inspect the immutable exact-type policy.
      * @return The profile selected during validation.

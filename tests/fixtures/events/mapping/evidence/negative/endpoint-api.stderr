@@ -1,0 +1,17 @@
+I 260923 143809.190 [main] DXEndpointImpl - DXEndpoint is loading properties from C:\qd-cxx\tests\fixtures\events\mapping\inputs\conflict.properties
+I 260923 143809.198 [main] QDFactory - Using QDS-UNKNOWN, (C) Devexperts
+I 260923 143809.337 [main] QDFactory - Using scheme com.dxfeed.api.impl.DXFeedScheme Rlqs_ynrnkrCC2LHriVP1T_Hz0O7hXGymC5jgfxUh5Q
+I 260923 143814.362 [main] QDEndpoint - qd with collectors [Ticker, Stream, History]
+I 260923 143814.517 [main] DXEndpointImpl - qd DXEndpoint with dxfeed.properties=C:\qd-cxx\tests\fixtures\events\mapping\inputs\conflict.properties
+I 260923 143814.517 [main] DXEndpointImpl - qd DXEndpoint with dxscheme.enabled.Sequence=Profile
+I 260923 143814.517 [main] DXEndpointImpl - qd DXEndpoint with dxscheme.nanoTime=true
+I 260923 143814.780 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-rejected-verify\events\endpoint-api\Quote-stream.qtp
+I 260923 143814.806 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-rejected-verify\events\endpoint-api\Quote-stream.qtp
+I 260923 143814.819 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-rejected-verify\events\endpoint-api\Quote-raw.qtp
+I 260923 143814.822 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-rejected-verify\events\endpoint-api\Quote-raw.qtp
+I 260923 143814.828 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-rejected-verify\events\endpoint-api\Profile-stream.qtp
+I 260923 143814.831 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-rejected-verify\events\endpoint-api\Profile-stream.qtp
+I 260923 143814.835 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-rejected-verify\events\endpoint-api\Profile-raw.qtp
+I 260923 143814.837 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-rejected-verify\events\endpoint-api\Profile-raw.qtp
+I 260923 143814.841 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-rejected-verify\events\endpoint-api\Profile-wire-omitted.qtp
+I 260923 143814.844 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-rejected-verify\events\endpoint-api\Quote-wire-omitted.qtp

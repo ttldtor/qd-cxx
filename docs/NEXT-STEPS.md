@@ -2,11 +2,11 @@
 
 ## Current priority: configurable schemas and settings
 
-1. QDCXX-025: apply the accepted [ADR-0003](decisions/ADR-0003-configurable-schemas-and-event-mappings.md) to schema-bound Quote/Profile, with properties/external-XML Java evidence and existing tape integration. Built-in defaults are retained, not promoted to the only possible schemas.
+1. Independently review implemented QDCXX-025: schema-bound Quote/Profile under accepted [ADR-0003](decisions/ADR-0003-configurable-schemas-and-event-mappings.md), properties/external-XML Java evidence and existing tape integration. [Author validation](../tests/conformance/protocol/profile/VALIDATION.md) is separate from acceptance. Built-in defaults remain conveniences for configurable libraries.
 2. Inventory project-wide settings and specify typed configuration resolution before general loading or operational-tool configuration. Use the owner-supplied wiki, pinned source consumers and release history per [CONFIGURATION](CONFIGURATION.md); include initialization/file/API sources, aliases, precedence, read timing, units and sensitive values. QDCXX-025's schema subset feeds this ledger. Assign this follow-up separately; no blanket implementation of every Java property is authorized.
 3. Implement external schema/configuration sources against those contracts, then continue event coverage and the operational feed/replay/multiplexer tools. Arbitrary live reconfiguration and unsupported representations need explicit compatibility tasks.
 
-QDCXX-025 is implementation work, not a request to rewrite only architecture documents. Earlier sequencing below is historical where this section supersedes it; historical verification remains unchanged.
+QDCXX-025's implementation handoff does not authorize staging, commit or the next task. Earlier sequencing below is historical where this section supersedes it; historical verification remains unchanged.
 
 [Русская версия](NEXT-STEPS.ru.md). English is authoritative.
 

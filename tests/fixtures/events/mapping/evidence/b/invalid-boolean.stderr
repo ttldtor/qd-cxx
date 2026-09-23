@@ -1,0 +1,17 @@
+E 260923 142800.383 [main] SchemeProperties - Failed to acquire correct value for "dxscheme.nanoTime" boolean system property
+java.lang.IllegalArgumentException: not-a-boolean is not a valid boolean value
+	at com.devexperts.util.SystemProperties.parseBooleanValue(SystemProperties.java:315)
+	at com.dxfeed.api.impl.SchemeProperties.getBooleanProperty(SchemeProperties.java:246)
+	at com.dxfeed.api.impl.SchemeProperties.<init>(SchemeProperties.java:88)
+	at com.dxfeed.api.impl.DXFeedScheme.<clinit>(DXFeedScheme.java:30)
+	at com.dxfeed.event.market.EventMappingOracle.main(EventMappingOracle.java:464)
+I 260923 142800.669 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-final-b\events\invalid-boolean\Quote-stream.qtp
+I 260923 142800.696 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-final-b\events\invalid-boolean\Quote-stream.qtp
+I 260923 142800.707 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-final-b\events\invalid-boolean\Quote-raw.qtp
+I 260923 142800.710 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-final-b\events\invalid-boolean\Quote-raw.qtp
+I 260923 142800.717 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-final-b\events\invalid-boolean\Profile-stream.qtp
+I 260923 142800.719 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-final-b\events\invalid-boolean\Profile-stream.qtp
+I 260923 142800.722 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-final-b\events\invalid-boolean\Profile-raw.qtp
+I 260923 142800.724 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-final-b\events\invalid-boolean\Profile-raw.qtp
+I 260923 142800.727 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-final-b\events\invalid-boolean\Profile-wire-omitted.qtp
+I 260923 142800.729 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-final-b\events\invalid-boolean\Quote-wire-omitted.qtp

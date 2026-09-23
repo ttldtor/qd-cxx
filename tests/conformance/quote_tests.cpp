@@ -596,6 +596,135 @@ TEST_CASE("typed late descriptions cumulative output budgets and per-message sym
     CHECK(p::decodeStreamData(payload(0, {}), ctx, limits().data).status == p::StreamDataStatus::OK);
 }
 
+TEST_CASE("prepared Quote selects reordered explicit aliases and independent optional time fields") {
+    c::LocalRecord record{0,
+                          u"Configured",
+                          false,
+                          {{8}, {120}, {56}, {72}, {8}, {120}, {120}, {40}},
+                          {{u"AskSize", 0},
+                           {u"BidPrice", 1},
+                           {u"BidTime", 2},
+                           {u"Sequence", 3},
+                           {u"TimeNanoPart", 4},
+                           {u"AskPrice", 5},
+                           {u"BidSize", 6},
+                           {u"Extra", 7}}};
+    auto local =
+        c::LocalSchema::create(std::span(&record, 1), {1, 8, 8, 64, 1024}, c::LocalProfile::EXTENDED_FIELDS_V1);
+    REQUIRE(local);
+    auto prepared = q::PreparedQuote::prepare(*local, 0, {16, 32, 16, 32, 32, 64, 2048, 100000});
+    REQUIRE(prepared);
+    std::vector<c::FieldValue> fields{{c::SerialFieldType::COMPACT_INT, 0},
+                                      {c::SerialFieldType::WIDE_DECIMAL, 32002},
+                                      {c::SerialFieldType::TIME_SECONDS, -3},
+                                      {c::SerialFieldType::SEQUENCE, -1},
+                                      {c::SerialFieldType::COMPACT_INT, -2147483648LL},
+                                      {c::SerialFieldType::WIDE_DECIMAL, 256},
+                                      {c::SerialFieldType::WIDE_DECIMAL, -256},
+                                      {c::SerialFieldType::SHORT_STRING, 42}};
+    auto result = prepared->map(u"IBM", {local->recordContext(0), fields}, 3, 123);
+    REQUIRE(result);
+    CHECK(result->bidTimeMs == -3000);
+    CHECK(result->askTimeMs == 0);
+    CHECK(result->timeMs == 1023);
+    CHECK(result->sequence == 4194303);
+    CHECK(result->timeNanoPart == -2147483648LL);
+    CHECK(result->eventTime == 123);
+    CHECK(result->bidExchangeCode == 0);
+    CHECK(result->askSize.toDouble() == 0.0);
+    CHECK(result->bidPrice.raw == 32002);
+    CHECK(result->bidSize.kind() == c::DecimalKind::NEGATIVE_INFINITY);
+    CHECK(result->askPrice.kind() == c::DecimalKind::POSITIVE_INFINITY);
+    CHECK(fields[7].raw == 42);
+    fields[7].units = u"bad";
+    CHECK(prepared->map(u"IBM", {local->recordContext(0), fields}, 0).error() == q::MappingError::INVALID_VALUES);
+    fields[7].units.reset();
+    CHECK(prepared->map(u"IBM", {local->recordContext(0), fields}, 2).error() == q::MappingError::RESOURCE_LIMIT);
+}
+
+TEST_CASE("prepared Quote missing local required fields wrong types contexts and ambiguous keys reject") {
+    auto local = schema();
+    auto prepared = q::PreparedQuote::prepare(local, 0, {16, 32, 16, 32, 32, 64, 2048, 100000});
+    REQUIRE(prepared);
+    std::vector<c::FieldValue> fields;
+
+    for (const auto type : q::QUOTE_FIELD_TYPES) {
+        fields.push_back({type, 0});
+    }
+
+    auto other = schema();
+    CHECK(prepared->map(u"", {other.recordContext(0), fields}, 0).error() == q::MappingError::WRONG_CONTEXT);
+    REQUIRE(prepared->map(u"", {local.recordContext(0), fields}, 0));
+    auto record = local.records()[0];
+    record.lookups.erase(std::remove_if(record.lookups.begin(), record.lookups.end(),
+                                        [](const auto &lookup) {
+                                            return lookup.fieldId == 2;
+                                        }),
+                         record.lookups.end());
+    record.lookups.push_back({u"Other", 2});
+    auto missing =
+        c::LocalSchema::create(std::span(&record, 1), limits().context.schema, c::LocalProfile::QUOTE_FIELDS_V1);
+    REQUIRE(missing);
+    CHECK(q::PreparedQuote::prepare(*missing, 0, {16, 32, 16, 32, 32, 64, 2048, 100000}).error() ==
+          q::MappingError::MISSING_REQUIRED);
+    record = local.records()[0];
+    record.lookups.push_back({u"Sequence", 2});
+    auto wrongType =
+        c::LocalSchema::create(std::span(&record, 1), limits().context.schema, c::LocalProfile::QUOTE_FIELDS_V1);
+    REQUIRE(wrongType);
+    CHECK(q::PreparedQuote::prepare(*wrongType, 0, {16, 32, 16, 32, 32, 64, 2048, 100000}).error() ==
+          q::MappingError::INCOMPATIBLE_TYPE);
+    record = local.records()[0];
+
+    for (auto &lookup : record.lookups) {
+        if (lookup.name == u"BidPrice") {
+            lookup.fieldId = 6;
+        }
+    }
+
+    auto ambiguous =
+        c::LocalSchema::create(std::span(&record, 1), limits().context.schema, c::LocalProfile::QUOTE_FIELDS_V1);
+    REQUIRE(ambiguous);
+    CHECK(q::PreparedQuote::prepare(*ambiguous, 0, {16, 32, 16, 32, 32, 64, 2048, 100000}).error() ==
+          q::MappingError::AMBIGUOUS_FIELD);
+}
+
+TEST_CASE("prepared Quote measured packed sequence boundaries preserve signed nano values") {
+    auto record = schema().records()[0];
+    record.fields.push_back({72});
+    record.fields.push_back({8});
+    record.lookups.push_back({u"Sequence", 8});
+    record.lookups.push_back({u"TimeNanoPart", 9});
+    auto local =
+        c::LocalSchema::create(std::span(&record, 1), limits().context.schema, c::LocalProfile::EXTENDED_FIELDS_V1);
+    REQUIRE(local);
+    auto prepared = q::PreparedQuote::prepare(*local, 0, {16, 32, 16, 32, 32, 64, 2048, 100000});
+    REQUIRE(prepared);
+    std::vector<c::FieldValue> fields;
+
+    for (const auto &field : record.fields) {
+        fields.push_back({static_cast<c::SerialFieldType>(field.serialTypeId), 0});
+    }
+
+    fields[0].raw = -3;
+    fields[4].raw = -2;
+    const std::array<std::int32_t, 7> raw{-2147483647 - 1, -1, 0, 1, 4194303, 4194304, 2147483647};
+    const std::array<std::int32_t, 7> sequence{0, 4194303, 0, 1, 4194303, 0, 4194303};
+    const std::array<std::int64_t, 7> time{-1488, -977, -2000, -2000, -2000, -1999, -1489};
+
+    for (std::size_t i = 0; i < raw.size(); ++i) {
+        CAPTURE(i);
+        fields[8].raw = raw[i];
+        fields[9].raw = raw[i];
+        auto result = prepared->map(u"", {local->recordContext(0), fields}, 0);
+        REQUIRE(result);
+        CHECK(result->timeMs == time[i]);
+        CHECK(result->sequence == sequence[i]);
+        CHECK(result->timeNanoPart == raw[i]);
+        CHECK(result->eventTime == 0);
+    }
+}
+
 /** Run conformance against a caller-selected immutable fixture directory.
  * @param argc Argument count including executable.
  * @param argv Executable and fixture directory.

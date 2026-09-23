@@ -1,0 +1,2 @@
+W 260923 143826.199 [main] RecordMappingFactoryHolder - Invalid record Quote: Required int field Bid.Price is missing in record Quote
+W 260923 143826.208 [main] RecordMappingFactoryHolder - Invalid record Profile: Required field Description is missing in record Profile

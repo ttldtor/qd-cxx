@@ -1,0 +1,10 @@
+qdcxx-tape-inspect human 5 profile=default-profile-v1 tape-mode=legacy identities=local
+Frame 0: DESCRIBE_PROTOCOL (1) bytes=[0,58) payload=2 size=56
+Descriptor: type=tape opt=EMPTY_SET version="QDS-UNKNOWN" time=absent send=15 receive=-
+Frame 1: DESCRIBE_RECORDS (2) bytes=[58,71) payload=60 size=11
+Frame 2: STREAM_DATA (15) bytes=[71,77) payload=73 size=4
+Profile 0: frame=2 local=0 name="Profile" symbol="IBM" fields={Beta=(type:120 raw:0), Eps=(type:120 raw:0), DivFreq=(type:120 raw:0), ExdDiv.Amount=(type:120 raw:0), ExdDiv.Date=(type:88 raw:0), 52High.Price=(type:120 raw:0), 52Low.Price=(type:120 raw:0), Shares=(type:120 raw:0), FreeFloat=(type:120 raw:0), HighLimitPrice=(type:120 raw:0), LowLimitPrice=(type:120 raw:0), Halt.StartTime=(type:56 raw:0), Halt.EndTime=(type:56 raw:0), Flags=(type:8 raw:0), Description=(type:10 raw:0 units:null), StatusReason=(type:10 raw:0 units:null)}
+ProfileValues 0: beta=NaN earningsPerShare=NaN dividendFrequency=NaN exDividendAmount=NaN exDividendDayId=0 high52WeekPrice=NaN low52WeekPrice=NaN shares=NaN freeFloat=NaN highLimitPrice=NaN lowLimitPrice=NaN haltStartTimeMs=0 haltEndTimeMs=0 flags=0 description=null statusReason=null tradingStatus=0 shortSaleRestriction=0 eventTime=0
+Frame 3: EMPTY_HEARTBEAT (-) bytes=[77,78) payload=- size=0
+Markers: count=1 authenticated-footer=no
+Complete: bytes=78 frames=4 records=1 charged-records=1 wire-fields=0

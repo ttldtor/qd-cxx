@@ -516,6 +516,144 @@ std::string Formatter::record(const protocol::StreamDataRecord &record, std::u16
     });
 }
 
+std::string Formatter::profileRecord(const protocol::StreamDataRecord &record, std::u16string_view name,
+                                     std::size_t frameIndex, std::size_t index, const events::Profile &event,
+                                     std::size_t budget) const {
+    if (!record.values.empty() || record.typedValues.size() != events::PROFILE_FIELD_TYPES.size()) {
+        throw std::invalid_argument("default Profile field shape");
+    }
+
+    for (std::size_t i = 0; i < record.typedValues.size(); ++i) {
+        if (record.typedValues[i].type != events::PROFILE_FIELD_TYPES[i] ||
+            !core::validFieldValue(record.typedValues[i])) {
+            throw std::invalid_argument("default Profile canonical field");
+        }
+    }
+
+    const std::array decimals{event.beta,
+                              event.earningsPerShare,
+                              event.dividendFrequency,
+                              event.exDividendAmount,
+                              event.high52WeekPrice,
+                              event.low52WeekPrice,
+                              event.shares,
+                              event.freeFloat,
+                              event.highLimitPrice,
+                              event.lowLimitPrice};
+    constexpr std::array<std::string_view, 10> LABELS{
+        "beta",           "earningsPerShare", "dividendFrequency", "exDividendAmount", "high52WeekPrice",
+        "low52WeekPrice", "shares",           "freeFloat",         "highLimitPrice",   "lowLimitPrice"};
+    std::array<std::optional<std::string>, 10> decimalText;
+
+    return build(budget, [&](Row &row) {
+        const bool tsv = format_ == OutputFormat::TSV;
+        const auto text = [&](std::u16string_view value) {
+            if (tsv) {
+                row.units(value);
+            } else {
+                row.quote(value);
+            }
+        };
+        const auto nullable = [&](const std::optional<std::u16string> &value) {
+            if (!value) {
+                row.add("null");
+            } else if (tsv && value->empty()) {
+                row.add("empty");
+            } else {
+                text(*value);
+            }
+        };
+        const auto scalar = [&](std::string_view label, auto value) {
+            row.add(tsv ? "\t" : " ");
+
+            if (!tsv) {
+                row.add(label);
+                row.add("=");
+            }
+
+            row.number(value);
+        };
+        row.add(tsv ? "profile-record\t" : "Profile ");
+        row.number(tsv ? frameIndex : index);
+        row.add(tsv ? "\t" : ": frame=");
+        row.number(tsv ? index : frameIndex);
+        scalar("local", record.localId);
+        row.add(tsv ? "\t" : " name=");
+        text(name);
+        row.add(tsv ? "\t" : " symbol=");
+        text(record.symbol.units);
+        row.add(tsv ? "\t" : " fields={");
+
+        for (std::size_t i = 0; i < record.typedValues.size(); ++i) {
+            const auto &field = record.typedValues[i];
+
+            if (i) {
+                row.add(tsv ? "," : ", ");
+            }
+
+            if (!tsv) {
+                row.add(events::PROFILE_FIELD_NAMES[i]);
+                row.add("=(type:");
+            }
+
+            row.number(std::to_underlying(field.type));
+            row.add(tsv ? ":" : " raw:");
+            row.number(field.raw);
+
+            if (field.type == core::SerialFieldType::UTF_CHAR_ARRAY) {
+                row.add(tsv ? ":" : " units:");
+                nullable(field.units);
+            } else if (tsv) {
+                row.add(":-");
+            }
+
+            if (!tsv) {
+                row.add(")");
+            }
+        }
+
+        row.add(tsv ? "\nprofile\t" : "}\nProfileValues ");
+        row.number(index);
+
+        if (!tsv) {
+            row.add(":");
+        }
+
+        for (std::size_t i = 0; i < decimals.size(); ++i) {
+            row.add(tsv ? "\t" : " ");
+
+            if (tsv) {
+                row.doubleBits(decimals[i].toDouble());
+            } else {
+                row.add(LABELS[i]);
+                row.add("=");
+
+                if (!decimalText[i]) {
+                    decimalText[i] = decimals[i].toString();
+                }
+
+                row.add(*decimalText[i]);
+            }
+
+            if (i == 3) {
+                scalar("exDividendDayId", event.exDividendDayId);
+            }
+        }
+
+        scalar("haltStartTimeMs", event.haltStartTimeMs);
+        scalar("haltEndTimeMs", event.haltEndTimeMs);
+        scalar("flags", event.flags);
+        row.add(tsv ? "\t" : " description=");
+        nullable(event.description);
+        row.add(tsv ? "\t" : " statusReason=");
+        nullable(event.statusReason);
+        scalar("tradingStatus", std::to_underlying(event.tradingStatus()));
+        scalar("shortSaleRestriction", std::to_underlying(event.shortSaleRestriction()));
+        scalar("eventTime", event.eventTime);
+        row.add("\n");
+    });
+}
+
 std::string Formatter::complete(std::uint64_t bytes, std::size_t frames, std::size_t records,
                                 std::size_t chargedRecords, std::size_t fields, std::size_t budget) const {
     return build(budget, [&](Row &row) {
@@ -536,7 +674,11 @@ std::string Formatter::complete(std::uint64_t bytes, std::size_t frames, std::si
 
 std::string Formatter::tapeHeader(std::size_t budget) const {
     return build(budget, [&](Row &row) {
-        if (profile_ == DisplayProfile::ORACLE_FIELD_TYPES_V1) {
+        if (profile_ == DisplayProfile::DEFAULT_PROFILE_V1) {
+            row.add(format_ == OutputFormat::TSV
+                        ? "format\tqdcxx-tape-inspect\t5\tdefault-profile-v1\tlegacy\n"
+                        : "qdcxx-tape-inspect human 5 profile=default-profile-v1 tape-mode=legacy identities=local\n");
+        } else if (profile_ == DisplayProfile::ORACLE_FIELD_TYPES_V1) {
             row.add(
                 format_ == OutputFormat::TSV
                     ? "format\tqdcxx-tape-inspect\t4\toracle-field-types-v1\tlegacy\n"
@@ -609,6 +751,14 @@ std::string Formatter::tapeFrame(const protocol::Frame &value, std::size_t index
 std::string Formatter::rawTapeHeader(std::size_t budget) const {
     return build(budget, [&](Row &row) {
         const bool tsv = format_ == OutputFormat::TSV;
+
+        if (profile_ == DisplayProfile::DEFAULT_PROFILE_V1) {
+            row.add(tsv ? "format\tqdcxx-tape-inspect\t5\tdefault-profile-v1\traw-message-v1\n"
+                        : "qdcxx-tape-inspect human 5 profile=default-profile-v1 tape-mode=raw-message-v1 "
+                          "identities=local\n");
+
+            return;
+        }
 
         if (profile_ == DisplayProfile::ORACLE_FIELD_TYPES_V1) {
             row.add(tsv ? "format\tqdcxx-tape-inspect\t4\toracle-field-types-v1\traw-message-v1\n"

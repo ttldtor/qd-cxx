@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dxfeed xmlns="https://www.dxfeed.com/datascheme">
+  <records>
+    <record name="Quote" mode="update">
+      <field name="Sequence" mode="update" disabled="false"/>
+      <field name="TimeNanoPart" mode="update" disabled="false"/>
+      <field name="Extra" type="compact_int"/>
+    </record>
+    <record name="Profile" mode="update">
+      <field name="ExtraText" type="utf_char_array"/>
+    </record>
+  </records>
+</dxfeed>
+

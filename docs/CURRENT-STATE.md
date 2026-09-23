@@ -1,11 +1,17 @@
 # Current state
 
-## Next assignment: QDCXX-025
+## QDCXX-025 implemented — independent review pending
 
-Configurable schemas and event mappings is assigned for implementation, not yet implemented.
-[ADR-0003](decisions/ADR-0003-configurable-schemas-and-event-mappings.md) makes configurability a project-wide requirement, including the existing Quote adapter and the new Profile adapter.
-Built-in schemas remain defaults; source loading and the [broader settings subsystem](CONFIGURATION.md) are separate work.
-No new C++ behavior, Java capture or runtime test is claimed by this planning update.
+Configurable schemas and event mappings, High, started at
+`e5a3764992ba3a90a07d3d092a4383e37a901de2`. New pinned Java production/configuration/XML evidence
+preceded C++ implementation. Shared bounded mapping preparation and opaque schema/record contexts
+support configured Quote and owned Profile, including exact optional/default/string/flags/time behavior.
+The explicit `default-profile-v1` CLI preset emits version 5 in both existing tape modes; old profiles
+and legacy Quote remain compatible. Generic extra fields and custom records remain accessible.
+[Coverage](../tests/conformance/protocol/profile/COVERAGE.md) and
+[author validation](../tests/conformance/protocol/profile/VALIDATION.md) separate executed checks
+from independent review. Built-in schemas remain defaults; general loaders, broader settings,
+new identities, indexed events and transport remain separate. No private tape, staging or commit.
 
 [Русская версия](CURRENT-STATE.ru.md). English is authoritative.
 

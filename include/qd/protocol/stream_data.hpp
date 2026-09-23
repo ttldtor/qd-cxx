@@ -17,8 +17,9 @@ struct ContextLimits {
 
 /** Owned validated plan with the output shape needed after schema destruction. */
 struct StreamRecordPlan {
-    RecordBinding binding;       ///< Owned ordered actions derived only by bindRecord.
-    std::size_t localFieldCount; ///< Number of local logical values, zero for unknown records.
+    RecordBinding binding;         ///< Owned ordered actions derived only by bindRecord.
+    std::size_t localFieldCount;   ///< Number of local logical values, zero for unknown records.
+    core::RecordContext context{}; ///< Owned local provenance; invalid for an unknown record.
 };
 
 /** Immutable static decoding snapshot; not a dynamic session table. */
@@ -108,6 +109,7 @@ struct StreamDataRecord {
     encoding::SymbolValue symbol;              ///< Exact owned UTF-16 and raw encoding metadata.
     std::vector<std::int32_t> values;          ///< Legacy profile only, local order; empty for the extended profile.
     std::vector<core::FieldValue> typedValues; ///< Extended profile only, exact local tags/raw values.
+    core::RecordContext context{}; ///< Source schema/record identity; old aggregate initializers remain untagged.
 };
 
 /** Owned completed prefix with explicit first-error diagnostics. */

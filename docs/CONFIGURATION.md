@@ -7,6 +7,12 @@ These are requirements and investigation work, not an implemented configuration 
 
 ## Sources and baseline
 
+The implemented QDCXX-025 [schema settings subset](../spec/schema/CONFIGURED-EVENTS.md) adds fresh-JVM
+production observations for selected startup, endpoint file/API, mutation and XML inputs. It records
+the measured precedence and read timing per setting, including explicit field selection versus nanoTime.
+These observations supplement the source facts below; they do not establish a universal precedence
+or implement a C++ settings loader. Prepared event mappings consume only explicit validated schemas.
+
 - [QD and dxFeed Java API Project Settings](https://github.com/dxFeed/dxfeed-graal-cxx-api/wiki/QD-and-dxFeed-Java-API-Project-Settings), read 2026-09-23: discovery list, not an exhaustive or pinned specification.
 - [Current release notes](https://github.com/devexperts/QD/blob/master/ReleaseNotes.txt): discovery and evolution history; master is mutable.
 - [Pinned release notes](https://github.com/devexperts/QD/blob/0ddc0a09779fb61d74cc0b37c6449ff47dcb715f/ReleaseNotes.txt), source consumers and production observations define the baseline under `upstream.lock`.

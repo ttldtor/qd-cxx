@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "qd/events/profile.hpp"
 #include "qd/protocol/frame_reader.hpp"
 #include "qd/protocol/stream_data.hpp"
 #include "qd/protocol/tape_reader.hpp"
@@ -21,10 +22,11 @@ enum class OutputFormat {
 
 /** Explicit display metadata selection, unrelated to schema lookup aliases. */
 enum class DisplayProfile {
-    LOCAL_SCHEMA,         ///< Independent schema with field[index] labels.
-    ORACLE_SRE_V1,        ///< Built-in adapter with S.v and R.y/R.x/R.z labels.
-    DEFAULT_QUOTE_V1,     ///< Explicit eight-field composite Quote with exact typed values.
-    ORACLE_FIELD_TYPES_V1 ///< Generic exact fields with nullable UTF-16, using tape output version 4.
+    LOCAL_SCHEMA,          ///< Independent schema with field[index] labels.
+    ORACLE_SRE_V1,         ///< Built-in adapter with S.v and R.y/R.x/R.z labels.
+    DEFAULT_QUOTE_V1,      ///< Explicit eight-field composite Quote with exact typed values.
+    ORACLE_FIELD_TYPES_V1, ///< Generic exact fields with nullable UTF-16, using tape output version 4.
+    DEFAULT_PROFILE_V1     ///< Explicit default Profile with raw fields and event values, output version 5.
 };
 
 /** Logical row exceeds remaining output bytes; translated to the existing write resource error. */
@@ -119,6 +121,19 @@ class Formatter {
      */
     std::string record(const protocol::StreamDataRecord &record, std::u16string_view name, std::size_t frameIndex,
                        std::size_t index, std::size_t budget, const protocol::TapeTiming *timing = nullptr) const;
+
+    /** Compose an atomic raw/event Profile pair after prepared mapping.
+     * @param record Borrowed generic record retaining every local field.
+     * @param name Exact local record name.
+     * @param frameIndex Owning envelope index.
+     * @param index Emitted record index.
+     * @param event Owned projected event, borrowed for this call.
+     * @param budget Remaining stdout bytes.
+     * @return Both complete rows, or OutputLimit before either is published.
+     */
+    std::string profileRecord(const protocol::StreamDataRecord &record, std::u16string_view name,
+                              std::size_t frameIndex, std::size_t index, const events::Profile &event,
+                              std::size_t budget) const;
 
     /** Compose the success summary, whose physical delivery still requires a successful exit.
      * @param bytes Accepted input bytes.

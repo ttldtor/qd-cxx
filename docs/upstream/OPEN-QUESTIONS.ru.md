@@ -4,6 +4,19 @@
 
 Записывать вопросы о поведении Java QD, на которые пока нет уверенного ответа. Связывать вопрос с исследующей задачей и закрывать его source или fixture evidence.
 
+## Подмножество событий и конфигурации QDCXX-025
+
+QDCXX-025 разрешает выбранные вопросы событий default/configured Quote и Profile через
+[новые production-наблюдения](../../tests/fixtures/events/mapping/COVERAGE.ru.md) и
+[подмножество реестра конфигурации](../../spec/schema/CONFIGURED-EVENTS.ru.md): обязательные/необязательные
+выборы, wire omission против local absence, точные integer/wide альтернативы чисел, flags, UTF-16 строки,
+упакованные Quote Sequence/TimeNanoPart и независимый eventTime. Full24/full137 сохранены как явно
+неподдерживаемые случаи; положительным случаям не нужны новые identities или семантика контейнера.
+[Контракты событий](../../spec/events/EVENT-MAPPING.ru.md) определяют ограниченное применение в C++.
+Полная совместимость настроек/загрузчиков, полный dxlink, regional/indexed события, бизнес-представления
+SHORT_STRING, дополнительные identities, ненулевые QTP flags и transport остаются отдельными вопросами.
+Исторические утверждения QDCXX-024 ниже сохраняют исходные границы; Profile mapping заменён только здесь.
+
 ## Ограниченное разрешение вопросов полей QDCXX-024
 
 [Production-доказательства Java](../../tests/fixtures/encoding/field-types/COVERAGE.ru.md) и

@@ -1,0 +1,17 @@
+I 260923 142404.137 [main] DXEndpointImpl - DXEndpoint is loading properties from C:\qd-cxx\tests\fixtures\events\mapping\inputs\conflict.properties
+I 260923 142404.165 [main] QDFactory - Using QDS-UNKNOWN, (C) Devexperts
+I 260923 142404.312 [main] QDFactory - Using scheme com.dxfeed.api.impl.DXFeedScheme Rlqs_ynrnkrCC2LHriVP1T_Hz0O7hXGymC5jgfxUh5Q
+I 260923 142409.351 [main] QDEndpoint - qd with collectors [Ticker, Stream, History]
+I 260923 142409.501 [main] DXEndpointImpl - qd DXEndpoint with dxfeed.properties=C:\qd-cxx\tests\fixtures\events\mapping\inputs\conflict.properties
+I 260923 142409.501 [main] DXEndpointImpl - qd DXEndpoint with dxscheme.enabled.Sequence=Quote
+I 260923 142409.501 [main] DXEndpointImpl - qd DXEndpoint with dxscheme.nanoTime=false
+I 260923 142409.776 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-final-a\events\endpoint-file\Quote-stream.qtp
+I 260923 142409.801 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-final-a\events\endpoint-file\Quote-stream.qtp
+I 260923 142409.812 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-final-a\events\endpoint-file\Quote-raw.qtp
+I 260923 142409.815 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-final-a\events\endpoint-file\Quote-raw.qtp
+I 260923 142409.821 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-final-a\events\endpoint-file\Profile-stream.qtp
+I 260923 142409.830 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-final-a\events\endpoint-file\Profile-stream.qtp
+I 260923 142409.833 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-final-a\events\endpoint-file\Profile-raw.qtp
+I 260923 142409.835 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-final-a\events\endpoint-file\Profile-raw.qtp
+I 260923 142409.839 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-final-a\events\endpoint-file\Profile-wire-omitted.qtp
+I 260923 142409.842 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-final-a\events\endpoint-file\Quote-wire-omitted.qtp

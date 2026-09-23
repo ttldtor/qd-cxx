@@ -55,8 +55,59 @@ bool charge(std::size_t count, std::size_t &remaining) {
 
 } // namespace
 
+/** Fixed-size lifetime token; never retains source declarations or protocol state. */
+struct RecordContext::Identity {};
+
+RecordContext::RecordContext(std::shared_ptr<const Identity> identity, std::int32_t localId) noexcept
+    : identity_(std::move(identity)), localId_(localId) {
+}
+
+bool RecordContext::valid() const noexcept {
+    return identity_ != nullptr && localId_ >= 0;
+}
+
+bool RecordContext::matches(const RecordContext &other) const noexcept {
+    return valid() && other.valid() && identity_ == other.identity_ && localId_ == other.localId_;
+}
+
 LocalSchema::LocalSchema(std::span<const LocalRecord> records, LocalProfile profile)
-    : records_(records.begin(), records.end()), profile_(profile) {
+    : records_(records.begin(), records.end()), profile_(profile),
+      identity_(std::make_shared<const RecordContext::Identity>()) {
+}
+
+RecordContext LocalSchema::recordContext(std::int32_t localId) const noexcept {
+    if (!identity_ || localId < 0 || static_cast<std::size_t>(localId) >= records_.size()) {
+        return {};
+    }
+
+    return RecordContext(identity_, localId);
+}
+
+std::expected<LocalSchema, SchemaError> LocalSchema::boundedCopy(SchemaLimits limits) const {
+    if (records_.size() > limits.records) {
+        return std::unexpected(SchemaError::RESOURCE_LIMIT);
+    }
+
+    for (const auto &record : records_) {
+        if (!charge(record.fields.size(), limits.fields) || !charge(record.lookups.size(), limits.lookups) ||
+            record.name.size() > limits.nameUnits || !charge(record.name.size(), limits.totalNameUnits)) {
+            return std::unexpected(SchemaError::RESOURCE_LIMIT);
+        }
+
+        for (const auto &lookup : record.lookups) {
+            if (lookup.name.size() > limits.nameUnits || !charge(lookup.name.size(), limits.totalNameUnits)) {
+                return std::unexpected(SchemaError::RESOURCE_LIMIT);
+            }
+        }
+    }
+
+    try {
+        return *this;
+    } catch (const std::bad_alloc &) {
+        return std::unexpected(SchemaError::ALLOCATION_FAILURE);
+    } catch (const std::length_error &) {
+        return std::unexpected(SchemaError::ALLOCATION_FAILURE);
+    }
 }
 
 std::span<const LocalRecord> LocalSchema::records() const noexcept {

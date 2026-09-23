@@ -255,7 +255,7 @@ class DescriptorParser {
  * @return Owned schema, or constructor exception before input is accepted.
  */
 core::LocalSchema copySchema(const core::LocalSchema &schema, core::SchemaLimits limits) {
-    auto result = core::LocalSchema::create(schema.records(), limits, schema.profile());
+    auto result = schema.boundedCopy(limits);
 
     if (!result) {
         if (result.error() == core::SchemaError::ALLOCATION_FAILURE) {

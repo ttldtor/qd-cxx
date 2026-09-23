@@ -1,0 +1,17 @@
+I 260923 142416.271 [main] DXEndpointImpl - DXEndpoint is loading properties from C:\qd-cxx\tests\fixtures\events\mapping\inputs\conflict.properties
+I 260923 142416.282 [main] QDFactory - Using QDS-UNKNOWN, (C) Devexperts
+I 260923 142416.302 [main] QDFactory - Using scheme com.dxfeed.api.impl.DXFeedScheme JFhzUYbcPr_gDabkoYd4_S0tWsvvKpzBmiN2aRCDnkY
+I 260923 142421.348 [main] QDEndpoint - qd with collectors [Ticker, Stream, History]
+I 260923 142421.512 [main] DXEndpointImpl - qd DXEndpoint with dxfeed.properties=C:\qd-cxx\tests\fixtures\events\mapping\inputs\conflict.properties
+I 260923 142421.512 [main] DXEndpointImpl - qd DXEndpoint with dxscheme.enabled.Sequence=Quote
+I 260923 142421.512 [main] DXEndpointImpl - qd DXEndpoint with dxscheme.nanoTime=true
+I 260923 142421.790 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-final-a\events\mutation\Quote-stream.qtp
+I 260923 142421.816 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-final-a\events\mutation\Quote-stream.qtp
+I 260923 142421.829 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-final-a\events\mutation\Quote-raw.qtp
+I 260923 142421.832 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-final-a\events\mutation\Quote-raw.qtp
+I 260923 142421.837 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-final-a\events\mutation\Profile-stream.qtp
+I 260923 142421.848 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-final-a\events\mutation\Profile-stream.qtp
+I 260923 142421.851 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-final-a\events\mutation\Profile-raw.qtp
+I 260923 142421.854 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-final-a\events\mutation\Profile-raw.qtp
+I 260923 142421.858 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-final-a\events\mutation\Profile-wire-omitted.qtp
+I 260923 142421.860 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-final-a\events\mutation\Quote-wire-omitted.qtp

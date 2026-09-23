@@ -1,5 +1,15 @@
 # Bounded STREAM_DATA decoder
 
+## Additive local record identity
+
+The [prepared mapping contract](../events/EVENT-MAPPING.md) adds `core::RecordContext` to each
+`StreamRecordPlan` and appends it to `StreamDataRecord`. Known plans retain the source local schema's
+opaque identity and local record ID; both STREAM and RAW copy that context into completed records.
+Unknown plans have invalid contexts and still emit no record. Old aggregate initializers remain valid
+and create invalid contexts; they do not authenticate values for the prepared event API.
+The identity owns no schema declarations, source names or protocol state and survives their destruction.
+No wire bytes, output values, work counters, failure positions or existing error precedence change.
+
 ## Explicit RAW payload entry point
 
 QDCXX-023 adds `decodeRawData(payload, context, limits)` for a complete type-5 payload under

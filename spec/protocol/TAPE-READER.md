@@ -1,5 +1,15 @@
 # Bounded binary tape reader
 
+## Identity-preserving local schema snapshot
+
+The reader constructs its owned local schema with `LocalSchema::boundedCopy`, retaining the caller's
+opaque identity under the existing schema budgets. Its append-only wire-description rebuilds therefore
+produce plans and completed records compatible with prepared mappings made from that caller schema.
+Earlier records and mappings remain valid across rebuilds and after the reader or source schema dies.
+A separately created local schema has a fresh identity even if every declaration matches. No mutable
+local schema replacement is introduced. See [EVENT-MAPPING](../events/EVENT-MAPPING.md) for the exact
+ownership/context API; constructor exceptions, construction charges and terminal-prefix rules stay unchanged.
+
 ## Explicit RAW/MESSAGE extension
 
 [RAW-TAPE](RAW-TAPE.md) defines the independent opt-in `TapeMode::RAW_MESSAGE_V1` policy:

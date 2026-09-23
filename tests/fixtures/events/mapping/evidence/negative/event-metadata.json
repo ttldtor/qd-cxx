@@ -1,0 +1,1048 @@
+{
+  "format": "qdcxx-event-mapping-oracle-v1",
+  "baselineMetadata": "metadata.json",
+  "inputs": [
+    {
+      "path": "conflict.properties",
+      "sha256": "66f4191aa3f3a513f952d4326c034ff9ebaee5b8d601602bca1cebfb963ee896"
+    },
+    {
+      "path": "extension.xml",
+      "sha256": "53ad84c7d7c9ccf1660ba540f963bdd7565b99aae23b83b10ade393c97efbd44"
+    },
+    {
+      "path": "unsupported-extension.xml",
+      "sha256": "87094a6d95a38c3a01530e078437da23097c54f104097dbb60488989d734c26a"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "both/observations.tsv",
+      "sha256": "7d294b548152270f04691a56d806fa41e14413e7bb6542770c19ce6734ef8a08"
+    },
+    {
+      "path": "both/Profile-raw.qtp",
+      "sha256": "b499a4e2876c27e9fb45d39d591e162078ed7537c124b58ed3662cd3c0e87da2"
+    },
+    {
+      "path": "both/Profile-stream.qtp",
+      "sha256": "be2db918c548e4f558716dda8b8ee059cc3a8bb02755a32b3f9e7691845fd477"
+    },
+    {
+      "path": "both/Profile-wire-omitted.qtp",
+      "sha256": "8f9e989839f2daef99c846104a51981838711be394f48f40507d252c8971566f"
+    },
+    {
+      "path": "both/Quote-raw.qtp",
+      "sha256": "889fa2177d9efb0adc63cb1dfc74c31c0a7d84fe5b051235d5c245460bc8f7af"
+    },
+    {
+      "path": "both/Quote-stream.qtp",
+      "sha256": "1b40b30fc246b1bb4dad81d5a0b85c29a7a91e631cd7d9d9ecec3c194f563904"
+    },
+    {
+      "path": "both/Quote-wire-omitted.qtp",
+      "sha256": "c19344325491d03285e03e5840def47be5d893d9361d0c9f3e800949cb205c4f"
+    },
+    {
+      "path": "default/observations.tsv",
+      "sha256": "7f22d5c18c89e9d9a13d5a2bf61c4568192bd2d364875bc7c077bf18a89ccfaa"
+    },
+    {
+      "path": "default/Profile-raw.qtp",
+      "sha256": "b499a4e2876c27e9fb45d39d591e162078ed7537c124b58ed3662cd3c0e87da2"
+    },
+    {
+      "path": "default/Profile-stream.qtp",
+      "sha256": "be2db918c548e4f558716dda8b8ee059cc3a8bb02755a32b3f9e7691845fd477"
+    },
+    {
+      "path": "default/Profile-wire-omitted.qtp",
+      "sha256": "8f9e989839f2daef99c846104a51981838711be394f48f40507d252c8971566f"
+    },
+    {
+      "path": "default/Quote-raw.qtp",
+      "sha256": "c824006ff02be4903242de0ef423e8fed24a68aace9340eff40629b688b63323"
+    },
+    {
+      "path": "default/Quote-stream.qtp",
+      "sha256": "d831bb86cbba9941fb61a39825562bfd27bc2093223c801ede3cfcffbcdf6ed9"
+    },
+    {
+      "path": "default/Quote-wire-omitted.qtp",
+      "sha256": "c19344325491d03285e03e5840def47be5d893d9361d0c9f3e800949cb205c4f"
+    },
+    {
+      "path": "endpoint-api/observations.tsv",
+      "sha256": "ed3becf0de7a936720a4831486094ac641beb1fe226a3ac64b24543bc822f3f6"
+    },
+    {
+      "path": "endpoint-api/Profile-raw.qtp",
+      "sha256": "b499a4e2876c27e9fb45d39d591e162078ed7537c124b58ed3662cd3c0e87da2"
+    },
+    {
+      "path": "endpoint-api/Profile-stream.qtp",
+      "sha256": "be2db918c548e4f558716dda8b8ee059cc3a8bb02755a32b3f9e7691845fd477"
+    },
+    {
+      "path": "endpoint-api/Profile-wire-omitted.qtp",
+      "sha256": "8f9e989839f2daef99c846104a51981838711be394f48f40507d252c8971566f"
+    },
+    {
+      "path": "endpoint-api/Quote-raw.qtp",
+      "sha256": "077acce935ef510d94af9c0b7ee13ceaa574c3ea6cf3e326ec1708f494f07300"
+    },
+    {
+      "path": "endpoint-api/Quote-stream.qtp",
+      "sha256": "bc8138d94e43ff27472304afbd4f85dfb32fbc6e15bfb55f666489818f63d2f7"
+    },
+    {
+      "path": "endpoint-api/Quote-wire-omitted.qtp",
+      "sha256": "c19344325491d03285e03e5840def47be5d893d9361d0c9f3e800949cb205c4f"
+    },
+    {
+      "path": "endpoint-file/observations.tsv",
+      "sha256": "969f8477902a4a8e0290239a445dbe5da04185ceda8c8f0bc0d58c2fbe8d0266"
+    },
+    {
+      "path": "endpoint-file/Profile-raw.qtp",
+      "sha256": "b499a4e2876c27e9fb45d39d591e162078ed7537c124b58ed3662cd3c0e87da2"
+    },
+    {
+      "path": "endpoint-file/Profile-stream.qtp",
+      "sha256": "be2db918c548e4f558716dda8b8ee059cc3a8bb02755a32b3f9e7691845fd477"
+    },
+    {
+      "path": "endpoint-file/Profile-wire-omitted.qtp",
+      "sha256": "8f9e989839f2daef99c846104a51981838711be394f48f40507d252c8971566f"
+    },
+    {
+      "path": "endpoint-file/Quote-raw.qtp",
+      "sha256": "b0fab5446d8bc461fc372dbe659fa99c97757c34cfeb99858507794d7db99c4f"
+    },
+    {
+      "path": "endpoint-file/Quote-stream.qtp",
+      "sha256": "290a0fb7aaa299774b19a1fcc908ebc1484efe5b843a99d229132e26ea3eeffe"
+    },
+    {
+      "path": "endpoint-file/Quote-wire-omitted.qtp",
+      "sha256": "c19344325491d03285e03e5840def47be5d893d9361d0c9f3e800949cb205c4f"
+    },
+    {
+      "path": "explicit/observations.tsv",
+      "sha256": "438df19133f910c34236fa0da6a10ba3aa3f017d8d541f17aa831a9bc978201c"
+    },
+    {
+      "path": "explicit/Profile-raw.qtp",
+      "sha256": "b499a4e2876c27e9fb45d39d591e162078ed7537c124b58ed3662cd3c0e87da2"
+    },
+    {
+      "path": "explicit/Profile-stream.qtp",
+      "sha256": "be2db918c548e4f558716dda8b8ee059cc3a8bb02755a32b3f9e7691845fd477"
+    },
+    {
+      "path": "explicit/Profile-wire-omitted.qtp",
+      "sha256": "8f9e989839f2daef99c846104a51981838711be394f48f40507d252c8971566f"
+    },
+    {
+      "path": "explicit/Quote-raw.qtp",
+      "sha256": "077acce935ef510d94af9c0b7ee13ceaa574c3ea6cf3e326ec1708f494f07300"
+    },
+    {
+      "path": "explicit/Quote-stream.qtp",
+      "sha256": "bc8138d94e43ff27472304afbd4f85dfb32fbc6e15bfb55f666489818f63d2f7"
+    },
+    {
+      "path": "explicit/Quote-wire-omitted.qtp",
+      "sha256": "c19344325491d03285e03e5840def47be5d893d9361d0c9f3e800949cb205c4f"
+    },
+    {
+      "path": "integer-representation/observations.tsv",
+      "sha256": "2199f1342d3a19293ad835c1fa809c8705395192885f3dc4826d6e2d1fb52a2b"
+    },
+    {
+      "path": "integer-representation/Profile-raw.qtp",
+      "sha256": "edaa8ef6815b70d2b65b4a54e1ba7167028a9e97d4874a6198f3234112a3d84c"
+    },
+    {
+      "path": "integer-representation/Profile-stream.qtp",
+      "sha256": "d3cdfdf023f432709b9971042f53d886469f3193d3ffcdd685739773501dd5e2"
+    },
+    {
+      "path": "integer-representation/Profile-wire-omitted.qtp",
+      "sha256": "8f9e989839f2daef99c846104a51981838711be394f48f40507d252c8971566f"
+    },
+    {
+      "path": "integer-representation/Quote-raw.qtp",
+      "sha256": "c3695af1a5a2edbf1bc9686245cd068cce353a301e02a2ad815d45573810960b"
+    },
+    {
+      "path": "integer-representation/Quote-stream.qtp",
+      "sha256": "2198057b6f7cff6ed33f2dfb3f49ad1a4d8bfc34de20368a8472cea3eb19e3ab"
+    },
+    {
+      "path": "integer-representation/Quote-wire-omitted.qtp",
+      "sha256": "c19344325491d03285e03e5840def47be5d893d9361d0c9f3e800949cb205c4f"
+    },
+    {
+      "path": "invalid-boolean/observations.tsv",
+      "sha256": "a036bb1685593eedf25cdc13fcfbdbeaea9fb877d11c3d023d9f64bb90a4e8b4"
+    },
+    {
+      "path": "invalid-boolean/Profile-raw.qtp",
+      "sha256": "b499a4e2876c27e9fb45d39d591e162078ed7537c124b58ed3662cd3c0e87da2"
+    },
+    {
+      "path": "invalid-boolean/Profile-stream.qtp",
+      "sha256": "be2db918c548e4f558716dda8b8ee059cc3a8bb02755a32b3f9e7691845fd477"
+    },
+    {
+      "path": "invalid-boolean/Profile-wire-omitted.qtp",
+      "sha256": "8f9e989839f2daef99c846104a51981838711be394f48f40507d252c8971566f"
+    },
+    {
+      "path": "invalid-boolean/Quote-raw.qtp",
+      "sha256": "c824006ff02be4903242de0ef423e8fed24a68aace9340eff40629b688b63323"
+    },
+    {
+      "path": "invalid-boolean/Quote-stream.qtp",
+      "sha256": "d831bb86cbba9941fb61a39825562bfd27bc2093223c801ede3cfcffbcdf6ed9"
+    },
+    {
+      "path": "invalid-boolean/Quote-wire-omitted.qtp",
+      "sha256": "c19344325491d03285e03e5840def47be5d893d9361d0c9f3e800949cb205c4f"
+    },
+    {
+      "path": "minimal/observations.tsv",
+      "sha256": "ca56217e87bd0085cc8b5b38fa1c6cb7d82900a3baa3d9808de03ba1b497b05a"
+    },
+    {
+      "path": "minimal/Profile-raw.qtp",
+      "sha256": "b26c0767d6752f67ff348c34516291af1a71def788511a8724df19a0b892f5ea"
+    },
+    {
+      "path": "minimal/Profile-stream.qtp",
+      "sha256": "50baeca2a88f64ee1dabd47e63be180e20b23b0a5d6dcf7717f952b532e74270"
+    },
+    {
+      "path": "minimal/Profile-wire-omitted.qtp",
+      "sha256": "8f9e989839f2daef99c846104a51981838711be394f48f40507d252c8971566f"
+    },
+    {
+      "path": "minimal/Quote-raw.qtp",
+      "sha256": "88d418b1b32a34b8ffcd3e6fbaaa8740fe07638a4e2e044ee5cdb047be6fdc4b"
+    },
+    {
+      "path": "minimal/Quote-stream.qtp",
+      "sha256": "8fb4136c7bc2588f373ac1a7839e385875cc07ec68c472a6201c67b651fb6ae7"
+    },
+    {
+      "path": "minimal/Quote-wire-omitted.qtp",
+      "sha256": "c19344325491d03285e03e5840def47be5d893d9361d0c9f3e800949cb205c4f"
+    },
+    {
+      "path": "mutation/observations.tsv",
+      "sha256": "d4e762a471c389a1fb9809f683e539869290fbfc0ef7c9c2529092ba76e30d46"
+    },
+    {
+      "path": "mutation/Profile-raw.qtp",
+      "sha256": "b499a4e2876c27e9fb45d39d591e162078ed7537c124b58ed3662cd3c0e87da2"
+    },
+    {
+      "path": "mutation/Profile-stream.qtp",
+      "sha256": "be2db918c548e4f558716dda8b8ee059cc3a8bb02755a32b3f9e7691845fd477"
+    },
+    {
+      "path": "mutation/Profile-wire-omitted.qtp",
+      "sha256": "8f9e989839f2daef99c846104a51981838711be394f48f40507d252c8971566f"
+    },
+    {
+      "path": "mutation/Quote-raw.qtp",
+      "sha256": "c824006ff02be4903242de0ef423e8fed24a68aace9340eff40629b688b63323"
+    },
+    {
+      "path": "mutation/Quote-stream.qtp",
+      "sha256": "d831bb86cbba9941fb61a39825562bfd27bc2093223c801ede3cfcffbcdf6ed9"
+    },
+    {
+      "path": "mutation/Quote-wire-omitted.qtp",
+      "sha256": "c19344325491d03285e03e5840def47be5d893d9361d0c9f3e800949cb205c4f"
+    },
+    {
+      "path": "nano/observations.tsv",
+      "sha256": "16444d11b19d83e04f783c0a0083a20bb763abe7a0fe8b3584cab1a1043c7479"
+    },
+    {
+      "path": "nano/Profile-raw.qtp",
+      "sha256": "b499a4e2876c27e9fb45d39d591e162078ed7537c124b58ed3662cd3c0e87da2"
+    },
+    {
+      "path": "nano/Profile-stream.qtp",
+      "sha256": "be2db918c548e4f558716dda8b8ee059cc3a8bb02755a32b3f9e7691845fd477"
+    },
+    {
+      "path": "nano/Profile-wire-omitted.qtp",
+      "sha256": "8f9e989839f2daef99c846104a51981838711be394f48f40507d252c8971566f"
+    },
+    {
+      "path": "nano/Quote-raw.qtp",
+      "sha256": "077acce935ef510d94af9c0b7ee13ceaa574c3ea6cf3e326ec1708f494f07300"
+    },
+    {
+      "path": "nano/Quote-stream.qtp",
+      "sha256": "bc8138d94e43ff27472304afbd4f85dfb32fbc6e15bfb55f666489818f63d2f7"
+    },
+    {
+      "path": "nano/Quote-wire-omitted.qtp",
+      "sha256": "c19344325491d03285e03e5840def47be5d893d9361d0c9f3e800949cb205c4f"
+    },
+    {
+      "path": "numeric-int/observations.tsv",
+      "sha256": "396c204d845e2827a34ee26cc50098781e30e12e347ae40f5a4165ca0f87555a"
+    },
+    {
+      "path": "numeric-int/Profile-raw.qtp",
+      "sha256": "c5eb161355c11d4c49a67cb8bfc14ce6260a9003cd04315c0f011fe005da714a"
+    },
+    {
+      "path": "numeric-int/Profile-stream.qtp",
+      "sha256": "001991429648bf6c41648ba582a9a1be23048794cc61577457cb811096921bd8"
+    },
+    {
+      "path": "numeric-int/Profile-wire-omitted.qtp",
+      "sha256": "8f9e989839f2daef99c846104a51981838711be394f48f40507d252c8971566f"
+    },
+    {
+      "path": "numeric-int/Quote-raw.qtp",
+      "sha256": "9e60e96689d33ef69b7d98b3ad6d9ab5ab5b8615a8a03d574548294de4771dd3"
+    },
+    {
+      "path": "numeric-int/Quote-stream.qtp",
+      "sha256": "23c62fd1cea2cb0e297b1dd022c604183d3d099a126cca62380ee5584f22f6f0"
+    },
+    {
+      "path": "numeric-int/Quote-wire-omitted.qtp",
+      "sha256": "c19344325491d03285e03e5840def47be5d893d9361d0c9f3e800949cb205c4f"
+    },
+    {
+      "path": "rejected/observations.tsv",
+      "sha256": "6f8866bfe32c32e17b5c23c46432cb2e8cf75d6b4a9142896f676d483cb041f6"
+    },
+    {
+      "path": "reorder/observations.tsv",
+      "sha256": "99e2af247b0c01cf43c5d9a24b7316b6337c50bf44fea052a1e111c2ab1df7e4"
+    },
+    {
+      "path": "reorder/Profile-raw.qtp",
+      "sha256": "6edd3717114d0bc7280efa60e2bd0a4417618d2f18794e6fa01715672311fcbd"
+    },
+    {
+      "path": "reorder/Profile-stream.qtp",
+      "sha256": "b4a0bf7923372f2ba1b0e8046cc598b6425d859ea7799d4e76fa6c4b4b9b2cf9"
+    },
+    {
+      "path": "reorder/Profile-wire-omitted.qtp",
+      "sha256": "8f9e989839f2daef99c846104a51981838711be394f48f40507d252c8971566f"
+    },
+    {
+      "path": "reorder/Quote-raw.qtp",
+      "sha256": "7245fbdc131e9fc1a1afd755d401d0b5c319f0f9382309f7d20c97c1aa2fc2fe"
+    },
+    {
+      "path": "reorder/Quote-stream.qtp",
+      "sha256": "99da33bf265a933f891287022db4ef9a77b05ea78d6d8b2c53c0dc4542cee480"
+    },
+    {
+      "path": "reorder/Quote-wire-omitted.qtp",
+      "sha256": "c19344325491d03285e03e5840def47be5d893d9361d0c9f3e800949cb205c4f"
+    },
+    {
+      "path": "sequence/observations.tsv",
+      "sha256": "3a026dea3f1b237e586e46a31273a37dbe5b47f585b33bb306a119a487849fbc"
+    },
+    {
+      "path": "sequence/Profile-raw.qtp",
+      "sha256": "b499a4e2876c27e9fb45d39d591e162078ed7537c124b58ed3662cd3c0e87da2"
+    },
+    {
+      "path": "sequence/Profile-stream.qtp",
+      "sha256": "be2db918c548e4f558716dda8b8ee059cc3a8bb02755a32b3f9e7691845fd477"
+    },
+    {
+      "path": "sequence/Profile-wire-omitted.qtp",
+      "sha256": "8f9e989839f2daef99c846104a51981838711be394f48f40507d252c8971566f"
+    },
+    {
+      "path": "sequence/Quote-raw.qtp",
+      "sha256": "b0fab5446d8bc461fc372dbe659fa99c97757c34cfeb99858507794d7db99c4f"
+    },
+    {
+      "path": "sequence/Quote-stream.qtp",
+      "sha256": "290a0fb7aaa299774b19a1fcc908ebc1484efe5b843a99d229132e26ea3eeffe"
+    },
+    {
+      "path": "sequence/Quote-wire-omitted.qtp",
+      "sha256": "c19344325491d03285e03e5840def47be5d893d9361d0c9f3e800949cb205c4f"
+    },
+    {
+      "path": "set-before/observations.tsv",
+      "sha256": "a473866be4f6886e507da21bfe3a0ba7492727b72c3b6f4ff2b3616fc65359e3"
+    },
+    {
+      "path": "set-before/Profile-raw.qtp",
+      "sha256": "b499a4e2876c27e9fb45d39d591e162078ed7537c124b58ed3662cd3c0e87da2"
+    },
+    {
+      "path": "set-before/Profile-stream.qtp",
+      "sha256": "be2db918c548e4f558716dda8b8ee059cc3a8bb02755a32b3f9e7691845fd477"
+    },
+    {
+      "path": "set-before/Profile-wire-omitted.qtp",
+      "sha256": "8f9e989839f2daef99c846104a51981838711be394f48f40507d252c8971566f"
+    },
+    {
+      "path": "set-before/Quote-raw.qtp",
+      "sha256": "889fa2177d9efb0adc63cb1dfc74c31c0a7d84fe5b051235d5c245460bc8f7af"
+    },
+    {
+      "path": "set-before/Quote-stream.qtp",
+      "sha256": "1b40b30fc246b1bb4dad81d5a0b85c29a7a91e631cd7d9d9ecec3c194f563904"
+    },
+    {
+      "path": "set-before/Quote-wire-omitted.qtp",
+      "sha256": "c19344325491d03285e03e5840def47be5d893d9361d0c9f3e800949cb205c4f"
+    },
+    {
+      "path": "tiny-unsupported/observations.tsv",
+      "sha256": "9845a0bc4532b0e7981f4e8edff884da8717b78f6b4ac13b4115b536e5bca49f"
+    },
+    {
+      "path": "tiny-unsupported/Profile-raw.qtp",
+      "sha256": "127e4b59c462af8fc70d54d644db312168116a325a8a473bdc6391e94a3981e1"
+    },
+    {
+      "path": "tiny-unsupported/Profile-stream.qtp",
+      "sha256": "927156f80eb3ff0a2fc708477aff4270f10be2ac308ee62b0d242a4d2576fe81"
+    },
+    {
+      "path": "tiny-unsupported/Profile-wire-omitted.qtp",
+      "sha256": "8f9e989839f2daef99c846104a51981838711be394f48f40507d252c8971566f"
+    },
+    {
+      "path": "tiny-unsupported/Quote-raw.qtp",
+      "sha256": "174a47a5061ce46c1ec2a9f37dcf6f7ff9817c2af77d2516f007cf0dd5ec8437"
+    },
+    {
+      "path": "tiny-unsupported/Quote-stream.qtp",
+      "sha256": "6c6971f026820adbb85cde7bf51abefbf582f6b66b77a3d06633459983e2afd1"
+    },
+    {
+      "path": "tiny-unsupported/Quote-wire-omitted.qtp",
+      "sha256": "c19344325491d03285e03e5840def47be5d893d9361d0c9f3e800949cb205c4f"
+    },
+    {
+      "path": "xml-extension/observations.tsv",
+      "sha256": "b92eea55f1f6515665272134d1137d7b94b665cc093fbab3afbfc0aa1b779de3"
+    },
+    {
+      "path": "xml-extension/Profile-raw.qtp",
+      "sha256": "7dde07143c676fc18d007982b62af39d6b07c59960c290cda754885c3be8cdb5"
+    },
+    {
+      "path": "xml-extension/Profile-stream.qtp",
+      "sha256": "e1223481a751b1a519a63eb96b080845f58354e6ee1c777e4d9e11de9533df6c"
+    },
+    {
+      "path": "xml-extension/Profile-wire-omitted.qtp",
+      "sha256": "8f9e989839f2daef99c846104a51981838711be394f48f40507d252c8971566f"
+    },
+    {
+      "path": "xml-extension/Quote-raw.qtp",
+      "sha256": "63fbb82b0b299fd7b4167cde35f418aec41328232a5f3a587f6679954b821900"
+    },
+    {
+      "path": "xml-extension/Quote-stream.qtp",
+      "sha256": "65de98511b89b36928b41afa8430fc724eee1f8c0f41c343d7ba55395c5c84a0"
+    },
+    {
+      "path": "xml-extension/Quote-wire-omitted.qtp",
+      "sha256": "c19344325491d03285e03e5840def47be5d893d9361d0c9f3e800949cb205c4f"
+    },
+    {
+      "path": "xml-properties/observations.tsv",
+      "sha256": "55c3d4071fa5c83edabf9e958c5d1f28209bb7ba2459b9f34755aacedc1612e2"
+    },
+    {
+      "path": "xml-properties/Profile-raw.qtp",
+      "sha256": "b499a4e2876c27e9fb45d39d591e162078ed7537c124b58ed3662cd3c0e87da2"
+    },
+    {
+      "path": "xml-properties/Profile-stream.qtp",
+      "sha256": "be2db918c548e4f558716dda8b8ee059cc3a8bb02755a32b3f9e7691845fd477"
+    },
+    {
+      "path": "xml-properties/Profile-wire-omitted.qtp",
+      "sha256": "8f9e989839f2daef99c846104a51981838711be394f48f40507d252c8971566f"
+    },
+    {
+      "path": "xml-properties/Quote-raw.qtp",
+      "sha256": "b0fab5446d8bc461fc372dbe659fa99c97757c34cfeb99858507794d7db99c4f"
+    },
+    {
+      "path": "xml-properties/Quote-stream.qtp",
+      "sha256": "290a0fb7aaa299774b19a1fcc908ebc1484efe5b843a99d229132e26ea3eeffe"
+    },
+    {
+      "path": "xml-properties/Quote-wire-omitted.qtp",
+      "sha256": "c19344325491d03285e03e5840def47be5d893d9361d0c9f3e800949cb205c4f"
+    },
+    {
+      "path": "xml-system/observations.tsv",
+      "sha256": "de338cda3ae35a6e5ef7b966913414af80de7e50b04cba6eae5e26fe074d422e"
+    },
+    {
+      "path": "xml-system/Profile-raw.qtp",
+      "sha256": "b499a4e2876c27e9fb45d39d591e162078ed7537c124b58ed3662cd3c0e87da2"
+    },
+    {
+      "path": "xml-system/Profile-stream.qtp",
+      "sha256": "be2db918c548e4f558716dda8b8ee059cc3a8bb02755a32b3f9e7691845fd477"
+    },
+    {
+      "path": "xml-system/Profile-wire-omitted.qtp",
+      "sha256": "8f9e989839f2daef99c846104a51981838711be394f48f40507d252c8971566f"
+    },
+    {
+      "path": "xml-system/Quote-raw.qtp",
+      "sha256": "c824006ff02be4903242de0ef423e8fed24a68aace9340eff40629b688b63323"
+    },
+    {
+      "path": "xml-system/Quote-stream.qtp",
+      "sha256": "d831bb86cbba9941fb61a39825562bfd27bc2093223c801ede3cfcffbcdf6ed9"
+    },
+    {
+      "path": "xml-system/Quote-wire-omitted.qtp",
+      "sha256": "c19344325491d03285e03e5840def47be5d893d9361d0c9f3e800949cb205c4f"
+    },
+    {
+      "path": "xml-unsupported/observations.tsv",
+      "sha256": "0c0beaecfce23d1fbd390d02771af24782e19a82eed9110c79400e3bb1eec21d"
+    },
+    {
+      "path": "xml/observations.tsv",
+      "sha256": "eb7fcdb7891d76c00972e21e55e22de15525faf72025112b6936d1e825bf6d92"
+    },
+    {
+      "path": "xml/Profile-raw.qtp",
+      "sha256": "b499a4e2876c27e9fb45d39d591e162078ed7537c124b58ed3662cd3c0e87da2"
+    },
+    {
+      "path": "xml/Profile-stream.qtp",
+      "sha256": "be2db918c548e4f558716dda8b8ee059cc3a8bb02755a32b3f9e7691845fd477"
+    },
+    {
+      "path": "xml/Profile-wire-omitted.qtp",
+      "sha256": "8f9e989839f2daef99c846104a51981838711be394f48f40507d252c8971566f"
+    },
+    {
+      "path": "xml/Quote-raw.qtp",
+      "sha256": "c824006ff02be4903242de0ef423e8fed24a68aace9340eff40629b688b63323"
+    },
+    {
+      "path": "xml/Quote-stream.qtp",
+      "sha256": "d831bb86cbba9941fb61a39825562bfd27bc2093223c801ede3cfcffbcdf6ed9"
+    },
+    {
+      "path": "xml/Quote-wire-omitted.qtp",
+      "sha256": "c19344325491d03285e03e5840def47be5d893d9361d0c9f3e800949cb205c4f"
+    }
+  ],
+  "commands": [
+    {
+      "timeoutSeconds": 30,
+      "arguments": [
+        "-Xmx256m",
+        "-Dfile.encoding=UTF-8",
+        "-Duser.language=en",
+        "-Duser.country=US",
+        "-Duser.timezone=UTC",
+        "-cp",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/harness;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\mars\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-promise\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-api\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib-qd-sandbox\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\auth\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-core\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto-ssl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-rmi\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-impl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-scheme\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-ipf-filter\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qds-file\\target\\classes",
+        "com.dxfeed.event.market.EventMappingOracle",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/events/default",
+        "default",
+        "C:\\qd-cxx/tests/fixtures/events/mapping/inputs"
+      ],
+      "scenario": "default",
+      "finishedUtc": "2026-09-23T14:38:01.0063624Z",
+      "heapMiB": 256,
+      "exit": 0,
+      "startedUtc": "2026-09-23T14:38:00.4553642Z"
+    },
+    {
+      "timeoutSeconds": 30,
+      "arguments": [
+        "-Xmx256m",
+        "-Dfile.encoding=UTF-8",
+        "-Duser.language=en",
+        "-Duser.country=US",
+        "-Duser.timezone=UTC",
+        "-Ddxscheme.enabled.Sequence=Quote",
+        "-cp",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/harness;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\mars\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-promise\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-api\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib-qd-sandbox\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\auth\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-core\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto-ssl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-rmi\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-impl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-scheme\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-ipf-filter\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qds-file\\target\\classes",
+        "com.dxfeed.event.market.EventMappingOracle",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/events/sequence",
+        "sequence",
+        "C:\\qd-cxx/tests/fixtures/events/mapping/inputs"
+      ],
+      "scenario": "sequence",
+      "finishedUtc": "2026-09-23T14:38:01.5120825Z",
+      "heapMiB": 256,
+      "exit": 0,
+      "startedUtc": "2026-09-23T14:38:01.0073833Z"
+    },
+    {
+      "timeoutSeconds": 30,
+      "arguments": [
+        "-Xmx256m",
+        "-Dfile.encoding=UTF-8",
+        "-Duser.language=en",
+        "-Duser.country=US",
+        "-Duser.timezone=UTC",
+        "-Ddxscheme.enabled.TimeNanoPart=Quote",
+        "-cp",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/harness;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\mars\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-promise\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-api\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib-qd-sandbox\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\auth\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-core\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto-ssl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-rmi\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-impl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-scheme\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-ipf-filter\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qds-file\\target\\classes",
+        "com.dxfeed.event.market.EventMappingOracle",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/events/nano",
+        "nano",
+        "C:\\qd-cxx/tests/fixtures/events/mapping/inputs"
+      ],
+      "scenario": "nano",
+      "finishedUtc": "2026-09-23T14:38:02.0252930Z",
+      "heapMiB": 256,
+      "exit": 0,
+      "startedUtc": "2026-09-23T14:38:01.5122040Z"
+    },
+    {
+      "timeoutSeconds": 30,
+      "arguments": [
+        "-Xmx256m",
+        "-Dfile.encoding=UTF-8",
+        "-Duser.language=en",
+        "-Duser.country=US",
+        "-Duser.timezone=UTC",
+        "-Ddxscheme.nanoTime=true",
+        "-cp",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/harness;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\mars\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-promise\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-api\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib-qd-sandbox\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\auth\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-core\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto-ssl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-rmi\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-impl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-scheme\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-ipf-filter\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qds-file\\target\\classes",
+        "com.dxfeed.event.market.EventMappingOracle",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/events/both",
+        "both",
+        "C:\\qd-cxx/tests/fixtures/events/mapping/inputs"
+      ],
+      "scenario": "both",
+      "finishedUtc": "2026-09-23T14:38:02.5810738Z",
+      "heapMiB": 256,
+      "exit": 0,
+      "startedUtc": "2026-09-23T14:38:02.0254119Z"
+    },
+    {
+      "timeoutSeconds": 30,
+      "arguments": [
+        "-Xmx256m",
+        "-Dfile.encoding=UTF-8",
+        "-Duser.language=en",
+        "-Duser.country=US",
+        "-Duser.timezone=UTC",
+        "-Ddxscheme.nanoTime=true",
+        "-Ddxscheme.enabled.Sequence=Profile",
+        "-cp",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/harness;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\mars\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-promise\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-api\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib-qd-sandbox\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\auth\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-core\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto-ssl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-rmi\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-impl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-scheme\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-ipf-filter\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qds-file\\target\\classes",
+        "com.dxfeed.event.market.EventMappingOracle",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/events/explicit",
+        "explicit",
+        "C:\\qd-cxx/tests/fixtures/events/mapping/inputs"
+      ],
+      "scenario": "explicit",
+      "finishedUtc": "2026-09-23T14:38:03.0930813Z",
+      "heapMiB": 256,
+      "exit": 0,
+      "startedUtc": "2026-09-23T14:38:02.5811772Z"
+    },
+    {
+      "timeoutSeconds": 30,
+      "arguments": [
+        "-Xmx256m",
+        "-Dfile.encoding=UTF-8",
+        "-Duser.language=en",
+        "-Duser.country=US",
+        "-Duser.timezone=UTC",
+        "-Ddxscheme.nanoTime=true",
+        "-Ddxscheme.enabled.Sequence=Profile",
+        "-cp",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/harness;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\mars\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-promise\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-api\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib-qd-sandbox\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\auth\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-core\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto-ssl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-rmi\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-impl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-scheme\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-ipf-filter\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qds-file\\target\\classes",
+        "com.dxfeed.event.market.EventMappingOracle",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/events/endpoint-file",
+        "endpoint-file",
+        "C:\\qd-cxx/tests/fixtures/events/mapping/inputs"
+      ],
+      "scenario": "endpoint-file",
+      "finishedUtc": "2026-09-23T14:38:08.9564925Z",
+      "heapMiB": 256,
+      "exit": 0,
+      "startedUtc": "2026-09-23T14:38:03.0931621Z"
+    },
+    {
+      "timeoutSeconds": 30,
+      "arguments": [
+        "-Xmx256m",
+        "-Dfile.encoding=UTF-8",
+        "-Duser.language=en",
+        "-Duser.country=US",
+        "-Duser.timezone=UTC",
+        "-Ddxscheme.nanoTime=true",
+        "-Ddxscheme.enabled.Sequence=Profile",
+        "-cp",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/harness;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\mars\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-promise\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-api\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib-qd-sandbox\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\auth\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-core\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto-ssl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-rmi\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-impl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-scheme\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-ipf-filter\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qds-file\\target\\classes",
+        "com.dxfeed.event.market.EventMappingOracle",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/events/endpoint-api",
+        "endpoint-api",
+        "C:\\qd-cxx/tests/fixtures/events/mapping/inputs"
+      ],
+      "scenario": "endpoint-api",
+      "finishedUtc": "2026-09-23T14:38:14.8658237Z",
+      "heapMiB": 256,
+      "exit": 0,
+      "startedUtc": "2026-09-23T14:38:08.9565838Z"
+    },
+    {
+      "timeoutSeconds": 30,
+      "arguments": [
+        "-Xmx256m",
+        "-Dfile.encoding=UTF-8",
+        "-Duser.language=en",
+        "-Duser.country=US",
+        "-Duser.timezone=UTC",
+        "-cp",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/harness;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\mars\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-promise\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-api\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib-qd-sandbox\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\auth\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-core\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto-ssl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-rmi\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-impl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-scheme\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-ipf-filter\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qds-file\\target\\classes",
+        "com.dxfeed.event.market.EventMappingOracle",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/events/mutation",
+        "mutation",
+        "C:\\qd-cxx/tests/fixtures/events/mapping/inputs"
+      ],
+      "scenario": "mutation",
+      "finishedUtc": "2026-09-23T14:38:20.8498386Z",
+      "heapMiB": 256,
+      "exit": 0,
+      "startedUtc": "2026-09-23T14:38:14.8660720Z"
+    },
+    {
+      "timeoutSeconds": 30,
+      "arguments": [
+        "-Xmx256m",
+        "-Dfile.encoding=UTF-8",
+        "-Duser.language=en",
+        "-Duser.country=US",
+        "-Duser.timezone=UTC",
+        "-cp",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/harness;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\mars\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-promise\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-api\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib-qd-sandbox\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\auth\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-core\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto-ssl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-rmi\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-impl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-scheme\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-ipf-filter\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qds-file\\target\\classes",
+        "com.dxfeed.event.market.EventMappingOracle",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/events/set-before",
+        "set-before",
+        "C:\\qd-cxx/tests/fixtures/events/mapping/inputs"
+      ],
+      "scenario": "set-before",
+      "finishedUtc": "2026-09-23T14:38:21.4106027Z",
+      "heapMiB": 256,
+      "exit": 0,
+      "startedUtc": "2026-09-23T14:38:20.8499465Z"
+    },
+    {
+      "timeoutSeconds": 30,
+      "arguments": [
+        "-Xmx256m",
+        "-Dfile.encoding=UTF-8",
+        "-Duser.language=en",
+        "-Duser.country=US",
+        "-Duser.timezone=UTC",
+        "-cp",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/harness;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\mars\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-promise\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-api\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib-qd-sandbox\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\auth\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-core\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto-ssl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-rmi\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-impl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-scheme\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-ipf-filter\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qds-file\\target\\classes",
+        "com.dxfeed.event.market.EventMappingOracle",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/events/xml",
+        "xml",
+        "C:\\qd-cxx/tests/fixtures/events/mapping/inputs"
+      ],
+      "scenario": "xml",
+      "finishedUtc": "2026-09-23T14:38:22.1046275Z",
+      "heapMiB": 256,
+      "exit": 0,
+      "startedUtc": "2026-09-23T14:38:21.4106729Z"
+    },
+    {
+      "timeoutSeconds": 30,
+      "arguments": [
+        "-Xmx256m",
+        "-Dfile.encoding=UTF-8",
+        "-Duser.language=en",
+        "-Duser.country=US",
+        "-Duser.timezone=UTC",
+        "-Ddxscheme.nanoTime=true",
+        "-cp",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/harness;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\mars\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-promise\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-api\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib-qd-sandbox\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\auth\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-core\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto-ssl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-rmi\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-impl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-scheme\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-ipf-filter\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qds-file\\target\\classes",
+        "com.dxfeed.event.market.EventMappingOracle",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/events/xml-system",
+        "xml-system",
+        "C:\\qd-cxx/tests/fixtures/events/mapping/inputs"
+      ],
+      "scenario": "xml-system",
+      "finishedUtc": "2026-09-23T14:38:22.8210305Z",
+      "heapMiB": 256,
+      "exit": 0,
+      "startedUtc": "2026-09-23T14:38:22.1047109Z"
+    },
+    {
+      "timeoutSeconds": 30,
+      "arguments": [
+        "-Xmx256m",
+        "-Dfile.encoding=UTF-8",
+        "-Duser.language=en",
+        "-Duser.country=US",
+        "-Duser.timezone=UTC",
+        "-Ddxscheme.nanoTime=true",
+        "-Ddxscheme.enabled.Sequence=Profile",
+        "-cp",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/harness;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\mars\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-promise\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-api\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib-qd-sandbox\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\auth\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-core\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto-ssl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-rmi\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-impl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-scheme\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-ipf-filter\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qds-file\\target\\classes",
+        "com.dxfeed.event.market.EventMappingOracle",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/events/xml-properties",
+        "xml-properties",
+        "C:\\qd-cxx/tests/fixtures/events/mapping/inputs"
+      ],
+      "scenario": "xml-properties",
+      "finishedUtc": "2026-09-23T14:38:23.5648138Z",
+      "heapMiB": 256,
+      "exit": 0,
+      "startedUtc": "2026-09-23T14:38:22.8211300Z"
+    },
+    {
+      "timeoutSeconds": 30,
+      "arguments": [
+        "-Xmx256m",
+        "-Dfile.encoding=UTF-8",
+        "-Duser.language=en",
+        "-Duser.country=US",
+        "-Duser.timezone=UTC",
+        "-cp",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/harness;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\mars\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-promise\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-api\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib-qd-sandbox\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\auth\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-core\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto-ssl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-rmi\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-impl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-scheme\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-ipf-filter\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qds-file\\target\\classes",
+        "com.dxfeed.event.market.EventMappingOracle",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/events/xml-extension",
+        "xml-extension",
+        "C:\\qd-cxx/tests/fixtures/events/mapping/inputs"
+      ],
+      "scenario": "xml-extension",
+      "finishedUtc": "2026-09-23T14:38:24.2703032Z",
+      "heapMiB": 256,
+      "exit": 0,
+      "startedUtc": "2026-09-23T14:38:23.5649322Z"
+    },
+    {
+      "timeoutSeconds": 30,
+      "arguments": [
+        "-Xmx256m",
+        "-Dfile.encoding=UTF-8",
+        "-Duser.language=en",
+        "-Duser.country=US",
+        "-Duser.timezone=UTC",
+        "-cp",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/harness;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\mars\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-promise\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-api\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib-qd-sandbox\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\auth\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-core\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto-ssl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-rmi\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-impl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-scheme\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-ipf-filter\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qds-file\\target\\classes",
+        "com.dxfeed.event.market.EventMappingOracle",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/events/xml-unsupported",
+        "xml-unsupported",
+        "C:\\qd-cxx/tests/fixtures/events/mapping/inputs"
+      ],
+      "scenario": "xml-unsupported",
+      "finishedUtc": "2026-09-23T14:38:24.7917356Z",
+      "heapMiB": 256,
+      "exit": 0,
+      "startedUtc": "2026-09-23T14:38:24.2703874Z"
+    },
+    {
+      "timeoutSeconds": 30,
+      "arguments": [
+        "-Xmx256m",
+        "-Dfile.encoding=UTF-8",
+        "-Duser.language=en",
+        "-Duser.country=US",
+        "-Duser.timezone=UTC",
+        "-Ddxscheme.nanoTime=true",
+        "-cp",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/harness;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\mars\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-promise\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-api\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib-qd-sandbox\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\auth\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-core\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto-ssl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-rmi\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-impl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-scheme\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-ipf-filter\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qds-file\\target\\classes",
+        "com.dxfeed.event.market.EventMappingOracle",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/events/reorder",
+        "reorder",
+        "C:\\qd-cxx/tests/fixtures/events/mapping/inputs"
+      ],
+      "scenario": "reorder",
+      "finishedUtc": "2026-09-23T14:38:25.3260543Z",
+      "heapMiB": 256,
+      "exit": 0,
+      "startedUtc": "2026-09-23T14:38:24.7918370Z"
+    },
+    {
+      "timeoutSeconds": 30,
+      "arguments": [
+        "-Xmx256m",
+        "-Dfile.encoding=UTF-8",
+        "-Duser.language=en",
+        "-Duser.country=US",
+        "-Duser.timezone=UTC",
+        "-cp",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/harness;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\mars\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-promise\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-api\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib-qd-sandbox\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\auth\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-core\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto-ssl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-rmi\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-impl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-scheme\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-ipf-filter\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qds-file\\target\\classes",
+        "com.dxfeed.event.market.EventMappingOracle",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/events/minimal",
+        "minimal",
+        "C:\\qd-cxx/tests/fixtures/events/mapping/inputs"
+      ],
+      "scenario": "minimal",
+      "finishedUtc": "2026-09-23T14:38:25.8634551Z",
+      "heapMiB": 256,
+      "exit": 0,
+      "startedUtc": "2026-09-23T14:38:25.3261414Z"
+    },
+    {
+      "timeoutSeconds": 30,
+      "arguments": [
+        "-Xmx256m",
+        "-Dfile.encoding=UTF-8",
+        "-Duser.language=en",
+        "-Duser.country=US",
+        "-Duser.timezone=UTC",
+        "-cp",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/harness;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\mars\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-promise\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-api\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib-qd-sandbox\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\auth\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-core\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto-ssl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-rmi\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-impl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-scheme\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-ipf-filter\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qds-file\\target\\classes",
+        "com.dxfeed.event.market.EventMappingOracle",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/events/rejected",
+        "rejected",
+        "C:\\qd-cxx/tests/fixtures/events/mapping/inputs"
+      ],
+      "scenario": "rejected",
+      "finishedUtc": "2026-09-23T14:38:26.2433885Z",
+      "heapMiB": 256,
+      "exit": 0,
+      "startedUtc": "2026-09-23T14:38:25.8635463Z"
+    },
+    {
+      "timeoutSeconds": 30,
+      "arguments": [
+        "-Xmx256m",
+        "-Dfile.encoding=UTF-8",
+        "-Duser.language=en",
+        "-Duser.country=US",
+        "-Duser.timezone=UTC",
+        "-cp",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/harness;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\mars\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-promise\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-api\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib-qd-sandbox\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\auth\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-core\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto-ssl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-rmi\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-impl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-scheme\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-ipf-filter\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qds-file\\target\\classes",
+        "com.dxfeed.event.market.EventMappingOracle",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/events/numeric-int",
+        "numeric-int",
+        "C:\\qd-cxx/tests/fixtures/events/mapping/inputs"
+      ],
+      "scenario": "numeric-int",
+      "finishedUtc": "2026-09-23T14:38:26.7812415Z",
+      "heapMiB": 256,
+      "exit": 0,
+      "startedUtc": "2026-09-23T14:38:26.2435017Z"
+    },
+    {
+      "timeoutSeconds": 30,
+      "arguments": [
+        "-Xmx256m",
+        "-Dfile.encoding=UTF-8",
+        "-Duser.language=en",
+        "-Duser.country=US",
+        "-Duser.timezone=UTC",
+        "-Ddxscheme.price=int",
+        "-Ddxscheme.size=int",
+        "-Ddxscheme.shares=int",
+        "-cp",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/harness;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\mars\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-promise\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-api\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib-qd-sandbox\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\auth\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-core\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto-ssl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-rmi\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-impl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-scheme\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-ipf-filter\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qds-file\\target\\classes",
+        "com.dxfeed.event.market.EventMappingOracle",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/events/integer-representation",
+        "integer-representation",
+        "C:\\qd-cxx/tests/fixtures/events/mapping/inputs"
+      ],
+      "scenario": "integer-representation",
+      "finishedUtc": "2026-09-23T14:38:27.3318214Z",
+      "heapMiB": 256,
+      "exit": 0,
+      "startedUtc": "2026-09-23T14:38:26.7813251Z"
+    },
+    {
+      "timeoutSeconds": 30,
+      "arguments": [
+        "-Xmx256m",
+        "-Dfile.encoding=UTF-8",
+        "-Duser.language=en",
+        "-Duser.country=US",
+        "-Duser.timezone=UTC",
+        "-Ddxscheme.wide=false",
+        "-cp",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/harness;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\mars\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-promise\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-api\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib-qd-sandbox\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\auth\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-core\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto-ssl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-rmi\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-impl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-scheme\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-ipf-filter\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qds-file\\target\\classes",
+        "com.dxfeed.event.market.EventMappingOracle",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/events/tiny-unsupported",
+        "tiny-unsupported",
+        "C:\\qd-cxx/tests/fixtures/events/mapping/inputs"
+      ],
+      "scenario": "tiny-unsupported",
+      "finishedUtc": "2026-09-23T14:38:27.8565997Z",
+      "heapMiB": 256,
+      "exit": 0,
+      "startedUtc": "2026-09-23T14:38:27.3318770Z"
+    },
+    {
+      "timeoutSeconds": 30,
+      "arguments": [
+        "-Xmx256m",
+        "-Dfile.encoding=UTF-8",
+        "-Duser.language=en",
+        "-Duser.country=US",
+        "-Duser.timezone=UTC",
+        "-Ddxscheme.nanoTime=not-a-boolean",
+        "-cp",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/harness;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\mars\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-promise\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-api\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxlib-qd-sandbox\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\auth\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-core\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\proto-ssl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qd-rmi\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-impl\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-scheme\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\dxfeed-ipf-filter\\target\\classes;C:\\path\\to\\profile\\AppData\\Local\\Temp\\qdcxx-003-qd\\qds-file\\target\\classes",
+        "com.dxfeed.event.market.EventMappingOracle",
+        "C:\\qd-cxx\\.work\\event-mapping-rejected-verify/events/invalid-boolean",
+        "invalid-boolean",
+        "C:\\qd-cxx/tests/fixtures/events/mapping/inputs"
+      ],
+      "scenario": "invalid-boolean",
+      "finishedUtc": "2026-09-23T14:38:28.3760536Z",
+      "heapMiB": 256,
+      "exit": 0,
+      "startedUtc": "2026-09-23T14:38:27.8566477Z"
+    }
+  ],
+  "mode": "Verify",
+  "tools": [
+    {
+      "path": "Compare-Events.ps1",
+      "sha256": "b5d8af77813e8c806da493b1a93ea69164b607c776494d20739bd8e416f7bff0"
+    },
+    {
+      "path": "EventMappingOracle.java",
+      "sha256": "16014d50a2fa0377c3f75ae5b590a140fde608dd51cf83cd048c5b8fb95dd6bd"
+    },
+    {
+      "path": "Invoke-Oracle.ps1",
+      "sha256": "7ab23ac45b4dd216ac6a16a6e7e91907f2461319cef0bedc5c361c7ff45cae54"
+    },
+    {
+      "path": "README.md",
+      "sha256": "fccd641a0bcd701feb19a64d69589bf51413e73f88954c49cc40d63154b10b48"
+    },
+    {
+      "path": "README.ru.md",
+      "sha256": "704ee06c02c950a01aa583024e1227b875e16c43e8a521612242860da42f8bbb"
+    },
+    {
+      "path": "Test-Negatives.ps1",
+      "sha256": "622b04228dee4026a63c8df4502c8fc284ec61199cc872ccf3d26995b5a32fba"
+    }
+  ]
+}

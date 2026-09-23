@@ -1,0 +1,72 @@
+[
+  {
+    "rejected": true,
+    "utc": "2026-09-23T14:28:11.9802281Z",
+    "mutation": "quote-value"
+  },
+  {
+    "rejected": true,
+    "utc": "2026-09-23T14:28:12.2765370Z",
+    "mutation": "profile-flags"
+  },
+  {
+    "rejected": true,
+    "utc": "2026-09-23T14:28:12.5511944Z",
+    "mutation": "profile-string"
+  },
+  {
+    "rejected": true,
+    "utc": "2026-09-23T14:28:12.9372707Z",
+    "mutation": "sequence"
+  },
+  {
+    "rejected": true,
+    "utc": "2026-09-23T14:28:15.1189792Z",
+    "mutation": "schema-type"
+  },
+  {
+    "rejected": true,
+    "utc": "2026-09-23T14:28:16.3074769Z",
+    "mutation": "default"
+  },
+  {
+    "rejected": true,
+    "utc": "2026-09-23T14:28:16.6321138Z",
+    "mutation": "unknown-row"
+  },
+  {
+    "rejected": true,
+    "utc": "2026-09-23T14:28:16.9433453Z",
+    "mutation": "duplicate-event"
+  },
+  {
+    "rejected": true,
+    "utc": "2026-09-23T14:28:17.2916308Z",
+    "mutation": "arity"
+  },
+  {
+    "rejected": true,
+    "utc": "2026-09-23T14:28:17.6004755Z",
+    "mutation": "missing-complete"
+  },
+  {
+    "rejected": true,
+    "utc": "2026-09-23T14:28:17.9471739Z",
+    "mutation": "duplicate-complete"
+  },
+  {
+    "rejected": true,
+    "utc": "2026-09-23T14:28:18.2713148Z",
+    "mutation": "trailing-row"
+  },
+  {
+    "rejected": true,
+    "utc": "2026-09-23T14:28:18.6092052Z",
+    "mutation": "missing-file"
+  },
+  {
+    "rejected": true,
+    "utc": "2026-09-23T14:28:19.9538917Z",
+    "mutation": "binary"
+  }
+]

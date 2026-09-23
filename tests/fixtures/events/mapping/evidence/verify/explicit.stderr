@@ -1,0 +1,10 @@
+I 260923 143955.374 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-accepted-verify\events\explicit\Quote-stream.qtp
+I 260923 143955.410 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-accepted-verify\events\explicit\Quote-stream.qtp
+I 260923 143955.422 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-accepted-verify\events\explicit\Quote-raw.qtp
+I 260923 143955.424 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-accepted-verify\events\explicit\Quote-raw.qtp
+I 260923 143955.429 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-accepted-verify\events\explicit\Profile-stream.qtp
+I 260923 143955.432 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-accepted-verify\events\explicit\Profile-stream.qtp
+I 260923 143955.436 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-accepted-verify\events\explicit\Profile-raw.qtp
+I 260923 143955.438 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-accepted-verify\events\explicit\Profile-raw.qtp
+I 260923 143955.440 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-accepted-verify\events\explicit\Profile-wire-omitted.qtp
+I 260923 143955.442 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-accepted-verify\events\explicit\Quote-wire-omitted.qtp

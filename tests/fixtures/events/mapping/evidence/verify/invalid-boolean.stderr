@@ -1,0 +1,17 @@
+E 260923 144021.243 [main] SchemeProperties - Failed to acquire correct value for "dxscheme.nanoTime" boolean system property
+java.lang.IllegalArgumentException: not-a-boolean is not a valid boolean value
+	at com.devexperts.util.SystemProperties.parseBooleanValue(SystemProperties.java:315)
+	at com.dxfeed.api.impl.SchemeProperties.getBooleanProperty(SchemeProperties.java:246)
+	at com.dxfeed.api.impl.SchemeProperties.<init>(SchemeProperties.java:88)
+	at com.dxfeed.api.impl.DXFeedScheme.<clinit>(DXFeedScheme.java:30)
+	at com.dxfeed.event.market.EventMappingOracle.main(EventMappingOracle.java:464)
+I 260923 144021.542 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-accepted-verify\events\invalid-boolean\Quote-stream.qtp
+I 260923 144021.567 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-accepted-verify\events\invalid-boolean\Quote-stream.qtp
+I 260923 144021.578 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-accepted-verify\events\invalid-boolean\Quote-raw.qtp
+I 260923 144021.580 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-accepted-verify\events\invalid-boolean\Quote-raw.qtp
+I 260923 144021.585 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-accepted-verify\events\invalid-boolean\Profile-stream.qtp
+I 260923 144021.589 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-accepted-verify\events\invalid-boolean\Profile-stream.qtp
+I 260923 144021.591 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-accepted-verify\events\invalid-boolean\Profile-raw.qtp
+I 260923 144021.594 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-accepted-verify\events\invalid-boolean\Profile-raw.qtp
+I 260923 144021.598 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-accepted-verify\events\invalid-boolean\Profile-wire-omitted.qtp
+I 260923 144021.600 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-accepted-verify\events\invalid-boolean\Quote-wire-omitted.qtp

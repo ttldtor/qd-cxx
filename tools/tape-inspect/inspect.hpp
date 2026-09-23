@@ -27,7 +27,8 @@ struct Limits {
                                16777216,
                                4194304,
                                4194304},
-                              4096}; ///< Explicit finite defaults, including RAW timing attempts.
+                              4096};  ///< Explicit finite defaults, including RAW timing attempts.
+    std::size_t eventUnits = 4194304; ///< Cumulative copied Profile symbol and string UTF-16 units.
 };
 
 /** Construct the fixed diagnostic mixed schema from FIELD-TYPES, without wire discovery.

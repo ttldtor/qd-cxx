@@ -15,6 +15,13 @@ logic. Transport/threading and CLI/properties compatibility remain separate deci
 
 ## Intent
 
+QDCXX-025 implements the bounded [prepared event mapping boundary](../spec/events/EVENT-MAPPING.md):
+immutable local schemas carry an opaque record context through generic decoding, while separate
+Quote/Profile adapters own validated field selections and event values. Schema copies preserve context;
+fresh schema creation creates a new identity. Wire binding and source configuration remain separate.
+The [Java configuration subset](../spec/schema/CONFIGURED-EVENTS.md) provides source evidence;
+it does not add a C++ loader, ambient process settings or transport to core/event libraries.
+
 `qd-cxx` will reproduce the externally observable contracts of Java QD without mechanically reproducing its class hierarchy or historical implementation choices. The design target is a modular, testable C++23 system.
 
 ## Proposed boundaries

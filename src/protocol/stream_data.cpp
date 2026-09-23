@@ -95,12 +95,14 @@ StreamDataContext::create(const core::LocalSchema &schema, std::span<const WireR
             }
 
             std::size_t count = 0;
+            core::RecordContext recordContext;
 
             if (bound->localRecordId) {
                 count = schema.records()[static_cast<std::size_t>(*bound->localRecordId)].fields.size();
+                recordContext = schema.recordContext(*bound->localRecordId);
             }
 
-            plans.push_back({std::move(*bound), count});
+            plans.push_back({std::move(*bound), count, std::move(recordContext)});
         }
 
         return StreamDataContext(std::move(plans), std::move(defaults), schema.profile());
@@ -328,7 +330,7 @@ StreamDataResult decodeDataPayload(std::span<const std::byte> payload, const Str
             if (plan->binding.localRecordId) {
                 const auto units = symbol.value->units.size();
                 result.records.push_back({*plan->binding.localRecordId, std::move(*symbol.value), std::move(values),
-                                          std::move(typedValues)});
+                                          std::move(typedValues), plan->context});
                 --limits.emittedRecords;
                 limits.emittedValues -= plan->localFieldCount;
                 limits.ownedSymbolUnits -= units;

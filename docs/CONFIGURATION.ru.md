@@ -7,6 +7,12 @@
 
 ## Источники и базовая версия
 
+Реализованное в QDCXX-025 [подмножество настроек схемы](../spec/schema/CONFIGURED-EVENTS.ru.md) добавляет
+production-наблюдения в новых JVM для выбранных startup, endpoint file/API, mutation и XML inputs.
+Оно фиксирует измеренные приоритет и момент чтения каждого параметра, включая явный выбор полей
+против nanoTime. Наблюдения дополняют исходные факты ниже; они не устанавливают универсальный приоритет
+и не реализуют C++ settings loader. Подготовленные отображения принимают только явные проверенные схемы.
+
 - [QD and dxFeed Java API Project Settings](https://github.com/dxFeed/dxfeed-graal-cxx-api/wiki/QD-and-dxFeed-Java-API-Project-Settings), прочитано 2026-09-23: исходный список для поиска, не полная и не закреплённая спецификация.
 - [Текущие release notes](https://github.com/devexperts/QD/blob/master/ReleaseNotes.txt): источник для поиска и истории изменений; master изменяем.
 - [Закреплённые release notes](https://github.com/devexperts/QD/blob/0ddc0a09779fb61d74cc0b37c6449ff47dcb715f/ReleaseNotes.txt), код потребителей и production-наблюдения определяют базу согласно `upstream.lock`.

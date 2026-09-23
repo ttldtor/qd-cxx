@@ -4,7 +4,13 @@
 
 #include "qd/core/local_schema.hpp"
 #include "qd/core/wide_decimal.hpp"
+#include "qd/events/event_mapping.hpp"
 #include <array>
+#include <cstddef>
+#include <cstdint>
+#include <expected>
+#include <span>
+#include <string>
 #include <string_view>
 
 namespace org::ttldtor::qdcxx::events {
@@ -17,7 +23,7 @@ inline constexpr std::array<core::SerialFieldType, 8> QUOTE_FIELD_TYPES{
     core::SerialFieldType::WIDE_DECIMAL, core::SerialFieldType::TIME_SECONDS, core::SerialFieldType::UTF_CHAR,
     core::SerialFieldType::WIDE_DECIMAL, core::SerialFieldType::WIDE_DECIMAL};
 
-/** Owned provisional default-composite view; no event hierarchy or transport dependency. */
+/** Owned Quote projection; no event hierarchy or transport dependency. */
 struct Quote {
     std::u16string symbol;         ///< Exact owned UTF-16 symbol, without normalization.
     std::int64_t bidTimeMs;        ///< Signed bid seconds expanded exactly to milliseconds.
@@ -28,10 +34,10 @@ struct Quote {
     char16_t askExchangeCode;      ///< Low UTF-16 unit of the preserved incoming code point.
     core::WideDecimal askPrice;    ///< Exact raw decimal, including NaN and infinities.
     core::WideDecimal askSize;     ///< Exact raw decimal size, including missing-field NaN.
-    std::int64_t timeMs;           ///< Maximum bid/ask millisecond time, without a subsecond component.
-    std::int64_t eventTime = 0;    ///< Field mapping leaves metadata zero; explicit tape timing is separate.
-    std::int32_t sequence = 0;     ///< Default schema has no Sequence field.
-    std::int32_t timeNanoPart = 0; ///< Default schema has no TimeNanoPart field.
+    std::int64_t timeMs;           ///< Maximum bid/ask time plus the prepared mapping's packed milliseconds.
+    std::int64_t eventTime = 0;    ///< Explicit caller metadata; the legacy mapper always leaves zero.
+    std::int32_t sequence = 0;     ///< Low 22 Sequence bits; zero on the legacy mapping path.
+    std::int32_t timeNanoPart = 0; ///< Signed TimeNanoPart value; zero on the legacy mapping path.
 };
 
 /** Mapping failure, separate from wire parsing and transport. */
@@ -55,4 +61,39 @@ enum class QuoteError {
  */
 [[nodiscard]] std::expected<Quote, QuoteError>
 mapQuote(std::u16string_view symbol, std::span<const core::FieldValue> fields, std::size_t symbolUnits);
+
+/** Immutable Quote field selections tied to one validated local record context. */
+class PreparedQuote {
+    EventMapping mapping_;
+
+    /** Take an independently owned validated field plan.
+     * @param mapping Complete immutable Quote field plan.
+     */
+    explicit PreparedQuote(EventMapping mapping);
+
+    public:
+    /** Resolve measured Quote keys and exact full types before event projection.
+     * @param schema Explicit validated source schema; no storage is borrowed after return.
+     * @param localId Selected ordinary local record identity.
+     * @param limits Mandatory finite preparation budgets.
+     * @return Immutable prepared mapping or atomic preparation error.
+     */
+    [[nodiscard]] static std::expected<PreparedQuote, MappingError> prepare(const core::LocalSchema &schema,
+                                                                            std::int32_t localId, MappingLimits limits);
+
+    /** Inspect the retained schema/record identity.
+     * @return Borrowed context until this mapping is moved, assigned or destroyed; a copy owns its identity.
+     */
+    [[nodiscard]] const core::RecordContext &context() const noexcept;
+
+    /** Validate and project without modifying or retaining generic values.
+     * @param symbol Exact UTF-16 symbol, borrowed during this call.
+     * @param values Context-tagged complete local values, including any extra fields.
+     * @param symbolUnits Mandatory maximum UTF-16 units copied into the owned result.
+     * @param eventTime Explicit metadata in milliseconds, independent of business fields.
+     * @return Complete owned Quote or context/value/resource/allocation error.
+     */
+    [[nodiscard]] std::expected<Quote, MappingError> map(std::u16string_view symbol, RecordValueView values,
+                                                         std::size_t symbolUnits, std::int64_t eventTime = 0) const;
+};
 } // namespace org::ttldtor::qdcxx::events

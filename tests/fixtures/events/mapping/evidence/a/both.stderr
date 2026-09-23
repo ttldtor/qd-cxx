@@ -1,0 +1,10 @@
+I 260923 142403.285 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-final-a\events\both\Quote-stream.qtp
+I 260923 142403.315 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-final-a\events\both\Quote-stream.qtp
+I 260923 142403.326 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-final-a\events\both\Quote-raw.qtp
+I 260923 142403.329 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-final-a\events\both\Quote-raw.qtp
+I 260923 142403.335 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-final-a\events\both\Profile-stream.qtp
+I 260923 142403.337 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-final-a\events\both\Profile-stream.qtp
+I 260923 142403.339 [main] FileWriterImpl - Writing tape data to C:\qd-cxx\.work\event-mapping-final-a\events\both\Profile-raw.qtp
+I 260923 142403.341 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-final-a\events\both\Profile-raw.qtp
+I 260923 142403.344 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-final-a\events\both\Profile-wire-omitted.qtp
+I 260923 142403.345 [main] FileReader - Reading data from C:\qd-cxx\.work\event-mapping-final-a\events\both\Quote-wire-omitted.qtp

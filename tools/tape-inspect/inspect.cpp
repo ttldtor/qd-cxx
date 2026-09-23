@@ -35,6 +35,35 @@ struct Failure {
  * @return True for a legacy schema/display pair or the exact default Quote field shape.
  */
 bool compatibleProfile(const core::LocalSchema &schema, inspect::DisplayProfile profile) noexcept {
+    if (profile == inspect::DisplayProfile::DEFAULT_PROFILE_V1) {
+        if (schema.profile() != core::LocalProfile::EXTENDED_FIELDS_V1 || schema.records().size() != 1) {
+            return false;
+        }
+
+        const auto &record = schema.records().front();
+
+        if (record.name != u"Profile" || record.fields.size() != events::PROFILE_FIELD_TYPES.size()) {
+            return false;
+        }
+
+        for (std::size_t i = 0; i < record.fields.size(); ++i) {
+            if (record.fields[i].serialTypeId != std::to_underlying(events::PROFILE_FIELD_TYPES[i])) {
+                return false;
+            }
+
+            const auto name = events::PROFILE_FIELD_NAMES[i];
+
+            if (std::none_of(record.lookups.begin(), record.lookups.end(), [&](const auto &lookup) {
+                    return lookup.fieldId == i && lookup.name.size() == name.size() &&
+                           std::equal(lookup.name.begin(), lookup.name.end(), name.begin());
+                })) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     if (profile == inspect::DisplayProfile::ORACLE_FIELD_TYPES_V1) {
         if (schema.profile() != core::LocalProfile::EXTENDED_FIELDS_V1 || schema.records().size() != 1) {
             return false;
@@ -224,10 +253,29 @@ int inspect(std::istream &input, std::ostream &output, std::ostream &diagnostic,
             return 4;
         }
 
+        std::optional<events::PreparedProfile> profileMapping;
+
+        if (profile == inspect::DisplayProfile::DEFAULT_PROFILE_V1) {
+            // The preset has exactly sixteen fields; construction remains bounded independently of file input.
+            auto prepared = events::PreparedProfile::prepare(schema, 0, {16, 64, 16, 32, 32, 128, 4096, 131072});
+
+            if (!prepared) {
+                const bool resource = prepared.error() == events::MappingError::RESOURCE_LIMIT ||
+                                      prepared.error() == events::MappingError::ALLOCATION_FAILURE;
+                report(diagnostic, resource ? 6 : 4, "profile", diagnosticsVersion,
+                       protocol::TapeRejection::LOCAL_PROFILE, format);
+
+                return resource ? 6 : 4;
+            }
+
+            profileMapping.emplace(std::move(*prepared));
+        }
+
         protocol::TapeReader reader(schema, limits.tape, mode);
         const bool timed = mode == protocol::TapeMode::RAW_MESSAGE_V1;
         org::ttldtor::qdcxx::inspect::Formatter formatter(format, profile);
         std::size_t remainingOutput = limits.output;
+        std::size_t remainingEventUnits = limits.eventUnits;
         std::size_t emitted = 0;
         const auto emit = [&](const std::string &row) {
             operation = "write";
@@ -308,9 +356,33 @@ int inspect(std::istream &input, std::ostream &output, std::ostream &diagnostic,
                     }
 
                     for (const auto &record : result.records) {
-                        emit(formatter.record(record, schema.records()[static_cast<std::size_t>(record.localId)].name,
-                                              index, emitted, remainingOutput,
-                                              result.timing ? &*result.timing : nullptr));
+                        if (profileMapping) {
+                            operation = "mapping";
+                            auto event =
+                                profileMapping->map(record.symbol.units, {record.context, record.typedValues},
+                                                    {limits.tape.data.symbol.codeUnits,
+                                                     limits.tape.data.fieldString.codeUnits, remainingEventUnits},
+                                                    result.timing ? result.timing->eventTimeMs() : 0);
+
+                            if (!event) {
+                                throw Failure{event.error() == events::MappingError::RESOURCE_LIMIT ||
+                                                      event.error() == events::MappingError::ALLOCATION_FAILURE
+                                                  ? 6
+                                                  : 4};
+                            }
+
+                            remainingEventUnits -= event->symbol.size() +
+                                                   (event->description ? event->description->size() : 0) +
+                                                   (event->statusReason ? event->statusReason->size() : 0);
+                            emit(formatter.profileRecord(
+                                record, schema.records()[static_cast<std::size_t>(record.localId)].name, index, emitted,
+                                *event, remainingOutput));
+                        } else {
+                            emit(formatter.record(
+                                record, schema.records()[static_cast<std::size_t>(record.localId)].name, index, emitted,
+                                remainingOutput, result.timing ? &*result.timing : nullptr));
+                        }
+
                         ++emitted;
                     }
                 }
