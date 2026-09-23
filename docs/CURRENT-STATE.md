@@ -1,5 +1,12 @@
 # Current state
 
+## Next assignment: QDCXX-025
+
+Configurable schemas and event mappings is assigned for implementation, not yet implemented.
+[ADR-0003](decisions/ADR-0003-configurable-schemas-and-event-mappings.md) makes configurability a project-wide requirement, including the existing Quote adapter and the new Profile adapter.
+Built-in schemas remain defaults; source loading and the [broader settings subsystem](CONFIGURATION.md) are separate work.
+No new C++ behavior, Java capture or runtime test is claimed by this planning update.
+
 [Русская версия](CURRENT-STATE.ru.md). English is authoritative.
 
 ## Serial type readability follow-up accepted

@@ -30,6 +30,15 @@ These are direction-setting boundaries, not yet implementation commitments:
 
 Dependency direction should point inward: transport may depend on protocol; protocol may depend on encoding and core contracts; core must not depend on transport.
 
+## Configurable schemas and event mappings
+
+[ADR-0003](decisions/ADR-0003-configurable-schemas-and-event-mappings.md) makes runtime-resolved schemas a project-wide requirement.
+Built-in defaults and future XML/JSON or programmatic sources use the same validated local-schema boundary.
+Generic records remain available without standard event adapters; Quote/Profile mappings bind to a particular schema instead of assuming its default field order.
+Source configuration, wire adaptation and event projection remain separate responsibilities.
+QDCXX-025 implements the first bounded application of this decision; the decision is not a claim of existing loader or arbitrary-schema support.
+The [configuration requirements](CONFIGURATION.md) apply beyond schema settings: property sources, precedence, scope, read timing and diagnostics are explicit compatibility concerns.
+
 ## Design principles
 
 - Specify observable behavior before implementation.
