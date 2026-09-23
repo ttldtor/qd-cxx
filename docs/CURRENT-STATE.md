@@ -2,13 +2,17 @@
 
 [Русская версия](CURRENT-STATE.ru.md). English is authoritative.
 
-## Serial type readability follow-up
+## Serial type readability follow-up accepted
 
 The owner-requested refactor separates base `SerialType`, `FieldRepresentation` and full
 `SerialFieldType` identities without widening any profile. Production schema code reuses the named
 identities; tests keep independent numeric expectations. See the [contract](../spec/encoding/FIELD-TYPES.md)
-and [new verification record](../tests/conformance/protocol/field-types/TYPE-MODEL-REFACTOR.md).
-Historical validation remains unchanged; independent review of this follow-up is not complete.
+and [review and verification record](../tests/conformance/protocol/field-types/TYPE-MODEL-REFACTOR.md).
+Independent review found one P2 test gap; the targeted follow-up review closed it after the six
+representation selectors were pinned to independent literals. No findings remain in that review scope.
+The accepted result is on `master` at `8f2ee55a9444aecc7cd7887a3efb60d6e7ef6379`.
+The working tree was clean before this status update. Historical validation remains unchanged.
+This records the owner-supplied review reports, not a new code review or a repeat review of all QDCXX-024.
 
 ## QDCXX-024 implemented — independent review pending
 

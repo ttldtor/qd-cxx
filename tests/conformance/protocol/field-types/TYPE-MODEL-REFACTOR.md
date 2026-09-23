@@ -6,6 +6,37 @@ Baseline: `bfdeca0d6450533bc8ef1c5a9cd098d62039a375`, branch `task/qdcxx-024-fie
 Owner-requested follow-up: make base serialization and representation explicit and avoid copying
 full numeric identities into production consumers. No additional supported type or wire behavior.
 
+## Acceptance and integration — 2026-09-23 (UTC)
+
+The serial type refactor is accepted; P2 is independently closed. No findings remain within the
+reviewed scope. This section records the independent reviewer reports supplied by the owner;
+documenting their conclusions is not another code review or test run.
+
+- Review of `a3d9c20db589a5730703f3a2c55bfb14a06961e5` against the baseline above found one
+  P2 gap in direct representation-selector checks and no other findings. The reviewer reported fresh
+  incremental MSVC Release and GCC Debug ASan+UBSan builds with 25/25 CTest suites in each,
+  pinned Format Check for three C++ files, and whitespace/link checks for six Markdown documents.
+- Correction `8f2ee55a9444aecc7cd7887a3efb60d6e7ef6379` changes only the test and this EN/RU
+  report pair. The targeted follow-up reviewer confirmed all six independent selector expectations,
+  retained earlier checks, unchanged production code, and consistent EN/RU reports and logs.
+  The reviewer confirmed the author's mutation evidence: the full ID remains 40, the new check fails
+  with `40 == 32`, and the restored clean build passes. The stale-binary intermediate run remains
+  documented below.
+- The targeted follow-up review freshly ran the existing MSVC Release target binary:
+  7/7 test cases, 15,846/15,846 assertions, exit 0. Its diff whitespace check passed.
+  Mutation, builds and complete 25/25 regressions were not rerun in that review; those results were
+  checked in the author's logs. It did not re-review all of QDCXX-024.
+
+The first review did not repeat production-only builds, clean builds, the full platform matrix or
+Java captures; it used neither the private tape nor an external cross-model pass. The targeted
+follow-up does not extend that coverage. Historical author results below retain their original scope.
+
+The owner integrated the result into `master`. Before this documentation update, read-only Git checks
+confirmed branch `master`, HEAD `8f2ee55a9444aecc7cd7887a3efb60d6e7ef6379` and a clean working tree.
+The pending-review statements below describe earlier stages and are superseded by this acceptance
+record. Historical commands, logs and hashes are retained; this update does not run staging, commit
+or merge.
+
 ## Changes and rationale
 
 - `SerialType` names the three implemented bases; `FieldRepresentation` names their implemented
