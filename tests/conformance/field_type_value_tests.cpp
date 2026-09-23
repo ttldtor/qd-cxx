@@ -202,6 +202,56 @@ TEST_CASE("locked Java char-array and exact integer field primitive observations
     CHECK(integers == 324);
 }
 
+TEST_CASE("full field identities expose serialization and representation without losing unknown bits") {
+    using T = c::SerialFieldType;
+    using S = c::SerialType;
+    using R = c::FieldRepresentation;
+    // Independent protocol literals must not be derived from the implementation constants.
+    constexpr std::array<T, 8> TYPES{T::UTF_CHAR,     T::COMPACT_INT, T::UTF_CHAR_ARRAY, T::SHORT_STRING,
+                                     T::TIME_SECONDS, T::SEQUENCE,    T::DATE,           T::WIDE_DECIMAL};
+    constexpr std::array<std::int32_t, 8> IDS{2, 8, 10, 40, 56, 72, 88, 120};
+    constexpr std::array<std::int32_t, 8> SERIAL{2, 8, 10, 8, 8, 8, 8, 8};
+    constexpr std::array<std::int32_t, 8> REPRESENTATIONS{0, 0, 0, 0x20, 0x30, 0x40, 0x50, 0x70};
+    static_assert(c::composeSerialTypeId(S::COMPACT_INT, R::WIDE_DECIMAL) == 120);
+    static_assert(c::serialTypeBits(0x178) == 0x108);
+    static_assert(c::representationBits(0x178) == 0x70);
+
+    CHECK(c::REPRESENTATION_MASK == 0xf0);
+    CHECK(c::SERIAL_TYPE_MASK == ~std::int32_t{0xf0});
+
+    for (std::size_t index = 0; index < TYPES.size(); ++index) {
+        CAPTURE(index);
+        CHECK(static_cast<std::int32_t>(TYPES[index]) == IDS[index]);
+        CHECK(c::serialTypeBits(IDS[index]) == SERIAL[index]);
+        CHECK(c::representationBits(IDS[index]) == REPRESENTATIONS[index]);
+    }
+
+    for (std::int32_t id = 0; id <= 0xff; ++id) {
+        CAPTURE(id);
+        CHECK(c::serialTypeBits(id) == id % 16);
+        CHECK(c::representationBits(id) == (id / 16) * 16);
+        CHECK((c::serialTypeBits(id) | c::representationBits(id)) == id);
+    }
+
+    // The serialization mask is NOT 0x0f: unknown high bits must survive decomposition.
+    for (const auto id :
+         {0x108, 0x178, -1, std::numeric_limits<std::int32_t>::min(), std::numeric_limits<std::int32_t>::max()}) {
+        CAPTURE(id);
+        CHECK(c::serialTypeBits(id) == (id & ~std::int32_t{0xf0}));
+        CHECK((c::serialTypeBits(id) | c::representationBits(id)) == id);
+
+        for (const auto profile :
+             {c::LocalProfile::COMPACT_INT_V1, c::LocalProfile::QUOTE_FIELDS_V1, c::LocalProfile::EXTENDED_FIELDS_V1}) {
+            CHECK_FALSE(c::supportsSerialType(id, profile));
+        }
+    }
+
+    // Bit composition is not a promise that a type/representation pair is supported.
+    const auto unsupported = c::composeSerialTypeId(S::UTF_CHAR, R::WIDE_DECIMAL);
+    CHECK(unsupported == 114);
+    CHECK_FALSE(c::supportsSerialType(unsupported, c::LocalProfile::EXTENDED_FIELDS_V1));
+}
+
 TEST_CASE("extended identities preserve both prior profile gates and reject serialization siblings") {
     constexpr std::array<std::int32_t, 8> EXTENDED{2, 8, 10, 40, 56, 72, 88, 120};
     constexpr std::array<std::int32_t, 4> QUOTE{2, 8, 56, 120};

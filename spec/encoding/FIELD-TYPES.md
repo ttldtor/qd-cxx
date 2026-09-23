@@ -32,6 +32,27 @@ low-32-bit projection. Redundant/wider encodings remain accepted. No ShortString
 calendar validation or date-unit conversion is provided. Field SEQUENCE is independent of the
 heartbeat's `TapeTiming::eventTimeSequence`. Existing scalar contracts remain in [QUOTE-VALUES](QUOTE-VALUES.md).
 
+### Serialization and representation components
+
+The full numeric identity is the bitwise OR of a base serialization type and one representation
+selector. The C++ `SerialType` and `FieldRepresentation` enums name the implemented components;
+`SerialFieldType` retains the existing full identities, now defined through `composeSerialTypeId`.
+For example, `WIDE_DECIMAL` is `COMPACT_INT | WIDE_DECIMAL` (`8 | 0x70 = 120`), not a new base encoding.
+The selectors are encoded alternatives, not flags that may be combined with each other.
+
+`REPRESENTATION_MASK = 0xf0` and `SERIAL_TYPE_MASK = ~REPRESENTATION_MASK` follow
+[locked SerialFieldType.Bits](https://github.com/devexperts/QD/blob/0ddc0a09779fb61d74cc0b37c6449ff47dcb715f/qd-core/src/main/java/com/devexperts/qd/SerialFieldType.java#L330).
+`serialTypeBits` and `representationBits` return raw numeric components without validation.
+In particular, the serialization mask preserves unknown high bits; it is not `0x0f`.
+Composition neither validates a pairing nor authorizes decoding. Unknown representation selectors
+remain numeric, and unsupported full identities still fail the unchanged exact-ID profile gate.
+A shared serialization base does not imply equal logical width: WIDE_DECIMAL retains all 64 bits.
+
+The enums are intentionally incomplete. This readability refactor adds no supported identity,
+conversion, wire behavior or fixture expectation. Schema construction and binding continue to use
+the single `supportsSerialType` policy; tests retain independent numeric expectations.
+See [refactor verification](../../tests/conformance/protocol/field-types/TYPE-MODEL-REFACTOR.md).
+
 ## Character-array primitive and message boundary
 
 Type 10 is compact-long character count, then that many UTFChar-encoded BMP values. Legal counts

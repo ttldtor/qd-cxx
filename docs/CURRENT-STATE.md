@@ -2,6 +2,14 @@
 
 [Русская версия](CURRENT-STATE.ru.md). English is authoritative.
 
+## Serial type readability follow-up
+
+The owner-requested refactor separates base `SerialType`, `FieldRepresentation` and full
+`SerialFieldType` identities without widening any profile. Production schema code reuses the named
+identities; tests keep independent numeric expectations. See the [contract](../spec/encoding/FIELD-TYPES.md)
+and [new verification record](../tests/conformance/protocol/field-types/TYPE-MODEL-REFACTOR.md).
+Historical validation remains unchanged; independent review of this follow-up is not complete.
+
 ## QDCXX-024 implemented — independent review pending
 
 Starting HEAD: `a9299317c1d4e7f3202ed8136916fd3ee94b9f3f`. The explicit

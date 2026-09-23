@@ -10,12 +10,16 @@
 #include <limits>
 #include <ostream>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
 namespace org::ttldtor::qdcxx::tape_inspect {
 namespace {
-constexpr std::array<std::int32_t, 9> FIELD_TYPE_IDS{10, 40, 72,  88, 8,
-                                                     2,  56, 120, 10}; ///< Exact diagnostic schema identities.
+/// Exact diagnostic schema identities, shared by construction and presentation validation.
+constexpr std::array FIELD_TYPES{
+    core::SerialFieldType::UTF_CHAR_ARRAY, core::SerialFieldType::SHORT_STRING, core::SerialFieldType::SEQUENCE,
+    core::SerialFieldType::DATE,           core::SerialFieldType::COMPACT_INT,  core::SerialFieldType::UTF_CHAR,
+    core::SerialFieldType::TIME_SECONDS,   core::SerialFieldType::WIDE_DECIMAL, core::SerialFieldType::UTF_CHAR_ARRAY};
 constexpr std::array<std::u16string_view, 9> FIELD_NAMES{
     u"Text", u"Short",   u"Sequence", u"Date", u"Count",
     u"Char", u"Seconds", u"Wide",     u"Tail"}; ///< Exact logical lookup names.
@@ -38,12 +42,12 @@ bool compatibleProfile(const core::LocalSchema &schema, inspect::DisplayProfile 
 
         const auto &record = schema.records().front();
 
-        if (record.name != u"FieldTypes" || record.fields.size() != FIELD_TYPE_IDS.size()) {
+        if (record.name != u"FieldTypes" || record.fields.size() != FIELD_TYPES.size()) {
             return false;
         }
 
-        for (std::size_t i = 0; i < FIELD_TYPE_IDS.size(); ++i) {
-            if (record.fields[i].serialTypeId != FIELD_TYPE_IDS[i]) {
+        for (std::size_t i = 0; i < FIELD_TYPES.size(); ++i) {
+            if (record.fields[i].serialTypeId != std::to_underlying(FIELD_TYPES[i])) {
                 return false;
             }
         }
@@ -149,8 +153,8 @@ std::expected<core::LocalSchema, core::SchemaError> oracleFieldTypesSchema(core:
     try {
         core::LocalRecord record{0, u"FieldTypes", false, {}, {}};
 
-        for (std::size_t i = 0; i < FIELD_TYPE_IDS.size(); ++i) {
-            record.fields.push_back({FIELD_TYPE_IDS[i]});
+        for (std::size_t i = 0; i < FIELD_TYPES.size(); ++i) {
+            record.fields.push_back({std::to_underlying(FIELD_TYPES[i])});
             record.lookups.push_back({std::u16string(FIELD_NAMES[i]), i});
         }
 
