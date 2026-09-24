@@ -1,9 +1,9 @@
 # Project roadmap
 
-## Current priority: implement external JSON schema loading
+## Current priority: export resolved Java schemas
 
-1. Implement QDCXX-029, High: native resolved JSON, an optional simdjson DOM loader and generic `--schema` inspection. Verify loaded Quote/Profile through the existing prepared APIs. The plan defines strict limits and proportionate verification; implementation is not started.
-2. Keep XML/imports/providers and Java-property resolution separate. The explicit native input does not require completing the general configuration inventory first; that inventory remains necessary before a general settings engine.
+1. QDCXX-029 is accepted and integrated at `0908094276cccfa494d58493611fa9ac363f4856`. Implement the assigned QDCXX-030, High: export an actual resolved Java DataScheme to the existing native JSON format, then consume it through the loader, generic inspector and prepared Quote/Profile APIs. The owner approved this offline bridge; implementation has not started. The plan defines U1–U4, controlled settings/XML sources and proportionate verification.
+2. Java resolves XML/imports and the explicitly supported settings in this bridge; C++ does not. A native XML importer and general settings engine remain separate assignments. The [configuration inventory](CONFIGURATION.md) is still required before implementing general resolution; QDCXX-030 does not attempt every Java property or live reconfiguration.
 3. Continue real-event coverage and operational replay/feed/multiplexer tools under separate assignments. Remaining [manual Python migration](PYTHON-MIGRATION.md) is deferred from the immediate implementation path; existing checks are not canceled without replacements.
 
 This order supersedes the previous priority below. No task authorizes staging, commit or the next implementation automatically.

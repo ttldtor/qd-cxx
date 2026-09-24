@@ -1,6 +1,15 @@
 # Current state
 
-## QDCXX-029 implemented: independent review pending
+## QDCXX-030 assigned: resolved Java schema export
+
+QDCXX-030 is ready, High; implementation has not started.
+The owner approved an offline Java bridge from the actual resolved DataScheme to the existing native JSON format.
+The plan covers explicit settings/XML sources,
+complete actual lookup keys, logical projection of storage slots and consumption by existing C++ APIs.
+It does not authorize a native XML importer, a general settings engine, new wire types or transport.
+This planning update changes documents only; no builds, Java captures or runtime checks were run.
+
+## QDCXX-029 accepted and integrated in master
 
 QDCXX-029, High, implements U1–U4 from the
 plan. Actual starting HEAD:
@@ -9,9 +18,14 @@ The distinct [native JSON contract](../spec/schema/NATIVE-JSON.md), optional pri
 DOM loader and explicit generic `--schema` inspection preserve core/event independence and old profiles.
 Loaded reordered Quote/Profile schemas use existing prepared APIs; custom and extra fields remain visible.
 [Author validation](../tests/conformance/schema-json/VALIDATION.md) records the Windows/Linux checks,
-limitations and complete changed-file manifest. Independent acceptance remains open; nothing was staged,
-committed, pushed or merged. Transient logs stay in `.work/`. XML, properties, new wire types, transport,
-private tape and further Python migration remain outside scope. Earlier entries retain their historical scope.
+limitations and complete changed-file manifest. The preceding independent review found no remaining findings:
+all 32 changed files were inspected, MSVC Release passed 43/43 CTest, and the three new tests passed
+in GCC Debug ASan+UBSan. The author's full Linux suite and production-only checks were inspected,
+not independently rerun; macOS, forced allocation failure and LSan remain unverified.
+The owner integrated the result in master at `0908094276cccfa494d58493611fa9ac363f4856` and confirmed a clean tree.
+This records the preceding review and owner integration, not fresh runtime verification in this planning turn.
+Transient logs stay in `.work/`. XML, properties, new wire types, transport, private tape and further
+Python migration were outside QDCXX-029. Earlier entries retain their historical scope.
 
 ## QDCXX-028 accepted and integrated in master
 
