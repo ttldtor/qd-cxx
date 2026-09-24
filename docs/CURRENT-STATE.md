@@ -1,12 +1,14 @@
 # Current state
 
-## QDCXX-028 implemented and author-verified: independent acceptance open
+## QDCXX-028 accepted and integrated in master
 
 QDCXX-028, High, implements standalone native UTC logging and CMake C++ formatting with explicit exact native executables.
 [Current instructions](../tools/dev/README.md) describe bootstrap, argument-vector logging and interpreter-free command trees; optional Windows PowerShell conveniences remain.
 U1–U5 implementation and author verification cover the required Windows/Linux profiles, option combinations and corrected reruns. macOS is explicitly unverified and nonblocking. ASan/UBSan ran with LSan disabled; Linux session cleanup requires Linux 5.4+, readable `/proc` and pidfd open/signal/wait support.
 [Coverage](../tests/conformance/tooling/COVERAGE.md) freezes obligations; [author validation](../tests/conformance/tooling/VALIDATION.md) records completed checks and remaining limits separately from historical evidence.
-Independent acceptance is open. Production code, Java tooling and remaining manual Python checks are outside this change; no staging, commit or next task is authorized.
+Independent review and the targeted re-review closed both findings; acceptance separates their checks and limitations from author validation.
+The owner integrated the implementation and fixes in master at `c6d2b848ee43b443cad33f9c0e17ade8acedfd16`; a clean tree was confirmed before this status update.
+Production code, Java tooling and remaining manual Python checks were outside this change. The next implementation requires its own assigned scope; this documentation update runs no builds or runtime checks.
 
 ## QDCXX-027 integrated in master
 
