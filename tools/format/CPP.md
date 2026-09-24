@@ -4,20 +4,38 @@
 
 The [style contract](../../docs/CPP-STYLE.md) applies to the QDCXX-010 C++ component.
 [Format-Cpp.ps1](Format-Cpp.ps1) runs **Uncrustify 0.83.0 → clang-format 20.1.8** using the unchanged
-root configurations. PowerShell 7.4+, Git and Python 3.11+ for acquisition are used here.
+root configurations. PowerShell 7.4+ and Git are required; acquisition does not require Python or pip.
 
 ```powershell
-python tools/format/setup_cpp.py
+pwsh -NoProfile -File tools/format/Setup-Cpp.ps1
 pwsh -NoProfile -File tools/format/Format-Cpp.ps1 -Mode Format
 pwsh -NoProfile -File tools/format/Format-Cpp.ps1 -Mode Check
 ```
 
-[setup_cpp.py](setup_cpp.py) downloads the exact Windows x64 archives in
+[Setup-Cpp.ps1](Setup-Cpp.ps1) downloads the exact Windows x64 archives in
 [cpp-tools.lock.json](cpp-tools.lock.json), verifies SHA-256 before extraction and stores everything
 under ignored `.work/`. The Uncrustify archive/hash comes from its official GitHub 0.83.0 release;
 the clang-format wheel/hash comes from PyPI's clang-format 20.1.8 release metadata (Python wheel
 packaging of the formatter, not a runtime dependency). Cached archives are also verified.
 No global installation occurs. Re-run setup to restore executables from verified archives.
+
+Setup uses only the repository lock and `tools/format/.work/`; there is no alternate-lock option.
+Downloads go to temporary files and are verified before entering the archive cache. Every archive,
+including a warm-cache hit, is hash-checked before extraction into a fresh staging directory.
+All ZIP names and attributes are checked before extraction: absolute paths, parent traversal with
+either separator, alternate data streams, Windows device/ambiguous names, duplicate paths and
+link/special/reparse entries are rejected. Existing filesystem reparse points are rejected as well.
+Only an installation containing its expected executable is published; extraction failure preserves
+the previous installation. Temporary staging/download files are cleaned after failures.
+
+The standalone [setup checks](../../tests/conformance/python-migration/Test-SetupCpp.ps1) exercise
+offline hostile archives through a private helper, real cold/warm Windows acquisition, and the existing
+wrapper's version rejection, read-only Check, Format and idempotence. They require network access for
+the cold-cache run and retain task-local files under `.work/python-migration-u3/`.
+This acquisition path is Windows x64 only. Linux/WSL contributors can use validated Windows-host
+formatting or provide the exact pinned native formatter versions to the wrapper; these Windows archives
+do not supply Linux-native tools. [setup_cpp.py](setup_cpp.py) remains unchanged for historical
+reproduction and is no longer the active setup command.
 
 The wrapper validates both executable versions and fails on missing tools/configurations,
 Uncrustify diagnostics or clang-format warnings/errors. Optional `-Uncrustify` and `-ClangFormat`

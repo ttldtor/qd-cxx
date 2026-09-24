@@ -111,3 +111,117 @@ tests/conformance/refactor/evidence/u4-build.log -whitespace
 tests/conformance/refactor/evidence/u4-test.log -whitespace
 tests/conformance/refactor/evidence/u5-build.log -whitespace
 tests/conformance/refactor/evidence/u5-test.log -whitespace
+
+# New Python-migration captures retain their actual bytes; authored files keep normal checks.
+tests/conformance/python-migration/evidence/**/*.log -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+tests/conformance/python-migration/evidence/**/*.json -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+tests/conformance/python-migration/evidence/**/*.tsv -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+tests/conformance/python-migration/evidence/**/*.txt -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+tests/conformance/python-migration/evidence/**/*.sha256 -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+
+# Exact raw whitespace exceptions for QDCXX-027 captures.
+tests/conformance/python-migration/evidence/baseline-build.log -whitespace
+tests/conformance/python-migration/evidence/baseline-configure-a.log -whitespace
+tests/conformance/python-migration/evidence/baseline-configure.log -whitespace
+tests/conformance/python-migration/evidence/baseline-ctest.json -whitespace
+tests/conformance/python-migration/evidence/baseline-test.log -whitespace
+tests/conformance/python-migration/evidence/linux-final-b/gcc-Asan-configure.log -whitespace
+tests/conformance/python-migration/evidence/linux-final-b/gcc-Asan-test.log -whitespace
+tests/conformance/python-migration/evidence/linux-final-b/gcc-Asan.tests.json -whitespace
+tests/conformance/python-migration/evidence/linux-final-b/gcc-Debug-configure.log -whitespace
+tests/conformance/python-migration/evidence/linux-final-b/gcc-Debug-test.log -whitespace
+tests/conformance/python-migration/evidence/linux-final-b/gcc-Debug.tests.json -whitespace
+tests/conformance/python-migration/evidence/linux-final-b/gcc-Release-configure.log -whitespace
+tests/conformance/python-migration/evidence/linux-final-b/gcc-Release-test.log -whitespace
+tests/conformance/python-migration/evidence/linux-final-b/gcc-Release.tests.json -whitespace
+tests/conformance/python-migration/evidence/linux-final-b/matrix-0-0-0-configure.log -whitespace
+tests/conformance/python-migration/evidence/linux-final-b/matrix-0-0-1-configure.log -whitespace
+tests/conformance/python-migration/evidence/linux-final-b/matrix-0-1-0-configure.log -whitespace
+tests/conformance/python-migration/evidence/linux-final-b/matrix-0-1-1-configure.log -whitespace
+tests/conformance/python-migration/evidence/linux-final-b/matrix-1-0-0-configure.log -whitespace
+tests/conformance/python-migration/evidence/linux-final-b/matrix-1-0-0-test.log -whitespace
+tests/conformance/python-migration/evidence/linux-final-b/matrix-1-0-0.tests.json -whitespace
+tests/conformance/python-migration/evidence/linux-final-b/matrix-1-0-1-configure.log -whitespace
+tests/conformance/python-migration/evidence/linux-final-b/matrix-1-0-1-test.log -whitespace
+tests/conformance/python-migration/evidence/linux-final-b/matrix-1-0-1.tests.json -whitespace
+tests/conformance/python-migration/evidence/linux-final-b/matrix-1-1-0-configure.log -whitespace
+tests/conformance/python-migration/evidence/linux-final-b/matrix-1-1-0-test.log -whitespace
+tests/conformance/python-migration/evidence/linux-final-b/matrix-1-1-0.tests.json -whitespace
+tests/conformance/python-migration/evidence/linux-final-b/matrix-1-1-1-configure.log -whitespace
+tests/conformance/python-migration/evidence/linux-final-b/matrix-1-1-1-test.log -whitespace
+tests/conformance/python-migration/evidence/linux-final-b/matrix-1-1-1.tests.json -whitespace
+tests/conformance/python-migration/evidence/u2-characterization.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-a/clang-Debug-build.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-a/clang-Debug-configure.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-a/clang-Debug-test.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-a/clang-Debug.tests.json -whitespace
+tests/conformance/python-migration/evidence/windows-final-a/clang-Release-build.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-a/clang-Release-configure.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-a/clang-Release-test.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-a/clang-Release.tests.json -whitespace
+tests/conformance/python-migration/evidence/windows-final-a/matrix-0-0-0-configure.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-a/msvc-Debug-build.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-a/msvc-Debug-configure.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-a/msvc-Debug-test.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-a/msvc-Debug.tests.json -whitespace
+tests/conformance/python-migration/evidence/windows-final-a/msvc-Release-build.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-a/msvc-Release-configure.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-a/msvc-Release-test.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-a/msvc-Release.tests.json -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/clang-Debug-build.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/clang-Debug-configure.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/clang-Debug-test.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/clang-Debug.tests.json -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/clang-Release-build.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/clang-Release-configure.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/clang-Release-test.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/clang-Release.tests.json -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/matrix-0-0-0-build.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/matrix-0-0-0-configure.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/matrix-0-0-1-build.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/matrix-0-0-1-configure.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/matrix-0-1-0-build.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/matrix-0-1-0-configure.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/matrix-0-1-1-build.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/matrix-0-1-1-configure.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/matrix-1-0-0-build.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/matrix-1-0-0-configure.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/matrix-1-0-0-test.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/matrix-1-0-0.tests.json -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/matrix-1-0-1-build.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/matrix-1-0-1-configure.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/matrix-1-0-1-test.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/matrix-1-0-1.tests.json -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/matrix-1-1-0-build.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/matrix-1-1-0-configure.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/matrix-1-1-0-test.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/matrix-1-1-0.tests.json -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/matrix-1-1-1-build.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/matrix-1-1-1-configure.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/matrix-1-1-1-test.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/matrix-1-1-1.tests.json -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/msvc-Debug-build.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/msvc-Debug-configure.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/msvc-Debug-test.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/msvc-Debug.tests.json -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/msvc-Release-build.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/msvc-Release-configure.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/msvc-Release-test.log -whitespace
+tests/conformance/python-migration/evidence/windows-final-b/msvc-Release.tests.json -whitespace
+
+# Exact raw whitespace exceptions for QDCXX-027 review-fix runs.
+tests/conformance/python-migration/evidence/review-fixes/clang-Debug-build.log -whitespace
+tests/conformance/python-migration/evidence/review-fixes/clang-Debug-test.log -whitespace
+tests/conformance/python-migration/evidence/review-fixes/clang-Release-build.log -whitespace
+tests/conformance/python-migration/evidence/review-fixes/clang-Release-test.log -whitespace
+tests/conformance/python-migration/evidence/review-fixes/gcc-Asan-build.log -whitespace
+tests/conformance/python-migration/evidence/review-fixes/gcc-Asan-test.log -whitespace
+tests/conformance/python-migration/evidence/review-fixes/gcc-Debug-build.log -whitespace
+tests/conformance/python-migration/evidence/review-fixes/gcc-Debug-test.log -whitespace
+tests/conformance/python-migration/evidence/review-fixes/gcc-Release-build.log -whitespace
+tests/conformance/python-migration/evidence/review-fixes/gcc-Release-test.log -whitespace
+tests/conformance/python-migration/evidence/review-fixes/msvc-Debug-build.log -whitespace
+tests/conformance/python-migration/evidence/review-fixes/msvc-Debug-test.log -whitespace
+tests/conformance/python-migration/evidence/review-fixes/msvc-Release-build.log -whitespace
+tests/conformance/python-migration/evidence/review-fixes/msvc-Release-test.log -whitespace
+tests/conformance/python-migration/evidence/review-fixes/windows-1252.log -whitespace

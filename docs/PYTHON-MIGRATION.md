@@ -2,25 +2,29 @@
 
 [Русская версия](PYTHON-MIGRATION.ru.md). English is authoritative.
 
-QDCXX-020 source inventory, not an executed migration. No Python was added, modified or run here.
-Goal: current configure/build/tests, formatter acquisition, oracle validation and evidence checks
-run without Python. Historical scripts, captures and recorded hashes remain historical evidence.
+The QDCXX-020 source inventory below is preserved as a historical snapshot. QDCXX-027 implements
+its first two migration steps; the other steps remain required follow-up work. Historical scripts,
+captures and recorded hashes remain historical evidence.
 
 ## Inventory and dependency edges
 
 ### Current assignment: QDCXX-027
 
-QDCXX-027, ready, High, implements steps 1–2 below from accepted master
-`d86c8a9842041f8876109285a33782d02e04018f`: the two mandatory CLI suites and their mutations,
-UTC logging and existing Windows formatter acquisition. The linked plan defines parity and Python-denial checks.
-This assignment does not yet remove any dependency; implementation and independent review are still required.
+QDCXX-027, High, implements steps 1–2 from actual starting HEAD
+`dcccd0242252cadb674f4970cc723fbf113bed53`. Normal configure/build/CTest now uses CMake and
+test-only C++ for both mandatory CLI suites and their mutations. Active UTC logging is
+`tools/Run-Utc.ps1`; existing Windows formatter acquisition is `tools/format/Setup-Cpp.ps1`.
+Both require PowerShell 7.4 or newer. See the [named coverage map](../tests/conformance/python-migration/COVERAGE.md)
+and [author verification](../tests/conformance/python-migration/VALIDATION.md) for parity, process-image
+Python denial, compiler/option matrices and limitations. Independent review remains pending.
 
 Manual primitive/protocol negatives, schema JSON validation, evidence audits, generators and tracked-bytecode
 cleanup remain follow-up work (steps 3–4). They are not retired or optional merely because normal CTest is migrated.
 Old comparison scripts and tracked bytecode stay unchanged in QDCXX-027; disable bytecode writing during parity runs.
 The original QDCXX-020 inventory below is retained; the QDCXX-027 plan refreshes the active migration scope.
 
-Paths below are repository-relative. Enumeration used `rg --files tools tests` filtered by `.py`,
+The following table describes the original QDCXX-020 state, not the current entry points above.
+Paths are repository-relative. Enumeration used `rg --files tools tests` filtered by `.py`,
 then CMake/PowerShell/document references and script imports/process calls. This distinguishes
 mandatory current execution from optional/manual historical reproduction; merely existing in Git
 does not mean a script runs in CTest. None of these scripts is a production C++ dependency.

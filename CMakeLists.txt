@@ -65,6 +65,12 @@ if(BUILD_TESTING)
         DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     )
     FetchContent_MakeAvailable(doctest)
+    # Verification-only image tracing is implemented for the Windows/Linux acceptance hosts.
+    if(WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        add_executable(qdcxx_no_python_guard tests/conformance/no_python_guard.cpp)
+        target_compile_features(qdcxx_no_python_guard PRIVATE cxx_std_23)
+        set_target_properties(qdcxx_no_python_guard PROPERTIES CXX_EXTENSIONS OFF)
+    endif()
     add_executable(qdcxx_event_mapping_tests tests/conformance/event_mapping_tests.cpp)
     target_link_libraries(qdcxx_event_mapping_tests PRIVATE qdcxx_event_mapping qdcxx_protocol doctest::doctest)
     add_test(NAME event_mapping_contract COMMAND qdcxx_event_mapping_tests)
@@ -180,24 +186,43 @@ if(BUILD_TESTING)
     set_target_properties(qdcxx_tape_tests PROPERTIES CXX_EXTENSIONS OFF)
     add_test(NAME protocol_binary_tape COMMAND qdcxx_tape_tests "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/protocol/tape-reader/expected")
     if(ORG_TTLDTOR_QDCXX_BUILD_QTP_INSPECT)
+        add_executable(qdcxx_inspection_cli_tests tests/conformance/inspection_cli_tests.cpp)
+        target_compile_features(qdcxx_inspection_cli_tests PRIVATE cxx_std_23)
+        set_target_properties(qdcxx_inspection_cli_tests PROPERTIES CXX_EXTENSIONS OFF)
+        add_test(NAME inspection_checker_contract COMMAND qdcxx_inspection_cli_tests selftest)
+        add_test(NAME inspection_cli_negatives COMMAND "${CMAKE_COMMAND}"
+            "-DPROGRAM=$<TARGET_FILE:qdcxx_qtp_inspect>" "-DCHECKER=$<TARGET_FILE:qdcxx_inspection_cli_tests>"
+            "-DPROCESS_HELPER=$<TARGET_FILE:qdcxx_inspection_process_tests>"
+            "-DFIXTURES=${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/protocol/offline-inspection"
+            "-DRUN_DIR=${CMAKE_CURRENT_BINARY_DIR}/inspection-cli-negatives"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/inspection_cli_negatives.cmake")
+        add_executable(qdcxx_inspection_process_tests tests/conformance/inspection_process_tests.cpp)
+        target_compile_features(qdcxx_inspection_process_tests PRIVATE cxx_std_23)
+        set_target_properties(qdcxx_inspection_process_tests PROPERTIES CXX_EXTENSIONS OFF)
+        add_test(NAME inspection_process_contract COMMAND qdcxx_inspection_process_tests
+            "$<TARGET_FILE:qdcxx_qtp_inspect>"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/protocol/offline-inspection/expected/composed.qtp"
+            "${CMAKE_CURRENT_BINARY_DIR}/inspection-process")
         add_test(NAME qtp_argument_contract COMMAND "${CMAKE_COMMAND}"
             "-DPROGRAM=$<TARGET_FILE:qdcxx_qtp_inspect>"
             "-DRUN=${CMAKE_CURRENT_BINARY_DIR}/qtp-argument-contract"
             "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/protocol/offline-inspection/expected/composed.qtp"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/refactor/cli_arguments.cmake")
-        find_package(Python3 REQUIRED COMPONENTS Interpreter)
-        add_test(NAME offline_inspection_cli COMMAND "${Python3_EXECUTABLE}"
-            "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/check_offline_inspection.py"
-            "$<TARGET_FILE:qdcxx_qtp_inspect>"
-            "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/protocol/offline-inspection")
+        add_test(NAME offline_inspection_cli COMMAND "${CMAKE_COMMAND}"
+            "-DPROGRAM=$<TARGET_FILE:qdcxx_qtp_inspect>" "-DCHECKER=$<TARGET_FILE:qdcxx_inspection_cli_tests>"
+            "-DPROCESS_HELPER=$<TARGET_FILE:qdcxx_inspection_process_tests>"
+            "-DFIXTURES=${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/protocol/offline-inspection"
+            "-DRUN_DIR=${CMAKE_CURRENT_BINARY_DIR}/offline-cli"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/offline_cli.cmake")
         add_executable(qdcxx_offline_io_tests tests/conformance/offline_io_tests.cpp)
         target_link_libraries(qdcxx_offline_io_tests PRIVATE qdcxx_inspect_tool doctest::doctest)
         set_target_properties(qdcxx_offline_io_tests PROPERTIES CXX_EXTENSIONS OFF)
         add_test(NAME offline_inspection_injected_io COMMAND qdcxx_offline_io_tests)
-        add_test(NAME human_inspection_cli COMMAND "${Python3_EXECUTABLE}"
-            "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/check_human_inspection.py"
-            "$<TARGET_FILE:qdcxx_qtp_inspect>"
-            "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/protocol/human-inspection")
+        add_test(NAME human_inspection_cli COMMAND "${CMAKE_COMMAND}"
+            "-DPROGRAM=$<TARGET_FILE:qdcxx_qtp_inspect>" "-DCHECKER=$<TARGET_FILE:qdcxx_inspection_cli_tests>"
+            "-DFIXTURES=${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/protocol/human-inspection"
+            "-DRUN_DIR=${CMAKE_CURRENT_BINARY_DIR}/human-cli"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/human_cli.cmake")
         add_executable(qdcxx_human_io_tests tests/conformance/human_io_tests.cpp)
         target_link_libraries(qdcxx_human_io_tests PRIVATE qdcxx_inspect_tool doctest::doctest)
         set_target_properties(qdcxx_human_io_tests PROPERTIES CXX_EXTENSIONS OFF)

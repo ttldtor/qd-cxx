@@ -205,10 +205,10 @@ UTF dependency was selected. Reuse probes are optional, separate ignored project
 
 Additional WSL sanitizer commands from the repository root (cached pinned doctest):
 
-```bash
-python3 tools/run_utc.py --log .work/utf-asan-configure.log -- cmake -S . -B .work/utf-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug '-DCMAKE_CXX_FLAGS=-fsanitize=address,undefined -fno-omit-frame-pointer' -DFETCHCONTENT_SOURCE_DIR_DOCTEST=/work/qd-cxx/.work/linux-debug/_deps/doctest-src
-python3 tools/run_utc.py --log .work/utf-asan-build.log -- cmake --build .work/utf-asan -j 4
-python3 tools/run_utc.py --log .work/utf-asan-test.log -- ctest --test-dir .work/utf-asan --output-on-failure
+```powershell
+& ./tools/Run-Utc.ps1 -Log .work/utf-asan-configure.log -Executable cmake -ArgumentList @('-S','.','-B','.work/utf-asan','-G','Ninja','-DCMAKE_BUILD_TYPE=Debug','-DCMAKE_CXX_FLAGS=-fsanitize=address,undefined -fno-omit-frame-pointer','-DFETCHCONTENT_SOURCE_DIR_DOCTEST=/work/qd-cxx/.work/linux-debug/_deps/doctest-src')
+& ./tools/Run-Utc.ps1 -Log .work/utf-asan-build.log -Executable cmake -ArgumentList @('--build','.work/utf-asan','-j','4')
+& ./tools/Run-Utc.ps1 -Log .work/utf-asan-test.log -Executable ctest -ArgumentList @('--test-dir','.work/utf-asan','--output-on-failure')
 ```
 
 ## Build and test on Windows
@@ -226,16 +226,16 @@ with extensions disabled. On these toolsets CMake selects `/std:c++latest` for C
 From the repository root in PowerShell:
 
 ```powershell
-python tools/run_utc.py --log .work/msvc-configure.log -- cmake -S . -B .work/msvc -G "Visual Studio 17 2022" -A x64
-python tools/run_utc.py --log .work/msvc-debug-build.log -- cmake --build .work/msvc --config Debug
-python tools/run_utc.py --log .work/msvc-debug-test.log -- ctest --test-dir .work/msvc -C Debug --output-on-failure
-python tools/run_utc.py --log .work/msvc-release-build.log -- cmake --build .work/msvc --config Release
-python tools/run_utc.py --log .work/msvc-release-test.log -- ctest --test-dir .work/msvc -C Release --output-on-failure
-python tools/run_utc.py --log .work/clang-configure.log -- cmake -S . -B .work/clang -G "Visual Studio 17 2022" -A x64 -T ClangCL
-python tools/run_utc.py --log .work/clang-debug-build.log -- cmake --build .work/clang --config Debug
-python tools/run_utc.py --log .work/clang-debug-test.log -- ctest --test-dir .work/clang -C Debug --output-on-failure
-python tools/run_utc.py --log .work/clang-release-build.log -- cmake --build .work/clang --config Release
-python tools/run_utc.py --log .work/clang-release-test.log -- ctest --test-dir .work/clang -C Release --output-on-failure
+& ./tools/Run-Utc.ps1 -Log .work/msvc-configure.log -Executable cmake -ArgumentList @('-S','.','-B','.work/msvc','-G','Visual Studio 17 2022','-A','x64')
+& ./tools/Run-Utc.ps1 -Log .work/msvc-debug-build.log -Executable cmake -ArgumentList @('--build','.work/msvc','--config','Debug')
+& ./tools/Run-Utc.ps1 -Log .work/msvc-debug-test.log -Executable ctest -ArgumentList @('--test-dir','.work/msvc','-C','Debug','--output-on-failure')
+& ./tools/Run-Utc.ps1 -Log .work/msvc-release-build.log -Executable cmake -ArgumentList @('--build','.work/msvc','--config','Release')
+& ./tools/Run-Utc.ps1 -Log .work/msvc-release-test.log -Executable ctest -ArgumentList @('--test-dir','.work/msvc','-C','Release','--output-on-failure')
+& ./tools/Run-Utc.ps1 -Log .work/clang-configure.log -Executable cmake -ArgumentList @('-S','.','-B','.work/clang','-G','Visual Studio 17 2022','-A','x64','-T','ClangCL')
+& ./tools/Run-Utc.ps1 -Log .work/clang-debug-build.log -Executable cmake -ArgumentList @('--build','.work/clang','--config','Debug')
+& ./tools/Run-Utc.ps1 -Log .work/clang-debug-test.log -Executable ctest -ArgumentList @('--test-dir','.work/clang','-C','Debug','--output-on-failure')
+& ./tools/Run-Utc.ps1 -Log .work/clang-release-build.log -Executable cmake -ArgumentList @('--build','.work/clang','--config','Release')
+& ./tools/Run-Utc.ps1 -Log .work/clang-release-test.log -Executable ctest -ArgumentList @('--test-dir','.work/clang','-C','Release','--output-on-failure')
 ```
 
 Build outside the source root; `.work/` and `build/` are ignored. In-source configure is rejected.
@@ -274,6 +274,9 @@ define the pinned two-tool pipeline; naming and meaningful Doxygen require separ
 
 ## Linux / WSL and UTC logs
 
+The next paragraph preserves the original compact-component validation. Current Python-free
+compiler/sanitizer results are recorded separately in [QDCXX-027 validation](../tests/conformance/python-migration/VALIDATION.md).
+
 Also executed in WSL2 Ubuntu 24.04.4 LTS, x86_64, kernel 6.18.40.1-microsoft-standard-WSL2,
 GCC 13.3.0 (libstdc++), CMake 4.4.2 and Ninja 1.11.1. Debug and Release pass the same two doctest
 cases (28,358 assertions) and unchanged 832 selected Java observations. Library-only configure/build
@@ -281,27 +284,37 @@ with `BUILD_TESTING=OFF` passes without creating `_deps/`. Linux negative fixtur
 pass; `--skip-format` explicitly omits the Windows-only formatter checks already run on Windows.
 Sanitizers, other Linux distributions, macOS and other architectures were not checked.
 
-From Ubuntu WSL (`wsl -d Ubuntu-24.04`), at the mounted repository:
+From Ubuntu WSL (`wsl -d Ubuntu-24.04`), at the mounted repository, inside PowerShell 7.4+:
 
-```bash
-cd /work/qd-cxx
-for config in Debug Release; do
-  build=.work/linux-${config,,}
-  python3 tools/run_utc.py --log "$build-configure.log" -- cmake -S . -B "$build" -G Ninja -DCMAKE_BUILD_TYPE="$config"
-  python3 tools/run_utc.py --log "$build-build.log" -- cmake --build "$build"
-  python3 tools/run_utc.py --log "$build-test.log" -- ctest --test-dir "$build" --output-on-failure
-done
-python3 tools/run_utc.py --log .work/linux-negative.log -- python3 tests/conformance/check_compact_negative.py .work/linux-release/qdcxx_compact_tests --skip-format --report .work/linux-negative-proof.json
+```powershell
+Set-Location /work/qd-cxx
+foreach ($config in @('Debug','Release')) {
+    $build = ".work/linux-$($config.ToLowerInvariant())"
+    & ./tools/Run-Utc.ps1 -Log "$build-configure.log" -Executable cmake -ArgumentList @('-S','.','-B',$build,'-G','Ninja',"-DCMAKE_BUILD_TYPE=$config")
+    & ./tools/Run-Utc.ps1 -Log "$build-build.log" -Executable cmake -ArgumentList @('--build',$build)
+    & ./tools/Run-Utc.ps1 -Log "$build-test.log" -Executable ctest -ArgumentList @('--test-dir',$build,'--output-on-failure')
+}
 cmake -S . -B .work/linux-library -G Ninja -DBUILD_TESTING=OFF
 cmake --build .work/linux-library
 ```
 
-[run_utc.py](../tools/run_utc.py) requires Python 3.11+, timestamps every retained output line and
-command start/exit in ISO 8601 UTC (`Z`) and sets `TZ=UTC` for child processes. This also makes
-CTest's generated LastTest.log use UTC. It preserves child output text and exit status; it does not
-change the host timezone. Current C++ logs were freshly generated in UTC, not relabeled; historical
-Java oracle captures keep their original bytes/timezones. New JSON negative reports include `executedAtUtc`.
-Public functions and test utilities now document each parameter/template parameter and non-void result.
+[Run-Utc.ps1](../tools/Run-Utc.ps1) requires PowerShell 7.4+ and an argument array,
+timestamps output and command start/exit in ISO 8601 UTC (`Z`), sets only child `TZ=UTC`
+and preserves the exit code. It is a UTF-8 text logger with invalid-sequence replacement and
+LF endings, including the final unterminated line. CR/CRLF/LF delimit lines; order within each
+stream is preserved, while stdout/stderr race order is unspecified. Launcher, log and console
+failures return 1; an internal worker owns a Windows job or Unix process group before launching
+the command, so cleanup also works after the command exits. Cleanup waits at most 5 seconds for
+the worker; deliberately detached Unix sessions are outside this boundary.
+Raw CLI evidence is captured separately. Historical logs and the [old logger](../tools/run_utc.py)
+are not rewritten.
+
+The manual check below still requires Python; it is unmigrated and not replaced by CTest results.
+Other deferred workflows remain in the [migration ledger](PYTHON-MIGRATION.md).
+
+```powershell
+& ./tools/Run-Utc.ps1 -Log .work/linux-negative.log -Executable python3 -ArgumentList @('tests/conformance/check_compact_negative.py','.work/linux-release/qdcxx_compact_tests','--skip-format','--report','.work/linux-negative-proof.json')
+```
 
 ## Static type-8 binding API (QDCXX-014)
 
@@ -354,8 +367,8 @@ No transport, dynamic session, nonzero flags, importer or production dependency 
 Enable `-DORG_TTLDTOR_QDCXX_BUILD_QTP_INSPECT=ON` for the bounded `qdcxx-qtp-inspect` executable; default OFF
 keeps the library-only build. `-DBUILD_TESTING=OFF` never acquires test dependencies, including
 when the tool is enabled. [CLI/profile/limits](QTP-INSPECT.md),
-[contract](../spec/protocol/OFFLINE-INSPECTION.md). With testing and tool enabled, Python 3
-provides process-level CTest checks and doctest covers portable injected I/O failures. The six
+[contract](../spec/protocol/OFFLINE-INSPECTION.md). With testing and tool enabled, CMake and a test-only C++ checker
+provide process-level CTest checks and doctest covers portable injected I/O failures. The six
 previous suites remain enabled. This adds no production dependency or public session framework.
 StreamDataResult now exposes charged `processedRecords`/`wireFields` under the
 accepted accounting decision, without wire or position changes.

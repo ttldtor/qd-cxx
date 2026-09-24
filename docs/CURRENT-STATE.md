@@ -1,11 +1,15 @@
 # Current state
 
-## QDCXX-027 ready: Python-free development workflow
+## QDCXX-027 implemented: independent review pending
 
-QDCXX-027, High, is assigned for implementation.
-It removes mandatory Python from configure/build/CTest, UTC logging and existing Windows formatter acquisition,
-preserving named positive/negative checks. Remaining manual Python audits and generators stay in
-[the migration ledger](PYTHON-MIGRATION.md). No implementation has started in this planning change.
+QDCXX-027, High, replaces mandatory Python in configure/build/CTest,
+UTC logging and existing Windows formatter acquisition, preserving named positive/negative checks.
+Starting HEAD: `dcccd0242252cadb674f4970cc723fbf113bed53`.
+[Coverage](../tests/conformance/python-migration/COVERAGE.md) and
+[author verification](../tests/conformance/python-migration/VALIDATION.md) record baseline/parity,
+Python-unavailable matrices, preservation and limitations. Independent acceptance is not claimed.
+Remaining manual Python audits and generators stay required in [the migration ledger](PYTHON-MIGRATION.md).
+Production code, historical evidence and the owner's index remain unchanged; no commit, merge or next task.
 
 ## QDCXX-026 accepted and merged
 

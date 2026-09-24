@@ -18,6 +18,13 @@ Start with:
 
 Contributor workflow and documentation-only validation are described in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
+Normal configure/build/CTest uses CMake and C++ without Python. UTC logging uses
+[Run-Utc.ps1](tools/Run-Utc.ps1) (PowerShell 7.4+); Windows formatter preparation uses
+[Setup-Cpp.ps1](tools/format/Setup-Cpp.ps1).
+[Migration coverage](tests/conformance/python-migration/COVERAGE.md)
+([Russian](tests/conformance/python-migration/COVERAGE.ru.md)) tracks preserved checks.
+The [migration ledger](docs/PYTHON-MIGRATION.md) keeps the remaining manual Python workflows explicit.
+
 ## Initial workflow
 
 1. Pin and inspect the Java upstream recorded in `upstream.lock`.
