@@ -1,6 +1,14 @@
 # Project roadmap
 
-## Current priority: remaining Python migration and configuration planning
+## Current priority: implement external JSON schema loading
+
+1. Implement QDCXX-029, High: native resolved JSON, an optional simdjson DOM loader and generic `--schema` inspection. Verify loaded Quote/Profile through the existing prepared APIs. The plan defines strict limits and proportionate verification; implementation is not started.
+2. Keep XML/imports/providers and Java-property resolution separate. The explicit native input does not require completing the general configuration inventory first; that inventory remains necessary before a general settings engine.
+3. Continue real-event coverage and operational replay/feed/multiplexer tools under separate assignments. Remaining [manual Python migration](PYTHON-MIGRATION.md) is deferred from the immediate implementation path; existing checks are not canceled without replacements.
+
+This order supersedes the previous priority below. No task authorizes staging, commit or the next implementation automatically.
+
+## Previous priority after QDCXX-028 (historical)
 
 1. QDCXX-026 is accepted and merged at `d86c8a9842041f8876109285a33782d02e04018f`; review closure records both findings and verification limits.
 2. QDCXX-027 is integrated in master at `2833027fb334c9206798f14f1dedc396b8a3ec2a`. QDCXX-028, High, is independently accepted and integrated at `c6d2b848ee43b443cad33f9c0e17ade8acedfd16`: [native bootstrap/logger and portable C++ formatting](../tools/dev/README.md) preserve interpreter-free configure/build/CTest and existing guarantees. Acceptance separates independent checks and both finding closures from [author validation](../tests/conformance/tooling/VALIDATION.md). Optional Windows PowerShell stays available; macOS is unverified/nonblocking.

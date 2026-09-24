@@ -1,5 +1,11 @@
 # Current state
 
+## QDCXX-029 ready: external JSON schemas
+
+The owner approved simdjson DOM after a local trial. QDCXX-029, High, now specifies a bounded native JSON loader and generic external-schema tape inspection, with existing Quote/Profile preparation tested through the library API.
+Planning started from clean master `c463f387bd6be6e828a5cbb48729196f7702969a`. Only task/plan/status documentation is added here; the loader is not implemented. The prototype was not production-contract conformance or a cross-platform validation.
+The plan separates the new native profile from XML-captured JSON and keeps core parser-independent. XML, general properties and remaining manual Python migration stay separate. Verification is scoped; transient logs stay outside Git. Earlier entries retain their historical scope.
+
 ## QDCXX-028 accepted and integrated in master
 
 QDCXX-028, High, implements standalone native UTC logging and CMake C++ formatting with explicit exact native executables.
