@@ -36,6 +36,10 @@ struct Failure {
  * @return True for a legacy schema/display pair or the exact default Quote field shape.
  */
 bool compatibleProfile(const core::LocalSchema &schema, inspect::DisplayProfile profile) noexcept {
+    if (profile == inspect::DisplayProfile::EXTERNAL_SCHEMA_V1) {
+        return schema.profile() == core::LocalProfile::EXTENDED_FIELDS_V1;
+    }
+
     if (profile == inspect::DisplayProfile::DEFAULT_PROFILE_V1) {
         if (schema.profile() != core::LocalProfile::EXTENDED_FIELDS_V1 || schema.records().size() != 1) {
             return false;

@@ -2,6 +2,91 @@
 
 [Русская версия](CPP-BUILD.ru.md). English is authoritative.
 
+## Native JSON schema loader
+
+`ORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON` defaults ON and adds `qdcxx_schema_json`. Include
+`qd/schema/json_schema.hpp` and link that target to use
+`org::ttldtor::qdcxx::schema::loadJsonSchema(std::string_view, JsonSchemaLimits = {})`.
+It returns `std::expected<core::LocalSchema, schema::JsonSchemaError>` and consumes supplied UTF-8
+bytes without file I/O or ambient settings. The [native contract](../spec/schema/NATIVE-JSON.md)
+defines the complete grammar, ownership, errors and finite defaults. `JsonSchemaLimits::documentBytes`
+and `depth` bound parsing; `schema` supplies the existing core element/name budgets. These are logical
+bounds, not an exact heap cap or an end-to-end linear-time guarantee.
+
+CMake acquires [simdjson 4.6.4 source](https://github.com/simdjson/simdjson/releases/tag/v4.6.4)
+from the [pinned archive](https://codeload.github.com/simdjson/simdjson/tar.gz/refs/tags/v4.6.4),
+SHA-256 `b091107844fe928158c5c2265c20360fff312889ddf7ebc4528a0f0f8f2ff9cd`.
+Only its amalgamation is compiled as a private dependency; upstream tests/tools and a C compiler
+are not required. [MIT attribution](../third_party/licenses/simdjson-MIT.txt) is retained.
+Public headers expose project/STL types only. Core, codecs, protocol and event targets do not depend
+on the loader or simdjson; only consumers linking the optional loader acquire its private link dependency.
+
+For the Windows multi-configuration build used by the CLI examples:
+
+```text
+cmake -S . -B .work/schema-json-msvc -DBUILD_TESTING=OFF -DORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON=ON -DORG_TTLDTOR_QDCXX_BUILD_TAPE_INSPECT=ON
+cmake --build .work/schema-json-msvc --config Release
+```
+
+For a Linux single-configuration build, use `-B .work/schema-json-linux -DCMAKE_BUILD_TYPE=Debug`
+with the same feature options, then `cmake --build .work/schema-json-linux`.
+To build only the existing built-in inspection path, configure a separate fresh build directory with
+`-DBUILD_TESTING=OFF -DORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON=OFF` and the desired inspector options.
+OFF neither acquires nor links simdjson. Built-in commands remain available; a valid `--schema`
+request reports `LOADER_DISABLED` (exit 4) before file I/O. Normal configure/build/CTest gains no
+Python or PowerShell requirement. These are usage instructions, not a report of executed checks.
+
+The [mixed native example](../spec/schema/examples/native/mixed.json) contains a custom record at
+local ID 0, reordered Quote at ID 1 and reordered Profile at ID 2, with optional and extra fields.
+At the owning application boundary, read this file with a finite byte limit; then the following
+function illustrates loading and both preparations. Link `qdcxx_schema_json`, `qdcxx_quote` and
+`qdcxx_profile`. The application chooses finite mapping budgets independently of loading budgets:
+
+```cpp
+#include "qd/events/profile.hpp"
+#include "qd/events/quote.hpp"
+#include "qd/schema/json_schema.hpp"
+
+#include <string_view>
+
+/** Prepare both event layouts from the mixed native example.
+ * @param schemaBytes UTF-8 contents supplied by the application's bounded file reader.
+ * @return True when loading and both preparations succeed; false on any typed failure.
+ */
+bool prepareExample(std::string_view schemaBytes) {
+    using namespace org::ttldtor::qdcxx;
+
+    auto loaded = schema::loadJsonSchema(schemaBytes);
+
+    if (!loaded) {
+        return false;
+    }
+
+    const events::MappingLimits limits{
+        .fields = 64, .lookups = 128, .selections = 32, .keys = 128,
+        .typeAlternatives = 64, .nameUnits = 1024,
+        .totalNameUnits = 16384, .comparisonWork = 1048576};
+    auto quote = events::PreparedQuote::prepare(*loaded, 1, limits);
+    auto profile = events::PreparedProfile::prepare(*loaded, 2, limits);
+
+    return quote.has_value() && profile.has_value();
+}
+```
+
+The function demonstrates preparation only. A processing application retains the successful schema
+and preparations, gives the same schema context to decoding, and maps complete `RecordValueView`
+values with explicit event ownership limits as described below. Copies retain context; a second
+load, even of identical bytes, has an independent identity and cannot reuse the first preparation.
+Input and parser destruction do not invalidate the loaded schema. Preparation validates lookups,
+types and required fields; a record name alone cannot establish compatibility. Generic records and
+extra fields remain accessible independently of event projection. The
+[external CLI](TAPE-INSPECT.md#external-native-json-schemas-and-output-version-6) always uses generic
+version-6 output rather than selecting an event mapping.
+
+Only `qdcxx-native` version 1, `hasTime:false` and exact full IDs 2/8/10/40/56/72/88/120 are accepted.
+The old XML-captured JSON profile, XML/imports, Java-property resolution, URLs, automatic schema
+selection, live replacement, new wire types/conversions and transport remain unsupported.
+
 ## Current portable development workflow
 
 Use CMake 3.25+, a C++23 compiler and native build tools. [Developer-tool instructions](../tools/dev/README.md)

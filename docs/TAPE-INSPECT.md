@@ -1,5 +1,64 @@
 # Tape inspection, version 1
 
+[Русская версия](TAPE-INSPECT.ru.md). English is authoritative.
+
+## External native JSON schemas and output version 6
+
+Use `--schema PATH` instead of `--profile BUILTIN` to supply an owned local schema without rebuilding.
+Exactly one schema source and `--input PATH` are required. The
+[native version-1 contract](../spec/schema/NATIVE-JSON.md) accepts `qdcxx-native` version 1,
+ordinary records with `hasTime:false`, exact full types 2/8/10/40/56/72/88/120, ordered local fields
+and explicit lookup keys. Local IDs are consecutive array positions, independent of sender IDs.
+Custom records, reordered fields and extra fields are retained. Names are exact Unicode scalar text
+converted to owned UTF-16; no aliases, property names or Java slots are inferred.
+
+Build with the [optional JSON loader](CPP-BUILD.md#native-json-schema-loader). From the repository
+root, these commands use the reusable native schema with unchanged Java-derived mixed tapes:
+
+```text
+.work/schema-json-msvc/Release/qdcxx-tape-inspect --input tests/fixtures/encoding/field-types/expected/mixed-stream.qtp --schema spec/schema/examples/native/field-types.json --output-format human
+.work/schema-json-msvc/Release/qdcxx-tape-inspect --input tests/fixtures/encoding/field-types/expected/mixed-raw.qtp --schema spec/schema/examples/native/field-types.json --tape-mode raw-message-v1 --output-format tsv
+```
+
+For a single-configuration build, use `.work/schema-json-linux/qdcxx-tape-inspect` instead.
+The JSON file does not select or expand the tape mode: `legacy` remains the default and
+`raw-message-v1` must be explicit. Both external modes emit output version **6**, profile
+`external-schema-v1`, with generic typed fields in local order. Type 10 preserves null, empty and
+exact UTF-16 values; scalar values retain their exact type/raw representation. Extra fields stay
+visible, and unknown wire records retain the existing skip policy. Names such as Quote or Profile
+do not request event projection; applications use the [prepared APIs](CPP-BUILD.md#native-json-schema-loader).
+The [contract](../spec/schema/NATIVE-JSON.md#external-output-identity-and-rows) defines TSV/human rows.
+
+The schema is read once, with finite bounds enforced during reading and loading. Defaults match
+the library; zero is a real limit and equality is accepted. These limits are separate from existing
+decoded-record/field, string, input-tape and output budgets:
+
+| Option | Default | Unit |
+| --- | --- | --- |
+| `--max-schema-bytes` | 1048576 | Entire schema document bytes, including whitespace |
+| `--max-schema-depth` | 16 | Nested objects/arrays; root depth is 1 |
+| `--max-schema-records` | 1024 | Local records |
+| `--max-schema-fields` | 16384 | Total local fields |
+| `--max-schema-lookups` | 32768 | Total lookup entries |
+| `--max-schema-name-units` | 1024 | UTF-16 units per record/lookup name |
+| `--max-schema-total-name-units` | 1048576 | Total record/lookup name UTF-16 units |
+
+Arguments are validated first, then loader availability, then the schema file and complete schema;
+the tape is opened only afterward. A bad schema therefore takes precedence over a missing tape,
+with no built-in fallback. Schema failures emit no stdout header or data and one bounded stderr row:
+`schema-error<TAB>1<TAB>CODE<LF>`. This representation is identical for TSV/human and diagnostic
+versions 1/2. External diagnostics default to 2; explicit 1/2 is accepted. Exit codes are usage 2,
+schema file I/O 3, unsupported profile/version/type/indexed semantics or disabled loader 4,
+malformed JSON/schema 5, and resource/allocation failure 6. The contract lists stable codes;
+subsequent tape errors retain existing diagnostics.
+
+With `ORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON=OFF`, valid external requests report `LOADER_DISABLED`
+before opening either file. No arguments and standalone `--help` remain identical and perform no
+file I/O: stdout, empty stderr, exit 0 if output succeeds. Built-in output/diagnostic defaults remain
+unchanged. XML, `qd-3.355-xml-captured`, imports, URLs, environment/Java properties, auto-detection,
+indexed records, new wire types/conversions, live schema replacement and transport are unsupported.
+Native examples define our source format; they do not establish broader private-tape support.
+
 ## Explicit oracle-field-types-v1 and output version 4
 
 `--profile oracle-field-types-v1` selects the fixed diagnostic `FieldTypes` local schema:

@@ -1,0 +1,33 @@
+{
+  "formatVersion": 1,
+  "profile": {"id": "qdcxx-native", "version": 1},
+  "records": [
+    {
+      "id": 0,
+      "name": "FieldTypes",
+      "hasTime": false,
+      "fields": [
+        {"serialTypeId": 10},
+        {"serialTypeId": 40},
+        {"serialTypeId": 72},
+        {"serialTypeId": 88},
+        {"serialTypeId": 8},
+        {"serialTypeId": 2},
+        {"serialTypeId": 56},
+        {"serialTypeId": 120},
+        {"serialTypeId": 10}
+      ],
+      "lookups": [
+        {"name": "Text", "fieldId": 0},
+        {"name": "Short", "fieldId": 1},
+        {"name": "Sequence", "fieldId": 2},
+        {"name": "Date", "fieldId": 3},
+        {"name": "Count", "fieldId": 4},
+        {"name": "Char", "fieldId": 5},
+        {"name": "Seconds", "fieldId": 6},
+        {"name": "Wide", "fieldId": 7},
+        {"name": "Tail", "fieldId": 8}
+      ]
+    }
+  ]
+}

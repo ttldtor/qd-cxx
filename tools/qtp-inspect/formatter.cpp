@@ -264,7 +264,7 @@ std::string Formatter::frame(const protocol::Frame &frame, std::size_t index, st
 std::string Formatter::record(const protocol::StreamDataRecord &record, std::u16string_view name,
                               std::size_t frameIndex, std::size_t index, std::size_t budget,
                               const protocol::TapeTiming *timing) const {
-    if (profile_ == DisplayProfile::ORACLE_FIELD_TYPES_V1) {
+    if (profile_ == DisplayProfile::ORACLE_FIELD_TYPES_V1 || profile_ == DisplayProfile::EXTERNAL_SCHEMA_V1) {
         if (!record.values.empty()) {
             throw std::invalid_argument("typed field representation");
         }
@@ -674,7 +674,11 @@ std::string Formatter::complete(std::uint64_t bytes, std::size_t frames, std::si
 
 std::string Formatter::tapeHeader(std::size_t budget) const {
     return build(budget, [&](Row &row) {
-        if (profile_ == DisplayProfile::DEFAULT_PROFILE_V1) {
+        if (profile_ == DisplayProfile::EXTERNAL_SCHEMA_V1) {
+            row.add(format_ == OutputFormat::TSV
+                        ? "format\tqdcxx-tape-inspect\t6\texternal-schema-v1\tlegacy\n"
+                        : "qdcxx-tape-inspect human 6 profile=external-schema-v1 tape-mode=legacy identities=local\n");
+        } else if (profile_ == DisplayProfile::DEFAULT_PROFILE_V1) {
             row.add(format_ == OutputFormat::TSV
                         ? "format\tqdcxx-tape-inspect\t5\tdefault-profile-v1\tlegacy\n"
                         : "qdcxx-tape-inspect human 5 profile=default-profile-v1 tape-mode=legacy identities=local\n");
@@ -751,6 +755,14 @@ std::string Formatter::tapeFrame(const protocol::Frame &value, std::size_t index
 std::string Formatter::rawTapeHeader(std::size_t budget) const {
     return build(budget, [&](Row &row) {
         const bool tsv = format_ == OutputFormat::TSV;
+
+        if (profile_ == DisplayProfile::EXTERNAL_SCHEMA_V1) {
+            row.add(tsv ? "format\tqdcxx-tape-inspect\t6\texternal-schema-v1\traw-message-v1\n"
+                        : "qdcxx-tape-inspect human 6 profile=external-schema-v1 tape-mode=raw-message-v1 "
+                          "identities=local\n");
+
+            return;
+        }
 
         if (profile_ == DisplayProfile::DEFAULT_PROFILE_V1) {
             row.add(tsv ? "format\tqdcxx-tape-inspect\t5\tdefault-profile-v1\traw-message-v1\n"

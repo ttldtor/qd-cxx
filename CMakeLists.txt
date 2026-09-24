@@ -18,6 +18,26 @@ target_include_directories(qdcxx_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/includ
 target_compile_features(qdcxx_core PUBLIC cxx_std_23)
 set_target_properties(qdcxx_core PROPERTIES CXX_EXTENSIONS OFF)
 
+option(ORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON "Build the bounded native JSON schema loader" ON)
+if(ORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON)
+    include(FetchContent)
+    # Build only the pinned amalgamation: no upstream tools, tests or interpreter discovery.
+    FetchContent_Declare(simdjson
+        URL https://codeload.github.com/simdjson/simdjson/tar.gz/refs/tags/v4.6.4
+        URL_HASH SHA256=b091107844fe928158c5c2265c20360fff312889ddf7ebc4528a0f0f8f2ff9cd
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+        SOURCE_SUBDIR qdcxx-unused
+    )
+    FetchContent_MakeAvailable(simdjson)
+    add_library(qdcxx_simdjson STATIC "${simdjson_SOURCE_DIR}/singleheader/simdjson.cpp")
+    target_include_directories(qdcxx_simdjson SYSTEM PUBLIC "${simdjson_SOURCE_DIR}/singleheader")
+    target_compile_features(qdcxx_simdjson PRIVATE cxx_std_17)
+    set_target_properties(qdcxx_simdjson PROPERTIES CXX_EXTENSIONS OFF POSITION_INDEPENDENT_CODE ON)
+    add_library(qdcxx_schema_json src/schema/json_schema.cpp)
+    target_link_libraries(qdcxx_schema_json PUBLIC qdcxx_core PRIVATE qdcxx_simdjson)
+    set_target_properties(qdcxx_schema_json PROPERTIES CXX_EXTENSIONS OFF)
+endif()
+
 add_library(qdcxx_event_mapping src/events/event_mapping.cpp)
 target_link_libraries(qdcxx_event_mapping PUBLIC qdcxx_core)
 set_target_properties(qdcxx_event_mapping PROPERTIES CXX_EXTENSIONS OFF)
@@ -47,12 +67,16 @@ if(ORG_TTLDTOR_QDCXX_BUILD_QTP_INSPECT)
 endif()
 
 if(ORG_TTLDTOR_QDCXX_BUILD_TAPE_INSPECT)
-    add_library(qdcxx_tape_inspect_tool STATIC tools/tape-inspect/inspect.cpp tools/tape-inspect/diagnostics.cpp)
+    add_library(qdcxx_tape_inspect_tool STATIC tools/tape-inspect/inspect.cpp tools/tape-inspect/diagnostics.cpp tools/tape-inspect/schema_input.cpp)
     target_include_directories(qdcxx_tape_inspect_tool PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/tools/tape-inspect")
     target_link_libraries(qdcxx_tape_inspect_tool PUBLIC qdcxx_inspect_tool)
     set_target_properties(qdcxx_tape_inspect_tool PROPERTIES CXX_EXTENSIONS OFF)
     add_executable(qdcxx_tape_inspect tools/tape-inspect/main.cpp)
     target_link_libraries(qdcxx_tape_inspect PRIVATE qdcxx_tape_inspect_tool)
+    if(ORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON)
+        target_link_libraries(qdcxx_tape_inspect PRIVATE qdcxx_schema_json)
+        target_compile_definitions(qdcxx_tape_inspect PRIVATE ORG_TTLDTOR_QDCXX_HAS_SCHEMA_JSON=1)
+    endif()
     set_target_properties(qdcxx_tape_inspect PROPERTIES CXX_EXTENSIONS OFF OUTPUT_NAME "qdcxx-tape-inspect")
 endif()
 include(CTest)
@@ -65,6 +89,24 @@ if(BUILD_TESTING)
         DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     )
     FetchContent_MakeAvailable(doctest)
+    if(ORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON)
+        add_executable(qdcxx_schema_json_tests tests/conformance/schema_json_tests.cpp)
+        target_link_libraries(qdcxx_schema_json_tests PRIVATE qdcxx_schema_json doctest::doctest)
+        set_target_properties(qdcxx_schema_json_tests PROPERTIES CXX_EXTENSIONS OFF)
+        add_test(NAME schema_json_contract COMMAND qdcxx_schema_json_tests)
+        if(ORG_TTLDTOR_QDCXX_BUILD_TAPE_INSPECT)
+            add_executable(qdcxx_schema_json_integration_tests tests/conformance/schema_json_integration_tests.cpp)
+            target_link_libraries(qdcxx_schema_json_integration_tests PRIVATE qdcxx_schema_json qdcxx_tape_inspect_tool doctest::doctest)
+            set_target_properties(qdcxx_schema_json_integration_tests PROPERTIES CXX_EXTENSIONS OFF)
+            add_test(NAME schema_json_integration COMMAND qdcxx_schema_json_integration_tests "${CMAKE_CURRENT_SOURCE_DIR}")
+        endif()
+    endif()
+    if(ORG_TTLDTOR_QDCXX_BUILD_TAPE_INSPECT)
+        add_test(NAME schema_json_cli COMMAND "${CMAKE_COMMAND}"
+            "-DPROGRAM=$<TARGET_FILE:qdcxx_tape_inspect>" "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DENABLED=${ORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON}" "-DRUN=${CMAKE_CURRENT_BINARY_DIR}/schema-json-cli"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/schema_json_cli.cmake")
+    endif()
     # Verification-only image tracing is implemented for the Windows/Linux acceptance hosts.
     if(WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
         add_executable(qdcxx_no_python_guard tests/conformance/no_python_guard.cpp)

@@ -26,7 +26,8 @@ enum class DisplayProfile {
     ORACLE_SRE_V1,         ///< Built-in adapter with S.v and R.y/R.x/R.z labels.
     DEFAULT_QUOTE_V1,      ///< Explicit eight-field composite Quote with exact typed values.
     ORACLE_FIELD_TYPES_V1, ///< Generic exact fields with nullable UTF-16, using tape output version 4.
-    DEFAULT_PROFILE_V1     ///< Explicit default Profile with raw fields and event values, output version 5.
+    DEFAULT_PROFILE_V1,    ///< Explicit default Profile with raw fields and event values, output version 5.
+    EXTERNAL_SCHEMA_V1     ///< Caller-loaded ordinary exact fields, generic tape output version 6.
 };
 
 /** Logical row exceeds remaining output bytes; translated to the existing write resource error. */

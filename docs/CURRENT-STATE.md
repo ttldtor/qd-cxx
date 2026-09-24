@@ -1,10 +1,17 @@
 # Current state
 
-## QDCXX-029 ready: external JSON schemas
+## QDCXX-029 implemented: independent review pending
 
-The owner approved simdjson DOM after a local trial. QDCXX-029, High, now specifies a bounded native JSON loader and generic external-schema tape inspection, with existing Quote/Profile preparation tested through the library API.
-Planning started from clean master `c463f387bd6be6e828a5cbb48729196f7702969a`. Only task/plan/status documentation is added here; the loader is not implemented. The prototype was not production-contract conformance or a cross-platform validation.
-The plan separates the new native profile from XML-captured JSON and keeps core parser-independent. XML, general properties and remaining manual Python migration stay separate. Verification is scoped; transient logs stay outside Git. Earlier entries retain their historical scope.
+QDCXX-029, High, implements U1–U4 from the
+plan. Actual starting HEAD:
+`3bc0e5ee37cf1dd68306d8016a5b65f68c2da2e0`; branch `task/qdcxx-029-external-json`.
+The distinct [native JSON contract](../spec/schema/NATIVE-JSON.md), optional privately pinned simdjson
+DOM loader and explicit generic `--schema` inspection preserve core/event independence and old profiles.
+Loaded reordered Quote/Profile schemas use existing prepared APIs; custom and extra fields remain visible.
+[Author validation](../tests/conformance/schema-json/VALIDATION.md) records the Windows/Linux checks,
+limitations and complete changed-file manifest. Independent acceptance remains open; nothing was staged,
+committed, pushed or merged. Transient logs stay in `.work/`. XML, properties, new wire types, transport,
+private tape and further Python migration remain outside scope. Earlier entries retain their historical scope.
 
 ## QDCXX-028 accepted and integrated in master
 

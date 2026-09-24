@@ -1,5 +1,28 @@
 # XML scheme and DataScheme semantic inventory
 
+[Русская навигация по новым контрактам](README.ru.md). English is authoritative.
+
+## Native JSON schema entry point
+
+[NATIVE-JSON](NATIVE-JSON.md) defines the separate `qdcxx-native` version-1 source format:
+ordinary records, ordered logical fields, exact full types 2/8/10/40/56/72/88/120 and explicit lookups.
+The optional `qdcxx_schema_json` loader publishes an owned immutable `LocalSchema` after bounded
+validation. [Build/API instructions](../../docs/CPP-BUILD.md#native-json-schema-loader) show loaded
+Quote/Profile preparation using explicit local IDs; [tape inspection](../../docs/TAPE-INSPECT.md)
+shows generic external-schema output version 6. Custom records and extra fields remain accessible.
+
+Reusable native examples: [empty](examples/native/empty.json),
+[field types](examples/native/field-types.json) and [mixed custom/Quote/Profile](examples/native/mixed.json).
+These describe our native syntax, not new Java observations. The
+[XML-captured JSON contract](JSON-CONTRACT.md), its examples and historical evidence remain separate
+and unchanged; its `qd-3.355-xml-captured` profile is unsupported by this loader. XML construction,
+imports, Java properties, new types/conversions and transport remain outside the native boundary.
+
+The historical English inventory below is preserved. The Russian navigation page translates the
+new native entry point and links this inventory; it does not claim to translate the old analysis.
+
+## Historical XML inventory
+
 Initial descriptive analysis for QDCXX-003, against Java QD **3.355**, commit **`0ddc0a09779fb61d74cc0b37c6449ff47dcb715f`**. This is not a normalized format or a C++ design. Upstream citations resolve through the [source inventory](SOURCES.md) to that immutable commit.
 
 Evidence labels:

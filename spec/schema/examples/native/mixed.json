@@ -1,0 +1,79 @@
+{
+  "formatVersion": 1,
+  "profile": {"id": "qdcxx-native", "version": 1},
+  "records": [
+    {
+      "id": 0,
+      "name": "Custom",
+      "hasTime": false,
+      "fields": [
+        {"serialTypeId": 8},
+        {"serialTypeId": 10},
+        {"serialTypeId": 40},
+        {"serialTypeId": 2},
+        {"serialTypeId": 56},
+        {"serialTypeId": 72},
+        {"serialTypeId": 88},
+        {"serialTypeId": 120}
+      ],
+      "lookups": [
+        {"name": "Count", "fieldId": 0},
+        {"name": "Text", "fieldId": 1},
+        {"name": "Text.\uD83D\uDE00", "fieldId": 1},
+        {"name": "Short", "fieldId": 2},
+        {"name": "Char", "fieldId": 3},
+        {"name": "Seconds", "fieldId": 4},
+        {"name": "Sequence", "fieldId": 5},
+        {"name": "Date", "fieldId": 6},
+        {"name": "Wide", "fieldId": 7}
+      ]
+    },
+    {
+      "id": 1,
+      "name": "Quote",
+      "hasTime": false,
+      "fields": [
+        {"serialTypeId": 120},
+        {"serialTypeId": 10},
+        {"serialTypeId": 120},
+        {"serialTypeId": 120},
+        {"serialTypeId": 120},
+        {"serialTypeId": 72}
+      ],
+      "lookups": [
+        {"name": "Ask.Size", "fieldId": 0},
+        {"name": "AskSize", "fieldId": 0},
+        {"name": "ExtraText", "fieldId": 1},
+        {"name": "Bid.Price", "fieldId": 2},
+        {"name": "BidPrice", "fieldId": 2},
+        {"name": "Ask.Price", "fieldId": 3},
+        {"name": "AskPrice", "fieldId": 3},
+        {"name": "Bid.Size", "fieldId": 4},
+        {"name": "BidSize", "fieldId": 4},
+        {"name": "Sequence", "fieldId": 5}
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Profile",
+      "hasTime": false,
+      "fields": [
+        {"serialTypeId": 10},
+        {"serialTypeId": 120},
+        {"serialTypeId": 40},
+        {"serialTypeId": 10},
+        {"serialTypeId": 8},
+        {"serialTypeId": 88}
+      ],
+      "lookups": [
+        {"name": "StatusReason", "fieldId": 0},
+        {"name": "Beta", "fieldId": 1},
+        {"name": "ExtraShort", "fieldId": 2},
+        {"name": "Description", "fieldId": 3},
+        {"name": "Flags", "fieldId": 4},
+        {"name": "ExdDiv.Date", "fieldId": 5},
+        {"name": "ExdDivDate", "fieldId": 5}
+      ]
+    }
+  ]
+}

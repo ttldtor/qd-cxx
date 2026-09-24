@@ -2,6 +2,97 @@
 
 [English version](CPP-BUILD.md). Английская версия является нормативной.
 
+## Нативный загрузчик JSON-схем
+
+`ORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON` по умолчанию ON и добавляет `qdcxx_schema_json`.
+Подключите `qd/schema/json_schema.hpp` и этот target для использования
+`org::ttldtor::qdcxx::schema::loadJsonSchema(std::string_view, JsonSchemaLimits = {})`.
+Функция возвращает `std::expected<core::LocalSchema, schema::JsonSchemaError>` и принимает переданные
+UTF-8 байты без файлового I/O и неявных настроек. [Нативный контракт](../spec/schema/NATIVE-JSON.ru.md)
+определяет полную грамматику, владение, ошибки и конечные значения по умолчанию.
+`JsonSchemaLimits::documentBytes` и `depth` ограничивают разбор; `schema` задаёт прежние бюджеты
+элементов/имён core. Это логические границы, а не точный предел heap или гарантия линейного времени
+всей проверки.
+
+CMake получает [исходники simdjson 4.6.4](https://github.com/simdjson/simdjson/releases/tag/v4.6.4)
+из [закреплённого архива](https://codeload.github.com/simdjson/simdjson/tar.gz/refs/tags/v4.6.4),
+SHA-256 `b091107844fe928158c5c2265c20360fff312889ddf7ebc4528a0f0f8f2ff9cd`.
+Компилируется только amalgamation как закрытая зависимость; upstream tests/tools и компилятор C
+не требуются. Сохранена [атрибуция MIT](../third_party/licenses/simdjson-MIT.txt).
+Публичные заголовки содержат только типы проекта/STL. Core, codecs, protocol и event targets не
+зависят от загрузчика или simdjson; закрытая зависимость линковки появляется только у потребителей,
+подключающих необязательный загрузчик.
+
+Для Windows-сборки с несколькими конфигурациями, используемой в примерах CLI:
+
+```text
+cmake -S . -B .work/schema-json-msvc -DBUILD_TESTING=OFF -DORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON=ON -DORG_TTLDTOR_QDCXX_BUILD_TAPE_INSPECT=ON
+cmake --build .work/schema-json-msvc --config Release
+```
+
+Для Linux-сборки с одной конфигурацией используйте
+`-B .work/schema-json-linux -DCMAKE_BUILD_TYPE=Debug` с теми же параметрами возможностей,
+затем `cmake --build .work/schema-json-linux`.
+Чтобы собрать только прежний путь инспекции со встроенными схемами, настройте отдельный новый
+каталог сборки с `-DBUILD_TESTING=OFF -DORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON=OFF` и нужными параметрами
+инспектора. OFF не получает и не линкует simdjson. Встроенные команды доступны; корректный запрос
+`--schema` сообщает `LOADER_DISABLED` (выход 4) до файлового I/O. Обычный configure/build/CTest не
+получает новых требований Python или PowerShell. Это инструкции использования, не отчёт о
+выполненных проверках.
+
+[Смешанный нативный пример](../spec/schema/examples/native/mixed.json) содержит пользовательскую
+запись с локальным ID 0, переставленный Quote с ID 1 и переставленный Profile с ID 2, с optional и
+дополнительными полями. На владеющей границе приложения прочитайте этот файл с конечным лимитом
+байтов; следующая функция показывает загрузку и обе подготовки. Подключите `qdcxx_schema_json`,
+`qdcxx_quote` и `qdcxx_profile`. Приложение выбирает конечные бюджеты отображения независимо от
+бюджетов загрузки:
+
+```cpp
+#include "qd/events/profile.hpp"
+#include "qd/events/quote.hpp"
+#include "qd/schema/json_schema.hpp"
+
+#include <string_view>
+
+/** Prepare both event layouts from the mixed native example.
+ * @param schemaBytes UTF-8 contents supplied by the application's bounded file reader.
+ * @return True when loading and both preparations succeed; false on any typed failure.
+ */
+bool prepareExample(std::string_view schemaBytes) {
+    using namespace org::ttldtor::qdcxx;
+
+    auto loaded = schema::loadJsonSchema(schemaBytes);
+
+    if (!loaded) {
+        return false;
+    }
+
+    const events::MappingLimits limits{
+        .fields = 64, .lookups = 128, .selections = 32, .keys = 128,
+        .typeAlternatives = 64, .nameUnits = 1024,
+        .totalNameUnits = 16384, .comparisonWork = 1048576};
+    auto quote = events::PreparedQuote::prepare(*loaded, 1, limits);
+    auto profile = events::PreparedProfile::prepare(*loaded, 2, limits);
+
+    return quote.has_value() && profile.has_value();
+}
+```
+
+Функция показывает только подготовку. Обрабатывающее приложение сохраняет успешно загруженную
+схему и подготовленные отображения, передаёт тот же контекст схемы декодеру и отображает полные
+значения `RecordValueView` с явными лимитами владения события, как описано ниже. Копии сохраняют
+контекст; повторная загрузка даже идентичных байтов создаёт независимую identity и не может
+повторно использовать первое подготовленное отображение. Уничтожение входа и парсера не нарушает
+валидность загруженной схемы. Подготовка проверяет lookups, типы и обязательные поля; одного имени
+записи недостаточно для совместимости. Общие записи и дополнительные поля доступны независимо
+от проекции событий. [Внешний CLI](TAPE-INSPECT.ru.md) всегда использует общий вывод версии 6,
+без выбора отображения события.
+
+Принимаются только `qdcxx-native` версии 1, `hasTime:false` и точные полные ID
+2/8/10/40/56/72/88/120. Прежний XML-captured JSON-профиль, XML/imports, разрешение Java properties,
+URLs, автоматический выбор схемы, замена во время работы, новые wire-типы/преобразования и транспорт
+остаются неподдерживаемыми.
+
 ## Актуальный переносимый процесс разработки
 
 Нужны CMake 3.25+, компилятор C++23 и нативные средства сборки. [Инструкции средств разработки](../tools/dev/README.ru.md)
