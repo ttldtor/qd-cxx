@@ -1,0 +1,38 @@
+# Copyright (c) 2026 ttldtor.
+# SPDX-License-Identifier: BSL-1.0
+# Native launcher contract: independent values, real destinations and owned process lifetimes.
+foreach(required QDCXX_LOGGER QDCXX_PROBE QDCXX_LOGGER_TESTS WORK ACP_LOGGER MUTANT_ARGS MUTANT_DECODING MUTANT_EXIT FAULT_LOGGER)
+    if(NOT DEFINED ${required})
+        message(FATAL_ERROR "Missing ${required}")
+    endif()
+endforeach()
+file(MAKE_DIRECTORY "${WORK}")
+execute_process(COMMAND "${QDCXX_LOGGER}" RESULT_VARIABLE missingResult OUTPUT_QUIET ERROR_QUIET TIMEOUT 10)
+if(NOT missingResult STREQUAL "0")
+    message(FATAL_ERROR "Logger no-argument help failed: ${missingResult}")
+endif()
+execute_process(COMMAND "${QDCXX_LOGGER_TESTS}" "${ACP_LOGGER}" "${QDCXX_PROBE}" "${WORK}/baseline" "${FAULT_LOGGER}"
+    RESULT_VARIABLE result TIMEOUT 180)
+if(NOT result STREQUAL "0")
+    message(FATAL_ERROR "Native logger suite failed: ${result}")
+endif()
+foreach(mutation ARGS DECODING EXIT)
+    if(mutation STREQUAL "ARGS")
+        set(expected "child-only TZ override")
+    elseif(mutation STREQUAL "DECODING")
+        set(expected "UTF-16 BOM replacement")
+    else()
+        set(expected "child exit propagation")
+    endif()
+    execute_process(COMMAND "${QDCXX_LOGGER_TESTS}" "${MUTANT_${mutation}}" "${QDCXX_PROBE}" "${WORK}/mutant-${mutation}"
+        RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE diagnostic TIMEOUT 180)
+    if(NOT result STREQUAL "1" OR NOT diagnostic MATCHES "LOGGER TEST FAILED: ${expected}")
+        message(FATAL_ERROR "Mutation ${mutation} was not rejected by contract assertion: ${result}\n${output}\n${diagnostic}")
+    endif()
+    message(STATUS "PASS actual logger ${mutation} mutation rejected: ${diagnostic}")
+endforeach()
+execute_process(COMMAND "${QDCXX_LOGGER_TESTS}" "${QDCXX_LOGGER}" "${QDCXX_PROBE}" "${WORK}/restored"
+    RESULT_VARIABLE result TIMEOUT 180)
+if(NOT result STREQUAL "0")
+    message(FATAL_ERROR "Restored native logger baseline failed: ${result}")
+endif()

@@ -24,7 +24,10 @@
 #endif
 
 namespace {
-/** Decide whether an executable image is a Python interpreter or launcher.
+/// Explicit acceptance policy; the historical interface remains Python-only.
+bool denyPowerShell = false;
+
+/** Decide whether an executable image is forbidden by the selected interpreter policy.
  * @param path Resolved image path, including absolute invocations.
  * @return Whether execution must be stopped before the image runs.
  */
@@ -34,7 +37,8 @@ bool forbidden(const std::filesystem::path &path) {
         return static_cast<char>(std::tolower(c));
     });
 
-    return std::regex_match(name, std::regex("(python([0-9].*)?|pythonw([0-9].*)?|py)(\\.exe)?"));
+    return std::regex_match(name, std::regex("(python([0-9].*)?|pythonw([0-9].*)?|py)(\\.exe)?")) ||
+           (denyPowerShell && std::regex_match(name, std::regex("(pwsh|powershell|powershell_ise)(\\.exe)?")));
 }
 
 /** Write every resolved image and flush before allowing execution.
@@ -100,7 +104,7 @@ std::filesystem::path imagePath(HANDLE file) {
 #endif
 
 /** Run one command under a child-tree image guard, never changing host settings.
- * @param arguments Guard, inventory path, absolute command and command arguments.
+ * @param arguments Guard, inventory path, absolute command and command arguments after policy selection.
  * @return Root exit code, 97 for a denied image, or 98 for guard failure.
  */
 int run(const std::vector<std::filesystem::path> &arguments) {
@@ -336,7 +340,7 @@ int run(const std::vector<std::filesystem::path> &arguments) {
 
 /** Preserve native command-line paths and dispatch the process-image guard.
  * @param argc Count including this executable.
- * @param argv Native command-line arguments borrowed for this call.
+ * @param argv Native command-line arguments, optionally starting with --deny-interpreters after argv[0].
  * @return Child exit, 97 for a denied image, or 98 for a harness failure.
  */
 #ifdef _WIN32
@@ -348,6 +352,11 @@ int main(int argc, char **argv) {
 
     for (int i = 0; i < argc; ++i) {
         arguments.emplace_back(argv[i]);
+    }
+
+    if (arguments.size() > 1 && arguments[1] == "--deny-interpreters") {
+        denyPowerShell = true;
+        arguments.erase(arguments.begin() + 1);
     }
 
     return run(arguments);

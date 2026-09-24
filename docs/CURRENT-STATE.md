@@ -1,20 +1,21 @@
 # Current state
 
-## QDCXX-028 assigned: portable development tools
+## QDCXX-028 implemented and author-verified: independent acceptance open
 
-QDCXX-028, High, assigns native UTC logging and portable C++ formatting without mandatory Python or PowerShell.
-Optional Windows PowerShell conveniences remain; Windows/Linux verification is required, macOS is explicitly unverified and nonblocking.
-Only the plan is prepared; implementation and its independent acceptance have not started.
-Current logging/formatting commands stay in force until their replacements are verified.
+QDCXX-028, High, implements standalone native UTC logging and CMake C++ formatting with explicit exact native executables.
+[Current instructions](../tools/dev/README.md) describe bootstrap, argument-vector logging and interpreter-free command trees; optional Windows PowerShell conveniences remain.
+U1–U5 implementation and author verification cover the required Windows/Linux profiles, option combinations and corrected reruns. macOS is explicitly unverified and nonblocking. ASan/UBSan ran with LSan disabled; Linux session cleanup requires Linux 5.4+, readable `/proc` and pidfd open/signal/wait support.
+[Coverage](../tests/conformance/tooling/COVERAGE.md) freezes obligations; [author validation](../tests/conformance/tooling/VALIDATION.md) records completed checks and remaining limits separately from historical evidence.
+Independent acceptance is open. Production code, Java tooling and remaining manual Python checks are outside this change; no staging, commit or next task is authorized.
 
 ## QDCXX-027 integrated in master
 
 The owner integrated QDCXX-027 at `2833027fb334c9206798f14f1dedc396b8a3ec2a`; the tree was clean before this planning update.
 The preceding review and targeted fixes are recorded in the conversation; this is a status update, not a new independent review or rerun.
 [Coverage](../tests/conformance/python-migration/COVERAGE.md), [author verification](../tests/conformance/python-migration/VALIDATION.md) and review-fix evidence retain their historical scope and limitations.
-Normal CTest is Python-free; active logging/formatting still uses PowerShell pending QDCXX-028.
+At the QDCXX-027 handoff, normal CTest was Python-free while active logging/formatting used PowerShell; QDCXX-028's current instructions supersede that tooling boundary.
 Remaining manual Python checks stay required in [the migration ledger](PYTHON-MIGRATION.md).
-No C++ builds, Java captures or runtime checks were performed for this planning update.
+No C++ builds, Java captures or runtime checks were performed for the original QDCXX-028 planning update; implementation evidence is recorded separately above.
 
 ## QDCXX-026 accepted and merged
 

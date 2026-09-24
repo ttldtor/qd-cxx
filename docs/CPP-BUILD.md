@@ -2,6 +2,32 @@
 
 [Русская версия](CPP-BUILD.ru.md). English is authoritative.
 
+## Current portable development workflow
+
+Use CMake 3.25+, a C++23 compiler and native build tools. [Developer-tool instructions](../tools/dev/README.md)
+define the standalone bootstrap, native `qdcxx-run-utc` contract and Windows/Linux commands.
+Bootstrap is the first-build exception: UTC phase bounds, exact command arguments and separate raw
+streams replace line timestamps until the logger exists. Normal configure/build/CTest and the new
+logger/formatter command trees require neither Python nor PowerShell; an interactive shell is
+outside that dependency claim. `BUILD_TESTING=OFF` neither builds developer tools nor fetches doctest.
+
+Formatting uses explicit native Uncrustify 0.83.0 followed by clang-format 20.1.8; the root
+configurations and dependency locks stay unchanged. Run Format and then Check, with exact executable paths:
+
+```text
+cmake -DMODE=Format "-DUNCRUSTIFY=<native-uncrustify>" "-DCLANG_FORMAT=<native-clang-format>" -P tools/format/Format-Cpp.cmake
+cmake -DMODE=Check "-DUNCRUSTIFY=<native-uncrustify>" "-DCLANG_FORMAT=<native-clang-format>" -P tools/format/Format-Cpp.cmake
+```
+
+[Formatter instructions](../tools/format/CPP.md) describe JSON file selection, scope, native Linux
+preparation and the optional unchanged Windows PowerShell downloader/wrappers. Acquisition and
+execution are separate. Java tooling and remaining manual Python checks retain their requirements.
+
+QDCXX-028 U1–U5 are implemented and author-verified on Windows/Linux, including corrected reruns;
+[new author validation](../tests/conformance/tooling/VALIDATION.md) records actual results separately
+from historical evidence. Independent acceptance is open. macOS is unverified and nonblocking.
+The component-era results below preserve their original scope and do not establish current matrix results.
+
 ## Prepared Quote and Profile mappings
 
 Include `qd/events/quote.hpp` or `qd/events/profile.hpp` and link `qdcxx_quote` or `qdcxx_profile`.
@@ -203,12 +229,12 @@ below describe the earlier compact-only run. `BUILD_TESTING=OFF` still fetches n
 UTF dependency was selected. Reuse probes are optional, separate ignored projects.
 [Current validation](../tests/conformance/encoding/VALIDATION.md) retains UTC evidence.
 
-Additional WSL sanitizer commands from the repository root (cached pinned doctest):
+Additional WSL sanitizer commands from the repository root after the Linux bootstrap below (cached pinned doctest). Report ASan/UBSan and LSan separately; ptrace checks with `detect_leaks=0` do not establish LSan coverage:
 
-```powershell
-& ./tools/Run-Utc.ps1 -Log .work/utf-asan-configure.log -Executable cmake -ArgumentList @('-S','.','-B','.work/utf-asan','-G','Ninja','-DCMAKE_BUILD_TYPE=Debug','-DCMAKE_CXX_FLAGS=-fsanitize=address,undefined -fno-omit-frame-pointer','-DFETCHCONTENT_SOURCE_DIR_DOCTEST=/work/qd-cxx/.work/linux-debug/_deps/doctest-src')
-& ./tools/Run-Utc.ps1 -Log .work/utf-asan-build.log -Executable cmake -ArgumentList @('--build','.work/utf-asan','-j','4')
-& ./tools/Run-Utc.ps1 -Log .work/utf-asan-test.log -Executable ctest -ArgumentList @('--test-dir','.work/utf-asan','--output-on-failure')
+```sh
+.work/dev-linux/qdcxx-run-utc --log .work/utf-asan-configure.log -- cmake -S . -B .work/utf-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug "-DCMAKE_CXX_FLAGS=-fsanitize=address,undefined -fno-omit-frame-pointer" "-DFETCHCONTENT_SOURCE_DIR_DOCTEST=/work/qd-cxx/.work/linux-debug/_deps/doctest-src"
+.work/dev-linux/qdcxx-run-utc --log .work/utf-asan-build.log -- cmake --build .work/utf-asan -j 4
+.work/dev-linux/qdcxx-run-utc --log .work/utf-asan-test.log -- ctest --test-dir .work/utf-asan --output-on-failure
 ```
 
 ## Build and test on Windows
@@ -223,19 +249,20 @@ No package manager is needed. doctest 2.4.12 emits a non-fatal CMake deprecation
 old minimum policy version; the downloaded source is unmodified. CMake requires 3.25+; each target inherits `cxx_std_23` from the library,
 with extensions disabled. On these toolsets CMake selects `/std:c++latest` for C++23 support.
 
-From the repository root in PowerShell:
+Current commands from the repository root (PowerShell may be the interactive shell):
 
-```powershell
-& ./tools/Run-Utc.ps1 -Log .work/msvc-configure.log -Executable cmake -ArgumentList @('-S','.','-B','.work/msvc','-G','Visual Studio 17 2022','-A','x64')
-& ./tools/Run-Utc.ps1 -Log .work/msvc-debug-build.log -Executable cmake -ArgumentList @('--build','.work/msvc','--config','Debug')
-& ./tools/Run-Utc.ps1 -Log .work/msvc-debug-test.log -Executable ctest -ArgumentList @('--test-dir','.work/msvc','-C','Debug','--output-on-failure')
-& ./tools/Run-Utc.ps1 -Log .work/msvc-release-build.log -Executable cmake -ArgumentList @('--build','.work/msvc','--config','Release')
-& ./tools/Run-Utc.ps1 -Log .work/msvc-release-test.log -Executable ctest -ArgumentList @('--test-dir','.work/msvc','-C','Release','--output-on-failure')
-& ./tools/Run-Utc.ps1 -Log .work/clang-configure.log -Executable cmake -ArgumentList @('-S','.','-B','.work/clang','-G','Visual Studio 17 2022','-A','x64','-T','ClangCL')
-& ./tools/Run-Utc.ps1 -Log .work/clang-debug-build.log -Executable cmake -ArgumentList @('--build','.work/clang','--config','Debug')
-& ./tools/Run-Utc.ps1 -Log .work/clang-debug-test.log -Executable ctest -ArgumentList @('--test-dir','.work/clang','-C','Debug','--output-on-failure')
-& ./tools/Run-Utc.ps1 -Log .work/clang-release-build.log -Executable cmake -ArgumentList @('--build','.work/clang','--config','Release')
-& ./tools/Run-Utc.ps1 -Log .work/clang-release-test.log -Executable ctest -ArgumentList @('--test-dir','.work/clang','-C','Release','--output-on-failure')
+```text
+cmake "-DBINARY=.work/dev" "-DLOG=.work/dev-bootstrap.log" "-DGENERATOR=Visual Studio 17 2022" -DCONFIG=Release -P tools/dev/Bootstrap.cmake
+.work/dev/Release/qdcxx-run-utc.exe --log .work/msvc-configure.log -- cmake -S . -B .work/msvc "-GVisual Studio 17 2022" -A x64
+.work/dev/Release/qdcxx-run-utc.exe --log .work/msvc-debug-build.log -- cmake --build .work/msvc --config Debug
+.work/dev/Release/qdcxx-run-utc.exe --log .work/msvc-debug-test.log -- ctest --test-dir .work/msvc -C Debug --output-on-failure
+.work/dev/Release/qdcxx-run-utc.exe --log .work/msvc-release-build.log -- cmake --build .work/msvc --config Release
+.work/dev/Release/qdcxx-run-utc.exe --log .work/msvc-release-test.log -- ctest --test-dir .work/msvc -C Release --output-on-failure
+.work/dev/Release/qdcxx-run-utc.exe --log .work/clang-configure.log -- cmake -S . -B .work/clang "-GVisual Studio 17 2022" -A x64 -T ClangCL
+.work/dev/Release/qdcxx-run-utc.exe --log .work/clang-debug-build.log -- cmake --build .work/clang --config Debug
+.work/dev/Release/qdcxx-run-utc.exe --log .work/clang-debug-test.log -- ctest --test-dir .work/clang -C Debug --output-on-failure
+.work/dev/Release/qdcxx-run-utc.exe --log .work/clang-release-build.log -- cmake --build .work/clang --config Release
+.work/dev/Release/qdcxx-run-utc.exe --log .work/clang-release-test.log -- ctest --test-dir .work/clang -C Release --output-on-failure
 ```
 
 Build outside the source root; `.work/` and `build/` are ignored. In-source configure is rejected.
@@ -284,21 +311,23 @@ with `BUILD_TESTING=OFF` passes without creating `_deps/`. Linux negative fixtur
 pass; `--skip-format` explicitly omits the Windows-only formatter checks already run on Windows.
 Sanitizers, other Linux distributions, macOS and other architectures were not checked.
 
-From Ubuntu WSL (`wsl -d Ubuntu-24.04`), at the mounted repository, inside PowerShell 7.4+:
+Current commands from a POSIX shell in Ubuntu WSL (`wsl -d Ubuntu-24.04`), at the mounted repository:
 
-```powershell
-Set-Location /work/qd-cxx
-foreach ($config in @('Debug','Release')) {
-    $build = ".work/linux-$($config.ToLowerInvariant())"
-    & ./tools/Run-Utc.ps1 -Log "$build-configure.log" -Executable cmake -ArgumentList @('-S','.','-B',$build,'-G','Ninja',"-DCMAKE_BUILD_TYPE=$config")
-    & ./tools/Run-Utc.ps1 -Log "$build-build.log" -Executable cmake -ArgumentList @('--build',$build)
-    & ./tools/Run-Utc.ps1 -Log "$build-test.log" -Executable ctest -ArgumentList @('--test-dir',$build,'--output-on-failure')
-}
-cmake -S . -B .work/linux-library -G Ninja -DBUILD_TESTING=OFF
-cmake --build .work/linux-library
+```sh
+set -e
+cd /work/qd-cxx
+cmake -DBINARY=.work/dev-linux -DLOG=.work/dev-linux-bootstrap.log -DGENERATOR=Ninja -DCONFIG=Release -P tools/dev/Bootstrap.cmake
+for config in Debug Release; do
+    build=".work/linux-$config"
+    .work/dev-linux/qdcxx-run-utc --log "$build-configure.log" -- cmake -S . -B "$build" -G Ninja "-DCMAKE_BUILD_TYPE=$config"
+    .work/dev-linux/qdcxx-run-utc --log "$build-build.log" -- cmake --build "$build"
+    .work/dev-linux/qdcxx-run-utc --log "$build-test.log" -- ctest --test-dir "$build" --output-on-failure
+done
+.work/dev-linux/qdcxx-run-utc --log .work/linux-library-configure.log -- cmake -S . -B .work/linux-library -G Ninja -DBUILD_TESTING=OFF
+.work/dev-linux/qdcxx-run-utc --log .work/linux-library-build.log -- cmake --build .work/linux-library
 ```
 
-[Run-Utc.ps1](../tools/Run-Utc.ps1) requires PowerShell 7.4+ and an argument array,
+The retained optional [Run-Utc.ps1](../tools/Run-Utc.ps1) requires PowerShell 7.4+ and an argument array,
 timestamps output and command start/exit in ISO 8601 UTC (`Z`), sets only child `TZ=UTC`
 and preserves the exit code. It is a UTF-8 text logger with invalid-sequence replacement and
 LF endings, including the final unterminated line. CR/CRLF/LF delimit lines; order within each

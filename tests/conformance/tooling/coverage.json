@@ -1,0 +1,669 @@
+{
+  "schema": "qdcxx-tooling-coverage-v1",
+  "startingHead": "9b4f8ddf5786f71ac5f6d2305a0215a84b86b4b4",
+  "meaning": "Frozen named obligations; not an execution result.",
+  "groups": {
+    "bootstrap": [
+      {
+        "id": "clean-standalone",
+        "owner": "tools/dev/Bootstrap.cmake; tooling/coverage.cmake"
+      },
+      {
+        "id": "record-success",
+        "owner": "tools/dev/Bootstrap.cmake; tooling/coverage.cmake"
+      },
+      {
+        "id": "record-failure",
+        "owner": "tools/dev/Bootstrap.cmake; tooling/coverage.cmake"
+      },
+      {
+        "id": "native-argv",
+        "owner": "tools/dev/Bootstrap.cmake; tooling/coverage.cmake"
+      },
+      {
+        "id": "raw-streams",
+        "owner": "tools/dev/Bootstrap.cmake; tooling/coverage.cmake"
+      },
+      {
+        "id": "controlled-lifetimes",
+        "owner": "tools/dev/Bootstrap.cmake; tooling/coverage.cmake"
+      },
+      {
+        "id": "missing-coverage",
+        "owner": "tools/dev/Bootstrap.cmake; tooling/coverage.cmake"
+      }
+    ],
+    "logger": [
+      {
+        "id": "argv-empty",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "argv-space",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "argv-unicode",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "argv-semicolon",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "argv-quotes",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "argv-backslashes",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "argv-option",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "windows-acp-1252",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "child-tz-only",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "parent-environment",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "cwd-inheritance",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "utf8-split",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "utf8-invalid",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "utf8-truncated",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "utf8-bom-retained",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "utf16-bom-bytes",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "newlines-split",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "newlines-universal",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "empty-lines",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "separate-final-fragments",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "concurrent-large-streams",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "per-stream-order",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "stdout-log-equality",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "utc-milliseconds",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "lf-no-file-bom",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "command-exit-records",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "exit-zero",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "exit-37",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "missing-executable",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "unwritable-log",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "late-write-failure",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "flush-failure",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "closed-console",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "linux-dev-full",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "orphan-pipes",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "failure-after-root-exit",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "five-second-cleanup",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "no-live-owned-descendants",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "help-equivalence",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "invalid-arguments",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "signal-exit",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "cancellation-limits",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "mutation-argv",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "mutation-decoding",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "mutation-exit",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "restored-baseline",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "stalled-open-console",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "stalled-log-fifo",
+        "owner": "logger_tests.cpp / logger.cmake"
+      },
+      {
+        "id": "stalled-stderr-diagnostic",
+        "owner": "tooling/logger_tests.cpp; tooling/logger.cmake"
+      },
+      {
+        "id": "same-session-process-group",
+        "owner": "tooling/logger_tests.cpp; tooling/process_probe.cpp"
+      }
+    ],
+    "formatter": [
+      {
+        "id": "real-format-check",
+        "owner": "tooling/format.cmake"
+      },
+      {
+        "id": "idempotence",
+        "owner": "tooling/format.cmake"
+      },
+      {
+        "id": "mismatch-read-only",
+        "owner": "tooling/format.cmake"
+      },
+      {
+        "id": "missing-tool",
+        "owner": "tooling/format.cmake"
+      },
+      {
+        "id": "wrong-uncrustify-version",
+        "owner": "tooling/format.cmake"
+      },
+      {
+        "id": "wrong-clang-version",
+        "owner": "tooling/format.cmake"
+      },
+      {
+        "id": "missing-config",
+        "owner": "tooling/format.cmake"
+      },
+      {
+        "id": "uncrustify-warning",
+        "owner": "tooling/format.cmake"
+      },
+      {
+        "id": "clang-diagnostic",
+        "owner": "tooling/format.cmake"
+      },
+      {
+        "id": "nonzero-exit",
+        "owner": "tooling/format.cmake"
+      },
+      {
+        "id": "interrupted-pipeline",
+        "owner": "tooling/format.cmake"
+      },
+      {
+        "id": "successful-file-publication-only",
+        "owner": "tooling/format.cmake"
+      },
+      {
+        "id": "cleanup",
+        "owner": "tooling/format.cmake"
+      },
+      {
+        "id": "tracked-discovery",
+        "owner": "tooling/format.cmake"
+      },
+      {
+        "id": "new-source-discovery",
+        "owner": "tooling/format.cmake"
+      },
+      {
+        "id": "developer-source-discovery",
+        "owner": "tooling/format.cmake"
+      },
+      {
+        "id": "unicode-path",
+        "owner": "tooling/format.cmake"
+      },
+      {
+        "id": "space-path",
+        "owner": "tooling/format.cmake"
+      },
+      {
+        "id": "semicolon-path",
+        "owner": "tooling/format.cmake"
+      },
+      {
+        "id": "same-basename",
+        "owner": "tooling/format.cmake"
+      },
+      {
+        "id": "cr-lf-rejection",
+        "owner": "tooling/format.cmake"
+      },
+      {
+        "id": "protected-segments",
+        "owner": "tooling/format.cmake"
+      },
+      {
+        "id": "unsupported-extension",
+        "owner": "tooling/format.cmake"
+      },
+      {
+        "id": "traversal",
+        "owner": "tooling/format.cmake"
+      },
+      {
+        "id": "outside-roots",
+        "owner": "tooling/format.cmake"
+      },
+      {
+        "id": "source-alias-escape",
+        "owner": "tooling/format.cmake"
+      },
+      {
+        "id": "executable-symlink",
+        "owner": "tooling/format.cmake"
+      },
+      {
+        "id": "exact-native-provenance",
+        "owner": "tooling/format.cmake"
+      },
+      {
+        "id": "caller-temp-cache-preserved",
+        "owner": "format.cmake"
+      },
+      {
+        "id": "no-interpreters",
+        "owner": "tooling/format.cmake"
+      }
+    ],
+    "guard": [
+      {
+        "id": "python-path",
+        "owner": "tooling/guard.cmake; tooling/audit.cmake"
+      },
+      {
+        "id": "python-absolute",
+        "owner": "tooling/guard.cmake; tooling/audit.cmake"
+      },
+      {
+        "id": "python-descendant-swallow",
+        "owner": "tooling/guard.cmake; tooling/audit.cmake"
+      },
+      {
+        "id": "powershell-path",
+        "owner": "tooling/guard.cmake; tooling/audit.cmake"
+      },
+      {
+        "id": "powershell-absolute",
+        "owner": "tooling/guard.cmake; tooling/audit.cmake"
+      },
+      {
+        "id": "powershell-descendant-swallow",
+        "owner": "tooling/guard.cmake; tooling/audit.cmake"
+      },
+      {
+        "id": "allowed-baseline",
+        "owner": "tooling/guard.cmake; tooling/audit.cmake"
+      },
+      {
+        "id": "missing-trace-each",
+        "owner": "tooling/guard.cmake; tooling/audit.cmake"
+      },
+      {
+        "id": "empty-trace",
+        "owner": "tooling/guard.cmake; tooling/audit.cmake"
+      },
+      {
+        "id": "extra-trace",
+        "owner": "tooling/guard.cmake; tooling/audit.cmake"
+      },
+      {
+        "id": "malformed-trace",
+        "owner": "tooling/guard.cmake; tooling/audit.cmake"
+      },
+      {
+        "id": "wrong-root",
+        "owner": "tooling/guard.cmake; tooling/audit.cmake"
+      },
+      {
+        "id": "old-suite-inventory",
+        "owner": "tooling/guard.cmake; tooling/audit.cmake"
+      },
+      {
+        "id": "old-inner-cases",
+        "owner": "tooling/guard.cmake; tooling/audit.cmake"
+      },
+      {
+        "id": "old-mutations",
+        "owner": "tooling/guard.cmake; tooling/audit.cmake"
+      },
+      {
+        "id": "production-eight-combinations",
+        "owner": "tooling/guard.cmake; tooling/audit.cmake"
+      },
+      {
+        "id": "no-doctest-production",
+        "owner": "tooling/guard.cmake; tooling/audit.cmake"
+      },
+      {
+        "id": "guarded-bootstrap",
+        "owner": "tooling/guard.cmake; tooling/audit.cmake"
+      },
+      {
+        "id": "guarded-real-format",
+        "owner": "tooling/guard.cmake; tooling/audit.cmake"
+      },
+      {
+        "id": "guarded-logger",
+        "owner": "tooling/guard.cmake; tooling/audit.cmake"
+      },
+      {
+        "id": "formatter-powershell-descendant",
+        "owner": "tooling/guard.cmake; tooling/audit.cmake"
+      }
+    ],
+    "offline_mutations": [
+      {
+        "id": "value",
+        "owner": "inspection_cli_negatives.cmake (unchanged)"
+      },
+      {
+        "id": "symbol",
+        "owner": "inspection_cli_negatives.cmake (unchanged)"
+      },
+      {
+        "id": "local-id",
+        "owner": "inspection_cli_negatives.cmake (unchanged)"
+      },
+      {
+        "id": "name",
+        "owner": "inspection_cli_negatives.cmake (unchanged)"
+      },
+      {
+        "id": "complete-count",
+        "owner": "inspection_cli_negatives.cmake (unchanged)"
+      },
+      {
+        "id": "offset",
+        "owner": "inspection_cli_negatives.cmake (unchanged)"
+      },
+      {
+        "id": "row-type",
+        "owner": "inspection_cli_negatives.cmake (unchanged)"
+      },
+      {
+        "id": "row-arity",
+        "owner": "inspection_cli_negatives.cmake (unchanged)"
+      },
+      {
+        "id": "number-syntax",
+        "owner": "inspection_cli_negatives.cmake (unchanged)"
+      },
+      {
+        "id": "hex-syntax",
+        "owner": "inspection_cli_negatives.cmake (unchanged)"
+      },
+      {
+        "id": "missing-complete",
+        "owner": "inspection_cli_negatives.cmake (unchanged)"
+      },
+      {
+        "id": "double-complete",
+        "owner": "inspection_cli_negatives.cmake (unchanged)"
+      },
+      {
+        "id": "trailing-row",
+        "owner": "inspection_cli_negatives.cmake (unchanged)"
+      },
+      {
+        "id": "empty-selection",
+        "owner": "inspection_cli_negatives.cmake (unchanged)"
+      },
+      {
+        "id": "java-value",
+        "owner": "inspection_cli_negatives.cmake (unchanged)"
+      },
+      {
+        "id": "java-unknown",
+        "owner": "inspection_cli_negatives.cmake (unchanged)"
+      },
+      {
+        "id": "java-completion",
+        "owner": "inspection_cli_negatives.cmake (unchanged)"
+      }
+    ],
+    "human_mutations": [
+      {
+        "id": "label",
+        "owner": "inspection_cli_negatives.cmake (unchanged)"
+      },
+      {
+        "id": "value",
+        "owner": "inspection_cli_negatives.cmake (unchanged)"
+      },
+      {
+        "id": "escape",
+        "owner": "inspection_cli_negatives.cmake (unchanged)"
+      },
+      {
+        "id": "escape-lookalike",
+        "owner": "inspection_cli_negatives.cmake (unchanged)"
+      },
+      {
+        "id": "completion-count",
+        "owner": "inspection_cli_negatives.cmake (unchanged)"
+      },
+      {
+        "id": "missing-completion",
+        "owner": "inspection_cli_negatives.cmake (unchanged)"
+      },
+      {
+        "id": "double-completion",
+        "owner": "inspection_cli_negatives.cmake (unchanged)"
+      },
+      {
+        "id": "trailing-output",
+        "owner": "inspection_cli_negatives.cmake (unchanged)"
+      },
+      {
+        "id": "frame-offset",
+        "owner": "inspection_cli_negatives.cmake (unchanged)"
+      }
+    ],
+    "optional_setup": [
+      {
+        "id": "wrong-sha256",
+        "owner": "python-migration/Test-SetupCpp.ps1 (unchanged optional Windows baseline)"
+      },
+      {
+        "id": "tampered-cache",
+        "owner": "python-migration/Test-SetupCpp.ps1 (unchanged optional Windows baseline)"
+      },
+      {
+        "id": "interrupted-download",
+        "owner": "python-migration/Test-SetupCpp.ps1 (unchanged optional Windows baseline)"
+      },
+      {
+        "id": "truncated-zip",
+        "owner": "python-migration/Test-SetupCpp.ps1 (unchanged optional Windows baseline)"
+      },
+      {
+        "id": "missing-executable",
+        "owner": "python-migration/Test-SetupCpp.ps1 (unchanged optional Windows baseline)"
+      },
+      {
+        "id": "cold-missing-executable",
+        "owner": "python-migration/Test-SetupCpp.ps1 (unchanged optional Windows baseline)"
+      },
+      {
+        "id": "parent-slash",
+        "owner": "python-migration/Test-SetupCpp.ps1 (unchanged optional Windows baseline)"
+      },
+      {
+        "id": "parent-backslash",
+        "owner": "python-migration/Test-SetupCpp.ps1 (unchanged optional Windows baseline)"
+      },
+      {
+        "id": "parent-mixed",
+        "owner": "python-migration/Test-SetupCpp.ps1 (unchanged optional Windows baseline)"
+      },
+      {
+        "id": "absolute-slash",
+        "owner": "python-migration/Test-SetupCpp.ps1 (unchanged optional Windows baseline)"
+      },
+      {
+        "id": "absolute-backslash",
+        "owner": "python-migration/Test-SetupCpp.ps1 (unchanged optional Windows baseline)"
+      },
+      {
+        "id": "absolute-drive",
+        "owner": "python-migration/Test-SetupCpp.ps1 (unchanged optional Windows baseline)"
+      },
+      {
+        "id": "absolute-unc",
+        "owner": "python-migration/Test-SetupCpp.ps1 (unchanged optional Windows baseline)"
+      },
+      {
+        "id": "alternate-stream",
+        "owner": "python-migration/Test-SetupCpp.ps1 (unchanged optional Windows baseline)"
+      },
+      {
+        "id": "device-name",
+        "owner": "python-migration/Test-SetupCpp.ps1 (unchanged optional Windows baseline)"
+      },
+      {
+        "id": "trailing-dot",
+        "owner": "python-migration/Test-SetupCpp.ps1 (unchanged optional Windows baseline)"
+      },
+      {
+        "id": "unix-symlink",
+        "owner": "python-migration/Test-SetupCpp.ps1 (unchanged optional Windows baseline)"
+      },
+      {
+        "id": "windows-reparse",
+        "owner": "python-migration/Test-SetupCpp.ps1 (unchanged optional Windows baseline)"
+      },
+      {
+        "id": "case-duplicate",
+        "owner": "python-migration/Test-SetupCpp.ps1 (unchanged optional Windows baseline)"
+      },
+      {
+        "id": "extraction-conflict",
+        "owner": "python-migration/Test-SetupCpp.ps1 (unchanged optional Windows baseline)"
+      },
+      {
+        "id": "filesystem-junction",
+        "owner": "python-migration/Test-SetupCpp.ps1 (unchanged optional Windows baseline)"
+      },
+      {
+        "id": "existing-installation-junction",
+        "owner": "python-migration/Test-SetupCpp.ps1 (unchanged optional Windows baseline)"
+      },
+      {
+        "id": "locked-cold-acquisition",
+        "owner": "python-migration/Test-SetupCpp.ps1 (unchanged optional Windows baseline)"
+      },
+      {
+        "id": "locked-warm-acquisition",
+        "owner": "python-migration/Test-SetupCpp.ps1 (unchanged optional Windows baseline)"
+      },
+      {
+        "id": "wrong-version-Uncrustify",
+        "owner": "python-migration/Test-SetupCpp.ps1 (unchanged optional Windows baseline)"
+      },
+      {
+        "id": "wrong-version-ClangFormat",
+        "owner": "python-migration/Test-SetupCpp.ps1 (unchanged optional Windows baseline)"
+      },
+      {
+        "id": "formatting-defect-read-only",
+        "owner": "python-migration/Test-SetupCpp.ps1 (unchanged optional Windows baseline)"
+      },
+      {
+        "id": "format-check-idempotence",
+        "owner": "python-migration/Test-SetupCpp.ps1 (unchanged optional Windows baseline)"
+      }
+    ]
+  }
+}

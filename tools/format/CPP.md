@@ -2,59 +2,85 @@
 
 [Русская версия](CPP.ru.md). English is authoritative.
 
-The [style contract](../../docs/CPP-STYLE.md) applies to the QDCXX-010 C++ component.
-[Format-Cpp.ps1](Format-Cpp.ps1) runs **Uncrustify 0.83.0 → clang-format 20.1.8** using the unchanged
-root configurations. PowerShell 7.4+ and Git are required; acquisition does not require Python or pip.
+The [style contract](../../docs/CPP-STYLE.md) applies to repository-owned C++.
+[Format-Cpp.cmake](Format-Cpp.cmake) runs **Uncrustify 0.83.0 → clang-format 20.1.8** with
+unchanged root configurations. CMake 3.25+ and exact native formatter executables are required;
+Git is needed for default discovery. The portable route requires neither Python nor PowerShell.
+Formatter acquisition is separate from execution: the driver never downloads tools or substitutes versions.
+
+```text
+cmake -DUNCRUSTIFY=/absolute/path/to/uncrustify -DCLANG_FORMAT=/absolute/path/to/clang-format -DMODE=Format -P tools/format/Format-Cpp.cmake
+cmake -DUNCRUSTIFY=/absolute/path/to/uncrustify -DCLANG_FORMAT=/absolute/path/to/clang-format -DMODE=Check -P tools/format/Format-Cpp.cmake
+```
+
+Quote complete `-DNAME=value` arguments when paths contain spaces or shell metacharacters.
+Use Windows-native executables on Windows and Linux-native executables on Linux.
+The [developer tooling instructions](../dev/README.md) give runnable platform examples, the native
+UTC logger bootstrap, an explicit Linux preparation route, and the recorded tool provenance.
+macOS is unverified; source-level portability assessment does not establish build/runtime support.
+
+`MODE` defaults to `Check`. Optional `FILES` names a UTF-8 JSON array manifest, not a semicolon list:
+
+```json
+["tools/dev/run_utc.cpp", "src/a name;example.cpp"]
+```
+
+Pass it as `-DFILES=/absolute/path/to/files.json`. Entries may be repository-relative or absolute.
+Optional `ROOT` selects an isolated repository root for deterministic tool tests; normally it is
+inferred from the driver's location. That root must contain both unchanged formatter configurations.
+Every selected source is validated before either formatter starts. Spaces, Unicode, semicolons and
+same-basename sources remain separate paths. CR/LF-containing filenames are rejected before formatting,
+including discovered Git filenames; they cannot silently truncate the selected inventory.
+POSIX filenames containing a literal backslash are also rejected before tool execution because the
+CMake 3.25 path grammar treats that character as a separator. Windows path separators remain supported.
+
+Default discovery includes tracked and nonignored new files under `include/` (`*.hpp`), `src/`
+(`*.cpp`), `tests/conformance/` (`*.cpp`), and `tools/qtp-inspect/`, `tools/tape-inspect/`,
+`tools/dev/` (`*.cpp`, `*.hpp`). Git C-quoted filenames are decoded before selection.
+`upstream`, `generated` and `fixtures` directory segments are excluded. Explicit manifests admit
+`.cpp` and `.hpp` in those roots and `.work/` for deliberate controls; other roots/extensions fail.
+Both lexical and resolved source paths must remain in permitted roots and outside protected segments.
+Thus a symlink/junction cannot bypass source scope. A formatter executable symlink is allowed and its
+resolved executable still has to report the exact pinned version.
+
+The driver rejects missing tools/configurations, wrong versions, nonzero formatter exits,
+Uncrustify warning/error/unknown/invalid diagnostics and any nonempty clang-format diagnostic.
+It runs each source through its own temporary copy, compares bytes, and never rewrites originals
+in `Check`. `Format` publishes that file only after both stages succeed; a later file's failure
+does not roll back already completed files. Task-owned temporary copies are removed on success and
+handled failures, including interrupted formatter processes. Externally forcing the CMake driver to
+terminate is outside that cleanup guarantee. Temporary cleanup never removes the shared `.work/` root.
+
+[Portable formatter checks](../../tests/conformance/tooling/format.cmake) cover real pinned tools,
+read-only mismatch detection, idempotence, diagnostic and exit failures, filename discovery, protected
+aliases, and deliberate mutations of the actual driver. [Current verification](../../tests/conformance/tooling/VALIDATION.md)
+records executed profiles and limits separately from historical results. Formatters do not enforce
+all naming, namespace, header self-containment or meaningful Doxygen requirements; review those separately.
+
+## Optional Windows acquisition and historical wrapper
+
+[Setup-Cpp.ps1](Setup-Cpp.ps1) remains an optional Windows x64 convenience requiring PowerShell 7.4+.
+It downloads the exact archives in [cpp-tools.lock.json](cpp-tools.lock.json), verifies SHA-256 before
+extraction and stores everything under ignored `.work/`. The Uncrustify archive/hash comes from its
+official GitHub 0.83.0 release; the clang-format wheel/hash comes from PyPI's 20.1.8 release metadata.
+Wheel packaging does not introduce a Python or pip runtime dependency. No global installation occurs.
 
 ```powershell
 pwsh -NoProfile -File tools/format/Setup-Cpp.ps1
-pwsh -NoProfile -File tools/format/Format-Cpp.ps1 -Mode Format
-pwsh -NoProfile -File tools/format/Format-Cpp.ps1 -Mode Check
 ```
 
-[Setup-Cpp.ps1](Setup-Cpp.ps1) downloads the exact Windows x64 archives in
-[cpp-tools.lock.json](cpp-tools.lock.json), verifies SHA-256 before extraction and stores everything
-under ignored `.work/`. The Uncrustify archive/hash comes from its official GitHub 0.83.0 release;
-the clang-format wheel/hash comes from PyPI's clang-format 20.1.8 release metadata (Python wheel
-packaging of the formatter, not a runtime dependency). Cached archives are also verified.
-No global installation occurs. Re-run setup to restore executables from verified archives.
-
 Setup uses only the repository lock and `tools/format/.work/`; there is no alternate-lock option.
-Downloads go to temporary files and are verified before entering the archive cache. Every archive,
-including a warm-cache hit, is hash-checked before extraction into a fresh staging directory.
-All ZIP names and attributes are checked before extraction: absolute paths, parent traversal with
-either separator, alternate data streams, Windows device/ambiguous names, duplicate paths and
-link/special/reparse entries are rejected. Existing filesystem reparse points are rejected as well.
-Only an installation containing its expected executable is published; extraction failure preserves
-the previous installation. Temporary staging/download files are cleaned after failures.
+Downloads are temporary and verified before cache publication. Every archive, including warm-cache
+hits, is hash-checked before extraction into fresh staging. ZIP absolute/traversal paths, alternate
+data streams, Windows device/ambiguous names, duplicates and link/special/reparse entries are rejected;
+existing filesystem reparse points are rejected too. Only installations containing the expected
+executable are published. Extraction failures preserve the previous installation; temporary staging
+and downloads are cleaned on failure. Windows archives do not provide Linux-native executables.
 
-The standalone [setup checks](../../tests/conformance/python-migration/Test-SetupCpp.ps1) exercise
-offline hostile archives through a private helper, real cold/warm Windows acquisition, and the existing
-wrapper's version rejection, read-only Check, Format and idempotence. They require network access for
-the cold-cache run and retain task-local files under `.work/python-migration-u3/`.
-This acquisition path is Windows x64 only. Linux/WSL contributors can use validated Windows-host
-formatting or provide the exact pinned native formatter versions to the wrapper; these Windows archives
-do not supply Linux-native tools. [setup_cpp.py](setup_cpp.py) remains unchanged for historical
-reproduction and is no longer the active setup command.
-
-The wrapper validates both executable versions and fails on missing tools/configurations,
-Uncrustify diagnostics or clang-format warnings/errors. Optional `-Uncrustify` and `-ClangFormat`
-paths must still have the exact versions. Acquisition never silently substitutes versions.
-`Check` runs both tools on temporary copies, compares bytes and does not rewrite originals.
-`Format` copies the pipeline result back only when changed. Temporary copies are removed afterward.
-
-Default discovery uses Git's tracked/nonignored new files under `include/` (`*.hpp`), `src/`
-(`*.cpp`) and `tests/conformance/` (`*.cpp`). Fixtures, upstream and generated directories are
-excluded. `-Files` can select files in these roots or `.work/` for deliberate negative checks;
-it rejects other paths/extensions. Add new source extensions explicitly when a task needs them.
-Naming, braces, header self-containment, namespace comments and meaningful Doxygen were separately
-reviewed; these formatters do not enforce all those rules. The combined pipeline's idempotence and
-read-only mismatch detection are recorded in [validation](../../tests/conformance/encoding/VALIDATION.md).
-Java formatting and oracle provenance rules in [README](README.md) remain separate and unchanged.
-
-QDCXX-017 extends discovery and explicit-file validation to `tools/qtp-inspect/*.cpp` and
-`*.hpp`. This keeps the optional tool under the same pinned two-stage pipeline; no upstream,
-fixture or generated source enters formatting scope.
-
-QDCXX-021 additionally includes tools/tape-inspect/*.cpp and *.hpp in the same pinned Format/Check
-scope. Existing inspector methods remain unchanged; tape presentation reuses bounded row helpers.
+The unchanged optional [Format-Cpp.ps1](Format-Cpp.ps1) and historical
+[setup_cpp.py](setup_cpp.py) retain their original interfaces and scopes. The PowerShell wrapper does
+not automatically acquire the new driver's `tools/dev/` discovery scope. Its historical
+[setup checks](../../tests/conformance/python-migration/Test-SetupCpp.ps1) cover hostile archives,
+cold/warm Windows acquisition and wrapper behavior; their cold-cache run needs network access.
+The original [formatting validation](../../tests/conformance/encoding/VALIDATION.md) remains historical.
+Java formatting and oracle provenance in [README](README.md) remain separate and unchanged.
