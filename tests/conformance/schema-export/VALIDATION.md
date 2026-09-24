@@ -2,6 +2,27 @@
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
+## Independent acceptance and integration
+
+Current status: accepted and integrated by the owner in master at
+`e386808c49f82a837e15dd670c40a26db5a26991` (implementation `1a9ea87`, diagnostic fix `e386808`).
+This record summarizes the completed independent review and follow-up; it does not claim new runs.
+The historical author sections below retain their original handoff status and evidence.
+
+- Initial review: Windows MSVC Release build and 45/45 CTest; Linux GCC Debug ASan+UBSan,
+  two schema-export tests 2/2 with `detect_leaks=0`; fresh JDK 8 command tests and C++ Format Check.
+- Follow-up: fresh JDK 8 compilation and full Java command tests passed. Both new endpoint/XML
+  regressions produced exit 5, empty stdout, exactly one expected stderr row and no published bundle.
+  Upstream logging finding #2 is closed. Reusable exporter code was unchanged.
+- The raw-fixture whitespace issue is closed: worktree and range checks passed; `-text` and fixture
+  SHA-256 stayed unchanged. Finding #1 remains a nonblocking, unspecified error-precedence question,
+  not a confirmed defect; this acceptance does not choose a policy for it.
+- Author formatter/capture Verify were not repeated in the follow-up. Full Linux/production-only
+  matrices were not repeated by the reviewer; macOS and LeakSanitizer remain unverified.
+  No private tape was used, and full schema/tape compatibility is not claimed.
+
+## Historical author handoff
+
 Date: 2026-09-24 UTC. U1–U4 of the assigned plan
 are implemented and author-verified. **Independent acceptance remains open.** Starting HEAD was
 `2ac1a85ea29c4553dd26db880e4e1fe0d2e03f50`; branch `task/qdcxx-030-java-schema-export`.

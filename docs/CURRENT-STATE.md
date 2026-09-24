@@ -1,10 +1,10 @@
 # Current state
 
-## QDCXX-030 implementation: resolved Java schema export
+## QDCXX-030 accepted and integrated in master
 
 QDCXX-030, High, implements U1–U4 of the
 plan; author verification is complete and
-independent acceptance remains open. Actual starting HEAD: `2ac1a85ea29c4553dd26db880e4e1fe0d2e03f50`;
+independent acceptance is complete. Actual starting HEAD: `2ac1a85ea29c4553dd26db880e4e1fe0d2e03f50`;
 branch `task/qdcxx-030-java-schema-export`. The [export contract](../spec/schema/JAVA-EXPORT.md) and
 [portable workflow](../tools/schema-export/README.md) define resolved settings/XML sources, complete
 actual lookup keys, explicit logical slot projection and failure-safe native JSON publication.
@@ -13,7 +13,12 @@ observations without Java. [Author validation](../tests/conformance/schema-expor
 records executed checks, remaining limits and the exact changed-file manifest separately from review.
 Native XML construction, a general settings engine, new wire types and transport remain outside scope.
 The private tape and historical evidence are untouched; transient logs stay in ignored `.work`.
-No staging, commit, push or merge is part of this handoff.
+The owner integrated implementation and diagnostic correction in master at
+`e386808c49f82a837e15dd670c40a26db5a26991`; the working tree was clean when confirmed.
+The [acceptance record](../tests/conformance/schema-export/VALIDATION.md#independent-acceptance-and-integration)
+separates independent checks from author evidence. Finding #2 and the raw-fixture whitespace issue
+are closed; #1 remains a nonblocking question about error precedence, not a confirmed defect.
+This status update runs no new builds or captures and starts no next task.
 
 ## QDCXX-029 accepted and integrated in master
 

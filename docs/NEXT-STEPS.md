@@ -1,8 +1,8 @@
 # Project roadmap
 
-## Current priority: export resolved Java schemas
+## After QDCXX-030 acceptance
 
-1. QDCXX-029 is accepted and integrated at `0908094276cccfa494d58493611fa9ac363f4856`. QDCXX-030, High, implements the approved offline Java bridge to native JSON and existing loader, generic inspector and prepared Quote/Profile APIs. Author verification is complete; perform separate independent acceptance; [author validation](../tests/conformance/schema-export/VALIDATION.md) records the actual checks and limits. The plan defines U1–U4 and proportionate verification; [usage](../tools/schema-export/README.md) documents controlled sources and explicit selection.
+1. QDCXX-029 is accepted and integrated at `0908094276cccfa494d58493611fa9ac363f4856`. QDCXX-030, High, is also accepted and integrated in master at `e386808c49f82a837e15dd670c40a26db5a26991`. The offline Java bridge supplies native JSON to the existing loader, generic inspector and prepared Quote/Profile APIs. [Validation and acceptance](../tests/conformance/schema-export/VALIDATION.md) separate author and independent checks. The plan defines the completed U1–U4; [usage](../tools/schema-export/README.md) documents controlled sources and explicit selection. No next implementation task is assigned by this status update.
 2. Java resolves XML/imports and the explicitly supported settings in this bridge; C++ does not. A native XML importer and general settings engine remain separate assignments. The [configuration inventory](CONFIGURATION.md) is still required before implementing general resolution; QDCXX-030 does not attempt every Java property or live reconfiguration.
 3. Continue real-event coverage and operational replay/feed/multiplexer tools under separate assignments. Remaining [manual Python migration](PYTHON-MIGRATION.md) is deferred from the immediate implementation path; existing checks are not canceled without replacements.
 
