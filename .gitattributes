@@ -462,3 +462,13 @@ tests/conformance/tooling/evidence/windows-recheck-b/standalone-bootstrap.log -w
 tests/conformance/tooling/evidence/windows-recheck-b/standalone-bootstrap.log.build.stdout -whitespace
 tests/conformance/tooling/evidence/windows-recheck-b/standalone-bootstrap.log.configure.stderr -whitespace
 tests/conformance/tooling/evidence/handoff-windows-pre.log -whitespace
+tests/conformance/tooling/evidence/handoff-windows.json -whitespace
+tests/conformance/tooling/evidence/review-12/environment.json -whitespace
+tests/conformance/tooling/evidence/review-12/handoff-whitespace-before.log -whitespace
+tests/conformance/tooling/evidence/review-12/inventory.json -whitespace
+tests/conformance/tooling/evidence/review-12/linux-ctest.log -whitespace
+tests/conformance/tooling/evidence/review-12/trace-audit.log -whitespace
+tests/conformance/tooling/evidence/review-12/windows-ctest.log -whitespace
+tests/conformance/tooling/evidence/review-12/windows-denied-before-retry.log -whitespace
+tests/conformance/tooling/evidence/review-12/windows-denied-before.log -whitespace
+tests/conformance/tooling/evidence/review-12/preservation.json -whitespace
