@@ -1,0 +1,55 @@
+# Explicit opt-in capture; never called by ordinary CMake/CTest consumption.
+cmake_minimum_required(VERSION 3.25)
+include("${CMAKE_CURRENT_LIST_DIR}/../Environment.cmake")
+schema_export_arguments(JAVA_HOME UPSTREAM CLASSPATH_RECEIPT RUN)
+schema_export_require(JAVA_HOME UPSTREAM CLASSPATH_RECEIPT RUN)
+schema_export_environment()
+schema_export_classpath(receipt classpath)
+file(READ "${CLASSPATH_RECEIPT}" supplied)
+if(NOT supplied STREQUAL receipt)
+    message(FATAL_ERROR "Classpath receipt mismatch")
+endif()
+schema_export_fresh_run()
+file(MAKE_DIRECTORY "${RUN}/classes" "${RUN}/home" "${RUN}/tmp")
+file(GLOB sources "${schema_export_directory}/*.java")
+list(APPEND sources "${CMAKE_CURRENT_LIST_DIR}/ExportCapture.java"
+    "${schema_export_repo}/tools/upstream/event-mapping-oracle/EventMappingOracle.java")
+execute_process(COMMAND "${schema_export_javac}" -J-Xmx256m -encoding UTF-8 -cp "${classpath}"
+    -d "${RUN}/classes" ${sources} RESULT_VARIABLE result
+    OUTPUT_FILE "${RUN}/compile.stdout" ERROR_FILE "${RUN}/compile.stderr" TIMEOUT 60)
+if(NOT result STREQUAL "0")
+    message(FATAL_ERROR "Capture compilation failed: ${RUN}/compile.stderr")
+endif()
+string(TIMESTAMP start "%Y-%m-%dT%H:%M:%SZ" UTC)
+execute_process(COMMAND "${schema_export_java}" -Xmx256m "-Duser.home=${RUN}/home"
+    "-Djava.io.tmpdir=${RUN}/tmp" -Duser.timezone=UTC -cp
+    "${RUN}/classes${schema_export_separator}${classpath}" qdcxx.schemaexport.ExportCapture
+    "${RUN}/expected" "${schema_export_repo}/tests/fixtures/schema/export/inputs"
+    WORKING_DIRECTORY "${RUN}/home" RESULT_VARIABLE result OUTPUT_FILE "${RUN}/capture.stdout"
+    ERROR_FILE "${RUN}/capture.stderr" TIMEOUT 120)
+string(TIMESTAMP end "%Y-%m-%dT%H:%M:%SZ" UTC)
+file(WRITE "${RUN}/phases.txt" "start=${start}\nend=${end}\nresult=${result}\n")
+if(NOT result STREQUAL "0")
+    message(FATAL_ERROR "Capture failed: ${RUN}/capture.stderr")
+endif()
+list(SORT sources)
+set(chain "")
+foreach(source IN LISTS sources)
+    file(SHA256 "${source}" hash)
+    file(RELATIVE_PATH relative "${schema_export_repo}" "${source}")
+    string(APPEND chain "${relative}\t${hash}\n")
+endforeach()
+string(SHA256 source_hash "${chain}")
+string(SHA256 classpath_hash "${receipt}")
+file(GLOB inputs "${schema_export_repo}/tests/fixtures/schema/export/inputs/*")
+list(SORT inputs)
+set(chain "")
+foreach(input IN LISTS inputs)
+    file(SHA256 "${input}" hash)
+    cmake_path(GET input FILENAME name)
+    string(APPEND chain "${name}\t${hash}\n")
+endforeach()
+string(SHA256 input_hash "${chain}")
+file(WRITE "${RUN}/expected/provenance.json"
+    "{\"revision\":\"${schema_export_commit}\",\"sourcesSha256\":\"${source_hash}\",\"classpathSha256\":\"${classpath_hash}\",\"inputsSha256\":\"${input_hash}\"}\n")
+message(STATUS "Production capture complete: ${RUN}/expected")

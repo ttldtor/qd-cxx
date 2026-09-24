@@ -99,6 +99,13 @@ if(BUILD_TESTING)
             target_link_libraries(qdcxx_schema_json_integration_tests PRIVATE qdcxx_schema_json qdcxx_tape_inspect_tool doctest::doctest)
             set_target_properties(qdcxx_schema_json_integration_tests PROPERTIES CXX_EXTENSIONS OFF)
             add_test(NAME schema_json_integration COMMAND qdcxx_schema_json_integration_tests "${CMAKE_CURRENT_SOURCE_DIR}")
+            add_executable(qdcxx_schema_export_tests tests/conformance/schema_export_tests.cpp)
+            target_link_libraries(qdcxx_schema_export_tests PRIVATE qdcxx_schema_json qdcxx_tape_inspect_tool doctest::doctest)
+            set_target_properties(qdcxx_schema_export_tests PROPERTIES CXX_EXTENSIONS OFF)
+            add_test(NAME schema_export_consumption COMMAND qdcxx_schema_export_tests "${CMAKE_CURRENT_SOURCE_DIR}")
+            add_test(NAME schema_export_cli COMMAND "${CMAKE_COMMAND}"
+                "-DPROGRAM=$<TARGET_FILE:qdcxx_tape_inspect>" "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/schema_export_cli.cmake")
         endif()
     endif()
     if(ORG_TTLDTOR_QDCXX_BUILD_TAPE_INSPECT)

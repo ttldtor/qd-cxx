@@ -2,7 +2,7 @@
 
 ## Current priority: export resolved Java schemas
 
-1. QDCXX-029 is accepted and integrated at `0908094276cccfa494d58493611fa9ac363f4856`. Implement the assigned QDCXX-030, High: export an actual resolved Java DataScheme to the existing native JSON format, then consume it through the loader, generic inspector and prepared Quote/Profile APIs. The owner approved this offline bridge; implementation has not started. The plan defines U1–U4, controlled settings/XML sources and proportionate verification.
+1. QDCXX-029 is accepted and integrated at `0908094276cccfa494d58493611fa9ac363f4856`. QDCXX-030, High, implements the approved offline Java bridge to native JSON and existing loader, generic inspector and prepared Quote/Profile APIs. Author verification is complete; perform separate independent acceptance; [author validation](../tests/conformance/schema-export/VALIDATION.md) records the actual checks and limits. The plan defines U1–U4 and proportionate verification; [usage](../tools/schema-export/README.md) documents controlled sources and explicit selection.
 2. Java resolves XML/imports and the explicitly supported settings in this bridge; C++ does not. A native XML importer and general settings engine remain separate assignments. The [configuration inventory](CONFIGURATION.md) is still required before implementing general resolution; QDCXX-030 does not attempt every Java property or live reconfiguration.
 3. Continue real-event coverage and operational replay/feed/multiplexer tools under separate assignments. Remaining [manual Python migration](PYTHON-MIGRATION.md) is deferred from the immediate implementation path; existing checks are not canceled without replacements.
 

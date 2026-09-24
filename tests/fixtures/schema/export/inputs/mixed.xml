@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dxfeed xmlns="https://www.dxfeed.com/datascheme">
+  <records>
+    <record name="Custom">
+      <field name="Text" type="utf_char_array"/>
+      <field name="Wide" type="wide_decimal"/>
+      <field name="Count" type="compact_int"><alias name="Total"/></field>
+    </record>
+  </records>
+</dxfeed>

@@ -1,13 +1,19 @@
 # Current state
 
-## QDCXX-030 assigned: resolved Java schema export
+## QDCXX-030 implementation: resolved Java schema export
 
-QDCXX-030 is ready, High; implementation has not started.
-The owner approved an offline Java bridge from the actual resolved DataScheme to the existing native JSON format.
-The plan covers explicit settings/XML sources,
-complete actual lookup keys, logical projection of storage slots and consumption by existing C++ APIs.
-It does not authorize a native XML importer, a general settings engine, new wire types or transport.
-This planning update changes documents only; no builds, Java captures or runtime checks were run.
+QDCXX-030, High, implements U1–U4 of the
+plan; author verification is complete and
+independent acceptance remains open. Actual starting HEAD: `2ac1a85ea29c4553dd26db880e4e1fe0d2e03f50`;
+branch `task/qdcxx-030-java-schema-export`. The [export contract](../spec/schema/JAVA-EXPORT.md) and
+[portable workflow](../tools/schema-export/README.md) define resolved settings/XML sources, complete
+actual lookup keys, explicit logical slot projection and failure-safe native JSON publication.
+Existing C++ loading, generic inspection and prepared Quote/Profile APIs consume committed production
+observations without Java. [Author validation](../tests/conformance/schema-export/VALIDATION.md)
+records executed checks, remaining limits and the exact changed-file manifest separately from review.
+Native XML construction, a general settings engine, new wire types and transport remain outside scope.
+The private tape and historical evidence are untouched; transient logs stay in ignored `.work`.
+No staging, commit, push or merge is part of this handoff.
 
 ## QDCXX-029 accepted and integrated in master
 

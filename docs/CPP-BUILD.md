@@ -2,6 +2,23 @@
 
 [Русская версия](CPP-BUILD.ru.md). English is authoritative.
 
+## Offline Java schema export
+
+The [optional Java exporter](../tools/schema-export/README.md) resolves permitted locked Java
+settings/XML sources and produces the existing native JSON version 1. Java/JDK 8 and Maven belong
+only to explicit export/regeneration, not ordinary C++ configure/build/CTest or schema consumption.
+Use `loadJsonSchema` and prepared Quote/Profile APIs below with explicit exported record IDs and
+the same loaded schema context. The exporter preserves actual lookup keys and projects Java slots
+to logical fields; its sidecar records the mapping. The generic inspector accepts the generated
+`schema.json` with `--schema`, using unchanged version-6 output and both existing tape modes.
+
+With JSON loader, tape inspector and `BUILD_TESTING` enabled, `schema_export_consumption` and
+`schema_export_cli` read [committed production observations](../tests/fixtures/schema/export/expected)
+without invoking Java, Maven, Python or PowerShell. They cover configured events and XML custom/extra
+fields. The [export contract](../spec/schema/JAVA-EXPORT.md) and
+[author validation](../tests/conformance/schema-export/VALIDATION.md) separate supported projection,
+executed checks and independent acceptance. C++ still does not resolve XML or Java properties.
+
 ## Native JSON schema loader
 
 `ORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON` defaults ON and adds `qdcxx_schema_json`. Include

@@ -1,4 +1,12 @@
 * text=auto
+# Export tool/input hashes use canonical source bytes; captures retain original bytes.
+tools/schema-export/*.java text eol=lf
+tools/schema-export/*.cmake text eol=lf
+tools/schema-export/tests/*.java text eol=lf
+tools/schema-export/tests/*.cmake text eol=lf
+tests/fixtures/schema/export/** -text
+tests/conformance/schema_export_cli.cmake text eol=lf
+tests/conformance/schema-export/changed-files.txt text eol=lf
 *.md text eol=lf
 *.lock text eol=lf
 *.cpp text eol=lf

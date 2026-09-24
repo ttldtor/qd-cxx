@@ -1,0 +1,1 @@
+[{"sourceId":0,"exportedId":0,"slots":[{"fieldId":0,"storage":"integer","slot":0,"tail":1},{"fieldId":1,"storage":"integer","slot":2,"tail":null},{"fieldId":2,"storage":"integer","slot":3,"tail":null},{"fieldId":3,"storage":"object","slot":0,"tail":null}],"omittedLookups":[{"name":"Custom.Wide$VoidTail","ownerFieldId":0},{"name":"Wide$VoidTail","ownerFieldId":0}]}]

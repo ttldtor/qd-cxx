@@ -2,6 +2,23 @@
 
 [English version](CPP-BUILD.md). Английская версия является нормативной.
 
+## Офлайн-экспорт Java-схемы
+
+[Необязательный Java-экспортёр](../tools/schema-export/README.ru.md) разрешает допустимые источники
+settings/XML закреплённой Java и создаёт существующий native JSON версии 1. Java/JDK 8 и Maven
+нужны только для явного экспорта/регенерации, а не обычных C++ configure/build/CTest и использования схемы.
+Используйте `loadJsonSchema` и prepared API Quote/Profile ниже с явными экспортированными ID записей
+и тем же контекстом загруженной схемы. Экспортёр сохраняет реальные lookup keys и проецирует Java
+slots в логические поля; sidecar фиксирует отображение. Generic inspector принимает полученный
+`schema.json` через `--schema`, сохраняя вывод версии 6 и оба существующих режима tape.
+
+При включённых JSON loader, tape inspector и `BUILD_TESTING` тесты `schema_export_consumption` и
+`schema_export_cli` читают [сохранённые production observations](../tests/fixtures/schema/export/expected)
+без запуска Java, Maven, Python или PowerShell. Они охватывают настроенные события и пользовательские/
+дополнительные XML-поля. [Контракт экспорта](../spec/schema/JAVA-EXPORT.ru.md) и
+[авторская валидация](../tests/conformance/schema-export/VALIDATION.ru.md) разделяют поддержанную проекцию,
+выполненные проверки и независимую приёмку. C++ по-прежнему не разрешает XML или Java properties.
+
 ## Нативный загрузчик JSON-схем
 
 `ORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON` по умолчанию ON и добавляет `qdcxx_schema_json`.

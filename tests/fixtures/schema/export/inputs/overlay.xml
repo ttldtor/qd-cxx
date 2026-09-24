@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dxfeed xmlns="https://www.dxfeed.com/datascheme">
+  <records>
+    <record name="Custom" mode="update">
+      <field name="Extra" type="compact_int"/>
+    </record>
+  </records>
+</dxfeed>
