@@ -1,14 +1,14 @@
 # Project roadmap
 
-## Current priority: remove mandatory Python
+## Current priority: portable developer tooling
 
 1. QDCXX-026 is accepted and merged at `d86c8a9842041f8876109285a33782d02e04018f`; review closure records both findings and verification limits.
-2. Implement QDCXX-027, High: Python-free configure/build/CTest, UTC logging and existing Windows formatter acquisition. Preserve every named case/mutation and prove the migrated path works without Python. This is implementation, not another inventory.
-3. Assign the remaining manual negative checks, schema JSON validation, evidence audits, fixture generators and tracked-bytecode cleanup from [PYTHON-MIGRATION](PYTHON-MIGRATION.md) separately. QDCXX-027 must not mark them retired without replacements.
+2. QDCXX-027 is integrated in master at `2833027fb334c9206798f14f1dedc396b8a3ec2a`. Implement QDCXX-028, High: native UTC logging and portable C++ formatting, preserving interpreter-free configure/build/CTest and existing guarantees. Optional Windows PowerShell is allowed; verify Windows/Linux and label macOS unverified/nonblocking.
+3. Assign the remaining manual negative checks, schema JSON validation, evidence audits, fixture generators and tracked-bytecode cleanup from [PYTHON-MIGRATION](PYTHON-MIGRATION.md) separately. Neither QDCXX-027 nor QDCXX-028 retires them without replacements. Do not turn QDCXX-028 into an unbounded migration of every script.
 4. Inventory project-wide settings and specify typed configuration resolution before general loading or operational-tool configuration. Use the owner-supplied wiki, pinned consumers and release history per [CONFIGURATION](CONFIGURATION.md); include initialization/file/API sources, aliases, precedence, read timing, units and sensitive values. QDCXX-025's schema subset feeds this ledger; implementing every Java property at once is not authorized.
 5. Implement external schema/configuration sources against those contracts, then continue event coverage and feed/replay/multiplexer tools. Arbitrary live reconfiguration and unsupported representations need explicit compatibility tasks.
 
-QDCXX-027 does not authorize later tasks, staging or commit. Earlier sequencing below is historical where superseded; historical verification remains unchanged.
+QDCXX-028 does not authorize later tasks, staging or commit. Earlier sequencing below is historical where superseded; historical verification remains unchanged.
 
 [Русская версия](NEXT-STEPS.ru.md). English is authoritative.
 

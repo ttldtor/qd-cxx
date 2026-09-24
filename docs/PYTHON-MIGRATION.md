@@ -8,7 +8,7 @@ captures and recorded hashes remain historical evidence.
 
 ## Inventory and dependency edges
 
-### Current assignment: QDCXX-027
+### Integrated QDCXX-027 and portability follow-up
 
 QDCXX-027, High, implements steps 1–2 from actual starting HEAD
 `dcccd0242252cadb674f4970cc723fbf113bed53`. Normal configure/build/CTest now uses CMake and
@@ -16,7 +16,11 @@ test-only C++ for both mandatory CLI suites and their mutations. Active UTC logg
 `tools/Run-Utc.ps1`; existing Windows formatter acquisition is `tools/format/Setup-Cpp.ps1`.
 Both require PowerShell 7.4 or newer. See the [named coverage map](../tests/conformance/python-migration/COVERAGE.md)
 and [author verification](../tests/conformance/python-migration/VALIDATION.md) for parity, process-image
-Python denial, compiler/option matrices and limitations. Independent review remains pending.
+Python denial, compiler/option matrices and limitations. The owner integrated the reviewed/fixed work in master at `2833027fb334c9206798f14f1dedc396b8a3ec2a`; historical author reports are not rewritten as fresh independent review.
+
+QDCXX-028 now assigns portable native UTC logging and C++ formatting without mandatory PowerShell or Python.
+Existing commands above remain current until replacement verification. Optional Windows PowerShell acquisition stays available; Windows/Linux are the required test platforms, macOS remains unverified and nonblocking.
+This follow-up does not migrate the remaining manual Python checks below or claim that Python has disappeared from the repository.
 
 Manual primitive/protocol negatives, schema JSON validation, evidence audits, generators and tracked-bytecode
 cleanup remain follow-up work (steps 3–4). They are not retired or optional merely because normal CTest is migrated.

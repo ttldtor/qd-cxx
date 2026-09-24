@@ -1,15 +1,20 @@
 # Current state
 
-## QDCXX-027 implemented: independent review pending
+## QDCXX-028 assigned: portable development tools
 
-QDCXX-027, High, replaces mandatory Python in configure/build/CTest,
-UTC logging and existing Windows formatter acquisition, preserving named positive/negative checks.
-Starting HEAD: `dcccd0242252cadb674f4970cc723fbf113bed53`.
-[Coverage](../tests/conformance/python-migration/COVERAGE.md) and
-[author verification](../tests/conformance/python-migration/VALIDATION.md) record baseline/parity,
-Python-unavailable matrices, preservation and limitations. Independent acceptance is not claimed.
-Remaining manual Python audits and generators stay required in [the migration ledger](PYTHON-MIGRATION.md).
-Production code, historical evidence and the owner's index remain unchanged; no commit, merge or next task.
+QDCXX-028, High, assigns native UTC logging and portable C++ formatting without mandatory Python or PowerShell.
+Optional Windows PowerShell conveniences remain; Windows/Linux verification is required, macOS is explicitly unverified and nonblocking.
+Only the plan is prepared; implementation and its independent acceptance have not started.
+Current logging/formatting commands stay in force until their replacements are verified.
+
+## QDCXX-027 integrated in master
+
+The owner integrated QDCXX-027 at `2833027fb334c9206798f14f1dedc396b8a3ec2a`; the tree was clean before this planning update.
+The preceding review and targeted fixes are recorded in the conversation; this is a status update, not a new independent review or rerun.
+[Coverage](../tests/conformance/python-migration/COVERAGE.md), [author verification](../tests/conformance/python-migration/VALIDATION.md) and review-fix evidence retain their historical scope and limitations.
+Normal CTest is Python-free; active logging/formatting still uses PowerShell pending QDCXX-028.
+Remaining manual Python checks stay required in [the migration ledger](PYTHON-MIGRATION.md).
+No C++ builds, Java captures or runtime checks were performed for this planning update.
 
 ## QDCXX-026 accepted and merged
 
