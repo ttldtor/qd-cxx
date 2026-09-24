@@ -107,3 +107,54 @@ fixtures, upstream Java tools, `upstream.lock`, production `src/` и `include/` 
 
 Предлагаемый scope коммита: ровно [changed-files.txt](changed-files.txt), после независимой приёмки.
 Предлагаемое сообщение: `feat(schema): export resolved Java schemes to native JSON`.
+
+## Исправление замечания #2 на 1a9ea87
+
+2026-09-24 UTC; исходное дерево чистое на `1a9ea87`. Исправлена утечка upstream-логов;
+замечание #1 и приоритет конфигурации относительно файлового I/O не менялись. До инициализации
+endpoint/XML command-only `SchemaSource` сбрасывает JUL handlers и отключает корневой logger.
+Фиксированный classpath использует JUL; закреплённый `com.devexperts.logging.DefaultLogging.configure`
+не меняет корень без handlers. `SchemaExport` сохраняет собственную диагностику stderr;
+`ResolvedSchemaExporter` неизменён. Перенаправление потоков, буфер логов, изменение native/C++
+контракта и доступ к частному tape не добавлялись.
+
+Fresh-JVM регрессии в `CommandTests.cmake` сначала упали в обоих случаях: endpoint с неизвестной
+записью выдал шесть строк stderr с путём snapshot; well-formed XML с `name="Private Value"` прошёл
+preflight и дошёл до XSD validation (`cvc-pattern-valid`), выдав три строки stderr со значением
+и путём. После исправления оба случая возвращают exit 5, пустой stdout, не публикуют bundle и
+выдают ровно одну строку stderr с LF: `schema-export-error<TAB>1<TAB>INVALID_SCHEMA` для endpoint
+и `schema-export-error<TAB>1<TAB>INVALID_INPUT` для XML. Точное сравнение байтов отвергает любые
+лишние значения, пути, stack traces и строки. Временные запуски: `review2-red/` и `review2-green/`.
+
+Java command tests на Windows Zulu 8u422 прошли; закреплённые Java Format и Check прошли (24 файла).
+Затронутый production capture выполнен в 20:36:05Z–20:36:10Z в `review2-capture/`. Полный состав
+файлов совпал; `Verify.cmake` прошёл для `custom`, `empty`, `names` и `set-before`, подтвердив
+сохранность всех байтов schema, projection, source observations и tape. Корневой hash provenance
+исходников ожидаемо изменился; прежний fixture не переписан. Фактические новые metadata сохранены здесь:
+
+```json
+{"revision":"0ddc0a09779fb61d74cc0b37c6449ff47dcb715f","sourcesSha256":"16766a5986ccabed1c66563fbe1811192841cab50f2b91a0340744e74f3242f1","classpathSha256":"6fefdf02950d4603e178d7d752abbbb94d9577c96e42e1e4925b900f32ab8af2","inputsSha256":"b70a2c19961c42daa2eafb7d2ef1ae1df1462654900f7ba1ba2b5b5222f41cad"}
+```
+
+Единственное изменение атрибутов — `whitespace=cr-at-eol` для
+`tests/fixtures/schema/export/expected/provenance.json`; унаследованная политика raw bytes `-text` сохранена.
+SHA-256 до/после: `184994cab64901576827c04f7db803a945d3e6f1ef44fe52d61d5cd00664df0e`.
+`git diff 2ac1a85ea29c4553dd26db880e4e1fe0d2e03f50 --check` падал до добавления атрибута и прошёл
+после него. Байты fixture не нормализовались. Итоговые diff, ссылки документов и whitespace
+проверены. В этих успешных проверках ошибок не обнаружено; C++/Linux suites для command-only
+исправления не повторялись. Независимая приёмка открыта; staging и commit не выполнялись.
+Дополнительное упрощение/независимое ревью не расширялось за пределы запрошенного узкого исправления.
+`ce-compound` пропущен: комментарий к коду, регрессия и эти доказательства уже сохраняют вывод.
+
+Точный список файлов исправления: `.gitattributes`, `tools/schema-export/SchemaSource.java`,
+`tools/schema-export/tests/CommandTests.cmake`, `tests/conformance/schema-export/VALIDATION.md` и
+`tests/conformance/schema-export/VALIDATION.ru.md`. Команды для последующего коммита (не выполнялись):
+
+```powershell
+$files = @('.gitattributes', 'tools/schema-export/SchemaSource.java',
+  'tools/schema-export/tests/CommandTests.cmake', 'tests/conformance/schema-export/VALIDATION.md',
+  'tests/conformance/schema-export/VALIDATION.ru.md')
+git add -- $files
+git diff --cached --check
+git commit --only -m "fix(schema): isolate upstream export diagnostics" -- $files
+```

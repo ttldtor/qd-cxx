@@ -5,6 +5,7 @@ tools/schema-export/*.cmake text eol=lf
 tools/schema-export/tests/*.java text eol=lf
 tools/schema-export/tests/*.cmake text eol=lf
 tests/fixtures/schema/export/** -text
+tests/fixtures/schema/export/expected/provenance.json whitespace=cr-at-eol
 tests/conformance/schema_export_cli.cmake text eol=lf
 tests/conformance/schema-export/changed-files.txt text eol=lf
 *.md text eol=lf

@@ -25,6 +25,9 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.logging.Level;
+import java.util.logging.LogManager;
+import java.util.logging.Logger;
 import java.util.stream.Stream;
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
@@ -123,6 +126,10 @@ public final class SchemaSource implements AutoCloseable {
       throw failure("INVALID_CONFIGURATION");
     }
     controlledProperties(startup);
+    // The fixed upstream classpath uses JUL. No handlers prevents its console setup; keep
+    // source paths and parser details out of the command's single-row diagnostic channel.
+    LogManager.getLogManager().reset();
+    Logger.getLogger("").setLevel(Level.OFF);
     DocumentBuilder parser = hardenedParser();
     Path snapshot = Files.createTempDirectory("qdcxx-schema-source-");
     DXEndpoint endpoint = null;

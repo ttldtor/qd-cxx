@@ -106,3 +106,53 @@ duplicate them. No additional task was started.
 
 Suggested commit scope: exactly [changed-files.txt](changed-files.txt), after independent acceptance.
 Suggested message: `feat(schema): export resolved Java schemes to native JSON`.
+
+## Review correction #2 on 1a9ea87
+
+2026-09-24 UTC; starting tree clean at `1a9ea87`. This correction addresses upstream log leakage,
+not finding #1 or configuration-versus-file-I/O precedence. Before endpoint/XML initialization,
+the command-only `SchemaSource` resets JUL handlers and disables the root logger. The fixed classpath
+uses JUL; locked `com.devexperts.logging.DefaultLogging.configure` leaves a root with no handlers
+unchanged. `SchemaExport` retains its own stderr diagnostic; `ResolvedSchemaExporter` is unchanged.
+No stream redirection, log buffer, native/C++ contract change or private-tape access was introduced.
+
+Fresh-JVM regressions in `CommandTests.cmake` first failed on both cases: endpoint with an unknown
+record produced six stderr lines including a snapshot path; well-formed XML with `name="Private Value"`
+passed preflight and reached XSD validation (`cvc-pattern-valid`), producing three stderr lines
+including that value and a path. After the fix, both return exit 5, empty stdout, no published
+bundle, and exactly one LF-terminated stderr row: `schema-export-error<TAB>1<TAB>INVALID_SCHEMA`
+for endpoint and `schema-export-error<TAB>1<TAB>INVALID_INPUT` for XML. Exact byte comparison rejects
+any extra value, path, stack trace or line. Scratch runs: `review2-red/` and `review2-green/`.
+
+Windows Zulu 8u422 Java command tests passed; pinned Java Format and Check passed (24 files).
+Affected production capture ran at 20:36:05Z–20:36:10Z in `review2-capture/`. Its full file inventory
+matched; `Verify.cmake` passed for `custom`, `empty`, `names` and `set-before`, preserving every
+schema, projection, source observation and tape byte. The root source-provenance hash changed as
+expected; the old fixture was not rewritten. Actual new metadata is retained here:
+
+```json
+{"revision":"0ddc0a09779fb61d74cc0b37c6449ff47dcb715f","sourcesSha256":"16766a5986ccabed1c66563fbe1811192841cab50f2b91a0340744e74f3242f1","classpathSha256":"6fefdf02950d4603e178d7d752abbbb94d9577c96e42e1e4925b900f32ab8af2","inputsSha256":"b70a2c19961c42daa2eafb7d2ef1ae1df1462654900f7ba1ba2b5b5222f41cad"}
+```
+
+The only attribute change is `whitespace=cr-at-eol` for
+`tests/fixtures/schema/export/expected/provenance.json`; its inherited `-text` raw-byte policy stays.
+Its before/after SHA-256 is `184994cab64901576827c04f7db803a945d3e6f1ef44fe52d61d5cd00664df0e`.
+`git diff 2ac1a85ea29c4553dd26db880e4e1fe0d2e03f50 --check` failed before this attribute and passed
+after it. Fixture bytes were not normalized. Final diff, documentation links and whitespace were
+reviewed. No errors were detected in these successful checks; C++/Linux suites were not rerun for
+this command-only correction. Independent acceptance remains open; no staging or commit occurred.
+Additional simplification/independent review was not expanded beyond this requested narrow fix.
+`ce-compound` was skipped because the code comment, regression and this evidence capture the lesson.
+
+Exact correction files: `.gitattributes`, `tools/schema-export/SchemaSource.java`,
+`tools/schema-export/tests/CommandTests.cmake`, `tests/conformance/schema-export/VALIDATION.md` and
+`tests/conformance/schema-export/VALIDATION.ru.md`. Suggested later commands (not executed):
+
+```powershell
+$files = @('.gitattributes', 'tools/schema-export/SchemaSource.java',
+  'tools/schema-export/tests/CommandTests.cmake', 'tests/conformance/schema-export/VALIDATION.md',
+  'tests/conformance/schema-export/VALIDATION.ru.md')
+git add -- $files
+git diff --cached --check
+git commit --only -m "fix(schema): isolate upstream export diagnostics" -- $files
+```
