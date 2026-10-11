@@ -2,7 +2,7 @@
 
 [English version](VALIDATION.md). Английский документ является основным.
 
-Выполнено 2026-09-21 в Windows/PowerShell с установленным Python 3.11.1 (только стандартная библиотека), reasoning High. [Контракт](../JSON-CONTRACT.ru.md), [матрица случаев](COVERAGE.ru.md), [проверка](../../../tests/conformance/check_json_contract.py).
+Выполнено 2026-09-21 в Windows/PowerShell с установленным Python 3.11.1 (только стандартная библиотека). [Контракт](../JSON-CONTRACT.ru.md), [матрица случаев](COVERAGE.ru.md), [проверка](../../../tests/conformance/check_json_contract.py).
 
 ## Выполненные проверки
 

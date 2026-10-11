@@ -2,8 +2,7 @@
 
 [English version](VALIDATION.md). Английская версия является основной.
 
-Авторские запуски 2026-09-22 UTC. Независимое ревью ожидается; субагентов, коммита и автоматического
-закрытия ревью нет. [Покрытие](COVERAGE.ru.md), [Java-доказательства](../../../fixtures/protocol/tape-reader/VALIDATION.ru.md),
+Авторские запуски 2026-09-22 UTC. Независимое ревью ожидается. [Покрытие](COVERAGE.ru.md), [Java-доказательства](../../../fixtures/protocol/tape-reader/VALIDATION.ru.md),
 [контракт](../../../../spec/protocol/TAPE-READER.ru.md), [архитектура](../../../../docs/decisions/ADR-0002-bounded-tape-reader.ru.md).
 
 ## Выполненная матрица

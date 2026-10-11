@@ -2,8 +2,8 @@
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
-QDCXX-022 implemented from HEAD `fa5a0b967e9c021e656846cdd3d6faee5faa4776` on
-`task/qdcxx-022-default-quote`. Checks below ran on 2026-09-22 UTC. No commit or staging.
+QDCXX-022 implemented from HEAD `fa5a0b967e9c021e656846cdd3d6faee5faa4776`.
+Checks below ran on 2026-09-22 UTC.
 **Independent review pending.** These are author/team observations, not an independently rerun review.
 
 The initial author runs below are historical. The subsequent presentation-boundary correction and
@@ -76,10 +76,7 @@ and final source/tool hashes match the last full Verify metadata. See the Java v
 The audit verified all 1393 pre-existing fixture/upstream.lock hashes,
 all 86 new artifact hashes across A/B/Verify, four oracle tool hashes, changed/untracked Markdown
 trailing whitespace and relative links, git diff --check and the staged diff separately.
-The index remains empty. During completion, a concurrent commit by the owner advanced HEAD to
-28f4cb0f5c63c9705eaa71df76a35e898b6eeb11, changing only AGENTS.md (worker completion rules and the
-already-written Quote scope section). It was preserved; no commit was created by this implementation
-agent. No compiled source changed in that commit, so it does not invalidate the final matrix.
+No compiled source changed during final validation.
 The tracked legacy Python bytecode cache regenerated
 by an early test run was restored byte-for-byte; final runs disabled bytecode writes.
 
@@ -89,14 +86,6 @@ conversion during output counting/writing. A separate scalar-only mapping API an
 abstraction for two fixed CLI profiles were not introduced: the existing empty-symbol projection
 avoids a symbol copy, and extra public/structural abstractions are unnecessary for this bounded task.
 These passes do not replace independent review.
-
-ce-compound was considered and skipped: the project-specific reasoning is already captured in the
-paired value/profile contracts and verification evidence; another learning would duplicate those sources.
-
-[Commit scope](commit-paths.txt) lists every intended pending deliverable as a literal Git pathspec,
-including untracked evidence and this list itself. It excludes .work and the owner's already committed
-AGENTS.md change. Suggested message after independent review: feat(quote): decode default Quote through bounded tape.
-No staging or commit command was executed by this agent.
 
 Reproduction: use [build/API commands](../../../../docs/CPP-BUILD.md), [oracle commands](../../../../tools/upstream/quote-oracle/README.md)
 and the exact compiler commands retained in logs. The C++ negative launcher is:

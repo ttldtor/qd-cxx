@@ -34,5 +34,4 @@ The optional/default/representation, properties/XML, string/flags/time and rejec
 are limited to [coverage](COVERAGE.md). This report makes no claim about C++ compiler/sanitizer/CLI
 results, arbitrary providers, additional types, indexed schemas or complete private-tape support.
 The durable configuration timing and local-absence versus wire-omission distinctions are recorded
-in the bilingual contracts; a duplicate ce-compound learning was not created. No staging or commit.
-
+in the bilingual contracts.

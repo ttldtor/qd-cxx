@@ -20,7 +20,7 @@ baseline passes unchanged. Source review checked Doxygen, ownership, range-versu
 subtraction-based aggregate arithmetic and no reserve/allocation indexed by declared counts or sender ID.
 Final evidence audit checks old fixture/upstream.lock hashes, independent capture equality, current probe
 source/input hashes, historical payload origins, all strict prefixes, EN/RU artifact targets and relative
-Markdown links. git diff --check passes. No commit was created.
+Markdown links. git diff --check passes.
 
 Reproduce with the existing [build commands](../../../../docs/CPP-BUILD.md); they include the new target.
 Use QD_DESCRIPTION_FIXTURES only for temporary negative selection, or run

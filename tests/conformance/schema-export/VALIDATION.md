@@ -21,14 +21,11 @@ The historical author sections below retain their original handoff status and ev
   matrices were not repeated by the reviewer; macOS and LeakSanitizer remain unverified.
   No private tape was used, and full schema/tape compatibility is not claimed.
 
-## Historical author handoff
+## Historical implementation verification
 
-Date: 2026-09-24 UTC. U1–U4 of the assigned plan
-are implemented and author-verified. **Independent acceptance remains open.** Starting HEAD was
-`2ac1a85ea29c4553dd26db880e4e1fe0d2e03f50`; branch `task/qdcxx-030-java-schema-export`.
-No staging, commit, push or merge was performed. The [complete file manifest](changed-files.txt)
-includes tracked edits and all new deliverables; temporary work remains under ignored
-`.work/schema-export-030/`. All evidence paths below are relative to that scratch directory unless
+Date: 2026-09-24 UTC. The bounded Java schema exporter is implemented and author-verified. **Independent acceptance remains open.** Starting HEAD was
+`2ac1a85ea29c4553dd26db880e4e1fe0d2e03f50`.
+Transient evidence is retained under `.work/schema-export-030/`. All evidence paths below are relative to that scratch directory unless
 they are links. Transient logs are not committed and must be regenerated on another machine.
 
 ## Implemented boundary and evidence
@@ -121,12 +118,7 @@ fixtures, upstream Java tools, `upstream.lock`, production `src/` and `include/`
 
 The author reviewed the complete diff and new files for correctness, scope, style/braces and
 unnecessary complexity; focused simplification feedback was applied and rechecked. This does not
-close independent acceptance. `ce-compound` was considered and skipped: the reusable reasoning is
-already captured in the authoritative export contract and focused tests, so a second learning would
-duplicate them. No additional task was started.
-
-Suggested commit scope: exactly [changed-files.txt](changed-files.txt), after independent acceptance.
-Suggested message: `feat(schema): export resolved Java schemes to native JSON`.
+close independent acceptance.  No additional task was started.
 
 ## Review correction #2 on 1a9ea87
 
@@ -161,19 +153,9 @@ Its before/after SHA-256 is `184994cab64901576827c04f7db803a945d3e6f1ef44fe52d61
 `git diff 2ac1a85ea29c4553dd26db880e4e1fe0d2e03f50 --check` failed before this attribute and passed
 after it. Fixture bytes were not normalized. Final diff, documentation links and whitespace were
 reviewed. No errors were detected in these successful checks; C++/Linux suites were not rerun for
-this command-only correction. Independent acceptance remains open; no staging or commit occurred.
+this command-only correction. Independent acceptance remains open.
 Additional simplification/independent review was not expanded beyond this requested narrow fix.
-`ce-compound` was skipped because the code comment, regression and this evidence capture the lesson.
 
 Exact correction files: `.gitattributes`, `tools/schema-export/SchemaSource.java`,
 `tools/schema-export/tests/CommandTests.cmake`, `tests/conformance/schema-export/VALIDATION.md` and
-`tests/conformance/schema-export/VALIDATION.ru.md`. Suggested later commands (not executed):
-
-```powershell
-$files = @('.gitattributes', 'tools/schema-export/SchemaSource.java',
-  'tools/schema-export/tests/CommandTests.cmake', 'tests/conformance/schema-export/VALIDATION.md',
-  'tests/conformance/schema-export/VALIDATION.ru.md')
-git add -- $files
-git diff --cached --check
-git commit --only -m "fix(schema): isolate upstream export diagnostics" -- $files
-```
+`tests/conformance/schema-export/VALIDATION.ru.md`.

@@ -29,7 +29,7 @@ negative tests. The reusable [negative checker](../../check_symbol_negative.py) 
 negative/baseline Verify, full provenance and the 706 unchanged historical fixture/lock paths.
 Final audit checks exact current tool/input hashes, capture equality,
 historical hashes, source hashes, relative links and diff whitespace. EN/RU claims and evidence links
-were synchronized. No commit was created; implementation is handed off for independent review.
+were synchronized. Independent review remains pending.
 
 The initial sandbox denied Windows SDK/WSL access; authorized execution with access passed. An initial
 local Linux runner ended on a CRLF blank line after successful commands; its LF-corrected full matrix
@@ -79,4 +79,4 @@ changed test sources in [current source manifest](source-sha256.json). The previ
 untouched. Preservation report records the before/after SHA-256 comparison
 for production, tooling, fixtures, lock and prior evidence. EN/RU coverage/validation and links are synchronized.
 No errors were detected in these checks. Existing protocol/allocator/architecture coverage limits still
-apply. No commit created.
+apply.

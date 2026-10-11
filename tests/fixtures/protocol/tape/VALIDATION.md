@@ -3,7 +3,7 @@
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
 Executed on 2026-09-22 UTC. **Ready for independent review; no independent QDCXX-019 review is
-claimed and no commit was created.** No errors were detected in the successful checks below;
+claimed.** No errors were detected in the successful checks below;
 the negative Verify and inspector unsupported exits are intentional rejection cases.
 [Coverage](COVERAGE.md), [specification/recommendation](../../../../spec/protocol/TAPE-FILES.md),
 [reproduction commands](../../../../tools/upstream/tape-oracle/README.md).
@@ -52,7 +52,7 @@ flags, follow/recovery, huge resources and real dxFeed schemas remain outside me
 There are no new Python scripts or Python dependencies; the existing `tools/run_utc.py` was used
 unchanged for build/format/verification logs. New oracle generation and strict verification are
 Java, launched through PowerShell. The existing tracked Python cache modification was left intact;
-nothing was staged, removed as cleanup or committed.
+no evidence was removed as cleanup.
 
 EN/RU technical claims were manually synchronized; the audit checks links and shared evidence
 targets, not translation semantics. Review can run the [launcher recipe](../../../../tools/upstream/tape-oracle/README.md)

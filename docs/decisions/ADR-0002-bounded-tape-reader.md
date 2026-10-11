@@ -41,7 +41,7 @@ C++ result is claimed by this pre-implementation ADR. Review remains open until 
 
 ## QDCXX-023 amendment: explicit RAW/MESSAGE policy
 
-The owner-authorized task permits an independent container-mode parameter,
+QDCXX-023 defines an independent container-mode parameter,
 fixed-size owning timing state and returned heartbeat/data timing metadata. Keep the existing
 append-only immutable snapshots and terminal failure policy; do not introduce a scheduler or
 mutable sessions. [RAW-TAPE](../../spec/protocol/RAW-TAPE.md) records production Java evidence,

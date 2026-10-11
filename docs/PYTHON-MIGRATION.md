@@ -10,7 +10,7 @@ captures and recorded hashes remain historical evidence.
 
 ### Integrated QDCXX-027 and portability follow-up
 
-QDCXX-027, High, implements steps 1–2 from actual starting HEAD
+QDCXX-027 implements steps 1–2 from actual starting HEAD
 `dcccd0242252cadb674f4970cc723fbf113bed53`. Normal configure/build/CTest now uses CMake and
 test-only C++ for both mandatory CLI suites and their mutations. At that handoff, active UTC logging was
 `tools/Run-Utc.ps1`; existing Windows formatter acquisition is `tools/format/Setup-Cpp.ps1`.

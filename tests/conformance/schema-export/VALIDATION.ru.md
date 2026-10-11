@@ -23,12 +23,9 @@
 
 ## Историческая передача автором
 
-Дата: 2026-09-24 UTC. U1–U4 назначенного плана
-реализованы и проверены автором. **Независимая приёмка остаётся открытой.** Исходный HEAD:
-`2ac1a85ea29c4553dd26db880e4e1fe0d2e03f50`; ветка `task/qdcxx-030-java-schema-export`.
-Staging, commit, push и merge не выполнялись. [Полный список файлов](changed-files.txt) включает
-изменённые отслеживаемые файлы и все новые результаты; временные материалы остаются в игнорируемом
-`.work/schema-export-030/`. Все пути доказательств ниже, кроме ссылок, заданы относительно этого
+Дата: 2026-09-24 UTC. Ограниченный Java-экспортёр схем реализован и проверен автором. **Независимая приёмка остаётся открытой.** Исходный HEAD:
+`2ac1a85ea29c4553dd26db880e4e1fe0d2e03f50`.
+Временные доказательства находятся в `.work/schema-export-030/`. Все пути доказательств ниже, кроме ссылок, заданы относительно этого
 временного каталога. Временные журналы не включаются в коммит и требуют повторного получения на другой машине.
 
 ## Реализованные границы и доказательства
@@ -123,11 +120,7 @@ fixtures, upstream Java tools, `upstream.lock`, production `src/` и `include/` 
 
 Автор просмотрел полный diff и новые файлы на корректность, границы, стиль/скобки и лишнюю сложность;
 целевые замечания по упрощению применены и перепроверены. Это не закрывает независимую приёмку.
-`ce-compound` рассмотрен и пропущен: повторно используемые решения уже записаны в нормативном контракте
-экспорта и целевых тестах, отдельная заметка дублировала бы их. Следующая задача не начиналась.
-
-Предлагаемый scope коммита: ровно [changed-files.txt](changed-files.txt), после независимой приёмки.
-Предлагаемое сообщение: `feat(schema): export resolved Java schemes to native JSON`.
+Следующая задача не начиналась.
 
 ## Исправление замечания #2 на 1a9ea87
 
@@ -163,19 +156,9 @@ SHA-256 до/после: `184994cab64901576827c04f7db803a945d3e6f1ef44fe52d61d5c
 `git diff 2ac1a85ea29c4553dd26db880e4e1fe0d2e03f50 --check` падал до добавления атрибута и прошёл
 после него. Байты fixture не нормализовались. Итоговые diff, ссылки документов и whitespace
 проверены. В этих успешных проверках ошибок не обнаружено; C++/Linux suites для command-only
-исправления не повторялись. Независимая приёмка открыта; staging и commit не выполнялись.
+исправления не повторялись. Независимая приёмка открыта.
 Дополнительное упрощение/независимое ревью не расширялось за пределы запрошенного узкого исправления.
-`ce-compound` пропущен: комментарий к коду, регрессия и эти доказательства уже сохраняют вывод.
 
 Точный список файлов исправления: `.gitattributes`, `tools/schema-export/SchemaSource.java`,
 `tools/schema-export/tests/CommandTests.cmake`, `tests/conformance/schema-export/VALIDATION.md` и
-`tests/conformance/schema-export/VALIDATION.ru.md`. Команды для последующего коммита (не выполнялись):
-
-```powershell
-$files = @('.gitattributes', 'tools/schema-export/SchemaSource.java',
-  'tools/schema-export/tests/CommandTests.cmake', 'tests/conformance/schema-export/VALIDATION.md',
-  'tests/conformance/schema-export/VALIDATION.ru.md')
-git add -- $files
-git diff --cached --check
-git commit --only -m "fix(schema): isolate upstream export diagnostics" -- $files
-```
+`tests/conformance/schema-export/VALIDATION.ru.md`.

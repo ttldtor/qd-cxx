@@ -44,7 +44,7 @@ No huge allocation, allocator-failure injection, 32-bit target, macOS, other Lin
 other BufferedInput implementations, performance benchmark, full Unicode/QTP or transport/importer
 was tested. No production UTF dependency was added. The API remains provisional.
 
-Initial implementation: 2026-09-21 local date, High reasoning. Owner follow-up: 2026-09-20 UTC
+Initial implementation: 2026-09-21 local date. Owner follow-up: 2026-09-20 UTC
 (exact UTC instants in the fresh logs below). [Build/API instructions](../../../docs/CPP-BUILD.md)
 record exact tools, generator, SDK and configure/build/test commands. MSVC 19.42.34444.0 and
 ClangCL 19.1.5 both passed Debug and Release (one CTest per configuration), each executing

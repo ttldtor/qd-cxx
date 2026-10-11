@@ -5,7 +5,7 @@
 Owner-requested follow-up to committed `e1e19e5`, executed 2026-09-22 UTC. This changes C++ namespace
 and CMake naming only. [Current names and migration](../../../docs/NAMING.md) document the persistent
 rules. Public `qd/...` include paths, `qd-qtp-inspect` filename, CTest case names and exact stdout/stderr
-remain unchanged. No commit was created. These are author checks, not independent review.
+remain unchanged.  These are author checks, not independent review.
 
 | Check | Evidence |
 | --- | --- |

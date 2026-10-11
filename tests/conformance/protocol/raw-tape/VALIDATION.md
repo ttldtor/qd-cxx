@@ -2,11 +2,10 @@
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
-Starting HEAD: `c1654f2dbb5163917b848d1b84b17dfb9d0999fc`; branch `task/qdcxx-023`.
+Starting HEAD: `c1654f2dbb5163917b848d1b84b17dfb9d0999fc`.
 Checks below were executed on 2026-09-22 UTC. No errors were detected in the successful checks
 listed here. They are author checks, distinct from independent review.
 Implementation is ready for independent review; independent acceptance is not claimed.
-No staging, commit, push or next-task work was performed.
 
 ## Evidence before implementation
 
@@ -15,7 +14,7 @@ captures, 94 scenarios / 284 exact artifacts, ten rejected mutations, a full neg
 subsequent unchanged baseline Verify. Six cases use the actual FileWriter or
 DXEndpoint/TapeConnector/FileWriterHandler producer path; the other inputs are explicitly labelled
 diagnostic-wire. The [contract](../../../../spec/protocol/RAW-TAPE.md) was established before C++.
-The parent worker subsequently rechecked all 284 artifacts from
+A subsequent check rechecked all 284 artifacts from
 clean capture B against repository expectations. This is not another clean upstream build.
 
 ## Compiler and production matrix
@@ -99,19 +98,6 @@ Final documentation/link/whitespace and changed-file audits are retained in hand
 Reuse/quality simplification reviews found no worthwhile change. An efficiency suggestion to move
 invalid-mode validation ahead of bounded schema construction was considered but not adopted: this
 invalid-configuration path does not justify another helper and changed exception precedence.
-`ce-compound mode:non-interactive` was considered; no additional learning was created because the
-durable timing/option/limit reasoning is already captured in RAW-TAPE and REAL-TAPE-GAPS, while the
-test-comparator and newline fixes are recorded above. No scope deviation or new semantic guess was
+No scope deviation or new semantic guess was
 introduced. Broader types, flags, compression, sessions, adapters, replay scheduling and transport
 remain excluded. Full private-tape support is not claimed.
-
-Suggested commit scope is the exact [path manifest](COMMIT-SCOPE.txt); suggested message:
-`Add bounded RAW/MESSAGE tape inspection with exact timing`.
-The manifest includes every intended deliverable and excludes `.work`/private evidence. Commands
-for the owner after review, not executed by this worker:
-
-```powershell
-git add --pathspec-from-file=tests/conformance/protocol/raw-tape/COMMIT-SCOPE.txt
-git diff --cached --check
-git commit -m "Add bounded RAW/MESSAGE tape inspection with exact timing"
-```

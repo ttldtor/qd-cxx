@@ -84,7 +84,7 @@ lines in the new inventory; these were fixed and checks rerun. Historical raw ev
 
 ## Independent review
 
-The separate `independent_review` agent performed read-only source review, not author validation.
+A separate read-only source verification was recorded independently of author validation.
 Its first pass independently checked pinned SHA, all 20 registrations, help/dispatch/packaging,
 MICBuilder, Quote defaults/types/slots/delegates and Python CMake/logging/acquisition paths.
 It checked 80 pinned links / 39 unique upstream paths in the first two document pairs; none missing.

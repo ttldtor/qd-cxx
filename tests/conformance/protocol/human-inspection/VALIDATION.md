@@ -3,7 +3,7 @@
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
 Executed 2026-09-21 UTC (local calendar date 2026-09-22). No errors were detected in the final
-checks below. These are author checks; independent QDCXX-018 review is pending. No commit was created.
+checks below. These are author checks; independent QDCXX-018 review is pending.
 [Coverage](COVERAGE.md) defines the exercised profile and exclusions.
 
 | Profile/check | UTC evidence |

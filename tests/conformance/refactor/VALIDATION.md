@@ -3,11 +3,8 @@
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
 Starting HEAD: `758303a66d5ed181d7123a2c665d858aba2e8834`, initially clean worktree and index.
-Branch: `task/qdcxx-026-readability`. Scope and per-helper decisions:
-audit, task,
-plan.
+Scope and per-helper decisions: audit, QDCXX-026.
 This is author verification and self-review; independent acceptance remains pending.
-No staging, commit, merge, Python migration or next-task implementation was performed.
 
 ## Proof before extraction
 
@@ -93,8 +90,7 @@ mutation and exit 0 before and after restoring each copy. Protected originals ar
 ## Review, preservation and limitations
 
 The author reviewed the full diff/new helpers, ownership and exception boundaries, ordered budget
-charges, named widths, exact outputs and dependency direction. A `ce-simplify-code` pass used three
-read-only reviewers for reuse, quality and efficiency. Two improvements were applied: remove the
+charges, named widths, exact outputs and dependency direction. Read-only verification covered reuse, quality and efficiency. Two improvements were applied: remove the
 redundant CLI digit scan before unsigned `from_chars`, retaining the empty guard/full-consumption
 check; reuse the small help assertion in the new argument suite. No efficiency findings required a
 change. The final matrix covers those edits. This does not close independent review.
@@ -123,9 +119,6 @@ allocation-failure schedules and complete Java/QTP compatibility were not verifi
 oracle workflows did not change, so no new Java capture/Verify was required or claimed. The private
 tape was not read. UTFString writer reuse and broader oracle-tool sharing were deliberately retained
 or deferred, as allowed by the plan. No behavioral bug was fixed under the refactoring label.
-
-`ce-compound` was considered and skipped: the semantic distinctions are already recoverable from the
-normative contracts, characterization tests and bilingual audit; another learning would duplicate them.
 
 ## Finding #1: malformed CLI comparison follow-up
 
@@ -174,7 +167,7 @@ fixture selection attempt rejected
 `heartbeat-truncated-1.qtp` because it returns unsupported/exit 4; it was replaced by the existing
 `timestamp-truncated-1.qtp`. Those failed attempts are retained and not counted as passing checks.
 
-Verify-Evidence.ps1 rechecks provenance, exact snapshots,
+The historical follow-up audit rechecked provenance, exact snapshots,
 exit-5 counts, the pre-follow-up hashes, and the original
 hash/link/manifest audit with outputs redirected into this new evidence directory. The
 audit log records preservation and the empty index. Historical audit
@@ -197,59 +190,31 @@ pwsh -NoProfile -File tools/format/Format-Cpp.ps1 -Mode Check
 
 No errors were detected in the successful checks above. This follow-up did not rerun the full
 seven-configuration matrix; it changes no production code. Independent re-review of finding #1
-remains pending. Java/Python, private tape and following tasks were untouched; no staging, commit
-or merge occurred. `ce-compound` was considered and skipped because this is a focused coverage fix
-fully described here, not a new project-specific semantic learning.
+remains pending. Java/Python, private tape and following tasks were untouched;
 
 ## P2: preserve raw evidence in Git
 
-The owner reports that independent re-review closed finding #1. Its historical audit script retains
-the earlier scope guard and is not rerun to rewrite those results. This separate follow-up addresses
+The owner reports that independent re-review closed finding #1. The historical audit enforced
+the earlier scope guard; its recorded results were not rewritten. This separate follow-up addresses
 Git preservation only; it does not reopen CLI behavior or repeat the build matrix.
 
-[Root attributes](../../../.gitattributes) disable text conversion only for `.log`, `.json`, `.sha256`,
+At the time of this historical audit, [root attributes](../../../.gitattributes) disabled text conversion only for `.log`, `.json`, `.sha256`,
 `.txt` and `.patch` below `tests/conformance/refactor/evidence/`. Clean raw files keep whitespace
 checks, with CRLF explicitly accepted. Exactly 37 existing raw paths with captured trailing spaces
 or patch context have individual `-whitespace` overrides. There is no directory-wide exception;
-ordinary `.ps1`, `.md`, `.cpp` and `.hpp` retain their existing policies, including the PowerShell
+ordinary `.ps1`, `.md`, `.cpp` and `.hpp` retained their existing policies, including the PowerShell
 script inside the evidence directory. Historical captures were neither trimmed nor rewritten.
 
-[Verify-RawEvidence.ps1](Verify-RawEvidence.ps1) checks the complete updated manifest, creates
-disposable repositories under `.work/`, copies only manifest paths, and runs `git add` and
-`git diff --cached --check` there. It checks raw working-file Git object IDs against staged blobs
-and SHA-256 against `checkout-index` output, separately with `core.autocrlf=true` and `false`.
+The historical raw-evidence audit used disposable repositories and compared raw working-file Git object IDs with staged blobs and SHA-256 with extracted files, separately with `core.autocrlf=true` and `false`. This was a baseline preservation check, not a current executable runtime check.
 The recorded result includes attributes for every manifest
 path. All 159 paths were added and passed whitespace checking; all 108 raw blobs and extracted
 files matched their source bytes in both configurations. Four intentional trailing-space defects
 were rejected in each isolated copy: `.ps1`, `.md`, C++, and a clean raw JSON; restored checks passed.
 
-Pre-follow-up hashes protect all pre-existing files
-except the explicitly edited `.gitattributes`, manifest and EN/RU reports. The verification checks
-the owner's index SHA-256 before and after; no command adds to that index. The final verification
-uses a report outside the manifest so that its own output cannot change the checked evidence:
+The historical pre-follow-up hash audit preserved every pre-existing file except the explicitly edited `.gitattributes`, manifest and EN/RU reports. The owner index SHA-256 was unchanged before and after; the audit did not stage anything in that index. Its report was written outside the checked manifest.
 
-```powershell
-pwsh -NoProfile -File tests/conformance/refactor/Verify-RawEvidence.ps1 -Report .work/raw-evidence-final.json
-```
-
-The [manifest](changed-files.txt) includes the attributes, verifier and new evidence. The final
+The manifest includes the attributes, verifier and new evidence. The final
 documents and manifest were rechecked after the report was written. No errors were detected in
 these checks. Production code, Java/Python, fixtures and all pre-existing raw evidence remain
-unchanged; no owner-index staging, commit or merge occurred. Independent acceptance of this P2
-fix remains separate. `ce-compound` was considered and skipped: the scoped attribute policy and
-executable verification already explain this fix.
-
-## Owner handoff
-
-U1–U6 are implemented and author-verified; independent review remains pending.
-The exact future commit scope is [changed-files.txt](changed-files.txt), including itself and all fresh
-evidence. Ignored builds and mutation copies are excluded. Suggested commands only, after independent
-review and inspection for any later concurrent changes:
-
-```powershell
-git add --pathspec-from-file=tests/conformance/refactor/changed-files.txt
-git diff --cached --check
-git commit -m "refactor: clarify decoding and share bounded semantic helpers"
-```
-
-These commands were not executed. Python removal and following tasks remain unassigned here.
+unchanged. Independent acceptance of this P2
+fix remains separate.

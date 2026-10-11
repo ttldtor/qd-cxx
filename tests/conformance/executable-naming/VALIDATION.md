@@ -5,7 +5,7 @@
 Owner-requested follow-up to `435c6d2`, executed 2026-09-22 UTC. The only user-facing CMake utility
 is now `qdcxx-qtp-inspect` (`.exe` on Windows); its target remains `qdcxx_qtp_inspect`. Help and current
 EN/RU commands use the new name. Internal test executable names and public include paths are unchanged.
-The rule for future utility filenames is documented in AGENTS.md and [NAMING](../../../docs/NAMING.md).
+The rule for future utility filenames is documented in [NAMING](../../../docs/NAMING.md).
 Version 1 TSV/human format identifiers remain `qd-qtp-inspect`, with unchanged fixtures and wire behavior.
 
 Author checks, not independent review:
@@ -25,4 +25,3 @@ for this filename/help-only change. Earlier reports and source-hash snapshots re
 
 No old-name alias is built; a stale old executable may remain in a reused build directory. Update
 commands/shortcuts to the new name. No wire/TSV/human grammar, protocol scope or dependency changed.
-No commit was created.

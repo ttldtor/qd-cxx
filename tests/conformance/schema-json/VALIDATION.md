@@ -2,12 +2,10 @@
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
-Date: 2026-09-24 UTC. Task: QDCXX-029, U1–U4 of the
-plan.
+Date: 2026-09-24 UTC. Scope: QDCXX-029 bounded native JSON schema loading.
 Actual clean starting HEAD: `3bc0e5ee37cf1dd68306d8016a5b65f68c2da2e0`.
-Working branch: `task/qdcxx-029-external-json`. Implementation and author self-review are complete;
-independent review/acceptance remains open. No staging, commit, push or merge was performed.
-The complete delivery inventory is [changed-files.txt](changed-files.txt).
+Implementation and author self-review are complete;
+independent review/acceptance remains open.
 
 ## Implementation and coverage
 
@@ -32,7 +30,7 @@ The complete delivery inventory is [changed-files.txt](changed-files.txt).
   [CLI tests](../schema_json_cli.cmake) cover argument conflicts/duplicates, help equivalence,
   unreadable/missing/malformed/oversized schemas, error precedence, disabled loading, both diagnostic
   versions, both modes/formats, quoted paths, output limits and empty/empty-field/all-int schemas.
-- U4: build/API and CLI instructions, schema indexes, AGENTS scope and current/task status are updated
+- U4: build/API and CLI instructions, schema indexes, documentation indexes are updated
   in EN/RU. The documented preparation function was extracted, compiled and run on the mixed example.
 
 Core/protocol/event APIs and wire semantics are unchanged. DOM validates syntax; a nonallocating
@@ -94,8 +92,4 @@ Author self-review included all changed/new files and focused reuse, quality and
 it does not close independent acceptance. EN/RU claims and relative links, changed/untracked Markdown
 whitespace, `git diff --check`, the empty staged diff and the complete inventory were checked.
 Scoped Git comparisons confirmed historical fixtures, upstream locks/tooling and old schema examples
-unchanged. No new evidence archive was created. `ce-compound` was considered and skipped: the durable
-boundary decisions are already captured by the native contract, usage documents and regression tests.
-
-Suggested single commit scope: every path in `changed-files.txt`, after independent review.
-Suggested message: `feat(schema): load bounded external JSON schemas`.
+unchanged. No new evidence archive was created.

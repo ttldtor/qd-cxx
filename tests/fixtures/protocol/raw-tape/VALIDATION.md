@@ -39,5 +39,4 @@ not converted into implied C++ support.
 This report does not assert C++ compiler/sanitizer/CLI results, independent review acceptance,
 private-file completeness, general tape support, scheduling, nonzero flags or broader types.
 Those are separate evidence/remaining-scope questions. The semantic learning is captured in the
-EN/RU RAW-TAPE contract and coverage; no duplicate ce-compound learning was created for this unit.
-No staging, commit or next task was performed.
+EN/RU RAW-TAPE contract and coverage.

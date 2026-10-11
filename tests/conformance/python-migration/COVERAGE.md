@@ -64,10 +64,10 @@ executed results and limitations belong in [validation](VALIDATION.md), not in i
   controls must return 97 and record DENIED. This is a scoped workflow check, not a general security sandbox
   for renamed or embedded runtimes. Production-only builds neither discover nor fetch doctest.
   The Windows `guard-orphan` control also requires prompt cleanup of a live descendant after its root exits.
-- `Audit-Handoff.ps1` requires the exact existing matrix inventory: 49 Windows and 42 Linux traces,
+- The historical trace audit required the exact existing matrix inventory: 49 Windows and 42 Linux traces,
   including every configure/build, applicable inventory/test phase and denial/developer-tool control.
   It rejects empty or malformed records, invalid UTF-8, relative images, wrong root images,
-  executed Python and missing/incorrect denials. `Test-HandoffAudit.ps1` mutates isolated copies;
+  executed Python and missing/incorrect denials. The historical negative audit mutated isolated copies;
   review-fix verification records results and the boundary of this retained-evidence audit.
 - `Compare-Legacy.ps1` is explicitly parity-only: it invokes the unchanged historical Python checker
   on the replacement's exact temporary mutations, records all 17 rejection stages, and checks that

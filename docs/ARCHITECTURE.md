@@ -2,7 +2,6 @@
 
 [Русская версия](ARCHITECTURE.ru.md). This English document is authoritative.
 
-
 ## Clarified goal: library and operational programs
 
 The project includes equivalents of the necessary qds-tools utilities, not just a library/inspector.

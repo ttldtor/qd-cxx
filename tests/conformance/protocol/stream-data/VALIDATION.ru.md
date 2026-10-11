@@ -29,7 +29,7 @@ capture и negative/baseline Verify. Прежние goldens и upstream.lock с�
 Format до captures / финальный Check успешны. [Source hashes](source-sha256.json) идентифицируют финальные
 production/test/CMake inputs. Audit проверяет provenance, равенство captures, исторические
 байты, финальные source hashes, парные Markdown links и diff whitespace; UTC log.
-Технические EN/RU утверждения и ссылки на доказательства синхронизированы. Коммит не создан; результат
+Технические EN/RU утверждения и ссылки на доказательства синхронизированы. Результат
 готов для независимого ревью, сам отчёт не является независимым ревью.
 
 Поддерживаются только обычный точный type 8 и нулевые raw flags. Completed-prefix retention, конечные

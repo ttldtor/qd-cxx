@@ -6,8 +6,7 @@ Java-код репозитория следует [Google Java Style](https://go
 [google-java-format](https://github.com/google/google-java-format) — основной автоматический
 форматтер в стандартном режиме Google: отступ блока 2 пробела и предел 100 колонок с исключениями
 из руководства. Режим AOSP не используется. [.editorconfig](../../.editorconfig) задаёт базовые
-настройки редактора, но не заменяет форматтер. AGENTS.md передаёт инструкции
-будущим сессиям, а [CONTRIBUTING.md](../../CONTRIBUTING.md) описывает проверки перед review.
+настройки редактора, но не заменяет форматтер. [CONTRIBUTING.md](../../CONTRIBUTING.md) описывает проверки перед review.
 
 ## Команды
 

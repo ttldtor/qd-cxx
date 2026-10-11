@@ -43,7 +43,7 @@ Unexecuted/excluded: Windows sanitizers, allocator-failure injection, huge alloc
 full JSON/XML import/validation, conversions, event decoding, built-in metadata/replacers/provider
 profiles, dynamic re-description/reset/PART and transport. Intermediate repeated writes are source
 inference; missing fields do not promise application defaults. API is provisional, no performance or
-full Java parity claim. No commit was created.
+full Java parity claim.
 
 ## Shared type identity follow-up, 2026-09-21 UTC
 
@@ -54,7 +54,7 @@ Author reran all four CTest targets on MSVC Debug and
 GCC Debug, plus the pinned formatter
 and evidence/link/diff checks. No errors were detected in these checks. ClangCL, Release, sanitizers,
 production-only builds and Java captures were not rerun for this follow-up; their earlier results above
-retain their original scope. EN/RU contract and results were updated; no commit was created.
+retain their original scope. EN/RU contract and results were updated;
 
 ## Shared wire-type bound follow-up, 2026-09-21 UTC
 
@@ -63,4 +63,4 @@ MAX_WIRE_SERIAL_TYPE_ID in describe_records.hpp. Structural acceptance and type 
 Author reran the MSVC Debug build,
 all four CTest targets, pinned format check
 and evidence/link/diff checks. No errors were detected in these checks. Other compiler/configuration,
-sanitizer and Java checks were not rerun for this constant-only follow-up. EN/RU updated; no commit.
+sanitizer and Java checks were not rerun for this constant-only follow-up. EN/RU updated.

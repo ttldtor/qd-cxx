@@ -38,7 +38,7 @@ links and whitespace. New fixture hashes are in [fixture-sha256.json](fixture-sh
 
 EN/RU contracts, usage, coverage, results and state are synchronized. The API-GATE is accepted:
 processedRecords/wireFields count budget charges including failed attempts, with unchanged wire
-semantics/check order/positions. Independent review remains pending; no commit was created.
+semantics/check order/positions. Independent review remains pending;
 
 The tool supports only raw offline initial descriptions and ordinary type-8 zero-flags data with
 one immutable context. No allocation-failure injection, enormous resources, 32-bit environment,

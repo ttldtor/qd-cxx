@@ -2,8 +2,7 @@
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
-Author execution, 2026-09-22 UTC. Independent review is pending; no subagents, commit or automatic
-review closure. [Coverage](COVERAGE.md), [Java evidence](../../../fixtures/protocol/tape-reader/VALIDATION.md),
+Author execution, 2026-09-22 UTC. Independent review is pending. [Coverage](COVERAGE.md), [Java evidence](../../../fixtures/protocol/tape-reader/VALIDATION.md),
 [contract](../../../../spec/protocol/TAPE-READER.md), [architecture](../../../../docs/decisions/ADR-0002-bounded-tape-reader.md).
 
 ## Executed matrix

@@ -33,5 +33,4 @@ conversion/recovery Java не расширяет exact-match/terminal контр
 
 Отчёт не заявляет результаты C++ compiler/sanitizer/CLI, независимую приёмку, полноту частного
 файла, дополнительные типы, индексированные схемы или отображение бизнес-события Profile.
-Устойчивое различие IOUtil/BufferedInputPart закреплено в EN/RU контракте полей и покрытии;
-дублирующий ce-compound learning для этого этапа не создан. Staging и коммит не выполнялись.
+Устойчивое различие IOUtil/BufferedInputPart закреплено в EN/RU контракте полей и покрытии.

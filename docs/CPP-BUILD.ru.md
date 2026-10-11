@@ -518,4 +518,4 @@ OFF сохраняет сборку только библиотек. `-DBUILD_TE
 обеспечивают process-level проверки CTest, doctest — переносимые инъекции ошибок I/O. Шесть
 прежних suites остаются включены. Новых production-зависимостей и публичного session framework нет.
 StreamDataResult теперь возвращает списанные `processedRecords`/`wireFields` согласно
-принятому решению, без изменения wire или позиций.
+[принятому решению](../spec/protocol/STREAM-DATA.ru.md#aggregate-accounting), без изменения wire или позиций.

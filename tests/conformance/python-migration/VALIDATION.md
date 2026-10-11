@@ -2,11 +2,10 @@
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
-Implementation scope is QDCXX-027, U1–U6 of the
-accepted plan.
+Implementation scope: QDCXX-027 Python-free development tooling.
 Starting HEAD was `dcccd0242252cadb674f4970cc723fbf113bed53`, with a clean tree.
-The work is on `task/qdcxx-027-python-free`. This is author verification, including agent-assisted
-self-review; independent review and acceptance remain pending. No staging, commit, merge or next task.
+This is author verification, including additional
+self-review; independent review and acceptance remain pending.
 
 This report retains the original implementation runs. The current source hashes, strict trace audit,
 Windows-1252 checks and affected-suite reruns for review findings #1/#2 are in
@@ -183,38 +182,18 @@ absence of sanitizer diagnostics and absence of Python images except the deliber
 The audit checks changed and untracked authored whitespace, reciprocal/relative document links,
 raw-file Git filters and raw-file whitespace attributes. The pre-review audit required whitespace
 exceptions for 88 concrete raw paths according to Git's actual diagnostics; authored whitespace rejection remains enabled.
-The pre-review manifest contained 299 intended files; [the current manifest](changed-files.txt)
-also includes the scoped review fixes and their new evidence. Original executed handoff command:
+Executed preservation audit:
 
-```powershell
-pwsh -NoProfile -File tests/conformance/python-migration/Audit-Handoff.ps1
-```
-
-The plan's isolated staging/checkout experiment was adapted to the user's explicit prohibition on
-staging: `Audit-Handoff.ps1` writes Git objects only to an ignored isolated object directory and
+The historical preservation audit wrote Git objects only to an ignored isolated object directory and
 roundtrips every new raw evidence file through Git clean/smudge with `core.autocrlf=true`.
 It does not write the owner's index or object database. Raw paths use scoped `-text` attributes;
 only concrete raw files with actual whitespace receive whitespace exceptions. An injected authored
 Markdown trailing-space defect must still be rejected. Historical raw evidence is never normalized.
 
 The resulting diff, including untracked code and documents, was reviewed for scope and correctness.
-Agent-assisted reuse/quality/efficiency review suggested seven optional simplifications; none was
+Reuse/quality/efficiency review suggested seven optional simplifications; none was
 needed for correctness. Shared parsing would add allocation or coupling; tiny duplicate conversions
 and unused exports did not justify extra abstraction; regex/poll tweaks had no measured bottleneck;
 a warm-install manifest would introduce a new trust/cache protocol. These suggestions were deferred.
 A separate harness audit led to explicit compiler pinning, a swallowed-descendant denial control and
 orphan-root logger cleanup, all included in the executed final checks. This is author self-review.
-
-`ce-compound mode:non-interactive depth:lightweight` was considered and skipped: the durable reasoning
-is already recorded in the coverage, implementation comments and this required bilingual report;
-a separate learning would duplicate those records.
-
-[Exact intended file list](changed-files.txt) includes every new source, document and raw evidence file.
-Suggested commit message: `build: remove Python from the development workflow`.
-The following commands are suggestions only; they were not executed:
-
-```powershell
-$files = Get-Content tests/conformance/python-migration/changed-files.txt
-git add -- $files
-git commit -m 'build: remove Python from the development workflow'
-```

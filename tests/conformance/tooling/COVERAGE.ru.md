@@ -6,8 +6,7 @@
 
 Реализация начинается с `9b4f8ddf5786f71ac5f6d2305a0215a84b86b4b4`.
 Исходные metadata фиксируют изначально чистые рабочее дерево/индекс и
-защищённый перечень. Основной план
-определяет R1–R10 и U1–U5. [Машиночитаемая карта](coverage.json) фиксирует исходные 157 именованных обязательств и регрессии R5 stalled-open-console, stalled-log-fifo, stalled-stderr-diagnostic и same-session-process-group, а также регрессию R6 caller-temp-cache-preserved (всего 162)
+защищённый перечень. [Машиночитаемая карта](coverage.json) фиксирует исходные 157 именованных обязательств и регрессии R5 stalled-open-console, stalled-log-fifo, stalled-stderr-diagnostic и same-session-process-group, а также регрессию R6 caller-temp-cache-preserved (всего 162)
 и ответственные проверки. Это перечень требований приёмки, а не заявление о выполнении всех проверок.
 
 [coverage.cmake](coverage.cmake) сравнивает точные идентификаторы, группы и уникальность

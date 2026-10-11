@@ -114,9 +114,11 @@ outer frame positions and exceptions are observations, not C++ position/batching
 and remaining limitations. No full
 QTP compatibility, event semantics, huge allocations, other architectures or transport is implied.
 
+<a id="aggregate-accounting"></a>
+
 ## Charged work accounting
 
-The accepted accounting decision adds zero-initialized
+The aggregate accounting contract adds zero-initialized
 `processedRecords` and `wireFields` to StreamDataResult. They count budget charges, not only
 completed records/fields: increment after a successful budget check at the existing decrement,
 before reading the symbol or field. Skips, repeated targets and later-failing attempts count.

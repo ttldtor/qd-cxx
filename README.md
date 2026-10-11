@@ -1,33 +1,29 @@
 # qd-cxx
 
-`qd-cxx` is a C++23 reimplementation of [devexperts/QD](https://github.com/devexperts/QD), designed to remain behaviorally compatible with the Java upstream while using an architecture appropriate for modern C++.
+`qd-cxx` is a C++23 implementation of a bounded, behaviorally compatible subset of
+[devexperts/QD](https://github.com/devexperts/QD). The project supplies reusable libraries and
+offline inspection utilities. Java QD at the revision in [upstream.lock](upstream.lock) is the
+compatibility oracle; its internal architecture does not prescribe the C++ design.
 
-The project begins with specifications and conformance evidence, not a line-by-line port. Java QD is treated as a compatibility oracle; its internal architecture is reference material, not a mandatory design.
-
-## Current phase
-
-The specification and Java-oracle baseline now includes the first bounded C++23 compact int/long component. See [build/API instructions](docs/CPP-BUILD.md) ([Russian](docs/CPP-BUILD.ru.md)) and [conformance validation](tests/conformance/encoding/VALIDATION.md) ([Russian](tests/conformance/encoding/VALIDATION.ru.md)). The API is provisional; UTFString, importer and transport require later approved tasks.
+The implementation includes compact integers, exact UTF-16 strings and symbols, bounded QTP framing
+and record binding, selected STREAM/RAW tape profiles, schema-bound Quote/Profile mappings, optional
+native JSON schema loading and an offline Java schema exporter. Full QD, tape and transport
+compatibility is not claimed.
 
 Start with:
 
-1. [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md)
-2. [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
-3. [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md)
-4. `tasks/README.md`
-5. The assigned task under `tasks/`
+1. [Build and API instructions](docs/CPP-BUILD.md) ([Russian](docs/CPP-BUILD.ru.md)).
+2. [Current capabilities and limits](docs/CURRENT-STATE.md) ([Russian](docs/CURRENT-STATE.ru.md)).
+3. [Architecture](docs/ARCHITECTURE.md) and [compatibility policy](docs/COMPATIBILITY.md).
+4. [Schema export and consumption](tools/schema-export/README.md) ([Russian](tools/schema-export/README.ru.md)).
+5. [Product roadmap](docs/NEXT-STEPS.md) ([Russian](docs/NEXT-STEPS.ru.md)).
 
-Contributor workflow and documentation-only validation are described in [`CONTRIBUTING.md`](CONTRIBUTING.md).
+[CONTRIBUTING.md](CONTRIBUTING.md) describes contribution and validation requirements.
+Normal configure/build/CTest uses CMake and C++ without Python. The
+[native developer tools](tools/dev/README.md) ([Russian](tools/dev/README.ru.md)) provide UTC logging
+and portable formatting; optional PowerShell conveniences remain available. The
+[migration ledger](docs/PYTHON-MIGRATION.md) describes remaining manual Python workflows.
 
-Normal configure/build/CTest uses CMake and C++ without Python. UTC logging uses
-[Run-Utc.ps1](tools/Run-Utc.ps1) (PowerShell 7.4+); Windows formatter preparation uses
-[Setup-Cpp.ps1](tools/format/Setup-Cpp.ps1).
-[Migration coverage](tests/conformance/python-migration/COVERAGE.md)
-([Russian](tests/conformance/python-migration/COVERAGE.ru.md)) tracks preserved checks.
-The [migration ledger](docs/PYTHON-MIGRATION.md) keeps the remaining manual Python workflows explicit.
-
-## Initial workflow
-
-1. Pin and inspect the Java upstream recorded in `upstream.lock`.
-2. Extract observable contracts into `spec/` with source traceability.
-3. Capture representative Java behavior as reviewed fixtures.
-4. Add C++ components only after their boundaries and acceptance evidence are understood.
+Observable contracts live in `spec/`, architecture and compatibility decisions in `docs/`, and
+reviewed inputs, expected results and conformance checks in `tests/`. Protocol and schema changes
+must update the corresponding contracts and evidence together.

@@ -5,8 +5,8 @@
 Follow-up: Java braces review correction records the current source hashes and
 new Verify run. The original author-run evidence below remains a historical snapshot.
 
-QDCXX-025 used High reasoning and started from clean HEAD
-`e5a3764992ba3a90a07d3d092a4383e37a901de2`, on `task/qdcxx-025-event-mappings`.
+QDCXX-025 started from clean HEAD
+`e5a3764992ba3a90a07d3d092a4383e37a901de2`.
 All retained run dates are 2026-09-23 UTC. This is author verification and self-review, not
 independent acceptance. Independent review remains pending. No errors were detected in the successful
 checks below. [Coverage](COVERAGE.md) traces R1–R10 and distinguishes evidence from broader claims.
@@ -90,22 +90,9 @@ and exact event values; fresh schemas cannot silently reuse old contexts. Copies
 snapshot rebuilds preserve the original local context. Generic extra/custom values remain available.
 Source loading, complete settings parity, full dxlink, additional identities, indexed/regional events,
 wire coercion, compression, nonzero QTP flags, transport and replay scheduling remain separate work.
-Independent review is open; no staging, commit, push or next-task implementation was performed.
+Independent review is open;
 
 The nontrivial configuration timing, absent/default distinctions and context ownership reasoning are
-already in the bilingual normative contracts. `ce-compound` was considered and skipped to avoid a
-duplicate learning. Document audit covers changed/untracked authored
+already in the bilingual normative contracts.  Document audit covers changed/untracked authored
 Markdown whitespace, reciprocal language links and local relative targets. Raw evidence was not normalized.
-Source hashes and the exact [changed-file manifest](changed-files.txt)
-include all intended deliverables; the manifest includes itself and excludes ignored build work.
-
-Suggested owner-only commands after independent review, from the repository root:
-
-```powershell
-git add --pathspec-from-file=tests/conformance/protocol/profile/changed-files.txt
-git diff --cached --check
-git commit -m "feat: add schema-bound Quote and Profile event mappings"
-```
-
-These commands are a suggestion, not an executed action. Inspect the manifest and staged diff if the
-working tree changes after this handoff; do not stage unrelated concurrent work.
+Source hashes identify the checked sources.

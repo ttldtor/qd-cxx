@@ -2,7 +2,7 @@
 
 [Русская версия](COVERAGE.ru.md). English is authoritative.
 
-The task implements only the exact ordinary-record subset in
+The QDCXX-025 implements only the exact ordinary-record subset in
 [EVENT-MAPPING](../../../../spec/events/EVENT-MAPPING.md), [QUOTE](../../../../spec/events/QUOTE.md)
 and [PROFILE](../../../../spec/events/PROFILE.md). [Java coverage](../../../fixtures/events/mapping/COVERAGE.md)
 separates production delegate/file observations, direct boundary probes and source-resolution evidence.

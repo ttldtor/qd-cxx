@@ -2,7 +2,7 @@
 
 [English](VALIDATION.md). Английская версия является основной.
 
-Выполнено 2026-09-21 с High reasoning, Windows / PowerShell 7.6.6, Zulu JDK 1.8.0_422-b05, Maven 3.9.16, закреплённый QD 3.355 commit `0ddc0a09779fb61d74cc0b37c6449ff47dcb715f`. Четыре финальные чистые сборки выполнялись последовательно на общем внешнем checkout. Upstream tests и повторное использование build-cache отключены; enforcer JDK оставался включённым.
+Выполнено 2026-09-21, Windows / PowerShell 7.6.6, Zulu JDK 1.8.0_422-b05, Maven 3.9.16, закреплённый QD 3.355 commit `0ddc0a09779fb61d74cc0b37c6449ff47dcb715f`. Четыре финальные чистые сборки выполнялись последовательно на общем внешнем checkout. Upstream tests и повторное использование build-cache отключены; enforcer JDK оставался включённым.
 
 ## Проверки
 

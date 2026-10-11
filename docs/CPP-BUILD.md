@@ -502,4 +502,4 @@ when the tool is enabled. [CLI/profile/limits](QTP-INSPECT.md),
 provide process-level CTest checks and doctest covers portable injected I/O failures. The six
 previous suites remain enabled. This adds no production dependency or public session framework.
 StreamDataResult now exposes charged `processedRecords`/`wireFields` under the
-accepted accounting decision, without wire or position changes.
+[accepted accounting decision](../spec/protocol/STREAM-DATA.md#aggregate-accounting), without wire or position changes.

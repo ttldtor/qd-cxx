@@ -29,7 +29,7 @@ negative fixture variants were rejected and the unchanged baseline passed. Pinne
 Check and Java Format before captures / final Check passed. [Source hashes](source-sha256.json)
 identify final production/test/CMake inputs. Audit checks provenance, capture equality,
 historical bytes, final source hashes, paired Markdown links and diff whitespace; see UTC log.
-EN/RU technical claims and evidence references are synchronized. No commit was created; ready for
+EN/RU technical claims and evidence references are synchronized. Ready for
 independent review, not an independent review result.
 
 Only ordinary exact type 8 and zero raw flags are supported. Completed-prefix retention, finite

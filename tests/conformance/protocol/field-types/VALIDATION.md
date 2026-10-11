@@ -2,8 +2,8 @@
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
-QDCXX-024 started at `a9299317c1d4e7f3202ed8136916fd3ee94b9f3f` on branch
-`task/qdcxx-024-field-types`. All dates below and retained logs are UTC, 2026-09-22.
+QDCXX-024 started at `a9299317c1d4e7f3202ed8136916fd3ee94b9f3f`.
+All dates below and retained logs are UTC, 2026-09-22.
 The initial locked-Java observations and [FIELD-TYPES](../../../../spec/encoding/FIELD-TYPES.md)
 preceded production C++. [Coverage](COVERAGE.md) maps R1–R8 to checks and states their limits.
 This is author validation and self-review, not independent acceptance. Independent review is pending.
@@ -67,13 +67,11 @@ before hashes, audit.
 Historical captures, upstream.lock and expectations were not rewritten. The private tape was not
 read. New evidence is generated offline; no live endpoint was needed.
 
-## Final scope and handoff
+## Final scope
 
-The changed-file list, including new files, is [changed-files.txt](changed-files.txt). The
 source manifest identifies the reviewed implementation/test sources;
 completion audit records links, whitespace and an empty staged diff.
 Raw evidence is preserved as captured, without trimming it to satisfy Markdown whitespace rules.
-No staging, commit, push, PR or next-task work was performed.
 
 The implementation adds exact field support and a fixed diagnostic profile, without a full Profile
 adapter. No scope deviation or blocking semantic question remains for this bounded task. Allocation
@@ -81,18 +79,4 @@ failure handling was reviewed but not fault-injected; generated evidence does no
 schema or full private-file compatibility. No errors were detected in the successful checks listed
 here; that does not assert the absence of all semantic errors.
 
-`ce-compound` was considered and skipped: the non-obvious primitive/message distinction and
-temporary-ownership charging are already preserved in the authoritative EN/RU contract and coverage.
 A duplicate learning would add no durable information. Independent review remains a separate step.
-
-Suggested owner-only PowerShell commands after review (not executed):
-
-```powershell
-git add --pathspec-from-file=tests/conformance/protocol/field-types/changed-files.txt
-git diff --cached --check
-git diff --cached --stat
-git commit -m "feat: add bounded exact field types and typed tape inspection"
-```
-
-The list scopes the whole QDCXX-024 deliverable, including contracts, translations, Java provenance,
-new fixtures, implementation, tests and validation; it excludes caches and unrelated files.

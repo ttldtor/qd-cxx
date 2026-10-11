@@ -6,8 +6,7 @@ Repository-owned Java follows [Google Java Style](https://google.github.io/style
 [google-java-format](https://github.com/google/google-java-format) is the authoritative automatic
 formatter, in its default Google mode: 2-space block indentation and a 100-column limit with the
 guide's exceptions. AOSP mode is not used. [.editorconfig](../../.editorconfig) supplies basic editor
-settings; it does not replace the formatter. AGENTS.md carries these instructions
-into future sessions, and [CONTRIBUTING.md](../../CONTRIBUTING.md) documents the review workflow.
+settings; it does not replace the formatter. [CONTRIBUTING.md](../../CONTRIBUTING.md) documents the review workflow.
 
 ## Commands
 

@@ -2,7 +2,7 @@
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
-Author checks on 2026-09-22 UTC; no independent review is claimed. No subagents were used.
+Author checks on 2026-09-22 UTC; no independent review is claimed.
 Initial clean captures a/b preceded the TAPE-READER contract, ADR-0002 and production C++ edits.
 Final clean captures below reran the same Java source with the completed launcher/provenance workflow.
 All expected inputs and observations match those initial captures byte-for-byte.
@@ -31,4 +31,4 @@ process finished within its 30-second bound. Primitive callback positions were n
 No errors were detected in these checks. General tape, compressed input, time sidecars, recovery,
 RAW_DATA/default TapeConnector, Quote, transport, huge allocations and allocator injection were not tested.
 The C++ terminal/atomic/strict policies are deliberate task-authorized differences, not Java observations.
-Historical evidence/upstream.lock remains unchanged; no commit or automatic review closure was performed.
+Historical evidence/upstream.lock remains unchanged.

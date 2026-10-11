@@ -55,7 +55,7 @@ profiles, dynamic re-description/reset/PART и transport. Промежуточн
 GCC Debug, а также закреплённое форматирование
 и evidence/link/diff checks. В этих проверках ошибок не обнаружено. ClangCL, Release, sanitizers,
 production-only builds и Java captures для этого дополнения не перезапускались; прежние результаты выше
-сохраняют исходный объём. Контракт и результаты EN/RU обновлены; коммит не создан.
+сохраняют исходный объём. Контракт и результаты EN/RU обновлены.
 
 ## Дополнение: общая граница wire type, 2026-09-21 UTC
 

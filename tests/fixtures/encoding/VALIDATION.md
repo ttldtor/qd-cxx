@@ -2,7 +2,7 @@
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
-Executed 2026-09-21 with High reasoning, Windows / PowerShell 7.6.6, Zulu JDK 1.8.0_422-b05, Maven 3.9.16, locked QD 3.355 commit `0ddc0a09779fb61d74cc0b37c6449ff47dcb715f`. Four final clean builds ran sequentially on the shared external checkout. Upstream tests and build-cache reuse were disabled; the JDK enforcer remained enabled.
+Executed 2026-09-21, Windows / PowerShell 7.6.6, Zulu JDK 1.8.0_422-b05, Maven 3.9.16, locked QD 3.355 commit `0ddc0a09779fb61d74cc0b37c6449ff47dcb715f`. Four final clean builds ran sequentially on the shared external checkout. Upstream tests and build-cache reuse were disabled; the JDK enforcer remained enabled.
 
 ## Checks
 

@@ -34,4 +34,4 @@ Java conversion/recovery behavior does not enlarge the exact-match/terminal C++ 
 This report makes no claim about C++ compiler/sanitizer/CLI results, independent review,
 private-file completeness, additional types, indexed schemas or Profile business-event mapping.
 The durable IOUtil/BufferedInputPart distinction is recorded in the EN/RU field contract and
-coverage; a duplicate ce-compound learning was not created for this unit. No staging or commit.
+coverage.

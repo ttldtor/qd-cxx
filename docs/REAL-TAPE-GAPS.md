@@ -4,7 +4,7 @@
 
 QDCXX-023 separates bounded structural inventory from payload compatibility. A complete inventory
 does not establish that the C++ reader or locked Java reader can decode the whole private sample.
-The task authorizes RAW/MESSAGE for existing exact types 2/8/56/120;
+QDCXX-023 defines RAW/MESSAGE for existing exact types 2/8/56/120;
 new field identities and broader standard-event adapters remain outside its scope.
 
 ## Diagnostic method and bounds

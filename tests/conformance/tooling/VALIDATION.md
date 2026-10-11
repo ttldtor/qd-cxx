@@ -4,16 +4,13 @@
 
 ## Scope and status
 
-QDCXX-028 implements and author-verifies U1–U5 of the approved plan.
+QDCXX-028 implements and author-verifies portable native development tooling.
 Actual starting HEAD: `9b4f8ddf5786f71ac5f6d2305a0215a84b86b4b4`, initially clean worktree and empty staged diff;
-branch `task/qdcxx-028-portable-tools`. Baseline retains original file hashes.
-This is author verification and agent-assisted self-review. Independent review/acceptance remains open.
-No staging, commit, push, merge or next task was performed.
+Baseline retains original file hashes.
+This is author verification and self-review. Independent review/acceptance remains open.
 
 Final source rechecks and targeted correction checks are complete as detailed below; final handoff
 preservation receipts are linked in the audit section. Earlier failures remain separate from corrected reruns.
-The [changed-file manifest](changed-files.txt) identifies every intended source, document and new
-evidence file, including itself.
 
 ## Implementation decisions
 
@@ -196,7 +193,7 @@ for the later source rechecks or final handoff audit.
 
 Final handoff preservation/filter receipts are
 Windows and Linux.
-[handoff.cmake](handoff.cmake) checks the complete
+The historical preservation audit checked the complete
 changed inventory, protected baseline hashes, authored whitespace and relative links. Raw evidence
 uses scoped `-text`; only concrete raw paths with actual whitespace diagnostics receive `-whitespace`.
 Clean/smudge roundtrips use `core.autocrlf=true` and an ignored isolated Git object directory, without
@@ -231,16 +228,4 @@ the retained failed attempt is not a passing receipt.
   Developer-tool Unicode results do not expand inspector Unicode support. Java tooling, remaining manual
   Python audits/generators, production code/settings and tracked bytecode retain their previous scope.
 
-No approved requirement was intentionally reduced. `ce-compound mode:non-interactive depth:lightweight`
-was considered and skipped: the relevant reasoning is already captured in the contracts, regression tests
-and this required bilingual report; a separate learning would duplicate it.
-Suggested owner-controlled commit scope is exactly [changed-files.txt](changed-files.txt), with message
-`build: add portable native development tools`. Suggested commands are not executed:
-
-```powershell
-git --literal-pathspecs add --pathspec-from-file=tests/conformance/tooling/changed-files.txt
-git diff --cached --stat
-git --literal-pathspecs commit --only --pathspec-from-file=tests/conformance/tooling/changed-files.txt -m "build: add portable native development tools"
-```
-
-Before committing, the owner should verify that the index contains only the intended manifest.
+No approved requirement was intentionally reduced.

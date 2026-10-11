@@ -2,7 +2,7 @@
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
-Author checks executed on 2026-09-22 UTC. These are implementation-agent observations; independent
+Author checks executed on 2026-09-22 UTC. These are implementation verification results; independent
 review remains pending. Starting repository HEAD was `fa5a0b967e9c021e656846cdd3d6faee5faa4776`.
 The first runtime observation preceded the new contracts and C++ implementation.
 
@@ -41,7 +41,7 @@ and lossy real Quote inputs, raw decimal/character/time bounds and focused produ
 Malformed UTF_CHAR consumed positions are primitive observations. Diagnostic constructed tapes
 do not independently establish the full production event-to-file path; `default-quote.qtp` does.
 No RAW_DATA, MESSAGE timing, general tape, compression, regional mapping, transport, schema importer
-or private-file acceptance was added. No Python or commit was created.
+or private-file acceptance was added. No new Python code was created.
 
 The C++ implementation and its separate compiler/sanitizer matrix are outside this Java validation
 report. Final task-level handoff must keep these author observations distinct from independently

@@ -2,7 +2,7 @@
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
-Executed 2026-09-21 in Windows/PowerShell with existing Python 3.11.1 (standard library only), High reasoning. [Contract](../JSON-CONTRACT.md), [case matrix](COVERAGE.md), [checker](../../../tests/conformance/check_json_contract.py).
+Executed 2026-09-21 in Windows/PowerShell with existing Python 3.11.1 (standard library only). [Contract](../JSON-CONTRACT.md), [case matrix](COVERAGE.md), [checker](../../../tests/conformance/check_json_contract.py).
 
 ## Executed checks
 

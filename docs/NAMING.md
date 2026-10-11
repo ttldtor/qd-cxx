@@ -22,7 +22,7 @@ No forwarding namespace aliases or duplicate legacy targets/options are introduc
 CTest case names and source filenames stay unchanged. Standard/dependency identifiers such as
 `BUILD_TESTING`, `CMAKE_*`, `Python3_*` and `doctest::doctest` are not project prefixes.
 Future project-owned targets use `qdcxx_`; public configuration/macros use `ORG_TTLDTOR_QDCXX_`.
-AGENTS.md and the [C++ style contract](CPP-STYLE.md) carry this persistent rule.
+The [C++ style contract](CPP-STYLE.md) also documents this rule.
 
 This is a source/build interface break: update namespace references and target/cache names in
 consumers, then rebuild. Old QD_* cache entries do not control the new options; use a fresh build

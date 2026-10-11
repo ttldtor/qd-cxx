@@ -35,5 +35,4 @@ JDK 8 для oracle и отдельный JDK 21+ для форматирова�
 [покрытием](COVERAGE.ru.md). Отчёт не заявляет результаты C++ compiler/sanitizer/CLI, произвольные
 providers, дополнительные типы, индексные схемы или полную поддержку частного tape.
 Существенные различия configuration timing и local absence/wire omission записаны в двуязычных
-контрактах; дублирующая ce-compound learning не создана. Staging и commit не выполнялись.
-
+контрактах.

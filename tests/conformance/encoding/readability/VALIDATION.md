@@ -21,7 +21,7 @@ Source review confirms equivalent compact range/shift formulas and unchanged UTF
 resource-policy precedence, consumed/written positions, accepted overlong/surrogate forms and
 failure atomicity. No normalized/repaired UTF path or new allocation was introduced. Obvious
 counters/indices remain literal. Tests and their exact byte examples are unchanged. The new
-[EN/RU style rule](../../../../docs/CPP-STYLE.md#numeric-format-semantics) and AGENTS guidance require
+[EN/RU style rule](../../../../docs/CPP-STYLE.md#numeric-format-semantics) requires
 meaningful names or local explanations for format semantics, without a generic framework.
 
 ## Executed checks
@@ -52,7 +52,7 @@ were available. Windows/WSL build access was granted through the tool's sandbox 
 - Existing encoding evidence audit: [UTC log](evidence-audit.log), passed; no Java rerun or hashed Java edit.
 - SHA-256 before/after: fixtures, upstream.lock, public headers and all pre-existing encoding
   validation artifacts unchanged; [check report](checks.json) records counts and inventory digest.
-- Relative Markdown links and `git diff --check`: [final audit](final-audit.log), passed.
+- Relative Markdown links and `git diff --check`: final audit, passed.
 - Naming, helper Doxygen, private scope, arithmetic and control-flow equivalence reviewed manually;
   formatters alone cannot enforce those properties.
 
@@ -65,4 +65,4 @@ No build-system, dependency, public API, wire-contract or fixture changes are pa
 
 The checks cover the existing bounded corpus, not every possible input or huge allocation. No new
 fuzzing, allocator-failure injection, 32-bit/macOS/other architecture coverage or performance claim.
-Existing provisional-API and alternate-BufferedInput limitations remain. No commit was created.
+Existing provisional-API and alternate-BufferedInput limitations remain.

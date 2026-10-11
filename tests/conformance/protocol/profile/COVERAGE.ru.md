@@ -2,7 +2,7 @@
 
 [English version](COVERAGE.md). Английская версия является нормативной.
 
-Задача реализует только точное подмножество ordinary records из
+QDCXX-025 реализует только точное подмножество ordinary records из
 [EVENT-MAPPING](../../../../spec/events/EVENT-MAPPING.ru.md), [QUOTE](../../../../spec/events/QUOTE.ru.md)
 и [PROFILE](../../../../spec/events/PROFILE.ru.md). [Java-покрытие](../../../fixtures/events/mapping/COVERAGE.ru.md)
 разделяет production delegate/file наблюдения, прямые граничные пробы и доказательства разрешения источников.

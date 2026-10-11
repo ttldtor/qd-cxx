@@ -6,8 +6,7 @@
 
 The implementation starts at `9b4f8ddf5786f71ac5f6d2305a0215a84b86b4b4`.
 Baseline metadata records the initial clean worktree/index and protected
-inventory. The canonical plan
-defines R1–R10 and U1–U5. The [machine-readable map](coverage.json) retains the initial 157 named obligations and adds the stalled-open-console, stalled-log-fifo, stalled-stderr-diagnostic and same-session-process-group R5 regressions
+inventory. The [machine-readable map](coverage.json) retains the initial 157 named obligations and adds the stalled-open-console, stalled-log-fifo, stalled-stderr-diagnostic and same-session-process-group R5 regressions
 and the caller-temp-cache-preserved R6 regression with their checking owners (162 total). It is an acceptance inventory, not a claim that each check has run.
 
 [coverage.cmake](coverage.cmake) compares exact identities, groups and uniqueness against
