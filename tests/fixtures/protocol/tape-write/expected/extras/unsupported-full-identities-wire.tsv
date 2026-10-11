@@ -1,0 +1,15 @@
+case	unsupported-full-identities-wire
+diagnostic	envelope-scan-only
+frame	0	0	69	67	1
+frame	1	69	78	8	0
+frame	2	78	108	29	2
+wire-record	0	0055006e0073007500700070006f0072007400650064	2
+wire-field	0	0	00500072006900630065	24
+wire-field	0	1	0054006500780074	137
+frame	3	108	127	18	5
+frame	4	127	136	8	0
+frame	5	136	195	58	5
+frame	6	195	204	8	0
+frame	7	204	224	19	5
+frame	8	224	225	0	-1
+complete	unsupported-full-identities-wire

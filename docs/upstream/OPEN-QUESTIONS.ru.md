@@ -4,6 +4,22 @@
 
 Записывать вопросы о поведении Java QD, на которые пока нет уверенного ответа. Связывать вопрос с исследующей задачей и закрывать его source или fixture evidence.
 
+## Исходящие production-свидетельства QDCXX-031
+
+Добавочный [production corpus](../../tests/fixtures/protocol/tape-write/CAPTURES.ru.md) разрешает
+отдельные вопросы outgoing names/IDs/layout и raw values через закреплённый FileWriter → FileReader.
+Исходящие поля используют property names, а не первый lookup alias; последний добавленный alias
+может изменить имя. Исходные Quote/Profile ID 0/5 и 8/16 logical fields не изменяются. Сохранены
+все прежние точные identities 2/8/10/40/56/72/88/120, nullable String/char-array units и допустимые
+symbol forms. Full24/full137 остаются negative C++ admission witnesses, несмотря на принятие Java.
+
+MESSAGE batch grouping отличается от singleton visits; FIELD добавляет built-in time descriptors,
+NONE теряет event timing. Это не допускает дополнительные writing modes. Java close может
+журналировать I/O errors, поэтому checked completion/publication требует отдельного outgoing
+контракта. Два deterministic captures, строгий Verify и семь отвергнутых mutants приведены в
+[проверках](../../tests/conformance/protocol/tape-write/VALIDATION.ru.md). Эта evidence не доказывает
+C++ writer, strict rewrite, replay scheduler, новые adapters или transport support.
+
 ## Подмножество событий и конфигурации QDCXX-025
 
 QDCXX-025 разрешает выбранные вопросы событий default/configured Quote и Profile через

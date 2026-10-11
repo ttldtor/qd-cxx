@@ -4,6 +4,22 @@
 
 Record questions about Java QD behavior that cannot yet be answered confidently. Link each question to the task investigating it and close it with source or fixture evidence.
 
+## QDCXX-031 outgoing production witnesses
+
+The additive [production corpus](../../tests/fixtures/protocol/tape-write/CAPTURES.md) resolves
+selected outgoing names/IDs/layout and raw-value questions through locked FileWriter → FileReader.
+Outgoing fields use property names, not the first lookup alias; last-added aliases can change those
+names. Original Quote/Profile IDs 0/5 and 8/16 logical fields remain unchanged. All existing exact
+identities 2/8/10/40/56/72/88/120, nullable String/char-array units and supported symbol forms are
+captured. Full24/full137 are retained negative C++ admission witnesses, despite Java acceptance.
+
+MESSAGE batch grouping differs from singleton visits; FIELD adds built-in time descriptors and NONE
+loses event timing. Those observations do not admit additional writing modes. Java close can log
+I/O errors, so checked completion/publication remains a separate outgoing-contract decision.
+Two deterministic captures, strict Verify and seven rejected mutants are recorded in
+[validation](../../tests/conformance/protocol/tape-write/VALIDATION.md). No C++ writer, strict rewrite,
+replay scheduler, new adapter or transport support is established by this evidence.
+
 ## QDCXX-025 event and configuration subset
 
 QDCXX-025 resolves the selected default/configured Quote and Profile event questions through
