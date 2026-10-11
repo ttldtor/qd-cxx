@@ -547,3 +547,29 @@ provide process-level CTest checks and doctest covers portable injected I/O fail
 previous suites remain enabled. This adds no production dependency or public session framework.
 StreamDataResult now exposes charged `processedRecords`/`wireFields` under the
 [accepted accounting decision](../spec/protocol/STREAM-DATA.md#aggregate-accounting), without wire or position changes.
+
+## Strict tape admission and offline rewriting
+
+`qdcxx_protocol` includes `qd/protocol/tape_admission.hpp`. `admitTape(schema, bytes, limits)`
+accepts only a complete supported `RAW_MESSAGE_V1` byte sequence that a fresh reader can finish
+successfully. It checks every description, including unused records, binds an exact complete
+outgoing inventory, and returns a move-only `AdmittedTape` only after explicit EOF. The token owns
+the original bytes, an independent schema/layout inventory, descriptor and limits. Its `valid()`
+state follows moves; accessors must not be used on a moved-from token. Failure publishes no token,
+does not retain decoded history and reports the actual nonrefunding work and peak logical storage.
+
+`AdmissionLimits` separately bounds input bytes, reader work/storage, layout/schema inventory,
+additional nonrefunding copy/visit work and simultaneous additional logical byte/UTF-16 storage.
+Scratch counters exclude allocator metadata/capacity and the reader's separately bounded private
+buffers. The accepted descriptor must be exactly representable; unsupported or ambiguous mappings
+fail closed. The Java-overflow sender endpoint is rejected without renumbering.
+
+The optional `qdcxx-tape-write` executable is enabled with
+`-DORG_TTLDTOR_QDCXX_BUILD_TAPE_WRITE=ON` and defaults OFF. It selects an explicit built-in schema
+or `--schema` when the optional native JSON loader is enabled. Production core/protocol libraries
+remain independent of JSON and file I/O. The tool reads and closes the complete source before
+admission, performs a separate bounded fresh-reader/writer composition pass, and creates the final
+destination atomically with create-only hard-link publication after checked output completion.
+Existing destinations are refused; no overwrite or rename fallback is used. See the
+[tape-write contract](TAPE-WRITE.md), [CLI reference](../tools/tape-write/README.md), and
+[admission validation](../tests/conformance/protocol/tape-write/ADMISSION-VALIDATION.md).

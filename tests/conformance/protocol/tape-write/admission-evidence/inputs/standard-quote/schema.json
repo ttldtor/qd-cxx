@@ -1,0 +1,106 @@
+{
+  "formatVersion": 1,
+  "profile": {
+    "id": "qdcxx-native",
+    "version": 1
+  },
+  "records": [
+    {
+      "id": 0,
+      "name": "Quote",
+      "hasTime": false,
+      "fields": [
+        {
+          "serialTypeId": 56
+        },
+        {
+          "serialTypeId": 2
+        },
+        {
+          "serialTypeId": 120
+        },
+        {
+          "serialTypeId": 120
+        },
+        {
+          "serialTypeId": 56
+        },
+        {
+          "serialTypeId": 2
+        },
+        {
+          "serialTypeId": 120
+        },
+        {
+          "serialTypeId": 120
+        }
+      ],
+      "lookups": [
+        {
+          "name": "Bid.Time",
+          "fieldId": 0
+        },
+        {
+          "name": "BidTime",
+          "fieldId": 0
+        },
+        {
+          "name": "Bid.Exchange",
+          "fieldId": 1
+        },
+        {
+          "name": "BidExchangeCode",
+          "fieldId": 1
+        },
+        {
+          "name": "Bid.Price",
+          "fieldId": 2
+        },
+        {
+          "name": "BidPrice",
+          "fieldId": 2
+        },
+        {
+          "name": "Bid.Size",
+          "fieldId": 3
+        },
+        {
+          "name": "BidSize",
+          "fieldId": 3
+        },
+        {
+          "name": "Ask.Time",
+          "fieldId": 4
+        },
+        {
+          "name": "AskTime",
+          "fieldId": 4
+        },
+        {
+          "name": "Ask.Exchange",
+          "fieldId": 5
+        },
+        {
+          "name": "AskExchangeCode",
+          "fieldId": 5
+        },
+        {
+          "name": "Ask.Price",
+          "fieldId": 6
+        },
+        {
+          "name": "AskPrice",
+          "fieldId": 6
+        },
+        {
+          "name": "Ask.Size",
+          "fieldId": 7
+        },
+        {
+          "name": "AskSize",
+          "fieldId": 7
+        }
+      ]
+    }
+  ]
+}

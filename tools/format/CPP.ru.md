@@ -35,7 +35,7 @@ POSIX-имена с буквальным обратным слешем тоже 
 CMake 3.25 трактует этот символ как разделитель. Разделители Windows-путей остаются поддержанными.
 
 Автоматический поиск включает tracked и nonignored new файлы из `include/` (`*.hpp`), `src/`
-(`*.cpp`), `tests/conformance/` (`*.cpp`), а также `tools/qtp-inspect/`, `tools/tape-inspect/`,
+(`*.cpp`), `tests/conformance/` (`*.cpp`), а также `tools/qtp-inspect/`, `tools/tape-inspect/`, `tools/tape-write/`,
 `tools/dev/` (`*.cpp`, `*.hpp`). Git C-quoted имена декодируются до отбора.
 Сегменты каталогов `upstream`, `generated` и `fixtures` исключаются. Явный manifest допускает
 `.cpp` и `.hpp` в этих корнях и `.work/` для намеренных контрольных примеров; другие корни/расширения отклоняются.

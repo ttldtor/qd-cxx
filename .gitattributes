@@ -1,4 +1,15 @@
 * text=auto
+# Admission captures and hash inventories retain exact bytes.
+tests/conformance/protocol/tape-write/admission-evidence/** whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+tests/conformance/protocol/tape-write/admission-evidence/inputs/** -text
+tests/conformance/protocol/tape-write/admission-evidence/oracle/** -text
+tests/conformance/protocol/tape-write/admission-evidence/java-observed/** -text
+tests/conformance/protocol/tape-write/admission-evidence/native-comparisons/** -text
+tests/conformance/protocol/tape-write/admission-evidence/rewritten/** -text
+tests/conformance/protocol/tape-write/admission-evidence/synthetic/** -text
+tests/conformance/protocol/tape-write/admission-evidence/logs/** -text -whitespace
+tests/conformance/protocol/tape-write/admission-evidence/*.tsv -text
+tests/conformance/protocol/tape-write/admission-evidence/*.qtp -text
 # Native writer captures and hash inventories retain exact bytes.
 tests/conformance/protocol/tape-write/writer-evidence/** whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
 tests/conformance/protocol/tape-write/writer-evidence/inputs/** -text
@@ -11,6 +22,7 @@ tools/upstream/tape-write-oracle/* text eol=lf
 tests/fixtures/protocol/tape-write/expected/** -text
 tests/fixtures/protocol/tape-write/inputs.tsv text eol=lf
 tests/fixtures/protocol/tape-write/contracts/** text eol=lf
+tests/fixtures/protocol/tape-write/contracts/*.qtp -text
 # Export tool/input hashes use canonical source bytes; captures retain original bytes.
 tools/schema-export/*.java text eol=lf
 tools/schema-export/*.cmake text eol=lf

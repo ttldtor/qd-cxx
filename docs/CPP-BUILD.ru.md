@@ -563,3 +563,30 @@ OFF сохраняет сборку только библиотек. `-DBUILD_TE
 прежних suites остаются включены. Новых production-зависимостей и публичного session framework нет.
 StreamDataResult теперь возвращает списанные `processedRecords`/`wireFields` согласно
 [принятому решению](../spec/protocol/STREAM-DATA.ru.md#aggregate-accounting), без изменения wire или позиций.
+
+## Строгий допуск tape и офлайн-перезапись
+
+`qdcxx_protocol` содержит `qd/protocol/tape_admission.hpp`. `admitTape(schema, bytes, limits)`
+принимает только полную последовательность байтов поддержанного `RAW_MESSAGE_V1`, которую
+успешно завершает новый reader. Проверяются все описания, включая неиспользуемые записи,
+и связывается полный точный исходящий inventory. Move-only `AdmittedTape` возвращается только
+после явного EOF. Token владеет исходными байтами, независимой схемой/layout inventory, descriptor
+и limits. Состояние `valid()` переносится при move; к accessors нельзя обращаться у moved-from
+объекта. При отказе token не публикуется, декодированная история не сохраняется, а диагностика
+возвращает фактические невозвратные расходы работы и пикового логического хранилища.
+
+`AdmissionLimits` раздельно ограничивает байты входа, работу/хранилище reader, inventory layout/schema,
+дополнительную невозвратную работу копирования/посещений и одновременное дополнительное логическое
+хранилище байтов/UTF-16. Scratch counters не включают metadata/capacity allocator и отдельно
+ограниченные внутренние буферы reader. Descriptor должен представляться точно; неподдержанные или
+неоднозначные отображения отклоняются. Граничный sender ID, переполняющий Java, отклоняется без перенумерации.
+
+Необязательный executable `qdcxx-tape-write` включается параметром
+`-DORG_TTLDTOR_QDCXX_BUILD_TAPE_WRITE=ON`; по умолчанию он OFF. Он использует явно выбранную
+встроенную схему или `--schema`, если включён необязательный native JSON loader. Production core/protocol
+библиотеки остаются независимыми от JSON и файлового I/O. Утилита полностью читает и закрывает исходный
+файл до допуска, выполняет отдельный ограниченный проход fresh reader/writer и атомарно публикует
+результат через create-only hard link после проверенного завершения записи. Существующие назначения
+отклоняются; overwrite и rename fallback отсутствуют. См. [контракт tape-write](TAPE-WRITE.ru.md),
+[справку CLI](../tools/tape-write/README.ru.md) и
+[валидацию допуска](../tests/conformance/protocol/tape-write/ADMISSION-VALIDATION.ru.md).

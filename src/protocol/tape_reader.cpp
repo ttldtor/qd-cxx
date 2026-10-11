@@ -325,6 +325,10 @@ TapeReader::TapeReader(const core::LocalSchema &schema, TapeLimits limits, TapeM
     auto empty = StreamDataContext::create(schema_, {}, limits_.context);
 
     if (!empty) {
+        if (empty.error() == BindingError::ALLOCATION_FAILURE) {
+            throw std::bad_alloc();
+        }
+
         throw std::invalid_argument("invalid empty tape context");
     }
 

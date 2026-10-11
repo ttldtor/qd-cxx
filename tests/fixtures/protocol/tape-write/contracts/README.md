@@ -13,6 +13,14 @@ No historical artifact is regenerated through this packet.
 
 ## File grammar
 
+`overlong-int.qtp` is a synthetic binary exception to the text grammar below. Its first 48 bytes
+are the descriptor from the retained native writer contract input. Its type-2 description declares
+sender 37, record `Empty`, and zero fields, encoding sender/count as full nine-byte compact-long
+values 4294967333 and 4294967296. At compact-int positions these become signed low32 values 37
+and 0. One empty RAW_DATA frame and one marker follow. Admission accepts it with `schema.json`;
+strict rewriting must preserve these actions and normalize integer widths. Canonical output has
+61 bytes versus 77 input bytes. This is not Java FileWriter output or a claim of byte-copy rewriting.
+
 All files use UTF-8 without BOM and LF. TSV has one header, exactly the documented columns,
 no quoting/escaping, and one finite case per following line. IDs are unique within each table.
 Decimal signed raw/time values are exact mathematical integers, never parsed through floating

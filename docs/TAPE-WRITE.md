@@ -53,6 +53,9 @@ move-only, with a private constructor. It owns a bounded copy of bytes, schema, 
 outgoing layouts and exact outgoing descriptor. Caller cannot set a public EOF boolean
 or forge a finished token. Library EOF means exhaustion of that supplied complete byte
 sequence; the filesystem caller separately authenticates physical read EOF/close.
+Moving a token makes its source inactive. `valid()` reports this lifecycle state, not a caller-set
+EOF assertion. Consumers refuse inactive tokens before borrowing their contents; accessors require
+an active token and borrowed views expire on move or destruction.
 The source bytes are retained, not an unbounded list of decoded records or frame actions.
 Feed results are released after each bounded frame. No context/view survives its owner.
 
@@ -148,6 +151,16 @@ verification. These are bounded repeated work, not a
 claim that two passes are charged once. Reader cumulative construction/field work is not refunded.
 Input copy, schema/layout duplication and temporary buffers must have checked size arithmetic.
 No untrusted count reaches an unchecked reserve. Logical-unit limits do not bound allocator metadata.
+
+The utility maps the writer's shared descriptor/name visit ledger to the checked sum of
+`--max-descriptor-units` and `--max-description-name-units`. Each retained descriptor and layout
+collection remains separately bounded; repeated comparison, sizing and encoding visits can exhaust
+the shared writer ledger before those retained-size limits. The writer's per-text UTFString limits
+are the descriptor string limits; layout validation additionally enforces `--max-name-units`.
+Physical file work is independently bounded by checked `4 * inputBytes + 68` for reading (including
+geometric-buffer copy work) and `2 * outputBytes + 68` for writing/publication. It does not consume
+the admission/writer traversal ledgers. Each owned native path is bounded to 4096 code units,
+including the generated temporary path; embedded NUL is refused. Arithmetic overflow is exit 6.
 
 ## Publication and same-path refusal
 

@@ -48,12 +48,22 @@ add_library(qdcxx_quote src/events/quote.cpp)
 target_link_libraries(qdcxx_quote PUBLIC qdcxx_event_mapping)
 set_target_properties(qdcxx_quote PROPERTIES CXX_EXTENSIONS OFF)
 
-add_library(qdcxx_protocol src/protocol/frame_reader.cpp src/protocol/describe_records.cpp src/protocol/static_binding.cpp src/protocol/stream_data.cpp src/protocol/tape_reader.cpp src/protocol/tape_writer.cpp)
+add_library(qdcxx_protocol src/protocol/frame_reader.cpp src/protocol/describe_records.cpp src/protocol/static_binding.cpp src/protocol/stream_data.cpp src/protocol/tape_reader.cpp src/protocol/tape_writer.cpp src/protocol/tape_admission.cpp)
 target_link_libraries(qdcxx_protocol PUBLIC qdcxx_encoding qdcxx_core)
 set_target_properties(qdcxx_protocol PROPERTIES CXX_EXTENSIONS OFF)
 
 option(ORG_TTLDTOR_QDCXX_BUILD_TAPE_INSPECT "Build the bounded binary tape diagnostic CLI" OFF)
 option(ORG_TTLDTOR_QDCXX_BUILD_QTP_INSPECT "Build the bounded offline QTP diagnostic CLI" OFF)
+option(ORG_TTLDTOR_QDCXX_BUILD_TAPE_WRITE "Build the strict bounded offline tape writer CLI" OFF)
+if(ORG_TTLDTOR_QDCXX_BUILD_TAPE_WRITE)
+    add_executable(qdcxx_tape_write tools/tape-write/main.cpp tools/tape-write/configuration.cpp tools/tape-write/file_boundary.cpp)
+    target_link_libraries(qdcxx_tape_write PRIVATE qdcxx_protocol qdcxx_quote qdcxx_profile)
+    if(ORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON)
+        target_link_libraries(qdcxx_tape_write PRIVATE qdcxx_schema_json)
+        target_compile_definitions(qdcxx_tape_write PRIVATE ORG_TTLDTOR_QDCXX_HAS_SCHEMA_JSON=1)
+    endif()
+    set_target_properties(qdcxx_tape_write PROPERTIES CXX_EXTENSIONS OFF OUTPUT_NAME "qdcxx-tape-write")
+endif()
 if(ORG_TTLDTOR_QDCXX_BUILD_QTP_INSPECT OR ORG_TTLDTOR_QDCXX_BUILD_TAPE_INSPECT)
     add_library(qdcxx_inspect_tool STATIC tools/qtp-inspect/inspect.cpp tools/qtp-inspect/formatter.cpp)
     target_link_libraries(qdcxx_inspect_tool PUBLIC qdcxx_protocol qdcxx_quote qdcxx_profile)
@@ -89,6 +99,24 @@ if(BUILD_TESTING)
         DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     )
     FetchContent_MakeAvailable(doctest)
+    add_executable(qdcxx_tape_admission_tests tests/conformance/tape_admission_tests.cpp)
+    target_link_libraries(qdcxx_tape_admission_tests PRIVATE qdcxx_protocol doctest::doctest)
+    set_target_properties(qdcxx_tape_admission_tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME protocol_tape_admission COMMAND qdcxx_tape_admission_tests
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/protocol/tape-write/contracts")
+    add_executable(qdcxx_tape_write_file_tests tests/conformance/tape_write_file_tests.cpp tools/tape-write/file_boundary.cpp)
+    target_link_libraries(qdcxx_tape_write_file_tests PRIVATE qdcxx_core doctest::doctest)
+    target_include_directories(qdcxx_tape_write_file_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tools/tape-write")
+    set_target_properties(qdcxx_tape_write_file_tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME tape_write_file_boundary COMMAND qdcxx_tape_write_file_tests)
+    if(ORG_TTLDTOR_QDCXX_BUILD_TAPE_WRITE)
+        add_test(NAME tape_write_cli COMMAND "${CMAKE_COMMAND}"
+            "-DPROGRAM=$<TARGET_FILE:qdcxx_tape_write>" "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DADMISSION_PRODUCER=$<TARGET_FILE:qdcxx_tape_admission_tests>"
+            "-DRUN=${CMAKE_CURRENT_BINARY_DIR}/tape-write-cli"
+            "-DJSON_ENABLED=${ORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/tape_write_cli.cmake")
+    endif()
     add_executable(qdcxx_tape_writer_tests tests/conformance/tape_writer_tests.cpp)
     target_link_libraries(qdcxx_tape_writer_tests PRIVATE qdcxx_protocol qdcxx_quote qdcxx_profile doctest::doctest)
     set_target_properties(qdcxx_tape_writer_tests PROPERTIES CXX_EXTENSIONS OFF)

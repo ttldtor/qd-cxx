@@ -1,0 +1,106 @@
+{
+  "formatVersion": 1,
+  "profile": {
+    "id": "qdcxx-native",
+    "version": 1
+  },
+  "records": [
+    {
+      "id": 0,
+      "name": "AllTypes",
+      "hasTime": false,
+      "fields": [
+        {
+          "serialTypeId": 2
+        },
+        {
+          "serialTypeId": 8
+        },
+        {
+          "serialTypeId": 10
+        },
+        {
+          "serialTypeId": 40
+        },
+        {
+          "serialTypeId": 56
+        },
+        {
+          "serialTypeId": 72
+        },
+        {
+          "serialTypeId": 88
+        },
+        {
+          "serialTypeId": 120
+        }
+      ],
+      "lookups": [
+        {
+          "name": "Char",
+          "fieldId": 0
+        },
+        {
+          "name": "OutgoingChar",
+          "fieldId": 0
+        },
+        {
+          "name": "Count",
+          "fieldId": 1
+        },
+        {
+          "name": "OutgoingCount",
+          "fieldId": 1
+        },
+        {
+          "name": "Text",
+          "fieldId": 2
+        },
+        {
+          "name": "OutgoingText",
+          "fieldId": 2
+        },
+        {
+          "name": "Short",
+          "fieldId": 3
+        },
+        {
+          "name": "OutgoingShort",
+          "fieldId": 3
+        },
+        {
+          "name": "Seconds",
+          "fieldId": 4
+        },
+        {
+          "name": "OutgoingSeconds",
+          "fieldId": 4
+        },
+        {
+          "name": "Sequence",
+          "fieldId": 5
+        },
+        {
+          "name": "OutgoingSequence",
+          "fieldId": 5
+        },
+        {
+          "name": "Date",
+          "fieldId": 6
+        },
+        {
+          "name": "OutgoingDate",
+          "fieldId": 6
+        },
+        {
+          "name": "Wide",
+          "fieldId": 7
+        },
+        {
+          "name": "OutgoingWide",
+          "fieldId": 7
+        }
+      ]
+    }
+  ]
+}

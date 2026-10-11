@@ -109,7 +109,7 @@ else()
         if(line MATCHES "[\r\n]")
             fail("CR/LF-containing filenames are unsupported")
         endif()
-        if(line MATCHES "^(include/.*\\.hpp|src/.*\\.cpp|tests/conformance/.*\\.cpp|tools/(qtp-inspect|tape-inspect|dev)/.*\\.(cpp|hpp))$"
+        if(line MATCHES "^(include/.*\\.hpp|src/.*\\.cpp|tests/conformance/.*\\.cpp|tools/(qtp-inspect|tape-inspect|tape-write|dev)/.*\\.(cpp|hpp))$"
             AND NOT line MATCHES "(^|/)(upstream|generated|fixtures)/")
             jsonString(quoted "${line}")
             string(JSON selected SET "${selected}" ${index} "${quoted}")
@@ -142,7 +142,7 @@ foreach(index RANGE 0 ${last})
     if(WIN32)
         string(TOLOWER "${relative}" relative)
     endif()
-    if(NOT relative MATCHES "^(include/|src/|tests/conformance/|tools/(qtp-inspect|tape-inspect|dev)/|\\.work/)"
+    if(NOT relative MATCHES "^(include/|src/|tests/conformance/|tools/(qtp-inspect|tape-inspect|tape-write|dev)/|\\.work/)"
         OR relative MATCHES "(^|/)(upstream|generated|fixtures)/" OR NOT relative MATCHES "\\.(cpp|hpp)$")
         fail("Outside formatting scope: ${path}")
     endif()
@@ -154,7 +154,7 @@ foreach(index RANGE 0 ${last})
     if(WIN32)
         string(TOLOWER "${relative}" relative)
     endif()
-    if(NOT relative MATCHES "^(include/|src/|tests/conformance/|tools/(qtp-inspect|tape-inspect|dev)/|\\.work/)"
+    if(NOT relative MATCHES "^(include/|src/|tests/conformance/|tools/(qtp-inspect|tape-inspect|tape-write|dev)/|\\.work/)"
         OR relative MATCHES "(^|/)(upstream|generated|fixtures)/" OR NOT relative MATCHES "\\.(cpp|hpp)$")
         fail("Resolved source outside formatting scope: ${path}")
     endif()

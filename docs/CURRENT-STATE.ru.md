@@ -13,11 +13,12 @@
 | QTP | Инкрементальное выделение кадров, исходные описания, неизменяемые обычные локальные схемы, статическое связывание и декодирование полного STREAM_DATA: [кадры](../spec/protocol/FRAMING.ru.md), [описания](../spec/protocol/DESCRIBE-RECORDS.ru.md), [связывание](../spec/protocol/STATIC-BINDING.ru.md), [stream data](../spec/protocol/STREAM-DATA.ru.md). |
 | Офлайн tape | Явные профили legacy STREAM и RAW_DATA/MESSAGE без сжатия, append-only описания, владеющие данные времени, конечные бюджеты работы/владения и терминальные ошибки с завершённым префиксом: [tape reader](../spec/protocol/TAPE-READER.ru.md), [RAW tape](../spec/protocol/RAW-TAPE.ru.md). |
 | Writer tape в памяти | Ограниченная запись RAW_DATA/MESSAGE v1 для точных поддержанных layouts и типов полей, с владеющими фрагментами, конечными бюджетами и терминальными ошибками: [контракт writer](../spec/protocol/TAPE-WRITER.ru.md), [валидация writer](../tests/conformance/protocol/tape-write/WRITER-VALIDATION.ru.md). |
+| Строгий допуск tape | Предварительная проверка всего `RAW_MESSAGE_V1`, точное связывание inventory, владеющий move-only token полного источника, явный EOF и отдельные конечные бюджеты работы/логического scratch: [валидация допуска](../tests/conformance/protocol/tape-write/ADMISSION-VALIDATION.ru.md). |
 | Значения полей | Явные точные полные ID 2/8/10/40/56/72/88/120; nullable UTF-16 хранится с владением, исходные скалярные представления сохраняются: [типы полей](../spec/encoding/FIELD-TYPES.ru.md). Прежние более узкие профили остаются доступными. |
 | События | Default Quote и подготовленные отображения Quote/Profile, привязанные к схеме, с явными локальными ID и сохранением дополнительных/custom полей в общем пути: [default Quote](../spec/protocol/DEFAULT-QUOTE.ru.md), [настраиваемые события](../spec/schema/CONFIGURED-EVENTS.ru.md). |
 | Native JSON | Необязательный загрузчик с отдельно закреплённой зависимостью, владеющие проверенные схемы, типизированные ошибки до I/O tape и общий просмотр: [native JSON](../spec/schema/NATIVE-JSON.ru.md). Core, codecs, protocol и отображения событий независимы от JSON. |
 | Экспорт Java-схем | Офлайн settings/XML источники, полный набор реальных lookup keys, явная логическая проекция storage slots и публикация native JSON без частичного результата при отказе: [контракт экспорта](../spec/schema/JAVA-EXPORT.ru.md), [использование](../tools/schema-export/README.ru.md). Существующие C++ потребители используют сохранённый результат без Java. |
-| Утилиты | Необязательные `qdcxx-qtp-inspect` и `qdcxx-tape-inspect`, конечные бюджеты входа/вывода, TSV/human диагностика и явные профили: [сборка/API](CPP-BUILD.ru.md), [QTP просмотр](QTP-INSPECT.ru.md), [tape просмотр](TAPE-INSPECT.ru.md), [Profile просмотр](PROFILE-INSPECT.ru.md). |
+| Утилиты | Необязательные `qdcxx-qtp-inspect`, `qdcxx-tape-inspect` и строгий офлайн `qdcxx-tape-write`, конечные бюджеты, явные профили и публикация результата только при отсутствии назначения: [сборка/API](CPP-BUILD.ru.md), [QTP просмотр](QTP-INSPECT.ru.md), [tape просмотр](TAPE-INSPECT.ru.md), [запись tape](TAPE-WRITE.ru.md), [Profile просмотр](PROFILE-INSPECT.ru.md). |
 | Инструменты разработки | Нативные UTC-логи и переносимое форматирование через CMake; обычные configure/build/CTest не требуют Python или PowerShell: [инструкции](../tools/dev/README.ru.md). Тестовые зависимости и JSON-загрузчик сохраняют отдельные границы включения. |
 
 ## Доказательства проверок
@@ -36,6 +37,19 @@ replay или поддержку tape целиком.
 Отчёт разделяет production-наблюдения Java, диагностическую проекцию и C++ conformance.
 Отчёты прежних компонентов сохраняют собственные выполненные профили и ограничения. Хеши
 форматтера, captures и исходников относятся к записанным ревизиям, а не к будущим входам.
+
+Доказательства реализации допуска и CLI задачи QDCXX-034 приведены в
+[валидации допуска](../tests/conformance/protocol/tape-write/ADMISSION-VALIDATION.ru.md) и её
+архиве с индексом хешей.
+Windows MSVC x64 Release прошёл полный CTest: 50/50 тестов; прошли две Windows production-only
+матрицы с JSON OFF, включая профиль с необязательными tape-write и inspection tools. Закреплённый
+production Java FileReader прочитал пять итоговых native перезаписей (18 STREAM records, 54 callback
+projections, 152 rows, без ошибок разбора). Целевые Linux GCC ASan+UBSan file-boundary тесты прошли
+12/12; полный Linux Debug набор прошёл 50/50 под Ubuntu 24.04 / WSL2 с GCC 13.3, ASan и UBSan
+(865,93 секунды по CTest). Оба Linux production-only Release-профиля собрались с JSON OFF: минимальный с tools OFF и с QTP inspection, tape inspection и tape-write ON. Итоговые проверки подтвердили отсутствие `_deps` в обоих профилях. В обеих сборках GCC выдал существующее предупреждение `-Wstringop-overflow` в `src/core/wide_decimal.cpp:68`; команды завершились успешно. Проверка
+форматирования C++ прошла для 97 файлов. Doxygen создал страницу API допуска без предупреждений;
+настройка `EXTRACT_ALL` не подтверждает полноту API-документации. Эти результаты не подтверждают
+macOS, враждебные гонки файловой системы или сохранность после сбоя.
 
 ## Известные ограничения
 

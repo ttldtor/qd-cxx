@@ -13,11 +13,12 @@ The project implements selected bounded profiles against Java QD 3.355 at the re
 | QTP | Incremental framing, raw descriptions, immutable ordinary local schemas, static binding and complete STREAM_DATA decoding: [framing](../spec/protocol/FRAMING.md), [descriptions](../spec/protocol/DESCRIBE-RECORDS.md), [binding](../spec/protocol/STATIC-BINDING.md), [stream data](../spec/protocol/STREAM-DATA.md). |
 | Offline tape | Explicit uncompressed legacy STREAM and RAW_DATA/MESSAGE profiles, append-only descriptions, owned timing, finite work/ownership budgets and completed-prefix terminal errors: [tape reader](../spec/protocol/TAPE-READER.md), [RAW tape](../spec/protocol/RAW-TAPE.md). |
 | In-memory tape writer | Bounded RAW_DATA/MESSAGE v1 writer for exact supported layouts and field types, with owned chunks, finite budgets and terminal errors: [writer contract](../spec/protocol/TAPE-WRITER.md), [writer validation](../tests/conformance/protocol/tape-write/WRITER-VALIDATION.md). |
+| Strict tape admission | Whole-input `RAW_MESSAGE_V1` preflight with exact inventory binding, an owned move-only complete-source token, explicit EOF and finite independent work/logical scratch budgets: [admission validation](../tests/conformance/protocol/tape-write/ADMISSION-VALIDATION.md). |
 | Field values | Explicit exact full IDs 2/8/10/40/56/72/88/120; nullable UTF-16 is owned, raw scalar representations are retained: [field types](../spec/encoding/FIELD-TYPES.md). Existing narrower profiles remain available. |
 | Events | Default Quote plus schema-bound prepared Quote/Profile mappings with explicit local IDs and preserved generic extra/custom fields: [default Quote](../spec/protocol/DEFAULT-QUOTE.md), [configured events](../spec/schema/CONFIGURED-EVENTS.md). |
 | Native JSON | Optional separately pinned loader, owned validated schemas, typed errors before tape I/O and generic inspection: [native JSON](../spec/schema/NATIVE-JSON.md). Core, codecs, protocol and event mappings remain JSON-independent. |
 | Java schema export | Offline resolved settings/XML sources, complete actual lookup keys, explicit logical storage-slot projection and failure-safe native JSON publication: [export contract](../spec/schema/JAVA-EXPORT.md), [usage](../tools/schema-export/README.md). Existing C++ consumers use saved outputs without Java. |
-| Utilities | Optional `qdcxx-qtp-inspect` and `qdcxx-tape-inspect`, finite input/output budgets, TSV/human diagnostics and explicit profiles: [build/API](CPP-BUILD.md), [QTP inspection](QTP-INSPECT.md), [tape inspection](TAPE-INSPECT.md), [Profile inspection](PROFILE-INSPECT.md). |
+| Utilities | Optional `qdcxx-qtp-inspect`, `qdcxx-tape-inspect` and strict offline `qdcxx-tape-write`, finite budgets, explicit profiles and create-only output publication: [build/API](CPP-BUILD.md), [QTP inspection](QTP-INSPECT.md), [tape inspection](TAPE-INSPECT.md), [tape writing](TAPE-WRITE.md), [Profile inspection](PROFILE-INSPECT.md). |
 | Developer tools | Native UTC logging and portable CMake formatting; ordinary configure/build/CTest does not require Python or PowerShell: [instructions](../tools/dev/README.md). Test-only dependencies and the JSON loader retain separate opt-in boundaries. |
 
 ## Verification evidence
@@ -35,6 +36,19 @@ errors. These results do not establish macOS, strict file publication, replay or
 The report separates Java production observations from diagnostic projection and C++ conformance.
 Earlier component reports retain their own executed profiles and limits. The formatter, capture
 and source hashes describe their recorded revisions; they are not assertions about future inputs.
+
+QDCXX-034 admission and CLI evidence is recorded separately in
+[admission validation](../tests/conformance/protocol/tape-write/ADMISSION-VALIDATION.md) and its
+hash-indexed archive.
+Windows MSVC x64 Release passed 50/50 full CTest tests; two Windows production-only profiles passed
+with JSON OFF, including one with the optional tape-write and inspection tools enabled. Five final
+native rewrites were read by the locked Java production FileReader (18 STREAM records, 54 callback
+projections, 152 rows, no parse errors). Focused Linux GCC ASan+UBSan file-boundary tests passed
+12/12; the final Linux Debug full suite passed 50/50 under Ubuntu 24.04 / WSL2 with GCC 13.3, ASan
+and UBSan (CTest-reported 865.93 seconds). Both Linux production-only Release profiles built successfully with JSON disabled: minimal tools OFF, and the QTP inspection, tape inspection, and tape-write tools ON. The final checks confirmed that neither profile created `_deps`; see the dependency records in the admission archive. Both builds emitted the existing GCC `-Wstringop-overflow` warning at `src/core/wide_decimal.cpp:68` and exited successfully.
+The C++ format check passed for 97 files. Doxygen generated the admission API page without warnings; its
+`EXTRACT_ALL` setting does not establish complete API documentation. These results do not certify
+macOS, hostile filesystem races or crash durability.
 
 ## Known limits
 

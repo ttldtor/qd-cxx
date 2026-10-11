@@ -1,0 +1,154 @@
+{
+  "formatVersion": 1,
+  "profile": {
+    "id": "qdcxx-native",
+    "version": 1
+  },
+  "records": [
+    {
+      "id": 0,
+      "name": "Profile",
+      "hasTime": false,
+      "fields": [
+        {
+          "serialTypeId": 120
+        },
+        {
+          "serialTypeId": 120
+        },
+        {
+          "serialTypeId": 120
+        },
+        {
+          "serialTypeId": 120
+        },
+        {
+          "serialTypeId": 88
+        },
+        {
+          "serialTypeId": 120
+        },
+        {
+          "serialTypeId": 120
+        },
+        {
+          "serialTypeId": 120
+        },
+        {
+          "serialTypeId": 120
+        },
+        {
+          "serialTypeId": 120
+        },
+        {
+          "serialTypeId": 120
+        },
+        {
+          "serialTypeId": 56
+        },
+        {
+          "serialTypeId": 56
+        },
+        {
+          "serialTypeId": 8
+        },
+        {
+          "serialTypeId": 10
+        },
+        {
+          "serialTypeId": 10
+        }
+      ],
+      "lookups": [
+        {
+          "name": "Beta",
+          "fieldId": 0
+        },
+        {
+          "name": "Eps",
+          "fieldId": 1
+        },
+        {
+          "name": "DivFreq",
+          "fieldId": 2
+        },
+        {
+          "name": "ExdDiv.Amount",
+          "fieldId": 3
+        },
+        {
+          "name": "ExdDivAmount",
+          "fieldId": 3
+        },
+        {
+          "name": "ExdDiv.Date",
+          "fieldId": 4
+        },
+        {
+          "name": "ExdDivDate",
+          "fieldId": 4
+        },
+        {
+          "name": "52High.Price",
+          "fieldId": 5
+        },
+        {
+          "name": "HighPrice52",
+          "fieldId": 5
+        },
+        {
+          "name": "52Low.Price",
+          "fieldId": 6
+        },
+        {
+          "name": "LowPrice52",
+          "fieldId": 6
+        },
+        {
+          "name": "Shares",
+          "fieldId": 7
+        },
+        {
+          "name": "FreeFloat",
+          "fieldId": 8
+        },
+        {
+          "name": "HighLimitPrice",
+          "fieldId": 9
+        },
+        {
+          "name": "LowLimitPrice",
+          "fieldId": 10
+        },
+        {
+          "name": "Halt.StartTime",
+          "fieldId": 11
+        },
+        {
+          "name": "HaltStartTime",
+          "fieldId": 11
+        },
+        {
+          "name": "Halt.EndTime",
+          "fieldId": 12
+        },
+        {
+          "name": "HaltEndTime",
+          "fieldId": 12
+        },
+        {
+          "name": "Flags",
+          "fieldId": 13
+        },
+        {
+          "name": "Description",
+          "fieldId": 14
+        },
+        {
+          "name": "StatusReason",
+          "fieldId": 15
+        }
+      ]
+    }
+  ]
+}

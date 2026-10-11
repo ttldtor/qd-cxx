@@ -35,7 +35,7 @@ POSIX filenames containing a literal backslash are also rejected before tool exe
 CMake 3.25 path grammar treats that character as a separator. Windows path separators remain supported.
 
 Default discovery includes tracked and nonignored new files under `include/` (`*.hpp`), `src/`
-(`*.cpp`), `tests/conformance/` (`*.cpp`), and `tools/qtp-inspect/`, `tools/tape-inspect/`,
+(`*.cpp`), `tests/conformance/` (`*.cpp`), and `tools/qtp-inspect/`, `tools/tape-inspect/`, `tools/tape-write/`,
 `tools/dev/` (`*.cpp`, `*.hpp`). Git C-quoted filenames are decoded before selection.
 `upstream`, `generated` and `fixtures` directory segments are excluded. Explicit manifests admit
 `.cpp` and `.hpp` in those roots and `.work/` for deliberate controls; other roots/extensions fail.
