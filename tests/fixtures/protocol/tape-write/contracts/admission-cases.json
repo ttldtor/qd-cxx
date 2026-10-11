@@ -23,6 +23,7 @@
     {"id": "A19", "change": "replace-RAW-frame-with-STREAM-frame", "expected": "UNSUPPORTED"},
     {"id": "A20", "change": "data-before-description", "expected": "MALFORMED"},
     {"id": "A21", "change": "description-name-unpaired-UTF16", "expected": "MALFORMED"},
-    {"id": "A22", "change": "append-valid-description-then-malformed-description-suffix", "expected": "MALFORMED", "assert": "no-partial-inventory-publish"}
+    {"id": "A22", "change": "append-valid-description-then-malformed-description-suffix", "expected": "MALFORMED", "assert": "no-partial-inventory-publish"},
+    {"id": "A23", "change": "replace-sender37-with-INT32_MAX-in-description-and-data", "expected": "INVALID_LAYOUT", "cause": "writer", "stage": "record-id", "assert": "reader-accepts-but-outgoing-refuses-without-renumbering"}
   ]
 }

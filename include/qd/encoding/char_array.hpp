@@ -7,13 +7,14 @@
 
 #include <optional>
 #include <string>
+#include <string_view>
 
 namespace org::ttldtor::qdcxx::encoding {
 
 /** Mandatory per-value limits; zero is zero allowance, never unlimited. */
 struct CharArrayLimits {
-    std::size_t encodedBytes; ///< Maximum examined prefix and body bytes together.
-    std::size_t codeUnits;    ///< Maximum reserved UTF-16 units, including failed decoding attempts.
+    std::size_t encodedBytes; ///< Maximum examined or written prefix and body bytes together.
+    std::size_t codeUnits;    ///< Maximum written units or reserved units, including failed decoding attempts.
 };
 
 /** Select the observed primitive or enclosing message length check. */
@@ -41,5 +42,18 @@ struct CharArrayResult {
  */
 [[nodiscard]] CharArrayResult readCharArray(std::span<const std::byte> input, CharArrayLimits limits,
                                             CharArrayBoundary boundary = CharArrayBoundary::PRIMITIVE) noexcept;
+
+/** Write a canonical compact-int count and one UTFChar per exact UTF-16 unit atomically.
+ * Null and empty remain distinct; paired and isolated surrogates are never combined.
+ * Count-domain checks precede byte/unit budgets, which precede output capacity checks.
+ * Sizing and encoding each traverse the units once. No allocation or input retention occurs.
+ * @param value Caller-owned nullable units, borrowed only for this call.
+ * @param output Caller-owned writable bytes; excess capacity remains unchanged.
+ * @param limits Required finite prefix/body-byte and UTF-16-unit bounds, including the count prefix.
+ * @return Encoded size on OK; otherwise zero with the whole output unchanged. Invalid counts report
+ * INVALID_LENGTH, budget or size overflow reports RESOURCE_LIMIT, and capacity reports INSUFFICIENT_OUTPUT.
+ */
+[[nodiscard]] WriteResult writeCharArray(std::optional<std::u16string_view> value, std::span<std::byte> output,
+                                         CharArrayLimits limits) noexcept;
 
 } // namespace org::ttldtor::qdcxx::encoding

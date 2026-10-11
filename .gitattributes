@@ -1,4 +1,12 @@
 * text=auto
+# Native writer captures and hash inventories retain exact bytes.
+tests/conformance/protocol/tape-write/writer-evidence/** whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+tests/conformance/protocol/tape-write/writer-evidence/inputs/** -text
+tests/conformance/protocol/tape-write/writer-evidence/oracle/** -text
+tests/conformance/protocol/tape-write/writer-evidence/sender-127/** -text
+tests/conformance/protocol/tape-write/writer-evidence/sender-max/** -text
+tests/conformance/protocol/tape-write/writer-evidence/logs/** -text -whitespace
+tests/conformance/protocol/tape-write/writer-evidence/*.tsv -text
 tools/upstream/tape-write-oracle/* text eol=lf
 tests/fixtures/protocol/tape-write/expected/** -text
 tests/fixtures/protocol/tape-write/inputs.tsv text eol=lf

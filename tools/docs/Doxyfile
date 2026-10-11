@@ -1,0 +1,24 @@
+# Copyright (c) 2026 ttldtor.
+# SPDX-License-Identifier: BSL-1.0
+# Run from the repository root. Generated output is local build material.
+PROJECT_NAME           = qdcxx
+OUTPUT_DIRECTORY       = .work/api
+INPUT                  = include/qd
+FILE_PATTERNS          = *.hpp
+RECURSIVE              = YES
+# Include documented free functions even where legacy files/namespaces lack a group comment.
+# EXTRACT_ALL suppresses missing-member warnings; parameter/markup diagnostics remain enabled.
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = NO
+WARNINGS               = YES
+WARN_IF_UNDOCUMENTED   = YES
+WARN_IF_DOC_ERROR      = YES
+WARN_NO_PARAMDOC       = YES
+WARN_LOGFILE           = .work/api/warnings.log
+QUIET                  = YES
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+HAVE_DOT               = NO
+SOURCE_BROWSER         = YES
+FULL_PATH_NAMES        = NO

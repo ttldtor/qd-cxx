@@ -7,7 +7,7 @@
       {"wireName": "Text", "serialTypeId": 10, "localFieldId": 1},
       {"wireName": "OutgoingCount", "serialTypeId": 8, "localFieldId": 0}
     ]},
-    {"senderId": 2147483647, "localRecordId": 1, "wireName": "Empty", "fields": []}
+    {"senderId": 127, "localRecordId": 1, "wireName": "Empty", "fields": []}
   ],
   "records": [
     {"senderId": 37, "symbolUnits": "", "eventFlags": 0, "values": [
@@ -22,7 +22,7 @@
       {"type": 8, "raw": "0", "units": null},
       {"type": 10, "raw": "0", "units": "d800dc00000a"}
     ]},
-    {"senderId": 2147483647, "symbolUnits": "002a", "eventFlags": 0, "values": []}
+    {"senderId": 127, "symbolUnits": "002a", "eventFlags": 0, "values": []}
   ],
   "actions": [
     {"op": "begin"},
@@ -32,7 +32,7 @@
     {"op": "heartbeat", "content": 1, "timestampMs": "-1"},
     {"op": "data", "recordIndices": [0, 1, 2]},
     {"op": "marker"},
-    {"op": "describe", "senderIds": [2147483647]},
+    {"op": "describe", "senderIds": [127]},
     {"op": "data", "recordIndices": [3]},
     {"op": "data", "recordIndices": []},
     {"op": "describe", "senderIds": []},
@@ -56,6 +56,7 @@
     {"id": "W14", "path": "actions[5].recordIndices", "value": [3], "expected": "INVALID_VALUE", "stage": "unannounced-id"},
     {"id": "W15", "path": "actions[7].senderIds", "value": [37], "expected": "INVALID_VALUE", "stage": "already-announced-id"},
     {"id": "W16", "path": "actions[1].senderIds", "value": [37, 37], "expected": "INVALID_VALUE", "stage": "repeated-description-id"},
-    {"id": "W17", "path": "actions[0].op", "value": "finish", "expected": "INVALID_STATE"}
+    {"id": "W17", "path": "actions[0].op", "value": "finish", "expected": "INVALID_STATE"},
+    {"id": "W18", "path": "layouts[0].senderId", "value": 2147483647, "expected": "INVALID_LAYOUT", "stage": "record-id"}
   ]
 }

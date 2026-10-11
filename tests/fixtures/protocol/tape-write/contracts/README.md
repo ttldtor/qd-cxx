@@ -27,7 +27,7 @@ be absent. Symbol JSON units are always nonnull, with empty text admitted. Names
 schema/layout use ordinary valid Unicode text; lone-surrogate values use hex units only.
 
 `schema.json` is unchanged native version1 grammar, local records Example0 and Empty1.
-`writer-cases.json` supplies immutable sender37→local0 and sender2147483647→local1 layouts.
+`writer-cases.json` supplies immutable sender37→local0 and sender127→local1 layouts.
 Local values Count/Text are deliberately serialized in wire order Text/OutgoingCount. Lookup
 Count precedes OutgoingCount, making first-alias inference visibly wrong. `descriptor.version=null`
 means absent version, `options=""` means present empty opt; descriptor null option means absence,
@@ -43,6 +43,12 @@ No general patch language is required. W07 deliberately has both nonzero flags a
 ID: flags wins after record-attempt budget. Failure returns no current chunk, then every later call
 returns the same first error; retained earlier chunks are compared unchanged.
 
+W18 rejects sender INT32_MAX at `record-id`: the locked Java parser overflows `id + 1`.
+Native layout construction separately accepts INT32_MAX-1 without allocating by that ID;
+do not ask Java to allocate this huge dense mapping as a positive test. The corrected
+sender127 corpus must pass production Java reading. The raw int32 maximum value and
+trailing int64 maximum heartbeat remain unchanged. Reader acceptance is not narrowed.
+
 ## Admission mutations
 
 `admission-cases.json` creates a fresh synthetic wire sequence for each listed `change`, preserving
@@ -53,6 +59,9 @@ and adds an identical local-record name under sender99. A06 repeats sender37 and
 existing reader before strict inventory checks. A08/A09 use exact unsupported full IDs24/137.
 A21 replaces the record name with one UTFString containing lone unit d800; the raw primitive can
 represent it, but the existing description/name validation refuses it.
+A23 changes sender37 to INT32_MAX in both its description and data. The unchanged
+reader can accept it, but admission must retain the writer's INVALID_LAYOUT/record-id
+cause and refuse before an admitted token or output is published; no ID is renumbered.
 
 Malformed or unsupported synthetic descriptions must be assembled with reused primitive writers
 and a test-only envelope builder rather than fed through TapeWriter's validated layout factory.

@@ -12,6 +12,7 @@ The project implements selected bounded profiles against Java QD 3.355 at the re
 | Encoding | Compact int/long acceptance, exact nullable UTF-16 strings, owned symbols, finite budgets and terminal errors: [primitives](../spec/encoding/PRIMITIVES.md), [UTFString](../spec/encoding/UTFSTRING.md), [symbols](../spec/encoding/SYMBOLS.md). |
 | QTP | Incremental framing, raw descriptions, immutable ordinary local schemas, static binding and complete STREAM_DATA decoding: [framing](../spec/protocol/FRAMING.md), [descriptions](../spec/protocol/DESCRIBE-RECORDS.md), [binding](../spec/protocol/STATIC-BINDING.md), [stream data](../spec/protocol/STREAM-DATA.md). |
 | Offline tape | Explicit uncompressed legacy STREAM and RAW_DATA/MESSAGE profiles, append-only descriptions, owned timing, finite work/ownership budgets and completed-prefix terminal errors: [tape reader](../spec/protocol/TAPE-READER.md), [RAW tape](../spec/protocol/RAW-TAPE.md). |
+| In-memory tape writer | Bounded RAW_DATA/MESSAGE v1 writer for exact supported layouts and field types, with owned chunks, finite budgets and terminal errors: [writer contract](../spec/protocol/TAPE-WRITER.md), [writer validation](../tests/conformance/protocol/tape-write/WRITER-VALIDATION.md). |
 | Field values | Explicit exact full IDs 2/8/10/40/56/72/88/120; nullable UTF-16 is owned, raw scalar representations are retained: [field types](../spec/encoding/FIELD-TYPES.md). Existing narrower profiles remain available. |
 | Events | Default Quote plus schema-bound prepared Quote/Profile mappings with explicit local IDs and preserved generic extra/custom fields: [default Quote](../spec/protocol/DEFAULT-QUOTE.md), [configured events](../spec/schema/CONFIGURED-EVENTS.md). |
 | Native JSON | Optional separately pinned loader, owned validated schemas, typed errors before tape I/O and generic inspection: [native JSON](../spec/schema/NATIVE-JSON.md). Core, codecs, protocol and event mappings remain JSON-independent. |
@@ -22,11 +23,14 @@ The project implements selected bounded profiles against Java QD 3.355 at the re
 ## Verification evidence
 
 [Schema-export validation](../tests/conformance/schema-export/VALIDATION.md) records the most recent
-integrated implementation: Windows MSVC Release 45/45 CTest and Linux GCC Debug ASan+UBSan 45/45 in
-the implementation checks. Separate verification reran Windows 45/45, two Linux schema-export
-tests, fresh JDK 8 command tests and targeted diagnostic regressions. The full Linux and
-production-only matrices were not repeated in that separate verification. These are historical
-results, not fresh executions caused by this capability summary.
+schema-export integration. The in-memory writer's final integration evidence is recorded in
+[writer validation](../tests/conformance/protocol/tape-write/WRITER-VALIDATION.md): Windows MSVC
+x64 Release passed 47/47 CTest tests; Linux GCC Debug ASan+UBSan passed the two affected writer and
+char-array tests on the final source, while its 47/47 full-suite run used the initial snapshot
+before the `textUnits` review correction. The final-source Linux production-only Release builds
+passed with tools disabled and enabled (JSON disabled in both). Java 8 FileReader parsed all five
+final native-emitted cases: 18 STREAM records, 54 callback projections, 152 rows and zero parser
+errors. These results do not establish macOS, strict file publication, replay or full tape support.
 
 The report separates Java production observations from diagnostic projection and C++ conformance.
 Earlier component reports retain their own executed profiles and limits. The formatter, capture
@@ -37,12 +41,13 @@ and source hashes describe their recorded revisions; they are not assertions abo
 - Native XML construction, general Java-property resolution and live schema replacement are absent.
   The Java bridge supports only its documented settings and controlled source closure.
 - Indexed schemas, additional full types/conversions, broader options/event flags, dynamic sessions,
-  recovery/compression, writer/replay scheduling and network transport remain outside implemented profiles.
+  recovery/compression, file publication, replay scheduling and network transport remain outside implemented profiles.
 - No adapter beyond the documented Quote/Profile mappings is supplied. Raw timing and field bits
   do not imply business conversions or ticker/history delivery.
 - Private aggregate tape observations in [remaining gaps](REAL-TAPE-GAPS.md) do not establish full-file support.
-- macOS, LeakSanitizer, forced allocation failure and hostile concurrent filesystem behavior are
-  unverified in the latest export validation. XML preflight is not a general hostile-input sandbox.
+- macOS, a separate standalone LeakSanitizer certification and hostile concurrent filesystem
+  behavior remain unverified. Writer allocation-failure paths are covered by focused fault injection;
+  XML preflight is not a general hostile-input sandbox.
 - Priority between invalid configuration and simultaneous output failure remains unspecified;
   see [schema-export validation](../tests/conformance/schema-export/VALIDATION.md).
 

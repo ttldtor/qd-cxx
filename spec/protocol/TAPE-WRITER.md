@@ -4,7 +4,8 @@
 
 This contract defines the outgoing subset `RAW_MESSAGE_V1`: uncompressed BINARY,
 RAW_DATA (5), MESSAGE timing, zero event flags, and ordinary exact full types
-2/8/10/40/56/72/88/120. It defines an API boundary, not an implemented capability.
+2/8/10/40/56/72/88/120. The in-memory writer implements this bounded API; it does
+not provide file I/O or publication.
 [RAW-TAPE](RAW-TAPE.md), [FIELD-TYPES](../encoding/FIELD-TYPES.md),
 [STATIC-BINDING](STATIC-BINDING.md) and existing reader modes retain their behavior.
 No VOID wire field, new representation, indexed record, conversion, event adapter,
@@ -33,6 +34,11 @@ API shape, strict bijection, raw-only symbol normalization, finite budgets and t
 operation atomicity below are deliberate bounded policies. They do not promise Java
 exception parity or byte-identical FileWriter output.
 
+Implementation and integration evidence is summarized in
+[writer validation](../../tests/conformance/protocol/tape-write/WRITER-VALIDATION.md).
+Retained native input/output cases, Java parser observations and platform logs are indexed in
+the writer evidence archive.
+
 ## Immutable layouts and names
 
 `OutgoingField` owns `wireName: u16string`, `serialTypeId: int32_t`, and
@@ -42,7 +48,15 @@ exception parity or byte-identical FileWriter output.
 returns `expected<OutgoingLayouts, WriterDiagnostic>`. It borrows inputs for the call,
 owns a bounded schema copy and layout copy, and exposes const views only.
 
-Sender IDs are in 0..INT32_MAX and distinct from local IDs. No allocation is indexed
+Sender IDs are in 0..INT32_MAX-1 and distinct from local IDs. INT32_MAX is rejected as
+INVALID_LAYOUT at the record-ID check. The locked production parser computes `id + 1`
+in signed Java int in [BinaryQTPParser:501–515](https://github.com/devexperts/QD/blob/0ddc0a09779fb61d74cc0b37c6449ff47dcb715f/qd-core/src/main/java/com/devexperts/qd/qtp/BinaryQTPParser.java#L501);
+INT32_MAX overflows and its later map access fails. Lower large IDs still require a
+dense Java array and remain subject to that JVM's array-length, heap and work limits;
+the numeric range does not promise universal Java resource compatibility. Choose sender
+IDs within the receiving implementation's budgets. The existing reader range is unchanged;
+strict rewriting rejects an unrepresentable outgoing ID rather than renumbering it.
+No allocation in the native writer is indexed
 by the numeric sender ID. Local IDs refer to existing schema records. The record name
 must exactly equal that local record's name. Sender IDs, local IDs and record names are
 unique across this layout set. Multiple incoming sender IDs for one local record are

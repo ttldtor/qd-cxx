@@ -2,6 +2,50 @@
 
 [English version](CPP-BUILD.md). Английская версия является нормативной.
 
+## Ограниченный tape writer в памяти
+
+Подключите `qdcxx_protocol` и `qd/protocol/tape_writer.hpp` для использования
+`org::ttldtor::qdcxx::protocol::OutgoingLayouts` и `TapeWriter`.
+[Контракт writer](../spec/protocol/TAPE-WRITER.ru.md) определяет явное несжатое подмножество
+`RAW_MESSAGE_V1`, точные полные типы 2/8/10/40/56/72/88/120, различия descriptor,
+конечные логические бюджеты и порядок отказов. API не выполняет файловый I/O.
+
+Создайте проверенную `core::LocalSchema`, передайте полные объявления `OutgoingRecord`
+с явными sender ID, local ID и lookup names и вызовите `OutgoingLayouts::create`
+с `LayoutLimits`. Имена и порядок полей задаёт вызывающая сторона; каждое поле выбранной
+локальной записи должно присутствовать ровно один раз. Layouts владеют ограниченными копиями
+схемы/объявлений и открывают const views. Sender ID используют разреженный нативный lookup
+и должны находиться в 0..INT32_MAX-1. Исключённая граница переполняет remapping ID закреплённого
+Java parser; другие большие ID всё ещё могут превысить отдельные ограничения Java dense-array/heap.
+
+`TapeWriter::create(layouts, descriptor, limits)` независимо владеет всей конфигурацией
+до возврата READY. Задайте все поля `WriterLimits`: ноль означает реальную границу.
+`begin()` выдаёт единственный descriptor, `describe(ids)` объявляет одну полную группу,
+а `data(records)` выдаёт один полный RAW_DATA batch со значениями в локальном логическом порядке.
+`heartbeat(value)` и `marker()` сохраняют явные границы frames. `finish()` не выдаёт байтов
+и идемпотентен только после успешного finish. Время и marker не синтезируются.
+
+Каждая операция возвращает `std::expected<WriterChunk, WriterDiagnostic>`. Успешные chunks
+владеют одним полным envelope и остаются действительными после следующих операций или уничтожения
+writer. Views записей заимствуют symbol/value storage только на время `data()`; входные layouts
+и descriptor заимствуются только при построении. Неудачная операция не возвращает байтов,
+не фиксирует объявления или output/frame counters и сохраняет первую terminal diagnostic.
+Последующие вызовы возвращают ту же diagnostic без проверки входов или новых work charges.
+Work/attempt counters сохраняют расходы неудачных попыток. Scratch limits ограничивают закрытое
+логическое хранилище байтов/units, а не накладные расходы allocator или caller-held chunks.
+
+`encoding::writeCharArray` из `qd/encoding/char_array.hpp` пишет nullable точные UTF-16 arrays
+через прежние compact/UTFChar writers, сохраняя null, empty и isolated surrogate units.
+Writer выдаёт raw symbols с FD и повторами FF внутри сообщения. Обещаний кратчайшего cipher
+или побайтового совпадения целого Java tape нет. Writer и primitive checks являются обычными
+CTest targets `protocol_tape_writer` и `encoding_char_array_writer`;
+[валидация writer](../tests/conformance/protocol/tape-write/WRITER-VALIDATION.ru.md) фиксирует
+выполненные профили и отдельные наблюдения production parser.
+
+Для генерации документированной справки C++ API выполните `doxygen tools/docs/Doxyfile`
+из корня репозитория. Начальная HTML-страница — `.work/api/html/index.html`;
+сгенерированная документация остаётся вне отслеживаемого дерева исходников.
+
 ## Офлайн-экспорт Java-схемы
 
 [Необязательный Java-экспортёр](../tools/schema-export/README.ru.md) разрешает допустимые источники

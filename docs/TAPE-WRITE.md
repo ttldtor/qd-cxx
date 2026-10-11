@@ -63,6 +63,7 @@ Feed results are released after each bounded frame. No context/view survives its
 | Description payload | Reparse the complete owning `frame.payload` through existing `parseDescribeRecords`; charge this extra work. Do not derive names/order from final decoded values. |
 | Each record binding | `bindRecord` must return known localRecordId. Check full exact field types, all actions have targets, each local target occurs exactly once and every local target occurs. Any skip, repeated target, missing target or conversion refuses admission. This also applies to zero-field/unused unknown records. |
 | Immutable inventory | No repeated sender ID, local ID or record name, even identical. Appended descriptions are allowed at their original placement; they are immutable. No data uses an unannounced ID. Retain exact supplied wire names/order/sender IDs, never first aliases. |
+| Outgoing ID domain | The writer admits 0..INT32_MAX-1. INT32_MAX must be refused before rewriting, never renumbered. See the [writer contract](../spec/protocol/TAPE-WRITER.md#immutable-layouts-and-names) for the locked Java overflow and separate dense-array resource limits. |
 | Data and heartbeats | Every result succeeds without failed-prefix laundering. Zero flags; canonical tagged values; all accepted empty/bits0/bits1 heartbeat distinctions/timestamps and envelope markers are represented. |
 | Terminal input | Physical read EOF and close succeeded; reader `finish()==FINISHED`. Marker is never EOF authentication. Truncation after a valid prefix or marker refuses the entire rewrite. |
 

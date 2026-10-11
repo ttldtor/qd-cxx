@@ -6,12 +6,67 @@
 #include "qd/encoding/utf_char.hpp"
 
 #include <algorithm>
+#include <array>
 #include <limits>
 #include <new>
 #include <stdexcept>
 #include <utility>
 
 namespace org::ttldtor::qdcxx::encoding {
+
+WriteResult writeCharArray(std::optional<std::u16string_view> value, std::span<std::byte> output,
+                           CharArrayLimits limits) noexcept {
+    constexpr std::int32_t NULL_LENGTH = -1;   ///< Nullable count prefix.
+    constexpr std::size_t MAX_COUNT_BYTES = 5; ///< Full-width compact-int count.
+    constexpr std::size_t MAX_UNIT_BYTES = 3;  ///< One BMP UTFChar, including a surrogate.
+    const auto count = value ? value->size() : 0;
+
+    if (count > static_cast<std::size_t>(std::numeric_limits<std::int32_t>::max())) {
+        return {0, Status::INVALID_LENGTH};
+    }
+
+    if (count > limits.codeUnits) {
+        return {0, Status::RESOURCE_LIMIT};
+    }
+
+    std::array<std::byte, MAX_COUNT_BYTES> prefix{};
+    const auto encoded = writeCompactInt(value ? static_cast<std::int32_t>(count) : NULL_LENGTH, prefix);
+    auto size = encoded.written;
+
+    if (size > limits.encodedBytes) {
+        return {0, Status::RESOURCE_LIMIT};
+    }
+
+    if (value) {
+        std::array<std::byte, MAX_UNIT_BYTES> character{};
+
+        for (const auto unit : *value) {
+            const auto written = writeUtfChar(static_cast<std::int32_t>(unit), character).written;
+
+            // Subtraction checks both the configured bound and size_t representability.
+            if (written > limits.encodedBytes - size) {
+                return {0, Status::RESOURCE_LIMIT};
+            }
+
+            size += written;
+        }
+    }
+
+    if (size > output.size()) {
+        return {0, Status::INSUFFICIENT_OUTPUT};
+    }
+
+    std::copy_n(prefix.begin(), encoded.written, output.begin());
+    auto position = encoded.written;
+
+    if (value) {
+        for (const auto unit : *value) {
+            position += writeUtfChar(static_cast<std::int32_t>(unit), output.subspan(position)).written;
+        }
+    }
+
+    return {position, Status::OK};
+}
 
 CharArrayResult readCharArray(std::span<const std::byte> input, CharArrayLimits limits,
                               CharArrayBoundary boundary) noexcept {

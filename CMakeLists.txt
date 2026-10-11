@@ -48,7 +48,7 @@ add_library(qdcxx_quote src/events/quote.cpp)
 target_link_libraries(qdcxx_quote PUBLIC qdcxx_event_mapping)
 set_target_properties(qdcxx_quote PROPERTIES CXX_EXTENSIONS OFF)
 
-add_library(qdcxx_protocol src/protocol/frame_reader.cpp src/protocol/describe_records.cpp src/protocol/static_binding.cpp src/protocol/stream_data.cpp src/protocol/tape_reader.cpp)
+add_library(qdcxx_protocol src/protocol/frame_reader.cpp src/protocol/describe_records.cpp src/protocol/static_binding.cpp src/protocol/stream_data.cpp src/protocol/tape_reader.cpp src/protocol/tape_writer.cpp)
 target_link_libraries(qdcxx_protocol PUBLIC qdcxx_encoding qdcxx_core)
 set_target_properties(qdcxx_protocol PROPERTIES CXX_EXTENSIONS OFF)
 
@@ -89,6 +89,16 @@ if(BUILD_TESTING)
         DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     )
     FetchContent_MakeAvailable(doctest)
+    add_executable(qdcxx_tape_writer_tests tests/conformance/tape_writer_tests.cpp)
+    target_link_libraries(qdcxx_tape_writer_tests PRIVATE qdcxx_protocol qdcxx_quote qdcxx_profile doctest::doctest)
+    set_target_properties(qdcxx_tape_writer_tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME protocol_tape_writer COMMAND qdcxx_tape_writer_tests
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/protocol/tape-write/contracts")
+    add_executable(qdcxx_char_array_writer_tests tests/conformance/char_array_writer_tests.cpp)
+    target_link_libraries(qdcxx_char_array_writer_tests PRIVATE qdcxx_encoding doctest::doctest)
+    set_target_properties(qdcxx_char_array_writer_tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME encoding_char_array_writer COMMAND qdcxx_char_array_writer_tests
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/protocol/tape-write/contracts")
     if(ORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON)
         add_executable(qdcxx_schema_json_tests tests/conformance/schema_json_tests.cpp)
         target_link_libraries(qdcxx_schema_json_tests PRIVATE qdcxx_schema_json doctest::doctest)

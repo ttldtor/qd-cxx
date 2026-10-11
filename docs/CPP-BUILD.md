@@ -2,6 +2,50 @@
 
 [Русская версия](CPP-BUILD.ru.md). English is authoritative.
 
+## Bounded in-memory tape writer
+
+Link `qdcxx_protocol` and include `qd/protocol/tape_writer.hpp` to use
+`org::ttldtor::qdcxx::protocol::OutgoingLayouts` and `TapeWriter`. The
+[writer contract](../spec/protocol/TAPE-WRITER.md) defines the explicit uncompressed
+`RAW_MESSAGE_V1` subset, exact full types 2/8/10/40/56/72/88/120, descriptor distinctions,
+finite logical budgets and failure precedence. This API performs no file I/O.
+
+Build a validated `core::LocalSchema`, supply complete `OutgoingRecord` declarations with
+explicit sender IDs, local IDs and lookup names, and call `OutgoingLayouts::create` with
+`LayoutLimits`. Names and field order are supplied by the caller; every selected local field
+appears exactly once. Layouts own bounded schema/declaration copies and expose const views.
+Sender IDs use a sparse native lookup and must be in 0..INT32_MAX-1. The excluded endpoint
+overflows the locked Java parser's ID remapping; other large IDs can still exceed Java's
+separate dense-array/heap bounds.
+
+`TapeWriter::create(layouts, descriptor, limits)` independently owns the full configuration
+before returning READY. Supply all members of `WriterLimits`: zero is a real allowance.
+`begin()` emits the sole descriptor, `describe(ids)` announces one complete group, and
+`data(records)` emits one complete RAW_DATA batch with values in local logical order.
+`heartbeat(value)` and `marker()` preserve explicit frame boundaries. `finish()` emits no
+bytes and is idempotent only after successful finish. No time or marker is synthesized.
+
+Each operation returns `std::expected<WriterChunk, WriterDiagnostic>`. Successful chunks own
+one complete envelope and remain valid after later operations or writer destruction. Record
+views borrow symbol/value storage only for `data()`; layouts and descriptor inputs are borrowed
+only during construction. A failed operation returns no bytes, commits no announcements or
+output/frame counters, and retains its first terminal diagnostic. Later calls return that
+same diagnostic without examining inputs or charging work. Work/attempt counters retain
+charges from failures. Scratch limits bound private logical byte/unit storage, not allocator
+overhead or caller-held chunks.
+
+`encoding::writeCharArray` in `qd/encoding/char_array.hpp` writes nullable exact UTF-16 arrays
+through existing compact/UTFChar writers, preserving null, empty and isolated surrogate units.
+The writer emits raw symbols with FD and message-local FF repeats. It makes no shortest-cipher
+or byte-identical whole-Java-tape promise. Writer and primitive checks are normal CTest targets
+`protocol_tape_writer` and `encoding_char_array_writer`; the
+[writer validation](../tests/conformance/protocol/tape-write/WRITER-VALIDATION.md) records the
+executed profiles and separate production-parser observations.
+
+To generate the documented C++ API reference, run `doxygen tools/docs/Doxyfile` from the
+repository root. The generated HTML entry point is `.work/api/html/index.html`;
+generated documentation remains outside the tracked source tree.
+
 ## Offline Java schema export
 
 The [optional Java exporter](../tools/schema-export/README.md) resolves permitted locked Java

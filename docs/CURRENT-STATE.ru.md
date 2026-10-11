@@ -12,6 +12,7 @@
 | Кодировки | Принимаемые формы compact int/long, точные nullable UTF-16 строки, владеющие символы, конечные бюджеты и терминальные ошибки: [примитивы](../spec/encoding/PRIMITIVES.ru.md), [UTFString](../spec/encoding/UTFSTRING.ru.md), [символы](../spec/encoding/SYMBOLS.ru.md). |
 | QTP | Инкрементальное выделение кадров, исходные описания, неизменяемые обычные локальные схемы, статическое связывание и декодирование полного STREAM_DATA: [кадры](../spec/protocol/FRAMING.ru.md), [описания](../spec/protocol/DESCRIBE-RECORDS.ru.md), [связывание](../spec/protocol/STATIC-BINDING.ru.md), [stream data](../spec/protocol/STREAM-DATA.ru.md). |
 | Офлайн tape | Явные профили legacy STREAM и RAW_DATA/MESSAGE без сжатия, append-only описания, владеющие данные времени, конечные бюджеты работы/владения и терминальные ошибки с завершённым префиксом: [tape reader](../spec/protocol/TAPE-READER.ru.md), [RAW tape](../spec/protocol/RAW-TAPE.ru.md). |
+| Writer tape в памяти | Ограниченная запись RAW_DATA/MESSAGE v1 для точных поддержанных layouts и типов полей, с владеющими фрагментами, конечными бюджетами и терминальными ошибками: [контракт writer](../spec/protocol/TAPE-WRITER.ru.md), [валидация writer](../tests/conformance/protocol/tape-write/WRITER-VALIDATION.ru.md). |
 | Значения полей | Явные точные полные ID 2/8/10/40/56/72/88/120; nullable UTF-16 хранится с владением, исходные скалярные представления сохраняются: [типы полей](../spec/encoding/FIELD-TYPES.ru.md). Прежние более узкие профили остаются доступными. |
 | События | Default Quote и подготовленные отображения Quote/Profile, привязанные к схеме, с явными локальными ID и сохранением дополнительных/custom полей в общем пути: [default Quote](../spec/protocol/DEFAULT-QUOTE.ru.md), [настраиваемые события](../spec/schema/CONFIGURED-EVENTS.ru.md). |
 | Native JSON | Необязательный загрузчик с отдельно закреплённой зависимостью, владеющие проверенные схемы, типизированные ошибки до I/O tape и общий просмотр: [native JSON](../spec/schema/NATIVE-JSON.ru.md). Core, codecs, protocol и отображения событий независимы от JSON. |
@@ -21,12 +22,16 @@
 
 ## Доказательства проверок
 
-[Валидация экспорта схем](../tests/conformance/schema-export/VALIDATION.ru.md) описывает последнюю
-интегрированную реализацию: Windows MSVC Release 45/45 CTest и Linux GCC Debug ASan+UBSan 45/45 при
-проверках реализации. Отдельная проверка повторила Windows 45/45, два Linux schema-export теста,
-fresh JDK 8 command tests и целевые регрессии диагностики. Полная Linux-матрица и production-only
-сборки в этой отдельной проверке не повторялись. Это исторические результаты, а не новые запуски
-из-за обновления сводки возможностей.
+[Валидация экспорта схем](../tests/conformance/schema-export/VALIDATION.ru.md) описывает
+интеграцию schema-export. Итоговые интеграционные доказательства writer приведены в
+[валидации writer](../tests/conformance/protocol/tape-write/WRITER-VALIDATION.ru.md): Windows
+MSVC x64 Release прошёл 47/47 CTest тестов; Linux GCC Debug ASan+UBSan на финальном исходнике
+прошёл два затронутых теста writer и char-array, тогда как полный прогон 47/47 использовал
+начальный snapshot до исправления `textUnits` после ревью. Финальные Linux production-only Release
+сборки прошли с выключенными и включёнными tools (JSON выключен в обеих). Java 8 FileReader
+прочитал все пять финальных native-emitted cases: 18 STREAM records, 54 callback projections,
+152 rows и ноль ошибок parser. Эти результаты не подтверждают macOS, строгую публикацию файлов,
+replay или поддержку tape целиком.
 
 Отчёт разделяет production-наблюдения Java, диагностическую проекцию и C++ conformance.
 Отчёты прежних компонентов сохраняют собственные выполненные профили и ограничения. Хеши
@@ -37,12 +42,13 @@ fresh JDK 8 command tests и целевые регрессии диагност�
 - Нативное построение XML-схем, общее разрешение Java properties и замена схем во время работы отсутствуют.
   Java-мост поддерживает только документированные settings и контролируемое замыкание источников.
 - Индексные схемы, дополнительные полные типы/преобразования, остальные options/event flags,
-  динамические сессии, восстановление/сжатие, writer/replay scheduling и сетевой транспорт вне реализованных профилей.
+  динамические сессии, восстановление/сжатие, публикация файлов, replay scheduling и сетевой транспорт вне реализованных профилей.
 - Адаптеры кроме документированных отображений Quote/Profile не предоставляются. Исходные данные
   времени и биты полей не подразумевают бизнес-преобразования или доставку ticker/history.
 - Агрегированные наблюдения частного tape в [оставшихся пробелах](REAL-TAPE-GAPS.ru.md) не доказывают поддержку всего файла.
-- macOS, LeakSanitizer, принудительный allocation failure и hostile concurrent filesystem не проверены
-  в последней валидации экспорта. XML preflight не является общей песочницей для враждебного входа.
+- macOS, отдельная standalone сертификация LeakSanitizer и hostile concurrent filesystem остаются
+  непроверенными. Пути отказа allocation у writer покрыты focused fault injection; XML preflight не
+  является общей песочницей для враждебного входа.
 - Приоритет неверной конфигурации и одновременного отказа вывода не определён;
   см. [валидацию экспорта схем](../tests/conformance/schema-export/VALIDATION.ru.md).
 
