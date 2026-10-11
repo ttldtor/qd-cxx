@@ -1,0 +1,28 @@
+{
+  "format": "qdcxx-tape-admission-contract", "version": 1,
+  "schema": "schema.json", "baseWriter": "writer-cases.json",
+  "cases": [
+    {"id": "A01", "change": "none", "expected": "ADMITTED", "assert": "preserve-fields-permutation-and-append-placement"},
+    {"id": "A02", "change": "append-description", "description": {"senderId": 99, "name": "Unknown", "fields": []}, "useInData": false, "expected": "UNKNOWN_RECORD"},
+    {"id": "A03", "change": "append-field-to-description-37", "field": {"name": "Unknown", "type": 8}, "useInData": false, "expected": "SKIPPED_FIELD"},
+    {"id": "A04", "change": "replace-count-name-with-Text-and-type-with-10", "expected": "REPEATED_TARGET"},
+    {"id": "A05", "change": "remove-count-field-from-description-37", "expected": "MISSING_TARGET"},
+    {"id": "A06", "change": "append-identical-description-37", "expected": "MALFORMED", "stage": "reader-duplicate-sender-id"},
+    {"id": "A07", "change": "append-description-Example-with-new-sender-99", "expected": "DUPLICATE_LAYOUT_IDENTITY"},
+    {"id": "A08", "change": "replace-type10-with-full24", "expected": "UNSUPPORTED"},
+    {"id": "A09", "change": "replace-type8-with-full137", "expected": "UNSUPPORTED"},
+    {"id": "A10", "change": "append-descriptor-unknown-property", "expected": "UNSUPPORTED"},
+    {"id": "A11", "change": "set-descriptor-opt-null-value-present", "expected": "UNSUPPORTED"},
+    {"id": "A12", "change": "set-descriptor-time-MESSAGE", "expected": "ADMITTED", "assert": "retain-uppercase-spelling"},
+    {"id": "A13", "change": "remove-descriptor-opt-and-version-and-send-entry", "expected": "ADMITTED", "assert": "retain-absent-versus-empty"},
+    {"id": "A14", "change": "set-descriptor-version-empty-opt-hs", "expected": "ADMITTED", "assert": "retain-empty-version-and-hs"},
+    {"id": "A15", "change": "append-raw-nonzero-flags", "expected": "UNSUPPORTED"},
+    {"id": "A16", "change": "append-heartbeat-bits2-timeMark0", "expected": "UNSUPPORTED"},
+    {"id": "A17", "change": "append-marker-then-truncated-envelope-prefix", "expected": "MALFORMED", "assert": "marker-is-not-eof"},
+    {"id": "A18", "change": "set-descriptor-time-FIELD", "expected": "UNSUPPORTED"},
+    {"id": "A19", "change": "replace-RAW-frame-with-STREAM-frame", "expected": "UNSUPPORTED"},
+    {"id": "A20", "change": "data-before-description", "expected": "MALFORMED"},
+    {"id": "A21", "change": "description-name-unpaired-UTF16", "expected": "MALFORMED"},
+    {"id": "A22", "change": "append-valid-description-then-malformed-description-suffix", "expected": "MALFORMED", "assert": "no-partial-inventory-publish"}
+  ]
+}

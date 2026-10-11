@@ -1,0 +1,20 @@
+{
+  "format": "qdcxx-description-heavy-contract", "version": 1,
+  "recordCount": 128,
+  "localId": "i",
+  "senderId": "37+i",
+  "recordName": "Example followed by exactly three zero-padded ASCII decimal digits of i",
+  "field": {"serialTypeId": 8, "localFieldId": 0, "wireName": "OutgoingCount"},
+  "lookups": [{"name": "Count", "fieldId": 0}, {"name": "OutgoingCount", "fieldId": 0}],
+  "descriptor": {"version": null, "options": "", "time": "message", "explicitRawSend": true},
+  "actions": ["begin", "describe-all-in-increasing-i", "data-one-per-record-in-increasing-i", "finish"],
+  "data": {"symbolUnits": "00490042004d", "type": 8, "raw": "0", "units": null, "eventFlags": 0},
+  "independentWriterScratchBytes": 1048585,
+  "independentWriterScratchUnits": 32768,
+  "allOtherCliLimits": "defaults in TAPE-WRITE; require baseline success before varying only admission-scratch-units",
+  "inputRecordNameUnits": 1280,
+  "inputWireFieldNameUnits": 1664,
+  "oneRawDescriptionCollectionUnits": 2944,
+  "oneOutgoingLayoutCollectionUnits": 2944,
+  "localSchemaNameAndLookupUnits": 3584
+}

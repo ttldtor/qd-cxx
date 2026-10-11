@@ -2,6 +2,7 @@
 tools/upstream/tape-write-oracle/* text eol=lf
 tests/fixtures/protocol/tape-write/expected/** -text
 tests/fixtures/protocol/tape-write/inputs.tsv text eol=lf
+tests/fixtures/protocol/tape-write/contracts/** text eol=lf
 # Export tool/input hashes use canonical source bytes; captures retain original bytes.
 tools/schema-export/*.java text eol=lf
 tools/schema-export/*.cmake text eol=lf

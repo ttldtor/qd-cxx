@@ -1,0 +1,16 @@
+{
+  "formatVersion": 1,
+  "profile": {"id": "qdcxx-native", "version": 1},
+  "records": [
+    {
+      "id": 0, "name": "Example", "hasTime": false,
+      "fields": [{"serialTypeId": 8}, {"serialTypeId": 10}],
+      "lookups": [
+        {"name": "Count", "fieldId": 0},
+        {"name": "OutgoingCount", "fieldId": 0},
+        {"name": "Text", "fieldId": 1}
+      ]
+    },
+    {"id": 1, "name": "Empty", "hasTime": false, "fields": [], "lookups": []}
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "format": "qdcxx-tape-writer-contract", "version": 1,
+  "schema": "schema.json",
+  "descriptor": {"version": null, "options": "", "time": "message", "explicitRawSend": true},
+  "layouts": [
+    {"senderId": 37, "localRecordId": 0, "wireName": "Example", "fields": [
+      {"wireName": "Text", "serialTypeId": 10, "localFieldId": 1},
+      {"wireName": "OutgoingCount", "serialTypeId": 8, "localFieldId": 0}
+    ]},
+    {"senderId": 2147483647, "localRecordId": 1, "wireName": "Empty", "fields": []}
+  ],
+  "records": [
+    {"senderId": 37, "symbolUnits": "", "eventFlags": 0, "values": [
+      {"type": 8, "raw": "-2147483648", "units": null},
+      {"type": 10, "raw": "0", "units": null}
+    ]},
+    {"senderId": 37, "symbolUnits": "", "eventFlags": 0, "values": [
+      {"type": 8, "raw": "2147483647", "units": null},
+      {"type": 10, "raw": "0", "units": ""}
+    ]},
+    {"senderId": 37, "symbolUnits": "d8000000dc00", "eventFlags": 0, "values": [
+      {"type": 8, "raw": "0", "units": null},
+      {"type": 10, "raw": "0", "units": "d800dc00000a"}
+    ]},
+    {"senderId": 2147483647, "symbolUnits": "002a", "eventFlags": 0, "values": []}
+  ],
+  "actions": [
+    {"op": "begin"},
+    {"op": "describe", "senderIds": [37]},
+    {"op": "heartbeat", "content": null, "timestampMs": null},
+    {"op": "heartbeat", "content": 0, "timestampMs": null},
+    {"op": "heartbeat", "content": 1, "timestampMs": "-1"},
+    {"op": "data", "recordIndices": [0, 1, 2]},
+    {"op": "marker"},
+    {"op": "describe", "senderIds": [2147483647]},
+    {"op": "data", "recordIndices": [3]},
+    {"op": "data", "recordIndices": []},
+    {"op": "describe", "senderIds": []},
+    {"op": "heartbeat", "content": 1, "timestampMs": "9223372036854775807"},
+    {"op": "finish"}
+  ],
+  "mutations": [
+    {"id": "W01", "path": "layouts[0].senderId", "value": -1, "expected": "INVALID_LAYOUT"},
+    {"id": "W02", "path": "layouts[1].senderId", "value": 37, "expected": "INVALID_LAYOUT"},
+    {"id": "W03", "path": "layouts[1].localRecordId", "value": 0, "expected": "INVALID_LAYOUT"},
+    {"id": "W04", "path": "layouts[0].fields[1].localFieldId", "value": 1, "expected": "INVALID_LAYOUT"},
+    {"id": "W05", "path": "layouts[0].fields[1].wireName", "value": "Unknown", "expected": "INVALID_LAYOUT"},
+    {"id": "W06", "path": "layouts[0].fields[0].serialTypeId", "value": 8, "expected": "UNSUPPORTED"},
+    {"id": "W07", "path": "records[0].eventFlags", "value": 1, "also": {"path": "records[0].senderId", "value": -1}, "expected": "UNSUPPORTED", "stage": "flags"},
+    {"id": "W08", "path": "records[0].values[0].raw", "value": "2147483648", "expected": "INVALID_VALUE"},
+    {"id": "W09", "path": "records[0].values[1].raw", "value": "1", "expected": "INVALID_VALUE"},
+    {"id": "W10", "path": "records[0].values[0].units", "value": "", "expected": "INVALID_VALUE"},
+    {"id": "W11", "path": "descriptor.options", "value": "hs,unknown", "expected": "UNSUPPORTED"},
+    {"id": "W12", "path": "descriptor.time", "value": "NONE", "expected": "UNSUPPORTED"},
+    {"id": "W13", "path": "actions[2].timestampMs", "value": "0", "expected": "INVALID_VALUE"},
+    {"id": "W14", "path": "actions[5].recordIndices", "value": [3], "expected": "INVALID_VALUE", "stage": "unannounced-id"},
+    {"id": "W15", "path": "actions[7].senderIds", "value": [37], "expected": "INVALID_VALUE", "stage": "already-announced-id"},
+    {"id": "W16", "path": "actions[1].senderIds", "value": [37, 37], "expected": "INVALID_VALUE", "stage": "repeated-description-id"},
+    {"id": "W17", "path": "actions[0].op", "value": "finish", "expected": "INVALID_STATE"}
+  ]
+}
