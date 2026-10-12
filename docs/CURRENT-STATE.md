@@ -14,6 +14,7 @@ The project implements selected bounded profiles against Java QD 3.355 at the re
 | Offline tape | Explicit uncompressed legacy STREAM and RAW_DATA/MESSAGE profiles, append-only descriptions, owned timing, finite work/ownership budgets and completed-prefix terminal errors: [tape reader](../spec/protocol/TAPE-READER.md), [RAW tape](../spec/protocol/RAW-TAPE.md). |
 | In-memory tape writer | Bounded RAW_DATA/MESSAGE v1 writer for exact supported layouts and field types, with owned chunks, finite budgets and terminal errors: [writer contract](../spec/protocol/TAPE-WRITER.md), [writer validation](../tests/conformance/protocol/tape-write/WRITER-VALIDATION.md). |
 | Strict tape admission | Whole-input `RAW_MESSAGE_V1` preflight with exact inventory binding, an owned move-only complete-source token, explicit EOF and finite independent work/logical scratch budgets: [admission validation](../tests/conformance/protocol/tape-write/ADMISSION-VALIDATION.md). |
+| Offline replay | Optional synchronous `qdcxx_replay` library over admitted immutable tapes, explicit `IMMEDIATE`/`RELATIVE` scheduling, finite per-session bounds and caller-owned callbacks: [contract](../spec/protocol/OFFLINE-REPLAY.md), [validation](../tests/conformance/replay/VALIDATION.md). |
 | Field values | Explicit exact full IDs 2/8/10/40/56/72/88/120; nullable UTF-16 is owned, raw scalar representations are retained: [field types](../spec/encoding/FIELD-TYPES.md). Existing narrower profiles remain available. |
 | Events | Default Quote plus schema-bound prepared Quote/Profile mappings with explicit local IDs and preserved generic extra/custom fields: [default Quote](../spec/protocol/DEFAULT-QUOTE.md), [configured events](../spec/schema/CONFIGURED-EVENTS.md). |
 | Native JSON | Optional separately pinned loader, owned validated schemas, typed errors before tape I/O and generic inspection: [native JSON](../spec/schema/NATIVE-JSON.md). Core, codecs, protocol and event mappings remain JSON-independent. |
@@ -31,7 +32,7 @@ char-array tests on the final source, while its 47/47 full-suite run used the in
 before the `textUnits` review correction. The final-source Linux production-only Release builds
 passed with tools disabled and enabled (JSON disabled in both). Java 8 FileReader parsed all five
 final native-emitted cases: 18 STREAM records, 54 callback projections, 152 rows and zero parser
-errors. These results do not establish macOS, strict file publication, replay or full tape support.
+errors. These results do not establish macOS, strict file publication or full tape support.
 
 The report separates Java production observations from diagnostic projection and C++ conformance.
 Earlier component reports retain their own executed profiles and limits. The formatter, capture
@@ -50,12 +51,14 @@ The C++ format check passed for 97 files. Doxygen generated the admission API pa
 `EXTRACT_ALL` setting does not establish complete API documentation. These results do not certify
 macOS, hostile filesystem races or crash durability.
 
+Replay validation records 9 cases / 1,303 assertions in the final focused Windows target run and a separate independent run. A standalone consumer compiled and ran with the documented macro guards. Full Windows and Linux sanitizer suites and production-only profiles passed. See [replay validation](../tests/conformance/replay/VALIDATION.md) for the recorded results and limits.
+
 ## Known limits
 
 - Native XML construction, general Java-property resolution and live schema replacement are absent.
   The Java bridge supports only its documented settings and controlled source closure.
 - Indexed schemas, additional full types/conversions, broader options/event flags, dynamic sessions,
-  recovery/compression, file publication, replay scheduling and network transport remain outside implemented profiles.
+  recovery/compression, broader file-publication policies, real-clock integration, replay CLI and network transport remain outside implemented profiles.
 - No adapter beyond the documented Quote/Profile mappings is supplied. Raw timing and field bits
   do not imply business conversions or ticker/history delivery.
 - Private aggregate tape observations in [remaining gaps](REAL-TAPE-GAPS.md) do not establish full-file support.

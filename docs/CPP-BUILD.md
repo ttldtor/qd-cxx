@@ -46,6 +46,45 @@ To generate the documented C++ API reference, run `doxygen tools/docs/Doxyfile` 
 repository root. The generated HTML entry point is `.work/api/html/index.html`;
 generated documentation remains outside the tracked source tree.
 
+## Synchronous offline replay
+
+The optional `qdcxx_replay` library is enabled with
+`ORG_TTLDTOR_QDCXX_BUILD_REPLAY=ON` (default OFF). Link to `qdcxx_replay` (it exposes\n`qdcxx_protocol` as a public dependency) and include
+`qd/replay/tape_replay.hpp` to call `org::ttldtor::qdcxx::replay::replayTape` on an immutable
+`protocol::AdmittedTape`. It is a synchronous, in-process library API: there is no replay executable,
+filesystem access, JSON dependency, transport, worker thread, background task or implicit clock. The
+caller supplies finite `ReplayLimits`, an observer, cancellation poll, and monotonic clock/wait
+boundary; all borrowed objects must outlive the call.
+
+Choose `IMMEDIATE` to deliver in wire order without clock sampling or waiting, or `RELATIVE` to
+schedule nonempty data frames from the first present raw timestamp. Relative waits are injected,
+checked monotonic deadlines in bounded slices. Empty data frames do not affect scheduling anchors or
+range calculations. Raw tape timing and business fields are preserved; business timestamps do not
+control scheduling. Callback record references expire when `onRecord` returns, so copy retained
+values in the callback. Failed frames deliver no completed prefix; earlier successful callbacks are
+not rolled back. Clean parser EOF and the final cancellation poll precede the single observer
+`finish()` call.
+
+On Windows, the replay enumerator `ReplayPolicy::RELATIVE` can collide with a `RELATIVE` macro from
+Windows headers, and existing core headers call `std::numeric_limits<T>::min()` / `max()`, which the Windows `min`/`max` macros also break. For the tested include sequence,
+define `NOMINMAX` before Windows headers and undefine `RELATIVE` after all Windows headers but before
+the replay header:
+
+```cpp
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <Windows.h>
+#ifdef RELATIVE
+#undef RELATIVE
+#endif
+#include "qd/replay/tape_replay.hpp"
+```
+
+This consumer-side workaround was verified with a standalone Windows consumer; it does not establish
+compatibility for every header order. The [replay contract](../spec/protocol/OFFLINE-REPLAY.md)
+defines ownership, counters, timing, cancellation and failure precedence. [Validation evidence](../tests/conformance/replay/VALIDATION.md) records checked profiles and remaining matrix limits.
+
 ## Offline Java schema export
 
 The [optional Java exporter](../tools/schema-export/README.md) resolves permitted locked Java

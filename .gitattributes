@@ -505,3 +505,6 @@ tests/conformance/tooling/evidence/review-12/windows-ctest.log -whitespace
 tests/conformance/tooling/evidence/review-12/windows-denied-before-retry.log -whitespace
 tests/conformance/tooling/evidence/review-12/windows-denied-before.log -whitespace
 tests/conformance/tooling/evidence/review-12/preservation.json -whitespace
+tests/conformance/replay/evidence/logs/** -text -whitespace
+tests/conformance/replay/evidence/profiles/** -text -whitespace
+tests/conformance/replay/evidence/*.tsv -text -whitespace

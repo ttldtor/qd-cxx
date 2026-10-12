@@ -40,7 +40,10 @@ option is implied by enabling this library.
 
 `replayTape(const protocol::AdmittedTape&, ReplayObserver&, ReplayClock&, ReplayCancellation&, ReplayLimits, ReplayPolicy)`
 returns `ReplayResult`. The immutable admitted tape and callback objects are borrowed for this
-synchronous call only; all must outlive it and remain unchanged. No pointers are retained after
+synchronous call only; all must outlive it. The tape and its owned storage remain unchanged.
+Callback objects keep their identity and lifetime throughout the call: no external concurrent or
+reentrant mutation, move, replacement or destruction. Their own methods may update internal state
+as defined by the callback contract. No pointers are retained after
 return, no callback runs on another thread, and no background work or detached wait survives.
 The caller owns callback object destruction. Independent calls share no mutable replay state.
 Reentrant/concurrent use of the same callback objects is outside this single-threaded contract.
@@ -62,6 +65,11 @@ exceptions and returns OBSERVER_FAILURE/CLOCK_FAILURE/CANCELLATION_FAILURE respe
 allocation/length exceptions in its own storage return ALLOCATION_FAILURE. It cannot guarantee
 bounded execution if user code blocks forever; honoring the prompt-return/wait contract is a
 caller precondition. No external callback rollback is promised.
+
+Replay counters cover engine-issued operations. Direct cancellation polls inside the clock's wait
+and other work inside caller callbacks do not consume engine poll/work counters. An exception
+escaping wait is CLOCK_FAILURE, including an uncaught nested cancellation exception; an exception
+from an engine-issued cancellation poll is CANCELLATION_FAILURE.
 
 The engine uses a fresh reader over `AdmittedTape`'s owned immutable bytes with separately charged
 ReplayLimits. Strict admission authenticates the complete source sequence, but actual replay EOF
@@ -126,6 +134,7 @@ the reader's preserved prefix exposure and must be covered explicitly. No partia
 
 | Outcome | EOF/completion facts |
 | --- | --- |
+| INVALID_CONFIGURATION | Inactive admitted token, invalid policy, or nonpositive RELATIVE wait slice; no parsing, callbacks or clock calls. |
 | COMPLETED | Actual reader finish FINISHED; final cancellation poll false; observer finish OK. cleanEof=true, observerFinished=true. |
 | CANCELLED | Pending records discarded. cleanEof=true only if actual finish had already succeeded before the final cancellation poll; observerFinished=false. Never successful completion. |
 | INPUT_FAILURE | Reader/feed/finish error with original owning diagnostic; cleanEof=false, no finish callback. |
@@ -140,13 +149,19 @@ checks → failed-result refusal → relative arithmetic → clock/wait/cancel �
 and buffers before return; caller observer/clock/cancellation objects remain alive and untouched by
 destruction. Cancellation is not authenticated EOF; marker/header-only valid files still require finish.
 
+Before the per-record cancellation poll, check both delivered-record and onRecord callback-count
+availability. Charge a callback attempt only when invoking it; cancellation does not charge an
+unstarted callback. Extra work is checked before each engine operation. At EOF, the final
+cancellation poll precedes the finish callback's allowance check, following the separate final order.
+
 ## Finite budgets and checks
 
 `ReplayLimits` contains explicit `TapeLimits`, `deliveredRecords`, `callbackCalls`, `workUnits`,
 `maxRelativeMs`, `maxWaitSliceNs`, `maxWaitCalls`, and `clockCalls`. Count fields are finite size_t;
 relative milliseconds are finite uint64; wait slice is positive int64 nanoseconds for RELATIVE.
-Zero is valid for counts/maximum elapsed and rejects the first needed operation. RELATIVE with
-zero/negative wait slice is INVALID_CONFIGURATION before parsing. IMMEDIATE ignores slice/delay
+Zero is valid for counts/maximum elapsed and rejects the first needed operation. An inactive
+admitted token or invalid policy yields INVALID_CONFIGURATION before parsing or any callback.
+RELATIVE with a zero/negative wait slice yields the same outcome. IMMEDIATE ignores slice/delay
 clock values and never calls clock. No library defaults or unlimited sentinel.
 
 Reader bounds independently cover each frame and cumulative parse/work/value/symbol/string/timing
