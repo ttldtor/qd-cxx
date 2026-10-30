@@ -2,6 +2,143 @@
 
 [English version](TAPE-INSPECT.md). Английская версия является нормативной.
 
+## Владеющие самодостаточные источники и вывод версии 9
+
+Явный профиль `self-contained-segments-v1` владеет конечным упорядоченным списком локальных файлов.
+Он реализует [контракт конечной последовательности](../spec/protocol/TAPE-SEQUENCE.ru.md): отдельные
+состояния схемы/времени для каждого вхождения, проверку admission, физическое закрытие и финальный flush.
+Прежние профили с заимствованным потоком и их версии вывода 1–8 сохраняются отдельно.
+
+```powershell
+qdcxx-tape-inspect --source-profile self-contained-segments-v1 --wire-schema binary-catalog-v1 --tape-mode binary-catalog-v1 --time-policy none --input first.qtp
+qdcxx-tape-inspect --source-profile self-contained-segments-v1 --wire-schema binary-catalog-v1 --tape-mode binary-catalog-v1 --time-policy long --input first.qtp.gz --time-input first.time.gz --container gzip --time-container gzip
+qdcxx-tape-inspect --source-profile self-contained-segments-v1 --wire-schema binary-catalog-v1 --tape-mode binary-catalog-v1 --time-policy field --input first.qtp --input second.qtp --aggregate-reservation-copies 2
+```
+
+Обязательны профиль источника, оба селектора binary-catalog и `--time-policy none|message|field|long|text`.
+LONG/TEXT требуют ровно один `--time-input` на каждый `--input`; пары образуются по отдельному порядку
+появления этих параметров. Повторные пути являются отдельными вхождениями; повторы остальных параметров
+считаются ошибкой использования. NONE/MESSAGE/FIELD отклоняют все параметры спутника, даже явно заданный
+контейнер `none`. Оба контейнера по умолчанию — `none`; вид общий для всех данных, отдельно — для спутников.
+Библиотека допускает независимый выбор контейнеров для каждого вхождения. CLI не определяет имена по
+расширению, не раскрывает wildcard, не сортирует и не ищет файлы, не использует stdin, follow, сеть,
+replay или восстановление. Пустой путь и `-` недопустимы. Внешнюю/локальную схему с этим режимом не совмещают.
+
+NONE разрешает отсутствие свойства времени в новом начальном дескрипторе, как в стандартном выводе
+производителя; heartbeat с меткой MESSAGE отклоняется. MESSAGE требует первого heartbeat с меткой времени
+до публикации записи; FIELD требует сырых метаданных FIELD у каждой записи. LONG/TEXT требуют применения
+первой метки спутника до публикации записи. Остальные политики требуют явного совпадающего объявления
+времени в начальном дескрипторе. Упакованный ноль не заменяет отсутствующее присваивание. Относительное
+время спутника и смешанные наложения MESSAGE/спутника/FIELD остаются вне этого именованного профиля.
+
+Здесь принимается только версия диагностики 3; при отсутствии параметра выбирается 3. По умолчанию
+выводится TSV; HUMAN сохраняет ту же информацию с безопасным цитированием/hex. [Контракт output9](../spec/protocol/TAPE-SEQUENCE.ru.md)
+определяет native-идентичность пути, строку политики сразу после каждого source-begin, все 27 ячеек записи,
+различие сырых FIELD и внешнего/эффективного времени, строки ресурсов и единственный итоговый маркер.
+Поколения схемы, ID отправителей и порядковые номера попыток FIELD локальны для сегмента; опубликованные
+записи также имеют проверяемый сквозной индекс. Native-пути кодируются UTF-16LE hex в Windows и байтовым hex
+в POSIX; преобразование локали и канонизация файловой системы не определяют идентичность.
+
+### Ограничения и admission
+
+Каждое ограничение — конечное беззнаковое десятичное число; ноль остаётся нулём. Прежние параметры
+binary-catalog для parser/string/schema/construction/payload/snapshot сохраняют свои стандартные значения.
+Ограничения размера документа JSON и глубины относятся только к внешнему загрузчику и здесь отклоняются.
+`--max-owned-field-time-records` по умолчанию равен 1048576. До admission `prepareLimits` вычисляет pending
+как frame+9, payload/symbol-input как frame, symbol-state как symbol-units, emitted-records как max-records.
+После admission ограничения не меняются. `--help` перечисляет все параметры и фактические значения по умолчанию.
+
+| Параметр источника | По умолчанию | Значение |
+| --- | --- | --- |
+| `--max-sources` | 256 | Вхождения, включая повторные пути |
+| `--max-path-units` | 4096 | Native-кодовые единицы одного пути |
+| `--max-total-path-units` | 1048576 | Native-единицы всех путей данных и спутников |
+| `--max-path-output-bytes` | 4194304 | Байты hex-представления native-путей |
+| `--aggregate-reservation-copies` | 1 | Явный множитель ёмкости, допустимо 1..256 |
+| `--max-source-output` | 16777216 | Допуск кодированного вывода каждого вхождения |
+| `--max-output` | 67108864 | Единый допуск кодированных байтов stdout+stderr команды |
+| `--max-physical-probes` | 2 | Отдельные суммарные байты физической проверки превышения |
+| `--max-inflated-probes` | 2 | Отдельные суммарные отброшенные логические байты проверки превышения |
+
+Copies с проверкой переполнения умножает каждую разрешённую вложенную ёмкость parser/container/scanner,
+рабочую память feed и допуск копирования событий. Общий вывод и проверки превышения не умножаются.
+Полные объявленные резервы учитываются для каждого вхождения до открытия файлов, включая повторы;
+неиспользованные ёмкости не возвращаются. Поэтому два источника со стандартными ограничениями требуют
+явного copies>=2, даже если оба малы. Сумма допусков вывода всех источников, строк идентичности и итогового
+резерва 65536 байт независимо должна помещаться в max-output. Одновременно принадлежит не более одной
+пары/двух физических файлов.
+
+До диагностики ошибок аргументов отдельный проход по позициям параметров разрешает бюджет вывода.
+Учитываются только корректные операнды `--max-output`; при повторах берётся минимум корректных значений.
+Некорректный операнд не задаёт допуск и остаётся ошибкой использования 2; если корректных значений нет,
+действует конечное стандартное значение. Порядок параметров не позволяет превысить допуск диагностики.
+Если целая строка не помещается, stderr остаётся пустым, а код завершения сохраняет первую ошибку.
+
+Каждый член `ContainerLimits` имеет варианты с префиксами `--source-` и `--time-source-`:
+
+| Суффикс | По умолчанию | Единица |
+| --- | --- | --- |
+| compressed-bytes / inflated-bytes | 67108864 / 67108864 | Физические / выданные логические байты |
+| expansion-ratio / ratio-slack | 1000 / 65536 | Безразмерное отношение / байты одного member |
+| gzip-members / zip-entries | 1024 / 64 | Начатые member / entries |
+| header-bytes / total-header-bytes | 262144 / 4194304 | Байты одного / суммарных метаданных |
+| work-bytes / inflate-calls | 268435456 / 262144 | Необратимая работа в байтах / фактические вызовы |
+| retained-bytes / inflater-bytes | 4194304 / 1048576 | Рабочая память и метаданные / текущая память inflater |
+| chunk-bytes | 4096 | Положительный размер физической входной рабочей памяти в байтах |
+
+`--chunk-size` отдельно задаёт положительный размер выдаваемого parser-span. Параметры scanner спутника:
+`--time-input-bytes` (4194304), `--time-line-bytes` (128), `--time-lines` (262144), `--time-marks` (262144),
+`--time-work-bytes` (8388608) и `--time-retained-bytes` (128). Это логические входные байты, байты тела строки,
+попытки строк, возвращённые метки, байтовая работа просмотра/разбора и память строки.
+Контракты [контейнера](../spec/protocol/TAPE-CONTAINERS.ru.md) и [scanner](../spec/protocol/SIDECAR-TIME.ru.md)
+определяют точные границы и разрешённые диагностические проверки EOF; резерв не является измерением работы или RSS.
+
+При `ORG_TTLDTOR_QDCXX_BUILD_TAPE_COMPRESSION=OFF` явный gzip/zip возвращает unsupported4 на этапе
+конфигурации до копирования имён, строк вывода и открытия источников; NONE работает без zlib. Для этого режима JSON и replay могут оставаться OFF;
+при выполнении CLI зависимости не загружаются. Без аргументов и с отдельным --help вывод одинаков: только stdout,
+exit0 при успешных записи/flush, без I/O источников и конфигурации. Непустой неверный список аргументов даёт2.
+
+### Завершение и проверка
+
+Коды: 0 завершение/help, 2 использование, 3 I/O, 4 неподдерживаемое, 5 повреждённое, 6 ресурсы/выделение
+памяти, 7 STOPPED. Новый параметр отмены CLI или планировщик сигналов не устанавливается. Синхронная
+владеющая библиотека принимает явный stop token. Она сохраняет первую причину, закрывает только текущую
+собственную пару после уничтожения заимствующих адаптеров и не открывает/читает/подаёт новые источники после
+ошибки или отмены.
+
+Source-end требует parser finish, полного хвоста спутника, EOF/целостности контейнеров и физического
+закрытия. После закрытия последнего источника flush данных должен пройти до вывода ресурсов/итога;
+затем должен пройти финальный flush маркера. Видимые байты complete-v9 остаются предварительными при
+ошибке последнего flush: COMPLETE подтверждает только успешный результат/exit0. Прежние полные строки
+остаются полезным частичным префиксом. Diagnostics3 содержит статические stage/reason и необязательные
+локальные координаты physical fetched/consumed, logical produced, parser accepted, начало frame/payload
+и строку спутника; неизвестные значения — `-`. Сжатые смещения не задают обратного отображения в QTP.
+Cleanup-диагностика сохраняет не более вторичных причин data-close, time-close и flush, не заменяя первую.
+
+Фиксированные токены операции и причины ниже не содержат входных байтов или текста пути.
+
+| stage | Набор staticReason |
+| --- | --- |
+| usage | invalid-arguments, duplicate-option, path-limits, zero-chunk |
+| configuration | compression-disabled, path-limits, unrepresentable, allocation, arguments-unavailable, invalid-argument, invalid-presentation |
+| admission | configuration-refused, identity-overflow, identity-output-limit |
+| profile | empty-segment, missing-source-header, missing-time-declaration, mixed-time-declaration, message-time-overlay, missing-field-time, missing-time-assignment |
+| schema / record | ordinal-overflow; для schema также missing-source-plan |
+| open / close | data-open или time-open / source-close |
+| parse / sidecar | parser-failure, parser-finish, no-progress / scanner-failure, scanner-finish |
+| container | invalid-header, invalid-data, truncated, checksum, invalid-directory, unsupported-container, compressed-limit, inflated-limit, ratio-limit, header-limit, member-entry-limit, work-limit, source-io, allocation-failure, invalid-argument, not-finished, invalid-container-state |
+| aggregate / allocation | counter-overflow / allocation-failure, length-limit |
+| stop / io | cancelled / stream-failure |
+| write / flush | output-limit, sink-io, diagnostic-output-limit, io-error / sink-io, diagnostic-io |
+Native-регрессии `source_sequence_cli`, `source_sequence_io` и `source_sequence_large` проверяют реальную
+границу CLI, ошибки владеющего жизненного цикла и ограниченный временный файл из 3000000 записей.
+Большой тест использует не более256 записей в кадре и ограниченный sink, сравнивающий каждый канонический
+байт schema/frame/record/time/source/complete с независимым ожидаемым представлением, строящимся по мере
+работы, для parser chunks1 и4096. Полный вывод не удерживается; строки ресурсов проверяются отдельно,
+поскольку зависящие от chunk наблюдения могут различаться. Логические резервы и отдельно измеренный OS RSS
+описывают разные величины. Квалификация именованного production-корпуса отделена от общей поддержки QD,
+живого транспорта и бизнес-событий.
+
 ## Явная wire-схема и вывод версии 7
 
 Параметр `--input PATH --wire-schema ordinary-v1` явно строит
@@ -376,5 +513,6 @@ optHex, timePresent, timeHex, effectiveSendMask. Наличие обознача
 6 — ресурсы. Успех требует физического EOF, успешного reader.finish, всех записей и последнего flush,
 а также кода 0. Уже записанные байты нельзя отозвать после ошибки flush. Инспекция заимствованных
 потоков не доказывает закрытие владельцем; приёмка Java отдельно инструментально проверяет закрытие.
-FIELD, sidecars, сжатие и цепочки источников исключены. [Валидация](../tests/conformance/protocol/field-types/DISPATCH-VALIDATION.ru.md)
+Эти функции вывода 8 для заимствованных потоков по-прежнему исключают FIELD (включая сырой ноль),
+спутники, сжатие и цепочки источников; для них используйте явный владеющий профиль выше. [Валидация](../tests/conformance/protocol/field-types/DISPATCH-VALIDATION.ru.md)
 задаёт точные границы производственных, нативных и полных файловых проверок.

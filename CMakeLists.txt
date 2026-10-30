@@ -92,6 +92,7 @@ if(ORG_TTLDTOR_QDCXX_BUILD_TAPE_INSPECT)
     target_link_libraries(qdcxx_tape_inspect_tool PUBLIC qdcxx_inspect_tool qdcxx_tape_sidecar qdcxx_tape_compression)
     set_target_properties(qdcxx_tape_inspect_tool PROPERTIES CXX_EXTENSIONS OFF)
     add_executable(qdcxx_tape_inspect tools/tape-inspect/main.cpp)
+    target_sources(qdcxx_tape_inspect PRIVATE tools/tape-inspect/source_cli.cpp)
     target_link_libraries(qdcxx_tape_inspect PRIVATE qdcxx_tape_inspect_tool)
     if(ORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON)
         target_link_libraries(qdcxx_tape_inspect PRIVATE qdcxx_schema_json)
@@ -180,6 +181,18 @@ if(BUILD_TESTING)
         add_test(NAME source_sequence_io COMMAND qdcxx_tape_sequence_owner_tests
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/protocol/tape-containers"
             "${CMAKE_CURRENT_BINARY_DIR}/sequence-owner-fixtures")
+        add_executable(qdcxx_large_tape_tests tests/conformance/large_tape_tests.cpp)
+        target_link_libraries(qdcxx_large_tape_tests PRIVATE qdcxx_tape_inspect_tool)
+        set_target_properties(qdcxx_large_tape_tests PROPERTIES CXX_EXTENSIONS OFF)
+        add_test(NAME source_sequence_large COMMAND qdcxx_large_tape_tests
+            "${CMAKE_CURRENT_BINARY_DIR}/large-tape-streaming")
+        add_test(NAME source_sequence_cli COMMAND "${CMAKE_COMMAND}"
+            "-DPROGRAM=$<TARGET_FILE:qdcxx_tape_inspect>"
+            "-DCOMPARATOR=$<TARGET_FILE:qdcxx_large_tape_tests>"
+            "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DRUN=${CMAKE_CURRENT_BINARY_DIR}/source-sequence-cli"
+            "-DCOMPRESSION=${ORG_TTLDTOR_QDCXX_BUILD_TAPE_COMPRESSION}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/source_sequence_cli.cmake")
     endif()
     add_executable(qdcxx_plain_input_tests tests/conformance/plain_input_tests.cpp)
     target_link_libraries(qdcxx_plain_input_tests PRIVATE qdcxx_tape_compression doctest::doctest)

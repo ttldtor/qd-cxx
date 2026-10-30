@@ -169,8 +169,9 @@ bounded GZIP/strict ZIP32 pull decoding independently of core/protocol and repla
 The default OFF and ON without a selected consumer neither acquire zlib nor enable C. An optional
 `ORG_TTLDTOR_QDCXX_ZLIB_ARCHIVE` names the exact local zlib 1.3.2 archive; CMake verifies its pinned
 SHA-256, version and license. Arbitrary FetchContent source overrides and system zlib discovery
-are refused. The target exports its C++23 header requirement. It is a component API; operational
-CLI container/companion/split hookup is separate and no new CLI flag is implied.
+are refused. The target exports its C++23 header requirement. It is a component API; the explicit
+[owning inspection profile](../../docs/TAPE-INSPECT.md#owning-self-contained-sources-and-output-version-9)
+composes operational file/container/companion selection.
 
 [tape-container-oracle](../upstream/tape-container-oracle/README.md) captures actual production
 FileWriter/FileReader/StreamCompression observations at either accepted pin without rebuilding or
@@ -194,11 +195,23 @@ observations, native component checks and remaining integration acceptance.
 The tool-private [LONG/TEXT scanner](../../spec/protocol/SIDECAR-TIME.md) is available as
 `qdcxx_tape_sidecar` when tests or tape inspection are selected. It has no optional dependency,
 clock or I/O. `TapeExternalTimePolicy::SIDECAR` separately admits exact companion-time headers in
-binary-catalog readers; the original constructor signatures still refuse them. No inspector flag,
-source pairing or operational time selection is added here.
+binary-catalog readers; the original constructor signatures still refuse them. The separate owning inspection profile composes
+source pairing and chronological time selection; this scanner remains I/O-free.
 
 Native tests `sidecar_scanner`, `sidecar_policy`, `sidecar_allocation` and `sidecar_windows_include`
 cover finite parsing/admission, allocation ordering and Windows-header compatibility. With the
 optional compression component enabled, `sidecar_paired_owner` additionally checks real container/
 parser cleanup and cancellation with instrumented close/flush boundaries. These component tests
 remain distinct from full CLI file ownership, chronological mark application and corpus acceptance.
+
+## Owning finite tape inspection
+
+The explicit [self-contained source profile](../../docs/TAPE-INSPECT.md#owning-self-contained-sources-and-output-version-9)
+composes ordered native files, optional containers and explicit NONE/MESSAGE/FIELD/LONG/TEXT timing.
+Enable `ORG_TTLDTOR_QDCXX_BUILD_TAPE_INSPECT`; JSON and replay may remain OFF. Compression OFF retains NONE
+and refuses explicit GZIP/ZIP before source work. The unchanged executable's standalone `--help` lists
+all profile selectors, finite limits/defaults, units, side effects and exits without working inputs.
+
+`source_sequence_cli`, `source_sequence_io` and `source_sequence_large` are native CTest regressions.
+The large test owns a small streamed temporary source and validates canonical bytes without retaining
+whole output. Resource reservations and separately measured OS RSS remain distinct observations.

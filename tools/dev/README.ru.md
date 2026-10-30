@@ -179,8 +179,9 @@ STREAM/MESSAGE, прошёл полную приёмку. Дополнитель
 либо tests. OFF по умолчанию и ON без consumer не получают zlib и не включают C. Необязательный
 `ORG_TTLDTOR_QDCXX_ZLIB_ARCHIVE` задаёт точный локальный архив zlib 1.3.2; CMake проверяет закреплённые
 SHA-256, version и license. Произвольные FetchContent source overrides и system zlib discovery
-отвергаются. Target экспортирует требование C++23 для header. Это component API: operational
-CLI container/companion/split hookup является отдельной интеграцией, новых CLI flags пока нет.
+отвергаются. Target экспортирует требование C++23 для header. Это API компонента;
+[явный владеющий профиль просмотра](../../docs/TAPE-INSPECT.ru.md#владеющие-самодостаточные-источники-и-вывод-версии-9)
+объединяет операционный выбор файлов, контейнеров и спутников.
 
 [tape-container-oracle](../upstream/tape-container-oracle/README.ru.md) фиксирует фактические
 FileWriter/FileReader/StreamCompression observations любого принятого pin без rebuild или записи
@@ -204,11 +205,24 @@ observations, native component checks и остающуюся integration accept
 Tool-private [LONG/TEXT scanner](../../spec/protocol/SIDECAR-TIME.ru.md) доступен как
 `qdcxx_tape_sidecar`, когда выбраны tests либо tape inspection. У него нет optional dependency,
 clock и I/O. `TapeExternalTimePolicy::SIDECAR` отдельно допускает точные companion-time headers в
-binary-catalog readers; прежние constructor signatures по-прежнему отвергают их. Здесь не добавлены
-inspector flag, source pairing и operational time selection.
+binary-catalog readers; прежние constructor signatures по-прежнему отвергают их. Отдельный владеющий профиль просмотра
+объединяет пары источников и хронологический выбор времени; scanner остаётся без I/O.
 
 Native tests `sidecar_scanner`, `sidecar_policy`, `sidecar_allocation`, `sidecar_windows_include`
 проверяют конечные parsing/admission, allocation ordering и Windows-header compatibility. При
 включённом optional compression component `sidecar_paired_owner` дополнительно проверяет настоящий
 container/parser cleanup и cancellation с instrumented close/flush boundaries. Component tests
 отделены от полного CLI file ownership, chronological mark application и corpus acceptance.
+
+## Владеющий просмотр конечных tape
+
+Явный [профиль самодостаточных источников](../../docs/TAPE-INSPECT.ru.md#владеющие-самодостаточные-источники-и-вывод-версии-9)
+объединяет упорядоченные native-файлы, необязательные контейнеры и явное время NONE/MESSAGE/FIELD/LONG/TEXT.
+Включите `ORG_TTLDTOR_QDCXX_BUILD_TAPE_INSPECT`; JSON и replay могут оставаться OFF. При Compression OFF
+сохраняется NONE, а явные GZIP/ZIP отклоняются до работы с источниками. Отдельный `--help` прежнего
+исполняемого файла перечисляет все селекторы, конечные ограничения/стандартные значения, единицы,
+побочные действия и коды завершения без рабочих входных данных.
+
+`source_sequence_cli`, `source_sequence_io` и `source_sequence_large` — native-регрессии CTest.
+Большой тест владеет небольшим потоково создаваемым временным источником и проверяет канонические байты,
+не удерживая полный вывод. Логические резервы и отдельно измеренный OS RSS остаются разными наблюдениями.

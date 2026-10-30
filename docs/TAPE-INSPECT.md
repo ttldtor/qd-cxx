@@ -2,6 +2,140 @@
 
 [Русская версия](TAPE-INSPECT.ru.md). English is authoritative.
 
+## Owning self-contained sources and output version 9
+
+The explicit `self-contained-segments-v1` source profile owns a finite ordered list of local files.
+It implements the [finite sequence contract](../spec/protocol/TAPE-SEQUENCE.md), including fresh
+schema/timing state per occurrence, checked admission, physical close and terminal flush. It is
+independent of the existing borrowed-stream profiles and their output versions 1–8.
+
+```powershell
+qdcxx-tape-inspect --source-profile self-contained-segments-v1 --wire-schema binary-catalog-v1 --tape-mode binary-catalog-v1 --time-policy none --input first.qtp
+qdcxx-tape-inspect --source-profile self-contained-segments-v1 --wire-schema binary-catalog-v1 --tape-mode binary-catalog-v1 --time-policy long --input first.qtp.gz --time-input first.time.gz --container gzip --time-container gzip
+qdcxx-tape-inspect --source-profile self-contained-segments-v1 --wire-schema binary-catalog-v1 --tape-mode binary-catalog-v1 --time-policy field --input first.qtp --input second.qtp --aggregate-reservation-copies 2
+```
+
+The source profile, both binary-catalog selectors and `--time-policy none|message|field|long|text`
+are required. LONG/TEXT require exactly one `--time-input` per `--input`, paired by their separate
+appearance order. Repeated input paths are separate occurrences; all other duplicate options are
+usage errors. NONE/MESSAGE/FIELD reject all companion options, even an explicit `none` container.
+Containers default to `none` and are shared by all data occurrences, separately by companions.
+The library permits independently selected per-occurrence envelopes. The CLI performs no filename
+inference, wildcard expansion, sorting, discovery, stdin, follow, network input, replay or recovery.
+Empty paths and `-` are invalid. External/local schema selectors cannot be combined with this mode.
+
+NONE permits a fresh initial descriptor with absent time, as the producer's default does; it rejects
+timestamp-bearing MESSAGE heartbeats. MESSAGE requires its first timestamp-bearing heartbeat before
+publishing a record; FIELD requires raw FIELD metadata on every record. LONG/TEXT require an applied
+first companion mark before record publication. Other policies require a matching explicit initial
+time declaration. A packed zero never stands in for a missing assignment. Relative companion time
+and mixed MESSAGE/sidecar/FIELD overlays remain outside this named profile.
+
+Only diagnostics version 3 is accepted here; omission selects 3. TSV is the output default and HUMAN
+preserves the same information using safe quoting/hex. The [output9 contract](../spec/protocol/TAPE-SEQUENCE.md)
+defines native path identity, a policy row immediately after each source-begin, all 27 record cells,
+raw FIELD versus external/effective time, resource rows and the single terminal marker. Schema generations,
+sender IDs and FIELD attempt ordinals are segment-local; emitted record ordinals also include a checked
+aggregate index. Native names are UTF-16LE hex on Windows and byte hex on POSIX; no locale conversion
+or filesystem canonicalization determines identity.
+
+### Limits and admission
+
+Every limit is a finite unsigned decimal; zero is literal. Existing binary-catalog parser/string/schema/
+construction/payload/snapshot options remain available with their existing defaults. JSON document-byte
+and depth options apply only to the external loader and are refused in this mode. `--max-owned-field-time-records`
+defaults to 1048576. `prepareLimits` resolves pending storage to frame+9, per-frame payload/symbol input
+to frame, symbol-state units to symbol-units, and emitted records to max-records before admission.
+No limit changes after admission. `--help` prints every accepted option and actual default.
+
+| Source option | Default | Meaning |
+| --- | --- | --- |
+| `--max-sources` | 256 | Occurrences, including repeated paths |
+| `--max-path-units` | 4096 | Native code units per path |
+| `--max-total-path-units` | 1048576 | All data/companion native path units |
+| `--max-path-output-bytes` | 4194304 | Encoded native path hex bytes |
+| `--aggregate-reservation-copies` | 1 | Explicit capacity multiplier, allowed 1..256 |
+| `--max-source-output` | 16777216 | Encoded output allowance for each occurrence |
+| `--max-output` | 67108864 | One command-wide stdout+stderr encoded-byte allowance |
+| `--max-physical-probes` | 2 | Separate aggregate physical excess-probe bytes |
+| `--max-inflated-probes` | 2 | Separate aggregate discarded logical excess-probe bytes |
+
+Copies multiply each fully resolved nested parser/container/scanner capacity, feed scratch and event-copy
+allowance with checked arithmetic. They never multiply global output or excess probes. Full declared
+reservations are charged for every selected occurrence before opening anything, including repeated paths;
+unused capacities are not refunded. Thus two default-limit sources require explicit copies>=2 even when
+both are tiny. The sum of selected per-source output allowances, identity rows and the 65536-byte terminal
+reserve must independently fit max-output. At most one pair/two physical files are owned at a time.
+
+Before reporting argument errors, a separate pass resolves output bytes at option positions only.
+Only valid `--max-output` operands supply an allowance; malformed duplicate requests use their minimum.
+Invalid operands remain usage2 and grant no allowance; the finite default applies if none is valid.
+Option order cannot bypass the diagnostic cap. If a complete row cannot fit, stderr stays empty and
+the authoritative exit retains the first argument error.
+
+Every `ContainerLimits` member has both `--source-` and `--time-source-` variants:
+
+| Suffix | Default | Unit |
+| --- | --- | --- |
+| compressed-bytes / inflated-bytes | 67108864 / 67108864 | Physical / produced logical bytes |
+| expansion-ratio / ratio-slack | 1000 / 65536 | Dimensionless ratio / bytes per member |
+| gzip-members / zip-entries | 1024 / 64 | Started members / entries |
+| header-bytes / total-header-bytes | 262144 / 4194304 | Single / cumulative metadata bytes |
+| work-bytes / inflate-calls | 268435456 / 262144 | Irreversible byte work / actual calls |
+| retained-bytes / inflater-bytes | 4194304 / 1048576 | Scratch/metadata / outstanding inflater allocation bytes |
+| chunk-bytes | 4096 | Positive physical input scratch bytes |
+
+`--chunk-size` separately controls the positive produced parser-span size. Companion scanner switches
+are `--time-input-bytes` (4194304), `--time-line-bytes` (128), `--time-lines` (262144), `--time-marks`
+(262144), `--time-work-bytes` (8388608) and `--time-retained-bytes` (128). Units are logical input bytes,
+line body bytes, attempted lines, returned marks, examined/parse byte work and line scratch bytes.
+The [container](../spec/protocol/TAPE-CONTAINERS.md) and [scanner](../spec/protocol/SIDECAR-TIME.md)
+contracts define exact gates and permitted diagnostic EOF probes; reservations are not measured work or RSS.
+
+With `ORG_TTLDTOR_QDCXX_BUILD_TAPE_COMPRESSION=OFF`, explicit gzip/zip fails unsupported4 at configuration
+before copied source names, output rows or source opens; NONE works without zlib. This mode requires neither JSON nor replay; both build options may remain OFF.
+The CLI performs no runtime dependency acquisition. No arguments and standalone --help remain identical, stdout-only, exit0
+when writing/flushing succeeds, without source/configuration I/O. Nonempty invalid argument lists return2.
+
+### Completion and verification
+
+Exits are 0 complete/help, 2 usage, 3 I/O, 4 unsupported, 5 malformed, 6 resource/allocation and 7 STOPPED.
+No new CLI cancellation flag or signal scheduler is installed. The synchronous owning library accepts
+an explicit stop token. It preserves the first cause, closes only its own current pair after destroying
+borrowed adapters, and stops opening/reading/feeding further sources on failure or cancellation.
+
+A source-end requires parser finish, complete companion tail, container EOF/integrity and physical closes.
+After the last source closes, the data flush must succeed before resource/summary output; the final marker
+flush must then succeed too. Visible complete-v9 bytes remain provisional if that last flush fails: only
+successful result/exit0 establishes COMPLETE. Earlier complete rows remain a useful partial prefix.
+Diagnostics3 have static stage/reason tokens and optional segment-local physical fetched/consumed, logical
+produced, parser accepted, frame/payload start and sidecar line coordinates; unavailable values are `-`.
+Compressed offsets do not imply a reverse mapping to QTP positions. Cleanup diagnostics retain at most
+data-close, time-close and flush secondary causes, without replacing the first cause.
+
+The fixed operation/cause tokens below never contain input bytes or path text.
+
+| stage | staticReason inventory |
+| --- | --- |
+| usage | invalid-arguments, duplicate-option, path-limits, zero-chunk |
+| configuration | compression-disabled, path-limits, unrepresentable, allocation, arguments-unavailable, invalid-argument, invalid-presentation |
+| admission | configuration-refused, identity-overflow, identity-output-limit |
+| profile | empty-segment, missing-source-header, missing-time-declaration, mixed-time-declaration, message-time-overlay, missing-field-time, missing-time-assignment |
+| schema / record | ordinal-overflow; schema also missing-source-plan |
+| open / close | data-open or time-open / source-close |
+| parse / sidecar | parser-failure, parser-finish, no-progress / scanner-failure, scanner-finish |
+| container | invalid-header, invalid-data, truncated, checksum, invalid-directory, unsupported-container, compressed-limit, inflated-limit, ratio-limit, header-limit, member-entry-limit, work-limit, source-io, allocation-failure, invalid-argument, not-finished, invalid-container-state |
+| aggregate / allocation | counter-overflow / allocation-failure, length-limit |
+| stop / io | cancelled / stream-failure |
+| write / flush | output-limit, sink-io, diagnostic-output-limit, io-error / sink-io, diagnostic-io |
+The native `source_sequence_cli`, `source_sequence_io` and `source_sequence_large` regressions cover the actual
+CLI boundary, owning lifecycle faults and a 3000000-record bounded real temporary source. The large test
+uses at most256 records per frame and a bounded sink comparing every canonical schema/frame/record/time/
+source/complete byte against an independent on-demand expectation for parser chunks1 and4096. It retains
+no whole output; resource rows are checked separately because chunk-sensitive observations may differ.
+Logical reservation counters and separately measured OS RSS describe different quantities. Qualification
+of a named production corpus remains separate from general QD, live transport or business-event support.
+
 ## Explicit ordinary wire schema and output version 7
 
 `--input PATH --wire-schema ordinary-v1` explicitly discovers
@@ -347,6 +481,6 @@ Output bytes, including header/schema/timing/completion, are counted before expa
 Exits remain0 success/help,2 usage,3 I/O,4 unsupported,5 malformed,6 resource. Success requires
 physical EOF, clean reader.finish, all writes and final flush plus exit0. Already-written bytes
 cannot be retracted after a failed flush. Borrowed-stream inspection does not prove owner close;
-Java acceptance has a separate instrumented close proof. FIELD, sidecars, compression and source
-chains remain excluded. [Validation](../tests/conformance/protocol/field-types/DISPATCH-VALIDATION.md)
+Java acceptance has a separate instrumented close proof. These borrowed-stream output8 entrypoints continue to exclude FIELD (including raw zero),
+sidecars, compression and source chains; use the explicit owning source profile above for that scope. [Validation](../tests/conformance/protocol/field-types/DISPATCH-VALIDATION.md)
 states the exact production/native/whole-file scope.

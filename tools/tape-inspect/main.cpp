@@ -6,6 +6,7 @@
 #include "qd/events/quote.hpp"
 #include "qd/schema/json_schema.hpp"
 #include "schema_input.hpp"
+#include "source_cli.hpp"
 
 #include <algorithm>
 #include <csignal>
@@ -65,6 +66,14 @@ int main(int argc, char **argv) {
     std::signal(SIGPIPE, SIG_IGN);
 #endif
     try {
+        for (int index = 1; index < argc; index += 2) {
+            if (std::string_view(argv[index]) != "--source-profile") {
+                continue;
+            }
+
+            return ti::runSourceCli(argc, argv, std::cout, std::cerr);
+        }
+
         ti::Limits limits;
         org::ttldtor::qdcxx::schema::JsonSchemaLimits schemaLimits;
         auto &t = limits.tape;
@@ -149,6 +158,8 @@ int main(int argc, char **argv) {
             for (const auto &[name, option] : broadOptions) {
                 std::cout << name << ' ' << option.second << '\n';
             }
+
+            ti::sourceCliHelp(std::cout);
 
             std::cout << "Exit: 0 success/help; 2 usage; 3 IO; 4 unsupported; 5 malformed; 6 resource.\n"
                          "Empty markers are not authenticated footers. Check the exit status after final flush.\n";
