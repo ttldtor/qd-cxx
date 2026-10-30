@@ -122,9 +122,12 @@ struct ReplayCounters {
     std::size_t parsedFields = 0;          ///< Fresh reader charged wire fields.
     std::size_t constructionUnits = 0;     ///< Fresh reader cumulative reconstruction work.
     std::size_t timingEvents = 0;          ///< Fresh reader RAW/heartbeat metadata attempts.
-    std::size_t fieldBytes = 0;            ///< Fresh reader cumulative string-byte work.
+    std::size_t fieldBytes = 0;            ///< Fresh reader cumulative type10 byte work.
     std::size_t fieldUnits = 0;            ///< Fresh reader cumulative string-unit work.
     std::size_t ownedFieldUnits = 0;       ///< Fresh reader cumulative published string units.
+    std::size_t payloadEncodedBytes = 0;   ///< Fresh reader cumulative examined new-payload bytes.
+    std::size_t payloadWorkBytes = 0;      ///< Fresh reader cumulative admitted new-payload body work.
+    std::size_t ownedPayloadBytes = 0;     ///< Fresh reader cumulative published logical new-payload bytes.
 };
 
 /** Owning terminal result; diagnostic text always references static storage. */

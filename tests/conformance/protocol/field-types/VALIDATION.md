@@ -2,6 +2,12 @@
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
+The2026-10-30 read-only BINARY_FIELDS_V1 payload extension has a separate
+[object validation](OBJECT-VALIDATION.md), including both-pin production evidence,
+focused C++ ownership/resource checks and explicit remaining acceptance gates.
+The historical QDCXX-024 compiler matrix and receipts below are not relabelled as
+verification of the new field identities.
+
 QDCXX-024 started at `a9299317c1d4e7f3202ed8136916fd3ee94b9f3f`.
 All dates below and retained logs are UTC, 2026-09-22.
 The initial locked-Java observations and [FIELD-TYPES](../../../../spec/encoding/FIELD-TYPES.md)

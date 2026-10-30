@@ -29,3 +29,16 @@ with the STREAM callback furnishing the one-wire-record comparison projection.
 
 No private tape was accessed. These captures prove the measured bounded cases; full event
 adapters, arbitrary schemas and complete private-file compatibility remain unclaimed.
+
+## Owned payload captures
+
+The separate [object capture manifest](object-captures.json) records both pinned
+revisions, final source/runtime/classpath-inventory hashes and all49 artifact
+hashes per pin. [Locked expectations](expected/objects/) and
+[current expectations](current-object-expected/) retain original requested composer
+and FileWriter bytes plus803-row production observations. Two final-source
+captures per pin match; complete locked clean-reactor Verify also preserves all82
+historical root and25 scalar artifacts. Earlier receipts above remain unchanged.
+The [object validation](../../../conformance/protocol/field-types/OBJECT-VALIDATION.md)
+separates known/unknown Java readers, wire233 from its local9 consumer, UTF/length
+errors, RAW callback fanout and C++ acceptance limits.

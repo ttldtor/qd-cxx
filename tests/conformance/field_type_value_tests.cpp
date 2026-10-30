@@ -311,9 +311,10 @@ TEST_CASE("owned FieldValue equality and canonical representations reject malfor
     CHECK_FALSE(c::validFieldValue({static_cast<T>(25), 0}));
 }
 
-TEST_CASE("binary scalar profile preserves exact old policies and canonical signed raw ranges") {
+TEST_CASE("binary field profile preserves exact old policies and canonical signed raw ranges") {
     using T = c::SerialFieldType;
-    constexpr std::array<std::int32_t, 15> BINARY{0, 1, 2, 3, 4, 8, 10, 24, 40, 56, 72, 88, 104, 120, 152};
+    constexpr std::array<std::int32_t, 19> BINARY{0,  1,  2,  3,   4,   8,   9,   10,  24, 40,
+                                                  56, 72, 88, 104, 120, 137, 152, 233, 249};
     constexpr std::array<T, 7> NEW_TYPES{T::VOID_FIELD, T::BYTE, T::SHORT, T::INT, T::DECIMAL, T::LONG, T::TIME_MILLIS};
     constexpr std::array<std::int32_t, 7> NEW_IDS{0, 1, 3, 4, 24, 104, 152};
 

@@ -830,6 +830,9 @@ void TapeReader::dispatch(TapeFeedResult &result) {
     budget.fieldBytes -= fieldBytes_;
     budget.fieldUnits -= fieldUnits_;
     budget.ownedFieldUnits -= ownedFieldUnits_;
+    budget.payloadEncodedBytes -= payloadEncodedBytes_;
+    budget.payloadWorkBytes -= payloadWorkBytes_;
+    budget.ownedPayloadBytes -= ownedPayloadBytes_;
     auto decoded = mode_ == TapeMode::LEGACY ? decodeStreamData(frame.payload, *context_, budget)
                                              : decodeRawData(frame.payload, *context_, budget);
     records_ += decoded.processedRecords;
@@ -837,6 +840,9 @@ void TapeReader::dispatch(TapeFeedResult &result) {
     fieldBytes_ += decoded.fieldBytes;
     fieldUnits_ += decoded.fieldUnits;
     ownedFieldUnits_ += decoded.ownedFieldUnits;
+    payloadEncodedBytes_ += decoded.payloadEncodedBytes;
+    payloadWorkBytes_ += decoded.payloadWorkBytes;
+    ownedPayloadBytes_ += decoded.ownedPayloadBytes;
 
     for (const auto &r : decoded.records) {
         values_ += r.values.size() + r.typedValues.size();

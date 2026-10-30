@@ -20,7 +20,7 @@ if ($LASTEXITCODE) { throw 'Baseline clean Verify failed' }
 $meta=Get-Content "$run/metadata.json" -Raw | ConvertFrom-Json
 $java=Join-Path $JavaHome 'bin/java.exe'
 $javac=Join-Path $JavaHome 'bin/javac.exe'
-& $javac -encoding UTF-8 -cp $meta.classpath -d "$run/harness" "$PSScriptRoot/FieldTypesOracle.java" 1> "$run/field-types-javac.stdout" 2> "$run/field-types-javac.stderr"
+& $javac -encoding UTF-8 -cp $meta.classpath -d "$run/harness" "$PSScriptRoot/FieldTypesOracle.java" "$PSScriptRoot/ObjectFieldsOracle.java" 1> "$run/field-types-javac.stdout" 2> "$run/field-types-javac.stderr"
 if ($LASTEXITCODE) { throw 'Field types compile failed' }
 $info=[Diagnostics.ProcessStartInfo]::new($java)
 $info.UseShellExecute=$false
@@ -40,6 +40,7 @@ $evidence=[ordered]@{
     format='qdcxx-field-types-oracle-v1'; mode=$Mode; startedUtc=$started; finishedUtc=[DateTime]::UtcNow.ToString('o')
     executable=$java; arguments=@($info.ArgumentList); exit=$p.ExitCode; baselineMetadata='metadata.json'
     sourceSha256=(Get-FileHash "$PSScriptRoot/FieldTypesOracle.java").Hash
+    objectSourceSha256=(Get-FileHash "$PSScriptRoot/ObjectFieldsOracle.java").Hash
     harnessClasses=@(Get-ChildItem "$run/harness" -Recurse -File | ForEach-Object { @{path=[IO.Path]::GetRelativePath("$run/harness",$_.FullName);sha256=(Get-FileHash $_.FullName).Hash} })
     tools=@(Get-ChildItem $PSScriptRoot -File | Where-Object Extension -in '.java','.ps1' | Sort-Object Name | ForEach-Object { @{name=$_.Name;sha256=(Get-FileHash $_.FullName).Hash} })
     artifacts=@(Get-ChildItem "$run/field-types" -File -Recurse | Sort-Object FullName | ForEach-Object { @{name=[IO.Path]::GetRelativePath("$run/field-types",$_.FullName); sha256=(Get-FileHash $_.FullName).Hash} })

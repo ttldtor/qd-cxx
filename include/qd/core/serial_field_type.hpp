@@ -3,11 +3,13 @@
 
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace org::ttldtor::qdcxx::core {
 
@@ -21,20 +23,24 @@ enum class SerialType : std::int32_t {
     SHORT = 3,          ///< Signed 16-bit big-endian integer.
     INT = 4,            ///< Signed 32-bit big-endian integer.
     COMPACT_INT = 8,    ///< Compact integer encoding; the representation determines the logical value.
+    BYTE_ARRAY = 9,     ///< Nullable byte-counted body; a representation may select a different length grammar.
     UTF_CHAR_ARRAY = 10 ///< Nullable character-counted array of UTF-16 units.
 };
 
 /** Encoded representation selectors, not independently combinable flags; intentionally incomplete. */
 enum class FieldRepresentation : std::int32_t {
-    PLAIN = 0x00,        ///< No additional representation selector.
-    DECIMAL = 0x10,      ///< Raw decimal bits in a signed 32-bit value.
-    SHORT_STRING = 0x20, ///< Packed short-string integer bits.
-    TIME_SECONDS = 0x30, ///< Signed seconds.
-    SEQUENCE = 0x40,     ///< Packed sequence integer bits.
-    DATE = 0x50,         ///< Signed day identifier.
-    LONG = 0x60,         ///< Signed 64-bit logical value.
-    WIDE_DECIMAL = 0x70, ///< Wide-decimal bits requiring a 64-bit value.
-    TIME_MILLIS = 0x90   ///< Signed 64-bit milliseconds, without timing conversion.
+    PLAIN = 0x00,         ///< No additional representation selector.
+    DECIMAL = 0x10,       ///< Raw decimal bits in a signed 32-bit value.
+    SHORT_STRING = 0x20,  ///< Packed short-string integer bits.
+    TIME_SECONDS = 0x30,  ///< Signed seconds.
+    SEQUENCE = 0x40,      ///< Packed sequence integer bits.
+    DATE = 0x50,          ///< Signed day identifier.
+    LONG = 0x60,          ///< Signed 64-bit logical value.
+    WIDE_DECIMAL = 0x70,  ///< Wide-decimal bits requiring a 64-bit value.
+    STRING = 0x80,        ///< UTFString byte length followed by exact UTF-16 text.
+    TIME_MILLIS = 0x90,   ///< Signed 64-bit milliseconds, without timing conversion.
+    CUSTOM_OBJECT = 0xe0, ///< Opaque byte-array content without execution or conversion.
+    SERIAL_OBJECT = 0xf0  ///< Opaque marshalled content with projected compact-int length.
 };
 
 /// The four bits that encode the field representation selector.
@@ -86,6 +92,8 @@ enum class SerialFieldType : std::int32_t {
     INT = composeSerialTypeId(SerialType::INT),
     /// Ordinary signed int32 logical value.
     COMPACT_INT = composeSerialTypeId(SerialType::COMPACT_INT),
+    /// Nullable owned byte-array body, with validated compact-long length.
+    BYTE_ARRAY = composeSerialTypeId(SerialType::BYTE_ARRAY),
     /// Nullable owned exact UTF-16 array.
     UTF_CHAR_ARRAY = composeSerialTypeId(SerialType::UTF_CHAR_ARRAY),
     /// Signed low 32 raw decimal bits, without numeric conversion.
@@ -103,7 +111,13 @@ enum class SerialFieldType : std::int32_t {
     /// All signed64 decimal bits, without a physical VOID tail.
     WIDE_DECIMAL = composeSerialTypeId(SerialType::COMPACT_INT, FieldRepresentation::WIDE_DECIMAL),
     /// All signed 64 raw milliseconds, without event-time conversion.
-    TIME_MILLIS = composeSerialTypeId(SerialType::COMPACT_INT, FieldRepresentation::TIME_MILLIS)
+    TIME_MILLIS = composeSerialTypeId(SerialType::COMPACT_INT, FieldRepresentation::TIME_MILLIS),
+    /// Nullable UTFString preserving exact UTF-16 units, not character-counted type10.
+    STRING = composeSerialTypeId(SerialType::BYTE_ARRAY, FieldRepresentation::STRING),
+    /// Nullable opaque custom bytes, with no tag or class interpretation.
+    CUSTOM_OBJECT = composeSerialTypeId(SerialType::BYTE_ARRAY, FieldRepresentation::CUSTOM_OBJECT),
+    /// Nullable opaque marshalled bytes, with projected compact-int length and no deserialization.
+    SERIAL_OBJECT = composeSerialTypeId(SerialType::BYTE_ARRAY, FieldRepresentation::SERIAL_OBJECT)
 };
 
 /** Explicit exact-type policy; the default preserves the original bounded subset. */
@@ -111,7 +125,7 @@ enum class LocalProfile {
     COMPACT_INT_V1,     ///< Only ordinary full type 8.
     QUOTE_FIELDS_V1,    ///< Exactly 2, 8, 56 and 120; no representation conversions.
     EXTENDED_FIELDS_V1, ///< Exactly 2, 8, 10, 40, 56, 72, 88 and 120; ordinary fields only.
-    BINARY_FIELDS_V1    ///< Read-only ordinary scalar subset of the finite binary catalog; explicit opt-in.
+    BINARY_FIELDS_V1    ///< Read-only ordinary exact fields of the finite binary catalog; explicit opt-in.
 };
 
 /** Test an exact full identity against a selected local policy.
@@ -145,6 +159,10 @@ enum class LocalProfile {
     case SerialFieldType::DECIMAL:
     case SerialFieldType::LONG:
     case SerialFieldType::TIME_MILLIS:
+    case SerialFieldType::BYTE_ARRAY:
+    case SerialFieldType::STRING:
+    case SerialFieldType::CUSTOM_OBJECT:
+    case SerialFieldType::SERIAL_OBJECT:
         return profile == LocalProfile::BINARY_FIELDS_V1;
     default:
         return false;
@@ -156,13 +174,14 @@ enum class LocalProfile {
  * decimal is raw signed32, long/wide-decimal/milliseconds retain signed64, and arrays retain exact units.
  */
 struct FieldValue {
-    SerialFieldType type;                  ///< Full identity, retained even when primitives are shared.
-    std::int64_t raw;                      ///< Raw integer, code point or decimal bits according to type.
-    std::optional<std::u16string> units{}; ///< Array null/empty/content; absent for every scalar tag.
+    SerialFieldType type;                          ///< Full identity, retained even when primitives are shared.
+    std::int64_t raw;                              ///< Raw integer, code point or decimal bits according to type.
+    std::optional<std::u16string> units{};         ///< Array null/empty/content; absent for every scalar tag.
+    std::optional<std::vector<std::byte>> bytes{}; ///< Nullable owned opaque body for byte/object tags only.
 
     /** Compare the identity and complete raw representation, including array nullability.
      * @param other Owned value to compare.
-     * @return True only when type, raw bits and nullable units all match.
+     * @return True only when type, raw bits and both nullable payloads all match.
      */
     bool operator==(const FieldValue &other) const = default;
 };
@@ -172,11 +191,20 @@ struct FieldValue {
  * @return Whether the known tag, scalar range and nullable payload obey FIELD-TYPES.
  */
 [[nodiscard]] constexpr bool validFieldValue(const FieldValue &value) noexcept {
-    if (value.type == SerialFieldType::UTF_CHAR_ARRAY) {
-        return value.raw == 0;
+    if (value.type == SerialFieldType::UTF_CHAR_ARRAY || value.type == SerialFieldType::STRING) {
+        return value.raw == 0 && !value.bytes;
     }
 
     if (value.units) {
+        return false;
+    }
+
+    if (value.type == SerialFieldType::BYTE_ARRAY || value.type == SerialFieldType::CUSTOM_OBJECT ||
+        value.type == SerialFieldType::SERIAL_OBJECT) {
+        return value.raw == 0;
+    }
+
+    if (value.bytes) {
         return false;
     }
 

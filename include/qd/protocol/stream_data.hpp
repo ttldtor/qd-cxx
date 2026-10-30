@@ -97,10 +97,15 @@ struct StreamDataLimits {
     std::size_t emittedValues;               ///< Aggregate logical local values, including absent fields.
     std::size_t ownedSymbolUnits;            ///< Aggregate units in output symbols, including repeat copies.
     encoding::SymbolLimits symbol;           ///< Remaining-span, per-symbol and retained-state limits.
-    encoding::CharArrayLimits fieldString{}; ///< Maximum encoded bytes and units in one string, including skips.
-    std::size_t fieldBytes = 0;              ///< Aggregate examined string bytes, including prefixes and failed reads.
+    encoding::CharArrayLimits fieldString{}; ///< Type10 encoded bound; per-value reserved units for both text tags.
+    std::size_t fieldBytes = 0;              ///< Aggregate examined type10 bytes, including prefixes and failed reads.
     std::size_t fieldUnits = 0;      ///< Aggregate admitted string units, without refunds for skips or replacements.
     std::size_t ownedFieldUnits = 0; ///< Completed plus current and temporary string units; logical storage only.
+    std::size_t fieldPayloadEncodedBytes = 0; ///< Examined prefix/body bytes for one byte/object/UTFString value.
+    std::size_t fieldPayloadBytes = 0;        ///< Admitted declared body bytes for one new payload value.
+    std::size_t payloadEncodedBytes = 0; ///< Aggregate examined new-payload bytes, including failed reads and skips.
+    std::size_t payloadWorkBytes = 0;  ///< Aggregate admitted new-payload body work; no skip/replacement/error refunds.
+    std::size_t ownedPayloadBytes = 0; ///< Completed plus current plus temporary new-payload logical storage bytes.
 };
 
 /** Owned local record; missing fields contain measured fresh-storage raw zero with their type. */
@@ -108,7 +113,7 @@ struct StreamDataRecord {
     std::int32_t localId;                      ///< Local schema ID, never sender identity.
     encoding::SymbolValue symbol;              ///< Exact owned UTF-16 and raw encoding metadata.
     std::vector<std::int32_t> values;          ///< Legacy profile only, local order; empty for the extended profile.
-    std::vector<core::FieldValue> typedValues; ///< Every non-compact profile, with exact local tags/raw values.
+    std::vector<core::FieldValue> typedValues; ///< Every non-compact profile, with exact tags/raw and owned payloads.
     core::RecordContext context{}; ///< Source schema/record identity; old aggregate initializers remain untagged.
     std::int32_t senderId = -1;    ///< Owned exact wire ID; -1 only for caller-created records without source identity.
 };
@@ -123,13 +128,18 @@ struct StreamDataResult {
     std::size_t errorOffset = 0; ///< Primitive start or validation checkpoint; payload size on success.
     encoding::SymbolStatus symbolStatus = encoding::SymbolStatus::OK; ///< Symbol cause when applicable.
     std::vector<StreamDataRecord> records; ///< Completed records only; retained on later failure.
-    std::size_t fieldBytes = 0;            ///< Charged string bytes examined, including failed reads.
-    std::size_t fieldUnits = 0;      ///< Charged admitted string units, including skips, replacements and failures.
-    std::size_t ownedFieldUnits = 0; ///< String units retained by completed records only.
+    std::size_t fieldBytes = 0;            ///< Charged type10 bytes examined, including failed reads.
+    std::size_t fieldUnits = 0;          ///< Charged admitted string units, including skips, replacements and failures.
+    std::size_t ownedFieldUnits = 0;     ///< String units retained by completed records only.
+    std::size_t payloadEncodedBytes = 0; ///< Examined new-payload bytes, including prefixes and failed reads.
+    std::size_t payloadWorkBytes = 0;  ///< Admitted new-payload body work, including skips, replacements and failures.
+    std::size_t ownedPayloadBytes = 0; ///< Logical new-payload bytes retained by completed records only.
 };
 
 /** Decode one complete type-15 payload with fresh message-local symbol state.
- * The context selects exact field support; BINARY_FIELDS_V1 adds only its ordinary scalar subset.
+ * The context selects exact field support; BINARY_FIELDS_V1 adds ordinary scalar and owned
+ * byte/object/UTFString identities with explicit finite payload budgets. Existing profiles and
+ * type10's character grammar and byte-budget defaults retain their meanings.
  * @param payload Borrowed payload excluding length/type, unchanged during this call.
  * @param context Validated static snapshot, borrowed during this call.
  * @param limits Required finite per-message budgets.

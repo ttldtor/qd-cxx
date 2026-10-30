@@ -511,6 +511,304 @@ TEST_CASE("both pinned production scalar parsers match exact raw values truncati
     }
 }
 
+namespace {
+/** Configure both old string units and new finite payload budgets.
+ * @return Tape budgets large enough for the bounded production witnesses.
+ */
+p::TapeLimits objectLimits() {
+    auto result = limits();
+    result.data.fieldString.codeUnits = 8192;
+    result.data.fieldUnits = result.data.ownedFieldUnits = 32768;
+    result.data.fieldPayloadEncodedBytes = result.data.fieldPayloadBytes = 16384;
+    result.data.payloadEncodedBytes = result.data.payloadWorkBytes = 32768;
+    result.data.ownedPayloadBytes = 65536;
+
+    return result;
+}
+
+/** Construct the exact ordinary producer projection without a Java conversion layer.
+ * @param type Full retained Value identity.
+ * @return Owned local schema.
+ */
+c::LocalSchema objectSchema(std::int32_t type) {
+    const std::vector<c::LocalRecord> records{{0, u"Objects", false, {{type}, {8}}, {{u"Value", 0}, {u"Sentinel", 1}}}};
+    auto result = c::LocalSchema::create(records, objectLimits().context.schema, c::LocalProfile::BINARY_FIELDS_V1);
+    REQUIRE(result);
+
+    return std::move(*result);
+}
+
+/** Bind exact wire fields independently of their Java local-class reader choice.
+ * @param type Full wire Value identity.
+ * @param mode Known, unknown-field, unknown-record or repeated-target witness.
+ * @return Owned immutable source binding.
+ */
+p::StreamDataContext objectContext(std::int32_t type, std::string_view mode) {
+    auto local = objectSchema(type);
+
+    if (mode == "unknown-record") {
+        auto empty = c::LocalSchema::create({}, objectLimits().context.schema, c::LocalProfile::BINARY_FIELDS_V1);
+        REQUIRE(empty);
+        local = std::move(*empty);
+    }
+
+    std::vector<p::WireFieldDescription> fields{{mode == "unknown-field" ? u"Skip" : u"Value", type}};
+
+    if (mode == "repeated-target")
+        fields.push_back({u"Value", type});
+
+    fields.push_back({u"Sentinel", 8});
+    const std::vector<p::WireRecordDescription> source{{0, u"Objects", std::move(fields)}};
+    auto result = p::StreamDataContext::create(local, source, objectLimits().context);
+    REQUIRE(result);
+
+    return std::move(*result);
+}
+
+/** Convert the oracle's canonical observation, never execute marshalled content.
+ * @param type Exact retained full identity.
+ * @param observed Java owned bytes/units spelling.
+ * @return Owned expected logical value.
+ */
+c::FieldValue objectValue(std::int32_t type, std::string_view observed) {
+    c::FieldValue result{static_cast<c::SerialFieldType>(type), 0};
+
+    if (observed == "null" || observed == "marshalled:null")
+        return result;
+
+    if (type == 137) {
+        REQUIRE(observed.starts_with("units:"));
+        const auto text = observed.substr(6);
+        result.units = text.empty() ? std::u16string{} : units(text);
+    } else {
+        REQUIRE(observed.starts_with(type == 249 ? "marshalled:" : "bytes:"));
+        const auto text = observed.substr(type == 249 ? 11 : 6);
+        result.bytes = text == "empty" ? std::vector<std::byte>{} : bytes(text);
+    }
+
+    return result;
+}
+
+/** Match the production capture's explicit sentinel-presence choice.
+ * @param id Oracle scenario identity.
+ * @return Whether a compact77 was appended after the supplied field bytes.
+ */
+bool objectSentinel(std::string_view id) {
+    return !id.starts_with("body-prefix-") && id != "truncated-length" && id != "truncated-body" &&
+           id != "utf-tail-exhaustion";
+}
+} // namespace
+
+TEST_CASE("both pinned object consumers establish exact value UTF error and examined-position parity") {
+    for (const auto &directory : {fixtures / "objects", fixtures.parent_path() / "current-object-expected"}) {
+        std::ifstream input(directory / "samples.tsv");
+        REQUIRE(input.good());
+        std::string line;
+        REQUIRE(std::getline(input, line));
+        REQUIRE(line == "case\tobject-samples");
+        std::size_t cases = 0, repeated = 0, unknown = 0;
+
+        while (std::getline(input, line)) {
+            const auto row = cells(line);
+
+            if (row[0] == "binding-parser") {
+                REQUIRE(row.size() == 11);
+
+                if (row[3] == "unknown-record") {
+                    ++unknown;
+                    continue;
+                }
+
+                REQUIRE(row[3] == "repeated-target");
+                const auto type = number<std::int32_t>(row[1]);
+                auto payload = bytes("244d00");
+                const auto body = bytes(row[5]);
+                payload.insert(payload.end(), body.begin(), body.end());
+                payload.insert(payload.end(), {std::byte{0x80}, std::byte{0x4d}});
+                const auto plan = objectContext(type, "repeated-target");
+                const auto result = row[4] == "5" ? p::decodeRawData(payload, plan, objectLimits().data)
+                                                  : p::decodeStreamData(payload, plan, objectLimits().data);
+                REQUIRE(result.status == p::StreamDataStatus::OK);
+                CHECK(result.consumed == 3 + number<std::size_t>(row[10]));
+                REQUIRE(result.records.size() == 1);
+                CHECK(result.records[0].typedValues[0] == objectValue(type, row[8]));
+                CHECK(result.records[0].typedValues[1].raw == 77);
+                ++repeated;
+            }
+
+            if (row[0] != "parser" || row[3] != "known")
+                continue;
+
+            REQUIRE(row.size() == 11);
+            CAPTURE(directory);
+            CAPTURE(row[1]);
+            CAPTURE(row[2]);
+            CAPTURE(row[4]);
+            const auto type = number<std::int32_t>(row[1]);
+            auto payload = bytes("244d00");
+            const auto body = bytes(row[5] == "empty" ? "" : row[5]);
+            payload.insert(payload.end(), body.begin(), body.end());
+
+            if (objectSentinel(row[2]))
+                payload.insert(payload.end(), {std::byte{0x80}, std::byte{0x4d}});
+
+            const auto plan = objectContext(type, "known");
+            const auto result = row[4] == "5" ? p::decodeRawData(payload, plan, objectLimits().data)
+                                              : p::decodeStreamData(payload, plan, objectLimits().data);
+            CHECK(result.consumed == 3 + number<std::size_t>(row[10]));
+
+            if (row[7] == "0") {
+                REQUIRE(result.status == p::StreamDataStatus::OK);
+                REQUIRE(result.records.size() == 1);
+                CHECK(result.records[0].typedValues[0] == objectValue(type, row[8]));
+                CHECK(result.records[0].typedValues[1].raw == number<std::int64_t>(row[9]));
+            } else {
+                CHECK(result.status != p::StreamDataStatus::OK);
+                CHECK(result.records.empty());
+            }
+
+            // Generic exact grammar stays fixed when the mapping discards the field/record.
+            for (const auto mode : {"unknown-field", "unknown-record"}) {
+                const auto skipped = p::decodeStreamData(payload, objectContext(type, mode), objectLimits().data);
+                CHECK(skipped.status == result.status);
+                CHECK(skipped.consumed == result.consumed);
+                CHECK(skipped.payloadEncodedBytes == result.payloadEncodedBytes);
+                CHECK(skipped.payloadWorkBytes == result.payloadWorkBytes);
+                CHECK(skipped.fieldUnits == result.fieldUnits);
+                CHECK(skipped.ownedPayloadBytes == 0);
+            }
+
+            ++cases;
+        }
+
+        CHECK(cases == 162);
+        CHECK(repeated == 24);
+        CHECK(unknown == 162);
+    }
+}
+
+TEST_CASE("original object FileWriter and requested composer captures survive reader and input destruction") {
+    for (const auto &directory : {fixtures / "objects", fixtures.parent_path() / "current-object-expected"}) {
+        for (const auto type : {9, 137, 233, 249}) {
+            for (const auto id : {"null", "empty", "content"}) {
+                for (const bool raw : {false, true}) {
+                    const std::string suffix = raw ? "-raw" : "";
+
+                    for (const bool requested : {false, true}) {
+                        auto wire = scalarTapeInput(directory, "file-" + std::to_string(type) + "-" + id + suffix);
+
+                        if (requested) {
+                            const auto prefix = e::readCompactInt(wire);
+                            REQUIRE(prefix.status == e::Status::OK);
+                            wire.resize(prefix.consumed + static_cast<std::size_t>(prefix.value));
+                            const auto composed =
+                                scalarTapeInput(directory, "composer-" + std::to_string(type) + "-" + id + suffix);
+                            wire.insert(wire.end(), composed.begin(), composed.end());
+                        }
+
+                        const auto localType = !requested && type == 233 ? 9 : type;
+
+                        for (const auto chunk : {std::size_t{1}, std::size_t{7}, std::size_t{65536}}) {
+                            std::vector<p::StreamDataRecord> saved;
+                            {
+                                auto local = objectSchema(localType);
+                                p::TapeReader reader(local, objectLimits(),
+                                                     raw ? p::TapeMode::RAW_MESSAGE_V1 : p::TapeMode::LEGACY);
+                                auto remaining = std::span<const std::byte>(wire);
+
+                                while (!remaining.empty()) {
+                                    auto result = reader.feed(remaining.first(std::min(chunk, remaining.size())));
+                                    REQUIRE(result.status != p::TapeStatus::FAILED);
+                                    REQUIRE(result.accepted > 0);
+                                    remaining = remaining.subspan(result.accepted);
+                                    saved.insert(saved.end(), result.records.begin(), result.records.end());
+                                }
+
+                                CHECK(reader.finish() == p::TapeStatus::FINISHED);
+                                CHECK(reader.processedRecords() == 1);
+                                CHECK(reader.payloadWorkBytes() == (std::string_view(id) == "content"
+                                                                        ? (type == 137   ? 6
+                                                                           : type == 249 ? 5
+                                                                                         : 4)
+                                                                        : 0));
+                            }
+                            REQUIRE(saved.size() == 1);
+                            CHECK(saved[0].typedValues[0].type == static_cast<c::SerialFieldType>(localType));
+                            CHECK(saved[0].typedValues[1].raw == 77);
+                            CHECK(c::validFieldValue(saved[0].typedValues[0]));
+                            CHECK(saved[0].context.valid());
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+TEST_CASE("new payload TapeReader charges cumulative successful and terminal failing frames without output refunds") {
+    for (const bool raw : {false, true}) {
+        const std::string suffix = raw ? "-raw" : "";
+        auto wire = scalarTapeInput(fixtures / "objects", "file-9-content" + suffix);
+        const auto header = e::readCompactInt(wire);
+        REQUIRE(header.status == e::Status::OK);
+        wire.resize(header.consumed + static_cast<std::size_t>(header.value));
+        const auto composed = scalarTapeInput(fixtures / "objects", "composer-9-content" + suffix);
+        const auto description = e::readCompactInt(composed);
+        REQUIRE(description.status == e::Status::OK);
+        const auto dataStart = description.consumed + static_cast<std::size_t>(description.value);
+        wire.insert(wire.end(), composed.begin(), composed.end());
+        wire.insert(wire.end(), composed.begin() + dataStart, composed.end());
+
+        for (const auto member : {&p::StreamDataLimits::payloadEncodedBytes, &p::StreamDataLimits::payloadWorkBytes,
+                                  &p::StreamDataLimits::ownedPayloadBytes}) {
+            const auto required =
+                member == &p::StreamDataLimits::payloadEncodedBytes ? std::size_t{10} : std::size_t{8};
+
+            for (const auto allowance : {std::size_t{0}, required - 1, required, required + 1}) {
+                auto budget = objectLimits();
+                budget.data.*member = allowance;
+                p::TapeReader reader(objectSchema(9), budget, raw ? p::TapeMode::RAW_MESSAGE_V1 : p::TapeMode::LEGACY);
+                auto remaining = std::span<const std::byte>(wire);
+                std::size_t delivered = 0;
+
+                while (!remaining.empty()) {
+                    auto event = reader.feed(remaining);
+                    remaining = remaining.subspan(event.accepted);
+                    delivered += event.records.size();
+                    event.records.clear();
+
+                    if (event.status == p::TapeStatus::FAILED)
+                        break;
+
+                    REQUIRE(event.accepted > 0);
+                }
+
+                if (allowance >= required) {
+                    CHECK(reader.finish() == p::TapeStatus::FINISHED);
+                    CHECK(delivered == 2);
+                    CHECK(reader.payloadEncodedBytes() == 10);
+                    CHECK(reader.payloadWorkBytes() == 8);
+                    CHECK(reader.ownedPayloadBytes() == 8);
+                } else {
+                    CHECK(reader.finish() == p::TapeStatus::FAILED);
+                    CHECK(reader.diagnostic().error == p::TapeError::RESOURCE_LIMIT);
+                    CHECK(reader.diagnostic().stage == "data");
+                    CHECK(reader.payloadEncodedBytes() <= budget.data.payloadEncodedBytes);
+                    CHECK(reader.payloadWorkBytes() <= budget.data.payloadWorkBytes);
+                    CHECK(reader.ownedPayloadBytes() == (allowance == 0 ? 0 : 4));
+                    CHECK(delivered == (allowance == 0 ? 0 : 1));
+                    CHECK(reader.feed(remaining).accepted == 0);
+
+                    if (allowance > 0 && member == &p::StreamDataLimits::ownedPayloadBytes) {
+                        CHECK(reader.payloadWorkBytes() == 8);
+                        CHECK(reader.payloadEncodedBytes() == 6);
+                    }
+                }
+            }
+        }
+    }
+}
+
 TEST_CASE("zero-width VOID keeps explicit source bindings distinct from dense local defaults") {
     const auto declared = scalarContext(0, {{u"Sentinel", 8}, {u"Value", 0}, {u"skip", 0}, {u"Value", 0}});
     const auto absent = scalarContext(0, {{u"Sentinel", 8}});

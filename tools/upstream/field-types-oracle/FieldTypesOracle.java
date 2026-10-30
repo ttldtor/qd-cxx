@@ -770,12 +770,18 @@ public final class FieldTypesOracle {
 
   public static void main(String[] args) throws Exception {
     require(
-        args.length == 1 || (args.length == 2 && args[1].equals("scalar-only")),
+        args.length == 1
+            || (args.length == 2
+                && (args[1].equals("scalar-only") || args[1].equals("object-only"))),
         "new output directory required");
     Path root = Paths.get(args[0]);
     Files.createDirectory(root);
     if (args.length == 2) {
-      Scalars.capture(root);
+      if (args[1].equals("scalar-only")) {
+        Scalars.capture(root);
+      } else {
+        ObjectFieldsOracle.capture(root);
+      }
       return;
     }
     schema(root);
@@ -787,6 +793,7 @@ public final class FieldTypesOracle {
     composer(root);
     diagnostics(root);
     Scalars.capture(Files.createDirectory(root.resolve("scalars")));
+    ObjectFieldsOracle.capture(Files.createDirectory(root.resolve("objects")));
     System.out.println(
         "CAPTURE COMPLETE: exact field types, original Profile and production paths");
   }

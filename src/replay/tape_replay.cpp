@@ -288,6 +288,9 @@ class ReplaySession {
         c.fieldBytes = reader.fieldBytes();
         c.fieldUnits = reader.fieldUnits();
         c.ownedFieldUnits = reader.ownedFieldUnits();
+        c.payloadEncodedBytes = reader.payloadEncodedBytes();
+        c.payloadWorkBytes = reader.payloadWorkBytes();
+        c.ownedPayloadBytes = reader.ownedPayloadBytes();
     }
 
     /** Execute fresh parsing and completion, with pending frame destruction before return. */

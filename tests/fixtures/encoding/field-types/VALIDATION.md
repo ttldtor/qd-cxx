@@ -2,6 +2,13 @@
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
+For the2026-10-30 owned-payload extension, see the separate
+[object validation](../../../conformance/protocol/field-types/OBJECT-VALIDATION.md)
+and [capture manifest](object-captures.json): actual full locked Verify preserves
+the82 root and25 scalar artifacts, both-pin final-source capture repeats match49
+object artifacts per pin, and28 verifier mutations are rejected. The historical
+validation below is preserved with its original source hashes and scope.
+
 Starting HEAD: `a9299317c1d4e7f3202ed8136916fd3ee94b9f3f`. Executed 2026-09-22 UTC with locked QD
 `0ddc0a09779fb61d74cc0b37c6449ff47dcb715f`, Zulu JDK 8 and the pinned upstream build path.
 Formatting used OpenJDK 23.0.2 and google-java-format 1.36.1. These are author checks, not

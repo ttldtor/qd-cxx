@@ -120,7 +120,8 @@ class Formatter {
      * @param budget Remaining stdout bytes.
      * @param timing Optional delivered tape timing; null preserves untimed output.
      * @param generation Current accepted description generation, used only by WIRE_SCHEMA_V1.
-     * @return Complete line or OutputLimit.
+     * @return Complete line or OutputLimit; invalid_argument for noncanonical values or payload
+     * identities9/137/233/249 unsupported by the existing output grammars, including null values.
      */
     std::string record(const protocol::StreamDataRecord &record, std::u16string_view name, std::size_t frameIndex,
                        std::size_t index, std::size_t budget, const protocol::TapeTiming *timing = nullptr,

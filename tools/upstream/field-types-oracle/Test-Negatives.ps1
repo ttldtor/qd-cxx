@@ -7,13 +7,14 @@ $root=[IO.Path]::GetFullPath($RunDirectory)
 if(Test-Path -LiteralPath $root){throw 'RunDirectory must be new'}
 New-Item -ItemType Directory -Path $root | Out-Null
 $expected=(Resolve-Path -LiteralPath $ExpectedDirectory).Path
-$mutations=@('type','value','unit','null-empty','order','record','arity','missing-field','missing-record','unknown-row','duplicate-row','missing-completion','duplicate-completion','misplaced-completion','extra-file','binary','primitive-consumption','scalar-value','scalar-wire-type','scalar-consumed','scalar-byte','scalar-missing','scalar-fanout')
+$mutations=@('type','value','unit','null-empty','order','record','arity','missing-field','missing-record','unknown-row','duplicate-row','missing-completion','duplicate-completion','misplaced-completion','extra-file','binary','primitive-consumption','scalar-value','scalar-wire-type','scalar-consumed','scalar-byte','scalar-missing','scalar-fanout','object-null-empty','object-byte','object-consumed','object-missing','object-local-type')
 $results=[Collections.Generic.List[object]]::new()
 foreach($mutation in $mutations){
     $dir=Join-Path $root $mutation
     New-Item -ItemType Directory -Path $dir | Out-Null
     Get-ChildItem -LiteralPath $expected -File | Copy-Item -Destination $dir
     Copy-Item -LiteralPath (Join-Path $expected 'scalars') -Destination $dir -Recurse
+    Copy-Item -LiteralPath (Join-Path $expected 'objects') -Destination $dir -Recurse
     $path=Join-Path $dir 'mixed-stream.tsv';$rows=[IO.File]::ReadAllLines($path)
     switch($mutation){
         'type' {$rows[3]=$rows[3].Replace("`t40`t","`t8`t")}
@@ -53,6 +54,25 @@ foreach($mutation in $mutations){
         $changed = ($scalarRows -join "`n") + "`n"
         if ($original -ceq $changed) { throw "Scalar mutation changed nothing: $mutation" }
         [IO.File]::WriteAllText($scalarPath, $changed)
+    }
+    if ($mutation.StartsWith('object-')) {
+        $objectPath=Join-Path $dir 'objects/samples.tsv'
+        $original=[IO.File]::ReadAllText($objectPath)
+        $objectRows=[IO.File]::ReadAllLines($objectPath)
+        switch ($mutation) {
+            'object-null-empty' { $objectRows[1]=$objectRows[1].Replace("`tnull`t77","`tbytes:empty`t77") }
+            'object-byte' { $objectRows[1]=$objectRows[1].Replace('7f804d','00804d') }
+            'object-consumed' {
+                $index=[Array]::FindIndex($objectRows,[Predicate[string]]{param($row)$row.StartsWith("FieldReader-message-part`t137`tsplit`tknown`t")})
+                if($index -lt 0){throw 'UTF split observation absent'}
+                $c=$objectRows[$index].Split("`t");$c[8]='2';$objectRows[$index]=$c -join "`t"
+            }
+            'object-local-type' { $objectRows[2]=$objectRows[2].Replace("`tactual-local-type`t9`t","`tactual-local-type`t233`t") }
+            'object-missing' { $objectRows=$objectRows[0..($objectRows.Count-2)] }
+        }
+        $changed=($objectRows -join "`n")+"`n"
+        if($original -ceq $changed){throw "Object mutation changed nothing: $mutation"}
+        [IO.File]::WriteAllText($objectPath,$changed)
     }
     [IO.File]::WriteAllText($path,($rows -join "`n")+"`n")
     $failed=$false

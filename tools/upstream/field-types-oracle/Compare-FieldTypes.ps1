@@ -113,3 +113,75 @@ function CompareScalars([string]$ActualRoot, [string]$ExpectedRoot) {
     "PASS: strict scalar comparison of $($names.Count) artifacts"
 }
 CompareScalars (Join-Path $Actual 'scalars') (Join-Path $Expected 'scalars')
+
+# Called by Invoke-Oracle.ps1 after the unchanged root/scalar comparisons.
+# Validates the finite owned-payload capture, then requires original byte equality.
+function CompareObjects([string]$ActualRoot, [string]$ExpectedRoot) {
+    $names = @('samples.tsv') + @(foreach ($kind in @('composer','file')) {
+        foreach ($type in @(9,137,233,249)) { foreach ($id in @('null','empty','content')) {
+            "$kind-$type-$id.qtp"; "$kind-$type-$id-raw.qtp"
+        } }
+    })
+    foreach ($root in @($ActualRoot, $ExpectedRoot)) {
+        $files = @(Get-ChildItem -LiteralPath $root -File | Sort-Object Name)
+        Assert (($files.Name -join '|') -ceq (($names | Sort-Object) -join '|')) 'exact object artifact set'
+        foreach ($file in $files) { Assert ($file.Length -gt 0 -and $file.Length -lt 1048576) 'bounded object artifact' }
+        $rows = [IO.File]::ReadAllLines((Join-Path $root 'samples.tsv'))
+        Assert ($rows.Count -eq 803 -and $rows[0] -ceq "case`tobject-samples" -and $rows[-1] -ceq "complete`tobject-samples") 'object scenario count/header/completion'
+        $keys = [Collections.Generic.HashSet[string]]::new()
+        $counts = @{}
+        for ($n = 1; $n -lt $rows.Count - 1; ++$n) {
+            $c = $rows[$n].Split("`t")
+            Assert ($c -notcontains '' -and $c[1] -cin @('9','137','233','249')) 'object full type and cells'
+            $kind = $c[0]
+            if (-not $counts.ContainsKey($kind)) { $counts[$kind] = 0 }
+            $counts[$kind]++
+            $identity = $null
+            $observed = $null
+            switch -CaseSensitive ($kind) {
+                'composer' {
+                    Assert ($c.Count -eq 10 -and $c[2] -cin @('null','empty','content') -and $c[3] -cin @('5','15')) 'object composer grammar'
+                    Assert ($c[4] -ceq $(if ($c[1] -ceq '233') { '9' } else { $c[1] })) 'requested versus local type'
+                    HexBytes $c[5]
+                    Assert ($c[6] -ceq $(if ($c[3] -ceq '5') { '3' } else { '1' }) -and $c[7] -ceq '0' -and $c[9] -ceq '77') 'object composer callbacks/sentinel'
+                    $observed=$c[8]; $identity="$kind/$($c[1])/$($c[2])/$($c[3])"
+                }
+                'FileWriter-FileReader' {
+                    Assert ($c.Count -eq 10 -and $c[2] -cin @('null','empty','content') -and $c[3] -cin @('5','15') -and $c[4] -ceq 'actual-local-type') 'object file grammar'
+                    Assert ($c[5] -ceq $(if ($c[1] -ceq '233') { '9' } else { $c[1] })) 'FileWriter actual local type'
+                    Assert ($c[6] -ceq $(if ($c[3] -ceq '5') { '3' } else { '1' }) -and $c[7] -ceq '0' -and $c[9] -ceq '77') 'object file callbacks/sentinel'
+                    $observed=$c[8]; $identity="$kind/$($c[1])/$($c[2])/$($c[3])"
+                }
+                { $_ -cin @('parser','binding-parser') } {
+                    Assert ($c.Count -eq 11 -and $c[4] -cin @('5','15')) 'object parser grammar'
+                    Assert ($c[3] -cin $(if ($kind -ceq 'parser') { @('known','unknown-field') } else { @('unknown-record','repeated-target') })) 'object binding mode'
+                    Assert ($c[5] -cmatch '^(empty|(?:[0-9a-f]{2})+)$') 'object parser bytes'
+                    foreach ($i in @(6,7,9,10)) { Integer $c[$i] }
+                    Assert ([int]$c[10] -ge 0 -and [int]$c[10] -le $(if($c[5] -ceq 'empty'){2}else{$c[5].Length/2+2})) 'object actual field examination'
+                    Assert ($c[6] -cin @('0','1','3') -and $c[7] -cin @('0','1')) 'object callback counts'
+                    $observed=$c[8]; $identity="$kind/$($c[1])/$($c[2])/$($c[3])/$($c[4])"
+                }
+                'FieldReader-message-part' {
+                    Assert ($c.Count -eq 9 -and $c[3] -cin @('known','unknown-field')) 'production FieldReader grammar'
+                    Assert ($c[4] -cmatch '^(empty|(?:[0-9a-f]{2})+)$' -and $c[5] -cin @('OK','IOException','UTFDataFormatException','EOFException')) 'production FieldReader bytes/status'
+                    Integer $c[7]; Integer $c[8]
+                    $observed=$c[6]; $identity="$kind/$($c[1])/$($c[2])/$($c[3])"
+                }
+                'primitive-message-part' {
+                    Assert ($c.Count -eq 7 -and $c[3] -cmatch '^(empty|(?:[0-9a-f]{2})+)$' -and $c[4] -cin @('OK','IOException','UTFDataFormatException','EOFException')) 'supporting bounded primitive grammar'
+                    Integer $c[6]
+                    $observed=$c[5]; $identity="$kind/$($c[1])/$($c[2])"
+                }
+                default { throw "unknown object row $kind" }
+            }
+            Assert ($observed -cmatch '^(-|skipped|null|bytes:(empty|(?:[0-9a-f]{2})+)|marshalled:(null|empty|(?:[0-9a-f]{2})+)|units:(?:[0-9a-f]{4})*)$') 'owned object projection grammar'
+            Assert ($keys.Add($identity)) 'unique object observation'
+        }
+        foreach ($entry in @{composer=24;'FileWriter-FileReader'=24;parser=324;'binding-parser'=186;'FieldReader-message-part'=162;'primitive-message-part'=81}.GetEnumerator()) {
+            Assert ($counts[$entry.Key] -eq $entry.Value) 'complete finite object surfaces'
+        }
+    }
+    foreach ($name in $names) { Assert ((Get-FileHash (Join-Path $ActualRoot $name)).Hash -ceq (Get-FileHash (Join-Path $ExpectedRoot $name)).Hash) "object artifact mismatch: $name" }
+    "PASS: strict object comparison of $($names.Count) artifacts"
+}
+CompareObjects (Join-Path $Actual 'objects') (Join-Path $Expected 'objects')

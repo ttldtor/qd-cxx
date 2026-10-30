@@ -443,6 +443,29 @@ TEST_CASE("Field display and schema mismatches fail before any input or output w
     }
 }
 
+TEST_CASE("existing generic formats explicitly refuse every new payload identity including null") {
+    for (const auto format : {view::OutputFormat::TSV, view::OutputFormat::HUMAN}) {
+        for (const auto profile : {view::DisplayProfile::ORACLE_FIELD_TYPES_V1,
+                                   view::DisplayProfile::EXTERNAL_SCHEMA_V1, view::DisplayProfile::WIRE_SCHEMA_V1}) {
+            const view::Formatter formatter(format, profile);
+
+            for (const auto type : {9, 137, 233, 249}) {
+                protocol::StreamDataRecord record{0, {}, {}, {{static_cast<core::SerialFieldType>(type), 0}}};
+                record.senderId = 0;
+                CHECK_THROWS_AS(formatter.record(record, u"Objects", 0, 0, 4096, nullptr, 1), std::invalid_argument);
+
+                if (type == 137) {
+                    record.typedValues[0].units.emplace();
+                } else {
+                    record.typedValues[0].bytes.emplace();
+                }
+
+                CHECK_THROWS_AS(formatter.record(record, u"Objects", 0, 0, 4096, nullptr, 1), std::invalid_argument);
+            }
+        }
+    }
+}
+
 /** Run injected IO and exact field-output checks against a supplied immutable fixture root.
  * @param argc Argument count.
  * @param argv Executable, expected-artifact directory, then optional doctest arguments.

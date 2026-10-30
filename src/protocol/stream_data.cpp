@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <bit>
+#include <limits>
 #include <new>
 #include <stdexcept>
 #include <utility>
@@ -194,6 +195,209 @@ encoding::ReadResult<std::int64_t> readScalar(std::span<const std::byte> input, 
     }
 }
 
+/** Charged temporary payload; errors retain work but never expose a partial value. */
+struct PayloadReadResult {
+    std::optional<std::u16string> units{};         ///< Exact UTFString units on success only.
+    std::optional<std::vector<std::byte>> bytes{}; ///< Exact opaque body on success only.
+    std::size_t consumed = 0;                      ///< Actual examined prefix/body, including an attempted UTF tail.
+    std::size_t chargedBytes = 0;                  ///< Admitted body-byte work, never refunded after admission.
+    std::size_t chargedUnits = 0;  ///< Admitted UTF-16 reservation work, never refunded after admission.
+    std::size_t retainedBytes = 0; ///< Logical successful temporary storage, excluding allocator capacity.
+    encoding::Status status = encoding::Status::OK; ///< First error or successful completion.
+};
+
+/** Check a UTF-16 append against its admitted reservation without overflowing.
+ * @param reservedUnits Admitted maximum logical UTF-16 units.
+ * @param currentUnits Units already held by the temporary.
+ * @param additionalUnits Complete decoded point width, one or two units.
+ * @return Whether the whole point fits; false also rejects an invalid current count.
+ */
+constexpr bool hasStringUnitRoom(std::size_t reservedUnits, std::size_t currentUnits,
+                                 std::size_t additionalUnits) noexcept {
+    return currentUnits <= reservedUnits && additionalUnits <= reservedUnits - currentUnits;
+}
+
+// Prove capped-reservation boundaries without constructing multi-gigabyte strings.
+static_assert(hasStringUnitRoom(std::numeric_limits<std::int32_t>::max(), std::numeric_limits<std::int32_t>::max() - 1,
+                                1));
+static_assert(!hasStringUnitRoom(std::numeric_limits<std::int32_t>::max(), std::numeric_limits<std::int32_t>::max() - 1,
+                                 2));
+static_assert(!hasStringUnitRoom(std::numeric_limits<std::int32_t>::max(), std::numeric_limits<std::int32_t>::max(),
+                                 1));
+static_assert(hasStringUnitRoom(std::numeric_limits<std::size_t>::max(), std::numeric_limits<std::size_t>::max() - 1,
+                                1));
+static_assert(!hasStringUnitRoom(std::numeric_limits<std::size_t>::max(), std::numeric_limits<std::size_t>::max() - 1,
+                                 2));
+static_assert(!hasStringUnitRoom(std::numeric_limits<std::size_t>::max(), std::numeric_limits<std::size_t>::max(), 1));
+static_assert(!hasStringUnitRoom(0, std::numeric_limits<std::size_t>::max(), 0));
+
+/** Read a new exact payload grammar independently of whether it will be retained.
+ * @param input Remaining complete message, borrowed only during this call.
+ * @param type Exact byte/object/UTFString identity validated by the binding.
+ * @param limits Remaining work/completed-output budgets and per-value limits.
+ * @param currentUnits Existing current-record strings that coexist with the temporary.
+ * @param currentBytes Existing current-record new payload storage that coexists with the temporary.
+ * @return Owned temporary or first error with all examined/admitted work retained.
+ */
+PayloadReadResult readPayload(std::span<const std::byte> input, core::SerialFieldType type,
+                              const StreamDataLimits &limits, std::size_t currentUnits,
+                              std::size_t currentBytes) noexcept {
+    constexpr std::int64_t NULL_LENGTH = -1;
+    constexpr std::int64_t MAX_BODY_LENGTH = std::numeric_limits<std::int32_t>::max();
+    constexpr std::size_t UNIT_BYTES = sizeof(char16_t);
+    constexpr std::uint32_t MAX_BMP_UNIT = 0xffff;
+    constexpr std::uint32_t SUPPLEMENTARY_BASE = 0x10000;
+    constexpr std::uint32_t HIGH_SURROGATE = 0xd800;
+    constexpr std::uint32_t LOW_SURROGATE = 0xdc00;
+    constexpr unsigned int SURROGATE_BITS = 10;
+    constexpr std::uint32_t SURROGATE_MASK = 0x3ff;
+    PayloadReadResult result;
+    const auto encodedAllowance = std::min(limits.fieldPayloadEncodedBytes, limits.payloadEncodedBytes);
+    const auto bounded = input.first(std::min(input.size(), encodedAllowance));
+    const auto exhausted =
+        bounded.size() < input.size() ? encoding::Status::RESOURCE_LIMIT : encoding::Status::INSUFFICIENT_INPUT;
+    auto prefix = encoding::readCompactLong(bounded);
+    result.consumed = prefix.consumed;
+
+    if (prefix.status != encoding::Status::OK) {
+        result.status = exhausted;
+
+        return result;
+    }
+
+    if (type == core::SerialFieldType::SERIAL_OBJECT) {
+        prefix.value = std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(prefix.value));
+    }
+
+    const bool text = type == core::SerialFieldType::STRING;
+    const auto maximum = text ? MAX_BODY_LENGTH * 4 : MAX_BODY_LENGTH;
+
+    if (prefix.value < NULL_LENGTH || prefix.value > maximum) {
+        result.status = encoding::Status::INVALID_LENGTH;
+
+        return result;
+    }
+
+    if (prefix.value == NULL_LENGTH) {
+        return result;
+    }
+
+    // Compare before narrowing: UTFString's wire domain can exceed a 32-bit size_t.
+    if (static_cast<std::uint64_t>(prefix.value) > input.size() - result.consumed) {
+        result.status = encoding::Status::INVALID_LENGTH;
+
+        return result;
+    }
+
+    const auto count = static_cast<std::size_t>(prefix.value);
+
+    if (count > limits.fieldPayloadBytes || count > limits.payloadWorkBytes) {
+        result.status = encoding::Status::RESOURCE_LIMIT;
+
+        return result;
+    }
+
+    result.chargedBytes = count;
+    const auto reservedUnits = text ? std::min(count, static_cast<std::size_t>(MAX_BODY_LENGTH)) : 0;
+
+    if (reservedUnits > limits.fieldString.codeUnits || reservedUnits > limits.fieldUnits) {
+        result.status = encoding::Status::RESOURCE_LIMIT;
+
+        return result;
+    }
+
+    result.chargedUnits = reservedUnits;
+
+    if (reservedUnits > limits.ownedFieldUnits - currentUnits ||
+        reservedUnits > std::numeric_limits<std::size_t>::max() / UNIT_BYTES) {
+        result.status = encoding::Status::RESOURCE_LIMIT;
+
+        return result;
+    }
+
+    const auto temporaryBytes = text ? reservedUnits * UNIT_BYTES : count;
+
+    if (temporaryBytes > limits.ownedPayloadBytes - currentBytes) {
+        result.status = encoding::Status::RESOURCE_LIMIT;
+
+        return result;
+    }
+
+    if (!text && count > bounded.size() - result.consumed) {
+        result.consumed = bounded.size();
+        result.status = exhausted;
+
+        return result;
+    }
+
+    try {
+        if (!text) {
+            const auto body = bounded.subspan(result.consumed, count);
+            std::vector<std::byte> value(body.begin(), body.end());
+            result.bytes = std::move(value);
+            result.consumed += count;
+            result.retainedBytes = count;
+
+            return result;
+        }
+
+        std::u16string value;
+        value.reserve(reservedUnits);
+        const auto bodyStart = result.consumed;
+
+        while (result.consumed - bodyStart < count) {
+            const auto character = encoding::readUtfChar(bounded.subspan(result.consumed));
+            result.consumed += character.consumed;
+
+            if (character.status != encoding::Status::OK) {
+                result.status = character.status == encoding::Status::INSUFFICIENT_INPUT ? exhausted : character.status;
+
+                return result;
+            }
+
+            if (result.consumed - bodyStart > count) {
+                result.status = encoding::Status::INVALID_ENCODING;
+
+                return result;
+            }
+
+            const auto point = static_cast<std::uint32_t>(character.value);
+            const auto neededUnits = point <= MAX_BMP_UNIT ? std::size_t{1} : std::size_t{2};
+
+            if (!hasStringUnitRoom(reservedUnits, value.size(), neededUnits)) {
+                result.status = encoding::Status::RESOURCE_LIMIT;
+
+                return result;
+            }
+
+            if (point <= MAX_BMP_UNIT) {
+                value.push_back(static_cast<char16_t>(point));
+            } else {
+                const auto remainder = point - SUPPLEMENTARY_BASE;
+                value.push_back(static_cast<char16_t>(HIGH_SURROGATE + (remainder >> SURROGATE_BITS)));
+                value.push_back(static_cast<char16_t>(LOW_SURROGATE + (remainder & SURROGATE_MASK)));
+            }
+        }
+
+        if (result.consumed - bodyStart != count) {
+            result.status = encoding::Status::INVALID_ENCODING;
+
+            return result;
+        }
+
+        result.retainedBytes = value.size() * UNIT_BYTES;
+        result.units = std::move(value);
+
+        return result;
+    } catch (const std::bad_alloc &) {
+        result.status = encoding::Status::ALLOCATION_FAILURE;
+    } catch (const std::length_error &) {
+        result.status = encoding::Status::ALLOCATION_FAILURE;
+    }
+
+    return result;
+}
+
 /** Decode the measured shared zero-flags wire record layout.
  * @param payload Complete borrowed data payload.
  * @param context Validated immutable bindings.
@@ -288,6 +492,7 @@ StreamDataResult decodeDataPayload(std::span<const std::byte> payload, const Str
             std::vector<core::FieldValue> typedValues;
             const bool typed = context.profile() != core::LocalProfile::COMPACT_INT_V1;
             std::size_t currentFieldUnits = 0;
+            std::size_t currentPayloadBytes = 0;
 
             if (plan->binding.localRecordId) {
                 if (limits.emittedRecords == 0 || plan->localFieldCount > limits.emittedValues ||
@@ -319,6 +524,8 @@ StreamDataResult decodeDataPayload(std::span<const std::byte> payload, const Str
                 ++result.wireFields;
                 std::int64_t raw = 0;
                 std::optional<std::u16string> units;
+                std::optional<std::vector<std::byte>> bytes;
+                std::size_t retainedPayloadBytes = 0;
 
                 if (field.type == core::SerialFieldType::UTF_CHAR_ARRAY) {
                     const encoding::CharArrayLimits allowance{
@@ -353,6 +560,42 @@ StreamDataResult decodeDataPayload(std::span<const std::byte> payload, const Str
                     }
 
                     units = std::move(value.units);
+                } else if (field.type == core::SerialFieldType::BYTE_ARRAY ||
+                           field.type == core::SerialFieldType::STRING ||
+                           field.type == core::SerialFieldType::CUSTOM_OBJECT ||
+                           field.type == core::SerialFieldType::SERIAL_OBJECT) {
+                    auto value = readPayload(payload.subspan(result.consumed), field.type, limits, currentFieldUnits,
+                                             currentPayloadBytes);
+                    result.consumed += value.consumed;
+                    limits.payloadEncodedBytes -= value.consumed;
+                    result.payloadEncodedBytes += value.consumed;
+                    limits.payloadWorkBytes -= value.chargedBytes;
+                    result.payloadWorkBytes += value.chargedBytes;
+                    limits.fieldUnits -= value.chargedUnits;
+                    result.fieldUnits += value.chargedUnits;
+
+                    if (value.status != encoding::Status::OK) {
+                        switch (value.status) {
+                        case encoding::Status::INSUFFICIENT_INPUT:
+                            result.status = StreamDataStatus::TRUNCATED_PAYLOAD;
+                            break;
+                        case encoding::Status::RESOURCE_LIMIT:
+                            result.status = StreamDataStatus::RESOURCE_LIMIT;
+                            break;
+                        case encoding::Status::ALLOCATION_FAILURE:
+                            result.status = StreamDataStatus::ALLOCATION_FAILURE;
+                            break;
+                        default:
+                            result.status = StreamDataStatus::INVALID_FIELD;
+                            break;
+                        }
+
+                        return result;
+                    }
+
+                    units = std::move(value.units);
+                    bytes = std::move(value.bytes);
+                    retainedPayloadBytes = value.retainedBytes;
                 } else {
                     const auto value = readScalar(payload.subspan(result.consumed), field.type);
                     result.consumed += value.consumed;
@@ -374,7 +617,14 @@ StreamDataResult decodeDataPayload(std::span<const std::byte> payload, const Str
                         // Replacement decoding must fit while the old value is still owned.
                         currentFieldUnits -= target.units ? target.units->size() : 0;
                         currentFieldUnits += units ? units->size() : 0;
-                        target = {field.type, raw, std::move(units)};
+                        currentPayloadBytes -= target.bytes ? target.bytes->size() : 0;
+
+                        if (target.type == core::SerialFieldType::STRING && target.units) {
+                            currentPayloadBytes -= target.units->size() * sizeof(char16_t);
+                        }
+
+                        currentPayloadBytes += retainedPayloadBytes;
+                        target = {field.type, raw, std::move(units), std::move(bytes)};
                     } else {
                         values[*field.targetFieldId] = static_cast<std::int32_t>(raw);
                     }
@@ -393,6 +643,8 @@ StreamDataResult decodeDataPayload(std::span<const std::byte> payload, const Str
                 limits.ownedSymbolUnits -= units;
                 limits.ownedFieldUnits -= currentFieldUnits;
                 result.ownedFieldUnits += currentFieldUnits;
+                limits.ownedPayloadBytes -= currentPayloadBytes;
+                result.ownedPayloadBytes += currentPayloadBytes;
             }
         }
 

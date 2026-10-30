@@ -1,0 +1,589 @@
+{
+  "format": "qdcxx-owned-object-captures-v1",
+  "checkedUtc": "2026-10-30T15:18:10.1891477Z",
+  "sources": [
+    {
+      "path": "tools/upstream/field-types-oracle/FieldTypesOracle.java",
+      "sha256": "c5e672e7a523a59e843d5ab812f099f3e977ad81717bbce3ad2aa8aace045d1c"
+    },
+    {
+      "path": "tools/upstream/field-types-oracle/ObjectFieldsOracle.java",
+      "sha256": "07210296e1833a1369b5a816742117df8e65c28ff99f36e240beece28942225a"
+    },
+    {
+      "path": "tools/upstream/field-types-oracle/Invoke-Oracle.ps1",
+      "sha256": "9366fb37285a3ecb8c6ac56b47b8d08a7582e5cdf05217d77046b9e908accce6"
+    },
+    {
+      "path": "tools/upstream/field-types-oracle/Compare-FieldTypes.ps1",
+      "sha256": "b17d375dc74604fad8456865a6f798318c22166ace1a98ab9131772301c59bc1"
+    },
+    {
+      "path": "tools/upstream/field-types-oracle/Test-Negatives.ps1",
+      "sha256": "3426ca983f6d0af824a6dfce1b0eb10155444956f8ee12102092a0fb2f0de990"
+    }
+  ],
+  "runtime": {
+    "heapMiB": 128,
+    "jdk": "Zulu 8u422, OpenJDK 1.8.0_422-b05",
+    "timeoutSeconds": 30,
+    "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58"
+  },
+  "pins": [
+    {
+      "version": "3.355",
+      "commit": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+      "expected": "tests/fixtures/encoding/field-types/expected/objects",
+      "captureRepeats": 2,
+      "observationRows": 803,
+      "artifacts": [
+        {
+          "name": "composer-137-content-raw.qtp",
+          "sha256": "2aef9763429cf2a38740d92a3996cddfd72c68cdfed5097888eae3d14754a0b7",
+          "bytes": 44
+        },
+        {
+          "name": "composer-137-content.qtp",
+          "sha256": "4249567da640bda48c13db756ba6dbd84882db6b935c2f95f46295e5ef2b2282",
+          "bytes": 44
+        },
+        {
+          "name": "composer-137-empty-raw.qtp",
+          "sha256": "bf4468438d07e0e735fd881947f118ad576945a53842fc13f30c9aba4ddc62f0",
+          "bytes": 38
+        },
+        {
+          "name": "composer-137-empty.qtp",
+          "sha256": "0f875f17d00a045cffb4588478dd0c257b535e72478c3be9e6ca93e37670b93b",
+          "bytes": 38
+        },
+        {
+          "name": "composer-137-null-raw.qtp",
+          "sha256": "06333fb604acf4b444daaa9d76f12e4fee80c57dd05ac58ac18aa334fc0f18b5",
+          "bytes": 38
+        },
+        {
+          "name": "composer-137-null.qtp",
+          "sha256": "802a32be441b637c7d05f8cf450907d9bb7a76c737da06038947bb78c9151d21",
+          "bytes": 38
+        },
+        {
+          "name": "composer-233-content-raw.qtp",
+          "sha256": "81e261544957c7c0f2986d0e76a135a2a526803318a004f9f4eb1f4d4dda2391",
+          "bytes": 42
+        },
+        {
+          "name": "composer-233-content.qtp",
+          "sha256": "cfd45356138fed6cc71a33e91851635bf47b7e103f66d94f5e60091ed0566cd8",
+          "bytes": 42
+        },
+        {
+          "name": "composer-233-empty-raw.qtp",
+          "sha256": "a6f01e126a1d237b300835329ca124ae91d1b269bd82759545d60710acb38207",
+          "bytes": 38
+        },
+        {
+          "name": "composer-233-empty.qtp",
+          "sha256": "0b6b8924eb2ee8871461fc7a7120c2c831f5fa1a6b214cd3d6888da271f21217",
+          "bytes": 38
+        },
+        {
+          "name": "composer-233-null-raw.qtp",
+          "sha256": "da4a98873ef3faafcdccb9357786fee6f848fb2a8bd4ec96611cbe887e2edffd",
+          "bytes": 38
+        },
+        {
+          "name": "composer-233-null.qtp",
+          "sha256": "27446da79a1513b8e75c0e1188b8081553cc503b84b988e6a92fd38db70d1c27",
+          "bytes": 38
+        },
+        {
+          "name": "composer-249-content-raw.qtp",
+          "sha256": "ba6cc22defc1c8c9290daf97c8a83808108e54fcb885def7484e071d9d1071da",
+          "bytes": 43
+        },
+        {
+          "name": "composer-249-content.qtp",
+          "sha256": "be2df4b15520c7c69c6bd630c11d732ed3dd4eb874f8dcbd76ee7f83e34fbbbc",
+          "bytes": 43
+        },
+        {
+          "name": "composer-249-empty-raw.qtp",
+          "sha256": "955193189cd0ec33f976c7ab5a679ba32780ec16a8d7f855c890836f0b0fe6f5",
+          "bytes": 38
+        },
+        {
+          "name": "composer-249-empty.qtp",
+          "sha256": "9b3765ad409bfacebbd3f7edb49342d6b1addf9c6ef92731bdd6f8f2f2009c77",
+          "bytes": 38
+        },
+        {
+          "name": "composer-249-null-raw.qtp",
+          "sha256": "ef90060ab96e8c565196ee47c74a931907163d276f86ea3e9aef8d4a1925a163",
+          "bytes": 38
+        },
+        {
+          "name": "composer-249-null.qtp",
+          "sha256": "c51619c5ca8326965a722a1d12d0e6fd8bf776eb81547fbdff5710f1050410cc",
+          "bytes": 38
+        },
+        {
+          "name": "composer-9-content-raw.qtp",
+          "sha256": "a3651cf5555cbf673d381a7790d5afbfe595bd8d6cb65b25b2fcad33fa4f2c70",
+          "bytes": 41
+        },
+        {
+          "name": "composer-9-content.qtp",
+          "sha256": "08b1f683caa2266be26fbf0c8cf13d8e9df58ad76a7cc42f63e7e30ecc4d89ce",
+          "bytes": 41
+        },
+        {
+          "name": "composer-9-empty-raw.qtp",
+          "sha256": "da654ac941b3923d072b27350357b4976ee3088e6d06221aaae6900b75dd4036",
+          "bytes": 37
+        },
+        {
+          "name": "composer-9-empty.qtp",
+          "sha256": "23efdc8a00d6d84b52296161038b8c81b1228cfbfb93db59fe476cc822ecdf60",
+          "bytes": 37
+        },
+        {
+          "name": "composer-9-null-raw.qtp",
+          "sha256": "5ae71fdb92c6db754eeac608d175f9247394891ce800bbaccee99862ab62492f",
+          "bytes": 37
+        },
+        {
+          "name": "composer-9-null.qtp",
+          "sha256": "f1310afe25155ffb0232b45afcf0853e9e3d7bbd5d0652afd27ae0dc3d87d3e5",
+          "bytes": 37
+        },
+        {
+          "name": "file-137-content-raw.qtp",
+          "sha256": "a7e6794281e978b7b5ba5b2e015cb1f1ed1a3b6dc3b34465997d080c513217a2",
+          "bytes": 123
+        },
+        {
+          "name": "file-137-content.qtp",
+          "sha256": "620a1704fa72f71a8b87c1185cd0b481705364bd169a591da48b0475b7be2679",
+          "bytes": 103
+        },
+        {
+          "name": "file-137-empty-raw.qtp",
+          "sha256": "3beb3b3612e321924b6613ab91e2f2d5d9cb2cef0896677067cbb6b599025d7d",
+          "bytes": 117
+        },
+        {
+          "name": "file-137-empty.qtp",
+          "sha256": "b316919e5c797225c04c5b8e5a4bd587c5880a310a2af9071c29996f18c219f6",
+          "bytes": 97
+        },
+        {
+          "name": "file-137-null-raw.qtp",
+          "sha256": "fba5ffd89f11bf0efddd0eaeb72d6601b4e0b61ddce0baa944da1fbce2eb7441",
+          "bytes": 117
+        },
+        {
+          "name": "file-137-null.qtp",
+          "sha256": "da0b2ee3faa137d4d3acdcb46b63d3b6342783ac543175fb8dea14556d35c78f",
+          "bytes": 97
+        },
+        {
+          "name": "file-233-content-raw.qtp",
+          "sha256": "2d1590b4fc0fc4a39a2dc3f3a2d1b9c3747327a935c92b2bac2bc197ffddef64",
+          "bytes": 120
+        },
+        {
+          "name": "file-233-content.qtp",
+          "sha256": "85e62c8e257951a4a8a894576936c72d26e6c17db2be20b746def74be91f283b",
+          "bytes": 100
+        },
+        {
+          "name": "file-233-empty-raw.qtp",
+          "sha256": "0fb0bacbb9fdfa75cdd2ab972924e4917bf63e5526fe9998db17efe60b585365",
+          "bytes": 116
+        },
+        {
+          "name": "file-233-empty.qtp",
+          "sha256": "3eaf841f3b9b4b47a500f6be0afe9355b776ec2a9754401fdc59c17566f15a43",
+          "bytes": 96
+        },
+        {
+          "name": "file-233-null-raw.qtp",
+          "sha256": "b30379269c4761d40282dde1f1039568277987b4f094c2c3d458f75a4088dd3b",
+          "bytes": 116
+        },
+        {
+          "name": "file-233-null.qtp",
+          "sha256": "a8f7177e04421d80425eb4ca5853fe8f375feb5c2a22f7ca56918eada9c84b30",
+          "bytes": 96
+        },
+        {
+          "name": "file-249-content-raw.qtp",
+          "sha256": "bd3cb5279bdf5e83361872750946b00a96aa53c928f21ee3e3f7ef55048a48ed",
+          "bytes": 122
+        },
+        {
+          "name": "file-249-content.qtp",
+          "sha256": "2e7724dd7f4e6fe359131a2d935cdc58f20cffb505542028ceb511a6f05a1d8c",
+          "bytes": 102
+        },
+        {
+          "name": "file-249-empty-raw.qtp",
+          "sha256": "92694135553347748bf0208885f82ea78e8e9afe60a45bb1dabd108900555983",
+          "bytes": 117
+        },
+        {
+          "name": "file-249-empty.qtp",
+          "sha256": "dd46ad18694994a1219a44579a30041bfe1ffd7eff90ecd4e8dbbe2f6faa77b2",
+          "bytes": 97
+        },
+        {
+          "name": "file-249-null-raw.qtp",
+          "sha256": "6e4f0b61abc09743792b07830bb63ee26100ca9ab9ba65b1b0f65150be091317",
+          "bytes": 117
+        },
+        {
+          "name": "file-249-null.qtp",
+          "sha256": "0374aaac0252cde936f952b9ab43bcd8fe9be5be2499f22826e845d4a2807cff",
+          "bytes": 97
+        },
+        {
+          "name": "file-9-content-raw.qtp",
+          "sha256": "2d1590b4fc0fc4a39a2dc3f3a2d1b9c3747327a935c92b2bac2bc197ffddef64",
+          "bytes": 120
+        },
+        {
+          "name": "file-9-content.qtp",
+          "sha256": "85e62c8e257951a4a8a894576936c72d26e6c17db2be20b746def74be91f283b",
+          "bytes": 100
+        },
+        {
+          "name": "file-9-empty-raw.qtp",
+          "sha256": "0fb0bacbb9fdfa75cdd2ab972924e4917bf63e5526fe9998db17efe60b585365",
+          "bytes": 116
+        },
+        {
+          "name": "file-9-empty.qtp",
+          "sha256": "3eaf841f3b9b4b47a500f6be0afe9355b776ec2a9754401fdc59c17566f15a43",
+          "bytes": 96
+        },
+        {
+          "name": "file-9-null-raw.qtp",
+          "sha256": "b30379269c4761d40282dde1f1039568277987b4f094c2c3d458f75a4088dd3b",
+          "bytes": 116
+        },
+        {
+          "name": "file-9-null.qtp",
+          "sha256": "a8f7177e04421d80425eb4ca5853fe8f375feb5c2a22f7ca56918eada9c84b30",
+          "bytes": 96
+        },
+        {
+          "name": "samples.tsv",
+          "sha256": "753e6ac876c5584f4160d8128c6dad9281499a4d649b0a61884eb12adfb798c1",
+          "bytes": 511468
+        }
+      ],
+      "classpathModules": [
+        "dxlib",
+        "mars",
+        "dxfeed-promise",
+        "dxfeed-api",
+        "dxlib-qd-sandbox",
+        "auth",
+        "proto",
+        "qd-core",
+        "proto-ssl",
+        "qd-rmi",
+        "dxfeed-impl",
+        "dxfeed-scheme",
+        "dxfeed-ipf-filter",
+        "qds-file"
+      ],
+      "classpathFiles": 1317,
+      "classpathInventorySha256": "b9905a5444d84344e5884e94fe7223f6a5d07c97d37b0f42754037fb96ff1030"
+    },
+    {
+      "version": "3.356",
+      "commit": "f71e4cb390d1586f2d4e3a83d9b9067e3326ef19",
+      "expected": "tests/fixtures/encoding/field-types/current-object-expected",
+      "captureRepeats": 2,
+      "observationRows": 803,
+      "artifacts": [
+        {
+          "name": "composer-137-content-raw.qtp",
+          "sha256": "2aef9763429cf2a38740d92a3996cddfd72c68cdfed5097888eae3d14754a0b7",
+          "bytes": 44
+        },
+        {
+          "name": "composer-137-content.qtp",
+          "sha256": "4249567da640bda48c13db756ba6dbd84882db6b935c2f95f46295e5ef2b2282",
+          "bytes": 44
+        },
+        {
+          "name": "composer-137-empty-raw.qtp",
+          "sha256": "bf4468438d07e0e735fd881947f118ad576945a53842fc13f30c9aba4ddc62f0",
+          "bytes": 38
+        },
+        {
+          "name": "composer-137-empty.qtp",
+          "sha256": "0f875f17d00a045cffb4588478dd0c257b535e72478c3be9e6ca93e37670b93b",
+          "bytes": 38
+        },
+        {
+          "name": "composer-137-null-raw.qtp",
+          "sha256": "06333fb604acf4b444daaa9d76f12e4fee80c57dd05ac58ac18aa334fc0f18b5",
+          "bytes": 38
+        },
+        {
+          "name": "composer-137-null.qtp",
+          "sha256": "802a32be441b637c7d05f8cf450907d9bb7a76c737da06038947bb78c9151d21",
+          "bytes": 38
+        },
+        {
+          "name": "composer-233-content-raw.qtp",
+          "sha256": "81e261544957c7c0f2986d0e76a135a2a526803318a004f9f4eb1f4d4dda2391",
+          "bytes": 42
+        },
+        {
+          "name": "composer-233-content.qtp",
+          "sha256": "cfd45356138fed6cc71a33e91851635bf47b7e103f66d94f5e60091ed0566cd8",
+          "bytes": 42
+        },
+        {
+          "name": "composer-233-empty-raw.qtp",
+          "sha256": "a6f01e126a1d237b300835329ca124ae91d1b269bd82759545d60710acb38207",
+          "bytes": 38
+        },
+        {
+          "name": "composer-233-empty.qtp",
+          "sha256": "0b6b8924eb2ee8871461fc7a7120c2c831f5fa1a6b214cd3d6888da271f21217",
+          "bytes": 38
+        },
+        {
+          "name": "composer-233-null-raw.qtp",
+          "sha256": "da4a98873ef3faafcdccb9357786fee6f848fb2a8bd4ec96611cbe887e2edffd",
+          "bytes": 38
+        },
+        {
+          "name": "composer-233-null.qtp",
+          "sha256": "27446da79a1513b8e75c0e1188b8081553cc503b84b988e6a92fd38db70d1c27",
+          "bytes": 38
+        },
+        {
+          "name": "composer-249-content-raw.qtp",
+          "sha256": "ba6cc22defc1c8c9290daf97c8a83808108e54fcb885def7484e071d9d1071da",
+          "bytes": 43
+        },
+        {
+          "name": "composer-249-content.qtp",
+          "sha256": "be2df4b15520c7c69c6bd630c11d732ed3dd4eb874f8dcbd76ee7f83e34fbbbc",
+          "bytes": 43
+        },
+        {
+          "name": "composer-249-empty-raw.qtp",
+          "sha256": "955193189cd0ec33f976c7ab5a679ba32780ec16a8d7f855c890836f0b0fe6f5",
+          "bytes": 38
+        },
+        {
+          "name": "composer-249-empty.qtp",
+          "sha256": "9b3765ad409bfacebbd3f7edb49342d6b1addf9c6ef92731bdd6f8f2f2009c77",
+          "bytes": 38
+        },
+        {
+          "name": "composer-249-null-raw.qtp",
+          "sha256": "ef90060ab96e8c565196ee47c74a931907163d276f86ea3e9aef8d4a1925a163",
+          "bytes": 38
+        },
+        {
+          "name": "composer-249-null.qtp",
+          "sha256": "c51619c5ca8326965a722a1d12d0e6fd8bf776eb81547fbdff5710f1050410cc",
+          "bytes": 38
+        },
+        {
+          "name": "composer-9-content-raw.qtp",
+          "sha256": "a3651cf5555cbf673d381a7790d5afbfe595bd8d6cb65b25b2fcad33fa4f2c70",
+          "bytes": 41
+        },
+        {
+          "name": "composer-9-content.qtp",
+          "sha256": "08b1f683caa2266be26fbf0c8cf13d8e9df58ad76a7cc42f63e7e30ecc4d89ce",
+          "bytes": 41
+        },
+        {
+          "name": "composer-9-empty-raw.qtp",
+          "sha256": "da654ac941b3923d072b27350357b4976ee3088e6d06221aaae6900b75dd4036",
+          "bytes": 37
+        },
+        {
+          "name": "composer-9-empty.qtp",
+          "sha256": "23efdc8a00d6d84b52296161038b8c81b1228cfbfb93db59fe476cc822ecdf60",
+          "bytes": 37
+        },
+        {
+          "name": "composer-9-null-raw.qtp",
+          "sha256": "5ae71fdb92c6db754eeac608d175f9247394891ce800bbaccee99862ab62492f",
+          "bytes": 37
+        },
+        {
+          "name": "composer-9-null.qtp",
+          "sha256": "f1310afe25155ffb0232b45afcf0853e9e3d7bbd5d0652afd27ae0dc3d87d3e5",
+          "bytes": 37
+        },
+        {
+          "name": "file-137-content-raw.qtp",
+          "sha256": "a7e6794281e978b7b5ba5b2e015cb1f1ed1a3b6dc3b34465997d080c513217a2",
+          "bytes": 123
+        },
+        {
+          "name": "file-137-content.qtp",
+          "sha256": "620a1704fa72f71a8b87c1185cd0b481705364bd169a591da48b0475b7be2679",
+          "bytes": 103
+        },
+        {
+          "name": "file-137-empty-raw.qtp",
+          "sha256": "3beb3b3612e321924b6613ab91e2f2d5d9cb2cef0896677067cbb6b599025d7d",
+          "bytes": 117
+        },
+        {
+          "name": "file-137-empty.qtp",
+          "sha256": "b316919e5c797225c04c5b8e5a4bd587c5880a310a2af9071c29996f18c219f6",
+          "bytes": 97
+        },
+        {
+          "name": "file-137-null-raw.qtp",
+          "sha256": "fba5ffd89f11bf0efddd0eaeb72d6601b4e0b61ddce0baa944da1fbce2eb7441",
+          "bytes": 117
+        },
+        {
+          "name": "file-137-null.qtp",
+          "sha256": "da0b2ee3faa137d4d3acdcb46b63d3b6342783ac543175fb8dea14556d35c78f",
+          "bytes": 97
+        },
+        {
+          "name": "file-233-content-raw.qtp",
+          "sha256": "2d1590b4fc0fc4a39a2dc3f3a2d1b9c3747327a935c92b2bac2bc197ffddef64",
+          "bytes": 120
+        },
+        {
+          "name": "file-233-content.qtp",
+          "sha256": "85e62c8e257951a4a8a894576936c72d26e6c17db2be20b746def74be91f283b",
+          "bytes": 100
+        },
+        {
+          "name": "file-233-empty-raw.qtp",
+          "sha256": "0fb0bacbb9fdfa75cdd2ab972924e4917bf63e5526fe9998db17efe60b585365",
+          "bytes": 116
+        },
+        {
+          "name": "file-233-empty.qtp",
+          "sha256": "3eaf841f3b9b4b47a500f6be0afe9355b776ec2a9754401fdc59c17566f15a43",
+          "bytes": 96
+        },
+        {
+          "name": "file-233-null-raw.qtp",
+          "sha256": "b30379269c4761d40282dde1f1039568277987b4f094c2c3d458f75a4088dd3b",
+          "bytes": 116
+        },
+        {
+          "name": "file-233-null.qtp",
+          "sha256": "a8f7177e04421d80425eb4ca5853fe8f375feb5c2a22f7ca56918eada9c84b30",
+          "bytes": 96
+        },
+        {
+          "name": "file-249-content-raw.qtp",
+          "sha256": "bd3cb5279bdf5e83361872750946b00a96aa53c928f21ee3e3f7ef55048a48ed",
+          "bytes": 122
+        },
+        {
+          "name": "file-249-content.qtp",
+          "sha256": "2e7724dd7f4e6fe359131a2d935cdc58f20cffb505542028ceb511a6f05a1d8c",
+          "bytes": 102
+        },
+        {
+          "name": "file-249-empty-raw.qtp",
+          "sha256": "92694135553347748bf0208885f82ea78e8e9afe60a45bb1dabd108900555983",
+          "bytes": 117
+        },
+        {
+          "name": "file-249-empty.qtp",
+          "sha256": "dd46ad18694994a1219a44579a30041bfe1ffd7eff90ecd4e8dbbe2f6faa77b2",
+          "bytes": 97
+        },
+        {
+          "name": "file-249-null-raw.qtp",
+          "sha256": "6e4f0b61abc09743792b07830bb63ee26100ca9ab9ba65b1b0f65150be091317",
+          "bytes": 117
+        },
+        {
+          "name": "file-249-null.qtp",
+          "sha256": "0374aaac0252cde936f952b9ab43bcd8fe9be5be2499f22826e845d4a2807cff",
+          "bytes": 97
+        },
+        {
+          "name": "file-9-content-raw.qtp",
+          "sha256": "2d1590b4fc0fc4a39a2dc3f3a2d1b9c3747327a935c92b2bac2bc197ffddef64",
+          "bytes": 120
+        },
+        {
+          "name": "file-9-content.qtp",
+          "sha256": "85e62c8e257951a4a8a894576936c72d26e6c17db2be20b746def74be91f283b",
+          "bytes": 100
+        },
+        {
+          "name": "file-9-empty-raw.qtp",
+          "sha256": "0fb0bacbb9fdfa75cdd2ab972924e4917bf63e5526fe9998db17efe60b585365",
+          "bytes": 116
+        },
+        {
+          "name": "file-9-empty.qtp",
+          "sha256": "3eaf841f3b9b4b47a500f6be0afe9355b776ec2a9754401fdc59c17566f15a43",
+          "bytes": 96
+        },
+        {
+          "name": "file-9-null-raw.qtp",
+          "sha256": "b30379269c4761d40282dde1f1039568277987b4f094c2c3d458f75a4088dd3b",
+          "bytes": 116
+        },
+        {
+          "name": "file-9-null.qtp",
+          "sha256": "a8f7177e04421d80425eb4ca5853fe8f375feb5c2a22f7ca56918eada9c84b30",
+          "bytes": 96
+        },
+        {
+          "name": "samples.tsv",
+          "sha256": "753e6ac876c5584f4160d8128c6dad9281499a4d649b0a61884eb12adfb798c1",
+          "bytes": 511468
+        }
+      ],
+      "classpathModules": [
+        "dxlib",
+        "mars",
+        "dxfeed-promise",
+        "dxfeed-api",
+        "dxlib-qd-sandbox",
+        "auth",
+        "proto",
+        "qd-core",
+        "proto-ssl",
+        "qd-rmi",
+        "dxfeed-impl",
+        "dxfeed-scheme",
+        "dxfeed-ipf-filter",
+        "qds-file"
+      ],
+      "classpathFiles": 1317,
+      "classpathInventorySha256": "65fc659bf78d13d903c5373714299541c6c76d2bc7172eb498eb3a341b11104b"
+    }
+  ],
+  "governedBaselineVerify": {
+    "result": "PASS",
+    "objectArtifacts": 49,
+    "scalarArtifacts": 25,
+    "rootArtifacts": 82
+  },
+  "negativeMutations": {
+    "unchangedBaseline": "PASS",
+    "rejected": 28
+  },
+  "scope": "Windows Java production-path author evidence; no Java object execution, no C++ full-matrix or independent-review claim"
+}

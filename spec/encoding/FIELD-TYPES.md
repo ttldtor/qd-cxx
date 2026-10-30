@@ -9,13 +9,13 @@ and [capture report](../../tests/fixtures/encoding/field-types/CAPTURES.md) dist
 diagnostic inputs and reproducibility checks. The lock remains unchanged. This is field support,
 not a Profile event adapter or evidence of complete private-tape compatibility.
 
-## Explicit binary scalar profile
+## Explicit binary field profile
 
-`LocalProfile::BINARY_FIELDS_V1` is an opt-in, ordinary, read-only scalar subset of
+`LocalProfile::BINARY_FIELDS_V1` is an opt-in, ordinary, read-only subset of
 the [finite binary catalog](../protocol/BINARY-TAPE-COVERAGE.md). It accepts exactly
-0/1/2/3/4/8/10/24/40/56/72/88/104/120/152. Existing local profiles retain their exact
-sets below. No object/byte payload member, indexed layout, conversion, new tape mode
-or inspector profile is added. The broader catalog remains incomplete.
+0/1/2/3/4/8/9/10/24/40/56/72/88/104/120/137/152/233/249. Existing local profiles
+retain their exact sets below. No indexed layout, conversion, new tape mode or
+inspector profile is added. The broader catalog remains incomplete.
 
 | Wire identity | C++ full identity | Physical read | Canonical `raw` |
 | --- | --- | --- | --- |
@@ -61,6 +61,39 @@ is added. [Scalar validation](../../tests/conformance/protocol/field-types/SCALA
 separates source facts, requested composer frames, FileWriter captures and actual
 parser/FileReader callbacks at both pinned revisions.
 
+## Byte, UTFString and opaque-object values
+
+Full identities9 BYTE_ARRAY and233 CUSTOM_OBJECT read a compact LONG length,
+validated in -1..INT32_MAX before narrowing. Full249 SERIAL_OBJECT instead uses
+the production Marshaller compact INT length: consume the complete compact
+encoding, project signed low32, then validate -1..INT32_MAX. All three preserve
+nullable owned body bytes, without Java object execution, deserialization, class
+loading or content validation. Null and engaged-empty bytes remain distinct.
+
+Full137 STRING reads UTFString's compact LONG byte length (-1..4*INT32_MAX), then
+exact UTF-16 units. This differs from10's character count. Supplementary scalars
+become two units; accepted overlong UTF and CESU/unpaired surrogates are preserved.
+Invalid sequences are rejected after the complete attempted tail, including an
+attempt crossing the declared byte count, bounded by actual message and work
+allowances. Examined-byte charges use actual examination, not declared length.
+
+These exact full-ID grammars are independent of local mapping, including skipped
+fields and unknown records: discarded249 still uses projected INT, and discarded137
+still validates UTF. Java BinaryRecordDesc selects its reader by local field class;
+an unknown object field instead uses byte-array LONG and bypasses UTF validation.
+Those Java unknown-field behaviors are deliberately different from this generic
+canonical projection. Known MarshalledObjField and StringField(true) observations
+establish the selected249/137 grammars; this is not Java local conversion/skip or
+full DataScheme compatibility. No existing profile's skip behavior changes.
+
+`FieldValue` appends `optional<vector<byte>> bytes{}` after its existing members.
+For9/233/249 raw is0, units are absent, and bytes hold null/empty/content. For137
+and10 raw is0, units hold null/empty/content, and bytes are absent. Every scalar
+requires both payload members absent. Equality includes type, raw, units and bytes.
+Copies own independent storage; moved/retained values survive input, schema,
+context and reader destruction. Old two/three-member aggregates keep source
+meaning; sizeof/ABI and structured-binding arity are not preserved promises.
+
 ## Identity, storage and binding
 
 `LocalProfile::EXTENDED_FIELDS_V1` accepts exactly full identities 2/8/10/40/56/72/88/120.
@@ -71,12 +104,12 @@ Binding retains ordered repeated assignments, skips supported unknown fields/rec
 known-field full-type mismatches, and owns its plans independently of names and schemas.
 Java's broader conversions and recovery do not expand this policy.
 
-`FieldValue` adds `optional<u16string> units` after `type` and `raw`. Type 10 requires raw zero:
+`FieldValue` retains `optional<u16string> units` after `type` and `raw`. Type 10 requires raw zero:
 disengaged units means null, engaged empty means empty, and all other units remain exact, including
 NUL and unpaired surrogates. Scalar tags require disengaged units. Types 8/40/56/72/88 require
 sign-extended int32 raw values, type 2 permits 0..0x10ffff, and type 120 preserves all signed64 bits.
-Unknown tags and noncanonical manually constructed values are invalid. Equality compares all three
-members. The public value validator, Quote mapper and typed formatter enforce these invariants.
+Unknown tags and noncanonical manually constructed values are invalid. Equality compares type,
+raw and both nullable payload members. The public value validator and Quote mapper enforce these invariants.
 Existing scalar aggregate expressions remain valid. Fresh missing fields are tagged raw zero/null;
 later matching assignments replace earlier values, including null/empty replacements.
 
@@ -162,6 +195,57 @@ Both STREAM and RAW share this field decoder. Append-only description updates, o
 prefixes, terminal errors and atomic heartbeat updates follow [TAPE-READER](../protocol/TAPE-READER.md)
 and [RAW-TAPE](../protocol/RAW-TAPE.md). A failed string publishes neither a partial record nor timing changes.
 
+### New payload budgets and failure checkpoints
+
+New trailing zero-default `StreamDataLimits` members apply only to9/137/233/249:
+`fieldPayloadEncodedBytes` bounds examined prefix/body bytes per value,
+`fieldPayloadBytes` bounds admitted declared body bytes per value,
+`payloadEncodedBytes` bounds aggregate examination, `payloadWorkBytes` bounds
+aggregate admitted body work, and `ownedPayloadBytes` bounds completed+current+
+temporary logical payload storage. Zero never means unlimited. Type10 keeps its
+existing byte budget and is not charged against these new zero-default bounds.
+
+Length-domain and complete-message remaining-byte checks precede body admission.
+A declared body beyond the complete message is INVALID_FIELD after its prefix;
+an incomplete compact prefix or UTF tail at the actual message end is
+TRUNCATED_PAYLOAD. An artificial encoded-byte cutoff is RESOURCE_LIMIT. The
+FIELD errorOffset is the primitive start and consumed includes actual examined
+bytes. A malformed UTF sequence may examine beyond its declared byte count before
+being rejected: `01 c2 80` examines three bytes, with no returned value. This
+examination can include following-field bytes; it never crosses the message or
+finite encoded allowance. A normal complete value leaves its sentinel untouched.
+
+Before proportional allocation, admit body work, then string-unit work and peak
+ownership. STRING reserves U=min(bodyBytes,INT32_MAX) UTF-16 units, charges the
+existing `fieldUnits` work counter, and needs both U available owned string units
+and checked2*U temporary payload bytes. Its retained logical storage is twice the
+actual decoded unit count. Byte/object storage uses its body byte count. Type10
+and137 share existing string-unit work/ownership, preserving those counters'
+meanings; `fieldBytes` keeps type10's existing byte accounting.
+
+For a body larger than INT32_MAX, decoded units can exceed the capped reservation.
+Before either a one-unit or two-unit append, check the entire decoded point
+against remaining admitted units by subtraction. Excess returns RESOURCE_LIMIT
+after the attempted tail's actual examination, preserving admitted body/unit work
+and publishing no current value. No append or completed ownership subtraction
+can cross the reservation; boundary arithmetic is checked without giant allocations.
+
+Replacement must fit while the old target and the new temporary coexist. Skips
+need temporary allowance too. Failed, skipped and replaced values never refund
+examined bytes, admitted body work or admitted string units. Storage release only
+releases current/temporary live ownership. These are logical element/storage
+budgets, excluding allocator capacity/metadata and RSS; they do not promise exact
+physical heap limits. Completed output remains charged across TapeReader frames
+even after the caller releases returned records.
+
+Results expose `payloadEncodedBytes`, `payloadWorkBytes` and completed-only
+`ownedPayloadBytes`; TapeReader accumulates all three, including terminal failing
+frames. Replay diagnostics copy them without widening admission or producer
+support. Allocation/length exceptions in payload construction are translated to
+ALLOCATION_FAILURE with examination/admitted work preserved. A failed current
+record is discarded while previously completed records stay owned. Ordinary
+caller copies of owned values can still throw standard allocation exceptions.
+
 ## Explicit diagnostic schema and output version 4
 
 The tool-only `oracle-field-types-v1` adapter supplies record ID 0, name `FieldTypes`, hasTime=false,
@@ -193,6 +277,12 @@ Each data line is `Fields <index>: frame=<frame> local=<id> name=<quoted> symbol
 Entries are `field[i]=(type:T raw:R)` for scalars, or `field[i]=(type:10 raw:0 units:null|<quoted>)`.
 Quoted values use the existing lossless safe UTF-8/escape rules, including escaping controls and lone
 surrogates. No event mapper or business/calendar/text interpretation is called.
+
+Existing generic formatter versions4/6/7 explicitly throw invalid_argument for
+full payload identities9/137/233/249, including null/empty values. They never emit
+raw0 while dropping bytes or UTFString identity. Broader inspector selection and
+a payload-capable output grammar are deferred; the existing CLI profiles remain
+unchanged.
 
 Every complete row is counted against the remaining encoded output budget before allocation and
 before its first write. Short writes or detected sink failures return nonzero and emit no subsequent

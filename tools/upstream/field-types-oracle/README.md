@@ -74,6 +74,34 @@ scalar capture/repeat and C++ consumption are recorded in the
 [scalar validation](../../../tests/conformance/protocol/field-types/SCALAR-VALIDATION.md).
 No new general-purpose CLI or default inspector profile is introduced.
 
+## Owned byte/string/object extension
+
+The governed invocation additionally writes `field-types/objects`:49 deterministic
+artifacts and803 observation rows per pin. `ObjectFieldsOracle.java` is an internal
+helper compiled/invoked by the same launcher, not a separate tool. It captures
+requested composer and FileWriter/FileReader null/empty/content in STREAM and RAW,
+actual parser known/unknown-field/unknown-record/repeated-target cases, direct
+production FieldReader over BufferedInputPart, and supporting bounded primitives.
+The unchanged82 root and25 scalar artifacts are still verified first.
+
+ByteArrayField is the local9/233 consumer; only requested composer establishes
+wire233, while its FileWriter uses actual type9. STRING uses StringField(true),
+SERIAL_OBJECT uses MarshalledObjField and getBytes only. No getObject/unwrap or
+Java deserialization is called. RAW callback fanout is distinct from wire count.
+Explicit timestamped cursors make RAW files deterministic; observation rows use
+explicit LF, so fixture text attributes do not alter captured bytes. Captures are
+not normalized afterward. Known249 uses projected INT; Java unknown object skips use
+LONG bytes and bypass137 UTF validation. The generic C++ exact grammar is fixed
+independently of mapping, as specified in [FIELD-TYPES](../../../spec/encoding/FIELD-TYPES.md).
+
+The existing internal entry also accepts `FieldTypesOracle <new-directory>
+object-only` for both-pin prebuilt-classpath captures. This neither rebuilds nor
+verifies upstream; the ordinary governed launcher retains complete clean Verify.
+Compare checks finite row/artifact grammars and all bytes; Test-Negatives adds five
+object mutations, for28 rejected mutations in total. Historical receipts remain
+unchanged. [Object validation](../../../tests/conformance/protocol/field-types/OBJECT-VALIDATION.md)
+records the new evidence separately.
+
 See [coverage](../../../tests/fixtures/encoding/field-types/COVERAGE.md),
 [captures](../../../tests/fixtures/encoding/field-types/CAPTURES.md),
 [validation](../../../tests/fixtures/encoding/field-types/VALIDATION.md) and the

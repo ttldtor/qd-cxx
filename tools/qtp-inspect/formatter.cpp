@@ -279,6 +279,12 @@ std::string Formatter::record(const protocol::StreamDataRecord &record, std::u16
             if (!core::validFieldValue(field)) {
                 throw std::invalid_argument("noncanonical field value");
             }
+
+            if (field.type == core::SerialFieldType::BYTE_ARRAY || field.type == core::SerialFieldType::STRING ||
+                field.type == core::SerialFieldType::CUSTOM_OBJECT ||
+                field.type == core::SerialFieldType::SERIAL_OBJECT) {
+                throw std::invalid_argument("unsupported field payload format");
+            }
         }
 
         return build(budget, [&](Row &row) {

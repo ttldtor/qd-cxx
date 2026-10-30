@@ -2,6 +2,15 @@
 
 [Русская версия](COVERAGE.ru.md). English is authoritative.
 
+The separate owned-payload extension9/137/233/249 is documented in
+[object validation](../../../conformance/protocol/field-types/OBJECT-VALIDATION.md)
+and the [both-pin capture manifest](object-captures.json). Its49 artifacts and803
+observations per pin cover requested composer, FileWriter/FileReader, known/
+unknown-field/unknown-record/repeated-target parser paths, separate FieldReader
+positions and supporting primitives. The historical bounded-profile coverage
+below retains its original scope and receipts; it does not itself qualify the
+new profile, Java object semantics or broad binary-container behavior.
+
 The [82 expected artifacts](expected/) contain 40 complete binary inputs, 40 production
 observations, one schema inventory and one primitive table. Evidence uses locked upstream
 `0ddc0a09779fb61d74cc0b37c6449ff47dcb715f`; see [captures](CAPTURES.md) and

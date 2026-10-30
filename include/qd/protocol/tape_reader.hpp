@@ -132,6 +132,9 @@ class TapeReader {
     std::size_t fieldBytes_ = 0;
     std::size_t fieldUnits_ = 0;
     std::size_t ownedFieldUnits_ = 0;
+    std::size_t payloadEncodedBytes_ = 0;
+    std::size_t payloadWorkBytes_ = 0;
+    std::size_t ownedPayloadBytes_ = 0;
     TapeTiming timing_;
     std::size_t timingEvents_ = 0;
     /** Set the first failure.
@@ -260,8 +263,8 @@ class TapeReader {
         return fields_;
     }
 
-    /** Inspect cumulative string-byte work.
-     * @return Examined bytes including prefixes, skips, replacements and failed reads.
+    /** Inspect cumulative type10 byte work.
+     * @return Examined character-array bytes including prefixes, skips, replacements and failed reads.
      */
     [[nodiscard]] std::size_t fieldBytes() const noexcept {
         return fieldBytes_;
@@ -279,6 +282,27 @@ class TapeReader {
      */
     [[nodiscard]] std::size_t ownedFieldUnits() const noexcept {
         return ownedFieldUnits_;
+    }
+
+    /** Inspect cumulative new-payload encoded work.
+     * @return Actual examined prefix/body bytes, including skips and the terminal failing frame.
+     */
+    [[nodiscard]] std::size_t payloadEncodedBytes() const noexcept {
+        return payloadEncodedBytes_;
+    }
+
+    /** Inspect cumulative new-payload body work.
+     * @return Admitted declared body bytes, never refunded for skips, replacements or failures.
+     */
+    [[nodiscard]] std::size_t payloadWorkBytes() const noexcept {
+        return payloadWorkBytes_;
+    }
+
+    /** Inspect cumulative published new-payload storage.
+     * @return Logical payload bytes in all completed records, including previously returned outputs.
+     */
+    [[nodiscard]] std::size_t ownedPayloadBytes() const noexcept {
+        return ownedPayloadBytes_;
     }
 
     /** Inspect reconstruction work.
