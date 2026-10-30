@@ -2,7 +2,7 @@
 
 [Русская версия](BINARY-TAPE-COVERAGE.ru.md). English is authoritative.
 
-Status: finite field/session/dispatch implementation and optional tool container component; sidecar/chain/operational integration and full-catalog acceptance remain pending.
+Status: finite field/session/dispatch, bounded companion scanner/header admission and optional tool container components; chain/operational integration and full-catalog acceptance remain pending.
 The [decision](../../docs/decisions/ADR-0004-broad-binary-tape-reading.md),
 [71-row support matrix](../../tests/fixtures/protocol/real-tape/support-matrix.tsv) and
 [verification contracts](../../tests/conformance/protocol/real-tape/CONTRACTS.md) define the same target.
@@ -44,6 +44,7 @@ RMI operations and transport are outside this target. Private recording contents
 | `BINARY_FIELDS_V1` | 19 exact read-only identities; ordinary and explicit indexed local records | Bounded fields/indexed subset implemented |
 | `TapeMode::BINARY_CATALOG_V1` | Four generic families, NONE/MESSAGE/headerless, known descriptors/options/flags/removal and immutable generations | Finite opt-in implemented; FIELD/containers/chains remain separate |
 | `FieldTimePolicy::READ` | Exact raw leading EventTime/full56 and optional EventSequence/full72 with separate physical REMOVE prefix | Explicit binary-catalog selection; old signatures remain DISABLED; see TAPE-TIME |
+| `TapeExternalTimePolicy::SIDECAR` | Exact LONG/long/TEXT/text header/delta admission; source-free fixed tag | Explicit binary-catalog selection; tool-private finite scanner and paired-owner component tests; operational integration remains separate; see SIDECAR-TIME |
 
 The core field profile and separate protocol mode are explicit selections. The current
 [indexed contract](../schema/INDEXED-SCHEMAS.md) and [message policy](BINARY-MESSAGES.md) define the finite subset. No existing constructor/default
@@ -240,8 +241,12 @@ NONE, MESSAGE and explicitly selected FIELD READ are bounded capabilities. The o
 [closed GZIP/ZIP component](TAPE-CONTAINERS.md) validates bounded concatenated gzip members or strict
 single-file ZIP32, including integrity and physical EOF. Its OFF-default dependency remains outside
 core/protocol. It does not add implicit wire modes or operational CLI container selection.
-LONG/TEXT sidecars (047), finite split sequences (049) and broader operational streaming/CLI hookup
-(050) retain their separate integration gates. Any composed sink must preserve callback lifetime,
+The [LONG/TEXT companion scanner](SIDECAR-TIME.md) and explicit header admission are bounded
+components. Their native paired-owner harness proves cleanup/error ordering with instrumented
+close/flush boundaries, separately from actual CLI file ownership and mark/FIELD/MESSAGE integration.
+The full LONG/TEXT matrix row remains pending operational/corpus acceptance; negative numeric time
+is explicitly unsupported instead of reading an ambient clock. Finite split sequences (049) and
+broader operational streaming/CLI hookup (050) retain their separate integration gates. Any composed sink must preserve callback lifetime,
 stop/exception checkpoints, completed-prefix publication and layered source/close/EOF completion;
 container closure alone cannot authenticate final COMPLETE.
 

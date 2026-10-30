@@ -188,3 +188,17 @@ cmake "-DPWSH=pwsh" "-DSCRIPT=tools/upstream/tape-container-oracle/Invoke-Oracle
 [Captures](../../tests/fixtures/protocol/tape-containers/CAPTURES.md) and
 [validation](../../tests/fixtures/protocol/tape-containers/VALIDATION.md) separate production
 observations, native component checks and remaining integration acceptance.
+
+## Bounded companion scanner and header admission
+
+The tool-private [LONG/TEXT scanner](../../spec/protocol/SIDECAR-TIME.md) is available as
+`qdcxx_tape_sidecar` when tests or tape inspection are selected. It has no optional dependency,
+clock or I/O. `TapeExternalTimePolicy::SIDECAR` separately admits exact companion-time headers in
+binary-catalog readers; the original constructor signatures still refuse them. No inspector flag,
+source pairing or operational time selection is added here.
+
+Native tests `sidecar_scanner`, `sidecar_policy`, `sidecar_allocation` and `sidecar_windows_include`
+cover finite parsing/admission, allocation ordering and Windows-header compatibility. With the
+optional compression component enabled, `sidecar_paired_owner` additionally checks real container/
+parser cleanup and cancellation with instrumented close/flush boundaries. These component tests
+remain distinct from full CLI file ownership, chronological mark application and corpus acceptance.

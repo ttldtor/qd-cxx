@@ -7,6 +7,11 @@ The additional required `FieldTimePolicy::READ` constructor argument selects the
 binding, output or removal behavior below implicitly enables FIELD. READ retains separate raw
 metadata and MESSAGE state, and adds finite fixed ownership/construction charges.
 
+The independent required-final `TapeExternalTimePolicy::SIDECAR` argument admits exact
+LONG/long/TEXT/text headers only in this catalog mode; old constructors keep DISABLED.
+[Companion scanning](SIDECAR-TIME.md), mark application and whole-pair closure remain outside protocol.
+The admission policy does not set external time or alter FIELD/MESSAGE state.
+
 `TapeMode::BINARY_CATALOG_V1` explicitly selects this policy. The existing LEGACY,
 RAW_MESSAGE_V1 and ordinary-v1 discovery policies retain their acceptance, defaults and output.
 The [coverage catalog](BINARY-TAPE-COVERAGE.md) and
@@ -75,7 +80,7 @@ after complete parsing, policy validation and resource admission.
 | --- | --- |
 | type | tape only; required in the first explicit descriptor |
 | version | Optional exact UTF16, including empty; diagnostic text, never a compatibility/pin test |
-| time | Absent, exact NONE/none/MESSAGE/message; other forms UNSUPPORTED/TIME |
+| time | Absent or exact NONE/none/MESSAGE/message; FIELD/field only with READ; LONG/long/TEXT/text only with SIDECAR; other forms UNSUPPORTED/TIME |
 | opt | Absent, empty or exact hs; other/duplicate/whitespace tokens UNSUPPORTED/OPTIONS |
 | Unknown or duplicate top key | UNSUPPORTED/DESCRIPTOR after the examined pair; no arbitrary property map |
 | Sends | Empty or any subset/order of exact numeric ID/name pairs for the four data families; no properties |
@@ -146,5 +151,6 @@ checkpoint, preserving old addresses and cumulative work. UID skip owns no metad
 bytes remain covered by payload work. Empty deltas, repeated headers, failed candidates and source
 finish never reset counters. Retired discovered names remain charged in S and final schema bounds.
 
-Declared FIELD event metadata, sidecars, compression and source chains remain excluded. No new
+FIELD metadata and companion-header admission require their separate explicit policies. Sidecar I/O,
+compression and source-chain ownership remain outside protocol. No new
 dependency, network transport or source/callback framework follows from this finite policy.

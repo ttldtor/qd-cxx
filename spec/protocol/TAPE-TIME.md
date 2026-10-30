@@ -26,6 +26,22 @@ It recognizes prefixes independently of descriptor text, including headerless, N
 This corresponds to explicitly enabling production parser `readEventTimeSequence`; descriptor text
 does not silently select the feature. No ambient configuration or broader case folding is added.
 
+## Independent companion-header admission
+
+`TapeExternalTimePolicy::SIDECAR` is a separate required-final constructor selection for
+`TapeReader(schema, limits, TapeMode::BINARY_CATALOG_V1, fieldTimePolicy, externalTimePolicy)` or
+`TapeReader(limits, TapeDiscovery::BINARY_CATALOG_V1, fieldTimePolicy, externalTimePolicy)`.
+Old signatures retain `TapeExternalTimePolicy::DISABLED`. SIDECAR admits exact LONG/long/TEXT/text
+headers and descriptor deltas; FIELD still independently requires READ. Invalid enum/mode selections
+fail before owning schema/framing allocation; diagnostic exception storage can allocate.
+
+This is admission only, with no provider I/O, clock, external timing setter/state or closure proof.
+The tool-private [companion scanner](SIDECAR-TIME.md) returns owning absolute timestamp/position marks
+within explicit finite budgets. Its positions address inflated logical data bytes. The owner applies
+marks and subsequent MESSAGE heartbeats chronologically; zero external packing still falls back to
+raw FIELD. Scanner END, protocol finish and container EOF are distinct from paired owner completion.
+CLI/source integration and full sidecar corpus/operational acceptance remain separate gates.
+
 ## Exact recognition and binding
 
 Recognition examines raw physical descriptions before zero-width VOID elision:

@@ -69,11 +69,29 @@ class DescriptorParser {
     TapeDescriptorLimits limits_;
     TapeMode mode_;
     FieldTimePolicy fieldTimePolicy_;
+    TapeExternalTimePolicy externalTimePolicy_;
     TapeDiagnostic &position_;
     std::size_t cursor_ = 0;
     std::size_t units_ = 0;
     std::size_t properties_ = 0;
     std::size_t messages_ = 0;
+
+    /** Test only the explicitly admitted finite header tokens.
+     * @param value Borrowed exact time token.
+     * @return Whether the immutable independent policies admit this token.
+     */
+    bool supportsCatalogTime(std::u16string_view value) const noexcept {
+        if (value == u"NONE" || value == u"none" || value == u"MESSAGE" || value == u"message") {
+            return true;
+        }
+
+        if (value == u"FIELD" || value == u"field") {
+            return fieldTimePolicy_ == FieldTimePolicy::READ;
+        }
+
+        return externalTimePolicy_ == TapeExternalTimePolicy::SIDECAR &&
+               (value == u"LONG" || value == u"long" || value == u"TEXT" || value == u"text");
+    }
 
     /** Scoped text ownership within the descriptor's shared metadata ledger. */
     struct CatalogText {
@@ -224,10 +242,12 @@ class DescriptorParser {
      * @param position Diagnostic checkpoints updated during examination.
      * @param mode Explicit container policy.
      * @param fieldTimePolicy Explicit finite FIELD recognition policy.
+     * @param externalTimePolicy Explicit companion header admission policy, without source state.
      */
     DescriptorParser(std::span<const std::byte> payload, TapeDescriptorLimits limits, TapeDiagnostic &position,
-                     TapeMode mode, FieldTimePolicy fieldTimePolicy)
-        : payload_(payload), limits_(limits), mode_(mode), fieldTimePolicy_(fieldTimePolicy), position_(position) {
+                     TapeMode mode, FieldTimePolicy fieldTimePolicy, TapeExternalTimePolicy externalTimePolicy)
+        : payload_(payload), limits_(limits), mode_(mode), fieldTimePolicy_(fieldTimePolicy),
+          externalTimePolicy_(externalTimePolicy), position_(position) {
     }
 
     /** Parse the selected broad full/delta grammar with old/candidate/temporary accounting.
@@ -288,10 +308,7 @@ class DescriptorParser {
 
                 target = &candidate.options;
             } else {
-                if (*value.value != u"NONE" && *value.value != u"none" && *value.value != u"MESSAGE" &&
-                    *value.value != u"message" &&
-                    !(fieldTimePolicy_ == FieldTimePolicy::READ &&
-                      (*value.value == u"FIELD" || *value.value == u"field"))) {
+                if (!supportsCatalogTime(*value.value)) {
                     reject(TapeError::UNSUPPORTED, TapeRejection::TIME);
                 }
 
@@ -764,19 +781,39 @@ discoverBinarySchema(const core::LocalSchema &previous, std::span<const WireReco
     return std::move(*result);
 }
 
+/** Validate all finite policy selections before any owning schema/framing allocation.
+ * @param mode Explicit tape grammar.
+ * @param fieldTimePolicy Independent FIELD-prefix policy.
+ * @param externalTimePolicy Independent companion header admission policy.
+ */
+void validateTimePolicies(TapeMode mode, FieldTimePolicy fieldTimePolicy, TapeExternalTimePolicy externalTimePolicy) {
+    if (mode != TapeMode::LEGACY && mode != TapeMode::RAW_MESSAGE_V1 && mode != TapeMode::BINARY_CATALOG_V1) {
+        throw std::invalid_argument("invalid tape mode");
+    }
+
+    if ((fieldTimePolicy != FieldTimePolicy::DISABLED && fieldTimePolicy != FieldTimePolicy::READ) ||
+        (fieldTimePolicy == FieldTimePolicy::READ && mode != TapeMode::BINARY_CATALOG_V1)) {
+        throw std::invalid_argument("invalid field time policy");
+    }
+
+    if ((externalTimePolicy != TapeExternalTimePolicy::DISABLED &&
+         externalTimePolicy != TapeExternalTimePolicy::SIDECAR) ||
+        (externalTimePolicy == TapeExternalTimePolicy::SIDECAR && mode != TapeMode::BINARY_CATALOG_V1)) {
+        throw std::invalid_argument("invalid external time policy");
+    }
+}
+
 /** Preserve old copying semantics and opt into fresh indexed provenance explicitly.
  * @param schema Validated caller-owned local schema.
  * @param limits Finite constructor bounds.
  * @param mode Explicit protocol policy.
  * @param fieldTimePolicy Explicit prefix policy, validated before any owning allocation.
+ * @param externalTimePolicy Explicit companion admission policy, validated before any owning allocation.
  * @return Bounded owning schema; constructor exceptions occur before any input.
  */
 core::LocalSchema initializeSchema(const core::LocalSchema &schema, const TapeLimits &limits, TapeMode mode,
-                                   FieldTimePolicy fieldTimePolicy) {
-    if ((fieldTimePolicy != FieldTimePolicy::DISABLED && fieldTimePolicy != FieldTimePolicy::READ) ||
-        (fieldTimePolicy == FieldTimePolicy::READ && mode != TapeMode::BINARY_CATALOG_V1)) {
-        throw std::invalid_argument("invalid field time policy");
-    }
+                                   FieldTimePolicy fieldTimePolicy, TapeExternalTimePolicy externalTimePolicy) {
+    validateTimePolicies(mode, fieldTimePolicy, externalTimePolicy);
 
     if (mode != TapeMode::BINARY_CATALOG_V1) {
         for (const auto &record : schema.records()) {
@@ -860,13 +897,15 @@ TapeReader::TapeReader(const core::LocalSchema &schema, TapeLimits limits, TapeM
 
 TapeReader::TapeReader(const core::LocalSchema &schema, TapeLimits limits, TapeMode mode,
                        FieldTimePolicy fieldTimePolicy)
-    : limits_(limits), mode_(mode), schema_(initializeSchema(schema, limits, mode, fieldTimePolicy)),
-      framer_(limits.frame) {
-    fieldTimePolicy_ = fieldTimePolicy;
+    : TapeReader(schema, limits, mode, fieldTimePolicy, TapeExternalTimePolicy::DISABLED) {
+}
 
-    if (mode_ != TapeMode::LEGACY && mode_ != TapeMode::RAW_MESSAGE_V1 && mode_ != TapeMode::BINARY_CATALOG_V1) {
-        throw std::invalid_argument("invalid tape mode");
-    }
+TapeReader::TapeReader(const core::LocalSchema &schema, TapeLimits limits, TapeMode mode,
+                       FieldTimePolicy fieldTimePolicy, TapeExternalTimePolicy externalTimePolicy)
+    : limits_(limits), mode_(mode),
+      schema_(initializeSchema(schema, limits, mode, fieldTimePolicy, externalTimePolicy)), framer_(limits.frame) {
+    fieldTimePolicy_ = fieldTimePolicy;
+    externalTimePolicy_ = externalTimePolicy;
 
     if (mode_ == TapeMode::BINARY_CATALOG_V1) {
         construction_ = initialSessionUnits(schema_, limits_);
@@ -888,7 +927,9 @@ TapeReader::TapeReader(const core::LocalSchema &schema, TapeLimits limits, TapeM
 
 TapeReader::TapeReader(TapeLimits limits, TapeMode mode)
     : TapeReader(
-          [](core::SchemaLimits bounds) {
+          [mode](core::SchemaLimits bounds) {
+              validateTimePolicies(mode, FieldTimePolicy::DISABLED, TapeExternalTimePolicy::DISABLED);
+
               auto empty = core::LocalSchema::create({}, bounds, core::LocalProfile::EXTENDED_FIELDS_V1);
 
               if (!empty) {
@@ -910,10 +951,13 @@ TapeReader::TapeReader(TapeLimits limits, TapeDiscovery discovery)
 }
 
 TapeReader::TapeReader(TapeLimits limits, TapeDiscovery discovery, FieldTimePolicy fieldTimePolicy)
+    : TapeReader(limits, discovery, fieldTimePolicy, TapeExternalTimePolicy::DISABLED) {
+}
+
+TapeReader::TapeReader(TapeLimits limits, TapeDiscovery discovery, FieldTimePolicy fieldTimePolicy,
+                       TapeExternalTimePolicy externalTimePolicy)
     : limits_(limits), mode_(TapeMode::BINARY_CATALOG_V1), schema_([&] {
-          if (fieldTimePolicy != FieldTimePolicy::DISABLED && fieldTimePolicy != FieldTimePolicy::READ) {
-              throw std::invalid_argument("invalid field time policy");
-          }
+          validateTimePolicies(TapeMode::BINARY_CATALOG_V1, fieldTimePolicy, externalTimePolicy);
 
           if (discovery != TapeDiscovery::BINARY_CATALOG_V1) {
               throw std::invalid_argument("invalid discovery policy");
@@ -937,6 +981,7 @@ TapeReader::TapeReader(TapeLimits limits, TapeDiscovery discovery, FieldTimePoli
       }()),
       framer_(limits.frame) {
     fieldTimePolicy_ = fieldTimePolicy;
+    externalTimePolicy_ = externalTimePolicy;
     construction_ = 1;
     snapshotUnits_ = 1;
     auto empty = StreamDataContext::createWithFieldTimePolicy(schema_, {}, limits.context, fieldTimePolicy_);
@@ -1405,7 +1450,8 @@ void TapeReader::dispatch(TapeFeedResult &result) {
             return;
         }
 
-        DescriptorParser parser(frame.payload, limits_.descriptor, diagnostic_, mode_, fieldTimePolicy_);
+        DescriptorParser parser(frame.payload, limits_.descriptor, diagnostic_, mode_, fieldTimePolicy_,
+                                externalTimePolicy_);
         try {
             auto candidate = parser.parseCatalog(descriptor_, budget);
             const auto old = descriptor_ ? descriptorUnits(*descriptor_) : 0;
@@ -1428,7 +1474,8 @@ void TapeReader::dispatch(TapeFeedResult &result) {
             return;
         }
 
-        DescriptorParser parser(frame.payload, limits_.descriptor, diagnostic_, mode_, fieldTimePolicy_);
+        DescriptorParser parser(frame.payload, limits_.descriptor, diagnostic_, mode_, fieldTimePolicy_,
+                                externalTimePolicy_);
         try {
             descriptor_ = parser.parse();
         } catch (const DescriptorFailure &failure) {

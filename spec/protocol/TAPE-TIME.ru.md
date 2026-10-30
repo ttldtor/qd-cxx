@@ -28,6 +28,22 @@ READ допускает точные FIELD/field вместе с прежним�
 Это соответствует явному включению production parser `readEventTimeSequence`; текст дескриптора
 не включает возможность скрыто. Ambient configuration и расширенное сравнение регистра не добавлены.
 
+## Независимый admission companion headers
+
+`TapeExternalTimePolicy::SIDECAR` — отдельный обязательный последний аргумент constructors
+`TapeReader(schema, limits, TapeMode::BINARY_CATALOG_V1, fieldTimePolicy, externalTimePolicy)` либо
+`TapeReader(limits, TapeDiscovery::BINARY_CATALOG_V1, fieldTimePolicy, externalTimePolicy)`.
+Старые сигнатуры сохраняют `TapeExternalTimePolicy::DISABLED`. SIDECAR принимает точные LONG/long/
+TEXT/text headers и descriptor deltas; FIELD независимо требует READ. Invalid enum/mode отвергаются
+до owning schema/framing allocation; память diagnostic exception может выделяться.
+
+Это только admission без provider I/O, clock, external timing setter/state и closure proof.
+Tool-private [companion scanner](SIDECAR-TIME.ru.md) возвращает владеющие absolute timestamp/position
+marks с явными конечными бюджетами. Позиции относятся к inflated logical data bytes. Owner применяет
+marks и последующие MESSAGE heartbeats хронологически; zero external packing возвращается к raw FIELD.
+Scanner END, protocol finish и container EOF отличаются от завершённости paired owner. CLI/source
+integration и полная sidecar corpus/operational acceptance остаются отдельными gates.
+
 ## Точное распознавание и привязка
 
 Распознавание рассматривает исходное физическое описание до исключения полей VOID нулевой ширины:

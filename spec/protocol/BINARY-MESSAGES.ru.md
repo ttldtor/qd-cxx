@@ -8,6 +8,11 @@
 отдельные исходные метаданные и состояние MESSAGE, добавляя конечные фиксированные charges владения
 и строительства.
 
+Независимый обязательный последний аргумент `TapeExternalTimePolicy::SIDECAR` принимает только
+LONG/long/TEXT/text headers в catalog mode; старые constructors сохраняют DISABLED.
+[Companion scanning](SIDECAR-TIME.ru.md), применение marks и whole-pair closure остаются вне protocol.
+Admission policy не задаёт external time и не меняет FIELD/MESSAGE state.
+
 `TapeMode::BINARY_CATALOG_V1` явно выбирает эту политику. Прежние LEGACY, RAW_MESSAGE_V1 и
 ordinary-v1 discovery сохраняют принятие, defaults и вывод. Конечные доказательства описаны в
 [каталоге](BINARY-TAPE-COVERAGE.ru.md) и
@@ -75,7 +80,7 @@ compact-int counts/ID списков и ограниченная UTFString gramm
 | --- | --- |
 | type | Только tape; обязателен в первом явном descriptor |
 | version | Необязательный точный UTF16, включая пустой; диагностика, не тест совместимости/pin |
-| time | Отсутствует либо точно NONE/none/MESSAGE/message; остальное UNSUPPORTED/TIME |
+| time | Отсутствует либо точно NONE/none/MESSAGE/message; FIELD/field только с READ; LONG/long/TEXT/text только с SIDECAR; остальное UNSUPPORTED/TIME |
 | opt | Отсутствует, пустой либо точно hs; другие/duplicate/whitespace tokens UNSUPPORTED/OPTIONS |
 | Неизвестный или duplicate top key | UNSUPPORTED/DESCRIPTOR после проверенной пары; без произвольной карты свойств |
 | Sends | Пусто либо подмножество/порядок точных numeric ID/name четырёх семейств, без properties |
@@ -140,5 +145,6 @@ header требует admission H(old), новый пустой кандидат
 Commit — только после полного успеха. Allocation failure переводится на текущем checkpoint,
 сохраняя прежние адреса и накопленную work. UID skip не владеет metadata и покрыт payload work.
 Дельты, headers, failed candidates и finish не сбрасывают счётчики. Retired имена остаются в S
-и конечных schema bounds. Объявленные FIELD metadata, sidecars, compression и цепочки источников
-исключены; новые зависимости, сеть и source/callback framework не добавлены.
+и конечных schema bounds. FIELD metadata и companion-header admission требуют отдельных явных policies.
+Sidecar I/O, compression и владение цепочкой источников остаются вне protocol; новые зависимости,
+сеть и source/callback framework не добавлены.

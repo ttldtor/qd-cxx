@@ -2,8 +2,8 @@
 
 [English version](BINARY-TAPE-COVERAGE.md). Английская версия нормативная.
 
-Статус: конечная реализация полей/сессии/диспетчеризации и необязательный инструментальный компонент
-контейнеров; sidecar/chain/operational integration и приёмка полного каталога ожидаются.
+Статус: реализованы конечные поля/сессия/диспетчеризация, bounded companion scanner/header admission
+и необязательные инструментальные контейнеры; chain/operational integration и приёмка полного каталога ожидаются.
 [Решение](../../docs/decisions/ADR-0004-broad-binary-tape-reading.ru.md),
 [матрица из 71 строки](../../tests/fixtures/protocol/real-tape/support-matrix.tsv) и
 [контракты проверок](../../tests/conformance/protocol/real-tape/CONTRACTS.ru.md) задают одну цель.
@@ -46,6 +46,7 @@ Windows во время исполнения. Чтение в C++ и его пр
 | `BINARY_FIELDS_V1` | 19 точных идентичностей только для чтения; обычные и явно индексные локальные записи | Ограниченный набор полей и индексных схем реализован |
 | `TapeMode::BINARY_CATALOG_V1` | Четыре общих семейства, NONE/MESSAGE/вход без заголовка, известные дескрипторы/опции/флаги/removal и неизменяемые поколения | Конечная реализация с явным включением; FIELD/контейнеры/цепочки остаются отдельными |
 | `FieldTimePolicy::READ` | Точные исходные ведущие EventTime/full56 и optional EventSequence/full72 с отдельным физическим REMOVE-префиксом | Явный binary-catalog выбор; прежние сигнатуры сохраняют DISABLED; см. TAPE-TIME |
+| `TapeExternalTimePolicy::SIDECAR` | Точный LONG/long/TEXT/text header/delta admission; source-free fixed tag | Явный binary-catalog выбор; tool-private finite scanner и paired-owner component tests; operational integration отдельно; см. SIDECAR-TIME |
 
 Профиль полей core и отдельный режим протокола выбираются явно. [Индексный контракт](../schema/INDEXED-SCHEMAS.ru.md)
 определяет переданные индексные раскладки; [BINARY-MESSAGES](BINARY-MESSAGES.ru.md) определяет
@@ -247,8 +248,12 @@ NONE, MESSAGE и явно выбранный FIELD READ являются огр�
 инструментальный [компонент закрытых GZIP/ZIP](TAPE-CONTAINERS.ru.md) проверяет ограниченные gzip
 members либо strict single-file ZIP32, включая integrity и physical EOF. Его OFF-default dependency
 остаётся вне core/protocol. Он не добавляет неявных wire modes или operational CLI выбора контейнера.
-LONG/TEXT sidecars (047), finite split sequences (049) и расширенный operational streaming/CLI hookup
-(050) сохраняют отдельные integration gates. Composed sink сохраняет callback lifetime, stop/exception
+[LONG/TEXT companion scanner](SIDECAR-TIME.ru.md) и явный header admission — bounded components.
+Их native paired-owner harness проверяет cleanup/error ordering с instrumented close/flush boundaries
+отдельно от настоящего CLI file ownership и mark/FIELD/MESSAGE integration. Полная LONG/TEXT matrix
+row остаётся pending до operational/corpus acceptance; negative numeric time явно не поддерживается
+вместо обращения к ambient clock. Finite split sequences (049) и расширенный operational streaming/
+CLI hookup (050) сохраняют отдельные integration gates. Composed sink сохраняет callback lifetime, stop/exception
 checkpoints, публикацию completed prefix и layered source/close/EOF completion; одного container
 closure недостаточно для итогового COMPLETE.
 

@@ -16,6 +16,12 @@ enum class TapeMode {
 /** Explicit broader discovery, independent from the unchanged ordinary constructor. */
 enum class TapeDiscovery { BINARY_CATALOG_V1 };
 
+/** Explicit admission of headers whose companion timing is resolved outside protocol. */
+enum class TapeExternalTimePolicy {
+    DISABLED, ///< Preserve existing LONG/TEXT refusal and all constructor defaults.
+    SIDECAR   ///< Admit exact LONG/long/TEXT/text only in BINARY_CATALOG_V1; no source or timing state is added.
+};
+
 /** Fixed-size owning timing state shared by all records in one data result. */
 struct TapeTiming {
     std::optional<std::int64_t> timestampMs; ///< Exact signed wire milliseconds; absent before a timestamp.
@@ -147,6 +153,7 @@ class TapeReader {
     std::size_t ownedPayloadBytes_ = 0;
     TapeTiming timing_;
     FieldTimePolicy fieldTimePolicy_ = FieldTimePolicy::DISABLED;
+    TapeExternalTimePolicy externalTimePolicy_ = TapeExternalTimePolicy::DISABLED; ///< Header admission only.
     std::size_t ownedFieldTimeRecords_ = 0;
     std::size_t timingEvents_ = 0;
     /** Set the first failure.
@@ -188,6 +195,16 @@ class TapeReader {
      * @param fieldTimePolicy Explicit prefix policy; invalid enum values fail before input.
      */
     TapeReader(const core::LocalSchema &schema, TapeLimits limits, TapeMode mode, FieldTimePolicy fieldTimePolicy);
+    /** Admit companion-time headers explicitly without changing FIELD decoding or internal MESSAGE timing.
+     * @param schema Borrowed validated BINARY_FIELDS_V1 declarations, copied before returning.
+     * @param limits Finite parsing, construction and owned metadata bounds.
+     * @param mode SIDECAR requires BINARY_CATALOG_V1.
+     * @param fieldTimePolicy Independent exact FIELD-prefix recognition policy.
+     * @param externalTimePolicy Admission-only companion policy; enum/mode validation precedes owning allocation.
+     * File I/O, logical mark application and whole-source completion remain the caller's responsibility.
+     */
+    TapeReader(const core::LocalSchema &schema, TapeLimits limits, TapeMode mode, FieldTimePolicy fieldTimePolicy,
+               TapeExternalTimePolicy externalTimePolicy);
     /** Explicitly discover ordinary exact fields from accepted descriptions; see WIRE-INVENTORY.
      * Starts with an empty EXTENDED_FIELDS_V1 schema. Invalid configuration throws
      * invalid_argument; allocation before input may throw bad_alloc. Single-threaded.
@@ -208,6 +225,15 @@ class TapeReader {
      * @param fieldTimePolicy Explicit prefix policy; invalid values throw invalid_argument before input.
      */
     TapeReader(TapeLimits limits, TapeDiscovery discovery, FieldTimePolicy fieldTimePolicy);
+    /** Discover binary fields while explicitly admitting companion-time headers.
+     * @param limits Finite parsing, construction and owned metadata bounds.
+     * @param discovery Explicit BINARY_CATALOG_V1 discovery; invalid values fail before owning allocation.
+     * @param fieldTimePolicy Independent exact FIELD-prefix recognition policy.
+     * @param externalTimePolicy Header admission only; invalid values fail before owning allocation.
+     * No provider, clock, filesystem access, external timing state or external-completion proof is retained.
+     */
+    TapeReader(TapeLimits limits, TapeDiscovery discovery, FieldTimePolicy fieldTimePolicy,
+               TapeExternalTimePolicy externalTimePolicy);
     /** Accept up to one envelope; caller resubmits any unaccepted suffix.
      * @param input Borrowed bytes, not retained by reference.
      * @return Owned event/prefix and exact accepted count; terminal failures accept zero later.
