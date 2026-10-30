@@ -25,6 +25,24 @@ std::string_view tapeRejectionName(protocol::TapeRejection reason) noexcept {
 }
 
 std::string_view tapeRejectionExplanation(protocol::TapeRejection reason, protocol::TapeMode mode) noexcept {
+    if (mode == protocol::TapeMode::BINARY_CATALOG_V1) {
+        switch (reason) {
+        case protocol::TapeRejection::TIME:
+            return "Binary catalog mode supports NONE/MESSAGE timing and empty or timestamp-only heartbeats; FIELD is "
+                   "excluded.";
+        case protocol::TapeRejection::OPTIONS:
+            return "Binary catalog mode accepts absent, empty or exact hs options and the six known event-flag bits.";
+        case protocol::TapeRejection::MESSAGE:
+            return "Binary catalog mode accepts four data families and known bounded controls; other operations are "
+                   "refused.";
+        case protocol::TapeRejection::DESCRIPTOR:
+            return "Binary catalog descriptors accept known properties and deltas; unknown properties and endpoint "
+                   "extensions are refused.";
+        default:
+            break;
+        }
+    }
+
     if (mode == protocol::TapeMode::RAW_MESSAGE_V1) {
         switch (reason) {
         case protocol::TapeRejection::TIME:

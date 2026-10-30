@@ -432,3 +432,66 @@ function CompareFlags([string]$ActualRoot, [string]$ExpectedRoot) {
     "PASS: strict flags comparison of $($names.Count) artifacts"
 }
 CompareFlags (Join-Path $Actual 'flags') (Join-Path $Expected 'flags')
+
+# Exact finite production dispatch capture; random synthetic endpoint UIDs remain in raw files.
+# Only the recorded serializer UID range is normalized in memory for comparison, never on disk.
+function CompareDispatch([string]$ActualRoot,[string]$ExpectedRoot) {
+    $arity=@{all=2;descriptor=10;direct=6;file=7;other=4;record=3;writer=4}
+    foreach($mode in @('normal','headerless')) {
+        $roots=@((Join-Path $ActualRoot $mode),(Join-Path $ExpectedRoot $mode))
+        $required=if($mode -ceq 'normal'){@{all=1;descriptor=59;direct=231;file=295;other=3;record=71;writer=8}}else{@{all=1;file=8;record=8;writer=8}}
+        $captures=@()
+        foreach($root in $roots) {
+            Assert (@(Get-ChildItem -LiteralPath $root -Directory).Count -eq 0) 'no dispatch leaf directories'
+            $rows=[IO.File]::ReadAllLines((Join-Path $root 'observations.tsv'))
+            Assert ($rows.Count -eq $(if($mode -ceq 'normal'){668}else{25}) -and $rows[-1] -ceq "all`tPASS") 'finite dispatch observations'
+            $counts=@{}
+            $names=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+            $null=$names.Add('observations.tsv')
+            foreach($time in @('NONE','MESSAGE')) {foreach($family in @(5,10,15,20)){$null=$names.Add("writer-$time-$family.qtp")}}
+            foreach($line in $rows) {
+                $cells=$line.Split("`t")
+                Assert ($arity.ContainsKey($cells[0]) -and $cells.Count -eq $arity[$cells[0]]) 'dispatch row arity'
+                $counts[$cells[0]]=1+$(if($counts.ContainsKey($cells[0])){$counts[$cells[0]]}else{0})
+                if($cells[0] -cne 'all') {Assert ($cells[1] -cmatch '^[A-Za-z0-9_-]+$') 'safe synthetic dispatch case'}
+                if($cells[0] -ceq 'file') {$null=$names.Add($cells[1]+'.qtp')}
+                if($cells[0] -ceq 'record') {Assert ($cells[2] -cmatch '^(5|10|15|20)/[01]/913/(0|1311768464867721216)$') 'dispatch family/value/timing'}
+                if($cells[0] -ceq 'descriptor') {Integer $cells[2];Assert ($cells[9] -cin @('absent','present')) 'endpoint presence'}
+            }
+            foreach($item in $required.GetEnumerator()){Assert ($counts[$item.Key] -eq $item.Value) "finite dispatch row count $($item.Key)"}
+            $ranges=[Collections.Generic.Dictionary[string,object]]::new([StringComparer]::Ordinal)
+            if($mode -ceq 'normal') {
+                $null=$names.Add('uid-ranges.tsv')
+                $rangeRows=[IO.File]::ReadAllLines((Join-Path $root 'uid-ranges.tsv'))
+                Assert ($rangeRows.Count -eq 59 -and $rangeRows[0] -ceq "file`tstart`tlength" -and $rangeRows[-1] -ceq "complete`t57") 'complete random UID range map'
+                foreach($line in $rangeRows[1..57]) {
+                    $cells=$line.Split("`t");Assert ($cells.Count -eq 3 -and $names.Contains($cells[0])) 'UID range file'
+                    Integer $cells[1];Integer $cells[2]
+                    $offset=[int]$cells[1];$size=[int]$cells[2]
+                    Assert ($offset -ge 0 -and $size -gt 0 -and $size -le 16 -and !$ranges.ContainsKey($cells[0])) 'finite UID range'
+                    $ranges.Add($cells[0],@($offset,$size))
+                }
+            }
+            $files=@(Get-ChildItem -LiteralPath $root -File|Sort-Object Name)
+            Assert ($files.Count -eq $(if($mode -ceq 'normal'){305}else{17}) -and ($files.Name -join '|') -ceq (($names|Sort-Object) -join '|')) 'exact dispatch artifact set'
+            foreach($file in $files){Assert ($file.Length -lt 1048576 -and ($file.Length -gt 0 -or $file.Name -cin @('empty-file.qtp','physical-endpoint-cut-0.qtp'))) 'bounded dispatch artifact'}
+            $captures+=,[ordered]@{root=$root;rows=$rows;files=$files;ranges=$ranges}
+        }
+        Assert (($captures[0].rows -join "`n") -ceq ($captures[1].rows -join "`n")) 'exact dispatch canonical rows'
+        foreach($file in $captures[0].files) {
+            $left=[IO.File]::ReadAllBytes($file.FullName)
+            $right=[IO.File]::ReadAllBytes((Join-Path $captures[1].root $file.Name))
+            Assert ($left.Length -eq $right.Length) 'dispatch raw length'
+            if($captures[0].ranges.ContainsKey($file.Name)) {
+                Assert ($captures[1].ranges.ContainsKey($file.Name)) 'matching UID range case'
+                $range=$captures[0].ranges[$file.Name];$other=$captures[1].ranges[$file.Name]
+                Assert (($range -join '/') -ceq ($other -join '/') -and $range[0] -le $left.Length - $range[1]) 'matching UID range coordinates'
+                for($i=0;$i -lt $range[1];$i++){$left[$range[0]+$i]=0;$right[$range[0]+$i]=0}
+            }
+            Assert ([Convert]::ToHexString($left) -ceq [Convert]::ToHexString($right)) "dispatch bytes outside recorded random UID: $($file.Name)"
+        }
+        if($mode -ceq 'normal'){"PASS: finite dispatch normal comparison; only57 synthetic UID ranges normalized in memory"}
+        else{"PASS: exact17 headerless artifacts including16 raw tapes; no UID normalization"}
+    }
+}
+CompareDispatch (Join-Path $Actual 'dispatch') (Join-Path $Expected 'dispatch')

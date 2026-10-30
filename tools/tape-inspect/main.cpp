@@ -20,6 +20,13 @@
 #endif
 
 namespace {
+constexpr std::size_t BROAD_FIELD_PAYLOAD_ENCODED_BYTES = 65536;
+constexpr std::size_t BROAD_FIELD_PAYLOAD_BYTES = 65536;
+constexpr std::size_t BROAD_PAYLOAD_ENCODED_BYTES = 16777216;
+constexpr std::size_t BROAD_PAYLOAD_WORK_BYTES = 16777216;
+constexpr std::size_t BROAD_OWNED_PAYLOAD_BYTES = 8388608;
+constexpr std::size_t BROAD_SNAPSHOT_UNITS = 16777216;
+
 /** Emit a bounded loader/source diagnostic without input text or protocol coordinates.
  * @param code Documented process exit for the loading failure.
  * @param token Static error name from the native schema contract.
@@ -61,6 +68,13 @@ int main(int argc, char **argv) {
         ti::Limits limits;
         org::ttldtor::qdcxx::schema::JsonSchemaLimits schemaLimits;
         auto &t = limits.tape;
+        const std::map<std::string_view, std::pair<std::size_t *, std::size_t>> broadOptions{
+            {"--field-payload-encoded-bytes", {&t.data.fieldPayloadEncodedBytes, BROAD_FIELD_PAYLOAD_ENCODED_BYTES}},
+            {"--field-payload-bytes", {&t.data.fieldPayloadBytes, BROAD_FIELD_PAYLOAD_BYTES}},
+            {"--max-payload-encoded-bytes", {&t.data.payloadEncodedBytes, BROAD_PAYLOAD_ENCODED_BYTES}},
+            {"--max-payload-work-bytes", {&t.data.payloadWorkBytes, BROAD_PAYLOAD_WORK_BYTES}},
+            {"--max-owned-payload-bytes", {&t.data.ownedPayloadBytes, BROAD_OWNED_PAYLOAD_BYTES}},
+            {"--max-snapshot-units", {&t.snapshotUnits, BROAD_SNAPSHOT_UNITS}}};
         std::map<std::string_view, std::size_t *> options{
             {"--max-schema-bytes", &schemaLimits.documentBytes},
             {"--max-schema-depth", &schemaLimits.depth},
@@ -100,8 +114,9 @@ int main(int argc, char **argv) {
             std::cout
                 << "qdcxx-tape-inspect --input PATH (--schema PATH | --profile "
                    "oracle-sre-v1|default-quote-v1|default-profile-v1|oracle-field-types-v1 | --wire-schema "
-                   "ordinary-v1) [--output-format "
-                   "tsv|human] [--diagnostics-version 1|2] [--tape-mode legacy|raw-message-v1] [LIMIT "
+                   "ordinary-v1|binary-catalog-v1) [--output-format "
+                   "tsv|human] [--diagnostics-version 1|2] [--tape-mode legacy|raw-message-v1|binary-catalog-v1] "
+                   "[LIMIT "
                    "VALUE ...]\n"
                    "Explicit BINARY, uncompressed, time NONE, EMPTY_SET, STREAM_DATA, zero flags.\n"
                    "oracle-sre-v1: diagnostic S/R/E, exact type 8, diagnostics default 1.\n"
@@ -113,6 +128,10 @@ int main(int argc, char **argv) {
                    "--schema PATH: native resolved JSON, generic typed output 6, diagnostics default 2.\n"
                    "--wire-schema ordinary-v1: explicit ordinary exact 2/8/10/40/56/72/88/120 discovery; "
                    "self-describing output 7 with names, source IDs/order and successful generations.\n"
+                   "--wire-schema binary-catalog-v1 --tape-mode binary-catalog-v1: explicit all19 finite fields, "
+                   "RAW/TICKER/STREAM/HISTORY, flags/removal metadata, NONE/MESSAGE/headerless; generic typed "
+                   "output8.\n"
+                   "No indexed layout is inferred. Empty description batches publish no broad generation.\n"
                    "Wire schema limits apply before owned union construction; JSON byte/depth limits are loader-only.\n"
                    "Exactly one schema source is required; external schema loads before tape IO.\n"
                    "--tape-mode raw-message-v1: explicit BINARY/RAW_DATA/MESSAGE, opt absent/empty/hs, zero "
@@ -123,6 +142,12 @@ int main(int argc, char **argv) {
 
             for (const auto &[name, value] : options) {
                 std::cout << name << ' ' << *value << '\n';
+            }
+
+            std::cout << "Broad-only defaults (bytes except snapshot metadata units; explicit0 stays0):\n";
+
+            for (const auto &[name, option] : broadOptions) {
+                std::cout << name << ' ' << option.second << '\n';
             }
 
             std::cout << "Exit: 0 success/help; 2 usage; 3 IO; 4 unsupported; 5 malformed; 6 resource.\n"
@@ -170,11 +195,17 @@ int main(int argc, char **argv) {
                 valid = operand == "1" || operand == "2";
                 diagnosticsVersion = operand == "2" ? 2U : 1U;
             } else if (key == "--tape-mode") {
-                valid = operand == "legacy" || operand == "raw-message-v1";
-                mode = operand == "raw-message-v1" ? protocol::TapeMode::RAW_MESSAGE_V1 : protocol::TapeMode::LEGACY;
+                valid = operand == "legacy" || operand == "raw-message-v1" || operand == "binary-catalog-v1";
+                mode = operand == "binary-catalog-v1" ? protocol::TapeMode::BINARY_CATALOG_V1
+                       : operand == "raw-message-v1"  ? protocol::TapeMode::RAW_MESSAGE_V1
+                                                      : protocol::TapeMode::LEGACY;
             } else {
                 auto option = options.find(key);
-                valid = option != options.end() && presentation::detail::parseUnsignedCount(operand, *option->second);
+                const auto broadOption = broadOptions.find(key);
+                valid = option != options.end()
+                            ? presentation::detail::parseUnsignedCount(operand, *option->second)
+                            : broadOption != broadOptions.end() &&
+                                  presentation::detail::parseUnsignedCount(operand, *broadOption->second.first);
             }
         }
 
@@ -184,11 +215,24 @@ int main(int argc, char **argv) {
         const bool knownProfile = quoteProfile || fieldProfile || standardProfile || profile == "oracle-sre-v1";
         const bool external = seen.contains("--schema");
         const bool wire = seen.contains("--wire-schema");
+        const bool catalog = mode == protocol::TapeMode::BINARY_CATALOG_V1;
         const auto sourceCount = static_cast<unsigned>(external) + static_cast<unsigned>(wire) +
                                  static_cast<unsigned>(seen.contains("--profile"));
-        const bool validSource = sourceCount == 1 && (wire       ? wireSchema == "ordinary-v1"
-                                                      : external ? !schemaPath.empty() && schemaPath != "-"
-                                                                 : knownProfile);
+        const bool validSource =
+            sourceCount == 1 && (wire ? (catalog ? wireSchema == "binary-catalog-v1" : wireSchema == "ordinary-v1")
+                                 : external ? !schemaPath.empty() && schemaPath != "-"
+                                            : knownProfile);
+        valid = valid && (!catalog || wire);
+
+        for (const auto &[name, option] : broadOptions) {
+            if (catalog) {
+                if (!seen.contains(name)) {
+                    *option.first = option.second;
+                }
+            } else if (seen.contains(name)) {
+                valid = false;
+            }
+        }
 
         if ((wire || external || quoteProfile || fieldProfile || standardProfile) &&
             !seen.contains("--diagnostics-version")) {
@@ -276,7 +320,8 @@ int main(int argc, char **argv) {
         }
 
         if (wire) {
-            return ti::inspectWire(input, std::cout, std::cerr, limits, format, diagnosticsVersion, mode);
+            return catalog ? ti::inspectBinaryWire(input, std::cout, std::cerr, limits, format, diagnosticsVersion)
+                           : ti::inspectWire(input, std::cout, std::cerr, limits, format, diagnosticsVersion, mode);
         }
 
         if (externalSchema) {

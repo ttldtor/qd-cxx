@@ -28,7 +28,8 @@ enum class DisplayProfile {
     ORACLE_FIELD_TYPES_V1, ///< Generic exact fields with nullable UTF-16, using tape output version 4.
     DEFAULT_PROFILE_V1,    ///< Explicit default Profile with raw fields and event values, output version 5.
     EXTERNAL_SCHEMA_V1,    ///< Caller-loaded ordinary exact fields, generic tape output version 6.
-    WIRE_SCHEMA_V1         ///< Explicit ordinary wire discovery with source metadata, output version 7.
+    WIRE_SCHEMA_V1,        ///< Explicit ordinary wire discovery with source metadata, output version 7.
+    BINARY_CATALOG_V1      ///< Explicit broader discovery with lossless fields and metadata, output version 8.
 };
 
 /** Logical row exceeds remaining output bytes; translated to the existing write resource error. */
@@ -83,6 +84,14 @@ class Formatter {
      * @return Complete bounded row or OutputLimit.
      */
     std::string tapeDescriptor(const protocol::TapeDescriptor &descriptor, std::size_t budget) const;
+    /** Compose effective broad descriptor metadata after one committed full/delta event.
+     * @param descriptor Validated owning effective header.
+     * @param index Source frame ordinal.
+     * @param budget Remaining encoded output bytes.
+     * @return Fixed version-8 descriptor row or OutputLimit.
+     */
+    std::string catalogDescriptor(const protocol::TapeDescriptor &descriptor, std::size_t index,
+                                  std::size_t budget) const;
     /** Compose a tape frame with the header type named separately.
      * @param frame Owning envelope borrowed for this call.
      * @param index Zero-based envelope index.
@@ -128,6 +137,19 @@ class Formatter {
     std::string record(const protocol::StreamDataRecord &record, std::u16string_view name, std::size_t frameIndex,
                        std::size_t index, std::size_t budget, const protocol::TapeTiming *timing = nullptr,
                        std::size_t generation = 0) const;
+    /** Compose a broad typed row after validating its authoritative schema and provenance.
+     * @param record Owning decoded values, exact local/source identity and metadata.
+     * @param schema Expected validated binary schema; supplies the record name and exact field shape.
+     * @param frameIndex Source envelope ordinal.
+     * @param index Emitted record ordinal.
+     * @param budget Remaining encoded bytes, inspected only after complete record/schema validation.
+     * @param timing Explicit owned frame timing, or null for absent timestamp/zero sequence.
+     * @param generation Current committed nonempty description publication.
+     * @return Version-8 row or OutputLimit; invalid_argument for any schema/context/shape/profile mismatch.
+     */
+    std::string catalogRecord(const protocol::StreamDataRecord &record, const core::LocalSchema &schema,
+                              std::size_t frameIndex, std::size_t index, std::size_t budget,
+                              const protocol::TapeTiming *timing, std::size_t generation) const;
 
     /** Begin a bounded version-7 description snapshot.
      * @param frameIndex Successful description envelope index.

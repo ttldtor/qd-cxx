@@ -189,3 +189,10 @@ whitespace, row uniqueness/count, exact full-ID/message/flag dimensions, primary
 at both pins and actual-evidence path existence. Required independent final-source review covers
 ownership, generation state, partial failure, EOF and resource bounds. Author rereading is not that
 independent review. Publish only the checks actually executed and retain named unresolved limits.
+
+
+The implemented045 selection is [BINARY-MESSAGES](../../../../spec/protocol/BINARY-MESSAGES.md),
+with [dispatch validation](../field-types/DISPATCH-VALIDATION.md). D3 valid unknown alternatives use
+selected typed refusal. Actual FileWriter headerless positive evidence is present; schemeKnown/readAs
+remain excluded. v8 empty description batches publish no generation/authentication. Native read/EOF/
+finish/write/flush proof is separate from039's instrumented Java source-close proof.

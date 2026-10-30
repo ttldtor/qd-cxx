@@ -1,0 +1,25 @@
+record	writer-NONE-5-reader	5/0/913/0
+file	writer-NONE-5-reader	bytes=24	records=1	errors=0	protocols=0	others=0
+writer	writer-NONE-5-reader	first=2	headerless=true
+record	writer-NONE-10-reader	10/0/913/0
+file	writer-NONE-10-reader	bytes=24	records=1	errors=0	protocols=0	others=0
+writer	writer-NONE-10-reader	first=2	headerless=true
+record	writer-NONE-15-reader	15/0/913/0
+file	writer-NONE-15-reader	bytes=24	records=1	errors=0	protocols=0	others=0
+writer	writer-NONE-15-reader	first=2	headerless=true
+record	writer-NONE-20-reader	20/0/913/0
+file	writer-NONE-20-reader	bytes=24	records=1	errors=0	protocols=0	others=0
+writer	writer-NONE-20-reader	first=2	headerless=true
+record	writer-MESSAGE-5-reader	5/0/913/1311768464867721216
+file	writer-MESSAGE-5-reader	bytes=33	records=1	errors=0	protocols=0	others=0
+writer	writer-MESSAGE-5-reader	first=0	headerless=true
+record	writer-MESSAGE-10-reader	10/0/913/1311768464867721216
+file	writer-MESSAGE-10-reader	bytes=33	records=1	errors=0	protocols=0	others=0
+writer	writer-MESSAGE-10-reader	first=0	headerless=true
+record	writer-MESSAGE-15-reader	15/0/913/1311768464867721216
+file	writer-MESSAGE-15-reader	bytes=33	records=1	errors=0	protocols=0	others=0
+writer	writer-MESSAGE-15-reader	first=0	headerless=true
+record	writer-MESSAGE-20-reader	20/0/913/1311768464867721216
+file	writer-MESSAGE-20-reader	bytes=33	records=1	errors=0	protocols=0	others=0
+writer	writer-MESSAGE-20-reader	first=0	headerless=true
+all	PASS

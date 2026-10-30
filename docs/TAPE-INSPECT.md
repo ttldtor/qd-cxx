@@ -1,4 +1,4 @@
-# Tape inspection, version 1
+# Tape inspection
 
 [Русская версия](TAPE-INSPECT.ru.md). English is authoritative.
 
@@ -290,3 +290,63 @@ it cannot silently turn a deletion into fresh zero values. Writer input formats 
 explicit read-only policy. No new CLI spelling or output grammar is introduced here.
 
 
+
+## Explicit binary discovery and output8
+
+```sh
+qdcxx-tape-inspect --input tests/fixtures/encoding/field-types/expected/dispatch/normal/writer-MESSAGE-20.qtp --wire-schema binary-catalog-v1 --tape-mode binary-catalog-v1
+```
+
+Both broad selections are required together. This is ordinary discovery of the19 exact binary field
+identities, four data families and selected NONE/MESSAGE/headerless policy in
+[BINARY-MESSAGES](../spec/protocol/BINARY-MESSAGES.md). It does not infer indexed layout from names,
+load a broad schema through native-v1 JSON, run collectors or interpret serialized Java objects.
+The existing ordinary-v1/old modes and their version4–7 outputs retain their exact behavior/refusals.
+
+TSV begins `format<TAB>qdcxx-tape-inspect<TAB>8<TAB>binary-catalog-v1<TAB>binary-catalog-v1`.
+Schema/source row grammar is the existing v7 grammar above; v8 generation advances only on an actual
+successful nonempty immutable publication. Empty description batches emit their frame only and
+cannot authenticate headerless completion. Equal nonempty batches create a new generation.
+Frame rows retain original family/type; RAW is represented once, without Java collector fanout.
+
+`wire-data-v8` has exactly14 cells including its label: frameIndex, recordIndex, generation,
+senderId, localId, recordNameHex, symbolHex, typedValues, timestampMs, eventTimeSequence,
+eventTimeMs, flags, removalTime. Name/symbol hex uses the existing lowercase UTF16 spelling.
+Each comma-separated value is `fullType:raw:units:bytes`: scalars use `raw:-:-`, types10/137 use
+`0:null|empty|utf16hex:-`, and types9/233/249 use `0:-:null|empty|bytehex`. Opaque bytes are lowercase
+hex and never executed. Empty value list is an empty cell. Timestamp/removal absence is `-`;
+engaged0 is different. The three timing columns preserve raw wire versus packed/delivered time.
+
+`descriptor-v8` has exactly9 cells: label, frameIndex, versionPresent, versionHex, optPresent,
+optHex, timePresent, timeHex, effectiveSendMask. Presence is0/1; present-empty text hex is `-`.
+Send bits are `(1u<<5)|(1u<<10)|(1u<<15)|(1u<<20)` for actual declared known sends, not authorization.
+HUMAN renders the same information with safe quoted text and hex, naming all accepted families and
+controls. Canonical values/metadata are preserved; redundant prefix/cipher encoding bytes are not promised.
+
+The tool formatter uses distinct `catalogRecord(record, schema, ..., timing, generation)`: expected
+binary schema, local ID, provenance, exact field count/full IDs and canonical shape are checked before
+row/output-budget work. The name comes from that schema. Calling the old name-only record formatter
+with the broad profile fails; old formatter signatures and metadata/payload refusal stay unchanged.
+
+| Broad-only option | Default | Meaning |
+| --- | --- | --- |
+| --field-payload-encoded-bytes |65536| Examined prefix/body bytes per new payload value |
+| --field-payload-bytes |65536| Admitted declared body bytes per value |
+| --max-payload-encoded-bytes |16777216| Aggregate examined new-payload bytes |
+| --max-payload-work-bytes |16777216| Aggregate admitted body work, without refunds |
+| --max-owned-payload-bytes |8388608| Completed/current/temporary logical payload bytes |
+| --max-snapshot-units |16777216| Simultaneous schema/description/context/descriptor/temporary metadata |
+
+Defaults apply only when that broad option was omitted; explicit0 stays0. Old modes refuse these
+options before tape I/O. Existing independent string-unit, construction, input/frame/record/value,
+timing and output limits still apply; STRING137 uses both string-unit and new payload bounds.
+The library reader applies no hidden CLI preset. No-args and standalone --help are identical and
+need no working files. Mismatched modes/sources and invalid options fail before input is opened.
+
+Output bytes, including header/schema/timing/completion, are counted before expansion and write.
+Exits remain0 success/help,2 usage,3 I/O,4 unsupported,5 malformed,6 resource. Success requires
+physical EOF, clean reader.finish, all writes and final flush plus exit0. Already-written bytes
+cannot be retracted after a failed flush. Borrowed-stream inspection does not prove owner close;
+Java acceptance has a separate instrumented close proof. FIELD, sidecars, compression and source
+chains remain excluded. [Validation](../tests/conformance/protocol/field-types/DISPATCH-VALIDATION.md)
+states the exact production/native/whole-file scope.

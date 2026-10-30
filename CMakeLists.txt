@@ -106,6 +106,16 @@ if(BUILD_TESTING)
         DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     )
     FetchContent_MakeAvailable(doctest)
+    if(ORG_TTLDTOR_QDCXX_BUILD_TAPE_INSPECT)
+        add_executable(qdcxx_tape_message_family_tests tests/conformance/tape_message_family_tests.cpp)
+        target_link_libraries(qdcxx_tape_message_family_tests PRIVATE qdcxx_tape_inspect_tool doctest::doctest)
+        set_target_properties(qdcxx_tape_message_family_tests PROPERTIES CXX_EXTENSIONS OFF)
+        add_test(NAME protocol_tape_message_families COMMAND qdcxx_tape_message_family_tests
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/encoding/field-types/expected/dispatch")
+        add_test(NAME binary_catalog_cli COMMAND "${CMAKE_COMMAND}"
+            "-DPROGRAM=$<TARGET_FILE:qdcxx_tape_inspect>" "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/binary_catalog_cli.cmake")
+    endif()
     if(ORG_TTLDTOR_QDCXX_BUILD_REPLAY)
         add_executable(qdcxx_tape_replay_tests tests/conformance/tape_replay_tests.cpp)
         target_link_libraries(qdcxx_tape_replay_tests PRIVATE qdcxx_replay doctest::doctest)

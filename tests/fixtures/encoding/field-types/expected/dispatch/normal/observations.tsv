@@ -1,0 +1,668 @@
+descriptor	writer-NONE-5-reader	1	QDS-UNKNOWN		null	null	[RAW_DATA]	[]	absent
+record	writer-NONE-5-reader	5/0/913/0
+file	writer-NONE-5-reader	bytes=80	records=1	errors=0	protocols=1	others=0
+writer	writer-NONE-5-reader	first=1	headerless=false
+descriptor	writer-NONE-10-reader	1	QDS-UNKNOWN		null	null	[TICKER_DATA]	[]	absent
+record	writer-NONE-10-reader	10/0/913/0
+file	writer-NONE-10-reader	bytes=83	records=1	errors=0	protocols=1	others=0
+writer	writer-NONE-10-reader	first=1	headerless=false
+descriptor	writer-NONE-15-reader	1	QDS-UNKNOWN		null	null	[STREAM_DATA]	[]	absent
+record	writer-NONE-15-reader	15/0/913/0
+file	writer-NONE-15-reader	bytes=83	records=1	errors=0	protocols=1	others=0
+writer	writer-NONE-15-reader	first=1	headerless=false
+descriptor	writer-NONE-20-reader	1	QDS-UNKNOWN		null	null	[HISTORY_DATA]	[]	absent
+record	writer-NONE-20-reader	20/0/913/0
+file	writer-NONE-20-reader	bytes=84	records=1	errors=0	protocols=1	others=0
+writer	writer-NONE-20-reader	first=1	headerless=false
+descriptor	writer-MESSAGE-5-reader	1	QDS-UNKNOWN		message	null	[RAW_DATA]	[]	absent
+record	writer-MESSAGE-5-reader	5/0/913/1311768464867721216
+file	writer-MESSAGE-5-reader	bytes=103	records=1	errors=0	protocols=1	others=0
+writer	writer-MESSAGE-5-reader	first=1	headerless=false
+descriptor	writer-MESSAGE-10-reader	1	QDS-UNKNOWN		message	null	[TICKER_DATA]	[]	absent
+record	writer-MESSAGE-10-reader	10/0/913/1311768464867721216
+file	writer-MESSAGE-10-reader	bytes=106	records=1	errors=0	protocols=1	others=0
+writer	writer-MESSAGE-10-reader	first=1	headerless=false
+descriptor	writer-MESSAGE-15-reader	1	QDS-UNKNOWN		message	null	[STREAM_DATA]	[]	absent
+record	writer-MESSAGE-15-reader	15/0/913/1311768464867721216
+file	writer-MESSAGE-15-reader	bytes=106	records=1	errors=0	protocols=1	others=0
+writer	writer-MESSAGE-15-reader	first=1	headerless=false
+descriptor	writer-MESSAGE-20-reader	1	QDS-UNKNOWN		message	null	[HISTORY_DATA]	[]	absent
+record	writer-MESSAGE-20-reader	20/0/913/1311768464867721216
+file	writer-MESSAGE-20-reader	bytes=107	records=1	errors=0	protocols=1	others=0
+writer	writer-MESSAGE-20-reader	first=1	headerless=false
+record	scheme-known-no-descriptions	15/0/913/0
+file	scheme-known-no-descriptions	bytes=9	records=1	errors=0	protocols=0	others=0
+file	no-descriptions-default	bytes=9	records=0	errors=1	protocols=0	others=0
+record	read-as-ticker	10/0/913/0
+file	read-as-ticker	bytes=24	records=1	errors=0	protocols=0	others=0
+record	headerless-described	15/0/913/0
+file	headerless-described	bytes=24	records=1	errors=0	protocols=0	others=0
+descriptor	late-interleaved	1	null		NONE	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+record	late-interleaved	15/0/913/0
+record	late-interleaved	15/0/913/0
+record	late-interleaved	20/1/913/0
+file	late-interleaved	bytes=146	records=3	errors=0	protocols=1	others=0
+descriptor	repeat-version-only	1	null		NONE	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+record	repeat-version-only	15/0/913/0
+descriptor	repeat-version-only	2	delta		NONE	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+record	repeat-version-only	15/0/913/0
+file	repeat-version-only	bytes=145	records=2	errors=0	protocols=2	others=0
+record	late-initial-descriptor	15/0/913/0
+descriptor	late-initial-descriptor	1	null		NONE	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+record	late-initial-descriptor	15/0/913/0
+file	late-initial-descriptor	bytes=122	records=2	errors=0	protocols=1	others=0
+descriptor	unknown-send	1	null	null	null	null	[]	[]	absent
+record	unknown-send	15/0/913/0
+file	unknown-send	bytes=76	records=1	errors=0	protocols=1	others=0
+descriptor	absent-time-opt-send	1	null	null	null	null	[]	[]	absent
+record	absent-time-opt-send	15/0/913/0
+file	absent-time-opt-send	bytes=43	records=1	errors=0	protocols=1	others=0
+descriptor	other-type	1	null		NONE	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+record	other-type	15/0/913/0
+file	other-type	bytes=114	records=1	errors=0	protocols=1	others=0
+descriptor	version-	1			NONE	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+record	version-	15/0/913/0
+file	version-	bytes=122	records=1	errors=0	protocols=1	others=0
+descriptor	version-3_355	1	3.355		NONE	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+record	version-3_355	15/0/913/0
+file	version-3_355	bytes=127	records=1	errors=0	protocols=1	others=0
+descriptor	version-not-a-version	1	not-a-version		NONE	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+record	version-not-a-version	15/0/913/0
+file	version-not-a-version	bytes=135	records=1	errors=0	protocols=1	others=0
+descriptor	unknown-property-send-mismatch	1	null	hs	NONE	value	[TICKER_DATA]	[HISTORY_DATA]	absent
+record	unknown-property-send-mismatch	15/0/913/0
+file	unknown-property-send-mismatch	bytes=122	records=1	errors=0	protocols=1	others=0
+descriptor	endpoint-valid	1	null		NONE	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	present
+record	endpoint-valid	15/0/913/0
+file	endpoint-valid	bytes=141	records=1	errors=0	protocols=1	others=0
+descriptor	repeated-delta	1	null		NONE	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+record	repeated-delta	15/0/913/0
+descriptor	repeated-delta	2	null	hs	NONE	value	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[HISTORY_DATA]	absent
+record	repeated-delta	15/0/913/0
+file	repeated-delta	bytes=220	records=2	errors=0	protocols=2	others=0
+descriptor	option-	1	null		NONE	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+record	option-	15/0/913/0
+file	option-	bytes=113	records=1	errors=0	protocols=1	others=0
+descriptor	option-hs	1	null	hs	NONE	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+record	option-hs	15/0/913/0
+file	option-hs	bytes=115	records=1	errors=0	protocols=1	others=0
+descriptor	option-unknown	1	null	unknown	NONE	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+record	option-unknown	15/0/913/0
+file	option-unknown	bytes=120	records=1	errors=0	protocols=1	others=0
+descriptor	option-hs-unknown	1	null	hs,unknown	NONE	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+record	option-hs-unknown	15/0/913/0
+file	option-hs-unknown	bytes=123	records=1	errors=0	protocols=1	others=0
+descriptor	option-hs-hs	1	null	hs,hs	NONE	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+record	option-hs-hs	15/0/913/0
+file	option-hs-hs	bytes=118	records=1	errors=0	protocols=1	others=0
+descriptor	option-_hs_	1	null	 hs 	NONE	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+record	option-_hs_	15/0/913/0
+file	option-_hs_	bytes=117	records=1	errors=0	protocols=1	others=0
+descriptor	time-NONE	1	null		NONE	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+record	time-NONE	15/0/913/0
+file	time-NONE	bytes=113	records=1	errors=0	protocols=1	others=0
+descriptor	time-auto-NONE	1	null		NONE	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+record	time-auto-NONE	15/0/913/0
+file	time-auto-NONE	bytes=113	records=1	errors=0	protocols=1	others=0
+descriptor	time-MESSAGE	1	null		MESSAGE	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+record	time-MESSAGE	15/0/913/0
+file	time-MESSAGE	bytes=116	records=1	errors=0	protocols=1	others=0
+descriptor	time-auto-MESSAGE	1	null		MESSAGE	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+record	time-auto-MESSAGE	15/0/913/0
+file	time-auto-MESSAGE	bytes=116	records=1	errors=0	protocols=1	others=0
+descriptor	time-lower-message	1	null		message	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+record	time-lower-message	15/0/913/0
+file	time-lower-message	bytes=116	records=1	errors=0	protocols=1	others=0
+descriptor	time-auto-lower-message	1	null		message	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+record	time-auto-lower-message	15/0/913/0
+file	time-auto-lower-message	bytes=116	records=1	errors=0	protocols=1	others=0
+descriptor	time-FIELD	1	null		FIELD	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+record	time-FIELD	15/0/913/0
+file	time-FIELD	bytes=114	records=1	errors=0	protocols=1	others=0
+descriptor	time-auto-FIELD	1	null		FIELD	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+record	time-auto-FIELD	15/0/913/0
+file	time-auto-FIELD	bytes=114	records=1	errors=0	protocols=1	others=0
+descriptor	time-unknown	1	null		unknown	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+record	time-unknown	15/0/913/0
+file	time-unknown	bytes=116	records=1	errors=0	protocols=1	others=0
+descriptor	time-auto-unknown	1	null		unknown	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+record	time-auto-unknown	15/0/913/0
+file	time-auto-unknown	bytes=116	records=1	errors=0	protocols=1	others=0
+descriptor	descriptor-empty	1	null	null	null	null	[]	[]	absent
+record	descriptor-empty	15/0/913/0
+file	descriptor-empty	bytes=33	records=1	errors=0	protocols=1	others=0
+descriptor	control-3	1	null		NONE	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+record	control-3	15/0/913/0
+record	control-3	15/0/913/0
+file	control-3	bytes=125	records=2	errors=0	protocols=1	others=0
+descriptor	control-4	1	null		NONE	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+record	control-4	15/0/913/0
+record	control-4	15/0/913/0
+file	control-4	bytes=125	records=2	errors=0	protocols=1	others=0
+descriptor	control-11	1	null		NONE	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+record	control-11	15/0/913/0
+record	control-11	15/0/913/0
+file	control-11	bytes=125	records=2	errors=1	protocols=1	others=0
+descriptor	control-49	1	null		NONE	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+other	control-49	49	1
+record	control-49	15/0/913/0
+record	control-49	15/0/913/0
+file	control-49	bytes=125	records=2	errors=0	protocols=1	others=1
+descriptor	control-61	1	null		NONE	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+record	control-61	15/0/913/0
+record	control-61	15/0/913/0
+file	control-61	bytes=125	records=2	errors=0	protocols=1	others=0
+descriptor	control-70	1	null		NONE	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+other	control-70	70	1
+record	control-70	15/0/913/0
+record	control-70	15/0/913/0
+file	control-70	bytes=126	records=2	errors=0	protocols=1	others=1
+descriptor	control-999	1	null		NONE	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+other	control-999	999	1
+record	control-999	15/0/913/0
+record	control-999	15/0/913/0
+file	control-999	bytes=126	records=2	errors=0	protocols=1	others=1
+file	physical-endpoint-cut-0	bytes=0	records=0	errors=0	protocols=0	others=0
+direct	physical-endpoint-cut-0	records=0	errors=0	position=0	length=0
+file	physical-endpoint-cut-1	bytes=1	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-1	records=0	errors=0	position=0	length=1
+file	physical-endpoint-cut-2	bytes=2	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-2	records=0	errors=0	position=0	length=2
+file	physical-endpoint-cut-3	bytes=3	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-3	records=0	errors=0	position=0	length=3
+file	physical-endpoint-cut-4	bytes=4	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-4	records=0	errors=0	position=0	length=4
+file	physical-endpoint-cut-5	bytes=5	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-5	records=0	errors=0	position=0	length=5
+file	physical-endpoint-cut-6	bytes=6	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-6	records=0	errors=0	position=0	length=6
+file	physical-endpoint-cut-7	bytes=7	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-7	records=0	errors=0	position=0	length=7
+file	physical-endpoint-cut-8	bytes=8	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-8	records=0	errors=0	position=0	length=8
+file	physical-endpoint-cut-9	bytes=9	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-9	records=0	errors=0	position=0	length=9
+file	physical-endpoint-cut-10	bytes=10	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-10	records=0	errors=0	position=0	length=10
+file	physical-endpoint-cut-11	bytes=11	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-11	records=0	errors=0	position=0	length=11
+file	physical-endpoint-cut-12	bytes=12	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-12	records=0	errors=0	position=0	length=12
+file	physical-endpoint-cut-13	bytes=13	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-13	records=0	errors=0	position=0	length=13
+file	physical-endpoint-cut-14	bytes=14	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-14	records=0	errors=0	position=0	length=14
+file	physical-endpoint-cut-15	bytes=15	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-15	records=0	errors=0	position=0	length=15
+file	physical-endpoint-cut-16	bytes=16	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-16	records=0	errors=0	position=0	length=16
+file	physical-endpoint-cut-17	bytes=17	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-17	records=0	errors=0	position=0	length=17
+file	physical-endpoint-cut-18	bytes=18	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-18	records=0	errors=0	position=0	length=18
+file	physical-endpoint-cut-19	bytes=19	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-19	records=0	errors=0	position=0	length=19
+file	physical-endpoint-cut-20	bytes=20	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-20	records=0	errors=0	position=0	length=20
+file	physical-endpoint-cut-21	bytes=21	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-21	records=0	errors=0	position=0	length=21
+file	physical-endpoint-cut-22	bytes=22	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-22	records=0	errors=0	position=0	length=22
+file	physical-endpoint-cut-23	bytes=23	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-23	records=0	errors=0	position=0	length=23
+file	physical-endpoint-cut-24	bytes=24	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-24	records=0	errors=0	position=0	length=24
+file	physical-endpoint-cut-25	bytes=25	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-25	records=0	errors=0	position=0	length=25
+file	physical-endpoint-cut-26	bytes=26	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-26	records=0	errors=0	position=0	length=26
+file	physical-endpoint-cut-27	bytes=27	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-27	records=0	errors=0	position=0	length=27
+file	physical-endpoint-cut-28	bytes=28	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-28	records=0	errors=0	position=0	length=28
+file	physical-endpoint-cut-29	bytes=29	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-29	records=0	errors=0	position=0	length=29
+file	physical-endpoint-cut-30	bytes=30	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-30	records=0	errors=0	position=0	length=30
+file	physical-endpoint-cut-31	bytes=31	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-31	records=0	errors=0	position=0	length=31
+file	physical-endpoint-cut-32	bytes=32	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-32	records=0	errors=0	position=0	length=32
+file	physical-endpoint-cut-33	bytes=33	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-33	records=0	errors=0	position=0	length=33
+file	physical-endpoint-cut-34	bytes=34	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-34	records=0	errors=0	position=0	length=34
+file	physical-endpoint-cut-35	bytes=35	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-35	records=0	errors=0	position=0	length=35
+file	physical-endpoint-cut-36	bytes=36	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-36	records=0	errors=0	position=0	length=36
+file	physical-endpoint-cut-37	bytes=37	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-37	records=0	errors=0	position=0	length=37
+file	physical-endpoint-cut-38	bytes=38	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-38	records=0	errors=0	position=0	length=38
+file	physical-endpoint-cut-39	bytes=39	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-39	records=0	errors=0	position=0	length=39
+file	physical-endpoint-cut-40	bytes=40	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-40	records=0	errors=0	position=0	length=40
+file	physical-endpoint-cut-41	bytes=41	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-41	records=0	errors=0	position=0	length=41
+file	physical-endpoint-cut-42	bytes=42	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-42	records=0	errors=0	position=0	length=42
+file	physical-endpoint-cut-43	bytes=43	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-43	records=0	errors=0	position=0	length=43
+file	physical-endpoint-cut-44	bytes=44	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-44	records=0	errors=0	position=0	length=44
+file	physical-endpoint-cut-45	bytes=45	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-45	records=0	errors=0	position=0	length=45
+file	physical-endpoint-cut-46	bytes=46	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-46	records=0	errors=0	position=0	length=46
+file	physical-endpoint-cut-47	bytes=47	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-47	records=0	errors=0	position=0	length=47
+file	physical-endpoint-cut-48	bytes=48	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-48	records=0	errors=0	position=0	length=48
+file	physical-endpoint-cut-49	bytes=49	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-49	records=0	errors=0	position=0	length=49
+file	physical-endpoint-cut-50	bytes=50	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-50	records=0	errors=0	position=0	length=50
+file	physical-endpoint-cut-51	bytes=51	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-51	records=0	errors=0	position=0	length=51
+file	physical-endpoint-cut-52	bytes=52	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-52	records=0	errors=0	position=0	length=52
+file	physical-endpoint-cut-53	bytes=53	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-53	records=0	errors=0	position=0	length=53
+file	physical-endpoint-cut-54	bytes=54	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-54	records=0	errors=0	position=0	length=54
+file	physical-endpoint-cut-55	bytes=55	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-55	records=0	errors=0	position=0	length=55
+file	physical-endpoint-cut-56	bytes=56	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-56	records=0	errors=0	position=0	length=56
+file	physical-endpoint-cut-57	bytes=57	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-57	records=0	errors=0	position=0	length=57
+file	physical-endpoint-cut-58	bytes=58	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-58	records=0	errors=0	position=0	length=58
+file	physical-endpoint-cut-59	bytes=59	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-59	records=0	errors=0	position=0	length=59
+file	physical-endpoint-cut-60	bytes=60	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-60	records=0	errors=0	position=0	length=60
+file	physical-endpoint-cut-61	bytes=61	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-61	records=0	errors=0	position=0	length=61
+file	physical-endpoint-cut-62	bytes=62	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-62	records=0	errors=0	position=0	length=62
+file	physical-endpoint-cut-63	bytes=63	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-63	records=0	errors=0	position=0	length=63
+file	physical-endpoint-cut-64	bytes=64	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-64	records=0	errors=0	position=0	length=64
+file	physical-endpoint-cut-65	bytes=65	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-65	records=0	errors=0	position=0	length=65
+file	physical-endpoint-cut-66	bytes=66	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-66	records=0	errors=0	position=0	length=66
+file	physical-endpoint-cut-67	bytes=67	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-67	records=0	errors=0	position=0	length=67
+file	physical-endpoint-cut-68	bytes=68	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-68	records=0	errors=0	position=0	length=68
+file	physical-endpoint-cut-69	bytes=69	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-69	records=0	errors=0	position=0	length=69
+file	physical-endpoint-cut-70	bytes=70	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-70	records=0	errors=0	position=0	length=70
+file	physical-endpoint-cut-71	bytes=71	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-71	records=0	errors=0	position=0	length=71
+file	physical-endpoint-cut-72	bytes=72	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-72	records=0	errors=0	position=0	length=72
+file	physical-endpoint-cut-73	bytes=73	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-73	records=0	errors=0	position=0	length=73
+file	physical-endpoint-cut-74	bytes=74	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-74	records=0	errors=0	position=0	length=74
+file	physical-endpoint-cut-75	bytes=75	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-75	records=0	errors=0	position=0	length=75
+file	physical-endpoint-cut-76	bytes=76	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-76	records=0	errors=0	position=0	length=76
+file	physical-endpoint-cut-77	bytes=77	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-77	records=0	errors=0	position=0	length=77
+file	physical-endpoint-cut-78	bytes=78	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-78	records=0	errors=0	position=0	length=78
+file	physical-endpoint-cut-79	bytes=79	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-79	records=0	errors=0	position=0	length=79
+file	physical-endpoint-cut-80	bytes=80	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-80	records=0	errors=0	position=0	length=80
+file	physical-endpoint-cut-81	bytes=81	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-81	records=0	errors=0	position=0	length=81
+file	physical-endpoint-cut-82	bytes=82	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-82	records=0	errors=0	position=0	length=82
+file	physical-endpoint-cut-83	bytes=83	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-83	records=0	errors=0	position=0	length=83
+file	physical-endpoint-cut-84	bytes=84	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-84	records=0	errors=0	position=0	length=84
+file	physical-endpoint-cut-85	bytes=85	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-85	records=0	errors=0	position=0	length=85
+file	physical-endpoint-cut-86	bytes=86	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-86	records=0	errors=0	position=0	length=86
+file	physical-endpoint-cut-87	bytes=87	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-87	records=0	errors=0	position=0	length=87
+file	physical-endpoint-cut-88	bytes=88	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-88	records=0	errors=0	position=0	length=88
+file	physical-endpoint-cut-89	bytes=89	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-89	records=0	errors=0	position=0	length=89
+file	physical-endpoint-cut-90	bytes=90	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-90	records=0	errors=0	position=0	length=90
+file	physical-endpoint-cut-91	bytes=91	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-91	records=0	errors=0	position=0	length=91
+file	physical-endpoint-cut-92	bytes=92	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-92	records=0	errors=0	position=0	length=92
+file	physical-endpoint-cut-93	bytes=93	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-93	records=0	errors=0	position=0	length=93
+file	physical-endpoint-cut-94	bytes=94	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-94	records=0	errors=0	position=0	length=94
+file	physical-endpoint-cut-95	bytes=95	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-95	records=0	errors=0	position=0	length=95
+file	physical-endpoint-cut-96	bytes=96	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-96	records=0	errors=0	position=0	length=96
+file	physical-endpoint-cut-97	bytes=97	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-97	records=0	errors=0	position=0	length=97
+file	physical-endpoint-cut-98	bytes=98	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-98	records=0	errors=0	position=0	length=98
+file	physical-endpoint-cut-99	bytes=99	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-99	records=0	errors=0	position=0	length=99
+file	physical-endpoint-cut-100	bytes=100	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-100	records=0	errors=0	position=0	length=100
+file	physical-endpoint-cut-101	bytes=101	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-101	records=0	errors=0	position=0	length=101
+file	physical-endpoint-cut-102	bytes=102	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-102	records=0	errors=0	position=0	length=102
+file	physical-endpoint-cut-103	bytes=103	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-103	records=0	errors=0	position=0	length=103
+file	physical-endpoint-cut-104	bytes=104	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-104	records=0	errors=0	position=0	length=104
+file	physical-endpoint-cut-105	bytes=105	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-105	records=0	errors=0	position=0	length=105
+file	physical-endpoint-cut-106	bytes=106	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-106	records=0	errors=0	position=0	length=106
+file	physical-endpoint-cut-107	bytes=107	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-107	records=0	errors=0	position=0	length=107
+file	physical-endpoint-cut-108	bytes=108	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-108	records=0	errors=0	position=0	length=108
+file	physical-endpoint-cut-109	bytes=109	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-109	records=0	errors=0	position=0	length=109
+file	physical-endpoint-cut-110	bytes=110	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-110	records=0	errors=0	position=0	length=110
+file	physical-endpoint-cut-111	bytes=111	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-111	records=0	errors=0	position=0	length=111
+file	physical-endpoint-cut-112	bytes=112	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-112	records=0	errors=0	position=0	length=112
+file	physical-endpoint-cut-113	bytes=113	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-113	records=0	errors=0	position=0	length=113
+file	physical-endpoint-cut-114	bytes=114	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-114	records=0	errors=0	position=0	length=114
+file	physical-endpoint-cut-115	bytes=115	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-115	records=0	errors=0	position=0	length=115
+file	physical-endpoint-cut-116	bytes=116	records=0	errors=1	protocols=0	others=0
+direct	physical-endpoint-cut-116	records=0	errors=0	position=0	length=116
+file	complete-endpoint-cut-0	bytes=2	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-0	records=0	errors=1	position=2	length=2
+file	complete-endpoint-cut-1	bytes=3	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-1	records=0	errors=1	position=3	length=3
+file	complete-endpoint-cut-2	bytes=4	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-2	records=0	errors=1	position=4	length=4
+file	complete-endpoint-cut-3	bytes=5	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-3	records=0	errors=1	position=5	length=5
+file	complete-endpoint-cut-4	bytes=6	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-4	records=0	errors=1	position=6	length=6
+file	complete-endpoint-cut-5	bytes=7	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-5	records=0	errors=1	position=7	length=7
+file	complete-endpoint-cut-6	bytes=8	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-6	records=0	errors=1	position=8	length=8
+file	complete-endpoint-cut-7	bytes=9	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-7	records=0	errors=1	position=9	length=9
+file	complete-endpoint-cut-8	bytes=10	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-8	records=0	errors=1	position=10	length=10
+file	complete-endpoint-cut-9	bytes=11	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-9	records=0	errors=1	position=11	length=11
+file	complete-endpoint-cut-10	bytes=12	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-10	records=0	errors=1	position=12	length=12
+file	complete-endpoint-cut-11	bytes=13	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-11	records=0	errors=1	position=13	length=13
+file	complete-endpoint-cut-12	bytes=14	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-12	records=0	errors=1	position=14	length=14
+file	complete-endpoint-cut-13	bytes=15	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-13	records=0	errors=1	position=15	length=15
+file	complete-endpoint-cut-14	bytes=16	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-14	records=0	errors=1	position=16	length=16
+file	complete-endpoint-cut-15	bytes=17	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-15	records=0	errors=1	position=17	length=17
+file	complete-endpoint-cut-16	bytes=18	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-16	records=0	errors=1	position=18	length=18
+file	complete-endpoint-cut-17	bytes=19	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-17	records=0	errors=1	position=19	length=19
+file	complete-endpoint-cut-18	bytes=20	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-18	records=0	errors=1	position=20	length=20
+file	complete-endpoint-cut-19	bytes=21	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-19	records=0	errors=1	position=21	length=21
+file	complete-endpoint-cut-20	bytes=22	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-20	records=0	errors=1	position=22	length=22
+file	complete-endpoint-cut-21	bytes=23	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-21	records=0	errors=1	position=23	length=23
+file	complete-endpoint-cut-22	bytes=24	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-22	records=0	errors=1	position=24	length=24
+file	complete-endpoint-cut-23	bytes=25	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-23	records=0	errors=1	position=25	length=25
+file	complete-endpoint-cut-24	bytes=26	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-24	records=0	errors=1	position=26	length=26
+file	complete-endpoint-cut-25	bytes=27	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-25	records=0	errors=1	position=27	length=27
+file	complete-endpoint-cut-26	bytes=28	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-26	records=0	errors=1	position=28	length=28
+file	complete-endpoint-cut-27	bytes=29	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-27	records=0	errors=1	position=29	length=29
+file	complete-endpoint-cut-28	bytes=30	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-28	records=0	errors=1	position=30	length=30
+file	complete-endpoint-cut-29	bytes=31	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-29	records=0	errors=1	position=31	length=31
+file	complete-endpoint-cut-30	bytes=32	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-30	records=0	errors=1	position=32	length=32
+file	complete-endpoint-cut-31	bytes=33	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-31	records=0	errors=1	position=33	length=33
+file	complete-endpoint-cut-32	bytes=34	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-32	records=0	errors=1	position=34	length=34
+file	complete-endpoint-cut-33	bytes=35	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-33	records=0	errors=1	position=35	length=35
+file	complete-endpoint-cut-34	bytes=36	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-34	records=0	errors=1	position=36	length=36
+file	complete-endpoint-cut-35	bytes=37	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-35	records=0	errors=1	position=37	length=37
+file	complete-endpoint-cut-36	bytes=38	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-36	records=0	errors=1	position=38	length=38
+file	complete-endpoint-cut-37	bytes=39	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-37	records=0	errors=1	position=39	length=39
+file	complete-endpoint-cut-38	bytes=40	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-38	records=0	errors=1	position=40	length=40
+file	complete-endpoint-cut-39	bytes=41	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-39	records=0	errors=1	position=41	length=41
+file	complete-endpoint-cut-40	bytes=42	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-40	records=0	errors=1	position=42	length=42
+file	complete-endpoint-cut-41	bytes=43	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-41	records=0	errors=1	position=43	length=43
+file	complete-endpoint-cut-42	bytes=44	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-42	records=0	errors=1	position=44	length=44
+file	complete-endpoint-cut-43	bytes=45	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-43	records=0	errors=1	position=45	length=45
+file	complete-endpoint-cut-44	bytes=46	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-44	records=0	errors=1	position=46	length=46
+file	complete-endpoint-cut-45	bytes=47	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-45	records=0	errors=1	position=47	length=47
+file	complete-endpoint-cut-46	bytes=48	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-46	records=0	errors=1	position=48	length=48
+file	complete-endpoint-cut-47	bytes=49	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-47	records=0	errors=1	position=49	length=49
+file	complete-endpoint-cut-48	bytes=50	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-48	records=0	errors=1	position=50	length=50
+file	complete-endpoint-cut-49	bytes=51	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-49	records=0	errors=1	position=51	length=51
+file	complete-endpoint-cut-50	bytes=52	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-50	records=0	errors=1	position=52	length=52
+file	complete-endpoint-cut-51	bytes=53	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-51	records=0	errors=1	position=53	length=53
+file	complete-endpoint-cut-52	bytes=54	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-52	records=0	errors=1	position=54	length=54
+file	complete-endpoint-cut-53	bytes=55	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-53	records=0	errors=1	position=55	length=55
+file	complete-endpoint-cut-54	bytes=56	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-54	records=0	errors=1	position=56	length=56
+file	complete-endpoint-cut-55	bytes=57	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-55	records=0	errors=1	position=57	length=57
+file	complete-endpoint-cut-56	bytes=58	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-56	records=0	errors=1	position=58	length=58
+file	complete-endpoint-cut-57	bytes=59	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-57	records=0	errors=1	position=59	length=59
+file	complete-endpoint-cut-58	bytes=60	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-58	records=0	errors=1	position=60	length=60
+file	complete-endpoint-cut-59	bytes=61	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-59	records=0	errors=1	position=61	length=61
+file	complete-endpoint-cut-60	bytes=62	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-60	records=0	errors=1	position=62	length=62
+file	complete-endpoint-cut-61	bytes=63	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-61	records=0	errors=1	position=63	length=63
+file	complete-endpoint-cut-62	bytes=64	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-62	records=0	errors=1	position=64	length=64
+file	complete-endpoint-cut-63	bytes=66	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-63	records=0	errors=1	position=66	length=66
+file	complete-endpoint-cut-64	bytes=67	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-64	records=0	errors=1	position=67	length=67
+file	complete-endpoint-cut-65	bytes=68	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-65	records=0	errors=1	position=68	length=68
+file	complete-endpoint-cut-66	bytes=69	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-66	records=0	errors=1	position=69	length=69
+file	complete-endpoint-cut-67	bytes=70	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-67	records=0	errors=1	position=70	length=70
+file	complete-endpoint-cut-68	bytes=71	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-68	records=0	errors=1	position=71	length=71
+file	complete-endpoint-cut-69	bytes=72	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-69	records=0	errors=1	position=72	length=72
+file	complete-endpoint-cut-70	bytes=73	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-70	records=0	errors=1	position=73	length=73
+file	complete-endpoint-cut-71	bytes=74	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-71	records=0	errors=1	position=74	length=74
+file	complete-endpoint-cut-72	bytes=75	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-72	records=0	errors=1	position=75	length=75
+file	complete-endpoint-cut-73	bytes=76	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-73	records=0	errors=1	position=76	length=76
+file	complete-endpoint-cut-74	bytes=77	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-74	records=0	errors=1	position=77	length=77
+file	complete-endpoint-cut-75	bytes=78	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-75	records=0	errors=1	position=78	length=78
+file	complete-endpoint-cut-76	bytes=79	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-76	records=0	errors=1	position=79	length=79
+file	complete-endpoint-cut-77	bytes=80	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-77	records=0	errors=1	position=80	length=80
+file	complete-endpoint-cut-78	bytes=81	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-78	records=0	errors=1	position=81	length=81
+file	complete-endpoint-cut-79	bytes=82	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-79	records=0	errors=1	position=82	length=82
+file	complete-endpoint-cut-80	bytes=83	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-80	records=0	errors=1	position=83	length=83
+file	complete-endpoint-cut-81	bytes=84	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-81	records=0	errors=1	position=84	length=84
+file	complete-endpoint-cut-82	bytes=85	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-82	records=0	errors=1	position=85	length=85
+file	complete-endpoint-cut-83	bytes=86	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-83	records=0	errors=1	position=86	length=86
+file	complete-endpoint-cut-84	bytes=87	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-84	records=0	errors=1	position=87	length=87
+file	complete-endpoint-cut-85	bytes=88	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-85	records=0	errors=1	position=88	length=88
+descriptor	complete-endpoint-cut-86	1	null		NONE	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+file	complete-endpoint-cut-86	bytes=89	records=0	errors=0	protocols=1	others=0
+descriptor	complete-endpoint-cut-86	1	null		NONE	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+direct	complete-endpoint-cut-86	records=0	errors=0	position=89	length=89
+file	complete-endpoint-cut-87	bytes=90	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-87	records=0	errors=1	position=90	length=90
+file	complete-endpoint-cut-88	bytes=91	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-88	records=0	errors=1	position=91	length=91
+file	complete-endpoint-cut-89	bytes=92	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-89	records=0	errors=1	position=92	length=92
+file	complete-endpoint-cut-90	bytes=93	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-90	records=0	errors=1	position=93	length=93
+file	complete-endpoint-cut-91	bytes=94	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-91	records=0	errors=1	position=94	length=94
+file	complete-endpoint-cut-92	bytes=95	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-92	records=0	errors=1	position=95	length=95
+file	complete-endpoint-cut-93	bytes=96	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-93	records=0	errors=1	position=96	length=96
+file	complete-endpoint-cut-94	bytes=97	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-94	records=0	errors=1	position=97	length=97
+file	complete-endpoint-cut-95	bytes=98	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-95	records=0	errors=1	position=98	length=98
+file	complete-endpoint-cut-96	bytes=99	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-96	records=0	errors=1	position=99	length=99
+file	complete-endpoint-cut-97	bytes=100	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-97	records=0	errors=1	position=100	length=100
+file	complete-endpoint-cut-98	bytes=101	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-98	records=0	errors=1	position=101	length=101
+file	complete-endpoint-cut-99	bytes=102	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-99	records=0	errors=1	position=102	length=102
+file	complete-endpoint-cut-100	bytes=103	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-100	records=0	errors=1	position=103	length=103
+file	complete-endpoint-cut-101	bytes=104	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-101	records=0	errors=1	position=104	length=104
+file	complete-endpoint-cut-102	bytes=105	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-102	records=0	errors=1	position=105	length=105
+file	complete-endpoint-cut-103	bytes=106	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-103	records=0	errors=1	position=106	length=106
+file	complete-endpoint-cut-104	bytes=107	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-104	records=0	errors=1	position=107	length=107
+file	complete-endpoint-cut-105	bytes=108	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-105	records=0	errors=1	position=108	length=108
+file	complete-endpoint-cut-106	bytes=109	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-106	records=0	errors=1	position=109	length=109
+file	complete-endpoint-cut-107	bytes=110	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-107	records=0	errors=1	position=110	length=110
+file	complete-endpoint-cut-108	bytes=111	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-108	records=0	errors=1	position=111	length=111
+file	complete-endpoint-cut-109	bytes=112	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-109	records=0	errors=1	position=112	length=112
+file	complete-endpoint-cut-110	bytes=113	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-110	records=0	errors=1	position=113	length=113
+file	complete-endpoint-cut-111	bytes=114	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-111	records=0	errors=1	position=114	length=114
+file	complete-endpoint-cut-112	bytes=115	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-112	records=0	errors=1	position=115	length=115
+file	complete-endpoint-cut-113	bytes=116	records=0	errors=1	protocols=0	others=0
+direct	complete-endpoint-cut-113	records=0	errors=1	position=116	length=116
+descriptor	endpoint-extra-byte	1	null		NONE	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	present
+record	endpoint-extra-byte	15/0/913/0
+file	endpoint-extra-byte	bytes=142	records=1	errors=0	protocols=1	others=0
+record	bad-magic	15/0/913/0
+file	bad-magic	bytes=141	records=1	errors=1	protocols=0	others=0
+file	negative-properties	bytes=7	records=0	errors=1	protocols=0	others=0
+descriptor	late-bad-descriptor	1	null		NONE	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+record	late-bad-descriptor	15/0/913/0
+file	late-bad-descriptor	bytes=230	records=1	errors=1	protocols=1	others=0
+descriptor	late-partial-descriptor	1	null		NONE	null	[RAW_DATA, TICKER_DATA, STREAM_DATA, HISTORY_DATA]	[]	absent
+record	late-partial-descriptor	15/0/913/0
+file	late-partial-descriptor	bytes=229	records=1	errors=1	protocols=1	others=0
+descriptor	duplicate-top-key	1	last	null	null	null	[]	[]	absent
+record	duplicate-top-key	15/0/913/0
+file	duplicate-top-key	bytes=70	records=1	errors=0	protocols=1	others=0
+descriptor	duplicate-send-id	1	null	null	null	null	[STREAM_DATA]	[]	absent
+record	duplicate-send-id	15/0/913/0
+file	duplicate-send-id	bytes=71	records=1	errors=0	protocols=1	others=0
+descriptor	send-name-alias	1	null	null	null	null	[STREAM_DATA]	[]	absent
+record	send-name-alias	15/0/913/0
+file	send-name-alias	bytes=57	records=1	errors=0	protocols=1	others=0
+descriptor	send-id-name-mismatch	1	null	null	null	null	[]	[]	absent
+record	send-id-name-mismatch	15/0/913/0
+file	send-id-name-mismatch	bytes=57	records=1	errors=0	protocols=1	others=0
+descriptor	endpoint-null	1	null	null	null	null	[]	[]	absent
+record	endpoint-null	15/0/913/0
+file	endpoint-null	bytes=44	records=1	errors=0	protocols=1	others=0
+descriptor	endpoint-empty-uid-null-name	1	null	null	null	null	[]	[]	present
+record	endpoint-empty-uid-null-name	15/0/913/0
+file	endpoint-empty-uid-null-name	bytes=46	records=1	errors=0	protocols=1	others=0
+file	negative-message-count	bytes=8	records=0	errors=1	protocols=0	others=0
+file	bad-property-utf	bytes=9	records=0	errors=1	protocols=0	others=0
+file	empty-file	bytes=0	records=0	errors=0	protocols=0	others=0
+file	only-empty-marker	bytes=1	records=0	errors=0	protocols=0	others=0
+descriptor	message-then-none-delta	1	QDS-UNKNOWN		message	null	[STREAM_DATA]	[]	absent
+record	message-then-none-delta	15/0/913/1311768464867721216
+descriptor	message-then-none-delta	2	QDS-UNKNOWN		NONE	null	[STREAM_DATA]	[]	absent
+record	message-then-none-delta	15/0/913/1311768464867721216
+file	message-then-none-delta	bytes=149	records=2	errors=0	protocols=2	others=0
+all	PASS

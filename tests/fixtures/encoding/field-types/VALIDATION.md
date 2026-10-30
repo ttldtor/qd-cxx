@@ -42,3 +42,9 @@ This report makes no claim about C++ compiler/sanitizer/CLI results, independent
 private-file completeness, additional types, indexed schemas or Profile business-event mapping.
 The durable IOUtil/BufferedInputPart distinction is recorded in the EN/RU field contract and
 coverage.
+
+
+The separate [finite dispatch validation](../../../conformance/protocol/field-types/DISPATCH-VALIDATION.md)
+adds322 synthetic artifacts and output8/family/descriptor checks while preserving all287 earlier
+files. [Dispatch provenance](dispatch-captures.json) records each original raw hash, the exact57
+UID-only comparison view and independent headerless bytes. Earlier subset results above stay historical.

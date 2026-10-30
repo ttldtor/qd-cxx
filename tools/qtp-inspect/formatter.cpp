@@ -13,9 +13,10 @@
 
 namespace org::ttldtor::qdcxx::inspect {
 namespace {
-constexpr std::int32_t DESCRIBE_PROTOCOL = 1; ///< Tape header, named only by tape presentation.
-constexpr std::int32_t DESCRIBE_RECORDS = 2;  ///< Initial wire descriptions.
-constexpr std::int32_t STREAM_DATA = 15;      ///< Supported data message type.
+constexpr std::int32_t DESCRIBE_PROTOCOL = 1;       ///< Tape header, named only by tape presentation.
+constexpr std::int32_t DESCRIBE_RECORDS = 2;        ///< Initial wire descriptions.
+constexpr std::int32_t STREAM_DATA = 15;            ///< Supported data message type.
+constexpr std::uint32_t CATALOG_EVENT_FLAGS = 0x5F; ///< Six supported raw data-event bits.
 
 /** Counting/writing cursor: every append checks subtraction before any expansion. */
 class Row {
@@ -88,6 +89,17 @@ class Row {
 
         for (auto unit : text) {
             hex(unit, false);
+        }
+    }
+
+    /** Append exact lowercase opaque byte hex without executing its contents. */
+    void bytes(std::span<const std::byte> value) {
+        constexpr std::string_view DIGITS = "0123456789abcdef";
+
+        for (const auto byte : value) {
+            const auto raw = std::to_integer<unsigned>(byte);
+            const std::array<char, 2> pair{DIGITS[raw >> 4], DIGITS[raw & 15]};
+            add({pair.data(), pair.size()});
         }
     }
 
@@ -261,9 +273,148 @@ std::string Formatter::frame(const protocol::Frame &frame, std::size_t index, st
     });
 }
 
+std::string Formatter::catalogRecord(const protocol::StreamDataRecord &record, const core::LocalSchema &schema,
+                                     std::size_t frameIndex, std::size_t index, std::size_t budget,
+                                     const protocol::TapeTiming *timing, std::size_t generation) const {
+    if (profile_ != DisplayProfile::BINARY_CATALOG_V1 || schema.profile() != core::LocalProfile::BINARY_FIELDS_V1 ||
+        record.localId < 0 || static_cast<std::size_t>(record.localId) >= schema.records().size()) {
+        throw std::invalid_argument("invalid catalog schema or local ID");
+    }
+
+    const auto &declaration = schema.records()[static_cast<std::size_t>(record.localId)];
+
+    if (!record.context.matches(schema.recordContext(record.localId)) ||
+        record.typedValues.size() != declaration.fields.size()) {
+        throw std::invalid_argument("catalog record context or shape mismatch");
+    }
+
+    for (std::size_t i = 0; i < declaration.fields.size(); ++i) {
+        if (static_cast<std::int32_t>(record.typedValues[i].type) != declaration.fields[i].serialTypeId) {
+            throw std::invalid_argument("catalog field identity mismatch");
+        }
+    }
+
+    const std::u16string_view name = declaration.name;
+
+    if (record.senderId < 0 || record.localId < 0 || generation == 0 || !record.context.valid() ||
+        !record.values.empty() || (static_cast<std::uint32_t>(record.symbol.eventFlags) & ~CATALOG_EVENT_FLAGS) != 0) {
+        throw std::invalid_argument("invalid catalog record metadata");
+    }
+
+    for (const auto &field : record.typedValues) {
+        if (!core::validFieldValue(field)) {
+            throw std::invalid_argument("noncanonical catalog value");
+        }
+    }
+
+    return build(budget, [&](Row &row) {
+        const bool tsv = format_ == OutputFormat::TSV;
+        const auto separator = tsv ? "\t" : " ";
+        row.add(tsv ? "wire-data-v8\t" : "Fields8 ");
+        row.number(frameIndex);
+        row.add(separator);
+        row.number(index);
+        row.add(separator);
+        row.number(generation);
+        row.add(separator);
+        row.number(record.senderId);
+        row.add(separator);
+        row.number(record.localId);
+        row.add(separator);
+
+        if (tsv) {
+            row.units(name);
+        } else {
+            row.quote(name);
+        }
+
+        row.add(separator);
+
+        if (tsv) {
+            row.units(record.symbol.units);
+        } else {
+            row.quote(record.symbol.units);
+        }
+
+        row.add(separator);
+
+        for (std::size_t i = 0; i < record.typedValues.size(); ++i) {
+            const auto &field = record.typedValues[i];
+
+            if (i != 0) {
+                row.add(",");
+            }
+
+            row.number(static_cast<std::int32_t>(field.type));
+            row.add(":");
+            row.number(field.raw);
+            row.add(":");
+            const bool text =
+                field.type == core::SerialFieldType::UTF_CHAR_ARRAY || field.type == core::SerialFieldType::STRING;
+            const bool bytes = field.type == core::SerialFieldType::BYTE_ARRAY ||
+                               field.type == core::SerialFieldType::CUSTOM_OBJECT ||
+                               field.type == core::SerialFieldType::SERIAL_OBJECT;
+
+            if (!text) {
+                row.add("-");
+            } else if (!field.units) {
+                row.add("null");
+            } else if (field.units->empty()) {
+                row.add("empty");
+            } else if (tsv) {
+                row.units(*field.units);
+            } else {
+                row.quote(*field.units);
+            }
+
+            row.add(":");
+
+            if (!bytes) {
+                row.add("-");
+            } else if (!field.bytes) {
+                row.add("null");
+            } else if (field.bytes->empty()) {
+                row.add("empty");
+            } else {
+                row.bytes(*field.bytes);
+            }
+        }
+
+        const protocol::TapeTiming empty{};
+        const auto &clock = timing ? *timing : empty;
+        row.add(separator);
+
+        if (clock.timestampMs) {
+            row.number(*clock.timestampMs);
+        } else {
+            row.add("-");
+        }
+
+        row.add(separator);
+        row.number(clock.eventTimeSequence);
+        row.add(separator);
+        row.number(clock.eventTimeMs());
+        row.add(separator);
+        row.number(record.symbol.eventFlags);
+        row.add(separator);
+
+        if (record.removalTime) {
+            row.number(*record.removalTime);
+        } else {
+            row.add("-");
+        }
+
+        row.add("\n");
+    });
+}
+
 std::string Formatter::record(const protocol::StreamDataRecord &record, std::u16string_view name,
                               std::size_t frameIndex, std::size_t index, std::size_t budget,
                               const protocol::TapeTiming *timing, std::size_t generation) const {
+    if (profile_ == DisplayProfile::BINARY_CATALOG_V1) {
+        throw std::invalid_argument("catalog presentation requires a validated schema");
+    }
+
     if (record.symbol.eventFlags != 0 || record.removalTime.has_value()) {
         throw std::invalid_argument("unsupported record metadata format");
     }
@@ -867,7 +1018,12 @@ std::string Formatter::wireSchemaEnd(std::size_t generation, std::size_t budget)
 
 std::string Formatter::tapeHeader(std::size_t budget) const {
     return build(budget, [&](Row &row) {
-        if (profile_ == DisplayProfile::WIRE_SCHEMA_V1) {
+        if (profile_ == DisplayProfile::BINARY_CATALOG_V1) {
+            row.add(format_ == OutputFormat::TSV
+                        ? "format\tqdcxx-tape-inspect\t8\tbinary-catalog-v1\tbinary-catalog-v1\n"
+                        : "qdcxx-tape-inspect human 8 profile=binary-catalog-v1 tape-mode=binary-catalog-v1 "
+                          "identities=local-and-sender\n");
+        } else if (profile_ == DisplayProfile::WIRE_SCHEMA_V1) {
             row.add(
                 format_ == OutputFormat::TSV
                     ? "format\tqdcxx-tape-inspect\t7\tordinary-v1\tlegacy\n"
@@ -928,6 +1084,59 @@ std::string Formatter::tapeFrame(const protocol::Frame &value, std::size_t index
     constexpr std::int32_t HEARTBEAT = 0; ///< Explicit timing envelope, distinct from an empty marker.
     const bool raw = mode == protocol::TapeMode::RAW_MESSAGE_V1;
 
+    if (mode == protocol::TapeMode::BINARY_CATALOG_V1 && format_ == OutputFormat::HUMAN && value.type) {
+        std::string_view name;
+
+        switch (*value.type) {
+        case 0:
+            name = "HEARTBEAT";
+            break;
+        case 1:
+            name = "DESCRIBE_PROTOCOL";
+            break;
+        case 2:
+            name = "DESCRIBE_RECORDS";
+            break;
+        case 3:
+            name = "DESCRIBE_RESERVED";
+            break;
+        case 5:
+            name = "RAW_DATA";
+            break;
+        case 10:
+            name = "TICKER_DATA";
+            break;
+        case 15:
+            name = "STREAM_DATA";
+            break;
+        case 20:
+            name = "HISTORY_DATA";
+            break;
+        default:
+            break;
+        }
+
+        if (!name.empty()) {
+            return build(budget, [&](Row &row) {
+                row.add("Frame ");
+                row.number(index);
+                row.add(": ");
+                row.add(name);
+                row.add(" (");
+                row.number(*value.type);
+                row.add(") bytes=[");
+                row.number(value.startOffset);
+                row.add(",");
+                row.number(value.endOffset);
+                row.add(") payload=");
+                row.number(value.endOffset - value.payload.size());
+                row.add(" size=");
+                row.number(value.payload.size());
+                row.add("\n");
+            });
+        }
+    }
+
     if (format_ == OutputFormat::TSV ||
         (value.type != DESCRIBE_PROTOCOL && !(raw && (value.type == RAW_DATA || value.type == HEARTBEAT)))) {
         return frame(value, index, budget);
@@ -946,6 +1155,37 @@ std::string Formatter::tapeFrame(const protocol::Frame &value, std::size_t index
         row.number(value.endOffset - value.payload.size());
         row.add(" size=");
         row.number(value.payload.size());
+        row.add("\n");
+    });
+}
+
+std::string Formatter::catalogDescriptor(const protocol::TapeDescriptor &descriptor, std::size_t index,
+                                         std::size_t budget) const {
+    return build(budget, [&](Row &row) {
+        const bool tsv = format_ == OutputFormat::TSV;
+        const auto separator = tsv ? "\t" : " ";
+        row.add(tsv ? "descriptor-v8\t" : "Descriptor8 ");
+        row.number(index);
+
+        for (const auto *value : {&descriptor.version, &descriptor.options, &descriptor.time}) {
+            row.add(separator);
+            row.number(value->has_value() ? 1 : 0);
+            row.add(separator);
+
+            if (tsv) {
+                row.units(*value ? **value : std::u16string_view{});
+            } else if (*value) {
+                row.quote(**value);
+            } else {
+                row.add("-");
+            }
+        }
+
+        const auto sends =
+            (descriptor.explicitRawSend ? 1U << 5 : 0U) | (descriptor.explicitTickerSend ? 1U << 10 : 0U) |
+            (descriptor.explicitStreamSend ? 1U << 15 : 0U) | (descriptor.explicitHistorySend ? 1U << 20 : 0U);
+        row.add(separator);
+        row.number(sends);
         row.add("\n");
     });
 }

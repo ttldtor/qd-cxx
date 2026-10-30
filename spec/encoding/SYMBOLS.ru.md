@@ -118,5 +118,3 @@ frame; terminal state запрещает retry без явного reset. Нет
 incoming-ID, преобразований, importer, time metadata, PART, транспорта или гарантий производительности.
 Парные [покрытие](../../tests/conformance/encoding/symbols/COVERAGE.md) и
 [валидация](../../tests/conformance/encoding/symbols/VALIDATION.md) указывают выполненные проверки и пределы.
-
-

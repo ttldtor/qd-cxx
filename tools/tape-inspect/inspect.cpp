@@ -258,8 +258,11 @@ int inspectImpl(std::istream &input, std::ostream &output, std::ostream &diagnos
                 unsigned diagnosticsVersion, protocol::TapeMode mode) {
     std::string_view operation = "configuration";
     try {
+        const bool catalog = profile == inspect::DisplayProfile::BINARY_CATALOG_V1;
+
         if (!prepareLimits(limits) || (diagnosticsVersion != 1 && diagnosticsVersion != 2) ||
-            (mode != protocol::TapeMode::LEGACY && mode != protocol::TapeMode::RAW_MESSAGE_V1)) {
+            (catalog ? mode != protocol::TapeMode::BINARY_CATALOG_V1
+                     : (mode != protocol::TapeMode::LEGACY && mode != protocol::TapeMode::RAW_MESSAGE_V1))) {
             report(diagnostic, 2, "usage", diagnosticsVersion, protocol::TapeRejection::NONE, format);
 
             return 2;
@@ -267,7 +270,7 @@ int inspectImpl(std::istream &input, std::ostream &output, std::ostream &diagnos
 
         const bool wire = schema == nullptr;
 
-        if ((profile == inspect::DisplayProfile::WIRE_SCHEMA_V1) != wire ||
+        if ((profile == inspect::DisplayProfile::WIRE_SCHEMA_V1 || catalog) != wire ||
             (!wire && !compatibleProfile(*schema, profile))) {
             report(diagnostic, 4, "profile", diagnosticsVersion, protocol::TapeRejection::LOCAL_PROFILE, format);
 
@@ -295,13 +298,17 @@ int inspectImpl(std::istream &input, std::ostream &output, std::ostream &diagnos
         std::optional<protocol::TapeReader> storage;
 
         if (wire) {
-            storage.emplace(limits.tape, mode);
+            if (catalog) {
+                storage.emplace(limits.tape, protocol::TapeDiscovery::BINARY_CATALOG_V1);
+            } else {
+                storage.emplace(limits.tape, mode);
+            }
         } else {
             storage.emplace(*schema, limits.tape, mode);
         }
 
         auto &reader = *storage;
-        const bool timed = mode == protocol::TapeMode::RAW_MESSAGE_V1;
+        const bool timed = mode == protocol::TapeMode::RAW_MESSAGE_V1 || catalog;
         org::ttldtor::qdcxx::inspect::Formatter formatter(format, profile);
         std::size_t remainingOutput = limits.output;
         std::size_t remainingEventUnits = limits.eventUnits;
@@ -330,7 +337,7 @@ int inspectImpl(std::istream &input, std::ostream &output, std::ostream &diagnos
                 throw Failure{3};
             }
         };
-        emit(timed ? formatter.rawTapeHeader(remainingOutput) : formatter.tapeHeader(remainingOutput));
+        emit(timed && !catalog ? formatter.rawTapeHeader(remainingOutput) : formatter.tapeHeader(remainingOutput));
         std::vector<char> buffer(limits.chunkSize);
         bool eof = false;
 
@@ -365,6 +372,7 @@ int inspectImpl(std::istream &input, std::ostream &output, std::ostream &diagnos
             auto bytes = std::as_bytes(std::span(buffer.data(), count));
 
             while (!bytes.empty()) {
+                const auto before = catalog ? reader.schema().recordContext(0) : core::RecordContext{};
                 auto result = reader.feed(bytes);
                 bytes = bytes.subspan(result.accepted);
 
@@ -372,7 +380,10 @@ int inspectImpl(std::istream &input, std::ostream &output, std::ostream &diagnos
                     auto index = reader.frameCount() - 1;
                     emit(formatter.tapeFrame(*result.frame, index, remainingOutput, mode));
 
-                    if (index == 0 && reader.descriptor()) {
+                    if (catalog && result.frame->type == 1 && result.status != protocol::TapeStatus::FAILED &&
+                        reader.descriptor()) {
+                        emit(formatter.catalogDescriptor(*reader.descriptor(), index, remainingOutput));
+                    } else if (!catalog && index == 0 && reader.descriptor()) {
                         emit(timed ? formatter.rawTapeDescriptor(*reader.descriptor(), remainingOutput)
                                    : formatter.tapeDescriptor(*reader.descriptor(), remainingOutput));
                     }
@@ -389,8 +400,11 @@ int inspectImpl(std::istream &input, std::ostream &output, std::ostream &diagnos
                     // the reader has committed the complete description event successfully.
                     constexpr std::int32_t DESCRIBE_RECORDS = 2;
 
+                    const auto after = catalog ? reader.schema().recordContext(0) : core::RecordContext{};
+
                     if (wire && result.frame->type == DESCRIBE_RECORDS &&
-                        result.status != protocol::TapeStatus::FAILED) {
+                        result.status != protocol::TapeStatus::FAILED &&
+                        (!catalog || (after.valid() && !before.matches(after)))) {
                         ++generation;
                         emit(formatter.wireSchema(index, generation, reader.schema().records().size(),
                                                   reader.descriptions().size(), remainingOutput));
@@ -437,6 +451,9 @@ int inspectImpl(std::istream &input, std::ostream &output, std::ostream &diagnos
                             emit(formatter.profileRecord(
                                 record, reader.schema().records()[static_cast<std::size_t>(record.localId)].name, index,
                                 emitted, *event, remainingOutput));
+                        } else if (catalog) {
+                            emit(formatter.catalogRecord(record, reader.schema(), index, emitted, remainingOutput,
+                                                         result.timing ? &*result.timing : nullptr, generation));
                         } else {
                             emit(formatter.record(
                                 record, reader.schema().records()[static_cast<std::size_t>(record.localId)].name, index,
@@ -502,5 +519,11 @@ int inspectWire(std::istream &input, std::ostream &output, std::ostream &diagnos
                 inspect::OutputFormat format, unsigned diagnosticsVersion, protocol::TapeMode mode) {
     return inspectImpl(input, output, diagnostic, nullptr, limits, format, inspect::DisplayProfile::WIRE_SCHEMA_V1,
                        diagnosticsVersion, mode);
+}
+
+int inspectBinaryWire(std::istream &input, std::ostream &output, std::ostream &diagnostic, Limits limits,
+                      inspect::OutputFormat format, unsigned diagnosticsVersion) {
+    return inspectImpl(input, output, diagnostic, nullptr, limits, format, inspect::DisplayProfile::BINARY_CATALOG_V1,
+                       diagnosticsVersion, protocol::TapeMode::BINARY_CATALOG_V1);
 }
 } // namespace org::ttldtor::qdcxx::tape_inspect

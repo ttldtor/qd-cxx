@@ -803,6 +803,7 @@ public final class FieldTypesOracle {
     ObjectFieldsOracle.capture(Files.createDirectory(root.resolve("objects")));
     IndexedSchemasOracle.capture(Files.createDirectory(root.resolve("indexed")));
     FlagsOracle.capture(Files.createDirectory(root.resolve("flags")));
+    DescriptorOracle.capture(Files.createDirectories(root.resolve("dispatch")).resolve("normal"));
     System.out.println(
         "CAPTURE COMPLETE: exact field types, original Profile and production paths");
   }

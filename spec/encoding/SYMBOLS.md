@@ -117,5 +117,3 @@ bytes; terminal state prohibits retry without explicit reset. No writer, event d
 installation, conversions, importer, time metadata, PART, transport or performance guarantee.
 See paired [conformance coverage](../../tests/conformance/encoding/symbols/COVERAGE.md) and
 [validation](../../tests/conformance/encoding/symbols/VALIDATION.md) for executed checks and limits.
-
-

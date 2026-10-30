@@ -179,8 +179,15 @@ The [flags production corpus](../../tests/conformance/protocol/field-types/FLAGS
 characterizes all 64 known subsets and composer/parser option differences in RAW5, TICKER 10,
 STREAM 15 and HISTORY20. RAW callback fanout is labelled and compared before selecting one STREAM
 wire projection. These observations do not extend RAW_MESSAGE_V1 or `decodeRawData`: both still
-refuse nonzero data flags. The new `decodeStreamDataWithEventPolicy` and BINARY_CATALOG_V1 enable
-only STREAM/NONE known flags and owned removal time under their explicit contract.
-Broader family dispatch and versioned output remain separate work; old serialized output is unchanged.
+refuse nonzero data flags. The explicit `decodeStreamDataWithEventPolicy` supplies shared known-flag/removal decoding.
+BINARY_CATALOG_V1 uses it for all four generic families under the selected NONE/MESSAGE/headerless
+container policy in [BINARY-MESSAGES](BINARY-MESSAGES.md); old RAW mode/output remain unchanged.
 
 
+
+
+## Separate broad container policy
+
+[BINARY-MESSAGES](BINARY-MESSAGES.md) adds RAW alongside TICKER/STREAM/HISTORY only in explicit
+BINARY_CATALOG_V1, with shared charged decoding, known flags/removalTime and NONE/MESSAGE/headerless.
+RAW_MESSAGE_V1 and the old three-argument decodeRawData retain this document's exact older policy.

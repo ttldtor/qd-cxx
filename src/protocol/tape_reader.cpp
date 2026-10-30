@@ -9,14 +9,19 @@
 #include <bit>
 #include <limits>
 #include <stdexcept>
+#include <type_traits>
 #include <utility>
 
 namespace org::ttldtor::qdcxx::protocol {
 namespace {
-constexpr std::int32_t DESCRIBE_PROTOCOL = 1;    ///< Required initial header.
-constexpr std::int32_t DESCRIBE_RECORDS = 2;     ///< Append-only description update.
-constexpr std::int32_t STREAM_DATA = 15;         ///< Legacy data message.
-constexpr std::int32_t RAW_DATA = 5;             ///< Opt-in raw wire records.
+constexpr std::int32_t DESCRIBE_PROTOCOL = 1; ///< Required initial header.
+constexpr std::int32_t DESCRIBE_RECORDS = 2;  ///< Append-only description update.
+constexpr std::int32_t STREAM_DATA = 15;      ///< Legacy data message.
+constexpr std::int32_t RAW_DATA = 5;          ///< Opt-in raw wire records.
+constexpr std::int32_t TICKER_DATA = 10;      ///< Generic ticker wire records, without collectors.
+constexpr std::int32_t HISTORY_DATA = 20;     ///< Generic history wire records, without collectors.
+constexpr std::int32_t DESCRIBE_RESERVED = 3; ///< Bounded stateless reserved message.
+constexpr std::uint64_t MAX_DESCRIPTOR_UTF_BODY_BYTES = 8589934588ULL; ///< Java UTFString's four-byte unit bound.
 constexpr std::int32_t HEARTBEAT = 0;            ///< Explicit timing message, distinct from an empty envelope.
 constexpr std::int64_t MILLIS_PER_SECOND = 1000; ///< Signed wire timestamp resolution.
 constexpr unsigned SECOND_SHIFT = 32;            ///< High signed seconds word in cursor timing.
@@ -29,6 +34,27 @@ constexpr std::array<std::byte, 4> MAGIC{std::byte{'D'}, std::byte{'X'}, std::by
 struct DescriptorFailure {
     TapeError error; ///< Category, separate from checkpoint.
 };
+
+/** Measure owning effective protocol metadata; fixed scalars share one header unit.
+ * @param value Published or candidate descriptor.
+ * @return Exact logical header/text units; descriptor bounds guarantee representability.
+ */
+std::size_t descriptorUnits(const TapeDescriptor &value) noexcept {
+    std::size_t units = 1;
+
+    for (const auto *text : {&value.version, &value.options, &value.time}) {
+        if (*text) {
+            units += 1 + (*text)->size();
+        }
+    }
+
+    return units;
+}
+
+/** Recognize only the four generic record families. */
+bool isDataFamily(std::int32_t type) noexcept {
+    return type == RAW_DATA || type == TICKER_DATA || type == STREAM_DATA || type == HISTORY_DATA;
+}
 
 /** Numeric projection required by the descriptor field grammar. */
 enum class NumberWidth {
@@ -46,6 +72,62 @@ class DescriptorParser {
     std::size_t units_ = 0;
     std::size_t properties_ = 0;
     std::size_t messages_ = 0;
+
+    /** Scoped text ownership within the descriptor's shared metadata ledger. */
+    struct CatalogText {
+        std::optional<std::u16string> value;
+        detail::SessionBudget &budget;
+        std::size_t units;
+
+        CatalogText(std::optional<std::u16string> text, detail::SessionBudget &owner, std::size_t cost)
+            : value(std::move(text)), budget(owner), units(cost) {
+        }
+
+        CatalogText(const CatalogText &) = delete;
+
+        CatalogText(CatalogText &&other) noexcept
+            : value(std::move(other.value)), budget(other.budget), units(std::exchange(other.units, 0)) {
+        }
+
+        ~CatalogText() {
+            budget.release(units);
+        }
+
+        /** Transfer storage and its already admitted ownership to a candidate field. */
+        std::optional<std::u16string> take() noexcept {
+            units = 0;
+
+            return std::move(value);
+        }
+    };
+
+    /** Decode with a finite preallocation reservation; no admitted work is refunded. */
+    CatalogText catalogText(detail::SessionBudget &budget) {
+        const auto prefix = encoding::readCompactLong(payload_.subspan(cursor_));
+        std::size_t reservation = 0;
+
+        if (prefix.status == encoding::Status::OK && prefix.value > 0 &&
+            static_cast<std::uint64_t>(prefix.value) <= MAX_DESCRIPTOR_UTF_BODY_BYTES) {
+            reservation = static_cast<std::size_t>(std::min({static_cast<std::uint64_t>(prefix.value) + 1,
+                                                             static_cast<std::uint64_t>(limits_.text.codeUnits),
+                                                             static_cast<std::uint64_t>(limits_.textUnits - units_)}));
+        }
+
+        if (reservation == std::numeric_limits<std::size_t>::max() || !budget.admit(1 + reservation)) {
+            reject(TapeError::RESOURCE_LIMIT);
+        }
+
+        CatalogText result{std::nullopt, budget, 1 + reservation};
+        const auto saved = limits_.text.codeUnits;
+        limits_.text.codeUnits = reservation;
+        result.value = text();
+        limits_.text.codeUnits = saved;
+        const auto actual = result.value ? result.value->size() : 0;
+        budget.release(reservation - actual);
+        result.units = 1 + actual;
+
+        return result;
+    }
 
     /** Raise a validation error at the current checkpoint.
      * @param error Terminal classification.
@@ -143,6 +225,162 @@ class DescriptorParser {
     DescriptorParser(std::span<const std::byte> payload, TapeDescriptorLimits limits, TapeDiagnostic &position,
                      TapeMode mode)
         : payload_(payload), limits_(limits), mode_(mode), position_(position) {
+    }
+
+    /** Parse the selected broad full/delta grammar with old/candidate/temporary accounting.
+     * @param previous Prior effective descriptor, borrowed only during this call.
+     * @param budget Shared metadata ledger, already charged for complete payload parse work.
+     * @return Owned validated candidate; publication belongs to the reader.
+     */
+    TapeDescriptor parseCatalog(const std::optional<TapeDescriptor> &previous, detail::SessionBudget &budget) {
+        position_.stage = "descriptor";
+
+        for (auto byte : MAGIC) {
+            if (cursor_ == payload_.size() || payload_[cursor_++] != byte) {
+                reject(TapeError::MALFORMED);
+            }
+        }
+
+        const auto candidateUnits = previous ? descriptorUnits(*previous) : 1;
+
+        if (!budget.admit(candidateUnits)) {
+            reject(TapeError::RESOURCE_LIMIT);
+        }
+
+        TapeDescriptor candidate = previous ? *previous : TapeDescriptor{};
+        unsigned seen = 0;
+        const auto pairs = count(NumberWidth::COMPACT_LONG, properties_, limits_.properties);
+
+        for (std::size_t index = 0; index < pairs; ++index) {
+            auto key = catalogText(budget);
+            auto value = catalogText(budget);
+
+            if (!key.value || key.value->empty() || !value.value) {
+                reject(TapeError::MALFORMED);
+            }
+
+            const unsigned bit = *key.value == u"type"      ? 1U
+                                 : *key.value == u"version" ? 2U
+                                 : *key.value == u"opt"     ? 4U
+                                 : *key.value == u"time"    ? 8U
+                                                            : 0U;
+
+            if (bit == 0 || (seen & bit) != 0) {
+                reject(TapeError::UNSUPPORTED, TapeRejection::DESCRIPTOR);
+            }
+
+            seen |= bit;
+            std::optional<std::u16string> *target = nullptr;
+
+            if (bit == 1U) {
+                if (*value.value != u"tape") {
+                    reject(TapeError::UNSUPPORTED, TapeRejection::DESCRIPTOR);
+                }
+            } else if (bit == 2U) {
+                target = &candidate.version;
+            } else if (bit == 4U) {
+                if (!value.value->empty() && *value.value != u"hs") {
+                    reject(TapeError::UNSUPPORTED, TapeRejection::OPTIONS);
+                }
+
+                target = &candidate.options;
+            } else {
+                if (*value.value != u"NONE" && *value.value != u"none" && *value.value != u"MESSAGE" &&
+                    *value.value != u"message") {
+                    reject(TapeError::UNSUPPORTED, TapeRejection::TIME);
+                }
+
+                candidate.explicitTimeNone = *value.value == u"NONE" || *value.value == u"none";
+                target = &candidate.time;
+            }
+
+            if (target) {
+                if (*target) {
+                    budget.release(1 + (*target)->size());
+                }
+
+                *target = value.take();
+            }
+        }
+
+        if (!previous && (seen & 1U) == 0) {
+            reject(TapeError::UNSUPPORTED, TapeRejection::DESCRIPTOR);
+        }
+
+        unsigned sendSeen = 0;
+        const auto sends = count(NumberWidth::COMPACT_INT, messages_, limits_.messages);
+
+        for (std::size_t index = 0; index < sends; ++index) {
+            const auto id = number(NumberWidth::COMPACT_INT);
+            auto name = catalogText(budget);
+            const auto props = count(NumberWidth::COMPACT_LONG, properties_, limits_.properties);
+            unsigned bit = 0;
+            bool *declared = nullptr;
+
+            if (id == RAW_DATA && name.value == u"RAW_DATA") {
+                bit = 1;
+                declared = &candidate.explicitRawSend;
+            }
+
+            if (id == TICKER_DATA && name.value == u"TICKER_DATA") {
+                bit = 2;
+                declared = &candidate.explicitTickerSend;
+            }
+
+            if (id == STREAM_DATA && name.value == u"STREAM_DATA") {
+                bit = 4;
+                declared = &candidate.explicitStreamSend;
+            }
+
+            if (id == HISTORY_DATA && name.value == u"HISTORY_DATA") {
+                bit = 8;
+                declared = &candidate.explicitHistorySend;
+            }
+
+            if (!name.value || name.value->empty()) {
+                reject(TapeError::MALFORMED);
+            }
+
+            if (bit == 0 || (sendSeen & bit) != 0 || props != 0) {
+                reject(TapeError::UNSUPPORTED, TapeRejection::MESSAGE);
+            }
+
+            sendSeen |= bit;
+            *declared = true;
+        }
+
+        if (count(NumberWidth::COMPACT_INT, messages_, limits_.messages) != 0) {
+            reject(TapeError::UNSUPPORTED, TapeRejection::MESSAGE);
+        }
+
+        if (cursor_ < payload_.size()) {
+            const auto length = number(NumberWidth::COMPACT_LONG);
+
+            if (length < -1 || length > std::numeric_limits<std::int32_t>::max()) {
+                reject(TapeError::MALFORMED);
+            }
+
+            if (length >= 0) {
+                if (static_cast<std::uint64_t>(length) > payload_.size() - cursor_) {
+                    reject(TapeError::MALFORMED);
+                }
+
+                cursor_ += static_cast<std::size_t>(length);
+                auto endpointName = catalogText(budget);
+                static_cast<void>(number(NumberWidth::COMPACT_LONG));
+            }
+
+            if (cursor_ != payload_.size()) {
+                reject(TapeError::MALFORMED);
+            }
+
+            reject(TapeError::UNSUPPORTED, TapeRejection::DESCRIPTOR);
+        }
+
+        position_.consumed = cursor_;
+        position_.errorOffset = cursor_;
+
+        return candidate;
     }
 
     /** Examine the entire restricted header.
@@ -304,15 +542,15 @@ class UnitCount {
 };
 
 /** Count owned local schema declarations and one immutable identity before copying.
- * @param schema Validated borrowed schema.
+ * @param records Validated borrowed declarations.
  * @param maximum Finite count ceiling.
  * @return S from INDEXED-SCHEMAS, or no value on overflow/excess.
  */
-std::optional<std::size_t> schemaUnits(const core::LocalSchema &schema, std::size_t maximum) noexcept {
+std::optional<std::size_t> schemaUnits(std::span<const core::LocalRecord> records, std::size_t maximum) noexcept {
     UnitCount count(maximum);
     count.add(1);
 
-    for (const auto &record : schema.records()) {
+    for (const auto &record : records) {
         count.add(1);
         count.add(record.name.size());
         count.add(record.fields.size());
@@ -325,6 +563,10 @@ std::optional<std::size_t> schemaUnits(const core::LocalSchema &schema, std::siz
     }
 
     return count.result();
+}
+
+std::optional<std::size_t> schemaUnits(const core::LocalSchema &schema, std::size_t maximum) noexcept {
+    return schemaUnits(schema.records(), maximum);
 }
 
 /** Count the D ownership of one active or staged raw declaration.
@@ -406,6 +648,112 @@ std::size_t initialSessionUnits(const core::LocalSchema &schema, const TapeLimit
     }
 
     throw std::invalid_argument("initial session metadata exceeds configured bounds");
+}
+
+/** Build the append-only logical name/type registry for explicit binary discovery.
+ * Retired declarations remain in the validated schema and in every schema/metadata bound.
+ */
+std::expected<core::LocalSchema, TapeError> discoverBinarySchema(const core::LocalSchema &previous,
+                                                                 std::span<const WireRecordDescription> incoming,
+                                                                 const TapeLimits &limits,
+                                                                 detail::SessionBudget &budget) {
+    const auto old = schemaUnits(previous, limits.snapshotUnits);
+
+    if (!old || !budget.admit(*old - 1)) {
+        return std::unexpected(TapeError::RESOURCE_LIMIT);
+    }
+
+    std::vector<core::LocalRecord> records(previous.records().begin(), previous.records().end());
+    std::size_t staging = *old - 1;
+    std::size_t fields = 0;
+    std::size_t names = 0;
+
+    for (const auto &local : records) {
+        fields += local.fields.size();
+        names += local.name.size();
+
+        for (const auto &key : local.lookups) {
+            names += key.name.size();
+        }
+    }
+
+    const auto &bounds = limits.context.schema;
+
+    for (const auto &description : incoming) {
+        if (!core::detail::validSchemaKey(description.name)) {
+            return std::unexpected(TapeError::MALFORMED);
+        }
+
+        auto local = std::find_if(records.begin(), records.end(), [&](const auto &value) {
+            return value.name == description.name;
+        });
+
+        if (local == records.end()) {
+            if (records.size() >= bounds.records ||
+                records.size() > static_cast<std::size_t>(std::numeric_limits<std::int32_t>::max()) ||
+                description.name.size() > bounds.nameUnits || description.name.size() > bounds.totalNameUnits - names ||
+                !budget.admit(1 + description.name.size())) {
+                return std::unexpected(TapeError::RESOURCE_LIMIT);
+            }
+
+            staging += 1 + description.name.size();
+            names += description.name.size();
+            records.push_back({static_cast<std::int32_t>(records.size()), description.name, false, {}, {}});
+            local = records.end() - 1;
+        }
+
+        for (const auto &field : description.fields) {
+            if (!core::supportsSerialType(field.serialTypeId, core::LocalProfile::BINARY_FIELDS_V1)) {
+                return std::unexpected(TapeError::UNSUPPORTED);
+            }
+
+            if (!core::detail::validSchemaKey(field.name)) {
+                return std::unexpected(TapeError::MALFORMED);
+            }
+
+            const auto key = std::find_if(local->lookups.begin(), local->lookups.end(), [&](const auto &value) {
+                return value.name == field.name;
+            });
+
+            if (key != local->lookups.end()) {
+                if (local->fields[key->fieldId].serialTypeId != field.serialTypeId) {
+                    return std::unexpected(TapeError::UNSUPPORTED);
+                }
+
+                continue;
+            }
+
+            if (fields >= bounds.fields || fields >= bounds.lookups || field.name.size() > bounds.nameUnits ||
+                field.name.size() > bounds.totalNameUnits - names || !budget.admit(2 + field.name.size())) {
+                return std::unexpected(TapeError::RESOURCE_LIMIT);
+            }
+
+            staging += 2 + field.name.size();
+            names += field.name.size();
+            ++fields;
+            local->lookups.push_back({field.name, local->fields.size()});
+            local->fields.push_back({field.serialTypeId});
+        }
+    }
+
+    const auto total = schemaUnits(records, limits.snapshotUnits);
+
+    if (!total || !budget.admit(*total)) {
+        return std::unexpected(TapeError::RESOURCE_LIMIT);
+    }
+
+    auto result = core::LocalSchema::create(records, bounds, core::LocalProfile::BINARY_FIELDS_V1);
+
+    if (!result) {
+        return std::unexpected(result.error() == core::SchemaError::ALLOCATION_FAILURE ? TapeError::ALLOCATION_FAILURE
+                               : result.error() == core::SchemaError::RESOURCE_LIMIT   ? TapeError::RESOURCE_LIMIT
+                                                                                       : TapeError::MALFORMED);
+    }
+
+    records.clear();
+    budget.release(staging);
+
+    return std::move(*result);
 }
 
 /** Preserve old copying semantics and opt into fresh indexed provenance explicitly.
@@ -531,6 +879,45 @@ TapeReader::TapeReader(TapeLimits limits, TapeMode mode)
               return std::move(*empty);
           }(limits.context.schema),
           limits, mode) {
+    discoverSchema_ = true;
+}
+
+TapeReader::TapeReader(TapeLimits limits, TapeDiscovery discovery)
+    : limits_(limits), mode_(TapeMode::BINARY_CATALOG_V1), schema_([&] {
+          if (discovery != TapeDiscovery::BINARY_CATALOG_V1) {
+              throw std::invalid_argument("invalid discovery policy");
+          }
+
+          if (limits.snapshotUnits == 0 || limits.constructionUnits == 0) {
+              throw std::invalid_argument("initial discovery identity exceeds bounds");
+          }
+
+          auto empty = core::LocalSchema::create({}, limits.context.schema, core::LocalProfile::BINARY_FIELDS_V1);
+
+          if (!empty) {
+              if (empty.error() == core::SchemaError::ALLOCATION_FAILURE) {
+                  throw std::bad_alloc();
+              }
+
+              throw std::invalid_argument("invalid empty binary schema");
+          }
+
+          return std::move(*empty);
+      }()),
+      framer_(limits.frame) {
+    construction_ = 1;
+    snapshotUnits_ = 1;
+    auto empty = StreamDataContext::create(schema_, {}, limits.context);
+
+    if (!empty) {
+        if (empty.error() == BindingError::ALLOCATION_FAILURE) {
+            throw std::bad_alloc();
+        }
+
+        throw std::invalid_argument("invalid empty discovery context");
+    }
+
+    context_ = std::move(*empty);
     discoverSchema_ = true;
 }
 
@@ -803,6 +1190,24 @@ void TapeReader::replaceDescriptions(std::span<const std::byte> payload) {
         return;
     }
 
+    std::optional<core::LocalSchema> nextSchema;
+
+    if (discoverSchema_) {
+        auto discovered = discoverBinarySchema(schema_, parsed.descriptions, limits_, budget);
+
+        if (!discovered) {
+            if (discovered.error() == TapeError::UNSUPPORTED) {
+                diagnostic_.rejection = TapeRejection::TYPE;
+            }
+
+            fail(discovered.error(), "wire-schema");
+
+            return;
+        }
+
+        nextSchema.emplace(std::move(*discovered));
+    }
+
     diagnostic_.stage = "construction";
     const auto ceiling = limits_.snapshotUnits;
     const auto rawUnits = descriptionUnits(parsed.descriptions, ceiling);
@@ -831,7 +1236,7 @@ void TapeReader::replaceDescriptions(std::span<const std::byte> payload) {
 
         {
             // Validate every wire-order entry, including an intermediate entry later overwritten.
-            auto validated = bindRecord(incoming, schema_, limits_.context.bindings);
+            auto validated = bindRecord(incoming, nextSchema ? *nextSchema : schema_, limits_.context.bindings);
 
             if (!validated) {
                 if (validated.error() == BindingError::UNSUPPORTED_PROFILE) {
@@ -879,23 +1284,27 @@ void TapeReader::replaceDescriptions(std::span<const std::byte> payload) {
 
     parsed.descriptions.clear();
     budget.release(*rawUnits);
-    const auto localUnits = schemaUnits(schema_, ceiling);
+    const auto localUnits = schemaUnits(nextSchema ? *nextSchema : schema_, ceiling);
 
-    if (!localUnits || !budget.admit(*localUnits)) {
+    if (!localUnits || (!nextSchema && !budget.admit(*localUnits))) {
         fail(TapeError::RESOURCE_LIMIT, "construction");
 
         return;
     }
 
     // create issues a fresh identity; boundedCopy deliberately retains an old generation instead.
-    auto nextSchema = core::LocalSchema::create(schema_.records(), limits_.context.schema, schema_.profile());
-
     if (!nextSchema) {
-        fail(nextSchema.error() == core::SchemaError::ALLOCATION_FAILURE ? TapeError::ALLOCATION_FAILURE
-                                                                         : TapeError::RESOURCE_LIMIT,
-             "construction");
+        auto copied = core::LocalSchema::create(schema_.records(), limits_.context.schema, schema_.profile());
 
-        return;
+        if (!copied) {
+            fail(copied.error() == core::SchemaError::ALLOCATION_FAILURE ? TapeError::ALLOCATION_FAILURE
+                                                                         : TapeError::RESOURCE_LIMIT,
+                 "construction");
+
+            return;
+        }
+
+        nextSchema.emplace(std::move(*copied));
     }
 
     const auto nextContextUnits = contextUnits(*nextSchema, candidate, ceiling);
@@ -924,7 +1333,8 @@ void TapeReader::replaceDescriptions(std::span<const std::byte> payload) {
     schema_ = std::move(*nextSchema);
     context_ = std::move(*nextContext);
     descriptions_.swap(candidate);
-    snapshotUnits_ = *localUnits + candidateUnits + *nextContextUnits;
+    snapshotUnits_ =
+        *localUnits + candidateUnits + *nextContextUnits + (descriptor_ ? descriptorUnits(*descriptor_) : 0);
 }
 
 void TapeReader::fail(TapeError error, std::string_view stage, std::size_t detail) noexcept {
@@ -948,7 +1358,33 @@ void TapeReader::dispatch(TapeFeedResult &result) {
         diagnostic_.payloadStart = frame.endOffset - frame.payload.size();
     }
 
-    if (!descriptor_) {
+    const bool catalog = mode_ == TapeMode::BINARY_CATALOG_V1;
+
+    if (catalog && frame.kind == FrameKind::MESSAGE && frame.type == DESCRIBE_PROTOCOL) {
+        detail::SessionBudget budget(snapshotUnits_, limits_.snapshotUnits, construction_, limits_.constructionUnits);
+
+        if (!budget.work(frame.payload.size())) {
+            fail(TapeError::RESOURCE_LIMIT, "construction");
+
+            return;
+        }
+
+        DescriptorParser parser(frame.payload, limits_.descriptor, diagnostic_, mode_);
+        try {
+            auto candidate = parser.parseCatalog(descriptor_, budget);
+            const auto old = descriptor_ ? descriptorUnits(*descriptor_) : 0;
+            const auto next = descriptorUnits(candidate);
+            static_assert(std::is_nothrow_move_assignable_v<TapeDescriptor>);
+            descriptor_ = std::move(candidate);
+            snapshotUnits_ = snapshotUnits_ - old + next;
+        } catch (const DescriptorFailure &failure) {
+            fail(failure.error, "descriptor");
+        }
+
+        return;
+    }
+
+    if (!catalog && !descriptor_) {
         if (frame.type != DESCRIBE_PROTOCOL) {
             diagnostic_.rejection = TapeRejection::SEQUENCE;
             fail(TapeError::UNSUPPORTED, "header");
@@ -972,7 +1408,8 @@ void TapeReader::dispatch(TapeFeedResult &result) {
         return;
     }
 
-    if (mode_ == TapeMode::RAW_MESSAGE_V1 && (frame.type == HEARTBEAT || frame.type == RAW_DATA)) {
+    if ((mode_ == TapeMode::RAW_MESSAGE_V1 && (frame.type == HEARTBEAT || frame.type == RAW_DATA)) ||
+        (catalog && (frame.type == HEARTBEAT || isDataFamily(*frame.type)))) {
         diagnostic_.consumed = 0;
         diagnostic_.errorOffset = 0;
 
@@ -985,7 +1422,7 @@ void TapeReader::dispatch(TapeFeedResult &result) {
         ++timingEvents_;
     }
 
-    if (mode_ == TapeMode::RAW_MESSAGE_V1 && frame.type == HEARTBEAT) {
+    if ((mode_ == TapeMode::RAW_MESSAGE_V1 || catalog) && frame.type == HEARTBEAT) {
         diagnostic_.stage = "heartbeat";
         TapeHeartbeat heartbeat;
         std::size_t cursor = 0;
@@ -1152,7 +1589,12 @@ void TapeReader::dispatch(TapeFeedResult &result) {
         return;
     }
 
-    if (frame.type != (mode_ == TapeMode::RAW_MESSAGE_V1 ? RAW_DATA : STREAM_DATA)) {
+    if (catalog && frame.type == DESCRIBE_RESERVED) {
+        return;
+    }
+
+    if (catalog ? !isDataFamily(*frame.type)
+                : frame.type != (mode_ == TapeMode::RAW_MESSAGE_V1 ? RAW_DATA : STREAM_DATA)) {
         diagnostic_.rejection = frame.type == DESCRIBE_PROTOCOL ? TapeRejection::SEQUENCE : TapeRejection::MESSAGE;
         fail(TapeError::UNSUPPORTED, "type");
 
@@ -1161,7 +1603,7 @@ void TapeReader::dispatch(TapeFeedResult &result) {
 
     diagnostic_.stage = "data";
 
-    if (mode_ == TapeMode::RAW_MESSAGE_V1) {
+    if (mode_ == TapeMode::RAW_MESSAGE_V1 || catalog) {
         result.timing = timing_;
     }
 
@@ -1286,7 +1728,7 @@ TapeStatus TapeReader::finish() noexcept {
 
     if (framer_.finish() == FrameStatus::FAILED) {
         fail(TapeError::MALFORMED, "framing", static_cast<std::size_t>(framer_.error()));
-    } else if (!descriptor_) {
+    } else if (!descriptor_ && !(mode_ == TapeMode::BINARY_CATALOG_V1 && !descriptions_.empty())) {
         fail(TapeError::MALFORMED, "header");
     } else {
         status_ = TapeStatus::FINISHED;

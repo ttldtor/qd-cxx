@@ -10,6 +10,7 @@ $expected=(Resolve-Path -LiteralPath $ExpectedDirectory).Path
 $mutations=@('type','value','unit','null-empty','order','record','arity','missing-field','missing-record','unknown-row','duplicate-row','missing-completion','duplicate-completion','misplaced-completion','extra-file','binary','primitive-consumption','scalar-value','scalar-wire-type','scalar-consumed','scalar-byte','scalar-missing','scalar-fanout','object-null-empty','object-byte','object-consumed','object-missing','object-local-type')
 $mutations+=@('indexed-time','indexed-slot','indexed-lookup','indexed-last-winner','indexed-missing','indexed-binary')
 $mutations+=@('flags-value','flags-removal-time','flags-byte-count','flags-projection','flags-mask','flags-missing','flags-binary','flags-option')
+$mutations+=@('dispatch-canonical','dispatch-family','dispatch-time','dispatch-binary','dispatch-uid-offset','dispatch-uid-length','dispatch-uid-outside','dispatch-headerless')
 $results=[Collections.Generic.List[object]]::new()
 foreach($mutation in $mutations){
     $dir=Join-Path $root $mutation
@@ -19,6 +20,7 @@ foreach($mutation in $mutations){
     Copy-Item -LiteralPath (Join-Path $expected 'objects') -Destination $dir -Recurse
     Copy-Item -LiteralPath (Join-Path $expected 'indexed') -Destination $dir -Recurse
     Copy-Item -LiteralPath (Join-Path $expected 'flags') -Destination $dir -Recurse
+    Copy-Item -LiteralPath (Join-Path $expected 'dispatch') -Destination $dir -Recurse
     $path=Join-Path $dir 'mixed-stream.tsv';$rows=[IO.File]::ReadAllLines($path)
     switch($mutation){
         'type' {$rows[3]=$rows[3].Replace("`t40`t","`t8`t")}
@@ -148,6 +150,29 @@ foreach($mutation in $mutations){
             $flagRows[$index]=$cells -join [char]9
             if($original -ceq $flagRows[$index]){throw 'Flags mutation changed nothing'}
             [IO.File]::WriteAllLines($flagsPath,$flagRows)
+        }
+    }
+    if($mutation.StartsWith('dispatch-')) {
+        $normal=Join-Path $dir 'dispatch/normal'
+        if($mutation -cin @('dispatch-canonical','dispatch-family','dispatch-time')) {
+            $target=Join-Path $normal 'observations.tsv'
+            $lines=[IO.File]::ReadAllLines($target)
+            $index=[Array]::FindIndex($lines,[Predicate[string]]{param($line)$line.StartsWith("record`twriter-MESSAGE-5-reader`t")})
+            if($index -lt 0){throw 'Dispatch record mutation target absent'}
+            $cells=$lines[$index].Split("`t");$values=$cells[2].Split('/')
+            switch($mutation){'dispatch-canonical'{$values[2]='914'};'dispatch-family'{$values[0]='10'};'dispatch-time'{$values[3]='0'}}
+            $cells[2]=$values -join '/';$lines[$index]=$cells -join "`t";[IO.File]::WriteAllLines($target,$lines)
+        } elseif($mutation -cin @('dispatch-uid-offset','dispatch-uid-length')) {
+            $target=Join-Path $normal 'uid-ranges.tsv';$lines=[IO.File]::ReadAllLines($target);$cells=$lines[1].Split("`t")
+            if($mutation -ceq 'dispatch-uid-offset'){$cells[1]="$(1+[int]$cells[1])"}else{$cells[2]='17'}
+            $lines[1]=$cells -join "`t";[IO.File]::WriteAllLines($target,$lines)
+        } else {
+            if($mutation -ceq 'dispatch-headerless'){$target=Join-Path $dir 'dispatch/headerless/writer-NONE-5.qtp';$offset=0}
+            elseif($mutation -ceq 'dispatch-uid-outside'){
+                $range=@([IO.File]::ReadAllLines((Join-Path $normal 'uid-ranges.tsv'))|Where-Object{$_ -clike 'endpoint-valid.qtp*'})[0].Split("`t")
+                $target=Join-Path $normal 'endpoint-valid.qtp';$offset=[int]$range[1]-1
+            }else{$target=Join-Path $normal 'writer-NONE-15.qtp';$offset=0}
+            $bytes=[IO.File]::ReadAllBytes($target);$bytes[$offset]=$bytes[$offset] -bxor 1;[IO.File]::WriteAllBytes($target,$bytes)
         }
     }
     $failed=$false

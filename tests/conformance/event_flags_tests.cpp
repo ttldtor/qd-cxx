@@ -584,7 +584,7 @@ TEST_CASE("allocation failures cannot expose partial removal records or mutate i
     CHECK(success);
 }
 
-TEST_CASE("catalog tape accepts exact hs absence and empty while preserving old modes and family gates") {
+TEST_CASE("catalog tape accepts exact hs absence and empty in all generic families while preserving old modes") {
     auto local = schema();
     const std::array wire{description()};
     std::vector<p::StreamDataRecord> retained;
@@ -616,8 +616,11 @@ TEST_CASE("catalog tape accepts exact hs absence and empty while preserving old 
             accept(guarded, descriptor(option));
             accept(guarded, descriptions(wire));
             const auto result = guarded.feed(frame(family, payload(2)));
-            CHECK(result.status == p::TapeStatus::FAILED);
-            CHECK(guarded.diagnostic().rejection == p::TapeRejection::MESSAGE);
+            CHECK(result.status == p::TapeStatus::EVENT);
+            REQUIRE(result.records.size() == 1);
+            CHECK(result.records[0].removalTime == TIME);
+            REQUIRE(result.frame);
+            CHECK(result.frame->type == family);
         }
     }
 

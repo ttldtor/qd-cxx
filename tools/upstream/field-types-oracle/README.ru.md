@@ -29,13 +29,13 @@ DataInputStream (`data-input`) и production-граница сообщения B
 
 ```powershell
 $fieldArgs = @{
-  Upstream = 'C:/path/to/profile/AppData/Local/Temp/qdcxx-003-qd'
+  Upstream = 'C:/src/qd-reference'
   JavaHome = 'C:/Program Files/Zulu/zulu-8'
-  Maven = 'C:/path/to/profile/.m2/wrapper/dists/apache-maven-3.9.16/0daed3be3ebd1c706f0e69e8b07c6b73f5cc4ea3dfce72a8d0ec2e849ca2ddb0/bin/mvn.cmd'
-  Inspector = 'C:/qd-cxx/.work/naming-final-msvc/Release/qdcxx-qtp-inspect.exe'
+  Maven = 'C:/tools/apache-maven-3.9.16/bin/mvn.cmd'
+  Inspector = 'C:/src/qd-cxx/.work/naming-final-msvc/Release/qdcxx-qtp-inspect.exe'
 }
-pwsh -NoProfile -File tools/format/Format-Java.ps1 -Mode Format -JavaHome C:/path/to/profile/.jdks/openjdk-23.0.2
-pwsh -NoProfile -File tools/format/Format-Java.ps1 -Mode Check -JavaHome C:/path/to/profile/.jdks/openjdk-23.0.2
+pwsh -NoProfile -File tools/format/Format-Java.ps1 -Mode Format -JavaHome C:/tools/jdk-23
+pwsh -NoProfile -File tools/format/Format-Java.ps1 -Mode Check -JavaHome C:/tools/jdk-23
 & tools/upstream/field-types-oracle/Invoke-Oracle.ps1 @fieldArgs -RunDirectory .work/field-types-a
 & tools/upstream/field-types-oracle/Invoke-Oracle.ps1 @fieldArgs -RunDirectory .work/field-types-b
 & tools/upstream/field-types-oracle/Compare-FieldTypes.ps1 -Actual .work/field-types-a/field-types -Expected .work/field-types-b/field-types
@@ -164,3 +164,18 @@ Compare-FieldTypes проверяет точный набор 105 файлов, 
 разделяет поведение Java, выбранные отказы C++, политику завершённого префикса и оставшиеся границы.
 
 
+
+## Дополнение для конечной диспетчеризации
+
+DescriptorOracle расширяет тот же процесс Capture/Verify до 609 артефактов, сохраняя все 287 прежних
+файлов побайтно. Обычный захват содержит 305 артефактов (303 исходных tape, 668 наблюдений, карту
+57 диапазонов UID); отдельный ограниченный дочерний процесс с явным noHeaderAndFooter — 17 артефактов
+(16 исходных tape, 25 наблюдений). Реальные FileWriter/FileReader покрывают четыре семейства с
+NONE/MESSAGE; управляемые изменения дескрипторов/управления/EOF выделены отдельно. Исходные случайные
+синтетические UID конечных точек сохраняются вместе с хэшами каждого запуска. Только 57 структурно
+определённых по исходному коду диапазонов UID нормализуются в памяти при сравнении; остальные байты
+и форма карты должны совпадать. Все 16 tape без заголовка совпадают побайтно. Новые сопровождаемые
+launcher и зависимости не добавлены. Прежний отрицательный процесс проверяет 50 мутаций
+(42 прежних и 8 для диспетчеризации). См. [валидацию диспетчеризации](../../../tests/conformance/protocol/field-types/DISPATCH-VALIDATION.ru.md)
+и [манифест](../../../tests/fixtures/encoding/field-types/dispatch-captures.json). Исторические
+разделы выше сохраняют исходные количества подмножеств и хэши исходников.

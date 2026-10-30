@@ -65,3 +65,9 @@ The harness source and reproduction commands are in the [oracle README](../../..
 The separate [flags extension](../../../conformance/protocol/field-types/FLAGS-VALIDATION.md)
 adds known STREAM/NONE event metadata under an explicit policy, while keeping this historical
 ordinary corpus unchanged. It does not extend old modes, collectors, FIELD or writer formats.
+
+
+The separate [finite dispatch validation](../../../conformance/protocol/field-types/DISPATCH-VALIDATION.md)
+adds322 synthetic artifacts and output8/family/descriptor checks while preserving all287 earlier
+files. [Dispatch provenance](dispatch-captures.json) records each original raw hash, the exact57
+UID-only comparison view and independent headerless bytes. Earlier subset results above stay historical.

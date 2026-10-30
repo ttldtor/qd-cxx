@@ -145,7 +145,7 @@ No Profile event adapter, indexed schema, importer or implicit discovery is adde
 ## Explicit catalog event metadata
 
 `decodeStreamDataWithEventPolicy(payload, context, limits, DataEventPolicy::BINARY_CATALOG_V1)`
-adds the catalog STREAM/NONE grammar with an explicitly validated BINARY_FIELDS_V1 context.
+adds the catalog payload grammar without builtin FIELD metadata, with an explicitly validated BINARY_FIELDS_V1 context.
 The old `decodeStreamData` and `decodeRawData` names/signatures remain unoverloaded and zero-flags
 only, preserving existing function-address use. DataEventPolicy::ZERO_FLAGS selects that same
 strict grammar through the new entry point. Invalid policy/profile combinations fail with
@@ -188,7 +188,8 @@ composer masks, primitive observations, designed messages and original FileWrite
 recordings at both pins. Java discards the buffered current-message prefix for the captured removal
 truncations; C++ deliberately preserves its existing completed-prefix guarantee. Production RAW
 fanout is three labelled callbacks, with equality checked before selecting one STREAM projection.
-RAW/TICKER/HISTORY container dispatch remains outside this partial mode.
+The four-family container dispatch policy is defined in [BINARY-MESSAGES](BINARY-MESSAGES.md);
+this complete-payload API does not select collectors or a time source.
 
 Existing formatter record/profileRecord entry points cannot represent raw flags or removalTime.
 They throw invalid_argument before building output for nonzero eventFlags or any engaged removalTime,
@@ -196,3 +197,11 @@ including0. An explicit zero prefix with eventFlagsBytes>0 preserves old output.
 tape-write record projection likewise refuses engaged removalTime; writer input/API is unchanged.
 
 
+
+
+## Broad tape dispatch boundary
+
+[BINARY-MESSAGES](BINARY-MESSAGES.md) applies the explicit policy decoder to all four generic data
+families, with source family on the owning frame and no collector fanout. Existing three-argument
+decoders stay unchanged. Direct policy payload decoding assumes no builtin FIELD prefix; declared
+FIELD descriptors remain refused. The broad reader owns descriptor/session budgets and generations.

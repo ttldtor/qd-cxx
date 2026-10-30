@@ -52,3 +52,9 @@ Penta primitives and labelled RAW fanout. Both full captures repeat identically;
 artifacts match across pins and the clean locked Verify preserves the historical 182 unchanged.
 See [flags validation](../../../conformance/protocol/field-types/FLAGS-VALIDATION.md) for the
 bounded STREAM/NONE C++ acceptance and intentional unsupported/error differences.
+
+
+The separate [finite dispatch validation](../../../conformance/protocol/field-types/DISPATCH-VALIDATION.md)
+adds322 synthetic artifacts and output8/family/descriptor checks while preserving all287 earlier
+files. [Dispatch provenance](dispatch-captures.json) records each original raw hash, the exact57
+UID-only comparison view and independent headerless bytes. Earlier subset results above stay historical.

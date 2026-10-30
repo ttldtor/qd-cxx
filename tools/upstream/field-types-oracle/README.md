@@ -28,13 +28,13 @@ The formatter uses a separate JDK 21+.
 
 ```powershell
 $fieldArgs = @{
-  Upstream = 'C:/path/to/profile/AppData/Local/Temp/qdcxx-003-qd'
+  Upstream = 'C:/src/qd-reference'
   JavaHome = 'C:/Program Files/Zulu/zulu-8'
-  Maven = 'C:/path/to/profile/.m2/wrapper/dists/apache-maven-3.9.16/0daed3be3ebd1c706f0e69e8b07c6b73f5cc4ea3dfce72a8d0ec2e849ca2ddb0/bin/mvn.cmd'
-  Inspector = 'C:/qd-cxx/.work/naming-final-msvc/Release/qdcxx-qtp-inspect.exe'
+  Maven = 'C:/tools/apache-maven-3.9.16/bin/mvn.cmd'
+  Inspector = 'C:/src/qd-cxx/.work/naming-final-msvc/Release/qdcxx-qtp-inspect.exe'
 }
-pwsh -NoProfile -File tools/format/Format-Java.ps1 -Mode Format -JavaHome C:/path/to/profile/.jdks/openjdk-23.0.2
-pwsh -NoProfile -File tools/format/Format-Java.ps1 -Mode Check -JavaHome C:/path/to/profile/.jdks/openjdk-23.0.2
+pwsh -NoProfile -File tools/format/Format-Java.ps1 -Mode Format -JavaHome C:/tools/jdk-23
+pwsh -NoProfile -File tools/format/Format-Java.ps1 -Mode Check -JavaHome C:/tools/jdk-23
 & tools/upstream/field-types-oracle/Invoke-Oracle.ps1 @fieldArgs -RunDirectory .work/field-types-a
 & tools/upstream/field-types-oracle/Invoke-Oracle.ps1 @fieldArgs -RunDirectory .work/field-types-b
 & tools/upstream/field-types-oracle/Compare-FieldTypes.ps1 -Actual .work/field-types-a/field-types -Expected .work/field-types-b/field-types
@@ -155,3 +155,18 @@ reviewed set is 287. [Flags validation](../../../tests/conformance/protocol/fiel
 separates Java behavior from selected C++ profile refusals, completed-prefix policy and remaining scope.
 
 
+
+
+## Finite dispatch companion
+
+DescriptorOracle extends this same Capture/Verify workflow to609 artifacts, retaining all287 earlier
+files byte-for-byte. Normal capture has305 artifacts (303 raw tapes,668 observations,57-range UID map);
+a separate bounded child with explicit noHeaderAndFooter has17 artifacts (16 raw tapes,25 observations).
+Actual FileWriter/FileReader covers all four families with NONE/MESSAGE; controlled descriptor/control/EOF
+mutations are separate. Raw random synthetic endpoint UIDs remain intact with per-run hashes. Only57
+structurally source-identified UID ranges are normalized in memory during comparison; every other byte
+and the map shape must match. Headerless16 tapes are byte-exact. No new maintained launcher/dependency.
+The existing negative workflow now checks50 mutations (42 prior and8 dispatch). See
+[dispatch validation](../../../tests/conformance/protocol/field-types/DISPATCH-VALIDATION.md) and
+[manifest](../../../tests/fixtures/encoding/field-types/dispatch-captures.json). Historical sections
+above retain their original subset counts and source hashes.

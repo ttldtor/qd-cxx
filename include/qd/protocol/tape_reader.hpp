@@ -10,8 +10,11 @@ namespace org::ttldtor::qdcxx::protocol {
 enum class TapeMode {
     LEGACY,           ///< Restricted untimed STREAM_DATA behavior.
     RAW_MESSAGE_V1,   ///< Bounded RAW_DATA with MESSAGE heartbeats; see RAW-TAPE.
-    BINARY_CATALOG_V1 ///< Partial opt-in: restricted STREAM grammar with indexed schemas and active replacements.
+    BINARY_CATALOG_V1 ///< Explicit finite binary families, descriptor deltas and self-described headerless input.
 };
+
+/** Explicit broader discovery, independent from the unchanged ordinary constructor. */
+enum class TapeDiscovery { BINARY_CATALOG_V1 };
 
 /** Fixed-size owning timing state shared by all records in one data result. */
 struct TapeTiming {
@@ -46,8 +49,9 @@ struct TapeLimits {
     ContextLimits context;           ///< Schema and retained descriptions/actions/names.
     std::size_t constructionUnits; ///< Cumulative construction units; discovery also charges raw payload/context work.
     StreamDataLimits data;         ///< Aggregate file work/output bounds and per-symbol bounds.
-    std::size_t timingEvents = 0;  ///< RAW metadata attempts: explicit heartbeats and data frames; zero is finite.
-    std::size_t snapshotUnits = 0; ///< New-mode simultaneous schema/description/context metadata units; zero is finite.
+    std::size_t timingEvents = 0; ///< RAW/broad metadata attempts: explicit heartbeats and data frames; zero is finite.
+    std::size_t snapshotUnits =
+        0; ///< Broad schema/description/context/descriptor/temporary peak units; zero is finite.
 };
 /** Terminal categories, independent of Java exception classes. */
 enum class TapeError {
@@ -85,6 +89,8 @@ struct TapeDescriptor {
     std::optional<std::u16string> options; ///< Exact accepted option text; absent differs from empty.
     std::optional<std::u16string> time;    ///< Exact accepted timing text, without case normalization.
     bool explicitRawSend = false;          ///< Whether the send set explicitly contained RAW_DATA.
+    bool explicitTickerSend = false;       ///< Effective known TICKER_DATA declaration.
+    bool explicitHistorySend = false;      ///< Effective known HISTORY_DATA declaration.
 };
 
 /** First error and exact separate framing/payload positions. */
@@ -165,9 +171,10 @@ class TapeReader {
      * @param schema Borrowed validated schema, copied before returning.
      * @param limits Mandatory finite bounds; invalid configuration throws invalid_argument.
      * @param mode Explicit container policy; default preserves the original untimed behavior.
-     * BINARY_CATALOG_V1 requires BINARY_FIELDS_V1 and finite snapshotUnits; it currently keeps
-     * restricted STREAM/NONE with absent/empty/hs options, known data flags and REMOVE_EVENT,
-     * indexed metadata and atomic active replacements. Other families and FIELD remain refused.
+     * BINARY_CATALOG_V1 requires BINARY_FIELDS_V1 and finite snapshotUnits; it selects generic
+     * RAW/TICKER/STREAM/HISTORY, known descriptor deltas, self-described headerless input,
+     * NONE/MESSAGE timing, known flags/removal time and immutable active replacements.
+     * Indexed metadata stays caller-proven; FIELD and unknown descriptor/control features are refused.
      * Indexed local schemas are refused by both older modes.
      * Allocation failure before input may throw bad_alloc.
      */
@@ -180,13 +187,20 @@ class TapeReader {
      * BINARY_CATALOG_V1 is refused; broader discovery is not selected through this constructor.
      */
     explicit TapeReader(TapeLimits limits, TapeMode mode = TapeMode::LEGACY);
+    /** Discover exact binary fields without inferring indexed metadata from wire names.
+     * @param limits Explicit finite parsing, payload, snapshot and construction bounds; zero stays zero.
+     * @param discovery Explicit binary policy; invalid values throw invalid_argument before input.
+     * Pre-input allocation can throw bad_alloc. Every discovered record hasTime=false.
+     */
+    explicit TapeReader(TapeLimits limits, TapeDiscovery discovery);
     /** Accept up to one envelope; caller resubmits any unaccepted suffix.
      * @param input Borrowed bytes, not retained by reference.
      * @return Owned event/prefix and exact accepted count; terminal failures accept zero later.
      */
     [[nodiscard]] TapeFeedResult feed(std::span<const std::byte> input);
     /** Declare actual EOF; idempotent, no recovery.
-     * @return FINISHED only for clean EOF after the header; otherwise FAILED.
+     * @return FINISHED only for clean EOF after an accepted header or, in broad mode, a committed
+     * nonempty description batch. Empty batches, markers and heartbeats alone do not authenticate EOF.
      */
     TapeStatus finish() noexcept;
 
@@ -198,7 +212,9 @@ class TapeReader {
     }
 
     /** Inspect accepted descriptor.
-     * @return Immutable owning header storage or absent before acceptance.
+     * @return Borrowed owning header storage or absent before acceptance. Descriptor/text views
+     * expire on successful descriptor publication, move, assignment or destruction; failed updates
+     * preserve addresses. Descriptor-only updates do not invalidate schema/context views.
      */
     [[nodiscard]] const std::optional<TapeDescriptor> &descriptor() const noexcept {
         return descriptor_;

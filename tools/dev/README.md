@@ -148,3 +148,15 @@ bounded processes and negative checks. Windows working modes require PowerShell,
 and an explicit native UTC runner; help is portable. It is independent of native configure/build/CTest.
 Its launcher, help regression and process-lifetime regression scripts document their parameters,
 outputs, exit codes and side effects with `-Help` and `Get-Help -Full`.
+
+## Ordinary real-tape acceptance
+
+The [real-tape comparator](../upstream/real-tape-acceptance/README.md) checks complete native
+version-7 projections and the strictly validated old-eight-type ordinary subset of explicit version8
+against the locked production Java reader. CppMode selects native projection independently from the
+Java NONE/MESSAGE source-time policy; flags must be0 and removal absent. Its maintained
+acceptance and process-ownership checks are documented beside the comparator. Windows working
+modes require an explicit native UTC runner, JDK 8, a prebuilt locked producer and a native
+inspector; help needs no working input. Exact child stdout/stderr remain separate raw files.
+The named ordinary corpus, including both actual STREAM/MESSAGE producers, passed complete acceptance.
+Additional payloads/flags/collectors are outside this comparator; its exact scope is documented beside it.

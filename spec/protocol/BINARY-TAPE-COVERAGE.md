@@ -2,7 +2,7 @@
 
 [Русская версия](BINARY-TAPE-COVERAGE.ru.md). English is authoritative.
 
-Status: technical contract for final review; broader implementation and acceptance are pending.
+Status: finite field/session/dispatch implementation; remaining time/container/lifecycle and full-catalog acceptance are pending.
 The [decision](../../docs/decisions/ADR-0004-broad-binary-tape-reading.md),
 [71-row support matrix](../../tests/fixtures/protocol/real-tape/support-matrix.tsv) and
 [verification contracts](../../tests/conformance/protocol/real-tape/CONTRACTS.md) define the same target.
@@ -42,10 +42,10 @@ RMI operations and transport are outside this target. Private recording contents
 | `TapeMode::RAW_MESSAGE_V1` | Existing RAW/MESSAGE policy, selected local profile, zero data flags | Unchanged |
 | Ordinary wire discovery | Existing exact ordinary types, append-only IDs and strict repeated-sender refusal | Unchanged |
 | `BINARY_FIELDS_V1` | 19 exact read-only identities; ordinary and explicit indexed local records | Bounded fields/indexed subset implemented |
-| `TapeMode::BINARY_CATALOG_V1` | STREAM/NONE, absent/empty/hs, known flags/removal time and atomic active descriptions | Partial opt-in implementation; other families/options/flags remain pending |
+| `TapeMode::BINARY_CATALOG_V1` | Four generic families, NONE/MESSAGE/headerless, known descriptors/options/flags/removal and immutable generations | Finite opt-in implemented; FIELD/containers/chains remain separate |
 
-The core field profile and separate partial protocol mode are explicit selections. The current
-[indexed contract](../schema/INDEXED-SCHEMAS.md) defines their implemented subset. No existing constructor/default
+The core field profile and separate protocol mode are explicit selections. The current
+[indexed contract](../schema/INDEXED-SCHEMAS.md) and [message policy](BINARY-MESSAGES.md) define the finite subset. No existing constructor/default
 starts broader discovery, accepts indexed layouts or enables new container semantics implicitly.
 The initial broader reader can use an explicitly supplied validated local schema. Any new broader
 discovery entry must be explicit and cannot reconstruct `hasTime` from record names.
@@ -186,23 +186,23 @@ layouts project the time into their local words; other missing ordinary values k
 The existing SymbolValue already carries raw flags; no duplicate flags member is introduced.
 Builtin FIELD event metadata remains pending QDCXX-046 and is refused until implemented.
 
-The bounded implementation uses `decodeStreamDataWithEventPolicy` and supplied-schema
-BINARY_CATALOG_V1 for STREAM/NONE only. Both pins have actual all 64-subset observations in each
-Java family, with six original FileWriter/FileReader files including full TimeAndSale; this
-does not enable other C++ container families. Absent/empty/exact hs are accepted; unknown,
-duplicate and whitespace option tokens are explicitly refused. Old modes and payload entry
-points remain zero-flags only. Old formatter grammars refuse nonzero flags or any removalTime
-before buffering, including removalTime0; explicit zero-prefix byte counts preserve old output.
-
+The bounded implementation uses `decodeStreamDataWithEventPolicy` under explicit BINARY_CATALOG_V1
+for RAW/TICKER/STREAM/HISTORY with NONE/MESSAGE metadata. Supplied indexed layouts remain explicit;
+a distinct TapeDiscovery constructor discovers ordinary binary fields without hasTime inference.
+Both pins retain actual all64-subset flag observations and the original TimeAndSale evidence.
+Absent/empty/exact hs are accepted; unknown/duplicate/whitespace option tokens are refused.
+Old modes and payload entry points remain zero-only. Old formatter grammars refuse nonzero flags
+or any removalTime before buffering, including0; explicit zero prefixes preserve old output.
+See [BINARY-MESSAGES](BINARY-MESSAGES.md) and [dispatch validation](../../tests/conformance/protocol/field-types/DISPATCH-VALIDATION.md).
 ## Message and descriptor policy
 
 | IDs | Target behavior |
 | --- | --- |
-| 5 RAW_DATA, 10 TICKER_DATA, 15 STREAM_DATA, 20 HISTORY_DATA | One generic wire-record sequence with original family identity; 10/20 pending 045 |
-| 0 HEARTBEAT | Existing bounded metadata policy; broader variants require explicit evidence |
-| 1 DESCRIBE_PROTOCOL | DXP3 properties, send/receive descriptors and optional endpoint tail; exact broader policy pending 045 |
+| 5 RAW_DATA, 10 TICKER_DATA, 15 STREAM_DATA, 20 HISTORY_DATA | Shared charged decoding, one wire-record sequence and original family identity |
+| 0 HEARTBEAT | Empty/timestamp-only metadata with aggregate timingEvents; other variants refused |
+| 1 DESCRIBE_PROTOCOL | Known DXP3 full/delta subset; unknown/receive/valid endpoint extensions explicitly refused |
 | 2 DESCRIBE_RECORDS | Exact field descriptions and reviewed generation policy |
-| 3 DESCRIBE_RESERVED | Pending bounded ignore policy; no records emitted |
+| 3 DESCRIBE_RESERVED | Bounded ignore event; no records or state reset |
 | 4 PART | Unsupported reassembly feature |
 | 11/12/16/17/21/22 | Unsupported subscription payload operations |
 | 49/50/51/52/53/54/55/56 | Unsupported RMI payload operations |
@@ -215,18 +215,18 @@ Shared charged decoding must serve the four data families without changing exist
 `decodeStreamData`/`decodeRawData` contracts. RAW does not fan out into three C++ collector callbacks.
 Wire order does not promise Java collector delivery order.
 
-The normal binary descriptor is DXP3, not the text-token representation. QDCXX-045 must probe
-optional endpoint tails, unknown properties/message descriptors and repeated descriptor deltas
-before selecting bounded preserve/ignore/refuse behavior. Malformed counts, strings, magic or
-tails fail; a late descriptor failure cannot turn a valid prefix into complete success.
+The normal descriptor is binary DXP3. Both pins characterize tails, properties and repeated deltas.
+Known properties/sends and deltas are accepted within finite old+candidate+temporary limits; valid
+unknown properties/message descriptors, nonempty receives and endpoint extensions use selected
+UNSUPPORTED diagnostics. Malformed examined primitives/magic/tails fail separately; a late failure
+cannot authenticate completion. The exact grammar and resource formula are in BINARY-MESSAGES.
 
-Headerless **self-described binary** is pending an actual FileWriter positive in 045 and is enabled
-only by the new mode. Every data sender must still be described before use. The selected policy
-does not require a heartbeat footer when all frames end cleanly. CSV/BLOB bare formats are separate
-nonbinary formats. `schemeKnown`, `readAs`, heuristic resynchronization, ignore/continue/cycle
-policies and implicit numeric local IDs are outside this target. Valid Java alternatives are refused
-explicitly; malformed input is terminal with the documented completed prefix and exact coordinates.
-
+Headerless self-described binary has actual FileWriter positive evidence and is enabled only by
+this explicit mode. Every data sender still needs a prior description. Clean EOF needs an accepted
+header or committed nonempty description batch, with no mandatory footer. Empty descriptions,
+markers and heartbeats alone do not authenticate EOF. CSV/BLOB are nonbinary alternatives;
+schemeKnown/readAs/resync/ignore/continue/cycle and implicit numeric local IDs remain excluded.
+Valid Java alternatives are refused explicitly; completed-prefix/error coordinates remain exact.
 ## Future gates and acceptance
 
 NONE and the existing MESSAGE subset remain existing bounded capabilities. FIELD (046), LONG/TEXT

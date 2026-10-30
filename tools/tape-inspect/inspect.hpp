@@ -86,4 +86,15 @@ int inspect(std::istream &input, std::ostream &output, std::ostream &diagnostic,
 int inspectWire(std::istream &input, std::ostream &output, std::ostream &diagnostic, Limits limits,
                 inspect::OutputFormat format = inspect::OutputFormat::TSV, unsigned diagnosticsVersion = 2,
                 protocol::TapeMode mode = protocol::TapeMode::LEGACY);
+/** Inspect explicit broader discovery with lossless output8 and caller-supplied finite bounds.
+ * @param input Borrowed binary source; owner close is outside this synchronous call.
+ * @param output Bounded LF destination; success also requires final flush and exit0.
+ * @param diagnostic Error destination.
+ * @param limits Explicit finite budgets, including payload and snapshot capacity.
+ * @param format Safe TSV or HUMAN presentation.
+ * @param diagnosticsVersion Existing diagnostic grammar.
+ * @return Zero only after physical EOF, reader finish, all writes and flush succeed.
+ */
+int inspectBinaryWire(std::istream &input, std::ostream &output, std::ostream &diagnostic, Limits limits,
+                      inspect::OutputFormat format = inspect::OutputFormat::TSV, unsigned diagnosticsVersion = 2);
 } // namespace org::ttldtor::qdcxx::tape_inspect

@@ -31,6 +31,57 @@ void *operator new(std::size_t size) {
     throw std::bad_alloc();
 }
 
+TEST_CASE("descriptor delta allocation failures retain prior text addresses schema identity and work") {
+    const auto delta = [](char16_t unit) {
+        std::vector<std::byte> body{std::byte{'D'}, std::byte{'X'}, std::byte{'P'}, std::byte{'3'}};
+        compact(body, 1);
+        text(body, u"version");
+        text(body, std::u16string(128, unit));
+        compact(body, 0);
+        compact(body, 0);
+
+        return frame(1, body);
+    };
+    const auto first = delta(u'A');
+    const auto replacement = delta(u'B');
+    std::size_t failures = 0;
+    std::size_t chargedFailures = 0;
+    bool succeeded = false;
+
+    for (std::ptrdiff_t checkpoint = 0; checkpoint < 64; ++checkpoint) {
+        p::TapeReader reader(schema(), limits(), p::TapeMode::BINARY_CATALOG_V1);
+        accept(reader, header());
+        accept(reader, first);
+        const auto *prior = reader.descriptor()->version->data();
+        const auto identity = reader.schema().recordContext(0);
+        const auto before = reader.constructionUnits();
+        allocationFailAfter = checkpoint;
+        const auto result = reader.feed(replacement);
+        allocationFailAfter = -1;
+        CHECK(reader.schema().recordContext(0).matches(identity));
+        CHECK(reader.constructionUnits() >= before);
+
+        if (result.status == p::TapeStatus::EVENT) {
+            succeeded = true;
+            break;
+        }
+
+        ++failures;
+
+        if (reader.constructionUnits() > before) {
+            ++chargedFailures;
+        }
+
+        CHECK(reader.diagnostic().error == p::TapeError::ALLOCATION_FAILURE);
+        CHECK(reader.descriptor()->version->data() == prior);
+        CHECK(*reader.descriptor()->version == std::u16string(128, u'A'));
+    }
+
+    CHECK(succeeded);
+    CHECK(failures > 0);
+    CHECK(chargedFailures > 0);
+}
+
 /** Route ordinary arrays through the same test-only checkpoint.
  * @param size Requested bytes.
  * @return Owned storage or bad_alloc.
@@ -204,11 +255,12 @@ TEST_CASE("constructor work is finite and rebuild storms cannot refund or retain
 
 TEST_CASE("exact schema staging and replacement peak units are finite and preserve rollback") {
     // Independent contract arithmetic: S=28, empty C=4, D=23, active C=9.
-    // First peak is old32 + candidate23 + new S28 + new C9 =92.
-    // Replacement peak is old60 + raw23 + old candidate23 + replacement copy23 =129.
+    // The effective NONE/empty-options descriptor contributes seven retained units.
+    // First peak is old32 + header7 + candidate23 + new S28 + new C9 =99.
+    // Replacement peak is old60 + header7 + raw23 + old candidate23 + replacement copy23 =136.
     constexpr std::size_t INITIAL_UNITS = 32;
-    constexpr std::size_t FIRST_PEAK = 92;
-    constexpr std::size_t REPLACEMENT_PEAK = 129;
+    constexpr std::size_t FIRST_PEAK = 99;
+    constexpr std::size_t REPLACEMENT_PEAK = 136;
     const auto local = schema();
     const std::array batch{description()};
     const auto wire = descriptions(batch);
@@ -269,7 +321,8 @@ TEST_CASE("exact schema staging and replacement peak units are finite and preser
 
 TEST_CASE("exact work boundaries include constructor parse validation copy and final rebuild") {
     // The full72 field type occupies two compact bytes: payload work is29, not28.
-    constexpr std::size_t FIRST_WORK = 148;
+    // Header work is payload46 + candidate1 + property text reservations30 + message name13 =90.
+    constexpr std::size_t FIRST_WORK = 238;
     constexpr std::size_t REPLACEMENT_WORK = 139;
     const auto local = schema();
     const std::array batch{description()};

@@ -161,15 +161,15 @@ Both existing tape modes keep their descriptor, flags, timing, terminal-error an
 Earlier type exclusions below describe the older profiles; only this explicit profile extends them.
 No Profile event adapter, indexed schema, importer or implicit discovery is added.
 
-## Partial catalog mode with indexed generations
+## Catalog mode with indexed generations
 
-The supplied-schema constructor now explicitly accepts BINARY_CATALOG_V1 only with
-BINARY_FIELDS_V1 and finite snapshotUnits. Its current header/data grammar is the same
-restricted BINARY/NONE/STREAM_DATA subset, accepting absent/empty/exact `hs` options and
-all known data flag subsets of 0x5f through the explicit catalog event policy. Old LEGACY/RAW_MESSAGE_V1
-behavior and ordinary discovery remain unchanged; the discovery constructor refuses the
-new mode. Other families, headerless input, other options/flags, FIELD and source chains remain pending.
-
+The supplied-schema constructor accepts BINARY_CATALOG_V1 only with BINARY_FIELDS_V1 and finite
+snapshotUnits. It supports the selected RAW/TICKER/STREAM/HISTORY, NONE/MESSAGE and self-described
+headerless policy in [BINARY-MESSAGES](BINARY-MESSAGES.md), with known flags/removalTime and atomic
+active descriptions. Old LEGACY/RAW_MESSAGE_V1 behavior and ordinary discovery remain unchanged.
+The old ordinary constructor refuses the new mode; explicit TapeDiscovery::BINARY_CATALOG_V1
+selects ordinary binary-field discovery without indexed-layout inference. Other options/flags,
+FIELD and source chains remain refused or pending their separate contracts.
 Unknown/duplicate/whitespace option tokens are UNSUPPORTED/OPTIONS; absent and empty remain distinct
 in the owned descriptor. Nonzero known flags are accepted even without hs advertisement, matching
 the production reader rather than the composer mask. Unknown raw bits fail before sender ID with
@@ -192,3 +192,11 @@ completed-prefix behavior and separate payload ownership budgets retain their co
 both production pins and the deliberately stronger C++ rollback policy.
 
 
+
+
+## Explicit finite binary catalog
+
+[BINARY-MESSAGES](BINARY-MESSAGES.md) defines the completed explicit broad policy: distinct
+TapeDiscovery constructor, four source families, known descriptor deltas, self-described headerless
+input, shared finite payload/metadata work and actual nonempty generation publication. The ordinary/legacy contracts above remain unchanged. FIELD and unsupported descriptor/control features stay refused. Borrowed native inspection
+proves read/EOF/finish/write/flush, without an owner close-before-complete guarantee.
