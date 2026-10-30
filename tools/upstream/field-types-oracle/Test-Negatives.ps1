@@ -11,6 +11,7 @@ $mutations=@('type','value','unit','null-empty','order','record','arity','missin
 $mutations+=@('indexed-time','indexed-slot','indexed-lookup','indexed-last-winner','indexed-missing','indexed-binary')
 $mutations+=@('flags-value','flags-removal-time','flags-byte-count','flags-projection','flags-mask','flags-missing','flags-binary','flags-option')
 $mutations+=@('dispatch-canonical','dispatch-family','dispatch-time','dispatch-binary','dispatch-uid-offset','dispatch-uid-length','dispatch-uid-outside','dispatch-headerless')
+$mutations+=@('field-raw-time','field-sequence','field-projection','field-order','field-business','field-completion','field-unknown','field-binary','field-extra','field-standard-time','field-standard-slot','field-standard-binary')
 $results=[Collections.Generic.List[object]]::new()
 foreach($mutation in $mutations){
     $dir=Join-Path $root $mutation
@@ -21,6 +22,7 @@ foreach($mutation in $mutations){
     Copy-Item -LiteralPath (Join-Path $expected 'indexed') -Destination $dir -Recurse
     Copy-Item -LiteralPath (Join-Path $expected 'flags') -Destination $dir -Recurse
     Copy-Item -LiteralPath (Join-Path $expected 'dispatch') -Destination $dir -Recurse
+    Copy-Item -LiteralPath (Join-Path $expected 'field-time') -Destination $dir -Recurse
     $path=Join-Path $dir 'mixed-stream.tsv';$rows=[IO.File]::ReadAllLines($path)
     switch($mutation){
         'type' {$rows[3]=$rows[3].Replace("`t40`t","`t8`t")}
@@ -173,6 +175,45 @@ foreach($mutation in $mutations){
                 $target=Join-Path $normal 'endpoint-valid.qtp';$offset=[int]$range[1]-1
             }else{$target=Join-Path $normal 'writer-NONE-15.qtp';$offset=0}
             $bytes=[IO.File]::ReadAllBytes($target);$bytes[$offset]=$bytes[$offset] -bxor 1;[IO.File]::WriteAllBytes($target,$bytes)
+        }
+    }
+    if($mutation.StartsWith('field-')) {
+        $leaf=Join-Path $dir 'field-time'
+        if($mutation -ceq 'field-standard-binary') {
+            $target=Join-Path $leaf 'standard-indexed.qtp';$bytes=[IO.File]::ReadAllBytes($target)
+            $bytes[$bytes.Length-2]=$bytes[$bytes.Length-2] -bxor 1;[IO.File]::WriteAllBytes($target,$bytes)
+        } elseif($mutation -cin @('field-standard-time','field-standard-slot')) {
+            $target=Join-Path $leaf 'standard.tsv';$lines=[IO.File]::ReadAllLines($target)
+            if($mutation -ceq 'field-standard-slot'){$lines[1]=$lines[1].Replace("`t56`t","`t8`t")}
+            else{$cells=$lines[16].Split("`t");$cells[3]='1';$lines[16]=$cells -join "`t"}
+            [IO.File]::WriteAllLines($target,$lines)
+        } elseif($mutation -ceq 'field-binary') {
+            $target=Join-Path $leaf 'pair.qtp';$bytes=[IO.File]::ReadAllBytes($target)
+            $bytes[$bytes.Length-1]=$bytes[$bytes.Length-1] -bxor 1;[IO.File]::WriteAllBytes($target,$bytes)
+        } elseif($mutation -ceq 'field-extra') {
+            [IO.File]::WriteAllText((Join-Path $leaf 'unexpected.tsv'),"unexpected`n")
+        } elseif($mutation -ceq 'field-unknown') {
+            $target=Join-Path $leaf 'observations.tsv';$content=[IO.File]::ReadAllText($target)
+            $changed=$content.Replace('java.lang.NullPointerException','none')
+            if($changed -ceq $content){throw 'FIELD unknown mutation target absent'}
+            [IO.File]::WriteAllText($target,$changed)
+        } else {
+            $target=Join-Path $leaf 'canonical.tsv';$lines=[IO.File]::ReadAllLines($target)
+            if($mutation -ceq 'field-completion') {$lines=$lines[0..($lines.Count-2)]}
+            else {
+                $index=[Array]::FindIndex($lines,[Predicate[string]]{param($line)$line.StartsWith("record`tpair`t15`t0`t")})
+                if($index -lt 0){throw 'FIELD canonical mutation target absent'}
+                $cells=$lines[$index].Split("`t")
+                switch($mutation) {
+                    'field-raw-time' {$cells[5]='1'}
+                    'field-sequence' {$cells[6]='absent'}
+                    'field-projection' {$cells[7]='1'}
+                    'field-order' {$cells[3]='1'}
+                    'field-business' {$cells[9]='1'}
+                }
+                $lines[$index]=$cells -join "`t"
+            }
+            [IO.File]::WriteAllLines($target,$lines)
         }
     }
     $failed=$false

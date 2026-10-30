@@ -2,6 +2,11 @@
 
 [Русская версия](BINARY-MESSAGES.ru.md). English is authoritative.
 
+The additional required `FieldTimePolicy::READ` constructor argument selects the finite
+[FIELD contract](TAPE-TIME.md). Existing signatures stay DISABLED: none of the default descriptor,
+binding, output or removal behavior below implicitly enables FIELD. READ retains separate raw
+metadata and MESSAGE state, and adds finite fixed ownership/construction charges.
+
 `TapeMode::BINARY_CATALOG_V1` explicitly selects this policy. The existing LEGACY,
 RAW_MESSAGE_V1 and ordinary-v1 discovery policies retain their acceptance, defaults and output.
 The [coverage catalog](BINARY-TAPE-COVERAGE.md) and

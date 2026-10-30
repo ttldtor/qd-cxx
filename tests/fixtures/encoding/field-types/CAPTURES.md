@@ -2,6 +2,13 @@
 
 [Русская версия](CAPTURES.ru.md). English is authoritative.
 
+The additional [FIELD manifest](field-time-captures.json) records29 immutable artifacts per pin,
+115 generic plus5 actual standard indexed source records,469 labelled projection deliveries,
+final-source capture/repeat, full638 governed Verify and62 rejected verifier mutations. Existing609
+expectations remain unchanged. See the paired
+[FIELD validation](../../../conformance/protocol/field-types/FIELD-TIME-VALIDATION.md) for ownership,
+configuration precedence, raw versus projected values and the intentional safe unknown-skip difference.
+
 The [82 expected artifacts](expected/) were copied unchanged from clean capture A and reproduced
 byte-for-byte by clean capture B. Both runs rebuilt the locked upstream reactor and verified the
 unchanged old tape baseline first. No timestamp/path/byte normalization or upstream.lock change

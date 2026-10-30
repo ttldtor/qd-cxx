@@ -146,6 +146,8 @@ class TapeReader {
     std::size_t payloadWorkBytes_ = 0;
     std::size_t ownedPayloadBytes_ = 0;
     TapeTiming timing_;
+    FieldTimePolicy fieldTimePolicy_ = FieldTimePolicy::DISABLED;
+    std::size_t ownedFieldTimeRecords_ = 0;
     std::size_t timingEvents_ = 0;
     /** Set the first failure.
      * @param error Category.
@@ -179,6 +181,13 @@ class TapeReader {
      * Allocation failure before input may throw bad_alloc.
      */
     TapeReader(const core::LocalSchema &schema, TapeLimits limits, TapeMode mode = TapeMode::LEGACY);
+    /** Select FIELD recognition explicitly without changing the original constructor defaults.
+     * @param schema Borrowed validated BINARY_FIELDS_V1 declarations, copied before returning.
+     * @param limits Finite parsing, work and owned metadata bounds.
+     * @param mode READ requires BINARY_CATALOG_V1; invalid configuration throws invalid_argument.
+     * @param fieldTimePolicy Explicit prefix policy; invalid enum values fail before input.
+     */
+    TapeReader(const core::LocalSchema &schema, TapeLimits limits, TapeMode mode, FieldTimePolicy fieldTimePolicy);
     /** Explicitly discover ordinary exact fields from accepted descriptions; see WIRE-INVENTORY.
      * Starts with an empty EXTENDED_FIELDS_V1 schema. Invalid configuration throws
      * invalid_argument; allocation before input may throw bad_alloc. Single-threaded.
@@ -193,6 +202,12 @@ class TapeReader {
      * Pre-input allocation can throw bad_alloc. Every discovered record hasTime=false.
      */
     explicit TapeReader(TapeLimits limits, TapeDiscovery discovery);
+    /** Discover ordinary binary fields while retaining virtual FIELD prefixes separately.
+     * @param limits Finite parsing, construction and owned metadata bounds; zero stays zero.
+     * @param discovery Explicit binary discovery policy.
+     * @param fieldTimePolicy Explicit prefix policy; invalid values throw invalid_argument before input.
+     */
+    TapeReader(TapeLimits limits, TapeDiscovery discovery, FieldTimePolicy fieldTimePolicy);
     /** Accept up to one envelope; caller resubmits any unaccepted suffix.
      * @param input Borrowed bytes, not retained by reference.
      * @return Owned event/prefix and exact accepted count; terminal failures accept zero later.
@@ -333,6 +348,13 @@ class TapeReader {
      */
     [[nodiscard]] std::size_t ownedPayloadBytes() const noexcept {
         return ownedPayloadBytes_;
+    }
+
+    /** Inspect cumulative fixed FIELD metadata ownership.
+     * @return Completed owners across all returned data families, without refunds.
+     */
+    [[nodiscard]] std::size_t ownedFieldTimeRecords() const noexcept {
+        return ownedFieldTimeRecords_;
     }
 
     /** Inspect reconstruction work.

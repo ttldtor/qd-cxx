@@ -775,7 +775,8 @@ public final class FieldTypesOracle {
                 && (args[1].equals("scalar-only")
                     || args[1].equals("object-only")
                     || args[1].equals("indexed-only")
-                    || args[1].equals("flags-only"))),
+                    || args[1].equals("flags-only")
+                    || args[1].equals("field-time-only"))),
         "new output directory required");
     Path root = Paths.get(args[0]);
     Files.createDirectory(root);
@@ -786,8 +787,10 @@ public final class FieldTypesOracle {
         ObjectFieldsOracle.capture(root);
       } else if (args[1].equals("indexed-only")) {
         IndexedSchemasOracle.capture(root);
-      } else {
+      } else if (args[1].equals("flags-only")) {
         FlagsOracle.capture(root);
+      } else {
+        FieldTimeOracle.capture(root);
       }
       return;
     }
@@ -804,6 +807,7 @@ public final class FieldTypesOracle {
     IndexedSchemasOracle.capture(Files.createDirectory(root.resolve("indexed")));
     FlagsOracle.capture(Files.createDirectory(root.resolve("flags")));
     DescriptorOracle.capture(Files.createDirectories(root.resolve("dispatch")).resolve("normal"));
+    FieldTimeOracle.capture(Files.createDirectories(root.resolve("field-time")));
     System.out.println(
         "CAPTURE COMPLETE: exact field types, original Profile and production paths");
   }

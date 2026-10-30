@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/protocol/tape_reader.hpp"
 #include "../core/schema_validation.hpp"
+#include "field_time_binding.hpp"
 #include "session_budget.hpp"
 
 #include <algorithm>
@@ -67,6 +68,7 @@ class DescriptorParser {
     std::span<const std::byte> payload_;
     TapeDescriptorLimits limits_;
     TapeMode mode_;
+    FieldTimePolicy fieldTimePolicy_;
     TapeDiagnostic &position_;
     std::size_t cursor_ = 0;
     std::size_t units_ = 0;
@@ -221,10 +223,11 @@ class DescriptorParser {
      * @param limits Finite text/collection bounds.
      * @param position Diagnostic checkpoints updated during examination.
      * @param mode Explicit container policy.
+     * @param fieldTimePolicy Explicit finite FIELD recognition policy.
      */
     DescriptorParser(std::span<const std::byte> payload, TapeDescriptorLimits limits, TapeDiagnostic &position,
-                     TapeMode mode)
-        : payload_(payload), limits_(limits), mode_(mode), position_(position) {
+                     TapeMode mode, FieldTimePolicy fieldTimePolicy)
+        : payload_(payload), limits_(limits), mode_(mode), fieldTimePolicy_(fieldTimePolicy), position_(position) {
     }
 
     /** Parse the selected broad full/delta grammar with old/candidate/temporary accounting.
@@ -286,7 +289,9 @@ class DescriptorParser {
                 target = &candidate.options;
             } else {
                 if (*value.value != u"NONE" && *value.value != u"none" && *value.value != u"MESSAGE" &&
-                    *value.value != u"message") {
+                    *value.value != u"message" &&
+                    !(fieldTimePolicy_ == FieldTimePolicy::READ &&
+                      (*value.value == u"FIELD" || *value.value == u"field"))) {
                     reject(TapeError::UNSUPPORTED, TapeRejection::TIME);
                 }
 
@@ -606,8 +611,8 @@ std::optional<std::size_t> descriptionUnits(std::span<const WireRecordDescriptio
  * @return C, or no value on overflow/excess.
  */
 std::optional<std::size_t> contextUnits(const core::LocalSchema &schema,
-                                        std::span<const WireRecordDescription> descriptions,
-                                        std::size_t maximum) noexcept {
+                                        std::span<const WireRecordDescription> descriptions, std::size_t maximum,
+                                        FieldTimePolicy fieldTimePolicy = FieldTimePolicy::DISABLED) noexcept {
     UnitCount count(maximum);
 
     for (const auto &record : schema.records()) {
@@ -618,6 +623,7 @@ std::optional<std::size_t> contextUnits(const core::LocalSchema &schema,
     for (const auto &description : descriptions) {
         count.add(1);
         count.add(description.fields.size());
+        count.add(fieldTimePolicy == FieldTimePolicy::READ ? 2 : 0);
 
         for (const auto &local : schema.records()) {
             if (local.name == description.name) {
@@ -653,10 +659,9 @@ std::size_t initialSessionUnits(const core::LocalSchema &schema, const TapeLimit
 /** Build the append-only logical name/type registry for explicit binary discovery.
  * Retired declarations remain in the validated schema and in every schema/metadata bound.
  */
-std::expected<core::LocalSchema, TapeError> discoverBinarySchema(const core::LocalSchema &previous,
-                                                                 std::span<const WireRecordDescription> incoming,
-                                                                 const TapeLimits &limits,
-                                                                 detail::SessionBudget &budget) {
+std::expected<core::LocalSchema, TapeError>
+discoverBinarySchema(const core::LocalSchema &previous, std::span<const WireRecordDescription> incoming,
+                     const TapeLimits &limits, detail::SessionBudget &budget, FieldTimePolicy fieldTimePolicy) {
     const auto old = schemaUnits(previous, limits.snapshotUnits);
 
     if (!old || !budget.admit(*old - 1)) {
@@ -702,7 +707,10 @@ std::expected<core::LocalSchema, TapeError> discoverBinarySchema(const core::Loc
             local = records.end() - 1;
         }
 
-        for (const auto &field : description.fields) {
+        const auto metadataFields =
+            fieldTimePolicy == FieldTimePolicy::READ ? detail::eventTimeFieldCount(description) : 0;
+
+        for (const auto &field : std::span(description.fields).subspan(metadataFields)) {
             if (!core::supportsSerialType(field.serialTypeId, core::LocalProfile::BINARY_FIELDS_V1)) {
                 return std::unexpected(TapeError::UNSUPPORTED);
             }
@@ -760,9 +768,16 @@ std::expected<core::LocalSchema, TapeError> discoverBinarySchema(const core::Loc
  * @param schema Validated caller-owned local schema.
  * @param limits Finite constructor bounds.
  * @param mode Explicit protocol policy.
+ * @param fieldTimePolicy Explicit prefix policy, validated before any owning allocation.
  * @return Bounded owning schema; constructor exceptions occur before any input.
  */
-core::LocalSchema initializeSchema(const core::LocalSchema &schema, const TapeLimits &limits, TapeMode mode) {
+core::LocalSchema initializeSchema(const core::LocalSchema &schema, const TapeLimits &limits, TapeMode mode,
+                                   FieldTimePolicy fieldTimePolicy) {
+    if ((fieldTimePolicy != FieldTimePolicy::DISABLED && fieldTimePolicy != FieldTimePolicy::READ) ||
+        (fieldTimePolicy == FieldTimePolicy::READ && mode != TapeMode::BINARY_CATALOG_V1)) {
+        throw std::invalid_argument("invalid field time policy");
+    }
+
     if (mode != TapeMode::BINARY_CATALOG_V1) {
         for (const auto &record : schema.records()) {
             if (record.hasTime || record.indexedTimeLayout) {
@@ -840,7 +855,15 @@ std::int64_t TapeTiming::eventTimeMs() const noexcept {
 }
 
 TapeReader::TapeReader(const core::LocalSchema &schema, TapeLimits limits, TapeMode mode)
-    : limits_(limits), mode_(mode), schema_(initializeSchema(schema, limits, mode)), framer_(limits.frame) {
+    : TapeReader(schema, limits, mode, FieldTimePolicy::DISABLED) {
+}
+
+TapeReader::TapeReader(const core::LocalSchema &schema, TapeLimits limits, TapeMode mode,
+                       FieldTimePolicy fieldTimePolicy)
+    : limits_(limits), mode_(mode), schema_(initializeSchema(schema, limits, mode, fieldTimePolicy)),
+      framer_(limits.frame) {
+    fieldTimePolicy_ = fieldTimePolicy;
+
     if (mode_ != TapeMode::LEGACY && mode_ != TapeMode::RAW_MESSAGE_V1 && mode_ != TapeMode::BINARY_CATALOG_V1) {
         throw std::invalid_argument("invalid tape mode");
     }
@@ -850,7 +873,7 @@ TapeReader::TapeReader(const core::LocalSchema &schema, TapeLimits limits, TapeM
         snapshotUnits_ = construction_;
     }
 
-    auto empty = StreamDataContext::create(schema_, {}, limits_.context);
+    auto empty = StreamDataContext::createWithFieldTimePolicy(schema_, {}, limits_.context, fieldTimePolicy_);
 
     if (!empty) {
         if (empty.error() == BindingError::ALLOCATION_FAILURE) {
@@ -883,7 +906,15 @@ TapeReader::TapeReader(TapeLimits limits, TapeMode mode)
 }
 
 TapeReader::TapeReader(TapeLimits limits, TapeDiscovery discovery)
+    : TapeReader(limits, discovery, FieldTimePolicy::DISABLED) {
+}
+
+TapeReader::TapeReader(TapeLimits limits, TapeDiscovery discovery, FieldTimePolicy fieldTimePolicy)
     : limits_(limits), mode_(TapeMode::BINARY_CATALOG_V1), schema_([&] {
+          if (fieldTimePolicy != FieldTimePolicy::DISABLED && fieldTimePolicy != FieldTimePolicy::READ) {
+              throw std::invalid_argument("invalid field time policy");
+          }
+
           if (discovery != TapeDiscovery::BINARY_CATALOG_V1) {
               throw std::invalid_argument("invalid discovery policy");
           }
@@ -905,9 +936,10 @@ TapeReader::TapeReader(TapeLimits limits, TapeDiscovery discovery)
           return std::move(*empty);
       }()),
       framer_(limits.frame) {
+    fieldTimePolicy_ = fieldTimePolicy;
     construction_ = 1;
     snapshotUnits_ = 1;
-    auto empty = StreamDataContext::create(schema_, {}, limits.context);
+    auto empty = StreamDataContext::createWithFieldTimePolicy(schema_, {}, limits.context, fieldTimePolicy_);
 
     if (!empty) {
         if (empty.error() == BindingError::ALLOCATION_FAILURE) {
@@ -1193,7 +1225,7 @@ void TapeReader::replaceDescriptions(std::span<const std::byte> payload) {
     std::optional<core::LocalSchema> nextSchema;
 
     if (discoverSchema_) {
-        auto discovered = discoverBinarySchema(schema_, parsed.descriptions, limits_, budget);
+        auto discovered = discoverBinarySchema(schema_, parsed.descriptions, limits_, budget, fieldTimePolicy_);
 
         if (!discovered) {
             if (discovered.error() == TapeError::UNSUPPORTED) {
@@ -1226,6 +1258,7 @@ void TapeReader::replaceDescriptions(std::span<const std::byte> payload) {
         UnitCount temporaryCount(ceiling);
         temporaryCount.add(1);
         temporaryCount.add(incoming.fields.size());
+        temporaryCount.add(fieldTimePolicy_ == FieldTimePolicy::READ ? 2 : 0);
         const auto temporaryUnits = temporaryCount.result();
 
         if (!temporaryUnits || !budget.admit(*temporaryUnits)) {
@@ -1236,7 +1269,9 @@ void TapeReader::replaceDescriptions(std::span<const std::byte> payload) {
 
         {
             // Validate every wire-order entry, including an intermediate entry later overwritten.
-            auto validated = bindRecord(incoming, nextSchema ? *nextSchema : schema_, limits_.context.bindings);
+            auto validated = detail::bindRecordWithPrefix(
+                incoming, nextSchema ? *nextSchema : schema_, limits_.context.bindings,
+                fieldTimePolicy_ == FieldTimePolicy::READ ? detail::eventTimeFieldCount(incoming) : 0);
 
             if (!validated) {
                 if (validated.error() == BindingError::UNSUPPORTED_PROFILE) {
@@ -1307,7 +1342,7 @@ void TapeReader::replaceDescriptions(std::span<const std::byte> payload) {
         nextSchema.emplace(std::move(*copied));
     }
 
-    const auto nextContextUnits = contextUnits(*nextSchema, candidate, ceiling);
+    const auto nextContextUnits = contextUnits(*nextSchema, candidate, ceiling, fieldTimePolicy_);
 
     if (!nextContextUnits || !budget.admit(*nextContextUnits)) {
         fail(TapeError::RESOURCE_LIMIT, "construction");
@@ -1315,7 +1350,8 @@ void TapeReader::replaceDescriptions(std::span<const std::byte> payload) {
         return;
     }
 
-    auto nextContext = StreamDataContext::create(*nextSchema, candidate, limits_.context);
+    auto nextContext =
+        StreamDataContext::createWithFieldTimePolicy(*nextSchema, candidate, limits_.context, fieldTimePolicy_);
 
     if (!nextContext) {
         if (nextContext.error() == BindingError::UNSUPPORTED_PROFILE) {
@@ -1369,7 +1405,7 @@ void TapeReader::dispatch(TapeFeedResult &result) {
             return;
         }
 
-        DescriptorParser parser(frame.payload, limits_.descriptor, diagnostic_, mode_);
+        DescriptorParser parser(frame.payload, limits_.descriptor, diagnostic_, mode_, fieldTimePolicy_);
         try {
             auto candidate = parser.parseCatalog(descriptor_, budget);
             const auto old = descriptor_ ? descriptorUnits(*descriptor_) : 0;
@@ -1392,7 +1428,7 @@ void TapeReader::dispatch(TapeFeedResult &result) {
             return;
         }
 
-        DescriptorParser parser(frame.payload, limits_.descriptor, diagnostic_, mode_);
+        DescriptorParser parser(frame.payload, limits_.descriptor, diagnostic_, mode_, fieldTimePolicy_);
         try {
             descriptor_ = parser.parse();
         } catch (const DescriptorFailure &failure) {
@@ -1619,11 +1655,25 @@ void TapeReader::dispatch(TapeFeedResult &result) {
     budget.payloadEncodedBytes -= payloadEncodedBytes_;
     budget.payloadWorkBytes -= payloadWorkBytes_;
     budget.ownedPayloadBytes -= ownedPayloadBytes_;
+    budget.ownedFieldTimeRecords -= ownedFieldTimeRecords_;
+
+    if constexpr (sizeof(std::size_t) > sizeof(std::uint64_t)) {
+        budget.processedRecords = std::min(
+            budget.processedRecords, static_cast<std::size_t>(std::numeric_limits<std::uint64_t>::max()) - records_);
+    }
+
     auto decoded =
         mode_ == TapeMode::RAW_MESSAGE_V1 ? decodeRawData(frame.payload, *context_, budget)
         : mode_ == TapeMode::BINARY_CATALOG_V1
             ? decodeStreamDataWithEventPolicy(frame.payload, *context_, budget, DataEventPolicy::BINARY_CATALOG_V1)
             : decodeStreamData(frame.payload, *context_, budget);
+
+    for (auto &record : decoded.records) {
+        if (record.fieldTime) {
+            record.fieldTime->sourceOrdinal += static_cast<std::uint64_t>(records_);
+        }
+    }
+
     records_ += decoded.processedRecords;
     fields_ += decoded.wireFields;
     fieldBytes_ += decoded.fieldBytes;
@@ -1632,6 +1682,7 @@ void TapeReader::dispatch(TapeFeedResult &result) {
     payloadEncodedBytes_ += decoded.payloadEncodedBytes;
     payloadWorkBytes_ += decoded.payloadWorkBytes;
     ownedPayloadBytes_ += decoded.ownedPayloadBytes;
+    ownedFieldTimeRecords_ += decoded.ownedFieldTimeRecords;
 
     for (const auto &r : decoded.records) {
         values_ += r.values.size() + r.typedValues.size();

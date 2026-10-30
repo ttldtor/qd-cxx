@@ -367,6 +367,10 @@ std::expected<void, Failure> compose(const protocol::AdmittedTape &admitted, pro
             std::size_t legacyValues = 0;
 
             for (const auto &record : event.records) {
+                if (record.fieldTime.has_value()) {
+                    return std::unexpected(fail(5, "second-metadata", "UNSUPPORTED_FIELD_TIME"));
+                }
+
                 if (record.removalTime.has_value()) {
                     return std::unexpected(fail(5, "second-metadata", "UNSUPPORTED_REMOVAL_TIME"));
                 }

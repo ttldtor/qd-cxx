@@ -43,6 +43,7 @@ RMI operations and transport are outside this target. Private recording contents
 | Ordinary wire discovery | Existing exact ordinary types, append-only IDs and strict repeated-sender refusal | Unchanged |
 | `BINARY_FIELDS_V1` | 19 exact read-only identities; ordinary and explicit indexed local records | Bounded fields/indexed subset implemented |
 | `TapeMode::BINARY_CATALOG_V1` | Four generic families, NONE/MESSAGE/headerless, known descriptors/options/flags/removal and immutable generations | Finite opt-in implemented; FIELD/containers/chains remain separate |
+| `FieldTimePolicy::READ` | Exact raw leading EventTime/full56 and optional EventSequence/full72 with separate physical REMOVE prefix | Explicit binary-catalog selection; old signatures remain DISABLED; see TAPE-TIME |
 
 The core field profile and separate protocol mode are explicit selections. The current
 [indexed contract](../schema/INDEXED-SCHEMAS.md) and [message policy](BINARY-MESSAGES.md) define the finite subset. No existing constructor/default
@@ -179,12 +180,18 @@ data families, including combinations a normal writer filters. Bit0x20 is reserv
 0x80 is not a data-writer flag; other bits are outside this profile. Raw parser acceptance of such
 bits is recorded separately from selected C++ refusal. No snapshot/transaction collector is added.
 
-REMOVE_EVENT changes the payload grammar: special builtin event fields, then one compact-long
-record time; ordinary fields are omitted. A trailing optional `removalTime` on the owned record
+REMOVE_EVENT changes the payload grammar: under explicit FIELD READ, all leading effective Event*
+actions, including ordinary business fields, precede one compact-long record time; later ordinary
+fields keep defaults. DISABLED retains its previous time-only removal handling. Optional `removalTime` on the owned record
 preserves this exact time without confusing it with FIELD event-time metadata. Configured indexed
 layouts project the time into their local words; other missing ordinary values keep fresh defaults.
 The existing SymbolValue already carries raw flags; no duplicate flags member is introduced.
-Builtin FIELD event metadata remains pending QDCXX-046 and is refused until implemented.
+Builtin FIELD event metadata requires the separate explicit READ selection in
+[TAPE-TIME](TAPE-TIME.md). It owns full physical compact-long words and source ordinals separately
+from indexed time and MESSAGE state. Existing constructors remain DISABLED and refuse FIELD text;
+old formatter versions refuse any engaged metadata. The
+[FIELD validation](../../tests/conformance/protocol/field-types/FIELD-TIME-VALIDATION.md) states the
+measured producer pins, resource boundaries and intentional Java unknown-consumer difference.
 
 The bounded implementation uses `decodeStreamDataWithEventPolicy` under explicit BINARY_CATALOG_V1
 for RAW/TICKER/STREAM/HISTORY with NONE/MESSAGE metadata. Supplied indexed layouts remain explicit;
@@ -229,7 +236,7 @@ schemeKnown/readAs/resync/ignore/continue/cycle and implicit numeric local IDs r
 Valid Java alternatives are refused explicitly; completed-prefix/error coordinates remain exact.
 ## Future gates and acceptance
 
-NONE and the existing MESSAGE subset remain existing bounded capabilities. FIELD (046), LONG/TEXT
+NONE, MESSAGE and explicitly selected FIELD READ are bounded capabilities. LONG/TEXT
 sidecars (047), GZIP/ZIP (048), finite split sequences (049) and broader operational streaming (050)
 remain pending. This contract adds no compression dependency, download or new callback/source API.
 Before 048, dependency/license/platform/OFF acquisition, member/entry and CRC/trailer/inflation policies

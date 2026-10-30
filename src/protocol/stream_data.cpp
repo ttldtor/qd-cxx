@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 
 #include "qd/protocol/stream_data.hpp"
+#include "field_time_binding.hpp"
 
 #include "qd/encoding/compact.hpp"
 #include "qd/encoding/utf_char.hpp"
@@ -14,6 +15,24 @@
 #include <utility>
 
 namespace org::ttldtor::qdcxx::protocol {
+std::int64_t FieldEventTime::packed() const noexcept {
+    constexpr unsigned SECOND_SHIFT = 32;
+    const auto seconds = static_cast<std::uint32_t>(rawSeconds);
+    const auto sequence = static_cast<std::uint32_t>(rawSequence.value_or(0));
+
+    return std::bit_cast<std::int64_t>((static_cast<std::uint64_t>(seconds) << SECOND_SHIFT) | sequence);
+}
+
+std::int64_t FieldEventTime::eventTimeMs() const noexcept {
+    constexpr std::int64_t MILLIS_PER_SECOND = 1000;
+    constexpr unsigned MILLIS_SHIFT = 22;
+    constexpr std::uint32_t MILLIS_MASK = 0x3ff;
+    const auto seconds = std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(rawSeconds));
+    const auto sequence = static_cast<std::uint32_t>(rawSequence.value_or(0));
+
+    return static_cast<std::int64_t>(seconds) * MILLIS_PER_SECOND + ((sequence >> MILLIS_SHIFT) & MILLIS_MASK);
+}
+
 StreamDataContext::StreamDataContext(std::vector<StreamRecordPlan> plans,
                                      std::vector<std::vector<core::FieldValue>> defaults,
                                      core::LocalProfile profile) noexcept
@@ -31,6 +50,18 @@ std::span<const core::FieldValue> StreamDataContext::defaults(std::int32_t local
 std::expected<StreamDataContext, BindingError>
 StreamDataContext::create(const core::LocalSchema &schema, std::span<const WireRecordDescription> descriptions,
                           ContextLimits limits) {
+    return createWithFieldTimePolicy(schema, descriptions, limits, FieldTimePolicy::DISABLED);
+}
+
+std::expected<StreamDataContext, BindingError>
+StreamDataContext::createWithFieldTimePolicy(const core::LocalSchema &schema,
+                                             std::span<const WireRecordDescription> descriptions, ContextLimits limits,
+                                             FieldTimePolicy policy) {
+    if ((policy != FieldTimePolicy::DISABLED && policy != FieldTimePolicy::READ) ||
+        (policy == FieldTimePolicy::READ && schema.profile() != core::LocalProfile::BINARY_FIELDS_V1)) {
+        return std::unexpected(BindingError::UNSUPPORTED_PROFILE);
+    }
+
     if (schema.records().size() > limits.schema.records) {
         return std::unexpected(BindingError::RESOURCE_LIMIT);
     }
@@ -82,7 +113,8 @@ StreamDataContext::create(const core::LocalSchema &schema, std::span<const WireR
                 }
             }
 
-            auto bound = bindRecord(description, schema, limits.bindings);
+            const auto metadataFields = policy == FieldTimePolicy::READ ? detail::eventTimeFieldCount(description) : 0;
+            auto bound = detail::bindRecordWithPrefix(description, schema, limits.bindings, metadataFields);
 
             if (!bound) {
                 return std::unexpected(bound.error());
@@ -115,7 +147,9 @@ StreamDataContext::create(const core::LocalSchema &schema, std::span<const WireR
                 }
             }
 
-            plans.push_back({std::move(*bound), count, std::move(recordContext), std::move(indexedLayout)});
+            plans.push_back({std::move(*bound), count, std::move(recordContext), std::move(indexedLayout),
+                             metadataFields,
+                             policy == FieldTimePolicy::READ ? detail::removalPrefixFieldCount(description) : 0});
         }
 
         return StreamDataContext(std::move(plans), std::move(defaults), schema.profile());
@@ -461,7 +495,8 @@ StreamDataResult decodeDataPayload(std::span<const std::byte> payload, const Str
             result.stage = StreamDataStage::RECORD;
             result.errorOffset = result.consumed;
 
-            if (limits.processedRecords == 0) {
+            if (limits.processedRecords == 0 || result.processedRecords == std::numeric_limits<std::size_t>::max() ||
+                !std::in_range<std::uint64_t>(result.processedRecords)) {
                 result.status = StreamDataStatus::RESOURCE_LIMIT;
 
                 return result;
@@ -543,7 +578,8 @@ StreamDataResult decodeDataPayload(std::span<const std::byte> payload, const Str
 
             if (plan->binding.localRecordId) {
                 if (limits.emittedRecords == 0 || plan->localFieldCount > limits.emittedValues ||
-                    symbol.value->units.size() > limits.ownedSymbolUnits) {
+                    symbol.value->units.size() > limits.ownedSymbolUnits ||
+                    (plan->eventTimeFieldCount != 0 && limits.ownedFieldTimeRecords == 0)) {
                     result.status = StreamDataStatus::RESOURCE_LIMIT;
 
                     return result;
@@ -558,25 +594,15 @@ StreamDataResult decodeDataPayload(std::span<const std::byte> payload, const Str
             }
 
             std::optional<std::int64_t> removalTime;
+            std::optional<FieldEventTime> fieldTime;
             auto fieldActions = std::span<const FieldBinding>(plan->binding.fields);
+            const bool removed = (flags & REMOVE_EVENT) != 0;
 
-            if ((flags & REMOVE_EVENT) != 0) {
-                result.stage = StreamDataStage::REMOVAL_TIME;
-                result.errorOffset = result.consumed;
-                const auto time = encoding::readCompactLong(payload.subspan(result.consumed));
-                result.consumed += time.consumed;
-
-                if (time.status != encoding::Status::OK) {
-                    result.status = StreamDataStatus::TRUNCATED_PAYLOAD;
-
-                    return result;
-                }
-
-                removalTime = time.value;
-                applyRemovalTime(typedValues, plan->indexedTimeLayout, time.value);
-                // The special time is bounded by record/input allowances, not descriptor-field work.
-                fieldActions = {};
+            if (removed) {
+                fieldActions = fieldActions.first(plan->removalPrefixFieldCount);
             }
+
+            std::size_t fieldIndex = 0;
 
             for (const auto &field : fieldActions) {
                 result.stage = StreamDataStage::FIELD;
@@ -595,7 +621,25 @@ StreamDataResult decodeDataPayload(std::span<const std::byte> payload, const Str
                 std::optional<std::vector<std::byte>> bytes;
                 std::size_t retainedPayloadBytes = 0;
 
-                if (field.type == core::SerialFieldType::UTF_CHAR_ARRAY) {
+                if (fieldIndex < plan->eventTimeFieldCount) {
+                    const auto value = encoding::readCompactLong(payload.subspan(result.consumed));
+                    result.consumed += value.consumed;
+
+                    if (value.status != encoding::Status::OK) {
+                        result.status = StreamDataStatus::TRUNCATED_PAYLOAD;
+
+                        return result;
+                    }
+
+                    if (plan->binding.localRecordId) {
+                        if (fieldIndex == 0) {
+                            fieldTime = FieldEventTime{
+                                value.value, {}, static_cast<std::uint64_t>(result.processedRecords - 1)};
+                        } else {
+                            fieldTime->rawSequence = value.value;
+                        }
+                    }
+                } else if (field.type == core::SerialFieldType::UTF_CHAR_ARRAY) {
                     const encoding::CharArrayLimits allowance{
                         std::min(limits.fieldString.encodedBytes, limits.fieldBytes),
                         std::min({limits.fieldString.codeUnits, limits.fieldUnits,
@@ -697,6 +741,24 @@ StreamDataResult decodeDataPayload(std::span<const std::byte> payload, const Str
                         values[*field.targetFieldId] = static_cast<std::int32_t>(raw);
                     }
                 }
+
+                ++fieldIndex;
+            }
+
+            if (removed) {
+                result.stage = StreamDataStage::REMOVAL_TIME;
+                result.errorOffset = result.consumed;
+                const auto time = encoding::readCompactLong(payload.subspan(result.consumed));
+                result.consumed += time.consumed;
+
+                if (time.status != encoding::Status::OK) {
+                    result.status = StreamDataStatus::TRUNCATED_PAYLOAD;
+
+                    return result;
+                }
+
+                removalTime = time.value;
+                applyRemovalTime(typedValues, plan->indexedTimeLayout, time.value);
             }
 
             result.stage = StreamDataStage::OUTPUT;
@@ -705,7 +767,13 @@ StreamDataResult decodeDataPayload(std::span<const std::byte> payload, const Str
             if (plan->binding.localRecordId) {
                 const auto units = symbol.value->units.size();
                 result.records.push_back({*plan->binding.localRecordId, std::move(*symbol.value), std::move(values),
-                                          std::move(typedValues), plan->context, id.value, removalTime});
+                                          std::move(typedValues), plan->context, id.value, removalTime, fieldTime});
+
+                if (fieldTime) {
+                    --limits.ownedFieldTimeRecords;
+                    ++result.ownedFieldTimeRecords;
+                }
+
                 --limits.emittedRecords;
                 limits.emittedValues -= plan->localFieldCount;
                 limits.ownedSymbolUnits -= units;

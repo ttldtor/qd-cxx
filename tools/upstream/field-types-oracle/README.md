@@ -170,3 +170,25 @@ The existing negative workflow now checks50 mutations (42 prior and8 dispatch). 
 [dispatch validation](../../../tests/conformance/protocol/field-types/DISPATCH-VALIDATION.md) and
 [manifest](../../../tests/fixtures/encoding/field-types/dispatch-captures.json). Historical sections
 above retain their original subset counts and source hashes.
+
+## FIELD event-time companion
+
+The governed invocation additionally compiles `FieldTimeOracle.java` and captures `field-time/`.
+Its29 immutable artifacts retain actual FileWriter FIELD in all four families and standard indexed
+TimeAndSale, direct parser and FileReader configuration projections, designed prefix/high32/overlong
+inputs, MESSAGE heartbeats and requested production composer REMOVE cases. Raw physical metadata is
+labelled separately from delivered cursor packing and ordinary business Time. See
+[TAPE-TIME](../../../spec/protocol/TAPE-TIME.md) and the
+[validation report](../../../tests/conformance/protocol/field-types/FIELD-TIME-VALIDATION.md).
+
+Each pin supplies115 generic plus5 standard source records and469 labelled record deliveries across
+the measured projections. The standard physical-slot table proves the ordinary indexed Time/Sequence
+layout independently of virtual FIELD. The measured Java unknown consumer throws NullPointerException;
+C++ preserves its stronger safe skip contract. No callback-order/fanout parity is inferred.
+
+The internal `FieldTypesOracle <new-directory> field-time-only` entry runs this finite companion on
+an already qualified classpath; it neither rebuilds upstream nor verifies expectations. The ordinary
+governed launcher retains its clean baseline Verify. Full comparisons now cover638 artifacts,
+preserving609 old expectations and the established57-range UID comparison view. New FIELD files are
+byte-exact. Test-Negatives rejects62 mutations, including12 FIELD cases. Source hashes require the
+pinned Java Format then Check gate before new capture/Verify evidence.

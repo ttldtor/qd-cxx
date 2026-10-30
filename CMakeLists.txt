@@ -98,6 +98,12 @@ if(ORG_TTLDTOR_QDCXX_BUILD_TAPE_INSPECT)
 endif()
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(qdcxx_field_time_tape_tests tests/conformance/field_time_tape_tests.cpp)
+    target_link_libraries(qdcxx_field_time_tape_tests PRIVATE qdcxx_protocol doctest::doctest)
+    set_target_properties(qdcxx_field_time_tape_tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME protocol_field_time COMMAND qdcxx_field_time_tape_tests
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/encoding/field-types/expected/field-time"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/encoding/field-types/current-field-time-expected")
     include(FetchContent)
     # Test-only dependency, pinned to the v2.4.12 release archive and its SHA-256.
     FetchContent_Declare(doctest

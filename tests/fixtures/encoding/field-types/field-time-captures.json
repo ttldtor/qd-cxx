@@ -1,0 +1,1095 @@
+{
+  "format": "qdcxx-field-time-captures-v1",
+  "generatedUtc": "2026-10-30T20:00:52.8739108Z",
+  "scope": "Synthetic production FIELD files and labelled designed physical inputs; no private recording",
+  "profile": "explicit FieldTimePolicy::READ with BINARY_CATALOG_V1; old signatures remain DISABLED",
+  "runtime": "Zulu JDK8 Windows x64;128MiB production JVM heap;30s own-process deadline",
+  "allArtifactCount": 638,
+  "historicalArtifactsUnchanged": 609,
+  "fieldArtifacts": 29,
+  "rawFieldTapes": 26,
+  "genericCanonicalSourceRecords": 115,
+  "standardIndexedSourceRecords": 5,
+  "productionRecordDeliveriesPerPin": 469,
+  "genericObservationRows": 616,
+  "standardObservationRows": 27,
+  "rawFieldRepeatAndCrossPinByteEqual": true,
+  "oldDispatchComparisonView": "only57 established random endpoint UID ranges normalized in comparison memory; raw captures unchanged",
+  "governedVerify": {
+    "mode": "Verify",
+    "startUtc": "2026-10-30T19:56:35.9385269Z",
+    "finishUtc": "2026-10-30T19:56:40.839711Z",
+    "lockedCommit": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+    "version": "3.355",
+    "cleanFullReactorBuild": true,
+    "allArtifactCount": 638,
+    "historicalArtifactsUnchanged": 609,
+    "fieldTimeSourceSha256": "514EB43400034CD604C78D8EB8B3BA33E590C96027243DCA43AC651186983AAC",
+    "sourceSha256": "4594AC19CFE909ACC2898A749C52B85E292B5AE7ADC821043B264EF07A42D7FD",
+    "inspectorSha256": "CB0E99178D0A94434D42E1746ECA49F23701C3903EA3298FA4273FE1E06BD5F0",
+    "headerlessExit": 0
+  },
+  "negativeMutations": {
+    "old": 50,
+    "field": 12,
+    "total": 62,
+    "allRejected": true,
+    "unchangedBaselinePassed": true
+  },
+  "tools": [
+    {
+      "path": "tools/upstream/field-types-oracle/Invoke-Oracle.ps1",
+      "sha256": "CF5653A7E0FAA820AC461424AC82818A22D7453F9E68BB762A26E95A34D48155"
+    },
+    {
+      "path": "tools/upstream/field-types-oracle/Compare-FieldTypes.ps1",
+      "sha256": "CF58B8C999F6E8F0FC9D19A14DF8A877B9758333D5DF4AA3C13B615D383A11CB"
+    },
+    {
+      "path": "tools/upstream/field-types-oracle/Test-Negatives.ps1",
+      "sha256": "EE8433D20D60A3A755D82312D7A67BB74603146BEA9289060C4CFD0E1B6FB496"
+    },
+    {
+      "path": "tools/format/google-java-format.lock.json",
+      "sha256": "36B2C6DF8A5B14D8A0FF3A3583ABB160217BA8A4B5B6E96679277A3B6616668A"
+    }
+  ],
+  "productionSources": [
+    {
+      "pin": "baseline",
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/BinaryRecordDesc.java",
+      "sha256": "38591f97045e2bcce4c37befa024a7824bc5f63ae1cd19ddc5af17668563aec9"
+    },
+    {
+      "pin": "baseline",
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/BinaryQTPParser.java",
+      "sha256": "785d4e9fec8129a6b2a6f0e875771e992183c20413614a43e6de3234775c02c8"
+    },
+    {
+      "pin": "baseline",
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/BinaryQTPComposer.java",
+      "sha256": "fd158524cc8b9ebbf63cbc4ba97f6a39e95a0e07368a6589f9a44b0dba1e42da"
+    },
+    {
+      "pin": "baseline",
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/AbstractQTPParser.java",
+      "sha256": "f152ce7dda2cc4fb3589b2b7ab19137a1d334dbe9565baf76f81b6f42a405075"
+    },
+    {
+      "pin": "baseline",
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/AbstractQTPComposer.java",
+      "sha256": "24ab932a300e9bf1c07a9425bef414fa66683a03ae5b21b6aea221961f59ab37"
+    },
+    {
+      "pin": "baseline",
+      "path": "qd-core/src/main/java/com/devexperts/qd/ng/RecordCursor.java",
+      "sha256": "b765e929cc5736432c36661c847151278c9a3f94e352b492818c5456dedb724e"
+    },
+    {
+      "pin": "baseline",
+      "path": "qd-core/src/main/java/com/devexperts/qd/util/TimeSequenceUtil.java",
+      "sha256": "ee1fc453383b8b978693475e80fa22f89ef70b947db637a417e66895f70a8596"
+    },
+    {
+      "pin": "baseline",
+      "path": "qds-file/src/main/java/com/devexperts/qd/qtp/file/FileWriter.java",
+      "sha256": "9e51994733658673e52d2d94af6e66b268720964f42069287efd7d38b48b72e1"
+    },
+    {
+      "pin": "baseline",
+      "path": "qds-file/src/main/java/com/devexperts/qd/qtp/file/FileWriterImpl.java",
+      "sha256": "a42237fe545ae5ee345e1667cc3aed426f0033e8c56e95ad3579a09e9e76d0b0"
+    },
+    {
+      "pin": "baseline",
+      "path": "qds-file/src/main/java/com/devexperts/qd/qtp/file/FileReader.java",
+      "sha256": "6114ca78e3da5de12ae1937a6d0c3184236a49328e8c028934744d4070a56271"
+    },
+    {
+      "pin": "baseline",
+      "path": "qds-file/src/main/java/com/devexperts/qd/qtp/file/FileReaderParams.java",
+      "sha256": "060f4c6157d3ea8aae8b2415eb2bfb01c2f42ea6e174ad355d06ad5388c0ee75"
+    },
+    {
+      "pin": "baseline",
+      "path": "qds-file/src/main/java/com/devexperts/qd/qtp/file/TimestampsType.java",
+      "sha256": "6482e1642ceab6f2898dff81bf0ee6850bd99bc5cd5cf5b915cca60fbb5e5b07"
+    },
+    {
+      "pin": "current",
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/BinaryRecordDesc.java",
+      "sha256": "38591f97045e2bcce4c37befa024a7824bc5f63ae1cd19ddc5af17668563aec9"
+    },
+    {
+      "pin": "current",
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/BinaryQTPParser.java",
+      "sha256": "785d4e9fec8129a6b2a6f0e875771e992183c20413614a43e6de3234775c02c8"
+    },
+    {
+      "pin": "current",
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/BinaryQTPComposer.java",
+      "sha256": "fd158524cc8b9ebbf63cbc4ba97f6a39e95a0e07368a6589f9a44b0dba1e42da"
+    },
+    {
+      "pin": "current",
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/AbstractQTPParser.java",
+      "sha256": "f152ce7dda2cc4fb3589b2b7ab19137a1d334dbe9565baf76f81b6f42a405075"
+    },
+    {
+      "pin": "current",
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/AbstractQTPComposer.java",
+      "sha256": "24ab932a300e9bf1c07a9425bef414fa66683a03ae5b21b6aea221961f59ab37"
+    },
+    {
+      "pin": "current",
+      "path": "qd-core/src/main/java/com/devexperts/qd/ng/RecordCursor.java",
+      "sha256": "b765e929cc5736432c36661c847151278c9a3f94e352b492818c5456dedb724e"
+    },
+    {
+      "pin": "current",
+      "path": "qd-core/src/main/java/com/devexperts/qd/util/TimeSequenceUtil.java",
+      "sha256": "ee1fc453383b8b978693475e80fa22f89ef70b947db637a417e66895f70a8596"
+    },
+    {
+      "pin": "current",
+      "path": "qds-file/src/main/java/com/devexperts/qd/qtp/file/FileWriter.java",
+      "sha256": "9e51994733658673e52d2d94af6e66b268720964f42069287efd7d38b48b72e1"
+    },
+    {
+      "pin": "current",
+      "path": "qds-file/src/main/java/com/devexperts/qd/qtp/file/FileWriterImpl.java",
+      "sha256": "a42237fe545ae5ee345e1667cc3aed426f0033e8c56e95ad3579a09e9e76d0b0"
+    },
+    {
+      "pin": "current",
+      "path": "qds-file/src/main/java/com/devexperts/qd/qtp/file/FileReader.java",
+      "sha256": "6114ca78e3da5de12ae1937a6d0c3184236a49328e8c028934744d4070a56271"
+    },
+    {
+      "pin": "current",
+      "path": "qds-file/src/main/java/com/devexperts/qd/qtp/file/FileReaderParams.java",
+      "sha256": "060f4c6157d3ea8aae8b2415eb2bfb01c2f42ea6e174ad355d06ad5388c0ee75"
+    },
+    {
+      "pin": "current",
+      "path": "qds-file/src/main/java/com/devexperts/qd/qtp/file/TimestampsType.java",
+      "sha256": "6482e1642ceab6f2898dff81bf0ee6850bd99bc5cd5cf5b915cca60fbb5e5b07"
+    }
+  ],
+  "pins": [
+    {
+      "pin": "baseline",
+      "version": "3.355",
+      "commit": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+      "startUtc": "2026-10-30T19:51:49.4087443Z",
+      "finishUtc": "2026-10-30T19:52:24.9191505Z",
+      "qualification": "independent capture/repeat against readonly prebuilt production classes",
+      "classpathRoots": 14,
+      "productionFiles": 1317,
+      "productionInventoryBeforeSha256": "934552DB481417DA833A814DC3C585B51BD57E13189B53DA7FDD74DF1C33285A",
+      "productionInventoryAfterSha256": "934552DB481417DA833A814DC3C585B51BD57E13189B53DA7FDD74DF1C33285A",
+      "classesUnchanged": true,
+      "javaSha256": "9052CBF792CED0C3DFEB8593483DC3AA543B7077B52A49F31FB0E93F2E16BA58",
+      "javacSha256": "633143E961AA18051C09112B85333F5CDBD845B54EB39678EB15B91CA8BBB527",
+      "sources": [
+        {
+          "path": "tools/upstream/field-types-oracle/FieldTypesOracle.java",
+          "sha256": "4594AC19CFE909ACC2898A749C52B85E292B5AE7ADC821043B264EF07A42D7FD"
+        },
+        {
+          "path": "tools/upstream/field-types-oracle/ObjectFieldsOracle.java",
+          "sha256": "07210296E1833A1369B5A816742117DF8E65C28FF99F36E240BEECE28942225A"
+        },
+        {
+          "path": "tools/upstream/field-types-oracle/IndexedSchemasOracle.java",
+          "sha256": "49ECCFD91119AEF2D153D8A292BCA98EC4CE39EC2BA329664150F61A8DCCDA79"
+        },
+        {
+          "path": "tools/upstream/field-types-oracle/FlagsOracle.java",
+          "sha256": "1DA40FD0B42A995A42D5898591ADC5EB3E35FEE99469298B0DBE766C878D5454"
+        },
+        {
+          "path": "tools/upstream/field-types-oracle/DescriptorOracle.java",
+          "sha256": "C82D34B87A9D3F1DEDB73CAA2A0DB1BDA85BEAFF9D5F839FB8114ADFD77F416F"
+        },
+        {
+          "path": "tools/upstream/field-types-oracle/FieldTimeOracle.java",
+          "sha256": "514EB43400034CD604C78D8EB8B3BA33E590C96027243DCA43AC651186983AAC"
+        },
+        {
+          "path": "tools/schema-export/ResolvedSchemaExporter.java",
+          "sha256": "887562383F91E993A83AE48CC63B18B48C38C9F11F504CD2ADDDAEF373F77C72"
+        }
+      ],
+      "harness": [
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\DescriptorOracle.class",
+          "sha256": "ECC60C180EEB024FBFA37567011A998CECB318B8A42DE3AFE29B83AB16AFA9C0"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\DescriptorOracle$Seen.class",
+          "sha256": "6B0761C592DA56982AFDEC4E05791C562432B779BFF456435D5F7D94C04117FE"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\FieldTimeOracle.class",
+          "sha256": "4C6B5C6B61FD90625E971B4D9CE58CD2E50B2F0EFD5B6A3B356DE8E9266EB9BA"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\FieldTimeOracle$1.class",
+          "sha256": "A4520F9D47662F50F33E8EDB4DCDA014E07BE1816DBA8D177601E912BA411AEA"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\FieldTimeOracle$2.class",
+          "sha256": "09E4EF4AC8AF1A44A9BBCD433FD9357D396E9C5CD8FDCA1B94CDB678F2B5B88B"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\FieldTimeOracle$Requested.class",
+          "sha256": "D511B4410D4D69C7D5BFB5F2F03BC0B6284CCF7933798A114747F70BD526DC29"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\FieldTimeOracle$Seen.class",
+          "sha256": "89ADCE340C9C8CB3A5760AE557B8CB399220DA6F2BF48143BD48EF56B6A62B30"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\FieldTypesOracle.class",
+          "sha256": "4ABDD6145A859059A8379D3EF928D5676768490EDBDD7D423101AFAA2B348501"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\FieldTypesOracle$Observer.class",
+          "sha256": "5DCFE7183518B1AC62D06172E708A26FDABEDC7525C961E432138C804C6817ED"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\FieldTypesOracle$Scalars.class",
+          "sha256": "1170B8B351026A5D4D7B30E2FA8EA3E063756C9415CB160DE5FCAB509710F358"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\FieldTypesOracle$Scalars$1.class",
+          "sha256": "91FBA676BF148470ADBF291D5E8ED8F841F05B53BCC45A7BADDFF311114A26B7"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\FieldTypesOracle$Scalars$2.class",
+          "sha256": "7DEB99A5A153FB94E5F2356E6C3576D735C1A3870EE34BD6ABB4FF31B9DD1323"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\FieldTypesOracle$Scalars$Requested.class",
+          "sha256": "47B29B5362FCE7745656DD775392C5EF4DE586F3CC1281D0D44CE65C7DA5A89C"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\FieldTypesOracle$Scalars$Seen.class",
+          "sha256": "9E2372EEEA0CAB99919B4EA961A7936FB0765E9F4988A1E20730A4C551CFEC61"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\FieldTypesOracle$Scalars$Trace.class",
+          "sha256": "11256A80DF1D2A26194B670E67189E91E31B3E31D1B4D7733F6F5821B93A23A4"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\FlagsOracle.class",
+          "sha256": "FE3F028F2D2C676ADD29427E6857FF5A80B71CBA8100E009BEBCC0458B9CBF03"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\FlagsOracle$Parser.class",
+          "sha256": "CE5C057DBCB6014D4E974D7A3E0E058D12CCCEED9D8263CABACEA5B34F1C3085"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\FlagsOracle$ReadDesc.class",
+          "sha256": "84CDEBD239C29A3D37B97B02432F4D6BE122BA5E3F36114C1E27AD42892F54F0"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\FlagsOracle$Seen.class",
+          "sha256": "B1333ED69256AAE1EAC54CC6E2E292867FD7A6D590EB0B13007CB73A6596851B"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\IndexedSchemasOracle.class",
+          "sha256": "911B1C5A060E113AC90B17895A45CFC348013878BC4709E2A4F54CF621DBDDB0"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\IndexedSchemasOracle$1.class",
+          "sha256": "B4C3CBC312C64080B1C9702E12C0F45A81ADDEB401316584BF7A7E990D14D75F"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\IndexedSchemasOracle$2.class",
+          "sha256": "2F66302A3DC14DDE3E5D03F19BAA9CB42A72460BA753190A592B79014D6A177A"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\IndexedSchemasOracle$ObservedDesc.class",
+          "sha256": "5C604FA7FCA3797791A0FDC7D5B91E6287B6D1CFBDBD43CAC8ECCF613DD34198"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\IndexedSchemasOracle$Observer.class",
+          "sha256": "5BA71724DCA93A80D8BEDFC120D27C8A1ACB5200ED37610A6B0CD56F71EC1955"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\IndexedSchemasOracle$Parser.class",
+          "sha256": "74A78C52A9FEDE0A0035CBB586635338D90CFBBD108B219E714D12A31CD6D0B0"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\IndexedSchemasOracle$Requested.class",
+          "sha256": "8D17C1A8EA81F3AB533C7889415AECE85DDC156D8A50B6381B85102A6A06C081"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\IndexedSessionObservations.class",
+          "sha256": "48A7800227652BF55B55BE3F6AE7FD2FE3A3C357D7DA3A3B7AF8D61A94E1AE7E"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\IndexedSessionObservations$Description.class",
+          "sha256": "AE3C7D4596FE259015427B53374B78C2500E8165BAEA4CB6A14ABF9D924410DC"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\IndexedSessionObservations$Observer.class",
+          "sha256": "8BA04F97F94D50CC51161DEED93A3EE74AACF97A1351C43328871EA5B06914DD"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\IndexedSessionObservations$Parser.class",
+          "sha256": "45253A2AE9DDEB7C4C34CA995458F6C88BEE647F6387B0A5458E8159BD037E74"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\ObjectFieldsOracle.class",
+          "sha256": "3A6FD5F709A44CC5A6C82A505293C472B907EB3212FF3C4309543F9CB6A2D8FD"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\ObjectFieldsOracle$1.class",
+          "sha256": "19486F762486A02F8E3B8B1C554EFF367EA1CD27ECA54A303C3CBAA3E70A0877"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\ObjectFieldsOracle$2.class",
+          "sha256": "C7FF73A839A484B5600DE360027AB0E12D9A928BF82C90B0884EDA21E1734E56"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\ObjectFieldsOracle$3.class",
+          "sha256": "534D7AC49C7B2934467CF3C3DA5C228BD28054C1BB1D75B939B7687CFB939476"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\ObjectFieldsOracle$Requested.class",
+          "sha256": "0E80D636D32DD4DDEB2C8CD76D32500C065F445AEEA708485E3959296E06ACEF"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\ObjectFieldsOracle$Seen.class",
+          "sha256": "3E6388A40171CDA44B7FD534C5E05FE528578E104CE51D0534ECE05B3E74B7DA"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\ObjectFieldsOracle$Trace.class",
+          "sha256": "6FBC70681B75725CBFEF34AF428A30F65770505971C3A0E6CFE4F901C0A0C70E"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\schemaexport\\ResolvedSchemaExporter.class",
+          "sha256": "B888E64FDDCB629F5E417051DB8CB2DE3A6485B237A522C4C5336948AE6F6764"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\schemaexport\\ResolvedSchemaExporter$Limits.class",
+          "sha256": "FD2974C3FC996F17DE82C253DF9FAF401DE051D2396043B858A101A5F8F64DFA"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\schemaexport\\ResolvedSchemaExporter$Snapshot.class",
+          "sha256": "4835D237C1CCA4B1B24828E66DB43E722D300431A56887635C7C652398BA34F2"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\schemaexport\\ResolvedSchemaExporter$Writer.class",
+          "sha256": "B7E5C9DDD95412A05A8170339CD8FFB5FAEA5045254E90248F69589999A4D22D"
+        }
+      ],
+      "artifacts": [
+        {
+          "name": "absent.qtp",
+          "bytes": 97,
+          "sha256": "4E148E14E82360973D5EE34AD6AAC793DF8D1950751B92AE5A2C4A753DBE3359",
+          "repeatSha256": "4E148E14E82360973D5EE34AD6AAC793DF8D1950751B92AE5A2C4A753DBE3359",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "alias.qtp",
+          "bytes": 144,
+          "sha256": "8DE7E63A1E2AB8CAFAC32341DF4B2211DB499A7142F924ABFB80FD0A4685ECB2",
+          "repeatSha256": "8DE7E63A1E2AB8CAFAC32341DF4B2211DB499A7142F924ABFB80FD0A4685ECB2",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "canonical.tsv",
+          "bytes": 8731,
+          "sha256": "7C4F03BEECFA86C4D2A96677DB7C685BFD66383CEBCC4E9F661ACB50D74F9F6B",
+          "repeatSha256": "7C4F03BEECFA86C4D2A96677DB7C685BFD66383CEBCC4E9F661ACB50D74F9F6B",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "first-only.qtp",
+          "bytes": 118,
+          "sha256": "9410E5338540559C9EAEF0658528BC6B8AF9276A1AAEFC19BDC24EC0A8E9463E",
+          "repeatSha256": "9410E5338540559C9EAEF0658528BC6B8AF9276A1AAEFC19BDC24EC0A8E9463E",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "heartbeat-FIELD.qtp",
+          "bytes": 239,
+          "sha256": "DFE060173D535F177CF72E7879F8C08213D3C6B3ACE7036A25586A7D42E5093B",
+          "repeatSha256": "DFE060173D535F177CF72E7879F8C08213D3C6B3ACE7036A25586A7D42E5093B",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "heartbeat-MESSAGE.qtp",
+          "bytes": 241,
+          "sha256": "C11DCC8204776EE00D74F0815D3F5CB5662DF49AAD7353C484F41672100A5C2C",
+          "repeatSha256": "C11DCC8204776EE00D74F0815D3F5CB5662DF49AAD7353C484F41672100A5C2C",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "heartbeat-NONE.qtp",
+          "bytes": 238,
+          "sha256": "054B6B8D52F68E136888D90C137F447A20D3816E2D3D38DC339F5B8447CEFB5D",
+          "repeatSha256": "054B6B8D52F68E136888D90C137F447A20D3816E2D3D38DC339F5B8447CEFB5D",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "lowercase.qtp",
+          "bytes": 144,
+          "sha256": "912F9558A74B97FB0EDB844A5C905EA8A5743C4EBC28F3D7F867B7E0B01A2DC3",
+          "repeatSha256": "912F9558A74B97FB0EDB844A5C905EA8A5743C4EBC28F3D7F867B7E0B01A2DC3",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "observations.tsv",
+          "bytes": 39845,
+          "sha256": "E4AED0F7968DFBDFAE1D2A1FE36865FD4EB86DACC9E8322AF8B35B15454E83D8",
+          "repeatSha256": "E4AED0F7968DFBDFAE1D2A1FE36865FD4EB86DACC9E8322AF8B35B15454E83D8",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "overlong-boundaries.qtp",
+          "bytes": 230,
+          "sha256": "CE112D35FE0C048CA67A064BC8C2AD9B8EAE3060FC4B44FF896ED7AC017F72F8",
+          "repeatSha256": "CE112D35FE0C048CA67A064BC8C2AD9B8EAE3060FC4B44FF896ED7AC017F72F8",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "pair.qtp",
+          "bytes": 144,
+          "sha256": "8CEF5629F5CAA9255E8F62CC5D4CDF92239C1BAF7A6A5B80B3D00E38CB3EA43B",
+          "repeatSha256": "8CEF5629F5CAA9255E8F62CC5D4CDF92239C1BAF7A6A5B80B3D00E38CB3EA43B",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "remove-pair.qtp",
+          "bytes": 110,
+          "sha256": "4DDA9A0B1E6B340D0DA83A9270C2B7CC69F4F3D27E4B4E88266A5EE563CE3F56",
+          "repeatSha256": "4DDA9A0B1E6B340D0DA83A9270C2B7CC69F4F3D27E4B4E88266A5EE563CE3F56",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "remove-void-after.qtp",
+          "bytes": 110,
+          "sha256": "4DDA9A0B1E6B340D0DA83A9270C2B7CC69F4F3D27E4B4E88266A5EE563CE3F56",
+          "repeatSha256": "4DDA9A0B1E6B340D0DA83A9270C2B7CC69F4F3D27E4B4E88266A5EE563CE3F56",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "remove-void-before.qtp",
+          "bytes": 91,
+          "sha256": "7705B0DD44C3ECAD6A5FFF8F5431A62935B2B063299CBE0C929C665D8BCDB11C",
+          "repeatSha256": "7705B0DD44C3ECAD6A5FFF8F5431A62935B2B063299CBE0C929C665D8BCDB11C",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "remove-void-between.qtp",
+          "bytes": 100,
+          "sha256": "40AA00180FB8EDC7AF2E1CF828B0A30D3E09FBB24A2F6F5327CE5080DCBED557",
+          "repeatSha256": "40AA00180FB8EDC7AF2E1CF828B0A30D3E09FBB24A2F6F5327CE5080DCBED557",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "remove-wrong-sequence.qtp",
+          "bytes": 100,
+          "sha256": "40AA00180FB8EDC7AF2E1CF828B0A30D3E09FBB24A2F6F5327CE5080DCBED557",
+          "repeatSha256": "40AA00180FB8EDC7AF2E1CF828B0A30D3E09FBB24A2F6F5327CE5080DCBED557",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "remove-wrong-time.qtp",
+          "bytes": 91,
+          "sha256": "7705B0DD44C3ECAD6A5FFF8F5431A62935B2B063299CBE0C929C665D8BCDB11C",
+          "repeatSha256": "7705B0DD44C3ECAD6A5FFF8F5431A62935B2B063299CBE0C929C665D8BCDB11C",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "reordered.qtp",
+          "bytes": 144,
+          "sha256": "2F71148D49FD4BEF1AAEBC52D153F3F3BE77B1E2526B62377D344D2E0EB55F3F",
+          "repeatSha256": "2F71148D49FD4BEF1AAEBC52D153F3F3BE77B1E2526B62377D344D2E0EB55F3F",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "standard-indexed.qtp",
+          "bytes": 458,
+          "sha256": "7EF7624BD12BEC8F4F64BA3D9A4B02BE40ED5FEB4C5FB3CF9F692A17071327BD",
+          "repeatSha256": "7EF7624BD12BEC8F4F64BA3D9A4B02BE40ED5FEB4C5FB3CF9F692A17071327BD",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "standard.tsv",
+          "bytes": 1576,
+          "sha256": "A712B5CE66B4864ABDBAF81BB98E941E27F4E034C700AF2B3827AC2CFA5DB6E0",
+          "repeatSha256": "A712B5CE66B4864ABDBAF81BB98E941E27F4E034C700AF2B3827AC2CFA5DB6E0",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "void-after.qtp",
+          "bytes": 150,
+          "sha256": "946357DC8BA7AA8B8B78711AB4C1DA59816FE77CEE24BA7477C6C26832C3E478",
+          "repeatSha256": "946357DC8BA7AA8B8B78711AB4C1DA59816FE77CEE24BA7477C6C26832C3E478",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "void-before.qtp",
+          "bytes": 150,
+          "sha256": "14046D9D2D8517CC874F1CA0029B760D842C48A18B301F52BCF20B4BFBD8588B",
+          "repeatSha256": "14046D9D2D8517CC874F1CA0029B760D842C48A18B301F52BCF20B4BFBD8588B",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "void-between.qtp",
+          "bytes": 150,
+          "sha256": "D3ECC34D2EF4272ACA9AE58B88EEE7B4E3A33B27EA298E96819B03B7C9FBE7CE",
+          "repeatSha256": "D3ECC34D2EF4272ACA9AE58B88EEE7B4E3A33B27EA298E96819B03B7C9FBE7CE",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "writer-10.qtp",
+          "bytes": 252,
+          "sha256": "8E48C4D29A466839CA9679C105050B7A7A55895DACF9124742DA63840F819ABA",
+          "repeatSha256": "8E48C4D29A466839CA9679C105050B7A7A55895DACF9124742DA63840F819ABA",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "writer-15.qtp",
+          "bytes": 252,
+          "sha256": "4228FEDB35A33DAB720BDAEE7C2F3A1BF101C504CA682177761AF2B0B096FD2A",
+          "repeatSha256": "4228FEDB35A33DAB720BDAEE7C2F3A1BF101C504CA682177761AF2B0B096FD2A",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "writer-20.qtp",
+          "bytes": 253,
+          "sha256": "1BE0E8A99CBC3A147F1FF9641F9888BC674399CD39A992B9AA696496B2B4A8DA",
+          "repeatSha256": "1BE0E8A99CBC3A147F1FF9641F9888BC674399CD39A992B9AA696496B2B4A8DA",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "writer-5.qtp",
+          "bytes": 249,
+          "sha256": "E8832F7B09A1576723201DAF1AEA7F14221160C5BF7DA24A987A9B7010D5E1DE",
+          "repeatSha256": "E8832F7B09A1576723201DAF1AEA7F14221160C5BF7DA24A987A9B7010D5E1DE",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "wrong-sequence.qtp",
+          "bytes": 143,
+          "sha256": "157B47720274970E86681B9CD49DF735BFE149B2A02167D9F901A914C667334A",
+          "repeatSha256": "157B47720274970E86681B9CD49DF735BFE149B2A02167D9F901A914C667334A",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "wrong-time.qtp",
+          "bytes": 143,
+          "sha256": "974AF11D77B003086E6264603488186B067438F5FEA9592A3E28FCF0C93B2ADB",
+          "repeatSha256": "974AF11D77B003086E6264603488186B067438F5FEA9592A3E28FCF0C93B2ADB",
+          "repeatByteEqual": true
+        }
+      ]
+    },
+    {
+      "pin": "current",
+      "version": "3.356",
+      "commit": "f71e4cb390d1586f2d4e3a83d9b9067e3326ef19",
+      "startUtc": "2026-10-30T19:52:47.0881401Z",
+      "finishUtc": "2026-10-30T19:53:22.1802679Z",
+      "qualification": "independent capture/repeat against readonly prebuilt production classes",
+      "classpathRoots": 14,
+      "productionFiles": 1317,
+      "productionInventoryBeforeSha256": "BFD8BF2FE8B753EC05734A1C5E728361D0A8B5026F010B39C4C3C6D2FEB73B46",
+      "productionInventoryAfterSha256": "BFD8BF2FE8B753EC05734A1C5E728361D0A8B5026F010B39C4C3C6D2FEB73B46",
+      "classesUnchanged": true,
+      "javaSha256": "9052CBF792CED0C3DFEB8593483DC3AA543B7077B52A49F31FB0E93F2E16BA58",
+      "javacSha256": "633143E961AA18051C09112B85333F5CDBD845B54EB39678EB15B91CA8BBB527",
+      "sources": [
+        {
+          "path": "tools/upstream/field-types-oracle/FieldTypesOracle.java",
+          "sha256": "4594AC19CFE909ACC2898A749C52B85E292B5AE7ADC821043B264EF07A42D7FD"
+        },
+        {
+          "path": "tools/upstream/field-types-oracle/ObjectFieldsOracle.java",
+          "sha256": "07210296E1833A1369B5A816742117DF8E65C28FF99F36E240BEECE28942225A"
+        },
+        {
+          "path": "tools/upstream/field-types-oracle/IndexedSchemasOracle.java",
+          "sha256": "49ECCFD91119AEF2D153D8A292BCA98EC4CE39EC2BA329664150F61A8DCCDA79"
+        },
+        {
+          "path": "tools/upstream/field-types-oracle/FlagsOracle.java",
+          "sha256": "1DA40FD0B42A995A42D5898591ADC5EB3E35FEE99469298B0DBE766C878D5454"
+        },
+        {
+          "path": "tools/upstream/field-types-oracle/DescriptorOracle.java",
+          "sha256": "C82D34B87A9D3F1DEDB73CAA2A0DB1BDA85BEAFF9D5F839FB8114ADFD77F416F"
+        },
+        {
+          "path": "tools/upstream/field-types-oracle/FieldTimeOracle.java",
+          "sha256": "514EB43400034CD604C78D8EB8B3BA33E590C96027243DCA43AC651186983AAC"
+        },
+        {
+          "path": "tools/schema-export/ResolvedSchemaExporter.java",
+          "sha256": "887562383F91E993A83AE48CC63B18B48C38C9F11F504CD2ADDDAEF373F77C72"
+        }
+      ],
+      "harness": [
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\DescriptorOracle.class",
+          "sha256": "ECC60C180EEB024FBFA37567011A998CECB318B8A42DE3AFE29B83AB16AFA9C0"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\DescriptorOracle$Seen.class",
+          "sha256": "6B0761C592DA56982AFDEC4E05791C562432B779BFF456435D5F7D94C04117FE"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\FieldTimeOracle.class",
+          "sha256": "4C6B5C6B61FD90625E971B4D9CE58CD2E50B2F0EFD5B6A3B356DE8E9266EB9BA"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\FieldTimeOracle$1.class",
+          "sha256": "A4520F9D47662F50F33E8EDB4DCDA014E07BE1816DBA8D177601E912BA411AEA"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\FieldTimeOracle$2.class",
+          "sha256": "09E4EF4AC8AF1A44A9BBCD433FD9357D396E9C5CD8FDCA1B94CDB678F2B5B88B"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\FieldTimeOracle$Requested.class",
+          "sha256": "D511B4410D4D69C7D5BFB5F2F03BC0B6284CCF7933798A114747F70BD526DC29"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\FieldTimeOracle$Seen.class",
+          "sha256": "89ADCE340C9C8CB3A5760AE557B8CB399220DA6F2BF48143BD48EF56B6A62B30"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\FieldTypesOracle.class",
+          "sha256": "4ABDD6145A859059A8379D3EF928D5676768490EDBDD7D423101AFAA2B348501"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\FieldTypesOracle$Observer.class",
+          "sha256": "5DCFE7183518B1AC62D06172E708A26FDABEDC7525C961E432138C804C6817ED"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\FieldTypesOracle$Scalars.class",
+          "sha256": "1170B8B351026A5D4D7B30E2FA8EA3E063756C9415CB160DE5FCAB509710F358"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\FieldTypesOracle$Scalars$1.class",
+          "sha256": "91FBA676BF148470ADBF291D5E8ED8F841F05B53BCC45A7BADDFF311114A26B7"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\FieldTypesOracle$Scalars$2.class",
+          "sha256": "7DEB99A5A153FB94E5F2356E6C3576D735C1A3870EE34BD6ABB4FF31B9DD1323"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\FieldTypesOracle$Scalars$Requested.class",
+          "sha256": "47B29B5362FCE7745656DD775392C5EF4DE586F3CC1281D0D44CE65C7DA5A89C"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\FieldTypesOracle$Scalars$Seen.class",
+          "sha256": "9E2372EEEA0CAB99919B4EA961A7936FB0765E9F4988A1E20730A4C551CFEC61"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\FieldTypesOracle$Scalars$Trace.class",
+          "sha256": "11256A80DF1D2A26194B670E67189E91E31B3E31D1B4D7733F6F5821B93A23A4"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\FlagsOracle.class",
+          "sha256": "FE3F028F2D2C676ADD29427E6857FF5A80B71CBA8100E009BEBCC0458B9CBF03"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\FlagsOracle$Parser.class",
+          "sha256": "CE5C057DBCB6014D4E974D7A3E0E058D12CCCEED9D8263CABACEA5B34F1C3085"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\FlagsOracle$ReadDesc.class",
+          "sha256": "84CDEBD239C29A3D37B97B02432F4D6BE122BA5E3F36114C1E27AD42892F54F0"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\FlagsOracle$Seen.class",
+          "sha256": "B1333ED69256AAE1EAC54CC6E2E292867FD7A6D590EB0B13007CB73A6596851B"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\IndexedSchemasOracle.class",
+          "sha256": "911B1C5A060E113AC90B17895A45CFC348013878BC4709E2A4F54CF621DBDDB0"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\IndexedSchemasOracle$1.class",
+          "sha256": "B4C3CBC312C64080B1C9702E12C0F45A81ADDEB401316584BF7A7E990D14D75F"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\IndexedSchemasOracle$2.class",
+          "sha256": "2F66302A3DC14DDE3E5D03F19BAA9CB42A72460BA753190A592B79014D6A177A"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\IndexedSchemasOracle$ObservedDesc.class",
+          "sha256": "5C604FA7FCA3797791A0FDC7D5B91E6287B6D1CFBDBD43CAC8ECCF613DD34198"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\IndexedSchemasOracle$Observer.class",
+          "sha256": "5BA71724DCA93A80D8BEDFC120D27C8A1ACB5200ED37610A6B0CD56F71EC1955"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\IndexedSchemasOracle$Parser.class",
+          "sha256": "74A78C52A9FEDE0A0035CBB586635338D90CFBBD108B219E714D12A31CD6D0B0"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\IndexedSchemasOracle$Requested.class",
+          "sha256": "8D17C1A8EA81F3AB533C7889415AECE85DDC156D8A50B6381B85102A6A06C081"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\IndexedSessionObservations.class",
+          "sha256": "48A7800227652BF55B55BE3F6AE7FD2FE3A3C357D7DA3A3B7AF8D61A94E1AE7E"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\IndexedSessionObservations$Description.class",
+          "sha256": "AE3C7D4596FE259015427B53374B78C2500E8165BAEA4CB6A14ABF9D924410DC"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\IndexedSessionObservations$Observer.class",
+          "sha256": "8BA04F97F94D50CC51161DEED93A3EE74AACF97A1351C43328871EA5B06914DD"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\IndexedSessionObservations$Parser.class",
+          "sha256": "45253A2AE9DDEB7C4C34CA995458F6C88BEE647F6387B0A5458E8159BD037E74"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\ObjectFieldsOracle.class",
+          "sha256": "3A6FD5F709A44CC5A6C82A505293C472B907EB3212FF3C4309543F9CB6A2D8FD"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\ObjectFieldsOracle$1.class",
+          "sha256": "19486F762486A02F8E3B8B1C554EFF367EA1CD27ECA54A303C3CBAA3E70A0877"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\ObjectFieldsOracle$2.class",
+          "sha256": "C7FF73A839A484B5600DE360027AB0E12D9A928BF82C90B0884EDA21E1734E56"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\ObjectFieldsOracle$3.class",
+          "sha256": "534D7AC49C7B2934467CF3C3DA5C228BD28054C1BB1D75B939B7687CFB939476"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\ObjectFieldsOracle$Requested.class",
+          "sha256": "0E80D636D32DD4DDEB2C8CD76D32500C065F445AEEA708485E3959296E06ACEF"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\ObjectFieldsOracle$Seen.class",
+          "sha256": "3E6388A40171CDA44B7FD534C5E05FE528578E104CE51D0534ECE05B3E74B7DA"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\oracle\\ObjectFieldsOracle$Trace.class",
+          "sha256": "6FBC70681B75725CBFEF34AF428A30F65770505971C3A0E6CFE4F901C0A0C70E"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\schemaexport\\ResolvedSchemaExporter.class",
+          "sha256": "B888E64FDDCB629F5E417051DB8CB2DE3A6485B237A522C4C5336948AE6F6764"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\schemaexport\\ResolvedSchemaExporter$Limits.class",
+          "sha256": "FD2974C3FC996F17DE82C253DF9FAF401DE051D2396043B858A101A5F8F64DFA"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\schemaexport\\ResolvedSchemaExporter$Snapshot.class",
+          "sha256": "4835D237C1CCA4B1B24828E66DB43E722D300431A56887635C7C652398BA34F2"
+        },
+        {
+          "entry": 0,
+          "path": "qdcxx\\schemaexport\\ResolvedSchemaExporter$Writer.class",
+          "sha256": "B7E5C9DDD95412A05A8170339CD8FFB5FAEA5045254E90248F69589999A4D22D"
+        }
+      ],
+      "artifacts": [
+        {
+          "name": "absent.qtp",
+          "bytes": 97,
+          "sha256": "4E148E14E82360973D5EE34AD6AAC793DF8D1950751B92AE5A2C4A753DBE3359",
+          "repeatSha256": "4E148E14E82360973D5EE34AD6AAC793DF8D1950751B92AE5A2C4A753DBE3359",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "alias.qtp",
+          "bytes": 144,
+          "sha256": "8DE7E63A1E2AB8CAFAC32341DF4B2211DB499A7142F924ABFB80FD0A4685ECB2",
+          "repeatSha256": "8DE7E63A1E2AB8CAFAC32341DF4B2211DB499A7142F924ABFB80FD0A4685ECB2",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "canonical.tsv",
+          "bytes": 8731,
+          "sha256": "7C4F03BEECFA86C4D2A96677DB7C685BFD66383CEBCC4E9F661ACB50D74F9F6B",
+          "repeatSha256": "7C4F03BEECFA86C4D2A96677DB7C685BFD66383CEBCC4E9F661ACB50D74F9F6B",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "first-only.qtp",
+          "bytes": 118,
+          "sha256": "9410E5338540559C9EAEF0658528BC6B8AF9276A1AAEFC19BDC24EC0A8E9463E",
+          "repeatSha256": "9410E5338540559C9EAEF0658528BC6B8AF9276A1AAEFC19BDC24EC0A8E9463E",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "heartbeat-FIELD.qtp",
+          "bytes": 239,
+          "sha256": "DFE060173D535F177CF72E7879F8C08213D3C6B3ACE7036A25586A7D42E5093B",
+          "repeatSha256": "DFE060173D535F177CF72E7879F8C08213D3C6B3ACE7036A25586A7D42E5093B",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "heartbeat-MESSAGE.qtp",
+          "bytes": 241,
+          "sha256": "C11DCC8204776EE00D74F0815D3F5CB5662DF49AAD7353C484F41672100A5C2C",
+          "repeatSha256": "C11DCC8204776EE00D74F0815D3F5CB5662DF49AAD7353C484F41672100A5C2C",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "heartbeat-NONE.qtp",
+          "bytes": 238,
+          "sha256": "054B6B8D52F68E136888D90C137F447A20D3816E2D3D38DC339F5B8447CEFB5D",
+          "repeatSha256": "054B6B8D52F68E136888D90C137F447A20D3816E2D3D38DC339F5B8447CEFB5D",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "lowercase.qtp",
+          "bytes": 144,
+          "sha256": "912F9558A74B97FB0EDB844A5C905EA8A5743C4EBC28F3D7F867B7E0B01A2DC3",
+          "repeatSha256": "912F9558A74B97FB0EDB844A5C905EA8A5743C4EBC28F3D7F867B7E0B01A2DC3",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "observations.tsv",
+          "bytes": 39845,
+          "sha256": "E4AED0F7968DFBDFAE1D2A1FE36865FD4EB86DACC9E8322AF8B35B15454E83D8",
+          "repeatSha256": "E4AED0F7968DFBDFAE1D2A1FE36865FD4EB86DACC9E8322AF8B35B15454E83D8",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "overlong-boundaries.qtp",
+          "bytes": 230,
+          "sha256": "CE112D35FE0C048CA67A064BC8C2AD9B8EAE3060FC4B44FF896ED7AC017F72F8",
+          "repeatSha256": "CE112D35FE0C048CA67A064BC8C2AD9B8EAE3060FC4B44FF896ED7AC017F72F8",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "pair.qtp",
+          "bytes": 144,
+          "sha256": "8CEF5629F5CAA9255E8F62CC5D4CDF92239C1BAF7A6A5B80B3D00E38CB3EA43B",
+          "repeatSha256": "8CEF5629F5CAA9255E8F62CC5D4CDF92239C1BAF7A6A5B80B3D00E38CB3EA43B",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "remove-pair.qtp",
+          "bytes": 110,
+          "sha256": "4DDA9A0B1E6B340D0DA83A9270C2B7CC69F4F3D27E4B4E88266A5EE563CE3F56",
+          "repeatSha256": "4DDA9A0B1E6B340D0DA83A9270C2B7CC69F4F3D27E4B4E88266A5EE563CE3F56",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "remove-void-after.qtp",
+          "bytes": 110,
+          "sha256": "4DDA9A0B1E6B340D0DA83A9270C2B7CC69F4F3D27E4B4E88266A5EE563CE3F56",
+          "repeatSha256": "4DDA9A0B1E6B340D0DA83A9270C2B7CC69F4F3D27E4B4E88266A5EE563CE3F56",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "remove-void-before.qtp",
+          "bytes": 91,
+          "sha256": "7705B0DD44C3ECAD6A5FFF8F5431A62935B2B063299CBE0C929C665D8BCDB11C",
+          "repeatSha256": "7705B0DD44C3ECAD6A5FFF8F5431A62935B2B063299CBE0C929C665D8BCDB11C",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "remove-void-between.qtp",
+          "bytes": 100,
+          "sha256": "40AA00180FB8EDC7AF2E1CF828B0A30D3E09FBB24A2F6F5327CE5080DCBED557",
+          "repeatSha256": "40AA00180FB8EDC7AF2E1CF828B0A30D3E09FBB24A2F6F5327CE5080DCBED557",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "remove-wrong-sequence.qtp",
+          "bytes": 100,
+          "sha256": "40AA00180FB8EDC7AF2E1CF828B0A30D3E09FBB24A2F6F5327CE5080DCBED557",
+          "repeatSha256": "40AA00180FB8EDC7AF2E1CF828B0A30D3E09FBB24A2F6F5327CE5080DCBED557",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "remove-wrong-time.qtp",
+          "bytes": 91,
+          "sha256": "7705B0DD44C3ECAD6A5FFF8F5431A62935B2B063299CBE0C929C665D8BCDB11C",
+          "repeatSha256": "7705B0DD44C3ECAD6A5FFF8F5431A62935B2B063299CBE0C929C665D8BCDB11C",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "reordered.qtp",
+          "bytes": 144,
+          "sha256": "2F71148D49FD4BEF1AAEBC52D153F3F3BE77B1E2526B62377D344D2E0EB55F3F",
+          "repeatSha256": "2F71148D49FD4BEF1AAEBC52D153F3F3BE77B1E2526B62377D344D2E0EB55F3F",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "standard-indexed.qtp",
+          "bytes": 458,
+          "sha256": "7EF7624BD12BEC8F4F64BA3D9A4B02BE40ED5FEB4C5FB3CF9F692A17071327BD",
+          "repeatSha256": "7EF7624BD12BEC8F4F64BA3D9A4B02BE40ED5FEB4C5FB3CF9F692A17071327BD",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "standard.tsv",
+          "bytes": 1576,
+          "sha256": "A712B5CE66B4864ABDBAF81BB98E941E27F4E034C700AF2B3827AC2CFA5DB6E0",
+          "repeatSha256": "A712B5CE66B4864ABDBAF81BB98E941E27F4E034C700AF2B3827AC2CFA5DB6E0",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "void-after.qtp",
+          "bytes": 150,
+          "sha256": "946357DC8BA7AA8B8B78711AB4C1DA59816FE77CEE24BA7477C6C26832C3E478",
+          "repeatSha256": "946357DC8BA7AA8B8B78711AB4C1DA59816FE77CEE24BA7477C6C26832C3E478",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "void-before.qtp",
+          "bytes": 150,
+          "sha256": "14046D9D2D8517CC874F1CA0029B760D842C48A18B301F52BCF20B4BFBD8588B",
+          "repeatSha256": "14046D9D2D8517CC874F1CA0029B760D842C48A18B301F52BCF20B4BFBD8588B",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "void-between.qtp",
+          "bytes": 150,
+          "sha256": "D3ECC34D2EF4272ACA9AE58B88EEE7B4E3A33B27EA298E96819B03B7C9FBE7CE",
+          "repeatSha256": "D3ECC34D2EF4272ACA9AE58B88EEE7B4E3A33B27EA298E96819B03B7C9FBE7CE",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "writer-10.qtp",
+          "bytes": 252,
+          "sha256": "8E48C4D29A466839CA9679C105050B7A7A55895DACF9124742DA63840F819ABA",
+          "repeatSha256": "8E48C4D29A466839CA9679C105050B7A7A55895DACF9124742DA63840F819ABA",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "writer-15.qtp",
+          "bytes": 252,
+          "sha256": "4228FEDB35A33DAB720BDAEE7C2F3A1BF101C504CA682177761AF2B0B096FD2A",
+          "repeatSha256": "4228FEDB35A33DAB720BDAEE7C2F3A1BF101C504CA682177761AF2B0B096FD2A",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "writer-20.qtp",
+          "bytes": 253,
+          "sha256": "1BE0E8A99CBC3A147F1FF9641F9888BC674399CD39A992B9AA696496B2B4A8DA",
+          "repeatSha256": "1BE0E8A99CBC3A147F1FF9641F9888BC674399CD39A992B9AA696496B2B4A8DA",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "writer-5.qtp",
+          "bytes": 249,
+          "sha256": "E8832F7B09A1576723201DAF1AEA7F14221160C5BF7DA24A987A9B7010D5E1DE",
+          "repeatSha256": "E8832F7B09A1576723201DAF1AEA7F14221160C5BF7DA24A987A9B7010D5E1DE",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "wrong-sequence.qtp",
+          "bytes": 143,
+          "sha256": "157B47720274970E86681B9CD49DF735BFE149B2A02167D9F901A914C667334A",
+          "repeatSha256": "157B47720274970E86681B9CD49DF735BFE149B2A02167D9F901A914C667334A",
+          "repeatByteEqual": true
+        },
+        {
+          "name": "wrong-time.qtp",
+          "bytes": 143,
+          "sha256": "974AF11D77B003086E6264603488186B067438F5FEA9592A3E28FCF0C93B2ADB",
+          "repeatSha256": "974AF11D77B003086E6264603488186B067438F5FEA9592A3E28FCF0C93B2ADB",
+          "repeatByteEqual": true
+        }
+      ]
+    }
+  ]
+}

@@ -87,6 +87,25 @@ std::array<p::WireRecordDescription, 1> declaration() {
 }
 } // namespace
 
+TEST_CASE("old formatter entrypoints refuse engaged FIELD metadata before row budgets") {
+    auto local = schema();
+    p::StreamDataRecord record{};
+    record.fieldTime = p::FieldEventTime{};
+    const org::ttldtor::qdcxx::events::Profile event{};
+
+    for (const auto format : {view::OutputFormat::TSV, view::OutputFormat::HUMAN}) {
+        for (const auto profile : {view::DisplayProfile::LOCAL_SCHEMA, view::DisplayProfile::ORACLE_SRE_V1,
+                                   view::DisplayProfile::DEFAULT_QUOTE_V1, view::DisplayProfile::ORACLE_FIELD_TYPES_V1,
+                                   view::DisplayProfile::DEFAULT_PROFILE_V1, view::DisplayProfile::EXTERNAL_SCHEMA_V1,
+                                   view::DisplayProfile::WIRE_SCHEMA_V1, view::DisplayProfile::BINARY_CATALOG_V1}) {
+            const view::Formatter formatter(format, profile);
+            CHECK_THROWS_AS(formatter.record(record, u"Pair", 0, 0, 0), std::invalid_argument);
+            CHECK_THROWS_AS(formatter.catalogRecord(record, local, 0, 0, 0, nullptr, 0), std::invalid_argument);
+            CHECK_THROWS_AS(formatter.profileRecord(record, u"Profile", 0, 0, event, 0), std::invalid_argument);
+        }
+    }
+}
+
 TEST_CASE("all four families share owning values flags removal and original envelope identity") {
     std::vector<p::StreamDataRecord> retained;
 

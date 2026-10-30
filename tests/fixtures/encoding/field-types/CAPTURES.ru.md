@@ -2,6 +2,13 @@
 
 [English version](CAPTURES.md). Английский текст является основным.
 
+Дополнительный [FIELD manifest](field-time-captures.json) фиксирует29 неизменяемых артефактов каждого
+pin,115 общих и5 настоящих стандартных индексных source records,469 помеченных projection deliveries,
+capture/repeat на финальном исходнике, full638 governed Verify и62 отклонённые verifier mutations.
+Прежние609 expectations не изменены. Парная
+[валидация FIELD](../../../conformance/protocol/field-types/FIELD-TIME-VALIDATION.ru.md) описывает
+владение, configuration precedence, raw/projected values и намеренно более сильный safe unknown skip.
+
 [82 ожидаемых артефакта](expected/) скопированы без изменений из чистого захвата A и побайтово
 воспроизведены чистым захватом B. Оба запуска сначала пересобрали закреплённый upstream reactor
 и проверили неизменённый прежний tape baseline. Времена/пути/байты не нормализовались,

@@ -8,6 +8,27 @@
 #include "qd/protocol/static_binding.hpp"
 
 namespace org::ttldtor::qdcxx::protocol {
+/** Explicit recognition of finite wire FIELD metadata, independent of descriptor time text. */
+enum class FieldTimePolicy {
+    DISABLED, ///< Preserve ordinary binding and the old explicit FIELD descriptor refusal.
+    READ      ///< Recognize the exact leading EventTime/full56 and optional EventSequence/full72.
+};
+
+/** Owned physical FIELD words with exact Java low-word projections. */
+struct FieldEventTime {
+    std::int64_t rawSeconds = 0;               ///< Physical signed compact-long before low32 projection.
+    std::optional<std::int64_t> rawSequence{}; ///< Absent differs from an explicit zero sequence.
+    std::uint64_t sourceOrdinal = 0;           ///< Zero-based source record attempt, including unknown skips.
+    /** Project low32 seconds and sequence without saturation.
+     * @return Exact signed64 packed cursor bits.
+     */
+    [[nodiscard]] std::int64_t packed() const noexcept;
+    /** Project signed32 seconds and the unsigned ten-bit millisecond subfield.
+     * @return Exact milliseconds, retaining subfield values 1000 through 1023.
+     */
+    [[nodiscard]] std::int64_t eventTimeMs() const noexcept;
+};
+
 /** Finite bounds for building a static snapshot; no caller memory is retained. */
 struct ContextLimits {
     core::SchemaLimits schema; ///< Bounds inspected local schema, including names and lookup storage.
@@ -31,10 +52,12 @@ using ResolvedIndexedTimeLayout = std::variant<ResolvedIndexedTimePairInt32, Res
 
 /** Owned validated plan with the output shape needed after schema destruction. */
 struct StreamRecordPlan {
-    RecordBinding binding;         ///< Owned ordered actions derived only by bindRecord.
+    RecordBinding binding;         ///< Owned ordered exact actions, with explicit virtual-prefix precedence.
     std::size_t localFieldCount;   ///< Number of local logical values, zero for unknown records.
     core::RecordContext context{}; ///< Owned local provenance; invalid for an unknown record.
     std::optional<ResolvedIndexedTimeLayout> indexedTimeLayout{}; ///< Fixed-size owned positions for indexed records.
+    std::size_t eventTimeFieldCount = 0;     ///< Exact recognized raw prefix length, zero through two.
+    std::size_t removalPrefixFieldCount = 0; ///< Exclusive physical action bound before removal time.
 };
 
 /** Immutable static decoding snapshot; not a dynamic session table. */
@@ -59,6 +82,16 @@ class StreamDataContext {
      */
     [[nodiscard]] static std::expected<StreamDataContext, BindingError>
     create(const core::LocalSchema &schema, std::span<const WireRecordDescription> descriptions, ContextLimits limits);
+    /** Build an owned snapshot with explicit virtual-prefix precedence.
+     * @param schema Borrowed validated schema; READ requires BINARY_FIELDS_V1.
+     * @param descriptions Complete borrowed sender declarations, never retained by reference.
+     * @param limits Mandatory finite construction bounds.
+     * @param policy Explicit FIELD recognition; invalid values return UNSUPPORTED_PROFILE.
+     * @return Complete snapshot or an error without publication.
+     */
+    [[nodiscard]] static std::expected<StreamDataContext, BindingError>
+    createWithFieldTimePolicy(const core::LocalSchema &schema, std::span<const WireRecordDescription> descriptions,
+                              ContextLimits limits, FieldTimePolicy policy);
     /** Find a sender plan without ID-indexed allocation.
      * @param senderId Wire identity, distinct from local identity.
      * @return Borrowed immutable plan until context mutation/destruction, or null if undescribed.
@@ -128,6 +161,7 @@ struct StreamDataLimits {
     std::size_t payloadEncodedBytes = 0; ///< Aggregate examined new-payload bytes, including failed reads and skips.
     std::size_t payloadWorkBytes = 0;  ///< Aggregate admitted new-payload body work; no skip/replacement/error refunds.
     std::size_t ownedPayloadBytes = 0; ///< Completed plus current plus temporary new-payload logical storage bytes.
+    std::size_t ownedFieldTimeRecords = 0; ///< Completed plus current fixed FIELD metadata owners; zero stays zero.
 };
 
 /** Owned local record; missing fields contain measured fresh-storage raw zero with their type. */
@@ -139,6 +173,7 @@ struct StreamDataRecord {
     core::RecordContext context{}; ///< Source schema/record identity; old aggregate initializers remain untagged.
     std::int32_t senderId = -1;    ///< Owned exact wire ID; -1 only for caller-created records without source identity.
     std::optional<std::int64_t> removalTime{}; ///< Exact REMOVE_EVENT compact-long; engaged zero differs from absence.
+    std::optional<FieldEventTime> fieldTime{}; ///< Owned raw virtual prefix; engaged zero differs from absence.
 };
 
 /** Owned completed prefix with explicit first-error diagnostics. */
@@ -157,6 +192,7 @@ struct StreamDataResult {
     std::size_t payloadEncodedBytes = 0; ///< Examined new-payload bytes, including prefixes and failed reads.
     std::size_t payloadWorkBytes = 0;  ///< Admitted new-payload body work, including skips, replacements and failures.
     std::size_t ownedPayloadBytes = 0; ///< Logical new-payload bytes retained by completed records only.
+    std::size_t ownedFieldTimeRecords = 0; ///< Fixed FIELD metadata owners retained by completed records only.
 };
 
 /** Decode one complete type-15 payload with fresh message-local symbol state.
@@ -172,9 +208,9 @@ struct StreamDataResult {
                                                 StreamDataLimits limits);
 /** Decode a complete type-15/NONE payload under an explicit event policy.
  * Broad policy preserves all subsets of raw0x5f independently of descriptor option advertisement.
- * REMOVE_EVENT omits ordinary fields, consumes one compact-long even for unknown records,
- * and initializes only explicitly mapped indexed words over fresh local defaults. No builtin
- * FIELD event-time metadata is declared or autodetected by this API. Other flags are refused.
+ * REMOVE_EVENT reads the configured physical Event* prefix under READ, then one compact-long;
+ * DISABLED omits ordinary fields; later fields keep defaults except explicitly mapped indexed words.
+ * FIELD metadata is selected only by the context's explicit FieldTimePolicy. Other flags are refused.
  * Invalid policy/profile combinations fail at PAYLOAD before payload-budget or record work.
  * @param payload Borrowed complete body excluding length/type; never retained.
  * @param context Owned validated bindings/layouts borrowed only during this call.

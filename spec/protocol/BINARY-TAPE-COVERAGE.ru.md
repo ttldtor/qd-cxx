@@ -45,6 +45,7 @@ Windows во время исполнения. Чтение в C++ и его пр
 | Обычное wire discovery | Прежние точные ordinary types, добавление IDs, отказ при повторном sender | Без изменений |
 | `BINARY_FIELDS_V1` | 19 точных идентичностей только для чтения; обычные и явно индексные локальные записи | Ограниченный набор полей и индексных схем реализован |
 | `TapeMode::BINARY_CATALOG_V1` | Четыре общих семейства, NONE/MESSAGE/вход без заголовка, известные дескрипторы/опции/флаги/removal и неизменяемые поколения | Конечная реализация с явным включением; FIELD/контейнеры/цепочки остаются отдельными |
+| `FieldTimePolicy::READ` | Точные исходные ведущие EventTime/full56 и optional EventSequence/full72 с отдельным физическим REMOVE-префиксом | Явный binary-catalog выбор; прежние сигнатуры сохраняют DISABLED; см. TAPE-TIME |
 
 Профиль полей core и отдельный режим протокола выбираются явно. [Индексный контракт](../schema/INDEXED-SCHEMAS.ru.md)
 определяет переданные индексные раскладки; [BINARY-MESSAGES](BINARY-MESSAGES.ru.md) определяет
@@ -185,12 +186,17 @@ MRU-флагов1; два префикса флагов перед одним с
 REMOVE_SYMBOL0x80 не является флагом writer данных, остальные биты вне профиля. Допуск этих битов
 исходным parser фиксируется отдельно от выбранного отказа C++. Collector снимков/транзакций не добавляется.
 
-REMOVE_EVENT меняет грамматику данных: специальные встроенные поля событий, затем один compact-long
-времени записи; обычные поля пропущены. Optional `removalTime` в конце владеющей записи сохраняет
+REMOVE_EVENT меняет грамматику данных: при явном FIELD READ все ведущие эффективные Event* actions,
+включая обычные бизнес-поля, предшествуют одному compact-long времени записи; поздние обычные поля
+сохраняют defaults. DISABLED сохраняет прежнюю обработку только removal time. Optional `removalTime` владеющей записи сохраняет
 это точное время отдельно от FIELD-метаданных события. Явная индексная раскладка проецирует время
 в локальные слова; остальные пропущенные значения получают свежие defaults. SymbolValue уже
-владеет исходными флагами, дублирующее поле не добавляется. Встроенные FIELD-метаданные ожидают
-QDCXX-046 и отвергаются до реализации.
+владеет исходными флагами, дублирующее поле не добавляется.
+Встроенные FIELD-метаданные требуют отдельного явного READ в [TAPE-TIME](TAPE-TIME.ru.md).
+Он владеет полными физическими compact-long и source ordinals отдельно от indexed time и MESSAGE.
+Прежние конструкторы сохраняют DISABLED и отклоняют FIELD text; прежние formatter versions
+отказывают любые engaged metadata. [Валидация FIELD](../../tests/conformance/protocol/field-types/FIELD-TIME-VALIDATION.ru.md)
+фиксирует измеренные producer pins, resource boundaries и намеренное отличие Java unknown consumer.
 
 Ограниченная реализация использует `decodeStreamDataWithEventPolicy` при явном BINARY_CATALOG_V1
 для RAW/TICKER/STREAM/HISTORY с метаданными NONE/MESSAGE. Переданные индексные раскладки остаются
@@ -237,7 +243,7 @@ QDCXX-046 и отвергаются до реализации.
 Допустимые альтернативы Java отклоняются явно; завершённый префикс и координаты ошибок сохраняются точно.
 ## Будущие gates и приёмка
 
-NONE и прежний MESSAGE subset остаются существующими ограниченными возможностями. FIELD (046),
+NONE, MESSAGE и явно выбранный FIELD READ являются ограниченными возможностями.
 LONG/TEXT sidecars (047), GZIP/ZIP (048), finite split sequences (049) и расширенный operational
 streaming (050) ожидаются. Контракт не добавляет compression dependency, download или callback/source API.
 До 048 выбираются dependency/license/platform/OFF acquisition, member/entry и CRC/trailer/inflation

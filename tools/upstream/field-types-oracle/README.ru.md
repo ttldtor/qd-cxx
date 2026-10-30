@@ -179,3 +179,26 @@ launcher и зависимости не добавлены. Прежний от�
 (42 прежних и 8 для диспетчеризации). См. [валидацию диспетчеризации](../../../tests/conformance/protocol/field-types/DISPATCH-VALIDATION.ru.md)
 и [манифест](../../../tests/fixtures/encoding/field-types/dispatch-captures.json). Исторические
 разделы выше сохраняют исходные количества подмножеств и хэши исходников.
+
+## Companion времени события FIELD
+
+Governed invocation дополнительно компилирует `FieldTimeOracle.java` и получает `field-time/`.
+Его29 неизменяемых артефактов сохраняют настоящий FileWriter FIELD во всех четырёх families и
+стандартную индексную TimeAndSale, direct parser и FileReader configuration projections,
+сконструированные prefix/high32/overlong inputs, MESSAGE heartbeat и REMOVE через настоящий composer
+с requested description. Физические metadata обозначены отдельно от delivered cursor packing и
+обычного business Time. См. [TAPE-TIME](../../../spec/protocol/TAPE-TIME.ru.md) и
+[отчёт валидации](../../../tests/conformance/protocol/field-types/FIELD-TIME-VALIDATION.ru.md).
+
+Каждый pin содержит115 общих и5 стандартных source records, а также469 помеченных record deliveries
+между измеренными projections. Таблица физических slots стандарта доказывает обычный indexed
+Time/Sequence layout независимо от виртуального FIELD. Измеренный неизвестный Java consumer
+выбрасывает NullPointerException; C++ сохраняет более сильный безопасный пропуск. Паритет
+callback order/fanout не предполагается.
+
+Внутренний entry `FieldTypesOracle <new-directory> field-time-only` запускает конечный companion на
+уже доказанном classpath; он не пересобирает upstream и не проверяет expectations. Прежний governed
+launcher сохраняет clean baseline Verify. Полное сравнение теперь покрывает638 артефактов, сохраняя
+609 прежних expectations и установленный comparison view из57 диапазонов UID. Новые FIELD files
+сравниваются побайтно. Test-Negatives отклоняет62 мутации, включая12 FIELD. Source hashes требуют
+закреплённых Java Format, затем Check до новых capture/Verify evidence.

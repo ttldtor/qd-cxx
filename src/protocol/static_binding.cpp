@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 
 #include "qd/protocol/static_binding.hpp"
+#include "field_time_binding.hpp"
 
 #include "qd/core/serial_field_type.hpp"
 
@@ -13,6 +14,13 @@ namespace org::ttldtor::qdcxx::protocol {
 
 std::expected<RecordBinding, BindingError> bindRecord(const WireRecordDescription &description,
                                                       const core::LocalSchema &schema, BindingLimits limits) {
+    return detail::bindRecordWithPrefix(description, schema, limits, 0);
+}
+
+std::expected<RecordBinding, BindingError> detail::bindRecordWithPrefix(const WireRecordDescription &description,
+                                                                        const core::LocalSchema &schema,
+                                                                        BindingLimits limits,
+                                                                        std::size_t prefixFields) {
     if (description.fields.size() > limits.fields) {
         return std::unexpected(BindingError::RESOURCE_LIMIT);
     }
@@ -59,10 +67,12 @@ std::expected<RecordBinding, BindingError> bindRecord(const WireRecordDescriptio
             plan.localRecordId = local->id;
         }
 
+        std::size_t position = 0;
+
         for (const auto &field : description.fields) {
             FieldBinding action{std::nullopt, static_cast<core::SerialFieldType>(field.serialTypeId)};
 
-            if (local != nullptr) {
+            if (local != nullptr && position >= prefixFields) {
                 for (const auto &key : local->lookups) {
                     if (key.name == field.name) {
                         if (local->fields[key.fieldId].serialTypeId != field.serialTypeId) {
@@ -76,6 +86,7 @@ std::expected<RecordBinding, BindingError> bindRecord(const WireRecordDescriptio
             }
 
             plan.fields.push_back(action);
+            ++position;
         }
 
         return plan;

@@ -1,5 +1,14 @@
 # Bounded binary tape reader
 
+## Explicit FIELD metadata extension
+
+[TAPE-TIME](TAPE-TIME.md) defines the separate required `FieldTimePolicy::READ` argument for
+the binary catalog constructors. Existing signatures remain DISABLED. READ owns raw virtual-prefix
+words separately from ordinary fields, indexed time and MESSAGE heartbeat state, with explicit
+output metadata bounds and checked source ordinals. Discovery omits only recognized virtual fields;
+description replacements retain the existing atomic ownership and view-invalidation contract.
+Existing inspector formats refuse engaged FIELD metadata before output construction.
+
 ## Explicit ordinary discovery
 
 [WIRE-INVENTORY](../schema/WIRE-INVENTORY.md) defines the separate opt-in

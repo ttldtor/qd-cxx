@@ -20,7 +20,7 @@ if ($LASTEXITCODE) { throw 'Baseline clean Verify failed' }
 $meta=Get-Content "$run/metadata.json" -Raw | ConvertFrom-Json
 $java=Join-Path $JavaHome 'bin/java.exe'
 $javac=Join-Path $JavaHome 'bin/javac.exe'
-& $javac -encoding UTF-8 -cp $meta.classpath -d "$run/harness" "$PSScriptRoot/FieldTypesOracle.java" "$PSScriptRoot/ObjectFieldsOracle.java" "$PSScriptRoot/IndexedSchemasOracle.java" "$PSScriptRoot/FlagsOracle.java" "$PSScriptRoot/DescriptorOracle.java" "$repo/tools/schema-export/ResolvedSchemaExporter.java" 1> "$run/field-types-javac.stdout" 2> "$run/field-types-javac.stderr"
+& $javac -encoding UTF-8 -cp $meta.classpath -d "$run/harness" "$PSScriptRoot/FieldTypesOracle.java" "$PSScriptRoot/ObjectFieldsOracle.java" "$PSScriptRoot/IndexedSchemasOracle.java" "$PSScriptRoot/FlagsOracle.java" "$PSScriptRoot/DescriptorOracle.java" "$PSScriptRoot/FieldTimeOracle.java" "$repo/tools/schema-export/ResolvedSchemaExporter.java" 1> "$run/field-types-javac.stdout" 2> "$run/field-types-javac.stderr"
 if ($LASTEXITCODE) { throw 'Field types compile failed' }
 $info=[Diagnostics.ProcessStartInfo]::new($java)
 $info.UseShellExecute=$false
@@ -64,6 +64,7 @@ $evidence=[ordered]@{
     indexedSourceSha256=(Get-FileHash "$PSScriptRoot/IndexedSchemasOracle.java").Hash
     flagsSourceSha256=(Get-FileHash "$PSScriptRoot/FlagsOracle.java").Hash
     descriptorSourceSha256=(Get-FileHash "$PSScriptRoot/DescriptorOracle.java").Hash
+    fieldTimeSourceSha256=(Get-FileHash "$PSScriptRoot/FieldTimeOracle.java").Hash
     headerless=$headerlessReceipt
     exporterSourceSha256=(Get-FileHash "$repo/tools/schema-export/ResolvedSchemaExporter.java").Hash
     harnessClasses=@(Get-ChildItem "$run/harness" -Recurse -File | ForEach-Object { @{path=[IO.Path]::GetRelativePath("$run/harness",$_.FullName);sha256=(Get-FileHash $_.FullName).Hash} })

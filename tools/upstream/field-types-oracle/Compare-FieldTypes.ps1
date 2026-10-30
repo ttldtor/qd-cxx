@@ -495,3 +495,77 @@ function CompareDispatch([string]$ActualRoot,[string]$ExpectedRoot) {
     }
 }
 CompareDispatch (Join-Path $Actual 'dispatch') (Join-Path $Expected 'dispatch')
+
+# FIELD files have no random UID bytes; compare raw captures exactly without rewriting either side.
+function CompareFieldTime([string]$ActualRoot,[string]$ExpectedRoot) {
+    $cases=@('writer-5','writer-10','writer-15','writer-20','heartbeat-NONE','heartbeat-MESSAGE','heartbeat-FIELD',
+        'pair','first-only','absent','wrong-time','wrong-sequence','reordered','lowercase','alias',
+        'void-before','void-between','void-after','overlong-boundaries','remove-pair','remove-wrong-sequence','remove-wrong-time',
+        'remove-void-before','remove-void-between','remove-void-after')
+    $names=@('canonical.tsv','observations.tsv','standard.tsv','standard-indexed.qtp')+@($cases|ForEach-Object{"$_.qtp"})
+    $arity=@{record=13;parse=5;file=5;input=6;unknown=5;all=2}
+    foreach($root in @($ActualRoot,$ExpectedRoot)) {
+        Assert (@(Get-ChildItem -LiteralPath $root -Directory).Count -eq 0) 'no FIELD child directories'
+        $files=@(Get-ChildItem -LiteralPath $root -File|Where-Object Name -cne '.gitattributes'|Sort-Object Name)
+        Assert (($files.Name -join '|') -ceq (($names|Sort-Object) -join '|')) 'exact FIELD artifact set'
+        foreach($file in $files){Assert ($file.Length -gt 0 -and $file.Length -lt 1048576) 'bounded FIELD artifact'}
+        $rows=[IO.File]::ReadAllLines((Join-Path $root 'canonical.tsv'))
+        Assert ($rows.Count -eq 116 -and $rows[-1] -ceq "all`tPASS") 'FIELD canonical completion/count'
+        $counts=@{}
+        foreach($line in $rows[0..($rows.Count-2)]) {
+            $cells=$line.Split("`t")
+            Assert ($cells.Count -eq 14 -and $cells[0] -ceq 'record' -and $cells[1] -cin $cases) 'FIELD canonical row'
+            $id=$cells[1]
+            $index=if($counts.ContainsKey($id)){$counts[$id]}else{0}
+            Assert ($cells[3] -ceq "$index") 'FIELD source order'
+            $counts[$id]=$index+1
+            Assert ($cells[2] -cin @('5','10','15','20')) 'FIELD source family'
+            Integer $cells[4]
+            foreach($column in @(5,6)) {if($cells[$column] -cne 'absent'){Integer $cells[$column] $true}}
+            Assert ($cells[5] -cne 'absent' -or $cells[6] -ceq 'absent') 'FIELD optional sequence depends on time'
+            Integer $cells[7] $true;Integer $cells[8] $true
+            foreach($column in 9..13){Integer $cells[$column]}
+        }
+        foreach($id in $cases){Assert ($counts[$id] -eq $(if($id.StartsWith('remove-')){3}elseif($id -ceq 'overlong-boundaries'){7}else{5})) "FIELD finite source records $id"}
+        $observed=[IO.File]::ReadAllLines((Join-Path $root 'observations.tsv'))
+        Assert ($observed.Count -eq 616 -and $observed[-1] -ceq "all`tPASS") 'FIELD observations completion/count'
+        $kinds=@{}
+        foreach($line in $observed) {
+            $cells=$line.Split("`t")
+            Assert ($arity.ContainsKey($cells[0]) -and $cells.Count -eq $arity[$cells[0]]) 'FIELD observation arity'
+            $kinds[$cells[0]]=1+$(if($kinds.ContainsKey($cells[0])){$kinds[$cells[0]]}else{0})
+            if($cells[0] -cne 'all'){Assert ($cells[1] -cin $cases) 'FIELD finite observed case'}
+            if($cells[0] -ceq 'record') {
+                Assert ($cells[3] -cin @('5','10','15','20')) 'FIELD observed callback family'
+                Integer $cells[4];Integer $cells[5];Integer $cells[6] $true;Integer $cells[7] $true
+                foreach($column in 8..12){Integer $cells[$column]}
+            } elseif($cells[0] -cin @('parse','file')) {
+                Assert ($cells[3] -cin @('3','5','7') -and $cells[4] -ceq '0') 'FIELD production completion'
+            } elseif($cells[0] -ceq 'unknown') {
+                Assert ($cells[2] -ceq 'java.lang.NullPointerException' -and $cells[3] -ceq '0' -and $cells[4] -ceq '0') 'measured Java unknown FIELD refusal'
+            }
+        }
+        foreach($entry in @{record=459;parse=65;file=28;input=62;unknown=1;all=1}.GetEnumerator()) {
+            Assert ($kinds[$entry.Key] -eq $entry.Value) "FIELD observation count $($entry.Key)"
+        }
+        $standard=[IO.File]::ReadAllLines((Join-Path $root 'standard.tsv'))
+        Assert ($standard.Count -eq 27 -and $standard[0] -ceq "schema`tTimeAndSale`ttrue`t15`t0" -and $standard[-1] -ceq "all`tPASS") 'finite standard FIELD shape/completion'
+        foreach($index in 0..14) {
+            $cells=$standard[1+$index].Split("`t")
+            Assert ($cells.Count -eq 5 -and $cells[0] -ceq 'slot' -and $cells[1] -ceq "$index" -and $cells[3] -cin @('true','false')) 'standard FIELD physical slot'
+            Integer $cells[2];Assert ($cells[4] -cmatch '^[A-Za-z0-9_$]+$') 'standard FIELD property'
+        }
+        Assert ($standard[1] -ceq "slot`t0`t56`tfalse`tTime" -and $standard[2] -ceq "slot`t1`t72`tfalse`tSequence") 'source-proven ordinary indexed time slots'
+        foreach($index in 0..9) {
+            $cells=$standard[16+$index].Split("`t")
+            Assert ($cells.Count -eq 21 -and $cells[0] -ceq 'record' -and $cells[1] -ceq $(if($index -lt 5){'parser'}else{'file'}) -and $cells[2] -ceq "$($index%5)") 'standard FIELD route/order'
+            foreach($column in 3..5){Integer $cells[$column] $true}
+            foreach($column in 6..20){Integer $cells[$column]}
+        }
+    }
+    foreach($name in $names) {
+        Assert ((Get-FileHash -LiteralPath (Join-Path $ActualRoot $name)).Hash -ceq (Get-FileHash -LiteralPath (Join-Path $ExpectedRoot $name)).Hash) "FIELD exact artifact mismatch: $name"
+    }
+    "PASS: exact29 FIELD artifacts,115 generic plus5 indexed source records and469 labelled production deliveries"
+}
+CompareFieldTime (Join-Path $Actual 'field-time') (Join-Path $Expected 'field-time')

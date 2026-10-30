@@ -276,6 +276,10 @@ std::string Formatter::frame(const protocol::Frame &frame, std::size_t index, st
 std::string Formatter::catalogRecord(const protocol::StreamDataRecord &record, const core::LocalSchema &schema,
                                      std::size_t frameIndex, std::size_t index, std::size_t budget,
                                      const protocol::TapeTiming *timing, std::size_t generation) const {
+    if (record.fieldTime) {
+        throw std::invalid_argument("unsupported FIELD metadata format");
+    }
+
     if (profile_ != DisplayProfile::BINARY_CATALOG_V1 || schema.profile() != core::LocalProfile::BINARY_FIELDS_V1 ||
         record.localId < 0 || static_cast<std::size_t>(record.localId) >= schema.records().size()) {
         throw std::invalid_argument("invalid catalog schema or local ID");
@@ -411,6 +415,10 @@ std::string Formatter::catalogRecord(const protocol::StreamDataRecord &record, c
 std::string Formatter::record(const protocol::StreamDataRecord &record, std::u16string_view name,
                               std::size_t frameIndex, std::size_t index, std::size_t budget,
                               const protocol::TapeTiming *timing, std::size_t generation) const {
+    if (record.fieldTime) {
+        throw std::invalid_argument("unsupported FIELD metadata format");
+    }
+
     if (profile_ == DisplayProfile::BINARY_CATALOG_V1) {
         throw std::invalid_argument("catalog presentation requires a validated schema");
     }
@@ -713,6 +721,10 @@ std::string Formatter::record(const protocol::StreamDataRecord &record, std::u16
 std::string Formatter::profileRecord(const protocol::StreamDataRecord &record, std::u16string_view name,
                                      std::size_t frameIndex, std::size_t index, const events::Profile &event,
                                      std::size_t budget) const {
+    if (record.fieldTime) {
+        throw std::invalid_argument("unsupported FIELD metadata format");
+    }
+
     if (record.symbol.eventFlags != 0 || record.removalTime.has_value()) {
         throw std::invalid_argument("unsupported record metadata format");
     }

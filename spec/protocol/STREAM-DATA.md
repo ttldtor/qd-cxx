@@ -1,5 +1,13 @@
 # Bounded STREAM_DATA decoder
 
+## Explicit FIELD prefix policy
+
+[TAPE-TIME](TAPE-TIME.md) defines `createWithFieldTimePolicy` and owned `FieldEventTime`.
+READ applies exact raw-prefix precedence before local lookup, preserves complete signed compact-long
+metadata separately from ordinary low32 fields, and admits one fixed output owner before defaults.
+REMOVE reads the separate effective leading Event* physical prefix before removalTime.
+Existing context creation and decoding signatures retain their default policy and charges.
+
 [Русская версия](STREAM-DATA.ru.md). English is authoritative.
 
 The rules below describe the unchanged three-argument zero-flags entry points unless explicitly
