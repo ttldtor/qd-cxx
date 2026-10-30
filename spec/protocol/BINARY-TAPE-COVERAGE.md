@@ -42,7 +42,7 @@ RMI operations and transport are outside this target. Private recording contents
 | `TapeMode::RAW_MESSAGE_V1` | Existing RAW/MESSAGE policy, selected local profile, zero data flags | Unchanged |
 | Ordinary wire discovery | Existing exact ordinary types, append-only IDs and strict repeated-sender refusal | Unchanged |
 | `BINARY_FIELDS_V1` | 19 exact read-only identities; ordinary and explicit indexed local records | Bounded fields/indexed subset implemented |
-| `TapeMode::BINARY_CATALOG_V1` | Restricted STREAM/NONE grammar plus atomic active descriptions | Partial opt-in implementation; broader options/flags/families remain pending |
+| `TapeMode::BINARY_CATALOG_V1` | STREAM/NONE, absent/empty/hs, known flags/removal time and atomic active descriptions | Partial opt-in implementation; other families/options/flags remain pending |
 
 The core field profile and separate partial protocol mode are explicit selections. The current
 [indexed contract](../schema/INDEXED-SCHEMAS.md) defines their implemented subset. No existing constructor/default
@@ -111,7 +111,7 @@ There are four different length grammars:
 | BYTE_ARRAY9 / default CUSTOM_OBJECT233 | Compact **long**, validated in -1..INT_MAX | Reject full out-of-range length before proportional allocation |
 | SERIAL_OBJECT249 through MarshalledObjField | Compact **int** projection, then -1..INT_MAX validation | High/overlong compact forms can project differently from byte-array lengths |
 | STRING137 | UTFString encoded-byte count | Preserve accepted UTF/CESU/overlong behavior and exact UTF-16 units |
-| UTF_CHAR_ARRAY10 | Character count followed by BMP UTFChar units | Preserve existing primitive/message boundary distinction |
+| UTF_CHAR_ARRAY 10 | Character count followed by BMP UTFChar units | Preserve existing primitive/message boundary distinction |
 
 The marshalled length rule is explicit in
 [Marshaller at 3.355](https://github.com/devexperts/QD/blob/0ddc0a09779fb61d74cc0b37c6449ff47dcb715f/dxlib/src/main/java/com/devexperts/io/Marshaller.java#L162-L175),
@@ -131,8 +131,8 @@ Published values own their contents and survive source, reader and schema destru
 
 DESCRIBE_RECORDS contains sender ID, record name and field names/full IDs; it has no `hasTime` bit.
 Indexed interpretation therefore requires caller-supplied or source-proven explicit local metadata.
-The supported finite layouts are two int32 logical contributors (`PAIR_INT32`) and one logical
-int64 contributor (`SINGLE_INT64`) for Java's first two integer storage slots. Both have actual
+The supported finite layouts are two int32 logical contributors (`PAIR_INT 32`) and one logical
+int64 contributor (`SINGLE_INT 64`) for Java's first two integer storage slots. Both have actual
 source/exporter and parser observations in [indexed validation](../../tests/conformance/protocol/field-types/INDEXED-VALIDATION.md);
 neither is inferred from a familiar name.
 Additional layouts remain pending until characterized. No synthetic VOID tail is inserted into values.
@@ -157,7 +157,7 @@ Known symbol forms are Penta 15/20/30/35-bit encodings, FC UTF-8, FD CESU-8, FE 
 F8 MRU flags and F9 new compact-int flags. Reserved C0..DF and FA/FB forms fail. Each data message
 starts fresh symbol state and MRU flags 1; two flag prefixes before one symbol fail.
 The [matrix](../../tests/fixtures/protocol/real-tape/support-matrix.tsv) links both PentaCodec sources
-and separates existing symbol observations from pending data-flag integration.
+and links the [bounded flag integration](../../tests/conformance/protocol/field-types/FLAGS-VALIDATION.md).
 
 `hs` is the only known protocol option. Absent, empty and present values require separate producer
 observations. The Java writer masks flags according to negotiated options/family; its symbol reader
@@ -185,6 +185,14 @@ preserves this exact time without confusing it with FIELD event-time metadata. C
 layouts project the time into their local words; other missing ordinary values keep fresh defaults.
 The existing SymbolValue already carries raw flags; no duplicate flags member is introduced.
 Builtin FIELD event metadata remains pending QDCXX-046 and is refused until implemented.
+
+The bounded implementation uses `decodeStreamDataWithEventPolicy` and supplied-schema
+BINARY_CATALOG_V1 for STREAM/NONE only. Both pins have actual all 64-subset observations in each
+Java family, with six original FileWriter/FileReader files including full TimeAndSale; this
+does not enable other C++ container families. Absent/empty/exact hs are accepted; unknown,
+duplicate and whitespace option tokens are explicitly refused. Old modes and payload entry
+points remain zero-flags only. Old formatter grammars refuse nonzero flags or any removalTime
+before buffering, including removalTime0; explicit zero-prefix byte counts preserve old output.
 
 ## Message and descriptor policy
 
@@ -236,3 +244,5 @@ documented profiles. No unfinished row is closed merely because a structural wal
 Owned byte/string/object fields have separate [validation](../../tests/conformance/protocol/field-types/OBJECT-VALIDATION.md).
 The generic exact 249/137 grammars also apply while discarding values and deliberately
 differ from Java unknown-local-field skipping; opaque bytes establish no Java object semantics.
+
+

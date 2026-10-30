@@ -42,3 +42,13 @@ historical root and25 scalar artifacts. Earlier receipts above remain unchanged.
 The [object validation](../../../conformance/protocol/field-types/OBJECT-VALIDATION.md)
 separates known/unknown Java readers, wire233 from its local9 consumer, UTF/length
 errors, RAW callback fanout and C++ acceptance limits.
+
+## Event flags and removal-time captures
+
+The separate [flags manifest](flags-captures.json) records both pins, final helper/runtime/
+production-classpath hashes and 105 original artifacts per pin. The [flags observations](expected/flags/observations.tsv)
+separate six original FileWriter/FileReader files, requested composer masks, designed mutations,
+Penta primitives and labelled RAW fanout. Both full captures repeat identically; all 287 reviewed
+artifacts match across pins and the clean locked Verify preserves the historical 182 unchanged.
+See [flags validation](../../../conformance/protocol/field-types/FLAGS-VALIDATION.md) for the
+bounded STREAM/NONE C++ acceptance and intentional unsupported/error differences.

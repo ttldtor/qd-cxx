@@ -190,7 +190,8 @@ class DescriptorParser {
 
                 type = true;
             } else if (*key == u"opt") {
-                if (!value->empty() && !(mode_ == TapeMode::RAW_MESSAGE_V1 && *value == u"hs")) {
+                if (!value->empty() &&
+                    !((mode_ == TapeMode::RAW_MESSAGE_V1 || mode_ == TapeMode::BINARY_CATALOG_V1) && *value == u"hs")) {
                     reject(TapeError::UNSUPPORTED, TapeRejection::OPTIONS);
                 }
 
@@ -237,7 +238,7 @@ class DescriptorParser {
             }
         }
 
-        if (cursor_ != payload_.size() || !type || (!opt && mode_ != TapeMode::RAW_MESSAGE_V1)) {
+        if (cursor_ != payload_.size() || !type || (!opt && mode_ == TapeMode::LEGACY)) {
             reject(TapeError::UNSUPPORTED,
                    cursor_ == payload_.size() && type && !opt ? TapeRejection::OPTIONS : TapeRejection::DESCRIPTOR);
         }
@@ -1176,8 +1177,11 @@ void TapeReader::dispatch(TapeFeedResult &result) {
     budget.payloadEncodedBytes -= payloadEncodedBytes_;
     budget.payloadWorkBytes -= payloadWorkBytes_;
     budget.ownedPayloadBytes -= ownedPayloadBytes_;
-    auto decoded = mode_ == TapeMode::RAW_MESSAGE_V1 ? decodeRawData(frame.payload, *context_, budget)
-                                                     : decodeStreamData(frame.payload, *context_, budget);
+    auto decoded =
+        mode_ == TapeMode::RAW_MESSAGE_V1 ? decodeRawData(frame.payload, *context_, budget)
+        : mode_ == TapeMode::BINARY_CATALOG_V1
+            ? decodeStreamDataWithEventPolicy(frame.payload, *context_, budget, DataEventPolicy::BINARY_CATALOG_V1)
+            : decodeStreamData(frame.payload, *context_, budget);
     records_ += decoded.processedRecords;
     fields_ += decoded.wireFields;
     fieldBytes_ += decoded.fieldBytes;

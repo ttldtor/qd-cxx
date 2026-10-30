@@ -166,7 +166,8 @@ class TapeReader {
      * @param limits Mandatory finite bounds; invalid configuration throws invalid_argument.
      * @param mode Explicit container policy; default preserves the original untimed behavior.
      * BINARY_CATALOG_V1 requires BINARY_FIELDS_V1 and finite snapshotUnits; it currently keeps
-     * the restricted STREAM grammar while enabling indexed metadata and atomic active replacements.
+     * restricted STREAM/NONE with absent/empty/hs options, known data flags and REMOVE_EVENT,
+     * indexed metadata and atomic active replacements. Other families and FIELD remain refused.
      * Indexed local schemas are refused by both older modes.
      * Allocation failure before input may throw bad_alloc.
      */

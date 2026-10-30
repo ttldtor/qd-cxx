@@ -1,5 +1,10 @@
 # Bounded STREAM_DATA decoder
 
+[Русская версия](STREAM-DATA.ru.md). English is authoritative.
+
+The rules below describe the unchanged three-argument zero-flags entry points unless explicitly
+qualified by the [catalog event policy](#catalog-event-metadata).
+
 ## Additive local record identity
 
 The [prepared mapping contract](../events/EVENT-MAPPING.md) adds `core::RecordContext` to each
@@ -134,3 +139,60 @@ owned nullable UTF-16, logical field positions independent of Java slots, and cu
 Both existing tape modes keep their descriptor, flags, timing, terminal-error and append-only policies.
 Earlier type exclusions below describe the older profiles; only this explicit profile extends them.
 No Profile event adapter, indexed schema, importer or implicit discovery is added.
+
+<a id="catalog-event-metadata"></a>
+
+## Explicit catalog event metadata
+
+`decodeStreamDataWithEventPolicy(payload, context, limits, DataEventPolicy::BINARY_CATALOG_V1)`
+adds the catalog STREAM/NONE grammar with an explicitly validated BINARY_FIELDS_V1 context.
+The old `decodeStreamData` and `decodeRawData` names/signatures remain unoverloaded and zero-flags
+only, preserving existing function-address use. DataEventPolicy::ZERO_FLAGS selects that same
+strict grammar through the new entry point. Invalid policy/profile combinations fail with
+UNSUPPORTED_PROFILE at PAYLOAD before payload-limit or record work; old entry-point precedence
+is unchanged. No FIELD event metadata is declared or autodetected by this API.
+
+The broad policy accepts every subset of projected low 32 mask 0x5f: TX_PENDING1, REMOVE_EVENT2,
+SNAPSHOT_BEGIN4, SNAPSHOT_END8, SNAPSHOT_SNIP16 and SNAPSHOT_MODE 64. Descriptor options do not mask
+reader flags. Unknown projected bits, reserved0x20, REMOVE_SYMBOL0x80 and negative raw masks are
+UNSUPPORTED_PROFILE at FLAGS after a complete symbol and before the sender ID. Compact-int flags
+retain the existing signed low 32 projection; physical high bits are discarded before this check.
+SymbolValue already owns exact flags and flag-byte counts; no second flags member is added.
+These are generic metadata, with no collector, transaction or snapshot scheduler.
+
+REMOVE_EVENT replaces ordinary field payloads with exactly one compact-long removal time in
+the NONE grammar. `StreamDataRecord::removalTime` owns that signed 64 value. Disengaged means no
+removal; engaged0 means a serialized removal time of zero. Unknown described records consume and
+validate it without emission. Undescribed IDs still fail before time decoding. Source Java reads
+configured builtin event fields before the time; explicit FIELD declarations remain refused at
+the tape boundary until their separate contract is implemented.
+
+Known records first admit emittedRecords, every dense local emittedValue and owned symbol units,
+then allocate fresh defaults. Omitted scalar fields stay raw0; nullable strings/bytes stay null.
+Only the explicit resolved [indexed layout](../schema/INDEXED-SCHEMAS.md) changes those defaults:
+PAIR32 writes signed high/low words at the selected logical positions, SINGLE64 writes one raw 64.
+No physical VOID tail, field-name heuristic, time-unit conversion or second indexed-time value
+is introduced. The owned removal time is retained even for nonindexed records.
+
+ProcessedRecords counts the attempt before symbol decoding. The special compact-long is bounded
+by this record count and payload/input limits; it does not charge wireFields, which counts
+descriptor-field attempts. Ordinary omitted fields charge no field/string/payload decoding work,
+but dense local values still require output allowance before allocation. Existing work never refunds.
+Truncation returns TRUNCATED_PAYLOAD at the appended REMOVAL_TIME stage, primitive-start
+errorOffset and actual examined consumed. No incomplete record is published; owned completed
+prefix/counters survive later parse or allocation failure. Values, symbols, removalTime and
+RecordContext survive input/context/schema/reader destruction, moves and later generations.
+
+[Production validation](../../tests/conformance/protocol/field-types/FLAGS-VALIDATION.md) separates
+composer masks, primitive observations, designed messages and original FileWriter/FileReader
+recordings at both pins. Java discards the buffered current-message prefix for the captured removal
+truncations; C++ deliberately preserves its existing completed-prefix guarantee. Production RAW
+fanout is three labelled callbacks, with equality checked before selecting one STREAM projection.
+RAW/TICKER/HISTORY container dispatch remains outside this partial mode.
+
+Existing formatter record/profileRecord entry points cannot represent raw flags or removalTime.
+They throw invalid_argument before building output for nonzero eventFlags or any engaged removalTime,
+including0. An explicit zero prefix with eventFlagsBytes>0 preserves old output. The automatic
+tape-write record projection likewise refuses engaged removalTime; writer input/API is unchanged.
+
+

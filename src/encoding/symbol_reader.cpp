@@ -112,7 +112,8 @@ SymbolReader::SymbolReader(SymbolLimits limits, std::uint32_t optionMask) noexce
 SymbolStatus SymbolReader::beginMessage(std::uint32_t optionMask) noexcept {
     previous_.reset();
     mruFlags_ = 1;
-    state_ = optionMask == 0 ? SymbolStatus::OK : SymbolStatus::UNSUPPORTED_PROFILE;
+    constexpr std::uint32_t HISTORY_SNAPSHOT_OPTION_MASK = 1;
+    state_ = (optionMask & ~HISTORY_SNAPSHOT_OPTION_MASK) == 0 ? SymbolStatus::OK : SymbolStatus::UNSUPPORTED_PROFILE;
 
     return state_;
 }

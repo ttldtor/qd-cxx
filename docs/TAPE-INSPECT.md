@@ -207,7 +207,7 @@ are separate from historical validation; independent re-review remains pending.
 QDCXX-022 adds --profile default-quote-v1 with all eight unchanged default composite Quote fields.
 It uses the same BINARY/uncompressed/NONE/EMPTY_SET/STREAM_DATA transport policy. TSV default and
 --output-format human now have a separate version 2 identity for this profile: exact type:raw fields,
-mapped binary64 bits and millisecond times; human prices/sizes use decimal text, never raw integers.
+mapped binary 64 bits and millisecond times; human prices/sizes use decimal text, never raw integers.
 [Complete row grammar, safe explanations and mapping losses](../spec/protocol/DEFAULT-QUOTE.md).
 
 --diagnostics-version 1|2 selects legacy nine-cell or new ten-cell diagnostics. Defaults are 1 for
@@ -274,3 +274,19 @@ limit separately. Independent tool callers default to local-schema display metad
 labels; the CLI explicitly selects oracle-sre-v1. On a failed decoded event, frame and completed-prefix
 rows are written before reporting the parser error; a failure writing that prefix takes IO/output-budget
 precedence. This does not allow processing any subsequent input.
+
+## Record metadata that old formats cannot represent
+
+The existing record formats, including generic versions4/6/7 and Profile output, have no raw
+symbol-flags or removalTime columns. Formatter::record and Formatter::profileRecord reject nonzero
+SymbolValue.eventFlags or any engaged removalTime, including zero, with invalid_argument before
+building a row. An explicit zero-flags prefix remains representable: eventFlagsBytes alone never
+causes refusal. Existing zero-flags/absent-removal output bytes remain unchanged. Profile's business
+Flags field is independent of raw QTP symbol flags.
+
+The automatic tape-write projection rejects engaged removalTime before constructing a writer view;
+it cannot silently turn a deletion into fresh zero values. Writer input formats are unchanged.
+[The event metadata contract](../spec/protocol/STREAM-DATA.md#catalog-event-metadata) defines the
+explicit read-only policy. No new CLI spelling or output grammar is introduced here.
+
+

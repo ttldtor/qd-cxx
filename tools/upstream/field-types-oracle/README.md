@@ -107,7 +107,7 @@ records the new evidence separately.
 The same governed invocation also writes `field-types/indexed`:26 artifacts and572
 canonical LF rows per pin. `IndexedSchemasOracle.java` is compiled by the existing
 launcher with the unchanged native-v1 exporter as an observation helper; it is not a
-separate CLI. Eleven original FileWriter/FileReader cases retain five arbitrary signed64
+separate CLI. Eleven original FileWriter/FileReader cases retain five arbitrary signed 64
 times each, including standard TimeAndSale with its complete actual source schema.
 Slot/lookup projection, actual descriptor binding, omitted tails, aliases, missing/reordered
 fields, equal/new/redefined senders and production reset are distinct observations.
@@ -131,3 +131,27 @@ See [coverage](../../../tests/fixtures/encoding/field-types/COVERAGE.md),
 [validation](../../../tests/fixtures/encoding/field-types/VALIDATION.md) and the
 [field contract](../../../spec/encoding/FIELD-TYPES.md). Metadata/log timestamps and paths are
 run-specific provenance; observed artifact bytes are never normalized.
+
+## Event flags and removal-time extension
+
+The same governed invocation now writes `field-types/flags`:105 additional artifacts. FlagsOracle
+is an internal FieldTypesOracle companion, not another launcher. Its source and class hashes are
+included in the ordinary provenance receipt. `FieldTypesOracle <new-directory> flags-only` supports
+an explicitly qualified prebuilt classpath without rebuilding upstream or verifying expectations.
+The normal invocation retains the complete clean baseline Verify workflow.
+
+The child has 104 original binary artifacts and 4300 canonical observation rows. It separately labels
+actual FileWriter/FileReader files, requested composer inputs/masks, designed message mutations,
+production parser observations and primitive Penta reads. Every known subset of 0x5f is observed in
+all four data families. RAW's three callbacks are compared before selecting one STREAM projection.
+Exact descriptor absence/empty/hs and unknown/duplicate options are recorded; omitted FileWriter
+settings actually select hs. REMOVE_EVENT covers raw signed 64 values, ordinary/indexed/unknown/
+zero-field consumers, omitted defaults, following sentinels and incomplete time payloads.
+
+Compare-FieldTypes checks the exact 105-file child set, finite row grammar/counts, raw values,
+projection multiplicity and every artifact byte. Test-Negatives adds eight flags mutations to
+34 earlier cases:42 rejections total. The historical 182 artifacts remain unchanged; the full
+reviewed set is 287. [Flags validation](../../../tests/conformance/protocol/field-types/FLAGS-VALIDATION.md)
+separates Java behavior from selected C++ profile refusals, completed-prefix policy and remaining scope.
+
+

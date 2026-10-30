@@ -63,3 +63,7 @@ Profile/event adapters остаются вне границ.
 `qd-core/.../qtp/BinaryRecordDesc.java`, `dxlib/.../io/{IOUtil,BufferedInputPart}.java` и
 `dxfeed-impl/.../market/MarketFactoryImpl.java`; точная ревизия и хеши classpath записаны в metadata.
 Исходник harness и команды повторения приведены в [README oracle](../../../../tools/upstream/field-types-oracle/README.ru.md).
+
+Отдельное [расширение флагов](../../../conformance/protocol/field-types/FLAGS-VALIDATION.ru.md)
+добавляет известные метаданные событий STREAM/NONE по явной политике, сохраняя прежний обычный
+набор без изменений. Прежние режимы, collector, FIELD и форматы writer не расширяются.

@@ -9,6 +9,7 @@ New-Item -ItemType Directory -Path $root | Out-Null
 $expected=(Resolve-Path -LiteralPath $ExpectedDirectory).Path
 $mutations=@('type','value','unit','null-empty','order','record','arity','missing-field','missing-record','unknown-row','duplicate-row','missing-completion','duplicate-completion','misplaced-completion','extra-file','binary','primitive-consumption','scalar-value','scalar-wire-type','scalar-consumed','scalar-byte','scalar-missing','scalar-fanout','object-null-empty','object-byte','object-consumed','object-missing','object-local-type')
 $mutations+=@('indexed-time','indexed-slot','indexed-lookup','indexed-last-winner','indexed-missing','indexed-binary')
+$mutations+=@('flags-value','flags-removal-time','flags-byte-count','flags-projection','flags-mask','flags-missing','flags-binary','flags-option')
 $results=[Collections.Generic.List[object]]::new()
 foreach($mutation in $mutations){
     $dir=Join-Path $root $mutation
@@ -17,6 +18,7 @@ foreach($mutation in $mutations){
     Copy-Item -LiteralPath (Join-Path $expected 'scalars') -Destination $dir -Recurse
     Copy-Item -LiteralPath (Join-Path $expected 'objects') -Destination $dir -Recurse
     Copy-Item -LiteralPath (Join-Path $expected 'indexed') -Destination $dir -Recurse
+    Copy-Item -LiteralPath (Join-Path $expected 'flags') -Destination $dir -Recurse
     $path=Join-Path $dir 'mixed-stream.tsv';$rows=[IO.File]::ReadAllLines($path)
     switch($mutation){
         'type' {$rows[3]=$rows[3].Replace("`t40`t","`t8`t")}
@@ -110,6 +112,42 @@ foreach($mutation in $mutations){
             $changed=($indexedRows -join [char]10)+[char]10
             if($original -ceq $changed){throw 'Indexed mutation changed nothing'}
             [IO.File]::WriteAllText($indexedPath,$changed)
+        }
+    }
+    if ($mutation.StartsWith('flags-')) {
+        $flagsPath=Join-Path $dir 'flags/observations.tsv'
+        $flagRows=[IO.File]::ReadAllLines($flagsPath)
+        if ($mutation -ceq 'flags-binary') {
+            $binaryPath=Join-Path $dir 'flags/designed-15-all64.qtp'
+            $binary=[IO.File]::ReadAllBytes($binaryPath)
+            $binary[-1]=$binary[-1] -bxor 1
+            [IO.File]::WriteAllBytes($binaryPath,$binary)
+        } elseif ($mutation -ceq 'flags-missing') {
+            [IO.File]::WriteAllLines($flagsPath,$flagRows[0..($flagRows.Count-2)])
+        } else {
+            $prefix=switch($mutation) {
+                'flags-value' {"callback`tdesigned-15-all64`t15`t"}
+                'flags-removal-time' {"raw-removal-time`t"}
+                'flags-byte-count' {"primitive`twide-low32`t"}
+                'flags-projection' {"projection`t"}
+                'flags-mask' {"requested-composer`tcomposer-5-hs`t"}
+                'flags-option' {"descriptor-option`tdesigned-descriptor-hs`t"}
+            }
+            $index=[Array]::FindIndex($flagRows,[Predicate[string]]{param($row)$row.StartsWith($prefix)})
+            if($index -lt 0){throw 'Flags mutation target absent'}
+            $original=$flagRows[$index]
+            $cells=$original.Split([char]9)
+            switch($mutation) {
+                'flags-value' {$values=$cells[3].Split('|');$values[1]='1';$cells[3]=$values -join '|'}
+                'flags-removal-time' {$cells[3]='0'}
+                'flags-byte-count' {$cells[4]='0'}
+                'flags-projection' {$cells[4]='callbacks=1'}
+                'flags-mask' {$cells[3]='mask=0'}
+                'flags-option' {$cells[2]='EMPTY'}
+            }
+            $flagRows[$index]=$cells -join [char]9
+            if($original -ceq $flagRows[$index]){throw 'Flags mutation changed nothing'}
+            [IO.File]::WriteAllLines($flagsPath,$flagRows)
         }
     }
     $failed=$false

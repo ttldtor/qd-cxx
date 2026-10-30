@@ -466,6 +466,41 @@ TEST_CASE("existing generic formats explicitly refuse every new payload identity
     }
 }
 
+TEST_CASE("old record formats refuse flags and removal metadata before buffering") {
+    for (const auto format : {view::OutputFormat::TSV, view::OutputFormat::HUMAN}) {
+        for (const auto profile : {view::DisplayProfile::LOCAL_SCHEMA, view::DisplayProfile::DEFAULT_QUOTE_V1,
+                                   view::DisplayProfile::ORACLE_FIELD_TYPES_V1,
+                                   view::DisplayProfile::EXTERNAL_SCHEMA_V1, view::DisplayProfile::WIRE_SCHEMA_V1}) {
+            const view::Formatter formatter(format, profile);
+            protocol::StreamDataRecord record{0, {u"A", 0, 0, 0}, {}};
+            record.senderId = 0;
+
+            for (const auto flag : {1, 2, 4, 8, 16, 64, 95, -1}) {
+                record.symbol.eventFlags = flag;
+                CHECK_THROWS_WITH_AS(formatter.record(record, u"R", 0, 0, 0, nullptr, 1),
+                                     "unsupported record metadata format", std::invalid_argument);
+            }
+
+            record.symbol.eventFlags = 0;
+            record.removalTime = 0;
+            CHECK_THROWS_WITH_AS(formatter.record(record, u"R", 0, 0, 0, nullptr, 1),
+                                 "unsupported record metadata format", std::invalid_argument);
+            record.removalTime = -1;
+            CHECK_THROWS_AS(formatter.record(record, u"R", 0, 0, 0, nullptr, 1), std::invalid_argument);
+        }
+
+        for (const auto profile : {view::DisplayProfile::LOCAL_SCHEMA, view::DisplayProfile::ORACLE_FIELD_TYPES_V1,
+                                   view::DisplayProfile::EXTERNAL_SCHEMA_V1, view::DisplayProfile::WIRE_SCHEMA_V1}) {
+            const view::Formatter formatter(format, profile);
+            protocol::StreamDataRecord record{0, {u"A", 0, 0, 0}, {}};
+            record.senderId = 0;
+            const auto original = formatter.record(record, u"R", 0, 0, 4096, nullptr, 1);
+            record.symbol.eventFlagsBytes = 5;
+            CHECK(formatter.record(record, u"R", 0, 0, 4096, nullptr, 1) == original);
+        }
+    }
+}
+
 /** Run injected IO and exact field-output checks against a supplied immutable fixture root.
  * @param argc Argument count.
  * @param argv Executable, expected-artifact directory, then optional doctest arguments.

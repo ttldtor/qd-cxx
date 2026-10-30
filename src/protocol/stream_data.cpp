@@ -410,15 +410,44 @@ PayloadReadResult readPayload(std::span<const std::byte> input, core::SerialFiel
     return result;
 }
 
-/** Decode the measured shared zero-flags wire record layout.
+/** Project validated indexed positions into the private current record without allocation.
+ * @param values Fresh local defaults, never published until the entire record succeeds.
+ * @param layout Owned validated dense positions; absence leaves every default unchanged.
+ * @param time Exact signed64 removal payload, without unit or event-time conversion.
+ */
+void applyRemovalTime(std::vector<core::FieldValue> &values, const std::optional<ResolvedIndexedTimeLayout> &layout,
+                      std::int64_t time) noexcept {
+    if (!layout) {
+        return;
+    }
+
+    if (const auto *pair = std::get_if<ResolvedIndexedTimePairInt32>(&*layout)) {
+        constexpr unsigned WORD_BITS = 32;
+        const auto bits = std::bit_cast<std::uint64_t>(time);
+        values[pair->firstValueIndex].raw = std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(bits >> WORD_BITS));
+        values[pair->secondValueIndex].raw = std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(bits));
+    } else {
+        values[std::get<ResolvedIndexedTimeSingleInt64>(*layout).valueIndex].raw = time;
+    }
+}
+
+/** Decode the measured shared data record grammar under an explicit metadata policy.
  * @param payload Complete borrowed data payload.
  * @param context Validated immutable bindings.
  * @param limits Finite record, field and output bounds.
+ * @param policy Zero-only or explicit bounded catalog event metadata.
  * @return Owned prefix and first-error diagnostics.
  */
 StreamDataResult decodeDataPayload(std::span<const std::byte> payload, const StreamDataContext &context,
-                                   StreamDataLimits limits) {
+                                   StreamDataLimits limits, DataEventPolicy policy) {
     StreamDataResult result;
+
+    if ((policy != DataEventPolicy::ZERO_FLAGS && policy != DataEventPolicy::BINARY_CATALOG_V1) ||
+        (policy == DataEventPolicy::BINARY_CATALOG_V1 && context.profile() != core::LocalProfile::BINARY_FIELDS_V1)) {
+        result.status = StreamDataStatus::UNSUPPORTED_PROFILE;
+
+        return result;
+    }
 
     if (payload.size() > limits.payloadBytes) {
         result.status = StreamDataStatus::RESOURCE_LIMIT;
@@ -467,7 +496,13 @@ StreamDataResult decodeDataPayload(std::span<const std::byte> payload, const Str
             result.stage = StreamDataStage::FLAGS;
             result.errorOffset = result.consumed;
 
-            if (symbol.value->eventFlags != 0) {
+            constexpr std::uint32_t KNOWN_DATA_FLAGS = 0x5f;
+            constexpr std::uint32_t REMOVE_EVENT = 0x02;
+            const auto flags = static_cast<std::uint32_t>(symbol.value->eventFlags);
+            const bool supported =
+                policy == DataEventPolicy::BINARY_CATALOG_V1 ? (flags & ~KNOWN_DATA_FLAGS) == 0 : flags == 0;
+
+            if (!supported) {
                 result.status = StreamDataStatus::UNSUPPORTED_PROFILE;
 
                 return result;
@@ -522,7 +557,28 @@ StreamDataResult decodeDataPayload(std::span<const std::byte> payload, const Str
                 }
             }
 
-            for (const auto &field : plan->binding.fields) {
+            std::optional<std::int64_t> removalTime;
+            auto fieldActions = std::span<const FieldBinding>(plan->binding.fields);
+
+            if ((flags & REMOVE_EVENT) != 0) {
+                result.stage = StreamDataStage::REMOVAL_TIME;
+                result.errorOffset = result.consumed;
+                const auto time = encoding::readCompactLong(payload.subspan(result.consumed));
+                result.consumed += time.consumed;
+
+                if (time.status != encoding::Status::OK) {
+                    result.status = StreamDataStatus::TRUNCATED_PAYLOAD;
+
+                    return result;
+                }
+
+                removalTime = time.value;
+                applyRemovalTime(typedValues, plan->indexedTimeLayout, time.value);
+                // The special time is bounded by record/input allowances, not descriptor-field work.
+                fieldActions = {};
+            }
+
+            for (const auto &field : fieldActions) {
                 result.stage = StreamDataStage::FIELD;
                 result.errorOffset = result.consumed;
 
@@ -649,7 +705,7 @@ StreamDataResult decodeDataPayload(std::span<const std::byte> payload, const Str
             if (plan->binding.localRecordId) {
                 const auto units = symbol.value->units.size();
                 result.records.push_back({*plan->binding.localRecordId, std::move(*symbol.value), std::move(values),
-                                          std::move(typedValues), plan->context, id.value});
+                                          std::move(typedValues), plan->context, id.value, removalTime});
                 --limits.emittedRecords;
                 limits.emittedValues -= plan->localFieldCount;
                 limits.ownedSymbolUnits -= units;
@@ -674,11 +730,16 @@ StreamDataResult decodeDataPayload(std::span<const std::byte> payload, const Str
 
 StreamDataResult decodeStreamData(std::span<const std::byte> payload, const StreamDataContext &context,
                                   StreamDataLimits limits) {
-    return decodeDataPayload(payload, context, limits);
+    return decodeDataPayload(payload, context, limits, DataEventPolicy::ZERO_FLAGS);
+}
+
+StreamDataResult decodeStreamDataWithEventPolicy(std::span<const std::byte> payload, const StreamDataContext &context,
+                                                 StreamDataLimits limits, DataEventPolicy policy) {
+    return decodeDataPayload(payload, context, limits, policy);
 }
 
 StreamDataResult decodeRawData(std::span<const std::byte> payload, const StreamDataContext &context,
                                StreamDataLimits limits) {
-    return decodeDataPayload(payload, context, limits);
+    return decodeDataPayload(payload, context, limits, DataEventPolicy::ZERO_FLAGS);
 }
 } // namespace org::ttldtor::qdcxx::protocol

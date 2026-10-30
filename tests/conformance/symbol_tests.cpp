@@ -504,7 +504,9 @@ TEST_CASE("Complete payload boundaries, budgets, profiles and independent owners
     CHECK(reader.beginMessage(0) == SymbolStatus::OK);
     CHECK(reader.read(bytes("f8fe")).value->eventFlags == 1);
     CHECK(saved.value->units == std::u16string{u'A', 0, u'B'});
-    CHECK(reader.beginMessage(1) == SymbolStatus::UNSUPPORTED_PROFILE);
+    CHECK(reader.beginMessage(1) == SymbolStatus::OK);
+    CHECK(reader.read(bytes("f8fe")).value->eventFlags == 1);
+    CHECK(reader.beginMessage(2) == SymbolStatus::UNSUPPORTED_PROFILE);
     CHECK(reader.read(bytes("fe")).status == SymbolStatus::UNSUPPORTED_PROFILE);
     CHECK(reader.beginMessage(0) == SymbolStatus::OK);
     auto partial = reader.read(bytes("fd01ed"));

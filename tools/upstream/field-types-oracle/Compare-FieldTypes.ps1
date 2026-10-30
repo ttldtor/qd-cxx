@@ -282,3 +282,153 @@ function CompareIndexed([string]$ActualRoot, [string]$ExpectedRoot) {
     "PASS: strict indexed comparison of $($names.Count) artifacts"
 }
 CompareIndexed (Join-Path $Actual 'indexed') (Join-Path $Expected 'indexed')
+
+# Flags child capture: exact artifact set and canonical grammar, followed by byte identity.
+function CompareFlags([string]$ActualRoot, [string]$ExpectedRoot) {
+    $names = @(
+        'composer-10-default.qtp',
+        'composer-10-empty.qtp',
+        'composer-10-hs-hs.qtp',
+        'composer-10-hs-unknown.qtp',
+        'composer-10-hs.qtp',
+        'composer-10-unknown.qtp',
+        'composer-15-default.qtp',
+        'composer-15-empty.qtp',
+        'composer-15-hs-hs.qtp',
+        'composer-15-hs-unknown.qtp',
+        'composer-15-hs.qtp',
+        'composer-15-unknown.qtp',
+        'composer-20-default.qtp',
+        'composer-20-empty.qtp',
+        'composer-20-hs-hs.qtp',
+        'composer-20-hs-unknown.qtp',
+        'composer-20-hs.qtp',
+        'composer-20-unknown.qtp',
+        'composer-5-default.qtp',
+        'composer-5-empty.qtp',
+        'composer-5-hs-hs.qtp',
+        'composer-5-hs-unknown.qtp',
+        'composer-5-hs.qtp',
+        'composer-5-unknown.qtp',
+        'composer-unknown-10-empty.qtp',
+        'composer-unknown-10-hs.qtp',
+        'composer-unknown-15-empty.qtp',
+        'composer-unknown-15-hs.qtp',
+        'composer-unknown-20-empty.qtp',
+        'composer-unknown-20-hs.qtp',
+        'composer-unknown-5-empty.qtp',
+        'composer-unknown-5-hs.qtp',
+        'designed-10-all64.qtp',
+        'designed-15-all64.qtp',
+        'designed-20-all64.qtp',
+        'designed-5-all64.qtp',
+        'designed-descriptor-_hs.qtp',
+        'designed-descriptor-absent.qtp',
+        'designed-descriptor-empty.qtp',
+        'designed-descriptor-hs-hs.qtp',
+        'designed-descriptor-hs-unknown.qtp',
+        'designed-descriptor-hs.qtp',
+        'designed-descriptor-unknown.qtp',
+        'designed-malformed-1-249.qtp',
+        'designed-malformed-1-255.qtp',
+        'designed-malformed-2-248.qtp',
+        'designed-malformed-2-249.qtp',
+        'designed-unknown-100.qtp',
+        'designed-unknown-20.qtp',
+        'designed-unknown-80.qtp',
+        'designed-unknown-80000000.qtp',
+        'designed-unknown-ffffffff.qtp',
+        'designed-wide-flags.qtp',
+        'empty-message.qtp',
+        'file-pair-absent-setting.qtp',
+        'file-pair-empty.qtp',
+        'file-pair-hs.qtp',
+        'file-time-and-sale-absent-setting.qtp',
+        'file-time-and-sale-empty.qtp',
+        'file-time-and-sale-hs.qtp',
+        'message-mru-reset.qtp',
+        'message-repeat-reset.qtp',
+        'observations.tsv',
+        'remove-Empty-0.qtp',
+        'remove-Empty-1234567889abcdef.qtp',
+        'remove-Empty-7fffffffffffffff.qtp',
+        'remove-Empty-8000000000000000.qtp',
+        'remove-Empty-ffffffffffffffff.qtp',
+        'remove-followed-sentinel-Empty.qtp',
+        'remove-followed-sentinel-Pair.qtp',
+        'remove-followed-sentinel-Plain.qtp',
+        'remove-layout-104.qtp',
+        'remove-layout-120.qtp',
+        'remove-layout-152.qtp',
+        'remove-layout-24.qtp',
+        'remove-layout-4.qtp',
+        'remove-layout-40.qtp',
+        'remove-layout-56.qtp',
+        'remove-layout-72.qtp',
+        'remove-layout-8.qtp',
+        'remove-layout-88.qtp',
+        'remove-Pair-0-unknown.qtp',
+        'remove-Pair-0.qtp',
+        'remove-Pair-1234567889abcdef-unknown.qtp',
+        'remove-Pair-1234567889abcdef.qtp',
+        'remove-Pair-7fffffffffffffff-unknown.qtp',
+        'remove-Pair-7fffffffffffffff.qtp',
+        'remove-Pair-8000000000000000-unknown.qtp',
+        'remove-Pair-8000000000000000.qtp',
+        'remove-Pair-ffffffffffffffff-unknown.qtp',
+        'remove-Pair-ffffffffffffffff.qtp',
+        'remove-Plain-0.qtp',
+        'remove-Plain-1234567889abcdef.qtp',
+        'remove-Plain-7fffffffffffffff.qtp',
+        'remove-Plain-8000000000000000.qtp',
+        'remove-Plain-ffffffffffffffff.qtp',
+        'remove-truncated-0.qtp',
+        'remove-truncated-1.qtp',
+        'remove-truncated-2.qtp',
+        'remove-truncated-3.qtp',
+        'remove-truncated-4.qtp',
+        'remove-truncated-5.qtp',
+        'remove-truncated-6.qtp',
+        'remove-truncated-7.qtp',
+        'remove-truncated-8.qtp'
+    )
+    $required = @{all=1; callback=3305; corrupt=15; 'descriptor-option'=13; layout=10; negative=9; option=6; parse=98; 'partial-frame'=1; primitive=6; 'primitive-error'=3; 'production-file'=6; projection=9; 'raw-removal-time'=794; 'requested-composer'=24}
+    $arity = @{all=2; callback=4; corrupt=3; 'descriptor-option'=3; layout=5; negative=4; option=3; parse=5; 'partial-frame'=3; primitive=7; 'primitive-error'=5; 'production-file'=4; projection=5; 'raw-removal-time'=6; 'requested-composer'=4}
+    foreach ($root in @($ActualRoot, $ExpectedRoot)) {
+        $files = @(Get-ChildItem -LiteralPath $root -File | Sort-Object Name)
+        Assert (($files.Name -join '|') -ceq ($names -join '|')) 'exact flags artifact set'
+        Assert (@(Get-ChildItem -LiteralPath $root -Directory).Count -eq 0) 'no flags child directories'
+        $rows = [IO.File]::ReadAllLines((Join-Path $root 'observations.tsv'))
+        Assert ($rows.Count -eq 4300 -and $rows[-1] -ceq "all`tPASS") 'flags completion/count'
+        $counts = @{}
+        foreach ($line in $rows) {
+            $c = $line.Split("`t")
+            Assert ($arity.ContainsKey($c[0]) -and $c.Count -eq $arity[$c[0]]) 'flags row kind/arity'
+            if (!$counts.ContainsKey($c[0])) { $counts[$c[0]] = 0 }; $counts[$c[0]]++
+            if ($c[0] -ceq 'callback') {
+                Assert ($c[2] -cin @('10','15','20')) 'labelled callback family'
+                $v = $c[3].Split('|')
+                Assert ($v.Count -ge 4 -and $v.Count -le 19 -and $v[0] -cmatch '^(Pair|Plain|Empty|Layout(4|8|24|40|56|72|88|104|120|152)|TimeAndSale)$') 'finite record shape'
+                Integer $v[1]; Integer $v[2] $true; Assert ($v[3] -ceq '0') 'no FIELD metadata'
+                for ($i=4; $i -lt $v.Count; $i++) { Integer $v[$i] }
+            } elseif ($c[0] -ceq 'raw-removal-time') {
+                Integer $c[3] $true; Integer $c[4] $true; Integer $c[5] $true
+                Assert ([long]$c[5] -gt [long]$c[4]) 'removal primitive consumes bytes'
+            } elseif ($c[0] -ceq 'projection') {
+                Assert ($c[2] -ceq 'STREAM') 'explicit STREAM projection'; Integer $c[3]
+                Assert ($c[4] -ceq ('callbacks=' + (3 * [int]$c[3]))) 'RAW three callbacks per wire record'
+            } elseif ($c[0] -ceq 'requested-composer') {
+                Assert ($c[2] -ceq 'input=all64' -and $c[3] -cin @('mask=0','mask=95')) 'composer masks separate from input'
+            } elseif ($c[0] -ceq 'primitive') {
+                Integer $c[2]; Integer $c[3]; Integer $c[4]; Integer $c[5]; Integer $c[6]
+                Assert ([int]$c[6] -gt [int]$c[5]) 'symbol primitive consumption'
+            } elseif ($c[0] -ceq 'negative') {
+                Assert ($c[2] -ceq 'completed=0' -and $c[3] -ceq 'errors=1') 'Java buffered-prefix error observation'
+            }
+        }
+        foreach ($item in $required.GetEnumerator()) { Assert ($counts[$item.Key] -eq $item.Value) "finite flags count $($item.Key)" }
+    }
+    foreach ($name in $names) { Assert ((Get-FileHash -LiteralPath (Join-Path $ActualRoot $name)).Hash -ceq (Get-FileHash -LiteralPath (Join-Path $ExpectedRoot $name)).Hash) "flags artifact mismatch: $name" }
+    "PASS: strict flags comparison of $($names.Count) artifacts"
+}
+CompareFlags (Join-Path $Actual 'flags') (Join-Path $Expected 'flags')

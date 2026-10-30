@@ -172,3 +172,15 @@ owned nullable UTF-16, logical field positions independent of Java slots, and cu
 Both existing tape modes keep their descriptor, flags, timing, terminal-error and append-only policies.
 Earlier type exclusions below describe the older profiles; only this explicit profile extends them.
 No Profile event adapter, indexed schema, importer or implicit discovery is added.
+
+## Catalog flag evidence and unchanged RAW gate
+
+The [flags production corpus](../../tests/conformance/protocol/field-types/FLAGS-VALIDATION.md)
+characterizes all 64 known subsets and composer/parser option differences in RAW5, TICKER 10,
+STREAM 15 and HISTORY20. RAW callback fanout is labelled and compared before selecting one STREAM
+wire projection. These observations do not extend RAW_MESSAGE_V1 or `decodeRawData`: both still
+refuse nonzero data flags. The new `decodeStreamDataWithEventPolicy` and BINARY_CATALOG_V1 enable
+only STREAM/NONE known flags and owned removal time under their explicit contract.
+Broader family dispatch and versioned output remain separate work; old serialized output is unchanged.
+
+

@@ -264,6 +264,10 @@ std::string Formatter::frame(const protocol::Frame &frame, std::size_t index, st
 std::string Formatter::record(const protocol::StreamDataRecord &record, std::u16string_view name,
                               std::size_t frameIndex, std::size_t index, std::size_t budget,
                               const protocol::TapeTiming *timing, std::size_t generation) const {
+    if (record.symbol.eventFlags != 0 || record.removalTime.has_value()) {
+        throw std::invalid_argument("unsupported record metadata format");
+    }
+
     const bool wire = profile_ == DisplayProfile::WIRE_SCHEMA_V1;
 
     if (profile_ == DisplayProfile::ORACLE_FIELD_TYPES_V1 || profile_ == DisplayProfile::EXTERNAL_SCHEMA_V1 || wire) {
@@ -558,6 +562,10 @@ std::string Formatter::record(const protocol::StreamDataRecord &record, std::u16
 std::string Formatter::profileRecord(const protocol::StreamDataRecord &record, std::u16string_view name,
                                      std::size_t frameIndex, std::size_t index, const events::Profile &event,
                                      std::size_t budget) const {
+    if (record.symbol.eventFlags != 0 || record.removalTime.has_value()) {
+        throw std::invalid_argument("unsupported record metadata format");
+    }
+
     if (!record.values.empty() || record.typedValues.size() != events::PROFILE_FIELD_TYPES.size()) {
         throw std::invalid_argument("default Profile field shape");
     }

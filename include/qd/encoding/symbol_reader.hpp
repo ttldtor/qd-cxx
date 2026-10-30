@@ -17,7 +17,7 @@ enum class SymbolStatus {
     INVALID_ENCODING,    ///< Reserved prefix, undefined repeat, duplicate flags or malformed text.
     INVALID_LENGTH,      ///< String length is outside zero through Java INT_MAX.
     RESOURCE_LIMIT,      ///< An explicit input, output or retained-state budget was exceeded.
-    UNSUPPORTED_PROFILE, ///< Only option mask zero is implemented.
+    UNSUPPORTED_PROFILE, ///< An option mask other than EMPTY_SET0 or history-snapshot1 was requested.
     ALLOCATION_FAILURE,  ///< Allocation failed; no tentative state or value was published.
     FAILED               ///< A previous failure requires beginMessage before another read.
 };
@@ -31,10 +31,10 @@ struct SymbolLimits {
 
 /** Independent owned symbol and raw Java encoding metadata; no event semantics are applied. */
 struct SymbolValue {
-    std::u16string units;        ///< Exact units, including NUL and isolated surrogates; never a null symbol.
-    std::int32_t cipher;         ///< Java cipher; zero means string representation, not an empty symbol.
-    std::int32_t eventFlags;     ///< Raw signed low-32-bit flags, zero without a prefix.
-    std::size_t eventFlagsBytes; ///< Java count: one for F8, compact integer bytes only for F9.
+    std::u16string units;            ///< Exact units, including NUL and isolated surrogates; never a null symbol.
+    std::int32_t cipher = 0;         ///< Java cipher; zero means string representation, not an empty symbol.
+    std::int32_t eventFlags = 0;     ///< Raw signed low-32-bit flags, zero without a prefix.
+    std::size_t eventFlagsBytes = 0; ///< Java count: one for F8, compact integer bytes only for F9.
 };
 
 /** Read result; failure never exposes a partial symbol. */
@@ -56,12 +56,12 @@ class SymbolReader {
     public:
     /** Initialize an empty message state without allocating.
      * @param limits Mandatory finite input/output/state budgets.
-     * @param optionMask Zero for EMPTY_SET; other values make reads UNSUPPORTED_PROFILE.
+     * @param optionMask Zero for EMPTY_SET or one for hs; other bits make reads UNSUPPORTED_PROFILE.
      */
     explicit SymbolReader(SymbolLimits limits, std::uint32_t optionMask) noexcept;
     /** Clear prior symbol, restore MRU=1 and begin a new complete message.
-     * @param optionMask Zero for EMPTY_SET; every other value is explicitly unsupported.
-     * @return OK for EMPTY_SET, otherwise UNSUPPORTED_PROFILE; no input is examined.
+     * @param optionMask Zero for EMPTY_SET or one for hs; no wire form depends on this mask.
+     * @return OK for either known set, otherwise UNSUPPORTED_PROFILE; no input is examined.
      */
     [[nodiscard]] SymbolStatus beginMessage(std::uint32_t optionMask) noexcept;
     /** Read one symbol from a borrowed remaining span inside one complete message payload.

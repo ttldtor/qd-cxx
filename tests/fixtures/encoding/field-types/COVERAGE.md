@@ -61,3 +61,7 @@ Source traceability: upstream `qd-core/.../kit/{StringField,ShortStringField,Seq
 `qd-core/.../qtp/BinaryRecordDesc.java`, `dxlib/.../io/{IOUtil,BufferedInputPart}.java`, and
 `dxfeed-impl/.../market/MarketFactoryImpl.java`; exact revision/classpath hashes are in run metadata.
 The harness source and reproduction commands are in the [oracle README](../../../../tools/upstream/field-types-oracle/README.md).
+
+The separate [flags extension](../../../conformance/protocol/field-types/FLAGS-VALIDATION.md)
+adds known STREAM/NONE event metadata under an explicit policy, while keeping this historical
+ordinary corpus unchanged. It does not extend old modes, collectors, FIELD or writer formats.

@@ -292,6 +292,21 @@ TEST_CASE("Profile formatter rejects incomplete and noncanonical generic fields 
     for (const auto format : {display::OutputFormat::TSV, display::OutputFormat::HUMAN}) {
         const display::Formatter formatter(format, display::DisplayProfile::DEFAULT_PROFILE_V1);
         CHECK_NOTHROW(formatter.profileRecord(original, u"Profile", 0, 0, event, 4096));
+        auto metadata = original;
+        metadata.symbol.eventFlagsBytes = 5;
+        CHECK(formatter.profileRecord(metadata, u"Profile", 0, 0, event, 4096) ==
+              formatter.profileRecord(original, u"Profile", 0, 0, event, 4096));
+
+        for (const auto flag : {1, 2, 4, 8, 16, 64, 95, -1}) {
+            metadata.symbol.eventFlags = flag;
+            CHECK_THROWS_WITH_AS(formatter.profileRecord(metadata, u"Profile", 0, 0, event, 0),
+                                 "unsupported record metadata format", std::invalid_argument);
+        }
+
+        metadata.symbol.eventFlags = 0;
+        metadata.removalTime = 0;
+        CHECK_THROWS_WITH_AS(formatter.profileRecord(metadata, u"Profile", 0, 0, event, 0),
+                             "unsupported record metadata format", std::invalid_argument);
 
         for (int change = 0; change < 6; ++change) {
             auto record = original;

@@ -25,11 +25,13 @@ readUTFChar/readUTFBody/readUTF2/3/4; [QTP sources](../protocol/SOURCES.md) iden
 parseData/parseSubscription and composer writeMessageHeader reset calls and PentaCodecTest.
 Those upstream tests were inspected, not executed.
 
-Only option mask zero (EMPTY_SET) is accepted by the C++ API. Any other mask is UNSUPPORTED_PROFILE.
+The C++ API accepts option mask zero (EMPTY_SET) or one (history snapshot, `hs`).
+Any other bit is UNSUPPORTED_PROFILE before input examination.
 Java reader ignores its option set; production parser resets with SUPPORTED_SET, while integration
 composer explicitly uses EMPTY_SET. No option-dependent wire form is silently reinterpreted: the
 pinned codec has none. Raw signed flags are retained even when a message/profile would mask them;
-EventFlag/message semantics and negotiation are not implemented.
+SymbolReader does not filter flags or negotiate options. The explicit data policy in
+[STREAM-DATA](../protocol/STREAM-DATA.md#catalog-event-metadata) validates the known data mask.
 
 ## Grammar
 
@@ -79,6 +81,7 @@ Result owns optional SymbolValue {units, cipher, eventFlags, eventFlagsBytes}. O
 consumed counts examined bytes in this call. Results survive subsequent reads, reset and reader
 destruction. No resolver, shared cache, global state or automatic message-boundary detection exists.
 Use is single-threaded and non-reentrant.
+Default-constructed numeric SymbolValue members are zero; aggregate member order is unchanged.
 
 C++ deliberately publishes state only on complete success and makes any error terminal until
 beginMessage. Later read returns FAILED with zero consumption; reset clears failure. Unsupported configuration
@@ -114,3 +117,5 @@ bytes; terminal state prohibits retry without explicit reset. No writer, event d
 installation, conversions, importer, time metadata, PART, transport or performance guarantee.
 See paired [conformance coverage](../../tests/conformance/encoding/symbols/COVERAGE.md) and
 [validation](../../tests/conformance/encoding/symbols/VALIDATION.md) for executed checks and limits.
+
+

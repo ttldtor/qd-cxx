@@ -25,11 +25,13 @@ readUTFChar/readUTFBody/readUTF2/3/4; [исходники QTP](../protocol/SOURC
 parseData/parseSubscription parser и writeMessageHeader composer, а также PentaCodecTest.
 Эти upstream tests изучены, но не запускались.
 
-C++ API принимает только нулевую маску опций (EMPTY_SET). Иная маска даёт UNSUPPORTED_PROFILE.
+C++ API принимает маску опций ноль (EMPTY_SET) или один (снимок истории, `hs`).
+Любой другой бит даёт UNSUPPORTED_PROFILE до просмотра входа.
 Java reader игнорирует набор опций; production parser вызывает reset с SUPPORTED_SET, integration
 composer явно использует EMPTY_SET. Формы wire, зависящие от опций, не переинтерпретируются молча:
 в закреплённом codec таких форм нет. Исходные знаковые флаги сохраняются даже там, где сообщение/профиль
-применяло бы маску; семантика EventFlag/сообщений и negotiation не реализованы.
+применяло бы маску. SymbolReader не отбирает флаги и не согласует опции. Явная политика данных в
+[STREAM-DATA](../protocol/STREAM-DATA.ru.md#catalog-event-metadata) проверяет известную маску флагов.
 
 ## Грамматика
 
@@ -79,6 +81,7 @@ span внутри одного полного payload. Читается ровн
 только при OK; consumed считает просмотренные байты вызова. Результаты сохраняются после следующих
 чтений, reset и уничтожения reader. Нет resolver, общего кеша, глобального состояния или автоматического
 определения границ сообщений. Использование однопоточное и нерекурсивное.
+Числовые члены SymbolValue при конструировании по умолчанию равны нулю; порядок членов агрегата сохранён.
 
 C++ намеренно публикует состояние только при полном успехе и делает любую ошибку terminal до
 beginMessage. Следующий read возвращает FAILED с нулевым consumption; reset снимает ошибку. Неподдерживаемая
@@ -115,3 +118,5 @@ frame; terminal state запрещает retry без явного reset. Нет
 incoming-ID, преобразований, importer, time metadata, PART, транспорта или гарантий производительности.
 Парные [покрытие](../../tests/conformance/encoding/symbols/COVERAGE.md) и
 [валидация](../../tests/conformance/encoding/symbols/VALIDATION.md) указывают выполненные проверки и пределы.
+
+

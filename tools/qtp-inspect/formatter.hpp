@@ -122,6 +122,8 @@ class Formatter {
      * @param generation Current accepted description generation, used only by WIRE_SCHEMA_V1.
      * @return Complete line or OutputLimit; invalid_argument for noncanonical values or payload
      * identities9/137/233/249 unsupported by the existing output grammars, including null values.
+     * Nonzero raw symbol flags or engaged removalTime also cause invalid_argument before buffering.
+     * Explicit zero-flags prefixes retain the old output regardless of eventFlagsBytes.
      */
     std::string record(const protocol::StreamDataRecord &record, std::u16string_view name, std::size_t frameIndex,
                        std::size_t index, std::size_t budget, const protocol::TapeTiming *timing = nullptr,
@@ -169,7 +171,8 @@ class Formatter {
      * @param index Emitted record index.
      * @param event Owned projected event, borrowed for this call.
      * @param budget Remaining stdout bytes.
-     * @return Both complete rows, or OutputLimit before either is published.
+     * @return Both complete rows, or OutputLimit before either is published; invalid_argument
+     * before buffering for nonzero raw symbol flags or engaged removalTime, including zero.
      */
     std::string profileRecord(const protocol::StreamDataRecord &record, std::u16string_view name,
                               std::size_t frameIndex, std::size_t index, const events::Profile &event,

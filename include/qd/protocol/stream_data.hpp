@@ -86,21 +86,28 @@ enum class StreamDataStatus {
     INVALID_SYMBOL,      ///< Symbol grammar or length is invalid.
     INVALID_ID,          ///< Negative signed sender ID.
     UNDESCRIBED_ID,      ///< Sender ID has no static description.
-    UNSUPPORTED_PROFILE, ///< Nonzero raw event flags.
+    UNSUPPORTED_PROFILE, ///< Event flags or explicit data policy outside the selected profile.
     RESOURCE_LIMIT,      ///< Mandatory logical budget exceeded.
     ALLOCATION_FAILURE,  ///< Allocation failed; completed prefix retained.
     INVALID_FIELD        ///< Character or array primitive has invalid encoding or length.
 };
 /** Checkpoint identifying failure location or successful completion. */
 enum class StreamDataStage {
-    PAYLOAD,   ///< Initial payload budget.
-    RECORD,    ///< Processed-record budget, including skips.
-    SYMBOL,    ///< Message-local symbol primitive.
-    FLAGS,     ///< Raw flag profile validation.
-    RECORD_ID, ///< Compact ID primitive and lookup.
-    FIELD,     ///< Wire-field budget or exact selected primitive.
-    OUTPUT,    ///< Output budgets, initialization or publication.
-    END        ///< Successful completion.
+    PAYLOAD,     ///< Initial payload budget.
+    RECORD,      ///< Processed-record budget, including skips.
+    SYMBOL,      ///< Message-local symbol primitive.
+    FLAGS,       ///< Raw flag profile validation.
+    RECORD_ID,   ///< Compact ID primitive and lookup.
+    FIELD,       ///< Wire-field budget or exact selected primitive.
+    OUTPUT,      ///< Output budgets, initialization or publication.
+    END,         ///< Successful completion.
+    REMOVAL_TIME ///< REMOVE_EVENT compact-long payload, distinct from ordinary fields and FIELD metadata.
+};
+
+/** Explicit data metadata policy; field support alone never enables event semantics. */
+enum class DataEventPolicy {
+    ZERO_FLAGS,       ///< Existing complete-payload grammar, refusing every nonzero raw flag.
+    BINARY_CATALOG_V1 ///< Six known data bits and REMOVE_EVENT/NONE, requiring BINARY_FIELDS_V1.
 };
 
 /** Mandatory finite per-message budgets; zero is valid. */
@@ -131,6 +138,7 @@ struct StreamDataRecord {
     std::vector<core::FieldValue> typedValues; ///< Every non-compact profile, with exact tags/raw and owned payloads.
     core::RecordContext context{}; ///< Source schema/record identity; old aggregate initializers remain untagged.
     std::int32_t senderId = -1;    ///< Owned exact wire ID; -1 only for caller-created records without source identity.
+    std::optional<std::int64_t> removalTime{}; ///< Exact REMOVE_EVENT compact-long; engaged zero differs from absence.
 };
 
 /** Owned completed prefix with explicit first-error diagnostics. */
@@ -162,6 +170,21 @@ struct StreamDataResult {
  */
 [[nodiscard]] StreamDataResult decodeStreamData(std::span<const std::byte> payload, const StreamDataContext &context,
                                                 StreamDataLimits limits);
+/** Decode a complete type-15/NONE payload under an explicit event policy.
+ * Broad policy preserves all subsets of raw0x5f independently of descriptor option advertisement.
+ * REMOVE_EVENT omits ordinary fields, consumes one compact-long even for unknown records,
+ * and initializes only explicitly mapped indexed words over fresh local defaults. No builtin
+ * FIELD event-time metadata is declared or autodetected by this API. Other flags are refused.
+ * Invalid policy/profile combinations fail at PAYLOAD before payload-budget or record work.
+ * @param payload Borrowed complete body excluding length/type; never retained.
+ * @param context Owned validated bindings/layouts borrowed only during this call.
+ * @param limits Finite input/work/output allowances; omitted fields still require local value storage.
+ * @param policy Explicit metadata policy; no default broadens existing overloads.
+ * @return Owned completed prefix and first-error diagnostics; current incomplete record is never published.
+ */
+[[nodiscard]] StreamDataResult decodeStreamDataWithEventPolicy(std::span<const std::byte> payload,
+                                                               const StreamDataContext &context,
+                                                               StreamDataLimits limits, DataEventPolicy policy);
 /** Decode one complete type-5 payload under the context's exact fields and RAW-TAPE's zero-flags policy.
  * This is one wire-record projection, without Java ticker/history callback fan-out or timing state.
  * @param payload Borrowed payload excluding length/type, unchanged during this call.

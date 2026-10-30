@@ -165,11 +165,19 @@ No Profile event adapter, indexed schema, importer or implicit discovery is adde
 
 The supplied-schema constructor now explicitly accepts BINARY_CATALOG_V1 only with
 BINARY_FIELDS_V1 and finite snapshotUnits. Its current header/data grammar is the same
-restricted BINARY/NONE/EMPTY_SET/STREAM_DATA/zero-flags subset. Old LEGACY/RAW_MESSAGE_V1
+restricted BINARY/NONE/STREAM_DATA subset, accepting absent/empty/exact `hs` options and
+all known data flag subsets of 0x5f through the explicit catalog event policy. Old LEGACY/RAW_MESSAGE_V1
 behavior and ordinary discovery remain unchanged; the discovery constructor refuses the
-new mode. Other families, headerless input, options/flags, FIELD and source chains remain pending.
+new mode. Other families, headerless input, other options/flags, FIELD and source chains remain pending.
 
-[INDEXED-SCHEMAS](../schema/INDEXED-SCHEMAS.md) defines pair32/single64 local metadata,
+Unknown/duplicate/whitespace option tokens are UNSUPPORTED/OPTIONS; absent and empty remain distinct
+in the owned descriptor. Nonzero known flags are accepted even without hs advertisement, matching
+the production reader rather than the composer mask. Unknown raw bits fail before sender ID with
+UNSUPPORTED/OPTIONS. [STREAM-DATA](STREAM-DATA.md#catalog-event-metadata) specifies owned removalTime,
+resolved time words, default allocation admission, counters and the appended REMOVAL_TIME stage.
+No new reset, callback, collector or implicit discovery policy follows from this extension.
+
+[INDEXED-SCHEMAS](../schema/INDEXED-SCHEMAS.md) defines pair 32/single 64 local metadata,
 owned resolved plan positions and exact S/D/C work/peak charges. Active sender descriptions
 are replaced in stable first-seen order. Every successful nonempty batch publishes fresh
 immutable provenance, even for equal shapes; an empty batch is a no-op. All input entries
@@ -182,3 +190,5 @@ header/footer resets state or work counters. Typed causes, framing/payload coord
 completed-prefix behavior and separate payload ownership budgets retain their contracts.
 [Validation](../../tests/conformance/protocol/field-types/INDEXED-VALIDATION.md) records
 both production pins and the deliberately stronger C++ rollback policy.
+
+
