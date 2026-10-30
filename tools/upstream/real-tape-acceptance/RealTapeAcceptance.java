@@ -22,6 +22,7 @@ import com.devexperts.qd.qtp.BinaryRecordDesc;
 import com.devexperts.qd.qtp.HeartbeatPayload;
 import com.devexperts.qd.qtp.MessageConsumerAdapter;
 import com.devexperts.qd.qtp.MessageType;
+import com.devexperts.qd.qtp.ProtocolDescriptor;
 import com.devexperts.qd.qtp.file.BinaryFileQTPParser;
 import com.devexperts.qd.qtp.file.FileFormat;
 import com.devexperts.qd.qtp.file.FileReader;
@@ -45,16 +46,20 @@ import java.security.MessageDigest;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /** Compares ordinary wire records with the unmodified locked production parser. */
 public final class RealTapeAcceptance {
   private static final String HELP =
       "RealTapeAcceptance --input PATH --cpp-output PATH --tape-mode legacy|raw-message-v1\n"
           + "  [--max-input N] [--max-records N] [--max-output N]\n"
-          + "  [--cpp-projection ordinary-v1|binary-catalog-v1] (default ordinary-v1)\n"
+          + "  [--cpp-projection ordinary-v1|binary-catalog-v1|self-contained-segments-v1]\n"
+          + "  (default ordinary-v1; source profile: one uncompressed MESSAGE ordinary source)\n"
           + "  [--inject-late-io] [--inject-close-io]\n"
           + "Read-only two-pass Java production oracle, then literal-file cross-check.\n"
           + "Supported full types: 2/8/10/40/56/72/88/120, ordinary schemas, zero flags.\n"
@@ -79,6 +84,7 @@ public final class RealTapeAcceptance {
   private final Path cpp;
   private final boolean timed;
   private final boolean binaryProjection;
+  private final boolean sourceProjection;
   private final boolean injectLateIo;
   private final boolean injectCloseIo;
   private final long maxInput;
@@ -98,9 +104,13 @@ public final class RealTapeAcceptance {
     String projection =
         args.containsKey("--cpp-projection") ? args.get("--cpp-projection") : "ordinary-v1";
     require(
-        projection.equals("ordinary-v1") || projection.equals("binary-catalog-v1"),
+        projection.equals("ordinary-v1")
+            || projection.equals("binary-catalog-v1")
+            || projection.equals("self-contained-segments-v1"),
         "cpp-projection");
-    binaryProjection = projection.equals("binary-catalog-v1");
+    sourceProjection = projection.equals("self-contained-segments-v1");
+    require(!sourceProjection || timed, "v9-message-only");
+    binaryProjection = projection.equals("binary-catalog-v1") || sourceProjection;
     injectLateIo = args.containsKey("--inject-late-io");
     injectCloseIo = args.containsKey("--inject-close-io");
     maxInput = limit(args, "--max-input", 8388608, 67108864);
@@ -420,6 +430,73 @@ public final class RealTapeAcceptance {
     final MessageDigest digest;
     final boolean binary;
     final boolean timed;
+    final boolean source;
+    final Path input;
+    boolean identity;
+    boolean started;
+    boolean policy;
+    boolean sourceEnded;
+    long sourceRecords;
+    String sourceComplete;
+    final Set<String> resources = new HashSet<>();
+    final Map<String, String> resourceObservations = new HashMap<>();
+    final MessageDigest sourceTimingDigest;
+    private static final Set<String> EXPECTED_RESOURCES = expectedResources();
+
+    private static Set<String> expectedResources() {
+      Set<String> result = new HashSet<>();
+      for (String name :
+          ("physicalFetched compressedConsumed logicalProduced headerBytes workBytes "
+                  + "inflateCalls physicalProbes inflatedProbes")
+              .split(" ")) {
+        result.add("data:" + name);
+      }
+      for (String name :
+          ("parserAccepted frames markers emittedRecords processedRecords wireFields").split(" ")) {
+        result.add("parser:" + name);
+      }
+      for (String name :
+          ("path-native-units path-encoded-bytes path-storage-bytes occurrences source-handles"
+                  + " diagnostic-bytes terminal-bytes output-charged-bytes closed-sources"
+                  + " accepted-bytes frames emitted-records processed-records wire-fields")
+              .split(" ")) {
+        result.add("sequence:" + name);
+      }
+      for (String name :
+          ("frame-maximumBodyBytes frame-maximumPendingBytes inputBytes frames"
+               + " descriptor-properties descriptor-messages descriptor-text-bodyBytes"
+               + " descriptor-text-codeUnits descriptor-textUnits context-schema-records"
+               + " context-schema-fields context-schema-lookups context-schema-nameUnits"
+               + " context-schema-totalNameUnits context-descriptions context-bindings-fields"
+               + " context-bindings-nameUnits context-bindings-totalNameUnits constructionUnits"
+               + " data-payloadBytes data-processedRecords data-wireFields data-emittedRecords"
+               + " data-emittedValues data-ownedSymbolUnits data-symbol-inputBytes"
+               + " data-symbol-codeUnits data-symbol-stateUnits data-fieldString-encodedBytes"
+               + " data-fieldString-codeUnits data-fieldBytes data-fieldUnits data-ownedFieldUnits"
+               + " data-fieldPayloadEncodedBytes data-fieldPayloadBytes data-payloadEncodedBytes"
+               + " data-payloadWorkBytes data-ownedPayloadBytes data-ownedFieldTimeRecords"
+               + " timingEvents snapshotUnits")
+              .split(" ")) {
+        result.add("sequence:tape-" + name);
+      }
+      for (String name :
+          ("compressedBytes inflatedBytes expansionRatio ratioSlack gzipMembers zipEntries"
+               + " headerBytes totalHeaderBytes workBytes inflateCalls retainedBytes inflaterBytes"
+               + " chunkBytes")
+              .split(" ")) {
+        result.add("sequence:dataContainer-" + name);
+        result.add("sequence:companionContainer-" + name);
+      }
+      for (String name : "inputBytes lineBytes lines marks workBytes retainedBytes".split(" ")) {
+        result.add("sequence:scanner-" + name);
+      }
+      for (String name :
+          "chunkBytes outputBytes eventUnits physicalProbes inflatedProbes".split(" ")) {
+        result.add("sequence:" + name);
+      }
+      return result;
+    }
+
     long row;
     long frames;
     long visibleGeneration;
@@ -427,7 +504,14 @@ public final class RealTapeAcceptance {
     String complete;
     boolean ended;
 
-    Projection(Path path, boolean metadata, String mode, boolean binary, boolean timed)
+    Projection(
+        Path path,
+        boolean metadata,
+        String mode,
+        boolean binary,
+        boolean timed,
+        boolean source,
+        Path input)
         throws Exception {
       reader =
           new BufferedReader(
@@ -435,12 +519,17 @@ public final class RealTapeAcceptance {
       this.metadata = metadata;
       this.binary = binary;
       this.timed = timed;
+      this.source = source;
+      this.input = input;
       digest = MessageDigest.getInstance("SHA-256");
+      sourceTimingDigest = MessageDigest.getInstance("SHA-256");
       try {
         String header =
-            binary
-                ? "format\tqdcxx-tape-inspect\t8\tbinary-catalog-v1\tbinary-catalog-v1"
-                : "format\tqdcxx-tape-inspect\t7\tordinary-v1\t" + mode;
+            source
+                ? "format\tqdcxx-tape-inspect\t9\tbinary-catalog-v1\tself-contained-segments-v1"
+                : binary
+                    ? "format\tqdcxx-tape-inspect\t8\tbinary-catalog-v1\tbinary-catalog-v1"
+                    : "format\tqdcxx-tape-inspect\t7\tordinary-v1\t" + mode;
         require(header.equals(line()), "cpp-format");
       } catch (Throwable failure) {
         reader.close();
@@ -490,6 +579,12 @@ public final class RealTapeAcceptance {
       long mask = decimal(cells[8]);
       long known = (1L << 5) | (1L << 10) | (1L << 15) | (1L << 20);
       require(mask >= 0 && (mask & ~known) == 0, "v8-send-mask");
+      if (source) {
+        require(
+            cells[6].equals("1")
+                && (cells[7].equals(units("message")) || cells[7].equals(units("MESSAGE"))),
+            "v9-physical-time-property");
+      }
     }
 
     /** Validate the full lossless row before forming the intentionally narrow comparison view. */
@@ -577,13 +672,194 @@ public final class RealTapeAcceptance {
       }
     }
 
+    /**
+     * Narrow original-corpus admission; broader catalog/time families remain explicit exclusions.
+     */
+    private String sourceData(String text) {
+      String[] c = text.split("\t", -1);
+      require(c.length == 27 && policy && !sourceEnded, "v9-data-context");
+      require(
+          c[1].equals("0") && decimal(c[3]) == sourceRecords && decimal(c[4]) == sourceRecords,
+          "v9-record-order");
+      require(c[16].equals("0"), "v9-field-not-in-original-profile");
+      for (int i = 17; i <= 21; i++) {
+        require(c[i].equals("-"), "v9-field-absent");
+      }
+      require(
+          c[22].equals("message") && !c[11].equals("-") && c[23].equals("message"),
+          "v9-message-assignment");
+      long packed = decimal(c[12]);
+      require(
+          c[24].equals(packed == 0 ? "zero" : "external")
+              && c[25].equals(c[12])
+              && c[26].equals(c[13]),
+          "v9-effective-time");
+      StringBuilder legacy = new StringBuilder("wire-data-v8");
+      for (int index : new int[] {2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}) {
+        legacy.append('\t').append(c[index]);
+      }
+      String result = ordinary(legacy.toString());
+      if (!metadata) {
+        StringBuilder timing = new StringBuilder("source-time");
+        for (int index :
+            new int[] {1, 3, 4, 11, 12, 13, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26}) {
+          timing.append('\t').append(c[index]);
+        }
+        sourceTimingDigest.update((timing + "\n").getBytes(StandardCharsets.US_ASCII));
+      }
+      sourceRecords++;
+      return result;
+    }
+
+    /** Validate occurrence identity without printing private native path bytes. */
+    private void identity(String text) {
+      String[] c = text.split("\t", -1);
+      require(
+          c.length == 5 && c[1].equals("0") && c[4].equals("-") && !identity && !started,
+          "v9-source-identity");
+      byte[] bytes;
+      if (c[2].equals("utf16le")) {
+        bytes = input.toString().getBytes(StandardCharsets.UTF_16LE);
+      } else {
+        require(c[2].equals("bytes"), "v9-path-encoding");
+        bytes = input.toString().getBytes(StandardCharsets.UTF_8);
+      }
+      StringBuilder expected = new StringBuilder();
+      for (byte b : bytes) {
+        expected.append(HEX[(b >>> 4) & 15]).append(HEX[b & 15]);
+      }
+      require(c[3].equals(expected.toString()), "v9-native-path");
+      identity = true;
+    }
+
+    private void resource(String text) {
+      String[] c = text.split("\t", -1);
+      require(c.length == 6 && policy, "v9-resource-columns");
+      boolean sequence = c[1].equals("sequence");
+      require(
+          sequence
+              ? sourceEnded && c[2].equals("-")
+              : !sourceEnded && (c[1].equals("data") || c[1].equals("parser")) && c[2].equals("0"),
+          "v9-resource-context");
+      require(
+          c[3].matches("[A-Za-z][A-Za-z0-9-]*") && resources.add(c[1] + ":" + c[3]),
+          "v9-resource-identity");
+      long reserved = decimal(c[4]);
+      require(reserved >= 0, "v9-resource-reserved");
+      if (!c[5].equals("-")) {
+        long observed = decimal(c[5]);
+        require(observed >= 0 && observed <= reserved, "v9-resource-observed");
+      }
+      require(EXPECTED_RESOURCES.contains(c[1] + ":" + c[3]), "v9-unknown-resource");
+      resourceObservations.put(c[1] + ":" + c[3], c[5]);
+    }
+
+    private void sourceEnd(String text) throws IOException {
+      String[] c = text.split("\t", -1);
+      require(
+          c.length == 9
+              && policy
+              && !sourceEnded
+              && pendingGeneration == null
+              && c[1].equals("0")
+              && decimal(c[2]) == Files.size(input)
+              && decimal(c[3]) == frames
+              && decimal(c[4]) == sourceRecords
+              && c[5].equals(c[4])
+              && c[7].equals(c[2])
+              && c[8].equals(c[2]),
+          "v9-source-end");
+      require(decimal(c[6]) >= 0, "v9-source-fields");
+      sourceComplete = "complete";
+      for (int i = 2; i <= 6; i++) {
+        sourceComplete += "\t" + c[i];
+      }
+      sourceEnded = true;
+    }
+
     String next() throws IOException {
       String text;
       while ((text = line()) != null) {
         require(!ended, "cpp-extra-after-complete");
+        if (source) {
+          if (text.startsWith("source\t")) {
+            identity(text);
+            continue;
+          }
+          if (text.equals("source-begin\t0")) {
+            require(identity && !started, "v9-source-begin");
+            started = true;
+            require("source-policy\tmessage\tnone\t-".equals(line()), "v9-source-policy");
+            policy = true;
+            continue;
+          }
+          require(policy, "v9-before-source");
+          if (text.startsWith("resource\t")) {
+            resource(text);
+            continue;
+          }
+          if (text.startsWith("source-end\t")) {
+            sourceEnd(text);
+            continue;
+          }
+          if (text.startsWith("complete-v9\t")) {
+            String[] c = text.split("\t", -1);
+            require(
+                c.length == 7 && c[1].equals("1") && sourceEnded && resources.size() > 0,
+                "v9-complete-context");
+            String summary = "complete";
+            for (int i = 2; i <= 6; i++) {
+              summary += "\t" + c[i];
+            }
+            require(summary.equals(sourceComplete), "v9-complete-counts");
+            require(resources.equals(EXPECTED_RESOURCES), "v9-resource-inventory");
+            for (String key :
+                new String[] {
+                  "data:physicalFetched",
+                  "data:compressedConsumed",
+                  "data:logicalProduced",
+                  "parser:parserAccepted",
+                  "sequence:accepted-bytes"
+                }) {
+              require(c[2].equals(resourceObservations.get(key)), "v9-resource-byte-count");
+            }
+            for (String[] pair :
+                new String[][] {
+                  {"parser:frames", "3"},
+                  {"sequence:frames", "3"},
+                  {"parser:emittedRecords", "4"},
+                  {"sequence:emitted-records", "4"},
+                  {"parser:processedRecords", "5"},
+                  {"sequence:processed-records", "5"},
+                  {"parser:wireFields", "6"},
+                  {"sequence:wire-fields", "6"}
+                }) {
+              require(
+                  c[Integer.parseInt(pair[1])].equals(resourceObservations.get(pair[0])),
+                  "v9-resource-parser-count");
+            }
+            for (String key :
+                new String[] {
+                  "sequence:occurrences", "sequence:closed-sources", "sequence:source-handles"
+                }) {
+              require("1".equals(resourceObservations.get(key)), "v9-resource-source-count");
+            }
+            text = summary;
+          } else {
+            require(!sourceEnded, "v9-row-after-source-end");
+            require(
+                !text.startsWith("wire-data-v8\t")
+                    && !text.startsWith("wire-data\t")
+                    && !text.startsWith("complete\t"),
+                "v9-old-row");
+            if (text.startsWith("wire-data-v9\t")) {
+              text = sourceData(text);
+            }
+          }
+        }
         if (binary) {
           require(
-              !text.startsWith("wire-data\t")
+              !(text.startsWith("wire-data\t") && !source)
                   && !text.startsWith("descriptor\t")
                   && !text.startsWith("descriptor-v3\t"),
               "v8-old-row");
@@ -697,12 +973,21 @@ public final class RealTapeAcceptance {
     boolean recordLimitExceeded;
     int descriptionsInFrame;
     Long millis;
+    boolean sourceMessageDeclared;
+    final MessageDigest expectedTimingDigest;
 
     Run(boolean discovery) throws Exception {
       this.discovery = discovery;
+      expectedTimingDigest = MessageDigest.getInstance("SHA-256");
       String mode = timed ? "raw-message-v1" : "legacy";
-      metadata = discovery ? null : new Projection(cpp, true, mode, binaryProjection, timed);
-      data = discovery ? null : new Projection(cpp, false, mode, binaryProjection, timed);
+      metadata =
+          discovery
+              ? null
+              : new Projection(cpp, true, mode, binaryProjection, timed, sourceProjection, input);
+      data =
+          discovery
+              ? null
+              : new Projection(cpp, false, mode, binaryProjection, timed, sourceProjection, input);
     }
 
     void snapshot() throws IOException {
@@ -802,6 +1087,12 @@ public final class RealTapeAcceptance {
       }
       metadata.finish(row);
       data.finish(row);
+      if (sourceProjection) {
+        String measuredTiming = hash(data.sourceTimingDigest);
+        require(measuredTiming.equals(hash(expectedTimingDigest)), "v9-timing-digest");
+        System.out.println(
+            "source-timing\trecords\t" + streamRecords + "\tsha256\t" + measuredTiming);
+      }
       return hash(metadata.digest) + ":" + hash(data.digest);
     }
 
@@ -867,6 +1158,7 @@ public final class RealTapeAcceptance {
     public RecordCursor readRecord(
         BufferedInput in, RecordBuffer buffer, int cipher, String symbol, int eventFlags)
         throws IOException {
+      require(!sourceProjection || run.sourceMessageDeclared, "v9-java-header-before-data");
       require(eventFlags == 0, "unsupported-event-flags");
       if (run.wireRecords == maxRecords) {
         run.recordLimitExceeded = true;
@@ -945,6 +1237,14 @@ public final class RealTapeAcceptance {
       this.run = run;
     }
 
+    public void processDescribeProtocol(ProtocolDescriptor descriptor, boolean logDescriptor) {
+      if (sourceProjection) {
+        String time = descriptor.getProperty(ProtocolDescriptor.TIME_PROPERTY);
+        require("message".equals(time) || "MESSAGE".equals(time), "v9-java-physical-time-property");
+        run.sourceMessageDeclared = true;
+      }
+    }
+
     public void processHeartbeat(HeartbeatPayload heartbeat) {
       if (heartbeat.hasTimeMillis()) {
         run.millis = heartbeat.getTimeMillis();
@@ -1011,6 +1311,31 @@ public final class RealTapeAcceptance {
               .append(
                   TimeSequenceUtil.getTimeMillisFromTimeSequence(cursor.getEventTimeSequence()));
         }
+        if (sourceProjection) {
+          long packed = cursor.getEventTimeSequence();
+          long eventMillis = TimeSequenceUtil.getTimeMillisFromTimeSequence(packed);
+          // millis comes from the production heartbeat callback; packed/eventMillis from its
+          // cursor.
+          String timing =
+              "source-time\t0\t"
+                  + (run.streamRecords - 1)
+                  + "\t"
+                  + (run.streamRecords - 1)
+                  + "\t"
+                  + run.millis
+                  + "\t"
+                  + packed
+                  + "\t"
+                  + eventMillis
+                  + "\t0\t-\t-\t-\t-\t-\tmessage\tmessage\t"
+                  + (packed == 0 ? "zero" : "external")
+                  + "\t"
+                  + packed
+                  + "\t"
+                  + eventMillis
+                  + "\n";
+          run.expectedTimingDigest.update(timing.getBytes(StandardCharsets.US_ASCII));
+        }
         try {
           run.data.compare(row.toString());
         } catch (IOException failure) {
@@ -1051,6 +1376,19 @@ public final class RealTapeAcceptance {
       }
       if (!literal) {
         activeSource.complete();
+      }
+      if (sourceProjection) {
+        System.out.println(
+            literal
+                ? "source-closure\tliteral\tinstrumented\tfalse"
+                : "source-closure\tinstrumented\topens\t"
+                    + activeSource.opens
+                    + "\tcloses\t"
+                    + activeSource.closes
+                    + "\tio-errors\t"
+                    + activeSource.errors
+                    + "\teof\t"
+                    + activeSource.eof);
       }
       require(stats.getReadBytes() == Files.size(input), "processed-byte-mismatch");
       String digest = run.complete();

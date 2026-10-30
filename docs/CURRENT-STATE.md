@@ -16,6 +16,8 @@ The project implements selected bounded profiles against Java QD 3.355 at the re
 | Strict tape admission | Whole-input `RAW_MESSAGE_V1` preflight with exact inventory binding, an owned move-only complete-source token, explicit EOF and finite independent work/logical scratch budgets: [admission validation](../tests/conformance/protocol/tape-write/ADMISSION-VALIDATION.md). |
 | Offline replay | Optional synchronous `qdcxx_replay` library over admitted immutable tapes, explicit `IMMEDIATE`/`RELATIVE` scheduling, finite per-session bounds and caller-owned callbacks: [contract](../spec/protocol/OFFLINE-REPLAY.md), [validation](../tests/conformance/replay/VALIDATION.md). |
 | Field values | Explicit exact full IDs 2/8/10/40/56/72/88/120; nullable UTF-16 is owned, raw scalar representations are retained: [field types](../spec/encoding/FIELD-TYPES.md). Existing narrower profiles remain available. |
+| Binary catalog | Explicit 19-identity finite field model, indexed/time schema state, raw message families, flags and removal metadata: [catalog coverage](../tests/conformance/protocol/real-tape/COVERAGE.md). |
+| Finite tape sources | Explicit self-contained occurrence sequence, homogeneous time, optional bounded containers and coordinated parser/source/close/flush completion: [source contract](../spec/protocol/TAPE-SEQUENCE.md), [validation](../tests/conformance/protocol/real-tape/VALIDATION.md). |
 | Events | Default Quote plus schema-bound prepared Quote/Profile mappings with explicit local IDs and preserved generic extra/custom fields: [default Quote](../spec/protocol/DEFAULT-QUOTE.md), [configured events](../spec/schema/CONFIGURED-EVENTS.md). |
 | Native JSON | Optional separately pinned loader, owned validated schemas, typed errors before tape I/O and generic inspection: [native JSON](../spec/schema/NATIVE-JSON.md). Core, codecs, protocol and event mappings remain JSON-independent. |
 | Java schema export | Offline resolved settings/XML sources, complete actual lookup keys, explicit logical storage-slot projection and failure-safe native JSON publication: [export contract](../spec/schema/JAVA-EXPORT.md), [usage](../tools/schema-export/README.md). Existing C++ consumers use saved outputs without Java. |
@@ -53,15 +55,50 @@ macOS, hostile filesystem races or crash durability.
 
 Replay validation records 9 cases / 1,303 assertions in the final focused Windows target run and a separate independent run. A standalone consumer compiled and ran with the documented macro guards. Full Windows and Linux sanitizer suites and production-only profiles passed. See [replay validation](../tests/conformance/replay/VALIDATION.md) for the recorded results and limits.
 
+## Finite binary tape catalog and owning sources
+
+The explicit `BINARY_CATALOG_V1` profile adds 19 finite field identities, supported
+raw message families, indexed/time schema state, flags and removal metadata. It
+preserves full identities, physical values and owned payloads rather than applying
+business-event conversions. The explicit `SELF_CONTAINED_SEGMENTS_V1` source
+profile adds a finite occurrence list, homogeneous NONE/MESSAGE/FIELD/LONG/TEXT
+timing, optional bounded GZIP/ZIP and coordinated source closure. Core codecs and
+protocol remain independent of files, clocks and transport.
+
+The [catalog coverage](../tests/conformance/protocol/real-tape/COVERAGE.md) accounts
+for all 71 rows and keeps unsupported alternatives explicit. The
+[named validation](../tests/conformance/protocol/real-tape/VALIDATION.md) separates
+production observations, native tests, complete ordinary-corpus comparison and
+remaining platform/version limits. That comparison's output9 source profile is
+limited to one uncompressed MESSAGE ordinary source; it does not replace the
+FIELD/sidecar/container/sequence fixtures.
+
+The new source CLI requires explicit source/time/schema/mode selection. It does
+not discover companions or files, follow a live sequence or mix timing policies.
+A complete marker requires all source layers, closes and final sink flushes plus
+successful process exit. Earlier profiles and output formats 1–8 keep their
+separate contracts. Logical resource counters are distinct from measured RSS.
+
+Final native suites passed 74/74 on Windows MSVC Release and Linux GCC Debug
+ASan/UBSan; six production-only profiles and dependency gates passed. The
+Windows public Java workflow passed 120 checks after a separate fresh 93-check
+legacy run. Complete ordinary-source comparisons passed against both exact
+parser pins. [Validation](../tests/conformance/protocol/real-tape/VALIDATION.md)
+records the source/artifact hashes and preserves the narrower time/OS scope.
+
+Full QD/network/subscription/collector compatibility, additional event adapters,
+object deserialization, general archives, live follow/cycle, macOS and a released
+version remain outside this named result. Historical reports retain their exact
+source/artifact qualification; final integration results are recorded separately.
+
 ## Known limits
 
 - Native XML construction, general Java-property resolution and live schema replacement are absent.
   The Java bridge supports only its documented settings and controlled source closure.
-- Indexed schemas, additional full types/conversions, broader options/event flags, dynamic sessions,
-  recovery/compression, broader file-publication policies, real-clock integration, replay CLI and network transport remain outside implemented profiles.
+- Indexed layouts, additional finite types, options/flags and compression are available only in their explicit catalog/source profiles. Recovery, unrestricted conversions, broader file-publication policies, real-clock integration, replay CLI and network transport remain outside the implemented boundary.
 - No adapter beyond the documented Quote/Profile mappings is supplied. Raw timing and field bits
   do not imply business conversions or ticker/history delivery.
-- Private aggregate tape observations in [remaining gaps](REAL-TAPE-GAPS.md) do not establish full-file support.
+- Complete private-source equality in [remaining gaps](REAL-TAPE-GAPS.md) is limited to its named ordinary MESSAGE profile; broader catalog cells use separate production fixtures.
 - macOS, a separate standalone LeakSanitizer certification and hostile concurrent filesystem
   behavior remain unverified. Writer allocation-failure paths are covered by focused fault injection;
   XML preflight is not a general hostile-input sandbox.

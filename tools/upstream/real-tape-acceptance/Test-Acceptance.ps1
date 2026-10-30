@@ -22,6 +22,9 @@ This does not execute or qualify a production C++ output8 implementation.
 .PARAMETER BinaryCatalog
 Additionally requires actual C++ binary-catalog-v1/output8 success for both immutable
 producer quote-message files. Existing four old-mode refusals remain mandatory.
+.PARAMETER SourceProfile
+Additionally requires actual output9 for both producer MESSAGE recordings, strict source/time
+mutations, actual protocol-header checks and compatible repeated-header acceptance.
 .PARAMETER Help
 Shows usage without inputs, dependencies or file I/O. No arguments is identical.
 .NOTES
@@ -31,18 +34,19 @@ explicitly pending. Nonzero/exception: setup or regression failure. Bounds: 128 
 #>
 [CmdletBinding()]
 param([string]$Inspector, [string]$UpstreamRoot, [string]$JavaHome, [string]$Runner,
-    [string]$RunDirectory, [switch]$DesignedV8, [switch]$BinaryCatalog, [switch]$Help)
+    [string]$RunDirectory, [switch]$DesignedV8, [switch]$BinaryCatalog, [switch]$SourceProfile, [switch]$Help)
 if ($Help -or $PSBoundParameters.Count -eq 0) {
     @'
 Test-Acceptance.ps1 -Inspector EXE -UpstreamRoot PATH -JavaHome JDK8 -Runner EXE
                    -RunDirectory NEW_REPOSITORY_WORK_PATH
-                   [-DesignedV8] [-BinaryCatalog]
+                   [-DesignedV8] [-BinaryCatalog] [-SourceProfile]
 Portable full comparisons, raw value/schema/source/time/order mutation controls,
 true EOF/late read and close errors, truncation, closed sink and help/no-I/O checks.
 Uses public fixtures only; no upstream/C++ builds or network. Full logs below .work.
 Bounds per child: 60 seconds, Java 128 MiB, input 8 MiB, output 256 MiB.
 Windows-qualified process-tree ownership. POSIX launcher is not qualified.
 DesignedV8 tests labelled designed rows only; BinaryCatalog requires the actual C++8 artifact.
+SourceProfile requires actual output9; one uncompressed MESSAGE ordinary source only.
 Exit 0: assigned checks passed, including explicit pending STREAM/MESSAGE gates.
 Exception/nonzero: setup/check failure. No arguments / -Help starts no file work.
 '@
@@ -106,6 +110,83 @@ function Invoke-TestCppRejection([string]$Name, [string]$InputPath, [string]$Mod
     if ($result.timedOut -or $result.outputExceeded -or $result.exitCode -ne $ExitCode -or
         (Get-Content -LiteralPath $result.stdout -Raw) -match '(?m)^complete\t') { throw "Expected C++ rejection: $Name" }
     $results.Add([ordered]@{ name = $Name; expected = $ExitCode; result = $result })
+}
+function Test-SourceProjection($Case) {
+    $sourceRows = [IO.File]::ReadAllLines((Join-Path $Case.directory 'cpp.stdout'))
+    $first = [Array]::FindIndex($sourceRows, [Predicate[string]]{param($line) $line.StartsWith("wire-data-v9`t")})
+    if ($first -lt 0) { throw 'Expected actual output9 data' }
+    foreach ($column in @(1,3,4,11,12,13,16,17,22,23,24,25,26)) {
+        $changed = [string[]]$sourceRows.Clone()
+        $cells = $changed[$first].Split([char]9)
+        $cells[$column] = switch ($column) {
+            16 {'1'} 17 {'0'} 22 {'none'} 23 {'sidecar'} 24 {'zero'}
+            default { ([long]$cells[$column] + 1).ToString() }
+        }
+        $changed[$first] = $cells -join "`t"
+        $path = Join-Path $run "source-negative-cell-$column.tsv"
+        Write-TestProjection $path $changed
+        Invoke-TestJava "source-negative-cell-$column" $Case.input $path 'raw-message-v1' `
+            @('--cpp-projection','self-contained-segments-v1') 'v9-|record-mismatch'
+    }
+    foreach ($kind in @('resource-missing','resource-duplicate','source-end-missing','complete-missing','old-data-row','trailing-row')) {
+        $changed = [Collections.Generic.List[string]]::new()
+        $changed.AddRange([string[]]$sourceRows)
+        switch ($kind) {
+            'resource-missing' { $i=$changed.FindIndex([Predicate[string]]{param($line) $line.StartsWith("resource`t")}); $changed.RemoveAt($i) }
+            'resource-duplicate' { $i=$changed.FindIndex([Predicate[string]]{param($line) $line.StartsWith("resource`t")}); $changed.Insert($i,$changed[$i]) }
+            'source-end-missing' { $i=$changed.FindIndex([Predicate[string]]{param($line) $line.StartsWith("source-end`t")}); $changed.RemoveAt($i) }
+            'complete-missing' { $changed.RemoveAt($changed.Count-1) }
+            'old-data-row' { $changed[$first]=$changed[$first].Replace('wire-data-v9','wire-data-v8') }
+            'trailing-row' { $changed.Add("markers`t0") }
+        }
+        $path = Join-Path $run "source-negative-$kind.tsv"
+        Write-TestProjection $path $changed.ToArray()
+        Invoke-TestJava "source-negative-$kind" $Case.input $path 'raw-message-v1' `
+            @('--cpp-projection','self-contained-segments-v1') 'v9-|cpp-'
+    }
+    Invoke-TestJava 'source-late-read-io' $Case.input (Join-Path $Case.directory 'cpp.stdout') 'raw-message-v1' `
+        @('--cpp-projection','self-contained-segments-v1','--inject-late-io') 'source-incomplete'
+    Invoke-TestJava 'source-close-io' $Case.input (Join-Path $Case.directory 'cpp.stdout') 'raw-message-v1' `
+        @('--cpp-projection','self-contained-segments-v1','--inject-close-io') 'source-incomplete'
+
+    $sourceBytes = [IO.File]::ReadAllBytes($Case.input)
+    $firstFrame = @($sourceRows | Where-Object { $_.StartsWith("frame`t") })[0].Split([char]9)
+    if ($firstFrame[4] -cne '1' -or [long]$firstFrame[2] -ne 0) { throw 'Expected initial protocol descriptor' }
+    $headerEnd = [int]$firstFrame[3]
+    $repeated = [Collections.Generic.List[byte]]::new()
+    $repeated.AddRange([byte[]]$sourceBytes[0..($headerEnd-1)])
+    $repeated.AddRange($sourceBytes)
+    $repeatedInput = Join-Path $run 'source-repeated-matching.qtp'
+    [IO.File]::WriteAllBytes($repeatedInput, $repeated.ToArray())
+    $repeatDirectory = Join-Path $run 'source-repeated-matching'
+    $null = & $compare -InputFile $repeatedInput -Inspector $inspectorPath -UpstreamRoot $UpstreamRoot `
+        -JavaHome $JavaHome -Runner $runnerPath -RunDirectory $repeatDirectory -TapeMode raw-message-v1 `
+        -SourceProfile self-contained-segments-v1
+    $results.Add([ordered]@{name='source-repeated-matching'; expected='actual-output9-full-parity'; metadata=(Join-Path $repeatDirectory 'metadata.json')})
+
+    foreach ($kind in @('missing','unknown','conflicting-update')) {
+        $bytes = if ($kind -eq 'conflicting-update') { $repeated.ToArray() } else { [byte[]]$sourceBytes.Clone() }
+        $projectionRows = if ($kind -eq 'conflicting-update') {
+            [IO.File]::ReadAllLines((Join-Path $repeatDirectory 'cpp.stdout'))
+        } else { [string[]]$sourceRows.Clone() }
+        $needle = if ($kind -eq 'missing') {'time'} else {'message'}
+        $headerText = [Text.Encoding]::ASCII.GetString($bytes)
+        $index = $headerText.IndexOf($needle, [StringComparison]::Ordinal)
+        if ($kind -eq 'conflicting-update') { $index=$headerText.IndexOf($needle,$index+$needle.Length,[StringComparison]::Ordinal) }
+        if ($index -lt 0) { throw 'Expected production physical MESSAGE property' }
+        for ($i=0; $i -lt $needle.Length; $i++) { $bytes[$index+$i]=[byte][char]'x' }
+        $inputPath = Join-Path $run "source-physical-$kind.qtp"
+        [IO.File]::WriteAllBytes($inputPath,$bytes)
+        $identity = [Array]::FindIndex($projectionRows,[Predicate[string]]{param($line) $line.StartsWith("source`t")})
+        $cells=$projectionRows[$identity].Split([char]9)
+        if ($cells[2] -cne 'utf16le') { throw 'This launcher qualifies Windows native paths only' }
+        $cells[3]=([Text.Encoding]::Unicode.GetBytes($inputPath) | ForEach-Object {$_.ToString('x2')}) -join ''
+        $projectionRows[$identity]=$cells -join "`t"
+        $path=Join-Path $run "source-physical-$kind.tsv"
+        Write-TestProjection $path $projectionRows
+        Invoke-TestJava "source-physical-$kind" $inputPath $path 'raw-message-v1' `
+            @('--cpp-projection','self-contained-segments-v1') 'v9-java-physical-time-property'
+    }
 }
 try {
     $cases = @(
@@ -198,7 +279,16 @@ try {
             $results.Add([ordered]@{ name = "$producer-stream-message-binary"; expected = 'actual-output8-full-parity'
                 metadata = Join-Path $caseDir 'metadata.json' })
         }
+        if ($SourceProfile) {
+            $caseDir = Join-Path $run "$producer-stream-message-source"
+            $null = & $compare -InputFile $message -Inspector $inspectorPath -UpstreamRoot $UpstreamRoot `
+                -JavaHome $JavaHome -Runner $runnerPath -RunDirectory $caseDir -TapeMode raw-message-v1 `
+                -SourceProfile self-contained-segments-v1
+            $results.Add([ordered]@{name="$producer-stream-message-source";expected='actual-output9-full-parity';metadata=(Join-Path $caseDir 'metadata.json')})
+            if ($producer -ceq 'baseline') { $sourceCase=@{input=$message;directory=$caseDir} }
+        }
     }
+    if ($SourceProfile) { Test-SourceProjection $sourceCase }
     if ($DesignedV8) {
         Invoke-TestJava 'designed-v8-invalid-projection-option' $inputPath $projection 'legacy' `
             @('--cpp-projection', 'invalid') 'cpp-projection'
@@ -435,6 +525,7 @@ try {
     [ordered]@{ status = $status; startedUtc = $started; finishedUtc = [DateTime]::UtcNow.ToString('o')
         sourceSha256 = $sourceHash; workerSourceSha256 = $workerHash; scriptSha256 = $scriptHash
         designedV8Requested = [bool]$DesignedV8; actualBinaryCatalogRequested = [bool]$BinaryCatalog
+        actualSourceProfileRequested = [bool]$SourceProfile
         results = $results } | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $run 'tests.json') -Encoding utf8NoBOM
 }
 if ($status -cnotin @('PASS-WITH-NAMED-GATES', 'PASS-WITH-BINARY-CATALOG-NAMED-CASES')) { throw 'Portable acceptance did not complete on unchanged sources.' }

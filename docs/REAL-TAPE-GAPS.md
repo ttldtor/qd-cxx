@@ -2,6 +2,8 @@
 
 [Русская версия](REAL-TAPE-GAPS.ru.md). English is authoritative.
 
+Historical observations below retain their original scope. The current bounded result is recorded in [finite catalog validation](../tests/conformance/protocol/real-tape/VALIDATION.md).
+
 QDCXX-023 separates bounded structural inventory from payload compatibility. A complete inventory
 does not establish that the C++ reader or locked Java reader can decode the whole private sample.
 QDCXX-023 defines RAW/MESSAGE for existing exact types 2/8/56/120;

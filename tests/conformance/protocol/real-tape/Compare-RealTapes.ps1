@@ -27,6 +27,12 @@ Existing ordinary profiles retain their family restrictions; CppMode selects C++
 .PARAMETER CppMode
 Optional independent C++ mode: legacy, raw-message-v1 or binary-catalog-v1. Defaults to
 TapeMode. Binary catalog selects output8; Java source NONE/MESSAGE still follows TapeMode.
+.PARAMETER SourceProfile
+Optional self-contained-segments-v1 selects strict output9 for one uncompressed MESSAGE
+ordinary source. Requires raw-message-v1 TapeMode and binary-catalog-v1 CppMode.
+.PARAMETER OracleProfile
+baseline (default) or current exact parser pin from real-tape-corpus/producer.lock.json.
+The default retains upstream.lock validation. No automatic version discovery.
 .PARAMETER MaxInputBytes
 Source byte cap; default 8388608, range 1..67108864.
 .PARAMETER MaxRecords
@@ -50,6 +56,8 @@ param(
     [string]$RunDirectory,
     [ValidateSet('legacy', 'raw-message-v1')][string]$TapeMode,
     [ValidateSet('legacy', 'raw-message-v1', 'binary-catalog-v1')][string]$CppMode,
+    [ValidateSet('self-contained-segments-v1')][string]$SourceProfile,
+    [ValidateSet('baseline', 'current')][string]$OracleProfile = 'baseline',
     [ValidateRange(1, 67108864)][long]$MaxInputBytes = 8388608,
     [ValidateRange(1, 10000000)][long]$MaxRecords = 1000000,
     [ValidateRange(1, 1073741824)][long]$MaxOutputBytes = 268435456,
@@ -62,11 +70,15 @@ if ($Help -or $PSBoundParameters.Count -eq 0) {
 Compare-RealTapes.ps1 -InputFile PATH -Inspector EXE -UpstreamRoot PATH -JavaHome JDK8 -Runner EXE
                      -RunDirectory NEW_REPOSITORY_WORK_PATH -TapeMode legacy|raw-message-v1
                      [-CppMode legacy|raw-message-v1|binary-catalog-v1]
+                     [-SourceProfile self-contained-segments-v1] [-OracleProfile baseline|current]
                      [-MaxInputBytes 8388608] [-MaxRecords 1000000]
                      [-MaxOutputBytes 268435456] [-TimeoutSeconds 60] [-HeapMiB 128]
 Read-only full schema/source-ID/order/raw-value/symbol/zero-flags/time comparison.
 CppMode defaults to TapeMode; binary-catalog-v1 selects strict output8 ordinary subset.
 TapeMode always selects Java NONE/MESSAGE timing independently; never inferred from CppMode.
+SourceProfile requires raw-message-v1 and binary-catalog-v1, selects one uncompressed MESSAGE
+ordinary source with strict output9 identity/closure/resources/raw and effective time checks.
+OracleProfile selects the exact existing baseline/current parser pin; default baseline.
 Requires clean prebuilt locked Java QD classes; never builds or changes upstream/input.
 RunDirectory must be new, below repository .work; all raw logs/paths/values stay private.
 Hard maxima: input 64 MiB, records 10000000, output 1 GiB, row 4 MiB.
@@ -85,13 +97,31 @@ Set-StrictMode -Version Latest
 if (!$InputFile -or !$Inspector -or !$UpstreamRoot -or !$JavaHome -or !$Runner -or !$RunDirectory -or !$TapeMode) {
     throw 'InputFile, Inspector, UpstreamRoot, JavaHome, Runner, RunDirectory and TapeMode are required. Use -Help.'
 }
-if (!$PSBoundParameters.ContainsKey('CppMode')) { $CppMode = $TapeMode }
+$OracleProfile = $OracleProfile.ToLowerInvariant()
+if ($SourceProfile) { $SourceProfile = $SourceProfile.ToLowerInvariant() }
+$sourceTerminalBytes = 65536
+if (!$PSBoundParameters.ContainsKey('CppMode')) {
+    $CppMode = if ($SourceProfile) { 'binary-catalog-v1' } else { $TapeMode }
+}
+if ($SourceProfile -and ($CppMode -cne 'binary-catalog-v1' -or $TapeMode -cne 'raw-message-v1' -or $MaxOutputBytes -le $sourceTerminalBytes)) {
+    throw 'SourceProfile requires binary-catalog-v1, raw-message-v1 and output greater than the 65536-byte terminal reserve.'
+}
 $cppProjection = if ($CppMode -eq 'binary-catalog-v1') { 'binary-catalog-v1' } else { 'ordinary-v1' }
+$comparisonProjection = if ($SourceProfile) { $SourceProfile } else { $cppProjection }
 $repo = (Resolve-Path "$PSScriptRoot/../../../..").Path
 $tool = Join-Path $repo 'tools/upstream/real-tape-acceptance'
 . (Join-Path $tool 'Acceptance.Common.ps1')
 $run = Get-AcceptanceWorkPath $repo $RunDirectory -RequireNew
 $inputPath = (Resolve-Path -LiteralPath $InputFile).Path
+$sourceOutputBytes = $MaxOutputBytes
+if ($SourceProfile) {
+    # This workflow qualifies Windows only; the exact resolved UTF-16 path is passed unchanged.
+    $sourceHeaderBytes = "format`tqdcxx-tape-inspect`t9`tbinary-catalog-v1`tself-contained-segments-v1`n".Length
+    $sourceIdentityBytes = [long]"source`t0`tutf16le`t".Length + [long]$inputPath.Length * 4 + "`t-`n".Length
+    $sourceHeadroom = $sourceTerminalBytes + $sourceHeaderBytes + $sourceIdentityBytes
+    if ($MaxOutputBytes -le $sourceHeadroom) { throw 'SourceProfile output must exceed terminal, format and native identity reservations.' }
+    $sourceOutputBytes = $MaxOutputBytes - $sourceHeadroom
+}
 $inspectorPath = (Resolve-Path -LiteralPath $Inspector).Path
 $runnerPath = (Resolve-Path -LiteralPath $Runner).Path
 $upstream = (Resolve-Path -LiteralPath $UpstreamRoot).Path
@@ -99,6 +129,11 @@ if ((Get-Item -LiteralPath $inputPath).Length -gt $MaxInputBytes) { throw 'Input
 $lock = Get-Content -LiteralPath (Join-Path $repo 'upstream.lock') -Raw
 if ($lock -notmatch '(?m)^commit = "([0-9a-f]{40})"') { throw 'Cannot read upstream lock.' }
 $expectedCommit = $Matches[1]
+if ($OracleProfile -ceq 'current') {
+    $producerLock = Get-Content -LiteralPath (Join-Path $repo 'tools/upstream/real-tape-corpus/producer.lock.json') -Raw | ConvertFrom-Json
+    $expectedCommit = $producerLock.producers.current.commit
+    if ($expectedCommit -cnotmatch '^[0-9a-f]{40}$') { throw 'Cannot read selected current parser pin.' }
+}
 $commit = (& git -C $upstream rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $commit -cne $expectedCommit) { throw 'Upstream commit mismatch.' }
 $dirty = @(& git -C $upstream status --porcelain --untracked-files=no)
@@ -134,8 +169,17 @@ $metadata = [ordered]@{
     limits = [ordered]@{ inputBytes = $MaxInputBytes; records = $MaxRecords; outputBytes = $MaxOutputBytes
         timeoutSeconds = $TimeoutSeconds; heapMiB = $HeapMiB; workerHeapMiB = 32; bootstrapHeapMiB = 128
         maximumNativeCleanupSeconds = 1 }
-    tapeMode = $TapeMode; cppMode = $CppMode; cppProjection = $cppProjection; commands = $commands
+    tapeMode = $TapeMode; cppMode = $CppMode; cppProjection = $comparisonProjection; sourceProfile = $SourceProfile
+    oracleProfile = $OracleProfile; commands = $commands
 }
+if ($SourceProfile) {
+    $metadata.sourceOutputReservation = [ordered]@{terminalBytes=$sourceTerminalBytes;
+        headerBytes=$sourceHeaderBytes;identityBytes=$sourceIdentityBytes;sourceBytes=$sourceOutputBytes}
+}
+$metadata.parserPinSource = if ($OracleProfile -ceq 'current') {
+    'tools/upstream/real-tape-corpus/producer.lock.json'
+} else { 'upstream.lock' }
+$metadata.parserPinSourceSha256 = (Get-FileHash -LiteralPath (Join-Path $repo $metadata.parserPinSource)).Hash.ToLowerInvariant()
 try {
     $bootstrap = Initialize-AcceptanceWorker $runnerPath $java $javac $workerSource $run $TimeoutSeconds $repo
     $commands.Add($bootstrap)
@@ -172,10 +216,14 @@ try {
         '--tape-mode', $CppMode, '--max-input', "$MaxInputBytes", '--max-output', "$MaxOutputBytes",
         '--max-records', "$MaxRecords", '--max-fields', '67108864', '--max-values', '67108864',
         '--max-frames', '1000000', '--max-timing-events', '1000000')
+    if ($SourceProfile) {
+        $inspectArgs += @('--source-profile', $SourceProfile, '--time-policy', 'message',
+            '--max-source-output', "$sourceOutputBytes")
+    }
     $inspect = Invoke-AcceptanceProcess $inspectorPath $inspectArgs $run 'cpp' $TimeoutSeconds $MaxOutputBytes $repo
     $commands.Add($inspect); Assert-AcceptanceProcess $inspect
     $compareArgs = @('--input', $inputPath, '--cpp-output', $inspect.stdout, '--tape-mode', $TapeMode,
-        '--cpp-projection', $cppProjection,
+        '--cpp-projection', $comparisonProjection,
         '--max-input', "$MaxInputBytes", '--max-records', "$MaxRecords", '--max-output', "$MaxOutputBytes")
     $compare = Invoke-AcceptanceProcess $java ($runtime + $compareArgs) $run 'java-compare' $TimeoutSeconds $MaxOutputBytes $repo
     $commands.Add($compare); Assert-AcceptanceProcess $compare
@@ -211,6 +259,25 @@ try {
     $metadata.inspectorSha256After = (Get-FileHash -LiteralPath $inspectorPath).Hash.ToLowerInvariant()
     if ($metadata.inspectorSha256After -cne $metadata.inspectorSha256) {
         $metadata.status = 'FAIL-INSPECTOR-CHANGED'
+    }
+    if ($SourceProfile -and $metadata.Contains('classpathInventorySha256')) {
+        $afterInventory = [Collections.Generic.List[string]]::new()
+        foreach ($classes in $classPaths) {
+            foreach ($file in (Get-ChildItem -LiteralPath $classes -File -Recurse | Sort-Object FullName)) {
+                $relative = [IO.Path]::GetRelativePath($upstream, $file.FullName).Replace('\', '/')
+                $afterInventory.Add($relative + "`t" + (Get-FileHash -LiteralPath $file.FullName).Hash.ToLowerInvariant())
+            }
+        }
+        $afterInventoryPath = Join-Path $run 'classpath-after.tsv'
+        [IO.File]::WriteAllText($afterInventoryPath, ($afterInventory -join "`n") + "`n", [Text.UTF8Encoding]::new($false))
+        $metadata.classpathInventoryAfterSha256 = (Get-FileHash -LiteralPath $afterInventoryPath).Hash.ToLowerInvariant()
+        if ($metadata.classpathInventoryAfterSha256 -cne $metadata.classpathInventorySha256) {
+            $metadata.status = 'FAIL-ORACLE-CLASSPATH-CHANGED'
+        }
+    }
+    $metadata.parserPinSourceSha256After = (Get-FileHash -LiteralPath (Join-Path $repo $metadata.parserPinSource)).Hash.ToLowerInvariant()
+    if ($metadata.parserPinSourceSha256After -cne $metadata.parserPinSourceSha256) {
+        $metadata.status = 'FAIL-PARSER-PIN-CHANGED'
     }
     if ((Get-FileHash -LiteralPath $PSCommandPath).Hash.ToLowerInvariant() -cne $metadata.launcherSha256 -or
         (Get-FileHash -LiteralPath (Join-Path $tool 'Acceptance.Common.ps1')).Hash.ToLowerInvariant() -cne $metadata.helperSha256) {

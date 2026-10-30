@@ -11,6 +11,11 @@ raw integers и nullable точные UTF-16 значения. Для RAW/MESSAG
 исходное значение timestamp в миллисекундах, cursor sequence и event time. Оба пути
 требуют нулевые event flags; поддержка ненулевых flags этим не подтверждается.
 
+Явный профиль владеющего источника также сравнивает узкое ordinary MESSAGE
+подмножество output9: identity источника, ресурсы/закрытие и отдельно учтённые
+raw/effective time. `OracleProfile` выбирает точный baseline/current parser pin
+без поиска версии. См. [сравнение владеющего источника](#явное-сравнение-владеющего-источника).
+
 ## Запуск
 
 Нужны PowerShell 7.4+, JDK 8, чистый предварительно собранный checkout по
@@ -203,3 +208,47 @@ EOF: одно равенство размеров не может ошибочн
 [Отчёт этапа](../../../tests/conformance/protocol/real-tape/MILESTONE-1.ru.md) перечисляет
 выполненные проверки и ограничения. Общая поддержка indexed schemas, десериализации объектов,
 ненулевых flags, сжатия, sidecar, split-file и бизнес-преобразований не заявляется.
+
+## Явное сравнение владеющего источника
+
+`-SourceProfile self-contained-segments-v1` выбирает output9 для одного несжатого
+ordinary-источника MESSAGE. `TapeMode` обязан быть `raw-message-v1`; пропущенный
+`CppMode` становится `binary-catalog-v1`, а явное конфликтующее значение
+отвергается до работы с входом. Обвязка передаёт native `--time-policy message`
+явно. Сравнение ограничено прежними восемью full field ID, нулевыми flags,
+отсутствием FIELD/removal metadata и ordinary-схемами. Остальные профили
+времени/значений/контейнеров проверяются отдельными production fixtures.
+
+```powershell
+& ./tests/conformance/protocol/real-tape/Compare-RealTapes.ps1 `
+    -InputFile $tape -Inspector $inspector -UpstreamRoot $lockedCheckout `
+    -JavaHome $oracleJdk -Runner $runner -RunDirectory .work/source-tape-acceptance `
+    -TapeMode raw-message-v1 -SourceProfile self-contained-segments-v1 -OracleProfile baseline
+& ./tools/upstream/real-tape-acceptance/Test-Acceptance.ps1 `
+    -Inspector $inspector -UpstreamRoot $lockedCheckout -JavaHome $oracleJdk -Runner $runner `
+    -RunDirectory .work/source-tape-regressions -DesignedV8 -BinaryCatalog -SourceProfile
+```
+
+`-OracleProfile baseline` используется по умолчанию и сохраняет проверку
+`upstream.lock`. Явное `current` выбирает отдельно закреплённую точную версию
+parser из [producer.lock.json](../real-tape-corpus/producer.lock.json); передайте
+её чистый заранее собранный checkout как `UpstreamRoot`. Поиск версии и сборка
+upstream не запускаются. Выбранный pin и hash его источника записываются и
+проверяются после запуска.
+
+Строгий source bridge проверяет все 27 ячеек данных, native identity источника,
+порядок вхождений/записей, точный список ресурсов, source-end и итоговое завершение.
+Резерв завершения 65 536 байт и точные байты format/native-identity строк
+исключаются из per-source допуска вывода; `MaxOutputBytes` по-прежнему
+ограничивает весь native-вывод. Source-profile требует положительного допуска
+публикации после всех трёх резервов.
+
+Production heartbeat callbacks задают истину для сырого timestamp; packed cursor
+time Java и его production-проекция миллисекунд сравниваются отдельно. Новый
+digest с числом записей включает явный выбор эффективного времени и отсутствие
+FIELD. Фактический production descriptor обязан объявить точное
+`message`/`MESSAGE` до данных; совместимые совпадающие обновления descriptor
+остаются валидными. Инструментированный источник доказывает EOF и read/close
+счётчики; проход с буквальным именем файла отдельно не инструментируется.
+Нужен успех обеих полных проекций и процесса. Сырые пути/строки/логи остаются
+приватными. См. [именованные проверки](../../../tests/conformance/protocol/real-tape/VALIDATION.ru.md).
