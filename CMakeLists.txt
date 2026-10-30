@@ -197,6 +197,22 @@ if(BUILD_TESTING)
     target_link_libraries(qdcxx_object_field_value_tests PRIVATE qdcxx_protocol doctest::doctest)
     set_target_properties(qdcxx_object_field_value_tests PROPERTIES CXX_EXTENSIONS OFF)
     add_test(NAME object_field_owned_values COMMAND qdcxx_object_field_value_tests)
+    add_executable(qdcxx_indexed_schema_tests tests/conformance/indexed_schema_tests.cpp)
+    target_link_libraries(qdcxx_indexed_schema_tests PRIVATE qdcxx_protocol doctest::doctest)
+    set_target_properties(qdcxx_indexed_schema_tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME indexed_schema_layout COMMAND qdcxx_indexed_schema_tests
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/encoding/field-types/expected/indexed"
+        "--test-case-exclude=production*")
+    add_test(NAME indexed_schema_java COMMAND qdcxx_indexed_schema_tests
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/encoding/field-types/expected/indexed"
+        "--test-case=production*")
+    add_test(NAME indexed_schema_java_current COMMAND qdcxx_indexed_schema_tests
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/encoding/field-types/current-indexed-expected"
+        "--test-case=production*")
+    add_executable(qdcxx_tape_session_tests tests/conformance/tape_session_tests.cpp)
+    target_link_libraries(qdcxx_tape_session_tests PRIVATE qdcxx_protocol doctest::doctest)
+    set_target_properties(qdcxx_tape_session_tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME tape_session_generations COMMAND qdcxx_tape_session_tests)
     add_executable(qdcxx_raw_tape_tests tests/conformance/raw_tape_tests.cpp)
     target_link_libraries(qdcxx_raw_tape_tests PRIVATE qdcxx_protocol qdcxx_quote doctest::doctest)
     set_target_properties(qdcxx_raw_tape_tests PROPERTIES CXX_EXTENSIONS OFF)

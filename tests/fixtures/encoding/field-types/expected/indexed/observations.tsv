@@ -1,0 +1,572 @@
+case	indexed-schemas
+schema	Pair4	true	3	0
+slot	Pair4	0	4	false	Pair4.High	High	High
+slot	Pair4	1	4	false	Pair4.Low	Low	Low
+slot	Pair4	2	8	false	Pair4.Sentinel	Sentinel	Sentinel
+source-map	Pair4	0	0	4
+source-map	Pair4	1	1	4
+source-map	Pair4	2	2	8
+source-lookup	Pair4	High	field:0
+source-lookup	Pair4	Low	field:1
+source-lookup	Pair4	Pair4.High	field:0
+source-lookup	Pair4	Pair4.Low	field:1
+source-lookup	Pair4	Pair4.Sentinel	field:2
+source-lookup	Pair4	Sentinel	field:2
+exporter	Pair4	UNSUPPORTED_INDEXED
+source	Pair4	-9223372036854775808	-2147483648	0	0
+source	Pair4	-1	-1	-1	0
+source	Pair4	0	0	0	0
+source	Pair4	1311768467177459183	305419896	-1985229329	0
+source	Pair4	9223372036854775807	2147483647	-1	0
+delivered	file-Pair4	15	0	-9223372036854775808	-2147483648	0	0
+delivered	file-Pair4	15	1	-1	-1	-1	0
+delivered	file-Pair4	15	2	0	0	0	0
+delivered	file-Pair4	15	3	1311768467177459183	305419896	-1985229329	0
+delivered	file-Pair4	15	4	9223372036854775807	2147483647	-1	0
+complete	file-Pair4	5	0
+bound	Pair4	0	High	4	0
+bound	Pair4	1	Low	4	1
+bound	Pair4	2	Sentinel	8	2
+remap	0	Pair4
+delivered	binary-Pair4	15	0	-9223372036854775808	-2147483648	0	0
+delivered	binary-Pair4	15	1	-1	-1	-1	0
+delivered	binary-Pair4	15	2	0	0	0	0
+delivered	binary-Pair4	15	3	1311768467177459183	305419896	-1985229329	0
+delivered	binary-Pair4	15	4	9223372036854775807	2147483647	-1	0
+complete	binary-Pair4	5	0
+schema	Pair8	true	3	0
+slot	Pair8	0	8	false	Pair8.High	High	High
+slot	Pair8	1	8	false	Pair8.Low	Low	Low
+slot	Pair8	2	8	false	Pair8.Sentinel	Sentinel	Sentinel
+source-map	Pair8	0	0	8
+source-map	Pair8	1	1	8
+source-map	Pair8	2	2	8
+source-lookup	Pair8	High	field:0
+source-lookup	Pair8	Low	field:1
+source-lookup	Pair8	Pair8.High	field:0
+source-lookup	Pair8	Pair8.Low	field:1
+source-lookup	Pair8	Pair8.Sentinel	field:2
+source-lookup	Pair8	Sentinel	field:2
+exporter	Pair8	UNSUPPORTED_INDEXED
+source	Pair8	-9223372036854775808	-2147483648	0	0
+source	Pair8	-1	-1	-1	0
+source	Pair8	0	0	0	0
+source	Pair8	1311768467177459183	305419896	-1985229329	0
+source	Pair8	9223372036854775807	2147483647	-1	0
+delivered	file-Pair8	15	0	-9223372036854775808	-2147483648	0	0
+delivered	file-Pair8	15	1	-1	-1	-1	0
+delivered	file-Pair8	15	2	0	0	0	0
+delivered	file-Pair8	15	3	1311768467177459183	305419896	-1985229329	0
+delivered	file-Pair8	15	4	9223372036854775807	2147483647	-1	0
+complete	file-Pair8	5	0
+bound	Pair8	0	High	8	0
+bound	Pair8	1	Low	8	1
+bound	Pair8	2	Sentinel	8	2
+remap	0	Pair8
+delivered	binary-Pair8	15	0	-9223372036854775808	-2147483648	0	0
+delivered	binary-Pair8	15	1	-1	-1	-1	0
+delivered	binary-Pair8	15	2	0	0	0	0
+delivered	binary-Pair8	15	3	1311768467177459183	305419896	-1985229329	0
+delivered	binary-Pair8	15	4	9223372036854775807	2147483647	-1	0
+complete	binary-Pair8	5	0
+schema	Pair24	true	3	0
+slot	Pair24	0	24	false	Pair24.High	High	High
+slot	Pair24	1	24	false	Pair24.Low	Low	Low
+slot	Pair24	2	8	false	Pair24.Sentinel	Sentinel	Sentinel
+source-map	Pair24	0	0	24
+source-map	Pair24	1	1	24
+source-map	Pair24	2	2	8
+source-lookup	Pair24	High	field:0
+source-lookup	Pair24	Low	field:1
+source-lookup	Pair24	Pair24.High	field:0
+source-lookup	Pair24	Pair24.Low	field:1
+source-lookup	Pair24	Pair24.Sentinel	field:2
+source-lookup	Pair24	Sentinel	field:2
+exporter	Pair24	UNSUPPORTED_INDEXED
+source	Pair24	-9223372036854775808	-2147483648	0	0
+source	Pair24	-1	-1	-1	0
+source	Pair24	0	0	0	0
+source	Pair24	1311768467177459183	305419896	-1985229329	0
+source	Pair24	9223372036854775807	2147483647	-1	0
+delivered	file-Pair24	15	0	-9223372036854775808	-2147483648	0	0
+delivered	file-Pair24	15	1	-1	-1	-1	0
+delivered	file-Pair24	15	2	0	0	0	0
+delivered	file-Pair24	15	3	1311768467177459183	305419896	-1985229329	0
+delivered	file-Pair24	15	4	9223372036854775807	2147483647	-1	0
+complete	file-Pair24	5	0
+bound	Pair24	0	High	24	0
+bound	Pair24	1	Low	24	1
+bound	Pair24	2	Sentinel	8	2
+remap	0	Pair24
+delivered	binary-Pair24	15	0	-9223372036854775808	-2147483648	0	0
+delivered	binary-Pair24	15	1	-1	-1	-1	0
+delivered	binary-Pair24	15	2	0	0	0	0
+delivered	binary-Pair24	15	3	1311768467177459183	305419896	-1985229329	0
+delivered	binary-Pair24	15	4	9223372036854775807	2147483647	-1	0
+complete	binary-Pair24	5	0
+schema	Pair40	true	3	0
+slot	Pair40	0	40	false	Pair40.High	High	High
+slot	Pair40	1	40	false	Pair40.Low	Low	Low
+slot	Pair40	2	8	false	Pair40.Sentinel	Sentinel	Sentinel
+source-map	Pair40	0	0	40
+source-map	Pair40	1	1	40
+source-map	Pair40	2	2	8
+source-lookup	Pair40	High	field:0
+source-lookup	Pair40	Low	field:1
+source-lookup	Pair40	Pair40.High	field:0
+source-lookup	Pair40	Pair40.Low	field:1
+source-lookup	Pair40	Pair40.Sentinel	field:2
+source-lookup	Pair40	Sentinel	field:2
+exporter	Pair40	UNSUPPORTED_INDEXED
+source	Pair40	-9223372036854775808	-2147483648	0	0
+source	Pair40	-1	-1	-1	0
+source	Pair40	0	0	0	0
+source	Pair40	1311768467177459183	305419896	-1985229329	0
+source	Pair40	9223372036854775807	2147483647	-1	0
+delivered	file-Pair40	15	0	-9223372036854775808	-2147483648	0	0
+delivered	file-Pair40	15	1	-1	-1	-1	0
+delivered	file-Pair40	15	2	0	0	0	0
+delivered	file-Pair40	15	3	1311768467177459183	305419896	-1985229329	0
+delivered	file-Pair40	15	4	9223372036854775807	2147483647	-1	0
+complete	file-Pair40	5	0
+bound	Pair40	0	High	40	0
+bound	Pair40	1	Low	40	1
+bound	Pair40	2	Sentinel	8	2
+remap	0	Pair40
+delivered	binary-Pair40	15	0	-9223372036854775808	-2147483648	0	0
+delivered	binary-Pair40	15	1	-1	-1	-1	0
+delivered	binary-Pair40	15	2	0	0	0	0
+delivered	binary-Pair40	15	3	1311768467177459183	305419896	-1985229329	0
+delivered	binary-Pair40	15	4	9223372036854775807	2147483647	-1	0
+complete	binary-Pair40	5	0
+schema	Pair56	true	3	0
+slot	Pair56	0	56	false	Pair56.High	High	High
+slot	Pair56	1	56	false	Pair56.Low	Low	Low
+slot	Pair56	2	8	false	Pair56.Sentinel	Sentinel	Sentinel
+source-map	Pair56	0	0	56
+source-map	Pair56	1	1	56
+source-map	Pair56	2	2	8
+source-lookup	Pair56	High	field:0
+source-lookup	Pair56	Low	field:1
+source-lookup	Pair56	Pair56.High	field:0
+source-lookup	Pair56	Pair56.Low	field:1
+source-lookup	Pair56	Pair56.Sentinel	field:2
+source-lookup	Pair56	Sentinel	field:2
+exporter	Pair56	UNSUPPORTED_INDEXED
+source	Pair56	-9223372036854775808	-2147483648	0	0
+source	Pair56	-1	-1	-1	0
+source	Pair56	0	0	0	0
+source	Pair56	1311768467177459183	305419896	-1985229329	0
+source	Pair56	9223372036854775807	2147483647	-1	0
+delivered	file-Pair56	15	0	-9223372036854775808	-2147483648	0	0
+delivered	file-Pair56	15	1	-1	-1	-1	0
+delivered	file-Pair56	15	2	0	0	0	0
+delivered	file-Pair56	15	3	1311768467177459183	305419896	-1985229329	0
+delivered	file-Pair56	15	4	9223372036854775807	2147483647	-1	0
+complete	file-Pair56	5	0
+bound	Pair56	0	High	56	0
+bound	Pair56	1	Low	56	1
+bound	Pair56	2	Sentinel	8	2
+remap	0	Pair56
+delivered	binary-Pair56	15	0	-9223372036854775808	-2147483648	0	0
+delivered	binary-Pair56	15	1	-1	-1	-1	0
+delivered	binary-Pair56	15	2	0	0	0	0
+delivered	binary-Pair56	15	3	1311768467177459183	305419896	-1985229329	0
+delivered	binary-Pair56	15	4	9223372036854775807	2147483647	-1	0
+complete	binary-Pair56	5	0
+schema	Pair72	true	3	0
+slot	Pair72	0	72	false	Pair72.High	High	High
+slot	Pair72	1	72	false	Pair72.Low	Low	Low
+slot	Pair72	2	8	false	Pair72.Sentinel	Sentinel	Sentinel
+source-map	Pair72	0	0	72
+source-map	Pair72	1	1	72
+source-map	Pair72	2	2	8
+source-lookup	Pair72	High	field:0
+source-lookup	Pair72	Low	field:1
+source-lookup	Pair72	Pair72.High	field:0
+source-lookup	Pair72	Pair72.Low	field:1
+source-lookup	Pair72	Pair72.Sentinel	field:2
+source-lookup	Pair72	Sentinel	field:2
+exporter	Pair72	UNSUPPORTED_INDEXED
+source	Pair72	-9223372036854775808	-2147483648	0	0
+source	Pair72	-1	-1	-1	0
+source	Pair72	0	0	0	0
+source	Pair72	1311768467177459183	305419896	-1985229329	0
+source	Pair72	9223372036854775807	2147483647	-1	0
+delivered	file-Pair72	15	0	-9223372036854775808	-2147483648	0	0
+delivered	file-Pair72	15	1	-1	-1	-1	0
+delivered	file-Pair72	15	2	0	0	0	0
+delivered	file-Pair72	15	3	1311768467177459183	305419896	-1985229329	0
+delivered	file-Pair72	15	4	9223372036854775807	2147483647	-1	0
+complete	file-Pair72	5	0
+bound	Pair72	0	High	72	0
+bound	Pair72	1	Low	72	1
+bound	Pair72	2	Sentinel	8	2
+remap	0	Pair72
+delivered	binary-Pair72	15	0	-9223372036854775808	-2147483648	0	0
+delivered	binary-Pair72	15	1	-1	-1	-1	0
+delivered	binary-Pair72	15	2	0	0	0	0
+delivered	binary-Pair72	15	3	1311768467177459183	305419896	-1985229329	0
+delivered	binary-Pair72	15	4	9223372036854775807	2147483647	-1	0
+complete	binary-Pair72	5	0
+schema	Pair88	true	3	0
+slot	Pair88	0	88	false	Pair88.High	High	High
+slot	Pair88	1	88	false	Pair88.Low	Low	Low
+slot	Pair88	2	8	false	Pair88.Sentinel	Sentinel	Sentinel
+source-map	Pair88	0	0	88
+source-map	Pair88	1	1	88
+source-map	Pair88	2	2	8
+source-lookup	Pair88	High	field:0
+source-lookup	Pair88	Low	field:1
+source-lookup	Pair88	Pair88.High	field:0
+source-lookup	Pair88	Pair88.Low	field:1
+source-lookup	Pair88	Pair88.Sentinel	field:2
+source-lookup	Pair88	Sentinel	field:2
+exporter	Pair88	UNSUPPORTED_INDEXED
+source	Pair88	-9223372036854775808	-2147483648	0	0
+source	Pair88	-1	-1	-1	0
+source	Pair88	0	0	0	0
+source	Pair88	1311768467177459183	305419896	-1985229329	0
+source	Pair88	9223372036854775807	2147483647	-1	0
+delivered	file-Pair88	15	0	-9223372036854775808	-2147483648	0	0
+delivered	file-Pair88	15	1	-1	-1	-1	0
+delivered	file-Pair88	15	2	0	0	0	0
+delivered	file-Pair88	15	3	1311768467177459183	305419896	-1985229329	0
+delivered	file-Pair88	15	4	9223372036854775807	2147483647	-1	0
+complete	file-Pair88	5	0
+bound	Pair88	0	High	88	0
+bound	Pair88	1	Low	88	1
+bound	Pair88	2	Sentinel	8	2
+remap	0	Pair88
+delivered	binary-Pair88	15	0	-9223372036854775808	-2147483648	0	0
+delivered	binary-Pair88	15	1	-1	-1	-1	0
+delivered	binary-Pair88	15	2	0	0	0	0
+delivered	binary-Pair88	15	3	1311768467177459183	305419896	-1985229329	0
+delivered	binary-Pair88	15	4	9223372036854775807	2147483647	-1	0
+complete	binary-Pair88	5	0
+schema	Single104	true	3	0
+slot	Single104	0	104	true	Single104.Index	Index	Index
+slot	Single104	1	0	false	Single104.Index$VoidTail	Index$VoidTail	Index$VoidTail
+slot	Single104	2	8	false	Single104.Sentinel	Sentinel	Sentinel
+source-map	Single104	0	0	104
+omitted-tail	Single104	1	0
+source-map	Single104	2	1	8
+source-lookup	Single104	Index	field:0
+source-lookup	Single104	Index$VoidTail	tail-owner:0
+source-lookup	Single104	Sentinel	field:1
+source-lookup	Single104	Single104.Index	field:0
+source-lookup	Single104	Single104.Index$VoidTail	tail-owner:0
+source-lookup	Single104	Single104.Sentinel	field:1
+exporter	Single104	UNSUPPORTED_INDEXED
+source	Single104	-9223372036854775808	-2147483648	0	0
+source	Single104	-1	-1	-1	0
+source	Single104	0	0	0	0
+source	Single104	1311768467177459183	305419896	-1985229329	0
+source	Single104	9223372036854775807	2147483647	-1	0
+delivered	file-Single104	15	0	-9223372036854775808	-2147483648	0	0
+delivered	file-Single104	15	1	-1	-1	-1	0
+delivered	file-Single104	15	2	0	0	0	0
+delivered	file-Single104	15	3	1311768467177459183	305419896	-1985229329	0
+delivered	file-Single104	15	4	9223372036854775807	2147483647	-1	0
+complete	file-Single104	5	0
+bound	Single104	0	Index	104	0
+bound	Single104	1	Sentinel	8	2
+remap	0	Single104
+delivered	binary-Single104	15	0	-9223372036854775808	-2147483648	0	0
+delivered	binary-Single104	15	1	-1	-1	-1	0
+delivered	binary-Single104	15	2	0	0	0	0
+delivered	binary-Single104	15	3	1311768467177459183	305419896	-1985229329	0
+delivered	binary-Single104	15	4	9223372036854775807	2147483647	-1	0
+complete	binary-Single104	5	0
+schema	Single120	true	3	0
+slot	Single120	0	120	true	Single120.Index	Index	Index
+slot	Single120	1	0	false	Single120.Index$VoidTail	Index$VoidTail	Index$VoidTail
+slot	Single120	2	8	false	Single120.Sentinel	Sentinel	Sentinel
+source-map	Single120	0	0	120
+omitted-tail	Single120	1	0
+source-map	Single120	2	1	8
+source-lookup	Single120	Index	field:0
+source-lookup	Single120	Index$VoidTail	tail-owner:0
+source-lookup	Single120	Sentinel	field:1
+source-lookup	Single120	Single120.Index	field:0
+source-lookup	Single120	Single120.Index$VoidTail	tail-owner:0
+source-lookup	Single120	Single120.Sentinel	field:1
+exporter	Single120	UNSUPPORTED_INDEXED
+source	Single120	-9223372036854775808	-2147483648	0	0
+source	Single120	-1	-1	-1	0
+source	Single120	0	0	0	0
+source	Single120	1311768467177459183	305419896	-1985229329	0
+source	Single120	9223372036854775807	2147483647	-1	0
+delivered	file-Single120	15	0	-9223372036854775808	-2147483648	0	0
+delivered	file-Single120	15	1	-1	-1	-1	0
+delivered	file-Single120	15	2	0	0	0	0
+delivered	file-Single120	15	3	1311768467177459183	305419896	-1985229329	0
+delivered	file-Single120	15	4	9223372036854775807	2147483647	-1	0
+complete	file-Single120	5	0
+bound	Single120	0	Index	120	0
+bound	Single120	1	Sentinel	8	2
+remap	0	Single120
+delivered	binary-Single120	15	0	-9223372036854775808	-2147483648	0	0
+delivered	binary-Single120	15	1	-1	-1	-1	0
+delivered	binary-Single120	15	2	0	0	0	0
+delivered	binary-Single120	15	3	1311768467177459183	305419896	-1985229329	0
+delivered	binary-Single120	15	4	9223372036854775807	2147483647	-1	0
+complete	binary-Single120	5	0
+schema	Single152	true	3	0
+slot	Single152	0	152	true	Single152.Index	Index	Index
+slot	Single152	1	0	false	Single152.Index$VoidTail	Index$VoidTail	Index$VoidTail
+slot	Single152	2	8	false	Single152.Sentinel	Sentinel	Sentinel
+source-map	Single152	0	0	152
+omitted-tail	Single152	1	0
+source-map	Single152	2	1	8
+source-lookup	Single152	Index	field:0
+source-lookup	Single152	Index$VoidTail	tail-owner:0
+source-lookup	Single152	Sentinel	field:1
+source-lookup	Single152	Single152.Index	field:0
+source-lookup	Single152	Single152.Index$VoidTail	tail-owner:0
+source-lookup	Single152	Single152.Sentinel	field:1
+exporter	Single152	UNSUPPORTED_INDEXED
+source	Single152	-9223372036854775808	-2147483648	0	0
+source	Single152	-1	-1	-1	0
+source	Single152	0	0	0	0
+source	Single152	1311768467177459183	305419896	-1985229329	0
+source	Single152	9223372036854775807	2147483647	-1	0
+delivered	file-Single152	15	0	-9223372036854775808	-2147483648	0	0
+delivered	file-Single152	15	1	-1	-1	-1	0
+delivered	file-Single152	15	2	0	0	0	0
+delivered	file-Single152	15	3	1311768467177459183	305419896	-1985229329	0
+delivered	file-Single152	15	4	9223372036854775807	2147483647	-1	0
+complete	file-Single152	5	0
+bound	Single152	0	Index	152	0
+bound	Single152	1	Sentinel	8	2
+remap	0	Single152
+delivered	binary-Single152	15	0	-9223372036854775808	-2147483648	0	0
+delivered	binary-Single152	15	1	-1	-1	-1	0
+delivered	binary-Single152	15	2	0	0	0	0
+delivered	binary-Single152	15	3	1311768467177459183	305419896	-1985229329	0
+delivered	binary-Single152	15	4	9223372036854775807	2147483647	-1	0
+complete	binary-Single152	5	0
+schema	TimeAndSale	true	15	0
+slot	TimeAndSale	0	56	false	TimeAndSale.Time	Time	Time
+slot	TimeAndSale	1	72	false	TimeAndSale.Sequence	Sequence	Sequence
+slot	TimeAndSale	2	2	false	TimeAndSale.Exchange	Exchange	ExchangeCode
+slot	TimeAndSale	3	104	true	TimeAndSale.TradeId	TradeId	TradeId
+slot	TimeAndSale	4	0	false	TimeAndSale.TradeId$VoidTail	TradeId$VoidTail	TradeId$VoidTail
+slot	TimeAndSale	5	120	true	TimeAndSale.Price	Price	Price
+slot	TimeAndSale	6	0	false	TimeAndSale.Price$VoidTail	Price$VoidTail	Price$VoidTail
+slot	TimeAndSale	7	120	true	TimeAndSale.Size	Size	Size
+slot	TimeAndSale	8	0	false	TimeAndSale.Size$VoidTail	Size$VoidTail	Size$VoidTail
+slot	TimeAndSale	9	120	true	TimeAndSale.Bid.Price	Bid.Price	BidPrice
+slot	TimeAndSale	10	0	false	TimeAndSale.Bid.Price$VoidTail	Bid.Price$VoidTail	BidPrice$VoidTail
+slot	TimeAndSale	11	120	true	TimeAndSale.Ask.Price	Ask.Price	AskPrice
+slot	TimeAndSale	12	0	false	TimeAndSale.Ask.Price$VoidTail	Ask.Price$VoidTail	AskPrice$VoidTail
+slot	TimeAndSale	13	40	false	TimeAndSale.ExchangeSaleConditions	ExchangeSaleConditions	SaleConditions
+slot	TimeAndSale	14	8	false	TimeAndSale.Flags	Flags	Flags
+source-map	TimeAndSale	0	0	56
+source-map	TimeAndSale	1	1	72
+source-map	TimeAndSale	2	2	2
+source-map	TimeAndSale	3	3	104
+omitted-tail	TimeAndSale	4	3
+source-map	TimeAndSale	5	4	120
+omitted-tail	TimeAndSale	6	4
+source-map	TimeAndSale	7	5	120
+omitted-tail	TimeAndSale	8	5
+source-map	TimeAndSale	9	6	120
+omitted-tail	TimeAndSale	10	6
+source-map	TimeAndSale	11	7	120
+omitted-tail	TimeAndSale	12	7
+source-map	TimeAndSale	13	8	40
+source-map	TimeAndSale	14	9	8
+source-lookup	TimeAndSale	Ask.Price	field:7
+source-lookup	TimeAndSale	Ask.Price$VoidTail	tail-owner:7
+source-lookup	TimeAndSale	AskPrice	field:7
+source-lookup	TimeAndSale	AskPrice$VoidTail	tail-owner:7
+source-lookup	TimeAndSale	Bid.Price	field:6
+source-lookup	TimeAndSale	Bid.Price$VoidTail	tail-owner:6
+source-lookup	TimeAndSale	BidPrice	field:6
+source-lookup	TimeAndSale	BidPrice$VoidTail	tail-owner:6
+source-lookup	TimeAndSale	Exchange	field:2
+source-lookup	TimeAndSale	ExchangeCode	field:2
+source-lookup	TimeAndSale	ExchangeSaleConditions	field:8
+source-lookup	TimeAndSale	Flags	field:9
+source-lookup	TimeAndSale	Price	field:4
+source-lookup	TimeAndSale	Price$VoidTail	tail-owner:4
+source-lookup	TimeAndSale	SaleConditions	field:8
+source-lookup	TimeAndSale	Sequence	field:1
+source-lookup	TimeAndSale	Size	field:5
+source-lookup	TimeAndSale	Size$VoidTail	tail-owner:5
+source-lookup	TimeAndSale	Time	field:0
+source-lookup	TimeAndSale	TimeAndSale.Ask.Price	field:7
+source-lookup	TimeAndSale	TimeAndSale.Ask.Price$VoidTail	tail-owner:7
+source-lookup	TimeAndSale	TimeAndSale.Bid.Price	field:6
+source-lookup	TimeAndSale	TimeAndSale.Bid.Price$VoidTail	tail-owner:6
+source-lookup	TimeAndSale	TimeAndSale.Exchange	field:2
+source-lookup	TimeAndSale	TimeAndSale.ExchangeSaleConditions	field:8
+source-lookup	TimeAndSale	TimeAndSale.Flags	field:9
+source-lookup	TimeAndSale	TimeAndSale.Price	field:4
+source-lookup	TimeAndSale	TimeAndSale.Price$VoidTail	tail-owner:4
+source-lookup	TimeAndSale	TimeAndSale.Sequence	field:1
+source-lookup	TimeAndSale	TimeAndSale.Size	field:5
+source-lookup	TimeAndSale	TimeAndSale.Size$VoidTail	tail-owner:5
+source-lookup	TimeAndSale	TimeAndSale.Time	field:0
+source-lookup	TimeAndSale	TimeAndSale.TradeId	field:3
+source-lookup	TimeAndSale	TimeAndSale.TradeId$VoidTail	tail-owner:3
+source-lookup	TimeAndSale	TradeId	field:3
+source-lookup	TimeAndSale	TradeId$VoidTail	tail-owner:3
+exporter	TimeAndSale	UNSUPPORTED_INDEXED
+source	TimeAndSale	-9223372036854775808	-2147483648	0	0
+source	TimeAndSale	-1	-1	-1	0
+source	TimeAndSale	0	0	0	0
+source	TimeAndSale	1311768467177459183	305419896	-1985229329	0
+source	TimeAndSale	9223372036854775807	2147483647	-1	0
+delivered	file-TimeAndSale	15	0	-9223372036854775808	-2147483648	0	0
+delivered	file-TimeAndSale	15	1	-1	-1	-1	0
+delivered	file-TimeAndSale	15	2	0	0	0	0
+delivered	file-TimeAndSale	15	3	1311768467177459183	305419896	-1985229329	0
+delivered	file-TimeAndSale	15	4	9223372036854775807	2147483647	-1	0
+complete	file-TimeAndSale	5	0
+bound	TimeAndSale	0	Time	56	0
+bound	TimeAndSale	1	Sequence	72	1
+bound	TimeAndSale	2	ExchangeCode	2	2
+bound	TimeAndSale	3	TradeId	104	3
+bound	TimeAndSale	4	Price	120	5
+bound	TimeAndSale	5	Size	120	7
+bound	TimeAndSale	6	BidPrice	120	9
+bound	TimeAndSale	7	AskPrice	120	11
+bound	TimeAndSale	8	SaleConditions	40	13
+bound	TimeAndSale	9	Flags	8	14
+remap	68	TimeAndSale
+delivered	binary-TimeAndSale	15	0	-9223372036854775808	-2147483648	0	0
+delivered	binary-TimeAndSale	15	1	-1	-1	-1	0
+delivered	binary-TimeAndSale	15	2	0	0	0	0
+delivered	binary-TimeAndSale	15	3	1311768467177459183	305419896	-1985229329	0
+delivered	binary-TimeAndSale	15	4	9223372036854775807	2147483647	-1	0
+complete	binary-TimeAndSale	5	0
+source	Pair8	1311768467177459183	305419896	-1985229329	0
+bound	Pair8	0	Low	8	1
+bound	Pair8	1	HighAlias	8	0
+bound	Pair8	2	Sentinel	8	2
+remap	0	Pair8
+delivered	reordered-alias	15	0	1311768467177459183	305419896	-1985229329	0
+complete	reordered-alias	1	0
+source	Pair8	1311768467177459183	305419896	-1985229329	0
+bound	Pair8	0	Low	8	1
+bound	Pair8	1	Sentinel	8	2
+remap	0	Pair8
+delivered	missing-high	15	0	2309737967	0	-1985229329	0
+complete	missing-high	1	0
+source	Pair8	1311768467177459183	305419896	-1985229329	0
+source	Pair8	1311768467177459183	305419896	-1985229329	0
+source	Pair8	1311768467177459183	305419896	-1985229329	0
+source	Pair8	1311768467177459183	305419896	-1985229329	0
+source	Other	1311768467177459183	305419896	-1985229329	0
+bound	Pair8	0	HighAlias	8	0
+bound	Pair8	1	Low	8	1
+bound	Pair8	2	Sentinel	8	2
+remap	0	Pair8
+bound	Pair8	0	HighAlias	8	0
+bound	Pair8	1	Low	8	1
+bound	Pair8	2	Sentinel	8	2
+remap	0	Pair8
+bound	Pair8	0	Low	8	1
+bound	Pair8	1	HighAlias	8	0
+bound	Pair8	2	Sentinel	8	2
+remap	0	Pair8
+bound	Pair8	0	Low	8	1
+bound	Pair8	1	Sentinel	8	2
+remap	0	Pair8
+bound	Pair8	0	HighAlias	4	0
+bound	Pair8	1	Low	4	1
+bound	Pair8	2	Sentinel	8	2
+remap	0	Pair8
+bound	Other	0	High	8	0
+bound	Other	1	Low	8	1
+bound	Other	2	Sentinel	8	2
+remap	1	Other
+delivered	session	15	0	1311768467177459183	305419896	-1985229329	0
+delivered	session	15	1	1311768467177459183	305419896	-1985229329	0
+delivered	session	15	2	1311768467177459183	305419896	-1985229329	0
+delivered	session	15	3	2309737967	0	-1985229329	0
+delivered	session	15	4	1311768467177459183	305419896	-1985229329	0
+delivered	session	15	5	1311768467177459183	305419896	-1985229329	0
+complete	session	6	0
+bound	Other	0	High	8	0
+bound	Other	1	Low	8	1
+bound	Other	2	Sentinel	8	2
+remap	0	Other
+delivered	renamed	15	0	1311768467177459183	305419896	-1985229329	0
+complete	renamed	1	0
+bound	Pair8	0	HighAlias	8	0
+bound	Pair8	1	Low	8	1
+bound	Pair8	2	Sentinel	8	2
+remap	0	Pair8
+delivered	before-partial	15	0	1311768467177459183	305419896	-1985229329	0
+complete	before-partial	1	0
+bound	Other	0	High	8	0
+bound	Other	1	Low	8	1
+bound	Other	2	Sentinel	8	2
+remap	0	Other
+partial-failure	1	Other
+delivered	after-partial	15	0	1311768467177459183	305419896	-1985229329	0
+complete	after-partial	1	0
+reset	0	1
+bound	Pair8	0	HighAlias	8	0
+bound	Pair8	1	Low	8	1
+bound	Pair8	2	Sentinel	8	2
+remap	0	Pair8
+delivered	fresh-source	15	0	1311768467177459183	305419896	-1985229329	0
+complete	fresh-source	1	0
+all	PASS
+source	Pair8	1311768467177459183	305419896	-1985229329	0
+source	Pair8	1311768467177459183	305419896	-1985229329	0
+source	Pair8	1311768467177459183	305419896	-1985229329	0
+source	Other	1311768467177459183	305419896	-1985229329	0
+batch-begin	batch-subset-last	4	1-description-frame
+batch-remap	0	0	Pair8|HighAlias:8@0|Low:8@1|Sentinel:8@2
+batch-remap	1	0	Pair8|HighAlias:8@0|Low:8@1|Sentinel:8@2
+batch-remap	2	0	Pair8|Low:8@1|HighAlias:8@0|Sentinel:8@2
+batch-remap	3	0	Pair8|Low:8@1|Sentinel:8@2
+batch-delivered	batch-subset-last	0	Pair8	2309737967	0	-1985229329	913
+batch-delivery-complete	batch-subset-last	1	0
+batch-complete	batch-subset-last	4	Pair8|Low:8@1|Sentinel:8@2	2309737967
+batch-begin	batch-retyped-last	3	1-description-frame
+batch-remap	0	0	Pair8|HighAlias:8@0|Low:8@1|Sentinel:8@2
+batch-remap	1	0	Pair8|HighAlias:8@0|Low:8@1|Sentinel:8@2
+batch-remap	2	0	Pair8|HighAlias:4@0|Low:4@1|Sentinel:8@2
+batch-delivered	batch-retyped-last	0	Pair8	1311768467177459183	305419896	-1985229329	913
+batch-delivery-complete	batch-retyped-last	1	0
+batch-complete	batch-retyped-last	3	Pair8|HighAlias:4@0|Low:4@1|Sentinel:8@2	1311768467177459183
+batch-begin	batch-renamed-last	4	1-description-frame
+batch-remap	0	0	Pair8|HighAlias:8@0|Low:8@1|Sentinel:8@2
+batch-remap	1	0	Pair8|HighAlias:8@0|Low:8@1|Sentinel:8@2
+batch-remap	2	0	Pair8|HighAlias:4@0|Low:4@1|Sentinel:8@2
+batch-remap	3	0	Other|High:8@0|Low:8@1|Sentinel:8@2
+batch-delivered	batch-renamed-last	0	Other	1311768467177459183	305419896	-1985229329	913
+batch-delivery-complete	batch-renamed-last	1	0
+batch-complete	batch-renamed-last	4	Other|High:8@0|Low:8@1|Sentinel:8@2	1311768467177459183
+batch-begin	batch-renamed-exact-last	4	1-description-frame
+batch-remap	0	0	Pair8|HighAlias:8@0|Low:8@1|Sentinel:8@2
+batch-remap	1	0	Pair8|HighAlias:8@0|Low:8@1|Sentinel:8@2
+batch-remap	2	0	Pair8|Low:8@1|HighAlias:8@0|Sentinel:8@2
+batch-remap	3	0	Other|High:8@0|Low:8@1|Sentinel:8@2
+batch-delivered	batch-renamed-exact-last	0	Other	1311768467177459183	305419896	-1985229329	913
+batch-delivery-complete	batch-renamed-exact-last	1	0
+batch-complete	batch-renamed-exact-last	4	Other|High:8@0|Low:8@1|Sentinel:8@2	1311768467177459183
+batch-remap	0	0	Pair8|HighAlias:8@0|Low:8@1|Sentinel:8@2
+batch-delivered	late-invalid-initial	0	Pair8	1311768467177459183	305419896	-1985229329	913
+batch-delivery-complete	late-invalid-initial	1	0
+batch-remap	1	0	Pair8|Low:8@1|HighAlias:8@0|Sentinel:8@2
+batch-remap	2	0	Other|High:8@0|Low:8@1|Sentinel:8@2
+batch-delivered	late-invalid-following	0	Other	1311768467177459183	305419896	-1985229329	913
+batch-delivery-complete	late-invalid-following	1	0
+batch-invalid-complete	1	2-prefix-installs	Other	1311768467177459183
+batch-remap	0	0	Pair8|HighAlias:8@0|Low:8@1|Sentinel:8@2
+batch-delivered	middle-invalid-initial	0	Pair8	1311768467177459183	305419896	-1985229329	913
+batch-delivery-complete	middle-invalid-initial	1	0
+batch-remap	1	0	Pair8|Low:8@1|HighAlias:8@0|Sentinel:8@2
+source	Pair8	1311768467177459183	305419896	-1985229329	0
+batch-delivered	middle-invalid-following	0	Pair8	1311768467177459183	305419896	-1985229329	913
+batch-delivery-complete	middle-invalid-following	1	0
+batch-middle-invalid-complete	1	1-prefix-install	Pair8	1311768467177459183
+batch-all	PASS
+complete	indexed-schemas

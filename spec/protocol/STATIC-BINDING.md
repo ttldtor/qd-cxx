@@ -120,3 +120,13 @@ owned nullable UTF-16, logical field positions independent of Java slots, and cu
 Both existing tape modes keep their descriptor, flags, timing, terminal-error and append-only policies.
 Earlier type exclusions below describe the older profiles; only this explicit profile extends them.
 No Profile event adapter, indexed schema, importer or implicit discovery is added.
+
+## Explicit indexed-field amendment
+
+[INDEXED-SCHEMAS](../schema/INDEXED-SCHEMAS.md) adds only explicit pair32/single64
+metadata under BINARY_FIELDS_V1. Older ordinary-only exclusions and exact-type policies
+remain unchanged for their profiles. Logical field IDs are resolved into owned dense
+positions in StreamRecordPlan; neither wire order nor sender ID supplies those positions.
+Absent fields keep fresh defaults, aliases remain explicit, and no physical VOID tail is
+manufactured. Static binding still has no session table; atomic active replacement belongs
+only to the explicit BINARY_CATALOG_V1 TapeReader mode.

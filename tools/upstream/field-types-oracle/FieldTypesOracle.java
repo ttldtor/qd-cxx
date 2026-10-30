@@ -772,15 +772,19 @@ public final class FieldTypesOracle {
     require(
         args.length == 1
             || (args.length == 2
-                && (args[1].equals("scalar-only") || args[1].equals("object-only"))),
+                && (args[1].equals("scalar-only")
+                    || args[1].equals("object-only")
+                    || args[1].equals("indexed-only"))),
         "new output directory required");
     Path root = Paths.get(args[0]);
     Files.createDirectory(root);
     if (args.length == 2) {
       if (args[1].equals("scalar-only")) {
         Scalars.capture(root);
-      } else {
+      } else if (args[1].equals("object-only")) {
         ObjectFieldsOracle.capture(root);
+      } else {
+        IndexedSchemasOracle.capture(root);
       }
       return;
     }
@@ -794,6 +798,7 @@ public final class FieldTypesOracle {
     diagnostics(root);
     Scalars.capture(Files.createDirectory(root.resolve("scalars")));
     ObjectFieldsOracle.capture(Files.createDirectory(root.resolve("objects")));
+    IndexedSchemasOracle.capture(Files.createDirectory(root.resolve("indexed")));
     System.out.println(
         "CAPTURE COMPLETE: exact field types, original Profile and production paths");
   }

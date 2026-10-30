@@ -185,3 +185,100 @@ function CompareObjects([string]$ActualRoot, [string]$ExpectedRoot) {
     "PASS: strict object comparison of $($names.Count) artifacts"
 }
 CompareObjects (Join-Path $Actual 'objects') (Join-Path $Expected 'objects')
+
+# Indexed observations retain distinct source slots, local logical fields and actual parser remaps.
+function CompareIndexed([string]$ActualRoot, [string]$ExpectedRoot) {
+    $names=@('observations.tsv','TimeAndSale.qtp','reordered-alias.qtp','missing-high.qtp',
+        'session-replacements.qtp','session-renamed.qtp','session-partial-failure.qtp',
+        'batch-subset-last.qtp','batch-retyped-last.qtp','batch-renamed-last.qtp',
+        'batch-renamed-exact-last.qtp','batch-late-invalid.qtp','batch-late-invalid-prelude.qtp',
+        'batch-late-invalid-following-data.qtp','batch-middle-invalid.qtp',
+        'batch-middle-invalid-following-data.qtp')+
+        @(foreach($type in @(4,8,24,40,56,72,88)){"Pair$type.qtp"})+
+        @(foreach($type in @(104,120,152)){"Single$type.qtp"})
+    $arity=@{schema=5;slot=8;'source-map'=5;'omitted-tail'=4;'source-lookup'=4;exporter=3;
+        source=6;delivered=8;bound=6;remap=3;'partial-failure'=3;reset=3;all=2;
+        'batch-begin'=4;'batch-remap'=4;'batch-delivered'=8;'batch-delivery-complete'=4;
+        'batch-complete'=5;'batch-invalid-complete'=5;'batch-middle-invalid-complete'=5;'batch-all'=2}
+    $required=@{schema=11;slot=45;'source-map'=37;'omitted-tail'=8;'source-lookup'=96;exporter=11;
+        source=67;delivered=122;bound=71;remap=23;complete=30;'partial-failure'=1;reset=1;all=1;
+        'batch-begin'=4;'batch-remap'=20;'batch-delivered'=8;'batch-delivery-complete'=8;
+        'batch-complete'=4;'batch-invalid-complete'=1;'batch-middle-invalid-complete'=1;'batch-all'=1}
+    foreach($directory in @($ActualRoot,$ExpectedRoot)) {
+        $files=@(Get-ChildItem -LiteralPath $directory -File | Sort-Object Name)
+        Assert (($files.Name -join '|') -ceq (($names|Sort-Object)-join '|')) 'finite indexed artifact set'
+        foreach($file in $files){Assert ($file.Length -gt 0 -and $file.Length -le 1048576) 'indexed artifact bound'}
+        $path=Join-Path $directory 'observations.tsv'
+        $bytes=[IO.File]::ReadAllBytes($path)
+        Assert ($bytes -notcontains 13 -and $bytes[-1] -eq 10) 'producer canonical LF'
+        $rows=[IO.File]::ReadAllLines($path)
+        Assert ($rows[0] -ceq ('case'+[char]9+'indexed-schemas') -and
+            $rows[-1] -ceq ('complete'+[char]9+'indexed-schemas')) 'indexed capture boundaries'
+        $counts=@{}
+        for($index=1;$index -lt $rows.Count;++$index) {
+            $c=$rows[$index].Split([char]9)
+            $kind=$c[0]
+            Assert ($c -notcontains '') 'nonempty indexed cells'
+            Assert ($required.ContainsKey($kind)) 'known indexed observation'
+            if(!$counts.ContainsKey($kind)){$counts[$kind]=0}
+            $counts[$kind]++
+            if($kind -ceq 'complete') {
+                Assert (($c.Count -eq 4 -and $c[3] -ceq '0') -or
+                    ($index -eq $rows.Count-1 -and $c.Count -eq 2)) 'completed indexed callback'
+            } else {
+                Assert ($c.Count -eq $arity[$kind]) "indexed row arity: $kind at row $index"
+            }
+            switch -CaseSensitive ($kind) {
+                'schema' {Assert ($c[2] -ceq 'true' -and $c[4] -ceq '0') 'actual indexed schema';Integer $c[3]}
+                'slot' {Integer $c[2];Integer $c[3];Assert ($c[4] -cin @('true','false')) 'source storage width'}
+                'source-map' {Integer $c[2];Integer $c[3];Integer $c[4]}
+                'omitted-tail' {Integer $c[2];Integer $c[3]}
+                'source-lookup' {Assert ($c[3] -cmatch '^(field|tail-owner):[0-9]+$') 'source identity projection'}
+                'exporter' {Assert ($c[2] -ceq 'UNSUPPORTED_INDEXED') 'unchanged ordinary exporter gate'}
+                'bound' {Integer $c[2];Integer $c[4];Integer $c[5]}
+                'source' {
+                    Integer $c[2] $true;Integer $c[3];Integer $c[4]
+                    Assert ($c[5] -ceq '0' -and [long]$c[2] -eq
+                        (([long]$c[3] -shl 32) -bor ([long]$c[4] -band 4294967295L))) 'actual source time words'
+                }
+                'delivered' {
+                    Assert ($c[2] -ceq '15' -and $c[7] -ceq '0') 'STREAM indexed time separate from event time'
+                    Integer $c[3];Integer $c[4] $true;Integer $c[5];Integer $c[6]
+                    Assert ([long]$c[4] -eq (([long]$c[5] -shl 32) -bor
+                        ([long]$c[6] -band 4294967295L))) 'actual delivered time words'
+                }
+                'batch-delivered' {
+                    Integer $c[2];Integer $c[4] $true;Integer $c[5];Integer $c[6]
+                    Assert ($c[3] -cin @('Pair8','Other') -and $c[7] -ceq '913') 'actual batch record and sentinel'
+                    Assert ([long]$c[4] -eq (([long]$c[5] -shl 32) -bor
+                        ([long]$c[6] -band 4294967295L))) 'batch time words'
+                }
+                'batch-begin' {Assert ($c[2] -cin @('3','4') -and $c[3] -ceq '1-description-frame') 'one repeated-sender batch'}
+                'batch-remap' {Integer $c[1];Assert ($c[2] -ceq '0') 'same sparse sender identity'}
+                'batch-complete' {Integer $c[2];Integer $c[4] $true}
+                'batch-delivery-complete' {Assert ($c[2] -ceq '1' -and $c[3] -ceq '0') 'one complete batch delivery'}
+                'batch-invalid-complete' {
+                    Assert ($c[1] -ceq '1' -and $c[2] -ceq '2-prefix-installs' -and $c[3] -ceq 'Other') 'late error retains Java prefix'
+                    Integer $c[4] $true
+                }
+                'batch-middle-invalid-complete' {
+                    Assert ($c[1] -ceq '1' -and $c[2] -ceq '1-prefix-install' -and $c[3] -ceq 'Pair8') 'middle error stops following Java remap'
+                    Integer $c[4] $true
+                }
+                'partial-failure' {Assert ($c[1] -ceq '1' -and $c[2] -ceq 'Other') 'Java valid-prefix mutation'}
+                'reset' {Assert ($c[1] -ceq '0' -and $c[2] -ceq '1') 'actual reset loses sender map'}
+                'all' {Assert ($c[1] -ceq 'PASS') 'indexed observation completion'}
+                'batch-all' {Assert ($c[1] -ceq 'PASS') 'same-message observation completion'}
+            }
+        }
+        foreach($item in $required.GetEnumerator()){
+            Assert ($counts[$item.Key] -eq $item.Value) "finite indexed count $($item.Key)"
+        }
+    }
+    foreach($name in $names){
+        Assert ((Get-FileHash -LiteralPath (Join-Path $ActualRoot $name)).Hash -ceq
+            (Get-FileHash -LiteralPath (Join-Path $ExpectedRoot $name)).Hash) "indexed artifact mismatch: $name"
+    }
+    "PASS: strict indexed comparison of $($names.Count) artifacts"
+}
+CompareIndexed (Join-Path $Actual 'indexed') (Join-Path $Expected 'indexed')

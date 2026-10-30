@@ -9,8 +9,10 @@
 #include <cstdint>
 #include <expected>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
+#include <variant>
 #include <vector>
 
 namespace org::ttldtor::qdcxx::core {
@@ -23,7 +25,7 @@ enum class SchemaError {
     ALLOCATION_FAILURE   ///< Owned copy could not be allocated.
 };
 
-/** One ordinary logical field; its position is its record-local identity. */
+/** One logical field; its position is its record-local identity, independent of source slots. */
 struct LocalField {
     std::int32_t serialTypeId; ///< Full type, validated against the explicitly selected local profile.
 };
@@ -34,13 +36,28 @@ struct FieldLookup {
     std::size_t fieldId; ///< Logical field position in the containing record.
 };
 
+/** Two logical signed32 fields proven to occupy source integer slots zero and one. */
+struct IndexedTimePairInt32 {
+    std::size_t firstField;  ///< Logical high-word field ID, independent of wire order.
+    std::size_t secondField; ///< Distinct logical low-word field ID.
+};
+
+/** One logical signed64 field proven to occupy both source time slots. */
+struct IndexedTimeSingleInt64 {
+    std::size_t field; ///< Logical field ID; no physical VOID tail is materialized.
+};
+
+/** Finite explicit source-time mapping; never inferred from a record or field name. */
+using IndexedTimeLayout = std::variant<IndexedTimePairInt32, IndexedTimeSingleInt64>;
+
 /** Loader-independent input subset; not a serialized DataScheme. */
 struct LocalRecord {
     std::int32_t id;                  ///< Local identity, required to equal the record position.
     std::u16string name;              ///< Exact nonempty well-formed UTF-16 record name.
-    bool hasTime;                     ///< True is explicitly unsupported by this ordinary-field subset.
+    bool hasTime;                     ///< Explicit source indexing; requires a supported layout in BINARY_FIELDS_V1.
     std::vector<LocalField> fields;   ///< Ordered logical fields, with no synthetic slots.
     std::vector<FieldLookup> lookups; ///< Unique record keys with valid targets covering every field.
+    std::optional<IndexedTimeLayout> indexedTimeLayout{}; ///< Owned logical IDs; absent for ordinary records.
 };
 
 /** Mandatory finite logical budgets for an owned schema. */

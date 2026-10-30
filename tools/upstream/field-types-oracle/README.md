@@ -102,6 +102,30 @@ object mutations, for28 rejected mutations in total. Historical receipts remain
 unchanged. [Object validation](../../../tests/conformance/protocol/field-types/OBJECT-VALIDATION.md)
 records the new evidence separately.
 
+## Indexed schema and active-description observations
+
+The same governed invocation also writes `field-types/indexed`:26 artifacts and572
+canonical LF rows per pin. `IndexedSchemasOracle.java` is compiled by the existing
+launcher with the unchanged native-v1 exporter as an observation helper; it is not a
+separate CLI. Eleven original FileWriter/FileReader cases retain five arbitrary signed64
+times each, including standard TimeAndSale with its complete actual source schema.
+Slot/lookup projection, actual descriptor binding, omitted tails, aliases, missing/reordered
+fields, equal/new/redefined senders and production reset are distinct observations.
+
+Four successful single-message repeated-sender batches prove last-wins. Assembled late/
+middle-invalid description batches demonstrate actual Java prefix mutation; following
+data bytes come unchanged from production composer. They are not FileWriter originals.
+The native-v1 exporter still reports UNSUPPORTED_INDEXED. C++ chooses exact types and
+whole-batch rollback, as [INDEXED-SCHEMAS](../../../spec/schema/INDEXED-SCHEMAS.md) specifies.
+
+The internal entry `FieldTypesOracle <new-directory> indexed-only` supports separately
+qualified prebuilt-classpath captures. It does not rebuild/verify upstream. The ordinary
+launcher still performs full clean baseline Verify; its metadata records all four Java
+sources, original artifacts and actual runtime/classpath provenance. The strict comparator
+checks26 indexed files after unchanged82/25/49 sets; six indexed mutations bring the
+negative total to34. [Indexed validation](../../../tests/conformance/protocol/field-types/INDEXED-VALIDATION.md)
+keeps baseline clean-build and current prebuilt qualifications separate.
+
 See [coverage](../../../tests/fixtures/encoding/field-types/COVERAGE.md),
 [captures](../../../tests/fixtures/encoding/field-types/CAPTURES.md),
 [validation](../../../tests/fixtures/encoding/field-types/VALIDATION.md) and the

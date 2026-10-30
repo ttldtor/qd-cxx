@@ -41,10 +41,11 @@ RMI operations and transport are outside this target. Private recording contents
 | `TapeMode::LEGACY` | Existing descriptor/STREAM/zero-flag policy | Unchanged |
 | `TapeMode::RAW_MESSAGE_V1` | Existing RAW/MESSAGE policy, selected local profile, zero data flags | Unchanged |
 | Ordinary wire discovery | Existing exact ordinary types, append-only IDs and strict repeated-sender refusal | Unchanged |
-| New `BINARY_FIELDS_V1` / `BINARY_CATALOG_V1` | Finite catalog below | Pending QDCXX-041–045; explicit opt-in only |
+| `BINARY_FIELDS_V1` | 19 exact read-only identities; ordinary and explicit indexed local records | Bounded fields/indexed subset implemented |
+| `TapeMode::BINARY_CATALOG_V1` | Restricted STREAM/NONE grammar plus atomic active descriptions | Partial opt-in implementation; broader options/flags/families remain pending |
 
-One new core field profile and a separate protocol mode are required. Names above are selected
-contract names; final C++ spelling remains subject to API review. No existing constructor/default
+The core field profile and separate partial protocol mode are explicit selections. The current
+[indexed contract](../schema/INDEXED-SCHEMAS.md) defines their implemented subset. No existing constructor/default
 starts broader discovery, accepts indexed layouts or enables new container semantics implicitly.
 The initial broader reader can use an explicitly supplied validated local schema. Any new broader
 discovery entry must be explicit and cannot reconstruct `hasTime` from record names.
@@ -60,26 +61,26 @@ PRICE and MMID add no new identity. The source is
 
 | Full ID | Name | Physical read / logical raw value | Current bounded support; new work |
 | --- | --- | --- | --- |
-| 0 | VOID | No serialized value; explicit wire field may project raw zero | Pending 041 |
-| 1 | BYTE | Signed 8-bit | Pending 041 |
+| 0 | VOID | No serialized value; explicit wire field may project raw zero | Implemented scalar subset |
+| 1 | BYTE | Signed 8-bit | Implemented scalar subset |
 | 2 | UTF_CHAR | Existing UTFChar code point contract | Existing exact profiles |
-| 3 | SHORT | Signed 16-bit, big endian | Pending 041 |
-| 4 | INT | Signed 32-bit, big endian | Pending 041 |
+| 3 | SHORT | Signed 16-bit, big endian | Implemented scalar subset |
+| 4 | INT | Signed 32-bit, big endian | Implemented scalar subset |
 | 8 | COMPACT_INT | Compact long, then signed low 32 bits | Existing exact profiles |
-| 9 | BYTE_ARRAY | Nullable byte count and opaque bytes | Pending 042 |
+| 9 | BYTE_ARRAY | Nullable byte count and opaque bytes | Implemented owned-payload subset |
 | 10 | UTF_CHAR_ARRAY | Nullable character count and exact UTF-16 units | Existing extended profile |
-| 24 | DECIMAL | Compact long, then signed low 32 raw bits | Pending 041 |
+| 24 | DECIMAL | Compact long, then signed low 32 raw bits | Implemented scalar subset |
 | 40 | SHORT_STRING | Compact long, then signed low 32 raw bits | Existing extended profile |
 | 56 | TIME_SECONDS | Compact long, then signed low 32 seconds | Existing Quote/extended profiles |
 | 72 | SEQUENCE | Compact long, then signed low 32 raw bits | Existing extended profile |
 | 88 | DATE | Compact long, then signed low 32 day-ID bits | Existing extended profile |
-| 104 | LONG | Compact signed 64-bit | Pending 041 |
+| 104 | LONG | Compact signed 64-bit | Implemented scalar subset |
 | 120 | WIDE_DECIMAL | Compact signed 64 raw bits | Existing Quote/extended profiles |
-| 137 | STRING | UTFString byte count and exact nullable UTF-16 units | Pending 042 |
-| 152 | TIME_MILLIS | Compact signed 64 milliseconds | Pending 041 |
+| 137 | STRING | UTFString byte count and exact nullable UTF-16 units | Implemented owned-payload subset |
+| 152 | TIME_MILLIS | Compact signed 64 milliseconds | Implemented scalar subset |
 | 168 | TIME_NANOS | Reserved upstream | Unsupported; no implementation candidate |
-| 233 | CUSTOM_OBJECT | Nullable opaque bytes | Pending 042 |
-| 249 | SERIAL_OBJECT | Nullable marshalled serialization bytes | Pending 042 |
+| 233 | CUSTOM_OBJECT | Nullable opaque bytes | Implemented owned-payload subset |
+| 249 | SERIAL_OBJECT | Nullable marshalled serialization bytes | Implemented owned-payload subset |
 
 The broader field target contains 19 candidates. All other full IDs are outside the selected
 profile, including otherwise readable Java representation/base combinations. Negative or greater
@@ -130,12 +131,13 @@ Published values own their contents and survive source, reader and schema destru
 
 DESCRIBE_RECORDS contains sender ID, record name and field names/full IDs; it has no `hasTime` bit.
 Indexed interpretation therefore requires caller-supplied or source-proven explicit local metadata.
-The finite proposed layouts are two int32 logical contributors (`PAIR_INT32`) and one logical
-int64 contributor (`SINGLE_INT64`) for Java's first two integer storage slots. Both require production
-schema/exporter and parser observations before acceptance; neither is inferred from a familiar name.
+The supported finite layouts are two int32 logical contributors (`PAIR_INT32`) and one logical
+int64 contributor (`SINGLE_INT64`) for Java's first two integer storage slots. Both have actual
+source/exporter and parser observations in [indexed validation](../../tests/conformance/protocol/field-types/INDEXED-VALIDATION.md);
+neither is inferred from a familiar name.
 Additional layouts remain pending until characterized. No synthetic VOID tail is inserted into values.
 
-QDCXX-043 must characterize equal/redefined sender IDs, record/type/order changes and reset.
+The indexed validation records equal/redefined sender IDs, record/type/order changes and actual Java reset.
 The new mode stages a complete sparse active-sender table, local schema and context, then publishes
 them together through nonthrowing operations. Old owned results retain their immutable provenance;
 borrowed schema/description/context views expire at successful publication or owner move/destruction.
@@ -230,3 +232,7 @@ Full generic support requires every applicable pending matrix row to gain produc
 negative evidence at both pins, matching C++ canonical observations, exact resource/ownership/error
 checks and independent final-source review. Existing bounded results remain valid only in their
 documented profiles. No unfinished row is closed merely because a structural walk reached EOF.
+
+Owned byte/string/object fields have separate [validation](../../tests/conformance/protocol/field-types/OBJECT-VALIDATION.md).
+The generic exact 249/137 grammars also apply while discarding values and deliberately
+differ from Java unknown-local-field skipping; opaque bytes establish no Java object semantics.

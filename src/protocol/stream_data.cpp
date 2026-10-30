@@ -97,13 +97,25 @@ StreamDataContext::create(const core::LocalSchema &schema, std::span<const WireR
 
             std::size_t count = 0;
             core::RecordContext recordContext;
+            std::optional<ResolvedIndexedTimeLayout> indexedLayout;
 
             if (bound->localRecordId) {
-                count = schema.records()[static_cast<std::size_t>(*bound->localRecordId)].fields.size();
+                const auto &local = schema.records()[static_cast<std::size_t>(*bound->localRecordId)];
+                count = local.fields.size();
                 recordContext = schema.recordContext(*bound->localRecordId);
+
+                if (local.indexedTimeLayout) {
+                    // Current validated field IDs equal dense positions; make this resolution explicit.
+                    if (const auto *pair = std::get_if<core::IndexedTimePairInt32>(&*local.indexedTimeLayout)) {
+                        indexedLayout = ResolvedIndexedTimePairInt32{pair->firstField, pair->secondField};
+                    } else {
+                        indexedLayout = ResolvedIndexedTimeSingleInt64{
+                            std::get<core::IndexedTimeSingleInt64>(*local.indexedTimeLayout).field};
+                    }
+                }
             }
 
-            plans.push_back({std::move(*bound), count, std::move(recordContext)});
+            plans.push_back({std::move(*bound), count, std::move(recordContext), std::move(indexedLayout)});
         }
 
         return StreamDataContext(std::move(plans), std::move(defaults), schema.profile());

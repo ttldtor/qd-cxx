@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: BSL-1.0
 
 #include "qd/protocol/describe_records.hpp"
+#include "qd/encoding/utf_char.hpp"
+#include "session_budget.hpp"
 
 #include <algorithm>
 #include <new>
@@ -10,6 +12,67 @@
 
 namespace org::ttldtor::qdcxx::protocol {
 namespace {
+/** Allocation-free UTFString measurement using the same compact/UTFChar primitives as the codec. */
+struct MeasuredName {
+    std::size_t units = 0;                          ///< Complete decoded UTF-16 units before an error.
+    std::size_t consumed = 0;                       ///< Exact primitive examination including an invalid full tail.
+    encoding::Status status = encoding::Status::OK; ///< Codec failure or complete success.
+};
+
+/** Count name units before their owning decode, preserving the codec's length/error grammar.
+ * @param input Borrowed remaining payload.
+ * @param limits Per-name and remaining aggregate bounds.
+ * @return Allocation-free measurement; no string or input view escapes.
+ */
+MeasuredName measureName(std::span<const std::byte> input, encoding::UtfStringLimits limits) noexcept {
+    constexpr std::int64_t MAX_UTF_BODY_BYTES = 8589934588LL;
+    constexpr std::int64_t NULL_LENGTH = -1;
+    constexpr std::uint32_t SUPPLEMENTARY_MIN = 0x10000;
+    constexpr std::size_t SURROGATE_PAIR_UNITS = 2;
+    const auto prefix = encoding::readCompactLong(input);
+    MeasuredName result{0, prefix.consumed, prefix.status};
+
+    if (prefix.status != encoding::Status::OK) {
+        return result;
+    }
+
+    if (prefix.value < NULL_LENGTH || prefix.value > MAX_UTF_BODY_BYTES) {
+        result.status = encoding::Status::INVALID_LENGTH;
+    } else if (prefix.value != NULL_LENGTH && static_cast<std::uint64_t>(prefix.value) > limits.bodyBytes) {
+        result.status = encoding::Status::RESOURCE_LIMIT;
+    } else if (prefix.value != NULL_LENGTH) {
+        auto remaining = prefix.value;
+
+        while (remaining > 0) {
+            const auto character = encoding::readUtfChar(input.subspan(result.consumed));
+            result.consumed += character.consumed;
+            result.status = character.status;
+
+            if (character.status != encoding::Status::OK) {
+                return result;
+            }
+
+            const std::size_t units =
+                static_cast<std::uint32_t>(character.value) >= SUPPLEMENTARY_MIN ? SURROGATE_PAIR_UNITS : 1;
+
+            if (units > limits.codeUnits - result.units) {
+                result.status = encoding::Status::RESOURCE_LIMIT;
+
+                return result;
+            }
+
+            result.units += units;
+            remaining -= static_cast<std::int64_t>(character.consumed);
+        }
+
+        if (remaining < 0) {
+            result.status = encoding::Status::INVALID_ENCODING;
+        }
+    }
+
+    return result;
+}
+
 /** Call-local bounded walk, publishing only completed descriptions into its owning result. */
 class DescriptionReader {
     std::span<const std::byte> payload_;
@@ -17,6 +80,7 @@ class DescriptionReader {
     DescriptionResult result_{{}, DescriptionStatus::OK, DescriptionStage::PAYLOAD, 0, 0, encoding::Status::OK};
     std::size_t fields_{};
     std::size_t nameUnits_{};
+    detail::SessionBudget *budget_ = nullptr; ///< Optional internal admission, never a user callback.
 
     /** Set a checkpoint before the next operation, clearing any prior primitive cause.
      * @param stage Next operation or validation checkpoint.
@@ -65,6 +129,25 @@ class DescriptionReader {
     bool name(std::optional<std::u16string> &value, DescriptionStage stage) {
         checkpoint(stage);
         const auto units = std::min(limits_.name.codeUnits, limits_.totalNameUnits - nameUnits_);
+
+        if (budget_ != nullptr) {
+            const auto measured = measureName(payload_.subspan(result_.consumed), {limits_.name.bodyBytes, units});
+
+            if (measured.status != encoding::Status::OK) {
+                result_.consumed += measured.consumed;
+                result_.primitiveStatus = measured.status;
+
+                return fail(measured.status == encoding::Status::INSUFFICIENT_INPUT
+                                ? DescriptionStatus::TRUNCATED_PAYLOAD
+                            : measured.status == encoding::Status::RESOURCE_LIMIT ? DescriptionStatus::RESOURCE_LIMIT
+                                                                                  : DescriptionStatus::INVALID_STRING);
+            }
+
+            if (!budget_->admit(measured.units)) {
+                return fail(DescriptionStatus::RESOURCE_LIMIT);
+            }
+        }
+
         auto decoded = encoding::readUtfString(payload_.subspan(result_.consumed), {limits_.name.bodyBytes, units});
         result_.consumed += decoded.consumed;
         result_.primitiveStatus = decoded.status;
@@ -94,7 +177,7 @@ class DescriptionReader {
     bool record() {
         checkpoint(DescriptionStage::DESCRIPTION);
 
-        if (result_.descriptions.size() == limits_.descriptions) {
+        if (result_.descriptions.size() == limits_.descriptions || (budget_ != nullptr && !budget_->admit(1))) {
             return fail(DescriptionStatus::RESOURCE_LIMIT);
         }
 
@@ -119,6 +202,11 @@ class DescriptionReader {
         }
 
         fields_ += fieldCount;
+
+        if (budget_ != nullptr && !budget_->admit(fieldCount)) {
+            return fail(DescriptionStatus::RESOURCE_LIMIT);
+        }
+
         WireRecordDescription pending{id, std::move(*recordName), {}};
 
         for (std::size_t i = 0; i < fieldCount; ++i) {
@@ -148,9 +236,11 @@ class DescriptionReader {
     /** Store call-local views and budgets without allocating.
      * @param payload Borrowed complete payload.
      * @param limits Logical element budgets.
+     * @param budget Optional internal peak/work ledger; absent preserves ordinary parser behavior.
      */
-    DescriptionReader(std::span<const std::byte> payload, DescriptionLimits limits)
-        : payload_(payload), limits_(limits) {
+    DescriptionReader(std::span<const std::byte> payload, DescriptionLimits limits,
+                      detail::SessionBudget *budget = nullptr)
+        : payload_(payload), limits_(limits), budget_(budget) {
     }
 
     /** Execute once, catching allocation errors before returning the owned completed prefix.
@@ -184,6 +274,11 @@ class DescriptionReader {
 
 DescriptionResult parseDescribeRecords(std::span<const std::byte> payload, DescriptionLimits limits) {
     return DescriptionReader(payload, limits).read();
+}
+
+DescriptionResult detail::parseSessionDescriptions(std::span<const std::byte> payload, DescriptionLimits limits,
+                                                   SessionBudget &budget) {
+    return DescriptionReader(payload, limits, &budget).read();
 }
 
 } // namespace org::ttldtor::qdcxx::protocol

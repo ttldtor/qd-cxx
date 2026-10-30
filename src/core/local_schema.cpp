@@ -11,6 +11,64 @@
 #include <utility>
 
 namespace org::ttldtor::qdcxx::core {
+namespace {
+/** Validate explicit logical contributors without importing source slots or protocol state.
+ * @param record Borrowed structurally identified local record.
+ * @param profile Exact selected field policy.
+ * @return First layout error, or no error.
+ */
+std::optional<SchemaError> validateIndexedLayout(const LocalRecord &record, LocalProfile profile) noexcept {
+    if (profile != LocalProfile::BINARY_FIELDS_V1) {
+        return record.hasTime || record.indexedTimeLayout ? std::optional{SchemaError::UNSUPPORTED_PROFILE}
+                                                          : std::nullopt;
+    }
+
+    if (record.hasTime != record.indexedTimeLayout.has_value()) {
+        return SchemaError::INVALID_SCHEMA;
+    }
+
+    if (!record.indexedTimeLayout) {
+        return std::nullopt;
+    }
+
+    if (const auto *pair = std::get_if<IndexedTimePairInt32>(&*record.indexedTimeLayout)) {
+        if (pair->firstField >= record.fields.size() || pair->secondField >= record.fields.size() ||
+            pair->firstField == pair->secondField) {
+            return SchemaError::INVALID_SCHEMA;
+        }
+
+        for (const auto fieldId : {pair->firstField, pair->secondField}) {
+            const auto type = record.fields[fieldId].serialTypeId;
+
+            if (type != std::to_underlying(SerialFieldType::INT) &&
+                type != std::to_underlying(SerialFieldType::COMPACT_INT) &&
+                type != std::to_underlying(SerialFieldType::DECIMAL) &&
+                type != std::to_underlying(SerialFieldType::SHORT_STRING) &&
+                type != std::to_underlying(SerialFieldType::TIME_SECONDS) &&
+                type != std::to_underlying(SerialFieldType::SEQUENCE) &&
+                type != std::to_underlying(SerialFieldType::DATE)) {
+                return SchemaError::UNSUPPORTED_PROFILE;
+            }
+        }
+    } else {
+        const auto fieldId = std::get<IndexedTimeSingleInt64>(*record.indexedTimeLayout).field;
+
+        if (fieldId >= record.fields.size()) {
+            return SchemaError::INVALID_SCHEMA;
+        }
+
+        const auto type = record.fields[fieldId].serialTypeId;
+
+        if (type != std::to_underlying(SerialFieldType::LONG) &&
+            type != std::to_underlying(SerialFieldType::WIDE_DECIMAL) &&
+            type != std::to_underlying(SerialFieldType::TIME_MILLIS)) {
+            return SchemaError::UNSUPPORTED_PROFILE;
+        }
+    }
+
+    return std::nullopt;
+}
+} // namespace
 
 /** Fixed-size lifetime token; never retains source declarations or protocol state. */
 struct RecordContext::Identity {};
@@ -102,8 +160,8 @@ std::expected<LocalSchema, SchemaError> LocalSchema::create(std::span<const Loca
             }
         }
 
-        if (record.hasTime) {
-            return std::unexpected(SchemaError::UNSUPPORTED_PROFILE);
+        if (const auto error = validateIndexedLayout(record, profile)) {
+            return std::unexpected(*error);
         }
 
         if (!detail::chargeBudget(record.fields.size(), limits.fields) ||

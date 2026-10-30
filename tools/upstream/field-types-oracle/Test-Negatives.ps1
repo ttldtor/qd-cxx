@@ -8,6 +8,7 @@ if(Test-Path -LiteralPath $root){throw 'RunDirectory must be new'}
 New-Item -ItemType Directory -Path $root | Out-Null
 $expected=(Resolve-Path -LiteralPath $ExpectedDirectory).Path
 $mutations=@('type','value','unit','null-empty','order','record','arity','missing-field','missing-record','unknown-row','duplicate-row','missing-completion','duplicate-completion','misplaced-completion','extra-file','binary','primitive-consumption','scalar-value','scalar-wire-type','scalar-consumed','scalar-byte','scalar-missing','scalar-fanout','object-null-empty','object-byte','object-consumed','object-missing','object-local-type')
+$mutations+=@('indexed-time','indexed-slot','indexed-lookup','indexed-last-winner','indexed-missing','indexed-binary')
 $results=[Collections.Generic.List[object]]::new()
 foreach($mutation in $mutations){
     $dir=Join-Path $root $mutation
@@ -15,6 +16,7 @@ foreach($mutation in $mutations){
     Get-ChildItem -LiteralPath $expected -File | Copy-Item -Destination $dir
     Copy-Item -LiteralPath (Join-Path $expected 'scalars') -Destination $dir -Recurse
     Copy-Item -LiteralPath (Join-Path $expected 'objects') -Destination $dir -Recurse
+    Copy-Item -LiteralPath (Join-Path $expected 'indexed') -Destination $dir -Recurse
     $path=Join-Path $dir 'mixed-stream.tsv';$rows=[IO.File]::ReadAllLines($path)
     switch($mutation){
         'type' {$rows[3]=$rows[3].Replace("`t40`t","`t8`t")}
@@ -75,6 +77,41 @@ foreach($mutation in $mutations){
         [IO.File]::WriteAllText($objectPath,$changed)
     }
     [IO.File]::WriteAllText($path,($rows -join "`n")+"`n")
+    if($mutation.StartsWith('indexed-')){
+        $indexedPath=Join-Path $dir 'indexed/observations.tsv'
+        $indexedRows=[IO.File]::ReadAllLines($indexedPath)
+        $original=[IO.File]::ReadAllText($indexedPath)
+        if($mutation -ceq 'indexed-binary'){
+            $binaryPath=Join-Path $dir 'indexed/batch-subset-last.qtp'
+            $binary=[IO.File]::ReadAllBytes($binaryPath)
+            $binary[-1]=$binary[-1] -bxor 1
+            [IO.File]::WriteAllBytes($binaryPath,$binary)
+        } elseif($mutation -ceq 'indexed-missing'){
+            $indexedRows=$indexedRows[0..($indexedRows.Count-2)]
+        } else {
+            $prefix=switch($mutation){
+                'indexed-time' {'delivered'+[char]9+'file-Pair4'+[char]9}
+                'indexed-slot' {'slot'+[char]9+'Pair4'+[char]9+'0'+[char]9}
+                'indexed-lookup' {'source-lookup'+[char]9+'Pair4'+[char]9+'High'+[char]9}
+                'indexed-last-winner' {'batch-complete'+[char]9+'batch-subset-last'+[char]9}
+            }
+            $index=[Array]::FindIndex($indexedRows,[Predicate[string]]{param($row)$row.StartsWith($prefix)})
+            if($index -lt 0){throw 'Indexed mutation target absent'}
+            $cells=$indexedRows[$index].Split([char]9)
+            switch($mutation){
+                'indexed-time' {$cells[4]='1'}
+                'indexed-slot' {$cells[2]='1'}
+                'indexed-lookup' {$cells[3]='field:1'}
+                'indexed-last-winner' {$cells[3]='Pair8|HighAlias:8@0|Low:8@1|Sentinel:8@2'}
+            }
+            $indexedRows[$index]=$cells -join [char]9
+        }
+        if($mutation -cne 'indexed-binary'){
+            $changed=($indexedRows -join [char]10)+[char]10
+            if($original -ceq $changed){throw 'Indexed mutation changed nothing'}
+            [IO.File]::WriteAllText($indexedPath,$changed)
+        }
+    }
     $failed=$false
     try {& "$PSScriptRoot/Compare-FieldTypes.ps1" -Actual $dir -Expected $expected *> "$dir-check.log"}
     catch {$failed=$true;[IO.File]::AppendAllText("$dir-check.log","REJECTED: $_`n")}

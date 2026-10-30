@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/protocol/tape_reader.hpp"
 #include "../core/schema_validation.hpp"
+#include "session_budget.hpp"
 
 #include <algorithm>
 #include <array>
@@ -196,7 +197,8 @@ class DescriptorParser {
                 opt = true;
                 result.options = std::move(value);
             } else if (*key == u"time") {
-                if (mode_ == TapeMode::LEGACY ? *value != u"NONE" : (*value != u"MESSAGE" && *value != u"message")) {
+                if (mode_ != TapeMode::RAW_MESSAGE_V1 ? *value != u"NONE"
+                                                      : (*value != u"MESSAGE" && *value != u"message")) {
                     reject(TapeError::UNSUPPORTED, TapeRejection::TIME);
                 }
 
@@ -222,19 +224,20 @@ class DescriptorParser {
 
                 auto props = count(NumberWidth::COMPACT_LONG, properties_, limits_.properties);
 
-                const bool acceptedMessage = mode_ == TapeMode::LEGACY ? id == STREAM_DATA && *name == u"STREAM_DATA"
-                                                                       : id == RAW_DATA && *name == u"RAW_DATA";
+                const bool acceptedMessage = mode_ != TapeMode::RAW_MESSAGE_V1
+                                                 ? id == STREAM_DATA && *name == u"STREAM_DATA"
+                                                 : id == RAW_DATA && *name == u"RAW_DATA";
 
                 if (props != 0 || direction != 0 || entries != 1 || !acceptedMessage) {
                     reject(TapeError::UNSUPPORTED, TapeRejection::MESSAGE);
                 }
 
-                result.explicitStreamSend = mode_ == TapeMode::LEGACY;
+                result.explicitStreamSend = mode_ != TapeMode::RAW_MESSAGE_V1;
                 result.explicitRawSend = mode_ == TapeMode::RAW_MESSAGE_V1;
             }
         }
 
-        if (cursor_ != payload_.size() || !type || (!opt && mode_ == TapeMode::LEGACY)) {
+        if (cursor_ != payload_.size() || !type || (!opt && mode_ != TapeMode::RAW_MESSAGE_V1)) {
             reject(TapeError::UNSUPPORTED,
                    cursor_ == payload_.size() && type && !opt ? TapeRejection::OPTIONS : TapeRejection::DESCRIPTOR);
         }
@@ -264,6 +267,176 @@ core::LocalSchema copySchema(const core::LocalSchema &schema, core::SchemaLimits
         }
 
         throw std::invalid_argument("tape schema exceeds configured bounds");
+    }
+
+    return std::move(*result);
+}
+
+/** Subtraction-based exact logical metadata count; never an allocator-capacity measurement. */
+class UnitCount {
+    std::size_t remaining_;
+    std::size_t maximum_;
+    bool fits_ = true;
+
+    public:
+    /** Select a finite bound before measuring borrowed declarations.
+     * @param maximum Largest admissible logical count.
+     */
+    explicit UnitCount(std::size_t maximum) noexcept : remaining_(maximum), maximum_(maximum) {
+    }
+
+    /** Add only after overflow-safe admission.
+     * @param amount One owning element/unit category.
+     */
+    void add(std::size_t amount) noexcept {
+        if (amount > remaining_) {
+            fits_ = false;
+        } else if (fits_) {
+            remaining_ -= amount;
+        }
+    }
+
+    /** Obtain the complete count, or reject without a wrapped arithmetic result. */
+    [[nodiscard]] std::optional<std::size_t> result() const noexcept {
+        return fits_ ? std::optional{maximum_ - remaining_} : std::nullopt;
+    }
+};
+
+/** Count owned local schema declarations and one immutable identity before copying.
+ * @param schema Validated borrowed schema.
+ * @param maximum Finite count ceiling.
+ * @return S from INDEXED-SCHEMAS, or no value on overflow/excess.
+ */
+std::optional<std::size_t> schemaUnits(const core::LocalSchema &schema, std::size_t maximum) noexcept {
+    UnitCount count(maximum);
+    count.add(1);
+
+    for (const auto &record : schema.records()) {
+        count.add(1);
+        count.add(record.name.size());
+        count.add(record.fields.size());
+        count.add(record.lookups.size());
+        count.add(record.indexedTimeLayout ? 1 : 0);
+
+        for (const auto &key : record.lookups) {
+            count.add(key.name.size());
+        }
+    }
+
+    return count.result();
+}
+
+/** Count the D ownership of one active or staged raw declaration.
+ * @param record Borrowed complete description.
+ * @param count Overflow-safe aggregate counter.
+ */
+void descriptionUnits(const WireRecordDescription &record, UnitCount &count) noexcept {
+    count.add(1);
+    count.add(record.name.size());
+    count.add(record.fields.size());
+
+    for (const auto &field : record.fields) {
+        count.add(field.name.size());
+    }
+}
+
+/** Measure a raw table without allocating an ID-indexed structure.
+ * @param descriptions Borrowed active or complete staging table.
+ * @param maximum Finite count ceiling.
+ * @return D, or no value on overflow/excess.
+ */
+std::optional<std::size_t> descriptionUnits(std::span<const WireRecordDescription> descriptions,
+                                            std::size_t maximum) noexcept {
+    UnitCount count(maximum);
+
+    for (const auto &record : descriptions) {
+        descriptionUnits(record, count);
+    }
+
+    return count.result();
+}
+
+/** Count complete plans, owned defaults and resolved indexed layout before construction.
+ * @param schema Validated borrowed local declarations.
+ * @param descriptions Borrowed final active table.
+ * @param maximum Finite count ceiling.
+ * @return C, or no value on overflow/excess.
+ */
+std::optional<std::size_t> contextUnits(const core::LocalSchema &schema,
+                                        std::span<const WireRecordDescription> descriptions,
+                                        std::size_t maximum) noexcept {
+    UnitCount count(maximum);
+
+    for (const auto &record : schema.records()) {
+        count.add(1);
+        count.add(record.fields.size());
+    }
+
+    for (const auto &description : descriptions) {
+        count.add(1);
+        count.add(description.fields.size());
+
+        for (const auto &local : schema.records()) {
+            if (local.name == description.name) {
+                count.add(local.indexedTimeLayout ? 1 : 0);
+                break;
+            }
+        }
+    }
+
+    return count.result();
+}
+
+/** Measure the complete initial new-mode state before either owning allocation.
+ * @param schema Caller-owned schema, not part of the reader's retained units.
+ * @param limits Finite work and peak bounds.
+ * @return S plus empty-context C, or constructor invalid_argument.
+ */
+std::size_t initialSessionUnits(const core::LocalSchema &schema, const TapeLimits &limits) {
+    const auto maximum = std::min(limits.snapshotUnits, limits.constructionUnits);
+    const auto local = schemaUnits(schema, maximum);
+
+    if (local) {
+        const auto context = contextUnits(schema, {}, maximum - *local);
+
+        if (context) {
+            return *local + *context;
+        }
+    }
+
+    throw std::invalid_argument("initial session metadata exceeds configured bounds");
+}
+
+/** Preserve old copying semantics and opt into fresh indexed provenance explicitly.
+ * @param schema Validated caller-owned local schema.
+ * @param limits Finite constructor bounds.
+ * @param mode Explicit protocol policy.
+ * @return Bounded owning schema; constructor exceptions occur before any input.
+ */
+core::LocalSchema initializeSchema(const core::LocalSchema &schema, const TapeLimits &limits, TapeMode mode) {
+    if (mode != TapeMode::BINARY_CATALOG_V1) {
+        for (const auto &record : schema.records()) {
+            if (record.hasTime || record.indexedTimeLayout) {
+                throw std::invalid_argument("indexed schemas require the catalog tape mode");
+            }
+        }
+
+        return copySchema(schema, limits.context.schema);
+    }
+
+    if (schema.profile() != core::LocalProfile::BINARY_FIELDS_V1) {
+        throw std::invalid_argument("catalog tape mode requires the binary field profile");
+    }
+
+    static_cast<void>(initialSessionUnits(schema, limits));
+    auto result = core::LocalSchema::create(schema.records(), limits.context.schema, schema.profile());
+
+    if (!result) {
+        if (result.error() == core::SchemaError::ALLOCATION_FAILURE) {
+            throw std::bad_alloc();
+        }
+
+        throw std::invalid_argument("invalid catalog schema bounds");
     }
 
     return std::move(*result);
@@ -318,9 +491,14 @@ std::int64_t TapeTiming::eventTimeMs() const noexcept {
 }
 
 TapeReader::TapeReader(const core::LocalSchema &schema, TapeLimits limits, TapeMode mode)
-    : limits_(limits), mode_(mode), schema_(copySchema(schema, limits.context.schema)), framer_(limits.frame) {
-    if (mode_ != TapeMode::LEGACY && mode_ != TapeMode::RAW_MESSAGE_V1) {
+    : limits_(limits), mode_(mode), schema_(initializeSchema(schema, limits, mode)), framer_(limits.frame) {
+    if (mode_ != TapeMode::LEGACY && mode_ != TapeMode::RAW_MESSAGE_V1 && mode_ != TapeMode::BINARY_CATALOG_V1) {
         throw std::invalid_argument("invalid tape mode");
+    }
+
+    if (mode_ == TapeMode::BINARY_CATALOG_V1) {
+        construction_ = initialSessionUnits(schema_, limits_);
+        snapshotUnits_ = construction_;
     }
 
     auto empty = StreamDataContext::create(schema_, {}, limits_.context);
@@ -589,6 +767,165 @@ void TapeReader::discoverDescriptions(std::vector<WireRecordDescription> &incomi
     descriptions_.swap(candidate);
 }
 
+void TapeReader::replaceDescriptions(std::span<const std::byte> payload) {
+    detail::SessionBudget budget(snapshotUnits_, limits_.snapshotUnits, construction_, limits_.constructionUnits);
+
+    if (!budget.work(payload.size())) {
+        fail(TapeError::RESOURCE_LIMIT, "construction");
+
+        return;
+    }
+
+    diagnostic_.stage = "description";
+    auto parsed =
+        detail::parseSessionDescriptions(payload,
+                                         {limits_.frame.maximumBodyBytes,
+                                          limits_.context.descriptions,
+                                          limits_.context.bindings.fields,
+                                          limits_.context.bindings.fields,
+                                          {limits_.frame.maximumBodyBytes, limits_.context.bindings.nameUnits},
+                                          limits_.context.bindings.totalNameUnits},
+                                         budget);
+    diagnostic_.consumed = parsed.consumed;
+    diagnostic_.errorOffset = parsed.errorOffset;
+
+    if (parsed.status != DescriptionStatus::OK) {
+        const auto error = parsed.status == DescriptionStatus::RESOURCE_LIMIT       ? TapeError::RESOURCE_LIMIT
+                           : parsed.status == DescriptionStatus::ALLOCATION_FAILURE ? TapeError::ALLOCATION_FAILURE
+                                                                                    : TapeError::MALFORMED;
+        fail(error, "description", static_cast<std::size_t>(parsed.stage));
+
+        return;
+    }
+
+    if (parsed.descriptions.empty()) {
+        return;
+    }
+
+    diagnostic_.stage = "construction";
+    const auto ceiling = limits_.snapshotUnits;
+    const auto rawUnits = descriptionUnits(parsed.descriptions, ceiling);
+    const auto oldUnits = descriptionUnits(descriptions_, ceiling);
+
+    if (!rawUnits || !oldUnits || !budget.admit(*oldUnits)) {
+        fail(TapeError::RESOURCE_LIMIT, "construction");
+
+        return;
+    }
+
+    auto candidate = descriptions_;
+    auto candidateUnits = *oldUnits;
+
+    for (const auto &incoming : parsed.descriptions) {
+        UnitCount temporaryCount(ceiling);
+        temporaryCount.add(1);
+        temporaryCount.add(incoming.fields.size());
+        const auto temporaryUnits = temporaryCount.result();
+
+        if (!temporaryUnits || !budget.admit(*temporaryUnits)) {
+            fail(TapeError::RESOURCE_LIMIT, "construction");
+
+            return;
+        }
+
+        {
+            // Validate every wire-order entry, including an intermediate entry later overwritten.
+            auto validated = bindRecord(incoming, schema_, limits_.context.bindings);
+
+            if (!validated) {
+                if (validated.error() == BindingError::UNSUPPORTED_PROFILE) {
+                    diagnostic_.rejection = TapeRejection::TYPE;
+                }
+
+                fail(bindingError(validated.error()), "binding", static_cast<std::size_t>(validated.error()));
+
+                return;
+            }
+        }
+
+        budget.release(*temporaryUnits);
+        const auto existing = std::find_if(candidate.begin(), candidate.end(), [&](const auto &record) {
+            return record.senderId == incoming.senderId;
+        });
+
+        if (existing == candidate.end() && candidate.size() == limits_.context.descriptions) {
+            fail(TapeError::RESOURCE_LIMIT, "construction");
+
+            return;
+        }
+
+        const auto copiedUnits = descriptionUnits(std::span{&incoming, 1}, ceiling);
+
+        if (!copiedUnits || !budget.admit(*copiedUnits)) {
+            fail(TapeError::RESOURCE_LIMIT, "construction");
+
+            return;
+        }
+
+        auto replacement = incoming;
+
+        if (existing == candidate.end()) {
+            candidate.push_back(std::move(replacement));
+            candidateUnits += *copiedUnits; // Both owners have already passed the subtraction-based peak check.
+        } else {
+            const auto released = descriptionUnits(std::span{&*existing, 1}, ceiling);
+            static_assert(noexcept(*existing = std::move(replacement)));
+            *existing = std::move(replacement);
+            budget.release(*released);
+            candidateUnits = candidateUnits - *released + *copiedUnits;
+        }
+    }
+
+    parsed.descriptions.clear();
+    budget.release(*rawUnits);
+    const auto localUnits = schemaUnits(schema_, ceiling);
+
+    if (!localUnits || !budget.admit(*localUnits)) {
+        fail(TapeError::RESOURCE_LIMIT, "construction");
+
+        return;
+    }
+
+    // create issues a fresh identity; boundedCopy deliberately retains an old generation instead.
+    auto nextSchema = core::LocalSchema::create(schema_.records(), limits_.context.schema, schema_.profile());
+
+    if (!nextSchema) {
+        fail(nextSchema.error() == core::SchemaError::ALLOCATION_FAILURE ? TapeError::ALLOCATION_FAILURE
+                                                                         : TapeError::RESOURCE_LIMIT,
+             "construction");
+
+        return;
+    }
+
+    const auto nextContextUnits = contextUnits(*nextSchema, candidate, ceiling);
+
+    if (!nextContextUnits || !budget.admit(*nextContextUnits)) {
+        fail(TapeError::RESOURCE_LIMIT, "construction");
+
+        return;
+    }
+
+    auto nextContext = StreamDataContext::create(*nextSchema, candidate, limits_.context);
+
+    if (!nextContext) {
+        if (nextContext.error() == BindingError::UNSUPPORTED_PROFILE) {
+            diagnostic_.rejection = TapeRejection::TYPE;
+        }
+
+        fail(bindingError(nextContext.error()), "binding", static_cast<std::size_t>(nextContext.error()));
+
+        return;
+    }
+
+    static_assert(noexcept(schema_ = std::move(*nextSchema)));
+    static_assert(noexcept(context_ = std::move(*nextContext)));
+    static_assert(noexcept(descriptions_.swap(candidate)));
+    schema_ = std::move(*nextSchema);
+    context_ = std::move(*nextContext);
+    descriptions_.swap(candidate);
+    snapshotUnits_ = *localUnits + candidateUnits + *nextContextUnits;
+}
+
 void TapeReader::fail(TapeError error, std::string_view stage, std::size_t detail) noexcept {
     if (status_ == TapeStatus::FAILED) {
         return;
@@ -707,6 +1044,12 @@ void TapeReader::dispatch(TapeFeedResult &result) {
     }
 
     if (frame.type == DESCRIBE_RECORDS) {
+        if (mode_ == TapeMode::BINARY_CATALOG_V1) {
+            replaceDescriptions(frame.payload);
+
+            return;
+        }
+
         if (discoverSchema_) {
             // Each materialized raw record/field needs a structural byte; decoded name units
             // never exceed their encoded bytes. This conservative charge includes failed parses.
@@ -808,7 +1151,7 @@ void TapeReader::dispatch(TapeFeedResult &result) {
         return;
     }
 
-    if (frame.type != (mode_ == TapeMode::LEGACY ? STREAM_DATA : RAW_DATA)) {
+    if (frame.type != (mode_ == TapeMode::RAW_MESSAGE_V1 ? RAW_DATA : STREAM_DATA)) {
         diagnostic_.rejection = frame.type == DESCRIBE_PROTOCOL ? TapeRejection::SEQUENCE : TapeRejection::MESSAGE;
         fail(TapeError::UNSUPPORTED, "type");
 
@@ -833,8 +1176,8 @@ void TapeReader::dispatch(TapeFeedResult &result) {
     budget.payloadEncodedBytes -= payloadEncodedBytes_;
     budget.payloadWorkBytes -= payloadWorkBytes_;
     budget.ownedPayloadBytes -= ownedPayloadBytes_;
-    auto decoded = mode_ == TapeMode::LEGACY ? decodeStreamData(frame.payload, *context_, budget)
-                                             : decodeRawData(frame.payload, *context_, budget);
+    auto decoded = mode_ == TapeMode::RAW_MESSAGE_V1 ? decodeRawData(frame.payload, *context_, budget)
+                                                     : decodeStreamData(frame.payload, *context_, budget);
     records_ += decoded.processedRecords;
     fields_ += decoded.wireFields;
     fieldBytes_ += decoded.fieldBytes;

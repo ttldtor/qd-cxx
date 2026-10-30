@@ -15,11 +15,26 @@ struct ContextLimits {
     BindingLimits bindings;    ///< Aggregate actions/names and per-name bound across all descriptions.
 };
 
+/** Resolved dense output positions for the signed32 high and low time words. */
+struct ResolvedIndexedTimePairInt32 {
+    std::size_t firstValueIndex;  ///< High-word position, never a sender ID or source slot.
+    std::size_t secondValueIndex; ///< Low-word position in the same local values vector.
+};
+
+/** Resolved dense output position for a signed64 indexed value. */
+struct ResolvedIndexedTimeSingleInt64 {
+    std::size_t valueIndex; ///< Complete logical64 value; physical tails remain absent.
+};
+
+/** Owned decoding positions, distinct from the logical IDs supplied to LocalRecord. */
+using ResolvedIndexedTimeLayout = std::variant<ResolvedIndexedTimePairInt32, ResolvedIndexedTimeSingleInt64>;
+
 /** Owned validated plan with the output shape needed after schema destruction. */
 struct StreamRecordPlan {
     RecordBinding binding;         ///< Owned ordered actions derived only by bindRecord.
     std::size_t localFieldCount;   ///< Number of local logical values, zero for unknown records.
     core::RecordContext context{}; ///< Owned local provenance; invalid for an unknown record.
+    std::optional<ResolvedIndexedTimeLayout> indexedTimeLayout{}; ///< Fixed-size owned positions for indexed records.
 };
 
 /** Immutable static decoding snapshot; not a dynamic session table. */

@@ -8,8 +8,9 @@
 namespace org::ttldtor::qdcxx::protocol {
 /** Explicit container policy, independent of the caller's local field profile. */
 enum class TapeMode {
-    LEGACY,        ///< Restricted untimed STREAM_DATA behavior.
-    RAW_MESSAGE_V1 ///< Bounded RAW_DATA with MESSAGE heartbeats; see RAW-TAPE.
+    LEGACY,           ///< Restricted untimed STREAM_DATA behavior.
+    RAW_MESSAGE_V1,   ///< Bounded RAW_DATA with MESSAGE heartbeats; see RAW-TAPE.
+    BINARY_CATALOG_V1 ///< Partial opt-in: restricted STREAM grammar with indexed schemas and active replacements.
 };
 
 /** Fixed-size owning timing state shared by all records in one data result. */
@@ -46,6 +47,7 @@ struct TapeLimits {
     std::size_t constructionUnits; ///< Cumulative construction units; discovery also charges raw payload/context work.
     StreamDataLimits data;         ///< Aggregate file work/output bounds and per-symbol bounds.
     std::size_t timingEvents = 0;  ///< RAW metadata attempts: explicit heartbeats and data frames; zero is finite.
+    std::size_t snapshotUnits = 0; ///< New-mode simultaneous schema/description/context metadata units; zero is finite.
 };
 /** Terminal categories, independent of Java exception classes. */
 enum class TapeError {
@@ -109,7 +111,7 @@ struct TapeFeedResult {
     std::optional<TapeHeartbeat> heartbeat;     ///< Accepted explicit heartbeat, even with no subsequent data.
 };
 
-/** Bounded single-threaded tape reader; no reset, replacement or recovery API. */
+/** Bounded single-threaded reader; active replacement is explicit-mode only, with no reset or recovery API. */
 class TapeReader {
     TapeLimits limits_;
     TapeMode mode_;
@@ -124,6 +126,8 @@ class TapeReader {
     std::size_t frames_ = 0;
     std::size_t markers_ = 0;
     std::size_t construction_ = 0;
+    std::size_t snapshotUnits_ =
+        0; ///< Current new-mode metadata, excluding caller-owned copies and frame/data storage.
     std::size_t records_ = 0;
     std::size_t fields_ = 0;
     std::size_t emitted_ = 0;
@@ -151,12 +155,19 @@ class TapeReader {
      * @param incoming Owned parsed batch, moved only after bounded admission.
      */
     void discoverDescriptions(std::vector<WireRecordDescription> &incoming);
+    /** Validate and publish one new-mode active-description generation.
+     * @param payload Complete borrowed description bytes; no publication occurs on any failure.
+     */
+    void replaceDescriptions(std::span<const std::byte> payload);
 
     public:
     /** Copy a validated local schema within bounds and allocate framing storage.
      * @param schema Borrowed validated schema, copied before returning.
      * @param limits Mandatory finite bounds; invalid configuration throws invalid_argument.
      * @param mode Explicit container policy; default preserves the original untimed behavior.
+     * BINARY_CATALOG_V1 requires BINARY_FIELDS_V1 and finite snapshotUnits; it currently keeps
+     * the restricted STREAM grammar while enabling indexed metadata and atomic active replacements.
+     * Indexed local schemas are refused by both older modes.
      * Allocation failure before input may throw bad_alloc.
      */
     TapeReader(const core::LocalSchema &schema, TapeLimits limits, TapeMode mode = TapeMode::LEGACY);
@@ -165,6 +176,7 @@ class TapeReader {
      * invalid_argument; allocation before input may throw bad_alloc. Single-threaded.
      * @param limits Mandatory finite parsing, final schema and cumulative construction bounds.
      * @param mode Explicit container policy, independent of schema discovery.
+     * BINARY_CATALOG_V1 is refused; broader discovery is not selected through this constructor.
      */
     explicit TapeReader(TapeLimits limits, TapeMode mode = TapeMode::LEGACY);
     /** Accept up to one envelope; caller resubmits any unaccepted suffix.
@@ -213,7 +225,7 @@ class TapeReader {
     }
 
     /** Inspect owned immutable local declarations, including an empty initial schema.
-     * @return Borrowed schema; views expire on successful discovery updates, reader destruction, move or assignment.
+     * @return Borrowed schema; views expire on successful discovery/catalog updates, destruction, move or assignment.
      * Failed updates retain declarations and provenance. boundedCopy explicitly retains an old snapshot.
      */
     [[nodiscard]] const core::LocalSchema &schema() const noexcept {
@@ -221,7 +233,8 @@ class TapeReader {
     }
 
     /** Inspect exact accepted source declarations without reparsing or copying.
-     * @return Borrowed append/wire order; expires on successful description updates, destruction, move or assignment.
+     * @return Borrowed append order in old modes; active first-seen sender order in BINARY_CATALOG_V1.
+     * Expires on successful description updates, destruction, move or assignment.
      * A rejected batch leaves this storage intact. Sender IDs are sparse identities, never local positions.
      */
     [[nodiscard]] std::span<const WireRecordDescription> descriptions() const noexcept {

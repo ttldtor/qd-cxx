@@ -160,3 +160,25 @@ owned nullable UTF-16, logical field positions independent of Java slots, and cu
 Both existing tape modes keep their descriptor, flags, timing, terminal-error and append-only policies.
 Earlier type exclusions below describe the older profiles; only this explicit profile extends them.
 No Profile event adapter, indexed schema, importer or implicit discovery is added.
+
+## Partial catalog mode with indexed generations
+
+The supplied-schema constructor now explicitly accepts BINARY_CATALOG_V1 only with
+BINARY_FIELDS_V1 and finite snapshotUnits. Its current header/data grammar is the same
+restricted BINARY/NONE/EMPTY_SET/STREAM_DATA/zero-flags subset. Old LEGACY/RAW_MESSAGE_V1
+behavior and ordinary discovery remain unchanged; the discovery constructor refuses the
+new mode. Other families, headerless input, options/flags, FIELD and source chains remain pending.
+
+[INDEXED-SCHEMAS](../schema/INDEXED-SCHEMAS.md) defines pair32/single64 local metadata,
+owned resolved plan positions and exact S/D/C work/peak charges. Active sender descriptions
+are replaced in stable first-seen order. Every successful nonempty batch publishes fresh
+immutable provenance, even for equal shapes; an empty batch is a no-op. All input entries
+are validated, including overwritten intermediates. Failed parse/type/admission/allocation
+retains old schema, context, descriptions and borrowed addresses. Publication uses only
+nonthrowing operations without user callbacks. Returned owned records/contexts survive it.
+
+New-reader construction is the explicit boundary for an independent closed source. No
+header/footer resets state or work counters. Typed causes, framing/payload coordinates,
+completed-prefix behavior and separate payload ownership budgets retain their contracts.
+[Validation](../../tests/conformance/protocol/field-types/INDEXED-VALIDATION.md) records
+both production pins and the deliberately stronger C++ rollback policy.
