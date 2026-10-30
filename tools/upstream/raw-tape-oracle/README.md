@@ -52,3 +52,36 @@ The separate `RawTapeInventory.java` / `Check-Inventory.ps1` path inventories op
 and structurally valid descriptions; it is not the production acceptance oracle. Its source hashes
 are excluded from the oracle tool manifest and recorded by its own runs. Private input is never
 copied into these fixtures; generated acceptance does not claim private-file compatibility.
+
+## Bounded corpus inventory
+
+Run `Check-Inventory.ps1 -Help` without upstream/input dependencies for invocation, defaults,
+side effects and exit semantics. The launcher verifies the [portable input manifest](../../../tests/fixtures/protocol/real-tape/corpus.tsv)
+and runs generated structural checks. It requires prebuilt clean locked upstream classes and JDK 8;
+it does not rebuild upstream. All captures and hashed tool/input metadata stay under repository `.work`.
+
+```powershell
+& tools/upstream/raw-tape-oracle/Check-Inventory.ps1 `
+  -UpstreamRoot $lockedUpstream -JavaHome $oracleJdk `
+  -WorkDir $privateWorkDir -PrivateFile $privateTape `
+  -ReplayDeliveryLimit 10000000 -TimeoutSeconds 30 -HeapMiB 128 `
+  -Inspector $tapeInspector
+```
+
+PrivateFile and Inspector are optional. The inspector uses explicit `oracle-field-types-v1`, `default-quote-v1`, `default-profile-v1` and
+`raw-message-v1`, preserving its finite defaults. Replay defaults to 1,000,000 callback deliveries;
+accepted range is 1..100,000,000. Heap is 32..1024 MiB (default 128), process time 1..300 seconds
+(default 30), input 8 MiB. A timed-out owned process is terminated; timeout never means EOF.
+Replay failure is retained as an observation, so launcher exit 0 alone is not replay acceptance.
+The output separates attempted/accepted fanout deliveries, STREAM_DATA projection and processed
+bytes. `returned-byte-match` additionally checks normal return, zero corruption callbacks and
+processed bytes equal physical size; review private stderr for swallowed upstream I/O failures.
+Compressed/paired/sequence qualification and complete C++/Java value equality remain separate.
+See [corpus contract](../../../tests/conformance/protocol/real-tape/CORPUS.md) and
+[observations](../../../docs/REAL-TAPE-GAPS.md).
+
+`returned-byte-match` is a neutral observation, not source/container classification or a complete
+semantic decode claim. Compressed output length can equal physical input size: generated checks
+replay 4,096 zero marker bytes both plain and as a small gzip padded to 4,096 bytes. Production
+FileReader returns with zero corruption callbacks and 4,096 processed bytes for both. The launcher
+requires the same neutral token for both, so byte equality never establishes an uncompressed source.

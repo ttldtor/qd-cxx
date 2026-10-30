@@ -1,0 +1,5 @@
+id	path	sha256	cpp_profile	cpp_exit	cpp_expectation	cpp_stage	cpp_reason	cpp_emitted	cpp_processed
+mixed-raw	tests/fixtures/encoding/field-types/expected/mixed-raw.qtp	da482404c0f58044030fc0dab53f55ce68d734bed6a4ef599aed2525ebb6b48e	oracle-field-types-v1	0	supported-field-types	-	-	3	3
+unsupported-identities	tests/fixtures/protocol/tape-write/expected/extras/unsupported-full-identities.qtp	7600d2faee9d3356a95091ba9307253d0f1018077d7ab558993fd997583d12f2	oracle-field-types-v1	4	binding-TYPE	binding	TYPE	-	-
+unsupported-message	tests/fixtures/protocol/raw-tape/expected/unsupported-message.qtp	cb229adc01961cd31bf71d657c4e93420668d77c531d4c9466aee198a685042a	oracle-sre-v1	4	type	type	-	-	-
+truncated-heartbeat	tests/fixtures/protocol/raw-tape/expected/timestamp-truncated-9.qtp	113ee3a545b52effc2cc95738e1a911681b08ec0fd3dbb22ff96f15ca55df5dd	oracle-sre-v1	5	heartbeat	heartbeat	-	-	-

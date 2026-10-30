@@ -508,3 +508,17 @@ tests/conformance/tooling/evidence/review-12/preservation.json -whitespace
 tests/conformance/replay/evidence/logs/** -text -whitespace
 tests/conformance/replay/evidence/profiles/** -text -whitespace
 tests/conformance/replay/evidence/*.tsv -text -whitespace
+
+# Oracle source hashes and binary tape evidence retain their exact captured bytes.
+tools/upstream/field-types-oracle/*.ps1 -text
+tools/upstream/raw-tape-oracle/*.ps1 -text
+tools/upstream/real-tape-corpus/** -text
+tools/upstream/real-tape-acceptance/** -text
+tools/upstream/real-tape-corpus/*.md text eol=lf
+tools/upstream/real-tape-acceptance/*.md text eol=lf
+tests/conformance/protocol/real-tape/*.ps1 -text
+tests/fixtures/encoding/field-types/expected/** -text
+tests/fixtures/encoding/field-types/current-*-expected/** -text
+tests/fixtures/encoding/field-types/*-captures.json -text
+tests/fixtures/protocol/real-tape/** -text
+tests/fixtures/protocol/real-tape/*.md text eol=lf

@@ -326,9 +326,16 @@ public final class RawTapeInventory {
   }
 
   private static final class ReplayObserver extends MessageConsumerAdapter {
-    int records;
+    final int deliveryLimit;
+    int attemptedDeliveries;
+    int acceptedDeliveries;
+    int streamDeliveries;
     int errors;
     final Map<Integer, Integer> callbacks = new TreeMap<>();
+
+    ReplayObserver(int deliveryLimit) {
+      this.deliveryLimit = deliveryLimit;
+    }
 
     @Override
     public void processDescribeProtocol(ProtocolDescriptor descriptor, boolean log) {
@@ -341,8 +348,12 @@ public final class RawTapeInventory {
       count(callbacks, type.getId());
       RecordSource source = (RecordSource) iterator;
       while (source.next() != null) {
-        if (++records > MAX_REPLAY_RECORDS) {
+        if (++attemptedDeliveries > deliveryLimit) {
           throw new IllegalStateException("replay-record-budget");
+        }
+        acceptedDeliveries++;
+        if (type == MessageType.STREAM_DATA) {
+          streamDeliveries++;
         }
       }
     }
@@ -366,45 +377,84 @@ public final class RawTapeInventory {
     }
   }
 
-  private static void replay(Path file) throws Exception {
+  private static void replay(Path file, int deliveryLimit) throws Exception {
     FileReaderParams.Default params = new FileReaderParams.Default();
     params.setSpeed(FileReaderParams.MAX_SPEED);
     params.setCycle(false);
     System.out.println(
         "settings\tdefault-DXFeedScheme\tsingle-file\tMAX_SPEED\tauto-format-time-compression"
             + "\tno-resync\tno-cycle");
-    ReplayObserver observer = new ReplayObserver();
-    FileReader reader = new FileReader(file.toString(), new ConnectionStats(), params);
+    ReplayObserver observer = new ReplayObserver(deliveryLimit);
+    ConnectionStats stats = new ConnectionStats();
+    long fileBytes = Files.size(file);
+    FileReader reader = new FileReader(file.toString(), stats, params);
+    boolean returned = false;
     try {
       reader.setScheme(DXFeedScheme.getInstance());
       reader.readInto(observer);
+      returned = true;
     } finally {
+      reader.close();
       System.out.println(
           "replay-observed\t"
-              + observer.records
+              + observer.attemptedDeliveries
               + "\t"
               + observer.errors
               + "\t"
               + observer.callbacks);
-      reader.close();
+      System.out.println(
+          "replay-result\t"
+              + (returned && observer.errors == 0 && stats.getReadBytes() == fileBytes
+                  ? "returned-byte-match"
+                  : "incomplete")
+              + "\tdelivery-limit\t"
+              + deliveryLimit
+              + "\taccepted-deliveries\t"
+              + observer.acceptedDeliveries
+              + "\tstream-projection-deliveries\t"
+              + observer.streamDeliveries
+              + "\tprocessed-bytes\t"
+              + stats.getReadBytes()
+              + "\tfile-bytes\t"
+              + fileBytes);
     }
   }
 
   /** Runs generated tests, structural inventory, or separately bounded production replay. */
   public static void main(String[] args) throws Exception {
+    if (args.length == 1 && args[0].equals("--help")) {
+      System.out.println(
+          "selftest | inventory FILE | replay FILE [DELIVERY_LIMIT]\n"
+              + "Read-only diagnostic inventory or production FileReader replay; max file 8 MiB.\n"
+              + "Replay delivery limit: 1..100000000, default 1000000; counts callback fanout.\n"
+              + "STREAM_DATA deliveries are a wire projection, not distinct business events.\n"
+              + "Output: TSV diagnostics; exit 0 on return, nonzero on invalid input/exception.\n"
+              + "A nonzero corruption count means incomplete even if the process exits 0.\n"
+              + "Returned-byte-match also requires processed bytes equal physical file size;\n"
+              + "compressed/paired/sequence sources need separate evidence and are not qualified.\n"
+              + "Use the launcher for finite wall time and heap; no input is modified.");
+      return;
+    }
     if (args.length == 1 && args[0].equals("selftest")) {
       selftest();
       return;
     }
-    if (args.length != 2 || (!args[0].equals("inventory") && !args[0].equals("replay"))) {
-      throw new IllegalArgumentException("selftest | inventory FILE | replay FILE");
+    if ((args.length != 2 && args.length != 3)
+        || (!args[0].equals("inventory") && !args[0].equals("replay"))
+        || (args.length == 3 && !args[0].equals("replay"))) {
+      throw new IllegalArgumentException(
+          "selftest | inventory FILE | replay FILE [DELIVERY_LIMIT]");
+    }
+    int deliveryLimit = args.length == 3 ? Integer.parseInt(args[2]) : MAX_REPLAY_RECORDS;
+    if (deliveryLimit < 1 || deliveryLimit > 100000000) {
+      throw new IllegalArgumentException("delivery limit must be 1..100000000");
     }
     Path file = Paths.get(args[1]);
     if (Files.size(file) > MAX_FILE_BYTES) {
       throw new IOException("file-budget");
     }
     if (args[0].equals("replay")) {
-      replay(file);
+      replay(file, deliveryLimit);
       return;
     }
     ByteArrayOutput bounded = new ByteArrayOutput();

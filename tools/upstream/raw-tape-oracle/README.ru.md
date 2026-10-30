@@ -52,3 +52,37 @@ Java для дескриптора, options и heartbeat не расширяет
 конверты и структурно допустимые описания; это не производственный acceptance oracle. Хеши его
 исходников исключены из manifest оракула и записываются его запусками. Частный вход не копируется
 в эти fixtures; generated acceptance не означает совместимость частного файла.
+
+## Ограниченная инвентаризация корпуса
+
+`Check-Inventory.ps1 -Help` без upstream/input dependencies показывает вызов, defaults,
+побочные действия и семантику exit. Launcher проверяет [manifest переносимых входов](../../../tests/fixtures/protocol/real-tape/corpus.tsv)
+и запускает generated structural checks. Нужны заранее собранные clean locked upstream classes
+и JDK 8; upstream не пересобирается. Все captures и хешированные tool/input metadata остаются
+в `.work` репозитория.
+
+```powershell
+& tools/upstream/raw-tape-oracle/Check-Inventory.ps1 `
+  -UpstreamRoot $lockedUpstream -JavaHome $oracleJdk `
+  -WorkDir $privateWorkDir -PrivateFile $privateTape `
+  -ReplayDeliveryLimit 10000000 -TimeoutSeconds 30 -HeapMiB 128 `
+  -Inspector $tapeInspector
+```
+
+PrivateFile и Inspector необязательны. Inspector использует явные `oracle-field-types-v1`, `default-quote-v1`, `default-profile-v1` и
+`raw-message-v1`, сохраняя конечные defaults. По умолчанию replay ограничен 1 000 000 callback
+доставок; допустимы 1..100 000 000. Heap: 32..1024 MiB (default 128), время процесса: 1..300 секунд
+(default 30), вход: 8 MiB. Собственный процесс по timeout завершается; timeout не означает EOF.
+Ошибка replay сохраняется как наблюдение, поэтому exit 0 launcher сам по себе не означает
+приёмки replay. Вывод разделяет attempted/accepted fanout deliveries, проекцию STREAM_DATA и
+обработанные bytes. `returned-byte-match` дополнительно требует нормального возврата, нуля
+corruption callbacks и равенства обработанных bytes физическому размеру; проверяйте частный
+stderr на поглощённые upstream I/O failures. Квалификация compressed/paired/sequence и полное
+равенство C++/Java values остаются отдельными проверками. См. [контракт корпуса](../../../tests/conformance/protocol/real-tape/CORPUS.ru.md)
+и [наблюдения](../../../docs/REAL-TAPE-GAPS.ru.md).
+
+`returned-byte-match` — нейтральное наблюдение, а не классификация source/container или доказательство
+полного семантического декодирования. Размер распакованных данных может совпасть с физическим:
+generated checks читают production FileReader 4 096 нулевых marker bytes в обычном файле и gzip,
+дополненном до 4 096 bytes. Оба возвращаются без corruption callbacks с 4 096 processed bytes.
+Launcher требует одинаковый нейтральный token: совпадение размеров не доказывает отсутствие сжатия.
