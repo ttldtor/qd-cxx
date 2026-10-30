@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "../tape-inspect/source_time.hpp"
 #include "qd/events/profile.hpp"
 #include "qd/protocol/frame_reader.hpp"
 #include "qd/protocol/stream_data.hpp"
@@ -151,6 +152,24 @@ class Formatter {
                               std::size_t frameIndex, std::size_t index, std::size_t budget,
                               const protocol::TapeTiming *timing, std::size_t generation) const;
 
+    /** Compose lossless output9 with independent raw FIELD and effective time.
+     * All inputs are borrowed only during this call; payloads and schemas are never copied or retained.
+     * Validation precedes output counting/allocation. This does not enforce source declaration sequencing.
+     * @param record Owned record borrowed unchanged, including exact raw FIELD metadata.
+     * @param schema Authoritative validated schema, consumed before any generation transition.
+     * @param frameIndex Segment-local envelope ordinal.
+     * @param segmentRecordIndex Segment-local emitted record ordinal.
+     * @param aggregateRecordIndex Checked cross-source emitted record ordinal.
+     * @param generation Segment-local committed nonempty description generation.
+     * @param budget Remaining encoded output bytes.
+     * @param timing Fixed owning explicit policy/assignment metadata borrowed only for this call.
+     * @return Complete 27-cell TSV row or safe HUMAN row; invalid_argument for invalid schema,
+     * values, policy, assignment or FIELD shape, OutputLimit before allocation on encoded excess.
+     */
+    std::string sourceCatalogRecord(const protocol::StreamDataRecord &record, const core::LocalSchema &schema,
+                                    std::size_t frameIndex, std::size_t segmentRecordIndex,
+                                    std::size_t aggregateRecordIndex, std::size_t generation, std::size_t budget,
+                                    const tape_inspect::SourceRecordTiming &timing) const;
     /** Begin a bounded version-7 description snapshot.
      * @param frameIndex Successful description envelope index.
      * @param generation One-based successful description event count.
@@ -179,6 +198,22 @@ class Formatter {
     std::string wireDescription(std::size_t generation, std::size_t index,
                                 const protocol::WireRecordDescription &record, const protocol::StreamRecordPlan &plan,
                                 std::size_t budget) const;
+    /** Compose output9 source declarations, retaining recognized virtual FIELD prefix actions.
+     * Exactly the leading EventTime/full56 and optional immediate EventSequence/full72 may have
+     * absent targets, and only when the authoritative plan recognizes that complete prefix.
+     * Every ordinary action still requires an exact type and a valid local target. All validation
+     * precedes output counting/allocation. Inputs are borrowed synchronously and never retained.
+     * @param generation Nonzero segment-local committed description generation.
+     * @param index Segment-local append position in the retained source descriptions.
+     * @param record Complete physical source declaration, including virtual metadata fields.
+     * @param plan Validated current sender plan; its context must remain valid through this call.
+     * @param budget Remaining encoded output bytes.
+     * @return Complete wire-record/wire-field group, with '-' targets only for virtual FIELD actions;
+     * invalid_argument on a binding/prefix/profile mismatch, or OutputLimit before allocation on excess.
+     */
+    std::string sourceWireDescription(std::size_t generation, std::size_t index,
+                                      const protocol::WireRecordDescription &record,
+                                      const protocol::StreamRecordPlan &plan, std::size_t budget) const;
     /** Mark the end of a fully emitted snapshot.
      * @param generation Current snapshot generation.
      * @param budget Remaining encoded output bytes.

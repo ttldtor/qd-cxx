@@ -8,6 +8,14 @@ whole-owned admission or replay. The adapter introduces no transport, callbacks,
 extraction or recursive decompression. Selection and physical file ownership belong to the tool.
 The borrowed uncompressed inspector API retains its existing contract.
 
+The pass-through NONE backend and API are available whenever the inspector or its tests are built,
+including with `ORG_TTLDTOR_QDCXX_BUILD_TAPE_COMPRESSION=OFF`. `containerAvailable` reports compiled
+support without allocation or I/O: NONE is always available, GZIP/ZIP require that option, and invalid
+enum values are unavailable. Known unavailable kinds fail with `UNSUPPORTED` on first read before
+allocation or source access; construction remains lazy. Owners can query availability before copying
+paths or opening files. With no tool/test consumer, no backend target is created. zlib acquisition
+and the C language are enabled only for an actual compression consumer; core stays independent.
+
 ## Ownership and completion
 
 `CompressedInput` borrows a binary `std::istream` until destruction and owns only finite decoder,

@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: BSL-1.0
 #include "compressed_input.hpp"
 
-#include <zlib.h>
+#ifdef ORG_TTLDTOR_QDCXX_HAS_ZLIB
+#    include <zlib.h>
+#endif
 
 #include <algorithm>
 #include <array>
@@ -16,6 +18,7 @@
 
 namespace org::ttldtor::qdcxx::tape_inspect {
 namespace {
+#ifdef ORG_TTLDTOR_QDCXX_HAS_ZLIB
 constexpr std::uint32_t ZIP_LOCAL = 0x04034b50;
 constexpr std::uint32_t ZIP_CENTRAL = 0x02014b50;
 constexpr std::uint32_t ZIP_END = 0x06054b50;
@@ -31,6 +34,8 @@ constexpr int INFLATE_BLOCK_BOUNDARY = 128;
 constexpr int INFLATE_FINAL_BLOCK = 64;
 constexpr int GZIP_WINDOW_BITS = 31; ///< 15-bit deflate window plus the gzip wrapper selection.
 constexpr int RAW_WINDOW_BITS = -15; ///< ZIP carries the wrapper; decode only raw deflate.
+
+#endif
 
 /** Overflow-safe allowance check.
  * @param used Irreversibly charged count.
@@ -53,6 +58,7 @@ struct CompressedInput::State {
         DONE      ///< Full physical closure; future reads perform no I/O.
     };
 
+#ifdef ORG_TTLDTOR_QDCXX_HAS_ZLIB
     /** Owned local-entry facts retained until central-directory cross-check. */
     struct Entry {
         std::unique_ptr<unsigned char[]> name; ///< Exact owned opaque name bytes; never a path.
@@ -70,6 +76,8 @@ struct CompressedInput::State {
         std::size_t bytes; ///< Allocation size including this aligned prefix.
     };
 
+#endif
+
     std::istream &physical;                                   ///< Borrowed until destruction; never closed here.
     ContainerKind kind;                                       ///< Explicit selected envelope.
     ContainerLimits limits;                                   ///< Instance-owned finite configuration.
@@ -81,11 +89,12 @@ struct CompressedInput::State {
     std::size_t available = 0;                                ///< Filled scratch length, possibly short at EOF/failure.
     bool physicalEof = false;                                 ///< Actual no-byte EOF probe completed.
     ContainerError pendingSourceError = ContainerError::NONE; ///< Deferred behind buffered input.
+    std::size_t retained = 0;                                 ///< Charged scratch/entry-slot/name capacity.
+#ifdef ORG_TTLDTOR_QDCXX_HAS_ZLIB
     z_stream inflater{};                ///< Owned decoder; borrowed pointers cleared after each call.
     gz_header gzipHeader{};             ///< Nonretaining header-progress observation.
     bool initialized = false;           ///< Whether inflateEnd is required.
     std::size_t allocations = 0;        ///< Outstanding zlib bytes, including aligned headers.
-    std::size_t retained = 0;           ///< Charged scratch/entry-slot/name capacity.
     std::unique_ptr<Entry[]> entries;   ///< Bounded local facts for central validation.
     std::size_t entryCount = 0;         ///< Validated local entries retained so far.
     std::size_t entryCapacity = 0;      ///< Actual owned entry slots; grows only for observed entries.
@@ -102,6 +111,8 @@ struct CompressedInput::State {
     bool gzipDeflateEnd = false;        ///< Last raw block reached before trailer.
     std::uint64_t gzipDeflateBytes = 0; ///< Raw size fixed at that boundary.
 
+#endif
+
     /** Allocate bounded state before source I/O.
      * @param stream Borrowed physical source.
      * @param selected Explicit container kind.
@@ -109,6 +120,7 @@ struct CompressedInput::State {
      */
     State(std::istream &stream, ContainerKind selected, ContainerLimits bounds)
         : physical(stream), kind(selected), limits(bounds), input(bounds.chunkBytes), retained(bounds.chunkBytes) {
+#ifdef ORG_TTLDTOR_QDCXX_HAS_ZLIB
         inflater.zalloc = allocate;
         inflater.zfree = release;
         inflater.opaque = this;
@@ -116,15 +128,22 @@ struct CompressedInput::State {
         if (kind != ContainerKind::NONE) {
             initialize(kind == ContainerKind::GZIP ? GZIP_WINDOW_BITS : RAW_WINDOW_BITS);
         }
+
+#endif
     }
 
     /** Release allocations without draining or closing the borrowed source. */
     ~State() {
+#ifdef ORG_TTLDTOR_QDCXX_HAS_ZLIB
+
         if (initialized) {
             inflateEnd(&inflater);
         }
+
+#endif
     }
 
+#ifdef ORG_TTLDTOR_QDCXX_HAS_ZLIB
     /** Allocate zeroed decoder memory with an aligned size header.
      * @param opaque Owning decoder state.
      * @param items Number of allocation elements.
@@ -173,6 +192,8 @@ struct CompressedInput::State {
         std::free(block);
     }
 
+#endif
+
     /** Preserve the first terminal outcome.
      * @param reason Typed failure, never NONE.
      * @return False for propagation through guarded decode operations.
@@ -199,6 +220,7 @@ struct CompressedInput::State {
         return true;
     }
 
+#ifdef ORG_TTLDTOR_QDCXX_HAS_ZLIB
     /** Reserve/debit one metadata slice before scanning it.
      * @param bytes Required scan bytes.
      * @param record Current metadata record's cumulative charge.
@@ -218,6 +240,8 @@ struct CompressedInput::State {
 
         return true;
     }
+
+#endif
 
     /** Aggregate a bounded physical chunk; defer a late source failure behind its buffered prefix.
      * @return Whether buffered bytes are available; otherwise EOF or sticky failure is recorded.
@@ -315,6 +339,7 @@ struct CompressedInput::State {
         return available != 0;
     }
 
+#ifdef ORG_TTLDTOR_QDCXX_HAS_ZLIB
     /** Consume one required physical byte.
      * @param value Receives the byte only on success.
      * @return False on truncated source or an earlier resource/I/O failure.
@@ -835,7 +860,7 @@ struct CompressedInput::State {
         const auto remainingWork = limits.workBytes - counts.workBytes;
         auto capacity =
             static_cast<std::size_t>(std::min<std::uint64_t>({output.size() - produced, allowance, remainingWork}));
-        capacity = std::min<std::size_t>(capacity, std::numeric_limits<uInt>::max());
+        capacity = std::min<std::size_t>(capacity, std::numeric_limits<unsigned int>::max());
         auto *destination = capacity == 0 ? &excess : reinterpret_cast<unsigned char *>(output.data() + produced);
         const auto reserved = capacity == 0 ? std::size_t{1} : capacity;
 
@@ -957,6 +982,8 @@ struct CompressedInput::State {
         return true;
     }
 
+#endif
+
     /** Pull logical bytes while preserving the completed prefix on exceptions.
      * @param output Nonempty caller-owned output span.
      * @return Produced prefix and sticky terminal/completion state.
@@ -992,13 +1019,16 @@ struct CompressedInput::State {
                     produced += static_cast<std::size_t>(count);
                     counts.logicalProduced += count;
                     counts.compressedConsumed += count;
-                } else if (kind == ContainerKind::GZIP && phase == Phase::START) {
+                }
+#ifdef ORG_TTLDTOR_QDCXX_HAS_ZLIB
+                else if (kind == ContainerKind::GZIP && phase == Phase::START) {
                     beginGzip();
                 } else if (kind == ContainerKind::ZIP && (phase == Phase::START || phase == Phase::ZIP_NEXT)) {
                     zipNext();
                 } else {
                     payload(output, produced);
                 }
+#endif
             }
         } catch (const std::bad_alloc &) {
             fail(ContainerError::ALLOCATION);
@@ -1009,6 +1039,24 @@ struct CompressedInput::State {
         return {produced, phase == Phase::DONE && error == ContainerError::NONE, error};
     }
 };
+
+bool containerAvailable(ContainerKind kind) noexcept {
+    switch (kind) {
+    case ContainerKind::NONE:
+        return true;
+    case ContainerKind::GZIP:
+    case ContainerKind::ZIP:
+#ifdef ORG_TTLDTOR_QDCXX_HAS_ZLIB
+
+        return true;
+#else
+
+        return false;
+#endif
+    }
+
+    return false;
+}
 
 CompressedInput::CompressedInput(std::istream &physical, ContainerKind kind, ContainerLimits limits) noexcept
     : physical_(physical), kind_(kind), limits_(limits) {
@@ -1028,11 +1076,14 @@ ContainerRead CompressedInput::read(std::span<std::byte> output) noexcept {
     std::size_t produced = 0;
     try {
         if (!state_) {
-            if (limits_.chunkBytes == 0 || limits_.chunkBytes > std::numeric_limits<uInt>::max() ||
-                limits_.chunkBytes > static_cast<std::uint64_t>(std::numeric_limits<std::streamsize>::max()) ||
-                limits_.compressedBytes == std::numeric_limits<std::uint64_t>::max() ||
-                limits_.inflatedBytes == std::numeric_limits<std::uint64_t>::max() ||
-                (kind_ != ContainerKind::NONE && kind_ != ContainerKind::GZIP && kind_ != ContainerKind::ZIP)) {
+            if (kind_ != ContainerKind::NONE && kind_ != ContainerKind::GZIP && kind_ != ContainerKind::ZIP) {
+                error_ = ContainerError::INVALID_ARGUMENT;
+            } else if (!containerAvailable(kind_)) {
+                error_ = ContainerError::UNSUPPORTED;
+            } else if (limits_.chunkBytes == 0 || limits_.chunkBytes > std::numeric_limits<unsigned int>::max() ||
+                       limits_.chunkBytes > static_cast<std::uint64_t>(std::numeric_limits<std::streamsize>::max()) ||
+                       limits_.compressedBytes == std::numeric_limits<std::uint64_t>::max() ||
+                       limits_.inflatedBytes == std::numeric_limits<std::uint64_t>::max()) {
                 error_ = ContainerError::INVALID_ARGUMENT;
             } else if (limits_.chunkBytes > limits_.retainedBytes) {
                 error_ = ContainerError::ALLOCATION;

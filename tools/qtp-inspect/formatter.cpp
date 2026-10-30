@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 
 #include "formatter.hpp"
+#include "format_row.hpp"
 
 #include "qd/events/quote.hpp"
 
@@ -18,193 +19,153 @@ constexpr std::int32_t DESCRIBE_RECORDS = 2;        ///< Initial wire descriptio
 constexpr std::int32_t STREAM_DATA = 15;            ///< Supported data message type.
 constexpr std::uint32_t CATALOG_EVENT_FLAGS = 0x5F; ///< Six supported raw data-event bits.
 
-/** Counting/writing cursor: every append checks subtraction before any expansion. */
-class Row {
-    std::size_t remaining_; ///< Bytes still permitted in this pass.
-    std::string *output_;   ///< Null during counting; exact reserved destination during writing.
+using detail::build;
+using detail::Row;
 
-    public:
-    /** Create one bounded pass.
-     * @param budget Maximum logical bytes.
-     * @param output Null to count without storing, otherwise destination.
-     */
-    Row(std::size_t budget, std::string *output) : remaining_(budget), output_(output) {
+/** Validate the complete borrowed schema and values before counting or allocating a row. */
+std::u16string_view validateCatalogRecord(const protocol::StreamDataRecord &record, const core::LocalSchema &schema,
+                                          std::size_t generation) {
+    if (schema.profile() != core::LocalProfile::BINARY_FIELDS_V1 || record.localId < 0 ||
+        static_cast<std::size_t>(record.localId) >= schema.records().size()) {
+        throw std::invalid_argument("invalid catalog schema or local ID");
     }
 
-    /** Append a bounded fragment.
-     * @param text Borrowed already encoded bytes.
-     */
-    void add(std::string_view text) {
-        if (text.size() > remaining_) {
-            throw OutputLimit{};
-        }
+    const auto &declaration = schema.records()[static_cast<std::size_t>(record.localId)];
 
-        remaining_ -= text.size();
+    if (!record.context.matches(schema.recordContext(record.localId)) ||
+        record.typedValues.size() != declaration.fields.size()) {
+        throw std::invalid_argument("catalog record context or shape mismatch");
+    }
 
-        if (output_) {
-            output_->append(text);
+    for (std::size_t i = 0; i < declaration.fields.size(); ++i) {
+        if (static_cast<std::int32_t>(record.typedValues[i].type) != declaration.fields[i].serialTypeId) {
+            throw std::invalid_argument("catalog field identity mismatch");
         }
     }
 
-    /** Append a locale-independent number using fixed temporary storage.
-     * @tparam T Integral type.
-     * @param value Exact value.
-     */
-    template <typename T> void number(T value) {
-        std::array<char, 32> buffer{};
-        const auto result = std::to_chars(buffer.data(), buffer.data() + buffer.size(), value);
-        add(std::string_view(buffer.data(), static_cast<std::size_t>(result.ptr - buffer.data())));
+    const std::u16string_view name = declaration.name;
+
+    if (record.senderId < 0 || record.localId < 0 || generation == 0 || !record.context.valid() ||
+        !record.values.empty() || (static_cast<std::uint32_t>(record.symbol.eventFlags) & ~CATALOG_EVENT_FLAGS) != 0) {
+        throw std::invalid_argument("invalid catalog record metadata");
     }
 
-    /** Return unconsumed budget.
-     * @return Remaining logical bytes.
-     */
-    std::size_t remaining() const {
-        return remaining_;
-    }
-
-    /** Append four hex digits for one UTF-16 unit.
-     * @param unit Exact unit.
-     * @param upper Whether escape-style uppercase digits are required.
-     */
-    void hex(char16_t unit, bool upper) {
-        const std::string_view digits = upper ? "0123456789ABCDEF" : "0123456789abcdef";
-        std::array<char, 4> buffer{};
-
-        // A UTF-16 unit has four nibbles, most significant first.
-        for (std::size_t i = 0; i < buffer.size(); ++i) {
-            buffer[i] = digits[(unit >> ((3 - i) * 4)) & 0xf];
-        }
-
-        add(std::string_view(buffer.data(), buffer.size()));
-    }
-
-    /** Append exact legacy unit hex or the empty sentinel.
-     * @param text Exact UTF-16 units.
-     */
-    void units(std::u16string_view text) {
-        if (text.empty()) {
-            add("-");
-        }
-
-        for (auto unit : text) {
-            hex(unit, false);
+    for (const auto &field : record.typedValues) {
+        if (!core::validFieldValue(field)) {
+            throw std::invalid_argument("noncanonical catalog value");
         }
     }
 
-    /** Append exact lowercase opaque byte hex without executing its contents. */
-    void bytes(std::span<const std::byte> value) {
-        constexpr std::string_view DIGITS = "0123456789abcdef";
+    return name;
+}
 
-        for (const auto byte : value) {
-            const auto raw = std::to_integer<unsigned>(byte);
-            const std::array<char, 2> pair{DIGITS[raw >> 4], DIGITS[raw & 15]};
-            add({pair.data(), pair.size()});
-        }
-    }
+/** Emit exact output8 typed-value cells, sharing all nineteen identities with output9. */
+void catalogValues(Row &row, const protocol::StreamDataRecord &record, bool tsv) {
+    for (std::size_t i = 0; i < record.typedValues.size(); ++i) {
+        const auto &field = record.typedValues[i];
 
-    /** Append exact binary64 bits, most significant nibble first.
-     * @param value WideDecimal numeric view, whose NaN representation is already canonical.
-     */
-    void doubleBits(double value) {
-        const auto bits = std::bit_cast<std::uint64_t>(value);
-
-        // Four UTF-16-sized groups cover all 64 bits without temporary allocation.
-        for (int shift = 48; shift >= 0; shift -= 16) {
-            hex(static_cast<char16_t>(bits >> shift), false);
-        }
-    }
-
-    /** Append quoted safe UTF-8 according to OFFLINE-INSPECTION, without normalization.
-     * @param text Exact UTF-16 units; lone surrogates are escaped losslessly.
-     */
-    void quote(std::u16string_view text) {
-        constexpr char16_t HIGH_FIRST = 0xd800, HIGH_LAST = 0xdbff;
-        constexpr char16_t LOW_FIRST = 0xdc00, LOW_LAST = 0xdfff;
-        constexpr std::uint32_t SUPPLEMENTARY_BASE = 0x10000;
-        add("\"");
-
-        for (std::size_t i = 0; i < text.size(); ++i) {
-            const auto unit = text[i];
-
-            switch (unit) {
-            case u'"':
-                add("\\\"");
-                continue;
-            case u'\\':
-                add("\\\\");
-                continue;
-            case u'\t':
-                add("\\t");
-                continue;
-            case u'\r':
-                add("\\r");
-                continue;
-            case u'\n':
-                add("\\n");
-                continue;
-            default:
-                break;
-            }
-
-            std::uint32_t scalar = unit;
-
-            if (unit >= HIGH_FIRST && unit <= HIGH_LAST && i + 1 < text.size() && text[i + 1] >= LOW_FIRST &&
-                text[i + 1] <= LOW_LAST) {
-                // Surrogates carry ten payload bits each.
-                scalar = SUPPLEMENTARY_BASE + ((unit - HIGH_FIRST) << 10) + (text[++i] - LOW_FIRST);
-            } else if (unit < 0x20 || (unit >= 0x7f && unit <= 0x9f) || unit == 0x061c ||
-                       (unit >= 0x200e && unit <= 0x200f) || (unit >= 0x2028 && unit <= 0x202e) ||
-                       (unit >= 0x2066 && unit <= 0x206f) || (unit >= HIGH_FIRST && unit <= LOW_LAST)) {
-                // C0/C1/DEL, line separators, bidi controls and lone surrogates cannot reach the terminal raw.
-                add("\\u");
-                hex(unit, true);
-                continue;
-            }
-
-            std::array<char, 4> buffer{};
-            std::size_t count = 0;
-
-            // UTF-8 scalar ranges and lead/continuation payload masks (surrogates excluded above).
-            if (scalar <= 0x7f) {
-                buffer[count++] = static_cast<char>(scalar);
-            } else if (scalar <= 0x7ff) {
-                buffer[count++] = static_cast<char>(0xc0 | (scalar >> 6));
-                buffer[count++] = static_cast<char>(0x80 | (scalar & 0x3f));
-            } else if (scalar <= 0xffff) {
-                buffer[count++] = static_cast<char>(0xe0 | (scalar >> 12));
-                buffer[count++] = static_cast<char>(0x80 | ((scalar >> 6) & 0x3f));
-                buffer[count++] = static_cast<char>(0x80 | (scalar & 0x3f));
-            } else {
-                buffer[count++] = static_cast<char>(0xf0 | (scalar >> 18));
-                buffer[count++] = static_cast<char>(0x80 | ((scalar >> 12) & 0x3f));
-                buffer[count++] = static_cast<char>(0x80 | ((scalar >> 6) & 0x3f));
-                buffer[count++] = static_cast<char>(0x80 | (scalar & 0x3f));
-            }
-
-            add(std::string_view(buffer.data(), count));
+        if (i != 0) {
+            row.add(",");
         }
 
-        add("\"");
+        row.number(static_cast<std::int32_t>(field.type));
+        row.add(":");
+        row.number(field.raw);
+        row.add(":");
+        const bool text =
+            field.type == core::SerialFieldType::UTF_CHAR_ARRAY || field.type == core::SerialFieldType::STRING;
+        const bool bytes = field.type == core::SerialFieldType::BYTE_ARRAY ||
+                           field.type == core::SerialFieldType::CUSTOM_OBJECT ||
+                           field.type == core::SerialFieldType::SERIAL_OBJECT;
+
+        if (!text) {
+            row.add("-");
+        } else if (!field.units) {
+            row.add("null");
+        } else if (field.units->empty()) {
+            row.add("empty");
+        } else if (tsv) {
+            row.units(*field.units);
+        } else {
+            row.quote(*field.units);
+        }
+
+        row.add(":");
+
+        if (!bytes) {
+            row.add("-");
+        } else if (!field.bytes) {
+            row.add("null");
+        } else if (field.bytes->empty()) {
+            row.add("empty");
+        } else {
+            row.bytes(*field.bytes);
+        }
     }
-};
+}
 
-/** Count before allocating one exact logical row, then repeat the same deterministic composition.
- * @tparam Compose Row composition callable.
- * @param budget Remaining encoded stdout bytes.
- * @param compose Callable accepting a counting or writing cursor.
- * @return Owned complete row; OutputLimit on excess, allocation exceptions propagate.
- */
-template <typename Compose> std::string build(std::size_t budget, Compose compose) {
-    Row counter(budget, nullptr);
-    compose(counter);
-    const auto size = budget - counter.remaining();
-    std::string result;
-    result.reserve(size);
-    Row writer(size, &result);
-    compose(writer);
+/** Emit shared source declaration rows; only a validated leading virtual prefix may lack targets. */
+void wireDescriptionRows(Row &row, std::size_t generation, std::size_t index,
+                         const protocol::WireRecordDescription &record, const protocol::StreamRecordPlan &plan,
+                         bool tsv, std::size_t virtualFields) {
+    const auto separator = tsv ? "\t" : " ";
 
-    return result;
+    row.add("wire-record");
+    row.add(separator);
+    row.number(generation);
+    row.add(separator);
+    row.number(index);
+    row.add(separator);
+    row.number(record.senderId);
+    row.add(separator);
+    row.number(*plan.binding.localRecordId);
+    row.add(separator);
+
+    if (tsv) {
+        row.units(record.name);
+    } else {
+        row.quote(record.name);
+    }
+
+    row.add(separator);
+    row.number(record.fields.size());
+    row.add("\n");
+
+    for (std::size_t field = 0; field < record.fields.size(); ++field) {
+        const auto &action = plan.binding.fields[field];
+
+        if ((!action.targetFieldId && field >= virtualFields) ||
+            std::to_underlying(action.type) != record.fields[field].serialTypeId) {
+            throw std::invalid_argument("wire source field binding");
+        }
+
+        row.add("wire-field");
+        row.add(separator);
+        row.number(generation);
+        row.add(separator);
+        row.number(record.senderId);
+        row.add(separator);
+        row.number(field);
+        row.add(separator);
+
+        if (tsv) {
+            row.units(record.fields[field].name);
+        } else {
+            row.quote(record.fields[field].name);
+        }
+
+        row.add(separator);
+        row.number(record.fields[field].serialTypeId);
+        row.add(separator);
+
+        if (action.targetFieldId) {
+            row.number(*action.targetFieldId);
+        } else {
+            row.add("-");
+        }
+
+        row.add("\n");
+    }
 }
 } // namespace
 
@@ -280,36 +241,11 @@ std::string Formatter::catalogRecord(const protocol::StreamDataRecord &record, c
         throw std::invalid_argument("unsupported FIELD metadata format");
     }
 
-    if (profile_ != DisplayProfile::BINARY_CATALOG_V1 || schema.profile() != core::LocalProfile::BINARY_FIELDS_V1 ||
-        record.localId < 0 || static_cast<std::size_t>(record.localId) >= schema.records().size()) {
-        throw std::invalid_argument("invalid catalog schema or local ID");
+    if (profile_ != DisplayProfile::BINARY_CATALOG_V1) {
+        throw std::invalid_argument("invalid catalog display profile");
     }
 
-    const auto &declaration = schema.records()[static_cast<std::size_t>(record.localId)];
-
-    if (!record.context.matches(schema.recordContext(record.localId)) ||
-        record.typedValues.size() != declaration.fields.size()) {
-        throw std::invalid_argument("catalog record context or shape mismatch");
-    }
-
-    for (std::size_t i = 0; i < declaration.fields.size(); ++i) {
-        if (static_cast<std::int32_t>(record.typedValues[i].type) != declaration.fields[i].serialTypeId) {
-            throw std::invalid_argument("catalog field identity mismatch");
-        }
-    }
-
-    const std::u16string_view name = declaration.name;
-
-    if (record.senderId < 0 || record.localId < 0 || generation == 0 || !record.context.valid() ||
-        !record.values.empty() || (static_cast<std::uint32_t>(record.symbol.eventFlags) & ~CATALOG_EVENT_FLAGS) != 0) {
-        throw std::invalid_argument("invalid catalog record metadata");
-    }
-
-    for (const auto &field : record.typedValues) {
-        if (!core::validFieldValue(field)) {
-            throw std::invalid_argument("noncanonical catalog value");
-        }
-    }
+    const auto name = validateCatalogRecord(record, schema, generation);
 
     return build(budget, [&](Row &row) {
         const bool tsv = format_ == OutputFormat::TSV;
@@ -342,47 +278,7 @@ std::string Formatter::catalogRecord(const protocol::StreamDataRecord &record, c
 
         row.add(separator);
 
-        for (std::size_t i = 0; i < record.typedValues.size(); ++i) {
-            const auto &field = record.typedValues[i];
-
-            if (i != 0) {
-                row.add(",");
-            }
-
-            row.number(static_cast<std::int32_t>(field.type));
-            row.add(":");
-            row.number(field.raw);
-            row.add(":");
-            const bool text =
-                field.type == core::SerialFieldType::UTF_CHAR_ARRAY || field.type == core::SerialFieldType::STRING;
-            const bool bytes = field.type == core::SerialFieldType::BYTE_ARRAY ||
-                               field.type == core::SerialFieldType::CUSTOM_OBJECT ||
-                               field.type == core::SerialFieldType::SERIAL_OBJECT;
-
-            if (!text) {
-                row.add("-");
-            } else if (!field.units) {
-                row.add("null");
-            } else if (field.units->empty()) {
-                row.add("empty");
-            } else if (tsv) {
-                row.units(*field.units);
-            } else {
-                row.quote(*field.units);
-            }
-
-            row.add(":");
-
-            if (!bytes) {
-                row.add("-");
-            } else if (!field.bytes) {
-                row.add("null");
-            } else if (field.bytes->empty()) {
-                row.add("empty");
-            } else {
-                row.bytes(*field.bytes);
-            }
-        }
+        catalogValues(row, record, tsv);
 
         const protocol::TapeTiming empty{};
         const auto &clock = timing ? *timing : empty;
@@ -408,6 +304,174 @@ std::string Formatter::catalogRecord(const protocol::StreamDataRecord &record, c
             row.add("-");
         }
 
+        row.add("\n");
+    });
+}
+
+std::string Formatter::sourceCatalogRecord(const protocol::StreamDataRecord &record, const core::LocalSchema &schema,
+                                           std::size_t frameIndex, std::size_t segmentRecordIndex,
+                                           std::size_t aggregateRecordIndex, std::size_t generation, std::size_t budget,
+                                           const tape_inspect::SourceRecordTiming &timing) const {
+    if (profile_ != DisplayProfile::BINARY_CATALOG_V1) {
+        throw std::invalid_argument("invalid source catalog display profile");
+    }
+
+    const auto name = validateCatalogRecord(record, schema, generation);
+    std::string_view policy;
+
+    switch (timing.policy) {
+    case tape_inspect::SourceTimePolicy::NONE:
+        policy = "none";
+        break;
+    case tape_inspect::SourceTimePolicy::MESSAGE:
+        policy = "message";
+        break;
+    case tape_inspect::SourceTimePolicy::FIELD:
+        policy = "field";
+        break;
+    case tape_inspect::SourceTimePolicy::LONG:
+        policy = "long";
+        break;
+    case tape_inspect::SourceTimePolicy::TEXT:
+        policy = "text";
+        break;
+    default:
+        throw std::invalid_argument("invalid source time policy");
+    }
+
+    std::string_view externalOrigin;
+
+    switch (timing.externalOrigin) {
+    case tape_inspect::ExternalTimeOrigin::NONE:
+        externalOrigin = "none";
+        break;
+    case tape_inspect::ExternalTimeOrigin::MESSAGE:
+        externalOrigin = "message";
+        break;
+    case tape_inspect::ExternalTimeOrigin::SIDECAR:
+        externalOrigin = "sidecar";
+        break;
+    default:
+        throw std::invalid_argument("invalid external time origin");
+    }
+
+    if (timing.external.has_value() != (timing.externalOrigin != tape_inspect::ExternalTimeOrigin::NONE) ||
+        (timing.external && !timing.external->timestampMs)) {
+        throw std::invalid_argument("invalid external time assignment");
+    }
+
+    const protocol::TapeTiming empty{};
+    const auto &external = timing.external ? *timing.external : empty;
+    std::string_view effectiveOrigin = "zero";
+    std::int64_t effectivePacked = 0;
+    std::int64_t effectiveMs = 0;
+
+    if (timing.policy != tape_inspect::SourceTimePolicy::NONE) {
+        if (external.eventTimeSequence != 0) {
+            effectiveOrigin = "external";
+            effectivePacked = external.eventTimeSequence;
+            effectiveMs = external.eventTimeMs();
+        } else if (record.fieldTime) {
+            effectiveOrigin = "field";
+            effectivePacked = record.fieldTime->packed();
+            effectiveMs = record.fieldTime->eventTimeMs();
+        }
+    }
+
+    return build(budget, [&](Row &row) {
+        const bool tsv = format_ == OutputFormat::TSV;
+        const auto separator = tsv ? "\t" : " ";
+        row.add(tsv ? "wire-data-v9" : "Fields9");
+
+        for (const auto value :
+             {timing.sourceOrdinal, frameIndex, segmentRecordIndex, aggregateRecordIndex, generation}) {
+            row.add(separator);
+            row.number(value);
+        }
+
+        row.add(separator);
+        row.number(record.senderId);
+        row.add(separator);
+        row.number(record.localId);
+        row.add(separator);
+
+        if (tsv) {
+            row.units(name);
+        } else {
+            row.quote(name);
+        }
+
+        row.add(separator);
+
+        if (tsv) {
+            row.units(record.symbol.units);
+        } else {
+            row.quote(record.symbol.units);
+        }
+
+        row.add(separator);
+        catalogValues(row, record, tsv);
+        row.add(separator);
+
+        if (external.timestampMs) {
+            row.number(*external.timestampMs);
+        } else {
+            row.add("-");
+        }
+
+        row.add(separator);
+        row.number(external.eventTimeSequence);
+        row.add(separator);
+        row.number(external.eventTimeMs());
+        row.add(separator);
+        row.number(record.symbol.eventFlags);
+        row.add(separator);
+
+        if (record.removalTime) {
+            row.number(*record.removalTime);
+        } else {
+            row.add("-");
+        }
+
+        row.add(separator);
+        row.number(record.fieldTime ? 1 : 0);
+        row.add(separator);
+
+        if (record.fieldTime) {
+            row.number(record.fieldTime->rawSeconds);
+            row.add(separator);
+
+            if (record.fieldTime->rawSequence) {
+                row.number(*record.fieldTime->rawSequence);
+            } else {
+                row.add("-");
+            }
+
+            row.add(separator);
+            row.number(record.fieldTime->sourceOrdinal);
+            row.add(separator);
+            row.number(record.fieldTime->packed());
+            row.add(separator);
+            row.number(record.fieldTime->eventTimeMs());
+        } else {
+            row.add("-");
+
+            for (std::size_t i = 0; i < 4; ++i) {
+                row.add(separator);
+                row.add("-");
+            }
+        }
+
+        row.add(separator);
+        row.add(policy);
+        row.add(separator);
+        row.add(externalOrigin);
+        row.add(separator);
+        row.add(effectiveOrigin);
+        row.add(separator);
+        row.number(effectivePacked);
+        row.add(separator);
+        row.number(effectiveMs);
         row.add("\n");
     });
 }
@@ -965,58 +1029,52 @@ std::string Formatter::wireDescription(std::size_t generation, std::size_t index
     }
 
     return build(budget, [&](Row &row) {
-        const bool tsv = format_ == OutputFormat::TSV;
-        const auto separator = tsv ? "\t" : " ";
+        wireDescriptionRows(row, generation, index, record, plan, format_ == OutputFormat::TSV, 0);
+    });
+}
 
-        row.add("wire-record");
-        row.add(separator);
-        row.number(generation);
-        row.add(separator);
-        row.number(index);
-        row.add(separator);
-        row.number(record.senderId);
-        row.add(separator);
-        row.number(*plan.binding.localRecordId);
-        row.add(separator);
+std::string Formatter::sourceWireDescription(std::size_t generation, std::size_t index,
+                                             const protocol::WireRecordDescription &record,
+                                             const protocol::StreamRecordPlan &plan, std::size_t budget) const {
+    if (profile_ != DisplayProfile::BINARY_CATALOG_V1 || generation == 0 || record.senderId < 0 ||
+        record.name.empty() || plan.binding.senderId != record.senderId || !plan.binding.localRecordId ||
+        *plan.binding.localRecordId < 0 || !plan.context.valid() ||
+        plan.binding.fields.size() != record.fields.size()) {
+        throw std::invalid_argument("invalid source description binding");
+    }
 
-        if (tsv) {
-            row.units(record.name);
-        } else {
-            row.quote(record.name);
+    std::size_t recognized = 0;
+
+    if (!record.fields.empty() && record.fields[0].name == u"EventTime" &&
+        record.fields[0].serialTypeId == std::to_underlying(core::SerialFieldType::TIME_SECONDS)) {
+        recognized = 1;
+
+        if (record.fields.size() > 1 && record.fields[1].name == u"EventSequence" &&
+            record.fields[1].serialTypeId == std::to_underlying(core::SerialFieldType::SEQUENCE)) {
+            recognized = 2;
         }
+    }
 
-        row.add(separator);
-        row.number(record.fields.size());
-        row.add("\n");
+    if (plan.eventTimeFieldCount != 0 && plan.eventTimeFieldCount != recognized) {
+        throw std::invalid_argument("invalid source FIELD prefix");
+    }
 
-        for (std::size_t field = 0; field < record.fields.size(); ++field) {
-            const auto &action = plan.binding.fields[field];
+    for (std::size_t field = 0; field < record.fields.size(); ++field) {
+        const auto &declaration = record.fields[field];
+        const auto &action = plan.binding.fields[field];
+        const bool virtualField = field < plan.eventTimeFieldCount;
 
-            if (!action.targetFieldId || std::to_underlying(action.type) != record.fields[field].serialTypeId) {
-                throw std::invalid_argument("wire source field binding");
-            }
-
-            row.add("wire-field");
-            row.add(separator);
-            row.number(generation);
-            row.add(separator);
-            row.number(record.senderId);
-            row.add(separator);
-            row.number(field);
-            row.add(separator);
-
-            if (tsv) {
-                row.units(record.fields[field].name);
-            } else {
-                row.quote(record.fields[field].name);
-            }
-
-            row.add(separator);
-            row.number(record.fields[field].serialTypeId);
-            row.add(separator);
-            row.number(*action.targetFieldId);
-            row.add("\n");
+        if (declaration.name.empty() ||
+            !core::supportsSerialType(declaration.serialTypeId, core::LocalProfile::BINARY_FIELDS_V1) ||
+            std::to_underlying(action.type) != declaration.serialTypeId || (virtualField && action.targetFieldId) ||
+            (!virtualField && (!action.targetFieldId || *action.targetFieldId >= plan.localFieldCount))) {
+            throw std::invalid_argument("invalid source field action");
         }
+    }
+
+    return build(budget, [&](Row &row) {
+        wireDescriptionRows(row, generation, index, record, plan, format_ == OutputFormat::TSV,
+                            plan.eventTimeFieldCount);
     });
 }
 

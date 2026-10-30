@@ -244,9 +244,11 @@ core/protocol. It does not add implicit wire modes or operational CLI container 
 The [LONG/TEXT companion scanner](SIDECAR-TIME.md) and explicit header admission are bounded
 components. Their native paired-owner harness proves cleanup/error ordering with instrumented
 close/flush boundaries, separately from actual CLI file ownership and mark/FIELD/MESSAGE integration.
-The full LONG/TEXT matrix row remains pending operational/corpus acceptance; negative numeric time
-is explicitly unsupported instead of reading an ambient clock. Finite split sequences (049) and
-broader operational streaming/CLI hookup (050) retain their separate integration gates. Any composed sink must preserve callback lifetime,
+The tool-owned [finite sequence API](TAPE-SEQUENCE.md) composes those components over an explicit
+ordered occurrence list, with fresh self-contained state, full aggregate reservations and physical
+pair closure before aggregate completion. It supports the five selected timing policies; GZIP/ZIP
+require the optional compression build. Negative numeric time remains explicitly unsupported.
+Broader operational streaming/CLI hookup (050) retains its separate integration gate. Any composed sink must preserve callback lifetime,
 stop/exception checkpoints, completed-prefix publication and layered source/close/EOF completion;
 container closure alone cannot authenticate final COMPLETE.
 

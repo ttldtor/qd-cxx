@@ -14,6 +14,11 @@ enum class ContainerKind {
     GZIP, ///< All concatenated members, validated through physical EOF.
     ZIP   ///< Strict ZIP32 with one file and bounded empty directories.
 };
+/** Query compiled tool input support without allocation, source access or ambient configuration.
+ * @param kind Explicit envelope choice; invalid enum values are unavailable.
+ * @return True for NONE, and for GZIP/ZIP only when compression support was built.
+ */
+[[nodiscard]] bool containerAvailable(ContainerKind kind) noexcept;
 /** Terminal source outcomes; malformed, unsupported and resource refusals remain distinct. */
 enum class ContainerError {
     NONE,               ///< No error; completion requires a separate physicalComplete flag.

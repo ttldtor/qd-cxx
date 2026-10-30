@@ -250,10 +250,13 @@ members либо strict single-file ZIP32, включая integrity и physical 
 остаётся вне core/protocol. Он не добавляет неявных wire modes или operational CLI выбора контейнера.
 [LONG/TEXT companion scanner](SIDECAR-TIME.ru.md) и явный header admission — bounded components.
 Их native paired-owner harness проверяет cleanup/error ordering с instrumented close/flush boundaries
-отдельно от настоящего CLI file ownership и mark/FIELD/MESSAGE integration. Полная LONG/TEXT matrix
-row остаётся pending до operational/corpus acceptance; negative numeric time явно не поддерживается
-вместо обращения к ambient clock. Finite split sequences (049) и расширенный operational streaming/
-CLI hookup (050) сохраняют отдельные integration gates. Composed sink сохраняет callback lifetime, stop/exception
+отдельно от настоящего CLI file ownership и mark/FIELD/MESSAGE integration.
+Инструментальный [API конечной последовательности](TAPE-SEQUENCE.ru.md) объединяет эти компоненты
+для явного упорядоченного списка вхождений, с новым самодостаточным состоянием, полной aggregate
+reservation и physical pair closure до общего завершения. Поддерживаются пять выбранных timing
+policies; GZIP/ZIP требуют optional compression build. Negative numeric time по-прежнему явно не
+поддерживается. Расширенный operational streaming/CLI hookup (050) сохраняет отдельный integration gate.
+Composed sink сохраняет callback lifetime, stop/exception
 checkpoints, публикацию completed prefix и layered source/close/EOF completion; одного container
 closure недостаточно для итогового COMPLETE.
 

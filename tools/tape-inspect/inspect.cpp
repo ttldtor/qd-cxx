@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 #include "inspect.hpp"
 #include "../../src/encoding/compact_limits.hpp"
+#include "catalog_segment.hpp"
 #include "diagnostics.hpp"
 #include "qd/events/quote.hpp"
 
@@ -241,6 +242,122 @@ void report(std::ostream &output, int code, std::string_view stage, unsigned dia
 }
 
 namespace {
+/** Preserve the existing output8 IO/terminal contract around the shared concrete catalog operation.
+ * @param input Borrowed binary source for this synchronous call.
+ * @param output Borrowed bounded output destination.
+ * @param diagnostic Existing bounded diagnostic grammar destination.
+ * @param limits Existing per-file limits, resolved before reader construction.
+ * @param format Existing safe record presentation.
+ * @param diagnosticsVersion Existing grammar1 or2.
+ * @return Existing exit code; this legacy operation does not own a physical file close.
+ */
+int inspectCatalogImpl(std::istream &input, std::ostream &output, std::ostream &diagnostic, Limits limits,
+                       inspect::OutputFormat format, unsigned diagnosticsVersion) {
+    constexpr auto MODE = protocol::TapeMode::BINARY_CATALOG_V1;
+    std::string_view operation = "configuration";
+
+    try {
+        if (!prepareLimits(limits) || (diagnosticsVersion != 1 && diagnosticsVersion != 2)) {
+            report(diagnostic, 2, "usage", diagnosticsVersion, protocol::TapeRejection::NONE, format);
+
+            return 2;
+        }
+
+        detail::CatalogOutput destination(output, diagnostic, limits.output, 0);
+        std::size_t aggregateEmitted = 0;
+        detail::CatalogSegment segment(limits, format, destination, aggregateEmitted);
+        inspect::Formatter formatter(format, inspect::DisplayProfile::BINARY_CATALOG_V1);
+
+        destination.write(formatter.tapeHeader(destination.rowBudget()));
+        std::vector<char> buffer(limits.chunkSize);
+        bool eof = false;
+
+        while (!eof) {
+            operation = "read";
+            const auto remaining = limits.tape.inputBytes - static_cast<std::size_t>(segment.reader().acceptedBytes());
+
+            if (remaining == 0) {
+                const auto next = input.peek();
+
+                if (input.bad() || (input.fail() && !input.eof())) {
+                    throw Failure{3};
+                }
+
+                if (next != std::char_traits<char>::eof()) {
+                    operation = "input";
+                    throw Failure{6};
+                }
+
+                break;
+            }
+
+            const auto request = std::min(buffer.size(), remaining);
+
+            input.read(buffer.data(), static_cast<std::streamsize>(request));
+            const auto count = static_cast<std::size_t>(input.gcount());
+
+            if (input.bad() || (input.fail() && !input.eof())) {
+                throw Failure{3};
+            }
+
+            eof = input.eof();
+            auto bytes = std::as_bytes(std::span(buffer.data(), count));
+
+            while (!bytes.empty()) {
+                const auto result = segment.feed(bytes);
+
+                bytes = bytes.subspan(result.accepted);
+
+                if (result.status == protocol::TapeStatus::FAILED) {
+                    return diagnose(diagnostic, segment.reader().diagnostic(), diagnosticsVersion, format, MODE);
+                }
+            }
+        }
+
+        if (segment.finish() != protocol::TapeStatus::FINISHED) {
+            return diagnose(diagnostic, segment.reader().diagnostic(), diagnosticsVersion, format, MODE);
+        }
+
+        operation = "flush";
+        destination.flush();
+        destination.write(formatter.tapeMarkers(segment.reader().markerCount(), destination.rowBudget()));
+        destination.write(formatter.complete(segment.reader().acceptedBytes(), segment.reader().frameCount(),
+                                             segment.emittedRecords(), segment.reader().processedRecords(),
+                                             segment.reader().wireFields(), destination.rowBudget()));
+        destination.flush();
+
+        return 0;
+    } catch (const inspect::OutputLimit &) {
+        report(diagnostic, 6, "write", diagnosticsVersion, protocol::TapeRejection::NONE, format);
+
+        return 6;
+    } catch (const detail::SequenceAbort &cause) {
+        report(diagnostic, cause.code, cause.stage, diagnosticsVersion, protocol::TapeRejection::NONE, format);
+
+        return cause.code;
+    } catch (const Failure &cause) {
+        report(diagnostic, cause.code, operation, diagnosticsVersion, protocol::TapeRejection::NONE, format);
+
+        return cause.code;
+    } catch (const std::bad_alloc &) {
+        report(diagnostic, 6, "allocation", diagnosticsVersion, protocol::TapeRejection::NONE, format);
+
+        return 6;
+    } catch (const std::length_error &) {
+        report(diagnostic, 6, "allocation", diagnosticsVersion, protocol::TapeRejection::NONE, format);
+
+        return 6;
+    } catch (const std::invalid_argument &) {
+        report(diagnostic, 6, "configuration", diagnosticsVersion, protocol::TapeRejection::NONE, format);
+
+        return 6;
+    } catch (const std::ios_base::failure &) {
+        report(diagnostic, 3, operation, diagnosticsVersion, protocol::TapeRejection::NONE, format);
+
+        return 3;
+    }
+}
+
 /** Execute one synchronous bounded inspection, selecting schema ownership only at construction.
  * @param input Borrowed binary source.
  * @param output Borrowed output destination.
@@ -277,6 +394,10 @@ int inspectImpl(std::istream &input, std::ostream &output, std::ostream &diagnos
             return 4;
         }
 
+        if (catalog) {
+            return inspectCatalogImpl(input, output, diagnostic, limits, format, diagnosticsVersion);
+        }
+
         std::optional<events::PreparedProfile> profileMapping;
 
         if (profile == inspect::DisplayProfile::DEFAULT_PROFILE_V1) {
@@ -298,17 +419,13 @@ int inspectImpl(std::istream &input, std::ostream &output, std::ostream &diagnos
         std::optional<protocol::TapeReader> storage;
 
         if (wire) {
-            if (catalog) {
-                storage.emplace(limits.tape, protocol::TapeDiscovery::BINARY_CATALOG_V1);
-            } else {
-                storage.emplace(limits.tape, mode);
-            }
+            storage.emplace(limits.tape, mode);
         } else {
             storage.emplace(*schema, limits.tape, mode);
         }
 
         auto &reader = *storage;
-        const bool timed = mode == protocol::TapeMode::RAW_MESSAGE_V1 || catalog;
+        const bool timed = mode == protocol::TapeMode::RAW_MESSAGE_V1;
         org::ttldtor::qdcxx::inspect::Formatter formatter(format, profile);
         std::size_t remainingOutput = limits.output;
         std::size_t remainingEventUnits = limits.eventUnits;
@@ -337,7 +454,7 @@ int inspectImpl(std::istream &input, std::ostream &output, std::ostream &diagnos
                 throw Failure{3};
             }
         };
-        emit(timed && !catalog ? formatter.rawTapeHeader(remainingOutput) : formatter.tapeHeader(remainingOutput));
+        emit(timed ? formatter.rawTapeHeader(remainingOutput) : formatter.tapeHeader(remainingOutput));
         std::vector<char> buffer(limits.chunkSize);
         bool eof = false;
 
@@ -372,7 +489,6 @@ int inspectImpl(std::istream &input, std::ostream &output, std::ostream &diagnos
             auto bytes = std::as_bytes(std::span(buffer.data(), count));
 
             while (!bytes.empty()) {
-                const auto before = catalog ? reader.schema().recordContext(0) : core::RecordContext{};
                 auto result = reader.feed(bytes);
                 bytes = bytes.subspan(result.accepted);
 
@@ -380,10 +496,7 @@ int inspectImpl(std::istream &input, std::ostream &output, std::ostream &diagnos
                     auto index = reader.frameCount() - 1;
                     emit(formatter.tapeFrame(*result.frame, index, remainingOutput, mode));
 
-                    if (catalog && result.frame->type == 1 && result.status != protocol::TapeStatus::FAILED &&
-                        reader.descriptor()) {
-                        emit(formatter.catalogDescriptor(*reader.descriptor(), index, remainingOutput));
-                    } else if (!catalog && index == 0 && reader.descriptor()) {
+                    if (index == 0 && reader.descriptor()) {
                         emit(timed ? formatter.rawTapeDescriptor(*reader.descriptor(), remainingOutput)
                                    : formatter.tapeDescriptor(*reader.descriptor(), remainingOutput));
                     }
@@ -400,11 +513,8 @@ int inspectImpl(std::istream &input, std::ostream &output, std::ostream &diagnos
                     // the reader has committed the complete description event successfully.
                     constexpr std::int32_t DESCRIBE_RECORDS = 2;
 
-                    const auto after = catalog ? reader.schema().recordContext(0) : core::RecordContext{};
-
                     if (wire && result.frame->type == DESCRIBE_RECORDS &&
-                        result.status != protocol::TapeStatus::FAILED &&
-                        (!catalog || (after.valid() && !before.matches(after)))) {
+                        result.status != protocol::TapeStatus::FAILED) {
                         ++generation;
                         emit(formatter.wireSchema(index, generation, reader.schema().records().size(),
                                                   reader.descriptions().size(), remainingOutput));
@@ -451,9 +561,6 @@ int inspectImpl(std::istream &input, std::ostream &output, std::ostream &diagnos
                             emit(formatter.profileRecord(
                                 record, reader.schema().records()[static_cast<std::size_t>(record.localId)].name, index,
                                 emitted, *event, remainingOutput));
-                        } else if (catalog) {
-                            emit(formatter.catalogRecord(record, reader.schema(), index, emitted, remainingOutput,
-                                                         result.timing ? &*result.timing : nullptr, generation));
                         } else {
                             emit(formatter.record(
                                 record, reader.schema().records()[static_cast<std::size_t>(record.localId)].name, index,
@@ -523,7 +630,6 @@ int inspectWire(std::istream &input, std::ostream &output, std::ostream &diagnos
 
 int inspectBinaryWire(std::istream &input, std::ostream &output, std::ostream &diagnostic, Limits limits,
                       inspect::OutputFormat format, unsigned diagnosticsVersion) {
-    return inspectImpl(input, output, diagnostic, nullptr, limits, format, inspect::DisplayProfile::BINARY_CATALOG_V1,
-                       diagnosticsVersion, protocol::TapeMode::BINARY_CATALOG_V1);
+    return inspectCatalogImpl(input, output, diagnostic, limits, format, diagnosticsVersion);
 }
 } // namespace org::ttldtor::qdcxx::tape_inspect
