@@ -524,3 +524,6 @@ tests/fixtures/protocol/real-tape/** -text whitespace=blank-at-eol,blank-at-eof,
 tests/fixtures/protocol/real-tape/*.md text eol=lf
 tests/conformance/binary_catalog_cli.cmake -text
 tests/conformance/wire_inventory_cli.cmake -text
+
+# Keep the standalone container help gate canonical across platforms.
+tests/conformance/compressed_oracle_help.cmake text eol=lf

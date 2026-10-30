@@ -1,0 +1,32 @@
+[
+  {
+    "path": "baseline/none.qtp",
+    "bytes": 88,
+    "sha256": "b0b7d422407759bc49396723cbc814950d8b0ec6f531ac1662495e495de3f6e5"
+  },
+  {
+    "path": "baseline/tape.qtp.gz",
+    "bytes": 108,
+    "sha256": "cc68edd3f5910172091b3bbc161d808af5db41ad66936c68ebb541687a39f0b3"
+  },
+  {
+    "path": "baseline/tape.qtp.zip",
+    "bytes": 220,
+    "sha256": "e8e11c39c671dc979ecd4f515eff86cc40c0617e6ba4ca3076a2630e920334f9"
+  },
+  {
+    "path": "current/none.qtp",
+    "bytes": 88,
+    "sha256": "b0b7d422407759bc49396723cbc814950d8b0ec6f531ac1662495e495de3f6e5"
+  },
+  {
+    "path": "current/tape.qtp.gz",
+    "bytes": 108,
+    "sha256": "cc68edd3f5910172091b3bbc161d808af5db41ad66936c68ebb541687a39f0b3"
+  },
+  {
+    "path": "current/tape.qtp.zip",
+    "bytes": 220,
+    "sha256": "73550d95f613fb4216af17e49fa4140d0fefde95bc02a079afd2eec384348f30"
+  }
+]

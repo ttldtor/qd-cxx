@@ -170,3 +170,31 @@ Windows нужны явный нативный UTC runner, JDK 8, заранее
 отдельными исходными файлами. Названный обычный набор, включая оба реальных производителя
 STREAM/MESSAGE, прошёл полную приёмку. Дополнительные payload, flags и collectors вне этого
 компаратора; его точная область описана рядом с ним.
+
+## Необязательные контейнеры tape и production oracle
+
+Инструментальный [компонент закрытых контейнеров](../../spec/protocol/TAPE-CONTAINERS.ru.md)
+предоставляет ограниченный GZIP/strict ZIP32 pull decoder независимо от core/protocol и replay.
+Для сборки включить `ORG_TTLDTOR_QDCXX_BUILD_TAPE_COMPRESSION=ON` и выбрать tape-inspection target
+либо tests. OFF по умолчанию и ON без consumer не получают zlib и не включают C. Необязательный
+`ORG_TTLDTOR_QDCXX_ZLIB_ARCHIVE` задаёт точный локальный архив zlib 1.3.2; CMake проверяет закреплённые
+SHA-256, version и license. Произвольные FetchContent source overrides и system zlib discovery
+отвергаются. Target экспортирует требование C++23 для header. Это component API: operational
+CLI container/companion/split hookup является отдельной интеграцией, новых CLI flags пока нет.
+
+[tape-container-oracle](../upstream/tape-container-oracle/README.ru.md) фиксирует фактические
+FileWriter/FileReader/StreamCompression observations любого принятого pin без rebuild или записи
+upstream sources/classes. В Windows нужны PowerShell 7.4, JDK 8, четырнадцать существующих class roots
+и явный native UTC logger. `-Help`, отсутствие аргументов и `Get-Help -Full` не требуют рабочих
+входов; README описывает Capture/Verify, параметры, exit codes и сохраняемые evidence.
+
+Help regression выполняется явно из корня репозитория, отдельно от interpreter-free native
+configure/build/CTest tree:
+
+```powershell
+cmake "-DPWSH=pwsh" "-DSCRIPT=tools/upstream/tape-container-oracle/Invoke-Oracle.ps1" "-DRUN=.work/container-oracle-help" -P tests/conformance/compressed_oracle_help.cmake
+```
+
+[Captures](../../tests/fixtures/protocol/tape-containers/CAPTURES.ru.md) и
+[валидация](../../tests/fixtures/protocol/tape-containers/VALIDATION.ru.md) отделяют production
+observations, native component checks и остающуюся integration acceptance.

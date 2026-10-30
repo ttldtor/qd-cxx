@@ -2,7 +2,7 @@
 
 [Русская версия](BINARY-TAPE-COVERAGE.ru.md). English is authoritative.
 
-Status: finite field/session/dispatch implementation; remaining time/container/lifecycle and full-catalog acceptance are pending.
+Status: finite field/session/dispatch implementation and optional tool container component; sidecar/chain/operational integration and full-catalog acceptance remain pending.
 The [decision](../../docs/decisions/ADR-0004-broad-binary-tape-reading.md),
 [71-row support matrix](../../tests/fixtures/protocol/real-tape/support-matrix.tsv) and
 [verification contracts](../../tests/conformance/protocol/real-tape/CONTRACTS.md) define the same target.
@@ -214,7 +214,7 @@ See [BINARY-MESSAGES](BINARY-MESSAGES.md) and [dispatch validation](../../tests/
 | 11/12/16/17/21/22 | Unsupported subscription payload operations |
 | 49/50/51/52/53/54/55/56 | Unsupported RMI payload operations |
 | 61 TEXT_FORMAT | Unsupported nonbinary marker |
-| 75 ZIP / 139 GZIP | Container detection markers; pending 048, not inner data messages |
+| 75 ZIP / 139 GZIP | Outer container markers; optional tool-owned [GZIP/ZIP component](TAPE-CONTAINERS.md), not inner data messages or implicit CLI input selection |
 | Other IDs | Typed unknown-message refusal |
 
 Source family already exists on the returned envelope; no duplicate per-record type is needed.
@@ -236,12 +236,14 @@ schemeKnown/readAs/resync/ignore/continue/cycle and implicit numeric local IDs r
 Valid Java alternatives are refused explicitly; completed-prefix/error coordinates remain exact.
 ## Future gates and acceptance
 
-NONE, MESSAGE and explicitly selected FIELD READ are bounded capabilities. LONG/TEXT
-sidecars (047), GZIP/ZIP (048), finite split sequences (049) and broader operational streaming (050)
-remain pending. This contract adds no compression dependency, download or new callback/source API.
-Before 048, dependency/license/platform/OFF acquisition, member/entry and CRC/trailer/inflation policies
-must be decided. Before any future sink API, define callback lifetime, stop/exception checkpoints,
-completed-prefix publication and layered source/close/EOF completion.
+NONE, MESSAGE and explicitly selected FIELD READ are bounded capabilities. The optional tool-owned
+[closed GZIP/ZIP component](TAPE-CONTAINERS.md) validates bounded concatenated gzip members or strict
+single-file ZIP32, including integrity and physical EOF. Its OFF-default dependency remains outside
+core/protocol. It does not add implicit wire modes or operational CLI container selection.
+LONG/TEXT sidecars (047), finite split sequences (049) and broader operational streaming/CLI hookup
+(050) retain their separate integration gates. Any composed sink must preserve callback lifetime,
+stop/exception checkpoints, completed-prefix publication and layered source/close/EOF completion;
+container closure alone cannot authenticate final COMPLETE.
 
 Full generic support requires every applicable pending matrix row to gain production positive and
 negative evidence at both pins, matching C++ canonical observations, exact resource/ownership/error

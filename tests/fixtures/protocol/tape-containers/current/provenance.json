@@ -1,0 +1,25 @@
+{
+  "producer": "Java QD production FileWriter/FileReader/StreamCompression",
+  "revision": "f71e4cb390d1586f2d4e3a83d9b9067e3326ef19",
+  "runtime": "Zulu 8.80.0.17-CA-win64 OpenJDK 1.8.0_422-b05",
+  "javaSha256": "9052CBF792CED0C3DFEB8593483DC3AA543B7077B52A49F31FB0E93F2E16BA58",
+  "javacSha256": "633143E961AA18051C09112B85333F5CDBD845B54EB39678EB15B91CA8BBB527",
+  "source": "tools/upstream/tape-container-oracle/ContainerOracle.java",
+  "sourceSha256": "1D85D708CFF5E68BD5D4FCB07E3F9A1783FD057F14D52E4318C69A4CCAE49B0F",
+  "launcher": "tools/upstream/tape-container-oracle/Invoke-Oracle.ps1",
+  "launcherSha256": "A775261DAF9D98AD5672ACFFDBD315BDA03124179FB8B128B4B0A426701BF16E",
+  "productionClasspathRoots": 14,
+  "beforeInventorySha256": "95E8E161BA644ED656DBB0D882F9897478C1D0662A7F5AAC74F789685F3ED5C0",
+  "afterInventorySha256": "95E8E161BA644ED656DBB0D882F9897478C1D0662A7F5AAC74F789685F3ED5C0",
+  "captureStartUtc": "2026-10-30T19:55:06.044236Z",
+  "captureFinishUtc": "2026-10-30T19:55:13.9111517Z",
+  "actualOperations": [
+    "Capture",
+    "independent repeat Capture",
+    "Verify"
+  ],
+  "outcomeSha256": "75047BE548EB5256A80838E4F912DE05D6444770E5468B3BF0D80CAE7109AAE6",
+  "classpathFileEntries": 1317,
+  "classFiles": 1290,
+  "resources": 27
+}

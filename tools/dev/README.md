@@ -160,3 +160,31 @@ modes require an explicit native UTC runner, JDK 8, a prebuilt locked producer a
 inspector; help needs no working input. Exact child stdout/stderr remain separate raw files.
 The named ordinary corpus, including both actual STREAM/MESSAGE producers, passed complete acceptance.
 Additional payloads/flags/collectors are outside this comparator; its exact scope is documented beside it.
+
+## Optional tape containers and production oracle
+
+The tool-private [closed-container component](../../spec/protocol/TAPE-CONTAINERS.md) provides
+bounded GZIP/strict ZIP32 pull decoding independently of core/protocol and replay. Build it with
+`ORG_TTLDTOR_QDCXX_BUILD_TAPE_COMPRESSION=ON` and either the tape-inspection target or tests selected.
+The default OFF and ON without a selected consumer neither acquire zlib nor enable C. An optional
+`ORG_TTLDTOR_QDCXX_ZLIB_ARCHIVE` names the exact local zlib 1.3.2 archive; CMake verifies its pinned
+SHA-256, version and license. Arbitrary FetchContent source overrides and system zlib discovery
+are refused. The target exports its C++23 header requirement. It is a component API; operational
+CLI container/companion/split hookup is separate and no new CLI flag is implied.
+
+[tape-container-oracle](../upstream/tape-container-oracle/README.md) captures actual production
+FileWriter/FileReader/StreamCompression observations at either accepted pin without rebuilding or
+writing upstream sources/classes. It requires PowerShell 7.4 on Windows, JDK 8, fourteen existing class
+roots and an explicit native UTC logger. `-Help`, no arguments and `Get-Help -Full` require no work
+inputs; the README describes Capture/Verify, parameters, exit codes and retained evidence.
+
+Its help regression runs explicitly from the repository root, outside the interpreter-free native
+configure/build/CTest tree:
+
+```powershell
+cmake "-DPWSH=pwsh" "-DSCRIPT=tools/upstream/tape-container-oracle/Invoke-Oracle.ps1" "-DRUN=.work/container-oracle-help" -P tests/conformance/compressed_oracle_help.cmake
+```
+
+[Captures](../../tests/fixtures/protocol/tape-containers/CAPTURES.md) and
+[validation](../../tests/fixtures/protocol/tape-containers/VALIDATION.md) separate production
+observations, native component checks and remaining integration acceptance.

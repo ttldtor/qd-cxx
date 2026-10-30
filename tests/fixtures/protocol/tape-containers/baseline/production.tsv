@@ -1,0 +1,37 @@
+file	none	1	0
+file	gzip-valid	1	0
+direct	gzip-valid	0	OK	88	b0b7d422407759bc49396723cbc814950d8b0ec6f531ac1662495e495de3f6e5
+direct	gzip-valid	1	OK	88	b0b7d422407759bc49396723cbc814950d8b0ec6f531ac1662495e495de3f6e5
+file	gzip-header-short	0	0
+direct	gzip-header-short	0	EOFException	0	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+direct	gzip-header-short	1	EOFException	0	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+file	gzip-trailer-short	1	0
+direct	gzip-trailer-short	0	EOFException	88	b0b7d422407759bc49396723cbc814950d8b0ec6f531ac1662495e495de3f6e5
+direct	gzip-trailer-short	1	EOFException	88	b0b7d422407759bc49396723cbc814950d8b0ec6f531ac1662495e495de3f6e5
+file	gzip-trailing-junk	1	0
+direct	gzip-trailing-junk	0	OK	88	b0b7d422407759bc49396723cbc814950d8b0ec6f531ac1662495e495de3f6e5
+direct	gzip-trailing-junk	1	OK	88	b0b7d422407759bc49396723cbc814950d8b0ec6f531ac1662495e495de3f6e5
+file	gzip-members-two	2	0
+direct	gzip-members-two	0	OK	176	8f587614cfcf2d433beec8e89a17244dba150ff585c90b23f99a35f5212b7aee
+direct	gzip-members-two	1	OK	88	b0b7d422407759bc49396723cbc814950d8b0ec6f531ac1662495e495de3f6e5
+file	gzip-crc	1	0
+direct	gzip-crc	0	ZipException	88	b0b7d422407759bc49396723cbc814950d8b0ec6f531ac1662495e495de3f6e5
+direct	gzip-crc	1	ZipException	88	b0b7d422407759bc49396723cbc814950d8b0ec6f531ac1662495e495de3f6e5
+file	zip-valid	1	0
+direct	zip-valid	0	OK	88	b0b7d422407759bc49396723cbc814950d8b0ec6f531ac1662495e495de3f6e5
+direct	zip-valid	1	OK	88	b0b7d422407759bc49396723cbc814950d8b0ec6f531ac1662495e495de3f6e5
+file	zip-header-short	0	0
+direct	zip-header-short	0	IOException	0	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+direct	zip-header-short	1	IOException	0	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+file	zip-trailer-short	1	0
+direct	zip-trailer-short	0	OK	88	b0b7d422407759bc49396723cbc814950d8b0ec6f531ac1662495e495de3f6e5
+direct	zip-trailer-short	1	OK	88	b0b7d422407759bc49396723cbc814950d8b0ec6f531ac1662495e495de3f6e5
+file	zip-trailing-junk	1	0
+direct	zip-trailing-junk	0	OK	88	b0b7d422407759bc49396723cbc814950d8b0ec6f531ac1662495e495de3f6e5
+direct	zip-trailing-junk	1	OK	88	b0b7d422407759bc49396723cbc814950d8b0ec6f531ac1662495e495de3f6e5
+file	zip-entries-two	1	0
+direct	zip-entries-two	0	OK	88	b0b7d422407759bc49396723cbc814950d8b0ec6f531ac1662495e495de3f6e5
+direct	zip-entries-two	1	OK	88	b0b7d422407759bc49396723cbc814950d8b0ec6f531ac1662495e495de3f6e5
+file	zip-crc	1	0
+direct	zip-crc	0	ZipException	88	b0b7d422407759bc49396723cbc814950d8b0ec6f531ac1662495e495de3f6e5
+direct	zip-crc	1	ZipException	88	b0b7d422407759bc49396723cbc814950d8b0ec6f531ac1662495e495de3f6e5

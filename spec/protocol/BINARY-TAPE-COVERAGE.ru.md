@@ -2,8 +2,8 @@
 
 [English version](BINARY-TAPE-COVERAGE.md). Английская версия нормативная.
 
-Статус: конечная реализация полей/сессии/диспетчеризации; оставшиеся возможности времени, контейнеров,
-жизненного цикла и приёмка полного каталога ожидаются.
+Статус: конечная реализация полей/сессии/диспетчеризации и необязательный инструментальный компонент
+контейнеров; sidecar/chain/operational integration и приёмка полного каталога ожидаются.
 [Решение](../../docs/decisions/ADR-0004-broad-binary-tape-reading.ru.md),
 [матрица из 71 строки](../../tests/fixtures/protocol/real-tape/support-matrix.tsv) и
 [контракты проверок](../../tests/conformance/protocol/real-tape/CONTRACTS.ru.md) задают одну цель.
@@ -221,7 +221,7 @@ REMOVE_EVENT меняет грамматику данных: при явном F
 | 11/12/16/17/21/22 | Операции подписок не поддерживаются |
 | 49/50/51/52/53/54/55/56 | Операции RMI не поддерживаются |
 | 61 TEXT_FORMAT | Небинарный маркер не поддерживается |
-| 75 ZIP / 139 GZIP | Маркеры определения контейнера; ожидают 048, не внутренние сообщения данных |
+| 75 ZIP / 139 GZIP | Внешние маркеры контейнера; необязательный инструментальный [GZIP/ZIP component](TAPE-CONTAINERS.ru.md), не внутренние сообщения и не неявный выбор CLI input |
 | Остальные IDs | Типизированный отказ для неизвестного сообщения |
 
 Исходное семейство уже есть в возвращаемом конверте; дублировать тип в каждой записи не нужно.
@@ -243,12 +243,14 @@ REMOVE_EVENT меняет грамматику данных: при явном F
 Допустимые альтернативы Java отклоняются явно; завершённый префикс и координаты ошибок сохраняются точно.
 ## Будущие gates и приёмка
 
-NONE, MESSAGE и явно выбранный FIELD READ являются ограниченными возможностями.
-LONG/TEXT sidecars (047), GZIP/ZIP (048), finite split sequences (049) и расширенный operational
-streaming (050) ожидаются. Контракт не добавляет compression dependency, download или callback/source API.
-До 048 выбираются dependency/license/platform/OFF acquisition, member/entry и CRC/trailer/inflation
-policies. До будущего sink API определяются callback lifetime, stop/exception checkpoints,
-публикация completed prefix и layered source/close/EOF completion.
+NONE, MESSAGE и явно выбранный FIELD READ являются ограниченными возможностями. Необязательный
+инструментальный [компонент закрытых GZIP/ZIP](TAPE-CONTAINERS.ru.md) проверяет ограниченные gzip
+members либо strict single-file ZIP32, включая integrity и physical EOF. Его OFF-default dependency
+остаётся вне core/protocol. Он не добавляет неявных wire modes или operational CLI выбора контейнера.
+LONG/TEXT sidecars (047), finite split sequences (049) и расширенный operational streaming/CLI hookup
+(050) сохраняют отдельные integration gates. Composed sink сохраняет callback lifetime, stop/exception
+checkpoints, публикацию completed prefix и layered source/close/EOF completion; одного container
+closure недостаточно для итогового COMPLETE.
 
 Полная общая поддержка требует для каждой применимой pending-строки production positive/negative
 evidence обоих commits, совпадающих C++ canonical observations, точных resource/ownership/error
