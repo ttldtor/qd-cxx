@@ -139,3 +139,12 @@ real formatting and exact trace audits; fresh RUN/EVIDENCE directories are requi
 [validation](../../tests/conformance/tooling/VALIDATION.md) records executed commands, results and
 limitations. Author verification and self-review do not close independent acceptance. Java tooling,
 remaining manual Python checks and historical artifacts retain their existing requirements.
+
+## Offline Java producer tooling
+
+The [production tape corpus](../upstream/real-tape-corpus/README.md) provides separately pinned
+baseline/current producers, deterministic offline FileWriter/FileReader fixtures, Capture/Verify,
+bounded processes and negative checks. Windows working modes require PowerShell, JDK 8, Maven
+and an explicit native UTC runner; help is portable. It is independent of native configure/build/CTest.
+Its launcher, help regression and process-lifetime regression scripts document their parameters,
+outputs, exit codes and side effects with `-Help` and `Get-Help -Full`.

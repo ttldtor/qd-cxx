@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "repository": "https://github.com/devexperts/QD.git",
+  "producers": {
+    "baseline": {
+      "version": "3.355",
+      "commit": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+      "tag": "qd-qds-3.355",
+      "sourceHashes": [
+        {
+          "path": "pom.xml",
+          "sha256Lf": "6019847073d21216c3bb1ae738ca8dd57382e7295245f449b02fbb0ed69cd9b3"
+        },
+        {
+          "path": "ReleaseNotes.txt",
+          "sha256Lf": "c9374033f7d7f1468c9e11b90b3ff927b5063bf65cde73010916e1689490b7d9"
+        },
+        {
+          "path": "qds-file/src/main/java/com/devexperts/qd/qtp/file/FileWriter.java",
+          "sha256Lf": "e4b3c762c3e7a1cacc01c880956ec76864af5ba8e9db88c6c93a5962eb52cb43"
+        },
+        {
+          "path": "qds-file/src/main/java/com/devexperts/qd/qtp/file/FileWriterImpl.java",
+          "sha256Lf": "a7c98f98c4c45b7de94b5e5b1fb27dd3a0ad1f1dd9954288cdfd7a1569bf6e12"
+        },
+        {
+          "path": "qds-file/src/main/java/com/devexperts/qd/qtp/file/FileReader.java",
+          "sha256Lf": "abf29509985cc791c360be9d25dc96ca03bb88215894aad3794571403daab0b8"
+        },
+        {
+          "path": "qd-tools/src/main/java/com/devexperts/qd/tools/Connect.java",
+          "sha256Lf": "f669c889cea304ad2eb9581a3320e8122584526478fa29320b33f26396c9ac58"
+        }
+      ]
+    },
+    "current": {
+      "version": "3.356",
+      "commit": "f71e4cb390d1586f2d4e3a83d9b9067e3326ef19",
+      "tag": "qd-qds-3.356",
+      "sourceHashes": [
+        {
+          "path": "pom.xml",
+          "sha256Lf": "dcc991cbb0529d1f7fb5fbe07520640b1f107ca8d337aaf771f731e94eb3a10b"
+        },
+        {
+          "path": "ReleaseNotes.txt",
+          "sha256Lf": "cb01b77713e3d4ebd3e30e7e034a27433013f7374b62476cb8465be3ea572d92"
+        },
+        {
+          "path": "qds-file/src/main/java/com/devexperts/qd/qtp/file/FileWriter.java",
+          "sha256Lf": "e4b3c762c3e7a1cacc01c880956ec76864af5ba8e9db88c6c93a5962eb52cb43"
+        },
+        {
+          "path": "qds-file/src/main/java/com/devexperts/qd/qtp/file/FileWriterImpl.java",
+          "sha256Lf": "a7c98f98c4c45b7de94b5e5b1fb27dd3a0ad1f1dd9954288cdfd7a1569bf6e12"
+        },
+        {
+          "path": "qds-file/src/main/java/com/devexperts/qd/qtp/file/FileReader.java",
+          "sha256Lf": "abf29509985cc791c360be9d25dc96ca03bb88215894aad3794571403daab0b8"
+        },
+        {
+          "path": "qd-tools/src/main/java/com/devexperts/qd/tools/Connect.java",
+          "sha256Lf": "f669c889cea304ad2eb9581a3320e8122584526478fa29320b33f26396c9ac58"
+        }
+      ]
+    }
+  },
+  "classDirectories": [
+    "dxlib",
+    "mars",
+    "dxfeed-promise",
+    "dxfeed-api",
+    "dxlib-qd-sandbox",
+    "auth",
+    "proto",
+    "qd-core",
+    "proto-ssl",
+    "qd-rmi",
+    "dxfeed-impl",
+    "dxfeed-scheme",
+    "dxfeed-ipf-filter",
+    "qds-file"
+  ],
+  "settings": {
+    "format": "BINARY",
+    "compression": "NONE",
+    "options": "EMPTY_SET",
+    "saveAs": "STREAM_DATA",
+    "time": [
+      "NONE",
+      "MESSAGE"
+    ],
+    "recordsPerCase": 3,
+    "maximumFileBytes": 65536,
+    "cycle": false,
+    "resync": false,
+    "speed": "MAX_SPEED",
+    "source": "single literal file",
+    "demo": "not implemented or run"
+  }
+}
