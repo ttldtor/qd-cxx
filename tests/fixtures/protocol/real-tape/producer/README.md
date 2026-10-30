@@ -41,4 +41,3 @@ truncation through production FileReader. [Validation](../../../../conformance/p
 records the executed scope. These files establish only their named Java production cases;
 they do not establish arbitrary QD input support or C++ decoding parity. Optional live demo
 acquisition is not implemented or run.
-

@@ -244,5 +244,3 @@ documented profiles. No unfinished row is closed merely because a structural wal
 Owned byte/string/object fields have separate [validation](../../tests/conformance/protocol/field-types/OBJECT-VALIDATION.md).
 The generic exact 249/137 grammars also apply while discarding values and deliberately
 differ from Java unknown-local-field skipping; opaque bytes establish no Java object semantics.
-
-

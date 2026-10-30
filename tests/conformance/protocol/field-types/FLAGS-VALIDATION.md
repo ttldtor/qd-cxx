@@ -94,6 +94,3 @@ Format/Check are recorded above. All six production-only builds passed: minimum,
 CLI and JSON-on profiles on Windows and Linux, completing at17:23:32/33UTC. Disabled dependency
 and doctest acquisition checks and the existing JSON-off wire CLI checks also passed.
 These build/configuration results are separate from CTest and do not establish live-host behavior.
-
-
-

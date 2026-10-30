@@ -16,3 +16,5 @@ current-object-expected/** -text whitespace=blank-at-eol,blank-at-eof,space-befo
 current-indexed-expected/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
 # Empty final TSV cells are significant production observations.
 expected/flags/observations.tsv -whitespace
+# Retain the captured metadata's final empty line verbatim.
+flags-captures.json -whitespace
