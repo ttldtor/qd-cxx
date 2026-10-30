@@ -124,6 +124,76 @@ const StreamRecordPlan *StreamDataContext::find(std::int32_t senderId) const noe
 }
 
 namespace {
+/** Read a signed big-endian scalar without retaining input or allocating storage.
+ * @param input Borrowed remaining field bytes.
+ * @param width Exact admitted physical width, one, two or four bytes.
+ * @return Sign-extended value, or all available prefix bytes consumed on truncation.
+ */
+encoding::ReadResult<std::int64_t> readFixedScalar(std::span<const std::byte> input, std::size_t width) noexcept {
+    constexpr std::size_t BITS_PER_BYTE = 8;
+    const auto consumed = std::min(input.size(), width);
+
+    if (consumed != width) {
+        return {0, consumed, encoding::Status::INSUFFICIENT_INPUT};
+    }
+
+    std::uint32_t raw = 0;
+
+    for (const auto byte : input.first(width)) {
+        raw = (raw << BITS_PER_BYTE) | std::to_integer<std::uint32_t>(byte);
+    }
+
+    const auto bits = width * BITS_PER_BYTE;
+    const auto signedValue = (raw & (std::uint32_t{1} << (bits - 1))) != 0
+                                 ? static_cast<std::int64_t>(raw) - (std::int64_t{1} << bits)
+                                 : static_cast<std::int64_t>(raw);
+
+    return {signedValue, consumed, encoding::Status::OK};
+}
+
+/** Decode one exact scalar grammar after the caller charges its field attempt.
+ * @param input Borrowed remaining payload, never retained.
+ * @param type Validated full identity; representation bits are never masked for dispatch.
+ * @return Raw value and examined bytes; no allocation, conversion or partial value on failure.
+ */
+encoding::ReadResult<std::int64_t> readScalar(std::span<const std::byte> input, core::SerialFieldType type) noexcept {
+    switch (type) {
+    case core::SerialFieldType::VOID_FIELD:
+        return {0, 0, encoding::Status::OK};
+    case core::SerialFieldType::BYTE:
+        return readFixedScalar(input, sizeof(std::int8_t));
+    case core::SerialFieldType::SHORT:
+        return readFixedScalar(input, sizeof(std::int16_t));
+    case core::SerialFieldType::INT:
+        return readFixedScalar(input, sizeof(std::int32_t));
+    case core::SerialFieldType::UTF_CHAR: {
+        const auto value = encoding::readUtfChar(input);
+
+        return {value.value, value.consumed, value.status};
+    }
+    case core::SerialFieldType::COMPACT_INT:
+    case core::SerialFieldType::DECIMAL:
+    case core::SerialFieldType::SHORT_STRING:
+    case core::SerialFieldType::TIME_SECONDS:
+    case core::SerialFieldType::SEQUENCE:
+    case core::SerialFieldType::DATE:
+    case core::SerialFieldType::LONG:
+    case core::SerialFieldType::WIDE_DECIMAL:
+    case core::SerialFieldType::TIME_MILLIS: {
+        auto value = encoding::readCompactLong(input);
+
+        if (value.status == encoding::Status::OK && type != core::SerialFieldType::LONG &&
+            type != core::SerialFieldType::WIDE_DECIMAL && type != core::SerialFieldType::TIME_MILLIS) {
+            value.value = std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(value.value));
+        }
+
+        return value;
+    }
+    default:
+        return {0, 0, encoding::Status::INVALID_ENCODING};
+    }
+}
+
 /** Decode the measured shared zero-flags wire record layout.
  * @param payload Complete borrowed data payload.
  * @param context Validated immutable bindings.
@@ -283,8 +353,8 @@ StreamDataResult decodeDataPayload(std::span<const std::byte> payload, const Str
                     }
 
                     units = std::move(value.units);
-                } else if (field.type == core::SerialFieldType::UTF_CHAR) {
-                    const auto value = encoding::readUtfChar(payload.subspan(result.consumed));
+                } else {
+                    const auto value = readScalar(payload.subspan(result.consumed), field.type);
                     result.consumed += value.consumed;
 
                     if (value.status != encoding::Status::OK) {
@@ -296,19 +366,6 @@ StreamDataResult decodeDataPayload(std::span<const std::byte> payload, const Str
                     }
 
                     raw = value.value;
-                } else {
-                    const auto value = encoding::readCompactLong(payload.subspan(result.consumed));
-                    result.consumed += value.consumed;
-
-                    if (value.status != encoding::Status::OK) {
-                        result.status = StreamDataStatus::TRUNCATED_PAYLOAD;
-
-                        return result;
-                    }
-
-                    raw = field.type == core::SerialFieldType::WIDE_DECIMAL
-                              ? value.value
-                              : std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(value.value));
                 }
 
                 if (field.targetFieldId) {

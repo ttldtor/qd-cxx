@@ -50,6 +50,32 @@ Capture проверяет структуру относительно себя;
 values, units, nullability, порядок, identity, отсутствующие/повторные/неизвестные строки,
 число колонок, завершение и потребление примитива.
 
+## Расширение двоичных скаляров
+
+Тот же запуск также записывает `field-types/scalars`: 25 дополнительных артефактов,
+с 1106 production parser samples в STREAM и RAW для каждого закреплённого producer.
+82 исторических корневых артефакта остаются побайтово прежними. Verify проверяет
+конечную грамматику скаляров и все байты; Test-Negatives включает шесть scalar mutations,
+всего 23 отвергнутые мутации. Metadata артефактов теперь включает дочерние пути.
+
+BYTE/SHORT используют requested `BinaryRecordDesc` и production composer с
+CompactIntField consumers (wire1/3, consumer8). Их default factories возвращают
+null. Остальные новые non-VOID типы используют реальные consumers PlainIntField/
+DecimalField/LongField/TimeMillisField. Десять исходных записей FileWriter/FileReader
+покрывают 0/4/24/104/152 в STREAM/NONE и RAW/MESSAGE. Producer удаляет VOID;
+приём explicit wire VOID и default-zero — отдельное наблюдение parser.
+Физические long tails никогда не перечисляются как логические поля.
+
+Для уже собранного чистого закреплённого classpath внутренний harness также принимает
+`FieldTypesOracle <new-directory> scalar-only`. Он выполняет только scalar capture;
+не собирает upstream и не проверяет expectations. Сначала скомпилируйте тот же source
+для закреплённого JDK8 classpath, сохраните хеши class/source/runtime, затем сравните
+полный набор из 25 файлов с рассмотренным каталогом соответствующего pin. Обычный
+launcher сохраняет полный workflow чистого baseline Verify. Scalar capture/repeat
+второго pin и чтение C++ отражены в
+[scalar validation](../../../tests/conformance/protocol/field-types/SCALAR-VALIDATION.ru.md).
+Новая универсальная CLI или default profile инспектора не добавлены.
+
 См. [покрытие](../../../tests/fixtures/encoding/field-types/COVERAGE.ru.md),
 [захваты](../../../tests/fixtures/encoding/field-types/CAPTURES.ru.md),
 [проверки](../../../tests/fixtures/encoding/field-types/VALIDATION.ru.md) и

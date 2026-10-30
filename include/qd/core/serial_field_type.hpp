@@ -15,7 +15,11 @@ namespace org::ttldtor::qdcxx::core {
  * A shared base does not imply equal value width, interpretation or profile support.
  */
 enum class SerialType : std::int32_t {
+    VOID_FIELD = 0,     ///< Explicit zero-width wire field; never a manufactured storage tail.
+    BYTE = 1,           ///< One signed byte.
     UTF_CHAR = 2,       ///< One UTF-encoded code point.
+    SHORT = 3,          ///< Signed 16-bit big-endian integer.
+    INT = 4,            ///< Signed 32-bit big-endian integer.
     COMPACT_INT = 8,    ///< Compact integer encoding; the representation determines the logical value.
     UTF_CHAR_ARRAY = 10 ///< Nullable character-counted array of UTF-16 units.
 };
@@ -23,11 +27,14 @@ enum class SerialType : std::int32_t {
 /** Encoded representation selectors, not independently combinable flags; intentionally incomplete. */
 enum class FieldRepresentation : std::int32_t {
     PLAIN = 0x00,        ///< No additional representation selector.
+    DECIMAL = 0x10,      ///< Raw decimal bits in a signed 32-bit value.
     SHORT_STRING = 0x20, ///< Packed short-string integer bits.
     TIME_SECONDS = 0x30, ///< Signed seconds.
     SEQUENCE = 0x40,     ///< Packed sequence integer bits.
     DATE = 0x50,         ///< Signed day identifier.
-    WIDE_DECIMAL = 0x70  ///< Wide-decimal bits requiring a 64-bit value.
+    LONG = 0x60,         ///< Signed 64-bit logical value.
+    WIDE_DECIMAL = 0x70, ///< Wide-decimal bits requiring a 64-bit value.
+    TIME_MILLIS = 0x90   ///< Signed 64-bit milliseconds, without timing conversion.
 };
 
 /// The four bits that encode the field representation selector.
@@ -67,12 +74,22 @@ composeSerialTypeId(SerialType type, FieldRepresentation representation = FieldR
  * unsupported identities can be validated without masking representation bits.
  */
 enum class SerialFieldType : std::int32_t {
+    /// Explicit zero-width generic projection; raw zero is a local default, not a delivered Java field.
+    VOID_FIELD = composeSerialTypeId(SerialType::VOID_FIELD),
+    /// Signed 8-bit value, sign-extended in FieldValue.
+    BYTE = composeSerialTypeId(SerialType::BYTE),
     /// Code point, including accepted surrogates and supplementary points.
     UTF_CHAR = composeSerialTypeId(SerialType::UTF_CHAR),
+    /// Signed 16-bit big-endian value.
+    SHORT = composeSerialTypeId(SerialType::SHORT),
+    /// Signed 32-bit big-endian value.
+    INT = composeSerialTypeId(SerialType::INT),
     /// Ordinary signed int32 logical value.
     COMPACT_INT = composeSerialTypeId(SerialType::COMPACT_INT),
     /// Nullable owned exact UTF-16 array.
     UTF_CHAR_ARRAY = composeSerialTypeId(SerialType::UTF_CHAR_ARRAY),
+    /// Signed low 32 raw decimal bits, without numeric conversion.
+    DECIMAL = composeSerialTypeId(SerialType::COMPACT_INT, FieldRepresentation::DECIMAL),
     /// Raw signed int32 bits; no text conversion is implied.
     SHORT_STRING = composeSerialTypeId(SerialType::COMPACT_INT, FieldRepresentation::SHORT_STRING),
     /// Signed seconds, distinct from ordinary integers.
@@ -81,15 +98,20 @@ enum class SerialFieldType : std::int32_t {
     SEQUENCE = composeSerialTypeId(SerialType::COMPACT_INT, FieldRepresentation::SEQUENCE),
     /// Raw signed int32, without calendar conversion.
     DATE = composeSerialTypeId(SerialType::COMPACT_INT, FieldRepresentation::DATE),
+    /// All signed 64 bits, independent of physical Java storage slots.
+    LONG = composeSerialTypeId(SerialType::COMPACT_INT, FieldRepresentation::LONG),
     /// All signed64 decimal bits, without a physical VOID tail.
-    WIDE_DECIMAL = composeSerialTypeId(SerialType::COMPACT_INT, FieldRepresentation::WIDE_DECIMAL)
+    WIDE_DECIMAL = composeSerialTypeId(SerialType::COMPACT_INT, FieldRepresentation::WIDE_DECIMAL),
+    /// All signed 64 raw milliseconds, without event-time conversion.
+    TIME_MILLIS = composeSerialTypeId(SerialType::COMPACT_INT, FieldRepresentation::TIME_MILLIS)
 };
 
 /** Explicit exact-type policy; the default preserves the original bounded subset. */
 enum class LocalProfile {
-    COMPACT_INT_V1,    ///< Only ordinary full type 8.
-    QUOTE_FIELDS_V1,   ///< Exactly 2, 8, 56 and 120; no representation conversions.
-    EXTENDED_FIELDS_V1 ///< Exactly 2, 8, 10, 40, 56, 72, 88 and 120; ordinary fields only.
+    COMPACT_INT_V1,     ///< Only ordinary full type 8.
+    QUOTE_FIELDS_V1,    ///< Exactly 2, 8, 56 and 120; no representation conversions.
+    EXTENDED_FIELDS_V1, ///< Exactly 2, 8, 10, 40, 56, 72, 88 and 120; ordinary fields only.
+    BINARY_FIELDS_V1    ///< Read-only ordinary scalar subset of the finite binary catalog; explicit opt-in.
 };
 
 /** Test an exact full identity against a selected local policy.
@@ -99,7 +121,7 @@ enum class LocalProfile {
  */
 [[nodiscard]] constexpr bool supportsSerialType(std::int32_t type, LocalProfile profile) noexcept {
     if (profile != LocalProfile::COMPACT_INT_V1 && profile != LocalProfile::QUOTE_FIELDS_V1 &&
-        profile != LocalProfile::EXTENDED_FIELDS_V1) {
+        profile != LocalProfile::EXTENDED_FIELDS_V1 && profile != LocalProfile::BINARY_FIELDS_V1) {
         return false;
     }
 
@@ -110,20 +132,28 @@ enum class LocalProfile {
     case SerialFieldType::UTF_CHAR:
     case SerialFieldType::TIME_SECONDS:
     case SerialFieldType::WIDE_DECIMAL:
-        return profile == LocalProfile::QUOTE_FIELDS_V1 || profile == LocalProfile::EXTENDED_FIELDS_V1;
+        return profile != LocalProfile::COMPACT_INT_V1;
     case SerialFieldType::UTF_CHAR_ARRAY:
     case SerialFieldType::SHORT_STRING:
     case SerialFieldType::SEQUENCE:
     case SerialFieldType::DATE:
-        return profile == LocalProfile::EXTENDED_FIELDS_V1;
+        return profile == LocalProfile::EXTENDED_FIELDS_V1 || profile == LocalProfile::BINARY_FIELDS_V1;
+    case SerialFieldType::VOID_FIELD:
+    case SerialFieldType::BYTE:
+    case SerialFieldType::SHORT:
+    case SerialFieldType::INT:
+    case SerialFieldType::DECIMAL:
+    case SerialFieldType::LONG:
+    case SerialFieldType::TIME_MILLIS:
+        return profile == LocalProfile::BINARY_FIELDS_V1;
     default:
         return false;
     }
 }
 
 /** Owned exact logical field, independent of Java slot storage.
- * Decoder values obey spec/encoding/FIELD-TYPES.md: integer fields are sign-extended int32,
- * char is a code point, decimal preserves all signed 64 raw bits, and arrays retain exact units.
+ * Decoder values obey spec/encoding/FIELD-TYPES.md: fixed-width integers retain their signed range,
+ * decimal is raw signed32, long/wide-decimal/milliseconds retain signed64, and arrays retain exact units.
  */
 struct FieldValue {
     SerialFieldType type;                  ///< Full identity, retained even when primitives are shared.
@@ -151,6 +181,16 @@ struct FieldValue {
     }
 
     switch (value.type) {
+    case SerialFieldType::VOID_FIELD:
+        return value.raw == 0;
+    case SerialFieldType::BYTE:
+        return value.raw >= std::numeric_limits<std::int8_t>::min() &&
+               value.raw <= std::numeric_limits<std::int8_t>::max();
+    case SerialFieldType::SHORT:
+        return value.raw >= std::numeric_limits<std::int16_t>::min() &&
+               value.raw <= std::numeric_limits<std::int16_t>::max();
+    case SerialFieldType::INT:
+    case SerialFieldType::DECIMAL:
     case SerialFieldType::COMPACT_INT:
     case SerialFieldType::SHORT_STRING:
     case SerialFieldType::TIME_SECONDS:
@@ -164,6 +204,8 @@ struct FieldValue {
         return value.raw >= 0 && value.raw <= MAX_CODE_POINT;
     }
     case SerialFieldType::WIDE_DECIMAL:
+    case SerialFieldType::LONG:
+    case SerialFieldType::TIME_MILLIS:
         return true;
     default:
         return false;

@@ -233,7 +233,7 @@ TEST_CASE("Field-only formatter escapes controls and lone surrogates before writ
 }
 
 TEST_CASE("Typed formatter refuses invalid manually constructed tags ranges and payloads") {
-    std::vector<core::FieldValue> invalid{{static_cast<core::SerialFieldType>(24), 0},
+    std::vector<core::FieldValue> invalid{{static_cast<core::SerialFieldType>(25), 0},
                                           {core::SerialFieldType::UTF_CHAR_ARRAY, 1},
                                           {core::SerialFieldType::UTF_CHAR_ARRAY, -1, std::u16string{}},
                                           {core::SerialFieldType::UTF_CHAR, -1},

@@ -179,6 +179,10 @@ OutgoingLayouts::OutgoingLayouts(core::LocalSchema schema, std::vector<OutgoingR
 
 std::expected<OutgoingLayouts, WriterDiagnostic>
 OutgoingLayouts::create(const core::LocalSchema &schema, std::span<const OutgoingRecord> records, LayoutLimits limits) {
+    if (schema.profile() == core::LocalProfile::BINARY_FIELDS_V1) {
+        return std::unexpected(layoutFailure(WriterError::UNSUPPORTED, "profile"));
+    }
+
     if (records.size() > limits.records || !schemaFits(schema, limits.schema)) {
         return std::unexpected(layoutFailure(WriterError::RESOURCE_LIMIT, "layout-count"));
     }

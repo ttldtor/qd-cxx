@@ -2,11 +2,65 @@
 
 [English version](FIELD-TYPES.md). Английская версия является нормативной.
 
-QDCXX-024. Контракт составлен после первых захватов примитивов и production FileWriter/FileReader
-закреплённого Java, до production C++. [Oracle](../../tools/upstream/field-types-oracle/FieldTypesOracle.java)
+Первоначальный контракт QDCXX-024 определён по захватам примитивов и production
+FileWriter/FileReader закреплённого Java. Расширение двоичных скаляров ниже добавляет
+отдельно подтверждённые наблюдения обоих pins. [Oracle](../../tools/upstream/field-types-oracle/FieldTypesOracle.java)
 и [отчёт о захватах](../../tests/fixtures/encoding/field-types/CAPTURES.md) разделяют наблюдения исполнения,
 диагностические входы и проверки воспроизводимости. Lock неизменён. Это поддержка полей,
 не адаптер события Profile и не доказательство полной совместимости частного tape.
+
+## Явный профиль двоичных скаляров
+
+`LocalProfile::BINARY_FIELDS_V1` — явно выбранное обычное подмножество скаляров
+[конечного двоичного каталога](../protocol/BINARY-TAPE-COVERAGE.ru.md), доступное
+только для чтения. Оно принимает ровно 0/1/2/3/4/8/10/24/40/56/72/88/104/120/152.
+Прежние локальные профили сохраняют точные наборы ниже. Член для object/byte payload,
+индексная схема, преобразование, новый tape mode или профиль инспектора не добавлены.
+Более широкий каталог остаётся незавершённым.
+
+| Wire identity | Полная identity C++ | Физическое чтение | Канонический `raw` |
+| --- | --- | --- | --- |
+| 0 VOID | `VOID_FIELD` | Ноль байтов | 0 |
+| 1 BYTE | `BYTE` | Один знаковый байт | -128..127 |
+| 3 SHORT | `SHORT` | Два big-endian байта | -32768..32767 |
+| 4 INT | `INT` | Четыре big-endian байта | INT32_MIN..INT32_MAX |
+| 24 DECIMAL | `DECIMAL` | Compact long | Знаковые младшие 32 raw-бита |
+| 104 LONG | `LONG` | Compact long | Все знаковые 64 бита |
+| 152 TIME_MILLIS | `TIME_MILLIS` | Compact long | Все знаковые 64 raw-бита миллисекунд |
+
+`SerialType::VOID_FIELD` и `SerialFieldType::VOID_FIELD` избегают конфликта с Windows
+macro `VOID`; числовая wire identity остаётся нулевой. У всех скаляров `units`
+отсутствуют. DECIMAL не получает числовой интерпретации; LONG/TIME_MILLIS сохраняют
+старшие биты, как прежний WIDE_DECIMAL. Общие serialization bits не разрешают aliases,
+reserved168, неизвестные старшие биты, отрицательные ID и неподдерживаемые комбинации.
+
+Явно объявленный локальный VOID — плотный локальный raw-zero default, включая
+отсутствие поля в source description. Source binding существует только при явном
+wire-объявлении. VOID не читает байты значения, но оплачивает одну попытку wire-field;
+пропуски и повторные bindings подчиняются тому же правилу. Production Java удаляет
+VOID из операций чтения/записи descriptor. Независимый cursor slot VoidIntField
+остаётся нулевым; это не доказывает доставку логического Java-поля или его запись
+FileWriter. Физические tails LONG/TIME_MILLIS/WIDE_DECIMAL никогда не превращаются
+в выдуманные source declarations или логические значения.
+
+Общий charged scalar decoder обслуживает полные payload STREAM и RAW. Усечение
+фиксированной ширины потребляет все доступные байты prefix и сообщает
+TRUNCATED_PAYLOAD на FIELD с offset начала примитива; частичная текущая запись
+не публикуется. Compact-формы потребляют всю физическую ширину перед low32 projection.
+Скаляры не выделяют value payload и не расходуют строковые бюджеты. Прежние ограничения
+payload, записей, полей, символов и вывода остаются конечными, включая ноль; admission
+defaults выполняется до построения. Завершённые записи владеют данными после разрушения
+input, schema, context или reader и сохраняются при последующей ошибке поля.
+
+Переданная вызывающей стороной новая схема может использовать прежние грамматики
+контейнеров LEGACY/NONE/STREAM или RAW_MESSAGE_V1/MESSAGE. Их политики descriptor,
+message-family, flags, timing и EOF не меняются; обычное автоматическое discovery
+сохраняет EXTENDED_FIELDS_V1. `OutgoingLayouts::create` отвергает любую схему
+BINARY_FIELDS_V1 типизированным UNSUPPORTED на `profile`, включая пустые layouts
+и layouts только с прежними типами, до обхода, копирования и выделения памяти.
+Outgoing codec не добавлен. [Scalar validation](../../tests/conformance/protocol/field-types/SCALAR-VALIDATION.ru.md)
+разделяет факты исходников, requested composer frames, FileWriter captures и реальные
+parser/FileReader callbacks на обеих закреплённых ревизиях.
 
 ## Идентичность, хранение и binding
 

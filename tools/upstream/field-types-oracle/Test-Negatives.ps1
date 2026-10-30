@@ -7,12 +7,13 @@ $root=[IO.Path]::GetFullPath($RunDirectory)
 if(Test-Path -LiteralPath $root){throw 'RunDirectory must be new'}
 New-Item -ItemType Directory -Path $root | Out-Null
 $expected=(Resolve-Path -LiteralPath $ExpectedDirectory).Path
-$mutations=@('type','value','unit','null-empty','order','record','arity','missing-field','missing-record','unknown-row','duplicate-row','missing-completion','duplicate-completion','misplaced-completion','extra-file','binary','primitive-consumption')
+$mutations=@('type','value','unit','null-empty','order','record','arity','missing-field','missing-record','unknown-row','duplicate-row','missing-completion','duplicate-completion','misplaced-completion','extra-file','binary','primitive-consumption','scalar-value','scalar-wire-type','scalar-consumed','scalar-byte','scalar-missing','scalar-fanout')
 $results=[Collections.Generic.List[object]]::new()
 foreach($mutation in $mutations){
     $dir=Join-Path $root $mutation
     New-Item -ItemType Directory -Path $dir | Out-Null
     Get-ChildItem -LiteralPath $expected -File | Copy-Item -Destination $dir
+    Copy-Item -LiteralPath (Join-Path $expected 'scalars') -Destination $dir -Recurse
     $path=Join-Path $dir 'mixed-stream.tsv';$rows=[IO.File]::ReadAllLines($path)
     switch($mutation){
         'type' {$rows[3]=$rows[3].Replace("`t40`t","`t8`t")}
@@ -32,6 +33,26 @@ foreach($mutation in $mutations){
         'extra-file' {[IO.File]::WriteAllText((Join-Path $dir 'unexpected.tsv'),"unexpected`n")}
         'binary' {$p=Join-Path $dir 'mixed-stream.qtp';$b=[IO.File]::ReadAllBytes($p);$b[$b.Length-2]=$b[$b.Length-2] -bxor 1;[IO.File]::WriteAllBytes($p,$b)}
         'primitive-consumption' {$p=Join-Path $dir 'primitives.tsv';$v=[IO.File]::ReadAllText($p);$v=$v.Replace("string-read`tvalue-0-prefix-1`tbuffered`t7f`tnull`tok`t1","string-read`tvalue-0-prefix-1`tbuffered`t7f`tnull`tok`t0");[IO.File]::WriteAllText($p,$v)}
+    }
+    if ($mutation.StartsWith('scalar-')) {
+        $scalarPath = Join-Path $dir 'scalars/samples.tsv'
+        $original = [IO.File]::ReadAllText($scalarPath)
+        $scalarRows = [IO.File]::ReadAllLines($scalarPath)
+        $index = [Array]::FindIndex($scalarRows, [Predicate[string]] { param($row) $row.StartsWith("sample`tvalue-0`t0`t15`t") })
+        if ($index -lt 0) { throw 'Scalar positive row absent' }
+        $c = $scalarRows[$index].Split("`t")
+        switch ($mutation) {
+            'scalar-value' { $c[7] = '1' }
+            'scalar-wire-type' { $c[2] = '8' }
+            'scalar-consumed' { $c[9] = '1' }
+            'scalar-byte' { $c[4] = $c[4].Replace('8391', '8392') }
+            'scalar-fanout' { $c[5] = '3' }
+            'scalar-missing' { $scalarRows = $scalarRows[0..($scalarRows.Count - 2)] }
+        }
+        if ($mutation -ne 'scalar-missing') { $scalarRows[$index] = $c -join "`t" }
+        $changed = ($scalarRows -join "`n") + "`n"
+        if ($original -ceq $changed) { throw "Scalar mutation changed nothing: $mutation" }
+        [IO.File]::WriteAllText($scalarPath, $changed)
     }
     [IO.File]::WriteAllText($path,($rows -join "`n")+"`n")
     $failed=$false

@@ -1,5 +1,6 @@
 package qdcxx.oracle;
 
+import com.devexperts.io.BufferedInput;
 import com.devexperts.io.BufferedInputPart;
 import com.devexperts.io.ByteArrayInput;
 import com.devexperts.io.ByteArrayOutput;
@@ -10,16 +11,21 @@ import com.devexperts.qd.DataIterator;
 import com.devexperts.qd.DataObjField;
 import com.devexperts.qd.DataRecord;
 import com.devexperts.qd.DataScheme;
+import com.devexperts.qd.SerialFieldType;
 import com.devexperts.qd.SymbolCodec;
 import com.devexperts.qd.kit.CompactCharField;
 import com.devexperts.qd.kit.CompactIntField;
 import com.devexperts.qd.kit.DateField;
+import com.devexperts.qd.kit.DecimalField;
 import com.devexperts.qd.kit.DefaultRecord;
 import com.devexperts.qd.kit.DefaultScheme;
+import com.devexperts.qd.kit.LongField;
 import com.devexperts.qd.kit.PentaCodec;
+import com.devexperts.qd.kit.PlainIntField;
 import com.devexperts.qd.kit.SequenceField;
 import com.devexperts.qd.kit.ShortStringField;
 import com.devexperts.qd.kit.StringField;
+import com.devexperts.qd.kit.TimeMillisField;
 import com.devexperts.qd.kit.TimeSecondsField;
 import com.devexperts.qd.kit.VoidIntField;
 import com.devexperts.qd.kit.WideDecimalField;
@@ -29,6 +35,7 @@ import com.devexperts.qd.ng.RecordMode;
 import com.devexperts.qd.ng.RecordSource;
 import com.devexperts.qd.qtp.BinaryQTPComposer;
 import com.devexperts.qd.qtp.BinaryQTPParser;
+import com.devexperts.qd.qtp.BinaryRecordDesc;
 import com.devexperts.qd.qtp.MessageConsumerAdapter;
 import com.devexperts.qd.qtp.MessageType;
 import com.devexperts.qd.qtp.ProtocolOption;
@@ -42,6 +49,7 @@ import com.dxfeed.api.impl.DXFeedScheme;
 import com.dxfeed.api.impl.SchemeProperties;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -761,9 +769,15 @@ public final class FieldTypesOracle {
   }
 
   public static void main(String[] args) throws Exception {
-    require(args.length == 1, "new output directory required");
+    require(
+        args.length == 1 || (args.length == 2 && args[1].equals("scalar-only")),
+        "new output directory required");
     Path root = Paths.get(args[0]);
     Files.createDirectory(root);
+    if (args.length == 2) {
+      Scalars.capture(root);
+      return;
+    }
     schema(root);
     primitives(root);
     production(root, "mixed-stream", MIXED, false);
@@ -772,7 +786,357 @@ public final class FieldTypesOracle {
     production(root, "profile-raw", PROFILE, true);
     composer(root);
     diagnostics(root);
+    Scalars.capture(Files.createDirectory(root.resolve("scalars")));
     System.out.println(
         "CAPTURE COMPLETE: exact field types, original Profile and production paths");
+  }
+
+  /** Requested wire formats and actual cursor slots are deliberately separate observations. */
+  private static final class Scalars {
+    static final int[] TYPES = {0, 1, 3, 4, 24, 104, 152};
+    static final long SENTINEL = 913;
+
+    static DataRecord record(int type) {
+      DataIntField value;
+      switch (type) {
+        case 0:
+          value = new VoidIntField(0, "Scalar.Value");
+          break;
+        case 1:
+        case 3:
+          value = new CompactIntField(0, "Scalar.Value");
+          break;
+        case 4:
+          value = new PlainIntField(0, "Scalar.Value");
+          break;
+        case 24:
+          value = new DecimalField(0, "Scalar.Value");
+          break;
+        case 104:
+          value = new LongField(0, "Scalar.Value");
+          break;
+        case 152:
+          value = new TimeMillisField(0, "Scalar.Value");
+          break;
+        default:
+          throw new IllegalArgumentException("scalar type " + type);
+      }
+      require(value != null, "production consumer field");
+      boolean wide = type == 104 || type == 152;
+      DataIntField[] fields =
+          wide
+              ? new DataIntField[] {
+                value,
+                new VoidIntField(1, "Scalar.Value$VoidTail"),
+                new CompactIntField(2, "Scalar.Sentinel")
+              }
+              : new DataIntField[] {value, new CompactIntField(1, "Scalar.Sentinel")};
+      DataRecord record = new DefaultRecord(0, "Scalar", false, fields, new DataObjField[0]);
+      new DefaultScheme(PentaCodec.INSTANCE, record);
+      return record;
+    }
+
+    static final class Requested extends BinaryRecordDesc {
+      Requested(DataRecord record, int type) throws Exception {
+        super(record, 2, new String[] {"Value", "Sentinel"}, new int[] {type, 8}, false, DIR_READ);
+      }
+
+      int count() {
+        return nDesc;
+      }
+    }
+
+    static final class Trace extends BinaryRecordDesc {
+      long examined;
+
+      Trace(BinaryRecordDesc source) {
+        super(source);
+      }
+
+      @Override
+      public RecordCursor readRecord(
+          BufferedInput input, RecordBuffer buffer, int cipher, String symbol, int flags)
+          throws IOException {
+        long start = input.totalPosition();
+        try {
+          return super.readRecord(input, buffer, cipher, symbol, flags);
+        } finally {
+          examined = input.totalPosition() - start;
+        }
+      }
+    }
+
+    static final class Seen extends MessageConsumerAdapter {
+      int records, errors, streamRecords;
+      long value, sentinel, callbackValue, callbackSentinel;
+
+      @Override
+      protected void processData(DataIterator iterator, MessageType type) {
+        RecordCursor cursor;
+        while ((cursor = ((RecordSource) iterator).next()) != null) {
+          DataRecord record = cursor.getRecord();
+          boolean wide = record.getIntField(0).getSerialType().isLong();
+          long raw = wide ? cursor.getLong(0) : cursor.getInt(0);
+          long tail = cursor.getInt(wide ? 2 : 1);
+          require(
+              records == 0 || (raw == callbackValue && tail == callbackSentinel),
+              "RAW callback values agree");
+          callbackValue = raw;
+          callbackSentinel = tail;
+          records++;
+          if (type == MessageType.STREAM_DATA) {
+            value = raw;
+            sentinel = tail;
+            streamRecords++;
+          }
+        }
+      }
+
+      @Override
+      public void handleCorruptedStream() {
+        errors++;
+      }
+
+      @Override
+      public void handleCorruptedMessage(int type) {
+        errors++;
+      }
+
+      @Override
+      public void handleUnknownMessage(int type) {
+        errors++;
+      }
+    }
+
+    static byte[] description(int type) throws Exception {
+      ByteArrayOutput out = new ByteArrayOutput();
+      out.writeCompactInt(0);
+      out.writeUTFString("Scalar");
+      out.writeCompactInt(2);
+      out.writeUTFString("Value");
+      out.writeCompactInt(type);
+      out.writeUTFString("Sentinel");
+      out.writeCompactInt(8);
+      return frame(2, bytes(out));
+    }
+
+    static byte[] payload(byte[] body) throws Exception {
+      ByteArrayOutput out = new ByteArrayOutput();
+      SymbolCodec.Writer symbols = PentaCodec.INSTANCE.createWriter();
+      symbols.reset(ProtocolOption.EMPTY_SET);
+      symbols.writeSymbol(out, PentaCodec.INSTANCE.encode("IBM"), null, 0);
+      out.writeCompactInt(0);
+      out.write(body);
+      return bytes(out);
+    }
+
+    static byte[] physical(int type, long value) throws Exception {
+      ByteArrayOutput out = new ByteArrayOutput();
+      switch (type) {
+        case 0:
+          break;
+        case 1:
+          out.writeByte((int) value);
+          break;
+        case 3:
+          out.writeShort((int) value);
+          break;
+        case 4:
+          out.writeInt((int) value);
+          break;
+        default:
+          out.writeCompactLong(value);
+      }
+      return bytes(out);
+    }
+
+    static Seen observe(DataRecord record, byte[] wire, long[] examined) {
+      final Trace[] trace = new Trace[1];
+      BinaryQTPParser parser =
+          new BinaryQTPParser(record.getScheme()) {
+            @Override
+            protected BinaryRecordDesc wrapRecordDesc(BinaryRecordDesc source) {
+              return trace[0] = new Trace(source);
+            }
+          };
+      parser.setInput(new ByteArrayInput(wire));
+      Seen seen = new Seen();
+      parser.parse(seen);
+      require(seen.streamRecords == (seen.records == 0 ? 0 : 1), "one STREAM callback projection");
+      examined[0] = trace[0] == null ? -1 : trace[0].examined;
+      return seen;
+    }
+
+    static void sample(PrintWriter out, String id, int type, byte[] body, boolean sentinel)
+        throws Exception {
+      DataRecord record = record(type);
+      byte[] data = payload(sentinel ? concat(body, compact(SENTINEL)) : body);
+      for (int family : new int[] {15, 5}) {
+        long[] examined = new long[1];
+        Seen seen = observe(record, concat(description(type), frame(family, data)), examined);
+        row(
+            out,
+            "sample",
+            id,
+            type,
+            family,
+            hex(data),
+            seen.records,
+            seen.errors,
+            seen.records == 0 ? "-" : Long.toString(seen.value),
+            seen.records == 0 ? "-" : Long.toString(seen.sentinel),
+            examined[0]);
+      }
+    }
+
+    static void composed(PrintWriter out, Path root, int type) throws Exception {
+      final DataRecord record = record(type);
+      final Requested requested = new Requested(record, type);
+      row(out, "binding", type, record.getIntField(0).getSerialType().getId(), requested.count());
+      RecordBuffer buffer = new RecordBuffer(RecordMode.TIMESTAMPED_DATA);
+      RecordCursor cursor = buffer.add(record, record.getScheme().getCodec().encode("IBM"), null);
+      boolean wide = type == 104 || type == 152;
+      if (wide) {
+        cursor.setLong(0, Long.MIN_VALUE);
+      } else {
+        cursor.setInt(0, -1);
+      }
+      cursor.setInt(wide ? 2 : 1, (int) SENTINEL);
+      cursor.setEventTimeSequence((1600000000L << 32) + (123L << 22));
+      for (boolean raw : new boolean[] {false, true}) {
+        MessageType family = raw ? MessageType.RAW_DATA : MessageType.STREAM_DATA;
+        String suffix = raw ? "-raw" : "";
+        ByteArrayOutput encoded = new ByteArrayOutput();
+        BinaryQTPComposer composer =
+            new BinaryQTPComposer(record.getScheme(), true) {
+              @Override
+              protected BinaryRecordDesc getRequestedRecordDesc(DataRecord ignored) {
+                return requested;
+              }
+            };
+        composer.setOptSet(ProtocolOption.EMPTY_SET);
+        composer.setOutput(encoded);
+        buffer.rewind();
+        composer.visitData(buffer, family);
+        byte[] wire = bytes(encoded);
+        Files.write(root.resolve("composer-" + type + suffix + ".qtp"), wire);
+        long[] examined = new long[1];
+        Seen seen = observe(record, wire, examined);
+        require(
+            seen.records == (raw ? 3 : 1) && seen.errors == 0 && seen.sentinel == SENTINEL,
+            "requested composer callback");
+        row(out, "composer", type, family.getId(), seen.value, seen.sentinel, examined[0]);
+        if (type == 1 || type == 3) {
+          continue;
+        }
+        FileWriter writer = new FileWriter();
+        writer.setFormat(FileFormat.BINARY);
+        writer.setCompression(StreamCompression.NONE);
+        writer.setTime(raw ? TimestampsType.MESSAGE : TimestampsType.NONE);
+        writer.setSaveAs(family);
+        writer.setOpt("");
+        Path path = root.resolve("file-" + type + suffix + ".qtp");
+        try (FileWriter opened = writer.open(path.toString(), record.getScheme())) {
+          buffer.rewind();
+          opened.visitData(buffer, MessageType.STREAM_DATA);
+        }
+        FileReaderParams.Default params = new FileReaderParams.Default();
+        params.setSpeed(FileReaderParams.MAX_SPEED);
+        params.setCycle(false);
+        FileReader reader = new FileReader(path.toString(), new ConnectionStats(), params);
+        reader.setScheme(record.getScheme());
+        Seen delivered = new Seen();
+        try {
+          reader.readInto(delivered);
+        } finally {
+          reader.close();
+        }
+        require(
+            delivered.records == (raw ? 3 : 1)
+                && delivered.streamRecords == 1
+                && delivered.errors == 0
+                && delivered.sentinel == SENTINEL,
+            "FileWriter/FileReader callback");
+        row(out, "file", type, family.getId(), delivered.value, delivered.sentinel);
+      }
+    }
+
+    static void capture(Path root) throws Exception {
+      try (PrintWriter out = output(root.resolve("samples.tsv"))) {
+        row(out, "case", "scalar-samples");
+        require(
+            SerialFieldType.BYTE.createDefaultIntInstance(0, "Scalar.Value") == null,
+            "BYTE default absent");
+        require(
+            SerialFieldType.SHORT.createDefaultIntInstance(0, "Scalar.Value") == null,
+            "SHORT default absent");
+        row(out, "factory", 1, "null");
+        row(out, "factory", 3, "null");
+        for (int type : TYPES) {
+          composed(out, root, type);
+          long[] values =
+              type == 0
+                  ? new long[] {0}
+                  : type == 1
+                      ? new long[] {-128, -1, 0, 127}
+                      : type == 3
+                          ? new long[] {-32768, -1, 0, 32767}
+                          : type == 4
+                              ? new long[] {Integer.MIN_VALUE, -1, 0, Integer.MAX_VALUE}
+                              : new long[] {
+                                Long.MIN_VALUE,
+                                Integer.MIN_VALUE,
+                                -1,
+                                0,
+                                Integer.MAX_VALUE,
+                                2147483648L,
+                                4294967295L,
+                                4294967296L,
+                                Long.MAX_VALUE
+                              };
+          for (int i = 0; i < values.length; ++i) {
+            byte[] body = physical(type, values[i]);
+            sample(out, "value-" + i, type, body, true);
+            for (int n = 0; n < body.length; ++n) {
+              sample(out, "value-" + i + "-prefix-" + n, type, Arrays.copyOf(body, n), false);
+            }
+            sample(out, "value-" + i + "-sentinel-prefix-0", type, body, false);
+            sample(
+                out,
+                "value-" + i + "-sentinel-prefix-1",
+                type,
+                concat(body, new byte[] {(byte) 0x83}),
+                false);
+          }
+          if (type == 24 || type == 104 || type == 152) {
+            String[] forms = {
+              "8000",
+              "bfff",
+              "c00000",
+              "dfffff",
+              "e0000000",
+              "efffffff",
+              "f000000000",
+              "f7ffffffff",
+              "f80000000000",
+              "fc000000000000",
+              "fe00000000000000",
+              "ff0000000000000000",
+              "ffffffffffffffffff",
+              "ff0000000080000000"
+            };
+            for (int i = 0; i < forms.length; ++i) {
+              byte[] body = unhex(forms[i]);
+              sample(out, "overlong-" + i, type, body, true);
+              for (int n = 0; n < body.length; ++n) {
+                sample(out, "overlong-" + i + "-prefix-" + n, type, Arrays.copyOf(body, n), false);
+              }
+            }
+          }
+        }
+        row(out, "complete", "scalar-samples");
+        require(!out.checkError(), "scalar samples output");
+      }
+    }
   }
 }

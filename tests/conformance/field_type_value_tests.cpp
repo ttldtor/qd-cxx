@@ -308,7 +308,58 @@ TEST_CASE("owned FieldValue equality and canonical representations reject malfor
     CHECK(c::validFieldValue({T::WIDE_DECIMAL, std::numeric_limits<std::int64_t>::min()}));
     CHECK(c::validFieldValue({T::WIDE_DECIMAL, std::numeric_limits<std::int64_t>::max()}));
     CHECK_FALSE(c::validFieldValue({T::WIDE_DECIMAL, 0, u""}));
-    CHECK_FALSE(c::validFieldValue({static_cast<T>(24), 0}));
+    CHECK_FALSE(c::validFieldValue({static_cast<T>(25), 0}));
+}
+
+TEST_CASE("binary scalar profile preserves exact old policies and canonical signed raw ranges") {
+    using T = c::SerialFieldType;
+    constexpr std::array<std::int32_t, 15> BINARY{0, 1, 2, 3, 4, 8, 10, 24, 40, 56, 72, 88, 104, 120, 152};
+    constexpr std::array<T, 7> NEW_TYPES{T::VOID_FIELD, T::BYTE, T::SHORT, T::INT, T::DECIMAL, T::LONG, T::TIME_MILLIS};
+    constexpr std::array<std::int32_t, 7> NEW_IDS{0, 1, 3, 4, 24, 104, 152};
+
+    for (std::size_t index = 0; index < NEW_TYPES.size(); ++index) {
+        CHECK(static_cast<std::int32_t>(NEW_TYPES[index]) == NEW_IDS[index]);
+
+        for (const auto profile :
+             {c::LocalProfile::COMPACT_INT_V1, c::LocalProfile::QUOTE_FIELDS_V1, c::LocalProfile::EXTENDED_FIELDS_V1}) {
+            CHECK_FALSE(c::supportsSerialType(NEW_IDS[index], profile));
+        }
+    }
+
+    for (std::int32_t type = -1; type <= 512; ++type) {
+        CAPTURE(type);
+        const bool accepted = std::find(BINARY.begin(), BINARY.end(), type) != BINARY.end();
+        CHECK(c::supportsSerialType(type, c::LocalProfile::BINARY_FIELDS_V1) == accepted);
+        const c::LocalRecord record{0, u"R", false, {{type}}, {{u"Value", 0}}};
+        const auto local =
+            c::LocalSchema::create(std::span(&record, 1), {1, 1, 1, 5, 6}, c::LocalProfile::BINARY_FIELDS_V1);
+        CHECK(local.has_value() == accepted);
+    }
+
+    CHECK(c::validFieldValue({T::VOID_FIELD, 0}));
+    CHECK_FALSE(c::validFieldValue({T::VOID_FIELD, 1}));
+    CHECK_FALSE(c::validFieldValue({T::VOID_FIELD, -1}));
+
+    for (const auto &[type, maximum] : std::array<std::pair<T, std::int64_t>, 4>{
+             {{T::BYTE, 127}, {T::SHORT, 32767}, {T::INT, 2147483647}, {T::DECIMAL, 2147483647}}}) {
+        CHECK(c::validFieldValue({type, -maximum - 1}));
+        CHECK(c::validFieldValue({type, maximum}));
+        CHECK_FALSE(c::validFieldValue({type, -maximum - 2}));
+        CHECK_FALSE(c::validFieldValue({type, maximum + 1}));
+    }
+
+    for (const auto type : {T::LONG, T::TIME_MILLIS}) {
+        CHECK(c::validFieldValue({type, std::numeric_limits<std::int64_t>::min()}));
+        CHECK(c::validFieldValue({type, std::numeric_limits<std::int64_t>::max()}));
+    }
+
+    for (const auto type : NEW_TYPES) {
+        CHECK_FALSE(c::validFieldValue({type, 0, u""}));
+    }
+
+    CHECK(static_cast<std::int32_t>(c::FieldRepresentation::DECIMAL) == 0x10);
+    CHECK(static_cast<std::int32_t>(c::FieldRepresentation::LONG) == 0x60);
+    CHECK(static_cast<std::int32_t>(c::FieldRepresentation::TIME_MILLIS) == 0x90);
 }
 
 TEST_CASE("char-array finite bounds and primitive versus message precedence") {

@@ -2,11 +2,64 @@
 
 [Русская версия](FIELD-TYPES.ru.md). English is authoritative.
 
-QDCXX-024. This contract follows the initial locked-Java primitive and production FileWriter/FileReader
-captures and precedes production C++. The [oracle](../../tools/upstream/field-types-oracle/FieldTypesOracle.java)
+The initial QDCXX-024 contract was defined from locked-Java primitive and production
+FileWriter/FileReader captures. The binary scalar extension below adds separately qualified
+both-pin evidence. The [oracle](../../tools/upstream/field-types-oracle/FieldTypesOracle.java)
 and [capture report](../../tests/fixtures/encoding/field-types/CAPTURES.md) distinguish runtime observations,
 diagnostic inputs and reproducibility checks. The lock remains unchanged. This is field support,
 not a Profile event adapter or evidence of complete private-tape compatibility.
+
+## Explicit binary scalar profile
+
+`LocalProfile::BINARY_FIELDS_V1` is an opt-in, ordinary, read-only scalar subset of
+the [finite binary catalog](../protocol/BINARY-TAPE-COVERAGE.md). It accepts exactly
+0/1/2/3/4/8/10/24/40/56/72/88/104/120/152. Existing local profiles retain their exact
+sets below. No object/byte payload member, indexed layout, conversion, new tape mode
+or inspector profile is added. The broader catalog remains incomplete.
+
+| Wire identity | C++ full identity | Physical read | Canonical `raw` |
+| --- | --- | --- | --- |
+| 0 VOID | `VOID_FIELD` | Zero bytes | 0 |
+| 1 BYTE | `BYTE` | One signed byte | -128..127 |
+| 3 SHORT | `SHORT` | Two big-endian bytes | -32768..32767 |
+| 4 INT | `INT` | Four big-endian bytes | INT32_MIN..INT32_MAX |
+| 24 DECIMAL | `DECIMAL` | Compact long | Signed low 32 raw bits |
+| 104 LONG | `LONG` | Compact long | All signed 64 bits |
+| 152 TIME_MILLIS | `TIME_MILLIS` | Compact long | All signed 64 raw milliseconds |
+
+`SerialType::VOID_FIELD` and `SerialFieldType::VOID_FIELD` avoid the Windows `VOID`
+macro; the numeric wire identity remains zero. All scalar `units` are disengaged.
+DECIMAL performs no numeric interpretation; LONG/TIME_MILLIS retain high bits just
+as existing WIDE_DECIMAL does. Shared serialization bits never authorize aliases,
+reserved168, unknown high bits, negative IDs or unsupported full combinations.
+
+An explicitly declared local VOID is a dense local raw-zero default, including
+when absent from the source description. A source binding exists only for an
+explicit wire declaration. VOID consumes no value bytes and still charges one
+wire-field attempt; skips and repeated bindings obey the same rule. Production
+Java elides VOID from descriptor read/write actions. Its independent VoidIntField
+cursor slot remains zero; this does not establish a delivered Java logical field
+or FileWriter emission. LONG/TIME_MILLIS/WIDE_DECIMAL physical tails are never
+manufactured as source declarations or logical values.
+
+The same charged scalar decoder serves complete STREAM and RAW payloads. Fixed
+width truncation consumes all available prefix bytes and reports TRUNCATED_PAYLOAD
+at FIELD with the primitive-start offset; no partial current record is published.
+Compact forms consume their complete physical width before any low32 projection.
+Scalars allocate no value payload and consume no string budgets. Existing payload,
+record, field, symbol and output limits remain finite, including zero; defaults
+are admitted before construction. Completed records remain owned after input,
+schema, context or reader destruction and are retained on a later field failure.
+
+A caller-supplied new schema can use existing LEGACY/NONE/STREAM or
+RAW_MESSAGE_V1/MESSAGE container grammars. Their descriptor, message-family,
+flags, timing and EOF policies remain unchanged; ordinary automatic discovery
+still uses EXTENDED_FIELDS_V1. `OutgoingLayouts::create` refuses every
+BINARY_FIELDS_V1 schema with typed UNSUPPORTED at `profile`, including empty and
+old-type-only layouts, before traversal, copying or allocation. No outgoing codec
+is added. [Scalar validation](../../tests/conformance/protocol/field-types/SCALAR-VALIDATION.md)
+separates source facts, requested composer frames, FileWriter captures and actual
+parser/FileReader callbacks at both pinned revisions.
 
 ## Identity, storage and binding
 

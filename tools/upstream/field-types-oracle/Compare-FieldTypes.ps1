@@ -69,3 +69,47 @@ function Validate([string]$Root) {
 $a=@(Validate $Actual);$e=@(Validate $Expected)
 for($i=0;$i -lt $a.Count;$i++){Assert ((Get-FileHash $a[$i].FullName).Hash -ceq (Get-FileHash $e[$i].FullName).Hash) "artifact mismatch: $($a[$i].Name)"}
 "PASS: strict field-type comparison of $($a.Count) artifacts"
+
+# The scalar child capture extends the oracle without altering the historical root artifacts.
+# Called by Invoke-Oracle.ps1; input is a fresh capture and reviewed expectations.
+# Returns no data, and throws on malformed grammar, missing files or byte differences.
+function CompareScalars([string]$ActualRoot, [string]$ExpectedRoot) {
+    $names = @('samples.tsv') + @(foreach ($t in @(0,1,3,4,24,104,152)) { "composer-$t.qtp"; "composer-$t-raw.qtp" }) + @(foreach ($t in @(0,4,24,104,152)) { "file-$t.qtp"; "file-$t-raw.qtp" })
+    foreach ($root in @($ActualRoot, $ExpectedRoot)) {
+        $files = @(Get-ChildItem -LiteralPath $root -File | Sort-Object Name)
+        Assert (($files.Name -join '|') -ceq (($names | Sort-Object) -join '|')) 'exact scalar artifact set'
+        $rows = [IO.File]::ReadAllLines((Join-Path $root 'samples.tsv'))
+        Assert ($rows[0] -ceq "case`tscalar-samples" -and $rows[-1] -ceq "complete`tscalar-samples") 'scalar header/completion'
+        $keys = [Collections.Generic.HashSet[string]]::new()
+        $samples = 0
+        for ($n = 1; $n -lt $rows.Count - 1; ++$n) {
+            $c = $rows[$n].Split("`t")
+            Assert ($c -notcontains '') 'scalar empty cell'
+            switch -CaseSensitive ($c[0]) {
+                'factory' { Assert ($c.Count -eq 3 -and $c[1] -cin @('1','3') -and $c[2] -ceq 'null' -and $keys.Add("factory/$($c[1])")) 'absent production factory' }
+                'binding' {
+                    Assert ($c.Count -eq 4 -and $c[1] -cin @('0','1','3','4','24','104','152') -and $keys.Add("binding/$($c[1])")) 'scalar binding'
+                    $consumer = if ($c[1] -cin @('1','3')) { '8' } else { $c[1] }
+                    Assert ($c[2] -ceq $consumer -and $c[3] -ceq $(if ($c[1] -ceq '0') { '1' } else { '2' })) 'consumer identity and VOID elision'
+                }
+                'composer' { Assert ($c.Count -eq 6 -and $c[2] -cin @('5','15') -and $keys.Add("composer/$($c[1])/$($c[2])")) 'composer row'; Integer $c[3] $true; Assert ($c[4] -ceq '913') 'composer sentinel'; Integer $c[5] }
+                'file' { Assert ($c.Count -eq 5 -and $c[2] -cin @('5','15') -and $keys.Add("file/$($c[1])/$($c[2])")) 'file row'; Integer $c[3] $true; Assert ($c[4] -ceq '913') 'file sentinel' }
+                'sample' {
+                    Assert ($c.Count -eq 10 -and $c[2] -cin @('0','1','3','4','24','104','152') -and $c[3] -cin @('5','15') -and $keys.Add("sample/$($c[1])/$($c[2])/$($c[3])")) 'sample identity'
+                    HexBytes $c[4]; Integer $c[5]; Integer $c[6]; Integer $c[9]
+                    Assert ([long]$c[9] -ge 0 -and [long]$c[9] -le ($c[4].Length / 2 - 3)) 'production examined field position'
+                    if ($c[6] -ceq '0') {
+                        Assert ($c[5] -ceq $(if ($c[3] -ceq '5') { '3' } else { '1' }) -and $c[8] -ceq '913') 'production callback fanout and sentinel'
+                        Integer $c[7] $true
+                    } else { Assert ($c[5] -ceq '0' -and $c[6] -ceq '1' -and $c[7] -ceq '-' -and $c[8] -ceq '-') 'failed record unpublished' }
+                    $samples++
+                }
+                default { throw "unknown scalar row $($c[0])" }
+            }
+        }
+        Assert ($samples -eq 1106 -and $keys.Count -eq 1139) 'finite scalar scenario counts'
+    }
+    foreach ($name in $names) { Assert ((Get-FileHash (Join-Path $ActualRoot $name)).Hash -ceq (Get-FileHash (Join-Path $ExpectedRoot $name)).Hash) "scalar artifact mismatch: $name" }
+    "PASS: strict scalar comparison of $($names.Count) artifacts"
+}
+CompareScalars (Join-Path $Actual 'scalars') (Join-Path $Expected 'scalars')

@@ -48,6 +48,32 @@ validates structure against itself; independent cross-capture and Verify establi
 Verify never replaces expectations. Negative checks cover bytes, tags, values, units, nullability,
 order, identity, missing/duplicate/unknown rows, arity, completion and primitive consumption.
 
+## Binary scalar extension
+
+The same invocation also writes `field-types/scalars`: 25 additional artifacts,
+with 1106 production parser samples in STREAM and RAW per pinned producer. The
+82 historical root artifacts remain byte-identical. Verify validates the finite
+scalar grammar and all bytes; Test-Negatives includes six scalar mutations, for
+23 rejected mutations total. Artifact metadata now includes child paths.
+
+BYTE/SHORT use requested `BinaryRecordDesc` instances and the production composer
+with CompactIntField consumers (wire1/3, consumer8). Their default factories return
+null. Other new non-VOID types use actual PlainIntField/DecimalField/LongField/
+TimeMillisField consumers. Ten original FileWriter/FileReader recordings cover
+0/4/24/104/152 in STREAM/NONE and RAW/MESSAGE. VOID is elided by the producer;
+explicit wire VOID acceptance/default-zero is a separate parser observation.
+Physical long tails are never enumerated as logical fields.
+
+For an already built, clean pinned classpath, the internal harness also accepts
+`FieldTypesOracle <new-directory> scalar-only`. This runs only the scalar capture;
+it does not build upstream or verify expectations. Compile the same source against
+the pinned JDK8 classpath first, preserve class/source/runtime hashes, then compare
+the complete 25-file set with the reviewed pin-specific directory. The ordinary
+launcher retains its complete clean baseline Verify workflow. The second pin's
+scalar capture/repeat and C++ consumption are recorded in the
+[scalar validation](../../../tests/conformance/protocol/field-types/SCALAR-VALIDATION.md).
+No new general-purpose CLI or default inspector profile is introduced.
+
 See [coverage](../../../tests/fixtures/encoding/field-types/COVERAGE.md),
 [captures](../../../tests/fixtures/encoding/field-types/CAPTURES.md),
 [validation](../../../tests/fixtures/encoding/field-types/VALIDATION.md) and the

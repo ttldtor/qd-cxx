@@ -42,7 +42,7 @@ $evidence=[ordered]@{
     sourceSha256=(Get-FileHash "$PSScriptRoot/FieldTypesOracle.java").Hash
     harnessClasses=@(Get-ChildItem "$run/harness" -Recurse -File | ForEach-Object { @{path=[IO.Path]::GetRelativePath("$run/harness",$_.FullName);sha256=(Get-FileHash $_.FullName).Hash} })
     tools=@(Get-ChildItem $PSScriptRoot -File | Where-Object Extension -in '.java','.ps1' | Sort-Object Name | ForEach-Object { @{name=$_.Name;sha256=(Get-FileHash $_.FullName).Hash} })
-    artifacts=@(Get-ChildItem "$run/field-types" -File | Sort-Object Name | ForEach-Object { @{name=$_.Name; sha256=(Get-FileHash $_.FullName).Hash} })
+    artifacts=@(Get-ChildItem "$run/field-types" -File -Recurse | Sort-Object FullName | ForEach-Object { @{name=[IO.Path]::GetRelativePath("$run/field-types",$_.FullName); sha256=(Get-FileHash $_.FullName).Hash} })
 }
 $evidence | ConvertTo-Json -Depth 8 | Set-Content -Encoding utf8 "$run/field-types-metadata.json"
 if (!$ExpectedDirectory) { $ExpectedDirectory=Join-Path $repo 'tests/fixtures/encoding/field-types/expected' }

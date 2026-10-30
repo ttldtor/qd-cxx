@@ -1,6 +1,7 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #define DOCTEST_CONFIG_IMPLEMENT
+#include "qd/encoding/compact.hpp"
 #include "qd/protocol/tape_reader.hpp"
 #include <algorithm>
 #include <array>
@@ -9,6 +10,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <limits>
 #include <stdexcept>
 
 namespace {
@@ -323,7 +325,316 @@ std::vector<std::byte> bytes(std::initializer_list<unsigned> values) {
 
     return result;
 }
+
+/** Decode a fixture's hexadecimal wire bytes without using an encoder under test.
+ * @param text Exact lowercase octets from the production oracle.
+ * @return Owned fixture bytes.
+ */
+std::vector<std::byte> bytes(std::string_view text) {
+    REQUIRE(text.size() % 2 == 0);
+    REQUIRE(text.find_first_not_of("0123456789abcdef") == text.npos);
+    std::vector<std::byte> result;
+
+    for (std::size_t index = 0; index < text.size(); index += 2) {
+        result.push_back(static_cast<std::byte>(number<unsigned>(text.substr(index, 2), 16)));
+    }
+
+    return result;
+}
+
+/** Construct an ordinary read-only binary projection with exact wire identities.
+ * @param type Local Value identity, distinct from the production Java consumer storage type.
+ * @param fields Explicit source declarations, including skips and repeated assignments.
+ * @return Owned binding/default snapshot independent of the temporary schema and declarations.
+ */
+p::StreamDataContext scalarContext(std::int32_t type, std::vector<p::WireFieldDescription> fields) {
+    const std::vector<c::LocalRecord> records{{0, u"Scalar", false, {{type}, {8}}, {{u"Value", 0}, {u"Sentinel", 1}}}};
+    auto local = c::LocalSchema::create(records, limits().context.schema, c::LocalProfile::BINARY_FIELDS_V1);
+    REQUIRE(local);
+    const std::vector<p::WireRecordDescription> descriptions{{0, u"Scalar", std::move(fields)}};
+    auto context = p::StreamDataContext::create(*local, descriptions, limits().context);
+    REQUIRE(context);
+
+    return std::move(*context);
+}
+
+/** Read one original scalar producer artifact.
+ * @param directory Explicit immutable pin-specific fixture directory.
+ * @param stem Fixture name excluding .qtp.
+ * @return Owned unchanged bytes.
+ */
+std::vector<std::byte> scalarTapeInput(const std::filesystem::path &directory, const std::string &stem) {
+    std::ifstream file(directory / (stem + ".qtp"), std::ios::binary);
+    REQUIRE(file.good());
+    const std::vector<char> chars((std::istreambuf_iterator<char>(file)), {});
+    const auto source = std::as_bytes(std::span(chars));
+
+    return {source.begin(), source.end()};
+}
 } // namespace
+
+TEST_CASE("new explicit scalar schema reads original FileWriter and requested composer containers") {
+    for (const auto &directory : {fixtures / "scalars", fixtures.parent_path() / "current-scalar-expected"}) {
+        for (const auto type : {0, 1, 3, 4, 24, 104, 152}) {
+            for (const bool raw : {false, true}) {
+                CAPTURE(directory);
+                CAPTURE(type);
+                CAPTURE(raw);
+                const std::string suffix = raw ? "-raw" : "";
+                auto wire =
+                    scalarTapeInput(directory, "file-" + std::to_string(type == 1 || type == 3 ? 4 : type) + suffix);
+
+                if (type == 1 || type == 3) {
+                    // BYTE/SHORT have no default fields: use an unchanged production header plus
+                    // the actual requested-wire composer frames, not a claimed FileWriter capture.
+                    const auto length = e::readCompactInt(wire);
+                    REQUIRE(length.status == e::Status::OK);
+                    REQUIRE(length.value > 0);
+                    wire.resize(length.consumed + static_cast<std::size_t>(length.value));
+                    const auto composed = scalarTapeInput(directory, "composer-" + std::to_string(type) + suffix);
+                    wire.insert(wire.end(), composed.begin(), composed.end());
+                }
+
+                for (const auto chunk : {std::size_t{1}, std::size_t{7}, std::size_t{65536}}) {
+                    std::vector<p::StreamDataRecord> records;
+                    {
+                        const std::vector<c::LocalRecord> input{
+                            {0, u"Scalar", false, {{type}, {8}}, {{u"Value", 0}, {u"Sentinel", 1}}}};
+                        auto schema =
+                            c::LocalSchema::create(input, limits().context.schema, c::LocalProfile::BINARY_FIELDS_V1);
+                        REQUIRE(schema);
+                        p::TapeReader reader(*schema, limits(),
+                                             raw ? p::TapeMode::RAW_MESSAGE_V1 : p::TapeMode::LEGACY);
+                        auto remaining = std::span<const std::byte>(wire);
+
+                        while (!remaining.empty()) {
+                            const auto event = reader.feed(remaining.first(std::min(chunk, remaining.size())));
+                            REQUIRE(event.status != p::TapeStatus::FAILED);
+                            REQUIRE(event.accepted > 0);
+                            remaining = remaining.subspan(event.accepted);
+                            records.insert(records.end(), event.records.begin(), event.records.end());
+                        }
+
+                        CHECK(reader.finish() == p::TapeStatus::FINISHED);
+                        CHECK(reader.wireFields() == (type == 0 ? 1 : 2));
+                    }
+
+                    REQUIRE(records.size() == 1);
+                    const auto expectedRaw = type == 0                    ? 0
+                                             : type == 104 || type == 152 ? std::numeric_limits<std::int64_t>::min()
+                                                                          : -1;
+                    CHECK(records[0].typedValues ==
+                          std::vector<c::FieldValue>{{static_cast<c::SerialFieldType>(type), expectedRaw},
+                                                     {c::SerialFieldType::COMPACT_INT, 913}});
+                    CHECK(records[0].context.valid());
+                }
+            }
+        }
+    }
+}
+
+TEST_CASE("both pinned production scalar parsers match exact raw values truncations and examined positions") {
+    for (const auto &directory : {fixtures / "scalars", fixtures.parent_path() / "current-scalar-expected"}) {
+        std::ifstream input(directory / "samples.tsv");
+        REQUIRE(input.good());
+        std::string line;
+        REQUIRE(std::getline(input, line));
+        REQUIRE(line == "case\tscalar-samples");
+        std::size_t samples = 0;
+        bool complete = false;
+
+        while (std::getline(input, line)) {
+            REQUIRE_FALSE(complete);
+            const auto row = cells(line);
+
+            if (row[0] == "complete") {
+                REQUIRE(row == std::vector<std::string>{"complete", "scalar-samples"});
+                complete = true;
+
+                continue;
+            }
+
+            if (row[0] != "sample") {
+                continue;
+            }
+
+            REQUIRE(row.size() == 10);
+            CAPTURE(directory);
+            CAPTURE(row[1]);
+            CAPTURE(row[2]);
+            CAPTURE(row[3]);
+            const auto type = number<std::int32_t>(row[2]);
+            const auto context = scalarContext(type, {{u"Value", type}, {u"Sentinel", 8}});
+            auto payload = bytes(row[4]);
+            const bool raw = row[3] == "5";
+            const auto result = raw ? p::decodeRawData(payload, context, limits().data)
+                                    : p::decodeStreamData(payload, context, limits().data);
+            CHECK(result.consumed == 3 + number<std::size_t>(row[9]));
+            CHECK(result.fieldBytes == 0);
+            CHECK(result.fieldUnits == 0);
+            CHECK(result.ownedFieldUnits == 0);
+            CHECK(result.processedRecords == 1);
+
+            if (row[6] == "0") {
+                // RAW's three Java callback families project onto one source wire record.
+                CHECK(row[5] == (raw ? "3" : "1"));
+                REQUIRE(result.status == p::StreamDataStatus::OK);
+                REQUIRE(result.records.size() == 1);
+                CHECK(result.consumed == payload.size());
+                CHECK(result.wireFields == 2);
+                std::fill(payload.begin(), payload.end(), std::byte{0xff});
+                const auto &record = result.records[0];
+                CHECK(record.values.empty());
+                CHECK(record.typedValues ==
+                      std::vector<c::FieldValue>{{static_cast<c::SerialFieldType>(type), number<std::int64_t>(row[7])},
+                                                 {c::SerialFieldType::COMPACT_INT, number<std::int64_t>(row[8])}});
+                CHECK(record.symbol.units == u"IBM");
+                CHECK(record.senderId == 0);
+                CHECK(record.context.valid());
+            } else {
+                CHECK(row[5] == "0");
+                CHECK(row[6] == "1");
+                CHECK(result.status == p::StreamDataStatus::TRUNCATED_PAYLOAD);
+                CHECK(result.stage == p::StreamDataStage::FIELD);
+                CHECK(result.records.empty());
+                const bool sentinel = row[1].find("-sentinel-prefix-") != std::string::npos;
+                const auto sentinelBytes = row[1].ends_with("-1") ? 1 : 0;
+                CHECK(result.errorOffset == (sentinel ? payload.size() - sentinelBytes : 3));
+                CHECK(result.wireFields == (sentinel ? 2 : 1));
+            }
+
+            ++samples;
+        }
+
+        CHECK(complete);
+        CHECK(samples == 1106);
+    }
+}
+
+TEST_CASE("zero-width VOID keeps explicit source bindings distinct from dense local defaults") {
+    const auto declared = scalarContext(0, {{u"Sentinel", 8}, {u"Value", 0}, {u"skip", 0}, {u"Value", 0}});
+    const auto absent = scalarContext(0, {{u"Sentinel", 8}});
+    REQUIRE(declared.find(0));
+    REQUIRE(absent.find(0));
+    CHECK(declared.find(0)->binding.fields.size() == 4);
+    CHECK(absent.find(0)->binding.fields.size() == 1);
+    CHECK(declared.find(0)->binding.fields[1].targetFieldId == 0);
+    CHECK_FALSE(declared.find(0)->binding.fields[2].targetFieldId);
+    const auto payload = bytes({0x24, 0x4d, 0, 0x83, 0x91, 0x24, 0x4d, 0, 0x83, 0x91});
+
+    for (const bool raw : {false, true}) {
+        for (const auto allowance : {std::size_t{0}, std::size_t{3}, std::size_t{4}, std::size_t{5}}) {
+            auto budget = limits().data;
+            budget.wireFields = allowance;
+            const auto first = std::span(payload).first(5);
+            const auto result =
+                raw ? p::decodeRawData(first, declared, budget) : p::decodeStreamData(first, declared, budget);
+            CHECK(result.status == (allowance >= 4 ? p::StreamDataStatus::OK : p::StreamDataStatus::RESOURCE_LIMIT));
+            CHECK(result.wireFields == std::min(allowance, std::size_t{4}));
+            CHECK(result.consumed == (allowance == 0 ? 3 : 5));
+        }
+
+        for (const auto *context : {&declared, &absent}) {
+            const auto decoded = raw ? p::decodeRawData(payload, *context, limits().data)
+                                     : p::decodeStreamData(payload, *context, limits().data);
+            REQUIRE(decoded.status == p::StreamDataStatus::OK);
+            REQUIRE(decoded.records.size() == 2);
+            CHECK(decoded.wireFields == (context == &declared ? 8 : 2));
+
+            for (const auto &record : decoded.records) {
+                CHECK(record.typedValues == std::vector<c::FieldValue>{{c::SerialFieldType::VOID_FIELD, 0},
+                                                                       {c::SerialFieldType::COMPACT_INT, 913}});
+            }
+        }
+    }
+}
+
+TEST_CASE("binary scalar skips replacements failure prefixes and finite budgets share STREAM RAW charging") {
+    const auto context = scalarContext(1, {{u"Value", 1}, {u"skip", 3}, {u"Value", 1}, {u"Sentinel", 8}});
+    const auto payload = bytes({0x24, 0x4d, 0, 0x80, 0x80, 0x00, 0x7f, 0x83, 0x91});
+
+    for (const bool raw : {false, true}) {
+        for (const auto allowance : {std::size_t{0}, payload.size() - 1, payload.size(), payload.size() + 1}) {
+            auto budget = limits().data;
+            budget.payloadBytes = allowance;
+            const auto result =
+                raw ? p::decodeRawData(payload, context, budget) : p::decodeStreamData(payload, context, budget);
+            CHECK(result.status ==
+                  (allowance >= payload.size() ? p::StreamDataStatus::OK : p::StreamDataStatus::RESOURCE_LIMIT));
+            CHECK(result.processedRecords == (allowance >= payload.size() ? 1 : 0));
+        }
+
+        for (const auto allowance : {std::size_t{0}, std::size_t{1}, std::size_t{2}}) {
+            for (const bool recordOutput : {false, true}) {
+                auto budget = limits().data;
+
+                if (recordOutput) {
+                    budget.emittedRecords = allowance;
+                } else {
+                    budget.processedRecords = allowance;
+                }
+
+                const auto result =
+                    raw ? p::decodeRawData(payload, context, budget) : p::decodeStreamData(payload, context, budget);
+                CHECK(result.status ==
+                      (allowance >= 1 ? p::StreamDataStatus::OK : p::StreamDataStatus::RESOURCE_LIMIT));
+                CHECK(result.wireFields == (allowance >= 1 ? 4 : 0));
+            }
+        }
+
+        for (const auto allowance : {std::size_t{0}, std::size_t{2}, std::size_t{3}, std::size_t{4}}) {
+            auto budget = limits().data;
+            budget.ownedSymbolUnits = allowance;
+            const auto result =
+                raw ? p::decodeRawData(payload, context, budget) : p::decodeStreamData(payload, context, budget);
+            CHECK(result.status == (allowance >= 3 ? p::StreamDataStatus::OK : p::StreamDataStatus::RESOURCE_LIMIT));
+            CHECK(result.wireFields == (allowance >= 3 ? 4 : 0));
+        }
+
+        for (const auto allowance : {std::size_t{0}, std::size_t{3}, std::size_t{4}, std::size_t{5}}) {
+            auto budget = limits().data;
+            budget.wireFields = allowance;
+            const auto result =
+                raw ? p::decodeRawData(payload, context, budget) : p::decodeStreamData(payload, context, budget);
+            CHECK(result.wireFields == std::min(allowance, std::size_t{4}));
+
+            if (allowance >= 4) {
+                REQUIRE(result.status == p::StreamDataStatus::OK);
+                CHECK(result.records[0].typedValues[0].raw == 127);
+            } else {
+                CHECK(result.status == p::StreamDataStatus::RESOURCE_LIMIT);
+                CHECK(result.records.empty());
+            }
+        }
+
+        for (const auto allowance : {std::size_t{0}, std::size_t{1}, std::size_t{2}, std::size_t{3}}) {
+            auto budget = limits().data;
+            budget.emittedValues = allowance;
+            const auto result =
+                raw ? p::decodeRawData(payload, context, budget) : p::decodeStreamData(payload, context, budget);
+            CHECK(result.status == (allowance >= 2 ? p::StreamDataStatus::OK : p::StreamDataStatus::RESOURCE_LIMIT));
+            CHECK(result.wireFields == (allowance >= 2 ? 4 : 0));
+        }
+
+        auto two = payload;
+        two.insert(two.end(), payload.begin(), payload.begin() + 5);
+        const auto failed =
+            raw ? p::decodeRawData(two, context, limits().data) : p::decodeStreamData(two, context, limits().data);
+        CHECK(failed.status == p::StreamDataStatus::TRUNCATED_PAYLOAD);
+        CHECK(failed.records.size() == 1);
+        CHECK(failed.processedRecords == 2);
+        CHECK(failed.wireFields == 6);
+        CHECK(failed.errorOffset == payload.size() + 4);
+        CHECK(failed.consumed == two.size());
+        const auto malformedSkip = bytes({0x24, 0x4d, 0, 0x7f, 0x80});
+        const auto skipped = raw ? p::decodeRawData(malformedSkip, context, limits().data)
+                                 : p::decodeStreamData(malformedSkip, context, limits().data);
+        CHECK(skipped.status == p::StreamDataStatus::TRUNCATED_PAYLOAD);
+        CHECK(skipped.wireFields == 2);
+        CHECK(skipped.errorOffset == 4);
+        CHECK(skipped.consumed == 5);
+    }
+}
 
 TEST_CASE("original Java tapes retain all logical fields and raw timing under every chunk schedule") {
     for (const bool profile : {false, true}) {

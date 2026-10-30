@@ -1,0 +1,449 @@
+{
+  "format": "qdcxx-scalar-capture-v1",
+  "recordedUtc": "2026-10-30T14:18:23.6764403Z",
+  "javaRuntime": "Zulu 8.80.0.17, 1.8.0_422-b05",
+  "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
+  "javacSha256": "633143e961aa18051c09112b85333f5cdbd845b54eb39678eb15b91ca8bbb527",
+  "heapMiB": 128,
+  "sourceAndHelperHashes": [
+    {
+      "path": "include/qd/core/serial_field_type.hpp",
+      "sha256": "552602ecc85ca9a1d43813c2d043c5fcd92745eaa9a859082184d89fd64d3e95"
+    },
+    {
+      "path": "src/core/local_schema.cpp",
+      "sha256": "48068f0cf387618d7f9d7f55f46d09622aa0b5ba2918686433da0f368709c04b"
+    },
+    {
+      "path": "src/protocol/stream_data.cpp",
+      "sha256": "5b81f23e6c9962f0a5be6578b9e567a793763180fdf171d737c1a8e192fb0e7d"
+    },
+    {
+      "path": "src/protocol/tape_writer.cpp",
+      "sha256": "86970157a8c9fee70b688ded768d3a5af70e8c62e383a3694ee03ea945e220eb"
+    },
+    {
+      "path": "tests/conformance/field_type_value_tests.cpp",
+      "sha256": "0cad4a23d460ccb1bc1fb8480c76bc16f118ab96af4495fa4d6e0f0fe44c518d"
+    },
+    {
+      "path": "tests/conformance/field_type_tape_tests.cpp",
+      "sha256": "96ae2041e51607b889ea3502342806ff4c2005e36fa09eb46637d9cebe7c24a6"
+    },
+    {
+      "path": "tests/conformance/tape_writer_tests.cpp",
+      "sha256": "f91d9c086aaf51728d586ed3c5271008b43f6a4773b2f6ab739a6e172dba400d"
+    },
+    {
+      "path": "include/qd/protocol/stream_data.hpp",
+      "sha256": "6c465502514698d8e89623df77c3bbd39355ac5f40f67910f9d52768401b9942"
+    },
+    {
+      "path": "include/qd/protocol/tape_writer.hpp",
+      "sha256": "90c5b626923a491da18ebd52becfc06521271436510770ee42ee4898a133369c"
+    },
+    {
+      "path": "tests/conformance/field_type_io_tests.cpp",
+      "sha256": "dc59b4019abaf61f5064769151662a6180c6bc54adcad19b501681dd9d015472"
+    },
+    {
+      "path": "tools/upstream/field-types-oracle/FieldTypesOracle.java",
+      "sha256": "2f627e3748888d50453fbb037216612a7998b7174e2046cf7096224b594a6f12"
+    },
+    {
+      "path": "tools/upstream/field-types-oracle/Compare-FieldTypes.ps1",
+      "sha256": "18f861877662756e8650929ef2eab12b4556472f3c59be596dff1db7f8f73cd0"
+    },
+    {
+      "path": "tools/upstream/field-types-oracle/Invoke-Oracle.ps1",
+      "sha256": "190d619284eea0aad33b7d31f74a46a65f581312f39f6dcac41b9d5c3b409b89"
+    },
+    {
+      "path": "tools/upstream/field-types-oracle/Test-Negatives.ps1",
+      "sha256": "e2b86789c1fa4e99f87fd49e8579e157a4a760acd67896b14ac7dbfdea42fdae"
+    }
+  ],
+  "settings": {
+    "compression": "NONE",
+    "options": "EMPTY_SET",
+    "flags": 0,
+    "localHasTime": false,
+    "symbol": "IBM",
+    "sentinel": 913,
+    "streamTime": "NONE",
+    "rawTime": "MESSAGE",
+    "rawEventTimeSequence": "6871947674115899392"
+  },
+  "inheritedRootArtifacts": 82,
+  "baselineFullVerify": "PASS",
+  "negativeMutations": 23,
+  "runs": [
+    {
+      "producerVersion": "3.355",
+      "producerCommit": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+      "build": "clean reactor and complete baseline Verify",
+      "sources": [
+        {
+          "path": "qd-core/src/main/java/com/devexperts/qd/SerialFieldType.java",
+          "sha256": "3cd21dec85308505ee2036c575449928e5f9e8ab1970a19aeb970340e56b6d16"
+        },
+        {
+          "path": "qd-core/src/main/java/com/devexperts/qd/qtp/BinaryRecordDesc.java",
+          "sha256": "38591f97045e2bcce4c37befa024a7824bc5f63ae1cd19ddc5af17668563aec9"
+        },
+        {
+          "path": "qd-core/src/main/java/com/devexperts/qd/qtp/BinaryQTPComposer.java",
+          "sha256": "fd158524cc8b9ebbf63cbc4ba97f6a39e95a0e07368a6589f9a44b0dba1e42da"
+        },
+        {
+          "path": "qd-core/src/main/java/com/devexperts/qd/qtp/BinaryQTPParser.java",
+          "sha256": "785d4e9fec8129a6b2a6f0e875771e992183c20413614a43e6de3234775c02c8"
+        },
+        {
+          "path": "qd-core/src/main/java/com/devexperts/qd/kit/CompactIntField.java",
+          "sha256": "ef0cada588779b817c685a9ea6f4259dac6249ede8918e6b807c4bcc226e5b9c"
+        },
+        {
+          "path": "qd-core/src/main/java/com/devexperts/qd/kit/PlainIntField.java",
+          "sha256": "4c95fbba29ebdab2809731b5805a9e63bcec9c63d638a34a2d0e4442c05a75fd"
+        },
+        {
+          "path": "qd-core/src/main/java/com/devexperts/qd/kit/DecimalField.java",
+          "sha256": "0ff913ab4ad49fe37dd229fcdbec13e7277d4652a61200feaf1fed552dc67fb4"
+        },
+        {
+          "path": "qd-core/src/main/java/com/devexperts/qd/kit/LongField.java",
+          "sha256": "451d09b9148bfc9354d6399aef328f6bf91d59a53ef91d6e4df8d65f5e5623e9"
+        },
+        {
+          "path": "qd-core/src/main/java/com/devexperts/qd/kit/TimeMillisField.java",
+          "sha256": "8d4b031bcb274daf9cb495947b99ccd22c04ec49fd4bcc2e5a6a787aebf6fca8"
+        },
+        {
+          "path": "qd-core/src/main/java/com/devexperts/qd/kit/VoidIntField.java",
+          "sha256": "aa3e7aef2c25e388943fcc8fae21cc576fe01b4ac7c15a9f510f90fc11e0f0b5"
+        },
+        {
+          "path": "qd-core/src/main/java/com/devexperts/qd/kit/DefaultRecord.java",
+          "sha256": "bc04b1fcc8698b3dbdcc44c674243e2a99d1937349d57aaaf6ac0fc2ed985bec"
+        },
+        {
+          "path": "qd-core/src/main/java/com/devexperts/qd/ng/RecordCursor.java",
+          "sha256": "b765e929cc5736432c36661c847151278c9a3f94e352b492818c5456dedb724e"
+        },
+        {
+          "path": "dxlib/src/main/java/com/devexperts/io/BufferedInput.java",
+          "sha256": "740aab757acd847b0e0086449322a82f5c65ca133cb6fa4c26432e238ce60cd9"
+        },
+        {
+          "path": "dxlib/src/main/java/com/devexperts/io/BufferedInputPart.java",
+          "sha256": "983d4356cf4e55ef2687dedc785cfd0fd600b2a017bc269be5f3ae288f38ddfe"
+        },
+        {
+          "path": "qds-file/src/main/java/com/devexperts/qd/qtp/file/FileWriter.java",
+          "sha256": "9e51994733658673e52d2d94af6e66b268720964f42069287efd7d38b48b72e1"
+        },
+        {
+          "path": "qds-file/src/main/java/com/devexperts/qd/qtp/file/FileReader.java",
+          "sha256": "6114ca78e3da5de12ae1937a6d0c3184236a49328e8c028934744d4070a56271"
+        }
+      ],
+      "classpathFileCount": 1317,
+      "classpathManifestSha256": "c80ddb7bc899897fee7204fdb628f261f8a703adeca70066274c7309cbf3f470",
+      "artifacts": [
+        {
+          "name": "composer-0-raw.qtp",
+          "sha256": "fa20c00aad2bcfcacd896e90303c550436fe4ed9d29c3f52b5ec4f0e12fd9128"
+        },
+        {
+          "name": "composer-0.qtp",
+          "sha256": "cc541f1815b4bff158080b14e06227af759500d6d03b2728fa23ed001aa8cb36"
+        },
+        {
+          "name": "composer-1-raw.qtp",
+          "sha256": "5b0e5927f0ab8857f7d27537d8ed9146bcc48874e2c24659de0412f22a8960fb"
+        },
+        {
+          "name": "composer-1.qtp",
+          "sha256": "93cf941401d030fb3bd49a8912070a7a451630a065c0ace5e1ef8ca45e0275ad"
+        },
+        {
+          "name": "composer-104-raw.qtp",
+          "sha256": "64960f2af29255c8a67cd9ab76e907b099bd236369b34b0bd1b31f7fa8f86755"
+        },
+        {
+          "name": "composer-104.qtp",
+          "sha256": "4fa1dd32927ba5672edecb796015d3037dc0c89525a40251c0972381cb20cf0c"
+        },
+        {
+          "name": "composer-152-raw.qtp",
+          "sha256": "94c3c3ee9c47a2a7355577d1134ffe7f3a5b602f43f6c176bcf7a964be7bd735"
+        },
+        {
+          "name": "composer-152.qtp",
+          "sha256": "79031ad9d7ec9d03e2f0cf495a2cb5596faad1d6b523f115d34916a7f21e37de"
+        },
+        {
+          "name": "composer-24-raw.qtp",
+          "sha256": "f92187cd41b12844b69c0376772f943e6e9e83550603d5c67a613409bf4a8bfe"
+        },
+        {
+          "name": "composer-24.qtp",
+          "sha256": "8a3114f2389ebedf01c760176a9b64bb7fe89478bd98066d4cbb761248f179d7"
+        },
+        {
+          "name": "composer-3-raw.qtp",
+          "sha256": "e770656093a7c32c9adfc26180014d1093a16a59e708850d5817c480793c80f4"
+        },
+        {
+          "name": "composer-3.qtp",
+          "sha256": "ec28fda2e8a687f2e10035a43fb726a528eed018a78004cd944aa97ac73686b1"
+        },
+        {
+          "name": "composer-4-raw.qtp",
+          "sha256": "ca9ab2151928741cbd8262e1db02fffcd505b96a1c7fcfc606d2f0a619928d5f"
+        },
+        {
+          "name": "composer-4.qtp",
+          "sha256": "02751246653ba8385da1481b5340c725e25e9e57f55be0b829a3cf01818e6bee"
+        },
+        {
+          "name": "file-0-raw.qtp",
+          "sha256": "553f7ce72a580d8272b488393963f1693bd483969eec01afa586db1cf35f5544"
+        },
+        {
+          "name": "file-0.qtp",
+          "sha256": "0bff52676b0a56eee7bf73f66f0b93554edd45dcdf35096a20a6e0405fa99dd0"
+        },
+        {
+          "name": "file-104-raw.qtp",
+          "sha256": "bbdb586caa61c11f7c80955e603c6b52b336e8fc271fb8e234ac26bbd62f4269"
+        },
+        {
+          "name": "file-104.qtp",
+          "sha256": "4b1d08a7f040a48a0cd532a2e3d7bc8d8c3a19bd87b192043b61f479418e13dd"
+        },
+        {
+          "name": "file-152-raw.qtp",
+          "sha256": "cb9dd8bbf2659cbc9ae3a1321642897a6576487bdf6469f48486c06e9a2d01c1"
+        },
+        {
+          "name": "file-152.qtp",
+          "sha256": "4265f7e87164f4e59f0bcc63791d151c998f432f5073b1c0dc739988fa3d5ded"
+        },
+        {
+          "name": "file-24-raw.qtp",
+          "sha256": "53866f7c5d3731db4920ae68faa19257da7fc4fd6483d0a2a261380462b39232"
+        },
+        {
+          "name": "file-24.qtp",
+          "sha256": "b40c6889eb52b2aaf0c482147e75e1f2a759e7afd3948b55512423d65174ceb4"
+        },
+        {
+          "name": "file-4-raw.qtp",
+          "sha256": "1d327137ff6f7d87ae8688c9da29811d4e5979b59fa422e60650de3b90b1568c"
+        },
+        {
+          "name": "file-4.qtp",
+          "sha256": "882d0a9c5ecae66bd39d8788f513ede525b2a7a80090e099a6556c77f8c8a34f"
+        },
+        {
+          "name": "samples.tsv",
+          "sha256": "6f1c3504b86261d21a72277f37c7cdbcc547e40b07efa686a44212ca784a24f0"
+        }
+      ],
+      "parserSamples": 1106,
+      "requestedComposerCaptures": 14,
+      "fileWriterCaptures": 10,
+      "repeat": "all 25 artifacts byte-identical",
+      "javaRawCallbacksPerWireRecord": 3,
+      "javaStreamCallbacksPerWireRecord": 1
+    },
+    {
+      "producerVersion": "3.356",
+      "producerCommit": "f71e4cb390d1586f2d4e3a83d9b9067e3326ef19",
+      "build": "reused verified clean pinned classes; fresh scalar capture and repeat",
+      "sources": [
+        {
+          "path": "qd-core/src/main/java/com/devexperts/qd/SerialFieldType.java",
+          "sha256": "3cd21dec85308505ee2036c575449928e5f9e8ab1970a19aeb970340e56b6d16"
+        },
+        {
+          "path": "qd-core/src/main/java/com/devexperts/qd/qtp/BinaryRecordDesc.java",
+          "sha256": "38591f97045e2bcce4c37befa024a7824bc5f63ae1cd19ddc5af17668563aec9"
+        },
+        {
+          "path": "qd-core/src/main/java/com/devexperts/qd/qtp/BinaryQTPComposer.java",
+          "sha256": "fd158524cc8b9ebbf63cbc4ba97f6a39e95a0e07368a6589f9a44b0dba1e42da"
+        },
+        {
+          "path": "qd-core/src/main/java/com/devexperts/qd/qtp/BinaryQTPParser.java",
+          "sha256": "785d4e9fec8129a6b2a6f0e875771e992183c20413614a43e6de3234775c02c8"
+        },
+        {
+          "path": "qd-core/src/main/java/com/devexperts/qd/kit/CompactIntField.java",
+          "sha256": "ef0cada588779b817c685a9ea6f4259dac6249ede8918e6b807c4bcc226e5b9c"
+        },
+        {
+          "path": "qd-core/src/main/java/com/devexperts/qd/kit/PlainIntField.java",
+          "sha256": "4c95fbba29ebdab2809731b5805a9e63bcec9c63d638a34a2d0e4442c05a75fd"
+        },
+        {
+          "path": "qd-core/src/main/java/com/devexperts/qd/kit/DecimalField.java",
+          "sha256": "0ff913ab4ad49fe37dd229fcdbec13e7277d4652a61200feaf1fed552dc67fb4"
+        },
+        {
+          "path": "qd-core/src/main/java/com/devexperts/qd/kit/LongField.java",
+          "sha256": "451d09b9148bfc9354d6399aef328f6bf91d59a53ef91d6e4df8d65f5e5623e9"
+        },
+        {
+          "path": "qd-core/src/main/java/com/devexperts/qd/kit/TimeMillisField.java",
+          "sha256": "8d4b031bcb274daf9cb495947b99ccd22c04ec49fd4bcc2e5a6a787aebf6fca8"
+        },
+        {
+          "path": "qd-core/src/main/java/com/devexperts/qd/kit/VoidIntField.java",
+          "sha256": "aa3e7aef2c25e388943fcc8fae21cc576fe01b4ac7c15a9f510f90fc11e0f0b5"
+        },
+        {
+          "path": "qd-core/src/main/java/com/devexperts/qd/kit/DefaultRecord.java",
+          "sha256": "bc04b1fcc8698b3dbdcc44c674243e2a99d1937349d57aaaf6ac0fc2ed985bec"
+        },
+        {
+          "path": "qd-core/src/main/java/com/devexperts/qd/ng/RecordCursor.java",
+          "sha256": "b765e929cc5736432c36661c847151278c9a3f94e352b492818c5456dedb724e"
+        },
+        {
+          "path": "dxlib/src/main/java/com/devexperts/io/BufferedInput.java",
+          "sha256": "740aab757acd847b0e0086449322a82f5c65ca133cb6fa4c26432e238ce60cd9"
+        },
+        {
+          "path": "dxlib/src/main/java/com/devexperts/io/BufferedInputPart.java",
+          "sha256": "983d4356cf4e55ef2687dedc785cfd0fd600b2a017bc269be5f3ae288f38ddfe"
+        },
+        {
+          "path": "qds-file/src/main/java/com/devexperts/qd/qtp/file/FileWriter.java",
+          "sha256": "9e51994733658673e52d2d94af6e66b268720964f42069287efd7d38b48b72e1"
+        },
+        {
+          "path": "qds-file/src/main/java/com/devexperts/qd/qtp/file/FileReader.java",
+          "sha256": "6114ca78e3da5de12ae1937a6d0c3184236a49328e8c028934744d4070a56271"
+        }
+      ],
+      "classpathFileCount": 1317,
+      "classpathManifestSha256": "fb39c2c91daab1513de17e2b2ef9e9327e1eb4e2c8975d5210990b8b138b3098",
+      "artifacts": [
+        {
+          "name": "composer-0-raw.qtp",
+          "sha256": "fa20c00aad2bcfcacd896e90303c550436fe4ed9d29c3f52b5ec4f0e12fd9128"
+        },
+        {
+          "name": "composer-0.qtp",
+          "sha256": "cc541f1815b4bff158080b14e06227af759500d6d03b2728fa23ed001aa8cb36"
+        },
+        {
+          "name": "composer-1-raw.qtp",
+          "sha256": "5b0e5927f0ab8857f7d27537d8ed9146bcc48874e2c24659de0412f22a8960fb"
+        },
+        {
+          "name": "composer-1.qtp",
+          "sha256": "93cf941401d030fb3bd49a8912070a7a451630a065c0ace5e1ef8ca45e0275ad"
+        },
+        {
+          "name": "composer-104-raw.qtp",
+          "sha256": "64960f2af29255c8a67cd9ab76e907b099bd236369b34b0bd1b31f7fa8f86755"
+        },
+        {
+          "name": "composer-104.qtp",
+          "sha256": "4fa1dd32927ba5672edecb796015d3037dc0c89525a40251c0972381cb20cf0c"
+        },
+        {
+          "name": "composer-152-raw.qtp",
+          "sha256": "94c3c3ee9c47a2a7355577d1134ffe7f3a5b602f43f6c176bcf7a964be7bd735"
+        },
+        {
+          "name": "composer-152.qtp",
+          "sha256": "79031ad9d7ec9d03e2f0cf495a2cb5596faad1d6b523f115d34916a7f21e37de"
+        },
+        {
+          "name": "composer-24-raw.qtp",
+          "sha256": "f92187cd41b12844b69c0376772f943e6e9e83550603d5c67a613409bf4a8bfe"
+        },
+        {
+          "name": "composer-24.qtp",
+          "sha256": "8a3114f2389ebedf01c760176a9b64bb7fe89478bd98066d4cbb761248f179d7"
+        },
+        {
+          "name": "composer-3-raw.qtp",
+          "sha256": "e770656093a7c32c9adfc26180014d1093a16a59e708850d5817c480793c80f4"
+        },
+        {
+          "name": "composer-3.qtp",
+          "sha256": "ec28fda2e8a687f2e10035a43fb726a528eed018a78004cd944aa97ac73686b1"
+        },
+        {
+          "name": "composer-4-raw.qtp",
+          "sha256": "ca9ab2151928741cbd8262e1db02fffcd505b96a1c7fcfc606d2f0a619928d5f"
+        },
+        {
+          "name": "composer-4.qtp",
+          "sha256": "02751246653ba8385da1481b5340c725e25e9e57f55be0b829a3cf01818e6bee"
+        },
+        {
+          "name": "file-0-raw.qtp",
+          "sha256": "553f7ce72a580d8272b488393963f1693bd483969eec01afa586db1cf35f5544"
+        },
+        {
+          "name": "file-0.qtp",
+          "sha256": "0bff52676b0a56eee7bf73f66f0b93554edd45dcdf35096a20a6e0405fa99dd0"
+        },
+        {
+          "name": "file-104-raw.qtp",
+          "sha256": "bbdb586caa61c11f7c80955e603c6b52b336e8fc271fb8e234ac26bbd62f4269"
+        },
+        {
+          "name": "file-104.qtp",
+          "sha256": "4b1d08a7f040a48a0cd532a2e3d7bc8d8c3a19bd87b192043b61f479418e13dd"
+        },
+        {
+          "name": "file-152-raw.qtp",
+          "sha256": "cb9dd8bbf2659cbc9ae3a1321642897a6576487bdf6469f48486c06e9a2d01c1"
+        },
+        {
+          "name": "file-152.qtp",
+          "sha256": "4265f7e87164f4e59f0bcc63791d151c998f432f5073b1c0dc739988fa3d5ded"
+        },
+        {
+          "name": "file-24-raw.qtp",
+          "sha256": "53866f7c5d3731db4920ae68faa19257da7fc4fd6483d0a2a261380462b39232"
+        },
+        {
+          "name": "file-24.qtp",
+          "sha256": "b40c6889eb52b2aaf0c482147e75e1f2a759e7afd3948b55512423d65174ceb4"
+        },
+        {
+          "name": "file-4-raw.qtp",
+          "sha256": "1d327137ff6f7d87ae8688c9da29811d4e5979b59fa422e60650de3b90b1568c"
+        },
+        {
+          "name": "file-4.qtp",
+          "sha256": "882d0a9c5ecae66bd39d8788f513ede525b2a7a80090e099a6556c77f8c8a34f"
+        },
+        {
+          "name": "samples.tsv",
+          "sha256": "6f1c3504b86261d21a72277f37c7cdbcc547e40b07efa686a44212ca784a24f0"
+        }
+      ],
+      "parserSamples": 1106,
+      "requestedComposerCaptures": 14,
+      "fileWriterCaptures": 10,
+      "repeat": "all 25 artifacts byte-identical",
+      "javaRawCallbacksPerWireRecord": 3,
+      "javaStreamCallbacksPerWireRecord": 1
+    }
+  ],
+  "limits": [
+    "BYTE/SHORT requested composer uses consumer8; no default BYTE/SHORT FileWriter field",
+    "VOID producer elision/default-zero is not delivered logical-field evidence",
+    "No object/indexed/new-mode/flags/business-conversion acceptance"
+  ]
+}

@@ -938,6 +938,34 @@ std::optional<p::WriterDiagnostic> contractRun(p::WriterLimits limits, Capture *
     return actions(*writer, input, records(input), capture);
 }
 
+TEST_CASE("read-only binary field profile refuses outgoing layouts before allocation or traversal") {
+    for (const auto type : {-1, 0, 1, 8, 104}) {
+        std::vector<c::LocalRecord> records;
+
+        if (type >= 0) {
+            records.push_back({0, u"R", false, {{type}}, {{u"Value", 0}}});
+        }
+
+        auto schema = c::LocalSchema::create(records, {1, 1, 1, 5, 6}, c::LocalProfile::BINARY_FIELDS_V1);
+        REQUIRE(schema);
+        const std::vector<p::OutgoingRecord> outgoing{{-1, -1, u"invalid", {}}};
+
+        for (const bool empty : {false, true}) {
+            const auto declarations = empty ? std::span<const p::OutgoingRecord>{} : std::span(outgoing);
+            allocation_test::remaining = 0;
+            allocation_test::enabled = true;
+            const auto result = p::OutgoingLayouts::create(*schema, declarations, {});
+            allocation_test::enabled = false;
+            REQUIRE_FALSE(result);
+            CHECK(result.error().error == p::WriterError::UNSUPPORTED);
+            CHECK(result.error().operation == p::WriterOperation::LAYOUT);
+            CHECK(result.error().stage == "profile");
+            CHECK_FALSE(result.error().record);
+            CHECK_FALSE(result.error().field);
+        }
+    }
+}
+
 TEST_CASE("writer executes the immutable JSON action contract and semantic reader round trip") {
     const auto input = fixtureJson("writer-cases.json");
     CHECK(input.at("format").text() == "qdcxx-tape-writer-contract");

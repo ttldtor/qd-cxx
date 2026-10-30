@@ -108,7 +108,7 @@ struct StreamDataRecord {
     std::int32_t localId;                      ///< Local schema ID, never sender identity.
     encoding::SymbolValue symbol;              ///< Exact owned UTF-16 and raw encoding metadata.
     std::vector<std::int32_t> values;          ///< Legacy profile only, local order; empty for the extended profile.
-    std::vector<core::FieldValue> typedValues; ///< Extended profile only, exact local tags/raw values.
+    std::vector<core::FieldValue> typedValues; ///< Every non-compact profile, with exact local tags/raw values.
     core::RecordContext context{}; ///< Source schema/record identity; old aggregate initializers remain untagged.
     std::int32_t senderId = -1;    ///< Owned exact wire ID; -1 only for caller-created records without source identity.
 };
@@ -129,6 +129,7 @@ struct StreamDataResult {
 };
 
 /** Decode one complete type-15 payload with fresh message-local symbol state.
+ * The context selects exact field support; BINARY_FIELDS_V1 adds only its ordinary scalar subset.
  * @param payload Borrowed payload excluding length/type, unchanged during this call.
  * @param context Validated static snapshot, borrowed during this call.
  * @param limits Required finite per-message budgets.
@@ -136,7 +137,7 @@ struct StreamDataResult {
  */
 [[nodiscard]] StreamDataResult decodeStreamData(std::span<const std::byte> payload, const StreamDataContext &context,
                                                 StreamDataLimits limits);
-/** Decode one complete type-5 payload under RAW-TAPE's exact fields and zero-flags policy.
+/** Decode one complete type-5 payload under the context's exact fields and RAW-TAPE's zero-flags policy.
  * This is one wire-record projection, without Java ticker/history callback fan-out or timing state.
  * @param payload Borrowed payload excluding length/type, unchanged during this call.
  * @param context Validated static snapshot, borrowed during this call.

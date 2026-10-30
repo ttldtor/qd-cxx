@@ -112,6 +112,7 @@ class OutgoingLayouts {
      */
     OutgoingLayouts &operator=(OutgoingLayouts &&other) = delete;
     /** Validate complete bijective coverage before publishing owned declarations.
+     * Read-only BINARY_FIELDS_V1 schemas are refused before allocation, including empty layouts.
      * @param schema Validated local schema, borrowed only for this call.
      * @param records Ordered outgoing declarations, borrowed only for this call.
      * @param limits Required finite copy bounds; zero is a real allowance.
