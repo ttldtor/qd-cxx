@@ -1,0 +1,2 @@
+# Producer captures and their provenance retain the original recorded bytes.
+producer/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol

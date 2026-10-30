@@ -3,3 +3,16 @@
 *.json text eol=lf
 *.stdout text eol=lf
 *.stderr text eol=lf
+
+# These production captures and their inventories retain their original bytes.
+*-captures.json -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+expected/scalars/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+expected/objects/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+expected/indexed/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+expected/flags/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+expected/dispatch/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+current-scalar-expected/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+current-object-expected/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+current-indexed-expected/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+# Empty final TSV cells are significant production observations.
+expected/flags/observations.tsv -whitespace

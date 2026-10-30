@@ -522,3 +522,5 @@ tests/fixtures/encoding/field-types/current-*-expected/** -text whitespace=blank
 tests/fixtures/encoding/field-types/*-captures.json -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
 tests/fixtures/protocol/real-tape/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
 tests/fixtures/protocol/real-tape/*.md text eol=lf
+tests/conformance/binary_catalog_cli.cmake -text
+tests/conformance/wire_inventory_cli.cmake -text
