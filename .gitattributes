@@ -510,15 +510,15 @@ tests/conformance/replay/evidence/profiles/** -text -whitespace
 tests/conformance/replay/evidence/*.tsv -text -whitespace
 
 # Oracle source hashes and binary tape evidence retain their exact captured bytes.
-tools/upstream/field-types-oracle/*.ps1 -text
-tools/upstream/raw-tape-oracle/*.ps1 -text
-tools/upstream/real-tape-corpus/** -text
-tools/upstream/real-tape-acceptance/** -text
+tools/upstream/field-types-oracle/*.ps1 -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+tools/upstream/raw-tape-oracle/*.ps1 -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+tools/upstream/real-tape-corpus/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+tools/upstream/real-tape-acceptance/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
 tools/upstream/real-tape-corpus/*.md text eol=lf
 tools/upstream/real-tape-acceptance/*.md text eol=lf
-tests/conformance/protocol/real-tape/*.ps1 -text
-tests/fixtures/encoding/field-types/expected/** -text
-tests/fixtures/encoding/field-types/current-*-expected/** -text
-tests/fixtures/encoding/field-types/*-captures.json -text
-tests/fixtures/protocol/real-tape/** -text
+tests/conformance/protocol/real-tape/*.ps1 -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+tests/fixtures/encoding/field-types/expected/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+tests/fixtures/encoding/field-types/current-*-expected/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+tests/fixtures/encoding/field-types/*-captures.json -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+tests/fixtures/protocol/real-tape/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
 tests/fixtures/protocol/real-tape/*.md text eol=lf
