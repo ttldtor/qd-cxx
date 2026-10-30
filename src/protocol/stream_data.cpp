@@ -330,7 +330,7 @@ StreamDataResult decodeDataPayload(std::span<const std::byte> payload, const Str
             if (plan->binding.localRecordId) {
                 const auto units = symbol.value->units.size();
                 result.records.push_back({*plan->binding.localRecordId, std::move(*symbol.value), std::move(values),
-                                          std::move(typedValues), plan->context});
+                                          std::move(typedValues), plan->context, id.value});
                 --limits.emittedRecords;
                 limits.emittedValues -= plan->localFieldCount;
                 limits.ownedSymbolUnits -= units;

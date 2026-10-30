@@ -1,5 +1,19 @@
 # Bounded C++23 components
 
+## Explicit ordinary wire discovery
+
+Include `qd/protocol/tape_reader.hpp`, link `qdcxx_protocol` and construct
+`TapeReader(limits, TapeMode::LEGACY)` for the opt-in ordinary wire schema.
+The existing `TapeReader(schema, limits, mode)` remains supplied-schema binding.
+`schema()` exposes current immutable declarations, `descriptions()` exact accepted
+source order, and completed records own their exact senderId. Borrowed views expire
+on successful description updates; retain an explicit boundedCopy when old schema
+declarations are needed. [WIRE-INVENTORY](../spec/schema/WIRE-INVENTORY.md) defines
+provenance, first-seen IDs, full-union preflight, finite construction charges and
+refusals. No new dependency or CMake option is required. With tape inspection
+enabled, `wire_inventory_schema` and `wire_inventory_cli` add focused tests;
+`--wire-schema ordinary-v1` selects self-describing output 7 independently of JSON.
+
 [Русская версия](CPP-BUILD.ru.md). English is authoritative.
 
 ## Bounded in-memory tape writer

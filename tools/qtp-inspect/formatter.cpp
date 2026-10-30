@@ -263,8 +263,14 @@ std::string Formatter::frame(const protocol::Frame &frame, std::size_t index, st
 
 std::string Formatter::record(const protocol::StreamDataRecord &record, std::u16string_view name,
                               std::size_t frameIndex, std::size_t index, std::size_t budget,
-                              const protocol::TapeTiming *timing) const {
-    if (profile_ == DisplayProfile::ORACLE_FIELD_TYPES_V1 || profile_ == DisplayProfile::EXTERNAL_SCHEMA_V1) {
+                              const protocol::TapeTiming *timing, std::size_t generation) const {
+    const bool wire = profile_ == DisplayProfile::WIRE_SCHEMA_V1;
+
+    if (profile_ == DisplayProfile::ORACLE_FIELD_TYPES_V1 || profile_ == DisplayProfile::EXTERNAL_SCHEMA_V1 || wire) {
+        if (wire && (record.senderId < 0 || generation == 0)) {
+            throw std::invalid_argument("missing source metadata");
+        }
+
         if (!record.values.empty()) {
             throw std::invalid_argument("typed field representation");
         }
@@ -277,10 +283,18 @@ std::string Formatter::record(const protocol::StreamDataRecord &record, std::u16
 
         return build(budget, [&](Row &row) {
             const bool tsv = format_ == OutputFormat::TSV;
-            row.add(tsv ? "field-record\t" : "Fields ");
+            row.add(tsv ? (wire ? "wire-data\t" : "field-record\t") : "Fields ");
             row.number(tsv ? frameIndex : index);
             row.add(tsv ? "\t" : ": frame=");
             row.number(tsv ? index : frameIndex);
+
+            if (wire) {
+                row.add(tsv ? "\t" : " generation=");
+                row.number(generation);
+                row.add(tsv ? "\t" : " sender=");
+                row.number(record.senderId);
+            }
+
             row.add(tsv ? "\t" : " local=");
             row.number(record.localId);
             row.add(tsv ? "\t" : " name=");
@@ -341,7 +355,26 @@ std::string Formatter::record(const protocol::StreamDataRecord &record, std::u16
                 }
             }
 
-            row.add(tsv ? "\n" : "}\n");
+            if (!tsv) {
+                row.add("}");
+            }
+
+            if (wire && timing) {
+                row.add(tsv ? "\t" : " timestamp-ms=");
+
+                if (timing->timestampMs) {
+                    row.number(*timing->timestampMs);
+                } else {
+                    row.add(tsv ? "-" : "absent");
+                }
+
+                row.add(tsv ? "\t" : " sequence=");
+                row.number(timing->eventTimeSequence);
+                row.add(tsv ? "\t" : " event-time-ms=");
+                row.number(timing->eventTimeMs());
+            }
+
+            row.add("\n");
         });
     }
 
@@ -672,9 +705,160 @@ std::string Formatter::complete(std::uint64_t bytes, std::size_t frames, std::si
     });
 }
 
+std::string Formatter::wireSchema(std::size_t frameIndex, std::size_t generation, std::size_t records,
+                                  std::size_t descriptions, std::size_t budget) const {
+    return build(budget, [&](Row &row) {
+        const auto separator = format_ == OutputFormat::TSV ? "\t" : " ";
+
+        row.add("schema");
+        row.add(separator);
+        row.number(frameIndex);
+        row.add(separator);
+        row.number(generation);
+        row.add(separator);
+        row.number(records);
+        row.add(separator);
+        row.number(descriptions);
+        row.add("\n");
+    });
+}
+
+std::string Formatter::wireLocalRecord(std::size_t generation, const core::LocalRecord &record,
+                                       std::size_t budget) const {
+    if (record.lookups.size() != record.fields.size()) {
+        throw std::invalid_argument("wire local lookup shape");
+    }
+
+    return build(budget, [&](Row &row) {
+        const bool tsv = format_ == OutputFormat::TSV;
+        const auto separator = tsv ? "\t" : " ";
+
+        row.add("schema-record");
+        row.add(separator);
+        row.number(generation);
+        row.add(separator);
+        row.number(record.id);
+        row.add(separator);
+
+        if (tsv) {
+            row.units(record.name);
+        } else {
+            row.quote(record.name);
+        }
+
+        row.add(separator);
+        row.number(record.hasTime ? 1 : 0);
+        row.add(separator);
+        row.number(record.fields.size());
+        row.add("\n");
+
+        for (std::size_t index = 0; index < record.fields.size(); ++index) {
+            if (record.lookups[index].fieldId != index) {
+                throw std::invalid_argument("wire local lookup order");
+            }
+
+            row.add("schema-field");
+            row.add(separator);
+            row.number(generation);
+            row.add(separator);
+            row.number(record.id);
+            row.add(separator);
+            row.number(index);
+            row.add(separator);
+
+            if (tsv) {
+                row.units(record.lookups[index].name);
+            } else {
+                row.quote(record.lookups[index].name);
+            }
+
+            row.add(separator);
+            row.number(record.fields[index].serialTypeId);
+            row.add("\n");
+        }
+    });
+}
+
+std::string Formatter::wireDescription(std::size_t generation, std::size_t index,
+                                       const protocol::WireRecordDescription &record,
+                                       const protocol::StreamRecordPlan &plan, std::size_t budget) const {
+    if (plan.binding.senderId != record.senderId || !plan.binding.localRecordId ||
+        plan.binding.fields.size() != record.fields.size()) {
+        throw std::invalid_argument("wire source binding");
+    }
+
+    return build(budget, [&](Row &row) {
+        const bool tsv = format_ == OutputFormat::TSV;
+        const auto separator = tsv ? "\t" : " ";
+
+        row.add("wire-record");
+        row.add(separator);
+        row.number(generation);
+        row.add(separator);
+        row.number(index);
+        row.add(separator);
+        row.number(record.senderId);
+        row.add(separator);
+        row.number(*plan.binding.localRecordId);
+        row.add(separator);
+
+        if (tsv) {
+            row.units(record.name);
+        } else {
+            row.quote(record.name);
+        }
+
+        row.add(separator);
+        row.number(record.fields.size());
+        row.add("\n");
+
+        for (std::size_t field = 0; field < record.fields.size(); ++field) {
+            const auto &action = plan.binding.fields[field];
+
+            if (!action.targetFieldId || std::to_underlying(action.type) != record.fields[field].serialTypeId) {
+                throw std::invalid_argument("wire source field binding");
+            }
+
+            row.add("wire-field");
+            row.add(separator);
+            row.number(generation);
+            row.add(separator);
+            row.number(record.senderId);
+            row.add(separator);
+            row.number(field);
+            row.add(separator);
+
+            if (tsv) {
+                row.units(record.fields[field].name);
+            } else {
+                row.quote(record.fields[field].name);
+            }
+
+            row.add(separator);
+            row.number(record.fields[field].serialTypeId);
+            row.add(separator);
+            row.number(*action.targetFieldId);
+            row.add("\n");
+        }
+    });
+}
+
+std::string Formatter::wireSchemaEnd(std::size_t generation, std::size_t budget) const {
+    return build(budget, [&](Row &row) {
+        row.add(format_ == OutputFormat::TSV ? "schema-end\t" : "schema-end ");
+        row.number(generation);
+        row.add("\n");
+    });
+}
+
 std::string Formatter::tapeHeader(std::size_t budget) const {
     return build(budget, [&](Row &row) {
-        if (profile_ == DisplayProfile::EXTERNAL_SCHEMA_V1) {
+        if (profile_ == DisplayProfile::WIRE_SCHEMA_V1) {
+            row.add(
+                format_ == OutputFormat::TSV
+                    ? "format\tqdcxx-tape-inspect\t7\tordinary-v1\tlegacy\n"
+                    : "qdcxx-tape-inspect human 7 profile=ordinary-v1 tape-mode=legacy identities=local-and-sender\n");
+        } else if (profile_ == DisplayProfile::EXTERNAL_SCHEMA_V1) {
             row.add(format_ == OutputFormat::TSV
                         ? "format\tqdcxx-tape-inspect\t6\texternal-schema-v1\tlegacy\n"
                         : "qdcxx-tape-inspect human 6 profile=external-schema-v1 tape-mode=legacy identities=local\n");
@@ -755,6 +939,14 @@ std::string Formatter::tapeFrame(const protocol::Frame &value, std::size_t index
 std::string Formatter::rawTapeHeader(std::size_t budget) const {
     return build(budget, [&](Row &row) {
         const bool tsv = format_ == OutputFormat::TSV;
+
+        if (profile_ == DisplayProfile::WIRE_SCHEMA_V1) {
+            row.add(tsv ? "format\tqdcxx-tape-inspect\t7\tordinary-v1\traw-message-v1\n"
+                        : "qdcxx-tape-inspect human 7 profile=ordinary-v1 tape-mode=raw-message-v1 "
+                          "identities=local-and-sender\n");
+
+            return;
+        }
 
         if (profile_ == DisplayProfile::EXTERNAL_SCHEMA_V1) {
             row.add(tsv ? "format\tqdcxx-tape-inspect\t6\texternal-schema-v1\traw-message-v1\n"

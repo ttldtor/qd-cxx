@@ -97,24 +97,29 @@ int main(int argc, char **argv) {
             {"--max-timing-events", &t.timingEvents}};
 
         if (argc == 1 || (argc == 2 && std::string_view(argv[1]) == "--help")) {
-            std::cout << "qdcxx-tape-inspect --input PATH (--schema PATH | --profile "
-                         "oracle-sre-v1|default-quote-v1|default-profile-v1|oracle-field-types-v1) [--output-format "
-                         "tsv|human] [--diagnostics-version 1|2] [--tape-mode legacy|raw-message-v1] [LIMIT "
-                         "VALUE ...]\n"
-                         "Explicit BINARY, uncompressed, time NONE, EMPTY_SET, STREAM_DATA, zero flags.\n"
-                         "oracle-sre-v1: diagnostic S/R/E, exact type 8, diagnostics default 1.\n"
-                         "default-quote-v1: composite Quote, exact types 2/8/56/120, diagnostics default 2.\n"
-                         "default-profile-v1: complete Profile, exact types 8/10/56/88/120; output 5, diagnostics "
-                         "default 2.\n"
-                         "oracle-field-types-v1: diagnostic FieldTypes, exact 2/8/10/40/56/72/88/120; output 4, "
-                         "diagnostics default 2.\n"
-                         "--schema PATH: native resolved JSON, generic typed output 6, diagnostics default 2.\n"
-                         "Exactly one schema source is required; external schema loads before tape IO.\n"
-                         "--tape-mode raw-message-v1: explicit BINARY/RAW_DATA/MESSAGE, opt absent/empty/hs, zero "
-                         "flags; timed output 3 (4 for oracle-field-types-v1, 5 for default-profile-v1).\n"
-                         "Omitted tape-mode or legacy preserves the restricted NONE/STREAM_DATA policy.\n"
-                         "No stdin, network, recovery or general tape support.\n"
-                         "Numeric limits are finite unsigned decimal; chunk-size must be positive. Defaults:\n";
+            std::cout
+                << "qdcxx-tape-inspect --input PATH (--schema PATH | --profile "
+                   "oracle-sre-v1|default-quote-v1|default-profile-v1|oracle-field-types-v1 | --wire-schema "
+                   "ordinary-v1) [--output-format "
+                   "tsv|human] [--diagnostics-version 1|2] [--tape-mode legacy|raw-message-v1] [LIMIT "
+                   "VALUE ...]\n"
+                   "Explicit BINARY, uncompressed, time NONE, EMPTY_SET, STREAM_DATA, zero flags.\n"
+                   "oracle-sre-v1: diagnostic S/R/E, exact type 8, diagnostics default 1.\n"
+                   "default-quote-v1: composite Quote, exact types 2/8/56/120, diagnostics default 2.\n"
+                   "default-profile-v1: complete Profile, exact types 8/10/56/88/120; output 5, diagnostics "
+                   "default 2.\n"
+                   "oracle-field-types-v1: diagnostic FieldTypes, exact 2/8/10/40/56/72/88/120; output 4, "
+                   "diagnostics default 2.\n"
+                   "--schema PATH: native resolved JSON, generic typed output 6, diagnostics default 2.\n"
+                   "--wire-schema ordinary-v1: explicit ordinary exact 2/8/10/40/56/72/88/120 discovery; "
+                   "self-describing output 7 with names, source IDs/order and successful generations.\n"
+                   "Wire schema limits apply before owned union construction; JSON byte/depth limits are loader-only.\n"
+                   "Exactly one schema source is required; external schema loads before tape IO.\n"
+                   "--tape-mode raw-message-v1: explicit BINARY/RAW_DATA/MESSAGE, opt absent/empty/hs, zero "
+                   "flags; timed output 3 (4 for oracle-field-types-v1, 5 for default-profile-v1).\n"
+                   "Omitted tape-mode or legacy preserves the restricted NONE/STREAM_DATA policy.\n"
+                   "No stdin, network, recovery or general tape support.\n"
+                   "Numeric limits are finite unsigned decimal; chunk-size must be positive. Defaults:\n";
 
             for (const auto &[name, value] : options) {
                 std::cout << name << ' ' << *value << '\n';
@@ -136,6 +141,7 @@ int main(int argc, char **argv) {
         std::string path;
         std::string profile;
         std::string schemaPath;
+        std::string wireSchema;
         std::set<std::string_view> seen;
         bool valid = true;
 
@@ -155,6 +161,8 @@ int main(int argc, char **argv) {
                 profile = operand;
             } else if (key == "--schema") {
                 schemaPath = operand;
+            } else if (key == "--wire-schema") {
+                wireSchema = operand;
             } else if (key == "--output-format") {
                 valid = operand == "tsv" || operand == "human";
                 format = operand == "human" ? presentation::OutputFormat::HUMAN : presentation::OutputFormat::TSV;
@@ -175,10 +183,15 @@ int main(int argc, char **argv) {
         const bool standardProfile = profile == "default-profile-v1";
         const bool knownProfile = quoteProfile || fieldProfile || standardProfile || profile == "oracle-sre-v1";
         const bool external = seen.contains("--schema");
-        const bool validSource =
-            external ? !seen.contains("--profile") && !schemaPath.empty() && schemaPath != "-" : knownProfile;
+        const bool wire = seen.contains("--wire-schema");
+        const auto sourceCount = static_cast<unsigned>(external) + static_cast<unsigned>(wire) +
+                                 static_cast<unsigned>(seen.contains("--profile"));
+        const bool validSource = sourceCount == 1 && (wire       ? wireSchema == "ordinary-v1"
+                                                      : external ? !schemaPath.empty() && schemaPath != "-"
+                                                                 : knownProfile);
 
-        if ((external || quoteProfile || fieldProfile || standardProfile) && !seen.contains("--diagnostics-version")) {
+        if ((wire || external || quoteProfile || fieldProfile || standardProfile) &&
+            !seen.contains("--diagnostics-version")) {
             diagnosticsVersion = 2;
         }
 
@@ -190,6 +203,10 @@ int main(int argc, char **argv) {
         }
 
         std::optional<org::ttldtor::qdcxx::core::LocalSchema> externalSchema;
+
+        if (wire) {
+            limits.tape.context.schema = schemaLimits.schema;
+        }
 
         if (external) {
 #ifdef ORG_TTLDTOR_QDCXX_HAS_SCHEMA_JSON
@@ -256,6 +273,10 @@ int main(int argc, char **argv) {
             ti::report(std::cerr, 3, "open", diagnosticsVersion, protocol::TapeRejection::NONE, format);
 
             return 3;
+        }
+
+        if (wire) {
+            return ti::inspectWire(input, std::cout, std::cerr, limits, format, diagnosticsVersion, mode);
         }
 
         if (externalSchema) {

@@ -1,5 +1,16 @@
 # Configuration architecture requirements
 
+## Explicit wire-schema source
+
+The tape inspector's `--wire-schema ordinary-v1` is an explicit source choice,
+mutually exclusive with `--schema PATH` and `--profile NAME`. It resolves at the
+CLI boundary before tape I/O; core/protocol read no environment, properties or
+schema files. [WIRE-INVENTORY](../spec/schema/WIRE-INVENTORY.md) bounds discovery
+and [TAPE-INSPECT](TAPE-INSPECT.md) specifies version-7 source metadata. Existing
+schema record/field/lookup/name options configure the complete union preflight;
+JSON document byte/depth options remain loader-only. No external loader or event
+adapter is implicitly selected, and JSON-disabled builds retain wire discovery.
+
 [Русская версия](CONFIGURATION.ru.md). English is authoritative.
 
 The owner requires counterparts of relevant Java QD/dxFeed settings across the project, not only event-schema options.

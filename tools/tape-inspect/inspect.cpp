@@ -240,9 +240,22 @@ void report(std::ostream &output, int code, std::string_view stage, unsigned dia
     }
 }
 
-int inspect(std::istream &input, std::ostream &output, std::ostream &diagnostic, const core::LocalSchema &schema,
-            Limits limits, inspect::OutputFormat format, inspect::DisplayProfile profile, unsigned diagnosticsVersion,
-            protocol::TapeMode mode) {
+namespace {
+/** Execute one synchronous bounded inspection, selecting schema ownership only at construction.
+ * @param input Borrowed binary source.
+ * @param output Borrowed output destination.
+ * @param diagnostic Borrowed error destination.
+ * @param schema Explicit schema, or null only for the wire discovery profile.
+ * @param limits Finite IO and protocol bounds.
+ * @param format Selected safe output representation.
+ * @param profile Explicit output identity, consistent with the schema source.
+ * @param diagnosticsVersion Existing diagnostic grammar.
+ * @param mode Explicit container mode.
+ * @return Native complete/error exit code.
+ */
+int inspectImpl(std::istream &input, std::ostream &output, std::ostream &diagnostic, const core::LocalSchema *schema,
+                Limits limits, inspect::OutputFormat format, inspect::DisplayProfile profile,
+                unsigned diagnosticsVersion, protocol::TapeMode mode) {
     std::string_view operation = "configuration";
     try {
         if (!prepareLimits(limits) || (diagnosticsVersion != 1 && diagnosticsVersion != 2) ||
@@ -252,7 +265,10 @@ int inspect(std::istream &input, std::ostream &output, std::ostream &diagnostic,
             return 2;
         }
 
-        if (!compatibleProfile(schema, profile)) {
+        const bool wire = schema == nullptr;
+
+        if ((profile == inspect::DisplayProfile::WIRE_SCHEMA_V1) != wire ||
+            (!wire && !compatibleProfile(*schema, profile))) {
             report(diagnostic, 4, "profile", diagnosticsVersion, protocol::TapeRejection::LOCAL_PROFILE, format);
 
             return 4;
@@ -262,7 +278,7 @@ int inspect(std::istream &input, std::ostream &output, std::ostream &diagnostic,
 
         if (profile == inspect::DisplayProfile::DEFAULT_PROFILE_V1) {
             // The preset has exactly sixteen fields; construction remains bounded independently of file input.
-            auto prepared = events::PreparedProfile::prepare(schema, 0, {16, 64, 16, 32, 32, 128, 4096, 131072});
+            auto prepared = events::PreparedProfile::prepare(*schema, 0, {16, 64, 16, 32, 32, 128, 4096, 131072});
 
             if (!prepared) {
                 const bool resource = prepared.error() == events::MappingError::RESOURCE_LIMIT ||
@@ -276,12 +292,21 @@ int inspect(std::istream &input, std::ostream &output, std::ostream &diagnostic,
             profileMapping.emplace(std::move(*prepared));
         }
 
-        protocol::TapeReader reader(schema, limits.tape, mode);
+        std::optional<protocol::TapeReader> storage;
+
+        if (wire) {
+            storage.emplace(limits.tape, mode);
+        } else {
+            storage.emplace(*schema, limits.tape, mode);
+        }
+
+        auto &reader = *storage;
         const bool timed = mode == protocol::TapeMode::RAW_MESSAGE_V1;
         org::ttldtor::qdcxx::inspect::Formatter formatter(format, profile);
         std::size_t remainingOutput = limits.output;
         std::size_t remainingEventUnits = limits.eventUnits;
         std::size_t emitted = 0;
+        std::size_t generation = 0;
         const auto emit = [&](const std::string &row) {
             operation = "write";
 
@@ -360,6 +385,36 @@ int inspect(std::istream &input, std::ostream &output, std::ostream &diagnostic,
                         emit(formatter.tapeTiming(*result.timing, index, remainingOutput));
                     }
 
+                    // A returned frame may contain a rejected batch. Publish metadata only after
+                    // the reader has committed the complete description event successfully.
+                    constexpr std::int32_t DESCRIBE_RECORDS = 2;
+
+                    if (wire && result.frame->type == DESCRIBE_RECORDS &&
+                        result.status != protocol::TapeStatus::FAILED) {
+                        ++generation;
+                        emit(formatter.wireSchema(index, generation, reader.schema().records().size(),
+                                                  reader.descriptions().size(), remainingOutput));
+
+                        for (const auto &record : reader.schema().records()) {
+                            emit(formatter.wireLocalRecord(generation, record, remainingOutput));
+                        }
+
+                        std::size_t descriptionIndex = 0;
+
+                        for (const auto &description : reader.descriptions()) {
+                            const auto *plan = reader.context()->find(description.senderId);
+
+                            if (plan == nullptr) {
+                                throw std::invalid_argument("missing wire source plan");
+                            }
+
+                            emit(formatter.wireDescription(generation, descriptionIndex++, description, *plan,
+                                                           remainingOutput));
+                        }
+
+                        emit(formatter.wireSchemaEnd(generation, remainingOutput));
+                    }
+
                     for (const auto &record : result.records) {
                         if (profileMapping) {
                             operation = "mapping";
@@ -380,12 +435,12 @@ int inspect(std::istream &input, std::ostream &output, std::ostream &diagnostic,
                                                    (event->description ? event->description->size() : 0) +
                                                    (event->statusReason ? event->statusReason->size() : 0);
                             emit(formatter.profileRecord(
-                                record, schema.records()[static_cast<std::size_t>(record.localId)].name, index, emitted,
-                                *event, remainingOutput));
+                                record, reader.schema().records()[static_cast<std::size_t>(record.localId)].name, index,
+                                emitted, *event, remainingOutput));
                         } else {
                             emit(formatter.record(
-                                record, schema.records()[static_cast<std::size_t>(record.localId)].name, index, emitted,
-                                remainingOutput, result.timing ? &*result.timing : nullptr));
+                                record, reader.schema().records()[static_cast<std::size_t>(record.localId)].name, index,
+                                emitted, remainingOutput, result.timing ? &*result.timing : nullptr, generation));
                         }
 
                         ++emitted;
@@ -434,5 +489,18 @@ int inspect(std::istream &input, std::ostream &output, std::ostream &diagnostic,
 
         return 3;
     }
+}
+} // namespace
+
+int inspect(std::istream &input, std::ostream &output, std::ostream &diagnostic, const core::LocalSchema &schema,
+            Limits limits, inspect::OutputFormat format, inspect::DisplayProfile profile, unsigned diagnosticsVersion,
+            protocol::TapeMode mode) {
+    return inspectImpl(input, output, diagnostic, &schema, limits, format, profile, diagnosticsVersion, mode);
+}
+
+int inspectWire(std::istream &input, std::ostream &output, std::ostream &diagnostic, Limits limits,
+                inspect::OutputFormat format, unsigned diagnosticsVersion, protocol::TapeMode mode) {
+    return inspectImpl(input, output, diagnostic, nullptr, limits, format, inspect::DisplayProfile::WIRE_SCHEMA_V1,
+                       diagnosticsVersion, mode);
 }
 } // namespace org::ttldtor::qdcxx::tape_inspect

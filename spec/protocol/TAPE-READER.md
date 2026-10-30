@@ -1,5 +1,16 @@
 # Bounded binary tape reader
 
+## Explicit ordinary discovery
+
+[WIRE-INVENTORY](../schema/WIRE-INVENTORY.md) defines the separate opt-in
+`TapeReader(limits, mode)` constructor, initially empty owned schema, borrowed
+`schema()`/`descriptions()` views and atomic late description snapshots.
+`TapeReader(schema, limits, mode)` retains the caller-identity behavior below.
+Discovery creates fresh provenance per successful description, including an empty
+batch; failed updates retain the old complete state. Local IDs/field IDs are
+append-only, while sender IDs and wire field order remain exact source metadata.
+No event adapter, hasTime inference, conversion or new container mode is added.
+
 ## Identity-preserving local schema snapshot
 
 The reader constructs its owned local schema with `LocalSchema::boundedCopy`, retaining the caller's

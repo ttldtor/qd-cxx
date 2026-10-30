@@ -276,6 +276,13 @@ if(BUILD_TESTING)
         target_link_libraries(qdcxx_tape_io_tests PRIVATE qdcxx_tape_inspect_tool doctest::doctest)
         set_target_properties(qdcxx_tape_io_tests PROPERTIES CXX_EXTENSIONS OFF)
         add_test(NAME tape_inspection_io COMMAND qdcxx_tape_io_tests)
+        add_executable(qdcxx_wire_inventory_schema_tests tests/conformance/wire_inventory_schema_tests.cpp)
+        target_link_libraries(qdcxx_wire_inventory_schema_tests PRIVATE qdcxx_tape_inspect_tool doctest::doctest)
+        set_target_properties(qdcxx_wire_inventory_schema_tests PROPERTIES CXX_EXTENSIONS OFF)
+        add_test(NAME wire_inventory_schema COMMAND qdcxx_wire_inventory_schema_tests "${CMAKE_CURRENT_SOURCE_DIR}")
+        add_test(NAME wire_inventory_cli COMMAND "${CMAKE_COMMAND}"
+            "-DPROGRAM=$<TARGET_FILE:qdcxx_tape_inspect>" "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/wire_inventory_cli.cmake")
         add_test(NAME tape_inspection_cli COMMAND "${CMAKE_COMMAND}" "-DPROGRAM=$<TARGET_FILE:qdcxx_tape_inspect>" "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}" -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/tape_cli.cmake")
         add_test(NAME tape_argument_contract COMMAND "${CMAKE_COMMAND}"
             "-DPROGRAM=$<TARGET_FILE:qdcxx_tape_inspect>"

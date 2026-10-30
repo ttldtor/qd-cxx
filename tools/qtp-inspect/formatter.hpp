@@ -27,7 +27,8 @@ enum class DisplayProfile {
     DEFAULT_QUOTE_V1,      ///< Explicit eight-field composite Quote with exact typed values.
     ORACLE_FIELD_TYPES_V1, ///< Generic exact fields with nullable UTF-16, using tape output version 4.
     DEFAULT_PROFILE_V1,    ///< Explicit default Profile with raw fields and event values, output version 5.
-    EXTERNAL_SCHEMA_V1     ///< Caller-loaded ordinary exact fields, generic tape output version 6.
+    EXTERNAL_SCHEMA_V1,    ///< Caller-loaded ordinary exact fields, generic tape output version 6.
+    WIRE_SCHEMA_V1         ///< Explicit ordinary wire discovery with source metadata, output version 7.
 };
 
 /** Logical row exceeds remaining output bytes; translated to the existing write resource error. */
@@ -118,10 +119,47 @@ class Formatter {
      * @param index Zero-based emitted index.
      * @param budget Remaining stdout bytes.
      * @param timing Optional delivered tape timing; null preserves untimed output.
+     * @param generation Current accepted description generation, used only by WIRE_SCHEMA_V1.
      * @return Complete line or OutputLimit.
      */
     std::string record(const protocol::StreamDataRecord &record, std::u16string_view name, std::size_t frameIndex,
-                       std::size_t index, std::size_t budget, const protocol::TapeTiming *timing = nullptr) const;
+                       std::size_t index, std::size_t budget, const protocol::TapeTiming *timing = nullptr,
+                       std::size_t generation = 0) const;
+
+    /** Begin a bounded version-7 description snapshot.
+     * @param frameIndex Successful description envelope index.
+     * @param generation One-based successful description event count.
+     * @param records Complete local record count.
+     * @param descriptions Complete source description count.
+     * @param budget Remaining encoded output bytes.
+     * @return Complete snapshot header row or OutputLimit.
+     */
+    std::string wireSchema(std::size_t frameIndex, std::size_t generation, std::size_t records,
+                           std::size_t descriptions, std::size_t budget) const;
+    /** Compose one local declaration and its exact first-seen field order.
+     * @param generation Current snapshot generation.
+     * @param record Borrowed validated ordinary record; generated lookups contain exactly one name per field.
+     * @param budget Remaining encoded output bytes, checked before allocation.
+     * @return Complete record/field row group or OutputLimit.
+     */
+    std::string wireLocalRecord(std::size_t generation, const core::LocalRecord &record, std::size_t budget) const;
+    /** Compose one original source declaration with authoritative binding targets.
+     * @param generation Current snapshot generation.
+     * @param index Original append position in the retained description list.
+     * @param record Borrowed exact source declaration.
+     * @param plan Borrowed current context plan for that sender; mismatch throws invalid_argument.
+     * @param budget Remaining encoded output bytes, checked before allocation.
+     * @return Complete source record/field row group or OutputLimit.
+     */
+    std::string wireDescription(std::size_t generation, std::size_t index,
+                                const protocol::WireRecordDescription &record, const protocol::StreamRecordPlan &plan,
+                                std::size_t budget) const;
+    /** Mark the end of a fully emitted snapshot.
+     * @param generation Current snapshot generation.
+     * @param budget Remaining encoded output bytes.
+     * @return Complete closing row or OutputLimit.
+     */
+    std::string wireSchemaEnd(std::size_t generation, std::size_t budget) const;
 
     /** Compose an atomic raw/event Profile pair after prepared mapping.
      * @param record Borrowed generic record retaining every local field.

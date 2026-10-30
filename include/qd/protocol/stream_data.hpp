@@ -110,6 +110,7 @@ struct StreamDataRecord {
     std::vector<std::int32_t> values;          ///< Legacy profile only, local order; empty for the extended profile.
     std::vector<core::FieldValue> typedValues; ///< Extended profile only, exact local tags/raw values.
     core::RecordContext context{}; ///< Source schema/record identity; old aggregate initializers remain untagged.
+    std::int32_t senderId = -1;    ///< Owned exact wire ID; -1 only for caller-created records without source identity.
 };
 
 /** Owned completed prefix with explicit first-error diagnostics. */

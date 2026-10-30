@@ -1,6 +1,7 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/protocol/tape_reader.hpp"
+#include "../core/schema_validation.hpp"
 
 #include <algorithm>
 #include <array>
@@ -335,6 +336,259 @@ TapeReader::TapeReader(const core::LocalSchema &schema, TapeLimits limits, TapeM
     context_ = std::move(*empty);
 }
 
+TapeReader::TapeReader(TapeLimits limits, TapeMode mode)
+    : TapeReader(
+          [](core::SchemaLimits bounds) {
+              auto empty = core::LocalSchema::create({}, bounds, core::LocalProfile::EXTENDED_FIELDS_V1);
+
+              if (!empty) {
+                  if (empty.error() == core::SchemaError::ALLOCATION_FAILURE) {
+                      throw std::bad_alloc();
+                  }
+
+                  throw std::invalid_argument("invalid empty wire schema");
+              }
+
+              return std::move(*empty);
+          }(limits.context.schema),
+          limits, mode) {
+    discoverSchema_ = true;
+}
+
+void TapeReader::discoverDescriptions(std::vector<WireRecordDescription> &incoming) {
+    // Preflight uses borrowed sources only. No owning local declaration or count-based reserve
+    // is permitted until the complete union satisfies every final-schema bound.
+    diagnostic_.stage = "wire-schema";
+
+    if (descriptions_.size() > limits_.context.descriptions ||
+        incoming.size() > limits_.context.descriptions - descriptions_.size()) {
+        fail(TapeError::RESOURCE_LIMIT, "wire-schema");
+
+        return;
+    }
+
+    const auto count = descriptions_.size() + incoming.size();
+    const auto source = [&](std::size_t index) -> const WireRecordDescription & {
+        return index < descriptions_.size() ? descriptions_[index] : incoming[index - descriptions_.size()];
+    };
+    auto bounds = limits_.context.schema;
+    std::size_t shapeRemaining = limits_.constructionUnits;
+    std::size_t contextRemaining = limits_.constructionUnits;
+    const auto cost = [](std::size_t amount, std::size_t &remaining) {
+        return core::detail::chargeBudget(amount, remaining);
+    };
+    std::size_t localRecords = 0;
+
+    for (std::size_t index = 0; index < count; ++index) {
+        const auto &record = source(index);
+        bool newRecord = true;
+
+        for (std::size_t previous = 0; previous < index; ++previous) {
+            if (source(previous).senderId == record.senderId) {
+                fail(TapeError::MALFORMED, "binding", static_cast<std::size_t>(BindingError::INVALID_DESCRIPTION));
+
+                return;
+            }
+
+            newRecord = newRecord && source(previous).name != record.name;
+        }
+
+        if (!core::detail::validSchemaKey(record.name)) {
+            fail(TapeError::MALFORMED, "wire-schema", static_cast<std::size_t>(core::SchemaError::INVALID_SCHEMA));
+
+            return;
+        }
+
+        if (!cost(1, contextRemaining) || !cost(record.fields.size(), contextRemaining)) {
+            fail(TapeError::RESOURCE_LIMIT, "construction");
+
+            return;
+        }
+
+        if (newRecord) {
+            if (localRecords > static_cast<std::size_t>(std::numeric_limits<std::int32_t>::max()) ||
+                !cost(1, bounds.records) || record.name.size() > bounds.nameUnits ||
+                !cost(record.name.size(), bounds.totalNameUnits) || !cost(1, shapeRemaining) ||
+                !cost(record.name.size(), shapeRemaining) || !cost(1, contextRemaining)) {
+                fail(TapeError::RESOURCE_LIMIT, "wire-schema");
+
+                return;
+            }
+
+            ++localRecords;
+        }
+
+        for (std::size_t fieldIndex = 0; fieldIndex < record.fields.size(); ++fieldIndex) {
+            const auto &field = record.fields[fieldIndex];
+
+            if (!core::supportsSerialType(field.serialTypeId, core::LocalProfile::EXTENDED_FIELDS_V1)) {
+                diagnostic_.rejection = TapeRejection::TYPE;
+                fail(TapeError::UNSUPPORTED, "wire-schema");
+
+                return;
+            }
+
+            if (!core::detail::validSchemaKey(field.name)) {
+                fail(TapeError::MALFORMED, "wire-schema", static_cast<std::size_t>(core::SchemaError::INVALID_SCHEMA));
+
+                return;
+            }
+
+            for (std::size_t earlierField = 0; earlierField < fieldIndex; ++earlierField) {
+                if (record.fields[earlierField].name == field.name) {
+                    diagnostic_.rejection = TapeRejection::LOCAL_PROFILE;
+                    fail(TapeError::UNSUPPORTED, "wire-schema");
+
+                    return;
+                }
+            }
+
+            bool newField = true;
+
+            for (std::size_t previous = 0; previous < index; ++previous) {
+                const auto &earlier = source(previous);
+
+                if (earlier.name != record.name) {
+                    continue;
+                }
+
+                for (const auto &known : earlier.fields) {
+                    if (known.name == field.name) {
+                        if (known.serialTypeId != field.serialTypeId) {
+                            diagnostic_.rejection = TapeRejection::TYPE;
+                            fail(TapeError::UNSUPPORTED, "wire-schema");
+
+                            return;
+                        }
+
+                        newField = false;
+                    }
+                }
+            }
+
+            // One logical field plus its sole generated lookup are two declaration elements.
+            constexpr std::size_t FIELD_AND_LOOKUP_ELEMENTS = 2;
+
+            if (newField &&
+                (!cost(1, bounds.fields) || !cost(1, bounds.lookups) || field.name.size() > bounds.nameUnits ||
+                 !cost(field.name.size(), bounds.totalNameUnits) || !cost(FIELD_AND_LOOKUP_ELEMENTS, shapeRemaining) ||
+                 !cost(field.name.size(), shapeRemaining) || !cost(1, contextRemaining))) {
+                fail(TapeError::RESOURCE_LIMIT, "wire-schema");
+
+                return;
+            }
+        }
+    }
+
+    const auto charge = [&](std::size_t amount) {
+        if (amount > limits_.constructionUnits - construction_) {
+            fail(TapeError::RESOURCE_LIMIT, "construction");
+
+            return false;
+        }
+
+        construction_ += amount;
+
+        return true;
+    };
+    // Charge only actual name copies. Fresh raw descriptions already own their names and move.
+    std::size_t copyRemaining = limits_.constructionUnits;
+
+    for (const auto &record : descriptions_) {
+        if (!cost(1, copyRemaining) || !cost(record.name.size(), copyRemaining) ||
+            !cost(record.fields.size(), copyRemaining)) {
+            fail(TapeError::RESOURCE_LIMIT, "construction");
+
+            return;
+        }
+
+        for (const auto &field : record.fields) {
+            if (!cost(field.name.size(), copyRemaining)) {
+                fail(TapeError::RESOURCE_LIMIT, "construction");
+
+                return;
+            }
+        }
+    }
+
+    if (!charge(limits_.constructionUnits - copyRemaining)) {
+        return;
+    }
+
+    auto candidate = descriptions_;
+
+    for (auto &record : incoming) {
+        candidate.push_back(std::move(record));
+    }
+
+    const auto shapeUnits = limits_.constructionUnits - shapeRemaining;
+
+    if (!charge(shapeUnits)) {
+        return;
+    }
+
+    std::vector<core::LocalRecord> records;
+
+    for (const auto &record : candidate) {
+        auto found = std::find_if(records.begin(), records.end(), [&](const auto &local) {
+            return local.name == record.name;
+        });
+
+        if (found == records.end()) {
+            records.push_back({static_cast<std::int32_t>(records.size()), record.name, false, {}, {}});
+            found = records.end() - 1;
+        }
+
+        for (const auto &field : record.fields) {
+            const auto key = std::find_if(found->lookups.begin(), found->lookups.end(), [&](const auto &lookup) {
+                return lookup.name == field.name;
+            });
+
+            if (key == found->lookups.end()) {
+                found->lookups.push_back({field.name, found->fields.size()});
+                found->fields.push_back({field.serialTypeId});
+            }
+        }
+    }
+
+    if (!charge(shapeUnits)) {
+        return;
+    }
+
+    auto nextSchema =
+        core::LocalSchema::create(records, limits_.context.schema, core::LocalProfile::EXTENDED_FIELDS_V1);
+
+    if (!nextSchema) {
+        const auto error = nextSchema.error();
+        fail(error == core::SchemaError::ALLOCATION_FAILURE ? TapeError::ALLOCATION_FAILURE
+             : error == core::SchemaError::RESOURCE_LIMIT   ? TapeError::RESOURCE_LIMIT
+                                                            : TapeError::MALFORMED,
+             "wire-schema", static_cast<std::size_t>(error));
+
+        return;
+    }
+
+    if (!charge(limits_.constructionUnits - contextRemaining)) {
+        return;
+    }
+
+    auto nextContext = StreamDataContext::create(*nextSchema, candidate, limits_.context);
+
+    if (!nextContext) {
+        fail(bindingError(nextContext.error()), "binding", static_cast<std::size_t>(nextContext.error()));
+
+        return;
+    }
+
+    // No throwing operation or external callback is allowed after publication starts.
+    static_assert(noexcept(schema_ = std::move(*nextSchema)));
+    static_assert(noexcept(context_ = std::move(*nextContext)));
+    static_assert(noexcept(descriptions_.swap(candidate)));
+    schema_ = std::move(*nextSchema);
+    context_ = std::move(*nextContext);
+    descriptions_.swap(candidate);
+}
+
 void TapeReader::fail(TapeError error, std::string_view stage, std::size_t detail) noexcept {
     if (status_ == TapeStatus::FAILED) {
         return;
@@ -453,6 +707,18 @@ void TapeReader::dispatch(TapeFeedResult &result) {
     }
 
     if (frame.type == DESCRIBE_RECORDS) {
+        if (discoverSchema_) {
+            // Each materialized raw record/field needs a structural byte; decoded name units
+            // never exceed their encoded bytes. This conservative charge includes failed parses.
+            if (frame.payload.size() > limits_.constructionUnits - construction_) {
+                fail(TapeError::RESOURCE_LIMIT, "construction");
+
+                return;
+            }
+
+            construction_ += frame.payload.size();
+        }
+
         diagnostic_.stage = "description";
         auto parsed =
             parseDescribeRecords(frame.payload, {limits_.frame.maximumBodyBytes,
@@ -469,6 +735,12 @@ void TapeReader::dispatch(TapeFeedResult &result) {
                          : parsed.status == DescriptionStatus::ALLOCATION_FAILURE ? TapeError::ALLOCATION_FAILURE
                                                                                   : TapeError::MALFORMED;
             fail(error, "description", static_cast<std::size_t>(parsed.stage));
+
+            return;
+        }
+
+        if (discoverSchema_) {
+            discoverDescriptions(parsed.descriptions);
 
             return;
         }

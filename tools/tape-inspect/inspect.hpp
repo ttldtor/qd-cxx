@@ -71,4 +71,19 @@ int inspect(std::istream &input, std::ostream &output, std::ostream &diagnostic,
             Limits limits, inspect::OutputFormat format = inspect::OutputFormat::TSV,
             inspect::DisplayProfile profile = inspect::DisplayProfile::LOCAL_SCHEMA, unsigned diagnosticsVersion = 1,
             protocol::TapeMode mode = protocol::TapeMode::LEGACY);
+
+/** Inspect an explicitly wire-derived ordinary schema with self-describing output version 7.
+ * Shares the existing synchronous bounded read/feed/render path; no JSON loader or event adapter.
+ * @param input Binary source borrowed only during this call.
+ * @param output Bounded LF destination including successful schema generations and exact sender IDs.
+ * @param diagnostic Error destination; incomplete output never reports successful completion.
+ * @param limits Finite IO, final schema and cumulative construction limits.
+ * @param format TSV hex or safe quoted human rendering.
+ * @param diagnosticsVersion Explicit existing diagnostic grammar, default 2.
+ * @param mode Explicit existing container policy; never inferred from input.
+ * @return Native contract exit code; only complete EOF and successful flush return zero.
+ */
+int inspectWire(std::istream &input, std::ostream &output, std::ostream &diagnostic, Limits limits,
+                inspect::OutputFormat format = inspect::OutputFormat::TSV, unsigned diagnosticsVersion = 2,
+                protocol::TapeMode mode = protocol::TapeMode::LEGACY);
 } // namespace org::ttldtor::qdcxx::tape_inspect

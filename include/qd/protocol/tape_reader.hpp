@@ -43,9 +43,9 @@ struct TapeLimits {
     std::size_t frames;              ///< All envelopes, including empty markers.
     TapeDescriptorLimits descriptor; ///< Initial descriptor bounds.
     ContextLimits context;           ///< Schema and retained descriptions/actions/names.
-    std::size_t constructionUnits;   ///< Cumulative full candidate and local schema elements.
-    StreamDataLimits data;           ///< Aggregate file work/output bounds and per-symbol bounds.
-    std::size_t timingEvents = 0;    ///< RAW metadata attempts: explicit heartbeats and data frames; zero is finite.
+    std::size_t constructionUnits; ///< Cumulative construction units; discovery also charges raw payload/context work.
+    StreamDataLimits data;         ///< Aggregate file work/output bounds and per-symbol bounds.
+    std::size_t timingEvents = 0;  ///< RAW metadata attempts: explicit heartbeats and data frames; zero is finite.
 };
 /** Terminal categories, independent of Java exception classes. */
 enum class TapeError {
@@ -114,6 +114,7 @@ class TapeReader {
     TapeLimits limits_;
     TapeMode mode_;
     core::LocalSchema schema_;
+    bool discoverSchema_ = false; ///< Explicit ordinary wire-schema policy, never inferred from input.
     FrameReader framer_;
     std::vector<WireRecordDescription> descriptions_;
     std::optional<StreamDataContext> context_;
@@ -143,6 +144,10 @@ class TapeReader {
      * @param result Owns the frame and receives completed data.
      */
     void dispatch(TapeFeedResult &result);
+    /** Prepare and publish one complete discovery batch; failure retains the old snapshot.
+     * @param incoming Owned parsed batch, moved only after bounded admission.
+     */
+    void discoverDescriptions(std::vector<WireRecordDescription> &incoming);
 
     public:
     /** Copy a validated local schema within bounds and allocate framing storage.
@@ -152,6 +157,13 @@ class TapeReader {
      * Allocation failure before input may throw bad_alloc.
      */
     TapeReader(const core::LocalSchema &schema, TapeLimits limits, TapeMode mode = TapeMode::LEGACY);
+    /** Explicitly discover ordinary exact fields from accepted descriptions; see WIRE-INVENTORY.
+     * Starts with an empty EXTENDED_FIELDS_V1 schema. Invalid configuration throws
+     * invalid_argument; allocation before input may throw bad_alloc. Single-threaded.
+     * @param limits Mandatory finite parsing, final schema and cumulative construction bounds.
+     * @param mode Explicit container policy, independent of schema discovery.
+     */
+    explicit TapeReader(TapeLimits limits, TapeMode mode = TapeMode::LEGACY);
     /** Accept up to one envelope; caller resubmits any unaccepted suffix.
      * @param input Borrowed bytes, not retained by reference.
      * @return Owned event/prefix and exact accepted count; terminal failures accept zero later.
@@ -195,6 +207,22 @@ class TapeReader {
      */
     [[nodiscard]] const StreamDataContext *context() const noexcept {
         return context_ ? &*context_ : nullptr;
+    }
+
+    /** Inspect owned immutable local declarations, including an empty initial schema.
+     * @return Borrowed schema; views expire on successful discovery updates, reader destruction, move or assignment.
+     * Failed updates retain declarations and provenance. boundedCopy explicitly retains an old snapshot.
+     */
+    [[nodiscard]] const core::LocalSchema &schema() const noexcept {
+        return schema_;
+    }
+
+    /** Inspect exact accepted source declarations without reparsing or copying.
+     * @return Borrowed append/wire order; expires on successful description updates, destruction, move or assignment.
+     * A rejected batch leaves this storage intact. Sender IDs are sparse identities, never local positions.
+     */
+    [[nodiscard]] std::span<const WireRecordDescription> descriptions() const noexcept {
+        return descriptions_;
     }
 
     /** Inspect accepted bytes.
@@ -254,7 +282,7 @@ class TapeReader {
     }
 
     /** Inspect reconstruction work.
-     * @return Charged complete-candidate logical elements.
+     * @return Admitted logical elements, including discovery raw payloads, temporary copies and context creation.
      */
     [[nodiscard]] std::size_t constructionUnits() const noexcept {
         return construction_;

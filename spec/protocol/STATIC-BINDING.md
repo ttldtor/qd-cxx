@@ -1,5 +1,14 @@
 # Bounded static incoming binding
 
+## Explicit ordinary wire schema
+
+[WIRE-INVENTORY](../schema/WIRE-INVENTORY.md) defines opt-in TapeReader discovery
+using the same LocalSchema validation and exact ordered bindRecord actions.
+Generated schemas union exact field names across distinct senders; ambiguous
+duplicate source field names and type conflicts are explicitly refused. This
+does not alter this API's caller-supplied schemas, aliases, skips or repeated
+targets. Source IDs/order remain separate from stable local IDs and event mappings.
+
 ## Explicit Quote field extension
 
 QDCXX-022 adds opt-in LocalProfile::QUOTE_FIELDS_V1 alongside the unchanged default

@@ -2,6 +2,75 @@
 
 [Русская версия](TAPE-INSPECT.ru.md). English is authoritative.
 
+## Explicit ordinary wire schema and output version 7
+
+`--input PATH --wire-schema ordinary-v1` explicitly discovers
+[ordinary exact fields](../spec/schema/WIRE-INVENTORY.md) without an external
+schema or business adapter. Exactly one of `--wire-schema ordinary-v1`,
+`--schema PATH` and `--profile NAME` is required. Invalid combinations, missing or
+duplicate values fail as usage before opening input. Diagnostics default to 2;
+both existing explicit tape modes remain available. JSON loading may be disabled.
+All `--max-schema-*` record/field/lookup/name limits apply to the complete wire
+union before owning local construction. Schema JSON byte/depth limits are
+loader-only. `--max-construction` additionally covers temporary discovery work
+as defined in WIRE-INVENTORY. No ambient settings or source inference are used.
+
+```powershell
+qdcxx-tape-inspect --input tests/fixtures/encoding/field-types/expected/mixed-stream.qtp --wire-schema ordinary-v1
+qdcxx-tape-inspect --input tests/fixtures/encoding/field-types/expected/mixed-raw.qtp --wire-schema ordinary-v1 --tape-mode raw-message-v1 --output-format human
+```
+
+TSV starts with `format, qdcxx-tape-inspect, 7, ordinary-v1, MODE`, with TAB
+separators. Existing frame/descriptor/heartbeat/timing/marker/completion rows keep
+their selected mode grammar. Version 7 adds complete schema/source snapshots
+after each successful DESCRIBE_RECORDS, before later data. Generation starts at
+1 and advances once per successful event, including an empty description batch.
+A returned but rejected frame never advances generation or emits candidate metadata.
+
+| Row | Following TAB-separated cells |
+| --- | --- |
+| schema | frameIndex, generation, localRecordCount, sourceDescriptionCount |
+| schema-record | generation, localId, recordNameHex, 0 (hasTime), localFieldCount |
+| schema-field | generation, localId, localFieldId, fieldNameHex, fullTypeId |
+| wire-record | generation, descriptionIndex, senderId, localId, recordNameHex, wireFieldCount |
+| wire-field | generation, senderId, wireFieldIndex, fieldNameHex, fullTypeId, targetLocalFieldId |
+| schema-end | generation |
+| wire-data | frameIndex, recordIndex, generation, senderId, localId, recordNameHex, symbolHex, typedValues |
+
+Indices are zero-based. Schema records/fields follow first-seen local order.
+Descriptions follow original append order; their fields follow exact wire order.
+All names/symbols use lowercase four-hex-digit UTF-16 units; `-` means empty.
+The typedValues cell contains comma-separated `fullType:raw:units` in current
+local field order. Units are `-` for non-10 fields; type 10 uses `null`, `empty`
+or exact UTF-16 hex. Signed decimal raw values are never business conversions.
+In raw-message-v1, wire-data adds timestampMs (`-` if absent), eventTimeSequence
+and eventTimeMs. These preserve exact wire timestamp versus packed/delivered time;
+zero differs from absence. Existing zero-flags/timing/option policies do not expand.
+
+Select each data row's generation/sender binding to recover source field presence
+and order from its local values. For `90:R(A,B)` and `7:R(B,C,A)`, a union A/B/C
+can contain identical raw-zero/null values for both records; wire-field targets
+0/1 versus 1/2/0 distinguish absence and original source order. Sender IDs come
+from decoded wire data, never reverse inference from a local ID. Snapshots include
+exact names and full types, so no external JSON file is needed to interpret them.
+This preserves logical source records, not original primitive/envelope byte encoding.
+
+Each bounded metadata row group is counted against remaining encoded output
+before allocation/write; no unbounded snapshot history or output buffer accumulates.
+A short physical write can leave an incomplete snapshot. `schema-end` closes only
+that snapshot; complete reading still requires final completion and exit 0 after
+flush. Parser failures retain earlier complete snapshots/data and emit no later
+completion. Human output carries the same metadata with safe quoted names; numeric
+metadata rows keep their row tags and use spaces. Ordinary `wire-data` is shown as
+`Fields` with generation/sender and exact typed fields, not a mapped business event.
+
+No-argument and standalone `--help` remain identical, stdout-only and free of
+input I/O. Existing profiles and external-schema output version 6 remain unchanged.
+The stream helper `inspectWire(input, output, diagnostic, limits, format, diagnosticsVersion,
+mode)` shares the synchronous inspection loop and returns existing native exit codes.
+[Focused validation](../tests/conformance/protocol/wire-inventory/VALIDATION.md)
+separates designed cases, production fixtures and integration limits.
+
 ## External native JSON schemas and output version 6
 
 Use `--schema PATH` instead of `--profile BUILTIN` to supply an owned local schema without rebuilding.
