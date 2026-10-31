@@ -51,8 +51,10 @@ The [configuration requirements](CONFIGURATION.md) apply beyond schema settings:
 the [subscription contracts](../spec/subscriptions/CONTRACTS.md) define its observable barriers and budgets.
 `qdcxx_core` owns deterministic identities, desired-interest maps and bounded atomic mutations.
 Live session/client/runtime layers own connection epochs, queues, callbacks, I/O and lifecycle.
-One logical serialization domain is selected for client dispatch; OS threading and the runtime/TCP/TLS
-backend remain undecided. This is a design boundary, not a claim of existing runtime support or owner acceptance.
+One logical serialization domain is selected for client dispatch.
+[ADR-0006](decisions/ADR-0006-live-runtime.md) selects an optional Asio/c-ares/OpenSSL profile,
+explicit SDK/bootstrap/trust requirements and its [feasibility boundary](../tests/conformance/transport/CONTRACTS.md).
+This is a design boundary, not a claim of existing runtime support or owner acceptance.
 
 ## Design principles
 

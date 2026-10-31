@@ -7,6 +7,10 @@
 
 ## Реализованные компоненты
 
+[Выбранный опциональный профиль runtime](decisions/ADR-0006-live-runtime.ru.md) имеет воспроизводимые
+[проверки реализуемости DNS/TCP/TLS](../tests/conformance/transport/VALIDATION.ru.md).
+Production-адаптеры transport/session/TLS/auth ещё не реализованы; эти тесты не добавляют live-подписки.
+
 | Компонент | Поведение и контракт |
 | --- | --- |
 | Вывод подписок | Шесть сообщений и явные описания, точные символы, владеющие хвосты частичной записи и квоты удержанного вывода: [live composer](../spec/subscriptions/WRITER.ru.md). Без socket/session/peer acknowledgement. |

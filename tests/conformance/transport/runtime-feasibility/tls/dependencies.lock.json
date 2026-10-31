@@ -1,0 +1,25 @@
+{
+  "asio": {
+    "version": "1.38.2",
+    "tag": "asio-1-38-2",
+    "commit": "8806a6803cde7054c3049d3666d3ec36786568c5",
+    "url": "https://github.com/chriskohlhoff/asio/archive/refs/tags/asio-1-38-2.tar.gz",
+    "sha256": "9f2648fa483e58a6bf848d970ee0ea650ca19ed7769dfa520ed4f7b8d27af1db",
+    "license": "BSL-1.0"
+  },
+  "openssl": {
+    "version": "3.5.9",
+    "tag": "openssl-3.5.9",
+    "commit": "45e844fa2a14ec92d146bd8f5778ac130b6625fb",
+    "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.9/openssl-3.5.9.tar.gz",
+    "sha256": "603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a",
+    "checksum_url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.9/openssl-3.5.9.tar.gz.sha256",
+    "license": "Apache-2.0",
+    "configure": [
+      "no-shared",
+      "no-tests",
+      "no-docs",
+      "no-autoload-config"
+    ]
+  }
+}

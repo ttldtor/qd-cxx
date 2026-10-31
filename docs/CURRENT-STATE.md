@@ -7,6 +7,10 @@ The project implements selected bounded profiles against Java QD 3.355 at the re
 
 ## Implemented components
 
+The [selected optional runtime profile](decisions/ADR-0006-live-runtime.md) has reproducible
+[DNS/TCP/TLS feasibility tests](../tests/conformance/transport/VALIDATION.md).
+Production transport/session/TLS/auth adapters remain unimplemented; these tests do not add live subscriptions.
+
 | Component | Behavior and contract |
 | --- | --- |
 | Subscription output | Six messages and explicit descriptions, exact symbols, owned partial-write suffixes and retained-output quotas: [live composer](../spec/subscriptions/WRITER.md). No socket/session/peer acknowledgement. |

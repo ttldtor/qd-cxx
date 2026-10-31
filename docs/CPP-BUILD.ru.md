@@ -21,6 +21,10 @@
 
 ## Целевое состояние подписок
 
+Отдельные [проекты проверки реализуемости runtime](../tests/conformance/transport/runtime-feasibility/README.ru.md)
+проверяют механизмы закреплённых опциональных SDK с явным локальным получением, OFF по умолчанию и тестовыми
+loopback peers. Они не меняют корневую сборку, не дают production runtime targets и не требуют менять её CRT.
+
 Для ограниченного живого вывода подключите `qd/protocol/subscription_writer.hpp` и `qdcxx_protocol`.
 [Контракт composer и пример](../spec/subscriptions/WRITER.ru.md) описывают шесть типов подписок,
 явные описания, владеющий хвост частичной записи и бюджеты удержанного вывода. Целевой тест —

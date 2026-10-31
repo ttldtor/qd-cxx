@@ -2,6 +2,10 @@
 
 [English version](README.md). Английская версия нормативная.
 
+Опциональные [проекты проверки реализуемости runtime](../../tests/conformance/transport/runtime-feasibility/README.ru.md)
+проверяют закреплённые DNS/TCP/TLS-механизмы, тестовые сертификаты, отмену и границы зависимостей при OFF.
+Каждый — отдельный CMake-проект с OFF по умолчанию; production transport target в корневую сборку они не добавляют.
+
 Необязательная [проверка нативных подписок парсером](../upstream/subscription-writer-oracle/README.ru.md)
 сравнивает захваты composer с настоящими callbacks/time reads закреплённой Java без сокетов.
 

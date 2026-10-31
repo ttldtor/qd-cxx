@@ -18,6 +18,10 @@ enabled, `wire_inventory_schema` and `wire_inventory_cli` add focused tests;
 
 ## Desired subscription state
 
+The separate [runtime feasibility projects](../tests/conformance/transport/runtime-feasibility/README.md)
+test pinned optional SDK mechanisms with explicit local acquisition, default OFF and synthetic loopback
+peers. They do not change this root build, provide production runtime targets or require a root CRT change.
+
 For bounded live output, include `qd/protocol/subscription_writer.hpp` and link `qdcxx_protocol`.
 The [composer contract and example](../spec/subscriptions/WRITER.md) cover six subscription types,
 explicit descriptions, owned partial-write suffixes and retained-output budgets. The focused test

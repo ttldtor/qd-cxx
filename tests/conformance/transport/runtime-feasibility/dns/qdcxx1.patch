@@ -1,0 +1,246 @@
+diff --git a/src/lib/ares_init.c b/src/lib/ares_init.c
+index 85b2e13..b9cf015 100644
+--- a/src/lib/ares_init.c
++++ b/src/lib/ares_init.c
+@@ -135,13 +135,7 @@ static void server_destroy_cb(void *data)
+ 
+ static ares_status_t init_by_defaults(ares_channel_t *channel)
+ {
+-  char         *hostname = NULL;
+-  ares_status_t rc       = ARES_SUCCESS;
+-#ifdef HAVE_GETHOSTNAME
+-  const char *dot;
+-#endif
+-  struct ares_addr addr;
+-  ares_llist_t    *sconfig = NULL;
++  ares_status_t rc = ARES_SUCCESS;
+ 
+   /* Enable EDNS by default */
+   if (!(channel->optmask & ARES_OPT_FLAGS)) {
+@@ -159,73 +153,9 @@ static ares_status_t init_by_defaults(ares_channel_t *channel)
+     channel->tries = DEFAULT_TRIES;
+   }
+ 
++  /* qdcxx1 requires explicit servers and never derives a hostname/search list. */
+   if (ares_slist_len(channel->servers) == 0) {
+-    /* Add a default local named server to the channel unless configured not
+-     * to (in which case return an error).
+-     */
+-    if (channel->flags & ARES_FLAG_NO_DFLT_SVR) {
+-      rc = ARES_ENOSERVER;
+-      goto error;
+-    }
+-
+-    addr.family            = AF_INET;
+-    addr.addr.addr4.s_addr = htonl(INADDR_LOOPBACK);
+-
+-    rc = ares_sconfig_append(channel, &sconfig, &addr, 0, 0, NULL);
+-    if (rc != ARES_SUCCESS) {
+-      goto error; /* LCOV_EXCL_LINE: OutOfMemory */
+-    }
+-
+-    rc = ares_servers_update(channel, sconfig, ARES_FALSE);
+-    ares_llist_destroy(sconfig);
+-
+-    if (rc != ARES_SUCCESS) {
+-      goto error;
+-    }
+-  }
+-
+-  if (channel->ndomains == 0) {
+-    /* Derive a default domain search list from the kernel hostname,
+-     * or set it to empty if the hostname isn't helpful.
+-     */
+-#ifndef HAVE_GETHOSTNAME
+-    channel->ndomains = 0; /* default to none */
+-#else
+-    size_t len        = 256;
+-    channel->ndomains = 0; /* default to none */
+-
+-    hostname = ares_malloc_zero(len);
+-    if (!hostname) {
+-      rc = ARES_ENOMEM; /* LCOV_EXCL_LINE: OutOfMemory */
+-      goto error;       /* LCOV_EXCL_LINE: OutOfMemory */
+-    }
+-
+-    /* POSIX leaves it unspecified whether gethostname() NUL terminates when the
+-     * host name doesn't fit, so force the last byte to a terminator afterwards.
+-     */
+-    if (gethostname(hostname, (GETHOSTNAME_TYPE_ARG2)len) != 0) {
+-      /* Lets not treat a gethostname failure as critical, since we
+-       * are ok if gethostname doesn't even exist */
+-      *hostname = '\0';
+-    }
+-    hostname[len - 1] = '\0';
+-
+-    dot = strchr(hostname, '.');
+-    if (dot) {
+-      /* a dot was found */
+-      channel->domains = ares_malloc(sizeof(char *));
+-      if (!channel->domains) {
+-        rc = ARES_ENOMEM; /* LCOV_EXCL_LINE: OutOfMemory */
+-        goto error;       /* LCOV_EXCL_LINE: OutOfMemory */
+-      }
+-      channel->domains[0] = ares_strdup(dot + 1);
+-      if (!channel->domains[0]) {
+-        rc = ARES_ENOMEM; /* LCOV_EXCL_LINE: OutOfMemory */
+-        goto error;       /* LCOV_EXCL_LINE: OutOfMemory */
+-      }
+-      channel->ndomains = 1;
+-    }
+-#endif
++    return ARES_ENOSERVER;
+   }
+ 
+   if (channel->nsort == 0) {
+@@ -245,11 +175,6 @@ static ares_status_t init_by_defaults(ares_channel_t *channel)
+     channel->server_retry_delay  = DEFAULT_SERVER_RETRY_DELAY;
+   }
+ 
+-error:
+-  if (hostname) {
+-    ares_free(hostname);
+-  }
+-
+   return rc;
+ }
+ 
+@@ -259,6 +184,26 @@ int ares_init_options(ares_channel_t           **channelptr,
+   ares_channel_t *channel;
+   ares_status_t   status = ARES_SUCCESS;
+ 
++  /* Qualified qdcxx1 profile: validate the bounded IPv4 server list before
++   * allocation, entropy initialization, or any configuration acquisition. */
++  if (channelptr == NULL) {
++    return ARES_EFORMERR;
++  }
++  *channelptr = NULL;
++  if (options == NULL || !(optmask & ARES_OPT_SERVERS) ||
++      options->servers == NULL || options->nservers <= 0 ||
++      options->nservers > ARES_QDCXX_PROFILE_MAX_SERVERS) {
++    return ARES_ENOSERVER;
++  }
++  {
++    int server_idx;
++    for (server_idx = 0; server_idx < options->nservers; server_idx++) {
++      if (options->servers[server_idx].s_addr == 0) {
++        return ARES_ENOSERVER;
++      }
++    }
++  }
++
+   if (ares_library_initialized() != ARES_SUCCESS) {
+     return ARES_ENOTINITIALIZED; /* LCOV_EXCL_LINE: n/a on non-WinSock */
+   }
+@@ -347,13 +292,7 @@ int ares_init_options(ares_channel_t           **channelptr,
+     goto done; /* LCOV_EXCL_LINE: OutOfMemory */
+   }
+ 
+-  if (status == ARES_SUCCESS) {
+-    status = ares_init_by_sysconfig(channel);
+-    if (status != ARES_SUCCESS) {
+-      DEBUGF(fprintf(stderr, "Error: init_by_sysconfig failed: %s\n",
+-                     ares_strerror(status)));
+-    }
+-  }
++  /* qdcxx1 deliberately bypasses all OS/environment resolver configuration. */
+ 
+   /*
+    * No matter what failed or succeeded, seed defaults to provide
+@@ -396,76 +335,11 @@ done:
+   return ARES_SUCCESS;
+ }
+ 
+-static void *ares_reinit_thread(void *arg)
+-{
+-  ares_channel_t *channel = arg;
+-  ares_status_t   status;
+-
+-  /* ares_init_by_sysconfig() will lock when applying the config, but not
+-   * when retrieving. */
+-  status = ares_init_by_sysconfig(channel);
+-  if (status != ARES_SUCCESS) {
+-    DEBUGF(fprintf(stderr, "Error: init_by_sysconfig failed: %s\n",
+-                   ares_strerror(status)));
+-  }
+-
+-  ares_channel_lock(channel);
+-
+-  /* Flush cached queries on reinit */
+-  if (status == ARES_SUCCESS && channel->qcache) {
+-    ares_qcache_flush(channel->qcache);
+-  }
+-
+-  channel->reinit_pending = ARES_FALSE;
+-  ares_channel_unlock(channel);
+-
+-  return NULL;
+-}
+-
++/* Qualified qdcxx1 channels are immutable configuration snapshots. */
+ ares_status_t ares_reinit(ares_channel_t *channel)
+ {
+-  ares_status_t status = ARES_SUCCESS;
+-
+-  if (channel == NULL) {
+-    return ARES_EFORMERR;
+-  }
+-
+-  ares_channel_lock(channel);
+-
+-  /* If a reinit is already in process, lets not do it again. Or if we are
+-   * shutting down, skip. */
+-  if (!channel->sys_up || channel->reinit_pending) {
+-    ares_channel_unlock(channel);
+-    return ARES_SUCCESS;
+-  }
+-  channel->reinit_pending = ARES_TRUE;
+-  ares_channel_unlock(channel);
+-
+-  if (ares_threadsafety()) {
+-    /* clean up the prior reinit process's thread.  We know the thread isn't
+-     * running since reinit_pending was false */
+-    if (channel->reinit_thread != NULL) {
+-      void *rv;
+-      ares_thread_join(channel->reinit_thread, &rv);
+-      channel->reinit_thread = NULL;
+-    }
+-
+-    /* Spawn a new thread */
+-    status =
+-      ares_thread_create(&channel->reinit_thread, ares_reinit_thread, channel);
+-    if (status != ARES_SUCCESS) {
+-      /* LCOV_EXCL_START: UntestablePath */
+-      ares_channel_lock(channel);
+-      channel->reinit_pending = ARES_FALSE;
+-      ares_channel_unlock(channel);
+-      /* LCOV_EXCL_STOP */
+-    }
+-  } else {
+-    /* Threading support not available, call directly */
+-    ares_reinit_thread(channel);
+-  }
+-
+-  return status;
++  (void)channel;
++  return ARES_ENOTIMP;
+ }
+ 
+ /* ares_dup() duplicates a channel handle with all its options and returns a
+diff --git a/include/ares_version.h b/include/ares_version.h
+index 43dc849..a9657c3 100644
+--- a/include/ares_version.h
++++ b/include/ares_version.h
+@@ -33,7 +33,11 @@
+ #define ARES_VERSION_MAJOR 1
+ #define ARES_VERSION_MINOR 34
+ #define ARES_VERSION_PATCH 9
+-#define ARES_VERSION_STR   "1.34.9"
++#define ARES_VERSION_STR   "1.34.9+qdcxx1"
++
++/* Qualified profile; not a drop-in upstream c-ares distribution. */
++#define ARES_QDCXX_PROFILE 1
++#define ARES_QDCXX_PROFILE_MAX_SERVERS 4
+ 
+ /* NOTE: We cannot make the version string a C preprocessor stringify operation
+  *       due to assumptions made by integrators that aren't properly using

@@ -535,3 +535,7 @@ tools/upstream/subscription-oracle/** text eol=lf
 tools/upstream/subscription-writer-oracle/** text eol=lf
 tests/fixtures/subscriptions/writer/expected/** -text
 tests/fixtures/subscriptions/writer/*.md text eol=lf
+# Qualified SDK patch context and the original upstream license retain exact bytes.
+tests/conformance/transport/** text eol=lf
+tests/conformance/transport/runtime-feasibility/dns/qdcxx1.patch -text -whitespace
+tests/conformance/transport/runtime-feasibility/dns/LICENSE.c-ares.md -text -whitespace
