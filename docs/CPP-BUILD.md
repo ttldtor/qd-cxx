@@ -1,5 +1,32 @@
 # Bounded C++23 components
 
+<a id="installed-binary-json-loader"></a>
+
+## Installed binary JSON loader
+
+JSON ON installs/exports `qdcxx_schema_json` and private static dependency `qdcxx_simdjson`, the optional
+schema header and exact upstream licenses. Consumers need no SDK headers/source root,
+`find_package(simdjson)` or fetch step. SDK includes are build-only; relocated imported archives use
+the package prefix. JSON OFF does not find/fetch/link simdjson, inspect its source or add optional
+dependency cache entries. The [standalone consumer](../tests/conformance/schema_json_consumer/CMakeLists.txt)
+uses these exact statements after its C++ project declaration:
+
+```cmake
+find_package(qdcxx CONFIG REQUIRED)
+add_executable(qdcxx_schema_json_consumer main.cpp)
+target_link_libraries(qdcxx_schema_json_consumer PRIVATE qdcxx_schema_json qdcxx_collectors)
+set_target_properties(qdcxx_schema_json_consumer PROPERTIES CXX_EXTENSIONS OFF)
+```
+
+C++23 is inherited from library usage requirements. Set `CMAKE_PREFIX_PATH` or `qdcxx_DIR` to the
+installed/relocated package as described below. Include `qd/schema/json_schema.hpp` and select
+`loadBinaryJsonSchema` with `BinaryJsonSchemaLimits` for the
+[native binary profile](../spec/schema/NATIVE-BINARY-JSON.md). Ordinary `loadJsonSchema` retains v1.
+New limits independently bound parser requests, logical work and logical two-copy schema bytes;
+they do not cap total heap/RSS. Core/protocol/collectors remain JSON-independent. The
+[qualification protocol](../tests/conformance/schema-json/VALIDATION.md#binary-json-profile-qualification)
+defines the consumer lifetime checks and final-build evidence boundary.
+
 ## Explicit ordinary wire discovery
 
 Include `qd/protocol/tape_reader.hpp`, link `qdcxx_protocol` and construct
@@ -42,8 +69,8 @@ relocatable `qdcxx` package. Consumers use `find_package(qdcxx CONFIG REQUIRED)`
 the target names `qdcxx_encoding`, `qdcxx_core`, `qdcxx_protocol`, `qdcxx_collectors`,
 `qdcxx_event_mapping`, `qdcxx_quote`, `qdcxx_profile` and, when built,
 `qdcxx_transport` and `qdcxx_client`. Installed event headers support generic-to-prepared
-Quote/Profile mappings without a JSON dependency. JSON, replay and tools are not
-additional exported library targets.
+Quote/Profile mappings without a JSON dependency. JSON ON also exports the loader described above;
+replay and tools are not additional exported library targets.
 The enabled package includes the qualified static c-ares archive, native link
 closure and dependency notices; consumers need neither SDK headers nor a C compiler.
 Set `CMAKE_PREFIX_PATH` to the installed prefix for discovery. For a nonstandard

@@ -2,6 +2,36 @@
 
 [Русская версия](TAPE-INSPECT.ru.md). English is authoritative.
 
+<a id="binary-json-configuration-validation"></a>
+
+## Binary JSON configuration validation
+
+With the optional JSON loader enabled, validate the separately selected
+[native binary profile](../spec/schema/NATIVE-BINARY-JSON.md) without opening a tape:
+
+```powershell
+qdcxx-tape-inspect --schema spec/schema/examples/native-binary/pair.json --schema-format binary-v1 --validate-schema
+```
+
+Both new flags and a nonempty schema path other than `-` are required. This mode accepts only these
+selectors and known `--max-schema-*` numeric limits. Input, profile, wire-schema, tape-mode,
+source-profile and rendering/output options are usage errors before file I/O. Three binary-only
+limits are `--max-schema-parser-bytes`, `--max-schema-work`, `--max-schema-model-bytes`; each defaults
+to 67,108,864 in its own units and intersects the original seven schema limits. Work units are logical
+credits; model bytes describe two logical declaration copies. Neither is a total heap/RSS cap.
+New budget flags cannot select or alter old ordinary mode without both explicit selectors.
+
+Success writes exactly `schema-valid<TAB>1<TAB>qdcxx-native-binary<TAB>1<LF>` to stdout, with empty
+stderr, and returns 0 only after successful write/flush. Errors use the bounded static stderr row
+`schema-error<TAB>1<TAB>CODE<LF>` without path/content echo. Exit 2 means invalid arguments; 3 is file
+or output I/O; 4 is unsupported profile/version/type/layout or `LOADER_DISABLED`; 5 is malformed JSON
+or invalid schema; 6 is resource/allocation failure. Valid options in JSON OFF return `LOADER_DISABLED`
+before attempting a missing schema file; invalid options still return usage 2.
+
+No arguments and standalone `--help` produce identical help without operational input or file I/O;
+help-output failures remain nonzero. Existing default tape semantics and output versions remain.
+This mode validates configuration only; it adds no HISTORY tape reading, subscription or transport facade.
+
 ## Owning self-contained sources and output version 9
 
 The explicit `self-contained-segments-v1` source profile owns a finite ordered list of local files.

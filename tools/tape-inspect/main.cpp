@@ -42,6 +42,68 @@ int schemaError(int code, std::string_view token) noexcept {
 
     return code;
 }
+
+/** Validate one explicitly selected binary schema without opening a tape or starting network work.
+ * @param path Explicit local file path, borrowed only for this call and never printed.
+ * @param limits Independent input/parser-request/logical work/schema-model bounds.
+ * @return Zero only after a complete schema and successful fixed success-row write/flush; otherwise
+ * a bounded schema diagnostic and the existing IO/unsupported/malformed/resource exit category.
+ */
+int validateBinarySchema(const std::string &path, org::ttldtor::qdcxx::schema::BinaryJsonSchemaLimits limits) {
+#ifdef ORG_TTLDTOR_QDCXX_HAS_SCHEMA_JSON
+    namespace loader = org::ttldtor::qdcxx::schema;
+    namespace ti = org::ttldtor::qdcxx::tape_inspect;
+
+    try {
+        std::ifstream input(path, std::ios::binary);
+
+        if (!input) {
+            return schemaError(3, "IO_ERROR");
+        }
+
+        auto document = ti::readSchemaDocument(input, limits.loading.documentBytes);
+
+        if (!document) {
+            const auto error = document.error();
+
+            return schemaError(error == ti::SchemaInputError::IO_ERROR ? 3 : 6,
+                               error == ti::SchemaInputError::IO_ERROR         ? "IO_ERROR"
+                               : error == ti::SchemaInputError::RESOURCE_LIMIT ? "RESOURCE_LIMIT"
+                                                                               : "ALLOCATION_FAILURE");
+        }
+
+        auto schema = loader::loadBinaryJsonSchema(*document, limits);
+
+        if (!schema) {
+            const auto error = schema.error();
+            const int code =
+                error == loader::JsonSchemaError::MALFORMED_JSON || error == loader::JsonSchemaError::INVALID_SCHEMA ? 5
+                : error == loader::JsonSchemaError::RESOURCE_LIMIT ||
+                        error == loader::JsonSchemaError::ALLOCATION_FAILURE
+                    ? 6
+                    : 4;
+
+            return schemaError(code, loader::jsonSchemaErrorName(error));
+        }
+
+        std::cout << "schema-valid\t1\tqdcxx-native-binary\t1\n";
+        std::cout.flush();
+
+        return std::cout ? 0 : schemaError(3, "IO_ERROR");
+    } catch (const std::bad_alloc &) {
+        return schemaError(6, "ALLOCATION_FAILURE");
+    } catch (const std::length_error &) {
+        return schemaError(6, "ALLOCATION_FAILURE");
+    } catch (const std::ios_base::failure &) {
+        return schemaError(3, "IO_ERROR");
+    }
+#else
+    (void)path;
+    (void)limits;
+
+    return schemaError(4, "LOADER_DISABLED");
+#endif
+}
 } // namespace
 
 /** Inspect one local tape with an explicit schema source.
@@ -76,6 +138,11 @@ int main(int argc, char **argv) {
 
         ti::Limits limits;
         org::ttldtor::qdcxx::schema::JsonSchemaLimits schemaLimits;
+        org::ttldtor::qdcxx::schema::BinaryJsonSchemaLimits binaryLimits;
+        const std::map<std::string_view, std::size_t *> binaryOptions{
+            {"--max-schema-parser-bytes", &binaryLimits.parserBytes},
+            {"--max-schema-work", &binaryLimits.workUnits},
+            {"--max-schema-model-bytes", &binaryLimits.schemaModelBytes}};
         auto &t = limits.tape;
         const std::map<std::string_view, std::pair<std::size_t *, std::size_t>> broadOptions{
             {"--field-payload-encoded-bytes", {&t.data.fieldPayloadEncodedBytes, BROAD_FIELD_PAYLOAD_ENCODED_BYTES}},
@@ -127,6 +194,8 @@ int main(int argc, char **argv) {
                    "tsv|human] [--diagnostics-version 1|2] [--tape-mode legacy|raw-message-v1|binary-catalog-v1] "
                    "[LIMIT "
                    "VALUE ...]\n"
+                   "qdcxx-tape-inspect --schema PATH --schema-format binary-v1 --validate-schema [SCHEMA-LIMIT VALUE "
+                   "...]\n"
                    "Explicit BINARY, uncompressed, time NONE, EMPTY_SET, STREAM_DATA, zero flags.\n"
                    "oracle-sre-v1: diagnostic S/R/E, exact type 8, diagnostics default 1.\n"
                    "default-quote-v1: composite Quote, exact types 2/8/56/120, diagnostics default 2.\n"
@@ -135,6 +204,11 @@ int main(int argc, char **argv) {
                    "oracle-field-types-v1: diagnostic FieldTypes, exact 2/8/10/40/56/72/88/120; output 4, "
                    "diagnostics default 2.\n"
                    "--schema PATH: native resolved JSON, generic typed output 6, diagnostics default 2.\n"
+                   "--schema-format binary-v1 --validate-schema: validate qdcxx-native-binary profile1 only; "
+                   "no tape/network work. Both flags are required; tape/output options are refused.\n"
+                   "Success: schema-valid<TAB>1<TAB>qdcxx-native-binary<TAB>1; errors: static schema-error row.\n"
+                   "Binary-only limits intersect input/count bounds: parser allocation-request bytes, logical "
+                   "work units (not bytes), logical two-copy schema-model bytes (not total heap/RSS).\n"
                    "--wire-schema ordinary-v1: explicit ordinary exact 2/8/10/40/56/72/88/120 discovery; "
                    "self-describing output 7 with names, source IDs/order and successful generations.\n"
                    "--wire-schema binary-catalog-v1 --tape-mode binary-catalog-v1: explicit all19 finite fields, "
@@ -150,6 +224,12 @@ int main(int argc, char **argv) {
                    "Numeric limits are finite unsigned decimal; chunk-size must be positive. Defaults:\n";
 
             for (const auto &[name, value] : options) {
+                std::cout << name << ' ' << *value << '\n';
+            }
+
+            std::cout << "Binary validation-only defaults (zero literal; equality admitted):\n";
+
+            for (const auto &[name, value] : binaryOptions) {
                 std::cout << name << ' ' << *value << '\n';
             }
 
@@ -178,18 +258,30 @@ int main(int argc, char **argv) {
         std::string profile;
         std::string schemaPath;
         std::string wireSchema;
+        std::string schemaFormat;
         std::set<std::string_view> seen;
         bool valid = true;
+        bool validateSchema = false;
 
-        for (int i = 1; valid && i < argc; i += 2) {
+        for (int i = 1; valid && i < argc; ++i) {
             std::string_view key(argv[i]);
 
-            if (i + 1 == argc || !seen.insert(key).second) {
+            if (!seen.insert(key).second) {
                 valid = false;
                 break;
             }
 
-            std::string_view operand(argv[i + 1]);
+            if (key == "--validate-schema") {
+                validateSchema = true;
+                continue;
+            }
+
+            if (i + 1 == argc) {
+                valid = false;
+                break;
+            }
+
+            std::string_view operand(argv[++i]);
 
             if (key == "--input") {
                 path = operand;
@@ -197,6 +289,8 @@ int main(int argc, char **argv) {
                 profile = operand;
             } else if (key == "--schema") {
                 schemaPath = operand;
+            } else if (key == "--schema-format") {
+                schemaFormat = operand;
             } else if (key == "--wire-schema") {
                 wireSchema = operand;
             } else if (key == "--output-format") {
@@ -213,11 +307,41 @@ int main(int argc, char **argv) {
             } else {
                 auto option = options.find(key);
                 const auto broadOption = broadOptions.find(key);
-                valid = option != options.end()
-                            ? presentation::detail::parseUnsignedCount(operand, *option->second)
+                const auto binaryOption = binaryOptions.find(key);
+                valid = option != options.end() ? presentation::detail::parseUnsignedCount(operand, *option->second)
+                        : binaryOption != binaryOptions.end()
+                            ? presentation::detail::parseUnsignedCount(operand, *binaryOption->second)
                             : broadOption != broadOptions.end() &&
                                   presentation::detail::parseUnsignedCount(operand, *broadOption->second.first);
             }
+        }
+
+        bool binarySelection = validateSchema || seen.contains("--schema-format");
+
+        for (const auto &[name, value] : binaryOptions) {
+            (void)value;
+            binarySelection = binarySelection || seen.contains(name);
+        }
+
+        if (binarySelection) {
+            valid = valid && validateSchema && schemaFormat == "binary-v1" && seen.contains("--schema") &&
+                    !schemaPath.empty() && schemaPath != "-";
+
+            for (const auto key : seen) {
+                const bool schemaLimit = key.starts_with("--max-schema-");
+                valid = valid &&
+                        (key == "--schema" || key == "--schema-format" || key == "--validate-schema" || schemaLimit);
+            }
+
+            if (!valid) {
+                ti::report(std::cerr, 2, "usage");
+
+                return 2;
+            }
+
+            binaryLimits.loading = schemaLimits;
+
+            return validateBinarySchema(schemaPath, binaryLimits);
         }
 
         const bool quoteProfile = profile == "default-quote-v1";

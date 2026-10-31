@@ -1,5 +1,33 @@
 # Ограниченные компоненты C++23
 
+<a id="installed-binary-json-loader"></a>
+
+## Устанавливаемый binary JSON loader
+
+При JSON ON устанавливаются/экспортируются `qdcxx_schema_json`, закрытая статическая зависимость
+`qdcxx_simdjson`, необязательный schema header и точные upstream licenses. Consumer не нужны SDK
+headers/source root, `find_package(simdjson)` и fetch step. SDK includes доступны только при сборке;
+relocated imported archives используют префикс пакета. JSON OFF не ищет/получает/линкует simdjson,
+не читает его исходники и не добавляет cache entries необязательной зависимости.
+[Самостоятельный consumer](../tests/conformance/schema_json_consumer/CMakeLists.txt) использует
+эти точные statements после объявления C++ project:
+
+```cmake
+find_package(qdcxx CONFIG REQUIRED)
+add_executable(qdcxx_schema_json_consumer main.cpp)
+target_link_libraries(qdcxx_schema_json_consumer PRIVATE qdcxx_schema_json qdcxx_collectors)
+set_target_properties(qdcxx_schema_json_consumer PROPERTIES CXX_EXTENSIONS OFF)
+```
+
+C++23 наследуется из usage requirements библиотеки. Задайте `CMAKE_PREFIX_PATH` или `qdcxx_DIR`
+на установленный/перемещённый пакет, как ниже. Подключите `qd/schema/json_schema.hpp` и выберите
+`loadBinaryJsonSchema` с `BinaryJsonSchemaLimits` для
+[native binary profile](../spec/schema/NATIVE-BINARY-JSON.ru.md). Обычный `loadJsonSchema` сохраняет v1.
+Новые лимиты независимо ограничивают parser requests, логическую работу и логические bytes двух
+копий схемы; total heap/RSS они не ограничивают. Core/protocol/collectors независимы от JSON.
+[Протокол квалификации](../tests/conformance/schema-json/VALIDATION.ru.md#binary-json-profile-qualification)
+описывает проверки lifetime consumer и границы доказательств окончательной сборки.
+
 ## Явное обнаружение обычной wire-схемы
 
 Чтобы явно включить обнаружение обычной схемы из wire-описаний, подключите
@@ -45,8 +73,8 @@ STREAM staging использует отдельный компонент кол
 и имена targets `qdcxx_encoding`, `qdcxx_core`, `qdcxx_protocol`, `qdcxx_collectors`,
 `qdcxx_event_mapping`, `qdcxx_quote`, `qdcxx_profile`, а при наличии также `qdcxx_transport`
 и `qdcxx_client`. Установленные заголовки событий позволяют применять prepared
-Quote/Profile mappings к общим записям без зависимости от JSON. JSON, replay и tools
-не становятся дополнительными exported library targets.
+Quote/Profile mappings к общим записям без зависимости от JSON. JSON ON также экспортирует описанный
+выше loader; replay и tools не становятся дополнительными exported library targets.
 Enabled package содержит qualified static c-ares archive, native link closure
 и notices зависимостей. SDK headers и компилятор C consumer не требуются.
 Для обнаружения задайте установленный prefix через `CMAKE_PREFIX_PATH`. При

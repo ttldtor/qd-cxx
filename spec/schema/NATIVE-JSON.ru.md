@@ -8,6 +8,9 @@
 наблюдаемый формат Java. Существующие [контракт XML-captured](JSON-CONTRACT.ru.md), примеры и
 provenance не меняются; этот загрузчик явно не поддерживает `qd-3.355-xml-captured`.
 
+Отдельно выбранный профиль `loadBinaryJsonSchema` / `qdcxx-native-binary` описан в
+[Native binary JSON](NATIVE-BINARY-JSON.ru.md). Обычный профиль и требования ниже сохранены.
+
 ## Документ и грамматика объектов
 
 Вход — ровно один JSON-документ в UTF-8 с допустимыми пробелами JSON до и после него, без BOM.

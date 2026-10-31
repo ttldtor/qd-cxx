@@ -7,6 +7,63 @@ Actual clean starting HEAD: `3bc0e5ee37cf1dd68306d8016a5b65f68c2da2e0`.
 Implementation and author self-review are complete;
 independent review/acceptance remains open.
 
+<a id="binary-json-profile-qualification"></a>
+
+## Binary JSON profile qualification
+
+This separate section specifies qualification of the
+[binary profile](../../../spec/schema/NATIVE-BINARY-JSON.md). Historical ordinary-profile results
+elsewhere on this page retain their date/scope and do not establish final-source binary acceptance.
+The following binary-addition checks were executed on 2026-10-31 UTC. Windows used MSVC 19.42
+x64 Release; Linux used GCC 13.3 x86-64 Debug with ASan+UBSan and LSan disabled.
+
+| Executed check | Windows | Linux |
+| --- | --- | --- |
+| Full module suite, JSON ON, CLIENT/RUNTIME OFF | 69/69 passed | 69/69 passed |
+| Full module suite, JSON OFF, CLIENT/RUNTIME OFF | 65/65 passed | 65/65 passed |
+| Corrected allocation/resource contract | 19 cases, 1221 assertions passed | 19 cases, 1221 assertions passed |
+| Clean production JSON ON, CLIENT/RUNTIME OFF; moved-prefix HISTORY consumer | 1/1 passed | 1/1 passed |
+| Clean production JSON/CLIENT/RUNTIME ON; moved-prefix schema, endpoint and controlled-TCP consumers | Each of three consumers passed 1/1 | Each of three consumers passed 1/1 |
+
+Production profiles used BUILD_TESTING=OFF and disabled command-line tools. Earlier test-enabled
+module packages remain validation artifacts, with their testing extras outside the clean SDK claim.
+The full suites precede the test-allocator alignment correction; production behavior was unchanged,
+and the corrected final allocation/failure/backend contract was rerun separately on both compilers.
+The ordinary request measurements exclude instrumentation headers and unobserved process allocations.
+
+An official production Java QD control capture and verification against both native outputs passed.
+The 344-byte control stream and 4778-byte callback projection remained identical; only CMake source
+provenance and its manifest changed. This is unchanged control-session evidence, not a Java HISTORY
+producer qualification or a full standard event adapter claim.
+
+Source tests cover nineteen full identities, pair/single/ordinary layouts, malformed members/numbers,
+independent provenance, zero/equality/one-short/overflow budget edges, tiny input with huge configured
+maxima, default intersection, long-prefix name comparisons, field coverage and allocation cleanup.
+Qualification inspects all nine pinned backends; source bounds and enabled-backend sizeof/request
+observations remain separate. MSVC 19.42 x64/STL and GCC 13.3 x64/libstdc++ capacity observations are
+not portable heap limits. Ordinary allocation instrumentation must preserve default-new alignment;
+its headers and unintercepted/aligned/process allocations are outside observed payload requests.
+
+Required native profiles are Windows x64 Release and Ubuntu 24.04 GCC 13.3 Debug ASan+UBSan with
+`ASAN_OPTIONS=detect_leaks=0:halt_on_error=1` and
+`UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1`. LSan is excluded. JSON ON/OFF module checks use
+CLIENT/RUNTIME OFF and do not qualify a combined runtime/client profile. Package checks install,
+physically relocate and rebuild independent ON and pure OFF consumers. OFF must avoid optional
+dependency acquisition/import/source access; changed complete SDK hashes must fail ON configuration.
+
+The [installed consumer](../schema_json_consumer/main.cpp) loads pair/single JSON, overwrites and
+destroys input before schema use, then composes existing real `LiveSession` and `HistoryCollector`.
+The source session lives during admission and `stage`; it dies before view opening and
+`front`/reading/`pop`. Checks retain raw time, NUL/unpaired UTF-16 payload and symbol units, null/empty
+payloads, opaque bytes, extra fields, source context and rejection of an independent foreign load.
+Staging after source destruction is not demonstrated. Native constructed frames establish neither
+new Java HISTORY production captures nor full wire equivalence.
+
+CLI gates cover paired selectors, usage before I/O, OFF before missing-file I/O, help/no-argument
+equivalence without input, static rows and failed flush. Ordinary goldens/API/errors and tape modes
+remain regression gates. EN/RU links/examples, Doxygen and changed Markdown whitespace require
+verification alongside final-source native evidence.
+
 ## Implementation and coverage
 
 - U1: [native version-1 contract](../../../spec/schema/NATIVE-JSON.md) and three small examples define

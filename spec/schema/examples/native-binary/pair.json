@@ -1,0 +1,13 @@
+{
+    "formatVersion": 1,
+    "profile": {"id": "qdcxx-native-binary", "version": 1},
+    "records": [{
+        "id": 0,
+        "name": "TimeAndSale",
+        "hasTime": true,
+        "fields": [{"serialTypeId": 56}, {"serialTypeId": 72}, {"serialTypeId": 120}],
+        "lookups": [{"name": "Time", "fieldId": 0}, {"name": "Sequence", "fieldId": 1},
+                    {"name": "Price", "fieldId": 2}],
+        "indexedTimeLayout": {"kind": "pair-int32", "highFieldId": 0, "lowFieldId": 1}
+    }]
+}

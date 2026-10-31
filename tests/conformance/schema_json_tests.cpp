@@ -8,10 +8,145 @@
 
 #include <array>
 #include <cstdint>
+#include <cstdlib>
+#include <iostream>
 #include <limits>
+#include <new>
+#include <simdjson.h>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
+
+namespace {
+bool allocationFault = false;       ///< Test-only ordinary-allocation fault injection, serialized with the loader.
+std::size_t allowedAllocations = 0; ///< Requests allowed before the selected operation fails.
+std::size_t requestedBytes = 0;     ///< Successful ordinary request payloads in the selected observation interval.
+std::size_t liveRequestedBytes = 0; ///< Ordinary request payloads still owned by this test executable.
+std::size_t peakRequestedBytes = 0; ///< Maximum simultaneous ordinary payload bytes in the observation interval.
+
+/** Aligned bookkeeping for an ordinary test allocation, excluded from observed request payloads. */
+struct alignas(__STDCPP_DEFAULT_NEW_ALIGNMENT__) AllocationHeader {
+    std::size_t bytes; ///< Original ordinary operator-new request.
+};
+} // namespace
+
+/** Inject/observe ordinary allocation requests without changing production allocators.
+ * @param bytes Requested ordinary payload size.
+ * @return Aligned owned storage, or bad_alloc before ownership when injection is armed.
+ */
+void *operator new(std::size_t bytes) {
+    if (allocationFault) {
+        if (allowedAllocations == 0) {
+            throw std::bad_alloc{};
+        }
+
+        --allowedAllocations;
+    }
+
+    if (bytes > std::numeric_limits<std::size_t>::max() - sizeof(AllocationHeader)) {
+        throw std::bad_alloc{};
+    }
+
+    auto *header = static_cast<AllocationHeader *>(std::malloc(sizeof(AllocationHeader) + bytes));
+
+    if (!header) {
+        throw std::bad_alloc{};
+    }
+
+    header->bytes = bytes;
+    requestedBytes += bytes;
+    liveRequestedBytes += bytes;
+    peakRequestedBytes = std::max(peakRequestedBytes, liveRequestedBytes);
+
+    return header + 1;
+}
+
+/** Allocate one ordinary test array through the same observed request boundary.
+ * @param bytes Requested payload size.
+ * @return Owned storage, or bad_alloc.
+ */
+void *operator new[](std::size_t bytes) {
+    return ::operator new(bytes);
+}
+
+/** Observe nonthrowing ordinary allocations, including pinned parser failure paths.
+ * @param bytes Requested payload size.
+ * @param tag Standard nonthrowing selection, unused.
+ * @return Owned storage, or null on failure.
+ */
+void *operator new(std::size_t bytes, const std::nothrow_t &tag) noexcept {
+    (void)tag;
+
+    try {
+        return ::operator new(bytes);
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+/** Observe nonthrowing ordinary arrays.
+ * @param bytes Requested payload size.
+ * @param tag Standard nonthrowing selection.
+ * @return Owned storage, or null on failure.
+ */
+void *operator new[](std::size_t bytes, const std::nothrow_t &tag) noexcept {
+    return ::operator new(bytes, tag);
+}
+
+/** Release one observed ordinary test allocation.
+ * @param pointer Previously returned storage, or null.
+ */
+void operator delete(void *pointer) noexcept {
+    if (pointer) {
+        auto *header = static_cast<AllocationHeader *>(pointer) - 1;
+        liveRequestedBytes -= header->bytes;
+        std::free(header);
+    }
+}
+
+/** Release an observed ordinary array.
+ * @param pointer Previously allocated array, or null.
+ */
+void operator delete[](void *pointer) noexcept {
+    ::operator delete(pointer);
+}
+
+/** Release sized ordinary storage without relying on its implementation-supplied size.
+ * @param pointer Previously allocated storage, or null.
+ * @param bytes Implementation-supplied size, unused.
+ */
+void operator delete(void *pointer, std::size_t bytes) noexcept {
+    (void)bytes;
+    ::operator delete(pointer);
+}
+
+/** Release sized array storage.
+ * @param pointer Previously allocated array, or null.
+ * @param bytes Implementation-supplied size, unused.
+ */
+void operator delete[](void *pointer, std::size_t bytes) noexcept {
+    (void)bytes;
+    ::operator delete(pointer);
+}
+
+/** Release ordinary storage after a nonthrowing constructor failure.
+ * @param pointer Allocated storage, or null.
+ * @param tag Standard nonthrowing selection, unused.
+ */
+void operator delete(void *pointer, const std::nothrow_t &tag) noexcept {
+    (void)tag;
+    ::operator delete(pointer);
+}
+
+/** Release array storage after a nonthrowing constructor failure.
+ * @param pointer Allocated storage, or null.
+ * @param tag Standard nonthrowing selection, unused.
+ */
+void operator delete[](void *pointer, const std::nothrow_t &tag) noexcept {
+    (void)tag;
+    ::operator delete(pointer);
+}
 
 namespace org::ttldtor::qdcxx::schema {
 namespace {
@@ -48,6 +183,52 @@ std::string replace(std::string input, std::string_view from, std::string_view t
     input.replace(position, from.size(), to);
 
     return input;
+}
+
+/** Supply an explicitly selected binary document without changing legacy fixture helpers.
+ * @param records Complete record-array JSON.
+ * @return Owned binary-profile document.
+ */
+std::string binaryDocument(std::string_view records = "[]") {
+    return R"({"formatVersion":1,"profile":{"id":"qdcxx-native-binary","version":1},"records":)" +
+           std::string(records) + "}";
+}
+
+/** Construct complete logical field/lookup metadata with an explicit time layout.
+ * @param types Full field identities.
+ * @param layout Complete layout JSON, or null for an ordinary record.
+ * @return One-record binary document with complete explicit keys.
+ */
+std::string binaryRecord(std::span<const int> types,
+                         std::string_view layout = R"({"kind":"pair-int32","highFieldId":0,"lowFieldId":1})") {
+    std::string fields = "[";
+    std::string lookups = "[";
+
+    for (std::size_t i = 0; i < types.size(); ++i) {
+        if (i != 0) {
+            fields += ',';
+            lookups += ',';
+        }
+
+        fields += "{\"serialTypeId\":" + std::to_string(types[i]) + "}";
+        lookups += "{\"name\":\"F" + std::to_string(i) + "\",\"fieldId\":" + std::to_string(i) + "}";
+    }
+
+    return binaryDocument("[{\"id\":0,\"name\":\"R\",\"hasTime\":" + std::string(layout == "null" ? "false" : "true") +
+                          ",\"fields\":" + fields + "],\"lookups\":" + lookups +
+                          "],\"indexedTimeLayout\":" + std::string(layout) + "}]");
+}
+
+/** Check one complete binary-profile failure without retaining its input in the result.
+ * @param input Complete document.
+ * @param error Required stable category.
+ * @param limits Explicit independent loading budgets.
+ */
+void binaryError(std::string_view input, JsonSchemaError error, BinaryJsonSchemaLimits limits = {}) {
+    const auto loaded = loadBinaryJsonSchema(input, limits);
+    CAPTURE(input);
+    REQUIRE_FALSE(loaded);
+    CHECK(loaded.error() == error);
 }
 
 /** Assert the complete load fails with the selected stable category.
@@ -306,6 +487,293 @@ TEST_CASE("native JSON diagnostic tokens are stable static text") {
 
     for (std::size_t i = 0; i < errors.size(); ++i) {
         CHECK(jsonSchemaErrorName(errors[i]) == names[i]);
+    }
+}
+
+TEST_CASE("binary JSON selects independent identity and owns all forty-nine pair layouts") {
+    for (const auto high : {4, 8, 24, 40, 56, 72, 88}) {
+        for (const auto low : {4, 8, 24, 40, 56, 72, 88}) {
+            const std::array types{low, 137, high, 233};
+            auto input = binaryRecord(types, R"({"kind":"pair-int32","highFieldId":2,"lowFieldId":0})");
+            auto loaded = loadBinaryJsonSchema(input);
+            auto other = loadBinaryJsonSchema(input);
+            REQUIRE(loaded);
+            REQUIRE(other);
+            input.assign(input.size(), 'x');
+            input.clear();
+            input.shrink_to_fit();
+            CHECK(loaded->profile() == core::LocalProfile::BINARY_FIELDS_V1);
+            const auto &record = loaded->records()[0];
+            REQUIRE(record.indexedTimeLayout);
+            const auto &pair = std::get<core::IndexedTimePairInt32>(*record.indexedTimeLayout);
+            CHECK(pair.firstField == 2);
+            CHECK(pair.secondField == 0);
+            CHECK(record.fields[2].serialTypeId == high);
+            CHECK(record.fields[0].serialTypeId == low);
+            CHECK_FALSE(loaded->sharesIdentityWith(*other));
+            auto copy = *loaded;
+            CHECK(copy.sharesIdentityWith(*loaded));
+            CHECK(copy.recordContext(0).matches(loaded->recordContext(0)));
+        }
+    }
+
+    binaryError(document(), JsonSchemaError::UNSUPPORTED_PROFILE);
+    checkError(binaryDocument(), JsonSchemaError::UNSUPPORTED_PROFILE);
+    checkError(replace(document(), "\"formatVersion\":1", "\"formatVersion\":2"), JsonSchemaError::UNSUPPORTED_VERSION);
+    binaryError(replace(binaryDocument(), "\"version\":1", "\"version\":2"), JsonSchemaError::UNSUPPORTED_VERSION);
+    binaryError(replace(binaryDocument("[null]"), "qdcxx-native-binary", "unknown"),
+                JsonSchemaError::UNSUPPORTED_PROFILE);
+}
+
+TEST_CASE("binary JSON single64 and ordinary records retain the complete exact field catalog") {
+    const std::array catalog{0, 1, 2, 3, 4, 8, 9, 10, 24, 40, 56, 72, 88, 104, 120, 137, 152, 233, 249};
+
+    for (const auto type : {104, 120, 152}) {
+        std::vector<int> types(catalog.begin(), catalog.end());
+        types.push_back(type);
+        auto loaded = loadBinaryJsonSchema(binaryRecord(types, R"({"kind":"single-int64","fieldId":19})"));
+        REQUIRE(loaded);
+        REQUIRE(loaded->records()[0].indexedTimeLayout);
+        CHECK(std::get<core::IndexedTimeSingleInt64>(*loaded->records()[0].indexedTimeLayout).field == 19);
+        CHECK(loaded->records()[0].fields.size() == 20);
+    }
+
+    auto ordinary = loadBinaryJsonSchema(binaryRecord(catalog, "null"));
+    REQUIRE(ordinary);
+    CHECK_FALSE(ordinary->records()[0].hasTime);
+    CHECK_FALSE(ordinary->records()[0].indexedTimeLayout);
+    CHECK(loadBinaryJsonSchema(binaryDocument()));
+    CHECK(loadBinaryJsonSchema(binaryRecord({}, "null")));
+}
+
+TEST_CASE("binary JSON rejects partial duplicate mismatched and unsupported indexing atomically") {
+    const std::array types{56, 72};
+    const auto valid = binaryRecord(types);
+
+    for (const auto layout : {"null", "{}", R"({"kind":"pair-int32","highFieldId":0})",
+                              R"({"kind":"pair-int32","highFieldId":0,"lowFieldId":0})",
+                              R"({"kind":"pair-int32","highFieldId":2,"lowFieldId":0})",
+                              R"({"kind":"pair-int32","highFieldId":0,"lowFieldId":1,"fieldId":0})",
+                              R"({"kind":"pair-int32","highFieldId":0,"highField\u0049d":1,"lowFieldId":1})",
+                              R"({"kind":"single-int64"})", R"({"kind":"single-int64","fieldId":2})"}) {
+        binaryError(replace(valid, R"({"kind":"pair-int32","highFieldId":0,"lowFieldId":1})", layout),
+                    JsonSchemaError::INVALID_SCHEMA);
+    }
+
+    for (const auto number : {"-1", "1.0", "1e0", "2147483648", "null", "true", "\"0\""}) {
+        binaryError(replace(valid, "\"highFieldId\":0", "\"highFieldId\":" + std::string(number)),
+                    JsonSchemaError::INVALID_SCHEMA);
+    }
+
+    for (const auto type : {0, 1, 2, 3, 9, 10, 104, 120, 137, 152, 233, 249}) {
+        const std::array wrong{type, 8};
+        binaryError(binaryRecord(wrong), JsonSchemaError::UNSUPPORTED_INDEXED);
+    }
+
+    binaryError(binaryRecord(types, R"({"kind":"single-int64","fieldId":0})"), JsonSchemaError::UNSUPPORTED_INDEXED);
+    binaryError(binaryRecord(types, R"({"kind":"unknown"})"), JsonSchemaError::UNSUPPORTED_INDEXED);
+    binaryError(replace(valid, "\"hasTime\":true", "\"hasTime\":false"), JsonSchemaError::INVALID_SCHEMA);
+    binaryError(replace(valid, "\"serialTypeId\":56", "\"serialTypeId\":264"), JsonSchemaError::UNSUPPORTED_TYPE);
+    binaryError(replace(valid, "\"fieldId\":1", "\"fieldId\":9"), JsonSchemaError::INVALID_SCHEMA);
+    binaryError(replace(valid, "\"name\":\"F1\"", "\"name\":\"F0\""), JsonSchemaError::INVALID_SCHEMA);
+    binaryError(replace(valid, "\"id\":0", "\"id\":1"), JsonSchemaError::INVALID_SCHEMA);
+}
+
+TEST_CASE("binary JSON independent budgets admit equality and reject one-short without changing old schemas") {
+    const std::array types{56, 72};
+    const auto valid = binaryRecord(types);
+    auto old = loadJsonSchema(oneRecord());
+    REQUIRE(old);
+    const auto context = old->recordContext(0);
+
+    for (const auto axis : {&BinaryJsonSchemaLimits::parserBytes, &BinaryJsonSchemaLimits::workUnits,
+                            &BinaryJsonSchemaLimits::schemaModelBytes}) {
+        std::size_t low = 0;
+        std::size_t high = BinaryJsonSchemaLimits{}.*axis;
+
+        while (low < high) {
+            const auto middle = low + (high - low) / 2;
+            BinaryJsonSchemaLimits limits;
+            limits.*axis = middle;
+
+            if (loadBinaryJsonSchema(valid, limits)) {
+                high = middle;
+            } else {
+                low = middle + 1;
+            }
+        }
+
+        REQUIRE(low > 0);
+        BinaryJsonSchemaLimits exact;
+        exact.*axis = low;
+        REQUIRE(loadBinaryJsonSchema(valid, exact));
+        --(exact.*axis);
+        binaryError(valid, JsonSchemaError::RESOURCE_LIMIT, exact);
+        exact.*axis = 0;
+        binaryError(valid, JsonSchemaError::RESOURCE_LIMIT, exact);
+        CHECK(context.matches(old->recordContext(0)));
+    }
+
+    BinaryJsonSchemaLimits huge;
+    const auto maximum = std::numeric_limits<std::size_t>::max();
+    huge.loading = {maximum, maximum, {maximum, maximum, maximum, maximum, maximum}};
+    huge.parserBytes = maximum;
+    huge.workUnits = maximum;
+    huge.schemaModelBytes = maximum;
+    CHECK(loadBinaryJsonSchema(binaryDocument(), huge));
+    CHECK(loadBinaryJsonSchema(valid, huge));
+    BinaryJsonSchemaLimits depth;
+    depth.loading.depth = 4;
+    binaryError(valid, JsonSchemaError::RESOURCE_LIMIT, depth);
+    depth.loading.depth = 5;
+    CHECK(loadBinaryJsonSchema(valid, depth));
+    BinaryJsonSchemaLimits logical;
+    logical.loading.documentBytes = valid.size();
+    logical.loading.schema = {1, 2, 2, 2, 5};
+    REQUIRE(loadBinaryJsonSchema(valid, logical));
+
+    for (const auto member : {&core::SchemaLimits::records, &core::SchemaLimits::fields, &core::SchemaLimits::lookups,
+                              &core::SchemaLimits::nameUnits, &core::SchemaLimits::totalNameUnits}) {
+        auto shortLimit = logical;
+        --(shortLimit.loading.schema.*member);
+        binaryError(valid, JsonSchemaError::RESOURCE_LIMIT, shortLimit);
+    }
+
+    --logical.loading.documentBytes;
+    binaryError(valid, JsonSchemaError::RESOURCE_LIMIT, logical);
+    auto unicodeInput = replace(valid, "\"name\":\"R\"", R"("name":"R\u0000\uD83D\uDE00")");
+    auto unicode = loadBinaryJsonSchema(unicodeInput);
+    REQUIRE(unicode);
+    unicodeInput.assign(unicodeInput.size(), 'x');
+    CHECK(unicode->records()[0].name == std::u16string({u'R', u'\0', 0xd83d, 0xde00}));
+}
+
+TEST_CASE("binary JSON failed ordinary allocations release all staged storage and preserve old provenance") {
+    const std::array types{104, 10, 137, 9, 233, 249};
+    const auto input = binaryRecord(types, R"({"kind":"single-int64","fieldId":0})");
+    auto old = loadJsonSchema(oneRecord());
+    REQUIRE(old);
+    const auto identity = old->recordContext(0);
+    bool success = false;
+    std::size_t failed = 0;
+
+    for (std::size_t allowed = 0; allowed < 128; ++allowed) {
+        const auto before = liveRequestedBytes;
+        bool allocationError = false;
+        {
+            allowedAllocations = allowed;
+            allocationFault = true;
+            auto result = loadBinaryJsonSchema(input);
+            allocationFault = false;
+            success = result.has_value();
+            allocationError = !result && result.error() == JsonSchemaError::ALLOCATION_FAILURE;
+        }
+
+        CHECK(liveRequestedBytes == before);
+        CHECK(identity.matches(old->recordContext(0)));
+
+        if (success) {
+            break;
+        }
+
+        REQUIRE(allocationError);
+        ++failed;
+    }
+
+    CHECK(success);
+    CHECK(failed > 6);
+}
+
+TEST_CASE("ordinary allocation instrumentation preserves the default new alignment before typed access") {
+    for (const std::size_t bytes : {0, 1, 8, 16, 64}) {
+        void *storage = ::operator new(bytes);
+        const auto remainder = reinterpret_cast<std::uintptr_t>(storage) % __STDCPP_DEFAULT_NEW_ALIGNMENT__;
+        ::operator delete(storage);
+        CHECK(remainder == 0);
+    }
+}
+
+TEST_CASE("binary JSON charges long-prefix record lookup and coverage work before owned construction") {
+    constexpr std::size_t COUNT = 192;
+    const std::string prefix(192, 'p');
+    std::string records = "[";
+    std::string fields = "[";
+    std::string lookups = "[";
+
+    for (std::size_t i = 0; i < COUNT; ++i) {
+        const auto suffix = std::to_string(i);
+        const auto separator = i == 0 ? "" : ",";
+        records += separator + std::string("{\"id\":") + suffix + ",\"name\":\"" + prefix + suffix +
+                   "\",\"hasTime\":false,\"fields\":[],\"lookups\":[],\"indexedTimeLayout\":null}";
+        fields += separator + std::string("{\"serialTypeId\":8}");
+        lookups += separator + std::string("{\"name\":\"") + prefix + suffix + "\",\"fieldId\":" + suffix + "}";
+    }
+
+    records += ']';
+    fields += ']';
+    lookups += ']';
+    const auto manyRecords = binaryDocument(records);
+    const auto manyLookups = binaryDocument("[{\"id\":0,\"name\":\"R\",\"hasTime\":false,\"fields\":" + fields +
+                                            ",\"lookups\":" + lookups + ",\"indexedTimeLayout\":null}]");
+
+    for (const auto &input : {manyRecords, manyLookups}) {
+        CHECK(loadBinaryJsonSchema(input));
+        BinaryJsonSchemaLimits byteOnly;
+        byteOnly.workUnits = 32 * input.size();
+        binaryError(input, JsonSchemaError::RESOURCE_LIMIT, byteOnly);
+    }
+
+    binaryError(replace(binaryDocument(), "\"records\":[]", "\"records\":[],\"unknown\":[[[[[[]]]]]]"),
+                JsonSchemaError::RESOURCE_LIMIT, {{1048576, 5, {1024, 16384, 32768, 1024, 1048576}}});
+}
+
+TEST_CASE("binary JSON pinned parser envelopes cover selected and fallback ordinary requests") {
+    const simdjson::implementation *selected = simdjson::get_active_implementation();
+
+    for (const auto *backend : {selected, simdjson::get_available_implementations()["fallback"]}) {
+        REQUIRE(backend);
+        simdjson::get_active_implementation() = backend;
+        const auto before = liveRequestedBytes;
+        requestedBytes = 0;
+        peakRequestedBytes = before;
+        bool invalid = false;
+        {
+            auto rejected = loadBinaryJsonSchema("null");
+            invalid = !rejected && rejected.error() == JsonSchemaError::INVALID_SCHEMA;
+        }
+
+        const auto requests = requestedBytes;
+        const auto peak = peakRequestedBytes - before;
+        const auto after = liveRequestedBytes;
+        // C=32, B=4, D=5: independent pinned-source arithmetic for variable requests.
+        constexpr std::size_t VARIABLE_REQUESTS = 4 + 64 + 4 * (64 + 9) + 8 * 64 + 128 + 5 * 9;
+        const auto fixed =
+            sizeof(simdjson::internal::dom_parser_implementation) + 6 * sizeof(void *) + alignof(std::max_align_t);
+        CHECK(invalid);
+        CHECK(requests <= VARIABLE_REQUESTS + fixed);
+        CHECK(peak <= requests);
+        CHECK(after == before);
+        std::cout << "parser-requests\t" << backend->name() << '\t' << requests << '\t' << peak << '\t'
+                  << VARIABLE_REQUESTS + fixed << '\n';
+    }
+
+    simdjson::get_active_implementation() = selected;
+}
+
+TEST_CASE("binary JSON STL capacities and small-string transitions are qualified observations") {
+    for (const auto length : {0, 1, 6, 7, 8, 15, 16, 31, 32}) {
+        auto input = binaryRecord(std::array{104}, R"({"kind":"single-int64","fieldId":0})");
+        input = replace(std::move(input), "\"name\":\"R\"", "\"name\":\"R" + std::string(length, 'x') + "\"");
+        requestedBytes = 0;
+        auto loaded = loadBinaryJsonSchema(input);
+        const auto requests = requestedBytes;
+        REQUIRE(loaded);
+        auto copy = *loaded;
+        const auto &record = loaded->records()[0];
+        std::cout << "schema-capacity\t" << record.name.size() << '\t' << record.name.capacity() << '\t'
+                  << record.fields.capacity() << '\t' << record.lookups.capacity() << '\t' << loaded->storageBytes()
+                  << '\t' << copy.storageBytes() << '\t' << requests << '\n';
+        CHECK(copy.recordContext(0).matches(loaded->recordContext(0)));
     }
 }
 

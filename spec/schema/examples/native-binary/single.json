@@ -1,0 +1,12 @@
+{
+    "formatVersion": 1,
+    "profile": {"id": "qdcxx-native-binary", "version": 1},
+    "records": [{
+        "id": 0,
+        "name": "Custom#History",
+        "hasTime": true,
+        "fields": [{"serialTypeId": 104}, {"serialTypeId": 137}],
+        "lookups": [{"name": "Index", "fieldId": 0}, {"name": "Text", "fieldId": 1}],
+        "indexedTimeLayout": {"kind": "single-int64", "fieldId": 0}
+    }]
+}

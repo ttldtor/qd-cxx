@@ -1,0 +1,6 @@
+{
+    "formatVersion": 1,
+    "profile": {"id": "qdcxx-native-binary", "version": 1},
+    "records": [{"id": 0, "name": "R", "hasTime": false, "fields": [], "lookups": [],
+                 "indexedTimeLayout": null}]
+}

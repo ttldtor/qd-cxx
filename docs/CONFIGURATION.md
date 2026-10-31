@@ -1,5 +1,21 @@
 # Configuration architecture requirements
 
+## Explicit binary JSON configuration
+
+The separately selected [binary profile](../spec/schema/NATIVE-BINARY-JSON.md) is loaded through
+`loadBinaryJsonSchema` with explicit logical fields, lookups and indexed/time contributors. Success
+owns a `BINARY_FIELDS_V1` schema with independent provenance. Copies retain identity; separate loads
+do not. Ordinary `loadJsonSchema` retains its v1 profile and limits. No core seam is added.
+
+`BinaryJsonSchemaLimits` intersects original input/count/name bounds with parser-request bytes,
+logical work credits and logical two-copy schema-model bytes. These are separate scopes; model bytes
+are not an exact heap/RSS cap. Caller input, retained schemas and downstream copies remain external.
+No XML/imports, Java properties, inferred units/event mappings or live replacement is added.
+First backend selection by pinned simdjson may read `SIMDJSON_FORCE_IMPLEMENTATION`; the loader
+does not resolve application properties or mutate SDK globals. Foreign SDK-global mutation is outside
+resource qualification. [Validation mode](TAPE-INSPECT.md#binary-json-configuration-validation)
+finishes without tape/network work and adds no HISTORY subscription facade.
+
 ## Explicit wire-schema source
 
 The tape inspector's `--wire-schema ordinary-v1` is an explicit source choice,

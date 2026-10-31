@@ -2,6 +2,36 @@
 
 [English version](TAPE-INSPECT.md). Английская версия является нормативной.
 
+<a id="binary-json-configuration-validation"></a>
+
+## Проверка binary JSON конфигурации
+
+При включённом необязательном JSON loader проверьте отдельно выбранный
+[native binary profile](../spec/schema/NATIVE-BINARY-JSON.ru.md) без открытия tape:
+
+```powershell
+qdcxx-tape-inspect --schema spec/schema/examples/native-binary/pair.json --schema-format binary-v1 --validate-schema
+```
+
+Обязательны оба новых флага и непустой schema path, отличный от `-`. Режим принимает только эти
+селекторы и известные числовые `--max-schema-*` limits. Input, profile, wire-schema, tape-mode,
+source-profile и rendering/output options отклоняются как usage до файлового I/O. Три binary-only
+лимита — `--max-schema-parser-bytes`, `--max-schema-work`, `--max-schema-model-bytes`; каждый имеет
+default 67 108 864 в собственных единицах и пересекается с семью прежними schema limits. Work units —
+логические кредиты; model bytes описывают две логические копии объявлений. Total heap/RSS cap нет.
+Новые budget flags не выбирают и не изменяют ordinary mode без обоих явных селекторов.
+
+Успех пишет ровно `schema-valid<TAB>1<TAB>qdcxx-native-binary<TAB>1<LF>` в stdout с пустым stderr;
+возврат 0 возможен только после успешных write/flush. Ошибки используют ограниченную статическую
+stderr-строку `schema-error<TAB>1<TAB>CODE<LF>` без повторения пути/содержимого. Exit 2 — неверные
+аргументы; 3 — file/output I/O; 4 — неподдерживаемые profile/version/type/layout или `LOADER_DISABLED`;
+5 — malformed JSON/invalid schema; 6 — resource/allocation failure. При корректных options JSON OFF
+возвращает `LOADER_DISABLED` до попытки открыть отсутствующий schema file; неверные options дают usage 2.
+
+Без аргументов и с отдельным `--help` выводится одинаковая справка без рабочих входов и file I/O;
+ошибки вывода справки сохраняют ненулевой exit. Прежние tape defaults и output versions сохранены.
+Режим проверяет только конфигурацию; HISTORY tape reading, subscription и transport facade не добавлены.
+
 ## Владеющие самодостаточные источники и вывод версии 9
 
 Явный профиль `self-contained-segments-v1` владеет конечным упорядоченным списком локальных файлов.

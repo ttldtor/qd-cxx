@@ -13,6 +13,53 @@ function(expect_failure expected token)
     endif()
 endfunction()
 
+# Invalid binary-selection combinations precede file IO.
+foreach(args IN ITEMS
+    "--schema;missing;--validate-schema"
+    "--schema;missing;--schema-format;binary-v1"
+    "--schema;missing;--schema-format;wrong;--validate-schema"
+    "--schema;missing;--schema-format;binary-v1;--validate-schema;--input;missing"
+    "--schema;missing;--schema-format;binary-v1;--validate-schema;--output-format;human"
+    "--schema;missing;--schema-format;binary-v1;--validate-schema;--profile;oracle-sre-v1"
+    "--schema;missing;--schema-format;binary-v1;--validate-schema;--max-schema-work;-1"
+    "--schema;missing;--schema-format;binary-v1;--validate-schema;--validate-schema"
+    "--input;missing;--schema;missing;--max-schema-parser-bytes;1")
+    expect_failure(2 usage ${args})
+endforeach()
+
+if(ENABLED)
+    set(binary_examples "${ROOT}/spec/schema/examples/native-binary")
+    foreach(stem IN ITEMS pair single ordinary)
+        execute_process(COMMAND "${PROGRAM}" --schema "${binary_examples}/${stem}.json"
+            --schema-format binary-v1 --validate-schema
+            RESULT_VARIABLE binary_code OUTPUT_VARIABLE binary_out ERROR_VARIABLE binary_error)
+        if(NOT binary_code EQUAL 0 OR NOT binary_out STREQUAL "schema-valid\t1\tqdcxx-native-binary\t1\n"
+            OR NOT binary_error STREQUAL "")
+            message(FATAL_ERROR "Binary validation ${stem}: ${binary_code}: ${binary_out}: ${binary_error}")
+        endif()
+    endforeach()
+    foreach(axis IN ITEMS parser-bytes work model-bytes)
+        expect_failure(6 "schema-error\t1\tRESOURCE_LIMIT\n"
+            --schema "${binary_examples}/pair.json" --schema-format binary-v1 --validate-schema
+            "--max-schema-${axis}" 0)
+    endforeach()
+    expect_failure(4 "schema-error\t1\tUNSUPPORTED_PROFILE\n"
+        --schema "${examples}/empty.json" --schema-format binary-v1 --validate-schema)
+    expect_failure(3 "schema-error\t1\tIO_ERROR\n"
+        --schema "${RUN}/absent-binary.json" --schema-format binary-v1 --validate-schema)
+    if(UNIX AND EXISTS "/dev/full")
+        execute_process(COMMAND "${PROGRAM}" --schema "${binary_examples}/pair.json"
+            --schema-format binary-v1 --validate-schema OUTPUT_FILE /dev/full
+            RESULT_VARIABLE full_code ERROR_VARIABLE full_error)
+        if(NOT full_code EQUAL 3 OR NOT full_error STREQUAL "schema-error\t1\tIO_ERROR\n")
+            message(FATAL_ERROR "Binary success-output failure returned ${full_code}: ${full_error}")
+        endif()
+    endif()
+else()
+    expect_failure(4 "schema-error\t1\tLOADER_DISABLED\n"
+        --schema missing --schema-format binary-v1 --validate-schema)
+endif()
+
 foreach(args IN ITEMS
     "--input;missing;--schema"
     "--input;missing;--schema;"

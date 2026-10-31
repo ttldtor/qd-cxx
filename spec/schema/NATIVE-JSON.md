@@ -8,6 +8,9 @@ This is the designed `qdcxx-native` profile for an owned ordinary local schema. 
 Java-observed format. The existing [XML-captured contract](JSON-CONTRACT.md), examples and provenance
 remain unchanged; `qd-3.355-xml-captured` is explicitly unsupported by this loader.
 
+For the separately selected `loadBinaryJsonSchema` / `qdcxx-native-binary` profile, see
+[Native binary JSON](NATIVE-BINARY-JSON.md). The ordinary profile and requirements below are unchanged.
+
 ## Document and object grammar
 
 Input is exactly one UTF-8 JSON document, with optional JSON whitespace before and after it, and

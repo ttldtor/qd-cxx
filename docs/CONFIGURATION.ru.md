@@ -1,5 +1,21 @@
 # Требования к архитектуре конфигурации
 
+## Явная binary JSON конфигурация
+
+Отдельно выбранный [binary profile](../spec/schema/NATIVE-BINARY-JSON.ru.md) загружается через
+`loadBinaryJsonSchema` с явными логическими полями, lookups и индексными/time-составляющими. Успех
+возвращает владеющую `BINARY_FIELDS_V1` схему с независимым provenance. Копии сохраняют идентичность,
+независимые загрузки — нет. Обычный `loadJsonSchema` сохраняет профиль v1 и лимиты. Core seam не добавлен.
+
+`BinaryJsonSchemaLimits` пересекает исходные input/count/name bounds с parser-request bytes,
+логическими work credits и логическими bytes двух копий схемы. Это отдельные области; model bytes
+не задают точный heap/RSS cap. Вход, сохранённые схемы и дальнейшие копии остаются внешними владельцами.
+XML/imports, Java properties, вывод units/event mappings и live replacement не добавлены.
+Первый выбор backend закреплённого simdjson может читать `SIMDJSON_FORCE_IMPLEMENTATION`; загрузчик
+не разрешает properties приложения и не изменяет SDK globals. Чужая мутация SDK globals вне ресурсной
+квалификации. [Режим проверки](TAPE-INSPECT.ru.md#binary-json-configuration-validation) завершается
+без tape/network work и не добавляет HISTORY subscription facade.
+
 ## Явный источник wire-схемы
 
 Параметр `--wire-schema ordinary-v1` явно выбирает источник схемы для инспектора tape

@@ -7,6 +7,64 @@
 Реализация и авторская самопроверка завершены;
 независимое ревью/приёмка открыты.
 
+<a id="binary-json-profile-qualification"></a>
+
+## Квалификация binary JSON profile
+
+Этот отдельный раздел задаёт квалификацию
+[binary profile](../../../spec/schema/NATIVE-BINARY-JSON.ru.md). Исторические ordinary-profile
+результаты остальных разделов сохраняют дату/область и не доказывают приёмку окончательного binary
+source. Следующие проверки binary-добавления выполнены 2026-10-31 UTC. Windows: MSVC 19.42
+x64 Release; Linux: GCC 13.3 x86-64 Debug с ASan+UBSan, LSan отключён.
+
+| Выполненная проверка | Windows | Linux |
+| --- | --- | --- |
+| Полный module suite, JSON ON, CLIENT/RUNTIME OFF | 69/69 прошли | 69/69 прошли |
+| Полный module suite, JSON OFF, CLIENT/RUNTIME OFF | 65/65 прошли | 65/65 прошли |
+| Исправленный allocation/resource contract | 19 cases, 1221 assertions прошли | 19 cases, 1221 assertions прошли |
+| Чистый production JSON ON, CLIENT/RUNTIME OFF; HISTORY consumer из перенесённого prefix | 1/1 прошёл | 1/1 прошёл |
+| Чистый production JSON/CLIENT/RUNTIME ON; schema, endpoint и controlled-TCP consumers из перенесённого prefix | Каждый из трёх прошёл 1/1 | Каждый из трёх прошёл 1/1 |
+
+Production-профили использовали BUILD_TESTING=OFF и отключённые CLI-утилиты. Прежние test-enabled
+module packages остаются артефактами валидации; их testing extras не входят в заявление о чистом SDK.
+Полные suites предшествуют исправлению выравнивания тестового allocator; production-поведение
+не менялось, а окончательный allocation/failure/backend contract повторён отдельно на обоих компиляторах.
+Наблюдения ordinary requests исключают instrumentation headers и ненаблюдаемые process allocations.
+
+Официальный production Java QD control capture и проверки по обоим native outputs прошли.
+Control stream 344 bytes и callback projection 4778 bytes остались идентичными; изменились только
+CMake source provenance и его manifest. Это прежнее control-session доказательство, а не квалификация
+Java HISTORY producer или полного адаптера стандартного события.
+
+Source tests охватывают девятнадцать full identities, pair/single/ordinary layouts, malformed
+members/numbers, независимое provenance, zero/equality/one-short/overflow budgets, tiny input при
+огромных максимумах, пересечение defaults, long-prefix name comparisons, field coverage и cleanup.
+Квалификация исследует все девять закреплённых backends; source bounds отделены от наблюдений
+sizeof/requests включённых backends. Наблюдения capacity MSVC 19.42 x64/STL и GCC 13.3 x64/libstdc++
+не являются переносимыми heap limits. Ordinary allocation instrumentation обязана сохранять
+default-new alignment; её headers и не перехваченные/aligned/process allocations вне наблюдаемых requests.
+
+Нужны Windows x64 Release и Ubuntu 24.04 GCC 13.3 Debug ASan+UBSan с
+`ASAN_OPTIONS=detect_leaks=0:halt_on_error=1` и
+`UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1`. LSan исключён. JSON ON/OFF module checks используют
+CLIENT/RUNTIME OFF и не квалифицируют combined runtime/client profile. Package checks устанавливают,
+физически перемещают пакет и заново собирают независимые ON и pure OFF consumers. OFF не должен
+получать/импортировать необязательную зависимость или читать её исходники; другой полный SDK hash
+должен отклоняться при ON configure.
+
+[Installed consumer](../schema_json_consumer/main.cpp) загружает pair/single JSON, перезаписывает и
+уничтожает вход до использования схемы, затем компонует настоящие прежние `LiveSession` и
+`HistoryCollector`. Source session живёт во время admission и `stage`; она уничтожается до открытия
+view и `front`/чтения/`pop`. Проверяются raw time, NUL/непарные UTF-16 units payload и symbol,
+null/empty payloads, opaque bytes, дополнительные поля, source context и отклонение независимой
+чужой загрузки. Staging после уничтожения source не проверяется. Native constructed frames не
+являются новыми Java HISTORY production captures и не доказывают полную wire equivalence.
+
+CLI gates покрывают парные селекторы, usage до I/O, OFF до missing-file I/O, одинаковую help/no-argument
+справку без входов, static rows и failed flush. Прежние ordinary goldens/API/errors и tape modes
+остаются regression gates. EN/RU links/examples, Doxygen и whitespace изменённых Markdown проверяются
+вместе с окончательными native evidence.
+
 ## Реализация и покрытие
 
 - U1: [native-контракт версии 1](../../../spec/schema/NATIVE-JSON.ru.md) и три небольших примера

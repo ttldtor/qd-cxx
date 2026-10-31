@@ -37,13 +37,28 @@ if(ORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON)
         SOURCE_SUBDIR qdcxx-unused
     )
     FetchContent_MakeAvailable(simdjson)
+    # The binary loader's parser-request model is qualified against these complete amalgamated sources.
+    file(SHA256 "${simdjson_SOURCE_DIR}/singleheader/simdjson.h" qdcxxSimdjsonHeaderHash)
+    file(SHA256 "${simdjson_SOURCE_DIR}/singleheader/simdjson.cpp" qdcxxSimdjsonSourceHash)
+    if(NOT qdcxxSimdjsonHeaderHash STREQUAL "fec0cb4559e25456789efb153b7e5eaa27b50ce2bc2c9d3b531ea2000928380a"
+        OR NOT qdcxxSimdjsonSourceHash STREQUAL "826660ed60cf467641ab2f93a0e1a2dacf603c444f76d835358c814bc2caba3a")
+        message(FATAL_ERROR "The native binary JSON parser model requires the pinned simdjson 4.6.4 amalgamation")
+    endif()
     add_library(qdcxx_simdjson STATIC "${simdjson_SOURCE_DIR}/singleheader/simdjson.cpp")
-    target_include_directories(qdcxx_simdjson SYSTEM PUBLIC "${simdjson_SOURCE_DIR}/singleheader")
+    target_include_directories(qdcxx_simdjson SYSTEM PUBLIC "$<BUILD_INTERFACE:${simdjson_SOURCE_DIR}/singleheader>")
     target_compile_features(qdcxx_simdjson PRIVATE cxx_std_17)
     set_target_properties(qdcxx_simdjson PROPERTIES CXX_EXTENSIONS OFF POSITION_INDEPENDENT_CODE ON)
     add_library(qdcxx_schema_json src/schema/json_schema.cpp)
     target_link_libraries(qdcxx_schema_json PUBLIC qdcxx_core PRIVATE qdcxx_simdjson)
     set_target_properties(qdcxx_schema_json PROPERTIES CXX_EXTENSIONS OFF)
+    install(TARGETS qdcxx_schema_json qdcxx_simdjson EXPORT qdcxxTargets
+        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+    install(DIRECTORY include/qd/schema DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qd"
+        FILES_MATCHING PATTERN "*.hpp")
+    install(FILES licenses/simdjson-4.6.4/LICENSE licenses/simdjson-4.6.4/LICENSE-MIT
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/qdcxx/licenses/simdjson-4.6.4")
 endif()
 
 add_library(qdcxx_event_mapping src/events/event_mapping.cpp)
@@ -464,7 +479,7 @@ if(BUILD_TESTING)
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/protocol/tape-write/contracts")
     if(ORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON)
         add_executable(qdcxx_schema_json_tests tests/conformance/schema_json_tests.cpp)
-        target_link_libraries(qdcxx_schema_json_tests PRIVATE qdcxx_schema_json doctest::doctest)
+        target_link_libraries(qdcxx_schema_json_tests PRIVATE qdcxx_schema_json qdcxx_simdjson doctest::doctest)
         set_target_properties(qdcxx_schema_json_tests PROPERTIES CXX_EXTENSIONS OFF)
         add_test(NAME schema_json_contract COMMAND qdcxx_schema_json_tests)
         if(ORG_TTLDTOR_QDCXX_BUILD_TAPE_INSPECT)
