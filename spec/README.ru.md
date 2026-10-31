@@ -18,4 +18,4 @@
 - `schema/` — records, fields, types, aliases, mappings и построение схемы.
 - `protocol/` — QTP messages, framing, negotiation и state machines.
 - `encoding/` — byte-level primitives и stateful codecs.
-- [Подписки](subscriptions/CONTRACTS.ru.md) — проектные контракты native desired state, delivery ownership, resource limits и lifecycle; implementation и peer qualification ещё не выполнены.
+- [Подписки](subscriptions/CONTRACTS.ru.md) — контракты delivery ownership, resource limits и lifecycle; [ограниченное целевое состояние](subscriptions/STATE.ru.md) реализовано, [выбранная Java-совместимость](../tests/fixtures/subscriptions/CAPTURES.ru.md) наблюдалась. Нативные wire/client/collectors ещё не реализованы.

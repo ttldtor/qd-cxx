@@ -6,13 +6,13 @@
 
 ## Матрица объёма
 
-SUPPORTED foundation обозначает только существующую lower-layer capability. Новые subscription/runtime rows остаются pending implementation; design fixed закрывает локальное решение, а не implementation/upstream compatibility gate. Обязательные pending rows нельзя переименовать в excluded ради заявления полной поддержки.
+SUPPORTED foundation обозначает только существующую lower-layer capability. Чистое desired state реализовано; остальные subscription/runtime возможности остаются pending согласно строкам. Design fixed закрывает локальное решение, а не implementation/upstream compatibility gate. Обязательные pending rows нельзя переименовать в excluded ради заявления полной поддержки.
 
 | Область | Состояние | Смысл / prerequisite |
 | --- | --- | --- |
 | Schema/record provenance и indexed layout | SUPPORTED foundation | Только прежние immutable identity и явная проверка time layout. |
 | Generic binary data families/flags | SUPPORTED foundation | Прежнее selected wire decoding; строка не означает collector delivery. |
-| Desired mutations и membership barriers | PENDING implementation; дизайн зафиксирован | Реализовать local atomic/upsert/revision contract после compatibility qualification. |
+| Desired mutations и membership barriers | SUPPORTED pure state; PENDING dispatch barriers | [Ограниченное состояние](../../../spec/subscriptions/STATE.ru.md) реализует atomic/upsert/revision/eligibility; callback cutovers требуют будущего dispatcher. |
 | Callable/lease/host lifetime | PENDING implementation; дизайн зафиксирован | Реализовать guards, nonblocking handle release и quiescence в верхних слоях. |
 | Resources, command/control admission и live-frame policy | PENDING implementation; дизайн зафиксирован | Реализовать resident/turn limits, reserved credits/control storage и whole-frame admission. |
 | Desired/sent state и epoch ownership | PENDING implementation; дизайн зафиксирован | Fresh connection state/reset barriers зафиксированы; наблюдения выбранного peer/auth приведены в профиле захватов, нативная реализация ещё нужна. |

@@ -19,6 +19,14 @@
 
 [English version](CPP-BUILD.md). Английская версия является нормативной.
 
+## Целевое состояние подписок
+
+Подключите `qd/core/subscription.hpp` и `qdcxx_core` для ограниченных синхронных desired maps.
+[Контракт API и полный пример](../spec/subscriptions/STATE.ru.md) описывают точные символы,
+schema identity, атомарные команды, revision, membership tokens и явные turn/peak бюджеты.
+Runtime, транспорт, JSON и новые зависимости не нужны. Целевой CTest — `core_subscription_state`;
+wire emission, доставка коллекторов и callback dispatch остаются отдельными компонентами.
+
 ## Ограниченный tape writer в памяти
 
 Подключите `qdcxx_protocol` и `qd/protocol/tape_writer.hpp` для использования

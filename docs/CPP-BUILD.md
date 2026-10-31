@@ -16,6 +16,14 @@ enabled, `wire_inventory_schema` and `wire_inventory_cli` add focused tests;
 
 [Русская версия](CPP-BUILD.ru.md). English is authoritative.
 
+## Desired subscription state
+
+Include `qd/core/subscription.hpp` and link `qdcxx_core` for bounded synchronous desired maps.
+The [API contract and complete example](../spec/subscriptions/STATE.md) cover exact symbols,
+schema identity, atomic commands, revisions, membership tokens and explicit turn/peak budgets.
+No runtime, transport, JSON or new dependency is needed. `core_subscription_state` is the focused
+CTest; wire emission, collector delivery and callback dispatch are separate pending components.
+
 ## Bounded in-memory tape writer
 
 Link `qdcxx_protocol` and include `qd/protocol/tape_writer.hpp` to use

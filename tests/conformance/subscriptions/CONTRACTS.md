@@ -6,13 +6,13 @@ This document qualifies the [native design contract](../../../spec/subscriptions
 
 ## Scope matrix
 
-“SUPPORTED foundation” means only the linked existing lower-layer capability. Every new subscription/runtime row remains pending implementation; “design fixed” closes its local design decision, not its implementation or upstream compatibility gate. Required pending rows cannot be reclassified excluded merely to claim complete support.
+“SUPPORTED foundation” means only the linked existing lower-layer capability. Pure desired state is implemented; other subscription/runtime capabilities remain pending as stated per row. “Design fixed” closes its local design decision, not its implementation or upstream compatibility gate. Required pending rows cannot be reclassified excluded merely to claim complete support.
 
 | Area | State | Meaning / prerequisite |
 | --- | --- | --- |
 | Schema/record provenance and indexed layout | SUPPORTED foundation | Existing immutable identity and explicit time-layout validation only. |
 | Generic binary data families/flags | SUPPORTED foundation | Existing selected wire decoding; no collector delivery follows from this row. |
-| Desired mutations and membership barriers | PENDING implementation; design fixed | Implement the local atomic/upsert/revision contract after compatibility qualification. |
+| Desired mutations and membership barriers | SUPPORTED pure state; PENDING dispatch barriers | [Bounded state](../../../spec/subscriptions/STATE.md) implements atomic/upsert/revision/eligibility; callback cutovers require the later dispatcher. |
 | Callable/lease/host lifetime | PENDING implementation; design fixed | Implement guards, nonblocking handle release and quiescence in upper layers. |
 | Resources, command/control admission and live-frame policy | PENDING implementation; design fixed | Implement resident/turn limits, reserved credits/control storage and whole-frame admission. |
 | Desired/sent state and epoch ownership | PENDING implementation; design fixed | Fresh connection state and reset barriers are fixed; selected peer/auth observations are recorded in the capture profile, with native implementation pending. |
