@@ -2,6 +2,10 @@
 
 [Русская версия](README.ru.md). English is authoritative.
 
+The optional [subscription production oracle](../upstream/subscription-oracle/README.md) captures
+locked Java wire/collector/session behavior offline and compares exact indexed fixtures. It has
+its own explicit JDK 8/CMake/PowerShell prerequisites; ordinary native builds do not invoke it.
+
 The native `qdcxx-run-utc` logger and [CMake formatter](../format/CPP.md) require no Python or
 PowerShell in their command trees. Prerequisites are CMake 3.25+, a C++23 compiler and its native
 build tools; formatting additionally needs Git and explicitly supplied native Uncrustify 0.83.0

@@ -2,7 +2,7 @@
 
 [Русская версия](CONTRACTS.ru.md). English is authoritative.
 
-This document qualifies the [native design contract](../../../spec/subscriptions/CONTRACTS.md). It is a finite support/pending/excluded ledger and a table of expected local traces, not execution evidence. There is no implemented subscription test harness or successful Java/native collector run claimed here. Existing [binary coverage](../protocol/real-tape/COVERAGE.md) and [validation](../protocol/real-tape/VALIDATION.md) retain their original profiles.
+This document qualifies the [native design contract](../../../spec/subscriptions/CONTRACTS.md). It is a finite support/pending/excluded ledger and a table of expected local traces. The [production Java captures](../../fixtures/subscriptions/CAPTURES.md) provide selected-profile evidence; native subscription/collector implementation and the local-trace harness remain pending. Existing [binary coverage](../protocol/real-tape/COVERAGE.md) and [validation](../protocol/real-tape/VALIDATION.md) retain their original profiles.
 
 ## Scope matrix
 
@@ -15,12 +15,12 @@ This document qualifies the [native design contract](../../../spec/subscriptions
 | Desired mutations and membership barriers | PENDING implementation; design fixed | Implement the local atomic/upsert/revision contract after compatibility qualification. |
 | Callable/lease/host lifetime | PENDING implementation; design fixed | Implement guards, nonblocking handle release and quiescence in upper layers. |
 | Resources, command/control admission and live-frame policy | PENDING implementation; design fixed | Implement resident/turn limits, reserved credits/control storage and whole-frame admission. |
-| Desired/sent state and epoch ownership | PENDING implementation; design fixed | Fresh connection state and reset barriers are fixed; peer-specific table/auth ordering still needs evidence. |
-| Six subscription messages and readiness/auth/heartbeat | PENDING production evidence and implementation | Capture selected production paths; resolve required PART/compression/conversion/legacy-peer behavior before native wire work. |
-| STREAM collector | PENDING production evidence and implementation | Verify every-event delivery, cutovers and wildcard overlap without duplicate fanout. |
-| TICKER collector | PENDING production evidence and implementation | Verify initial/latest/live ordering, retention after last unsubscribe and allowed conflation; do not promise every re-add has a cached snapshot. |
-| HISTORY collector and raw lower bound | PENDING production evidence and implementation | Verify bound packing/range, empty/snip/restarted snapshots, transactions, removals, aggregation and incomplete/reset state. |
-| Wildcard family/peer combinations | PENDING production evidence and implementation | Explicit selector policy is fixed; STREAM is the candidate. Refuse unproved family/peer combinations; no inferred literal escape. |
+| Desired/sent state and epoch ownership | PENDING implementation; design fixed | Fresh connection state and reset barriers are fixed; selected peer/auth observations are recorded in the capture profile, with native implementation pending. |
+| Six subscription messages and readiness/auth/heartbeat | OBSERVED Java profile; PENDING native implementation | Six messages, requested layouts, protocol deltas, 16 heartbeat masks, client/server auth and capability readiness have production captures. Modern plain ordinary read-side profile only; PART/compression/converters/legacy limits are explicit in the capture profile. |
+| STREAM collector | OBSERVED Java profile; PENDING native implementation | Every-event/two-client/overlap traces captured; native cutover, ownership and resource tests remain required. |
+| TICKER collector | OBSERVED Java profile; PENDING native implementation | Initial/latest/re-add and explicit retention traces captured; no universal cached re-add snapshot. |
+| HISTORY collector and raw lower bound | OBSERVED Java profile; PENDING native implementation | Raw bound/snapshot/transaction/removal/aggregation traces captured; raw QDAgent output is distinct from a business-event model. Native completeness/reset tests remain required. |
+| Wildcard family/peer combinations | OBSERVED Java profile; PENDING native implementation | Enabled STREAM fanout/overlap is proved; no TICKER/HISTORY fanout. Native All is restricted to proved profile; Java can still accept literal star in aggregate subscriptions. |
 | TCP/executor/TLS/configured authentication | PENDING runtime decision and implementation | Select one supported backend/profile, trust/cancellation policy and dependency-OFF behavior before adapter code. |
 | Java object/business conversion and full event catalog | EXCLUDED | Preserve existing opaque/generic data boundaries; no claim of all business-event APIs. |
 | Server/publisher/RMI/multi-endpoint routing | EXCLUDED | These are separate product capabilities, not prerequisites for the selected read-side client. |

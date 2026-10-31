@@ -527,3 +527,8 @@ tests/conformance/wire_inventory_cli.cmake -text
 
 # Keep the standalone container help gate canonical across platforms.
 tests/conformance/compressed_oracle_help.cmake text eol=lf
+
+# Preserve reviewed subscription capture bytes, including empty binary deltas.
+tests/fixtures/subscriptions/expected/** -text
+tests/fixtures/subscriptions/*.md text eol=lf
+tools/upstream/subscription-oracle/** text eol=lf
