@@ -4,9 +4,15 @@
 
 Native test проверяет [контракт коллектора](../../../spec/subscriptions/STREAM-COLLECTOR.ru.md)
 через настоящие полные события `LiveSession` и изменения desired state. Decoder,
-dispatcher и socket не добавляются. Окончательный pure-profile CTest: **41/41**
+dispatcher и socket не добавляются. Начальная квалификация только коллектора: **41/41**
 на Windows x64 MSVC 19.42 Release и Linux x86-64 GCC 13.3 Debug ASan/UBSan;
-основной LSan OFF. У коллектора 15 cases, включая полную standard Quote.
+основной LSan OFF. Исходные 15 сценариев включали полный стандартный Quote.
+
+Расширение подготовленных батчей добавляет шесть сценариев: атомарное подтверждение
+префикса, чередование одиночных и пакетных offers, предварительную оплату работы,
+нулевой/выведенный префикс, происхождение данных и инвалидацию при перемещении.
+Текущие 21 сценарий проходят в 42-тестовом профиле с включённым клиентом на обеих
+платформах; см. [проверки клиента](CLIENT-VALIDATION.ru.md).
 
 ## Поведение
 
@@ -51,7 +57,7 @@ native-control verification принимает Windows/GCC live-session output; 
 
 ## Сборка, владение и документация
 
-Production-only builds и перенесённые installed consumers проходят на обеих
+Начальные production-only builds только коллектора и перенесённые installed consumers прошли на обеих
 платформах, включая factory/add, реальный feed/stage и явный front/pop. У каждого
 пакета 27 hash-preserved files, runtime/JSON SDK не нужен. Совместимость с optional
 TCP проверена отдельным MSVC configure/export tree; SDK там не собирался и не
@@ -65,5 +71,6 @@ Java format/check и Doxygen 1.18 без предупреждений прохо
 Requested capacities и byte-work allowances не включают allocator overhead,
 CPU instructions и RSS. Destruction/move assignment вне turn credits. GCC Release
 также выдаёт прежнее предупреждение conversion-buffer в `wide_decimal.cpp`;
-исходник не изменён, полный sanitizer regression suite проходит. Callback,
-wildcard, TICKER/HISTORY, MUX и full subscriptions этим не квалифицируются.
+исходник не изменён, полный sanitizer regression suite проходит. Wildcard,
+TICKER/HISTORY, MUX и full subscriptions этим не квалифицируются. Локальные callbacks
+описаны отдельно в [проверках клиента](CLIENT-VALIDATION.ru.md).

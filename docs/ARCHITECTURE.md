@@ -60,11 +60,16 @@ The [STREAM collector](../spec/subscriptions/STREAM-COLLECTOR.md) adds pure boun
 over admitted events and owned desired state. It preserves event order without conflation,
 filters retired membership activations before offering records and reports whole-frame overflow.
 Its staging, desired-state and shared epoch bounds are separate scopes to aggregate at the upper owner.
+The [local STREAM dispatcher](../spec/subscriptions/CLIENT-DISPATCH.md) owns one collector,
+one guarded consumer, bounded command/result storage and detached immutable batches.
+Only its command handles, results and detached leases cross threads; source event leases stay
+in the serialized owner domain. The caller owns the actual session/runtime, explicitly routes
+events and subscription output, and combines local completion with transport/output shutdown.
 [ADR-0006](decisions/ADR-0006-live-runtime.md) selects an optional Asio/c-ares/OpenSSL profile,
 explicit SDK/bootstrap/trust requirements and its [feasibility boundary](../tests/conformance/transport/CONTRACTS.md).
 The [optional TCP adapter](../spec/transport/TCP-RUNTIME.md) implements only the caller-driven,
 credential-free plain subset, with explicit bootstrap, bounded SDK sources and owned-operation
-retirement. TLS, execution-host dispatch and the complete subscription client remain separate work.
+retirement. TLS, transport/dispatch integration and the complete subscription client remain separate work.
 The ADR does not imply implementation or owner acceptance of those remaining parts.
 
 ## Design principles

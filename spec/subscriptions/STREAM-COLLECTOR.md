@@ -59,6 +59,27 @@ pending records atomically without reporting delivery; it preserves the epoch pi
 and terminal cause. Counts distinguish staged, delivered, withdrawn, discarded
 and ignored records, with explicit saturation.
 
+Each offer also carries its owning core membership token and original scalar
+binding generation, scoped to the pinned epoch. These metadata copies do not
+extend the borrowed record's lifetime or retain a protocol snapshot.
+
+For a multi-record consumer, `prepareBatch(storage, work)` writes an eligible
+source prefix into caller-provided fixed metadata slots without consuming it.
+The caller keeps those slots stable through acknowledgement. Matching and
+metadata work are preflighted; no scratch allocation or second filter is added.
+`acknowledgeBatch(work)` preflights every item and possible frame/snapshot release
+before atomically consuming that exact prefix. It returns separate eligible and
+withdrawn counts, without claiming a user callback ran. A client can copy a full
+detached candidate before this commit; failure starts no callback and loses no
+eligible prefix.
+
+Single and batch offers are exclusive. A successful front or replacement prepare
+cannot leave an old batch acknowledgement valid. Effective changes, nonempty
+stage, pop/discard, move or destruction invalidate prepared views; failed/no-op
+commands and failed work preflight preserve them. Empty storage offers prefix
+zero; positive storage may prepare a wholly withdrawn prefix with no eligible
+records, acknowledged without invoking a consumer.
+
 ## Resources and failure
 
 All limits are finite, including zero: frame slots, selected record slots, retained

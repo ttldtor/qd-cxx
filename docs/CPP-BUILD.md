@@ -39,7 +39,7 @@ OFF does not inspect those SDK roots or add C/SDK dependencies to the pure libra
 `cmake --install build-runtime --prefix C:/sdk/qdcxx --config Release` installs a
 relocatable `qdcxx` package. Consumers use `find_package(qdcxx CONFIG REQUIRED)` and
 the target names `qdcxx_encoding`, `qdcxx_core`, `qdcxx_protocol`, `qdcxx_collectors` and,
-when built, `qdcxx_transport`. This minimal package exports only those components;
+when built, `qdcxx_transport` and `qdcxx_client`. This minimal package exports only those components;
 JSON, Quote projection, replay and tools are not additional exported targets.
 The enabled package includes the qualified static c-ares archive, native link
 closure and dependency notices; consumers need neither SDK headers nor a C compiler.
@@ -50,6 +50,17 @@ package directory inside the relocated prefix:
 ```powershell
 cmake -S consumer -B build-consumer '-Dqdcxx_DIR=C:/sdk/qdcxx/lib64/cmake/qdcxx'
 ```
+
+## Optional local STREAM dispatch
+
+`ORG_TTLDTOR_QDCXX_BUILD_CLIENT` defaults to `OFF`. Enable it to build and install
+`qdcxx_client`; include `qd/client/stream_dispatcher.hpp`. The
+[client contract](../spec/subscriptions/CLIENT-DISPATCH.md) defines serialized owner
+progress, a bounded thread-safe command port, immutable batches and local close.
+The only additional dependency is standard `Threads::Threads`. Runtime and JSON
+may remain disabled. `client_dispatch` is the focused CTest. The composing caller
+owns its source session/runtime and explicitly routes events and wire output;
+local terminal does not certify transport shutdown.
 
 ## Desired subscription state
 
@@ -74,7 +85,7 @@ The [API contract and complete example](../spec/subscriptions/STATE.md) cover ex
 schema identity, atomic commands, revisions, membership tokens and explicit turn/peak budgets.
 No runtime, transport, JSON or new dependency is needed. `core_subscription_state` is the focused
 CTest; wire composition and STREAM staging use the separate components above.
-Callback dispatch remains separate work.
+The optional local dispatcher above adds the separate callback and command boundary.
 
 ## Bounded in-memory tape writer
 

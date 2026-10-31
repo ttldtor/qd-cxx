@@ -55,6 +55,15 @@ struct StreamDelivery {
     const protocol::LiveRecordView *record; ///< Event-owned value; invalidated by successful nonempty stage/pop/discard
                                             ///< or effective desired change.
     std::uint64_t revision;                 ///< Desired revision at admission, not peer acknowledgement.
+    core::SubscriptionMembership membership; ///< Owning admission activation, independent of borrowed record storage.
+    std::uint64_t bindingGeneration =
+        0; ///< Original event snapshot generation, scoped to the collector's pinned epoch.
+};
+
+/** Atomic acknowledgement of one prepared prefix, independent of user callback execution. */
+struct StreamAcknowledged {
+    std::size_t records;   ///< Eligible records consumed from the prepared offer.
+    std::size_t withdrawn; ///< Retired records discarded from the same source prefix.
 };
 
 /** Cumulative local observations; saturated counters are explicitly marked. */
@@ -153,6 +162,22 @@ class StreamCollector {
      * Successful withdrawal invalidates previous views. Repeated front alone does not acknowledge data.
      */
     [[nodiscard]] std::expected<std::optional<StreamDelivery>, StreamError> front(StreamWork &work);
+    /** Prepare a source-ordered eligible batch without consuming its queued prefix.
+     * @param storage Caller-owned fixed metadata slots, preserved until acknowledgement or offer invalidation.
+     * @param work Mutable credits for the complete eligibility/metadata preflight; no per-call allocation occurs.
+     * @return Borrowed selected prefix metadata, or failure preserving queue and previous offer. A successful
+     * call replaces a single/batch offer. Empty storage offers prefix zero; positive storage can offer zero
+     * records with a wholly withdrawn prefix. Effective mutation, nonempty stage, successful front/pop/discard,
+     * another preparation or move/destruction invalidates the span. Caller storage must not alias collector state.
+     */
+    [[nodiscard]] std::expected<std::span<const StreamDelivery>, StreamError>
+    prepareBatch(std::span<StreamDelivery> storage, StreamWork &work);
+    /** Atomically acknowledge only the most recent valid prepared batch, never a single front offer.
+     * @param work Mutable credits, including conservative shared-owner release work before any consumption.
+     * @return Consumed eligible/withdrawn counts, or failure preserving queue/offer. No user code runs;
+     * acknowledgement is not callback start/completion. Success invalidates every prepared span.
+     */
+    [[nodiscard]] std::expected<StreamAcknowledged, StreamError> acknowledgeBatch(StreamWork &work);
     /** Acknowledge exactly the currently offered record, without invoking user code.
      * @param work Mutable turn credits; last-record owner release is charged before mutation.
      * @return Success or failure preserving queue and offer. Terminal overflow prohibits delivery.

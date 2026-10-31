@@ -65,6 +65,9 @@ void accumulate(std::size_t &counter, std::size_t amount, bool &saturated) noexc
 } // namespace
 
 struct StreamCollector::Impl {
+    /** Exclusive delivery offer; single and batch acknowledgement cannot be mixed. */
+    enum class OfferKind { NONE, SINGLE, BATCH };
+
     /** One immutable frame and the selected items retaining it. */
     struct Frame {
         std::optional<protocol::LiveEvent> event; ///< Full owner, never a decoder prefix.
@@ -80,21 +83,23 @@ struct StreamCollector::Impl {
         std::size_t frame = 0;                   ///< Fixed frame ring index.
     };
 
-    protocol::LiveIdentity epoch;    ///< Retained through drain; destruction follows all frame releases.
-    core::SubscriptionState desired; ///< Unique mutable eligibility owner.
-    StreamLimits limits;             ///< Immutable configured capacities.
-    std::unique_ptr<Frame[]> frames; ///< Fixed initialized frame slots.
-    std::unique_ptr<Item[]> items;   ///< Fixed initialized selected-record slots.
-    std::size_t fixedBytes;          ///< Impl plus requested fixed array backing.
-    std::size_t stagedBytes = 0;     ///< Unique whole-event backing currently retained.
-    std::size_t frameHead = 0;       ///< First retained frame slot.
-    std::size_t frameCount = 0;      ///< Retained whole frame owners.
-    std::size_t itemHead = 0;        ///< First queued record slot.
-    std::size_t itemCount = 0;       ///< Queued selected records, including pending withdrawals.
-    bool pinned = false;             ///< First selected admission established the epoch.
-    bool offered = false;            ///< front offered the current item after the last effective mutation.
-    StreamCounts counts;             ///< Explicit cumulative observations.
-    StreamDiagnostic diagnostic;     ///< Inline control evidence unaffected by ordinary queue saturation.
+    protocol::LiveIdentity epoch;      ///< Retained through drain; destruction follows all frame releases.
+    core::SubscriptionState desired;   ///< Unique mutable eligibility owner.
+    StreamLimits limits;               ///< Immutable configured capacities.
+    std::unique_ptr<Frame[]> frames;   ///< Fixed initialized frame slots.
+    std::unique_ptr<Item[]> items;     ///< Fixed initialized selected-record slots.
+    std::size_t fixedBytes;            ///< Impl plus requested fixed array backing.
+    std::size_t stagedBytes = 0;       ///< Unique whole-event backing currently retained.
+    std::size_t frameHead = 0;         ///< First retained frame slot.
+    std::size_t frameCount = 0;        ///< Retained whole frame owners.
+    std::size_t itemHead = 0;          ///< First queued record slot.
+    std::size_t itemCount = 0;         ///< Queued selected records, including pending withdrawals.
+    bool pinned = false;               ///< First selected admission established the epoch.
+    OfferKind offer = OfferKind::NONE; ///< Most recent successful single/batch offer.
+    std::size_t batchPrefix = 0;       ///< Queued items covered by the prepared batch, including retired items.
+    std::size_t batchSelected = 0;     ///< Eligible records in the prepared batch.
+    StreamCounts counts;               ///< Explicit cumulative observations.
+    StreamDiagnostic diagnostic;       ///< Inline control evidence unaffected by ordinary queue saturation.
 
     /** Transfer only after every fallible factory step.
      * @param state Validated desired owner.
@@ -133,6 +138,22 @@ struct StreamCollector::Impl {
         return nullptr;
     }
 
+    /** Invalidate all borrowed delivery offers after an effective queue/state change. */
+    void invalidate() noexcept {
+        offer = OfferKind::NONE;
+        batchPrefix = 0;
+        batchSelected = 0;
+    }
+
+    /** Retain only core eligibility and scalar provenance in a delivery offer.
+     * @param item Selected immutable queued item.
+     * @return Borrowed record plus independently owning fixed core membership.
+     */
+    [[nodiscard]] StreamDelivery delivery(const Item &item) const noexcept {
+        return {item.record, item.revision, item.membership,
+                frames[item.frame].event->snapshot().identity().generation()};
+    }
+
     /** Remove one front item after all possible failures and work charges.
      * Counts are updated by the caller according to delivery/withdrawal/discard intent.
      */
@@ -156,8 +177,24 @@ struct StreamCollector::Impl {
 StreamCollector::StreamCollector(std::unique_ptr<Impl> impl) noexcept : impl_(std::move(impl)) {
 }
 
-StreamCollector::StreamCollector(StreamCollector &&other) noexcept = default;
-StreamCollector &StreamCollector::operator=(StreamCollector &&other) noexcept = default;
+StreamCollector::StreamCollector(StreamCollector &&other) noexcept : impl_(std::move(other.impl_)) {
+    if (impl_ && impl_->offer == Impl::OfferKind::BATCH) {
+        impl_->invalidate();
+    }
+}
+
+StreamCollector &StreamCollector::operator=(StreamCollector &&other) noexcept {
+    if (this != &other) {
+        impl_ = std::move(other.impl_);
+
+        if (impl_ && impl_->offer == Impl::OfferKind::BATCH) {
+            impl_->invalidate();
+        }
+    }
+
+    return *this;
+}
+
 StreamCollector::~StreamCollector() = default;
 
 std::expected<StreamCollector, StreamError> StreamCollector::create(core::SubscriptionState &&desired,
@@ -217,7 +254,7 @@ StreamCollector::add(std::span<const core::SubscriptionRequest> requests, core::
     const auto result = impl_->desired.add(requests, work);
 
     if (result && result->changed) {
-        impl_->offered = false;
+        impl_->invalidate();
     }
 
     return result;
@@ -232,7 +269,7 @@ StreamCollector::remove(std::span<const core::SubscriptionKey> keys, core::Subsc
     const auto result = impl_->desired.remove(keys, work);
 
     if (result && result->changed) {
-        impl_->offered = false;
+        impl_->invalidate();
     }
 
     return result;
@@ -247,7 +284,7 @@ StreamCollector::replace(std::span<const core::SubscriptionRequest> requests, co
     const auto result = impl_->desired.replace(requests, work);
 
     if (result && result->changed) {
-        impl_->offered = false;
+        impl_->invalidate();
     }
 
     return result;
@@ -261,7 +298,7 @@ std::expected<core::SubscriptionChange, core::SubscriptionError> StreamCollector
     const auto result = impl_->desired.clear(work);
 
     if (result && result->changed) {
-        impl_->offered = false;
+        impl_->invalidate();
     }
 
     return result;
@@ -324,7 +361,7 @@ std::expected<StreamStage, StreamError> StreamCollector::stage(protocol::LiveEve
             bytes > impl_->limits.stagedBytes - impl_->stagedBytes ||
             bytes > impl_->limits.residentBytes - impl_->fixedBytes - impl_->stagedBytes) {
             impl_->diagnostic = {Error::RESOURCE_LIMIT, impl_->itemCount, selected};
-            impl_->offered = false;
+            impl_->invalidate();
 
             throw Error::RESOURCE_LIMIT;
         }
@@ -351,7 +388,7 @@ std::expected<StreamStage, StreamError> StreamCollector::stage(protocol::LiveEve
         impl_->itemCount += selected;
         ++impl_->frameCount;
         impl_->stagedBytes += bytes;
-        impl_->offered = false;
+        impl_->invalidate();
 
         if (!impl_->pinned) {
             impl_->epoch = identity;
@@ -400,15 +437,16 @@ std::expected<std::optional<StreamDelivery>, StreamError> StreamCollector::front
         }
 
         accumulate(impl_->counts.withdrawn, withdrawn, impl_->counts.saturated);
-        impl_->offered = impl_->itemCount != 0;
+        impl_->invalidate();
+        impl_->offer = impl_->itemCount != 0 ? Impl::OfferKind::SINGLE : Impl::OfferKind::NONE;
 
-        if (!impl_->offered) {
+        if (impl_->offer != Impl::OfferKind::SINGLE) {
             return std::optional<StreamDelivery>{};
         }
 
         const auto &item = impl_->items[impl_->itemHead];
 
-        return std::optional<StreamDelivery>{{item.record, item.revision}};
+        return std::optional<StreamDelivery>{impl_->delivery(item)};
     } catch (Error error) {
         return std::unexpected(error);
     }
@@ -422,7 +460,7 @@ std::expected<void, StreamError> StreamCollector::pop(StreamWork &work) {
             throw Error::INVALID_STATE;
         }
 
-        if (!impl_->offered) {
+        if (impl_->offer != Impl::OfferKind::SINGLE) {
             throw Error::NO_OFFER;
         }
 
@@ -435,10 +473,100 @@ std::expected<void, StreamError> StreamCollector::pop(StreamWork &work) {
         }
 
         impl_->removeFront();
-        impl_->offered = false;
+        impl_->invalidate();
         accumulate(impl_->counts.delivered, 1, impl_->counts.saturated);
 
         return {};
+    } catch (Error error) {
+        return std::unexpected(error);
+    }
+}
+
+std::expected<std::span<const StreamDelivery>, StreamError>
+StreamCollector::prepareBatch(std::span<StreamDelivery> storage, StreamWork &work) {
+    try {
+        debit(1, work.operations);
+
+        if (!impl_ || impl_->diagnostic.error) {
+            throw Error::INVALID_STATE;
+        }
+
+        std::size_t prefix = 0;
+        std::size_t selected = 0;
+
+        while (prefix < impl_->itemCount && selected < storage.size()) {
+            debit(2, work.visits);
+            debit(impl_->desired.entries().size(), work.visits);
+            debit(impl_->desired.entries().size(), work.visits);
+            const auto &item = impl_->items[impl_->index(prefix++)];
+
+            if (impl_->desired.isCurrent(item.membership)) {
+                ++selected;
+            }
+        }
+
+        // Overwriting caller slots releases only fixed immutable core identities, never live owners.
+        debit(selected, work.visits);
+        debit(selected, work.visits);
+        std::size_t output = 0;
+
+        for (std::size_t offset = 0; offset < prefix; ++offset) {
+            const auto &item = impl_->items[impl_->index(offset)];
+
+            if (impl_->desired.isCurrent(item.membership)) {
+                storage[output++] = impl_->delivery(item);
+            }
+        }
+
+        impl_->invalidate();
+        impl_->offer = Impl::OfferKind::BATCH;
+        impl_->batchPrefix = prefix;
+        impl_->batchSelected = selected;
+
+        return std::span<const StreamDelivery>(storage.data(), selected);
+    } catch (Error error) {
+        return std::unexpected(error);
+    }
+}
+
+std::expected<StreamAcknowledged, StreamError> StreamCollector::acknowledgeBatch(StreamWork &work) {
+    try {
+        debit(1, work.operations);
+
+        if (!impl_ || impl_->diagnostic.error) {
+            throw Error::INVALID_STATE;
+        }
+
+        if (impl_->offer != Impl::OfferKind::BATCH) {
+            throw Error::NO_OFFER;
+        }
+
+        debit(impl_->batchPrefix, work.visits);
+
+        for (std::size_t offset = 0; offset < impl_->batchPrefix; ++offset) {
+            const auto &item = impl_->items[impl_->index(offset)];
+            const bool last =
+                offset + 1 == impl_->itemCount || impl_->items[impl_->index(offset + 1)].frame != item.frame;
+
+            if (last) {
+                debit(1, work.visits);
+                debit(impl_->frames[item.frame].event->releaseBytes(), work.bytes);
+            }
+        }
+
+        const auto selected = impl_->batchSelected;
+        const auto withdrawn = impl_->batchPrefix - selected;
+        const auto prefix = impl_->batchPrefix;
+
+        for (std::size_t offset = 0; offset < prefix; ++offset) {
+            impl_->removeFront();
+        }
+
+        impl_->invalidate();
+        accumulate(impl_->counts.delivered, selected, impl_->counts.saturated);
+        accumulate(impl_->counts.withdrawn, withdrawn, impl_->counts.saturated);
+
+        return StreamAcknowledged{selected, withdrawn};
     } catch (Error error) {
         return std::unexpected(error);
     }
@@ -466,7 +594,7 @@ std::expected<std::size_t, StreamError> StreamCollector::discard(StreamWork &wor
             impl_->removeFront();
         }
 
-        impl_->offered = false;
+        impl_->invalidate();
         accumulate(impl_->counts.discarded, count, impl_->counts.saturated);
 
         return count;

@@ -57,6 +57,26 @@ effective desired change его инвалидирует. Failed preflight со�
 очередь без заявления о доставке и сохраняет epoch pin/terminal cause. Счётчики
 различают staged, delivered, withdrawn, discarded и ignored с явной saturation.
 
+Offer также содержит owning core membership token и исходную scalar binding
+generation в пределах pinned epoch. Копия metadata не продлевает lifetime borrowed
+record и не удерживает protocol snapshot.
+
+Для multi-record consumer `prepareBatch(storage, work)` заполняет caller-provided
+fixed metadata slots eligible source prefix без его потребления. Эти slots должны
+оставаться стабильными до acknowledgement. Matching/metadata work предварительно
+оплачены; scratch allocation и второй filter не добавляются. `acknowledgeBatch(work)`
+оплачивает все items и возможное освобождение frame/snapshot до атомарного потребления
+ровно этого prefix. Возвращаются отдельные eligible/withdrawn counts без заявления,
+что callback выполнялся. Клиент может скопировать весь detached candidate перед
+commit; отказ не начинает callback и не теряет eligible prefix.
+
+Single/batch offers взаимоисключающие. Successful front или replacement prepare
+не оставляет старый batch acknowledgement действительным. Effective changes,
+nonempty stage, pop/discard, move/destruction инвалидируют prepared views;
+failed/no-op commands и failed work preflight сохраняют их. Empty storage предлагает
+prefix zero; positive storage может подготовить полностью withdrawn prefix без
+eligible records, подтверждаемый без вызова consumer.
+
 ## Ресурсы и отказы
 
 Все limits конечны, включая ноль: frame slots, selected record slots, retained

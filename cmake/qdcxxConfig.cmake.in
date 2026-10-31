@@ -2,9 +2,11 @@
 # SPDX-License-Identifier: BSL-1.0
 @PACKAGE_INIT@
 
-if(@ORG_TTLDTOR_QDCXX_BUILD_RUNTIME@)
+if(@ORG_TTLDTOR_QDCXX_BUILD_RUNTIME@ OR @ORG_TTLDTOR_QDCXX_BUILD_CLIENT@)
     include(CMakeFindDependencyMacro)
     find_dependency(Threads)
+endif()
+if(@ORG_TTLDTOR_QDCXX_BUILD_RUNTIME@)
     if(NOT TARGET qdcxx_runtime_cares)
         add_library(qdcxx_runtime_cares STATIC IMPORTED)
         set_and_check(qdcxxCaresArchive "@PACKAGE_CMAKE_INSTALL_LIBDIR@/@qdcxxCaresInstalledName@")

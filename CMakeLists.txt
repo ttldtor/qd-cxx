@@ -60,6 +60,20 @@ add_library(qdcxx_collectors src/collectors/stream.cpp)
 target_link_libraries(qdcxx_collectors PUBLIC qdcxx_protocol)
 set_target_properties(qdcxx_collectors PROPERTIES CXX_EXTENSIONS OFF)
 
+option(ORG_TTLDTOR_QDCXX_BUILD_CLIENT "Build the bounded event-driven STREAM client dispatcher" OFF)
+if(ORG_TTLDTOR_QDCXX_BUILD_CLIENT)
+    find_package(Threads REQUIRED)
+    add_library(qdcxx_client src/client/stream_dispatcher.cpp)
+    target_link_libraries(qdcxx_client PUBLIC qdcxx_collectors Threads::Threads)
+    set_target_properties(qdcxx_client PROPERTIES CXX_EXTENSIONS OFF)
+    install(TARGETS qdcxx_client EXPORT qdcxxTargets
+        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+    install(DIRECTORY include/qd/client
+        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qd" FILES_MATCHING PATTERN "*.hpp")
+endif()
+
 option(ORG_TTLDTOR_QDCXX_BUILD_RUNTIME "Build the explicit credential-free caller-driven TCP runtime" OFF)
 if(ORG_TTLDTOR_QDCXX_BUILD_RUNTIME)
     include(cmake/Runtime.cmake)
@@ -247,6 +261,15 @@ if(BUILD_TESTING)
     set_target_properties(qdcxx_stream_collector_tests PROPERTIES CXX_EXTENSIONS OFF)
     add_test(NAME collectors_stream COMMAND qdcxx_stream_collector_tests)
     set_tests_properties(collectors_stream PROPERTIES TIMEOUT 120)
+    if(ORG_TTLDTOR_QDCXX_BUILD_CLIENT)
+        add_executable(qdcxx_client_dispatch_tests tests/conformance/client_dispatch_tests.cpp)
+        target_link_libraries(qdcxx_client_dispatch_tests PRIVATE qdcxx_client qdcxx_quote doctest::doctest)
+        target_compile_definitions(qdcxx_client_dispatch_tests PRIVATE
+            "ORG_TTLDTOR_QDCXX_CLIENT_SOURCE_ROOT=\"${CMAKE_CURRENT_SOURCE_DIR}\"")
+        set_target_properties(qdcxx_client_dispatch_tests PROPERTIES CXX_EXTENSIONS OFF)
+        add_test(NAME client_dispatch COMMAND qdcxx_client_dispatch_tests)
+        set_tests_properties(client_dispatch PROPERTIES TIMEOUT 120)
+    endif()
     if(TARGET qdcxx_inspect_tool)
         add_executable(qdcxx_source_format_tests tests/conformance/source_format_tests.cpp)
         target_link_libraries(qdcxx_source_format_tests PRIVATE qdcxx_inspect_tool doctest::doctest)

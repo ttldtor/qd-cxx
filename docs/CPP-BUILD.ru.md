@@ -42,7 +42,7 @@ STREAM staging использует отдельный компонент кол
 `cmake --install build-runtime --prefix C:/sdk/qdcxx --config Release` устанавливает
 переносимый пакет `qdcxx`. Consumer использует `find_package(qdcxx CONFIG REQUIRED)`
 и имена targets `qdcxx_encoding`, `qdcxx_core`, `qdcxx_protocol`, `qdcxx_collectors`, а при наличии
-также `qdcxx_transport`. Этот минимальный пакет экспортирует только эти компоненты;
+также `qdcxx_transport` и `qdcxx_client`. Этот минимальный пакет экспортирует только эти компоненты;
 JSON, Quote projection, replay и tools не становятся дополнительными exported targets.
 Enabled package содержит qualified static c-ares archive, native link closure
 и notices зависимостей. SDK headers и компилятор C consumer не требуются.
@@ -53,6 +53,17 @@ Enabled package содержит qualified static c-ares archive, native link cl
 ```powershell
 cmake -S consumer -B build-consumer '-Dqdcxx_DIR=C:/sdk/qdcxx/lib64/cmake/qdcxx'
 ```
+
+## Опциональная локальная доставка STREAM
+
+`ORG_TTLDTOR_QDCXX_BUILD_CLIENT` по умолчанию `OFF`. При включении собирается и
+устанавливается `qdcxx_client`; заголовок — `qd/client/stream_dispatcher.hpp`.
+[Контракт клиента](../spec/subscriptions/CLIENT-DISPATCH.ru.md) определяет продвижение
+сериализованным владельцем, ограниченный потокобезопасный порт команд, неизменяемые
+батчи и локальное завершение. Дополнительная зависимость — стандартная
+`Threads::Threads`. Runtime и JSON могут оставаться выключенными. Целевой CTest —
+`client_dispatch`. Вызывающий код владеет сессией/runtime и явно передаёт события
+и исходящие сообщения; локальное завершение не подтверждает закрытие транспорта.
 
 ## Целевое состояние подписок
 
@@ -77,7 +88,7 @@ loopback peers. Они не меняют корневую сборку, не д�
 schema identity, атомарные команды, revision, membership tokens и явные turn/peak бюджеты.
 Runtime, транспорт, JSON и новые зависимости не нужны. Целевой CTest — `core_subscription_state`;
 wire composition и STREAM staging используют отдельные компоненты выше.
-Callback dispatch остаётся отдельной работой.
+Опциональный локальный диспетчер выше добавляет отдельную границу callbacks и команд.
 
 ## Ограниченный tape writer в памяти
 

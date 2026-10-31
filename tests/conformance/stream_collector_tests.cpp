@@ -1210,3 +1210,190 @@ TEST_CASE("STREAM full standard Quote capture retains all fields and provenance 
     CHECK(quote->timeMs == 1000);
     CHECK(quote->eventTime == 0);
 }
+
+TEST_CASE("STREAM prepared batches preserve eligible queue until one atomic acknowledgement") {
+    auto f = fixture();
+    add(f, u"ALPHA");
+    add(f, u"BETA");
+    const Input inputs[]{{0, u"ALPHA", 1, 10}, {0, u"BETA", 1, 20}, {0, u"ALPHA", 1, 11}, {0, u"BETA", 1, 21}};
+    (void)stage(f, inputs);
+    remove(f, u"ALPHA");
+    std::array<s::StreamDelivery, 4> storage{};
+    auto work = turn();
+    auto prepared = f.collector.prepareBatch(storage, work);
+    REQUIRE(prepared);
+    REQUIRE(prepared->size() == 2);
+    CHECK((*prepared)[0].record->typedValues[2].raw == 20);
+    CHECK((*prepared)[1].record->typedValues[2].raw == 21);
+    CHECK((*prepared)[0].revision == 2);
+    CHECK(f.collector.desired()->isCurrent((*prepared)[0].membership));
+    CHECK(f.collector.queuedRecords() == 4);
+    CHECK(f.collector.counts().delivered == 0);
+    CHECK(f.collector.counts().withdrawn == 0);
+    CHECK(f.collector.pop(work).error() == Error::NO_OFFER);
+    auto acknowledged = f.collector.acknowledgeBatch(work);
+    REQUIRE(acknowledged);
+    CHECK(acknowledged->records == 2);
+    CHECK(acknowledged->withdrawn == 2);
+    CHECK(f.collector.queuedRecords() == 0);
+    CHECK(f.collector.counts().delivered == 2);
+    CHECK(f.collector.counts().withdrawn == 2);
+    CHECK(f.collector.acknowledgeBatch(work).error() == Error::NO_OFFER);
+}
+
+TEST_CASE("STREAM single and batch offer replacement rejects stale acknowledgement interleavings") {
+    auto f = fixture();
+    add(f, u"ALPHA");
+    add(f, u"BETA");
+    const Input inputs[]{{0, u"ALPHA", 1, 10}, {0, u"BETA", 1, 20}};
+    (void)stage(f, inputs);
+    std::array<s::StreamDelivery, 4> storage{};
+    auto work = turn();
+    REQUIRE(f.collector.prepareBatch(storage, work));
+    REQUIRE(f.collector.front(work));
+    CHECK(f.collector.acknowledgeBatch(work).error() == Error::NO_OFFER);
+    REQUIRE(f.collector.pop(work));
+    REQUIRE(f.collector.front(work));
+    auto insufficient = turn();
+    insufficient.visits = 0;
+    CHECK(f.collector.prepareBatch(storage, insufficient).error() == Error::WORK_LIMIT);
+    REQUIRE(f.collector.pop(work));
+    (void)stage(f, inputs);
+    REQUIRE(f.collector.prepareBatch(storage, work));
+    insufficient = turn();
+    insufficient.visits = 0;
+    CHECK(f.collector.front(insufficient).error() == Error::WORK_LIMIT);
+    CHECK(f.collector.acknowledgeBatch(work)->records == 2);
+    (void)stage(f, inputs);
+    REQUIRE(f.collector.prepareBatch(storage, work));
+    remove(f, u"ALPHA");
+    REQUIRE(f.collector.front(work));
+    CHECK(f.collector.acknowledgeBatch(work).error() == Error::NO_OFFER);
+    REQUIRE(f.collector.pop(work));
+    CHECK(f.collector.queuedRecords() == 0);
+}
+
+TEST_CASE("STREAM batch acknowledgement preflights shared release work without partial consumption or allocation") {
+    auto f = fixture();
+    add(f, u"ALPHA");
+    const Input inputs[]{{0, u"ALPHA", 1, 10}, {0, u"ALPHA", 1, 11}};
+    (void)stage(f, inputs);
+    std::array<s::StreamDelivery, 4> storage{};
+    auto work = turn();
+    auto prepared = [&] {
+        AllocationFault fault(0);
+
+        return f.collector.prepareBatch(storage, work);
+    }();
+    REQUIRE(prepared);
+    CHECK(prepared->size() == 2);
+    auto insufficient = turn();
+    insufficient.bytes = 0;
+    CHECK(f.collector.acknowledgeBatch(insufficient).error() == Error::WORK_LIMIT);
+    CHECK(f.collector.queuedRecords() == 2);
+    CHECK(f.collector.counts().delivered == 0);
+    auto acknowledged = [&] {
+        AllocationFault fault(0);
+
+        return f.collector.acknowledgeBatch(work);
+    }();
+    REQUIRE(acknowledged);
+    CHECK(acknowledged->records == 2);
+    CHECK(f.collector.queuedRecords() == 0);
+}
+
+TEST_CASE("STREAM zero-capacity and wholly withdrawn prepared prefixes have distinct exact counts") {
+    auto f = fixture();
+    add(f, u"ALPHA");
+    const Input inputs[]{{0, u"ALPHA", 1, 10}, {0, u"ALPHA", 1, 11}};
+    (void)stage(f, inputs);
+    remove(f, u"ALPHA");
+    auto work = turn();
+    CHECK(f.collector.prepareBatch({}, work)->empty());
+    auto empty = f.collector.acknowledgeBatch(work);
+    REQUIRE(empty);
+    CHECK(empty->records == 0);
+    CHECK(empty->withdrawn == 0);
+    CHECK(f.collector.queuedRecords() == 2);
+    std::array<s::StreamDelivery, 1> storage{};
+    CHECK(f.collector.prepareBatch(storage, work)->empty());
+    auto withdrawn = f.collector.acknowledgeBatch(work);
+    REQUIRE(withdrawn);
+    CHECK(withdrawn->records == 0);
+    CHECK(withdrawn->withdrawn == 2);
+    CHECK(f.collector.queuedRecords() == 0);
+    CHECK(f.collector.counts().delivered == 0);
+}
+
+TEST_CASE("STREAM prepared provenance preserves original generations and no-op versus effective invalidation") {
+    auto f = fixture();
+    add(f, u"ALPHA");
+    const Input first[]{{0, u"ALPHA", 1, 10}};
+    auto old = admit(f.session, data(first));
+    const auto oldGeneration = old.snapshot().identity().generation();
+    auto work = turn();
+    REQUIRE(f.collector.stage(std::move(old), work));
+    (void)admit(f.session, description(41, 0));
+    auto newer = admit(f.session, data(first));
+    const auto newGeneration = newer.snapshot().identity().generation();
+    REQUIRE(newGeneration != oldGeneration);
+    REQUIRE(f.collector.stage(std::move(newer), work));
+    std::array<s::StreamDelivery, 2> storage{};
+    auto prepared = f.collector.prepareBatch(storage, work);
+    REQUIRE(prepared);
+    REQUIRE(prepared->size() == 2);
+    CHECK((*prepared)[0].bindingGeneration == oldGeneration);
+    CHECK((*prepared)[1].bindingGeneration == newGeneration);
+    add(f, u"ALPHA");
+    CHECK(f.collector.acknowledgeBatch(work)->records == 2);
+    (void)stage(f, first);
+    REQUIRE(f.collector.prepareBatch(storage, work));
+    add(f, u"BETA");
+    CHECK(f.collector.acknowledgeBatch(work).error() == Error::NO_OFFER);
+    REQUIRE(f.collector.prepareBatch(storage, work));
+    const Input ignored[]{{0, u"OTHER", 1, 99}};
+    CHECK(stage(f, ignored).selected == 0);
+    CHECK(f.collector.acknowledgeBatch(work)->records == 1);
+    (void)stage(f, first);
+    REQUIRE(f.collector.prepareBatch(storage, work));
+    (void)stage(f, first);
+    CHECK(f.collector.acknowledgeBatch(work).error() == Error::NO_OFFER);
+    CHECK(drain(f.collector) == std::vector<std::int32_t>{10, 10});
+}
+
+TEST_CASE("STREAM batch offers are invalidated by move construction and assignment while single offers survive") {
+    auto f = fixture();
+    add(f, u"ALPHA");
+    const Input input[]{{0, u"ALPHA", 1, 10}};
+    (void)stage(f, input);
+    std::array<s::StreamDelivery, 1> metadata{};
+    auto work = turn();
+    REQUIRE(f.collector.prepareBatch(metadata, work));
+    auto moved = std::move(f.collector);
+    auto stale = moved.acknowledgeBatch(work);
+    CHECK_FALSE(stale);
+
+    if (!stale) {
+        CHECK(stale.error() == Error::NO_OFFER);
+    }
+
+    CHECK(moved.queuedRecords() == 1);
+
+    if (moved.queuedRecords() != 0) {
+        REQUIRE(moved.prepareBatch(metadata, work));
+        auto destination = collector(state(f.schema));
+        destination = std::move(moved);
+        auto assigned = destination.acknowledgeBatch(work);
+        CHECK_FALSE(assigned);
+
+        if (!assigned) {
+            CHECK(assigned.error() == Error::NO_OFFER);
+        }
+
+        CHECK(destination.queuedRecords() == 1);
+        REQUIRE(destination.front(work));
+        auto singleMoved = std::move(destination);
+        CHECK(singleMoved.pop(work));
+        CHECK(singleMoved.queuedRecords() == 0);
+    }
+}

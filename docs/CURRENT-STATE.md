@@ -14,6 +14,7 @@ TLS/credential adapters, TICKER/HISTORY collectors, shared upstream multiplexing
 
 | Component | Behavior and contract |
 | --- | --- |
+| Local STREAM dispatch | Serialized callbacks, bounded thread-safe commands, detached immutable batches and explicit local close: [contract](../spec/subscriptions/CLIENT-DISPATCH.md). Default OFF; source session/runtime and wire reconciliation remain caller-owned. Local completion does not certify transport quiescence. |
 | STREAM collector | Every admitted subscribed record in source order, including identical values; bounded whole-event staging and local membership/revision barriers: [contract](../spec/subscriptions/STREAM-COLLECTOR.md). No callbacks, latest cache or upstream multiplexing. |
 | Optional TCP runtime | Explicit SDK/bootstrap, caller-driven DNS/connect/read/write, owned buffers, bounded progress and quiescent close: [contract](../spec/transport/TCP-RUNTIME.md), [DNS resources](../spec/transport/DNS-RESOURCES.md), [validation](../tests/conformance/transport/TCP-VALIDATION.md). Default OFF; no TLS, application callbacks, collector or reconnect. |
 | Pure live session | Whole-frame admission, immutable peer generations, protocol/heartbeat controls, readiness/auth gates and owned output: [session contract](../spec/subscriptions/LIVE-SESSION.md). No sockets, clocks, collectors or reconnecting client. |
