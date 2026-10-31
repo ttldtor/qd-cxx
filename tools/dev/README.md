@@ -2,6 +2,9 @@
 
 [Русская версия](README.ru.md). English is authoritative.
 
+The optional [native subscription parser verification](../upstream/subscription-writer-oracle/README.md)
+compares native composer captures with actual locked Java callbacks/time reads without sockets.
+
 The optional [subscription production oracle](../upstream/subscription-oracle/README.md) captures
 locked Java wire/collector/session behavior offline and compares exact indexed fixtures. It has
 its own explicit JDK 8/CMake/PowerShell prerequisites; ordinary native builds do not invoke it.

@@ -8,7 +8,7 @@
 
 Выбранная цель — read-side client для явно поддержанных binary records и caller-supplied immutable schemas: STREAM, TICKER и HISTORY, общий upstream demand, изолированные локальные потребители, finite resources и явные recovery/stop. [Текущие возможности](../../docs/CURRENT-STATE.ru.md) остаются источником реализованного поведения. [Матрица и сценарии](../../tests/conformance/subscriptions/CONTRACTS.ru.md) различают current support, fixed design, pending evidence и exclusions. Совместимость collectors/capabilities/wildcard подтверждается до зависимой реализации; выбор runtime/TLS/backend — отдельная предпосылка.
 
-Чистый [API ограниченного целевого состояния](STATE.ru.md) реализован. Остальной client/protocol/collector lifecycle здесь остаётся проектным контрактом. Наблюдения выбранного Java-профиля приведены в [захватах](../../tests/fixtures/subscriptions/CAPTURES.ru.md).
+Чистый [API целевого состояния](STATE.ru.md) и [исходящий composer](WRITER.ru.md) реализованы. Остальной client/live-session/collector lifecycle здесь остаётся проектным контрактом. Наблюдения выбранного Java-профиля приведены в [захватах](../../tests/fixtures/subscriptions/CAPTURES.ru.md).
 
 ## Границы владения
 

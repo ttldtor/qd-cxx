@@ -21,6 +21,12 @@
 
 ## Целевое состояние подписок
 
+Для ограниченного живого вывода подключите `qd/protocol/subscription_writer.hpp` и `qdcxx_protocol`.
+[Контракт composer и пример](../spec/subscriptions/WRITER.ru.md) описывают шесть типов подписок,
+явные описания, владеющий хвост частичной записи и бюджеты удержанного вывода. Целевой тест —
+`protocol_subscription_writer`; необязательная [проверка Java](../tools/upstream/subscription-writer-oracle/README.ru.md)
+не становится зависимостью native сборки. Recording профили не менялись.
+
 Подключите `qd/core/subscription.hpp` и `qdcxx_core` для ограниченных синхронных desired maps.
 [Контракт API и полный пример](../spec/subscriptions/STATE.ru.md) описывают точные символы,
 schema identity, атомарные команды, revision, membership tokens и явные turn/peak бюджеты.

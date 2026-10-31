@@ -9,6 +9,7 @@ The project implements selected bounded profiles against Java QD 3.355 at the re
 
 | Component | Behavior and contract |
 | --- | --- |
+| Subscription output | Six messages and explicit descriptions, exact symbols, owned partial-write suffixes and retained-output quotas: [live composer](../spec/subscriptions/WRITER.md). No socket/session/peer acknowledgement. |
 | Desired subscriptions | Pure bounded state, exact symbols/schema identity, atomic add/remove/replace/clear, revisions and non-reused membership tokens: [state API](../spec/subscriptions/STATE.md). No live client/collector/transport follows from this row. |
 | Encoding | Compact int/long acceptance, exact nullable UTF-16 strings, owned symbols, finite budgets and terminal errors: [primitives](../spec/encoding/PRIMITIVES.md), [UTFString](../spec/encoding/UTFSTRING.md), [symbols](../spec/encoding/SYMBOLS.md). |
 | QTP | Incremental framing, raw descriptions, immutable ordinary local schemas, static binding and complete STREAM_DATA decoding: [framing](../spec/protocol/FRAMING.md), [descriptions](../spec/protocol/DESCRIBE-RECORDS.md), [binding](../spec/protocol/STATIC-BINDING.md), [stream data](../spec/protocol/STREAM-DATA.md). |

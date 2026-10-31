@@ -8,7 +8,7 @@ This is the selected design contract for future native subscriptions. It defines
 
 The selected goal is a read-side client over explicitly supported binary records and caller-supplied immutable schemas: STREAM, TICKER and HISTORY delivery, shared upstream demand, isolated local consumers, finite resources and explicit recovery/stop. [Current capabilities](../../docs/CURRENT-STATE.md) remain authoritative for implemented behavior. The [coverage matrix and scenarios](../../tests/conformance/subscriptions/CONTRACTS.md) distinguish current support, fixed design, pending evidence and exclusions. Collector/capability/wildcard compatibility must be measured before dependent implementation; runtime/TLS/backend selection is a separate prerequisite.
 
-The pure [bounded desired-state API](STATE.md) is implemented. The remaining client, protocol and collector lifecycle described here is still a design contract. Selected Java observations are recorded in the [capture profile](../../tests/fixtures/subscriptions/CAPTURES.md).
+The pure [bounded desired-state API](STATE.md) and [outgoing composer](WRITER.md) are implemented. The remaining client, live-session and collector lifecycle described here is still a design contract. Selected Java observations are recorded in the [capture profile](../../tests/fixtures/subscriptions/CAPTURES.md).
 
 ## Ownership boundaries
 

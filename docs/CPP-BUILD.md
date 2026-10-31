@@ -18,6 +18,12 @@ enabled, `wire_inventory_schema` and `wire_inventory_cli` add focused tests;
 
 ## Desired subscription state
 
+For bounded live output, include `qd/protocol/subscription_writer.hpp` and link `qdcxx_protocol`.
+The [composer contract and example](../spec/subscriptions/WRITER.md) cover six subscription types,
+explicit descriptions, owned partial-write suffixes and retained-output budgets. The focused test
+is `protocol_subscription_writer`; optional [production Java verification](../tools/upstream/subscription-writer-oracle/README.md)
+does not become a native build dependency. Recording profiles are unchanged.
+
 Include `qd/core/subscription.hpp` and link `qdcxx_core` for bounded synchronous desired maps.
 The [API contract and complete example](../spec/subscriptions/STATE.md) cover exact symbols,
 schema identity, atomic commands, revisions, membership tokens and explicit turn/peak budgets.

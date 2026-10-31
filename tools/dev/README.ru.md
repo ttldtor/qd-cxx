@@ -2,6 +2,9 @@
 
 [English version](README.md). Английская версия нормативная.
 
+Необязательная [проверка нативных подписок парсером](../upstream/subscription-writer-oracle/README.ru.md)
+сравнивает захваты composer с настоящими callbacks/time reads закреплённой Java без сокетов.
+
 Необязательный [эталон подписок](../upstream/subscription-oracle/README.ru.md) офлайново захватывает
 wire/collector/session поведение закреплённой Java и сравнивает точные индексированные эталоны.
 Ему явно нужны JDK 8/CMake/PowerShell; обычные нативные сборки его не запускают.

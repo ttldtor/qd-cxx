@@ -18,4 +18,4 @@ Areas:
 - `schema/` — records, fields, types, aliases, mappings, and scheme construction.
 - `protocol/` — QTP messages, framing, negotiation, and state machines.
 - `encoding/` — byte-level primitives and stateful codecs.
-- [Subscriptions](subscriptions/CONTRACTS.md) — delivery ownership, resource limits and lifecycle design; [bounded desired state](subscriptions/STATE.md) is implemented and [selected Java compatibility](../tests/fixtures/subscriptions/CAPTURES.md) is observed. Native wire/client/collector implementation remains pending.
+- [Subscriptions](subscriptions/CONTRACTS.md) — delivery ownership, resource limits and lifecycle design; [bounded desired state](subscriptions/STATE.md) and [outgoing composition](subscriptions/WRITER.md) are implemented, with [selected Java evidence](../tests/fixtures/subscriptions/CAPTURES.md). Live session/client/collector implementation remains pending.

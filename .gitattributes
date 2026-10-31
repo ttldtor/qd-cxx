@@ -532,3 +532,6 @@ tests/conformance/compressed_oracle_help.cmake text eol=lf
 tests/fixtures/subscriptions/expected/** -text
 tests/fixtures/subscriptions/*.md text eol=lf
 tools/upstream/subscription-oracle/** text eol=lf
+tools/upstream/subscription-writer-oracle/** text eol=lf
+tests/fixtures/subscriptions/writer/expected/** -text
+tests/fixtures/subscriptions/writer/*.md text eol=lf

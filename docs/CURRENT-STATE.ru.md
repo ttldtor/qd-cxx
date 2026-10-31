@@ -9,6 +9,7 @@
 
 | Компонент | Поведение и контракт |
 | --- | --- |
+| Вывод подписок | Шесть сообщений и явные описания, точные символы, владеющие хвосты частичной записи и квоты удержанного вывода: [live composer](../spec/subscriptions/WRITER.ru.md). Без socket/session/peer acknowledgement. |
 | Целевые подписки | Чистое ограниченное состояние, точные символы/schema identity, атомарные add/remove/replace/clear, revision и непереиспользуемые membership tokens: [API состояния](../spec/subscriptions/STATE.ru.md). Live client/collector/transport этой строкой не заявлены. |
 | Кодировки | Принимаемые формы compact int/long, точные nullable UTF-16 строки, владеющие символы, конечные бюджеты и терминальные ошибки: [примитивы](../spec/encoding/PRIMITIVES.ru.md), [UTFString](../spec/encoding/UTFSTRING.ru.md), [символы](../spec/encoding/SYMBOLS.ru.md). |
 | QTP | Инкрементальное выделение кадров, исходные описания, неизменяемые обычные локальные схемы, статическое связывание и декодирование полного STREAM_DATA: [кадры](../spec/protocol/FRAMING.ru.md), [описания](../spec/protocol/DESCRIBE-RECORDS.ru.md), [связывание](../spec/protocol/STATIC-BINDING.ru.md), [stream data](../spec/protocol/STREAM-DATA.ru.md). |
