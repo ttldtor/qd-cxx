@@ -19,4 +19,5 @@
 - `protocol/` — QTP messages, framing, negotiation и state machines.
 - `encoding/` — byte-level primitives и stateful codecs.
 - [TCP transport](transport/TCP-RUNTIME.ru.md) — владение, продвижение и close runtime под управлением вызывающего кода; [граница ресурсов DNS](transport/DNS-RESOURCES.ru.md).
-- [Подписки](subscriptions/CONTRACTS.ru.md) — контракты delivery ownership, resource limits и lifecycle; [целевое состояние](subscriptions/STATE.ru.md), [исходящие сообщения](subscriptions/WRITER.ru.md) и [чистая live-сессия](subscriptions/LIVE-SESSION.ru.md) реализованы с [выбранными Java-доказательствами](../tests/fixtures/subscriptions/CAPTURES.ru.md). Сетевой клиент и коллекторы ещё не реализованы.
+- [STREAM-коллектор](subscriptions/STREAM-COLLECTOR.ru.md) — очередь каждой записи, membership/revision barriers, whole-frame overflow и оплата освобождения.
+- [Подписки](subscriptions/CONTRACTS.ru.md) — контракты delivery ownership, resource limits и lifecycle; [целевое состояние](subscriptions/STATE.ru.md), [исходящие сообщения](subscriptions/WRITER.ru.md), [чистая live-сессия](subscriptions/LIVE-SESSION.ru.md) и STREAM staging реализованы с [выбранными Java-доказательствами](../tests/fixtures/subscriptions/CAPTURES.ru.md). Полный клиент, callback dispatch и TICKER/HISTORY-коллекторы ещё не реализованы.

@@ -35,12 +35,13 @@ cmake --build build-runtime --config Release
 Подключите `qd/transport/tcp_runtime.hpp` и свяжите `qdcxx_transport`.
 [Контракт runtime](../spec/transport/TCP-RUNTIME.ru.md) задаёт bootstrap на главном потоке,
 продвижение владельцем, deadlines, credits и explicit close. Это plain TCP;
-TLS, прикладной dispatch callbacks, коллекторы и reconnecting client остаются отдельной работой.
+TLS, прикладной dispatch callbacks и reconnecting client остаются отдельной работой.
+STREAM staging использует отдельный компонент коллектора ниже.
 При OFF указанные SDK roots не проверяются, C/SDK-зависимости чистых библиотек не добавляются.
 
 `cmake --install build-runtime --prefix C:/sdk/qdcxx --config Release` устанавливает
 переносимый пакет `qdcxx`. Consumer использует `find_package(qdcxx CONFIG REQUIRED)`
-и прежние имена targets `qdcxx_encoding`, `qdcxx_core`, `qdcxx_protocol`, а при наличии
+и имена targets `qdcxx_encoding`, `qdcxx_core`, `qdcxx_protocol`, `qdcxx_collectors`, а при наличии
 также `qdcxx_transport`. Этот минимальный пакет экспортирует только эти компоненты;
 JSON, Quote projection, replay и tools не становятся дополнительными exported targets.
 Enabled package содержит qualified static c-ares archive, native link closure
@@ -54,6 +55,12 @@ cmake -S consumer -B build-consumer '-Dqdcxx_DIR=C:/sdk/qdcxx/lib64/cmake/qdcxx'
 ```
 
 ## Целевое состояние подписок
+
+Подключите `qd/collectors/stream.hpp` и свяжите `qdcxx_collectors` для чистой ограниченной
+STREAM staging поверх принятых `LiveEvent`. [Контракт коллектора](../spec/subscriptions/STREAM-COLLECTOR.ru.md)
+задаёт перенос владения в фабрике, точные membership barriers, front/pop/discard, конечную работу
+и terminal overflow. Runtime, JSON и дополнительный SDK не нужны. `collectors_stream` — focused
+CTest; production-only installed package также экспортирует этот target.
 
 Отдельные [проекты проверки реализуемости runtime](../tests/conformance/transport/runtime-feasibility/README.ru.md)
 проверяют механизмы закреплённых опциональных SDK с явным локальным получением, OFF по умолчанию и тестовыми
@@ -69,7 +76,8 @@ loopback peers. Они не меняют корневую сборку, не д�
 [Контракт API и полный пример](../spec/subscriptions/STATE.ru.md) описывают точные символы,
 schema identity, атомарные команды, revision, membership tokens и явные turn/peak бюджеты.
 Runtime, транспорт, JSON и новые зависимости не нужны. Целевой CTest — `core_subscription_state`;
-wire emission, доставка коллекторов и callback dispatch остаются отдельными компонентами.
+wire composition и STREAM staging используют отдельные компоненты выше.
+Callback dispatch остаётся отдельной работой.
 
 ## Ограниченный tape writer в памяти
 

@@ -111,6 +111,7 @@ public final class CollectorOracle {
       wildcard(contract, false);
     }
     streamOrder();
+    streamIdenticalFilter();
     wildcard(QDContract.STREAM, true);
     ticker(false);
     ticker(true);
@@ -261,6 +262,26 @@ public final class CollectorOracle {
       hub.send(hub.first, B, 2, 21, 0);
       hub.send(hub.first, A, 2, 13, 0);
       data("separate-batches", agent);
+      finish(hub);
+    }
+  }
+
+  private void streamIdenticalFilter() {
+    start("stream-identical-filter");
+    try (Hub hub = new Hub(QDContract.STREAM, false, false, true)) {
+      QDAgent agent = hub.agent(false);
+      hub.send(hub.first, A, 1, 9, 0);
+      hub.sub(agent, false, hub.first, A, 0);
+      data("after-add", agent);
+      hub.sendBatch(
+          new Item(hub.first, A, 1, 10, 0),
+          new Item(hub.first, A, 1, 10, 0),
+          new Item(hub.first, B, 1, 20, 0),
+          new Item(hub.second, A, 1, 30, 0),
+          new Item(hub.first, A, 1, 10, 0));
+      data("filtered-batch", agent);
+      hub.send(hub.first, A, 2, 11, 0);
+      data("next-batch", agent);
       finish(hub);
     }
   }

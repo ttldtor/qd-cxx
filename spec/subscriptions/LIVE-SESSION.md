@@ -104,6 +104,18 @@ the exposed whole envelope still cannot exceed `outputBytes`.
 `residentBytes` and `peakBytes` measure requested backing reservations, not heap
 allocator overhead or process RSS.
 
+`LiveEvent::residentBytes()` reports only its requested State plus complete event
+arena, including spare capacity. `LiveEvent::releaseBytes()` reports the current
+whole epoch reservation as a conservative byte-work allowance before releasing
+an event: the last event reference to a snapshot can also destroy its nested
+containers. This allowance includes shared configuration/snapshot storage and
+possibly unrelated live owners. Sample and debit it immediately before release
+in the same serialized operation; it is not event-specific staging or a CPU-time
+measurement. Both getters take constant work and return zero after move.
+`LiveIdentity::sameEpoch()` compares valid opaque epochs while ignoring binding
+generation; `matches()` still requires the same generation. Initial generation
+zero may be valid; two invalid identities never match either comparison.
+
 Caller-created copies outside these owners, including independently retained
 core provenance tokens, have their own lifetime. These per-epoch counters do
 not measure all allocations made by the application.

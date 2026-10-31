@@ -125,6 +125,11 @@ class LiveIdentity {
      * @return True only for the same valid epoch and generation.
      */
     [[nodiscard]] bool matches(const LiveIdentity &other) const noexcept;
+    /** Compare opaque epochs independently of effective binding generations.
+     * @param other Owning identity to compare; invalid identities never match.
+     * @return True only when both identities retain the same epoch, including generation zero.
+     */
+    [[nodiscard]] bool sameEpoch(const LiveIdentity &other) const noexcept;
     /** Inspect the monotonically increasing generation within its opaque epoch.
      * @return Generation number; zero is also the initial empty generation.
      */
@@ -294,6 +299,19 @@ class LiveEvent {
      * @return Independent owning snapshot handle.
      */
     [[nodiscard]] LiveSnapshot snapshot() const noexcept;
+    /** Inspect this event's complete requested State and arena backing in constant work.
+     * Shared snapshot/epoch reservations remain separately bounded by the epoch ledger.
+     * @return Event-specific requested bytes, including spare arena capacity; zero after move.
+     */
+    [[nodiscard]] std::size_t residentBytes() const noexcept;
+    /** Inspect a conservative byte-work allowance before releasing this event.
+     * Includes the current whole epoch reservation, shared snapshot/configuration backing and
+     * possibly unrelated owners. Sample immediately before release in the serialized, nonreentrant
+     * ownership domain; do not use this value as event-specific staging or physical-memory usage.
+     * This does not bound native allocator latency or measure CPU instructions.
+     * @return Current epoch requested bytes covering potential shared-owner destruction; zero after move.
+     */
+    [[nodiscard]] std::size_t releaseBytes() const noexcept;
 };
 
 /** Move-only complete output and local partial-write cursor; consumption is never peer acknowledgement. */

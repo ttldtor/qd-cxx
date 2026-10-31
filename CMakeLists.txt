@@ -56,17 +56,21 @@ add_library(qdcxx_protocol src/protocol/frame_reader.cpp src/protocol/describe_r
 target_link_libraries(qdcxx_protocol PUBLIC qdcxx_encoding qdcxx_core)
 set_target_properties(qdcxx_protocol PROPERTIES CXX_EXTENSIONS OFF)
 
+add_library(qdcxx_collectors src/collectors/stream.cpp)
+target_link_libraries(qdcxx_collectors PUBLIC qdcxx_protocol)
+set_target_properties(qdcxx_collectors PROPERTIES CXX_EXTENSIONS OFF)
+
 option(ORG_TTLDTOR_QDCXX_BUILD_RUNTIME "Build the explicit credential-free caller-driven TCP runtime" OFF)
 if(ORG_TTLDTOR_QDCXX_BUILD_RUNTIME)
     include(cmake/Runtime.cmake)
 endif()
 
 include(CMakePackageConfigHelpers)
-install(TARGETS qdcxx_encoding qdcxx_core qdcxx_protocol EXPORT qdcxxTargets
+install(TARGETS qdcxx_encoding qdcxx_core qdcxx_protocol qdcxx_collectors EXPORT qdcxxTargets
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
-install(DIRECTORY include/qd/core include/qd/encoding include/qd/protocol
+install(DIRECTORY include/qd/core include/qd/encoding include/qd/protocol include/qd/collectors
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qd" FILES_MATCHING PATTERN "*.hpp")
 install(FILES LICENSE DESTINATION "${CMAKE_INSTALL_DATADIR}/qdcxx/licenses" RENAME qdcxx-LICENSE.txt)
 configure_package_config_file(cmake/qdcxxConfig.cmake.in "${CMAKE_CURRENT_BINARY_DIR}/qdcxxConfig.cmake"
@@ -235,6 +239,14 @@ if(BUILD_TESTING)
     set_target_properties(qdcxx_live_session_tests PROPERTIES CXX_EXTENSIONS OFF)
     add_test(NAME protocol_live_session COMMAND qdcxx_live_session_tests)
     set_tests_properties(protocol_live_session PROPERTIES TIMEOUT 120)
+    add_executable(qdcxx_stream_collector_tests tests/conformance/stream_collector_tests.cpp)
+    target_link_libraries(qdcxx_stream_collector_tests PRIVATE qdcxx_collectors qdcxx_quote doctest::doctest)
+    target_compile_definitions(qdcxx_stream_collector_tests PRIVATE
+        "ORG_TTLDTOR_QDCXX_STREAM_SOURCE_ROOT=\"${CMAKE_CURRENT_SOURCE_DIR}\""
+        "ORG_TTLDTOR_QDCXX_STREAM_CAPTURE_DIR=\"${CMAKE_CURRENT_BINARY_DIR}/stream-native\"")
+    set_target_properties(qdcxx_stream_collector_tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME collectors_stream COMMAND qdcxx_stream_collector_tests)
+    set_tests_properties(collectors_stream PROPERTIES TIMEOUT 120)
     if(TARGET qdcxx_inspect_tool)
         add_executable(qdcxx_source_format_tests tests/conformance/source_format_tests.cpp)
         target_link_libraries(qdcxx_source_format_tests PRIVATE qdcxx_inspect_tool doctest::doctest)

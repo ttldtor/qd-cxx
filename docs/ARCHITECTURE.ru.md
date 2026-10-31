@@ -56,6 +56,10 @@ QDCXX-025 реализует первое ограниченное примен�
 неизменяемыми поколениями другой стороны и целиком принятыми кадрами. Байтовые диапазоны
 и рабочие бюджеты поступают от вызывающей стороны; этот слой не зависит от runtime, часов
 и прикладных callback. Курсор частичной записи не подтверждает доставку другой стороне.
+[STREAM-коллектор](../spec/subscriptions/STREAM-COLLECTOR.ru.md) добавляет чистую ограниченную
+очередь поверх принятых событий и принадлежащего ему desired state. Он сохраняет порядок без
+conflation, фильтрует retired membership activations перед выдачей и сообщает whole-frame overflow.
+Staging, desired-state и shared epoch bounds — отдельные области для агрегации верхним владельцем.
 [ADR-0006](decisions/ADR-0006-live-runtime.ru.md) выбирает опциональный профиль Asio/c-ares/OpenSSL,
 явные требования к SDK/bootstrap/доверию и [границу проверки реализуемости](../tests/conformance/transport/CONTRACTS.ru.md).
 [Опциональный TCP-адаптер](../spec/transport/TCP-RUNTIME.ru.md) реализует только plain-подмножество

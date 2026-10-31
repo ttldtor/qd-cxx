@@ -56,6 +56,10 @@ The [pure protocol session](../spec/subscriptions/LIVE-SESSION.md) owns a fresh 
 immutable peer generations and whole admitted frames. Caller-supplied byte spans and work credits
 keep that layer independent of runtime, clocks and application callbacks. Its partial-write cursor
 does not acknowledge peer delivery.
+The [STREAM collector](../spec/subscriptions/STREAM-COLLECTOR.md) adds pure bounded staging
+over admitted events and owned desired state. It preserves event order without conflation,
+filters retired membership activations before offering records and reports whole-frame overflow.
+Its staging, desired-state and shared epoch bounds are separate scopes to aggregate at the upper owner.
 [ADR-0006](decisions/ADR-0006-live-runtime.md) selects an optional Asio/c-ares/OpenSSL profile,
 explicit SDK/bootstrap/trust requirements and its [feasibility boundary](../tests/conformance/transport/CONTRACTS.md).
 The [optional TCP adapter](../spec/transport/TCP-RUNTIME.md) implements only the caller-driven,

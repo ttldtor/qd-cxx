@@ -32,12 +32,13 @@ cmake --build build-runtime --config Release
 Include `qd/transport/tcp_runtime.hpp` and link `qdcxx_transport`. The
 [runtime contract](../spec/transport/TCP-RUNTIME.md) defines main-thread bootstrap,
 owner-thread progress, deadlines, credits and explicit close. This is plain TCP;
-TLS, application callback dispatch, collectors and a reconnecting client remain separate work.
+TLS, application callback dispatch and a reconnecting client remain separate work.
+STREAM staging uses the separate collector component below.
 OFF does not inspect those SDK roots or add C/SDK dependencies to the pure libraries.
 
 `cmake --install build-runtime --prefix C:/sdk/qdcxx --config Release` installs a
 relocatable `qdcxx` package. Consumers use `find_package(qdcxx CONFIG REQUIRED)` and
-the unchanged target names `qdcxx_encoding`, `qdcxx_core`, `qdcxx_protocol` and,
+the target names `qdcxx_encoding`, `qdcxx_core`, `qdcxx_protocol`, `qdcxx_collectors` and,
 when built, `qdcxx_transport`. This minimal package exports only those components;
 JSON, Quote projection, replay and tools are not additional exported targets.
 The enabled package includes the qualified static c-ares archive, native link
@@ -51,6 +52,12 @@ cmake -S consumer -B build-consumer '-Dqdcxx_DIR=C:/sdk/qdcxx/lib64/cmake/qdcxx'
 ```
 
 ## Desired subscription state
+
+Include `qd/collectors/stream.hpp` and link `qdcxx_collectors` for pure bounded STREAM
+staging over admitted `LiveEvent` owners. The [collector contract](../spec/subscriptions/STREAM-COLLECTOR.md)
+defines factory transfer, exact membership barriers, front/pop/discard, finite work and terminal overflow.
+No runtime, JSON or additional SDK is needed. `collectors_stream` is the focused CTest;
+the production-only installed package exports this target too.
 
 The separate [runtime feasibility projects](../tests/conformance/transport/runtime-feasibility/README.md)
 test pinned optional SDK mechanisms with explicit local acquisition, default OFF and synthetic loopback
@@ -66,7 +73,8 @@ Include `qd/core/subscription.hpp` and link `qdcxx_core` for bounded synchronous
 The [API contract and complete example](../spec/subscriptions/STATE.md) cover exact symbols,
 schema identity, atomic commands, revisions, membership tokens and explicit turn/peak budgets.
 No runtime, transport, JSON or new dependency is needed. `core_subscription_state` is the focused
-CTest; wire emission, collector delivery and callback dispatch are separate pending components.
+CTest; wire composition and STREAM staging use the separate components above.
+Callback dispatch remains separate work.
 
 ## Bounded in-memory tape writer
 

@@ -5,8 +5,8 @@
 These offline synthetic observations characterize the production Java paths at
 [upstream.lock](../../../upstream.lock), QD source version 3.355, commit
 `0ddc0a09779fb61d74cc0b37c6449ff47dcb715f`. They qualify compatibility inputs for the
-[native subscription contract](../../../spec/subscriptions/CONTRACTS.md); native subscription,
-collector, transport and lifecycle implementations remain pending.
+[native subscription contract](../../../spec/subscriptions/CONTRACTS.md). Capturing these paths
+does not itself establish native implementation, full compatibility or lifecycle readiness.
 
 ## Provenance and reproducibility
 
@@ -32,7 +32,7 @@ empty strings and unpaired surrogates. Ledgers and binary data are machine evide
 | wire/wire-11,12,16,17,21,22-a-b and -b-a | All six add/remove families, both sender/local record-ID mappings, exact empty/duplicate/UTF-16 symbols and literal AB*/A?. HISTORY_ADD consumes signed raw64 time, including extrema; HISTORY_REMOVE consumes no time. |
 | wire/layout-absent, -empty, -x, -z, -object-x | Absent/empty requested layout retains producer x/y; x selects x; z intersects to no fields. Object type10 requested for compact type8 x produces the observed type10/null versus compact audit0; this is not authority for native implicit converters. |
 | wire/layout-before-first-use, -after-first-use, -after-reset | Request change is effective before first writer use; the cached descriptor persists afterward, including explicit production parser/composer reset. This does not establish reconnect policy. |
-| collectors/stream-* | Every-event order, two overlapping clients and enabled STREAM wildcard/exact overlap without duplicate delivery. Disabled STREAM wildcard produces no ALPHA/BETA fanout. |
+| collectors/stream-* | Every-event order, exact identical duplicates, unrequested record/symbol filtering, no pre-add replay, two overlapping clients and enabled STREAM wildcard/exact overlap without duplicate delivery. Disabled STREAM wildcard produces no ALPHA/BETA fanout. |
 | collectors/ticker-* | Latest/initial/re-add behavior depends on explicit storeEverything retention. No universal cached snapshot on every re-add is promised. |
 | collectors/history-* | Inclusive signed raw lower bounds, earliest aggregate bound/change, empty/complete/snip/restarted/overlapping snapshots, transactions, removal and interrupted unsubscribe. Untimed records are rejected. |
 | session/S01–S04 | Actual full/delta/unchanged/reset protocol descriptors, all 16 heartbeat field-presence masks and observed option round trips. |

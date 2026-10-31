@@ -281,6 +281,13 @@ class LiveArena {
     [[nodiscard]] std::pmr::memory_resource *resource() noexcept {
         return &resource_;
     }
+
+    /** Inspect the complete requested block, including spare and abandoned monotonic slots.
+     * @return Fixed arena capacity admitted against the epoch ledger.
+     */
+    [[nodiscard]] std::size_t capacityBytes() const noexcept {
+        return bytes_;
+    }
 };
 
 using Error = LiveError;
@@ -1834,6 +1841,10 @@ bool LiveIdentity::matches(const LiveIdentity &other) const noexcept {
     return epoch_ && epoch_ == other.epoch_ && generation_ == other.generation_;
 }
 
+bool LiveIdentity::sameEpoch(const LiveIdentity &other) const noexcept {
+    return epoch_ && epoch_ == other.epoch_;
+}
+
 std::uint64_t LiveIdentity::generation() const noexcept {
     return generation_;
 }
@@ -1913,6 +1924,15 @@ std::optional<LiveHeartbeat> LiveEvent::heartbeat() const noexcept {
 
 LiveSnapshot LiveEvent::snapshot() const noexcept {
     return state_ ? state_->snapshot : LiveSnapshot{};
+}
+
+std::size_t LiveEvent::residentBytes() const noexcept {
+    // Both reservations coexist in one finite ledger, so their sum is representable.
+    return state_ ? sizeof(State) + state_->arena.capacityBytes() : 0;
+}
+
+std::size_t LiveEvent::releaseBytes() const noexcept {
+    return state_ ? state_->ledger.lease.get()->resident() : 0;
 }
 
 LivePendingOutput::LivePendingOutput(std::unique_ptr<State> state) noexcept : state_(std::move(state)) {

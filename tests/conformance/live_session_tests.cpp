@@ -442,6 +442,8 @@ TEST_CASE("fresh epochs transfer only at successful creation and keep opaque gen
     CHECK(first.session.peer().identity().generation() == 0);
     CHECK_FALSE(first.session.peer().identity().matches(second.session.peer().identity()));
     CHECK_FALSE(p::LiveIdentity{}.matches(p::LiveIdentity{}));
+    CHECK_FALSE(first.session.peer().identity().sameEpoch(second.session.peer().identity()));
+    CHECK_FALSE(p::LiveIdentity{}.sameEpoch(p::LiveIdentity{}));
     auto old = first.session.peer();
     auto event = admit(first.session, ready());
     CHECK(event.kind() == p::LiveEventKind::PROTOCOL);
@@ -449,6 +451,8 @@ TEST_CASE("fresh epochs transfer only at successful creation and keep opaque gen
     CHECK(event.messageType() == 1);
     CHECK(event.snapshot().identity().generation() == 1);
     CHECK_FALSE(old.identity().matches(event.snapshot().identity()));
+    CHECK(old.identity().sameEpoch(event.snapshot().identity()));
+    CHECK(first.session.peer().identity().sameEpoch(event.snapshot().identity()));
     CHECK(first.session.historySnapshotEnabled());
 }
 
@@ -482,7 +486,11 @@ TEST_CASE("whole-frame data admission preserves earlier completed frames and dro
     std::vector<std::byte> body;
     const std::int64_t first[]{17};
     record(body, 90, u"PREFIX", first);
+    const auto beforeEvent = f.session.residentBytes();
     auto earlier = admit(f.session, frame(15, body));
+    CHECK(earlier.residentBytes() == f.session.residentBytes() - beforeEvent);
+    CHECK(earlier.releaseBytes() == f.session.residentBytes());
+    CHECK(earlier.releaseBytes() >= earlier.residentBytes());
     REQUIRE(earlier.records().size() == 1);
     CHECK(earlier.records()[0].typedValues[0].raw == 17);
     record(body, 90, u"LATE", {});
@@ -493,6 +501,13 @@ TEST_CASE("whole-frame data admission preserves earlier completed frames and dro
     CHECK(f.session.diagnostic().error == Error::MALFORMED);
     CHECK(earlier.records()[0].symbol == u"PREFIX");
     CHECK(earlier.records()[0].typedValues[0].raw == 17);
+    const auto eventBytes = earlier.residentBytes();
+    auto moved = std::move(earlier);
+    CHECK(earlier.residentBytes() == 0);
+    CHECK(earlier.releaseBytes() == 0);
+    CHECK(moved.residentBytes() == eventBytes);
+    CHECK(moved.releaseBytes() == f.session.residentBytes());
+    CHECK(moved.records()[0].symbol == u"PREFIX");
 }
 
 TEST_CASE("all captured heartbeat masks round trip canonical compact widths and remain controls") {

@@ -19,4 +19,5 @@ Areas:
 - `protocol/` — QTP messages, framing, negotiation, and state machines.
 - `encoding/` — byte-level primitives and stateful codecs.
 - [TCP transport](transport/TCP-RUNTIME.md) — caller-driven runtime ownership, progress and close, with the [DNS resource derivation](transport/DNS-RESOURCES.md).
-- [Subscriptions](subscriptions/CONTRACTS.md) — delivery ownership, resource limits and lifecycle design; [bounded desired state](subscriptions/STATE.md), [outgoing composition](subscriptions/WRITER.md) and the [pure live session](subscriptions/LIVE-SESSION.md) are implemented, with [selected Java evidence](../tests/fixtures/subscriptions/CAPTURES.md). Network client/collector implementation remains pending.
+- [STREAM collector](subscriptions/STREAM-COLLECTOR.md) — every-record staging, membership/revision barriers, whole-frame overflow and release-work accounting.
+- [Subscriptions](subscriptions/CONTRACTS.md) — delivery ownership, resource limits and lifecycle design; [bounded desired state](subscriptions/STATE.md), [outgoing composition](subscriptions/WRITER.md), the [pure live session](subscriptions/LIVE-SESSION.md) and STREAM staging are implemented, with [selected Java evidence](../tests/fixtures/subscriptions/CAPTURES.md). Full client, callback dispatch and TICKER/HISTORY collectors remain pending.

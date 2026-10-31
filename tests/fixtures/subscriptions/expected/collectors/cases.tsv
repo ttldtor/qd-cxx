@@ -6,6 +6,7 @@ ticker-wildcard-false	production-observation	QDFactory.getDefaultFactory/collect
 history-duplicate-two-clients	production-observation	QDFactory.getDefaultFactory/collectorBuilder/HISTORY/QDAgent/QDDistributor/RecordBuffer	observed
 history-wildcard-false	production-observation	QDFactory.getDefaultFactory/collectorBuilder/HISTORY/QDAgent/QDDistributor/RecordBuffer	observed
 stream-every-event-order	production-observation	QDFactory.getDefaultFactory/collectorBuilder/STREAM/QDAgent/QDDistributor/RecordBuffer	observed
+stream-identical-filter	production-observation	QDFactory.getDefaultFactory/collectorBuilder/STREAM/QDAgent/QDDistributor/RecordBuffer	observed
 stream-wildcard-true	production-observation	QDFactory.getDefaultFactory/collectorBuilder/STREAM/QDAgent/QDDistributor/RecordBuffer	observed
 ticker-latest-retention-false	production-observation	QDFactory.getDefaultFactory/collectorBuilder/TICKER/QDAgent/QDDistributor/RecordBuffer	observed
 ticker-latest-retention-true	production-observation	QDFactory.getDefaultFactory/collectorBuilder/TICKER/QDAgent/QDDistributor/RecordBuffer	observed
