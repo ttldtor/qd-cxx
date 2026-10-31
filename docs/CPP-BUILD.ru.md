@@ -86,6 +86,12 @@ STREAM staging поверх принятых `LiveEvent`. [Контракт ко
 и terminal overflow. Runtime, JSON и дополнительный SDK не нужны. `collectors_stream` — focused
 CTest; production-only installed package также экспортирует этот target.
 
+Для общего ограниченного latest-кеша и независимых локальных представлений подключите
+`qd/collectors/ticker.hpp` и тот же target `qdcxx_collectors`.
+[Контракт TICKER](../spec/subscriptions/TICKER-COLLECTOR.ru.md) задаёт явное хранение,
+whole-frame conflation, front/pop и stale/reset барьеры. `collectors_ticker` — focused
+CTest. Этот чистый компонент не добавляет runtime или внешних SDK-зависимостей.
+
 Отдельные [проекты проверки реализуемости runtime](../tests/conformance/transport/runtime-feasibility/README.ru.md)
 проверяют механизмы закреплённых опциональных SDK с явным локальным получением, OFF по умолчанию и тестовыми
 loopback peers. Они не меняют корневую сборку, не дают production runtime targets и не требуют менять её CRT.

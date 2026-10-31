@@ -83,6 +83,12 @@ defines factory transfer, exact membership barriers, front/pop/discard, finite w
 No runtime, JSON or additional SDK is needed. `collectors_stream` is the focused CTest;
 the production-only installed package exports this target too.
 
+For a shared bounded latest cache and independent local delivery views, include
+`qd/collectors/ticker.hpp` and link the same `qdcxx_collectors` target. The
+[TICKER contract](../spec/subscriptions/TICKER-COLLECTOR.md) defines explicit retention,
+whole-frame conflation, front/pop and stale/reset barriers. `collectors_ticker` is the
+focused CTest. This pure component adds no runtime or external SDK dependency.
+
 The separate [runtime feasibility projects](../tests/conformance/transport/runtime-feasibility/README.md)
 test pinned optional SDK mechanisms with explicit local acquisition, default OFF and synthetic loopback
 peers. They do not change this root build, provide production runtime targets or require a root CRT change.

@@ -60,6 +60,10 @@ The [STREAM collector](../spec/subscriptions/STREAM-COLLECTOR.md) adds pure boun
 over admitted events and owned desired state. It preserves event order without conflation,
 filters retired membership activations before offering records and reports whole-frame overflow.
 Its staging, desired-state and shared epoch bounds are separate scopes to aggregate at the upper owner.
+The [TICKER collector](../spec/subscriptions/TICKER-COLLECTOR.md) owns a shared latest cache
+and finite independent local views. Explicit retention, per-view initial/update metadata,
+whole-frame publication and stale/reset barriers keep cached evidence distinct from fresh delivery.
+Local view interests do not export upstream demand or add a callback/runtime owner.
 The [local STREAM dispatcher](../spec/subscriptions/CLIENT-DISPATCH.md) owns one collector,
 one guarded consumer, bounded command/result storage and detached immutable batches.
 Only its command handles, results and detached leases cross threads; source event leases stay

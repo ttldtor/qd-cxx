@@ -10,6 +10,13 @@ stream-identical-filter	production-observation	QDFactory.getDefaultFactory/colle
 stream-wildcard-true	production-observation	QDFactory.getDefaultFactory/collectorBuilder/STREAM/QDAgent/QDDistributor/RecordBuffer	observed
 ticker-latest-retention-false	production-observation	QDFactory.getDefaultFactory/collectorBuilder/TICKER/QDAgent/QDDistributor/RecordBuffer	observed
 ticker-latest-retention-true	production-observation	QDFactory.getDefaultFactory/collectorBuilder/TICKER/QDAgent/QDDistributor/RecordBuffer	observed
+ticker-equal-value-retention-false	production-observation	QDFactory.getDefaultFactory/collectorBuilder/TICKER/QDAgent/QDDistributor/RecordBuffer	observed
+ticker-equal-value-retention-true	production-observation	QDFactory.getDefaultFactory/collectorBuilder/TICKER/QDAgent/QDDistributor/RecordBuffer	observed
+ticker-partial-initial-live-cutover	production-observation	QDFactory.getDefaultFactory/collectorBuilder/TICKER/QDAgent/QDDistributor/RecordBuffer	observed
+ticker-raw-remove-retention-false	production-observation	QDFactory.getDefaultFactory/collectorBuilder/TICKER/QDAgent/QDDistributor/RecordBuffer	observed
+ticker-raw-remove-retention-true	production-observation	QDFactory.getDefaultFactory/collectorBuilder/TICKER/QDAgent/QDDistributor/RecordBuffer	observed
+ticker-pending-readd-with-keeper	production-observation	QDFactory.getDefaultFactory/collectorBuilder/TICKER/QDAgent/QDDistributor/RecordBuffer	observed
+ticker-initial-update-quantum-boundary	production-observation	QDFactory.getDefaultFactory/collectorBuilder/TICKER/QDAgent/QDDistributor/RecordBuffer	observed
 history-raw-bound-change-aggregate-inclusive	production-observation	QDFactory.getDefaultFactory/collectorBuilder/HISTORY/QDAgent/QDDistributor/RecordBuffer	observed
 history-snapshot-empty-agent-true	production-observation	QDFactory.getDefaultFactory/collectorBuilder/HISTORY/QDAgent/QDDistributor/RecordBuffer	observed
 history-snapshot-complete-agent-true	production-observation	QDFactory.getDefaultFactory/collectorBuilder/HISTORY/QDAgent/QDDistributor/RecordBuffer	observed

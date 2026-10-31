@@ -10,13 +10,14 @@ The project implements selected bounded profiles against Java QD 3.355 at the re
 The [selected optional runtime profile](decisions/ADR-0006-live-runtime.md) has reproducible
 [DNS/TCP/TLS feasibility tests](../tests/conformance/transport/VALIDATION.md).
 The separate production TCP adapter implements the bounded plain, credential-free subset below.
-TLS/credential adapters, TICKER/HISTORY collectors, shared upstream multiplexing and a complete end-to-end subscription client remain unimplemented.
+TLS/credential adapters, the HISTORY collector, shared upstream multiplexing and a complete end-to-end subscription client remain unimplemented.
 
 | Component | Behavior and contract |
 | --- | --- |
 | Controlled STREAM client | Optional `qdcxx-connect` and a programmatic example compose the actual plain TCP runtime and dispatcher: [guide](SUBSCRIPTIONS.md). Exact limited CLI selectors, generic records and explicit Quote/Profile summaries; no TLS/reconnect/full-subscription claim. |
 | Local STREAM dispatch | Serialized callbacks, bounded thread-safe commands, detached immutable batches and explicit local close: [contract](../spec/subscriptions/CLIENT-DISPATCH.md). Default OFF; source session/runtime and wire reconciliation remain caller-owned. Local completion does not certify transport quiescence. |
 | STREAM collector | Every admitted subscribed record in source order, including identical values; bounded whole-event staging and local membership/revision barriers: [contract](../spec/subscriptions/STREAM-COLLECTOR.md). No callbacks, latest cache or upstream multiplexing. |
+| TICKER collector | Shared bounded latest cache, independent local views, explicit retention, initial/live ordering and stale/reset evidence: [contract](../spec/subscriptions/TICKER-COLLECTOR.md). Pure caller-driven delivery; callback dispatch and upstream multiplexing remain separate. |
 | Optional TCP runtime | Explicit SDK/bootstrap, caller-driven DNS/connect/read/write, owned buffers, bounded progress and quiescent close: [contract](../spec/transport/TCP-RUNTIME.md), [DNS resources](../spec/transport/DNS-RESOURCES.md), [validation](../tests/conformance/transport/TCP-VALIDATION.md). Default OFF; no TLS, application callbacks, collector or reconnect. |
 | Pure live session | Whole-frame admission, immutable peer generations, protocol/heartbeat controls, readiness/auth gates and owned output: [session contract](../spec/subscriptions/LIVE-SESSION.md). No sockets, clocks, collectors or reconnecting client. |
 | Subscription output | Six messages and explicit descriptions, exact symbols, owned partial-write suffixes and retained-output quotas: [live composer](../spec/subscriptions/WRITER.md). No socket/session/peer acknowledgement. |

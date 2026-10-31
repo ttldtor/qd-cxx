@@ -11,6 +11,7 @@ import com.devexperts.qd.QDDistributor;
 import com.devexperts.qd.QDErrorHandler;
 import com.devexperts.qd.QDFactory;
 import com.devexperts.qd.QDStream;
+import com.devexperts.qd.QDTicker;
 import com.devexperts.qd.kit.CompactIntField;
 import com.devexperts.qd.kit.DefaultRecord;
 import com.devexperts.qd.kit.DefaultScheme;
@@ -115,6 +116,13 @@ public final class CollectorOracle {
     wildcard(QDContract.STREAM, true);
     ticker(false);
     ticker(true);
+    tickerEqualValues(false);
+    tickerEqualValues(true);
+    tickerPartialInitial();
+    tickerRawRemove(false);
+    tickerRawRemove(true);
+    tickerPendingReadd();
+    tickerQuantumBoundary();
     historyBounds();
     historySnapshot("empty", true);
     historySnapshot("complete", true);
@@ -333,6 +341,237 @@ public final class CollectorOracle {
       hub.send(hub.first, A, 5, 50, 0);
       hub.sub(agent, false, hub.first, A, 0);
       data("unsubscribed-update-readd", agent);
+      finish(hub);
+    }
+  }
+
+  private void tickerEqualValues(boolean storeEverything) {
+    start("ticker-equal-value-retention-" + storeEverything);
+    try (Hub hub = new Hub(QDContract.TICKER, storeEverything, false, true)) {
+      tickerModes();
+      QDAgent agent = hub.agent(false);
+      hub.sub(agent, false, hub.first, A, 0);
+      hub.send(hub.first, A, 1, 10, 0);
+      data("baseline", agent);
+      hub.send(hub.first, A, 1, 10, 0);
+      hub.send(hub.first, A, 1, 10, 0);
+      data("identical-twice", agent);
+      hub.send(hub.first, A, 1, 11, 0);
+      hub.send(hub.first, A, 1, 11, 0);
+      data("changed-value-twice", agent);
+      hub.send(hub.first, A, 2, 11, 0);
+      data("time-only", agent);
+      hub.send(hub.first, A, 2, 11, TX);
+      data("flags-only", agent);
+      hub.send(hub.first, A, 2, 11, 0);
+      data("flags-cleared", agent);
+      finish(hub);
+    }
+  }
+
+  private void tickerPartialInitial() {
+    start("ticker-partial-initial-live-cutover");
+    try (Hub hub = new Hub(QDContract.TICKER, true, false, true)) {
+      tickerModes();
+      Item[] initial = {
+        new Item(hub.first, A, 1, 10, 0),
+        new Item(hub.first, B, 1, 20, 0),
+        new Item(hub.second, A, 1, 30, 0)
+      };
+      hub.sendBatch(initial);
+      QDAgent agent = hub.agent(false);
+      for (Item item : initial) {
+        hub.sub(agent, false, item.record, item.symbol, 0);
+      }
+      RecordBuffer first = new RecordBuffer(RecordMode.FLAGGED_DATA);
+      first.setCapacityLimit(1);
+      integer("partial-control", 0, "sink-capacity-records", 1);
+      row("partial-control", 0, "sink-mode", "t:FLAGGED_DATA");
+      bool("partial-control", "more-after-first", agent.retrieve(first));
+      RecordCursor consumed = first.next();
+      if (consumed == null || first.next() != null) {
+        throw new IllegalStateException("partial retrieval must deliver exactly one record");
+      }
+      Item consumedItem = null;
+      Item unconsumedItem = null;
+      for (Item item : initial) {
+        if (item.record == consumed.getRecord()
+            && item.symbol.equals(consumed.getDecodedSymbol())) {
+          consumedItem = item;
+        } else if (unconsumedItem == null) {
+          unconsumedItem = item;
+        }
+      }
+      if (consumedItem == null || unconsumedItem == null) {
+        throw new IllegalStateException("partial retrieval returned an unknown key");
+      }
+      first.rewind();
+      records("initial-first", first, RecordMode.FLAGGED_DATA, true);
+      row("update-selection", 0, "role", "t:unconsumed-initial");
+      row("update-selection", 0, "record", utf16(unconsumedItem.record.getName()));
+      row("update-selection", 0, "symbol", utf16(unconsumedItem.symbol));
+      hub.send(unconsumedItem.record, unconsumedItem.symbol, 2, unconsumedItem.value + 1, 0);
+      row("update-selection", 1, "role", "t:already-consumed");
+      row("update-selection", 1, "record", utf16(consumedItem.record.getName()));
+      row("update-selection", 1, "symbol", utf16(consumedItem.symbol));
+      hub.send(consumedItem.record, consumedItem.symbol, 3, consumedItem.value + 2, 0);
+      data("remaining-initial-and-live", agent);
+      data("after-drain", agent);
+      finish(hub);
+    }
+  }
+
+  private void tickerAvailability(String phase, Hub hub) {
+    QDTicker ticker = (QDTicker) hub.collector;
+    bool(
+        phase,
+        "first-A-available",
+        ticker.isAvailable(hub.first, hub.scheme.getCodec().encode(A), null));
+    bool(
+        phase,
+        "first-B-available",
+        ticker.isAvailable(hub.first, hub.scheme.getCodec().encode(B), null));
+  }
+
+  private void tickerRawRemove(boolean storeEverything) {
+    start("ticker-raw-remove-retention-" + storeEverything);
+    try (Hub hub = new Hub(QDContract.TICKER, storeEverything, false, true)) {
+      tickerModes();
+      QDAgent agent = hub.agent(false);
+      hub.sub(agent, false, hub.first, A, 0);
+      hub.sub(agent, false, hub.first, B, 0);
+      hub.send(hub.first, A, 1, 10, 0);
+      data("baseline", agent);
+      tickerAvailability("baseline-availability", hub);
+      hub.send(hub.first, A, 1, 10, REMOVE);
+      data("remove-existing-same-payload", agent);
+      tickerAvailability("same-payload-availability", hub);
+      hub.send(hub.first, A, 1, 0, REMOVE);
+      data("remove-existing-zero-value", agent);
+      hub.send(hub.first, B, 0, 0, REMOVE);
+      data("remove-absent", agent);
+      tickerAvailability("after-remove-availability", hub);
+      hub.send(hub.first, B, 0, 0, REMOVE);
+      data("remove-absent-repeated", agent);
+      hub.send(hub.first, A, 0, 0, REMOVE);
+      data("remove-existing-zero-time", agent);
+      hub.send(hub.first, B, 1, 0, REMOVE);
+      data("remove-absent-time-only", agent);
+      hub.sub(agent, true, hub.first, A, 0);
+      hub.sub(agent, true, hub.first, B, 0);
+      tickerAvailability("unsubscribed-availability", hub);
+      hub.sub(agent, false, hub.first, A, 0);
+      hub.sub(agent, false, hub.first, B, 0);
+      data("readded-after-remove", agent);
+      hub.send(hub.first, A, 2, 0, REMOVE);
+      data("remove-time-only", agent);
+      hub.send(hub.first, A, 2, 0, TX);
+      data("remove-flags-only", agent);
+      hub.send(hub.first, A, 2, 0, 0);
+      data("remove-flags-cleared", agent);
+      tickerAvailability("final-availability", hub);
+      finish(hub);
+    }
+  }
+
+  private void tickerModes() {
+    row("options", 0, "producer-mode", "t:FLAGGED_DATA");
+    row("options", 0, "retrieval-mode", "t:FLAGGED_DATA");
+  }
+
+  private void tickerPendingReadd() {
+    start("ticker-pending-readd-with-keeper");
+    try (Hub hub = new Hub(QDContract.TICKER, false, false, true)) {
+      tickerModes();
+      QDAgent agent = hub.agent(false);
+      QDAgent keeper = hub.agent(false);
+      hub.sub(agent, false, hub.first, A, 0);
+      hub.sub(agent, false, hub.first, B, 0);
+      hub.sub(agent, false, hub.second, A, 0);
+      hub.sub(keeper, false, hub.first, B, 0);
+      hub.sendBatch(
+          new Item(hub.first, A, 1, 10, 0),
+          new Item(hub.first, B, 1, 20, 0),
+          new Item(hub.second, A, 1, 30, 0));
+      RecordBuffer first = new RecordBuffer(RecordMode.FLAGGED_DATA);
+      first.setCapacityLimit(1);
+      integer("partial-control", 0, "sink-capacity-records", 1);
+      bool("partial-control", "more-after-first", agent.retrieve(first));
+      if (first.size() != 1) {
+        throw new IllegalStateException("partial retrieval must deliver exactly one record");
+      }
+      records("initial-first", first, RecordMode.FLAGGED_DATA, true);
+      hub.sub(agent, true, hub.first, B, 0);
+      hub.sub(agent, false, hub.first, B, 0);
+      hub.send(hub.first, B, 2, 21, 0);
+      data("remaining-after-readd", agent);
+      data("keeper-after-update", keeper);
+      data("after-drain", agent);
+      finish(hub);
+    }
+  }
+
+  private List<Item> tickerLimitedData(String phase, QDAgent agent, int capacity) {
+    RecordBuffer buffer = new RecordBuffer(RecordMode.FLAGGED_DATA);
+    buffer.setCapacityLimit(capacity);
+    integer(phase + "-control", 0, "sink-capacity-records", capacity);
+    bool(phase + "-control", "provider-more", agent.retrieve(buffer));
+    List<Item> delivered = new ArrayList<>();
+    for (RecordCursor cursor; (cursor = buffer.next()) != null; ) {
+      delivered.add(
+          new Item(
+              cursor.getRecord(),
+              cursor.getDecodedSymbol(),
+              cursor.getTime(),
+              cursor.getInt(2),
+              cursor.getEventFlags()));
+    }
+    buffer.rewind();
+    records(phase, buffer, RecordMode.FLAGGED_DATA, true);
+    return delivered;
+  }
+
+  private void tickerQuantumBoundary() {
+    start("ticker-initial-update-quantum-boundary");
+    try (Hub hub = new Hub(QDContract.TICKER, true, false, true)) {
+      tickerModes();
+      final int initialKeyCount = 104;
+      integer("options", 0, "initial-key-count", initialKeyCount);
+      Item[] initial = new Item[initialKeyCount];
+      for (int ordinal = 0; ordinal < initial.length; ordinal++) {
+        String symbol = "Q" + String.format(java.util.Locale.ROOT, "%03d", ordinal);
+        initial[ordinal] = new Item(hub.first, symbol, 1, ordinal + 10, 0);
+      }
+      hub.sendBatch(initial);
+      QDAgent agent = hub.agent(false);
+      for (Item item : initial) {
+        hub.sub(agent, false, item.record, item.symbol, 0);
+      }
+      List<Item> first = tickerLimitedData("initial-first", agent, 1);
+      if (first.isEmpty()) {
+        throw new IllegalStateException("initial retrieval returned no key to update");
+      }
+      Item consumed = first.get(0);
+      int delivered = first.size();
+      integer("initial-first-control", 0, "cumulative-delivered", delivered);
+      row("update-selection", 0, "record", utf16(consumed.record.getName()));
+      row("update-selection", 0, "symbol", utf16(consumed.symbol));
+      integer("update-selection", 0, "original-time", consumed.time);
+      integer("update-selection", 0, "original-value", consumed.value);
+      hub.send(consumed.record, consumed.symbol, 2, consumed.value + 1000, 0);
+      delivered += tickerLimitedData("initial-next-99", agent, 99).size();
+      integer("initial-next-99-control", 0, "cumulative-delivered", delivered);
+      List<Item> boundary = tickerLimitedData("first-after-quantum", agent, 1);
+      delivered += boundary.size();
+      integer("first-after-quantum-control", 0, "cumulative-delivered", delivered);
+      bool(
+          "quantum-comparison",
+          "same-key-as-consumed",
+          !boundary.isEmpty()
+              && boundary.get(0).record == consumed.record
+              && boundary.get(0).symbol.equals(consumed.symbol));
+      data("remainder", agent);
+      data("after-drain", agent);
       finish(hub);
     }
   }
@@ -587,7 +826,8 @@ public final class CollectorOracle {
               remove
                   ? RecordMode.SUBSCRIPTION
                   : RecordMode.addedSubscriptionFor(collector.getContract()));
-      RecordCursor cursor = buffer.add(record, scheme.getCodec().encode(symbol), null);
+      int cipher = scheme.getCodec().encode(symbol);
+      RecordCursor cursor = buffer.add(record, cipher, cipher == 0 ? symbol : null);
       if (!remove && collector.getContract() == QDContract.HISTORY && record.hasTime()) {
         cursor.setTime(bound);
       }
@@ -612,7 +852,8 @@ public final class CollectorOracle {
         integer(phase, ordinal, "raw-time", item.time);
         integer(phase, ordinal, "value", item.value);
         integer(phase, ordinal, "flags", item.flags);
-        RecordCursor cursor = buffer.add(item.record, scheme.getCodec().encode(item.symbol), null);
+        int cipher = scheme.getCodec().encode(item.symbol);
+        RecordCursor cursor = buffer.add(item.record, cipher, cipher == 0 ? item.symbol : null);
         cursor.setTime(item.time);
         cursor.setInt(2, item.value);
         cursor.setEventFlags(item.flags);

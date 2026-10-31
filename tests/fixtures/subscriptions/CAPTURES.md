@@ -8,6 +8,9 @@ These offline synthetic observations characterize the production Java paths at
 [native subscription contract](../../../spec/subscriptions/CONTRACTS.md). Capturing these paths
 does not itself establish native implementation, full compatibility or lifecycle readiness.
 
+The current profile contains 83 cases and 8255 observation rows: wire 22/2169,
+collectors 29/5187 and session 32/899.
+
 ## Provenance and reproducibility
 
 [Oracle instructions](../../../tools/upstream/subscription-oracle/README.md) describe preparation,
@@ -27,13 +30,27 @@ empty strings and unpaired surrogates. Ledgers and binary data are machine evide
 
 ## Production observations
 
+The seven additional TICKER cases use direct distributor input, synthetic timed
+`DefaultRecord` fields, `RecordMode.FLAGGED_DATA` for input and retrieval, and agents
+with history-snapshot and event-time-sequence disabled. Identical fields and flags-only
+changes produce no new record in these cases. Raw `REMOVE_EVENT=2` does not erase the
+cache here; changed or newly inserted fields can produce an available record with output
+flags zero. This does not qualify end-to-end wire REMOVE conversion or custom record equality.
+The partial initial/live cases record an actual one-record sink and its consumed key;
+their output order does not establish arbitrary hash traversal order.
+
+The default-quantum case seeds 104 cached keys and retrieves one initial record.
+It updates that actual consumed key, retrieves another 99 initial records, then
+observes the updated consumed key before the remaining four initial records.
+This executes the locked default quantum of 100 without changing JVM properties.
+
 | Cases | Observed boundary |
 | --- | --- |
 | wire/wire-11,12,16,17,21,22-a-b and -b-a | All six add/remove families, both sender/local record-ID mappings, exact empty/duplicate/UTF-16 symbols and literal AB*/A?. HISTORY_ADD consumes signed raw64 time, including extrema; HISTORY_REMOVE consumes no time. |
 | wire/layout-absent, -empty, -x, -z, -object-x | Absent/empty requested layout retains producer x/y; x selects x; z intersects to no fields. Object type10 requested for compact type8 x produces the observed type10/null versus compact audit0; this is not authority for native implicit converters. |
 | wire/layout-before-first-use, -after-first-use, -after-reset | Request change is effective before first writer use; the cached descriptor persists afterward, including explicit production parser/composer reset. This does not establish reconnect policy. |
 | collectors/stream-* | Every-event order, exact identical duplicates, unrequested record/symbol filtering, no pre-add replay, two overlapping clients and enabled STREAM wildcard/exact overlap without duplicate delivery. Disabled STREAM wildcard produces no ALPHA/BETA fanout. |
-| collectors/ticker-* | Latest/initial/re-add behavior depends on explicit storeEverything retention. No universal cached snapshot on every re-add is promised. |
+| collectors/ticker-* | Explicit storeEverything retention, field equality, pending conflation, partial initial/live delivery, keeper-assisted re-add and raw REMOVE inputs. No universal cached snapshot on every re-add is promised. |
 | collectors/history-* | Inclusive signed raw lower bounds, earliest aggregate bound/change, empty/complete/snip/restarted/overlapping snapshots, transactions, removal and interrupted unsubscribe. Untimed records are rejected. |
 | session/S01–S04 | Actual full/delta/unchanged/reset protocol descriptors, all 16 heartbeat field-presence masks and observed option round trips. |
 | session/S05–S07 | Eight capability intersections, real connection heartbeat/input/inactivity paths and explicit before/at-deadline examination. |

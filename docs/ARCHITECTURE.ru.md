@@ -66,6 +66,10 @@ QDCXX-025 реализует первое ограниченное примен�
 очередь поверх принятых событий и принадлежащего ему desired state. Он сохраняет порядок без
 conflation, фильтрует retired membership activations перед выдачей и сообщает whole-frame overflow.
 Staging, desired-state и shared epoch bounds — отдельные области для агрегации верхним владельцем.
+[TICKER-коллектор](../spec/subscriptions/TICKER-COLLECTOR.ru.md) владеет общим latest-кешем
+и конечным числом независимых локальных представлений. Явное хранение, отдельные initial/update
+метаданные, публикация целого кадра и stale/reset барьеры различают кешированные доказательства
+и свежую выдачу. Локальные интересы не экспортируют upstream demand и не добавляют callback/runtime owner.
 [ADR-0006](decisions/ADR-0006-live-runtime.ru.md) выбирает опциональный профиль Asio/c-ares/OpenSSL,
 явные требования к SDK/bootstrap/доверию и [границу проверки реализуемости](../tests/conformance/transport/CONTRACTS.ru.md).
 [Опциональный TCP-адаптер](../spec/transport/TCP-RUNTIME.ru.md) реализует только plain-подмножество
