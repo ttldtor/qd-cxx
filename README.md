@@ -18,6 +18,7 @@ Start with:
 4. [Schema export and consumption](tools/schema-export/README.md) ([Russian](tools/schema-export/README.ru.md)).
 5. [Product roadmap](docs/NEXT-STEPS.md) ([Russian](docs/NEXT-STEPS.ru.md)).
 6. [Tape inspection and finite source profiles](docs/TAPE-INSPECT.md) ([Russian](docs/TAPE-INSPECT.ru.md)).
+7. [QD and qd-cxx knowledge base](docs/knowledge/README.md) ([Russian](docs/knowledge/README.ru.md)).
 
 [CONTRIBUTING.md](CONTRIBUTING.md) describes contribution and validation requirements.
 Normal configure/build/CTest uses CMake and C++ without Python. The
