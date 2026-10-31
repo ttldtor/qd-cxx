@@ -32,15 +32,18 @@ cmake --build build-runtime --config Release
 Include `qd/transport/tcp_runtime.hpp` and link `qdcxx_transport`. The
 [runtime contract](../spec/transport/TCP-RUNTIME.md) defines main-thread bootstrap,
 owner-thread progress, deadlines, credits and explicit close. This is plain TCP;
-TLS, application callback dispatch and a reconnecting client remain separate work.
+TLS and a reconnecting client remain separate work. Application callbacks use the
+optional local dispatcher below.
 STREAM staging uses the separate collector component below.
 OFF does not inspect those SDK roots or add C/SDK dependencies to the pure libraries.
 
 `cmake --install build-runtime --prefix C:/sdk/qdcxx --config Release` installs a
 relocatable `qdcxx` package. Consumers use `find_package(qdcxx CONFIG REQUIRED)` and
-the target names `qdcxx_encoding`, `qdcxx_core`, `qdcxx_protocol`, `qdcxx_collectors` and,
-when built, `qdcxx_transport` and `qdcxx_client`. This minimal package exports only those components;
-JSON, Quote projection, replay and tools are not additional exported targets.
+the target names `qdcxx_encoding`, `qdcxx_core`, `qdcxx_protocol`, `qdcxx_collectors`,
+`qdcxx_event_mapping`, `qdcxx_quote`, `qdcxx_profile` and, when built,
+`qdcxx_transport` and `qdcxx_client`. Installed event headers support generic-to-prepared
+Quote/Profile mappings without a JSON dependency. JSON, replay and tools are not
+additional exported library targets.
 The enabled package includes the qualified static c-ares archive, native link
 closure and dependency notices; consumers need neither SDK headers nor a C compiler.
 Set `CMAKE_PREFIX_PATH` to the installed prefix for discovery. For a nonstandard
@@ -61,6 +64,16 @@ The only additional dependency is standard `Threads::Threads`. Runtime and JSON
 may remain disabled. `client_dispatch` is the focused CTest. The composing caller
 owns its source session/runtime and explicitly routes events and wire output;
 local terminal does not certify transport shutdown.
+
+## Optional controlled STREAM tool
+
+`ORG_TTLDTOR_QDCXX_BUILD_CONNECT` defaults to `OFF` and requires explicit CLIENT and
+RUNTIME enablement with the qualified SDK sources above. Build target `qdcxx_connect`
+for executable `qdcxx-connect`. The [usage and output guide](SUBSCRIPTIONS.md) defines
+the numeric-endpoint, exact-selection and finite-run profile, native EN/RU help,
+generic records and explicit prepared summaries. This tool does not add TLS,
+reconnect or shared upstream multiplexing. The programmatic example is built against
+the same runtime/dispatcher and supports a caller-provided validated schema.
 
 ## Desired subscription state
 

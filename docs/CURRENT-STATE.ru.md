@@ -10,10 +10,11 @@
 [Выбранный опциональный профиль runtime](decisions/ADR-0006-live-runtime.ru.md) имеет воспроизводимые
 [проверки реализуемости DNS/TCP/TLS](../tests/conformance/transport/VALIDATION.ru.md).
 Отдельный production TCP-адаптер реализует описанный ниже ограниченный plain-профиль без credentials.
-Адаптеры TLS/учётных данных, TICKER/HISTORY-коллекторы, общий upstream multiplexing и сквозной клиент подписок ещё не реализованы.
+Адаптеры TLS/учётных данных, TICKER/HISTORY-коллекторы, общий upstream multiplexing и полный сквозной клиент подписок ещё не реализованы.
 
 | Компонент | Поведение и контракт |
 | --- | --- |
+| Контролируемый STREAM-клиент | Опциональный `qdcxx-connect` и программный пример соединяют настоящие plain TCP runtime и диспетчер: [руководство](SUBSCRIPTIONS.ru.md). Точный ограниченный выбор CLI, общие записи и явные Quote/Profile summaries; без заявления TLS/reconnect/полных подписок. |
 | Локальная доставка STREAM | Сериализованные callbacks, ограниченные потокобезопасные команды, независимые неизменяемые батчи и явное локальное завершение: [контракт](../spec/subscriptions/CLIENT-DISPATCH.ru.md). OFF по умолчанию; сессией/runtime и согласованием исходящих подписок владеет вызывающий код. Локальное завершение не подтверждает вывод транспортных операций. |
 | STREAM-коллектор | Каждая принятая запрошенная запись в исходном порядке, включая одинаковые значения; ограниченная whole-event staging и локальные membership/revision barriers: [контракт](../spec/subscriptions/STREAM-COLLECTOR.ru.md). Без callbacks, latest cache и общего upstream multiplexing. |
 | Опциональный TCP runtime | Явные SDK/bootstrap, DNS/connect/read/write под управлением вызывающей стороны, владеющие буферы, конечная работа и close после вывода операций: [контракт](../spec/transport/TCP-RUNTIME.ru.md), [ресурсы DNS](../spec/transport/DNS-RESOURCES.ru.md), [проверки](../tests/conformance/transport/TCP-VALIDATION.ru.md). OFF по умолчанию; без TLS, прикладных callback, коллектора и reconnect. |

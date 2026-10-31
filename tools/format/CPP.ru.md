@@ -36,7 +36,8 @@ CMake 3.25 трактует этот символ как разделитель.
 
 Автоматический поиск включает tracked и nonignored new файлы из `include/` (`*.hpp`), `src/`
 (`*.cpp`), `tests/conformance/` (`*.cpp`), а также `tools/qtp-inspect/`, `tools/tape-inspect/`, `tools/tape-write/`,
-`tools/dev/` (`*.cpp`, `*.hpp`). Git C-quoted имена декодируются до отбора.
+`tools/dev/`, `tools/subscribe/` и `examples/subscriptions/` (`*.cpp`, `*.hpp`).
+Git C-quoted имена декодируются до отбора.
 Сегменты каталогов `upstream`, `generated` и `fixtures` исключаются. Явный manifest допускает
 `.cpp` и `.hpp` в этих корнях и `.work/` для намеренных контрольных примеров; другие корни/расширения отклоняются.
 И лексический, и разрешённый путь исходника должны оставаться в допустимых корнях вне защищённых сегментов.

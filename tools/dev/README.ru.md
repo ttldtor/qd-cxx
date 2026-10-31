@@ -10,6 +10,11 @@
 [подготовку SDK](../../cmake/runtime-profile/README.ru.md) и
 [инструкции сборки/пакета](../../docs/CPP-BUILD.ru.md#опциональный-tcp-runtime).
 
+Опциональный [контролируемый STREAM-клиент](../../docs/SUBSCRIPTIONS.ru.md)
+`qdcxx-connect` использует production TCP runtime и локальный диспетчер с точным
+выбором символов и общим либо prepared Quote/Profile выводом. Встроенная справка
+доступна без работы со входом/сетью. Конечный plain-профиль не предоставляет TLS и reconnect.
+
 Необязательная [проверка управляющих сообщений сессии](../upstream/live-session-oracle/README.ru.md)
 сравнивает нативный вывод протокола и heartbeat с настоящими callbacks закреплённой Java,
 включая наследование свойств и скрытие тестовой авторизации. Проверка офлайновая,

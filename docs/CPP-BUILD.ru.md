@@ -35,15 +35,18 @@ cmake --build build-runtime --config Release
 Подключите `qd/transport/tcp_runtime.hpp` и свяжите `qdcxx_transport`.
 [Контракт runtime](../spec/transport/TCP-RUNTIME.ru.md) задаёт bootstrap на главном потоке,
 продвижение владельцем, deadlines, credits и explicit close. Это plain TCP;
-TLS, прикладной dispatch callbacks и reconnecting client остаются отдельной работой.
+TLS и reconnecting client остаются отдельной работой. Прикладные callbacks используют
+опциональный локальный диспетчер ниже.
 STREAM staging использует отдельный компонент коллектора ниже.
 При OFF указанные SDK roots не проверяются, C/SDK-зависимости чистых библиотек не добавляются.
 
 `cmake --install build-runtime --prefix C:/sdk/qdcxx --config Release` устанавливает
 переносимый пакет `qdcxx`. Consumer использует `find_package(qdcxx CONFIG REQUIRED)`
-и имена targets `qdcxx_encoding`, `qdcxx_core`, `qdcxx_protocol`, `qdcxx_collectors`, а при наличии
-также `qdcxx_transport` и `qdcxx_client`. Этот минимальный пакет экспортирует только эти компоненты;
-JSON, Quote projection, replay и tools не становятся дополнительными exported targets.
+и имена targets `qdcxx_encoding`, `qdcxx_core`, `qdcxx_protocol`, `qdcxx_collectors`,
+`qdcxx_event_mapping`, `qdcxx_quote`, `qdcxx_profile`, а при наличии также `qdcxx_transport`
+и `qdcxx_client`. Установленные заголовки событий позволяют применять prepared
+Quote/Profile mappings к общим записям без зависимости от JSON. JSON, replay и tools
+не становятся дополнительными exported library targets.
 Enabled package содержит qualified static c-ares archive, native link closure
 и notices зависимостей. SDK headers и компилятор C consumer не требуются.
 Для обнаружения задайте установленный prefix через `CMAKE_PREFIX_PATH`. При
@@ -64,6 +67,16 @@ cmake -S consumer -B build-consumer '-Dqdcxx_DIR=C:/sdk/qdcxx/lib64/cmake/qdcxx'
 `Threads::Threads`. Runtime и JSON могут оставаться выключенными. Целевой CTest —
 `client_dispatch`. Вызывающий код владеет сессией/runtime и явно передаёт события
 и исходящие сообщения; локальное завершение не подтверждает закрытие транспорта.
+
+## Опциональный контролируемый STREAM-инструмент
+
+`ORG_TTLDTOR_QDCXX_BUILD_CONNECT` по умолчанию `OFF`; ему нужны явно включённые CLIENT
+и RUNTIME с указанными выше квалифицированными SDK. Соберите target `qdcxx_connect`
+для executable `qdcxx-connect`. [Руководство по использованию и выводу](SUBSCRIPTIONS.ru.md)
+описывает профиль числового endpoint, точного выбора и конечного запуска, встроенную
+EN/RU-справку, общие записи и явные prepared summaries. Инструмент не добавляет TLS,
+reconnect или общий upstream multiplexing. Программный пример использует те же runtime
+и диспетчер, поддерживая проверенную схему вызывающей стороны.
 
 ## Целевое состояние подписок
 

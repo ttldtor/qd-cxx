@@ -69,7 +69,9 @@ events and subscription output, and combines local completion with transport/out
 explicit SDK/bootstrap/trust requirements and its [feasibility boundary](../tests/conformance/transport/CONTRACTS.md).
 The [optional TCP adapter](../spec/transport/TCP-RUNTIME.md) implements only the caller-driven,
 credential-free plain subset, with explicit bootstrap, bounded SDK sources and owned-operation
-retirement. TLS, transport/dispatch integration and the complete subscription client remain separate work.
+retirement. The [controlled STREAM tool/example](SUBSCRIPTIONS.md) connects this actual runtime
+to the dispatcher with explicit add/remove output and separate local/transport terminal evidence.
+TLS and the complete subscription client remain separate work.
 The ADR does not imply implementation or owner acceptance of those remaining parts.
 
 ## Design principles

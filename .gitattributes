@@ -553,3 +553,8 @@ cmake/*.cmake.in text eol=lf
 cmake/runtime-profile/*.json text eol=lf
 cmake/runtime-profile/*.patch -text -whitespace
 tests/conformance/transport/cares_ownership_tests.c text eol=lf
+
+# Keep formatter execution and its conformance script byte-stable across checkouts.
+tools/format/Format-Cpp.cmake text eol=lf
+tests/conformance/tooling/format.cmake text eol=lf
+tests/conformance/connect_cli.cmake text eol=lf

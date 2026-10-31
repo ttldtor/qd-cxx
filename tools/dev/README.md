@@ -10,6 +10,11 @@ For the root's optional production TCP target, use the separate
 [SDK preparation guide](../../cmake/runtime-profile/README.md) and
 [build/package instructions](../../docs/CPP-BUILD.md#optional-tcp-runtime).
 
+The opt-in [controlled STREAM client](../../docs/SUBSCRIPTIONS.md), `qdcxx-connect`,
+uses the production TCP runtime and local dispatcher with exact selectors and
+generic or prepared Quote/Profile output. Its native help is available without
+input/network work. This plain, finite profile does not provide TLS or reconnect.
+
 The optional [native session control verification](../upstream/live-session-oracle/README.md)
 compares native protocol/heartbeat output with actual locked Java callbacks, including descriptor
 inheritance and synthetic authorization redaction. It runs offline with explicit prepared providers.
