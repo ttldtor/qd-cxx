@@ -9,10 +9,12 @@
 
 [Выбранный опциональный профиль runtime](decisions/ADR-0006-live-runtime.ru.md) имеет воспроизводимые
 [проверки реализуемости DNS/TCP/TLS](../tests/conformance/transport/VALIDATION.ru.md).
-Production-адаптеры transport/TLS/учётных данных ещё не реализованы; эти тесты не добавляют live-подписки.
+Отдельный production TCP-адаптер реализует описанный ниже ограниченный plain-профиль без credentials.
+Адаптеры TLS/учётных данных, коллекторы и сквозной клиент подписок ещё не реализованы.
 
 | Компонент | Поведение и контракт |
 | --- | --- |
+| Опциональный TCP runtime | Явные SDK/bootstrap, DNS/connect/read/write под управлением вызывающей стороны, владеющие буферы, конечная работа и close после вывода операций: [контракт](../spec/transport/TCP-RUNTIME.ru.md), [ресурсы DNS](../spec/transport/DNS-RESOURCES.ru.md), [проверки](../tests/conformance/transport/TCP-VALIDATION.ru.md). OFF по умолчанию; без TLS, прикладных callback, коллектора и reconnect. |
 | Чистая live-сессия | Приём целого кадра, неизменяемые поколения другой стороны, управляющие сообщения протокола/heartbeat, readiness/auth gates и владеющий вывод: [контракт сессии](../spec/subscriptions/LIVE-SESSION.ru.md). Без сокетов, часов, коллекторов и клиента с переподключением. |
 | Вывод подписок | Шесть сообщений и явные описания, точные символы, владеющие хвосты частичной записи и квоты удержанного вывода: [live composer](../spec/subscriptions/WRITER.ru.md). Без socket/session/peer acknowledgement. |
 | Целевые подписки | Чистое ограниченное состояние, точные символы/schema identity, атомарные add/remove/replace/clear, revision и непереиспользуемые membership tokens: [API состояния](../spec/subscriptions/STATE.ru.md). Live client/collector/transport этой строкой не заявлены. |

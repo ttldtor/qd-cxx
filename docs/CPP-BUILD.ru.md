@@ -19,6 +19,40 @@
 
 [English version](CPP-BUILD.md). Английская версия является нормативной.
 
+## Опциональный TCP runtime
+
+`ORG_TTLDTOR_QDCXX_BUILD_RUNTIME` по умолчанию `OFF`. Для plain-адаптера без credentials,
+продвигаемого вызывающим кодом, сначала подготовьте точные
+[квалифицированные исходники SDK](../cmake/runtime-profile/README.ru.md) и поддерживаемый x64 toolchain:
+
+```powershell
+cmake -S . -B build-runtime '-DORG_TTLDTOR_QDCXX_BUILD_RUNTIME=ON' `
+  '-DORG_TTLDTOR_QDCXX_ASIO_INCLUDE=C:/sdk/asio-1.38.2/include' `
+  '-DORG_TTLDTOR_QDCXX_CARES_SOURCE=C:/sdk/c-ares-1.34.9-qdcxx2'
+cmake --build build-runtime --config Release
+```
+
+Подключите `qd/transport/tcp_runtime.hpp` и свяжите `qdcxx_transport`.
+[Контракт runtime](../spec/transport/TCP-RUNTIME.ru.md) задаёт bootstrap на главном потоке,
+продвижение владельцем, deadlines, credits и explicit close. Это plain TCP;
+TLS, прикладной dispatch callbacks, коллекторы и reconnecting client остаются отдельной работой.
+При OFF указанные SDK roots не проверяются, C/SDK-зависимости чистых библиотек не добавляются.
+
+`cmake --install build-runtime --prefix C:/sdk/qdcxx --config Release` устанавливает
+переносимый пакет `qdcxx`. Consumer использует `find_package(qdcxx CONFIG REQUIRED)`
+и прежние имена targets `qdcxx_encoding`, `qdcxx_core`, `qdcxx_protocol`, а при наличии
+также `qdcxx_transport`. Этот минимальный пакет экспортирует только эти компоненты;
+JSON, Quote projection, replay и tools не становятся дополнительными exported targets.
+Enabled package содержит qualified static c-ares archive, native link closure
+и notices зависимостей. SDK headers и компилятор C consumer не требуются.
+Для обнаружения задайте установленный prefix через `CMAKE_PREFIX_PATH`. При
+нестандартном library directory, например `lib64` на Windows, задайте `qdcxx_DIR`
+непосредственно на каталог пакета внутри перенесённого prefix:
+
+```powershell
+cmake -S consumer -B build-consumer '-Dqdcxx_DIR=C:/sdk/qdcxx/lib64/cmake/qdcxx'
+```
+
 ## Целевое состояние подписок
 
 Отдельные [проекты проверки реализуемости runtime](../tests/conformance/transport/runtime-feasibility/README.ru.md)

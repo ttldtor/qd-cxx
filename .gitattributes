@@ -546,3 +546,10 @@ CMakeLists.txt text eol=lf
 tests/fixtures/live-session/expected/** -text
 tests/fixtures/live-session/*.md text eol=lf
 tools/upstream/live-session-oracle/** text eol=lf
+
+# Runtime SDK receipts and patch context preserve qualified source bytes.
+cmake/*.cmake text eol=lf
+cmake/*.cmake.in text eol=lf
+cmake/runtime-profile/*.json text eol=lf
+cmake/runtime-profile/*.patch -text -whitespace
+tests/conformance/transport/cares_ownership_tests.c text eol=lf

@@ -16,6 +16,40 @@ enabled, `wire_inventory_schema` and `wire_inventory_cli` add focused tests;
 
 [Русская версия](CPP-BUILD.ru.md). English is authoritative.
 
+## Optional TCP runtime
+
+`ORG_TTLDTOR_QDCXX_BUILD_RUNTIME` defaults to `OFF`. To enable the credential-free,
+caller-driven adapter, first prepare the exact [qualified SDK sources](../cmake/runtime-profile/README.md)
+and use a supported x64 toolchain:
+
+```powershell
+cmake -S . -B build-runtime '-DORG_TTLDTOR_QDCXX_BUILD_RUNTIME=ON' `
+  '-DORG_TTLDTOR_QDCXX_ASIO_INCLUDE=C:/sdk/asio-1.38.2/include' `
+  '-DORG_TTLDTOR_QDCXX_CARES_SOURCE=C:/sdk/c-ares-1.34.9-qdcxx2'
+cmake --build build-runtime --config Release
+```
+
+Include `qd/transport/tcp_runtime.hpp` and link `qdcxx_transport`. The
+[runtime contract](../spec/transport/TCP-RUNTIME.md) defines main-thread bootstrap,
+owner-thread progress, deadlines, credits and explicit close. This is plain TCP;
+TLS, application callback dispatch, collectors and a reconnecting client remain separate work.
+OFF does not inspect those SDK roots or add C/SDK dependencies to the pure libraries.
+
+`cmake --install build-runtime --prefix C:/sdk/qdcxx --config Release` installs a
+relocatable `qdcxx` package. Consumers use `find_package(qdcxx CONFIG REQUIRED)` and
+the unchanged target names `qdcxx_encoding`, `qdcxx_core`, `qdcxx_protocol` and,
+when built, `qdcxx_transport`. This minimal package exports only those components;
+JSON, Quote projection, replay and tools are not additional exported targets.
+The enabled package includes the qualified static c-ares archive, native link
+closure and dependency notices; consumers need neither SDK headers nor a C compiler.
+Set `CMAKE_PREFIX_PATH` to the installed prefix for discovery. For a nonstandard
+library directory such as `lib64` on Windows, point `qdcxx_DIR` directly to the
+package directory inside the relocated prefix:
+
+```powershell
+cmake -S consumer -B build-consumer '-Dqdcxx_DIR=C:/sdk/qdcxx/lib64/cmake/qdcxx'
+```
+
 ## Desired subscription state
 
 The separate [runtime feasibility projects](../tests/conformance/transport/runtime-feasibility/README.md)

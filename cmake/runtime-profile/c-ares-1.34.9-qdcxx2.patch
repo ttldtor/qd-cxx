@@ -1,0 +1,417 @@
+--- a/include/ares_version.h
++++ b/include/ares_version.h
+@@ -33,7 +33,11 @@
+ #define ARES_VERSION_MAJOR 1
+ #define ARES_VERSION_MINOR 34
+ #define ARES_VERSION_PATCH 9
+-#define ARES_VERSION_STR   "1.34.9"
++#define ARES_VERSION_STR   "1.34.9+qdcxx2"
++
++/* Qualified profile; not a drop-in upstream c-ares distribution. */
++#define ARES_QDCXX_PROFILE 2
++#define ARES_QDCXX_PROFILE_MAX_SERVERS 4
+ 
+ /* NOTE: We cannot make the version string a C preprocessor stringify operation
+  *       due to assumptions made by integrators that aren't properly using
+--- a/src/lib/ares_init.c
++++ b/src/lib/ares_init.c
+@@ -135,13 +135,7 @@
+ 
+ static ares_status_t init_by_defaults(ares_channel_t *channel)
+ {
+-  char         *hostname = NULL;
+-  ares_status_t rc       = ARES_SUCCESS;
+-#ifdef HAVE_GETHOSTNAME
+-  const char *dot;
+-#endif
+-  struct ares_addr addr;
+-  ares_llist_t    *sconfig = NULL;
++  ares_status_t rc = ARES_SUCCESS;
+ 
+   /* Enable EDNS by default */
+   if (!(channel->optmask & ARES_OPT_FLAGS)) {
+@@ -159,73 +153,9 @@
+     channel->tries = DEFAULT_TRIES;
+   }
+ 
++  /* qdcxx1 requires explicit servers and never derives a hostname/search list. */
+   if (ares_slist_len(channel->servers) == 0) {
+-    /* Add a default local named server to the channel unless configured not
+-     * to (in which case return an error).
+-     */
+-    if (channel->flags & ARES_FLAG_NO_DFLT_SVR) {
+-      rc = ARES_ENOSERVER;
+-      goto error;
+-    }
+-
+-    addr.family            = AF_INET;
+-    addr.addr.addr4.s_addr = htonl(INADDR_LOOPBACK);
+-
+-    rc = ares_sconfig_append(channel, &sconfig, &addr, 0, 0, NULL);
+-    if (rc != ARES_SUCCESS) {
+-      goto error; /* LCOV_EXCL_LINE: OutOfMemory */
+-    }
+-
+-    rc = ares_servers_update(channel, sconfig, ARES_FALSE);
+-    ares_llist_destroy(sconfig);
+-
+-    if (rc != ARES_SUCCESS) {
+-      goto error;
+-    }
+-  }
+-
+-  if (channel->ndomains == 0) {
+-    /* Derive a default domain search list from the kernel hostname,
+-     * or set it to empty if the hostname isn't helpful.
+-     */
+-#ifndef HAVE_GETHOSTNAME
+-    channel->ndomains = 0; /* default to none */
+-#else
+-    size_t len        = 256;
+-    channel->ndomains = 0; /* default to none */
+-
+-    hostname = ares_malloc_zero(len);
+-    if (!hostname) {
+-      rc = ARES_ENOMEM; /* LCOV_EXCL_LINE: OutOfMemory */
+-      goto error;       /* LCOV_EXCL_LINE: OutOfMemory */
+-    }
+-
+-    /* POSIX leaves it unspecified whether gethostname() NUL terminates when the
+-     * host name doesn't fit, so force the last byte to a terminator afterwards.
+-     */
+-    if (gethostname(hostname, (GETHOSTNAME_TYPE_ARG2)len) != 0) {
+-      /* Lets not treat a gethostname failure as critical, since we
+-       * are ok if gethostname doesn't even exist */
+-      *hostname = '\0';
+-    }
+-    hostname[len - 1] = '\0';
+-
+-    dot = strchr(hostname, '.');
+-    if (dot) {
+-      /* a dot was found */
+-      channel->domains = ares_malloc(sizeof(char *));
+-      if (!channel->domains) {
+-        rc = ARES_ENOMEM; /* LCOV_EXCL_LINE: OutOfMemory */
+-        goto error;       /* LCOV_EXCL_LINE: OutOfMemory */
+-      }
+-      channel->domains[0] = ares_strdup(dot + 1);
+-      if (!channel->domains[0]) {
+-        rc = ARES_ENOMEM; /* LCOV_EXCL_LINE: OutOfMemory */
+-        goto error;       /* LCOV_EXCL_LINE: OutOfMemory */
+-      }
+-      channel->ndomains = 1;
+-    }
+-#endif
++    return ARES_ENOSERVER;
+   }
+ 
+   if (channel->nsort == 0) {
+@@ -245,11 +175,6 @@
+     channel->server_retry_delay  = DEFAULT_SERVER_RETRY_DELAY;
+   }
+ 
+-error:
+-  if (hostname) {
+-    ares_free(hostname);
+-  }
+-
+   return rc;
+ }
+ 
+@@ -259,6 +184,26 @@
+   ares_channel_t *channel;
+   ares_status_t   status = ARES_SUCCESS;
+ 
++  /* Qualified qdcxx1 profile: validate the bounded IPv4 server list before
++   * allocation, entropy initialization, or any configuration acquisition. */
++  if (channelptr == NULL) {
++    return ARES_EFORMERR;
++  }
++  *channelptr = NULL;
++  if (options == NULL || !(optmask & ARES_OPT_SERVERS) ||
++      options->servers == NULL || options->nservers <= 0 ||
++      options->nservers > ARES_QDCXX_PROFILE_MAX_SERVERS) {
++    return ARES_ENOSERVER;
++  }
++  {
++    int server_idx;
++    for (server_idx = 0; server_idx < options->nservers; server_idx++) {
++      if (options->servers[server_idx].s_addr == 0) {
++        return ARES_ENOSERVER;
++      }
++    }
++  }
++
+   if (ares_library_initialized() != ARES_SUCCESS) {
+     return ARES_ENOTINITIALIZED; /* LCOV_EXCL_LINE: n/a on non-WinSock */
+   }
+@@ -347,13 +292,7 @@
+     goto done; /* LCOV_EXCL_LINE: OutOfMemory */
+   }
+ 
+-  if (status == ARES_SUCCESS) {
+-    status = ares_init_by_sysconfig(channel);
+-    if (status != ARES_SUCCESS) {
+-      DEBUGF(fprintf(stderr, "Error: init_by_sysconfig failed: %s\n",
+-                     ares_strerror(status)));
+-    }
+-  }
++  /* qdcxx1 deliberately bypasses all OS/environment resolver configuration. */
+ 
+   /*
+    * No matter what failed or succeeded, seed defaults to provide
+@@ -396,76 +335,11 @@
+   return ARES_SUCCESS;
+ }
+ 
+-static void *ares_reinit_thread(void *arg)
+-{
+-  ares_channel_t *channel = arg;
+-  ares_status_t   status;
+-
+-  /* ares_init_by_sysconfig() will lock when applying the config, but not
+-   * when retrieving. */
+-  status = ares_init_by_sysconfig(channel);
+-  if (status != ARES_SUCCESS) {
+-    DEBUGF(fprintf(stderr, "Error: init_by_sysconfig failed: %s\n",
+-                   ares_strerror(status)));
+-  }
+-
+-  ares_channel_lock(channel);
+-
+-  /* Flush cached queries on reinit */
+-  if (status == ARES_SUCCESS && channel->qcache) {
+-    ares_qcache_flush(channel->qcache);
+-  }
+-
+-  channel->reinit_pending = ARES_FALSE;
+-  ares_channel_unlock(channel);
+-
+-  return NULL;
+-}
+-
++/* Qualified qdcxx1 channels are immutable configuration snapshots. */
+ ares_status_t ares_reinit(ares_channel_t *channel)
+ {
+-  ares_status_t status = ARES_SUCCESS;
+-
+-  if (channel == NULL) {
+-    return ARES_EFORMERR;
+-  }
+-
+-  ares_channel_lock(channel);
+-
+-  /* If a reinit is already in process, lets not do it again. Or if we are
+-   * shutting down, skip. */
+-  if (!channel->sys_up || channel->reinit_pending) {
+-    ares_channel_unlock(channel);
+-    return ARES_SUCCESS;
+-  }
+-  channel->reinit_pending = ARES_TRUE;
+-  ares_channel_unlock(channel);
+-
+-  if (ares_threadsafety()) {
+-    /* clean up the prior reinit process's thread.  We know the thread isn't
+-     * running since reinit_pending was false */
+-    if (channel->reinit_thread != NULL) {
+-      void *rv;
+-      ares_thread_join(channel->reinit_thread, &rv);
+-      channel->reinit_thread = NULL;
+-    }
+-
+-    /* Spawn a new thread */
+-    status =
+-      ares_thread_create(&channel->reinit_thread, ares_reinit_thread, channel);
+-    if (status != ARES_SUCCESS) {
+-      /* LCOV_EXCL_START: UntestablePath */
+-      ares_channel_lock(channel);
+-      channel->reinit_pending = ARES_FALSE;
+-      ares_channel_unlock(channel);
+-      /* LCOV_EXCL_STOP */
+-    }
+-  } else {
+-    /* Threading support not available, call directly */
+-    ares_reinit_thread(channel);
+-  }
+-
+-  return status;
++  (void)channel;
++  return ARES_ENOTIMP;
+ }
+ 
+ /* ares_dup() duplicates a channel handle with all its options and returns a
+--- a/src/lib/ares_process.c
++++ b/src/lib/ares_process.c
+@@ -61,7 +61,7 @@
+                               ares_status_t failure_status);
+ static ares_bool_t same_questions(const ares_query_t      *query,
+                                   const ares_dns_record_t *arec);
+-static void        end_query(ares_channel_t *channel, ares_server_t *server,
++static ares_status_t end_query(ares_channel_t *channel, ares_server_t *server,
+                              ares_query_t *query, ares_status_t status,
+                              ares_dns_record_t *dnsrec,
+                              ares_array_t **requeue);
+@@ -1083,6 +1083,7 @@
+   ares_server_t     *server  = conn->server;
+   ares_dns_record_t *rdnsrec = NULL;
+   ares_status_t      status;
++  ares_status_t      end_status;
+   ares_bool_t        is_cached = ARES_FALSE;
+ 
+   /* UDP can have 0-byte messages, drop them to the ground */
+@@ -1157,7 +1158,10 @@
+   if (issue_might_be_edns(query->query, rdnsrec)) {
+     status = rewrite_without_edns(query);
+     if (status != ARES_SUCCESS) {
+-      end_query(channel, server, query, status, NULL, requeue);
++      end_status = end_query(channel, server, query, status, NULL, requeue);
++      if (end_status != ARES_SUCCESS) {
++        status = end_status;
++      }
+       goto cleanup;
+     }
+ 
+@@ -1220,10 +1224,8 @@
+   ares_qcache_insert(channel, now, query, rdnsrec);
+ 
+   server_set_good(server, query->using_tcp);
+-  end_query(channel, server, query, ARES_SUCCESS, rdnsrec, requeue);
+-  rdnsrec = NULL; /* Free'd by the requeue */
+-
+-  status = ARES_SUCCESS;
++  status = end_query(channel, server, query, ARES_SUCCESS, rdnsrec, requeue);
++  rdnsrec = NULL; /* Consumed even if deferred queue admission failed. */
+ 
+ cleanup:
+   /* Don't cleanup the cached pointer to the dns response */
+@@ -1299,8 +1301,9 @@
+     query->error_status = ARES_ETIMEOUT;
+   }
+ 
+-  end_query(channel, server, query, query->error_status, dnsrec, requeue);
+-  return ARES_ETIMEOUT;
++  status = end_query(channel, server, query, query->error_status, dnsrec,
++                     requeue);
++  return status == ARES_SUCCESS ? ARES_ETIMEOUT : status;
+ }
+ 
+ /*! Count the number of servers that share the same highest priority (lowest
+@@ -1624,6 +1627,7 @@
+   ares_conn_t    *conn;
+   size_t          timeplus;
+   ares_status_t   status;
++  ares_status_t   end_status;
+   ares_bool_t     probe_downed_server = ARES_TRUE;
+   /* Captured before any application callback below, which may free the query */
+   unsigned short  qid    = query->qid;
+@@ -1643,8 +1647,9 @@
+   }
+ 
+   if (server == NULL) {
+-    end_query(channel, server, query, ARES_ENOSERVER /* ? */, NULL, requeue);
+-    return ARES_ENOSERVER;
++    status = end_query(channel, server, query, ARES_ENOSERVER /* ? */, NULL,
++                       requeue);
++    return status == ARES_SUCCESS ? ARES_ENOSERVER : status;
+   }
+ 
+   /* If a query is directed to a specific server, or the query is being
+@@ -1699,8 +1704,8 @@
+ 
+       /* Anything else is not retryable, likely ENOMEM */
+       default:
+-        end_query(channel, server, query, status, NULL, requeue);
+-        return status;
++        end_status = end_query(channel, server, query, status, NULL, requeue);
++        return end_status == ARES_SUCCESS ? status : end_status;
+     }
+   }
+ 
+@@ -1726,8 +1731,8 @@
+ 
+     case ARES_ENOMEM:
+       /* Not retryable */
+-      end_query(channel, server, query, status, NULL, requeue);
+-      return status;
++      end_status = end_query(channel, server, query, status, NULL, requeue);
++      return end_status == ARES_SUCCESS ? status : end_status;
+ 
+     /* These conditions are retryable as they are server-specific
+      * error codes */
+@@ -1769,8 +1774,8 @@
+     ares_slist_insert(channel->queries_by_timeout, query);
+   if (!query->node_queries_by_timeout) {
+     /* LCOV_EXCL_START: OutOfMemory */
+-    end_query(channel, server, query, ARES_ENOMEM, NULL, requeue);
+-    return ARES_ENOMEM;
++    status = end_query(channel, server, query, ARES_ENOMEM, NULL, requeue);
++    return status == ARES_SUCCESS ? ARES_ENOMEM : status;
+     /* LCOV_EXCL_STOP */
+   }
+ 
+@@ -1782,8 +1787,8 @@
+ 
+   if (query->node_queries_to_conn == NULL) {
+     /* LCOV_EXCL_START: OutOfMemory */
+-    end_query(channel, server, query, ARES_ENOMEM, NULL, requeue);
+-    return ARES_ENOMEM;
++    status = end_query(channel, server, query, ARES_ENOMEM, NULL, requeue);
++    return status == ARES_SUCCESS ? ARES_ENOMEM : status;
+     /* LCOV_EXCL_STOP */
+   }
+ 
+@@ -1879,7 +1884,25 @@
+   query->node_all_queries = NULL;
+ }
+ 
+-static void end_query(ares_channel_t *channel, ares_server_t *server,
++/* The queue owns the response on successful admission. Otherwise release it
++ * here and leave only the channel's root query ownership for later retirement.
++ * This also normalizes linkage when array creation failed before insertion. */
++static ares_status_t end_query_deferred_result(ares_query_t *query,
++                                               ares_dns_record_t *dnsrec,
++                                               ares_status_t admission_status)
++{
++  if (admission_status != ARES_SUCCESS) {
++    ares_query_remove_from_conn(query);
++    ares_dns_record_destroy(dnsrec);
++  }
++
++  return admission_status;
++}
++
++/* Always consumes dnsrec. The return describes queue admission/delivery, not
++ * the query result supplied in status. Failed admission never invokes a new
++ * immediate callback; the channel retains the query for explicit retirement. */
++static ares_status_t end_query(ares_channel_t *channel, ares_server_t *server,
+                       ares_query_t *query, ares_status_t status,
+                       ares_dns_record_t *dnsrec, ares_array_t **requeue)
+ {
+@@ -1893,8 +1916,9 @@
+ 
+   /* Delay calling the query callback */
+   if (requeue != NULL) {
+-    ares_append_endqueue(requeue, query, status, dnsrec);
+-    return;
++    ares_status_t admission_status =
++      ares_append_endqueue(requeue, query, status, dnsrec);
++    return end_query_deferred_result(query, dnsrec, admission_status);
+   }
+ 
+   /* Detach from all lookup lists before the callback, otherwise a reentrant
+@@ -1909,6 +1933,7 @@
+ 
+   /* Invoke the callback. */
+   query->callback(query->arg, status, query->timeouts, dnsrec);
++  ares_dns_record_destroy(dnsrec);
+   ares_free_query(query);
+ 
+   /* Check and notify if no other queries are enqueued on the channel.  This
+@@ -1918,6 +1943,7 @@
+    *     point it is no longer tracked.
+    */
+   ares_queue_notify_empty(channel);
++  return ARES_SUCCESS;
+ }
+ 
+ void ares_free_query(ares_query_t *query)

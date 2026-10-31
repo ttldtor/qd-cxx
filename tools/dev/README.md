@@ -6,6 +6,10 @@ The optional [runtime feasibility projects](../../tests/conformance/transport/ru
 check pinned DNS/TCP/TLS mechanisms, synthetic certificates, cancellation and dependency-OFF boundaries.
 Each is a separate default-OFF CMake project; neither adds a production transport target to the root build.
 
+For the root's optional production TCP target, use the separate
+[SDK preparation guide](../../cmake/runtime-profile/README.md) and
+[build/package instructions](../../docs/CPP-BUILD.md#optional-tcp-runtime).
+
 The optional [native session control verification](../upstream/live-session-oracle/README.md)
 compares native protocol/heartbeat output with actual locked Java callbacks, including descriptor
 inheritance and synthetic authorization redaction. It runs offline with explicit prepared providers.

@@ -9,10 +9,12 @@ The project implements selected bounded profiles against Java QD 3.355 at the re
 
 The [selected optional runtime profile](decisions/ADR-0006-live-runtime.md) has reproducible
 [DNS/TCP/TLS feasibility tests](../tests/conformance/transport/VALIDATION.md).
-Production transport/TLS/credential adapters remain unimplemented; these tests do not add live subscriptions.
+The separate production TCP adapter implements the bounded plain, credential-free subset below.
+TLS/credential adapters, collectors and an end-to-end subscription client remain unimplemented.
 
 | Component | Behavior and contract |
 | --- | --- |
+| Optional TCP runtime | Explicit SDK/bootstrap, caller-driven DNS/connect/read/write, owned buffers, bounded progress and quiescent close: [contract](../spec/transport/TCP-RUNTIME.md), [DNS resources](../spec/transport/DNS-RESOURCES.md), [validation](../tests/conformance/transport/TCP-VALIDATION.md). Default OFF; no TLS, application callbacks, collector or reconnect. |
 | Pure live session | Whole-frame admission, immutable peer generations, protocol/heartbeat controls, readiness/auth gates and owned output: [session contract](../spec/subscriptions/LIVE-SESSION.md). No sockets, clocks, collectors or reconnecting client. |
 | Subscription output | Six messages and explicit descriptions, exact symbols, owned partial-write suffixes and retained-output quotas: [live composer](../spec/subscriptions/WRITER.md). No socket/session/peer acknowledgement. |
 | Desired subscriptions | Pure bounded state, exact symbols/schema identity, atomic add/remove/replace/clear, revisions and non-reused membership tokens: [state API](../spec/subscriptions/STATE.md). No live client/collector/transport follows from this row. |

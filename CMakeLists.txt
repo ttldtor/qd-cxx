@@ -4,17 +4,21 @@
 cmake_minimum_required(VERSION 3.25)
 project(qdcxx LANGUAGES CXX)
 
+include(GNUInstallDirs)
+
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
     message(FATAL_ERROR "Use an out-of-source build, for example -B .work/build")
 endif()
 
 add_library(qdcxx_encoding src/encoding/compact.cpp src/encoding/utf_string.cpp src/encoding/symbol_reader.cpp src/encoding/utf_char.cpp src/encoding/char_array.cpp)
-target_include_directories(qdcxx_encoding PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
+target_include_directories(qdcxx_encoding PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 target_compile_features(qdcxx_encoding PUBLIC cxx_std_23)
 set_target_properties(qdcxx_encoding PROPERTIES CXX_EXTENSIONS OFF)
 
 add_library(qdcxx_core src/core/local_schema.cpp src/core/wide_decimal.cpp src/core/subscription.cpp)
-target_include_directories(qdcxx_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
+target_include_directories(qdcxx_core PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 target_compile_features(qdcxx_core PUBLIC cxx_std_23)
 set_target_properties(qdcxx_core PROPERTIES CXX_EXTENSIONS OFF)
 
@@ -51,6 +55,26 @@ set_target_properties(qdcxx_quote PROPERTIES CXX_EXTENSIONS OFF)
 add_library(qdcxx_protocol src/protocol/frame_reader.cpp src/protocol/describe_records.cpp src/protocol/static_binding.cpp src/protocol/stream_data.cpp src/protocol/tape_reader.cpp src/protocol/tape_writer.cpp src/protocol/tape_admission.cpp src/protocol/subscription_writer.cpp src/protocol/live_session.cpp)
 target_link_libraries(qdcxx_protocol PUBLIC qdcxx_encoding qdcxx_core)
 set_target_properties(qdcxx_protocol PROPERTIES CXX_EXTENSIONS OFF)
+
+option(ORG_TTLDTOR_QDCXX_BUILD_RUNTIME "Build the explicit credential-free caller-driven TCP runtime" OFF)
+if(ORG_TTLDTOR_QDCXX_BUILD_RUNTIME)
+    include(cmake/Runtime.cmake)
+endif()
+
+include(CMakePackageConfigHelpers)
+install(TARGETS qdcxx_encoding qdcxx_core qdcxx_protocol EXPORT qdcxxTargets
+    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+install(DIRECTORY include/qd/core include/qd/encoding include/qd/protocol
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qd" FILES_MATCHING PATTERN "*.hpp")
+install(FILES LICENSE DESTINATION "${CMAKE_INSTALL_DATADIR}/qdcxx/licenses" RENAME qdcxx-LICENSE.txt)
+configure_package_config_file(cmake/qdcxxConfig.cmake.in "${CMAKE_CURRENT_BINARY_DIR}/qdcxxConfig.cmake"
+    INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/qdcxx"
+    PATH_VARS CMAKE_INSTALL_LIBDIR)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/qdcxxConfig.cmake"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/qdcxx")
+install(EXPORT qdcxxTargets FILE qdcxxTargets.cmake DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/qdcxx")
 
 option(ORG_TTLDTOR_QDCXX_BUILD_REPLAY "Build the bounded synchronous offline replay library" OFF)
 if(ORG_TTLDTOR_QDCXX_BUILD_REPLAY)
@@ -162,6 +186,35 @@ if(BUILD_TESTING)
         DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     )
     FetchContent_MakeAvailable(doctest)
+    if(ORG_TTLDTOR_QDCXX_BUILD_RUNTIME)
+        add_executable(qdcxx_tcp_tests tests/conformance/transport/tcp_tests.cpp)
+        target_link_libraries(qdcxx_tcp_tests PRIVATE qdcxx_transport qdcxx_quote doctest::doctest c-ares::cares)
+        target_include_directories(qdcxx_tcp_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/transport")
+        target_compile_definitions(qdcxx_tcp_tests PRIVATE
+            "ORG_TTLDTOR_QDCXX_TCP_SOURCE_ROOT=\"${CMAKE_CURRENT_SOURCE_DIR}\"")
+        set_target_properties(qdcxx_tcp_tests PROPERTIES CXX_EXTENSIONS OFF)
+        if(WIN32)
+            target_compile_definitions(qdcxx_tcp_tests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+            target_link_libraries(qdcxx_tcp_tests PRIVATE ws2_32)
+        endif()
+        add_test(NAME transport_tcp COMMAND qdcxx_tcp_tests)
+        set_tests_properties(transport_tcp PROPERTIES TIMEOUT 45)
+        add_executable(qdcxx_cares_ownership_tests tests/conformance/transport/cares_ownership_tests.c)
+        target_compile_features(qdcxx_cares_ownership_tests PRIVATE c_std_99)
+        target_compile_definitions(qdcxx_cares_ownership_tests PRIVATE HAVE_CONFIG_H=1 CARES_BUILDING_LIBRARY)
+        target_include_directories(qdcxx_cares_ownership_tests PRIVATE
+            "${CMAKE_CURRENT_BINARY_DIR}/qdcxx-runtime-cares" "${ORG_TTLDTOR_QDCXX_CARES_SOURCE}"
+            "${ORG_TTLDTOR_QDCXX_CARES_SOURCE}/src/lib" "${ORG_TTLDTOR_QDCXX_CARES_SOURCE}/src/lib/include")
+        if(WIN32)
+            target_compile_definitions(qdcxx_cares_ownership_tests PRIVATE WIN32_LEAN_AND_MEAN _WIN32_WINNT=0x0602)
+        else()
+            target_compile_definitions(qdcxx_cares_ownership_tests PRIVATE
+                _GNU_SOURCE _POSIX_C_SOURCE=200809L _XOPEN_SOURCE=700)
+        endif()
+        target_link_libraries(qdcxx_cares_ownership_tests PRIVATE c-ares::cares)
+        add_test(NAME transport_cares_ownership COMMAND qdcxx_cares_ownership_tests)
+        set_tests_properties(transport_cares_ownership PROPERTIES TIMEOUT 20)
+    endif()
     add_executable(qdcxx_subscription_state_tests tests/conformance/subscription_state_tests.cpp)
     target_link_libraries(qdcxx_subscription_state_tests PRIVATE qdcxx_core doctest::doctest)
     set_target_properties(qdcxx_subscription_state_tests PROPERTIES CXX_EXTENSIONS OFF)

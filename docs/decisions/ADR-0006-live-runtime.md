@@ -12,7 +12,7 @@ an external execution host responsibility for progress through quiescence. The n
 concrete Windows/Linux dependency, cancellation and trust policy. A cancelled public operation is not
 necessarily an exited resolver worker; returning from an event loop is not close completion.
 
-The selected implementation direction is C++23, standalone Asio for executor/TCP/timers, c-ares for
+The selected implementation direction is C++23, standalone Asio for executor/TCP, c-ares for
 asynchronous DNS, and optional OpenSSL for TLS. None belongs in core, encoding, event mapping or the
 pure protocol/session implementation. Existing tape profiles and APIs remain unchanged.
 
@@ -24,8 +24,8 @@ must not silently fetch network dependencies. No package manager or global insta
 
 | Dependency | Pin | License | Selected role/build |
 | --- | --- | --- | --- |
-| Standalone Asio | 1.38.2, commit `8806a6803cde7054c3049d3666d3ec36786568c5` | Boost Software License 1.0 | Header-only standalone executor/TCP/timers; Windows IOCP, Linux epoll; no built-in resolver. |
-| c-ares | 1.34.9 upstream commit `bc91829cce983a35ec01f5dbc05465858a3df469`, release archive SHA-256 `9364b70a12eb59a06830fb488d9357f90100dff0d98b23ea3593a183d43e6f2f`; qualified `1.34.9+qdcxx1` patch required | MIT | Static, `CARES_THREADS=OFF`, caller-driven channel, no event thread/system monitor, bounded socket callbacks; distinct qualified SDK rather than an interchangeable stock build. |
+| Standalone Asio | 1.38.2, commit `8806a6803cde7054c3049d3666d3ec36786568c5` | Boost Software License 1.0 | Header-only standalone executor/TCP; Windows IOCP, Linux epoll; no built-in resolver. |
+| c-ares | 1.34.9 upstream commit `bc91829cce983a35ec01f5dbc05465858a3df469`, release archive SHA-256 `9364b70a12eb59a06830fb488d9357f90100dff0d98b23ea3593a183d43e6f2f`; qualified `1.34.9+qdcxx2` patch required | MIT | Static, `CARES_THREADS=OFF`, caller-driven channel, no event thread/system monitor, bounded socket callbacks; distinct qualified SDK rather than an interchangeable stock build. |
 | OpenSSL | 3.5.9, commit `45e844fa2a14ec92d146bd8f5778ac130b6625fb`, release archive SHA-256 `603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a` | Apache 2.0 | Optional static SSL/Crypto, `no-shared no-tests no-docs no-autoload-config`; built-in default provider. |
 
 OpenSSL's [release list](https://www.openssl-library.org/source/) identifies the 3.5 LTS support horizon
@@ -40,9 +40,10 @@ its application reproduces the qualified source tree, without changing the origi
 ## Executor and TCP ownership
 
 Use one caller-driven `asio::io_context` with one active owner thread per execution host. The application
-may run that owner on a thread it owns. Windows IOCP timers also use an SDK timer-wait helper: it only
+may run that owner on a thread it owns. When Asio timer waits are used, Windows IOCP also uses an SDK timer-wait helper: it only
 wakes IOCP, not application callbacks. Its thread/stack/lifetime count toward runtime resources. Context
-shutdown wakes and joins it after owner operations drain, outside callbacks. This is a single callback
+shutdown wakes and joins it after owner operations drain, outside callbacks. The qualified TCP adapter
+creates no timer waits, as detailed below. This is a single callback
 serialization domain, not a promise that the process has only one thread. Use a monotonic runtime clock
 for deadlines; pure components receive explicit
 time inputs. No public API requires an Asio/native socket/TLS type.
@@ -64,6 +65,26 @@ blocking host/thread join may run inside a user callback. Graceful close gets a 
 the defined abort path without falsely reporting a flushed result. A blocking user callback remains
 outside a preemptive shutdown guarantee; see ADR-0005's host progress precondition.
 
+## TCP adapter qualification refinements
+
+The [TCP adapter contract](../../spec/transport/TCP-RUNTIME.md) uses a narrower
+execution path to preserve finite work and retirement. It creates no Asio timer
+waits: the caller drives steady-clock deadlines and progress hints. The Windows
+timer-helper behavior described above remains SDK/feasibility evidence, not a
+helper instantiated by this adapter. Linux readiness is followed by one native
+receive/send attempt; Windows native nonblocking connect avoids the SDK's hidden
+select-reactor fallback. Unbounded user-space EINTR retries are not reclassified
+as a kernel-scheduling assumption.
+
+The current runtime requires [c-ares qdcxx2](../../cmake/runtime-profile/README.md).
+Its cumulative patch retains the earlier configuration restrictions and corrects
+deferred response ownership/error propagation on queue-admission failure. Original
+qdcxx1 sources, lock and feasibility results remain historical evidence. Complete
+source manifests bind all 637 Asio and 532 qualified c-ares files; a version header
+alone does not qualify the code. The [DNS resource derivation](../../spec/transport/DNS-RESOURCES.md)
+separates SDK requested-storage reservations from conservative work credits,
+allocator overhead, native resources, RSS and latency.
+
 ## DNS and process bootstrap
 
 Do not use `asio::ip::tcp::resolver` for this profile. In the pinned implementation, cancellation resets
@@ -78,7 +99,7 @@ lifetime for one upstream run/independent retirement domain across that run's co
 New requests carry fresh epoch/operation identities. No background
 configuration monitor or periodic `ares_reinit` runs during active operation.
 
-While a query is pending, an owner timer drives bounded fd snapshots, zero-timeout readiness polling and
+While a query is pending, owner-driven monotonic deadline ticks drive bounded fd snapshots, zero-timeout readiness polling and
 c-ares progress. There is no second descriptor owner or DNS polling thread. C callbacks capture bounded
 nonthrowing results on that same owner; they never invoke application code or destroy their channel.
 Account for sockets, query/answer/cache state and old-plus-retiring ownership, including SDK state.
@@ -90,8 +111,10 @@ must enforce finite fd/answer/storage and per-turn work limits; counting an opaq
 work is not sufficient. Use at most one outstanding wire query per channel; resolve IPv4 and IPv6
 sequentially rather than selecting `AF_UNSPEC`, and never submit a new query from a C callback.
 The [qualified DNS profile](../../tests/conformance/transport/runtime-feasibility/dns/profile.json)
-records the tested ceilings and conservative input-buffer/reallocation envelope. Total SDK heap is not
-yet implemented or measured as a production resource budget.
+records the original feasibility ceilings and input-buffer/reallocation envelope. That feasibility
+check did not establish total SDK heap. The subsequent
+[production DNS derivation](../../spec/transport/DNS-RESOURCES.md) defines a conservative requested-storage
+bound enforced by the TCP adapter; physical allocator overhead and RSS remain outside that bound.
 
 **Application bootstrap is a supported-profile precondition.** The documented
 [`ares_library_init`](https://c-ares.org/docs/ares_library_init.html) contract requires initialization
@@ -121,8 +144,15 @@ inline on the cancelling owner; defer application delivery until the C call has 
 
 Native OS cryptographic randomness must be available and initialized: the qualified Linux build uses
 `arc4random_buf`, Windows uses `RtlGenRandom`. Unsupported entropy/file/RC4 fallback paths are not
-qualified. The adapter's bootstrap must check native readiness and reject an unavailable service;
-small timing measurements do not establish a hard wall-clock bound for OS primitives.
+qualified. Before SDK ownership, bootstrap samples the selected native service once.
+On Windows, a FALSE result from
+[`RtlGenRandom`](https://learn.microsoft.com/en-us/windows/win32/api/ntsecapi/nf-ntsecapi-rtlgenrandom)
+must produce a typed bootstrap failure without cleaning someone else's SDK state.
+Linux [`arc4random_buf`](https://sourceware.org/glibc/manual/latest/html_node/High-Quality-Random.html)
+has no recoverable status: normal return confirms only that invocation; native failure remains a
+platform prerequisite rather than a promised recoverable rejection. Neither sample proves future
+availability or a hard wall-clock bound for OS primitives. Subsequent SDK entropy calls retain that
+qualified-environment precondition; the sample is not an entropy-quality test.
 
 ## TLS identity, trust and authentication
 
@@ -196,9 +226,10 @@ separately from this TLS decision.
 
 ## Optional build and consumer boundary
 
-Future runtime and TLS facilities are separately OFF by default. Runtime enables only the selected
-Asio/c-ares/Threads/native socket closure; TLS additionally enables OpenSSL SSL/Crypto. TLS requires
-runtime. Neither option may change JSON, recording, replay or pure-library dependencies. Public headers
+The existing `ORG_TTLDTOR_QDCXX_BUILD_RUNTIME` option is OFF by default and enables only the selected
+Asio/c-ares/Threads/native socket closure. The planned separate TLS facility will also default to OFF,
+add OpenSSL SSL/Crypto and require runtime; no production TLS option exists yet.
+Neither facility may change JSON, recording, replay or pure-library dependencies. Public headers
 retain standard/project types; a static consumer still receives the explicit native link closure.
 
 OFF configure/build/consumer operations must not find, fetch, include or link runtime/TLS SDKs, start
@@ -209,9 +240,10 @@ developer step, never an unannounced configure side effect.
 
 Preserve CMake 3.25+, C++23 and existing CLion toolchains/presets. Supply dependency roots in local
 configuration rather than editing global paths. Source-built SDKs with native tools support MSVC x64
-and Linux GCC without requiring installed Conan; native consumer linkage and install/export behavior
-must be checked when the adapters/package integration actually exist. This ADR does not pretend those
-future production options or package exports already exist.
+and Linux GCC without requiring installed Conan. The TCP option and minimal relocatable package now
+exist; their native consumer linkage and install/export checks are covered by the
+[TCP validation matrix](../../tests/conformance/transport/TCP-VALIDATION.md). This does not qualify
+future TLS/package extensions or the full client.
 
 ## Alternatives and consequences
 

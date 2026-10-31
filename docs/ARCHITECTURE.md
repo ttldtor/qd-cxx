@@ -58,7 +58,10 @@ keep that layer independent of runtime, clocks and application callbacks. Its pa
 does not acknowledge peer delivery.
 [ADR-0006](decisions/ADR-0006-live-runtime.md) selects an optional Asio/c-ares/OpenSSL profile,
 explicit SDK/bootstrap/trust requirements and its [feasibility boundary](../tests/conformance/transport/CONTRACTS.md).
-This is a design boundary, not a claim of existing runtime support or owner acceptance.
+The [optional TCP adapter](../spec/transport/TCP-RUNTIME.md) implements only the caller-driven,
+credential-free plain subset, with explicit bootstrap, bounded SDK sources and owned-operation
+retirement. TLS, execution-host dispatch and the complete subscription client remain separate work.
+The ADR does not imply implementation or owner acceptance of those remaining parts.
 
 ## Design principles
 
@@ -71,7 +74,7 @@ This is a design boundary, not a claim of existing runtime support or owner acce
 
 ## Not decided yet
 
-No networking library, package manager, stable public API, OS threading model, or binary compatibility policy has been selected. The QDCXX-010 owner follow-up selects doctest as a test-only FetchContent dependency. Those decisions require scoped tasks and evidence.
+A package manager, stable public API and general binary compatibility policy remain undecided. The selected optional networking profile and serialized ownership model are described above and in ADR-0006. The QDCXX-010 owner follow-up selects doctest as a test-only FetchContent dependency. Further decisions require scoped tasks and evidence.
 
 QDCXX-010 implements only the encoding boundary's compact int/long primitives, with a provisional span-based API, minimal CMake/CTest and no third-party runtime dependency. See [build/API](CPP-BUILD.md) and [validation](../tests/conformance/encoding/VALIDATION.md). This does not implement or change the other proposed boundaries.
 

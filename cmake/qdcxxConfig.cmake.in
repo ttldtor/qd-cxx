@@ -1,0 +1,16 @@
+# Copyright (c) 2026 ttldtor.
+# SPDX-License-Identifier: BSL-1.0
+@PACKAGE_INIT@
+
+if(@ORG_TTLDTOR_QDCXX_BUILD_RUNTIME@)
+    include(CMakeFindDependencyMacro)
+    find_dependency(Threads)
+    if(NOT TARGET qdcxx_runtime_cares)
+        add_library(qdcxx_runtime_cares STATIC IMPORTED)
+        set_and_check(qdcxxCaresArchive "@PACKAGE_CMAKE_INSTALL_LIBDIR@/@qdcxxCaresInstalledName@")
+        set_target_properties(qdcxx_runtime_cares PROPERTIES IMPORTED_LOCATION "${qdcxxCaresArchive}"
+            INTERFACE_LINK_LIBRARIES "@qdcxxCaresNativeLibraries@")
+    endif()
+endif()
+include("${CMAKE_CURRENT_LIST_DIR}/qdcxxTargets.cmake")
+check_required_components(qdcxx)
