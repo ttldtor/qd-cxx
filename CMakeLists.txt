@@ -48,7 +48,7 @@ add_library(qdcxx_quote src/events/quote.cpp)
 target_link_libraries(qdcxx_quote PUBLIC qdcxx_event_mapping)
 set_target_properties(qdcxx_quote PROPERTIES CXX_EXTENSIONS OFF)
 
-add_library(qdcxx_protocol src/protocol/frame_reader.cpp src/protocol/describe_records.cpp src/protocol/static_binding.cpp src/protocol/stream_data.cpp src/protocol/tape_reader.cpp src/protocol/tape_writer.cpp src/protocol/tape_admission.cpp src/protocol/subscription_writer.cpp)
+add_library(qdcxx_protocol src/protocol/frame_reader.cpp src/protocol/describe_records.cpp src/protocol/static_binding.cpp src/protocol/stream_data.cpp src/protocol/tape_reader.cpp src/protocol/tape_writer.cpp src/protocol/tape_admission.cpp src/protocol/subscription_writer.cpp src/protocol/live_session.cpp)
 target_link_libraries(qdcxx_protocol PUBLIC qdcxx_encoding qdcxx_core)
 set_target_properties(qdcxx_protocol PROPERTIES CXX_EXTENSIONS OFF)
 
@@ -174,6 +174,14 @@ if(BUILD_TESTING)
     set_target_properties(qdcxx_subscription_writer_tests PROPERTIES CXX_EXTENSIONS OFF)
     add_test(NAME protocol_subscription_writer COMMAND qdcxx_subscription_writer_tests)
     set_tests_properties(protocol_subscription_writer PROPERTIES TIMEOUT 60)
+    add_executable(qdcxx_live_session_tests tests/conformance/live_session_tests.cpp)
+    target_link_libraries(qdcxx_live_session_tests PRIVATE qdcxx_protocol qdcxx_quote doctest::doctest)
+    target_compile_definitions(qdcxx_live_session_tests PRIVATE
+        "ORG_TTLDTOR_QDCXX_LIVE_SOURCE_ROOT=\"${CMAKE_CURRENT_SOURCE_DIR}\""
+        "ORG_TTLDTOR_QDCXX_LIVE_CAPTURE_DIR=\"${CMAKE_CURRENT_BINARY_DIR}/live-session-native\"")
+    set_target_properties(qdcxx_live_session_tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME protocol_live_session COMMAND qdcxx_live_session_tests)
+    set_tests_properties(protocol_live_session PROPERTIES TIMEOUT 120)
     if(TARGET qdcxx_inspect_tool)
         add_executable(qdcxx_source_format_tests tests/conformance/source_format_tests.cpp)
         target_link_libraries(qdcxx_source_format_tests PRIVATE qdcxx_inspect_tool doctest::doctest)

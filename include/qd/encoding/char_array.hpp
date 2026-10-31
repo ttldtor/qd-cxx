@@ -5,6 +5,7 @@
 
 #include "qd/encoding/compact.hpp"
 
+#include <memory_resource>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -31,6 +32,14 @@ struct CharArrayResult {
     Status status;                       ///< Success, malformed wire, input exhaustion, resource or allocation failure.
 };
 
+/** Allocator-aware exact character-array value, with explicit resource lifetime. */
+struct PmrCharArrayResult {
+    std::optional<std::pmr::u16string> units; ///< Exact text/null on success, never a failed partial value.
+    std::size_t consumed;                     ///< Examined encoded bytes, including failures.
+    std::size_t chargedUnits;                 ///< Admitted units, not refunded on later failure.
+    Status status;                            ///< Complete or failed primitive outcome.
+};
+
 /** Read a compact character count and exact BMP UTFChar units without retaining input.
  * Null is distinct from empty. Surrogates and observed overlong BMP encodings are preserved;
  * supplementary scalar encodings are rejected after their complete tail. This is not UTFString.
@@ -42,6 +51,16 @@ struct CharArrayResult {
  */
 [[nodiscard]] CharArrayResult readCharArray(std::span<const std::byte> input, CharArrayLimits limits,
                                             CharArrayBoundary boundary = CharArrayBoundary::PRIMITIVE) noexcept;
+
+/** Decode the same character-counted grammar into explicit caller-owned allocation.
+ * @param input Borrowed remaining payload, never retained.
+ * @param limits Required finite primitive allowances.
+ * @param boundary Explicit remaining-message length policy.
+ * @param resource Resource which must outlive the result; custom resource exceptions propagate.
+ * @return Owning exact text/null or classified failure without a partial value.
+ */
+[[nodiscard]] PmrCharArrayResult readCharArray(std::span<const std::byte> input, CharArrayLimits limits,
+                                               CharArrayBoundary boundary, std::pmr::memory_resource &resource);
 
 /** Write a canonical compact-int count and one UTFChar per exact UTF-16 unit atomically.
  * Null and empty remain distinct; paired and isolated surrogates are never combined.

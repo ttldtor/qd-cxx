@@ -3,6 +3,8 @@
 
 #include "qd/protocol/stream_data.hpp"
 #include "field_time_binding.hpp"
+#include "live_decode.hpp"
+#include <type_traits>
 
 #include "qd/encoding/compact.hpp"
 #include "qd/encoding/utf_char.hpp"
@@ -241,12 +243,31 @@ encoding::ReadResult<std::int64_t> readScalar(std::span<const std::byte> input, 
     }
 }
 
-/** Charged temporary payload; errors retain work but never expose a partial value. */
-struct PayloadReadResult {
-    std::optional<std::u16string> units{};         ///< Exact UTFString units on success only.
-    std::optional<std::vector<std::byte>> bytes{}; ///< Exact opaque body on success only.
-    std::size_t consumed = 0;                      ///< Actual examined prefix/body, including an attempted UTF tail.
-    std::size_t chargedBytes = 0;                  ///< Admitted body-byte work, never refunded after admission.
+/** Construct a container without changing its selected allocator.
+ * @tparam T Ordinary or explicit-resource owned container/result.
+ * @param resource Explicit allocation resource for allocator-aware instantiations.
+ * @return Empty owned container carrying the selected allocator.
+ */
+template <typename T> T makeDecodeOwner(std::pmr::memory_resource *resource) {
+    if constexpr (std::is_constructible_v<T, std::pmr::memory_resource &>) {
+        return T(*resource);
+    } else if constexpr (std::is_constructible_v<T, std::pmr::memory_resource *>) {
+        return T(resource);
+    } else {
+        return T{};
+    }
+}
+
+/** Charged temporary payload; errors retain work but never expose a partial value.
+ * @tparam Pmr Whether text/byte ownership uses the explicitly supplied resource.
+ */
+template <bool Pmr> struct PayloadReadResult {
+    using String = std::conditional_t<Pmr, std::pmr::u16string, std::u16string>;
+    using Bytes = std::conditional_t<Pmr, std::pmr::vector<std::byte>, std::vector<std::byte>>;
+    std::optional<String> units{}; ///< Exact UTFString units on success only.
+    std::optional<Bytes> bytes{};  ///< Exact opaque body on success only.
+    std::size_t consumed = 0;      ///< Actual examined prefix/body, including an attempted UTF tail.
+    std::size_t chargedBytes = 0;  ///< Admitted body-byte work, never refunded after admission.
     std::size_t chargedUnits = 0;  ///< Admitted UTF-16 reservation work, never refunded after admission.
     std::size_t retainedBytes = 0; ///< Logical successful temporary storage, excluding allocator capacity.
     encoding::Status status = encoding::Status::OK; ///< First error or successful completion.
@@ -278,16 +299,19 @@ static_assert(!hasStringUnitRoom(std::numeric_limits<std::size_t>::max(), std::n
 static_assert(!hasStringUnitRoom(0, std::numeric_limits<std::size_t>::max(), 0));
 
 /** Read a new exact payload grammar independently of whether it will be retained.
+ * @tparam Pmr Whether text/byte ownership uses the explicitly supplied resource.
  * @param input Remaining complete message, borrowed only during this call.
  * @param type Exact byte/object/UTFString identity validated by the binding.
  * @param limits Remaining work/completed-output budgets and per-value limits.
  * @param currentUnits Existing current-record strings that coexist with the temporary.
  * @param currentBytes Existing current-record new payload storage that coexists with the temporary.
+ * @param resource Explicit allocator for the allocator-aware specialization; otherwise unused.
  * @return Owned temporary or first error with all examined/admitted work retained.
  */
-PayloadReadResult readPayload(std::span<const std::byte> input, core::SerialFieldType type,
-                              const StreamDataLimits &limits, std::size_t currentUnits,
-                              std::size_t currentBytes) noexcept {
+template <bool Pmr>
+PayloadReadResult<Pmr> readPayload(std::span<const std::byte> input, core::SerialFieldType type,
+                                   const StreamDataLimits &limits, std::size_t currentUnits, std::size_t currentBytes,
+                                   std::pmr::memory_resource *resource) {
     constexpr std::int64_t NULL_LENGTH = -1;
     constexpr std::int64_t MAX_BODY_LENGTH = std::numeric_limits<std::int32_t>::max();
     constexpr std::size_t UNIT_BYTES = sizeof(char16_t);
@@ -297,7 +321,7 @@ PayloadReadResult readPayload(std::span<const std::byte> input, core::SerialFiel
     constexpr std::uint32_t LOW_SURROGATE = 0xdc00;
     constexpr unsigned int SURROGATE_BITS = 10;
     constexpr std::uint32_t SURROGATE_MASK = 0x3ff;
-    PayloadReadResult result;
+    PayloadReadResult<Pmr> result;
     const auto encodedAllowance = std::min(limits.fieldPayloadEncodedBytes, limits.payloadEncodedBytes);
     const auto bounded = input.first(std::min(input.size(), encodedAllowance));
     const auto exhausted =
@@ -379,7 +403,8 @@ PayloadReadResult readPayload(std::span<const std::byte> input, core::SerialFiel
     try {
         if (!text) {
             const auto body = bounded.subspan(result.consumed, count);
-            std::vector<std::byte> value(body.begin(), body.end());
+            auto value = makeDecodeOwner<typename PayloadReadResult<Pmr>::Bytes>(resource);
+            value.assign(body.begin(), body.end());
             result.bytes = std::move(value);
             result.consumed += count;
             result.retainedBytes = count;
@@ -387,7 +412,7 @@ PayloadReadResult readPayload(std::span<const std::byte> input, core::SerialFiel
             return result;
         }
 
-        std::u16string value;
+        auto value = makeDecodeOwner<typename PayloadReadResult<Pmr>::String>(resource);
         value.reserve(reservedUnits);
         const auto bodyStart = result.consumed;
 
@@ -445,11 +470,13 @@ PayloadReadResult readPayload(std::span<const std::byte> input, core::SerialFiel
 }
 
 /** Project validated indexed positions into the private current record without allocation.
+ * @tparam Values Ordinary or explicit-resource complete local value container.
  * @param values Fresh local defaults, never published until the entire record succeeds.
  * @param layout Owned validated dense positions; absence leaves every default unchanged.
  * @param time Exact signed64 removal payload, without unit or event-time conversion.
  */
-void applyRemovalTime(std::vector<core::FieldValue> &values, const std::optional<ResolvedIndexedTimeLayout> &layout,
+template <typename Values>
+void applyRemovalTime(Values &values, const std::optional<ResolvedIndexedTimeLayout> &layout,
                       std::int64_t time) noexcept {
     if (!layout) {
         return;
@@ -466,15 +493,24 @@ void applyRemovalTime(std::vector<core::FieldValue> &values, const std::optional
 }
 
 /** Decode the measured shared data record grammar under an explicit metadata policy.
+ * @tparam Pmr Whether all variable output storage uses the explicit resource.
+ * @tparam Context Immutable ordinary or explicit-resource binding context.
  * @param payload Complete borrowed data payload.
  * @param context Validated immutable bindings.
  * @param limits Finite record, field and output bounds.
  * @param policy Zero-only or explicit bounded catalog event metadata.
+ * @param resource Explicit allocator for the allocator-aware specialization; otherwise unused.
  * @return Owned prefix and first-error diagnostics.
  */
-StreamDataResult decodeDataPayload(std::span<const std::byte> payload, const StreamDataContext &context,
-                                   StreamDataLimits limits, DataEventPolicy policy) {
-    StreamDataResult result;
+template <bool Pmr, typename Context>
+auto decodeDataPayload(std::span<const std::byte> payload, const Context &context, StreamDataLimits limits,
+                       DataEventPolicy policy, std::pmr::memory_resource *resource) {
+    using Result = std::conditional_t<Pmr, detail::PmrStreamDataResult, StreamDataResult>;
+    using String = std::conditional_t<Pmr, std::pmr::u16string, std::u16string>;
+    using Bytes = std::conditional_t<Pmr, std::pmr::vector<std::byte>, std::vector<std::byte>>;
+    using Values = std::conditional_t<Pmr, std::pmr::vector<std::int32_t>, std::vector<std::int32_t>>;
+    using TypedValues = std::conditional_t<Pmr, std::pmr::vector<detail::PmrFieldValue>, std::vector<core::FieldValue>>;
+    auto result = makeDecodeOwner<Result>(resource);
 
     if ((policy != DataEventPolicy::ZERO_FLAGS && policy != DataEventPolicy::BINARY_CATALOG_V1) ||
         (policy == DataEventPolicy::BINARY_CATALOG_V1 && context.profile() != core::LocalProfile::BINARY_FIELDS_V1)) {
@@ -489,8 +525,18 @@ StreamDataResult decodeDataPayload(std::span<const std::byte> payload, const Str
         return result;
     }
 
-    encoding::SymbolReader symbols(limits.symbol, 0);
+    auto symbols = [&] {
+        if constexpr (Pmr) {
+            return encoding::PmrSymbolReader(limits.symbol, 0, *resource);
+        } else {
+            return encoding::SymbolReader(limits.symbol, 0);
+        }
+    }();
     try {
+        if constexpr (Pmr) {
+            result.records.reserve(std::min(limits.emittedRecords, payload.size()));
+        }
+
         while (result.consumed < payload.size()) {
             result.stage = StreamDataStage::RECORD;
             result.errorOffset = result.consumed;
@@ -570,8 +616,8 @@ StreamDataResult decodeDataPayload(std::span<const std::byte> payload, const Str
             }
 
             result.stage = StreamDataStage::OUTPUT;
-            std::vector<std::int32_t> values;
-            std::vector<core::FieldValue> typedValues;
+            auto values = makeDecodeOwner<Values>(resource);
+            auto typedValues = makeDecodeOwner<TypedValues>(resource);
             const bool typed = context.profile() != core::LocalProfile::COMPACT_INT_V1;
             std::size_t currentFieldUnits = 0;
             std::size_t currentPayloadBytes = 0;
@@ -617,8 +663,8 @@ StreamDataResult decodeDataPayload(std::span<const std::byte> payload, const Str
                 --limits.wireFields;
                 ++result.wireFields;
                 std::int64_t raw = 0;
-                std::optional<std::u16string> units;
-                std::optional<std::vector<std::byte>> bytes;
+                std::optional<String> units;
+                std::optional<Bytes> bytes;
                 std::size_t retainedPayloadBytes = 0;
 
                 if (fieldIndex < plan->eventTimeFieldCount) {
@@ -644,8 +690,15 @@ StreamDataResult decodeDataPayload(std::span<const std::byte> payload, const Str
                         std::min(limits.fieldString.encodedBytes, limits.fieldBytes),
                         std::min({limits.fieldString.codeUnits, limits.fieldUnits,
                                   limits.ownedFieldUnits - currentFieldUnits})};
-                    auto value = encoding::readCharArray(payload.subspan(result.consumed), allowance,
-                                                         encoding::CharArrayBoundary::MESSAGE);
+                    auto value = [&] {
+                        if constexpr (Pmr) {
+                            return encoding::readCharArray(payload.subspan(result.consumed), allowance,
+                                                           encoding::CharArrayBoundary::MESSAGE, *resource);
+                        } else {
+                            return encoding::readCharArray(payload.subspan(result.consumed), allowance,
+                                                           encoding::CharArrayBoundary::MESSAGE);
+                        }
+                    }();
                     result.consumed += value.consumed;
                     limits.fieldBytes -= value.consumed;
                     result.fieldBytes += value.consumed;
@@ -676,8 +729,8 @@ StreamDataResult decodeDataPayload(std::span<const std::byte> payload, const Str
                            field.type == core::SerialFieldType::STRING ||
                            field.type == core::SerialFieldType::CUSTOM_OBJECT ||
                            field.type == core::SerialFieldType::SERIAL_OBJECT) {
-                    auto value = readPayload(payload.subspan(result.consumed), field.type, limits, currentFieldUnits,
-                                             currentPayloadBytes);
+                    auto value = readPayload<Pmr>(payload.subspan(result.consumed), field.type, limits,
+                                                  currentFieldUnits, currentPayloadBytes, resource);
                     result.consumed += value.consumed;
                     limits.payloadEncodedBytes -= value.consumed;
                     result.payloadEncodedBytes += value.consumed;
@@ -798,16 +851,22 @@ StreamDataResult decodeDataPayload(std::span<const std::byte> payload, const Str
 
 StreamDataResult decodeStreamData(std::span<const std::byte> payload, const StreamDataContext &context,
                                   StreamDataLimits limits) {
-    return decodeDataPayload(payload, context, limits, DataEventPolicy::ZERO_FLAGS);
+    return decodeDataPayload<false>(payload, context, limits, DataEventPolicy::ZERO_FLAGS, nullptr);
 }
 
 StreamDataResult decodeStreamDataWithEventPolicy(std::span<const std::byte> payload, const StreamDataContext &context,
                                                  StreamDataLimits limits, DataEventPolicy policy) {
-    return decodeDataPayload(payload, context, limits, policy);
+    return decodeDataPayload<false>(payload, context, limits, policy, nullptr);
 }
 
 StreamDataResult decodeRawData(std::span<const std::byte> payload, const StreamDataContext &context,
                                StreamDataLimits limits) {
-    return decodeDataPayload(payload, context, limits, DataEventPolicy::ZERO_FLAGS);
+    return decodeDataPayload<false>(payload, context, limits, DataEventPolicy::ZERO_FLAGS, nullptr);
+}
+
+detail::PmrStreamDataResult detail::decodePmrStreamData(std::span<const std::byte> payload,
+                                                        const PmrStreamDataContext &context, StreamDataLimits limits,
+                                                        DataEventPolicy policy, std::pmr::memory_resource &resource) {
+    return decodeDataPayload<true>(payload, context, limits, policy, &resource);
 }
 } // namespace org::ttldtor::qdcxx::protocol

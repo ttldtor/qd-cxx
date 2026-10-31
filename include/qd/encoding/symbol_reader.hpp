@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory_resource>
 #include <optional>
 #include <span>
 #include <string>
@@ -42,6 +43,77 @@ struct SymbolResult {
     std::optional<SymbolValue> value; ///< Engaged only on OK; independent of reader/input lifetime.
     std::size_t consumed;             ///< Examined bytes of this call, including failure bytes.
     SymbolStatus status;              ///< Success or explicit failure classification.
+};
+
+/** Allocator-aware symbol; every copy retains the same explicit allocation resource. */
+struct PmrSymbolValue {
+    std::pmr::u16string units;       ///< Exact owned UTF-16, never a null symbol.
+    std::int32_t cipher = 0;         ///< Raw Java cipher metadata.
+    std::int32_t eventFlags = 0;     ///< Raw signed low-32-bit event flags.
+    std::size_t eventFlagsBytes = 0; ///< Original flag primitive byte count.
+
+    /** Select the allocation resource before any symbol storage is created.
+     * @param resource Resource which must outlive this value and every copy.
+     */
+    explicit PmrSymbolValue(std::pmr::memory_resource &resource) : units(&resource) {
+    }
+
+    /** Copy exact text through the source's explicit resource.
+     * @param other Immutable source, borrowed during the copy.
+     */
+    PmrSymbolValue(const PmrSymbolValue &other)
+        : units(other.units, other.units.get_allocator()), cipher(other.cipher), eventFlags(other.eventFlags),
+          eventFlagsBytes(other.eventFlagsBytes) {
+    }
+
+    /** Transfer owned storage without allocation.
+     * @param other Source value.
+     */
+    PmrSymbolValue(PmrSymbolValue &&other) noexcept = default;
+    /** Assign exact text through this value's existing allocator.
+     * @param other Source value.
+     * @return This value.
+     */
+    PmrSymbolValue &operator=(const PmrSymbolValue &other) = default;
+    /** Transfer storage when allocator identity permits; otherwise copy into this allocator.
+     * @param other Source value.
+     * @return This value.
+     */
+    PmrSymbolValue &operator=(PmrSymbolValue &&other) = default;
+};
+
+/** Allocator-aware symbol result; the explicit resource outlives every successful value. */
+struct PmrSymbolResult {
+    std::optional<PmrSymbolValue> value; ///< Independent successful symbol, absent on failure.
+    std::size_t consumed;                ///< Exact examined input bytes.
+    SymbolStatus status;                 ///< Primitive, profile, work or allocation result.
+};
+
+/** Message-local symbol decoder sharing the ordinary grammar with explicit allocation. */
+class PmrSymbolReader {
+    SymbolLimits limits_;                    ///< Required primitive budgets.
+    std::pmr::memory_resource *resource_;    ///< Borrowed allocator, outliving reader and all results.
+    std::optional<PmrSymbolValue> previous_; ///< Message-local previous exact symbol.
+    std::int32_t mruFlags_ = 1;              ///< Message-local MRU flags.
+    SymbolStatus state_ = SymbolStatus::OK;  ///< Terminal until beginMessage after failure.
+
+    public:
+    /** Initialize message-local state without allocating.
+     * @param limits Required finite primitive bounds.
+     * @param optionMask Zero or history-snapshot bit one.
+     * @param resource Explicit allocator which outlives this reader and all results.
+     */
+    PmrSymbolReader(SymbolLimits limits, std::uint32_t optionMask, std::pmr::memory_resource &resource) noexcept;
+    /** Start fresh message-local previous-symbol and flags state.
+     * @param optionMask Zero or history-snapshot bit one.
+     * @return OK for the selected sets, otherwise UNSUPPORTED_PROFILE.
+     */
+    [[nodiscard]] SymbolStatus beginMessage(std::uint32_t optionMask) noexcept;
+    /** Decode through the ordinary shared symbol grammar using explicit allocation.
+     * @param input Borrowed remaining message payload, never retained.
+     * @return Exact owned symbol or failure; custom resource exceptions propagate.
+     */
+    [[nodiscard]] PmrSymbolResult read(std::span<const std::byte> input);
 };
 
 /** Single-threaded message-local reader, independent of schema, framing and transport.

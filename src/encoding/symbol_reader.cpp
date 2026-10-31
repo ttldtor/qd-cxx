@@ -12,6 +12,7 @@
 #include <bit>
 #include <new>
 #include <stdexcept>
+#include <type_traits>
 #include <utility>
 
 namespace org::ttldtor::qdcxx::encoding {
@@ -118,9 +119,23 @@ SymbolStatus SymbolReader::beginMessage(std::uint32_t optionMask) noexcept {
     return state_;
 }
 
-SymbolResult SymbolReader::read(std::span<const std::byte> input) {
-    if (state_ != SymbolStatus::OK) {
-        return {std::nullopt, 0, state_};
+namespace {
+/** Decode the shared symbol grammar with allocator-preserving owned value types.
+ * @tparam Value Ordinary or explicit-resource symbol owner.
+ * @tparam Result Corresponding complete primitive result.
+ * @param input Borrowed remaining message payload.
+ * @param limits Finite primitive bounds.
+ * @param previous Message-local previous symbol, published only on success.
+ * @param mruFlags Message-local MRU flags, published only on success.
+ * @param state Terminal state updated on failure.
+ * @param value Empty symbol carrying the selected allocator.
+ * @return Owned complete symbol or exact failure with no partial current value.
+ */
+template <typename Value, typename Result>
+Result readSymbol(std::span<const std::byte> input, SymbolLimits limits, std::optional<Value> &previous,
+                  std::int32_t &mruFlags, SymbolStatus &state, Value value) {
+    if (state != SymbolStatus::OK) {
+        return {std::nullopt, 0, state};
     }
 
     std::size_t position = 0;
@@ -128,20 +143,25 @@ SymbolResult SymbolReader::read(std::span<const std::byte> input) {
      * @param status Error to report for this call.
      * @return Failure result at the current committed examination position.
      */
-    const auto fail = [&](SymbolStatus status) -> SymbolResult {
-        state_ = SymbolStatus::FAILED;
+    const auto fail = [&](SymbolStatus status) -> Result {
+        state = SymbolStatus::FAILED;
 
         return {std::nullopt, position, status};
     };
 
-    if (input.size() > limits_.inputBytes) {
+    if (input.size() > limits.inputBytes) {
         return fail(SymbolStatus::RESOURCE_LIMIT);
     }
 
-    const auto unitLimit = std::min(limits_.codeUnits, limits_.stateUnits);
-    SymbolValue value{{}, 0, 0, 0};
-    auto nextMru = mruFlags_;
+    const auto unitLimit = std::min(limits.codeUnits, limits.stateUnits);
+    auto nextMru = mruFlags;
     try {
+        if constexpr (std::is_same_v<Value, PmrSymbolValue>) {
+            constexpr std::size_t MAX_PENTA_UNITS = 35 / GROUP_BITS;
+            const auto previousUnits = previous ? previous->units.size() : 0;
+            value.units.reserve(std::min(unitLimit, std::max({input.size(), previousUnits, MAX_PENTA_UNITS})));
+        }
+
         unsigned prefix;
 
         while (true) {
@@ -181,16 +201,16 @@ SymbolResult SymbolReader::read(std::span<const std::byte> input) {
         }
 
         if (prefix == REPEAT) {
-            if (!previous_) {
+            if (!previous) {
                 return fail(SymbolStatus::INVALID_ENCODING);
             }
 
-            if (previous_->units.size() > unitLimit) {
+            if (previous->units.size() > unitLimit) {
                 return fail(SymbolStatus::RESOURCE_LIMIT);
             }
 
-            value.units = previous_->units;
-            value.cipher = previous_->cipher;
+            value.units = previous->units;
+            value.cipher = previous->cipher;
         } else if (prefix == UTF_BYTES || prefix == CESU_UNITS) {
             const auto lengthStart = position;
             const auto length = readCompactLong(input.subspan(position));
@@ -207,12 +227,19 @@ SymbolResult SymbolReader::read(std::span<const std::byte> input) {
             const auto count = static_cast<std::uint64_t>(length.value);
 
             if (prefix == UTF_BYTES) {
-                if (count > limits_.inputBytes) {
+                if (count > limits.inputBytes) {
                     return fail(SymbolStatus::RESOURCE_LIMIT);
                 }
 
                 position = lengthStart; // A throwing delegated primitive does not commit its examination.
-                auto decoded = readUtfString(input.subspan(lengthStart), {limits_.inputBytes, unitLimit});
+                auto decoded = [&] {
+                    if constexpr (std::is_same_v<Value, SymbolValue>) {
+                        return readUtfString(input.subspan(lengthStart), {limits.inputBytes, unitLimit});
+                    } else {
+                        return readUtfString(input.subspan(lengthStart), {limits.inputBytes, unitLimit},
+                                             *value.units.get_allocator().resource());
+                    }
+                }();
                 position += decoded.consumed;
 
                 if (decoded.status != Status::OK) {
@@ -300,9 +327,9 @@ SymbolResult SymbolReader::read(std::span<const std::byte> input) {
         }
 
         // Copy before publishing: if it throws, previous state remains intact and the message fails.
-        SymbolResult result{value, position, SymbolStatus::OK};
-        previous_ = std::move(value);
-        mruFlags_ = nextMru;
+        Result result{value, position, SymbolStatus::OK};
+        previous = std::move(value);
+        mruFlags = nextMru;
 
         return result;
     } catch (const std::bad_alloc &) {
@@ -310,5 +337,30 @@ SymbolResult SymbolReader::read(std::span<const std::byte> input) {
     } catch (const std::length_error &) {
         return fail(SymbolStatus::ALLOCATION_FAILURE);
     }
+}
+} // namespace
+
+SymbolResult SymbolReader::read(std::span<const std::byte> input) {
+    return readSymbol<SymbolValue, SymbolResult>(input, limits_, previous_, mruFlags_, state_, {{}, 0, 0, 0});
+}
+
+PmrSymbolReader::PmrSymbolReader(SymbolLimits limits, std::uint32_t optionMask,
+                                 std::pmr::memory_resource &resource) noexcept
+    : limits_(limits), resource_(&resource) {
+    (void)beginMessage(optionMask);
+}
+
+SymbolStatus PmrSymbolReader::beginMessage(std::uint32_t optionMask) noexcept {
+    previous_.reset();
+    mruFlags_ = 1;
+    constexpr std::uint32_t HISTORY_SNAPSHOT_OPTION_MASK = 1;
+    state_ = (optionMask & ~HISTORY_SNAPSHOT_OPTION_MASK) == 0 ? SymbolStatus::OK : SymbolStatus::UNSUPPORTED_PROFILE;
+
+    return state_;
+}
+
+PmrSymbolResult PmrSymbolReader::read(std::span<const std::byte> input) {
+    return readSymbol<PmrSymbolValue, PmrSymbolResult>(input, limits_, previous_, mruFlags_, state_,
+                                                       PmrSymbolValue{*resource_});
 }
 } // namespace org::ttldtor::qdcxx::encoding

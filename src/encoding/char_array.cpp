@@ -68,8 +68,17 @@ WriteResult writeCharArray(std::optional<std::u16string_view> value, std::span<s
     return {position, Status::OK};
 }
 
-CharArrayResult readCharArray(std::span<const std::byte> input, CharArrayLimits limits,
-                              CharArrayBoundary boundary) noexcept {
+namespace {
+/** Shared allocator-independent character-array grammar.
+ * @tparam String Explicit owned UTF-16 string type.
+ * @tparam Result Matching primitive result type.
+ * @param input Borrowed encoded bytes.
+ * @param limits Finite byte/unit limits.
+ * @param value Empty string carrying the selected allocator.
+ * @return Exact primitive outcome, never a partial failed string.
+ */
+template <typename String, typename Result>
+Result readArray(std::span<const std::byte> input, CharArrayLimits limits, CharArrayBoundary boundary, String value) {
     constexpr std::int64_t NULL_LENGTH = -1;
     constexpr std::int32_t MAX_BMP_UNIT = 0xffff;
     const auto bounded = input.first(std::min(input.size(), limits.encodedBytes));
@@ -101,7 +110,6 @@ CharArrayResult readCharArray(std::span<const std::byte> input, CharArrayLimits 
     }
 
     try {
-        std::u16string value;
         value.reserve(count);
 
         for (std::size_t index = 0; index < count; ++index) {
@@ -129,4 +137,15 @@ CharArrayResult readCharArray(std::span<const std::byte> input, CharArrayLimits 
     }
 }
 
+} // namespace
+
+CharArrayResult readCharArray(std::span<const std::byte> input, CharArrayLimits limits,
+                              CharArrayBoundary boundary) noexcept {
+    return readArray<std::u16string, CharArrayResult>(input, limits, boundary, {});
+}
+
+PmrCharArrayResult readCharArray(std::span<const std::byte> input, CharArrayLimits limits, CharArrayBoundary boundary,
+                                 std::pmr::memory_resource &resource) {
+    return readArray<std::pmr::u16string, PmrCharArrayResult>(input, limits, boundary, std::pmr::u16string{&resource});
+}
 } // namespace org::ttldtor::qdcxx::encoding

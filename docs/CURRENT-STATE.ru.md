@@ -9,10 +9,11 @@
 
 [Выбранный опциональный профиль runtime](decisions/ADR-0006-live-runtime.ru.md) имеет воспроизводимые
 [проверки реализуемости DNS/TCP/TLS](../tests/conformance/transport/VALIDATION.ru.md).
-Production-адаптеры transport/session/TLS/auth ещё не реализованы; эти тесты не добавляют live-подписки.
+Production-адаптеры transport/TLS/учётных данных ещё не реализованы; эти тесты не добавляют live-подписки.
 
 | Компонент | Поведение и контракт |
 | --- | --- |
+| Чистая live-сессия | Приём целого кадра, неизменяемые поколения другой стороны, управляющие сообщения протокола/heartbeat, readiness/auth gates и владеющий вывод: [контракт сессии](../spec/subscriptions/LIVE-SESSION.ru.md). Без сокетов, часов, коллекторов и клиента с переподключением. |
 | Вывод подписок | Шесть сообщений и явные описания, точные символы, владеющие хвосты частичной записи и квоты удержанного вывода: [live composer](../spec/subscriptions/WRITER.ru.md). Без socket/session/peer acknowledgement. |
 | Целевые подписки | Чистое ограниченное состояние, точные символы/schema identity, атомарные add/remove/replace/clear, revision и непереиспользуемые membership tokens: [API состояния](../spec/subscriptions/STATE.ru.md). Live client/collector/transport этой строкой не заявлены. |
 | Кодировки | Принимаемые формы compact int/long, точные nullable UTF-16 строки, владеющие символы, конечные бюджеты и терминальные ошибки: [примитивы](../spec/encoding/PRIMITIVES.ru.md), [UTFString](../spec/encoding/UTFSTRING.ru.md), [символы](../spec/encoding/SYMBOLS.ru.md). |

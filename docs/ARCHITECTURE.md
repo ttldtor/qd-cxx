@@ -52,6 +52,10 @@ the [subscription contracts](../spec/subscriptions/CONTRACTS.md) define its obse
 `qdcxx_core` owns deterministic identities, desired-interest maps and bounded atomic mutations.
 Live session/client/runtime layers own connection epochs, queues, callbacks, I/O and lifecycle.
 One logical serialization domain is selected for client dispatch.
+The [pure protocol session](../spec/subscriptions/LIVE-SESSION.md) owns a fresh epoch,
+immutable peer generations and whole admitted frames. Caller-supplied byte spans and work credits
+keep that layer independent of runtime, clocks and application callbacks. Its partial-write cursor
+does not acknowledge peer delivery.
 [ADR-0006](decisions/ADR-0006-live-runtime.md) selects an optional Asio/c-ares/OpenSSL profile,
 explicit SDK/bootstrap/trust requirements and its [feasibility boundary](../tests/conformance/transport/CONTRACTS.md).
 This is a design boundary, not a claim of existing runtime support or owner acceptance.

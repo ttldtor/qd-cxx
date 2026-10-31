@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: BSL-1.0
 
 #include "qd/protocol/describe_records.hpp"
+#include "live_decode.hpp"
 #include "qd/encoding/utf_char.hpp"
 #include "session_budget.hpp"
+#include <type_traits>
 
 #include <algorithm>
 #include <new>
@@ -73,14 +75,45 @@ MeasuredName measureName(std::span<const std::byte> input, encoding::UtfStringLi
     return result;
 }
 
-/** Call-local bounded walk, publishing only completed descriptions into its owning result. */
-class DescriptionReader {
+/** Call-local bounded walk, publishing only completed descriptions into its owning result.
+ * @tparam Pmr Whether every owned container uses the explicit allocation resource.
+ */
+template <bool Pmr> class DescriptionReader {
+    using String = std::conditional_t<Pmr, std::pmr::u16string, std::u16string>;
+    using Result = std::conditional_t<Pmr, detail::PmrDescriptionResult, DescriptionResult>;
+    using Record = std::conditional_t<Pmr, detail::PmrWireRecordDescription, WireRecordDescription>;
     std::span<const std::byte> payload_;
     DescriptionLimits limits_;
-    DescriptionResult result_{{}, DescriptionStatus::OK, DescriptionStage::PAYLOAD, 0, 0, encoding::Status::OK};
+    std::pmr::memory_resource *resource_; ///< Explicit allocator for the allocator-aware path.
+    Result result_;                       ///< Complete-prefix output using the selected allocator.
     std::size_t fields_{};
     std::size_t nameUnits_{};
     detail::SessionBudget *budget_ = nullptr; ///< Optional internal admission, never a user callback.
+
+    /** Initialize the corresponding complete-prefix result.
+     * @param resource Explicit allocator, required only for the allocator-aware specialization.
+     * @return Empty result with ordinary initial checkpoints.
+     */
+    static Result makeResult(std::pmr::memory_resource *resource) {
+        if constexpr (Pmr) {
+            return Result(*resource);
+        } else {
+            return {{}, DescriptionStatus::OK, DescriptionStage::PAYLOAD, 0, 0, encoding::Status::OK};
+        }
+    }
+
+    /** Adopt a parsed name and select the field-container allocator.
+     * @param id Peer directional identity.
+     * @param name Complete owned name.
+     * @return Empty-field current description using the selected allocator.
+     */
+    Record makeRecord(std::int32_t id, String name) {
+        if constexpr (Pmr) {
+            return Record(id, std::move(name), *resource_);
+        } else {
+            return {id, std::move(name), {}};
+        }
+    }
 
     /** Set a checkpoint before the next operation, clearing any prior primitive cause.
      * @param stage Next operation or validation checkpoint.
@@ -126,7 +159,7 @@ class DescriptionReader {
      * @param stage Name identity for diagnostics.
      * @return True on primitive success; false on bounded primitive error.
      */
-    bool name(std::optional<std::u16string> &value, DescriptionStage stage) {
+    bool name(std::optional<String> &value, DescriptionStage stage) {
         checkpoint(stage);
         const auto units = std::min(limits_.name.codeUnits, limits_.totalNameUnits - nameUnits_);
 
@@ -148,7 +181,14 @@ class DescriptionReader {
             }
         }
 
-        auto decoded = encoding::readUtfString(payload_.subspan(result_.consumed), {limits_.name.bodyBytes, units});
+        auto decoded = [&] {
+            if constexpr (Pmr) {
+                return encoding::readUtfString(payload_.subspan(result_.consumed), {limits_.name.bodyBytes, units},
+                                               *resource_);
+            } else {
+                return encoding::readUtfString(payload_.subspan(result_.consumed), {limits_.name.bodyBytes, units});
+            }
+        }();
         result_.consumed += decoded.consumed;
         result_.primitiveStatus = decoded.status;
 
@@ -182,7 +222,7 @@ class DescriptionReader {
         }
 
         std::int32_t id{}, count{};
-        std::optional<std::u16string> recordName;
+        std::optional<String> recordName;
 
         if (!integer(id, DescriptionStage::SENDER_ID) || !name(recordName, DescriptionStage::RECORD_NAME) ||
             !integer(count, DescriptionStage::FIELD_COUNT)) {
@@ -207,10 +247,14 @@ class DescriptionReader {
             return fail(DescriptionStatus::RESOURCE_LIMIT);
         }
 
-        WireRecordDescription pending{id, std::move(*recordName), {}};
+        Record pending = makeRecord(id, std::move(*recordName));
+
+        if constexpr (Pmr) {
+            pending.fields.reserve(fieldCount);
+        }
 
         for (std::size_t i = 0; i < fieldCount; ++i) {
-            std::optional<std::u16string> fieldName;
+            std::optional<String> fieldName;
             std::int32_t type{};
 
             if (!name(fieldName, DescriptionStage::FIELD_NAME) || !integer(type, DescriptionStage::FIELD_TYPE)) {
@@ -237,21 +281,26 @@ class DescriptionReader {
      * @param payload Borrowed complete payload.
      * @param limits Logical element budgets.
      * @param budget Optional internal peak/work ledger; absent preserves ordinary parser behavior.
+     * @param resource Explicit allocator for the allocator-aware specialization; otherwise unused.
      */
     DescriptionReader(std::span<const std::byte> payload, DescriptionLimits limits,
-                      detail::SessionBudget *budget = nullptr)
-        : payload_(payload), limits_(limits), budget_(budget) {
+                      detail::SessionBudget *budget = nullptr, std::pmr::memory_resource *resource = nullptr)
+        : payload_(payload), limits_(limits), resource_(resource), result_(makeResult(resource)), budget_(budget) {
     }
 
     /** Execute once, catching allocation errors before returning the owned completed prefix.
      * @return Result with exact committed examination positions and first error.
      */
-    DescriptionResult read() {
+    Result read() {
         try {
             if (payload_.size() > limits_.payloadBytes) {
                 fail(DescriptionStatus::RESOURCE_LIMIT);
 
                 return std::move(result_);
+            }
+
+            if constexpr (Pmr) {
+                result_.descriptions.reserve(std::min(limits_.descriptions, payload_.size()));
             }
 
             while (result_.consumed < payload_.size()) {
@@ -273,12 +322,16 @@ class DescriptionReader {
 } // namespace
 
 DescriptionResult parseDescribeRecords(std::span<const std::byte> payload, DescriptionLimits limits) {
-    return DescriptionReader(payload, limits).read();
+    return DescriptionReader<false>(payload, limits).read();
 }
 
 DescriptionResult detail::parseSessionDescriptions(std::span<const std::byte> payload, DescriptionLimits limits,
                                                    SessionBudget &budget) {
-    return DescriptionReader(payload, limits, &budget).read();
+    return DescriptionReader<false>(payload, limits, &budget).read();
 }
 
+detail::PmrDescriptionResult detail::parsePmrDescriptions(std::span<const std::byte> payload, DescriptionLimits limits,
+                                                          std::pmr::memory_resource &resource) {
+    return DescriptionReader<true>(payload, limits, nullptr, &resource).read();
+}
 } // namespace org::ttldtor::qdcxx::protocol

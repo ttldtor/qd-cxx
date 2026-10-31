@@ -5,6 +5,7 @@
 
 #include "qd/encoding/compact.hpp"
 
+#include <memory_resource>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -24,6 +25,13 @@ struct UtfStringResult {
     Status status;                       ///< Wire, input or operational-budget outcome.
 };
 
+/** Allocator-aware UTFString ownership; the resource must outlive the value. */
+struct PmrUtfStringResult {
+    std::optional<std::pmr::u16string> value; ///< Exact owned text or Java null on success.
+    std::size_t consumed;                     ///< Examined bytes, including failures.
+    Status status;                            ///< Primitive or finite-budget outcome.
+};
+
 /** Read Java UTFString, preserving raw UTF-16 units and measured noncanonical forms.
  * May read past the declared body before detecting an overrun, but never past input.
  * No normalization, repair or rollback. Allocation may throw std::bad_alloc/std::length_error;
@@ -33,6 +41,15 @@ struct UtfStringResult {
  * @return Owning value/null on OK; otherwise no value, with examined byte count and error category.
  */
 [[nodiscard]] UtfStringResult readUtfString(std::span<const std::byte> input, UtfStringLimits limits);
+
+/** Decode through the same UTFString grammar using explicit caller-owned allocation.
+ * @param input Borrowed remaining input, never retained.
+ * @param limits Required finite byte/unit allowances.
+ * @param resource Allocator which must outlive the returned value; no default-resource fallback occurs.
+ * @return Exact owning value/null or failure without partial value; allocator exceptions propagate.
+ */
+[[nodiscard]] PmrUtfStringResult readUtfString(std::span<const std::byte> input, UtfStringLimits limits,
+                                               std::pmr::memory_resource &resource);
 
 /** Write canonical Java UTFString with size/capacity preflight and no allocation.
  * Input units and output storage must not overlap and must remain valid during the call.

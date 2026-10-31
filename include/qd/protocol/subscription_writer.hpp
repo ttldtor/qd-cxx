@@ -112,6 +112,11 @@ class SubscriptionWriter {
     std::vector<OutgoingRecord> records_;
     SubscriptionWriterLimits limits_;
     std::shared_ptr<PendingSubscriptionOutput::Budget> budget_;
+    std::size_t storageBytes_ = 0; ///< Immutable actual-capacity total, cached before the composer is published.
+    /** Measure adopted immutable configuration once, after its construction work is charged.
+     * @return Conservative backing and fixed metadata bytes, excluding pending byte arrays.
+     */
+    [[nodiscard]] std::size_t measureStorageBytes() const noexcept;
     /** Adopt independently owned validated metadata.
      * @param schema Bounded schema copy preserving provenance.
      * @param records Bounded complete outgoing layouts.
@@ -171,6 +176,23 @@ class SubscriptionWriter {
      * @return Aggregate backing bytes, or zero for a moved-from composer.
      */
     [[nodiscard]] std::size_t retainedBytes() const noexcept;
+
+    /** Inspect cached configuration backing in constant time, including capacities and fixed metadata.
+     * Shared schema provenance and inline string capacity may be counted more than once.
+     * @return Configuration bytes excluding pending byte arrays; zero for a moved-from composer.
+     */
+    [[nodiscard]] std::size_t storageBytes() const noexcept;
+
+    /** Validate immutable provenance before transferring this composer into a session.
+     * @param schema Schema supplying the expected local identity.
+     * @return True for a usable composer retaining this exact schema provenance.
+     */
+    [[nodiscard]] bool matchesSchema(const core::LocalSchema &schema) const noexcept;
+
+    /** Inspect the finite maximum whole-envelope allocation for one operation.
+     * @return Configured per-operation byte limit; zero for a moved-from composer.
+     */
+    [[nodiscard]] std::size_t maximumOutputBytes() const noexcept;
 };
 
 } // namespace org::ttldtor::qdcxx::protocol

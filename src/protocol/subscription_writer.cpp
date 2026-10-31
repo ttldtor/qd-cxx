@@ -16,6 +16,68 @@
 
 namespace org::ttldtor::qdcxx::protocol {
 namespace {
+/** Record the actual allocator request used by shared output credits.
+ * @tparam T Rebound allocation element selected by allocate_shared.
+ */
+template <typename T> struct CreditAllocator {
+    using value_type = T;   ///< Standard allocator element type.
+    std::size_t *requested; ///< Construction-local request counter; never read during deallocation.
+
+    /** Bind the construction-local counter.
+     * @param bytes Counter which outlives allocation, but need not outlive deallocation.
+     */
+    explicit CreditAllocator(std::size_t &bytes) noexcept : requested(&bytes) {
+    }
+
+    /** Preserve the counter across allocator rebinding.
+     * @tparam U Source allocation element.
+     * @param other Allocator rebound by allocate_shared.
+     */
+    template <typename U> CreditAllocator(const CreditAllocator<U> &other) noexcept : requested(other.requested) {
+    }
+
+    /** Allocate exact requested element backing and record successful requests.
+     * @param count Requested elements.
+     * @return Allocated storage; failure propagates as bad_alloc.
+     */
+    T *allocate(std::size_t count) {
+        if (count > std::numeric_limits<std::size_t>::max() / sizeof(T)) {
+            throw std::bad_alloc{};
+        }
+
+        const auto bytes = count * sizeof(T);
+
+        if (bytes > std::numeric_limits<std::size_t>::max() - *requested) {
+            throw std::bad_alloc{};
+        }
+
+        auto *result = static_cast<T *>(::operator new(bytes));
+        *requested += bytes;
+
+        return result;
+    }
+
+    /** Release backing without touching the construction-local counter.
+     * @param pointer Allocated storage.
+     * @param count Original element request.
+     */
+    void deallocate(T *pointer, std::size_t count) noexcept {
+        static_cast<void>(count);
+        ::operator delete(pointer);
+    }
+
+    /** Compare interchangeable allocation ownership.
+     * @tparam U Rebound allocator element.
+     * @param other Allocator to compare.
+     * @return True; all instances use ordinary operator new/delete.
+     */
+    template <typename U> bool operator==(const CreditAllocator<U> &other) const noexcept {
+        static_cast<void>(other);
+
+        return true;
+    }
+};
+
 using Error = SubscriptionWriterError;
 constexpr std::size_t COMPACT_BYTES = 9;
 constexpr std::size_t MAX_WIRE_COUNT = static_cast<std::size_t>(std::numeric_limits<std::int32_t>::max());
@@ -117,8 +179,9 @@ void checkSchema(const core::LocalSchema &schema, core::SchemaLimits limits, Sub
 
 /** One fixed-size accounting owner shared by the composer and all of its outputs. */
 struct PendingSubscriptionOutput::Budget {
-    std::size_t retained = 0; ///< Exact byte-array slots currently owned by outputs.
-    std::size_t outputs = 0;  ///< Live output owners, including a reserved candidate.
+    std::size_t retained = 0;        ///< Exact byte-array slots currently owned by outputs.
+    std::size_t outputs = 0;         ///< Live output owners, including a reserved candidate.
+    std::size_t allocationBytes = 0; ///< Actual shared credit allocator request including control metadata.
 };
 
 PendingSubscriptionOutput::PendingSubscriptionOutput(std::shared_ptr<Budget> budget, std::unique_ptr<std::byte[]> bytes,
@@ -176,6 +239,7 @@ SubscriptionWriter::SubscriptionWriter(core::LocalSchema schema, std::vector<Out
                                        SubscriptionWriterLimits limits,
                                        std::shared_ptr<PendingSubscriptionOutput::Budget> budget)
     : schema_(std::move(schema)), records_(std::move(records)), limits_(limits), budget_(std::move(budget)) {
+    storageBytes_ = measureStorageBytes();
 }
 
 std::expected<SubscriptionWriter, Error>
@@ -280,7 +344,14 @@ SubscriptionWriter::create(const core::LocalSchema &schema, std::span<const Outg
         }
 
         std::vector<OutgoingRecord> owned(records.begin(), records.end());
-        auto budget = std::make_shared<PendingSubscriptionOutput::Budget>();
+        std::size_t creditBytes = 0;
+        auto budget = std::allocate_shared<PendingSubscriptionOutput::Budget>(
+            CreditAllocator<PendingSubscriptionOutput::Budget>{creditBytes});
+        budget->allocationBytes = creditBytes;
+
+        // Cache actual adopted capacities in one additional bounded metadata pass.
+        debit(records.size(), work.visits);
+        debit(fields, work.visits);
 
         return SubscriptionWriter(std::move(*ownedSchema), std::move(owned), limits, std::move(budget));
     } catch (Error error) {
@@ -598,6 +669,43 @@ std::expected<PendingSubscriptionOutput, Error> SubscriptionWriter::describe(std
 
 std::size_t SubscriptionWriter::retainedBytes() const noexcept {
     return budget_ ? budget_->retained : 0;
+}
+
+std::size_t SubscriptionWriter::measureStorageBytes() const noexcept {
+    std::size_t bytes = sizeof(SubscriptionWriter);
+    /** Saturate conservative aggregate ownership instead of wrapping a requested-capacity total.
+     * @param amount Additional actual capacity or fixed metadata bytes.
+     */
+    const auto add = [&](std::size_t amount) {
+        const auto maximum = std::numeric_limits<std::size_t>::max();
+        bytes = amount > maximum - bytes ? maximum : bytes + amount;
+    };
+    add(schema_.storageBytes());
+    add(records_.capacity() * sizeof(OutgoingRecord));
+    add(budget_ ? budget_->allocationBytes : 0);
+
+    for (const auto &record : records_) {
+        add((record.wireName.capacity() + 1) * sizeof(char16_t));
+        add(record.fields.capacity() * sizeof(OutgoingField));
+
+        for (const auto &field : record.fields) {
+            add((field.wireName.capacity() + 1) * sizeof(char16_t));
+        }
+    }
+
+    return bytes;
+}
+
+std::size_t SubscriptionWriter::storageBytes() const noexcept {
+    return budget_ ? storageBytes_ : 0;
+}
+
+bool SubscriptionWriter::matchesSchema(const core::LocalSchema &schema) const noexcept {
+    return budget_ && schema_.sharesIdentityWith(schema);
+}
+
+std::size_t SubscriptionWriter::maximumOutputBytes() const noexcept {
+    return budget_ ? limits_.operationBytes : 0;
 }
 
 } // namespace org::ttldtor::qdcxx::protocol

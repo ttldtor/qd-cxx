@@ -6,8 +6,10 @@
 #include "compact_limits.hpp"
 #include "qd/encoding/utf_char.hpp"
 
+#include <algorithm>
 #include <array>
 #include <limits>
+#include <type_traits>
 #include <utility>
 
 namespace org::ttldtor::qdcxx::encoding {
@@ -75,7 +77,17 @@ std::size_t characterSize(std::uint32_t point) noexcept {
 }
 } // namespace
 
-UtfStringResult readUtfString(std::span<const std::byte> input, UtfStringLimits limits) {
+namespace {
+/** Shared allocator-independent UTFString grammar.
+ * @tparam String Explicit owned UTF-16 string type.
+ * @tparam Result Matching primitive result type.
+ * @param input Borrowed encoded bytes.
+ * @param limits Finite byte/unit limits.
+ * @param value Empty string carrying the selected allocator.
+ * @return Exact primitive outcome, never a partial failed string.
+ */
+template <typename String, typename Result>
+Result readText(std::span<const std::byte> input, UtfStringLimits limits, String value) {
     const auto prefix = readCompactLong(input);
     auto position = prefix.consumed;
 
@@ -96,7 +108,14 @@ UtfStringResult readUtfString(std::span<const std::byte> input, UtfStringLimits 
     }
 
     auto remaining = prefix.value;
-    std::u16string value;
+
+    if constexpr (std::is_same_v<String, std::pmr::u16string>) {
+        // A final supplementary overrun can append one extra unit before invalid-body classification.
+        const auto bodyUnits = static_cast<std::uint64_t>(prefix.value) + 1;
+        const auto reserved = std::min(
+            {bodyUnits, static_cast<std::uint64_t>(limits.codeUnits), static_cast<std::uint64_t>(input.size())});
+        value.reserve(static_cast<std::size_t>(reserved));
+    }
 
     while (remaining > 0) {
         // The complete available remainder preserves full-tail consumption past the declared body.
@@ -131,6 +150,17 @@ UtfStringResult readUtfString(std::span<const std::byte> input, UtfStringLimits 
     }
 
     return {std::move(value), position, Status::OK};
+}
+
+} // namespace
+
+UtfStringResult readUtfString(std::span<const std::byte> input, UtfStringLimits limits) {
+    return readText<std::u16string, UtfStringResult>(input, limits, {});
+}
+
+PmrUtfStringResult readUtfString(std::span<const std::byte> input, UtfStringLimits limits,
+                                 std::pmr::memory_resource &resource) {
+    return readText<std::pmr::u16string, PmrUtfStringResult>(input, limits, std::pmr::u16string{&resource});
 }
 
 WriteResult writeUtfString(std::optional<std::u16string_view> value, std::span<std::byte> output,

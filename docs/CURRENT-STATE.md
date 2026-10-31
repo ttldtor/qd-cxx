@@ -9,10 +9,11 @@ The project implements selected bounded profiles against Java QD 3.355 at the re
 
 The [selected optional runtime profile](decisions/ADR-0006-live-runtime.md) has reproducible
 [DNS/TCP/TLS feasibility tests](../tests/conformance/transport/VALIDATION.md).
-Production transport/session/TLS/auth adapters remain unimplemented; these tests do not add live subscriptions.
+Production transport/TLS/credential adapters remain unimplemented; these tests do not add live subscriptions.
 
 | Component | Behavior and contract |
 | --- | --- |
+| Pure live session | Whole-frame admission, immutable peer generations, protocol/heartbeat controls, readiness/auth gates and owned output: [session contract](../spec/subscriptions/LIVE-SESSION.md). No sockets, clocks, collectors or reconnecting client. |
 | Subscription output | Six messages and explicit descriptions, exact symbols, owned partial-write suffixes and retained-output quotas: [live composer](../spec/subscriptions/WRITER.md). No socket/session/peer acknowledgement. |
 | Desired subscriptions | Pure bounded state, exact symbols/schema identity, atomic add/remove/replace/clear, revisions and non-reused membership tokens: [state API](../spec/subscriptions/STATE.md). No live client/collector/transport follows from this row. |
 | Encoding | Compact int/long acceptance, exact nullable UTF-16 strings, owned symbols, finite budgets and terminal errors: [primitives](../spec/encoding/PRIMITIVES.md), [UTFString](../spec/encoding/UTFSTRING.md), [symbols](../spec/encoding/SYMBOLS.md). |

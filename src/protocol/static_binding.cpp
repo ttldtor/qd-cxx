@@ -3,11 +3,13 @@
 
 #include "qd/protocol/static_binding.hpp"
 #include "field_time_binding.hpp"
+#include "live_decode.hpp"
 
 #include "qd/core/serial_field_type.hpp"
 
 #include <new>
 #include <stdexcept>
+#include <type_traits>
 #include <utility>
 
 namespace org::ttldtor::qdcxx::protocol {
@@ -17,10 +19,20 @@ std::expected<RecordBinding, BindingError> bindRecord(const WireRecordDescriptio
     return detail::bindRecordWithPrefix(description, schema, limits, 0);
 }
 
-std::expected<RecordBinding, BindingError> detail::bindRecordWithPrefix(const WireRecordDescription &description,
-                                                                        const core::LocalSchema &schema,
-                                                                        BindingLimits limits,
-                                                                        std::size_t prefixFields) {
+namespace {
+/** Shared exact-type binding algorithm, independent of the action-container allocator.
+ * @tparam Description Complete ordinary or explicit-resource description.
+ * @tparam Plan Corresponding owned binding type.
+ * @param description Borrowed complete sender description.
+ * @param schema Immutable local schema.
+ * @param limits Finite name/action allowances.
+ * @param prefixFields Physical prefix which takes precedence over local field lookup.
+ * @param plan Empty action owner carrying the selected allocator.
+ * @return Complete owned plan or ordinary first binding failure.
+ */
+template <typename Description, typename Plan>
+std::expected<Plan, BindingError> bindDescription(const Description &description, const core::LocalSchema &schema,
+                                                  BindingLimits limits, std::size_t prefixFields, Plan plan) {
     if (description.fields.size() > limits.fields) {
         return std::unexpected(BindingError::RESOURCE_LIMIT);
     }
@@ -54,14 +66,16 @@ std::expected<RecordBinding, BindingError> detail::bindRecordWithPrefix(const Wi
     const core::LocalRecord *local = nullptr;
 
     for (const auto &record : schema.records()) {
-        if (record.name == description.name) {
+        if (std::u16string_view(record.name) == std::u16string_view(description.name)) {
             local = &record;
             break;
         }
     }
 
     try {
-        RecordBinding plan{description.senderId, std::nullopt, {}};
+        if constexpr (std::is_same_v<Plan, detail::PmrRecordBinding>) {
+            plan.fields.reserve(description.fields.size());
+        }
 
         if (local != nullptr) {
             plan.localRecordId = local->id;
@@ -74,7 +88,7 @@ std::expected<RecordBinding, BindingError> detail::bindRecordWithPrefix(const Wi
 
             if (local != nullptr && position >= prefixFields) {
                 for (const auto &key : local->lookups) {
-                    if (key.name == field.name) {
+                    if (std::u16string_view(key.name) == std::u16string_view(field.name)) {
                         if (local->fields[key.fieldId].serialTypeId != field.serialTypeId) {
                             return std::unexpected(BindingError::UNSUPPORTED_PROFILE);
                         }
@@ -97,4 +111,18 @@ std::expected<RecordBinding, BindingError> detail::bindRecordWithPrefix(const Wi
     }
 }
 
+} // namespace
+
+std::expected<RecordBinding, BindingError> detail::bindRecordWithPrefix(const WireRecordDescription &description,
+                                                                        const core::LocalSchema &schema,
+                                                                        BindingLimits limits,
+                                                                        std::size_t prefixFields) {
+    return bindDescription(description, schema, limits, prefixFields, RecordBinding{description.senderId, {}, {}});
+}
+
+std::expected<detail::PmrRecordBinding, BindingError>
+detail::bindPmrRecord(const PmrWireRecordDescription &description, const core::LocalSchema &schema,
+                      BindingLimits limits, std::size_t prefixFields, std::pmr::memory_resource &resource) {
+    return bindDescription(description, schema, limits, prefixFields, PmrRecordBinding{description.senderId, resource});
+}
 } // namespace org::ttldtor::qdcxx::protocol

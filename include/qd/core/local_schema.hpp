@@ -101,6 +101,12 @@ class LocalSchema {
     std::vector<LocalRecord> records_;
     LocalProfile profile_;
     std::shared_ptr<const RecordContext::Identity> identity_;
+    std::size_t storageBytes_ = 0; ///< Immutable conservative capacity total, refreshed for each owned copy.
+
+    /** Measure actual owned capacities after construction/copy without allocating.
+     * @return Conservative backing/metadata bytes, saturated on arithmetic overflow.
+     */
+    [[nodiscard]] std::size_t measureStorageBytes() const noexcept;
 
     /** Copy a fully validated input.
      * @param records Borrowed validated records, copied into this object.
@@ -109,6 +115,24 @@ class LocalSchema {
     explicit LocalSchema(std::span<const LocalRecord> records, LocalProfile profile);
 
     public:
+    /** Copy declarations and recompute their actual new capacities, preserving provenance.
+     * @param other Immutable source schema, borrowed during the copy.
+     */
+    LocalSchema(const LocalSchema &other);
+    /** Transfer declarations and cached accounting without allocating.
+     * @param other Source schema, left with invalid provenance and fixed-object accounting.
+     */
+    LocalSchema(LocalSchema &&other) noexcept;
+    /** Publish a fully constructed independent declaration copy.
+     * @param other Immutable source; allocation failure leaves this schema unchanged.
+     * @return This schema, retaining the source provenance on success.
+     */
+    LocalSchema &operator=(const LocalSchema &other);
+    /** Release old declarations and transfer complete ownership/accounting.
+     * @param other Source schema; self-move preserves state.
+     * @return This schema; the source retains only fixed-object accounting.
+     */
+    LocalSchema &operator=(LocalSchema &&other) noexcept;
     /** Validate all input before publishing an owned schema.
      * @param records Borrowed input, unchanged during the call; may be empty.
      * @param limits Required logical-element bounds, including zero.
@@ -124,6 +148,20 @@ class LocalSchema {
      * @return Independent owned declarations with the same identity, or resource/allocation error.
      */
     [[nodiscard]] std::expected<LocalSchema, SchemaError> boundedCopy(SchemaLimits limits) const;
+
+    /** Inspect cached conservative backing and fixed metadata in constant time without allocating.
+     * Inline string capacity is included conservatively; shared provenance is counted in each owner.
+     * Allocator bookkeeping outside allocation requests and caller-created independent copies are excluded.
+     * @return Bytes held by this schema, including capacity beyond current logical sizes; fixed-object size when moved
+     * from.
+     */
+    [[nodiscard]] std::size_t storageBytes() const noexcept;
+
+    /** Compare immutable schema provenance, including for empty schemas.
+     * @param other Schema whose identity is compared without examining declarations.
+     * @return True only for the same valid provenance; moved-from schemas never match.
+     */
+    [[nodiscard]] bool sharesIdentityWith(const LocalSchema &other) const noexcept;
 
     /** Obtain owned provenance for manually supplied or decoded local values.
      * @param localId Explicit record position in this schema.

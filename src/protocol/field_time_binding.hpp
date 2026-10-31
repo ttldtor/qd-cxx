@@ -6,10 +6,11 @@
 
 namespace org::ttldtor::qdcxx::protocol::detail {
 /** Count the exact raw metadata prefix before zero-width VOID elision.
+ * @tparam Description Ordinary or explicit-resource physical description.
  * @param description Borrowed physical sender declaration.
  * @return Zero, one or two recognized fields.
  */
-inline std::size_t eventTimeFieldCount(const WireRecordDescription &description) noexcept {
+template <typename Description> inline std::size_t eventTimeFieldCount(const Description &description) noexcept {
     if (description.fields.empty() || description.fields[0].name != u"EventTime" ||
         description.fields[0].serialTypeId != 56) {
         return 0;
@@ -22,10 +23,11 @@ inline std::size_t eventTimeFieldCount(const WireRecordDescription &description)
 }
 
 /** Find the exclusive physical action bound of leading effective Event fields.
+ * @tparam Description Ordinary or explicit-resource physical description.
  * @param description Borrowed declaration, including explicit zero-width VOID actions.
  * @return Action position before the first non-VOID ordinary field, or the full action count.
  */
-inline std::size_t removalPrefixFieldCount(const WireRecordDescription &description) noexcept {
+template <typename Description> inline std::size_t removalPrefixFieldCount(const Description &description) noexcept {
     for (std::size_t index = 0; index < description.fields.size(); ++index) {
         const auto &field = description.fields[index];
 
