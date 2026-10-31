@@ -779,3 +779,34 @@ Existing destinations are refused; no overwrite or rename fallback is used. See 
 ## Bounded MUX interest API (QDCXX-066)
 
 The installed `qdcxx_mux` target links to `qdcxx_core`; include `qd/mux/interest.hpp`. It is a pure desired-interest component with no new SDK dependency. The build target and executable are named `qdcxx_mux_interest_tests`; the CTest name is `mux_interest`. See the [interest contract](../spec/mux/INTERESTS.md) and [validation](../tests/conformance/subscriptions/MUX-VALIDATION.md).
+
+<a id="mux-delivery-queues"></a>
+
+## Local MUX delivery queues
+
+`ORG_TTLDTOR_QDCXX_BUILD_CLIENT=ON` also builds/installs `qdcxx_mux_queue` and
+`qd/mux/queue.hpp`. The target links `qdcxx_mux`, `qdcxx_collectors` and standard `Threads::Threads`;
+core C++23 usage requirements propagate to consumers. Runtime and JSON may remain OFF. CLIENT OFF
+omits this target/header and its Threads discovery; the existing pure `qdcxx_mux` stays available.
+The queue adds no networking SDK or background worker.
+
+Installed applications use `find_package(qdcxx CONFIG REQUIRED)` and link `qdcxx_mux_queue`.
+Use the existing install/relocation and `CMAKE_PREFIX_PATH`/`qdcxx_DIR` instructions above. The CTest
+name is `mux_queue`; its executable/target is `qdcxx_mux_queue_tests`. The
+[queue contract](../spec/mux/QUEUES.md) explains family factories, caller-supplied source admission,
+finite work and per-client reservations. The [validation section](../tests/conformance/subscriptions/MUX-VALIDATION.md#mux-queue-validation)
+separates queue-specific execution from historical pure-interest results and runtime integration.
+This component does not create a full wire subscription client or close external sockets.
+
+For a complete caller-owned main.cpp, the qualified installed consumer uses these CMake declarations.
+The [integration fragment](../spec/mux/QUEUES.md#compiled-stream-integration-example) requires the
+ready source/schema/input preamble described there; it supplies no standalone main.
+
+```cmake
+cmake_minimum_required(VERSION 3.25)
+project(mux_queue_consumer LANGUAGES CXX)
+find_package(qdcxx CONFIG REQUIRED)
+add_executable(mux_queue_consumer main.cpp)
+target_link_libraries(mux_queue_consumer PRIVATE qdcxx_mux_queue)
+set_target_properties(mux_queue_consumer PROPERTIES CXX_EXTENSIONS OFF)
+```

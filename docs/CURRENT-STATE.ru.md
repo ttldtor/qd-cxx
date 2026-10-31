@@ -130,3 +130,12 @@ parser pin. [Проверки](../tests/conformance/protocol/real-tape/VALIDATIO
 
 [Открытые вопросы upstream](upstream/OPEN-QUESTIONS.ru.md), [требования конфигурации](CONFIGURATION.ru.md),
 [политика совместимости](COMPATIBILITY.ru.md) и [план развития](NEXT-STEPS.ru.md) задают оставшиеся границы.
+
+## Локальная MUX delivery composition
+
+Необязательный CLIENT graph также предоставляет `qdcxx_mux_queue`: один настоящий MUX state и один
+настоящий STREAM/TICKER/HISTORY collector с конечным per-client command/control/delivery storage,
+callbacks и detached immutable leases. См. [контракт очередей](../spec/mux/QUEUES.ru.md) и
+[ограниченную валидацию](../tests/conformance/subscriptions/MUX-VALIDATION.ru.md#mux-queue-validation).
+Эта композиция отделена от чистого `qdcxx_mux`; wildcard, wire reconciliation, полный subscription
+facade, transport stop и новая Java HISTORY producer equivalence не добавлены.

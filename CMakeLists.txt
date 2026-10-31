@@ -89,6 +89,14 @@ if(ORG_TTLDTOR_QDCXX_BUILD_CLIENT)
         ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
         LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
         RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+    add_library(qdcxx_mux_queue src/mux/queue.cpp)
+    target_link_libraries(qdcxx_mux_queue PUBLIC qdcxx_mux qdcxx_collectors Threads::Threads)
+    set_target_properties(qdcxx_mux_queue PROPERTIES CXX_EXTENSIONS OFF)
+    install(TARGETS qdcxx_mux_queue EXPORT qdcxxTargets
+        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+    install(FILES include/qd/mux/queue.hpp DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qd/mux")
     install(DIRECTORY include/qd/client
         DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qd" FILES_MATCHING PATTERN "*.hpp")
 endif()
@@ -105,7 +113,7 @@ install(TARGETS qdcxx_encoding qdcxx_core qdcxx_protocol qdcxx_collectors qdcxx_
     LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 install(DIRECTORY include/qd/core include/qd/encoding include/qd/protocol include/qd/collectors include/qd/events include/qd/mux
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qd" FILES_MATCHING PATTERN "*.hpp")
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qd" FILES_MATCHING PATTERN "*.hpp" PATTERN "queue.hpp" EXCLUDE)
 install(FILES LICENSE DESTINATION "${CMAKE_INSTALL_DATADIR}/qdcxx/licenses" RENAME qdcxx-LICENSE.txt)
 configure_package_config_file(cmake/qdcxxConfig.cmake.in "${CMAKE_CURRENT_BINARY_DIR}/qdcxxConfig.cmake"
     INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/qdcxx"
@@ -365,6 +373,13 @@ if(BUILD_TESTING)
         set_target_properties(qdcxx_client_dispatch_tests PROPERTIES CXX_EXTENSIONS OFF)
         add_test(NAME client_dispatch COMMAND qdcxx_client_dispatch_tests)
         set_tests_properties(client_dispatch PROPERTIES TIMEOUT 120)
+        add_executable(qdcxx_mux_queue_tests tests/conformance/mux_queue_tests.cpp)
+        target_link_libraries(qdcxx_mux_queue_tests PRIVATE qdcxx_mux_queue qdcxx_quote qdcxx_profile doctest::doctest)
+        target_compile_definitions(qdcxx_mux_queue_tests PRIVATE "ORG_TTLDTOR_QDCXX_MUX_QUEUE_SOURCE_ROOT=\"${CMAKE_CURRENT_SOURCE_DIR}\"")
+        target_compile_definitions(qdcxx_mux_queue_tests PRIVATE "ORG_TTLDTOR_QDCXX_MUX_QUEUE_OBSERVATIONS=\"${CMAKE_CURRENT_BINARY_DIR}/mux-queue-native\"")
+        set_target_properties(qdcxx_mux_queue_tests PROPERTIES CXX_EXTENSIONS OFF)
+        add_test(NAME mux_queue COMMAND qdcxx_mux_queue_tests)
+        set_tests_properties(mux_queue PROPERTIES TIMEOUT 120)
     endif()
     if(TARGET qdcxx_inspect_tool)
         add_executable(qdcxx_source_format_tests tests/conformance/source_format_tests.cpp)

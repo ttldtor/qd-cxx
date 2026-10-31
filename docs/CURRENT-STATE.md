@@ -126,3 +126,12 @@ source/artifact qualification; final integration results are recorded separately
 
 [Open upstream questions](upstream/OPEN-QUESTIONS.md), [configuration requirements](CONFIGURATION.md),
 [compatibility policy](COMPATIBILITY.md) and [roadmap](NEXT-STEPS.md) define the remaining boundaries.
+
+## Local MUX delivery composition
+
+The optional CLIENT graph also exposes `qdcxx_mux_queue`: one actual MUX state and one real
+STREAM/TICKER/HISTORY collector with finite per-client command/control/delivery storage, callbacks
+and detached immutable leases. See the [queue contract](../spec/mux/QUEUES.md) and
+[scoped validation](../tests/conformance/subscriptions/MUX-VALIDATION.md#mux-queue-validation).
+This composition is separate from pure `qdcxx_mux`; it adds no wildcard, wire reconciliation,
+complete subscription facade, transport stop or new Java HISTORY producer-equivalence claim.
