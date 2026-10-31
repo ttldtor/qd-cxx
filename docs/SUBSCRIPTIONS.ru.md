@@ -47,6 +47,11 @@ JSON остаётся необязательным и не использует�
 | `--duration-ms N` | Интервал приёма 1–600000 мс, по умолчанию 5000 |
 | `--remove-after-ms N` | Необязательное удаление всего набора, 0 < N < duration |
 | `--max-records N` | Необязательная цель по завершённым записям, 1–1000000; запрашивает отсечку приёма |
+| `--connect-timeout-ms N` | Deadline соединения, 1..2147483647 мс; по умолчанию 1000 |
+| `--read-timeout-ms N` | Deadline неактивности ввода, 1..2147483647 мс; по умолчанию duration |
+| `--write-timeout-ms N` | Deadline неактивности вывода, 1..2147483647 мс; по умолчанию duration |
+| `--poll-interval-ms N` | Период прогресса вызывающего кода, 1..2147483647 мс; по умолчанию 1 |
+| `--security plain\|tls` | По умолчанию `plain`; `tls` отклоняется до схемы/signals/bootstrap/сети |
 
 Цель по записям не является жёсткой границей вывода: уже принятый допустимый префикс
 может доставляться сверх неё. Без цели конечной границей остаётся duration. Повторять
@@ -57,6 +62,89 @@ JSON остаётся необязательным и не использует�
 ```text
 qdcxx-connect --host 127.0.0.1 --port 19123 --symbol IBM --schema-profile quote --output generic --duration-ms 5000
 ```
+
+<a id="endpoint-options"></a>
+
+## Явные параметры конечной точки
+
+Подключите [`qd/client/endpoint_options.hpp`](../include/qd/client/endpoint_options.hpp)
+и свяжите `qdcxx_client`. `EndpointOptions::create(schema, settings)` копирует проверенную
+`LocalSchema` и явные `EndpointSettings` в неизменяемый владеющий снимок, сохраняя
+происхождение схемы. Входы читаются один раз; environment, JSON, файлы, Java properties
+и глобальные defaults не разрешаются. Общие записи сохраняют схему вызывающего кода;
+CLI по-прежнему выбирает полную встроенную Quote/Profile-схему.
+[Справка по конфигурации](CONFIGURATION.ru.md) описывает типизированные поля и единицы.
+
+`controlledStreamSettings(duration)` задаёт прежние бюджеты контролируемого примера C++.
+Duration по умолчанию 5000 мс, допустимо 1..600000 мс; DNS/connect по умолчанию 1000 мс,
+read/write равны duration, poll — 1 мс. Host пустой, port нулевой, пока их не задаст
+вызывающий код. Это явные значения примера, а не Java/defaults процесса. Каждый timeout
+положителен и не превышает `INT_MAX` миллисекунд. Ёмкости компонентов и работа хода
+сохраняют отдельные оси байтов/количества/UTF-16 units; квота на весь поток не вводится.
+
+Прежний overload `runStream(bootstrap, schema, options, consumer, publishedHandle)`
+и поля/defaults `StreamOptions` сохраняют поведение. У нового overload второй аргумент —
+`const client::EndpointOptions &endpoint`. Пустой legacy `options.host` и нулевой
+`options.port` независимо означают отсутствие значения; каждое заданное значение должно
+совпадать со снимком. Конфликт отклоняется до использования bootstrap или I/O этим driver.
+У вызывающего кода уже может быть bootstrap или другие работающие endpoint.
+Выбор записи/символов и конечные условия приёма остаются в `StreamOptions`.
+
+Эффективные dispatch operations равны
+`min(endpoint.settings().budgets.dispatchTurn.operations, options.ownerOperationsPerTurn)`;
+прежний cap допускает 1..10000. Остальные оси сохраняют заданные значения для обычных
+и применимых shutdown/drain ходов, без подмены более щедрыми defaults helper.
+Новый контролируемый driver требует достаточного профиля неделимых операций:
+
+- Dispatch: `operations >= 1`, `commands >= 1`, `records >= max(1,
+  client.commandEntries, collector.frames + collector.records + фактическое число
+  записей схемы + desired.entries)` и
+  `bytes >= max(collector.residentBytes, session.residentBytes)`.
+- Вложенная работа collector: `operations >= 1`, `visits >= collector.records + collector.frames`,
+  `bytes >= collector.frames * session.residentBytes`.
+- Runtime work: `steps >= 1`, `handlers >= 1`,
+  `socketBytes >= max(tcp.inputBytes, tcp.writeBytes)`.
+- Для выбранного `recordId` кредиты полей dispatch не меньше удвоенного числа полей
+  локальной записи. Суммы/произведения проверяются до использования.
+
+Это ограничения выбранного driver. Общие параметры и прежний `TcpRuntime` могут
+представлять допустимые меньшие профили частичного продвижения/передачи настроек.
+Граница полного кванта записи консервативна и не является универсальным минимумом TCP.
+`requirePlainStream()` проверяет выбранный профиль; `runStream` — границу записи.
+Только фактический `ClientError::WORK_LIMIT` из первого progress диспетчера на свежем
+локальном ходе, до любого успешного шага, даёт видимый отказ `DISPATCH` со статической
+диагностикой `endpoint-dispatch-work` и запрос abort с теми же кредитами. Успешный шаг
+с последующим `YIELD` на остатке хода, native `YIELD`/`IDLE` и обычное ожидание сохраняют
+смысл. Прежний overload сохраняет старую политику.
+
+`EndpointSecurity::TLS` запрашивает транспортную политику и не подтверждает проверку.
+TLS identity/PEM проверяются локально по форме/размеру. Проверка доверия, SAN/identity,
+handshake и вызов credentials относятся к адаптеру проверенного TLS. Конфигурация
+никогда не вызывает необязательный Basic provider. Границы TLS handshake/close явные;
+authentication timeout/token capacity обязательны только с provider. Текущий driver
+отклоняет TLS, DNS-host и retry больше одной попытки до собственного I/O; хранение
+handoff-значений не включает TLS/authentication/DNS/reconnect.
+
+Разные handles снимка можно копировать/читать/освобождать в разных потоках; замену
+или уничтожение одного и того же handle нужно синхронизировать. Удерживайте снимок
+при использовании заимствованных `settings()`/`schema()`. Перемещённому handle допустимы
+только присваивание/уничтожение. Shared state/captures/resources provider и работа
+callback/деструктора остаются у вызывающего кода вне бюджетов конфигурации. Последний
+shared release может уничтожить provider в своём потоке. Для произвольного пользовательского
+кода/native cleanup нет жёсткой границы времени.
+
+Полный [пример endpoint options](../tests/conformance/endpoint_options_consumer/main.cpp)
+содержит заголовки и `main`, создаёт два независимых снимка и не запускает runtime/сеть.
+Его [CMake project](../tests/conformance/endpoint_options_consumer/CMakeLists.txt) связывает
+`qdcxx_client qdcxx_quote` с установленным runtime/JSON-OFF пакетом;
+см. [инструкции сборки](CPP-BUILD.ru.md#endpoint-options-build). При успехе stdout:
+
+```text
+Independent endpoint snapshots: 7301, 7302
+```
+
+При успешной конфигурации/выводе код завершения равен нулю. См.
+[выполненную валидацию параметров](../tests/conformance/subscriptions/OPTIONS-VALIDATION.ru.md).
 
 ## Источник, схема и выбор
 

@@ -65,6 +65,34 @@ may remain disabled. `client_dispatch` is the focused CTest. The composing calle
 owns its source session/runtime and explicitly routes events and wire output;
 local terminal does not certify transport shutdown.
 
+<a id="endpoint-options-build"></a>
+
+## Native endpoint options without runtime or JSON
+
+`qd/client/endpoint_options.hpp` is installed with CLIENT ON in `qdcxx_client`.
+Runtime, CONNECT, JSON and BUILD_TESTING may stay OFF; the client facility retains
+standard `Threads::Threads`. This profile needs no transport/TLS SDK or C compiler.
+Use the compiler setup in this guide, then:
+
+```powershell
+cmake -S . -B build-options '-DORG_TTLDTOR_QDCXX_BUILD_CLIENT=ON' '-DORG_TTLDTOR_QDCXX_BUILD_RUNTIME=OFF' '-DORG_TTLDTOR_QDCXX_BUILD_CONNECT=OFF' '-DORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON=OFF' '-DBUILD_TESTING=OFF' '-DCMAKE_INSTALL_LIBDIR=lib'
+cmake --build build-options --config Release
+cmake --install build-options --prefix C:/sdk/qdcxx-options --config Release
+cmake -S tests/conformance/endpoint_options_consumer -B build-options-consumer '-Dqdcxx_DIR=C:/sdk/qdcxx-options/lib/cmake/qdcxx'
+cmake --build build-options-consumer --config Release
+ctest --test-dir build-options-consumer -C Release --output-on-failure
+```
+
+Choose your installation prefix; explicit `lib` keeps the package path fixed.
+The complete [consumer source](../tests/conformance/endpoint_options_consumer/main.cpp)
+contains headers and `main`; its [CMake project](../tests/conformance/endpoint_options_consumer/CMakeLists.txt)
+uses `find_package(qdcxx CONFIG REQUIRED)` and links `qdcxx_client qdcxx_quote`.
+It creates two independent snapshots without runtime/network activation and prints
+`Independent endpoint snapshots: 7301, 7302` with exit zero.
+[Native usage and driver restrictions](SUBSCRIPTIONS.md#endpoint-options) and
+[executed validation](../tests/conformance/subscriptions/OPTIONS-VALIDATION.md)
+cover lifetimes, budgets, the snapshot overload and optional dependency closure.
+
 ## Optional controlled STREAM tool
 
 `ORG_TTLDTOR_QDCXX_BUILD_CONNECT` defaults to `OFF` and requires explicit CLIENT and

@@ -32,7 +32,11 @@ struct Configuration {
     OutputProfile output = OutputProfile::GENERIC; ///< Exact generic rows by default.
     std::vector<std::u16string> symbols;           ///< One to sixteen distinct ASCII selectors, at most 128 units each.
     std::chrono::milliseconds duration{5000};      ///< Positive finite admission interval, at most 600000 ms.
-    std::optional<std::chrono::milliseconds> removeAfter; ///< Optional removal of the entire initial exact set.
+    std::optional<std::chrono::milliseconds> removeAfter;    ///< Optional removal of the entire initial exact set.
+    std::optional<std::chrono::milliseconds> connectTimeout; ///< Explicit override; otherwise1000 ms.
+    std::optional<std::chrono::milliseconds> readTimeout;    ///< Explicit override; otherwise duration.
+    std::optional<std::chrono::milliseconds> writeTimeout;   ///< Explicit override; otherwise duration.
+    std::optional<std::chrono::milliseconds> pollInterval;   ///< Explicit override; otherwise1 ms.
     std::optional<std::size_t> maximumRecords; ///< Optional positive completed-record target, at most 1000000.
 };
 
@@ -42,6 +46,14 @@ struct Configuration {
  */
 [[nodiscard]] std::expected<Configuration, std::string_view>
 parseArguments(std::span<const std::string_view> arguments);
+
+/** Resolve the same native immutable endpoint settings used by the programmatic driver.
+ * @param configuration Complete parsed values, borrowed unchanged during this call.
+ * @param schema Explicit validated selection, copied with provenance preserved.
+ * @return Owned snapshot or a static typed failure, before bootstrap/signals/network.
+ */
+[[nodiscard]] std::expected<client::EndpointOptions, client::EndpointDiagnostic>
+effectiveEndpoint(const Configuration &configuration, const core::LocalSchema &schema);
 
 /** Inspect built-in help without initializing any working subsystem.
  * @param russian Select Russian rather than authoritative English text.

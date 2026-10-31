@@ -42,6 +42,11 @@ DXP3 readiness, complete record descriptions and STREAM data; a listening socket
 | `--duration-ms N` | Admission interval in 1..600000 milliseconds, default 5000. |
 | `--remove-after-ms N` | Optional removal of the entire initial exact selection; positive and less than duration. |
 | `--max-records N` | Optional positive callback record target, at most 1000000; stops further source admission after an admitted prefix reaches the target. |
+| `--connect-timeout-ms N` | Connect deadline, 1..2147483647 ms; default 1000 |
+| `--read-timeout-ms N` | Input inactivity deadline, 1..2147483647 ms; default duration |
+| `--write-timeout-ms N` | Output inactivity deadline, 1..2147483647 ms; default duration |
+| `--poll-interval-ms N` | Caller progress cadence, 1..2147483647 ms; default 1 |
+| `--security plain\|tls` | Default `plain`; `tls` rejects before schema/signals/bootstrap/network work |
 
 Only `--symbol` may repeat. Unknown, incomplete, duplicate or incompatible arguments fail before
 application activation. There is no stdin command interface, ambient configuration or schema loading.
@@ -67,6 +72,23 @@ handlers and ignores POSIX SIGPIPE so a broken working-output pipe becomes a che
 Arbitrary blocking sinks/callbacks and native OS completion have no hard elapsed-time guarantee.
 TLS, credentials/authentication, reconnect, wildcard, shared MUX, TICKER/HISTORY and full subscriptions
 remain outside this milestone.
+
+## Immutable native configuration
+
+After parsing every argument, the CLI resolves the same [typed endpoint snapshot](../../docs/SUBSCRIPTIONS.md#endpoint-options)
+as the native overload. Explicit timeout overrides win over duration-derived defaults
+regardless of argument order. All five new options are singletons. TLS is recognized
+for a static unsupported-profile error before working setup; no trust/secret argv,
+configuration files, environment or Java resolution are added. Errors do not echo
+caller secrets. Existing working exit codes and noargs/standalone help behavior remain.
+
+The new overload permits independently omitted legacy host/port, rejects supplied
+conflicts and applies the minimum of snapshot operations and the old cap1..10000.
+[Native driver restrictions](../../docs/SUBSCRIPTIONS.md#endpoint-options) describe
+sufficient retirement/full-quantum guards and first-pristine-call WORK_LIMIT handling;
+valid smaller generic options/TCP partial-progress profiles remain representable.
+TLS/auth, retry and DNS handoff does not enable execution.
+See [options validation](../../tests/conformance/subscriptions/OPTIONS-VALIDATION.md).
 
 ## Output version 1
 

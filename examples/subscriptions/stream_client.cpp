@@ -120,15 +120,28 @@ enum class LocalProgress { IDLE, YIELD, TERMINAL, FAILED };
 /** Apply all available prior local work, including callback stop flags, before polling the source.
  * @param dispatcher Serialized local owner.
  * @param work Mutable credits shared across this complete application owner turn.
+ * @param pristineWorkLimit Optional output: actual WORK_LIMIT on the first call before any successful step.
  * @return Idle/terminal, or a local-only retry/failure requirement.
  */
-LocalProgress progressLocal(d::StreamDispatcher &dispatcher, d::DispatchWork &work) {
+LocalProgress progressLocal(d::StreamDispatcher &dispatcher, d::DispatchWork &work, bool *pristineWorkLimit = nullptr) {
+    bool succeeded = false;
+
+    if (pristineWorkLimit) {
+        *pristineWorkLimit = false;
+    }
+
     for (;;) {
         const auto result = dispatcher.progress(work);
 
         if (!result) {
+            if (pristineWorkLimit && !succeeded && result.error() == d::ClientError::WORK_LIMIT) {
+                *pristineWorkLimit = true;
+            }
+
             return result.error() == d::ClientError::WORK_LIMIT ? LocalProgress::YIELD : LocalProgress::FAILED;
         }
+
+        succeeded = true;
 
         if (result->state == d::DispatchState::TERMINAL) {
             return LocalProgress::TERMINAL;
@@ -167,10 +180,11 @@ void fail(StreamResult &result, StreamFailure failure) {
  * @param keys Matching removal keys with the same lifetime.
  * @param options Borrowed application controls.
  * @param result Result initialized by preparation, completed with both terminal scopes.
+ * @param configuration Optional borrowed snapshot settings; null preserves exact legacy work/default behavior.
  */
 void drive(t::TcpRuntime &runtime, d::StreamDispatcher &dispatcher, const d::ClientHandle &handle,
            std::span<const c::SubscriptionRequest> requests, std::span<const c::SubscriptionKey> keys,
-           StreamOptions options, StreamResult &result) {
+           StreamOptions options, StreamResult &result, const d::EndpointSettings *configuration) {
     const auto started = Clock::now();
     const auto cutoff = started + options.duration;
     const auto removal = started + options.removeAfter.value_or(options.duration);
@@ -178,7 +192,7 @@ void drive(t::TcpRuntime &runtime, d::StreamDispatcher &dispatcher, const d::Cli
     bool stopping = false;
     bool removeSubmitted = false;
     std::optional<d::CommandTicket> mutation;
-    d::SubmitWork submitWork{16, 1000000, 1000000};
+    auto submitWork = configuration ? configuration->budgets.submitTurn : d::SubmitWork{16, 1000000, 1000000};
     auto added = handle.add(requests, submitWork);
 
     if (!added) {
@@ -217,9 +231,18 @@ void drive(t::TcpRuntime &runtime, d::StreamDispatcher &dispatcher, const d::Cli
 
     for (;;) {
         // A callback may only have set the port flag: observe it before another source admission.
-        auto dispatchWork = dispatchTurn();
-        dispatchWork.operations = options.ownerOperationsPerTurn;
-        const auto local = progressLocal(dispatcher, dispatchWork);
+        auto dispatchWork = configuration ? configuration->budgets.dispatchTurn : dispatchTurn();
+        dispatchWork.operations = configuration ? std::min(dispatchWork.operations, options.ownerOperationsPerTurn)
+                                                : options.ownerOperationsPerTurn;
+        bool pristineWorkLimit = false;
+        const auto local = progressLocal(dispatcher, dispatchWork, configuration ? &pristineWorkLimit : nullptr);
+
+        if (configuration && pristineWorkLimit) {
+            result.diagnostic = t::TcpDiagnostic{t::TcpError::WORK_LIMIT, "endpoint-dispatch-work"};
+            fail(result, StreamFailure::DISPATCH);
+            beginStop(true);
+        }
+
         observeCutoff();
 
         if (local == LocalProgress::YIELD) {
@@ -253,7 +276,7 @@ void drive(t::TcpRuntime &runtime, d::StreamDispatcher &dispatcher, const d::Cli
         const auto now = Clock::now();
 
         if (!stopping && result.addComposed && options.removeAfter && now >= removal && !removeSubmitted) {
-            auto work = d::SubmitWork{16, 1000000, 1000000};
+            auto work = configuration ? configuration->budgets.submitTurn : d::SubmitWork{16, 1000000, 1000000};
             auto removed = handle.remove(keys, work);
 
             if (!removed) {
@@ -267,7 +290,7 @@ void drive(t::TcpRuntime &runtime, d::StreamDispatcher &dispatcher, const d::Cli
         }
 
         if (!stopping) {
-            auto work = protocolTurn();
+            auto work = configuration ? configuration->budgets.protocolTurn : protocolTurn();
             std::expected<void, t::TcpDiagnostic> output;
             bool attempted = true;
 
@@ -302,8 +325,11 @@ void drive(t::TcpRuntime &runtime, d::StreamDispatcher &dispatcher, const d::Cli
         }
 
         if (!runtime.terminal()) {
-            t::TcpWork work{128, 128, 10000000, 0, 0, 0, 0};
-            auto sessionWork = protocolTurn();
+            const auto credits = configuration ? configuration->budgets.runtimeTurn
+                                               : d::EndpointRuntimeWork{128, 128, 10000000, 0, 0, 0, 0};
+            t::TcpWork work{credits.steps,      credits.handlers, credits.socketBytes, credits.dnsCalls,
+                            credits.dnsPackets, credits.dnsBytes, credits.dnsUnits};
+            auto sessionWork = configuration ? configuration->budgets.protocolTurn : protocolTurn();
             auto next = runtime.poll(work, sessionWork);
 
             if (!next) {
@@ -343,13 +369,22 @@ void drive(t::TcpRuntime &runtime, d::StreamDispatcher &dispatcher, const d::Cli
             return;
         }
 
-        std::this_thread::sleep_for(1ms);
+        std::this_thread::sleep_for(configuration ? configuration->timeouts.poll : 1ms);
     }
 }
-} // namespace
 
-StreamResult runStream(t::RuntimeBootstrap &bootstrap, const c::LocalSchema &schema, StreamOptions options,
-                       const std::shared_ptr<d::Consumer> &consumer, std::optional<d::ClientHandle> &publishedHandle) {
+/** Prepare and execute one mode without changing the legacy rejection order.
+ * @param bootstrap Borrowed explicit process owner.
+ * @param schema Immutable selected declarations.
+ * @param options Borrowed operation selection.
+ * @param consumer Retained callable through retirement.
+ * @param publishedHandle Initially empty output slot.
+ * @param configuration Borrowed snapshot, or null for the unchanged legacy mode.
+ * @return Separate preparation and retirement evidence.
+ */
+StreamResult runPrepared(t::RuntimeBootstrap &bootstrap, const c::LocalSchema &schema, StreamOptions options,
+                         const std::shared_ptr<d::Consumer> &consumer, std::optional<d::ClientHandle> &publishedHandle,
+                         const d::EndpointSettings *configuration) {
     StreamResult result;
 
     if (publishedHandle || !consumer || !validOptions(schema, options)) {
@@ -359,7 +394,7 @@ StreamResult runStream(t::RuntimeBootstrap &bootstrap, const c::LocalSchema &sch
     }
 
     try {
-        auto copied = schema.boundedCopy(SCHEMA_LIMITS);
+        auto copied = schema.boundedCopy(configuration ? configuration->budgets.schema : SCHEMA_LIMITS);
 
         if (!copied) {
             result.failure = StreamFailure::PREPARATION;
@@ -377,10 +412,14 @@ StreamResult runStream(t::RuntimeBootstrap &bootstrap, const c::LocalSchema &sch
             keys.push_back(key);
         }
 
-        p::SubscriptionWriterWork writerWork{10000, 1000000, 1000000, 1000000};
-        auto writer =
-            p::SubscriptionWriter::create(schema, std::span(&outgoing, 1), {SCHEMA_LIMITS, 16, 128, 128, 16384},
-                                          {8192, 8201, 512, 128, {8192, 1024}, 65536, 65536, 128}, writerWork);
+        auto writerWork = configuration ? configuration->budgets.writerPreparation
+                                        : p::SubscriptionWriterWork{10000, 1000000, 1000000, 1000000};
+        auto writer = p::SubscriptionWriter::create(
+            schema, std::span(&outgoing, 1),
+            configuration ? configuration->budgets.layout : p::LayoutLimits{SCHEMA_LIMITS, 16, 128, 128, 16384},
+            configuration ? configuration->budgets.writer
+                          : p::SubscriptionWriterLimits{8192, 8201, 512, 128, {8192, 1024}, 65536, 65536, 128},
+            writerWork);
 
         if (!writer) {
             result.failure = StreamFailure::PREPARATION;
@@ -388,10 +427,20 @@ StreamResult runStream(t::RuntimeBootstrap &bootstrap, const c::LocalSchema &sch
             return result;
         }
 
-        auto work = dispatchTurn();
+        auto work = configuration ? configuration->budgets.dispatchTurn : dispatchTurn();
+
+        if (configuration) {
+            work.operations = std::min(work.operations, options.ownerOperationsPerTurn);
+        }
+
         auto dispatcher = d::StreamDispatcher::create(
-            schema, {16, 32, 128, 2048, 64, 4096, 32}, {16, 128, 2 * MEBIBYTE, 4 * MEBIBYTE},
-            {4, 8, 16, 2048, 1, 128, 128, 8192, 8192, 65536, 4, MEBIBYTE, 2 * MEBIBYTE}, consumer, work);
+            schema,
+            configuration ? configuration->budgets.desired : c::SubscriptionLimits{16, 32, 128, 2048, 64, 4096, 32},
+            configuration ? configuration->budgets.collector
+                          : collectors::StreamLimits{16, 128, 2 * MEBIBYTE, 4 * MEBIBYTE},
+            configuration ? configuration->budgets.client
+                          : d::ClientLimits{4, 8, 16, 2048, 1, 128, 128, 8192, 8192, 65536, 4, MEBIBYTE, 2 * MEBIBYTE},
+            consumer, work);
 
         if (!dispatcher) {
             result.failure = StreamFailure::PREPARATION;
@@ -400,19 +449,33 @@ StreamResult runStream(t::RuntimeBootstrap &bootstrap, const c::LocalSchema &sch
         }
 
         auto handle = dispatcher->handle();
-        auto sessionWork = protocolTurn();
-        const t::TcpOptions tcp{options.host,
-                                options.port,
-                                {},
-                                53,
-                                1s,
-                                1s,
-                                options.duration,
-                                options.duration,
-                                1ms,
-                                {8192, 8192, 16, 4, 65536, 8192, 8 * MEBIBYTE}};
+        auto sessionWork = configuration ? configuration->budgets.protocolTurn : protocolTurn();
+        t::TcpOptions tcp{options.host,
+                          options.port,
+                          {},
+                          53,
+                          1s,
+                          1s,
+                          options.duration,
+                          options.duration,
+                          1ms,
+                          {8192, 8192, 16, 4, 65536, 8192, 8 * MEBIBYTE}};
+
+        if (configuration) {
+            const auto &timeouts = configuration->timeouts;
+            const auto &limits = configuration->budgets.tcp;
+            tcp.dnsTimeout = timeouts.dns;
+            tcp.connectTimeout = timeouts.connect;
+            tcp.readTimeout = timeouts.read;
+            tcp.writeTimeout = timeouts.write;
+            tcp.pollInterval = timeouts.poll;
+            tcp.limits = {limits.inputBytes,   limits.writeBytes,   limits.addresses,    limits.cnameDepth,
+                          limits.contextBytes, limits.handlerBytes, limits.residentBytes};
+        }
+
         auto runtime =
-            t::TcpRuntime::create(bootstrap, std::move(*copied), std::move(*writer), sessionLimits(), tcp, sessionWork);
+            t::TcpRuntime::create(bootstrap, std::move(*copied), std::move(*writer),
+                                  configuration ? configuration->budgets.session : sessionLimits(), tcp, sessionWork);
 
         if (!handle || !runtime) {
             result.failure = StreamFailure::PREPARATION;
@@ -434,11 +497,50 @@ StreamResult runStream(t::RuntimeBootstrap &bootstrap, const c::LocalSchema &sch
             (void)runtime->requestClose();
         }
 
-        drive(*runtime, *dispatcher, *handle, requests, keys, options, result);
+        drive(*runtime, *dispatcher, *handle, requests, keys, options, result, configuration);
     } catch (const std::bad_alloc &) {
         fail(result, StreamFailure::PREPARATION);
     }
 
     return result;
+}
+} // namespace
+
+StreamResult runStream(t::RuntimeBootstrap &bootstrap, const c::LocalSchema &schema, StreamOptions options,
+                       const std::shared_ptr<d::Consumer> &consumer, std::optional<d::ClientHandle> &publishedHandle) {
+    return runPrepared(bootstrap, schema, options, consumer, publishedHandle, nullptr);
+}
+
+StreamResult runStream(t::RuntimeBootstrap &bootstrap, const d::EndpointOptions &endpoint, StreamOptions options,
+                       const std::shared_ptr<d::Consumer> &consumer, std::optional<d::ClientHandle> &publishedHandle) {
+    const auto supported = endpoint.requirePlainStream();
+    const auto &settings = endpoint.settings();
+
+    if (!supported || (!options.host.empty() && options.host != settings.host) ||
+        (options.port != 0 && options.port != settings.port)) {
+        StreamResult result;
+        result.failure = StreamFailure::CONFIGURATION;
+        result.diagnostic = t::TcpDiagnostic{t::TcpError::INVALID_CONFIGURATION,
+                                             supported ? "endpoint-selection" : supported.error().stage};
+
+        return result;
+    }
+
+    if (options.recordId >= 0 && static_cast<std::size_t>(options.recordId) < endpoint.schema().records().size()) {
+        const auto fields = endpoint.schema().records()[static_cast<std::size_t>(options.recordId)].fields.size();
+
+        if (fields > std::numeric_limits<std::size_t>::max() / 2 || settings.budgets.dispatchTurn.fields < fields * 2) {
+            StreamResult result;
+            result.failure = StreamFailure::CONFIGURATION;
+            result.diagnostic = t::TcpDiagnostic{t::TcpError::WORK_LIMIT, "endpoint-record-work"};
+
+            return result;
+        }
+    }
+
+    options.host = settings.host;
+    options.port = settings.port;
+
+    return runPrepared(bootstrap, endpoint.schema(), options, consumer, publishedHandle, &settings);
 }
 } // namespace org::ttldtor::qdcxx::examples

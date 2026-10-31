@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 #pragma once
 
+#include "qd/client/endpoint_options.hpp"
 #include "qd/client/stream_dispatcher.hpp"
 #include "qd/transport/tcp_runtime.hpp"
 
@@ -76,4 +77,24 @@ struct StreamResult {
                                      StreamOptions options, const std::shared_ptr<client::Consumer> &consumer,
                                      std::optional<client::ClientHandle> &publishedHandle);
 
+/** Drive the same controlled application using an immutable explicit endpoint snapshot.
+ * The legacy host may be empty and port zero independently; any supplied value must match endpoint.
+ * The legacy operations cap in1..10000 additionally limits snapshot dispatchTurn.operations via min;
+ * all other snapshot axes remain unchanged, including applicable shutdown/drain turns. No configured
+ * credit is increased or replaced with helper defaults. The selected record requires at least twice
+ * its local field count in dispatch field credits. Actual WORK_LIMIT on the first local progress call
+ * of a fresh turn fails visibly and requests abort with unchanged credits; residual-turn yields and
+ * native idle/yield remain ordinary progress. TLS/auth/retry/DNS remain unsupported here.
+ * Bootstrap may already exist; rejection precedes this driver's own bootstrap use/network I/O.
+ * Other callback, schema, retirement and published-handle contracts match the legacy overload.
+ * @param bootstrap Borrowed process owner, outliving all native operations in this call.
+ * @param endpoint Immutable retained settings/schema; borrowed unchanged through return.
+ * @param options Borrowed operation selection, optional matching host/port and additional operation cap.
+ * @param consumer Shared callable, guarded through callback return and local retirement.
+ * @param publishedHandle Initially empty slot, borrowed through return; unchanged on configuration rejection.
+ * @return Separate local/native completion or static preparation/configuration rejection, never peer ACK.
+ */
+[[nodiscard]] StreamResult runStream(transport::RuntimeBootstrap &bootstrap, const client::EndpointOptions &endpoint,
+                                     StreamOptions options, const std::shared_ptr<client::Consumer> &consumer,
+                                     std::optional<client::ClientHandle> &publishedHandle);
 } // namespace org::ttldtor::qdcxx::examples

@@ -12,6 +12,7 @@
 #include <functional>
 #include <sstream>
 #include <stdexcept>
+#include <utility>
 
 namespace {
 namespace root = org::ttldtor::qdcxx;
@@ -418,4 +419,294 @@ TEST_CASE("record target stops further admission while the whole admitted eligib
     CHECK(result.local->counts.ignoredRecords == 1);
     CHECK(consumer->symbols.size() == 3);
     CHECK(a::exitCode(result, true) == 0);
+}
+
+TEST_CASE("snapshot work limits retain credit caps through controlled retirement") {
+    auto bootstrap = t::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    auto schema = standardSchema(false);
+    const std::vector<std::u16string> selected{u"IBM"};
+    const auto values = standardValues(schema);
+    const std::vector<s::Record> records{{u"IBM", values}};
+    s::Peer peer(schema, records, selected);
+    auto settings = d::controlledStreamSettings(1000ms);
+    REQUIRE(settings);
+    settings->host = "127.0.0.1";
+    settings->port = peer.port();
+    settings->budgets.dispatchTurn.fields = 1;
+    auto endpoint = d::EndpointOptions::create(schema, *settings);
+    REQUIRE(endpoint);
+    CHECK(endpoint->requirePlainStream());
+    auto consumer = std::make_shared<Recorder>();
+    std::optional<d::ClientHandle> control;
+    const auto result = x::runStream(*bootstrap, *endpoint, {"", 0, 0, selected, 1000ms}, consumer, control);
+    CHECK(result.failure == x::StreamFailure::CONFIGURATION);
+    REQUIRE(result.diagnostic);
+    CHECK(result.diagnostic->stage == "endpoint-record-work");
+    CHECK_FALSE(result.local);
+    CHECK_FALSE(result.transport);
+    CHECK_FALSE(control);
+    CHECK(peer.adds() == 0);
+}
+
+TEST_CASE("CLI overrides and native options share one immutable effective configuration") {
+    const std::string_view arguments[]{"--host",
+                                       "127.0.0.1",
+                                       "--port",
+                                       "3210",
+                                       "--symbol",
+                                       "IBM",
+                                       "--read-timeout-ms",
+                                       "77",
+                                       "--duration-ms",
+                                       "200",
+                                       "--connect-timeout-ms",
+                                       "88",
+                                       "--write-timeout-ms",
+                                       "99",
+                                       "--poll-interval-ms",
+                                       "2",
+                                       "--security",
+                                       "plain"};
+    auto config = a::parseArguments(arguments);
+    REQUIRE(config);
+    auto schema = standardSchema(false);
+    auto endpoint = a::effectiveEndpoint(*config, schema);
+    REQUIRE(endpoint);
+    CHECK(endpoint->settings().timeouts.read == 77ms);
+    CHECK(endpoint->settings().timeouts.connect == 88ms);
+    CHECK(endpoint->settings().timeouts.write == 99ms);
+    CHECK(endpoint->settings().timeouts.poll == 2ms);
+    auto settings = d::controlledStreamSettings(200ms);
+    REQUIRE(settings);
+    settings->host = "127.0.0.1";
+    settings->port = 3210;
+    settings->timeouts = {1000ms, 88ms, 77ms, 99ms, 2ms};
+    auto native = d::EndpointOptions::create(schema, *settings);
+    REQUIRE(native);
+    CHECK(native->settings().timeouts.read == endpoint->settings().timeouts.read);
+    CHECK(native->settings().budgets.dispatchTurn.operations == endpoint->settings().budgets.dispatchTurn.operations);
+
+    for (const auto &invalid :
+         std::vector<std::vector<std::string_view>>{{"--security", "tls"},
+                                                    {"--security", "synthetic-secret"},
+                                                    {"--connect-timeout-ms", "2147483648"},
+                                                    {"--read-timeout-ms", "0"},
+                                                    {"--poll-interval-ms", "-1"},
+                                                    {"--write-timeout-ms", "99999999999999999999"}}) {
+        auto rejected = a::parseArguments(invalid);
+        REQUIRE_FALSE(rejected);
+        CHECK(rejected.error().find("synthetic-secret") == std::string_view::npos);
+    }
+}
+
+TEST_CASE("snapshot operation caps allow bounded progress and independently omitted matching selectors") {
+    auto bootstrap = t::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    auto schema = standardSchema(false);
+    const std::vector<std::u16string> selected{u"IBM"};
+    const auto values = standardValues(schema);
+    const std::vector<s::Record> records{{u"IBM", values}};
+
+    const std::pair<std::size_t, std::size_t> caps[]{{1, 10000}, {2, 1}, {3, 1}, {2, 2}, {3, 3}};
+
+    for (const auto [cap, selectionCap] : caps) {
+        s::Peer peer(schema, records, selected);
+        auto settings = d::controlledStreamSettings(2000ms);
+        REQUIRE(settings);
+        settings->host = "127.0.0.1";
+        settings->port = peer.port();
+        settings->budgets.dispatchTurn.operations = cap;
+        auto endpoint = d::EndpointOptions::create(schema, *settings);
+        REQUIRE(endpoint);
+        auto consumer = std::make_shared<Recorder>();
+        std::optional<d::ClientHandle> control;
+        x::StreamOptions options{"", 0, 0, selected, 2000ms, {}, 1};
+        options.ownerOperationsPerTurn = selectionCap;
+
+        if (cap == 2) {
+            options.host = settings->host;
+        }
+
+        if (cap == 3) {
+            options.port = settings->port;
+        }
+
+        auto result = x::runStream(*bootstrap, *endpoint, options, consumer, control);
+        retired(result);
+        CHECK(result.targetReached);
+        CHECK(result.local->counts.completedRecords == 1);
+        CHECK(result.eventWorkYields > 0);
+        CHECK(result.failure == x::StreamFailure::NONE);
+        CHECK_FALSE(peer.failed());
+    }
+
+    auto settings = d::controlledStreamSettings();
+    REQUIRE(settings);
+    settings->host = "127.0.0.1";
+    settings->port = 3210;
+    auto endpoint = d::EndpointOptions::create(schema, *settings);
+    REQUIRE(endpoint);
+    auto consumer = std::make_shared<Recorder>();
+    std::optional<d::ClientHandle> control;
+    auto wrongHost = x::runStream(*bootstrap, *endpoint, {"::1", 0, 0, selected}, consumer, control);
+    auto wrongPort = x::runStream(*bootstrap, *endpoint, {"", 3211, 0, selected}, consumer, control);
+    CHECK(wrongHost.failure == x::StreamFailure::CONFIGURATION);
+    CHECK(wrongPort.failure == x::StreamFailure::CONFIGURATION);
+    CHECK_FALSE(control);
+    CHECK(consumer->symbols.empty());
+}
+
+TEST_CASE("snapshot runtime inactivity timeout reaches the existing native owner") {
+    auto bootstrap = t::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    auto schema = standardSchema(false);
+    const std::vector<std::u16string> selected{u"IBM"};
+    s::Peer peer(schema, {}, selected, 8192, s::PeerMode::SILENT);
+    auto settings = d::controlledStreamSettings(2000ms);
+    REQUIRE(settings);
+    settings->host = "127.0.0.1";
+    settings->port = peer.port();
+    settings->timeouts.read = 20ms;
+    auto endpoint = d::EndpointOptions::create(schema, *settings);
+    REQUIRE(endpoint);
+    auto consumer = std::make_shared<Recorder>();
+    std::optional<d::ClientHandle> control;
+    auto result = x::runStream(*bootstrap, *endpoint, {"", 0, 0, selected, 2000ms}, consumer, control);
+    REQUIRE(result.transport);
+    CHECK(result.transport->primary.error == t::TcpError::DEADLINE);
+    CHECK_FALSE(result.intervalExpired);
+}
+
+TEST_CASE("snapshot pristine dispatcher work refusal fails and aborts with unchanged credits") {
+    auto bootstrap = t::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    auto schema = standardSchema(false);
+    const std::vector<std::u16string> selected{u"IBM"};
+    const auto values = standardValues(schema);
+    const std::vector<s::Record> records{{u"IBM", values}, {u"IBM", values}};
+    s::Peer peer(schema, records, selected);
+    auto settings = d::controlledStreamSettings(2000ms);
+    REQUIRE(settings);
+    settings->host = "127.0.0.1";
+    settings->port = peer.port();
+    settings->budgets.client.batchRecords = 2;
+    settings->budgets.dispatchTurn.fields = schema.records()[0].fields.size() * 2;
+    auto endpoint = d::EndpointOptions::create(schema, *settings);
+    REQUIRE(endpoint);
+    REQUIRE(endpoint->requirePlainStream());
+    auto consumer = std::make_shared<Recorder>();
+    std::optional<d::ClientHandle> control;
+    auto result = x::runStream(*bootstrap, *endpoint, {"", 0, 0, selected, 2000ms}, consumer, control);
+    REQUIRE(result.local);
+    REQUIRE(result.transport);
+    CHECK(result.failure == x::StreamFailure::DISPATCH);
+    REQUIRE(result.diagnostic);
+    CHECK(result.diagnostic->error == t::TcpError::WORK_LIMIT);
+    CHECK(result.diagnostic->stage == "endpoint-dispatch-work");
+    CHECK(result.local->outcome == d::DispatchOutcome::ABORTED);
+    CHECK(result.local->counts.completedRecords == 0);
+    CHECK(result.local->counts.discardedRecords == 2);
+    CHECK(result.eventWorkYields > 0);
+    CHECK(consumer->symbols.empty());
+    CHECK_FALSE(peer.failed());
+    CHECK(endpoint->settings().budgets.dispatchTurn.fields == schema.records()[0].fields.size() * 2);
+}
+
+TEST_CASE("snapshot sufficient work profile restrictions do not invalidate generic handoff") {
+    auto schema = standardSchema(false);
+    auto settings = d::controlledStreamSettings();
+    REQUIRE(settings);
+    settings->host = "127.0.0.1";
+    settings->port = 3210;
+    settings->budgets.runtimeTurn.socketBytes = 1;
+    auto endpoint = d::EndpointOptions::create(schema, *settings);
+    REQUIRE(endpoint);
+    auto driver = endpoint->requirePlainStream();
+    REQUIRE_FALSE(driver);
+    CHECK(driver.error().error == d::EndpointError::UNSUPPORTED_PROFILE);
+    CHECK(driver.error().stage == "endpoint-driver-work");
+}
+
+TEST_CASE("snapshot callback stop throw and queued command abort retire with configured work") {
+    auto bootstrap = t::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    auto schema = standardSchema(false);
+    const std::vector<std::u16string> selected{u"IBM"};
+    const auto values = standardValues(schema);
+    const std::vector<s::Record> records{{u"IBM", values}, {u"IBM", values}};
+
+    for (unsigned mode = 0; mode < 3; ++mode) {
+        s::Peer peer(schema, records, selected);
+        auto settings = d::controlledStreamSettings(2000ms);
+        REQUIRE(settings);
+        settings->host = "127.0.0.1";
+        settings->port = peer.port();
+        settings->budgets.dispatchTurn.operations = 2;
+        auto endpoint = d::EndpointOptions::create(schema, *settings);
+        REQUIRE(endpoint);
+        auto consumer = std::make_shared<Recorder>();
+        std::weak_ptr<Recorder> weakConsumer = consumer;
+        std::optional<d::ClientHandle> control;
+        std::optional<d::CommandTicket> queued;
+        const c::SubscriptionRequest request{{schema.recordContext(0), u"QUEUED"}, {}};
+        const std::vector<c::SubscriptionRequest> requests(16, request);
+        unsigned calls = 0;
+        consumer->action = [&] {
+            ++calls;
+            REQUIRE(control);
+
+            if (mode == 1) {
+                throw std::runtime_error("synthetic callback failure");
+            }
+
+            if (mode == 2) {
+                auto work = settings->budgets.submitTurn;
+                auto accepted = control->add(requests, work);
+                REQUIRE(accepted);
+                queued.emplace(std::move(*accepted));
+                CHECK(control->requestStop(d::StopMode::ABORT));
+            } else {
+                CHECK(control->requestStop(d::StopMode::GRACEFUL));
+            }
+        };
+        x::StreamOptions options{"", 0, 0, selected, 2000ms};
+        options.ownerOperationsPerTurn = 3;
+        const auto result = x::runStream(*bootstrap, *endpoint, options, consumer, control);
+        REQUIRE(result.local);
+        REQUIRE(result.transport);
+        REQUIRE(control);
+        REQUIRE(control->terminal());
+        CHECK(result.transport->aborted);
+        CHECK(endpoint->settings().budgets.dispatchTurn.operations == 2);
+        CHECK(endpoint->settings().budgets.dispatchTurn.commands == settings->budgets.dispatchTurn.commands);
+        CHECK(endpoint->settings().budgets.dispatchTurn.bytes == settings->budgets.dispatchTurn.bytes);
+
+        if (mode == 0) {
+            CHECK(result.local->outcome == d::DispatchOutcome::DRAINED);
+            CHECK(result.local->counts.completedRecords == 2);
+            CHECK(calls == 2);
+        } else if (mode == 1) {
+            CHECK(result.local->outcome == d::DispatchOutcome::FAILED);
+            CHECK(result.local->primary == d::ClientError::CALLBACK_FAILURE);
+            CHECK(result.local->counts.failedBatches == 1);
+            CHECK(result.local->counts.completedRecords == 0);
+            CHECK(calls == 1);
+        } else {
+            CHECK(result.local->outcome == d::DispatchOutcome::ABORTED);
+            CHECK(result.local->counts.completedRecords == 1);
+            CHECK(result.local->counts.discardedRecords == 1);
+            REQUIRE(queued);
+            REQUIRE(queued->result());
+            CHECK(queued->result()->status == d::CommandStatus::CANCELLED_CLOSING);
+            CHECK(calls == 1);
+            queued.reset();
+        }
+
+        CHECK_FALSE(peer.failed());
+        consumer.reset();
+        CHECK(weakConsumer.expired());
+        CHECK(control->terminal()->counts.startedBatches == calls);
+        control.reset();
+    }
 }

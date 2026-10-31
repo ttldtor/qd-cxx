@@ -47,6 +47,11 @@ help arguments are usage errors. Failure to write help is an I/O failure.
 | `--duration-ms N` | Admission interval 1–600000 ms; default 5000 |
 | `--remove-after-ms N` | Optional full-set removal with 0 < N < duration |
 | `--max-records N` | Optional completed-record target, 1–1000000; requests an admission cutoff |
+| `--connect-timeout-ms N` | Connect deadline, 1..2147483647 ms; default 1000 |
+| `--read-timeout-ms N` | Input inactivity deadline, 1..2147483647 ms; default duration |
+| `--write-timeout-ms N` | Output inactivity deadline, 1..2147483647 ms; default duration |
+| `--poll-interval-ms N` | Caller progress cadence, 1..2147483647 ms; default 1 |
+| `--security plain\|tls` | Default `plain`; `tls` rejects before schema/signals/bootstrap/network work |
 
 The record target is not a hard output cap: the already-admitted eligible prefix
 can drain beyond it. With no target, duration remains the finite cutoff. Only
@@ -57,6 +62,89 @@ For example, with a controlled peer already listening on the selected port:
 ```text
 qdcxx-connect --host 127.0.0.1 --port 19123 --symbol IBM --schema-profile quote --output generic --duration-ms 5000
 ```
+
+<a id="endpoint-options"></a>
+
+## Explicit endpoint options
+
+Include [`qd/client/endpoint_options.hpp`](../include/qd/client/endpoint_options.hpp)
+and link `qdcxx_client`. `EndpointOptions::create(schema, settings)` copies a validated
+`LocalSchema` and explicit `EndpointSettings` into an immutable owning snapshot,
+preserving schema provenance. Inputs are read once; there is no environment,
+JSON, file, Java-property or global-default resolution. Generic records retain the
+caller's schema; CLI schema selection remains complete built-in Quote/Profile.
+The [configuration reference](CONFIGURATION.md) describes all typed fields and units.
+
+`controlledStreamSettings(duration)` supplies the existing controlled C++ example
+budgets. Duration defaults to 5000 ms and accepts 1..600000 ms; DNS/connect default
+to 1000 ms, read/write to duration and poll to 1 ms. Host is empty and port zero
+until supplied by the caller. These are explicit example values, not Java or
+process defaults. Each timeout is positive and at most `INT_MAX` milliseconds.
+Component capacities and turn work retain their byte/count/UTF-16-unit axes;
+they do not impose a lifetime feed quota.
+
+The old `runStream(bootstrap, schema, options, consumer, publishedHandle)` overload
+and `StreamOptions` fields/defaults retain their behavior. The new overload uses
+`const client::EndpointOptions &endpoint` as its second argument. Empty legacy
+`options.host` and zero `options.port` independently mean omitted; every supplied
+value must match the snapshot. Conflicts reject before this driver's bootstrap
+use or I/O. The caller may already own a bootstrap or other active endpoints.
+Record/symbol selection and finite admission controls remain in `StreamOptions`.
+
+Effective dispatch operations are
+`min(endpoint.settings().budgets.dispatchTurn.operations, options.ownerOperationsPerTurn)`;
+the unchanged legacy cap accepts 1..10000. Other work axes stay at their configured
+values for normal and applicable shutdown/drain turns, with no larger helper fallback.
+The new controlled driver requires the following sufficient whole-operation profile:
+
+- Dispatch `operations >= 1`, `commands >= 1`, `records >= max(1,
+  client.commandEntries, collector.frames + collector.records + actual schema
+  record count + desired.entries)`, and
+  `bytes >= max(collector.residentBytes, session.residentBytes)`.
+- Nested collector work: `operations >= 1`, `visits >= collector.records + collector.frames`,
+  `bytes >= collector.frames * session.residentBytes`.
+- Runtime work: `steps >= 1`, `handlers >= 1`,
+  `socketBytes >= max(tcp.inputBytes, tcp.writeBytes)`.
+- At the selected `recordId`, dispatch field credits are at least twice the local
+  record's field count. Sums/products are checked before use.
+
+These restrictions belong to this selected driver. Generic options and the existing
+`TcpRuntime` can represent valid smaller partial-progress/handoff profiles. The
+full write-quantum floor is conservative, not a universal TCP minimum.
+`requirePlainStream()` checks the selected profile; `runStream` checks the record floor.
+Only actual `ClientError::WORK_LIMIT` on the first dispatcher progress call of a
+fresh local turn, before any successful step, produces visible `DISPATCH` failure
+with static `endpoint-dispatch-work` evidence and requests abort with the same
+credits. Successful-step then residual-turn `YIELD`, native `YIELD`/`IDLE` and
+ordinary waiting retain their meanings. The legacy overload keeps its old policy.
+
+`EndpointSecurity::TLS` requests a transport policy; it does not prove verification.
+TLS identity/PEM validation is local shape/size validation. Trust, SAN/identity,
+handshake and credential invocation belong to the verified TLS adapter.
+Configuration never calls the optional Basic provider. TLS handshake/close bounds
+are explicit; authentication timeout/token capacity are required only with a provider.
+The current driver rejects TLS, DNS hosts and retry above one before its own I/O;
+stored handoff values activate none of TLS/authentication/DNS/reconnect.
+
+Distinct snapshot handles can be copied/read/released across threads; synchronize
+replacement/destruction of the same handle. Retain a snapshot while using borrowed
+`settings()`/`schema()` views. Moved-from handles permit only assignment/destruction.
+Shared provider state/captures/resources and callback/destructor work remain
+caller-owned and outside configuration bounds. Last shared release may destroy the
+provider on that thread. Arbitrary user code/native cleanup has no hard elapsed-time bound.
+
+The complete [endpoint-options example](../tests/conformance/endpoint_options_consumer/main.cpp)
+contains headers and `main`, creates two independent snapshots and activates no
+runtime/network. Its [CMake project](../tests/conformance/endpoint_options_consumer/CMakeLists.txt)
+links `qdcxx_client qdcxx_quote` against an installed runtime/JSON-OFF package;
+see [build instructions](CPP-BUILD.md#endpoint-options-build). Successful stdout is:
+
+```text
+Independent endpoint snapshots: 7301, 7302
+```
+
+It exits zero when configuration/output succeed. See
+[executed options validation](../tests/conformance/subscriptions/OPTIONS-VALIDATION.md).
 
 ## Source, schema and selection
 

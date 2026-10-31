@@ -45,6 +45,11 @@ DXP3, полные описания записей и данные STREAM; од�
 | `--duration-ms N` | Интервал приёма 1..600000 миллисекунд, по умолчанию 5000. |
 | `--remove-after-ms N` | Необязательное удаление всего исходного набора; положительное значение меньше duration. |
 | `--max-records N` | Необязательная положительная цель по числу callback records до 1000000; прекращает новый приём после достижения цели принятым префиксом. |
+| `--connect-timeout-ms N` | Deadline соединения, 1..2147483647 мс; по умолчанию 1000 |
+| `--read-timeout-ms N` | Deadline неактивности ввода, 1..2147483647 мс; по умолчанию duration |
+| `--write-timeout-ms N` | Deadline неактивности вывода, 1..2147483647 мс; по умолчанию duration |
+| `--poll-interval-ms N` | Период прогресса вызывающего кода, 1..2147483647 мс; по умолчанию 1 |
+| `--security plain\|tls` | По умолчанию `plain`; `tls` отклоняется до схемы/signals/bootstrap/сети |
 
 Повторять можно лишь `--symbol`. Неизвестные, неполные, повторные или несовместимые аргументы
 отклоняются до активации приложения. Нет stdin-команд, ambient configuration или загрузки схемы.
@@ -70,6 +75,23 @@ signal handlers и игнорирует POSIX SIGPIPE, чтобы broken working
 sink. Для произвольно блокирующих sinks/callbacks и native OS completion нет жёсткой гарантии времени.
 TLS, credentials/authentication, reconnect, wildcard, общий MUX, TICKER/HISTORY и полные subscriptions
 остаются вне этого этапа.
+
+## Неизменяемая нативная конфигурация
+
+После разбора всех аргументов CLI формирует тот же [типизированный снимок endpoint](../../docs/SUBSCRIPTIONS.ru.md#endpoint-options),
+что и нативный overload. Явные timeout overrides имеют приоритет над defaults из duration
+независимо от порядка аргументов. Все пять новых параметров однократные. TLS распознаётся
+для статической ошибки неподдерживаемого профиля до рабочей подготовки; trust/secret argv,
+конфигурационные файлы, environment и Java resolution не добавляются. Ошибки не повторяют
+секреты вызывающего кода. Прежние рабочие exit codes и noargs/отдельная справка сохраняются.
+
+Новый overload допускает независимое отсутствие legacy host/port, отклоняет заданные
+конфликты и применяет минимум operations снимка и прежнего cap1..10000.
+[Ограничения нативного driver](../../docs/SUBSCRIPTIONS.ru.md#endpoint-options) описывают
+достаточные retirement/full-quantum guards и обработку WORK_LIMIT первого вызова свежего хода;
+меньшие допустимые общие options/TCP-профили частичного продвижения остаются представимыми.
+Передача TLS/auth, retry и DNS settings не включает исполнение.
+См. [валидацию параметров](../../tests/conformance/subscriptions/OPTIONS-VALIDATION.ru.md).
 
 ## Версия вывода 1
 

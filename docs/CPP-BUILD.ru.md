@@ -68,6 +68,35 @@ cmake -S consumer -B build-consumer '-Dqdcxx_DIR=C:/sdk/qdcxx/lib64/cmake/qdcxx'
 `client_dispatch`. Вызывающий код владеет сессией/runtime и явно передаёт события
 и исходящие сообщения; локальное завершение не подтверждает закрытие транспорта.
 
+<a id="endpoint-options-build"></a>
+
+## Нативные параметры endpoint без runtime и JSON
+
+`qd/client/endpoint_options.hpp` устанавливается с CLIENT ON в `qdcxx_client`.
+Runtime, CONNECT, JSON и BUILD_TESTING могут оставаться OFF; у возможности client
+сохраняется стандартная зависимость `Threads::Threads`. Этому профилю не нужны
+transport/TLS SDK или компилятор C. Подготовьте compiler environment по руководству,
+затем выполните:
+
+```powershell
+cmake -S . -B build-options '-DORG_TTLDTOR_QDCXX_BUILD_CLIENT=ON' '-DORG_TTLDTOR_QDCXX_BUILD_RUNTIME=OFF' '-DORG_TTLDTOR_QDCXX_BUILD_CONNECT=OFF' '-DORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON=OFF' '-DBUILD_TESTING=OFF' '-DCMAKE_INSTALL_LIBDIR=lib'
+cmake --build build-options --config Release
+cmake --install build-options --prefix C:/sdk/qdcxx-options --config Release
+cmake -S tests/conformance/endpoint_options_consumer -B build-options-consumer '-Dqdcxx_DIR=C:/sdk/qdcxx-options/lib/cmake/qdcxx'
+cmake --build build-options-consumer --config Release
+ctest --test-dir build-options-consumer -C Release --output-on-failure
+```
+
+Выберите свой префикс установки; явный `lib` фиксирует путь пакета.
+Полный [исходник consumer](../tests/conformance/endpoint_options_consumer/main.cpp)
+содержит заголовки и `main`; его [CMake project](../tests/conformance/endpoint_options_consumer/CMakeLists.txt)
+вызывает `find_package(qdcxx CONFIG REQUIRED)` и связывает `qdcxx_client qdcxx_quote`.
+Он создаёт два независимых снимка без запуска runtime/сети и печатает
+`Independent endpoint snapshots: 7301, 7302`, завершаясь кодом ноль.
+[Нативное использование и ограничения driver](SUBSCRIPTIONS.ru.md#endpoint-options) и
+[выполненная валидация](../tests/conformance/subscriptions/OPTIONS-VALIDATION.ru.md)
+описывают lifetime, бюджеты, overload со снимком и замыкание необязательных зависимостей.
+
 ## Опциональный контролируемый STREAM-инструмент
 
 `ORG_TTLDTOR_QDCXX_BUILD_CONNECT` по умолчанию `OFF`; ему нужны явно включённые CLIENT

@@ -128,13 +128,21 @@ int main(int argc, char **argv) {
             return 1;
         }
 
+        auto local = schema(config->schema);
+        auto endpoint = app::effectiveEndpoint(*config, local);
+
+        if (!endpoint) {
+            std::cerr << "qdcxx-connect: configuration failure stage=" << endpoint.error().stage << '\n';
+
+            return 1;
+        }
+
         SignalGuard signals;
 
         if (!signals.ready()) {
             throw std::runtime_error("signal setup failed");
         }
 
-        auto local = schema(config->schema);
         auto output = std::make_shared<app::OutputConsumer>(std::cout, local, config->output);
         output->begin();
         auto bootstrap = t::RuntimeBootstrap::create();
@@ -149,7 +157,7 @@ int main(int argc, char **argv) {
         const x::StreamOptions options{config->host,           config->port,     0,
                                        config->symbols,        config->duration, config->removeAfter,
                                        config->maximumRecords, &interrupted};
-        const auto result = x::runStream(*bootstrap, local, options, output, control);
+        const auto result = x::runStream(*bootstrap, *endpoint, options, output, control);
         bool sinkFailed = false;
 
         try {

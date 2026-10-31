@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <array>
 #include <charconv>
+#include <climits>
 
 namespace org::ttldtor::qdcxx::connect {
 namespace {
@@ -60,8 +61,19 @@ std::expected<Configuration, std::string_view> parseArguments(std::span<const st
         }
 
         const auto value = arguments[index + 1];
-        const std::array<std::string_view, 8> names{"--host",   "--port",        "--schema-profile",  "--output",
-                                                    "--symbol", "--duration-ms", "--remove-after-ms", "--max-records"};
+        const std::array<std::string_view, 13> names{"--host",
+                                                     "--port",
+                                                     "--schema-profile",
+                                                     "--output",
+                                                     "--symbol",
+                                                     "--duration-ms",
+                                                     "--remove-after-ms",
+                                                     "--max-records",
+                                                     "--connect-timeout-ms",
+                                                     "--read-timeout-ms",
+                                                     "--write-timeout-ms",
+                                                     "--poll-interval-ms",
+                                                     "--security"};
         const auto found = std::ranges::find(names, option);
 
         if (found == names.end()) {
@@ -77,7 +89,12 @@ std::expected<Configuration, std::string_view> parseArguments(std::span<const st
 
         seen |= bit;
 
-        if (option == "--host") {
+        if (option == "--security") {
+            if (value != "plain") {
+                return std::unexpected(value == "tls" ? "TLS is unsupported by this plain-only client"
+                                                      : "--security requires plain or tls; only plain executes");
+            }
+        } else if (option == "--host") {
             if (value.empty() || value.size() > 45) {
                 return std::unexpected("--host requires a numeric IPv4/IPv6 literal");
             }
@@ -118,7 +135,10 @@ std::expected<Configuration, std::string_view> parseArguments(std::span<const st
 
             result.symbols.push_back(std::move(symbol));
         } else {
-            const unsigned maximum = option == "--port"          ? 65535
+            const bool timeout = option == "--connect-timeout-ms" || option == "--read-timeout-ms" ||
+                                 option == "--write-timeout-ms" || option == "--poll-interval-ms";
+            const unsigned maximum = timeout                     ? static_cast<unsigned>(INT_MAX)
+                                     : option == "--port"        ? 65535
                                      : option == "--max-records" ? MAXIMUM_RECORDS
                                                                  : MAXIMUM_DURATION_MS;
             const auto number = positive(value, maximum);
@@ -127,7 +147,19 @@ std::expected<Configuration, std::string_view> parseArguments(std::span<const st
                 return std::unexpected(number.error());
             }
 
-            if (option == "--port") {
+            if (timeout) {
+                auto duration = std::chrono::milliseconds(*number);
+
+                if (option == "--connect-timeout-ms") {
+                    result.connectTimeout = duration;
+                } else if (option == "--read-timeout-ms") {
+                    result.readTimeout = duration;
+                } else if (option == "--write-timeout-ms") {
+                    result.writeTimeout = duration;
+                } else {
+                    result.pollInterval = duration;
+                }
+            } else if (option == "--port") {
                 result.port = static_cast<std::uint16_t>(*number);
             } else if (option == "--duration-ms") {
                 result.duration = std::chrono::milliseconds(*number);
@@ -155,6 +187,24 @@ std::expected<Configuration, std::string_view> parseArguments(std::span<const st
     return result;
 }
 
+std::expected<client::EndpointOptions, client::EndpointDiagnostic> effectiveEndpoint(const Configuration &configuration,
+                                                                                     const core::LocalSchema &schema) {
+    auto settings = client::controlledStreamSettings(configuration.duration);
+
+    if (!settings) {
+        return std::unexpected(settings.error());
+    }
+
+    settings->host = configuration.host;
+    settings->port = configuration.port;
+    settings->timeouts.connect = configuration.connectTimeout.value_or(settings->timeouts.connect);
+    settings->timeouts.read = configuration.readTimeout.value_or(settings->timeouts.read);
+    settings->timeouts.write = configuration.writeTimeout.value_or(settings->timeouts.write);
+    settings->timeouts.poll = configuration.pollInterval.value_or(settings->timeouts.poll);
+
+    return client::EndpointOptions::create(schema, *settings);
+}
+
 std::string_view help(bool russian) noexcept {
     if (russian) {
         return R"(qdcxx-connect: ограниченный клиент STREAM по обычному TCP для управляемого peer.
@@ -167,6 +217,11 @@ std::string_view help(bool russian) noexcept {
   --duration-ms N            Интервал приёма 1..600000 мс; по умолчанию 5000.
   --remove-after-ms N        Удалить весь исходный набор через N мс, 0<N<duration.
   --max-records N            Цель 1..1000000 завершённых records; по умолчанию нет цели.
+  --connect-timeout-ms N     Deadline соединения1..2147483647 мс; по умолчанию1000.
+  --read-timeout-ms N        Неактивность ввода1..2147483647 мс; по умолчанию duration.
+  --write-timeout-ms N       Неактивность вывода1..2147483647 мс; по умолчанию duration.
+  --poll-interval-ms N       Период прогресса1..2147483647 мс; по умолчанию1.
+  --security plain|tls      По умолчанию plain; TLS отклоняется до рабочей подготовки.
   --help / --help-ru         Отдельная справка EN/RU, без рабочих входов/bootstrap/сети.
 Без аргументов: та же английская справка, что и --help. Повторять можно лишь --symbol.
 Цель прекращает новый приём; уже принятый допустимый префикс может дать records сверх цели.
@@ -192,6 +247,11 @@ Usage: qdcxx-connect --host IP --port N --symbol SYMBOL [options]
   --duration-ms N            Admission interval in 1..600000 milliseconds; default 5000.
   --remove-after-ms N        Remove the entire initial set after N ms, 0<N<duration.
   --max-records N            Target 1..1000000 completed records; default no data target.
+  --connect-timeout-ms N     Connect deadline1..2147483647 ms; default1000.
+  --read-timeout-ms N        Input inactivity1..2147483647 ms; default duration.
+  --write-timeout-ms N       Output inactivity1..2147483647 ms; default duration.
+  --poll-interval-ms N       Caller progress cadence1..2147483647 ms; default1.
+  --security plain|tls      Default plain; TLS is rejected before working setup.
   --help / --help-ru         Standalone EN/RU help without working inputs/bootstrap/network.
 No arguments prints the same English help as --help. Only --symbol may be repeated.
 A target stops new admission; the already admitted eligible prefix can finish beyond that target.
