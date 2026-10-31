@@ -1,5 +1,7 @@
 # Specifications
 
+[Русская версия](README.ru.md). English is authoritative.
+
 This directory holds implementation-independent contracts extracted from upstream evidence and intentional qd-cxx decisions.
 
 Specifications should distinguish:
@@ -16,3 +18,4 @@ Areas:
 - `schema/` — records, fields, types, aliases, mappings, and scheme construction.
 - `protocol/` — QTP messages, framing, negotiation, and state machines.
 - `encoding/` — byte-level primitives and stateful codecs.
+- [Subscriptions](subscriptions/CONTRACTS.md) — native desired state, delivery ownership, resource limits and lifecycle design; implementation and peer qualification remain pending.

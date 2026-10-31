@@ -45,6 +45,15 @@ Source configuration, wire adaptation and event projection remain separate respo
 QDCXX-025 implements the first bounded application of this decision; the decision is not a claim of existing loader or arbitrary-schema support.
 The [configuration requirements](CONFIGURATION.md) apply beyond schema settings: property sources, precedence, scope, read timing and diagnostics are explicit compatibility concerns.
 
+## Live subscription ownership
+
+[ADR-0005](decisions/ADR-0005-live-subscriptions.md) selects the design for upcoming live subscriptions;
+the [subscription contracts](../spec/subscriptions/CONTRACTS.md) define its observable barriers and budgets.
+`qdcxx_core` owns deterministic identities, desired-interest maps and bounded atomic mutations.
+Live session/client/runtime layers own connection epochs, queues, callbacks, I/O and lifecycle.
+One logical serialization domain is selected for client dispatch; OS threading and the runtime/TCP/TLS
+backend remain undecided. This is a design boundary, not a claim of existing runtime support or owner acceptance.
+
 ## Design principles
 
 - Specify observable behavior before implementation.
@@ -56,7 +65,7 @@ The [configuration requirements](CONFIGURATION.md) apply beyond schema settings:
 
 ## Not decided yet
 
-No networking library, package manager, stable public API, threading model, or binary compatibility policy has been selected. The QDCXX-010 owner follow-up selects doctest as a test-only FetchContent dependency. Those decisions require scoped tasks and evidence.
+No networking library, package manager, stable public API, OS threading model, or binary compatibility policy has been selected. The QDCXX-010 owner follow-up selects doctest as a test-only FetchContent dependency. Those decisions require scoped tasks and evidence.
 
 QDCXX-010 implements only the encoding boundary's compact int/long primitives, with a provisional span-based API, minimal CMake/CTest and no third-party runtime dependency. See [build/API](CPP-BUILD.md) and [validation](../tests/conformance/encoding/VALIDATION.md). This does not implement or change the other proposed boundaries.
 
