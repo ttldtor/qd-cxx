@@ -63,7 +63,7 @@ Its staging, desired-state and shared epoch bounds are separate scopes to aggreg
 The [TICKER collector](../spec/subscriptions/TICKER-COLLECTOR.md) owns a shared latest cache
 and finite independent local views. Explicit retention, per-view initial/update metadata,
 whole-frame publication and stale/reset barriers keep cached evidence distinct from fresh delivery.
-Local view interests do not export upstream demand or add a callback/runtime owner.
+Local view interests do not export upstream demand or add a callback/runtime owner. The separate pure `qdcxx_mux` component captures a bounded desired-interest set per local client and publishes their exact aggregate union. Its per-client selection predicate remains separate from wire reconciliation, collector staging and callback delivery; the caller owns those components and any source-session integration.
 The [local STREAM dispatcher](../spec/subscriptions/CLIENT-DISPATCH.md) owns one collector,
 one guarded consumer, bounded command/result storage and detached immutable batches.
 Only its command handles, results and detached leases cross threads; source event leases stay

@@ -22,6 +22,10 @@ target_include_directories(qdcxx_core PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_
 target_compile_features(qdcxx_core PUBLIC cxx_std_23)
 set_target_properties(qdcxx_core PROPERTIES CXX_EXTENSIONS OFF)
 
+add_library(qdcxx_mux src/mux/interest.cpp)
+target_link_libraries(qdcxx_mux PUBLIC qdcxx_core)
+set_target_properties(qdcxx_mux PROPERTIES CXX_EXTENSIONS OFF)
+
 option(ORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON "Build the bounded native JSON schema loader" ON)
 if(ORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON)
     include(FetchContent)
@@ -80,12 +84,12 @@ if(ORG_TTLDTOR_QDCXX_BUILD_RUNTIME)
 endif()
 
 include(CMakePackageConfigHelpers)
-install(TARGETS qdcxx_encoding qdcxx_core qdcxx_protocol qdcxx_collectors
+install(TARGETS qdcxx_encoding qdcxx_core qdcxx_protocol qdcxx_collectors qdcxx_mux
     qdcxx_event_mapping qdcxx_quote qdcxx_profile EXPORT qdcxxTargets
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
-install(DIRECTORY include/qd/core include/qd/encoding include/qd/protocol include/qd/collectors include/qd/events
+install(DIRECTORY include/qd/core include/qd/encoding include/qd/protocol include/qd/collectors include/qd/events include/qd/mux
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qd" FILES_MATCHING PATTERN "*.hpp")
 install(FILES LICENSE DESTINATION "${CMAKE_INSTALL_DATADIR}/qdcxx/licenses" RENAME qdcxx-LICENSE.txt)
 configure_package_config_file(cmake/qdcxxConfig.cmake.in "${CMAKE_CURRENT_BINARY_DIR}/qdcxxConfig.cmake"
@@ -280,6 +284,12 @@ if(BUILD_TESTING)
         add_test(NAME transport_cares_ownership COMMAND qdcxx_cares_ownership_tests)
         set_tests_properties(transport_cares_ownership PROPERTIES TIMEOUT 20)
     endif()
+    add_executable(qdcxx_mux_interest_tests tests/conformance/mux_interest_tests.cpp)
+    target_link_libraries(qdcxx_mux_interest_tests PRIVATE qdcxx_mux qdcxx_protocol qdcxx_quote doctest::doctest)
+    set_target_properties(qdcxx_mux_interest_tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME mux_interest COMMAND qdcxx_mux_interest_tests)
+    set_tests_properties(mux_interest PROPERTIES TIMEOUT 60)
+
     add_executable(qdcxx_subscription_state_tests tests/conformance/subscription_state_tests.cpp)
     target_link_libraries(qdcxx_subscription_state_tests PRIVATE qdcxx_core doctest::doctest)
     set_target_properties(qdcxx_subscription_state_tests PROPERTIES CXX_EXTENSIONS OFF)

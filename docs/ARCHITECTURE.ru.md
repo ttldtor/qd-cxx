@@ -69,7 +69,7 @@ Staging, desired-state и shared epoch bounds — отдельные облас�
 [TICKER-коллектор](../spec/subscriptions/TICKER-COLLECTOR.ru.md) владеет общим latest-кешем
 и конечным числом независимых локальных представлений. Явное хранение, отдельные initial/update
 метаданные, публикация целого кадра и stale/reset барьеры различают кешированные доказательства
-и свежую выдачу. Локальные интересы не экспортируют upstream demand и не добавляют callback/runtime owner.
+и свежую выдачу. Локальные интересы не экспортируют upstream demand и не добавляют callback/runtime owner. Отдельный чистый компонент `qdcxx_mux` хранит ограниченный набор желаемых interests каждого локального клиента и публикует их точное агрегированное объединение. Predicate выбора клиента отделён от согласования wire-подписок, staging коллектора и доставки callback; вызывающий код владеет этими компонентами и интеграцией с сессией источника.
 [ADR-0006](decisions/ADR-0006-live-runtime.ru.md) выбирает опциональный профиль Asio/c-ares/OpenSSL,
 явные требования к SDK/bootstrap/доверию и [границу проверки реализуемости](../tests/conformance/transport/CONTRACTS.ru.md).
 [Опциональный TCP-адаптер](../spec/transport/TCP-RUNTIME.ru.md) реализует только plain-подмножество

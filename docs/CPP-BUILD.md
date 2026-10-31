@@ -716,3 +716,7 @@ destination atomically with create-only hard-link publication after checked outp
 Existing destinations are refused; no overwrite or rename fallback is used. See the
 [tape-write contract](TAPE-WRITE.md), [CLI reference](../tools/tape-write/README.md), and
 [admission validation](../tests/conformance/protocol/tape-write/ADMISSION-VALIDATION.md).
+
+## Bounded MUX interest API (QDCXX-066)
+
+The installed `qdcxx_mux` target links to `qdcxx_core`; include `qd/mux/interest.hpp`. It is a pure desired-interest component with no new SDK dependency. The build target and executable are named `qdcxx_mux_interest_tests`; the CTest name is `mux_interest`. See the [interest contract](../spec/mux/INTERESTS.md) and [validation](../tests/conformance/subscriptions/MUX-VALIDATION.md).

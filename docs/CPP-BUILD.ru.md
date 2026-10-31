@@ -738,3 +738,7 @@ StreamDataResult теперь возвращает списанные `processed
 отклоняются; overwrite и rename fallback отсутствуют. См. [контракт tape-write](TAPE-WRITE.ru.md),
 [справку CLI](../tools/tape-write/README.ru.md) и
 [валидацию допуска](../tests/conformance/protocol/tape-write/ADMISSION-VALIDATION.ru.md).
+
+## Ограниченный API MUX interests (QDCXX-066)
+
+Установленная цель `qdcxx_mux` связана с `qdcxx_core`; подключите `qd/mux/interest.hpp`. Это чистый компонент желаемых interests без новой SDK-зависимости. Цель сборки и исполняемый файл называются `qdcxx_mux_interest_tests`; имя теста CTest — `mux_interest`. См. [контракт interests](../spec/mux/INTERESTS.ru.md) и [валидацию](../tests/conformance/subscriptions/MUX-VALIDATION.ru.md).
