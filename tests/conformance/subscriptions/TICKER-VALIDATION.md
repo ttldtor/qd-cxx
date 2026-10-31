@@ -51,8 +51,9 @@ They supplement the complete native suites.
 
 ## Actual Java comparison
 
-The [capture profile](../../fixtures/subscriptions/CAPTURES.md) contains 83 cases /
-8255 observations. Seven additional TICKER cases preserve all previous cases;
+This TICKER qualification used an 83-case / 8255-observation
+[capture profile](../../fixtures/subscriptions/CAPTURES.md); later profile extensions
+have their own evidence. Seven additional TICKER cases preserve all previous cases;
 wire/session artifacts retain their bytes. Actual Capture and fresh Verify run
 on Windows JDK 8. This is not a claim of a Linux JVM run.
 

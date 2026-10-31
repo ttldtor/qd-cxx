@@ -60,7 +60,7 @@ add_library(qdcxx_protocol src/protocol/frame_reader.cpp src/protocol/describe_r
 target_link_libraries(qdcxx_protocol PUBLIC qdcxx_encoding qdcxx_core)
 set_target_properties(qdcxx_protocol PROPERTIES CXX_EXTENSIONS OFF)
 
-add_library(qdcxx_collectors src/collectors/stream.cpp src/collectors/ticker.cpp)
+add_library(qdcxx_collectors src/collectors/stream.cpp src/collectors/ticker.cpp src/collectors/history.cpp)
 target_link_libraries(qdcxx_collectors PUBLIC qdcxx_protocol)
 set_target_properties(qdcxx_collectors PROPERTIES CXX_EXTENSIONS OFF)
 
@@ -329,6 +329,14 @@ if(BUILD_TESTING)
     set_target_properties(qdcxx_ticker_collector_tests PROPERTIES CXX_EXTENSIONS OFF)
     add_test(NAME collectors_ticker COMMAND qdcxx_ticker_collector_tests)
     set_tests_properties(collectors_ticker PROPERTIES TIMEOUT 120)
+    add_executable(qdcxx_history_collector_tests tests/conformance/history_collector_tests.cpp)
+    target_link_libraries(qdcxx_history_collector_tests PRIVATE qdcxx_collectors qdcxx_quote qdcxx_profile doctest::doctest Threads::Threads)
+    target_compile_definitions(qdcxx_history_collector_tests PRIVATE
+        "ORG_TTLDTOR_QDCXX_HISTORY_SOURCE_ROOT=\"${CMAKE_CURRENT_SOURCE_DIR}\""
+        "ORG_TTLDTOR_QDCXX_HISTORY_CAPTURE_DIR=\"${CMAKE_CURRENT_BINARY_DIR}/history-native\"")
+    set_target_properties(qdcxx_history_collector_tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME collectors_history COMMAND qdcxx_history_collector_tests)
+    set_tests_properties(collectors_history PROPERTIES TIMEOUT 120)
     if(ORG_TTLDTOR_QDCXX_BUILD_CLIENT)
         add_executable(qdcxx_client_dispatch_tests tests/conformance/client_dispatch_tests.cpp)
         target_link_libraries(qdcxx_client_dispatch_tests PRIVATE qdcxx_client qdcxx_quote doctest::doctest)

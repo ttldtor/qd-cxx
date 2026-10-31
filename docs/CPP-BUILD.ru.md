@@ -92,6 +92,10 @@ CTest; production-only installed package также экспортирует э�
 whole-frame conflation, front/pop и stale/reset барьеры. `collectors_ticker` — focused
 CTest. Этот чистый компонент не добавляет runtime или внешних SDK-зависимостей.
 
+## Ограниченный HISTORY-коллектор (QDCXX-065)
+
+Подключите `qd/collectors/history.hpp` и свяжите установленную цель `qdcxx_collectors`. Компонент принимает целиком допущенные HISTORY-события и предоставляет ограниченное общее индексированное хранилище, независимые локальные представления и evidence полноты каждого запрошенного диапазона. Он не владеет сессией источника, upstream demand, callbacks или transport. См. [контракт коллектора](../spec/subscriptions/HISTORY-COLLECTOR.ru.md) и [валидацию](../tests/conformance/subscriptions/HISTORY-VALIDATION.ru.md). Цель сборки — `qdcxx_history_collector_tests`, имя CTest — `collectors_history`. В production-only installed package входят публичный заголовок и `qdcxx_collectors`.
+
 Отдельные [проекты проверки реализуемости runtime](../tests/conformance/transport/runtime-feasibility/README.ru.md)
 проверяют механизмы закреплённых опциональных SDK с явным локальным получением, OFF по умолчанию и тестовыми
 loopback peers. Они не меняют корневую сборку, не дают production runtime targets и не требуют менять её CRT.

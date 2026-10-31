@@ -134,6 +134,10 @@ public final class CollectorOracle {
     historyIsolation();
     historyInterrupted();
     historyUntimedRecord();
+    historyPartialInitial();
+    historySignedIndex();
+    historyRetention(false);
+    historyRetention(true);
   }
 
   private void start(String name) {
@@ -348,7 +352,7 @@ public final class CollectorOracle {
   private void tickerEqualValues(boolean storeEverything) {
     start("ticker-equal-value-retention-" + storeEverything);
     try (Hub hub = new Hub(QDContract.TICKER, storeEverything, false, true)) {
-      tickerModes();
+      flaggedModes();
       QDAgent agent = hub.agent(false);
       hub.sub(agent, false, hub.first, A, 0);
       hub.send(hub.first, A, 1, 10, 0);
@@ -372,7 +376,7 @@ public final class CollectorOracle {
   private void tickerPartialInitial() {
     start("ticker-partial-initial-live-cutover");
     try (Hub hub = new Hub(QDContract.TICKER, true, false, true)) {
-      tickerModes();
+      flaggedModes();
       Item[] initial = {
         new Item(hub.first, A, 1, 10, 0),
         new Item(hub.first, B, 1, 20, 0),
@@ -436,7 +440,7 @@ public final class CollectorOracle {
   private void tickerRawRemove(boolean storeEverything) {
     start("ticker-raw-remove-retention-" + storeEverything);
     try (Hub hub = new Hub(QDContract.TICKER, storeEverything, false, true)) {
-      tickerModes();
+      flaggedModes();
       QDAgent agent = hub.agent(false);
       hub.sub(agent, false, hub.first, A, 0);
       hub.sub(agent, false, hub.first, B, 0);
@@ -474,7 +478,7 @@ public final class CollectorOracle {
     }
   }
 
-  private void tickerModes() {
+  private void flaggedModes() {
     row("options", 0, "producer-mode", "t:FLAGGED_DATA");
     row("options", 0, "retrieval-mode", "t:FLAGGED_DATA");
   }
@@ -482,7 +486,7 @@ public final class CollectorOracle {
   private void tickerPendingReadd() {
     start("ticker-pending-readd-with-keeper");
     try (Hub hub = new Hub(QDContract.TICKER, false, false, true)) {
-      tickerModes();
+      flaggedModes();
       QDAgent agent = hub.agent(false);
       QDAgent keeper = hub.agent(false);
       hub.sub(agent, false, hub.first, A, 0);
@@ -511,7 +515,7 @@ public final class CollectorOracle {
     }
   }
 
-  private List<Item> tickerLimitedData(String phase, QDAgent agent, int capacity) {
+  private List<Item> limitedData(String phase, QDAgent agent, int capacity) {
     RecordBuffer buffer = new RecordBuffer(RecordMode.FLAGGED_DATA);
     buffer.setCapacityLimit(capacity);
     integer(phase + "-control", 0, "sink-capacity-records", capacity);
@@ -534,7 +538,7 @@ public final class CollectorOracle {
   private void tickerQuantumBoundary() {
     start("ticker-initial-update-quantum-boundary");
     try (Hub hub = new Hub(QDContract.TICKER, true, false, true)) {
-      tickerModes();
+      flaggedModes();
       final int initialKeyCount = 104;
       integer("options", 0, "initial-key-count", initialKeyCount);
       Item[] initial = new Item[initialKeyCount];
@@ -547,7 +551,7 @@ public final class CollectorOracle {
       for (Item item : initial) {
         hub.sub(agent, false, item.record, item.symbol, 0);
       }
-      List<Item> first = tickerLimitedData("initial-first", agent, 1);
+      List<Item> first = limitedData("initial-first", agent, 1);
       if (first.isEmpty()) {
         throw new IllegalStateException("initial retrieval returned no key to update");
       }
@@ -559,9 +563,9 @@ public final class CollectorOracle {
       integer("update-selection", 0, "original-time", consumed.time);
       integer("update-selection", 0, "original-value", consumed.value);
       hub.send(consumed.record, consumed.symbol, 2, consumed.value + 1000, 0);
-      delivered += tickerLimitedData("initial-next-99", agent, 99).size();
+      delivered += limitedData("initial-next-99", agent, 99).size();
       integer("initial-next-99-control", 0, "cumulative-delivered", delivered);
-      List<Item> boundary = tickerLimitedData("first-after-quantum", agent, 1);
+      List<Item> boundary = limitedData("first-after-quantum", agent, 1);
       delivered += boundary.size();
       integer("first-after-quantum-control", 0, "cumulative-delivered", delivered);
       bool(
@@ -708,6 +712,98 @@ public final class CollectorOracle {
       hub.send(hub.first, A, 0, 0, END | REMOVE);
       data("readded-after-end", one);
       data("keeper-after-end", keeper);
+      finish(hub);
+    }
+  }
+
+  private void historyPartialInitial() {
+    start("history-partial-initial-live-quantum");
+    try (Hub hub = new Hub(QDContract.HISTORY, false, false, true)) {
+      flaggedModes();
+      QDAgent agent = hub.agent(true);
+      hub.sub(agent, false, hub.first, A, 0);
+      final int initialRecordCount = 104;
+      Item[] initial = new Item[initialRecordCount + 1];
+      for (int ordinal = 0; ordinal < initialRecordCount; ordinal++) {
+        int time = initialRecordCount - ordinal;
+        initial[ordinal] = new Item(hub.first, A, time, time + 10, ordinal == 0 ? BEGIN : 0);
+      }
+      initial[initialRecordCount] = new Item(hub.first, A, 0, 0, END | REMOVE);
+      hub.sendBatch(initial);
+      List<Item> first = limitedData("initial-first", agent, 1);
+      if (first.isEmpty()) {
+        throw new IllegalStateException("initial retrieval returned no record to update");
+      }
+      Item consumed = first.get(0);
+      row("update-selection", 0, "record", utf16(consumed.record.getName()));
+      row("update-selection", 0, "symbol", utf16(consumed.symbol));
+      integer("update-selection", 0, "original-time", consumed.time);
+      integer("update-selection", 0, "original-value", consumed.value);
+      int delivered = first.size();
+      integer("initial-first-control", 0, "cumulative-delivered", delivered);
+      hub.send(consumed.record, consumed.symbol, consumed.time, consumed.value + 1000, 0);
+      delivered += limitedData("initial-next-99", agent, 99).size();
+      integer("initial-next-99-control", 0, "cumulative-delivered", delivered);
+      delivered += limitedData("first-after-quantum", agent, 1).size();
+      integer("first-after-quantum-control", 0, "cumulative-delivered", delivered);
+      data("remainder", agent);
+      data("after-drain", agent);
+      finish(hub);
+    }
+  }
+
+  private void historySignedIndex() {
+    start("history-signed-inner-index-conflation");
+    try (Hub hub = new Hub(QDContract.HISTORY, false, false, true)) {
+      flaggedModes();
+      QDAgent agent = hub.agent(true);
+      hub.sub(agent, false, hub.first, A, Long.MIN_VALUE);
+      long higher = (2L << 32) | 7;
+      long lower = (1L << 32) | 7;
+      hub.sendBatch(
+          new Item(hub.first, A, higher, 20, BEGIN),
+          new Item(hub.first, A, lower, 10, 0),
+          new Item(hub.first, A, -1, -10, 0),
+          new Item(hub.first, A, Long.MIN_VALUE, 0, END | REMOVE));
+      data("baseline", agent);
+      hub.send(hub.first, A, lower, 10, 0);
+      hub.send(hub.first, A, lower, 10, 0);
+      data("identical-twice", agent);
+      hub.sendBatch(new Item(hub.first, A, lower, 11, TX), new Item(hub.first, A, lower, 12, 0));
+      data("same-index-conflated", agent);
+      hub.send(hub.first, A, higher, 21, TX);
+      data("pending-higher-index", agent);
+      hub.send(hub.first, A, -1, -11, 0);
+      data("transaction-end-negative-index", agent);
+      hub.send(hub.first, A, lower, 0, REMOVE);
+      hub.send(hub.first, A, lower, 0, REMOVE);
+      data("remove-twice", agent);
+      hub.send(hub.first, A, lower, 13, 0);
+      data("readded-index", agent);
+      finish(hub);
+    }
+  }
+
+  private void historyRetention(boolean storeEverything) {
+    start("history-retention-" + storeEverything);
+    try (Hub hub = new Hub(QDContract.HISTORY, storeEverything, false, true)) {
+      flaggedModes();
+      hub.sendBatch(
+          new Item(hub.first, A, 2, 20, BEGIN), new Item(hub.first, A, 0, 0, END | REMOVE));
+      QDAgent agent = hub.agent(true);
+      hub.sub(agent, false, hub.first, A, 0);
+      data("preadd-view", agent);
+      hub.sendBatch(
+          new Item(hub.first, A, 3, 30, BEGIN), new Item(hub.first, A, 0, 0, END | REMOVE));
+      data("active", agent);
+      hub.sub(agent, true, hub.first, A, 0);
+      hub.sub(agent, false, hub.first, A, 0);
+      data("readd", agent);
+      hub.send(hub.first, A, 3, 31, 0);
+      data("post-readd-live", agent);
+      hub.sendBatch(
+          new Item(hub.first, A, 4, 40, BEGIN), new Item(hub.first, A, 0, 0, END | REMOVE));
+      data("fresh-begin", agent);
       finish(hub);
     }
   }

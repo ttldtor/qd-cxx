@@ -10,7 +10,10 @@ The project implements selected bounded profiles against Java QD 3.355 at the re
 The [selected optional runtime profile](decisions/ADR-0006-live-runtime.md) has reproducible
 [DNS/TCP/TLS feasibility tests](../tests/conformance/transport/VALIDATION.md).
 The separate production TCP adapter implements the bounded plain, credential-free subset below.
-TLS/credential adapters, the HISTORY collector and a complete end-to-end subscription client remain unimplemented. The pure bounded MUX component aggregates desired interests across local clients; it does not own a source session, wire reconciliation, callbacks or slow-consumer queues.
+TLS/credential adapters and a complete end-to-end subscription client remain unimplemented.
+The bounded local HISTORY collector handles admitted source events without owning upstream demand,
+a source session or callbacks. The pure bounded MUX component aggregates desired interests across
+local clients; it does not own source sessions, wire reconciliation, callback delivery or slow-consumer queues.
 
 | Component | Behavior and contract |
 | --- | --- |
@@ -18,6 +21,7 @@ TLS/credential adapters, the HISTORY collector and a complete end-to-end subscri
 | Local STREAM dispatch | Serialized callbacks, bounded thread-safe commands, detached immutable batches and explicit local close: [contract](../spec/subscriptions/CLIENT-DISPATCH.md). Default OFF; source session/runtime and wire reconciliation remain caller-owned. Local completion does not certify transport quiescence. |
 | STREAM collector | Every admitted subscribed record in source order, including identical values; bounded whole-event staging and local membership/revision barriers: [contract](../spec/subscriptions/STREAM-COLLECTOR.md). No callbacks, latest cache or upstream multiplexing. |
 | TICKER collector | Shared bounded latest cache, independent local views, explicit retention, initial/live ordering and stale/reset evidence: [contract](../spec/subscriptions/TICKER-COLLECTOR.md). Pure caller-driven delivery; callback dispatch and upstream multiplexing remain separate. |
+| HISTORY collector | Pure bounded per-view projection of whole admitted HISTORY events, with shared signed-raw-index storage and requested-range completeness: [contract](../spec/subscriptions/HISTORY-COLLECTOR.md), [validation](../tests/conformance/subscriptions/HISTORY-VALIDATION.md). No source session, callback or upstream-demand ownership. |
 | Optional TCP runtime | Explicit SDK/bootstrap, caller-driven DNS/connect/read/write, owned buffers, bounded progress and quiescent close: [contract](../spec/transport/TCP-RUNTIME.md), [DNS resources](../spec/transport/DNS-RESOURCES.md), [validation](../tests/conformance/transport/TCP-VALIDATION.md). Default OFF; no TLS, application callbacks, collector or reconnect. |
 | Pure live session | Whole-frame admission, immutable peer generations, protocol/heartbeat controls, readiness/auth gates and owned output: [session contract](../spec/subscriptions/LIVE-SESSION.md). No sockets, clocks, collectors or reconnecting client. |
 | Subscription output | Six messages and explicit descriptions, exact symbols, owned partial-write suffixes and retained-output quotas: [live composer](../spec/subscriptions/WRITER.md). No socket/session/peer acknowledgement. |
@@ -110,7 +114,7 @@ source/artifact qualification; final integration results are recorded separately
   The Java bridge supports only its documented settings and controlled source closure.
 - Indexed layouts, additional finite types, options/flags and compression are available only in their explicit catalog/source profiles. Recovery, unrestricted conversions, broader file-publication policies, real-clock integration, replay CLI and network transport remain outside the implemented boundary.
 - No adapter beyond the documented Quote/Profile mappings is supplied. Raw timing and field bits
-  do not imply business conversions or ticker/history delivery.
+  do not imply business conversions, TICKER delivery or broad source integration. The bounded local HISTORY projection is described separately in the [collector contract](../spec/subscriptions/HISTORY-COLLECTOR.md).
 - Complete private-source equality in [remaining gaps](REAL-TAPE-GAPS.md) is limited to its named ordinary MESSAGE profile; broader catalog cells use separate production fixtures.
 - macOS, a separate standalone LeakSanitizer certification and hostile concurrent filesystem
   behavior remain unverified. Writer allocation-failure paths are covered by focused fault injection;

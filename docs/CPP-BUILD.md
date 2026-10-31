@@ -89,6 +89,10 @@ For a shared bounded latest cache and independent local delivery views, include
 whole-frame conflation, front/pop and stale/reset barriers. `collectors_ticker` is the
 focused CTest. This pure component adds no runtime or external SDK dependency.
 
+## Bounded HISTORY collector (QDCXX-065)
+
+Include `qd/collectors/history.hpp` and link the installed `qdcxx_collectors` target. The component consumes whole admitted HISTORY events and provides bounded shared indexed storage with independent local views and per-request range evidence. It does not own a source session, upstream demand, callbacks or transport. See the [collector contract](../spec/subscriptions/HISTORY-COLLECTOR.md) and [validation](../tests/conformance/subscriptions/HISTORY-VALIDATION.md). The build target is `qdcxx_history_collector_tests`; its CTest name is `collectors_history`. The installed production-only package includes the public header and `qdcxx_collectors`.
+
 The separate [runtime feasibility projects](../tests/conformance/transport/runtime-feasibility/README.md)
 test pinned optional SDK mechanisms with explicit local acquisition, default OFF and synthetic loopback
 peers. They do not change this root build, provide production runtime targets or require a root CRT change.

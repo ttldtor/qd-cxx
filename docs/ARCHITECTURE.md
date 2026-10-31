@@ -64,6 +64,7 @@ The [TICKER collector](../spec/subscriptions/TICKER-COLLECTOR.md) owns a shared 
 and finite independent local views. Explicit retention, per-view initial/update metadata,
 whole-frame publication and stale/reset barriers keep cached evidence distinct from fresh delivery.
 Local view interests do not export upstream demand or add a callback/runtime owner. The separate pure `qdcxx_mux` component captures a bounded desired-interest set per local client and publishes their exact aggregate union. Its per-client selection predicate remains separate from wire reconciliation, collector staging and callback delivery; the caller owns those components and any source-session integration.
+The [HISTORY collector](../spec/subscriptions/HISTORY-COLLECTOR.md) adds bounded per-view projection over whole admitted source events, with shared raw-indexed storage and independent requested-range completeness. It consumes events admitted by a session; source sessions, upstream demand and callbacks remain separate owners. A complete requested range for one view does not imply a globally complete source snapshot.
 The [local STREAM dispatcher](../spec/subscriptions/CLIENT-DISPATCH.md) owns one collector,
 one guarded consumer, bounded command/result storage and detached immutable batches.
 Only its command handles, results and detached leases cross threads; source event leases stay

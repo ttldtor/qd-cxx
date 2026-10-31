@@ -28,3 +28,7 @@ history-transaction-single-batch	production-observation	QDFactory.getDefaultFact
 history-transaction-record-key-isolation	production-observation	QDFactory.getDefaultFactory/collectorBuilder/HISTORY/QDAgent/QDDistributor/RecordBuffer	observed
 history-interrupted-transaction-unsubscribe	production-observation	QDFactory.getDefaultFactory/collectorBuilder/HISTORY/QDAgent/QDDistributor/RecordBuffer	observed
 history-rejects-untimed-record	production-observation	QDFactory.getDefaultFactory/collectorBuilder/HISTORY/QDAgent/QDDistributor/RecordBuffer	observed
+history-partial-initial-live-quantum	production-observation	QDFactory.getDefaultFactory/collectorBuilder/HISTORY/QDAgent/QDDistributor/RecordBuffer	observed
+history-signed-inner-index-conflation	production-observation	QDFactory.getDefaultFactory/collectorBuilder/HISTORY/QDAgent/QDDistributor/RecordBuffer	observed
+history-retention-false	production-observation	QDFactory.getDefaultFactory/collectorBuilder/HISTORY/QDAgent/QDDistributor/RecordBuffer	observed
+history-retention-true	production-observation	QDFactory.getDefaultFactory/collectorBuilder/HISTORY/QDAgent/QDDistributor/RecordBuffer	observed

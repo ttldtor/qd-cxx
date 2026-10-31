@@ -8,8 +8,8 @@ These offline synthetic observations characterize the production Java paths at
 [native subscription contract](../../../spec/subscriptions/CONTRACTS.md). Capturing these paths
 does not itself establish native implementation, full compatibility or lifecycle readiness.
 
-The current profile contains 83 cases and 8255 observation rows: wire 22/2169,
-collectors 29/5187 and session 32/899.
+The current profile contains 87 cases and 10051 observation rows: wire 22/2169,
+collectors 33/6983 and session 32/899.
 
 ## Provenance and reproducibility
 
@@ -43,6 +43,15 @@ The default-quantum case seeds 104 cached keys and retrieves one initial record.
 It updates that actual consumed key, retrieves another 99 initial records, then
 observes the updated consumed key before the remaining four initial records.
 This executes the locked default quantum of 100 without changing JVM properties.
+
+Four additional HISTORY cases observe partial retrieval across its default quantum
+of 100, full signed-64 indexed identity/equality/conflation, and pre-add/last-interest
+retention in both storeEverything modes. They use actual bounded sinks and record
+the provider's result separately from draining those sinks. Immediate false-mode
+remove/re-add has no replay and ordinary live data remains gated until a fresh BEGIN.
+True retention preserves snapshots and can generate difference-removal records.
+Raw transaction progress remains observable while incomplete. These observations
+do not define business source IDs or establish native HISTORY implementation.
 
 | Cases | Observed boundary |
 | --- | --- |
