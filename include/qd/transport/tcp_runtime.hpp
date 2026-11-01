@@ -18,7 +18,8 @@ namespace org::ttldtor::qdcxx::transport {
 
 namespace detail {
 struct BootstrapFactory;
-}
+struct RuntimeCore;
+} // namespace detail
 
 /** Static transport failures; peer text, hostnames and credentials are never diagnostics. */
 enum class TcpError {
@@ -151,6 +152,7 @@ class RuntimeBootstrap {
     struct State;
     std::unique_ptr<State> state_; ///< Stable process-lifetime state borrowed by runtimes.
     friend class TcpRuntime;
+    friend struct detail::RuntimeCore;
     friend struct detail::BootstrapFactory;
     /** Adopt successfully initialized SDK state.
      * @param state Complete process-lifetime owner.
@@ -185,12 +187,11 @@ class RuntimeBootstrap {
  * A run never reopens or reconnects after terminal. Keep bootstrap alive through destruction.
  */
 class TcpRuntime {
-    struct Impl;
-    std::unique_ptr<Impl> impl_; ///< Stable executor, operation state, retained buffers and session.
+    std::unique_ptr<detail::RuntimeCore> impl_; ///< Stable executor, operation state, retained buffers and session.
     /** Adopt fully prepared state without allocating.
      * @param impl Complete unactivated run.
      */
-    explicit TcpRuntime(std::unique_ptr<Impl> impl) noexcept;
+    explicit TcpRuntime(std::unique_ptr<detail::RuntimeCore> impl) noexcept;
 
     public:
     /** Transfer stable runtime ownership on its recorded owner thread.

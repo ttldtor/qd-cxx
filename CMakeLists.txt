@@ -106,6 +106,11 @@ if(ORG_TTLDTOR_QDCXX_BUILD_RUNTIME)
     include(cmake/Runtime.cmake)
 endif()
 
+option(ORG_TTLDTOR_QDCXX_BUILD_TLS "Build the explicit qualified verified-TLS runtime" OFF)
+if(ORG_TTLDTOR_QDCXX_BUILD_TLS)
+    include(cmake/Tls.cmake)
+endif()
+
 include(CMakePackageConfigHelpers)
 install(TARGETS qdcxx_encoding qdcxx_core qdcxx_protocol qdcxx_collectors qdcxx_mux
     qdcxx_event_mapping qdcxx_quote qdcxx_profile EXPORT qdcxxTargets
@@ -308,6 +313,41 @@ if(BUILD_TESTING)
         target_link_libraries(qdcxx_cares_ownership_tests PRIVATE c-ares::cares)
         add_test(NAME transport_cares_ownership COMMAND qdcxx_cares_ownership_tests)
         set_tests_properties(transport_cares_ownership PROPERTIES TIMEOUT 20)
+    endif()
+    if(ORG_TTLDTOR_QDCXX_BUILD_TLS)
+        set(ORG_TTLDTOR_QDCXX_TLS_TEST_FIXTURES "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/transport/tls"
+            CACHE PATH "Explicit ordinary TLS conformance fixture directory")
+        add_executable(qdcxx_tls_test_peer tests/conformance/transport/tls_test_peer_main.cpp)
+        target_compile_features(qdcxx_tls_test_peer PRIVATE cxx_std_23)
+        target_include_directories(qdcxx_tls_test_peer SYSTEM PRIVATE "${ORG_TTLDTOR_QDCXX_ASIO_INCLUDE}")
+        target_compile_definitions(qdcxx_tls_test_peer PRIVATE ASIO_STANDALONE ASIO_NO_DEPRECATED)
+        target_link_libraries(qdcxx_tls_test_peer PRIVATE qdcxx_tls_ssl qdcxx_tls_crypto Threads::Threads)
+        if(WIN32)
+            target_compile_definitions(qdcxx_tls_test_peer PRIVATE _WIN32_WINNT=0x0A00 WINVER=0x0A00 NOMINMAX WIN32_LEAN_AND_MEAN)
+        endif()
+        add_executable(qdcxx_tls_tests tests/conformance/transport/tls_tests.cpp
+            tests/conformance/transport/auth_tests.cpp
+            tests/conformance/transport/tls_dns_peer.cpp
+            tests/conformance/transport/tls_framing_peer.cpp
+            tests/conformance/transport/tls_test_peer.cpp)
+        target_link_libraries(qdcxx_tls_tests PRIVATE qdcxx_tls qdcxx_quote doctest::doctest qdcxx_tls_crypto)
+        target_compile_definitions(qdcxx_tls_tests PRIVATE
+            "ORG_TTLDTOR_QDCXX_TLS_TEST_PEER=\"$<TARGET_FILE:qdcxx_tls_test_peer>\""
+            "ORG_TTLDTOR_QDCXX_TLS_TEST_FIXTURES=\"${ORG_TTLDTOR_QDCXX_TLS_TEST_FIXTURES}\""
+            "ORG_TTLDTOR_QDCXX_TLS_TEST_CONTROL=\"${CMAKE_CURRENT_BINARY_DIR}/tls-test-control\"")
+        add_dependencies(qdcxx_tls_tests qdcxx_tls_test_peer)
+        add_test(NAME transport_tls COMMAND qdcxx_tls_tests)
+        set_tests_properties(transport_tls PROPERTIES TIMEOUT 120)
+        add_test(NAME transport_tls_peer_cli COMMAND "${CMAKE_COMMAND}"
+            "-DPROGRAM=$<TARGET_FILE:qdcxx_tls_test_peer>" "-DRUN=${CMAKE_CURRENT_BINARY_DIR}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/transport/tls_peer_cli.cmake")
+        set_tests_properties(transport_tls_peer_cli PROPERTIES TIMEOUT 20)
+        add_executable(qdcxx_tls_resource_tests tests/conformance/transport/tls_resource_tests.cpp)
+        target_link_libraries(qdcxx_tls_resource_tests PRIVATE qdcxx_tls doctest::doctest)
+        set_target_properties(qdcxx_tls_test_peer qdcxx_tls_tests qdcxx_tls_resource_tests
+            PROPERTIES CXX_EXTENSIONS OFF)
+        add_test(NAME transport_tls_resources COMMAND qdcxx_tls_resource_tests)
+        set_tests_properties(transport_tls_resources PROPERTIES TIMEOUT 30)
     endif()
     add_executable(qdcxx_mux_interest_tests tests/conformance/mux_interest_tests.cpp)
     target_link_libraries(qdcxx_mux_interest_tests PRIVATE qdcxx_mux qdcxx_protocol qdcxx_quote doctest::doctest)

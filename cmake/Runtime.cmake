@@ -66,7 +66,7 @@ set(CARES_THREADS OFF CACHE BOOL "" FORCE)
 add_subdirectory("${ORG_TTLDTOR_QDCXX_CARES_SOURCE}" qdcxx-runtime-cares EXCLUDE_FROM_ALL)
 
 add_library(qdcxx_transport src/transport/runtime_bootstrap.cpp src/transport/dns_resolver.cpp
-    src/transport/tcp_runtime.cpp)
+    src/transport/runtime_core.cpp src/transport/tcp_runtime.cpp)
 target_compile_definitions(qdcxx_transport PRIVATE ASIO_STANDALONE ASIO_NO_DEPRECATED)
 target_include_directories(qdcxx_transport SYSTEM PRIVATE "${ORG_TTLDTOR_QDCXX_ASIO_INCLUDE}")
 target_link_libraries(qdcxx_transport PUBLIC qdcxx_protocol PRIVATE Threads::Threads
@@ -91,7 +91,7 @@ install(TARGETS qdcxx_transport EXPORT qdcxxTargets
 install(FILES "$<TARGET_FILE:${qdcxxCaresTarget}>" DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     RENAME "${qdcxxCaresInstalledName}")
 install(DIRECTORY include/qd/transport DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qd"
-    FILES_MATCHING PATTERN "*.hpp")
+    FILES_MATCHING PATTERN "*.hpp" PATTERN "tls_runtime.hpp" EXCLUDE PATTERN "tls_resources.hpp" EXCLUDE)
 install(FILES "${ORG_TTLDTOR_QDCXX_CARES_SOURCE}/LICENSE.md"
     DESTINATION "${CMAKE_INSTALL_DATADIR}/qdcxx/licenses" RENAME c-ares-MIT.txt)
 install(FILES "${ORG_TTLDTOR_QDCXX_ASIO_INCLUDE}/../LICENSE_1_0.txt"

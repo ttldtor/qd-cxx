@@ -123,3 +123,18 @@ SDKs nor changes JSON, recording, replay or pure-library dependencies.
 
 See the [native verification matrix](../../tests/conformance/transport/TCP-VALIDATION.md)
 for execution profiles, retained-owner and pending-operation evidence boundaries.
+
+<a id="tls-source-profile-tcp-runtime-en"></a>
+
+## Separate verified TLS interface
+
+The implemented [TLS runtime](TLS-RUNTIME.md) composes the common native/DNS owner with a separate
+bounded memory-BIO engine and [resource/work contract](TLS-RESOURCES.md). This plain `TcpRuntime`
+remains credential-free and does not acquire TLS behavior from a stored endpoint setting. Shared-core
+extraction must preserve the established plain semantics and pass its full regression gates.
+TLS header/resource checks do not substitute for those gates or completed TLS backend qualification;
+see [current evidence](../../tests/conformance/transport/TLS-VALIDATION.md).
+
+### Current TLS evidence boundary
+
+The TLS runtime is implemented. The focused current-source suite passed 39 native tests: Windows MSVC 19.42 x64 Release /MD, 11,486 assertions; Linux GCC 13.3 x64 Debug ASan+UBSan, 11,625 assertions, with LSan disabled. Full regression passed on each OS: 58/58 tests with JSON enabled and 57/57 with JSON disabled. Generated-reference verification is recorded separately. The refreshed installed package passed four TLS 1.2/1.3 cases across both OSes. These observations do not establish release, complete subscriptions or security certification. The TLS qualification page linked above distinguishes executed cases from source-only reasoning.

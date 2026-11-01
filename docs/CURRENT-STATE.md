@@ -10,7 +10,7 @@ The project implements selected bounded profiles against Java QD 3.355 at the re
 The [selected optional runtime profile](decisions/ADR-0006-live-runtime.md) has reproducible
 [DNS/TCP/TLS feasibility tests](../tests/conformance/transport/VALIDATION.md).
 The separate production TCP adapter implements the bounded plain, credential-free subset below.
-TLS/credential adapters and a complete end-to-end subscription client remain unimplemented.
+The separate TLS resource module/runtime API are described below; TLS has focused native evidence; final integration acceptance remains separate, and a complete end-to-end subscription client remains unimplemented.
 The bounded local HISTORY collector handles admitted source events without owning upstream demand,
 a source session or callbacks. The pure bounded MUX component aggregates desired interests across
 local clients; it does not own source sessions, wire reconciliation, callback delivery or slow-consumer queues.
@@ -145,3 +145,18 @@ known-record All for STREAM. See [selector contracts and compiled examples](../s
 and [scoped qualification](../tests/conformance/subscriptions/WILDCARD-VALIDATION.md). Legacy Exact
 remains the default; All is not literal wildcard text. TICKER/HISTORY All, automatic peer negotiation,
 complete network facades and broad provider/HISTORY-producer equivalence are not added.
+
+<a id="tls-source-profile-current-state-en"></a>
+
+## TLS resources and runtime implementation
+
+Pure TLS requested-backing/work calculation and atomic admission have native resource-test evidence.
+The move-only TLS runtime implements verified credential handoff, exact pending-I/O ownership and
+truthful local closure. Focused native qualification is recorded separately from final regression acceptance. See the
+[resource contract](../spec/transport/TLS-RESOURCES.md), [runtime API](../spec/transport/TLS-RUNTIME.md)
+and [qualification status](../tests/conformance/transport/TLS-VALIDATION.md). This does not change
+plain runtime/CLI behavior or establish a released TLS/full-subscription capability.
+
+### Current TLS evidence boundary
+
+The TLS runtime is implemented. The focused current-source suite passed 39 native tests: Windows MSVC 19.42 x64 Release /MD, 11,486 assertions; Linux GCC 13.3 x64 Debug ASan+UBSan, 11,625 assertions, with LSan disabled. Full regression passed on each OS: 58/58 tests with JSON enabled and 57/57 with JSON disabled. Generated-reference verification is recorded separately. The refreshed installed package passed four TLS 1.2/1.3 cases across both OSes. These observations do not establish release, complete subscriptions or security certification. The TLS qualification page linked above distinguishes executed cases from source-only reasoning.

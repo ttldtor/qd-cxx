@@ -169,7 +169,7 @@ approved key/group/signature input limits and a source-derived conservative SDK 
 deadlines are cooperative between SDK calls, not preemption of cryptographic work. Logical limits must
 cover SDK buffers, objects and old-plus-candidate peaks; measurements alone do not prove an upper bound.
 Library context/provider/context owners outlive every
-stream and completion; Asio takes ownership of its supplied native `SSL_CTX`. Do not alter the process
+stream and completion; in the feasibility Asio SSL profile, Asio takes ownership of its supplied native `SSL_CTX`. Do not alter the process
 default provider, trust store, property query or initialization flags, and do not call global
 `OPENSSL_cleanup` from a client. The pinned SDK's `OPENSSL_NO_AUTOLOAD_CONFIG` build property disables
 automatic configuration loading; this is not a claim that OpenSSL has no normal process initialization.
@@ -228,7 +228,7 @@ separately from this TLS decision.
 
 The existing `ORG_TTLDTOR_QDCXX_BUILD_RUNTIME` option is OFF by default and enables only the selected
 Asio/c-ares/Threads/native socket closure. The planned separate TLS facility will also default to OFF,
-add OpenSSL SSL/Crypto and require runtime; no production TLS option exists yet.
+add OpenSSL SSL/Crypto and require runtime; the production TLS build/package boundary is tracked separately below.
 Neither facility may change JSON, recording, replay or pure-library dependencies. Public headers
 retain standard/project types; a static consumer still receives the explicit native link closure.
 
@@ -261,3 +261,25 @@ MinGW, io_uring, alternate providers/allocators, late uncoordinated global initi
 system SDKs remain unqualified. See the [transport verification contract](../../tests/conformance/transport/CONTRACTS.md)
 for executed evidence versus source facts and required adapter checks. Kernel scheduling and arbitrary
 application callback duration are not hard real-time guarantees inferred from small loopback probes.
+
+<a id="tls-source-profile-adr0006-en"></a>
+
+## Controlled TLS resource and API refinement
+
+The [TLS resource contract](../../spec/transport/TLS-RESOURCES.md) adds explicit same-image host
+qualification, finite requested backing and a named work vector. The first resource-qualified SDK
+further selects `no-ec2m` / `no-ml-kem`; the older feasibility SDK observations do not automatically
+qualify a differently configured production image. Private library context is not global/thread/
+history isolation, and host declarations include relevant foreign users and failed prefixes.
+
+The [TLS runtime](../../spec/transport/TLS-RUNTIME.md) uses direct bounded memory BIOs over
+the common TCP owner. The earlier Asio SSL stream ownership observation is feasibility-specific.
+Reserved abort/public cutoff and deferred TLS-close progress have separate work/lifetime rules.
+The resource module has native arithmetic/admission checks. Backend and credential behavior have focused native evidence;
+whole-run reservation composition has source-review and admission evidence, not whole-heap measurement.
+packages and runnable consumers have their own [separate qualification](../../tests/conformance/transport/TLS-VALIDATION.md).
+Ordinary malformed/key-policy cases have executed; broader source-only cases remain explicit in the qualification ledger.
+
+### Current TLS evidence boundary
+
+The TLS runtime is implemented. The focused current-source suite passed 39 native tests: Windows MSVC 19.42 x64 Release /MD, 11,486 assertions; Linux GCC 13.3 x64 Debug ASan+UBSan, 11,625 assertions, with LSan disabled. Full regression passed on each OS: 58/58 tests with JSON enabled and 57/57 with JSON disabled. Generated-reference verification is recorded separately. The refreshed installed package passed four TLS 1.2/1.3 cases across both OSes. These observations do not establish release, complete subscriptions or security certification. The TLS qualification page linked above distinguishes executed cases from source-only reasoning.

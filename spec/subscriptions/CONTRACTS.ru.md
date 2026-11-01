@@ -133,3 +133,20 @@ Quiescence означает отсутствие исполняемого librar
 До native state/wire/collectors получить selected peer evidence для add/remove families, HISTORY raw bound, exact/empty/reserved selectors, descriptor/readiness/auth/heartbeat и membership/initial/latest/snapshot/transaction/removal cases. Разделять source inspection, production observations и native tests. Будущий collector не считается supported из-за наличия generic decoder.
 
 Дизайн фиксирует local ownership, mutation, work и epoch boundaries. Peer-dependent protocol/collector details, literal escapes, broader field conversions, PART/compression requirements и exact authentication options остаются blocking evidence rows для своей реализации. Отдельное runtime decision должно установить progress/cancellation/trust behavior на каждой supported platform. Дополнительные framework, persistent journal, business-event catalog и спекулятивные recovery mechanisms здесь не добавляются.
+
+<a id="tls-source-profile-subscription-contracts-ru"></a>
+
+## Граница явной передачи аутентификации TLS
+
+Отдельный [API TLS runtime](../transport/TLS-RUNTIME.ru.md) реализует вызов поставщика свежих учётных
+данных только после полной проверки цепочки и настроенной SAN-идентичности. Владение исходной
+попыткой сохраняется через callbacks. Прекращение допуска публичным владельцем отличается от очистки
+SDK, TLS close_notify и плавного завершения приложения/подписок. Прежнее поведение обычного runtime/CLI
+и чистые контракты сессии, событий и коллекторов сохранены. Квалифицированные условия среды, работы,
+ресурсов и открытые проверки исполнения TLS описаны в [ресурсах TLS](../transport/TLS-RESOURCES.ru.md)
+и [валидации](../../tests/conformance/transport/TLS-VALIDATION.ru.md). Объявление не означает доставку,
+переподключение, завершённость полного клиентского фасада или выпуск.
+
+### Текущая граница доказательств TLS
+
+Рабочий TLS runtime реализован. Целевой набор текущих исходников прошёл 39 native-тестов: Windows MSVC 19.42 x64 Release /MD — 11 486 проверок; Linux GCC 13.3 x64 Debug ASan+UBSan — 11 625 проверок, LSan выключен. Полная регрессия на каждой ОС прошла 58/58 тестов с JSON и 57/57 без JSON. Проверка сгенерированной справки учитывается отдельно. Обновлённый установленный пакет прошёл четыре TLS 1.2/1.3 запуска на двух ОС. Результаты отдельных проверок не означают выпуск, полную поддержку подписок или сертификацию безопасности. Актуальный перечень выполненных и только обоснованных исходниками случаев находится на странице квалификации TLS, ссылка на которую приведена выше.

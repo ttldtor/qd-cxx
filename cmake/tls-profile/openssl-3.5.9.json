@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "profileId": "openssl-3.5.9-controlled-static-v1",
+  "version": "3.5.9",
+  "source": {
+    "archiveName": "openssl-3.5.9.tar.gz",
+    "archiveSha256": "603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a",
+    "manifest": {
+      "file": "openssl-3.5.9-source.sha256.tsv",
+      "sha256": "1a34ca46ecfd407bfcaf1f786ac6f92ed5ebd25c8ace73f373d58d7486f98a3f",
+      "regularFileCount": 5779
+    }
+  },
+  "configureFlags": [
+    "no-shared",
+    "no-tests",
+    "no-docs",
+    "no-autoload-config",
+    "no-ec2m",
+    "no-ml-kem"
+  ],
+  "requiredHeaderMacros": [
+    "OPENSSL_NO_AUTOLOAD_CONFIG",
+    "OPENSSL_NO_EC2M",
+    "OPENSSL_NO_ML_KEM"
+  ],
+  "platforms": {
+    "windows-x64": {
+      "configureTarget": "VC-WIN64A",
+      "architecture": "x86_64",
+      "compiler": "MSVC 19.42; VC toolset 14.42",
+      "sdkCrtFlags": [
+        "/MT",
+        "/Zl"
+      ],
+      "qualifiedConsumerCrtFlag": "/MD",
+      "manifest": {
+        "file": "openssl-3.5.9-windows-x64.sha256.tsv",
+        "sha256": "7571218323228e9f617e58bca2970ba6af9eb90212ca5be382740e4a0475ac1f",
+        "regularFileCount": 152
+      },
+      "libraryPaths": [
+        "lib/libssl.lib",
+        "lib/libcrypto.lib"
+      ],
+      "sdkErrorDebugStringCapacityBytes": 278,
+      "nativeSort": {
+        "implementation": "ucrtbase.dll",
+        "version": "10.0.26100.9750",
+        "sha256": "4ed5d1ce30f8b89729a878a32ca754bf2a4f892b03529e1b0b12c83edeb8bdb8",
+        "qsortExportRva": "0x4a990",
+        "loadedModuleObservation": "not established by this asset manifest",
+        "bindingPremise": "API-set resolves to this unmodified System32 UCRT export and qualified platform services, without replacement or hooks; the qualified optional FLS getter-slot premise remains required.",
+        "scope": "Algorithm-owned dynamic qsort scratch is zero; this does not bound all CRT housekeeping or fixed native stack frames."
+      }
+    },
+    "linux-x64": {
+      "configureTarget": "linux-x86_64",
+      "architecture": "x86_64",
+      "compiler": "GCC 13.3",
+      "manifest": {
+        "file": "openssl-3.5.9-linux-x64.sha256.tsv",
+        "sha256": "de699d180107696826dbaa8a34a2747da0c5b577dd6d4be923f6f4f5c29d456b",
+        "regularFileCount": 152
+      },
+      "libraryPaths": [
+        "lib64/libssl.a",
+        "lib64/libcrypto.a"
+      ],
+      "sdkErrorDebugStringCapacityBytes": 162,
+      "nativeSort": {
+        "implementation": "glibc",
+        "package": "libc6",
+        "version": "2.39-0ubuntu8.9",
+        "architecture": "amd64",
+        "sha256": "3a15d66867d83762c7f2f1e37359cb8f6c5743edb369c65285cb0b1c4f7498bf",
+        "qsortSourceSha256": "f0b597b85c9ebd32caca495cb0df6c529416b2c5e00f8cce04b6c95566c020f6",
+        "bindingPremise": "Production qsort binds the unmodified qualified glibc without sanitizer, foreign qsort or allocator interposition.",
+        "sanitizerBinding": "Direct glibc dispatch is not established for sanitizer-linked conformance executables.",
+        "scratchCandidateBytes": "n <= 1 ? 0 : (w <= 32 ? n * w : 16 * n + w)",
+        "scratchHeapBytes": "n <= 1 || B <= 1024 ? 0 : B, with checked size arithmetic and B equal to scratchCandidateBytes",
+        "scratchAllocationRequests": "n > 1 && B > 1024 ? 1 : 0; allocation failure uses nonrecursive heapsort without retry"
+      }
+    }
+  },
+  "qualificationScope": [
+    "Exact source-tree and installed-file identities for the selected static SDK builds; no SDK binaries or private paths are distributed in this metadata.",
+    "Installed manifests include generated headers, static libraries and installation metadata. They identify these particular qualified builds, including build-prefix-dependent bytes.",
+    "An independent rebuild, another build prefix, a serviced native runtime or an alternate compiler is not automatically qualified by matching the OpenSSL version or Configure flags.",
+    "SDK qualification does not establish completion of the TLS runtime, its integration tests, installed consumers or application acceptance."
+  ],
+  "persistentPremises": [
+    "The application controls every user of the same OpenSSL image, declares finite truthful shared-state and history maxima, and maintains them through final SDK retirement.",
+    "Only the qualified builtin default provider, algorithms, allocator and thread/native bindings are used; affected foreign ex-data, OID, ENGINE, provider and trust mutations are excluded.",
+    "The OpenSSL secure heap remains uninitialized throughout the admitted lifetime; qualification does not initialize or disable it.",
+    "On Linux, kernel 4.8 or newer and the qualified unmodified native entropy dispatch with normally available entropy are required for the finite getrandom request bound; this does not bound syscall duration or entropy wait time.",
+    "Effective ambient identity and the qualified READY CTR/AES-256/SEED-SRC generator profile remain valid at every dependent entry, use and free; the runtime cannot prove all external host declarations.",
+    "The resource metric bounds requested dynamic backing and explicit variable native scratch, not allocator rounding or retention, fixed automatic frames, RSS, instruction count or a hard wall-clock limit."
+  ],
+  "preciseExclusions": [
+    "Binary-curve decoder/inversion APIs and ML-KEM implementations are excluded by the selected build profile.",
+    "The residual bn_GF2m_mul_2x2 assembler helper remains with one definition and no undefined archive references; absence of every GF2m-named symbol is not claimed."
+  ]
+}

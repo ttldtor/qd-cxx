@@ -563,3 +563,9 @@ tests/conformance/connect_cli.cmake text eol=lf
 tests/conformance/schema_json_cli.cmake text eol=lf
 spec/schema/examples/native-binary/*.json text eol=lf
 licenses/simdjson-4.6.4/** -text -whitespace
+
+# Preserve qualified TLS profile inventories and exact ordinary fixture bytes across checkouts.
+cmake/tls-profile/*.json text eol=lf
+cmake/tls-profile/*.tsv text eol=lf
+tests/fixtures/transport/tls/** -text -whitespace
+tests/fixtures/transport/tls/*.md text eol=lf

@@ -81,3 +81,19 @@ package/install closure, reconnect, cross-run isolation, adversarial DER/key cas
 external deployments remain separate required integration evidence. Native root regressions and public
 API Doxygen from prior implementation revisions are not relabeled as new transport tests; no public
 production API or root build option changed here.
+
+<a id="tls-source-profile-transport-validation-en"></a>
+
+## Production TLS qualification boundary
+
+The historical mechanism/SDK profiles above retain their original inputs and evidence scope.
+They do not execute the new TLS runtime or establish its whole-run resource/credential/callback
+contract. Current [TLS resource/runtime validation](TLS-VALIDATION.md) records actual pure resource
+native tests separately from focused backend, ordinary malformed/key-policy, package/TLS-disabled,
+consumer evidence and remaining final integration gates. The [resource contract](../../../spec/transport/TLS-RESOURCES.md)
+adds controlled same-image host history and named-vector premises rather than treating a private
+library context or these feasibility measurements as a complete SDK bound.
+
+### Current TLS evidence boundary
+
+The TLS runtime is implemented. The focused current-source suite passed 39 native tests: Windows MSVC 19.42 x64 Release /MD, 11,486 assertions; Linux GCC 13.3 x64 Debug ASan+UBSan, 11,625 assertions, with LSan disabled. Full regression passed on each OS: 58/58 tests with JSON enabled and 57/57 with JSON disabled. Generated-reference verification is recorded separately. The refreshed installed package passed four TLS 1.2/1.3 cases across both OSes. These observations do not establish release, complete subscriptions or security certification. The TLS qualification page linked above distinguishes executed cases from source-only reasoning.

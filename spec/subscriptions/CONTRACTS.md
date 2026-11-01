@@ -133,3 +133,20 @@ The [finite binary message contract](../protocol/BINARY-MESSAGES.md) currently r
 Before native state/wire/collectors, capture the selected peer's add/remove families, HISTORY raw-bound handling, exact/empty/reserved selectors, descriptor/readiness/auth/heartbeat behavior and membership/initial/latest/snapshot/transaction/removal cases. Distinguish source inspection, production observations and native tests. Never classify a future collector row as supported because generic data decoding exists.
 
 The design fixes local ownership, mutation, work and epoch boundaries. Peer-dependent protocol/collector details, literal escapes, broader field conversions, PART/compression requirements and exact authentication options remain blocking evidence rows for their implementation. The separate runtime decision must establish executable progress/cancellation/trust behavior on each supported platform. No additional framework, persistent journal, business-event catalog or speculative recovery mechanism is added here.
+
+<a id="tls-source-profile-subscription-contracts-en"></a>
+
+## Explicit TLS authentication handoff boundary
+
+The separate [TLS runtime API](../transport/TLS-RUNTIME.md) implements a fresh credential-provider
+handoff only after complete chain and configured SAN identity verification, retaining original-attempt
+ownership across callbacks. A public abort cutoff differs from SDK cleanup, TLS close_notify and
+application/subscription graceful drain. Existing plain runtime/CLI behavior and pure session/event/
+collector contracts remain unchanged. Qualified host/work/resource requirements and the still-open
+TLS execution gates are recorded in [TLS resources](../transport/TLS-RESOURCES.md) and
+[validation](../../tests/conformance/transport/TLS-VALIDATION.md); declaration does not mean delivery,
+reconnect, full client-facade completion or release.
+
+### Current TLS evidence boundary
+
+The TLS runtime is implemented. The focused current-source suite passed 39 native tests: Windows MSVC 19.42 x64 Release /MD, 11,486 assertions; Linux GCC 13.3 x64 Debug ASan+UBSan, 11,625 assertions, with LSan disabled. Full regression passed on each OS: 58/58 tests with JSON enabled and 57/57 with JSON disabled. Generated-reference verification is recorded separately. The refreshed installed package passed four TLS 1.2/1.3 cases across both OSes. These observations do not establish release, complete subscriptions or security certification. The TLS qualification page linked above distinguishes executed cases from source-only reasoning.

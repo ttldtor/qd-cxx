@@ -823,3 +823,60 @@ rebuild for changed C++ selector/membership metadata; source-compatible defaults
 The focused CTest is `wildcard_subscriptions`, executable/target `qdcxx_wildcard_subscription_tests`.
 [Qualified examples and packages](../tests/conformance/subscriptions/WILDCARD-VALIDATION.md) cover
 both pure and CLIENT graphs with physically relocated installed prefixes and unchanged wire/schema layouts.
+
+<a id="tls-source-profile-cpp-build-en"></a>
+
+## Building controlled TLS
+
+The pure `qd/transport/tls_resources.hpp` provides requirement calculation and atomic work admission.
+The implemented `qd/transport/tls_runtime.hpp` belongs to the optional static `qdcxx_tls` target.
+See [resources](../spec/transport/TLS-RESOURCES.md), [runtime](../spec/transport/TLS-RUNTIME.md)
+and [executed checks and limitations](../tests/conformance/transport/TLS-VALIDATION.md).
+Earlier runtime commands describe plain TCP; `runStream`, CLI and endpoint defaults are unchanged.
+
+Enable `ORG_TTLDTOR_QDCXX_BUILD_CLIENT`, `ORG_TTLDTOR_QDCXX_BUILD_RUNTIME` and
+`ORG_TTLDTOR_QDCXX_BUILD_TLS`. Set `ORG_TTLDTOR_QDCXX_OPENSSL_ROOT` to the installed qualified SDK
+and `ORG_TTLDTOR_QDCXX_OPENSSL_SOURCE` to the exact OpenSSL 3.5.9 source tree.
+Replace the illustrative paths below with absolute paths. Qualification checks source/SDK identities,
+not only a version string. Runtime also needs explicit Asio/c-ares inputs as described above.
+
+```powershell
+cmake -S . -B build-tls -G Ninja `
+  -DCMAKE_BUILD_TYPE=Release -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL `
+  -DORG_TTLDTOR_QDCXX_BUILD_CLIENT=ON -DORG_TTLDTOR_QDCXX_BUILD_RUNTIME=ON `
+  -DORG_TTLDTOR_QDCXX_BUILD_TLS=ON `
+  -DORG_TTLDTOR_QDCXX_OPENSSL_ROOT=C:/absolute/qualified-sdk `
+  -DORG_TTLDTOR_QDCXX_OPENSSL_SOURCE=C:/absolute/openssl-3.5.9 `
+  -DORG_TTLDTOR_QDCXX_ASIO_INCLUDE=C:/absolute/asio/include `
+  -DORG_TTLDTOR_QDCXX_CARES_SOURCE=C:/absolute/c-ares `
+  -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX=C:/absolute/install
+cmake --build build-tls --parallel 2
+cmake --install build-tls
+```
+
+Check the Asio/c-ares option names and toolchain setup against the runtime section above.
+The qualified Windows profile is x64 MSVC 19.42 Release `/MD`; `/MT` is rejected.
+The Linux profile is x86-64 GCC 13.3. The selected SDK is fixed by the
+[profile](../cmake/tls-profile/openssl-3.5.9.json) and its source/SDK manifests;
+arbitrary system OpenSSL, automatic acquisition, system roots or another CRT are not substitutes.
+Consumer tests do not make the uninstrumented SDK ASan/UBSan-qualified.
+
+An installed consumer calls `find_package(qdcxx CONFIG REQUIRED)` with the relocated prefix and
+explicit qualified SDK, then `target_link_libraries(app PRIVATE qdcxx_tls)`.
+Add `qdcxx_quote` only when using its prepared Quote schema. SDK/Asio headers and internal runtime
+core are not consumer-code dependencies. Repeated `find_package` is checked separately.
+The compiled independent consumer uses the complete eight-field Quote, public bootstrap/endpoint/
+writer/options, actual TLS and finite retirement; short API declarations in the reference are not
+presented as a standalone program.
+
+| Internal executable | Purpose |
+| --- | --- |
+| `qdcxx_tls_test_peer` | One bounded loopback TLS child owned by the conformance helper; not installed. [Help, codec and lifetime](../tests/conformance/transport/TLS-VALIDATION.md#internal-test-peer). |
+
+Control-v4 (v2/v3 reading is also supported) selects initial write → optional delay → exact read → reply;
+each byte script is bounded by 4 MiB and both writes together by 8 MiB. Legacy/CBC/P-521/SHA-1
+policies and TLS 1.3 ticket counts 0..2 belong only to the test server and do not widen the client profile.
+Report-v2 contains 21 numeric words, including SNI flags and suite/group/hash/tickets/signature-scheme/
+signature-size metadata; it emits no certificate/signature contents. On POSIX the parent preserves
+waitable `SIGCHLD` without `SIG_IGN`/`SA_NOCLDWAIT` and exclusively reaps its child; known incompatible
+pre-start state returns `PROCESS_START`.

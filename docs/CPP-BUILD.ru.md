@@ -848,3 +848,60 @@ requirement и build option в pure graph не добавлены. Прежни�
 Целевой CTest — `wildcard_subscriptions`, executable/target — `qdcxx_wildcard_subscription_tests`.
 [Проверенные примеры и пакеты](../tests/conformance/subscriptions/WILDCARD-VALIDATION.ru.md) охватывают
 pure и CLIENT graphs с физически перемещёнными installed prefixes и сохранёнными wire/schema layouts.
+
+<a id="tls-source-profile-cpp-build-ru"></a>
+
+## Сборка контролируемого TLS
+
+Чистый `qd/transport/tls_resources.hpp` предоставляет расчёт требований и атомарный допуск работы.
+Рабочий `qd/transport/tls_runtime.hpp` входит в необязательный статический `qdcxx_tls`.
+См. [ресурсы](../spec/transport/TLS-RESOURCES.ru.md), [runtime](../spec/transport/TLS-RUNTIME.ru.md)
+и [выполненные проверки и ограничения](../tests/conformance/transport/TLS-VALIDATION.ru.md).
+Прежние параметры runtime выше относятся к обычному TCP; `runStream`, CLI и defaults endpoint не меняются.
+
+Включите `ORG_TTLDTOR_QDCXX_BUILD_CLIENT`, `ORG_TTLDTOR_QDCXX_BUILD_RUNTIME` и
+`ORG_TTLDTOR_QDCXX_BUILD_TLS`. Задайте `ORG_TTLDTOR_QDCXX_OPENSSL_ROOT` для установленного
+квалифицированного SDK и `ORG_TTLDTOR_QDCXX_OPENSSL_SOURCE` для точных исходников OpenSSL 3.5.9.
+Обозначения путей ниже заменяются абсолютными путями; исходники/SDK проверяются по профилю,
+а не только по строке версии. Сборка runtime также требует явно заданные Asio/c-ares из раздела выше.
+
+```powershell
+cmake -S . -B build-tls -G Ninja `
+  -DCMAKE_BUILD_TYPE=Release -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL `
+  -DORG_TTLDTOR_QDCXX_BUILD_CLIENT=ON -DORG_TTLDTOR_QDCXX_BUILD_RUNTIME=ON `
+  -DORG_TTLDTOR_QDCXX_BUILD_TLS=ON `
+  -DORG_TTLDTOR_QDCXX_OPENSSL_ROOT=C:/absolute/qualified-sdk `
+  -DORG_TTLDTOR_QDCXX_OPENSSL_SOURCE=C:/absolute/openssl-3.5.9 `
+  -DORG_TTLDTOR_QDCXX_ASIO_INCLUDE=C:/absolute/asio/include `
+  -DORG_TTLDTOR_QDCXX_CARES_SOURCE=C:/absolute/c-ares `
+  -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX=C:/absolute/install
+cmake --build build-tls --parallel 2
+cmake --install build-tls
+```
+
+Имена параметров Asio/c-ares и подготовку toolchain сверяйте с разделом runtime выше.
+Проверенный Windows-профиль — x64 MSVC 19.42 Release `/MD`; `/MT` отвергается.
+Linux-профиль — x86-64 GCC 13.3. Выбранный SDK фиксируется
+[профилем](../cmake/tls-profile/openssl-3.5.9.json) и его source/SDK manifests;
+произвольная системная OpenSSL, автоматическая загрузка, system roots и иной CRT не являются заменой.
+Тесты потребителя не превращают неинструментированный SDK в ASan/UBSan-квалифицированный.
+
+Установленный потребитель вызывает `find_package(qdcxx CONFIG REQUIRED)` с перемещённым prefix
+и явным квалифицированным SDK, затем `target_link_libraries(app PRIVATE qdcxx_tls)`.
+`qdcxx_quote` нужен дополнительно только при использовании его готовой схемы Quote.
+Заголовки SDK/Asio и внутренний runtime core не нужны коду потребителя. Повторный `find_package`
+проверяется отдельно. Скомпилированный независимый потребитель использует полный восьмиполевой Quote,
+публичные bootstrap/endpoint/writer/options, реальный TLS и конечное закрытие; короткие объявления API
+в справке не выдаются за самостоятельную программу.
+
+| Внутренний executable | Назначение |
+| --- | --- |
+| `qdcxx_tls_test_peer` | Один ограниченный loopback TLS child под владельцем conformance helper; не устанавливается. [Справка, codec и lifetime](../tests/conformance/transport/TLS-VALIDATION.ru.md#internal-test-peer-ru). |
+
+Control-v4 (чтение v2/v3 также поддерживается) задаёт initial write → необязательную задержку →
+exact read → reply; каждая byte script ограничена 4 MiB, две записи вместе — 8 MiB.
+Политики legacy/CBC/P-521/SHA-1 и число TLS 1.3 tickets 0..2 относятся только к тестовому серверу,
+не расширяя профиль клиента. Report-v2 содержит 21 числовое слово, включая флаги SNI и метаданные
+suite/group/hash/tickets/signature scheme/signature size; содержимое сертификатов/подписей не выводится.
+На POSIX родитель сохраняет waitable `SIGCHLD` без `SIG_IGN`/`SA_NOCLDWAIT` и исключительно reap своего child;
+известное несовместимое состояние до запуска возвращает `PROCESS_START`.
