@@ -874,6 +874,79 @@ TEST_CASE("MUX queue global terminal retains callback failure after its public g
     CHECK(f.queue.terminal()->failedRegistrationCount == 1);
 }
 
+TEST_CASE("MUX queue repeated stop preserves published terminal state for every family") {
+    for (const auto family :
+         {c::SubscriptionFamily::STREAM, c::SubscriptionFamily::TICKER, c::SubscriptionFamily::HISTORY}) {
+        for (const auto mode : {m::StopMode::GRACEFUL, m::StopMode::ABORT}) {
+            INFO("family=", static_cast<int>(family), " initial mode=", static_cast<int>(mode));
+            auto f = fixture(family);
+            f.queue.requestStop(mode);
+            until(f, [&] {
+                return f.queue.terminal().has_value();
+            });
+            const auto before = *f.queue.terminal();
+
+            for (const auto repeated : {m::StopMode::GRACEFUL, m::StopMode::ABORT, m::StopMode::GRACEFUL}) {
+                f.queue.requestStop(repeated);
+                CHECK(f.queue.state() == m::QueueState::TERMINAL);
+                auto work = turn();
+                const auto progress = f.queue.progress(work);
+                REQUIRE(progress);
+                CHECK(progress->state == m::QueueState::TERMINAL);
+                CHECK(f.queue.state() == m::QueueState::TERMINAL);
+                REQUIRE(f.queue.terminal());
+                const auto after = *f.queue.terminal();
+                CHECK(after.outcome == before.outcome);
+                CHECK(after.hadGap == before.hadGap);
+                CHECK(after.failedRegistrationCount == before.failedRegistrationCount);
+                CHECK(after.counts.acceptedRecords == before.counts.acceptedRecords);
+                CHECK(after.counts.callbackStartedBatches == before.counts.callbackStartedBatches);
+                CHECK(after.primary.has_value() == before.primary.has_value());
+                CHECK(after.secondary.has_value() == before.secondary.has_value());
+            }
+        }
+    }
+}
+
+TEST_CASE("MUX queue repeated stop retains a callback failure after callback-side abort") {
+    auto f = fixture(c::SubscriptionFamily::STREAM);
+    auto consumer = std::make_shared<Recorder>();
+    auto handle = open(f, consumer);
+    add(f, handle);
+    consumer->throws = true;
+    consumer->action = [&] {
+        f.queue.requestStop(m::StopMode::GRACEFUL);
+        f.queue.requestStop(m::StopMode::ABORT);
+        f.queue.requestStop(m::StopMode::GRACEFUL);
+    };
+    send(f, {{0, u"ALPHA", 1, 10, 0}});
+    until(f, [&] {
+        return f.queue.terminal().has_value();
+    });
+    const auto before = *f.queue.terminal();
+    REQUIRE(before.primary);
+    CHECK(before.primary->error == m::QueueError::CALLBACK_FAILURE);
+    CHECK(before.outcome == m::TerminalOutcome::FAILED);
+    const auto delivered = consumer->values.size();
+
+    for (const auto mode : {m::StopMode::GRACEFUL, m::StopMode::ABORT}) {
+        f.queue.requestStop(mode);
+        CHECK(f.queue.state() == m::QueueState::TERMINAL);
+        auto work = turn();
+        REQUIRE(f.queue.progress(work));
+        REQUIRE(f.queue.terminal());
+        const auto after = *f.queue.terminal();
+        REQUIRE(after.primary);
+        CHECK(after.primary->error == before.primary->error);
+        CHECK(after.outcome == before.outcome);
+        CHECK(after.failedRegistrationCount == before.failedRegistrationCount);
+        CHECK(after.counts.callbackFailedRecords == before.counts.callbackFailedRecords);
+        CHECK(after.counts.discarded == before.counts.discarded);
+        CHECK(after.secondary.has_value() == before.secondary.has_value());
+        CHECK(consumer->values.size() == delivered);
+    }
+}
+
 TEST_CASE("MUX queue global graceful result cannot hide a paused-client forced abort") {
     auto f = fixture(c::SubscriptionFamily::STREAM);
     auto paused = std::make_shared<Recorder>();

@@ -180,7 +180,9 @@ RESUME and exact reset ACK use reserved controls even when data/ordinary command
 Coalesced notices preserve interval evidence without counting the same source notice twice.
 
 Graceful stop fences admission at a finite local cutoff and drains that prefix when possible.
-Abort can escalate graceful. A paused/full client that cannot drain must report `FAILED`/`ABORTED`
+Abort can escalate graceful before terminal publication; later graceful requests cannot downgrade it.
+After publication, repeated stop requests are no-ops: the terminal state, outcome and evidence remain unchanged.
+A paused/full client that cannot drain must report `FAILED`/`ABORTED`
 with gap/discard evidence rather than `DRAINED`. Context/client terminals require actual local
 callback, command and source-view cleanup quiescence. Destructor fallback performs finite abort
 traversal without starting callbacks; arbitrary consumer-destructor work and wall time are excluded.

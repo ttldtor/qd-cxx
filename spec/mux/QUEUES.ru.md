@@ -180,7 +180,9 @@ RESUME и exact reset ACK используют reserved controls даже при
 Coalesced notices сохраняют interval evidence без повторного подсчёта одного source notice.
 
 Graceful stop закрывает admission конечным локальным cutoff и по возможности доставляет его prefix.
-Abort может усилить graceful. Paused/full client, который не может drain, обязан получить
+До публикации terminal abort может усилить graceful; последующие graceful requests не отменяют abort.
+После публикации повторные stop requests ничего не меняют: terminal state, outcome и evidence сохраняются.
+Paused/full client, который не может drain, обязан получить
 `FAILED`/`ABORTED` с gap/discard evidence вместо `DRAINED`. Context/client terminals требуют
 настоящей quiescence callbacks, commands и source-view cleanup. Destructor fallback выполняет
 конечный abort traversal без запуска callbacks; произвольная работа consumer destructor и wall time

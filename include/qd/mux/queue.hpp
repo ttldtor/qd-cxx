@@ -688,6 +688,8 @@ class MuxQueue {
      */
     std::expected<QueueProgress, QueueFailure> progress(QueueWork &work);
     /** Request context-wide stop without iterating/cleaning inline.
+     * Repeated requests can escalate graceful stop to abort before completion.
+     * Requests after terminal publication leave the terminal state and evidence unchanged.
      * @param mode Graceful or escalating abort; allowed from its callback.
      */
     void requestStop(StopMode mode) noexcept;

@@ -3583,7 +3583,7 @@ std::expected<QueueAdmission, QueueFailure> MuxQueue::admit(protocol::LiveEvent 
 }
 
 void MuxQueue::requestStop(StopMode mode) noexcept {
-    if (!state_)
+    if (!state_ || state_->terminal)
         return;
 
     auto &s = *state_;
