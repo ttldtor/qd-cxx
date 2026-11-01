@@ -2,7 +2,7 @@
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
-Author execution, 2026-09-21 UTC; not an independently rerun review. QD 3.355 / locked commit
+Recorded execution, 2026-09-21 UTC; not an independently rerun review. QD 3.355 / locked commit
 0ddc0a09779fb61d74cc0b37c6449ff47dcb715f, Zulu JDK 8.0.422 and Maven 3.9.16. Native clean reactor builds
 ran sequentially, cache disabled, upstream tests skipped, no source/POM patch. Only CRLF was normalized.
 

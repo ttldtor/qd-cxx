@@ -1,10 +1,10 @@
-# QDCXX-027 author verification
+# QDCXX-027 verification
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
 Implementation scope: QDCXX-027 Python-free development tooling.
 Starting HEAD was `dcccd0242252cadb674f4970cc723fbf113bed53`, with a clean tree.
-This is author verification, including additional
+This is verification, including additional
 self-review; independent review and acceptance remain pending.
 
 This report retains the original implementation runs. The current source hashes, strict trace audit,
@@ -196,4 +196,4 @@ needed for correctness. Shared parsing would add allocation or coupling; tiny du
 and unused exports did not justify extra abstraction; regex/poll tweaks had no measured bottleneck;
 a warm-install manifest would introduce a new trust/cache protocol. These suggestions were deferred.
 A separate harness audit led to explicit compiler pinning, a swallowed-descendant denial control and
-orphan-root logger cleanup, all included in the executed final checks. This is author self-review.
+orphan-root logger cleanup, all included in the executed final checks. This is source verification.

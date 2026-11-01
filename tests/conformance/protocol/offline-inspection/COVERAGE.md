@@ -42,5 +42,5 @@ then the unchanged baseline passes. [Proof](negative-proof.json). Expectations r
 
 All six prior suites remain regression checks in all seven test profiles. No full protocol,
 importer/transport/dynamic-session, nonzero flags, huge allocations, exact RSS, 32-bit platform,
-performance or universal Java exception/callback parity is covered. These are author checks;
+performance or universal Java exception/callback parity is covered. These are recorded checks;
 independent review is still required.

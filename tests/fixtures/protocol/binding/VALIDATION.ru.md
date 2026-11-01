@@ -2,7 +2,7 @@
 
 [English version](VALIDATION.md). Английская версия является основной.
 
-Запуски автора, 2026-09-21 UTC; не независимо повторённое ревью. QD 3.355 / locked commit
+Зафиксированные запуски, 2026-09-21 UTC; не независимо повторённое ревью. QD 3.355 / locked commit
 0ddc0a09779fb61d74cc0b37c6449ff47dcb715f, Zulu JDK 8.0.422 и Maven 3.9.16. Чистые native reactor builds
 выполнялись последовательно, cache отключён, upstream tests пропущены, source/POM не исправлялись.
 Нормализован только CRLF.

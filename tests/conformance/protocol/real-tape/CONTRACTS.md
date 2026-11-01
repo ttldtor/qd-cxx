@@ -20,7 +20,7 @@ can explain an observation but does not turn a pending test at the other pin int
 For each row, retain portable deterministic inputs, exact source/helper/runtime/classpath hashes,
 canonical production observations and C++ expected status/value/order/flags/time. Preserve historical
 captures and `upstream.lock`. Keep private recordings, symbols, paths and complete local logs outside
-public fixtures. Distinguish immutable source facts, planned tests, author execution and independently
+public fixtures. Distinguish immutable source facts, planned tests, Native execution and independently
 repeated checks. Do not fill an actual-evidence column with a future path that does not yet exist.
 
 The [producer validation](producer/VALIDATION.md) is existing Windows Java evidence for its named
@@ -187,8 +187,7 @@ formatters and affected oracle Verify after source changes; record final source/
 For documents/matrix, check EN/RU semantic parity, reciprocal and relative links, all changed/new
 whitespace, row uniqueness/count, exact full-ID/message/flag dimensions, primary-source references
 at both pins and actual-evidence path existence. Required independent final-source review covers
-ownership, generation state, partial failure, EOF and resource bounds. Author rereading is not that
-independent review. Publish only the checks actually executed and retain named unresolved limits.
+ownership, generation state, partial failure, EOF and resource bounds. Self-review does not replace independent review. Publish only the checks actually executed and retain named unresolved limits.
 
 
 The implemented045 selection is [BINARY-MESSAGES](../../../../spec/protocol/BINARY-MESSAGES.md),

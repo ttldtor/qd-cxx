@@ -57,7 +57,7 @@ Initial attempt records the sandbox-denied Windows SDK lookup;
 the retry used the installed Visual Studio 2022 toolchain with permitted SDK access.
 Intentional missing-source failure records configure exit 1;
 build does not start after this failure. Coverage negative checks
-record all 157 missing-entry rejections. These are author checks only.
+record all 157 missing-entry rejections. These are recorded checks only.
 
 Initial Linux bootstrap configured and built the native probes
 and available logger sources with GCC. This initial source-stage run reports `u8path` deprecation

@@ -1,8 +1,8 @@
-# Авторская валидация tape reader
+# проверка tape reader
 
 [English version](VALIDATION.md). Английская версия является основной.
 
-Авторские запуски 2026-09-22 UTC. Независимое ревью ожидается. [Покрытие](COVERAGE.ru.md), [Java-доказательства](../../../fixtures/protocol/tape-reader/VALIDATION.ru.md),
+исходные запуски 2026-09-22 UTC. Независимое ревью ожидается. [Покрытие](COVERAGE.ru.md), [Java-доказательства](../../../fixtures/protocol/tape-reader/VALIDATION.ru.md),
 [контракт](../../../../spec/protocol/TAPE-READER.ru.md), [архитектура](../../../../docs/decisions/ADR-0002-bounded-tape-reader.ru.md).
 
 ## Выполненная матрица
@@ -70,4 +70,4 @@ cache восстановлен из точного HEAD blob; generated cache н
 В этих проверках ошибок не обнаружено. Публичный API предварительный. Не заявлены инъекция ошибок
 аллокатора, огромные ресурсы, производительность, authenticated-footer, совместимость default TapeConnector/
 RAW_DATA, Quote, сжатия, временных sidecar, импортера, сети и общих sessions. Следующая веха реального
-события — неизменённый default Quote с точными типами 56/2/120. Это авторская передача на ревью.
+события — неизменённый default Quote с точными типами 56/2/120. Это исходная передача на ревью.

@@ -3,7 +3,7 @@
 [Русская версия](COVERAGE.ru.md). English is authoritative.
 
 The [FIELD-TYPES contract](../../../../spec/encoding/FIELD-TYPES.md) defines the exact opt-in union,
-owned values, primitive/message boundary and charging policy. These author tests consume the
+owned values, primitive/message boundary and charging policy. These tests consume the
 [unchanged Java expectations](../../../fixtures/encoding/field-types/expected) directly.
 [Java coverage](../../../fixtures/encoding/field-types/COVERAGE.md) distinguishes original production
 FileWriter/FileReader delivery, production parser probes and direct primitives. A diagnostic walk

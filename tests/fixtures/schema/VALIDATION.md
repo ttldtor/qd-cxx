@@ -28,7 +28,7 @@ Use the commands in the [harness instructions](../../../tools/upstream/schema-or
 - validation.json: per-run raw/normalized output hashes, counts, baseline comparison and classpath comparisons. It can be checked against the preserved raw files and current expectations.
 - [expected](expected/): reviewed normalized output, explicitly promoted from the first reviewed capture. No Java source behavior was replaced by hand-authored expected values.
 
-Normalization replaces only the exact input-directory `file:/.../inputs/` prefix with `<INPUT>/` and CRLF with LF. No semantic ordering, exception message, alias, type, slot or line number is changed. Metadata retains machine paths; it is not a golden semantic expectation. Maven itself ran in its inherited ru_RU/Cp1251 environment; the **oracle JVMs** explicitly used en/US, UTC and UTF-8, as their environment inventory records.
+Normalization replaces only the exact input-directory <code>file:<span></span>/.../inputs/</code> prefix with `<INPUT>/` and CRLF with LF. No semantic ordering, exception message, alias, type, slot or line number is changed. Metadata retains machine paths; it is not a golden semantic expectation. Maven itself ran in its inherited ru_RU/Cp1251 environment; the **oracle JVMs** explicitly used en/US, UTC and UTF-8, as their environment inventory records.
 
 ## Review and limits
 

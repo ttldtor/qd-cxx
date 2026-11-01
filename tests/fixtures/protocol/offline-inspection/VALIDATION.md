@@ -2,7 +2,7 @@
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
-Author checks executed 2026-09-21 UTC, before CLI implementation; not independent review.
+Checks executed 2026-09-21 UTC, before CLI implementation; not independent review.
 No errors were detected in the final checks below. [Coverage](COVERAGE.md) limits the claims.
 
 Two sequential clean native reactor builds of locked QD 3.355 under JDK 8, with upstream tests

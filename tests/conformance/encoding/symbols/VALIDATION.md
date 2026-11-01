@@ -4,7 +4,7 @@
 
 ## Initial implementation checks (historical)
 
-Author checks executed 2026-09-21 UTC after the integration/test and readability follow-ups. This is
+recorded checks executed 2026-09-21 UTC after the integration/test and readability follow-ups. This is
 not an independent review report. No errors were detected in these checks; no full protocol claim.
 
 | Final profile | Result / UTC evidence |
@@ -44,7 +44,7 @@ See [coverage](COVERAGE.md) and [contract](../../../../spec/encoding/SYMBOLS.md)
 
 ## TSV review follow-up
 
-Author rerun on 2026-09-21 UTC after the TSV-only review fix; this is not independent review.
+Rerun on 2026-09-21 UTC after the TSV-only review fix; this is not independent review.
 All 13 row types now have exact column/schema checks and explicit comparison or diagnostic-only
 handling. Exactly one complete must terminate the file. See the [schema/coverage](COVERAGE.md#tsv-review-follow-up).
 Production code, Java tooling, fixtures and upstream.lock were not changed or regenerated.

@@ -47,7 +47,7 @@ The unchanged default Profile requires 16 logical fields, 24 Java int slots incl
 and two object slots; the field-level library projection retains all of them. No excluded identity or
 indexed schema was needed for this witness. SHORT_STRING/SEQUENCE standard-event witnesses remain open;
 their synthetic coverage does not establish broader standard schemas or business conversions.
-[Author checks](../../tests/conformance/protocol/field-types/VALIDATION.md) remain separate from
+[recorded checks](../../tests/conformance/protocol/field-types/VALIDATION.md) remain separate from
 pending independent review. Full Profile mapping, other events/types, importer, indexed records,
 compression, nonzero flags and transport remain open. The private tape was not used; historical
 aggregate gaps and generated captures do not establish whole-file support.
@@ -60,7 +60,7 @@ absent/empty/null/nonempty option observations and heartbeat propagation before 
 Replay timestamp retains signed int64 milliseconds; the delivered event-time sequence uses saturated
 signed seconds plus milliseconds, independently of Quote business fields. The C++ policy accepts
 only absent/empty/hs options, MESSAGE/message time and the documented heartbeat subset; Java's broader
-acceptance does not authorize more C++ behavior. [Author checks](../../tests/conformance/protocol/raw-tape/VALIDATION.md)
+acceptance does not authorize more C++ behavior. [recorded checks](../../tests/conformance/protocol/raw-tape/VALIDATION.md)
 remain separate from the completed independent acceptance.
 
 [Remaining private-sample gaps](../REAL-TAPE-GAPS.md) include full types 10/40/72/88 and Profile;
@@ -74,7 +74,7 @@ The [Java runtime evidence](../../tests/fixtures/protocol/quote/COVERAGE.md) res
 default Quote schema, production round trip, missing raw-zero fields, repeated targets, UTF_CHAR
 positions, signed-second mapping and finite decimal raw/text/binary64/loss observations.
 [Contracts](../../spec/protocol/DEFAULT-QUOTE.md) and
-[C++ author validation](../../tests/conformance/protocol/quote/VALIDATION.md) implement only the
+[C++ validation](../../tests/conformance/protocol/quote/VALIDATION.md) implement only the
 explicit 2/8/56/120 exact-match local profile. Independent review is complete; implementation commit c26aed28f84db5c574ec5fbb9e4e5160e9dbbd8e.
 TF-04 exclusions, RAW_DATA/MESSAGE, missing-opt policy, other events, conversions, regional mapping,
 compression, importer and transport remain open. Earlier Quote runtime/code gates below are historical
@@ -93,7 +93,7 @@ Unknown/duplicate properties, repeated headers/IDs, partial Java installations, 
 unknown records and malformed/truncated EOF have bounded evidence; the C++ strict/atomic/terminal
 policies are task-authorized differences. Clean EOF does not authenticate a complete recording.
 Broader TF-02/03 sessions, recovery, extreme resources and all TF-04 exclusions remain open. No default
-TapeConnector/RAW_DATA, Quote, compression, importer or transport claim. Author matrix passed;
+TapeConnector/RAW_DATA, Quote, compression, importer or transport claim. Native matrix passed;
 [independent review is pending](../../tests/conformance/protocol/tape/VALIDATION.md). Earlier gates below
 retain their historical scope and are superseded only for this assigned bounded implementation.
 
@@ -110,7 +110,7 @@ constrained type-8 profile as an enabler, not Quote support. RMI/IPF/Launcher sc
 Python migration needs old/new negative equivalence before retiring active checks.
 
 [Tape inventory/gaps](../../spec/protocol/TAPE-FILES.md) and
-[author validation](../../tests/fixtures/protocol/tape/VALIDATION.md) add real FileWriter/FileReader
+[validation](../../tests/fixtures/protocol/tape/VALIDATION.md) add real FileWriter/FileReader
 evidence: default/constrained BINARY and TEXT preserve seven local records; truncated constrained
 input delivers four records and one EOF stream error. Two clean captures match without normalization.
 

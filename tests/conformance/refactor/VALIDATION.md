@@ -1,10 +1,10 @@
-# QDCXX-026 author validation and handoff
+# QDCXX-026 validation and handoff
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
 Starting HEAD: `758303a66d5ed181d7123a2c665d858aba2e8834`, initially clean worktree and index.
 Scope and per-helper decisions: audit, QDCXX-026.
-This is author verification and self-review; independent acceptance remains pending.
+This is verification and self-review; independent acceptance remains pending.
 
 ## Proof before extraction
 
@@ -89,7 +89,7 @@ mutation and exit 0 before and after restoring each copy. Protected originals ar
 
 ## Review, preservation and limitations
 
-The author reviewed the full diff/new helpers, ownership and exception boundaries, ordered budget
+Source inspection covered the full diff/new helpers, ownership and exception boundaries, ordered budget
 charges, named widths, exact outputs and dependency direction. Read-only verification covered reuse, quality and efficiency. Two improvements were applied: remove the
 redundant CLI digit scan before unsigned `from_chars`, retaining the empty guard/full-consumption
 check; reuse the small help assertion in the new argument suite. No efficiency findings required a

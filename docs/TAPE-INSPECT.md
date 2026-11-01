@@ -333,7 +333,7 @@ completion; a final-flush error can follow an already written completion row. Su
 Existing profiles retain their output/diagnostic versions and behavior except the expanded tape help.
 No arguments and standalone `--help` remain identical without input IO. Invalid, missing or duplicate
 profile arguments are usage errors before opening input. [Coverage](../tests/conformance/protocol/field-types/COVERAGE.md)
-and [author validation](../tests/conformance/protocol/field-types/VALIDATION.md) describe checks and limits;
+and [validation](../tests/conformance/protocol/field-types/VALIDATION.md) describe checks and limits;
 independent review remains pending. Historical sections below describe their original increments.
 
 ## Explicit raw-message-v1 and timed output version 3
@@ -365,7 +365,7 @@ full support. The historical sections below describe prior versions and their or
 Diagnostic names and human explanations are implemented in tools/tape-inspect/diagnostics.hpp/.cpp
 (qdcxx_tape_inspect_tool). Protocol retains TapeRejection/TapeDiagnostic data and exact checkpoints,
 without CLI profile names or selection advice. The presentation move preserves stdout/stderr bytes,
-format versions and exit codes. Review-fix author checks
+format versions and exit codes. Review-fix recorded checks
 are separate from historical validation; independent re-review remains pending.
 
 QDCXX-022 adds --profile default-quote-v1 with all eight unchanged default composite Quote fields.
@@ -430,7 +430,7 @@ Read only bounded chunks; at exact input limit peek once to distinguish clean EO
 No continuation after failure, stripping/reordering of input or protocol parsing in presentation.
 
 Configure with -DORG_TTLDTOR_QDCXX_BUILD_TAPE_INSPECT=ON; target qdcxx_tape_inspect,
-filename qdcxx-tape-inspect. [Author validation](../tests/conformance/protocol/tape/VALIDATION.md)
+filename qdcxx-tape-inspect. [validation](../tests/conformance/protocol/tape/VALIDATION.md)
 records the completed checks; independent review remains pending.
 
 Descriptor strings also have a fixed 4096-byte encoded-body cap in the CLI; the library exposes this

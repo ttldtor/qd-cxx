@@ -37,7 +37,7 @@ Java capture `history-raw-bound-change-aggregate-inclusive` фиксирует �
 Дата: 2026-10-31 UTC. Область: `qdcxx_mux_queue` и [контракт очередей](../../../spec/mux/QUEUES.ru.md).
 Исторические результаты чистого interest-компонента QDCXX-066 выше сохраняют исходную область
 source/profile и не квалифицируют callback queues. Следующие результаты относятся к окончательным
-queue implementation и tests. Native execution и package checks выполнил автор реализации;
+queue implementation и tests. Native execution и package checks относятся к исходным проверкам реализации;
 проверка документации охватывает links, точное извлечение source и language/ownership claims.
 
 ### Выполненная native matrix

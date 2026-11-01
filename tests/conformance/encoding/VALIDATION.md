@@ -102,8 +102,7 @@ and local qds-tools replay or a Java publisher where appropriate; none was imple
 
 ## Owner follow-up evidence
 
-- [Windows negative proof](negative-proof.json) was regenerated after doctest migration; [Linux negative
-  proof](linux-negative-proof.json) and [Linux negative log](linux-negative.log) confirm the same
+- [Windows negative proof](negative-proof.json) was regenerated after doctest migration; [Linux negative proof](linux-negative-proof.json) and [Linux negative log](linux-negative.log) confirm the same
   byte/value/parser/CTest mutation failures. Linux explicitly skips the Windows formatter checks.
 - `BUILD_TESTING=OFF` Linux configure/build succeeds and creates no `_deps/` directory, confirming
   the doctest download is confined to tests. Production codec source and original fixture hashes are unchanged.

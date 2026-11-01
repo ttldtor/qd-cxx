@@ -4,7 +4,7 @@
 
 Scope: [WIRE-INVENTORY](../../../../spec/schema/WIRE-INVENTORY.md), explicit
 ordinary discovery and [version-7 inspection](../../../../docs/TAPE-INSPECT.md).
-This report distinguishes author checks from final independent/integration acceptance.
+This report distinguishes recorded checks from final independent/integration acceptance.
 
 ## Executed checks on 2026-10-30
 
@@ -16,7 +16,7 @@ This report distinguishes author checks from final independent/integration accep
 | wire_inventory_schema | 10 cases, 7,724 assertions, all PASS |
 | wire_inventory_cli | PASS, both current tape modes and one-byte/4096-byte schedules |
 | Relevant tape/schema/Quote/Profile/raw/admission/writer/replay/stream CTests | 25/25 PASS, including the two wire tests |
-| Pinned C++ Format then Check | PASS, 10 authored files, Uncrustify 0.83.0 then clang-format 20.1.8 |
+| Pinned C++ Format then Check | PASS, 10 changed files, Uncrustify 0.83.0 then clang-format 20.1.8 |
 | Doxygen, public include tree plus changed tooling headers | Exit 0, zero warning bytes; new constructor/schema/descriptions present in generated HTML |
 
 The targeted CTest set includes protocol_binary_tape, tape_inspection_io/cli,

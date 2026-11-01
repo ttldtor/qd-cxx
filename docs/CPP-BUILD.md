@@ -205,9 +205,10 @@ or byte-identical whole-Java-tape promise. Writer and primitive checks are norma
 [writer validation](../tests/conformance/protocol/tape-write/WRITER-VALIDATION.md) records the
 executed profiles and separate production-parser observations.
 
-To generate the documented C++ API reference, run `doxygen tools/docs/Doxyfile` from the
-repository root. The generated HTML entry point is `.work/api/html/index.html`;
-generated documentation remains outside the tracked source tree.
+To build the user guides, architecture documents and C++ API reference from the repository root, run
+`cmake -DDOXYGEN=/absolute/path/to/doxygen -DOUTPUT=/absolute/path/to/new-docs -P tools/docs/Build.cmake`.
+Open `OUTPUT/html/index.html`. See the [documentation builder](../tools/docs/README.md) for help,
+defaults and limits. Generated documentation remains outside the tracked source tree.
 
 ## Synchronous offline replay
 
@@ -262,7 +263,7 @@ With JSON loader, tape inspector and `BUILD_TESTING` enabled, `schema_export_con
 `schema_export_cli` read [committed production observations](../tests/fixtures/schema/export/expected)
 without invoking Java, Maven, Python or PowerShell. They cover configured events and XML custom/extra
 fields. The [export contract](../spec/schema/JAVA-EXPORT.md) and
-[author validation](../tests/conformance/schema-export/VALIDATION.md) separate supported projection,
+[validation](../tests/conformance/schema-export/VALIDATION.md) separate supported projection,
 executed checks and independent acceptance. C++ still does not resolve XML or Java properties.
 
 ## Native JSON schema loader
@@ -371,8 +372,8 @@ cmake -DMODE=Check "-DUNCRUSTIFY=<native-uncrustify>" "-DCLANG_FORMAT=<native-cl
 preparation and the optional unchanged Windows PowerShell downloader/wrappers. Acquisition and
 execution are separate. Java tooling and remaining manual Python checks retain their requirements.
 
-QDCXX-028 U1–U5 are implemented and author-verified on Windows/Linux, including corrected reruns;
-[new author validation](../tests/conformance/tooling/VALIDATION.md) records actual results separately
+QDCXX-028 U1–U5 are implemented and verified on Windows/Linux, including corrected reruns;
+[new validation](../tests/conformance/tooling/VALIDATION.md) records actual results separately
 from historical evidence. Independent acceptance is open. macOS is unverified and nonblocking.
 The component-era results below preserve their original scope and do not establish current matrix results.
 
@@ -435,7 +436,7 @@ The unchanged standard Profile is tested with a complete caller-local field proj
 Profile event adapter. New suites are `field_type_java_values`, `field_type_fixture_negatives`, `field_type_java_tape`,
 `field_type_inspection_io` and `field_type_inspection_cli`; the last two require the tape inspector.
 Build targets/options and dependency policy are unchanged. [Coverage](../tests/conformance/protocol/field-types/COVERAGE.md)
-and [author validation](../tests/conformance/protocol/field-types/VALIDATION.md) record actual checks;
+and [validation](../tests/conformance/protocol/field-types/VALIDATION.md) record actual checks;
 independent review remains pending. The earlier component sections below retain their historical scope.
 
 ## RAW/MESSAGE tape API
@@ -473,7 +474,7 @@ Build options are unchanged. Example after building both tools:
 ```
 
 [Contract](../spec/protocol/DEFAULT-QUOTE.md), [CLI](TAPE-INSPECT.md),
-[author validation and remaining limits](../tests/conformance/protocol/quote/VALIDATION.md).
+[validation and remaining limits](../tests/conformance/protocol/quote/VALIDATION.md).
 New suites: quote_java_values, quote_java_tape, quote_inspection_io and quote_inspection_cli.
 The IO/CLI suites require the tape tool option. Existing suites and production-only no-fetch/no-Python
 configuration remain supported. No general tape, RAW_DATA, MESSAGE timing or schema loading is added.

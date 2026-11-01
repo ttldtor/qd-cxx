@@ -18,16 +18,17 @@ OpenSSL operation, TLS handshake, callback, native peer or runtime activation.
 
 | Profile | Result | Scope |
 | --- | --- | --- |
-| Windows MSVC 19.42.34444, x64 Release `/MD` | 8/8 cases; 835 assertions; exit 0 | Author source-bound resource tests |
-| Ubuntu 24.04 GCC 13.3, x64 Debug ASan+UBSan | 8/8 cases; 835 assertions; exit 0 | Author source-bound resource tests |
+| Windows MSVC 19.42.34444, x64 Release `/MD` | 8/8 cases; 835 assertions; exit 0 | Source-bound resource tests |
+| Ubuntu 24.04 GCC 13.3, x64 Debug ASan+UBSan | 8/8 cases; 835 assertions; exit 0 | Source-bound resource tests |
 | Independent MSVC native resource oracle | 32 cases passed | Expected quantities derived separately from the paper equations |
 | Independent MSVC resource-suite rerun | 8/8 cases; 835 assertions passed | Actual compiled resource executable |
 | Runtime public header | MSVC self-contained compile-only check passed | No runtime method linking/execution or TLS backend qualification |
 
 Linux used `ASAN_OPTIONS=detect_leaks=0:halt_on_error=1` and
-`UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1`; LSan was excluded. The independent reviewer
-inspected the Linux receipt and did not independently rerun Linux. The resource implementation and
-declared runtime API received focused source review; the evolving runtime body was outside that review.
+`UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1`; LSan was excluded. The additional MSVC resource
+runs are separate executions. The Linux resource receipt was inspected without a second Linux run.
+Resource arithmetic and the runtime declarations were source-checked at that point; full runtime
+execution is reported in its own matrix below.
 
 The resource checks cover five input ceilings, twenty copied host maxima and 25 work coordinates;
 63 nonzero one-short phase cases; zero/exact/excess, shape mismatch, copied input independence,

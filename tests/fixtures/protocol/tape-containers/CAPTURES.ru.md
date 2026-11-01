@@ -4,7 +4,7 @@
 
 [Сопровождаемый oracle](../../../../tools/upstream/tape-container-oracle/README.ru.md) выполнил Capture,
 отдельный повторный Capture и Verify с первым capture для каждого production pin 2026-10-30,
-19:54:40–19:55:32 UTC. Это повторные авторские captures, не независимое ревью кода.
+19:54:40–19:55:32 UTC. Это повторные captures, не независимое ревью кода.
 Исходный [locked reference](../../../../upstream.lock) не изменён.
 
 | Producer | Commit | Runtime/classpath |

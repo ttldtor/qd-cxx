@@ -8,4 +8,4 @@ Historical Java/TSV files are reused byte-for-byte. Names, labels, empty values,
 frame offsets and completion are compared exactly; [full coverage](../../../conformance/protocol/human-inspection/COVERAGE.md).
 [Builder](../../../conformance/protocol/human-inspection/design_fixtures.py) writes only to an explicitly
 requested new directory; verification never invokes it or rewrites fixtures.
-[Validation](VALIDATION.md) identifies author results and limitations.
+[Validation](VALIDATION.md) identifies recorded results and limitations.

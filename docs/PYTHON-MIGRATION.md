@@ -15,12 +15,12 @@ QDCXX-027 implements steps 1–2 from actual starting HEAD
 test-only C++ for both mandatory CLI suites and their mutations. At that handoff, active UTC logging was
 `tools/Run-Utc.ps1`; existing Windows formatter acquisition is `tools/format/Setup-Cpp.ps1`.
 Both retained scripts require PowerShell 7.4 or newer. See the [named coverage map](../tests/conformance/python-migration/COVERAGE.md)
-and [author verification](../tests/conformance/python-migration/VALIDATION.md) for parity, process-image
-Python denial, compiler/option matrices and limitations. The owner integrated the reviewed/fixed work in master at `2833027fb334c9206798f14f1dedc396b8a3ec2a`; historical author reports are not rewritten as fresh independent review.
+and [verification](../tests/conformance/python-migration/VALIDATION.md) for parity, process-image
+Python denial, compiler/option matrices and limitations. The owner integrated the reviewed/fixed work in master at `2833027fb334c9206798f14f1dedc396b8a3ec2a`; historical recorded results are not rewritten as fresh independent review.
 
 QDCXX-028 implements the portable route described in the [native tooling instructions](../tools/dev/README.md): standalone `tools/dev/Bootstrap.cmake`, then `qdcxx-run-utc` and `tools/format/Format-Cpp.cmake` with exact caller-supplied native formatter executables.
 Normal configure/build/CTest and these command trees require neither Python nor PowerShell. The first bootstrap records UTC phase bounds and raw streams instead of per-line timestamps. Optional Windows `Setup-Cpp.ps1`, `Format-Cpp.ps1` and `Run-Utc.ps1` remain available; acquisition is separate from execution, and no portable downloader or package manager is added.
-U1–U5 implementation and author verification on Windows/Linux are complete, including corrected reruns; [new author validation](../tests/conformance/tooling/VALIDATION.md) records actual checks and limitations separately from historical evidence. Independent acceptance is complete; both review findings are closed and the owner integrated the result in master at `c6d2b848ee43b443cad33f9c0e17ade8acedfd16`. macOS remains unverified and nonblocking.
+U1–U5 implementation and verification on Windows/Linux are complete, including corrected reruns; [new validation](../tests/conformance/tooling/VALIDATION.md) records actual checks and limitations separately from historical evidence. Independent acceptance is complete; both review findings are closed and the owner integrated the result in master at `c6d2b848ee43b443cad33f9c0e17ade8acedfd16`. macOS remains unverified and nonblocking.
 This change does not migrate the remaining manual Python checks below, modify Java tooling, retire their requirements or claim that Python has disappeared from the repository.
 
 Manual primitive/protocol negatives, schema JSON validation, evidence audits, generators and tracked-bytecode
@@ -76,5 +76,5 @@ BUILD_TESTING=OFF have no CMake Python requirement; documented logging/acquisiti
 
 The final migration acceptance is **no Python requirement in current workflows**, not deletion of
 every `.py` or historical mention. Preserve fixtures/captures/logs, lock files, hashes and timestamps;
-new reports reference old evidence without editing it. Do not convert an archived author report
+new reports reference old evidence without editing it. Do not convert an archived validation report
 into an independently rerun check. These are later bounded tasks, not implementation authorization.

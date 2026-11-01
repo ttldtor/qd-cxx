@@ -153,7 +153,7 @@ Capture использует отдельный бюджет JVM 120 секун�
 В WSL используйте checkout/classpath на Linux filesystem, если Windows mount превышает бюджеты процессов.
 
 Hashes исходников/classpath относятся к фактическому capture. Изменённый инструмент требует новых
-авторских доказательств, а не исправления старого hash. [Авторская валидация](../../tests/conformance/schema-export/VALIDATION.ru.md)
+доказательств новой проверки, а не исправления старого hash. [Проверка](../../tests/conformance/schema-export/VALIDATION.ru.md)
 фиксирует выполненные проверки, ограничения платформ/provenance и открытую независимую приёмку.
 Обычные CTests `schema_export_consumption` и `schema_export_cli` используют только сохранённые наблюдения.
 Native XML import, общие настройки, новые identities/conversions, замена во время работы, транспорт

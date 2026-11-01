@@ -54,7 +54,7 @@ terminal/prefix и offsets сохраняются. TapeDiagnostic добавля
 
 [English version](TAPE-READER.md). Английская версия является основной.
 
-Авторский контракт QDCXX-021 задан после Java-проб и до реализации C++.
+исходный контракт QDCXX-021 задан после Java-проб и до реализации C++.
 [Решение](../../docs/decisions/ADR-0002-bounded-tape-reader.ru.md). Профиль: явно заданный BINARY
 без сжатия, time NONE, EMPTY_SET, STREAM_DATA, нулевые raw flags, точный обычный тип 8,
 hasTime=false. Вызывающая сторона предоставляет проверенную неизменяемую локальную схему;

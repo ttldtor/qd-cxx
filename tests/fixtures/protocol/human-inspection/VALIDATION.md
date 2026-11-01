@@ -2,7 +2,7 @@
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
-The [author report](../../../conformance/protocol/human-inspection/VALIDATION.md) records seven build/test
+The [validation report](../../../conformance/protocol/human-inspection/VALIDATION.md) records seven build/test
 profiles, ten suites, exact comparisons, escaped-byte budgets, negative/baseline and hash/link checks.
 No errors were detected in those checks; independent review remains pending. All 16 new artifacts
 were reproduced byte-for-byte in a fresh directory using the retained design builder; verification

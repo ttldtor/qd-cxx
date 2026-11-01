@@ -6,7 +6,7 @@ The QDCXX-025 implements only the exact ordinary-record subset in
 [EVENT-MAPPING](../../../../spec/events/EVENT-MAPPING.md), [QUOTE](../../../../spec/events/QUOTE.md)
 and [PROFILE](../../../../spec/events/PROFILE.md). [Java coverage](../../../fixtures/events/mapping/COVERAGE.md)
 separates production delegate/file observations, direct boundary probes and source-resolution evidence.
-[Author validation](VALIDATION.md) records actual runs; independent review is pending.
+[validation](VALIDATION.md) records actual runs; independent review is pending.
 
 | Requirement | Executable coverage |
 | --- | --- |
@@ -31,4 +31,4 @@ Finite tests do not exhaust allocation failure schedules or all Unicode/numeric 
 source loader, complete settings compatibility, regional/indexed events, new full type, wire coercion,
 compression, nonzero QTP flags, replay scheduler or transport is added. No private tape or live endpoint
 is used. Retaining multiple library events requires caller-owned cumulative budgets. Self-review and
-author checks do not close independent review.
+recorded checks do not close independent review.

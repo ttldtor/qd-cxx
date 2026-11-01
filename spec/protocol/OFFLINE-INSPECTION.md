@@ -113,7 +113,7 @@ Diagnostics themselves may fail on an unusable stderr; return remains nonzero.
 Existing STREAM_DATA/binding/symbol captures supply reused semantic cases. Add a locked Java
 production composer/parser workflow with raw .qtp bytes and observable records before CLI code.
 Require two clean captures and negative/baseline Verify. Designed CLI fixtures define sequencing,
-budgets, diagnostics and TSV; Java does not define those policies. Final author validation and
+budgets, diagnostics and TSV; Java does not define those policies. Final validation and
 independent review must remain distinguishable. No timing or full protocol compatibility claim.
 
 ## Opt-in human presentation, version 1

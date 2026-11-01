@@ -2,6 +2,11 @@
 
 [Русская версия](README.ru.md). English is authoritative.
 
+The [HTML/API documentation builder](../docs/README.md) uses CMake and Doxygen without Python or a compiler.
+`cmake -DHELP=ON -P tools/docs/Build.cmake` prints help without inputs or side effects.
+A normal build writes only the selected documentation output; the builder guide describes parameters,
+limits and exits. Standalone checks run through `tools/docs/Tests.cmake`.
+
 The optional [runtime feasibility projects](../../tests/conformance/transport/runtime-feasibility/README.md)
 check pinned DNS/TCP/TLS mechanisms, synthetic certificates, cancellation and dependency-OFF boundaries.
 Each is a separate default-OFF CMake project; neither adds a production transport target to the root build.
@@ -161,7 +166,7 @@ real formatting and exact trace audits; fresh RUN/EVIDENCE directories are requi
 
 [Coverage](../../tests/conformance/tooling/COVERAGE.md) maps named obligations;
 [validation](../../tests/conformance/tooling/VALIDATION.md) records executed commands, results and
-limitations. Author verification and self-review do not close independent acceptance. Java tooling,
+limitations. Initial verification and self-review do not establish independent acceptance. Java tooling,
 remaining manual Python checks and historical artifacts retain their existing requirements.
 
 ## Offline Java producer tooling

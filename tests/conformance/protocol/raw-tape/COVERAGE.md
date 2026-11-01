@@ -53,6 +53,6 @@ FIELD/NONE timing in the new mode, session replacement, transport and replay sch
 excluded. Complete private-file structural inventory is not complete semantic replay; its Java
 replay stopped at the delivery budget, and types 10/40/72/88 remain unsupported by C++.
 
-[Author validation](VALIDATION.md) records executed configurations, counts, commands and limitations.
+[validation](VALIDATION.md) records executed configurations, counts, commands and limitations.
 Independent acceptance is complete within this scope; its fresh checks remain
-separate from the author runs and do not establish general tape compatibility.
+separate from the initial runs and do not establish general tape compatibility.

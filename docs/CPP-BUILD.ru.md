@@ -210,9 +210,10 @@ CTest targets `protocol_tape_writer` и `encoding_char_array_writer`;
 [валидация writer](../tests/conformance/protocol/tape-write/WRITER-VALIDATION.ru.md) фиксирует
 выполненные профили и отдельные наблюдения production parser.
 
-Для генерации документированной справки C++ API выполните `doxygen tools/docs/Doxyfile`
-из корня репозитория. Начальная HTML-страница — `.work/api/html/index.html`;
-сгенерированная документация остаётся вне отслеживаемого дерева исходников.
+Для сборки пользовательских руководств, архитектурной документации и справки C++ API выполните из корня репозитория
+`cmake -DDOXYGEN=/absolute/path/to/doxygen -DOUTPUT=/absolute/path/to/new-docs -P tools/docs/Build.cmake`.
+Откройте `OUTPUT/html/index.html`. Справка, значения по умолчанию и ограничения описаны в
+[сборщике документации](../tools/docs/README.ru.md). Результат остаётся вне отслеживаемого дерева исходников.
 
 ## Синхронное офлайн-воспроизведение
 
@@ -269,7 +270,7 @@ slots в логические поля; sidecar фиксирует отобра�
 `schema_export_cli` читают [сохранённые production observations](../tests/fixtures/schema/export/expected)
 без запуска Java, Maven, Python или PowerShell. Они охватывают настроенные события и пользовательские/
 дополнительные XML-поля. [Контракт экспорта](../spec/schema/JAVA-EXPORT.ru.md) и
-[авторская валидация](../tests/conformance/schema-export/VALIDATION.ru.md) разделяют поддержанную проекцию,
+[проверка](../tests/conformance/schema-export/VALIDATION.ru.md) разделяют поддержанную проекцию,
 выполненные проверки и независимую приёмку. C++ по-прежнему не разрешает XML или Java properties.
 
 ## Нативный загрузчик JSON-схем
@@ -384,8 +385,8 @@ cmake -DMODE=Check "-DUNCRUSTIFY=<native-uncrustify>" "-DCLANG_FORMAT=<native-cl
 подготовку native Linux и необязательные неизменённые Windows PowerShell downloader/wrappers.
 Получение и исполнение разделены. Java tooling и оставшиеся ручные Python-проверки сохраняют свои требования.
 
-QDCXX-028 U1–U5 реализованы и проверены автором на Windows/Linux, включая исправленные повторные запуски;
-[новая авторская валидация](../tests/conformance/tooling/VALIDATION.ru.md) фиксирует фактические результаты
+QDCXX-028 U1–U5 реализованы и проверены на Windows/Linux, включая исправленные повторные запуски;
+[новая проверка](../tests/conformance/tooling/VALIDATION.ru.md) фиксирует фактические результаты
 отдельно от исторических доказательств. Независимая приёмка открыта. macOS непроверена и не блокирует работу.
 Ниже результаты эпохи отдельных компонентов сохраняют первоначальную область и не доказывают текущую матрицу.
 
@@ -451,7 +452,7 @@ encoded bytes вместе с префиксом и UTF-16 units. Значени
 `field_type_inspection_io`, `field_type_inspection_cli`; последние два требуют tape inspector.
 Цели/параметры сборки и политика зависимостей не изменены.
 [Покрытие](../tests/conformance/protocol/field-types/COVERAGE.ru.md) и
-[авторская валидация](../tests/conformance/protocol/field-types/VALIDATION.ru.md) фиксируют фактические
+[проверка](../tests/conformance/protocol/field-types/VALIDATION.ru.md) фиксируют фактические
 проверки; независимое ревью ожидается. Прежние разделы компонентов ниже сохраняют исторические границы.
 
 ## API tape RAW/MESSAGE
@@ -489,7 +490,7 @@ events::mapQuote(record.symbol.units, record.typedValues, maxSymbolUnits). Ре�
 ```
 
 [Контракт](../spec/protocol/DEFAULT-QUOTE.ru.md), [CLI](TAPE-INSPECT.ru.md),
-[авторская валидация и ограничения](../tests/conformance/protocol/quote/VALIDATION.ru.md).
+[проверка и ограничения](../tests/conformance/protocol/quote/VALIDATION.ru.md).
 Новые наборы: quote_java_values, quote_java_tape, quote_inspection_io и quote_inspection_cli.
 IO/CLI требуют включённой опции tape tool. Прежние наборы и production-only конфигурация без
 fetch/Python поддерживаются. Общий tape, RAW_DATA, время MESSAGE и загрузка схем не добавлены.

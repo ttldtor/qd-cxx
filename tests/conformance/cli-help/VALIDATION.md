@@ -8,7 +8,7 @@ remain usage exit 2. Help write/flush failure remains I/O exit 3. The current us
 is the QTP inspector; this rule applies to future qdcxx utilities. Internal operational
 scripts/test runners retain their documented invocation contracts.
 
-Author checks executed 2026-09-22 UTC:
+recorded checks executed 2026-09-22 UTC:
 
 - MSVC Release build and all 10 suites.
 - WSL GCC Release build and all 10 suites.
@@ -23,7 +23,7 @@ invocations using a pipe whose reader is closed before process launch. Existing 
 cases and 84 human cases remain covered. Supplied-input output formats, wire behavior, libraries,
 Java sources and fixture bytes are unchanged. EN/RU usage and policy are synchronized.
 
-These are author checks, not independent review. Release builds reused configured directories;
+These are recorded checks, not independent review. Release builds reused configured directories;
 only the inspector target was rebuilt in the user's Debug directory. No full Debug/ClangCL/sanitizer
 matrix, fresh Java capture or allocation-failure injection was run for this CLI branch change.
 Historical evidence remains historical.

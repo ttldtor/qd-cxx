@@ -112,4 +112,4 @@ Wire profiles, exact binding, raw-zero missing-wire defaults, completed prefixes
 terminal failures and timing policies remain governed by [STREAM-DATA](../protocol/STREAM-DATA.md),
 [TAPE-READER](../protocol/TAPE-READER.md) and [RAW-TAPE](../protocol/RAW-TAPE.md).
 No loader, indexed record, additional serial identity, general wire conversion, transport or mutable
-schema replacement is introduced. Independent review remains separate from author verification.
+schema replacement is introduced. Independent review remains separate from verification.

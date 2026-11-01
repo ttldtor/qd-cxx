@@ -28,10 +28,10 @@ Existing [STREAM_DATA](../stream-data/COVERAGE.md), [binding](../binding/COVERAG
 type-8/malformed/symbol observations. Their semantics are reused; they are not new executions here.
 Repeated intermediate writes are source-supported; callbacks expose their final value only.
 
-[designed.json](designed.json) and [designed streams](designed/) are explicitly authored CLI policy
+[designed.json](designed.json) and [designed streams](designed/) are explicitly specified local CLI policy
 expectations, not Java captures. They cover strict sequencing, errors/positions, resource boundaries,
 completed-prefix output, noncanonical headers and heartbeat envelopes. Initial 53 cases preceded
-CLI implementation; 19 additional boundary cases were authored during validation. No expected
+CLI implementation; 19 additional boundary cases were added during validation. No expected
 record semantics are derived solely from the executable under test.
 
 No importer, transport, dynamic session, conversions, nonzero flag support, enormous allocations,

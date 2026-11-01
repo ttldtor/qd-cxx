@@ -150,8 +150,8 @@ Capture uses a separate 120-second JVM budget for production writer/reader obser
 not change the export command's 30-second budget. Git source verification has a 180-second timeout.
 On WSL, use a native Linux checkout/classpath if mounted Windows storage exceeds process budgets.
 
-Source/classpath hashes belong to the actual capture. A changed tool requires new author evidence,
-not relabeling an old hash. [Author validation](../../tests/conformance/schema-export/VALIDATION.md)
+Source/classpath hashes belong to the actual capture. A changed tool requires fresh verification evidence,
+not relabeling an old hash. [Validation](../../tests/conformance/schema-export/VALIDATION.md)
 records executed checks, platform/provenance limits and open independent acceptance. The normal
 `schema_export_consumption` and `schema_export_cli` CTests consume committed observations only.
 Native XML import, general settings, new identities/conversions, live replacement, transport and

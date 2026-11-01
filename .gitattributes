@@ -569,3 +569,6 @@ cmake/tls-profile/*.json text eol=lf
 cmake/tls-profile/*.tsv text eol=lf
 tests/fixtures/transport/tls/** -text -whitespace
 tests/fixtures/transport/tls/*.md text eol=lf
+
+# Documentation build inputs use portable line endings.
+tools/docs/** text eol=lf

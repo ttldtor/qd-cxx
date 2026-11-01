@@ -356,7 +356,7 @@ Human сохраняет те же tags/raw и безопасно заключа
 Вызовы без аргументов и с отдельным `--help` остаются одинаковыми без входного IO. Неверные,
 пропущенные или повторные аргументы профиля дают usage error до открытия входа.
 [Покрытие](../tests/conformance/protocol/field-types/COVERAGE.ru.md) и
-[авторская валидация](../tests/conformance/protocol/field-types/VALIDATION.ru.md) описывают проверки и ограничения;
+[проверка](../tests/conformance/protocol/field-types/VALIDATION.ru.md) описывают проверки и ограничения;
 независимое ревью ожидается. Исторические разделы ниже описывают свои исходные этапы.
 
 ## Явный raw-message-v1 и вывод времени версии 3
@@ -388,7 +388,7 @@ cursor. `--max-timing-events` ограничивает накопленные п
 Имена и human-пояснения диагностики реализованы в tools/tape-inspect/diagnostics.hpp/.cpp
 (qdcxx_tape_inspect_tool). Protocol сохраняет данные TapeRejection/TapeDiagnostic и точные checkpoints,
 без имён CLI-профилей и советов по выбору. Перенос представления сохраняет байты stdout/stderr,
-версии форматов и коды завершения. Авторские проверки исправления ревью
+версии форматов и коды завершения. исходные проверки исправления ревью
 отделены от исторической валидации; повторное независимое ревью ожидается.
 
 QDCXX-022 добавляет --profile default-quote-v1 со всеми восемью неизменными полями default composite
@@ -455,7 +455,7 @@ payload. Абсолютная позиция его проверки равна 
 удаления/перестановки входа и разбора протокола в представлении.
 
 Настройка: -DORG_TTLDTOR_QDCXX_BUILD_TAPE_INSPECT=ON; target qdcxx_tape_inspect,
-файл qdcxx-tape-inspect. [Авторская валидация](../tests/conformance/protocol/tape/VALIDATION.ru.md)
+файл qdcxx-tape-inspect. [проверка](../tests/conformance/protocol/tape/VALIDATION.ru.md)
 содержит завершённые проверки; независимое ревью ожидается.
 
 Строки дескриптора в CLI также имеют фиксированный лимит тела 4096 байт; библиотека предоставляет

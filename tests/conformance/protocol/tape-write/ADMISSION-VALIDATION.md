@@ -28,7 +28,7 @@ chunks. Publication creates the destination only after checked writes, reader/wr
 flush and close, using same-directory temporary ownership and create-only hard-link publication.
 Existing and racing destination entries are refused. There is no overwrite or rename fallback.
 
-## Executed author checks
+## Executed recorded checks
 
 The archived raw inputs, outputs, Java observations and selected logs are indexed in the
 admission evidence archive; `snapshot.tsv` and `inventory.tsv`
@@ -43,7 +43,7 @@ descriptor-only tape with 0, 1 and 3 schema fields and the exact boundary formul
 mutations that removed schema-field copy charges or changed reader allocation-failure translation
 failed their expected assertions; the restored implementation passed.
 
-The CLI author checks covered both JSON-enabled and JSON-disabled MSVC Release production builds,
+The CLI recorded checks covered both JSON-enabled and JSON-disabled MSVC Release production builds,
 with `BUILD_TESTING=OFF`; JSON-disabled configuration did not acquire simdjson. The CLI regression
 checked all 38 help options/defaults and numeric grammar, five native corpus inputs, exact canonical
 rewrites, standard Quote/Profile, finite input/output refusals, existing/same destinations, Unicode
@@ -75,8 +75,7 @@ are in the archive. Focused Linux GCC ASan+UBSan file-boundary tests passed 12 c
 The final Linux Debug full-suite run
 passed **50/50** under Ubuntu 24.04 / WSL2 with GCC 13.3, AddressSanitizer and UndefinedBehaviorSanitizer.
 CTest reported 865.93 seconds; the logged command interval was 2026-10-11T23:23:12.960Z–23:38:14.459Z.
-Both Linux production-only Release profiles built successfully with JSON disabled: minimal tools OFF, and the QTP inspection, tape inspection, and tape-write tools ON. The final checks confirmed that neither profile created `_deps`; see the archived Linux dependency-gate logs and tools profile gate. Both builds emitted the existing GCC `-Wstringop-overflow` warning at `src/core/wide_decimal.cpp:68` and exited successfully. The independent reviewer did not run
-Linux, JSON ON, the Java oracle, or the complete project suite independently.
+Both Linux production-only Release profiles built successfully with JSON disabled: minimal tools OFF, and the QTP inspection, tape inspection, and tape-write tools ON. The final checks confirmed that neither profile created `_deps`; see the archived Linux dependency-gate logs and tools profile gate. Both builds emitted the existing GCC `-Wstringop-overflow` warning at `src/core/wide_decimal.cpp:68` and exited successfully. Linux, JSON ON, the Java oracle, and the complete project suite were not rerun independently.
 
 Doxygen exited 0, generated the admission API page, and emitted a zero-byte warnings file. The
 configuration enables `EXTRACT_ALL` to include free functions; neither the empty file nor generated

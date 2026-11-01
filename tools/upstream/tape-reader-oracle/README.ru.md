@@ -45,5 +45,5 @@ Java может продолжать после ошибок; observer сохр�
 завершение эксперимента. Строка `complete` не означает успешного разбора повреждённого входа.
 Исходники грамматики: ProtocolDescriptor.parseFrom/parseMessageListFrom, MessageDescriptor.parseFrom,
 BufferedInput.readProperties и BinaryQTPParser.parseDescribeProtocol/parseDescribeRecords из upstream.lock.
-Переносимость и общая tape за пределами профиля не заявляются. Итоговые хеши и авторские проверки —
+Переносимость и общая tape за пределами профиля не заявляются. Итоговые хеши и зафиксированные проверки —
 в [валидации](../../../tests/fixtures/protocol/tape-reader/VALIDATION.ru.md).

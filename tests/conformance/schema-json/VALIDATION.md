@@ -1,10 +1,10 @@
-# External JSON schema author validation
+# External JSON schema validation
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
 Date: 2026-09-24 UTC. Scope: QDCXX-029 bounded native JSON schema loading.
 Actual clean starting HEAD: `3bc0e5ee37cf1dd68306d8016a5b65f68c2da2e0`.
-Implementation and author self-review are complete;
+Implementation and source verification are complete;
 independent review/acceptance remains open.
 
 <a id="binary-json-profile-qualification"></a>
@@ -145,7 +145,7 @@ made. macOS and forced allocator exhaustion were not tested. Linux Release emitt
 No new Java capture, private-tape access, XML/property engine, new type/conversion, transport or
 Python migration was performed. There was no scope deviation.
 
-Author self-review included all changed/new files and focused reuse, quality and efficiency checks;
+source verification included all changed/new files and focused reuse, quality and efficiency checks;
 it does not close independent acceptance. EN/RU claims and relative links, changed/untracked Markdown
 whitespace, `git diff --check`, the empty staged diff and the complete inventory were checked.
 Scoped Git comparisons confirmed historical fixtures, upstream locks/tooling and old schema examples

@@ -2,7 +2,7 @@
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
-Author checks executed on 2026-09-21 UTC, not independent review. No errors were detected in these
+Checks executed on 2026-09-21 UTC, not independent review. No errors were detected in these
 checks. [Coverage](COVERAGE.md) bounds all claims; upstream tests were skipped.
 
 Two sequential clean native reactor builds with JDK 8, build cache disabled and pinned QD 3.355

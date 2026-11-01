@@ -6,7 +6,7 @@ QDCXX-025 реализует только точное подмножество 
 [EVENT-MAPPING](../../../../spec/events/EVENT-MAPPING.ru.md), [QUOTE](../../../../spec/events/QUOTE.ru.md)
 и [PROFILE](../../../../spec/events/PROFILE.ru.md). [Java-покрытие](../../../fixtures/events/mapping/COVERAGE.ru.md)
 разделяет production delegate/file наблюдения, прямые граничные пробы и доказательства разрешения источников.
-[Авторская проверка](VALIDATION.ru.md) записывает выполненные прогоны; независимое ревью ожидается.
+[проверка](VALIDATION.ru.md) записывает выполненные прогоны; независимое ревью ожидается.
 
 | Требование | Исполняемое покрытие |
 | --- | --- |
@@ -31,4 +31,4 @@ duplicate и missing rows, null/empty, flags, time, decimals и небезопа
 общий source loader, полная совместимость настроек, regional/indexed события, новые full types, wire coercion,
 сжатие, ненулевые QTP flags, replay scheduler или transport. Частный tape и live endpoint не используются.
 Сохранение нескольких библиотечных событий требует накопленных бюджетов вызывающей стороны. Самопроверка
-и авторские проверки не закрывают независимое ревью.
+и исходные проверки не закрывают независимое ревью.

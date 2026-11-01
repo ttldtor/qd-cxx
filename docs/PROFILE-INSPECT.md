@@ -79,5 +79,5 @@ exit 0. Truncated input never becomes successful EOF. Exactly one final completi
 by positive comparators; unknown, duplicate and trailing rows are errors.
 
 This capability does not imply indexed events, a properties/XML/JSON loader, additional wire identities,
-compression, replay scheduling, transport or compatibility with a private tape. Author verification
+compression, replay scheduling, transport or compatibility with a private tape. Verification
 and independent review are recorded separately.

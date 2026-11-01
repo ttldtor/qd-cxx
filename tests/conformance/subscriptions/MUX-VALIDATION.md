@@ -37,7 +37,7 @@ The Java capture `history-raw-bound-change-aggregate-inclusive` records the aggr
 Date: 2026-10-31 UTC. Scope: `qdcxx_mux_queue` and the [queue contract](../../../spec/mux/QUEUES.md).
 The historical QDCXX-066 pure-interest results above retain their original source/profile scope;
 they do not qualify callback queues. The following results concern the final queue implementation
-and tests. Native execution and package checks were performed by the implementation author;
+and tests. Native execution and package checks were recorded for the implementation;
 documentation verification checks links, exact source extraction and language/ownership claims.
 
 ### Executed native matrix

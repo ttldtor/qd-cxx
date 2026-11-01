@@ -1,12 +1,12 @@
-# Default Quote author validation
+# Default Quote validation
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
 QDCXX-022 implemented from HEAD `fa5a0b967e9c021e656846cdd3d6faee5faa4776`.
 Checks below ran on 2026-09-22 UTC.
-**Independent review pending.** These are author/team observations, not an independently rerun review.
+**Independent review pending.** These recorded results were not independently rerun.
 
-The initial author runs below are historical. The subsequent presentation-boundary correction and
+The initial runs below are historical. The subsequent presentation-boundary correction and
 test additions have a separate review-fix report; independent re-review remains pending.
 
 ## Evidence and contract order
@@ -21,7 +21,7 @@ Forty additional constructed tapes are focused production-parser probes; they ar
 [Java validation](../../../fixtures/protocol/quote/VALIDATION.md) records two clean matching captures
 of all 86 artifacts, nine rejected mutations, a failing full negative Verify followed by successful
 unchanged baseline Verify, and the old 22-artifact tape Verify in each of four clean invocations.
-Final author comparison reran strict comparison against capture A.
+The final comparison reran strict comparison against capture A.
 This last comparison is not a fifth clean Java build. Final tool hashes and A/B/Verify artifact hashes
 were checked against retained metadata by the audit.
 

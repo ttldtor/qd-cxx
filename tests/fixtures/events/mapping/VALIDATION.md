@@ -1,10 +1,10 @@
-# Configured event oracle author validation
+# Configured event oracle validation
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
 Starting HEAD: `e5a3764992ba3a90a07d3d092a4383e37a901de2`. Executed 2026-09-23 UTC with locked
 QD `0ddc0a09779fb61d74cc0b37c6449ff47dcb715f`, Zulu JDK 8 and Maven 3.9.16.
-Formatting used OpenJDK 23.0.2 and pinned google-java-format 1.36.1. These are author checks;
+Formatting used OpenJDK 23.0.2 and pinned google-java-format 1.36.1. These are recorded checks;
 independent review remains pending. No errors were detected in the successful checks below.
 
 | Executed check | Result |
@@ -15,7 +15,7 @@ independent review remains pending. No errors were detected in the successful ch
 | `.work/event-mapping-negatives` | All 14 mutations rejected; baseline passes and expectation hashes unchanged |
 | Full negative Verify against separate profile-flags expected copy | Expected exit1; changed event flags contradict actual delegate/FileReader event values |
 | Full baseline Verify | PASS against unchanged repository expectations; all 135 artifacts agree |
-| Authored-document links/whitespace and owned-file inventory | Checked separately from raw evidence; no historical evidence normalized |
+| Documentation links/whitespace and owned-file inventory | Checked separately from raw evidence; no historical evidence normalized |
 
 [Capture links](CAPTURES.md) retain the actual logs and metadata. [Reproduction commands](../../../../tools/upstream/event-mapping-oracle/README.md)
 use JDK 8 for the oracle and a separate JDK 21+ for formatting. Each scenario has heap 256 MiB,

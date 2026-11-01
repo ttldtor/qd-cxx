@@ -1,8 +1,8 @@
-# Tape reader author validation
+# Tape reader validation
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
-Author execution, 2026-09-22 UTC. Independent review is pending. [Coverage](COVERAGE.md), [Java evidence](../../../fixtures/protocol/tape-reader/VALIDATION.md),
+Native execution, 2026-09-22 UTC. Independent review is pending. [Coverage](COVERAGE.md), [Java evidence](../../../fixtures/protocol/tape-reader/VALIDATION.md),
 [contract](../../../../spec/protocol/TAPE-READER.md), [architecture](../../../../docs/decisions/ADR-0002-bounded-tape-reader.md).
 
 ## Executed matrix
@@ -70,4 +70,4 @@ Final audit records source/tool hashes, whitespace/link checks and the staged/un
 No errors were detected in these checks. Public API remains provisional. No allocation-failure injection,
 huge-resource, throughput, authenticated-footer, default TapeConnector/RAW_DATA, Quote, compression,
 time-sidecar, importer, network or general-session compatibility is claimed. Next real-event milestone
-remains unchanged default Quote with exact types 56/2/120. This is an author handoff for review.
+remains unchanged default Quote with exact types 56/2/120. Independent review remains pending for this historical record.

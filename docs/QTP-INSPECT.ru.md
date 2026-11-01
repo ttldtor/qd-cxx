@@ -113,5 +113,5 @@ Human версии 1 показывает заголовок формата/пр
 
 Читается raw QTP, не QD tape: нет tape-контейнеров, сжатия, time-файлов, protocol descriptors,
 расширенных полей, importer, transport или динамических сессий.
-[Покрытие human и авторская валидация](../tests/conformance/protocol/human-inspection/VALIDATION.ru.md)
+[Покрытие human и проверка](../tests/conformance/protocol/human-inspection/VALIDATION.ru.md)
 используют прежние доказательства Java; само представление — спроектированная политика C++.

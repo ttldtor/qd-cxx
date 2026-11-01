@@ -1,11 +1,11 @@
-# RAW tape oracle author validation
+# RAW tape oracle validation
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
 Starting repository HEAD: `c1654f2dbb5163917b848d1b84b17dfb9d0999fc`. Executed on 2026-09-22 UTC,
 with locked QD `0ddc0a09779fb61d74cc0b37c6449ff47dcb715f`, Zulu JDK 8 and the pinned upstream
 build path. Formatter used the separate OpenJDK 23.0.2 and google-java-format 1.36.1. No errors were
-detected in the successful checks below. These are author runs, not independent review acceptance.
+detected in the successful checks below. These are initial runs, not independent review acceptance.
 
 ## Executed checks
 

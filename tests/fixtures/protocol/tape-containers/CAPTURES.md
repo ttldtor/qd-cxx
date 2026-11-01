@@ -4,7 +4,7 @@
 
 The [maintained oracle](../../../../tools/upstream/tape-container-oracle/README.md) executed Capture,
 an independent repeat Capture and Verify against the first capture for each production pin on
-2026-10-30, 19:54:40–19:55:32 UTC. This is a repeated author capture, not independent code review.
+2026-10-30, 19:54:40–19:55:32 UTC. This is a repeated capture run, not independent code review.
 The original [locked reference](../../../../upstream.lock) remains unchanged.
 
 | Producer | Commit | Runtime/classpath |

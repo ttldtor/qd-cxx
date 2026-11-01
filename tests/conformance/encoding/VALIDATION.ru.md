@@ -107,8 +107,7 @@ Java publisher по необходимости; здесь это не реал�
 
 ## Доказательства дополнения владельца
 
-- [Windows negative proof](negative-proof.json) создан заново после миграции doctest; [Linux negative
-  proof](linux-negative-proof.json) и [Linux negative log](linux-negative.log) подтверждают те же
+- [Windows negative proof](negative-proof.json) создан заново после миграции doctest; [Linux negative proof](linux-negative-proof.json) и [Linux negative log](linux-negative.log) подтверждают те же
   отказы для мутаций байта/значения/parser/CTest. Linux явно пропускает проверки Windows-форматтеров.
 - Конфигурация/сборка Linux с `BUILD_TESTING=OFF` успешна и не создаёт `_deps/`, подтверждая, что
   загрузка doctest ограничена тестами. Исходник production codec и хеши исходных fixtures неизменны.

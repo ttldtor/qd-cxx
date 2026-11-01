@@ -64,14 +64,14 @@ construction work and old-plus-candidate snapshot peak boundaries, and retained 
 across prefix/business/prefix generations. TSV/HUMAN and all eight old formatter profiles reject
 engaged zero metadata before a zero row budget.
 
-Pinned Uncrustify0.83.0 followed by clang-format20.1.8 Format/Check passed for the authored C++.
+Pinned Uncrustify0.83.0 followed by clang-format20.1.8 Format/Check passed for the C++ sources.
 The clean locked full-reactor governed Verify passed all638 artifacts and the old tape baseline.
 All62 verifier mutations were rejected:50 existing and12 FIELD cases covering raw seconds, optional
 sequence, projection, order, business values, completion, unknown consumers, raw bytes, extra files,
 standard indexed time and physical slots. The unchanged positive baseline passed afterward.
 Independent copied Windows and Linux sanitizer binaries additionally passed FIELD19 cases/6546
 assertions, message-family14/1266 and session12 cases (4223 Windows/4101 Linux assertions; allocation
-checkpoints differ by platform). The reviewer independently rehashed retained production executions,
+checkpoints differ by platform). Independent inspection rehashed retained production executions,
 public fixtures, unchanged classpaths and final source. No independent JVM or verifier-negative rerun
 is claimed. The final documentation-only header clarification was independently checked separately
 from the executed semantic binaries.

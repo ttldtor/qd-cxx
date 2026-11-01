@@ -4,7 +4,7 @@
 
 [Контракт FIELD-TYPES](../../../../spec/encoding/FIELD-TYPES.ru.md) задаёт точное явно выбираемое
 объединение типов, владеющие значения, границы primitive/message и правила начисления работы.
-Авторские тесты непосредственно читают [неизменённые Java expectations](../../../fixtures/encoding/field-types/expected).
+исходные тесты непосредственно читают [неизменённые Java expectations](../../../fixtures/encoding/field-types/expected).
 [Java coverage](../../../fixtures/encoding/field-types/COVERAGE.ru.md) различает исходную доставку
 production FileWriter/FileReader, пробы production parser и прямые примитивы. Диагностический обход
 не используется как доказательство доставки событий. Выполненные конфигурации и ограничения — в [VALIDATION](VALIDATION.ru.md).

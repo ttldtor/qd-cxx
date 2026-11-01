@@ -2,7 +2,7 @@
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
-Author checks on 2026-09-22 UTC; no independent review is claimed.
+Checks on 2026-09-22 UTC; no independent review is claimed.
 Initial clean captures a/b preceded the TAPE-READER contract, ADR-0002 and production C++ edits.
 Final clean captures below reran the same Java source with the completed launcher/provenance workflow.
 All expected inputs and observations match those initial captures byte-for-byte.

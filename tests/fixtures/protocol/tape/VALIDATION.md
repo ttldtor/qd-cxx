@@ -1,4 +1,4 @@
-# QDCXX-019 author validation
+# QDCXX-019 validation
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
@@ -66,5 +66,5 @@ MSVC Release/GCC ASan+UBSan, ten suites each, format Check and hash/diff checks.
 original [MSVC](evidence/prior-review-018/msvc-test.log), [ASan/UBSan](evidence/prior-review-018/asan-test.log)
 and [format](evidence/prior-review-018/format-check.log) logs retain their historical timestamps.
 The task's supplied review record establishes the prior hash/diff checks. Migration review at
-`4cb1d8c` reran only MSVC Release ten suites. Other QDCXX-018 author checks remain author checks;
+`4cb1d8c` reran only MSVC Release ten suites. Other QDCXX-018 checks retain their original scope;
 none of these historical review runs is presented as a new QDCXX-019 check.

@@ -7,7 +7,7 @@ This contract defines an opt-in developer bridge from the locked Java `DataSchem
 Java constructs and exports the schema; ordinary C++ loading, inspection and prepared event APIs
 consume the resulting files without Java. This does not implement native XML construction or a
 general settings engine. The [usage guide](../../tools/schema-export/README.md) describes invocation;
-[author validation](../../tests/conformance/schema-export/VALIDATION.md) records executed checks and
+[validation](../../tests/conformance/schema-export/VALIDATION.md) records executed checks and
 independent acceptance separately.
 
 ## Source boundary

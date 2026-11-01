@@ -110,5 +110,5 @@ Stderr and exit codes are unchanged; completed prefixes may remain on failure, a
 summary does not supersede a failed write/final flush exit.
 
 This reads raw QTP, not QD tape: no tape containers, compression, time files, protocol descriptors,
-broader fields, importer, transport or dynamic sessions. [Human coverage and author validation](../tests/conformance/protocol/human-inspection/VALIDATION.md)
+broader fields, importer, transport or dynamic sessions. [Human coverage and validation](../tests/conformance/protocol/human-inspection/VALIDATION.md)
 reuse historical Java evidence; the presentation itself is a designed C++ policy.

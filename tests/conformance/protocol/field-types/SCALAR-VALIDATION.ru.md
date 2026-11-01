@@ -6,7 +6,7 @@
 [FIELD-TYPES](../../../../spec/encoding/FIELD-TYPES.ru.md). Более широкий каталог
 из 19 типов, object payloads, индексные схемы, новые политики контейнера, flags
 и бизнес-преобразования находятся вне результата. Ревью реализации и итоговая
-интеграция отделены от описанных ниже focused-проверок автора.
+интеграция отделены от описанных ниже focused-исходных проверок.
 
 ## Production evidence
 
@@ -73,7 +73,7 @@ reader/schema/input. Обычное автоматическое discovery не 
 и schema только с прежними типами. Это предотвращает случайный приём read-only
 профиля прежним outgoing compact-int codec.
 
-Авторская focused build Windows MSVC19.42 Release и все три названных CTest suites
+исходная focused build Windows MSVC19.42 Release и все три названных CTest suites
 прошли. Первая сборка выявила конфликт Windows VOID macro; `VOID_FIELD` исправляет
 публичное имя без изменения macros. Consumer tests компилируют обращения после
 Windows headers doctest. Закреплённые Uncrustify0.83.0, затем clang-format20.1.8

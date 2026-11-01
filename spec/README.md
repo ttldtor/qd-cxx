@@ -1,27 +1,28 @@
-# Specifications
+# Architecture and protocol contracts {#architecture-protocols}
 
-[Русская версия](README.ru.md). English is authoritative.
+[Русская версия](README.ru.md) · [Documentation home](../docs/index.md)
 
-This directory holds implementation-independent contracts extracted from upstream evidence and intentional qd-cxx decisions.
+Read [Architecture](../docs/ARCHITECTURE.md) for component responsibilities and
+[Compatibility](../docs/COMPATIBILITY.md) for the Java QD behavioral boundary. Specifications describe
+observable contracts; [current capabilities](../docs/CURRENT-STATE.md) identify implemented profiles.
 
-Specifications should distinguish:
+## Encoding contracts {#encoding-contracts}
 
-- **normative** requirements qd-cxx commits to;
-- **descriptive** Java QD behavior observed at the locked revision;
-- **open** questions not yet verified;
-- **intentional deviations** backed by an ADR.
+See the [wire encoding specification](encoding/PRIMITIVES.md), including compact integers, text and symbols.
 
-Every nontrivial upstream-derived statement should be traceable. Prefer examples that can become conformance fixtures. Do not use C++ class design as the specification language unless the contract is specifically a C++ API.
+## Schema contracts {#schema-contracts}
 
-Areas:
+[Configuration](../docs/CONFIGURATION.md) describes explicit caller schemas and source precedence.
+The [schema model](schema/NORMALIZED-MODEL.md), [native JSON](schema/NATIVE-JSON.md) and
+[ordinary wire discovery](schema/WIRE-INVENTORY.md) specify the corresponding boundaries.
 
-- `schema/` — records, fields, types, aliases, mappings, and scheme construction.
-- `protocol/` — QTP messages, framing, negotiation, and state machines.
-- `encoding/` — byte-level primitives and stateful codecs.
-- [TCP transport](transport/TCP-RUNTIME.md) — caller-driven runtime ownership, progress and close, with the [DNS resource derivation](transport/DNS-RESOURCES.md).
-- [STREAM collector](subscriptions/STREAM-COLLECTOR.md) — every-record staging, membership/revision barriers, whole-frame overflow and release-work accounting.
-- [TICKER collector](subscriptions/TICKER-COLLECTOR.md) — shared latest cache, bounded local views, initial/live ordering, explicit retention and stale/reset barriers.
-- [Aggregate interests](mux/INTERESTS.md) — exact upstream union, independent local clients, raw HISTORY bounds and atomic bounded mutations.
-- [Local STREAM dispatch](subscriptions/CLIENT-DISPATCH.md) — serialized callbacks, bounded cross-thread commands, detached batches and explicit local completion; source/transport composition remains caller-owned.
-- [Controlled STREAM usage](../docs/SUBSCRIPTIONS.md) — optional plain-TCP CLI and programmatic example, exact selection, generic records and prepared summaries with separate local/transport outcomes.
-- [Subscriptions](subscriptions/CONTRACTS.md) — delivery ownership, resource limits and lifecycle design; [bounded desired state](subscriptions/STATE.md), [outgoing composition](subscriptions/WRITER.md), the [pure live session](subscriptions/LIVE-SESSION.md), STREAM staging, bounded TICKER cache/views and the [bounded HISTORY collector](subscriptions/HISTORY-COLLECTOR.md) are implemented as separate local components, with [selected Java evidence](../tests/fixtures/subscriptions/CAPTURES.md). Full end-to-end client and upstream-demand integration remain pending.
+## Protocol contracts {#protocol-contracts}
+
+- [QTP framing](protocol/FRAMING.md) and [tape reading](protocol/TAPE-READER.md)
+- [Subscription contracts](subscriptions/CONTRACTS.md), [live session](subscriptions/LIVE-SESSION.md)
+  and [local STREAM dispatch](subscriptions/CLIENT-DISPATCH.md)
+- [TCP runtime](transport/TCP-RUNTIME.md), [TLS runtime](transport/TLS-RUNTIME.md)
+  and [TLS resource assumptions](transport/TLS-RESOURCES.md)
+
+For rationale and unresolved QD/native design questions, use the [knowledge base](../docs/knowledge/README.md).
+Exact conformance results belong to the [developer reading path](../docs/developer.md).

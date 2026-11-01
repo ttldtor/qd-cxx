@@ -1,4 +1,4 @@
-# QDCXX-030 author validation
+# QDCXX-030 validation
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
@@ -7,7 +7,7 @@
 Current status: accepted and integrated by the owner in master at
 `e386808c49f82a837e15dd670c40a26db5a26991` (implementation `1a9ea87`, diagnostic fix `e386808`).
 This record summarizes the completed independent review and follow-up; it does not claim new runs.
-The historical author sections below retain their original handoff status and evidence.
+The historical result sections below retain their original handoff status and evidence.
 
 - Initial review: Windows MSVC Release build and 45/45 CTest; Linux GCC Debug ASan+UBSan,
   two schema-export tests 2/2 with `detect_leaks=0`; fresh JDK 8 command tests and C++ Format Check.
@@ -17,13 +17,13 @@ The historical author sections below retain their original handoff status and ev
 - The raw-fixture whitespace issue is closed: worktree and range checks passed; `-text` and fixture
   SHA-256 stayed unchanged. Finding #1 remains a nonblocking, unspecified error-precedence question,
   not a confirmed defect; this acceptance does not choose a policy for it.
-- Author formatter/capture Verify were not repeated in the follow-up. Full Linux/production-only
-  matrices were not repeated by the reviewer; macOS and LeakSanitizer remain unverified.
+- earlier formatter/capture Verify were not repeated in the follow-up. Full Linux/production-only
+  matrices were not repeated independently; macOS and LeakSanitizer remain unverified.
   No private tape was used, and full schema/tape compatibility is not claimed.
 
 ## Historical implementation verification
 
-Date: 2026-09-24 UTC. The bounded Java schema exporter is implemented and author-verified. **Independent acceptance remains open.** Starting HEAD was
+Date: 2026-09-24 UTC. The bounded Java schema exporter is implemented and verified. **Independent acceptance remains open.** Starting HEAD was
 `2ac1a85ea29c4553dd26db880e4e1fe0d2e03f50`.
 Transient evidence is retained under `.work/schema-export-030/`. All evidence paths below are relative to that scratch directory unless
 they are links. Transient logs are not committed and must be regenerated on another machine.
@@ -71,7 +71,7 @@ input and classpath hashes. Scoped `.gitattributes` preserves new source/capture
 | Production builds | Windows Release and Linux Release; `BUILD_TESTING=OFF`, JSON ON/OFF, both inspectors ON: all four passed | `windows-prod-{ON,OFF}-{configure,build}.log`, `linux-prod-{ON,OFF}-{configure,build}-final.log` |
 | Process/dependency audit | 14 nonempty configure/build/CTest traces: no Java, javac, Maven, Python or PowerShell process; no doctest in production caches; JSON OFF has no simdjson; no production `_deps` acquisition directory | matching `*.exec.tsv`, `trace-audit.txt`, four production `CMakeCache.txt` files |
 | Formatting | Java pinned google-java-format 1.36.1 Format then Check with JDK 21.0.4: 24 files passed; native Uncrustify 0.83.0 then clang-format 20.1.8 Format on added C++ test, Check: 84 files passed | formatter output and `cpp-format-final.log` |
-| Final inventory | Authored documentation links and whitespace, new-file manifest, unstaged/staged diff checks and unchanged historical/production paths checked | author final audit |
+| Final inventory | Documentation links and whitespace, new-file manifest, unstaged/staged diff checks and unchanged historical/production paths checked | final source audit |
 
 The source/command checks cover exact and one-over projection/output/input limits, malformed and
 unsupported records/types/maps, unknown/duplicate selection, properties precedence, inactive/unknown
@@ -116,7 +116,7 @@ independently diagnosed in this task. macOS, forced JVM exhaustion/crash during 
 concurrent hostile filesystem mutation were not tested. No private tape was read. Historical
 fixtures, upstream Java tools, `upstream.lock`, production `src/` and `include/` remain unchanged.
 
-The author reviewed the complete diff and new files for correctness, scope, style/braces and
+Source inspection covered the complete diff and new files for correctness, scope, style/braces and
 unnecessary complexity; focused simplification feedback was applied and rechecked. This does not
 close independent acceptance.  No additional task was started.
 

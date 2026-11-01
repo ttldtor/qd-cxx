@@ -2,7 +2,7 @@
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
-Author checks executed 2026-09-21 UTC; not independent review. No errors were detected in the final
+recorded checks executed 2026-09-21 UTC; not independent review. No errors were detected in the final
 checks listed below. [Coverage](COVERAGE.md) specifies what was exercised and what remains excluded.
 
 | Profile | Evidence |

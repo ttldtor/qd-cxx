@@ -20,7 +20,7 @@ Owner decisions are concrete proposals, not already accepted: tape descriptor/ad
 ADR, new executable/output contract, per-utility CLI/configuration compatibility; later Quote
 adapter/API and transport/subscription choices. No task ID beyond QDCXX-020 was assigned.
 
-## Author: executed read-only investigation
+## executed read-only investigation
 
 Checkout: `C:/path/to/profile/AppData/Local/Temp/qdcxx-003-qd`. These commands were executed using
 PowerShell; Git trust was scoped to this checkout for each process, not saved in user settings:
@@ -62,7 +62,7 @@ listeners, publication, rotation/deletion or user-setting changes were performed
 event/tape capture, clean upstream build, Python script or C++ tests were run in QDCXX-020.
 Earlier QDCXX-019 runtime results are cited as historical evidence, not independently rerun here.
 
-## Author: final document checks
+## final document checks
 
 Final scope is the actual changed/new Markdown set, including untracked deliverables. Checks:
 local relative file links and reciprocal EN/RU links; pinned source paths against the verified
@@ -71,7 +71,7 @@ protected source/fixture/lock paths and no new Python. EN/RU claims were read si
 preserving source-only versus measured/proposed distinctions. Raw historical evidence was not
 normalized or rewritten.
 
-Final author run at `2026-09-22T14:21:42Z`: 18 Markdown files (10 tracked modifications / 8 new),
+Final initial run at `2026-09-22T14:21:42Z`: 18 Markdown files (10 tracked modifications / 8 new),
 326 relative links, 88 pinned links / 43 unique source paths, reciprocal links in all 18 files,
 20 providers present in each language. No errors detected in these checks. Protected diff empty,
 new Python count zero, upstream status clean. Inline PowerShell enumerated `git diff --name-only`
@@ -84,25 +84,24 @@ lines in the new inventory; these were fixed and checks rerun. Historical raw ev
 
 ## Independent review
 
-A separate read-only source verification was recorded independently of author validation.
+A separate read-only source verification was recorded independently of validation.
 Its first pass independently checked pinned SHA, all 20 registrations, help/dispatch/packaging,
 MICBuilder, Quote defaults/types/slots/delegates and Python CMake/logging/acquisition paths.
 It checked 80 pinned links / 39 unique upstream paths in the first two document pairs; none missing.
 It read EN/RU QDS-TOOLS, REAL-EVENT-BASELINE and PYTHON-MIGRATION without finding material translation
-differences. No Java/Python/C++/network execution or edits were performed by that reviewer.
+differences. The independent inspection included no Java/Python/C++/network execution or file changes.
 
 First-pass findings: missing Compare --collector/-c (P2), TDP existing-profile → file+"~" and
-swallowed IOException path (P2), unspecified Invoke default void return type (P3). Author fixed
-all three in EN/RU and also corrected NetTest's --rate-limit spelling from direct source inspection.
+swallowed IOException path (P2), unspecified Invoke default void return type (P3). All three were corrected in EN/RU; NetTest's --rate-limit spelling was also corrected from direct source inspection.
 The second independent pass reviewed final roadmap/status/validation and corrections, repeated
 18-document/326-relative-link, tracked/new whitespace and protected-file/no-new-Python checks,
 and found no further issues. It accepted tape-first as a bounded enabling proposal, distinct from
 the subsequent Quote milestone and subject to owner assignment.
 
-An author follow-up corrected the distinction between dotted local schema names and outgoing
+A subsequent correction clarified the distinction between dotted local schema names and outgoing
 property names and documented direct-file wide-decimal support independently of EMPTY_SET.
-The reviewer independently verified AbstractDataField/DefaultRecord/QuoteMapping/BinaryRecordDesc,
+Independent inspection verified AbstractDataField/DefaultRecord/QuoteMapping/BinaryRecordDesc,
 FileFormat/BinaryQTPComposer, EN/RU and all 88 pinned links / 43 unique source paths: no missing
 paths or further findings. Review is complete; the three initial findings are closed.
-Final status/result bookkeeping was performed by the author after that review. No errors were
+Final status and results were recorded after that review. No errors were
 detected in the stated checks; this is not a general semantic/runtime compatibility guarantee.

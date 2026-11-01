@@ -9,27 +9,27 @@ full numeric identities into production consumers. No additional supported type 
 ## Acceptance and integration — 2026-09-23 (UTC)
 
 The serial type refactor is accepted; P2 is independently closed. No findings remain within the
-reviewed scope. This section records the independent reviewer reports supplied by the owner;
+reviewed scope. This section retains the recorded independent-review results;
 documenting their conclusions is not another code review or test run.
 
 - Review of `a3d9c20db589a5730703f3a2c55bfb14a06961e5` against the baseline above found one
-  P2 gap in direct representation-selector checks and no other findings. The reviewer reported fresh
+  P2 gap in direct representation-selector checks and no other findings. The independent verification record reports fresh
   incremental MSVC Release and GCC Debug ASan+UBSan builds with 25/25 CTest suites in each,
   pinned Format Check for three C++ files, and whitespace/link checks for six Markdown documents.
 - Correction `8f2ee55a9444aecc7cd7887a3efb60d6e7ef6379` changes only the test and this EN/RU
-  report pair. The targeted follow-up reviewer confirmed all six independent selector expectations,
+  report pair. The targeted follow-up confirmed all six independent selector expectations,
   retained earlier checks, unchanged production code, and consistent EN/RU reports and logs.
-  The reviewer confirmed the author's mutation evidence: the full ID remains 40, the new check fails
+  Independent inspection confirmed the initial mutation evidence: the full ID remains 40, the new check fails
   with `40 == 32`, and the restored clean build passes. The stale-binary intermediate run remains
   documented below.
 - The targeted follow-up review freshly ran the existing MSVC Release target binary:
   7/7 test cases, 15,846/15,846 assertions, exit 0. Its diff whitespace check passed.
   Mutation, builds and complete 25/25 regressions were not rerun in that review; those results were
-  checked in the author's logs. It did not re-review all of QDCXX-024.
+  checked in the initial logs. It did not re-review all of QDCXX-024.
 
 The first review did not repeat production-only builds, clean builds, the full platform matrix or
 Java captures; it used neither the private tape nor broader verification. The targeted
-follow-up does not extend that coverage. Historical author results below retain their original scope.
+follow-up does not extend that coverage. Historical initial results below retain their original scope.
 
 The owner integrated the result into `master`. Before this documentation update, read-only Git checks
 confirmed branch `master`, HEAD `8f2ee55a9444aecc7cd7887a3efb60d6e7ef6379` and a clean working tree.
@@ -64,7 +64,7 @@ decomposition and profile checks are retained. Production code, Java tooling and
 
 ### Newly executed correction checks
 
-These are correction-author checks, separate from the historical refactor checks below and from the
+These are correction-recorded checks, separate from the historical refactor checks below and from the
 preceding independent review. No repeat independent review of this correction has been performed.
 
 - Pinned Format followed by Check passed for the changed C++ test (Uncrustify 0.83.0 then
@@ -97,7 +97,7 @@ P2 is implemented and locally verified, not independently re-reviewed. The full 
 production-only build, Java recapture and allocator-failure injection were not rerun; the private tape
 was not used.
 
-## Historical author verification
+## Historical verification
 
 Before implementation, the existing MSVC Release `field_type_java_values` passed. After adding
 the new test but before production changes, rebuilding that target failed on the missing
@@ -116,7 +116,7 @@ Linux generator path; the correct WSL invocation then passed. No cache was rewri
 Format followed by read-only Check passed for all three changed C++ files.
 
 Three read-only simplification passes (reuse, quality, efficiency) found no needed changes in
-the header/test diff. The author also inspected the tool's enum substitution and final diff.
+the header/test diff. The tool's enum substitution and final diff were also inspected.
 Independent review was not available for this follow-up. No independent acceptance is claimed.
 
 Only these two test configurations and one production configuration were rerun, not the original

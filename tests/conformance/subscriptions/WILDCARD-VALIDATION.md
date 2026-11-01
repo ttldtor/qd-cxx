@@ -4,7 +4,7 @@
 
 Date: 2026-11-01 UTC. Scope: the immutable [selector profiles](../../../spec/subscriptions/SELECTORS.md),
 stateless Penta encoder, explicit STREAM All, canonical Exact and whole-event domain guards.
-Implementation-author native execution and qualified source/Java observations are distinguished below;
+Native execution and qualified source/Java observations are distinguished below;
 documentation checks bind the actual compiled excerpts, links, translations and preserved prior contracts.
 Historical desired-state/writer/collector validation retains its original scope.
 

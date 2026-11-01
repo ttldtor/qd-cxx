@@ -65,14 +65,14 @@ allocation failure rollback с сохранением borrowed addresses, каж
 обычные имена/типы между prefix/business/prefix generations. TSV/HUMAN и все восемь прежних formatter
 profiles отказывают engaged zero metadata до нулевого row budget.
 
-Закреплённые Uncrustify0.83.0, затем clang-format20.1.8 Format/Check прошли для авторского C++.
+Закреплённые Uncrustify0.83.0, затем clang-format20.1.8 Format/Check прошли для исходного C++.
 Clean locked full-reactor governed Verify прошёл все638 артефактов и прежний tape baseline.
 Все62 мутации верификатора отклонены:50 прежних и12 FIELD для raw seconds, optional sequence,
 projection, order, business values, completion, unknown consumer, raw bytes, extra files,
 стандартного indexed time и физических slots. Неизменённая положительная база прошла после мутаций.
 Независимые копии Windows и Linux sanitizer binaries также прошли FIELD19 cases/6546 assertions,
 message-family14/1266 и session12 cases (4223 Windows/4101 Linux assertions; allocation checkpoints
-различаются по платформам). Ревьюер независимо проверил хэши сохранённых production executions,
+различаются по платформам). Независимо проверены хэши сохранённых production executions,
 public fixtures, неизменённых classpaths и финального source. Независимый JVM или повторный запуск
 verifier negatives не заявлен. Финальное уточнение комментария заголовка проверено отдельно от
 исполненных семантических binaries.

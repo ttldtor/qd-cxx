@@ -1,13 +1,13 @@
-# Configured events: author validation and handoff
+# Configured events: validation and handoff
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
 Follow-up: Java braces review correction records the current source hashes and
-new Verify run. The original author-run evidence below remains a historical snapshot.
+new Verify run. The original evidence below remains a historical snapshot.
 
 QDCXX-025 started from clean HEAD
 `e5a3764992ba3a90a07d3d092a4383e37a901de2`.
-All retained run dates are 2026-09-23 UTC. This is author verification and self-review, not
+All retained run dates are 2026-09-23 UTC. This is verification and self-review, not
 independent acceptance. Independent review remains pending. No errors were detected in the successful
 checks below. [Coverage](COVERAGE.md) traces R1–R10 and distinguishes evidence from broader claims.
 
@@ -20,7 +20,7 @@ probes and source-resolution observations are labelled separately. Contracts pre
 Full24/full137 remain negative witnesses; compatible XML uses explicit full10 without weakening the
 unchanged default/dxlink witnesses. No acceptance blocker required widening the approved scope.
 
-The root author checked current hashes of six oracle tools and all 135 expectations against the
+The source check compared current hashes of six oracle tools and all 135 expectations against the
 last positive Verify metadata: provenance audit. Final Java Format
 then Check passed 17 sources using pinned google-java-format 1.36.1 on JDK 25.0.1; the earlier oracle
 formatter used JDK 23.0.2 and oracle execution used JDK 8. Format,

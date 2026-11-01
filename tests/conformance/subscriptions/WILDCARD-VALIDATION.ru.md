@@ -4,7 +4,7 @@
 
 Дата: 2026-11-01 UTC. Область: неизменяемые [selector profiles](../../../spec/subscriptions/SELECTORS.ru.md),
 stateless Penta encoder, явный STREAM All, canonical Exact и whole-event domain guards.
-Ниже различаются native execution автора реализации и квалифицированные source/Java observations;
+Ниже различаются результаты native execution и квалифицированные source/Java observations;
 проверка документации связывает настоящие compiled excerpts, links, переводы и сохранённые прежние contracts.
 Историческая desired-state/writer/collector validation сохраняет исходную область.
 

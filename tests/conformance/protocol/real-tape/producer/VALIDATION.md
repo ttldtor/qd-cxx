@@ -2,7 +2,7 @@
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
-Author checks on 2026-10-30 UTC used Windows 11 x64, Zulu JDK 8.80.0.17
+recorded checks on 2026-10-30 UTC used Windows 11 x64, Zulu JDK 8.80.0.17
 `1.8.0_422-b05` and Maven 3.9.16. These results apply to the exact
 [producer lock](../../../../../tools/upstream/real-tape-corpus/producer.lock.json),
 [Java source](../../../../../tools/upstream/real-tape-corpus/RealTapeCorpus.java) and
@@ -70,7 +70,7 @@ Optional live demo acquisition is not implemented or run. Full logs and private 
 not published. Arbitrary Unicode JDK/Maven/source installation paths are not qualified. The parent
 shared corpus inventory and historical evidence remain untouched.
 
-These are author checks. Independent review is a separate gate and is not implied by this report.
+These are recorded checks. Independent review is a separate gate and is not implied by this report.
 
 ## Native fixture consumption
 

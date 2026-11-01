@@ -164,5 +164,5 @@ time/cursor comparison. These are required executions; this packet records no ru
 
 Run project-required pinned formatting, Doxygen diagnostics, full Windows MSVC Release and Linux
 GCC Debug ASan+UBSan CTest, optional-dependency/library-only/utility-OFF/JSON-OFF checks as applicable.
-Keep actual UTC full logs and independent ownership/time/state review distinct from author structural
+Keep actual UTC full logs and independent ownership/time/state review distinct from structural
 fixture checks. Historical matrices do not verify new implementations.

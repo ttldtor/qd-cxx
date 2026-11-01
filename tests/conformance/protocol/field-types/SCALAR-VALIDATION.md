@@ -6,7 +6,7 @@ This report qualifies the ordinary read-only scalar extension in
 [FIELD-TYPES](../../../../spec/encoding/FIELD-TYPES.md). The broader 19-type catalog,
 object payloads, indexed layouts, new container policies, flags and business
 conversions remain outside this result. Implementation review and final integration
-results are separate from the focused author checks below.
+results are separate from the focused recorded checks below.
 
 ## Production evidence
 
@@ -73,7 +73,7 @@ including empty schemas, empty declarations, invalid declarations and old-type-o
 schemas. This prevents the existing outgoing compact-int codec from accidentally
 accepting the read-only profile.
 
-Author Windows MSVC19.42 Release focused build and all three named CTest suites
+Windows MSVC19.42 Release focused build and all three named CTest suites
 passed. The first build exposed the Windows VOID macro conflict; `VOID_FIELD` fixes
 the public spelling without changing macros. The resulting consumer tests compile
 references after doctest's Windows headers. Pinned Uncrustify0.83.0 followed by

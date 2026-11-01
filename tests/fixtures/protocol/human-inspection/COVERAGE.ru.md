@@ -8,4 +8,4 @@
 escape, offsets кадров и итог сравниваются точно; [полное покрытие](../../../conformance/protocol/human-inspection/COVERAGE.ru.md).
 [Генератор](../../../conformance/protocol/human-inspection/design_fixtures.py) пишет только в явно указанный
 новый каталог; верификация его не вызывает и не перезаписывает fixtures.
-[Валидация](VALIDATION.ru.md) отделяет результаты автора и ограничения.
+[Валидация](VALIDATION.ru.md) описывает результаты проверок и ограничения.

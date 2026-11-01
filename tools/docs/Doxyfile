@@ -22,3 +22,15 @@ GENERATE_LATEX         = NO
 HAVE_DOT               = NO
 SOURCE_BROWSER         = YES
 FULL_PATH_NAMES        = NO
+
+USE_MDFILE_AS_MAINPAGE = docs/index.md
+LAYOUT_FILE = tools/docs/layout.xml
+GENERATE_TREEVIEW = YES
+DISABLE_INDEX = YES
+MARKDOWN_ID_STYLE = GITHUB
+IMPLICIT_DIR_DOCS = NO
+GENERATE_XML = YES
+HTML_COLORSTYLE = TOGGLE
+
+# Sort destructors by type name to avoid mismatched tilde-index fragments in this API set.
+IGNORE_PREFIX = ~

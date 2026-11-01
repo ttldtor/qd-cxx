@@ -4,10 +4,10 @@
 
 ## Scope and status
 
-QDCXX-028 implements and author-verifies portable native development tooling.
+QDCXX-028 implements portable native development tooling; the recorded checks follow below.
 Actual starting HEAD: `9b4f8ddf5786f71ac5f6d2305a0215a84b86b4b4`, initially clean worktree and empty staged diff;
 Baseline retains original file hashes.
-This is author verification and self-review. Independent review/acceptance remains open.
+This is verification and self-review. Independent review/acceptance remains open.
 
 Final source rechecks and targeted correction checks are complete as detailed below; final handoff
 preservation receipts are linked in the audit section. Earlier failures remain separate from corrected reruns.
@@ -42,7 +42,7 @@ Linux logger checks and all
 28 optional Windows setup/formatter checks ran before
 replacement. These intentional historical PowerShell characterizations are outside the new denied tree.
 
-Seven findings were reproduced and corrected during author review:
+Seven findings were reproduced and corrected during source verification:
 
 1. An open, unread console pipe could hide root exit: red.
    The observer remains active even while final EXIT is emitted.
@@ -68,7 +68,7 @@ Seven findings were reproduced and corrected during author review:
    operations with a stable root PID, covering descendants that move to another process group in the
    same session. Missing-capability rejection returns 1
    before executing the command; the focused Linux suite ends in
-   EXIT 0. This focused author check is complemented by the full-profile results below.
+   EXIT 0. This focused check is complemented by the full-profile results below.
 6. The terminal audits of otherwise passing Windows/Linux matrices failed on roughly 1 MB traces:
    Windows regex stack overflow and Linux segmentation fault. After removing the repeated regex,
    validation exposed CMake list splitting that lost semicolons in image paths. The auditor now checks
@@ -194,7 +194,7 @@ for the later source rechecks or final handoff audit.
 Final handoff preservation/filter receipts are
 Windows and Linux.
 The historical preservation audit checked the complete
-changed inventory, protected baseline hashes, authored whitespace and relative links. Raw evidence
+changed inventory, protected baseline hashes, source whitespace and relative links. Raw evidence
 uses scoped `-text`; only concrete raw paths with actual whitespace diagnostics receive `-whitespace`.
 Clean/smudge roundtrips use `core.autocrlf=true` and an ignored isolated Git object directory, without
 writing the owner's index/object database. The audit compares index bytes before/after and requires

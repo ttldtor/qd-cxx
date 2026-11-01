@@ -1,4 +1,4 @@
-# Авторская валидация QDCXX-019
+# Проверка QDCXX-019
 
 [English version](VALIDATION.md). Английская версия является нормативной.
 
@@ -69,5 +69,5 @@ MSVC Release/GCC ASan+UBSan, по десять suites, format Check и пров�
 логов [MSVC](evidence/prior-review-018/msvc-test.log), [ASan/UBSan](evidence/prior-review-018/asan-test.log)
 и [format](evidence/prior-review-018/format-check.log) сохраняют исторические времена.
 Переданная с задачей запись ревью устанавливает факт прежних hash/diff checks. Ревью миграции на
-`4cb1d8c` повторило только MSVC Release, десять suites. Остальные авторские проверки QDCXX-018
-остаются авторскими; ни один исторический запуск ревью не представлен как новая проверка QDCXX-019.
+`4cb1d8c` повторило только MSVC Release, десять suites. Остальные проверки QDCXX-018
+сохраняют исходную область; ни один исторический запуск ревью не представлен как новая проверка QDCXX-019.

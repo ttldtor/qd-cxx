@@ -1,4 +1,4 @@
-# Additional field types: author validation
+# Additional field types: validation
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
@@ -12,7 +12,7 @@ QDCXX-024 started at `a9299317c1d4e7f3202ed8136916fd3ee94b9f3f`.
 All dates below and retained logs are UTC, 2026-09-22.
 The initial locked-Java observations and [FIELD-TYPES](../../../../spec/encoding/FIELD-TYPES.md)
 preceded production C++. [Coverage](COVERAGE.md) maps R1–R8 to checks and states their limits.
-This is author validation and self-review, not independent acceptance. Independent review is pending.
+This is validation and self-review, not independent acceptance. Independent review is pending.
 
 ## Executed compiler and production matrix
 
@@ -43,11 +43,10 @@ or Python script was added. Existing Python launchers/process regression tests r
 
 ## Oracle, style and negative checks
 
-[Java author validation](../../../fixtures/encoding/field-types/VALIDATION.md) records two clean
+[Java validation](../../../fixtures/encoding/field-types/VALIDATION.md) records two clean
 upstream captures with all 82 artifacts byte-identical, 17 rejected mutations, a full negative Verify
 and subsequent unchanged baseline Verify. Java Format then Check covered 16 sources with the pinned
-formatter on OpenJDK 23.0.2; oracle execution used Zulu JDK 8. The root author reread current hashes
-of all four oracle tools and 82 artifacts against final Verify metadata:
+formatter on OpenJDK 23.0.2; oracle execution used Zulu JDK 8. Current hashes of all four oracle tools and 82 artifacts were rechecked against final Verify metadata:
 provenance audit. No oracle source changed afterward.
 
 C++ Format then Check passed for 57 files with Uncrustify 0.83.0 followed by clang-format 20.1.8:

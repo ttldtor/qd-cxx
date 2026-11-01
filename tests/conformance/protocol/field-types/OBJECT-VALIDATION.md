@@ -55,11 +55,11 @@ bytes. All28 deliberate mutations were rejected, followed by unchanged-baseline
 PASS. Five new mutations target null/empty, payload bytes, UTF examination,
 completion and actual local identity. Historical capture receipts remain unchanged.
 
-## Executed C++ author checks
+## Executed C++ recorded checks
 
 Windows MSVC19.42 Release focused build and four CTest entries passed on the frozen
 source: `field_type_java_values`, `field_type_java_tape`, `object_field_owned_values`
-and `field_type_inspection_io`. These are author checks, not independent review.
+and `field_type_inspection_io`. These are recorded checks, not independent review.
 
 The tests consume both pin directories through actual FileWriter containers and
 requested composer frames with chunk sizes1/7/65536. Generic canonical values,

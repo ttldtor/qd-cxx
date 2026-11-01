@@ -2,7 +2,7 @@
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
-Executed by the implementation author on 2026-09-21 UTC; not an independent review report.
+Checks executed on 2026-09-21 UTC; not an independent review report.
 QD 3.355 / 0ddc0a09779fb61d74cc0b37c6449ff47dcb715f, native JDK 8 reactor, skipped upstream tests,
 disabled Maven build cache, unchanged external source. Shared-checkout builds ran sequentially.
 

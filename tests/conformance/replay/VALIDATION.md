@@ -19,7 +19,7 @@ not rolled back. These behavioral and lifetime rules are specified in the
 
 ## Executed focused checks
 
-The author’s final Windows MSVC 19.42 x64 Release target build and focused CTest passed one target
+The final Windows MSVC 19.42 x64 Release target build and focused CTest passed one target
 with 9 cases / 1,303 assertions. The test executes all 24 documented replay scenarios, uses native
 writer/admission inputs, compares nine Java RAW timestamp/cursor packing observations and covers all
 eight exact field types. An independently calculated fixture ledger expects 31 work units across

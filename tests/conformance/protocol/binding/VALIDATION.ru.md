@@ -2,7 +2,7 @@
 
 [English version](VALIDATION.md). Английская версия является основной.
 
-Проверки автора выполнены 2026-09-21 UTC. Независимый повтор reviewer не заявляется. Штатные Java
+записанные проверки выполнены 2026-09-21 UTC. Независимый повтор не заявляется. Штатные Java
 [наблюдения и clean Verify evidence](../../../fixtures/protocol/binding/VALIDATION.md) получены до
 реализации. Три новых doctest cases проходят 1357 assertions; четыре CTest targets включают существующие
 регрессии compact/UTFString, framing и descriptions. В этих проверках ошибок не обнаружено.
@@ -51,7 +51,7 @@ profiles, dynamic re-description/reset/PART и transport. Промежуточн
 Две локальные константы COMPACT_INT=8 заменены задокументированным
 [enum SerialFieldType](../../../../include/qd/core/serial_field_type.hpp). Числовые входы и независимые
 литеральные oracle expectations не изменены. Это C++ рефакторинг без изменения wire/profile.
-Автор повторил все четыре CTest targets на MSVC Debug и
+Повторены все четыре CTest targets на MSVC Debug и
 GCC Debug, а также закреплённое форматирование
 и evidence/link/diff checks. В этих проверках ошибок не обнаружено. ClangCL, Release, sanitizers,
 production-only builds и Java captures для этого дополнения не перезапускались; прежние результаты выше
@@ -61,7 +61,7 @@ production-only builds и Java captures для этого дополнения �
 
 MAX_SERIAL_TYPE_ID raw parser и MAX_RAW_TYPE planner объединены в задокументированную протокольную
 константу MAX_WIRE_SERIAL_TYPE_ID в describe_records.hpp. Структурное принятие и поддержка типов неизменны.
-Автор повторил MSVC Debug build,
+Повторены MSVC Debug build,
 все четыре CTest targets, закреплённый format check
 и evidence/link/diff checks. В этих проверках ошибок не обнаружено. Другие compiler/configuration,
 sanitizer и Java checks для этого изменения только константы не повторялись. EN/RU обновлены; коммита нет.

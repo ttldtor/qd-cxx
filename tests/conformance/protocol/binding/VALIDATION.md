@@ -2,7 +2,7 @@
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
-Author checks executed 2026-09-21 UTC. No independent reviewer rerun is claimed. Production Java
+recorded checks executed 2026-09-21 UTC. No independent rerun is claimed. Production Java
 [observations and clean Verify evidence](../../../fixtures/protocol/binding/VALIDATION.md) preceded
 implementation. Three new doctest cases pass 1357 assertions; the four CTest targets include existing
 compact/UTFString, framing and descriptions regressions. No errors were detected in these checks.
@@ -50,7 +50,7 @@ full Java parity claim.
 Removed the two local COMPACT_INT=8 constants in favor of the documented
 [SerialFieldType enum](../../../../include/qd/core/serial_field_type.hpp). Numeric inputs and independent
 literal oracle expectations are unchanged. This is a C++ refactoring with no wire/profile change.
-Author reran all four CTest targets on MSVC Debug and
+All four CTest targets were rerun on MSVC Debug and
 GCC Debug, plus the pinned formatter
 and evidence/link/diff checks. No errors were detected in these checks. ClangCL, Release, sanitizers,
 production-only builds and Java captures were not rerun for this follow-up; their earlier results above
@@ -60,7 +60,7 @@ retain their original scope. EN/RU contract and results were updated;
 
 Consolidated raw parser MAX_SERIAL_TYPE_ID and planner MAX_RAW_TYPE into documented protocol constant
 MAX_WIRE_SERIAL_TYPE_ID in describe_records.hpp. Structural acceptance and type support are unchanged.
-Author reran the MSVC Debug build,
+Repeated checks included the MSVC Debug build,
 all four CTest targets, pinned format check
 and evidence/link/diff checks. No errors were detected in these checks. Other compiler/configuration,
 sanitizer and Java checks were not rerun for this constant-only follow-up. EN/RU updated.

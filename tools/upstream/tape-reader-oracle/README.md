@@ -45,5 +45,5 @@ Java can continue after errors; the observer records actual deliveries/errors/ex
 completion of the experiment. Its `complete` row does not mean that malformed input parsed successfully.
 Source grammar references are ProtocolDescriptor.parseFrom/parseMessageListFrom, MessageDescriptor.parseFrom,
 BufferedInput.readProperties and BinaryQTPParser.parseDescribeProtocol/parseDescribeRecords at upstream.lock.
-No portability or general tape claim beyond the recorded profile. Final source hashes and author checks
+No portability or general tape claim beyond the recorded profile. Final source hashes and recorded checks
 are in [validation](../../../tests/fixtures/protocol/tape-reader/VALIDATION.md).

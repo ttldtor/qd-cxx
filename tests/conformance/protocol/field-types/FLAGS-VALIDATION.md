@@ -71,7 +71,7 @@ The explicit policy entry is distinctly named `decodeStreamDataWithEventPolicy`;
 decodeStreamData/decodeRawData remain unoverloaded. Full Windows compilation exposed ambiguous
 old function-address use with the initially proposed overload; the new name fixes that source
 compatibility regression without modifying old callers. No unused RAW policy API is introduced.
-Final-source author MSVC 14.42 Release focused 8/8 checks passed at 17:13:44UTC, including the
+Final-source MSVC 14.42 Release focused 8/8 checks passed at 17:13:44UTC, including the
 unchanged event_mapping_contract. Uncrustify0.83.0 followed by clang-format20.1.8 Format and Check
 passed; header contracts document policy precedence, ownership, defaults and failure.
 

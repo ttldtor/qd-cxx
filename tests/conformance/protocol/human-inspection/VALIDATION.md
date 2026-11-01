@@ -1,9 +1,9 @@
-# QDCXX-018 author validation
+# QDCXX-018 validation
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
 Executed 2026-09-21 UTC (local calendar date 2026-09-22). No errors were detected in the final
-checks below. These are author checks; independent QDCXX-018 review is pending.
+checks below. These are recorded checks; independent QDCXX-018 review is pending.
 [Coverage](COVERAGE.md) defines the exercised profile and exclusions.
 
 | Profile/check | UTC evidence |
@@ -29,9 +29,9 @@ The pinned doctest CMake deprecation warning is not a failed test.
 The first sandboxed Windows build failed during SDK discovery (failed attempt);
 the authorized retry succeeded. The failed attempt is not a passed check.
 No Java sources changed or fresh Java captures were run. Reused [Java production composer/parser evidence](../../../fixtures/protocol/offline-inspection/VALIDATION.md)
-and historical author reports/hashes remain untouched. QDCXX-017 was closed against its committed
+and historical recorded results/hashes remain untouched. QDCXX-017 was closed against its committed
 revision and the prior review scope specified by QDCXX-018: MSVC Release/GCC ASan+UBSan, eight suites,
-17 mutations/baseline and hash/diff checks. Other QDCXX-017 profiles/captures remain author results.
+17 mutations/baseline and hash/diff checks. Other QDCXX-017 profiles/captures remain initial results.
 
 ## Measured encoded stdout budgets
 

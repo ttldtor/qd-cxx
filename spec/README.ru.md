@@ -1,27 +1,28 @@
-# Спецификации
+# Архитектура и контракты протокола {#architecture-protocols-ru}
 
-[English version](README.md). Английская версия нормативная.
+[English version](README.md) · [Главная](../docs/index.ru.md)
 
-Здесь находятся независимые от реализации контракты, полученные из upstream evidence и намеренных решений qd-cxx.
+[Архитектура](../docs/ARCHITECTURE.ru.md) описывает ответственность компонентов,
+[политика совместимости](../docs/COMPATIBILITY.ru.md) — границу поведения Java QD. Спецификации задают
+наблюдаемые контракты; [текущие возможности](../docs/CURRENT-STATE.ru.md) определяют реализованные профили.
 
-Спецификации различают:
+## Контракты кодировок {#encoding-contracts-ru}
 
-- **нормативные** требования qd-cxx;
-- **описательное** поведение Java QD на закреплённой ревизии;
-- **открытые** ещё не проверенные вопросы;
-- **намеренные отклонения**, обоснованные ADR.
+См. [спецификацию wire-кодирования](encoding/PRIMITIVES.ru.md): compact integers, текст и символы.
 
-Каждое нетривиальное upstream-derived утверждение должно иметь источник. Предпочтительны примеры, пригодные для conformance fixtures. C++ class design не используется как язык спецификации, если контракт не относится именно к C++ API.
+## Контракты схем {#schema-contracts-ru}
 
-Разделы:
+[Конфигурация](../docs/CONFIGURATION.ru.md) описывает явные схемы вызывающей стороны и приоритет источников.
+[Модель схем](schema/NORMALIZED-MODEL.ru.md), [нативный JSON](schema/NATIVE-JSON.ru.md)
+и [обычная схема с провода](schema/WIRE-INVENTORY.ru.md) задают соответствующие границы.
 
-- `schema/` — records, fields, types, aliases, mappings и построение схемы.
-- `protocol/` — QTP messages, framing, negotiation и state machines.
-- `encoding/` — byte-level primitives и stateful codecs.
-- [TCP transport](transport/TCP-RUNTIME.ru.md) — владение, продвижение и close runtime под управлением вызывающего кода; [граница ресурсов DNS](transport/DNS-RESOURCES.ru.md).
-- [STREAM-коллектор](subscriptions/STREAM-COLLECTOR.ru.md) — очередь каждой записи, membership/revision barriers, whole-frame overflow и оплата освобождения.
-- [TICKER-коллектор](subscriptions/TICKER-COLLECTOR.ru.md) — общий latest-кеш, ограниченные локальные представления, initial/live порядок, явные retention и stale/reset барьеры.
-- [Агрегация интересов](mux/INTERESTS.ru.md) — точный upstream union, независимые локальные клиенты, raw HISTORY bounds и атомарные ограниченные изменения.
-- [Локальная доставка STREAM](subscriptions/CLIENT-DISPATCH.ru.md) — сериализованные callbacks, ограниченные межпоточные команды, независимые батчи и явное локальное завершение; источником и транспортом владеет вызывающий код.
-- [Контролируемые STREAM-подписки](../docs/SUBSCRIPTIONS.ru.md) — опциональные plain-TCP CLI и программный пример, точный выбор, общие записи и prepared summaries с отдельными локальным и транспортным исходами.
-- [Подписки](subscriptions/CONTRACTS.ru.md) — контракты delivery ownership, resource limits и lifecycle; [целевое состояние](subscriptions/STATE.ru.md), [исходящие сообщения](subscriptions/WRITER.ru.md), [чистая live-сессия](subscriptions/LIVE-SESSION.ru.md), STREAM staging, ограниченные TICKER cache/views и [HISTORY-коллектор](subscriptions/HISTORY-COLLECTOR.ru.md) реализованы как отдельные локальные компоненты с [выбранными Java-доказательствами](../tests/fixtures/subscriptions/CAPTURES.ru.md). Сквозной клиент и интеграция upstream demand остаются отдельной работой.
+## Контракты протокола {#protocol-contracts-ru}
+
+- [Кадры QTP](protocol/FRAMING.ru.md) и [чтение tape](protocol/TAPE-READER.ru.md)
+- [Контракты подписок](subscriptions/CONTRACTS.ru.md), [live session](subscriptions/LIVE-SESSION.ru.md)
+  и [локальный STREAM dispatch](subscriptions/CLIENT-DISPATCH.ru.md)
+- [TCP runtime](transport/TCP-RUNTIME.ru.md), [TLS runtime](transport/TLS-RUNTIME.ru.md)
+  и [ресурсные предпосылки TLS](transport/TLS-RESOURCES.ru.md)
+
+Причины решений и открытые вопросы дизайна QD/native собраны в [базе знаний](../docs/knowledge/README.ru.md).
+Точные результаты conformance-проверок находятся в [разделе разработчика](../docs/developer.ru.md).

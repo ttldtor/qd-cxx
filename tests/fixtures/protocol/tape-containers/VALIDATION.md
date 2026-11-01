@@ -7,7 +7,7 @@ profiles below. Operational CLI composition and final catalogue acceptance remai
 does not establish layered inspection COMPLETE or release acceptance. The [contract](../../../../spec/protocol/TAPE-CONTAINERS.md) and
 [production captures](CAPTURES.md) define the bounded claim.
 
-Author checks on 2026-10-30:
+Checks on 2026-10-30:
 
 | Check | Actual profile/result |
 | --- | --- |

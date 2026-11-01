@@ -57,7 +57,7 @@ under chunks1/7/65536, retain all ten TimeAndSale logical fields, compare raw wo
 exercise same-message alternatives and assert the selected stronger C++ refusal/rollback.
 No indexedTime duplicate or synthetic tail is used to satisfy the comparison.
 
-Final-source author MSVC14.42 focused checks passed. Independent final integration passed
+Final-source MSVC14.42 focused checks passed. Independent final integration passed
 Windows MSVC19.42 Release58/58 at16:44:20UTC and Linux GCC13.3 Debug ASan/UBSan58/58 at16:45:33UTC;
 Linux leak detection was disabled. All three production-only profiles on each OS passed,
 including JSON-off wire CLI and disabled dependency/test-only fetching boundaries.

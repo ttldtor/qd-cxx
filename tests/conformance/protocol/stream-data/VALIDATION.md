@@ -2,7 +2,7 @@
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
-Author checks on 2026-09-21 UTC after final C++ changes; this is not independent review. No errors
+recorded checks on 2026-09-21 UTC after final C++ changes; this is not independent review. No errors
 were detected in these checks. All six suites pass in each test profile, including the five existing
 suites. Four new cases execute 85,549 assertions. [Coverage](COVERAGE.md) defines limitations.
 

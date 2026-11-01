@@ -8,7 +8,7 @@ EN/RU commands use the new name. Internal test executable names and public inclu
 The rule for future utility filenames is documented in [NAMING](../../../docs/NAMING.md).
 Version 1 TSV/human format identifiers remain `qd-qtp-inspect`, with unchanged fixtures and wire behavior.
 
-Author checks, not independent review:
+recorded checks, not independent review:
 
 - MSVC 19.42.34444 x64 Release: build, 10 suites.
 - WSL GCC 13.3.0 x86_64 Release: build, 10 suites.

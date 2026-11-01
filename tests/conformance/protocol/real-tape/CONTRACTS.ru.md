@@ -20,7 +20,7 @@ decoder не заменяют production message-path observation. Иденти�
 Для каждой строки сохранять переносимые deterministic inputs, точные source/helper/runtime/classpath
 hashes, canonical production observations и C++ expected status/value/order/flags/time. Сохранять
 исторические captures и `upstream.lock`. Частные recordings, symbols, paths и полные локальные логи
-не входят в публичные fixtures. Различать immutable source facts, planned tests, author execution
+не входят в публичные fixtures. Различать immutable source facts, planned tests, Native execution
 и независимо повторённые проверки. В actual-evidence не указывать ещё не существующий будущий путь.
 
 [Producer validation](producer/VALIDATION.ru.md) — существующее Windows Java evidence для конкретных
@@ -186,5 +186,4 @@ acquisition. Windows-only qualification producer не отменяет Linux cli
 Для документов/матрицы проверить EN/RU semantic parity, reciprocal/relative links, whitespace всех
 changed/new files, row uniqueness/count, точные full-ID/message/flag dimensions, primary-source
 references обоих commits и существование actual-evidence paths. Обязательный independent final-source
-review охватывает ownership, generation state, partial failure, EOF и resource bounds. Повторное
-чтение автором не является independent review. Публиковать только фактические checks и оставшиеся limits.
+review охватывает ownership, generation state, partial failure, EOF и resource bounds. Самостоятельная повторная проверка не заменяет независимую. Публиковать только фактические checks и оставшиеся limits.

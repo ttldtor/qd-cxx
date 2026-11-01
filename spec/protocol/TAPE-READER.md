@@ -50,7 +50,7 @@ below describes the preserved legacy profile, not the new explicitly selected Qu
 
 [Русская версия](TAPE-READER.ru.md). English is authoritative.
 
-QDCXX-021 author contract, specified after Java probes and before C++ implementation.
+QDCXX-021 contract, specified after Java probes and before C++ implementation.
 [Decision](../../docs/decisions/ADR-0002-bounded-tape-reader.md). This is explicit uncompressed
 BINARY, time NONE, EMPTY_SET, STREAM_DATA, raw flags zero, ordinary exact type 8, hasTime=false.
 Caller supplies validated immutable local schema; no importer, transport or inferred schema.

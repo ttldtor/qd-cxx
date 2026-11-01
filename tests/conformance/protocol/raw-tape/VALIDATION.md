@@ -1,10 +1,10 @@
-# RAW/MESSAGE implementation author validation
+# RAW/MESSAGE implementation validation
 
 [Русская версия](VALIDATION.ru.md). English is authoritative.
 
 Starting HEAD: `c1654f2dbb5163917b848d1b84b17dfb9d0999fc`.
 Checks below were executed on 2026-09-22 UTC. No errors were detected in the successful checks
-listed here. They are author checks, distinct from independent review.
+listed here. They are recorded checks, distinct from independent review.
 Implementation is ready for independent review; independent acceptance is not claimed.
 
 ## Evidence before implementation
