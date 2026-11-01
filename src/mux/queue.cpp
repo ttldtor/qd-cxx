@@ -1013,7 +1013,8 @@ submit(const std::shared_ptr<detail::QueuePort> &port, detail::QueueCommandKind 
             auto *destination = command.text.data() + offset;
             std::copy(key.symbol.begin(), key.symbol.end(), destination);
             destination[key.symbol.size()] = 0;
-            const core::SubscriptionKey copied{key.context, std::u16string_view(destination, key.symbol.size())};
+            const core::SubscriptionKey copied{key.context, std::u16string_view(destination, key.symbol.size()),
+                                               key.selector};
             command.keys[i] = copied;
             command.requests[i] = {copied, kind == detail::QueueCommandKind::REMOVE ? std::optional<std::int64_t>{}
                                                                                     : requests[i].historyBound};
@@ -1434,7 +1435,8 @@ struct MuxQueue::State {
      * @return Prepared unique state or typed exception.
      */
     static StateOwner create(const core::LocalSchema &local, core::SubscriptionFamily contract, MuxLimits ml,
-                             QueueLimits ql, QueueWork &work) {
+                             QueueLimits ql, QueueWork &work,
+                             core::SubscriptionSelectorPolicy policy = core::SubscriptionSelectorPolicy::EXACT_ONLY) {
         if (!ql.routeRecords || !ql.batchRecords || !ql.cleanupRecords || ql.routeRecords > ql.sourceRecords ||
             ml.clients < ql.clients)
             throw QueueError::INVALID_CONFIGURATION;
@@ -1458,7 +1460,7 @@ struct MuxQueue::State {
             sum(sum(product(ql.clients, 5), cells),
                 sum(sum(ql.routeRecords, ml.entries), product(local.records().size(), local.records().size())));
         spend(work, sum(product(slots, 2), 9), 0, 0, product(fixed, 2));
-        auto mux = MuxState::create(local, contract, ml, work.interest);
+        auto mux = MuxState::create(local, contract, ml, work.interest, policy);
 
         if (!mux)
             throw sourceFailure(mux.error());
@@ -1636,7 +1638,7 @@ struct MuxQueue::State {
         for (std::size_t i = 0; i < c.mappingCount; ++i) {
             auto &m = c.mapping[i];
 
-            if (m.key.context.matches(key.context) && m.key.symbol == key.symbol) {
+            if (m.key.selector == key.selector && m.key.context.matches(key.context) && m.key.symbol == key.symbol) {
                 auto current = interest.isCurrent(c.interest, m.mux, work.interest);
 
                 if (!current) {
@@ -1922,7 +1924,7 @@ MuxQueue::~MuxQueue() = default;
 std::expected<MuxQueue, QueueFailure> MuxQueue::createStream(const core::LocalSchema &schema, MuxLimits ml,
                                                              core::SubscriptionLimits desired,
                                                              collectors::StreamLimits source, QueueLimits limits,
-                                                             QueueWork &work) {
+                                                             QueueWork &work, core::SubscriptionSelectorPolicy policy) {
     try {
         debit(work.operations, 1);
 
@@ -1930,11 +1932,11 @@ std::expected<MuxQueue, QueueFailure> MuxQueue::createStream(const core::LocalSc
             throw QueueError::INVALID_CONFIGURATION;
         }
 
-        auto state = State::create(schema, core::SubscriptionFamily::STREAM, ml, limits, work);
+        auto state = State::create(schema, core::SubscriptionFamily::STREAM, ml, limits, work, policy);
         state->checkDesired(desired);
         spend(work, sum(desired.schemaRecords, 1), 0, 0,
               sum(schema.storageBytes(), product(desired.schemaRecords, sizeof(core::LocalRecord))));
-        auto demand = core::SubscriptionState::create(schema, core::SubscriptionFamily::STREAM, desired);
+        auto demand = core::SubscriptionState::create(schema, core::SubscriptionFamily::STREAM, desired, policy);
 
         if (!demand) {
             return std::unexpected(sourceFailure(demand.error()));
@@ -1973,7 +1975,7 @@ std::expected<MuxQueue, QueueFailure> MuxQueue::createTicker(const core::LocalSc
             throw QueueError::INVALID_CONFIGURATION;
         }
 
-        auto state = State::create(schema, core::SubscriptionFamily::TICKER, ml, limits, work);
+        auto state = State::create(schema, core::SubscriptionFamily::TICKER, ml, limits, work, options.selectorPolicy);
         state->checkDesired(source.viewSubscriptions);
         auto copy = schema;
         auto collector = collectors::TickerCollector::create(std::move(copy), source, options, work.ticker);
@@ -2009,7 +2011,7 @@ std::expected<MuxQueue, QueueFailure> MuxQueue::createHistory(const core::LocalS
             throw QueueError::INVALID_CONFIGURATION;
         }
 
-        auto state = State::create(schema, core::SubscriptionFamily::HISTORY, ml, limits, work);
+        auto state = State::create(schema, core::SubscriptionFamily::HISTORY, ml, limits, work, options.selectorPolicy);
         state->checkDesired(source.viewSubscriptions);
         auto copy = schema;
         auto collector = collectors::HistoryCollector::create(std::move(copy), source, options, work.history);
@@ -2355,7 +2357,8 @@ std::expected<bool, QueueFailure> MuxQueue::State::sync(Client &c, QueueWork &wo
         const MuxEntry *match = nullptr;
 
         for (const auto &wanted : *desired) {
-            if (entry.key.context.matches(wanted.key.context) && entry.key.symbol == wanted.key.symbol) {
+            if (entry.key.selector == wanted.key.selector && entry.key.context.matches(wanted.key.context) &&
+                entry.key.symbol == wanted.key.symbol) {
                 match = &wanted;
                 break;
             }
@@ -3876,7 +3879,8 @@ std::expected<QueueRangeStatus, QueueFailure> MuxQueue::rangeStatus(const MuxHan
         const MuxEntry *wanted = nullptr;
 
         for (const auto &entry : *entries)
-            if (entry.key.context.matches(key.context) && entry.key.symbol == key.symbol) {
+            if (entry.key.selector == key.selector && entry.key.context.matches(key.context) &&
+                entry.key.symbol == key.symbol) {
                 wanted = &entry;
                 break;
             }

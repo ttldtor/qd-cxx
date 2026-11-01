@@ -6,7 +6,7 @@
 один настоящий [MuxState](INTERESTS.ru.md), один настоящий family collector и конечные независимые
 регистрации. Вызывающая сторона задаёт неизменяемую схему, ёмкости, work credits, consumers и полные
 события, допущенные прежней [LiveSession](../subscriptions/LIVE-SESSION.ru.md). Очередь не выполняет
-декодирование, I/O, background pumping, чтение часов, wildcard expansion и wire reconciliation.
+декодирование, I/O, background pumping, чтение часов, текстовый glob expansion и wire reconciliation.
 Локальное завершение команды/доставки не подтверждает socket writes, применение peer и полный subscription facade.
 
 ## Композиция и атомарные границы
@@ -347,3 +347,15 @@ m::OwnedMuxBatch runMuxQueueExample(p::LiveSession &source, const c::LocalSchema
 }
 
 ```
+
+<a id="selector-profiles"></a>
+
+## Opt-in canonical selectors
+
+`MuxQueue::createStream` принимает неизменяемую [selector policy](../subscriptions/SELECTORS.ru.md).
+Default и прежний скомпилированный пример остаются `EXACT_ONLY`; явный All использует
+`CANONICAL_STREAM_ALL_V1`. TICKER/HISTORY могут выбрать canonical Exact через options без All.
+Command/mapping copies сохраняют selector kind. Canonical-domain failure после queue admission
+относится к уже принятому UNSTAGED event: обычные shared-source failure/disposal сохраняют nested
+cause, counts и gaps. Принятая ownership barrier не отменяется. Reservations и local stop/lease rules
+выше сохранены; пересобранные consumers должны учесть текущие metadata sizes.

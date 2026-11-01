@@ -3,10 +3,10 @@
 [Русская версия](STREAM-COLLECTOR.ru.md). English is authoritative.
 
 Include `qd/collectors/stream.hpp` and link `qdcxx_collectors`. This pure C++23
-component stages exact STREAM interests over [desired state](STATE.md) and whole
+component defaults to exact STREAM interests over [desired state](STATE.md) and whole
 admitted [live-session events](LIVE-SESSION.md). It implements every-record order,
 including identical consecutive values, without a latest-value cache. Callback
-dispatch, shared upstream multiplexing, wildcard, TICKER and HISTORY collectors
+dispatch, shared upstream multiplexing, TICKER and HISTORY collectors
 are separate components. No runtime, socket or JSON dependency is introduced.
 
 ## Ownership and input
@@ -207,3 +207,14 @@ int runStreamExample(p::LiveSession &session, const c::LocalSchema &schema, std:
     return delivered == staged->selected && delivered == 1 ? 0 : 9;
 }
 ```
+
+<a id="selector-profiles"></a>
+
+## Canonical Exact and explicit All
+
+The desired owner carries an immutable [selector profile](SELECTORS.md). Under
+`CANONICAL_STREAM_ALL_V1`, known-record All and matching Exact capture at most two original
+activations and offer the concrete record once. Canonical DATA star is ordinary concrete input.
+Whole-event domain/work preflight precedes moves, epoch pinning and state/offer changes;
+`UNSUPPORTED_SYMBOL_DOMAIN` preserves input. Removing/re-adding a selector never revives old eligibility.
+The default and existing example above remain legacy Exact; no wildcard text expansion is inferred.

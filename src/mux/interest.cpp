@@ -53,7 +53,7 @@ bool accumulate(std::size_t &total, std::size_t count, std::size_t width = 1) no
  * @return Exact provenance and UTF-16-unit equality.
  */
 bool sameKey(const core::SubscriptionKey &left, const core::SubscriptionKey &right) noexcept {
-    return left.context.matches(right.context) && left.symbol == right.symbol;
+    return left.selector == right.selector && left.context.matches(right.context) && left.symbol == right.symbol;
 }
 } // namespace
 
@@ -88,6 +88,7 @@ struct MuxState::State {
         char16_t emptySymbol = 0;                               ///< Stable inline address for a zero-unit exact symbol.
     };
 
+    core::SubscriptionSelectorPolicy policy = core::SubscriptionSelectorPolicy::EXACT_ONLY; ///< Immutable profile.
     MuxLimits limits{};                                                 ///< Immutable finite capacities.
     core::SubscriptionFamily family = core::SubscriptionFamily::STREAM; ///< Fixed owner contract.
     std::shared_ptr<const detail::Identity> identity;                   ///< Independent fixed owner identity.
@@ -159,7 +160,7 @@ struct MuxState::State {
      * @param key Borrowed exact key.
      * @return First input rejection, or no error.
      */
-    std::optional<MuxError> validateKey(const core::SubscriptionKey &key) const noexcept {
+    std::optional<MuxError> validateKey(const core::SubscriptionKey &key, bool concrete = false) const noexcept {
         bool found = false;
         bool indexed = false;
 
@@ -175,15 +176,31 @@ struct MuxState::State {
             return MuxError::INVALID_CONTEXT;
         }
 
+        if (key.selector != core::SubscriptionSelectorKind::EXACT &&
+            key.selector != core::SubscriptionSelectorKind::ALL) {
+            return MuxError::INVALID_SELECTOR;
+        }
+
+        if (key.selector == core::SubscriptionSelectorKind::ALL && (!key.symbol.empty() || concrete)) {
+            return MuxError::INVALID_SELECTOR;
+        }
+
+        if (key.selector == core::SubscriptionSelectorKind::ALL &&
+            policy != core::SubscriptionSelectorPolicy::CANONICAL_STREAM_ALL_V1) {
+            return MuxError::UNSUPPORTED_SELECTOR;
+        }
+
+        const bool canonicalData = concrete && policy == core::SubscriptionSelectorPolicy::CANONICAL_STREAM_ALL_V1;
+
         if (key.symbol.data() == nullptr) {
             return MuxError::INVALID_SELECTOR;
         }
 
-        if (key.symbol.size() > limits.symbolUnits) {
+        if (!canonicalData && key.symbol.size() > limits.symbolUnits) {
             return MuxError::RESOURCE_LIMIT;
         }
 
-        if (!key.symbol.empty() && key.symbol.front() == u'*') {
+        if (!canonicalData && !key.symbol.empty() && key.symbol.front() == u'*') {
             return MuxError::INVALID_SELECTOR;
         }
 
@@ -266,7 +283,9 @@ struct MuxState::State {
         std::copy(request.key.symbol.begin(), request.key.symbol.end(), text);
         bank.symbolCount += request.key.symbol.size();
         auto &entry = bank.entries[bank.entryCount++];
-        entry = {{request.key.context, {text, request.key.symbol.size()}}, request.historyBound, std::move(membership)};
+        entry = {{request.key.context, {text, request.key.symbol.size()}, request.key.selector},
+                 request.historyBound,
+                 std::move(membership)};
 
         for (std::size_t i = 0; i < bank.aggregateCount; ++i) {
             auto &aggregate = bank.aggregate[i];
@@ -305,7 +324,8 @@ MuxState &MuxState::operator=(MuxState &&other) noexcept {
 }
 
 std::expected<MuxState, MuxError> MuxState::create(const core::LocalSchema &schema, core::SubscriptionFamily family,
-                                                   MuxLimits limits, MuxWork &work) {
+                                                   MuxLimits limits, MuxWork &work,
+                                                   core::SubscriptionSelectorPolicy policy) {
     if (!charge(work.operations, 1)) {
         return std::unexpected(MuxError::WORK_LIMIT);
     }
@@ -313,6 +333,14 @@ std::expected<MuxState, MuxError> MuxState::create(const core::LocalSchema &sche
     if (family != core::SubscriptionFamily::STREAM && family != core::SubscriptionFamily::TICKER &&
         family != core::SubscriptionFamily::HISTORY) {
         return std::unexpected(MuxError::INVALID_STATE);
+    }
+
+    if ((policy != core::SubscriptionSelectorPolicy::EXACT_ONLY &&
+         policy != core::SubscriptionSelectorPolicy::CANONICAL_EXACT_V1 &&
+         policy != core::SubscriptionSelectorPolicy::CANONICAL_STREAM_ALL_V1) ||
+        (policy == core::SubscriptionSelectorPolicy::CANONICAL_STREAM_ALL_V1 &&
+         family != core::SubscriptionFamily::STREAM)) {
+        return std::unexpected(MuxError::UNSUPPORTED_SELECTOR);
     }
 
     if (!schema.sharesIdentityWith(schema)) {
@@ -360,6 +388,7 @@ std::expected<MuxState, MuxError> MuxState::create(const core::LocalSchema &sche
     try {
         auto state = std::make_unique<State>();
         state->limits = limits;
+        state->policy = policy;
         state->family = family;
         state->recordCount = records.size();
         state->storageBytes = bytes;
@@ -649,7 +678,7 @@ std::expected<std::optional<MuxMembership>, MuxError> MuxState::select(const Mux
         return std::unexpected(result.error());
     }
 
-    if (const auto error = state_->validateKey(key)) {
+    if (const auto error = state_->validateKey(key, true)) {
         return std::unexpected(*error);
     }
 
@@ -658,6 +687,39 @@ std::expected<std::optional<MuxMembership>, MuxError> MuxState::select(const Mux
     }
 
     const auto &bank = state_->banks[state_->published];
+
+    if (state_->policy == core::SubscriptionSelectorPolicy::CANONICAL_STREAM_ALL_V1) {
+        const auto range = bank.ranges[client.slot_];
+        std::size_t visits = 1;
+        std::size_t units = 0;
+
+        if (!accumulate(visits, range.count, 2) || !accumulate(units, range.count, key.symbol.size()) ||
+            !accumulate(units, units)) {
+            return std::unexpected(MuxError::RESOURCE_LIMIT);
+        }
+
+        if (!charge(work.visits, visits) || !charge(work.symbolUnits, units)) {
+            return std::unexpected(MuxError::WORK_LIMIT);
+        }
+
+        MuxMembership selected;
+
+        for (std::size_t i = 0; i < range.count; ++i) {
+            const auto &candidate = bank.entries[range.offset + i];
+
+            if (candidate.key.context.matches(key.context) &&
+                (candidate.key.selector == core::SubscriptionSelectorKind::ALL || candidate.key.symbol == key.symbol)) {
+                if (selected.activation_ == 0) {
+                    selected = candidate.membership;
+                } else {
+                    selected.alternateActivation_ = candidate.membership.activation_;
+                }
+            }
+        }
+
+        return selected.activation_ == 0 ? std::optional<MuxMembership>{} : std::optional<MuxMembership>{selected};
+    }
+
     const auto *entry = state_->find(bank, bank.ranges[client.slot_], key);
 
     if (!entry || (rawTime && *rawTime < *entry->historyBound)) {
@@ -690,6 +752,10 @@ std::expected<bool, MuxError> MuxState::isCurrent(const MuxClient &client, const
         return std::unexpected(MuxError::RESOURCE_LIMIT);
     }
 
+    if (membership.alternateActivation_ != 0 && !accumulate(visits, range.count)) {
+        return std::unexpected(MuxError::RESOURCE_LIMIT);
+    }
+
     if (!charge(work.visits, visits)) {
         return std::unexpected(MuxError::WORK_LIMIT);
     }
@@ -700,12 +766,18 @@ std::expected<bool, MuxError> MuxState::isCurrent(const MuxClient &client, const
     }
 
     for (std::size_t i = 0; i < range.count; ++i) {
-        if (bank.entries[range.offset + i].membership.activation_ == membership.activation_) {
+        if (bank.entries[range.offset + i].membership.activation_ == membership.activation_ ||
+            (membership.alternateActivation_ != 0 &&
+             bank.entries[range.offset + i].membership.activation_ == membership.alternateActivation_)) {
             return true;
         }
     }
 
     return false;
+}
+
+core::SubscriptionSelectorPolicy MuxState::selectorPolicy() const noexcept {
+    return state_ ? state_->policy : core::SubscriptionSelectorPolicy::EXACT_ONLY;
 }
 
 std::uint64_t MuxState::revision() const noexcept {

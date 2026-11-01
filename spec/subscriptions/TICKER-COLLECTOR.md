@@ -249,3 +249,14 @@ int runTickerExample(p::LiveSession &source, const c::LocalSchema &schema, std::
     return removed && !*removed ? 0 : 14;
 }
 ```
+
+<a id="selector-profiles"></a>
+
+## Canonical Exact domain
+
+`TickerOptions::selectorPolicy` defaults to `EXACT_ONLY`; opt-in `CANONICAL_EXACT_V1` selects the
+[canonical incoming domain](SELECTORS.md). TICKER All and the STREAM-All owner profile remain
+unsupported. A whole-event guard prepays domain visits/text before moves, cache candidates, epoch
+or stale/maintenance changes. Direct domain/work/arithmetic refusal preserves input, state and offers;
+`UNSUPPORTED_SYMBOL_DOMAIN` is distinct from established capacity-overflow STALE behavior.
+The cache, initial/update projection and reset algorithms above are unchanged.

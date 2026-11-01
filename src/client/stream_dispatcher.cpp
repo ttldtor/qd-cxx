@@ -759,9 +759,9 @@ std::expected<CommandTicket, ClientError> ClientHandle::submit(detail::CommandKi
             }
 
             if (kind == detail::CommandKind::REMOVE) {
-                slot->keys[i] = {key.context, symbol};
+                slot->keys[i] = {key.context, symbol, key.selector};
             } else {
-                slot->requests[i] = {{key.context, symbol}, requests[i].historyBound};
+                slot->requests[i] = {{key.context, symbol, key.selector}, requests[i].historyBound};
             }
 
             offset += key.symbol.size();

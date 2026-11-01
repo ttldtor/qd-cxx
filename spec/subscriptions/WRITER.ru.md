@@ -26,10 +26,10 @@ Tuple содержит точный symbol, затем compact sender ID. Тол
 знаковую raw64 compact-long границу. Обе HISTORY формы требуют явных indexed metadata;
 остальные сообщения и HISTORY_REMOVE отвергают переданную границу. Преобразование бизнес-времени не выводится.
 
-Symbol state сбрасывается на каждом сообщении. Выбранный encoder выдаёт raw FD CharArray
+Symbol state сбрасывается на каждом сообщении. Default EXACT_ONLY encoder выдаёт raw FD CharArray
 и локальные для сообщения FF repeats; кратчайшая PentaCodec-форма Java не обещается.
 Сохраняются ненулевая пустая строка, встроенный ноль и непарные UTF-16 units. Null data pointer
-и точные селекторы с начальным `*` отвергаются; All/glob и неявных converters нет.
+и точные селекторы с начальным `*` отвергаются; этот default не включает All/glob и неявных converters. Явные profiles описаны ниже.
 Описания используют прежние ограниченные UTFString/compact primitives.
 
 ## Жизнь выхода и частичная запись
@@ -135,3 +135,14 @@ int main() {
 [Производственный разбор захватов](../../tests/fixtures/subscriptions/writer/README.ru.md)
 проверяет выбранный нативный вывод закреплённой Java. [Проверки](../../tests/conformance/subscriptions/WRITER-VALIDATION.ru.md)
 отделяют выполненные профили от будущей квалификации live session/runtime.
+
+<a id="selector-profiles"></a>
+
+## Canonical symbol profiles
+
+Явный неизменяемый `SubscriptionSelectorPolicy` при создании выбирает
+[контракт canonical symbols](SELECTORS.ru.md). Оба canonical profiles кодируют Exact всех шести messages;
+только `CANONICAL_STREAM_ALL_V1` разрешает явный All в STREAM 16/17. Default `EXACT_ONLY` сохраняет
+старые FD/repeat bytes. Descriptor и текст не включают permission, локальный output не является peer ACK.
+Полные Java envelope comparisons и ограничение legacy FD/canonical collector-key описаны в
+[валидации селекторов](../../tests/conformance/subscriptions/WILDCARD-VALIDATION.ru.md).

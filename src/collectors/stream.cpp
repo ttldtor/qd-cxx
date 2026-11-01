@@ -1,6 +1,7 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/collectors/stream.hpp"
+#include "qd/encoding/penta_symbol.hpp"
 
 #include <limits>
 #include <new>
@@ -126,16 +127,21 @@ struct StreamCollector::Impl {
 
     /** Locate an exact current subscription; no work or allocation occurs here.
      * @param record Whole-frame local record.
-     * @return Borrowed matching desired entry, or null for unsolicited data.
+     * @return Original matched activation(s), or absent for unsolicited data; no event owner is copied.
      */
-    [[nodiscard]] const core::SubscriptionEntry *match(const protocol::LiveRecordView &record) const noexcept {
+    [[nodiscard]] std::optional<core::SubscriptionMembership>
+    match(const protocol::LiveRecordView &record) const noexcept {
+        std::optional<core::SubscriptionMembership> selected;
+
         for (const auto &entry : desired.entries()) {
-            if (entry.key.context.matches(record.context) && entry.key.symbol == record.symbol) {
-                return &entry;
+            if (entry.key.context.matches(record.context) &&
+                (entry.key.selector == core::SubscriptionSelectorKind::ALL || entry.key.symbol == record.symbol)) {
+                selected =
+                    selected ? core::SubscriptionMembership::anyOf(*selected, entry.membership) : entry.membership;
             }
         }
 
-        return nullptr;
+        return selected;
     }
 
     /** Invalidate all borrowed delivery offers after an effective queue/state change. */
@@ -327,6 +333,17 @@ std::expected<StreamStage, StreamError> StreamCollector::stage(protocol::LiveEve
         // Reserve both matching passes before writing any free ring slot or transferring ownership.
         for (const auto &record : event.records()) {
             debit(1, work.visits);
+
+            if (impl_->desired.selectorPolicy() != core::SubscriptionSelectorPolicy::EXACT_ONLY) {
+                // Canonical validation and two captured-choice retain/release passes precede all writes.
+                debit(8, work.visits);
+                debit(7, work.textUnits);
+
+                if (!encoding::isCanonicalPentaSymbol(record.symbol, record.cipher)) {
+                    throw Error::UNSUPPORTED_SYMBOL_DOMAIN;
+                }
+            }
+
             bool requested = false;
 
             for (const auto &entry : impl_->desired.entries()) {
@@ -336,7 +353,8 @@ std::expected<StreamStage, StreamError> StreamCollector::stage(protocol::LiveEve
                 debit(record.symbol.size(), work.textUnits);
                 debit(entry.key.symbol.size(), work.textUnits);
 
-                if (entry.key.context.matches(record.context) && entry.key.symbol == record.symbol) {
+                if (entry.key.context.matches(record.context) &&
+                    (entry.key.selector == core::SubscriptionSelectorKind::ALL || entry.key.symbol == record.symbol)) {
                     requested = true;
                 }
             }
@@ -372,10 +390,10 @@ std::expected<StreamStage, StreamError> StreamCollector::stage(protocol::LiveEve
         std::size_t offset = impl_->itemCount;
 
         for (const auto &record : event.records()) {
-            if (const auto *entry = impl_->match(record)) {
+            if (const auto membership = impl_->match(record)) {
                 auto &item = impl_->items[impl_->index(offset++)];
                 item.record = &record;
-                item.membership = entry->membership;
+                item.membership = *membership;
                 item.revision = revision;
                 item.frame = frameIndex;
             }
@@ -418,6 +436,10 @@ std::expected<std::optional<StreamDelivery>, StreamError> StreamCollector::front
             const auto &item = impl_->items[impl_->index(withdrawn)];
             debit(1, work.visits);
             debit(impl_->desired.entries().size(), work.visits);
+
+            if (impl_->desired.selectorPolicy() == core::SubscriptionSelectorPolicy::CANONICAL_STREAM_ALL_V1) {
+                debit(impl_->desired.entries().size(), work.visits);
+            }
 
             if (impl_->desired.isCurrent(item.membership)) {
                 break;
@@ -497,7 +519,17 @@ StreamCollector::prepareBatch(std::span<StreamDelivery> storage, StreamWork &wor
         while (prefix < impl_->itemCount && selected < storage.size()) {
             debit(2, work.visits);
             debit(impl_->desired.entries().size(), work.visits);
+
+            if (impl_->desired.selectorPolicy() == core::SubscriptionSelectorPolicy::CANONICAL_STREAM_ALL_V1) {
+                debit(impl_->desired.entries().size(), work.visits);
+            }
+
             debit(impl_->desired.entries().size(), work.visits);
+
+            if (impl_->desired.selectorPolicy() == core::SubscriptionSelectorPolicy::CANONICAL_STREAM_ALL_V1) {
+                debit(impl_->desired.entries().size(), work.visits);
+            }
+
             const auto &item = impl_->items[impl_->index(prefix++)];
 
             if (impl_->desired.isCurrent(item.membership)) {

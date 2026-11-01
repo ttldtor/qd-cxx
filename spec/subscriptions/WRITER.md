@@ -26,10 +26,10 @@ Each tuple is exact symbol then compact sender ID. Only HISTORY_ADD requires/all
 raw compact-long bound. Both HISTORY forms require explicit indexed metadata; other messages
 and HISTORY_REMOVE reject a supplied bound. No business-time conversion is inferred.
 
-Symbols reset per message. The selected encoder emits raw FD CharArray symbols and message-local
+Symbols reset per message. The default EXACT_ONLY encoder emits raw FD CharArray symbols and message-local
 FF repeats; it does not promise Java's shortest PentaCodec representation. Non-null empty,
 embedded zero and unpaired UTF-16 units are preserved. Null data pointers and reserved leading
-`*` exact selectors are rejected; no All/glob or implicit converter is introduced.
+`*` exact selectors are rejected; this default enables no All/glob or implicit converter. Explicit profiles are described below.
 Descriptions use the existing bounded UTFString/compact primitives.
 
 ## Output lifetime and partial writes
@@ -135,3 +135,14 @@ int main() {
 [Captured production parsing](../../tests/fixtures/subscriptions/writer/README.md) verifies the
 selected native output with locked Java. [Validation](../../tests/conformance/subscriptions/WRITER-VALIDATION.md)
 separates executed profiles from remaining live-session/runtime qualification.
+
+<a id="selector-profiles"></a>
+
+## Canonical symbol profiles
+
+An explicit immutable `SubscriptionSelectorPolicy` at creation selects the
+[canonical symbol contract](SELECTORS.md). Both canonical profiles encode Exact in all six messages;
+only `CANONICAL_STREAM_ALL_V1` permits explicit All in STREAM 16/17. Default `EXACT_ONLY` retains old
+FD/repeat bytes. No descriptor or text spelling enables permission, and local output is not peer ACK.
+Complete-envelope Java comparisons and the legacy FD/canonical collector-key limitation are recorded
+in [selector validation](../../tests/conformance/subscriptions/WILDCARD-VALIDATION.md).

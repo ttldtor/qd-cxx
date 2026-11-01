@@ -3,10 +3,10 @@
 [English version](STREAM-COLLECTOR.md). Английская версия нормативная.
 
 Подключите `qd/collectors/stream.hpp` и свяжите `qdcxx_collectors`. Чистый C++23
-компонент ставит точные STREAM interests в очередь поверх [desired state](STATE.ru.md)
+компонент по умолчанию ставит точные STREAM interests в очередь поверх [desired state](STATE.ru.md)
 и целиком принятых [событий live-сессии](LIVE-SESSION.ru.md). Каждая запись сохраняет
 порядок, включая полностью одинаковые последовательные значения; latest-value cache
-не используется. Callback dispatch, общий upstream multiplexing, wildcard, TICKER
+не используется. Callback dispatch, общий upstream multiplexing, TICKER
 и HISTORY — отдельные компоненты. Runtime, socket и JSON dependency не добавляются.
 
 ## Владение и вход
@@ -203,3 +203,14 @@ int runStreamExample(p::LiveSession &session, const c::LocalSchema &schema, std:
     return delivered == staged->selected && delivered == 1 ? 0 : 9;
 }
 ```
+
+<a id="selector-profiles"></a>
+
+## Canonical Exact и явный All
+
+Desired owner содержит неизменяемый [selector profile](SELECTORS.ru.md). При
+`CANONICAL_STREAM_ALL_V1` known-record All и подходящий Exact сохраняют не более двух исходных
+activations и предлагают конкретную record один раз. Canonical DATA star — обычный конкретный вход.
+Whole-event domain/work preflight предшествует moves, epoch pinning и изменениям state/offers;
+`UNSUPPORTED_SYMBOL_DOMAIN` сохраняет input. Remove/re-add selector не оживляет старую eligibility.
+Default и прежний пример выше остаются legacy Exact; wildcard text expansion не выводится.

@@ -28,7 +28,8 @@ enum class MuxError {
     RESOURCE_LIMIT,        ///< Fixed resident, client, entry, symbol or command capacity exceeded.
     WORK_LIMIT,            ///< Explicit turn credits exhausted; successful charges are not refunded.
     IDENTITY_EXHAUSTED,    ///< Revision or non-reused activation cannot advance.
-    ALLOCATION_FAILURE     ///< Factory allocation failed before publication.
+    ALLOCATION_FAILURE,    ///< Factory allocation failed before publication.
+    UNSUPPORTED_SELECTOR   ///< Recognized selector/profile is disabled for this family.
 };
 
 /** Explicit finite reservations; zero means zero, never unlimited.
@@ -75,6 +76,7 @@ class MuxMembership {
     std::shared_ptr<const detail::Identity> identity_;
     std::uint64_t clientActivation_ = 0;
     std::uint64_t activation_ = 0;
+    std::uint64_t alternateActivation_ = 0; ///< Second original matched activation, never current desire recomputed.
     friend class MuxState;
 
     public:
@@ -151,12 +153,18 @@ class MuxState {
      * to all local backing. Initialization and cleanup are charged before allocations.
      * @param schema Valid immutable schema, borrowed only for the call; may die afterward.
      * @param family Fixed STREAM/TICKER/HISTORY contract.
+     * @param policy Immutable selector profile; STREAM_ALL is unsupported for fixed TICKER/HISTORY owners.
      * @param limits Explicit finite immutable reservations.
      * @param work Caller-turn attempt, metadata, text and byte credits.
      * @return Empty owner or typed configuration/resource/work/allocation failure.
      */
     [[nodiscard]] static std::expected<MuxState, MuxError>
-    create(const core::LocalSchema &schema, core::SubscriptionFamily family, MuxLimits limits, MuxWork &work);
+    create(const core::LocalSchema &schema, core::SubscriptionFamily family, MuxLimits limits, MuxWork &work,
+           core::SubscriptionSelectorPolicy policy = core::SubscriptionSelectorPolicy::EXACT_ONLY);
+    /** Inspect the immutable explicit selector profile.
+     * @return Chosen profile; EXACT_ONLY when moved from. No work, allocation or mutation occurs.
+     */
+    [[nodiscard]] core::SubscriptionSelectorPolicy selectorPolicy() const noexcept;
     /** Activate one fixed slot; even an empty new client advances the global revision.
      * @param work Remaining turn credits, charged before scanning slots.
      * @return Owning client token, or rejection with no client/revision publication.
@@ -210,7 +218,9 @@ class MuxState {
     [[nodiscard]] std::span<const core::SubscriptionRequest> aggregateEntries() const noexcept;
     /** Select ordinary exact-key eligibility without publishing state or handling collector control flags.
      * @param client Exact current client token.
-     * @param key Borrowed exact provenance/key.
+     * @param key Borrowed concrete DATA provenance/symbol with kind EXACT, never an All query.
+     * Canonical STREAM-All permits concrete leading-asterisk DATA; desired Exact commands still refuse it.
+     * Actual source admission validates the canonical cipher domain; this pure predicate is not a decoder.
      * @param rawTime Required only for HISTORY, compared inclusively in signed raw record units.
      * @param work Remaining query credits; failure is distinct from no match.
      * @return Current client membership or no selection, or typed work/input/client rejection.

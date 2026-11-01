@@ -17,23 +17,25 @@ namespace org::ttldtor::qdcxx::collectors {
 
 /** Typed owner failures; no outcome implies callback, wire or peer completion. */
 enum class HistoryError {
-    INVALID_STATE,         ///< Moved-from owner or wrong lifecycle state.
-    INVALID_CONFIGURATION, ///< Unrepresentable fixed storage or zero scheduling quantum.
-    INVALID_VIEW,          ///< Default, foreign, closed or reused token.
-    INVALID_KEY,           ///< No current membership for the selected exact key.
-    INVALID_CONTEXT,       ///< An actual local record belongs to another immutable schema.
-    INVALID_EVENT,         ///< Not a complete admitted HISTORY_DATA event.
-    INVALID_EPOCH,         ///< A foreign source epoch requires explicit reset.
-    INVALID_INDEX,         ///< Relevant non-removal index is the reserved signed64 maximum.
-    CORE_REJECTED,         ///< Independently typed desired-state rejection is available.
-    RESOURCE_LIMIT,        ///< Shared staging failure marks stale; ordinary command rejection preserves state.
-    WORK_LIMIT,            ///< Retryable turn exhaustion preserves input, state and offers.
-    ALLOCATION_FAILURE,    ///< Fixed factory or desired-state allocation failed before publication.
-    FAILED_VIEW,           ///< Local pending reservation overflowed; evidence remains until close.
-    STALE,                 ///< Shared gap prevents fresh delivery until reset.
-    RESET_PENDING,         ///< Exact owner reset acknowledgment is required before fresh admission.
-    NO_OFFER,              ///< No current nonempty front can be acknowledged.
-    IDENTITY_EXHAUSTED     ///< A non-reused scalar identity cannot advance.
+    INVALID_STATE,            ///< Moved-from owner or wrong lifecycle state.
+    INVALID_CONFIGURATION,    ///< Unrepresentable fixed storage or zero scheduling quantum.
+    INVALID_VIEW,             ///< Default, foreign, closed or reused token.
+    INVALID_KEY,              ///< No current membership for the selected exact key.
+    INVALID_CONTEXT,          ///< An actual local record belongs to another immutable schema.
+    INVALID_EVENT,            ///< Not a complete admitted HISTORY_DATA event.
+    INVALID_EPOCH,            ///< A foreign source epoch requires explicit reset.
+    INVALID_INDEX,            ///< Relevant non-removal index is the reserved signed64 maximum.
+    CORE_REJECTED,            ///< Independently typed desired-state rejection is available.
+    RESOURCE_LIMIT,           ///< Shared staging failure marks stale; ordinary command rejection preserves state.
+    WORK_LIMIT,               ///< Retryable turn exhaustion preserves input, state and offers.
+    ALLOCATION_FAILURE,       ///< Fixed factory or desired-state allocation failed before publication.
+    FAILED_VIEW,              ///< Local pending reservation overflowed; evidence remains until close.
+    STALE,                    ///< Shared gap prevents fresh delivery until reset.
+    RESET_PENDING,            ///< Exact owner reset acknowledgment is required before fresh admission.
+    NO_OFFER,                 ///< No current nonempty front can be acknowledged.
+    IDENTITY_EXHAUSTED,       ///< A non-reused scalar identity cannot advance.
+    UNSUPPORTED_SELECTOR,     ///< Immutable selector profile is not supported by HISTORY.
+    UNSUPPORTED_SYMBOL_DOMAIN ///< Canonical source key-domain rejection preserves input/state/offers.
 };
 
 /** Finite error without text allocation or retained operations. */
@@ -152,6 +154,8 @@ struct HistoryOptions {
     bool storeEverything; ///< Retain unrequested points; false keeps only requested ranges plus bounded empty metadata.
     std::size_t retrievalQuantum; ///< Positive global-snapshot/local-update balance, selected source default100.
     std::size_t partitionSnapshotQuantum; ///< Positive per-partition snapshot rotation, source default10000.
+    core::SubscriptionSelectorPolicy selectorPolicy =
+        core::SubscriptionSelectorPolicy::EXACT_ONLY; ///< Immutable symbol domain; no All.
 };
 
 /** Explicit view projection; false emits legacy unflagged data while preserving raw provenance. */
@@ -364,6 +368,8 @@ class HistoryCollector {
     clear(const HistoryViewToken &view, core::SubscriptionWork &coreWork, HistoryWork &work);
     /** Stage one complete HISTORY_DATA20 event atomically.
      * @param event Actual admitted source; consumed only on success, including ignored frames.
+     * Canonical domain/work refusal precedes candidate activation and preserves the whole input and old offers;
+     * this preflight is separate from shared RESOURCE_LIMIT transitions to STALE.
      * @param work Full candidate/peak/normalization/disposal credits.
      * @return Exact stage counts. Shared capacity/source failure marks STALE and leaves input owned;
      * WORK_LIMIT/context/family rejection preserves prior state/offers/input. Individual pending

@@ -16,14 +16,15 @@ namespace org::ttldtor::qdcxx::collectors {
 
 /** Local staging failures, independent of connection and callback completion. */
 enum class StreamError {
-    INVALID_STATE,      ///< Moved-from collector or terminal overflow already observed.
-    INVALID_FAMILY,     ///< Desired state does not select STREAM or is moved from.
-    INVALID_EVENT,      ///< Input is not a complete admitted STREAM_DATA event.
-    INVALID_EPOCH,      ///< Input belongs to another connection epoch; construct a fresh collector.
-    RESOURCE_LIMIT,     ///< Terminal overflow; no incoming record is staged or silently conflated.
-    WORK_LIMIT,         ///< Nonterminal exhausted turn credits; queue and input ownership are unchanged.
-    ALLOCATION_FAILURE, ///< Factory backing allocation failed before desired-state transfer.
-    NO_OFFER            ///< pop requires a successful nonempty front after the last effective mutation.
+    INVALID_STATE,            ///< Moved-from collector or terminal overflow already observed.
+    INVALID_FAMILY,           ///< Desired state does not select STREAM or is moved from.
+    INVALID_EVENT,            ///< Input is not a complete admitted STREAM_DATA event.
+    INVALID_EPOCH,            ///< Input belongs to another connection epoch; construct a fresh collector.
+    RESOURCE_LIMIT,           ///< Terminal overflow; no incoming record is staged or silently conflated.
+    WORK_LIMIT,               ///< Nonterminal exhausted turn credits; queue and input ownership are unchanged.
+    ALLOCATION_FAILURE,       ///< Factory backing allocation failed before desired-state transfer.
+    NO_OFFER,                 ///< pop requires a successful nonempty front after the last effective mutation.
+    UNSUPPORTED_SYMBOL_DOMAIN ///< Canonical profile rejects a noncanonical admitted cipher/text pair; input unchanged.
 };
 
 /** Required finite capacities, including zero; no lifetime record quota is imposed. */
@@ -150,6 +151,7 @@ class StreamCollector {
     [[nodiscard]] std::expected<core::SubscriptionChange, core::SubscriptionError> clear(core::SubscriptionWork &work);
     /** Atomically stage every currently eligible record from one whole admitted STREAM_DATA frame.
      * @param event Complete source owner, transferred only for a successful nonzero selection.
+     * A canonical-profile domain refusal preserves the complete input, queued records and outstanding offer.
      * @param work Mutable turn credits; full matching/publication work is reserved before queue mutation.
      * @return Selection/ignore counts or failure. A zero selection preserves the prior offer. RESOURCE_LIMIT retires
      * delivery, preserves the queue and input owner, and records known pending/incoming counts. Other failures preserve

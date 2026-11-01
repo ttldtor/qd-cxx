@@ -15,11 +15,11 @@ Move-only `SubscriptionState` создаётся из валидированно
 факты indexed layout, а не объявления схемы. Входная схема не обязана переживать состояние.
 Ограниченная копия схемы сохраняет provenance; независимо созданная схема той же формы — нет.
 
-Ключ содержит `RecordContext` и заимствованный точный UTF-16 `string_view`. Текст нельзя менять
+Default Exact key содержит `RecordContext` и заимствованный точный UTF-16 `string_view`. Текст нельзя менять
 во время вызова; при эффективном изменении он копируется в собственное упакованное хранилище.
 Null data pointer недопустим, включая view по умолчанию. Ненулевой указатель с нулевой длиной
 допустим. Встроенный ноль и непарные суррогаты сохраняются. Нормализации и glob expansion нет;
-точный текст с начальным `*` отклоняется. Явный All относится к будущему API.
+точный текст с начальным `*` отклоняется. Явный All отдельно включается selector profiles ниже.
 
 HISTORY-ключ требует явных indexed-time метаданных записи для add, replace **и remove**,
 даже если удаление отсутствующего ключа иначе было бы no-op. Add/replace HISTORY требуют
@@ -140,3 +140,13 @@ int main() {
 Отдельный CTest `core_subscription_state` проверяет изменения, identity, HISTORY, ёмкости,
 работу и allocation rollback. Выполненные конфигурации и ограничения — в
 [проверках](../../tests/conformance/subscriptions/STATE-VALIDATION.ru.md).
+
+<a id="selector-profiles"></a>
+
+## Явные selector profiles
+
+Default — `EXACT_ONLY`. Неизменяемый [контракт селекторов](SELECTORS.ru.md) добавляет canonical Exact
+и opt-in STREAM All через `core::allSymbols`; All — отдельный selector key с одной entry и нулём
+desired symbol text. Captured Exact/All choices сохраняют исходные activations при mutation;
+`SubscriptionMembership::anyOf` — structural OR, а не matching/liveness oracle. Canonical profiles
+и добавленные selector errors не означают stable binary ABI: пересоберите consumers и учтите текущие metadata.

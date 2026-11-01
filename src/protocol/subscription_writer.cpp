@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 
 #include "qd/protocol/subscription_writer.hpp"
+#include "qd/encoding/penta_symbol.hpp"
 
 #include "qd/encoding/char_array.hpp"
 #include "qd/encoding/compact.hpp"
@@ -237,16 +238,25 @@ std::expected<void, Error> PendingSubscriptionOutput::consume(std::size_t count)
 
 SubscriptionWriter::SubscriptionWriter(core::LocalSchema schema, std::vector<OutgoingRecord> records,
                                        SubscriptionWriterLimits limits,
-                                       std::shared_ptr<PendingSubscriptionOutput::Budget> budget)
-    : schema_(std::move(schema)), records_(std::move(records)), limits_(limits), budget_(std::move(budget)) {
+                                       std::shared_ptr<PendingSubscriptionOutput::Budget> budget,
+                                       core::SubscriptionSelectorPolicy policy)
+    : schema_(std::move(schema)), records_(std::move(records)), limits_(limits), budget_(std::move(budget)),
+      selectorPolicy_(policy) {
     storageBytes_ = measureStorageBytes();
 }
 
 std::expected<SubscriptionWriter, Error>
 SubscriptionWriter::create(const core::LocalSchema &schema, std::span<const OutgoingRecord> records,
-                           LayoutLimits layoutLimits, SubscriptionWriterLimits limits, SubscriptionWriterWork &work) {
+                           LayoutLimits layoutLimits, SubscriptionWriterLimits limits, SubscriptionWriterWork &work,
+                           core::SubscriptionSelectorPolicy policy) {
     try {
         debit(1, work.operations);
+
+        if (policy != core::SubscriptionSelectorPolicy::EXACT_ONLY &&
+            policy != core::SubscriptionSelectorPolicy::CANONICAL_EXACT_V1 &&
+            policy != core::SubscriptionSelectorPolicy::CANONICAL_STREAM_ALL_V1) {
+            throw Error::UNSUPPORTED_SELECTOR;
+        }
 
         if (records.size() > layoutLimits.records) {
             throw Error::RESOURCE_LIMIT;
@@ -353,7 +363,7 @@ SubscriptionWriter::create(const core::LocalSchema &schema, std::span<const Outg
         debit(records.size(), work.visits);
         debit(fields, work.visits);
 
-        return SubscriptionWriter(std::move(*ownedSchema), std::move(owned), limits, std::move(budget));
+        return SubscriptionWriter(std::move(*ownedSchema), std::move(owned), limits, std::move(budget), policy);
     } catch (Error error) {
         return std::unexpected(error);
     } catch (const std::bad_alloc &) {
@@ -529,6 +539,24 @@ struct SubscriptionWriter::Operation {
         for (const auto &request : requests) {
             debit(1, work.visits);
             const auto &symbol = request.key.symbol;
+            const bool all = request.key.selector == core::SubscriptionSelectorKind::ALL;
+            const bool canonical = writer.selectorPolicy_ != core::SubscriptionSelectorPolicy::EXACT_ONLY;
+
+            if (request.key.selector != core::SubscriptionSelectorKind::EXACT && !all) {
+                throw Error::INVALID_SELECTOR;
+            }
+
+            if (all && !symbol.empty()) {
+                throw Error::INVALID_SELECTOR;
+            }
+
+            if (all &&
+                (writer.selectorPolicy_ != core::SubscriptionSelectorPolicy::CANONICAL_STREAM_ALL_V1 ||
+                 (*message != SubscriptionMessage::STREAM_ADD && *message != SubscriptionMessage::STREAM_REMOVE))) {
+                throw Error::UNSUPPORTED_SELECTOR;
+            }
+
+            const std::u16string_view wireSymbol = all ? std::u16string_view(u"*") : symbol;
 
             if (symbol.data() == nullptr) {
                 throw Error::INVALID_SELECTOR;
@@ -553,11 +581,25 @@ struct SubscriptionWriter::Operation {
                 throw Error::INVALID_HISTORY;
             }
 
-            const bool repeated = previous && same(*previous, symbol, work);
+            const bool repeated = previous && same(*previous, wireSymbol, work);
 
-            byte(repeated ? REPEAT_SYMBOL : RAW_SYMBOL);
+            if (repeated) {
+                byte(REPEAT_SYMBOL);
+            } else if (canonical) {
+                debit(1, work.visits);
+                debit(wireSymbol.size(), work.textUnits);
+                const auto encoded = encoding::encodePentaSymbol(wireSymbol);
 
-            if (!repeated) {
+                if (encoded) {
+                    for (std::size_t i = 0; i < encoded->size; ++i) {
+                        byte(encoded->bytes[i]);
+                    }
+                } else {
+                    byte(RAW_SYMBOL);
+                    text(wireSymbol, true);
+                }
+            } else {
+                byte(RAW_SYMBOL);
                 text(symbol, true);
             }
 
@@ -567,7 +609,7 @@ struct SubscriptionWriter::Operation {
                 number(*request.historyBound);
             }
 
-            previous = symbol;
+            previous = wireSymbol;
         }
     }
 };

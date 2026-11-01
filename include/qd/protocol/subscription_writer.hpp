@@ -29,7 +29,8 @@ enum class SubscriptionWriterError {
     INVALID_CONSUMPTION, ///< Requested suffix consumption exceeds remaining bytes.
     RESOURCE_LIMIT,      ///< Finite storage, input or wire-domain allowance exceeded.
     WORK_LIMIT,          ///< Caller turn credits exhausted; previous charges are not refunded.
-    ALLOCATION_FAILURE   ///< Owned storage allocation failed before publication.
+    ALLOCATION_FAILURE,  ///< Owned storage allocation failed before publication.
+    UNSUPPORTED_SELECTOR ///< Explicit profile/family does not permit All; no output is published.
 };
 
 /** Explicit caller-turn credits; reuse across calls, replenish only at the next chosen turn. */
@@ -113,6 +114,8 @@ class SubscriptionWriter {
     SubscriptionWriterLimits limits_;
     std::shared_ptr<PendingSubscriptionOutput::Budget> budget_;
     std::size_t storageBytes_ = 0; ///< Immutable actual-capacity total, cached before the composer is published.
+    core::SubscriptionSelectorPolicy selectorPolicy_ =
+        core::SubscriptionSelectorPolicy::EXACT_ONLY; ///< Immutable peer assertion.
     /** Measure adopted immutable configuration once, after its construction work is charged.
      * @return Conservative backing and fixed metadata bytes, excluding pending byte arrays.
      */
@@ -122,9 +125,11 @@ class SubscriptionWriter {
      * @param records Bounded complete outgoing layouts.
      * @param limits Operation/output limits.
      * @param budget Fixed shared output accounting owner.
+     * @param policy Immutable controlled-peer symbol/selector assertion, not negotiated capability.
      */
     SubscriptionWriter(core::LocalSchema schema, std::vector<OutgoingRecord> records, SubscriptionWriterLimits limits,
-                       std::shared_ptr<PendingSubscriptionOutput::Budget> budget);
+                       std::shared_ptr<PendingSubscriptionOutput::Budget> budget,
+                       core::SubscriptionSelectorPolicy policy);
     /** Compose one atomic operation after validation and exact sizing.
      * @param message Subscription identity, or absent for descriptions.
      * @param requests Borrowed ordered keys; unused for descriptions.
@@ -150,14 +155,17 @@ class SubscriptionWriter {
      * @param layoutLimits Required complete metadata-copy bounds.
      * @param limits Required finite per-operation/aggregate byte bounds.
      * @param work Mutable explicit caller-turn credits; failures retain successful charges.
+     * @param policy Immutable profile selected before activation. Canonical profiles encode Exact for all six messages;
+     * only CANONICAL_STREAM_ALL_V1 permits All under STREAM16/17. Default retains every legacy FD byte.
      * @return Owned composer or typed validation/resource/allocation error.
      */
     [[nodiscard]] static std::expected<SubscriptionWriter, SubscriptionWriterError>
     create(const core::LocalSchema &schema, std::span<const OutgoingRecord> records, LayoutLimits layoutLimits,
-           SubscriptionWriterLimits limits, SubscriptionWriterWork &work);
+           SubscriptionWriterLimits limits, SubscriptionWriterWork &work,
+           core::SubscriptionSelectorPolicy policy = core::SubscriptionSelectorPolicy::EXACT_ONLY);
     /** Encode one message with fresh symbol state, preserving order and duplicate tuples.
      * @param message One of six supported subscription identities.
-     * @param requests Exact keys; only HISTORY_ADD requires/allows a raw bound. Both history
+     * @param requests Explicit keys; only HISTORY_ADD requires/allows a raw bound. Both history
      * forms require explicit indexed metadata. Non-null empty/NUL/unpaired UTF-16 is preserved.
      * @param work Mutable explicit caller-turn credits.
      * @return Whole envelope with zero cursor, or rejection without partial output.

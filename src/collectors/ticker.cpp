@@ -1,6 +1,7 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/collectors/ticker.hpp"
+#include "qd/encoding/penta_symbol.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -802,6 +803,11 @@ std::expected<TickerCollector, TickerError> TickerCollector::create(core::LocalS
     try {
         spend(work, 1);
 
+        if (options.selectorPolicy != core::SubscriptionSelectorPolicy::EXACT_ONLY &&
+            options.selectorPolicy != core::SubscriptionSelectorPolicy::CANONICAL_EXACT_V1) {
+            return std::unexpected(TickerError::UNSUPPORTED_SELECTOR);
+        }
+
         if (!options.retrievalQuantum || limits.viewSlots == NONE) {
             return std::unexpected(TickerError::INVALID_CONFIGURATION);
         }
@@ -881,8 +887,8 @@ std::expected<TickerViewToken, TickerError> TickerCollector::openView(TickerWork
             }
 
             spend(work, 0, sum(s.schema.records().size(), s.limits.cacheKeys));
-            auto desired =
-                core::SubscriptionState::create(s.schema, core::SubscriptionFamily::TICKER, s.limits.viewSubscriptions);
+            auto desired = core::SubscriptionState::create(s.schema, core::SubscriptionFamily::TICKER,
+                                                           s.limits.viewSubscriptions, s.options.selectorPolicy);
 
             if (!desired) {
                 return std::unexpected(desired.error() == core::SubscriptionError::ALLOCATION_FAILURE
@@ -1148,6 +1154,18 @@ std::expected<TickerStage, TickerError> TickerCollector::stage(protocol::LiveEve
 
         if (s.epoch && !s.epoch->sameEpoch(identity)) {
             return std::unexpected(TickerError::INVALID_EPOCH);
+        }
+
+        if (s.options.selectorPolicy != core::SubscriptionSelectorPolicy::EXACT_ONLY) {
+            // Prepay the metadata traversal and maximum seven encoder units per actual record.
+            const auto records = event.records().size();
+            spend(work, 0, sum(records, 1), product(records, 7));
+
+            for (const auto &record : event.records()) {
+                if (!encoding::isCanonicalPentaSymbol(record.symbol, record.cipher)) {
+                    return std::unexpected(TickerError::UNSUPPORTED_SYMBOL_DOMAIN);
+                }
+            }
         }
 
         // This guard clears every borrowed candidate pointer even if a later read-only pass fails.

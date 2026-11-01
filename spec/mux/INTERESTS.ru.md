@@ -15,7 +15,7 @@
 
 ## Идентичность и смысл объединения
 
-Ключ состоит из неизменяемой record-context provenance и точного UTF-16 символа.
+Default Exact key состоит из неизменяемой record-context provenance и точного UTF-16 символа.
 Равные числовые ID и одинаково выглядящие независимые схемы не совпадают.
 Семейство контракта принадлежит владельцу. HISTORY дополнительно задаёт signed-64
 raw lower bound — атрибут ключа, не Unix milliseconds и не business source ID.
@@ -176,3 +176,13 @@ int main() {
 }
 ```
 
+
+<a id="selector-profiles"></a>
+
+## Неизменяемые selector profiles
+
+`MuxState::create` принимает явную [selector policy](../subscriptions/SELECTORS.ru.md) с default
+`EXACT_ONLY`. Canonical Exact доступен всем families; STREAM-All owner profile — только STREAM.
+Exact и known-record All остаются разными desired/aggregate keys. Настоящий concrete selection
+сохраняет исходные matching activations; удаление одной сохраняет другую без current-desire
+recomputation. Enumeration, glob expansion и wire acknowledgment не добавлены.

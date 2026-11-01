@@ -137,5 +137,15 @@ parser pin. [Проверки](../tests/conformance/protocol/real-tape/VALIDATIO
 настоящий STREAM/TICKER/HISTORY collector с конечным per-client command/control/delivery storage,
 callbacks и detached immutable leases. См. [контракт очередей](../spec/mux/QUEUES.ru.md) и
 [ограниченную валидацию](../tests/conformance/subscriptions/MUX-VALIDATION.ru.md#mux-queue-validation).
-Эта композиция отделена от чистого `qdcxx_mux`; wildcard, wire reconciliation, полный subscription
+Эта композиция отделена от чистого `qdcxx_mux`; текстовый glob expansion, wire reconciliation, полный subscription
 facade, transport stop и новая Java HISTORY producer equivalence не добавлены.
+
+<a id="selector-profiles"></a>
+
+## Явные canonical selectors
+
+Opt-in immutable profiles добавляют canonical Exact всех трёх subscription families и явный
+known-record All для STREAM. См. [контракты селекторов и compiled examples](../spec/subscriptions/SELECTORS.ru.md)
+и [ограниченную квалификацию](../tests/conformance/subscriptions/WILDCARD-VALIDATION.ru.md). Legacy Exact
+остаётся default; All не является буквальным wildcard text. TICKER/HISTORY All, automatic peer
+negotiation, полные network facades и общая provider/HISTORY-producer equivalence не добавлены.

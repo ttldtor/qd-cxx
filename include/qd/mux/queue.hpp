@@ -611,12 +611,13 @@ class MuxQueue {
      * @param source Actual STREAM capacities.
      * @param limits Explicit queue aggregate maxima.
      * @param work Owner initialization/cleanup credits.
+     * @param policy Immutable controlled-peer selector profile, chosen before any registration.
      * @return Fresh owner or typed failure before publication.
      */
-    static std::expected<MuxQueue, QueueFailure> createStream(const core::LocalSchema &schema, MuxLimits interests,
-                                                              core::SubscriptionLimits desired,
-                                                              collectors::StreamLimits source, QueueLimits limits,
-                                                              QueueWork &work);
+    static std::expected<MuxQueue, QueueFailure>
+    createStream(const core::LocalSchema &schema, MuxLimits interests, core::SubscriptionLimits desired,
+                 collectors::StreamLimits source, QueueLimits limits, QueueWork &work,
+                 core::SubscriptionSelectorPolicy policy = core::SubscriptionSelectorPolicy::EXACT_ONLY);
     /** Create one real shared TICKER collector.
      * @param schema Immutable provenance.
      * @param interests Actual interest capacities.

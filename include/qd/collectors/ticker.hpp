@@ -17,19 +17,21 @@ namespace org::ttldtor::qdcxx::collectors {
 
 /** Typed pure collector failures; no result implies wire or callback completion. */
 enum class TickerError {
-    INVALID_STATE,         ///< Moved-from collector.
-    INVALID_CONFIGURATION, ///< Invalid finite capacities or zero retrieval quantum.
-    INVALID_VIEW,          ///< Default, foreign, closed or reused view token.
-    INVALID_CONTEXT,       ///< Input belongs to another immutable local schema.
-    INVALID_EVENT,         ///< Input is not a complete TICKER_DATA event.
-    INVALID_EPOCH,         ///< Another source epoch requires an explicit reset barrier.
-    RESOURCE_LIMIT,        ///< Finite capacity exceeded; only stage rejection publishes shared STALE.
-    WORK_LIMIT,            ///< Retryable turn exhaustion; published state and input are unchanged.
-    ALLOCATION_FAILURE,    ///< Fixed backing or a new desired-state owner could not be allocated.
-    STALE,                 ///< Shared cache failure prevents fresh delivery until reset.
-    RESET_PENDING,         ///< The owner must acknowledge the exact reserved reset notice.
-    NO_OFFER,              ///< Pop requires the current successful nonempty front.
-    IDENTITY_EXHAUSTED     ///< A natural identity counter cannot advance without reuse.
+    INVALID_STATE,            ///< Moved-from collector.
+    INVALID_CONFIGURATION,    ///< Invalid finite capacities or zero retrieval quantum.
+    INVALID_VIEW,             ///< Default, foreign, closed or reused view token.
+    INVALID_CONTEXT,          ///< Input belongs to another immutable local schema.
+    INVALID_EVENT,            ///< Input is not a complete TICKER_DATA event.
+    INVALID_EPOCH,            ///< Another source epoch requires an explicit reset barrier.
+    RESOURCE_LIMIT,           ///< Finite capacity exceeded; only stage rejection publishes shared STALE.
+    WORK_LIMIT,               ///< Retryable turn exhaustion; published state and input are unchanged.
+    ALLOCATION_FAILURE,       ///< Fixed backing or a new desired-state owner could not be allocated.
+    STALE,                    ///< Shared cache failure prevents fresh delivery until reset.
+    RESET_PENDING,            ///< The owner must acknowledge the exact reserved reset notice.
+    NO_OFFER,                 ///< Pop requires the current successful nonempty front.
+    IDENTITY_EXHAUSTED,       ///< A natural identity counter cannot advance without reuse.
+    UNSUPPORTED_SELECTOR,     ///< Immutable selector profile is not supported by TICKER.
+    UNSUPPORTED_SYMBOL_DOMAIN ///< Canonical source key-domain rejection preserves input/state/offers.
 };
 
 /** Current collector freshness, independent of external session/socket state. */
@@ -121,6 +123,8 @@ struct TickerLimits {
 struct TickerOptions {
     bool storeEverything;         ///< False evicts after last interest; true retains unrequested source keys.
     std::size_t retrievalQuantum; ///< Positive initial/update credit quantum; locked Java default is 100.
+    core::SubscriptionSelectorPolicy selectorPolicy =
+        core::SubscriptionSelectorPolicy::EXACT_ONLY; ///< Immutable symbol domain; no All.
 };
 
 /** Caller-delimited operation credits, including failed work; never refunded. */
@@ -286,6 +290,7 @@ class TickerCollector {
     clear(const TickerViewToken &view, core::SubscriptionWork &subscriptionWork, TickerWork &work);
     /** Atomically apply a whole already-admitted TICKER_DATA frame.
      * @param event Immutable source owner; transferred only when a final cache value retains it.
+     * Canonical domain/work preflight precedes candidate mutation and preserves input, cache and borrowed offers.
      * @param work Full frame/candidate/equality/disposal credits, never refunded.
      * @return Counts or typed failure. RESOURCE_LIMIT alone rejects input while publishing shared STALE;
      * WORK_LIMIT and other rejection preserve state and offers. Foreign epoch requires reset first.

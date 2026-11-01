@@ -1,6 +1,7 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/collectors/history.hpp"
+#include "qd/encoding/penta_symbol.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -1773,6 +1774,11 @@ HistoryCollector::create(core::LocalSchema &&schema, HistoryLimits limits, Histo
     try {
         spend(work, 1, schema.records().size());
 
+        if (options.selectorPolicy != core::SubscriptionSelectorPolicy::EXACT_ONLY &&
+            options.selectorPolicy != core::SubscriptionSelectorPolicy::CANONICAL_EXACT_V1) {
+            throw HistoryError::UNSUPPORTED_SELECTOR;
+        }
+
         if (!schema.sharesIdentityWith(schema) || !options.retrievalQuantum || !options.partitionSnapshotQuantum) {
             throw HistoryError::INVALID_CONFIGURATION;
         }
@@ -1904,8 +1910,8 @@ std::expected<HistoryViewToken, HistoryFailure> HistoryCollector::openView(Histo
             throw HistoryError::RESOURCE_LIMIT;
         }
 
-        auto desired =
-            core::SubscriptionState::create(s.schema, core::SubscriptionFamily::HISTORY, s.limits.viewSubscriptions);
+        auto desired = core::SubscriptionState::create(s.schema, core::SubscriptionFamily::HISTORY,
+                                                       s.limits.viewSubscriptions, s.options.selectorPolicy);
 
         if (!desired) {
             return std::unexpected(HistoryFailure{HistoryError::CORE_REJECTED, desired.error()});
@@ -2074,6 +2080,22 @@ std::expected<HistoryStage, HistoryFailure> HistoryCollector::stage(protocol::Li
 
         if (s.source.matches(s.source) && !s.source.sameEpoch(identity)) {
             throw HistoryError::INVALID_EPOCH;
+        }
+
+        if (s.options.selectorPolicy != core::SubscriptionSelectorPolicy::EXACT_ONLY) {
+            // Guard arithmetic/work/domain failures return before the outer RESOURCE_LIMIT->STALE path.
+            try {
+                const auto records = event.records().size();
+                spend(work, 0, sum(records, 1), product(records, 7));
+
+                for (const auto &record : event.records()) {
+                    if (!encoding::isCanonicalPentaSymbol(record.symbol, record.cipher)) {
+                        return std::unexpected(HistoryFailure{HistoryError::UNSUPPORTED_SYMBOL_DOMAIN, {}});
+                    }
+                }
+            } catch (HistoryError error) {
+                return std::unexpected(HistoryFailure{error, {}});
+            }
         }
 
         s.maintenance(work, &event);

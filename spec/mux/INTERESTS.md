@@ -15,7 +15,7 @@ local intent, protocol output and completion. The [implementation validation](..
 
 ## Identity and aggregate meaning
 
-A key combines immutable record-context provenance and exact UTF-16 symbol.
+A default Exact key combines immutable record-context provenance and exact UTF-16 symbol.
 Identical numeric IDs or equal-shaped independent schemas do not match. The
 contract family belongs to the owner. HISTORY additionally carries a signed-64
 raw lower bound; it is an attribute of the key, not Unix milliseconds or a
@@ -178,3 +178,13 @@ int main() {
 }
 ```
 
+
+<a id="selector-profiles"></a>
+
+## Immutable selector profiles
+
+`MuxState::create` accepts the explicit [selector policy](../subscriptions/SELECTORS.md), defaulting
+to `EXACT_ONLY`. Canonical Exact is available in all families; the STREAM-All owner profile is
+STREAM-only. Exact and known-record All remain distinct desired/aggregate keys. Actual concrete
+selection captures the original matching activations; removing one preserves the other without
+current-desire recomputation. No enumeration, glob expansion or wire acknowledgment is introduced.

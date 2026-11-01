@@ -835,3 +835,16 @@ add_executable(mux_queue_consumer main.cpp)
 target_link_libraries(mux_queue_consumer PRIVATE qdcxx_mux_queue)
 set_target_properties(mux_queue_consumer PROPERTIES CXX_EXTENSIONS OFF)
 ```
+
+<a id="selector-profiles"></a>
+
+## Canonical selector components
+
+`qd/encoding/penta_symbol.hpp` устанавливается с прежним `qdcxx_encoding`; новый SDK, Threads
+requirement и build option в pure graph не добавлены. Прежние core/protocol/MUX/collectors предоставляют
+неизменяемые [selector profiles](../spec/subscriptions/SELECTORS.ru.md). Необязательный `qdcxx_mux_queue`
+по-прежнему требует CLIENT ON; standalone dispatcher/CLI defaults остаются legacy Exact. Consumers
+должны пересобраться для изменённых C++ selector/membership metadata; source-compatible defaults не обещают binary ABI.
+Целевой CTest — `wildcard_subscriptions`, executable/target — `qdcxx_wildcard_subscription_tests`.
+[Проверенные примеры и пакеты](../tests/conformance/subscriptions/WILDCARD-VALIDATION.ru.md) охватывают
+pure и CLIENT graphs с физически перемещёнными installed prefixes и сохранёнными wire/schema layouts.

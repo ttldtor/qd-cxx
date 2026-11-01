@@ -61,7 +61,8 @@ std::size_t addCapacity(std::size_t current, std::size_t extra, std::size_t maxi
 bool equalKey(const SubscriptionKey &left, const SubscriptionKey &right, SubscriptionWork &work) {
     charge(work.keyVisits, 1);
 
-    if (!left.context.matches(right.context) || left.symbol.size() != right.symbol.size()) {
+    if (left.selector != right.selector || !left.context.matches(right.context) ||
+        left.symbol.size() != right.symbol.size()) {
         return false;
     }
 
@@ -77,6 +78,30 @@ bool equalKey(const SubscriptionKey &left, const SubscriptionKey &right, Subscri
 }
 
 } // namespace
+
+SubscriptionKey allSymbols(RecordContext context) noexcept {
+    return {std::move(context), u"", SubscriptionSelectorKind::ALL};
+}
+
+SubscriptionMembership SubscriptionMembership::anyOf(const SubscriptionMembership &first,
+                                                     const SubscriptionMembership &second) noexcept {
+    if (!first.identity_ || first.identity_ != second.identity_ || first.activation_ == 0 || second.activation_ == 0 ||
+        first.alternateActivation_ != 0 || second.alternateActivation_ != 0) {
+        return {};
+    }
+
+    auto result = first;
+
+    if (first.activation_ != second.activation_) {
+        result.alternateActivation_ = second.activation_;
+    }
+
+    return result;
+}
+
+SubscriptionSelectorPolicy SubscriptionState::selectorPolicy() const noexcept {
+    return identity_ ? selectorPolicy_ : SubscriptionSelectorPolicy::EXACT_ONLY;
+}
 
 SubscriptionState::SubscriptionState() noexcept = default;
 SubscriptionState::~SubscriptionState() = default;
@@ -94,6 +119,7 @@ SubscriptionState &SubscriptionState::operator=(SubscriptionState &&other) noexc
     recordCount_ = std::exchange(other.recordCount_, 0);
     identity_ = std::move(other.identity_);
     family_ = other.family_;
+    selectorPolicy_ = other.selectorPolicy_;
     limits_ = other.limits_;
     entries_ = std::move(other.entries_);
     symbols_ = std::move(other.symbols_);
@@ -105,11 +131,19 @@ SubscriptionState &SubscriptionState::operator=(SubscriptionState &&other) noexc
     return *this;
 }
 
-std::expected<SubscriptionState, SubscriptionError>
-SubscriptionState::create(const LocalSchema &schema, SubscriptionFamily family, SubscriptionLimits limits) {
+std::expected<SubscriptionState, SubscriptionError> SubscriptionState::create(const LocalSchema &schema,
+                                                                              SubscriptionFamily family,
+                                                                              SubscriptionLimits limits,
+                                                                              SubscriptionSelectorPolicy policy) {
     if (family != SubscriptionFamily::STREAM && family != SubscriptionFamily::TICKER &&
         family != SubscriptionFamily::HISTORY) {
         return std::unexpected(SubscriptionError::INVALID_STATE);
+    }
+
+    if ((policy != SubscriptionSelectorPolicy::EXACT_ONLY && policy != SubscriptionSelectorPolicy::CANONICAL_EXACT_V1 &&
+         policy != SubscriptionSelectorPolicy::CANONICAL_STREAM_ALL_V1) ||
+        (policy == SubscriptionSelectorPolicy::CANONICAL_STREAM_ALL_V1 && family != SubscriptionFamily::STREAM)) {
+        return std::unexpected(SubscriptionError::UNSUPPORTED_SELECTOR);
     }
 
     const auto count = schema.records().size();
@@ -122,6 +156,7 @@ SubscriptionState::create(const LocalSchema &schema, SubscriptionFamily family, 
         SubscriptionState state;
 
         state.family_ = family;
+        state.selectorPolicy_ = policy;
         state.limits_ = limits;
         state.identity_ = std::make_shared<SubscriptionMembership::Identity>();
 
@@ -180,6 +215,19 @@ SubscriptionState::apply(Command command, std::span<const SubscriptionRequest> r
 
             if (!found) {
                 throw Rejected{SubscriptionError::INVALID_CONTEXT};
+            }
+
+            if (key.selector != SubscriptionSelectorKind::EXACT && key.selector != SubscriptionSelectorKind::ALL) {
+                throw Rejected{SubscriptionError::INVALID_SELECTOR};
+            }
+
+            if (key.selector == SubscriptionSelectorKind::ALL && !key.symbol.empty()) {
+                throw Rejected{SubscriptionError::INVALID_SELECTOR};
+            }
+
+            if (key.selector == SubscriptionSelectorKind::ALL &&
+                selectorPolicy_ != SubscriptionSelectorPolicy::CANONICAL_STREAM_ALL_V1) {
+                throw Rejected{SubscriptionError::UNSUPPORTED_SELECTOR};
             }
 
             if (key.symbol.data() == nullptr) {
@@ -351,7 +399,7 @@ SubscriptionState::apply(Command command, std::span<const SubscriptionRequest> r
 
                 auto &entry = candidateEntries[entryOffset++];
 
-                entry.key = {key.context, std::u16string_view(symbol, key.symbol.size())};
+                entry.key = {key.context, std::u16string_view(symbol, key.symbol.size()), key.selector};
                 entry.historyBound = bound;
 
                 if (previous && previous->historyBound == bound) {
@@ -411,7 +459,8 @@ bool SubscriptionState::isCurrent(const SubscriptionMembership &membership) cons
     }
 
     for (const auto &entry : entries()) {
-        if (entry.membership.activation_ == membership.activation_) {
+        if (entry.membership.activation_ == membership.activation_ ||
+            (membership.alternateActivation_ != 0 && entry.membership.activation_ == membership.alternateActivation_)) {
             return true;
         }
     }

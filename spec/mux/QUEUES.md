@@ -6,7 +6,7 @@ Include [`qd/mux/queue.hpp`](../../include/qd/mux/queue.hpp) and link optional `
 [MuxState](INTERESTS.md) with one actual family collector and finite independent registrations.
 The caller supplies an immutable schema, explicit capacities, work credits, consumers and complete
 events admitted by the existing [LiveSession](../subscriptions/LIVE-SESSION.md). The queue performs
-no decoding, I/O, background pumping, clocks, wildcard expansion or wire reconciliation. Local
+no decoding, I/O, background pumping, clocks, text glob expansion or wire reconciliation. Local
 command/delivery completion does not establish socket writes, peer application or a full subscription facade.
 
 ## Composition and atomic boundaries
@@ -346,3 +346,15 @@ m::OwnedMuxBatch runMuxQueueExample(p::LiveSession &source, const c::LocalSchema
 }
 
 ```
+
+<a id="selector-profiles"></a>
+
+## Opt-in canonical selectors
+
+`MuxQueue::createStream` accepts the immutable [selector policy](../subscriptions/SELECTORS.md).
+The default and earlier compiled example remain `EXACT_ONLY`; explicit All uses
+`CANONICAL_STREAM_ALL_V1`. TICKER/HISTORY may select canonical Exact through their options, without All.
+Command/mapping copies retain selector kind. A canonical-domain failure after queue admission concerns
+an already owned UNSTAGED event: normal shared-source failure/disposal preserves the nested cause,
+counts and gaps. It does not undo the accepted ownership barrier. Reservations and local stop/lease
+rules above remain; rebuilt consumers must account current metadata sizes.

@@ -241,3 +241,14 @@ int runHistoryExample(p::LiveSession &source, const c::LocalSchema &schema, std:
     return 12;
 }
 ```
+
+<a id="selector-profiles"></a>
+
+## Canonical Exact domain
+
+`HistoryOptions::selectorPolicy` defaults to `EXACT_ONLY`; opt-in `CANONICAL_EXACT_V1` selects the
+[canonical incoming domain](SELECTORS.md). HISTORY All and the STREAM-All owner profile remain
+unsupported. The whole-event domain/work/arithmetic guard runs before ownership, candidate, epoch,
+stale and maintenance mutations; its refusal preserves input/state/offers. A guard resource failure
+must not become shared STALE. Existing capacity-overflow, snapshot, AS-OF and reset semantics remain.
+Selected parser/projection comparisons do not establish full native Java HISTORY producer equivalence.

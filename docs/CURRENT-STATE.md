@@ -133,5 +133,15 @@ The optional CLIENT graph also exposes `qdcxx_mux_queue`: one actual MUX state a
 STREAM/TICKER/HISTORY collector with finite per-client command/control/delivery storage, callbacks
 and detached immutable leases. See the [queue contract](../spec/mux/QUEUES.md) and
 [scoped validation](../tests/conformance/subscriptions/MUX-VALIDATION.md#mux-queue-validation).
-This composition is separate from pure `qdcxx_mux`; it adds no wildcard, wire reconciliation,
+This composition is separate from pure `qdcxx_mux`; it adds no text glob expansion, wire reconciliation,
 complete subscription facade, transport stop or new Java HISTORY producer-equivalence claim.
+
+<a id="selector-profiles"></a>
+
+## Explicit canonical selectors
+
+Opt-in immutable profiles add canonical Exact in all three subscription families and explicit
+known-record All for STREAM. See [selector contracts and compiled examples](../spec/subscriptions/SELECTORS.md)
+and [scoped qualification](../tests/conformance/subscriptions/WILDCARD-VALIDATION.md). Legacy Exact
+remains the default; All is not literal wildcard text. TICKER/HISTORY All, automatic peer negotiation,
+complete network facades and broad provider/HISTORY-producer equivalence are not added.

@@ -22,6 +22,19 @@ enum class SubscriptionFamily {
     HISTORY ///< Explicit indexed records with signed64 raw lower bounds.
 };
 
+/** Explicit subscription identity, independent of literal DATA text. */
+enum class SubscriptionSelectorKind {
+    EXACT, ///< Exact units; reserved leading asterisk remains invalid.
+    ALL    ///< Every admitted canonical STREAM symbol of one known record.
+};
+
+/** Immutable caller-selected local/controlled-peer profile, never inferred from descriptors. */
+enum class SubscriptionSelectorPolicy {
+    EXACT_ONLY,             ///< Existing exact keys and legacy FD output.
+    CANONICAL_EXACT_V1,     ///< Canonical Exact symbol domain for all families; All remains disabled.
+    CANONICAL_STREAM_ALL_V1 ///< Canonical Exact codec plus explicit STREAM-only All permission.
+};
+
 /** Synchronous local rejection; a rejection leaves published state unchanged. */
 enum class SubscriptionError {
     INVALID_STATE,       ///< Moved-from owner or invalid family.
@@ -32,7 +45,8 @@ enum class SubscriptionError {
     RESOURCE_LIMIT,      ///< Resident, input, peak or representable allocation size exceeded.
     WORK_LIMIT,          ///< Explicit caller-supplied turn credits exhausted; no refund.
     IDENTITY_EXHAUSTED,  ///< Revision or non-reused activation cannot advance.
-    ALLOCATION_FAILURE   ///< Allocation failed before publication.
+    ALLOCATION_FAILURE,  ///< Allocation failed before publication.
+    UNSUPPORTED_SELECTOR ///< Recognized selector/profile is disabled for this family.
 };
 
 /** Finite logical capacities; zero always means zero, never unlimited.
@@ -59,11 +73,20 @@ struct SubscriptionWork {
     std::size_t symbolUnits; ///< Remaining conservative examined/copied UTF-16 units, including duplicates.
 };
 
-/** Borrowed exact key; the caller preserves its text for the duration of the command. */
+/** Borrowed explicit key; caller preserves Exact text for the complete command.
+ * Trailing selector preserves ordinary two-field aggregate initialization, not binary ABI/sizeof.
+ */
 struct SubscriptionKey {
     RecordContext context;      ///< Owned provenance; equal-shaped independent schemas never match.
     std::u16string_view symbol; ///< Exact units; null is invalid, non-null empty is a valid key.
+    SubscriptionSelectorKind selector = SubscriptionSelectorKind::EXACT; ///< All requires unused empty text.
 };
+
+/** Select all symbols of one known record without allocating or retaining text.
+ * @param context Owning provenance, validated by the receiving owner.
+ * @return Explicit All key with static empty text; no permission is granted.
+ */
+[[nodiscard]] SubscriptionKey allSymbols(RecordContext context) noexcept;
 
 /** Borrowed command input; HISTORY time is an attribute rather than part of the key. */
 struct SubscriptionRequest {
@@ -71,7 +94,8 @@ struct SubscriptionRequest {
     std::optional<std::int64_t> historyBound; ///< Raw indexed record time, never Unix milliseconds.
 };
 
-/** Owning eligibility token; retaining it does not retain desired entries or their symbol buffers.
+/** Owning eligibility token; desired entries are singleton activations, delivery may capture two original choices.
+ * Retaining it does not retain desired entries, symbols, callbacks or protocol owners.
  * Tokens share one fixed identity allocation per owner, which survives owner destruction until its
  * last token is released. These local limits do not enforce a runtime's aggregate retained-token quota.
  */
@@ -79,12 +103,23 @@ class SubscriptionMembership {
     struct Identity;
     std::shared_ptr<const Identity> identity_;
     std::uint64_t activation_ = 0;
+    std::uint64_t alternateActivation_ = 0; ///< Second original activation in a captured eligibility choice.
 
     friend class SubscriptionState;
 
     public:
     /** Construct an invalid token, which is never current. */
     SubscriptionMembership() noexcept = default;
+    /** Form a structural OR of singleton activations, not a liveness or record-match assertion.
+     * Default, foreign or compound inputs return invalid before duplicate handling.
+     * The actual collector first matches both desired entries to one concrete record/symbol.
+     * Independent immutable copies may be combined/released concurrently; owners remain serialized.
+     * @param first Original singleton; its owner need not still exist.
+     * @param second Singleton from the same fixed origin.
+     * @return Two original choices, or the same valid singleton for equal inputs; never allocates/throws.
+     */
+    [[nodiscard]] static SubscriptionMembership anyOf(const SubscriptionMembership &first,
+                                                      const SubscriptionMembership &second) noexcept;
 };
 
 /** Borrowed published entry; text is invalidated by effective mutation, move or owner destruction.
@@ -116,6 +151,7 @@ class SubscriptionState {
     std::size_t recordCount_ = 0;
     std::shared_ptr<const SubscriptionMembership::Identity> identity_;
     SubscriptionFamily family_ = SubscriptionFamily::STREAM;
+    SubscriptionSelectorPolicy selectorPolicy_ = SubscriptionSelectorPolicy::EXACT_ONLY; ///< Immutable profile.
     SubscriptionLimits limits_{};
     std::unique_ptr<SubscriptionEntry[]> entries_;
     std::unique_ptr<char16_t[]> symbols_;
@@ -156,10 +192,16 @@ class SubscriptionState {
      * @param schema Immutable schema borrowed for this call; it need not outlive the result.
      * @param family Fixed registration family; invalid enumeration values are rejected.
      * @param limits Required immutable finite capacities. Peak limits may intentionally prevent growth.
+     * @param policy Immutable profile selected before activation; default preserves legacy Exact semantics.
      * @return Empty owner, or invalid-state/resource/allocation error. No work/I/O is started.
      */
     [[nodiscard]] static std::expected<SubscriptionState, SubscriptionError>
-    create(const LocalSchema &schema, SubscriptionFamily family, SubscriptionLimits limits);
+    create(const LocalSchema &schema, SubscriptionFamily family, SubscriptionLimits limits,
+           SubscriptionSelectorPolicy policy = SubscriptionSelectorPolicy::EXACT_ONLY);
+    /** Inspect the immutable selector profile without scanning or allocating.
+     * @return Chosen profile; EXACT_ONLY for a moved-from owner.
+     */
+    [[nodiscard]] SubscriptionSelectorPolicy selectorPolicy() const noexcept;
 
     /** Upsert complete inputs atomically, collapsing identical duplicates.
      * @param requests Borrowed inputs; symbol views may refer to this owner's current entries.

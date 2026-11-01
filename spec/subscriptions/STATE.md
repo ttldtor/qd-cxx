@@ -15,11 +15,11 @@ Create a move-only `SubscriptionState` from one validated `LocalSchema`, one
 and indexed-layout facts, not the schema declarations. The input schema need not outlive it.
 A bounded schema copy shares provenance; an independently created equal-shaped schema does not.
 
-Keys contain `RecordContext` and a borrowed exact UTF-16 `string_view`. The input text must
+Default Exact keys contain `RecordContext` and a borrowed exact UTF-16 `string_view`. The input text must
 stay unchanged through the call; it is copied into owned packed storage on effective mutation.
 A null data pointer is invalid, including a default-constructed view. A non-null empty view is
 valid. Embedded zero and unpaired surrogate units are preserved. There is no normalization or
-glob expansion; exact text beginning with `*` is rejected. Explicit All belongs to a later API.
+glob expansion; exact text beginning with `*` is rejected. Explicit All is separately enabled by the selector profiles below.
 
 HISTORY keys must identify records with explicit indexed-time metadata for add, replace **and
 remove**, even if removal would otherwise be absent. HISTORY add/replace require a signed64
@@ -138,3 +138,13 @@ int main() {
 The dedicated `core_subscription_state` CTest covers mutation, identity, history, capacities,
 work and allocation rollback. See [validation](../../tests/conformance/subscriptions/STATE-VALIDATION.md)
 for executed configurations and limits.
+
+<a id="selector-profiles"></a>
+
+## Explicit selector profiles
+
+The default is `EXACT_ONLY`. The immutable [selector contract](SELECTORS.md) adds canonical Exact
+and opt-in STREAM All through `core::allSymbols`; All is a separate selector key with one entry
+and zero desired symbol text. Captured Exact/All choices retain original activations across mutation;
+`SubscriptionMembership::anyOf` is structural OR, not a matching/liveness oracle. Canonical profiles
+and appended selector errors do not imply stable binary ABI: rebuild consumers and account current metadata.
