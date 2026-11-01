@@ -15,6 +15,8 @@
 
 namespace org::ttldtor::qdcxx::mux {
 namespace {
+constexpr std::uint64_t INITIAL_QUEUE_EPOCH = 1; ///< Initial unbound local source generation.
+
 /** Check a requested sum before allocation or counter publication.
  * @param a First nonnegative quantity.
  * @param b Second quantity.
@@ -1346,6 +1348,8 @@ struct MuxQueue::State {
     detail::ContextLease ledger;                   ///< Pure aggregate accounting outlives every requested block.
     detail::Vector<detail::ContextEntry> contexts; ///< Exact local identities; actual components own complete schemas.
     MuxState interest;                             ///< Sole authoritative desired maps/union.
+    core::SchemaIdentity schemaIdentity;           ///< Fixed exact provenance, including empty catalogs.
+    QueueCapacity capacity;                        ///< Future independently enforced component/count ceilings.
     core::SubscriptionFamily family;               ///< Immutable source family.
     MuxLimits interestLimits;                      ///< Actual source input/mapping capacities.
     QueueLimits limits;                            ///< Queue-domain maxima.
@@ -1372,23 +1376,23 @@ struct MuxQueue::State {
     std::optional<protocol::LiveIdentity> sourceIdentity; ///< Serialized pinned actual source epoch.
     QueueState state = QueueState::OPEN;                  ///< Local context lifecycle.
     QueueCounts counts;                                   ///< Context evidence.
-    std::optional<QueueFailure> primary;    ///< First non-cancellation failure, preserved through stop and retirement.
-    std::optional<QueueFailure> secondary;  ///< Later bounded failure; never replaces the primary cause.
-    std::size_t failedRegistrations = 0;    ///< Completed lifetime outcomes, not active slots.
-    std::size_t abortedRegistrations = 0;   ///< Completed lifetime outcomes, not active slots.
-    bool hadGap = false;                    ///< Run integrity survives generation cleanup.
-    bool unknownEligibility = false;        ///< Unclassified loss survives retired registrations.
-    std::optional<QueueTerminal> terminal;  ///< Detached global outcome.
-    std::uint64_t nextGeneration = 1;       ///< Non-reused identities.
-    std::uint64_t epochGeneration = 1;      ///< Non-reused identities.
-    std::uint64_t noticeSequence = 0;       ///< Non-reused identities.
-    std::uint64_t resetRequestSequence = 0; ///< Non-reused identities.
-    std::size_t cursor = 0;                 ///< Bounded fair owner cursors.
-    std::size_t phase = 0;                  ///< Bounded fair owner cursors.
-    bool executing = false;                 ///< Reentrancy and derived-union gates.
-    bool unionDirty = false;                ///< Reentrancy and derived-union gates.
-    unsigned stopMode = 0;                  ///< Context reserved stop.
-    std::optional<std::size_t> unionOrigin; ///< Command responsible for a pending shared derived update.
+    std::optional<QueueFailure> primary;   ///< First non-cancellation failure, preserved through stop and retirement.
+    std::optional<QueueFailure> secondary; ///< Later bounded failure; never replaces the primary cause.
+    std::size_t failedRegistrations = 0;   ///< Completed lifetime outcomes, not active slots.
+    std::size_t abortedRegistrations = 0;  ///< Completed lifetime outcomes, not active slots.
+    bool hadGap = false;                   ///< Run integrity survives generation cleanup.
+    bool unknownEligibility = false;       ///< Unclassified loss survives retired registrations.
+    std::optional<QueueTerminal> terminal; ///< Detached global outcome.
+    std::uint64_t nextGeneration = 1;      ///< Non-reused identities.
+    std::uint64_t epochGeneration = INITIAL_QUEUE_EPOCH; ///< Non-reused identities.
+    std::uint64_t noticeSequence = 0;                    ///< Non-reused identities.
+    std::uint64_t resetRequestSequence = 0;              ///< Non-reused identities.
+    std::size_t cursor = 0;                              ///< Bounded fair owner cursors.
+    std::size_t phase = 0;                               ///< Bounded fair owner cursors.
+    bool executing = false;                              ///< Reentrancy and derived-union gates.
+    bool unionDirty = false;                             ///< Reentrancy and derived-union gates.
+    unsigned stopMode = 0;                               ///< Context reserved stop.
+    std::optional<std::size_t> unionOrigin;              ///< Command responsible for a pending shared derived update.
     bool canAdmit = true;        ///< One fair owner cycle follows source acceptance before another admission.
     ResetStatus reset;           ///< Phased accepted reset.
     QueueIdentity resetFrom;     ///< Earliest affected scope.
@@ -1401,11 +1405,14 @@ struct MuxQueue::State {
      * @param contract Immutable family.
      * @param ml Actual desired limits.
      * @param ql Aggregate limits.
+     * @param identity Exact retained schema origin, without declarations.
+     * @param maxima Original enforced component ceilings, including source desired scopes.
      */
-    State(detail::ContextLease context, MuxState &&mux, core::SubscriptionFamily contract, MuxLimits ml, QueueLimits ql)
+    State(detail::ContextLease context, MuxState &&mux, core::SubscriptionFamily contract, MuxLimits ml, QueueLimits ql,
+          core::SchemaIdentity identity, QueueCapacity maxima)
         : ledger(context), contexts(detail::QueueAllocator<detail::ContextEntry>{detail::ownerScope(context)}),
-          interest(std::move(mux)), family(contract), interestLimits(ml), limits(ql),
-          fixedClients(detail::QueueAllocator<MuxClient>{detail::ownerScope(context)}),
+          interest(std::move(mux)), schemaIdentity(std::move(identity)), capacity(maxima), family(contract),
+          interestLimits(ml), limits(ql), fixedClients(detail::QueueAllocator<MuxClient>{detail::ownerScope(context)}),
           clients(detail::QueueAllocator<ClientOwner>{detail::ownerScope(context)}),
           offers(detail::QueueAllocator<collectors::StreamDelivery>{detail::ownerScope(context)}),
           requests(detail::QueueAllocator<core::SubscriptionRequest>{detail::ownerScope(context)}),
@@ -1432,10 +1439,11 @@ struct MuxQueue::State {
      * @param ml Actual desired maxima.
      * @param ql Aggregate capacities.
      * @param work Initialization/cleanup credits.
+     * @param capacity Original enforced byte and desired-state capacities.
      * @return Prepared unique state or typed exception.
      */
     static StateOwner create(const core::LocalSchema &local, core::SubscriptionFamily contract, MuxLimits ml,
-                             QueueLimits ql, QueueWork &work,
+                             QueueLimits ql, QueueWork &work, QueueCapacity capacity,
                              core::SubscriptionSelectorPolicy policy = core::SubscriptionSelectorPolicy::EXACT_ONLY) {
         if (!ql.routeRecords || !ql.batchRecords || !ql.cleanupRecords || ql.routeRecords > ql.sourceRecords ||
             ml.clients < ql.clients)
@@ -1472,7 +1480,7 @@ struct MuxQueue::State {
         detail::QueueAllocator<State> allocator{detail::ownerScope(ledger)};
         auto *raw = allocator.allocate(1);
         try {
-            std::construct_at(raw, ledger, std::move(*mux), contract, ml, ql);
+            std::construct_at(raw, ledger, std::move(*mux), contract, ml, ql, local.identity(), capacity);
         } catch (...) {
             allocator.deallocate(raw, 1);
             throw;
@@ -1932,7 +1940,8 @@ std::expected<MuxQueue, QueueFailure> MuxQueue::createStream(const core::LocalSc
             throw QueueError::INVALID_CONFIGURATION;
         }
 
-        auto state = State::create(schema, core::SubscriptionFamily::STREAM, ml, limits, work, policy);
+        const QueueCapacity capacity{limits.residentBytes, ml.residentBytes, source.residentBytes, 1, desired};
+        auto state = State::create(schema, core::SubscriptionFamily::STREAM, ml, limits, work, capacity, policy);
         state->checkDesired(desired);
         spend(work, sum(desired.schemaRecords, 1), 0, 0,
               sum(schema.storageBytes(), product(desired.schemaRecords, sizeof(core::LocalRecord))));
@@ -1975,7 +1984,10 @@ std::expected<MuxQueue, QueueFailure> MuxQueue::createTicker(const core::LocalSc
             throw QueueError::INVALID_CONFIGURATION;
         }
 
-        auto state = State::create(schema, core::SubscriptionFamily::TICKER, ml, limits, work, options.selectorPolicy);
+        const QueueCapacity capacity{limits.residentBytes, ml.residentBytes, source.residentBytes, source.viewSlots,
+                                     source.viewSubscriptions};
+        auto state =
+            State::create(schema, core::SubscriptionFamily::TICKER, ml, limits, work, capacity, options.selectorPolicy);
         state->checkDesired(source.viewSubscriptions);
         auto copy = schema;
         auto collector = collectors::TickerCollector::create(std::move(copy), source, options, work.ticker);
@@ -2011,7 +2023,10 @@ std::expected<MuxQueue, QueueFailure> MuxQueue::createHistory(const core::LocalS
             throw QueueError::INVALID_CONFIGURATION;
         }
 
-        auto state = State::create(schema, core::SubscriptionFamily::HISTORY, ml, limits, work, options.selectorPolicy);
+        const QueueCapacity capacity{limits.residentBytes, ml.residentBytes, source.residentBytes, source.viewSlots,
+                                     source.viewSubscriptions};
+        auto state = State::create(schema, core::SubscriptionFamily::HISTORY, ml, limits, work, capacity,
+                                   options.selectorPolicy);
         state->checkDesired(source.viewSubscriptions);
         auto copy = schema;
         auto collector = collectors::HistoryCollector::create(std::move(copy), source, options, work.history);
@@ -3130,6 +3145,46 @@ std::expected<bool, QueueFailure> MuxQueue::State::close(Client &c, QueueWork &w
     return true;
 }
 
+std::expected<void, QueueFailure> MuxQueue::validateBinding(const core::LocalSchema &schema,
+                                                            core::SubscriptionFamily family,
+                                                            core::SubscriptionSelectorPolicy policy,
+                                                            QueueWork &work) const {
+    try {
+        debit(work.operations, 1);
+
+        if (!state_)
+            throw QueueError::INVALID_STATE;
+
+        const auto &s = *state_;
+
+        if (s.executing)
+            throw QueueError::REENTRANT;
+
+        if (s.state != QueueState::OPEN || s.stopMode)
+            throw QueueError::CLOSING;
+
+        if (s.reset.phase != ResetPhase::NONE || s.epochGeneration != INITIAL_QUEUE_EPOCH || s.sourceIdentity ||
+            s.pendingPhase != State::Pending::NONE)
+            throw QueueError::INVALID_STATE;
+
+        spend(work, 2, 0, 0, sizeof(core::SchemaIdentity));
+
+        if (!s.schemaIdentity.matches(schema.identity()))
+            throw QueueError::INVALID_CONTEXT;
+
+        if (s.family != family || s.interest.selectorPolicy() != policy)
+            throw QueueError::INVALID_CONFIGURATION;
+
+        return {};
+    } catch (QueueError error) {
+        return std::unexpected(QueueFailure{error, {}});
+    }
+}
+
+QueueCapacity MuxQueue::capacity() const noexcept {
+    return state_ ? state_->capacity : QueueCapacity{};
+}
+
 std::expected<ResetAdmission, QueueFailure> MuxQueue::resetSource(QueueWork &work) {
     try {
         debit(work.operations, 1);
@@ -3141,9 +3196,6 @@ std::expected<ResetAdmission, QueueFailure> MuxQueue::resetSource(QueueWork &wor
 
         if (s.executing)
             throw QueueError::REENTRANT;
-
-        if (s.stream)
-            throw QueueError::INVALID_STATE;
 
         if (s.state != QueueState::OPEN || s.reset.phase == ResetPhase::FAILED)
             throw QueueError::CLOSING;
@@ -3286,12 +3338,27 @@ std::expected<QueueProgress, QueueFailure> MuxQueue::State::resetStep(QueueWork 
         // Reserve every fixed commit/failure recording write BEFORE irreversible source reset.
         spend(work, sum(product(clients.size(), 2), 4), 0, 0,
               sum(product(clients.size(), sum(sizeof(Client), sizeof(QueueResetNotice))),
-                  sum(sizeof(ResetStatus), sizeof(QueueIdentity))));
+                  sum(sum(sizeof(ResetStatus), sizeof(QueueIdentity)),
+                      sourceIdentity ? sourceIdentity->releaseBytes() : 0)));
         std::uint64_t sequence = 0;
         std::size_t discarded = 0;
         bool sourceSaturated = false, unknownLoss = true;
 
-        if (ticker) {
+        if (stream) {
+            auto result = stream->resetSource(work.stream);
+
+            if (!result) {
+                if (result.error() == collectors::StreamError::WORK_LIMIT)
+                    return std::unexpected(QueueFailure{QueueError::WORK_LIMIT, {}});
+
+                return failed(sourceFailure(result.error()));
+            }
+
+            sequence = result->sequence;
+            discarded = result->discarded;
+            sourceSaturated = result->countsSaturated;
+            unknownLoss = result->unknownLoss;
+        } else if (ticker) {
             auto result = ticker->reset(work.ticker);
 
             if (!result) {
@@ -3329,6 +3396,8 @@ std::expected<QueueProgress, QueueFailure> MuxQueue::State::resetStep(QueueWork 
         counts.saturated = counts.saturated || sourceSaturated;
         reset.actualSourceSequence = sequence;
         reset.sourceCommitted = true;
+        // STREAM has no extra collector ACK: its synchronous source barrier is already complete.
+        reset.globalAcknowledged = stream != nullptr;
         ++epochGeneration;
         sourceIdentity.reset();
         reset.phase = ResetPhase::NOTICE_PUBLICATION_PENDING;
@@ -3356,7 +3425,7 @@ std::expected<QueueProgress, QueueFailure> MuxQueue::State::resetStep(QueueWork 
                 notice.toEpoch = epoch();
                 notice.knownDiscardedQueueRecords = resetDiscards[resetCursor];
                 notice.sourceCommitted = true;
-                notice.globalAckPending = true;
+                notice.globalAckPending = !reset.globalAcknowledged;
                 notice.unknownEligibility = reset.unknownEligibility;
                 c->unknownEligibility = c->unknownEligibility || reset.unknownEligibility;
                 notice.skippedResets = reset.coalescedRequests;
@@ -3389,7 +3458,7 @@ std::expected<QueueProgress, QueueFailure> MuxQueue::State::resetStep(QueueWork 
 
         return progress(QueueProgressKind::CONTROL);
     case ResetPhase::GLOBAL_ACK_PENDING: {
-        // Actual TICKER ACK can yield after reset committed; HISTORY has a different no-work API.
+        // TICKER/HISTORY acknowledge their source resets; STREAM completed its barrier at commit.
         spend(work, sum(product(clients.size(), 2), 2), 0, 0,
               sum(sizeof(ResetStatus), product(clients.size(), sum(sizeof(Client), sizeof(QueueResetNotice)))));
 
@@ -3402,7 +3471,7 @@ std::expected<QueueProgress, QueueFailure> MuxQueue::State::resetStep(QueueWork 
 
                 return failed(sourceFailure(result.error()));
             }
-        } else {
+        } else if (history) {
             auto result = history->acknowledgeReset(*reset.actualSourceSequence);
 
             if (!result)

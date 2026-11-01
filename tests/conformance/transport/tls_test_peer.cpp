@@ -28,7 +28,7 @@ extern char **environ;
 namespace org::ttldtor::qdcxx::test {
 namespace {
 using Clock = std::chrono::steady_clock;                       ///< Monotonic parent deadlines.
-constexpr std::uint64_t CONTROL_MAGIC = 0x5144435854503034ULL; ///< Internal control format version 4.
+constexpr std::uint64_t CONTROL_MAGIC = 0x5144435854503035ULL; ///< Internal control format version 5.
 constexpr std::uint64_t REPORT_MAGIC = 0x5144435852503031ULL;  ///< Internal numeric report version 1.
 constexpr std::size_t MAX_SCRIPT_BYTES = 4U * 1024U * 1024U;   ///< Finite test-only script ceiling per direction.
 constexpr std::size_t MAX_REPORT_BYTES = 512;                  ///< Finite numeric report input ceiling.
@@ -87,7 +87,33 @@ bool validOptions(const PeerOptions &options) {
     }
 
     if (options.initialBytes.size() > MAX_SCRIPT_BYTES || options.replyBytes.size() > MAX_SCRIPT_BYTES ||
+        options.finalBytes.size() > MAX_SCRIPT_BYTES ||
+        (options.expectedReplyClientBytes && options.expectedReplyClientBytes->size() > MAX_SCRIPT_BYTES) ||
         (options.expectedClientBytes && options.expectedClientBytes->size() > MAX_SCRIPT_BYTES)) {
+        return false;
+    }
+
+    if (options.successor && (!options.captureUntilClose || options.successor->initialBytes.size() > MAX_SCRIPT_BYTES ||
+                              options.successor->replyBytes.size() > MAX_SCRIPT_BYTES ||
+                              options.successor->finalBytes.size() > MAX_SCRIPT_BYTES ||
+                              (options.successor->expectedReplyClientBytes &&
+                               options.successor->expectedReplyClientBytes->size() > MAX_SCRIPT_BYTES) ||
+                              (options.successor->expectedClientBytes &&
+                               options.successor->expectedClientBytes->size() > MAX_SCRIPT_BYTES) ||
+                              options.successor->pauseBeforeHandshake.count() < 0 ||
+                              options.successor->pauseBeforeHandshake > options.overallTimeout)) {
+        return false;
+    }
+
+    const auto captureFits = [](const auto &script) {
+        const auto first = script.expectedClientBytes ? script.expectedClientBytes->size() : 0;
+        const auto second = script.expectedReplyClientBytes ? script.expectedReplyClientBytes->size() : 0;
+
+        return second <= MAX_SCRIPT_BYTES - first;
+    };
+
+    if (options.captureUntilClose &&
+        (!captureFits(options) || (options.successor && !captureFits(*options.successor)))) {
         return false;
     }
 
@@ -285,7 +311,7 @@ struct TlsTestPeer::State {
 
             std::ifstream input(reportPath, std::ios::binary);
 #endif
-            std::array<std::uint64_t, 21> words{};
+            std::array<std::uint64_t, 26> words{};
 
             for (std::size_t index = 0; index < 15; ++index) {
                 if (!(input >> words[index])) {
@@ -294,9 +320,12 @@ struct TlsTestPeer::State {
             }
 
             constexpr std::uint64_t REPORT_MAGIC_V2 = 0x5144435852503032ULL;
+            constexpr std::uint64_t REPORT_MAGIC_V3 = 0x5144435852503033ULL;
 
-            if (words[0] == REPORT_MAGIC_V2) {
-                for (std::size_t index = 15; index < words.size(); ++index) {
+            if (words[0] == REPORT_MAGIC_V2 || words[0] == REPORT_MAGIC_V3) {
+                const auto count = words[0] == REPORT_MAGIC_V3 ? words.size() : 21;
+
+                for (std::size_t index = 15; index < count; ++index) {
                     if (!(input >> words[index])) {
                         return;
                     }
@@ -305,12 +334,15 @@ struct TlsTestPeer::State {
 
             input >> std::ws;
 
-            if (!input.eof() || (words[0] != REPORT_MAGIC && words[0] != REPORT_MAGIC_V2) || words[1] == 0 ||
-                words[1] > 65535 || words[15] > 65535 || words[16] > std::numeric_limits<std::uint32_t>::max() ||
+            if (!input.eof() ||
+                (words[0] != REPORT_MAGIC && words[0] != REPORT_MAGIC_V2 && words[0] != REPORT_MAGIC_V3) ||
+                words[1] == 0 || words[1] > 65535 || words[15] > 65535 ||
+                words[16] > std::numeric_limits<std::uint32_t>::max() ||
                 words[17] > std::numeric_limits<std::uint32_t>::max() ||
                 words[18] > std::numeric_limits<std::uint32_t>::max() || words[19] > 65535 || words[20] > 65535 ||
                 (words[2] != 0 && (words[2] < 10 || words[2] > 13)) || words[3] > MAX_SCRIPT_BYTES ||
-                words[4] > 2 * MAX_SCRIPT_BYTES) {
+                words[4] > 3 * MAX_SCRIPT_BYTES || words[21] > 2 || words[22] > 2 || words[23] > 2 || words[24] > 3 ||
+                words[25] > 3) {
                 return;
             }
 
@@ -342,6 +374,28 @@ struct TlsTestPeer::State {
             last.childReportedFailure = words[12] != 0;
             last.failed = last.childReportedFailure || exitFailed;
             last.reportReadable = true;
+            last.completedSessions = static_cast<std::uint32_t>(words[21]);
+            last.successfulHandshakes = static_cast<std::uint32_t>(words[22]);
+            last.matchedSessions = static_cast<std::uint32_t>(words[23]);
+            last.firstCaptureEnd = static_cast<std::uint32_t>(words[24]);
+            last.secondCaptureEnd = static_cast<std::uint32_t>(words[25]);
+
+            for (const auto &entry :
+                 {std::pair{"capture-1", &last.firstClientBytes}, std::pair{"capture-2", &last.secondClientBytes}}) {
+                std::error_code error;
+                const auto path = directory / entry.first;
+                const auto bytes = std::filesystem::file_size(path, error);
+
+                if (!error && bytes <= MAX_SCRIPT_BYTES) {
+                    std::ifstream capture(path, std::ios::binary);
+                    std::vector<std::uint8_t> value(static_cast<std::size_t>(bytes));
+                    capture.read(reinterpret_cast<char *>(value.data()), static_cast<std::streamsize>(bytes));
+
+                    if (capture) {
+                        *entry.second = std::move(value);
+                    }
+                }
+            }
         } catch (...) {
             // Destruction and polling never expose paths, payloads or exception diagnostics.
         }
@@ -362,7 +416,7 @@ struct TlsTestPeer::State {
                 return;
             }
 
-            for (const auto *name : {"control", "report", "report.next", "stop"}) {
+            for (const auto *name : {"control", "report", "report.next", "stop", "capture-1", "capture-2"}) {
                 std::filesystem::remove(directory / name, error);
             }
 
@@ -515,6 +569,50 @@ std::expected<TlsTestPeer, PeerError> TlsTestPeer::start(PeerOptions options) {
                      static_cast<std::streamsize>(options.replyBytes.size()));
         output.write(reinterpret_cast<const char *>(options.initialBytes.data()),
                      static_cast<std::streamsize>(options.initialBytes.size()));
+        writeWord(output, options.captureUntilClose);
+        writeWord(output, options.expectedReplyClientBytes.has_value());
+        writeWord(output, options.expectedReplyClientBytes ? options.expectedReplyClientBytes->size() : 0);
+        writeWord(output, options.finalBytes.size());
+
+        if (options.expectedReplyClientBytes) {
+            output.write(reinterpret_cast<const char *>(options.expectedReplyClientBytes->data()),
+                         static_cast<std::streamsize>(options.expectedReplyClientBytes->size()));
+        }
+
+        output.write(reinterpret_cast<const char *>(options.finalBytes.data()),
+                     static_cast<std::streamsize>(options.finalBytes.size()));
+        writeWord(output, options.successor.has_value());
+
+        if (options.successor) {
+            const auto &next = *options.successor;
+            writeWord(output, static_cast<std::uint64_t>(next.pauseBeforeHandshake.count()));
+            writeWord(output, next.expectedClientBytes.has_value());
+            writeWord(output, next.expectedClientBytes ? next.expectedClientBytes->size() : 0);
+            writeWord(output, next.replyBytes.size());
+            writeWord(output, next.initialBytes.size());
+
+            if (next.expectedClientBytes) {
+                output.write(reinterpret_cast<const char *>(next.expectedClientBytes->data()),
+                             static_cast<std::streamsize>(next.expectedClientBytes->size()));
+            }
+
+            output.write(reinterpret_cast<const char *>(next.replyBytes.data()),
+                         static_cast<std::streamsize>(next.replyBytes.size()));
+            output.write(reinterpret_cast<const char *>(next.initialBytes.data()),
+                         static_cast<std::streamsize>(next.initialBytes.size()));
+            writeWord(output, next.expectedReplyClientBytes.has_value());
+            writeWord(output, next.expectedReplyClientBytes ? next.expectedReplyClientBytes->size() : 0);
+            writeWord(output, next.finalBytes.size());
+
+            if (next.expectedReplyClientBytes) {
+                output.write(reinterpret_cast<const char *>(next.expectedReplyClientBytes->data()),
+                             static_cast<std::streamsize>(next.expectedReplyClientBytes->size()));
+            }
+
+            output.write(reinterpret_cast<const char *>(next.finalBytes.data()),
+                         static_cast<std::streamsize>(next.finalBytes.size()));
+        }
+
         output.close();
 
         if (!output) {

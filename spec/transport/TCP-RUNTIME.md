@@ -2,6 +2,9 @@
 
 [Русская версия](TCP-RUNTIME.ru.md). English is authoritative.
 
+For opt-in liveness checks, finite reconnect and desired-subscription replay,
+see the separate [connection recovery contract](RECOVERY.md).
+
 `qd/transport/tcp_runtime.hpp` is the optional credential-free TCP adapter for
 the [pure live session](../subscriptions/LIVE-SESSION.md). It owns one run and
 one protocol epoch. It does not implement TLS, business callbacks, collectors,

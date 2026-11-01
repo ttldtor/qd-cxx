@@ -76,6 +76,7 @@ class RecordContext {
     std::int32_t localId_ = -1;
 
     friend class LocalSchema;
+    friend class SchemaIdentity;
     /** Retain one validated schema identity and record selection.
      * @param identity Fixed-size owned identity, independent of schema declarations.
      * @param localId Validated local record ID.
@@ -94,6 +95,29 @@ class RecordContext {
      * @return True only for the same live identity and local record ID.
      */
     [[nodiscard]] bool matches(const RecordContext &other) const noexcept;
+};
+
+/** Fixed owning schema provenance, including an empty catalog; never retains declarations. */
+class SchemaIdentity {
+    std::shared_ptr<const RecordContext::Identity> identity_; ///< Shared fixed provenance only.
+    friend class LocalSchema;
+    /** Retain validated provenance without copying declarations.
+     * @param identity Existing immutable schema origin, or empty for a moved-from schema.
+     */
+    explicit SchemaIdentity(std::shared_ptr<const RecordContext::Identity> identity) noexcept;
+
+    public:
+    /** Construct an invalid token, which never matches another token. */
+    SchemaIdentity() noexcept = default;
+    /** Inspect whether a validated schema supplied this token.
+     * @return True for a retained origin, including an empty schema catalog.
+     */
+    [[nodiscard]] bool valid() const noexcept;
+    /** Compare exact retained origins without examining record counts or declarations.
+     * @param other Possibly invalid independent token.
+     * @return True only for the same valid origin; invalid tokens never match.
+     */
+    [[nodiscard]] bool matches(const SchemaIdentity &other) const noexcept;
 };
 
 /** Validated owned immutable subset; no protocol or loading dependency. */
@@ -162,6 +186,11 @@ class LocalSchema {
      * @return True only for the same valid provenance; moved-from schemas never match.
      */
     [[nodiscard]] bool sharesIdentityWith(const LocalSchema &other) const noexcept;
+
+    /** Retain fixed schema provenance without copying declarations or allocating.
+     * @return Owning token, valid for an empty catalog and invalid after this schema was moved from.
+     */
+    [[nodiscard]] SchemaIdentity identity() const noexcept;
 
     /** Obtain owned provenance for manually supplied or decoded local values.
      * @param localId Explicit record position in this schema.

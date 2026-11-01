@@ -15,6 +15,11 @@ Create a move-only `SubscriptionState` from one validated `LocalSchema`, one
 and indexed-layout facts, not the schema declarations. The input schema need not outlive it.
 A bounded schema copy shares provenance; an independently created equal-shaped schema does not.
 
+`LocalSchema::identity()` returns an owning fixed `SchemaIdentity` without allocation
+or copying declarations. It also identifies an empty validated catalog. `valid()`
+distinguishes a retained origin from a default/moved-from token; `matches()` compares
+exact origins, and invalid tokens never match. The token can outlive the catalog.
+
 Default Exact keys contain `RecordContext` and a borrowed exact UTF-16 `string_view`. The input text must
 stay unchanged through the call; it is copied into owned packed storage on effective mutation.
 A null data pointer is invalid, including a default-constructed view. A non-null empty view is

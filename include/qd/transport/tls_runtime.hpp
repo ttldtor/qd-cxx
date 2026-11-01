@@ -124,6 +124,7 @@ struct TlsResources {
  * native scheduling have no library duration bound. Continue explicit polling to observe quiescence.
  */
 class TlsRuntime {
+    friend struct detail::TlsRuntimeFactory;
     struct Impl;
     std::shared_ptr<Impl> impl_; ///< Stable private operation lease; public ownership is still unique.
     /** Adopt complete unactivated state without allocation.

@@ -1397,3 +1397,119 @@ TEST_CASE("STREAM batch offers are invalidated by move construction and assignme
         CHECK(singleMoved.queuedRecords() == 0);
     }
 }
+
+TEST_CASE("STREAM explicit source reset preserves desired activations and accepts a fresh real epoch") {
+    auto f = fixture();
+    add(f, u"ALPHA");
+    const auto membership = f.collector.desired()->entries()[0].membership;
+    const auto revision = f.collector.desired()->revision();
+    const auto backing = f.collector.residentBytes();
+    const Input first[]{{0, u"ALPHA", 1, 10}};
+    auto event = admit(f.session, data(first));
+    const auto oldEpoch = event.snapshot().identity();
+    auto work = turn();
+    REQUIRE(f.collector.stage(std::move(event), work));
+    REQUIRE(f.collector.front(work));
+    const auto reset = [&] {
+        AllocationFault noAllocation(0);
+
+        return f.collector.resetSource(work);
+    }();
+    REQUIRE(reset);
+    CHECK(reset->sequence == 1);
+    CHECK(reset->discarded == 1);
+    CHECK(reset->unknownLoss);
+    CHECK(f.collector.residentBytes() == backing);
+    CHECK(f.collector.queuedRecords() == 0);
+    CHECK(f.collector.desired()->revision() == revision);
+    CHECK(f.collector.desired()->isCurrent(membership));
+    CHECK(f.collector.pop(work).error() == Error::NO_OFFER);
+
+    auto next = session(f.schema);
+    const Input second[]{{0, u"ALPHA", 2, 20}};
+    auto fresh = admit(next, data(second));
+    CHECK_FALSE(oldEpoch.sameEpoch(fresh.snapshot().identity()));
+    REQUIRE(f.collector.stage(std::move(fresh), work));
+    CHECK(drain(f.collector) == std::vector<std::int32_t>{20});
+    auto stale = admit(f.session, data(first));
+    CHECK(f.collector.stage(std::move(stale), work).error() == Error::INVALID_EPOCH);
+}
+
+TEST_CASE("STREAM source reset prepays every old frame and epoch release before any mutation") {
+    for (unsigned boundary = 0; boundary < 3; ++boundary) {
+        auto f = fixture();
+        add(f, u"ALPHA");
+        const Input first[]{{0, u"ALPHA", 1, 10}};
+        auto event = admit(f.session, data(first));
+        const auto release = event.releaseBytes() + event.snapshot().identity().releaseBytes();
+        auto work = turn();
+        REQUIRE(f.collector.stage(std::move(event), work));
+        auto offered = f.collector.front(work);
+        REQUIRE(offered);
+        REQUIRE(*offered);
+        const auto *record = (*offered)->record;
+        s::StreamWork exact{1, 2, 0, release};
+        auto shortWork = exact;
+
+        if (boundary == 0)
+            shortWork.operations = 0;
+        else if (boundary == 1)
+            --shortWork.visits;
+        else
+            --shortWork.bytes;
+
+        const auto rejected = f.collector.resetSource(shortWork);
+        REQUIRE_FALSE(rejected);
+        CHECK(rejected.error() == Error::WORK_LIMIT);
+        CHECK(f.collector.queuedRecords() == 1);
+        REQUIRE(record->typedValues.size() == 3);
+        CHECK(record->typedValues[2].raw == 10);
+        CHECK(f.collector.counts().discarded == 0);
+        const auto reset = f.collector.resetSource(exact);
+        REQUIRE(reset);
+        CHECK(reset->sequence == 1);
+        CHECK(reset->discarded == 1);
+        CHECK(exact.operations == 0);
+        CHECK(exact.visits == 0);
+        CHECK(exact.bytes == 0);
+        CHECK(f.collector.queuedRecords() == 0);
+    }
+}
+
+TEST_CASE("STREAM empty resets release a last old epoch pin and never revive terminal overflow") {
+    auto f = fixture();
+    add(f, u"ALPHA");
+    const Input first[]{{0, u"ALPHA", 1, 10}};
+    (void)stage(f, first);
+    CHECK(drain(f.collector) == std::vector<std::int32_t>{10});
+    f.session = session(f.schema);
+    auto work = turn();
+    REQUIRE(f.collector.resetSource(work));
+    (void)stage(f, first);
+    CHECK(drain(f.collector) == std::vector<std::int32_t>{10});
+
+    auto bounds = limits();
+    bounds.frames = 1;
+    bounds.records = 1;
+    auto overflow = fixture(bounds);
+    add(overflow, u"ALPHA");
+    (void)stage(overflow, first);
+    auto extra = admit(overflow.session, data(first));
+    REQUIRE(overflow.collector.stage(std::move(extra), work).error() == Error::RESOURCE_LIMIT);
+    CHECK(overflow.collector.resetSource(work).error() == Error::INVALID_STATE);
+    CHECK(overflow.collector.queuedRecords() == 1);
+    CHECK(overflow.collector.diagnostic().error == Error::RESOURCE_LIMIT);
+
+    auto empty = fixture();
+    s::StreamWork exact{1, 0, 0, 0};
+    auto firstReset = empty.collector.resetSource(exact);
+    REQUIRE(firstReset);
+    CHECK(firstReset->sequence == 1);
+    CHECK(firstReset->discarded == 0);
+    auto moved = std::move(empty.collector);
+    work = turn();
+    CHECK(empty.collector.resetSource(work).error() == Error::INVALID_STATE);
+    auto secondReset = moved.resetSource(work);
+    REQUIRE(secondReset);
+    CHECK(secondReset->sequence == 2);
+}

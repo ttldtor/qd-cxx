@@ -3,6 +3,7 @@
 #include "qd/transport/tls_runtime.hpp"
 
 #include "tls_engine.hpp"
+#include "tls_runtime_factory.hpp"
 
 #include <algorithm>
 #include <limits>
@@ -405,6 +406,24 @@ std::expected<TlsRuntime, TlsDiagnostic> TlsRuntime::create(RuntimeBootstrap &bo
                                                             const client::EndpointOptions &endpoint,
                                                             protocol::SubscriptionWriter &&composer, TlsOptions options,
                                                             TlsWork &tlsWork, protocol::LiveWork &sessionWork) {
+    return detail::TlsRuntimeFactory::create(bootstrap.state_.get(), endpoint, std::move(composer), options, tlsWork,
+                                             sessionWork);
+}
+
+std::expected<TlsRuntime, TlsDiagnostic> detail::TlsRuntimeFactory::create(const BootstrapLease &lease,
+                                                                           const client::EndpointOptions &endpoint,
+                                                                           protocol::SubscriptionWriter &&composer,
+                                                                           TlsOptions options, TlsWork &tlsWork,
+                                                                           protocol::LiveWork &sessionWork) {
+    return create(lease.state_, endpoint, std::move(composer), options, tlsWork, sessionWork);
+}
+
+std::expected<TlsRuntime, TlsDiagnostic> detail::TlsRuntimeFactory::create(RuntimeBootstrap::State *bootstrap,
+                                                                           const client::EndpointOptions &endpoint,
+                                                                           protocol::SubscriptionWriter &&composer,
+                                                                           TlsOptions options, TlsWork &tlsWork,
+                                                                           protocol::LiveWork &sessionWork) {
+    using Impl = TlsRuntime::Impl;
     const auto &settings = endpoint.settings();
 
     if (settings.security != client::EndpointSecurity::TLS || !settings.tls ||

@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: BSL-1.0
 #include "runtime_bootstrap.hpp"
 
+#include "bootstrap_lease.hpp"
+
 #ifdef _WIN32
 #    include <windows.h>
 #    include <winsock2.h>
@@ -14,6 +16,7 @@
 
 #include <array>
 #include <exception>
+#include <limits>
 #include <new>
 #include <utility>
 
@@ -63,6 +66,45 @@ RuntimeBootstrap::RuntimeBootstrap(std::unique_ptr<State> state) noexcept : stat
 RuntimeBootstrap::RuntimeBootstrap(RuntimeBootstrap &&other) noexcept = default;
 RuntimeBootstrap &RuntimeBootstrap::operator=(RuntimeBootstrap &&other) noexcept = default;
 RuntimeBootstrap::~RuntimeBootstrap() = default;
+
+detail::BootstrapLease &detail::BootstrapLease::operator=(BootstrapLease &&other) noexcept {
+    if (this != &other) {
+        if (state_) {
+            state_->borrowers.fetch_sub(1, std::memory_order_relaxed);
+        }
+
+        state_ = std::exchange(other.state_, nullptr);
+    }
+
+    return *this;
+}
+
+detail::BootstrapLease::~BootstrapLease() {
+    if (state_) {
+        state_->borrowers.fetch_sub(1, std::memory_order_relaxed);
+    }
+}
+
+std::expected<detail::BootstrapLease, TcpDiagnostic>
+detail::BootstrapLease::acquire(RuntimeBootstrap &bootstrap) noexcept {
+    return acquire(bootstrap.state_.get());
+}
+
+std::expected<detail::BootstrapLease, TcpDiagnostic>
+detail::BootstrapLease::acquire(RuntimeBootstrap::State *state) noexcept {
+    if (!state || !state->dnsInitialized) {
+        return std::unexpected(TcpDiagnostic{TcpError::INVALID_CONFIGURATION, "bootstrap-lease-configuration"});
+    }
+
+    auto count = state->borrowers.load(std::memory_order_relaxed);
+
+    if (count == std::numeric_limits<std::size_t>::max() ||
+        !state->borrowers.compare_exchange_strong(count, count + 1, std::memory_order_relaxed)) {
+        return std::unexpected(TcpDiagnostic{TcpError::RESOURCE_LIMIT, "bootstrap-lease-borrowers"});
+    }
+
+    return BootstrapLease(state);
+}
 
 std::expected<RuntimeBootstrap, TcpDiagnostic> RuntimeBootstrap::create() {
     return detail::BootstrapFactory::create(nativeReadiness, nullptr);

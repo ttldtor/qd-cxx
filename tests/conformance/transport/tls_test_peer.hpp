@@ -44,12 +44,24 @@ enum class PeerError {
     CHILD_FAILED     ///< The child exited or rejected its input before becoming ready.
 };
 
-/** Explicit owned inputs for one loopback connection; no ambient SDK configuration is used.
+/** Optional second fresh TLS connection on the same owned loopback endpoint. */
+struct PeerSuccessor {
+    std::optional<std::vector<std::uint8_t>> expectedReplyClientBytes; ///< Exact post-reply authorization prefix.
+    std::vector<std::uint8_t> finalBytes;   ///< Final acknowledgement after the second exact read.
+    std::vector<std::uint8_t> initialBytes; ///< Independent second challenge or protocol prefix.
+    std::vector<std::uint8_t> replyBytes;   ///< Independent second reply after the exact read.
+    std::optional<std::vector<std::uint8_t>> expectedClientBytes; ///< Exact second pre-reply prefix.
+    std::chrono::milliseconds pauseBeforeHandshake{0};            ///< Explicit second handshake pause.
+};
+
+/** Explicit owned inputs for one or two loopback connections; no ambient SDK configuration is used.
  * Scripts are bounded to 4 MiB each, paths to 4096 UTF-8 bytes, and each timeout to 1..60000 ms.
  * Delays may be zero, otherwise they must not exceed the overall timeout (maximum 60000 ms).
  * Certificate/key paths name ordinary test fixtures; their contents never enter diagnostics.
  */
 struct PeerOptions {
+    std::optional<std::vector<std::uint8_t>> expectedReplyClientBytes; ///< Optional exact read after replyBytes.
+    std::vector<std::uint8_t> finalBytes;  ///< Bytes sent after the optional second exact read.
     std::filesystem::path childExecutable; ///< Absolute internal peer executable path.
     std::filesystem::path certificateFile; ///< Absolute ordinary PEM server certificate fixture.
     std::filesystem::path privateKeyFile;  ///< Absolute ordinary PEM private-key fixture.
@@ -69,10 +81,14 @@ struct PeerOptions {
     std::chrono::milliseconds pauseBeforeHandshake{0};            ///< Delay after accept, before handshake.
     std::chrono::milliseconds readDelay{0};   ///< Delay after handshake, before reading; allows backpressure tests.
     std::chrono::milliseconds stopGrace{250}; ///< Parent grace before terminating only its owned child.
+    bool captureUntilClose{false};            ///< Opt-in bounded synthetic plaintext capture through client TLS EOF.
+    std::optional<PeerSuccessor> successor;   ///< At most one independent successor, requiring captureUntilClose.
 };
 
-/** Numeric observations only; retained after stop. No peer/application plaintext is exposed. */
+/** Numeric observations and explicitly enabled bounded synthetic client captures, retained after stop. */
 struct PeerSnapshot {
+    std::uint32_t firstCaptureEnd{};  ///< Zero incomplete; 1 TLS EOF, 2 truncated TLS EOF, 3 TCP reset.
+    std::uint32_t secondCaptureEnd{}; ///< Independent successor receive termination, using the same tags.
     std::uint16_t port{};             ///< Listening IPv4 loopback port, or zero before readiness.
     std::uint32_t tlsVersion{};       ///< Negotiated version: 12, 13, or zero before successful handshake.
     std::uint64_t processId{};        ///< Exact owned child identifier; never used to find foreign processes.
@@ -98,9 +114,14 @@ struct PeerSnapshot {
     bool exitObserved{};              ///< A terminal native process status was successfully obtained.
     std::uint32_t exitCode{};         ///< Native Windows exit code; POSIX exit code or 128 plus terminating signal.
     std::uint32_t exitQueryError{};   ///< Native process-status query error; zero after a successful query.
-    bool parentTerminationRequested{}; ///< Parent attempted forced termination after its finite cooperative wait.
-    bool reportReadable{};             ///< At least one complete validated numeric report was observed.
-    bool childRunning{};               ///< Child was still running when this snapshot was taken.
+    bool parentTerminationRequested{};    ///< Parent attempted forced termination after its finite cooperative wait.
+    bool reportReadable{};                ///< At least one complete validated numeric report was observed.
+    bool childRunning{};                  ///< Child was still running when this snapshot was taken.
+    std::uint32_t completedSessions{};    ///< Successfully retired scripts, bounded to two.
+    std::uint32_t successfulHandshakes{}; ///< Independent completed handshakes, bounded to two.
+    std::uint32_t matchedSessions{};      ///< Completely matched configured prefixes, bounded to two.
+    std::vector<std::uint8_t> firstClientBytes;  ///< Opt-in synthetic first-session plaintext after completion.
+    std::vector<std::uint8_t> secondClientBytes; ///< Opt-in synthetic successor plaintext after completion.
 };
 
 /** Move-only owner of an isolated test peer process and its exact temporary directory.

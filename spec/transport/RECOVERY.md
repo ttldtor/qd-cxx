@@ -1,0 +1,220 @@
+# Bounded connection recovery
+
+[Русская версия](RECOVERY.ru.md). English is authoritative.
+
+This contract specifies the opt-in `TcpRecovery` and `TlsRecovery` owners in
+`qd/transport/tcp_recovery.hpp` and `qd/transport/tls_recovery.hpp`. The common
+types are declared in `qd/transport/recovery.hpp`. They combine finite reconnect,
+liveness checks and replay of current desired subscriptions over fresh protocol
+epochs.
+
+## Build and scope
+
+`ORG_TTLDTOR_QDCXX_BUILD_RECOVERY` defaults to `OFF`. Enabling it requires both
+`ORG_TTLDTOR_QDCXX_BUILD_CLIENT=ON` and `ORG_TTLDTOR_QDCXX_BUILD_RUNTIME=ON`.
+The `qdcxx_recovery` target provides plain recovery without TLS/OpenSSL linkage.
+`qdcxx_tls_recovery` is available only when
+`ORG_TTLDTOR_QDCXX_BUILD_TLS=ON` and additionally links the qualified TLS runtime.
+The existing [TCP runtime](TCP-RUNTIME.md), [TLS runtime](TLS-RUNTIME.md), CLI
+options and their default single-run behavior do not change.
+
+Recovery is caller driven. It installs no worker, timer or background scheduler.
+`start()` requests activation; it does not enter an attempt factory or open a
+route. `poll()` spends caller-supplied credits. `nextWake()` returns the earliest
+monotonic progress hint; the application must arrange the next turn itself.
+This owner does not provide a whole-application graceful-drain protocol.
+
+## Preparation, ownership and cutoff
+
+`create()` validates immutable endpoint/schema declarations, outgoing records,
+family bindings, capacities and work before final input adoption. Transferred
+queues must be compatible pristine sources; existing registrations and desired
+commands are permitted. Every fallible allocation, including the stable outer
+operation state, precedes the final nonthrowing transfer. On failure the caller
+retains the blueprint and queue ownership; already spent work is not refunded.
+Preparation performs no network activation, credential-provider call or consumer
+callback. `TlsRecovery` also performs no TLS SDK entry during preparation.
+
+The application must create `RuntimeBootstrap` under its main-thread/process
+preconditions and keep its stable borrowed state alive for the entire recovery
+object lifetime and until every returning operation lease retires. The recovery
+object retains a counted borrow in `CONFIGURED`, `BACKOFF` and `CLOSED` as well
+as during native activity; final native retirement alone does not release that
+borrow. Moving the bootstrap transfers its stable state without invalidating
+active borrows;
+replacing or destroying a state with live borrowers violates its lifetime
+precondition. Recovery methods, inspection, moves and destruction are serialized
+on the thread that created the recovery owner. Checked misuse reports
+`WRONG_THREAD` or `REENTRANT`; these errors do not grant concurrent access.
+
+The public recovery handle is move-only. A move transfers the same run; move
+assignment first cuts off the old destination, and self-move has no effect.
+A provider or consumer callback may call `requestStop()`, destroy the public
+handle or replace it by move. The executing operation retains a stable lease on
+the old state and rechecks its cutoff and identities after callback return.
+An old continuation must not activate a replacement, start another factory or
+deliver later callbacks after cutoff.
+
+`requestStop()` records an allocation-free monotonic cutoff without inline
+native/TLS cleanup, callback dispatch or waiting. Callback destruction uses the
+same request-only rule; permitted idle destructor fallback may drain owned
+retirement synchronously. The bootstrap borrow follows the full-object lifetime
+above; controlled-host premises remain required through retirement.
+Recovery exposes detached status and queue batches;
+no raw `LiveEvent`, live-session snapshot or native runtime escapes the owner.
+
+## Attempts and failure policy
+
+The original endpoint's `retry.maximumAttempts` is a lifetime budget **including
+the first attempt**. Successful connections and incoming traffic never reset it.
+Retries use the original fixed delay; there is no exponential multiplier,
+jitter or authentication-retry option. A combined writer/schema/runtime factory
+entry counts once, including when that entry fails. An entered factory failure
+is terminal. A lack of credits before entry consumes no attempt and permits a
+later funded turn; it does not refund work already consumed by other actions.
+
+After an established attempt fails, the owner must retire its native/private
+state and complete the old-source reset barrier before starting a successor.
+Backoff cannot bypass either obligation. Exhaustion ends in `EXHAUSTED`;
+terminal failure ends in `FAILED`; explicit stop ends in `CLOSED` after local
+retirement. `ACTIVE` means local current-demand convergence, never a peer ACK.
+
+Retry classification is conservative:
+
+| Cause | Recovery policy |
+| --- | --- |
+| Ordinary DNS/connect/read/write failure, transport EOF or a provenance-preserving native operation deadline | May retry after retirement/reset, within the remaining lifetime budget. |
+| Protocol inactivity after eligible current transport input ceases | May retry under the same finite policy. |
+| Authentication/credential failure, certificate/identity/trust/policy failure, corrupt or unsupported protocol input | Terminal. |
+| Generic capacity, allocation, immutable-configuration, identity-exhaustion or reset failure | Terminal. |
+| TLS-phase deadline without the exact nested native deadline evidence | Terminal; it is not inferred to be a transient network timeout. |
+
+TLS transport failures retain their typed numeric provenance. A specifically
+classified truncated EOF may be transient when no nested protocol failure is
+present; an arbitrary handshake failure is not automatically retryable.
+The existing occupied output slot and temporary protocol/auth readiness gates
+can defer a composition action. They do not convert a generic resource or
+security failure into a retry. First and distinct secondary diagnostics retain
+bounded static/numeric component evidence without endpoint, token or peer text.
+
+## Monotonic liveness
+
+`heartbeatInterval` and `protocolInactivity` are optional explicit positive
+finite millisecond intervals. Deadlines use `std::chrono::steady_clock`;
+wall-clock changes cannot renew them. Arithmetic/identity exhaustion is typed
+and must not wrap. No hard real-time deadline is promised by this clock choice.
+
+Heartbeat admission requires the current transport, protocol and authentication
+eligibility. Its interval measures local output-admission inactivity. Admitting
+ordinary output rearms that interval; admission does not prove peer receipt.
+An occupied output slot defers the heartbeat without creating another slot or
+unbounded pending-frame list.
+
+Protocol inactivity measures validated input belonging to the current attempt
+while its transport is eligible. Raw socket bytes, stale-epoch events and local
+poll activity do not refresh this deadline. Liveness processing and delivery
+remain subject to the explicit work coordinates; `nextWake()` is a scheduling
+hint rather than a timer callback or a latency guarantee.
+
+## Fresh negotiation and desired replay
+
+Each entered connection uses a fresh runtime, writer, parser, protocol epoch,
+authentication exchange and outgoing descriptions. No prior sender IDs,
+authentication success or partially composed output authorize the new epoch.
+Replay waits for actual current verified transport readiness, a validated
+current protocol advertisement and the applicable authentication readiness.
+Each family's real subscription admission remains authoritative.
+
+Replay uses the **latest owner-applied desired state** of the stable family
+queues. A queued command takes effect when the queue owner applies it. Desired
+changes made while disconnected therefore participate in the next replay;
+an applied offline REMOVE must not be resurrected from an older emitted map.
+Revision changes during replay invalidate obsolete candidate work. A frame
+already admitted to the single output slot must finish or abort before its
+follow-up update can be admitted. Empty demand does not require a fabricated
+empty-family subscription.
+
+TICKER, STREAM and HISTORY keep their existing
+[subscription semantics](../subscriptions/CONTRACTS.md) and
+[live-session readiness rules](../subscriptions/LIVE-SESSION.md). Local replay
+convergence is not an acknowledgement from the producer and does not establish
+upstream continuity or exactly-once delivery.
+
+## Reset, gaps and retained batches
+
+Stable queue registrations survive a connection change. The phased
+[queue reset](../mux/QUEUES.md) freezes old intake/callbacks, disposes old pending
+owners with bounded work, commits the source reset and publishes its notices.
+The replacement cannot consume old protocol offers as new-epoch data.
+
+STREAM reset uses the collector's real reset sequence and discard counts; it
+does not fabricate a collector-global ACK. Each client's exact reset-notice ACK
+still gates new callbacks. Global source ACK and client notice ACK are distinct;
+stale notice sequences cannot acknowledge newer intervals. Reset commit is not
+repeated because later notice or ACK progress needs another funded turn.
+See the [STREAM collector](../subscriptions/STREAM-COLLECTOR.md) contract.
+
+Caller-retained detached batches remain valid under their existing lease and
+remain charged to the same queue reservation ledger after reset. Reset does
+not free that external ownership or turn it into a new-epoch callback.
+Gaps, discards and interruption remain observable. A disconnected
+[HISTORY](../subscriptions/HISTORY-COLLECTOR.md) request is interrupted;
+replay does not establish completion, resumable upstream history or exactly-once
+delivery. Previously delivered data may overlap a fresh request.
+
+## Capacity, work and qualified copy profile
+
+All `RecoveryLimits` coordinates are explicit and finite; zero means zero.
+They are simultaneous componentwise limits, not interchangeable byte credits.
+The runtime-entry peak admits three owned schema copies before entry. The
+caller-held source schema remains a separate borrowed-input scope. The copied
+writer blueprint, adopted blueprint capacities, settings text and retained
+writer configuration have independent ceilings.
+
+Each enabled family reserves three replay entry banks and three UTF16 slabs:
+latest desired, emitted state and candidate replay. Both `entries` and
+`symbolUnits` apply to **each** bank/slab. Retained/adopted storage uses actual
+capacities; admitted copy envelopes account for terminators and conservatively
+count inline small-string capacity. Checked overflow refuses admission before
+allocation or transfer.
+
+`RecoveryCapacity` reports these logical coordinates separately. Replay byte
+subtotals overlap replay counts; existing native/session/TLS byte ceilings also
+overlap adopted declarations. Queue byte subtotals exclude independently
+bounded desired-owner/count scopes. These values must not be added as if they
+were disjoint, or presented as whole-process RSS, allocator overhead, kernel
+socket storage or a hard wall-time bound. TLS retains the additional
+[controlled-host/resource premises](TLS-RESOURCES.md), including persistent
+external failed-prefix debt across attempts; recovery does not reset that debt.
+This run reserves three private and four ambient failed-initialization prefixes
+once, rather than multiplying that reserve by `retry.maximumAttempts`.
+Already READY ambient generators may be reused under the qualified profile.
+Each fresh private TLS context has fresh private generators and is disposed
+before a successor is admitted. Successful attempts add no failed-initialization
+debt; terminal failed preparation consumes the once-only three/four reserve.
+Declared host totals must be at least
+these reserves, but that comparison does not measure free headroom. External
+and past failed-prefix debt must fit within the remaining declared totals for
+the entire run.
+
+`RecoveryPreparationWork` separates recovery, first-writer and per-family queue
+credits. `RecoveryTurnWork` separates operations, visits, text units and bytes
+from actual writer, runtime, session and queue work. TLS additionally consumes
+`TlsWork`. No work reference escapes a call, no coordinate is implicitly
+replenished and a failed action receives no refund. Pre-entry `WORK_LIMIT` can
+yield; an already entered factory failure follows the terminal rule above.
+
+The compiled copy profile is deliberately narrow:
+
+| Profile | Qualified implementation family |
+| --- | --- |
+| `1` | MSVC 19.42 with the selected standard-library headers and ABI. |
+| `2` | GCC 13.3 with the selected libstdc++ headers and ABI. |
+| `0` | Unknown or unqualified environment; `create()` returns `UNSUPPORTED_PROFILE` before recovery allocation/adoption/activation. |
+
+Compiler version alone is insufficient: qualification includes the selected
+header bytes, ABI/macro settings and copy paths. Every participating translation
+unit must use that same qualified standard-library profile and ABI. The compiled
+factory gate does not attest arbitrary consumer include paths, later target
+overrides or foreign template instantiations at runtime. Changing those premises
+requires fresh qualification rather than assuming the capacity proof transfers.

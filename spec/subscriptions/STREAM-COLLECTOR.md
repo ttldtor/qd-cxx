@@ -34,7 +34,7 @@ whole-event backing before publishing anything. Successful nonempty admission
 moves the input event and captures each selected membership/revision. The first
 selected frame pins one opaque epoch even after drain. Later binding generations
 within that epoch are allowed; queued values retain their original snapshot.
-Another epoch is rejected and needs a fresh collector. A zero selection leaves
+Another epoch is rejected until an explicit successful source reset. A zero selection leaves
 the input owner and previous offer unchanged. Rejected admission never consumes
 the input or publishes a partial selected frame.
 
@@ -58,6 +58,18 @@ that record. It is not a user callback. Client dispatch must implement the
 pending records atomically without reporting delivery; it preserves the epoch pin
 and terminal cause. Counts distinguish staged, delivered, withdrawn, discarded
 and ignored records, with explicit saturation.
+
+`resetSource(work)` atomically discards pending records and releases the fixed epoch
+pin while preserving desired entries, membership activations, revision, fixed rings
+and cumulative counts. It prepays every item/frame visit, event release and identity
+release before mutation. Insufficient work preserves owners and offers. Success
+invalidates all offers, advances a non-reused reset sequence and reports actual
+discarded records with `unknownLoss = true`; upstream continuity cannot be inferred
+even when the local queue was empty. A new admitted epoch may then be pinned.
+Terminal overflow, a moved-from owner or exhausted reset sequence returns
+`INVALID_STATE`; reset never revives a terminal collector. Source ownership must
+exclude further old-epoch input before switching; the collector does not maintain
+a history of rejected epochs. This operation does not implement transport retry.
 
 Each offer also carries its owning core membership token and original scalar
 binding generation, scoped to the pinned epoch. These metadata copies do not

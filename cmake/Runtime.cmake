@@ -91,7 +91,8 @@ install(TARGETS qdcxx_transport EXPORT qdcxxTargets
 install(FILES "$<TARGET_FILE:${qdcxxCaresTarget}>" DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     RENAME "${qdcxxCaresInstalledName}")
 install(DIRECTORY include/qd/transport DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qd"
-    FILES_MATCHING PATTERN "*.hpp" PATTERN "tls_runtime.hpp" EXCLUDE PATTERN "tls_resources.hpp" EXCLUDE)
+    FILES_MATCHING PATTERN "*.hpp" PATTERN "tls_runtime.hpp" EXCLUDE PATTERN "tls_resources.hpp" EXCLUDE
+    PATTERN "recovery.hpp" EXCLUDE PATTERN "tcp_recovery.hpp" EXCLUDE PATTERN "tls_recovery.hpp" EXCLUDE)
 install(FILES "${ORG_TTLDTOR_QDCXX_CARES_SOURCE}/LICENSE.md"
     DESTINATION "${CMAKE_INSTALL_DATADIR}/qdcxx/licenses" RENAME c-ares-MIT.txt)
 install(FILES "${ORG_TTLDTOR_QDCXX_ASIO_INCLUDE}/../LICENSE_1_0.txt"

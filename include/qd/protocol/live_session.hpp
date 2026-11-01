@@ -134,6 +134,11 @@ class LiveIdentity {
      * @return Generation number; zero is also the initial empty generation.
      */
     [[nodiscard]] std::uint64_t generation() const noexcept;
+    /** Inspect conservative work for releasing this fixed opaque epoch reference.
+     * @return Fixed ledger disposal bytes for a retained epoch, or zero when empty. This is not a
+     * reservation refund or a claim that other epoch/snapshot/event owners have retired.
+     */
+    [[nodiscard]] std::size_t releaseBytes() const noexcept;
 };
 
 /** Exact borrowed property text; Java null and non-null empty remain distinct. */

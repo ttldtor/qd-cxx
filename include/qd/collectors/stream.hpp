@@ -16,10 +16,10 @@ namespace org::ttldtor::qdcxx::collectors {
 
 /** Local staging failures, independent of connection and callback completion. */
 enum class StreamError {
-    INVALID_STATE,            ///< Moved-from collector or terminal overflow already observed.
+    INVALID_STATE,            ///< Moved-from collector, terminal overflow, or exhausted reset identity.
     INVALID_FAMILY,           ///< Desired state does not select STREAM or is moved from.
     INVALID_EVENT,            ///< Input is not a complete admitted STREAM_DATA event.
-    INVALID_EPOCH,            ///< Input belongs to another connection epoch; construct a fresh collector.
+    INVALID_EPOCH,            ///< Input belongs to another epoch; reset the source before switching.
     RESOURCE_LIMIT,           ///< Terminal overflow; no incoming record is staged or silently conflated.
     WORK_LIMIT,               ///< Nonterminal exhausted turn credits; queue and input ownership are unchanged.
     ALLOCATION_FAILURE,       ///< Factory backing allocation failed before desired-state transfer.
@@ -49,6 +49,14 @@ struct StreamStage {
     std::size_t selected;   ///< Records staged in original source order.
     std::size_t ignored;    ///< Unrequested records in this frame, never cached.
     std::uint64_t revision; ///< Desired revision used for the whole frame.
+};
+
+/** One committed explicit source reset; desired identities and cumulative counters survive. */
+struct StreamReset {
+    std::uint64_t sequence; ///< Nonzero collector-local reset identity, never reused.
+    std::size_t discarded;  ///< Actual selected queued records discarded without delivery.
+    bool countsSaturated;   ///< Cumulative diagnostic arithmetic has saturated.
+    bool unknownLoss;       ///< Upstream continuity cannot be quantified by a local reset.
 };
 
 /** Borrowed next record; front does not acknowledge delivery or invoke application code. */
@@ -88,12 +96,11 @@ struct StreamDiagnostic {
  * All operations, views, moves and destruction require serialized, non-reentrant access, including
  * related LiveSession/LiveIdentity owners. No background work or user callbacks exist. First selected
  * admission pins one epoch through drain; newer bindings within it are accepted without reinterpreting
- * queued records. A new epoch requires a new collector. Staging counts unique event backing; desired
- * state and shared snapshots/epoch reservations remain in their separate existing bounds. An upper
- * owner must aggregate those scopes. Logical bounds exclude allocator overhead and process RSS.
- * Overflow retires delivery visibly and retains its bounded queue for work-bounded discard or destruction.
- * Destruction and move-assignment cleanup release bounded owners without caller credits; it never dispatches or reports
- * delivery.
+ * queued records. A new epoch requires explicit resetSource or a new collector. Staging counts unique event backing;
+ * desired state and shared snapshots/epoch reservations remain in their separate existing bounds. An upper owner must
+ * aggregate those scopes. Logical bounds exclude allocator overhead and process RSS. Overflow retires delivery visibly
+ * and retains its bounded queue for work-bounded discard or destruction. Destruction and move-assignment cleanup
+ * release bounded owners without caller credits; it never dispatches or reports delivery.
  */
 class StreamCollector {
     struct Impl;
@@ -190,6 +197,14 @@ class StreamCollector {
      * @return Known discarded count or failure preserving the queue. Epoch pin and terminal cause persist.
      */
     [[nodiscard]] std::expected<std::size_t, StreamError> discard(StreamWork &work);
+    /** Discard a healthy source and unpin its epoch while preserving desired state and fixed backing.
+     * Preflight failure preserves queued records, offers, desired identities, epoch and reset sequence;
+     * attempted work may be consumed. Successful reset invalidates offers and permits a new epoch.
+     * Ordinary discard alone still preserves its epoch. Terminal overflow cannot be revived by reset.
+     * @param work Complete item/frame visits and conservative frame/epoch disposal credits.
+     * @return Committed actual discard and source-reset identity, or a typed refusal before mutation.
+     */
+    [[nodiscard]] std::expected<StreamReset, StreamError> resetSource(StreamWork &work);
     /** Borrow immutable desired demand for outgoing composition.
      * @return State valid until move/destruction; null for a moved-from collector.
      */

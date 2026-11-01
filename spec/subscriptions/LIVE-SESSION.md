@@ -116,6 +116,11 @@ measurement. Both getters take constant work and return zero after move.
 generation; `matches()` still requires the same generation. Initial generation
 zero may be valid; two invalid identities never match either comparison.
 
+`LiveIdentity::releaseBytes()` reports only the fixed opaque epoch-control storage,
+or zero for an invalid token. Unlike a snapshot or event owner, the token retains no
+schema, frame or snapshot graph. Sample and debit this fixed release allowance
+before dropping a source identity in the serialized owner domain.
+
 Caller-created copies outside these owners, including independently retained
 core provenance tokens, have their own lifetime. These per-epoch counters do
 not measure all allocations made by the application.

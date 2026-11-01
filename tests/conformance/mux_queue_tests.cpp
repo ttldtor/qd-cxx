@@ -2813,3 +2813,129 @@ TEST_CASE("MUX queue reserved resume and graceful stop work with an actually ful
     CHECK(handle.terminal()->counts.commandsCancelled == 1);
     CHECK(consumer->values == std::vector<std::int64_t>{10, 20});
 }
+
+TEST_CASE("MUX source binding validates exact schema family policy and future count capacities") {
+    for (const auto family :
+         {c::SubscriptionFamily::STREAM, c::SubscriptionFamily::TICKER, c::SubscriptionFamily::HISTORY}) {
+        auto f = fixture(family);
+        auto work = turn();
+        REQUIRE(f.queue.validateBinding(f.schema, family, c::SubscriptionSelectorPolicy::EXACT_ONLY, work));
+        const auto caps = f.queue.capacity();
+        CHECK(caps.queueBytes == queueLimits().residentBytes);
+        CHECK(caps.muxBytes == muxLimits().residentBytes);
+        CHECK(caps.desiredOwners == (family == c::SubscriptionFamily::STREAM ? 1 : 4));
+        CHECK(caps.desiredPerOwner.peakEntries == desiredLimits().peakEntries);
+        CHECK(caps.desiredPerOwner.peakSymbolUnits == desiredLimits().peakSymbolUnits);
+        auto foreign = schema();
+        CHECK(f.queue.validateBinding(foreign, family, c::SubscriptionSelectorPolicy::EXACT_ONLY, work).error().error ==
+              m::QueueError::INVALID_CONTEXT);
+        const auto wrongFamily =
+            family == c::SubscriptionFamily::STREAM ? c::SubscriptionFamily::TICKER : c::SubscriptionFamily::STREAM;
+        CHECK(f.queue.validateBinding(f.schema, wrongFamily, c::SubscriptionSelectorPolicy::EXACT_ONLY, work)
+                  .error()
+                  .error == m::QueueError::INVALID_CONFIGURATION);
+        auto shortWork = turn();
+        shortWork.bytes = sizeof(c::SchemaIdentity) - 1;
+        CHECK(f.queue.validateBinding(f.schema, family, c::SubscriptionSelectorPolicy::EXACT_ONLY, shortWork)
+                  .error()
+                  .error == m::QueueError::WORK_LIMIT);
+        auto receiver = std::make_shared<Recorder>();
+        auto handle = open(f, receiver);
+        add(f, handle);
+        const auto revision = f.queue.revision();
+        REQUIRE(f.queue.validateBinding(f.schema, family, c::SubscriptionSelectorPolicy::EXACT_ONLY, work));
+        CHECK(f.queue.revision() == revision);
+        send(f, {{0, u"ALPHA", 1, 10, 0}});
+        CHECK(
+            f.queue.validateBinding(f.schema, family, c::SubscriptionSelectorPolicy::EXACT_ONLY, work).error().error ==
+            m::QueueError::INVALID_STATE);
+    }
+
+    auto empty = c::LocalSchema::create({}, {16, 128, 256, 128, 16384});
+    auto independent = c::LocalSchema::create({}, {16, 128, 256, 128, 16384});
+    REQUIRE(empty);
+    REQUIRE(independent);
+    auto work = turn();
+    auto queue = m::MuxQueue::createStream(*empty, muxLimits(), desiredLimits(),
+                                           {8, 256, 4 * 1024 * 1024, 8 * 1024 * 1024}, queueLimits(), work);
+    REQUIRE(queue);
+    REQUIRE(
+        queue->validateBinding(*empty, c::SubscriptionFamily::STREAM, c::SubscriptionSelectorPolicy::EXACT_ONLY, work));
+    CHECK(queue
+              ->validateBinding(*independent, c::SubscriptionFamily::STREAM, c::SubscriptionSelectorPolicy::EXACT_ONLY,
+                                work)
+              .error()
+              .error == m::QueueError::INVALID_CONTEXT);
+    auto moved = std::move(*queue);
+    CHECK(queue->capacity().queueBytes == 0);
+    CHECK(queue->validateBinding(*empty, c::SubscriptionFamily::STREAM, c::SubscriptionSelectorPolicy::EXACT_ONLY, work)
+              .error()
+              .error == m::QueueError::INVALID_STATE);
+    REQUIRE(
+        moved.validateBinding(*empty, c::SubscriptionFamily::STREAM, c::SubscriptionSelectorPolicy::EXACT_ONLY, work));
+}
+
+TEST_CASE("MUX STREAM reset preserves handles old detached values and exact client ACK gates") {
+    auto f = fixture(c::SubscriptionFamily::STREAM);
+    auto receiver = std::make_shared<Recorder>();
+    receiver->retain = true;
+    auto handle = open(f, receiver);
+    add(f, handle);
+    send(f, {{0, u"ALPHA", 1, 10, 0}});
+    until(f, [&] {
+        return receiver->retained.size() == 1;
+    });
+    const auto oldEpoch = receiver->retained[0].epoch();
+    const auto oldBytes = f.queue.resources().batchBytes;
+    REQUIRE(oldBytes > 0);
+    send(f, {{0, u"ALPHA", 2, 20, 0}});
+    auto work = turn();
+    REQUIRE(f.queue.resetSource(work));
+    until(f, [&] {
+        return f.queue.resetStatus().phase == m::ResetPhase::NOTICE_PUBLICATION_PENDING;
+    });
+    const auto committed = f.queue.resetStatus();
+    REQUIRE(committed.sourceCommitted);
+    REQUIRE(committed.actualSourceSequence);
+    CHECK(committed.globalAcknowledged);
+    CHECK(committed.discardedPendingFrames == 1);
+    work = turn();
+    work.bytes = 0;
+    const auto blocked = f.queue.progress(work);
+    REQUIRE_FALSE(blocked);
+    CHECK(blocked.error().error == m::QueueError::WORK_LIMIT);
+    CHECK(f.queue.resetStatus().actualSourceSequence == committed.actualSourceSequence);
+    until(f, [&] {
+        return f.queue.resetStatus().phase == m::ResetPhase::NONE;
+    });
+    auto notice = handle.resetNotice();
+    REQUIRE(notice);
+    REQUIRE(notice->toEpoch);
+    CHECK_FALSE(notice->toEpoch->matches(oldEpoch));
+    CHECK_FALSE(notice->globalAckPending);
+    CHECK(handle.acknowledgeReset(notice->sequence + 1) == m::ControlAdmission::STALE);
+    CHECK(receiver->retained[0].records()[0].typedValues[2].raw == 10);
+    CHECK(f.queue.resources().batchBytes >= oldBytes);
+
+    f.live = session(f.schema);
+    send(f, {{0, u"ALPHA", 3, 30, 0}});
+    constexpr unsigned PRE_ACK_TURNS = 100; ///< Finite fair cycles with an intentionally unacknowledged reset.
+
+    for (unsigned i = 0; i < PRE_ACK_TURNS; ++i) {
+        work = turn();
+        REQUIRE(f.queue.progress(work));
+    }
+
+    CHECK(receiver->values == std::vector<std::int64_t>{10});
+    CHECK(handle.acknowledgeReset(notice->sequence) == m::ControlAdmission::RECORDED);
+    until(f, [&] {
+        return receiver->values.size() == 2;
+    });
+    CHECK(receiver->values == std::vector<std::int64_t>{10, 30});
+    CHECK_FALSE(handle.resetNotice());
+    CHECK(receiver->retained[1].epoch().matches(*notice->toEpoch));
+    const auto retainedCurrentBytes = f.queue.resources().batchBytes;
+    receiver->retained.erase(receiver->retained.begin());
+    CHECK(f.queue.resources().batchBytes < retainedCurrentBytes);
+    CHECK(receiver->retained[0].records()[0].typedValues[2].raw == 30);
+}

@@ -16,7 +16,8 @@
 | JSON-схемы | `qd/schema/json_schema.hpp` | `qdcxx_schema_json` | [Нативный JSON](../spec/schema/NATIVE-JSON.ru.md); устанавливается при `ORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON=ON` (по умолчанию ON) |
 | Автономный replay | `qd/replay/tape_replay.hpp` | `qdcxx_replay` — только дерево сборки | [Контракт replay](../spec/protocol/OFFLINE-REPLAY.ru.md); `ORG_TTLDTOR_QDCXX_BUILD_REPLAY=ON` (по умолчанию OFF), без установки/экспорта пакета |
 | Необязательный клиент | `qd/client/` | `qdcxx_client` | [Локальный STREAM dispatch](../spec/subscriptions/CLIENT-DISPATCH.ru.md) |
-| Необязательный транспорт | `qd/transport/` | `qdcxx_transport`, `qdcxx_tls` | [TCP](../spec/transport/TCP-RUNTIME.ru.md), [TLS](../spec/transport/TLS-RUNTIME.ru.md) |
+| Необязательный транспорт | `qd/transport/tcp_runtime.hpp`, `qd/transport/tls_runtime.hpp`, `qd/transport/tls_resources.hpp` | `qdcxx_transport`, `qdcxx_tls` | [TCP](../spec/transport/TCP-RUNTIME.ru.md), [TLS](../spec/transport/TLS-RUNTIME.ru.md) |
+| Восстановление соединения | `qd/transport/recovery.hpp`, `qd/transport/tcp_recovery.hpp`, `qd/transport/tls_recovery.hpp` | `qdcxx_recovery`, `qdcxx_tls_recovery` | [Контракт восстановления и условия включения](../spec/transport/RECOVERY.ru.md); `ORG_TTLDTOR_QDCXX_BUILD_RECOVERY=ON` (по умолчанию OFF) |
 
 Необязательные цели требуют соответствующих [параметров сборки](CPP-BUILD.ru.md). Контракты различают
 заимствованные представления, владеющие значения, конечные бюджеты работы и локальное принятие байтов

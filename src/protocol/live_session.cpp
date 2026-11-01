@@ -1849,6 +1849,10 @@ std::uint64_t LiveIdentity::generation() const noexcept {
     return generation_;
 }
 
+std::size_t LiveIdentity::releaseBytes() const noexcept {
+    return epoch_ ? sizeof(Storage) : 0;
+}
+
 LiveSnapshot::LiveSnapshot(State *state) noexcept : state_(state) {
 }
 

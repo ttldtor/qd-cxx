@@ -1,0 +1,1006 @@
+// Copyright (c) 2026 ttldtor.
+// SPDX-License-Identifier: BSL-1.0
+#include "recovery_core.hpp"
+
+#include "recovery_core_support.hpp"
+
+#include <algorithm>
+#include <array>
+#include <exception>
+#include <limits>
+#include <new>
+#include <utility>
+
+namespace org::ttldtor::qdcxx::transport::detail {
+namespace {
+
+constexpr std::size_t FACTORY_SAMPLES = 3;    ///< Choose, explicit factory-entry permission and completion.
+constexpr std::size_t TURN_FAMILY_VISITS = 9; ///< Three fixed family observations in each of three samples.
+constexpr std::size_t SCHEMA_PEAK = 3;        ///< Immutable endpoint, composer and session coexist.
+
+/** Construct a validated scheduler at its final stable address.
+ * @param config Already validated preparation policy.
+ * @param origin Final stable Core identity.
+ * @return Nonallocating prepared state; failed validation would violate the private construction contract.
+ */
+RecoveryState scheduler(RecoveryConfig config, const void *origin) noexcept {
+    auto result = RecoveryState::create(config, origin);
+
+    if (!result) {
+        std::terminate();
+    }
+
+    return std::move(*result);
+}
+
+/** Map the frozen private phases explicitly into the public inspection type.
+ * @param phase Current actual state.
+ * @return Corresponding detached public phase.
+ */
+org::ttldtor::qdcxx::transport::RecoveryPhase publicPhase(RecoveryPhase phase) noexcept {
+    using Public = org::ttldtor::qdcxx::transport::RecoveryPhase;
+
+    switch (phase) {
+    case RecoveryPhase::CONFIGURED:
+        return Public::CONFIGURED;
+    case RecoveryPhase::PREPARING:
+        return Public::PREPARING;
+    case RecoveryPhase::STARTING:
+        return Public::STARTING;
+    case RecoveryPhase::NEGOTIATING:
+        return Public::NEGOTIATING;
+    case RecoveryPhase::REPLAYING:
+        return Public::REPLAYING;
+    case RecoveryPhase::ACTIVE:
+        return Public::ACTIVE;
+    case RecoveryPhase::RETIRING:
+        return Public::RETIRING;
+    case RecoveryPhase::RESETTING:
+        return Public::RESETTING;
+    case RecoveryPhase::BACKOFF:
+        return Public::BACKOFF;
+    case RecoveryPhase::STOPPING:
+        return Public::STOPPING;
+    case RecoveryPhase::CLOSED:
+        return Public::CLOSED;
+    case RecoveryPhase::EXHAUSTED:
+        return Public::EXHAUSTED;
+    case RecoveryPhase::FAILED:
+        return Public::FAILED;
+    }
+
+    return Public::FAILED;
+}
+
+/** Run the actual pure state on caller-owned coordinates without retaining or refilling them.
+ * @param state Stable actual production scheduler.
+ * @param now Current selected monotonic sample.
+ * @param observation Actual current action result.
+ * @param work Mutable owner coordinates.
+ * @return One actual scheduler result.
+ */
+RecoveryStep step(RecoveryState &state, RecoveryClock::time_point now, const RecoveryObservation &observation,
+                  RecoveryWork &work) noexcept {
+    RecoveryStateWork credits{work.operations, work.visits};
+    const auto result = state.step(now, observation, credits);
+    work.operations = credits.observations;
+    work.visits = credits.transitions;
+
+    return result;
+}
+
+/** Check and charge a fresh inner schema's complete preparation/rollback work before factory entry.
+ * One optional postcheck pass is conservative for the opaque TLS-owned copy; no future turn is refilled.
+ * @param capacity Admitted immutable three-schema capacity.
+ * @param work Actual caller work; two scheduler samples/transitions must remain funded.
+ * @return True on complete admission, false before any attempt is charged.
+ */
+bool schemaWork(RecoverySchemaCapacity capacity, RecoveryWork &work) {
+    const RecoverySchemaCapacity one{capacity.records / SCHEMA_PEAK, capacity.fields / SCHEMA_PEAK,
+                                     capacity.lookups / SCHEMA_PEAK, capacity.nameUnits / SCHEMA_PEAK};
+    const auto nodes = recoverySum(one.records, recoverySum(one.fields, one.lookups));
+    auto bytes = recoverySum(sizeof(core::LocalSchema), recoveryProduct(one.records, sizeof(core::LocalRecord)));
+    bytes = recoverySum(bytes, recoveryProduct(one.fields, sizeof(core::LocalField)));
+    bytes = recoverySum(bytes, recoveryProduct(one.lookups, sizeof(core::FieldLookup)));
+    bytes = recoverySum(bytes, recoveryProduct(one.nameUnits, sizeof(char16_t)));
+    const auto visits = recoveryProduct(5, nodes); // Validate, copy, measure, possible postcheck and rollback.
+    const auto byteWork = recoveryProduct(2, bytes);
+
+    if (work.operations < 3 || work.visits < recoverySum(visits, 2) || work.textUnits < one.nameUnits ||
+        work.bytes < byteWork) {
+        return false;
+    }
+
+    --work.operations;
+    work.visits -= visits;
+    work.textUnits -= one.nameUnits;
+    work.bytes -= byteWork;
+
+    return true;
+}
+
+/** Interpret only an engaged actual decoded event before any move/release.
+ * @param kind Actual optional event's current kind.
+ * @return Validated current-input marker.
+ */
+RecoveryInput inputKind(protocol::LiveEventKind kind) noexcept {
+    switch (kind) {
+    case protocol::LiveEventKind::EMPTY_HEARTBEAT:
+        return RecoveryInput::EMPTY_HEARTBEAT;
+    case protocol::LiveEventKind::HEARTBEAT:
+        return RecoveryInput::HEARTBEAT;
+    case protocol::LiveEventKind::PROTOCOL:
+        return RecoveryInput::PROTOCOL;
+    case protocol::LiveEventKind::DESCRIPTIONS:
+        return RecoveryInput::DESCRIPTIONS;
+    case protocol::LiveEventKind::DATA:
+        return RecoveryInput::DATA;
+    }
+
+    return RecoveryInput::NONE;
+}
+
+/** Map one actual type10/15/20 data envelope to its sole destination family.
+ * @param type Actual decoded data identity.
+ * @return Fixed array index or no supported data family.
+ */
+std::optional<std::size_t> dataFamily(std::optional<std::int32_t> type) noexcept {
+    if (type == 10)
+        return 0;
+
+    if (type == 15)
+        return 1;
+
+    if (type == 20)
+        return 2;
+
+    return std::nullopt;
+}
+
+/** Preserve actual queue evidence with a conservative recovery-level category.
+ * @param failure Existing complete nested cause.
+ * @return Detached static checkpoint.
+ */
+RecoveryDiagnostic queueFailure(mux::QueueFailure failure) noexcept {
+    auto error = RecoveryError::INVALID_STATE;
+
+    if (failure.error == mux::QueueError::WORK_LIMIT)
+        error = RecoveryError::WORK_LIMIT;
+
+    if (failure.error == mux::QueueError::RESOURCE_LIMIT)
+        error = RecoveryError::RESOURCE_LIMIT;
+
+    if (failure.error == mux::QueueError::ALLOCATION_FAILURE)
+        error = RecoveryError::ALLOCATION_FAILURE;
+
+    auto result = RecoveryDiagnostic{error, "recovery-queue"};
+    result.queue = std::move(failure);
+
+    return result;
+}
+
+} // namespace
+
+RecoveryDiagnostic recoveryTransportDiagnostic(TcpDiagnostic diagnostic) noexcept {
+    auto error = RecoveryError::TRANSPORT_FAILURE;
+
+    switch (diagnostic.error) {
+    case TcpError::NONE:
+        error = RecoveryError::NONE;
+        break;
+    case TcpError::INVALID_STATE:
+        error = RecoveryError::INVALID_STATE;
+        break;
+    case TcpError::WRONG_THREAD:
+        error = RecoveryError::WRONG_THREAD;
+        break;
+    case TcpError::INVALID_CONFIGURATION:
+    case TcpError::BOOTSTRAP_FAILURE:
+        error = RecoveryError::INVALID_CONFIGURATION;
+        break;
+    case TcpError::RESOURCE_LIMIT:
+        error = RecoveryError::RESOURCE_LIMIT;
+        break;
+    case TcpError::WORK_LIMIT:
+        error = RecoveryError::WORK_LIMIT;
+        break;
+    case TcpError::ALLOCATION_FAILURE:
+        error = RecoveryError::ALLOCATION_FAILURE;
+        break;
+    case TcpError::PROTOCOL_FAILURE:
+        error = RecoveryError::PROTOCOL_FAILURE;
+        break;
+    case TcpError::UNSUPPORTED_DNS_NAME:
+        error = RecoveryError::UNSUPPORTED_PROFILE;
+        break;
+    default:
+        break;
+    }
+
+    return {error, diagnostic.stage, diagnostic};
+}
+
+RecoveryAttemptFailure recoveryTransportFailure(TcpDiagnostic diagnostic) noexcept {
+    const bool retryable = diagnostic.error == TcpError::NONE || diagnostic.error == TcpError::DNS_FAILURE ||
+                           diagnostic.error == TcpError::CONNECT_FAILURE ||
+                           diagnostic.error == TcpError::READ_FAILURE || diagnostic.error == TcpError::WRITE_FAILURE ||
+                           diagnostic.error == TcpError::DEADLINE;
+    auto failure = recoveryTransportDiagnostic(diagnostic);
+
+    if (diagnostic.error == TcpError::NONE) {
+        failure = {RecoveryError::TRANSPORT_FAILURE, "recovery-peer-end"};
+    }
+
+    const auto cause =
+        retryable                                          ? RecoveryCause::TRANSPORT
+        : failure.error == RecoveryError::PROTOCOL_FAILURE ? RecoveryCause::PROTOCOL
+        : failure.error == RecoveryError::RESOURCE_LIMIT || failure.error == RecoveryError::ALLOCATION_FAILURE
+            ? RecoveryCause::RESOURCE
+            : RecoveryCause::CONFIGURATION;
+
+    return {failure, cause, retryable};
+}
+
+std::expected<RecoveryWork, RecoveryDiagnostic>
+admitRecoveryOwner(const RecoveryConfiguration &configuration, std::size_t ownerBytes, RecoveryWork &work) noexcept {
+    try {
+        const auto protocolBytes = configuration.endpoint.settings().budgets.session.residentBytes;
+        const RecoveryWork retirement{1, 2, 0, recoverySum(ownerBytes, protocolBytes)};
+        const auto totalBytes = recoverySum(ownerBytes, retirement.bytes);
+        recoveryDebit(2, work.operations); // Actual construction and prepaid final retirement.
+        recoveryDebit(4, work.visits);     // Stable payload/control plus their final release.
+        recoveryDebit(totalBytes, work.bytes);
+
+        return retirement;
+    } catch (const RecoveryActionRefusal &error) {
+        return std::unexpected(error.diagnostic);
+    }
+}
+
+RecoveryCore::RecoveryCore(RecoveryConfiguration &&configuration, RecoveryBackend &backend,
+                           RecoveryWork retirement) noexcept
+    : configuration_(std::move(configuration)), backend_(backend), state_(scheduler(configuration_.scheduler, this)),
+      retirement_(retirement), thread_(std::this_thread::get_id()) {
+}
+
+RecoveryCore::~RecoveryCore() {
+    cutoff();
+    // Active public operations retain the enclosing Impl, so this fallback is outside its callbacks.
+    backend_.dispose();
+
+    if (event_) {
+        const auto bytes = event_->releaseBytes();
+
+        if (retirement_.visits == 0 || bytes > retirement_.bytes)
+            std::terminate();
+
+        --retirement_.visits;
+        retirement_.bytes -= bytes;
+        event_.reset();
+    }
+}
+
+bool RecoveryCore::adopt(std::vector<protocol::OutgoingRecord> &&blueprint, RecoveryQueues &&queues) noexcept {
+    return configuration_.adopt(std::move(blueprint), std::move(queues));
+}
+
+std::optional<RecoveryDiagnostic> RecoveryCore::rejection() const noexcept {
+    if (thread_ != std::this_thread::get_id()) {
+        return RecoveryDiagnostic{RecoveryError::WRONG_THREAD, "recovery-owner-thread"};
+    }
+
+    if (executing_) {
+        return RecoveryDiagnostic{RecoveryError::REENTRANT, "recovery-owner-busy"};
+    }
+
+    return std::nullopt;
+}
+
+std::expected<void, RecoveryDiagnostic> RecoveryCore::start() noexcept {
+    if (const auto error = rejection())
+        return std::unexpected(*error);
+
+    if (cutoff_ || !configuration_.adopted || state_.status().terminal) {
+        return std::unexpected(RecoveryDiagnostic{RecoveryError::INVALID_STATE, "recovery-start-state"});
+    }
+
+    state_.requestStart();
+
+    return {};
+}
+
+void RecoveryCore::cutoff() noexcept {
+    cutoff_ = true;
+    state_.requestStop();
+    backend_.abort();
+    abortIssued_ = true;
+
+    for (std::size_t family = 0; family != 3; ++family) {
+        if (auto &queue = configuration_.queue(family); queue && queue->state() != mux::QueueState::TERMINAL) {
+            queue->requestStop(mux::StopMode::ABORT);
+        }
+    }
+}
+
+std::expected<void, RecoveryDiagnostic> RecoveryCore::requestStop() noexcept {
+    if (thread_ != std::this_thread::get_id()) {
+        return std::unexpected(RecoveryDiagnostic{RecoveryError::WRONG_THREAD, "recovery-owner-thread"});
+    }
+
+    cutoff();
+
+    return {};
+}
+
+void RecoveryCore::record(RecoveryDiagnostic diagnostic) noexcept {
+    if (diagnostic.error == RecoveryError::NONE)
+        return;
+
+    if (first_.error == RecoveryError::NONE) {
+        first_ = std::move(diagnostic);
+    } else if (secondary_.error == RecoveryError::NONE &&
+               (first_.error != diagnostic.error || first_.stage != diagnostic.stage ||
+                first_.transport.error != diagnostic.transport.error ||
+                first_.transport.nativeCode != diagnostic.transport.nativeCode ||
+                first_.transport.protocolError != diagnostic.transport.protocolError)) {
+        secondary_ = std::move(diagnostic);
+    }
+}
+
+void RecoveryCore::recordModelCause() noexcept {
+    switch (state_.status().currentCause) {
+    case RecoveryCause::PROTOCOL_INACTIVITY:
+        record({RecoveryError::TRANSPORT_FAILURE, "recovery-protocol-inactivity"});
+        break;
+    case RecoveryCause::CLOCK_BACKWARDS:
+        record({RecoveryError::IDENTITY_EXHAUSTED, "recovery-clock-backwards"});
+        break;
+    case RecoveryCause::CLOCK_RANGE:
+        record({RecoveryError::IDENTITY_EXHAUSTED, "recovery-clock-range"});
+        break;
+    case RecoveryCause::IDENTITY_EXHAUSTED:
+        record({RecoveryError::IDENTITY_EXHAUSTED, "recovery-action-identity"});
+        break;
+    default:
+        break;
+    }
+}
+
+RecoveryFacts RecoveryCore::facts() noexcept {
+    const auto actual = backend_.facts();
+    bool changed = actual.generation != peerGeneration_ || actual.authentication != authentication_;
+    peerGeneration_ = actual.generation;
+    authentication_ = actual.authentication;
+    RecoveryFacts result;
+    result.transportEligible = actual.connected && !cutoff_;
+    result.authenticationEligible = actual.authenticated && !cutoff_;
+    result.terminal = actual.terminal;
+    result.negotiationPending = !descriptor_ || description_ < configuration_.blueprint.size();
+
+    for (std::size_t family = 0; family != 3; ++family) {
+        if (auto &queue = configuration_.queue(family)) {
+            const auto revision = queue->revision();
+            changed = changed || revision != desiredRevisions_[family];
+            desiredRevisions_[family] = revision;
+
+            if (revision != configuration_.replay[family].banks[0].revision)
+                converged_[family] = false;
+
+            const bool demanded = !queue->aggregateEntries().empty();
+
+            if (demanded)
+                result.demandedFamilies |= static_cast<std::uint8_t>(1U << family);
+
+            if (demanded && converged_[family])
+                result.convergedFamilies |= static_cast<std::uint8_t>(1U << family);
+
+            result.replayPending = result.replayPending || !converged_[family];
+            result.deliveryPending = true;
+        }
+    }
+
+    if (changed && !readinessExhausted_) {
+        if (readiness_ == std::numeric_limits<std::uint64_t>::max()) {
+            readinessExhausted_ = true;
+            record({RecoveryError::IDENTITY_EXHAUSTED, "recovery-readiness-identity"});
+        } else {
+            ++readiness_;
+        }
+    }
+
+    result.readinessVersion = readiness_;
+
+    return result;
+}
+
+bool RecoveryCore::releaseEvent(protocol::LiveWork &work) noexcept {
+    if (!event_)
+        return true;
+
+    const auto release = event_->releaseBytes();
+
+    if (cutoff_ || finalRetirement_) {
+        if (retirement_.visits == 0 || retirement_.bytes < release)
+            std::terminate();
+
+        --retirement_.visits;
+        retirement_.bytes -= release;
+        event_.reset();
+
+        return true;
+    }
+
+    if (work.visits == 0 || work.bytes < release)
+        return false;
+
+    --work.visits;
+    work.bytes -= release;
+    event_.reset();
+
+    return true;
+}
+
+std::optional<RecoveryDiagnostic> RecoveryCore::controls(RecoveryTurnWork &work) {
+    auto &queue = configuration_.queue(controlFamily_);
+    auto &credits = work.queues[controlFamily_];
+    controlFamily_ = (controlFamily_ + 1) % 3;
+
+    if (!queue)
+        return std::nullopt;
+
+    // Offline desired commands and reset/control publication must not depend on auth/data eligibility.
+    const auto callbacks = credits.callbacks;
+    credits.callbacks = 0;
+    const auto result = queue->progress(credits);
+    credits.callbacks = callbacks; // No callback could consume a credit while this explicit gate was zero.
+
+    if (!result && result.error().error != mux::QueueError::WORK_LIMIT &&
+        result.error().error != mux::QueueError::BUSY) {
+        return queueFailure(result.error());
+    }
+
+    return std::nullopt;
+}
+
+RecoveryObservation RecoveryCore::reset(RecoveryTicket ticket, RecoveryTurnWork &work) {
+    auto result = recoveryResult(ticket, RecoveryCompletion::DEFERRED);
+
+    if (!releaseEvent(work.session))
+        return result;
+
+    for (std::size_t family = 0; family != 3; ++family) {
+        auto &queue = configuration_.queue(family);
+
+        if (!queue)
+            continue;
+
+        if (!resetRequested_[family]) {
+            const auto requested = queue->resetSource(work.queues[family]);
+
+            if (!requested) {
+                if (requested.error().error == mux::QueueError::WORK_LIMIT)
+                    return result;
+
+                auto failure = queueFailure(requested.error());
+                record(failure);
+                result.completion = RecoveryCompletion::TERMINAL_FAILURE;
+                result.cause = RecoveryCause::RESET_FAILURE;
+
+                return result;
+            }
+
+            resetRequested_[family] = true;
+        }
+
+        const auto reset = queue->resetStatus();
+
+        if (reset.failure) {
+            record(queueFailure(*reset.failure));
+            result.completion = RecoveryCompletion::TERMINAL_FAILURE;
+            result.cause = RecoveryCause::RESET_FAILURE;
+
+            return result;
+        }
+
+        if (reset.phase != mux::ResetPhase::NONE || !reset.globalAcknowledged) {
+            const auto progressed = queue->progress(work.queues[family]);
+
+            if (!progressed && progressed.error().error != mux::QueueError::WORK_LIMIT) {
+                record(queueFailure(progressed.error()));
+                result.completion = RecoveryCompletion::TERMINAL_FAILURE;
+                result.cause = RecoveryCause::RESET_FAILURE;
+            }
+
+            return result;
+        }
+    }
+
+    for (std::size_t family = 0; family != 3; ++family) {
+        for (auto &bank : configuration_.replay[family].banks) {
+            recoveryDebit(bank.size, work.recovery.visits);
+
+            for (std::size_t index = 0; index != bank.size; ++index)
+                bank.entries[index] = {};
+
+            bank.size = 0;
+            bank.units = 0;
+            bank.revision = 0;
+        }
+
+        converged_[family] = false;
+    }
+
+    result.completion = RecoveryCompletion::COMPLETED;
+    result.sourceResetComplete = true;
+
+    return result;
+}
+
+RecoveryObservation RecoveryCore::execute(RecoveryTicket ticket, RecoveryTurnWork &work) {
+    auto result = recoveryResult(ticket);
+    const auto model = state_.status();
+    const bool ordinary = ticket.action == RecoveryAction::PREPARE_ATTEMPT ||
+                          ticket.action == RecoveryAction::START_ATTEMPT ||
+                          ticket.action == RecoveryAction::NEGOTIATE || ticket.action == RecoveryAction::REPLAY ||
+                          ticket.action == RecoveryAction::HEARTBEAT || ticket.action == RecoveryAction::DELIVER;
+
+    // A new PREPARE retains the previous cause until its actual entry commit; do not strand backoff here.
+    if (ordinary &&
+        (cutoff_ || (model.currentCause != RecoveryCause::NONE && ticket.action != RecoveryAction::PREPARE_ATTEMPT))) {
+        return recoveryResult(ticket, RecoveryCompletion::DEFERRED);
+    }
+
+    if (ordinary && readinessExhausted_) {
+        result.completion = RecoveryCompletion::TERMINAL_FAILURE;
+        result.cause = RecoveryCause::IDENTITY_EXHAUSTED;
+
+        return result;
+    }
+
+    const auto failure = [&](RecoveryDiagnostic diagnostic, RecoveryCause cause, bool retryable = false) {
+        record(diagnostic);
+        auto rejected = recoveryResult(ticket, retryable ? RecoveryCompletion::RETRYABLE_FAILURE
+                                                         : RecoveryCompletion::TERMINAL_FAILURE);
+        rejected.cause = cause;
+
+        return rejected;
+    };
+    const auto output = [&](const std::expected<void, RecoveryDiagnostic> &admitted) {
+        if (admitted) {
+            auto accepted = recoveryResult(ticket);
+            accepted.outputAdmitted = true;
+
+            return accepted;
+        }
+
+        if (admitted.error().error == RecoveryError::WORK_LIMIT) {
+            return recoveryResult(ticket, RecoveryCompletion::DEFERRED);
+        }
+
+        if (recoveryOutputBlocked(admitted.error())) {
+            return recoveryResult(ticket, RecoveryCompletion::OUTPUT_BLOCKED);
+        }
+
+        return failure(admitted.error(), RecoveryCause::RESOURCE);
+    };
+    try {
+        switch (ticket.action) {
+        case RecoveryAction::PREPARE_ATTEMPT: {
+            if (backend_.facts().present || event_) {
+                return failure({RecoveryError::INVALID_STATE, "recovery-attempt-overlap"},
+                               RecoveryCause::CONFIGURATION);
+            }
+
+            if (!schemaWork(configuration_.capacity.schemaCopies, work.recovery)) {
+                return recoveryResult(ticket, RecoveryCompletion::DEFERRED);
+            }
+
+            auto entered = recoveryResult(ticket, RecoveryCompletion::FACTORY_ENTERED);
+
+            if (!step(state_, RecoveryClock::now(), entered, work.recovery).factoryEntryAccepted) {
+                return recoveryResult(ticket, RecoveryCompletion::DEFERRED);
+            }
+
+            std::optional<protocol::SubscriptionWriter> fresh;
+            auto *writer = configuration_.firstWriter ? &*configuration_.firstWriter : nullptr;
+
+            if (!writer) {
+                auto composed = protocol::SubscriptionWriter::create(
+                    configuration_.endpoint.schema(), configuration_.blueprint,
+                    configuration_.endpoint.settings().budgets.layout,
+                    configuration_.endpoint.settings().budgets.writer, work.writer, configuration_.options.selectors);
+
+                if (!composed) {
+                    auto diagnostic = RecoveryDiagnostic{
+                        composed.error() == protocol::SubscriptionWriterError::WORK_LIMIT ? RecoveryError::WORK_LIMIT
+                        : composed.error() == protocol::SubscriptionWriterError::ALLOCATION_FAILURE
+                            ? RecoveryError::ALLOCATION_FAILURE
+                            : RecoveryError::RESOURCE_LIMIT,
+                        "recovery-attempt-writer"};
+                    diagnostic.writer = composed.error();
+
+                    return failure(diagnostic, diagnostic.error == RecoveryError::WORK_LIMIT
+                                                   ? RecoveryCause::FACTORY_WORK_LIMIT
+                                                   : RecoveryCause::FACTORY_FAILURE);
+                }
+
+                if (composed->storageBytes() > configuration_.options.limits.writerConfigurationBytes) {
+                    return failure({RecoveryError::RESOURCE_LIMIT, "recovery-attempt-writer-adoption"},
+                                   RecoveryCause::FACTORY_FAILURE);
+                }
+
+                fresh.emplace(std::move(*composed));
+                writer = &*fresh;
+            }
+
+            const auto prepared = backend_.prepare(configuration_, std::move(*writer), work);
+
+            if (!prepared) {
+                return failure(prepared.error(), prepared.error().error == RecoveryError::WORK_LIMIT
+                                                     ? RecoveryCause::FACTORY_WORK_LIMIT
+                                                     : RecoveryCause::FACTORY_FAILURE);
+            }
+
+            configuration_.firstWriter.reset();
+            descriptor_ = false;
+            description_ = 0;
+            resetRequested_ = {};
+            converged_ = {};
+            abortIssued_ = false;
+
+            return result;
+        }
+        case RecoveryAction::START_ATTEMPT: {
+            const auto started = backend_.start();
+
+            if (started)
+                return result;
+
+            const auto classified = backend_.failure();
+
+            return failure(started.error(), classified.cause, classified.retryable);
+        }
+        case RecoveryAction::POLL_ATTEMPT: {
+            if (model.currentCause != RecoveryCause::NONE && !abortIssued_) {
+                return recoveryResult(ticket, RecoveryCompletion::DEFERRED);
+            }
+
+            if (event_ && event_->kind() != protocol::LiveEventKind::DATA) {
+                (void)releaseEvent(work.session);
+            }
+
+            if (event_ && event_->kind() == protocol::LiveEventKind::DATA && !cutoff_ &&
+                model.currentCause == RecoveryCause::NONE) {
+                const auto family = dataFamily(event_->messageType());
+
+                if (!family || !configuration_.queue(*family)) {
+                    return failure({RecoveryError::PROTOCOL_FAILURE, "recovery-unconfigured-data-family"},
+                                   RecoveryCause::PROTOCOL);
+                }
+
+                const auto admitted = configuration_.queue(*family)->admit(std::move(*event_), work.queues[*family]);
+
+                if (admitted) {
+                    event_.reset(); // Only a moved-from handle remains; its epoch owner belongs to the queue.
+                } else if (admitted.error().error != mux::QueueError::BUSY &&
+                           admitted.error().error != mux::QueueError::WORK_LIMIT) {
+                    return failure(queueFailure(admitted.error()), RecoveryCause::RESOURCE);
+                }
+            }
+
+            auto polled = backend_.poll(work, !event_);
+
+            if (!polled) {
+                if (polled.error().error == RecoveryError::WORK_LIMIT) {
+                    return recoveryResult(ticket, RecoveryCompletion::DEFERRED);
+                }
+
+                const auto classified = backend_.failure();
+
+                return failure(polled.error(), classified.cause, classified.retryable);
+            }
+
+            if (polled->event) {
+                // The zero-operation decode gate is source-bound: an engaged old event forbids another decode.
+                if (event_)
+                    std::terminate();
+
+                if (polled->event->residentBytes() == 0) {
+                    return failure({RecoveryError::INVALID_STATE, "recovery-empty-event-owner"},
+                                   RecoveryCause::PROTOCOL);
+                }
+
+                result.input = inputKind(polled->event->kind());
+                event_.emplace(std::move(*polled->event));
+            }
+
+            if (event_ && (event_->kind() != protocol::LiveEventKind::DATA || cutoff_)) {
+                (void)releaseEvent(work.session);
+            }
+
+            const auto classified = backend_.failure();
+
+            if (classified.diagnostic.error != RecoveryError::NONE &&
+                (backend_.facts().terminal || !classified.retryable)) {
+                if (!cutoff_ && (model.currentCause == RecoveryCause::NONE || !classified.retryable)) {
+                    auto failed = failure(classified.diagnostic, classified.cause, classified.retryable);
+
+                    if (classified.secondary)
+                        record(*classified.secondary);
+
+                    return failed;
+                }
+
+                record(classified.diagnostic);
+
+                if (classified.secondary)
+                    record(*classified.secondary);
+            }
+
+            return result;
+        }
+        case RecoveryAction::REQUEST_ABORT:
+            backend_.abort();
+            abortIssued_ = true;
+
+            return result;
+        case RecoveryAction::DISPOSE_ATTEMPT:
+
+            if (!backend_.facts().terminal)
+                return recoveryResult(ticket, RecoveryCompletion::DEFERRED);
+
+            backend_.dispose();
+            result.privateDisposed = !backend_.facts().present;
+
+            return result;
+        case RecoveryAction::RESET_SOURCES:
+            return reset(ticket, work);
+        case RecoveryAction::NEGOTIATE:
+
+            if (!descriptor_) {
+                std::array<protocol::LiveMessageView, 9> send{};
+                std::array<protocol::LiveMessageView, 6> receive{};
+                constexpr std::array<std::u16string_view, 3> commonNames{u"HEARTBEAT", u"DESCRIBE_PROTOCOL",
+                                                                         u"DESCRIBE_RECORDS"};
+
+                for (std::size_t index = 0; index != commonNames.size(); ++index) {
+                    send[index] = {static_cast<std::int32_t>(index), commonNames[index], {}};
+                    receive[index] = send[index];
+                }
+
+                constexpr std::array<std::int32_t, 3> adds{11, 16, 21};
+                constexpr std::array<std::int32_t, 3> data{10, 15, 20};
+                constexpr std::array<std::u16string_view, 3> addNames{
+                    u"TICKER_ADD_SUBSCRIPTION", u"STREAM_ADD_SUBSCRIPTION", u"HISTORY_ADD_SUBSCRIPTION"};
+                constexpr std::array<std::u16string_view, 3> removeNames{
+                    u"TICKER_REMOVE_SUBSCRIPTION", u"STREAM_REMOVE_SUBSCRIPTION", u"HISTORY_REMOVE_SUBSCRIPTION"};
+                constexpr std::array<std::u16string_view, 3> dataNames{u"TICKER_DATA", u"STREAM_DATA", u"HISTORY_DATA"};
+                std::size_t sent = commonNames.size(), received = commonNames.size();
+
+                for (std::size_t family = 0; family != 3; ++family) {
+                    if (!configuration_.queue(family))
+                        continue;
+
+                    send[sent++] = {adds[family], addNames[family], {}};
+                    send[sent++] = {adds[family] + 1, removeNames[family], {}};
+                    receive[received++] = {data[family], dataNames[family], {}};
+                }
+
+                const std::array<protocol::LivePropertyView, 1> history{{{u"opt", u"hs"}}};
+                const auto properties = configuration_.endpoint.settings().budgets.session.historySnapshot
+                                            ? std::span<const protocol::LivePropertyView>{history}
+                                            : std::span<const protocol::LivePropertyView>{};
+                auto admitted = output(
+                    backend_.protocol({properties, {send.data(), sent}, {receive.data(), received}}, work.session));
+
+                if (admitted.outputAdmitted)
+                    descriptor_ = true;
+
+                return admitted;
+            } else if (description_ < configuration_.blueprint.size()) {
+                const auto id = configuration_.blueprint[description_].senderId;
+                auto admitted = output(backend_.describe({&id, 1}, work.session));
+
+                if (admitted.outputAdmitted)
+                    ++description_;
+
+                return admitted;
+            }
+
+            return result;
+        case RecoveryAction::REPLAY:
+            return replay(ticket, work);
+        case RecoveryAction::HEARTBEAT:
+            return output(backend_.heartbeat(work.session));
+        case RecoveryAction::DELIVER: {
+            for (std::size_t visited = 0; visited != 3; ++visited) {
+                const auto family = family_;
+                family_ = (family_ + 1) % 3;
+
+                if (!configuration_.queue(family))
+                    continue;
+
+                const auto progressed = configuration_.queue(family)->progress(work.queues[family]);
+
+                if (cutoff_)
+                    return recoveryResult(ticket, RecoveryCompletion::DEFERRED);
+
+                if (!progressed && progressed.error().error == mux::QueueError::WORK_LIMIT) {
+                    return recoveryResult(ticket, RecoveryCompletion::DEFERRED);
+                }
+
+                if (!progressed)
+                    return failure(queueFailure(progressed.error()), RecoveryCause::RESOURCE);
+
+                return result;
+            }
+
+            return result;
+        }
+        case RecoveryAction::STOP_DELIVERY:
+        case RecoveryAction::RETIRE_ALL: {
+            finalRetirement_ = true;
+            backend_.abort();
+            abortIssued_ = true;
+
+            if (backend_.facts().present && !backend_.facts().terminal) {
+                const auto progressed = backend_.poll(work, false);
+
+                if (!progressed && progressed.error().error != RecoveryError::WORK_LIMIT)
+                    record(progressed.error());
+
+                return recoveryResult(ticket, RecoveryCompletion::DEFERRED);
+            }
+
+            backend_.dispose();
+            (void)releaseEvent(work.session);
+
+            for (std::size_t family = 0; family != 3; ++family) {
+                auto &queue = configuration_.queue(family);
+
+                if (!queue || queue->state() == mux::QueueState::TERMINAL) {
+                    continue;
+                }
+
+                // A terminal queue has already committed cleanup; do not reopen its closing state.
+                queue->requestStop(mux::StopMode::ABORT);
+
+                if (queue->state() != mux::QueueState::TERMINAL) {
+                    const auto progressed = queue->progress(work.queues[family]);
+
+                    if (!progressed && progressed.error().error != mux::QueueError::WORK_LIMIT)
+                        record(queueFailure(progressed.error()));
+
+                    return recoveryResult(ticket, RecoveryCompletion::DEFERRED);
+                }
+            }
+
+            result.privateDisposed = true;
+            result.deliveryRetired = true;
+
+            return result;
+        }
+        case RecoveryAction::NONE:
+            return recoveryResult(ticket, RecoveryCompletion::DEFERRED);
+        }
+    } catch (const RecoveryActionRefusal &error) {
+        if (error.diagnostic.error == RecoveryError::WORK_LIMIT &&
+            !(ticket.action == RecoveryAction::PREPARE_ATTEMPT && state_.status().factoryEntered)) {
+            return recoveryResult(ticket, RecoveryCompletion::DEFERRED);
+        }
+
+        return failure(error.diagnostic, ticket.action == RecoveryAction::PREPARE_ATTEMPT
+                                             ? RecoveryCause::FACTORY_FAILURE
+                                             : RecoveryCause::RESOURCE);
+    } catch (const std::bad_alloc &) {
+        return failure({RecoveryError::ALLOCATION_FAILURE, "recovery-action-allocation"}, RecoveryCause::RESOURCE);
+    }
+
+    return recoveryResult(ticket, RecoveryCompletion::DEFERRED);
+}
+
+std::expected<RecoveryStatus, RecoveryDiagnostic> RecoveryCore::poll(RecoveryTurnWork &work) {
+    if (const auto error = rejection())
+        return std::unexpected(*error);
+
+    if (!configuration_.adopted) {
+        return std::unexpected(RecoveryDiagnostic{RecoveryError::INVALID_STATE, "recovery-uncommitted"});
+    }
+
+    if (work.recovery.operations < FACTORY_SAMPLES + 1 || work.recovery.visits < TURN_FAMILY_VISITS + FACTORY_SAMPLES) {
+        return std::unexpected(RecoveryDiagnostic{RecoveryError::WORK_LIMIT, "recovery-state-work"});
+    }
+
+    struct Turn {
+        bool &active;
+
+        explicit Turn(bool &value) : active(value) {
+            active = true;
+        }
+
+        ~Turn() {
+            active = false;
+        }
+    } turn(executing_);
+
+    work.recovery.visits -= TURN_FAMILY_VISITS;
+    auto action = step(state_, RecoveryClock::now(), {}, work.recovery);
+    recordModelCause();
+
+    if (action.status == RecoveryStepStatus::TERMINAL)
+        return status();
+
+    const auto controlError = controls(work);
+
+    if (controlError)
+        record(*controlError);
+
+    if (action.status == RecoveryStepStatus::WAITING) {
+        // A completion may have issued the next bounded ticket on the preceding public turn.
+        action.action = state_.status().pending;
+        action.status = RecoveryStepStatus::ACTION;
+    }
+
+    if (action.status != RecoveryStepStatus::ACTION && action.status != RecoveryStepStatus::CONTINUE)
+        return status();
+
+    auto observation = controlError ? recoveryResult(action.action, RecoveryCompletion::TERMINAL_FAILURE)
+                                    : execute(action.action, work);
+
+    if (controlError)
+        observation.cause = RecoveryCause::RESET_FAILURE;
+
+    observation.facts = facts();
+    const auto completed = step(state_, RecoveryClock::now(), observation, work.recovery);
+    recordModelCause();
+
+    if (completed.status == RecoveryStepStatus::INVALID_OBSERVATION) {
+        record({RecoveryError::INVALID_STATE, "recovery-action-proof"});
+        cutoff();
+    }
+
+    return status();
+}
+
+RecoveryStatus RecoveryCore::status() const noexcept {
+    const auto current = state_.status();
+    RecoveryStatus result{publicPhase(current.phase), current.attempts, first_, secondary_};
+    result.stopped = cutoff_;
+    const std::array slots{&configuration_.queues.ticker, &configuration_.queues.stream,
+                           &configuration_.queues.history};
+
+    for (std::size_t family = 0; family != slots.size(); ++family) {
+        if (const auto &queue = *slots[family]) {
+            const bool demanded = !queue->aggregateEntries().empty();
+
+            if (demanded)
+                result.demandedFamilies |= static_cast<std::uint8_t>(1U << family);
+
+            if (demanded && converged_[family] &&
+                queue->revision() == configuration_.replay[family].banks[0].revision) {
+                result.convergedFamilies |= static_cast<std::uint8_t>(1U << family);
+            }
+        }
+    }
+
+    return result;
+}
+
+RecoveryCapacity RecoveryCore::capacity() const noexcept {
+    return configuration_.capacity;
+}
+
+std::optional<RecoveryClock::time_point> RecoveryCore::nextWake() const noexcept {
+    const auto scheduled = state_.nextWake();
+    const auto native = backend_.nextWake();
+
+    if (!scheduled)
+        return native;
+
+    if (!native)
+        return scheduled;
+
+    return std::min(*scheduled, *native);
+}
+
+} // namespace org::ttldtor::qdcxx::transport::detail

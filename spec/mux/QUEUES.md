@@ -114,6 +114,23 @@ remain their own scopes. Adding these counters does not produce an exact total h
 Concurrent detached release can make separately sampled counters describe adjacent instants;
 quiescent counters are exact for their stated scopes.
 
+`capacity()` returns the original enforced queue, MUX and collector byte ceilings,
+plus the maximum number of source desired owners and their per-owner
+`SubscriptionLimits`. These immutable ceilings include future growth; they are
+not current usage. Desired entries, UTF-16 peaks and schema counts remain separate
+logical axes. Aggregate products must use checked arithmetic in an upper owner;
+per-key and per-command maxima remain individual constraints. Component byte
+scopes can overlap session events and exclude independently bounded desired storage.
+The byte subtotal is neither a whole-run byte bound nor process RSS. A moved-from
+queue returns zeroed capacities.
+
+`validateBinding(schema, family, policy, work)` checks exact immutable schema
+provenance, including empty schemas, family and selector policy before source
+ownership transfer. The queue must be open, without a stop/reset, prior source
+identity, pending input or advanced source epoch. Existing registrations and
+desired commands are allowed. It performs fixed, charged inspection without
+allocation, callbacks or mutation; failure can consume work but preserves the queue.
+
 `QueueSubmitWork` charges operations, visits, text units and bytes. `QueueWork` separately charges
 operations, metadata visits, fields, text units, bytes, command actions and callbacks, plus actual
 `MuxWork`, `SubscriptionWork` and family collector work. Initialization, rollback, disposal and
@@ -138,7 +155,7 @@ producer equivalence or an upstream continuity guarantee.
 
 ## Phased reset and local stop
 
-TICKER/HISTORY `resetSource` accepts/coalesces an owner operation; STREAM requires a fresh owner.
+Every family supports `resetSource` as an accepted/coalesced owner operation.
 The operation freezes intake/callbacks, preflights old pending disposal, discards the old pending
 owner, disposes detached queues in bounded quanta, invokes actual source reset, publishes reserved
 client notices, then performs the actual global ACK. `ResetStatus` exposes the phase, real source
@@ -146,6 +163,16 @@ sequence, committed/acknowledged flags and preserved failure. Bookkeeping is pre
 irreversible commit. TICKER global ACK may return work exhaustion after source commit: retain its
 sequence and `GLOBAL_ACK_PENDING`, retry ACK with genuine new credits, and never repeat reset or
 report that accepted reset as rejected. HISTORY's actual ACK has no work argument.
+
+STREAM uses the actual collector reset and its real sequence/discard count while
+preserving registrations and desired state. Its source barrier completes
+synchronously with that reset, so no collector-global ACK is fabricated. Client
+notices report `globalAckPending = false`; each exact client notice ACK still gates
+new callbacks. The queue epoch advances once at source commit, including when
+later notice publication needs a new work turn. Old caller-retained detached
+batches remain valid and charged in the same ledger; they cannot become new-epoch
+callbacks. The source owner must retire old protocol intake before admitting a
+replacement source. Reset alone is not reconnect or uninterrupted delivery.
 
 Global ACK and each client's exact notice ACK are separate. `acknowledgeReset(sequence)` records
 an exact request for owner rechecking; stale sequences cannot acknowledge newer intervals. STOP,

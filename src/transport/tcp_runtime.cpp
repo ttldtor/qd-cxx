@@ -3,6 +3,7 @@
 #include "qd/transport/tcp_runtime.hpp"
 
 #include "runtime_core.hpp"
+#include "tcp_runtime_factory.hpp"
 
 #include <utility>
 
@@ -29,6 +30,21 @@ std::expected<TcpRuntime, TcpDiagnostic> TcpRuntime::create(RuntimeBootstrap &bo
                                                             protocol::SubscriptionWriter &&composer,
                                                             protocol::LiveLimits sessionLimits, TcpOptions options,
                                                             protocol::LiveWork &work) {
+    return detail::TcpRuntimeFactory::create(bootstrap.state_.get(), std::move(schema), std::move(composer),
+                                             sessionLimits, options, work);
+}
+
+std::expected<TcpRuntime, TcpDiagnostic>
+detail::TcpRuntimeFactory::create(const BootstrapLease &lease, core::LocalSchema &&schema,
+                                  protocol::SubscriptionWriter &&composer, protocol::LiveLimits sessionLimits,
+                                  TcpOptions options, protocol::LiveWork &work) {
+    return create(lease.state_, std::move(schema), std::move(composer), sessionLimits, options, work);
+}
+
+std::expected<TcpRuntime, TcpDiagnostic>
+detail::TcpRuntimeFactory::create(RuntimeBootstrap::State *bootstrap, core::LocalSchema &&schema,
+                                  protocol::SubscriptionWriter &&composer, protocol::LiveLimits sessionLimits,
+                                  TcpOptions options, protocol::LiveWork &work) {
     auto impl =
         detail::RuntimeCore::create(bootstrap, std::move(schema), std::move(composer), sessionLimits, options, work);
 

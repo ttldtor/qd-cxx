@@ -18,7 +18,10 @@ namespace org::ttldtor::qdcxx::transport {
 
 namespace detail {
 struct BootstrapFactory;
+class BootstrapLease;
 struct RuntimeCore;
+struct TcpRuntimeFactory;
+struct TlsRuntimeFactory;
 } // namespace detail
 
 /** Static transport failures; peer text, hostnames and credentials are never diagnostics. */
@@ -152,8 +155,12 @@ class RuntimeBootstrap {
     struct State;
     std::unique_ptr<State> state_; ///< Stable process-lifetime state borrowed by runtimes.
     friend class TcpRuntime;
+    friend class TlsRuntime;
+    friend class detail::BootstrapLease;
     friend struct detail::RuntimeCore;
     friend struct detail::BootstrapFactory;
+    friend struct detail::TcpRuntimeFactory;
+    friend struct detail::TlsRuntimeFactory;
     /** Adopt successfully initialized SDK state.
      * @param state Complete process-lifetime owner.
      */
@@ -188,6 +195,7 @@ class RuntimeBootstrap {
  */
 class TcpRuntime {
     std::unique_ptr<detail::RuntimeCore> impl_; ///< Stable executor, operation state, retained buffers and session.
+    friend struct detail::TcpRuntimeFactory;
     /** Adopt fully prepared state without allocating.
      * @param impl Complete unactivated run.
      */

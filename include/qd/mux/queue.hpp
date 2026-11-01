@@ -34,7 +34,7 @@ enum class QueueError {
     INVALID_CLIENT,        ///< Foreign, closed or reused registration.
     INVALID_EVENT,         ///< Not a complete admitted compatible source event.
     INVALID_CONTEXT,       ///< Independent local provenance or invalid exact key.
-    INVALID_EPOCH,         ///< Foreign source epoch requires explicit reset or a fresh STREAM owner.
+    INVALID_EPOCH,         ///< Foreign source epoch requires explicit reset before new admission.
     REENTRANT,             ///< Recursive owner mutation/progress from a callback.
     BUSY,                  ///< Pending event or mandatory owner phase prevents new source admission.
     CLOSING,               ///< Ordinary command/data admission has closed.
@@ -346,8 +346,8 @@ struct ResetStatus {
     ResetPhase phase = ResetPhase::NONE;               ///< Current owner phase.
     std::uint64_t requestSequence = 0;                 ///< Latest coalesced request identity.
     std::optional<std::uint64_t> actualSourceSequence; ///< Real collector notice sequence after commit.
-    bool sourceCommitted = false;           ///< The actual source reset returned success; rollback is not implied.
-    bool globalAcknowledged = false;        ///< Actual collector-global ACK completed, independently of client ACK.
+    bool sourceCommitted = false;    ///< The actual source reset returned success; rollback is not implied.
+    bool globalAcknowledged = false; ///< Source barrier completed by TICKER/HISTORY ACK or synchronous STREAM reset.
     std::size_t discardedPendingFrames = 0; ///< Whole old accepted owner frames discarded before source reset.
     std::size_t discardedPendingRecords =
         0; ///< Actual old accepted source records discarded, without per-client classification.
@@ -407,6 +407,17 @@ struct ClientResources {
     std::size_t queuedCommands = 0;        ///< Ordinary accepted commands still awaiting application/cancellation.
     std::size_t resultSlotsInUse = 0;      ///< Pending or externally retained finite completion slots.
     std::size_t controlSlots = 0;          ///< Reserved reset and terminal control slots.
+};
+
+/** Immutable independently enforced capacities; byte subtotals exclude the separate desired-count scopes.
+ * Event/session storage may overlap component scopes. These are finite logical ceilings, not process RSS.
+ */
+struct QueueCapacity {
+    std::size_t queueBytes = 0;     ///< Queue ledger ceiling, including future caller-retained generations.
+    std::size_t muxBytes = 0;       ///< Independent interest-state byte ceiling.
+    std::size_t collectorBytes = 0; ///< Collector byte ceiling, excluding its separate desired/session scopes.
+    std::size_t desiredOwners = 0;  ///< Maximum simultaneous desired owners: one STREAM owner or source view slots.
+    core::SubscriptionLimits desiredPerOwner{}; ///< Immutable count ceilings for each source desired owner.
 };
 
 /** Context known scopes; source events overlap the separately enforced session ledger. */
@@ -644,6 +655,19 @@ class MuxQueue {
                                                                collectors::HistoryLimits source,
                                                                collectors::HistoryOptions options, QueueLimits limits,
                                                                QueueWork &work);
+    /** Validate an unbound source owner before transferring it into a composing runtime.
+     * Existing registrations and desired commands are permitted; prior source admission/reset is not.
+     * No callback, allocation, ownership transfer or state mutation occurs. Owner access is serialized.
+     * @param schema Required exact immutable provenance, including an empty catalog.
+     * @param family Required fixed source family.
+     * @param policy Required immutable selector policy.
+     * @param work Fixed inspection credits; a failed call may consume attempted work.
+     * @return Success or typed state/context/profile/work refusal, leaving the queue usable.
+     */
+    [[nodiscard]] std::expected<void, QueueFailure> validateBinding(const core::LocalSchema &schema,
+                                                                    core::SubscriptionFamily family,
+                                                                    core::SubscriptionSelectorPolicy policy,
+                                                                    QueueWork &work) const;
     /** Reserve a registration before exposing its port.
      * @param limits Complete individual reservations.
      * @param consumer Caller-created callback, preserved on failure.
@@ -667,7 +691,9 @@ class MuxQueue {
      * @param mode Graceful or escalating abort; allowed from its callback.
      */
     void requestStop(StopMode mode) noexcept;
-    /** Accept/coalesce a phased TICKER/HISTORY reset; STREAM requires a fresh owner.
+    /** Accept/coalesce a phased source reset while retaining registration and desired identities.
+     * STREAM explicitly unpins its old source in place; TICKER/HISTORY retain actual reset/ACK behavior.
+     * Acceptance cuts off later old-source admission and callback dispatch before returning.
      * @param work Bounded request-publication credits.
      * @return Accepted request, never synchronous reset/ACK completion.
      */
@@ -689,6 +715,11 @@ class MuxQueue {
      * across independently sampled counters; quiescent values are exact.
      */
     [[nodiscard]] QueueResources resources() const noexcept;
+    /** Inspect future enforced capacities without allocating or changing the owner.
+     * Desired entry/UTF16 peaks remain separate count axes; do not label the byte subtotal a whole-run byte bound.
+     * @return Immutable configured component ceilings, or zeroed capacities after move.
+     */
+    [[nodiscard]] QueueCapacity capacity() const noexcept;
     /** Inspect one retained current registration.
      * @param client Exact port from this owner.
      * @return Actual/reserved counts or typed invalid-client.

@@ -4,6 +4,7 @@
 
 #include "qd/transport/tcp_runtime.hpp"
 
+#include "bootstrap_lease.hpp"
 #include "dns_resolver.hpp"
 #include "fixed_arena.hpp"
 #include "runtime_bootstrap.hpp"
@@ -98,25 +99,8 @@ class ByteEngine {
  * Fields and operations retain the caller-driven TCP contract. This owner is never moved after allocation.
  */
 struct RuntimeCore {
-    /** Release the process borrow only after context/services/socket members have been destroyed. */
-    struct BootstrapBorrow {
-        std::atomic_size_t &count; ///< Stable application-owned borrower counter.
-
-        /** Retain the borrowed process lifetime before fallible host construction.
-         * @param value Application-owned counter.
-         */
-        explicit BootstrapBorrow(std::atomic_size_t &value) noexcept : count(value) {
-            count.fetch_add(1, std::memory_order_relaxed);
-        }
-
-        /** Release after every subsequent run member has been destroyed. */
-        ~BootstrapBorrow() {
-            count.fetch_sub(1, std::memory_order_relaxed);
-        }
-    };
-
     RuntimeBootstrap::State *bootstrap;                 ///< Borrowed explicit application owner.
-    BootstrapBorrow bootstrapBorrow;                    ///< Declared before SDK state so its release is last.
+    BootstrapLease bootstrapBorrow;                     ///< Independent borrow, released after all SDK state.
     std::thread::id owner = std::this_thread::get_id(); ///< Immutable serialized execution affinity.
     TcpOptions options; ///< Views are rebound to owned fixed arrays immediately after construction.
     std::array<char, MAX_HOST_BYTES + 2> host{}; ///< NUL-terminated endpoint/root-name storage.
@@ -168,9 +152,10 @@ struct RuntimeCore {
 
     /** Own all fallible runtime storage before transferring pure-session configuration.
      * @param process Borrowed process owner.
+     * @param borrow Independent counted borrow, retained before fallible native members.
      * @param config Validated explicit settings.
      */
-    RuntimeCore(RuntimeBootstrap::State &process, TcpOptions config);
+    RuntimeCore(RuntimeBootstrap::State &process, BootstrapLease &&borrow, TcpOptions config);
 
     /** Release the bootstrap borrow after every owned descriptor/handler is retired. */
     ~RuntimeCore();
@@ -282,7 +267,7 @@ struct RuntimeCore {
      * @return One stable unactivated core or the unchanged detached typed rejection.
      */
     [[nodiscard]] static std::expected<std::unique_ptr<RuntimeCore>, TcpDiagnostic>
-    create(RuntimeBootstrap &bootstrap, core::LocalSchema &&schema, protocol::SubscriptionWriter &&composer,
+    create(RuntimeBootstrap::State *bootstrap, core::LocalSchema &&schema, protocol::SubscriptionWriter &&composer,
            protocol::LiveLimits sessionLimits, TcpOptions options, protocol::LiveWork &work,
            std::unique_ptr<ByteEngine> engine = {});
     /** Inspect conservative DNS-only preparation credits without SDK/bootstrap access.

@@ -96,6 +96,7 @@ struct StreamCollector::Impl {
     std::size_t itemHead = 0;          ///< First queued record slot.
     std::size_t itemCount = 0;         ///< Queued selected records, including pending withdrawals.
     bool pinned = false;               ///< First selected admission established the epoch.
+    std::uint64_t resetSequence = 0;   ///< Explicit committed source resets, never reused.
     OfferKind offer = OfferKind::NONE; ///< Most recent successful single/batch offer.
     std::size_t batchPrefix = 0;       ///< Queued items covered by the prepared batch, including retired items.
     std::size_t batchSelected = 0;     ///< Eligible records in the prepared batch.
@@ -177,6 +178,35 @@ struct StreamCollector::Impl {
             --frameCount;
             frameHead = frameHead + 1 == limits.frames ? 0 : frameHead + 1;
         }
+    }
+
+    /** Reserve all discard traversal and event disposal before changing the queue.
+     * @param work Caller credits; failures leave every owner and offer unchanged.
+     */
+    void preflightDiscard(StreamWork &work) const {
+        debit(itemCount, work.visits);
+        debit(frameCount, work.visits);
+
+        for (std::size_t i = 0, slot = frameHead; i < frameCount; ++i) {
+            debit(frames[slot].event->releaseBytes(), work.bytes);
+            slot = slot + 1 == limits.frames ? 0 : slot + 1;
+        }
+    }
+
+    /** Commit a fully prepaid discard without allocating or invoking user code.
+     * @return Actual selected records removed; the epoch pin remains unchanged.
+     */
+    std::size_t discardItems() noexcept {
+        const auto count = itemCount;
+
+        while (itemCount != 0) {
+            removeFront();
+        }
+
+        invalidate();
+        accumulate(counts.discarded, count, counts.saturated);
+
+        return count;
     }
 };
 
@@ -612,24 +642,31 @@ std::expected<std::size_t, StreamError> StreamCollector::discard(StreamWork &wor
             throw Error::INVALID_STATE;
         }
 
-        debit(impl_->itemCount, work.visits);
-        debit(impl_->frameCount, work.visits);
+        impl_->preflightDiscard(work);
 
-        for (std::size_t i = 0, slot = impl_->frameHead; i < impl_->frameCount; ++i) {
-            debit(impl_->frames[slot].event->releaseBytes(), work.bytes);
-            slot = slot + 1 == impl_->limits.frames ? 0 : slot + 1;
+        return impl_->discardItems();
+    } catch (Error error) {
+        return std::unexpected(error);
+    }
+}
+
+std::expected<StreamReset, StreamError> StreamCollector::resetSource(StreamWork &work) {
+    try {
+        debit(1, work.operations);
+
+        if (!impl_ || impl_->diagnostic.error || impl_->resetSequence == std::numeric_limits<std::uint64_t>::max()) {
+            throw Error::INVALID_STATE;
         }
 
-        const auto count = impl_->itemCount;
+        debit(impl_->epoch.releaseBytes(), work.bytes);
+        impl_->preflightDiscard(work);
 
-        while (impl_->itemCount != 0) {
-            impl_->removeFront();
-        }
+        const auto discarded = impl_->discardItems();
+        impl_->epoch = {};
+        impl_->pinned = false;
+        ++impl_->resetSequence;
 
-        impl_->invalidate();
-        accumulate(impl_->counts.discarded, count, impl_->counts.saturated);
-
-        return count;
+        return StreamReset{impl_->resetSequence, discarded, impl_->counts.saturated, true};
     } catch (Error error) {
         return std::unexpected(error);
     }

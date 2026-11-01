@@ -1485,3 +1485,39 @@ TEST_CASE("cached capacity metrics follow actual schema copies assignments and n
     static_assert(std::is_nothrow_move_assignable_v<c::LocalSchema>);
     static_assert(std::is_nothrow_move_constructible_v<p::SubscriptionWriter>);
 }
+
+TEST_CASE("fixed schema identity retains exact empty provenance without declaration copies") {
+    c::SchemaIdentity retained;
+    c::SchemaIdentity copied;
+    const c::SchemaIdentity invalid;
+    CHECK_FALSE(invalid.valid());
+    CHECK_FALSE(invalid.matches(invalid));
+
+    {
+        auto empty = c::LocalSchema::create({}, limits().context.schema);
+        auto other = c::LocalSchema::create({}, limits().context.schema);
+        REQUIRE(empty);
+        REQUIRE(other);
+        CHECK_FALSE(empty->recordContext(0).valid());
+
+        {
+            AllocationFault noAllocation(0);
+            retained = empty->identity();
+            copied = retained;
+        }
+
+        CHECK(retained.valid());
+        CHECK(retained.matches(copied));
+        CHECK_FALSE(retained.matches(other->identity()));
+        CHECK_FALSE(retained.matches(invalid));
+        auto moved = std::move(*empty);
+        CHECK_FALSE(empty->identity().valid());
+        CHECK(retained.matches(moved.identity()));
+    }
+
+    CHECK(retained.valid());
+    CHECK(retained.matches(copied));
+    auto moved = std::move(copied);
+    CHECK_FALSE(copied.valid());
+    CHECK(moved.matches(retained));
+}

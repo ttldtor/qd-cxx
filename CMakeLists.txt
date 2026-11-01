@@ -111,6 +111,11 @@ if(ORG_TTLDTOR_QDCXX_BUILD_TLS)
     include(cmake/Tls.cmake)
 endif()
 
+option(ORG_TTLDTOR_QDCXX_BUILD_RECOVERY "Build the explicit bounded caller-driven connection recovery wrappers" OFF)
+if(ORG_TTLDTOR_QDCXX_BUILD_RECOVERY)
+    include(cmake/Recovery.cmake)
+endif()
+
 include(CMakePackageConfigHelpers)
 install(TARGETS qdcxx_encoding qdcxx_core qdcxx_protocol qdcxx_collectors qdcxx_mux
     qdcxx_event_mapping qdcxx_quote qdcxx_profile EXPORT qdcxxTargets
@@ -259,6 +264,66 @@ if(BUILD_TESTING)
         DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     )
     FetchContent_MakeAvailable(doctest)
+    add_executable(qdcxx_recovery_state_tests
+        src/transport/recovery_state.cpp tests/conformance/recovery_state_tests.cpp)
+    target_include_directories(qdcxx_recovery_state_tests PRIVATE src/transport)
+    target_link_libraries(qdcxx_recovery_state_tests PRIVATE doctest::doctest)
+    target_compile_features(qdcxx_recovery_state_tests PRIVATE cxx_std_23)
+    set_target_properties(qdcxx_recovery_state_tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME transport_recovery_state COMMAND qdcxx_recovery_state_tests)
+    if(ORG_TTLDTOR_QDCXX_BUILD_RECOVERY)
+        add_executable(qdcxx_recovery_configuration_tests tests/conformance/recovery_configuration_tests.cpp)
+        target_include_directories(qdcxx_recovery_configuration_tests PRIVATE src/transport)
+        target_link_libraries(qdcxx_recovery_configuration_tests PRIVATE qdcxx_recovery doctest::doctest)
+        add_test(NAME transport_recovery_configuration COMMAND qdcxx_recovery_configuration_tests)
+        # Compile the pure preparation gate separately to exercise its unqualified fallback.
+        add_executable(qdcxx_recovery_profile_tests tests/conformance/recovery_profile_tests.cpp
+            src/transport/recovery_state.cpp src/transport/recovery_copy_profile.cpp
+            src/transport/recovery_configuration.cpp)
+        target_include_directories(qdcxx_recovery_profile_tests PRIVATE src/transport)
+        target_compile_definitions(qdcxx_recovery_profile_tests PRIVATE ORG_TTLDTOR_QDCXX_RECOVERY_COPY_PROFILE=0)
+        target_link_libraries(qdcxx_recovery_profile_tests PRIVATE qdcxx_client qdcxx_mux_queue doctest::doctest)
+        add_test(NAME transport_recovery_profile COMMAND qdcxx_recovery_profile_tests)
+        add_executable(qdcxx_recovery_peer_tests tests/conformance/recovery_test_peer.cpp
+            tests/conformance/recovery_test_peer_tests.cpp)
+        target_link_libraries(qdcxx_recovery_peer_tests PRIVATE Threads::Threads doctest::doctest)
+        target_compile_features(qdcxx_recovery_peer_tests PRIVATE cxx_std_23)
+        add_test(NAME transport_recovery_peer COMMAND qdcxx_recovery_peer_tests)
+        add_executable(qdcxx_tcp_recovery_tests tests/conformance/recovery_runtime_tests.cpp
+            tests/conformance/recovery_test_peer.cpp)
+        target_link_libraries(qdcxx_tcp_recovery_tests PRIVATE qdcxx_recovery doctest::doctest)
+        add_test(NAME transport_tcp_recovery COMMAND qdcxx_tcp_recovery_tests)
+        add_executable(qdcxx_recovery_replay_tests tests/conformance/recovery_replay_tests.cpp
+            tests/conformance/recovery_test_peer.cpp)
+        target_link_libraries(qdcxx_recovery_replay_tests PRIVATE qdcxx_recovery doctest::doctest)
+        add_test(NAME transport_recovery_replay COMMAND qdcxx_recovery_replay_tests)
+        add_executable(qdcxx_recovery_lifecycle_tests tests/conformance/recovery_lifecycle_tests.cpp
+            tests/conformance/recovery_test_peer.cpp)
+        target_link_libraries(qdcxx_recovery_lifecycle_tests PRIVATE qdcxx_recovery doctest::doctest)
+        add_test(NAME transport_recovery_lifecycle COMMAND qdcxx_recovery_lifecycle_tests)
+        add_executable(qdcxx_recovery_factory_tests tests/conformance/recovery_factory_tests.cpp)
+        target_link_libraries(qdcxx_recovery_factory_tests PRIVATE qdcxx_recovery doctest::doctest)
+        add_test(NAME transport_recovery_factory COMMAND qdcxx_recovery_factory_tests)
+        add_executable(qdcxx_recovery_family_tests tests/conformance/recovery_family_tests.cpp
+            tests/conformance/recovery_test_peer.cpp)
+        target_link_libraries(qdcxx_recovery_family_tests PRIVATE qdcxx_recovery qdcxx_quote doctest::doctest)
+        add_test(NAME transport_recovery_families COMMAND qdcxx_recovery_family_tests)
+        add_executable(qdcxx_recovery_soak_tests tests/conformance/recovery_soak_tests.cpp
+            tests/conformance/recovery_test_peer.cpp)
+        target_link_libraries(qdcxx_recovery_soak_tests PRIVATE qdcxx_recovery doctest::doctest)
+        add_test(NAME transport_recovery_soak COMMAND qdcxx_recovery_soak_tests)
+        set_target_properties(qdcxx_recovery_configuration_tests qdcxx_recovery_profile_tests
+            qdcxx_recovery_peer_tests qdcxx_tcp_recovery_tests qdcxx_recovery_replay_tests qdcxx_recovery_lifecycle_tests
+            qdcxx_recovery_factory_tests qdcxx_recovery_family_tests qdcxx_recovery_soak_tests
+            PROPERTIES CXX_EXTENSIONS OFF)
+        set_tests_properties(transport_recovery_configuration transport_recovery_profile transport_recovery_peer
+            transport_tcp_recovery transport_recovery_replay transport_recovery_lifecycle
+            transport_recovery_factory transport_recovery_families transport_recovery_soak
+            PROPERTIES TIMEOUT 90)
+        if(WIN32)
+            target_link_libraries(qdcxx_recovery_peer_tests PRIVATE ws2_32)
+        endif()
+    endif()
     if(ORG_TTLDTOR_QDCXX_BUILD_CONNECT)
         add_executable(qdcxx_connect_tests tests/conformance/connect_tests.cpp tests/conformance/connect_peer.cpp)
         target_link_libraries(qdcxx_connect_tests PRIVATE qdcxx_connect_tool doctest::doctest)
@@ -286,6 +351,13 @@ if(BUILD_TESTING)
         set_tests_properties(connect_process PROPERTIES TIMEOUT 45)
     endif()
     if(ORG_TTLDTOR_QDCXX_BUILD_RUNTIME)
+        add_executable(qdcxx_bootstrap_lease_tests tests/conformance/bootstrap_lease_tests.cpp
+            tests/conformance/recovery_test_peer.cpp)
+        target_link_libraries(qdcxx_bootstrap_lease_tests PRIVATE qdcxx_transport qdcxx_quote doctest::doctest)
+        target_include_directories(qdcxx_bootstrap_lease_tests PRIVATE src/transport)
+        set_target_properties(qdcxx_bootstrap_lease_tests PROPERTIES CXX_EXTENSIONS OFF)
+        add_test(NAME transport_bootstrap_lease COMMAND qdcxx_bootstrap_lease_tests)
+        set_tests_properties(transport_bootstrap_lease PROPERTIES TIMEOUT 90)
         add_executable(qdcxx_tcp_tests tests/conformance/transport/tcp_tests.cpp)
         target_link_libraries(qdcxx_tcp_tests PRIVATE qdcxx_transport qdcxx_quote doctest::doctest c-ares::cares)
         target_include_directories(qdcxx_tcp_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/transport")
@@ -336,6 +408,26 @@ if(BUILD_TESTING)
             "ORG_TTLDTOR_QDCXX_TLS_TEST_FIXTURES=\"${ORG_TTLDTOR_QDCXX_TLS_TEST_FIXTURES}\""
             "ORG_TTLDTOR_QDCXX_TLS_TEST_CONTROL=\"${CMAKE_CURRENT_BINARY_DIR}/tls-test-control\"")
         add_dependencies(qdcxx_tls_tests qdcxx_tls_test_peer)
+        target_sources(qdcxx_bootstrap_lease_tests PRIVATE tests/conformance/transport/tls_test_peer.cpp)
+        target_link_libraries(qdcxx_bootstrap_lease_tests PRIVATE qdcxx_tls)
+        target_compile_definitions(qdcxx_bootstrap_lease_tests PRIVATE ORG_TTLDTOR_QDCXX_BOOTSTRAP_TEST_TLS=1
+            "ORG_TTLDTOR_QDCXX_TLS_TEST_PEER=\"$<TARGET_FILE:qdcxx_tls_test_peer>\""
+            "ORG_TTLDTOR_QDCXX_TLS_TEST_FIXTURES=\"${ORG_TTLDTOR_QDCXX_TLS_TEST_FIXTURES}\""
+            "ORG_TTLDTOR_QDCXX_TLS_TEST_CONTROL=\"${CMAKE_CURRENT_BINARY_DIR}/bootstrap-tls-test-control\"")
+        add_dependencies(qdcxx_bootstrap_lease_tests qdcxx_tls_test_peer)
+        if(ORG_TTLDTOR_QDCXX_BUILD_RECOVERY)
+            add_executable(qdcxx_tls_recovery_tests tests/conformance/recovery_tls_tests.cpp
+                tests/conformance/transport/tls_test_peer.cpp)
+            target_link_libraries(qdcxx_tls_recovery_tests PRIVATE qdcxx_tls_recovery qdcxx_quote doctest::doctest)
+            target_compile_definitions(qdcxx_tls_recovery_tests PRIVATE
+                "ORG_TTLDTOR_QDCXX_TLS_TEST_PEER=\"$<TARGET_FILE:qdcxx_tls_test_peer>\""
+                "ORG_TTLDTOR_QDCXX_TLS_TEST_FIXTURES=\"${ORG_TTLDTOR_QDCXX_TLS_TEST_FIXTURES}\""
+                "ORG_TTLDTOR_QDCXX_TLS_TEST_CONTROL=\"${CMAKE_CURRENT_BINARY_DIR}/recovery-tls-test-control\"")
+            set_target_properties(qdcxx_tls_recovery_tests PROPERTIES CXX_EXTENSIONS OFF)
+            add_dependencies(qdcxx_tls_recovery_tests qdcxx_tls_test_peer)
+            add_test(NAME transport_tls_recovery COMMAND qdcxx_tls_recovery_tests)
+            set_tests_properties(transport_tls_recovery PROPERTIES TIMEOUT 120)
+        endif()
         add_test(NAME transport_tls COMMAND qdcxx_tls_tests)
         set_tests_properties(transport_tls PROPERTIES TIMEOUT 120)
         add_test(NAME transport_tls_peer_cli COMMAND "${CMAKE_COMMAND}"

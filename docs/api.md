@@ -16,7 +16,8 @@ and ownership. Use the namespace/type indexes beside this page to find individua
 | JSON schemas | `qd/schema/json_schema.hpp` | `qdcxx_schema_json` | [Native JSON](../spec/schema/NATIVE-JSON.md); installed with `ORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON=ON` (default ON) |
 | Offline replay | `qd/replay/tape_replay.hpp` | `qdcxx_replay` — build tree only | [Replay contract](../spec/protocol/OFFLINE-REPLAY.md); `ORG_TTLDTOR_QDCXX_BUILD_REPLAY=ON` (default OFF), not installed/exported |
 | Optional client | `qd/client/` | `qdcxx_client` | [Local STREAM dispatch](../spec/subscriptions/CLIENT-DISPATCH.md) |
-| Optional transport | `qd/transport/` | `qdcxx_transport`, `qdcxx_tls` | [TCP](../spec/transport/TCP-RUNTIME.md), [TLS](../spec/transport/TLS-RUNTIME.md) |
+| Optional transport | `qd/transport/tcp_runtime.hpp`, `qd/transport/tls_runtime.hpp`, `qd/transport/tls_resources.hpp` | `qdcxx_transport`, `qdcxx_tls` | [TCP](../spec/transport/TCP-RUNTIME.md), [TLS](../spec/transport/TLS-RUNTIME.md) |
+| Connection recovery | `qd/transport/recovery.hpp`, `qd/transport/tcp_recovery.hpp`, `qd/transport/tls_recovery.hpp` | `qdcxx_recovery`, `qdcxx_tls_recovery` | [Recovery contract and prerequisites](../spec/transport/RECOVERY.md); `ORG_TTLDTOR_QDCXX_BUILD_RECOVERY=ON` (default OFF) |
 
 Optional targets require their corresponding [build options](CPP-BUILD.md). Contracts distinguish
 borrowed views, owning values, finite work credits and local acceptance from peer delivery. A generated

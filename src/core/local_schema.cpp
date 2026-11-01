@@ -149,6 +149,18 @@ bool RecordContext::matches(const RecordContext &other) const noexcept {
     return valid() && other.valid() && identity_ == other.identity_ && localId_ == other.localId_;
 }
 
+SchemaIdentity::SchemaIdentity(std::shared_ptr<const RecordContext::Identity> identity) noexcept
+    : identity_(std::move(identity)) {
+}
+
+bool SchemaIdentity::valid() const noexcept {
+    return identity_ != nullptr;
+}
+
+bool SchemaIdentity::matches(const SchemaIdentity &other) const noexcept {
+    return identity_ && identity_ == other.identity_;
+}
+
 LocalSchema::LocalSchema(std::span<const LocalRecord> records, LocalProfile profile)
     : records_(records.begin(), records.end()), profile_(profile) {
     std::size_t bytes = 0;
@@ -222,6 +234,10 @@ std::size_t LocalSchema::storageBytes() const noexcept {
 
 bool LocalSchema::sharesIdentityWith(const LocalSchema &other) const noexcept {
     return identity_ && identity_ == other.identity_;
+}
+
+SchemaIdentity LocalSchema::identity() const noexcept {
+    return SchemaIdentity(identity_);
 }
 
 RecordContext LocalSchema::recordContext(std::int32_t localId) const noexcept {

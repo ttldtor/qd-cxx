@@ -172,10 +172,11 @@ bool retryLater(int error) noexcept {
 
 /** Own all fallible runtime storage before transferring pure-session configuration.
  * @param process Borrowed process owner.
+ * @param borrow Independent counted borrow, retained before fallible native members.
  * @param config Validated explicit settings.
  */
-RuntimeCore::RuntimeCore(RuntimeBootstrap::State &process, TcpOptions config)
-    : bootstrap(&process), bootstrapBorrow(process.borrowers), options(config),
+RuntimeCore::RuntimeCore(RuntimeBootstrap::State &process, BootstrapLease &&borrow, TcpOptions config)
+    : bootstrap(&process), bootstrapBorrow(std::move(borrow)), options(config),
       contextArena(config.limits.contextBytes), handlerArena(config.limits.handlerBytes),
       context(std::allocator_arg, detail::ArenaAllocator<void>(contextArena), 1), socket(context),
       input(std::make_unique<std::byte[]>(config.limits.inputBytes)) {
@@ -801,9 +802,9 @@ RuntimeCore::adoptOutput(std::expected<protocol::LivePendingOutput, protocol::Li
 }
 
 std::expected<std::unique_ptr<RuntimeCore>, TcpDiagnostic>
-RuntimeCore::create(RuntimeBootstrap &bootstrap, core::LocalSchema &&schema, protocol::SubscriptionWriter &&composer,
-                    protocol::LiveLimits sessionLimits, TcpOptions options, protocol::LiveWork &work,
-                    std::unique_ptr<ByteEngine> codec) {
+RuntimeCore::create(RuntimeBootstrap::State *bootstrap, core::LocalSchema &&schema,
+                    protocol::SubscriptionWriter &&composer, protocol::LiveLimits sessionLimits, TcpOptions options,
+                    protocol::LiveWork &work, std::unique_ptr<ByteEngine> codec) {
     if (work.operations == 0) {
         return std::unexpected(diagnostic(TcpError::WORK_LIMIT, "runtime-create-attempt"));
     }
@@ -811,7 +812,7 @@ RuntimeCore::create(RuntimeBootstrap &bootstrap, core::LocalSchema &&schema, pro
     --work.operations;
     const auto &limits = options.limits;
 
-    if (!bootstrap.state_ || !bootstrap.state_->dnsInitialized ||
+    if (!bootstrap || !bootstrap->dnsInitialized ||
         sessionLimits.credentials != (codec ? protocol::LiveCredentialPolicy::VERIFIED_TLS_BASIC
                                             : protocol::LiveCredentialPolicy::CREDENTIAL_FREE_PLAIN) ||
         !validEndpointSettings(options) || !validSocketLimits(limits) || !validTimingSettings(options)) {
@@ -875,8 +876,14 @@ RuntimeCore::create(RuntimeBootstrap &bootstrap, core::LocalSchema &&schema, pro
     work.bytes -= preparationBytes;
     work.visits -= PREPARATION_VISITS + dnsPreparation.visits;
 
+    auto borrow = BootstrapLease::acquire(bootstrap);
+
+    if (!borrow) {
+        return std::unexpected(borrow.error());
+    }
+
     try {
-        auto impl = std::make_unique<RuntimeCore>(*bootstrap.state_, options);
+        auto impl = std::make_unique<RuntimeCore>(*bootstrap, std::move(*borrow), options);
         impl->engine = std::move(codec);
         impl->adapterBytes = backing;
         impl->namedEndpoint = namedEndpoint;
@@ -954,6 +961,8 @@ RuntimeCore::dnsPreparationWorkRequirement(std::size_t serverCount) noexcept {
  * @return One bounded action/event/yield observation; no application callback is invoked.
  */
 TcpPollResult RuntimeCore::pollEngine(TcpWork &work, protocol::LiveWork &sessionWork) {
+    const bool decodePaused = sessionWork.operations == 0 && !engine->plaintext().empty();
+
     if (writeReady) {
 #ifndef _WIN32
         const auto bytes = (std::min)(options.limits.writeBytes, wireBytes().size());
@@ -969,7 +978,7 @@ TcpPollResult RuntimeCore::pollEngine(TcpWork &work, protocol::LiveWork &session
         return {TcpPollStatus::PROGRESS, std::nullopt};
     }
 
-    if (readReady) {
+    if (readReady && !decodePaused) {
 #ifndef _WIN32
 
         if (work.socketBytes < options.limits.inputBytes) {
@@ -990,25 +999,27 @@ TcpPollResult RuntimeCore::pollEngine(TcpWork &work, protocol::LiveWork &session
             return {TcpPollStatus::PROGRESS, std::nullopt};
         }
 
-        auto result = session->feed(engine->plaintext(), sessionWork);
-        engine->consumePlaintext(result.accepted);
-        frameBytes += result.accepted;
-        observePeak();
+        if (sessionWork.operations != 0) {
+            auto result = session->feed(engine->plaintext(), sessionWork);
+            engine->consumePlaintext(result.accepted);
+            frameBytes += result.accepted;
+            observePeak();
 
-        if (result.status == protocol::LiveStatus::FAILED) {
-            fail({TcpError::PROTOCOL_FAILURE, "session-input", 0, session->diagnostic().error});
+            if (result.status == protocol::LiveStatus::FAILED) {
+                fail({TcpError::PROTOCOL_FAILURE, "session-input", 0, session->diagnostic().error});
+            }
+
+            if (result.event) {
+                frameBytes = 0;
+
+                return {TcpPollStatus::EVENT, std::move(result.event)};
+            }
+
+            return {result.accepted == 0 ? TcpPollStatus::YIELD : TcpPollStatus::PROGRESS, std::nullopt};
         }
-
-        if (result.event) {
-            frameBytes = 0;
-
-            return {TcpPollStatus::EVENT, std::move(result.event)};
-        }
-
-        return {result.accepted == 0 ? TcpPollStatus::YIELD : TcpPollStatus::PROGRESS, std::nullopt};
     }
 
-    if (engine->finished()) {
+    if (!decodePaused && engine->finished()) {
         if (session->finish() == protocol::LiveStatus::CLOSED) {
             outcome.peerEnded = true;
             closeRequested = true;
@@ -1032,6 +1043,11 @@ TcpPollResult RuntimeCore::pollEngine(TcpWork &work, protocol::LiveWork &session
         beginWrite();
 
         return {TcpPollStatus::PROGRESS, std::nullopt};
+    }
+
+    if (decodePaused) {
+        // Keep plaintext and any completed read intact; pending ciphertext still drains above.
+        return {TcpPollStatus::YIELD, std::nullopt};
     }
 
     if (engine->needsStep(inputBegin != inputEnd, output.has_value())) {
@@ -1227,7 +1243,7 @@ std::expected<TcpPollResult, TcpDiagnostic> RuntimeCore::poll(TcpWork &work, pro
             work.socketBytes -= state.options.limits.inputBytes;
 #endif
             state.readStep();
-        } else if (state.inputBegin != state.inputEnd) {
+        } else if (state.inputBegin != state.inputEnd && sessionWork.operations != 0) {
             auto result = state.session->feed({state.input.get() + state.inputBegin, state.inputEnd - state.inputBegin},
                                               sessionWork);
             state.inputBegin += result.accepted;
@@ -1248,7 +1264,7 @@ std::expected<TcpPollResult, TcpDiagnostic> RuntimeCore::poll(TcpWork &work, pro
 
                 return TcpPollResult{TcpPollStatus::EVENT, std::move(result.event)};
             }
-        } else if (state.readErrorPending) {
+        } else if (state.readErrorPending && state.inputBegin == state.inputEnd) {
             state.readErrorPending = false;
 
             if (state.readError == asio::error::eof) {
@@ -1267,7 +1283,7 @@ std::expected<TcpPollResult, TcpDiagnostic> RuntimeCore::poll(TcpWork &work, pro
             work.socketBytes -= bytes;
 #endif
             state.beginWrite();
-        } else if (!state.readPending) {
+        } else if (state.inputBegin == state.inputEnd && !state.readPending) {
 #ifdef _WIN32
 
             if (work.socketBytes < state.options.limits.inputBytes) {
@@ -1278,6 +1294,10 @@ std::expected<TcpPollResult, TcpDiagnostic> RuntimeCore::poll(TcpWork &work, pro
 #endif
             state.beginRead();
         } else {
+            if (state.inputBegin != state.inputEnd) {
+                return TcpPollResult{TcpPollStatus::YIELD, std::nullopt};
+            }
+
             return TcpPollResult{state.pending != 0 && work.handlers == 0 ? TcpPollStatus::YIELD : TcpPollStatus::IDLE,
                                  std::nullopt};
         }

@@ -2,6 +2,9 @@
 
 [Русская версия](TLS-RUNTIME.ru.md). English is authoritative.
 
+The opt-in `TlsRecovery` owner adds finite reconnect and fresh authenticated
+subscription replay; see the [connection recovery contract](RECOVERY.md).
+
 [`TlsRuntime`](../../include/qd/transport/tls_runtime.hpp) implements verified TLS/authentication
 handoff over the common caller-driven TCP owner. Focused native tests exercise the backend, credential
 gate and lifetime boundaries. See [qualification and remaining gates](../../tests/conformance/transport/TLS-VALIDATION.md).

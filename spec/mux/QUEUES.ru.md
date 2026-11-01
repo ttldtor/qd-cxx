@@ -114,6 +114,23 @@ live backing отделены от reservations. Сохранённые leases/r
 Конкурентный detached release может дать соседние моменты в отдельно снятых counters; quiescent
 значения точны для своих областей.
 
+`capacity()` возвращает исходные действующие потолки байтов queue, MUX и collector,
+а также максимальное число source desired owners и их отдельные `SubscriptionLimits`.
+Эти неизменные потолки учитывают будущий рост, а не текущее использование. Число
+desired entries, пиковые единицы UTF-16 и число schema records остаются отдельными
+логическими координатами. Верхний владелец проверяет переполнение произведений при
+агрегации; ограничения отдельного ключа и команды остаются самостоятельными.
+Байтовые области компонентов могут перекрываться с session events и не включают
+независимо ограниченное desired storage. Сумма байтов не является полной границей
+для всего запуска или RSS процесса. После move возвращаются нулевые ёмкости.
+
+`validateBinding(schema, family, policy, work)` перед переносом источника проверяет
+точное неизменное происхождение схемы, включая пустые схемы, family и selector policy.
+Очередь должна быть открыта, без stop/reset, прежнего source identity, pending input
+и продвижения source epoch. Существующие регистрации и desired commands разрешены.
+Проверка имеет фиксированный оплачиваемый объём, не выделяет память, не вызывает
+callbacks и не меняет очередь; отказ может потратить work, сохраняя очередь.
+
 `QueueSubmitWork` учитывает operations, visits, text units и bytes. `QueueWork` отдельно учитывает
 operations, metadata visits, fields, text units, bytes, command actions и callbacks, а также настоящие
 `MuxWork`, `SubscriptionWork` и family collector work. Initialization, rollback, disposal и record
@@ -138,7 +155,7 @@ request. Query work включает точное key matching и queue visits. 
 
 ## Поэтапный reset и локальная остановка
 
-TICKER/HISTORY `resetSource` принимает/coalesce owner operation; STREAM требует нового owner.
+Каждое семейство поддерживает `resetSource` как принимаемую/coalesce owner operation.
 Операция замораживает intake/callbacks, проверяет бюджет old pending disposal, исключает старого
 pending owner, освобождает detached queues конечными quanta, вызывает настоящий source reset,
 публикует reserved client notices и выполняет настоящий global ACK. `ResetStatus` показывает фазу,
@@ -146,6 +163,16 @@ pending owner, освобождает detached queues конечными quanta,
 до необратимого commit. TICKER global ACK может исчерпать work после source commit: сохраняются
 sequence и `GLOBAL_ACK_PENDING`, ACK повторяется с настоящими новыми credits; reset не повторяется
 и принятый reset не объявляется отклонённым. У настоящего HISTORY ACK нет work argument.
+
+STREAM вызывает настоящий reset коллектора с его фактической последовательностью
+и числом исключённых записей, сохраняя регистрации и desired state. Барьер источника
+завершается синхронно с reset, поэтому collector-global ACK не выдумывается. Notices
+клиентов содержат `globalAckPending = false`; точный ACK каждого client notice всё ещё
+ограничивает новые callbacks. Эпоха очереди увеличивается один раз при source commit,
+в том числе если публикации notices позже нужен новый work turn. Сохранённые вызывающей
+стороной detached batches остаются действительными и учитываются в прежнем ledger;
+они не становятся callbacks новой эпохи. Владелец источника должен завершить приём
+старого протокола до допуска замены. Сам reset не означает reconnect или непрерывную доставку.
 
 Global ACK и exact notice ACK каждого клиента разделены. `acknowledgeReset(sequence)` записывает
 точный request для повторной owner-проверки; stale sequence не подтверждает новый interval. STOP,

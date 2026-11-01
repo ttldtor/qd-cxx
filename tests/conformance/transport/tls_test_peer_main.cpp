@@ -26,10 +26,11 @@ namespace {
 namespace t = org::ttldtor::qdcxx::test;
 using Tcp = asio::ip::tcp;      ///< Ordinary IPv4 loopback transport.
 using Error = asio::error_code; ///< Asio errors are reduced to numeric flags, never printed.
-constexpr std::uint64_t CONTROL_MAGIC = 0x5144435854503034ULL;       ///< Internal binary control version 4.
+constexpr std::uint64_t CONTROL_MAGIC = 0x5144435854503035ULL;       ///< Internal binary control version 5.
+constexpr std::uint64_t CONTROL_MAGIC_V4 = 0x5144435854503034ULL;    ///< Accepted original ticket-control input.
 constexpr std::uint64_t CONTROL_MAGIC_V3 = 0x5144435854503033ULL;    ///< Accepted policy-control compatibility input.
 constexpr std::uint64_t CONTROL_MAGIC_V2 = 0x5144435854503032ULL;    ///< Accepted ordinary-script compatibility input.
-constexpr std::uint64_t REPORT_MAGIC = 0x5144435852503032ULL;        ///< Internal numeric report version 2.
+constexpr std::uint64_t REPORT_MAGIC = 0x5144435852503033ULL;        ///< Internal numeric report version 3.
 constexpr std::size_t MAX_SCRIPT_BYTES = 4U * 1024U * 1024U;         ///< Finite application bytes per script.
 constexpr std::size_t MAX_PATH_BYTES = 4096;                         ///< Finite UTF-8 ordinary fixture path ceiling.
 constexpr std::size_t MAX_PEM_BYTES = 128U * 1024U;                  ///< Finite ordinary certificate/key fixture input.
@@ -96,16 +97,17 @@ std::chrono::milliseconds readTimeout(std::istream &input) {
  */
 t::PeerOptions readControl(const std::filesystem::path &file) {
     const auto fileSize = std::filesystem::file_size(file);
-    constexpr std::size_t MAX_CONTROL_BYTES = 3 * MAX_SCRIPT_BYTES + 2 * MAX_PATH_BYTES + 17 * sizeof(std::uint64_t);
+    constexpr std::size_t MAX_CONTROL_BYTES = 10 * MAX_SCRIPT_BYTES + 2 * MAX_PATH_BYTES + 32 * sizeof(std::uint64_t);
     require(fileSize <= MAX_CONTROL_BYTES);
     std::ifstream input(file, std::ios::binary);
     const auto magic = readWord(input);
-    require(magic == CONTROL_MAGIC || magic == CONTROL_MAGIC_V3 || magic == CONTROL_MAGIC_V2);
+    require(magic == CONTROL_MAGIC || magic == CONTROL_MAGIC_V4 || magic == CONTROL_MAGIC_V3 ||
+            magic == CONTROL_MAGIC_V2);
     t::PeerOptions options;
     const auto version = readWord(input);
     const auto mode = readWord(input);
     const auto policy = magic != CONTROL_MAGIC_V2 ? readWord(input) : 0;
-    const auto tickets = magic == CONTROL_MAGIC ? readWord(input) : 0;
+    const auto tickets = magic == CONTROL_MAGIC || magic == CONTROL_MAGIC_V4 ? readWord(input) : 0;
     require(version >= 10 && version <= 13 && mode <= 2 && policy <= 3 &&
             ((policy != 1 && policy != 3) || version == 12) && (version >= 12 || policy == 0) && tickets <= 2 &&
             (tickets == 0 || version == 13));
@@ -142,6 +144,71 @@ t::PeerOptions readControl(const std::filesystem::path &file) {
     input.read(reinterpret_cast<char *>(options.replyBytes.data()), static_cast<std::streamsize>(replySize));
     options.initialBytes.resize(static_cast<std::size_t>(initialSize));
     input.read(reinterpret_cast<char *>(options.initialBytes.data()), static_cast<std::streamsize>(initialSize));
+
+    if (magic == CONTROL_MAGIC) {
+        const auto capture = readWord(input);
+        require(capture <= 1);
+        const auto hasReplyExpected = readWord(input);
+        const auto replyExpectedSize = readWord(input);
+        const auto finalSize = readWord(input);
+        require(hasReplyExpected <= 1 && replyExpectedSize <= MAX_SCRIPT_BYTES && finalSize <= MAX_SCRIPT_BYTES &&
+                (hasReplyExpected != 0 || replyExpectedSize == 0));
+        require(capture == 0 || replyExpectedSize <= MAX_SCRIPT_BYTES - expectedSize);
+
+        if (hasReplyExpected != 0) {
+            options.expectedReplyClientBytes.emplace(static_cast<std::size_t>(replyExpectedSize));
+            input.read(reinterpret_cast<char *>(options.expectedReplyClientBytes->data()),
+                       static_cast<std::streamsize>(replyExpectedSize));
+        }
+
+        options.finalBytes.resize(static_cast<std::size_t>(finalSize));
+        input.read(reinterpret_cast<char *>(options.finalBytes.data()), static_cast<std::streamsize>(finalSize));
+        const auto successor = readWord(input);
+        require(capture <= 1 && successor <= 1 && (successor == 0 || capture != 0));
+        options.captureUntilClose = capture != 0;
+
+        if (successor != 0) {
+            options.successor.emplace();
+            auto &next = *options.successor;
+            const auto nextPause = readWord(input);
+            const auto nextExpected = readWord(input);
+            const auto nextExpectedSize = readWord(input);
+            const auto nextReplySize = readWord(input);
+            const auto nextInitialSize = readWord(input);
+            require(nextPause <= static_cast<std::uint64_t>(options.overallTimeout.count()) && nextExpected <= 1 &&
+                    nextExpectedSize <= MAX_SCRIPT_BYTES && nextReplySize <= MAX_SCRIPT_BYTES &&
+                    nextInitialSize <= MAX_SCRIPT_BYTES && (nextExpected != 0 || nextExpectedSize == 0));
+            next.pauseBeforeHandshake = std::chrono::milliseconds(nextPause);
+
+            if (nextExpected != 0) {
+                next.expectedClientBytes.emplace(static_cast<std::size_t>(nextExpectedSize));
+                input.read(reinterpret_cast<char *>(next.expectedClientBytes->data()),
+                           static_cast<std::streamsize>(nextExpectedSize));
+            }
+
+            next.replyBytes.resize(static_cast<std::size_t>(nextReplySize));
+            input.read(reinterpret_cast<char *>(next.replyBytes.data()), static_cast<std::streamsize>(nextReplySize));
+            next.initialBytes.resize(static_cast<std::size_t>(nextInitialSize));
+            input.read(reinterpret_cast<char *>(next.initialBytes.data()),
+                       static_cast<std::streamsize>(nextInitialSize));
+            const auto nextHasReplyExpected = readWord(input);
+            const auto nextReplyExpectedSize = readWord(input);
+            const auto nextFinalSize = readWord(input);
+            require(nextHasReplyExpected <= 1 && nextReplyExpectedSize <= MAX_SCRIPT_BYTES &&
+                    nextFinalSize <= MAX_SCRIPT_BYTES && (nextHasReplyExpected != 0 || nextReplyExpectedSize == 0));
+            require(nextReplyExpectedSize <= MAX_SCRIPT_BYTES - nextExpectedSize);
+
+            if (nextHasReplyExpected != 0) {
+                next.expectedReplyClientBytes.emplace(static_cast<std::size_t>(nextReplyExpectedSize));
+                input.read(reinterpret_cast<char *>(next.expectedReplyClientBytes->data()),
+                           static_cast<std::streamsize>(nextReplyExpectedSize));
+            }
+
+            next.finalBytes.resize(static_cast<std::size_t>(nextFinalSize));
+            input.read(reinterpret_cast<char *>(next.finalBytes.data()), static_cast<std::streamsize>(nextFinalSize));
+        }
+    }
+
     require(static_cast<bool>(input) && input.peek() == std::char_traits<char>::eof());
 
     return options;
@@ -248,6 +315,10 @@ class PeerSession {
     t::PeerOptions options_;
     std::filesystem::path directory_;
     std::vector<std::uint8_t> received_;
+    std::vector<std::uint8_t> captured_; ///< Opt-in synthetic plaintext, bounded independently of every read.
+    std::array<std::uint8_t, 4096> captureBuffer_{}; ///< Async-read storage retained through cancellation drain.
+    unsigned ordinal_{};                             ///< One or two, selecting the exact owned capture file.
+    std::chrono::steady_clock::time_point absoluteDeadline_; ///< Shared child lifetime across both fresh sessions.
     t::PeerSnapshot report_;
     bool finished_{};
     bool publicationDisabled_{}; ///< Exception cleanup never retries a failed report operation.
@@ -319,7 +390,9 @@ class PeerSession {
                << ' ' << report_.completed << ' ' << report_.timedOut << ' ' << report_.failed << ' '
                << report_.sniPresent << ' ' << report_.sniLocalhost << ' ' << report_.cipherSuite << ' '
                << report_.groupId << ' ' << report_.signatureHashNid << ' ' << report_.ticketsSent << ' '
-               << report_.signatureScheme << ' ' << report_.signatureBytes << '\n';
+               << report_.signatureScheme << ' ' << report_.signatureBytes << ' ' << report_.completedSessions << ' '
+               << report_.successfulHandshakes << ' ' << report_.matchedSessions << ' ' << report_.firstCaptureEnd
+               << ' ' << report_.secondCaptureEnd << '\n';
         output.close();
         require(static_cast<bool>(output));
 #ifdef _WIN32
@@ -377,6 +450,20 @@ class PeerSession {
         report_.completed = true;
         report_.failed = failed;
         report_.timedOut = timedOut;
+
+        if (!failed) {
+            ++report_.completedSessions;
+        }
+
+        if (options_.captureUntilClose) {
+            std::ofstream capture(directory_ / (ordinal_ == 1 ? "capture-1" : "capture-2"),
+                                  std::ios::binary | std::ios::trunc);
+            capture.write(reinterpret_cast<const char *>(captured_.data()),
+                          static_cast<std::streamsize>(captured_.size()));
+            capture.close();
+            require(static_cast<bool>(capture));
+        }
+
         cancelOwned();
         publish();
     }
@@ -438,8 +525,40 @@ class PeerSession {
         });
     }
 
+    /** Capture synthetic application bytes until peer EOF, retaining storage through cancellation. */
+    void captureToClose() {
+        armOperation(options_.readTimeout);
+        stream_.async_read_some(asio::buffer(captureBuffer_), [this](Error error, std::size_t size) {
+            if (finished_) {
+                return;
+            }
+
+            require(size <= MAX_SCRIPT_BYTES - captured_.size());
+            captured_.insert(captured_.end(), captureBuffer_.begin(),
+                             captureBuffer_.begin() + static_cast<std::ptrdiff_t>(size));
+            report_.bytesRead += size;
+
+            if (error) {
+                const unsigned end = error == asio::error::eof                     ? 1U
+                                     : error == asio::ssl::error::stream_truncated ? 2U
+                                     : error == asio::error::connection_reset      ? 3U
+                                                                                   : 0U;
+                (ordinal_ == 1 ? report_.firstCaptureEnd : report_.secondCaptureEnd) = end;
+                finish(end == 0);
+            } else {
+                captureToClose();
+            }
+        });
+    }
+
     /** Apply the selected script-completion close behavior. */
     void closeScript() {
+        if (options_.captureUntilClose) {
+            captureToClose();
+
+            return;
+        }
+
         if (options_.closeMode == t::PeerCloseMode::HOLD) {
             operation_.cancel();
             publish();
@@ -464,10 +583,68 @@ class PeerSession {
         });
     }
 
+    /** Write the final acknowledgement after a separately checked authorization read. */
+    void writeFinal() {
+        if (options_.finalBytes.empty()) {
+            closeScript();
+
+            return;
+        }
+
+        armOperation(options_.writeTimeout);
+        asio::async_write(stream_, asio::buffer(options_.finalBytes), [this](Error error, std::size_t size) {
+            report_.bytesWritten += size;
+
+            if (finished_) {
+                return;
+            }
+
+            if (error) {
+                finish(true);
+            } else {
+                closeScript();
+            }
+        });
+    }
+
+    /** Check the optional second prefix before publishing the final acknowledgement. */
+    void readReplyExpected() {
+        if (!options_.expectedReplyClientBytes) {
+            writeFinal();
+
+            return;
+        }
+
+        require(!options_.captureUntilClose ||
+                options_.expectedReplyClientBytes->size() <= MAX_SCRIPT_BYTES - captured_.size());
+        received_.resize(options_.expectedReplyClientBytes->size());
+        armOperation(options_.readTimeout);
+        asio::async_read(stream_, asio::buffer(received_), [this](Error error, std::size_t size) {
+            report_.bytesRead += size;
+
+            if (finished_) {
+                return;
+            }
+
+            require(size <= MAX_SCRIPT_BYTES - captured_.size());
+
+            if (options_.captureUntilClose) {
+                captured_.insert(captured_.end(), received_.begin(),
+                                 received_.begin() + static_cast<std::ptrdiff_t>(size));
+            }
+
+            if (error || received_ != *options_.expectedReplyClientBytes) {
+                finish(true);
+            } else {
+                writeFinal();
+            }
+        });
+    }
+
     /** Write the exact bounded application reply after the optional read succeeds. */
     void writeReply() {
         if (options_.replyBytes.empty()) {
-            closeScript();
+            readReplyExpected();
 
             return;
         }
@@ -487,7 +664,7 @@ class PeerSession {
             if (error) {
                 finish(true);
             } else {
-                closeScript();
+                readReplyExpected();
             }
         });
     }
@@ -504,6 +681,7 @@ class PeerSession {
 
         if (received_.empty()) {
             report_.expectedBytesMatched = true;
+            ++report_.matchedSessions;
             writeReply();
 
             return;
@@ -520,6 +698,16 @@ class PeerSession {
             }
 
             report_.expectedBytesMatched = !error && received_ == *options_.expectedClientBytes;
+
+            if (options_.captureUntilClose) {
+                captured_.insert(captured_.end(), received_.begin(),
+                                 received_.begin() + static_cast<std::ptrdiff_t>(size));
+            }
+
+            if (report_.expectedBytesMatched) {
+                ++report_.matchedSessions;
+            }
+
             publish();
 
             if (!report_.expectedBytesMatched) {
@@ -593,6 +781,7 @@ class PeerSession {
 
             operation_.cancel();
             report_.handshakeComplete = true;
+            ++report_.successfulHandshakes;
             const auto *cipher = SSL_get_current_cipher(stream_.native_handle());
             report_.cipherSuite = cipher ? SSL_CIPHER_get_protocol_id(cipher) : 0;
             const auto group = SSL_get_negotiated_group(stream_.native_handle());
@@ -619,9 +808,19 @@ class PeerSession {
      * @param options Validated bounded owned script.
      * @param directory Exact parent-created directory holding control/report/stop files.
      */
-    PeerSession(asio::ssl::context &context, t::PeerOptions options, std::filesystem::path directory)
-        : acceptor_(io_, {asio::ip::address_v4::loopback(), 0}, false), stream_(io_, context), overall_(io_),
-          operation_(io_), pause_(io_), stopPoll_(io_), options_(std::move(options)), directory_(std::move(directory)) {
+    PeerSession(asio::ssl::context &context, t::PeerOptions options, std::filesystem::path directory,
+                std::uint16_t port, unsigned ordinal, t::PeerSnapshot previous,
+                std::chrono::steady_clock::time_point absoluteDeadline)
+        : acceptor_(io_, {asio::ip::address_v4::loopback(), port}, options.captureUntilClose), stream_(io_, context),
+          overall_(io_), operation_(io_), pause_(io_), stopPoll_(io_), options_(std::move(options)),
+          directory_(std::move(directory)) {
+        ordinal_ = ordinal;
+        absoluteDeadline_ = absoluteDeadline;
+        report_.completedSessions = previous.completedSessions;
+        report_.successfulHandshakes = previous.successfulHandshakes;
+        report_.matchedSessions = previous.matchedSessions;
+        report_.firstCaptureEnd = previous.firstCaptureEnd;
+        report_.secondCaptureEnd = previous.secondCaptureEnd;
         report_.port = acceptor_.local_endpoint().port();
         report_.ready = true;
         SSL_set_msg_callback(stream_.native_handle(), observeMessage);
@@ -634,12 +833,19 @@ class PeerSession {
         SSL_set_msg_callback_arg(stream_.native_handle(), nullptr);
     }
 
+    /** Copy numeric observations after the event loop drained.
+     * @return Detached report; no socket, stream or callback borrow escapes.
+     */
+    t::PeerSnapshot snapshot() const {
+        return report_;
+    }
+
     /** Run until script completion, parent stop or a deadline; drain canceled operations before returning.
      * @return Zero for ordinary script/stop completion, one for bounded TLS/I/O/script failure.
      */
     int run() {
         try {
-            overall_.expires_after(options_.overallTimeout);
+            overall_.expires_at(absoluteDeadline_);
             overall_.async_wait([this](Error error) {
                 if (!error && !finished_) {
                     finish(true, true);
@@ -687,24 +893,27 @@ class PeerSession {
  * @return Zero on successful stdout output, one on output failure.
  */
 int printHelp() {
-    std::cout << "Internal isolated localhost TLS test peer\n"
-                 "Usage: qdcxx_tls_test_peer [--help] | --control ABSOLUTE_OWNED_FILE\n"
-                 "No arguments and --help print this help without files, TLS initialization or sockets.\n"
-                 "--control reads parent-owned binary v4 (or compatible v2/v3) and serves one loopback connection.\n"
-                 "Input includes explicit ordinary PEM fixtures, exact TLS 1.0/1.1/1.2/1.3, scripts and deadlines.\n"
-                 "Legacy versions and CBC/P-521/SHA-1 policies are isolated negative-test server modes only.\n"
-                 "Numeric report flags expose only SNI presence and exact localhost match, never the name.\n"
-                 "Report v2 also carries cipher/group/signature-hash IDs and outgoing ticket count; no ticket data.\n"
-                 "TLS 1.3 initial ticket count is explicitly 0..2, default 0; other versions require zero.\n"
-                 "Limits: 4 MiB/script, 4096 UTF-8 bytes/path, 128 KiB/PEM fixture, 1..60000 ms/timeout.\n"
-                 "Scripts: initial write, optional exact read, reply write; each at most 4 MiB (8 MiB total writes).\n"
-                 "API defaults: TLS 1.3; clean close_notify; empty initial/reply; no expected read; zero delays;\n"
-                 "startup/handshake/read/write 5000 ms; overall 15000 ms; parent stop grace 250 ms.\n"
-                 "Modes: clean close_notify, abrupt TCP EOF, hold; optional handshake/read delays.\n"
-                 "Side effects: one loopback listener and numeric report/report.next in the owned directory;\n"
-                 "polls its stop marker; all operations end at their configured finite deadlines.\n"
-                 "No application bytes, certificate/key contents or SDK error text are printed or reported.\n"
-                 "Exit: 0 normal script/stop or help; 1 invalid control/TLS/I/O/deadline; 2 invalid arguments.\n";
+    std::cout
+        << "Internal isolated localhost TLS test peer\n"
+           "Usage: qdcxx_tls_test_peer [--help] | --control ABSOLUTE_OWNED_FILE\n"
+           "No arguments and --help print this help without files, TLS initialization or sockets.\n"
+           "--control reads parent-owned binary v5 (or compatible v2/v3/v4); at most two fresh TLS connections.\n"
+           "Input includes explicit ordinary PEM fixtures, exact TLS 1.0/1.1/1.2/1.3, scripts and deadlines.\n"
+           "Legacy versions and CBC/P-521/SHA-1 policies are isolated negative-test server modes only.\n"
+           "Numeric report flags expose only SNI presence and exact localhost match, never the name.\n"
+           "Report v3 carries cipher/group/signature-hash IDs, ticket count and up to two session counters.\n"
+           "TLS 1.3 initial ticket count is explicitly 0..2, default 0; other versions require zero.\n"
+           "Limits: 4 MiB/script, 4096 UTF-8 bytes/path, 128 KiB/PEM fixture, 1..60000 ms/timeout.\n"
+           "Scripts: initial write/read, reply write/read, final write; each at most 4 MiB, 12 MiB writes/session.\n"
+           "Opt-in captureUntilClose retains at most 4 MiB synthetic client bytes/session until EOF or reset.\n"
+           "A successor uses the same endpoint and fresh SSL owners after the first session drains.\n"
+           "API defaults: TLS 1.3; clean close_notify; empty writes; no reads/capture/successor; zero delays;\n"
+           "startup/handshake/read/write 5000 ms; overall 15000 ms; parent stop grace 250 ms.\n"
+           "Modes: clean close_notify, abrupt TCP EOF, hold; optional handshake/read delays.\n"
+           "Side effects: owned loopback listener, numeric report/report.next and opt-in capture-1/capture-2 files;\n"
+           "polls its stop marker; both sessions share the absolute overall deadline after control validation.\n"
+           "Only opt-in synthetic client bytes enter captures; no keys, payloads or SDK errors are printed.\n"
+           "Exit: 0 normal script/stop or help; 1 invalid control/TLS/I/O/deadline; 2 invalid arguments.\n";
     std::cout.flush();
 
     return std::cout ? 0 : 1;
@@ -719,9 +928,29 @@ int runControl(const std::filesystem::path &control) {
         require(control.is_absolute() && control.filename() == "control" &&
                 control.parent_path().filename().string().find("qdcxx-tls-peer-") == 0);
         auto options = readControl(control);
+        const auto absoluteDeadline = std::chrono::steady_clock::now() + options.overallTimeout;
         Crypto crypto;
+        auto next = std::move(options.successor);
+        options.successor.reset();
+        t::PeerSnapshot first;
+        {
+            auto context = crypto.makeContext(options);
+            PeerSession session(context, options, control.parent_path(), 0, 1, {}, absoluteDeadline);
+            const auto result = session.run();
+            first = session.snapshot();
+
+            if (result != 0 || !next) {
+                return result;
+            }
+        }
+        options.initialBytes = std::move(next->initialBytes);
+        options.replyBytes = std::move(next->replyBytes);
+        options.expectedClientBytes = std::move(next->expectedClientBytes);
+        options.pauseBeforeHandshake = next->pauseBeforeHandshake;
+        options.expectedReplyClientBytes = std::move(next->expectedReplyClientBytes);
+        options.finalBytes = std::move(next->finalBytes);
         auto context = crypto.makeContext(options);
-        PeerSession session(context, std::move(options), control.parent_path());
+        PeerSession session(context, std::move(options), control.parent_path(), first.port, 2, first, absoluteDeadline);
 
         return session.run();
     } catch (...) {
