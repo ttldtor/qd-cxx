@@ -973,6 +973,281 @@ TEST_CASE("MUX queue global graceful result cannot hide a paused-client forced a
     CHECK(f.queue.terminal()->hadGap);
 }
 
+TEST_CASE("MUX queue graceful stop drains the admitted STREAM prefix before and during routing") {
+    for (const bool partialRouting : {false, true}) {
+        INFO("partial routing=", partialRouting);
+        auto bounds = queueLimits();
+        bounds.routeRecords = 2;
+        bounds.batchRecords = 1;
+        auto f = fixture(c::SubscriptionFamily::STREAM, bounds);
+        auto first = std::make_shared<Recorder>();
+        auto keeper = std::make_shared<Recorder>();
+        keeper->retain = true;
+        auto perClient = clientLimits();
+        perClient.batchRecords = 1;
+        auto firstHandle = open(f, first, perClient);
+        auto keeperHandle = open(f, keeper, perClient);
+        add(f, firstHandle);
+        add(f, keeperHandle);
+        send(f, {{0, u"ALPHA", 1, 10, 0},
+                 {0, u"BETA", 1, 99, 0},
+                 {0, u"ALPHA", 2, 20, 0},
+                 {0, u"ALPHA", 3, 30, 0},
+                 {0, u"BETA", 2, 98, 0},
+                 {0, u"ALPHA", 4, 40, 0}});
+        REQUIRE(f.queue.resources().pendingRecords == 6);
+
+        if (partialRouting) {
+            until(f, [&] {
+                return f.queue.resources().pendingRecords == 2;
+            });
+            REQUIRE(f.queue.resources().pendingRecords == 2);
+        } else {
+            CHECK(first->values.empty());
+            CHECK(keeper->values.empty());
+        }
+
+        f.queue.requestStop(m::StopMode::GRACEFUL);
+        const auto type = 15;
+        const std::array<Input, 1> later{{{0, u"ALPHA", 5, 50, 0}}};
+        auto unadmitted = admit(f.live, data(later, type));
+        auto work = turn();
+        auto refused = f.queue.admit(std::move(unadmitted), work);
+        REQUIRE_FALSE(refused);
+        CHECK(refused.error().error == m::QueueError::CLOSING);
+        CHECK(unadmitted.records().size() == 1);
+        until(f, [&] {
+            return f.queue.terminal().has_value();
+        });
+        REQUIRE(firstHandle.terminal());
+        REQUIRE(keeperHandle.terminal());
+        const auto terminal = *f.queue.terminal();
+        CHECK(terminal.outcome == m::TerminalOutcome::DRAINED);
+        CHECK_FALSE(terminal.hadGap);
+        CHECK(firstHandle.terminal()->outcome == m::TerminalOutcome::DRAINED);
+        CHECK(keeperHandle.terminal()->outcome == m::TerminalOutcome::DRAINED);
+        CHECK(first->values == std::vector<std::int64_t>{10, 20, 30, 40});
+        REQUIRE(first->values.size() == 4);
+        CHECK(keeper->values == first->values);
+        CHECK(terminal.counts.acceptedRecords == 6);
+        CHECK(terminal.counts.collectorAcknowledged == 4);
+        CHECK(terminal.counts.queueAdmitted == 8);
+        CHECK(terminal.counts.callbackCompletedRecords == 8);
+        CHECK(terminal.counts.discarded == 0);
+        CHECK(terminal.counts.sourceRecordsDiscarded == 0);
+        CHECK(f.queue.resources().pendingRecords == 0);
+        REQUIRE(keeper->retained.size() == 4);
+        CHECK(f.queue.resources().batchOwners == 4);
+        CHECK(f.queue.resources().dataItems == 4);
+
+        for (std::size_t i = 0; i < keeper->retained.size(); ++i) {
+            REQUIRE(keeper->retained[i].records().size() == 1);
+            CHECK(keeper->retained[i].records()[0].typedValues[2].raw == first->values[i]);
+        }
+
+        keeper->retained.clear();
+        CHECK(f.queue.resources().batchOwners == 0);
+        CHECK(f.queue.resources().dataItems == 0);
+        CHECK(f.queue.terminal()->counts.callbackCompletedRecords == terminal.counts.callbackCompletedRecords);
+    }
+}
+
+TEST_CASE("MUX queue graceful admitted prefix keeps healthy clients independent of a paused or failed peer") {
+    for (const bool callbackFailure : {false, true}) {
+        INFO("callback failure=", callbackFailure);
+        auto bounds = queueLimits();
+        bounds.routeRecords = 2;
+        bounds.batchRecords = 1;
+        auto f = fixture(c::SubscriptionFamily::STREAM, bounds);
+        auto first = std::make_shared<Recorder>();
+        auto second = std::make_shared<Recorder>();
+        auto troubled = std::make_shared<Recorder>();
+        troubled->pause = !callbackFailure;
+        troubled->throws = callbackFailure;
+        auto perClient = clientLimits();
+        perClient.batchRecords = 1;
+        auto firstHandle = open(f, first, perClient);
+        auto secondHandle = open(f, second, perClient);
+        auto troubledHandle = open(f, troubled, perClient);
+        add(f, firstHandle);
+        add(f, secondHandle);
+        add(f, troubledHandle);
+        send(f, {{0, u"ALPHA", 1, 10, 0},
+                 {0, u"ALPHA", 2, 20, 0},
+                 {0, u"ALPHA", 3, 30, 0},
+                 {0, u"ALPHA", 4, 40, 0},
+                 {0, u"ALPHA", 5, 50, 0},
+                 {0, u"ALPHA", 6, 60, 0}});
+        f.queue.requestStop(m::StopMode::GRACEFUL);
+        until(f, [&] {
+            return f.queue.terminal().has_value();
+        });
+        REQUIRE(firstHandle.terminal());
+        REQUIRE(secondHandle.terminal());
+        REQUIRE(troubledHandle.terminal());
+        CHECK(firstHandle.terminal()->outcome == m::TerminalOutcome::DRAINED);
+        CHECK(secondHandle.terminal()->outcome == m::TerminalOutcome::DRAINED);
+        CHECK(first->values == std::vector<std::int64_t>{10, 20, 30, 40, 50, 60});
+        CHECK(second->values == first->values);
+        CHECK(troubled->values == std::vector<std::int64_t>{10});
+        CHECK(troubledHandle.terminal()->hadGap);
+        const auto terminal = *f.queue.terminal();
+        CHECK(terminal.counts.acceptedRecords == 6);
+        CHECK(terminal.hadGap);
+        CHECK(terminal.counts.discarded > 0);
+        CHECK(f.queue.resources().pendingRecords == 0);
+
+        if (callbackFailure) {
+            CHECK(troubledHandle.terminal()->outcome == m::TerminalOutcome::FAILED);
+            REQUIRE(terminal.primary);
+            CHECK(terminal.primary->error == m::QueueError::CALLBACK_FAILURE);
+            CHECK(terminal.outcome == m::TerminalOutcome::FAILED);
+        } else {
+            CHECK(troubledHandle.terminal()->outcome == m::TerminalOutcome::ABORTED);
+            CHECK(terminal.outcome == m::TerminalOutcome::ABORTED);
+        }
+    }
+}
+
+TEST_CASE("MUX queue graceful prefix preserves TICKER and HISTORY projections across staging") {
+    for (const auto family : {c::SubscriptionFamily::TICKER, c::SubscriptionFamily::HISTORY}) {
+        for (const bool staged : {false, true}) {
+            INFO("family=", static_cast<int>(family), " staged=", staged);
+            auto bounds = queueLimits();
+            bounds.batchRecords = 1;
+            auto f = fixture(family, bounds);
+            auto first = std::make_shared<Recorder>();
+            auto keeper = std::make_shared<Recorder>();
+            keeper->retain = true;
+            auto perClient = clientLimits();
+            perClient.batchRecords = 1;
+            auto firstHandle = open(f, first, perClient);
+            auto keeperHandle = open(f, keeper, perClient);
+            add(f, firstHandle, 1);
+            add(f, keeperHandle, 1);
+            const bool history = family == c::SubscriptionFamily::HISTORY;
+            constexpr std::int32_t SNAPSHOT_BEGIN = 4;
+            constexpr std::int32_t SNAPSHOT_END = 8;
+            send(f, {{0, u"ALPHA", 3, 30, history ? SNAPSHOT_BEGIN : 0},
+                     {0, u"ALPHA", 2, 20, 0},
+                     {0, u"ALPHA", 1, 10, history ? SNAPSHOT_END : 0}});
+
+            if (staged) {
+                until(f, [&] {
+                    return f.queue.resources().pendingRecords == 0;
+                });
+            }
+
+            REQUIRE(first->values.empty());
+            REQUIRE(keeper->values.empty());
+            f.queue.requestStop(m::StopMode::GRACEFUL);
+            until(f, [&] {
+                return f.queue.terminal().has_value();
+            });
+            REQUIRE(firstHandle.terminal());
+            REQUIRE(keeperHandle.terminal());
+            const auto terminal = *f.queue.terminal();
+            const auto expected = history ? std::vector<std::int64_t>{30, 20, 10} : std::vector<std::int64_t>{10};
+            CHECK(first->values == expected);
+            CHECK(keeper->values == expected);
+            CHECK(firstHandle.terminal()->outcome == m::TerminalOutcome::DRAINED);
+            CHECK(keeperHandle.terminal()->outcome == m::TerminalOutcome::DRAINED);
+            CHECK(terminal.outcome == m::TerminalOutcome::DRAINED);
+            CHECK_FALSE(terminal.hadGap);
+            CHECK(terminal.counts.acceptedRecords == 3);
+            CHECK(terminal.counts.queueAdmitted == 2 * expected.size());
+            CHECK(terminal.counts.callbackCompletedRecords == 2 * expected.size());
+            CHECK(terminal.counts.discarded == 0);
+            CHECK(terminal.counts.sourceRecordsDiscarded == 0);
+            CHECK(f.queue.resources().pendingRecords == 0);
+            REQUIRE(keeper->retained.size() == expected.size());
+            CHECK(f.queue.resources().batchOwners == expected.size());
+
+            for (std::size_t i = 0; i < expected.size(); ++i) {
+                REQUIRE(keeper->retained[i].records().size() == 1);
+                CHECK(keeper->retained[i].records()[0].typedValues[2].raw == expected[i]);
+            }
+
+            keeper->retained.clear();
+            CHECK(f.queue.resources().batchOwners == 0);
+            CHECK(f.queue.resources().dataItems == 0);
+        }
+    }
+}
+
+TEST_CASE("MUX queue graceful prefix escalation accounts unrouted source separately from client copies") {
+    for (const bool partialRouting : {false, true}) {
+        INFO("partial routing=", partialRouting);
+        auto bounds = queueLimits();
+        bounds.routeRecords = 2;
+        auto f = fixture(c::SubscriptionFamily::STREAM, bounds);
+        auto first = std::make_shared<Recorder>();
+        auto second = std::make_shared<Recorder>();
+        auto firstHandle = open(f, first);
+        auto secondHandle = open(f, second);
+        add(f, firstHandle);
+        add(f, secondHandle);
+        send(f, {{0, u"ALPHA", 1, 10, 0},
+                 {0, u"ALPHA", 2, 20, 0},
+                 {0, u"ALPHA", 3, 30, 0},
+                 {0, u"ALPHA", 4, 40, 0},
+                 {0, u"ALPHA", 5, 50, 0}});
+
+        if (partialRouting) {
+            until(f, [&] {
+                return f.queue.resources().pendingRecords == 3;
+            });
+        }
+
+        REQUIRE(first->values.empty());
+        REQUIRE(second->values.empty());
+        f.queue.requestStop(m::StopMode::GRACEFUL);
+        f.queue.requestStop(m::StopMode::ABORT);
+        until(f, [&] {
+            return f.queue.terminal().has_value();
+        });
+        REQUIRE(firstHandle.terminal());
+        REQUIRE(secondHandle.terminal());
+        const auto terminal = *f.queue.terminal();
+        CHECK(terminal.outcome == m::TerminalOutcome::ABORTED);
+        CHECK(firstHandle.terminal()->outcome == m::TerminalOutcome::ABORTED);
+        CHECK(secondHandle.terminal()->outcome == m::TerminalOutcome::ABORTED);
+        CHECK(terminal.hadGap);
+        CHECK(terminal.unknownEligibility);
+        CHECK(terminal.counts.acceptedRecords == 5);
+        CHECK(terminal.counts.sourceRecordsDiscarded == (partialRouting ? 3 : 5));
+        CHECK(terminal.counts.discarded == (partialRouting ? 4 : 0));
+        CHECK(terminal.counts.callbackStartedRecords == 0);
+        CHECK(first->values.empty());
+        CHECK(second->values.empty());
+        CHECK(f.queue.resources().pendingRecords == 0);
+        CHECK(f.queue.resources().dataItems == 0);
+    }
+}
+
+TEST_CASE("MUX queue graceful prefix cannot report a missing HISTORY range as drained") {
+    auto f = fixture(c::SubscriptionFamily::HISTORY);
+    auto receiver = std::make_shared<Recorder>();
+    auto handle = open(f, receiver);
+    add(f, handle, 0);
+    constexpr std::int32_t SNAPSHOT_BEGIN = 4;
+    send(f, {{0, u"ALPHA", 3, 30, SNAPSHOT_BEGIN}, {0, u"ALPHA", 2, 20, 0}});
+    f.queue.requestStop(m::StopMode::GRACEFUL);
+    until(f, [&] {
+        return f.queue.terminal().has_value();
+    });
+    REQUIRE(handle.terminal());
+    const auto terminal = *f.queue.terminal();
+    CHECK(receiver->values == std::vector<std::int64_t>{30, 20});
+    CHECK(handle.terminal()->outcome == m::TerminalOutcome::ABORTED);
+    CHECK(terminal.outcome == m::TerminalOutcome::ABORTED);
+    CHECK(terminal.hadGap);
+    CHECK(terminal.counts.callbackCompletedRecords == 2);
+    CHECK(terminal.counts.discarded == 0);
+    CHECK(terminal.counts.sourceRecordsDiscarded == 0);
+    CHECK(f.queue.resources().pendingRecords == 0);
+}
+
 namespace {
 p::LiveSession genericSession(const c::LocalSchema &local) {
     std::vector<p::OutgoingRecord> declarations;

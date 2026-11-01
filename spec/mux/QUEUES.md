@@ -188,6 +188,20 @@ callback, command and source-view cleanup quiescence. Destructor fallback perfor
 traversal without starting callbacks; arbitrary consumer-destructor work and wall time are excluded.
 This does not close sockets or implement a whole-application stop protocol.
 
+The local prefix starts at successful whole-event `admit`, including events that still require
+staging or several routing turns. Decoded or socket-buffered input that was never admitted is
+outside that prefix; a closing rejection leaves the input event owned by its caller. STREAM drains
+selected records in source order, preserving duplicates. TICKER and HISTORY drain their actual
+family projections, not one callback per raw input record. A HISTORY range that remains incomplete
+cannot report `DRAINED`, even when every materialized projection was delivered and no counted item
+was discarded. One paused or failing registration does not prevent healthy registrations from
+draining their eligible prefix; the context still preserves the affected registration's gap or failure.
+
+Terminal publication does not wait for application-retained `OwnedMuxBatch` values. Their records
+remain readable and their allocations stay charged in resource observations until the application
+releases them. `DRAINED` acknowledges normally returning callbacks, not release of caller-owned
+copies, upstream delivery beyond the cutoff, or completion of arbitrary application side effects.
+
 Diagnostic counts distinguish raw `sourceRecordsDiscarded` from per-client delivery projections.
 TICKER reset `discarded` counts pending view items; HISTORY `discardedPending` counts materialized
 FIFO items. Neither sums cache evictions or retained points. `hadGap` also covers unknown excluded

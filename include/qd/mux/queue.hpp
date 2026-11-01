@@ -688,6 +688,9 @@ class MuxQueue {
      */
     std::expected<QueueProgress, QueueFailure> progress(QueueWork &work);
     /** Request context-wide stop without iterating/cleaning inline.
+     * Graceful stop attempts to drain admitted projections, including unfinished staging/routing.
+     * The terminal outcome records actual drain, abort or failure.
+     * Caller-retained batches remain valid and charged after terminal publication.
      * Repeated requests can escalate graceful stop to abort before completion.
      * Requests after terminal publication leave the terminal state and evidence unchanged.
      * @param mode Graceful or escalating abort; allowed from its callback.

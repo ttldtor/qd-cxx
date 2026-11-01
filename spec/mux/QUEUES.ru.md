@@ -188,6 +188,22 @@ Paused/full client, который не может drain, обязан полу�
 конечный abort traversal без запуска callbacks; произвольная работа consumer destructor и wall time
 исключены. Это не закрывает sockets и не реализует whole-application stop protocol.
 
+Локальный prefix начинается с успешного `admit` целого события, включая события, для которых ещё
+нужны staging или несколько routing turns. Разобранные или буферизованные сокетом данные без
+успешного admission находятся вне этого prefix; отказ closing сохраняет владение входным событием
+у вызывающей стороны. STREAM доставляет выбранные записи в порядке источника, сохраняя дубликаты.
+TICKER и HISTORY доставляют настоящие проекции своего семейства, а не один callback на каждую
+исходную запись. Незавершённый HISTORY range не может получить `DRAINED`, даже когда все
+материализованные проекции доставлены и ни один учитываемый элемент не отброшен. Paused или failing
+регистрация не мешает здоровым регистрациям завершить доставку своего допустимого prefix;
+при этом context сохраняет gap или failure пострадавшей регистрации.
+
+Публикация terminal не ждёт освобождения `OwnedMuxBatch`, сохранённых приложением. Их записи
+остаются доступны для чтения, а выделенная память продолжает учитываться в resource observations
+до освобождения приложением. `DRAINED` подтверждает нормально вернувшиеся callbacks, а не
+освобождение принадлежащих вызывающей стороне копий, upstream delivery за пределами cutoff
+или завершение произвольных побочных действий приложения.
+
 Diagnostic counts различают raw `sourceRecordsDiscarded` и per-client delivery projections.
 TICKER reset `discarded` считает pending view items; HISTORY `discardedPending` — materialized FIFO
 items. Ни один не суммирует cache evictions и retained points. `hadGap` охватывает также неизвестную
