@@ -1188,6 +1188,40 @@ RecoveryCapacity RecoveryCore::capacity() const noexcept {
     return configuration_.capacity;
 }
 
+std::expected<mux::QueueRangeStatus, RecoveryDiagnostic>
+RecoveryCore::historyRangeStatus(const mux::MuxHandle &handle, core::SubscriptionKey key, mux::QueueWork &work) const {
+    if (const auto error = rejection()) {
+        return std::unexpected(*error);
+    }
+
+    const auto &history = configuration_.queues.history;
+
+    if (!history) {
+        return std::unexpected(RecoveryDiagnostic{RecoveryError::INVALID_STATE, "recovery-history-queue"});
+    }
+
+    if (cutoff_ || event_ || state_.status().phase != RecoveryPhase::ACTIVE) {
+        return std::unexpected(RecoveryDiagnostic{RecoveryError::INVALID_STATE, "recovery-history-ineligible"});
+    }
+
+    // DEFERRED can preserve the scheduler's old ACTIVE phase after actual TLS authentication changes.
+    // Use the read-only backend accessor, not facts(), which publishes mutable readiness observations.
+    const auto actual = backend_.facts();
+
+    if (!actual.present || !actual.connected || !actual.authenticated || actual.terminal ||
+        actual.generation != peerGeneration_ || actual.authentication != authentication_) {
+        return std::unexpected(RecoveryDiagnostic{RecoveryError::INVALID_STATE, "recovery-history-ineligible"});
+    }
+
+    auto observed = history->rangeStatus(handle, key, work);
+
+    if (!observed) {
+        return std::unexpected(queueFailure(observed.error()));
+    }
+
+    return std::move(*observed);
+}
+
 std::optional<RecoveryClock::time_point> RecoveryCore::nextWake() const noexcept {
     if (terminal_)
         return std::nullopt;

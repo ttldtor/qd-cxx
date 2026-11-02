@@ -22,6 +22,7 @@
 
 - [Квалификация TLS runtime и ресурсов](../tests/conformance/transport/TLS-VALIDATION.ru.md)
 - [Квалификация TCP runtime](../tests/conformance/transport/TCP-VALIDATION.ru.md)
+- [Наблюдение диапазона HISTORY в recovery](../tests/conformance/transport/HISTORY-STATUS-VALIDATION.ru.md)
 - [Чтение tape и поддержанные входы](../spec/protocol/TAPE-READER.ru.md)
 - [Проверки записи tape](../tests/conformance/protocol/tape-write/WRITER-VALIDATION.ru.md)
 - [Проверки экспорта схем](../tests/conformance/schema-export/VALIDATION.ru.md)

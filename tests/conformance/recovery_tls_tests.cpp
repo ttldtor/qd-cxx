@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 // Internal CTest runner: public TLS recovery with finite caller work and isolated loopback peers.
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "recovery_history_status_support.hpp"
 #include "recovery_test_support.hpp"
 #include "subscription_receiver_lifetime_support.hpp"
 #include "transport/tls_test_support.hpp"
@@ -959,4 +960,143 @@ TEST_CASE("prepared receiver projects a whole multi-record batch after callback-
         CHECK_FALSE(consumer);
         f::check(observed);
     }
+}
+
+TEST_CASE("verified TLS recovery public HISTORY observation preserves current range and detached owner lifetime") {
+    namespace hs = root::test::history_status;
+    auto bootstrap = t::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    auto bytes = r::ready();
+    r::append(bytes, r::description(41));
+    auto script = x::peerOptions(h::PeerTlsVersion::TLS_1_3, h::PeerCloseMode::HOLD);
+    script.initialBytes = wire(bytes);
+    script.expectedClientBytes = wire(hs::clientOutput());
+    const auto reply = hs::data({{3, 30, hs::SNAPSHOT_BEGIN}, {2, 20, 0}});
+    script.replyBytes = wire(reply);
+    auto peer = h::TlsTestPeer::start(std::move(script));
+    REQUIRE(peer);
+    const auto tls = tlsOptions();
+    const auto requirements = t::tlsRequirements(tls.limits, tls.host);
+    REQUIRE(requirements);
+    auto local = r::schema();
+    auto queue = hs::queue(local);
+    auto recorder = std::make_shared<hs::Recorder>();
+    auto handle = hs::open(queue, recorder);
+    auto desired = hs::replace(handle, local, 2);
+    t::RecoveryQueues queues;
+    queues.history = std::move(queue);
+    auto input = x::settings(peer->port());
+    input.retry = {1, 0ms};
+    hs::enableHistory(input);
+    auto endpoint = r::endpoint(local, input);
+    auto preparation = r::preparation();
+    auto created =
+        t::TlsRecovery::create(*bootstrap, endpoint, r::blueprint(), std::move(queues), r::options(), tls, preparation);
+    REQUIRE(created);
+    std::optional<t::TlsRecovery> owner;
+    owner.emplace(std::move(*created));
+    const c::SubscriptionKey key{local.recordContext(0), u"A"};
+    auto configuredWork = r::queueWork();
+    const auto configuredBefore = hs::coordinates(configuredWork);
+    const auto configured = owner->historyRangeStatus(handle, key, configuredWork);
+    REQUIRE_FALSE(configured);
+    CHECK(configured.error().error == t::RecoveryError::INVALID_STATE);
+    CHECK(hs::coordinates(configuredWork) == configuredBefore);
+    bool reentryObserved = false;
+    recorder->action = [&] {
+        auto work = r::queueWork();
+        const auto before = hs::coordinates(work);
+        const auto rejected = owner->historyRangeStatus(handle, key, work);
+        REQUIRE_FALSE(rejected);
+        CHECK(rejected.error().error == t::RecoveryError::REENTRANT);
+        CHECK(hs::coordinates(work) == before);
+        reentryObserved = true;
+    };
+    REQUIRE(owner->start());
+    std::optional<m::QueueRangeStatus> observed;
+    std::optional<m::QueueRangeStatus> lastEligible;
+    std::optional<std::expected<m::QueueRangeStatus, t::RecoveryDiagnostic>> lastQuery;
+    const auto deadline = std::chrono::steady_clock::now() + 6s;
+
+    while (!observed && std::chrono::steady_clock::now() < deadline) {
+        (void)poll(*owner, *requirements);
+        auto work = r::queueWork();
+        const auto status = owner->historyRangeStatus(handle, key, work);
+        lastQuery = status;
+
+        if (status) {
+            lastEligible = *status;
+
+            if (status->completeDeliveredRange) {
+                observed = *status;
+            }
+        }
+
+        std::this_thread::sleep_for(1ms);
+    }
+
+    const auto diagnosticStatus = owner->status();
+    INFO("TLS recovery phase=", static_cast<int>(diagnosticStatus.recovery.phase),
+         " error=", static_cast<int>(diagnosticStatus.first.error), " stage=", diagnosticStatus.first.stage);
+
+    if (!observed && lastQuery) {
+        hs::diagnose(*lastQuery);
+
+        if (lastEligible) {
+            hs::diagnose(*lastEligible);
+        }
+    }
+
+    REQUIRE(observed);
+    REQUIRE(observed->source);
+    CHECK(observed->source->snapshot == root::collectors::HistorySnapshotState::COMPLETE);
+    CHECK(observed->source->sourceFrontier == 2);
+    CHECK(observed->requestedFrom == 2);
+    CHECK(observed->queuedForKey == 0);
+    CHECK(reentryObserved);
+    REQUIRE(desired.result());
+    CHECK(desired.result()->status == m::CommandStatus::APPLIED);
+    auto noWork = m::QueueWork{};
+    const auto insufficient = owner->historyRangeStatus(handle, key, noWork);
+    REQUIRE_FALSE(insufficient);
+    CHECK(insufficient.error().error == t::RecoveryError::WORK_LIMIT);
+    REQUIRE(insufficient.error().queue);
+    CHECK(insufficient.error().queue->error == m::QueueError::WORK_LIMIT);
+    const auto foreignSchema = r::schema();
+    auto foreignWork = r::queueWork();
+    const auto foreign = owner->historyRangeStatus(handle, {foreignSchema.recordContext(0), u"A"}, foreignWork);
+    REQUIRE_FALSE(foreign);
+    REQUIRE(foreign.error().queue);
+    CHECK(foreign.error().queue->error == m::QueueError::INVALID_CONTEXT);
+    auto moved = std::move(*owner);
+    auto movedWork = r::queueWork();
+    const auto movedBefore = hs::coordinates(movedWork);
+    const auto movedFrom = owner->historyRangeStatus(handle, key, movedWork);
+    REQUIRE_FALSE(movedFrom);
+    CHECK(movedFrom.error().error == t::RecoveryError::INVALID_STATE);
+    CHECK(hs::coordinates(movedWork) == movedBefore);
+    owner.reset();
+    owner.emplace(std::move(moved));
+    auto restoredWork = r::queueWork();
+    const auto restored = owner->historyRangeStatus(handle, key, restoredWork);
+    REQUIRE(restored);
+    CHECK(restored->completeDeliveredRange);
+    REQUIRE(owner->requestStop());
+    auto cutoffWork = r::queueWork();
+    const auto cutoffBefore = hs::coordinates(cutoffWork);
+    const auto cutoff = owner->historyRangeStatus(handle, key, cutoffWork);
+    REQUIRE_FALSE(cutoff);
+    CHECK(cutoff.error().stage == "recovery-history-ineligible");
+    CHECK(hs::coordinates(cutoffWork) == cutoffBefore);
+    stop(*owner, *requirements);
+    owner.reset();
+    const auto report = peer->stop();
+    CHECK(report.handshakeComplete);
+    CHECK(report.bytesWritten == bytes.size() + reply.size());
+    CHECK(observed->completeDeliveredRange);
+    CHECK(observed->source->sourceFrontier == 2);
+    REQUIRE_FALSE(recorder->batches.empty());
+    CHECK(observed->epoch.matches(recorder->batches.front().epoch()));
+    std::cout << "TLS history observation: verified=1 covered=1 aggregateComplete=1 callbackReentry=1 "
+                 "detachedAfterRetirement=1\n";
 }

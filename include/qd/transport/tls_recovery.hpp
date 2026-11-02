@@ -109,6 +109,19 @@ class TlsRecovery {
      * @return Logical requested capacities, or zeros after move; never process RSS.
      */
     [[nodiscard]] RecoveryCapacity capacity() const noexcept;
+    /** Observe an adopted HISTORY range on the creating thread after poll/callback returns.
+     * Requires current ACTIVE recovery, no cutoff or held complete input, and fresh read-only backend
+     * facts proving connected/authenticated/nonterminal state. ACTIVE alone is insufficient after
+     * a deferred TLS authentication step. Refusal never enters the SDK or changes operational failure.
+     * @param handle Registration belonging to this owner's adopted HISTORY queue.
+     * @param key Exact schema/symbol/selector key; borrowed units last only through this call.
+     * @param work Existing queue/history credits; an ineligible query leaves all coordinates unchanged.
+     * @return Detached admitted-prefix AS-OF evidence or typed owner/state/nested queue refusal.
+     * A copied result is historical after progress; query again for a current claim. Only
+     * completeDeliveredRange proves scoped local completion, never peer ACK or unread-wire completeness.
+     */
+    [[nodiscard]] std::expected<mux::QueueRangeStatus, RecoveryDiagnostic>
+    historyRangeStatus(const mux::MuxHandle &handle, core::SubscriptionKey key, mux::QueueWork &work) const;
     /** Inspect the earliest selected monotonic/native/TLS progress hint.
      * @return Hint or empty; no timer, notifier or background scheduler is installed.
      */

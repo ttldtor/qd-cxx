@@ -2,12 +2,14 @@
 // SPDX-License-Identifier: BSL-1.0
 // Internal CTest runner: real TICKER/HISTORY recovery, detached batches and exact reset ACKs.
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "recovery_history_status_support.hpp"
 #include "recovery_test_peer.hpp"
 #include "recovery_test_support.hpp"
 
 #include "qd/events/quote.hpp"
 
 #include <algorithm>
+#include <iostream>
 
 namespace {
 namespace root = org::ttldtor::qdcxx;
@@ -160,9 +162,10 @@ void until(t::TcpRecovery &owner, const root::test::OwnedTcpPeer &peer, Predicat
          " transportError=", static_cast<int>(status.first.transport.error),
          " protocolError=", static_cast<int>(status.first.transport.protocolError),
          " peerError=", static_cast<int>(snapshot.error), " nativeCode=", snapshot.nativeCode,
-         " first matched=", snapshot.sessions[0].matched, " second accepted=", snapshot.sessions[1].accepted,
-         " second matched=", snapshot.sessions[1].matched,
-         " second reply bytes=", snapshot.sessions[1].replyBytesWritten);
+         " first matched=", !snapshot.sessions.empty() && snapshot.sessions[0].matched,
+         " second accepted=", snapshot.sessions.size() > 1 && snapshot.sessions[1].accepted,
+         " second matched=", snapshot.sessions.size() > 1 && snapshot.sessions[1].matched,
+         " second reply bytes=", snapshot.sessions.size() > 1 ? snapshot.sessions[1].replyBytesWritten : 0);
     REQUIRE(predicate());
 }
 
@@ -533,7 +536,11 @@ TEST_CASE("HISTORY recovery exposes interruption and replays current signed raw 
     CHECK(peer.snapshot().error == root::test::TcpPeerError::NONE);
 
     // The raw point overlaps the old request. Gap/epoch evidence does not promise resume or exactly-once delivery.
-    // Recovery exposes no adopted owner's rangeStatus; these unflagged points do not establish snapshot completion.
+    // The adopted queue is observable, but unflagged points still do not establish snapshot completion.
+    auto rangeWork = r::queueWork();
+    const auto incomplete = owner->historyRangeStatus(handle, {local.recordContext(0), u"A"}, rangeWork);
+    REQUIRE(incomplete);
+    CHECK_FALSE(incomplete->completeDeliveredRange);
     r::stop(*owner);
     peer.stop();
     const auto &retained = record(*recorder, 0, u"A", 41);
@@ -541,4 +548,148 @@ TEST_CASE("HISTORY recovery exposes interruption and replays current signed raw 
     CHECK(retained.typedValues[2].raw == 101);
     CHECK(recorder->batches[0].epoch().matches(oldEpoch));
     CHECK(record(*recorder, 1, u"A", 7).typedValues[2].raw == 202);
+}
+
+TEST_CASE("TCP recovery public HISTORY observation preserves covered range reentry guards and detached lifetime") {
+    namespace hs = root::test::history_status;
+    auto bootstrap = t::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    root::test::TcpPeerConfig script;
+    script.lifetime = 15s;
+    script.sessions.resize(1);
+    auto &session = script.sessions[0];
+    session.initialBytes = r::ready();
+    r::append(session.initialBytes, r::description(41));
+    session.expectedClientBytes = hs::clientOutput();
+    session.replyBytes = hs::data({{3, 30, hs::SNAPSHOT_BEGIN}, {2, 20, 0}});
+    session.waitForControllerClose = true;
+    root::test::OwnedTcpPeer peer(std::move(script));
+    REQUIRE(peer.port() != 0);
+    auto local = r::schema();
+    auto queue = hs::queue(local);
+    auto recorder = std::make_shared<hs::Recorder>();
+    auto handle = hs::open(queue, recorder);
+    auto desired = hs::replace(handle, local, 2);
+    t::RecoveryQueues queues;
+    queues.history = std::move(queue);
+    auto input = r::settings(peer.port(), 1, 0ms);
+    hs::enableHistory(input);
+    auto endpoint = r::endpoint(local, input);
+    auto preparation = r::preparation();
+    std::optional<t::TcpRecovery> owner;
+    auto created =
+        t::TcpRecovery::create(*bootstrap, endpoint, r::blueprint(), std::move(queues), r::options(), preparation);
+    REQUIRE(created);
+    owner.emplace(std::move(*created));
+    const c::SubscriptionKey key{local.recordContext(0), u"A"};
+    auto configuredWork = r::queueWork();
+    const auto configuredBefore = hs::coordinates(configuredWork);
+    const auto configured = owner->historyRangeStatus(handle, key, configuredWork);
+    REQUIRE_FALSE(configured);
+    CHECK(configured.error().error == t::RecoveryError::INVALID_STATE);
+    CHECK(hs::coordinates(configuredWork) == configuredBefore);
+    bool reentryObserved = false;
+    recorder->action = [&] {
+        auto work = r::queueWork();
+        const auto before = hs::coordinates(work);
+        const auto rejected = owner->historyRangeStatus(handle, key, work);
+        REQUIRE_FALSE(rejected);
+        CHECK(rejected.error().error == t::RecoveryError::REENTRANT);
+        CHECK(hs::coordinates(work) == before);
+        reentryObserved = true;
+    };
+    REQUIRE(owner->start());
+    std::optional<m::QueueRangeStatus> observed;
+    std::optional<m::QueueRangeStatus> lastEligible;
+    std::optional<std::expected<m::QueueRangeStatus, t::RecoveryDiagnostic>> lastQuery;
+    const auto deadline = std::chrono::steady_clock::now() + OBSERVATION_DEADLINE;
+
+    while (!observed && std::chrono::steady_clock::now() < deadline) {
+        auto turn = r::turn();
+        const auto progressed = owner->poll(turn);
+        REQUIRE(progressed);
+        auto work = r::queueWork();
+        const auto status = owner->historyRangeStatus(handle, key, work);
+        lastQuery = status;
+
+        if (status) {
+            lastEligible = *status;
+
+            if (status->completeDeliveredRange) {
+                observed = *status;
+            }
+        }
+
+        if (progressed->phase == t::RecoveryPhase::FAILED || progressed->phase == t::RecoveryPhase::EXHAUSTED) {
+            break;
+        }
+
+        std::this_thread::sleep_for(1ms);
+    }
+
+    if (!observed) {
+        const auto peerStatus = peer.snapshot();
+        std::cout << "TCP_HISTORY_TIMEOUT phase=" << static_cast<int>(owner->status().phase)
+                  << " stage=" << owner->status().first.stage
+                  << " matched=" << (!peerStatus.sessions.empty() && peerStatus.sessions[0].matched) << '\n';
+
+        if (lastQuery) {
+            hs::diagnose(*lastQuery);
+        }
+
+        if (lastEligible) {
+            hs::diagnose(*lastEligible);
+        }
+    }
+
+    REQUIRE(observed);
+    REQUIRE(observed->source);
+    CHECK(observed->source->snapshot == root::collectors::HistorySnapshotState::COMPLETE);
+    CHECK(observed->source->sourceFrontier == 2);
+    CHECK(observed->requestedFrom == 2);
+    CHECK(observed->queuedForKey == 0);
+    CHECK_FALSE(observed->acceptedUnstagedData);
+    CHECK(reentryObserved);
+    REQUIRE(desired.result());
+    CHECK(desired.result()->status == m::CommandStatus::APPLIED);
+
+    auto noWork = m::QueueWork{};
+    const auto shortQuery = owner->historyRangeStatus(handle, key, noWork);
+    REQUIRE_FALSE(shortQuery);
+    CHECK(shortQuery.error().error == t::RecoveryError::WORK_LIMIT);
+    REQUIRE(shortQuery.error().queue);
+    CHECK(shortQuery.error().queue->error == m::QueueError::WORK_LIMIT);
+    auto invalidWork = r::queueWork();
+    const auto invalid = owner->historyRangeStatus(m::MuxHandle{}, key, invalidWork);
+    REQUIRE_FALSE(invalid);
+    REQUIRE(invalid.error().queue);
+    CHECK(invalid.error().queue->error == m::QueueError::INVALID_CLIENT);
+
+    auto moved = std::move(*owner);
+    auto movedWork = r::queueWork();
+    const auto movedBefore = hs::coordinates(movedWork);
+    const auto movedFrom = owner->historyRangeStatus(handle, key, movedWork);
+    REQUIRE_FALSE(movedFrom);
+    CHECK(movedFrom.error().error == t::RecoveryError::INVALID_STATE);
+    CHECK(hs::coordinates(movedWork) == movedBefore);
+    owner.reset();
+    owner.emplace(std::move(moved));
+    auto restoredWork = r::queueWork();
+    const auto restored = owner->historyRangeStatus(handle, key, restoredWork);
+    REQUIRE(restored);
+    CHECK(restored->completeDeliveredRange);
+    REQUIRE(owner->requestStop());
+    auto cutoffWork = r::queueWork();
+    const auto cutoffBefore = hs::coordinates(cutoffWork);
+    const auto cutoff = owner->historyRangeStatus(handle, key, cutoffWork);
+    REQUIRE_FALSE(cutoff);
+    CHECK(cutoff.error().stage == "recovery-history-ineligible");
+    CHECK(hs::coordinates(cutoffWork) == cutoffBefore);
+    r::stop(*owner);
+    owner.reset();
+    peer.stop();
+    CHECK(observed->completeDeliveredRange);
+    CHECK(observed->source->sourceFrontier == 2);
+    CHECK(observed->epoch.matches(recorder->batches.front().epoch()));
+    std::cout << "TCP history observation: covered=1 aggregateComplete=1 callbackReentry=1 detachedAfterRetirement=1\n";
 }

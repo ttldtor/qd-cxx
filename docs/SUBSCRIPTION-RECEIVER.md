@@ -106,6 +106,14 @@ terminal outcome after owned work retires. The deadline can escalate to abort; i
 prove peer receipt, wire flush or a complete upstream history snapshot. `requestStop()`
 and destruction retain their immediate abort semantics.
 
+For a recovery-owned HISTORY queue, call the owner's `historyRangeStatus(handle, key,
+work)` on its creating thread after `poll()` returns. A successful detached observation
+reports the existing queue's `completeDeliveredRange` for that exact bound and epoch.
+Held input, reset/reconnect/cutoff or unavailable authentication make the current query
+ineligible; report unknown instead of reusing an older complete result. The
+[recovery observation contract](../spec/transport/RECOVERY.md) defines eligibility and
+work. Raw progress, event flags and local drain alone do not prove a completed range.
+
 The [receiver contract](../spec/subscriptions/RECEIVER.md) documents exact errors, work
 charges and compatibility. The [queue contract](../spec/mux/QUEUES.md),
 [prepared event mappings](../spec/events/EVENT-MAPPING.md) and

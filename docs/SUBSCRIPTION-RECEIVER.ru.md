@@ -107,6 +107,14 @@ produced flags и необязательные trigger/source metadata само�
 доказательство получения peer, сброса wire-output или полного upstream HISTORY snapshot.
 `requestStop()` и деструктор сохраняют немедленную abort-семантику.
 
+Если HISTORY-очередью владеет Recovery, вызывайте его `historyRangeStatus(handle, key,
+work)` в создающем потоке после возврата `poll()`. Успешное detached-наблюдение содержит
+`completeDeliveredRange` существующей очереди для точных bound и epoch. Удержанный вход,
+reset/reconnect/cutoff или недоступная аутентификация запрещают текущее наблюдение;
+сообщайте unknown вместо повторного использования прежнего complete. Доступность и work
+определяет [контракт наблюдения recovery](../spec/transport/RECOVERY.ru.md). Raw progress,
+флаги события и локальный drain сами по себе не доказывают полноту диапазона.
+
 [Контракт получателя](../spec/subscriptions/RECEIVER.ru.md) описывает точные ошибки,
 расход work и совместимость. [Контракт очереди](../spec/mux/QUEUES.ru.md),
 [prepared-отображения](../spec/events/EVENT-MAPPING.ru.md) и

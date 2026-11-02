@@ -493,6 +493,13 @@ RecoveryCapacity TlsRecovery::capacity() const noexcept {
     return impl_ ? impl_->core.capacity() : RecoveryCapacity{};
 }
 
+std::expected<mux::QueueRangeStatus, RecoveryDiagnostic>
+TlsRecovery::historyRangeStatus(const mux::MuxHandle &handle, core::SubscriptionKey key, mux::QueueWork &work) const {
+    const auto lease = impl_;
+
+    return lease ? lease->core.historyRangeStatus(handle, key, work) : std::unexpected(moved());
+}
+
 std::optional<std::chrono::steady_clock::time_point> TlsRecovery::nextWake() const noexcept {
     return impl_ ? impl_->core.nextWake() : std::nullopt;
 }

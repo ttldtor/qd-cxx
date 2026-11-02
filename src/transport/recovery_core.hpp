@@ -261,6 +261,14 @@ class RecoveryCore {
      * @return Explicit logical vector with documented byte overlap.
      */
     [[nodiscard]] RecoveryCapacity capacity() const noexcept;
+    /** Observe the adopted HISTORY queue only under current owner/backend eligibility.
+     * @param handle Exact adopted HISTORY registration.
+     * @param key Borrowed key used synchronously; nothing is retained.
+     * @param work Existing mutable queue/history observation allowance.
+     * @return Unchanged detached queue evidence or a nonmutating owner/state/nested queue refusal.
+     */
+    [[nodiscard]] std::expected<mux::QueueRangeStatus, RecoveryDiagnostic>
+    historyRangeStatus(const mux::MuxHandle &handle, core::SubscriptionKey key, mux::QueueWork &work) const;
     /** Inspect the earliest native/model wake hint.
      * @return Monotonic hint without a notifier.
      */

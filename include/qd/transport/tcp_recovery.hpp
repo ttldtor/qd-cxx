@@ -97,6 +97,19 @@ class TcpRecovery {
      * @return Logical resource vector, or zeros after move; never process RSS.
      */
     [[nodiscard]] RecoveryCapacity capacity() const noexcept;
+    /** Observe one adopted HISTORY range after the enclosing poll/callback returns.
+     * Requires the creating owner thread, current ACTIVE recovery, no cutoff or held complete input,
+     * and an actually connected, authenticated, nonterminal backend. A gated query is unknown;
+     * an older successful result does not remain a current completeness claim.
+     * No I/O, callback, stop, reset acknowledgement or operational failure recording is performed.
+     * @param handle Registration belonging to this owner's adopted HISTORY queue.
+     * @param key Exact schema/symbol/selector key; borrowed units are used only during this call.
+     * @param work Actual queue/history observation credits, debited only by an eligible queue query.
+     * @return Detached admitted-prefix AS-OF evidence, or owner/state refusal or exact nested queue failure.
+     * Only completeDeliveredRange establishes scoped local completion; unread input and peer ACK are excluded.
+     */
+    [[nodiscard]] std::expected<mux::QueueRangeStatus, RecoveryDiagnostic>
+    historyRangeStatus(const mux::MuxHandle &handle, core::SubscriptionKey key, mux::QueueWork &work) const;
     /** Inspect the earliest monotonic/native hint without registering a timer.
      * @return Wake hint, or empty when no progress deadline remains.
      */

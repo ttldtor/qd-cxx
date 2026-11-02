@@ -232,6 +232,44 @@ Gaps, discards and interruption remain observable. A disconnected
 replay does not establish completion, resumable upstream history or exactly-once
 delivery. Previously delivered data may overlap a fresh request.
 
+## Observe an adopted HISTORY range
+
+Both owners expose `historyRangeStatus(handle, key, work)` after `poll()` and its
+callbacks return. The client handle must belong to the adopted HISTORY queue;
+`key` is its exact schema/symbol/selector identity. The caller supplies ordinary
+`mux::QueueWork`, including the existing HISTORY observation coordinates.
+
+The query first rejects a moved owner, wrong thread or callback reentry. An absent
+HISTORY queue returns `INVALID_STATE` at `recovery-history-queue`. Current observation
+requires ACTIVE recovery, no cutoff and no held complete event of any kind. Actual
+read-only backend facts must also report a present, connected, authenticated,
+nonterminal attempt coherent with the last sampled generation/authentication.
+The scheduler's ACTIVE phase alone is insufficient after deferred authentication.
+The query performs no SDK entry, I/O, callback, progress or reset acknowledgement.
+
+If these eligibility conditions do not hold, it returns `INVALID_STATE` at
+`recovery-history-ineligible`, without calling the queue or changing any work,
+first/secondary diagnostic, stop or replay state. This refusal means the current
+range is unknown. A previously successful observation must not be reused as current.
+Known retirement/reset/backoff is gated even before the queue's reset commits.
+
+An eligible call delegates to the existing [queue range query](../mux/QUEUES.md),
+returning its `QueueRangeStatus` unchanged. Queue refusals retain exact nested
+`QueueFailure`; work/resource/allocation categories and actual work debits are
+preserved. There is no additional work axis, implicit replenishment or retry.
+Foreign/stale handle, invalid key and insufficient work follow that queue contract.
+
+Use `completeDeliveredRange` for scoped local completion. Source coverage alone,
+raw flags or successful local drain cannot establish it. A requested higher bound
+can be complete while a lower aggregate snapshot is still RECEIVING; transaction,
+view, queued/unstaged data, gap and reset conditions remain authoritative. See the
+[HISTORY completeness rules](../subscriptions/HISTORY-COLLECTOR.md).
+
+The result is detached AS-OF evidence for the exact key, bound, activation, revision
+and epoch of the admitted prefix. It survives later progress and owner destruction
+as a historical value. It proves neither peer acknowledgement, unread/future wire
+input, provider-wide history nor future connection health.
+
 ## Capacity, work and qualified copy profile
 
 All `RecoveryLimits` coordinates are explicit and finite; zero means zero.

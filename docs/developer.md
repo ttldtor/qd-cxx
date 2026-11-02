@@ -20,6 +20,7 @@ reruns are different evidence; none is a general security certification or an RS
 
 - [TLS runtime/resource qualification](../tests/conformance/transport/TLS-VALIDATION.md)
 - [TCP runtime qualification](../tests/conformance/transport/TCP-VALIDATION.md)
+- [Recovery-owned HISTORY range observation](../tests/conformance/transport/HISTORY-STATUS-VALIDATION.md)
 - [Tape reader and supported inputs](../spec/protocol/TAPE-READER.md)
 - [Tape writer validation](../tests/conformance/protocol/tape-write/WRITER-VALIDATION.md)
 - [Schema export validation](../tests/conformance/schema-export/VALIDATION.md)
