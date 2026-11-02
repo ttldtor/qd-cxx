@@ -230,10 +230,51 @@ std::string_view help(bool russian) noexcept {
 Остановка по времени/цели/сигналу закрывает TCP с отменой pending output, затем завершает local prefix.
 Запись в сокет не подтверждает приём peer; завершение local не означает полного сетевого drain.
 SIGINT/SIGTERM инициируют cooperative stop; нет жёсткой гарантии задержки OS/блокирующего sink.
-Нет TLS, auth, reconnect, wildcard, MUX, stdin-команд или совместимости Java CLI.
+В режиме по умолчанию нет TLS, auth, reconnect, wildcard, MUX, stdin-команд или совместимости Java CLI.
 Коды: 0 intentional cutoff/достигнутая цель; 1 input/setup/peer/protocol/callback/sink failure;
       2 истёк интервал до add или недостигнута заданная цель; 130 interrupt.
 Ошибка вывода справки тоже даёт ненулевой код.
+
+Явный режим восстановления (нужна сборка с RECOVERY):
+  qdcxx-connect --mode recovery --host HOST --port N --symbol SYMBOL [параметры]
+  --family stream|ticker|history  По умолчанию stream; одна семья/запись/клиент за запуск.
+  --schema-profile quote|profile  Полная встроенная схема; по умолчанию quote, record-id 0.
+  --schema-json PATH         Явная native binary JSON схема, до 1 MiB; нужна сборка с JSON.
+  --record-id N              Локальный ID 0..2147483647; обязателен с --schema-json.
+  --history-from-raw N       Для HISTORY: обязательный signed int64 и внешняя indexed схема.
+  --selectors exact-only|canonical-exact-v1  По умолчанию exact-only; All/wildcard не принимаются.
+  --output generic|quote|profile  Всегда точные generic поля; optional prepared строки добавляются.
+  --dns-server IPv4          Для DNS имени нужен явный числовой resolver; для numeric IP не нужен.
+  --dns-port N               Порт resolver 1..65535, по умолчанию 53; требует --dns-server.
+  --dns-timeout-ms N         Deadline 1..2147483647 мс; по умолчанию connect timeout.
+  --attempts N               Положительный uint32, по умолчанию 1; действует предел таблицы epoch 1 MiB.
+  --retry-delay-ms N         Для attempts>1: 1..2147483647 мс, по умолчанию 250; с attempts 1 запрещён.
+  --drain-ms N               Локальное завершение 1..60000 мс, по умолчанию 1000.
+  --security plain|tls       По умолчанию plain; TLS требует отдельной сборки, trust и reference.
+  --tls-trust-pem PATH       Для TLS: явный файл обычных CERTIFICATE PEM, без системного trust fallback.
+  --tls-reference NAME       Для TLS: проверяемый numeric IP или ASCII/A-label DNS, независимо от route.
+  --tls-handshake-ms N       Для TLS:1..2147483647 мс, по умолчанию 1000.
+  --tls-close-ms N           Для TLS:1..2147483647 мс, по умолчанию 1000.
+  --auth-basic-token-file PATH  Только TLS: точные ASCII bytes полного Basic token; newline запрещён.
+  --auth-timeout-ms N        Только с token file:1..2147483647 мс, по умолчанию 1000.
+Общие --host/--port/--symbol/--duration-ms/--remove-after-ms/--max-records и четыре timeout/poll
+параметра сохраняют указанные диапазоны/значения по умолчанию; read/write defaults равны duration.
+Нельзя смешивать --schema-json и --schema-profile. HISTORY bound не является Unix/event timestamp.
+Пути ограничены 4096 bytes; Windows native UTF16 преобразуется в UTF8 без смены кодировки процесса.
+Фиксированный профиль: schema 16 records/128 fields/256 lookups, name 128 units/16384 units всего,
+до 16 symbols по 128 ASCII units, кадр до 64 records. Превышение входных лимитов отвергается до активации.
+Live данные могут исчерпать фиксированные очереди/кэши; это явный отказ, без скрытого роста бюджета.
+Файлы читаются один раз после проверки выбранных возможностей сборки; stdin и скрытых defaults нет.
+Результат stdout: qdcxx-subscriptions TSV v1; stderr: фактические команды/reset/HISTORY/terminal.
+Печатается целая callback batch: цель max-records может быть превышена; новых строк внутри неё не отбрасываем.
+Reset публикуется перед точным ACK. HISTORY — локальное AS-OF наблюдение; отказ означает unknown.
+Effects: DNS только при явном resolver, конечные новые TCP/TLS попытки, временные signal handlers,
+чтение явно заданных файлов и запись stdout/stderr. TLS никогда не откатывается в plaintext.
+Drain завершает только принятый локальный префикс; это не peer ACK или полное network flush.
+Коды нового режима:0 фактический DRAINED без expiry и выполненные readiness/цели/команды;
+1 ошибка настройки/протокола/транспорта/вывода/завершения;2 usage или недостигнутая цель/readiness;
+130 обработанный signal после фактического ABORTED. Ошибка имеет приоритет над signal.
+Отсутствующая возможность сборки отвергается до файлов/bootstrap/signals/network.
 )";
     }
 
@@ -260,10 +301,51 @@ Effects: one TCP connection, protocol/description/add and optional remove; tempo
 Duration/target/signal cutoff aborts pending TCP output, then retires the admitted local prefix.
 Socket acceptance is not peer acknowledgement; local completion is not a whole-network drain.
 SIGINT/SIGTERM request cooperative stop; OS completion/blocking sinks have no hard latency guarantee.
-No TLS, auth, reconnect, wildcard, MUX, stdin commands or Java CLI compatibility.
+The default route has no TLS, auth, reconnect, wildcard, MUX, stdin commands or Java CLI compatibility.
 Exit: 0 intentional cutoff/data target reached; 1 input/setup/peer/protocol/callback/sink failure;
       2 interval expired before add or requested target not reached; 130 interrupt.
 Help output failure also returns nonzero.
+
+Explicit recovery route (requires a RECOVERY build):
+  qdcxx-connect --mode recovery --host HOST --port N --symbol SYMBOL [options]
+  --family stream|ticker|history  Default stream; one family/record/client per invocation.
+  --schema-profile quote|profile  Complete built-in schema; default quote, record-id 0.
+  --schema-json PATH         Explicit native binary JSON schema, at most 1 MiB; requires JSON build.
+  --record-id N              Local ID 0..2147483647; required with --schema-json.
+  --history-from-raw N       HISTORY requires signed int64 input and an external indexed schema.
+  --selectors exact-only|canonical-exact-v1  Default exact-only; no All or wildcard.
+  --output generic|quote|profile  Always exact generic fields; optional prepared rows are additional.
+  --dns-server IPv4          Named routes require an explicit numeric resolver; numeric routes do not.
+  --dns-port N               Resolver port 1..65535, default 53; requires --dns-server.
+  --dns-timeout-ms N         Deadline 1..2147483647 ms; default connect timeout.
+  --attempts N               Positive uint32, default 1; also bounded by the 1 MiB epoch-label table.
+  --retry-delay-ms N         For attempts>1: 1..2147483647 ms, default 250; rejected with attempts 1.
+  --drain-ms N               Local retirement 1..60000 ms, default 1000.
+  --security plain|tls       Default plain; TLS requires its separate build, trust and reference.
+  --tls-trust-pem PATH       TLS: explicit ordinary CERTIFICATE PEM file; no system-trust fallback.
+  --tls-reference NAME       TLS: verified numeric IP or ASCII/A-label DNS identity, independent of route.
+  --tls-handshake-ms N       TLS:1..2147483647 ms, default 1000.
+  --tls-close-ms N           TLS:1..2147483647 ms, default 1000.
+  --auth-basic-token-file PATH  TLS only: exact ASCII bytes of a complete Basic token; no newline.
+  --auth-timeout-ms N        With token file only:1..2147483647 ms, default 1000.
+Shared host/port/symbol/duration/remove/record-target and four timeout/poll options retain the ranges
+and defaults above; read/write defaults equal duration. --schema-json excludes --schema-profile.
+HISTORY raw bound is not a Unix/event timestamp. Paths are bounded to 4096 bytes; Windows native
+UTF16 arguments become UTF8 without changing process codepages.
+Fixed profile: schema 16 records/128 fields/256 lookups,128 units/name/16384 total name units,
+up to 16 symbols of 128 ASCII units, at most 64 records/frame. Input-profile excess refuses before activation.
+Live data can exhaust fixed queues/caches; this is an explicit failure without hidden budget growth.
+Explicit files are read once after build-feature checks; no stdin or implicit configuration sources.
+Result stdout: qdcxx-subscriptions TSV v1; stderr: actual commands/reset/HISTORY/local terminal.
+A whole callback batch is published even across max-records; the target does not discard its suffix.
+Reset publication precedes exact ACK. HISTORY is local AS-OF evidence; refusal means unknown.
+Effects: DNS with an explicit resolver, finite fresh TCP/TLS attempts, temporary signal handlers,
+explicit file reads and stdout/stderr writes. TLS never falls back to plaintext.
+Drain covers only the admitted local prefix; it does not establish peer ACK or whole-network flush.
+New-route exits:0 actual DRAINED without expiry and satisfied readiness/targets/commands;
+1 setup/protocol/transport/output/retirement failure;2 usage or unmet target/readiness;
+130 handled signal after actual ABORTED. Failure takes precedence over signal.
+Unavailable build features refuse before files/bootstrap/signals/network.
 )";
 }
 } // namespace org::ttldtor::qdcxx::connect
