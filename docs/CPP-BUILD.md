@@ -120,15 +120,21 @@ It creates two independent snapshots without runtime/network activation and prin
 [executed validation](../tests/conformance/subscriptions/OPTIONS-VALIDATION.md)
 cover lifetimes, budgets, the snapshot overload and optional dependency closure.
 
-## Optional controlled STREAM tool
+## Optional subscription tool
 
 `ORG_TTLDTOR_QDCXX_BUILD_CONNECT` defaults to `OFF` and requires explicit CLIENT and
 RUNTIME enablement with the qualified SDK sources above. Build target `qdcxx_connect`
-for executable `qdcxx-connect`. The [usage and output guide](SUBSCRIPTIONS.md) defines
-the numeric-endpoint, exact-selection and finite-run profile, native EN/RU help,
-generic records and explicit prepared summaries. This tool does not add TLS,
-reconnect or shared upstream multiplexing. The programmatic example is built against
-the same runtime/dispatcher and supports a caller-provided validated schema.
+for executable `qdcxx-connect`. The [usage and output guide](SUBSCRIPTIONS.md) covers
+native EN/RU help, generic records and prepared Quote/Profile summaries. The default
+mode preserves the controlled plain-TCP STREAM driver. Enable
+`ORG_TTLDTOR_QDCXX_BUILD_RECOVERY=ON` for explicit `--mode recovery` with
+STREAM/TICKER/HISTORY, finite retries, reset notices and drain outcomes. Enable
+`ORG_TTLDTOR_QDCXX_BUILD_TLS=ON` and prepare the
+[qualified TLS SDK](#tls-source-profile-cpp-build-en) for verified TLS and optional Basic
+credentials. External schemas additionally require `ORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON=ON`.
+Disabled features reject before input files or network activation. The CLI selects
+one family and one record per run; shared queues and multiple logical subscriptions
+are available through the [public receiving API](SUBSCRIPTION-RECEIVER.md).
 
 ## Desired subscription state
 

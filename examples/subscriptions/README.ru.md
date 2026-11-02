@@ -1,6 +1,86 @@
-# Программный пример управляемого STREAM
+# Консольные примеры подписок
 
 [English version](README.md). Английская версия — нормативная.
+
+Начните с готового [консольного приложения Quote](receiver/quote.cpp). Оно получает настоящий binary
+QTP через публичные `TcpRecovery` и `SubscriptionConsumer`, проецирует полную встроенную восьмиполевую
+Quote и печатает bid/ask raw price/size. Это приложение-потребитель установленной библиотеки;
+в его executable нет тестового peer или test framework.
+
+## Сборка и запуск Quote-приёмника
+
+Сначала соберите/установите CLIENT, RUNTIME и RECOVERY с точными зависимостями из
+[инструкции сборки](../../docs/CPP-BUILD.ru.md). Затем используйте существующий отдельный CMake-проект:
+
+```powershell
+cmake -S examples/subscriptions/receiver -B build/quote-subscriber '-Dqdcxx_DIR=C:/dev/qdcxx/install/lib/cmake/qdcxx'
+cmake --build build/quote-subscriber --config Release
+```
+
+Подставьте свой prefix/package library directory. Установка с TLS дополнительно требует точный
+`ORG_TTLDTOR_QDCXX_OPENSSL_ROOT` при конфигурации потребителя; это не включает TLS в данном plain
+приложении. Visual Studio помещает executable в `Release`; одноконфигурационные генераторы — обычно
+прямо в каталог сборки. Для Visual Studio запустите из корня checkout:
+
+```powershell
+./build/quote-subscriber/Release/qdcxx-quote-subscription.exe --help
+./build/quote-subscriber/Release/qdcxx-quote-subscription.exe --help-ru
+./build/quote-subscriber/Release/qdcxx-quote-subscription.exe --host 127.0.0.1 --port 19123 --symbol IBM --duration-ms 5000
+```
+
+Для одноконфигурационной Windows-сборки используйте `./build/quote-subscriber/qdcxx-quote-subscription.exe`;
+для Linux обычно `./build/quote-subscriber/qdcxx-quote-subscription`. При запуске из каталога executable
+PowerShell требует `./qdcxx-quote-subscription.exe`. Короткие имена в остальных примерах предполагают
+наличие в `PATH`; иначе укажите фактический полный путь.
+
+Без аргументов выводится та же английская справка без schema/bootstrap/network work. Совместимый
+источник должен уже слушать выбранный порт и поддерживать Quote/символ. Сам пример сервис не запускает.
+Для DNS-имени задайте явный numeric IPv4 `--dns-server` и при необходимости `--dns-port`; системный
+resolver не обнаруживается. Named route добавляет описанные 80 MiB логического резерва запрошенной
+памяти и отдельную консервативную DNS work; numeric route это обходит. Это не предел RSS/времени.
+
+Конечные исходные настройки находятся в [quote.cpp](receiver/quote.cpp), [settings.hpp](receiver/settings.hpp)
+и [arguments.hpp](receiver/arguments.hpp). Приложение создаёт schema и endpoint snapshot, открывает
+receiver на STREAM queue, передаёт desired set, затем создаёт/запускает/продвигает recovery на потоке
+владельца. Progress и shutdown используют одинаковый конечный work profile.
+
+В настоящем `QuoteConsumer::onBatch` параметр `batch` — заимствованный публичный `SubscriptionBatch`;
+цикл проецирует записи с явными конечными credits:
+
+```cpp
+auto work = projectionWork();
+auto projected = batch.project(index, work);
+```
+
+Это фрагмент полного приложения: `index` — индекс текущей записи, `projectionWork()` — объявленный
+помощник из `settings.hpp`. Полный callback проверяет ошибку projection и Quote variant до чтения,
+проверяет stdout и возвращает существующее whole-batch action. Projected Quote владеет значениями;
+batch/projection service действуют только внутри callback.
+[Руководство API приёмника](../../docs/SUBSCRIPTION-RECEIVER.ru.md) описывает сохранение generic batches,
+добавление независимых logical clients и выбор других семейств без удержания заимствованного фасада.
+
+`--maximum-records N` необязательно ограничивает печать 1–1000000 строками; duration остаётся
+безусловной границей. Пример может перестать печатать внутри callback batch. У отдельного CLI
+`--max-records` задаёт цель с сохранением целого опубликованного batch. Максимум три новые попытки
+используют фиксированную задержку 250 мс. Duration/row cutoff запрашивает local drain (`--drain-ms`,
+default 1000); сигналы и ошибки — abort. Exit: 0 для завершённого drain/справки, 1 для ошибки,
+2 для неверных аргументов, 130 для interruption. Local drain не доказывает peer ACK или whole-network flush.
+
+Напечатанные `.raw` — точные WideDecimal bits; raw zero означает NaN. Для business values
+используйте `toString()` либо `toDouble()`. Пример остаётся plain TCP/STREAM. Для Quote/Profile/HISTORY,
+external JSON, проверяемого TLS и необязательных Basic-файлов есть
+[руководство recovery CLI](../../docs/SUBSCRIPTIONS.ru.md) и [справочник](../../tools/subscribe/README.ru.md).
+Машинные форматы и границы TLS-окружения определены в
+[recovery output](../../spec/cli/RECOVERY-OUTPUT.ru.md) и
+[замкнутом TLS-профиле](../../spec/cli/TLS-HOST-PROFILE.ru.md).
+
+<a id="программный-пример-управляемого-stream"></a>
+<a id="example-subscriptions-legacy-stream-ru"></a>
+
+## Прежний вызываемый STREAM-пример
+
+Остальные разделы описывают существующий `runStream` и вызываемую библиотеку примера;
+их configuration/output/terminal rules отделены от приложения-приёмника выше.
 
 [example.cpp](example.cpp) — небольшой вызываемый пример без второго операционного CLI.
 `runSubscriptionExample` принимает заранее созданный main-thread `RuntimeBootstrap`, валидированную

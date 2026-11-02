@@ -20,8 +20,9 @@ TLS and custom indexed schemas use their existing separate configuration contrac
 
 ## Build and run the console application
 
-First build and install the library with `ORG_TTLDTOR_QDCXX_BUILD_CLIENT=ON` and
-`ORG_TTLDTOR_QDCXX_BUILD_RUNTIME=ON`, following [the build guide](CPP-BUILD.md).
+First build and install the library with `ORG_TTLDTOR_QDCXX_BUILD_CLIENT=ON`,
+`ORG_TTLDTOR_QDCXX_BUILD_RUNTIME=ON` and `ORG_TTLDTOR_QDCXX_BUILD_RECOVERY=ON`,
+following [the build guide](CPP-BUILD.md).
 Then configure the example as an independent installed consumer. For example, in PowerShell
 from a source checkout, replace the installation directory with your own:
 
@@ -35,6 +36,9 @@ places the executable directly under `build/quote-subscriber`; Visual Studio nor
 the `Release` subdirectory. An installed package built with TLS enabled also needs its
 qualified `ORG_TTLDTOR_QDCXX_OPENSSL_ROOT`, even for this plain-linked application;
 see the [package/TLS instructions](CPP-BUILD.md).
+
+Short executable names below assume the executable is on `PATH`. From its directory use
+`./qdcxx-quote-subscription.exe` on Windows or `./qdcxx-quote-subscription` on Linux.
 
 `qdcxx-quote-subscription --help` and no arguments show identical English help without
 schema loading, process bootstrap or networking. `--help-ru` shows Russian help.

@@ -14,10 +14,14 @@
 [подготовку SDK](../../cmake/runtime-profile/README.ru.md) и
 [инструкции сборки/пакета](../../docs/CPP-BUILD.ru.md#опциональный-tcp-runtime).
 
-Опциональный [контролируемый STREAM-клиент](../../docs/SUBSCRIPTIONS.ru.md)
-`qdcxx-connect` использует production TCP runtime и локальный диспетчер с точным
-выбором символов и общим либо prepared Quote/Profile выводом. Встроенная справка
-доступна без работы со входом/сетью. Конечный plain-профиль не предоставляет TLS и reconnect.
+Опциональный [клиент подписок](../../docs/SUBSCRIPTIONS.ru.md) `qdcxx-connect`
+сохраняет исходный контролируемый plain STREAM-режим по умолчанию. Явный
+`--mode recovery` добавляет получение STREAM/TICKER/HISTORY, конечные повторы,
+уведомления reset и завершение очередей; проверенный TLS и внешние JSON-схемы
+имеют отдельные флаги сборки. Оба режима выводят общие записи и подготовленные
+Quote/Profile. Встроенная EN/RU-справка работает без входных данных и сети.
+См. [формат вывода](../../spec/cli/RECOVERY-OUTPUT.ru.md) и
+[контролируемый TLS-профиль процесса](../../spec/cli/TLS-HOST-PROFILE.ru.md).
 
 Самостоятельный [пример подписки Quote](../../docs/SUBSCRIPTION-RECEIVER.ru.md) собирается
 с установленным пакетом и использует prepared-получатель и существующий TCP recovery.

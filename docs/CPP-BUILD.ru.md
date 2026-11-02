@@ -125,15 +125,22 @@ ctest --test-dir build-options-consumer -C Release --output-on-failure
 [выполненная валидация](../tests/conformance/subscriptions/OPTIONS-VALIDATION.ru.md)
 описывают lifetime, бюджеты, overload со снимком и замыкание необязательных зависимостей.
 
-## Опциональный контролируемый STREAM-инструмент
+## Опциональный инструмент подписок
 
 `ORG_TTLDTOR_QDCXX_BUILD_CONNECT` по умолчанию `OFF`; ему нужны явно включённые CLIENT
 и RUNTIME с указанными выше квалифицированными SDK. Соберите target `qdcxx_connect`
 для executable `qdcxx-connect`. [Руководство по использованию и выводу](SUBSCRIPTIONS.ru.md)
-описывает профиль числового endpoint, точного выбора и конечного запуска, встроенную
-EN/RU-справку, общие записи и явные prepared summaries. Инструмент не добавляет TLS,
-reconnect или общий upstream multiplexing. Программный пример использует те же runtime
-и диспетчер, поддерживая проверенную схему вызывающей стороны.
+описывает встроенную EN/RU-справку, общие записи и подготовленные Quote/Profile.
+По умолчанию сохраняется контролируемый plain-TCP STREAM-драйвер. Включите
+`ORG_TTLDTOR_QDCXX_BUILD_RECOVERY=ON` для явного `--mode recovery` с
+STREAM/TICKER/HISTORY, конечными повторами, уведомлениями reset и результатами
+завершения очередей. Для проверенного TLS и необязательных Basic credentials
+включите `ORG_TTLDTOR_QDCXX_BUILD_TLS=ON` и подготовьте
+[квалифицированный TLS SDK](#tls-source-profile-cpp-build-ru). Внешним схемам
+дополнительно нужен `ORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON=ON`. Выключенные возможности
+отклоняются до чтения входных файлов и запуска сети. CLI выбирает одну семью и запись
+на запуск; общие очереди и несколько логических подписок доступны через
+[публичный API получения](SUBSCRIPTION-RECEIVER.ru.md).
 
 ## Целевое состояние подписок
 

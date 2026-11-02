@@ -15,10 +15,13 @@ For the root's optional production TCP target, use the separate
 [SDK preparation guide](../../cmake/runtime-profile/README.md) and
 [build/package instructions](../../docs/CPP-BUILD.md#optional-tcp-runtime).
 
-The opt-in [controlled STREAM client](../../docs/SUBSCRIPTIONS.md), `qdcxx-connect`,
-uses the production TCP runtime and local dispatcher with exact selectors and
-generic or prepared Quote/Profile output. Its native help is available without
-input/network work. This plain, finite profile does not provide TLS or reconnect.
+The opt-in [subscription client](../../docs/SUBSCRIPTIONS.md), `qdcxx-connect`,
+preserves its default controlled plain STREAM mode. Explicit `--mode recovery`
+adds STREAM/TICKER/HISTORY receiving, finite retries, reset notices and draining;
+verified TLS and external JSON schemas have separate build switches. Both modes
+provide generic records and prepared Quote/Profile output. Native EN/RU help runs
+without input/network work. See the [output format](../../spec/cli/RECOVERY-OUTPUT.md)
+and [controlled TLS host profile](../../spec/cli/TLS-HOST-PROFILE.md).
 
 The standalone [Quote subscription example](../../docs/SUBSCRIPTION-RECEIVER.md) builds
 against an installed package and uses the prepared receiving facade and existing TCP recovery.

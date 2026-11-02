@@ -21,8 +21,9 @@ TLS и custom indexed-схемы используют собственные с�
 
 ## Сборка и запуск консольного приложения
 
-Сначала соберите и установите библиотеку с `ORG_TTLDTOR_QDCXX_BUILD_CLIENT=ON` и
-`ORG_TTLDTOR_QDCXX_BUILD_RUNTIME=ON` по [инструкции сборки](CPP-BUILD.ru.md).
+Сначала соберите и установите библиотеку с `ORG_TTLDTOR_QDCXX_BUILD_CLIENT=ON`,
+`ORG_TTLDTOR_QDCXX_BUILD_RUNTIME=ON` и `ORG_TTLDTOR_QDCXX_BUILD_RECOVERY=ON`
+по [инструкции сборки](CPP-BUILD.ru.md).
 Затем настройте пример как независимого потребителя установленного пакета.
 Например, в PowerShell из дерева исходников замените каталог установки своим:
 
@@ -36,6 +37,9 @@ cmake --build build/quote-subscriber --config Release
 подкаталог `Release`. Установленному пакету со включённым TLS также нужен квалифицированный
 `ORG_TTLDTOR_QDCXX_OPENSSL_ROOT`, даже для этого приложения с plain linkage;
 см. [настройку пакета/TLS](CPP-BUILD.ru.md).
+
+Короткие имена ниже предполагают executable в `PATH`. Из его каталога используйте
+`./qdcxx-quote-subscription.exe` в Windows либо `./qdcxx-quote-subscription` в Linux.
 
 `qdcxx-quote-subscription --help` и отсутствие аргументов показывают одинаковую английскую
 справку без загрузки схемы, bootstrap процесса и сети. `--help-ru` показывает русскую справку.

@@ -1,6 +1,155 @@
-# Контролируемые STREAM-подписки
+# Получение данных по подпискам
 
 [English version](SUBSCRIPTIONS.md). Английская версия нормативная.
+
+Начните с готового консольного приёмника ниже либо используйте `qdcxx-connect --mode recovery`
+для STREAM, TICKER или индексированной HISTORY. Продвижением и конечными ресурсами управляет
+вызывающее приложение. CLI выбирает одно семейство, одну запись и одного логического клиента
+на запуск. Несколько логических подписок приложение может собрать через
+[публичный API приёмника](SUBSCRIPTION-RECEIVER.ru.md).
+Вызовы без `--mode recovery` сохраняют [прежний STREAM-профиль](#subscription-legacy-stream-ru).
+
+## Сборка консольного приёмника
+
+Соберите и установите библиотеку с `ORG_TTLDTOR_QDCXX_BUILD_CLIENT=ON`,
+`ORG_TTLDTOR_QDCXX_BUILD_RUNTIME=ON` и `ORG_TTLDTOR_QDCXX_BUILD_RECOVERY=ON`.
+Используйте поддерживаемый компилятор и точные подготовленные Asio/c-ares из
+[руководства по сборке](CPP-BUILD.ru.md). Получение SDK выполняется явно и не является частью
+приёма данных. Подходит существующая квалифицированная установка или подготовленный локальный кеш.
+
+Полное [C++ приложение Quote](../examples/subscriptions/receiver/quote.cpp) — отдельный потребитель
+установленной библиотеки с публичным callback `SubscriptionConsumer`, prepared Quote mapping
+и собственным циклом продвижения. Из checkout соберите его против своей установки:
+
+```powershell
+cmake -S examples/subscriptions/receiver -B build/quote-subscriber '-Dqdcxx_DIR=C:/dev/qdcxx/install/lib/cmake/qdcxx'
+cmake --build build/quote-subscriber --config Release
+```
+
+После сборки Visual Studio запустите из корня checkout:
+
+```powershell
+./build/quote-subscriber/Release/qdcxx-quote-subscription.exe --help
+```
+
+Одноконфигурационные Windows-генераторы используют `./build/quote-subscriber/qdcxx-quote-subscription.exe`;
+Linux обычно использует `./build/quote-subscriber/qdcxx-quote-subscription`. Из каталога executable
+PowerShell требует `./qdcxx-quote-subscription.exe`. Если установленный пакет собран с TLS,
+при конфигурации потребителя также нужен точный `ORG_TTLDTOR_QDCXX_OPENSSL_ROOT`, даже для этого
+обычного TCP-приёмника. [Руководство примеров](../examples/subscriptions/README.ru.md) объясняет callback и владение.
+
+Если совместимый binary QTP-источник уже слушает указанный адрес:
+
+```powershell
+./build/quote-subscriber/Release/qdcxx-quote-subscription.exe --host 127.0.0.1 --port 19123 --symbol IBM --duration-ms 5000
+```
+
+Встроенного сервиса на этом порту нет. Подставьте адрес/порт своего источника и поддерживаемый им
+символ; источник должен объявить совместимое описание Quote. Программа печатает фактические raw bits
+bid/ask. У `WideDecimal` raw zero означает NaN; для представления цен используйте `toString()` либо
+`toDouble()`. Пример работает по обычному TCP; проверяемый TLS отдельно доступен в CLI ниже.
+
+## CLI с восстановлением соединения
+
+Дополнительно включите `ORG_TTLDTOR_QDCXX_BUILD_CONNECT=ON` и соберите target `qdcxx_connect`,
+создающий `qdcxx-connect`. Для внешних native binary JSON-схем нужен
+`ORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON=ON`, для TLS — `ORG_TTLDTOR_QDCXX_BUILD_TLS=ON` и
+[точный квалифицированный статический SDK](CPP-BUILD.ru.md#tls-source-profile-cpp-build-ru). Недоступная возможность
+отвергается до чтения файлов и активации. Вызов без аргументов и отдельные `--help`/`--help-ru`
+не требуют endpoint, файлов схемы или сети. Полные параметры находятся в
+[справочнике инструмента](../tools/subscribe/README.ru.md).
+Короткие имена в командах ниже предполагают каталог executable в `PATH`; иначе замените имя
+полным путём либо используйте `./name.exe` из его каталога в PowerShell.
+
+Команды требуют существующего совместимого источника. STREAM доставляет выбранные записи;
+TICKER предоставляет контракт последних значений и может объединять промежуточные обновления.
+Явно выбранный prepared output добавляет Quote/Profile-строки, сохраняя все generic-поля:
+
+```text
+qdcxx-connect --mode recovery --host 127.0.0.1 --port 19123 --symbol IBM --family stream --schema-profile quote --output quote --duration-ms 5000
+qdcxx-connect --mode recovery --host 127.0.0.1 --port 19123 --symbol IBM --family ticker --schema-profile profile --output profile --duration-ms 5000
+```
+
+Обе встроенные схемы полные и обычные. Для собственной схемы явно укажите локальный ID записи.
+HISTORY требует индексные метаданные и знаковую int64 raw lower bound:
+
+```text
+qdcxx-connect --mode recovery --host 127.0.0.1 --port 19123 --symbol IBM --family history --schema-json spec/schema/examples/native-binary/pair.json --record-id 0 --history-from-raw 0 --output generic --duration-ms 5000
+```
+
+Команда с относительным путём схемы запускается из корня checkout; можно указать абсолютный путь.
+Отслеживаемая [pair-index схема](../spec/schema/examples/native-binary/pair.json) описывает
+`TimeAndSale` с Time/Sequence contributors; источник должен поддерживать эту запись/схему.
+`--history-from-raw` — точная знаковая индексная идентичность, **не Unix milliseconds и не бизнес-время
+события**. Выбирайте границу по [контракту индексных схем](../spec/schema/INDEXED-SCHEMAS.ru.md) и
+[формату native binary JSON](../spec/schema/NATIVE-BINARY-JSON.ru.md). Файл описывает данные;
+он не создаёт источник и не добавляет peer поддержку неизвестной записи.
+
+Числовой host обходит DNS. Для имени обязателен явный числовой IPv4 `--dns-server`, при необходимости
+с `--dns-port`; системный resolver не обнаруживается. DNS использует дополнительные 80 MiB логического
+резерва запрошенной памяти и отдельный консервативный профиль работы. Это не предел RSS.
+
+## Проверяемый TLS и необязательный Basic token
+
+Если сертификат TLS-источника действителен для `feed.example`, задайте свой trust-файл и reference
+identity. Адрес маршрута и проверяемая идентичность независимы:
+
+```text
+qdcxx-connect --mode recovery --host 127.0.0.1 --port 19443 --symbol IBM --family stream --schema-profile quote --security tls --tls-trust-pem C:/dev/qd/trust.pem --tls-reference feed.example --duration-ms 5000
+```
+
+Адрес/порт и файлы здесь заменяются значениями вашего источника. Trust содержит обычные
+`CERTIFICATE` PEM blocks: максимум 524288 байтов/256 блоков. Нет system-trust fallback или перехода
+на plaintext. Executable использует узкий [замкнутый TLS-профиль](../spec/cli/TLS-HOST-PROFILE.ru.md):
+новый процесс, один точный статический SDK image и последовательный владелец, без других
+пользователей SDK/хуков или общей мутации, с отсутствующей `OPENSSL_ia32cap`. Фиксированный preflight
+выполняется до декодирования сертификатов. Это обязанности данного TLS-маршрута, а не автоматическое
+обнаружение всех пользователей SDK в произвольном процессе.
+
+Если проверенный источник требует Basic authentication, добавьте:
+
+```text
+qdcxx-connect --mode recovery --host 127.0.0.1 --port 19443 --symbol IBM --family stream --schema-profile quote --security tls --tls-trust-pem C:/dev/qd/trust.pem --tls-reference feed.example --auth-basic-token-file C:/dev/qd/basic-token.txt --auth-timeout-ms 1000 --duration-ms 5000
+```
+
+Файл содержит полный префикс `Basic ` и канонический base64 token как точные ASCII bytes,
+максимум 4096 байтов, **без newline, trimming или нормализации**. Не помещайте credentials в argv.
+Файлы читаются один раз после проверки возможностей/аргументов; диагностика не повторяет пути,
+identity или token. Credentials запрашивает проверенный TLS-адаптер. Поддерживаемые криптографические
+и peer-ограничения описаны в [TLS-контракте](../spec/transport/TLS-RUNTIME.ru.md).
+
+## Наблюдение восстановления и завершение
+
+Добавьте `--attempts 3 --retry-delay-ms 250` для максимум трёх новых попыток, включая первую.
+После подходящих ошибок воспроизводится текущий desired set. `--remove-after-ms 1000` один раз
+удаляет начальные ключи; момент должен предшествовать концу admission interval. Нет stdin command
+language, wildcard или обещания exactly-once replay. Превышение фиксированных входных лимитов/cache
+видимо отвергается; лимиты не растут неявно. Ошибка setup/factory может завершить запуск раньше всех попыток.
+
+Stdout содержит `qdcxx-subscriptions` TSV version 1; stderr — фактические команды, phase, reset,
+HISTORY и terminal observations. Reset публикуется перед его точным acknowledgement; смены epoch
+и разрывы видимы. Перед разбором строк прочтите [контракт вывода](../spec/cli/RECOVERY-OUTPUT.ru.md).
+HISTORY-наблюдения дают локальное AS-OF evidence; недопустимый range query означает unknown,
+а не ранее сохранённую полноту. Flags, `ACTIVE`, local drain и сами записи не доказывают завершение snapshot.
+
+Duration или достигнутый record target запрашивает local drain с `--drain-ms` (по умолчанию 1000).
+Целый допущенный callback batch может пересечь `--max-records`; его суффикс сохраняется. Drain охватывает
+только ранее допущенный локальный префикс и может истечь с ошибкой; он не доказывает peer ACK или
+whole-network flush. SIGINT/SIGTERM запрашивает abort; progress/drain используют тот же конечный work
+profile. Для блокирующего output stream или native operation нет hard preemption guarantee.
+
+Коды recovery: `0` — фактический DRAINED без expiry и выполненные readiness/commands/targets;
+`1` — setup/protocol/transport/output/retirement failure; `2` — usage либо недостигнутые readiness/target;
+`130` — обработанный сигнал после фактического ABORTED. Ошибка важнее interruption.
+Допустимость наблюдений, reset/replay и shutdown определяет [recovery-контракт](../spec/transport/RECOVERY.ru.md).
+
+<a id="контролируемые-stream-подписки"></a>
+<a id="subscription-legacy-stream-ru"></a>
+
+## Прежний контролируемый STREAM-драйвер
+
+Все разделы ниже относятся к вызовам **без `--mode recovery`** и существующему примеру `runStream`.
+Их формат вывода, endpoint snapshot overload и правила terminal сохранены.
 
 Для приложений с общими очередями и prepared-callback начните с
 [получения generic-записей и подготовленных событий](SUBSCRIPTION-RECEIVER.ru.md).

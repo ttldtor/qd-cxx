@@ -1,6 +1,152 @@
-# Controlled STREAM subscriptions
+# Receive subscriptions
 
 [Русская версия](SUBSCRIPTIONS.ru.md). English is authoritative.
+
+Start with the existing console receiver below, or use `qdcxx-connect --mode recovery` for
+STREAM, TICKER or indexed HISTORY. Both use caller-driven progress and finite resource limits.
+The CLI selects one delivery family, one record and one logical client per run. Applications can
+compose multiple logical subscriptions with the [public receiving API](SUBSCRIPTION-RECEIVER.md).
+Calls without `--mode recovery` retain the [legacy STREAM profile](#subscription-legacy-stream-en).
+
+## Build a console receiver
+
+Build and install with `ORG_TTLDTOR_QDCXX_BUILD_CLIENT=ON`,
+`ORG_TTLDTOR_QDCXX_BUILD_RUNTIME=ON` and `ORG_TTLDTOR_QDCXX_BUILD_RECOVERY=ON`.
+Use a supported compiler and the exact prepared Asio/c-ares inputs from the
+[build guide](CPP-BUILD.md#optional-tcp-runtime); SDK acquisition is explicit and is not part of
+receiving data. An existing qualified installation or prepared local dependency cache can be reused.
+
+The complete [C++ Quote application](../examples/subscriptions/receiver/quote.cpp) is an installed
+consumer with a public `SubscriptionConsumer` callback, prepared Quote mapping and its own progress
+loop. Build it from the checkout against your installation:
+
+```powershell
+cmake -S examples/subscriptions/receiver -B build/quote-subscriber '-Dqdcxx_DIR=C:/dev/qdcxx/install/lib/cmake/qdcxx'
+cmake --build build/quote-subscriber --config Release
+```
+
+For a Visual Studio build, run from the checkout root:
+
+```powershell
+./build/quote-subscriber/Release/qdcxx-quote-subscription.exe --help
+```
+
+Single-configuration Windows generators use `./build/quote-subscriber/qdcxx-quote-subscription.exe`;
+Linux normally uses `./build/quote-subscriber/qdcxx-quote-subscription`. From the executable directory,
+PowerShell requires `./qdcxx-quote-subscription.exe`. A TLS-enabled installed package also
+requires the exact `ORG_TTLDTOR_QDCXX_OPENSSL_ROOT` during consumer configuration, even for this plain
+receiver. The [example guide](../examples/subscriptions/README.md) explains the callback and ownership.
+
+Given a compatible binary QTP source already listening at the example endpoint:
+
+```powershell
+./build/quote-subscriber/Release/qdcxx-quote-subscription.exe --host 127.0.0.1 --port 19123 --symbol IBM --duration-ms 5000
+```
+
+There is no bundled service at that port. Supply your source's address/port and a symbol it supports;
+it must advertise a compatible Quote description. The application prints actual projected bid/ask
+representation bits. `WideDecimal` raw zero represents NaN; use its `toString()` or `toDouble()` when
+presenting prices. This example uses plain TCP; the CLI below supplies verified TLS separately.
+
+## Use the recovery CLI
+
+Also enable `ORG_TTLDTOR_QDCXX_BUILD_CONNECT=ON` and build target `qdcxx_connect` for executable
+`qdcxx-connect`. Enable `ORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON=ON` for external native binary JSON
+schemas and `ORG_TTLDTOR_QDCXX_BUILD_TLS=ON` for TLS. TLS requires its
+[exact qualified static SDK](CPP-BUILD.md#tls-source-profile-cpp-build-en). Missing compiled features refuse before
+file reads or activation. No arguments, standalone `--help` and `--help-ru` work without endpoint,
+schema files or networking. See the [full option reference](../tools/subscribe/README.md).
+Short executable names in the commands below assume the executable directory is on `PATH`;
+otherwise replace the name with its full path, or `./name.exe` from that directory in PowerShell.
+
+Use an existing compatible source for these commands. STREAM delivers selected records; TICKER
+provides the latest-value contract and can conflate intermediate updates. Explicit prepared output
+adds Quote/Profile rows while retaining every generic field:
+
+```text
+qdcxx-connect --mode recovery --host 127.0.0.1 --port 19123 --symbol IBM --family stream --schema-profile quote --output quote --duration-ms 5000
+qdcxx-connect --mode recovery --host 127.0.0.1 --port 19123 --symbol IBM --family ticker --schema-profile profile --output profile --duration-ms 5000
+```
+
+Both built-in schemas are complete and ordinary. For a custom schema, explicitly select its local
+record ID. HISTORY requires indexed metadata and a signed int64 raw lower bound:
+
+```text
+qdcxx-connect --mode recovery --host 127.0.0.1 --port 19123 --symbol IBM --family history --schema-json spec/schema/examples/native-binary/pair.json --record-id 0 --history-from-raw 0 --output generic --duration-ms 5000
+```
+
+Run the schema-relative command from the checkout root or supply an absolute path. The tracked
+[pair-index example](../spec/schema/examples/native-binary/pair.json) declares `TimeAndSale` with
+Time/Sequence contributors; the source must support that record/schema. `--history-from-raw` is the
+exact signed indexed identity, **not Unix milliseconds or business event time**. Choose it using
+the [indexed-schema contract](../spec/schema/INDEXED-SCHEMAS.md) and
+[native binary JSON format](../spec/schema/NATIVE-BINARY-JSON.md). A schema file describes the data;
+it does not create a source or request arbitrary records unknown to the peer.
+
+Numeric hosts bypass DNS. A named host requires explicit numeric IPv4 `--dns-server` and optionally
+`--dns-port`; there is no system resolver discovery. DNS uses the documented extra 80 MiB logical
+requested-payload reservation and separate conservative work profile, rather than an RSS allowance.
+
+## Verified TLS and optional Basic credentials
+
+For a TLS source whose certificate is valid for `feed.example`, use your explicit trust file and
+reference identity. The route address and reference identity are independent:
+
+```text
+qdcxx-connect --mode recovery --host 127.0.0.1 --port 19443 --symbol IBM --family stream --schema-profile quote --security tls --tls-trust-pem C:/dev/qd/trust.pem --tls-reference feed.example --duration-ms 5000
+```
+
+The example address/port and files are placeholders for your source. Trust contains ordinary
+`CERTIFICATE` PEM blocks, at most 524288 bytes/256 blocks. Verification has no system-trust fallback
+or plaintext downgrade. The executable uses a narrow [closed TLS host profile](../spec/cli/TLS-HOST-PROFILE.md):
+one fresh process, one exact static SDK image and serialized owner, no other SDK users/hooks or
+ambient mutation, and absent `OPENSSL_ia32cap`. It performs the fixed preflight before certificate
+decoding. These obligations qualify this executable's TLS route; the helper does not detect every SDK user.
+
+If that verified source requires Basic authentication, add:
+
+```text
+qdcxx-connect --mode recovery --host 127.0.0.1 --port 19443 --symbol IBM --family stream --schema-profile quote --security tls --tls-trust-pem C:/dev/qd/trust.pem --tls-reference feed.example --auth-basic-token-file C:/dev/qd/basic-token.txt --auth-timeout-ms 1000 --duration-ms 5000
+```
+
+The file must contain the complete `Basic ` prefix and canonical base64 token as exact ASCII bytes,
+at most 4096 bytes, with **no newline, trimming or normalization**. Do not place credentials in argv.
+Files are read once after feature/argument checks; diagnostics do not echo paths, identities or tokens.
+Credential acquisition belongs to the verified TLS adapter. See the
+[TLS contract](../spec/transport/TLS-RUNTIME.md) for supported cryptographic and peer limits.
+
+## Observe recovery and finish
+
+Add `--attempts 3 --retry-delay-ms 250` for at most three fresh attempts, including the first.
+The current desired set is replayed after eligible failures; `--remove-after-ms 1000` removes the
+initial keys once. It must precede the admission duration. There is no stdin command language,
+wildcard or exactly-once replay claim. The fixed limits can reject excess input/live cache growth;
+they do not silently expand. Setup/factory failures can terminate without consuming all attempts.
+
+Stdout is `qdcxx-subscriptions` TSV version 1; stderr carries actual command, phase, reset, HISTORY
+and terminal observations. Reset publication precedes its exact acknowledgement; epoch changes and
+gaps remain visible. Inspect the [output contract](../spec/cli/RECOVERY-OUTPUT.md) before parsing rows.
+HISTORY observations are local AS-OF evidence; an ineligible range query means unknown, not a cached
+complete result. Flags, `ACTIVE`, local drain and generic records alone do not prove snapshot completion.
+
+Duration or a completed-record target requests local drain with `--drain-ms` (default 1000).
+An admitted whole callback batch can cross `--max-records`; its suffix is preserved. Drain covers
+only the already admitted local prefix and may expire into failure; it proves neither peer ACK nor
+whole-network flush. SIGINT/SIGTERM requests abort; progress/drain retain the same bounded work profile.
+A blocked output stream or native operation has no hard preemption guarantee.
+
+Recovery exits are `0` for actual DRAINED without expiry and satisfied readiness/commands/targets,
+`1` for setup/protocol/transport/output/retirement failure, `2` for usage or unmet readiness/target,
+and `130` for a handled signal after actual ABORTED. Failure takes precedence over interruption.
+See [recovery semantics](../spec/transport/RECOVERY.md) for eligibility, reset/replay and shutdown.
+
+<a id="controlled-stream-subscriptions"></a>
+<a id="subscription-legacy-stream-en"></a>
+
+## Legacy controlled STREAM driver
+
+The remaining sections describe calls **without `--mode recovery`** and the existing `runStream`
+example driver. Their output, endpoint snapshot overload and terminal rules remain unchanged.
 
 Application authors using shared queues and prepared callbacks can start with
 [Receive generic records and prepared events](SUBSCRIPTION-RECEIVER.md).

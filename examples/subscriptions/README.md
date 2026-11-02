@@ -1,6 +1,86 @@
-# Programmatic controlled STREAM example
+# Console subscription examples
 
 [Русская версия](README.ru.md). English is authoritative.
+
+Start with the existing [Quote console application](receiver/quote.cpp). It receives actual binary
+QTP data through the public `TcpRecovery` and `SubscriptionConsumer` APIs, projects the complete
+built-in eight-field Quote and prints bid/ask raw price/size values. It is an installed consumer
+application, with no test peer or test framework in its executable.
+
+## Build and run the Quote receiver
+
+First build/install with CLIENT, RUNTIME and RECOVERY enabled using the exact dependency inputs in
+the [build guide](../../docs/CPP-BUILD.md). Then configure its existing standalone CMake project:
+
+```powershell
+cmake -S examples/subscriptions/receiver -B build/quote-subscriber '-Dqdcxx_DIR=C:/dev/qdcxx/install/lib/cmake/qdcxx'
+cmake --build build/quote-subscriber --config Release
+```
+
+Use your actual prefix/package library directory. A TLS-enabled installation also requires its
+qualified `ORG_TTLDTOR_QDCXX_OPENSSL_ROOT` at consumer configuration time; it does not turn this
+plain application into TLS. Visual Studio puts the executable under `Release`; single-configuration
+generators normally put it directly in the build directory. For Visual Studio, run from the checkout root:
+
+```powershell
+./build/quote-subscriber/Release/qdcxx-quote-subscription.exe --help
+./build/quote-subscriber/Release/qdcxx-quote-subscription.exe --help-ru
+./build/quote-subscriber/Release/qdcxx-quote-subscription.exe --host 127.0.0.1 --port 19123 --symbol IBM --duration-ms 5000
+```
+
+For a single-configuration Windows build use `./build/quote-subscriber/qdcxx-quote-subscription.exe`;
+on Linux normally use `./build/quote-subscriber/qdcxx-quote-subscription`. PowerShell needs
+`./qdcxx-quote-subscription.exe` when running from the executable directory. Short executable names
+elsewhere assume `PATH`; otherwise use the actual full path.
+
+No arguments give the same English help without schema/bootstrap/network work. A compatible source
+must already listen at your selected port and support the requested Quote/symbol. The example starts
+no service. For DNS names provide explicit numeric IPv4 `--dns-server` and optional `--dns-port`;
+there is no system resolver discovery. Named routes add the documented 80 MiB logical requested-payload
+reservation and separate conservative DNS work; numeric routes bypass it. These are not RSS/time limits.
+
+The bounded source/settings are [quote.cpp](receiver/quote.cpp), [settings.hpp](receiver/settings.hpp)
+and [arguments.hpp](receiver/arguments.hpp). The application creates a schema and endpoint snapshot,
+opens a receiver on a STREAM queue, submits the desired set, then creates/starts/polls recovery on
+its owner thread. The same finite work profile is used during progress and shutdown.
+
+In the actual `QuoteConsumer::onBatch`, `batch` is a borrowed public `SubscriptionBatch`; its loop
+projects each record with explicit finite credits:
+
+```cpp
+auto work = projectionWork();
+auto projected = batch.project(index, work);
+```
+
+This is an excerpt from the complete application: `index` is the current record index, and
+`projectionWork()` is the declared helper in `settings.hpp`. The full callback checks projection
+failure and the Quote variant before reading it, checks stdout and returns the existing whole-batch
+action. The projected Quote owns its values; the batch/projection service is callback-scoped.
+The [receiving API guide](../../docs/SUBSCRIPTION-RECEIVER.md) explains how to keep generic batches,
+add independent logical clients or select the other delivery families without retaining borrowed facades.
+
+`--maximum-records N` optionally caps printed rows at 1–1000000; duration remains an unconditional
+cutoff. This example can stop printing inside a callback batch. In contrast, the separate CLI's
+`--max-records` target preserves a whole published batch. At most three fresh attempts use a fixed
+250 ms retry delay. Duration/row cutoff requests local drain (`--drain-ms`, default 1000); signals
+or failures request abort. Exit is 0 for completed drain/help, 1 for failure, 2 for invalid arguments,
+130 for interruption. Local drain proves neither peer ACK nor whole-network flush.
+
+Printed `.raw` values are exact WideDecimal bits; raw zero is NaN. Use `toString()` or `toDouble()`
+when displaying business values. The example remains plain TCP/STREAM; for Quote/Profile/HISTORY,
+external JSON, verified TLS and optional Basic files use the
+[recovery CLI tutorial](../../docs/SUBSCRIPTIONS.md) and [tool reference](../../tools/subscribe/README.md).
+Its machine-readable formats and TLS host limits are defined in
+[recovery output](../../spec/cli/RECOVERY-OUTPUT.md) and
+[closed TLS host profile](../../spec/cli/TLS-HOST-PROFILE.md).
+
+<a id="programmatic-controlled-stream-example"></a>
+<a id="example-subscriptions-legacy-stream-en"></a>
+
+## Callable legacy STREAM example
+
+The remaining sections describe the existing `runStream` composition and callable example library,
+whose configuration, output and terminal rules are separate from the receiver application above.
 
 [example.cpp](example.cpp) is a small callable example, with no second operational CLI. Its
 `runSubscriptionExample` receives an already-created main-thread `RuntimeBootstrap`, a validated

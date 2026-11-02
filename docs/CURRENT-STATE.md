@@ -10,7 +10,9 @@ The project implements selected bounded profiles against Java QD 3.355 at the re
 The [selected optional runtime profile](decisions/ADR-0006-live-runtime.md) has reproducible
 [DNS/TCP/TLS feasibility tests](../tests/conformance/transport/VALIDATION.md).
 The separate production TCP adapter implements the bounded plain, credential-free subset below.
-The separate TLS resource module/runtime API are described below; TLS has focused native evidence; final integration acceptance remains separate, and a complete end-to-end subscription client remains unimplemented.
+The separate TLS resource module/runtime API are described below. The receiving API and explicit
+CLI recovery mode compose the supported STREAM/TICKER/HISTORY, recovery and controlled TLS profiles;
+their limits are documented in the linked application guides. Release and user acceptance remain separate.
 The bounded local HISTORY collector handles admitted source events without owning upstream demand,
 a source session or callbacks. The pure bounded MUX component aggregates desired interests across
 local clients; it does not own source sessions, wire reconciliation, callback delivery or slow-consumer queues.
@@ -18,8 +20,8 @@ local clients; it does not own source sessions, wire reconciliation, callback de
 | Component | Behavior and contract |
 | --- | --- |
 | Generic/prepared subscription receiver | Independent logical registrations on existing STREAM/TICKER/HISTORY queues, complete generic records and explicit schema-bound Quote/Profile projections, atomic preparation before registration, callback-only borrowed batches and independent owned results: [application guide](SUBSCRIPTION-RECEIVER.md), [contract](../spec/subscriptions/RECEIVER.md). Endpoint/recovery ownership remains separate. |
-| Controlled STREAM client | Optional `qdcxx-connect` and a programmatic example compose the actual plain TCP runtime and dispatcher: [guide](SUBSCRIPTIONS.md). Exact limited CLI selectors, generic records and explicit Quote/Profile summaries; no TLS/reconnect/full-subscription claim. |
-| Endpoint options | Typed immutable schema/settings snapshots in optional `qdcxx_client`, independent endpoints, finite budgets/timeouts and runtime/TLS/auth/schema handoff: [native guide](SUBSCRIPTIONS.md#endpoint-options), [configuration](CONFIGURATION.md), [validation](../tests/conformance/subscriptions/OPTIONS-VALIDATION.md). The current application remains credential-free numeric TCP STREAM; storing TLS/DNS/retry settings does not activate them. |
+| Subscription CLI | Optional `qdcxx-connect` preserves its default plain STREAM driver. Explicit recovery mode selects STREAM/TICKER/HISTORY, numeric or explicitly configured DNS endpoints, finite retries, reset notices and draining; optional verified TLS/Basic and external JSON schemas retain separate build switches: [guide](SUBSCRIPTIONS.md), [output](../spec/cli/RECOVERY-OUTPUT.md), [TLS host profile](../spec/cli/TLS-HOST-PROFILE.md). One family/record per run, exact bounded CLI selectors; this is a receiving client, with no publishing/server or event-routing service. |
+| Endpoint options | Typed immutable schema/settings snapshots in optional `qdcxx_client`, independent endpoints, finite budgets/timeouts and runtime/TLS/auth/schema handoff: [native guide](SUBSCRIPTIONS.md#endpoint-options), [configuration](CONFIGURATION.md), [validation](../tests/conformance/subscriptions/OPTIONS-VALIDATION.md). A snapshot alone starts no work; the selected application driver activates its supported settings. |
 | Local STREAM dispatch | Serialized callbacks, bounded thread-safe commands, detached immutable batches and explicit local close: [contract](../spec/subscriptions/CLIENT-DISPATCH.md). Default OFF; source session/runtime and wire reconciliation remain caller-owned. Local completion does not certify transport quiescence. |
 | STREAM collector | Every admitted subscribed record in source order, including identical values; bounded whole-event staging and local membership/revision barriers: [contract](../spec/subscriptions/STREAM-COLLECTOR.md). No callbacks, latest cache or upstream multiplexing. |
 | TICKER collector | Shared bounded latest cache, independent local views, explicit retention, initial/live ordering and stale/reset evidence: [contract](../spec/subscriptions/TICKER-COLLECTOR.md). Pure caller-driven delivery; callback dispatch and upstream multiplexing remain separate. |
@@ -155,9 +157,10 @@ Pure TLS requested-backing/work calculation and atomic admission have native res
 The move-only TLS runtime implements verified credential handoff, exact pending-I/O ownership and
 truthful local closure. Focused native qualification is recorded separately from final regression acceptance. See the
 [resource contract](../spec/transport/TLS-RESOURCES.md), [runtime API](../spec/transport/TLS-RUNTIME.md)
-and [qualification status](../tests/conformance/transport/TLS-VALIDATION.md). This does not change
-plain runtime/CLI behavior or establish a released TLS/full-subscription capability.
+and [component qualification](../tests/conformance/transport/TLS-VALIDATION.md). The default plain CLI
+route retains its behavior; the receiving/recovery route is described above. Release and security
+certification are not established by these component results.
 
-### Current TLS evidence boundary
+### Earlier TLS component snapshot
 
-The TLS runtime is implemented. The focused current-source suite passed 39 native tests: Windows MSVC 19.42 x64 Release /MD, 11,486 assertions; Linux GCC 13.3 x64 Debug ASan+UBSan, 11,625 assertions, with LSan disabled. Full regression passed on each OS: 58/58 tests with JSON enabled and 57/57 with JSON disabled. Generated-reference verification is recorded separately. The refreshed installed package passed four TLS 1.2/1.3 cases across both OSes. These observations do not establish release, complete subscriptions or security certification. The TLS qualification page linked above distinguishes executed cases from source-only reasoning.
+The earlier TLS component snapshot passed 39 native tests: Windows MSVC 19.42 x64 Release /MD, 11,486 assertions; Linux GCC 13.3 x64 Debug ASan+UBSan, 11,625 assertions, with LSan disabled. Its regression passed on each OS: 58/58 tests with JSON enabled and 57/57 with JSON disabled. The installed package passed four TLS 1.2/1.3 cases across both OSes. These historical counts retain their original scope. The newer [receiving qualification](../tests/conformance/subscriptions/DELIVERY-VALIDATION.md) records the composed CLI, closed TLS process and final receiving matrix.
