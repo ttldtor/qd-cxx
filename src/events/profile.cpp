@@ -124,20 +124,50 @@ const core::RecordContext &PreparedProfile::context() const noexcept {
     return mapping_.context();
 }
 
-std::expected<Profile, MappingError> PreparedProfile::map(std::u16string_view symbol, RecordValueView values,
-                                                          EventValueLimits limits, std::int64_t eventTime) const {
-    const auto validation = mapping_.validate(values);
-
-    if (!validation) {
-        return std::unexpected(validation.error());
+namespace {
+/** Borrow a nullable string from either field representation without retaining its storage.
+ * @tparam Field Canonical core FieldValue or FieldValueView.
+ * @param field Validated field containing a nullable UTF-16 payload.
+ * @return Nullable exact string view, with engaged empty preserved.
+ */
+template <typename Field> std::optional<std::u16string_view> borrowText(const Field &field) noexcept {
+    if (!field.units) {
+        return std::nullopt;
     }
 
+    return std::u16string_view(*field.units);
+}
+
+/** Copy one already bounded nullable payload into its final event storage.
+ * @param text Borrowed exact text; null and empty remain distinct.
+ * @return Independently owned nullable text; allocation failure is handled by the projection boundary.
+ */
+std::optional<std::u16string> ownText(std::optional<std::u16string_view> text) {
+    if (!text) {
+        return std::nullopt;
+    }
+
+    return std::u16string(*text);
+}
+
+/** Project validated Profile fields, copying text only into the complete owned event.
+ * @tparam Field Canonical core FieldValue or FieldValueView.
+ * @param symbol Borrowed exact UTF-16 symbol.
+ * @param fields Complete validated local fields in schema order.
+ * @param selections Immutable prepared Profile property positions.
+ * @param limits Maximum copied symbol, per-string and aggregate UTF-16 units.
+ * @param eventTime Explicit caller metadata milliseconds, independent of business fields.
+ * @return Complete owned Profile or resource/allocation error.
+ */
+template <typename Field>
+std::expected<Profile, MappingError> projectProfileFields(std::u16string_view symbol, std::span<const Field> fields,
+                                                          std::span<const std::optional<std::size_t>> selections,
+                                                          EventValueLimits limits, std::int64_t eventTime) {
     constexpr std::size_t STATUS_REASON_INDEX = 15;
     constexpr std::int64_t MILLISECONDS_PER_SECOND = 1000;
-    const auto selections = mapping_.selections();
-    const auto *description = &values.values[*selections[DESCRIPTION_INDEX]].units;
-    const auto *statusReason =
-        selections[STATUS_REASON_INDEX] ? &values.values[*selections[STATUS_REASON_INDEX]].units : nullptr;
+    const auto description = borrowText(fields[*selections[DESCRIPTION_INDEX]]);
+    const auto statusReason =
+        selections[STATUS_REASON_INDEX] ? borrowText(fields[*selections[STATUS_REASON_INDEX]]) : std::nullopt;
 
     if (symbol.size() > limits.symbolUnits || symbol.size() > limits.totalUnits) {
         return std::unexpected(MappingError::RESOURCE_LIMIT);
@@ -145,8 +175,8 @@ std::expected<Profile, MappingError> PreparedProfile::map(std::u16string_view sy
 
     auto remainingUnits = limits.totalUnits - symbol.size();
 
-    for (const auto *text : {description, statusReason}) {
-        const auto count = text != nullptr && *text ? (*text)->size() : 0;
+    for (const auto text : {description, statusReason}) {
+        const auto count = text ? text->size() : 0;
 
         if (count > limits.stringUnits || count > remainingUnits) {
             return std::unexpected(MappingError::RESOURCE_LIMIT);
@@ -156,16 +186,16 @@ std::expected<Profile, MappingError> PreparedProfile::map(std::u16string_view sy
     }
 
     const auto raw = [&](std::size_t selection) -> std::int64_t {
-        return selections[selection] ? values.values[*selections[selection]].raw : 0;
+        return selections[selection] ? fields[*selections[selection]].raw : 0;
     };
     const auto decimal = [&](std::size_t selection) -> core::WideDecimal {
         if (!selections[selection]) {
             return {0};
         }
 
-        const auto &field = values.values[*selections[selection]];
+        const auto &field = fields[*selections[selection]];
 
-        return detail::projectPresentDecimal(field);
+        return detail::projectPresentDecimal(field.type, field.raw);
     };
     try {
         // Selection numbers follow the default declarations, independently of schema field positions.
@@ -184,13 +214,37 @@ std::expected<Profile, MappingError> PreparedProfile::map(std::u16string_view sy
                        raw(11) * MILLISECONDS_PER_SECOND,
                        raw(12) * MILLISECONDS_PER_SECOND,
                        static_cast<std::int32_t>(raw(13)),
-                       *description,
-                       statusReason != nullptr ? *statusReason : std::nullopt,
+                       ownText(description),
+                       ownText(statusReason),
                        eventTime};
     } catch (const std::bad_alloc &) {
         return std::unexpected(MappingError::ALLOCATION_FAILURE);
     } catch (const std::length_error &) {
         return std::unexpected(MappingError::ALLOCATION_FAILURE);
     }
+}
+} // namespace
+
+std::expected<Profile, MappingError> PreparedProfile::map(std::u16string_view symbol, RecordValueView values,
+                                                          EventValueLimits limits, std::int64_t eventTime) const {
+    const auto validation = mapping_.validate(values);
+
+    if (!validation) {
+        return std::unexpected(validation.error());
+    }
+
+    return projectProfileFields(symbol, values.values, mapping_.selections(), limits, eventTime);
+}
+
+std::expected<Profile, MappingError> PreparedProfile::mapView(std::u16string_view symbol,
+                                                              BorrowedRecordValueView values, EventValueLimits limits,
+                                                              std::int64_t eventTime) const {
+    const auto validation = mapping_.validateView(values);
+
+    if (!validation) {
+        return std::unexpected(validation.error());
+    }
+
+    return projectProfileFields(symbol, values.values, mapping_.selections(), limits, eventTime);
 }
 } // namespace org::ttldtor::qdcxx::events

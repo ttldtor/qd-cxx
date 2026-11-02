@@ -19,6 +19,13 @@
 выбором символов и общим либо prepared Quote/Profile выводом. Встроенная справка
 доступна без работы со входом/сетью. Конечный plain-профиль не предоставляет TLS и reconnect.
 
+Самостоятельный [пример подписки Quote](../../docs/SUBSCRIPTION-RECEIVER.ru.md) собирается
+с установленным пакетом и использует prepared-получатель и существующий TCP recovery.
+Исходный проект — [examples/subscriptions/receiver/CMakeLists.txt](../../examples/subscriptions/receiver/CMakeLists.txt).
+`qdcxx-quote-subscription --help` (или отсутствие аргументов) показывает справку без запуска
+работы; `--help-ru` выводит русскую справку. Явные настройки примера описывают конечную
+нагрузку и политики retry, DNS и drain; TLS в этот пример не входит.
+
 Необязательная [проверка управляющих сообщений сессии](../upstream/live-session-oracle/README.ru.md)
 сравнивает нативный вывод протокола и heartbeat с настоящими callbacks закреплённой Java,
 включая наследование свойств и скрытие тестовой авторизации. Проверка офлайновая,

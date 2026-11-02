@@ -3,7 +3,7 @@
 [Русская версия](EVENT-MAPPING.ru.md). English is authoritative.
 
 This contract defines the bounded mapping boundary in [ADR-0003](../../docs/decisions/ADR-0003-configurable-schemas-and-event-mappings.md).
-It follows the initial new production Java observations under QDCXX-025 and precedes production C++.
+The selected Java production observations establish the field rules; the C++ API defines their bounded projection.
 Java source resolution and event observations belong to [CONFIGURED-EVENTS](../schema/CONFIGURED-EVENTS.md)
 and [PROFILE](PROFILE.md). The ownership, preparation limits and structured errors below are C++ API policy.
 
@@ -100,6 +100,19 @@ Errors distinguish invalid preparation input, missing required field, ambiguous 
 full type, wrong record context/value shape, resource limit and allocation failure. Validation follows
 input order after count preflight; context failure precedes value and ownership checks. This is not a
 promise of Java exception-class parity. Failed preparation or projection leaves all inputs unchanged.
+
+## Borrowed queue values
+
+`RecordValueView` continues to borrow complete owning `core::FieldValue` elements. The separate
+`BorrowedRecordValueView` borrows complete `core::FieldValueView` elements, whose nullable UTF-16
+and byte payloads are spans/views. `EventMapping::validateView` and prepared Quote/Profile `mapView`
+check the same provenance-first, full-shape canonical rules as the owning-input API. Validation
+does not allocate, copy payloads or retain input values. Successful business projections still own
+their symbol and projected strings under the same explicit output limits.
+
+The existing `validate`/`map` names and signatures are unchanged, including calls with empty
+aggregate arguments. The [subscription receiver](../subscriptions/RECEIVER.md) uses the borrowed
+path directly for immutable queue records and keeps generic extra fields accessible independently.
 
 ## Integration and compatibility
 

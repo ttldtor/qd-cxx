@@ -239,12 +239,7 @@ class MuxCommandTicket {
 };
 
 /** Exact copied generic fields; spans borrow only immutable detached record backing. */
-struct MuxFieldValueView {
-    core::SerialFieldType type;                      ///< Full serial identity.
-    std::int64_t raw;                                ///< Exact scalar bits.
-    std::optional<std::u16string_view> units;        ///< Null versus engaged empty UTF16.
-    std::optional<std::span<const std::byte>> bytes; ///< Null versus engaged empty opaque payload.
-};
+using MuxFieldValueView = core::FieldValueView;
 
 /** True source scalar provenance, absent for synthesized projections. */
 struct RawSourceMetadata {
@@ -668,6 +663,19 @@ class MuxQueue {
                                                                     core::SubscriptionFamily family,
                                                                     core::SubscriptionSelectorPolicy policy,
                                                                     QueueWork &work) const;
+    /** Validate immutable receiver provenance without requiring a pristine source epoch.
+     * Prior admission, staging and resets do not invalidate the immutable binding. This serialized
+     * owner query performs no allocation, callback, ownership transfer or state mutation.
+     * @param schema Required exact immutable provenance, including an empty catalog.
+     * @param family Required fixed source family.
+     * @param policy Required immutable selector policy.
+     * @param work Fixed inspection credits; attempted work is not refunded on refusal.
+     * @return Success or typed state/context/profile/work refusal, leaving the queue usable.
+     */
+    [[nodiscard]] std::expected<void, QueueFailure> validateReceiverBinding(const core::LocalSchema &schema,
+                                                                            core::SubscriptionFamily family,
+                                                                            core::SubscriptionSelectorPolicy policy,
+                                                                            QueueWork &work) const;
     /** Reserve a registration before exposing its port.
      * @param limits Complete individual reservations.
      * @param consumer Caller-created callback, preserved on failure.

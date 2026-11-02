@@ -129,5 +129,17 @@ class PreparedProfile {
      */
     [[nodiscard]] std::expected<Profile, MappingError> map(std::u16string_view symbol, RecordValueView values,
                                                            EventValueLimits limits, std::int64_t eventTime = 0) const;
+
+    /** Project borrowed complete fields, copying only the final event's symbol and nullable strings.
+     * @param symbol Exact UTF-16 symbol, borrowed during this call.
+     * @param values Context-tagged complete field views; source fields and payloads outlive this call.
+     * @param limits Maximum copied per-symbol, per-string and aggregate UTF-16 units.
+     * @param eventTime Explicit metadata milliseconds, independent of indexed identity, halt times and flags.
+     * @return Complete independently owned Profile or context/value/resource/allocation error; no partial event
+     * escapes.
+     */
+    [[nodiscard]] std::expected<Profile, MappingError> mapView(std::u16string_view symbol,
+                                                               BorrowedRecordValueView values, EventValueLimits limits,
+                                                               std::int64_t eventTime = 0) const;
 };
 } // namespace org::ttldtor::qdcxx::events

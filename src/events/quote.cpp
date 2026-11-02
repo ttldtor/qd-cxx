@@ -123,28 +123,33 @@ const core::RecordContext &PreparedQuote::context() const noexcept {
     return mapping_.context();
 }
 
-std::expected<Quote, MappingError> PreparedQuote::map(std::u16string_view symbol, RecordValueView values,
-                                                      std::size_t symbolUnits, std::int64_t eventTime) const {
-    const auto validation = mapping_.validate(values);
-
-    if (!validation) {
-        return std::unexpected(validation.error());
-    }
-
+namespace {
+/** Project validated Quote fields without owning an intermediate field representation.
+ * @tparam Field Canonical core FieldValue or FieldValueView.
+ * @param symbol Borrowed exact UTF-16 symbol.
+ * @param fields Complete validated local fields in schema order.
+ * @param selections Immutable prepared Quote property positions.
+ * @param symbolUnits Maximum symbol units copied into the result.
+ * @param eventTime Explicit caller metadata milliseconds, independent of business fields.
+ * @return Complete owned Quote or resource/allocation error.
+ */
+template <typename Field>
+std::expected<Quote, MappingError> projectQuoteFields(std::u16string_view symbol, std::span<const Field> fields,
+                                                      std::span<const std::optional<std::size_t>> selections,
+                                                      std::size_t symbolUnits, std::int64_t eventTime) {
     if (symbol.size() > symbolUnits) {
         return std::unexpected(MappingError::RESOURCE_LIMIT);
     }
 
     constexpr unsigned SEQUENCE_BITS = 22;
     constexpr std::uint32_t SEQUENCE_MASK = (std::uint32_t{1} << SEQUENCE_BITS) - 1;
-    const auto selections = mapping_.selections();
     const auto raw = [&](std::size_t selection) -> std::int64_t {
-        return selections[selection] ? values.values[*selections[selection]].raw : 0;
+        return selections[selection] ? fields[*selections[selection]].raw : 0;
     };
     const auto decimal = [&](std::size_t selection) -> core::WideDecimal {
-        const auto &field = values.values[*selections[selection]];
+        const auto &field = fields[*selections[selection]];
 
-        return detail::projectPresentDecimal(field);
+        return detail::projectPresentDecimal(field.type, field.raw);
     };
     // Selection numbers follow the request order above, independently of schema field positions.
     const auto bidTime = raw(0) * MILLISECONDS_PER_SECOND;
@@ -169,5 +174,28 @@ std::expected<Quote, MappingError> PreparedQuote::map(std::u16string_view symbol
     } catch (const std::length_error &) {
         return std::unexpected(MappingError::ALLOCATION_FAILURE);
     }
+}
+} // namespace
+
+std::expected<Quote, MappingError> PreparedQuote::map(std::u16string_view symbol, RecordValueView values,
+                                                      std::size_t symbolUnits, std::int64_t eventTime) const {
+    const auto validation = mapping_.validate(values);
+
+    if (!validation) {
+        return std::unexpected(validation.error());
+    }
+
+    return projectQuoteFields(symbol, values.values, mapping_.selections(), symbolUnits, eventTime);
+}
+
+std::expected<Quote, MappingError> PreparedQuote::mapView(std::u16string_view symbol, BorrowedRecordValueView values,
+                                                          std::size_t symbolUnits, std::int64_t eventTime) const {
+    const auto validation = mapping_.validateView(values);
+
+    if (!validation) {
+        return std::unexpected(validation.error());
+    }
+
+    return projectQuoteFields(symbol, values.values, mapping_.selections(), symbolUnits, eventTime);
 }
 } // namespace org::ttldtor::qdcxx::events

@@ -95,5 +95,15 @@ class PreparedQuote {
      */
     [[nodiscard]] std::expected<Quote, MappingError> map(std::u16string_view symbol, RecordValueView values,
                                                          std::size_t symbolUnits, std::int64_t eventTime = 0) const;
+
+    /** Project complete borrowed fields without constructing intermediate owning field values.
+     * @param symbol Exact UTF-16 symbol, borrowed during this call.
+     * @param values Context-tagged complete field views; all source storage remains valid during this call.
+     * @param symbolUnits Maximum UTF-16 symbol units copied into the owned result.
+     * @param eventTime Explicit metadata milliseconds, independent of indexed identity and business fields.
+     * @return Complete independently owned Quote or context/value/resource/allocation error; inputs are not retained.
+     */
+    [[nodiscard]] std::expected<Quote, MappingError> mapView(std::u16string_view symbol, BorrowedRecordValueView values,
+                                                             std::size_t symbolUnits, std::int64_t eventTime = 0) const;
 };
 } // namespace org::ttldtor::qdcxx::events

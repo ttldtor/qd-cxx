@@ -3,6 +3,7 @@
 // Internal CTest runner: public TLS recovery with finite caller work and isolated loopback peers.
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "recovery_test_support.hpp"
+#include "subscription_receiver_lifetime_support.hpp"
 #include "transport/tls_test_support.hpp"
 
 #include "qd/transport/tls_recovery.hpp"
@@ -870,4 +871,92 @@ TEST_CASE("TLS recovery performs a fresh successor handshake authentication and 
     CHECK(report.secondClientBytes == expectedSecond);
     std::cout << "TLS_RECOVERY_SUCCESSOR_CAPTURE\t" << report.firstCaptureEnd << '\t' << report.secondCaptureEnd << '\t'
               << report.firstClientBytes.size() << '\t' << report.secondClientBytes.size() << '\n';
+}
+
+TEST_CASE("prepared receiver projects a whole multi-record batch after callback-side TLS owner cutoff") {
+    namespace f = root::test::receiver_lifetime;
+    auto bootstrap = t::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+
+    for (const auto action : {f::OwnerAction::STOP, f::OwnerAction::DESTROY, f::OwnerAction::REPLACE}) {
+        INFO("action=", static_cast<int>(action));
+        auto bytes = r::ready();
+        r::append(bytes, f::description());
+        r::append(bytes, f::data());
+        auto script = x::peerOptions(h::PeerTlsVersion::TLS_1_3);
+        script.initialBytes = wire(bytes);
+        auto peer = h::TlsTestPeer::start(std::move(script));
+        REQUIRE(peer);
+        const auto tls = tlsOptions();
+        const auto requirements = t::tlsRequirements(tls.limits, tls.host);
+        REQUIRE(requirements);
+        auto local = f::schema();
+        f::Observation observed;
+        std::optional<t::TlsRecovery> owner;
+        std::optional<t::TlsRecovery> replacement;
+        auto consumer = std::make_shared<f::Consumer<t::TlsRecovery>>(owner, observed, action);
+        consumer->external = &consumer;
+        consumer->replacement = &replacement;
+        auto queue = stream(local);
+        auto handle = f::subscribe(queue, local, consumer);
+        t::RecoveryQueues queues;
+        queues.stream = std::move(queue);
+        auto input = x::settings(peer->port());
+        input.retry = {1, 0ms};
+        auto endpoint = r::endpoint(local, input);
+        auto preparation = r::preparation();
+
+        if (action == f::OwnerAction::REPLACE) {
+            t::RecoveryQueues empty;
+            auto nextWork = r::preparation();
+            auto next = t::TlsRecovery::create(*bootstrap, endpoint, f::blueprint(), std::move(empty), r::options(),
+                                               tls, nextWork);
+            REQUIRE(next);
+            replacement.emplace(std::move(*next));
+        }
+
+        auto created = t::TlsRecovery::create(*bootstrap, endpoint, f::blueprint(), std::move(queues), r::options(),
+                                              tls, preparation);
+        REQUIRE(created);
+        owner.emplace(std::move(*created));
+        REQUIRE(owner->start());
+        const auto deadline = std::chrono::steady_clock::now() + 5s;
+        t::TlsRecoveryStatus returned;
+
+        while (owner && observed.callbacks == 0 && std::chrono::steady_clock::now() < deadline) {
+            returned = poll(*owner, *requirements);
+            std::this_thread::sleep_for(1ms);
+        }
+
+        REQUIRE(observed.callbacks == 1);
+        CHECK(returned.recovery.stopped);
+        CHECK(returned.recovery.attempts == 1);
+
+        if (action == f::OwnerAction::DESTROY) {
+            CHECK_FALSE(owner);
+        } else {
+            REQUIRE(owner);
+
+            if (action == f::OwnerAction::REPLACE) {
+                CHECK_FALSE(replacement);
+                CHECK(owner->status().recovery.phase == t::RecoveryPhase::CONFIGURED);
+                CHECK(owner->status().recovery.attempts == 0);
+                CHECK_FALSE(owner->status().recovery.stopped);
+            }
+
+            stop(*owner, *requirements);
+            owner.reset();
+        }
+
+        const auto terminal = handle.terminal();
+        REQUIRE(terminal);
+        CHECK(terminal->counts.callbackStartedBatches == 1);
+        CHECK(terminal->counts.callbackCompletedBatches == 1);
+        handle = {};
+        const auto report = peer->stop();
+        CHECK(report.handshakeComplete);
+        CHECK(report.bytesWritten == bytes.size());
+        CHECK_FALSE(consumer);
+        f::check(observed);
+    }
 }

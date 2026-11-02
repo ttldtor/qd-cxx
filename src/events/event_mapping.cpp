@@ -11,6 +11,37 @@
 #include <utility>
 
 namespace org::ttldtor::qdcxx::events {
+namespace {
+/** Check complete local values with one canonical validator for their concrete representation.
+ * @tparam Record RecordValueView or BorrowedRecordValueView.
+ * @tparam Validator Internal nonthrowing canonical field validator.
+ * @param context Expected immutable record provenance.
+ * @param shape Expected complete exact field types.
+ * @param record Borrowed context and values, retained only during validation.
+ * @param validator Canonical validator for the selected owning or borrowed field type.
+ * @return Success or provenance/complete-shape error without allocating or copying payloads.
+ */
+template <typename Record, typename Validator>
+std::expected<void, MappingError> validateValues(const core::RecordContext &context,
+                                                 std::span<const core::SerialFieldType> shape, Record record,
+                                                 Validator validator) noexcept {
+    if (!context.matches(record.context)) {
+        return std::unexpected(MappingError::WRONG_CONTEXT);
+    }
+
+    if (record.values.size() != shape.size()) {
+        return std::unexpected(MappingError::INVALID_VALUES);
+    }
+
+    for (std::size_t i = 0; i < shape.size(); ++i) {
+        if (record.values[i].type != shape[i] || !validator(record.values[i])) {
+            return std::unexpected(MappingError::INVALID_VALUES);
+        }
+    }
+
+    return {};
+}
+} // namespace
 
 EventMapping::EventMapping(core::RecordContext context, std::vector<core::SerialFieldType> shape,
                            std::vector<std::optional<std::size_t>> selections) noexcept
@@ -144,21 +175,11 @@ std::expected<EventMapping, MappingError> EventMapping::prepare(const core::Loca
 }
 
 std::expected<void, MappingError> EventMapping::validate(RecordValueView record) const noexcept {
-    if (!context_.matches(record.context)) {
-        return std::unexpected(MappingError::WRONG_CONTEXT);
-    }
+    return validateValues(context_, shape_, record, core::validFieldValue);
+}
 
-    if (record.values.size() != shape_.size()) {
-        return std::unexpected(MappingError::INVALID_VALUES);
-    }
-
-    for (std::size_t i = 0; i < shape_.size(); ++i) {
-        if (record.values[i].type != shape_[i] || !core::validFieldValue(record.values[i])) {
-            return std::unexpected(MappingError::INVALID_VALUES);
-        }
-    }
-
-    return {};
+std::expected<void, MappingError> EventMapping::validateView(BorrowedRecordValueView record) const noexcept {
+    return validateValues(context_, shape_, record, core::validFieldValueView);
 }
 
 } // namespace org::ttldtor::qdcxx::events

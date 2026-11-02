@@ -24,6 +24,7 @@ reruns are different evidence; none is a general security certification or an RS
 - [Tape writer validation](../tests/conformance/protocol/tape-write/WRITER-VALIDATION.md)
 - [Schema export validation](../tests/conformance/schema-export/VALIDATION.md)
 - [Subscription compatibility](../tests/conformance/subscriptions/VALIDATION.md)
+- [Subscription receiver and installed console example](../tests/conformance/subscriptions/RECEIVER-VALIDATION.md)
 - [Knowledge base and decision trace](knowledge/README.md)
 
 [Current capabilities](CURRENT-STATE.md) distinguish delivered components from the

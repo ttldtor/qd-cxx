@@ -26,6 +26,7 @@
 - [Проверки записи tape](../tests/conformance/protocol/tape-write/WRITER-VALIDATION.ru.md)
 - [Проверки экспорта схем](../tests/conformance/schema-export/VALIDATION.ru.md)
 - [Совместимость подписок](../tests/conformance/subscriptions/VALIDATION.ru.md)
+- [Получатель подписок и установленный консольный пример](../tests/conformance/subscriptions/RECEIVER-VALIDATION.ru.md)
 - [База знаний и связь решений](knowledge/README.ru.md)
 
 [Текущие возможности](CURRENT-STATE.ru.md) отделяют готовые компоненты от

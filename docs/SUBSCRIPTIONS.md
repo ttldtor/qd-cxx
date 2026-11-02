@@ -2,6 +2,10 @@
 
 [Русская версия](SUBSCRIPTIONS.ru.md). English is authoritative.
 
+Application authors using shared queues and prepared callbacks can start with
+[Receive generic records and prepared events](SUBSCRIPTION-RECEIVER.md).
+The controlled CLI and its explicit driver configuration are described below.
+
 `qdcxx-connect` is an opt-in native STREAM client for a controlled plain-TCP peer.
 It composes the existing [TCP runtime](../spec/transport/TCP-RUNTIME.md),
 [live session](../spec/subscriptions/LIVE-SESSION.md) and

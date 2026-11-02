@@ -1,0 +1,50 @@
+[
+  {
+    "file": "linux-dns/live.stderr",
+    "sha256": "1B0DA1CFAC24A3C92BED63893253D48F9744BC6F2988837882C1850839EAE6FA"
+  },
+  {
+    "file": "linux-dns/live.stdout",
+    "sha256": "856BD9A34D242C35E28F0BFFB673D776B6AAAA2DC1FED0E44D233E3FC37ED7E4"
+  },
+  {
+    "file": "linux-dns/peer.stdout",
+    "sha256": "D27871AB9AF2B7A8CDC2AE703161D2F8E31BE826F880CEA2F912D41C0CC5AA46"
+  },
+  {
+    "file": "linux-numeric/live.stderr",
+    "sha256": "1B0DA1CFAC24A3C92BED63893253D48F9744BC6F2988837882C1850839EAE6FA"
+  },
+  {
+    "file": "linux-numeric/live.stdout",
+    "sha256": "856BD9A34D242C35E28F0BFFB673D776B6AAAA2DC1FED0E44D233E3FC37ED7E4"
+  },
+  {
+    "file": "linux-numeric/peer.stdout",
+    "sha256": "E96628BE63B14B388BC28DB4850689E7E067B757519B021D4D5F66D9772A9F3A"
+  },
+  {
+    "file": "windows-dns/live.stderr",
+    "sha256": "B1DB8FD05FC5DE0F03B3BC16DE0052D3DF03D18CC6D90A68642EC3A5153174B9"
+  },
+  {
+    "file": "windows-dns/live.stdout",
+    "sha256": "5AA69D3CCF3B6D46462276854692406F9A5263F6FA10DC881E0103B38B56C78B"
+  },
+  {
+    "file": "windows-dns/peer.stdout",
+    "sha256": "304C89E076FFFE0BA83414C37D3DF58404FF3C61941399A1A5DB80A96ECE0F76"
+  },
+  {
+    "file": "windows-numeric/live.stderr",
+    "sha256": "B1DB8FD05FC5DE0F03B3BC16DE0052D3DF03D18CC6D90A68642EC3A5153174B9"
+  },
+  {
+    "file": "windows-numeric/live.stdout",
+    "sha256": "5AA69D3CCF3B6D46462276854692406F9A5263F6FA10DC881E0103B38B56C78B"
+  },
+  {
+    "file": "windows-numeric/peer.stdout",
+    "sha256": "54DB7EF1001B80FA19A977C8CB9A70A75CA492D115D6E158287A9E21FDCC4961"
+  }
+]

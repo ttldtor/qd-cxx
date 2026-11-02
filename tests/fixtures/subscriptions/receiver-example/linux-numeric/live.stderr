@@ -1,0 +1,10 @@
+phase=STARTING attempts=1
+phase=NEGOTIATING attempts=1
+Subscription applied locally; revision=2
+phase=REPLAYING attempts=1
+phase=ACTIVE attempts=1
+phase=RETIRING attempts=1
+phase=STOPPING attempts=1
+phase=CLOSED attempts=1
+Stopped: records=1 attempts=1 outcome=0 deadlineExpired=0
+recovery error=9 stage=recovery-peer-end transport=0 transportStage=none native=0 protocol=0

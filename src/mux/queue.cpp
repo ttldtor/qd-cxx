@@ -3181,6 +3181,40 @@ std::expected<void, QueueFailure> MuxQueue::validateBinding(const core::LocalSch
     }
 }
 
+std::expected<void, QueueFailure> MuxQueue::validateReceiverBinding(const core::LocalSchema &schema,
+                                                                    core::SubscriptionFamily family,
+                                                                    core::SubscriptionSelectorPolicy policy,
+                                                                    QueueWork &work) const {
+    try {
+        debit(work.operations, 1);
+
+        if (!state_)
+            throw QueueError::INVALID_STATE;
+
+        const auto &s = *state_;
+
+        if (s.executing)
+            throw QueueError::REENTRANT;
+
+        if (s.state != QueueState::OPEN || s.stopMode)
+            throw QueueError::CLOSING;
+
+        // New receivers share the immutable schema even after source admission or reset.
+        // Recovery adoption retains validateBinding's separate pristine-source requirement.
+        spend(work, 2, 0, 0, sizeof(core::SchemaIdentity));
+
+        if (!s.schemaIdentity.matches(schema.identity()))
+            throw QueueError::INVALID_CONTEXT;
+
+        if (s.family != family || s.interest.selectorPolicy() != policy)
+            throw QueueError::INVALID_CONFIGURATION;
+
+        return {};
+    } catch (QueueError error) {
+        return std::unexpected(QueueFailure{error, {}});
+    }
+}
+
 QueueCapacity MuxQueue::capacity() const noexcept {
     return state_ ? state_->capacity : QueueCapacity{};
 }

@@ -20,6 +20,13 @@ uses the production TCP runtime and local dispatcher with exact selectors and
 generic or prepared Quote/Profile output. Its native help is available without
 input/network work. This plain, finite profile does not provide TLS or reconnect.
 
+The standalone [Quote subscription example](../../docs/SUBSCRIPTION-RECEIVER.md) builds
+against an installed package and uses the prepared receiving facade and existing TCP recovery.
+Its source project is [examples/subscriptions/receiver/CMakeLists.txt](../../examples/subscriptions/receiver/CMakeLists.txt);
+`qdcxx-quote-subscription --help` (or no arguments) shows usage without startup work,
+and `--help-ru` provides Russian help. The example's explicit settings document its
+finite workload, retry, DNS and drain policies; TLS is outside this example.
+
 The optional [native session control verification](../upstream/live-session-oracle/README.md)
 compares native protocol/heartbeat output with actual locked Java callbacks, including descriptor
 inheritance and synthetic authorization redaction. It runs offline with explicit prepared providers.

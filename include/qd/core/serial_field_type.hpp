@@ -7,7 +7,9 @@
 #include <cstdint>
 #include <limits>
 #include <optional>
+#include <span>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -186,11 +188,22 @@ struct FieldValue {
     bool operator==(const FieldValue &other) const = default;
 };
 
-/** Validate a manually constructed exact field value independently of schema policy.
- * @param value Borrowed tagged value; never modified or retained.
- * @return Whether the known tag, scalar range and nullable payload obey FIELD-TYPES.
+/** Exact non-owning logical field; payload views borrow their source storage. */
+struct FieldValueView {
+    SerialFieldType type;                     ///< Full serial identity, never masked to its primitive type.
+    std::int64_t raw;                         ///< Exact scalar bits; canonical arrays require zero.
+    std::optional<std::u16string_view> units; ///< Null versus engaged empty UTF-16; source must outlive this view.
+    std::optional<std::span<const std::byte>>
+        bytes; ///< Null versus engaged empty bytes; source must outlive this view.
+};
+
+namespace detail {
+/** Validate either internal field representation without inspecting or copying payload contents.
+ * @tparam Field FieldValue or FieldValueView, exposing the same exact tag and nullable payload members.
+ * @param value Borrowed owning value or view; source storage is not retained.
+ * @return Whether its tag, range and canonical payload combination obey FIELD-TYPES.
  */
-[[nodiscard]] constexpr bool validFieldValue(const FieldValue &value) noexcept {
+template <typename Field> [[nodiscard]] constexpr bool validFieldValueImpl(const Field &value) noexcept {
     if (value.type == SerialFieldType::UTF_CHAR_ARRAY || value.type == SerialFieldType::STRING) {
         return value.raw == 0 && !value.bytes;
     }
@@ -238,6 +251,24 @@ struct FieldValue {
     default:
         return false;
     }
+}
+
+} // namespace detail
+
+/** Validate a manually constructed exact field value independently of schema policy.
+ * @param value Borrowed tagged value; never modified or retained.
+ * @return Whether the known tag, scalar range and nullable payload obey FIELD-TYPES.
+ */
+[[nodiscard]] constexpr bool validFieldValue(const FieldValue &value) noexcept {
+    return detail::validFieldValueImpl(value);
+}
+
+/** Validate a borrowed exact field without allocating, copying or retaining its payload.
+ * @param value Borrowed tagged field whose payload storage remains valid during this call.
+ * @return Whether the known tag, scalar range and nullable payload obey FIELD-TYPES.
+ */
+[[nodiscard]] constexpr bool validFieldValueView(const FieldValueView &value) noexcept {
+    return detail::validFieldValueImpl(value);
 }
 
 } // namespace org::ttldtor::qdcxx::core

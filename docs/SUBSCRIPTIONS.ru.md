@@ -2,6 +2,10 @@
 
 [English version](SUBSCRIPTIONS.md). Английская версия нормативная.
 
+Для приложений с общими очередями и prepared-callback начните с
+[получения generic-записей и подготовленных событий](SUBSCRIPTION-RECEIVER.ru.md).
+Ниже описаны контролируемый CLI и явные настройки его драйвера.
+
 `qdcxx-connect` — опциональный native STREAM-клиент для контролируемого plain-TCP peer.
 Он соединяет существующие [TCP runtime](../spec/transport/TCP-RUNTIME.ru.md),
 [live-сессию](../spec/subscriptions/LIVE-SESSION.ru.md) и

@@ -4,6 +4,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "recovery_test_peer.hpp"
 #include "recovery_test_support.hpp"
+#include "subscription_receiver_lifetime_support.hpp"
 
 #include <memory>
 #include <optional>
@@ -411,5 +412,83 @@ TEST_CASE("repeated public stop requests monotonically close an unstarted STREAM
         CHECK(status->phase == t::RecoveryPhase::CLOSED);
         CHECK(status->stopped);
         CHECK(status->attempts == 0);
+    }
+}
+
+TEST_CASE("prepared receiver projects a whole multi-record batch after callback-side TCP owner cutoff") {
+    namespace f = root::test::receiver_lifetime;
+    auto bootstrap = t::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+
+    for (const auto action : {f::OwnerAction::STOP, f::OwnerAction::DESTROY, f::OwnerAction::REPLACE}) {
+        INFO("action=", static_cast<int>(action));
+        root::test::TcpPeerConfig scripts;
+        scripts.sessions.resize(2);
+        scripts.sessions[0].initialBytes = r::ready();
+        r::append(scripts.sessions[0].initialBytes, f::description());
+        scripts.sessions[0].clientBytesToRead = 1;
+        scripts.sessions[0].replyBytes = f::data();
+        scripts.sessions[0].waitForControllerClose = true;
+        root::test::OwnedTcpPeer peer(std::move(scripts));
+        REQUIRE(peer.port() != 0);
+        auto local = f::schema();
+        f::Observation observed;
+        std::optional<t::TcpRecovery> owner;
+        std::optional<t::TcpRecovery> replacement;
+        auto consumer = std::make_shared<f::Consumer<t::TcpRecovery>>(owner, observed, action);
+        consumer->external = &consumer;
+        consumer->replacement = &replacement;
+        auto queue = stream(local);
+        auto handle = f::subscribe(queue, local, consumer);
+        t::RecoveryQueues queues;
+        queues.stream = std::move(queue);
+        auto endpoint = r::endpoint(local, r::settings(peer.port(), 1));
+        auto preparation = r::preparation();
+
+        if (action == f::OwnerAction::REPLACE) {
+            t::RecoveryQueues empty;
+            auto nextWork = r::preparation();
+            auto next =
+                t::TcpRecovery::create(*bootstrap, endpoint, f::blueprint(), std::move(empty), r::options(), nextWork);
+            REQUIRE(next);
+            replacement.emplace(std::move(*next));
+        }
+
+        auto created =
+            t::TcpRecovery::create(*bootstrap, endpoint, f::blueprint(), std::move(queues), r::options(), preparation);
+        REQUIRE(created);
+        owner.emplace(std::move(*created));
+        REQUIRE(owner->start());
+        const auto returned = until(owner, peer, [&] {
+            return observed.callbacks != 0;
+        });
+        CHECK(returned.stopped);
+        CHECK(returned.attempts == 1);
+
+        if (action == f::OwnerAction::DESTROY) {
+            CHECK_FALSE(owner);
+        } else {
+            REQUIRE(owner);
+
+            if (action == f::OwnerAction::REPLACE) {
+                CHECK_FALSE(replacement);
+                CHECK(owner->status().phase == t::RecoveryPhase::CONFIGURED);
+                CHECK(owner->status().attempts == 0);
+                CHECK_FALSE(owner->status().stopped);
+            }
+
+            r::stop(*owner);
+            owner.reset();
+        }
+
+        const auto terminal = handle.terminal();
+        REQUIRE(terminal);
+        CHECK(terminal->counts.callbackStartedBatches == 1);
+        CHECK(terminal->counts.callbackCompletedBatches == 1);
+        handle = {};
+        CHECK_FALSE(peer.snapshot().sessions[1].accepted);
+        peer.stop();
+        CHECK_FALSE(consumer);
+        f::check(observed);
     }
 }

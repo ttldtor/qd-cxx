@@ -52,6 +52,12 @@ struct RecordValueView {
     std::span<const core::FieldValue> values; ///< Complete local field order, borrowed for validation/projection.
 };
 
+/** Complete local field views; copying this object does not retain borrowed payload storage. */
+struct BorrowedRecordValueView {
+    core::RecordContext context;                  ///< Owned immutable source schema/record identity.
+    std::span<const core::FieldValueView> values; ///< Complete local order; fields and payloads must outlive use.
+};
+
 /** Immutable local-to-event selections, independent of protocol and preparation input lifetime. */
 class EventMapping {
     core::RecordContext context_;
@@ -94,6 +100,12 @@ class EventMapping {
      * @return Success or context/value error; no allocation, copying or retained values.
      */
     [[nodiscard]] std::expected<void, MappingError> validate(RecordValueView record) const noexcept;
+
+    /** Validate borrowed field provenance first, then every exact tag and canonical payload shape.
+     * @param record Complete field views and context; storage remains valid throughout this call.
+     * @return Success or context/value error; no allocation, payload copying or retained views.
+     */
+    [[nodiscard]] std::expected<void, MappingError> validateView(BorrowedRecordValueView record) const noexcept;
 };
 
 } // namespace org::ttldtor::qdcxx::events
