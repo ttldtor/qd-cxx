@@ -285,7 +285,8 @@ class TlsRecoveryBackend final : public detail::RecoveryBackend {
                 verified && eligible,
                 runtime_->terminal().has_value(),
                 runtime_->peer().identity().generation(),
-                auth};
+                auth,
+                runtime_->resources().transport.pendingOperations};
     }
 
     detail::RecoveryAttemptFailure failure() const noexcept override {
@@ -304,6 +305,15 @@ class TlsRecoveryBackend final : public detail::RecoveryBackend {
         }
 
         return last_.error == TlsError::NONE ? detail::RecoveryAttemptFailure{} : classify(last_);
+    }
+
+    std::optional<TcpTerminal> wireTerminal() const noexcept override {
+        if (runtime_) {
+            if (const auto terminal = runtime_->terminal())
+                return terminal->wire;
+        }
+
+        return std::nullopt;
     }
 
     std::optional<detail::RecoveryClock::time_point> nextWake() const noexcept override {
@@ -459,6 +469,13 @@ std::expected<void, RecoveryDiagnostic> TlsRecovery::requestStop() noexcept {
     const auto lease = impl_;
 
     return lease ? lease->core.requestStop() : std::unexpected(moved());
+}
+
+std::expected<void, RecoveryDiagnostic>
+TlsRecovery::requestDrain(std::chrono::steady_clock::time_point deadline) noexcept {
+    const auto lease = impl_;
+
+    return lease ? lease->core.requestDrain(deadline) : std::unexpected(moved());
 }
 
 TlsRecoveryStatus TlsRecovery::status() const noexcept {

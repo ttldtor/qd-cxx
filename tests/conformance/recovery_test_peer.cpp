@@ -126,6 +126,7 @@ struct OwnedTcpPeer::Impl {
     mutable std::mutex mutex;
     TcpPeerSnapshot status;
     std::array<bool, MAXIMUM_SESSIONS> closeAllowed{};
+    std::array<bool, MAXIMUM_SESSIONS> replyAllowed{};
     std::atomic<bool> stopping{};
     SocketOwner listener;
     std::thread worker;
@@ -351,10 +352,23 @@ struct OwnedTcpPeer::Impl {
         const auto &script = config.sessions[index];
 
         if (!sendBytes(connection.value, script.initialBytes, index, false) ||
-            !receiveBytes(connection.value, script, index) ||
-            !sendBytes(connection.value, script.replyBytes, index, true)) {
+            !receiveBytes(connection.value, script, index)) {
             return false;
         }
+
+        while (script.waitForControllerReply && active()) {
+            {
+                const std::lock_guard lock(mutex);
+
+                if (replyAllowed[index])
+                    break;
+            }
+
+            std::this_thread::sleep_for(POLL_INTERVAL);
+        }
+
+        if (!active() || !sendBytes(connection.value, script.replyBytes, index, true))
+            return false;
 
         while (script.waitForControllerClose && active()) {
             {
@@ -499,6 +513,13 @@ void OwnedTcpPeer::allowClose(std::size_t index) {
     if (index < impl_->config.sessions.size() && index < MAXIMUM_SESSIONS) {
         impl_->closeAllowed[index] = true;
     }
+}
+
+void OwnedTcpPeer::allowReply(std::size_t index) {
+    const std::lock_guard lock(impl_->mutex);
+
+    if (index < impl_->config.sessions.size() && index < MAXIMUM_SESSIONS)
+        impl_->replyAllowed[index] = true;
 }
 
 void OwnedTcpPeer::stop() {

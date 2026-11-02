@@ -80,6 +80,15 @@ class TcpRecovery {
      * @return Acceptance or wrong-thread/moved-from refusal.
      */
     [[nodiscard]] std::expected<void, RecoveryDiagnostic> requestStop() noexcept;
+    /** Request drain of the local queue-admitted delivery prefix, immediately aborting native I/O.
+     * Later poll calls may deliver only that prefix until the earliest requested deadline expires.
+     * No output flush, peer acknowledgement or delivery of an unadmitted Core-held event is promised.
+     * Allowed in this owner's callback; existing stop/destruction always escalates to immediate abort.
+     * @param deadline Inclusive steady-clock deadline covering all unfinished local retirement.
+     * @return Acceptance or creating-thread/moved-from refusal; no inline cleanup or callback dispatch.
+     */
+    [[nodiscard]] std::expected<void, RecoveryDiagnostic>
+    requestDrain(std::chrono::steady_clock::time_point deadline) noexcept;
     /** Inspect current fixed status on the serialized owner.
      * @return Detached evidence; moved-from handles report CLOSED/stopped.
      */

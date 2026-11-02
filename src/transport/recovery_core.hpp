@@ -3,6 +3,7 @@
 #pragma once
 
 #include "recovery_configuration.hpp"
+#include "recovery_drain.hpp"
 
 #include <array>
 #include <chrono>
@@ -21,6 +22,7 @@ struct RecoveryAttemptFacts {
     bool terminal = false;        ///< Published native quiescence, distinct from private destruction.
     std::uint64_t generation = 0; ///< Current actual peer generation, never a reconstructed sender ID.
     protocol::LiveAuthentication authentication = protocol::LiveAuthentication::UNCHALLENGED; ///< Actual auth gate.
+    std::size_t pendingOperations = 0; ///< Submitted native/DNS/connecting lifetimes awaiting owned retirement.
 };
 
 /** Selected real failure classification, preserving existing typed/static evidence. */
@@ -98,6 +100,10 @@ class RecoveryBackend {
      * @return Fixed typed/static evidence.
      */
     [[nodiscard]] virtual RecoveryAttemptFailure failure() const noexcept = 0;
+    /** Inspect the actual terminal of this attempt's native byte transport before private disposal.
+     * @return Detached final wire evidence, or empty before native retirement/no attempt.
+     */
+    [[nodiscard]] virtual std::optional<TcpTerminal> wireTerminal() const noexcept = 0;
     /** Inspect actual native/TLS progress hint.
      * @return Monotonic deadline or empty when no active deadline remains.
      */
@@ -118,8 +124,12 @@ class RecoveryCore {
     std::optional<protocol::LiveEvent> event_; ///< At most one undecided complete event under the current epoch cap.
     RecoveryDiagnostic first_{};               ///< First fixed failure across this run.
     RecoveryDiagnostic secondary_{};           ///< First distinct subsequent failure.
-    std::array<bool, 3> converged_{};          ///< Cached funded bank comparison at the exact represented revision.
-    std::array<bool, 3> resetRequested_{};     ///< Actual reset-publication acceptance for the current retiring epoch.
+    RecoveryDrain drain_;                      ///< Earliest local-drain deadline and monotonic abort policy.
+    std::optional<RecoveryTerminal> terminal_; ///< Frozen after all actual owned retirement barriers.
+    std::optional<TcpTerminal> wire_; ///< Latest actually retired attempt; cleared at the next factory-entry commit.
+    std::optional<std::size_t> nativeOperationsAtCutoff_; ///< First explicit fence sample, including an observed zero.
+    std::array<bool, 3> converged_{};      ///< Cached funded bank comparison at the exact represented revision.
+    std::array<bool, 3> resetRequested_{}; ///< Actual reset-publication acceptance for the current retiring epoch.
     std::array<std::uint64_t, 3> desiredRevisions_{}; ///< Last constant-time observed owner-applied revision.
     std::uint64_t readiness_ = 0;      ///< Checked readiness change identity, never inferred from schema shape.
     std::uint64_t peerGeneration_ = 0; ///< Last actual current generation.
@@ -128,11 +138,33 @@ class RecoveryCore {
     std::size_t family_ = 0;          ///< Fixed fair family cursor.
     std::size_t controlFamily_ = 0;   ///< Independent bounded offline/control-progress cursor.
     bool descriptor_ = false;         ///< The local initial descriptor was actually admitted in this attempt.
-    bool cutoff_ = false;             ///< Monotonic old-owner stop; no subsequent factory/output/callback eligibility.
+    bool cutoff_ = false;             ///< No new factory/input/output; only an active local drain may dispatch.
     bool executing_ = false;          ///< Reject recursive public progress without replacing active caller budgets.
     bool readinessExhausted_ = false; ///< A readiness change identity cannot wrap into an old value.
     bool abortIssued_ = false;        ///< Actual request-only abort was sent to the current inner runtime.
     bool finalRetirement_ = false;    ///< No successor is possible; the owned fallback event reserve may be used.
+    bool shutdownFailed_ = false;     ///< A fatal current cause or failed final retirement prevents successful drain.
+    bool shutdownGap_ = false;        ///< An unresolved current transport/inactivity cause prevents successful drain.
+    bool heldDataDiscarded_ = false;  ///< Complete DATA was released during stop without queue admission.
+
+    /** Request one fixed stop mode on each unfinished adopted queue.
+     * @param mode Graceful local prefix or immediate abort.
+     */
+    void stopQueues(mux::StopMode mode) noexcept;
+    /** Sample the active deadline and fence later delivery if it expired.
+     * @param now Fresh monotonic sample, including after native disposal.
+     */
+    void sampleDrain(RecoveryClock::time_point now) noexcept;
+    /** Classify current shutdown causes independently of recovered historical diagnostics. */
+    void observeShutdownCause() noexcept;
+    /** Preserve and classify each actual native retirement cause relative to the local prefix.
+     * @param afterFence These backend causes were first observed after the accepted shutdown fence.
+     */
+    void observeRetiringBackend(bool afterFence) noexcept;
+    /** Preserve any actual wire terminal before disposing the current native/private attempt. */
+    void captureWire() noexcept;
+    /** Freeze a detached result only after scheduler, native, held-event and all queue barriers. */
+    void publishTerminal() noexcept;
 
     /** Record fixed first/secondary failure evidence.
      * @param diagnostic Actual cause, without borrowed user text.
@@ -216,6 +248,11 @@ class RecoveryCore {
      * @return Acceptance or wrong-thread refusal; normal busy guards do not block stop.
      */
     std::expected<void, RecoveryDiagnostic> requestStop() noexcept;
+    /** Request only local admitted-prefix drain while immediately fencing native attempts/I/O.
+     * @param deadline Earliest inclusive monotonic deadline, covering all unfinished retirement.
+     * @return Acceptance or wrong-thread refusal; callback reentry does not block this request.
+     */
+    std::expected<void, RecoveryDiagnostic> requestDrain(RecoveryClock::time_point deadline) noexcept;
     /** Copy fixed current status.
      * @return Detached public phase/attempt/cause evidence.
      */

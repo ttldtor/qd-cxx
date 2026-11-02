@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: BSL-1.0
 // Internal CTest runner: deterministic observations exercise the production recovery transition model.
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include <doctest/doctest.h>
-
+#include "recovery_drain.hpp"
 #include "recovery_state.hpp"
+
+#include <doctest/doctest.h>
 
 #include <algorithm>
 #include <array>
@@ -728,4 +729,127 @@ TEST_CASE("recovery combined backpressure never overrides reset or stop control 
               .status == t::RecoveryStepStatus::TERMINAL);
     CHECK(value.state.status().phase == t::RecoveryPhase::CLOSED);
     CHECK(value.state.status().attempts == 1);
+}
+
+TEST_CASE("local recovery drain keeps the earliest inclusive deadline") {
+    t::RecoveryDrain drain;
+    CHECK_FALSE(drain.active());
+    CHECK_FALSE(drain.nextWake());
+    drain.request(at(20ms), at(10ms));
+    REQUIRE(drain.active());
+    REQUIRE(drain.nextWake());
+    CHECK(*drain.nextWake() == at(20ms));
+    drain.request(at(40ms), at(11ms));
+    REQUIRE(drain.nextWake());
+    CHECK(*drain.nextWake() == at(20ms));
+    drain.request(at(15ms), at(12ms));
+    REQUIRE(drain.nextWake());
+    CHECK(*drain.nextWake() == at(15ms));
+    drain.sample(at(14ms));
+    CHECK(drain.active());
+    CHECK_FALSE(drain.expired());
+    drain.sample(at(15ms));
+    CHECK_FALSE(drain.active());
+    CHECK(drain.expired());
+    CHECK_FALSE(drain.nextWake());
+    drain.request(at(100ms), at(16ms));
+    CHECK_FALSE(drain.active());
+    CHECK(drain.expired());
+}
+
+TEST_CASE("local recovery drain rejects past deadlines without a graceful action window") {
+    for (const auto deadline : {at(9ms), at(10ms)}) {
+        t::RecoveryDrain drain;
+        drain.request(deadline, at(10ms));
+        CHECK_FALSE(drain.active());
+        CHECK(drain.expired());
+        CHECK_FALSE(drain.nextWake());
+    }
+}
+
+TEST_CASE("local recovery drain cannot undo explicit or fatal abort") {
+    for (const bool requested : {false, true}) {
+        t::RecoveryDrain drain;
+
+        if (requested)
+            drain.request(at(20ms), at(10ms));
+
+        drain.abort();
+        drain.request(at(30ms), at(11ms));
+        drain.sample(at(40ms));
+        CHECK_FALSE(drain.active());
+        CHECK_FALSE(drain.expired());
+        CHECK_FALSE(drain.nextWake());
+    }
+}
+
+TEST_CASE("local recovery drain rechecks expiry after work consumed its remaining interval") {
+    t::RecoveryDrain drain;
+    drain.request(at(20ms), at(10ms));
+    drain.sample(at(19ms));
+    REQUIRE(drain.active());
+    drain.sample(at(21ms));
+    CHECK_FALSE(drain.active());
+    CHECK(drain.expired());
+    drain.abort();
+    CHECK(drain.expired());
+}
+
+TEST_CASE("local recovery shutdown scopes exact native failures by their first observation fence") {
+    namespace r = org::ttldtor::qdcxx::transport;
+    constexpr int AMBIGUOUS_WINDOWS_CLOSE = 1236;
+
+    for (const auto error : {r::TcpError::READ_FAILURE, r::TcpError::WRITE_FAILURE, r::TcpError::DNS_FAILURE,
+                             r::TcpError::CONNECT_FAILURE, r::TcpError::DEADLINE}) {
+        const r::RecoveryDiagnostic diagnostic{r::RecoveryError::TRANSPORT_FAILURE,
+                                               "observed-native-cause",
+                                               {error, "socket-operation", AMBIGUOUS_WINDOWS_CLOSE}};
+        CHECK(t::classifyRecoveryShutdown(diagnostic, false) == t::RecoveryShutdownFailure::TRANSPORT_GAP);
+        const auto expected = error == r::TcpError::READ_FAILURE || error == r::TcpError::WRITE_FAILURE
+                                  ? t::RecoveryShutdownFailure::POST_FENCE_TRANSPORT
+                                  : t::RecoveryShutdownFailure::TRANSPORT_GAP;
+        CHECK(t::classifyRecoveryShutdown(diagnostic, true) == expected);
+        CHECK(diagnostic.transport.error == error);
+        CHECK(diagnostic.transport.nativeCode == AMBIGUOUS_WINDOWS_CLOSE);
+        CHECK(diagnostic.transport.stage == "socket-operation");
+    }
+
+    const r::RecoveryDiagnostic ended{r::RecoveryError::TRANSPORT_FAILURE, "recovery-peer-end"};
+    CHECK(t::classifyRecoveryShutdown(ended, false) == t::RecoveryShutdownFailure::TRANSPORT_GAP);
+    CHECK(t::classifyRecoveryShutdown(ended, true) == t::RecoveryShutdownFailure::POST_FENCE_TRANSPORT);
+    const r::RecoveryDiagnostic inactive{r::RecoveryError::TRANSPORT_FAILURE, "recovery-protocol-inactivity"};
+    CHECK(t::classifyRecoveryShutdown(inactive, true) == t::RecoveryShutdownFailure::TRANSPORT_GAP);
+}
+
+TEST_CASE("local recovery shutdown never hides fatal primary or secondary evidence behind a read failure") {
+    namespace r = org::ttldtor::qdcxx::transport;
+    namespace p = org::ttldtor::qdcxx::protocol;
+
+    for (const bool afterFence : {false, true}) {
+        for (const auto error :
+             {r::RecoveryError::AUTHENTICATION, r::RecoveryError::PROTOCOL_FAILURE, r::RecoveryError::RESOURCE_LIMIT,
+              r::RecoveryError::ALLOCATION_FAILURE, r::RecoveryError::INVALID_CONFIGURATION,
+              r::RecoveryError::RESET_FAILURE, r::RecoveryError::IDENTITY_EXHAUSTED}) {
+            const r::RecoveryDiagnostic diagnostic{error, "actual-fatal-cause", {r::TcpError::READ_FAILURE}};
+            CHECK(t::classifyRecoveryShutdown(diagnostic, afterFence) == t::RecoveryShutdownFailure::FATAL);
+        }
+
+        const r::RecoveryDiagnostic malformed{r::RecoveryError::TRANSPORT_FAILURE,
+                                              "actual-protocol-cause",
+                                              {r::TcpError::READ_FAILURE, "socket-read", 0, p::LiveError::MALFORMED}};
+        CHECK(t::classifyRecoveryShutdown(malformed, afterFence) == t::RecoveryShutdownFailure::FATAL);
+        const r::RecoveryDiagnostic work{r::RecoveryError::WORK_LIMIT, "pre-admission-work"};
+        CHECK(t::classifyRecoveryShutdown(work, afterFence) == t::RecoveryShutdownFailure::NONE);
+
+        for (const auto stage : {"tls-close-failure", "tls-phase-deadline", "unknown-transport-cause"}) {
+            const r::RecoveryDiagnostic opaque{r::RecoveryError::TRANSPORT_FAILURE, stage};
+            CHECK(t::classifyRecoveryShutdown(opaque, afterFence) == t::RecoveryShutdownFailure::FATAL);
+        }
+    }
+
+    const r::RecoveryDiagnostic primary{
+        r::RecoveryError::TRANSPORT_FAILURE, "socket-read", {r::TcpError::READ_FAILURE}};
+    const r::RecoveryDiagnostic secondary{r::RecoveryError::RESOURCE_LIMIT, "actual-cleanup-failure"};
+    CHECK(t::classifyRecoveryShutdown(primary, true) == t::RecoveryShutdownFailure::POST_FENCE_TRANSPORT);
+    CHECK(t::classifyRecoveryShutdown(secondary, true) == t::RecoveryShutdownFailure::FATAL);
 }

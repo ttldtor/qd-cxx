@@ -266,6 +266,7 @@ RecoveryCore::RecoveryCore(RecoveryConfiguration &&configuration, RecoveryBacken
 RecoveryCore::~RecoveryCore() {
     cutoff();
     // Active public operations retain the enclosing Impl, so this fallback is outside its callbacks.
+    captureWire();
     backend_.dispose();
 
     if (event_) {
@@ -310,16 +311,122 @@ std::expected<void, RecoveryDiagnostic> RecoveryCore::start() noexcept {
 }
 
 void RecoveryCore::cutoff() noexcept {
+    if (!cutoff_)
+        nativeOperationsAtCutoff_ = backend_.facts().pendingOperations;
+
     cutoff_ = true;
+
+    if (terminal_)
+        return;
+
+    drain_.abort();
     state_.requestStop();
     backend_.abort();
     abortIssued_ = true;
+    stopQueues(mux::StopMode::ABORT);
+}
 
+void RecoveryCore::stopQueues(mux::StopMode mode) noexcept {
     for (std::size_t family = 0; family != 3; ++family) {
         if (auto &queue = configuration_.queue(family); queue && queue->state() != mux::QueueState::TERMINAL) {
-            queue->requestStop(mux::StopMode::ABORT);
+            queue->requestStop(mode);
         }
     }
+}
+
+void RecoveryCore::sampleDrain(RecoveryClock::time_point now) noexcept {
+    if (terminal_)
+        return;
+
+    const bool active = drain_.active();
+    drain_.sample(now);
+
+    if (active && !drain_.active())
+        stopQueues(mux::StopMode::ABORT);
+}
+
+void RecoveryCore::observeShutdownCause() noexcept {
+    switch (state_.status().currentCause) {
+    case RecoveryCause::NONE:
+        break;
+    case RecoveryCause::TRANSPORT:
+    case RecoveryCause::PROTOCOL_INACTIVITY:
+        shutdownGap_ = shutdownGap_ || cutoff_ || finalRetirement_;
+        break;
+    default:
+        shutdownFailed_ = true;
+
+        if (drain_.active()) {
+            drain_.abort();
+            stopQueues(mux::StopMode::ABORT);
+        }
+
+        break;
+    }
+}
+
+void RecoveryCore::observeRetiringBackend(bool afterFence) noexcept {
+    const auto failure = backend_.failure();
+    const auto observe = [&](RecoveryDiagnostic diagnostic) {
+        const auto relevance = classifyRecoveryShutdown(diagnostic, afterFence);
+
+        if (relevance == RecoveryShutdownFailure::NONE)
+            return;
+
+        record(diagnostic);
+        shutdownGap_ = shutdownGap_ || relevance == RecoveryShutdownFailure::TRANSPORT_GAP;
+        shutdownFailed_ = shutdownFailed_ || relevance == RecoveryShutdownFailure::FATAL;
+    };
+
+    observe(failure.diagnostic);
+
+    if (failure.secondary)
+        observe(*failure.secondary);
+
+    if (shutdownFailed_) {
+        drain_.abort();
+        stopQueues(mux::StopMode::ABORT);
+    }
+}
+
+void RecoveryCore::captureWire() noexcept {
+    if (const auto actual = backend_.wireTerminal())
+        wire_ = actual;
+}
+
+void RecoveryCore::publishTerminal() noexcept {
+    if (terminal_ || !state_.status().terminal || backend_.facts().present || event_)
+        return;
+
+    sampleDrain(RecoveryClock::now());
+    observeShutdownCause();
+    RecoveryTerminal result;
+    result.outcome = shutdownFailed_                                           ? mux::TerminalOutcome::FAILED
+                     : drain_.active() && !shutdownGap_ && !heldDataDiscarded_ ? mux::TerminalOutcome::DRAINED
+                                                                               : mux::TerminalOutcome::ABORTED;
+    result.deadlineExpired = drain_.expired();
+    result.heldDataDiscarded = heldDataDiscarded_;
+    result.wire = wire_;
+    result.nativeOperationsAtCutoff = nativeOperationsAtCutoff_;
+
+    for (std::size_t family = 0; family != result.queues.size(); ++family) {
+        if (const auto &queue = configuration_.queue(family)) {
+            result.queues[family] = queue->terminal();
+
+            if (!result.queues[family])
+                return;
+
+            const auto &actual = *result.queues[family];
+
+            if (actual.outcome == mux::TerminalOutcome::FAILED)
+                result.outcome = mux::TerminalOutcome::FAILED;
+            else if (result.outcome != mux::TerminalOutcome::FAILED &&
+                     (actual.outcome == mux::TerminalOutcome::ABORTED || actual.hadGap))
+                result.outcome = mux::TerminalOutcome::ABORTED;
+        }
+    }
+
+    terminal_ = std::move(result);
 }
 
 std::expected<void, RecoveryDiagnostic> RecoveryCore::requestStop() noexcept {
@@ -328,6 +435,39 @@ std::expected<void, RecoveryDiagnostic> RecoveryCore::requestStop() noexcept {
     }
 
     cutoff();
+
+    return {};
+}
+
+std::expected<void, RecoveryDiagnostic> RecoveryCore::requestDrain(RecoveryClock::time_point deadline) noexcept {
+    if (thread_ != std::this_thread::get_id()) {
+        return std::unexpected(RecoveryDiagnostic{RecoveryError::WRONG_THREAD, "recovery-owner-thread"});
+    }
+
+    const bool firstFence = !cutoff_;
+
+    if (firstFence)
+        nativeOperationsAtCutoff_ = backend_.facts().pendingOperations;
+
+    cutoff_ = true;
+
+    if (terminal_)
+        return {};
+
+    observeShutdownCause();
+
+    if (firstFence && backend_.facts().present)
+        observeRetiringBackend(false);
+
+    drain_.request(deadline, RecoveryClock::now());
+
+    if (shutdownFailed_)
+        drain_.abort();
+
+    state_.requestStop();
+    backend_.abort();
+    abortIssued_ = true;
+    stopQueues(drain_.active() ? mux::StopMode::GRACEFUL : mux::StopMode::ABORT);
 
     return {};
 }
@@ -348,6 +488,8 @@ void RecoveryCore::record(RecoveryDiagnostic diagnostic) noexcept {
 }
 
 void RecoveryCore::recordModelCause() noexcept {
+    observeShutdownCause();
+
     switch (state_.status().currentCause) {
     case RecoveryCause::PROTOCOL_INACTIVITY:
         record({RecoveryError::TRANSPORT_FAILURE, "recovery-protocol-inactivity"});
@@ -425,6 +567,7 @@ bool RecoveryCore::releaseEvent(protocol::LiveWork &work) noexcept {
 
         --retirement_.visits;
         retirement_.bytes -= release;
+        heldDataDiscarded_ = heldDataDiscarded_ || event_->kind() == protocol::LiveEventKind::DATA;
         event_.reset();
 
         return true;
@@ -544,6 +687,9 @@ RecoveryObservation RecoveryCore::execute(RecoveryTicket ticket, RecoveryTurnWor
                           ticket.action == RecoveryAction::NEGOTIATE || ticket.action == RecoveryAction::REPLAY ||
                           ticket.action == RecoveryAction::HEARTBEAT || ticket.action == RecoveryAction::DELIVER;
 
+    if (cutoff_ && ticket.action == RecoveryAction::RESET_SOURCES)
+        return recoveryResult(ticket, RecoveryCompletion::DEFERRED);
+
     // A new PREPARE retains the previous cause until its actual entry commit; do not strand backoff here.
     if (ordinary &&
         (cutoff_ || (model.currentCause != RecoveryCause::NONE && ticket.action != RecoveryAction::PREPARE_ATTEMPT))) {
@@ -601,6 +747,7 @@ RecoveryObservation RecoveryCore::execute(RecoveryTicket ticket, RecoveryTurnWor
                 return recoveryResult(ticket, RecoveryCompletion::DEFERRED);
             }
 
+            wire_.reset();
             std::optional<protocol::SubscriptionWriter> fresh;
             auto *writer = configuration_.firstWriter ? &*configuration_.firstWriter : nullptr;
 
@@ -688,7 +835,7 @@ RecoveryObservation RecoveryCore::execute(RecoveryTicket ticket, RecoveryTurnWor
                 }
             }
 
-            auto polled = backend_.poll(work, !event_);
+            auto polled = backend_.poll(work, !event_ && !cutoff_);
 
             if (!polled) {
                 if (polled.error().error == RecoveryError::WORK_LIMIT) {
@@ -696,6 +843,13 @@ RecoveryObservation RecoveryCore::execute(RecoveryTicket ticket, RecoveryTurnWor
                 }
 
                 const auto classified = backend_.failure();
+
+                if (cutoff_ && classifyRecoveryShutdown(classified.diagnostic, true) ==
+                                   RecoveryShutdownFailure::POST_FENCE_TRANSPORT) {
+                    observeRetiringBackend(true);
+
+                    return result;
+                }
 
                 return failure(polled.error(), classified.cause, classified.retryable);
             }
@@ -731,10 +885,14 @@ RecoveryObservation RecoveryCore::execute(RecoveryTicket ticket, RecoveryTurnWor
                     return failed;
                 }
 
-                record(classified.diagnostic);
+                if (cutoff_ || finalRetirement_)
+                    observeRetiringBackend(true);
+                else {
+                    record(classified.diagnostic);
 
-                if (classified.secondary)
-                    record(*classified.secondary);
+                    if (classified.secondary)
+                        record(*classified.secondary);
+                }
             }
 
             return result;
@@ -749,6 +907,10 @@ RecoveryObservation RecoveryCore::execute(RecoveryTicket ticket, RecoveryTurnWor
             if (!backend_.facts().terminal)
                 return recoveryResult(ticket, RecoveryCompletion::DEFERRED);
 
+            if (cutoff_ || finalRetirement_)
+                observeRetiringBackend(cutoff_);
+
+            captureWire();
             backend_.dispose();
             result.privateDisposed = !backend_.facts().present;
 
@@ -840,20 +1002,39 @@ RecoveryObservation RecoveryCore::execute(RecoveryTicket ticket, RecoveryTurnWor
         case RecoveryAction::STOP_DELIVERY:
         case RecoveryAction::RETIRE_ALL: {
             finalRetirement_ = true;
+
+            if (ticket.action == RecoveryAction::RETIRE_ALL) {
+                shutdownFailed_ = true;
+                drain_.abort();
+            }
+
+            observeShutdownCause();
             backend_.abort();
             abortIssued_ = true;
 
             if (backend_.facts().present && !backend_.facts().terminal) {
                 const auto progressed = backend_.poll(work, false);
 
-                if (!progressed && progressed.error().error != RecoveryError::WORK_LIMIT)
+                if (!progressed && progressed.error().error != RecoveryError::WORK_LIMIT) {
                     record(progressed.error());
+                    const auto relevance = classifyRecoveryShutdown(progressed.error(), cutoff_);
+                    shutdownGap_ = shutdownGap_ || relevance == RecoveryShutdownFailure::TRANSPORT_GAP;
+                    shutdownFailed_ = shutdownFailed_ || relevance == RecoveryShutdownFailure::FATAL;
+                    observeRetiringBackend(cutoff_);
+                }
 
                 return recoveryResult(ticket, RecoveryCompletion::DEFERRED);
             }
 
+            if (backend_.facts().present)
+                observeRetiringBackend(cutoff_);
+
+            captureWire();
             backend_.dispose();
             (void)releaseEvent(work.session);
+
+            if (backend_.facts().present || event_)
+                return recoveryResult(ticket, RecoveryCompletion::DEFERRED);
 
             for (std::size_t family = 0; family != 3; ++family) {
                 auto &queue = configuration_.queue(family);
@@ -862,14 +1043,18 @@ RecoveryObservation RecoveryCore::execute(RecoveryTicket ticket, RecoveryTurnWor
                     continue;
                 }
 
-                // A terminal queue has already committed cleanup; do not reopen its closing state.
-                queue->requestStop(mux::StopMode::ABORT);
+                // Native disposal can consume the deadline; sample again before entering any delivery action.
+                sampleDrain(RecoveryClock::now());
+                queue->requestStop(drain_.active() ? mux::StopMode::GRACEFUL : mux::StopMode::ABORT);
 
                 if (queue->state() != mux::QueueState::TERMINAL) {
                     const auto progressed = queue->progress(work.queues[family]);
 
-                    if (!progressed && progressed.error().error != mux::QueueError::WORK_LIMIT)
+                    if (!progressed && progressed.error().error != mux::QueueError::WORK_LIMIT) {
                         record(queueFailure(progressed.error()));
+                        shutdownFailed_ = true;
+                        drain_.abort();
+                    }
 
                     return recoveryResult(ticket, RecoveryCompletion::DEFERRED);
                 }
@@ -907,6 +1092,9 @@ std::expected<RecoveryStatus, RecoveryDiagnostic> RecoveryCore::poll(RecoveryTur
         return std::unexpected(RecoveryDiagnostic{RecoveryError::INVALID_STATE, "recovery-uncommitted"});
     }
 
+    if (terminal_)
+        return status();
+
     if (work.recovery.operations < FACTORY_SAMPLES + 1 || work.recovery.visits < TURN_FAMILY_VISITS + FACTORY_SAMPLES) {
         return std::unexpected(RecoveryDiagnostic{RecoveryError::WORK_LIMIT, "recovery-state-work"});
     }
@@ -923,13 +1111,18 @@ std::expected<RecoveryStatus, RecoveryDiagnostic> RecoveryCore::poll(RecoveryTur
         }
     } turn(executing_);
 
+    sampleDrain(RecoveryClock::now());
     work.recovery.visits -= TURN_FAMILY_VISITS;
     auto action = step(state_, RecoveryClock::now(), {}, work.recovery);
     recordModelCause();
 
-    if (action.status == RecoveryStepStatus::TERMINAL)
-        return status();
+    if (action.status == RecoveryStepStatus::TERMINAL) {
+        publishTerminal();
 
+        return status();
+    }
+
+    sampleDrain(RecoveryClock::now());
     const auto controlError = controls(work);
 
     if (controlError)
@@ -956,8 +1149,12 @@ std::expected<RecoveryStatus, RecoveryDiagnostic> RecoveryCore::poll(RecoveryTur
 
     if (completed.status == RecoveryStepStatus::INVALID_OBSERVATION) {
         record({RecoveryError::INVALID_STATE, "recovery-action-proof"});
+        shutdownFailed_ = true;
         cutoff();
     }
+
+    sampleDrain(RecoveryClock::now());
+    publishTerminal();
 
     return status();
 }
@@ -966,6 +1163,7 @@ RecoveryStatus RecoveryCore::status() const noexcept {
     const auto current = state_.status();
     RecoveryStatus result{publicPhase(current.phase), current.attempts, first_, secondary_};
     result.stopped = cutoff_;
+    result.terminal = terminal_;
     const std::array slots{&configuration_.queues.ticker, &configuration_.queues.stream,
                            &configuration_.queues.history};
 
@@ -991,16 +1189,19 @@ RecoveryCapacity RecoveryCore::capacity() const noexcept {
 }
 
 std::optional<RecoveryClock::time_point> RecoveryCore::nextWake() const noexcept {
+    if (terminal_)
+        return std::nullopt;
+
     const auto scheduled = state_.nextWake();
     const auto native = backend_.nextWake();
+    auto earliest = drain_.nextWake();
 
-    if (!scheduled)
-        return native;
+    for (const auto hint : {scheduled, native}) {
+        if (hint && (!earliest || *hint < *earliest))
+            earliest = hint;
+    }
 
-    if (!native)
-        return scheduled;
-
-    return std::min(*scheduled, *native);
+    return earliest;
 }
 
 } // namespace org::ttldtor::qdcxx::transport::detail

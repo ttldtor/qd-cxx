@@ -92,6 +92,15 @@ class TlsRecovery {
      * @return Acceptance or creating-thread/moved-from refusal; normal busy guards do not block stop.
      */
     [[nodiscard]] std::expected<void, RecoveryDiagnostic> requestStop() noexcept;
+    /** Request drain of the local queue-admitted delivery prefix, immediately aborting native TLS I/O.
+     * Later poll calls may deliver only that prefix until the earliest requested deadline expires.
+     * This does not flush output, complete close-notify, await the peer or deliver a Core-held event.
+     * Allowed in this owner's callback; stop/destruction still escalates to immediate abort.
+     * @param deadline Inclusive steady-clock deadline covering all unfinished local retirement.
+     * @return Acceptance or creating-thread/moved-from refusal; no inline SDK cleanup or callbacks.
+     */
+    [[nodiscard]] std::expected<void, RecoveryDiagnostic>
+    requestDrain(std::chrono::steady_clock::time_point deadline) noexcept;
     /** Inspect actual common and TLS cause evidence.
      * @return Fixed detached status; moved-from handles report CLOSED/stopped.
      */

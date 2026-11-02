@@ -53,7 +53,8 @@ A provider or consumer callback may call `requestStop()`, destroy the public
 handle or replace it by move. The executing operation retains a stable lease on
 the old state and rechecks its cutoff and identities after callback return.
 An old continuation must not activate a replacement, start another factory or
-deliver later callbacks after cutoff.
+deliver later callbacks after an abort cutoff. An explicit local drain permits only
+the previously queue-admitted prefix described below.
 
 `requestStop()` records an allocation-free monotonic cutoff without inline
 native/TLS cleanup, callback dispatch or waiting. Callback destruction uses the
@@ -62,6 +63,75 @@ retirement synchronously. The bootstrap borrow follows the full-object lifetime
 above; controlled-host premises remain required through retirement.
 Recovery exposes detached status and queue batches;
 no raw `LiveEvent`, live-session snapshot or native runtime escapes the owner.
+
+## Local admitted-prefix drain and terminal evidence
+
+`requestDrain(deadline)` requests drain of the **local queue-admitted delivery
+prefix**. Like `requestStop()`, it immediately fences factories and new native
+input/output and requests native abort. It performs no inline cleanup or delivery.
+Only later explicit `poll()` calls may deliver already admitted queue projections,
+after the native/private attempt has actually retired. The prefix excludes a
+complete DATA event still held by Core without successful queue admission, partial
+native input and pending output. This is neither a wire flush nor peer acknowledgement
+or TLS close-notify completion. It is not a whole-application drain protocol.
+
+The deadline uses `std::chrono::steady_clock`. Repeated requests retain the earliest
+deadline; they cannot extend it or undo `requestStop()`, destruction or fatal abort.
+`now >= deadline` selects abort, including at request admission. Expiry covers all
+unfinished local retirement, not only callback delivery. `nextWake()` includes an
+active drain deadline. The owner samples again before each newly entered delivery
+action, after potentially expensive native disposal and before terminal publication.
+An already running callback, provider, SDK operation or destructor is not preempted;
+the deadline is not a hard bound on arbitrary user/SDK execution time.
+
+`RecoveryStatus::terminal` is absent until the scheduler has committed retirement,
+the native/private backend is absent, no Core-held event remains and every adopted
+queue has published its terminal. The frozen `RecoveryTerminal` contains the exact
+optional queue results in TICKER/STREAM/HISTORY order, `deadlineExpired` and
+`heldDataDiscarded`. The latter marks release of a complete Core-held **DATA** event
+without queue admission during stop/final retirement; it does not invent a lost
+record count from partial input. These flags and the result stay unchanged on all
+later requests/polls. A moved-from handle reports CLOSED/stopped with no terminal.
+
+`DRAINED` requires an explicit still-valid drain, every adopted queue drained and
+no shutdown failure, unresolved gap or discarded Core-held DATA. An expired deadline,
+explicit abort, any aborted queue, unresolved pre-fence transport/inactivity failure
+or discarded held DATA yields `ABORTED`, unless a fatal current cause, failed
+retirement or failed queue requires `FAILED`. Fatal causes include factory,
+authentication, configuration/resource/protocol/reset and clock/identity failures.
+`first`/`secondary` retain run-wide historical diagnostics; a successfully recovered
+old transport failure alone does not make final shutdown fail. Exact native read/write
+failures or clean EOF first **observed after** the accepted drain fence affect only
+input/output outside this queue-admitted prefix. They remain in `first`/`secondary`
+and native evidence, including ambiguous Windows error 1236; they are never relabelled
+as cancellation. This exception does not apply to DNS/connect/deadline failures,
+fatal TLS/protocol/authentication/resource/cleanup errors, or already observed
+pre-fence causes, including nonterminal backend failures. Primary and secondary
+causes are classified independently. Exact queue causes
+remain attached to their own family; no cross-family chronological ordering is claimed.
+`CLOSED` describes scheduler retirement and does not itself mean `DRAINED`.
+
+The optional `wire` terminal preserves the most recent actually retired attempt's
+`TcpTerminal`, captured before private disposal and cleared at the next actual
+factory entry. For TLS its counters describe encrypted transport bytes. It retains
+native primary/secondary causes, discarded unadmitted input, pending output and
+local write-acceptance evidence. A local `DRAINED` result can therefore coexist with
+post-fence socket errors or a discarded native suffix; it does not assert an
+error-free connection, output flush or peer acknowledgement.
+
+`nativeOperationsAtCutoff` is sampled before the first explicit drain/abort fence
+requests native cancellation. Empty means no such cutoff was observed; an engaged
+zero is an actual zero count. Repeated requests cannot replace it. The count covers
+owned submitted native/DNS/connecting lifetimes still awaiting retirement. In a
+plain CONNECTED attempt a count of two proves that its read and write/readiness
+handlers still require owner progress. It does not prove kernel stalling or that
+the operating system accepted no output; queued Windows completions and Linux
+readiness waits retain their existing native semantics.
+
+Detached terminal/queue identity copies and application-retained `OwnedMuxBatch`
+values remain valid after owner destruction. Such values may retain charged logical
+allocations; terminal quiescence does not require their resource counters to be zero.
+The fixed terminal storage is part of the admitted owner `sizeof(Impl)` scope.
 
 ## Attempts and failure policy
 

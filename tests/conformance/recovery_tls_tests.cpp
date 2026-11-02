@@ -290,7 +290,7 @@ struct StreamConsumer final : m::MuxConsumer {
  * @param local Exact subscription provenance shared with the incoming record binding.
  * @return Producer-safe public handle surviving source and recovery destruction.
  */
-m::MuxHandle subscribe(m::MuxQueue &queue, const std::shared_ptr<StreamConsumer> &consumer,
+m::MuxHandle subscribe(m::MuxQueue &queue, const std::shared_ptr<m::MuxConsumer> &consumer,
                        const c::LocalSchema &local) {
     auto work = r::queueWork();
     auto handle =
@@ -303,7 +303,139 @@ m::MuxHandle subscribe(m::MuxQueue &queue, const std::shared_ptr<StreamConsumer>
 
     return std::move(*handle);
 }
+
+/** Preserve admitted TLS payload while requesting local drain from its first callback. */
+struct DrainConsumer final : m::MuxConsumer {
+    std::optional<t::TlsRecovery> &owner;   ///< External owner; callback creates no ownership cycle.
+    std::vector<m::OwnedMuxBatch> retained; ///< Real payloads readable after native disposal.
+    std::vector<t::RecoveryPhase> phases;   ///< Callback-entry scheduler observations.
+    bool accepted = false;                  ///< Allocation-free request acceptance, asserted after callback return.
+    bool expired = false;                   ///< Select explicit inclusive past-deadline abort.
+
+    /** Bind the sole creating-thread handle.
+     * @param current Live owner retained by its actual poll operation.
+     * @param past Request an already expired drain deadline.
+     */
+    DrainConsumer(std::optional<t::TlsRecovery> &current, bool past) noexcept : owner(current), expired(past) {
+    }
+
+    m::BatchAction onBatch(const m::BorrowedMuxBatch &batch) override {
+        phases.push_back(owner->status().recovery.phase);
+        retained.push_back(batch.retain());
+
+        if (retained.size() == 1) {
+            accepted = owner
+                           ->requestDrain(expired ? std::chrono::steady_clock::time_point::min()
+                                                  : std::chrono::steady_clock::now() + 3s)
+                           .has_value();
+        }
+
+        return m::BatchAction::CONTINUE;
+    }
+};
 } // namespace
+
+TEST_CASE("TLS recovery local drain delivers only admitted payload and freezes shutdown evidence") {
+    auto bootstrap = t::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+
+    for (const bool expired : {false, true}) {
+        auto bytes = r::ready();
+        r::append(bytes, r::description(41));
+        std::vector<std::byte> payload;
+
+        for (const auto value : {101, 102}) {
+            payload.push_back(std::byte{0xfd});
+            r::number(payload, 1);
+            payload.push_back(std::byte{'A'});
+            r::number(payload, 41);
+            r::number(payload, 0);
+            r::number(payload, 1);
+            r::number(payload, value);
+        }
+
+        r::append(bytes, r::frame(15, payload));
+        auto script = x::peerOptions(h::PeerTlsVersion::TLS_1_3);
+        script.initialBytes = wire(bytes);
+        auto peer = h::TlsTestPeer::start(std::move(script));
+        REQUIRE(peer);
+        const auto tls = tlsOptions();
+        const auto requirements = t::tlsRequirements(tls.limits, tls.host);
+        REQUIRE(requirements);
+        auto local = r::schema();
+        std::optional<t::TlsRecovery> owner;
+        auto consumer = std::make_shared<DrainConsumer>(owner, expired);
+        auto queue = stream(local);
+        auto handle = subscribe(queue, consumer, local);
+        t::RecoveryQueues queues;
+        queues.stream = std::move(queue);
+        auto input = x::settings(peer->port());
+        input.retry = {3, 5s};
+        auto endpoint = r::endpoint(local, input);
+        auto preparation = r::preparation();
+        auto created = t::TlsRecovery::create(*bootstrap, endpoint, r::blueprint(), std::move(queues), r::options(),
+                                              tls, preparation);
+        REQUIRE(created);
+        owner.emplace(std::move(*created));
+        REQUIRE(owner->start());
+        const auto deadline = std::chrono::steady_clock::now() + 5s;
+        auto status = owner->status();
+
+        while (!status.recovery.terminal && std::chrono::steady_clock::now() < deadline) {
+            status = poll(*owner, *requirements);
+            std::this_thread::sleep_for(1ms);
+        }
+
+        INFO("phase=", static_cast<int>(status.recovery.phase), " recovery stage=", status.recovery.first.stage,
+             " TLS stage=", status.first.stage);
+        REQUIRE(status.recovery.terminal);
+        CHECK(consumer->accepted);
+        CHECK(status.recovery.phase == t::RecoveryPhase::CLOSED);
+        CHECK(status.recovery.terminal->outcome ==
+              (expired ? m::TerminalOutcome::ABORTED : m::TerminalOutcome::DRAINED));
+        CHECK(status.recovery.terminal->deadlineExpired == expired);
+        REQUIRE(status.recovery.terminal->queues[1]);
+        REQUIRE(status.recovery.terminal->wire);
+        const auto &wire = *status.recovery.terminal->wire;
+
+        if (wire.primary.error != t::TcpError::NONE) {
+            CHECK(status.recovery.first.transport.error == wire.primary.error);
+            CHECK(status.recovery.first.transport.nativeCode == wire.primary.nativeCode);
+            CHECK(status.recovery.first.transport.stage == wire.primary.stage);
+        }
+
+        std::cout << "TLS_DRAIN_WIRE\t" << expired << '\t' << static_cast<int>(wire.primary.error) << '\t'
+                  << wire.primary.nativeCode << '\t' << wire.primary.stage << '\n';
+        CHECK(status.recovery.terminal->queues[1]->counts.acceptedRecords == 2);
+        REQUIRE(consumer->retained.size() == (expired ? 1U : 2U));
+
+        if (!expired) {
+            REQUIRE(consumer->phases.size() == 2);
+            CHECK(consumer->phases[1] == t::RecoveryPhase::STOPPING);
+        }
+
+        const auto terminal = *status.recovery.terminal;
+        REQUIRE(owner->requestStop());
+        REQUIRE(owner->requestDrain(std::chrono::steady_clock::time_point::min()));
+        const auto repeated = poll(*owner, *requirements);
+        REQUIRE(repeated.recovery.terminal);
+        CHECK(repeated.recovery.terminal->outcome == terminal.outcome);
+        CHECK(repeated.recovery.terminal->deadlineExpired == terminal.deadlineExpired);
+        owner.reset();
+
+        for (std::size_t index = 0; index != consumer->retained.size(); ++index) {
+            const auto records = consumer->retained[index].records();
+            REQUIRE(records.size() == 1);
+            REQUIRE(records[0].typedValues.size() == 3);
+            CHECK(records[0].typedValues[2].raw == 101 + static_cast<std::int64_t>(index));
+        }
+
+        REQUIRE(handle.terminal());
+        CHECK(terminal.queues[1]->epoch.matches(handle.terminal()->epoch));
+        const auto report = peer->stop();
+        CHECK(report.handshakeComplete);
+    }
+}
 
 TEST_CASE("TLS recovery reaches actual protocol ACTIVE with empty demand using TLS 1.2 and TLS 1.3") {
     auto bootstrap = t::RuntimeBootstrap::create();
@@ -382,12 +514,16 @@ TEST_CASE("TLS recovery cannot activate empty demand from a verified handshake w
     CHECK(peer->stop().handshakeComplete);
 }
 
-TEST_CASE("TLS recovery credential callback refusal and owner destruction cannot authorize a successor") {
+TEST_CASE("TLS recovery credential callback refusal destruction and drain cannot authorize a successor") {
     auto bootstrap = t::RuntimeBootstrap::create();
     REQUIRE(bootstrap);
 
-    for (const bool destroyOwner : {false, true}) {
-        CAPTURE(destroyOwner);
+    enum class ProviderAction { REFUSE, DESTROY, DRAIN };
+
+    for (const auto selected : {ProviderAction::REFUSE, ProviderAction::DESTROY, ProviderAction::DRAIN}) {
+        CAPTURE(static_cast<unsigned>(selected));
+        const bool destroyOwner = selected == ProviderAction::DESTROY;
+        const bool drainOwner = selected == ProviderAction::DRAIN;
         auto script = x::peerOptions();
         script.initialBytes = property(u"authentication", u"LOGIN synthetic-realm");
         script.captureUntilClose = true;
@@ -400,12 +536,17 @@ TEST_CASE("TLS recovery credential callback refusal and owner destruction cannot
         std::optional<t::TlsRecovery> owner;
         std::shared_ptr<Provider> provider;
         std::function<void()> action;
+        bool drainAccepted = false;
 
         if (destroyOwner) {
             action = [&] {
                 provider.reset();
                 owner.reset();
                 CHECK_FALSE(observed->destroyed);
+            };
+        } else if (drainOwner) {
+            action = [&] {
+                drainAccepted = owner->requestDrain(std::chrono::steady_clock::now() + 3s).has_value();
             };
         }
 
@@ -416,6 +557,7 @@ TEST_CASE("TLS recovery credential callback refusal and owner destruction cannot
         t::TlsRecoveryStatus returned;
 
         while (owner && owner->status().recovery.phase != t::RecoveryPhase::FAILED &&
+               owner->status().recovery.phase != t::RecoveryPhase::CLOSED &&
                std::chrono::steady_clock::now() < deadline) {
             // The callback may destroy the public handle; only the detached return is used afterwards.
             returned = poll(*owner, *requirements);
@@ -430,6 +572,14 @@ TEST_CASE("TLS recovery credential callback refusal and owner destruction cannot
             CHECK_FALSE(owner);
             CHECK(observed->actionReturned);
             CHECK(observed->destroyed);
+            CHECK(returned.recovery.stopped);
+        } else if (drainOwner) {
+            REQUIRE(owner);
+            CHECK(drainAccepted);
+            CHECK(observed->actionReturned);
+            CHECK(returned.recovery.phase == t::RecoveryPhase::CLOSED);
+            REQUIRE(returned.recovery.terminal);
+            CHECK(returned.recovery.terminal->outcome == m::TerminalOutcome::DRAINED);
             CHECK(returned.recovery.stopped);
         } else {
             REQUIRE(owner);
@@ -461,8 +611,8 @@ TEST_CASE("TLS recovery credential callback refusal and owner destruction cannot
         append(permitted, wire(r::description(71)));
         REQUIRE(report.firstClientBytes.size() <= permitted.size());
         CHECK(std::equal(report.firstClientBytes.begin(), report.firstClientBytes.end(), permitted.begin()));
-        std::cout << "TLS_RECOVERY_CUTOFF_CAPTURE\t" << destroyOwner << '\t' << report.firstCaptureEnd << '\t'
-                  << report.firstClientBytes.size() << '\n';
+        std::cout << (drainOwner ? "TLS_RECOVERY_DRAIN_PROVIDER_CAPTURE\t" : "TLS_RECOVERY_CUTOFF_CAPTURE\t")
+                  << destroyOwner << '\t' << report.firstCaptureEnd << '\t' << report.firstClientBytes.size() << '\n';
     }
 }
 

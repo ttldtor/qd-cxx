@@ -161,6 +161,17 @@ enum class RecoveryPhase {
     FAILED       ///< Terminal failure and local retirement completed.
 };
 
+/** Detached local shutdown result, published only after owned native, event and queue retirement. */
+struct RecoveryTerminal {
+    mux::TerminalOutcome outcome = mux::TerminalOutcome::ABORTED; ///< Actual local result, never wire-flush proof.
+    std::array<std::optional<mux::QueueTerminal>, 3> queues{};    ///< Exact TICKER/STREAM/HISTORY results, if adopted.
+    bool deadlineExpired = false;      ///< An active graceful deadline expired before all retirement completed.
+    bool heldDataDiscarded = false;    ///< A complete Core-held DATA event was released without queue admission.
+    std::optional<TcpTerminal> wire{}; ///< Most recent actually retired attempt; encrypted-byte evidence for TLS.
+    std::optional<std::size_t>
+        nativeOperationsAtCutoff{}; ///< Owned native lifetimes observed at the first explicit fence.
+};
+
 /** Fixed owner status, without a per-attempt log or raw protocol/event owner. */
 struct RecoveryStatus {
     RecoveryPhase phase = RecoveryPhase::CONFIGURED; ///< Actual current owner phase.
@@ -170,6 +181,7 @@ struct RecoveryStatus {
     std::uint8_t demandedFamilies = 0;               ///< Nonempty owner-applied demand bits.
     std::uint8_t convergedFamilies = 0;              ///< Exact locally admitted current-revision bits.
     bool stopped = false;                            ///< Monotonic public cutoff was requested.
+    std::optional<RecoveryTerminal> terminal{};      ///< Frozen detached result after actual complete local quiescence.
 };
 
 } // namespace org::ttldtor::qdcxx::transport

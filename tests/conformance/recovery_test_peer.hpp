@@ -17,6 +17,7 @@ struct TcpPeerScript {
     std::size_t clientBytesToRead{};   ///< Read count if no expected prefix was supplied; otherwise zero or its size.
     std::vector<std::byte> replyBytes; ///< Bytes written after the requested prefix was received.
     bool waitForControllerClose{};     ///< Hold the connection until allowClose(index), stop, or deadline.
+    bool waitForControllerReply{};     ///< Gate reply bytes until allowReply(index), stop, or deadline.
 };
 
 /** Finite resource limits validated before a native listener is created. */
@@ -72,6 +73,10 @@ class OwnedTcpPeer {
      * @return Snapshot independent of subsequent worker activity.
      */
     [[nodiscard]] TcpPeerSnapshot snapshot() const;
+    /** Permit reply transmission after the application's exact readiness condition.
+     * @param index Zero-based session index; out-of-range indices have no effect.
+     */
+    void allowReply(std::size_t index);
     /** Permit the designated script to close after its writes and reads finish.
      * @param index Zero-based session index; out-of-range indices have no effect.
      */

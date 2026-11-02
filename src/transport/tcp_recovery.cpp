@@ -145,7 +145,8 @@ class PlainRecoveryBackend final : public detail::RecoveryBackend {
                     authentication == protocol::LiveAuthentication::ACKNOWLEDGED,
                 runtime_->terminal().has_value(),
                 runtime_->peer().identity().generation(),
-                authentication};
+                authentication,
+                runtime_->resources().pendingOperations};
     }
 
     detail::RecoveryAttemptFailure failure() const noexcept override {
@@ -171,6 +172,10 @@ class PlainRecoveryBackend final : public detail::RecoveryBackend {
 
         return last_.error == TcpError::NONE ? detail::RecoveryAttemptFailure{}
                                              : detail::recoveryTransportFailure(last_);
+    }
+
+    std::optional<TcpTerminal> wireTerminal() const noexcept override {
+        return runtime_ ? runtime_->terminal() : std::nullopt;
     }
 
     std::optional<detail::RecoveryClock::time_point> nextWake() const noexcept override {
@@ -273,6 +278,13 @@ std::expected<void, RecoveryDiagnostic> TcpRecovery::requestStop() noexcept {
     const auto lease = impl_;
 
     return lease ? lease->core.requestStop() : std::unexpected(moved());
+}
+
+std::expected<void, RecoveryDiagnostic>
+TcpRecovery::requestDrain(std::chrono::steady_clock::time_point deadline) noexcept {
+    const auto lease = impl_;
+
+    return lease ? lease->core.requestDrain(deadline) : std::unexpected(moved());
 }
 
 RecoveryStatus TcpRecovery::status() const noexcept {
