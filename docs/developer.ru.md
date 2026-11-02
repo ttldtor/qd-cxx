@@ -27,6 +27,7 @@
 - [Проверки записи tape](../tests/conformance/protocol/tape-write/WRITER-VALIDATION.ru.md)
 - [Проверки экспорта схем](../tests/conformance/schema-export/VALIDATION.ru.md)
 - [Совместимость подписок](../tests/conformance/subscriptions/VALIDATION.ru.md)
+- [Составные профили получения и проверки CLI](../tests/conformance/subscriptions/DELIVERY-VALIDATION.ru.md)
 - [Получатель подписок и установленный консольный пример](../tests/conformance/subscriptions/RECEIVER-VALIDATION.ru.md)
 - [База знаний и связь решений](knowledge/README.ru.md)
 
