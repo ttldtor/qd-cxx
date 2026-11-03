@@ -580,3 +580,7 @@ tests/fixtures/subscriptions/receiver-example/*/*.stderr -text whitespace=blank-
 # Runtime provisioning scripts retain portable canonical line endings.
 tools/deps/ProvisionRuntime.cmake text eol=lf
 tools/deps/Tests.cmake text eol=lf
+# Portable build-profile JSON uses canonical line endings.
+/CMakePresets.json text eol=lf
+/cmake/BuildProfiles.json text eol=lf
+/examples/feed_quote/CMakePresets.json text eol=lf

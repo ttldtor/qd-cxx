@@ -21,6 +21,37 @@ this application links only the plain feed API; add
 below with your actual [qualified TLS SDK](../../docs/CPP-BUILD.md#tls-source-profile-cpp-build-en)
 path. Asio/c-ares source roots are not required by the consumer.
 
+### Presets for an installed package {#sample-build-profiles}
+
+The [Feed build profiles](../../docs/CPP-BUILD.md#portable-feed-profiles) prepare
+an installable plain package without repeating internal library switches.
+After `cmake --install build/qdcxx-feed-windows` from the repository root, run
+these commands from `examples/feed_quote`:
+
+```text
+cmake --list-presets
+cmake --preset qdcxx-sample-windows
+cmake --build --preset qdcxx-sample-windows
+```
+
+On Linux use `qdcxx-sample-linux`. Only the host's sample preset is visible;
+[shared hidden profiles](../../cmake/BuildProfiles.json) supply the same Release/MD
+or Debug ASan/UBSan settings as the library. CMake 3.25+, Ninja and the qualified
+compiler terminal are prerequisites. The sample never configures or downloads the
+library or SDKs. It calls `find_package(qdcxx CONFIG REQUIRED COMPONENTS feed)`.
+
+Default package prefixes are `build/install/qdcxx-feed-windows` and
+`build/install/qdcxx-feed-linux` from the checkout root. For a different installed
+or relocated package use `cmake --preset qdcxx-sample-windows -DCMAKE_PREFIX_PATH=/your/prefix`
+(or the Linux name). Compiler/CRT/sanitizer settings must match that package.
+Binary directories are `build/qdcxx-sample-windows` or `build/qdcxx-sample-linux`
+at the checkout root; build presets default to two jobs, overridden by `--parallel N`.
+The executable is `qdcxx-feed-demo.exe` on Windows or `qdcxx-feed-demo` on Linux.
+Pass `--help` for offline help. Direct Linux execution should use
+`ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1`
+when retaining the qualified sanitizer environment; presets do not change your shell.
+
+The manual configure/build form below remains supported.
 From the qd-cxx source root, with your actual installed prefix:
 
 ```text

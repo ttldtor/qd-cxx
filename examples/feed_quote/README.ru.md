@@ -20,6 +20,37 @@ endpoint/feed/subscription API. Библиотека владеет сетевы
 подставив реальный путь [подготовленного TLS SDK](../../docs/CPP-BUILD.ru.md#tls-source-profile-cpp-build-ru).
 Исходники Asio/c-ares приложению не требуются.
 
+### Presets для установленного пакета {#sample-build-profiles-ru}
+
+[Профили сборки Feed](../../docs/CPP-BUILD.ru.md#portable-feed-profiles-ru) готовят
+устанавливаемый plain-пакет без повторения внутренних переключателей библиотеки.
+После `cmake --install build/qdcxx-feed-windows` из корня репозитория выполните
+следующие команды в `examples/feed_quote`:
+
+```text
+cmake --list-presets
+cmake --preset qdcxx-sample-windows
+cmake --build --preset qdcxx-sample-windows
+```
+
+На Linux используйте `qdcxx-sample-linux`. Видим только sample preset текущей ОС;
+[общие скрытые профили](../../cmake/BuildProfiles.json) задают те же Release/MD
+или Debug ASan/UBSan настройки, что и у библиотеки. Нужны CMake 3.25+, Ninja и
+терминал квалифицированного компилятора. Пример не конфигурирует/загружает
+библиотеку или SDK. Он вызывает `find_package(qdcxx CONFIG REQUIRED COMPONENTS feed)`.
+
+Префиксы пакета по умолчанию — `build/install/qdcxx-feed-windows` и
+`build/install/qdcxx-feed-linux` от корня checkout. Для другого установленного или
+перемещённого пакета задайте `cmake --preset qdcxx-sample-windows -DCMAKE_PREFIX_PATH=/your/prefix`
+(либо имя Linux-профиля). Compiler/CRT/sanitizer настройки должны соответствовать
+пакету. Binary-каталоги — `build/qdcxx-sample-windows` или `build/qdcxx-sample-linux`
+от корня checkout; build presets используют два задания с override `--parallel N`.
+Программа называется `qdcxx-feed-demo.exe` на Windows и `qdcxx-feed-demo` на Linux.
+`--help` выводит offline-справку. Для прямого Linux-запуска задайте
+`ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1`,
+если сохраняете квалифицированное sanitizer-окружение: presets не меняют ваш shell.
+
+Ручные команды configure/build ниже остаются поддержанными.
 Из корня исходников qd-cxx, подставив реальный префикс установки:
 
 ```text

@@ -1,0 +1,136 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 25,
+    "patch": 0
+  },
+  "include": [
+    "cmake/BuildProfiles.json"
+  ],
+  "configurePresets": [
+    {
+      "name": "_qdcxx-production",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "installDir": "${sourceDir}/build/install/${presetName}",
+      "cacheVariables": {
+        "CMAKE_INSTALL_LIBDIR": "lib",
+        "BUILD_TESTING": "OFF",
+        "ORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON": "OFF",
+        "ORG_TTLDTOR_QDCXX_BUILD_TLS": "OFF",
+        "ORG_TTLDTOR_QDCXX_BUILD_CONNECT": "OFF",
+        "ORG_TTLDTOR_QDCXX_BUILD_REPLAY": "OFF",
+        "ORG_TTLDTOR_QDCXX_BUILD_TAPE_INSPECT": "OFF",
+        "ORG_TTLDTOR_QDCXX_BUILD_QTP_INSPECT": "OFF",
+        "ORG_TTLDTOR_QDCXX_BUILD_TAPE_WRITE": "OFF",
+        "ORG_TTLDTOR_QDCXX_BUILD_TAPE_COMPRESSION": "OFF",
+        "ORG_TTLDTOR_QDCXX_BUILD_EXAMPLES": "OFF",
+        "ORG_TTLDTOR_QDCXX_BUILD_FEED_API": "OFF",
+        "ORG_TTLDTOR_QDCXX_BUILD_CLIENT": "OFF",
+        "ORG_TTLDTOR_QDCXX_BUILD_RUNTIME": "OFF",
+        "ORG_TTLDTOR_QDCXX_BUILD_RECOVERY": "OFF"
+      }
+    },
+    {
+      "name": "_qdcxx-feed",
+      "hidden": true,
+      "inherits": "_qdcxx-production",
+      "cacheVariables": {
+        "ORG_TTLDTOR_QDCXX_BUILD_EXAMPLES": "ON",
+        "ORG_TTLDTOR_QDCXX_BUILD_FEED_API": "ON",
+        "ORG_TTLDTOR_QDCXX_BUILD_CLIENT": "ON",
+        "ORG_TTLDTOR_QDCXX_BUILD_RUNTIME": "ON",
+        "ORG_TTLDTOR_QDCXX_BUILD_RECOVERY": "ON",
+        "ORG_TTLDTOR_QDCXX_ASIO_INCLUDE": "${sourceDir}/.work/runtime-sdk/asio-asio-1-38-2/include",
+        "ORG_TTLDTOR_QDCXX_CARES_SOURCE": "${sourceDir}/.work/runtime-sdk/c-ares-1.34.9-qdcxx2"
+      }
+    },
+    {
+      "name": "qdcxx-feed-windows",
+      "displayName": "Plain Feed and sample (Windows x64 Release/MD)",
+      "inherits": [
+        "_qdcxx-windows",
+        "_qdcxx-feed"
+      ]
+    },
+    {
+      "name": "qdcxx-feed-linux",
+      "displayName": "Plain Feed and sample (Linux GCC Debug ASan/UBSan)",
+      "inherits": [
+        "_qdcxx-linux",
+        "_qdcxx-feed"
+      ]
+    },
+    {
+      "name": "qdcxx-minimal-windows",
+      "displayName": "SDK-free core (Windows x64 Release/MD)",
+      "inherits": [
+        "_qdcxx-windows",
+        "_qdcxx-production"
+      ]
+    },
+    {
+      "name": "qdcxx-minimal-linux",
+      "displayName": "SDK-free core (Linux GCC Debug ASan/UBSan)",
+      "inherits": [
+        "_qdcxx-linux",
+        "_qdcxx-production"
+      ]
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "qdcxx-feed-windows",
+      "configurePreset": "qdcxx-feed-windows",
+      "targets": [
+        "qdcxx_feed_demo"
+      ],
+      "jobs": 2,
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "qdcxx-feed-linux",
+      "configurePreset": "qdcxx-feed-linux",
+      "targets": [
+        "qdcxx_feed_demo"
+      ],
+      "jobs": 2,
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
+      "name": "qdcxx-minimal-windows",
+      "configurePreset": "qdcxx-minimal-windows",
+      "targets": [
+        "qdcxx_core"
+      ],
+      "jobs": 2,
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "qdcxx-minimal-linux",
+      "configurePreset": "qdcxx-minimal-linux",
+      "targets": [
+        "qdcxx_core"
+      ],
+      "jobs": 2,
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    }
+  ]
+}

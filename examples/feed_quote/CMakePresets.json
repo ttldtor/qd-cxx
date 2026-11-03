@@ -1,0 +1,72 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 25,
+    "patch": 0
+  },
+  "include": [
+    "../../cmake/BuildProfiles.json"
+  ],
+  "configurePresets": [
+    {
+      "name": "_qdcxx-sample",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/../../build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_FIND_USE_PACKAGE_REGISTRY": "OFF",
+        "CMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY": "OFF"
+      }
+    },
+    {
+      "name": "qdcxx-sample-windows",
+      "displayName": "Installed Feed sample (Windows x64 Release/MD)",
+      "inherits": [
+        "_qdcxx-windows",
+        "_qdcxx-sample"
+      ],
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "${sourceDir}/../../build/install/qdcxx-feed-windows"
+      }
+    },
+    {
+      "name": "qdcxx-sample-linux",
+      "displayName": "Installed Feed sample (Linux GCC Debug ASan/UBSan)",
+      "inherits": [
+        "_qdcxx-linux",
+        "_qdcxx-sample"
+      ],
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "${sourceDir}/../../build/install/qdcxx-feed-linux"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "qdcxx-sample-windows",
+      "configurePreset": "qdcxx-sample-windows",
+      "targets": [
+        "qdcxx_feed_demo"
+      ],
+      "jobs": 2,
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "qdcxx-sample-linux",
+      "configurePreset": "qdcxx-sample-linux",
+      "targets": [
+        "qdcxx_feed_demo"
+      ],
+      "jobs": 2,
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    }
+  ]
+}

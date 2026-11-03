@@ -2,6 +2,67 @@
 
 Prepare the exact [runtime SDK sources](../cmake/runtime-profile/README.md) first. The explicit [dependency provisioning step](../tools/deps/README.md) supplies pinned Asio/c-ares with offline/cache support and no global installation; ordinary configure never downloads them.
 
+## Portable Feed and minimal profiles {#portable-feed-profiles}
+
+The [root presets](../CMakePresets.json) require CMake 3.25+ and Ninja. Choose a
+qualified x64 MSVC 19.42 developer terminal on Windows or GCC 13.3 on Linux; the
+presets select `cl` or `g++` from that terminal's `PATH`. They do not install tools.
+
+| Configure/build preset | Result |
+| --- | --- |
+| `qdcxx-feed-windows` | Plain Feed and the console sample; Release, `/MD`, Release compiler probes. |
+| `qdcxx-feed-linux` | The same targets; Debug with C++ ASan/UBSan and matching executable linker flags. |
+| `qdcxx-minimal-windows` | SDK-free `qdcxx_core`; Release and `/MD`. |
+| `qdcxx-minimal-linux` | SDK-free `qdcxx_core`; Debug with C++ ASan/UBSan. |
+
+Only presets for the current host are listed. Feed profiles enable FEED_API,
+CLIENT, RUNTIME, RECOVERY and the sample together: callers choose one profile
+instead of repeating the three internal prerequisite switches. Tests, JSON, TLS,
+replay and separate tools are OFF in these production profiles. Minimal profiles
+also disable Feed/client/runtime/recovery/examples and neither inspect SDK roots
+nor fetch dependencies. The normal raw CMake options below remain available.
+
+Prepare the [qualified runtime sources](../tools/deps/README.md) as a separate,
+explicit step. The default source bundle is `.work/runtime-sdk` from the checkout
+root. Its `asio-asio-1-38-2/include` and `c-ares-1.34.9-qdcxx2` paths are set by the
+Feed presets; an absent bundle gives the existing explicit SDK error, without a
+download. To reuse sources elsewhere, override the two SDK variables on configure:
+
+```powershell
+cmake --preset qdcxx-feed-windows `
+  '-DORG_TTLDTOR_QDCXX_ASIO_INCLUDE=C:/sdk/runtime/asio-asio-1-38-2/include' `
+  '-DORG_TTLDTOR_QDCXX_CARES_SOURCE=C:/sdk/runtime/c-ares-1.34.9-qdcxx2'
+```
+
+With the default prepared bundle, run from the repository root:
+
+```text
+cmake --list-presets
+cmake --preset qdcxx-feed-windows
+cmake --build --preset qdcxx-feed-windows
+cmake --install build/qdcxx-feed-windows
+```
+
+On Linux replace `windows` with `linux` in these preset/path names. Build presets
+use two jobs by default; `--parallel N` overrides that limit. Binary directories
+are `build/<preset>` and the Feed install prefix is `build/install/<preset>`.
+`cmake --install` may override it with `--prefix`. Install after building the Feed
+profile; the minimal build preset intentionally builds only core, rather than an
+installable set of every pure-library archive.
+
+For example, `cmake --preset qdcxx-minimal-windows` followed by
+`cmake --build --preset qdcxx-minimal-windows` builds core without SDK preparation.
+Each profile has its own binary directory; use a fresh directory when changing
+compiler/toolchain. If configure uses a local `-B` override, build that directory with `cmake --build <directory>`; build presets continue to address their declared binary directories.
+The [installed-sample presets](../examples/feed_quote/README.md#sample-build-profiles)
+share these platform settings and default to the corresponding Feed install prefix;
+no internal library switches or SDK source roots are needed by that consumer.
+
+Linux profiles set `ASAN_OPTIONS=detect_leaks=0:halt_on_error=1` and
+`UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1` for configure/build children.
+When launching a binary directly from your shell, supply the same environment
+explicitly if needed; preset environment does not modify the parent shell.
+LSan and c-ares C instrumentation are not promised by these C++ sanitizer flags.
 ## Public feed API {#public-feed-api-build}
 
 `ORG_TTLDTOR_QDCXX_BUILD_FEED_API` defaults to `OFF`. It requires explicit
