@@ -65,7 +65,7 @@ endif()
 
 option(ORG_TTLDTOR_QDCXX_BUILD_IPF "Build the independent instrument-profile value model" OFF)
 if(ORG_TTLDTOR_QDCXX_BUILD_IPF)
-    add_library(qdcxx_ipf src/ipf/instrument_profile.cpp)
+    add_library(qdcxx_ipf src/ipf/instrument_profile.cpp src/ipf/reader.cpp)
     target_include_directories(qdcxx_ipf PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
         "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
     target_compile_features(qdcxx_ipf PUBLIC cxx_std_23)
@@ -327,6 +327,13 @@ if(BUILD_TESTING)
             ORG_TTLDTOR_QDCXX_IPF_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/ipf/value-oracle.tsv")
         set_target_properties(qdcxx_ipf_tests PROPERTIES CXX_EXTENSIONS OFF)
         add_test(NAME ipf_values COMMAND qdcxx_ipf_tests)
+        add_executable(qdcxx_ipf_reader_tests tests/conformance/ipf_reader_tests.cpp)
+        target_link_libraries(qdcxx_ipf_reader_tests PRIVATE qdcxx_ipf doctest::doctest)
+        target_compile_definitions(qdcxx_ipf_reader_tests PRIVATE
+            ORG_TTLDTOR_QDCXX_IPF_READER_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/ipf-reader/capture")
+        set_target_properties(qdcxx_ipf_reader_tests PROPERTIES CXX_EXTENSIONS OFF)
+        add_test(NAME ipf_reader COMMAND qdcxx_ipf_reader_tests)
+        set_tests_properties(ipf_reader PROPERTIES TIMEOUT 60)
     endif()
     add_executable(qdcxx_recovery_state_tests
         src/transport/recovery_state.cpp tests/conformance/recovery_state_tests.cpp)

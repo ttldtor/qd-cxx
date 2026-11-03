@@ -54,6 +54,53 @@ int main() {
 текста. Глобальные настройки не читаются. Преобразования, неограниченные числа, lenient-исторические
 даты и различие точного символа/порядка представления определяет [контракт](../spec/ipf/PROFILE.ru.md).
 
-Компонент не читает файлы/URL и не начинает фоновую работу. IPF CSV reading/writing, HTTP/live
-collection, построение option-chain и толкование расписаний относятся к отдельным возможностям.
+Объект значения не начинает I/O или фоновую работу. Тот же optional target предоставляет отдельный
+локальный reader ниже. Writing, HTTP/live collection, построение option-chain и толкование расписаний
+относятся к отдельным возможностям.
 [Oracle fixture](../tests/fixtures/ipf/README.ru.md) описывает фактические доказательства преобразований.
+
+## Читать локальный IPF stream
+
+Подключите `qd/ipf/instrument_profile_reader.hpp` и свяжите тот же target `qdcxx_ipf`.
+`readInstrumentProfilesFile(path)` открывает локальный файл в binary mode. Для уже принадлежащего
+вам stream используйте синхронную перегрузку: она не закрывает stream и не делает seek:
+
+```cpp
+#include <qd/ipf/instrument_profile_reader.hpp>
+#include <sstream>
+
+int main() {
+    using org::ttldtor::qdcxx::ipf::readInstrumentProfiles;
+    std::istringstream input(
+        "#STOCK::=TYPE,SYMBOL,DESCRIPTION\n"
+        "STOCK,IBM,International Business Machines\n"
+        "##COMPLETE\n");
+    auto result = readInstrumentProfiles(input);
+    if (result.error || !result.complete || result.profiles.size() != 1) {
+        return 1;
+    }
+    return result.profiles.front().getSymbol() == u"IBM" ? 0 : 2;
+}
+```
+
+Результат владеет целыми profiles в порядке источника. При ошибке `profiles` сохраняет принятый
+целый префикс, `error` описывает первую ошибку; частичная row не становится profile.
+`completionSeen` и чистый `finished` — отдельные свидетельства; `complete` требует оба.
+Marker завершения не останавливает stream. Default ALLOW принимает чистый EOF без marker как
+неполный; явно выбирайте `IpfCompletionPolicy::REQUIRE`, если приложение требует marker.
+
+Reader принимает объявленные/переопределённые форматы, точные стандартные/custom names, quoted
+запятые/newlines, парные кавычки и JDK-совместимые UTF-8 replacements. По умолчанию input ограничен
+64 MiB, output — 100000 profiles/16 Mi UTF-16 units, отдельно ограничены row/field/header и каждый
+profile. Это инженерные значения по умолчанию: передавайте `IpfReadOptions` для иных границ.
+Чистый `InstrumentProfileParser` поддерживает incremental spans, один владеющий profile/control
+item и явно пополняемый work. См. [контракт reader](../spec/ipf/READER.ru.md) и
+[фактические наблюдения грамматики](../tests/fixtures/ipf-reader/README.ru.md).
+
+Input/output/work bounds не задают I/O deadline. Streambuf вызывающей стороны может читать
+заранее; `acceptedBytes` — логическое потребление parser, а не `tellg()` или обещание rollback.
+Маска исключений stream вызывающей стороны сохраняется. Вышедший наружу `std::bad_alloc` даёт
+`ALLOCATION_FAILURE`; если stream подавляет его и устанавливает `badbit`, наблюдаемый результат —
+`IO_ERROR`. Ошибки выделения памяти parser/output дают `ALLOCATION_FAILURE`. Типизированные ошибки
+сохраняют полные предшествующие profiles.
+Поддержан только локальный несжатый input; HTTP, decompression и автоопределение формата не запускаются.

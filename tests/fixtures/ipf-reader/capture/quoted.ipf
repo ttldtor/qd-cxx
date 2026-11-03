@@ -1,0 +1,3 @@
+#STOCK::=TYPE,SYMBOL,DESCRIPTION
+STOCK,"A,B","He said ""hello"""
+##COMPLETE

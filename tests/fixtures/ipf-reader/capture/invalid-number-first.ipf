@@ -1,0 +1,2 @@
+#STOCK::=TYPE,STRIKE,SYMBOL
+STOCK,bad,un"quoted

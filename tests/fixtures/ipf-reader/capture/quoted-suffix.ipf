@@ -1,0 +1,2 @@
+#STOCK::=TYPE,SYMBOL
+STOCK,"A"x

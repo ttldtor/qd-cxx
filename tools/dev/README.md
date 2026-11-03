@@ -58,6 +58,8 @@ production-library dependencies. Root `BUILD_TESTING=OFF` neither builds them no
 
 The [IPF value oracle](../upstream/ipf-value-oracle/README.md) captures/verifies pinned Java field and typed-conversion behavior; its standalone -Help starts no Java or I/O work.
 
+The [plain IPF reader oracle](../upstream/ipf-reader-oracle/README.md) captures/verifies named local grammar, UTF-8 and complete-prefix outcomes; `-Help`/`-HelpRu` start no Java or working I/O.
+
 ## First build
 
 Run from the repository root. This bootstrap is the explicit first-build logging exception:

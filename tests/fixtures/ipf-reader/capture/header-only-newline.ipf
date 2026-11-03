@@ -1,0 +1,1 @@
+#STOCK::=TYPE,SYMBOL

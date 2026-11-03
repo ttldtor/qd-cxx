@@ -1,0 +1,4 @@
+#STOCK::=TYPE,SYMBOL,SYMBOL,X,X,TYPE
+STOCK,A,,first,,OTHER
+STOCK,A,B,first,second,
+##COMPLETE

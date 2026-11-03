@@ -60,6 +60,8 @@ production-библиотек. Корневой `BUILD_TESTING=OFF` не соб�
 
 [Oracle значений IPF](../upstream/ipf-value-oracle/README.ru.md) захватывает/проверяет поля и типизированные преобразования закреплённого Java; отдельный -Help не начинает Java или I/O работу.
 
+[Oracle локального IPF reader](../upstream/ipf-reader-oracle/README.ru.md) захватывает/проверяет именованные grammar, UTF-8 и complete-prefix outcomes; `-Help`/`-HelpRu` не начинают Java или рабочую I/O.
+
 ## Первая сборка
 
 Запускать из корня репозитория. Bootstrap — явное исключение логирования первой сборки:

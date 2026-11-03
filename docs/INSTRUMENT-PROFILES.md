@@ -52,6 +52,53 @@ other bounds. Canonical numbers/dates also count against retained text limits. N
 is read. Conversion details, nonfinite numbers, lenient historical dates and exact symbol versus
 presentation ordering are defined in the [contract](../spec/ipf/PROFILE.md).
 
-This component reads no files or URLs and starts no background work. IPF CSV reading/writing,
-HTTP/live collection, option-chain construction and schedule interpretation are separate features.
+The value object starts no I/O or background work. The same optional target also supplies the
+separate local reader below. Writing, HTTP/live collection, option-chain construction and schedule
+interpretation remain separate features.
 The [oracle fixture](../tests/fixtures/ipf/README.md) documents the actual conversion evidence.
+
+## Read a local IPF stream
+
+Include `qd/ipf/instrument_profile_reader.hpp` and link the same `qdcxx_ipf` target.
+`readInstrumentProfilesFile(path)` opens a local file in binary mode. For an already owned stream,
+use the synchronous stream overload; it does not close or seek your stream:
+
+```cpp
+#include <qd/ipf/instrument_profile_reader.hpp>
+#include <sstream>
+
+int main() {
+    using org::ttldtor::qdcxx::ipf::readInstrumentProfiles;
+    std::istringstream input(
+        "#STOCK::=TYPE,SYMBOL,DESCRIPTION\n"
+        "STOCK,IBM,International Business Machines\n"
+        "##COMPLETE\n");
+    auto result = readInstrumentProfiles(input);
+    if (result.error || !result.complete || result.profiles.size() != 1) {
+        return 1;
+    }
+    return result.profiles.front().getSymbol() == u"IBM" ? 0 : 2;
+}
+```
+
+The result owns all complete profiles in source order. On failure, `profiles` keeps the accepted
+whole prefix and `error` describes the first failure; no partial row becomes a profile.
+`completionSeen` and clean `finished` are separate evidence, and `complete` requires both.
+A completion marker does not stop the stream. Default ALLOW accepts clean EOF without a marker
+as incomplete; select `IpfCompletionPolicy::REQUIRE` explicitly when your application requires it.
+
+Readers accept declared/redefined formats, exact standard/custom names, quoted commas/newlines,
+doubled quotes and JDK-compatible UTF-8 replacements. Default cumulative input is 64 MiB and output
+is 100000 profiles/16 Mi UTF-16 units, with separate row/field/header and per-profile bounds.
+They are engineering defaults: pass `IpfReadOptions` when the application needs other bounds.
+Pure `InstrumentProfileParser` supports incremental byte spans, one owning profile/control item
+and explicit replenishable work. See [reader contract](../spec/ipf/READER.md) and
+[actual grammar observations](../tests/fixtures/ipf-reader/README.md).
+
+Input/output/work bounds do not impose an I/O deadline. The caller's streambuf may read ahead;
+`acceptedBytes` is the parser's logical consumption, not `tellg()` or a rollback promise.
+The caller's stream exception mask is preserved. An escaping `std::bad_alloc` maps to
+`ALLOCATION_FAILURE`; if the stream suppresses it and sets `badbit`, the observable result is
+`IO_ERROR`. Parser/output allocation failures map to `ALLOCATION_FAILURE`. Typed failures retain
+complete earlier profiles.
+Only local uncompressed input is supported; no HTTP, decompression or file-format auto-detection runs.

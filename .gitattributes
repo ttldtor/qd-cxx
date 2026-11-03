@@ -590,3 +590,9 @@ tools/upstream/ipf-value-oracle/*.java text eol=lf
 tools/upstream/ipf-value-oracle/*.ps1 text eol=lf
 tests/fixtures/ipf/value-oracle.tsv -text -whitespace
 tests/fixtures/ipf/provenance.json text eol=lf
+
+# Preserve plain IPF reader grammar inputs/outcomes and canonical oracle sources.
+tools/upstream/ipf-reader-oracle/*.java text eol=lf
+tools/upstream/ipf-reader-oracle/*.ps1 text eol=lf
+tests/fixtures/ipf-reader/capture/** -text -whitespace
+tests/fixtures/ipf-reader/provenance.json text eol=lf
