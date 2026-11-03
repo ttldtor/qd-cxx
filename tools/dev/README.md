@@ -2,6 +2,10 @@
 
 [Русская версия](README.ru.md). English is authoritative.
 
+The [market-symbol oracle](../upstream/market-symbol-oracle/README.md) captures and verifies
+exact nullable UTF-16 base/exchange operations against pinned production Java classes.
+Its `-Help`/`-HelpRu` modes require no inputs and start no work.
+
 [Explicit runtime dependency provisioning](../deps/README.md) prepares the pinned Asio/c-ares source profiles in a caller-selected cache; ordinary configure and disabled mode perform no acquisition. EN/RU help, offline/cache failures and retained staging are documented there.
 
 The optional [public feed example](../../examples/feed_quote/README.md),

@@ -7,6 +7,7 @@
 | Receive typed live events | [Public feed API](FEED-API.md) | Library-owned progress, Quote/Profile subscriptions and plain TCP; [complete example](../examples/feed_quote/README.md) |
 | Embed in an existing host | [Runtime bootstrap ownership](../spec/transport/RUNTIME-EMBEDDING.md) | Startup requirements and explicit borrowed bootstrap lifetime |
 | Model instrument metadata | [Instrument-profile values](INSTRUMENT-PROFILES.md) | Owned standard/custom fields and typed conversions without I/O |
+| Parse regional market symbols | [Market-symbol helpers](MARKET-SYMBOLS.md) | Exact UTF-16 base/exchange composition without subscription routing |
 | Read binary tapes | [Tape inspection](TAPE-INSPECT.md) | Input is an existing file; select a supported finite source profile |
 | Write a tape | [Tape writing](TAPE-WRITE.md) | You already own validated records and an explicit schema |
 | Inspect protocol frames | [QTP inspection](QTP-INSPECT.md) | You need framing and record diagnostics offline |

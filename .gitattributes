@@ -602,3 +602,9 @@ tools/upstream/ipf-writer-oracle/*.java text eol=lf
 tools/upstream/ipf-writer-oracle/*.ps1 text eol=lf
 tests/fixtures/ipf-writer/capture/** -text -whitespace
 tests/fixtures/ipf-writer/provenance.json text eol=lf
+
+# Preserve exact market-symbol observations and canonical oracle provenance.
+tools/upstream/market-symbol-oracle/*.java text eol=lf
+tools/upstream/market-symbol-oracle/*.ps1 text eol=lf
+tests/fixtures/market-symbols/oracle.tsv -text -whitespace
+tests/fixtures/market-symbols/provenance.json text eol=lf

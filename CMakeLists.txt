@@ -76,6 +76,11 @@ if(ORG_TTLDTOR_QDCXX_BUILD_IPF)
 endif()
 
 add_library(qdcxx_event_mapping src/events/event_mapping.cpp)
+add_library(qdcxx_market_event_symbols src/events/market_event_symbols.cpp)
+target_include_directories(qdcxx_market_event_symbols PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
+target_compile_features(qdcxx_market_event_symbols PUBLIC cxx_std_23)
+set_target_properties(qdcxx_market_event_symbols PROPERTIES CXX_EXTENSIONS OFF)
 target_link_libraries(qdcxx_event_mapping PUBLIC qdcxx_core)
 set_target_properties(qdcxx_event_mapping PROPERTIES CXX_EXTENSIONS OFF)
 add_library(qdcxx_profile src/events/profile.cpp)
@@ -139,7 +144,7 @@ if(ORG_TTLDTOR_QDCXX_BUILD_FEED_API)
     add_library(qdcxx_feed src/api/feed.cpp src/api/receiving_profile.cpp src/api/event_registry.cpp src/api/system_dns.cpp)
     add_library(qdcxx::feed ALIAS qdcxx_feed)
     target_include_directories(qdcxx_feed PRIVATE src/api)
-    target_link_libraries(qdcxx_feed PUBLIC qdcxx_recovery qdcxx_quote qdcxx_profile)
+    target_link_libraries(qdcxx_feed PUBLIC qdcxx_recovery qdcxx_quote qdcxx_profile qdcxx_market_event_symbols)
     set_target_properties(qdcxx_feed PROPERTIES CXX_EXTENSIONS OFF)
     if(WIN32)
         target_compile_definitions(qdcxx_feed PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN _WIN32_WINNT=0x0A00)
@@ -155,7 +160,7 @@ endif()
 
 include(CMakePackageConfigHelpers)
 install(TARGETS qdcxx_encoding qdcxx_core qdcxx_protocol qdcxx_collectors qdcxx_mux
-    qdcxx_event_mapping qdcxx_quote qdcxx_profile EXPORT qdcxxTargets
+    qdcxx_event_mapping qdcxx_quote qdcxx_profile qdcxx_market_event_symbols EXPORT qdcxxTargets
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
@@ -320,6 +325,11 @@ if(BUILD_TESTING)
         DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     )
     FetchContent_MakeAvailable(doctest)
+    add_executable(qdcxx_market_event_symbols_tests tests/conformance/market_event_symbols_tests.cpp)
+    target_link_libraries(qdcxx_market_event_symbols_tests PRIVATE qdcxx_market_event_symbols doctest::doctest)
+    target_compile_definitions(qdcxx_market_event_symbols_tests PRIVATE
+        ORG_TTLDTOR_QDCXX_MARKET_SYMBOL_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/market-symbols/oracle.tsv")
+    add_test(NAME market_event_symbols COMMAND qdcxx_market_event_symbols_tests)
     if(ORG_TTLDTOR_QDCXX_BUILD_IPF)
         add_executable(qdcxx_ipf_tests tests/conformance/ipf_tests.cpp)
         target_link_libraries(qdcxx_ipf_tests PRIVATE qdcxx_ipf doctest::doctest)
