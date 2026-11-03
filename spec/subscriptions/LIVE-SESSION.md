@@ -51,8 +51,27 @@ the intersection of explicit local `hs` support and the effective peer option.
 Protocol descriptors use the selected `DXP3` grammar. Incoming deltas merge into
 effective peer state; omission does not clear a property or capability. The `hs`
 option is an exact comma-separated token; unknown option tokens do not imply
-support and do not by themselves invalidate a descriptor. Actual unsupported
-messages or descriptor extensions are rejected explicitly. Advertising `PART`
+support and do not by themselves invalidate a descriptor. After both message lists,
+one standard optional peer `EndpointId` is accepted structurally: a compact-long UID
+byte-array length in -1..INT_MAX, exact opaque UID bytes when nonnull, nullable UTFString
+name and a full signed compact-long counter. Length -1 ends the null endpoint immediately;
+zero is an engaged empty UID and still requires name/counter. No ReadContext references
+or fixed UUID-size assumption apply. Endpoint fields are discarded after validation;
+no routing identity or new snapshot property is published.
+
+UID bytes are bounded by the complete frame; missing declared bytes are malformed.
+The name shares existing per-string byte/unit, aggregate descriptor text-unit and scratch
+bounds. Whole payload bytes remain prepaid; a present tail additionally charges three
+primitive visits plus the UID byte count before raw UID advancement. An absent tail
+adds no work. These are logical bounds, not instruction/time measurements. Malformed or
+truncated fields, configured resource exhaustion and work exhaustion retain their distinct
+categories. Parsing must finish before peer descriptor merging/publication, so every
+refusal preserves the prior retained descriptor and generation.
+
+Any bytes after the one known endpoint, and actual unsupported messages or other
+descriptor extensions, remain explicitly rejected as `UNSUPPORTED`. The
+[synthetic endpoint witnesses](../../tests/fixtures/subscriptions/endpoint-identity-v1/README.md)
+define exact accepted and negative examples. Advertising `PART`
 does not implement `PART` reassembly.
 
 Snapshot message properties expose local overrides. Resolve inheritance from

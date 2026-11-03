@@ -1410,6 +1410,7 @@ TEST_CASE("fresh sender tables do not infer old IDs and truncated or unsupported
     p::FrameReader reader(limits().frame);
     auto envelope = reader.feed(extended);
     REQUIRE(envelope.frame);
+    number(envelope.frame->payload, -1);
     envelope.frame->payload.push_back(std::byte{0});
     auto refused = extension.session.feed(frame(1, envelope.frame->payload), work);
     CHECK(refused.status == p::LiveStatus::FAILED);
@@ -1520,4 +1521,157 @@ TEST_CASE("fixed schema identity retains exact empty provenance without declarat
     auto moved = std::move(copied);
     CHECK_FALSE(copied.valid());
     CHECK(moved.matches(retained));
+}
+
+namespace {
+/** Read a deterministic official-Java EndpointId envelope, never live endpoint metadata. */
+std::vector<std::byte> endpointWitness(std::string_view name) {
+    return read(std::string("tests/fixtures/subscriptions/endpoint-identity-v1/wire/") + std::string(name) + ".bin");
+}
+
+/** Check failed descriptor admission against an actually retained previous peer snapshot. */
+p::LiveDiagnostic endpointRefusal(std::string_view name, Error expected, p::LiveLimits bounds = limits(),
+                                  std::optional<p::LiveWork> supplied = std::nullopt) {
+    INFO("witness=", name);
+    auto f = fixture(bounds);
+    const p::LivePropertyView previous[]{{u"retained", u"stable"}};
+    auto retained = admit(f.session, protocol(previous));
+    const auto identity = retained.snapshot().identity();
+    auto credits = supplied.value_or(turn());
+    const auto result = f.session.feed(endpointWitness(name), credits);
+    CHECK(result.status == p::LiveStatus::FAILED);
+    CHECK_FALSE(result.event);
+    CHECK(f.session.diagnostic().error == expected);
+    CHECK(f.session.peer().identity().matches(identity));
+    CHECK(property(f.session.peer().protocol().properties, u"retained") == u"stable");
+    CHECK_FALSE(property(f.session.peer().protocol().properties, u"witness"));
+    CHECK(property(retained.snapshot().protocol().properties, u"retained") == u"stable");
+    CHECK_FALSE(property(retained.snapshot().protocol().properties, u"witness"));
+
+    return f.session.diagnostic();
+}
+} // namespace
+
+TEST_CASE("EndpointId accepts official absent null empty and full signed synthetic witnesses") {
+    constexpr std::array names{"absent",        "null",       "present",  "empty-uid-name-min",
+                               "null-name-max", "utf16-name", "long-uid", "long-name"};
+
+    for (const auto name : names) {
+        INFO("witness=", name);
+        auto f = fixture();
+        const p::LivePropertyView previous[]{{u"retained", u"stable"}};
+        auto retained = admit(f.session, protocol(previous));
+        auto event = admit(f.session, endpointWitness(name));
+        CHECK(event.kind() == p::LiveEventKind::PROTOCOL);
+        CHECK(event.messageType() == 1);
+        CHECK(property(event.snapshot().protocol().properties, u"witness") == u"synthetic-endpoint");
+        CHECK(property(event.snapshot().protocol().properties, u"retained") == u"stable");
+        CHECK(event.snapshot().protocol().properties.size() == 2);
+        CHECK(event.snapshot().protocol().send.empty());
+        CHECK(event.snapshot().protocol().receive.empty());
+        CHECK_FALSE(property(retained.snapshot().protocol().properties, u"witness"));
+        CHECK(property(retained.snapshot().protocol().properties, u"retained") == u"stable");
+    }
+}
+
+TEST_CASE("EndpointId incremental framing publishes only one complete descriptor") {
+    for (const auto name : {"null", "present", "empty-uid-name-min", "utf16-name"}) {
+        const auto bytes = endpointWitness(name);
+
+        for (std::size_t split = 0; split <= bytes.size(); ++split) {
+            INFO("witness=", name, " split=", split);
+            auto f = fixture();
+            auto credits = turn();
+            auto first = f.session.feed(std::span(bytes).first(split), credits);
+            CHECK(first.accepted == split);
+
+            if (split < bytes.size()) {
+                CHECK(first.status == p::LiveStatus::NEED_INPUT);
+                CHECK_FALSE(first.event);
+                CHECK(f.session.peer().protocol().properties.empty());
+                credits = turn();
+                auto last = f.session.feed(std::span(bytes).subspan(split), credits);
+                CHECK(last.accepted == bytes.size() - split);
+                REQUIRE(last.status == p::LiveStatus::EVENT);
+                REQUIRE(last.event);
+                CHECK(last.event->kind() == p::LiveEventKind::PROTOCOL);
+            } else {
+                REQUIRE(first.status == p::LiveStatus::EVENT);
+                REQUIRE(first.event);
+            }
+
+            CHECK(property(f.session.peer().protocol().properties, u"witness") == u"synthetic-endpoint");
+        }
+
+        auto f = fixture();
+        std::size_t published = 0;
+
+        for (std::size_t index = 0; index < bytes.size(); ++index) {
+            auto credits = turn();
+            auto step = f.session.feed(std::span(bytes).subspan(index, 1), credits);
+            CHECK(step.accepted == 1);
+
+            if (step.event) {
+                ++published;
+                CHECK(index + 1 == bytes.size());
+            }
+
+            CHECK(step.status == (index + 1 == bytes.size() ? p::LiveStatus::EVENT : p::LiveStatus::NEED_INPUT));
+        }
+
+        CHECK(published == 1);
+    }
+}
+
+TEST_CASE("EndpointId malformed fields and unknown suffixes preserve previous descriptor") {
+    for (const auto name : {"invalid-uid-negative", "invalid-uid-overflow", "truncated-uid-length", "truncated-uid",
+                            "truncated-empty-uid", "truncated-name", "truncated-counter"}) {
+        endpointRefusal(name, Error::MALFORMED);
+    }
+
+    for (const auto name : {"extra-after-present", "extra-after-null"}) {
+        endpointRefusal(name, Error::UNSUPPORTED);
+    }
+}
+
+TEST_CASE("EndpointId reuses frame text and aggregate bounds without a UID text ceiling") {
+    auto smallTextBytes = limits();
+    smallTextBytes.protocol.text.bodyBytes = 32;
+    auto accepted = fixture(smallTextBytes);
+    auto event = admit(accepted.session, endpointWitness("long-uid"));
+    CHECK(event.kind() == p::LiveEventKind::PROTOCOL);
+    endpointRefusal("frame-excess", Error::RESOURCE_LIMIT);
+
+    auto nameBound = limits();
+    nameBound.protocol.text.codeUnits = 32;
+    endpointRefusal("long-name", Error::RESOURCE_LIMIT, nameBound);
+    auto aggregate = limits();
+    aggregate.protocol.textUnits =
+        std::u16string_view(u"witness").size() + std::u16string_view(u"synthetic-endpoint").size();
+    endpointRefusal("present", Error::RESOURCE_LIMIT, aggregate);
+}
+
+TEST_CASE("EndpointId visit and whole payload work shortage never publishes a partial delta") {
+    auto visits = turn();
+    visits.visits = 3; // One property consumes one visit, leaving less than the three-primitive endpoint allowance.
+    const auto fixedShort = endpointRefusal("present", Error::WORK_LIMIT, limits(), visits);
+    CHECK(fixedShort.stage == "descriptor-endpoint");
+    CHECK(fixedShort.consumed == 34);
+    constexpr std::size_t UID_BYTES = 256;
+    constexpr std::size_t PROPERTY_VISITS = 1;
+    constexpr std::size_t ENDPOINT_PRIMITIVE_VISITS = 3;
+    auto uidVisits = turn();
+    uidVisits.visits = PROPERTY_VISITS + ENDPOINT_PRIMITIVE_VISITS + UID_BYTES - 1;
+    const auto uidShort = endpointRefusal("long-uid", Error::WORK_LIMIT, limits(), uidVisits);
+    CHECK(uidShort.stage == "descriptor-endpoint");
+    CHECK(uidShort.consumed == 36); // Base34 plus the two-byte compact UID length; no raw UID advancement.
+    const auto bytes = endpointWitness("long-uid");
+    p::FrameReader reader(limits().frame);
+    const auto envelope = reader.feed(bytes);
+    REQUIRE(envelope.frame);
+    auto byteWork = turn();
+    byteWork.bytes = bytes.size() + envelope.frame->payload.size() - 1;
+    const auto payloadShort = endpointRefusal("long-uid", Error::WORK_LIMIT, limits(), byteWork);
+    CHECK(payloadShort.stage == "protocol");
+    CHECK(payloadShort.consumed == 0);
 }

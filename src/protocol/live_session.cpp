@@ -821,6 +821,37 @@ class ProtocolParser {
         }
     }
 
+    /** Consume one standard optional peer EndpointId without publishing routing identity.
+     * The null JVMId read context uses ordinary nullable byte-array framing, not reference IDs.
+     * UID bytes stay inside the bounded frame; nullable name uses the existing scratch/text limits.
+     */
+    void endpoint() {
+        diagnostic_.stage = "descriptor-endpoint";
+        constexpr std::size_t ENDPOINT_PRIMITIVE_VISITS = 3;
+        debit(ENDPOINT_PRIMITIVE_VISITS, work_.visits);
+        const auto length = number(true);
+
+        if (length < -1 || length > static_cast<std::int64_t>(MAX_WIRE_COUNT)) {
+            throw Error::MALFORMED;
+        }
+
+        if (length == -1) {
+            return;
+        }
+
+        const auto bytes = static_cast<std::size_t>(length);
+
+        if (bytes > payload_.size() - cursor_) {
+            throw Error::MALFORMED;
+        }
+
+        debit(bytes, work_.visits);
+        cursor_ += bytes;
+        diagnostic_.consumed = cursor_;
+        static_cast<void>(text());
+        static_cast<void>(number(true));
+    }
+
     public:
     /** Bind complete input and explicitly owned scratch allocation.
      * @param payload Complete DXP3 body, excluding frame/type.
@@ -834,7 +865,7 @@ class ProtocolParser {
         : payload_(payload), limits_(limits), work_(work), resource_(resource), diagnostic_(diagnostic) {
     }
 
-    /** Parse one whole delta; endpoint trailers remain explicitly unsupported.
+    /** Parse one whole delta and at most one standard optional EndpointId.
      * @return Complete scratch-owned delta, never partial published state.
      */
     Protocol parse() {
@@ -851,6 +882,11 @@ class ProtocolParser {
         properties(result.properties);
         messages(result.send);
         messages(result.receive);
+
+        if (cursor_ != payload_.size()) {
+            endpoint();
+            diagnostic_.stage = "protocol";
+        }
 
         if (cursor_ != payload_.size()) {
             diagnostic_.stage = "descriptor-extension";

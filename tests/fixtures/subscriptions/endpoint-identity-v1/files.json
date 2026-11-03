@@ -1,0 +1,92 @@
+[
+  {
+    "file": "absent.bin",
+    "bytes": 36,
+    "sha256": "797bcdcc17a61d64e57a210215ea20f9e45bff661ce440f642512bc6fda5cd50"
+  },
+  {
+    "file": "empty-uid-name-min.bin",
+    "bytes": 47,
+    "sha256": "73202e2a5ba5aa7c7e09b6199fe0c7f6e455372632eb848c84b57c14dabd65e2"
+  },
+  {
+    "file": "extra-after-null.bin",
+    "bytes": 38,
+    "sha256": "30782337b89dfff8d06c06e7290fe6d5912bc13bfad80ef54514219041418542"
+  },
+  {
+    "file": "extra-after-present.bin",
+    "bytes": 71,
+    "sha256": "47d257f69d4d5fc1a3dbeb6945b7198df9f592edf6604aa8c496108199b6700b"
+  },
+  {
+    "file": "frame-excess.bin",
+    "bytes": 8235,
+    "sha256": "8210808e84b6b6c55f5316031ebd3ea952cef5bfb1c9da50c19fb29823e651de"
+  },
+  {
+    "file": "invalid-uid-negative.bin",
+    "bytes": 37,
+    "sha256": "9b80ea6fc579701eeffd6a307cc58c2f5775a81586d68d7ef8d1f8b1327198eb"
+  },
+  {
+    "file": "invalid-uid-overflow.bin",
+    "bytes": 41,
+    "sha256": "ce3f735b38afe8af7efe0da877893535ee4f851e4a2e5b47e73802ab4dff998f"
+  },
+  {
+    "file": "long-name.bin",
+    "bytes": 121,
+    "sha256": "729882bf2ca5f8f6836885bb3889b97631441dc010b104c2e01da541395a2b68"
+  },
+  {
+    "file": "long-uid.bin",
+    "bytes": 306,
+    "sha256": "d79e7ca47a9c126c691f428f23d332b92893d3ba9774d5918f94b38a251ccd8a"
+  },
+  {
+    "file": "null-name-max.bin",
+    "bytes": 63,
+    "sha256": "ef4d2764c61716ffcded9f4c16bb51f09be5408777983c0300205fdf4e9ed649"
+  },
+  {
+    "file": "null.bin",
+    "bytes": 37,
+    "sha256": "1af7079473225d8ec948126dba146c677dd2a69193e134bc94f2f73dc3d9fc2d"
+  },
+  {
+    "file": "present.bin",
+    "bytes": 70,
+    "sha256": "b1695e5dbbfeb1c2fa651e27ef0827bf37154553c9f7783b84dc09b15693966f"
+  },
+  {
+    "file": "truncated-counter.bin",
+    "bytes": 62,
+    "sha256": "2801194ae7577f3279db4c96a184bb6974663553025fd4cf2370bc2beb2c8da1"
+  },
+  {
+    "file": "truncated-empty-uid.bin",
+    "bytes": 37,
+    "sha256": "20134f55907109a54d2ce8114ea8447b4b02900b2af99f4b4cda83cfbaeb325f"
+  },
+  {
+    "file": "truncated-name.bin",
+    "bytes": 56,
+    "sha256": "5197408a1c2496dc15a4c1a02bb00b73f2f7c3bf770b590c1c75875a63ec5396"
+  },
+  {
+    "file": "truncated-uid-length.bin",
+    "bytes": 37,
+    "sha256": "7f770b2925956ad01bae6f65e8061b07b922fb88a9766de99a2d6b698f3e8300"
+  },
+  {
+    "file": "truncated-uid.bin",
+    "bytes": 45,
+    "sha256": "a9c3435b7917da31966f82031917c72b16fd33a2be3cb3b03c1d0b99110c5f88"
+  },
+  {
+    "file": "utf16-name.bin",
+    "bytes": 70,
+    "sha256": "ef2ed1db3c7141264cac85a719e13ccad078b504954649202884c9bf8fb55f95"
+  }
+]
