@@ -2,26 +2,25 @@
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/api/feed.hpp"
 
+#include "signal_stop.hpp"
+
 #include <atomic>
 #include <charconv>
 #include <chrono>
-#include <csignal>
 #include <iostream>
 #include <stdexcept>
+#include <stop_token>
 #include <string>
 #include <string_view>
-#include <thread>
 
 namespace {
 namespace q = org::ttldtor::qdcxx;
 using namespace std::chrono_literals;
-constexpr auto DEFAULT_DURATION = 10s;      ///< Finite admission interval for this console application.
-constexpr auto MAXIMUM_DURATION = 600000ms; ///< Maximum caller-selected interval.
-constexpr auto CONTROL_CADENCE = 20ms;      ///< Signal/control observation only; the library owns all feed progress.
+constexpr auto DEFAULT_DURATION = 10s;              ///< Finite admission interval for this console application.
+constexpr auto MAXIMUM_DURATION = 600000ms;         ///< Maximum caller-selected interval.
 constexpr std::size_t MAXIMUM_ADDRESS_BYTES = 4096; ///< Finite command-line endpoint spelling.
 constexpr std::size_t MAXIMUM_SYMBOL_BYTES = 128;   ///< Default public selector bound.
 constexpr char16_t MAXIMUM_ASCII_UNIT = 0x7f;       ///< Console profile admits exact ASCII selectors only.
-volatile std::sig_atomic_t interrupted = 0;
 
 /** Write the selected event symbol without an implicit narrowing conversion.
  * @param symbol Borrowed owning-event text; non-ASCII data fails this console profile.
@@ -36,13 +35,22 @@ void printSymbol(std::u16string_view symbol) {
     }
 }
 
-/** Publish a signal flag without calling streams, allocation or endpoint methods.
- * @param signal Unused process signal identity.
- */
-void onInterrupt(int signal) noexcept {
-    static_cast<void>(signal);
-    interrupted = 1;
-}
+/** Keep SDK callbacks/output quiescent before the scoped process signal bridge is removed, including unwind. */
+class RuntimeShutdown final {
+    q::api::ApiRuntime &runtime_; ///< Borrowed main-owned runtime, outliving this guard and the bridge.
+
+    public:
+    /** Establish cleanup before any connect can start the lazy SDK worker.
+     * @param runtime Existing main-thread runtime; shutdown is idempotent.
+     */
+    explicit RuntimeShutdown(q::api::ApiRuntime &runtime) noexcept : runtime_(runtime) {
+    }
+
+    /** Join native work and release application captures while signal policy remains installed. */
+    ~RuntimeShutdown() {
+        runtime_.closeAndAwaitTermination();
+    }
+};
 
 /** Print usage before constructing any SDK/schema/runtime owner.
  * @param russian Select the Russian description.
@@ -151,20 +159,12 @@ int main(int argc, char **argv) {
         return 2;
     }
 
-    if (std::signal(SIGINT, onInterrupt) == SIG_ERR || std::signal(SIGTERM, onInterrupt) == SIG_ERR) {
-        return 1;
-    }
-
-#ifdef SIGPIPE
-
-    if (std::signal(SIGPIPE, SIG_IGN) == SIG_ERR) {
-        return 1;
-    }
-
-#endif
     try {
         std::atomic<std::size_t> received{0};
+        std::stop_source stop;
         q::api::ApiRuntime runtime;
+        feed_quote::SignalStop signals(stop);
+        RuntimeShutdown shutdown(runtime);
         auto endpoint = runtime.createEndpoint();
         auto subscription = endpoint->getFeed()->createSubscription<q::events::Quote>();
         subscription->addEventListener([&](std::span<const q::events::Quote> quotes) {
@@ -181,28 +181,29 @@ int main(int argc, char **argv) {
                 received.fetch_add(1, std::memory_order_relaxed);
             }
         });
+        subscription->addStateChangeListener([source = stop](auto, auto current) mutable {
+            if (current == q::api::SubscriptionState::FAILED) {
+                source.request_stop();
+            }
+        });
         subscription->addSymbols(symbol);
         endpoint->connect(address);
 
         const auto cutoff = std::chrono::steady_clock::now() + duration;
 
-        while (!interrupted && std::chrono::steady_clock::now() < cutoff &&
-               endpoint->getState() != q::api::EndpointState::FAILED &&
-               subscription->getState() != q::api::SubscriptionState::FAILED) {
-            std::this_thread::sleep_for(CONTROL_CADENCE);
-        }
+        static_cast<void>(endpoint->awaitState(q::api::EndpointState::CLOSED, cutoff, stop.get_token()));
 
         const auto closed = endpoint->closeAndAwaitTermination();
         runtime.closeAndAwaitTermination();
 
-        if (interrupted) {
+        if (signals.interrupted()) {
             return 130;
         }
 
         const auto failure = subscription->getDiagnostic();
 
-        const bool deliveredAndDrained = closed.drained && !closed.deadlineExpired && !closed.hadGap &&
-                                         received.load(std::memory_order_relaxed) != 0 &&
+        const bool deliveredAndDrained = !signals.failed() && closed.drained && !closed.deadlineExpired &&
+                                         !closed.hadGap && received.load(std::memory_order_relaxed) != 0 &&
                                          failure.code == q::api::ErrorCode::NONE;
 
         if (!deliveredAndDrained || closed.diagnostic.code != q::api::ErrorCode::NONE) {

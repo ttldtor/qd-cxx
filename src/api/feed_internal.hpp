@@ -67,7 +67,9 @@ struct StateListeners {
 
 /** Producer-only subscription state; no queue, receiver, schema or native owner can escape here. */
 struct SubscriptionPort {
-    mutable std::mutex mutex;                          ///< Protects accepted snapshots and detached observations only.
+    mutable std::mutex mutex;               ///< Protects accepted snapshots and detached observations only.
+    std::condition_variable stateCondition; ///< Creator current-state wait; publication uses this port mutex.
+    std::thread::id owner; ///< Immutable runtime creator affinity, retained after endpoint/runtime destruction.
     std::weak_ptr<RuntimeControl> control;             ///< Wake/lifetime gate, without worker ownership.
     std::weak_ptr<EndpointPort> endpoint;              ///< Endpoint policy/status domain, without a producer cycle.
     std::shared_ptr<ListenerLedger> listenerLedger;    ///< Selected/retiring callback reservation.
@@ -89,6 +91,7 @@ struct SubscriptionPort {
 struct EndpointPort {
     mutable std::mutex mutex;                 ///< Protects bounded registration/address and detached observation state.
     std::condition_variable retiredCondition; ///< Main-owner await only; no native work runs here.
+    std::condition_variable stateCondition;   ///< Current-state wait, independent of full capture quiescence.
     std::weak_ptr<RuntimeControl> control;    ///< Lifetime-gated dispatch, never a free raw runtime pointer.
     std::thread::id owner;   ///< Creator/main await affinity remains available after runtime destruction.
     RuntimeOptions limits;   ///< Finite immutable limits and resolved DNS snapshot.

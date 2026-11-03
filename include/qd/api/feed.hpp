@@ -15,6 +15,7 @@
 #include <memory>
 #include <span>
 #include <stdexcept>
+#include <stop_token>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -122,6 +123,23 @@ enum class SubscriptionState {
     FAILED      ///< A failure is retained; this subscription no longer admits ordinary mutations.
 };
 
+/** Result category for a creator-thread current-state wait, independent of lifecycle failure codes. */
+enum class WaitStatus {
+    REACHED,         ///< The current state equals the requested target.
+    TERMINAL,        ///< A different absorbing CLOSED or FAILED state prevents reaching the target.
+    CANCELLED,       ///< Cancellation was requested before either state condition was observed.
+    DEADLINE_EXPIRED ///< The steady-clock deadline was reached before another condition was observed.
+};
+
+/** Detached observation captured atomically when a current-state wait finishes.
+ * @tparam State EndpointState or SubscriptionState, matching the waited owner.
+ */
+template <class State> struct StateWaitResult {
+    WaitStatus status;     ///< Exact target, other terminal, cancellation or deadline result.
+    State state;           ///< Current lifecycle state under the publishing owner's mutex.
+    Diagnostic diagnostic; ///< Owner's first lifecycle failure at that observation; advisory errors stay separate.
+};
+
 /** Actual local endpoint retirement; DRAINED is limited to the admitted local prefix. */
 struct CloseResult {
     bool drained = false;         ///< True only for actual DRAINED without expiry or unresolved gap.
@@ -209,6 +227,22 @@ template <class Event> class Subscription final {
      * @return Last observed logical lifecycle.
      */
     [[nodiscard]] SubscriptionState getState() const noexcept;
+    /** Wait for a current logical state without progressing or closing the subscription.
+     * Only the runtime creator may wait, including after runtime/endpoint destruction. Worker/foreign calls
+     * reject WRONG_THREAD; any creator callback/capture-retirement context rejects INVALID_STATE, even if ready.
+     * The target is checked first, then a different CLOSED/FAILED, cancellation and the deadline, under one mutex.
+     * Intermediate transitions may be missed. CLOSED is not an opt-in state-observer quiescence barrier.
+     * @param target Valid current-state target; invalid enum values reject INVALID_ARGUMENT through Error.
+     * @param deadline Absolute steady-clock deadline; max means no deadline. It does not bound OS scheduling.
+     * @param stop Caller-owned cancellation token; cancellation has no lifecycle side effects.
+     * @return Detached current state, owner diagnostic and reason; no state observer or native work is registered.
+     * @throws Error For invalid target, wrong thread or creator retirement context.
+     * @throws std::system_error If native C++ synchronization fails.
+     */
+    [[nodiscard]] StateWaitResult<SubscriptionState>
+    awaitState(SubscriptionState target,
+               std::chrono::steady_clock::time_point deadline = std::chrono::steady_clock::time_point::max(),
+               std::stop_token stop = {}) const;
     /** Inspect the first asynchronous failure.
      * @return Static/numeric detached diagnostic, or NONE.
      */
@@ -292,6 +326,22 @@ class Endpoint final {
      * @return Detached lifecycle state, not peer acknowledgement.
      */
     [[nodiscard]] EndpointState getState() const noexcept;
+    /** Wait for a current endpoint state without connecting, closing or progressing native work.
+     * Only the runtime creator may wait. Worker/foreign calls reject WRONG_THREAD; any creator callback/
+     * capture-retirement context rejects INVALID_STATE, even if already ready. Synchronous rejections throw Error.
+     * Under one mutex, precedence is target, different CLOSED/FAILED, cancellation, then deadline.
+     * Intermediate transitions may be missed. Use closeAndAwaitTermination for actual callback/native quiescence.
+     * @param target Valid current-state target; invalid enum values reject INVALID_ARGUMENT through Error.
+     * @param deadline Absolute steady-clock deadline; max means no deadline. It does not bound OS scheduling.
+     * @param stop Caller-owned cancellation token; cancellation has no lifecycle side effects.
+     * @return Detached current state, owner diagnostic and reason; state observers may still be executing.
+     * @throws Error For invalid target, wrong thread or creator retirement context.
+     * @throws std::system_error If native C++ synchronization fails.
+     */
+    [[nodiscard]] StateWaitResult<EndpointState>
+    awaitState(EndpointState target,
+               std::chrono::steady_clock::time_point deadline = std::chrono::steady_clock::time_point::max(),
+               std::stop_token stop = {}) const;
     /** Inspect first asynchronous failure.
      * @return Static/numeric detached diagnostic, or NONE.
      */

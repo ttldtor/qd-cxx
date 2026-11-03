@@ -125,3 +125,16 @@ The run creates a worker and sockets, reads system DNS configuration, writes std
 and diagnostics, and modifies no input files or global settings. Blocking output or
 callbacks can delay shutdown; the duration and drain allowance are not hard process
 completion deadlines.
+
+The receiving interval uses `awaitState` with a steady-clock deadline and stop token;
+there is no state/sleep polling loop. Subscription failure requests that same token
+and remains exit 1. The SDK installs no process signal handlers. This CLI owns a
+scoped signal bridge: POSIX `sigwait` for SIGINT/SIGTERM with complete saved/restored
+signal dispositions and creator mask, or a Windows Ctrl+C/Break event reader.
+Only the ordinary reader calls `request_stop`; SIGPIPE is scoped while POSIX output
+and native work remain live. SDK callbacks quiesce before bridge restoration on
+normal and exceptional exits. Windows console close/logoff/shutdown retain prior
+OS behavior. Pending real POSIX signals racing restoration retain prior OS semantics.
+See the [complete wait and signal contract](../../spec/subscriptions/FEED-WAITS.md).
+The CLI creates one application signal-reader thread in addition to the SDK worker;
+both retire before runtime bootstrap destruction.

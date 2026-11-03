@@ -138,6 +138,7 @@ template <class Port, class State> void observeState(const std::shared_ptr<Port>
         listeners = port->stateListeners.snapshot;
     }
 
+    port->stateCondition.notify_all();
     notifyState(port, listeners, previous, next);
 }
 
@@ -242,6 +243,70 @@ bool retirementReentered(const detail::EndpointPort *port) noexcept {
     }
 
     return false;
+}
+
+/** Wait on a detached port's current state without selecting observers or performing lifecycle work.
+ * @tparam Port EndpointPort or SubscriptionPort, retaining immutable creator affinity.
+ * @tparam State The matching public lifecycle enum; its contiguous range ends with FAILED.
+ * @param port Strong ownership lasts through cancellation callback deregistration.
+ * @param target Requested current state, not a remembered transition.
+ * @param deadline Absolute steady-clock deadline, or max for no deadline.
+ * @param stop Application-owned cancellation token.
+ * @return One state/diagnostic snapshot with target, terminal, cancellation, deadline precedence.
+ */
+template <class Port, class State>
+StateWaitResult<State> awaitCurrentState(std::shared_ptr<Port> port, State target,
+                                         std::chrono::steady_clock::time_point deadline, std::stop_token stop) {
+    if (std::this_thread::get_id() != port->owner) {
+        reject(ErrorCode::WRONG_THREAD, "state-await-thread");
+    }
+
+    if (retirementFrame) {
+        reject(ErrorCode::INVALID_STATE, "state-await-retirement-reentry");
+    }
+
+    if (target < State{} || target > State::FAILED) {
+        reject(ErrorCode::INVALID_ARGUMENT, "state-await-target");
+    }
+
+    // Registration may invoke inline for a pre-cancelled token. It must precede locking the port.
+    // This object is destroyed after the later unique_lock, so deregistration cannot join under that lock.
+    std::stop_callback cancellation(stop, [port] {
+        {
+            // Synchronize with the predicate-to-wait interval, even though stop_requested is atomic.
+            std::lock_guard lock(port->mutex);
+        }
+
+        port->stateCondition.notify_all();
+    });
+    std::unique_lock lock(port->mutex);
+
+    for (;;) {
+        if (port->state == target) {
+            return {WaitStatus::REACHED, port->state, port->diagnostic};
+        }
+
+        if (port->state == State::CLOSED || port->state == State::FAILED) {
+            return {WaitStatus::TERMINAL, port->state, port->diagnostic};
+        }
+
+        // Sample time before the monotonic stop flag: an expired result then has a point at which stop was false.
+        const auto observedAt = std::chrono::steady_clock::now();
+
+        if (stop.stop_requested()) {
+            return {WaitStatus::CANCELLED, port->state, port->diagnostic};
+        }
+
+        if (observedAt >= deadline) {
+            return {WaitStatus::DEADLINE_EXPIRED, port->state, port->diagnostic};
+        }
+
+        if (deadline == std::chrono::steady_clock::time_point::max()) {
+            port->stateCondition.wait(lock);
+        } else {
+            port->stateCondition.wait_until(lock, deadline);
+        }
+    }
 }
 
 /** Retire accepted snapshots outside all locks, then publish actual callback quiescence.
@@ -874,6 +939,13 @@ template <class Event> SubscriptionState Subscription<Event>::getState() const n
     return port_->state;
 }
 
+template <class Event>
+StateWaitResult<SubscriptionState> Subscription<Event>::awaitState(SubscriptionState target,
+                                                                   std::chrono::steady_clock::time_point deadline,
+                                                                   std::stop_token stop) const {
+    return awaitCurrentState(port_, target, deadline, stop);
+}
+
 template <class Event> Diagnostic Subscription<Event>::getDiagnostic() const noexcept {
     std::lock_guard lock(port_->mutex);
 
@@ -891,6 +963,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(bool quot
         auto subscription = std::make_shared<detail::SubscriptionPort>();
         subscription->control = port_->control;
         subscription->endpoint = port_;
+        subscription->owner = port_->owner;
         subscription->quote = quote;
         subscription->maximumSymbols = port_->limits.maximumSymbolsPerSubscription;
         subscription->maximumSymbolUnits = port_->limits.maximumSymbolUnits;
@@ -994,6 +1067,7 @@ void Endpoint::connect(std::string_view address) {
             ++control->wakeSequence;
         }
 
+        port_->stateCondition.notify_all();
         control->condition.notify_one();
     });
 }
@@ -1040,6 +1114,11 @@ EndpointState Endpoint::getState() const noexcept {
     std::lock_guard lock(port_->mutex);
 
     return port_->state;
+}
+
+StateWaitResult<EndpointState>
+Endpoint::awaitState(EndpointState target, std::chrono::steady_clock::time_point deadline, std::stop_token stop) const {
+    return awaitCurrentState(port_, target, deadline, stop);
 }
 
 Diagnostic Endpoint::getDiagnostic() const noexcept {

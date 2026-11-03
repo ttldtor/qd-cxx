@@ -1678,3 +1678,297 @@ TEST_CASE("public state observers preserve CONNECTING order on an already runnin
         }
     }
 }
+
+TEST_CASE("public await current state defines ready terminal cancellation and deadline precedence") {
+    api::ApiRuntime runtime(runtimeOptions());
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    auto subscription = endpoint->getFeed()->createSubscription<events::Quote>();
+    std::stop_source stopped;
+    stopped.request_stop();
+    const auto past = std::chrono::steady_clock::now() - 1ms;
+
+    const auto ready = endpoint->awaitState(api::EndpointState::NOT_CONNECTED, past, stopped.get_token());
+    CHECK(ready.status == api::WaitStatus::REACHED);
+    CHECK(ready.state == api::EndpointState::NOT_CONNECTED);
+    CHECK(ready.diagnostic.code == api::ErrorCode::NONE);
+    CHECK(subscription->awaitState(api::SubscriptionState::CONFIGURED, past, stopped.get_token()).status ==
+          api::WaitStatus::REACHED);
+    CHECK(endpoint->awaitState(api::EndpointState::CONNECTED, past, stopped.get_token()).status ==
+          api::WaitStatus::CANCELLED);
+    CHECK(subscription->awaitState(api::SubscriptionState::ACTIVE, past, stopped.get_token()).status ==
+          api::WaitStatus::CANCELLED);
+    CHECK(endpoint->awaitState(api::EndpointState::CONNECTED, past).status == api::WaitStatus::DEADLINE_EXPIRED);
+    CHECK(subscription->awaitState(api::SubscriptionState::ACTIVE, past).status == api::WaitStatus::DEADLINE_EXPIRED);
+    CHECK(endpoint->getState() == api::EndpointState::NOT_CONNECTED);
+    CHECK(subscription->getState() == api::SubscriptionState::CONFIGURED);
+    CHECK(errorCode([&] {
+              static_cast<void>(endpoint->awaitState(static_cast<api::EndpointState>(-1), past));
+          }) == api::ErrorCode::INVALID_ARGUMENT);
+    CHECK(errorCode([&] {
+              static_cast<void>(subscription->awaitState(static_cast<api::SubscriptionState>(255), past));
+          }) == api::ErrorCode::INVALID_ARGUMENT);
+    CHECK(endpoint->closeAndAwaitTermination().drained);
+
+    CHECK(endpoint->awaitState(api::EndpointState::CLOSED, past, stopped.get_token()).status ==
+          api::WaitStatus::REACHED);
+    const auto terminal = endpoint->awaitState(api::EndpointState::CONNECTED, past, stopped.get_token());
+    CHECK(terminal.status == api::WaitStatus::TERMINAL);
+    CHECK(terminal.state == api::EndpointState::CLOSED);
+    CHECK(terminal.diagnostic.code == api::ErrorCode::NONE);
+    CHECK(subscription->awaitState(api::SubscriptionState::ACTIVE, past, stopped.get_token()).status ==
+          api::WaitStatus::TERMINAL);
+}
+
+TEST_CASE("public await keeps creator affinity on detached endpoint and subscription handles") {
+    std::shared_ptr<api::Endpoint> endpoint;
+    std::shared_ptr<api::Subscription<events::Profile>> subscription;
+    {
+        api::ApiRuntime runtime(runtimeOptions());
+        endpoint = runtime.createEndpoint(endpointOptions());
+        subscription = endpoint->getFeed()->createSubscription<events::Profile>();
+        runtime.closeAndAwaitTermination();
+    }
+
+    CHECK(endpoint->awaitState(api::EndpointState::CLOSED).status == api::WaitStatus::REACHED);
+    endpoint.reset();
+    CHECK(subscription->awaitState(api::SubscriptionState::CLOSED).status == api::WaitStatus::REACHED);
+    std::atomic<api::ErrorCode> error{api::ErrorCode::NONE};
+    std::thread foreign([&] {
+        error = errorCode([&] {
+            static_cast<void>(subscription->awaitState(api::SubscriptionState::CLOSED));
+        });
+    });
+    foreign.join();
+    CHECK(error.load() == api::ErrorCode::WRONG_THREAD);
+}
+
+TEST_CASE("public await rejects worker callbacks and every creator retirement context before ready success") {
+    api::ApiRuntime runtime(runtimeOptions());
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    auto sibling = runtime.createEndpoint(endpointOptions());
+    auto subscription = sibling->getFeed()->createSubscription<events::Quote>();
+    std::atomic<api::ErrorCode> workerError{api::ErrorCode::NONE};
+    api::ErrorCode distinctError = api::ErrorCode::NONE;
+    api::ErrorCode subscriptionError = api::ErrorCode::NONE;
+    sibling->addStateChangeListener([&](auto, auto) {
+        distinctError = errorCode([&] {
+            static_cast<void>(endpoint->awaitState(api::EndpointState::NOT_CONNECTED));
+        });
+        subscriptionError = errorCode([&] {
+            static_cast<void>(subscription->awaitState(subscription->getState()));
+        });
+    });
+    CHECK(sibling->closeAndAwaitTermination().drained);
+    CHECK(distinctError == api::ErrorCode::INVALID_STATE);
+    CHECK(subscriptionError == api::ErrorCode::INVALID_STATE);
+    endpoint->addStateChangeListener([&](auto, auto current) {
+        workerError = errorCode([&] {
+            static_cast<void>(endpoint->awaitState(current));
+        });
+
+        if (current == api::EndpointState::CONNECTING) {
+            endpoint->close();
+        }
+    });
+    endpoint->connect("127.0.0.1:1");
+    const auto result = endpoint->awaitState(api::EndpointState::CLOSED, std::chrono::steady_clock::now() + 3s);
+    CHECK(result.status == api::WaitStatus::REACHED);
+    CHECK(endpoint->closeAndAwaitTermination().drained);
+    CHECK(workerError.load() == api::ErrorCode::WRONG_THREAD);
+    CHECK(endpoint->awaitState(api::EndpointState::CONNECTING).status == api::WaitStatus::TERMINAL);
+}
+
+TEST_CASE("public await cancellation registration and concurrent state publication do not lose wakeups") {
+    api::ApiRuntime runtime(runtimeOptions());
+    // Scheduling stress covers cancellation before/during registration; it is not a deterministic tiny-window hook.
+    constexpr unsigned ROUNDS = 32;
+
+    for (unsigned round = 0; round < ROUNDS; ++round) {
+        auto endpoint = runtime.createEndpoint(endpointOptions());
+        auto subscription = endpoint->getFeed()->createSubscription<events::Quote>();
+        std::stop_source cancellation;
+        std::thread requester([source = cancellation]() mutable {
+            source.request_stop();
+        });
+        const auto result = subscription->awaitState(api::SubscriptionState::ACTIVE,
+                                                     std::chrono::steady_clock::now() + 3s, cancellation.get_token());
+        requester.join();
+        CHECK(result.status == api::WaitStatus::CANCELLED);
+        CHECK(result.state == api::SubscriptionState::CONFIGURED);
+        CHECK(result.diagnostic.code == api::ErrorCode::NONE);
+        endpoint->addStateChangeListener([endpoint](auto, auto current) {
+            if (current == api::EndpointState::CONNECTING) {
+                endpoint->close();
+            }
+        });
+        std::thread producer([endpoint] {
+            endpoint->connect("127.0.0.1:1");
+        });
+        const auto closed = endpoint->awaitState(api::EndpointState::CLOSED, std::chrono::steady_clock::now() + 3s);
+        producer.join();
+        CHECK(closed.status == api::WaitStatus::REACHED);
+        CHECK(endpoint->closeAndAwaitTermination().drained);
+    }
+}
+
+TEST_CASE("public await CLOSED observes state before opt-in terminal observer quiescence") {
+    api::ApiRuntime runtime(runtimeOptions());
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    std::mutex mutex;
+    std::condition_variable condition;
+    bool release = false;
+    std::atomic<bool> terminalEntered{false};
+    std::atomic<bool> terminalExited{false};
+    endpoint->addStateChangeListener([&](auto, auto current) {
+        if (current == api::EndpointState::CONNECTING) {
+            endpoint->close();
+        }
+
+        if (current == api::EndpointState::CLOSED) {
+            terminalEntered = true;
+            std::unique_lock lock(mutex);
+            condition.wait(lock, [&] {
+                return release;
+            });
+            terminalExited = true;
+        }
+    });
+    endpoint->connect("127.0.0.1:1");
+    const auto result = endpoint->awaitState(api::EndpointState::CLOSED, std::chrono::steady_clock::now() + 3s);
+    CHECK(result.status == api::WaitStatus::REACHED);
+    CHECK_FALSE(terminalExited.load());
+    {
+        std::lock_guard lock(mutex);
+        release = true;
+    }
+
+    condition.notify_all();
+    CHECK(endpoint->closeAndAwaitTermination().drained);
+    CHECK(terminalEntered.load());
+    CHECK(terminalExited.load());
+}
+
+TEST_CASE("public await captures actual subscription failure and deregisters cancellation before returning") {
+    std::stop_source cancellation;
+    {
+        api::ApiRuntime runtime(runtimeOptions());
+        auto schema = standardSchema(false);
+        const std::vector<std::u16string> symbols{u"IBM"};
+        const std::vector<peer::Record> records{{u"IBM", standardValues(schema)}};
+        peer::Peer source(schema, records, symbols, 64, peer::PeerMode::HOLD, script());
+        auto endpoint = runtime.createEndpoint(endpointOptions());
+        auto subscription = endpoint->getFeed()->createSubscription<events::Quote>();
+        std::atomic<api::ErrorCode> callbackError{api::ErrorCode::NONE};
+        subscription->addEventListener([&](std::span<const events::Quote>) {
+            callbackError = errorCode([&] {
+                static_cast<void>(subscription->awaitState(api::SubscriptionState::ACTIVE));
+            });
+            throw std::runtime_error("intentional-event-failure");
+        });
+        subscription->addSymbols("IBM");
+        endpoint->connect(address(source));
+        const auto failed = subscription->awaitState(api::SubscriptionState::FAILED,
+                                                     std::chrono::steady_clock::now() + 3s, cancellation.get_token());
+        CHECK(failed.status == api::WaitStatus::REACHED);
+        CHECK(failed.state == api::SubscriptionState::FAILED);
+        CHECK(failed.diagnostic.code == api::ErrorCode::CALLBACK_FAILURE);
+        CHECK(callbackError.load() == api::ErrorCode::WRONG_THREAD);
+        CHECK(subscription->awaitState(api::SubscriptionState::ACTIVE).status == api::WaitStatus::TERMINAL);
+        static_cast<void>(endpoint->closeAndAwaitTermination());
+        CHECK_FALSE(source.failed());
+    }
+
+    // Neither the detached port nor its stack mutex is retained by a deregistered stop callback.
+    CHECK(cancellation.request_stop());
+}
+
+TEST_CASE("public await expires an actual wait and rejects creator capture self and distinct waits") {
+    api::ApiRuntime runtime(runtimeOptions());
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    auto sibling = runtime.createEndpoint(endpointOptions());
+    auto subscription = endpoint->getFeed()->createSubscription<events::Profile>();
+    const auto cutoff = std::chrono::steady_clock::now() + 5ms;
+    const auto expired = endpoint->awaitState(api::EndpointState::CONNECTED, cutoff);
+    CHECK(expired.status == api::WaitStatus::DEADLINE_EXPIRED);
+    CHECK(std::chrono::steady_clock::now() >= cutoff);
+    CHECK(expired.state == api::EndpointState::NOT_CONNECTED);
+    api::ErrorCode selfError = api::ErrorCode::NONE;
+    api::ErrorCode distinctError = api::ErrorCode::NONE;
+    auto capture = std::make_shared<CaptureAction>();
+    capture->action = [&] {
+        selfError = errorCode([&] {
+            static_cast<void>(subscription->awaitState(api::SubscriptionState::CONFIGURED));
+        });
+        distinctError = errorCode([&] {
+            static_cast<void>(sibling->awaitState(api::EndpointState::NOT_CONNECTED));
+        });
+    };
+    const auto id = subscription->addStateChangeListener([capture](auto, auto) {
+    });
+    capture.reset();
+    subscription->removeStateChangeListener(id);
+    CHECK(selfError == api::ErrorCode::INVALID_STATE);
+    CHECK(distinctError == api::ErrorCode::INVALID_STATE);
+    CHECK(endpoint->closeAndAwaitTermination().drained);
+    CHECK(sibling->closeAndAwaitTermination().drained);
+}
+
+TEST_CASE("public await terminal failure precedes cancellation and deadline with exact diagnostic snapshot") {
+    api::ApiRuntime runtime(runtimeOptions());
+    auto schema = standardSchema();
+    const std::vector<std::u16string> symbols;
+    const std::vector<peer::Record> records;
+    peer::Peer source(schema, records, symbols, 8192, peer::PeerMode::NO_READINESS, script());
+    auto options = endpointOptions();
+    options.connectTimeout = 100ms;
+    options.readTimeout = 100ms;
+    auto endpoint = runtime.createEndpoint(options);
+    endpoint->connect(address(source));
+    const auto failed = endpoint->awaitState(api::EndpointState::FAILED, std::chrono::steady_clock::now() + 3s);
+    CHECK(failed.status == api::WaitStatus::REACHED);
+    CHECK(failed.state == api::EndpointState::FAILED);
+    CHECK(failed.diagnostic.code == api::ErrorCode::TRANSPORT_FAILURE);
+    const auto terminal = endpoint->closeAndAwaitTermination();
+    CHECK(terminal.diagnostic.code == failed.diagnostic.code);
+    CHECK(terminal.diagnostic.stage == failed.diagnostic.stage);
+    CHECK(terminal.diagnostic.nativeCode == failed.diagnostic.nativeCode);
+    CHECK(terminal.diagnostic.detailCode == failed.diagnostic.detailCode);
+    std::stop_source cancellation;
+    cancellation.request_stop();
+    const auto result = endpoint->awaitState(api::EndpointState::CONNECTED, std::chrono::steady_clock::now() - 1ms,
+                                             cancellation.get_token());
+    CHECK(result.status == api::WaitStatus::TERMINAL);
+    CHECK(result.state == api::EndpointState::FAILED);
+    CHECK(result.diagnostic.code == failed.diagnostic.code);
+    CHECK(result.diagnostic.stage == failed.diagnostic.stage);
+    CHECK(endpoint->awaitState(api::EndpointState::FAILED, {}, cancellation.get_token()).status ==
+          api::WaitStatus::REACHED);
+}
+
+TEST_CASE("public await accepts cancellation requested by its own worker state callback") {
+    api::ApiRuntime runtime(runtimeOptions());
+    auto schema = standardSchema(false);
+    const std::vector<std::u16string> symbols{u"IBM"};
+    const std::vector<peer::Record> records{{u"IBM", standardValues(schema)}};
+    peer::Peer source(schema, records, symbols, 64, peer::PeerMode::HOLD, script());
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    auto subscription = endpoint->getFeed()->createSubscription<events::Quote>();
+    std::stop_source cancellation;
+    std::atomic<bool> callbackReturned{false};
+    subscription->addStateChangeListener([source = cancellation, &callbackReturned](auto, auto current) mutable {
+        if (current == api::SubscriptionState::ACTIVE) {
+            source.request_stop();
+            callbackReturned = true;
+        }
+    });
+    subscription->addSymbols("IBM");
+    endpoint->connect(address(source));
+    const auto result = subscription->awaitState(api::SubscriptionState::CLOSED, std::chrono::steady_clock::now() + 3s,
+                                                 cancellation.get_token());
+    CHECK(result.status == api::WaitStatus::CANCELLED);
+    CHECK(result.state == api::SubscriptionState::ACTIVE);
+    CHECK(result.diagnostic.code == api::ErrorCode::NONE);
+    static_cast<void>(endpoint->closeAndAwaitTermination());
+    CHECK(callbackReturned.load());
+    CHECK_FALSE(source.failed());
+}

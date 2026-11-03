@@ -28,12 +28,13 @@ The central application sequence is:
 
 #include <chrono>
 #include <iostream>
-#include <thread>
+#include <stop_token>
 
 int main() {
     namespace q = org::ttldtor::qdcxx;
 
     try {
+        std::stop_source stop;
         q::api::ApiRuntime runtime;
         auto endpoint = runtime.createEndpoint();
         auto quotes = endpoint->getFeed()->createSubscription<q::events::Quote>();
@@ -43,10 +44,16 @@ int main() {
                 std::cout << quote.bidPrice.toString() << '\n';
             }
         });
+        quotes->addStateChangeListener([source = stop](auto, auto current) mutable {
+            if (current == q::api::SubscriptionState::FAILED) {
+                source.request_stop();
+            }
+        });
         quotes->addSymbols({"AAPL", "IBM"});
         endpoint->connect("demo.dxfeed.com:7300");
 
-        std::this_thread::sleep_for(std::chrono::seconds(10));
+        const auto cutoff = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+        static_cast<void>(endpoint->awaitState(q::api::EndpointState::CLOSED, cutoff, stop.get_token()));
 
         const auto closed = endpoint->closeAndAwaitTermination();
         runtime.closeAndAwaitTermination();
@@ -246,3 +253,21 @@ endpoint's exact symbol/delivery policy.
 The [layered statistics contract](../spec/subscriptions/CLIENT-STATISTICS.md) defines
 future endpoint/subscription counters, epoch and availability rules. These counters
 are not exposed by the current facade; lifecycle diagnostics remain available.
+
+## Wait for a current state
+
+`endpoint->awaitState(target, deadline, stopToken)` and
+`subscription->awaitState(target, deadline, stopToken)` block only the runtime's
+creator, without polling or native progress. `StateWaitResult<State>` returns the
+current state and first lifecycle diagnostic. Conditions have explicit precedence:
+`REACHED` target, a different absorbing `TERMINAL` (`CLOSED`/`FAILED`), `CANCELLED`,
+then `DEADLINE_EXPIRED`. The default deadline is steady-clock `max()` and the
+default stop token is empty. A past transition is not remembered.
+
+Foreign/SDK callback calls reject with `api::Error` / `WRONG_THREAD`; any creator
+callback/capture-retirement context rejects `INVALID_STATE`, even for a different
+owner or already matching state. Invalid enum values reject `INVALID_ARGUMENT`.
+Checks happen before the ready-result shortcut. State waits have no lifecycle side
+effects and do not consume observer capacity. `awaitState(CLOSED)` can return while
+opt-in state observers still retire; use `closeAndAwaitTermination()` for full
+quiescence. See [wait results, cancellation and signal lifetime](../spec/subscriptions/FEED-WAITS.md).

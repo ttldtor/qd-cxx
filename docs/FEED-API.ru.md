@@ -29,12 +29,13 @@ HISTORY, wildcard-селекторы и внешние схемы в этот AP
 
 #include <chrono>
 #include <iostream>
-#include <thread>
+#include <stop_token>
 
 int main() {
     namespace q = org::ttldtor::qdcxx;
 
     try {
+        std::stop_source stop;
         q::api::ApiRuntime runtime;
         auto endpoint = runtime.createEndpoint();
         auto quotes = endpoint->getFeed()->createSubscription<q::events::Quote>();
@@ -44,10 +45,16 @@ int main() {
                 std::cout << quote.bidPrice.toString() << '\n';
             }
         });
+        quotes->addStateChangeListener([source = stop](auto, auto current) mutable {
+            if (current == q::api::SubscriptionState::FAILED) {
+                source.request_stop();
+            }
+        });
         quotes->addSymbols({"AAPL", "IBM"});
         endpoint->connect("demo.dxfeed.com:7300");
 
-        std::this_thread::sleep_for(std::chrono::seconds(10));
+        const auto cutoff = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+        static_cast<void>(endpoint->awaitState(q::api::EndpointState::CLOSED, cutoff, stop.get_token()));
 
         const auto closed = endpoint->closeAndAwaitTermination();
         runtime.closeAndAwaitTermination();
@@ -250,3 +257,23 @@ q::api::ApiRuntime runtime(options);
 [Контракт послойной статистики](../spec/subscriptions/CLIENT-STATISTICS.ru.md) определяет
 будущие счётчики endpoint/подписки, эпохи и доступность. Текущий фасад не предоставляет
 эти счётчики; наблюдения состояния и диагностики остаются доступны.
+
+## Ожидание текущего состояния
+
+`endpoint->awaitState(target, deadline, stopToken)` и
+`subscription->awaitState(target, deadline, stopToken)` блокируют только
+поток-создатель runtime без опроса и выполнения native-работы.
+`StateWaitResult<State>` возвращает текущее состояние и первую диагностику
+жизненного цикла. Приоритеты условий заданы явно: целевое `REACHED`, другое
+поглощающее `TERMINAL` (`CLOSED`/`FAILED`), `CANCELLED`, затем `DEADLINE_EXPIRED`.
+По умолчанию срок равен steady-clock `max()`, stop token пустой. Прошедший переход
+не запоминается.
+
+Чужие потоки/SDK callbacks получают `api::Error` / `WRONG_THREAD`; любой контекст
+callback/освобождения захватов на потоке-создателе получает `INVALID_STATE`,
+в том числе для другого объекта и уже совпавшего состояния. Неверное значение enum
+даёт `INVALID_ARGUMENT`. Проверки предшествуют быстрому возврату готового результата.
+Ожидание состояния не меняет жизненный цикл и не расходует ёмкость наблюдателей.
+`awaitState(CLOSED)` может вернуться до освобождения подключённых наблюдателей
+состояния; полный барьер quiescence — `closeAndAwaitTermination()`.
+См. [результаты ожидания, отмену и время жизни обработки сигналов](../spec/subscriptions/FEED-WAITS.ru.md).
