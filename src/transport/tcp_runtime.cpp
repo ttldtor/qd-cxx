@@ -113,6 +113,14 @@ std::expected<void, TcpDiagnostic> TcpRuntime::subscribe(protocol::SubscriptionM
     return impl_->subscribe(message, requests, work);
 }
 
+std::expected<void, TcpDiagnostic> detail::TcpRuntimeFactory::requestPause(TcpRuntime &runtime) noexcept {
+    if (!runtime.impl_) {
+        return std::unexpected(movedRuntimeDiagnostic());
+    }
+
+    return runtime.impl_->requestPause();
+}
+
 std::expected<void, TcpDiagnostic> TcpRuntime::requestClose() noexcept {
     if (!impl_) {
         return std::unexpected(movedRuntimeDiagnostic());

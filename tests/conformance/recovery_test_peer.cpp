@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: BSL-1.0
 #include "recovery_test_peer.hpp"
 
+#include "qd/protocol/frame_reader.hpp"
+
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -27,6 +29,7 @@
 namespace org::ttldtor::qdcxx::test {
 namespace {
 using Clock = std::chrono::steady_clock;
+constexpr std::size_t MAXIMUM_FRAME_PREFIX_BYTES = 9; ///< Maximum signed compact-length prefix.
 constexpr auto POLL_INTERVAL = std::chrono::milliseconds{10};
 constexpr std::size_t MAXIMUM_SESSIONS = 3;
 constexpr std::size_t MAXIMUM_BYTES = 4 * 1024 * 1024;
@@ -45,6 +48,16 @@ void closeSocket(Socket value) {
 
 bool wouldBlock(int code) {
     return code == WSAEWOULDBLOCK || code == WSAEINTR;
+}
+
+bool clientReset(int code) {
+#    ifdef _WIN32
+
+    return code == WSAECONNRESET;
+#    else
+
+    return code == ECONNRESET;
+#    endif
 }
 
 bool setNonblocking(Socket value) {
@@ -66,6 +79,16 @@ void closeSocket(Socket value) {
 
 bool wouldBlock(int code) {
     return code == EAGAIN || code == EWOULDBLOCK || code == EINTR;
+}
+
+bool clientReset(int code) {
+#    ifdef _WIN32
+
+    return code == WSAECONNRESET;
+#    else
+
+    return code == ECONNRESET;
+#    endif
 }
 
 bool setNonblocking(Socket value) {
@@ -98,6 +121,15 @@ bool validConfig(const TcpPeerConfig &config) {
     }
 
     for (const auto &script : config.sessions) {
+        if (script.waitForClientClose && script.waitForControllerClose) {
+            return false;
+        }
+
+        if (script.readThroughMessage &&
+            (*script.readThroughMessage < 0 || !script.expectedClientBytes.empty() || script.clientBytesToRead != 0)) {
+            return false;
+        }
+
         if (!script.expectedClientBytes.empty() && script.clientBytesToRead != 0 &&
             script.clientBytesToRead != script.expectedClientBytes.size()) {
             return false;
@@ -267,21 +299,50 @@ struct OwnedTcpPeer::Impl {
     }
 
     bool receiveBytes(Socket socket, const TcpPeerScript &script, std::size_t index) {
-        const auto required =
-            script.expectedClientBytes.empty() ? script.clientBytesToRead : script.expectedClientBytes.size();
+        const auto required = script.readThroughMessage ? config.maximumBytesPerSession - script.initialBytes.size() -
+                                                              script.replyBytes.size()
+                              : script.expectedClientBytes.empty() ? script.clientBytesToRead
+                                                                   : script.expectedClientBytes.size();
+        std::optional<protocol::FrameReader> reader;
+
+        if (script.readThroughMessage) {
+            reader.emplace(protocol::FrameLimits{required, required + MAXIMUM_FRAME_PREFIX_BYTES});
+        }
+
         std::array<std::byte, 16384> buffer{};
         std::size_t received = 0;
+        bool messageSeen = false;
 
-        while (received < required && waitReady(socket, false)) {
+        while (received < required && !messageSeen && waitReady(socket, false)) {
             const auto capacity = static_cast<int>(std::min(required - received, buffer.size()));
             const auto result = recv(socket, reinterpret_cast<char *>(buffer.data()), capacity, 0);
 
             if (result > 0) {
                 const auto count = static_cast<std::size_t>(result);
-                const std::lock_guard lock(mutex);
-                auto &capture = status.sessions[index].received;
-                capture.insert(capture.end(), buffer.begin(), buffer.begin() + result);
+                {
+                    const std::lock_guard lock(mutex);
+                    auto &capture = status.sessions[index].received;
+                    capture.insert(capture.end(), buffer.begin(), buffer.begin() + result);
+                }
+
                 received += count;
+
+                if (reader) {
+                    std::size_t offset = 0;
+
+                    while (offset < count && !messageSeen) {
+                        const auto framed = reader->feed(std::span(buffer).first(count).subspan(offset));
+
+                        if (framed.status == protocol::FrameStatus::FAILED || framed.accepted == 0) {
+                            fail(TcpPeerError::MISMATCH);
+
+                            return false;
+                        }
+
+                        offset += framed.accepted;
+                        messageSeen = framed.frame && framed.frame->type == script.readThroughMessage;
+                    }
+                }
             } else if (result == 0) {
                 fail(TcpPeerError::PEER_CLOSED);
 
@@ -297,7 +358,7 @@ struct OwnedTcpPeer::Impl {
             }
         }
 
-        if (received != required || !active()) {
+        if (!(script.readThroughMessage ? messageSeen : received == required) || !active()) {
             return false;
         }
 
@@ -370,6 +431,56 @@ struct OwnedTcpPeer::Impl {
         if (!active() || !sendBytes(connection.value, script.replyBytes, index, true))
             return false;
 
+        if (script.waitForClientClose) {
+            std::array<std::byte, 16384> bytes{};
+
+            while (waitReady(connection.value, false)) {
+                const auto count =
+                    recv(connection.value, reinterpret_cast<char *>(bytes.data()), static_cast<int>(bytes.size()), 0);
+
+                if (count == 0) {
+                    break;
+                }
+
+                if (count < 0) {
+                    const auto code = socketError();
+
+                    if (wouldBlock(code)) {
+                        continue;
+                    }
+
+                    if (clientReset(code)) {
+                        const std::lock_guard lock(mutex);
+                        status.sessions[index].clientCloseCode = code;
+                        break;
+                    }
+
+                    fail(TcpPeerError::SOCKET, code);
+
+                    return false;
+                }
+
+                bool exceeded = false;
+                {
+                    const std::lock_guard lock(mutex);
+                    auto &capture = status.sessions[index].received;
+                    const auto maximum =
+                        config.maximumBytesPerSession - script.initialBytes.size() - script.replyBytes.size();
+                    exceeded = static_cast<std::size_t>(count) > maximum - capture.size();
+
+                    if (!exceeded) {
+                        capture.insert(capture.end(), bytes.begin(), bytes.begin() + count);
+                    }
+                }
+
+                if (exceeded) {
+                    fail(TcpPeerError::MISMATCH);
+
+                    return false;
+                }
+            }
+        }
+
         while (script.waitForControllerClose && active()) {
             {
                 const std::lock_guard lock(mutex);
@@ -421,7 +532,10 @@ struct OwnedTcpPeer::Impl {
         for (std::size_t index = 0; index < config.sessions.size(); ++index) {
             const auto &script = config.sessions[index];
             status.sessions[index].received.reserve(
-                script.expectedClientBytes.empty() ? script.clientBytesToRead : script.expectedClientBytes.size());
+                script.readThroughMessage
+                    ? config.maximumBytesPerSession - script.initialBytes.size() - script.replyBytes.size()
+                : script.expectedClientBytes.empty() ? script.clientBytesToRead
+                                                     : script.expectedClientBytes.size());
         }
 
 #ifdef _WIN32

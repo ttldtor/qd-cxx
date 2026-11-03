@@ -163,7 +163,8 @@ enum class RecoveryPhase {
     STOPPING,    ///< Recovery-owned delivery/control work is retiring.
     CLOSED,      ///< Explicit stop and local retirement completed.
     EXHAUSTED,   ///< The finite lifetime attempt budget was consumed.
-    FAILED       ///< Terminal failure and local retirement completed.
+    FAILED,      ///< Terminal failure and local retirement completed.
+    SUSPENDED    ///< Explicit disconnect retired native input; stable queues/cache remain owned.
 };
 
 /** Detached local shutdown result, published only after owned native, event and queue retirement. */
@@ -187,6 +188,8 @@ struct RecoveryStatus {
     std::uint8_t convergedFamilies = 0;              ///< Exact locally admitted current-revision bits.
     bool stopped = false;                            ///< Monotonic public cutoff was requested.
     std::optional<RecoveryTerminal> terminal{};      ///< Frozen detached result after actual complete local quiescence.
+    bool sourceResetPending =
+        false; ///< Old source still needs reset before replacement; may retain cache while paused.
 };
 
 } // namespace org::ttldtor::qdcxx::transport

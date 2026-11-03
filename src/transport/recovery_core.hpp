@@ -90,6 +90,12 @@ class RecoveryBackend {
     virtual std::expected<void, RecoveryDiagnostic> heartbeat(protocol::LiveWork &work) = 0;
     /** Request-only native cutoff, including inside the adapter's provider callback. */
     virtual void abort() noexcept = 0;
+
+    /** Request an explicitly reusable plain pause; default adapters retain their ordinary abort policy. */
+    virtual void suspend() noexcept {
+        abort();
+    }
+
     /** Destroy the terminal runtime, completing actual private SDK/native owner disposal. */
     virtual void dispose() noexcept = 0;
     /** Inspect actual current facts without retaining a protocol owner.
@@ -138,6 +144,7 @@ class RecoveryCore {
     std::size_t family_ = 0;          ///< Fixed fair family cursor.
     std::size_t controlFamily_ = 0;   ///< Independent bounded offline/control-progress cursor.
     bool descriptor_ = false;         ///< The local initial descriptor was actually admitted in this attempt.
+    bool connectionFenced_ = false;   ///< Explicit nonterminal control blocks old native intake/output/delivery.
     bool cutoff_ = false;             ///< No new factory/input/output; only an active local drain may dispatch.
     bool executing_ = false;          ///< Reject recursive public progress without replacing active caller budgets.
     bool readinessExhausted_ = false; ///< A readiness change identity cannot wrap into an old value.
@@ -242,6 +249,15 @@ class RecoveryCore {
      * @return Detached status or transient pre-admission refusal.
      */
     std::expected<RecoveryStatus, RecoveryDiagnostic> poll(RecoveryTurnWork &work);
+    /** Fence old input while preserving stable queue owners.
+     * @param clear Request real cache/pending reset, without invalidating caller-owned immutable values.
+     * @return Acceptance or owner/state refusal; request-only and permitted inside an executing callback.
+     */
+    std::expected<void, RecoveryDiagnostic> requestDisconnect(bool clear) noexcept;
+    /** Request a fresh actual source attempt without resetting lifetime factory or ticket admission.
+     * @return Acceptance or owner/state/remaining-attempt refusal.
+     */
+    std::expected<void, RecoveryDiagnostic> requestReconnect() noexcept;
     /** Request-only monotonic cutoff; caller obeys the creating-thread precondition. */
     void cutoff() noexcept;
     /** Request stop with checked thread affinity, including from a consumer/provider callback.

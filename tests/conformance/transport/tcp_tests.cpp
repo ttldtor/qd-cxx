@@ -7,6 +7,7 @@
 #include "deadline.hpp"
 #include "dns_resolver.hpp"
 #include "runtime_bootstrap.hpp"
+#include "runtime_core.hpp"
 
 #include "qd/encoding/compact.hpp"
 #include "qd/encoding/utf_string.hpp"
@@ -1567,3 +1568,105 @@ TEST_CASE("a dispatched non-cancellation write failure survives abort before out
     CHECK(run.terminal()->pendingOutputBytes > 0);
 }
 #endif
+
+namespace {
+/** Complete one manually owned native handler without starting socket I/O.
+ * @param core Real runtime owner with no submitted operations.
+ * @param reading Exact input/output completion domain.
+ * @param error Actual category-tagged native result.
+ */
+void completePauseProbe(td::RuntimeCore &core, bool reading, asio::error_code error) {
+    core.pending = 1;
+
+    if (reading)
+        core.readPending = true;
+    else
+        core.writePending = true;
+
+    core.completed(reading, error, 0);
+    CHECK(core.pending == 0);
+    CHECK(core.callbackDepth == 0);
+}
+} // namespace
+
+TEST_CASE("actual plain pause orders owned cancellation after cutoff without erasing other evidence") {
+    auto bootstrap = t::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+
+    for (unsigned scenario = 0; scenario != 8; ++scenario) {
+        CAPTURE(scenario);
+        auto lease = td::BootstrapLease::acquire(*bootstrap);
+        REQUIRE(lease);
+        auto *state = lease->state();
+        td::RuntimeCore core(*state, std::move(*lease), options(1));
+        CHECK_FALSE(core.pauseCancellation);
+#ifdef _WIN32
+        const asio::error_code cancelled(ERROR_CONNECTION_ABORTED, asio::error::get_system_category());
+#else
+        const asio::error_code cancelled = asio::error::connection_aborted;
+#endif
+        const asio::error_code reset = asio::error::connection_reset;
+
+        if (scenario == 0) {
+            completePauseProbe(core, true, cancelled);
+            CHECK(core.outcome.primary.error == t::TcpError::READ_FAILURE);
+            REQUIRE(core.requestPause());
+            CHECK_FALSE(core.pauseCancellation);
+            CHECK(core.outcome.primary.nativeCode == cancelled.value());
+        } else if (scenario == 1) {
+            REQUIRE(core.requestPause());
+            CHECK(core.closeRequested);
+            CHECK(core.closeApplied);
+            CHECK(core.pauseCancellation);
+            completePauseProbe(core, true, cancelled);
+#ifdef _WIN32
+            CHECK(core.outcome.primary.error == t::TcpError::NONE);
+#else
+            CHECK(core.outcome.primary.error == t::TcpError::READ_FAILURE);
+#endif
+        } else if (scenario == 2) {
+            core.recordFailure({t::TcpError::PROTOCOL_FAILURE, "prior-protocol"});
+            core.recordFailure({t::TcpError::WRITE_FAILURE, "prior-secondary", 17});
+            REQUIRE(core.requestPause());
+            completePauseProbe(core, true, cancelled);
+            CHECK(core.outcome.primary.error == t::TcpError::PROTOCOL_FAILURE);
+            CHECK(core.outcome.primary.stage == "prior-protocol");
+            CHECK(core.outcome.secondary.stage == "prior-secondary");
+            CHECK(core.outcome.secondary.nativeCode == 17);
+        } else if (scenario == 3) {
+            REQUIRE(core.requestClose());
+            CHECK_FALSE(core.pauseCancellation);
+            completePauseProbe(core, true, cancelled);
+            CHECK(core.outcome.primary.error == t::TcpError::READ_FAILURE);
+            CHECK(core.outcome.primary.nativeCode == cancelled.value());
+        } else if (scenario == 4) {
+            REQUIRE(core.requestPause());
+            completePauseProbe(core, true, reset);
+            CHECK(core.outcome.primary.error == t::TcpError::READ_FAILURE);
+            CHECK(core.outcome.primary.nativeCode == reset.value());
+        } else if (scenario == 5) {
+            REQUIRE(core.requestPause());
+            completePauseProbe(core, false, cancelled);
+            CHECK(core.outcome.primary.error == t::TcpError::WRITE_FAILURE);
+            CHECK(core.outcome.primary.nativeCode == cancelled.value());
+        } else if (scenario == 6) {
+            REQUIRE(core.requestPause());
+            // WSAECONNABORTED is distinct from the owned ERROR_CONNECTION_ABORTED system result.
+            completePauseProbe(core, true, asio::error::connection_aborted);
+            CHECK(core.outcome.primary.error == t::TcpError::READ_FAILURE);
+        } else {
+            std::optional<t::TcpDiagnostic> rejection;
+            std::thread wrong([&] {
+                const auto result = core.requestPause();
+
+                if (!result)
+                    rejection = result.error();
+            });
+            wrong.join();
+            REQUIRE(rejection);
+            CHECK(rejection->error == t::TcpError::WRONG_THREAD);
+            CHECK_FALSE(core.pauseCancellation);
+            CHECK_FALSE(core.closeRequested);
+        }
+    }
+}

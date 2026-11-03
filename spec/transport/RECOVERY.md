@@ -64,6 +64,44 @@ above; controlled-host premises remain required through retirement.
 Recovery exposes detached status and queue batches;
 no raw `LiveEvent`, live-session snapshot or native runtime escapes the owner.
 
+## Explicit plain pause and restart
+
+`TcpRecovery::requestDisconnect(clear)` fences native input and retires its actual
+attempt while retaining the same Core, queues, registrations and desired interests.
+It is owner-thread checked and allowed from a consumer callback; no application
+callback runs inline. `poll()` must fund the continuing disposal/reset work.
+`SUSPENDED` is nonterminal native quiescence. Without clear, already projected cache
+remains eligible for offline cached replay with its original queue epoch. Old
+undecided decoded input is released, never relabelled as a fresh source.
+Adopted queues receive the generic funded pending-source cutoff before staging;
+committed cache remains owned. The lower-owner action establishes that cache
+boundary; an already begun nonpreemptible projection may finish. Work exhaustion
+keeps pending disposal/admission fences live. See [queue source-offer disposal](../mux/QUEUES.md#discarding-an-uncommitted-source-offer).
+
+Offline progress distinguishes actual cached INITIAL construction from old queued
+source/live/initial notification. Only newly built retained-cache INITIAL records
+can start callbacks; old STREAM FIFO and queued TICKER updates/initials cannot be
+relabeled as replay. The immutable local origin gate survives final drain after
+pause. Ordinary active/default TLS and close-without-pause behavior remain unchanged.
+With clear, actual queue reset and client/global ACK are required before
+`sourceResetPending` becomes false. A later independent clear after completion
+starts a new actual reset/epoch/notice/ACK cycle; per-family admission flags cannot
+borrow the earlier successful global ACK. Unfinished clear requests may coalesce. An accepted clear fences subsequent stale
+selection immediately; state alone is not its completion barrier. Reset does not
+invalidate caller-retained immutable batches or refund their original record/batch
+charges. `requestReconnect()` resets the old source before actual replacement
+factory entry, resetting replay convergence even for unchanged desired membership.
+It cannot replenish actual attempts, work or action identities. Remaining-attempt
+exhaustion rejects before mutation; final stop/drain supersedes an outstanding clear
+without waiting for an application reset ACK. See [public lifecycle](../subscriptions/FEED-LIFECYCLE.md).
+
+Only this explicit reusable plain intent classifies a Windows
+`ERROR_CONNECTION_ABORTED` read completion from its subsequently owned cutoff as
+expected cancellation. A failure/close already observed before the pause is not
+reclassified. Prior primary/secondary, other read/write errors and fatal failures
+remain evidence. Ordinary `requestClose()`/final drain and TLS defaults retain
+their existing diagnostic policy, including ambiguous Windows final-close errors.
+A new actual native owner starts with no inherited pause classification.
 ## Local admitted-prefix drain and terminal evidence
 
 `requestDrain(deadline)` requests drain of the **local queue-admitted delivery

@@ -21,6 +21,12 @@ struct TcpRuntimeFactory {
     create(const BootstrapLease &lease, core::LocalSchema &&schema, protocol::SubscriptionWriter &&composer,
            protocol::LiveLimits sessionLimits, TcpOptions options, protocol::LiveWork &work);
 
+    /** Fence a plain attempt for reuse, classifying only its subsequent owned local read cancellation.
+     * @param runtime Existing owner; no state is allocated or transferred.
+     * @return Existing owner-thread/moved rejection or accepted native cutoff.
+     */
+    [[nodiscard]] static std::expected<void, TcpDiagnostic> requestPause(TcpRuntime &runtime) noexcept;
+
     private:
     friend class transport::TcpRuntime;
     /** Shared implementation; nullable State preserves public factory failure ordering.

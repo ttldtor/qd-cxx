@@ -92,6 +92,13 @@ struct SubscriptionPort {
     Diagnostic diagnostic;                                   ///< First retained asynchronous failure.
 };
 
+/** One complete selected endpoint observation; storage is preallocated, including an executing lease. */
+struct EndpointStateChange {
+    EndpointState previous = EndpointState::NOT_CONNECTED; ///< Actual preceding published state.
+    EndpointState current = EndpointState::NOT_CONNECTED;  ///< Actual newly published state.
+    std::shared_ptr<const ListenerSnapshot> listeners;     ///< Complete immutable selection, released outside locks.
+};
+
 /** Producer-only endpoint state; native lifetime is exclusively worker-owned. */
 struct EndpointPort {
     mutable std::mutex mutex;                 ///< Protects bounded registration/address and detached observation state.
@@ -103,12 +110,21 @@ struct EndpointPort {
     EndpointOptions options; ///< Finite immutable endpoint policy.
     std::vector<std::shared_ptr<SubscriptionPort>> subscriptions; ///< Fixed slots, including retiring registrations.
     StateListeners stateListeners; ///< Opt-in advisory lifecycle observations, retired after all subscriptions.
-    std::shared_ptr<const ListenerSnapshot> connectingListeners; ///< One producer-published CONNECTING selection.
-    bool connectingNotification = false; ///< Deferred first transition, dispatched before every worker exit path.
-    std::string address;                 ///< First accepted bounded spelling; immutable after connect publication.
-    std::string host;                    ///< Validated bounded route, copied only once before worker publication.
-    std::uint16_t port = 0;              ///< Original nonzero route port.
-    bool connectRequested = false;       ///< Published once under the endpoint mutex.
+    std::vector<EndpointStateChange> stateChanges; ///< Fixed ring; selection lease remains charged through release.
+    std::size_t stateChangeHead = 0;     ///< Oldest pending/executing entry, reused only after its lease release.
+    std::size_t stateChangeCount = 0;    ///< Pending, executing and selection-retiring entries together.
+    bool stateChangeDispatching = false; ///< The sole owner has moved the head selection outside the mutex.
+    bool connectionIntent = false; ///< Latest admitted logical transport intent; physical application can coalesce.
+    std::uint64_t connectionRevision = 0;     ///< Checked control/delivery fence identity, never reused.
+    std::uint64_t activeDeliveryRevision = 0; ///< Revision tagged only at a real fresh attempt after source reset.
+    std::uint64_t pausedReplayFence =
+        0; ///< Local cached replay authorization after native quiescence; not data provenance.
+    std::uint64_t clearRevision = 0;   ///< Latest accepted logical clear; all new data/read selections are fenced.
+    std::uint64_t clearedRevision = 0; ///< Latest actual applied reset/global-ACK completion, not inferred from state.
+    std::string address;               ///< First accepted bounded spelling; immutable after connect publication.
+    std::string host;                  ///< Validated bounded route, copied only once before worker publication.
+    std::uint16_t port = 0;            ///< Original nonzero route port.
+    bool connectRequested = false;     ///< Published once under the endpoint mutex.
     std::atomic<std::chrono::steady_clock::duration::rep> closeDeadline{0}; ///< First admitted absolute drain deadline.
     std::atomic<bool> closeRequested{false};                                ///< Reserved monotonic drain admission.
     std::atomic<bool> retired{false};           ///< Native owner and all captures have retired.

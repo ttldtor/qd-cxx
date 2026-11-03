@@ -106,3 +106,76 @@ TEST_CASE("plain recovery cancels a long backoff without entering another factor
     peer.stop();
     CHECK_FALSE(peer.snapshot().sessions[1].accepted);
 }
+
+TEST_CASE("plain recovery explicit disconnect suspends without a fake failure and resumes the same stable owner") {
+    auto bootstrap = t::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    root::test::TcpPeerConfig peerConfig;
+    peerConfig.sessions.resize(2);
+
+    for (auto &script : peerConfig.sessions) {
+        script.initialBytes = r::ready();
+        script.waitForControllerClose = true;
+    }
+
+    root::test::OwnedTcpPeer peer(std::move(peerConfig));
+    REQUIRE(peer.port() != 0);
+    auto local = r::schema();
+    auto endpoint = r::endpoint(local, r::settings(peer.port(), 2));
+    auto blueprint = r::blueprint();
+    auto options = r::options();
+    auto preparation = r::preparation();
+    t::RecoveryQueues queues;
+    auto owner =
+        t::TcpRecovery::create(*bootstrap, endpoint, std::move(blueprint), std::move(queues), options, preparation);
+    REQUIRE(owner);
+    REQUIRE(owner->start());
+    auto cutoff = std::chrono::steady_clock::now() + 2s;
+
+    while (owner->status().phase != t::RecoveryPhase::ACTIVE && std::chrono::steady_clock::now() < cutoff) {
+        auto work = r::turn();
+        REQUIRE(owner->poll(work));
+        std::this_thread::sleep_for(1ms);
+    }
+
+    REQUIRE(owner->status().phase == t::RecoveryPhase::ACTIVE);
+    CHECK(owner->status().attempts == 1);
+    REQUIRE(owner->requestDisconnect());
+    cutoff = std::chrono::steady_clock::now() + 2s;
+
+    while (owner->status().phase != t::RecoveryPhase::SUSPENDED && std::chrono::steady_clock::now() < cutoff) {
+        auto work = r::turn();
+        REQUIRE(owner->poll(work));
+        std::this_thread::sleep_for(1ms);
+    }
+
+    const auto paused = owner->status();
+    CAPTURE(paused.first.stage);
+    CAPTURE(paused.first.transport.error);
+    REQUIRE(paused.phase == t::RecoveryPhase::SUSPENDED);
+    CHECK(paused.first.error == t::RecoveryError::NONE);
+    CHECK_FALSE(paused.terminal);
+    CHECK(paused.attempts == 1);
+    peer.allowClose(0);
+    REQUIRE(owner->requestReconnect());
+    cutoff = std::chrono::steady_clock::now() + 2s;
+
+    while (owner->status().phase != t::RecoveryPhase::ACTIVE && std::chrono::steady_clock::now() < cutoff) {
+        auto work = r::turn();
+        REQUIRE(owner->poll(work));
+        std::this_thread::sleep_for(1ms);
+    }
+
+    REQUIRE(owner->status().phase == t::RecoveryPhase::ACTIVE);
+    CHECK(owner->status().attempts == 2);
+    CHECK(owner->status().first.error == t::RecoveryError::NONE);
+    CHECK(owner->status().first.stage == "none");
+    const auto refused = owner->requestReconnect();
+    REQUIRE_FALSE(refused);
+    CHECK(refused.error().error == t::RecoveryError::RESOURCE_LIMIT);
+    r::stop(*owner);
+    peer.stop();
+    const auto snapshot = peer.snapshot();
+    CHECK(snapshot.sessions[0].accepted);
+    CHECK(snapshot.sessions[1].accepted);
+}

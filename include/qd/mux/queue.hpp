@@ -596,6 +596,13 @@ class MuxQueue {
      */
     explicit MuxQueue(StateOwner state) noexcept;
 
+    /** Share one finite scheduler with explicit callback-origin eligibility.
+     * @param work Actual caller credits, never replenished.
+     * @param retainedOnly Admit only newly projected cached INITIAL records to callbacks.
+     * @return Existing fair progress result or unchanged typed error.
+     */
+    std::expected<QueueProgress, QueueFailure> progressImpl(QueueWork &work, bool retainedOnly);
+
     public:
     /** Transfer serialized ownership.
      * @param other Source made empty.
@@ -695,6 +702,15 @@ class MuxQueue {
      * @return Actual progress or nonterminal typed rejection.
      */
     std::expected<QueueProgress, QueueFailure> progress(QueueWork &work);
+    /** Progress retained cache while the composing owner fences fresh source input.
+     * Only actual cached INITIAL projections constructed by this mode can start callbacks. Previously queued
+     * source/live/initial records are discarded with genuine work/gap accounting, never relabelled as replay.
+     * Caller-retained batches and source identity remain unchanged. An already executing callback may finish.
+     * Serialized owner use; no wait, thread, wire flag or business EventSource is introduced.
+     * @param work Remaining actual turn credits; exhaustion preserves the unconsumed queue prefix.
+     * @return Existing fair progress result or typed refusal; no budget or lease charge is refunded.
+     */
+    std::expected<QueueProgress, QueueFailure> progressRetainedCache(QueueWork &work);
     /** Request context-wide stop without iterating/cleaning inline.
      * Graceful stop attempts to drain admitted projections, including unfinished staging/routing.
      * The terminal outcome records actual drain, abort or failure.
@@ -704,12 +720,20 @@ class MuxQueue {
      * @param mode Graceful or escalating abort; allowed from its callback.
      */
     void requestStop(StopMode mode) noexcept;
-    /** Accept/coalesce a phased source reset while retaining registration and desired identities.
-     * STREAM explicitly unpins its old source in place; TICKER/HISTORY retain actual reset/ACK behavior.
-     * Acceptance cuts off later old-source admission and callback dispatch before returning.
-     * @param work Bounded request-publication credits.
-     * @return Accepted request, never synchronous reset/ACK completion.
+    /** Request funded disposal of the current uncommitted source offer while preserving committed cache.
+     * Serialized owner use, including its callback; no allocation, callback, disposal or epoch reset occurs inline.
+     * Later progress releases pending input before staging/callbacks and rejects new admission until complete.
+     * Already committed projections, registrations, source identity and caller-owned leases remain unchanged.
+     * Exhausted progress work keeps this request pending; no quota/work is refunded. Empty/terminal is a no-op.
      */
+    void
+    requestDiscardPendingSource() noexcept; /** Accept/coalesce a phased source reset while retaining registration and
+                                             * desired identities. STREAM explicitly unpins its old source in place;
+                                             * TICKER/HISTORY retain actual reset/ACK behavior. Acceptance cuts off
+                                             * later old-source admission and callback dispatch before returning.
+                                             * @param work Bounded request-publication credits.
+                                             * @return Accepted request, never synchronous reset/ACK completion.
+                                             */
     std::expected<ResetAdmission, QueueFailure> resetSource(QueueWork &work);
     /** Copy current reset phase without advancing it.
      * @return Detached phase/commit/ACK evidence.

@@ -804,12 +804,15 @@ struct QueueRecord {
     std::unique_ptr<std::byte[], BlockDelete<std::byte>> arena; ///< Full exact accounted requested arena.
     std::size_t arenaSize = 0;                                  ///< Whole requested arena capacity.
     MuxRecordView view;                                         ///< Pure detached immutable projection.
+    const bool retainedInitial; ///< Actual cached INITIAL built in retained progress; never changed after construction.
 
     /** Bind the eventual arena deallocator without allocating data.
      * @param source Pure record accounting.
+     * @param retainedInitial Immutable actual cached-INITIAL eligibility, assigned only at construction.
      */
-    explicit QueueRecord(BudgetLease source)
-        : budget(source), arena(nullptr, BlockDelete<std::byte>{clientScope(source, AllocationTag::ARENA), 0, false}) {
+    explicit QueueRecord(BudgetLease source, bool retainedInitial = false)
+        : budget(source), arena(nullptr, BlockDelete<std::byte>{clientScope(source, AllocationTag::ARENA), 0, false}),
+          retainedInitial(retainedInitial) {
     }
 };
 
@@ -1371,8 +1374,9 @@ struct MuxQueue::State {
         ROUTING,      ///< The STREAM source prefix is still routing atomically.
         RELEASE_ONLY, ///< Only serialized owner disposal remains.
     };
-    Pending pendingPhase = Pending::NONE;                 ///< Explicit accepted-event continuation.
-    std::size_t pendingRecords = 0;                       ///< Actual source records accepted.
+    Pending pendingPhase = Pending::NONE; ///< Explicit accepted-event continuation.
+    bool discardPendingSource = false;    ///< Request-only cutoff, retained through funded pending disposal.
+    std::size_t pendingRecords = 0;       ///< Actual source records accepted.
     std::optional<protocol::LiveIdentity> sourceIdentity; ///< Serialized pinned actual source epoch.
     QueueState state = QueueState::OPEN;                  ///< Local context lifecycle.
     QueueCounts counts;                                   ///< Context evidence.
@@ -1743,6 +1747,7 @@ struct MuxQueue::State {
      * @param raw Optional true raw provenance.
      * @param trigger Optional actual HISTORY trigger.
      * @param work Copy/initialization/disposal credits.
+     * @param retainedInitial Actual cached INITIAL constructed in retained-cache progress, never a retagged FIFO.
      * @return Unpublished complete detached candidate.
      */
     template <class Field>
@@ -1750,7 +1755,7 @@ struct MuxQueue::State {
     record(Client &c, core::SubscriptionKey key, std::optional<std::int64_t> time, std::int32_t flags,
            std::span<const std::int32_t> legacy, std::span<const Field> fields, MuxMembership membership,
            std::uint64_t sourceRevision, std::optional<RawSourceMetadata> raw,
-           std::optional<collectors::HistorySourceMetadata> trigger, QueueWork &work) {
+           std::optional<collectors::HistorySourceMetadata> trigger, QueueWork &work, bool retainedInitial = false) {
         auto &l = c.port->budget->limits;
         const auto fieldCount = sum(legacy.size(), fields.size());
         std::size_t units = 0, bytes = 0;
@@ -1794,7 +1799,7 @@ struct MuxQueue::State {
         spend(work, sum(fieldCount, 4), product(fieldCount, 2), product(sum(units, key.symbol.size()), 3),
               sum(product(charge, 3), product(bytes, 2)));
         auto out = detail::shared<detail::QueueRecord>(
-            detail::clientScope(c.port->budget, detail::AllocationTag::RECORD), c.port->budget);
+            detail::clientScope(c.port->budget, detail::AllocationTag::RECORD), c.port->budget, retainedInitial);
         out->arenaSize = l.recordArenaBytes;
         const auto arenaScope = detail::clientScope(c.port->budget, detail::AllocationTag::ARENA);
         auto *memory = detail::QueueAllocator<std::byte>{arenaScope}.allocate(l.recordArenaBytes);
@@ -1880,9 +1885,10 @@ struct MuxQueue::State {
     /** Prepare/copy/pop one actual TICKER or HISTORY projection atomically.
      * @param c Current serialized registration.
      * @param work Complete caller credits, including candidate disposal.
+     * @param retainedOnly Route/select only newly constructed cached initial projections for callbacks.
      * @return Whether the phase advanced, or typed rejection without fabricated completion.
      */
-    std::expected<bool, QueueFailure> route(Client &c, QueueWork &work);
+    std::expected<bool, QueueFailure> route(Client &c, QueueWork &work, bool retainedOnly);
     /** Atomically prepare all clients before acknowledging one actual STREAM source chunk.
      * @param work Complete fanout, source ACK and candidate cleanup credits.
      * @return Committed routing, no action, or typed rejection with source prefix preserved.
@@ -1891,9 +1897,10 @@ struct MuxQueue::State {
     /** Build one immutable batch and hold its callable through return/catch.
      * @param c Current serialized registration.
      * @param work Complete caller credits, including candidate disposal.
+     * @param retainedOnly Route/select only newly constructed cached initial projections for callbacks.
      * @return Whether the phase advanced, or typed rejection without fabricated completion.
      */
-    std::expected<bool, QueueFailure> callback(Client &c, QueueWork &work);
+    std::expected<bool, QueueFailure> callback(Client &c, QueueWork &work, bool retainedOnly);
     /** Apply or cancel one whole accepted ordinary command.
      * @param c Current serialized registration.
      * @param work Complete caller credits, including candidate disposal.
@@ -1903,9 +1910,10 @@ struct MuxQueue::State {
     /** Retire one finite client source/queue/command/callable cleanup phase.
      * @param c Current serialized registration.
      * @param work Complete caller credits, including candidate disposal.
+     * @param retainedOnly Preserve the actual pause origin fence during graceful source cleanup.
      * @return Whether the phase advanced, or typed rejection without fabricated completion.
      */
-    std::expected<bool, QueueFailure> close(Client &c, QueueWork &work);
+    std::expected<bool, QueueFailure> close(Client &c, QueueWork &work, bool retainedOnly);
     /** Advance one accepted continuing reset phase, preserving an actual committed reset across ACK yield.
      * @param work Exact current phase/source credits.
      * @return Real phase evidence, or typed nonterminal yield/failure.
@@ -2514,7 +2522,7 @@ std::expected<bool, QueueFailure> MuxQueue::State::command(Client &c, QueueWork 
     return true;
 }
 
-std::expected<bool, QueueFailure> MuxQueue::State::route(Client &c, QueueWork &work) {
+std::expected<bool, QueueFailure> MuxQueue::State::route(Client &c, QueueWork &work, bool retainedOnly) {
     if (stream || c.sync || c.sourceClosed || (c.closing && c.stopMode == 2)) {
         return false;
     }
@@ -2556,7 +2564,8 @@ std::expected<bool, QueueFailure> MuxQueue::State::route(Client &c, QueueWork &w
                     const RawSourceMetadata raw{r.senderId,    r.cipher,    r.eventFlags,
                                                 r.removalTime, r.fieldTime, o.value.bindingGeneration};
                     value = record(c, {r.context, r.symbol}, {}, o.deliveryFlags, r.values, r.typedValues, m->mux,
-                                   o.revision, raw, {}, work);
+                                   o.revision, raw, {}, work,
+                                   retainedOnly && o.kind == collectors::TickerDeliveryKind::INITIAL);
                 } catch (QueueError e) {
                     if (e != QueueError::RESOURCE_LIMIT) {
                         throw;
@@ -2620,7 +2629,8 @@ std::expected<bool, QueueFailure> MuxQueue::State::route(Client &c, QueueWork &w
                     }
 
                     value = record(c, {r.context, r.symbol}, r.rawTime, r.eventFlags, legacy, r.fields, m->mux,
-                                   o.admissionRevision, raw, o.trigger, work);
+                                   o.admissionRevision, raw, o.trigger, work,
+                                   retainedOnly && o.kind == collectors::HistoryDeliveryKind::INITIAL);
                 } catch (QueueError e) {
                     if (e != QueueError::RESOURCE_LIMIT) {
                         throw;
@@ -2798,7 +2808,7 @@ std::expected<bool, QueueFailure> MuxQueue::State::routeStream(QueueWork &work) 
     }
 }
 
-std::expected<bool, QueueFailure> MuxQueue::State::callback(Client &c, QueueWork &work) {
+std::expected<bool, QueueFailure> MuxQueue::State::callback(Client &c, QueueWork &work, bool retainedOnly) {
     if (!c.size || c.sync || c.paused || !c.consumer || reset.phase != ResetPhase::NONE ||
         c.port->advertisedNotice.load() || (c.closing && c.stopMode == 2) || c.port->stop.load() == 2) {
         return false;
@@ -2811,6 +2821,20 @@ std::expected<bool, QueueFailure> MuxQueue::State::callback(Client &c, QueueWork
               sum(sum(sizeof(Client), product(sizeof(QueueCounts), 2)),
                   product(product(c.size, 3),
                           sum(sizeof(std::shared_ptr<const detail::QueueRecord>), sizeof(std::uint8_t)))));
+        constexpr std::uint8_t WITHDRAWN = 0;
+        constexpr std::uint8_t SELECTED = 1;
+        constexpr std::uint8_t FENCED = 2;
+        auto dropUnselected = [&](std::uint8_t selection) {
+            const bool fenced = selection == FENCED;
+
+            if (fenced) {
+                c.hadGap = true;
+                c.epochGap = true;
+                hadGap = true;
+            }
+
+            drop(c, !fenced);
+        };
         std::size_t prefix = 0, selected = 0;
 
         // Read-only selection first: work failure cannot withdraw an earlier queue prefix.
@@ -2822,16 +2846,16 @@ std::expected<bool, QueueFailure> MuxQueue::State::callback(Client &c, QueueWork
                 return std::unexpected(sourceFailure(current.error()));
             }
 
-            c.selection[prefix] = *current ? 1 : 0;
+            c.selection[prefix] = !*current ? WITHDRAWN : retainedOnly && !r->retainedInitial ? FENCED : SELECTED;
 
-            if (*current) {
+            if (c.selection[prefix] == SELECTED) {
                 ++selected;
             }
         }
 
         if (!selected) {
             for (std::size_t i = 0; i < prefix; ++i) {
-                drop(c, true);
+                dropUnselected(c.selection[i]);
             }
 
             return prefix != 0;
@@ -2855,7 +2879,7 @@ std::expected<bool, QueueFailure> MuxQueue::State::callback(Client &c, QueueWork
         for (std::size_t i = 0; i < prefix; ++i) {
             const auto &r = c.records[(c.head + i) % c.records.size()];
 
-            if (c.selection[i]) {
+            if (c.selection[i] == SELECTED) {
                 batch->roots.push_back(r);
                 batch->views.push_back(r->view);
             }
@@ -2874,7 +2898,7 @@ std::expected<bool, QueueFailure> MuxQueue::State::callback(Client &c, QueueWork
                 c.head = (c.head + 1) % c.records.size();
                 --c.size;
             } else {
-                drop(c, true);
+                dropUnselected(c.selection[i]);
             }
         }
 
@@ -2927,7 +2951,7 @@ std::expected<bool, QueueFailure> MuxQueue::State::callback(Client &c, QueueWork
     }
 }
 
-std::expected<bool, QueueFailure> MuxQueue::State::close(Client &c, QueueWork &work) {
+std::expected<bool, QueueFailure> MuxQueue::State::close(Client &c, QueueWork &work, bool retainedOnly) {
     if (!c.closing) {
         return false;
     }
@@ -2966,7 +2990,7 @@ std::expected<bool, QueueFailure> MuxQueue::State::close(Client &c, QueueWork &w
             }
 
             if (!stream) {
-                auto routed = route(c, work);
+                auto routed = route(c, work, retainedOnly);
 
                 if (!routed || *routed)
                     return routed;
@@ -3555,7 +3579,8 @@ std::expected<QueueAdmission, QueueFailure> MuxQueue::admit(protocol::LiveEvent 
         if (s.state != QueueState::OPEN || s.stopMode)
             throw QueueError::CLOSING;
 
-        if (s.pendingPhase != State::Pending::NONE || !s.canAdmit || s.reset.phase != ResetPhase::NONE || s.unionDirty)
+        if (s.discardPendingSource || s.pendingPhase != State::Pending::NONE || !s.canAdmit ||
+            s.reset.phase != ResetPhase::NONE || s.unionDirty)
             throw QueueError::BUSY;
 
         spend(work, s.clients.size() + 2, 0, 0, sizeof(protocol::LiveEvent));
@@ -3616,6 +3641,12 @@ std::expected<QueueAdmission, QueueFailure> MuxQueue::admit(protocol::LiveEvent 
     }
 }
 
+void MuxQueue::requestDiscardPendingSource() noexcept {
+    if (state_ && !state_->terminal) {
+        state_->discardPendingSource = true;
+    }
+}
+
 void MuxQueue::requestStop(StopMode mode) noexcept {
     if (!state_ || state_->terminal)
         return;
@@ -3628,6 +3659,14 @@ void MuxQueue::requestStop(StopMode mode) noexcept {
 }
 
 std::expected<QueueProgress, QueueFailure> MuxQueue::progress(QueueWork &work) {
+    return progressImpl(work, false);
+}
+
+std::expected<QueueProgress, QueueFailure> MuxQueue::progressRetainedCache(QueueWork &work) {
+    return progressImpl(work, true);
+}
+
+std::expected<QueueProgress, QueueFailure> MuxQueue::progressImpl(QueueWork &work, bool retainedOnly) {
     try {
         debit(work.operations, 1);
 
@@ -3643,6 +3682,16 @@ std::expected<QueueProgress, QueueFailure> MuxQueue::progress(QueueWork &work) {
             return QueueProgress{QueueProgressKind::TERMINAL, QueueState::TERMINAL};
 
         spend(work, 3, 0, 0, sum(product(sum(sizeof(s.cursor), sizeof(s.phase)), 2), sizeof(s.canAdmit)));
+
+        if (s.discardPendingSource) {
+            const bool uncommitted =
+                s.pendingPhase == State::Pending::UNSTAGED || s.pendingPhase == State::Pending::ROUTING;
+            s.releasePending(work, uncommitted);
+            // Commit only after complete funded disposal; WORK_LIMIT leaves the cutoff/admission fence live.
+            s.discardPendingSource = false;
+
+            return QueueProgress{QueueProgressKind::RELEASED, s.state};
+        }
 
         if (s.reset.phase != ResetPhase::NONE && s.reset.phase != ResetPhase::FAILED && !s.stopMode)
             return s.resetStep(work);
@@ -3796,7 +3845,7 @@ std::expected<QueueProgress, QueueFailure> MuxQueue::progress(QueueWork &work) {
                 if (s.cursor == 0)
                     action = s.routeStream(work);
             } else if (c && !c->closing)
-                action = s.route(*c, work);
+                action = s.route(*c, work, retainedOnly);
 
             kind = QueueProgressKind::ROUTED;
         } else if (activePhase == 1) {
@@ -3806,12 +3855,12 @@ std::expected<QueueProgress, QueueFailure> MuxQueue::progress(QueueWork &work) {
             kind = QueueProgressKind::COMMAND;
         } else if (activePhase == 2) {
             if (c)
-                action = s.callback(*c, work);
+                action = s.callback(*c, work, retainedOnly);
 
             kind = QueueProgressKind::CALLBACK;
         } else if (activePhase == 3) {
             if (c && c->closing)
-                action = s.close(*c, work);
+                action = s.close(*c, work, retainedOnly);
 
             kind = QueueProgressKind::CLEANUP;
 

@@ -72,6 +72,46 @@ void RecoveryState::requestStart() noexcept {
     }
 }
 
+void RecoveryState::requestDisconnect(bool resetSources) noexcept {
+    if (stopRequested_ || terminalPhase(phase_)) {
+        return;
+    }
+
+    explicitControl_ = true;
+    suspendRequested_ = true;
+    startRequested_ = false;
+    controlChanged_ = true;
+    controlReset_ = controlReset_ || resetSources;
+
+    if (resetSources) {
+        resetComplete_ = config_.families == 0;
+    }
+
+    retryDeadline_.reset();
+    receiveDeadline_.reset();
+    heartbeatDeadline_.reset();
+}
+
+void RecoveryState::requestReconnect() noexcept {
+    if (stopRequested_ || terminalPhase(phase_)) {
+        return;
+    }
+
+    explicitControl_ = true;
+    suspendRequested_ = false;
+    startRequested_ = true;
+    controlChanged_ = true;
+
+    if (sourceUsed_) {
+        controlReset_ = true;
+        resetComplete_ = config_.families == 0;
+    }
+
+    retryDeadline_.reset();
+    receiveDeadline_.reset();
+    heartbeatDeadline_.reset();
+}
+
 void RecoveryState::requestStop() noexcept {
     stopRequested_ = true;
     retryDeadline_.reset();
@@ -111,7 +151,7 @@ void RecoveryState::fail(RecoveryCause cause, bool retryable) noexcept {
 
 bool RecoveryState::eligible() const noexcept {
     return attemptPresent_ && attemptStarted_ && facts_.transportEligible && facts_.authenticationEligible &&
-           protocolObserved_ && !facts_.negotiationPending && !recovering_ && !stopRequested_;
+           protocolObserved_ && !facts_.negotiationPending && !recovering_ && !stopRequested_ && !explicitControl_;
 }
 
 void RecoveryState::rotate(RecoveryAction action) noexcept {
@@ -176,6 +216,10 @@ RecoveryStep RecoveryState::observe(RecoveryClock::time_point now, const Recover
 
         --work.transitions;
         ++attempts_; // PREPARE is issued only while attempts_ < the finite uint32 maximumAttempts.
+        explicitControl_ = false;
+        controlReset_ = false;
+        controlChanged_ = false;
+        sourceUsed_ = true;
         factoryEntered_ = true;
         facts_ = {};
         protocolObserved_ = false;
@@ -316,6 +360,7 @@ RecoveryStep RecoveryState::observe(RecoveryClock::time_point now, const Recover
         break;
     case RecoveryAction::RESET_SOURCES:
         resetComplete_ = true;
+        sourceUsed_ = false;
         break;
     case RecoveryAction::STOP_DELIVERY:
         deliveryStopped_ = true;
@@ -335,11 +380,11 @@ RecoveryStep RecoveryState::observe(RecoveryClock::time_point now, const Recover
             protocolObserved_ = true;
         }
 
-        if (facts_.terminal && !recovering_ && !stopRequested_) {
+        if (facts_.terminal && !recovering_ && !stopRequested_ && !explicitControl_) {
             fail(RecoveryCause::TRANSPORT, true);
         }
 
-        if (!recovering_ && !stopRequested_) {
+        if (!recovering_ && !stopRequested_ && !explicitControl_) {
             if (config_.protocolInactivity && facts_.transportEligible &&
                 (!receiveDeadline_ || observation.input != RecoveryInput::NONE)) {
                 receiveDeadline_ = deadlineAfter(now, *config_.protocolInactivity);
@@ -363,6 +408,40 @@ RecoveryStep RecoveryState::observe(RecoveryClock::time_point now, const Recover
 }
 
 RecoveryAction RecoveryState::choose(RecoveryClock::time_point now) noexcept {
+    if (explicitControl_ && !stopRequested_ && (!recovering_ || retryable_)) {
+        if (attemptPresent_) {
+            phase_ = RecoveryPhase::RETIRING;
+
+            if (facts_.terminal) {
+                return RecoveryAction::DISPOSE_ATTEMPT;
+            }
+
+            return abortRequested_ ? RecoveryAction::POLL_ATTEMPT : RecoveryAction::REQUEST_ABORT;
+        }
+
+        if (controlReset_ && !resetComplete_ && !resetFailed_) {
+            phase_ = RecoveryPhase::RESETTING;
+
+            return RecoveryAction::RESET_SOURCES;
+        }
+
+        if (suspendRequested_) {
+            phase_ = RecoveryPhase::SUSPENDED;
+
+            // Only the stable queue remains: cached initial/update projection is independent of native eligibility.
+            return facts_.deliveryPending ? RecoveryAction::DELIVER : RecoveryAction::NONE;
+        }
+
+        if (!resetFailed_ && attempts_ < config_.maximumAttempts) {
+            phase_ = RecoveryPhase::PREPARING;
+
+            return RecoveryAction::PREPARE_ATTEMPT;
+        }
+
+        // A requested restart cannot replenish lifetime factory admission or conceal a failed source reset.
+        fail(resetFailed_ ? RecoveryCause::RESET_FAILURE : RecoveryCause::RESOURCE, false);
+    }
+
     if (stopRequested_ || recovering_) {
         if (attemptPresent_) {
             phase_ = RecoveryPhase::RETIRING;
@@ -520,8 +599,18 @@ RecoveryStep RecoveryState::step(RecoveryClock::time_point now, const RecoveryOb
         lastNow_ = now;
     }
 
-    if (!stopRequested_ && !recovering_ && receiveDeadline_ && now >= *receiveDeadline_) {
+    if (!stopRequested_ && !recovering_ && !explicitControl_ && receiveDeadline_ && now >= *receiveDeadline_) {
         fail(RecoveryCause::PROTOCOL_INACTIVITY, true);
+    }
+
+    if (controlChanged_) {
+        // Outside an executing action, abandon only its unused ticket; charged sequence/work are not refunded.
+        // An in-flight callback instead returns its matching observation before the new control gets priority.
+        if (observation.completion == RecoveryCompletion::NONE) {
+            pending_ = {};
+        }
+
+        controlChanged_ = false;
     }
 
     auto observed = observe(now, observation, work);
@@ -557,6 +646,10 @@ RecoveryStep RecoveryState::step(RecoveryClock::time_point now, const RecoveryOb
     issued.observationAccepted = observed.observationAccepted;
 
     return issued;
+}
+
+bool RecoveryState::sourceResetPending() const noexcept {
+    return !resetComplete_;
 }
 
 RecoveryStateStatus RecoveryState::status() const noexcept {

@@ -325,6 +325,20 @@ TEST_CASE("failed borrowed feed configuration rolls back only its lease") {
               api::ApiRuntime runtime(*bootstrap, invalid);
           }).code == api::ErrorCode::INVALID_ARGUMENT);
     CHECK(probe->state()->borrowers.load() == 1);
+    invalid = options();
+    invalid.maximumPendingStateChangesPerEndpoint = 0;
+    const auto owned = diagnostic([&] {
+        api::ApiRuntime runtime(invalid);
+    });
+    CHECK(owned.code == api::ErrorCode::INVALID_ARGUMENT);
+    CHECK(owned.stage == "runtime-options");
+    CHECK(probe->state()->borrowers.load() == 1);
+    const auto borrowed = diagnostic([&] {
+        api::ApiRuntime runtime(*bootstrap, invalid);
+    });
+    CHECK(borrowed.code == api::ErrorCode::INVALID_ARGUMENT);
+    CHECK(borrowed.stage == "runtime-options");
+    CHECK(probe->state()->borrowers.load() == 1);
     api::ApiRuntime subsequent(*bootstrap, options());
     subsequent.closeAndAwaitTermination();
 }

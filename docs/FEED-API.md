@@ -261,15 +261,25 @@ Each subscription has independent interests and delivery, including overlapping 
 
 Synchronous rejection throws `api::Error`, whose `diagnostic()` is detached static
 and numeric evidence. Use `getState()` and `getDiagnostic()` on endpoints and
-subscriptions for the worker's latest lifecycle and first asynchronous failure.
+subscriptions for the latest committed lifecycle and first asynchronous failure.
 There is no application polling requirement for connection or delivery progress.
 
 `connect()` accepts ASCII `host:port` or `[IPv6]:port`. The first accepted address is
-fixed; repeating it while open is a no-op. Another address, or reconnecting a closed
+fixed; repeating it while logically online is a no-op. After `disconnect()`, the
+same address resumes with a fresh source epoch. Another address, or connecting a closed
 or failed endpoint, rejects. Automatic finite recovery uses the endpoint policy.
 Selectors are nonempty exact printable ASCII, within the runtime's symbol limit,
 without a leading `*` or wildcard/All syntax.
 
+`disconnect()` immediately reports `NOT_CONNECTED`, retaining desired interests and
+projected cache. After physical pause quiescence, new/changed subscriptions may
+receive that retained cache. `reconnect()` requests a fresh epoch while online;
+after explicit disconnect it does nothing. `disconnectAndClear()` immediately
+fences new stale selections and requests asynchronous real cache clear, including
+while already disconnected. `NOT_CONNECTED` is not a clear-completion barrier.
+An already selected listener snapshot can finish; owning event copies remain valid.
+These controls preserve finite lifetime attempts/work. See the
+[complete lifecycle and admission contract](../spec/subscriptions/FEED-LIFECYCLE.md).
 ## Finite defaults
 
 Configure `RuntimeOptions` before constructing the runtime and `EndpointOptions`
@@ -286,6 +296,7 @@ substantial backing storage, and unsupported capacity arithmetic rejects explici
 | `maximumStateListenersPerEndpoint` | 4 |
 | `maximumStateListenersPerSubscription` | 4 |
 | `maximumEventTypeArgumentsPerSubscription` | 64 raw type arguments, including duplicates; positive |
+| `maximumPendingStateChangesPerEndpoint` | 8; pending/executing/retiring selections |
 | `maximumSymbolUnits` | 128; configurable in 1..128 |
 | `dnsServers` | Empty: discover up to 4 system IPv4 resolver addresses |
 | `dnsPort` | 53 |

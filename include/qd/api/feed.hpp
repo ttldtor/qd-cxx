@@ -88,6 +88,7 @@ struct RuntimeOptions {
         4; ///< Accepted and selected/retiring subscription state observers.
     std::size_t maximumEventTypeArgumentsPerSubscription = 64;
     ///< Maximum raw type arguments inspected during one subscription creation, including duplicates.
+    std::size_t maximumPendingStateChangesPerEndpoint = 8; ///< Pending/executing/retiring state selections together.
 };
 
 /** Existing delivery semantics selected for one high-level endpoint. */
@@ -348,11 +349,33 @@ class Endpoint final {
      */
     [[nodiscard]] std::shared_ptr<Feed> getFeed() const noexcept;
     /** Start an asynchronous plain binary-QTP connection; no I/O or callbacks run on this caller.
-     * The first accepted address is fixed. Repeating it while open is a no-op; another address or
+     * The first accepted address is fixed. Repeating it while logically online is a no-op; after disconnect
+     * the same address resumes with a fresh source epoch. Another address or
      * reconnecting a closed/failed endpoint rejects. Automatic finite recovery remains internal.
      * @param address ASCII host:port or [IPv6]:port; no TLS/URI/login/configuration extensions.
      */
     void connect(std::string_view address);
+    /** Disconnect logically now, retaining desired interests and projected cache while physically offline.
+     * Actual native retirement is asynchronous. New old-attempt native input is fenced immediately;
+     * an already selected whole listener snapshot may finish. After native pause quiescence, projected cache
+     * may replay to new/changed subscriptions with its original source identity. State observations remain ordered.
+     * CLOSED/FAILED and repeated disconnection are no-ops. No SDK thread starts before an initial connect.
+     * @throws Error If finite notification/revision admission refuses; state, intent and fence stay unchanged.
+     */
+    void disconnect();
+    /** Disconnect now and request real asynchronous SDK cache/pending-data clear, including while disconnected.
+     * NOT_CONNECTED is an immediate logical fence, not clear-completion acknowledgement. Every new data/read
+     * selection is fenced immediately; caller-owned Event copies and retained immutable batches stay valid.
+     * Existing desired symbols/listeners survive. Future fresh-source activation resets old source data too.
+     * @throws Error For finite admission refusal; no partial state, intent, clear or delivery-fence change.
+     */
+    void disconnectAndClear();
+    /** Request a fresh source attempt with the same fixed address and desired interests.
+     * No-op before connect, after disconnect, or in CLOSED/FAILED. Actual attempts/work are never replenished;
+     * asynchronous source reset/attempt exhaustion remains observable. No callback or I/O runs inline.
+     * @throws Error For finite notification/revision admission refusal, without partial mutation.
+     */
+    void reconnect();
     /** Request admitted-prefix drain, escalating after drainTimeout; never wait or consume an ordinary slot. */
     void close() noexcept;
     /** Request close and await actual native/callback quiescence; only the runtime creator may wait.
@@ -362,7 +385,7 @@ class Endpoint final {
      * @return Detached actual local outcome. Application callbacks and OS retirement have no hard time bound.
      */
     [[nodiscard]] CloseResult closeAndAwaitTermination();
-    /** Inspect the last SDK-worker state observation.
+    /** Inspect the latest committed producer/worker state observation.
      * @return Detached lifecycle state, not peer acknowledgement.
      */
     [[nodiscard]] EndpointState getState() const noexcept;

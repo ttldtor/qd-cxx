@@ -51,6 +51,8 @@ class Backend final : public detail::RecoveryBackend {
     detail::RecoveryAttemptFacts actual{};         ///< Test-controlled actual facts, distinct from stored model phase.
     detail::RecoveryAttemptFailure failureValue{}; ///< Test-controlled native refusal classification.
     std::optional<p::LiveEvent> next;              ///< At most one actual admitted event awaiting backend poll.
+    m::MuxQueue *stream = nullptr;      ///< Borrowed stable stream queue for exact prequeued-offer regression.
+    m::MuxQueue *ticker = nullptr;      ///< Borrowed stable ticker queue for lifecycle/retained-lease evidence.
     m::MuxQueue *history = nullptr;     ///< Borrowed Core-owned queue for independent direct-query comparison only.
     mutable std::size_t factsReads = 0; ///< Read-only observation calls; no I/O is represented.
     std::size_t advancingCalls = 0;     ///< Prepare/start/poll/compose/abort/dispose calls, excluding facts.
@@ -86,6 +88,8 @@ class Backend final : public detail::RecoveryBackend {
         REQUIRE_FALSE(next);
         next.emplace(decode(r::ready()));
         (void)decode(r::description(41));
+        stream = configuration.queues.stream ? &*configuration.queues.stream : nullptr;
+        ticker = configuration.queues.ticker ? &*configuration.queues.ticker : nullptr;
         history = configuration.queues.history ? &*configuration.queues.history : nullptr;
         actual = {
             true, false, true, false, session_->peer().identity().generation(), p::LiveAuthentication::UNCHALLENGED, 0};
@@ -563,4 +567,314 @@ TEST_CASE("public TCP receiver forwarding keeps adopted queues and rejects a mov
     CHECK(owner.status().attempts == 0);
     CHECK(consumer->batches.empty());
     REQUIRE(owner.requestStop());
+}
+
+TEST_CASE("recovery receiver pause retains original cache epoch while clear preserves caller leases and charges") {
+    Fixture fixture(r::schema(), 1);
+    auto first = std::make_shared<Consumer>();
+    auto second = std::make_shared<Consumer>();
+    auto third = std::make_shared<Consumer>();
+    auto one = fixture.open(c::SubscriptionFamily::TICKER, first);
+    REQUIRE(one);
+    const std::array<c::SubscriptionRequest, 1> requested{{{{fixture.schema.recordContext(0), u"A"}, {}}}};
+    m::QueueSubmitWork submit{10000, 1000000, 1000000, 1000000};
+    auto ticket = one->replace(requested, submit);
+    REQUIRE(ticket);
+    fixture.start();
+    fixture.until([&] {
+        return ticket->result().has_value();
+    });
+    fixture.backend.next.emplace(fixture.backend.decode(r::data(41, u"A", 17, 10)));
+    fixture.until([&] {
+        return first->batches.size() == 1;
+    });
+    auto *const originalQueue = fixture.backend.ticker;
+    REQUIRE(originalQueue);
+    REQUIRE(first->batches[0].records().size() == 1);
+    const auto originalEpoch = first->batches[0].epoch();
+    const auto chargedBefore = originalQueue->resources(*one);
+    REQUIRE(chargedBefore);
+    CHECK(chargedBefore->recordOwners == 1);
+    CHECK(chargedBefore->batchOwners == 1);
+    auto uncommitted = fixture.backend.decode(r::data(41, u"A", 23, 10));
+    bool sourceAdmitted = false;
+    fixture.until([&] {
+        if (sourceAdmitted)
+            return true;
+
+        auto work = r::queueWork();
+        const auto admitted = originalQueue->admit(std::move(uncommitted), work);
+
+        sourceAdmitted = admitted.has_value();
+
+        return sourceAdmitted;
+    });
+    CHECK(originalQueue->resources().pendingRecords == 1);
+    REQUIRE(fixture.owner->requestDisconnect(false));
+    m::QueueWork exhausted{};
+    const auto deferred = originalQueue->progress(exhausted);
+    REQUIRE_FALSE(deferred);
+    CHECK(deferred.error().error == m::QueueError::WORK_LIMIT);
+    CHECK(originalQueue->resources().pendingRecords == 1);
+    {
+        auto blockedOffer = fixture.backend.decode(r::data(41, u"A", 25, 10));
+        auto work = r::queueWork();
+        const auto blocked = originalQueue->admit(std::move(blockedOffer), work);
+        REQUIRE_FALSE(blocked);
+        CHECK(blocked.error().error == m::QueueError::BUSY);
+        CHECK(blockedOffer.residentBytes() > 0);
+    }
+    auto disposal = r::queueWork();
+    REQUIRE(originalQueue->progress(disposal));
+    CHECK(originalQueue->resources().pendingRecords == 0);
+    fixture.until([&] {
+        return fixture.owner->status().phase == t::RecoveryPhase::SUSPENDED;
+    });
+    CHECK(fixture.owner->status().attempts == 1);
+    CHECK(fixture.backend.ticker == originalQueue);
+    CHECK_FALSE(originalQueue->resetStatus().sourceCommitted);
+    auto two = fixture.open(c::SubscriptionFamily::TICKER, second);
+    REQUIRE(two);
+    submit = {10000, 1000000, 1000000, 1000000};
+    auto cachedTicket = two->replace(requested, submit);
+    REQUIRE(cachedTicket);
+    fixture.until([&] {
+        return second->batches.size() == 1;
+    });
+    REQUIRE(second->batches[0].records().size() == 1);
+    CHECK(second->batches[0].epoch().matches(originalEpoch));
+    CHECK(second->batches[0].records()[0].typedValues[2].raw == 17);
+    REQUIRE(fixture.owner->requestDisconnect(true));
+    CHECK(fixture.owner->status().sourceResetPending);
+    auto three = fixture.open(c::SubscriptionFamily::TICKER, third);
+    REQUIRE(three);
+    submit = {10000, 1000000, 1000000, 1000000};
+    auto afterClear = three->replace(requested, submit);
+    REQUIRE(afterClear);
+    fixture.until([&] {
+        for (auto *handle : {&*one, &*two, &*three}) {
+            if (const auto notice = handle->resetNotice())
+                handle->acknowledgeReset(notice->sequence);
+        }
+
+        return !fixture.owner->status().sourceResetPending && afterClear->result().has_value();
+    });
+    CHECK(originalQueue->resetStatus().globalAcknowledged);
+    CHECK(originalQueue->resetStatus().sourceCommitted);
+    CHECK(third->batches.empty());
+    CHECK(first->batches.size() == 1);
+    CHECK(second->batches.size() == 1);
+    REQUIRE(first->batches[0].records().size() == 1);
+    CHECK(first->batches[0].epoch().matches(originalEpoch));
+    CHECK(first->batches[0].records()[0].typedValues[2].raw == 17);
+    const auto chargedAfter = originalQueue->resources(*one);
+    REQUIRE(chargedAfter);
+    CHECK(chargedAfter->recordOwners == chargedBefore->recordOwners);
+    CHECK(chargedAfter->recordBytes == chargedBefore->recordBytes);
+    CHECK(chargedAfter->batchOwners == chargedBefore->batchOwners);
+    CHECK(chargedAfter->batchBytes == chargedBefore->batchBytes);
+    REQUIRE(fixture.owner->requestReconnect());
+    fixture.until([&] {
+        return fixture.owner->status().phase == t::RecoveryPhase::ACTIVE;
+    });
+    CHECK(fixture.owner->status().attempts == 2);
+    CHECK(fixture.backend.ticker == originalQueue);
+    fixture.backend.next.emplace(fixture.backend.decode(r::data(41, u"A", 29, 10)));
+    fixture.until([&] {
+        return third->batches.size() == 1 && first->batches.size() == 2;
+    });
+    REQUIRE(third->batches[0].records().size() == 1);
+    CHECK_FALSE(third->batches[0].epoch().matches(originalEpoch));
+    CHECK(third->batches[0].records()[0].typedValues[2].raw == 29);
+    CHECK(first->batches[0].records()[0].typedValues[2].raw == 17);
+    REQUIRE(fixture.owner->requestDisconnect(true));
+    fixture.until([&] {
+        return one->resetNotice().has_value();
+    });
+    // Final retirement supersedes the unacknowledged clear; caller-held batches are still charged and valid.
+    REQUIRE(fixture.owner->requestStop());
+    fixture.until([&] {
+        return fixture.owner->status().terminal.has_value();
+    });
+    CHECK(first->batches[0].epoch().matches(originalEpoch));
+    CHECK(first->batches[0].records()[0].typedValues[2].raw == 17);
+}
+
+TEST_CASE("recovery receiver pause excludes queued live and prequeued initial offers but permits new cached initial") {
+    for (unsigned scenario = 0; scenario != 6; ++scenario) {
+        CAPTURE(scenario);
+        const auto sourceScenario = scenario % 3;
+        const bool ticker = sourceScenario != 0;
+        const bool update = sourceScenario == 2;
+        const bool closeAfterFence = scenario >= 3;
+        const auto family = ticker ? c::SubscriptionFamily::TICKER : c::SubscriptionFamily::STREAM;
+        Fixture fixture(r::schema(), ticker ? 1U : 2U);
+        auto first = std::make_shared<Consumer>();
+        auto second = std::make_shared<Consumer>();
+        auto one = fixture.open(family, first);
+        auto two = fixture.open(family, second);
+        REQUIRE(one);
+        REQUIRE(two);
+        const std::array<c::SubscriptionRequest, 1> requested{{{{fixture.schema.recordContext(0), u"A"}, {}}}};
+        m::QueueSubmitWork submit{10000, 1000000, 1000000, 1000000};
+        auto oneTicket = one->replace(requested, submit);
+        auto twoTicket = two->replace(requested, submit);
+        REQUIRE(oneTicket);
+        REQUIRE(twoTicket);
+        fixture.start();
+        fixture.until([&] {
+            return oneTicket->result().has_value() && twoTicket->result().has_value();
+        });
+        auto *const source = ticker ? fixture.backend.ticker : fixture.backend.stream;
+        REQUIRE(source);
+
+        if (update) {
+            fixture.backend.next.emplace(fixture.backend.decode(r::data(41, u"A", 11, 10)));
+            fixture.until([&] {
+                return first->batches.size() == 1 && second->batches.size() == 1;
+            });
+        }
+
+        const auto prior = update ? std::size_t{1} : std::size_t{0};
+        fixture.backend.next.emplace(fixture.backend.decode(r::data(41, u"A", 17, ticker ? 10 : 15)));
+        bool queued = false;
+
+        for (unsigned turn = 0; turn != 20000 && !queued; ++turn) {
+            auto work = r::turn();
+
+            for (auto &queueWork : work.queues)
+                queueWork.callbacks = 0;
+
+            REQUIRE(fixture.owner->poll(work));
+            const auto a = source->resources(*one);
+            const auto b = source->resources(*two);
+            REQUIRE(a);
+            REQUIRE(b);
+            queued = a->queuedRecords == 1 && b->queuedRecords == 1;
+        }
+
+        REQUIRE(queued);
+        int selected = -1;
+        first->action = [&] {
+            if (selected == -1) {
+                selected = 0;
+                REQUIRE(fixture.owner->requestDisconnect(false));
+
+                if (closeAfterFence)
+                    REQUIRE(fixture.owner->requestDrain(detail::RecoveryClock::now() + 1s));
+            }
+        };
+        second->action = [&] {
+            if (selected == -1) {
+                selected = 1;
+                REQUIRE(fixture.owner->requestDisconnect(false));
+
+                if (closeAfterFence)
+                    REQUIRE(fixture.owner->requestDrain(detail::RecoveryClock::now() + 1s));
+            }
+        };
+        fixture.until([&] {
+            return selected != -1;
+        });
+        fixture.until([&] {
+            return closeAfterFence ? fixture.owner->status().terminal.has_value()
+                                   : fixture.owner->status().phase == t::RecoveryPhase::SUSPENDED;
+        });
+
+        for (unsigned turn = 0; turn != 500; ++turn) {
+            auto work = r::turn();
+            REQUIRE(fixture.owner->poll(work));
+        }
+
+        const auto &chosen = selected == 0 ? first : second;
+        const auto &unselected = selected == 0 ? second : first;
+        CHECK(chosen->batches.size() == prior + 1);
+        CHECK(unselected->batches.size() == prior);
+        REQUIRE(chosen->batches.back().records().size() == 1);
+        REQUIRE(chosen->batches.back().records()[0].typedValues.size() == 3);
+        CHECK(chosen->batches.back().records()[0].typedValues[2].raw == 17);
+        const auto originalEpoch = chosen->batches.back().epoch();
+        const auto charged = source->resources(selected == 0 ? *one : *two);
+        REQUIRE(charged);
+        CHECK(charged->recordOwners == prior + 1);
+        CHECK(charged->batchOwners == prior + 1);
+
+        if (ticker && !closeAfterFence) {
+            auto cached = std::make_shared<Consumer>();
+            auto offline = fixture.open(family, cached);
+            REQUIRE(offline);
+            submit = {10000, 1000000, 1000000, 1000000};
+            auto added = offline->replace(requested, submit);
+            REQUIRE(added);
+            fixture.until([&] {
+                return cached->batches.size() == 1;
+            });
+            REQUIRE(cached->batches[0].records().size() == 1);
+            REQUIRE(cached->batches[0].records()[0].typedValues.size() == 3);
+            CHECK(cached->batches[0].records()[0].typedValues[2].raw == 17);
+            CHECK(cached->batches[0].epoch().matches(originalEpoch));
+        }
+
+        REQUIRE(fixture.owner->requestStop());
+        fixture.until([&] {
+            return fixture.owner->status().terminal.has_value();
+        });
+        CHECK(chosen->batches.back().records()[0].typedValues[2].raw == 17);
+        CHECK(chosen->batches.back().epoch().matches(originalEpoch));
+    }
+}
+
+TEST_CASE("recovery receiver distinct completed offline clears require fresh reset epochs and acknowledgements") {
+    Fixture fixture(r::schema(), 1);
+    auto first = std::make_shared<Consumer>();
+    auto one = fixture.open(c::SubscriptionFamily::TICKER, first);
+    REQUIRE(one);
+    fixture.start();
+    auto *const source = fixture.backend.ticker;
+    REQUIRE(source);
+    REQUIRE(fixture.owner->requestDisconnect(true));
+    std::optional<m::QueueIdentity> firstEpoch;
+    fixture.until([&] {
+        if (const auto notice = one->resetNotice()) {
+            firstEpoch = notice->toEpoch;
+            one->acknowledgeReset(notice->sequence);
+        }
+
+        return !fixture.owner->status().sourceResetPending;
+    });
+    REQUIRE(firstEpoch);
+    const auto firstReset = source->resetStatus();
+    REQUIRE(firstReset.globalAcknowledged);
+    REQUIRE(firstReset.actualSourceSequence);
+    auto second = std::make_shared<Consumer>();
+    auto two = fixture.open(c::SubscriptionFamily::TICKER, second);
+    REQUIRE(two);
+    REQUIRE(fixture.owner->requestDisconnect(true));
+    CHECK(fixture.owner->status().sourceResetPending);
+
+    for (unsigned turn = 0; turn != 500 && !two->resetNotice(); ++turn) {
+        auto work = r::turn();
+        REQUIRE(fixture.owner->poll(work));
+    }
+
+    const auto nextReset = source->resetStatus();
+    CHECK(nextReset.requestSequence > firstReset.requestSequence);
+    REQUIRE(nextReset.actualSourceSequence);
+    CHECK(*nextReset.actualSourceSequence > *firstReset.actualSourceSequence);
+    REQUIRE(one->resetNotice());
+    REQUIRE(two->resetNotice());
+    REQUIRE(two->resetNotice()->toEpoch);
+    CHECK_FALSE(two->resetNotice()->toEpoch->matches(*firstEpoch));
+    CHECK(fixture.owner->status().sourceResetPending);
+    one->acknowledgeReset(one->resetNotice()->sequence);
+    two->acknowledgeReset(two->resetNotice()->sequence);
+    fixture.until([&] {
+        return !fixture.owner->status().sourceResetPending;
+    });
+    CHECK(source->resetStatus().globalAcknowledged);
+    CHECK(source->resetStatus().requestSequence == nextReset.requestSequence);
+    REQUIRE(fixture.owner->requestStop());
+    fixture.until([&] {
+        return fixture.owner->status().terminal.has_value();
+    });
 }

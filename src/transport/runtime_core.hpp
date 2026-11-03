@@ -126,6 +126,7 @@ struct RuntimeCore {
     TcpState runState = TcpState::CONFIGURED; ///< Serialized run lifecycle.
     TcpTerminal outcome;            ///< Reserved primary/cleanup/terminal metadata, independent of data saturation.
     bool closeRequested = false;    ///< Immediate ordinary-admission cutoff.
+    bool pauseCancellation = false; ///< Only explicit plain pause may classify its later local read abort as expected.
     bool closeApplied = false;      ///< Owned descriptor retirement has been applied once.
     bool terminalPublished = false; ///< Completion is observable only after all handlers return.
     bool connecting = false;        ///< Native nonblocking connect awaits bounded readiness inspection.
@@ -320,6 +321,10 @@ struct RuntimeCore {
      * @return Acceptance or unchanged wrong-thread rejection; poll still drives completion.
      */
     [[nodiscard]] std::expected<void, TcpDiagnostic> requestClose() noexcept;
+    /** Request reusable plain retirement with exact subsequent owned read-cancellation classification.
+     * @return Existing owner-thread rejection or accepted cutoff; earlier diagnostics remain unchanged.
+     */
+    [[nodiscard]] std::expected<void, TcpDiagnostic> requestPause() noexcept;
     /** Inspect lifecycle on the creating owner.
      * @return Current state; CLOSED requires callback quiescence.
      */

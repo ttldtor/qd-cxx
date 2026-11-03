@@ -366,7 +366,14 @@ void RuntimeCore::completed(bool reading, asio::error_code error, std::size_t by
 
 #endif
 
-    if (error && (error != asio::error::operation_aborted || !closeRequested) &&
+    bool expectedPauseRead = false;
+#ifdef _WIN32
+    // ERROR_CONNECTION_ABORTED is returned by an owned closesocket cancellation on Windows.
+    expectedPauseRead = reading && pauseCancellation && closeRequested &&
+                        error == asio::error_code(ERROR_CONNECTION_ABORTED, asio::error::get_system_category());
+#endif
+
+    if (error && !expectedPauseRead && (error != asio::error::operation_aborted || !closeRequested) &&
         (!reading || error != asio::error::eof)) {
         recordFailure(diagnostic(reading ? TcpError::READ_FAILURE : TcpError::WRITE_FAILURE,
                                  reading ? "socket-read" : "socket-write", error.value()));
@@ -1347,6 +1354,19 @@ std::expected<void, TcpDiagnostic> RuntimeCore::subscribe(protocol::Subscription
     }
 
     return this->adoptOutput(this->session->subscribe(message, requests, work));
+}
+
+std::expected<void, TcpDiagnostic> RuntimeCore::requestPause() noexcept {
+    if (const auto error = wrongThread()) {
+        return std::unexpected(*error);
+    }
+
+    // Never reclassify a failure/close already observed before this reusable plain intent.
+    if (!closeRequested && !terminalPublished) {
+        pauseCancellation = true;
+    }
+
+    return requestClose();
 }
 
 std::expected<void, TcpDiagnostic> RuntimeCore::requestClose() noexcept {

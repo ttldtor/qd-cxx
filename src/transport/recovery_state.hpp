@@ -40,7 +40,8 @@ enum class RecoveryPhase {
     STOPPING,    ///< Delivery/control retirement remains outstanding.
     CLOSED,      ///< Explicit stop completed; external immutable values may still exist.
     EXHAUSTED,   ///< Retryable failure consumed the lifetime attempt limit and cleanup completed.
-    FAILED       ///< Terminal failure and cleanup completed.
+    FAILED,      ///< Terminal failure and cleanup completed.
+    SUSPENDED    ///< Explicit disconnect completed without closing stable delivery owners.
 };
 
 /** One bounded integration action; the model never executes it. */
@@ -211,7 +212,12 @@ class RecoveryState {
     bool stopRequested_ = false;                                 ///< Monotonic cutoff.
     bool attemptPresent_ = false;                                ///< Native/TLS owner remains held.
     bool attemptStarted_ = false;                                ///< The current owner completed start.
-    bool factoryEntered_ = false;                                ///< Pending PREPARE has charged its actual attempt.
+    bool explicitControl_ = false;  ///< Explicit pause/restart path, distinct from a transport failure.
+    bool suspendRequested_ = false; ///< Latest explicit physical intent is offline.
+    bool controlReset_ = false;     ///< Clear or fresh-source resume requires the real stable-source reset.
+    bool controlChanged_ = false;   ///< A not-yet-executed old ticket must not bypass the accepted control.
+    bool sourceUsed_ = false;       ///< An actual attempt entered since the last completed source reset.
+    bool factoryEntered_ = false;   ///< Pending PREPARE has charged its actual attempt.
     bool protocolObserved_ = false; ///< Current actual decoder PROTOCOL event was observed.
     bool recovering_ = false;       ///< Failure/disposition/reset path is active.
     bool retryable_ = false;        ///< Current fully created attempt may retry.
@@ -293,6 +299,12 @@ class RecoveryState {
     RecoveryState &operator=(RecoveryState &&other) = delete;
     /** Request start without entering a factory; idempotent before cutoff. */
     void requestStart() noexcept;
+    /** Fence a live connection while preserving stable queue ownership.
+     * @param resetSources Clear requested data, or complete an already accepted source reset.
+     */
+    void requestDisconnect(bool resetSources) noexcept;
+    /** Resume/restart with a fresh source epoch; actual attempt and ticket counters are never reset. */
+    void requestReconnect() noexcept;
     /** Record allocation-free monotonic cutoff; integration requests current native abort separately. */
     void requestStop() noexcept;
     /** Admit one clock/result sample and return at most one integration action.
@@ -303,6 +315,10 @@ class RecoveryState {
      */
     [[nodiscard]] RecoveryStep step(RecoveryClock::time_point now, const RecoveryObservation &observation,
                                     RecoveryStateWork &work) noexcept;
+    /** Inspect the old-source reset requirement, including a plain pause retaining its cache.
+     * @return True until the real source barrier commits, or before a retained epoch can be replaced.
+     */
+    [[nodiscard]] bool sourceResetPending() const noexcept;
     /** Copy current detached scalar status without sampling a clock or SDK.
      * @return Fixed owner/attempt/action/deadline evidence.
      */

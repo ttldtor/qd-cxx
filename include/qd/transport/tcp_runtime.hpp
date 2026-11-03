@@ -121,9 +121,10 @@ struct TcpPollResult {
 };
 
 /** Final abort/failure/peer-end evidence; socket acceptance never proves peer acknowledgement.
- * Causes follow serialized owner observation order. Only operation_aborted from our cancellation is
+ * Causes follow serialized owner observation order. For ordinary public close, operation_aborted is
  * ignored. Windows may instead report ERROR_CONNECTION_ABORTED (1236) after owned close: its source is
- * ambiguous, so the non-cancellation cause remains visible even when aborted is true.
+ * ambiguous, so the non-cancellation cause remains visible even when aborted is true. Explicit reusable
+ * plain recovery pause separately classifies only its own subsequent ERROR_CONNECTION_ABORTED read completion.
  */
 struct TcpTerminal {
     TcpDiagnostic primary;   ///< First observed non-cancellation failure, or NONE when none was observed.

@@ -853,3 +853,85 @@ TEST_CASE("local recovery shutdown never hides fatal primary or secondary eviden
     CHECK(t::classifyRecoveryShutdown(primary, true) == t::RecoveryShutdownFailure::POST_FENCE_TRANSPORT);
     CHECK(t::classifyRecoveryShutdown(secondary, true) == t::RecoveryShutdownFailure::FATAL);
 }
+
+TEST_CASE("recovery explicit pause retains source and resumes only through a real reset without attempt refunds") {
+    Driver value(config(3));
+    value.connect();
+    value.state.requestDisconnect(false);
+    REQUIRE(value.step().status == t::RecoveryStepStatus::ACTION);
+    value.pending(t::RecoveryAction::REQUEST_ABORT);
+    REQUIRE(value.finish().observationAccepted);
+    value.pending(t::RecoveryAction::POLL_ATTEMPT);
+    value.facts.terminal = true;
+    REQUIRE(value.finish().observationAccepted);
+    value.pending(t::RecoveryAction::DISPOSE_ATTEMPT);
+    REQUIRE(value.finish(t::RecoveryCompletion::COMPLETED, t::RecoveryInput::NONE, t::RecoveryCause::NONE, false, true)
+                .observationAccepted);
+    CHECK(value.state.status().phase == t::RecoveryPhase::SUSPENDED);
+    CHECK(value.state.status().pending.action == t::RecoveryAction::NONE);
+    CHECK(value.state.status().attempts == 1);
+    CHECK(value.state.status().firstCause == t::RecoveryCause::NONE);
+    CHECK(value.state.sourceResetPending());
+    CHECK_FALSE(value.state.nextWake());
+    value.state.requestReconnect();
+    REQUIRE(value.step().status == t::RecoveryStepStatus::ACTION);
+    value.pending(t::RecoveryAction::RESET_SOURCES);
+    CHECK(value.finish().status == t::RecoveryStepStatus::INVALID_OBSERVATION);
+    CHECK(value.state.sourceResetPending());
+    REQUIRE(value
+                .finish(t::RecoveryCompletion::COMPLETED, t::RecoveryInput::NONE, t::RecoveryCause::NONE, false, false,
+                        true)
+                .observationAccepted);
+    CHECK_FALSE(value.state.sourceResetPending());
+    value.pending(t::RecoveryAction::PREPARE_ATTEMPT);
+    value.createAttempt();
+    CHECK(value.state.status().attempts == 2);
+    CHECK(value.state.status().firstCause == t::RecoveryCause::NONE);
+}
+
+TEST_CASE("recovery explicit clear completes while offline and final stop bypasses its outstanding reset ACK") {
+    Driver value(config(2));
+    value.connect();
+    value.state.requestDisconnect(true);
+    REQUIRE(value.step().status == t::RecoveryStepStatus::ACTION);
+    value.pending(t::RecoveryAction::REQUEST_ABORT);
+    REQUIRE(value.finish().observationAccepted);
+    value.facts.terminal = true;
+    REQUIRE(value.finish().observationAccepted);
+    value.pending(t::RecoveryAction::DISPOSE_ATTEMPT);
+    REQUIRE(value.finish(t::RecoveryCompletion::COMPLETED, t::RecoveryInput::NONE, t::RecoveryCause::NONE, false, true)
+                .observationAccepted);
+    value.pending(t::RecoveryAction::RESET_SOURCES);
+    const auto deferred = value.finish(t::RecoveryCompletion::DEFERRED);
+    REQUIRE(deferred.observationAccepted);
+    CHECK(deferred.status == t::RecoveryStepStatus::YIELD);
+    CHECK(value.state.sourceResetPending());
+    value.state.requestStop();
+    REQUIRE(value.step().action.action == t::RecoveryAction::STOP_DELIVERY);
+    CHECK(value
+              .finish(t::RecoveryCompletion::COMPLETED, t::RecoveryInput::NONE, t::RecoveryCause::NONE, false, false,
+                      false, true)
+              .status == t::RecoveryStepStatus::TERMINAL);
+    CHECK(value.state.status().phase == t::RecoveryPhase::CLOSED);
+    CHECK(value.state.status().attempts == 1);
+}
+
+TEST_CASE("recovery explicit control abandons unused factory ticket but accepts selected callback completion") {
+    Driver value(config(2));
+    value.state.requestStart();
+    const auto unused = value.step().action;
+    REQUIRE(unused.action == t::RecoveryAction::PREPARE_ATTEMPT);
+    value.state.requestDisconnect(false);
+    CHECK(value.step().status == t::RecoveryStepStatus::IDLE);
+    CHECK(value.state.status().phase == t::RecoveryPhase::SUSPENDED);
+    CHECK(value.state.status().attempts == 0);
+    CHECK(value.step({unused, t::RecoveryCompletion::COMPLETED}).status == t::RecoveryStepStatus::STALE);
+    value.state.requestReconnect();
+    REQUIRE(value.step().status == t::RecoveryStepStatus::ACTION);
+    value.createAttempt();
+    value.state.requestDisconnect(false);
+    value.facts.terminal = true;
+    REQUIRE(value.finish().observationAccepted);
+    value.pending(t::RecoveryAction::DISPOSE_ATTEMPT);
+    CHECK(value.state.status().attempts == 1);
+}

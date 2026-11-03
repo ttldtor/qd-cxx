@@ -6,11 +6,12 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <vector>
 
 namespace org::ttldtor::qdcxx::test {
 
-/** A single byte-only TCP exchange, closed before the next script is accepted. */
+/** One finite TCP exchange, with exact bytes or an explicit frame-type read boundary, closed before the next. */
 struct TcpPeerScript {
     std::vector<std::byte> initialBytes;        ///< Bytes written immediately after accept.
     std::vector<std::byte> expectedClientBytes; ///< Exact expected prefix; empty disables comparison.
@@ -18,6 +19,8 @@ struct TcpPeerScript {
     std::vector<std::byte> replyBytes; ///< Bytes written after the requested prefix was received.
     bool waitForControllerClose{};     ///< Hold the connection until allowClose(index), stop, or deadline.
     bool waitForControllerReply{};     ///< Gate reply bytes until allowReply(index), stop, or deadline.
+    std::optional<std::int32_t> readThroughMessage; ///< Alternative bounded capture through one complete frame type.
+    bool waitForClientClose = false; ///< Capture until client EOF/reset, without creating a server peer-end race.
 };
 
 /** Finite resource limits validated before a native listener is created. */
@@ -30,14 +33,15 @@ struct TcpPeerConfig {
 /** Terminal helper errors; nativeCode contains only the corresponding numeric socket error. */
 enum class TcpPeerError { NONE, INVALID_CONFIG, STARTUP, SOCKET, TIMEOUT, PEER_CLOSED, MISMATCH, INTERNAL };
 
-/** Thread-safe copied observations for one connection. No protocol parsing occurs in the helper. */
+/** Thread-safe copied observations; optional framing stop does not interpret subscription/business payload. */
 struct TcpPeerSessionSnapshot {
     std::vector<std::byte> received;   ///< Bounded received prefix retained for test-side comparisons.
     std::size_t initialBytesWritten{}; ///< Successfully sent initial byte count.
     std::size_t replyBytesWritten{};   ///< Successfully sent reply byte count.
     bool accepted{};                   ///< A connection was accepted for this script.
     bool matched{};                    ///< Exact expected prefix matched, or an unverified requested prefix was read.
-    bool completed{};                  ///< The whole script completed and its connection closed.
+    int clientCloseCode{}; ///< Actual reset code when explicitly waiting for client termination; zero for EOF.
+    bool completed{};      ///< The whole script completed and its connection closed.
 };
 
 /** Copied numeric status and bounded fixture bytes. */

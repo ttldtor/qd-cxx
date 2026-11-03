@@ -72,6 +72,44 @@
 очередей; сырые `LiveEvent`, snapshot живой сессии и нативный runtime наружу
 не передаются.
 
+## Явная пауза и перезапуск plain owner
+
+`TcpRecovery::requestDisconnect(clear)` запрещает native input и завершает текущую
+попытку, сохраняя тот же Core, очереди, регистрации и желаемые интересы. Проверяется
+поток владельца; вызов из consumer callback разрешён, обработчик приложения inline
+не вызывается. `poll()` расходует настоящую работу на продолжение disposal/reset.
+`SUSPENDED` означает nonterminal native quiescence. Без clear спроецированный кэш
+может доставляться offline с исходной эпохой очереди. Старый не принятый decoded
+input освобождается и не переименовывается в свежий источник.
+Adopted queues получают общий запрос оплаченного освобождения pending source до
+staging, сохраняя зафиксированный кэш. Граница кэша устанавливается действием
+нижнего owner; начатая непрерываемая проекция может завершиться. Исчерпание работы
+сохраняет disposal/admission fence; см. [queue source-offer disposal](../mux/QUEUES.ru.md).
+
+Offline progress отличает новое построение cached INITIAL от старого queued
+source/live/initial уведомления. Callback разрешён только для заново построенного
+retained-cache INITIAL: старые STREAM FIFO и queued TICKER update/initial не
+переименовываются в replay. Неизменяемый локальный origin gate действует и при
+final drain после паузы. Обычные active/default TLS и close без паузы не меняются.
+При clear требуется настоящий сброс очереди и client/global ACK, прежде чем
+`sourceResetPending` станет false. Следующий отдельный clear после завершения
+начинает новый настоящий reset/epoch/notice/ACK цикл; per-family admission flags
+не используют прежний global ACK. Незавершённые clear могут объединяться. Принятая очистка немедленно запрещает новый выбор
+старых данных; одно состояние не подтверждает её завершение. Сброс не инвалидирует
+retained immutable batches приложения и не возвращает их record/batch квоты.
+`requestReconnect()` сбрасывает старый источник до настоящего входа в фабрику новой
+попытки, включая replay convergence при прежнем составе интересов. Попытки, работа
+и ID действий не пополняются. Исчерпание оставшихся попыток отклоняется до изменения
+намерения. Окончательный stop/drain замещает незавершённый clear без ожидания ACK
+приложения; см. [публичный lifecycle](../subscriptions/FEED-LIFECYCLE.ru.md).
+
+Только это явное повторно используемое plain-намерение классифицирует Windows read
+completion `ERROR_CONNECTION_ABORTED` после собственного cutoff как ожидаемую
+отмену. Ошибка/close, наблюдённые до паузы, не переклассифицируются. Сохраняются
+прежние primary/secondary, остальные read/write ошибки и fatal failures. Обычный
+`requestClose()`/окончательный drain и TLS defaults сохраняют прежнюю политику,
+включая неоднозначные Windows ошибки окончательного close. Новый native owner
+не наследует признак классификации паузы.
 ## Локальный drain принятого prefix и свидетельства завершения
 
 `requestDrain(deadline)` запрашивает доставку **локального prefix, принятого

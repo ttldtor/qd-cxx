@@ -404,3 +404,29 @@ Command/mapping copies сохраняют selector kind. Canonical-domain failur
 относится к уже принятому UNSTAGED event: обычные shared-source failure/disposal сохраняют nested
 cause, counts и gaps. Принятая ownership barrier не отменяется. Reservations и local stop/lease rules
 выше сохранены; пересобранные consumers должны учесть текущие metadata sizes.
+
+## Освобождение незафиксированного source offer
+
+`requestDiscardPendingSource()` записывает сериализованный запрос без выделения
+памяти, в том числе из queue callback. Inline disposal и изменение эпохи источника
+не выполняются. До освобождения текущего незафиксированного source offer последующим
+оплаченным `progress()` новый `admit()` отклоняется с `BUSY`. Progress выполняет
+освобождение до staging, обычных команд и новых callbacks. `WORK_LIMIT` сохраняет
+запрос и admission fence; израсходованная работа не возвращается.
+
+Сохраняются зафиксированный collector cache, очереди зафиксированных проекций,
+регистрации, желаемые интересы, source identity и immutable batch leases приложения
+с исходными квотами. Уже зафиксированный до cutoff source offer не откатывается.
+Незавершённый STREAM routing использует настоящий discard с сохранением сведений
+о gap/потерях. Это не `resetSource()` и не окончательный stop. Составляющий recovery
+owner отдельно запрещает native input; см. [явную паузу/reconnect](../transport/RECOVERY.ru.md).
+`progressRetainedCache(work)` использует тот же конечный owner scheduler с неизменяемым
+локальным признаком происхождения записи. Он может строить настоящий cached INITIAL;
+callbacks начинаются только для таких проекций, заново построенных в этом режиме.
+Старым queued INITIAL/LIVE и STREAM-записям происхождение не переприсваивается:
+они освобождаются с настоящими work/discard/gap счётчиками до выбора callback.
+При исчерпании работы невыбранный префикс сохраняется. Составляющий owner отдельно
+запрещает source intake; метод не вводит wire flags, business event source или поток.
+Обычный `progress()` не меняется. Retained values/epochs и их исходные квоты остаются
+действительными. Явный final drain после паузы сохраняет тот же origin gate,
+чтобы close не включал ранее запрещённый live FIFO заново.

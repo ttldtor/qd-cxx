@@ -41,6 +41,8 @@ org::ttldtor::qdcxx::transport::RecoveryPhase publicPhase(RecoveryPhase phase) n
     using Public = org::ttldtor::qdcxx::transport::RecoveryPhase;
 
     switch (phase) {
+    case RecoveryPhase::SUSPENDED:
+        return Public::SUSPENDED;
     case RecoveryPhase::CONFIGURED:
         return Public::CONFIGURED;
     case RecoveryPhase::PREPARING:
@@ -429,6 +431,68 @@ void RecoveryCore::publishTerminal() noexcept {
     terminal_ = std::move(result);
 }
 
+std::expected<void, RecoveryDiagnostic> RecoveryCore::requestDisconnect(bool clear) noexcept {
+    if (thread_ != std::this_thread::get_id()) {
+        return std::unexpected(RecoveryDiagnostic{RecoveryError::WRONG_THREAD, "recovery-owner-thread"});
+    }
+
+    if (!configuration_.adopted || cutoff_ || terminal_ || state_.status().terminal) {
+        return std::unexpected(RecoveryDiagnostic{RecoveryError::INVALID_STATE, "recovery-disconnect-state"});
+    }
+
+    if (clear && !state_.sourceResetPending()) {
+        // A completed cycle cannot lend its old global ACK to a later independent clear.
+        resetRequested_.fill(false);
+    }
+
+    connectionFenced_ = true;
+
+    for (std::size_t family = 0; family != 3; ++family) {
+        if (auto &queue = configuration_.queue(family)) {
+            queue->requestDiscardPendingSource();
+        }
+    }
+
+    const bool resetAccepted = state_.sourceResetPending() && std::ranges::any_of(resetRequested_, [](bool accepted) {
+                                   return accepted;
+                               });
+    state_.requestDisconnect(clear || resetAccepted);
+    backend_.suspend();
+    abortIssued_ = true;
+
+    return {};
+}
+
+std::expected<void, RecoveryDiagnostic> RecoveryCore::requestReconnect() noexcept {
+    if (thread_ != std::this_thread::get_id()) {
+        return std::unexpected(RecoveryDiagnostic{RecoveryError::WRONG_THREAD, "recovery-owner-thread"});
+    }
+
+    const auto current = state_.status();
+
+    if (!configuration_.adopted || cutoff_ || terminal_ || current.terminal) {
+        return std::unexpected(RecoveryDiagnostic{RecoveryError::INVALID_STATE, "recovery-reconnect-state"});
+    }
+
+    if (current.attempts >= configuration_.scheduler.maximumAttempts) {
+        return std::unexpected(RecoveryDiagnostic{RecoveryError::RESOURCE_LIMIT, "recovery-attempt-limit"});
+    }
+
+    connectionFenced_ = true;
+
+    for (std::size_t family = 0; family != 3; ++family) {
+        if (auto &queue = configuration_.queue(family)) {
+            queue->requestDiscardPendingSource();
+        }
+    }
+
+    state_.requestReconnect();
+    backend_.suspend();
+    abortIssued_ = true;
+
+    return {};
+}
+
 std::expected<void, RecoveryDiagnostic> RecoveryCore::requestStop() noexcept {
     if (thread_ != std::this_thread::get_id()) {
         return std::unexpected(RecoveryDiagnostic{RecoveryError::WRONG_THREAD, "recovery-owner-thread"});
@@ -514,8 +578,8 @@ RecoveryFacts RecoveryCore::facts() noexcept {
     peerGeneration_ = actual.generation;
     authentication_ = actual.authentication;
     RecoveryFacts result;
-    result.transportEligible = actual.connected && !cutoff_;
-    result.authenticationEligible = actual.authenticated && !cutoff_;
+    result.transportEligible = actual.connected && !cutoff_ && !connectionFenced_;
+    result.authenticationEligible = actual.authenticated && !cutoff_ && !connectionFenced_;
     result.terminal = actual.terminal;
     result.negotiationPending = !descriptor_ || description_ < configuration_.blueprint.size();
 
@@ -578,6 +642,7 @@ bool RecoveryCore::releaseEvent(protocol::LiveWork &work) noexcept {
 
     --work.visits;
     work.bytes -= release;
+    heldDataDiscarded_ = heldDataDiscarded_ || (connectionFenced_ && event_->kind() == protocol::LiveEventKind::DATA);
     event_.reset();
 
     return true;
@@ -594,7 +659,7 @@ std::optional<RecoveryDiagnostic> RecoveryCore::controls(RecoveryTurnWork &work)
     // Offline desired commands and reset/control publication must not depend on auth/data eligibility.
     const auto callbacks = credits.callbacks;
     credits.callbacks = 0;
-    const auto result = queue->progress(credits);
+    const auto result = connectionFenced_ ? queue->progressRetainedCache(credits) : queue->progress(credits);
     credits.callbacks = callbacks; // No callback could consume a credit while this explicit gate was zero.
 
     if (!result && result.error().error != mux::QueueError::WORK_LIMIT &&
@@ -690,9 +755,15 @@ RecoveryObservation RecoveryCore::execute(RecoveryTicket ticket, RecoveryTurnWor
     if (cutoff_ && ticket.action == RecoveryAction::RESET_SOURCES)
         return recoveryResult(ticket, RecoveryCompletion::DEFERRED);
 
+    // Local retained projection after actual pause is independent of the retired native attempt's eligibility.
+    const bool retainedCacheDelivery = ticket.action == RecoveryAction::DELIVER &&
+                                       model.phase == RecoveryPhase::SUSPENDED && !backend_.facts().present && !event_;
+
     // A new PREPARE retains the previous cause until its actual entry commit; do not strand backoff here.
     if (ordinary &&
-        (cutoff_ || (model.currentCause != RecoveryCause::NONE && ticket.action != RecoveryAction::PREPARE_ATTEMPT))) {
+        (cutoff_ || (connectionFenced_ && ticket.action != RecoveryAction::PREPARE_ATTEMPT && !retainedCacheDelivery) ||
+         (model.currentCause != RecoveryCause::NONE && ticket.action != RecoveryAction::PREPARE_ATTEMPT &&
+          !retainedCacheDelivery))) {
         return recoveryResult(ticket, RecoveryCompletion::DEFERRED);
     }
 
@@ -788,6 +859,7 @@ RecoveryObservation RecoveryCore::execute(RecoveryTicket ticket, RecoveryTurnWor
                                                      : RecoveryCause::FACTORY_FAILURE);
             }
 
+            connectionFenced_ = false;
             configuration_.firstWriter.reset();
             descriptor_ = false;
             description_ = 0;
@@ -816,7 +888,7 @@ RecoveryObservation RecoveryCore::execute(RecoveryTicket ticket, RecoveryTurnWor
                 (void)releaseEvent(work.session);
             }
 
-            if (event_ && event_->kind() == protocol::LiveEventKind::DATA && !cutoff_ &&
+            if (event_ && event_->kind() == protocol::LiveEventKind::DATA && !cutoff_ && !connectionFenced_ &&
                 model.currentCause == RecoveryCause::NONE) {
                 const auto family = dataFamily(event_->messageType());
 
@@ -835,7 +907,7 @@ RecoveryObservation RecoveryCore::execute(RecoveryTicket ticket, RecoveryTurnWor
                 }
             }
 
-            auto polled = backend_.poll(work, !event_ && !cutoff_);
+            auto polled = backend_.poll(work, !event_ && !cutoff_ && !connectionFenced_);
 
             if (!polled) {
                 if (polled.error().error == RecoveryError::WORK_LIMIT) {
@@ -844,8 +916,8 @@ RecoveryObservation RecoveryCore::execute(RecoveryTicket ticket, RecoveryTurnWor
 
                 const auto classified = backend_.failure();
 
-                if (cutoff_ && classifyRecoveryShutdown(classified.diagnostic, true) ==
-                                   RecoveryShutdownFailure::POST_FENCE_TRANSPORT) {
+                if ((cutoff_ || connectionFenced_) && classifyRecoveryShutdown(classified.diagnostic, true) ==
+                                                          RecoveryShutdownFailure::POST_FENCE_TRANSPORT) {
                     observeRetiringBackend(true);
 
                     return result;
@@ -868,7 +940,7 @@ RecoveryObservation RecoveryCore::execute(RecoveryTicket ticket, RecoveryTurnWor
                 event_.emplace(std::move(*polled->event));
             }
 
-            if (event_ && (event_->kind() != protocol::LiveEventKind::DATA || cutoff_)) {
+            if (event_ && (event_->kind() != protocol::LiveEventKind::DATA || cutoff_ || connectionFenced_)) {
                 (void)releaseEvent(work.session);
             }
 
@@ -876,7 +948,8 @@ RecoveryObservation RecoveryCore::execute(RecoveryTicket ticket, RecoveryTurnWor
 
             if (classified.diagnostic.error != RecoveryError::NONE &&
                 (backend_.facts().terminal || !classified.retryable)) {
-                if (!cutoff_ && (model.currentCause == RecoveryCause::NONE || !classified.retryable)) {
+                if (!cutoff_ &&
+                    ((!connectionFenced_ && model.currentCause == RecoveryCause::NONE) || !classified.retryable)) {
                     auto failed = failure(classified.diagnostic, classified.cause, classified.retryable);
 
                     if (classified.secondary)
@@ -888,7 +961,16 @@ RecoveryObservation RecoveryCore::execute(RecoveryTicket ticket, RecoveryTurnWor
                 if (cutoff_ || finalRetirement_)
                     observeRetiringBackend(true);
                 else {
-                    record(classified.diagnostic);
+                    // A clean runtime is represented by synthetic peer-end; an explicit pause caused that end.
+                    // Preserve genuine native failures and distinct secondary evidence instead of inventing failure.
+                    const bool requestedCleanEnd = connectionFenced_ &&
+                                                   classified.diagnostic.error == RecoveryError::TRANSPORT_FAILURE &&
+                                                   classified.diagnostic.stage == "recovery-peer-end" &&
+                                                   classified.diagnostic.transport.error == TcpError::NONE;
+
+                    if (!requestedCleanEnd) {
+                        record(classified.diagnostic);
+                    }
 
                     if (classified.secondary)
                         record(*classified.secondary);
@@ -909,6 +991,11 @@ RecoveryObservation RecoveryCore::execute(RecoveryTicket ticket, RecoveryTurnWor
 
             if (cutoff_ || finalRetirement_)
                 observeRetiringBackend(cutoff_);
+
+            // A plain pause retains projected queue cache, never the old undecided protocol offer.
+            if (connectionFenced_ && !releaseEvent(work.session)) {
+                return recoveryResult(ticket, RecoveryCompletion::DEFERRED);
+            }
 
             captureWire();
             backend_.dispose();
@@ -982,7 +1069,9 @@ RecoveryObservation RecoveryCore::execute(RecoveryTicket ticket, RecoveryTurnWor
                 if (!configuration_.queue(family))
                     continue;
 
-                const auto progressed = configuration_.queue(family)->progress(work.queues[family]);
+                const auto progressed = connectionFenced_
+                                            ? configuration_.queue(family)->progressRetainedCache(work.queues[family])
+                                            : configuration_.queue(family)->progress(work.queues[family]);
 
                 if (cutoff_)
                     return recoveryResult(ticket, RecoveryCompletion::DEFERRED);
@@ -1048,7 +1137,8 @@ RecoveryObservation RecoveryCore::execute(RecoveryTicket ticket, RecoveryTurnWor
                 queue->requestStop(drain_.active() ? mux::StopMode::GRACEFUL : mux::StopMode::ABORT);
 
                 if (queue->state() != mux::QueueState::TERMINAL) {
-                    const auto progressed = queue->progress(work.queues[family]);
+                    const auto progressed = connectionFenced_ ? queue->progressRetainedCache(work.queues[family])
+                                                              : queue->progress(work.queues[family]);
 
                     if (!progressed && progressed.error().error != mux::QueueError::WORK_LIMIT) {
                         record(queueFailure(progressed.error()));
@@ -1163,6 +1253,7 @@ RecoveryStatus RecoveryCore::status() const noexcept {
     const auto current = state_.status();
     RecoveryStatus result{publicPhase(current.phase), current.attempts, first_, secondary_};
     result.stopped = cutoff_;
+    result.sourceResetPending = state_.sourceResetPending();
     result.terminal = terminal_;
     const std::array slots{&configuration_.queues.ticker, &configuration_.queues.stream,
                            &configuration_.queues.history};
@@ -1260,7 +1351,7 @@ RecoveryCore::historyRangeStatus(const mux::MuxHandle &handle, core::Subscriptio
         return std::unexpected(RecoveryDiagnostic{RecoveryError::INVALID_STATE, "recovery-history-queue"});
     }
 
-    if (cutoff_ || event_ || state_.status().phase != RecoveryPhase::ACTIVE) {
+    if (cutoff_ || connectionFenced_ || event_ || state_.status().phase != RecoveryPhase::ACTIVE) {
         return std::unexpected(RecoveryDiagnostic{RecoveryError::INVALID_STATE, "recovery-history-ineligible"});
     }
 

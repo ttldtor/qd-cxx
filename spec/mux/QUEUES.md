@@ -401,3 +401,30 @@ Command/mapping copies retain selector kind. A canonical-domain failure after qu
 an already owned UNSTAGED event: normal shared-source failure/disposal preserves the nested cause,
 counts and gaps. It does not undo the accepted ownership barrier. Reservations and local stop/lease
 rules above remain; rebuilt consumers must account current metadata sizes.
+
+## Discarding an uncommitted source offer
+
+`requestDiscardPendingSource()` records a serialized allocation-free request,
+including from a queue callback. It does not dispose data or change the source
+epoch inline. Until subsequent funded `progress()` releases the current uncommitted
+source offer, `admit()` rejects with `BUSY`. Progress performs that release before
+staging, ordinary commands or further callbacks. `WORK_LIMIT` retains the request
+and admission fence; already consumed work is not refunded.
+
+The operation preserves committed collector cache, queued committed projections,
+registrations, desired interests, source identity and caller-owned immutable batch
+leases with their original quota charges. A source offer already committed before
+the cutoff is not retroactively undone. An uncommitted STREAM routing remainder
+uses its actual discard path and retains gap/loss evidence. This is neither
+`resetSource()` nor final stop. The composing recovery owner keeps native input
+fenced separately; see [explicit pause/reconnect](../transport/RECOVERY.md#explicit-plain-pause-and-restart).
+`progressRetainedCache(work)` uses the same finite owner scheduler with an immutable
+local record-origin gate. It may construct real cached INITIAL projections; only
+those newly constructed in this mode may start callbacks. Old queued INITIAL/LIVE
+or STREAM records are not retagged. They are discarded using genuine work and
+discard/gap counts before callback selection. Work exhaustion preserves the
+unconsumed prefix. The composing owner must separately fence source intake; this
+method introduces no wire flags, business event source or execution thread.
+Ordinary `progress()` remains unchanged. Retained values/epochs and their original
+charges remain valid. Explicit final drain after a pause must keep the same origin
+gate so close cannot re-enable a previously fenced live FIFO.

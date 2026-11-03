@@ -130,6 +130,12 @@ class PlainRecoveryBackend final : public detail::RecoveryBackend {
             (void)runtime_->requestClose();
     }
 
+    void suspend() noexcept override {
+        if (runtime_) {
+            (void)detail::TcpRuntimeFactory::requestPause(*runtime_);
+        }
+    }
+
     void dispose() noexcept override {
         runtime_.reset();
     }
@@ -288,6 +294,18 @@ std::expected<RecoveryStatus, RecoveryDiagnostic> TcpRecovery::poll(RecoveryTurn
     const auto lease = impl_; // Taken before any callback can destroy or replace the public handle.
 
     return lease ? lease->core.poll(work) : std::unexpected(moved());
+}
+
+std::expected<void, RecoveryDiagnostic> TcpRecovery::requestDisconnect(bool clear) noexcept {
+    const auto lease = impl_;
+
+    return lease ? lease->core.requestDisconnect(clear) : std::unexpected(moved());
+}
+
+std::expected<void, RecoveryDiagnostic> TcpRecovery::requestReconnect() noexcept {
+    const auto lease = impl_;
+
+    return lease ? lease->core.requestReconnect() : std::unexpected(moved());
 }
 
 std::expected<void, RecoveryDiagnostic> TcpRecovery::requestStop() noexcept {

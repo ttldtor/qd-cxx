@@ -38,10 +38,14 @@ self-await and runtime-await reentry reject `INVALID_STATE` rather than wait for
 the callback containing them.
 
 The first `connect()` preserves its existing immediate `CONNECTING` observation.
-Its selected snapshot occupies one deferred notification slot and is dispatched
+Its selected snapshot occupies a bounded ring slot and is dispatched
 before later worker observations on every exit path, including early close, native
 activation failure and worker infrastructure failure. Worker-start refusal occurs
 before state publication, produces no transition and runs no callback on a producer.
+Later disconnect/connect/reconnect transitions use the same ordered fixed ring.
+`maximumPendingStateChangesPerEndpoint` defaults to 8 and includes executing/
+retiring selections; ordinary overflow refuses before lifecycle mutation. Close
+and failure retain reserved progress. See [lifecycle admission](FEED-LIFECYCLE.md).
 There is no unbounded transition queue or detached notification thread.
 
 `RuntimeOptions::maximumStateListenersPerEndpoint` and

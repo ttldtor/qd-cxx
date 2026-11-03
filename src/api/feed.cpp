@@ -13,6 +13,7 @@
 #include <exception>
 #include <limits>
 #include <new>
+#include <optional>
 #include <utility>
 
 namespace org::ttldtor::qdcxx::api {
@@ -132,14 +133,72 @@ void notifyState(const std::shared_ptr<Port> &port, const std::shared_ptr<const 
     }
 }
 
-/** Publish a distinct lifecycle observation and select advisory observers atomically.
- * Only the endpoint's native or claimed creator-retirement execution domain calls this helper.
+/** Reserve and publish one actual endpoint transition under its mutex, after caller admission.
+ * @param port Detached endpoint with one free preallocated ring slot.
+ * @param next Newly published state; the current state differs and is not absorbing.
+ */
+void queueStateChange(detail::EndpointPort &port, EndpointState next) noexcept {
+    if (port.stateChangeCount == port.stateChanges.size()) {
+        std::terminate();
+    }
+
+    const auto tail = (port.stateChangeHead + port.stateChangeCount) % port.stateChanges.size();
+    auto &entry = port.stateChanges[tail];
+    entry.previous = port.state;
+    entry.current = next;
+    entry.listeners = port.stateListeners.snapshot;
+    ++port.stateChangeCount;
+    port.state = next;
+}
+
+/** Dispatch a finite allowance of complete endpoint selections, keeping executing leases charged.
+ * Only the claimed execution domain enters this helper; reentrant producers can only append.
+ * @param port Detached endpoint, kept alive through selection/capture destruction.
+ * @param allowance Fixed entry allowance for this call; producer refills do not extend it.
+ * @return True when no notification remains after this allowance.
+ */
+bool dispatchStateChanges(const std::shared_ptr<detail::EndpointPort> &port, std::size_t allowance) noexcept {
+    for (std::size_t dispatched = 0; dispatched < allowance; ++dispatched) {
+        detail::EndpointStateChange selected;
+        {
+            std::lock_guard lock(port->mutex);
+
+            if (port->stateChangeCount == 0 || port->stateChangeDispatching) {
+                return port->stateChangeCount == 0;
+            }
+
+            port->stateChangeDispatching = true;
+            selected = std::move(port->stateChanges[port->stateChangeHead]);
+        }
+
+        notifyState(port, selected.listeners, selected.previous, selected.current);
+        // This notification's lease, including any final application destructors, ends outside every lock.
+        selected.listeners.reset();
+        {
+            std::lock_guard lock(port->mutex);
+            port->stateChangeHead = (port->stateChangeHead + 1) % port->stateChanges.size();
+            --port->stateChangeCount;
+            port->stateChangeDispatching = false;
+        }
+
+        port->retiredCondition.notify_all();
+    }
+
+    std::lock_guard lock(port->mutex);
+
+    return port->stateChangeCount == 0;
+}
+
+/** Publish a distinct owning-domain observation without bypassing producer publication order.
  * @tparam Port Detached endpoint or subscription port.
  * @tparam State Its public lifecycle enum.
- * @param port Owner with serialized state publication.
- * @param next Actual new lifecycle observation; CLOSED and FAILED are absorbing.
+ * @param port Owner with serialized native/claimed creator dispatch.
+ * @param next Actual new state; CLOSED/FAILED are absorbing.
+ * @param revision Endpoint control revision captured before native progress; absent for final retirement.
  */
-template <class Port, class State> void observeState(const std::shared_ptr<Port> &port, State next) noexcept {
+template <class Port, class State>
+void observeState(const std::shared_ptr<Port> &port, State next,
+                  std::optional<std::uint64_t> revision = std::nullopt) noexcept {
     std::shared_ptr<const detail::ListenerSnapshot> listeners;
     State previous;
     {
@@ -150,31 +209,81 @@ template <class Port, class State> void observeState(const std::shared_ptr<Port>
             return;
         }
 
-        port->state = next;
-        listeners = port->stateListeners.snapshot;
+        if constexpr (std::is_same_v<Port, detail::EndpointPort>) {
+            if (port->stateChangeCount != 0 || (revision && *revision != port->connectionRevision)) {
+                return;
+            }
+
+            queueStateChange(*port, next);
+        } else {
+            port->state = next;
+            listeners = port->stateListeners.snapshot;
+        }
     }
 
     port->stateCondition.notify_all();
-    notifyState(port, listeners, previous, next);
+
+    if constexpr (std::is_same_v<Port, detail::EndpointPort>) {
+        // Pending debt has its separate per-turn allowance; this one new native observation is bounded by poll work.
+        static_cast<void>(dispatchStateChanges(port, 1));
+    } else {
+        notifyState(port, listeners, previous, next);
+    }
 }
 
-/** Drain the one producer-published initial transition before later owner-domain observations.
- * @param port Endpoint whose connection admission already published CONNECTING.
+/** Drain bounded producer publication debt before native/final observations, including every failure path.
+ * @param port Endpoint whose pending transitions already own complete selected snapshots.
+ * @return True if all earlier published selections have retired; producer refills cannot extend this call.
  */
-void notifyConnecting(const std::shared_ptr<detail::EndpointPort> &port) noexcept {
-    std::shared_ptr<const detail::ListenerSnapshot> listeners;
-    {
-        std::lock_guard lock(port->mutex);
+bool notifyConnecting(const std::shared_ptr<detail::EndpointPort> &port) noexcept {
+    return dispatchStateChanges(port, port->limits.maximumPendingStateChangesPerEndpoint);
+}
 
-        if (!port->connectingNotification) {
-            return;
+/** Producer controls; physical intent can coalesce without losing complete published observation selections. */
+enum class ConnectionRequest { DISCONNECT, CLEAR, RECONNECT };
+
+/** Admit a nonterminal lifecycle control atomically, without I/O or callable release under locks.
+ * @param port Detached endpoint with fixed notification storage.
+ * @param request Explicit pause, clear or restart intent.
+ */
+void requestConnectionChange(const std::shared_ptr<detail::EndpointPort> &port, ConnectionRequest request) {
+    producerAction([&] {
+        const bool restart = request == ConnectionRequest::RECONNECT;
+        const bool clear = request == ConnectionRequest::CLEAR;
+        const auto next = restart ? EndpointState::CONNECTING : EndpointState::NOT_CONNECTED;
+        {
+            std::lock_guard lock(port->mutex);
+
+            if (port->state == EndpointState::CLOSED || port->state == EndpointState::FAILED ||
+                (restart && (!port->connectRequested || !port->connectionIntent)) ||
+                (!restart && !clear && !port->connectionIntent)) {
+                return;
+            }
+
+            if (port->closeRequested.load(std::memory_order_acquire)) {
+                reject(ErrorCode::CLOSED, "endpoint-closed");
+            }
+
+            if (port->connectionRevision == std::numeric_limits<std::uint64_t>::max() ||
+                (port->state != next && port->stateChangeCount == port->stateChanges.size())) {
+                reject(ErrorCode::RESOURCE_LIMIT, "endpoint-control-admission");
+            }
+
+            ++port->connectionRevision;
+            port->connectionIntent = restart;
+
+            if (clear) {
+                port->clearRevision = port->connectionRevision;
+            }
+
+            if (port->state != next) {
+                queueStateChange(*port, next);
+            }
         }
 
-        port->connectingNotification = false;
-        listeners = std::move(port->connectingListeners);
-    }
-
-    notifyState(port, listeners, EndpointState::NOT_CONNECTED, EndpointState::CONNECTING);
+        port->stateCondition.notify_all();
+        wake(port->control);
+    });
 }
 
 /** Preserve a subscription's first bounded asynchronous failure.
@@ -1121,7 +1230,7 @@ void Endpoint::connect(std::string_view address) {
         }
 
         {
-            // This lock pins the dispatch pointer through thread creation and address publication.
+            // Pins worker creation and dispatch lifetime; all fallible preparation precedes publication.
             std::lock_guard gate(control->mutex);
 
             if (!control->runtime || control->stopping) {
@@ -1136,27 +1245,57 @@ void Endpoint::connect(std::string_view address) {
             }
 
             if (port_->connectRequested) {
-                if (port_->address == copiedAddress) {
-                    return;
+                if (port_->address != copiedAddress) {
+                    reject(ErrorCode::INVALID_STATE, "endpoint-address-fixed");
                 }
 
-                reject(ErrorCode::INVALID_STATE, "endpoint-address-fixed");
+                if (port_->connectionIntent) {
+                    return;
+                }
+            }
+
+            if (port_->connectionRevision == std::numeric_limits<std::uint64_t>::max()) {
+                reject(ErrorCode::RESOURCE_LIMIT, "endpoint-control-identity");
+            }
+
+            if (port_->state != EndpointState::CONNECTING && port_->stateChangeCount == port_->stateChanges.size()) {
+                reject(ErrorCode::RESOURCE_LIMIT, "endpoint-state-notification-count");
             }
 
             control->runtime->startWorker();
-            port_->address = std::move(copiedAddress);
-            port_->host = std::move(host);
-            port_->port = port;
-            port_->connectRequested = true;
-            port_->state = EndpointState::CONNECTING;
-            port_->connectingListeners = port_->stateListeners.snapshot;
-            port_->connectingNotification = true;
+
+            if (!port_->connectRequested) {
+                port_->address = std::move(copiedAddress);
+                port_->host = std::move(host);
+                port_->port = port;
+                port_->connectRequested = true;
+            }
+
+            ++port_->connectionRevision;
+            port_->connectionIntent = true;
+
+            if (port_->state != EndpointState::CONNECTING) {
+                queueStateChange(*port_, EndpointState::CONNECTING);
+            }
+
             ++control->wakeSequence;
         }
 
         port_->stateCondition.notify_all();
         control->condition.notify_one();
     });
+}
+
+void Endpoint::disconnect() {
+    requestConnectionChange(port_, ConnectionRequest::DISCONNECT);
+}
+
+void Endpoint::disconnectAndClear() {
+    requestConnectionChange(port_, ConnectionRequest::CLEAR);
+}
+
+void Endpoint::reconnect() {
+    requestConnectionChange(port_, ConnectionRequest::RECONNECT);
 }
 
 void Endpoint::close() noexcept {
@@ -1309,6 +1448,21 @@ class TypedConsumer final : public client::SubscriptionConsumer {
 
         std::shared_ptr<const ListenerSnapshot> listeners;
         {
+            // Endpoint-to-subscription order makes the whole selection atomic with producer source/clear fences.
+            std::lock_guard endpointLock(endpoint->mutex);
+
+            const bool currentSource =
+                endpoint->connectionIntent && endpoint->activeDeliveryRevision == endpoint->connectionRevision;
+            const bool retainedCache =
+                !endpoint->connectionIntent && endpoint->pausedReplayFence == endpoint->connectionRevision;
+
+            if ((!currentSource && !retainedCache) || endpoint->clearRevision > endpoint->clearedRevision) {
+                endpoint->terminal.hadGap = endpoint->terminal.hadGap || !batch.records().empty();
+
+                // Consume an obsolete offer without permanently pausing this still-live stable registration.
+                return mux::BatchAction::CONTINUE;
+            }
+
             std::lock_guard lock(port_->mutex);
             listeners = port_->listeners;
         }
@@ -1356,6 +1510,9 @@ struct NativeEndpoint {
     std::optional<transport::TcpRecovery> recovery; ///< Sole native/protocol/queue owner on this worker.
     std::vector<std::unique_ptr<NativeSubscription>> subscriptions; ///< Fixed native registration slots.
     bool draining = false;                                          ///< Actual admitted-prefix drain requested once.
+    std::uint64_t appliedRevision = 0;      ///< Latest physical control captured/applied on this worker.
+    std::uint64_t appliedClearRevision = 0; ///< Sticky clear included in that physical control.
+    std::uint32_t actualAttempts = 0;       ///< Last actual factory-entry count, never inferred from desired state.
 
     /** Adopt nonnative immutable preparation on the worker.
      * @param port Detached endpoint route/policy.
@@ -1413,7 +1570,7 @@ std::unique_ptr<NativeEndpoint> activate(const transport::detail::BootstrapLease
 /** Register one actual independent existing receiver on the adopted family queue.
  * @param endpoint Sole worker-owned native endpoint.
  * @param port Detached logical producer state.
- * @return Actual native registration, or detached Error preserving a static failure category.
+ * @return Actual registration, empty during a continuing source reset, or detached Error for permanent refusal.
  */
 std::unique_ptr<NativeSubscription> registerSubscription(NativeEndpoint &endpoint,
                                                          const std::shared_ptr<SubscriptionPort> &port) {
@@ -1440,6 +1597,13 @@ std::unique_ptr<NativeSubscription> registerSubscription(NativeEndpoint &endpoin
         const auto &failure = std::get<client::ReceiverFailure>(handle.error());
 
         if (const auto *queue = std::get_if<mux::QueueFailure>(&failure.cause)) {
+            if (queue->error == mux::QueueError::BUSY ||
+                (queue->error == mux::QueueError::CLOSING &&
+                 endpoint.recovery->status().phase == transport::RecoveryPhase::RESETTING)) {
+                // A real reset temporarily fences registration; retry once on a later bounded owner turn.
+                return {};
+            }
+
             throw Error(queueDiagnostic(queue->error, "subscription-registration"));
         }
 
@@ -1656,6 +1820,48 @@ enum class EndpointProgress {
  */
 EndpointProgress progressEndpoint(NativeEndpoint &endpoint, transport::RecoveryTurnWork &work,
                                   mux::QueueSubmitWork &submitWork, bool firstPoll) {
+    std::uint64_t revision;
+    std::uint64_t clearRevision;
+    bool online;
+    {
+        std::lock_guard lock(endpoint.port->mutex);
+
+        if (endpoint.port->stateChangeCount != 0) {
+            return EndpointProgress::TURN_EXHAUSTED;
+        }
+
+        revision = endpoint.port->connectionRevision;
+        clearRevision = endpoint.port->clearRevision;
+        online = endpoint.port->connectionIntent;
+    }
+
+    if (!endpoint.port->closeRequested.load(std::memory_order_acquire) && endpoint.appliedRevision != revision) {
+        const bool clear = clearRevision > endpoint.appliedClearRevision;
+        const auto disconnected = endpoint.recovery->requestDisconnect(clear);
+
+        if (!disconnected) {
+            failEndpoint(endpoint.port, recoveryDiagnostic(disconnected.error()));
+
+            return EndpointProgress::RETIRED;
+        }
+
+        if (online) {
+            const auto restarted = endpoint.recovery->requestReconnect();
+
+            if (!restarted) {
+                failEndpoint(endpoint.port, recoveryDiagnostic(restarted.error()));
+
+                return EndpointProgress::RETIRED;
+            }
+        }
+
+        endpoint.appliedRevision = revision;
+
+        if (clear) {
+            endpoint.appliedClearRevision = clearRevision;
+        }
+    }
+
     progressSubscriptions(endpoint, submitWork);
 
     if (endpoint.port->closeRequested.load(std::memory_order_acquire) && !endpoint.draining) {
@@ -1683,24 +1889,42 @@ EndpointProgress progressEndpoint(NativeEndpoint &endpoint, transport::RecoveryT
 
         failEndpoint(endpoint.port, recoveryDiagnostic(polled.error()));
 
-        // A fixed turn profile refusal is visible. Existing owner fallback retires on this same worker;
-        // retrying identical insufficient work indefinitely would conceal a broken admission profile.
         return EndpointProgress::RETIRED;
     }
 
     const auto &status = *polled;
-
-    if (status.first.error != transport::RecoveryError::NONE) {
+    const bool enteredFactory = status.attempts != endpoint.actualAttempts;
+    endpoint.actualAttempts = status.attempts;
+    {
         std::lock_guard lock(endpoint.port->mutex);
 
-        if (endpoint.port->diagnostic.code == ErrorCode::NONE) {
+        if (!status.sourceResetPending && endpoint.appliedClearRevision > endpoint.port->clearedRevision) {
+            endpoint.port->clearedRevision = endpoint.appliedClearRevision;
+        }
+
+        // A paused cache belongs to its original stable queue epoch, never to a fabricated new transport attempt.
+        if (status.phase == transport::RecoveryPhase::SUSPENDED && !status.terminal &&
+            endpoint.appliedRevision == endpoint.port->connectionRevision && !endpoint.port->connectionIntent &&
+            endpoint.port->clearRevision <= endpoint.port->clearedRevision && !endpoint.draining) {
+            endpoint.port->pausedReplayFence = endpoint.appliedRevision;
+        }
+
+        // Factory entry is after the real source reset and before START/POLL/DELIVER; never retag an old offer.
+        if (enteredFactory && !status.terminal && endpoint.appliedRevision == endpoint.port->connectionRevision &&
+            endpoint.port->connectionIntent && !endpoint.draining) {
+            endpoint.port->activeDeliveryRevision = endpoint.appliedRevision;
+        }
+
+        if (status.first.error != transport::RecoveryError::NONE && endpoint.port->diagnostic.code == ErrorCode::NONE) {
             endpoint.port->diagnostic = recoveryDiagnostic(status.first);
         }
     }
 
-    if (!endpoint.draining && !status.terminal) {
-        observeState(endpoint.port, status.phase == transport::RecoveryPhase::ACTIVE ? EndpointState::CONNECTED
-                                                                                     : EndpointState::CONNECTING);
+    if (!endpoint.draining && !status.terminal && online && endpoint.appliedRevision == revision) {
+        observeState(endpoint.port,
+                     status.phase == transport::RecoveryPhase::ACTIVE ? EndpointState::CONNECTED
+                                                                      : EndpointState::CONNECTING,
+                     revision);
     }
 
     return status.terminal ? EndpointProgress::RETIRED : EndpointProgress::PENDING;
@@ -1854,12 +2078,18 @@ void RuntimeImpl::run() noexcept {
                 bool connectRequested = false;
                 {
                     std::lock_guard lock(port->mutex);
-                    connectRequested = port->connectRequested;
+                    connectRequested = port->connectRequested && port->connectionIntent;
                 }
 
                 // Capture admission before draining its notification: a concurrent later connect must wait
                 // for the next turn instead of activating ahead of its deferred CONNECTING selection.
-                notifyConnecting(port);
+                if (!notifyConnecting(port)) {
+                    // A producer refill yields to other endpoints, but finite remaining debt still needs owner work.
+                    nextWake = std::min(nextWake, std::chrono::steady_clock::now() + port->options.pollInterval);
+
+                    continue;
+                }
+
                 bool failedThisTurn = false;
 
                 try {
@@ -2019,7 +2249,8 @@ RuntimeOptions prepareRuntimeOptions(RuntimeOptions options) {
         !options.maximumSymbolsPerSubscription || !options.maximumListenersPerSubscription ||
         !options.maximumStateListenersPerEndpoint || !options.maximumStateListenersPerSubscription ||
         !options.maximumSymbolUnits || options.maximumSymbolUnits > 128 ||
-        !options.maximumEventTypeArgumentsPerSubscription || options.dnsServers.size() > 4 || options.dnsPort == 0) {
+        !options.maximumEventTypeArgumentsPerSubscription || !options.maximumPendingStateChangesPerEndpoint ||
+        options.dnsServers.size() > 4 || options.dnsPort == 0) {
         reject(ErrorCode::INVALID_ARGUMENT, "runtime-options");
     }
 
@@ -2091,6 +2322,7 @@ std::shared_ptr<Endpoint> ApiRuntime::createEndpoint(EndpointOptions options) {
         port->options = options;
         port->stateListeners = makeStateListeners(port, impl_->options.maximumStateListenersPerEndpoint);
         port->subscriptions.resize(impl_->options.maximumSubscriptionsPerEndpoint);
+        port->stateChanges.resize(impl_->options.maximumPendingStateChangesPerEndpoint);
         auto endpoint = std::shared_ptr<Endpoint>(new Endpoint(port));
         {
             std::lock_guard gate(control->mutex);

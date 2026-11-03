@@ -6,6 +6,10 @@
 #include "qd/transport/recovery.hpp"
 
 #include "connect_peer.hpp"
+#include "recovery_test_peer.hpp"
+
+#include "qd/encoding/compact.hpp"
+#include "qd/encoding/symbol_reader.hpp"
 
 #include <doctest/doctest.h>
 
@@ -590,6 +594,7 @@ TEST_CASE("public feed supports registration after connect and independent overl
                endpoint->getDiagnostic().code != api::ErrorCode::NONE;
     }));
     CAPTURE(endpoint->getDiagnostic().stage);
+    CAPTURE(endpoint->getDiagnostic().nativeCode);
     CAPTURE(endpoint->getDiagnostic().detailCode);
     REQUIRE(endpoint->getDiagnostic().code == api::ErrorCode::NONE);
     auto first = endpoint->getFeed()->createSubscription<events::Quote>();
@@ -1971,4 +1976,543 @@ TEST_CASE("public await accepts cancellation requested by its own worker state c
     static_cast<void>(endpoint->closeAndAwaitTermination());
     CHECK(callbackReturned.load());
     CHECK_FALSE(source.failed());
+}
+
+namespace {
+/** Finite test-owned callback/capture barrier; storage is declared before the runtime it observes. */
+struct LifecycleBarrier {
+    std::mutex mutex;                  ///< Protects scheduling flags, never an SDK control lock.
+    std::condition_variable condition; ///< Explicit owned scheduling, not network progress.
+    bool entered = false;              ///< Callback/capture reached the held phase.
+    bool release = false;              ///< Main test opened this barrier.
+    std::atomic<bool> timedOut{false}; ///< A failed setup cannot hold the worker indefinitely.
+
+    /** Hold one actual callback/destructor for at most five seconds. */
+    void enter() {
+        std::unique_lock lock(mutex);
+        entered = true;
+        condition.notify_all();
+        timedOut = !condition.wait_for(lock, 5s, [&] {
+            return release;
+        });
+    }
+
+    /** Observe entry without driving any SDK progress.
+     * @return True within the finite setup allowance.
+     */
+    bool awaitEntry() {
+        std::unique_lock lock(mutex);
+
+        return condition.wait_for(lock, 3s, [&] {
+            return entered;
+        });
+    }
+
+    /** Wake only this owned barrier; safe on assertion unwind. */
+    void open() {
+        {
+            std::lock_guard lock(mutex);
+            release = true;
+        }
+
+        condition.notify_all();
+    }
+};
+
+/** Release before runtime destruction while the separate barrier storage still lives. */
+struct ReleaseLifecycleBarrier {
+    LifecycleBarrier &barrier; ///< Test storage declared before the main-owned runtime.
+
+    /** Guarantee the runtime never joins behind an unreleased test barrier. */
+    ~ReleaseLifecycleBarrier() {
+        barrier.open();
+    }
+};
+
+/** Decode actual outgoing TICKER ADD tuples from a bounded captured wire prefix.
+ * @param bytes Bytes captured from the real client, not writer composition output.
+ * @return Number of complete exact IBM/local-record0 ADD frames.
+ */
+std::size_t checkLifecycleAdds(std::span<const std::byte> bytes) {
+    root::protocol::FrameReader reader({8192, 8201});
+    std::size_t adds = 0;
+
+    while (!bytes.empty()) {
+        const auto framed = reader.feed(bytes);
+        REQUIRE(framed.status != root::protocol::FrameStatus::FAILED);
+        REQUIRE(framed.accepted != 0);
+        bytes = bytes.subspan(framed.accepted);
+
+        if (!framed.frame || framed.frame->type != 11) {
+            continue;
+        }
+
+        std::span<const std::byte> payload = framed.frame->payload;
+        root::encoding::SymbolReader symbols({8192, 128, 128}, 0);
+        const auto symbol = symbols.read(payload);
+        REQUIRE(symbol.status == root::encoding::SymbolStatus::OK);
+        CHECK(symbol.value->units == u"IBM");
+        CHECK(symbol.value->eventFlags == 0);
+        payload = payload.subspan(symbol.consumed);
+        const auto record = root::encoding::readCompactInt(payload);
+        REQUIRE(record.status == root::encoding::Status::OK);
+        CHECK(record.value == 0);
+        CHECK(payload.subspan(record.consumed).empty());
+        ++adds;
+    }
+
+    return adds;
+}
+} // namespace
+
+TEST_CASE("public lifecycle notification capacity includes selected callbacks and reserves close") {
+    LifecycleBarrier barrier;
+    StateLog<api::EndpointState> changes;
+    auto options = runtimeOptions();
+    options.maximumPendingStateChangesPerEndpoint = 1;
+    api::ApiRuntime runtime(options);
+    ReleaseLifecycleBarrier release{barrier};
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    endpoint->addStateChangeListener([&](auto previous, auto current) {
+        changes.record(previous, current);
+
+        if (current == api::EndpointState::CONNECTING) {
+            barrier.enter();
+        }
+    });
+    endpoint->connect("127.0.0.1:1");
+    REQUIRE(barrier.awaitEntry());
+    CHECK(errorCode([&] {
+              endpoint->disconnect();
+          }) == api::ErrorCode::RESOURCE_LIMIT);
+    CHECK(endpoint->getState() == api::EndpointState::CONNECTING);
+    endpoint->close();
+    barrier.open();
+    CHECK(endpoint->closeAndAwaitTermination().drained);
+    CHECK_FALSE(barrier.timedOut.load());
+    const auto observed = changes.snapshot();
+    checkStateOrder(observed, api::EndpointState::NOT_CONNECTED, api::EndpointState::CLOSED);
+    CHECK(observed.size() == 3);
+}
+
+TEST_CASE("public lifecycle notification slot remains charged through selected capture destruction") {
+    LifecycleBarrier barrier;
+    api::Endpoint::StateChangeListenerId id = 0;
+    auto options = runtimeOptions();
+    options.maximumPendingStateChangesPerEndpoint = 1;
+    api::ApiRuntime runtime(options);
+    ReleaseLifecycleBarrier release{barrier};
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    auto capture = std::make_shared<CaptureAction>();
+    capture->action = [&] {
+        barrier.enter();
+    };
+    id = endpoint->addStateChangeListener([&, capture, endpoint](auto, auto current) {
+        if (current == api::EndpointState::CONNECTING) {
+            endpoint->removeStateChangeListener(id);
+        }
+    });
+    capture.reset();
+    endpoint->connect("127.0.0.1:1");
+    REQUIRE(barrier.awaitEntry());
+    CHECK(errorCode([&] {
+              endpoint->disconnectAndClear();
+          }) == api::ErrorCode::RESOURCE_LIMIT);
+    CHECK(endpoint->getState() == api::EndpointState::CONNECTING);
+    endpoint->close();
+    barrier.open();
+    CHECK(endpoint->closeAndAwaitTermination().drained);
+    CHECK_FALSE(barrier.timedOut.load());
+    CHECK(endpoint->getState() == api::EndpointState::CLOSED);
+}
+
+TEST_CASE("public lifecycle preserves rapid immediate producer states and refuses overflow before mutation") {
+    LifecycleBarrier barrier;
+    StateLog<api::EndpointState> changes;
+    std::atomic<bool> held{false};
+    auto options = runtimeOptions();
+    options.maximumPendingStateChangesPerEndpoint = 4;
+    api::ApiRuntime runtime(options);
+    ReleaseLifecycleBarrier release{barrier};
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    endpoint->addStateChangeListener([&](auto previous, auto current) {
+        changes.record(previous, current);
+
+        if (current == api::EndpointState::CONNECTING && !held.exchange(true)) {
+            barrier.enter();
+        }
+    });
+    endpoint->connect("127.0.0.1:1");
+    REQUIRE(barrier.awaitEntry());
+    endpoint->disconnect();
+    CHECK(endpoint->getState() == api::EndpointState::NOT_CONNECTED);
+    endpoint->reconnect();
+    CHECK(endpoint->getState() == api::EndpointState::NOT_CONNECTED);
+    endpoint->connect("127.0.0.1:1");
+    CHECK(endpoint->getState() == api::EndpointState::CONNECTING);
+    endpoint->disconnect();
+    CHECK(endpoint->getState() == api::EndpointState::NOT_CONNECTED);
+    CHECK(errorCode([&] {
+              endpoint->connect("127.0.0.1:1");
+          }) == api::ErrorCode::RESOURCE_LIMIT);
+    CHECK(endpoint->getState() == api::EndpointState::NOT_CONNECTED);
+    endpoint->close();
+    barrier.open();
+    CHECK(endpoint->closeAndAwaitTermination().drained);
+    CHECK_FALSE(barrier.timedOut.load());
+    const auto observed = changes.snapshot();
+    checkStateOrder(observed, api::EndpointState::NOT_CONNECTED, api::EndpointState::CLOSED);
+    REQUIRE(observed.size() == 6);
+    CHECK(observed[1].second == api::EndpointState::NOT_CONNECTED);
+    CHECK(observed[2].second == api::EndpointState::CONNECTING);
+    CHECK(observed[3].second == api::EndpointState::NOT_CONNECTED);
+}
+
+TEST_CASE("public lifecycle full notification ring still publishes actual worker failure before retirement") {
+    StateLog<api::EndpointState> changes;
+    auto options = runtimeOptions();
+    options.maximumPendingStateChangesPerEndpoint = 1;
+    api::ApiRuntime runtime(options);
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    endpoint->addStateChangeListener([&, endpoint](auto previous, auto current) {
+        changes.record(previous, current);
+        endpoint->close();
+    });
+    allocation_probe::WorkerFault fault(runtime);
+    fault.arm();
+    endpoint->connect("127.0.0.1:1");
+    const bool intercepted = eventually([&] {
+        return fault.entered.load();
+    });
+    CHECK(intercepted);
+    CHECK(errorCode([&] {
+              endpoint->disconnect();
+          }) == api::ErrorCode::RESOURCE_LIMIT);
+    fault.release = true;
+    const auto terminal = endpoint->closeAndAwaitTermination();
+    CHECK(terminal.diagnostic.code == api::ErrorCode::ALLOCATION_FAILURE);
+    CHECK(terminal.diagnostic.stage == "runtime-worker");
+    CHECK(endpoint->getState() == api::EndpointState::FAILED);
+    const auto observed = changes.snapshot();
+    checkStateOrder(observed, api::EndpointState::NOT_CONNECTED, api::EndpointState::FAILED);
+    CHECK(observed.size() == 2);
+}
+
+TEST_CASE("public lifecycle reconnect replays unchanged desired Quote on a real second source epoch") {
+    std::atomic<unsigned> first{0};
+    std::atomic<unsigned> second{0};
+    std::atomic<unsigned> unexpected{0};
+    std::optional<events::Quote> retained;
+    std::mutex values;
+    api::ApiRuntime runtime(runtimeOptions());
+    auto schema = standardSchema(false);
+    auto firstValues = standardValues(schema);
+    auto secondValues = firstValues;
+
+    for (std::size_t index = 0; index < secondValues.size(); ++index) {
+        if (static_cast<core::SerialFieldType>(schema.records()[0].fields[index].serialTypeId) ==
+            core::SerialFieldType::TIME_SECONDS) {
+            secondValues[index].raw = 7;
+        }
+    }
+
+    const std::vector<peer::Record> firstRecords{{u"IBM", firstValues}};
+    const std::vector<peer::Record> secondRecords{{u"IBM", secondValues}};
+    root::test::TcpPeerConfig config;
+    config.sessions.resize(2);
+
+    for (std::size_t index = 0; index < 2; ++index) {
+        auto &script = config.sessions[index];
+        script.initialBytes = peer::fixturePeerPrefix(schema, core::SubscriptionFamily::TICKER);
+        script.replyBytes =
+            peer::fixturePeerData(index == 0 ? firstRecords : secondRecords, core::SubscriptionFamily::TICKER, true);
+        script.readThroughMessage = 11;
+        script.waitForClientClose = true;
+    }
+
+    root::test::OwnedTcpPeer source(std::move(config));
+    REQUIRE(source.port() != 0);
+    auto settings = endpointOptions();
+    settings.maximumAttempts = 2;
+    settings.retryDelay = 1ms;
+    auto endpoint = runtime.createEndpoint(settings);
+    auto subscription = endpoint->getFeed()->createSubscription<events::Quote>();
+    subscription->addEventListener([&](std::span<const events::Quote> quotes) {
+        for (const auto &quote : quotes) {
+            if (quote.bidTimeMs == 3000) {
+                {
+                    std::lock_guard lock(values);
+                    retained = quote;
+                }
+
+                ++first;
+            } else if (quote.bidTimeMs == 7000) {
+                ++second;
+            } else {
+                ++unexpected;
+            }
+        }
+    });
+    subscription->addSymbols("IBM");
+    endpoint->connect("127.0.0.1:" + std::to_string(source.port()));
+    REQUIRE(eventually([&] {
+        return first.load() == 1;
+    }));
+    CHECK(endpoint->getDiagnostic().code == api::ErrorCode::NONE);
+    endpoint->reconnect();
+    CHECK(endpoint->getState() == api::EndpointState::CONNECTING);
+    const bool deliveredSecond = eventually([&] {
+        return second.load() == 1;
+    });
+    const auto failureSnapshot = source.snapshot();
+    CAPTURE(static_cast<int>(endpoint->getState()));
+    CAPTURE(static_cast<int>(endpoint->getDiagnostic().code));
+    CAPTURE(endpoint->getDiagnostic().stage);
+    CAPTURE(endpoint->getDiagnostic().nativeCode);
+    CAPTURE(static_cast<int>(failureSnapshot.error));
+    CAPTURE(failureSnapshot.nativeCode);
+    CAPTURE(first.load());
+    CAPTURE(second.load());
+
+    for (const auto &session : failureSnapshot.sessions) {
+        INFO("accepted=", session.accepted, " completed=", session.completed, " received=", session.received.size(),
+             " reply=", session.replyBytesWritten);
+    }
+
+    REQUIRE(deliveredSecond);
+    CHECK(unexpected.load() == 0);
+    CHECK(first.load() == 1);
+    REQUIRE(endpoint->awaitState(api::EndpointState::CONNECTED, std::chrono::steady_clock::now() + 2s).status ==
+            api::WaitStatus::REACHED);
+    CHECK(endpoint->getDiagnostic().code == api::ErrorCode::NONE);
+    const auto snapshot = source.snapshot();
+    REQUIRE(snapshot.sessions.size() == 2);
+    CHECK(snapshot.sessions[0].matched);
+    CHECK(snapshot.sessions[1].matched);
+    CHECK(checkLifecycleAdds(snapshot.sessions[0].received) == 1);
+    CHECK(checkLifecycleAdds(snapshot.sessions[1].received) == 1);
+    CHECK(snapshot.error == root::test::TcpPeerError::NONE);
+    {
+        std::lock_guard lock(values);
+        REQUIRE(retained);
+        CHECK(retained->bidTimeMs == 3000);
+        CHECK(retained->symbol == u"IBM");
+    }
+
+    static_cast<void>(endpoint->closeAndAwaitTermination());
+    checkRetiredEndpoint(endpoint);
+}
+
+TEST_CASE("public lifecycle offline cached Quote replay survives pause and clear fences every later selection") {
+    std::atomic<unsigned> initial{0};
+    std::atomic<unsigned> cached{0};
+    std::atomic<unsigned> fresh{0};
+    std::atomic<unsigned> staleAfterClear{0};
+    api::ApiRuntime runtime(runtimeOptions());
+    auto schema = standardSchema(false);
+    auto oldValues = standardValues(schema);
+    auto newValues = oldValues;
+
+    for (std::size_t index = 0; index < newValues.size(); ++index) {
+        if (static_cast<core::SerialFieldType>(schema.records()[0].fields[index].serialTypeId) ==
+            core::SerialFieldType::TIME_SECONDS) {
+            newValues[index].raw = 7;
+        }
+    }
+
+    const std::vector<peer::Record> oldRecords{{u"IBM", oldValues}};
+    const std::vector<peer::Record> newRecords{{u"IBM", newValues}};
+    root::test::TcpPeerConfig config;
+    config.sessions.resize(2);
+
+    for (std::size_t index = 0; index < config.sessions.size(); ++index) {
+        auto &script = config.sessions[index];
+        script.initialBytes = peer::fixturePeerPrefix(schema, core::SubscriptionFamily::TICKER);
+        script.replyBytes =
+            peer::fixturePeerData(index == 0 ? oldRecords : newRecords, core::SubscriptionFamily::TICKER, true);
+        script.readThroughMessage = 11;
+        script.waitForClientClose = true;
+    }
+
+    root::test::OwnedTcpPeer source(std::move(config));
+    REQUIRE(source.port() != 0);
+    auto settings = endpointOptions();
+    settings.maximumAttempts = 2;
+    settings.retryDelay = 1ms;
+    auto endpoint = runtime.createEndpoint(settings);
+    auto first = endpoint->getFeed()->createSubscription<events::Quote>();
+    first->addEventListener([&](std::span<const events::Quote> quotes) {
+        for (const auto &quote : quotes) {
+            if (quote.bidTimeMs == 3000)
+                ++initial;
+            else if (quote.bidTimeMs == 7000)
+                ++fresh;
+        }
+    });
+    first->addSymbols("IBM");
+    const auto address = "127.0.0.1:" + std::to_string(source.port());
+    endpoint->connect(address);
+    REQUIRE(eventually([&] {
+        return initial.load() == 1;
+    }));
+    endpoint->disconnect();
+    CHECK(endpoint->getState() == api::EndpointState::NOT_CONNECTED);
+    auto offline = endpoint->getFeed()->createSubscription({api::EventType::QUOTE});
+    offline->addEventListener([&](std::span<const api::RegisteredEvent> batch) {
+        for (const auto &event : batch) {
+            const auto *quote = std::get_if<events::Quote>(&event);
+            REQUIRE(quote);
+
+            if (quote->bidTimeMs == 3000)
+                ++cached;
+            else if (quote->bidTimeMs == 7000)
+                ++fresh;
+        }
+    });
+    offline->addSymbols("IBM");
+    // This actual cached callback is enabled only after native SUSPENDED quiescence; NOT_CONNECTED alone is not ACK.
+    REQUIRE(eventually([&] {
+        return cached.load() == 1;
+    }));
+    CHECK(endpoint->getState() == api::EndpointState::NOT_CONNECTED);
+    CHECK(endpoint->getDiagnostic().code == api::ErrorCode::NONE);
+    endpoint->reconnect();
+    CHECK(endpoint->getState() == api::EndpointState::NOT_CONNECTED);
+    endpoint->disconnectAndClear();
+    auto afterClear = endpoint->getFeed()->createSubscription({api::EventType::QUOTE});
+    afterClear->addEventListener([&](std::span<const api::RegisteredEvent> batch) {
+        for (const auto &event : batch) {
+            const auto *quote = std::get_if<events::Quote>(&event);
+            REQUIRE(quote);
+
+            if (quote->bidTimeMs == 3000)
+                ++staleAfterClear;
+            else if (quote->bidTimeMs == 7000)
+                ++fresh;
+        }
+    });
+    afterClear->addSymbols("IBM");
+    endpoint->connect(address);
+    const bool freshDelivered = eventually([&] {
+        return fresh.load() == 3;
+    });
+    CAPTURE(fresh.load());
+    CAPTURE(staleAfterClear.load());
+    CAPTURE(static_cast<int>(endpoint->getState()));
+    CAPTURE(endpoint->getDiagnostic().stage);
+    CAPTURE(endpoint->getDiagnostic().nativeCode);
+    CAPTURE(first->getDiagnostic().stage);
+    CAPTURE(offline->getDiagnostic().stage);
+    CAPTURE(afterClear->getDiagnostic().stage);
+    CAPTURE(afterClear->getDiagnostic().detailCode);
+    CAPTURE(static_cast<int>(afterClear->getDiagnostic().code));
+    const auto failedPeer = source.snapshot();
+    CAPTURE(static_cast<int>(failedPeer.error));
+    CAPTURE(failedPeer.nativeCode);
+    CAPTURE(failedPeer.sessions[0].completed);
+    CAPTURE(failedPeer.sessions[1].accepted);
+    CAPTURE(failedPeer.sessions[1].received.size());
+    REQUIRE(freshDelivered);
+    REQUIRE(endpoint->awaitState(api::EndpointState::CONNECTED, std::chrono::steady_clock::now() + 2s).status ==
+            api::WaitStatus::REACHED);
+    CHECK(initial.load() == 1);
+    CHECK(cached.load() == 1);
+    CHECK(staleAfterClear.load() == 0);
+    CHECK(endpoint->getDiagnostic().code == api::ErrorCode::NONE);
+    const auto snapshot = source.snapshot();
+    REQUIRE(snapshot.sessions.size() == 2);
+    CHECK(snapshot.sessions[0].matched);
+    CHECK(snapshot.sessions[1].matched);
+    CHECK(checkLifecycleAdds(snapshot.sessions[0].received) == 1);
+    CHECK(checkLifecycleAdds(snapshot.sessions[1].received) == 1);
+    CHECK(snapshot.error == root::test::TcpPeerError::NONE);
+    static_cast<void>(endpoint->closeAndAwaitTermination());
+    checkRetiredEndpoint(endpoint);
+}
+
+TEST_CASE("public lifecycle clear inside selected Quote fanout permits its remainder without stale state publication") {
+    std::atomic<unsigned> firstCalls{0};
+    std::atomic<unsigned> remainder{0};
+    StateLog<api::EndpointState> changes;
+    api::ApiRuntime runtime(runtimeOptions());
+    auto schema = standardSchema(false);
+    const std::vector<peer::Record> records{{u"IBM", standardValues(schema)}};
+    root::test::TcpPeerConfig config;
+    config.sessions.resize(1);
+    auto &script = config.sessions[0];
+    script.initialBytes = peer::fixturePeerPrefix(schema, core::SubscriptionFamily::TICKER);
+    script.replyBytes = peer::fixturePeerData(records, core::SubscriptionFamily::TICKER, true);
+    script.readThroughMessage = 11;
+    script.waitForClientClose = true;
+    root::test::OwnedTcpPeer source(std::move(config));
+    REQUIRE(source.port() != 0);
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    auto quotes = endpoint->getFeed()->createSubscription<events::Quote>();
+    quotes->addEventListener([&, endpoint](std::span<const events::Quote> batch) {
+        CHECK(batch.size() == 1);
+        endpoint->disconnectAndClear();
+        CHECK(endpoint->getState() == api::EndpointState::NOT_CONNECTED);
+        ++firstCalls;
+    });
+    quotes->addEventListener([&, endpoint](std::span<const events::Quote> batch) {
+        CHECK(firstCalls.load() == 1);
+        REQUIRE(batch.size() == 1);
+        CHECK(batch[0].bidTimeMs == 3000);
+        CHECK(endpoint->getState() == api::EndpointState::NOT_CONNECTED);
+        ++remainder;
+    });
+    endpoint->addStateChangeListener([&](auto previous, auto current) {
+        changes.record(previous, current);
+    });
+    quotes->addSymbols("IBM");
+    endpoint->connect("127.0.0.1:" + std::to_string(source.port()));
+    REQUIRE(eventually([&] {
+        return remainder.load() == 1;
+    }));
+    CHECK(endpoint->getState() == api::EndpointState::NOT_CONNECTED);
+    CHECK(endpoint->getDiagnostic().code == api::ErrorCode::NONE);
+    const auto closed = endpoint->closeAndAwaitTermination();
+    static_cast<void>(closed);
+    const auto observed = changes.snapshot();
+    checkStateOrder(observed, api::EndpointState::NOT_CONNECTED, endpoint->getState());
+    bool disconnected = false;
+
+    for (const auto &transition : observed) {
+        if (transition.second == api::EndpointState::NOT_CONNECTED)
+            disconnected = true;
+        else if (disconnected)
+            CHECK(transition.second != api::EndpointState::CONNECTED);
+    }
+
+    CHECK(disconnected);
+    CHECK(firstCalls.load() == 1);
+    CHECK(remainder.load() == 1);
+    CHECK(source.snapshot().error == root::test::TcpPeerError::NONE);
+    checkRetiredEndpoint(endpoint);
+}
+
+TEST_CASE("public lifecycle inactive and terminal controls are idempotent without a native peer") {
+    StateLog<api::EndpointState> changes;
+    api::ApiRuntime runtime(runtimeOptions());
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    endpoint->addStateChangeListener([&](auto previous, auto current) {
+        changes.record(previous, current);
+    });
+    endpoint->disconnect();
+    endpoint->disconnectAndClear();
+    endpoint->disconnectAndClear();
+    endpoint->reconnect();
+    CHECK(endpoint->getState() == api::EndpointState::NOT_CONNECTED);
+    CHECK(changes.snapshot().empty());
+    const auto closed = endpoint->closeAndAwaitTermination();
+    CHECK(closed.diagnostic.code == api::ErrorCode::NONE);
+    CHECK(endpoint->getState() == api::EndpointState::CLOSED);
+    const auto before = changes.snapshot();
+    endpoint->disconnect();
+    endpoint->disconnectAndClear();
+    endpoint->reconnect();
+    CHECK(endpoint->getState() == api::EndpointState::CLOSED);
+    CHECK(endpoint->getDiagnostic().code == api::ErrorCode::NONE);
+    CHECK(changes.snapshot() == before);
+    checkStateOrder(before, api::EndpointState::NOT_CONNECTED, api::EndpointState::CLOSED);
 }

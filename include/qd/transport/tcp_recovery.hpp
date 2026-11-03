@@ -79,6 +79,16 @@ class TcpRecovery {
      * @return Current detached status or transient pre-admission work/thread/reentry refusal.
      */
     [[nodiscard]] std::expected<RecoveryStatus, RecoveryDiagnostic> poll(RecoveryTurnWork &work);
+    /** Request nonterminal disconnection; stable queues, registrations and projected cache remain owned.
+     * Physical native retirement/reset needs later poll calls with genuine caller work.
+     * @param clear True requests actual source-cache/pending reset; accepted old immutable batches stay valid.
+     * @return Acceptance or owner/state refusal, including from a consumer callback; no callbacks run inline.
+     */
+    [[nodiscard]] std::expected<void, RecoveryDiagnostic> requestDisconnect(bool clear = false) noexcept;
+    /** Resume/restart a nonterminal owner after its actual old-source reset, without replenishing attempts.
+     * @return Acceptance or owner/state/remaining-attempt refusal; native work runs only on later poll calls.
+     */
+    [[nodiscard]] std::expected<void, RecoveryDiagnostic> requestReconnect() noexcept;
     /** Record allocation-free monotonic cutoff, including from this owner's consumer callback.
      * No inline native cleanup, callback dispatch or waiting occurs.
      * @return Acceptance or wrong-thread/moved-from refusal.
