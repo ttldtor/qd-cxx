@@ -38,7 +38,7 @@ inline constexpr auto RETRY_DELAY = std::chrono::milliseconds{250}; ///< Fixed d
 inline constexpr unsigned char FIRST_PRINTABLE_ASCII = 0x20;        ///< First accepted exact CLI symbol byte.
 inline constexpr unsigned char LAST_PRINTABLE_ASCII = 0x7e;         ///< Last accepted exact CLI symbol byte.
 /** Bounded full-shape preparation for the unchanged eight-field default Quote. */
-inline constexpr events::MappingLimits MAPPING_LIMITS{128, 256, 16, 64, 64, 128, 16384, 100000};
+inline constexpr events::MappingLimits MAPPING_LIMITS{128, 256, 16, 64, 128, 128, 16384, 100000};
 
 /** Supply actual independent queue/collector/desired work for one caller-selected owner turn.
  * @return Finite credits, used unchanged during normal operation and local drain.

@@ -12,8 +12,10 @@ QDCXX-025: проекция следует новым [production Java дока�
 24 Java integer slots (включая десять VOID tails), два object slots и hasTime=false.
 Логический порядок соответствует таблице. Все числовые поля ниже в default имеют полный120,
 а в numeric-int дополнительно измерены с точным полным8.
+Таблица описывает эти исходные generated witnesses. Исчерпывающие текущие numeric, raw-slot
+и текстовые альтернативы заданы в [FIELD-CONVERSIONS](FIELD-CONVERSIONS.ru.md).
 
-| Локальный lookup | Property lookup | Проекция события | Полный тип | При отсутствии локально |
+| Локальный lookup | Property lookup | Проекция события | Типы исходного witness | При отсутствии локально |
 | --- | --- | --- | --- | --- |
 | Beta | Beta | beta | 120 или 8 | NaN |
 | Eps | Eps | earningsPerShare | 120 или 8 | NaN |
@@ -40,6 +42,15 @@ binary64 проекцию; полный8 — точное знаковое чи�
 суррогаты. Подготовка и копирование применяют конечные лимиты до выделения памяти; ошибка
 проекции не публикует частичное событие. До проекции обязательны проверка каноничности FieldValue
 и проверка контекста схемы/записи.
+
+Десять Java-подобных business getters возвращают прямые source binary64 значения и сохраняют
+наблюдаемый missing default каждого публичного Java getter. Существующие WideDecimal поля
+сохраняют generated wide accessor view; для LONG эти представления могут различаться.
+Необязательные владеющие inline snapshots добавлены в конец aggregate; после изменения raw поля
+или при отсутствии snapshot getter использует текущий raw view. См.
+[числовое состояние и точный LONG пример](FIELD-CONVERSIONS.ru.md).
+Raw date/flag/halt альтернативы Profile читают первый физический int slot; long halt поля поэтому
+используют старшие 32 бита как секунды. Пределы symbol/text и complete-shape/context checks сохранены.
 
 ## Подготовленный API и бюджеты владения
 

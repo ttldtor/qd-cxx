@@ -1577,7 +1577,7 @@ TEST_CASE("MUX queue preserves full materialized Quote and Profile bodies throug
                 CHECK(values[n].bytes == expected[n].bytes);
             }
 
-            const q::MappingLimits mappingLimits{128, 256, 32, 64, 64, 128, 16384, 1000000};
+            const q::MappingLimits mappingLimits{128, 256, 32, 64, 128, 128, 16384, 1000000};
 
             if (profile) {
                 auto mapping = q::PreparedProfile::prepare(*local, 0, mappingLimits);

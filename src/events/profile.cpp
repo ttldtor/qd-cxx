@@ -24,6 +24,46 @@ constexpr std::array<std::u16string_view, 16> LOCAL_NAMES{
     u"Halt.EndTime", u"Flags",  u"Description", u"StatusReason"};
 } // namespace
 
+double Profile::getBeta() const noexcept {
+    return detail::businessValue(beta, businessNumericSnapshot, 0);
+}
+
+double Profile::getEarningsPerShare() const noexcept {
+    return detail::businessValue(earningsPerShare, businessNumericSnapshot, 1);
+}
+
+double Profile::getDividendFrequency() const noexcept {
+    return detail::businessValue(dividendFrequency, businessNumericSnapshot, 2);
+}
+
+double Profile::getExDividendAmount() const noexcept {
+    return detail::businessValue(exDividendAmount, businessNumericSnapshot, 3);
+}
+
+double Profile::getHigh52WeekPrice() const noexcept {
+    return detail::businessValue(high52WeekPrice, businessNumericSnapshot, 4);
+}
+
+double Profile::getLow52WeekPrice() const noexcept {
+    return detail::businessValue(low52WeekPrice, businessNumericSnapshot, 5);
+}
+
+double Profile::getShares() const noexcept {
+    return detail::businessValue(shares, businessNumericSnapshot, 6);
+}
+
+double Profile::getFreeFloat() const noexcept {
+    return detail::businessValue(freeFloat, businessNumericSnapshot, 7);
+}
+
+double Profile::getHighLimitPrice() const noexcept {
+    return detail::businessValue(highLimitPrice, businessNumericSnapshot, 8);
+}
+
+double Profile::getLowLimitPrice() const noexcept {
+    return detail::businessValue(lowLimitPrice, businessNumericSnapshot, 9);
+}
+
 TradingStatus Profile::tradingStatus() const noexcept {
     constexpr std::uint32_t STATUS_MASK = 3;
     const auto code = static_cast<std::uint32_t>(flags) & STATUS_MASK;
@@ -77,11 +117,11 @@ PreparedProfile::PreparedProfile(EventMapping mapping) : mapping_(std::move(mapp
 std::expected<PreparedProfile, MappingError> PreparedProfile::prepare(const core::LocalSchema &schema,
                                                                       std::int32_t localId, MappingLimits limits) {
     using Type = core::SerialFieldType;
-    constexpr std::array numericTypes{Type::WIDE_DECIMAL, Type::COMPACT_INT};
-    constexpr std::array dateTypes{Type::DATE};
-    constexpr std::array timeTypes{Type::TIME_SECONDS};
-    constexpr std::array flagTypes{Type::COMPACT_INT};
-    constexpr std::array stringTypes{Type::UTF_CHAR_ARRAY};
+    constexpr auto numericTypes = detail::NUMERIC_TYPES;
+    constexpr auto dateTypes = detail::RAW_INT_TYPES;
+    constexpr auto timeTypes = detail::RAW_INT_TYPES;
+    constexpr auto flagTypes = detail::RAW_INT_TYPES;
+    constexpr std::array stringTypes{Type::UTF_CHAR_ARRAY, Type::STRING};
     std::array<std::array<std::u16string_view, 2>, PROFILE_FIELD_TYPES.size()> keys{};
     std::array<FieldRequest, PROFILE_FIELD_TYPES.size()> requests{};
 
@@ -186,37 +226,50 @@ std::expected<Profile, MappingError> projectProfileFields(std::u16string_view sy
     }
 
     const auto raw = [&](std::size_t selection) -> std::int64_t {
-        return selections[selection] ? fields[*selections[selection]].raw : 0;
+        if (!selections[selection]) {
+            return 0;
+        }
+
+        const auto &field = fields[*selections[selection]];
+
+        return detail::projectPhysicalInt(field.type, field.raw);
     };
-    const auto decimal = [&](std::size_t selection) -> core::WideDecimal {
+    std::array<detail::BusinessNumericSnapshot, 10> businessValues{};
+    const auto decimal = [&](std::size_t selection, std::size_t numericIndex) -> core::WideDecimal {
         if (!selections[selection]) {
             return {0};
         }
 
         const auto &field = fields[*selections[selection]];
+        const auto raw = field.raw;
+        const auto projected = detail::projectPresentDecimal(field.type, raw);
+        businessValues[numericIndex] = {projected.raw, detail::projectPresentBusinessDouble(field.type, raw)};
 
-        return detail::projectPresentDecimal(field.type, field.raw);
+        return projected;
     };
     try {
         // Selection numbers follow the default declarations, independently of schema field positions.
-        return Profile{std::u16string(symbol),
-                       decimal(0),
-                       decimal(1),
-                       decimal(2),
-                       decimal(3),
+        Profile result{std::u16string(symbol),
+                       decimal(0, 0),
+                       decimal(1, 1),
+                       decimal(2, 2),
+                       decimal(3, 3),
                        static_cast<std::int32_t>(raw(4)),
-                       decimal(5),
-                       decimal(6),
-                       decimal(7),
-                       decimal(8),
-                       decimal(9),
-                       decimal(10),
+                       decimal(5, 4),
+                       decimal(6, 5),
+                       decimal(7, 6),
+                       decimal(8, 7),
+                       decimal(9, 8),
+                       decimal(10, 9),
                        raw(11) * MILLISECONDS_PER_SECOND,
                        raw(12) * MILLISECONDS_PER_SECOND,
                        static_cast<std::int32_t>(raw(13)),
                        ownText(description),
                        ownText(statusReason),
                        eventTime};
+        result.businessNumericSnapshot = businessValues;
+
+        return result;
     } catch (const std::bad_alloc &) {
         return std::unexpected(MappingError::ALLOCATION_FAILURE);
     } catch (const std::length_error &) {

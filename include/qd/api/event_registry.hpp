@@ -30,7 +30,7 @@ enum class EventTimePolicy {
 struct EventRegistration {
     EventType type;             ///< Actual supported projection, never inferred from a record name.
     std::int32_t localRecordId; ///< Explicit dense record position in the supplied validated schema.
-    events::MappingLimits mappingLimits{128, 256, 32, 64, 64, 128, 20480, 256 * 64 * 129 + 32 * 64};
+    events::MappingLimits mappingLimits{128, 256, 32, 64, 128, 128, 20480, 256 * 64 * 129 + 32 * 128};
     ///< Finite per-route preparation bounds for existing exact-key and exact-type validation.
     EventTimePolicy eventTimePolicy = EventTimePolicy::FIELD_METADATA; ///< Source of optional event metadata.
 };

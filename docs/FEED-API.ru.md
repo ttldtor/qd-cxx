@@ -128,6 +128,14 @@ Endpoint копирует неизменяемый владеющий снимо
 до native activation; усечения нет. См. полный
 [контракт владения, ошибок и пределов реестра](../spec/events/EVENT-REGISTRY.ru.md).
 
+Подготовленные Quote/Profile используют исчерпывающие
+[правила преобразования полей](../spec/events/FIELD-CONVERSIONS.ru.md): допустимые числа
+сохраняют WideDecimal поля и предоставляют прямые Java business getters вроде
+`quote.getBidPrice()`/`profile.getBeta()` без LONG-to-wide округления. Raw int свойства сохраняют Java physical-slot поведение,
+UTF_CHAR_ARRAY/STRING сохраняют nullable UTF-16 текст. Неверные присутствующие типы отвергаются
+при подготовке registry. Default registration допускает 128 альтернатив типов; меньшие custom
+границы остаются явными resource limits.
+
 Для региональной доставки Quote передайте настоящее проверенное объявление региональной
 записи и зарегистрируйте его как `EventType::QUOTE`. Например, если выбранная схема содержит
 `Quote&Q`, обычная подписка `quotes->addSymbols("AAPL&Q")` отправляет физический interest

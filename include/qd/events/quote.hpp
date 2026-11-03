@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -25,20 +26,39 @@ inline constexpr std::array<core::SerialFieldType, 8> QUOTE_FIELD_TYPES{
 
 /** Owned Quote projection; no event hierarchy or transport dependency. */
 struct Quote {
-    std::u16string symbol;      ///< Exact owned UTF-16 symbol, without normalization.
-    std::int64_t bidTimeMs;     ///< Signed milliseconds; TIME_SECONDS expands by 1000, TIME_MILLIS is unchanged.
-    char16_t bidExchangeCode;   ///< Low UTF-16 unit of the preserved incoming code point.
-    core::WideDecimal bidPrice; ///< Exact raw decimal, with decimal/binary64 views.
-    core::WideDecimal bidSize;  ///< Exact raw decimal size, preserving fractional values.
-    std::int64_t askTimeMs;     ///< Signed milliseconds; absent optional local time projects zero.
-    char16_t askExchangeCode;   ///< Low UTF-16 unit of the preserved incoming code point.
-    core::WideDecimal askPrice; ///< Exact raw decimal, including NaN and infinities.
-    core::WideDecimal askSize;  ///< Exact raw decimal size, including missing-field NaN.
-    std::int64_t timeMs;        ///< Maximum bid/ask floored to seconds plus unsigned packed milliseconds, wrapping.
-    std::int64_t eventTime = 0; ///< Explicit caller metadata; the legacy mapper always leaves zero.
-    std::int32_t sequence = 0;  ///< Low 22 Sequence bits; zero on the legacy mapping path.
+    std::u16string symbol;         ///< Exact owned UTF-16 symbol, without normalization.
+    std::int64_t bidTimeMs;        ///< Signed milliseconds; TIME_SECONDS expands by 1000, TIME_MILLIS is unchanged.
+    char16_t bidExchangeCode;      ///< Low UTF-16 unit of the preserved incoming code point.
+    core::WideDecimal bidPrice{0}; ///< Generated WideDecimal accessor projection; incoming wide bits stay unchanged.
+    core::WideDecimal bidSize{0};  ///< Decimal size projection, preserving supported fractional values.
+    std::int64_t askTimeMs;        ///< Signed milliseconds; absent optional local time projects zero.
+    char16_t askExchangeCode;      ///< Low UTF-16 unit of the preserved incoming code point.
+    core::WideDecimal askPrice{0}; ///< Decimal price projection, including NaN and infinities.
+    core::WideDecimal askSize{0};  ///< Decimal size projection; the local field remains required.
+    std::int64_t timeMs;           ///< Maximum bid/ask floored to seconds plus unsigned packed milliseconds, wrapping.
+    std::int64_t eventTime = 0;    ///< Explicit caller metadata; the legacy mapper always leaves zero.
+    std::int32_t sequence = 0;     ///< Low 22 Sequence bits; zero on the legacy mapping path.
     std::int32_t timeNanoPart =
         0; ///< Raw signed nanoseconds within a millisecond; absent means zero, without clamping.
+    std::optional<std::array<detail::BusinessNumericSnapshot, 4>> businessNumericSnapshot{};
+    ///< Inline projection state; leave absent for manual aggregates. Raw edits invalidate each cached value separately.
+
+    /** Read the Java business bid price without a LONG-to-wide rounding step.
+     * @return Captured direct value while bidPrice.raw is unchanged; otherwise its current raw decimal view.
+     */
+    [[nodiscard]] double getBidPrice() const noexcept;
+    /** Read the Java business bid size as binary64.
+     * @return Captured direct value while bidSize.raw is unchanged; otherwise its current raw decimal view.
+     */
+    [[nodiscard]] double getBidSizeAsDouble() const noexcept;
+    /** Read the Java business ask price without a LONG-to-wide rounding step.
+     * @return Captured direct value while askPrice.raw is unchanged; otherwise its current raw decimal view.
+     */
+    [[nodiscard]] double getAskPrice() const noexcept;
+    /** Read the Java business ask size as binary64.
+     * @return Captured direct value while askSize.raw is unchanged; otherwise its current raw decimal view.
+     */
+    [[nodiscard]] double getAskSizeAsDouble() const noexcept;
 };
 
 /** Mapping failure, separate from wire parsing and transport. */
@@ -75,7 +95,7 @@ class PreparedQuote {
     explicit PreparedQuote(EventMapping mapping, char16_t recordExchange);
 
     public:
-    /** Resolve measured Quote keys and exact full types before event projection.
+    /** Resolve Quote keys and exact numeric/raw/time types declared in FIELD-CONVERSIONS.
      * @param schema Explicit validated source schema; no storage is borrowed after return.
      * @param localId Selected ordinary local record identity.
      * @param limits Finite preparation budgets; record name consumes name units and three conservative scans.

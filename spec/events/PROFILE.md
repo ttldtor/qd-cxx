@@ -11,8 +11,10 @@ an explicit prepared schema mapping; source loading and tape delivery remain out
 Only Description is required locally. The unchanged default has 16 logical fields, 24 Java integer
 slots (including ten VOID tails), two object slots and hasTime=false. Logical order is the table order.
 Every numeric field below is full120 in the default and is also measured as exact full8 in numeric-int.
+The table describes those original generated witnesses. The exhaustive current numeric, raw-slot
+and text alternatives are specified in [FIELD-CONVERSIONS](FIELD-CONVERSIONS.md).
 
-| Local lookup | Property lookup | Event projection | Full type | Absent local default |
+| Local lookup | Property lookup | Event projection | Original witness types | Absent local default |
 | --- | --- | --- | --- | --- |
 | Beta | Beta | beta | 120 or 8 | NaN |
 | Eps | Eps | earningsPerShare | 120 or 8 | NaN |
@@ -38,6 +40,14 @@ project NaN, while a present wire-omitted full8 value projects zero. The event o
 strings, preserving empty values, embedded NUL, paired and lone surrogates. Preparation and copying
 must apply finite limits before allocating; a rejected projection publishes no partial event.
 Canonical FieldValue validation and schema/record context checks are required before projection.
+
+The ten Java-like business getters return direct source binary64 values and preserve each actual
+public Java getter's missing default. Existing WideDecimal members retain the generated wide
+accessor view; these views can differ for LONG. Optional owning inline snapshots append to the
+aggregate, and a getter falls back to the current raw view after that field is edited or when no
+snapshot exists. See [numeric state and exact LONG example](FIELD-CONVERSIONS.md#numeric-values).
+Profile raw date/flag/halt alternatives use the first physical int slot; long halt fields therefore
+use their high 32 bits as seconds. Symbol/text bounds and complete-shape/context checks are unchanged.
 
 ## Prepared API and ownership bounds
 

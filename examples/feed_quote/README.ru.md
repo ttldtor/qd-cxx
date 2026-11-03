@@ -107,8 +107,10 @@ Visual Studio помещает программу в подкаталог `Relea
 | `--duration-ms N` | `10000`; целое 1..600000 миллисекунд |
 | `--help`, `--help-ru` | Английская/русская справка, только отдельный вызов |
 
-Строки вывода содержат символ и `bid`, `bidSize`, `ask`, `askSize`, отформатированные
-существующим точным decimal formatter. `ApiRuntime` получает системные IPv4 DNS-серверы;
+Строки вывода содержат символ и `bid`, `bidSize`, `ask`, `askSize`, используя Java-подобные
+business getters с binary64 точностью `max_digits10`. Так сохраняется прямое преобразование LONG;
+отдельные WideDecimal поля доступны как raw decimal views. См.
+[преобразования полей](../../spec/events/FIELD-CONVERSIONS.ru.md). `ApiRuntime` получает системные IPv4 DNS-серверы;
 см. [правила DNS и жизненного цикла](../../docs/FEED-API.ru.md#feed-api-ru).
 Программа использует TICKER по умолчанию и обычный TCP без credentials.
 

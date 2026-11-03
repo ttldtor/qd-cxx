@@ -19,6 +19,22 @@ constexpr std::int64_t MILLISECONDS_PER_SECOND = 1000;
 constexpr std::uint64_t UTF16_UNIT_MASK = 0xffff;
 } // namespace
 
+double Quote::getBidPrice() const noexcept {
+    return detail::businessValue(bidPrice, businessNumericSnapshot, 0);
+}
+
+double Quote::getBidSizeAsDouble() const noexcept {
+    return detail::businessValue(bidSize, businessNumericSnapshot, 1);
+}
+
+double Quote::getAskPrice() const noexcept {
+    return detail::businessValue(askPrice, businessNumericSnapshot, 2);
+}
+
+double Quote::getAskSizeAsDouble() const noexcept {
+    return detail::businessValue(askSize, businessNumericSnapshot, 3);
+}
+
 std::expected<core::LocalSchema, core::SchemaError> defaultQuoteSchema(core::SchemaLimits limits) {
     constexpr std::array<std::u16string_view, 8> PROPERTY_NAMES{u"BidTime",  u"BidExchangeCode", u"BidPrice",
                                                                 u"BidSize",  u"AskTime",         u"AskExchangeCode",
@@ -105,10 +121,10 @@ std::expected<PreparedQuote, MappingError> PreparedQuote::prepare(const core::Lo
 
     using Type = core::SerialFieldType;
     constexpr std::array timeTypes{Type::TIME_SECONDS, Type::TIME_MILLIS};
-    constexpr std::array exchangeTypes{Type::UTF_CHAR};
-    constexpr std::array numericTypes{Type::WIDE_DECIMAL, Type::COMPACT_INT};
-    constexpr std::array sequenceTypes{Type::SEQUENCE};
-    constexpr std::array nanoTypes{Type::COMPACT_INT};
+    constexpr auto exchangeTypes = detail::RAW_INT_TYPES;
+    constexpr auto numericTypes = detail::NUMERIC_TYPES;
+    constexpr auto sequenceTypes = detail::RAW_INT_TYPES;
+    constexpr auto nanoTypes = detail::RAW_INT_TYPES;
     constexpr std::array<std::u16string_view, 2> bidTime{u"Bid.Time", u"BidTime"};
     constexpr std::array<std::u16string_view, 2> bidExchange{u"Bid.Exchange", u"BidExchangeCode"};
     constexpr std::array<std::u16string_view, 2> bidPrice{u"Bid.Price", u"BidPrice"};
@@ -188,12 +204,22 @@ std::expected<Quote, MappingError> projectQuoteFields(std::u16string_view symbol
     constexpr unsigned SEQUENCE_BITS = 22;
     constexpr std::uint32_t SEQUENCE_MASK = (std::uint32_t{1} << SEQUENCE_BITS) - 1;
     const auto raw = [&](std::size_t selection) -> std::int64_t {
-        return selections[selection] ? fields[*selections[selection]].raw : 0;
-    };
-    const auto decimal = [&](std::size_t selection) -> core::WideDecimal {
+        if (!selections[selection]) {
+            return 0;
+        }
+
         const auto &field = fields[*selections[selection]];
 
-        return detail::projectPresentDecimal(field.type, field.raw);
+        return detail::projectPhysicalInt(field.type, field.raw);
+    };
+    std::array<detail::BusinessNumericSnapshot, 4> businessValues{};
+    const auto decimal = [&](std::size_t selection, std::size_t numericIndex) -> core::WideDecimal {
+        const auto &field = fields[*selections[selection]];
+        const auto raw = field.raw;
+        const auto projected = detail::projectPresentDecimal(field.type, raw);
+        businessValues[numericIndex] = {projected.raw, detail::projectPresentBusinessDouble(field.type, raw)};
+
+        return projected;
     };
     const auto time = [&](std::size_t selection) -> std::int64_t {
         if (!selections[selection]) {
@@ -217,19 +243,22 @@ std::expected<Quote, MappingError> projectQuoteFields(std::u16string_view symbol
         auto eventSymbol =
             recordExchange ? *market_symbols::changeExchangeCode(symbol, recordExchange) : std::u16string(symbol);
 
-        return Quote{std::move(eventSymbol),
+        Quote result{std::move(eventSymbol),
                      bidTime,
                      exchange(1),
-                     decimal(2),
-                     decimal(3),
+                     decimal(2, 0),
+                     decimal(3, 1),
                      askTime,
                      exchange(5),
-                     decimal(6),
-                     decimal(7),
+                     decimal(6, 2),
+                     decimal(7, 3),
                      quoteTime(std::max(bidTime, askTime), packedSequence >> SEQUENCE_BITS),
                      eventTime,
                      static_cast<std::int32_t>(packedSequence & SEQUENCE_MASK),
                      static_cast<std::int32_t>(raw(9))};
+        result.businessNumericSnapshot = businessValues;
+
+        return result;
     } catch (const std::bad_alloc &) {
         return std::unexpected(MappingError::ALLOCATION_FAILURE);
     } catch (const std::length_error &) {

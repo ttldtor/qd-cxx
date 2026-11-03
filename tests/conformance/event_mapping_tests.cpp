@@ -13,7 +13,7 @@ namespace c = org::ttldtor::qdcxx::core;
 namespace e = org::ttldtor::qdcxx::events;
 namespace p = org::ttldtor::qdcxx::protocol;
 constexpr c::SchemaLimits SCHEMA_LIMITS{8, 32, 64, 64, 4096};                            ///< Finite schema test bounds.
-constexpr e::MappingLimits MAPPING_LIMITS{32, 64, 16, 64, 32, 64, 4096, 100000};         ///< Finite preparation bounds.
+constexpr e::MappingLimits MAPPING_LIMITS{32, 64, 16, 64, 128, 64, 4096, 100000};        ///< Finite preparation bounds.
 constexpr std::array<c::SerialFieldType, 1> INTS{c::SerialFieldType::COMPACT_INT};       ///< Exact scalar request.
 constexpr std::array<c::SerialFieldType, 1> STRINGS{c::SerialFieldType::UTF_CHAR_ARRAY}; ///< Exact string request.
 
@@ -140,7 +140,7 @@ TEST_CASE("missing ambiguous incompatible and malformed field requests reject at
 
     CHECK(prepare(local, {}).error() == e::MappingError::INVALID_INPUT);
     const std::array<std::u16string_view, 1> keys{u"A"};
-    const std::array<c::SerialFieldType, 1> unknown{static_cast<c::SerialFieldType>(24)};
+    const std::array<c::SerialFieldType, 1> unknown{static_cast<c::SerialFieldType>(25)};
 
     for (const auto types : {std::span<const c::SerialFieldType>{}, std::span<const c::SerialFieldType>(unknown)}) {
         const std::array requests{e::FieldRequest{keys, types, true}};

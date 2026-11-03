@@ -20,7 +20,7 @@ namespace events = org::ttldtor::qdcxx::events;
 namespace protocol = org::ttldtor::qdcxx::protocol;
 std::filesystem::path fixture; ///< Explicit immutable input selected by CTest, never discovered from ambient state.
 constexpr core::SchemaLimits SCHEMA_LIMITS{16, 128, 256, 128, 16384}; ///< Existing complete receiving bounds.
-constexpr events::MappingLimits MAPPING_LIMITS{128, 256, 32, 64, 64, 128, 20480, 3000000};
+constexpr events::MappingLimits MAPPING_LIMITS{128, 256, 32, 64, 128, 128, 20480, 3000000};
 
 ///< Finite property-resolution allowance, independent of corpus row counts.
 
@@ -164,11 +164,12 @@ TEST_CASE("optional time fields reject present wrong types and preserve exact co
             return lookup.name == key;
         });
         REQUIRE(found != records[1].lookups.end());
-        records[1].fields[found->fieldId].serialTypeId = std::to_underlying(core::SerialFieldType::DATE);
+        records[1].fields[found->fieldId].serialTypeId = std::to_underlying(core::SerialFieldType::UTF_CHAR_ARRAY);
         auto wrong = core::LocalSchema::create(records, SCHEMA_LIMITS, core::LocalProfile::BINARY_FIELDS_V1);
         REQUIRE(wrong);
-        CHECK(events::PreparedQuote::prepare(*wrong, 1, MAPPING_LIMITS).error() ==
-              events::MappingError::INCOMPATIBLE_TYPE);
+        auto rejected = events::PreparedQuote::prepare(*wrong, 1, MAPPING_LIMITS);
+        REQUIRE(!rejected);
+        CHECK(rejected.error() == events::MappingError::INCOMPATIBLE_TYPE);
     }
 
     auto schema = core::LocalSchema::create(scenario.records, SCHEMA_LIMITS, core::LocalProfile::BINARY_FIELDS_V1);

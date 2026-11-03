@@ -183,7 +183,7 @@ template <typename Recovery> struct Consumer final : d::SubscriptionConsumer {
 inline m::MuxHandle subscribe(m::MuxQueue &queue, const c::LocalSchema &local,
                               const std::shared_ptr<d::SubscriptionConsumer> &consumer) {
     const std::array<d::PreparedSubscriptionBinding, 1> bindings{
-        {{0, d::PreparedEventKind::PROFILE, {64, 128, 32, 64, 64, 128, 8192, 100000}, {128, 256, 512}}}};
+        {{0, d::PreparedEventKind::PROFILE, {64, 128, 32, 64, 128, 128, 8192, 100000}, {128, 256, 512}}}};
     d::ReceiverWork receiverWork{10000, 1000000};
     auto queueWork = r::queueWork();
     auto handle = d::openSubscriptionReceiver(

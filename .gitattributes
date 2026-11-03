@@ -639,3 +639,8 @@ tools/upstream/order-index-oracle/*.java text eol=lf
 tools/upstream/order-index-oracle/*.ps1 text eol=lf
 tests/fixtures/order-index/oracle.tsv -text -whitespace
 tests/fixtures/order-index/provenance.json text eol=lf
+# Preserve field-conversion observations and canonical oracle provenance.
+tools/upstream/field-conversion-oracle/*.java text eol=lf
+tools/upstream/field-conversion-oracle/*.ps1 text eol=lf
+tests/fixtures/field-conversions/oracle.tsv -text -whitespace
+tests/fixtures/field-conversions/provenance.json text eol=lf

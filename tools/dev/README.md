@@ -2,6 +2,10 @@
 
 [Русская версия](README.ru.md). English is authoritative.
 
+The [field conversion oracle](../upstream/field-conversion-oracle/README.md) captures/verifies
+actual numeric, physical-slot, nullable String and missing-field behavior. Noargs, EN/RU help
+and Get-Help require no operational inputs and start no Java process.
+
 The [event-time oracle](../upstream/event-time-oracle/README.md) checks optional Quote
 Sequence/nanoseconds, second/millisecond business times, Profile defaults and regional
 Quote routing through production Java delegates. No arguments, `-Help`/`-HelpRu` and

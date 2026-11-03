@@ -8,12 +8,21 @@
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <limits>
 #include <optional>
 #include <span>
 #include <string_view>
 #include <vector>
 
 namespace org::ttldtor::qdcxx::events {
+
+namespace detail {
+/** Inline source business value paired with its WideDecimal projection, without source references. */
+struct BusinessNumericSnapshot {
+    std::int64_t wideRaw = 0; ///< Captured wide bits; a getter uses directValue only while these still match.
+    double directValue = std::numeric_limits<double>::quiet_NaN(); ///< Actual source business-double semantics.
+};
+} // namespace detail
 
 /** Failures of bounded preparation or complete local-value validation. */
 enum class MappingError {

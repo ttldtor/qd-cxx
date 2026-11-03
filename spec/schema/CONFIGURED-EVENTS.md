@@ -36,7 +36,7 @@ Every scenario runs in a fresh JVM; only mutation deliberately changes propertie
 | `dxscheme.nanoTime`, `SchemeProperties` | Boolean; absent false | Explicit `dxscheme.enabled.Sequence` and `.TimeNanoPart` selections override the shortcut independently | default, sequence, nano, both, explicit |
 | `dxscheme.enabled.<Property>` | Event-name glob; Quote enables only Quote; Profile excludes Quote | Copied when SchemeProperties is constructed; enabled selections precede nano shortcut fallback | sequence, nano, explicit |
 | `dxscheme.price`, `.size`, `.shares`, `MarketFactoryImpl` | Case-insensitive int/wide/tiny/decimal; absent uses wide=true defaults | Snapshot at schema construction; the fixture requests int explicitly | integer-representation |
-| `dxscheme.wide`, `SchemeProperties` | Boolean, default true | false selects some full type24 fields, outside the accepted C++ profile | tiny-unsupported |
+| `dxscheme.wide`, `SchemeProperties` | Boolean, default true | false selects some full type24 fields; the original tiny-unsupported capture is retained, with current adapter support defined separately | tiny-unsupported |
 | `dxscheme.nanoTime` invalid value | Invalid boolean logs an error and falls back to false | Java behavior is observed, not a recommendation to silently accept invalid C++ input | invalid-boolean |
 | `dxfeed.properties`, FEED `DXEndpointImpl.Builder` | Explicit local properties-file path | For tested keys: builder withProperty > file > JVM property; resolution at build | endpoint-file, endpoint-api |
 | `System.setProperty` / `DXFeedScheme` | Explicit before/after mutation | Before class initialization affects singleton; after does not change its existing snapshot; a new explicitly configured endpoint differs | set-before, mutation |
@@ -52,9 +52,10 @@ Aliases for other settings, repeated endpoint builds and live changes remain out
 
 ## Exact representations and absence
 
-Quote numeric price/size and Profile numeric projections accept evidenced full120 and full8
-representations, validated per selected field. Full8 projects its signed integer to numeric double;
-full120 uses existing WideDecimal semantics. This is local event projection, not wire coercion:
+The original configured-event witnesses establish full120 and full8 numeric projections. Current
+Quote/Profile numeric, raw-slot, String and missing conversions are defined by the exhaustive
+[field conversion contract](../events/FIELD-CONVERSIONS.md), including direct Java business getters
+alongside retained WideDecimal fields. This remains local event projection, not wire coercion:
 wire/local full identities must still match. Other exact field types retain their semantic roles.
 
 Optional absent local numeric properties produce NaN; an existing wire-omitted full120 value has
@@ -63,8 +64,9 @@ outputs do not merge the distinct schema states. Missing string slots produce nu
 and empty strings stay distinct. Missing required local fields yield no compatible production event
 delegate. An existing local required Description may receive wire omission and deliver null.
 
-The separate unsupported XML extension uses Java `string` full137, and wide=false includes full24.
-Those originals are retained as explicit unsupported C++ variants; they do not widen the field profile.
-No new serial identities, indexed records, general conversion, XML loader, transport or session
+The separate XML extension uses Java `string` full137, and wide=false includes full24. Their original
+captures and historical unsupported labels remain unchanged; the current adapters explicitly support
+their declared local String/numeric representations. This does not add XML loading or silently widen
+wire/local binding. No new serial identities, indexed records, general conversion, transport or session
 semantics are introduced. Generated file modes remain uncompressed STREAM/NONE or RAW/MESSAGE,
 EMPTY_SET options and zero QTP event flags. Profile business Flags are independent record data.

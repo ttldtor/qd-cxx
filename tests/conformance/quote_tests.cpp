@@ -612,7 +612,7 @@ TEST_CASE("prepared Quote selects reordered explicit aliases and independent opt
     auto local =
         c::LocalSchema::create(std::span(&record, 1), {1, 8, 8, 64, 1024}, c::LocalProfile::EXTENDED_FIELDS_V1);
     REQUIRE(local);
-    auto prepared = q::PreparedQuote::prepare(*local, 0, {16, 32, 16, 32, 32, 64, 2048, 100000});
+    auto prepared = q::PreparedQuote::prepare(*local, 0, {16, 32, 16, 32, 128, 64, 2048, 100000});
     REQUIRE(prepared);
     std::vector<c::FieldValue> fields{{c::SerialFieldType::COMPACT_INT, 0},
                                       {c::SerialFieldType::WIDE_DECIMAL, 32002},
@@ -650,7 +650,7 @@ TEST_CASE("prepared Quote present integer decimals preserve literal boundary rep
                           {{u"BidPrice", 0}, {u"BidSize", 1}, {u"AskPrice", 2}, {u"AskSize", 3}}};
     auto local = c::LocalSchema::create(std::span(&record, 1), {1, 4, 4, 32, 128}, c::LocalProfile::QUOTE_FIELDS_V1);
     REQUIRE(local);
-    auto prepared = q::PreparedQuote::prepare(*local, 0, {16, 32, 16, 32, 32, 64, 2048, 100000});
+    auto prepared = q::PreparedQuote::prepare(*local, 0, {16, 32, 16, 32, 128, 64, 2048, 100000});
     REQUIRE(prepared);
 
     for (const auto wideBits :
@@ -673,7 +673,7 @@ TEST_CASE("prepared Quote present integer decimals preserve literal boundary rep
 
 TEST_CASE("prepared Quote missing local required fields wrong types contexts and ambiguous keys reject") {
     auto local = schema();
-    auto prepared = q::PreparedQuote::prepare(local, 0, {16, 32, 16, 32, 32, 64, 2048, 100000});
+    auto prepared = q::PreparedQuote::prepare(local, 0, {16, 32, 16, 32, 128, 64, 2048, 100000});
     REQUIRE(prepared);
     std::vector<c::FieldValue> fields;
 
@@ -694,15 +694,17 @@ TEST_CASE("prepared Quote missing local required fields wrong types contexts and
     auto missing =
         c::LocalSchema::create(std::span(&record, 1), limits().context.schema, c::LocalProfile::QUOTE_FIELDS_V1);
     REQUIRE(missing);
-    CHECK(q::PreparedQuote::prepare(*missing, 0, {16, 32, 16, 32, 32, 64, 2048, 100000}).error() ==
+    CHECK(q::PreparedQuote::prepare(*missing, 0, {16, 32, 16, 32, 128, 64, 2048, 100000}).error() ==
           q::MappingError::MISSING_REQUIRED);
     record = local.records()[0];
-    record.lookups.push_back({u"Sequence", 2});
+    record.lookups.push_back({u"Sequence", record.fields.size()});
+    record.fields.push_back({std::to_underlying(c::SerialFieldType::UTF_CHAR_ARRAY)});
     auto wrongType =
-        c::LocalSchema::create(std::span(&record, 1), limits().context.schema, c::LocalProfile::QUOTE_FIELDS_V1);
+        c::LocalSchema::create(std::span(&record, 1), limits().context.schema, c::LocalProfile::EXTENDED_FIELDS_V1);
     REQUIRE(wrongType);
-    CHECK(q::PreparedQuote::prepare(*wrongType, 0, {16, 32, 16, 32, 32, 64, 2048, 100000}).error() ==
-          q::MappingError::INCOMPATIBLE_TYPE);
+    const auto rejectedType = q::PreparedQuote::prepare(*wrongType, 0, {16, 32, 16, 32, 128, 64, 2048, 100000});
+    REQUIRE(!rejectedType);
+    CHECK(rejectedType.error() == q::MappingError::INCOMPATIBLE_TYPE);
     record = local.records()[0];
 
     for (auto &lookup : record.lookups) {
@@ -714,7 +716,7 @@ TEST_CASE("prepared Quote missing local required fields wrong types contexts and
     auto ambiguous =
         c::LocalSchema::create(std::span(&record, 1), limits().context.schema, c::LocalProfile::QUOTE_FIELDS_V1);
     REQUIRE(ambiguous);
-    CHECK(q::PreparedQuote::prepare(*ambiguous, 0, {16, 32, 16, 32, 32, 64, 2048, 100000}).error() ==
+    CHECK(q::PreparedQuote::prepare(*ambiguous, 0, {16, 32, 16, 32, 128, 64, 2048, 100000}).error() ==
           q::MappingError::AMBIGUOUS_FIELD);
 }
 
@@ -727,7 +729,7 @@ TEST_CASE("prepared Quote measured packed sequence boundaries preserve signed na
     auto local =
         c::LocalSchema::create(std::span(&record, 1), limits().context.schema, c::LocalProfile::EXTENDED_FIELDS_V1);
     REQUIRE(local);
-    auto prepared = q::PreparedQuote::prepare(*local, 0, {16, 32, 16, 32, 32, 64, 2048, 100000});
+    auto prepared = q::PreparedQuote::prepare(*local, 0, {16, 32, 16, 32, 128, 64, 2048, 100000});
     REQUIRE(prepared);
     std::vector<c::FieldValue> fields;
 

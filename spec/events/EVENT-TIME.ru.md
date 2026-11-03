@@ -12,7 +12,10 @@ production Java `MarketFactoryImpl`, `QuoteMapping`, `QuoteDelegate`, `ProfileMa
 
 ## Поля, единицы и отсутствие
 
-| Свойство события | Точный локальный тип | Проекция и значение при отсутствии локального поля |
+Таблица перечисляет default generated identities. Допустимые точные альтернативы и physical-slot
+преобразования исчерпывающе заданы в [FIELD-CONVERSIONS](FIELD-CONVERSIONS.ru.md).
+
+| Свойство события | Default generated identity | Проекция и значение при отсутствии локального поля |
 | --- | --- | --- |
 | Quote `bidTimeMs`, `askTimeMs` | TIME_SECONDS (56), TIME_MILLIS (152) | Знаковые секунды ×1000 либо знаковые миллисекунды без изменения; при отсутствии0 |
 | Quote `sequence` | SEQUENCE (72) | Младшие22 бита беззнакового исходного Sequence; при отсутствии0 |

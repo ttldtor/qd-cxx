@@ -34,7 +34,7 @@ namespace p = org::ttldtor::qdcxx::protocol;
 namespace m = org::ttldtor::qdcxx::mux;
 namespace a = org::ttldtor::qdcxx::client;
 constexpr c::SchemaLimits SCHEMA_LIMITS{8, 64, 128, 128, 8192}; ///< Finite fixture schema capacities.
-constexpr q::MappingLimits MAPPING_LIMITS{64, 128, 32, 64, 64, 128, 8192, 100000}; ///< Per-route preparation bounds.
+constexpr q::MappingLimits MAPPING_LIMITS{64, 128, 32, 64, 128, 128, 8192, 100000}; ///< Per-route preparation bounds.
 constexpr std::int32_t FIRST_SENDER = 41;  ///< Sparse directional identity, independent of local record IDs.
 constexpr std::int32_t SNAPSHOT_BEGIN = 4; ///< Existing binary HISTORY source flag.
 constexpr std::int32_t SNAPSHOT_END = 8;   ///< Existing binary HISTORY source flag.
@@ -831,7 +831,10 @@ TEST_CASE("minimal Profile projection requires all twenty visit credits and neve
     bool oneShortRefused = false;
     bool exactSucceeded = false;
     bool repeatedRefused = false;
+    bool oneByteShortRefused = false;
+    bool exactBytesSucceeded = false;
     std::size_t remainingVisits = 1;
+    std::size_t remainingBytes = 1;
     observer->action = [&](const a::SubscriptionBatch &batch) {
         auto work = projectionTurn();
         // One index, one route, one field, sixteen selections and one metadata inspection.
@@ -854,6 +857,21 @@ TEST_CASE("minimal Profile projection requires all twenty visit credits and neve
         repeatedRefused = !repeated && std::holds_alternative<a::ReceiverError>(repeated.error()) &&
                           std::get<a::ReceiverError>(repeated.error()) == a::ReceiverError::WORK_LIMIT;
 
+        // The whole owning projection includes inline business snapshots and three potential string terminators.
+        constexpr auto EXACT_BYTES = sizeof(a::SubscriptionProjection) + (16 + 3) * sizeof(char16_t);
+        work = projectionTurn();
+        work.bytes = EXACT_BYTES - 1;
+        auto oneByteShort = batch.project(0, work);
+        oneByteShortRefused = !oneByteShort && std::holds_alternative<a::ReceiverError>(oneByteShort.error()) &&
+                              std::get<a::ReceiverError>(oneByteShort.error()) == a::ReceiverError::WORK_LIMIT &&
+                              work.bytes == EXACT_BYTES - 1;
+        work = projectionTurn();
+        work.bytes = EXACT_BYTES;
+        auto exactBytes = batch.project(0, work);
+        exactBytesSucceeded = exactBytes && std::holds_alternative<q::Profile>(exactBytes->value) &&
+                              std::get<q::Profile>(exactBytes->value).businessNumericSnapshot.has_value();
+        remainingBytes = work.bytes;
+
         return m::BatchAction::CONTINUE;
     };
     auto handle = open(graph, observer, routes);
@@ -868,6 +886,9 @@ TEST_CASE("minimal Profile projection requires all twenty visit credits and neve
     CHECK(exactSucceeded);
     CHECK(remainingVisits == 0);
     CHECK(repeatedRefused);
+    CHECK(oneByteShortRefused);
+    CHECK(exactBytesSucceeded);
+    CHECK(remainingBytes == 0);
 }
 
 TEST_CASE("independent receiver handles preserve same-symbol peer demand and allow opening an already live queue") {

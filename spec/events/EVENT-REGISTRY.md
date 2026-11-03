@@ -44,6 +44,11 @@ projection does not replace the complete generic representation. A custom wire
 alias can be the first lookup for a field while a supported business alias selects
 that same field. No aliases, conversions or arbitrary C++ event classes are inferred.
 
+The exhaustive [field conversion table](FIELD-CONVERSIONS.md) belongs to each prepared adapter.
+Default registration bounds allow 128 exact type alternatives and conservatively charge their
+comparison work; Quote requires 72 and Profile 108. Explicit lower bounds still fail atomically.
+The complete receive schema caps remain 16 records and 128 fields.
+
 `FIELD_METADATA` selects actual original FIELD event time when present;
 `UNSPECIFIED` asserts no event timestamp. Neither uses indexed identity as time.
 Per-result symbol/text ownership bounds remain the receiving profile's explicit

@@ -14,7 +14,7 @@ namespace q = org::ttldtor::qdcxx::events;
  * @return Bounds covering the default and designed schemas.
  */
 q::MappingLimits mappingLimits() {
-    return {64, 128, 32, 64, 64, 128, 8192, 100000};
+    return {64, 128, 32, 64, 128, 128, 8192, 100000};
 }
 
 /** Construct the default owned local schema.

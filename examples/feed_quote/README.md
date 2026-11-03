@@ -107,8 +107,10 @@ not established by these commands. A source may supply delayed data.
 | `--duration-ms N` | `10000`; integer 1..600000 milliseconds |
 | `--help`, `--help-ru` | English/Russian help, standalone only |
 
-Output lines contain the symbol and `bid`, `bidSize`, `ask`, `askSize`, using the
-existing exact decimal formatter. System IPv4 DNS is discovered by `ApiRuntime`;
+Output lines contain the symbol and `bid`, `bidSize`, `ask`, `askSize`, using Java-like
+business getters with binary64 `max_digits10` precision. This preserves direct LONG conversion;
+the separate WideDecimal fields remain available as raw decimal views. See
+[field conversions](../../spec/events/FIELD-CONVERSIONS.md). System IPv4 DNS is discovered by `ApiRuntime`;
 see the [DNS and lifecycle rules](../../docs/FEED-API.md#feed-api).
 This program uses default TICKER delivery and plain TCP without credentials.
 

@@ -7,7 +7,9 @@
 #include <atomic>
 #include <charconv>
 #include <chrono>
+#include <iomanip>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <stop_token>
 #include <string>
@@ -170,8 +172,9 @@ int main(int argc, char **argv) {
         subscription->addEventListener([&](std::span<const q::events::Quote> quotes) {
             for (const auto &quote : quotes) {
                 printSymbol(quote.symbol);
-                std::cout << " bid=" << quote.bidPrice.toString() << " bidSize=" << quote.bidSize.toString()
-                          << " ask=" << quote.askPrice.toString() << " askSize=" << quote.askSize.toString() << '\n';
+                std::cout << std::setprecision(std::numeric_limits<double>::max_digits10)
+                          << " bid=" << quote.getBidPrice() << " bidSize=" << quote.getBidSizeAsDouble()
+                          << " ask=" << quote.getAskPrice() << " askSize=" << quote.getAskSizeAsDouble() << '\n';
                 std::cout.flush();
 
                 if (!std::cout) {

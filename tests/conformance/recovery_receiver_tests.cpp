@@ -41,7 +41,7 @@ static_assert(std::is_same_v<decltype(&t::TcpRecovery::openSubscriptionReceiver)
 static_assert(std::is_same_v<decltype(&t::TlsRecovery::openSubscriptionReceiver), TlsOpenMember>);
 
 /** Actual caller-owned projection/preparation allowance, independently supplied to each attempt. */
-constexpr q::MappingLimits MAPPING_LIMITS{64, 128, 32, 64, 64, 128, 8192, 100000};
+constexpr q::MappingLimits MAPPING_LIMITS{64, 128, 32, 64, 128, 128, 8192, 100000};
 
 /** Controlled adapter only; decoder, scheduler, writer, queue and collector are the actual production types. */
 class Backend final : public detail::RecoveryBackend {

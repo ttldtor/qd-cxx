@@ -11,7 +11,10 @@ Physical Java VOID tails are omitted from logical schemas without changing long 
 
 ## Fields, units and absence
 
-| Event property | Exact local identity | Projection and absent-local default |
+The table lists default generated identities. Accepted exact alternatives and physical-slot
+conversions are specified exhaustively in [FIELD-CONVERSIONS](FIELD-CONVERSIONS.md).
+
+| Event property | Default generated identity | Projection and absent-local default |
 | --- | --- | --- |
 | Quote `bidTimeMs`, `askTimeMs` | TIME_SECONDS (56), TIME_MILLIS (152) | Signed seconds ×1000, or signed milliseconds unchanged; absent means 0 |
 | Quote `sequence` | SEQUENCE (72) | Low22 bits of unsigned raw Sequence; absent means 0 |

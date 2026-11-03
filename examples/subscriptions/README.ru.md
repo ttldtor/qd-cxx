@@ -44,6 +44,11 @@ resolver не обнаруживается. Named route добавляет оп�
 receiver на STREAM queue, передаёт desired set, затем создаёт/запускает/продвигает recovery на потоке
 владельца. Progress и shutdown используют одинаковый конечный work profile.
 
+Явный mapping budget допускает 128 точных альтернатив типов, покрывая текущие 72 Quote
+альтернативы без изменения default восьмиполевой схемы. Это low-level приложение сохраняет
+диагностический raw-decimal вывод; обычный [пример Feed](../feed_quote/README.ru.md) показывает
+business getters по [контракту преобразования полей](../../spec/events/FIELD-CONVERSIONS.ru.md).
+
 В настоящем `QuoteConsumer::onBatch` параметр `batch` — заимствованный публичный `SubscriptionBatch`;
 цикл проецирует записи с явными конечными credits:
 

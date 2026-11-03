@@ -127,6 +127,13 @@ name units. A registry valid under larger bounds is refused at `profile-schema`
 before native activation; it is never truncated. See the complete
 [registry ownership, errors and bounds contract](../spec/events/EVENT-REGISTRY.md).
 
+Prepared Quote/Profile use the exhaustive [field conversion rules](../spec/events/FIELD-CONVERSIONS.md):
+supported numbers retain WideDecimal fields and expose direct Java business getters such as
+`quote.getBidPrice()`/`profile.getBeta()` without LONG-to-wide rounding. Raw int
+properties preserve Java physical-slot behavior, and UTF_CHAR_ARRAY/STRING preserve nullable
+UTF-16 text. Wrong present types are refused during registry preparation. Default registrations
+allow 128 type alternatives; custom lower bounds remain explicit resource limits.
+
 For regional Quote delivery, supply the actual validated regional record declaration
 and register it as `EventType::QUOTE`. For example, when the selected schema contains
 `Quote&Q`, subscribing with ordinary `quotes->addSymbols("AAPL&Q")` sends the physical

@@ -36,7 +36,7 @@ Bid.Time -> BidPrice отвергается. C++ сохраняет ограни
 | `dxscheme.nanoTime`, `SchemeProperties` | Boolean; отсутствие false | Явные `dxscheme.enabled.Sequence` и `.TimeNanoPart` независимо перекрывают shortcut | default, sequence, nano, both, explicit |
 | `dxscheme.enabled.<Property>` | Glob имени события; Quote включает только Quote, Profile исключает Quote | Копирование при создании SchemeProperties; явный выбор предшествует nano fallback | sequence, nano, explicit |
 | `dxscheme.price`, `.size`, `.shares`, `MarketFactoryImpl` | int/wide/tiny/decimal без учёта регистра; отсутствие использует wide=true | Снимок при создании схемы; fixture явно запрашивает int | integer-representation |
-| `dxscheme.wide`, `SchemeProperties` | Boolean, default true | false выбирает некоторые поля полного типа24 вне принимаемого C++ профиля | tiny-unsupported |
+| `dxscheme.wide`, `SchemeProperties` | Boolean, default true | false выбирает некоторые поля полного типа24; исходный tiny-unsupported capture сохранён, текущая поддержка адаптера задана отдельно | tiny-unsupported |
 | Неверное `dxscheme.nanoTime` | Неверный boolean записывает ошибку в журнал и использует false | Поведение Java наблюдается, но не рекомендует молча принимать неверный C++ ввод | invalid-boolean |
 | `dxfeed.properties`, FEED `DXEndpointImpl.Builder` | Явный путь локального properties-файла | Для проверенных ключей: builder withProperty > файл > JVM property; разрешение при build | endpoint-file, endpoint-api |
 | `System.setProperty` / `DXFeedScheme` | Явное изменение до/после | До инициализации класса влияет на singleton; после не меняет снимок; новый явно настроенный endpoint отличается | set-before, mutation |
@@ -52,10 +52,11 @@ nanoTime=false/Sequence=Quote вместо startup true/Sequence=Profile. Пер
 
 ## Точные представления и отсутствие
 
-Числовые price/size Quote и числовые проекции Profile принимают измеренные полные представления
-120 и 8 с проверкой выбранного поля. Полный8 проецирует знаковое целое в double;
-полный120 использует существующую семантику WideDecimal. Это локальная проекция события, а не
-wire coercion: wire/local полные identities должны совпадать. Другие точные типы сохраняют свои роли.
+Исходные configured-event witnesses устанавливают числовые проекции полного120 и полного8.
+Текущие numeric, raw-slot, String и missing преобразования Quote/Profile задаёт исчерпывающий
+[контракт преобразования полей](../events/FIELD-CONVERSIONS.ru.md), включая прямые Java business
+getters наряду с сохранёнными WideDecimal полями. Это остаётся локальной проекцией события,
+а не wire coercion: wire/local полные identities должны совпадать. Другие точные типы сохраняют роли.
 
 Отсутствующее optional локальное числовое свойство даёт NaN; существующий wire-omitted полный120
 имеет raw zero и также даёт NaN, а wire-omitted полный8 даёт числовой ноль. Совпадение/различие
@@ -63,8 +64,9 @@ wire coercion: wire/local полные identities должны совпадат�
 и пустая строка различаются. Отсутствующие обязательные локальные поля не дают совместимого
 production event delegate. Существующее обязательное Description при wire omission может дать null.
 
-Отдельное неподдерживаемое XML-расширение использует Java `string` полного137, а wide=false включает
-полный24. Исходники сохранены как явно неподдерживаемые C++ варианты и не расширяют профиль полей.
-Не добавляются новые serial identities, индексные записи, общие преобразования, XML loader,
-транспорт и session semantics. Созданные файлы остаются STREAM/NONE или RAW/MESSAGE без сжатия,
+Отдельное XML-расширение использует Java `string` полного137, а wide=false включает полный24.
+Исходные captures и исторические unsupported labels сохранены; текущие адаптеры явно поддерживают
+объявленные локальные String/numeric representations. Это не добавляет XML loading и не расширяет
+wire/local binding молча. Не добавляются новые serial identities, индексные записи, общие
+преобразования, транспорт и session semantics. Созданные файлы остаются STREAM/NONE или RAW/MESSAGE без сжатия,
 с options EMPTY_SET и нулевыми QTP event flags. Business Flags Profile — независимые данные записи.

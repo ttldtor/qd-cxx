@@ -106,8 +106,7 @@ std::expected<EventMapping, MappingError> EventMapping::prepare(const core::Loca
         }
 
         for (const auto type : request.types) {
-            if (!core::supportsSerialType(std::to_underlying(type), core::LocalProfile::EXTENDED_FIELDS_V1) &&
-                type != core::SerialFieldType::TIME_MILLIS) {
+            if (!core::supportsSerialType(std::to_underlying(type), core::LocalProfile::BINARY_FIELDS_V1)) {
                 return std::unexpected(MappingError::INVALID_INPUT);
             }
         }

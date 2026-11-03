@@ -44,6 +44,11 @@ and [arguments.hpp](receiver/arguments.hpp). The application creates a schema an
 opens a receiver on a STREAM queue, submits the desired set, then creates/starts/polls recovery on
 its owner thread. The same finite work profile is used during progress and shutdown.
 
+The explicit mapping budget allows 128 exact type alternatives, covering the current 72 Quote
+alternatives without changing its default eight-field schema. This low-level application keeps
+its diagnostic raw-decimal output; the ordinary [Feed example](../feed_quote/README.md) displays
+business getters under the [field conversion contract](../../spec/events/FIELD-CONVERSIONS.md).
+
 In the actual `QuoteConsumer::onBatch`, `batch` is a borrowed public `SubscriptionBatch`; its loop
 projects each record with explicit finite credits:
 

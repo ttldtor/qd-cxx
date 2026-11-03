@@ -1852,7 +1852,7 @@ TEST_CASE(
             CHECK(values[i].bytes == expected[i].bytes);
         }
 
-        const q::MappingLimits mappingBounds{128, 256, 32, 64, 64, 128, 16384, 1000000};
+        const q::MappingLimits mappingBounds{128, 256, 32, 64, 128, 128, 16384, 1000000};
 
         if (profile) {
             auto mapping = q::PreparedProfile::prepare(*local, 0, mappingBounds);

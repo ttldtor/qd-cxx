@@ -62,12 +62,55 @@ struct Profile {
     core::WideDecimal freeFloat{0};             ///< Exact free-float projection.
     core::WideDecimal highLimitPrice{0};        ///< Exact high-limit price projection.
     core::WideDecimal lowLimitPrice{0};         ///< Exact low-limit price projection.
-    std::int64_t haltStartTimeMs = 0;           ///< Signed halt-start seconds expanded to milliseconds.
-    std::int64_t haltEndTimeMs = 0;             ///< Signed halt-end seconds expanded to milliseconds.
+    std::int64_t haltStartTimeMs = 0;           ///< First signed physical int slot interpreted as seconds, times1000.
+    std::int64_t haltEndTimeMs = 0;             ///< First signed physical int slot interpreted as seconds, times1000.
     std::int32_t flags = 0;                     ///< Preserved business flags, including reserved bits; not QTP flags.
     std::optional<std::u16string> description;  ///< Owned exact nullable Description; empty differs from null.
     std::optional<std::u16string> statusReason; ///< Owned exact nullable reason; absent local field means null.
     std::int64_t eventTime = 0; ///< Caller metadata milliseconds from Unix epoch; unspecified means zero.
+    std::optional<std::array<detail::BusinessNumericSnapshot, 10>> businessNumericSnapshot{};
+    ///< Inline source business values; absent on manual aggregates, individually invalidated by raw edits.
+
+    /** Read the Java business beta.
+     * @return Direct source value while beta.raw matches the snapshot; otherwise the current raw decimal view.
+     */
+    [[nodiscard]] double getBeta() const noexcept;
+    /** Read the Java business earnings per share.
+     * @return Direct source value while its raw bits match; otherwise the current raw decimal view.
+     */
+    [[nodiscard]] double getEarningsPerShare() const noexcept;
+    /** Read the Java business dividend frequency.
+     * @return Direct source value while its raw bits match; otherwise the current raw decimal view.
+     */
+    [[nodiscard]] double getDividendFrequency() const noexcept;
+    /** Read the Java business ex-dividend amount.
+     * @return Direct source value while its raw bits match; otherwise the current raw decimal view.
+     */
+    [[nodiscard]] double getExDividendAmount() const noexcept;
+    /** Read the Java business 52-week high price.
+     * @return Direct source value while its raw bits match; otherwise the current raw decimal view.
+     */
+    [[nodiscard]] double getHigh52WeekPrice() const noexcept;
+    /** Read the Java business 52-week low price.
+     * @return Direct source value while its raw bits match; otherwise the current raw decimal view.
+     */
+    [[nodiscard]] double getLow52WeekPrice() const noexcept;
+    /** Read the Java business shares value.
+     * @return Direct source value while its raw bits match; otherwise the current raw decimal view.
+     */
+    [[nodiscard]] double getShares() const noexcept;
+    /** Read the Java business free-float value.
+     * @return Direct source value while its raw bits match; otherwise the current raw decimal view.
+     */
+    [[nodiscard]] double getFreeFloat() const noexcept;
+    /** Read the Java business high limit price.
+     * @return Direct source value while its raw bits match; otherwise the current raw decimal view.
+     */
+    [[nodiscard]] double getHighLimitPrice() const noexcept;
+    /** Read the Java business low limit price.
+     * @return Direct source value while its raw bits match; otherwise the current raw decimal view.
+     */
+    [[nodiscard]] double getLowLimitPrice() const noexcept;
 
     /** Interpret the low two business flag bits, preserving the raw member.
      * @return Known trading status, or UNDEFINED for the reserved code.
@@ -106,7 +149,7 @@ class PreparedProfile {
     explicit PreparedProfile(EventMapping mapping);
 
     public:
-    /** Resolve measured Profile keys and exact full types once.
+    /** Resolve Profile keys and exact numeric/raw/String types declared in FIELD-CONVERSIONS.
      * @param schema Explicit validated schema; source containers are not retained.
      * @param localId Selected ordinary local record identity.
      * @param limits Mandatory finite preparation budgets.

@@ -160,6 +160,20 @@ std::vector<std::byte> frame(std::int32_t type, std::span<const std::byte> paylo
 void field(std::vector<std::byte> &bytes, const core::FieldValue &field) {
     if (field.type == core::SerialFieldType::UTF_CHAR) {
         character(bytes, static_cast<std::int32_t>(field.raw));
+    } else if (field.type == core::SerialFieldType::INT) {
+        constexpr unsigned BYTE_BITS = 8;
+        constexpr unsigned INT_BYTES = 4;
+        const auto raw = static_cast<std::uint32_t>(field.raw);
+
+        for (unsigned i = INT_BYTES; i > 0; --i) {
+            bytes.push_back(static_cast<std::byte>(raw >> ((i - 1) * BYTE_BITS)));
+        }
+    } else if (field.type == core::SerialFieldType::STRING) {
+        std::array<std::byte, 8192> encoded{};
+        const auto result = e::writeUtfString(
+            field.units ? std::optional<std::u16string_view>(*field.units) : std::nullopt, encoded, {8192, 1024});
+        require(result.status == e::Status::OK);
+        bytes.insert(bytes.end(), encoded.begin(), encoded.begin() + static_cast<std::ptrdiff_t>(result.written));
     } else if (field.type == core::SerialFieldType::UTF_CHAR_ARRAY) {
         std::array<std::byte, 8192> encoded{};
         const auto result = e::writeCharArray(

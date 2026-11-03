@@ -24,7 +24,7 @@ namespace c = org::ttldtor::qdcxx::core;
 namespace e = org::ttldtor::qdcxx::events;
 namespace m = org::ttldtor::qdcxx::mux;
 constexpr c::SchemaLimits SCHEMA_LIMITS{4, 64, 128, 128, 8192}; ///< Finite schema construction bounds.
-constexpr e::MappingLimits MAPPING_LIMITS{64, 128, 32, 64, 64, 128, 8192, 100000}; ///< Finite preparation bounds.
+constexpr e::MappingLimits MAPPING_LIMITS{64, 128, 32, 64, 128, 128, 8192, 100000}; ///< Finite preparation bounds.
 constexpr std::int32_t UNKNOWN_TYPE_BIT = 0x100; ///< Outside the supported full serial identity catalog.
 /** A compact-int primitive with an unsupported high representation bit must not become a known type. */
 constexpr auto UNKNOWN_FIELD_TYPE =

@@ -414,6 +414,8 @@ TEST_CASE("mixed creation after connect isolates a throwing selected listener fr
     script.family = core::SubscriptionFamily::STREAM;
     script.canonicalSymbols = script.describeAllRecords = true;
     script.subscriptionRecordIds = {1, 2};
+    script.removeSequence =
+        std::vector{peer::ExpectedSubscription{{u"MIX"}, {2}}, peer::ExpectedSubscription{{u"MIX"}, {1}}};
     const std::array records{peer::Record{u"MIX", values(source.records()[1], 3), 0, {}, 1},
                              peer::Record{u"MIX", values(source.records()[2], 7), 0, {}, 2}};
     const std::array<std::u16string, 2> expected{u"MIX", u"MIX"};
@@ -445,10 +447,19 @@ TEST_CASE("mixed creation after connect isolates a throwing selected listener fr
     REQUIRE(eventually([&] {
         return observation->quotes.load() == 1 && mixed->getDiagnostic().code == api::ErrorCode::CALLBACK_FAILURE;
     }));
+    REQUIRE(eventually([&] {
+        return sourcePeer.removes() == 1 || sourcePeer.failed();
+    }));
     CHECK_FALSE(sourcePeer.failed());
     CHECK(selectedLimit->load() == api::ErrorCode::RESOURCE_LIMIT);
     CHECK(concrete->getDiagnostic().code == api::ErrorCode::NONE);
     CHECK(endpoint->getDiagnostic().code == api::ErrorCode::NONE);
+    concrete->clearSymbols();
+    REQUIRE(eventually([&] {
+        return sourcePeer.removes() == 2 || sourcePeer.failed();
+    }));
+    CHECK_FALSE(sourcePeer.failed());
+    CHECK(sourcePeer.removes() == 2);
     static_cast<void>(endpoint->closeAndAwaitTermination());
     CHECK(mixed->getState() == api::SubscriptionState::FAILED);
 }

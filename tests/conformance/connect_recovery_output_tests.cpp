@@ -37,7 +37,8 @@ namespace f = root::connect;
 namespace t = root::transport;
 using Type = c::SerialFieldType;
 constexpr c::SchemaLimits SCHEMA_LIMITS{8, 64, 128, 128, 16384}; ///< Small complete local declarations.
-constexpr q::MappingLimits MAPPING_LIMITS{64, 128, 32, 64, 64, 128, 8192, 100000}; ///< Explicit prepared mapper bounds.
+constexpr q::MappingLimits MAPPING_LIMITS{64,  128, 32,   64,
+                                          128, 128, 8192, 100000}; ///< Explicit prepared mapper bounds.
 constexpr std::int32_t SENDER = 41; ///< Sparse incoming ID distinct from selected local position zero.
 constexpr std::size_t EPOCH_BYTES = 16 * sizeof(m::QueueIdentity); ///< Independent application label allowance.
 constexpr std::size_t PROGRESS_LIMIT = 20000; ///< Finite deterministic public-owner polling ceiling.
