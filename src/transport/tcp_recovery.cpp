@@ -5,6 +5,7 @@
 #include "recovery_copy_profile.hpp"
 #include "recovery_core.hpp"
 #include "recovery_core_support.hpp"
+#include "tcp_recovery_factory.hpp"
 #include "tcp_runtime_factory.hpp"
 
 #include <exception>
@@ -233,13 +234,28 @@ std::expected<TcpRecovery, RecoveryDiagnostic>
 TcpRecovery::create(RuntimeBootstrap &bootstrap, const client::EndpointOptions &endpoint,
                     std::vector<protocol::OutgoingRecord> &&blueprint, RecoveryQueues &&queues,
                     const RecoveryOptions &options, RecoveryPreparationWork &work) {
+    return detail::TcpRecoveryFactory::create(bootstrap.state_.get(), endpoint, std::move(blueprint), std::move(queues),
+                                              options, work);
+}
+
+std::expected<TcpRecovery, RecoveryDiagnostic>
+detail::TcpRecoveryFactory::create(const BootstrapLease &bootstrap, const client::EndpointOptions &endpoint,
+                                   std::vector<protocol::OutgoingRecord> &&blueprint, RecoveryQueues &&queues,
+                                   const RecoveryOptions &options, RecoveryPreparationWork &work) {
+    return create(bootstrap.state(), endpoint, std::move(blueprint), std::move(queues), options, work);
+}
+
+std::expected<TcpRecovery, RecoveryDiagnostic>
+detail::TcpRecoveryFactory::create(RuntimeBootstrap::State *bootstrap, const client::EndpointOptions &endpoint,
+                                   std::vector<protocol::OutgoingRecord> &&blueprint, RecoveryQueues &&queues,
+                                   const RecoveryOptions &options, RecoveryPreparationWork &work) {
     auto candidate = detail::RecoveryConfiguration::prepare(endpoint, blueprint, queues, options,
                                                             client::EndpointSecurity::CREDENTIAL_FREE_PLAIN, work);
 
     if (!candidate)
         return std::unexpected(candidate.error());
 
-    const auto retirement = detail::admitRecoveryOwner(*candidate, sizeof(Impl), work.recovery);
+    const auto retirement = detail::admitRecoveryOwner(*candidate, sizeof(TcpRecovery::Impl), work.recovery);
 
     if (!retirement)
         return std::unexpected(retirement.error());
@@ -251,7 +267,7 @@ TcpRecovery::create(RuntimeBootstrap &bootstrap, const client::EndpointOptions &
     }
 
     try {
-        auto impl = std::make_shared<Impl>(std::move(*bootstrapLease), std::move(*candidate), *retirement);
+        auto impl = std::make_shared<TcpRecovery::Impl>(std::move(*bootstrapLease), std::move(*candidate), *retirement);
 
         if (!impl->core.adopt(std::move(blueprint), std::move(queues)))
             std::terminate();

@@ -11,6 +11,8 @@ namespace org::ttldtor::qdcxx::transport {
 
 /** Stable application-owned SDK reference; runtime borrowers never perform its global cleanup. */
 struct RuntimeBootstrap::State {
+    const void *provenance =
+        nullptr; ///< Opaque identity of the linked runtime instance; not an ABI/security attestation.
     std::thread::id owner = std::this_thread::get_id(); ///< Application bootstrap/main-thread identity.
     std::atomic_size_t borrowers{0}; ///< Live runtime/outer-owner borrows, including idle gaps and retirement.
     bool dnsInitialized = false;     ///< Whether this owner acquired one c-ares global reference.

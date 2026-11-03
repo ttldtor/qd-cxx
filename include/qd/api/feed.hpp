@@ -39,7 +39,7 @@ enum class ErrorCode {
     RESOURCE_LIMIT,     ///< A finite configured capacity or native thread reservation was exhausted.
     WORK_LIMIT,         ///< The derived bounded preparation or progress allowance was exhausted.
     ALLOCATION_FAILURE, ///< Required owned storage could not be allocated.
-    WRONG_THREAD,       ///< A checked wait was called outside the runtime creator thread.
+    WRONG_THREAD,       ///< A checked operation used an incompatible creator thread.
     CLOSED,             ///< Admission is fenced by endpoint, subscription or runtime retirement.
     CALLBACK_FAILURE,   ///< Event listener failure closes its subscription; advisory state failure is recorded
                         ///< separately.
@@ -389,18 +389,28 @@ class Endpoint final {
 };
 
 /** Explicit process/main-thread SDK lifetime and joined worker owner.
- * Create on main before application threads and coordinate all foreign c-ares users. Destroy on
- * that creating thread after application threads retire. Endpoint/subscription handles may outlive
+ * The default constructor creates on main before application threads; the explicit bootstrap overload may
+ * borrow a pre-thread owner later on that same main thread. Coordinate all foreign c-ares users.
+ * Destroy this runtime on its creating thread; owned mode requires application threads to retire first.
+ * Borrowed mode retains the host owner until runtime destruction. Endpoint/subscription handles may outlive
  * this object as closed detached ports. The worker starts lazily on the first connect request.
  */
 class ApiRuntime final {
     std::unique_ptr<detail::RuntimeImpl> impl_;
 
     public:
-    /** Acquire the existing bootstrap and a bounded DNS configuration snapshot, without connecting.
+    /** Acquire an owned bootstrap and a bounded DNS configuration snapshot, without connecting.
      * @param options Finite registry limits and optional explicit IPv4 DNS settings.
      */
     explicit ApiRuntime(RuntimeOptions options = {});
+    /** Borrow existing same-linked-instance SDK lifetime without global init/cleanup or a connection.
+     * @param bootstrap Live owner created on main before application threads; retain its stable state until
+     * this runtime is destroyed, even after close. Moving its facade preserves the borrow. The creating
+     * main thread must construct/destroy this runtime. Foreign SDK/user obligations remain caller preconditions.
+     * @param options Finite settings; invalid token/provenance rejects INVALID_ARGUMENT, wrong creator thread
+     * rejects WRONG_THREAD, exhausted borrow capacity rejects RESOURCE_LIMIT, all before native activation.
+     */
+    explicit ApiRuntime(transport::RuntimeBootstrap &bootstrap, RuntimeOptions options = {});
     ~ApiRuntime();
     ApiRuntime(const ApiRuntime &) = delete;
     ApiRuntime &operator=(const ApiRuntime &) = delete;

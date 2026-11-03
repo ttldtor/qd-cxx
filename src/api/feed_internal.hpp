@@ -4,6 +4,7 @@
 
 #include "qd/api/feed.hpp"
 
+#include "../transport/bootstrap_lease.hpp"
 #include "event_selection.hpp"
 
 #include <atomic>
@@ -132,17 +133,24 @@ struct RuntimeControl {
 
 /** Main-thread lifetime owner. The worker never owns this facade or its joinable thread. */
 struct RuntimeImpl {
-    transport::RuntimeBootstrap bootstrap;   ///< Constructed on main before worker and destroyed after join.
+    std::optional<transport::RuntimeBootstrap> ownedBootstrap; ///< Optional process owner, destroyed after the lease.
+    transport::detail::BootstrapLease
+        bootstrap;                           ///< Stable process lease, retained through full worker/capture retirement.
     RuntimeOptions options;                  ///< Explicit immutable capacities and resolver snapshot.
     std::shared_ptr<RuntimeControl> control; ///< Detached producer gate; raw dispatch is mutex-protected.
     std::thread worker;                      ///< Lazy joinable SDK worker, owned and joined only on main.
     bool shutdownInProgress = false;         ///< Creator-thread reentry guard, including capture destruction.
 
-    /** Adopt main-owned bootstrap and construct fixed detached control storage.
-     * @param bootstrap Explicit process lifetime owner.
-     * @param options Validated finite configuration, with DNS resolution settings already snapped.
+    /** Retain the owner parameter through fallible lease/control construction, then adopt it without failure.
+     * @param owner Newly acquired process owner; an allocation failure before entry leaves its caller intact.
+     * @param options Validated finite configuration and resolver snapshot.
      */
-    RuntimeImpl(transport::RuntimeBootstrap bootstrap, RuntimeOptions options);
+    RuntimeImpl(transport::RuntimeBootstrap owner, RuntimeOptions options);
+    /** Adopt a stable host lease without global SDK operations.
+     * @param bootstrap Counted process lease, retained through all worker/native/capture retirement.
+     * @param options Validated finite configuration and resolver snapshot.
+     */
+    RuntimeImpl(transport::detail::BootstrapLease bootstrap, RuntimeOptions options);
     /** Fail fast on wrong-owner destruction; join before bootstrap cleanup. */
     ~RuntimeImpl();
     /** Start once while holding control->mutex, which pins this dispatch target's lifetime. */

@@ -22,6 +22,7 @@
 
 namespace org::ttldtor::qdcxx::transport {
 namespace {
+constexpr unsigned char BOOTSTRAP_PROVENANCE = 0; ///< Address identifies this linked runtime instance.
 
 /** Complete one native readiness sample without inspecting byte quality or acquiring SDK references.
  * @param argument Unused call-local context.
@@ -92,7 +93,7 @@ detail::BootstrapLease::acquire(RuntimeBootstrap &bootstrap) noexcept {
 
 std::expected<detail::BootstrapLease, TcpDiagnostic>
 detail::BootstrapLease::acquire(RuntimeBootstrap::State *state) noexcept {
-    if (!state || !state->dnsInitialized) {
+    if (!state || state->provenance != &BOOTSTRAP_PROVENANCE || !state->dnsInitialized) {
         return std::unexpected(TcpDiagnostic{TcpError::INVALID_CONFIGURATION, "bootstrap-lease-configuration"});
     }
 
@@ -104,6 +105,21 @@ detail::BootstrapLease::acquire(RuntimeBootstrap::State *state) noexcept {
     }
 
     return BootstrapLease(state);
+}
+
+std::expected<detail::BootstrapLease, TcpDiagnostic>
+detail::BootstrapLease::acquireForRuntime(RuntimeBootstrap &bootstrap) noexcept {
+    auto *state = bootstrap.state_.get();
+
+    if (!state || state->provenance != &BOOTSTRAP_PROVENANCE || !state->dnsInitialized) {
+        return std::unexpected(TcpDiagnostic{TcpError::INVALID_CONFIGURATION, "bootstrap-lease-configuration"});
+    }
+
+    if (state->owner != std::this_thread::get_id()) {
+        return std::unexpected(TcpDiagnostic{TcpError::WRONG_THREAD, "bootstrap-borrow-thread"});
+    }
+
+    return acquire(state);
 }
 
 std::expected<RuntimeBootstrap, TcpDiagnostic> RuntimeBootstrap::create() {
@@ -126,6 +142,7 @@ std::expected<RuntimeBootstrap, TcpDiagnostic> detail::BootstrapFactory::create(
 
     try {
         auto state = std::make_unique<RuntimeBootstrap::State>();
+        state->provenance = &BOOTSTRAP_PROVENANCE;
 
 #ifdef _WIN32
         WSADATA data{};

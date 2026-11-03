@@ -9,6 +9,9 @@
 #include <vector>
 
 namespace org::ttldtor::qdcxx::transport {
+namespace detail {
+struct TcpRecoveryFactory;
+} // namespace detail
 
 /** Opt-in finite reconnect owner with stable family delivery queues and fresh plain protocol epochs.
  * All operations, moves and destruction are serialized on the creating thread. Bootstrap's stable
@@ -20,6 +23,7 @@ namespace org::ttldtor::qdcxx::transport {
  * Default TcpRuntime behavior is unchanged. No raw protocol event/snapshot escapes this owner.
  */
 class TcpRecovery {
+    friend struct detail::TcpRecoveryFactory;
     struct Impl;
     std::shared_ptr<Impl> impl_; ///< Stable operation lease, independent of unique public ownership.
     /** Adopt complete unactivated state without allocating.

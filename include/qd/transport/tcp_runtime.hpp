@@ -21,6 +21,7 @@ struct BootstrapFactory;
 class BootstrapLease;
 struct RuntimeCore;
 struct TcpRuntimeFactory;
+struct TcpRecoveryFactory;
 struct TlsRuntimeFactory;
 } // namespace detail
 
@@ -155,6 +156,8 @@ class RuntimeBootstrap {
     struct State;
     std::unique_ptr<State> state_; ///< Stable process-lifetime state borrowed by runtimes.
     friend class TcpRuntime;
+    friend class TcpRecovery;
+    friend struct detail::TcpRecoveryFactory;
     friend class TlsRuntime;
     friend class detail::BootstrapLease;
     friend struct detail::RuntimeCore;

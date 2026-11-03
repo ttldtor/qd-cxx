@@ -17,6 +17,7 @@ class BootstrapLease {
     RuntimeBootstrap::State *state_ = nullptr; ///< Stable application-owned state; null after transfer.
     friend struct RuntimeCore;
     friend struct TcpRuntimeFactory;
+    friend struct TcpRecoveryFactory;
     friend struct TlsRuntimeFactory;
 
     /** Adopt one already counted borrow without allocation.
@@ -53,6 +54,13 @@ class BootstrapLease {
      * @return Token or static refusal; failed admission leaves the owner unchanged.
      */
     [[nodiscard]] static std::expected<BootstrapLease, TcpDiagnostic> acquire(RuntimeBootstrap &bootstrap) noexcept;
+
+    /** Acquire for the high-level runtime on the bootstrap creator thread, without SDK initialization.
+     * @param bootstrap Existing live same-instance owner; original pre-thread startup remains a precondition.
+     * @return Stable lease or configuration/thread/capacity refusal; no global SDK calls.
+     */
+    [[nodiscard]] static std::expected<BootstrapLease, TcpDiagnostic>
+    acquireForRuntime(RuntimeBootstrap &bootstrap) noexcept;
 
     /** Inspect whether this token still retains a stable borrow.
      * @return False only after this token has been moved from.

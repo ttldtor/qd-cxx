@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/api/feed.hpp"
 
+#include "../transport/tcp_recovery_factory.hpp"
 #include "feed_internal.hpp"
 #include "receiving_profile.hpp"
 #include "system_dns.hpp"
@@ -27,6 +28,21 @@ constexpr std::size_t MAXIMUM_ADDRESS_BYTES = MAXIMUM_HOST_BYTES + 8; ///< Brack
  */
 [[noreturn]] void reject(ErrorCode code, std::string_view stage) {
     throw Error({code, stage});
+}
+
+/** Acquire the owned constructor's lease while its parameter still retains process ownership.
+ * @param bootstrap Newly created owner, kept alive through every delegated-constructor failure.
+ * @return Counted lease or the existing typed bootstrap refusal; no allocation or SDK initialization.
+ */
+transport::detail::BootstrapLease acquireOwnedBootstrap(transport::RuntimeBootstrap &bootstrap) {
+    auto lease = transport::detail::BootstrapLease::acquireForRuntime(bootstrap);
+
+    if (!lease) {
+        throw Error({ErrorCode::BOOTSTRAP_FAILURE, lease.error().stage, lease.error().nativeCode,
+                     static_cast<std::uint32_t>(lease.error().error)});
+    }
+
+    return std::move(*lease);
 }
 
 /** Translate only allocation/capacity exceptions at one public producer boundary.
@@ -1356,7 +1372,7 @@ struct NativeEndpoint {
  * @param port Detached route and immutable public settings.
  * @return Complete native endpoint or detached Error; no native object escapes the worker.
  */
-std::unique_ptr<NativeEndpoint> activate(transport::RuntimeBootstrap &bootstrap,
+std::unique_ptr<NativeEndpoint> activate(const transport::detail::BootstrapLease &bootstrap,
                                          const std::shared_ptr<EndpointPort> &port) {
     auto profile = prepareReceivingProfile(port->limits, port->options, port->host, port->port);
     auto native = std::make_unique<NativeEndpoint>(port, std::move(profile));
@@ -1376,9 +1392,9 @@ std::unique_ptr<NativeEndpoint> activate(transport::RuntimeBootstrap &bootstrap,
     }
 
     auto work = native->profile.preparationWork;
-    auto recovery =
-        transport::TcpRecovery::create(bootstrap, native->profile.endpoint, std::move(native->profile.blueprint),
-                                       std::move(queues), native->profile.recoveryOptions, work);
+    auto recovery = transport::detail::TcpRecoveryFactory::create(
+        bootstrap, native->profile.endpoint, std::move(native->profile.blueprint), std::move(queues),
+        native->profile.recoveryOptions, work);
 
     if (!recovery) {
         throw Error(recoveryDiagnostic(recovery.error()));
@@ -1703,7 +1719,13 @@ void retireNative(std::unique_ptr<NativeEndpoint> &endpoint) noexcept {
 }
 } // namespace
 
-RuntimeImpl::RuntimeImpl(transport::RuntimeBootstrap bootstrap, RuntimeOptions options)
+RuntimeImpl::RuntimeImpl(transport::RuntimeBootstrap owner, RuntimeOptions options)
+    : RuntimeImpl(acquireOwnedBootstrap(owner), std::move(options)) {
+    // The parameter owns SDK state until all fallible delegated storage has succeeded.
+    ownedBootstrap.emplace(std::move(owner));
+}
+
+RuntimeImpl::RuntimeImpl(transport::detail::BootstrapLease bootstrap, RuntimeOptions options)
     : bootstrap(std::move(bootstrap)), options(std::move(options)), control(std::make_shared<RuntimeControl>()) {
     control->owner = std::this_thread::get_id();
     control->endpoints.resize(this->options.maximumEndpoints);
@@ -1987,34 +2009,45 @@ void RuntimeImpl::run() noexcept {
 }
 } // namespace detail
 
+namespace {
+/** Validate and snapshot caller settings before publishing any runtime.
+ * @param options Explicit finite settings, including optional DNS server input.
+ * @return Validated owning settings with a bounded resolver snapshot; throws Error on refusal.
+ */
+RuntimeOptions prepareRuntimeOptions(RuntimeOptions options) {
+    if (!options.maximumEndpoints || !options.maximumSubscriptionsPerEndpoint ||
+        !options.maximumSymbolsPerSubscription || !options.maximumListenersPerSubscription ||
+        !options.maximumStateListenersPerEndpoint || !options.maximumStateListenersPerSubscription ||
+        !options.maximumSymbolUnits || options.maximumSymbolUnits > 128 ||
+        !options.maximumEventTypeArgumentsPerSubscription || options.dnsServers.size() > 4 || options.dnsPort == 0) {
+        reject(ErrorCode::INVALID_ARGUMENT, "runtime-options");
+    }
+
+    if (options.dnsServers.empty()) {
+        auto discovered = detail::discoverSystemDnsServers();
+
+        if (!discovered) {
+            throw Error(discovered.error());
+        }
+
+        options.dnsServers = std::move(*discovered);
+    }
+
+    for (const auto &server : options.dnsServers) {
+        if (std::ranges::all_of(server.address, [](auto value) {
+                return value == 0;
+            })) {
+            reject(ErrorCode::DNS_CONFIGURATION, "runtime-dns");
+        }
+    }
+
+    return options;
+}
+} // namespace
+
 ApiRuntime::ApiRuntime(RuntimeOptions options) {
     producerAction([&] {
-        if (!options.maximumEndpoints || !options.maximumSubscriptionsPerEndpoint ||
-            !options.maximumSymbolsPerSubscription || !options.maximumListenersPerSubscription ||
-            !options.maximumStateListenersPerEndpoint || !options.maximumStateListenersPerSubscription ||
-            !options.maximumSymbolUnits || options.maximumSymbolUnits > 128 ||
-            !options.maximumEventTypeArgumentsPerSubscription || options.dnsServers.size() > 4 ||
-            options.dnsPort == 0) {
-            reject(ErrorCode::INVALID_ARGUMENT, "runtime-options");
-        }
-
-        if (options.dnsServers.empty()) {
-            auto discovered = detail::discoverSystemDnsServers();
-
-            if (!discovered) {
-                throw Error(discovered.error());
-            }
-
-            options.dnsServers = std::move(*discovered);
-        }
-
-        for (const auto &server : options.dnsServers) {
-            if (std::ranges::all_of(server.address, [](auto value) {
-                    return value == 0;
-                })) {
-                reject(ErrorCode::DNS_CONFIGURATION, "runtime-dns");
-            }
-        }
+        options = prepareRuntimeOptions(std::move(options));
 
         auto bootstrap = transport::RuntimeBootstrap::create();
 
@@ -2024,6 +2057,24 @@ ApiRuntime::ApiRuntime(RuntimeOptions options) {
         }
 
         impl_ = std::make_unique<detail::RuntimeImpl>(std::move(*bootstrap), std::move(options));
+    });
+}
+
+ApiRuntime::ApiRuntime(transport::RuntimeBootstrap &bootstrap, RuntimeOptions options) {
+    producerAction([&] {
+        auto lease = transport::detail::BootstrapLease::acquireForRuntime(bootstrap);
+
+        if (!lease) {
+            const auto code = lease.error().error == transport::TcpError::WRONG_THREAD ? ErrorCode::WRONG_THREAD
+                              : lease.error().error == transport::TcpError::RESOURCE_LIMIT
+                                  ? ErrorCode::RESOURCE_LIMIT
+                                  : ErrorCode::INVALID_ARGUMENT;
+            throw Error(
+                {code, lease.error().stage, lease.error().nativeCode, static_cast<std::uint32_t>(lease.error().error)});
+        }
+
+        options = prepareRuntimeOptions(std::move(options));
+        impl_ = std::make_unique<detail::RuntimeImpl>(std::move(*lease), std::move(options));
     });
 }
 

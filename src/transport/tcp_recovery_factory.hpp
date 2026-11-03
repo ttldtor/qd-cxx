@@ -1,0 +1,43 @@
+// Copyright (c) 2026 ttldtor.
+// SPDX-License-Identifier: BSL-1.0
+#pragma once
+
+#include "bootstrap_lease.hpp"
+#include "qd/transport/tcp_recovery.hpp"
+
+namespace org::ttldtor::qdcxx::transport::detail {
+
+/** Private recovery assembly from stable process state, independent of its movable public facade. */
+struct TcpRecoveryFactory {
+    /** Prepare from a counted outer lease; SDK progress and worker affinity remain caller driven.
+     * @param bootstrap Outer lease retained across all native and callback retirement.
+     * @param endpoint Original immutable route configuration.
+     * @param blueprint Outgoing records adopted only after fallible preparation.
+     * @param queues Compatible queue owners, preserved on failure.
+     * @param options Finite recovery settings.
+     * @param work Caller-owned preparation credits, without refunds.
+     * @return Prepared owner or existing typed refusal; public preparation/error order is preserved.
+     */
+    [[nodiscard]] static std::expected<TcpRecovery, RecoveryDiagnostic>
+    create(const BootstrapLease &bootstrap, const client::EndpointOptions &endpoint,
+           std::vector<protocol::OutgoingRecord> &&blueprint, RecoveryQueues &&queues, const RecoveryOptions &options,
+           RecoveryPreparationWork &work);
+
+    private:
+    friend class transport::TcpRecovery;
+    /** Shared public/private assembly path, preserving configuration preparation before lease admission.
+     * @param bootstrap Nullable stable process state.
+     * @param endpoint Original immutable route configuration.
+     * @param blueprint Outgoing records adopted transactionally.
+     * @param queues Queue owners preserved on failure.
+     * @param options Finite settings.
+     * @param work Actual caller preparation credits.
+     * @return Prepared owner or existing static refusal.
+     */
+    [[nodiscard]] static std::expected<TcpRecovery, RecoveryDiagnostic>
+    create(RuntimeBootstrap::State *bootstrap, const client::EndpointOptions &endpoint,
+           std::vector<protocol::OutgoingRecord> &&blueprint, RecoveryQueues &&queues, const RecoveryOptions &options,
+           RecoveryPreparationWork &work);
+};
+
+} // namespace org::ttldtor::qdcxx::transport::detail
