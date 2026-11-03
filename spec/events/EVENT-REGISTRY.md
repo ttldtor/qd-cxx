@@ -31,8 +31,9 @@ requirement: each ID equals its position in the complete record catalog.
 
 Distinct records may project the same event type. Duplicate routes for the same
 local record ID reject atomically, including routes with different types. Route
-inspection preserves input order. A single-type feed subscription selects every
-registered route of that type; several selected types use the
+inspection preserves input order. A single-type feed subscription selects registered
+routes of that type, applying the [regional Quote exchange rules](EVENT-TIME.md);
+several selected types use the
 [mixed subscription contract](MIXED-SUBSCRIPTIONS.md).
 
 Preparation uses the existing adapters' exact accepted lookup keys, full type
@@ -90,13 +91,43 @@ rejection by the generic schema boundary.
 Within that ceiling, preparation preserves the exact schema identity and groups
 routes by type. It checks and aggregates complete mapping shape/selection/work
 coordinates, callback projection allowances and desired-command capacities.
-Each accepted symbol requires one interest per selected local record route.
+Each accepted symbol requires one interest per matching selected local record route.
 The total registered route count scales endpoint and per-subscription interest
 reservations with checked arithmetic, including subscriptions created after connect.
 Actual maximum record field count
 sets the complete frame field allowance, retaining the default minimum of16.
 With the built-in registry, interest reservations cover both routes per symbol.
 The schema and frame/queue data ceilings remain unchanged.
+
+Regional demand routing retains a fixed16-code exchange array (32 bytes) in the
+receiving profile's own fixed object. Its name inspection is bounded by the existing
+16×128-unit schema ceiling; the suffix helper can scan each name at most three times.
+Each desired revision additionally owns a logical snapshot and at most one suffix-free
+physical string per logical symbol. Matching regional routes share that physical string;
+Profile or composite fallback may simultaneously use the original logical copy.
+
+For maximum symbol count `N`, maximum symbol units `U` and registered route count `R`,
+the separate temporary allowance contains `2*N*U` text units, `N` routing wrappers,
+`N*R` borrowed request wrappers and text terminators. Frontend-retained symbols and
+queue-owned command copies keep their existing separate bounds. This is logical
+backing, excluding unused implementation-selected capacity, allocator overhead and RSS.
+The helper reserves the complete final string before copying borrowed prefix/attribute
+slices, so no growing-prefix allocation overlaps the final physical buffer. Temporary backing and disposal
+are conservatively charged before snapshot allocation. Routing work includes
+`N*(2*R+8)+R` visits, `11*N*U` text inspections/copies and twice the temporary backing
+plus the32-byte exchange array in byte work. Checked sums/products derive additional
+per-endpoint grants for every logical subscription before publication. A fresh valid
+grant can always fund this routing attempt plus the existing submission allowance;
+overflow refuses at `profile-arithmetic`. Exhausted current-turn credits postpone the
+revision without allocation, mutation or internal refill. Failed attempts do not refund.
+
+Request symbol views are created only after the temporary selector vector is fully
+populated and remain alive through synchronous `handle.replace`, which owns its
+successful command copy. They never escape into listener captures or reconnect state.
+
+Queue-owned command text separately reserves `N*R*(U+1)` units, including one terminator
+per maximum-length symbol. Terminators do not reduce the public maximum of128 printable
+ASCII units. Checked arithmetic refuses an unrepresentable reservation before allocation.
 
 ## Custom schema example
 

@@ -798,11 +798,18 @@ enum class SymbolMutation { ADD, REMOVE, REPLACE };
 void mutateSymbols(const std::shared_ptr<detail::SubscriptionPort> &port, std::span<const std::string_view> inputs,
                    SymbolMutation mutation) {
     producerAction([&] {
+        const auto endpoint = port->endpoint.lock();
         std::vector<std::u16string> parsed;
         parsed.reserve(std::min(inputs.size(), port->maximumSymbols));
 
         for (const auto input : inputs) {
             auto symbol = exactSymbol(input, port->maximumSymbolUnits);
+
+            if (mutation != SymbolMutation::REMOVE && endpoint) {
+                detail::validateReceivingSymbol(endpoint->options.eventRegistry ? &*endpoint->options.eventRegistry
+                                                                                : nullptr,
+                                                port->eventSelection, symbol);
+            }
 
             if (std::ranges::find(parsed, symbol) == parsed.end()) {
                 if (parsed.size() >= port->maximumSymbols) {
@@ -1656,7 +1663,8 @@ void applyDesired(NativeEndpoint &endpoint, NativeSubscription &subscription, mu
         return;
     }
 
-    std::vector<std::u16string> symbols;
+    const auto &plan = receivingEventPlan(endpoint.profile, subscription.port->eventSelection);
+    std::vector<ReceivingSymbol> symbols;
     std::uint64_t revision = 0;
     {
         std::lock_guard lock(subscription.port->mutex);
@@ -1666,23 +1674,40 @@ void applyDesired(NativeEndpoint &endpoint, NativeSubscription &subscription, mu
             return;
         }
 
-        symbols = subscription.port->symbols;
+        if (!prepayReceivingRouting(endpoint.profile, work)) {
+            return;
+        }
+
+        if (subscription.port->symbols.size() > endpoint.profile.routing.symbols) {
+            throw Error({ErrorCode::RESOURCE_LIMIT, "subscription-routing-symbols"});
+        }
+
+        symbols.reserve(subscription.port->symbols.size());
+
+        for (const auto &symbol : subscription.port->symbols) {
+            symbols.push_back({symbol});
+        }
     }
 
     std::vector<core::SubscriptionRequest> requests;
-    const auto &plan = receivingEventPlan(endpoint.profile, subscription.port->eventSelection);
 
     if (plan.bindingCount == 0 || symbols.size() > endpoint.profile.clientLimits.commandEntries / plan.bindingCount) {
         throw Error({ErrorCode::RESOURCE_LIMIT, "subscription-route-entries"});
     }
 
     requests.reserve(symbols.size() * plan.bindingCount);
+    prepareReceivingSymbols(endpoint.profile, plan, symbols);
 
-    for (const auto &binding : std::span(endpoint.profile.bindings).subspan(plan.firstBinding, plan.bindingCount)) {
+    for (std::size_t offset = 0; offset < plan.bindingCount; ++offset) {
+        const auto index = plan.firstBinding + offset;
+        const auto &binding = endpoint.profile.bindings[index];
         const auto context = endpoint.profile.schema.recordContext(binding.localId);
 
         for (const auto &symbol : symbols) {
-            requests.push_back({{context, symbol}, {}});
+            if (receivingSymbolMatches(endpoint.profile, index, symbol)) {
+                const auto &physical = endpoint.profile.bindingExchanges[index] ? symbol.physical : symbol.logical;
+                requests.push_back({{context, physical}, {}});
+            }
         }
     }
 
@@ -1765,6 +1790,8 @@ void progressSubscriptions(NativeEndpoint &endpoint, mux::QueueSubmitWork &submi
         if (!endpoint.port->closeRequested.load(std::memory_order_acquire)) {
             try {
                 applyDesired(endpoint, *native, submitWork);
+            } catch (const Error &failure) {
+                failSubscription(port, failure.diagnostic());
             } catch (const std::bad_alloc &) {
                 failSubscription(port, {ErrorCode::ALLOCATION_FAILURE, "subscription-desired-copy"});
             } catch (...) {

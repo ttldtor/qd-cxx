@@ -25,19 +25,20 @@ inline constexpr std::array<core::SerialFieldType, 8> QUOTE_FIELD_TYPES{
 
 /** Owned Quote projection; no event hierarchy or transport dependency. */
 struct Quote {
-    std::u16string symbol;         ///< Exact owned UTF-16 symbol, without normalization.
-    std::int64_t bidTimeMs;        ///< Signed bid seconds expanded exactly to milliseconds.
-    char16_t bidExchangeCode;      ///< Low UTF-16 unit of the preserved incoming code point.
-    core::WideDecimal bidPrice;    ///< Exact raw decimal, with decimal/binary64 views.
-    core::WideDecimal bidSize;     ///< Exact raw decimal size, preserving fractional values.
-    std::int64_t askTimeMs;        ///< Signed ask seconds expanded exactly to milliseconds.
-    char16_t askExchangeCode;      ///< Low UTF-16 unit of the preserved incoming code point.
-    core::WideDecimal askPrice;    ///< Exact raw decimal, including NaN and infinities.
-    core::WideDecimal askSize;     ///< Exact raw decimal size, including missing-field NaN.
-    std::int64_t timeMs;           ///< Maximum bid/ask time plus the prepared mapping's packed milliseconds.
-    std::int64_t eventTime = 0;    ///< Explicit caller metadata; the legacy mapper always leaves zero.
-    std::int32_t sequence = 0;     ///< Low 22 Sequence bits; zero on the legacy mapping path.
-    std::int32_t timeNanoPart = 0; ///< Signed TimeNanoPart value; zero on the legacy mapping path.
+    std::u16string symbol;      ///< Exact owned UTF-16 symbol, without normalization.
+    std::int64_t bidTimeMs;     ///< Signed milliseconds; TIME_SECONDS expands by 1000, TIME_MILLIS is unchanged.
+    char16_t bidExchangeCode;   ///< Low UTF-16 unit of the preserved incoming code point.
+    core::WideDecimal bidPrice; ///< Exact raw decimal, with decimal/binary64 views.
+    core::WideDecimal bidSize;  ///< Exact raw decimal size, preserving fractional values.
+    std::int64_t askTimeMs;     ///< Signed milliseconds; absent optional local time projects zero.
+    char16_t askExchangeCode;   ///< Low UTF-16 unit of the preserved incoming code point.
+    core::WideDecimal askPrice; ///< Exact raw decimal, including NaN and infinities.
+    core::WideDecimal askSize;  ///< Exact raw decimal size, including missing-field NaN.
+    std::int64_t timeMs;        ///< Maximum bid/ask floored to seconds plus unsigned packed milliseconds, wrapping.
+    std::int64_t eventTime = 0; ///< Explicit caller metadata; the legacy mapper always leaves zero.
+    std::int32_t sequence = 0;  ///< Low 22 Sequence bits; zero on the legacy mapping path.
+    std::int32_t timeNanoPart =
+        0; ///< Raw signed nanoseconds within a millisecond; absent means zero, without clamping.
 };
 
 /** Mapping failure, separate from wire parsing and transport. */
@@ -65,17 +66,19 @@ mapQuote(std::u16string_view symbol, std::span<const core::FieldValue> fields, s
 /** Immutable Quote field selections tied to one validated local record context. */
 class PreparedQuote {
     EventMapping mapping_;
+    char16_t recordExchange_; ///< Immutable syntactic record exchange; absent business exchange fields use this code.
 
     /** Take an independently owned validated field plan.
      * @param mapping Complete immutable Quote field plan.
+     * @param recordExchange Regional record suffix, or zero for a composite/custom record.
      */
-    explicit PreparedQuote(EventMapping mapping);
+    explicit PreparedQuote(EventMapping mapping, char16_t recordExchange);
 
     public:
     /** Resolve measured Quote keys and exact full types before event projection.
      * @param schema Explicit validated source schema; no storage is borrowed after return.
      * @param localId Selected ordinary local record identity.
-     * @param limits Mandatory finite preparation budgets.
+     * @param limits Finite preparation budgets; record name consumes name units and three conservative scans.
      * @return Immutable prepared mapping or atomic preparation error.
      */
     [[nodiscard]] static std::expected<PreparedQuote, MappingError> prepare(const core::LocalSchema &schema,
@@ -87,7 +90,7 @@ class PreparedQuote {
     [[nodiscard]] const core::RecordContext &context() const noexcept;
 
     /** Validate and project without modifying or retaining generic values.
-     * @param symbol Exact UTF-16 symbol, borrowed during this call.
+     * @param symbol Physical QD UTF-16 symbol; a regional record restores its suffix on the owned result.
      * @param values Context-tagged complete local values, including any extra fields.
      * @param symbolUnits Mandatory maximum UTF-16 units copied into the owned result.
      * @param eventTime Explicit metadata in milliseconds, independent of business fields.
@@ -97,7 +100,7 @@ class PreparedQuote {
                                                          std::size_t symbolUnits, std::int64_t eventTime = 0) const;
 
     /** Project complete borrowed fields without constructing intermediate owning field values.
-     * @param symbol Exact UTF-16 symbol, borrowed during this call.
+     * @param symbol Physical QD UTF-16 symbol; a regional record restores its suffix on the owned result.
      * @param values Context-tagged complete field views; all source storage remains valid during this call.
      * @param symbolUnits Maximum UTF-16 symbol units copied into the owned result.
      * @param eventTime Explicit metadata milliseconds, independent of indexed identity and business fields.

@@ -1,0 +1,2152 @@
+record	default	0	Quote
+field	default	0	0	56	Bid.Time	BidTime
+field	default	0	1	2	Bid.Exchange	BidExchangeCode
+field	default	0	2	120	Bid.Price	BidPrice
+field	default	0	3	120	Bid.Size	BidSize
+field	default	0	4	56	Ask.Time	AskTime
+field	default	0	5	2	Ask.Exchange	AskExchangeCode
+field	default	0	6	120	Ask.Price	AskPrice
+field	default	0	7	120	Ask.Size	AskSize
+input	default	0	0	004100410050004c	0
+value	default	0	0	0	0	null
+value	default	0	0	1	0	null
+value	default	0	0	2	0	null
+value	default	0	0	3	0	null
+value	default	0	0	4	-1	null
+value	default	0	0	5	0	null
+value	default	0	0	6	0	null
+value	default	0	0	7	0	null
+quote	default	0	0	004100410050004c	0	0	-1000	0	0	0	0	0	0
+input	default	0	1	004100410050004c	-1
+value	default	0	1	0	-1	null
+value	default	0	1	1	78	null
+value	default	0	1	2	0	null
+value	default	0	1	3	0	null
+value	default	0	1	4	0	null
+value	default	0	1	5	78	null
+value	default	0	1	6	0	null
+value	default	0	1	7	0	null
+quote	default	0	1	004100410050004c	-1000	78	0	78	0	0	0	23	0
+input	default	0	2	004100410050004c	-9223372036854775808
+value	default	0	2	0	-2147483648	null
+value	default	0	2	1	78	null
+value	default	0	2	2	0	null
+value	default	0	2	3	0	null
+value	default	0	2	4	-2147483647	null
+value	default	0	2	5	78	null
+value	default	0	2	6	0	null
+value	default	0	2	7	0	null
+quote	default	0	2	004100410050004c	-2147483648000	78	-2147483647000	78	-2147483647000	0	0	-2147483648000	-2147483647000000000
+input	default	0	3	004100410050004c	9223372036854775807
+value	default	0	3	0	2147483647	null
+value	default	0	3	1	78	null
+value	default	0	3	2	0	null
+value	default	0	3	3	0	null
+value	default	0	3	4	2147483646	null
+value	default	0	3	5	78	null
+value	default	0	3	6	0	null
+value	default	0	3	7	0	null
+quote	default	0	3	004100410050004c	2147483647000	78	2147483646000	78	2147483647000	0	0	2147483648023	2147483647000000000
+input	default	0	4	004100410050004c0026004e007b0061003d0062007d	1311768467463790320
+value	default	0	4	0	17	null
+value	default	0	4	1	78	null
+value	default	0	4	2	0	null
+value	default	0	4	3	0	null
+value	default	0	4	4	18	null
+value	default	0	4	5	78	null
+value	default	0	4	6	0	null
+value	default	0	4	7	0	null
+quote	default	0	4	004100410050004c0026004e007b0061003d0062007d	17000	78	18000	78	18000	0	0	305419896618	18000000000
+record	default	1	Quote&Q
+field	default	1	0	56	Bid.Time	BidTime
+field	default	1	1	120	Bid.Price	BidPrice
+field	default	1	2	120	Bid.Size	BidSize
+field	default	1	3	56	Ask.Time	AskTime
+field	default	1	4	120	Ask.Price	AskPrice
+field	default	1	5	120	Ask.Size	AskSize
+input	default	1	0	004100410050004c	0
+value	default	1	0	0	0	null
+value	default	1	0	1	0	null
+value	default	1	0	2	0	null
+value	default	1	0	3	-1	null
+value	default	1	0	4	0	null
+value	default	1	0	5	0	null
+quote	default	1	0	004100410050004c00260051	0	81	-1000	81	0	0	0	0	0
+input	default	1	1	004100410050004c	-1
+value	default	1	1	0	-1	null
+value	default	1	1	1	0	null
+value	default	1	1	2	0	null
+value	default	1	1	3	0	null
+value	default	1	1	4	0	null
+value	default	1	1	5	0	null
+quote	default	1	1	004100410050004c00260051	-1000	81	0	81	0	0	0	23	0
+input	default	1	2	004100410050004c	-9223372036854775808
+value	default	1	2	0	-2147483648	null
+value	default	1	2	1	0	null
+value	default	1	2	2	0	null
+value	default	1	2	3	-2147483647	null
+value	default	1	2	4	0	null
+value	default	1	2	5	0	null
+quote	default	1	2	004100410050004c00260051	-2147483648000	81	-2147483647000	81	-2147483647000	0	0	-2147483648000	-2147483647000000000
+input	default	1	3	004100410050004c	9223372036854775807
+value	default	1	3	0	2147483647	null
+value	default	1	3	1	0	null
+value	default	1	3	2	0	null
+value	default	1	3	3	2147483646	null
+value	default	1	3	4	0	null
+value	default	1	3	5	0	null
+quote	default	1	3	004100410050004c00260051	2147483647000	81	2147483646000	81	2147483647000	0	0	2147483648023	2147483647000000000
+input	default	1	4	004100410050004c0026004e007b0061003d0062007d	1311768467463790320
+value	default	1	4	0	17	null
+value	default	1	4	1	0	null
+value	default	1	4	2	0	null
+value	default	1	4	3	18	null
+value	default	1	4	4	0	null
+value	default	1	4	5	0	null
+quote	default	1	4	004100410050004c00260051007b0061003d0062007d	17000	81	18000	81	18000	0	0	305419896618	18000000000
+record	default	2	Quote&z
+field	default	2	0	56	Bid.Time	BidTime
+field	default	2	1	120	Bid.Price	BidPrice
+field	default	2	2	120	Bid.Size	BidSize
+field	default	2	3	56	Ask.Time	AskTime
+field	default	2	4	120	Ask.Price	AskPrice
+field	default	2	5	120	Ask.Size	AskSize
+input	default	2	0	004100410050004c	0
+value	default	2	0	0	0	null
+value	default	2	0	1	0	null
+value	default	2	0	2	0	null
+value	default	2	0	3	-1	null
+value	default	2	0	4	0	null
+value	default	2	0	5	0	null
+quote	default	2	0	004100410050004c0026007a	0	122	-1000	122	0	0	0	0	0
+input	default	2	1	004100410050004c	-1
+value	default	2	1	0	-1	null
+value	default	2	1	1	0	null
+value	default	2	1	2	0	null
+value	default	2	1	3	0	null
+value	default	2	1	4	0	null
+value	default	2	1	5	0	null
+quote	default	2	1	004100410050004c0026007a	-1000	122	0	122	0	0	0	23	0
+input	default	2	2	004100410050004c	-9223372036854775808
+value	default	2	2	0	-2147483648	null
+value	default	2	2	1	0	null
+value	default	2	2	2	0	null
+value	default	2	2	3	-2147483647	null
+value	default	2	2	4	0	null
+value	default	2	2	5	0	null
+quote	default	2	2	004100410050004c0026007a	-2147483648000	122	-2147483647000	122	-2147483647000	0	0	-2147483648000	-2147483647000000000
+input	default	2	3	004100410050004c	9223372036854775807
+value	default	2	3	0	2147483647	null
+value	default	2	3	1	0	null
+value	default	2	3	2	0	null
+value	default	2	3	3	2147483646	null
+value	default	2	3	4	0	null
+value	default	2	3	5	0	null
+quote	default	2	3	004100410050004c0026007a	2147483647000	122	2147483646000	122	2147483647000	0	0	2147483648023	2147483647000000000
+input	default	2	4	004100410050004c0026004e007b0061003d0062007d	1311768467463790320
+value	default	2	4	0	17	null
+value	default	2	4	1	0	null
+value	default	2	4	2	0	null
+value	default	2	4	3	18	null
+value	default	2	4	4	0	null
+value	default	2	4	5	0	null
+quote	default	2	4	004100410050004c0026007a007b0061003d0062007d	17000	122	18000	122	18000	0	0	305419896618	18000000000
+record	default	3	Profile
+field	default	3	0	120	Beta	Beta
+field	default	3	1	120	Eps	Eps
+field	default	3	2	120	DivFreq	DivFreq
+field	default	3	3	120	ExdDiv.Amount	ExdDivAmount
+field	default	3	4	88	ExdDiv.Date	ExdDivDate
+field	default	3	5	120	52High.Price	HighPrice52
+field	default	3	6	120	52Low.Price	LowPrice52
+field	default	3	7	120	Shares	Shares
+field	default	3	8	120	FreeFloat	FreeFloat
+field	default	3	9	120	HighLimitPrice	HighLimitPrice
+field	default	3	10	120	LowLimitPrice	LowLimitPrice
+field	default	3	11	56	Halt.StartTime	HaltStartTime
+field	default	3	12	56	Halt.EndTime	HaltEndTime
+field	default	3	13	8	Flags	Flags
+field	default	3	14	10	Description	Description
+field	default	3	15	10	StatusReason	StatusReason
+input	default	3	0	004100410050004c	0
+value	default	3	0	0	0	null
+value	default	3	0	1	0	null
+value	default	3	0	2	0	null
+value	default	3	0	3	0	null
+value	default	3	0	4	0	null
+value	default	3	0	5	0	null
+value	default	3	0	6	0	null
+value	default	3	0	7	0	null
+value	default	3	0	8	0	null
+value	default	3	0	9	0	null
+value	default	3	0	10	0	null
+value	default	3	0	11	0	null
+value	default	3	0	12	0	null
+value	default	3	0	13	0	null
+value	default	3	0	14	0	null
+value	default	3	0	15	0	null
+profile	default	3	0	004100410050004c	0	0	0	null	null
+input	default	3	1	004100410050004c	-1
+value	default	3	1	0	0	null
+value	default	3	1	1	0	null
+value	default	3	1	2	0	null
+value	default	3	1	3	0	null
+value	default	3	1	4	0	null
+value	default	3	1	5	0	null
+value	default	3	1	6	0	null
+value	default	3	1	7	0	null
+value	default	3	1	8	0	null
+value	default	3	1	9	0	null
+value	default	3	1	10	0	null
+value	default	3	1	11	-1	null
+value	default	3	1	12	-1	null
+value	default	3	1	13	0	null
+value	default	3	1	14	0	-
+value	default	3	1	15	0	-
+profile	default	3	1	004100410050004c	-1000	-1000	23	-	-
+input	default	3	2	004100410050004c	-9223372036854775808
+value	default	3	2	0	0	null
+value	default	3	2	1	0	null
+value	default	3	2	2	0	null
+value	default	3	2	3	0	null
+value	default	3	2	4	0	null
+value	default	3	2	5	0	null
+value	default	3	2	6	0	null
+value	default	3	2	7	0	null
+value	default	3	2	8	0	null
+value	default	3	2	9	0	null
+value	default	3	2	10	0	null
+value	default	3	2	11	-2147483648	null
+value	default	3	2	12	-2147483648	null
+value	default	3	2	13	0	null
+value	default	3	2	14	0	0074006500780074
+value	default	3	2	15	0	0074006500780074
+profile	default	3	2	004100410050004c	-2147483648000	-2147483648000	-2147483648000	0074006500780074	0074006500780074
+input	default	3	3	004100410050004c	9223372036854775807
+value	default	3	3	0	0	null
+value	default	3	3	1	0	null
+value	default	3	3	2	0	null
+value	default	3	3	3	0	null
+value	default	3	3	4	0	null
+value	default	3	3	5	0	null
+value	default	3	3	6	0	null
+value	default	3	3	7	0	null
+value	default	3	3	8	0	null
+value	default	3	3	9	0	null
+value	default	3	3	10	0	null
+value	default	3	3	11	2147483647	null
+value	default	3	3	12	2147483647	null
+value	default	3	3	13	0	null
+value	default	3	3	14	0	0074006500780074
+value	default	3	3	15	0	0074006500780074
+profile	default	3	3	004100410050004c	2147483647000	2147483647000	2147483648023	0074006500780074	0074006500780074
+input	default	3	4	004100410050004c0026004e007b0061003d0062007d	1311768467463790320
+value	default	3	4	0	0	null
+value	default	3	4	1	0	null
+value	default	3	4	2	0	null
+value	default	3	4	3	0	null
+value	default	3	4	4	0	null
+value	default	3	4	5	0	null
+value	default	3	4	6	0	null
+value	default	3	4	7	0	null
+value	default	3	4	8	0	null
+value	default	3	4	9	0	null
+value	default	3	4	10	0	null
+value	default	3	4	11	17	null
+value	default	3	4	12	17	null
+value	default	3	4	13	0	null
+value	default	3	4	14	0	0074006500780074
+value	default	3	4	15	0	0074006500780074
+profile	default	3	4	004100410050004c0026004e007b0061003d0062007d	17000	17000	305419896618	0074006500780074	0074006500780074
+selection	default	0	004100410050004c	Quote	004100410050004c
+selection	default	1	004100410050004c	Quote	004100410050004c
+route	default	0	004100410050004c	004100410050004c	004100410050004c
+route	default	1	004100410050004c	004100410050004c	004100410050004c00260051
+route	default	2	004100410050004c	004100410050004c	004100410050004c0026007a
+selection	default	0	004100410050004c00260051	Quote&Q	004100410050004c
+selection	default	1	004100410050004c00260051	Quote	004100410050004c00260051
+route	default	0	004100410050004c00260051	004100410050004c00260051	004100410050004c00260051
+route	default	1	004100410050004c00260051	004100410050004c	004100410050004c00260051
+route	default	2	004100410050004c00260051	004100410050004c	004100410050004c0026007a
+selection	default	0	004100410050004c0026007a	Quote&z	004100410050004c
+selection	default	1	004100410050004c0026007a	Quote	004100410050004c0026007a
+route	default	0	004100410050004c0026007a	004100410050004c0026007a	004100410050004c0026007a
+route	default	1	004100410050004c0026007a	004100410050004c	004100410050004c00260051
+route	default	2	004100410050004c0026007a	004100410050004c	004100410050004c0026007a
+selection	default	0	004100410050004c0026004e	Quote	004100410050004c0026004e
+selection	default	1	004100410050004c0026004e	Quote	004100410050004c0026004e
+route	default	0	004100410050004c0026004e	004100410050004c0026004e	004100410050004c0026004e
+route	default	1	004100410050004c0026004e	004100410050004c	004100410050004c00260051
+route	default	2	004100410050004c0026004e	004100410050004c	004100410050004c0026007a
+selection	default	0	004100410050004c007b0078003d0079007d	Quote	004100410050004c007b0078003d0079007d
+selection	default	1	004100410050004c007b0078003d0079007d	Quote	004100410050004c007b0078003d0079007d
+route	default	0	004100410050004c007b0078003d0079007d	004100410050004c007b0078003d0079007d	004100410050004c007b0078003d0079007d
+route	default	1	004100410050004c007b0078003d0079007d	004100410050004c007b0078003d0079007d	004100410050004c00260051007b0078003d0079007d
+route	default	2	004100410050004c007b0078003d0079007d	004100410050004c007b0078003d0079007d	004100410050004c0026007a007b0078003d0079007d
+selection	default	0	004100410050004c00260051007b0078003d0079007d	Quote&Q	004100410050004c007b0078003d0079007d
+selection	default	1	004100410050004c00260051007b0078003d0079007d	Quote	004100410050004c00260051007b0078003d0079007d
+route	default	0	004100410050004c00260051007b0078003d0079007d	004100410050004c00260051007b0078003d0079007d	004100410050004c00260051007b0078003d0079007d
+route	default	1	004100410050004c00260051007b0078003d0079007d	004100410050004c007b0078003d0079007d	004100410050004c00260051007b0078003d0079007d
+route	default	2	004100410050004c00260051007b0078003d0079007d	004100410050004c007b0078003d0079007d	004100410050004c0026007a007b0078003d0079007d
+selection	default	0	004100410050004c0026004e007b0078003d0079007d	Quote	004100410050004c0026004e007b0078003d0079007d
+selection	default	1	004100410050004c0026004e007b0078003d0079007d	Quote	004100410050004c0026004e007b0078003d0079007d
+route	default	0	004100410050004c0026004e007b0078003d0079007d	004100410050004c0026004e007b0078003d0079007d	004100410050004c0026004e007b0078003d0079007d
+route	default	1	004100410050004c0026004e007b0078003d0079007d	004100410050004c007b0078003d0079007d	004100410050004c00260051007b0078003d0079007d
+route	default	2	004100410050004c0026004e007b0078003d0079007d	004100410050004c007b0078003d0079007d	004100410050004c0026007a007b0078003d0079007d
+record	sequence	0	Quote
+field	sequence	0	0	72	Sequence	Sequence
+field	sequence	0	1	56	Bid.Time	BidTime
+field	sequence	0	2	2	Bid.Exchange	BidExchangeCode
+field	sequence	0	3	120	Bid.Price	BidPrice
+field	sequence	0	4	120	Bid.Size	BidSize
+field	sequence	0	5	56	Ask.Time	AskTime
+field	sequence	0	6	2	Ask.Exchange	AskExchangeCode
+field	sequence	0	7	120	Ask.Price	AskPrice
+field	sequence	0	8	120	Ask.Size	AskSize
+input	sequence	0	0	004100410050004c	0
+value	sequence	0	0	0	0	null
+value	sequence	0	0	1	0	null
+value	sequence	0	0	2	0	null
+value	sequence	0	0	3	0	null
+value	sequence	0	0	4	0	null
+value	sequence	0	0	5	-1	null
+value	sequence	0	0	6	0	null
+value	sequence	0	0	7	0	null
+value	sequence	0	0	8	0	null
+quote	sequence	0	0	004100410050004c	0	0	-1000	0	0	0	0	0	0
+input	sequence	0	1	004100410050004c	-1
+value	sequence	0	1	0	-100663297	null
+value	sequence	0	1	1	-1	null
+value	sequence	0	1	2	78	null
+value	sequence	0	1	3	0	null
+value	sequence	0	1	4	0	null
+value	sequence	0	1	5	0	null
+value	sequence	0	1	6	78	null
+value	sequence	0	1	7	0	null
+value	sequence	0	1	8	0	null
+quote	sequence	0	1	004100410050004c	-1000	78	0	78	999	4194303	0	23	999000000
+input	sequence	0	2	004100410050004c	-9223372036854775808
+value	sequence	0	2	0	-1	null
+value	sequence	0	2	1	-2147483648	null
+value	sequence	0	2	2	78	null
+value	sequence	0	2	3	0	null
+value	sequence	0	2	4	0	null
+value	sequence	0	2	5	-2147483647	null
+value	sequence	0	2	6	78	null
+value	sequence	0	2	7	0	null
+value	sequence	0	2	8	0	null
+quote	sequence	0	2	004100410050004c	-2147483648000	78	-2147483647000	78	-2147483645977	4194303	0	-2147483648000	-2147483645977000000
+input	sequence	0	3	004100410050004c	9223372036854775807
+value	sequence	0	3	0	-2147483648	null
+value	sequence	0	3	1	2147483647	null
+value	sequence	0	3	2	78	null
+value	sequence	0	3	3	0	null
+value	sequence	0	3	4	0	null
+value	sequence	0	3	5	2147483646	null
+value	sequence	0	3	6	78	null
+value	sequence	0	3	7	0	null
+value	sequence	0	3	8	0	null
+quote	sequence	0	3	004100410050004c	2147483647000	78	2147483646000	78	2147483647512	0	0	2147483648023	2147483647512000000
+input	sequence	0	4	004100410050004c0026004e007b0061003d0062007d	1311768467463790320
+value	sequence	0	4	0	2147483647	null
+value	sequence	0	4	1	17	null
+value	sequence	0	4	2	78	null
+value	sequence	0	4	3	0	null
+value	sequence	0	4	4	0	null
+value	sequence	0	4	5	18	null
+value	sequence	0	4	6	78	null
+value	sequence	0	4	7	0	null
+value	sequence	0	4	8	0	null
+quote	sequence	0	4	004100410050004c0026004e007b0061003d0062007d	17000	78	18000	78	18511	4194303	0	305419896618	18511000000
+record	sequence	1	Quote&Q
+field	sequence	1	0	72	Sequence	Sequence
+field	sequence	1	1	56	Bid.Time	BidTime
+field	sequence	1	2	120	Bid.Price	BidPrice
+field	sequence	1	3	120	Bid.Size	BidSize
+field	sequence	1	4	56	Ask.Time	AskTime
+field	sequence	1	5	120	Ask.Price	AskPrice
+field	sequence	1	6	120	Ask.Size	AskSize
+input	sequence	1	0	004100410050004c	0
+value	sequence	1	0	0	0	null
+value	sequence	1	0	1	0	null
+value	sequence	1	0	2	0	null
+value	sequence	1	0	3	0	null
+value	sequence	1	0	4	-1	null
+value	sequence	1	0	5	0	null
+value	sequence	1	0	6	0	null
+quote	sequence	1	0	004100410050004c00260051	0	81	-1000	81	0	0	0	0	0
+input	sequence	1	1	004100410050004c	-1
+value	sequence	1	1	0	-100663297	null
+value	sequence	1	1	1	-1	null
+value	sequence	1	1	2	0	null
+value	sequence	1	1	3	0	null
+value	sequence	1	1	4	0	null
+value	sequence	1	1	5	0	null
+value	sequence	1	1	6	0	null
+quote	sequence	1	1	004100410050004c00260051	-1000	81	0	81	999	4194303	0	23	999000000
+input	sequence	1	2	004100410050004c	-9223372036854775808
+value	sequence	1	2	0	-1	null
+value	sequence	1	2	1	-2147483648	null
+value	sequence	1	2	2	0	null
+value	sequence	1	2	3	0	null
+value	sequence	1	2	4	-2147483647	null
+value	sequence	1	2	5	0	null
+value	sequence	1	2	6	0	null
+quote	sequence	1	2	004100410050004c00260051	-2147483648000	81	-2147483647000	81	-2147483645977	4194303	0	-2147483648000	-2147483645977000000
+input	sequence	1	3	004100410050004c	9223372036854775807
+value	sequence	1	3	0	-2147483648	null
+value	sequence	1	3	1	2147483647	null
+value	sequence	1	3	2	0	null
+value	sequence	1	3	3	0	null
+value	sequence	1	3	4	2147483646	null
+value	sequence	1	3	5	0	null
+value	sequence	1	3	6	0	null
+quote	sequence	1	3	004100410050004c00260051	2147483647000	81	2147483646000	81	2147483647512	0	0	2147483648023	2147483647512000000
+input	sequence	1	4	004100410050004c0026004e007b0061003d0062007d	1311768467463790320
+value	sequence	1	4	0	2147483647	null
+value	sequence	1	4	1	17	null
+value	sequence	1	4	2	0	null
+value	sequence	1	4	3	0	null
+value	sequence	1	4	4	18	null
+value	sequence	1	4	5	0	null
+value	sequence	1	4	6	0	null
+quote	sequence	1	4	004100410050004c00260051007b0061003d0062007d	17000	81	18000	81	18511	4194303	0	305419896618	18511000000
+record	sequence	2	Quote&z
+field	sequence	2	0	72	Sequence	Sequence
+field	sequence	2	1	56	Bid.Time	BidTime
+field	sequence	2	2	120	Bid.Price	BidPrice
+field	sequence	2	3	120	Bid.Size	BidSize
+field	sequence	2	4	56	Ask.Time	AskTime
+field	sequence	2	5	120	Ask.Price	AskPrice
+field	sequence	2	6	120	Ask.Size	AskSize
+input	sequence	2	0	004100410050004c	0
+value	sequence	2	0	0	0	null
+value	sequence	2	0	1	0	null
+value	sequence	2	0	2	0	null
+value	sequence	2	0	3	0	null
+value	sequence	2	0	4	-1	null
+value	sequence	2	0	5	0	null
+value	sequence	2	0	6	0	null
+quote	sequence	2	0	004100410050004c0026007a	0	122	-1000	122	0	0	0	0	0
+input	sequence	2	1	004100410050004c	-1
+value	sequence	2	1	0	-100663297	null
+value	sequence	2	1	1	-1	null
+value	sequence	2	1	2	0	null
+value	sequence	2	1	3	0	null
+value	sequence	2	1	4	0	null
+value	sequence	2	1	5	0	null
+value	sequence	2	1	6	0	null
+quote	sequence	2	1	004100410050004c0026007a	-1000	122	0	122	999	4194303	0	23	999000000
+input	sequence	2	2	004100410050004c	-9223372036854775808
+value	sequence	2	2	0	-1	null
+value	sequence	2	2	1	-2147483648	null
+value	sequence	2	2	2	0	null
+value	sequence	2	2	3	0	null
+value	sequence	2	2	4	-2147483647	null
+value	sequence	2	2	5	0	null
+value	sequence	2	2	6	0	null
+quote	sequence	2	2	004100410050004c0026007a	-2147483648000	122	-2147483647000	122	-2147483645977	4194303	0	-2147483648000	-2147483645977000000
+input	sequence	2	3	004100410050004c	9223372036854775807
+value	sequence	2	3	0	-2147483648	null
+value	sequence	2	3	1	2147483647	null
+value	sequence	2	3	2	0	null
+value	sequence	2	3	3	0	null
+value	sequence	2	3	4	2147483646	null
+value	sequence	2	3	5	0	null
+value	sequence	2	3	6	0	null
+quote	sequence	2	3	004100410050004c0026007a	2147483647000	122	2147483646000	122	2147483647512	0	0	2147483648023	2147483647512000000
+input	sequence	2	4	004100410050004c0026004e007b0061003d0062007d	1311768467463790320
+value	sequence	2	4	0	2147483647	null
+value	sequence	2	4	1	17	null
+value	sequence	2	4	2	0	null
+value	sequence	2	4	3	0	null
+value	sequence	2	4	4	18	null
+value	sequence	2	4	5	0	null
+value	sequence	2	4	6	0	null
+quote	sequence	2	4	004100410050004c0026007a007b0061003d0062007d	17000	122	18000	122	18511	4194303	0	305419896618	18511000000
+record	sequence	3	Profile
+field	sequence	3	0	120	Beta	Beta
+field	sequence	3	1	120	Eps	Eps
+field	sequence	3	2	120	DivFreq	DivFreq
+field	sequence	3	3	120	ExdDiv.Amount	ExdDivAmount
+field	sequence	3	4	88	ExdDiv.Date	ExdDivDate
+field	sequence	3	5	120	52High.Price	HighPrice52
+field	sequence	3	6	120	52Low.Price	LowPrice52
+field	sequence	3	7	120	Shares	Shares
+field	sequence	3	8	120	FreeFloat	FreeFloat
+field	sequence	3	9	120	HighLimitPrice	HighLimitPrice
+field	sequence	3	10	120	LowLimitPrice	LowLimitPrice
+field	sequence	3	11	56	Halt.StartTime	HaltStartTime
+field	sequence	3	12	56	Halt.EndTime	HaltEndTime
+field	sequence	3	13	8	Flags	Flags
+field	sequence	3	14	10	Description	Description
+field	sequence	3	15	10	StatusReason	StatusReason
+input	sequence	3	0	004100410050004c	0
+value	sequence	3	0	0	0	null
+value	sequence	3	0	1	0	null
+value	sequence	3	0	2	0	null
+value	sequence	3	0	3	0	null
+value	sequence	3	0	4	0	null
+value	sequence	3	0	5	0	null
+value	sequence	3	0	6	0	null
+value	sequence	3	0	7	0	null
+value	sequence	3	0	8	0	null
+value	sequence	3	0	9	0	null
+value	sequence	3	0	10	0	null
+value	sequence	3	0	11	0	null
+value	sequence	3	0	12	0	null
+value	sequence	3	0	13	0	null
+value	sequence	3	0	14	0	null
+value	sequence	3	0	15	0	null
+profile	sequence	3	0	004100410050004c	0	0	0	null	null
+input	sequence	3	1	004100410050004c	-1
+value	sequence	3	1	0	0	null
+value	sequence	3	1	1	0	null
+value	sequence	3	1	2	0	null
+value	sequence	3	1	3	0	null
+value	sequence	3	1	4	0	null
+value	sequence	3	1	5	0	null
+value	sequence	3	1	6	0	null
+value	sequence	3	1	7	0	null
+value	sequence	3	1	8	0	null
+value	sequence	3	1	9	0	null
+value	sequence	3	1	10	0	null
+value	sequence	3	1	11	-1	null
+value	sequence	3	1	12	-1	null
+value	sequence	3	1	13	0	null
+value	sequence	3	1	14	0	-
+value	sequence	3	1	15	0	-
+profile	sequence	3	1	004100410050004c	-1000	-1000	23	-	-
+input	sequence	3	2	004100410050004c	-9223372036854775808
+value	sequence	3	2	0	0	null
+value	sequence	3	2	1	0	null
+value	sequence	3	2	2	0	null
+value	sequence	3	2	3	0	null
+value	sequence	3	2	4	0	null
+value	sequence	3	2	5	0	null
+value	sequence	3	2	6	0	null
+value	sequence	3	2	7	0	null
+value	sequence	3	2	8	0	null
+value	sequence	3	2	9	0	null
+value	sequence	3	2	10	0	null
+value	sequence	3	2	11	-2147483648	null
+value	sequence	3	2	12	-2147483648	null
+value	sequence	3	2	13	0	null
+value	sequence	3	2	14	0	0074006500780074
+value	sequence	3	2	15	0	0074006500780074
+profile	sequence	3	2	004100410050004c	-2147483648000	-2147483648000	-2147483648000	0074006500780074	0074006500780074
+input	sequence	3	3	004100410050004c	9223372036854775807
+value	sequence	3	3	0	0	null
+value	sequence	3	3	1	0	null
+value	sequence	3	3	2	0	null
+value	sequence	3	3	3	0	null
+value	sequence	3	3	4	0	null
+value	sequence	3	3	5	0	null
+value	sequence	3	3	6	0	null
+value	sequence	3	3	7	0	null
+value	sequence	3	3	8	0	null
+value	sequence	3	3	9	0	null
+value	sequence	3	3	10	0	null
+value	sequence	3	3	11	2147483647	null
+value	sequence	3	3	12	2147483647	null
+value	sequence	3	3	13	0	null
+value	sequence	3	3	14	0	0074006500780074
+value	sequence	3	3	15	0	0074006500780074
+profile	sequence	3	3	004100410050004c	2147483647000	2147483647000	2147483648023	0074006500780074	0074006500780074
+input	sequence	3	4	004100410050004c0026004e007b0061003d0062007d	1311768467463790320
+value	sequence	3	4	0	0	null
+value	sequence	3	4	1	0	null
+value	sequence	3	4	2	0	null
+value	sequence	3	4	3	0	null
+value	sequence	3	4	4	0	null
+value	sequence	3	4	5	0	null
+value	sequence	3	4	6	0	null
+value	sequence	3	4	7	0	null
+value	sequence	3	4	8	0	null
+value	sequence	3	4	9	0	null
+value	sequence	3	4	10	0	null
+value	sequence	3	4	11	17	null
+value	sequence	3	4	12	17	null
+value	sequence	3	4	13	0	null
+value	sequence	3	4	14	0	0074006500780074
+value	sequence	3	4	15	0	0074006500780074
+profile	sequence	3	4	004100410050004c0026004e007b0061003d0062007d	17000	17000	305419896618	0074006500780074	0074006500780074
+record	nano	0	Quote
+field	nano	0	0	8	TimeNanoPart	TimeNanoPart
+field	nano	0	1	56	Bid.Time	BidTime
+field	nano	0	2	2	Bid.Exchange	BidExchangeCode
+field	nano	0	3	120	Bid.Price	BidPrice
+field	nano	0	4	120	Bid.Size	BidSize
+field	nano	0	5	56	Ask.Time	AskTime
+field	nano	0	6	2	Ask.Exchange	AskExchangeCode
+field	nano	0	7	120	Ask.Price	AskPrice
+field	nano	0	8	120	Ask.Size	AskSize
+input	nano	0	0	004100410050004c	0
+value	nano	0	0	0	0	null
+value	nano	0	0	1	0	null
+value	nano	0	0	2	0	null
+value	nano	0	0	3	0	null
+value	nano	0	0	4	0	null
+value	nano	0	0	5	-1	null
+value	nano	0	0	6	0	null
+value	nano	0	0	7	0	null
+value	nano	0	0	8	0	null
+quote	nano	0	0	004100410050004c	0	0	-1000	0	0	0	0	0	0
+input	nano	0	1	004100410050004c	-1
+value	nano	0	1	0	999999	null
+value	nano	0	1	1	-1	null
+value	nano	0	1	2	78	null
+value	nano	0	1	3	0	null
+value	nano	0	1	4	0	null
+value	nano	0	1	5	0	null
+value	nano	0	1	6	78	null
+value	nano	0	1	7	0	null
+value	nano	0	1	8	0	null
+quote	nano	0	1	004100410050004c	-1000	78	0	78	0	0	999999	23	999999
+input	nano	0	2	004100410050004c	-9223372036854775808
+value	nano	0	2	0	-1	null
+value	nano	0	2	1	-2147483648	null
+value	nano	0	2	2	78	null
+value	nano	0	2	3	0	null
+value	nano	0	2	4	0	null
+value	nano	0	2	5	-2147483647	null
+value	nano	0	2	6	78	null
+value	nano	0	2	7	0	null
+value	nano	0	2	8	0	null
+quote	nano	0	2	004100410050004c	-2147483648000	78	-2147483647000	78	-2147483647000	0	-1	-2147483648000	-2147483647000000001
+input	nano	0	3	004100410050004c	9223372036854775807
+value	nano	0	3	0	-2147483648	null
+value	nano	0	3	1	2147483647	null
+value	nano	0	3	2	78	null
+value	nano	0	3	3	0	null
+value	nano	0	3	4	0	null
+value	nano	0	3	5	2147483646	null
+value	nano	0	3	6	78	null
+value	nano	0	3	7	0	null
+value	nano	0	3	8	0	null
+quote	nano	0	3	004100410050004c	2147483647000	78	2147483646000	78	2147483647000	0	-2147483648	2147483648023	2147483644852516352
+input	nano	0	4	004100410050004c0026004e007b0061003d0062007d	1311768467463790320
+value	nano	0	4	0	2147483647	null
+value	nano	0	4	1	17	null
+value	nano	0	4	2	78	null
+value	nano	0	4	3	0	null
+value	nano	0	4	4	0	null
+value	nano	0	4	5	18	null
+value	nano	0	4	6	78	null
+value	nano	0	4	7	0	null
+value	nano	0	4	8	0	null
+quote	nano	0	4	004100410050004c0026004e007b0061003d0062007d	17000	78	18000	78	18000	0	2147483647	305419896618	20147483647
+record	nano	1	Quote&Q
+field	nano	1	0	8	TimeNanoPart	TimeNanoPart
+field	nano	1	1	56	Bid.Time	BidTime
+field	nano	1	2	120	Bid.Price	BidPrice
+field	nano	1	3	120	Bid.Size	BidSize
+field	nano	1	4	56	Ask.Time	AskTime
+field	nano	1	5	120	Ask.Price	AskPrice
+field	nano	1	6	120	Ask.Size	AskSize
+input	nano	1	0	004100410050004c	0
+value	nano	1	0	0	0	null
+value	nano	1	0	1	0	null
+value	nano	1	0	2	0	null
+value	nano	1	0	3	0	null
+value	nano	1	0	4	-1	null
+value	nano	1	0	5	0	null
+value	nano	1	0	6	0	null
+quote	nano	1	0	004100410050004c00260051	0	81	-1000	81	0	0	0	0	0
+input	nano	1	1	004100410050004c	-1
+value	nano	1	1	0	999999	null
+value	nano	1	1	1	-1	null
+value	nano	1	1	2	0	null
+value	nano	1	1	3	0	null
+value	nano	1	1	4	0	null
+value	nano	1	1	5	0	null
+value	nano	1	1	6	0	null
+quote	nano	1	1	004100410050004c00260051	-1000	81	0	81	0	0	999999	23	999999
+input	nano	1	2	004100410050004c	-9223372036854775808
+value	nano	1	2	0	-1	null
+value	nano	1	2	1	-2147483648	null
+value	nano	1	2	2	0	null
+value	nano	1	2	3	0	null
+value	nano	1	2	4	-2147483647	null
+value	nano	1	2	5	0	null
+value	nano	1	2	6	0	null
+quote	nano	1	2	004100410050004c00260051	-2147483648000	81	-2147483647000	81	-2147483647000	0	-1	-2147483648000	-2147483647000000001
+input	nano	1	3	004100410050004c	9223372036854775807
+value	nano	1	3	0	-2147483648	null
+value	nano	1	3	1	2147483647	null
+value	nano	1	3	2	0	null
+value	nano	1	3	3	0	null
+value	nano	1	3	4	2147483646	null
+value	nano	1	3	5	0	null
+value	nano	1	3	6	0	null
+quote	nano	1	3	004100410050004c00260051	2147483647000	81	2147483646000	81	2147483647000	0	-2147483648	2147483648023	2147483644852516352
+input	nano	1	4	004100410050004c0026004e007b0061003d0062007d	1311768467463790320
+value	nano	1	4	0	2147483647	null
+value	nano	1	4	1	17	null
+value	nano	1	4	2	0	null
+value	nano	1	4	3	0	null
+value	nano	1	4	4	18	null
+value	nano	1	4	5	0	null
+value	nano	1	4	6	0	null
+quote	nano	1	4	004100410050004c00260051007b0061003d0062007d	17000	81	18000	81	18000	0	2147483647	305419896618	20147483647
+record	nano	2	Quote&z
+field	nano	2	0	8	TimeNanoPart	TimeNanoPart
+field	nano	2	1	56	Bid.Time	BidTime
+field	nano	2	2	120	Bid.Price	BidPrice
+field	nano	2	3	120	Bid.Size	BidSize
+field	nano	2	4	56	Ask.Time	AskTime
+field	nano	2	5	120	Ask.Price	AskPrice
+field	nano	2	6	120	Ask.Size	AskSize
+input	nano	2	0	004100410050004c	0
+value	nano	2	0	0	0	null
+value	nano	2	0	1	0	null
+value	nano	2	0	2	0	null
+value	nano	2	0	3	0	null
+value	nano	2	0	4	-1	null
+value	nano	2	0	5	0	null
+value	nano	2	0	6	0	null
+quote	nano	2	0	004100410050004c0026007a	0	122	-1000	122	0	0	0	0	0
+input	nano	2	1	004100410050004c	-1
+value	nano	2	1	0	999999	null
+value	nano	2	1	1	-1	null
+value	nano	2	1	2	0	null
+value	nano	2	1	3	0	null
+value	nano	2	1	4	0	null
+value	nano	2	1	5	0	null
+value	nano	2	1	6	0	null
+quote	nano	2	1	004100410050004c0026007a	-1000	122	0	122	0	0	999999	23	999999
+input	nano	2	2	004100410050004c	-9223372036854775808
+value	nano	2	2	0	-1	null
+value	nano	2	2	1	-2147483648	null
+value	nano	2	2	2	0	null
+value	nano	2	2	3	0	null
+value	nano	2	2	4	-2147483647	null
+value	nano	2	2	5	0	null
+value	nano	2	2	6	0	null
+quote	nano	2	2	004100410050004c0026007a	-2147483648000	122	-2147483647000	122	-2147483647000	0	-1	-2147483648000	-2147483647000000001
+input	nano	2	3	004100410050004c	9223372036854775807
+value	nano	2	3	0	-2147483648	null
+value	nano	2	3	1	2147483647	null
+value	nano	2	3	2	0	null
+value	nano	2	3	3	0	null
+value	nano	2	3	4	2147483646	null
+value	nano	2	3	5	0	null
+value	nano	2	3	6	0	null
+quote	nano	2	3	004100410050004c0026007a	2147483647000	122	2147483646000	122	2147483647000	0	-2147483648	2147483648023	2147483644852516352
+input	nano	2	4	004100410050004c0026004e007b0061003d0062007d	1311768467463790320
+value	nano	2	4	0	2147483647	null
+value	nano	2	4	1	17	null
+value	nano	2	4	2	0	null
+value	nano	2	4	3	0	null
+value	nano	2	4	4	18	null
+value	nano	2	4	5	0	null
+value	nano	2	4	6	0	null
+quote	nano	2	4	004100410050004c0026007a007b0061003d0062007d	17000	122	18000	122	18000	0	2147483647	305419896618	20147483647
+record	nano	3	Profile
+field	nano	3	0	120	Beta	Beta
+field	nano	3	1	120	Eps	Eps
+field	nano	3	2	120	DivFreq	DivFreq
+field	nano	3	3	120	ExdDiv.Amount	ExdDivAmount
+field	nano	3	4	88	ExdDiv.Date	ExdDivDate
+field	nano	3	5	120	52High.Price	HighPrice52
+field	nano	3	6	120	52Low.Price	LowPrice52
+field	nano	3	7	120	Shares	Shares
+field	nano	3	8	120	FreeFloat	FreeFloat
+field	nano	3	9	120	HighLimitPrice	HighLimitPrice
+field	nano	3	10	120	LowLimitPrice	LowLimitPrice
+field	nano	3	11	56	Halt.StartTime	HaltStartTime
+field	nano	3	12	56	Halt.EndTime	HaltEndTime
+field	nano	3	13	8	Flags	Flags
+field	nano	3	14	10	Description	Description
+field	nano	3	15	10	StatusReason	StatusReason
+input	nano	3	0	004100410050004c	0
+value	nano	3	0	0	0	null
+value	nano	3	0	1	0	null
+value	nano	3	0	2	0	null
+value	nano	3	0	3	0	null
+value	nano	3	0	4	0	null
+value	nano	3	0	5	0	null
+value	nano	3	0	6	0	null
+value	nano	3	0	7	0	null
+value	nano	3	0	8	0	null
+value	nano	3	0	9	0	null
+value	nano	3	0	10	0	null
+value	nano	3	0	11	0	null
+value	nano	3	0	12	0	null
+value	nano	3	0	13	0	null
+value	nano	3	0	14	0	null
+value	nano	3	0	15	0	null
+profile	nano	3	0	004100410050004c	0	0	0	null	null
+input	nano	3	1	004100410050004c	-1
+value	nano	3	1	0	0	null
+value	nano	3	1	1	0	null
+value	nano	3	1	2	0	null
+value	nano	3	1	3	0	null
+value	nano	3	1	4	0	null
+value	nano	3	1	5	0	null
+value	nano	3	1	6	0	null
+value	nano	3	1	7	0	null
+value	nano	3	1	8	0	null
+value	nano	3	1	9	0	null
+value	nano	3	1	10	0	null
+value	nano	3	1	11	-1	null
+value	nano	3	1	12	-1	null
+value	nano	3	1	13	0	null
+value	nano	3	1	14	0	-
+value	nano	3	1	15	0	-
+profile	nano	3	1	004100410050004c	-1000	-1000	23	-	-
+input	nano	3	2	004100410050004c	-9223372036854775808
+value	nano	3	2	0	0	null
+value	nano	3	2	1	0	null
+value	nano	3	2	2	0	null
+value	nano	3	2	3	0	null
+value	nano	3	2	4	0	null
+value	nano	3	2	5	0	null
+value	nano	3	2	6	0	null
+value	nano	3	2	7	0	null
+value	nano	3	2	8	0	null
+value	nano	3	2	9	0	null
+value	nano	3	2	10	0	null
+value	nano	3	2	11	-2147483648	null
+value	nano	3	2	12	-2147483648	null
+value	nano	3	2	13	0	null
+value	nano	3	2	14	0	0074006500780074
+value	nano	3	2	15	0	0074006500780074
+profile	nano	3	2	004100410050004c	-2147483648000	-2147483648000	-2147483648000	0074006500780074	0074006500780074
+input	nano	3	3	004100410050004c	9223372036854775807
+value	nano	3	3	0	0	null
+value	nano	3	3	1	0	null
+value	nano	3	3	2	0	null
+value	nano	3	3	3	0	null
+value	nano	3	3	4	0	null
+value	nano	3	3	5	0	null
+value	nano	3	3	6	0	null
+value	nano	3	3	7	0	null
+value	nano	3	3	8	0	null
+value	nano	3	3	9	0	null
+value	nano	3	3	10	0	null
+value	nano	3	3	11	2147483647	null
+value	nano	3	3	12	2147483647	null
+value	nano	3	3	13	0	null
+value	nano	3	3	14	0	0074006500780074
+value	nano	3	3	15	0	0074006500780074
+profile	nano	3	3	004100410050004c	2147483647000	2147483647000	2147483648023	0074006500780074	0074006500780074
+input	nano	3	4	004100410050004c0026004e007b0061003d0062007d	1311768467463790320
+value	nano	3	4	0	0	null
+value	nano	3	4	1	0	null
+value	nano	3	4	2	0	null
+value	nano	3	4	3	0	null
+value	nano	3	4	4	0	null
+value	nano	3	4	5	0	null
+value	nano	3	4	6	0	null
+value	nano	3	4	7	0	null
+value	nano	3	4	8	0	null
+value	nano	3	4	9	0	null
+value	nano	3	4	10	0	null
+value	nano	3	4	11	17	null
+value	nano	3	4	12	17	null
+value	nano	3	4	13	0	null
+value	nano	3	4	14	0	0074006500780074
+value	nano	3	4	15	0	0074006500780074
+profile	nano	3	4	004100410050004c0026004e007b0061003d0062007d	17000	17000	305419896618	0074006500780074	0074006500780074
+record	both	0	Quote
+field	both	0	0	72	Sequence	Sequence
+field	both	0	1	8	TimeNanoPart	TimeNanoPart
+field	both	0	2	56	Bid.Time	BidTime
+field	both	0	3	2	Bid.Exchange	BidExchangeCode
+field	both	0	4	120	Bid.Price	BidPrice
+field	both	0	5	120	Bid.Size	BidSize
+field	both	0	6	56	Ask.Time	AskTime
+field	both	0	7	2	Ask.Exchange	AskExchangeCode
+field	both	0	8	120	Ask.Price	AskPrice
+field	both	0	9	120	Ask.Size	AskSize
+input	both	0	0	004100410050004c	0
+value	both	0	0	0	0	null
+value	both	0	0	1	0	null
+value	both	0	0	2	0	null
+value	both	0	0	3	0	null
+value	both	0	0	4	0	null
+value	both	0	0	5	0	null
+value	both	0	0	6	-1	null
+value	both	0	0	7	0	null
+value	both	0	0	8	0	null
+value	both	0	0	9	0	null
+quote	both	0	0	004100410050004c	0	0	-1000	0	0	0	0	0	0
+input	both	0	1	004100410050004c	-1
+value	both	0	1	0	-100663297	null
+value	both	0	1	1	999999	null
+value	both	0	1	2	-1	null
+value	both	0	1	3	78	null
+value	both	0	1	4	0	null
+value	both	0	1	5	0	null
+value	both	0	1	6	0	null
+value	both	0	1	7	78	null
+value	both	0	1	8	0	null
+value	both	0	1	9	0	null
+quote	both	0	1	004100410050004c	-1000	78	0	78	999	4194303	999999	23	999999999
+input	both	0	2	004100410050004c	-9223372036854775808
+value	both	0	2	0	-1	null
+value	both	0	2	1	-1	null
+value	both	0	2	2	-2147483648	null
+value	both	0	2	3	78	null
+value	both	0	2	4	0	null
+value	both	0	2	5	0	null
+value	both	0	2	6	-2147483647	null
+value	both	0	2	7	78	null
+value	both	0	2	8	0	null
+value	both	0	2	9	0	null
+quote	both	0	2	004100410050004c	-2147483648000	78	-2147483647000	78	-2147483645977	4194303	-1	-2147483648000	-2147483645977000001
+input	both	0	3	004100410050004c	9223372036854775807
+value	both	0	3	0	-2147483648	null
+value	both	0	3	1	-2147483648	null
+value	both	0	3	2	2147483647	null
+value	both	0	3	3	78	null
+value	both	0	3	4	0	null
+value	both	0	3	5	0	null
+value	both	0	3	6	2147483646	null
+value	both	0	3	7	78	null
+value	both	0	3	8	0	null
+value	both	0	3	9	0	null
+quote	both	0	3	004100410050004c	2147483647000	78	2147483646000	78	2147483647512	0	-2147483648	2147483648023	2147483645364516352
+input	both	0	4	004100410050004c0026004e007b0061003d0062007d	1311768467463790320
+value	both	0	4	0	2147483647	null
+value	both	0	4	1	2147483647	null
+value	both	0	4	2	17	null
+value	both	0	4	3	78	null
+value	both	0	4	4	0	null
+value	both	0	4	5	0	null
+value	both	0	4	6	18	null
+value	both	0	4	7	78	null
+value	both	0	4	8	0	null
+value	both	0	4	9	0	null
+quote	both	0	4	004100410050004c0026004e007b0061003d0062007d	17000	78	18000	78	18511	4194303	2147483647	305419896618	20658483647
+record	both	1	Quote&Q
+field	both	1	0	72	Sequence	Sequence
+field	both	1	1	8	TimeNanoPart	TimeNanoPart
+field	both	1	2	56	Bid.Time	BidTime
+field	both	1	3	120	Bid.Price	BidPrice
+field	both	1	4	120	Bid.Size	BidSize
+field	both	1	5	56	Ask.Time	AskTime
+field	both	1	6	120	Ask.Price	AskPrice
+field	both	1	7	120	Ask.Size	AskSize
+input	both	1	0	004100410050004c	0
+value	both	1	0	0	0	null
+value	both	1	0	1	0	null
+value	both	1	0	2	0	null
+value	both	1	0	3	0	null
+value	both	1	0	4	0	null
+value	both	1	0	5	-1	null
+value	both	1	0	6	0	null
+value	both	1	0	7	0	null
+quote	both	1	0	004100410050004c00260051	0	81	-1000	81	0	0	0	0	0
+input	both	1	1	004100410050004c	-1
+value	both	1	1	0	-100663297	null
+value	both	1	1	1	999999	null
+value	both	1	1	2	-1	null
+value	both	1	1	3	0	null
+value	both	1	1	4	0	null
+value	both	1	1	5	0	null
+value	both	1	1	6	0	null
+value	both	1	1	7	0	null
+quote	both	1	1	004100410050004c00260051	-1000	81	0	81	999	4194303	999999	23	999999999
+input	both	1	2	004100410050004c	-9223372036854775808
+value	both	1	2	0	-1	null
+value	both	1	2	1	-1	null
+value	both	1	2	2	-2147483648	null
+value	both	1	2	3	0	null
+value	both	1	2	4	0	null
+value	both	1	2	5	-2147483647	null
+value	both	1	2	6	0	null
+value	both	1	2	7	0	null
+quote	both	1	2	004100410050004c00260051	-2147483648000	81	-2147483647000	81	-2147483645977	4194303	-1	-2147483648000	-2147483645977000001
+input	both	1	3	004100410050004c	9223372036854775807
+value	both	1	3	0	-2147483648	null
+value	both	1	3	1	-2147483648	null
+value	both	1	3	2	2147483647	null
+value	both	1	3	3	0	null
+value	both	1	3	4	0	null
+value	both	1	3	5	2147483646	null
+value	both	1	3	6	0	null
+value	both	1	3	7	0	null
+quote	both	1	3	004100410050004c00260051	2147483647000	81	2147483646000	81	2147483647512	0	-2147483648	2147483648023	2147483645364516352
+input	both	1	4	004100410050004c0026004e007b0061003d0062007d	1311768467463790320
+value	both	1	4	0	2147483647	null
+value	both	1	4	1	2147483647	null
+value	both	1	4	2	17	null
+value	both	1	4	3	0	null
+value	both	1	4	4	0	null
+value	both	1	4	5	18	null
+value	both	1	4	6	0	null
+value	both	1	4	7	0	null
+quote	both	1	4	004100410050004c00260051007b0061003d0062007d	17000	81	18000	81	18511	4194303	2147483647	305419896618	20658483647
+record	both	2	Quote&z
+field	both	2	0	72	Sequence	Sequence
+field	both	2	1	8	TimeNanoPart	TimeNanoPart
+field	both	2	2	56	Bid.Time	BidTime
+field	both	2	3	120	Bid.Price	BidPrice
+field	both	2	4	120	Bid.Size	BidSize
+field	both	2	5	56	Ask.Time	AskTime
+field	both	2	6	120	Ask.Price	AskPrice
+field	both	2	7	120	Ask.Size	AskSize
+input	both	2	0	004100410050004c	0
+value	both	2	0	0	0	null
+value	both	2	0	1	0	null
+value	both	2	0	2	0	null
+value	both	2	0	3	0	null
+value	both	2	0	4	0	null
+value	both	2	0	5	-1	null
+value	both	2	0	6	0	null
+value	both	2	0	7	0	null
+quote	both	2	0	004100410050004c0026007a	0	122	-1000	122	0	0	0	0	0
+input	both	2	1	004100410050004c	-1
+value	both	2	1	0	-100663297	null
+value	both	2	1	1	999999	null
+value	both	2	1	2	-1	null
+value	both	2	1	3	0	null
+value	both	2	1	4	0	null
+value	both	2	1	5	0	null
+value	both	2	1	6	0	null
+value	both	2	1	7	0	null
+quote	both	2	1	004100410050004c0026007a	-1000	122	0	122	999	4194303	999999	23	999999999
+input	both	2	2	004100410050004c	-9223372036854775808
+value	both	2	2	0	-1	null
+value	both	2	2	1	-1	null
+value	both	2	2	2	-2147483648	null
+value	both	2	2	3	0	null
+value	both	2	2	4	0	null
+value	both	2	2	5	-2147483647	null
+value	both	2	2	6	0	null
+value	both	2	2	7	0	null
+quote	both	2	2	004100410050004c0026007a	-2147483648000	122	-2147483647000	122	-2147483645977	4194303	-1	-2147483648000	-2147483645977000001
+input	both	2	3	004100410050004c	9223372036854775807
+value	both	2	3	0	-2147483648	null
+value	both	2	3	1	-2147483648	null
+value	both	2	3	2	2147483647	null
+value	both	2	3	3	0	null
+value	both	2	3	4	0	null
+value	both	2	3	5	2147483646	null
+value	both	2	3	6	0	null
+value	both	2	3	7	0	null
+quote	both	2	3	004100410050004c0026007a	2147483647000	122	2147483646000	122	2147483647512	0	-2147483648	2147483648023	2147483645364516352
+input	both	2	4	004100410050004c0026004e007b0061003d0062007d	1311768467463790320
+value	both	2	4	0	2147483647	null
+value	both	2	4	1	2147483647	null
+value	both	2	4	2	17	null
+value	both	2	4	3	0	null
+value	both	2	4	4	0	null
+value	both	2	4	5	18	null
+value	both	2	4	6	0	null
+value	both	2	4	7	0	null
+quote	both	2	4	004100410050004c0026007a007b0061003d0062007d	17000	122	18000	122	18511	4194303	2147483647	305419896618	20658483647
+record	both	3	Profile
+field	both	3	0	120	Beta	Beta
+field	both	3	1	120	Eps	Eps
+field	both	3	2	120	DivFreq	DivFreq
+field	both	3	3	120	ExdDiv.Amount	ExdDivAmount
+field	both	3	4	88	ExdDiv.Date	ExdDivDate
+field	both	3	5	120	52High.Price	HighPrice52
+field	both	3	6	120	52Low.Price	LowPrice52
+field	both	3	7	120	Shares	Shares
+field	both	3	8	120	FreeFloat	FreeFloat
+field	both	3	9	120	HighLimitPrice	HighLimitPrice
+field	both	3	10	120	LowLimitPrice	LowLimitPrice
+field	both	3	11	56	Halt.StartTime	HaltStartTime
+field	both	3	12	56	Halt.EndTime	HaltEndTime
+field	both	3	13	8	Flags	Flags
+field	both	3	14	10	Description	Description
+field	both	3	15	10	StatusReason	StatusReason
+input	both	3	0	004100410050004c	0
+value	both	3	0	0	0	null
+value	both	3	0	1	0	null
+value	both	3	0	2	0	null
+value	both	3	0	3	0	null
+value	both	3	0	4	0	null
+value	both	3	0	5	0	null
+value	both	3	0	6	0	null
+value	both	3	0	7	0	null
+value	both	3	0	8	0	null
+value	both	3	0	9	0	null
+value	both	3	0	10	0	null
+value	both	3	0	11	0	null
+value	both	3	0	12	0	null
+value	both	3	0	13	0	null
+value	both	3	0	14	0	null
+value	both	3	0	15	0	null
+profile	both	3	0	004100410050004c	0	0	0	null	null
+input	both	3	1	004100410050004c	-1
+value	both	3	1	0	0	null
+value	both	3	1	1	0	null
+value	both	3	1	2	0	null
+value	both	3	1	3	0	null
+value	both	3	1	4	0	null
+value	both	3	1	5	0	null
+value	both	3	1	6	0	null
+value	both	3	1	7	0	null
+value	both	3	1	8	0	null
+value	both	3	1	9	0	null
+value	both	3	1	10	0	null
+value	both	3	1	11	-1	null
+value	both	3	1	12	-1	null
+value	both	3	1	13	0	null
+value	both	3	1	14	0	-
+value	both	3	1	15	0	-
+profile	both	3	1	004100410050004c	-1000	-1000	23	-	-
+input	both	3	2	004100410050004c	-9223372036854775808
+value	both	3	2	0	0	null
+value	both	3	2	1	0	null
+value	both	3	2	2	0	null
+value	both	3	2	3	0	null
+value	both	3	2	4	0	null
+value	both	3	2	5	0	null
+value	both	3	2	6	0	null
+value	both	3	2	7	0	null
+value	both	3	2	8	0	null
+value	both	3	2	9	0	null
+value	both	3	2	10	0	null
+value	both	3	2	11	-2147483648	null
+value	both	3	2	12	-2147483648	null
+value	both	3	2	13	0	null
+value	both	3	2	14	0	0074006500780074
+value	both	3	2	15	0	0074006500780074
+profile	both	3	2	004100410050004c	-2147483648000	-2147483648000	-2147483648000	0074006500780074	0074006500780074
+input	both	3	3	004100410050004c	9223372036854775807
+value	both	3	3	0	0	null
+value	both	3	3	1	0	null
+value	both	3	3	2	0	null
+value	both	3	3	3	0	null
+value	both	3	3	4	0	null
+value	both	3	3	5	0	null
+value	both	3	3	6	0	null
+value	both	3	3	7	0	null
+value	both	3	3	8	0	null
+value	both	3	3	9	0	null
+value	both	3	3	10	0	null
+value	both	3	3	11	2147483647	null
+value	both	3	3	12	2147483647	null
+value	both	3	3	13	0	null
+value	both	3	3	14	0	0074006500780074
+value	both	3	3	15	0	0074006500780074
+profile	both	3	3	004100410050004c	2147483647000	2147483647000	2147483648023	0074006500780074	0074006500780074
+input	both	3	4	004100410050004c0026004e007b0061003d0062007d	1311768467463790320
+value	both	3	4	0	0	null
+value	both	3	4	1	0	null
+value	both	3	4	2	0	null
+value	both	3	4	3	0	null
+value	both	3	4	4	0	null
+value	both	3	4	5	0	null
+value	both	3	4	6	0	null
+value	both	3	4	7	0	null
+value	both	3	4	8	0	null
+value	both	3	4	9	0	null
+value	both	3	4	10	0	null
+value	both	3	4	11	17	null
+value	both	3	4	12	17	null
+value	both	3	4	13	0	null
+value	both	3	4	14	0	0074006500780074
+value	both	3	4	15	0	0074006500780074
+profile	both	3	4	004100410050004c0026004e007b0061003d0062007d	17000	17000	305419896618	0074006500780074	0074006500780074
+record	millis	0	Quote
+field	millis	0	0	72	Sequence	Sequence
+field	millis	0	1	8	TimeNanoPart	TimeNanoPart
+field	millis	0	2	152	Bid.Time	BidTime
+field	millis	0	3	2	Bid.Exchange	BidExchangeCode
+field	millis	0	4	120	Bid.Price	BidPrice
+field	millis	0	5	120	Bid.Size	BidSize
+field	millis	0	6	152	Ask.Time	AskTime
+field	millis	0	7	2	Ask.Exchange	AskExchangeCode
+field	millis	0	8	120	Ask.Price	AskPrice
+field	millis	0	9	120	Ask.Size	AskSize
+input	millis	0	0	004100410050004c	0
+value	millis	0	0	0	0	null
+value	millis	0	0	1	0	null
+value	millis	0	0	2	0	null
+value	millis	0	0	3	0	null
+value	millis	0	0	4	0	null
+value	millis	0	0	5	0	null
+value	millis	0	0	6	-1001	null
+value	millis	0	0	7	0	null
+value	millis	0	0	8	0	null
+value	millis	0	0	9	0	null
+quote	millis	0	0	004100410050004c	0	0	-1001	0	0	0	0	0	0
+input	millis	0	1	004100410050004c	-1
+value	millis	0	1	0	-100663297	null
+value	millis	0	1	1	999999	null
+value	millis	0	1	2	-1	null
+value	millis	0	1	3	78	null
+value	millis	0	1	4	0	null
+value	millis	0	1	5	0	null
+value	millis	0	1	6	-2001	null
+value	millis	0	1	7	78	null
+value	millis	0	1	8	0	null
+value	millis	0	1	9	0	null
+quote	millis	0	1	004100410050004c	-1	78	-2001	78	-1	4194303	999999	23	-1
+input	millis	0	2	004100410050004c	-9223372036854775808
+value	millis	0	2	0	-1	null
+value	millis	0	2	1	-1	null
+value	millis	0	2	2	-9223372036854775808	null
+value	millis	0	2	3	78	null
+value	millis	0	2	4	0	null
+value	millis	0	2	5	0	null
+value	millis	0	2	6	-9223372036854775807	null
+value	millis	0	2	7	78	null
+value	millis	0	2	8	0	null
+value	millis	0	2	9	0	null
+quote	millis	0	2	004100410050004c	-9223372036854775808	78	-9223372036854775807	78	-9223372036854774977	4194303	-1	-2147483648000	830999999
+input	millis	0	3	004100410050004c	9223372036854775807
+value	millis	0	3	0	-2147483648	null
+value	millis	0	3	1	-2147483648	null
+value	millis	0	3	2	9223372036854775807	null
+value	millis	0	3	3	78	null
+value	millis	0	3	4	0	null
+value	millis	0	3	5	0	null
+value	millis	0	3	6	9223372036854775806	null
+value	millis	0	3	7	78	null
+value	millis	0	3	8	0	null
+value	millis	0	3	9	0	null
+quote	millis	0	3	004100410050004c	9223372036854775807	78	9223372036854775806	78	9223372036854775512	0	-2147483648	2147483648023	-2443483648
+input	millis	0	4	004100410050004c0026004e007b0061003d0062007d	1311768467463790320
+value	millis	0	4	0	2147483647	null
+value	millis	0	4	1	2147483647	null
+value	millis	0	4	2	-1001	null
+value	millis	0	4	3	78	null
+value	millis	0	4	4	0	null
+value	millis	0	4	5	0	null
+value	millis	0	4	6	9001	null
+value	millis	0	4	7	78	null
+value	millis	0	4	8	0	null
+value	millis	0	4	9	0	null
+quote	millis	0	4	004100410050004c0026004e007b0061003d0062007d	-1001	78	9001	78	9511	4194303	2147483647	305419896618	11658483647
+record	millis	1	Quote&Q
+field	millis	1	0	72	Sequence	Sequence
+field	millis	1	1	8	TimeNanoPart	TimeNanoPart
+field	millis	1	2	152	Bid.Time	BidTime
+field	millis	1	3	120	Bid.Price	BidPrice
+field	millis	1	4	120	Bid.Size	BidSize
+field	millis	1	5	152	Ask.Time	AskTime
+field	millis	1	6	120	Ask.Price	AskPrice
+field	millis	1	7	120	Ask.Size	AskSize
+input	millis	1	0	004100410050004c	0
+value	millis	1	0	0	0	null
+value	millis	1	0	1	0	null
+value	millis	1	0	2	0	null
+value	millis	1	0	3	0	null
+value	millis	1	0	4	0	null
+value	millis	1	0	5	-1001	null
+value	millis	1	0	6	0	null
+value	millis	1	0	7	0	null
+quote	millis	1	0	004100410050004c00260051	0	81	-1001	81	0	0	0	0	0
+input	millis	1	1	004100410050004c	-1
+value	millis	1	1	0	-100663297	null
+value	millis	1	1	1	999999	null
+value	millis	1	1	2	-1	null
+value	millis	1	1	3	0	null
+value	millis	1	1	4	0	null
+value	millis	1	1	5	-2001	null
+value	millis	1	1	6	0	null
+value	millis	1	1	7	0	null
+quote	millis	1	1	004100410050004c00260051	-1	81	-2001	81	-1	4194303	999999	23	-1
+input	millis	1	2	004100410050004c	-9223372036854775808
+value	millis	1	2	0	-1	null
+value	millis	1	2	1	-1	null
+value	millis	1	2	2	-9223372036854775808	null
+value	millis	1	2	3	0	null
+value	millis	1	2	4	0	null
+value	millis	1	2	5	-9223372036854775807	null
+value	millis	1	2	6	0	null
+value	millis	1	2	7	0	null
+quote	millis	1	2	004100410050004c00260051	-9223372036854775808	81	-9223372036854775807	81	-9223372036854774977	4194303	-1	-2147483648000	830999999
+input	millis	1	3	004100410050004c	9223372036854775807
+value	millis	1	3	0	-2147483648	null
+value	millis	1	3	1	-2147483648	null
+value	millis	1	3	2	9223372036854775807	null
+value	millis	1	3	3	0	null
+value	millis	1	3	4	0	null
+value	millis	1	3	5	9223372036854775806	null
+value	millis	1	3	6	0	null
+value	millis	1	3	7	0	null
+quote	millis	1	3	004100410050004c00260051	9223372036854775807	81	9223372036854775806	81	9223372036854775512	0	-2147483648	2147483648023	-2443483648
+input	millis	1	4	004100410050004c0026004e007b0061003d0062007d	1311768467463790320
+value	millis	1	4	0	2147483647	null
+value	millis	1	4	1	2147483647	null
+value	millis	1	4	2	-1001	null
+value	millis	1	4	3	0	null
+value	millis	1	4	4	0	null
+value	millis	1	4	5	9001	null
+value	millis	1	4	6	0	null
+value	millis	1	4	7	0	null
+quote	millis	1	4	004100410050004c00260051007b0061003d0062007d	-1001	81	9001	81	9511	4194303	2147483647	305419896618	11658483647
+record	millis	2	Quote&z
+field	millis	2	0	72	Sequence	Sequence
+field	millis	2	1	8	TimeNanoPart	TimeNanoPart
+field	millis	2	2	152	Bid.Time	BidTime
+field	millis	2	3	120	Bid.Price	BidPrice
+field	millis	2	4	120	Bid.Size	BidSize
+field	millis	2	5	152	Ask.Time	AskTime
+field	millis	2	6	120	Ask.Price	AskPrice
+field	millis	2	7	120	Ask.Size	AskSize
+input	millis	2	0	004100410050004c	0
+value	millis	2	0	0	0	null
+value	millis	2	0	1	0	null
+value	millis	2	0	2	0	null
+value	millis	2	0	3	0	null
+value	millis	2	0	4	0	null
+value	millis	2	0	5	-1001	null
+value	millis	2	0	6	0	null
+value	millis	2	0	7	0	null
+quote	millis	2	0	004100410050004c0026007a	0	122	-1001	122	0	0	0	0	0
+input	millis	2	1	004100410050004c	-1
+value	millis	2	1	0	-100663297	null
+value	millis	2	1	1	999999	null
+value	millis	2	1	2	-1	null
+value	millis	2	1	3	0	null
+value	millis	2	1	4	0	null
+value	millis	2	1	5	-2001	null
+value	millis	2	1	6	0	null
+value	millis	2	1	7	0	null
+quote	millis	2	1	004100410050004c0026007a	-1	122	-2001	122	-1	4194303	999999	23	-1
+input	millis	2	2	004100410050004c	-9223372036854775808
+value	millis	2	2	0	-1	null
+value	millis	2	2	1	-1	null
+value	millis	2	2	2	-9223372036854775808	null
+value	millis	2	2	3	0	null
+value	millis	2	2	4	0	null
+value	millis	2	2	5	-9223372036854775807	null
+value	millis	2	2	6	0	null
+value	millis	2	2	7	0	null
+quote	millis	2	2	004100410050004c0026007a	-9223372036854775808	122	-9223372036854775807	122	-9223372036854774977	4194303	-1	-2147483648000	830999999
+input	millis	2	3	004100410050004c	9223372036854775807
+value	millis	2	3	0	-2147483648	null
+value	millis	2	3	1	-2147483648	null
+value	millis	2	3	2	9223372036854775807	null
+value	millis	2	3	3	0	null
+value	millis	2	3	4	0	null
+value	millis	2	3	5	9223372036854775806	null
+value	millis	2	3	6	0	null
+value	millis	2	3	7	0	null
+quote	millis	2	3	004100410050004c0026007a	9223372036854775807	122	9223372036854775806	122	9223372036854775512	0	-2147483648	2147483648023	-2443483648
+input	millis	2	4	004100410050004c0026004e007b0061003d0062007d	1311768467463790320
+value	millis	2	4	0	2147483647	null
+value	millis	2	4	1	2147483647	null
+value	millis	2	4	2	-1001	null
+value	millis	2	4	3	0	null
+value	millis	2	4	4	0	null
+value	millis	2	4	5	9001	null
+value	millis	2	4	6	0	null
+value	millis	2	4	7	0	null
+quote	millis	2	4	004100410050004c0026007a007b0061003d0062007d	-1001	122	9001	122	9511	4194303	2147483647	305419896618	11658483647
+record	millis	3	Profile
+field	millis	3	0	120	Beta	Beta
+field	millis	3	1	120	Eps	Eps
+field	millis	3	2	120	DivFreq	DivFreq
+field	millis	3	3	120	ExdDiv.Amount	ExdDivAmount
+field	millis	3	4	88	ExdDiv.Date	ExdDivDate
+field	millis	3	5	120	52High.Price	HighPrice52
+field	millis	3	6	120	52Low.Price	LowPrice52
+field	millis	3	7	120	Shares	Shares
+field	millis	3	8	120	FreeFloat	FreeFloat
+field	millis	3	9	120	HighLimitPrice	HighLimitPrice
+field	millis	3	10	120	LowLimitPrice	LowLimitPrice
+field	millis	3	11	56	Halt.StartTime	HaltStartTime
+field	millis	3	12	56	Halt.EndTime	HaltEndTime
+field	millis	3	13	8	Flags	Flags
+field	millis	3	14	10	Description	Description
+field	millis	3	15	10	StatusReason	StatusReason
+input	millis	3	0	004100410050004c	0
+value	millis	3	0	0	0	null
+value	millis	3	0	1	0	null
+value	millis	3	0	2	0	null
+value	millis	3	0	3	0	null
+value	millis	3	0	4	0	null
+value	millis	3	0	5	0	null
+value	millis	3	0	6	0	null
+value	millis	3	0	7	0	null
+value	millis	3	0	8	0	null
+value	millis	3	0	9	0	null
+value	millis	3	0	10	0	null
+value	millis	3	0	11	0	null
+value	millis	3	0	12	0	null
+value	millis	3	0	13	0	null
+value	millis	3	0	14	0	null
+value	millis	3	0	15	0	null
+profile	millis	3	0	004100410050004c	0	0	0	null	null
+input	millis	3	1	004100410050004c	-1
+value	millis	3	1	0	0	null
+value	millis	3	1	1	0	null
+value	millis	3	1	2	0	null
+value	millis	3	1	3	0	null
+value	millis	3	1	4	0	null
+value	millis	3	1	5	0	null
+value	millis	3	1	6	0	null
+value	millis	3	1	7	0	null
+value	millis	3	1	8	0	null
+value	millis	3	1	9	0	null
+value	millis	3	1	10	0	null
+value	millis	3	1	11	-1	null
+value	millis	3	1	12	-1	null
+value	millis	3	1	13	0	null
+value	millis	3	1	14	0	-
+value	millis	3	1	15	0	-
+profile	millis	3	1	004100410050004c	-1000	-1000	23	-	-
+input	millis	3	2	004100410050004c	-9223372036854775808
+value	millis	3	2	0	0	null
+value	millis	3	2	1	0	null
+value	millis	3	2	2	0	null
+value	millis	3	2	3	0	null
+value	millis	3	2	4	0	null
+value	millis	3	2	5	0	null
+value	millis	3	2	6	0	null
+value	millis	3	2	7	0	null
+value	millis	3	2	8	0	null
+value	millis	3	2	9	0	null
+value	millis	3	2	10	0	null
+value	millis	3	2	11	-2147483648	null
+value	millis	3	2	12	-2147483648	null
+value	millis	3	2	13	0	null
+value	millis	3	2	14	0	0074006500780074
+value	millis	3	2	15	0	0074006500780074
+profile	millis	3	2	004100410050004c	-2147483648000	-2147483648000	-2147483648000	0074006500780074	0074006500780074
+input	millis	3	3	004100410050004c	9223372036854775807
+value	millis	3	3	0	0	null
+value	millis	3	3	1	0	null
+value	millis	3	3	2	0	null
+value	millis	3	3	3	0	null
+value	millis	3	3	4	0	null
+value	millis	3	3	5	0	null
+value	millis	3	3	6	0	null
+value	millis	3	3	7	0	null
+value	millis	3	3	8	0	null
+value	millis	3	3	9	0	null
+value	millis	3	3	10	0	null
+value	millis	3	3	11	2147483647	null
+value	millis	3	3	12	2147483647	null
+value	millis	3	3	13	0	null
+value	millis	3	3	14	0	0074006500780074
+value	millis	3	3	15	0	0074006500780074
+profile	millis	3	3	004100410050004c	2147483647000	2147483647000	2147483648023	0074006500780074	0074006500780074
+input	millis	3	4	004100410050004c0026004e007b0061003d0062007d	1311768467463790320
+value	millis	3	4	0	0	null
+value	millis	3	4	1	0	null
+value	millis	3	4	2	0	null
+value	millis	3	4	3	0	null
+value	millis	3	4	4	0	null
+value	millis	3	4	5	0	null
+value	millis	3	4	6	0	null
+value	millis	3	4	7	0	null
+value	millis	3	4	8	0	null
+value	millis	3	4	9	0	null
+value	millis	3	4	10	0	null
+value	millis	3	4	11	17	null
+value	millis	3	4	12	17	null
+value	millis	3	4	13	0	null
+value	millis	3	4	14	0	0074006500780074
+value	millis	3	4	15	0	0074006500780074
+profile	millis	3	4	004100410050004c0026004e007b0061003d0062007d	17000	17000	305419896618	0074006500780074	0074006500780074
+record	millis-default	0	Quote
+field	millis-default	0	0	152	Bid.Time	BidTime
+field	millis-default	0	1	2	Bid.Exchange	BidExchangeCode
+field	millis-default	0	2	120	Bid.Price	BidPrice
+field	millis-default	0	3	120	Bid.Size	BidSize
+field	millis-default	0	4	152	Ask.Time	AskTime
+field	millis-default	0	5	2	Ask.Exchange	AskExchangeCode
+field	millis-default	0	6	120	Ask.Price	AskPrice
+field	millis-default	0	7	120	Ask.Size	AskSize
+input	millis-default	0	0	004100410050004c	0
+value	millis-default	0	0	0	0	null
+value	millis-default	0	0	1	0	null
+value	millis-default	0	0	2	0	null
+value	millis-default	0	0	3	0	null
+value	millis-default	0	0	4	-1001	null
+value	millis-default	0	0	5	0	null
+value	millis-default	0	0	6	0	null
+value	millis-default	0	0	7	0	null
+quote	millis-default	0	0	004100410050004c	0	0	-1001	0	0	0	0	0	0
+input	millis-default	0	1	004100410050004c	-1
+value	millis-default	0	1	0	-1	null
+value	millis-default	0	1	1	78	null
+value	millis-default	0	1	2	0	null
+value	millis-default	0	1	3	0	null
+value	millis-default	0	1	4	-2001	null
+value	millis-default	0	1	5	78	null
+value	millis-default	0	1	6	0	null
+value	millis-default	0	1	7	0	null
+quote	millis-default	0	1	004100410050004c	-1	78	-2001	78	-1000	0	0	23	-1000000000
+input	millis-default	0	2	004100410050004c	-9223372036854775808
+value	millis-default	0	2	0	-9223372036854775808	null
+value	millis-default	0	2	1	78	null
+value	millis-default	0	2	2	0	null
+value	millis-default	0	2	3	0	null
+value	millis-default	0	2	4	-9223372036854775807	null
+value	millis-default	0	2	5	78	null
+value	millis-default	0	2	6	0	null
+value	millis-default	0	2	7	0	null
+quote	millis-default	0	2	004100410050004c	-9223372036854775808	78	-9223372036854775807	78	9223372036854775616	0	0	-2147483648000	-192000000
+input	millis-default	0	3	004100410050004c	9223372036854775807
+value	millis-default	0	3	0	9223372036854775807	null
+value	millis-default	0	3	1	78	null
+value	millis-default	0	3	2	0	null
+value	millis-default	0	3	3	0	null
+value	millis-default	0	3	4	9223372036854775806	null
+value	millis-default	0	3	5	78	null
+value	millis-default	0	3	6	0	null
+value	millis-default	0	3	7	0	null
+quote	millis-default	0	3	004100410050004c	9223372036854775807	78	9223372036854775806	78	9223372036854775000	0	0	2147483648023	-808000000
+input	millis-default	0	4	004100410050004c0026004e007b0061003d0062007d	1311768467463790320
+value	millis-default	0	4	0	-1001	null
+value	millis-default	0	4	1	78	null
+value	millis-default	0	4	2	0	null
+value	millis-default	0	4	3	0	null
+value	millis-default	0	4	4	9001	null
+value	millis-default	0	4	5	78	null
+value	millis-default	0	4	6	0	null
+value	millis-default	0	4	7	0	null
+quote	millis-default	0	4	004100410050004c0026004e007b0061003d0062007d	-1001	78	9001	78	9000	0	0	305419896618	9000000000
+record	millis-default	1	Quote&Q
+field	millis-default	1	0	152	Bid.Time	BidTime
+field	millis-default	1	1	120	Bid.Price	BidPrice
+field	millis-default	1	2	120	Bid.Size	BidSize
+field	millis-default	1	3	152	Ask.Time	AskTime
+field	millis-default	1	4	120	Ask.Price	AskPrice
+field	millis-default	1	5	120	Ask.Size	AskSize
+input	millis-default	1	0	004100410050004c	0
+value	millis-default	1	0	0	0	null
+value	millis-default	1	0	1	0	null
+value	millis-default	1	0	2	0	null
+value	millis-default	1	0	3	-1001	null
+value	millis-default	1	0	4	0	null
+value	millis-default	1	0	5	0	null
+quote	millis-default	1	0	004100410050004c00260051	0	81	-1001	81	0	0	0	0	0
+input	millis-default	1	1	004100410050004c	-1
+value	millis-default	1	1	0	-1	null
+value	millis-default	1	1	1	0	null
+value	millis-default	1	1	2	0	null
+value	millis-default	1	1	3	-2001	null
+value	millis-default	1	1	4	0	null
+value	millis-default	1	1	5	0	null
+quote	millis-default	1	1	004100410050004c00260051	-1	81	-2001	81	-1000	0	0	23	-1000000000
+input	millis-default	1	2	004100410050004c	-9223372036854775808
+value	millis-default	1	2	0	-9223372036854775808	null
+value	millis-default	1	2	1	0	null
+value	millis-default	1	2	2	0	null
+value	millis-default	1	2	3	-9223372036854775807	null
+value	millis-default	1	2	4	0	null
+value	millis-default	1	2	5	0	null
+quote	millis-default	1	2	004100410050004c00260051	-9223372036854775808	81	-9223372036854775807	81	9223372036854775616	0	0	-2147483648000	-192000000
+input	millis-default	1	3	004100410050004c	9223372036854775807
+value	millis-default	1	3	0	9223372036854775807	null
+value	millis-default	1	3	1	0	null
+value	millis-default	1	3	2	0	null
+value	millis-default	1	3	3	9223372036854775806	null
+value	millis-default	1	3	4	0	null
+value	millis-default	1	3	5	0	null
+quote	millis-default	1	3	004100410050004c00260051	9223372036854775807	81	9223372036854775806	81	9223372036854775000	0	0	2147483648023	-808000000
+input	millis-default	1	4	004100410050004c0026004e007b0061003d0062007d	1311768467463790320
+value	millis-default	1	4	0	-1001	null
+value	millis-default	1	4	1	0	null
+value	millis-default	1	4	2	0	null
+value	millis-default	1	4	3	9001	null
+value	millis-default	1	4	4	0	null
+value	millis-default	1	4	5	0	null
+quote	millis-default	1	4	004100410050004c00260051007b0061003d0062007d	-1001	81	9001	81	9000	0	0	305419896618	9000000000
+record	millis-default	2	Quote&z
+field	millis-default	2	0	152	Bid.Time	BidTime
+field	millis-default	2	1	120	Bid.Price	BidPrice
+field	millis-default	2	2	120	Bid.Size	BidSize
+field	millis-default	2	3	152	Ask.Time	AskTime
+field	millis-default	2	4	120	Ask.Price	AskPrice
+field	millis-default	2	5	120	Ask.Size	AskSize
+input	millis-default	2	0	004100410050004c	0
+value	millis-default	2	0	0	0	null
+value	millis-default	2	0	1	0	null
+value	millis-default	2	0	2	0	null
+value	millis-default	2	0	3	-1001	null
+value	millis-default	2	0	4	0	null
+value	millis-default	2	0	5	0	null
+quote	millis-default	2	0	004100410050004c0026007a	0	122	-1001	122	0	0	0	0	0
+input	millis-default	2	1	004100410050004c	-1
+value	millis-default	2	1	0	-1	null
+value	millis-default	2	1	1	0	null
+value	millis-default	2	1	2	0	null
+value	millis-default	2	1	3	-2001	null
+value	millis-default	2	1	4	0	null
+value	millis-default	2	1	5	0	null
+quote	millis-default	2	1	004100410050004c0026007a	-1	122	-2001	122	-1000	0	0	23	-1000000000
+input	millis-default	2	2	004100410050004c	-9223372036854775808
+value	millis-default	2	2	0	-9223372036854775808	null
+value	millis-default	2	2	1	0	null
+value	millis-default	2	2	2	0	null
+value	millis-default	2	2	3	-9223372036854775807	null
+value	millis-default	2	2	4	0	null
+value	millis-default	2	2	5	0	null
+quote	millis-default	2	2	004100410050004c0026007a	-9223372036854775808	122	-9223372036854775807	122	9223372036854775616	0	0	-2147483648000	-192000000
+input	millis-default	2	3	004100410050004c	9223372036854775807
+value	millis-default	2	3	0	9223372036854775807	null
+value	millis-default	2	3	1	0	null
+value	millis-default	2	3	2	0	null
+value	millis-default	2	3	3	9223372036854775806	null
+value	millis-default	2	3	4	0	null
+value	millis-default	2	3	5	0	null
+quote	millis-default	2	3	004100410050004c0026007a	9223372036854775807	122	9223372036854775806	122	9223372036854775000	0	0	2147483648023	-808000000
+input	millis-default	2	4	004100410050004c0026004e007b0061003d0062007d	1311768467463790320
+value	millis-default	2	4	0	-1001	null
+value	millis-default	2	4	1	0	null
+value	millis-default	2	4	2	0	null
+value	millis-default	2	4	3	9001	null
+value	millis-default	2	4	4	0	null
+value	millis-default	2	4	5	0	null
+quote	millis-default	2	4	004100410050004c0026007a007b0061003d0062007d	-1001	122	9001	122	9000	0	0	305419896618	9000000000
+record	millis-default	3	Profile
+field	millis-default	3	0	120	Beta	Beta
+field	millis-default	3	1	120	Eps	Eps
+field	millis-default	3	2	120	DivFreq	DivFreq
+field	millis-default	3	3	120	ExdDiv.Amount	ExdDivAmount
+field	millis-default	3	4	88	ExdDiv.Date	ExdDivDate
+field	millis-default	3	5	120	52High.Price	HighPrice52
+field	millis-default	3	6	120	52Low.Price	LowPrice52
+field	millis-default	3	7	120	Shares	Shares
+field	millis-default	3	8	120	FreeFloat	FreeFloat
+field	millis-default	3	9	120	HighLimitPrice	HighLimitPrice
+field	millis-default	3	10	120	LowLimitPrice	LowLimitPrice
+field	millis-default	3	11	56	Halt.StartTime	HaltStartTime
+field	millis-default	3	12	56	Halt.EndTime	HaltEndTime
+field	millis-default	3	13	8	Flags	Flags
+field	millis-default	3	14	10	Description	Description
+field	millis-default	3	15	10	StatusReason	StatusReason
+input	millis-default	3	0	004100410050004c	0
+value	millis-default	3	0	0	0	null
+value	millis-default	3	0	1	0	null
+value	millis-default	3	0	2	0	null
+value	millis-default	3	0	3	0	null
+value	millis-default	3	0	4	0	null
+value	millis-default	3	0	5	0	null
+value	millis-default	3	0	6	0	null
+value	millis-default	3	0	7	0	null
+value	millis-default	3	0	8	0	null
+value	millis-default	3	0	9	0	null
+value	millis-default	3	0	10	0	null
+value	millis-default	3	0	11	0	null
+value	millis-default	3	0	12	0	null
+value	millis-default	3	0	13	0	null
+value	millis-default	3	0	14	0	null
+value	millis-default	3	0	15	0	null
+profile	millis-default	3	0	004100410050004c	0	0	0	null	null
+input	millis-default	3	1	004100410050004c	-1
+value	millis-default	3	1	0	0	null
+value	millis-default	3	1	1	0	null
+value	millis-default	3	1	2	0	null
+value	millis-default	3	1	3	0	null
+value	millis-default	3	1	4	0	null
+value	millis-default	3	1	5	0	null
+value	millis-default	3	1	6	0	null
+value	millis-default	3	1	7	0	null
+value	millis-default	3	1	8	0	null
+value	millis-default	3	1	9	0	null
+value	millis-default	3	1	10	0	null
+value	millis-default	3	1	11	-1	null
+value	millis-default	3	1	12	-1	null
+value	millis-default	3	1	13	0	null
+value	millis-default	3	1	14	0	-
+value	millis-default	3	1	15	0	-
+profile	millis-default	3	1	004100410050004c	-1000	-1000	23	-	-
+input	millis-default	3	2	004100410050004c	-9223372036854775808
+value	millis-default	3	2	0	0	null
+value	millis-default	3	2	1	0	null
+value	millis-default	3	2	2	0	null
+value	millis-default	3	2	3	0	null
+value	millis-default	3	2	4	0	null
+value	millis-default	3	2	5	0	null
+value	millis-default	3	2	6	0	null
+value	millis-default	3	2	7	0	null
+value	millis-default	3	2	8	0	null
+value	millis-default	3	2	9	0	null
+value	millis-default	3	2	10	0	null
+value	millis-default	3	2	11	-2147483648	null
+value	millis-default	3	2	12	-2147483648	null
+value	millis-default	3	2	13	0	null
+value	millis-default	3	2	14	0	0074006500780074
+value	millis-default	3	2	15	0	0074006500780074
+profile	millis-default	3	2	004100410050004c	-2147483648000	-2147483648000	-2147483648000	0074006500780074	0074006500780074
+input	millis-default	3	3	004100410050004c	9223372036854775807
+value	millis-default	3	3	0	0	null
+value	millis-default	3	3	1	0	null
+value	millis-default	3	3	2	0	null
+value	millis-default	3	3	3	0	null
+value	millis-default	3	3	4	0	null
+value	millis-default	3	3	5	0	null
+value	millis-default	3	3	6	0	null
+value	millis-default	3	3	7	0	null
+value	millis-default	3	3	8	0	null
+value	millis-default	3	3	9	0	null
+value	millis-default	3	3	10	0	null
+value	millis-default	3	3	11	2147483647	null
+value	millis-default	3	3	12	2147483647	null
+value	millis-default	3	3	13	0	null
+value	millis-default	3	3	14	0	0074006500780074
+value	millis-default	3	3	15	0	0074006500780074
+profile	millis-default	3	3	004100410050004c	2147483647000	2147483647000	2147483648023	0074006500780074	0074006500780074
+input	millis-default	3	4	004100410050004c0026004e007b0061003d0062007d	1311768467463790320
+value	millis-default	3	4	0	0	null
+value	millis-default	3	4	1	0	null
+value	millis-default	3	4	2	0	null
+value	millis-default	3	4	3	0	null
+value	millis-default	3	4	4	0	null
+value	millis-default	3	4	5	0	null
+value	millis-default	3	4	6	0	null
+value	millis-default	3	4	7	0	null
+value	millis-default	3	4	8	0	null
+value	millis-default	3	4	9	0	null
+value	millis-default	3	4	10	0	null
+value	millis-default	3	4	11	17	null
+value	millis-default	3	4	12	17	null
+value	millis-default	3	4	13	0	null
+value	millis-default	3	4	14	0	0074006500780074
+value	millis-default	3	4	15	0	0074006500780074
+profile	millis-default	3	4	004100410050004c0026004e007b0061003d0062007d	17000	17000	305419896618	0074006500780074	0074006500780074
+record	minimal	0	Quote
+field	minimal	0	0	120	Bid.Price	BidPrice
+field	minimal	0	1	120	Bid.Size	BidSize
+field	minimal	0	2	120	Ask.Price	AskPrice
+field	minimal	0	3	120	Ask.Size	AskSize
+input	minimal	0	0	004100410050004c	0
+value	minimal	0	0	0	0	null
+value	minimal	0	0	1	0	null
+value	minimal	0	0	2	0	null
+value	minimal	0	0	3	0	null
+quote	minimal	0	0	004100410050004c	0	0	0	0	0	0	0	0	0
+input	minimal	0	1	004100410050004c	-1
+value	minimal	0	1	0	0	null
+value	minimal	0	1	1	0	null
+value	minimal	0	1	2	0	null
+value	minimal	0	1	3	0	null
+quote	minimal	0	1	004100410050004c	0	0	0	0	0	0	0	23	0
+input	minimal	0	2	004100410050004c	-9223372036854775808
+value	minimal	0	2	0	0	null
+value	minimal	0	2	1	0	null
+value	minimal	0	2	2	0	null
+value	minimal	0	2	3	0	null
+quote	minimal	0	2	004100410050004c	0	0	0	0	0	0	0	-2147483648000	0
+input	minimal	0	3	004100410050004c	9223372036854775807
+value	minimal	0	3	0	0	null
+value	minimal	0	3	1	0	null
+value	minimal	0	3	2	0	null
+value	minimal	0	3	3	0	null
+quote	minimal	0	3	004100410050004c	0	0	0	0	0	0	0	2147483648023	0
+input	minimal	0	4	004100410050004c0026004e007b0061003d0062007d	1311768467463790320
+value	minimal	0	4	0	0	null
+value	minimal	0	4	1	0	null
+value	minimal	0	4	2	0	null
+value	minimal	0	4	3	0	null
+quote	minimal	0	4	004100410050004c0026004e007b0061003d0062007d	0	0	0	0	0	0	0	305419896618	0
+record	minimal	1	Quote&Q
+field	minimal	1	0	120	Bid.Price	BidPrice
+field	minimal	1	1	120	Bid.Size	BidSize
+field	minimal	1	2	120	Ask.Price	AskPrice
+field	minimal	1	3	120	Ask.Size	AskSize
+input	minimal	1	0	004100410050004c	0
+value	minimal	1	0	0	0	null
+value	minimal	1	0	1	0	null
+value	minimal	1	0	2	0	null
+value	minimal	1	0	3	0	null
+quote	minimal	1	0	004100410050004c00260051	0	81	0	81	0	0	0	0	0
+input	minimal	1	1	004100410050004c	-1
+value	minimal	1	1	0	0	null
+value	minimal	1	1	1	0	null
+value	minimal	1	1	2	0	null
+value	minimal	1	1	3	0	null
+quote	minimal	1	1	004100410050004c00260051	0	81	0	81	0	0	0	23	0
+input	minimal	1	2	004100410050004c	-9223372036854775808
+value	minimal	1	2	0	0	null
+value	minimal	1	2	1	0	null
+value	minimal	1	2	2	0	null
+value	minimal	1	2	3	0	null
+quote	minimal	1	2	004100410050004c00260051	0	81	0	81	0	0	0	-2147483648000	0
+input	minimal	1	3	004100410050004c	9223372036854775807
+value	minimal	1	3	0	0	null
+value	minimal	1	3	1	0	null
+value	minimal	1	3	2	0	null
+value	minimal	1	3	3	0	null
+quote	minimal	1	3	004100410050004c00260051	0	81	0	81	0	0	0	2147483648023	0
+input	minimal	1	4	004100410050004c0026004e007b0061003d0062007d	1311768467463790320
+value	minimal	1	4	0	0	null
+value	minimal	1	4	1	0	null
+value	minimal	1	4	2	0	null
+value	minimal	1	4	3	0	null
+quote	minimal	1	4	004100410050004c00260051007b0061003d0062007d	0	81	0	81	0	0	0	305419896618	0
+record	minimal	2	Quote&z
+field	minimal	2	0	120	Bid.Price	BidPrice
+field	minimal	2	1	120	Bid.Size	BidSize
+field	minimal	2	2	120	Ask.Price	AskPrice
+field	minimal	2	3	120	Ask.Size	AskSize
+input	minimal	2	0	004100410050004c	0
+value	minimal	2	0	0	0	null
+value	minimal	2	0	1	0	null
+value	minimal	2	0	2	0	null
+value	minimal	2	0	3	0	null
+quote	minimal	2	0	004100410050004c0026007a	0	122	0	122	0	0	0	0	0
+input	minimal	2	1	004100410050004c	-1
+value	minimal	2	1	0	0	null
+value	minimal	2	1	1	0	null
+value	minimal	2	1	2	0	null
+value	minimal	2	1	3	0	null
+quote	minimal	2	1	004100410050004c0026007a	0	122	0	122	0	0	0	23	0
+input	minimal	2	2	004100410050004c	-9223372036854775808
+value	minimal	2	2	0	0	null
+value	minimal	2	2	1	0	null
+value	minimal	2	2	2	0	null
+value	minimal	2	2	3	0	null
+quote	minimal	2	2	004100410050004c0026007a	0	122	0	122	0	0	0	-2147483648000	0
+input	minimal	2	3	004100410050004c	9223372036854775807
+value	minimal	2	3	0	0	null
+value	minimal	2	3	1	0	null
+value	minimal	2	3	2	0	null
+value	minimal	2	3	3	0	null
+quote	minimal	2	3	004100410050004c0026007a	0	122	0	122	0	0	0	2147483648023	0
+input	minimal	2	4	004100410050004c0026004e007b0061003d0062007d	1311768467463790320
+value	minimal	2	4	0	0	null
+value	minimal	2	4	1	0	null
+value	minimal	2	4	2	0	null
+value	minimal	2	4	3	0	null
+quote	minimal	2	4	004100410050004c0026007a007b0061003d0062007d	0	122	0	122	0	0	0	305419896618	0
+record	minimal	3	Profile
+field	minimal	3	0	10	Description	Description
+input	minimal	3	0	004100410050004c	0
+value	minimal	3	0	0	0	null
+profile	minimal	3	0	004100410050004c	0	0	0	null	null
+input	minimal	3	1	004100410050004c	-1
+value	minimal	3	1	0	0	-
+profile	minimal	3	1	004100410050004c	0	0	23	-	null
+input	minimal	3	2	004100410050004c	-9223372036854775808
+value	minimal	3	2	0	0	0074006500780074
+profile	minimal	3	2	004100410050004c	0	0	-2147483648000	0074006500780074	null
+input	minimal	3	3	004100410050004c	9223372036854775807
+value	minimal	3	3	0	0	0074006500780074
+profile	minimal	3	3	004100410050004c	0	0	2147483648023	0074006500780074	null
+input	minimal	3	4	004100410050004c0026004e007b0061003d0062007d	1311768467463790320
+value	minimal	3	4	0	0	0074006500780074
+profile	minimal	3	4	004100410050004c0026004e007b0061003d0062007d	0	0	305419896618	0074006500780074	null
+record	reordered	0	Quote
+field	reordered	0	0	120	Ask.Size	AskSize
+field	reordered	0	1	120	Ask.Price	AskPrice
+field	reordered	0	2	2	Ask.Exchange	AskExchangeCode
+field	reordered	0	3	56	Ask.Time	AskTime
+field	reordered	0	4	120	Bid.Size	BidSize
+field	reordered	0	5	120	Bid.Price	BidPrice
+field	reordered	0	6	2	Bid.Exchange	BidExchangeCode
+field	reordered	0	7	56	Bid.Time	BidTime
+field	reordered	0	8	8	TimeNanoPart	TimeNanoPart
+field	reordered	0	9	72	Sequence	Sequence
+input	reordered	0	0	004100410050004c	0
+value	reordered	0	0	0	0	null
+value	reordered	0	0	1	0	null
+value	reordered	0	0	2	0	null
+value	reordered	0	0	3	-1	null
+value	reordered	0	0	4	0	null
+value	reordered	0	0	5	0	null
+value	reordered	0	0	6	0	null
+value	reordered	0	0	7	0	null
+value	reordered	0	0	8	0	null
+value	reordered	0	0	9	0	null
+quote	reordered	0	0	004100410050004c	0	0	-1000	0	0	0	0	0	0
+input	reordered	0	1	004100410050004c	-1
+value	reordered	0	1	0	0	null
+value	reordered	0	1	1	0	null
+value	reordered	0	1	2	78	null
+value	reordered	0	1	3	0	null
+value	reordered	0	1	4	0	null
+value	reordered	0	1	5	0	null
+value	reordered	0	1	6	78	null
+value	reordered	0	1	7	-1	null
+value	reordered	0	1	8	999999	null
+value	reordered	0	1	9	-100663297	null
+quote	reordered	0	1	004100410050004c	-1000	78	0	78	999	4194303	999999	23	999999999
+input	reordered	0	2	004100410050004c	-9223372036854775808
+value	reordered	0	2	0	0	null
+value	reordered	0	2	1	0	null
+value	reordered	0	2	2	78	null
+value	reordered	0	2	3	-2147483647	null
+value	reordered	0	2	4	0	null
+value	reordered	0	2	5	0	null
+value	reordered	0	2	6	78	null
+value	reordered	0	2	7	-2147483648	null
+value	reordered	0	2	8	-1	null
+value	reordered	0	2	9	-1	null
+quote	reordered	0	2	004100410050004c	-2147483648000	78	-2147483647000	78	-2147483645977	4194303	-1	-2147483648000	-2147483645977000001
+input	reordered	0	3	004100410050004c	9223372036854775807
+value	reordered	0	3	0	0	null
+value	reordered	0	3	1	0	null
+value	reordered	0	3	2	78	null
+value	reordered	0	3	3	2147483646	null
+value	reordered	0	3	4	0	null
+value	reordered	0	3	5	0	null
+value	reordered	0	3	6	78	null
+value	reordered	0	3	7	2147483647	null
+value	reordered	0	3	8	-2147483648	null
+value	reordered	0	3	9	-2147483648	null
+quote	reordered	0	3	004100410050004c	2147483647000	78	2147483646000	78	2147483647512	0	-2147483648	2147483648023	2147483645364516352
+input	reordered	0	4	004100410050004c0026004e007b0061003d0062007d	1311768467463790320
+value	reordered	0	4	0	0	null
+value	reordered	0	4	1	0	null
+value	reordered	0	4	2	78	null
+value	reordered	0	4	3	18	null
+value	reordered	0	4	4	0	null
+value	reordered	0	4	5	0	null
+value	reordered	0	4	6	78	null
+value	reordered	0	4	7	17	null
+value	reordered	0	4	8	2147483647	null
+value	reordered	0	4	9	2147483647	null
+quote	reordered	0	4	004100410050004c0026004e007b0061003d0062007d	17000	78	18000	78	18511	4194303	2147483647	305419896618	20658483647
+record	reordered	1	Quote&Q
+field	reordered	1	0	120	Ask.Size	AskSize
+field	reordered	1	1	120	Ask.Price	AskPrice
+field	reordered	1	2	56	Ask.Time	AskTime
+field	reordered	1	3	120	Bid.Size	BidSize
+field	reordered	1	4	120	Bid.Price	BidPrice
+field	reordered	1	5	56	Bid.Time	BidTime
+field	reordered	1	6	8	TimeNanoPart	TimeNanoPart
+field	reordered	1	7	72	Sequence	Sequence
+input	reordered	1	0	004100410050004c	0
+value	reordered	1	0	0	0	null
+value	reordered	1	0	1	0	null
+value	reordered	1	0	2	-1	null
+value	reordered	1	0	3	0	null
+value	reordered	1	0	4	0	null
+value	reordered	1	0	5	0	null
+value	reordered	1	0	6	0	null
+value	reordered	1	0	7	0	null
+quote	reordered	1	0	004100410050004c00260051	0	81	-1000	81	0	0	0	0	0
+input	reordered	1	1	004100410050004c	-1
+value	reordered	1	1	0	0	null
+value	reordered	1	1	1	0	null
+value	reordered	1	1	2	0	null
+value	reordered	1	1	3	0	null
+value	reordered	1	1	4	0	null
+value	reordered	1	1	5	-1	null
+value	reordered	1	1	6	999999	null
+value	reordered	1	1	7	-100663297	null
+quote	reordered	1	1	004100410050004c00260051	-1000	81	0	81	999	4194303	999999	23	999999999
+input	reordered	1	2	004100410050004c	-9223372036854775808
+value	reordered	1	2	0	0	null
+value	reordered	1	2	1	0	null
+value	reordered	1	2	2	-2147483647	null
+value	reordered	1	2	3	0	null
+value	reordered	1	2	4	0	null
+value	reordered	1	2	5	-2147483648	null
+value	reordered	1	2	6	-1	null
+value	reordered	1	2	7	-1	null
+quote	reordered	1	2	004100410050004c00260051	-2147483648000	81	-2147483647000	81	-2147483645977	4194303	-1	-2147483648000	-2147483645977000001
+input	reordered	1	3	004100410050004c	9223372036854775807
+value	reordered	1	3	0	0	null
+value	reordered	1	3	1	0	null
+value	reordered	1	3	2	2147483646	null
+value	reordered	1	3	3	0	null
+value	reordered	1	3	4	0	null
+value	reordered	1	3	5	2147483647	null
+value	reordered	1	3	6	-2147483648	null
+value	reordered	1	3	7	-2147483648	null
+quote	reordered	1	3	004100410050004c00260051	2147483647000	81	2147483646000	81	2147483647512	0	-2147483648	2147483648023	2147483645364516352
+input	reordered	1	4	004100410050004c0026004e007b0061003d0062007d	1311768467463790320
+value	reordered	1	4	0	0	null
+value	reordered	1	4	1	0	null
+value	reordered	1	4	2	18	null
+value	reordered	1	4	3	0	null
+value	reordered	1	4	4	0	null
+value	reordered	1	4	5	17	null
+value	reordered	1	4	6	2147483647	null
+value	reordered	1	4	7	2147483647	null
+quote	reordered	1	4	004100410050004c00260051007b0061003d0062007d	17000	81	18000	81	18511	4194303	2147483647	305419896618	20658483647
+record	reordered	2	Quote&z
+field	reordered	2	0	120	Ask.Size	AskSize
+field	reordered	2	1	120	Ask.Price	AskPrice
+field	reordered	2	2	56	Ask.Time	AskTime
+field	reordered	2	3	120	Bid.Size	BidSize
+field	reordered	2	4	120	Bid.Price	BidPrice
+field	reordered	2	5	56	Bid.Time	BidTime
+field	reordered	2	6	8	TimeNanoPart	TimeNanoPart
+field	reordered	2	7	72	Sequence	Sequence
+input	reordered	2	0	004100410050004c	0
+value	reordered	2	0	0	0	null
+value	reordered	2	0	1	0	null
+value	reordered	2	0	2	-1	null
+value	reordered	2	0	3	0	null
+value	reordered	2	0	4	0	null
+value	reordered	2	0	5	0	null
+value	reordered	2	0	6	0	null
+value	reordered	2	0	7	0	null
+quote	reordered	2	0	004100410050004c0026007a	0	122	-1000	122	0	0	0	0	0
+input	reordered	2	1	004100410050004c	-1
+value	reordered	2	1	0	0	null
+value	reordered	2	1	1	0	null
+value	reordered	2	1	2	0	null
+value	reordered	2	1	3	0	null
+value	reordered	2	1	4	0	null
+value	reordered	2	1	5	-1	null
+value	reordered	2	1	6	999999	null
+value	reordered	2	1	7	-100663297	null
+quote	reordered	2	1	004100410050004c0026007a	-1000	122	0	122	999	4194303	999999	23	999999999
+input	reordered	2	2	004100410050004c	-9223372036854775808
+value	reordered	2	2	0	0	null
+value	reordered	2	2	1	0	null
+value	reordered	2	2	2	-2147483647	null
+value	reordered	2	2	3	0	null
+value	reordered	2	2	4	0	null
+value	reordered	2	2	5	-2147483648	null
+value	reordered	2	2	6	-1	null
+value	reordered	2	2	7	-1	null
+quote	reordered	2	2	004100410050004c0026007a	-2147483648000	122	-2147483647000	122	-2147483645977	4194303	-1	-2147483648000	-2147483645977000001
+input	reordered	2	3	004100410050004c	9223372036854775807
+value	reordered	2	3	0	0	null
+value	reordered	2	3	1	0	null
+value	reordered	2	3	2	2147483646	null
+value	reordered	2	3	3	0	null
+value	reordered	2	3	4	0	null
+value	reordered	2	3	5	2147483647	null
+value	reordered	2	3	6	-2147483648	null
+value	reordered	2	3	7	-2147483648	null
+quote	reordered	2	3	004100410050004c0026007a	2147483647000	122	2147483646000	122	2147483647512	0	-2147483648	2147483648023	2147483645364516352
+input	reordered	2	4	004100410050004c0026004e007b0061003d0062007d	1311768467463790320
+value	reordered	2	4	0	0	null
+value	reordered	2	4	1	0	null
+value	reordered	2	4	2	18	null
+value	reordered	2	4	3	0	null
+value	reordered	2	4	4	0	null
+value	reordered	2	4	5	17	null
+value	reordered	2	4	6	2147483647	null
+value	reordered	2	4	7	2147483647	null
+quote	reordered	2	4	004100410050004c0026007a007b0061003d0062007d	17000	122	18000	122	18511	4194303	2147483647	305419896618	20658483647
+record	reordered	3	Profile
+field	reordered	3	0	8	Flags	Flags
+field	reordered	3	1	56	Halt.EndTime	HaltEndTime
+field	reordered	3	2	56	Halt.StartTime	HaltStartTime
+field	reordered	3	3	120	LowLimitPrice	LowLimitPrice
+field	reordered	3	4	120	HighLimitPrice	HighLimitPrice
+field	reordered	3	5	120	FreeFloat	FreeFloat
+field	reordered	3	6	120	Shares	Shares
+field	reordered	3	7	120	52Low.Price	LowPrice52
+field	reordered	3	8	120	52High.Price	HighPrice52
+field	reordered	3	9	88	ExdDiv.Date	ExdDivDate
+field	reordered	3	10	120	ExdDiv.Amount	ExdDivAmount
+field	reordered	3	11	120	DivFreq	DivFreq
+field	reordered	3	12	120	Eps	Eps
+field	reordered	3	13	120	Beta	Beta
+field	reordered	3	14	10	StatusReason	StatusReason
+field	reordered	3	15	10	Description	Description
+input	reordered	3	0	004100410050004c	0
+value	reordered	3	0	0	0	null
+value	reordered	3	0	1	0	null
+value	reordered	3	0	2	0	null
+value	reordered	3	0	3	0	null
+value	reordered	3	0	4	0	null
+value	reordered	3	0	5	0	null
+value	reordered	3	0	6	0	null
+value	reordered	3	0	7	0	null
+value	reordered	3	0	8	0	null
+value	reordered	3	0	9	0	null
+value	reordered	3	0	10	0	null
+value	reordered	3	0	11	0	null
+value	reordered	3	0	12	0	null
+value	reordered	3	0	13	0	null
+value	reordered	3	0	14	0	null
+value	reordered	3	0	15	0	null
+profile	reordered	3	0	004100410050004c	0	0	0	null	null
+input	reordered	3	1	004100410050004c	-1
+value	reordered	3	1	0	0	null
+value	reordered	3	1	1	-1	null
+value	reordered	3	1	2	-1	null
+value	reordered	3	1	3	0	null
+value	reordered	3	1	4	0	null
+value	reordered	3	1	5	0	null
+value	reordered	3	1	6	0	null
+value	reordered	3	1	7	0	null
+value	reordered	3	1	8	0	null
+value	reordered	3	1	9	0	null
+value	reordered	3	1	10	0	null
+value	reordered	3	1	11	0	null
+value	reordered	3	1	12	0	null
+value	reordered	3	1	13	0	null
+value	reordered	3	1	14	0	-
+value	reordered	3	1	15	0	-
+profile	reordered	3	1	004100410050004c	-1000	-1000	23	-	-
+input	reordered	3	2	004100410050004c	-9223372036854775808
+value	reordered	3	2	0	0	null
+value	reordered	3	2	1	-2147483648	null
+value	reordered	3	2	2	-2147483648	null
+value	reordered	3	2	3	0	null
+value	reordered	3	2	4	0	null
+value	reordered	3	2	5	0	null
+value	reordered	3	2	6	0	null
+value	reordered	3	2	7	0	null
+value	reordered	3	2	8	0	null
+value	reordered	3	2	9	0	null
+value	reordered	3	2	10	0	null
+value	reordered	3	2	11	0	null
+value	reordered	3	2	12	0	null
+value	reordered	3	2	13	0	null
+value	reordered	3	2	14	0	0074006500780074
+value	reordered	3	2	15	0	0074006500780074
+profile	reordered	3	2	004100410050004c	-2147483648000	-2147483648000	-2147483648000	0074006500780074	0074006500780074
+input	reordered	3	3	004100410050004c	9223372036854775807
+value	reordered	3	3	0	0	null
+value	reordered	3	3	1	2147483647	null
+value	reordered	3	3	2	2147483647	null
+value	reordered	3	3	3	0	null
+value	reordered	3	3	4	0	null
+value	reordered	3	3	5	0	null
+value	reordered	3	3	6	0	null
+value	reordered	3	3	7	0	null
+value	reordered	3	3	8	0	null
+value	reordered	3	3	9	0	null
+value	reordered	3	3	10	0	null
+value	reordered	3	3	11	0	null
+value	reordered	3	3	12	0	null
+value	reordered	3	3	13	0	null
+value	reordered	3	3	14	0	0074006500780074
+value	reordered	3	3	15	0	0074006500780074
+profile	reordered	3	3	004100410050004c	2147483647000	2147483647000	2147483648023	0074006500780074	0074006500780074
+input	reordered	3	4	004100410050004c0026004e007b0061003d0062007d	1311768467463790320
+value	reordered	3	4	0	0	null
+value	reordered	3	4	1	17	null
+value	reordered	3	4	2	17	null
+value	reordered	3	4	3	0	null
+value	reordered	3	4	4	0	null
+value	reordered	3	4	5	0	null
+value	reordered	3	4	6	0	null
+value	reordered	3	4	7	0	null
+value	reordered	3	4	8	0	null
+value	reordered	3	4	9	0	null
+value	reordered	3	4	10	0	null
+value	reordered	3	4	11	0	null
+value	reordered	3	4	12	0	null
+value	reordered	3	4	13	0	null
+value	reordered	3	4	14	0	0074006500780074
+value	reordered	3	4	15	0	0074006500780074
+profile	reordered	3	4	004100410050004c0026004e007b0061003d0062007d	17000	17000	305419896618	0074006500780074	0074006500780074
+record	missing	0	Quote
+field	missing	0	0	56	Bid.Time	BidTime
+field	missing	0	1	2	Bid.Exchange	BidExchange
+field	missing	0	2	56	Ask.Time	AskTime
+field	missing	0	3	2	Ask.Exchange	AskExchange
+reject	missing	0	IllegalArgumentException
+record	missing	1	Quote&Q
+field	missing	1	0	56	Bid.Time	BidTime
+field	missing	1	1	56	Ask.Time	AskTime
+reject	missing	1	IllegalArgumentException
+record	missing	2	Quote&z
+field	missing	2	0	56	Bid.Time	BidTime
+field	missing	2	1	56	Ask.Time	AskTime
+reject	missing	2	IllegalArgumentException
+record	missing	3	Profile
+field	missing	3	0	120	Beta	Beta
+field	missing	3	1	120	Eps	Eps
+field	missing	3	2	120	DivFreq	DivFreq
+field	missing	3	3	120	ExdDiv.Amount	ExdDivAmount
+field	missing	3	4	88	ExdDiv.Date	ExdDivDate
+field	missing	3	5	120	52High.Price	52HighPrice
+field	missing	3	6	120	52Low.Price	52LowPrice
+field	missing	3	7	120	Shares	Shares
+field	missing	3	8	120	FreeFloat	FreeFloat
+field	missing	3	9	120	HighLimitPrice	HighLimitPrice
+field	missing	3	10	120	LowLimitPrice	LowLimitPrice
+field	missing	3	11	56	Halt.StartTime	HaltStartTime
+field	missing	3	12	56	Halt.EndTime	HaltEndTime
+field	missing	3	13	8	Flags	Flags
+field	missing	3	14	10	StatusReason	StatusReason
+reject	missing	3	IllegalArgumentException

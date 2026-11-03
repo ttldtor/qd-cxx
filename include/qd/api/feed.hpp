@@ -216,10 +216,14 @@ template <class Event> class Subscription final {
     void removeEventListener(ListenerId id);
     /** Accept an exact selector; application return is not a wire acknowledgement.
      * @param symbol Nonempty printable ASCII, within runtime limits, without All/wildcard syntax.
+     * @throws Error INVALID_ARGUMENT at subscription-symbol-representation if a selected regional Quote route
+     * cannot restore this exact spelling; no part of the desired mutation is published.
      */
     void addSymbols(std::string_view symbol);
     /** Atomically accept several exact selectors, with duplicates coalesced.
      * @param symbols Complete bounded set to add.
+     * @throws Error INVALID_ARGUMENT if any selected regional Quote symbol is not exactly representable;
+     * the whole batch is refused at subscription-symbol-representation.
      */
     void addSymbols(std::initializer_list<std::string_view> symbols);
     /** Accept removal of one selector; absence is an idempotent no-op.
@@ -228,6 +232,8 @@ template <class Event> class Subscription final {
     void removeSymbols(std::string_view symbol);
     /** Replace the complete accepted set atomically. Backend failure is reported by getDiagnostic().
      * @param symbols New bounded exact set; empty withdraws all interests.
+     * @throws Error INVALID_ARGUMENT at subscription-symbol-representation for a lossy selected regional route;
+     * previously accepted selectors remain unchanged and no partial replacement is sent.
      */
     void setSymbols(std::initializer_list<std::string_view> symbols);
     /** Withdraw all accepted selectors asynchronously. */

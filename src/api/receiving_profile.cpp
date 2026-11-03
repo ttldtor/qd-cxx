@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: BSL-1.0
 #include "receiving_profile.hpp"
 
+#include "qd/events/market_event_symbols.hpp"
+
 #include <algorithm>
 #include <array>
 #include <limits>
@@ -9,10 +11,11 @@
 
 namespace org::ttldtor::qdcxx::api::detail {
 namespace {
-constexpr std::size_t MEBIBYTE = 1024 * 1024;                         ///< Independent logical byte unit.
-constexpr core::SchemaLimits SCHEMA_LIMITS{16, 128, 256, 128, 16384}; ///< Complete declarations and aliases.
-constexpr std::size_t FRAME_RECORDS = 64;                             ///< Whole admitted DATA frame record ceiling.
-constexpr std::size_t CALLBACK_RECORDS = 4;                           ///< Whole callback projection ceiling.
+constexpr std::size_t MEBIBYTE = 1024 * 1024; ///< Independent logical byte unit.
+constexpr core::SchemaLimits SCHEMA_LIMITS{MAXIMUM_RECEIVING_RECORDS, 128, 256, 128, 16384};
+///< Complete declarations and aliases; regional binding does not expand this ceiling.
+constexpr std::size_t FRAME_RECORDS = 64;                 ///< Whole admitted DATA frame record ceiling.
+constexpr std::size_t CALLBACK_RECORDS = 4;               ///< Whole callback projection ceiling.
 constexpr std::size_t FIELD_TEXT_UNITS = 8192;            ///< Aggregate text copied from one complete record.
 constexpr std::size_t FIELD_BYTE_UNITS = 16384;           ///< Aggregate opaque payload copied from one record.
 constexpr std::size_t RECORD_ARENA_BYTES = 65536;         ///< Complete detached per-record arena request ceiling.
@@ -228,6 +231,9 @@ void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, s
             const auto policy = registration.eventTimePolicy == EventTimePolicy::FIELD_METADATA
                                     ? client::ReceiverEventTimePolicy::FIELD_METADATA
                                     : client::ReceiverEventTimePolicy::UNSPECIFIED;
+            const auto &record = profile.schema.records()[static_cast<std::size_t>(registration.localRecordId)];
+            profile.bindingExchanges[profile.bindings.size()] =
+                quote ? events::market_symbols::getExchangeCode(record.name) : 0;
             profile.bindings.push_back({registration.localRecordId,
                                         quote ? client::PreparedEventKind::QUOTE : client::PreparedEventKind::PROFILE,
                                         mapping, values, policy});
@@ -382,7 +388,7 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
                            4,
                            8,
                            subscriptionEntries,
-                           multiply(subscriptionEntries, runtime.maximumSymbolUnits)};
+                           multiply(subscriptionEntries, add(runtime.maximumSymbolUnits, 1))};
     result.queueLimits = {clients,
                           FRAME_RECORDS,
                           16,
@@ -405,9 +411,25 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
     result.blueprint = prepareBlueprint(result.schema);
     prepareCopies(result);
     prepareMappings(result, selected, runtime.maximumSymbolUnits);
+    auto &routing = result.routing;
+    routing.symbols = runtime.maximumSymbolsPerSubscription;
+    const auto logicalUnits = multiply(routing.symbols, runtime.maximumSymbolUnits);
+    routing.temporaryTextUnits = multiply(2, logicalUnits);
+    // The port's retained logical set and the queue's owned command copies have their own existing bounds.
+    const auto textBacking = multiply(add(routing.temporaryTextUnits, multiply(2, routing.symbols)), sizeof(char16_t));
+    routing.temporaryBytes = add(add(multiply(routing.symbols, sizeof(ReceivingSymbol)),
+                                     multiply(subscriptionEntries, sizeof(core::SubscriptionRequest))),
+                                 textBacking);
+    routing.retainedMetadataBytes = sizeof(result.bindingExchanges);
+    // Snapshot copy, suffix/representability scans, physical conversion and conservative retirement.
+    constexpr std::size_t ROUTING_TEXT_PASSES = 11;
+    routing.work = {0, add(multiply(routing.symbols, add(multiply(2, maximumRoutes), 8)), maximumRoutes),
+                    multiply(ROUTING_TEXT_PASSES, logicalUnits),
+                    add(multiply(2, routing.temporaryBytes), routing.retainedMetadataBytes)};
     result.queueWork = queueWork(scale);
-    result.submitWork = {16, multiply(scale, CONTROL_VISITS), multiply(scale, CONTROL_VISITS),
-                         multiply(scale, CONTROL_BYTES)};
+    result.submitWork = {16, add(multiply(scale, CONTROL_VISITS), multiply(clients, routing.work.visits)),
+                         add(multiply(scale, CONTROL_VISITS), multiply(clients, routing.work.textUnits)),
+                         add(multiply(scale, CONTROL_BYTES), multiply(clients, routing.work.bytes))};
     const transport::RecoveryWork recovery{10000, multiply(scale, CONTROL_VISITS), multiply(scale, CONTROL_VISITS),
                                            multiply(scale, CONTROL_BYTES)};
     const protocol::SubscriptionWriterWork writer{10000, multiply(scale, CONTROL_VISITS),
@@ -435,6 +457,99 @@ const ReceivingEventPlan &receivingEventPlan(const ReceivingProfile &profile, Ev
     default:
         refuse(ErrorCode::UNSUPPORTED_PROFILE, "subscription-event-type");
     }
+}
+
+bool prepayReceivingRouting(const ReceivingProfile &profile, mux::QueueSubmitWork &work) noexcept {
+    const auto &charge = profile.routing.work;
+
+    if (charge.visits > work.visits || charge.textUnits > work.textUnits || charge.bytes > work.bytes) {
+        return false;
+    }
+
+    work.visits -= charge.visits;
+    work.textUnits -= charge.textUnits;
+    work.bytes -= charge.bytes;
+
+    return true;
+}
+
+bool regionalSymbolRepresentable(std::u16string_view symbol) noexcept {
+    const auto attributes = events::market_symbols::hasAttributes(symbol);
+    // hasAttributes establishes the recognized final opener; locate its position without owning text.
+    const auto end = attributes ? symbol.rfind(u'{', symbol.size() - 2) : symbol.size();
+
+    if (end < 2 || symbol[end - 2] != u'&') {
+        return true;
+    }
+
+    const auto base = symbol.substr(0, end - 2);
+    const auto repeatedSuffix = base.size() >= 2 && base[base.size() - 2] == u'&';
+
+    return !repeatedSuffix && (attributes || !events::market_symbols::hasAttributes(base));
+}
+
+void validateReceivingSymbol(const EventRegistry *registry, EventSelection selection, std::u16string_view symbol) {
+    if (!registry || selection == EventSelection::PROFILE || regionalSymbolRepresentable(symbol)) {
+        return;
+    }
+
+    if (registry->schema().records().size() > SCHEMA_LIMITS.records) {
+        refuse(ErrorCode::UNSUPPORTED_PROFILE, "profile-schema");
+    }
+
+    const auto exchange = events::market_symbols::getExchangeCode(symbol);
+
+    for (const auto &route : registry->registrations()) {
+        if (route.type != EventType::QUOTE) {
+            continue;
+        }
+
+        const auto &record = registry->schema().records()[static_cast<std::size_t>(route.localRecordId)];
+
+        if (record.name.size() > SCHEMA_LIMITS.nameUnits) {
+            refuse(ErrorCode::UNSUPPORTED_PROFILE, "profile-schema");
+        }
+
+        if (exchange && events::market_symbols::getExchangeCode(record.name) == exchange) {
+            refuse(ErrorCode::INVALID_ARGUMENT, "subscription-symbol-representation");
+        }
+    }
+}
+
+void prepareReceivingSymbols(const ReceivingProfile &profile, const ReceivingEventPlan &plan,
+                             std::span<ReceivingSymbol> symbols) {
+    for (auto &symbol : symbols) {
+        symbol.regional = {};
+        // Retire any previous physical backing before constructing its replacement, including helper reuse.
+        std::u16string{}.swap(symbol.physical);
+        symbol.exchange = events::market_symbols::getExchangeCode(symbol.logical);
+
+        for (std::size_t offset = 0; offset < plan.bindingCount; ++offset) {
+            const auto index = plan.firstBinding + offset;
+            const auto exchange = profile.bindingExchanges[index];
+
+            if (exchange && exchange == symbol.exchange) {
+                const auto kind = profile.bindings[index].kind == client::PreparedEventKind::QUOTE ? 0U : 1U;
+                symbol.regional[kind] = true;
+            }
+        }
+
+        if (symbol.regional[0] || symbol.regional[1]) {
+            if (!regionalSymbolRepresentable(symbol.logical)) {
+                refuse(ErrorCode::INVALID_ARGUMENT, "subscription-symbol-representation");
+            }
+
+            symbol.physical = *events::market_symbols::changeExchangeCode(symbol.logical, 0);
+        }
+    }
+}
+
+bool receivingSymbolMatches(const ReceivingProfile &profile, std::size_t bindingIndex,
+                            const ReceivingSymbol &symbol) noexcept {
+    const auto kind = profile.bindings[bindingIndex].kind == client::PreparedEventKind::QUOTE ? 0U : 1U;
+    const auto exchange = profile.bindingExchanges[bindingIndex];
+
+    return exchange ? exchange == symbol.exchange : !symbol.regional[kind];
 }
 
 std::expected<mux::MuxQueue, mux::QueueFailure> createReceivingQueue(const ReceivingProfile &profile,

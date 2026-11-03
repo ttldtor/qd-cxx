@@ -13,7 +13,8 @@ retain their listener types and behavior.
 Creation copies and normalizes the complete type set. Duplicate entries coalesce;
 input order does not order delivery. The caller can destroy or change its input
 after return. The selected set remains fixed until this subscription closes.
-Every registered local record route of each selected type participates. The
+Registered local record routes of each selected type participate according to the
+[regional Quote exchange selection](EVENT-TIME.md). The
 [immutable registry](EVENT-REGISTRY.md) retains complete caller schema identity,
 dense local IDs, mapping options and generic records. Record names and wire sender
 IDs do not select a C++ type.
@@ -45,7 +46,8 @@ symbol set, rather than a slot per event kind.
 
 The worker opens one existing receiver and one multiplexed registration for the
 complete selected route span. Desired additions/removals contain one interest per
-symbol and selected local record. Overlapping concrete or mixed subscriptions
+symbol and matching selected local record, using a regional physical base symbol where applicable.
+Overlapping concrete or mixed subscriptions
 share upstream interest through the existing multiplexer. Closing or clearing one
 withdraws only interests no longer required by any active subscription.
 

@@ -14,6 +14,25 @@
 #include <vector>
 
 namespace org::ttldtor::qdcxx::api::detail {
+inline constexpr std::size_t MAXIMUM_RECEIVING_RECORDS = 16; ///< Existing complete receiving catalog ceiling.
+
+/** One temporary logical selector and at most one physical regional copy, never shared with a callback. */
+struct ReceivingSymbol {
+    std::u16string logical;         ///< Owned immutable frontend snapshot, kept through synchronous desired submission.
+    std::u16string physical;        ///< Owned suffix-free text, shared by matching regional routes of this selector.
+    char16_t exchange = 0;          ///< Syntactic logical exchange, preserving trailing attributes.
+    std::array<bool, 2> regional{}; ///< Exact regional match per Quote/Profile kind within this selection.
+};
+
+/** Separate finite reservation for desired routing temporaries, excluding frontend and queue-owned storage. */
+struct ReceivingRoutingLimits {
+    std::size_t symbols = 0;               ///< Maximum logical snapshot and physical-copy slots.
+    std::size_t temporaryTextUnits = 0;    ///< Combined logical snapshot plus physical UTF-16 units.
+    std::size_t temporaryBytes = 0;        ///< Logical wrapper/input/text backing including terminators, not heap/RSS.
+    std::size_t retainedMetadataBytes = 0; ///< Fixed exchange array backing, separately retained in the profile.
+    mux::QueueSubmitWork work{};           ///< Conservative per-attempt scans, copies, backing and disposal charge.
+};
+
 /** Complete independently bounded plan for every registered record in one supported type selection. */
 struct ReceivingEventPlan {
     std::size_t firstBinding = 0;                    ///< First route in ReceivingProfile::bindings.
@@ -35,6 +54,9 @@ struct ReceivingProfile {
     mux::ClientLimits clientLimits;                  ///< Independent per-registration reservations.
     collectors::TickerLimits tickerLimits;           ///< Existing shared cache and independent desired views.
     std::vector<client::PreparedSubscriptionBinding> bindings; ///< Explicit routes grouped by business type.
+    std::array<char16_t, MAXIMUM_RECEIVING_RECORDS> bindingExchanges{};
+    ///< Exact aligned Quote record suffixes; fixed backing is included in sizeof(ReceivingProfile).
+    ReceivingRoutingLimits routing; ///< Explicit additional routing workspace and pre-allocation work charge.
     std::array<ReceivingEventPlan, 2> eventPlans; ///< Aggregate Quote/Profile plans, independent of record IDs.
     ReceivingEventPlan allEvents;    ///< Aggregate plan for one logical selection of both supported event kinds.
     mux::QueueSubmitWork submitWork; ///< One whole desired replacement admission.
@@ -65,6 +87,48 @@ struct ReceivingProfile {
  * @return Borrowed complete per-type plan; throws a detached unsupported-profile error for an unknown type.
  */
 [[nodiscard]] const ReceivingEventPlan &receivingEventPlan(const ReceivingProfile &profile, EventSelection selection);
+
+/** Debit the complete conservative routing workspace before snapshot allocation or publication.
+ * @param profile Immutable checked capacities and additional routing allowance.
+ * @param work Remaining whole-owner-turn submission coordinates; failed preflight leaves them unchanged.
+ * @return True after debiting routing only; false postpones this revision until a fresh owner turn.
+ */
+[[nodiscard]] bool prepayReceivingRouting(const ReceivingProfile &profile, mux::QueueSubmitWork &work) noexcept;
+
+/** Check whether removing and restoring an existing regional suffix preserves the exact logical spelling.
+ * @param symbol Borrowed logical selector, possibly with attributes or a repeated suffix.
+ * @return True when regional conversion is invertible; symbols without a regional suffix need no conversion.
+ */
+[[nodiscard]] bool regionalSymbolRepresentable(std::u16string_view symbol) noexcept;
+
+/** Reject a nonrepresentable selector only when this selection actually chooses a regional Quote route.
+ * @param registry Immutable optional explicit registry; defaults contain only composite routes.
+ * @param selection Immutable normalized selected event kinds.
+ * @param symbol Complete printable logical selector, already bounded by runtime symbol limits.
+ * @throws Error INVALID_ARGUMENT at subscription-symbol-representation for a lossy selected regional route;
+ * unsupported oversized registry names/counts retain profile-schema refusal before native activation.
+ */
+void validateReceivingSymbol(const EventRegistry *registry, EventSelection selection, std::u16string_view symbol);
+
+/** Select actual regional/composite routes and create at most one physical copy per logical selector.
+ * @param profile Immutable complete schema/binding/exchange metadata.
+ * @param plan Valid selected span within that profile, grouped by supported business kind.
+ * @param symbols Complete owned logical snapshot, unchanged in count and logical contents.
+ * @throws std::bad_alloc Physical string allocation fails; no desired command has been published.
+ * @throws std::length_error A physical string exceeds its implementation limit.
+ * @throws Error INVALID_ARGUMENT if selected regional conversion cannot preserve logical membership.
+ */
+void prepareReceivingSymbols(const ReceivingProfile &profile, const ReceivingEventPlan &plan,
+                             std::span<ReceivingSymbol> symbols);
+
+/** Test one selected binding against precomputed same-kind regional/fallback metadata.
+ * @param profile Immutable metadata aligned with bindings.
+ * @param bindingIndex Valid selected binding position.
+ * @param symbol Complete prepared selector, kept alive through desired submission.
+ * @return True for an exact regional match, or a composite route without a matching regional route of that kind.
+ */
+[[nodiscard]] bool receivingSymbolMatches(const ReceivingProfile &profile, std::size_t bindingIndex,
+                                          const ReceivingSymbol &symbol) noexcept;
 
 /** Construct the selected existing queue without opening registrations or activating native work.
  * @param profile Complete immutable prepared configuration.

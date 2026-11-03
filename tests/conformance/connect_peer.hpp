@@ -5,6 +5,7 @@
 #include "qd/core/local_schema.hpp"
 #include "qd/core/subscription.hpp"
 #include "qd/protocol/frame_reader.hpp"
+#include "qd/protocol/stream_data.hpp"
 
 #include <atomic>
 #include <cstdint>
@@ -23,6 +24,7 @@ struct Record {
     std::int32_t flags = 0;                  ///< Exact optional binary event flags; zero preserves old STREAM bytes.
     std::optional<std::int64_t> removalTime; ///< Required only for an actual REMOVE_EVENT record.
     std::int32_t localRecordId = 0; ///< Source schema position; peer wire sender is17+this ID, never a client ADD ID.
+    std::optional<protocol::FieldEventTime> fieldTime; ///< Exact physical FIELD words when the script declares them.
 };
 /** Explicit finite test fault after the initial data prefix. */
 enum class PeerMode {
@@ -51,17 +53,21 @@ struct PeerScript {
     std::vector<std::int32_t> subscriptionRecordIds; ///< Optional exact client ID per expected symbol tuple.
     std::optional<std::vector<ExpectedSubscription>> removeSequence;
     ///< Optional finite exact REMOVE sets for overlapping logical clients; absence preserves the original script.
+    bool fieldMetadata = false; ///< Declare leading EventTime56/EventSequence72; every DATA tuple supplies both words.
+    std::optional<std::vector<Record>> afterReconnect;
+    ///< Hold the first connection until client close, then accept one fresh connection and validate its replayed ADD.
 };
 
 /** Encode the existing independent peer readiness/complete-description fixture without opening a socket.
  * @param schema Complete ordinary source schema, borrowed only during encoding.
  * @param family Explicit wire family; STREAM preserves the original peer bytes.
  * @param describeAllRecords Describe every source record instead of only record0.
+ * @param fieldMetadata Declare the existing leading FIELD metadata words; false preserves original bytes.
  * @return Exact owned prefix; default sender17 bytes are preserved, explicit all-record mode uses17+local ID.
  */
 [[nodiscard]] std::vector<std::byte>
 fixturePeerPrefix(const core::LocalSchema &schema, core::SubscriptionFamily family = core::SubscriptionFamily::STREAM,
-                  bool describeAllRecords = false);
+                  bool describeAllRecords = false, bool fieldMetadata = false);
 /** Encode the existing independent peer DATA fixture without opening a socket.
  * @param records Exact source tuples, borrowed only during encoding.
  * @param family Explicit wire family, STREAM by default.
@@ -82,6 +88,7 @@ class Peer {
     std::vector<std::byte> initial_;
     std::vector<std::byte> data_;
     std::vector<std::byte> afterRemove_;
+    std::vector<std::byte> afterReconnect_;
     std::vector<std::u16string> expected_;
     std::size_t chunk_;
     PeerMode mode_;

@@ -2,6 +2,11 @@
 
 [English version](README.md). Английская версия нормативная.
 
+[Oracle времени событий](../upstream/event-time-oracle/README.ru.md) проверяет необязательные
+Sequence/nanoseconds Quote, секунды/миллисекунды business time, значения Profile по умолчанию
+и региональные маршруты Quote через production Java delegate. Без аргументов, с
+`-Help`/`-HelpRu` и `Get-Help` рабочие пути не требуются, Java не запускается.
+
 [Oracle рыночных символов](../upstream/market-symbol-oracle/README.ru.md) захватывает и сверяет
 точные nullable-операции UTF-16 с базой/кодом по закреплённым production-классам Java.
 Режимы `-Help`/`-HelpRu` не требуют входов и не начинают работу.

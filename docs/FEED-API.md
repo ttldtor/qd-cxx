@@ -113,8 +113,9 @@ The advanced snippet assumes an existing runtime and includes `<array>` and
 positions; the example requires compatible records 1/2 after record 0. Record names
 do not select an event class. Existing adapters resolve supported explicit business
 lookup aliases and exact types, preserving reordered fields, extra fields and
-generic records. Every registered record of the requested type participates;
-duplicate local-ID routes reject, and an unregistered type rejects synchronously.
+generic records. Registered composite records of the requested type participate;
+regional Quote routes use the exchange selection below.
+Duplicate local-ID routes reject, and an unregistered type rejects synchronously.
 For several types in one logical subscription, use the overload below.
 
 The endpoint copies an immutable owning registry snapshot. Later assignment or
@@ -125,6 +126,29 @@ application callback, loader or network. The receiving profile supports at most
 name units. A registry valid under larger bounds is refused at `profile-schema`
 before native activation; it is never truncated. See the complete
 [registry ownership, errors and bounds contract](../spec/events/EVENT-REGISTRY.md).
+
+For regional Quote delivery, supply the actual validated regional record declaration
+and register it as `EventType::QUOTE`. For example, when the selected schema contains
+`Quote&Q`, subscribing with ordinary `quotes->addSymbols("AAPL&Q")` sends the physical
+`Quote&Q`/`AAPL` interest. The received owning Quote has symbol `AAPL&Q`; absent exchange
+fields use the record's suffix. Any registered exchange follows the same rule.
+Composite and regional interests stay distinct in a mixed subscription. A matching
+regional route is selected per event kind; otherwise composite routes keep the exact
+logical symbol. Trailing attributes survive conversion. Remove and explicit reconnect
+use the same selected record and physical symbol.
+
+A selected regional route must restore the exact logical spelling. Noninvertible forms
+such as `AAPL&N&Q` or `AAPL{x=y}&Q` throw `INVALID_ARGUMENT` at
+`subscription-symbol-representation` from `addSymbols`/`setSymbols`; the complete mutation
+is refused and the previous desired set remains. Composite fallback keeps these literals
+unchanged. The ordinary attributed form `AAPL&Q{x=y}` is representable.
+
+The built-in registry remains composite Quote/Profile. This explicit bounded registry
+path does not load the complete regional catalog or implement broader selectors.
+The [time and variant contract](../spec/events/EVENT-TIME.md) specifies optional
+Sequence/nanoseconds, Quote seconds/milliseconds, Profile halt seconds, independent
+event metadata and the deterministic local-wire evidence boundary. It makes no new
+public-service availability claim.
 
 ## Receive several event types
 
@@ -150,7 +174,7 @@ mixed->addSymbols({"AAPL", "IBM"});
 ```
 
 This creates one `Subscription<RegisteredEvent>` and one symbol set. Repeated types
-coalesce; every registered route of each selected type participates. The type set
+coalesce; registered routes of each selected type use the exchange selection above. The type set
 is copied and remains fixed for that subscription. A runtime array can use the
 `std::span<const EventType>` overload. An empty list or unknown enum rejects with
 `INVALID_ARGUMENT`; a supported type absent from the endpoint registry rejects

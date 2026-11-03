@@ -73,8 +73,12 @@ them. Each key/lookup comparison costs `max(key units, lookup units)` plus one, 
 avoid overflow. Every alternative compared with a present field costs one work unit, even after an
 earlier alternative matched. Missing optional fields do not compare types. Empty requests on an empty
 record need zero preparation budget. Empty key/type lists, empty or ill-formed UTF-16 keys, and type
-identities outside the implemented extended subset are invalid inputs; repeated same-target keys and
+identities outside the implemented extended subset plus TIME_MILLIS (152) are invalid inputs; repeated same-target keys and
 repeated supported types are allowed and still consume their full budgets.
+
+The [regional Quote adapter](EVENT-TIME.md) additionally bounds and charges its selected record name
+before calling this generic helper: one name-unit allowance and three conservative name scans.
+The generic helper itself still performs no event-name or regional inference.
 
 Error order is invalid record ID; selected field/lookup/request counts; aggregate request key/type
 counts; source and request text bounds; request syntax and supported alternative validation; then

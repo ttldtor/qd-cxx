@@ -1,4 +1,8 @@
 * text=auto
+# Event-time source/provenance hashes use canonical LF; raw oracle observations retain exact bytes.
+tools/upstream/event-time-oracle/*.ps1 text eol=lf
+tests/fixtures/event-times/*.json text eol=lf
+tests/fixtures/event-times/*.tsv -text -whitespace
 # Admission captures and hash inventories retain exact bytes.
 tests/conformance/protocol/tape-write/admission-evidence/** whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
 tests/conformance/protocol/tape-write/admission-evidence/inputs/** -text

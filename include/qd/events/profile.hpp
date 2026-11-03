@@ -67,7 +67,7 @@ struct Profile {
     std::int32_t flags = 0;                     ///< Preserved business flags, including reserved bits; not QTP flags.
     std::optional<std::u16string> description;  ///< Owned exact nullable Description; empty differs from null.
     std::optional<std::u16string> statusReason; ///< Owned exact nullable reason; absent local field means null.
-    std::int64_t eventTime = 0;                 ///< Explicit caller metadata, independent of halt times and flags.
+    std::int64_t eventTime = 0; ///< Caller metadata milliseconds from Unix epoch; unspecified means zero.
 
     /** Interpret the low two business flag bits, preserving the raw member.
      * @return Known trading status, or UNDEFINED for the reserved code.

@@ -23,9 +23,11 @@
 
 #include <algorithm>
 #include <array>
+#include <cerrno>
 #include <chrono>
 #include <limits>
 #include <stdexcept>
+#include <utility>
 
 namespace org::ttldtor::qdcxx::connect_tests {
 namespace {
@@ -73,6 +75,20 @@ void closeSocket(Socket socket) noexcept {
     closesocket(socket);
 #else
     ::close(socket);
+#endif
+}
+
+/** Recognize a client-close reset for the explicitly selected two-session fixture only.
+ * @return True for connection reset/abort/not-connected; nonblocking would-block is false.
+ */
+bool clientCloseError() noexcept {
+#ifdef _WIN32
+    const auto error = WSAGetLastError();
+
+    return error == WSAECONNRESET || error == WSAECONNABORTED || error == WSAENOTCONN;
+#else
+
+    return errno == ECONNRESET || errno == ENOTCONN;
 #endif
 }
 
@@ -192,9 +208,11 @@ WireFamily wireFamily(core::SubscriptionFamily family) {
  * @param schema Ordinary local schema, used solely for deterministic peer source data.
  * @param family Exact scripted wire family.
  * @param describeAllRecords Describe all source records instead of the default first record only.
+ * @param fieldMetadata Declare the exact leading EventTime56/EventSequence72 metadata words.
  * @return Finite owning protocol/description prefix.
  */
-std::vector<std::byte> initial(const core::LocalSchema &schema, WireFamily family, bool describeAllRecords) {
+std::vector<std::byte> initial(const core::LocalSchema &schema, WireFamily family, bool describeAllRecords,
+                               bool fieldMetadata) {
     std::vector<std::byte> body{std::byte{'D'}, std::byte{'X'}, std::byte{'P'}, std::byte{'3'}};
     number(body, 0);
     number(body, 1);
@@ -218,7 +236,14 @@ std::vector<std::byte> initial(const core::LocalSchema &schema, WireFamily famil
     for (const auto &record : records) {
         number(body, senderId(record.id));
         text(body, record.name);
-        number(body, static_cast<std::int64_t>(record.fields.size()));
+        number(body, static_cast<std::int64_t>(record.fields.size() + (fieldMetadata ? 2 : 0)));
+
+        if (fieldMetadata) {
+            text(body, u"EventTime");
+            number(body, std::to_underlying(core::SerialFieldType::TIME_SECONDS));
+            text(body, u"EventSequence");
+            number(body, std::to_underlying(core::SerialFieldType::SEQUENCE));
+        }
 
         for (std::size_t index = 0; index < record.fields.size(); ++index) {
             const auto lookup = std::ranges::find_if(record.lookups, [index](const auto &item) {
@@ -265,6 +290,12 @@ std::vector<std::byte> data(std::span<const Record> records, WireFamily family, 
         }
 
         number(body, senderId(record.localRecordId));
+
+        if (record.fieldTime) {
+            require(record.fieldTime->rawSequence.has_value());
+            number(body, record.fieldTime->rawSeconds);
+            number(body, *record.fieldTime->rawSequence);
+        }
 
         if ((record.flags & REMOVE_EVENT) != 0) {
             require(record.removalTime.has_value());
@@ -336,8 +367,8 @@ bool exactSubscription(std::span<const std::byte> bytes, std::span<const std::u1
 } // namespace
 
 std::vector<std::byte> fixturePeerPrefix(const core::LocalSchema &schema, core::SubscriptionFamily family,
-                                         bool describeAllRecords) {
-    return initial(schema, wireFamily(family), describeAllRecords);
+                                         bool describeAllRecords, bool fieldMetadata) {
+    return initial(schema, wireFamily(family), describeAllRecords, fieldMetadata);
 }
 
 std::vector<std::byte> fixturePeerData(std::span<const Record> records, core::SubscriptionFamily family,
@@ -347,15 +378,37 @@ std::vector<std::byte> fixturePeerData(std::span<const Record> records, core::Su
 
 Peer::Peer(const core::LocalSchema &schema, std::span<const Record> records, std::span<const std::u16string> expected,
            std::size_t chunk, PeerMode mode, PeerScript script)
-    : initial_(mode == PeerMode::NO_READINESS ? std::vector<std::byte>{}
-                                              : initial(schema, wireFamily(script.family), script.describeAllRecords)),
+    : initial_(mode == PeerMode::NO_READINESS
+                   ? std::vector<std::byte>{}
+                   : initial(schema, wireFamily(script.family), script.describeAllRecords, script.fieldMetadata)),
       data_(data(records, wireFamily(script.family), script.canonicalSymbols)),
       afterRemove_(script.afterRemove ? data(*script.afterRemove, wireFamily(script.family), script.canonicalSymbols)
                                       : data_),
+      afterReconnect_(script.afterReconnect
+                          ? data(*script.afterReconnect, wireFamily(script.family), script.canonicalSymbols)
+                          : std::vector<std::byte>{}),
       expected_(expected.begin(), expected.end()), chunk_(chunk), mode_(mode), script_(std::move(script)),
       dataReleased_(!script_.waitForDataRelease) {
     require(chunk != 0);
     require(script_.subscriptionRecordIds.empty() || script_.subscriptionRecordIds.size() == expected_.size());
+
+    for (const auto &record : records) {
+        require(record.fieldTime.has_value() == script_.fieldMetadata);
+    }
+
+    if (script_.afterRemove) {
+        for (const auto &record : *script_.afterRemove) {
+            require(record.fieldTime.has_value() == script_.fieldMetadata);
+        }
+    }
+
+    if (script_.afterReconnect) {
+        require(mode_ == PeerMode::HOLD);
+
+        for (const auto &record : *script_.afterReconnect) {
+            require(record.fieldTime.has_value() == script_.fieldMetadata);
+        }
+    }
 
     if (script_.removeSequence) {
         for (const auto &command : *script_.removeSequence) {
@@ -412,6 +465,8 @@ void Peer::serve(std::stop_token stop) noexcept {
         std::size_t sent = 0;
         bool ending = false;
         bool initialQueued = false;
+        bool addReceived = false;
+        bool reconnected = false;
         std::size_t initialEnd = 0;
         std::size_t afterRemoveEnd = 0;
         std::size_t addTuples = 0;
@@ -431,9 +486,10 @@ void Peer::serve(std::stop_token stop) noexcept {
                                        sizeof(immediate)) == 0);
                 }
             } else {
-                if (!initialQueued && adds_.load() != 0 && dataReleased_.load() && mode_ != PeerMode::SILENT &&
+                if (!initialQueued && addReceived && dataReleased_.load() && mode_ != PeerMode::SILENT &&
                     mode_ != PeerMode::NO_READINESS) {
-                    output.insert(output.end(), data_.begin(), data_.end());
+                    const auto &selectedData = reconnected ? afterReconnect_ : data_;
+                    output.insert(output.end(), selectedData.begin(), selectedData.end());
                     initialEnd = output.size();
                     initialQueued = true;
 
@@ -473,7 +529,24 @@ void Peer::serve(std::stop_token stop) noexcept {
                 const auto count = recv(connection, input.data(), input.size(), 0);
 #endif
 
-                if (count == 0) {
+                if (count == 0 || (count < 0 && script_.afterReconnect && clientCloseError())) {
+                    if (!reconnected && script_.afterReconnect) {
+                        require(initialQueued && sent >= initialEnd);
+                        closeSocket(connection);
+                        connection = NO_SOCKET;
+                        output = initial_;
+                        sent = 0;
+                        ending = false;
+                        initialQueued = false;
+                        addReceived = false;
+                        reconnected = true;
+                        initialEnd = afterRemoveEnd = 0;
+                        addTuples = removeTuples = removeSet = 0;
+                        reader.reset();
+
+                        continue;
+                    }
+
                     break;
                 }
 
@@ -507,7 +580,8 @@ void Peer::serve(std::stop_token stop) noexcept {
                             }
 
                             if (adding) {
-                                require(adds_.load() == 0);
+                                require(!addReceived);
+                                addReceived = true;
                                 ++adds_;
                             } else {
                                 if (script_.removeSequence) {

@@ -2,6 +2,11 @@
 
 [Русская версия](README.ru.md). English is authoritative.
 
+The [event-time oracle](../upstream/event-time-oracle/README.md) checks optional Quote
+Sequence/nanoseconds, second/millisecond business times, Profile defaults and regional
+Quote routing through production Java delegates. No arguments, `-Help`/`-HelpRu` and
+`Get-Help` require no operational paths and start no Java work.
+
 The [market-symbol oracle](../upstream/market-symbol-oracle/README.md) captures and verifies
 exact nullable UTF-16 base/exchange operations against pinned production Java classes.
 Its `-Help`/`-HelpRu` modes require no inputs and start no work.

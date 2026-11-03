@@ -3,8 +3,10 @@
 #include "qd/events/quote.hpp"
 
 #include "decimal_projection.hpp"
+#include "qd/events/market_event_symbols.hpp"
 
 #include <algorithm>
+#include <bit>
 #include <new>
 #include <stdexcept>
 #include <utility>
@@ -79,13 +81,30 @@ std::expected<Quote, QuoteError> mapQuote(std::u16string_view symbol, std::span<
     }
 }
 
-PreparedQuote::PreparedQuote(EventMapping mapping) : mapping_(std::move(mapping)) {
+PreparedQuote::PreparedQuote(EventMapping mapping, char16_t recordExchange)
+    : mapping_(std::move(mapping)), recordExchange_(recordExchange) {
 }
 
 std::expected<PreparedQuote, MappingError> PreparedQuote::prepare(const core::LocalSchema &schema, std::int32_t localId,
                                                                   MappingLimits limits) {
+    if (!schema.recordContext(localId).valid()) {
+        return std::unexpected(MappingError::INVALID_INPUT);
+    }
+
+    const auto &record = schema.records()[static_cast<std::size_t>(localId)];
+    // The existing suffix helper can inspect the name three times when attributes are present.
+    constexpr std::size_t RECORD_NAME_SCANS = 3;
+
+    if (record.name.size() > limits.nameUnits || record.name.size() > limits.totalNameUnits ||
+        record.name.size() > limits.comparisonWork / RECORD_NAME_SCANS) {
+        return std::unexpected(MappingError::RESOURCE_LIMIT);
+    }
+
+    limits.totalNameUnits -= record.name.size();
+    limits.comparisonWork -= record.name.size() * RECORD_NAME_SCANS;
+
     using Type = core::SerialFieldType;
-    constexpr std::array timeTypes{Type::TIME_SECONDS};
+    constexpr std::array timeTypes{Type::TIME_SECONDS, Type::TIME_MILLIS};
     constexpr std::array exchangeTypes{Type::UTF_CHAR};
     constexpr std::array numericTypes{Type::WIDE_DECIMAL, Type::COMPACT_INT};
     constexpr std::array sequenceTypes{Type::SEQUENCE};
@@ -116,7 +135,7 @@ std::expected<PreparedQuote, MappingError> PreparedQuote::prepare(const core::Lo
         return std::unexpected(mapping.error());
     }
 
-    return PreparedQuote(std::move(*mapping));
+    return PreparedQuote(std::move(*mapping), market_symbols::getExchangeCode(record.name));
 }
 
 const core::RecordContext &PreparedQuote::context() const noexcept {
@@ -124,6 +143,22 @@ const core::RecordContext &PreparedQuote::context() const noexcept {
 }
 
 namespace {
+/** Floor to whole seconds and add packed milliseconds with Java long wrapping, including signed64 boundaries.
+ * @param time Signed business milliseconds before the packed Sequence override.
+ * @param millis Unsigned high ten Sequence bits, preserved even above 999.
+ * @return Signed two's-complement result; no signed C++ arithmetic overflows.
+ */
+std::int64_t quoteTime(std::int64_t time, std::uint32_t millis) noexcept {
+    const auto remainder = time % MILLISECONDS_PER_SECOND;
+    auto rounded = static_cast<std::uint64_t>(time) - static_cast<std::uint64_t>(remainder);
+
+    if (remainder < 0) {
+        rounded -= MILLISECONDS_PER_SECOND;
+    }
+
+    return std::bit_cast<std::int64_t>(rounded + millis);
+}
+
 /** Project validated Quote fields without owning an intermediate field representation.
  * @tparam Field Canonical core FieldValue or FieldValueView.
  * @param symbol Borrowed exact UTF-16 symbol.
@@ -131,13 +166,22 @@ namespace {
  * @param selections Immutable prepared Quote property positions.
  * @param symbolUnits Maximum symbol units copied into the result.
  * @param eventTime Explicit caller metadata milliseconds, independent of business fields.
+ * @param recordExchange Syntactic regional record suffix, used for output identity and absent exchange fields.
  * @return Complete owned Quote or resource/allocation error.
  */
 template <typename Field>
 std::expected<Quote, MappingError> projectQuoteFields(std::u16string_view symbol, std::span<const Field> fields,
                                                       std::span<const std::optional<std::size_t>> selections,
-                                                      std::size_t symbolUnits, std::int64_t eventTime) {
+                                                      std::size_t symbolUnits, std::int64_t eventTime,
+                                                      char16_t recordExchange) {
     if (symbol.size() > symbolUnits) {
+        return std::unexpected(MappingError::RESOURCE_LIMIT);
+    }
+
+    constexpr std::size_t REGIONAL_SUFFIX_UNITS = 2;
+
+    if (recordExchange && !market_symbols::hasExchangeCode(symbol) &&
+        symbolUnits - symbol.size() < REGIONAL_SUFFIX_UNITS) {
         return std::unexpected(MappingError::RESOURCE_LIMIT);
     }
 
@@ -151,21 +195,38 @@ std::expected<Quote, MappingError> projectQuoteFields(std::u16string_view symbol
 
         return detail::projectPresentDecimal(field.type, field.raw);
     };
+    const auto time = [&](std::size_t selection) -> std::int64_t {
+        if (!selections[selection]) {
+            return 0;
+        }
+
+        const auto &field = fields[*selections[selection]];
+
+        return field.type == core::SerialFieldType::TIME_MILLIS ? field.raw : field.raw * MILLISECONDS_PER_SECOND;
+    };
+    const auto exchange = [&](std::size_t selection) -> char16_t {
+        return selections[selection]
+                   ? static_cast<char16_t>(static_cast<std::uint64_t>(raw(selection)) & UTF16_UNIT_MASK)
+                   : recordExchange;
+    };
     // Selection numbers follow the request order above, independently of schema field positions.
-    const auto bidTime = raw(0) * MILLISECONDS_PER_SECOND;
-    const auto askTime = raw(4) * MILLISECONDS_PER_SECOND;
+    const auto bidTime = time(0);
+    const auto askTime = time(4);
     const auto packedSequence = static_cast<std::uint32_t>(raw(8));
     try {
-        return Quote{std::u16string(symbol),
+        auto eventSymbol =
+            recordExchange ? *market_symbols::changeExchangeCode(symbol, recordExchange) : std::u16string(symbol);
+
+        return Quote{std::move(eventSymbol),
                      bidTime,
-                     static_cast<char16_t>(static_cast<std::uint64_t>(raw(1)) & UTF16_UNIT_MASK),
+                     exchange(1),
                      decimal(2),
                      decimal(3),
                      askTime,
-                     static_cast<char16_t>(static_cast<std::uint64_t>(raw(5)) & UTF16_UNIT_MASK),
+                     exchange(5),
                      decimal(6),
                      decimal(7),
-                     std::max(bidTime, askTime) + (packedSequence >> SEQUENCE_BITS),
+                     quoteTime(std::max(bidTime, askTime), packedSequence >> SEQUENCE_BITS),
                      eventTime,
                      static_cast<std::int32_t>(packedSequence & SEQUENCE_MASK),
                      static_cast<std::int32_t>(raw(9))};
@@ -185,7 +246,7 @@ std::expected<Quote, MappingError> PreparedQuote::map(std::u16string_view symbol
         return std::unexpected(validation.error());
     }
 
-    return projectQuoteFields(symbol, values.values, mapping_.selections(), symbolUnits, eventTime);
+    return projectQuoteFields(symbol, values.values, mapping_.selections(), symbolUnits, eventTime, recordExchange_);
 }
 
 std::expected<Quote, MappingError> PreparedQuote::mapView(std::u16string_view symbol, BorrowedRecordValueView values,
@@ -196,6 +257,6 @@ std::expected<Quote, MappingError> PreparedQuote::mapView(std::u16string_view sy
         return std::unexpected(validation.error());
     }
 
-    return projectQuoteFields(symbol, values.values, mapping_.selections(), symbolUnits, eventTime);
+    return projectQuoteFields(symbol, values.values, mapping_.selections(), symbolUnits, eventTime, recordExchange_);
 }
 } // namespace org::ttldtor::qdcxx::events

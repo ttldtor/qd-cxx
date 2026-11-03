@@ -63,7 +63,19 @@ std::optional<std::u16string> changeExchangeCode(std::optional<std::u16string_vi
 
     const auto input = symbol.value_or(u"");
     const auto length = lengthWithoutAttributes(input);
-    std::u16string result(input.substr(0, baseLength(input, length)));
+    const auto base = baseLength(input, length);
+    const auto keptUnits = base + (input.size() - length);
+    constexpr std::size_t EXCHANGE_SUFFIX_UNITS = 2;
+    const auto suffixUnits = exchangeCode != 0 ? EXCHANGE_SUFFIX_UNITS : 0;
+    std::u16string result;
+
+    if (keptUnits > result.max_size() || suffixUnits > result.max_size() - keptUnits) {
+        throw std::length_error("Regional symbol exceeds string capacity");
+    }
+
+    // Reserve the complete result before copying; a growing prefix would overlap old and new text backing.
+    result.reserve(keptUnits + suffixUnits);
+    result.append(input.substr(0, base));
 
     if (exchangeCode != 0) {
         result.push_back(u'&');
