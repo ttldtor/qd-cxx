@@ -958,17 +958,67 @@ template <class Event> Diagnostic Subscription<Event>::getDiagnostic() const noe
 
 template class Subscription<events::Quote>;
 template class Subscription<events::Profile>;
+template class Subscription<RegisteredEvent>;
 
 Feed::Feed(std::shared_ptr<detail::EndpointPort> port) : port_(std::move(port)) {
 }
 
 std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(EventType type) {
+    return createSubscriptionPort(std::span(&type, 1), false);
+}
+
+std::shared_ptr<Subscription<RegisteredEvent>> Feed::createSubscription(std::span<const EventType> types) {
     return producerAction([&] {
+        auto subscription = std::shared_ptr<Subscription<RegisteredEvent>>(new Subscription<RegisteredEvent>({}));
+        subscription->port_ = createSubscriptionPort(types, true);
+
+        return subscription;
+    });
+}
+
+std::shared_ptr<Subscription<RegisteredEvent>> Feed::createSubscription(std::initializer_list<EventType> types) {
+    return createSubscription(std::span(types.begin(), types.size()));
+}
+
+std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span<const EventType> types,
+                                                                       bool registeredDelivery) {
+    return producerAction([&] {
+        if (types.size() > port_->limits.maximumEventTypeArgumentsPerSubscription) {
+            reject(ErrorCode::RESOURCE_LIMIT, "subscription-event-type-arguments");
+        }
+
+        if (types.empty()) {
+            reject(ErrorCode::INVALID_ARGUMENT, "subscription-event-types");
+        }
+
+        bool quote = false;
+        bool profile = false;
+
+        for (const auto type : types) {
+            switch (type) {
+            case EventType::QUOTE:
+                quote = true;
+                break;
+            case EventType::PROFILE:
+                profile = true;
+                break;
+            default:
+                reject(ErrorCode::INVALID_ARGUMENT, "subscription-event-types");
+            }
+        }
+
+        const auto selection = quote && profile ? detail::EventSelection::BOTH
+                               : quote          ? detail::EventSelection::QUOTE
+                                                : detail::EventSelection::PROFILE;
+        const auto delivery = registeredDelivery ? detail::EventDelivery::REGISTERED
+                              : quote            ? detail::EventDelivery::QUOTE
+                                                 : detail::EventDelivery::PROFILE;
         auto subscription = std::make_shared<detail::SubscriptionPort>();
         subscription->control = port_->control;
         subscription->endpoint = port_;
         subscription->owner = port_->owner;
-        subscription->eventType = type;
+        subscription->eventSelection = selection;
+        subscription->eventDelivery = delivery;
         subscription->maximumSymbols = port_->limits.maximumSymbolsPerSubscription;
         subscription->maximumSymbolUnits = port_->limits.maximumSymbolUnits;
         subscription->listenerLedger = std::make_shared<detail::ListenerLedger>();
@@ -985,10 +1035,20 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(EventType
                 reject(ErrorCode::CLOSED, "endpoint-closed");
             }
 
-            if (port_->options.eventRegistry &&
-                !std::ranges::any_of(port_->options.eventRegistry->registrations(), [type](const auto &registration) {
-                    return registration.type == type;
-                })) {
+            bool registeredQuote = !port_->options.eventRegistry;
+            bool registeredProfile = !port_->options.eventRegistry;
+
+            if (port_->options.eventRegistry) {
+                for (const auto &registration : port_->options.eventRegistry->registrations()) {
+                    registeredQuote = registeredQuote || registration.type == EventType::QUOTE;
+                    registeredProfile = registeredProfile || registration.type == EventType::PROFILE;
+                }
+            }
+
+            const auto missingQuote = quote && !registeredQuote;
+            const auto missingProfile = profile && !registeredProfile;
+
+            if (missingQuote || missingProfile) {
                 reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-unregistered-event");
             }
 
@@ -1151,7 +1211,7 @@ class TypedConsumer final : public client::SubscriptionConsumer {
     client::ReceiverProjectionWork projectionWork_; ///< Finite whole-callback seed, never shared with queue work.
 
     /** Project and deliver one complete event type under a stable listener selection.
-     * @tparam Event Existing owning Quote or Profile.
+     * @tparam Event Existing owning Quote, Profile or their RegisteredEvent variant.
      * @param batch Existing receiver's callback-only projection service.
      * @param listeners Whole-batch immutable callable selection.
      * @return Existing queue acknowledgement/pause action.
@@ -1159,20 +1219,38 @@ class TypedConsumer final : public client::SubscriptionConsumer {
     template <class Event>
     mux::BatchAction deliver(const client::SubscriptionBatch &batch,
                              const std::shared_ptr<const ListenerSnapshot> &listeners) {
-        std::vector<Event> events;
-        events.reserve(batch.records().size());
+        std::vector<Event> projectedEvents;
+        projectedEvents.reserve(batch.records().size());
         auto work = projectionWork_;
 
         for (std::size_t index = 0; index < batch.records().size(); ++index) {
             auto projected = batch.project(index, work);
 
-            if (!projected || !std::holds_alternative<Event>(projected->value)) {
+            if (!projected) {
                 failSubscription(port_, {ErrorCode::PROTOCOL_FAILURE, "subscription-projection"});
 
                 return mux::BatchAction::PAUSE;
             }
 
-            events.push_back(std::get<Event>(std::move(projected->value)));
+            if constexpr (std::is_same_v<Event, RegisteredEvent>) {
+                if (auto *quote = std::get_if<events::Quote>(&projected->value)) {
+                    projectedEvents.emplace_back(std::move(*quote));
+                } else if (auto *profile = std::get_if<events::Profile>(&projected->value)) {
+                    projectedEvents.emplace_back(std::move(*profile));
+                } else {
+                    failSubscription(port_, {ErrorCode::PROTOCOL_FAILURE, "subscription-projection"});
+
+                    return mux::BatchAction::PAUSE;
+                }
+            } else {
+                if (!std::holds_alternative<Event>(projected->value)) {
+                    failSubscription(port_, {ErrorCode::PROTOCOL_FAILURE, "subscription-projection"});
+
+                    return mux::BatchAction::PAUSE;
+                }
+
+                projectedEvents.push_back(std::get<Event>(std::move(projected->value)));
+            }
         }
 
         // One selection lasts through the whole underlying batch. Reentrant mutation affects a later batch.
@@ -1182,7 +1260,7 @@ class TypedConsumer final : public client::SubscriptionConsumer {
             }
 
             try {
-                std::get<typename Subscription<Event>::Listener>(listener.callback->function)(events);
+                std::get<typename Subscription<Event>::Listener>(listener.callback->function)(projectedEvents);
             } catch (...) {
                 failSubscription(port_, {ErrorCode::CALLBACK_FAILURE, "subscription-listener"});
 
@@ -1224,11 +1302,13 @@ class TypedConsumer final : public client::SubscriptionConsumer {
         }
 
         try {
-            switch (port_->eventType) {
-            case EventType::QUOTE:
+            switch (port_->eventDelivery) {
+            case EventDelivery::QUOTE:
                 return deliver<events::Quote>(batch, listeners);
-            case EventType::PROFILE:
+            case EventDelivery::PROFILE:
                 return deliver<events::Profile>(batch, listeners);
+            case EventDelivery::REGISTERED:
+                return deliver<RegisteredEvent>(batch, listeners);
             default:
                 throw Error({ErrorCode::UNSUPPORTED_PROFILE, "subscription-event-type"});
             }
@@ -1321,7 +1401,7 @@ std::unique_ptr<NativeEndpoint> activate(transport::RuntimeBootstrap &bootstrap,
  */
 std::unique_ptr<NativeSubscription> registerSubscription(NativeEndpoint &endpoint,
                                                          const std::shared_ptr<SubscriptionPort> &port) {
-    const auto &plan = receivingEventPlan(endpoint.profile, port->eventType);
+    const auto &plan = receivingEventPlan(endpoint.profile, port->eventSelection);
 
     if (plan.bindingCount == 0) {
         throw Error({ErrorCode::UNSUPPORTED_PROFILE, "subscription-unregistered-event"});
@@ -1410,7 +1490,7 @@ void applyDesired(NativeEndpoint &endpoint, NativeSubscription &subscription, mu
     }
 
     std::vector<core::SubscriptionRequest> requests;
-    const auto &plan = receivingEventPlan(endpoint.profile, subscription.port->eventType);
+    const auto &plan = receivingEventPlan(endpoint.profile, subscription.port->eventSelection);
 
     if (plan.bindingCount == 0 || symbols.size() > endpoint.profile.clientLimits.commandEntries / plan.bindingCount) {
         throw Error({ErrorCode::RESOURCE_LIMIT, "subscription-route-entries"});
@@ -1912,7 +1992,8 @@ ApiRuntime::ApiRuntime(RuntimeOptions options) {
         if (!options.maximumEndpoints || !options.maximumSubscriptionsPerEndpoint ||
             !options.maximumSymbolsPerSubscription || !options.maximumListenersPerSubscription ||
             !options.maximumStateListenersPerEndpoint || !options.maximumStateListenersPerSubscription ||
-            !options.maximumSymbolUnits || options.maximumSymbolUnits > 128 || options.dnsServers.size() > 4 ||
+            !options.maximumSymbolUnits || options.maximumSymbolUnits > 128 ||
+            !options.maximumEventTypeArgumentsPerSubscription || options.dnsServers.size() > 4 ||
             options.dnsPort == 0) {
             reject(ErrorCode::INVALID_ARGUMENT, "runtime-options");
         }

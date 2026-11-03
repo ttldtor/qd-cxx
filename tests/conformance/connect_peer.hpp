@@ -33,6 +33,12 @@ enum class PeerMode {
     NO_READINESS ///< Keep the connection open without advertising protocol readiness or sending data.
 };
 
+/** One exact finite client tuple set; individual records may arrive in separate wire frames. */
+struct ExpectedSubscription {
+    std::vector<std::u16string> symbols; ///< Exact expected tuple symbols, in composer order.
+    std::vector<std::int32_t> recordIds; ///< Matching client outgoing IDs, never peer source sender IDs.
+};
+
 /** Optional explicit receiving script; defaults preserve the original STREAM peer and replay-after-remove. */
 struct PeerScript {
     core::SubscriptionFamily family = core::SubscriptionFamily::STREAM; ///< Exact advertised/delivered family.
@@ -43,6 +49,8 @@ struct PeerScript {
     std::int32_t subscriptionRecordId = 0; ///< Expected client outgoing record identity; independent of peer sender17.
     bool describeAllRecords = false;       ///< Explicitly describe every source record as sender17+local ID.
     std::vector<std::int32_t> subscriptionRecordIds; ///< Optional exact client ID per expected symbol tuple.
+    std::optional<std::vector<ExpectedSubscription>> removeSequence;
+    ///< Optional finite exact REMOVE sets for overlapping logical clients; absence preserves the original script.
 };
 
 /** Encode the existing independent peer readiness/complete-description fixture without opening a socket.

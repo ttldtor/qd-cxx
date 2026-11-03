@@ -356,6 +356,13 @@ Peer::Peer(const core::LocalSchema &schema, std::span<const Record> records, std
       dataReleased_(!script_.waitForDataRelease) {
     require(chunk != 0);
     require(script_.subscriptionRecordIds.empty() || script_.subscriptionRecordIds.size() == expected_.size());
+
+    if (script_.removeSequence) {
+        for (const auto &command : *script_.removeSequence) {
+            require(!command.symbols.empty() && command.symbols.size() == command.recordIds.size());
+        }
+    }
+
     require((script_.family == core::SubscriptionFamily::HISTORY) == script_.historyBound.has_value());
     const auto listener = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     require(listener != NO_SOCKET);
@@ -409,6 +416,7 @@ void Peer::serve(std::stop_token stop) noexcept {
         std::size_t afterRemoveEnd = 0;
         std::size_t addTuples = 0;
         std::size_t removeTuples = 0;
+        std::size_t removeSet = 0;
         const auto family = wireFamily(script_.family);
         p::FrameReader reader({8192, 8201});
 
@@ -478,21 +486,37 @@ void Peer::serve(std::stop_token stop) noexcept {
                         bytes = bytes.subspan(next.accepted);
 
                         if (next.frame && (next.frame->type == family.add || next.frame->type == family.remove)) {
-                            auto &tuples = next.frame->type == family.add ? addTuples : removeTuples;
-                            require(
-                                exactSubscription(next.frame->payload, expected_,
-                                                  next.frame->type == family.add ? script_.historyBound : std::nullopt,
-                                                  script_.subscriptionRecordId, script_.subscriptionRecordIds, tuples));
+                            const auto adding = next.frame->type == family.add;
+                            auto expected = std::span<const std::u16string>(expected_);
+                            auto expectedIds = std::span<const std::int32_t>(script_.subscriptionRecordIds);
 
-                            if (tuples != expected_.size()) {
+                            if (!adding && script_.removeSequence) {
+                                require(removeSet < script_.removeSequence->size());
+                                const auto &command = (*script_.removeSequence)[removeSet];
+                                expected = command.symbols;
+                                expectedIds = command.recordIds;
+                            }
+
+                            auto &tuples = adding ? addTuples : removeTuples;
+                            require(exactSubscription(next.frame->payload, expected,
+                                                      adding ? script_.historyBound : std::nullopt,
+                                                      script_.subscriptionRecordId, expectedIds, tuples));
+
+                            if (tuples != expected.size()) {
                                 continue;
                             }
 
-                            if (next.frame->type == family.add) {
+                            if (adding) {
                                 require(adds_.load() == 0);
                                 ++adds_;
                             } else {
-                                require(removes_.load() == 0);
+                                if (script_.removeSequence) {
+                                    ++removeSet;
+                                    removeTuples = 0;
+                                } else {
+                                    require(removes_.load() == 0);
+                                }
+
                                 ++removes_;
                                 output.insert(output.end(), afterRemove_.begin(), afterRemove_.end());
                                 afterRemoveEnd = output.size();

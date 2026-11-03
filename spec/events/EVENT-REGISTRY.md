@@ -32,8 +32,8 @@ requirement: each ID equals its position in the complete record catalog.
 Distinct records may project the same event type. Duplicate routes for the same
 local record ID reject atomically, including routes with different types. Route
 inspection preserves input order. A single-type feed subscription selects every
-registered route of that type; mixed event types in one subscription remain a
-separate contract.
+registered route of that type; several selected types use the
+[mixed subscription contract](MIXED-SUBSCRIPTIONS.md).
 
 Preparation uses the existing adapters' exact accepted lookup keys, full type
 alternatives, required/optional fields and business defaults. Caller lookup aliases
@@ -91,10 +91,12 @@ Within that ceiling, preparation preserves the exact schema identity and groups
 routes by type. It checks and aggregates complete mapping shape/selection/work
 coordinates, callback projection allowances and desired-command capacities.
 Each accepted symbol requires one interest per selected local record route.
-The maximum registered route count per type scales endpoint and per-subscription
-interest reservations with checked arithmetic. Actual maximum record field count
+The total registered route count scales endpoint and per-subscription interest
+reservations with checked arithmetic, including subscriptions created after connect.
+Actual maximum record field count
 sets the complete frame field allowance, retaining the default minimum of16.
-Default native/queue reservations remain those of the existing receiving profile.
+With the built-in registry, interest reservations cover both routes per symbol.
+The schema and frame/queue data ceilings remain unchanged.
 
 ## Custom schema example
 

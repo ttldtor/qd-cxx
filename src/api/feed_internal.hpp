@@ -4,6 +4,8 @@
 
 #include "qd/api/feed.hpp"
 
+#include "event_selection.hpp"
+
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
@@ -22,9 +24,9 @@ struct ListenerLedger {
     std::weak_ptr<EndpointPort> endpoint;  ///< Notify inactive main retirement without owning the endpoint.
 };
 
-using ListenerFunction =
-    std::variant<std::monostate, Subscription<events::Quote>::Listener, Subscription<events::Profile>::Listener,
-                 Endpoint::StateChangeListener, Subscription<events::Quote>::StateChangeListener>;
+using ListenerFunction = std::variant<std::monostate, Subscription<events::Quote>::Listener,
+                                      Subscription<events::Profile>::Listener, Subscription<RegisteredEvent>::Listener,
+                                      Endpoint::StateChangeListener, Subscription<events::Quote>::StateChangeListener>;
 
 /** Shared application callable; its last release never occurs under a control mutex. */
 struct ListenerBox {
@@ -80,7 +82,9 @@ struct SubscriptionPort {
     std::size_t maximumSymbolUnits;      ///< Original per-selector capacity.
     std::uint64_t revision = 0;          ///< Accepted local desired revision, separate from queue tickets.
     std::uint64_t nextListener = 1;      ///< Non-reused listener identity, zero never issued.
-    EventType eventType;                 ///< Immutable business projection; its explicit record routes are separate.
+    EventSelection eventSelection;       ///< Immutable normalized set, independent of explicit local record routes.
+    EventDelivery
+        eventDelivery; ///< Exact listener value shape, assigned together with the selection before publication.
     std::atomic<bool> closeRequested{false}; ///< Reserved monotonic control, independent of ordinary capacity.
     std::atomic<bool> retired{false};        ///< True only after callback/capture/registration retirement.
     SubscriptionState state = SubscriptionState::CONFIGURED; ///< Detached worker observation.

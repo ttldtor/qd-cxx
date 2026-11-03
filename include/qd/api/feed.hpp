@@ -21,6 +21,7 @@
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <variant>
 #include <vector>
 
 namespace org::ttldtor::qdcxx::api {
@@ -85,6 +86,8 @@ struct RuntimeOptions {
     std::size_t maximumStateListenersPerEndpoint = 4; ///< Accepted and selected/retiring endpoint state observers.
     std::size_t maximumStateListenersPerSubscription =
         4; ///< Accepted and selected/retiring subscription state observers.
+    std::size_t maximumEventTypeArgumentsPerSubscription = 64;
+    ///< Maximum raw type arguments inspected during one subscription creation, including duplicates.
 };
 
 /** Existing delivery semantics selected for one high-level endpoint. */
@@ -154,13 +157,17 @@ struct CloseResult {
 class Endpoint;
 class Feed;
 
+/** Independently owning supported event value; inspect its actual class with std::visit or std::get_if. */
+using RegisteredEvent = std::variant<events::Quote, events::Profile>;
+
 /** Typed logical subscription, backed by the existing receiver and shared queue.
  * Methods are producer-safe. Event-listener calls are serialized on the runtime's SDK worker.
  * A listener's span lasts only through that invocation; copying an Event produces an owning value.
- * @tparam Event Existing events::Quote or events::Profile; no other event class is admitted.
+ * @tparam Event Existing events::Quote, events::Profile or the owning RegisteredEvent variant.
  */
 template <class Event> class Subscription final {
-    static_assert(std::is_same_v<Event, events::Quote> || std::is_same_v<Event, events::Profile>);
+    static_assert(std::is_same_v<Event, events::Quote> || std::is_same_v<Event, events::Profile> ||
+                  std::is_same_v<Event, RegisteredEvent>);
     std::shared_ptr<detail::SubscriptionPort> port_;
     friend class Feed;
     explicit Subscription(std::shared_ptr<detail::SubscriptionPort> port) noexcept;
@@ -254,13 +261,25 @@ template <class Event> class Subscription final {
 
 extern template class Subscription<events::Quote>;
 extern template class Subscription<events::Profile>;
+extern template class Subscription<RegisteredEvent>;
 
 /** Endpoint's typed registration entry point; owns no SDK thread or bootstrap. */
 class Feed final {
     std::shared_ptr<detail::EndpointPort> port_;
     friend class Endpoint;
     explicit Feed(std::shared_ptr<detail::EndpointPort> port);
+    /** Preserve the existing single-class listener shape while selecting that class's registered routes.
+     * @param type Existing supported projection.
+     * @return Unpublished-or-atomically-registered producer port; throws Error on refusal.
+     */
     std::shared_ptr<detail::SubscriptionPort> createSubscriptionPort(EventType type);
+    /** Normalize one bounded borrowed input before atomically publishing a logical registration.
+     * @param types Raw supported type arguments, including duplicates, borrowed only during the call.
+     * @param registeredDelivery True selects owning variants; false is used only by the one-type wrapper.
+     * @return One port with its complete immutable selection and exact listener value shape.
+     */
+    std::shared_ptr<detail::SubscriptionPort> createSubscriptionPort(std::span<const EventType> types,
+                                                                     bool registeredDelivery);
 
     public:
     /** Create a bounded logical registration, before or after connect, without application polling.
@@ -276,6 +295,22 @@ class Feed final {
 
         return subscription;
     }
+
+    /** Create one logical subscription for an immutable normalized set of supported registered types.
+     * Raw argument count is checked before inspection and may reject RESOURCE_LIMIT; empty/unknown enums
+     * reject INVALID_ARGUMENT.
+     * Duplicates coalesce. Closed admission precedes missing registered types and logical-slot checks.
+     * Every requested type must be registered; refusal opens no native/producer registration.
+     * @param types Caller-owned bounded type list, borrowed only during this call; Quote/Profile are supported.
+     * @return One variant-valued producer handle; throws Error on atomic validation/resource refusal.
+     */
+    [[nodiscard]] std::shared_ptr<Subscription<RegisteredEvent>> createSubscription(std::span<const EventType> types);
+    /** Create the same immutable type selection from an inline argument list.
+     * @param types Bounded raw list; duplicates count toward maximumEventTypeArgumentsPerSubscription then coalesce.
+     * @return One owning variant subscription, or the same synchronous Error as the span overload.
+     */
+    [[nodiscard]] std::shared_ptr<Subscription<RegisteredEvent>>
+    createSubscription(std::initializer_list<EventType> types);
 };
 
 /** Producer endpoint handle; destruction requests asynchronous close and never joins its own worker. */

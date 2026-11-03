@@ -19,6 +19,8 @@ The [schema model](schema/NORMALIZED-MODEL.md), [native JSON](schema/NATIVE-JSON
 [Schema-bound event mappings](events/EVENT-MAPPING.md) and the
 [immutable receiving event registry](events/EVENT-REGISTRY.md) define explicit
 typed projections over complete caller schemas.
+[Mixed registered subscriptions](events/MIXED-SUBSCRIPTIONS.md) select several
+supported types through one owning variant-valued logical subscription.
 
 ## Protocol contracts {#protocol-contracts}
 

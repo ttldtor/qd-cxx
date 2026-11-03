@@ -8,7 +8,7 @@ and ownership. Use the namespace/type indexes beside this page to find individua
 
 | Component | Public headers | Link target | Detailed contract |
 | --- | --- | --- | --- |
-| Public typed feed | `qd/api/feed.hpp`, `qd/api/event_registry.hpp` | `qdcxx_feed` | [Endpoint, Feed and typed subscriptions](FEED-API.md), [immutable registry](../spec/events/EVENT-REGISTRY.md); `ORG_TTLDTOR_QDCXX_BUILD_FEED_API=ON` (default OFF), requires CLIENT/RUNTIME/RECOVERY |
+| Public typed feed | `qd/api/feed.hpp`, `qd/api/event_registry.hpp` | `qdcxx_feed` | [Endpoint, Feed and typed subscriptions](FEED-API.md), [immutable registry](../spec/events/EVENT-REGISTRY.md), [mixed subscriptions](../spec/events/MIXED-SUBSCRIPTIONS.md); `ORG_TTLDTOR_QDCXX_BUILD_FEED_API=ON` (default OFF), requires CLIENT/RUNTIME/RECOVERY |
 | Encodings | `qd/encoding/` | `qdcxx_encoding` | [Encoding specifications](../spec/README.md#encoding-contracts) |
 | Schemas and record identity | `qd/core/` | `qdcxx_core` | [Schema specifications](../spec/README.md#schema-contracts) |
 | Frames, binding and tapes | `qd/protocol/` | `qdcxx_protocol` | [Protocol specifications](../spec/README.md#protocol-contracts) |

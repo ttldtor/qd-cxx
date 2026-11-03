@@ -357,9 +357,9 @@ TEST_CASE("receiving preparation selects all explicit same-kind routes and deriv
     CHECK(profile.eventPlans[0].limits.shapeFields == 18);
     CHECK(profile.eventPlans[1].firstBinding == 2);
     CHECK(profile.eventPlans[1].bindingCount == 1);
-    CHECK(profile.clientLimits.commandEntries == 10);
-    CHECK(profile.endpoint.settings().budgets.desired.entries == 20);
-    CHECK(profile.endpoint.settings().budgets.desired.totalSymbolUnits == 20 * runtime.maximumSymbolUnits);
+    CHECK(profile.clientLimits.commandEntries == 15);
+    CHECK(profile.endpoint.settings().budgets.desired.entries == 30);
+    CHECK(profile.endpoint.settings().budgets.desired.totalSymbolUnits == 30 * runtime.maximumSymbolUnits);
 
     auto queueWork = profile.queueWork;
     auto queue = api::detail::createReceivingQueue(profile, queueWork);

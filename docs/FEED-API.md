@@ -115,7 +115,7 @@ do not select an event class. Existing adapters resolve supported explicit busin
 lookup aliases and exact types, preserving reordered fields, extra fields and
 generic records. Every registered record of the requested type participates;
 duplicate local-ID routes reject, and an unregistered type rejects synchronously.
-Mixed event types in one logical subscription are outside this API.
+For several types in one logical subscription, use the overload below.
 
 The endpoint copies an immutable owning registry snapshot. Later assignment or
 destruction of caller schema/registry/options cannot replace it. Construction has
@@ -125,6 +125,43 @@ application callback, loader or network. The receiving profile supports at most
 name units. A registry valid under larger bounds is refused at `profile-schema`
 before native activation; it is never truncated. See the complete
 [registry ownership, errors and bounds contract](../spec/events/EVENT-REGISTRY.md).
+
+## Receive several event types
+
+The following fragment assumes an existing endpoint and includes `<type_traits>`:
+
+```cpp
+auto mixed = endpoint->getFeed()->createSubscription(
+    {q::api::EventType::QUOTE, q::api::EventType::PROFILE, q::api::EventType::QUOTE});
+mixed->addEventListener([](std::span<const q::api::RegisteredEvent> batch) {
+    for (const auto &event : batch) {
+        std::visit([](const auto &value) {
+            using Event = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<Event, q::events::Quote>) {
+                // Read the owning Quote value.
+            } else {
+                // Read the owning Profile value.
+            }
+            (void)value;
+        }, event);
+    }
+});
+mixed->addSymbols({"AAPL", "IBM"});
+```
+
+This creates one `Subscription<RegisteredEvent>` and one symbol set. Repeated types
+coalesce; every registered route of each selected type participates. The type set
+is copied and remains fixed for that subscription. A runtime array can use the
+`std::span<const EventType>` overload. An empty list or unknown enum rejects with
+`INVALID_ARGUMENT`; a supported type absent from the endpoint registry rejects
+with `UNSUPPORTED_PROFILE`, without publishing a subscription.
+
+`RegisteredEvent` is an owning `std::variant<events::Quote, events::Profile>`.
+Copy a value to retain it beyond its callback span. Concrete subscriptions and
+mixed subscriptions can overlap independently; closing one withdraws only its
+remaining exclusive interests. Callback batches follow queue delivery boundaries
+and need not combine all selected types. See the complete
+[mixed selection and delivery contract](../spec/events/MIXED-SUBSCRIPTIONS.md).
 
 ## Runtime, callbacks and shutdown
 
@@ -248,6 +285,7 @@ substantial backing storage, and unsupported capacity arithmetic rejects explici
 | `maximumListenersPerSubscription` | 4 |
 | `maximumStateListenersPerEndpoint` | 4 |
 | `maximumStateListenersPerSubscription` | 4 |
+| `maximumEventTypeArgumentsPerSubscription` | 64 raw type arguments, including duplicates; positive |
 | `maximumSymbolUnits` | 128; configurable in 1..128 |
 | `dnsServers` | Empty: discover up to 4 system IPv4 resolver addresses |
 | `dnsPort` | 53 |

@@ -7,15 +7,17 @@
 #include "qd/client/subscription_receiver.hpp"
 #include "qd/transport/tcp_recovery.hpp"
 
+#include "event_selection.hpp"
+
 #include <array>
 #include <string>
 #include <vector>
 
 namespace org::ttldtor::qdcxx::api::detail {
-/** Complete independently bounded plan for every registered record of one business type. */
+/** Complete independently bounded plan for every registered record in one supported type selection. */
 struct ReceivingEventPlan {
     std::size_t firstBinding = 0;                    ///< First route in ReceivingProfile::bindings.
-    std::size_t bindingCount = 0;                    ///< Number of consecutive routes of this business type.
+    std::size_t bindingCount = 0;                    ///< Number of consecutive routes in this type selection.
     client::ReceiverLimits limits{};                 ///< Aggregate complete immutable receiver plan allowance.
     client::ReceiverWork work{};                     ///< Aggregate per-registration preparation seed.
     client::ReceiverProjectionWork projectionWork{}; ///< Complete callback projection allowance.
@@ -33,9 +35,10 @@ struct ReceivingProfile {
     mux::ClientLimits clientLimits;                  ///< Independent per-registration reservations.
     collectors::TickerLimits tickerLimits;           ///< Existing shared cache and independent desired views.
     std::vector<client::PreparedSubscriptionBinding> bindings; ///< Explicit routes grouped by business type.
-    std::array<ReceivingEventPlan, 2> eventPlans;       ///< Aggregate Quote/Profile plans, independent of record IDs.
-    mux::QueueSubmitWork submitWork;                    ///< One whole desired replacement admission.
-    mux::QueueWork queueWork;                           ///< Identical initialization, normal and drain coordinates.
+    std::array<ReceivingEventPlan, 2> eventPlans; ///< Aggregate Quote/Profile plans, independent of record IDs.
+    ReceivingEventPlan allEvents;    ///< Aggregate plan for one logical selection of both supported event kinds.
+    mux::QueueSubmitWork submitWork; ///< One whole desired replacement admission.
+    mux::QueueWork queueWork;        ///< Identical initialization, normal and drain coordinates.
     transport::RecoveryPreparationWork preparationWork; ///< Original recovery/writer/queue preparation seed.
     transport::RecoveryTurnWork turnWork;               ///< Identical normal and drain owner-turn coordinates.
 
@@ -58,10 +61,10 @@ struct ReceivingProfile {
 
 /** Select complete immutable preparation for a supported business projection, independently of local record IDs.
  * @param profile Worker-owned immutable receiving preparation.
- * @param type Actual supported business projection.
+ * @param selection Immutable supported type set.
  * @return Borrowed complete per-type plan; throws a detached unsupported-profile error for an unknown type.
  */
-[[nodiscard]] const ReceivingEventPlan &receivingEventPlan(const ReceivingProfile &profile, EventType type);
+[[nodiscard]] const ReceivingEventPlan &receivingEventPlan(const ReceivingProfile &profile, EventSelection selection);
 
 /** Construct the selected existing queue without opening registrations or activating native work.
  * @param profile Complete immutable prepared configuration.

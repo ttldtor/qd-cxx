@@ -116,7 +116,7 @@ auto quotes = endpoint->getFeed()->createSubscription<q::events::Quote>();
 lookup aliases и точные типы, сохраняя иной порядок полей, дополнительные поля и
 generic records. Участвуют все зарегистрированные записи запрошенного типа;
 повторные маршруты local ID отклоняются, отсутствующий тип отклоняется синхронно.
-Несколько типов событий в одной логической подписке в этот API не входят.
+Для нескольких типов в одной логической подписке используйте перегрузку ниже.
 
 Endpoint копирует неизменяемый владеющий снимок реестра. Последующие присваивание
 или уничтожение исходных schema/registry/options не могут заменить его. Создание
@@ -126,6 +126,43 @@ Endpoint копирует неизменяемый владеющий снимо
 всех имён. Реестр, допустимый при больших пределах, отклоняется на `profile-schema`
 до native activation; усечения нет. См. полный
 [контракт владения, ошибок и пределов реестра](../spec/events/EVENT-REGISTRY.ru.md).
+
+## Получение нескольких типов событий
+
+Фрагмент предполагает существующий endpoint и подключение `<type_traits>`:
+
+```cpp
+auto mixed = endpoint->getFeed()->createSubscription(
+    {q::api::EventType::QUOTE, q::api::EventType::PROFILE, q::api::EventType::QUOTE});
+mixed->addEventListener([](std::span<const q::api::RegisteredEvent> batch) {
+    for (const auto &event : batch) {
+        std::visit([](const auto &value) {
+            using Event = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<Event, q::events::Quote>) {
+                // Read the owning Quote value.
+            } else {
+                // Read the owning Profile value.
+            }
+            (void)value;
+        }, event);
+    }
+});
+mixed->addSymbols({"AAPL", "IBM"});
+```
+
+Создаётся одна `Subscription<RegisteredEvent>` с одним набором символов. Повторы
+типов объединяются; участвуют все зарегистрированные маршруты каждого выбранного
+типа. Набор типов копируется и остаётся фиксированным для подписки. Массив runtime
+можно передать перегрузке `std::span<const EventType>`. Пустой список или неизвестный
+enum даёт `INVALID_ARGUMENT`; отсутствие поддержанного типа в реестре endpoint —
+`UNSUPPORTED_PROFILE`, без публикации подписки.
+
+`RegisteredEvent` — владеющий `std::variant<events::Quote, events::Profile>`.
+Скопируйте значение, чтобы сохранить его после callback span. Конкретные и смешанные
+подписки могут независимо перекрываться; закрытие одной отзывает только её оставшиеся
+исключительные interests. Границы callback batch следуют очереди; один batch может
+содержать не все выбранные типы. См. полный
+[контракт смешанного выбора и доставки](../spec/events/MIXED-SUBSCRIPTIONS.ru.md).
 
 ## Runtime, обработчики и завершение
 
@@ -252,6 +289,7 @@ endpoint. Лимиты учитывают ожидающие, активные �
 | `maximumListenersPerSubscription` | 4 |
 | `maximumStateListenersPerEndpoint` | 4 |
 | `maximumStateListenersPerSubscription` | 4 |
+| `maximumEventTypeArgumentsPerSubscription` | 64 исходных аргумента типов, включая повторы; положительное |
 | `maximumSymbolUnits` | 128; настраивается в 1..128 |
 | `dnsServers` | Пусто: до 4 системных IPv4-адресов DNS-серверов |
 | `dnsPort` | 53 |

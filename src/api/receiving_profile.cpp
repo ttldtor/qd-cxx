@@ -255,6 +255,26 @@ void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, s
         // Each projection scans preceding routes even when its matching record is last in the plan.
         plan.projectionWork.visits = add(plan.projectionWork.visits, multiply(CALLBACK_RECORDS, plan.bindingCount));
     }
+
+    auto &all = profile.allEvents;
+    all.firstBinding = 0;
+    all.bindingCount = profile.bindings.size();
+    all.limits.bindings = all.bindingCount;
+    all.work.visits = 16;
+
+    for (std::size_t index = 0; index < all.bindingCount; ++index) {
+        // One validation and one construction visit, plus every preceding-route duplicate inspection.
+        all.work.visits = add(all.work.visits, add(index, 2));
+    }
+
+    for (const auto &plan : profile.eventPlans) {
+        all.limits.shapeFields = add(all.limits.shapeFields, plan.limits.shapeFields);
+        all.limits.selections = add(all.limits.selections, plan.limits.selections);
+        all.work.preparationWork = add(all.work.preparationWork, plan.work.preparationWork);
+        all.projectionWork.visits = add(all.projectionWork.visits, plan.projectionWork.visits);
+        all.projectionWork.textUnits = add(all.projectionWork.textUnits, plan.projectionWork.textUnits);
+        all.projectionWork.bytes = add(all.projectionWork.bytes, plan.projectionWork.bytes);
+    }
 }
 } // namespace
 
@@ -286,7 +306,8 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
         maximumFields = std::max(maximumFields, record.fields.size());
     }
 
-    const auto maximumRoutes = std::max({std::size_t{1}, routes[0], routes[1]});
+    // A mixed subscription may be created after connect; reserve the complete immutable registered selection.
+    const auto maximumRoutes = std::max(std::size_t{1}, add(routes[0], routes[1]));
     auto configured = client::controlledStreamSettings();
 
     if (!configured) {
@@ -403,12 +424,14 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
     return result;
 }
 
-const ReceivingEventPlan &receivingEventPlan(const ReceivingProfile &profile, EventType type) {
-    switch (type) {
-    case EventType::QUOTE:
+const ReceivingEventPlan &receivingEventPlan(const ReceivingProfile &profile, EventSelection selection) {
+    switch (selection) {
+    case EventSelection::QUOTE:
         return profile.eventPlans[0];
-    case EventType::PROFILE:
+    case EventSelection::PROFILE:
         return profile.eventPlans[1];
+    case EventSelection::BOTH:
+        return profile.allEvents;
     default:
         refuse(ErrorCode::UNSUPPORTED_PROFILE, "subscription-event-type");
     }

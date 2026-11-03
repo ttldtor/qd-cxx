@@ -8,7 +8,7 @@
 
 | Компонент | Публичные заголовки | Цель линковки | Подробный контракт |
 | --- | --- | --- | --- |
-| Публичный типизированный feed | `qd/api/feed.hpp`, `qd/api/event_registry.hpp` | `qdcxx_feed` | [Endpoint, Feed и типизированные подписки](FEED-API.ru.md), [неизменяемый реестр](../spec/events/EVENT-REGISTRY.ru.md); `ORG_TTLDTOR_QDCXX_BUILD_FEED_API=ON` (по умолчанию OFF), требует CLIENT/RUNTIME/RECOVERY |
+| Публичный типизированный feed | `qd/api/feed.hpp`, `qd/api/event_registry.hpp` | `qdcxx_feed` | [Endpoint, Feed и типизированные подписки](FEED-API.ru.md), [неизменяемый реестр](../spec/events/EVENT-REGISTRY.ru.md), [смешанные подписки](../spec/events/MIXED-SUBSCRIPTIONS.ru.md); `ORG_TTLDTOR_QDCXX_BUILD_FEED_API=ON` (по умолчанию OFF), требует CLIENT/RUNTIME/RECOVERY |
 | Кодировки | `qd/encoding/` | `qdcxx_encoding` | [Спецификации кодировок](../spec/README.ru.md#encoding-contracts-ru) |
 | Схемы и идентичность записей | `qd/core/` | `qdcxx_core` | [Спецификации схем](../spec/README.ru.md#schema-contracts-ru) |
 | Кадры, привязка и tape | `qd/protocol/` | `qdcxx_protocol` | [Спецификации протокола](../spec/README.ru.md#protocol-contracts-ru) |

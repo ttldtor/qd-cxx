@@ -19,6 +19,8 @@
 [Schema-bound mappings событий](events/EVENT-MAPPING.ru.md) и
 [неизменяемый реестр принимаемых событий](events/EVENT-REGISTRY.ru.md) определяют
 явные типизированные проекции полных пользовательских схем.
+[Смешанные зарегистрированные подписки](events/MIXED-SUBSCRIPTIONS.ru.md) выбирают
+несколько поддержанных типов через одну логическую подписку на владеющие variant values.
 
 ## Контракты протокола {#protocol-contracts-ru}
 
