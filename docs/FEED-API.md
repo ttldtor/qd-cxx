@@ -9,9 +9,10 @@ finite recovery, queues and delivery. Subscriptions can be created before or aft
 `connect()`.
 
 This API supports plain binary QTP over TCP with built-in full Quote/Profile
-schemas. An endpoint chooses TICKER (default, latest values with possible
+schemas or explicit validated caller schemas and registered Quote/Profile mappings.
+An endpoint chooses TICKER (default, latest values with possible
 conflation) or STREAM (every admitted selected source record). TLS, credentials,
-HISTORY, wildcard selectors and external schemas are outside this API. The
+HISTORY and wildcard selectors are outside this API. Schema loading is separate. The
 [lower-level receiving APIs](SUBSCRIPTIONS.md) expose separate profiles.
 
 ## Receive Quote
@@ -84,6 +85,46 @@ For Profile, create `createSubscription<q::events::Profile>()` and use a listene
 taking `std::span<const q::events::Profile>`. For STREAM, set
 `EndpointOptions::contract = DeliveryContract::STREAM` before `createEndpoint(options)`.
 The delivery contract applies to every subscription on that endpoint.
+
+## Explicit event registry
+
+Defaults need no registry setup. For a validated caller `schema`, register explicit
+record routes before creating an endpoint:
+
+```cpp
+const std::array routes{q::api::EventRegistration{q::api::EventType::QUOTE, 1},
+                        q::api::EventRegistration{q::api::EventType::QUOTE, 2}};
+q::api::EventRegistryWork work;
+auto registry = q::api::EventRegistry::create(schema, routes, {}, work);
+
+if (!registry) {
+    // Inspect the typed cause and optional registrationIndex before continuing.
+    return 1;
+}
+
+q::api::EndpointOptions options;
+options.eventRegistry = std::move(*registry);
+auto endpoint = runtime.createEndpoint(options);
+auto quotes = endpoint->getFeed()->createSubscription<q::events::Quote>();
+```
+
+The advanced snippet assumes an existing runtime and includes `<array>` and
+`<utility>` in addition to `qd/api/feed.hpp`. Local record IDs remain dense catalog
+positions; the example requires compatible records 1/2 after record 0. Record names
+do not select an event class. Existing adapters resolve supported explicit business
+lookup aliases and exact types, preserving reordered fields, extra fields and
+generic records. Every registered record of the requested type participates;
+duplicate local-ID routes reject, and an unregistered type rejects synchronously.
+Mixed event types in one logical subscription are outside this API.
+
+The endpoint copies an immutable owning registry snapshot. Later assignment or
+destruction of caller schema/registry/options cannot replace it. Construction has
+explicit finite schema, route, allocation-request and work limits; it invokes no
+application callback, loader or network. The receiving profile supports at most
+16 records, 128 total fields, 256 lookups, 128 UTF-16 units per name and 16384 total
+name units. A registry valid under larger bounds is refused at `profile-schema`
+before native activation; it is never truncated. See the complete
+[registry ownership, errors and bounds contract](../spec/events/EVENT-REGISTRY.md).
 
 ## Runtime, callbacks and shutdown
 
@@ -214,6 +255,7 @@ substantial backing storage, and unsupported capacity arithmetic rejects explici
 | Endpoint option | Default |
 | --- | --- |
 | `contract` | `TICKER` |
+| `eventRegistry` | Absent: built-in Quote0/Profile1; an explicit value is copied as an immutable snapshot |
 | `connectTimeout`, `dnsTimeout`, `writeTimeout` | 5000 ms each |
 | `readTimeout` | 30000 ms |
 | `pollInterval` | 1 ms |

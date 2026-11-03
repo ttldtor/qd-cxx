@@ -16,6 +16,10 @@ See the [wire encoding specification](encoding/PRIMITIVES.md), including compact
 The [schema model](schema/NORMALIZED-MODEL.md), [native JSON](schema/NATIVE-JSON.md) and
 [ordinary wire discovery](schema/WIRE-INVENTORY.md) specify the corresponding boundaries.
 
+[Schema-bound event mappings](events/EVENT-MAPPING.md) and the
+[immutable receiving event registry](events/EVENT-REGISTRY.md) define explicit
+typed projections over complete caller schemas.
+
 ## Protocol contracts {#protocol-contracts}
 
 - [QTP framing](protocol/FRAMING.md) and [tape reading](protocol/TAPE-READER.md)

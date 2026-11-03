@@ -22,6 +22,7 @@ struct Record {
     std::vector<core::FieldValue> fields;    ///< Complete typed fields in the selected local order.
     std::int32_t flags = 0;                  ///< Exact optional binary event flags; zero preserves old STREAM bytes.
     std::optional<std::int64_t> removalTime; ///< Required only for an actual REMOVE_EVENT record.
+    std::int32_t localRecordId = 0; ///< Source schema position; peer wire sender is17+this ID, never a client ADD ID.
 };
 /** Explicit finite test fault after the initial data prefix. */
 enum class PeerMode {
@@ -40,20 +41,24 @@ struct PeerScript {
     bool waitForDataRelease = false; ///< Test-controlled barrier after full ADD parsing, without a timer race.
     bool canonicalSymbols = false;   ///< Explicit canonical DATA encoding; false preserves legacy FD/cipher-zero bytes.
     std::int32_t subscriptionRecordId = 0; ///< Expected client outgoing record identity; independent of peer sender17.
+    bool describeAllRecords = false;       ///< Explicitly describe every source record as sender17+local ID.
+    std::vector<std::int32_t> subscriptionRecordIds; ///< Optional exact client ID per expected symbol tuple.
 };
 
 /** Encode the existing independent peer readiness/complete-description fixture without opening a socket.
  * @param schema Complete ordinary source schema, borrowed only during encoding.
  * @param family Explicit wire family; STREAM preserves the original peer bytes.
- * @return Exact owned protocol and source-description frames, using sender 17.
+ * @param describeAllRecords Describe every source record instead of only record0.
+ * @return Exact owned prefix; default sender17 bytes are preserved, explicit all-record mode uses17+local ID.
  */
 [[nodiscard]] std::vector<std::byte>
-fixturePeerPrefix(const core::LocalSchema &schema, core::SubscriptionFamily family = core::SubscriptionFamily::STREAM);
+fixturePeerPrefix(const core::LocalSchema &schema, core::SubscriptionFamily family = core::SubscriptionFamily::STREAM,
+                  bool describeAllRecords = false);
 /** Encode the existing independent peer DATA fixture without opening a socket.
  * @param records Exact source tuples, borrowed only during encoding.
  * @param family Explicit wire family, STREAM by default.
  * @param canonical Explicit canonical symbol opt-in; false preserves the original FD-symbol bytes.
- * @return Exact owned complete DATA frame, using sender 17.
+ * @return Exact owned complete DATA frame, using sender17+each explicit source record position.
  */
 [[nodiscard]] std::vector<std::byte> fixturePeerData(std::span<const Record> records,
                                                      core::SubscriptionFamily family = core::SubscriptionFamily::STREAM,
@@ -103,12 +108,12 @@ class Peer {
      * @return Numeric owned listener port.
      */
     std::uint16_t port() const noexcept;
-    /** Inspect actual complete add frames received by the peer.
-     * @return Atomic observation count.
+    /** Inspect completed exact ADD tuple sets received by the peer, possibly across several frames.
+     * @return Atomic complete-set count; the default single-record script preserves its frame count.
      */
     unsigned adds() const noexcept;
-    /** Inspect actual complete remove frames received by the peer.
-     * @return Atomic observation count.
+    /** Inspect completed exact REMOVE tuple sets received by the peer, possibly across several frames.
+     * @return Atomic complete-set count; the default single-record script preserves its frame count.
      */
     unsigned removes() const noexcept;
     /** Release initial scripted data after a test observes/changes its owned child's sink.

@@ -24,8 +24,7 @@ constexpr std::size_t CONTROL_VISITS = 100000000;         ///< Qualified finite 
 constexpr std::size_t CONTROL_BYTES = 256 * MEBIBYTE;     ///< Qualified logical copy/disposal seed.
 constexpr std::size_t DNS_ENVELOPE_BYTES = 80 * MEBIBYTE; ///< Separate documented DNS SDK envelope.
 constexpr std::uint64_t DNS_PROGRESS_UNITS = 351280142190671838ULL; ///< Complete documented DNS logical charge.
-constexpr std::size_t MAPPING_SELECTIONS = 32; ///< Existing full Quote/Profile mapper selection allowance.
-constexpr std::size_t WRITER_CONFIGURATION_BYTES = 4 * MEBIBYTE; ///< Retained complete writer reservation.
+constexpr std::size_t WRITER_CONFIGURATION_BYTES = 4 * MEBIBYTE;    ///< Retained complete writer reservation.
 constexpr auto SELECTORS = core::SubscriptionSelectorPolicy::CANONICAL_EXACT_V1; ///< Exact ASCII selector domain.
 
 /** Reject before activating any native state.
@@ -62,30 +61,38 @@ std::size_t multiply(std::size_t count, std::size_t amount) {
     return count * amount;
 }
 
-/** Preserve complete standard schemas while assigning disjoint small local record identities.
- * @return Complete Quote0/Profile1 binary declaration set.
+/** Select an immutable caller registry or prepare compatible defaults without native work.
+ * @param registry Optional explicit registry, borrowed during selection.
+ * @return Owning immutable snapshot or detached registry refusal.
  */
-core::LocalSchema completeSchema() {
-    auto quote = events::defaultQuoteSchema(SCHEMA_LIMITS);
-    auto profile = events::defaultProfileSchema(SCHEMA_LIMITS);
+EventRegistry selectRegistry(const EventRegistry *registry) {
+    if (registry) {
+        if (!registry->valid()) {
+            refuse(ErrorCode::INVALID_ARGUMENT, "profile-registry");
+        }
 
-    if (!quote || !profile) {
-        refuse(ErrorCode::ALLOCATION_FAILURE, "profile-schema");
+        return *registry;
     }
 
-    std::array records{quote->records()[0], profile->records()[0]};
-    records[1].id = 1;
-    auto combined = core::LocalSchema::create(records, SCHEMA_LIMITS, core::LocalProfile::BINARY_FIELDS_V1);
+    EventRegistryWork work;
+    auto result = EventRegistry::builtIn({}, work);
 
-    if (!combined) {
-        refuse(ErrorCode::RESOURCE_LIMIT, "profile-schema");
+    if (!result) {
+        const auto allocation = std::visit(
+            [](auto error) {
+                using Error = decltype(error);
+
+                return error == Error::ALLOCATION_FAILURE;
+            },
+            result.error().cause);
+        refuse(allocation ? ErrorCode::ALLOCATION_FAILURE : ErrorCode::UNSUPPORTED_PROFILE, "profile-registry");
     }
 
-    return std::move(*combined);
+    return std::move(*result);
 }
 
-/** Copy every complete field using its first supported wire alias.
- * @param schema Complete nonindexed Quote/Profile declarations.
+/** Copy every complete field using its first explicit wire alias.
+ * @param schema Complete selected declarations, including unregistered generic records and extra fields.
  * @return Complete one-to-one outgoing description blueprint.
  */
 std::vector<protocol::OutgoingRecord> prepareBlueprint(const core::LocalSchema &schema) {
@@ -190,35 +197,63 @@ void prepareCopies(ReceivingProfile &profile) {
 
 /** Prepare each existing mapping and exact whole-callback projection coordinates.
  * @param profile Complete preparation, modified before publication.
+ * @param registry Immutable validated routes; complete schema identity is preserved by profile.schema.
  * @param symbolUnits Maximum owned exact symbol size.
  */
-void prepareMappings(ReceivingProfile &profile, std::size_t symbolUnits) {
-    const events::MappingLimits mapping{128,
-                                        256,
-                                        MAPPING_SELECTIONS,
-                                        64,
-                                        64,
-                                        128,
-                                        20480,
-                                        add(multiply(multiply(256, 64), 129), multiply(MAPPING_SELECTIONS, 64))};
+void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, std::size_t symbolUnits) {
     const events::EventValueLimits values{symbolUnits, FIELD_TEXT_UNITS, add(symbolUnits, 2 * FIELD_TEXT_UNITS)};
-    const auto preparation =
-        add(add(add(mapping.fields, mapping.lookups), add(mapping.selections, mapping.keys)),
-            add(add(mapping.typeAlternatives, mapping.nameUnits), add(mapping.totalNameUnits, mapping.comparisonWork)));
+    profile.bindings.reserve(registry.registrations().size());
 
-    for (std::size_t index = 0; index < profile.bindings.size(); ++index) {
-        const auto quote = index == 0;
-        profile.bindings[index] = {static_cast<std::int32_t>(index),
-                                   quote ? client::PreparedEventKind::QUOTE : client::PreparedEventKind::PROFILE,
-                                   mapping, values, client::ReceiverEventTimePolicy::FIELD_METADATA};
-        const auto fields = profile.schema.records()[index].fields.size();
-        profile.receiverLimits[index] = {1, fields, MAPPING_SELECTIONS};
-        profile.receiverWork[index] = {16, preparation};
-        const auto units = quote ? values.symbolUnits : values.totalUnits;
-        const auto strings = quote ? std::size_t{1} : std::size_t{3};
-        const auto bytes = add(sizeof(client::SubscriptionProjection), multiply(add(units, strings), sizeof(char16_t)));
-        profile.projectionWork[index] = {multiply(CALLBACK_RECORDS, add(fields, add(MAPPING_SELECTIONS, 3))),
-                                         multiply(CALLBACK_RECORDS, units), multiply(CALLBACK_RECORDS, bytes)};
+    if (profile.bindings.capacity() > SCHEMA_LIMITS.records) {
+        refuse(ErrorCode::RESOURCE_LIMIT, "profile-mapping-storage");
+    }
+
+    for (std::size_t kind = 0; kind < profile.eventPlans.size(); ++kind) {
+        const auto quote = kind == 0;
+        const auto type = quote ? EventType::QUOTE : EventType::PROFILE;
+        auto &plan = profile.eventPlans[kind];
+        plan.firstBinding = profile.bindings.size();
+        plan.work.visits = 16;
+
+        for (const auto &registration : registry.registrations()) {
+            if (registration.type != type) {
+                continue;
+            }
+
+            const auto mapping = registration.mappingLimits;
+            const auto preparation =
+                add(add(add(mapping.fields, mapping.lookups), add(mapping.selections, mapping.keys)),
+                    add(add(mapping.typeAlternatives, mapping.nameUnits),
+                        add(mapping.totalNameUnits, mapping.comparisonWork)));
+            const auto policy = registration.eventTimePolicy == EventTimePolicy::FIELD_METADATA
+                                    ? client::ReceiverEventTimePolicy::FIELD_METADATA
+                                    : client::ReceiverEventTimePolicy::UNSPECIFIED;
+            profile.bindings.push_back({registration.localRecordId,
+                                        quote ? client::PreparedEventKind::QUOTE : client::PreparedEventKind::PROFILE,
+                                        mapping, values, policy});
+            const auto fields =
+                profile.schema.records()[static_cast<std::size_t>(registration.localRecordId)].fields.size();
+            const auto units = quote ? values.symbolUnits : values.totalUnits;
+            const auto strings = quote ? std::size_t{1} : std::size_t{3};
+            const auto bytes =
+                add(sizeof(client::SubscriptionProjection), multiply(add(units, strings), sizeof(char16_t)));
+            const client::ReceiverProjectionWork projection{
+                multiply(CALLBACK_RECORDS, add(fields, add(mapping.selections, 3))), multiply(CALLBACK_RECORDS, units),
+                multiply(CALLBACK_RECORDS, bytes)};
+            plan.bindingCount = add(plan.bindingCount, 1);
+            plan.limits.bindings = plan.bindingCount;
+            plan.limits.shapeFields = add(plan.limits.shapeFields, fields);
+            plan.limits.selections = add(plan.limits.selections, mapping.selections);
+            plan.work.preparationWork = add(plan.work.preparationWork, preparation);
+            plan.work.visits = add(plan.work.visits, add(plan.bindingCount, 1));
+            // Any callback can contain this route; summing bounds covers heterogeneous complete batches.
+            plan.projectionWork.visits = add(plan.projectionWork.visits, projection.visits);
+            plan.projectionWork.textUnits = add(plan.projectionWork.textUnits, projection.textUnits);
+            plan.projectionWork.bytes = add(plan.projectionWork.bytes, projection.bytes);
+        }
+
+        // Each projection scans preceding routes even when its matching record is last in the plan.
+        plan.projectionWork.visits = add(plan.projectionWork.visits, multiply(CALLBACK_RECORDS, plan.bindingCount));
     }
 }
 } // namespace
@@ -229,7 +264,29 @@ ReceivingProfile::ReceivingProfile(core::LocalSchema schema, client::EndpointOpt
 
 ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const EndpointOptions &options,
                                          const std::string &host, std::uint16_t port) {
-    auto schema = completeSchema();
+    auto selected = selectRegistry(options.eventRegistry ? &*options.eventRegistry : nullptr);
+    auto copied = selected.schema().boundedCopy(SCHEMA_LIMITS);
+
+    if (!copied) {
+        refuse(copied.error() == core::SchemaError::ALLOCATION_FAILURE ? ErrorCode::ALLOCATION_FAILURE
+                                                                       : ErrorCode::UNSUPPORTED_PROFILE,
+               "profile-schema");
+    }
+
+    auto schema = std::move(*copied);
+    std::array<std::size_t, 2> routes{};
+    std::size_t maximumFields = 16;
+
+    for (const auto &registration : selected.registrations()) {
+        const auto kind = registration.type == EventType::QUOTE ? std::size_t{0} : std::size_t{1};
+        routes[kind] = add(routes[kind], 1);
+    }
+
+    for (const auto &record : schema.records()) {
+        maximumFields = std::max(maximumFields, record.fields.size());
+    }
+
+    const auto maximumRoutes = std::max({std::size_t{1}, routes[0], routes[1]});
     auto configured = client::controlledStreamSettings();
 
     if (!configured) {
@@ -244,14 +301,15 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
     settings.retry = {options.maximumAttempts,
                       options.maximumAttempts == 1 ? std::chrono::milliseconds{0} : options.retryDelay};
     const auto clients = runtime.maximumSubscriptionsPerEndpoint;
-    const auto entries = multiply(clients, runtime.maximumSymbolsPerSubscription);
+    const auto subscriptionEntries = multiply(runtime.maximumSymbolsPerSubscription, maximumRoutes);
+    const auto entries = multiply(clients, subscriptionEntries);
     const auto symbolUnits = multiply(entries, runtime.maximumSymbolUnits);
-    const auto scale = multiply(clients, add(runtime.maximumSymbolsPerSubscription, 15) / 16);
+    const auto scale = multiply(clients, add(subscriptionEntries, 15) / 16);
     auto &budgets = settings.budgets;
     budgets.session.events = protocol::DataEventPolicy::BINARY_CATALOG_V1;
     budgets.session.fieldTime = protocol::FieldTimePolicy::READ;
     budgets.session.data.processedRecords = budgets.session.data.emittedRecords = FRAME_RECORDS;
-    budgets.session.data.wireFields = budgets.session.data.emittedValues = multiply(FRAME_RECORDS, 16);
+    budgets.session.data.wireFields = budgets.session.data.emittedValues = multiply(FRAME_RECORDS, maximumFields);
     budgets.session.data.symbol.codeUnits = budgets.session.data.symbol.stateUnits = runtime.maximumSymbolUnits;
     budgets.session.data.ownedFieldUnits = FIELD_TEXT_UNITS;
     budgets.session.data.ownedPayloadBytes = FIELD_BYTE_UNITS;
@@ -302,8 +360,8 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
                            RECORD_ARENA_BYTES,
                            4,
                            8,
-                           runtime.maximumSymbolsPerSubscription,
-                           multiply(runtime.maximumSymbolsPerSubscription, runtime.maximumSymbolUnits)};
+                           subscriptionEntries,
+                           multiply(subscriptionEntries, runtime.maximumSymbolUnits)};
     result.queueLimits = {clients,
                           FRAME_RECORDS,
                           16,
@@ -325,7 +383,7 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
         clients, entries, tickerFrames, tickerBytes, add(tickerBytes, multiply(scale, 8 * MEBIBYTE)), budgets.desired};
     result.blueprint = prepareBlueprint(result.schema);
     prepareCopies(result);
-    prepareMappings(result, runtime.maximumSymbolUnits);
+    prepareMappings(result, selected, runtime.maximumSymbolUnits);
     result.queueWork = queueWork(scale);
     result.submitWork = {16, multiply(scale, CONTROL_VISITS), multiply(scale, CONTROL_VISITS),
                          multiply(scale, CONTROL_BYTES)};
@@ -343,6 +401,17 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
                        {result.queueWork, result.queueWork, result.queueWork}};
 
     return result;
+}
+
+const ReceivingEventPlan &receivingEventPlan(const ReceivingProfile &profile, EventType type) {
+    switch (type) {
+    case EventType::QUOTE:
+        return profile.eventPlans[0];
+    case EventType::PROFILE:
+        return profile.eventPlans[1];
+    default:
+        refuse(ErrorCode::UNSUPPORTED_PROFILE, "subscription-event-type");
+    }
 }
 
 std::expected<mux::MuxQueue, mux::QueueFailure> createReceivingQueue(const ReceivingProfile &profile,

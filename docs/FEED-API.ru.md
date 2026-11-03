@@ -8,10 +8,11 @@ endpoint, обработчики и подписки на точные симв�
 конечные переподключения, очереди и доставку. Подписки можно создавать до и после
 `connect()`.
 
-Поддержан обычный бинарный QTP поверх TCP со встроенными полными схемами Quote/Profile.
+Поддержан обычный бинарный QTP поверх TCP со встроенными полными схемами Quote/Profile
+либо явными валидированными схемами вызывающего кода и зарегистрированными mappings Quote/Profile.
 Endpoint выбирает TICKER (по умолчанию: последние значения с возможным объединением
 обновлений) или STREAM (каждая принятая выбранная запись источника). TLS, credentials,
-HISTORY, wildcard-селекторы и внешние схемы в этот API не входят.
+HISTORY и wildcard-селекторы в этот API не входят. Загрузка схем является отдельной задачей.
 [Низкоуровневые API получения](SUBSCRIPTIONS.ru.md) предоставляют отдельные профили.
 
 ## Получить Quote
@@ -85,6 +86,46 @@ int main() {
 аргументом `std::span<const q::events::Profile>`. Для STREAM задайте
 `EndpointOptions::contract = DeliveryContract::STREAM` перед `createEndpoint(options)`.
 Выбранный контракт доставки действует для всех подписок этого endpoint.
+
+## Явный реестр событий
+
+Для значений по умолчанию настраивать реестр не требуется. Для валидированной
+пользовательской `schema` зарегистрируйте явные маршруты записей до создания endpoint:
+
+```cpp
+const std::array routes{q::api::EventRegistration{q::api::EventType::QUOTE, 1},
+                        q::api::EventRegistration{q::api::EventType::QUOTE, 2}};
+q::api::EventRegistryWork work;
+auto registry = q::api::EventRegistry::create(schema, routes, {}, work);
+
+if (!registry) {
+    // Inspect the typed cause and optional registrationIndex before continuing.
+    return 1;
+}
+
+q::api::EndpointOptions options;
+options.eventRegistry = std::move(*registry);
+auto endpoint = runtime.createEndpoint(options);
+auto quotes = endpoint->getFeed()->createSubscription<q::events::Quote>();
+```
+
+Этот расширенный фрагмент предполагает существующий runtime и подключение `<array>`
+и `<utility>` вместе с `qd/api/feed.hpp`. Local record IDs остаются плотными позициями
+каталога; пример требует совместимых записей 1/2 после записи 0. Имя записи не
+выбирает класс события. Существующие адаптеры разрешают поддержанные явные business
+lookup aliases и точные типы, сохраняя иной порядок полей, дополнительные поля и
+generic records. Участвуют все зарегистрированные записи запрошенного типа;
+повторные маршруты local ID отклоняются, отсутствующий тип отклоняется синхронно.
+Несколько типов событий в одной логической подписке в этот API не входят.
+
+Endpoint копирует неизменяемый владеющий снимок реестра. Последующие присваивание
+или уничтожение исходных schema/registry/options не могут заменить его. Создание
+имеет явные конечные пределы схемы, маршрутов, allocation requests и работы; оно не
+вызывает callbacks приложения, loader или сеть. Receiving profile поддерживает до
+16 записей, 128 полей суммарно, 256 lookups, 128 UTF-16 units на имя и 16384 units
+всех имён. Реестр, допустимый при больших пределах, отклоняется на `profile-schema`
+до native activation; усечения нет. См. полный
+[контракт владения, ошибок и пределов реестра](../spec/events/EVENT-REGISTRY.ru.md).
 
 ## Runtime, обработчики и завершение
 
@@ -218,6 +259,7 @@ endpoint. Лимиты учитывают ожидающие, активные �
 | Endpoint option | По умолчанию |
 | --- | --- |
 | `contract` | `TICKER` |
+| `eventRegistry` | Отсутствует: встроенные Quote0/Profile1; явное значение копируется как неизменяемый снимок |
 | `connectTimeout`, `dnsTimeout`, `writeTimeout` | По 5000 мс |
 | `readTimeout` | 30000 мс |
 | `pollInterval` | 1 мс |

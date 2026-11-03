@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 #pragma once
 
+#include "qd/api/event_registry.hpp"
 #include "qd/client/endpoint_options.hpp"
 #include "qd/events/profile.hpp"
 #include "qd/events/quote.hpp"
@@ -13,6 +14,7 @@
 #include <functional>
 #include <initializer_list>
 #include <memory>
+#include <optional>
 #include <span>
 #include <stdexcept>
 #include <stop_token>
@@ -102,6 +104,7 @@ struct EndpointOptions {
     std::chrono::milliseconds retryDelay{250};    ///< Delay between finite fresh recovery attempts.
     std::chrono::milliseconds drainTimeout{1000}; ///< Local admitted-prefix retirement allowance.
     std::uint32_t maximumAttempts = 3;            ///< Total connection attempts, including the initial attempt.
+    std::optional<EventRegistry> eventRegistry; ///< Immutable owning snapshot; absence selects built-in Quote/Profile.
 };
 
 /** Last SDK-worker observation, never an upstream acknowledgement or a whole-network guarantee. */
@@ -257,17 +260,19 @@ class Feed final {
     std::shared_ptr<detail::EndpointPort> port_;
     friend class Endpoint;
     explicit Feed(std::shared_ptr<detail::EndpointPort> port);
-    std::shared_ptr<detail::SubscriptionPort> createSubscriptionPort(bool quote);
+    std::shared_ptr<detail::SubscriptionPort> createSubscriptionPort(EventType type);
 
     public:
     /** Create a bounded logical registration, before or after connect, without application polling.
-     * @tparam Event Existing Quote or Profile.
+     * All registered records of the selected type participate; an unregistered type rejects synchronously.
+     * @tparam Event Existing Quote or Profile, explicitly registered for this endpoint or provided by its defaults.
      * @return Producer handle; native preparation failures are observed asynchronously by its diagnostic.
      */
     template <class Event> [[nodiscard]] std::shared_ptr<Subscription<Event>> createSubscription() {
         static_assert(std::is_same_v<Event, events::Quote> || std::is_same_v<Event, events::Profile>);
         auto subscription = std::shared_ptr<Subscription<Event>>(new Subscription<Event>({}));
-        subscription->port_ = createSubscriptionPort(std::is_same_v<Event, events::Quote>);
+        subscription->port_ =
+            createSubscriptionPort(std::is_same_v<Event, events::Quote> ? EventType::QUOTE : EventType::PROFILE);
 
         return subscription;
     }
@@ -366,10 +371,10 @@ class ApiRuntime final {
     ApiRuntime &operator=(const ApiRuntime &) = delete;
     ApiRuntime(ApiRuntime &&) = delete;
     ApiRuntime &operator=(ApiRuntime &&) = delete;
-    /** Create an independent producer endpoint with built-in full Quote/Profile schemas.
+    /** Create an independent producer endpoint with its immutable registry or built-in full Quote/Profile defaults.
      * Failed wrapper/control allocation rolls back its reservation without publishing an active endpoint.
      * Producer dispatch uses a lifetime-gated detached control port, never an unprotected RuntimeImpl*.
-     * @param options Existing delivery policy and deadlines; finite capacities use RuntimeOptions.
+     * @param options Existing policy/deadlines and optional immutable registry; finite capacities use RuntimeOptions.
      * @return Endpoint facade; no socket is opened and no listener is called inline.
      */
     [[nodiscard]] std::shared_ptr<Endpoint> createEndpoint(EndpointOptions options = {});

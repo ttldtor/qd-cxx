@@ -727,6 +727,10 @@ void mutateSymbols(const std::shared_ptr<detail::SubscriptionPort> &port, std::s
  * @param options Caller-selected finite policy.
  */
 void validateEndpointOptions(const EndpointOptions &options) {
+    if (options.eventRegistry && !options.eventRegistry->valid()) {
+        reject(ErrorCode::INVALID_ARGUMENT, "endpoint-registry");
+    }
+
     const auto durationValid = [](std::chrono::milliseconds value) {
         return value.count() > 0 && value.count() <= INT_MAX;
     };
@@ -958,13 +962,13 @@ template class Subscription<events::Profile>;
 Feed::Feed(std::shared_ptr<detail::EndpointPort> port) : port_(std::move(port)) {
 }
 
-std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(bool quote) {
+std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(EventType type) {
     return producerAction([&] {
         auto subscription = std::make_shared<detail::SubscriptionPort>();
         subscription->control = port_->control;
         subscription->endpoint = port_;
         subscription->owner = port_->owner;
-        subscription->quote = quote;
+        subscription->eventType = type;
         subscription->maximumSymbols = port_->limits.maximumSymbolsPerSubscription;
         subscription->maximumSymbolUnits = port_->limits.maximumSymbolUnits;
         subscription->listenerLedger = std::make_shared<detail::ListenerLedger>();
@@ -979,6 +983,13 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(bool quot
             if (port_->closeRequested.load(std::memory_order_acquire) ||
                 port_->retired.load(std::memory_order_acquire)) {
                 reject(ErrorCode::CLOSED, "endpoint-closed");
+            }
+
+            if (port_->options.eventRegistry &&
+                !std::ranges::any_of(port_->options.eventRegistry->registrations(), [type](const auto &registration) {
+                    return registration.type == type;
+                })) {
+                reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-unregistered-event");
             }
 
             const auto free = std::ranges::find_if(port_->subscriptions, [](const auto &item) {
@@ -1213,7 +1224,14 @@ class TypedConsumer final : public client::SubscriptionConsumer {
         }
 
         try {
-            return port_->quote ? deliver<events::Quote>(batch, listeners) : deliver<events::Profile>(batch, listeners);
+            switch (port_->eventType) {
+            case EventType::QUOTE:
+                return deliver<events::Quote>(batch, listeners);
+            case EventType::PROFILE:
+                return deliver<events::Profile>(batch, listeners);
+            default:
+                throw Error({ErrorCode::UNSUPPORTED_PROFILE, "subscription-event-type"});
+            }
         } catch (const std::bad_alloc &) {
             failSubscription(port_, {ErrorCode::ALLOCATION_FAILURE, "subscription-projection"});
         } catch (...) {
@@ -1303,15 +1321,20 @@ std::unique_ptr<NativeEndpoint> activate(transport::RuntimeBootstrap &bootstrap,
  */
 std::unique_ptr<NativeSubscription> registerSubscription(NativeEndpoint &endpoint,
                                                          const std::shared_ptr<SubscriptionPort> &port) {
-    const auto index = port->quote ? std::size_t{0} : std::size_t{1};
+    const auto &plan = receivingEventPlan(endpoint.profile, port->eventType);
+
+    if (plan.bindingCount == 0) {
+        throw Error({ErrorCode::UNSUPPORTED_PROFILE, "subscription-unregistered-event"});
+    }
+
     auto result = std::make_unique<NativeSubscription>();
     result->port = port;
-    result->consumer = std::make_shared<TypedConsumer>(port, endpoint.profile.projectionWork[index]);
-    auto receiverWork = endpoint.profile.receiverWork[index];
+    result->consumer = std::make_shared<TypedConsumer>(port, plan.projectionWork);
+    auto receiverWork = plan.work;
     auto queueWork = endpoint.profile.queueWork;
     auto handle = endpoint.recovery->openSubscriptionReceiver(
-        endpoint.profile.family, std::span(&endpoint.profile.bindings[index], 1), result->consumer,
-        endpoint.profile.receiverLimits[index], endpoint.profile.clientLimits, receiverWork, queueWork);
+        endpoint.profile.family, std::span(endpoint.profile.bindings).subspan(plan.firstBinding, plan.bindingCount),
+        result->consumer, plan.limits, endpoint.profile.clientLimits, receiverWork, queueWork);
 
     if (!handle) {
         if (const auto *failure = std::get_if<transport::RecoveryDiagnostic>(&handle.error())) {
@@ -1387,11 +1410,20 @@ void applyDesired(NativeEndpoint &endpoint, NativeSubscription &subscription, mu
     }
 
     std::vector<core::SubscriptionRequest> requests;
-    requests.reserve(symbols.size());
-    const auto context = endpoint.profile.schema.recordContext(subscription.port->quote ? 0 : 1);
+    const auto &plan = receivingEventPlan(endpoint.profile, subscription.port->eventType);
 
-    for (const auto &symbol : symbols) {
-        requests.push_back({{context, symbol}, {}});
+    if (plan.bindingCount == 0 || symbols.size() > endpoint.profile.clientLimits.commandEntries / plan.bindingCount) {
+        throw Error({ErrorCode::RESOURCE_LIMIT, "subscription-route-entries"});
+    }
+
+    requests.reserve(symbols.size() * plan.bindingCount);
+
+    for (const auto &binding : std::span(endpoint.profile.bindings).subspan(plan.firstBinding, plan.bindingCount)) {
+        const auto context = endpoint.profile.schema.recordContext(binding.localId);
+
+        for (const auto &symbol : symbols) {
+            requests.push_back({{context, symbol}, {}});
+        }
     }
 
     auto accepted = subscription.handle.replace(requests, work);

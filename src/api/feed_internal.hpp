@@ -74,13 +74,13 @@ struct SubscriptionPort {
     std::weak_ptr<EndpointPort> endpoint;              ///< Endpoint policy/status domain, without a producer cycle.
     std::shared_ptr<ListenerLedger> listenerLedger;    ///< Selected/retiring callback reservation.
     std::shared_ptr<const ListenerSnapshot> listeners; ///< Complete accepted bounded selection.
-    StateListeners stateListeners;           ///< Opt-in advisory lifecycle observations, retired after event captures.
-    std::vector<std::u16string> symbols;     ///< Complete accepted exact desired set.
-    std::size_t maximumSymbols;              ///< Original per-registration selector count.
-    std::size_t maximumSymbolUnits;          ///< Original per-selector capacity.
-    std::uint64_t revision = 0;              ///< Accepted local desired revision, separate from queue tickets.
-    std::uint64_t nextListener = 1;          ///< Non-reused listener identity, zero never issued.
-    bool quote;                              ///< Selects one existing prepared mapping.
+    StateListeners stateListeners;       ///< Opt-in advisory lifecycle observations, retired after event captures.
+    std::vector<std::u16string> symbols; ///< Complete accepted exact desired set.
+    std::size_t maximumSymbols;          ///< Original per-registration selector count.
+    std::size_t maximumSymbolUnits;      ///< Original per-selector capacity.
+    std::uint64_t revision = 0;          ///< Accepted local desired revision, separate from queue tickets.
+    std::uint64_t nextListener = 1;      ///< Non-reused listener identity, zero never issued.
+    EventType eventType;                 ///< Immutable business projection; its explicit record routes are separate.
     std::atomic<bool> closeRequested{false}; ///< Reserved monotonic control, independent of ordinary capacity.
     std::atomic<bool> retired{false};        ///< True only after callback/capture/registration retirement.
     SubscriptionState state = SubscriptionState::CONFIGURED; ///< Detached worker observation.

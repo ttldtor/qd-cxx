@@ -24,6 +24,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <limits>
 #include <stdexcept>
 
 namespace org::ttldtor::qdcxx::connect_tests {
@@ -31,7 +32,8 @@ namespace {
 namespace e = encoding;
 namespace p = protocol;
 using namespace std::chrono_literals;
-constexpr std::int32_t REMOVE_EVENT = 2; ///< Exact QTP removal flag used by an explicit test source record.
+constexpr std::int32_t REMOVE_EVENT = 2;          ///< Exact QTP removal flag used by an explicit test source record.
+constexpr std::int32_t FIRST_PEER_RECORD_ID = 17; ///< Default source sender; unrelated to client outgoing ADD IDs.
 #ifdef _WIN32
 using Socket = SOCKET;
 constexpr Socket NO_SOCKET = INVALID_SOCKET; ///< Invalid Windows-owned socket.
@@ -47,6 +49,16 @@ void require(bool value) {
     if (!value) {
         throw std::runtime_error("controlled peer setup failure");
     }
+}
+
+/** Select an explicit peer source sender without conflating it with a client outgoing record ID.
+ * @param localRecordId Dense position in the source schema used to encode these controlled values.
+ * @return Sender17+local record position, or controlled setup failure on invalid/overflowing input.
+ */
+std::int32_t senderId(std::int32_t localRecordId) {
+    require(localRecordId >= 0 && localRecordId <= std::numeric_limits<std::int32_t>::max() - FIRST_PEER_RECORD_ID);
+
+    return FIRST_PEER_RECORD_ID + localRecordId;
 }
 
 /** Close exactly one test-owned socket.
@@ -179,9 +191,10 @@ WireFamily wireFamily(core::SubscriptionFamily family) {
 /** Compose peer readiness then complete source descriptions from the explicit schema.
  * @param schema Ordinary local schema, used solely for deterministic peer source data.
  * @param family Exact scripted wire family.
+ * @param describeAllRecords Describe all source records instead of the default first record only.
  * @return Finite owning protocol/description prefix.
  */
-std::vector<std::byte> initial(const core::LocalSchema &schema, WireFamily family) {
+std::vector<std::byte> initial(const core::LocalSchema &schema, WireFamily family, bool describeAllRecords) {
     std::vector<std::byte> body{std::byte{'D'}, std::byte{'X'}, std::byte{'P'}, std::byte{'3'}};
     number(body, 0);
     number(body, 1);
@@ -199,17 +212,22 @@ std::vector<std::byte> initial(const core::LocalSchema &schema, WireFamily famil
 
     auto result = frame(1, body);
     body.clear();
-    const auto &record = schema.records()[0];
-    number(body, 17);
-    text(body, record.name);
-    number(body, static_cast<std::int64_t>(record.fields.size()));
+    require(!schema.records().empty());
+    const auto records = describeAllRecords ? schema.records() : schema.records().first(1);
 
-    for (std::size_t index = 0; index < record.fields.size(); ++index) {
-        const auto lookup = std::ranges::find_if(record.lookups, [index](const auto &item) {
-            return item.fieldId == index;
-        });
-        text(body, lookup->name);
-        number(body, record.fields[index].serialTypeId);
+    for (const auto &record : records) {
+        number(body, senderId(record.id));
+        text(body, record.name);
+        number(body, static_cast<std::int64_t>(record.fields.size()));
+
+        for (std::size_t index = 0; index < record.fields.size(); ++index) {
+            const auto lookup = std::ranges::find_if(record.lookups, [index](const auto &item) {
+                return item.fieldId == index;
+            });
+            require(lookup != record.lookups.end());
+            text(body, lookup->name);
+            number(body, record.fields[index].serialTypeId);
+        }
     }
 
     const auto described = frame(2, body);
@@ -246,7 +264,7 @@ std::vector<std::byte> data(std::span<const Record> records, WireFamily family, 
                 character(body, unit);
         }
 
-        number(body, 17);
+        number(body, senderId(record.localRecordId));
 
         if ((record.flags & REMOVE_EVENT) != 0) {
             require(record.removalTime.has_value());
@@ -268,12 +286,19 @@ std::vector<std::byte> data(std::span<const Record> records, WireFamily family, 
  * @param expected Exact expected client symbol sequence.
  * @param historyBound Actual expected raw bound for HISTORY ADD, absent for other commands.
  * @param recordId Exact expected client outgoing record identity, independent of the peer's sender identity.
- * @return True only for identical complete tuples with the configured outgoing identity.
+ * @param recordIds Optional explicit client outgoing ID for each expected tuple; empty preserves recordId.
+ * @param completed Complete tuples already validated in preceding frames of this one expected command.
+ * @return True only for identical complete frame tuples; completed advances atomically on success.
  */
 bool exactSubscription(std::span<const std::byte> bytes, std::span<const std::u16string> expected,
-                       std::optional<std::int64_t> historyBound, std::int32_t recordId) {
+                       std::optional<std::int64_t> historyBound, std::int32_t recordId,
+                       std::span<const std::int32_t> recordIds, std::size_t &completed) {
+    if (!recordIds.empty() && recordIds.size() != expected.size()) {
+        return false;
+    }
+
     e::SymbolReader symbols({8192, 128, 128}, 0);
-    std::size_t index = 0;
+    std::size_t index = completed;
 
     while (!bytes.empty()) {
         auto symbol = symbols.read(bytes);
@@ -286,7 +311,7 @@ bool exactSubscription(std::span<const std::byte> bytes, std::span<const std::u1
         bytes = bytes.subspan(symbol.consumed);
         const auto id = e::readCompactInt(bytes);
 
-        if (id.status != e::Status::OK || id.value != recordId) {
+        if (id.status != e::Status::OK || id.value != (recordIds.empty() ? recordId : recordIds[index])) {
             return false;
         }
 
@@ -304,12 +329,15 @@ bool exactSubscription(std::span<const std::byte> bytes, std::span<const std::u1
         ++index;
     }
 
-    return index == expected.size();
+    completed = index;
+
+    return true;
 }
 } // namespace
 
-std::vector<std::byte> fixturePeerPrefix(const core::LocalSchema &schema, core::SubscriptionFamily family) {
-    return initial(schema, wireFamily(family));
+std::vector<std::byte> fixturePeerPrefix(const core::LocalSchema &schema, core::SubscriptionFamily family,
+                                         bool describeAllRecords) {
+    return initial(schema, wireFamily(family), describeAllRecords);
 }
 
 std::vector<std::byte> fixturePeerData(std::span<const Record> records, core::SubscriptionFamily family,
@@ -319,13 +347,15 @@ std::vector<std::byte> fixturePeerData(std::span<const Record> records, core::Su
 
 Peer::Peer(const core::LocalSchema &schema, std::span<const Record> records, std::span<const std::u16string> expected,
            std::size_t chunk, PeerMode mode, PeerScript script)
-    : initial_(mode == PeerMode::NO_READINESS ? std::vector<std::byte>{} : initial(schema, wireFamily(script.family))),
+    : initial_(mode == PeerMode::NO_READINESS ? std::vector<std::byte>{}
+                                              : initial(schema, wireFamily(script.family), script.describeAllRecords)),
       data_(data(records, wireFamily(script.family), script.canonicalSymbols)),
       afterRemove_(script.afterRemove ? data(*script.afterRemove, wireFamily(script.family), script.canonicalSymbols)
                                       : data_),
       expected_(expected.begin(), expected.end()), chunk_(chunk), mode_(mode), script_(std::move(script)),
       dataReleased_(!script_.waitForDataRelease) {
     require(chunk != 0);
+    require(script_.subscriptionRecordIds.empty() || script_.subscriptionRecordIds.size() == expected_.size());
     require((script_.family == core::SubscriptionFamily::HISTORY) == script_.historyBound.has_value());
     const auto listener = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     require(listener != NO_SOCKET);
@@ -377,6 +407,8 @@ void Peer::serve(std::stop_token stop) noexcept {
         bool initialQueued = false;
         std::size_t initialEnd = 0;
         std::size_t afterRemoveEnd = 0;
+        std::size_t addTuples = 0;
+        std::size_t removeTuples = 0;
         const auto family = wireFamily(script_.family);
         p::FrameReader reader({8192, 8201});
 
@@ -446,10 +478,15 @@ void Peer::serve(std::stop_token stop) noexcept {
                         bytes = bytes.subspan(next.accepted);
 
                         if (next.frame && (next.frame->type == family.add || next.frame->type == family.remove)) {
+                            auto &tuples = next.frame->type == family.add ? addTuples : removeTuples;
                             require(
                                 exactSubscription(next.frame->payload, expected_,
                                                   next.frame->type == family.add ? script_.historyBound : std::nullopt,
-                                                  script_.subscriptionRecordId));
+                                                  script_.subscriptionRecordId, script_.subscriptionRecordIds, tuples));
+
+                            if (tuples != expected_.size()) {
+                                continue;
+                            }
 
                             if (next.frame->type == family.add) {
                                 require(adds_.load() == 0);

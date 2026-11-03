@@ -16,6 +16,10 @@
 [Модель схем](schema/NORMALIZED-MODEL.ru.md), [нативный JSON](schema/NATIVE-JSON.ru.md)
 и [обычная схема с провода](schema/WIRE-INVENTORY.ru.md) задают соответствующие границы.
 
+[Schema-bound mappings событий](events/EVENT-MAPPING.ru.md) и
+[неизменяемый реестр принимаемых событий](events/EVENT-REGISTRY.ru.md) определяют
+явные типизированные проекции полных пользовательских схем.
+
 ## Контракты протокола {#protocol-contracts-ru}
 
 - [Кадры QTP](protocol/FRAMING.ru.md) и [чтение tape](protocol/TAPE-READER.ru.md)

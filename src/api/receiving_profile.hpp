@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 #pragma once
 
+#include "qd/api/event_registry.hpp"
 #include "qd/api/feed.hpp"
 #include "qd/client/subscription_receiver.hpp"
 #include "qd/transport/tcp_recovery.hpp"
@@ -11,9 +12,18 @@
 #include <vector>
 
 namespace org::ttldtor::qdcxx::api::detail {
+/** Complete independently bounded plan for every registered record of one business type. */
+struct ReceivingEventPlan {
+    std::size_t firstBinding = 0;                    ///< First route in ReceivingProfile::bindings.
+    std::size_t bindingCount = 0;                    ///< Number of consecutive routes of this business type.
+    client::ReceiverLimits limits{};                 ///< Aggregate complete immutable receiver plan allowance.
+    client::ReceiverWork work{};                     ///< Aggregate per-registration preparation seed.
+    client::ReceiverProjectionWork projectionWork{}; ///< Complete callback projection allowance.
+};
+
 /** Worker-owned immutable receiving configuration; it owns no native object or callback. */
 struct ReceivingProfile {
-    core::LocalSchema schema;         ///< Complete built-in Quote/Profile declarations, with original provenance.
+    core::LocalSchema schema;         ///< Complete selected declarations, preserving validated registry provenance.
     client::EndpointOptions endpoint; ///< Independently owned validated endpoint snapshot.
     core::SubscriptionFamily family;  ///< Selected existing source delivery semantics.
     transport::RecoveryOptions recoveryOptions;      ///< Explicit route and finite replay/copy reservations.
@@ -22,11 +32,9 @@ struct ReceivingProfile {
     mux::QueueLimits queueLimits;                    ///< Aggregate registration and detached-data reservations.
     mux::ClientLimits clientLimits;                  ///< Independent per-registration reservations.
     collectors::TickerLimits tickerLimits;           ///< Existing shared cache and independent desired views.
-    std::array<client::PreparedSubscriptionBinding, 2> bindings;  ///< Exact existing typed mappings.
-    std::array<client::ReceiverLimits, 2> receiverLimits;         ///< Per-type complete preparation bounds.
-    std::array<client::ReceiverWork, 2> receiverWork;             ///< Per-registration preparation seeds.
-    std::array<client::ReceiverProjectionWork, 2> projectionWork; ///< Complete whole-callback projection seeds.
-    mux::QueueSubmitWork submitWork;                              ///< One whole desired replacement admission.
+    std::vector<client::PreparedSubscriptionBinding> bindings; ///< Explicit routes grouped by business type.
+    std::array<ReceivingEventPlan, 2> eventPlans;       ///< Aggregate Quote/Profile plans, independent of record IDs.
+    mux::QueueSubmitWork submitWork;                    ///< One whole desired replacement admission.
     mux::QueueWork queueWork;                           ///< Identical initialization, normal and drain coordinates.
     transport::RecoveryPreparationWork preparationWork; ///< Original recovery/writer/queue preparation seed.
     transport::RecoveryTurnWork turnWork;               ///< Identical normal and drain owner-turn coordinates.
@@ -47,6 +55,13 @@ struct ReceivingProfile {
  */
 [[nodiscard]] ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const EndpointOptions &options,
                                                        const std::string &host, std::uint16_t port);
+
+/** Select complete immutable preparation for a supported business projection, independently of local record IDs.
+ * @param profile Worker-owned immutable receiving preparation.
+ * @param type Actual supported business projection.
+ * @return Borrowed complete per-type plan; throws a detached unsupported-profile error for an unknown type.
+ */
+[[nodiscard]] const ReceivingEventPlan &receivingEventPlan(const ReceivingProfile &profile, EventType type);
 
 /** Construct the selected existing queue without opening registrations or activating native work.
  * @param profile Complete immutable prepared configuration.
