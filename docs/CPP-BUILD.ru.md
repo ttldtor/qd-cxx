@@ -5,8 +5,13 @@
 `ORG_TTLDTOR_QDCXX_BUILD_FEED_API` по умолчанию `OFF`. Он требует явно включить
 `ORG_TTLDTOR_QDCXX_BUILD_CLIENT=ON`, `ORG_TTLDTOR_QDCXX_BUILD_RUNTIME=ON` и
 `ORG_TTLDTOR_QDCXX_BUILD_RECOVERY=ON`. Собираются/устанавливаются `qdcxx_feed`
-и `qd/api/feed.hpp`; также собирается executable target `qdcxx_feed_demo`
-(`qdcxx-feed-demo`). TLS, JSON и отдельный connection CLI не требуются.
+и `qd/api/feed.hpp`. Отдельная опция `ORG_TTLDTOR_QDCXX_BUILD_EXAMPLES` управляет
+executable target `qdcxx_feed_demo` (`qdcxx-feed-demo`); по умолчанию она включена
+для основной сборки и выключена при подключении qd-cxx через `add_subdirectory`.
+Собираются только примеры включённых публичных API. Выключение примеров сохраняет
+библиотеку feed и её библиотечные тесты. [Отдельный пример](../examples/feed_quote/README.ru.md)
+можно собрать с установленным пакетом, который собирался без примеров.
+TLS, JSON и отдельный connection CLI не требуются.
 
 Сначала подготовьте точные [исходники SDK транспорта](../cmake/runtime-profile/README.ru.md).
 Используйте закреплённый x64 [профиль копирования recovery](../spec/transport/RECOVERY.ru.md):

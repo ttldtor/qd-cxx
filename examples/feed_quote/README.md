@@ -42,7 +42,13 @@ On Linux replace the prefix with your installation path. Windows/Ninja produces
 `build/feed-quote/qdcxx-feed-demo.exe`; Linux produces `build/feed-quote/qdcxx-feed-demo`.
 Visual Studio places the executable in the `Release` subdirectory.
 
-The root project also builds target `qdcxx_feed_demo` when the feed API is enabled.
+The root project builds target `qdcxx_feed_demo` when the feed API and
+`ORG_TTLDTOR_QDCXX_BUILD_EXAMPLES` are enabled. Examples default to ON for a
+top-level qd-cxx build and OFF when qd-cxx is included with `add_subdirectory`.
+Set `ORG_TTLDTOR_QDCXX_BUILD_EXAMPLES=OFF` to build the library without this
+executable; this does not disable the feed API or its library tests. The
+standalone project above builds the example directly against an installed
+package, independently of the option used to build that package.
 
 ## Run
 

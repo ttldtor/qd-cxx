@@ -5,8 +5,13 @@
 `ORG_TTLDTOR_QDCXX_BUILD_FEED_API` defaults to `OFF`. It requires explicit
 `ORG_TTLDTOR_QDCXX_BUILD_CLIENT=ON`, `ORG_TTLDTOR_QDCXX_BUILD_RUNTIME=ON` and
 `ORG_TTLDTOR_QDCXX_BUILD_RECOVERY=ON`. It builds/installs `qdcxx_feed` and
-`qd/api/feed.hpp`, and builds the `qdcxx_feed_demo` executable target
-(`qdcxx-feed-demo`). TLS, JSON and the separate connection CLI are not prerequisites.
+`qd/api/feed.hpp`. The separate `ORG_TTLDTOR_QDCXX_BUILD_EXAMPLES` option controls
+the `qdcxx_feed_demo` executable target (`qdcxx-feed-demo`); it defaults to ON for
+a top-level build and OFF when qd-cxx is included with `add_subdirectory`.
+Only examples whose public API is enabled are built. Turning examples OFF leaves
+the feed library and its library tests available. The [standalone example](../examples/feed_quote/README.md)
+can consume an installed package built without examples. TLS, JSON and the
+separate connection CLI are not prerequisites.
 
 Prepare the exact [runtime SDK sources](../cmake/runtime-profile/README.md) first.
 Use a qualified x64 [recovery copy profile](../spec/transport/RECOVERY.md): selected

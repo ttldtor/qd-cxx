@@ -41,7 +41,13 @@ C++23 и нативные статические зависимости насл
 `build/feed-quote/qdcxx-feed-demo.exe`, Linux — `build/feed-quote/qdcxx-feed-demo`.
 Visual Studio помещает программу в подкаталог `Release`.
 
-Корневой проект также собирает target `qdcxx_feed_demo` при включённом feed API.
+Корневой проект собирает target `qdcxx_feed_demo`, когда включены feed API и
+`ORG_TTLDTOR_QDCXX_BUILD_EXAMPLES`. Примеры по умолчанию включены при основной
+сборке qd-cxx и выключены при подключении qd-cxx через `add_subdirectory`.
+Задайте `ORG_TTLDTOR_QDCXX_BUILD_EXAMPLES=OFF`, чтобы собрать библиотеку без этого
+исполняемого файла; feed API и его библиотечные тесты остаются включёнными.
+Показанный выше отдельный проект собирает пример с установленным пакетом
+независимо от значения этой опции при сборке самого пакета.
 
 ## Запустить
 

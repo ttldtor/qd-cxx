@@ -6,6 +6,8 @@ project(qdcxx LANGUAGES CXX)
 
 include(GNUInstallDirs)
 
+option(ORG_TTLDTOR_QDCXX_BUILD_EXAMPLES "Build examples for enabled public APIs" ${PROJECT_IS_TOP_LEVEL})
+
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
     message(FATAL_ERROR "Use an out-of-source build, for example -B .work/build")
 endif()
@@ -132,10 +134,10 @@ if(ORG_TTLDTOR_QDCXX_BUILD_FEED_API)
     endif()
     install(TARGETS qdcxx_feed EXPORT qdcxxTargets ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
     install(FILES include/qd/api/feed.hpp DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qd/api")
-    add_executable(qdcxx_feed_demo examples/feed_quote/main.cpp)
-    target_link_libraries(qdcxx_feed_demo PRIVATE qdcxx_feed)
-    target_compile_options(qdcxx_feed_demo PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
-    set_target_properties(qdcxx_feed_demo PROPERTIES CXX_EXTENSIONS OFF OUTPUT_NAME qdcxx-feed-demo)
+endif()
+
+if(ORG_TTLDTOR_QDCXX_BUILD_EXAMPLES AND ORG_TTLDTOR_QDCXX_BUILD_FEED_API)
+    add_subdirectory(examples/feed_quote)
 endif()
 
 include(CMakePackageConfigHelpers)
@@ -383,9 +385,11 @@ if(BUILD_TESTING)
             target_link_libraries(qdcxx_feed_dns_tests PRIVATE qdcxx_feed doctest::doctest)
             set_target_properties(qdcxx_feed_dns_tests PROPERTIES CXX_EXTENSIONS OFF)
             add_test(NAME feed_dns_snapshot COMMAND qdcxx_feed_dns_tests)
-            add_test(NAME feed_demo_help COMMAND "${CMAKE_COMMAND}"
-                "-DPROGRAM=$<TARGET_FILE:qdcxx_feed_demo>"
-                -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/feed_demo_help.cmake")
+            if(TARGET qdcxx_feed_demo)
+                add_test(NAME feed_demo_help COMMAND "${CMAKE_COMMAND}"
+                    "-DPROGRAM=$<TARGET_FILE:qdcxx_feed_demo>"
+                    -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/feed_demo_help.cmake")
+            endif()
         endif()
         add_executable(qdcxx_recovery_soak_tests tests/conformance/recovery_soak_tests.cpp
             tests/conformance/recovery_test_peer.cpp)
