@@ -271,3 +271,35 @@ TEST_CASE("Twenty fractional digits round the binary value rather than its round
     REQUIRE(profile.setStrike(std::bit_cast<double>(std::uint64_t{0x3ee9e4093026776e})));
     CHECK(profile.getField(u"STRIKE") == u"0.00001234567890123401");
 }
+
+TEST_CASE("Nonallocating retained metadata follows independent values through edits copies and moves") {
+    InstrumentProfile profile;
+    CHECK(profile.retainedUnits() == 0);
+    CHECK(profile.customFieldCount() == 0);
+    REQUIRE(profile.setSymbol(u"A"));
+    REQUIRE(profile.setField(u"", u"xy"));
+    REQUIRE(profile.setField(u"K", u"v"));
+    CHECK(profile.retainedUnits() == 5);
+    CHECK(profile.customFieldCount() == 2);
+    auto copy = profile;
+    REQUIRE(copy.setField(u"", u""));
+    CHECK(copy.retainedUnits() == 3);
+    CHECK(copy.customFieldCount() == 1);
+    CHECK(profile.getField(u"") == u"xy");
+    auto moved = std::move(copy);
+    CHECK(moved.getSymbol() == u"A");
+    CHECK(moved.retainedUnits() == 3);
+    CHECK(moved.customFieldCount() == 1);
+    CHECK(copy.retainedUnits() == 0);
+    CHECK(copy.customFieldCount() == 0);
+    InstrumentProfile bounded({1, 4, 4, 4, 8});
+    REQUIRE(bounded.setField(u"", u"1234"));
+    CHECK(bounded.setSymbol(u"A").error() == ProfileError::LIMIT_EXCEEDED);
+    CHECK(bounded.retainedUnits() == 4);
+    CHECK(bounded.customFieldCount() == 1);
+    CHECK(bounded.getField(u"") == u"1234");
+    bounded = moved;
+    CHECK(bounded == moved);
+    CHECK(bounded.retainedUnits() == 3);
+    CHECK(bounded.customFieldCount() == 1);
+}

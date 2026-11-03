@@ -101,3 +101,13 @@ The optional default-OFF `qdcxx_ipf` target has only the C++23 standard-library 
 feed/core/transport dependency. It starts no I/O or background work. IPF CSV readers/writers,
 HTTP, live collectors, option-chain construction and schedule interpretation are separate features.
 See the [application guide](../../docs/INSTRUMENT-PROFILES.md).
+
+
+## Nonallocating retained metadata
+
+`customFieldCount()` reports actual nonempty custom entries, including a possible empty name.
+`retainedUnits()` reports standard text plus custom names/values in UTF-16 code units, excluding
+configuration, container capacity and allocator overhead. Both getters allocate nothing.
+Copy/move/assignment/edit guarantees apply to these observations; a moved-from profile reports
+empty storage, and a failed edit leaves counts unchanged. The [local writer](WRITER.md) uses this
+metadata to check actual input/count bounds before allocating an independent custom-name copy.

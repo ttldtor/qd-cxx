@@ -267,3 +267,11 @@ all profile selectors, finite limits/defaults, units, side effects and exits wit
 `source_sequence_cli`, `source_sequence_io` and `source_sequence_large` are native CTest regressions.
 The large test owns a small streamed temporary source and validates canonical bytes without retaining
 whole output. Resource reservations and separately measured OS RSS remain distinct observations.
+
+
+## Local IPF writer oracle
+
+The [maintained writer oracle](../upstream/ipf-writer-oracle/README.md) captures/verifies deterministic
+Java writer bytes and reader projections, including explicit lossy/rejected value boundaries.
+Use its built-in `-Help`/`-HelpRu` without inputs; optional NativeDirectory reads actual emitted
+native writer files through the pinned Java reader. No network, SDK build or new dependency runs.

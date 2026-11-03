@@ -596,3 +596,9 @@ tools/upstream/ipf-reader-oracle/*.java text eol=lf
 tools/upstream/ipf-reader-oracle/*.ps1 text eol=lf
 tests/fixtures/ipf-reader/capture/** -text -whitespace
 tests/fixtures/ipf-reader/provenance.json text eol=lf
+
+# Preserve local IPF writer bytes/reader projections and canonical oracle sources.
+tools/upstream/ipf-writer-oracle/*.java text eol=lf
+tools/upstream/ipf-writer-oracle/*.ps1 text eol=lf
+tests/fixtures/ipf-writer/capture/** -text -whitespace
+tests/fixtures/ipf-writer/provenance.json text eol=lf

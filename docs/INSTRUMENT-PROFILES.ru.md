@@ -55,7 +55,7 @@ int main() {
 даты и различие точного символа/порядка представления определяет [контракт](../spec/ipf/PROFILE.ru.md).
 
 Объект значения не начинает I/O или фоновую работу. Тот же optional target предоставляет отдельный
-локальный reader ниже. Writing, HTTP/live collection, построение option-chain и толкование расписаний
+локальные reader и writer ниже. HTTP/live collection, построение option-chain и толкование расписаний
 относятся к отдельным возможностям.
 [Oracle fixture](../tests/fixtures/ipf/README.ru.md) описывает фактические доказательства преобразований.
 
@@ -104,3 +104,53 @@ Input/output/work bounds не задают I/O deadline. Streambuf вызыва�
 `IO_ERROR`. Ошибки выделения памяти parser/output дают `ALLOCATION_FAILURE`. Типизированные ошибки
 сохраняют полные предшествующие profiles.
 Поддержан только локальный несжатый input; HTTP, decompression и автоопределение формата не запускаются.
+
+## Записывать и читать локальные profiles
+
+Подключите `qd/ipf/instrument_profile_writer.hpp` и свяжите `qdcxx_ipf`. Обычный stream round trip:
+
+```cpp
+#include <qd/ipf/instrument_profile_writer.hpp>
+#include <qd/ipf/instrument_profile_reader.hpp>
+#include <array>
+#include <sstream>
+
+int main() {
+    using namespace org::ttldtor::qdcxx::ipf;
+    InstrumentProfile profile;
+    if (!profile.setType(u"STOCK") || !profile.setSymbol(u"IBM")) {
+        return 1;
+    }
+    const std::array profiles{profile};
+    std::ostringstream output;
+    auto written = writeInstrumentProfiles(output, profiles);
+    if (written.error || !written.complete) {
+        return 2;
+    }
+    std::istringstream input(output.str());
+    auto read = readInstrumentProfiles(input);
+    return !read.error && read.complete && read.profiles.size() == 1 &&
+           read.profiles.front().getSymbol() == u"IBM" ? 0 : 3;
+}
+```
+
+`composeInstrumentProfiles(profiles)` возвращает владеющую полную UTF-8 строку без I/O.
+`writeInstrumentProfilesFile(path, profiles)` готовит документ до открытия собственного binary/
+truncating файла. Stream API заимствует ваш stream на вызов и сохраняет exception mask.
+
+Formats/CSV сохраняют canonical field text, точные type/custom names и порядок profiles.
+Исходное написание чисел, raw presence и биты signed zero не сериализуются. Чтобы не терять text
+тихо, непарный UTF-16, запрещённые reader types и непустые extra REMOVED fields отклоняются до
+публикации; обычные REMOVED tombstones, unknown/empty types и valid surrogate pairs работают.
+См. [writer contract](../spec/ipf/WRITER.ru.md) и
+[actual writer observations](../tests/fixtures/ipf-writer/README.ru.md).
+
+Defaults ограничивают profiles/types/fields, retained input/format units, output bytes и logical
+work; передавайте `IpfWriteOptions` для иных инженерных границ. Value metadata `retainedUnits()`
+и `customFieldCount()` ничего не выделяют и описывают logical UTF-16 storage/entries, а не RSS.
+
+Любая I/O ошибка даёт complete=false. Body write/flush предшествует публикации marker; поздняя
+ошибка marker/final flush уже могла оставить снаружи полный marker.
+`confirmedBytes` учитывает лишь успешные write calls, а не точные side effects неуспешного вызова.
+Streams/files не транзакционны; open файла может уничтожить прежнее содержимое. Для успешного
+file result нужен успешный owned close. Resource limits не задают deadline блокирующей I/O.

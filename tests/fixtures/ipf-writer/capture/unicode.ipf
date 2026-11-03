@@ -1,0 +1,3 @@
+#STOCK::=TYPE,SYMBOL,😀
+STOCK,€😀,𐀀􏿿
+##COMPLETE

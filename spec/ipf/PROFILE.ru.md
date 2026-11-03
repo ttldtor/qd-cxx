@@ -105,3 +105,13 @@ Optional target `qdcxx_ipf` по умолчанию OFF, зависит толь
 зависит от feed/core/transport. Он не начинает I/O или фоновую работу. IPF CSV readers/writers,
 HTTP, live collectors, построение option-chain и толкование расписаний относятся к отдельным
 возможностям. См. [прикладное руководство](../../docs/INSTRUMENT-PROFILES.ru.md).
+
+
+## Невыделяющие retained metadata
+
+`customFieldCount()` сообщает actual nonempty custom entries, включая возможное пустое name.
+`retainedUnits()` сообщает standard text плюс custom names/values в UTF-16 code units без
+configuration, container capacity и allocator overhead. Оба getters ничего не выделяют.
+Гарантии copy/move/assignment/edit распространяются на эти наблюдения: moved-from profile имеет
+пустое storage, failed edit не меняет counts. [Локальный writer](WRITER.ru.md) использует metadata
+для проверки actual input/count bounds до выделения независимой копии custom names.

@@ -53,7 +53,7 @@ is read. Conversion details, nonfinite numbers, lenient historical dates and exa
 presentation ordering are defined in the [contract](../spec/ipf/PROFILE.md).
 
 The value object starts no I/O or background work. The same optional target also supplies the
-separate local reader below. Writing, HTTP/live collection, option-chain construction and schedule
+separate local reader and writer below. HTTP/live collection, option-chain construction and schedule
 interpretation remain separate features.
 The [oracle fixture](../tests/fixtures/ipf/README.md) documents the actual conversion evidence.
 
@@ -102,3 +102,52 @@ The caller's stream exception mask is preserved. An escaping `std::bad_alloc` ma
 `IO_ERROR`. Parser/output allocation failures map to `ALLOCATION_FAILURE`. Typed failures retain
 complete earlier profiles.
 Only local uncompressed input is supported; no HTTP, decompression or file-format auto-detection runs.
+
+## Write and round-trip local profiles
+
+Include `qd/ipf/instrument_profile_writer.hpp` and link `qdcxx_ipf`. A normal stream round trip:
+
+```cpp
+#include <qd/ipf/instrument_profile_writer.hpp>
+#include <qd/ipf/instrument_profile_reader.hpp>
+#include <array>
+#include <sstream>
+
+int main() {
+    using namespace org::ttldtor::qdcxx::ipf;
+    InstrumentProfile profile;
+    if (!profile.setType(u"STOCK") || !profile.setSymbol(u"IBM")) {
+        return 1;
+    }
+    const std::array profiles{profile};
+    std::ostringstream output;
+    auto written = writeInstrumentProfiles(output, profiles);
+    if (written.error || !written.complete) {
+        return 2;
+    }
+    std::istringstream input(output.str());
+    auto read = readInstrumentProfiles(input);
+    return !read.error && read.complete && read.profiles.size() == 1 &&
+           read.profiles.front().getSymbol() == u"IBM" ? 0 : 3;
+}
+```
+
+`composeInstrumentProfiles(profiles)` returns an owning complete UTF-8 string without I/O.
+`writeInstrumentProfilesFile(path, profiles)` prepares before opening an owned binary/truncating
+file. The stream API borrows your stream for the call and preserves its exception mask.
+
+Formats/CSV preserve canonical field text, exact type/custom names and profile order. Numeric
+spelling, raw presence and signed-zero bits are not serialized. To prevent silent text loss,
+unpaired UTF-16, reader-forbidden types and nonempty extra REMOVED fields fail before publication;
+ordinary REMOVED tombstones, unknown/empty types and valid surrogate pairs work. See
+[writer contract](../spec/ipf/WRITER.md) and [actual writer observations](../tests/fixtures/ipf-writer/README.md).
+
+Defaults bound profiles/types/fields, retained input/format units, output bytes and logical work;
+pass `IpfWriteOptions` for other engineering bounds. Value metadata `retainedUnits()` and
+`customFieldCount()` allocate nothing and describe logical UTF-16 storage/entries, not RSS.
+
+Any I/O failure returns complete=false. Body write/flush precedes marker publication; a later
+marker/final-flush failure may already leave a complete-looking marker externally.
+`confirmedBytes` counts only successful write calls, not exact side effects of a failing call.
+Streams/files are not transactional; opening a file may destroy prior contents. The file result
+requires successful owned close. Blocking I/O has no deadline implied by resource limits.

@@ -767,6 +767,14 @@ ProfileLimits InstrumentProfile::limits() const noexcept {
     return limits_;
 }
 
+std::size_t InstrumentProfile::customFieldCount() const noexcept {
+    return custom_.size();
+}
+
+std::size_t InstrumentProfile::retainedUnits() const noexcept {
+    return totalUnits_;
+}
+
 std::u16string_view InstrumentProfile::getField(std::u16string_view name) const noexcept {
     if (auto field = findField(name)) {
         return values_[static_cast<std::size_t>(field->field)].text;

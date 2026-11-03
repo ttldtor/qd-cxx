@@ -128,6 +128,15 @@ class InstrumentProfile {
      * @return Independent limits copied by value.
      */
     [[nodiscard]] ProfileLimits limits() const noexcept;
+    /** Count retained nonempty custom values, including a possible empty name.
+     * @return Actual custom entry count; no allocation or source view is returned.
+     */
+    [[nodiscard]] std::size_t customFieldCount() const noexcept;
+    /** Measure retained standard text plus custom names/values in UTF-16 units.
+     * Configuration, container capacity and allocator overhead are excluded.
+     * @return Actual logical retained units; no allocation is performed.
+     */
+    [[nodiscard]] std::size_t retainedUnits() const noexcept;
     /** Get textual field representation; absent/custom-empty/null values normalize to empty.
      * @param name Exact name borrowed for the call; unknown and empty custom names are supported.
      * @return Borrowed normalized text; no view into the name argument is retained.

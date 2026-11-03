@@ -1,0 +1,3 @@
+##X::=TYPE::=TYPE,SYMBOL
+#X::=TYPE,A
+##COMPLETE

@@ -280,3 +280,11 @@ container/parser cleanup и cancellation с instrumented close/flush boundaries.
 `source_sequence_cli`, `source_sequence_io` и `source_sequence_large` — native-регрессии CTest.
 Большой тест владеет небольшим потоково создаваемым временным источником и проверяет канонические байты,
 не удерживая полный вывод. Логические резервы и отдельно измеренный OS RSS остаются разными наблюдениями.
+
+
+## Oracle локального IPF writer
+
+[Сопровождаемый writer oracle](../upstream/ipf-writer-oracle/README.ru.md) captures/verifies
+детерминированные Java writer bytes и reader projections, включая явные lossy/rejected boundaries.
+Встроенные `-Help`/`-HelpRu` работают без inputs; optional NativeDirectory читает actual emitted
+native writer files pinned Java reader. Сеть, SDK build и новая dependency не запускаются.
