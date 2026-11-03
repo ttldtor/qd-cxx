@@ -154,3 +154,11 @@ work; передавайте `IpfWriteOptions` для иных инженерн�
 `confirmedBytes` учитывает лишь успешные write calls, а не точные side effects неуспешного вызова.
 Streams/files не транзакционны; open файла может уничтожить прежнее содержимое. Для успешного
 file result нужен успешный owned close. Resource limits не задают deadline блокирующей I/O.
+
+
+## Решение о загрузке URL sources
+
+Локальные value/read/write APIs остаются независимыми от сетевых зависимостей. Выбранный
+[контракт dependency/ownership загрузки](../spec/ipf/TRANSFER.ru.md) определяет Beast HTTP parser,
+скомпилированный статический Boost.URL и повторное использование controlled TLS profile. Он задаёт
+владение source/credentials и квалификацию до доступности URL loading, но не добавляет URL API.

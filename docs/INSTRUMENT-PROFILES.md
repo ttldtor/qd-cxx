@@ -151,3 +151,11 @@ marker/final-flush failure may already leave a complete-looking marker externall
 `confirmedBytes` counts only successful write calls, not exact side effects of a failing call.
 Streams/files are not transactional; opening a file may destroy prior contents. The file result
 requires successful owned close. Blocking I/O has no deadline implied by resource limits.
+
+
+## URL source transfer decision
+
+Local value/read/write APIs remain independent of network dependencies. The selected
+[transfer dependency and ownership contract](../spec/ipf/TRANSFER.md) specifies Beast HTTP parser,
+compiled static Boost.URL and reuse of the controlled TLS profile. It defines source/credential
+ownership and the qualification required before URL loading becomes available; it adds no URL API.
