@@ -292,3 +292,5 @@ native writer files through the pinned Java reader. No network, SDK build or new
 - [Event-source oracle](../upstream/event-source-oracle/README.md): source identity capture/verify and standalone noargs/EN/RU help regression.
 
 - [Order source/index oracle](../upstream/order-index-oracle/README.md): production record mappings, index packing and source IDs; standalone noargs/EN/RU help.
+
+- [Order-source capability oracle](../upstream/order-source-capability-oracle/README.md): publication/full-book and specific-source values; EN/RU help without inputs, Verify default, JDK8/production classes, heap128MiB/60s, exit0/1.

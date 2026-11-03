@@ -13,23 +13,138 @@ struct Builtin {
     std::int32_t id;
     /** Static exact UTF-16 literal. */
     std::u16string_view name;
+    /** Direct publication and full-book capability bits. */
+    unsigned flags;
 };
 
+constexpr unsigned PUB_ORDER = 0x0001;
+constexpr unsigned PUB_ANALYTIC_ORDER = 0x0002;
+constexpr unsigned PUB_OTC_MARKETS_ORDER = 0x0004;
+constexpr unsigned PUB_SPREAD_ORDER = 0x0008;
+constexpr unsigned FULL_ORDER_BOOK = 0x0010;
+constexpr unsigned PUB_NUAM_ORDER = 0x0020;
+constexpr unsigned PUB_ORDER_IMBALANCE = 0x0040;
 constexpr auto BUILTINS = std::to_array<Builtin>({
-    {1, u"COMPOSITE_BID"}, {2, u"COMPOSITE_ASK"}, {3, u"REGIONAL_BID"},  {4, u"REGIONAL_ASK"},  {5, u"AGGREGATE_BID"},
-    {6, u"AGGREGATE_ASK"}, {7, u"COMPOSITE"},     {8, u"REGIONAL"},      {9, u"AGGREGATE"},     {0, u"DEFAULT"},
-    {5133398, u"NTV"},     {7238774, u"ntv"},     {5129816, u"NFX"},     {1163087940, u"ESPD"}, {1481524809, u"XNFI"},
-    {4801349, u"ICE"},     {4805445, u"ISE"},     {4474177, u"DEA"},     {4474200, u"DEX"},     {6579576, u"dex"},
-    {4348248, u"BYX"},     {4348504, u"BZX"},     {6453880, u"bzx"},     {1111577669, u"BATE"}, {1128810840, u"CHIX"},
-    {1128617304, u"CEUX"}, {1113085010, u"BXTR"}, {4805460, u"IST"},     {1112093232, u"BI20"}, {4276805, u"ABE"},
-    {1178683730, u"FAIR"}, {1196180056, u"GLBX"}, {1735156344, u"glbx"}, {1163020627, u"ERIS"}, {1480938834, u"XEUR"},
-    {2019915122, u"xeur"}, {4408901, u"CFE"},     {1127370584, u"C2OX"}, {1397573189, u"SMFE"}, {1936549477, u"smfe"},
-    {6907256, u"iex"},     {1296387416, u"MEMX"}, {1835363704, u"memx"}, {1329808705, u"OCEA"}, {1868784993, u"ocea"},
-    {1885957739, u"pink"}, {1095910209, u"ARCA"}, {1634886497, u"arca"}, {1128612952, u"CEDX"}, {1667589240, u"cedx"},
-    {4802371, u"IGC"},     {6907747, u"igc"},     {4539480, u"EDX"},     {6644856, u"edx"},     {1314210125, u"NUAM"},
-    {1853186413, u"nuam"}, {1297043278, u"MOON"}, {1836019566, u"moon"}, {1330922317, u"OTCM"}, {1869898605, u"otcm"},
-    {1112494931, u"BOSS"}, {1651471219, u"boss"}, {5129551, u"NEO"},     {7234927, u"neo"},
+    {1, u"COMPOSITE_BID", 0},
+    {2, u"COMPOSITE_ASK", 0},
+    {3, u"REGIONAL_BID", 0},
+    {4, u"REGIONAL_ASK", 0},
+    {5, u"AGGREGATE_BID", 0},
+    {6, u"AGGREGATE_ASK", 0},
+    {7, u"COMPOSITE", 0},
+    {8, u"REGIONAL", 0},
+    {9, u"AGGREGATE", 0},
+    {0, u"DEFAULT",
+     PUB_ORDER | PUB_ANALYTIC_ORDER | PUB_OTC_MARKETS_ORDER | PUB_SPREAD_ORDER | FULL_ORDER_BOOK | PUB_NUAM_ORDER |
+         PUB_ORDER_IMBALANCE},
+    {5133398, u"NTV", PUB_ORDER | FULL_ORDER_BOOK | PUB_ORDER_IMBALANCE},
+    {7238774, u"ntv", PUB_ORDER},
+    {5129816, u"NFX", PUB_ORDER},
+    {1163087940, u"ESPD", PUB_ORDER},
+    {1481524809, u"XNFI", PUB_ORDER},
+    {4801349, u"ICE", PUB_ORDER},
+    {4805445, u"ISE", PUB_ORDER | PUB_SPREAD_ORDER},
+    {4474177, u"DEA", PUB_ORDER},
+    {4474200, u"DEX", PUB_ORDER},
+    {6579576, u"dex", PUB_ORDER},
+    {4348248, u"BYX", PUB_ORDER},
+    {4348504, u"BZX", PUB_ORDER},
+    {6453880, u"bzx", PUB_ORDER},
+    {1111577669, u"BATE", PUB_ORDER},
+    {1128810840, u"CHIX", PUB_ORDER},
+    {1128617304, u"CEUX", PUB_ORDER},
+    {1113085010, u"BXTR", PUB_ORDER},
+    {4805460, u"IST", PUB_ORDER},
+    {1112093232, u"BI20", PUB_ORDER},
+    {4276805, u"ABE", PUB_ORDER},
+    {1178683730, u"FAIR", PUB_ORDER},
+    {1196180056, u"GLBX", PUB_ORDER | PUB_ANALYTIC_ORDER},
+    {1735156344, u"glbx", PUB_ORDER},
+    {1163020627, u"ERIS", PUB_ORDER},
+    {1480938834, u"XEUR", PUB_ORDER},
+    {2019915122, u"xeur", PUB_ORDER},
+    {4408901, u"CFE", PUB_ORDER},
+    {1127370584, u"C2OX", PUB_ORDER},
+    {1397573189, u"SMFE", PUB_ORDER},
+    {1936549477, u"smfe", PUB_ORDER},
+    {6907256, u"iex", PUB_ORDER},
+    {1296387416, u"MEMX", PUB_ORDER},
+    {1835363704, u"memx", PUB_ORDER},
+    {1329808705, u"OCEA", PUB_ORDER},
+    {1868784993, u"ocea", PUB_ORDER},
+    {1885957739, u"pink", PUB_ORDER | PUB_OTC_MARKETS_ORDER},
+    {1095910209, u"ARCA", PUB_ORDER | PUB_ORDER_IMBALANCE},
+    {1634886497, u"arca", PUB_ORDER},
+    {1128612952, u"CEDX", PUB_ORDER},
+    {1667589240, u"cedx", PUB_ORDER},
+    {4802371, u"IGC", PUB_ORDER},
+    {6907747, u"igc", PUB_ORDER},
+    {4539480, u"EDX", PUB_ORDER},
+    {6644856, u"edx", PUB_ORDER},
+    {1314210125, u"NUAM", PUB_ORDER | FULL_ORDER_BOOK | PUB_NUAM_ORDER | PUB_ORDER_IMBALANCE},
+    {1853186413, u"nuam", PUB_ORDER | PUB_NUAM_ORDER},
+    {1297043278, u"MOON", PUB_ORDER},
+    {1836019566, u"moon", PUB_ORDER},
+    {1330922317, u"OTCM", PUB_ORDER},
+    {1869898605, u"otcm", PUB_ORDER},
+    {1112494931, u"BOSS", PUB_ORDER},
+    {1651471219, u"boss", PUB_ORDER},
+    {5129551, u"NEO", PUB_ORDER},
+    {7234927, u"neo", PUB_ORDER},
 });
+
+/** @param eventType Exact supported family.
+ * @return Capability bit for that family.
+ * @throws std::invalid_argument Unrecognized family.
+ */
+unsigned eventTypeMask(OrderEventType eventType) {
+    switch (eventType) {
+    case OrderEventType::ORDER:
+        return PUB_ORDER;
+    case OrderEventType::ANALYTIC_ORDER:
+        return PUB_ANALYTIC_ORDER;
+    case OrderEventType::OTC_MARKETS_ORDER:
+        return PUB_OTC_MARKETS_ORDER;
+    case OrderEventType::SPREAD_ORDER:
+        return PUB_SPREAD_ORDER;
+    case OrderEventType::NUAM_ORDER:
+        return PUB_NUAM_ORDER;
+    case OrderEventType::ORDER_IMBALANCE:
+        return PUB_ORDER_IMBALANCE;
+    }
+
+    throw std::invalid_argument("Invalid order event type");
+}
+
+/** @param id Resolved source ID.
+ * @return Built-in capability bits, or zero for custom sources.
+ */
+unsigned sourceFlags(std::int32_t id) noexcept {
+    for (const auto &entry : BUILTINS) {
+        if (entry.id == id) {
+            return entry.flags;
+        }
+    }
+
+    return 0;
+}
+
+/** @param mask Publication or full-book capability bit.
+ * @return Owned filtered catalog in declaration order.
+ * @throws std::bad_alloc Allocation fails.
+ * @throws std::length_error Result exceeds container capacity.
+ */
+std::vector<OrderSource> matchingSources(unsigned mask) {
+    std::vector<OrderSource> sources;
+
+    for (const auto &entry : BUILTINS) {
+        if ((entry.flags & mask) != 0) {
+            sources.push_back(OrderSource::valueOf(entry.id));
+        }
+    }
+
+    return sources;
+}
 
 /** @param unit Exact UTF-16 unit to check.
  * @return True for ASCII letters and digits only.
@@ -170,6 +285,24 @@ OrderSource OrderSource::valueOf(std::optional<std::u16string_view> name) {
     }
 
     return OrderSource(id, *name);
+}
+
+bool OrderSource::isPublishable(OrderEventType eventType) const {
+    const auto mask = eventTypeMask(eventType);
+
+    return (sourceFlags(id()) & mask) != 0;
+}
+
+bool OrderSource::isFullOrderBook() const noexcept {
+    return (sourceFlags(id()) & FULL_ORDER_BOOK) != 0;
+}
+
+std::vector<OrderSource> OrderSource::publishable(OrderEventType eventType) {
+    return matchingSources(eventTypeMask(eventType));
+}
+
+std::vector<OrderSource> OrderSource::fullOrderBook() {
+    return matchingSources(FULL_ORDER_BOOK);
 }
 
 std::int32_t OrderSource::id() const noexcept {

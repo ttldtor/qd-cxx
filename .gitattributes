@@ -1,4 +1,8 @@
 * text=auto
+# Order source capability observations retain exact bytes; launcher/provenance hashes use LF.
+tools/upstream/order-source-capability-oracle/*.ps1 text eol=lf
+tests/fixtures/order-source-capabilities/provenance.json text eol=lf
+tests/fixtures/order-source-capabilities/oracle.tsv -text -whitespace
 # Event-time source/provenance hashes use canonical LF; raw oracle observations retain exact bytes.
 tools/upstream/event-time-oracle/*.ps1 text eol=lf
 tests/fixtures/event-times/*.json text eol=lf

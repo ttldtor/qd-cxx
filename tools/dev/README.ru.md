@@ -305,3 +305,5 @@ native writer files pinned Java reader. Сеть, SDK build и новая depend
 - [Oracle источников событий](../upstream/event-source-oracle/README.ru.md): захват/проверка идентичности и отдельная проверка noargs/EN/RU справки.
 
 - [Order source/index oracle](../upstream/order-index-oracle/README.ru.md): production отображения, индексы, source IDs и справка EN/RU без рабочих входов.
+
+- [Oracle возможностей источников](../upstream/order-source-capability-oracle/README.ru.md): publication/full-book и specific-source; EN/RU help без входов, Verify по умолчанию, JDK8/production classes, heap128MiB/60s, код 0/1.

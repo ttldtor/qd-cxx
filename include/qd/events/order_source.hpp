@@ -4,9 +4,27 @@
 
 #include "qd/events/indexed_event_source.hpp"
 
+#include <vector>
+
 namespace org::ttldtor::qdcxx::events {
+/** Exact supported order event families for publication capability queries. */
+enum class OrderEventType {
+    /** Ordinary Order. */
+    ORDER,
+    /** AnalyticOrder. */
+    ANALYTIC_ORDER,
+    /** OtcMarketsOrder. */
+    OTC_MARKETS_ORDER,
+    /** SpreadOrder. */
+    SPREAD_ORDER,
+    /** NuamOrder. */
+    NUAM_ORDER,
+    /** OrderImbalance. */
+    ORDER_IMBALANCE
+};
+
 /** Owned order-source identity with strict built-in/name resolution.
- * No capabilities, record packing, subscription routing or interning is implied.
+ * Capabilities describe direct publication, not subscription admission or routing.
  */
 class OrderSource final {
     IndexedEventSource source_;
@@ -46,6 +64,25 @@ class OrderSource final {
      * @return True when IDs match, ignoring source family and names.
      */
     [[nodiscard]] bool operator==(const IndexedEventSource &other) const noexcept;
+    /** @param eventType Exact event family; unrecognized enum values are invalid.
+     * @return Whether direct publication is supported. Custom sources return false.
+     * @throws std::invalid_argument Unrecognized event family.
+     */
+    [[nodiscard]] bool isPublishable(OrderEventType eventType) const;
+    /** @return Whether this source supports a full order book; custom sources return false. */
+    [[nodiscard]] bool isFullOrderBook() const noexcept;
+    /** @param eventType Exact event family; unrecognized enum values are invalid.
+     * @return Independently owned publishable sources in upstream declaration order.
+     * @throws std::invalid_argument Unrecognized event family.
+     * @throws std::bad_alloc Allocation fails.
+     * @throws std::length_error Result exceeds container capacity.
+     */
+    [[nodiscard]] static std::vector<OrderSource> publishable(OrderEventType eventType);
+    /** @return Independently owned full-order-book sources in upstream declaration order.
+     * @throws std::bad_alloc Allocation fails.
+     * @throws std::length_error Result exceeds container capacity.
+     */
+    [[nodiscard]] static std::vector<OrderSource> fullOrderBook();
     /** Built-in identity named COMPOSITE_BID. */
     static const OrderSource COMPOSITE_BID;
     /** Built-in identity named COMPOSITE_ASK. */

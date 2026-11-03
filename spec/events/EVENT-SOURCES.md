@@ -59,7 +59,7 @@ exposing partial returned values. Error text is not a compatibility contract.
 Base construction does not reject nullable names or signed IDs.
 
 Source identity is distinct from a regional exchange code and physical route origin.
-Capabilities, Order record mapping/index packing, source subscriptions and new wire
+Order record mapping/index packing, active source subscriptions and new wire
 events are outside this API.
 
 ## Conformance
@@ -70,3 +70,50 @@ cover all built-ins and round-trips, invalid names/IDs, nullable/empty/malformed
 base names, duplicate IDs with different names, and cross-family equality/hash.
 The focused C++ test consumes these observations directly.
 [Usage](../../docs/EVENT-SOURCES.md) covers the independent installed API.
+
+## Publication capabilities and source selection
+
+OrderEventType identifies exactly six supported families. isPublishable(type) and
+publishable(type) reject unrecognized enum values with std::invalid_argument,
+including when the queried source is custom. A derived or unrelated Java event
+class is not another supported family. Lists contain independent owning values in
+upstream declaration order; changing a returned list cannot change the catalog.
+
+| Capability | Sources |
+| --- | --- |
+| Order | DEFAULT and every encoded-name built-in |
+| AnalyticOrder | DEFAULT, GLBX |
+| OtcMarketsOrder | DEFAULT, pink |
+| SpreadOrder | DEFAULT, ISE |
+| NuamOrder | DEFAULT, NUAM, nuam |
+| OrderImbalance | DEFAULT, NTV, ARCA, NUAM |
+| Full order book | DEFAULT, NTV, NUAM |
+
+The nine synthetic/aggregate sources (IDs 1–9) have no publication/full-book flags.
+Custom OrderSource values have no flags, even though their names and IDs resolve
+normally. Full-book support and publication are separate queries; neither is a
+subscription admission check. fullOrderBook() filters the same finite built-in
+catalog. Capability predicates allocate no storage; list creation can throw
+standard allocation/capacity errors and never exposes a partial result.
+
+[SourceSelection](../../include/qd/events/source_selection.hpp) owns either ALL or
+one IndexedEventSource. all() represents the plain-symbol semantics described by
+IndexedEventSubscriptionSymbol: all supported sources, without treating the finite
+built-in catalog as the complete set. specific(source) represents a source-specific
+symbol. An explicit DEFAULT ID zero is a specific selection and is unequal to ALL.
+Specific selection accepts every signed base ID, special/custom ID and nullable
+name; it compares only IDs. It does not impose OrderSource name validation or
+publication flags. Java rejects a null source reference; specific requires a value,
+so this invalid combination is unrepresentable. matches(candidate) is true for ALL
+or an equal selected ID. source() returns nullptr for ALL, otherwise a borrowed
+pointer invalidated by assignment, move-from or destruction. Copies own independent
+names; read-only access to unchanged values needs no shared mutable cache.
+
+The [production oracle](../../tools/upstream/order-source-capability-oracle/README.md)
+records all 64 built-ins, five custom sources, six family lists, full-book list,
+invalid null/unrelated event types and arbitrary specific-source IDs. Its 503 raw
+observations cover exact list order and ID-only symbol equality. Source pointers:
+OrderSource.getEventTypeMask/isPublishable/publishable/fullOrderBook and
+api/osub/IndexedEventSubscriptionSymbol constructor, equality and class documentation.
+OrderBase.setSource does not use capability flags. The pure selector performs no
+symbol wrapping, Feed integration, source-specific record mapping or Order reception.

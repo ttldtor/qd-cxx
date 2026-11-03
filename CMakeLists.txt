@@ -79,7 +79,7 @@ add_library(qdcxx_event_mapping src/events/event_mapping.cpp)
 add_library(qdcxx_order_index src/events/order_index.cpp)
 target_link_libraries(qdcxx_order_index PUBLIC qdcxx_event_mapping qdcxx_event_sources)
 set_target_properties(qdcxx_order_index PROPERTIES CXX_EXTENSIONS OFF)
-add_library(qdcxx_event_sources src/events/indexed_event_source.cpp src/events/order_source.cpp)
+add_library(qdcxx_event_sources src/events/indexed_event_source.cpp src/events/order_source.cpp src/events/source_selection.cpp)
 target_include_directories(qdcxx_event_sources PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 target_compile_features(qdcxx_event_sources PUBLIC cxx_std_23)
@@ -349,6 +349,17 @@ if(BUILD_TESTING)
     target_compile_definitions(qdcxx_event_sources_tests PRIVATE
         ORG_TTLDTOR_QDCXX_SOURCE_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/event-sources/oracle.tsv")
     add_test(NAME event_sources COMMAND qdcxx_event_sources_tests)
+    add_executable(qdcxx_order_source_capability_tests tests/conformance/order_source_capability_tests.cpp)
+    target_link_libraries(qdcxx_order_source_capability_tests PRIVATE qdcxx_event_sources doctest::doctest)
+    target_compile_definitions(qdcxx_order_source_capability_tests PRIVATE
+        ORG_TTLDTOR_QDCXX_CAPABILITY_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/order-source-capabilities/oracle.tsv")
+    set_target_properties(qdcxx_order_source_capability_tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME order_source_capabilities COMMAND qdcxx_order_source_capability_tests)
+    set_tests_properties(order_source_capabilities PROPERTIES TIMEOUT 30)
+    if(WIN32)
+        add_test(NAME order_source_capability_oracle_help COMMAND ${CMAKE_COMMAND}
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/order_source_capability_oracle_help.cmake")
+    endif()
     add_executable(qdcxx_market_event_symbols_tests tests/conformance/market_event_symbols_tests.cpp)
     target_link_libraries(qdcxx_market_event_symbols_tests PRIVATE qdcxx_market_event_symbols doctest::doctest)
     target_compile_definitions(qdcxx_market_event_symbols_tests PRIVATE
