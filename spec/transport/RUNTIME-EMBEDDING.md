@@ -85,6 +85,38 @@ preconditions. These checks run for each borrowed construction, before the resol
 reliably reconstruct whether the host initialized before unrelated threads or
 whether every foreign SDK user honored its obligations.
 
+## Controlled coexistence and detached handles
+
+A host may create two owners from the same linked QDCXX/SDK image on main before
+starting its application threads. A feed runtime may later borrow either live
+owner on that same creator thread while another controlled native runtime is
+active. Destroying the later borrower releases its leases; it must not stop the
+other owner's native work or perform global SDK cleanup. Keep every host owner
+alive until its borrowers and application threads have retired. This qualified
+ordering does not extend to arbitrary foreign DLLs, raw OpenSSL/c-ares ownership,
+changed allocators, cold initialization in an already threaded host, or isolation.
+
+After runtime quiescence and destruction, surviving endpoint/subscription handles
+are terminal detached control objects. Their state and diagnostic queries remain
+usable; accepted native work and callbacks cannot continue through them. A
+successful close remains `CLOSED`; a retained native failure remains `FAILED`
+with its original diagnostic. Shutdown does not erase a failure to manufacture
+successful closure. `awaitState` still requires the original creator thread,
+even for an already reached terminal state; a foreign-thread wait rejects
+`WRONG_THREAD`. Producer admission to a closed subscription rejects `CLOSED`.
+Nonblocking close and removal of an absent state-observer identity stay idempotent.
+Once quiescence is established, the last closed handle may be released on another
+thread without joining an SDK worker or acquiring/releasing the host's SDK state.
+
+Application callbacks and final capture destructors may reenter permitted query
+and nonblocking-close operations. They run outside port/control locks. Use runtime
+shutdown on its creator to include native, callback and capture retirement;
+observing an endpoint terminal state alone is not the complete quiescence barrier
+for opted-in state observers. Closing a borrowed runtime also does not release its
+outer bootstrap lease until that runtime object is destroyed. Detached handles
+do not extend that lease, and they do not authorize a new native activation after
+the owner has retired.
+
 ## Why initialized-state detection is insufficient
 
 The pinned `src/lib/ares_library_init.c` uses a non-atomic global unsigned reference

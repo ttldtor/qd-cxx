@@ -22,10 +22,12 @@
 
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <cstdlib>
 #include <exception>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <stdexcept>
 #include <string_view>
@@ -224,6 +226,126 @@ struct Capture {
 
     ~Capture() {
         retired.store(true, std::memory_order_release);
+    }
+};
+
+/** Keep one bounded, joined host thread alive without SDK calls or a polling loop. */
+class EmbeddingHostThread {
+    std::mutex mutex_;
+    std::condition_variable_any changed_;
+    bool ready_ = false;
+    std::atomic<bool> alive_{false};
+    std::jthread thread_;
+
+    public:
+    /** Start only after every host bootstrap was created on main; throw if readiness exceeds five seconds. */
+    EmbeddingHostThread()
+        : thread_([this](std::stop_token stop) {
+              std::unique_lock lock(mutex_);
+              alive_.store(true, std::memory_order_release);
+              ready_ = true;
+              changed_.notify_all();
+              changed_.wait(lock, stop, [] {
+                  return false;
+              });
+              alive_.store(false, std::memory_order_release);
+          }) {
+        std::unique_lock lock(mutex_);
+
+        if (!changed_.wait_for(lock, 5s, [this] {
+                return ready_;
+            })) {
+            throw std::runtime_error("host-thread-ready");
+        }
+    }
+
+    /** Inspect the known owned thread, without claiming to enumerate foreign threads.
+     * @return True while the host thread is waiting for its own stop token.
+     */
+    bool alive() const noexcept {
+        return alive_.load(std::memory_order_acquire);
+    }
+};
+
+/** Test-owned callback observation; declared before the runtime that retains its references. */
+class EmbeddingQuoteSignal {
+    std::mutex mutex_;
+    std::condition_variable changed_;
+    unsigned count_ = 0;
+    bool valid_ = true;
+
+    public:
+    /** Record actual typed native delivery without retaining the borrowed span.
+     * @param batch The current listener invocation's Quote values.
+     */
+    void record(std::span<const root::events::Quote> batch) {
+        {
+            std::lock_guard lock(mutex_);
+            valid_ = valid_ && batch.size() == 1 && batch.front().symbol == u"AAPL";
+            count_ += static_cast<unsigned>(batch.size());
+        }
+        changed_.notify_all();
+    }
+
+    /** Await an actual callback, without progressing the SDK.
+     * @return True after one valid Quote arrived within five seconds.
+     */
+    bool wait() {
+        std::unique_lock lock(mutex_);
+
+        return changed_.wait_for(lock, 5s,
+                                 [this] {
+                                     return count_ != 0;
+                                 }) &&
+               valid_ && count_ == 1;
+    }
+
+    /** Copy the callback count under the same application mutex.
+     * @return Number of observed owning Quote values.
+     */
+    unsigned count() {
+        std::lock_guard lock(mutex_);
+
+        return count_;
+    }
+};
+
+/** Main-owned result outlives callback capture destruction and runtime quiescence. */
+struct EmbeddingCaptureObservation {
+    std::atomic<bool> reentered{false};
+    std::atomic<bool> retired{false};
+    std::atomic<bool> failed{false};
+};
+
+/** Strong application handle cycle that shutdown must retire outside both port/control locks. */
+struct EmbeddingReentrantCapture {
+    std::shared_ptr<api::Endpoint> endpoint;
+    std::shared_ptr<api::Subscription<root::events::Quote>> subscription;
+    EmbeddingCaptureObservation &observation;
+
+    /** Retain application handles until the last registered/selected function releases this capture.
+     * @param endpoint Endpoint used for nonblocking callback reentry.
+     * @param subscription Subscription whose own capture will query and close it during final release.
+     * @param observation Main-owned results, declared before the runtime.
+     */
+    EmbeddingReentrantCapture(std::shared_ptr<api::Endpoint> endpoint,
+                              std::shared_ptr<api::Subscription<root::events::Quote>> subscription,
+                              EmbeddingCaptureObservation &observation)
+        : endpoint(std::move(endpoint)), subscription(std::move(subscription)), observation(observation) {
+    }
+
+    /** Reacquire both public query locks and reenter close; a lock-held destruction would hit the test timeout. */
+    ~EmbeddingReentrantCapture() {
+        try {
+            static_cast<void>(endpoint->getDiagnostic());
+            static_cast<void>(subscription->getDiagnostic());
+            endpoint->close();
+            subscription->close();
+            observation.reentered.store(true, std::memory_order_release);
+        } catch (...) {
+            observation.failed.store(true, std::memory_order_release);
+        }
+        observation.retired.store(true, std::memory_order_release);
     }
 };
 } // namespace
@@ -435,6 +557,235 @@ TEST_CASE("borrowed feed retires an actually pending DNS query before releasing 
         CHECK(terminalDiagnostic.detailCode == static_cast<std::uint32_t>(transport::RecoveryError::TRANSPORT_FAILURE));
     }
     CHECK(probe->state()->borrowers.load() == 1);
+}
+
+TEST_CASE("runtime embedding late borrow preserves a live native owner across quiescence") {
+    bool separateOwner = false;
+    SUBCASE("one pre-thread host owner") {
+    }
+    SUBCASE("two pre-thread same-image host owners") {
+        separateOwner = true;
+    }
+    auto bootstrap = transport::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    std::optional<transport::RuntimeBootstrap> other;
+
+    if (separateOwner) {
+        auto created = transport::RuntimeBootstrap::create();
+        REQUIRE(created);
+        other.emplace(std::move(*created));
+    }
+
+    auto firstProbe = transport::detail::BootstrapLease::acquire(*bootstrap);
+    REQUIRE(firstProbe);
+    std::optional<transport::detail::BootstrapLease> otherProbe;
+
+    if (other) {
+        auto acquired = transport::detail::BootstrapLease::acquire(*other);
+        REQUIRE(acquired);
+        otherProbe.emplace(std::move(*acquired));
+    }
+
+    EmbeddingQuoteSignal firstSignal;
+    EmbeddingQuoteSignal lateSignal;
+    EmbeddingHostThread host;
+    auto declaration = schema();
+    std::vector<root::core::FieldValue> values;
+
+    for (const auto &field : declaration.records()[0].fields) {
+        values.push_back({static_cast<root::core::SerialFieldType>(field.serialTypeId), 0});
+    }
+
+    const std::vector<peer::Record> records{{u"AAPL", std::move(values)}};
+    const std::vector<std::u16string> symbols{u"AAPL"};
+    peer::PeerScript gated;
+    gated.family = root::core::SubscriptionFamily::TICKER;
+    gated.canonicalSymbols = true;
+    gated.waitForDataRelease = true;
+    auto ready = gated;
+    ready.waitForDataRelease = false;
+    peer::Peer firstSource(declaration, records, symbols, 8192, peer::PeerMode::HOLD, gated);
+    peer::Peer lateSource(declaration, records, symbols, 8192, peer::PeerMode::HOLD, ready);
+    {
+        api::ApiRuntime first(*bootstrap, options());
+        auto endpoint = first.createEndpoint();
+        auto subscription = endpoint->getFeed()->createSubscription<root::events::Quote>();
+        subscription->addEventListener([&firstSignal](auto batch) {
+            firstSignal.record(batch);
+        });
+        subscription->addSymbols("AAPL");
+        endpoint->connect("127.0.0.1:" + std::to_string(firstSource.port()));
+        REQUIRE(endpoint->awaitState(api::EndpointState::CONNECTED, std::chrono::steady_clock::now() + 5s).status ==
+                api::WaitStatus::REACHED);
+        REQUIRE(eventually([&] {
+            return firstSource.adds() == 1;
+        }));
+        CHECK(firstSignal.count() == 0);
+        const auto firstBaseline = firstProbe->state()->borrowers.load();
+        {
+            api::ApiRuntime late(other ? *other : *bootstrap, options());
+            auto lateEndpoint = late.createEndpoint();
+            auto lateSubscription = lateEndpoint->getFeed()->createSubscription<root::events::Quote>();
+            lateSubscription->addEventListener([&lateSignal](auto batch) {
+                lateSignal.record(batch);
+            });
+            lateSubscription->addSymbols("AAPL");
+            lateEndpoint->connect("127.0.0.1:" + std::to_string(lateSource.port()));
+            REQUIRE(lateSignal.wait());
+            CHECK(host.alive());
+        }
+        CHECK(firstProbe->state()->borrowers.load() == firstBaseline);
+
+        if (otherProbe) {
+            CHECK(otherProbe->state()->borrowers.load() == 1);
+        }
+
+        CHECK(host.alive());
+        CHECK(endpoint->getState() == api::EndpointState::CONNECTED);
+        CHECK(endpoint->getDiagnostic().code == api::ErrorCode::NONE);
+        firstSource.releaseData();
+        REQUIRE(firstSignal.wait());
+        first.closeAndAwaitTermination();
+        CHECK_FALSE(firstSource.failed());
+        CHECK_FALSE(lateSource.failed());
+    }
+    CHECK(firstProbe->state()->borrowers.load() == 1);
+
+    if (otherProbe) {
+        CHECK(otherProbe->state()->borrowers.load() == 1);
+    }
+}
+
+TEST_CASE("runtime embedding native detached handles survive owner retirement and foreign final release") {
+    bool borrowed = false;
+    SUBCASE("owned runtime") {
+    }
+    SUBCASE("borrowed runtime") {
+        borrowed = true;
+    }
+    std::optional<transport::RuntimeBootstrap> host;
+    std::optional<transport::detail::BootstrapLease> probe;
+
+    if (borrowed) {
+        auto created = transport::RuntimeBootstrap::create();
+        REQUIRE(created);
+        host.emplace(std::move(*created));
+        auto acquired = transport::detail::BootstrapLease::acquire(*host);
+        REQUIRE(acquired);
+        probe.emplace(std::move(*acquired));
+    }
+
+    EmbeddingQuoteSignal signal;
+    EmbeddingQuoteSignal pausedReplay;
+    EmbeddingCaptureObservation observation;
+    std::weak_ptr<EmbeddingReentrantCapture> captureWitness;
+    std::shared_ptr<api::Endpoint> endpoint;
+    std::shared_ptr<api::Subscription<root::events::Quote>> subscription;
+    {
+        auto runtime = borrowed ? std::make_unique<api::ApiRuntime>(*host, options())
+                                : std::make_unique<api::ApiRuntime>(options());
+        auto declaration = schema();
+        std::vector<root::core::FieldValue> values;
+
+        for (const auto &field : declaration.records()[0].fields) {
+            values.push_back({static_cast<root::core::SerialFieldType>(field.serialTypeId), 0});
+        }
+
+        const std::vector<peer::Record> records{{u"AAPL", std::move(values)}};
+        const std::vector<std::u16string> symbols{u"AAPL"};
+        {
+            peer::PeerScript script;
+            script.family = root::core::SubscriptionFamily::TICKER;
+            script.canonicalSymbols = true;
+            peer::Peer source(declaration, records, symbols, 8192, peer::PeerMode::HOLD, script);
+            endpoint = runtime->createEndpoint();
+            subscription = endpoint->getFeed()->createSubscription<root::events::Quote>();
+            auto capture = std::make_shared<EmbeddingReentrantCapture>(endpoint, subscription, observation);
+            captureWitness = capture;
+            subscription->addEventListener([capture, &signal](auto batch) {
+                capture->endpoint->disconnect();
+                signal.record(batch);
+            });
+            capture.reset();
+            subscription->addSymbols("AAPL");
+            endpoint->connect("127.0.0.1:" + std::to_string(source.port()));
+            REQUIRE(signal.wait());
+            auto cached = endpoint->getFeed()->createSubscription<root::events::Quote>();
+            cached->addEventListener([&pausedReplay](auto batch) {
+                pausedReplay.record(batch);
+            });
+            cached->addSymbols("AAPL");
+            // A genuine retained INITIAL requires physical SUSPENDED; logical NOT_CONNECTED alone is no barrier.
+            REQUIRE(pausedReplay.wait());
+            CHECK(endpoint->getState() == api::EndpointState::NOT_CONNECTED);
+            CHECK(endpoint->getDiagnostic().code == api::ErrorCode::NONE);
+            runtime->closeAndAwaitTermination();
+            CHECK(observation.retired.load(std::memory_order_acquire));
+            CHECK(observation.reentered.load(std::memory_order_acquire));
+            CHECK_FALSE(observation.failed.load(std::memory_order_acquire));
+            CHECK(captureWitness.expired());
+            CHECK(source.adds() == 1);
+            CHECK_FALSE(source.failed());
+
+            if (probe) {
+                CHECK(probe->state()->borrowers.load() == 2);
+            }
+        }
+        // The owned bootstrap cannot be destroyed until the application peer thread above has joined.
+    }
+
+    if (probe) {
+        CHECK(probe->state()->borrowers.load() == 1);
+    }
+
+    const auto detachedDiagnostic = endpoint->getDiagnostic();
+    CAPTURE(detachedDiagnostic.stage);
+    CAPTURE(detachedDiagnostic.nativeCode);
+    CAPTURE(detachedDiagnostic.detailCode);
+    CHECK(endpoint->getState() == api::EndpointState::CLOSED);
+    CHECK(subscription->getState() == api::SubscriptionState::CLOSED);
+    CHECK(endpoint->getDiagnostic().code == api::ErrorCode::NONE);
+    CHECK(subscription->getDiagnostic().code == api::ErrorCode::NONE);
+    CHECK(endpoint->awaitState(api::EndpointState::CLOSED).status == api::WaitStatus::REACHED);
+    CHECK(subscription->awaitState(api::SubscriptionState::CLOSED).status == api::WaitStatus::REACHED);
+    CHECK(diagnostic([&] {
+              subscription->addSymbols("IBM");
+          }).code == api::ErrorCode::CLOSED);
+    const auto callbacks = signal.count();
+    std::weak_ptr<api::Endpoint> endpointWitness = endpoint;
+    std::weak_ptr<api::Subscription<root::events::Quote>> subscriptionWitness = subscription;
+    std::atomic<bool> foreignClosed{false};
+    std::atomic<api::ErrorCode> endpointWait{api::ErrorCode::NONE};
+    std::atomic<api::ErrorCode> subscriptionWait{api::ErrorCode::NONE};
+    std::thread foreign([endpoint = std::move(endpoint), subscription = std::move(subscription), &foreignClosed,
+                         &endpointWait, &subscriptionWait]() mutable {
+        foreignClosed = endpoint->getState() == api::EndpointState::CLOSED &&
+                        subscription->getState() == api::SubscriptionState::CLOSED;
+        endpointWait = diagnostic([&] {
+                           static_cast<void>(endpoint->awaitState(api::EndpointState::CLOSED));
+                       }).code;
+        subscriptionWait = diagnostic([&] {
+                               static_cast<void>(subscription->awaitState(api::SubscriptionState::CLOSED));
+                           }).code;
+        endpoint->disconnect();
+        endpoint->disconnectAndClear();
+        endpoint->reconnect();
+        endpoint->close();
+        subscription->close();
+        subscription.reset();
+        endpoint.reset();
+    });
+    foreign.join();
+    CHECK(foreignClosed.load());
+    CHECK(endpointWait.load() == api::ErrorCode::WRONG_THREAD);
+    CHECK(subscriptionWait.load() == api::ErrorCode::WRONG_THREAD);
+    CHECK(signal.count() == callbacks);
+    CHECK(endpointWitness.expired());
+    CHECK(subscriptionWitness.expired());
+
+    if (probe) {
+        CHECK(probe->state()->borrowers.load() == 1);
+    }
 }
 
 /** Run bounded internal death modes or the ordinary doctest suite.

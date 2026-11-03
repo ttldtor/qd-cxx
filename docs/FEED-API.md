@@ -189,12 +189,14 @@ and need not combine all selected types. See the complete
 
 ## Runtime, callbacks and shutdown
 
-Create `ApiRuntime` on the application's main thread **before application threads**.
-It acquires the existing transport bootstrap and retains it until its worker has
-joined. The worker starts lazily on the first accepted `connect()` request and is
-shared by that runtime's endpoints. Coordinate all other users of the same c-ares
-library; application threads must retire before the runtime is destroyed. See the
-[bootstrap lifetime contract](../spec/transport/TCP-RUNTIME.md).
+Create the owning `ApiRuntime(RuntimeOptions)` on main **before application threads**;
+those threads must retire before its destruction. A host that already created
+`RuntimeBootstrap` on main before starting threads may later use the explicit
+borrowing constructor on that same creator thread, while retaining the host owner.
+Both forms retain their bootstrap lease until the runtime object is destroyed,
+including after close. The worker starts lazily on the first accepted `connect()`
+and is shared by that runtime's endpoints. Coordinate every user of the same
+c-ares state. See the [embedding and ownership contract](../spec/transport/RUNTIME-EMBEDDING.md).
 
 Destroy the runtime on its creating thread. It is neither copyable nor movable.
 `Endpoint::closeAndAwaitTermination()` and `ApiRuntime::closeAndAwaitTermination()`
@@ -211,6 +213,13 @@ Endpoint and subscription producer methods are safe to call from listeners.
 capacity exhaustion. Releasing endpoint/subscription handles requests close;
 retirement remains with the runtime. Handles may survive the runtime as closed,
 detached ports and do not keep a native worker alive.
+
+After quiescence, state/diagnostic queries and final release of a terminal handle
+are permitted on another thread. `awaitState` remains creator-affine even when its
+terminal target is already reached; a closed subscription refuses new admission
+with `CLOSED`. These handles retain no SDK lease and cannot resume native work
+after runtime destruction. A retained native failure stays `FAILED` with its
+original diagnostic rather than becoming a successful `CLOSED`.
 
 Listeners run serially on the worker. Their span expires when that invocation
 returns; copy an event to retain its owning strings and values. Such application
