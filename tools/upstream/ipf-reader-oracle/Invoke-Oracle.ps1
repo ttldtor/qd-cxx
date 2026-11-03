@@ -1,5 +1,6 @@
 # Copyright (c) 2026 ttldtor.
 # SPDX-License-Identifier: BSL-1.0
+
 <#
 .SYNOPSIS
 Capture or verify deterministic plain local instrument-profile stream observations against pinned Java QD.

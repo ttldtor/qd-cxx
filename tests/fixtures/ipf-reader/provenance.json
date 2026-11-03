@@ -4,7 +4,7 @@
   "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
   "javacSha256": "633143e961aa18051c09112b85333f5cdbd845b54eb39678eb15b91ca8bbb527",
   "harnessSha256": "194e211c79445b290c3fd533339259760d4920e789aa38b80701294c6cf6bb5b",
-  "launcherSha256": "2f2365e886ac976c0b5e7e8079f95e9c6d502318af957814f7b91c0fca1d6f4c",
+  "launcherSha256": "deeb92ef8144eb2c895f4ea37a6bc4585241e978c3106a3e33eacaf83f4aed88",
   "upstreamSources": [
     {
       "path": "dxfeed-api/src/main/java/com/dxfeed/ipf/InstrumentProfile.java",
