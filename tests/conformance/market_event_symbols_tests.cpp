@@ -7,6 +7,7 @@
 #include <doctest/doctest.h>
 #include <fstream>
 #include <sstream>
+#include <stdexcept>
 
 using namespace org::ttldtor::qdcxx::events::market_symbols;
 
@@ -112,4 +113,91 @@ TEST_CASE("Returned strings outlive caller storage and inputs remain unchanged")
 
     REQUIRE(changed);
     CHECK(*changed == u"IBM&Q{z=2,a=1}");
+}
+
+TEST_CASE("Attribute operations match production Java exact UTF16 and malformed syntax") {
+    std::ifstream input(ORG_TTLDTOR_QDCXX_MARKET_ATTRIBUTE_FIXTURE);
+    REQUIRE(input.good());
+    std::string line;
+    std::size_t rows = 0;
+    std::size_t nullKeyErrors = 0;
+    std::size_t substringErrors = 0;
+
+    while (std::getline(input, line)) {
+        if (!line.empty() && line.back() == '\r') {
+            line.pop_back();
+        }
+
+        std::array<std::string, 5> columns;
+        std::istringstream parser(line);
+
+        for (auto &column : columns) {
+            std::getline(parser, column, '\t');
+        }
+
+        CAPTURE(rows);
+        CAPTURE(columns[0]);
+        CAPTURE(columns[1]);
+        CAPTURE(columns[2]);
+        CAPTURE(columns[3]);
+        const auto symbol = decode(columns[1]);
+        const auto key = decode(columns[2]);
+        const auto value = decode(columns[3]);
+        const auto invoke = [&]() -> std::optional<std::u16string> {
+            if (columns[0] == "get") {
+                return getAttributeStringByKey(view(symbol), view(key));
+            }
+
+            if (columns[0] == "remove") {
+                return removeAttributeStringByKey(view(symbol), view(key));
+            }
+
+            REQUIRE(columns[0] == "change");
+
+            return changeAttributeStringByKey(view(symbol), view(key), view(value));
+        };
+
+        if (columns[0] == "has") {
+            CHECK(hasAttributes(view(symbol)) == (columns[4] == "true"));
+        } else if (columns[4] == "THROW:NullPointerException") {
+            CHECK_THROWS_AS(invoke(), std::invalid_argument);
+            ++nullKeyErrors;
+        } else if (columns[4] == "THROW:StringIndexOutOfBoundsException") {
+            CHECK_THROWS_AS(invoke(), std::out_of_range);
+            ++substringErrors;
+        } else {
+            REQUIRE(columns[4].find("THROW:") != 0);
+            CHECK(invoke() == decode(columns[4]));
+        }
+
+        ++rows;
+    }
+
+    CHECK(rows == 276958);
+    CHECK(nullKeyErrors > 0);
+    // The count is recorded even if this bounded corpus has no invalid substring ranges.
+    CAPTURE(substringErrors);
+}
+
+TEST_CASE("Attribute results own their storage and null keys precede symbol inspection") {
+    std::optional<std::u16string> changed;
+    std::optional<std::u16string> value;
+
+    {
+        const std::u16string symbol = u"SPY&Q{a=1,a=2,z=3}";
+        const std::u16string key = u"a";
+        const std::u16string replacement = u"bid";
+        changed = changeAttributeStringByKey(symbol, key, replacement);
+        value = getAttributeStringByKey(symbol, key);
+        CHECK(symbol == u"SPY&Q{a=1,a=2,z=3}");
+        CHECK(key == u"a");
+        CHECK(replacement == u"bid");
+    }
+
+    CHECK(changed == std::optional<std::u16string>(u"SPY&Q{a=bid,z=3}"));
+    CHECK(value == std::optional<std::u16string>(u"1"));
+    CHECK_THROWS_AS((void)getAttributeStringByKey(std::nullopt, std::nullopt), std::invalid_argument);
+    CHECK_THROWS_AS((void)changeAttributeStringByKey(std::nullopt, std::nullopt, std::nullopt), std::invalid_argument);
+    CHECK_THROWS_AS((void)removeAttributeStringByKey(std::nullopt, std::nullopt), std::invalid_argument);
+    static_assert(noexcept(hasAttributes(std::nullopt)));
 }

@@ -1,0 +1,22 @@
+{
+  "revision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "javaVersion": "openjdk version \"1.8.0_422\"",
+  "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
+  "javacSha256": "633143e961aa18051c09112b85333f5cdbd845b54eb39678eb15b91ca8bbb527",
+  "harnessSha256": "33d3e0054442570685a15e162079bff3192e91096ae9da67d610743d75200803",
+  "launcherSha256": "c5f9ee893f1890cd5c722f7a8c015fb5a6a4fef57eebaa9116009ae4b440b6cc",
+  "upstreamSources": [
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/MarketEventSymbols.java",
+      "sha256": "7d693cc4b6e1b81d05858d9106b72ba368671887c337db2f5158f1763662708e"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/Quote.java",
+      "sha256": "4cb3db3e132c1d0b71428bf4fa3da5a1c25226250ace6c6b55fb8ce3e8fd4b68"
+    }
+  ],
+  "productionClassInventorySha256": "e2714e42136525fb804c7a627d047449b8c6297a815042c2bbc5ca82dda87b76",
+  "fixtureSha256": "d0d0dd54d4dc9d852a0e75495fc45305df61185059fa82b7e5fc371c70a56a9b",
+  "rows": 276958,
+  "timezoneInvariant": true
+}

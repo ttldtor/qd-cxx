@@ -328,7 +328,8 @@ if(BUILD_TESTING)
     add_executable(qdcxx_market_event_symbols_tests tests/conformance/market_event_symbols_tests.cpp)
     target_link_libraries(qdcxx_market_event_symbols_tests PRIVATE qdcxx_market_event_symbols doctest::doctest)
     target_compile_definitions(qdcxx_market_event_symbols_tests PRIVATE
-        ORG_TTLDTOR_QDCXX_MARKET_SYMBOL_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/market-symbols/oracle.tsv")
+        ORG_TTLDTOR_QDCXX_MARKET_SYMBOL_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/market-symbols/oracle.tsv"
+        ORG_TTLDTOR_QDCXX_MARKET_ATTRIBUTE_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/market-attributes/oracle.tsv")
     add_test(NAME market_event_symbols COMMAND qdcxx_market_event_symbols_tests)
     if(ORG_TTLDTOR_QDCXX_BUILD_IPF)
         add_executable(qdcxx_ipf_tests tests/conformance/ipf_tests.cpp)

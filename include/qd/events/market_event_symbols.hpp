@@ -52,4 +52,49 @@ inline constexpr std::u16string_view DEFAULT_EXCHANGES = u"ABCDEFGHIJKLMNOPQRSTU
  */
 [[nodiscard]] std::optional<std::u16string> changeBaseSymbol(std::optional<std::u16string_view> symbol,
                                                              std::optional<std::u16string_view> baseSymbol);
+/** Inspect the trailing nonempty brace block without validating its contents.
+ * @param symbol Exact UTF-16 borrowed for this call; nullopt represents Java null.
+ * @return True when a trailing attribute block is recognized.
+ */
+[[nodiscard]] bool hasAttributes(std::optional<std::u16string_view> symbol) noexcept;
+
+/** Read the first matching attribute, using exact UTF-16 key equality.
+ * @param symbol Borrowed symbol; nullopt returns nullopt after checking key.
+ * @param key Borrowed key; empty is valid, nullopt is invalid.
+ * @return Independently owned value, or nullopt when absent. Inputs are not retained.
+ * @throws std::invalid_argument The key is null, checked before inspecting symbol.
+ * @throws std::out_of_range Malformed input produces an invalid Java substring range.
+ * @throws std::bad_alloc Allocation fails.
+ * @throws std::length_error The owned result exceeds the string maximum size.
+ */
+[[nodiscard]] std::optional<std::u16string> getAttributeStringByKey(std::optional<std::u16string_view> symbol,
+                                                                    std::optional<std::u16string_view> key);
+
+/** Insert/replace an attribute, or remove all matching keys when value is null.
+ * Existing unrelated keys are not sorted; insertion uses Java UTF-16 lexical comparison.
+ * Keys and values are not validated or escaped, including delimiters and malformed UTF-16.
+ * @param symbol Borrowed symbol; null is treated as empty for insertion and preserved for removal.
+ * @param key Borrowed key; empty is valid, nullopt is invalid.
+ * @param value Borrowed replacement; nullopt removes matching keys.
+ * @return Independently owned result; no input storage is retained or modified.
+ * @throws std::invalid_argument The key is null, checked before inspecting symbol.
+ * @throws std::out_of_range Malformed input produces an invalid Java substring range.
+ * @throws std::bad_alloc Allocation fails.
+ * @throws std::length_error The owned result exceeds the string maximum size.
+ */
+[[nodiscard]] std::optional<std::u16string> changeAttributeStringByKey(std::optional<std::u16string_view> symbol,
+                                                                       std::optional<std::u16string_view> key,
+                                                                       std::optional<std::u16string_view> value);
+
+/** Remove every matching attribute without sorting unrelated keys.
+ * @param symbol Borrowed symbol; nullopt returns nullopt after checking key.
+ * @param key Borrowed key; empty is valid, nullopt is invalid.
+ * @return Independently owned result; inputs are not retained or modified.
+ * @throws std::invalid_argument The key is null, checked before inspecting symbol.
+ * @throws std::out_of_range Malformed input produces an invalid Java substring range.
+ * @throws std::bad_alloc Allocation fails.
+ * @throws std::length_error The owned result exceeds the string maximum size.
+ */
+[[nodiscard]] std::optional<std::u16string> removeAttributeStringByKey(std::optional<std::u16string_view> symbol,
+                                                                       std::optional<std::u16string_view> key);
 } // namespace org::ttldtor::qdcxx::events::market_symbols

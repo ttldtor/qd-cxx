@@ -31,5 +31,25 @@ The helpers recognize one UTF-16 unit after `&`; they do not validate that unit
 against `SUPPORTED_EXCHANGES` or map it to a venue. The default code list is
 `DEFAULT_EXCHANGES`. A malformed symbol is transformed according to the
 [exact boundary rules](../spec/events/MARKET-SYMBOLS.md), not rejected.
-Attribute normalization, Candle symbols and regional Feed selector integration
-are separate capabilities; this API alone does not subscribe to regional records.
+Candle symbols and regional Feed selector integration are separate capabilities; this API alone does not subscribe to regional records.
+
+## Read and edit attributes
+
+```cpp
+auto price = symbols::getAttributeStringByKey(u"SPY&Q{price=bid}", u"price"); // owns bid
+auto ask = symbols::changeAttributeStringByKey(u"SPY&Q{price=bid}", u"price", u"ask");
+// ask owns SPY&Q{price=ask}.
+auto plain = symbols::removeAttributeStringByKey(u"SPY&Q{price=bid}", u"price"); // owns SPY&Q
+```
+
+`hasAttributes` checks only whether a nonempty trailing brace block exists.
+Empty keys/values are supported; `std::nullopt` value removes matching keys.
+A null key throws `std::invalid_argument` before checking even a null symbol.
+Reads return the first matching value; edits remove duplicate occurrences of that key.
+Inputs are borrowed for the call and results own their storage.
+
+Insertion follows UTF-16 lexical order locally; existing unrelated unsorted keys
+remain unsorted. Delimiters are accepted literally, so these helpers do not sanitize
+untrusted strings. See the [attribute contract](../spec/events/MARKET-SYMBOLS.md#generic-attributes)
+for malformed blocks, null behavior and the qualified `std::out_of_range` mapping
+for Java substring failures. No new subscription or source routing is implied.

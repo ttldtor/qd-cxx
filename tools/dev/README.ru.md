@@ -6,6 +6,10 @@
 точные nullable-операции UTF-16 с базой/кодом по закреплённым production-классам Java.
 Режимы `-Help`/`-HelpRu` не требуют входов и не начинают работу.
 
+[Oracle атрибутов](../upstream/market-attribute-oracle/README.ru.md) отдельно проверяет
+чтение/изменение общих атрибутов, порядок UTF-16, некорректные блоки и null-ключи.
+Режимы `-Help`/`-HelpRu` не требуют входов и не начинают работу.
+
 [Явная подготовка зависимостей runtime](../deps/README.ru.md) подготавливает закреплённые Asio/c-ares в выбранном кэше; обычный configure и OFF не выполняют acquisition. По ссылке описаны EN/RU-справка, offline/cache-ошибки и сохранение staging.
 
 Необязательный [пример публичного feed API](../../examples/feed_quote/README.ru.md),
