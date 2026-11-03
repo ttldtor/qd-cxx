@@ -56,6 +56,8 @@ build tools; formatting additionally needs Git and explicitly supplied native Un
 and clang-format 20.1.8. Nothing is installed globally. These developer executables have no
 production-library dependencies. Root `BUILD_TESTING=OFF` neither builds them nor fetches doctest.
 
+The [IPF value oracle](../upstream/ipf-value-oracle/README.md) captures/verifies pinned Java field and typed-conversion behavior; its standalone -Help starts no Java or I/O work.
+
 ## First build
 
 Run from the repository root. This bootstrap is the explicit first-build logging exception:

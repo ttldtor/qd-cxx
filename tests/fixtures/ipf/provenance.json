@@ -1,0 +1,26 @@
+{
+  "revision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "javaVersion": "openjdk version \"1.8.0_422\"",
+  "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
+  "javacSha256": "633143e961aa18051c09112b85333f5cdbd845b54eb39678eb15b91ca8bbb527",
+  "harnessSha256": "203a443892de7fdcf7db6538c6c3297ddf810c3f2802b84be26857f22aab63ff",
+  "launcherSha256": "5348759579ee9ec65867eec3e1f90cd1faa3954ee9aa44f7d03e0e8320cf9a6a",
+  "upstreamSources": [
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/ipf/InstrumentProfile.java",
+      "sha256": "4ef87d9d20e8b5b8f963c29dc2295e4dc5b1cea065e56a21c788d697ef12dfd1"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/ipf/InstrumentProfileField.java",
+      "sha256": "a42362fd76e47946066d87a3a5869945bec6f049421c801967be6d780df87f33"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/ipf/InstrumentProfileType.java",
+      "sha256": "d1305f295249ab21624cb3f4c7906b373ef20cd154799588b5ef477eb33f86c6"
+    }
+  ],
+  "productionClassInventorySha256": "e2714e42136525fb804c7a627d047449b8c6297a815042c2bbc5ca82dda87b76",
+  "fixtureSha256": "12ae4daa1567922927c53aadd37a528481817f7819c8c7476a890249b5d35efe",
+  "rows": 22738,
+  "timezoneInvariant": true
+}

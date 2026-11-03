@@ -64,6 +64,12 @@ Linux-профили задают `ASAN_OPTIONS=detect_leaks=0:halt_on_error=1` 
 При прямом запуске программы из shell задайте то же окружение явно при необходимости:
 preset не меняет родительский shell. Эти C++ sanitizer flags не обещают LSan и
 инструментирование c-ares C.
+## Независимые значения instrument profile
+
+`ORG_TTLDTOR_QDCXX_BUILD_IPF=ON` собирает и устанавливает `qdcxx_ipf` и
+`qd/ipf/instrument_profile.hpp`; по умолчанию OFF, без предпосылок feed/runtime/JSON и новых
+зависимостей. См. [руководство instrument profile](INSTRUMENT-PROFILES.ru.md) и
+[контракт значения](../spec/ipf/PROFILE.ru.md).
 ## Публичный feed API {#public-feed-api-build-ru}
 
 `ORG_TTLDTOR_QDCXX_BUILD_FEED_API` по умолчанию `OFF`. Он требует явно включить

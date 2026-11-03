@@ -63,6 +63,18 @@ if(ORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON)
         DESTINATION "${CMAKE_INSTALL_DATADIR}/qdcxx/licenses/simdjson-4.6.4")
 endif()
 
+option(ORG_TTLDTOR_QDCXX_BUILD_IPF "Build the independent instrument-profile value model" OFF)
+if(ORG_TTLDTOR_QDCXX_BUILD_IPF)
+    add_library(qdcxx_ipf src/ipf/instrument_profile.cpp)
+    target_include_directories(qdcxx_ipf PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+        "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
+    target_compile_features(qdcxx_ipf PUBLIC cxx_std_23)
+    set_target_properties(qdcxx_ipf PROPERTIES CXX_EXTENSIONS OFF)
+    install(TARGETS qdcxx_ipf EXPORT qdcxxTargets ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}" RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+    install(DIRECTORY include/qd/ipf DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qd" FILES_MATCHING PATTERN "*.hpp")
+endif()
+
 add_library(qdcxx_event_mapping src/events/event_mapping.cpp)
 target_link_libraries(qdcxx_event_mapping PUBLIC qdcxx_core)
 set_target_properties(qdcxx_event_mapping PROPERTIES CXX_EXTENSIONS OFF)
@@ -308,6 +320,14 @@ if(BUILD_TESTING)
         DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     )
     FetchContent_MakeAvailable(doctest)
+    if(ORG_TTLDTOR_QDCXX_BUILD_IPF)
+        add_executable(qdcxx_ipf_tests tests/conformance/ipf_tests.cpp)
+        target_link_libraries(qdcxx_ipf_tests PRIVATE qdcxx_ipf doctest::doctest)
+        target_compile_definitions(qdcxx_ipf_tests PRIVATE
+            ORG_TTLDTOR_QDCXX_IPF_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/ipf/value-oracle.tsv")
+        set_target_properties(qdcxx_ipf_tests PROPERTIES CXX_EXTENSIONS OFF)
+        add_test(NAME ipf_values COMMAND qdcxx_ipf_tests)
+    endif()
     add_executable(qdcxx_recovery_state_tests
         src/transport/recovery_state.cpp tests/conformance/recovery_state_tests.cpp)
     target_include_directories(qdcxx_recovery_state_tests PRIVATE src/transport include)

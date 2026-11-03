@@ -584,3 +584,9 @@ tools/deps/Tests.cmake text eol=lf
 /CMakePresets.json text eol=lf
 /cmake/BuildProfiles.json text eol=lf
 /examples/feed_quote/CMakePresets.json text eol=lf
+
+# Preserve instrument-profile oracle observations and canonical harness provenance.
+tools/upstream/ipf-value-oracle/*.java text eol=lf
+tools/upstream/ipf-value-oracle/*.ps1 text eol=lf
+tests/fixtures/ipf/value-oracle.tsv -text -whitespace
+tests/fixtures/ipf/provenance.json text eol=lf

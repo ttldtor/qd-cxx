@@ -63,6 +63,13 @@ Linux profiles set `ASAN_OPTIONS=detect_leaks=0:halt_on_error=1` and
 When launching a binary directly from your shell, supply the same environment
 explicitly if needed; preset environment does not modify the parent shell.
 LSan and c-ares C instrumentation are not promised by these C++ sanitizer flags.
+## Independent instrument-profile values
+
+`ORG_TTLDTOR_QDCXX_BUILD_IPF=ON` builds and installs `qdcxx_ipf` with
+`qd/ipf/instrument_profile.hpp`; it defaults to OFF and has no feed/runtime/JSON prerequisites or
+new dependencies. See the [instrument-profile guide](INSTRUMENT-PROFILES.md) and
+[value contract](../spec/ipf/PROFILE.md).
+
 ## Public feed API {#public-feed-api-build}
 
 `ORG_TTLDTOR_QDCXX_BUILD_FEED_API` defaults to `OFF`. It requires explicit
