@@ -190,3 +190,9 @@ q::api::ApiRuntime runtime(options);
 `192.0.2.53` is a documentation placeholder; replace it with your actual resolver.
 This option chooses the DNS server transport; it does not enable TLS or change the
 endpoint's exact symbol/delivery policy.
+
+## Planned statistics
+
+The [layered statistics contract](../spec/subscriptions/CLIENT-STATISTICS.md) defines
+future endpoint/subscription counters, epoch and availability rules. These counters
+are not exposed by the current facade; lifecycle diagnostics remain available.
