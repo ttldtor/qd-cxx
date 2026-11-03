@@ -577,3 +577,6 @@ tools/docs/** text eol=lf
 # Receiver captures preserve the original platform bytes used by their hash inventory.
 tests/fixtures/subscriptions/receiver-example/*/*.stdout -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
 tests/fixtures/subscriptions/receiver-example/*/*.stderr -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+# Runtime provisioning scripts retain portable canonical line endings.
+tools/deps/ProvisionRuntime.cmake text eol=lf
+tools/deps/Tests.cmake text eol=lf

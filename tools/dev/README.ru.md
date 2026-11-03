@@ -2,6 +2,8 @@
 
 [English version](README.md). Английская версия нормативная.
 
+[Явная подготовка зависимостей runtime](../deps/README.ru.md) подготавливает закреплённые Asio/c-ares в выбранном кэше; обычный configure и OFF не выполняют acquisition. По ссылке описаны EN/RU-справка, offline/cache-ошибки и сохранение staging.
+
 Необязательный [пример публичного feed API](../../examples/feed_quote/README.ru.md),
 `qdcxx-feed-demo`, использует продвижение библиотекой и типизированные подписки Quote.
 Включите `ORG_TTLDTOR_QDCXX_BUILD_FEED_API=ON` вместе с CLIENT/RUNTIME/RECOVERY;

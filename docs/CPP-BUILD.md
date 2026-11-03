@@ -1,5 +1,7 @@
 # Bounded C++23 components
 
+Prepare the exact [runtime SDK sources](../cmake/runtime-profile/README.md) first. The explicit [dependency provisioning step](../tools/deps/README.md) supplies pinned Asio/c-ares with offline/cache support and no global installation; ordinary configure never downloads them.
+
 ## Public feed API {#public-feed-api-build}
 
 `ORG_TTLDTOR_QDCXX_BUILD_FEED_API` defaults to `OFF`. It requires explicit

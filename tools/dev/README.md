@@ -2,6 +2,8 @@
 
 [Русская версия](README.ru.md). English is authoritative.
 
+[Explicit runtime dependency provisioning](../deps/README.md) prepares the pinned Asio/c-ares source profiles in a caller-selected cache; ordinary configure and disabled mode perform no acquisition. EN/RU help, offline/cache failures and retained staging are documented there.
+
 The optional [public feed example](../../examples/feed_quote/README.md),
 `qdcxx-feed-demo`, uses library-owned progress and typed Quote subscriptions.
 Enable `ORG_TTLDTOR_QDCXX_BUILD_FEED_API=ON` with CLIENT/RUNTIME/RECOVERY;

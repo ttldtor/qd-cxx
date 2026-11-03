@@ -2,6 +2,8 @@
 
 [Русская версия](README.ru.md). English is authoritative.
 
+For reproducible acquisition and zero-fuzz patching, use the separate [runtime dependency helper](../../tools/deps/README.md). It downloads only pinned archives when explicitly invoked, supports offline archive/source caches and reuses these complete source receipts. Ordinary configure still performs no downloads.
+
 Runtime builds use explicit source roots. Configuration never downloads or installs
 dependencies. Runtime OFF does not inspect these roots or require their build tools.
 

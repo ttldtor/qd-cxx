@@ -1,5 +1,7 @@
 # Ограниченные компоненты C++23
 
+Сначала подготовьте точные [исходники runtime SDK](../cmake/runtime-profile/README.ru.md). Явный [шаг подготовки зависимостей](../tools/deps/README.ru.md) предоставляет закреплённые Asio/c-ares с offline/cache и без глобальной установки; обычный configure их не загружает.
+
 ## Публичный feed API {#public-feed-api-build-ru}
 
 `ORG_TTLDTOR_QDCXX_BUILD_FEED_API` по умолчанию `OFF`. Он требует явно включить
