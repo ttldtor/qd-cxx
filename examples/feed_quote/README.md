@@ -31,10 +31,16 @@ cmake --build build/feed-quote --config Release --parallel 2
 The [standalone CMake project](CMakeLists.txt) uses:
 
 ```cmake
-find_package(qdcxx CONFIG REQUIRED)
+find_package(qdcxx CONFIG REQUIRED COMPONENTS feed)
 add_executable(qdcxx_feed_demo main.cpp)
 target_link_libraries(qdcxx_feed_demo PRIVATE qdcxx_feed)
 ```
+
+The required `feed` component gives an early, actionable package error if Feed
+was not installed. `qdcxx::feed` is an equivalent alias for `qdcxx_feed`; the
+existing target name and component-free package lookup remain supported.
+For optional discovery use `find_package(qdcxx CONFIG REQUIRED OPTIONAL_COMPONENTS feed)`
+and check `qdcxx_feed_FOUND` before linking. Only `feed` is a supported named component.
 
 C++23 and native static-link dependencies are inherited from the package. Use the
 same compatible compiler/standard-library/CRT profile as the installed package.

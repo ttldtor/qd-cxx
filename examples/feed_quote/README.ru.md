@@ -30,10 +30,17 @@ cmake --build build/feed-quote --config Release --parallel 2
 [Самостоятельный CMake-проект](CMakeLists.txt) использует:
 
 ```cmake
-find_package(qdcxx CONFIG REQUIRED)
+find_package(qdcxx CONFIG REQUIRED COMPONENTS feed)
 add_executable(qdcxx_feed_demo main.cpp)
 target_link_libraries(qdcxx_feed_demo PRIVATE qdcxx_feed)
 ```
+
+Обязательный компонент `feed` даёт раннюю понятную ошибку поиска пакета, если
+Feed не установлен. `qdcxx::feed` — равнозначный alias `qdcxx_feed`; прежнее имя
+target и поиск пакета без компонентов остаются поддержанными. Для необязательного
+поиска используйте `find_package(qdcxx CONFIG REQUIRED OPTIONAL_COMPONENTS feed)`
+и проверяйте `qdcxx_feed_FOUND` перед линковкой. Единственный поддержанный
+именованный компонент — `feed`.
 
 C++23 и нативные статические зависимости наследуются от пакета. Используйте
 совместимые компилятор, стандартную библиотеку и CRT установленного пакета.

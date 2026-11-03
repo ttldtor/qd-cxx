@@ -39,10 +39,22 @@ cmake --install build/feed --config Release --prefix C:/sdk/qd-cxx
 статические зависимости; приложению не нужны исходники SDK и их include roots:
 
 ```cmake
-find_package(qdcxx CONFIG REQUIRED)
+find_package(qdcxx CONFIG REQUIRED COMPONENTS feed)
 add_executable(feed_app main.cpp)
 target_link_libraries(feed_app PRIVATE qdcxx_feed)
 ```
+
+`feed` — поддержанный компонент пакета. Если он отсутствует в установленном
+пакете, обязательный запрос `feed` завершается до поиска SDK с подсказкой о
+пересборке; неизвестный обязательный компонент также приводит к отказу.
+`OPTIONAL_COMPONENTS feed` сохраняет доступность пакета без Feed и сообщает
+`qdcxx_feed_FOUND=FALSE`. Для неизвестных необязательных компонентов также
+устанавливается `qdcxx_<component>_FOUND=FALSE`. Каждый поиск обновляет флаг Feed
+и сообщение об отказе пакета, в том числе при повторных вызовах в одном каталоге.
+Локальная и установленная сборки Feed предоставляют `qdcxx::feed` как alias
+`qdcxx_feed`. Прежние вызовы `find_package(qdcxx CONFIG REQUIRED)` и имена targets
+остаются поддержанными. У остальных экспортируемых библиотек нет именованных
+компонентов пакета.
 
 Указанная сборка приложения без SDK roots предполагает рекомендованный TLS-OFF
 пакет. Пакет с включённым TLS дополнительно проверяет закреплённую установку

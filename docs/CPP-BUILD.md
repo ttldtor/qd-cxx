@@ -38,10 +38,20 @@ still apply. Configuration does not acquire SDKs. The enabled package carries it
 native static-link closure; an installed consumer needs no SDK source/include roots:
 
 ```cmake
-find_package(qdcxx CONFIG REQUIRED)
+find_package(qdcxx CONFIG REQUIRED COMPONENTS feed)
 add_executable(feed_app main.cpp)
 target_link_libraries(feed_app PRIVATE qdcxx_feed)
 ```
+
+`feed` is the supported package component. A required `feed` request fails early
+with a rebuild hint when the installed package lacks it; an unsupported required
+component also fails. `OPTIONAL_COMPONENTS feed` keeps the package usable when
+Feed is absent and reports `qdcxx_feed_FOUND=FALSE`. Unsupported optional components
+likewise report `qdcxx_<component>_FOUND=FALSE`. Each lookup refreshes the Feed flag
+and package failure message, including repeated calls in the same directory.
+Both local and installed Feed builds provide `qdcxx::feed` as an alias of
+`qdcxx_feed`. Existing `find_package(qdcxx CONFIG REQUIRED)` calls and target names
+remain supported. Other exported libraries do not have named package components.
 
 The no-SDK-root consumer command above assumes the recommended TLS-OFF package.
 A TLS-enabled installed package additionally validates its qualified OpenSSL
