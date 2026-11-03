@@ -22,6 +22,8 @@ typed projections over complete caller schemas.
 [Mixed registered subscriptions](events/MIXED-SUBSCRIPTIONS.md) select several
 supported types through one owning variant-valued logical subscription.
 
+- [Candle period values](events/CANDLE-PERIOD.md): pure aggregation types and period text, independent of Candle receiving.
+
 ## Protocol contracts {#protocol-contracts}
 
 - [QTP framing](protocol/FRAMING.md) and [tape reading](protocol/TAPE-READER.md)

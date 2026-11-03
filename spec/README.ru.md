@@ -22,6 +22,8 @@
 [Смешанные зарегистрированные подписки](events/MIXED-SUBSCRIPTIONS.ru.md) выбирают
 несколько поддержанных типов через одну логическую подписку на владеющие variant values.
 
+- [Значения периодов Candle](events/CANDLE-PERIOD.ru.md): чистые типы агрегации и текст периодов, отдельно от приёма Candle.
+
 ## Контракты протокола {#protocol-contracts-ru}
 
 - [Кадры QTP](protocol/FRAMING.ru.md) и [чтение tape](protocol/TAPE-READER.ru.md)

@@ -1,0 +1,22 @@
+{
+  "revision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "javaVersion": "openjdk version \"1.8.0_422\"",
+  "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
+  "javacSha256": "633143e961aa18051c09112b85333f5cdbd845b54eb39678eb15b91ca8bbb527",
+  "harnessSha256": "454fe073018420b30f3b990acecb6d32ebfeb5490a2d7d9fee76683030547032",
+  "launcherSha256": "4d8c3b321c9e911dd07444106a5f0fda61dd14c184d592fc7a4b5011343fd26e",
+  "upstreamSources": [
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/candle/CandleType.java",
+      "sha256": "be28b61d73d89ffdf65b1559575c876906b5bc4ce7901e6968ca4217a83f5af2"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/candle/CandlePeriod.java",
+      "sha256": "dace2c3fefd87f69a088cf58bde136e37d93efbae053a497d8eeb34b2046b791"
+    }
+  ],
+  "productionClassInventorySha256": "e2714e42136525fb804c7a627d047449b8c6297a815042c2bbc5ca82dda87b76",
+  "fixtureSha256": "1947607b87714af9f8002a3d0d4f3e05ae1fff39698ca6a92fc6b11343897d54",
+  "rows": 73546,
+  "timezoneInvariant": true
+}

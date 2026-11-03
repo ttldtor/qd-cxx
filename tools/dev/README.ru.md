@@ -307,3 +307,4 @@ native writer files pinned Java reader. Сеть, SDK build и новая depend
 - [Order source/index oracle](../upstream/order-index-oracle/README.ru.md): production отображения, индексы, source IDs и справка EN/RU без рабочих входов.
 
 - [Oracle возможностей источников](../upstream/order-source-capability-oracle/README.ru.md): publication/full-book и specific-source; EN/RU help без входов, Verify по умолчанию, JDK8/production classes, heap128MiB/60s, код 0/1.
+- [Оракул периодов Candle](../upstream/candle-period-oracle/README.ru.md): production-типы агрегации, числовые границы и точный текст периодов; EN/RU-справка без рабочих входов.

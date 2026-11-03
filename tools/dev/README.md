@@ -294,3 +294,4 @@ native writer files through the pinned Java reader. No network, SDK build or new
 - [Order source/index oracle](../upstream/order-index-oracle/README.md): production record mappings, index packing and source IDs; standalone noargs/EN/RU help.
 
 - [Order-source capability oracle](../upstream/order-source-capability-oracle/README.md): publication/full-book and specific-source values; EN/RU help without inputs, Verify default, JDK8/production classes, heap128MiB/60s, exit0/1.
+- [Candle-period oracle](../upstream/candle-period-oracle/README.md): production aggregation types, numeric boundaries and exact period text; input-free EN/RU help.

@@ -21,3 +21,5 @@ rebuild. The [developer catalog](../dev/README.md#optional-tape-containers-and-p
 documents the separate manual help regression and optional native compression component.
 
 - [Event-source oracle](event-source-oracle/README.md): exact source identities and invalid-input policy.
+
+- [Candle-period oracle](candle-period-oracle/README.md): exact aggregation types, multipliers and short names.

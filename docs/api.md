@@ -13,6 +13,7 @@ and ownership. Use the namespace/type indexes beside this page to find individua
 | Schemas and record identity | `qd/core/` | `qdcxx_core` | [Schema specifications](../spec/README.md#schema-contracts) |
 | Frames, binding and tapes | `qd/protocol/` | `qdcxx_protocol` | [Protocol specifications](../spec/README.md#protocol-contracts) |
 | Standard events | `qd/events/` | `qdcxx_quote`, `qdcxx_profile`, `qdcxx_event_mapping` | [Configuration](CONFIGURATION.md) |
+| Candle periods | `qd/events/candle_period.hpp` | `qdcxx_candle_values` | [Types, text and interval estimates](../spec/events/CANDLE-PERIOD.md); no Candle receiving |
 | Collectors and multiplexing | `qd/collectors/`, `qd/mux/` | `qdcxx_collectors`, `qdcxx_mux`, `qdcxx_mux_queue` | [Subscription contracts](../spec/subscriptions/CONTRACTS.md) |
 | JSON schemas | `qd/schema/json_schema.hpp` | `qdcxx_schema_json` | [Native JSON](../spec/schema/NATIVE-JSON.md); installed with `ORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON=ON` (default ON) |
 | Offline replay | `qd/replay/tape_replay.hpp` | `qdcxx_replay` — build tree only | [Replay contract](../spec/protocol/OFFLINE-REPLAY.md); `ORG_TTLDTOR_QDCXX_BUILD_REPLAY=ON` (default OFF), not installed/exported |

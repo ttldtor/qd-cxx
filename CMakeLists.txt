@@ -63,9 +63,15 @@ if(ORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON)
         DESTINATION "${CMAKE_INSTALL_DATADIR}/qdcxx/licenses/simdjson-4.6.4")
 endif()
 
+# Private binary64 implementation shared by independent value models; no numeric headers are installed.
+add_library(qdcxx_java_double STATIC src/detail/java_double.cpp)
+target_compile_features(qdcxx_java_double PRIVATE cxx_std_23)
+set_target_properties(qdcxx_java_double PROPERTIES CXX_EXTENSIONS OFF POSITION_INDEPENDENT_CODE ON)
+
 option(ORG_TTLDTOR_QDCXX_BUILD_IPF "Build the independent instrument-profile value model" OFF)
 if(ORG_TTLDTOR_QDCXX_BUILD_IPF)
     add_library(qdcxx_ipf src/ipf/instrument_profile.cpp src/ipf/reader.cpp src/ipf/writer.cpp)
+    target_link_libraries(qdcxx_ipf PRIVATE qdcxx_java_double)
     target_include_directories(qdcxx_ipf PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
         "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
     target_compile_features(qdcxx_ipf PUBLIC cxx_std_23)
@@ -89,6 +95,13 @@ target_include_directories(qdcxx_market_event_symbols PUBLIC "$<BUILD_INTERFACE:
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 target_compile_features(qdcxx_market_event_symbols PUBLIC cxx_std_23)
 set_target_properties(qdcxx_market_event_symbols PROPERTIES CXX_EXTENSIONS OFF)
+add_library(qdcxx_candle_values src/events/candle_period.cpp)
+target_include_directories(qdcxx_candle_values PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
+target_compile_features(qdcxx_candle_values PUBLIC cxx_std_23)
+target_link_libraries(qdcxx_candle_values PRIVATE qdcxx_java_double)
+set_target_properties(qdcxx_candle_values PROPERTIES CXX_EXTENSIONS OFF)
+
 target_link_libraries(qdcxx_event_mapping PUBLIC qdcxx_core)
 set_target_properties(qdcxx_event_mapping PROPERTIES CXX_EXTENSIONS OFF)
 add_library(qdcxx_profile src/events/profile.cpp)
@@ -152,7 +165,7 @@ if(ORG_TTLDTOR_QDCXX_BUILD_FEED_API)
     add_library(qdcxx_feed src/api/feed.cpp src/api/receiving_profile.cpp src/api/event_registry.cpp src/api/system_dns.cpp)
     add_library(qdcxx::feed ALIAS qdcxx_feed)
     target_include_directories(qdcxx_feed PRIVATE src/api)
-    target_link_libraries(qdcxx_feed PUBLIC qdcxx_recovery qdcxx_quote qdcxx_profile qdcxx_market_event_symbols qdcxx_event_sources qdcxx_order_index)
+    target_link_libraries(qdcxx_feed PUBLIC qdcxx_recovery qdcxx_quote qdcxx_profile qdcxx_market_event_symbols qdcxx_event_sources qdcxx_order_index qdcxx_candle_values)
     set_target_properties(qdcxx_feed PROPERTIES CXX_EXTENSIONS OFF)
     if(WIN32)
         target_compile_definitions(qdcxx_feed PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN _WIN32_WINNT=0x0A00)
@@ -168,7 +181,7 @@ endif()
 
 include(CMakePackageConfigHelpers)
 install(TARGETS qdcxx_encoding qdcxx_core qdcxx_protocol qdcxx_collectors qdcxx_mux
-    qdcxx_event_mapping qdcxx_quote qdcxx_profile qdcxx_market_event_symbols qdcxx_event_sources qdcxx_order_index EXPORT qdcxxTargets
+    qdcxx_event_mapping qdcxx_quote qdcxx_profile qdcxx_market_event_symbols qdcxx_event_sources qdcxx_order_index qdcxx_candle_values qdcxx_java_double EXPORT qdcxxTargets
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
@@ -359,6 +372,20 @@ if(BUILD_TESTING)
     if(WIN32)
         add_test(NAME order_source_capability_oracle_help COMMAND ${CMAKE_COMMAND}
             -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/order_source_capability_oracle_help.cmake")
+    endif()
+    add_executable(qdcxx_candle_period_tests tests/conformance/candle_period_tests.cpp)
+    target_link_libraries(qdcxx_candle_period_tests PRIVATE qdcxx_candle_values doctest::doctest)
+    target_compile_definitions(qdcxx_candle_period_tests PRIVATE
+        QDCXX_CANDLE_PERIOD_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/events/candle/period-oracle.tsv")
+    set_target_properties(qdcxx_candle_period_tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME candle_period_values COMMAND qdcxx_candle_period_tests)
+    set_tests_properties(candle_period_values PROPERTIES TIMEOUT 30)
+    find_program(ORG_TTLDTOR_QDCXX_CANDLE_ORACLE_PWSH NAMES pwsh)
+    if(ORG_TTLDTOR_QDCXX_CANDLE_ORACLE_PWSH)
+        add_test(NAME candle_period_oracle_help COMMAND "${CMAKE_COMMAND}"
+            "-DPOWERSHELL=${ORG_TTLDTOR_QDCXX_CANDLE_ORACLE_PWSH}" "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/candle_period_oracle_help.cmake")
+        set_tests_properties(candle_period_oracle_help PROPERTIES TIMEOUT 45)
     endif()
     add_executable(qdcxx_market_event_symbols_tests tests/conformance/market_event_symbols_tests.cpp)
     target_link_libraries(qdcxx_market_event_symbols_tests PRIVATE qdcxx_market_event_symbols doctest::doctest)
