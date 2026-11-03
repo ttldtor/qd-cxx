@@ -27,6 +27,7 @@ reruns are different evidence; none is a general security certification or an RS
 - [Subscription compatibility](../tests/conformance/subscriptions/VALIDATION.md)
 - [Composed receiving profiles and CLI qualification](../tests/conformance/subscriptions/DELIVERY-VALIDATION.md)
 - [Subscription receiver and installed console example](../tests/conformance/subscriptions/RECEIVER-VALIDATION.md)
+- [Public feed API, installed package and live Quote](../tests/conformance/subscriptions/FEED-VALIDATION.md)
 - [Knowledge base and decision trace](knowledge/README.md)
 
 [Current capabilities](CURRENT-STATE.md) distinguish delivered components from the

@@ -1,5 +1,57 @@
 # Ограниченные компоненты C++23
 
+## Публичный feed API {#public-feed-api-build-ru}
+
+`ORG_TTLDTOR_QDCXX_BUILD_FEED_API` по умолчанию `OFF`. Он требует явно включить
+`ORG_TTLDTOR_QDCXX_BUILD_CLIENT=ON`, `ORG_TTLDTOR_QDCXX_BUILD_RUNTIME=ON` и
+`ORG_TTLDTOR_QDCXX_BUILD_RECOVERY=ON`. Собираются/устанавливаются `qdcxx_feed`
+и `qd/api/feed.hpp`; также собирается executable target `qdcxx_feed_demo`
+(`qdcxx-feed-demo`). TLS, JSON и отдельный connection CLI не требуются.
+
+Сначала подготовьте точные [исходники SDK транспорта](../cmake/runtime-profile/README.ru.md).
+Используйте закреплённый x64 [профиль копирования recovery](../spec/transport/RECOVERY.ru.md):
+выбранные MSVC 19.42/ABI стандартной библиотеки или GCC 13.3/ABI libstdc++.
+Неподдержанный профиль даёт явный отказ runtime; это не обещание совместимости с
+любым компилятором C++23. Для Windows/Ninja используйте терминал с окружением
+компилятора и реальные пути подготовленных SDK:
+
+```powershell
+cmake -S . -B build/feed -G Ninja '-DCMAKE_BUILD_TYPE=Release' `
+  '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL' '-DCMAKE_INSTALL_LIBDIR=lib' `
+  '-DBUILD_TESTING=OFF' '-DORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON=OFF' `
+  '-DORG_TTLDTOR_QDCXX_BUILD_TLS=OFF' `
+  '-DORG_TTLDTOR_QDCXX_BUILD_CLIENT=ON' '-DORG_TTLDTOR_QDCXX_BUILD_RUNTIME=ON' `
+  '-DORG_TTLDTOR_QDCXX_BUILD_RECOVERY=ON' '-DORG_TTLDTOR_QDCXX_BUILD_FEED_API=ON' `
+  '-DORG_TTLDTOR_QDCXX_ASIO_INCLUDE=C:/sdk/asio-1.38.2/include' `
+  '-DORG_TTLDTOR_QDCXX_CARES_SOURCE=C:/sdk/c-ares-1.34.9-qdcxx2'
+cmake --build build/feed --config Release --parallel 2
+cmake --install build/feed --config Release --prefix C:/sdk/qd-cxx
+```
+
+На Linux используйте закреплённый профиль GCC, пути SDK и префикс установки Linux;
+параметр MSVC runtime опустите. Существующие требования подготовки/проверки SDK
+сохраняются. Configure не получает SDK. Установленный пакет содержит нативные
+статические зависимости; приложению не нужны исходники SDK и их include roots:
+
+```cmake
+find_package(qdcxx CONFIG REQUIRED)
+add_executable(feed_app main.cpp)
+target_link_libraries(feed_app PRIVATE qdcxx_feed)
+```
+
+Указанная сборка приложения без SDK roots предполагает рекомендованный TLS-OFF
+пакет. Пакет с включённым TLS дополнительно проверяет закреплённую установку
+OpenSSL при поиске пакета, даже для plain feed приложения; задайте
+`-DORG_TTLDTOR_QDCXX_OPENSSL_ROOT=C:/sdk/openssl-qualified` с реальным путём
+[подготовленного TLS SDK](#tls-source-profile-cpp-build-ru). Исходники Asio/c-ares
+для установленного consumer по-прежнему не требуются.
+
+Сохраняйте совместимые настройки компилятора, стандартной библиотеки и CRT.
+[Руководство API](FEED-API.ru.md) и [самостоятельный пример с установленным пакетом](../examples/feed_quote/README.ru.md)
+описывают жизненный цикл приложения, системный IPv4 DNS, типизированные подписки
+и EN/RU-справку команд. Фасад использует обычный TCP и TICKER/STREAM; включение
+низкоуровневого TLS не добавляет TLS в этот высокоуровневый API.
+
 <a id="installed-binary-json-loader"></a>
 
 ## Устанавливаемый binary JSON loader

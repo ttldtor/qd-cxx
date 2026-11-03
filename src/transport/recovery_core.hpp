@@ -261,6 +261,20 @@ class RecoveryCore {
      * @return Explicit logical vector with documented byte overlap.
      */
     [[nodiscard]] RecoveryCapacity capacity() const noexcept;
+    /** Prepare one empty receiver on an adopted family without native progress.
+     * @param family Exact immutable adopted queue family.
+     * @param bindings Borrowed typed routes under the owner's original schema.
+     * @param consumer Application callable, retained only after successful registration.
+     * @param receiverLimits Explicit immutable plan reservations.
+     * @param clientLimits Explicit complete queue registration reservations.
+     * @param receiverWork Actual preparation credits; failures may consume work.
+     * @param queueWork Actual queue inspection/open credits.
+     * @return Empty handle or unchanged typed owner/receiver failure.
+     */
+    [[nodiscard]] std::expected<mux::MuxHandle, RecoveryReceiverFailure> openSubscriptionReceiver(
+        core::SubscriptionFamily family, std::span<const client::PreparedSubscriptionBinding> bindings,
+        const std::shared_ptr<client::SubscriptionConsumer> &consumer, client::ReceiverLimits receiverLimits,
+        mux::ClientLimits clientLimits, client::ReceiverWork &receiverWork, mux::QueueWork &queueWork);
     /** Observe the adopted HISTORY queue only under current owner/backend eligibility.
      * @param handle Exact adopted HISTORY registration.
      * @param key Borrowed key used synchronously; nothing is retained.

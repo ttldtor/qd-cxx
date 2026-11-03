@@ -500,6 +500,20 @@ TlsRecovery::historyRangeStatus(const mux::MuxHandle &handle, core::Subscription
     return lease ? lease->core.historyRangeStatus(handle, key, work) : std::unexpected(moved());
 }
 
+std::expected<mux::MuxHandle, RecoveryReceiverFailure> TlsRecovery::openSubscriptionReceiver(
+    core::SubscriptionFamily family, std::span<const client::PreparedSubscriptionBinding> bindings,
+    const std::shared_ptr<client::SubscriptionConsumer> &consumer, client::ReceiverLimits receiverLimits,
+    mux::ClientLimits clientLimits, client::ReceiverWork &receiverWork, mux::QueueWork &queueWork) {
+    const auto lease = impl_;
+
+    if (!lease) {
+        return std::unexpected(RecoveryReceiverFailure{moved()});
+    }
+
+    return lease->core.openSubscriptionReceiver(family, bindings, consumer, receiverLimits, clientLimits, receiverWork,
+                                                queueWork);
+}
+
 std::optional<std::chrono::steady_clock::time_point> TlsRecovery::nextWake() const noexcept {
     return impl_ ? impl_->core.nextWake() : std::nullopt;
 }

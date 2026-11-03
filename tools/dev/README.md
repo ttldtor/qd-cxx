@@ -2,6 +2,13 @@
 
 [Русская версия](README.ru.md). English is authoritative.
 
+The optional [public feed example](../../examples/feed_quote/README.md),
+`qdcxx-feed-demo`, uses library-owned progress and typed Quote subscriptions.
+Enable `ORG_TTLDTOR_QDCXX_BUILD_FEED_API=ON` with CLIENT/RUNTIME/RECOVERY;
+`--help` (also no arguments) and `--help-ru` perform no SDK/DNS/connection work.
+`--run` starts a finite plain-TCP session. Its guide documents arguments, output,
+exit codes, system DNS and shutdown; TLS/HISTORY are outside this high-level example.
+
 The [HTML/API documentation builder](../docs/README.md) uses CMake and Doxygen without Python or a compiler.
 `cmake -DHELP=ON -P tools/docs/Build.cmake` prints help without inputs or side effects.
 A normal build writes only the selected documentation output; the builder guide describes parameters,

@@ -39,6 +39,7 @@ struct PeerScript {
     std::optional<std::vector<Record>> afterRemove; ///< Separate late data, or the old initial-data replay by default.
     bool waitForDataRelease = false; ///< Test-controlled barrier after full ADD parsing, without a timer race.
     bool canonicalSymbols = false;   ///< Explicit canonical DATA encoding; false preserves legacy FD/cipher-zero bytes.
+    std::int32_t subscriptionRecordId = 0; ///< Expected client outgoing record identity; independent of peer sender17.
 };
 
 /** Encode the existing independent peer readiness/complete-description fixture without opening a socket.

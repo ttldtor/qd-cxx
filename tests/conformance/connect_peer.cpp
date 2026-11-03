@@ -267,10 +267,11 @@ std::vector<std::byte> data(std::span<const Record> records, WireFamily family, 
  * @param bytes Complete frame payload after message identity.
  * @param expected Exact expected client symbol sequence.
  * @param historyBound Actual expected raw bound for HISTORY ADD, absent for other commands.
- * @return True only for identical complete tuples with sender ID zero.
+ * @param recordId Exact expected client outgoing record identity, independent of the peer's sender identity.
+ * @return True only for identical complete tuples with the configured outgoing identity.
  */
 bool exactSubscription(std::span<const std::byte> bytes, std::span<const std::u16string> expected,
-                       std::optional<std::int64_t> historyBound) {
+                       std::optional<std::int64_t> historyBound, std::int32_t recordId) {
     e::SymbolReader symbols({8192, 128, 128}, 0);
     std::size_t index = 0;
 
@@ -285,7 +286,7 @@ bool exactSubscription(std::span<const std::byte> bytes, std::span<const std::u1
         bytes = bytes.subspan(symbol.consumed);
         const auto id = e::readCompactInt(bytes);
 
-        if (id.status != e::Status::OK || id.value != 0) {
+        if (id.status != e::Status::OK || id.value != recordId) {
             return false;
         }
 
@@ -445,9 +446,10 @@ void Peer::serve(std::stop_token stop) noexcept {
                         bytes = bytes.subspan(next.accepted);
 
                         if (next.frame && (next.frame->type == family.add || next.frame->type == family.remove)) {
-                            require(exactSubscription(next.frame->payload, expected_,
-                                                      next.frame->type == family.add ? script_.historyBound
-                                                                                     : std::nullopt));
+                            require(
+                                exactSubscription(next.frame->payload, expected_,
+                                                  next.frame->type == family.add ? script_.historyBound : std::nullopt,
+                                                  script_.subscriptionRecordId));
 
                             if (next.frame->type == family.add) {
                                 require(adds_.load() == 0);

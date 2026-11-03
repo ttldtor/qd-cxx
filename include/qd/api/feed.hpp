@@ -1,0 +1,287 @@
+// Copyright (c) 2026 ttldtor.
+// SPDX-License-Identifier: BSL-1.0
+#pragma once
+
+#include "qd/client/endpoint_options.hpp"
+#include "qd/events/profile.hpp"
+#include "qd/events/quote.hpp"
+#include "qd/transport/tcp_runtime.hpp"
+
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <initializer_list>
+#include <memory>
+#include <span>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+#include <type_traits>
+#include <vector>
+
+namespace org::ttldtor::qdcxx::api {
+namespace detail {
+struct RuntimeImpl;
+struct EndpointPort;
+struct SubscriptionPort;
+} // namespace detail
+
+/** Detached high-level failures. No peer payload, credential or address is diagnostic text. */
+enum class ErrorCode {
+    NONE,               ///< No failure has been recorded.
+    INVALID_ARGUMENT,   ///< Caller input does not satisfy the public contract.
+    INVALID_STATE,      ///< Operation conflicts with the accepted lifecycle or fixed address.
+    RESOURCE_LIMIT,     ///< A finite configured capacity or native thread reservation was exhausted.
+    WORK_LIMIT,         ///< The derived bounded preparation or progress allowance was exhausted.
+    ALLOCATION_FAILURE, ///< Required owned storage could not be allocated.
+    WRONG_THREAD,       ///< A checked wait was called outside the runtime creator thread.
+    CLOSED,             ///< Admission is fenced by endpoint, subscription or runtime retirement.
+    CALLBACK_FAILURE,   ///< An application listener threw; its subscription is failed and closed.
+    TRANSPORT_FAILURE,  ///< Connection, recovery or native I/O failed; inspect the static stage and codes.
+    PROTOCOL_FAILURE,   ///< Peer input failed the existing bounded protocol profile.
+    BOOTSTRAP_FAILURE,  ///< The explicit process/main-thread runtime bootstrap could not be acquired.
+    DNS_CONFIGURATION,  ///< No supported bounded IPv4 resolver snapshot could be obtained.
+    UNSUPPORTED_PROFILE ///< The requested combination is outside this public receiving profile.
+};
+
+/** Static/numeric failure snapshot, independent of runtime and native owners. */
+struct Diagnostic {
+    ErrorCode code = ErrorCode::NONE; ///< High-level failure category.
+    std::string_view stage = "none";  ///< Static library-owned label, never peer or caller text.
+    int nativeCode = 0;               ///< Native code when available; zero otherwise.
+    std::uint32_t detailCode = 0;     ///< Nested source category, meaningful with the static stage.
+};
+
+/** Synchronous public-API rejection; asynchronous failures are exposed by getDiagnostic(). */
+class Error final : public std::runtime_error {
+    Diagnostic diagnostic_;
+
+    public:
+    /** Preserve one detached static diagnostic.
+     * @param diagnostic Library-owned static stage and numeric failure.
+     */
+    explicit Error(Diagnostic diagnostic);
+    /** Inspect the rejection after its source owner has retired.
+     * @return Detached diagnostic retained by this exception.
+     */
+    [[nodiscard]] Diagnostic diagnostic() const noexcept;
+};
+
+/** Finite high-level registry limits; these are capacities, not process RSS or time guarantees. */
+struct RuntimeOptions {
+    std::size_t maximumEndpoints = 4;                ///< Maximum pending, active and retiring endpoint slots together.
+    std::size_t maximumSubscriptionsPerEndpoint = 8; ///< Pending, active and retiring registrations together.
+    std::size_t maximumSymbolsPerSubscription = 16;  ///< Maximum distinct exact ASCII selectors per subscription.
+    std::size_t maximumListenersPerSubscription = 4; ///< Pending, active and selected/retiring listener slots together.
+    std::size_t maximumSymbolUnits = 128;            ///< Maximum units of one exact printable ASCII selector.
+    std::vector<transport::DnsServer>
+        dnsServers;             ///< Explicit IPv4 resolvers; empty discovers a bounded system snapshot.
+    std::uint16_t dnsPort = 53; ///< Shared UDP/TCP resolver port, in 1..65535.
+};
+
+/** Existing delivery semantics selected for one high-level endpoint. */
+enum class DeliveryContract {
+    TICKER, ///< Initial/latest delivery with possible conflation, as for ordinary Java FEED Quote subscriptions.
+    STREAM  ///< Every admitted selected source record, including equal consecutive records.
+};
+
+/** Endpoint policy; defaults need no caller-owned queue or turn-work objects. */
+struct EndpointOptions {
+    DeliveryContract contract = DeliveryContract::TICKER; ///< Selected source contract for this endpoint.
+    std::chrono::milliseconds connectTimeout{5000};       ///< Whole native connection attempt deadline.
+    std::chrono::milliseconds dnsTimeout{5000};           ///< Whole two-family lookup deadline.
+    std::chrono::milliseconds readTimeout{30000};         ///< Connected input inactivity deadline.
+    std::chrono::milliseconds writeTimeout{5000};         ///< Pending-output inactivity deadline.
+    std::chrono::milliseconds pollInterval{1};    ///< SDK worker progress cadence; not a thread per subscription.
+    std::chrono::milliseconds retryDelay{250};    ///< Delay between finite fresh recovery attempts.
+    std::chrono::milliseconds drainTimeout{1000}; ///< Local admitted-prefix retirement allowance.
+    std::uint32_t maximumAttempts = 3;            ///< Total connection attempts, including the initial attempt.
+};
+
+/** Last SDK-worker observation, never an upstream acknowledgement or a whole-network guarantee. */
+enum class EndpointState {
+    NOT_CONNECTED, ///< Created without an accepted connection request.
+    CONNECTING,    ///< Connection, protocol negotiation or finite recovery is in progress.
+    CONNECTED,     ///< The existing recovery wrapper reports an active receiving session.
+    CLOSING,       ///< Reserved close is accepted; native and callback retirement may remain.
+    CLOSED,        ///< Native state and accepted callback captures have retired without a retained failure.
+    FAILED         ///< A failure is retained; inspect the diagnostic and await actual retirement.
+};
+
+/** Local logical-subscription lifecycle. Symbol mutations remain asynchronous. */
+enum class SubscriptionState {
+    CONFIGURED, ///< Created; worker registration has not yet become active.
+    ACTIVE,     ///< Worker registration is active; accepted symbol changes may still be pending.
+    CLOSING,    ///< Reserved close is accepted; an already selected callback may still execute.
+    CLOSED,     ///< Registration and accepted callback captures have retired without a failure.
+    FAILED      ///< A failure is retained; this subscription no longer admits ordinary mutations.
+};
+
+/** Actual local endpoint retirement; DRAINED is limited to the admitted local prefix. */
+struct CloseResult {
+    bool drained = false;         ///< True only for actual DRAINED without expiry or unresolved gap.
+    bool deadlineExpired = false; ///< Local drain allowance escalated to abort.
+    bool hadGap = false;          ///< Recovery or queue evidence retained an upstream/data gap.
+    Diagnostic diagnostic;        ///< First retained failure, independent of the closed worker state.
+};
+
+class Endpoint;
+class Feed;
+
+/** Typed logical subscription, backed by the existing receiver and shared queue.
+ * Methods are producer-safe. Listener calls are serialized on the runtime's SDK worker.
+ * A listener's span lasts only through that invocation; copying an Event produces an owning value.
+ * @tparam Event Existing events::Quote or events::Profile; no other event class is admitted.
+ */
+template <class Event> class Subscription final {
+    static_assert(std::is_same_v<Event, events::Quote> || std::is_same_v<Event, events::Profile>);
+    std::shared_ptr<detail::SubscriptionPort> port_;
+    friend class Feed;
+    explicit Subscription(std::shared_ptr<detail::SubscriptionPort> port) noexcept;
+
+    public:
+    using Listener =
+        std::function<void(std::span<const Event>)>; ///< Synchronous callback receiving ready owning values.
+    using ListenerId = std::uint64_t;                ///< Non-reused listener identity within this subscription.
+    /** Request nonblocking close; native/callback retirement stays with the runtime owner. */
+    ~Subscription();
+    Subscription(const Subscription &) = delete;
+    Subscription &operator=(const Subscription &) = delete;
+    /** Add a bounded listener without invoking it inline.
+     * @param listener Nonempty callback; its allocations and blocking behavior are application-owned.
+     * Throwing from a listener fails this subscription, without retrying it or failing other clients.
+     * Captures are released outside all control locks; close/await quiescence releases retained captures.
+     * @return Identity usable by removeEventListener; throws Error on synchronous rejection.
+     */
+    ListenerId addEventListener(Listener listener);
+    /** Remove a listener for future worker observations; an already selected callback may finish.
+     * @param id Previously returned listener identity; absence is an idempotent no-op.
+     */
+    void removeEventListener(ListenerId id);
+    /** Accept an exact selector; application return is not a wire acknowledgement.
+     * @param symbol Nonempty printable ASCII, within runtime limits, without All/wildcard syntax.
+     */
+    void addSymbols(std::string_view symbol);
+    /** Atomically accept several exact selectors, with duplicates coalesced.
+     * @param symbols Complete bounded set to add.
+     */
+    void addSymbols(std::initializer_list<std::string_view> symbols);
+    /** Accept removal of one selector; absence is an idempotent no-op.
+     * @param symbol Exact selector to remove.
+     */
+    void removeSymbols(std::string_view symbol);
+    /** Replace the complete accepted set atomically. Backend failure is reported by getDiagnostic().
+     * @param symbols New bounded exact set; empty withdraws all interests.
+     */
+    void setSymbols(std::initializer_list<std::string_view> symbols);
+    /** Withdraw all accepted selectors asynchronously. */
+    void clearSymbols();
+    /** Request closure without waiting, including from a listener; ordinary capacity cannot block it. */
+    void close() noexcept;
+    /** Inspect a detached lifecycle observation.
+     * @return Last observed logical lifecycle.
+     */
+    [[nodiscard]] SubscriptionState getState() const noexcept;
+    /** Inspect the first asynchronous failure.
+     * @return Static/numeric detached diagnostic, or NONE.
+     */
+    [[nodiscard]] Diagnostic getDiagnostic() const noexcept;
+};
+
+extern template class Subscription<events::Quote>;
+extern template class Subscription<events::Profile>;
+
+/** Endpoint's typed registration entry point; owns no SDK thread or bootstrap. */
+class Feed final {
+    std::shared_ptr<detail::EndpointPort> port_;
+    friend class Endpoint;
+    explicit Feed(std::shared_ptr<detail::EndpointPort> port);
+    std::shared_ptr<detail::SubscriptionPort> createSubscriptionPort(bool quote);
+
+    public:
+    /** Create a bounded logical registration, before or after connect, without application polling.
+     * @tparam Event Existing Quote or Profile.
+     * @return Producer handle; native preparation failures are observed asynchronously by its diagnostic.
+     */
+    template <class Event> [[nodiscard]] std::shared_ptr<Subscription<Event>> createSubscription() {
+        static_assert(std::is_same_v<Event, events::Quote> || std::is_same_v<Event, events::Profile>);
+        auto subscription = std::shared_ptr<Subscription<Event>>(new Subscription<Event>({}));
+        subscription->port_ = createSubscriptionPort(std::is_same_v<Event, events::Quote>);
+
+        return subscription;
+    }
+};
+
+/** Producer endpoint handle; destruction requests asynchronous close and never joins its own worker. */
+class Endpoint final {
+    std::shared_ptr<detail::EndpointPort> port_;
+    std::shared_ptr<Feed> feed_;
+    friend class ApiRuntime;
+    explicit Endpoint(std::shared_ptr<detail::EndpointPort> port);
+
+    public:
+    ~Endpoint();
+    Endpoint(const Endpoint &) = delete;
+    Endpoint &operator=(const Endpoint &) = delete;
+    /** Inspect the stable typed feed entry point.
+     * @return Shared producer facade; keeping it does not extend the native runtime lifetime.
+     */
+    [[nodiscard]] std::shared_ptr<Feed> getFeed() const noexcept;
+    /** Start an asynchronous plain binary-QTP connection; no I/O or callbacks run on this caller.
+     * The first accepted address is fixed. Repeating it while open is a no-op; another address or
+     * reconnecting a closed/failed endpoint rejects. Automatic finite recovery remains internal.
+     * @param address ASCII host:port or [IPv6]:port; no TLS/URI/login/configuration extensions.
+     */
+    void connect(std::string_view address);
+    /** Request admitted-prefix drain, escalating after drainTimeout; never wait or consume an ordinary slot. */
+    void close() noexcept;
+    /** Request close and await actual native/callback quiescence; only the runtime creator may wait.
+     * Worker/listener and other threads reject with WRONG_THREAD before waiting. Repeated waits return
+     * the same detached terminal. If no worker was started, creator-thread retirement needs no worker.
+     * Reentering retirement of this endpoint from capture destruction rejects with INVALID_STATE.
+     * @return Detached actual local outcome. Application callbacks and OS retirement have no hard time bound.
+     */
+    [[nodiscard]] CloseResult closeAndAwaitTermination();
+    /** Inspect the last SDK-worker state observation.
+     * @return Detached lifecycle state, not peer acknowledgement.
+     */
+    [[nodiscard]] EndpointState getState() const noexcept;
+    /** Inspect first asynchronous failure.
+     * @return Static/numeric detached diagnostic, or NONE.
+     */
+    [[nodiscard]] Diagnostic getDiagnostic() const noexcept;
+};
+
+/** Explicit process/main-thread SDK lifetime and joined worker owner.
+ * Create on main before application threads and coordinate all foreign c-ares users. Destroy on
+ * that creating thread after application threads retire. Endpoint/subscription handles may outlive
+ * this object as closed detached ports. The worker starts lazily on the first connect request.
+ */
+class ApiRuntime final {
+    std::unique_ptr<detail::RuntimeImpl> impl_;
+
+    public:
+    /** Acquire the existing bootstrap and a bounded DNS configuration snapshot, without connecting.
+     * @param options Finite registry limits and optional explicit IPv4 DNS settings.
+     */
+    explicit ApiRuntime(RuntimeOptions options = {});
+    ~ApiRuntime();
+    ApiRuntime(const ApiRuntime &) = delete;
+    ApiRuntime &operator=(const ApiRuntime &) = delete;
+    ApiRuntime(ApiRuntime &&) = delete;
+    ApiRuntime &operator=(ApiRuntime &&) = delete;
+    /** Create an independent producer endpoint with built-in full Quote/Profile schemas.
+     * Failed wrapper/control allocation rolls back its reservation without publishing an active endpoint.
+     * Producer dispatch uses a lifetime-gated detached control port, never an unprotected RuntimeImpl*.
+     * @param options Existing delivery policy and deadlines; finite capacities use RuntimeOptions.
+     * @return Endpoint facade; no socket is opened and no listener is called inline.
+     */
+    [[nodiscard]] std::shared_ptr<Endpoint> createEndpoint(EndpointOptions options = {});
+    /** Close every endpoint, join the SDK worker and preserve bootstrap until safe main-thread cleanup.
+     * Only the creating main/owner thread may call this operation; worker calls reject immediately.
+     * Reentrant shutdown or shutdown from accepted capture destruction rejects with INVALID_STATE.
+     */
+    void closeAndAwaitTermination();
+};
+} // namespace org::ttldtor::qdcxx::api

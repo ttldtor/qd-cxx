@@ -1188,6 +1188,66 @@ RecoveryCapacity RecoveryCore::capacity() const noexcept {
     return configuration_.capacity;
 }
 
+std::expected<mux::MuxHandle, RecoveryReceiverFailure> RecoveryCore::openSubscriptionReceiver(
+    core::SubscriptionFamily family, std::span<const client::PreparedSubscriptionBinding> bindings,
+    const std::shared_ptr<client::SubscriptionConsumer> &consumer, client::ReceiverLimits receiverLimits,
+    mux::ClientLimits clientLimits, client::ReceiverWork &receiverWork, mux::QueueWork &queueWork) {
+    if (const auto error = rejection()) {
+        return std::unexpected(RecoveryReceiverFailure{*error});
+    }
+
+    if (!configuration_.adopted || cutoff_ || finalRetirement_ || terminal_ || state_.status().terminal) {
+        return std::unexpected(
+            RecoveryReceiverFailure{RecoveryDiagnostic{RecoveryError::INVALID_STATE, "recovery-receiver-state"}});
+    }
+
+    std::size_t slot;
+
+    switch (family) {
+    case core::SubscriptionFamily::TICKER:
+        slot = 0;
+        break;
+    case core::SubscriptionFamily::STREAM:
+        slot = 1;
+        break;
+    case core::SubscriptionFamily::HISTORY:
+        slot = 2;
+        break;
+    default:
+        return std::unexpected(RecoveryReceiverFailure{
+            RecoveryDiagnostic{RecoveryError::INVALID_CONFIGURATION, "recovery-receiver-family"}});
+    }
+
+    auto &queue = configuration_.queue(slot);
+
+    if (!queue) {
+        return std::unexpected(
+            RecoveryReceiverFailure{RecoveryDiagnostic{RecoveryError::INVALID_STATE, "recovery-receiver-queue"}});
+    }
+
+    struct Registration {
+        bool &active;
+
+        explicit Registration(bool &value) : active(value) {
+            active = true;
+        }
+
+        ~Registration() {
+            active = false;
+        }
+    } registration(executing_);
+
+    auto opened = client::openSubscriptionReceiver(*queue, configuration_.endpoint.schema(), family,
+                                                   configuration_.options.selectors, bindings, consumer, receiverLimits,
+                                                   clientLimits, receiverWork, queueWork);
+
+    if (!opened) {
+        return std::unexpected(RecoveryReceiverFailure{std::move(opened.error())});
+    }
+
+    return std::move(*opened);
+}
+
 std::expected<mux::QueueRangeStatus, RecoveryDiagnostic>
 RecoveryCore::historyRangeStatus(const mux::MuxHandle &handle, core::SubscriptionKey key, mux::QueueWork &work) const {
     if (const auto error = rejection()) {

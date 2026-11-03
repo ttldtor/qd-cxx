@@ -1,5 +1,56 @@
 # Bounded C++23 components
 
+## Public feed API {#public-feed-api-build}
+
+`ORG_TTLDTOR_QDCXX_BUILD_FEED_API` defaults to `OFF`. It requires explicit
+`ORG_TTLDTOR_QDCXX_BUILD_CLIENT=ON`, `ORG_TTLDTOR_QDCXX_BUILD_RUNTIME=ON` and
+`ORG_TTLDTOR_QDCXX_BUILD_RECOVERY=ON`. It builds/installs `qdcxx_feed` and
+`qd/api/feed.hpp`, and builds the `qdcxx_feed_demo` executable target
+(`qdcxx-feed-demo`). TLS, JSON and the separate connection CLI are not prerequisites.
+
+Prepare the exact [runtime SDK sources](../cmake/runtime-profile/README.md) first.
+Use a qualified x64 [recovery copy profile](../spec/transport/RECOVERY.md): selected
+MSVC 19.42/standard-library ABI or GCC 13.3/libstdc++ ABI. An unsupported copy profile
+is an explicit runtime refusal, not a generic C++23 compatibility promise.
+For Windows/Ninja, use a compiler-configured terminal and actual SDK source paths:
+
+```powershell
+cmake -S . -B build/feed -G Ninja '-DCMAKE_BUILD_TYPE=Release' `
+  '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL' '-DCMAKE_INSTALL_LIBDIR=lib' `
+  '-DBUILD_TESTING=OFF' '-DORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON=OFF' `
+  '-DORG_TTLDTOR_QDCXX_BUILD_TLS=OFF' `
+  '-DORG_TTLDTOR_QDCXX_BUILD_CLIENT=ON' '-DORG_TTLDTOR_QDCXX_BUILD_RUNTIME=ON' `
+  '-DORG_TTLDTOR_QDCXX_BUILD_RECOVERY=ON' '-DORG_TTLDTOR_QDCXX_BUILD_FEED_API=ON' `
+  '-DORG_TTLDTOR_QDCXX_ASIO_INCLUDE=C:/sdk/asio-1.38.2/include' `
+  '-DORG_TTLDTOR_QDCXX_CARES_SOURCE=C:/sdk/c-ares-1.34.9-qdcxx2'
+cmake --build build/feed --config Release --parallel 2
+cmake --install build/feed --config Release --prefix C:/sdk/qd-cxx
+```
+
+On Linux use the qualified GCC profile, Linux SDK paths and installation prefix;
+omit the MSVC runtime option. Existing SDK preparation/qualification requirements
+still apply. Configuration does not acquire SDKs. The enabled package carries its
+native static-link closure; an installed consumer needs no SDK source/include roots:
+
+```cmake
+find_package(qdcxx CONFIG REQUIRED)
+add_executable(feed_app main.cpp)
+target_link_libraries(feed_app PRIVATE qdcxx_feed)
+```
+
+The no-SDK-root consumer command above assumes the recommended TLS-OFF package.
+A TLS-enabled installed package additionally validates its qualified OpenSSL
+installation during package discovery, even for a plain feed application; supply
+`-DORG_TTLDTOR_QDCXX_OPENSSL_ROOT=C:/sdk/openssl-qualified` with the actual
+[qualified TLS SDK](#tls-source-profile-cpp-build-en) path. Asio/c-ares source roots
+remain unnecessary for installed consumers.
+
+Use compatible compiler/standard-library/CRT settings. See the [public API guide](FEED-API.md)
+and [standalone installed example](../examples/feed_quote/README.md) for application
+lifetime, system IPv4 DNS, typed subscriptions and EN/RU command help. This facade
+uses plain TCP and TICKER/STREAM; enabling lower-level TLS does not add TLS support
+to this high-level API.
+
 <a id="installed-binary-json-loader"></a>
 
 ## Installed binary JSON loader

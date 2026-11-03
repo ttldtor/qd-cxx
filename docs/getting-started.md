@@ -2,6 +2,11 @@
 
 [Русская версия](getting-started.ru.md) · [Documentation home](index.md) · [Next: practical guides](guides.md)
 
+For a live market-data application, start with the [public feed API](FEED-API.md)
+and its [complete Quote example](../examples/feed_quote/README.md). That optional
+package owns connection progress and requires the transport SDK. The encoding-only
+example below remains the smallest dependency-free package introduction.
+
 This example uses the installed encoding library to write a compact int and read it back.
 You need CMake 3.25+, a C++23 compiler and its native build tools. No network, transport SDK, JSON
 or test framework is needed. See [current capabilities](CURRENT-STATE.md) for other profiles.

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "qd/client/endpoint_options.hpp"
+#include "qd/client/subscription_receiver.hpp"
 #include "qd/mux/queue.hpp"
 #include "qd/transport/tcp_runtime.hpp"
 
@@ -12,6 +13,7 @@
 #include <cstdint>
 #include <optional>
 #include <string_view>
+#include <variant>
 
 namespace org::ttldtor::qdcxx::transport {
 
@@ -49,6 +51,9 @@ struct RecoveryDiagnostic {
     std::optional<client::EndpointDiagnostic> endpoint{}; ///< Existing immutable-configuration refusal.
     std::optional<protocol::SubscriptionWriterError> writer{}; ///< Existing composition category when applicable.
 };
+
+/** Owner admission refusal or the complete original receiver preparation/registration failure. */
+using RecoveryReceiverFailure = std::variant<RecoveryDiagnostic, client::ReceiverFailure>;
 
 /** Simultaneous schema backing, in separate logical requested-capacity coordinates. */
 struct RecoverySchemaCapacity {

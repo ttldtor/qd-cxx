@@ -109,6 +109,25 @@ class TlsRecovery {
      * @return Logical requested capacities, or zeros after move; never process RSS.
      */
     [[nodiscard]] RecoveryCapacity capacity() const noexcept;
+    /** Prepare one empty logical receiver on an adopted family queue, without I/O or callbacks.
+     * Requires the creating thread outside owner progress/callbacks. Allowed before start and during
+     * temporary reconnect/reset; stop, drain, final retirement and terminal owners reject before work
+     * debit. Uses the owner's exact schema provenance and immutable selector policy. Success submits
+     * no desired command: use the returned handle's existing add/remove/replace/clear operations.
+     * @param family Required adopted delivery family; a missing queue is an owner-state refusal.
+     * @param bindings Borrowed unique local typed routes; unlisted records remain generic.
+     * @param consumer Application callable, preserved on refusal and retained on successful registration.
+     * @param receiverLimits Finite immutable receiver plan reservations.
+     * @param clientLimits Complete finite per-registration queue reservations.
+     * @param receiverWork Actual preparation credits; attempted failures are not refunded.
+     * @param queueWork Actual queue inspection/open credits, never retained by reference.
+     * @return Existing empty producer handle, owner refusal, or complete original ReceiverFailure.
+     * Returned handles expose no queue owner and do not extend native recovery lifetime.
+     */
+    [[nodiscard]] std::expected<mux::MuxHandle, RecoveryReceiverFailure> openSubscriptionReceiver(
+        core::SubscriptionFamily family, std::span<const client::PreparedSubscriptionBinding> bindings,
+        const std::shared_ptr<client::SubscriptionConsumer> &consumer, client::ReceiverLimits receiverLimits,
+        mux::ClientLimits clientLimits, client::ReceiverWork &receiverWork, mux::QueueWork &queueWork);
     /** Observe an adopted HISTORY range on the creating thread after poll/callback returns.
      * Requires current ACTIVE recovery, no cutoff or held complete input, and fresh read-only backend
      * facts proving connected/authenticated/nonterminal state. ACTIVE alone is insufficient after

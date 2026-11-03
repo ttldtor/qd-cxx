@@ -4,6 +4,7 @@
 
 | Task | Guide | Choose this when |
 | --- | --- | --- |
+| Receive typed live events | [Public feed API](FEED-API.md) | Library-owned progress, Quote/Profile subscriptions and plain TCP; [complete example](../examples/feed_quote/README.md) |
 | Read binary tapes | [Tape inspection](TAPE-INSPECT.md) | Input is an existing file; select a supported finite source profile |
 | Write a tape | [Tape writing](TAPE-WRITE.md) | You already own validated records and an explicit schema |
 | Inspect protocol frames | [QTP inspection](QTP-INSPECT.md) | You need framing and record diagnostics offline |
