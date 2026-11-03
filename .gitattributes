@@ -625,3 +625,9 @@ tools/upstream/event-source-oracle/*.java text eol=lf
 tools/upstream/event-source-oracle/*.ps1 text eol=lf
 tests/fixtures/event-sources/oracle.tsv -text -whitespace
 tests/fixtures/event-sources/provenance.json text eol=lf
+
+# Preserve exact order-index observations and canonical oracle provenance.
+tools/upstream/order-index-oracle/*.java text eol=lf
+tools/upstream/order-index-oracle/*.ps1 text eol=lf
+tests/fixtures/order-index/oracle.tsv -text -whitespace
+tests/fixtures/order-index/provenance.json text eol=lf

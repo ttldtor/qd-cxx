@@ -1,0 +1,54 @@
+{
+  "revision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "javaVersion": "openjdk version \"1.8.0_422\"",
+  "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
+  "javacSha256": "633143e961aa18051c09112b85333f5cdbd845b54eb39678eb15b91ca8bbb527",
+  "harnessSha256": "7d154c3bf9a2bcd916f61654ebaf77637cf49385da948c67fdcf63ab11f8a545",
+  "launcherSha256": "6d917bc4f45b9adee5078d9a5c351cdebed02e556cc2cad04510dae6e0a83090",
+  "upstreamSources": [
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/IndexedEventSource.java",
+      "sha256": "5b2df5fd210f02e641188dcf657b65e11a6d1d042203d47c8bad43559c9e61ea"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/OrderSource.java",
+      "sha256": "3b0d0b0e83f685efd688b87dba479003a76d9ad69097867326b74206dc3a2a45"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/OrderBase.java",
+      "sha256": "94df739d6a931f0c215c2c32ac7d591b8a0b9d567bb4f41da1769b44ea82a195"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/Order.java",
+      "sha256": "a521309fa94e41ec1790f980758aa8680cb495ce090c712741f2f0b1b5d58bb5"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/impl/MarketEventMapping.java",
+      "sha256": "8c88dbc8c84cbf9055d3807e0070dc66244662a8aad7290c992d8ef8b02c4265"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/impl/OrderBaseMapping.java",
+      "sha256": "ccb4b9fadc340b6120e0339d81a10673c77f2219b3af3e1f613cf169780757a5"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/impl/OrderMapping.java",
+      "sha256": "8d82def9cb2894b3cbbc3ada52dab76d735289fbc3b9db5c5c645bbdd3d84455"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/OrderDelegate.java",
+      "sha256": "a81a4f7356b1847ca3a96e09227dbdd43668122c58adecf0ef02ada74df35f2a"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/MarketFactoryImpl.java",
+      "sha256": "c74b324b2f99d2a351963fead08419c2ba1d92573c633d30740295acc9d0bac4"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/util/MappingUtil.java",
+      "sha256": "ec334d41b3fcac73ca0845e3ebd7f0e1bceaf8eb1623ea19c7c3dadaccea8eae"
+    }
+  ],
+  "productionClassInventorySha256": "90a478b5d3737246d8c897322c9f9db60887846e20117572588e05ae78fbc6d8",
+  "fixtureSha256": "d699de9a3d4fd2c1d6065948090023b49209927ba1f8f6df7b0675b179423fd6",
+  "rows": 321,
+  "timezoneInvariant": true
+}

@@ -290,3 +290,5 @@ Use its built-in `-Help`/`-HelpRu` without inputs; optional NativeDirectory read
 native writer files through the pinned Java reader. No network, SDK build or new dependency runs.
 
 - [Event-source oracle](../upstream/event-source-oracle/README.md): source identity capture/verify and standalone noargs/EN/RU help regression.
+
+- [Order source/index oracle](../upstream/order-index-oracle/README.md): production record mappings, index packing and source IDs; standalone noargs/EN/RU help.

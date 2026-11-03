@@ -76,6 +76,9 @@ if(ORG_TTLDTOR_QDCXX_BUILD_IPF)
 endif()
 
 add_library(qdcxx_event_mapping src/events/event_mapping.cpp)
+add_library(qdcxx_order_index src/events/order_index.cpp)
+target_link_libraries(qdcxx_order_index PUBLIC qdcxx_event_mapping qdcxx_event_sources)
+set_target_properties(qdcxx_order_index PROPERTIES CXX_EXTENSIONS OFF)
 add_library(qdcxx_event_sources src/events/indexed_event_source.cpp src/events/order_source.cpp)
 target_include_directories(qdcxx_event_sources PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
@@ -149,7 +152,7 @@ if(ORG_TTLDTOR_QDCXX_BUILD_FEED_API)
     add_library(qdcxx_feed src/api/feed.cpp src/api/receiving_profile.cpp src/api/event_registry.cpp src/api/system_dns.cpp)
     add_library(qdcxx::feed ALIAS qdcxx_feed)
     target_include_directories(qdcxx_feed PRIVATE src/api)
-    target_link_libraries(qdcxx_feed PUBLIC qdcxx_recovery qdcxx_quote qdcxx_profile qdcxx_market_event_symbols qdcxx_event_sources)
+    target_link_libraries(qdcxx_feed PUBLIC qdcxx_recovery qdcxx_quote qdcxx_profile qdcxx_market_event_symbols qdcxx_event_sources qdcxx_order_index)
     set_target_properties(qdcxx_feed PROPERTIES CXX_EXTENSIONS OFF)
     if(WIN32)
         target_compile_definitions(qdcxx_feed PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN _WIN32_WINNT=0x0A00)
@@ -165,7 +168,7 @@ endif()
 
 include(CMakePackageConfigHelpers)
 install(TARGETS qdcxx_encoding qdcxx_core qdcxx_protocol qdcxx_collectors qdcxx_mux
-    qdcxx_event_mapping qdcxx_quote qdcxx_profile qdcxx_market_event_symbols qdcxx_event_sources EXPORT qdcxxTargets
+    qdcxx_event_mapping qdcxx_quote qdcxx_profile qdcxx_market_event_symbols qdcxx_event_sources qdcxx_order_index EXPORT qdcxxTargets
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
@@ -330,6 +333,17 @@ if(BUILD_TESTING)
         DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     )
     FetchContent_MakeAvailable(doctest)
+    add_executable(qdcxx_order_index_tests tests/conformance/order_index_tests.cpp)
+    target_link_libraries(qdcxx_order_index_tests PRIVATE qdcxx_order_index doctest::doctest)
+    target_compile_definitions(qdcxx_order_index_tests PRIVATE
+        ORG_TTLDTOR_QDCXX_ORDER_INDEX_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/order-index/oracle.tsv")
+    set_target_properties(qdcxx_order_index_tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME order_index COMMAND qdcxx_order_index_tests)
+    set_tests_properties(order_index PROPERTIES TIMEOUT 30)
+    if(WIN32)
+        add_test(NAME order_index_oracle_help COMMAND ${CMAKE_COMMAND}
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/order_index_oracle_help.cmake")
+    endif()
     add_executable(qdcxx_event_sources_tests tests/conformance/event_sources_tests.cpp)
     target_link_libraries(qdcxx_event_sources_tests PRIVATE qdcxx_event_sources doctest::doctest)
     target_compile_definitions(qdcxx_event_sources_tests PRIVATE

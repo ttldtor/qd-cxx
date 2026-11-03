@@ -303,3 +303,5 @@ container/parser cleanup и cancellation с instrumented close/flush boundaries.
 native writer files pinned Java reader. Сеть, SDK build и новая dependency не запускаются.
 
 - [Oracle источников событий](../upstream/event-source-oracle/README.ru.md): захват/проверка идентичности и отдельная проверка noargs/EN/RU справки.
+
+- [Order source/index oracle](../upstream/order-index-oracle/README.ru.md): production отображения, индексы, source IDs и справка EN/RU без рабочих входов.
