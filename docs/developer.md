@@ -33,3 +33,5 @@ reruns are different evidence; none is a general security certification or an RS
 [Current capabilities](CURRENT-STATE.md) distinguish delivered components from the
 [remaining product direction](NEXT-STEPS.md). Conformance captures and technical specifications remain
 part of the source distribution; the navigation above does not turn proposals into supported behavior.
+
+- [Event-source oracle](../tools/upstream/event-source-oracle/README.md): capture/verify pinned Java source identities, with help and bounded processes.

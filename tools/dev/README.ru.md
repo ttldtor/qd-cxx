@@ -296,3 +296,5 @@ container/parser cleanup и cancellation с instrumented close/flush boundaries.
 детерминированные Java writer bytes и reader projections, включая явные lossy/rejected boundaries.
 Встроенные `-Help`/`-HelpRu` работают без inputs; optional NativeDirectory читает actual emitted
 native writer files pinned Java reader. Сеть, SDK build и новая dependency не запускаются.
+
+- [Oracle источников событий](../upstream/event-source-oracle/README.ru.md): захват/проверка идентичности и отдельная проверка noargs/EN/RU справки.

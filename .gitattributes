@@ -615,3 +615,9 @@ tools/upstream/market-attribute-oracle/*.java text eol=lf
 tools/upstream/market-attribute-oracle/*.ps1 text eol=lf
 tests/fixtures/market-attributes/oracle.tsv -text -whitespace
 tests/fixtures/market-attributes/provenance.json text eol=lf
+
+# Preserve exact event-source oracle bytes and canonical source provenance.
+tools/upstream/event-source-oracle/*.java text eol=lf
+tools/upstream/event-source-oracle/*.ps1 text eol=lf
+tests/fixtures/event-sources/oracle.tsv -text -whitespace
+tests/fixtures/event-sources/provenance.json text eol=lf

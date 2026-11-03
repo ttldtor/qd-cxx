@@ -19,3 +19,5 @@ and StreamCompression observations at either accepted baseline/current pin using
 class directories. Capture/Verify, explicit native UTC logging and built-in help require no upstream
 rebuild. The [developer catalog](../dev/README.md#optional-tape-containers-and-production-oracle)
 documents the separate manual help regression and optional native compression component.
+
+- [Event-source oracle](event-source-oracle/README.md): exact source identities and invalid-input policy.

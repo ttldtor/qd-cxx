@@ -22,3 +22,5 @@ The STREAM program has a finite cutoff and uses plain TCP. The separate TLS runt
 in a stored endpoint does not turn the plain program into a TLS client. Reconnect and a complete
 shared subscription facade remain separate capabilities. Check [current support](CURRENT-STATE.md)
 before choosing an integration.
+
+- [Indexed and order event sources](EVENT-SOURCES.md): owned ID/name values without subscription routing.

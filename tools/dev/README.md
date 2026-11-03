@@ -283,3 +283,5 @@ The [maintained writer oracle](../upstream/ipf-writer-oracle/README.md) captures
 Java writer bytes and reader projections, including explicit lossy/rejected value boundaries.
 Use its built-in `-Help`/`-HelpRu` without inputs; optional NativeDirectory reads actual emitted
 native writer files through the pinned Java reader. No network, SDK build or new dependency runs.
+
+- [Event-source oracle](../upstream/event-source-oracle/README.md): source identity capture/verify and standalone noargs/EN/RU help regression.
