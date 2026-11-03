@@ -37,7 +37,8 @@ enum class ErrorCode {
     ALLOCATION_FAILURE, ///< Required owned storage could not be allocated.
     WRONG_THREAD,       ///< A checked wait was called outside the runtime creator thread.
     CLOSED,             ///< Admission is fenced by endpoint, subscription or runtime retirement.
-    CALLBACK_FAILURE,   ///< An application listener threw; its subscription is failed and closed.
+    CALLBACK_FAILURE,   ///< Event listener failure closes its subscription; advisory state failure is recorded
+                        ///< separately.
     TRANSPORT_FAILURE,  ///< Connection, recovery or native I/O failed; inspect the static stage and codes.
     PROTOCOL_FAILURE,   ///< Peer input failed the existing bounded protocol profile.
     BOOTSTRAP_FAILURE,  ///< The explicit process/main-thread runtime bootstrap could not be acquired.
@@ -78,6 +79,9 @@ struct RuntimeOptions {
     std::vector<transport::DnsServer>
         dnsServers;             ///< Explicit IPv4 resolvers; empty discovers a bounded system snapshot.
     std::uint16_t dnsPort = 53; ///< Shared UDP/TCP resolver port, in 1..65535.
+    std::size_t maximumStateListenersPerEndpoint = 4; ///< Accepted and selected/retiring endpoint state observers.
+    std::size_t maximumStateListenersPerSubscription =
+        4; ///< Accepted and selected/retiring subscription state observers.
 };
 
 /** Existing delivery semantics selected for one high-level endpoint. */
@@ -105,7 +109,7 @@ enum class EndpointState {
     CONNECTING,    ///< Connection, protocol negotiation or finite recovery is in progress.
     CONNECTED,     ///< The existing recovery wrapper reports an active receiving session.
     CLOSING,       ///< Reserved close is accepted; native and callback retirement may remain.
-    CLOSED,        ///< Native state and accepted callback captures have retired without a retained failure.
+    CLOSED,        ///< Native state and event captures retired; opt-in state observers may still be retiring.
     FAILED         ///< A failure is retained; inspect the diagnostic and await actual retirement.
 };
 
@@ -114,7 +118,7 @@ enum class SubscriptionState {
     CONFIGURED, ///< Created; worker registration has not yet become active.
     ACTIVE,     ///< Worker registration is active; accepted symbol changes may still be pending.
     CLOSING,    ///< Reserved close is accepted; an already selected callback may still execute.
-    CLOSED,     ///< Registration and accepted callback captures have retired without a failure.
+    CLOSED,     ///< Registration and event captures retired; opt-in state observers may still be retiring.
     FAILED      ///< A failure is retained; this subscription no longer admits ordinary mutations.
 };
 
@@ -130,7 +134,7 @@ class Endpoint;
 class Feed;
 
 /** Typed logical subscription, backed by the existing receiver and shared queue.
- * Methods are producer-safe. Listener calls are serialized on the runtime's SDK worker.
+ * Methods are producer-safe. Event-listener calls are serialized on the runtime's SDK worker.
  * A listener's span lasts only through that invocation; copying an Event produces an owning value.
  * @tparam Event Existing events::Quote or events::Profile; no other event class is admitted.
  */
@@ -144,6 +148,28 @@ template <class Event> class Subscription final {
     using Listener =
         std::function<void(std::span<const Event>)>; ///< Synchronous callback receiving ready owning values.
     using ListenerId = std::uint64_t;                ///< Non-reused listener identity within this subscription.
+    using StateChangeListener =
+        std::function<void(SubscriptionState, SubscriptionState)>; ///< Advisory old/new observation.
+    using StateChangeListenerId =
+        std::uint64_t; ///< Non-reused state-observer identity, separate from event identities.
+    /** Add an advisory state observer; no initial notification is made.
+     * Selection is atomic with each distinct transition; selected observers run in registration order outside locks.
+     * Calls use the SDK worker, or creator-thread retirement if this runtime has never started its worker.
+     * Exceptions are retained by getStateChangeDiagnostic(), without failing the subscription or stopping selection.
+     * Captures remain charged until destroyed; endpoint await includes their final retirement.
+     * @param listener Nonempty callback receiving actual old/new states by value; application blocking is unbounded.
+     * @return Identity for removeStateChangeListener; throws Error for closed admission or finite-capacity refusal.
+     */
+    StateChangeListenerId addStateChangeListener(StateChangeListener listener);
+    /** Remove an observer from future transition selections, including after close.
+     * @param id Previously returned state-observer identity; absence is an idempotent no-op.
+     * An already selected invocation may still run. Capture destruction occurs outside all control locks.
+     */
+    void removeStateChangeListener(StateChangeListenerId id);
+    /** Inspect the first advisory observer exception independently of the subscription lifecycle.
+     * @return Detached CALLBACK_FAILURE or NONE; owner state and getDiagnostic() are unaffected.
+     */
+    [[nodiscard]] Diagnostic getStateChangeDiagnostic() const noexcept;
     /** Request nonblocking close; native/callback retirement stays with the runtime owner. */
     ~Subscription();
     Subscription(const Subscription &) = delete;
@@ -221,6 +247,25 @@ class Endpoint final {
     explicit Endpoint(std::shared_ptr<detail::EndpointPort> port);
 
     public:
+    using StateChangeListener = std::function<void(EndpointState, EndpointState)>; ///< Advisory old/new observation.
+    using StateChangeListenerId = std::uint64_t; ///< Non-reused state-observer identity within this endpoint.
+    /** Add an advisory state observer without an initial notification or inline invocation.
+     * Selection is atomic with each distinct transition; selected observers run in registration order outside locks.
+     * Calls use the SDK worker, or creator-thread retirement if this runtime has never started its worker.
+     * Exceptions are retained by getStateChangeDiagnostic(), without changing owner state, diagnostic or CloseResult.
+     * CLOSED preserves event-capture/native retirement; these opt-in observers may still retire until endpoint await.
+     * @param listener Nonempty old/new state callback; captures and application blocking remain application-owned.
+     * @return Identity for removeStateChangeListener; throws Error for closed admission or finite-capacity refusal.
+     */
+    StateChangeListenerId addStateChangeListener(StateChangeListener listener);
+    /** Remove an observer from future selections, including after close; a selected invocation may still run.
+     * @param id Previously returned identity; absence is an idempotent no-op. Captures are destroyed outside locks.
+     */
+    void removeStateChangeListener(StateChangeListenerId id);
+    /** Inspect the first advisory state-observer exception separately from native/lifecycle failure.
+     * @return Detached CALLBACK_FAILURE or NONE; getDiagnostic(), state and CloseResult remain unaffected.
+     */
+    [[nodiscard]] Diagnostic getStateChangeDiagnostic() const noexcept;
     ~Endpoint();
     Endpoint(const Endpoint &) = delete;
     Endpoint &operator=(const Endpoint &) = delete;

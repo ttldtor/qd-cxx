@@ -9,14 +9,173 @@
 
 #include <doctest/doctest.h>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <cstdlib>
 #include <functional>
 #include <mutex>
+#include <new>
 #include <optional>
 #include <stdexcept>
 #include <thread>
+#include <utility>
+
+/** Test-executable-only allocation faults; production targets have no fault hook. */
+namespace allocation_probe {
+struct WorkerFault;
+thread_local bool failNext = false;         ///< One creator-thread owned-storage refusal, reset before throwing.
+std::atomic<WorkerFault *> worker{nullptr}; ///< Explicit one-worker scenario, never armed during ordinary tests.
+
+/** Bounded scheduling barrier at the sole worker's first allocation, before it owns any native state. */
+struct WorkerFault {
+    org::ttldtor::qdcxx::api::ApiRuntime &runtime;      ///< Main-owned runtime, joined before this fault state dies.
+    std::thread::id owner = std::this_thread::get_id(); ///< Creator allocations must never consume the worker fault.
+    std::atomic<bool> claimed{false}; ///< Exactly one foreign allocation receives the injected failure.
+    std::atomic<bool> entered{false}; ///< Worker has reached the failure barrier.
+    std::atomic<bool> release{false}; ///< Test-owned helper releases the worker to throw bad_alloc.
+
+    /** Keep the runtime lifetime explicit through the fault scenario.
+     * @param runtime Test-owned main-thread runtime; no other foreign thread exists when this hook is armed.
+     */
+    explicit WorkerFault(org::ttldtor::qdcxx::api::ApiRuntime &runtime) : runtime(runtime) {
+    }
+
+    /** Publish this scenario only after its owner and atomic scheduling fields exist. */
+    void arm() {
+        worker.store(this, std::memory_order_release);
+    }
+
+    /** Release and join the owned worker before this stack-resident scheduling state can disappear. */
+    ~WorkerFault() {
+        release.store(true, std::memory_order_release);
+        worker.store(nullptr, std::memory_order_release);
+        runtime.closeAndAwaitTermination();
+    }
+};
+
+/** Refuse one requested allocation before allocating application storage. */
+void beforeAllocation() {
+    if (std::exchange(failNext, false)) {
+        throw std::bad_alloc();
+    }
+
+    auto *fault = worker.load(std::memory_order_acquire);
+
+    if (fault && std::this_thread::get_id() != fault->owner && !fault->claimed.exchange(true)) {
+        fault->entered.store(true, std::memory_order_release);
+
+        while (!fault->release.load(std::memory_order_acquire)) {
+            std::this_thread::yield();
+        }
+
+        throw std::bad_alloc();
+    }
+}
+} // namespace allocation_probe
+
+/** Allocate test-runner storage with an explicitly armed deterministic fault boundary.
+ * @param bytes Requested allocation size, including a valid allocation for zero.
+ * @return Owning malloc-backed storage; throws bad_alloc for the explicit fault or real exhaustion.
+ */
+void *operator new(std::size_t bytes) {
+    allocation_probe::beforeAllocation();
+
+    if (void *result = std::malloc(bytes ? bytes : 1)) {
+        return result;
+    }
+
+    throw std::bad_alloc();
+}
+
+/** Release storage allocated by the test executable's scalar allocation function.
+ * @param address Owning allocation, or null.
+ */
+void operator delete(void *address) noexcept {
+    std::free(address);
+}
+
+/** Release sized scalar storage through the same malloc/free pair.
+ * @param address Owning allocation, or null.
+ * @param bytes Original allocation size; not needed by free.
+ */
+void operator delete(void *address, std::size_t bytes) noexcept {
+    (void)bytes;
+    std::free(address);
+}
+
+/** Allocate array storage with the same explicit test fault boundary.
+ * @param bytes Requested array allocation size.
+ * @return Owning malloc-backed storage; throws bad_alloc on injected or real exhaustion.
+ */
+void *operator new[](std::size_t bytes) {
+    return ::operator new(bytes);
+}
+
+/** Release array storage through the test executable's matching malloc/free pair.
+ * @param address Owning array allocation, or null.
+ */
+void operator delete[](void *address) noexcept {
+    std::free(address);
+}
+
+/** Release sized array storage through the same malloc/free pair.
+ * @param address Owning array allocation, or null.
+ * @param bytes Original size; not needed by free.
+ */
+void operator delete[](void *address, std::size_t bytes) noexcept {
+    (void)bytes;
+    std::free(address);
+}
+
+/** Allocate nothrow scalar storage through the matching throwing replacement.
+ * @param bytes Requested allocation size.
+ * @param tag Standard nothrow allocation tag.
+ * @return Owning storage, or null on allocation failure.
+ */
+void *operator new(std::size_t bytes, const std::nothrow_t &tag) noexcept {
+    (void)tag;
+
+    try {
+        return ::operator new(bytes);
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+/** Allocate nothrow array storage through the matching throwing replacement.
+ * @param bytes Requested allocation size.
+ * @param tag Standard nothrow allocation tag.
+ * @return Owning storage, or null on allocation failure.
+ */
+void *operator new[](std::size_t bytes, const std::nothrow_t &tag) noexcept {
+    (void)tag;
+
+    try {
+        return ::operator new[](bytes);
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+/** Release nothrow scalar storage after construction failure.
+ * @param address Owning allocation, or null.
+ * @param tag Standard nothrow allocation tag.
+ */
+void operator delete(void *address, const std::nothrow_t &tag) noexcept {
+    (void)tag;
+    std::free(address);
+}
+
+/** Release nothrow array storage after construction failure.
+ * @param address Owning allocation, or null.
+ * @param tag Standard nothrow allocation tag.
+ */
+void operator delete[](void *address, const std::nothrow_t &tag) noexcept {
+    (void)tag;
+    std::free(address);
+}
 
 namespace {
 namespace root = org::ttldtor::qdcxx;
@@ -191,6 +350,77 @@ void checkRetiredEndpoint(const std::shared_ptr<api::Endpoint> &endpoint) {
     CHECK(endpoint->getState() == api::EndpointState::CLOSED);
     CHECK(diagnostic.code == api::ErrorCode::NONE);
 }
+
+/** Test-owned synchronized state observations; waiting never drives SDK progress.
+ * @tparam State Public endpoint or subscription enum.
+ */
+template <class State> struct StateLog {
+    std::mutex mutex;                                 ///< Protects the finite test observation vector.
+    std::condition_variable condition;                ///< Wakes assertions after actual callback publication.
+    std::vector<std::pair<State, State>> transitions; ///< Ordered actual old/new observations.
+    std::vector<std::thread::id> threads;             ///< Actual callback execution domains.
+
+    /** Record one callback observation.
+     * @param previous Actual old state.
+     * @param current Actual new state.
+     */
+    void record(State previous, State current) {
+        {
+            std::lock_guard lock(mutex);
+            transitions.emplace_back(previous, current);
+            threads.push_back(std::this_thread::get_id());
+        }
+
+        condition.notify_all();
+    }
+
+    /** Await an actual notification rather than polling state.
+     * @param state Desired observed new state.
+     * @return True within the finite test deadline.
+     */
+    bool await(State state) {
+        std::unique_lock lock(mutex);
+
+        return condition.wait_for(lock, 3000ms, [&] {
+            return std::ranges::any_of(transitions, [state](const auto &change) {
+                return change.second == state;
+            });
+        });
+    }
+
+    /** Copy the finite test observations after synchronization.
+     * @return Owning ordered transitions.
+     */
+    auto snapshot() {
+        std::lock_guard lock(mutex);
+
+        return transitions;
+    }
+};
+
+/** Verify a full observer sees contiguous distinct transitions and an absorbing final state.
+ * @tparam State Public lifecycle enum.
+ * @param changes Complete owning transition observations after callback quiescence.
+ * @param initial Expected initial state, which must not have been notified on registration.
+ * @param terminal Actual final observed state.
+ */
+template <class State>
+void checkStateOrder(const std::vector<std::pair<State, State>> &changes, State initial, State terminal) {
+    REQUIRE_FALSE(changes.empty());
+    CHECK(changes.front().first == initial);
+    CHECK(changes.back().second == terminal);
+
+    for (std::size_t index = 0; index < changes.size(); ++index) {
+        CHECK(changes[index].first != changes[index].second);
+
+        if (index != 0) {
+            CHECK(changes[index - 1].second == changes[index].first);
+            CHECK(changes[index].first != State::CLOSED);
+            CHECK(changes[index].first != State::FAILED);
+        }
+    }
+}
+
 } // namespace
 
 TEST_CASE("public feed bounds atomic desired sets listeners and inactive retirement") {
@@ -395,6 +625,10 @@ TEST_CASE("public feed isolates listener failure and keeps selected listener slo
     auto endpoint = runtime.createEndpoint(endpointOptions());
     auto broken = endpoint->getFeed()->createSubscription<events::Quote>();
     auto healthy = endpoint->getFeed()->createSubscription<events::Quote>();
+    StateLog<api::SubscriptionState> brokenStates;
+    broken->addStateChangeListener([&](auto previous, auto current) {
+        brokenStates.record(previous, current);
+    });
     std::atomic<unsigned> received{0};
     std::atomic<api::ErrorCode> selectedLimit{api::ErrorCode::NONE};
     std::uint64_t listener = 0;
@@ -420,6 +654,7 @@ TEST_CASE("public feed isolates listener failure and keeps selected listener slo
     CHECK(endpoint->getDiagnostic().code == api::ErrorCode::NONE);
     static_cast<void>(endpoint->closeAndAwaitTermination());
     CHECK(broken->getState() == api::SubscriptionState::FAILED);
+    checkStateOrder(brokenStates.snapshot(), api::SubscriptionState::CONFIGURED, api::SubscriptionState::FAILED);
 }
 
 TEST_CASE("public feed callback rejects await and may release all endpoint producer ownership") {
@@ -763,4 +998,683 @@ TEST_CASE("public feed default drain allowance retires a controlled admitted Quo
     CHECK_FALSE(result.hadGap);
     CHECK(subscription->getDiagnostic().code == api::ErrorCode::NONE);
     CHECK_FALSE(source.failed());
+}
+
+TEST_CASE("public state observers have no initial call and preserve inactive legacy retirement") {
+    api::ApiRuntime runtime(runtimeOptions());
+    const auto owner = std::this_thread::get_id();
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    auto subscription = endpoint->getFeed()->createSubscription<events::Quote>();
+    StateLog<api::EndpointState> endpoints;
+    StateLog<api::SubscriptionState> subscriptions;
+    bool eventCaptureRetired = false;
+    auto capture = std::make_shared<CaptureAction>();
+    capture->action = [&] {
+        eventCaptureRetired = true;
+    };
+    subscription->addEventListener([capture](std::span<const events::Quote>) {
+    });
+    capture.reset();
+    api::ErrorCode endpointAwait = api::ErrorCode::NONE;
+    api::ErrorCode runtimeAwait = api::ErrorCode::NONE;
+    api::ErrorCode terminalAdmission = api::ErrorCode::NONE;
+    bool legacyRetiredBeforeClosed = false;
+    const auto subscriptionListener = subscription->addStateChangeListener([&](auto previous, auto current) {
+        subscriptions.record(previous, current);
+
+        if (current == api::SubscriptionState::CLOSED) {
+            legacyRetiredBeforeClosed = eventCaptureRetired;
+        }
+    });
+    const auto endpointListener = endpoint->addStateChangeListener([&](auto previous, auto current) {
+        endpoints.record(previous, current);
+        endpoint->close();
+        endpointAwait = errorCode([&] {
+            static_cast<void>(endpoint->closeAndAwaitTermination());
+        });
+        runtimeAwait = errorCode([&] {
+            runtime.closeAndAwaitTermination();
+        });
+        terminalAdmission = errorCode([&] {
+            endpoint->addStateChangeListener([](auto, auto) {
+            });
+        });
+        subscription->removeStateChangeListener(subscriptionListener);
+    });
+    CHECK(endpoints.snapshot().empty());
+    CHECK(subscriptions.snapshot().empty());
+    CHECK(endpoint->closeAndAwaitTermination().drained);
+    checkStateOrder(endpoints.snapshot(), api::EndpointState::NOT_CONNECTED, api::EndpointState::CLOSED);
+    // The endpoint CLOSING observer removed the subscription observer before its first selection.
+    CHECK(subscriptions.snapshot().empty());
+    CHECK(eventCaptureRetired);
+    CHECK_FALSE(legacyRetiredBeforeClosed);
+    CHECK(endpointAwait == api::ErrorCode::INVALID_STATE);
+    CHECK(runtimeAwait == api::ErrorCode::INVALID_STATE);
+    CHECK(terminalAdmission == api::ErrorCode::CLOSED);
+
+    for (const auto thread : endpoints.threads) {
+        CHECK(thread == owner);
+    }
+
+    endpoint->removeStateChangeListener(endpointListener);
+    subscription->removeStateChangeListener(subscriptionListener);
+    const auto count = endpoints.snapshot().size();
+    runtime.closeAndAwaitTermination();
+    CHECK(endpoints.snapshot().size() == count);
+}
+
+TEST_CASE("public state observers preserve event capture retirement before CLOSED") {
+    api::ApiRuntime runtime(runtimeOptions());
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    auto subscription = endpoint->getFeed()->createSubscription<events::Profile>();
+    bool captureRetired = false;
+    auto capture = std::make_shared<CaptureAction>();
+    capture->action = [&] {
+        captureRetired = true;
+    };
+    subscription->addEventListener([capture](std::span<const events::Profile>) {
+    });
+    capture.reset();
+    StateLog<api::SubscriptionState> changes;
+    bool subscriptionClosedAfterCapture = false;
+    bool endpointClosedAfterCapture = false;
+    subscription->addStateChangeListener([&](auto previous, auto current) {
+        changes.record(previous, current);
+
+        if (current == api::SubscriptionState::CLOSED) {
+            subscriptionClosedAfterCapture = captureRetired;
+            subscription->close();
+        }
+    });
+    endpoint->addStateChangeListener([&](auto, auto current) {
+        if (current == api::EndpointState::CLOSED) {
+            endpointClosedAfterCapture = captureRetired && subscription->getState() == api::SubscriptionState::CLOSED;
+        }
+    });
+    CHECK(endpoint->closeAndAwaitTermination().drained);
+    checkStateOrder(changes.snapshot(), api::SubscriptionState::CONFIGURED, api::SubscriptionState::CLOSED);
+    CHECK(subscriptionClosedAfterCapture);
+    CHECK(endpointClosedAfterCapture);
+}
+
+TEST_CASE("public state observer reentry changes only future selections on the SDK worker") {
+    api::ApiRuntime runtime(runtimeOptions());
+    const auto owner = std::this_thread::get_id();
+    auto schema = standardSchema();
+    const std::vector<std::u16string> symbols{u"IBM"};
+    const std::vector<peer::Record> records{{u"IBM", standardValues(schema)}};
+    peer::Peer source(schema, records, symbols, 8192, peer::PeerMode::HOLD, script());
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    auto other = runtime.createEndpoint(endpointOptions());
+    auto subscription = endpoint->getFeed()->createSubscription<events::Quote>();
+    subscription->addSymbols("IBM");
+    StateLog<api::EndpointState> all;
+    StateLog<api::EndpointState> removed;
+    StateLog<api::EndpointState> added;
+    StateLog<api::SubscriptionState> logical;
+    std::atomic<api::ErrorCode> workerAwait{api::ErrorCode::NONE};
+    api::Endpoint::StateChangeListenerId removedId = 0;
+    endpoint->addStateChangeListener([&](auto previous, auto current) {
+        all.record(previous, current);
+
+        if (current == api::EndpointState::CONNECTING) {
+            endpoint->removeStateChangeListener(removedId);
+            endpoint->addStateChangeListener([&](auto oldState, auto newState) {
+                added.record(oldState, newState);
+            });
+            workerAwait = errorCode([&] {
+                static_cast<void>(endpoint->closeAndAwaitTermination());
+            });
+            other->close();
+        }
+    });
+    removedId = endpoint->addStateChangeListener([&](auto previous, auto current) {
+        removed.record(previous, current);
+    });
+    subscription->addStateChangeListener([&](auto previous, auto current) {
+        logical.record(previous, current);
+    });
+    std::atomic<bool> delivered{false};
+    subscription->addEventListener([&](std::span<const events::Quote>) {
+        delivered = true;
+    });
+    endpoint->connect(address(source));
+    CHECK(eventually([&] {
+        return delivered.load();
+    }));
+    CHECK(endpoint->getDiagnostic().code == api::ErrorCode::NONE);
+    static_cast<void>(endpoint->closeAndAwaitTermination());
+    checkRetiredEndpoint(endpoint);
+    checkStateOrder(all.snapshot(), api::EndpointState::NOT_CONNECTED, endpoint->getState());
+    checkStateOrder(logical.snapshot(), api::SubscriptionState::CONFIGURED, api::SubscriptionState::CLOSED);
+    REQUIRE(removed.snapshot().size() == 1);
+    CHECK(removed.snapshot().front().second == api::EndpointState::CONNECTING);
+    REQUIRE_FALSE(added.snapshot().empty());
+    CHECK(added.snapshot().front().first == api::EndpointState::CONNECTING);
+    CHECK(workerAwait.load() == api::ErrorCode::WRONG_THREAD);
+
+    for (const auto thread : all.threads) {
+        CHECK(thread != owner);
+        CHECK(thread == all.threads.front());
+    }
+
+    CHECK(other->closeAndAwaitTermination().drained);
+}
+
+TEST_CASE("public state observer exceptions remain advisory through terminal notifications") {
+    api::ApiRuntime runtime(runtimeOptions());
+    auto schema = standardSchema();
+    const std::vector<std::u16string> symbols{u"IBM"};
+    const std::vector<peer::Record> records{{u"IBM", standardValues(schema)}};
+    peer::Peer source(schema, records, symbols, 8192, peer::PeerMode::HOLD, script());
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    auto subscription = endpoint->getFeed()->createSubscription<events::Quote>();
+    subscription->addSymbols("IBM");
+    endpoint->addStateChangeListener([](auto, auto) {
+        throw std::runtime_error("advisory endpoint observer");
+    });
+    subscription->addStateChangeListener([](auto, auto) {
+        throw std::runtime_error("advisory subscription observer");
+    });
+    StateLog<api::EndpointState> endpoints;
+    StateLog<api::SubscriptionState> subscriptions;
+    endpoint->addStateChangeListener([&](auto previous, auto current) {
+        endpoints.record(previous, current);
+    });
+    subscription->addStateChangeListener([&](auto previous, auto current) {
+        subscriptions.record(previous, current);
+    });
+    std::atomic<bool> delivered{false};
+    subscription->addEventListener([&](std::span<const events::Quote>) {
+        delivered = true;
+    });
+    endpoint->connect(address(source));
+    CHECK(eventually([&] {
+        return delivered.load();
+    }));
+    CHECK(endpoint->getDiagnostic().code == api::ErrorCode::NONE);
+    const auto terminal = endpoint->closeAndAwaitTermination();
+    checkRetiredEndpoint(endpoint);
+    checkStateOrder(endpoints.snapshot(), api::EndpointState::NOT_CONNECTED, endpoint->getState());
+    checkStateOrder(subscriptions.snapshot(), api::SubscriptionState::CONFIGURED, api::SubscriptionState::CLOSED);
+    CHECK(terminal.diagnostic.code == endpoint->getDiagnostic().code);
+    CHECK(terminal.diagnostic.stage == endpoint->getDiagnostic().stage);
+    CHECK(terminal.diagnostic.nativeCode == endpoint->getDiagnostic().nativeCode);
+    CHECK(subscription->getDiagnostic().code == api::ErrorCode::NONE);
+    CHECK(endpoint->getStateChangeDiagnostic().code == api::ErrorCode::CALLBACK_FAILURE);
+    CHECK(subscription->getStateChangeDiagnostic().code == api::ErrorCode::CALLBACK_FAILURE);
+    CHECK(endpoints.snapshot().size() <= 4);
+}
+
+TEST_CASE("public state observers report natural no-subscription failure before quiescence") {
+    api::ApiRuntime runtime(runtimeOptions());
+    auto schema = standardSchema();
+    const std::vector<std::u16string> symbols;
+    const std::vector<peer::Record> records;
+    peer::Peer source(schema, records, symbols, 8192, peer::PeerMode::NO_READINESS, script());
+    auto options = endpointOptions();
+    options.connectTimeout = 100ms;
+    options.readTimeout = 100ms;
+    auto endpoint = runtime.createEndpoint(options);
+    StateLog<api::EndpointState> changes;
+    std::atomic<api::ErrorCode> lateAdmission{api::ErrorCode::NONE};
+    endpoint->addStateChangeListener([&](auto previous, auto current) {
+        changes.record(previous, current);
+
+        if (current == api::EndpointState::FAILED) {
+            lateAdmission = errorCode([&] {
+                static_cast<void>(endpoint->getFeed()->createSubscription<events::Quote>());
+            });
+            throw std::runtime_error("terminal advisory observer");
+        }
+    });
+    endpoint->connect(address(source));
+    CHECK(changes.await(api::EndpointState::FAILED));
+    const auto terminal = endpoint->closeAndAwaitTermination();
+    checkStateOrder(changes.snapshot(), api::EndpointState::NOT_CONNECTED, api::EndpointState::FAILED);
+    CHECK(lateAdmission.load() == api::ErrorCode::CLOSED);
+    CHECK(terminal.diagnostic.code != api::ErrorCode::NONE);
+    CHECK(terminal.diagnostic.code != api::ErrorCode::CALLBACK_FAILURE);
+    CHECK(endpoint->getStateChangeDiagnostic().code == api::ErrorCode::CALLBACK_FAILURE);
+    CHECK(endpoint->getState() == api::EndpointState::FAILED);
+}
+
+TEST_CASE("public state observer capacity includes removed selected captures") {
+    auto limits = runtimeOptions();
+    limits.maximumStateListenersPerEndpoint = 2;
+    api::ApiRuntime runtime(limits);
+    auto schema = standardSchema();
+    const std::vector<std::u16string> symbols;
+    const std::vector<peer::Record> records;
+    peer::Peer source(schema, records, symbols, 8192, peer::PeerMode::HOLD, script());
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    std::mutex mutex;
+    std::condition_variable condition;
+    bool release = false;
+    std::atomic<bool> selected{false};
+    std::atomic<bool> removedCalled{false};
+    std::atomic<bool> removedDestroyed{false};
+    StateLog<api::EndpointState> changes;
+    endpoint->addStateChangeListener([&](auto previous, auto current) {
+        changes.record(previous, current);
+
+        if (current == api::EndpointState::CONNECTING) {
+            selected = true;
+            std::unique_lock lock(mutex);
+            condition.wait(lock, [&] {
+                return release;
+            });
+        }
+    });
+    auto capture = std::make_shared<CaptureAction>();
+    capture->action = [&] {
+        // Reentering a getter would deadlock if the last callable were destroyed under its port lock.
+        static_cast<void>(endpoint->getState());
+        removedDestroyed = true;
+    };
+    const auto id = endpoint->addStateChangeListener([&, capture](auto, auto) {
+        removedCalled = true;
+    });
+    capture.reset();
+    endpoint->connect(address(source));
+    const auto entered = eventually([&] {
+        return selected.load();
+    });
+    endpoint->removeStateChangeListener(id);
+    CHECK(errorCode([&] {
+              endpoint->addStateChangeListener([](auto, auto) {
+              });
+          }) == api::ErrorCode::RESOURCE_LIMIT);
+    CHECK_FALSE(removedDestroyed.load());
+    {
+        std::lock_guard lock(mutex);
+        release = true;
+    }
+
+    condition.notify_all();
+    CHECK(entered);
+    CHECK(eventually([&] {
+        return removedDestroyed.load();
+    }));
+    CHECK(removedCalled.load());
+    CHECK_NOTHROW(endpoint->addStateChangeListener([](auto, auto) {
+    }));
+    static_cast<void>(endpoint->closeAndAwaitTermination());
+}
+
+TEST_CASE("public state observer retirement includes producer-held capture and keeps CLOSED absorbing") {
+    auto limits = runtimeOptions();
+    limits.maximumEndpoints = 1;
+    limits.maximumStateListenersPerEndpoint = 1;
+    api::ApiRuntime runtime(limits);
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    std::mutex mutex;
+    std::condition_variable condition;
+    bool release = false;
+    std::atomic<bool> destructorEntered{false};
+    std::atomic<bool> destructorReturned{false};
+    std::atomic<bool> awaitReturned{false};
+    std::atomic<bool> prematureReturn{false};
+    std::atomic<api::ErrorCode> slotReuse{api::ErrorCode::NONE};
+    auto capture = std::make_shared<CaptureAction>();
+    capture->action = [&] {
+        destructorEntered = true;
+        static_cast<void>(endpoint->getState());
+        std::unique_lock lock(mutex);
+        condition.wait(lock, [&] {
+            return release;
+        });
+        destructorReturned = true;
+    };
+    const auto id = endpoint->addStateChangeListener([capture](auto, auto) {
+    });
+    capture.reset();
+    std::thread producer([&] {
+        endpoint->removeStateChangeListener(id);
+    });
+    const auto entered = eventually([&] {
+        return destructorEntered.load();
+    });
+    std::thread releaser([&] {
+        const auto closed = eventually([&] {
+            return endpoint->getState() == api::EndpointState::CLOSED;
+        });
+        prematureReturn = !closed || awaitReturned.load();
+        slotReuse = errorCode([&] {
+            static_cast<void>(runtime.createEndpoint(endpointOptions()));
+        });
+        {
+            std::lock_guard lock(mutex);
+            release = true;
+        }
+
+        condition.notify_all();
+    });
+    CHECK(endpoint->closeAndAwaitTermination().drained);
+    awaitReturned = true;
+    releaser.join();
+    producer.join();
+    CHECK(entered);
+    CHECK(destructorReturned.load());
+    CHECK_FALSE(prematureReturn.load());
+    CHECK(slotReuse.load() == api::ErrorCode::RESOURCE_LIMIT);
+    CHECK(endpoint->getState() == api::EndpointState::CLOSED);
+    CHECK_NOTHROW(static_cast<void>(runtime.createEndpoint(endpointOptions())));
+    endpoint->removeStateChangeListener(id);
+}
+
+TEST_CASE("public state observers close before activation without a peer and deliver the pending transition first") {
+    api::ApiRuntime runtime(runtimeOptions());
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    StateLog<api::EndpointState> changes;
+    std::atomic<api::ErrorCode> callbackAwait{api::ErrorCode::NONE};
+    endpoint->addStateChangeListener([&](auto previous, auto current) {
+        changes.record(previous, current);
+
+        if (current == api::EndpointState::CONNECTING) {
+            endpoint->close();
+            callbackAwait = errorCode([&] {
+                static_cast<void>(endpoint->closeAndAwaitTermination());
+            });
+        }
+    });
+    // The first observer closes before activation; no listener, peer or socket progress is required.
+    endpoint->connect("127.0.0.1:1");
+    CHECK(changes.await(api::EndpointState::CLOSED));
+    CHECK(endpoint->closeAndAwaitTermination().drained);
+    checkStateOrder(changes.snapshot(), api::EndpointState::NOT_CONNECTED, api::EndpointState::CLOSED);
+    CHECK(changes.snapshot().size() == 3);
+    CHECK(callbackAwait.load() == api::ErrorCode::WRONG_THREAD);
+}
+
+TEST_CASE("public state observer bounds and producer destruction use the existing reentry guard") {
+    auto limits = runtimeOptions();
+    limits.maximumStateListenersPerEndpoint = 1;
+    limits.maximumStateListenersPerSubscription = 1;
+    api::ApiRuntime runtime(limits);
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    auto subscription = endpoint->getFeed()->createSubscription<events::Profile>();
+    CHECK(errorCode([&] {
+              endpoint->addStateChangeListener({});
+          }) == api::ErrorCode::INVALID_ARGUMENT);
+    CHECK(errorCode([&] {
+              subscription->addStateChangeListener({});
+          }) == api::ErrorCode::INVALID_ARGUMENT);
+    api::ErrorCode endpointAwait = api::ErrorCode::NONE;
+    api::ErrorCode runtimeAwait = api::ErrorCode::NONE;
+    auto capture = std::make_shared<CaptureAction>();
+    capture->action = [&] {
+        endpointAwait = errorCode([&] {
+            static_cast<void>(endpoint->closeAndAwaitTermination());
+        });
+        runtimeAwait = errorCode([&] {
+            runtime.closeAndAwaitTermination();
+        });
+    };
+    const auto id = subscription->addStateChangeListener([capture](auto, auto) {
+    });
+    capture.reset();
+    CHECK(errorCode([&] {
+              subscription->addStateChangeListener([](auto, auto) {
+              });
+          }) == api::ErrorCode::RESOURCE_LIMIT);
+    subscription->removeStateChangeListener(id);
+    CHECK(endpointAwait == api::ErrorCode::INVALID_STATE);
+    CHECK(runtimeAwait == api::ErrorCode::INVALID_STATE);
+    CHECK(endpoint->getState() == api::EndpointState::NOT_CONNECTED);
+    CHECK_NOTHROW(subscription->addStateChangeListener([](auto, auto) {
+    }));
+    CHECK(endpoint->closeAndAwaitTermination().drained);
+    subscription->removeStateChangeListener(id);
+}
+
+TEST_CASE("public state observer terminal publication precedes state callback quiescence and slot reuse") {
+    auto limits = runtimeOptions();
+    limits.maximumEndpoints = 1;
+    api::ApiRuntime runtime(limits);
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    std::mutex mutex;
+    std::condition_variable condition;
+    bool release = false;
+    std::atomic<bool> terminalEntered{false};
+    std::atomic<bool> awaitReturned{false};
+    std::atomic<bool> prematureReturn{false};
+    std::atomic<api::ErrorCode> slotReuse{api::ErrorCode::NONE};
+    StateLog<api::EndpointState> changes;
+    endpoint->addStateChangeListener([&](auto previous, auto current) {
+        changes.record(previous, current);
+
+        if (current == api::EndpointState::CONNECTING) {
+            endpoint->close();
+        }
+
+        if (current == api::EndpointState::CLOSED) {
+            terminalEntered = true;
+            std::unique_lock lock(mutex);
+            condition.wait(lock, [&] {
+                return release;
+            });
+        }
+    });
+    endpoint->connect("127.0.0.1:1");
+    std::thread releaser([&] {
+        const auto entered = eventually([&] {
+            return terminalEntered.load();
+        });
+        prematureReturn = !entered || awaitReturned.load() || endpoint->getState() != api::EndpointState::CLOSED;
+        slotReuse = errorCode([&] {
+            static_cast<void>(runtime.createEndpoint(endpointOptions()));
+        });
+        {
+            std::lock_guard lock(mutex);
+            release = true;
+        }
+
+        condition.notify_all();
+    });
+    CHECK(endpoint->closeAndAwaitTermination().drained);
+    awaitReturned = true;
+    releaser.join();
+    CHECK_FALSE(prematureReturn.load());
+    CHECK(slotReuse.load() == api::ErrorCode::RESOURCE_LIMIT);
+    checkStateOrder(changes.snapshot(), api::EndpointState::NOT_CONNECTED, api::EndpointState::CLOSED);
+}
+
+TEST_CASE("public callback box allocation failure releases its reservation before capture self-await") {
+    SUBCASE("state observer") {
+        api::ApiRuntime runtime(runtimeOptions());
+        auto endpoint = runtime.createEndpoint(endpointOptions());
+        bool destroyed = false;
+        api::ErrorCode awaitError = api::ErrorCode::INVALID_STATE;
+        auto capture = std::make_shared<CaptureAction>();
+        capture->action = [&] {
+            awaitError = errorCode([&] {
+                static_cast<void>(endpoint->closeAndAwaitTermination());
+                runtime.closeAndAwaitTermination();
+            });
+            destroyed = true;
+        };
+        api::Endpoint::StateChangeListener listener = [capture](auto, auto) {
+        };
+        capture.reset();
+        const std::function<void()> action = [&] {
+            endpoint->addStateChangeListener(std::move(listener));
+        };
+        allocation_probe::failNext = true;
+        const auto rejected = errorCode(action);
+        CHECK_FALSE(allocation_probe::failNext);
+        CHECK(rejected == api::ErrorCode::ALLOCATION_FAILURE);
+        CHECK(destroyed);
+        CHECK(awaitError == api::ErrorCode::NONE);
+        CHECK(endpoint->getState() == api::EndpointState::CLOSED);
+    }
+
+    SUBCASE("event listener") {
+        api::ApiRuntime runtime(runtimeOptions());
+        auto endpoint = runtime.createEndpoint(endpointOptions());
+        auto subscription = endpoint->getFeed()->createSubscription<events::Quote>();
+        bool destroyed = false;
+        api::ErrorCode awaitError = api::ErrorCode::INVALID_STATE;
+        auto capture = std::make_shared<CaptureAction>();
+        capture->action = [&] {
+            awaitError = errorCode([&] {
+                static_cast<void>(endpoint->closeAndAwaitTermination());
+                runtime.closeAndAwaitTermination();
+            });
+            destroyed = true;
+        };
+        api::Subscription<events::Quote>::Listener listener = [capture](auto) {
+        };
+        capture.reset();
+        const std::function<void()> action = [&] {
+            subscription->addEventListener(std::move(listener));
+        };
+        allocation_probe::failNext = true;
+        const auto rejected = errorCode(action);
+        CHECK_FALSE(allocation_probe::failNext);
+        CHECK(rejected == api::ErrorCode::ALLOCATION_FAILURE);
+        CHECK(destroyed);
+        CHECK(awaitError == api::ErrorCode::NONE);
+        CHECK(endpoint->getState() == api::EndpointState::CLOSED);
+    }
+}
+
+TEST_CASE("public worker allocation failure sweeps distinct endpoints before waiting for producer captures") {
+    api::ApiRuntime runtime(runtimeOptions());
+    auto first = runtime.createEndpoint(endpointOptions());
+    auto second = runtime.createEndpoint(endpointOptions());
+    StateLog<api::EndpointState> secondStates;
+    second->addStateChangeListener([&](auto previous, auto current) {
+        secondStates.record(previous, current);
+    });
+    std::atomic<bool> destructorEntered{false};
+    bool destructorReturned = false;
+    api::ErrorCode nestedAwait = api::ErrorCode::INVALID_STATE;
+    auto capture = std::make_shared<CaptureAction>();
+    capture->action = [&] {
+        destructorEntered = true;
+        nestedAwait = errorCode([&] {
+            static_cast<void>(second->closeAndAwaitTermination());
+        });
+        destructorReturned = true;
+    };
+    const auto id = first->addStateChangeListener([capture](auto, auto) {
+    });
+    capture.reset();
+    allocation_probe::WorkerFault fault(runtime);
+    fault.arm();
+    second->connect("127.0.0.1:1");
+    CHECK(eventually([&] {
+        return fault.entered.load(std::memory_order_acquire);
+    }));
+    std::atomic<bool> releasedAfterDestructor{false};
+    std::thread releaser([&] {
+        releasedAfterDestructor = eventually([&] {
+            return destructorEntered.load();
+        });
+        fault.release.store(true, std::memory_order_release);
+    });
+    first->removeStateChangeListener(id);
+    releaser.join();
+    CHECK(releasedAfterDestructor.load());
+    CHECK(destructorReturned);
+    CHECK(nestedAwait == api::ErrorCode::NONE);
+    runtime.closeAndAwaitTermination();
+    checkStateOrder(secondStates.snapshot(), api::EndpointState::NOT_CONNECTED, api::EndpointState::FAILED);
+    REQUIRE(secondStates.snapshot().size() == 2);
+    CHECK(secondStates.snapshot().front().second == api::EndpointState::CONNECTING);
+    CHECK(second->getDiagnostic().code == api::ErrorCode::ALLOCATION_FAILURE);
+    CHECK(second->getDiagnostic().stage == "runtime-worker");
+    CHECK(first->getDiagnostic().code == api::ErrorCode::ALLOCATION_FAILURE);
+}
+
+TEST_CASE("public worker allocation failure respects MAIN claimed retirement and deferred CONNECTING") {
+    api::ApiRuntime runtime(runtimeOptions());
+    auto inactive = runtime.createEndpoint(endpointOptions());
+    auto failing = runtime.createEndpoint(endpointOptions());
+    StateLog<api::EndpointState> inactiveStates;
+    StateLog<api::EndpointState> failingStates;
+    const auto owner = std::this_thread::get_id();
+    failing->addStateChangeListener([&](auto previous, auto current) {
+        failingStates.record(previous, current);
+    });
+    allocation_probe::WorkerFault fault(runtime);
+    bool nestedRetired = false;
+    bool workerIntercepted = false;
+    inactive->addStateChangeListener([&](auto previous, auto current) {
+        inactiveStates.record(previous, current);
+
+        if (current == api::EndpointState::CLOSING) {
+            fault.arm();
+            failing->connect("127.0.0.1:1");
+            workerIntercepted = eventually([&] {
+                return fault.entered.load(std::memory_order_acquire);
+            });
+            fault.release.store(true, std::memory_order_release);
+            static_cast<void>(failing->closeAndAwaitTermination());
+            nestedRetired = true;
+        }
+    });
+    CHECK(inactive->closeAndAwaitTermination().drained);
+    CHECK(nestedRetired);
+    CHECK(workerIntercepted);
+    runtime.closeAndAwaitTermination();
+    checkStateOrder(inactiveStates.snapshot(), api::EndpointState::NOT_CONNECTED, api::EndpointState::CLOSED);
+    checkStateOrder(failingStates.snapshot(), api::EndpointState::NOT_CONNECTED, api::EndpointState::FAILED);
+    CHECK(failingStates.snapshot().size() == 2);
+    CHECK(inactive->getDiagnostic().code == api::ErrorCode::NONE);
+    CHECK(failing->getDiagnostic().code == api::ErrorCode::ALLOCATION_FAILURE);
+    CHECK(failing->getDiagnostic().stage == "runtime-worker");
+
+    for (const auto thread : inactiveStates.threads) {
+        CHECK(thread == owner);
+    }
+
+    for (const auto thread : failingStates.threads) {
+        CHECK(thread != owner);
+    }
+}
+
+TEST_CASE("public state observers preserve CONNECTING order on an already running sibling worker") {
+    api::ApiRuntime runtime(runtimeOptions());
+    auto starter = runtime.createEndpoint(endpointOptions());
+    StateLog<api::EndpointState> starterStates;
+    starter->addStateChangeListener([&](auto previous, auto current) {
+        starterStates.record(previous, current);
+
+        if (current == api::EndpointState::CONNECTING) {
+            starter->close();
+        }
+    });
+    starter->connect("127.0.0.1:1");
+    CHECK(starterStates.await(api::EndpointState::CLOSED));
+    CHECK(starter->closeAndAwaitTermination().drained);
+    REQUIRE_FALSE(starterStates.threads.empty());
+    const auto worker = starterStates.threads.front();
+    constexpr std::size_t CONCURRENT_CONNECT_ROUNDS = 32;
+
+    for (std::size_t round = 0; round < CONCURRENT_CONNECT_ROUNDS; ++round) {
+        auto endpoint = runtime.createEndpoint(endpointOptions());
+        StateLog<api::EndpointState> changes;
+        endpoint->addStateChangeListener([&](auto previous, auto current) {
+            changes.record(previous, current);
+
+            if (current == api::EndpointState::CONNECTING) {
+                endpoint->close();
+            }
+        });
+        std::thread producer([&] {
+            endpoint->connect("127.0.0.1:1");
+        });
+        producer.join();
+        CHECK(changes.await(api::EndpointState::CLOSED));
+        CHECK(endpoint->closeAndAwaitTermination().drained);
+        checkStateOrder(changes.snapshot(), api::EndpointState::NOT_CONNECTED, api::EndpointState::CLOSED);
+        CHECK(changes.snapshot().size() == 3);
+
+        for (const auto thread : changes.threads) {
+            CHECK(thread == worker);
+        }
+    }
 }

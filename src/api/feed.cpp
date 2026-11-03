@@ -88,6 +88,78 @@ void releaseListenerReservation(const std::shared_ptr<detail::ListenerLedger> &l
     wake(ledger->control);
 }
 
+/** Invoke one complete state-observer selection without a control lock.
+ * @tparam Port Detached endpoint or subscription port.
+ * @tparam State Its public lifecycle enum.
+ * @param port Detached owner, kept alive through callbacks and exception observation.
+ * @param listeners Immutable selection made atomically with the transition.
+ * @param oldState Actual preceding observation.
+ * @param newState Actual newly published observation.
+ */
+template <class Port, class State>
+void notifyState(const std::shared_ptr<Port> &port, const std::shared_ptr<const detail::ListenerSnapshot> &listeners,
+                 State oldState, State newState) noexcept {
+    if (!listeners) {
+        return;
+    }
+
+    for (const auto &entry : *listeners) {
+        try {
+            std::get<std::function<void(State, State)>>(entry.callback->function)(oldState, newState);
+        } catch (...) {
+            std::lock_guard lock(port->mutex);
+
+            if (port->stateListeners.diagnostic.code == ErrorCode::NONE) {
+                port->stateListeners.diagnostic = {ErrorCode::CALLBACK_FAILURE, "state-change-listener"};
+            }
+        }
+    }
+}
+
+/** Publish a distinct lifecycle observation and select advisory observers atomically.
+ * Only the endpoint's native or claimed creator-retirement execution domain calls this helper.
+ * @tparam Port Detached endpoint or subscription port.
+ * @tparam State Its public lifecycle enum.
+ * @param port Owner with serialized state publication.
+ * @param next Actual new lifecycle observation; CLOSED and FAILED are absorbing.
+ */
+template <class Port, class State> void observeState(const std::shared_ptr<Port> &port, State next) noexcept {
+    std::shared_ptr<const detail::ListenerSnapshot> listeners;
+    State previous;
+    {
+        std::lock_guard lock(port->mutex);
+        previous = port->state;
+
+        if (previous == next || previous == State::CLOSED || previous == State::FAILED) {
+            return;
+        }
+
+        port->state = next;
+        listeners = port->stateListeners.snapshot;
+    }
+
+    notifyState(port, listeners, previous, next);
+}
+
+/** Drain the one producer-published initial transition before later owner-domain observations.
+ * @param port Endpoint whose connection admission already published CONNECTING.
+ */
+void notifyConnecting(const std::shared_ptr<detail::EndpointPort> &port) noexcept {
+    std::shared_ptr<const detail::ListenerSnapshot> listeners;
+    {
+        std::lock_guard lock(port->mutex);
+
+        if (!port->connectingNotification) {
+            return;
+        }
+
+        port->connectingNotification = false;
+        listeners = std::move(port->connectingListeners);
+    }
+
+    notifyState(port, listeners, EndpointState::NOT_CONNECTED, EndpointState::CONNECTING);
+}
+
 /** Preserve a subscription's first bounded asynchronous failure.
  * @param port Detached producer state.
  * @param diagnostic Static/numeric failure snapshot.
@@ -96,14 +168,18 @@ void failSubscription(const std::shared_ptr<detail::SubscriptionPort> &port, Dia
     {
         std::lock_guard lock(port->mutex);
 
+        if (port->state == SubscriptionState::CLOSED) {
+            return;
+        }
+
         if (port->diagnostic.code == ErrorCode::NONE) {
             port->diagnostic = diagnostic;
         }
 
-        port->state = SubscriptionState::FAILED;
+        port->closeRequested.store(true, std::memory_order_release);
     }
 
-    port->closeRequested.store(true, std::memory_order_release);
+    observeState(port, SubscriptionState::FAILED);
 }
 
 /** Preserve an endpoint's first bounded asynchronous failure.
@@ -111,14 +187,21 @@ void failSubscription(const std::shared_ptr<detail::SubscriptionPort> &port, Dia
  * @param diagnostic Static/numeric failure snapshot.
  */
 void failEndpoint(const std::shared_ptr<detail::EndpointPort> &port, Diagnostic diagnostic) noexcept {
-    std::lock_guard lock(port->mutex);
+    port->closeRequested.store(true, std::memory_order_release);
+    notifyConnecting(port);
+    {
+        std::lock_guard lock(port->mutex);
 
-    if (port->diagnostic.code == ErrorCode::NONE) {
-        port->diagnostic = diagnostic;
+        if (port->state == EndpointState::CLOSED) {
+            return;
+        }
+
+        if (port->diagnostic.code == ErrorCode::NONE) {
+            port->diagnostic = diagnostic;
+        }
     }
 
-    port->state = EndpointState::FAILED;
-    port->closeRequested.store(true, std::memory_order_release);
+    observeState(port, EndpointState::FAILED);
 }
 
 /** Allocation-free stack node for creator-thread capture-retirement reentry checks. */
@@ -166,13 +249,14 @@ bool retirementReentered(const detail::EndpointPort *port) noexcept {
  * @return True only after accepted and producer-held removed callable captures have all retired.
  */
 bool retireSubscription(const std::shared_ptr<detail::SubscriptionPort> &port) noexcept {
+    port->closeRequested.store(true, std::memory_order_release);
+    observeState(port, SubscriptionState::CLOSING);
     std::shared_ptr<const detail::ListenerSnapshot> listeners;
     std::vector<std::u16string> symbols;
     {
         std::lock_guard lock(port->mutex);
         listeners = std::move(port->listeners);
         symbols = std::move(port->symbols);
-        port->state = port->diagnostic.code == ErrorCode::NONE ? SubscriptionState::CLOSING : SubscriptionState::FAILED;
     }
 
     listeners.reset();
@@ -182,12 +266,23 @@ bool retireSubscription(const std::shared_ptr<detail::SubscriptionPort> &port) n
         return false;
     }
 
+    observeState(port, SubscriptionState::CLOSED);
     {
         std::lock_guard lock(port->mutex);
-        port->state = port->diagnostic.code == ErrorCode::NONE ? SubscriptionState::CLOSED : SubscriptionState::FAILED;
+        listeners = std::move(port->stateListeners.snapshot);
     }
 
-    port->retired.store(true, std::memory_order_release);
+    listeners.reset();
+
+    if (port->stateListeners.ledger->count.load(std::memory_order_acquire) != 0) {
+        return false;
+    }
+
+    {
+        // Publish under the wait predicate's mutex so notification cannot fall between its check and wait.
+        std::lock_guard lock(port->mutex);
+        port->retired.store(true, std::memory_order_release);
+    }
 
     return true;
 }
@@ -211,6 +306,8 @@ bool retireEndpoint(const std::shared_ptr<detail::EndpointPort> &port, CloseResu
     }
 
     RetirementGuard guard(port.get());
+    notifyConnecting(port);
+    observeState(port, EndpointState::CLOSING);
 
     bool complete = true;
     {
@@ -220,8 +317,6 @@ bool retireEndpoint(const std::shared_ptr<detail::EndpointPort> &port, CloseResu
             port->terminal = result;
             port->retirementResultPrepared = true;
         }
-
-        port->state = port->diagnostic.code == ErrorCode::NONE ? EndpointState::CLOSING : EndpointState::FAILED;
     }
 
     for (std::size_t index = 0; index < port->subscriptions.size(); ++index) {
@@ -243,10 +338,27 @@ bool retireEndpoint(const std::shared_ptr<detail::EndpointPort> &port, CloseResu
     {
         std::lock_guard lock(port->mutex);
         port->terminal.diagnostic = port->diagnostic;
-        port->state = port->diagnostic.code == ErrorCode::NONE ? EndpointState::CLOSED : EndpointState::FAILED;
     }
 
-    port->retired.store(true, std::memory_order_release);
+    observeState(port,
+                 port->terminal.diagnostic.code == ErrorCode::NONE ? EndpointState::CLOSED : EndpointState::FAILED);
+    std::shared_ptr<const detail::ListenerSnapshot> listeners;
+    {
+        std::lock_guard lock(port->mutex);
+        listeners = std::move(port->stateListeners.snapshot);
+    }
+
+    listeners.reset();
+
+    if (port->stateListeners.ledger->count.load(std::memory_order_acquire) != 0) {
+        return false;
+    }
+
+    {
+        // Publish under the wait predicate's mutex so notification cannot fall between its check and wait.
+        std::lock_guard lock(port->mutex);
+        port->retired.store(true, std::memory_order_release);
+    }
     port->retiredCondition.notify_all();
     wake(port->control);
 
@@ -258,8 +370,20 @@ bool retireEndpoint(const std::shared_ptr<detail::EndpointPort> &port, CloseResu
  * @return True only when all independently charged callable boxes have been destroyed.
  */
 bool capturesRetired(const detail::EndpointPort &port) noexcept {
+    if (!port.stateListeners.snapshot && port.stateListeners.ledger->count.load(std::memory_order_acquire) != 0) {
+        return false;
+    }
+
     return std::ranges::all_of(port.subscriptions, [](const auto &subscription) {
-        return !subscription || subscription->listenerLedger->count.load(std::memory_order_acquire) == 0;
+        if (!subscription) {
+            return true;
+        }
+
+        std::lock_guard lock(subscription->mutex);
+
+        return subscription->listenerLedger->count.load(std::memory_order_acquire) == 0 &&
+               (subscription->stateListeners.snapshot ||
+                subscription->stateListeners.ledger->count.load(std::memory_order_acquire) == 0);
     });
 }
 
@@ -334,6 +458,127 @@ void requireOpen(const detail::SubscriptionPort &port) {
         endpoint->retired.load(std::memory_order_acquire)) {
         reject(ErrorCode::CLOSED, "subscription-closed");
     }
+}
+
+/** Prepare a detached state-observer reservation before publishing its owner.
+ * @param endpoint Enclosing endpoint whose wait includes final capture retirement.
+ * @param maximum Explicit positive count of accepted and still selected/retiring observers.
+ * @return Empty state-observer selection and its independent detached ledger.
+ */
+detail::StateListeners makeStateListeners(const std::shared_ptr<detail::EndpointPort> &endpoint, std::size_t maximum) {
+    detail::StateListeners result;
+    result.ledger = std::make_shared<detail::ListenerLedger>();
+    result.ledger->maximum = maximum;
+    result.ledger->control = endpoint->control;
+    result.ledger->endpoint = endpoint;
+    result.snapshot = std::make_shared<const detail::ListenerSnapshot>();
+
+    return result;
+}
+
+/** Check state-observer admission while the enclosing port mutex is held.
+ * @tparam Port Detached endpoint or subscription port.
+ * @param port Owner whose close cutoff also fences ordinary observer admission.
+ */
+template <class Port> void requireStateOpen(const Port &port) {
+    if constexpr (std::is_same_v<Port, detail::SubscriptionPort>) {
+        requireOpen(port);
+    } else if (port.closeRequested.load(std::memory_order_acquire) || port.retired.load(std::memory_order_acquire)) {
+        reject(ErrorCode::CLOSED, "endpoint-closed");
+    }
+}
+
+/** Add one bounded advisory observer without copying or destroying application functors under locks.
+ * @tparam Port Detached endpoint or subscription port.
+ * @tparam Function Exact public state-observer callable type.
+ * @param port Owner of the accepted snapshot.
+ * @param listener Owning nonempty callable, moved into one charged shared box.
+ * @return Non-reused identity; throws Error for invalid input, closed admission or exhausted capacity.
+ */
+template <class Port, class Function>
+std::uint64_t addStateListener(const std::shared_ptr<Port> &port, Function listener) {
+    return producerAction([&]() -> std::uint64_t {
+        if (!listener) {
+            reject(ErrorCode::INVALID_ARGUMENT, "state-change-listener");
+        }
+
+        const auto ledger = port->stateListeners.ledger;
+        {
+            std::lock_guard lock(port->mutex);
+            requireStateOpen(*port);
+            auto count = ledger->count.load(std::memory_order_acquire);
+
+            do {
+                if (count >= ledger->maximum) {
+                    reject(ErrorCode::RESOURCE_LIMIT, "state-change-listener-count");
+                }
+            } while (!ledger->count.compare_exchange_weak(count, count + 1, std::memory_order_acq_rel));
+        }
+
+        std::shared_ptr<detail::ListenerBox> callback;
+
+        try {
+            callback = std::make_shared<detail::ListenerBox>(ledger, std::move(listener));
+        } catch (...) {
+            releaseListenerReservation(ledger);
+            throw;
+        }
+
+        std::shared_ptr<const detail::ListenerSnapshot> previous;
+        std::uint64_t id = 0;
+        {
+            std::lock_guard lock(port->mutex);
+            requireStateOpen(*port);
+            auto &state = port->stateListeners;
+
+            if (state.nextListener == std::numeric_limits<std::uint64_t>::max()) {
+                reject(ErrorCode::RESOURCE_LIMIT, "state-change-listener-identity");
+            }
+
+            auto candidate = std::make_shared<detail::ListenerSnapshot>(*state.snapshot);
+            id = state.nextListener;
+            candidate->push_back({id, callback});
+            previous = std::move(state.snapshot);
+            state.snapshot = std::move(candidate);
+            ++state.nextListener;
+        }
+
+        previous.reset();
+
+        return id;
+    });
+}
+
+/** Remove an advisory observer without revoking an already selected invocation.
+ * @tparam Port Detached endpoint or subscription port.
+ * @param port Owner of the accepted snapshot, possibly already closed.
+ * @param id Non-reused state-observer identity; absence is an idempotent no-op.
+ */
+template <class Port> void removeStateListener(const std::shared_ptr<Port> &port, std::uint64_t id) {
+    producerAction([&] {
+        std::shared_ptr<const detail::ListenerSnapshot> previous;
+        {
+            std::lock_guard lock(port->mutex);
+            auto &snapshot = port->stateListeners.snapshot;
+
+            if (!snapshot) {
+                return;
+            }
+
+            const auto found = std::ranges::find(*snapshot, id, &detail::ListenerEntry::id);
+
+            if (found == snapshot->end()) {
+                return;
+            }
+
+            auto candidate = std::make_shared<detail::ListenerSnapshot>(*snapshot);
+            candidate->erase(candidate->begin() + (found - snapshot->begin()));
+            previous = std::move(snapshot);
+            snapshot = std::move(candidate);
+        }
+
+        previous.reset();
+    });
 }
 
 /** Validate and own one exact canonical ASCII selector before publication.
@@ -486,9 +731,6 @@ Diagnostic Error::diagnostic() const noexcept {
 }
 
 namespace detail {
-ListenerBox::ListenerBox(std::shared_ptr<ListenerLedger> ledger, ListenerFunction function) noexcept
-    : ledger(std::move(ledger)), function(std::move(function)) {
-}
 
 ListenerBox::~ListenerBox() {
     const auto endpoint = ledger->endpoint.lock();
@@ -500,6 +742,22 @@ ListenerBox::~ListenerBox() {
 
 template <class Event>
 Subscription<Event>::Subscription(std::shared_ptr<detail::SubscriptionPort> port) noexcept : port_(std::move(port)) {
+}
+
+template <class Event>
+typename Subscription<Event>::StateChangeListenerId
+Subscription<Event>::addStateChangeListener(StateChangeListener listener) {
+    return addStateListener(port_, std::move(listener));
+}
+
+template <class Event> void Subscription<Event>::removeStateChangeListener(StateChangeListenerId id) {
+    removeStateListener(port_, id);
+}
+
+template <class Event> Diagnostic Subscription<Event>::getStateChangeDiagnostic() const noexcept {
+    std::lock_guard lock(port_->mutex);
+
+    return port_->stateListeners.diagnostic;
 }
 
 template <class Event> Subscription<Event>::~Subscription() {
@@ -529,8 +787,7 @@ typename Subscription<Event>::ListenerId Subscription<Event>::addEventListener(L
         std::shared_ptr<detail::ListenerBox> callback;
 
         try {
-            callback = std::make_shared<detail::ListenerBox>(
-                ledger, detail::ListenerFunction{std::in_place_type<Listener>, std::move(listener)});
+            callback = std::make_shared<detail::ListenerBox>(ledger, std::move(listener));
         } catch (...) {
             releaseListenerReservation(ledger);
             throw;
@@ -642,6 +899,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(bool quot
         subscription->listenerLedger->control = port_->control;
         subscription->listenerLedger->endpoint = port_;
         subscription->listeners = std::make_shared<const detail::ListenerSnapshot>();
+        subscription->stateListeners = makeStateListeners(port_, port_->limits.maximumStateListenersPerSubscription);
         {
             std::lock_guard lock(port_->mutex);
 
@@ -668,6 +926,20 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(bool quot
 }
 
 Endpoint::Endpoint(std::shared_ptr<detail::EndpointPort> port) : port_(std::move(port)), feed_(new Feed(port_)) {
+}
+
+Endpoint::StateChangeListenerId Endpoint::addStateChangeListener(StateChangeListener listener) {
+    return addStateListener(port_, std::move(listener));
+}
+
+void Endpoint::removeStateChangeListener(StateChangeListenerId id) {
+    removeStateListener(port_, id);
+}
+
+Diagnostic Endpoint::getStateChangeDiagnostic() const noexcept {
+    std::lock_guard lock(port_->mutex);
+
+    return port_->stateListeners.diagnostic;
 }
 
 Endpoint::~Endpoint() {
@@ -717,6 +989,8 @@ void Endpoint::connect(std::string_view address) {
             port_->port = port;
             port_->connectRequested = true;
             port_->state = EndpointState::CONNECTING;
+            port_->connectingListeners = port_->stateListeners.snapshot;
+            port_->connectingNotification = true;
             ++control->wakeSequence;
         }
 
@@ -984,10 +1258,7 @@ std::unique_ptr<NativeSubscription> registerSubscription(NativeEndpoint &endpoin
     }
 
     result->handle = std::move(*handle);
-    {
-        std::lock_guard lock(port->mutex);
-        port->state = SubscriptionState::ACTIVE;
-    }
+    observeState(port, SubscriptionState::ACTIVE);
 
     return result;
 }
@@ -1193,13 +1464,7 @@ EndpointProgress progressEndpoint(NativeEndpoint &endpoint, transport::RecoveryT
             static_cast<void>(endpoint.recovery->requestStop());
         }
 
-        {
-            std::lock_guard lock(endpoint.port->mutex);
-
-            if (endpoint.port->diagnostic.code == ErrorCode::NONE) {
-                endpoint.port->state = EndpointState::CLOSING;
-            }
-        }
+        observeState(endpoint.port, EndpointState::CLOSING);
     }
 
     const auto polled = endpoint.recovery->poll(work);
@@ -1226,13 +1491,9 @@ EndpointProgress progressEndpoint(NativeEndpoint &endpoint, transport::RecoveryT
         }
     }
 
-    {
-        std::lock_guard lock(endpoint.port->mutex);
-
-        if (!endpoint.draining) {
-            endpoint.port->state =
-                status.phase == transport::RecoveryPhase::ACTIVE ? EndpointState::CONNECTED : EndpointState::CONNECTING;
-        }
+    if (!endpoint.draining && !status.terminal) {
+        observeState(endpoint.port, status.phase == transport::RecoveryPhase::ACTIVE ? EndpointState::CONNECTED
+                                                                                     : EndpointState::CONNECTING);
     }
 
     return status.terminal ? EndpointProgress::RETIRED : EndpointProgress::PENDING;
@@ -1383,6 +1644,9 @@ void RuntimeImpl::run() noexcept {
                     connectRequested = port->connectRequested;
                 }
 
+                // Capture admission before draining its notification: a concurrent later connect must wait
+                // for the next turn instead of activating ahead of its deferred CONNECTING selection.
+                notifyConnecting(port);
                 bool failedThisTurn = false;
 
                 try {
@@ -1500,19 +1764,33 @@ void RuntimeImpl::run() noexcept {
             }
         }
 
-        for (const auto &endpoint : control->endpoints) {
-            if (endpoint && !endpoint->retired.load(std::memory_order_acquire)) {
-                failEndpoint(endpoint, {ErrorCode::ALLOCATION_FAILURE, "runtime-worker"});
+        while (true) {
+            std::uint64_t observedWake = 0;
+            {
+                std::lock_guard gate(control->mutex);
+                observedWake = control->wakeSequence;
+            }
 
-                while (!retireEndpoint(endpoint, {})) {
-                    std::unique_lock lock(endpoint->mutex);
-                    endpoint->retiredCondition.wait(lock, [&] {
-                        return endpoint->retirementOnMain.load(std::memory_order_acquire)
-                                   ? endpoint->retired.load(std::memory_order_acquire)
-                                   : capturesRetired(*endpoint);
-                    });
+            bool complete = true;
+
+            // Sweep every worker-owned port before waiting: an A capture destructor may legitimately
+            // await distinct endpoint B. Waiting on A first would prevent B from ever retiring.
+            for (const auto &endpoint : control->endpoints) {
+                if (endpoint && !endpoint->retired.load(std::memory_order_acquire) &&
+                    !endpoint->retirementOnMain.load(std::memory_order_acquire)) {
+                    failEndpoint(endpoint, {ErrorCode::ALLOCATION_FAILURE, "runtime-worker"});
+                    complete = retireEndpoint(endpoint, {}) && complete;
                 }
             }
+
+            if (complete) {
+                break;
+            }
+
+            std::unique_lock gate(control->mutex);
+            control->condition.wait(gate, [&] {
+                return control->wakeSequence != observedWake;
+            });
         }
     }
 }
@@ -1522,6 +1800,7 @@ ApiRuntime::ApiRuntime(RuntimeOptions options) {
     producerAction([&] {
         if (!options.maximumEndpoints || !options.maximumSubscriptionsPerEndpoint ||
             !options.maximumSymbolsPerSubscription || !options.maximumListenersPerSubscription ||
+            !options.maximumStateListenersPerEndpoint || !options.maximumStateListenersPerSubscription ||
             !options.maximumSymbolUnits || options.maximumSymbolUnits > 128 || options.dnsServers.size() > 4 ||
             options.dnsPort == 0) {
             reject(ErrorCode::INVALID_ARGUMENT, "runtime-options");
@@ -1567,6 +1846,7 @@ std::shared_ptr<Endpoint> ApiRuntime::createEndpoint(EndpointOptions options) {
         port->owner = control->owner;
         port->limits = impl_->options;
         port->options = options;
+        port->stateListeners = makeStateListeners(port, impl_->options.maximumStateListenersPerEndpoint);
         port->subscriptions.resize(impl_->options.maximumSubscriptionsPerEndpoint);
         auto endpoint = std::shared_ptr<Endpoint>(new Endpoint(port));
         {

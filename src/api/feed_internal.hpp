@@ -8,6 +8,7 @@
 #include <condition_variable>
 #include <mutex>
 #include <thread>
+#include <utility>
 #include <variant>
 
 namespace org::ttldtor::qdcxx::api::detail {
@@ -22,17 +23,26 @@ struct ListenerLedger {
 };
 
 using ListenerFunction =
-    std::variant<std::monostate, Subscription<events::Quote>::Listener, Subscription<events::Profile>::Listener>;
+    std::variant<std::monostate, Subscription<events::Quote>::Listener, Subscription<events::Profile>::Listener,
+                 Endpoint::StateChangeListener, Subscription<events::Quote>::StateChangeListener>;
 
 /** Shared application callable; its last release never occurs under a control mutex. */
 struct ListenerBox {
     std::shared_ptr<ListenerLedger> ledger; ///< Keeps the detached count alive through callback destruction.
     ListenerFunction function;              ///< Application captures, moved in before publication.
-    /** Adopt one already charged callable without copying its application captures.
+
+    /** Adopt one already charged callable only after this box's allocation has succeeded.
+     * A failed box allocation leaves captures with the caller until its reservation has been released.
+     * @tparam Function Exact public callback type, moved without throwing.
      * @param ledger Detached selected/retiring reservation.
-     * @param function Owning application callable, moved without throwing.
+     * @param function Application callable, borrowed until construction moves it into the allocated box.
      */
-    ListenerBox(std::shared_ptr<ListenerLedger> ledger, ListenerFunction function) noexcept;
+    template <class Function>
+    ListenerBox(std::shared_ptr<ListenerLedger> ledger, Function &&function) noexcept
+        : ledger(std::move(ledger)),
+          function(std::in_place_type<std::remove_cvref_t<Function>>, std::forward<Function>(function)) {
+    }
+
     ListenerBox(const ListenerBox &) = delete;
     ListenerBox &operator=(const ListenerBox &) = delete;
     /** Destroy application captures before releasing their selected/retiring reservation. */
@@ -47,6 +57,14 @@ struct ListenerEntry {
 
 using ListenerSnapshot = std::vector<ListenerEntry>;
 
+/** Advisory state observers, protected by the enclosing detached port mutex. */
+struct StateListeners {
+    std::shared_ptr<ListenerLedger> ledger;           ///< Independent accepted/selected/retiring observer reservation.
+    std::shared_ptr<const ListenerSnapshot> snapshot; ///< Accepted immutable selection; null after terminal dispatch.
+    std::uint64_t nextListener = 1; ///< Non-reused observer identity; independent of event-listener identities.
+    Diagnostic diagnostic;          ///< First observer exception; never changes the owner's lifecycle diagnostic.
+};
+
 /** Producer-only subscription state; no queue, receiver, schema or native owner can escape here. */
 struct SubscriptionPort {
     mutable std::mutex mutex;                          ///< Protects accepted snapshots and detached observations only.
@@ -54,9 +72,10 @@ struct SubscriptionPort {
     std::weak_ptr<EndpointPort> endpoint;              ///< Endpoint policy/status domain, without a producer cycle.
     std::shared_ptr<ListenerLedger> listenerLedger;    ///< Selected/retiring callback reservation.
     std::shared_ptr<const ListenerSnapshot> listeners; ///< Complete accepted bounded selection.
-    std::vector<std::u16string> symbols;               ///< Complete accepted exact desired set.
-    std::size_t maximumSymbols;                        ///< Original per-registration selector count.
-    std::size_t maximumSymbolUnits;                    ///< Original per-selector capacity.
+    StateListeners stateListeners;           ///< Opt-in advisory lifecycle observations, retired after event captures.
+    std::vector<std::u16string> symbols;     ///< Complete accepted exact desired set.
+    std::size_t maximumSymbols;              ///< Original per-registration selector count.
+    std::size_t maximumSymbolUnits;          ///< Original per-selector capacity.
     std::uint64_t revision = 0;              ///< Accepted local desired revision, separate from queue tickets.
     std::uint64_t nextListener = 1;          ///< Non-reused listener identity, zero never issued.
     bool quote;                              ///< Selects one existing prepared mapping.
@@ -75,10 +94,13 @@ struct EndpointPort {
     RuntimeOptions limits;   ///< Finite immutable limits and resolved DNS snapshot.
     EndpointOptions options; ///< Finite immutable endpoint policy.
     std::vector<std::shared_ptr<SubscriptionPort>> subscriptions; ///< Fixed slots, including retiring registrations.
-    std::string address;           ///< First accepted bounded spelling; immutable after connect publication.
-    std::string host;              ///< Validated bounded route, copied only once before worker publication.
-    std::uint16_t port = 0;        ///< Original nonzero route port.
-    bool connectRequested = false; ///< Published once under the endpoint mutex.
+    StateListeners stateListeners; ///< Opt-in advisory lifecycle observations, retired after all subscriptions.
+    std::shared_ptr<const ListenerSnapshot> connectingListeners; ///< One producer-published CONNECTING selection.
+    bool connectingNotification = false; ///< Deferred first transition, dispatched before every worker exit path.
+    std::string address;                 ///< First accepted bounded spelling; immutable after connect publication.
+    std::string host;                    ///< Validated bounded route, copied only once before worker publication.
+    std::uint16_t port = 0;              ///< Original nonzero route port.
+    bool connectRequested = false;       ///< Published once under the endpoint mutex.
     std::atomic<std::chrono::steady_clock::duration::rep> closeDeadline{0}; ///< First admitted absolute drain deadline.
     std::atomic<bool> closeRequested{false};                                ///< Reserved monotonic drain admission.
     std::atomic<bool> retired{false};           ///< Native owner and all captures have retired.

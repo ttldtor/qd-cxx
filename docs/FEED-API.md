@@ -110,7 +110,7 @@ library's finite reservations. Keep callbacks short: a blocked callback delays
 other endpoints and shutdown. Neither drain deadlines nor destructors can preempt
 application code or promise a hard OS-retirement deadline.
 
-A listener exception fails that subscription with `CALLBACK_FAILURE`; it is not
+An event-listener exception fails that subscription with `CALLBACK_FAILURE`; it is not
 retried and does not fail other subscriptions. Removing a listener prevents future
 selection; a callback already selected may finish. Listener captures retire outside
 control locks. Awaiting endpoint closure establishes callback/capture quiescence.
@@ -118,6 +118,54 @@ control locks. Awaiting endpoint closure establishes callback/capture quiescence
 `CloseResult::drained` describes the actual admitted local prefix. Inspect
 `deadlineExpired`, `hadGap` and `diagnostic` as well. It does not establish peer
 acknowledgement, unread-wire completeness or an uninterrupted upstream history.
+
+## State observers
+
+Register endpoint and subscription state observers before the transitions you need:
+
+```cpp
+const auto listener = endpoint->addStateChangeListener(
+    [](q::api::EndpointState previous, q::api::EndpointState current) {
+        // Observe the transition; keep this callback short.
+        (void)previous;
+        (void)current;
+    });
+endpoint->removeStateChangeListener(listener);
+```
+
+The same methods on `Subscription<Event>` use `SubscriptionState`. Registration
+makes **no initial callback**; `getState()` is a separate current-state snapshot.
+Observers receive distinct actual old/new transitions in publication order, including
+failure and terminal states. One complete selection is made atomically with each
+transition and invoked in registration order outside control locks. Removing an
+observer prevents later selections; an already selected observer can still run.
+Removal is idempotent and remains available after close. Adding after the close
+admission fence rejects with `CLOSED`; ordinary capacity cannot block close.
+
+Calls run on the SDK worker after that runtime's first `connect()`. If the runtime
+has never started its worker, creator-thread endpoint/runtime retirement invokes
+state observers without starting one. A callback can inspect state, close, remove
+observers or operate on another endpoint. Worker awaits reject with `WRONG_THREAD`;
+creator-retirement reentry into that endpoint's await or runtime await rejects with
+`INVALID_STATE`. Different inactive endpoints can be retired recursively; an
+inactive creator retirement and another active endpoint's worker can overlap.
+
+State observers are advisory. If one throws, the complete selected snapshot still
+runs. `getStateChangeDiagnostic()` retains the first static `CALLBACK_FAILURE`
+separately; owner state, `getDiagnostic()` and `CloseResult` do not change. `CLOSED`
+and `FAILED` remain absorbing. As before, `CLOSED` proves native/registration and
+all **event-listener** captures have retired. Only these new opt-in state observers
+can still be executing or releasing captures; endpoint await includes both event
+and state-observer retirement before returning or releasing a runtime slot.
+
+Separate positive `maximumStateListenersPerEndpoint` and
+`maximumStateListenersPerSubscription` limits count accepted, selected and retiring
+observer boxes. Removal releases capacity only after the final selected invocation
+and application capture destruction. No state queue grows with transitions: the
+first producer-published `CONNECTING` selection has one deferred slot, and later
+observations are dispatched directly by the owning execution domain. A synchronous
+worker-start refusal publishes no transition and invokes no observer on the producer.
+See the [complete state-observer contract](../spec/subscriptions/FEED-STATES.md).
 
 ## Accepted changes and errors
 
@@ -150,6 +198,8 @@ substantial backing storage, and unsupported capacity arithmetic rejects explici
 | `maximumSubscriptionsPerEndpoint` | 8 |
 | `maximumSymbolsPerSubscription` | 16 |
 | `maximumListenersPerSubscription` | 4 |
+| `maximumStateListenersPerEndpoint` | 4 |
+| `maximumStateListenersPerSubscription` | 4 |
 | `maximumSymbolUnits` | 128; configurable in 1..128 |
 | `dnsServers` | Empty: discover up to 4 system IPv4 resolver addresses |
 | `dnsPort` | 53 |
