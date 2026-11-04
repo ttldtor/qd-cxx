@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/api/event_registry.hpp"
 
+#include "qd/events/configuration.hpp"
 #include "qd/events/profile.hpp"
 #include "qd/events/quote.hpp"
 #include "qd/events/summary.hpp"
@@ -163,7 +164,8 @@ bool validRegistration(const EventRegistration &registration) noexcept {
     return (registration.type == EventType::QUOTE || registration.type == EventType::PROFILE ||
             registration.type == EventType::TRADE || registration.type == EventType::TRADE_ETH ||
             registration.type == EventType::SUMMARY || registration.type == EventType::TEXT_MESSAGE ||
-            registration.type == EventType::TEXT_CONFIGURATION) &&
+            registration.type == EventType::TEXT_CONFIGURATION || registration.type == EventType::MESSAGE ||
+            registration.type == EventType::CONFIGURATION) &&
            (registration.eventTimePolicy == EventTimePolicy::UNSPECIFIED ||
             registration.eventTimePolicy == EventTimePolicy::FIELD_METADATA);
 }
@@ -279,6 +281,22 @@ EventRegistry::create(const core::LocalSchema &schema, std::span<const EventRegi
                 if (!mapping) {
                     return std::unexpected(EventRegistryFailure{mapping.error(), index});
                 }
+            } else if (registration.type == EventType::MESSAGE) {
+                const auto mapping = events::PreparedMessage::prepare(*ownedSchema, registration.localRecordId,
+                                                                      registration.mappingLimits);
+
+                if (!mapping) {
+                    return std::unexpected(EventRegistryFailure{mapping.error(), index});
+                }
+            } else if (registration.type == EventType::CONFIGURATION) {
+                const auto mapping = events::PreparedConfiguration::prepare(*ownedSchema, registration.localRecordId,
+                                                                            registration.mappingLimits);
+
+                if (!mapping) {
+                    return std::unexpected(EventRegistryFailure{mapping.error(), index});
+                }
+
+                versionField = mapping->versionField();
             } else if (registration.type == EventType::TEXT_MESSAGE) {
                 const auto mapping = events::PreparedTextMessage::prepare(*ownedSchema, registration.localRecordId,
                                                                           registration.mappingLimits);
@@ -338,7 +356,7 @@ EventRegistry::create(const core::LocalSchema &schema, std::span<const EventRegi
 std::expected<EventRegistry, EventRegistryFailure> EventRegistry::builtIn(EventRegistryLimits limits,
                                                                           EventRegistryWork &work) {
     try {
-        // Prepay construction of all seven fixed input catalogs and their aliases before allocating them.
+        // Prepay construction of all nine fixed input catalogs and their aliases before allocating them.
         constexpr std::size_t DEFAULT_CONSTRUCTION_WORK = 4096;
         debit(work.visits, DEFAULT_CONSTRUCTION_WORK);
 
@@ -349,6 +367,12 @@ std::expected<EventRegistry, EventRegistryFailure> EventRegistry::builtIn(EventR
         auto summary = events::defaultSummarySchema(limits.schema);
         auto textMessage = events::defaultTextMessageSchema(limits.schema);
         auto textConfiguration = events::defaultTextConfigurationSchema(limits.schema);
+        auto message = events::defaultMessageSchema(limits.schema);
+        auto configuration = events::defaultConfigurationSchema(limits.schema);
+
+        if (!message || !configuration) {
+            return std::unexpected(EventRegistryFailure{!message ? message.error() : configuration.error(), {}});
+        }
 
         if (!quote || !profile) {
             return std::unexpected(EventRegistryFailure{!quote ? quote.error() : profile.error(), {}});
@@ -376,7 +400,9 @@ std::expected<EventRegistry, EventRegistryFailure> EventRegistry::builtIn(EventR
                            tradeETH->records()[0],
                            summary->records()[0],
                            textMessage->records()[0],
-                           textConfiguration->records()[0]};
+                           textConfiguration->records()[0],
+                           message->records()[0],
+                           configuration->records()[0]};
 
         for (std::size_t index = 0; index < records.size(); ++index) {
             records[index].id = static_cast<std::int32_t>(index);
@@ -394,7 +420,9 @@ std::expected<EventRegistry, EventRegistryFailure> EventRegistry::builtIn(EventR
                                        EventRegistration{EventType::TRADE_ETH, 3},
                                        EventRegistration{EventType::SUMMARY, 4},
                                        EventRegistration{EventType::TEXT_MESSAGE, 5},
-                                       EventRegistration{EventType::TEXT_CONFIGURATION, 6}};
+                                       EventRegistration{EventType::TEXT_CONFIGURATION, 6},
+                                       EventRegistration{EventType::MESSAGE, 7},
+                                       EventRegistration{EventType::CONFIGURATION, 8}};
 
         return create(*combined, registrations, limits, work);
     } catch (EventRegistryError error) {
@@ -431,4 +459,5 @@ std::optional<std::size_t> EventRegistry::versionField(std::int32_t localRecordI
 std::size_t EventRegistry::storageBytes() const noexcept {
     return state_ ? state_->storageBytes : 0;
 }
+
 } // namespace org::ttldtor::qdcxx::api

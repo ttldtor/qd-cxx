@@ -10,7 +10,8 @@ Feed-фильтр — неизменяемый классификатор зап
 
 ## Существующие координаты
 
-Native registry поддерживает Quote, Profile, Trade, TradeETH, Summary, TextMessage и TextConfiguration.
+Native registry поддерживает Quote, Profile, Trade, TradeETH, Summary, TextMessage,
+TextConfiguration, Message и Configuration.
 Запрос использует реальные настроенные имена записей и физические символы; тип события не выводится из
 имени записи. При наличии точного регионального маршрута выбирается он, иначе composite.
 Региональный маршрут убирает суффикс биржи символа, сохраняя атрибуты. Существующий native
@@ -22,11 +23,13 @@ Time-series проверяется раньше indexed. У текущих пр�
 строка, начинающаяся с `*`, не имеет делегатов подписки; явный ALL — отдельный тип запроса.
 Запрос готового события использует publisher-координаты без этого ограничения подписки.
 
-TextMessage и TextConfiguration используют generic delegate coordinates: полное имя
+TextMessage, TextConfiguration, Message и Configuration используют generic delegate coordinates: полное имя
 символа сохраняется, включая `&Q`, даже если пользовательская запись похожа на региональную.
 В indexed-запросе source0 и отрицательные ID выбирают доступные делегаты, положительный ID
 даёт no-match. Это отличается от MarketEventDelegateSet и не меняет его прежние правила.
 Payload null/empty/body, version и metadata времени не участвуют в классификации.
+Message и Configuration сохраняют непрозрачные сериализованные байты attachment;
+классификация не декодирует их и не вызывает codec.
 Владеющий C++ symbol имеет тип `std::u16string`: пустая строка соответствует явному пустому
 символу Java, а null symbol/model Java не представимы этим value API. Raw production Java
 возвращает NullPointerException для null, включая события без заданного символа; null

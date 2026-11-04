@@ -233,7 +233,8 @@ void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, s
             const auto &record = profile.schema.records()[static_cast<std::size_t>(registration.localRecordId)];
             profile.bindingExchanges[index] =
                 (registration.type == EventType::PROFILE || registration.type == EventType::TEXT_MESSAGE ||
-                 registration.type == EventType::TEXT_CONFIGURATION)
+                 registration.type == EventType::TEXT_CONFIGURATION || registration.type == EventType::MESSAGE ||
+                 registration.type == EventType::CONFIGURATION)
                     ? 0
                     : events::market_symbols::getExchangeCode(record.name);
             const auto policy = registration.eventTimePolicy == EventTimePolicy::FIELD_METADATA
@@ -247,7 +248,7 @@ void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, s
 
             profile.bindings.push_back({registration.localRecordId,
                                         static_cast<client::PreparedEventKind>(registration.type),
-                                        registration.mappingLimits, values, policy});
+                                        registration.mappingLimits, values, policy, FIELD_BYTE_UNITS});
         }
     }
 
@@ -275,7 +276,11 @@ void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, s
             const auto units = text ? values.totalUnits : values.symbolUnits;
             const auto strings = profileText ? std::size_t{3} : (text ? std::size_t{2} : std::size_t{1});
             const auto bytes =
-                add(sizeof(client::SubscriptionProjection), multiply(add(units, strings), sizeof(char16_t)));
+                add(add(sizeof(client::SubscriptionProjection), multiply(add(units, strings), sizeof(char16_t))),
+                    binding.kind == client::PreparedEventKind::MESSAGE ||
+                            binding.kind == client::PreparedEventKind::CONFIGURATION
+                        ? binding.attachmentBytes
+                        : 0);
             plan.bindingIndices[plan.bindingCount++] = index;
             plan.limits.bindings = plan.bindingCount;
             plan.limits.shapeFields = add(plan.limits.shapeFields, fields);
@@ -474,7 +479,7 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
 const ReceivingEventPlan &receivingEventPlan(const ReceivingProfile &profile, EventSelection selection) {
     const auto mask = static_cast<std::size_t>(selection);
 
-    if (!mask || mask > RECEIVING_EVENT_SELECTIONS)
+    if (!mask || mask > RECEIVING_EVENT_SELECTIONS || (mask & ~static_cast<std::size_t>(EventSelection::ALL)))
         refuse(ErrorCode::UNSUPPORTED_PROFILE, "subscription-event-type");
 
     return profile.eventPlans[mask - 1];
@@ -544,7 +549,8 @@ void validateReceivingSymbol(const EventRegistry *registry, EventSelection selec
 
     for (const auto &route : registry->registrations()) {
         if (route.type == EventType::PROFILE || route.type == EventType::TEXT_MESSAGE ||
-            route.type == EventType::TEXT_CONFIGURATION || !selectsEvent(selection, route.type)) {
+            route.type == EventType::TEXT_CONFIGURATION || route.type == EventType::MESSAGE ||
+            route.type == EventType::CONFIGURATION || !selectsEvent(selection, route.type)) {
             continue;
         }
 

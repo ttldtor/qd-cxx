@@ -3,9 +3,25 @@
   "javaVersion": "openjdk version \"1.8.0_422\"",
   "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
   "javacSha256": "633143e961aa18051c09112b85333f5cdbd845b54eb39678eb15b91ca8bbb527",
-  "harnessSha256": "24f6397bf2da92228d5025aa3dbe1fac018ede85abd2e8d5c48fd7688fe809d4",
-  "launcherSha256": "27c7c2863ed740fccfc58ce3377fbc2909c46d505ca873bbfe391d2bb728c503",
+  "harnessSha256": "691e9c68c934eecc8e2a614a2f8f22208c62f05e9a7660496dcea26ae782a6cf",
+  "launcherSha256": "e675c16f8f7488401ae741e122f3f8949c3bf67f311395c7300c5fc9e894a706",
   "upstreamSources": [
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/misc/Message.java",
+      "sha256": "ed4ffa997ac47891461a149af4572daf072f8cc6130806fa0ebbb0f5ce1140af"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/misc/Configuration.java",
+      "sha256": "4c338c7fc9054361aa4883ad3057e0a51d62c7d5e3dab453ab6fc5857cb87cc1"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/misc/MessageDelegate.java",
+      "sha256": "77670cda9fdf3f33a31888423bf7edf86979075d7662ba14400348a727c05047"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/misc/ConfigurationDelegate.java",
+      "sha256": "62bd95a3bde1ae7347065faac97c1a2262122ad17847893784e89fa3320ce9e0"
+    },
     {
       "path": "dxfeed-api/src/main/java/com/dxfeed/event/misc/TextMessage.java",
       "sha256": "88586609f8c89be3b3a7c8692c916e9086d344128bc786e1f5fcd00f82cda75f"
@@ -134,7 +150,7 @@
   "productionClassFiles": 1290,
   "productionResourceFiles": 27,
   "productionClassInventorySha256": "90a478b5d3737246d8c897322c9f9db60887846e20117572588e05ae78fbc6d8",
-  "fixtureSha256": "64d13237e91cd3ea4e04547bdd85822089c0bcf7f93bc633e5dc765e459883d4",
-  "rows": 1411,
+  "fixtureSha256": "a442a17cb47379c4a8ef9cdfe944aecf73c27eff3969f902d608b56576f18f32",
+  "rows": 1466,
   "timezoneInvariant": true
 }

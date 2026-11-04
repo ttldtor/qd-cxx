@@ -50,3 +50,5 @@ Exact conformance results belong to the [developer reading path](../docs/develop
 
 - [Text-event receiving](events/TEXT-EVENTS.md): nullable UTF-16 payloads, packed time and TICKER version semantics.
 - [Event text](events/EVENT-TEXT.md): explicit context, numeric/date representation, UTF-16/UTF-8 and finite ownership/work contracts.
+
+- [Serialized attachments](events/ATTACHMENTS.md) and [Message/Configuration receiving](../docs/MISC-EVENTS.md): owning nullable bytes, explicit local codecs and collector version admission.

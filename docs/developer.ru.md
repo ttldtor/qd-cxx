@@ -54,3 +54,5 @@
 
 - [Проверки текста событий](../tests/conformance/EVENT-TEXT-VALIDATION.ru.md): production Java profiles, точные различия эталона, числовое округление, ограниченное владение и установленные consumers.
 - [Публичный пример live IPF](../examples/ipf_live/README.ru.md): отдельный installed consumer, EN/RU help без inputs, конечные duration/revision capture и creator shutdown; [shutdown oracle](../tests/fixtures/ipf/live/README.ru.md#shutdown-oracle) использует pinned JDK8 с конечным собственным cleanup.
+
+- [Получение Message/Configuration и кодеки](MISC-EVENTS.ru.md): владеющие payload, явный decode и Java-совместимый version admission Configuration; [version oracle](../tools/upstream/configuration-version-oracle/README.ru.md).

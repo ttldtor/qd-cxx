@@ -52,3 +52,5 @@ The [event-value oracle](../tools/upstream/event-values-oracle/README.md) captur
 
 - [Event text validation](../tests/conformance/EVENT-TEXT-VALIDATION.md): production Java profiles, exact reference differences, numeric rounding, finite ownership and installed consumers.
 - [Live IPF public sample](../examples/ipf_live/README.md): installed independent consumer, input-free EN/RU help, bounded duration/revision capture and creator shutdown; [shutdown oracle](../tests/fixtures/ipf/live/README.md#shutdown-oracle) uses pinned JDK8 with finite owned cleanup.
+
+- [Message/Configuration receiving and codecs](MISC-EVENTS.md): owning payloads, explicit decode and Java-compatible Configuration version admission; [version oracle](../tools/upstream/configuration-version-oracle/README.md).

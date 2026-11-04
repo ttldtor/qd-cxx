@@ -50,3 +50,5 @@
 
 - [Приём текстовых событий](events/TEXT-EVENTS.ru.md): nullable UTF-16, packed time и семантика версии TICKER.
 - [Текст событий](events/EVENT-TEXT.ru.md): явный контекст, числа/даты, UTF-16/UTF-8 и ограниченные контракты владения/работы.
+
+- [Сериализованные вложения](events/ATTACHMENTS.ru.md) и [получение Message/Configuration](../docs/MISC-EVENTS.ru.md): владеющие nullable bytes, явные локальные кодеки и version admission collector.

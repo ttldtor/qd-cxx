@@ -142,7 +142,7 @@ TEST_CASE("built-in registry preserves existing ordinals and appends text events
     auto result = api::EventRegistry::builtIn({}, work);
     REQUIRE(result);
     CHECK(result->valid());
-    REQUIRE(result->registrations().size() == 7);
+    REQUIRE(result->registrations().size() == 9);
     CHECK(result->registrations()[0].type == api::EventType::QUOTE);
     CHECK(result->registrations()[0].localRecordId == 0);
     CHECK(result->registrations()[1].type == api::EventType::PROFILE);
@@ -169,6 +169,19 @@ TEST_CASE("built-in registry preserves existing ordinals and appends text events
     CHECK_FALSE(result->versionField(5));
     REQUIRE(result->versionField(6));
     CHECK(*result->versionField(6) == 2);
+    CHECK(result->registrations()[7].type == api::EventType::MESSAGE);
+    CHECK(result->registrations()[7].localRecordId == 7);
+    CHECK(result->schema().records()[7].name == u"Message");
+    REQUIRE(result->schema().records()[7].fields.size() == 1);
+    CHECK(result->schema().records()[7].fields[0].serialTypeId == 249);
+    CHECK_FALSE(result->versionField(7));
+    CHECK(result->registrations()[8].type == api::EventType::CONFIGURATION);
+    CHECK(result->registrations()[8].localRecordId == 8);
+    CHECK(result->schema().records()[8].name == u"Configuration");
+    REQUIRE(result->schema().records()[8].fields.size() == 2);
+    CHECK(result->schema().records()[8].fields[0].serialTypeId == 8);
+    CHECK(result->schema().records()[8].fields[1].serialTypeId == 249);
+    CHECK(result->versionField(8) == 0);
     CHECK_FALSE(result->versionField(99));
     CHECK(result->storageBytes() <= api::EventRegistryLimits{}.storageBytes);
     CHECK(work.visits < api::EventRegistryWork{}.visits);

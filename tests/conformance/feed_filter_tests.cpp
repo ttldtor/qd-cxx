@@ -11,8 +11,11 @@
 #include <array>
 #include <atomic>
 #include <barrier>
+#include <cstddef>
+#include <cstdint>
 #include <fstream>
 #include <limits>
+#include <span>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -479,11 +482,11 @@ TEST_CASE("Context normalization work is shared across successful and refused co
     CHECK(held.accept(api::EventType::QUOTE, api::SubscriptionSelector::plain(u"AAPL")));
 }
 
-TEST_CASE("Text event coordinates follow actual generic delegates and ignore nullable payload") {
+TEST_CASE("Generic event coordinates follow actual delegates and ignore nullable payload") {
     auto filter = api::FeedFilter::Builder(registry())
                       .withCategory(u"decorated", u"TOPIC[&]Q")
-                      .withCategory(u"message", u":TextMessage*")
-                      .withCategory(u"configuration", u":TextConfiguration*")
+                      .withCategory(u"message", u":TextMessage*,:Message*")
+                      .withCategory(u"configuration", u":TextConfiguration*,:Configuration*")
                       .build();
     std::ifstream input(ORG_TTLDTOR_QDCXX_FILTER_FIXTURE);
     REQUIRE(input.good());
@@ -503,24 +506,58 @@ TEST_CASE("Text event coordinates follow actual generic delegates and ignore nul
             cells.push_back(cell);
         }
 
-        if (cells.empty() || (cells[0] != "text-event" && cells[0] != "text-subscription")) {
+        if (cells.empty() || (cells[0] != "text-event" && cells[0] != "text-subscription" &&
+                              cells[0] != "attachment-event" && cells[0] != "attachment-subscription")) {
             // Java null symbol/model observations have no representation in the owning native value API.
             continue;
         }
 
         INFO(line);
-        const bool configuration = cells[1] == "TextConfiguration";
-        REQUIRE((configuration || cells[1] == "TextMessage"));
-        const auto type = configuration ? api::EventType::TEXT_CONFIGURATION : api::EventType::TEXT_MESSAGE;
+        const bool attachment = cells[0].starts_with("attachment-");
+        const bool configuration = cells[1] == (attachment ? "Configuration" : "TextConfiguration");
+        REQUIRE((configuration || cells[1] == (attachment ? "Message" : "TextMessage")));
+        const auto type = attachment
+                              ? (configuration ? api::EventType::CONFIGURATION : api::EventType::MESSAGE)
+                              : (configuration ? api::EventType::TEXT_CONFIGURATION : api::EventType::TEXT_MESSAGE);
 
-        if (cells[0] == "text-event") {
+        if (cells[0] == "text-event" || cells[0] == "attachment-event") {
             REQUIRE(cells.size() == 6);
             const auto symbol = unescape(cells[2]);
-            const auto text = cells[3] == "null" ? std::optional<std::u16string>{}
-                                                 : std::optional<std::u16string>(cells[3] == "empty" ? u"" : u"body");
-            api::RegisteredEvent event = configuration
-                                             ? api::RegisteredEvent(q::events::TextConfiguration{symbol, 0, 0, 0, text})
-                                             : api::RegisteredEvent(q::events::TextMessage{symbol, 0, 0, text});
+            const api::RegisteredEvent event = [&]() -> api::RegisteredEvent {
+                if (attachment) {
+                    q::events::SerializedAttachment payload;
+
+                    if (cells[3] != "null") {
+                        // Arbitrary serialized bytes must remain opaque to the classifier.
+                        const std::array bytes{std::byte{0}, std::byte{0xff}};
+                        const auto body = cells[3] == "empty-object" ? std::span<const std::byte>{}
+                                                                     : std::span<const std::byte>(bytes);
+                        auto value = q::events::SerializedAttachment::create(q::core::SerialFieldType::SERIAL_OBJECT,
+                                                                             body, bytes.size());
+                        REQUIRE(value);
+                        payload = std::move(*value);
+                    }
+
+                    const auto time = cells[3] == "opaque-object" ? std::numeric_limits<std::int64_t>::min() : 0;
+                    const auto version = cells[3] == "opaque-object" ? std::numeric_limits<std::int32_t>::min() : 0;
+
+                    if (configuration) {
+                        return q::events::Configuration{symbol, time, version, payload};
+                    }
+
+                    return q::events::Message{symbol, time, payload};
+                }
+
+                const auto text = cells[3] == "null"
+                                      ? std::optional<std::u16string>{}
+                                      : std::optional<std::u16string>(cells[3] == "empty" ? u"" : u"body");
+
+                if (configuration) {
+                    return q::events::TextConfiguration{symbol, 0, 0, 0, text};
+                }
+
+                return q::events::TextMessage{symbol, 0, 0, text};
+            }();
             CHECK(filter.acceptEvent(event) == (cells[4] == "true"));
             CHECK(filter.getEventCategory(event) == unescape(cells[5]));
         } else {
@@ -554,7 +591,7 @@ TEST_CASE("Text event coordinates follow actual generic delegates and ignore nul
         ++checked;
     }
 
-    CHECK(checked == 46);
+    CHECK(checked == 92);
 }
 
 TEST_CASE("Text mappings preserve symbols for regional-looking custom records and valid absent types") {
@@ -581,4 +618,40 @@ TEST_CASE("Text mappings preserve symbols for regional-looking custom records an
     CHECK_FALSE(filter.accept(api::EventType::TEXT_CONFIGURATION, api::SubscriptionSelector::plain(u"TOPIC&Q")));
     q::events::TextConfiguration absent{u"TOPIC&Q", 0, 0, -1, std::nullopt};
     CHECK_FALSE(filter.acceptEvent(absent));
+}
+
+TEST_CASE("Attachment mappings preserve regional-looking symbols and valid absent event types") {
+    const std::array types{api::EventType::MESSAGE, api::EventType::CONFIGURATION};
+
+    for (const auto type : types) {
+        const bool configuration = type == api::EventType::CONFIGURATION;
+        auto model = configuration ? q::events::defaultConfigurationSchema({16, 128, 256, 128, 16384})
+                                   : q::events::defaultMessageSchema({16, 128, 256, 128, 16384});
+        REQUIRE(model);
+        auto record = model->records()[0];
+        record.name = u"AttachmentRoute&Q";
+        const std::array records{record};
+        auto schema =
+            q::core::LocalSchema::create(records, {16, 128, 256, 128, 16384}, q::core::LocalProfile::BINARY_FIELDS_V1);
+        REQUIRE(schema);
+        const std::array routes{api::EventRegistration{type, 0}};
+        api::EventRegistryWork work;
+        auto registered = api::EventRegistry::create(*schema, routes, {}, work);
+        REQUIRE(registered);
+        auto filter = api::FeedFilter::Builder(*registered)
+                          .withCategory(u"physical", u"TOPIC[&]Q")
+                          .withCategory(u"record", u":AttachmentRoute[&]Q")
+                          .build();
+        const api::RegisteredEvent event = configuration
+                                               ? api::RegisteredEvent(q::events::Configuration{u"TOPIC&Q", 0, 0, {}})
+                                               : api::RegisteredEvent(q::events::Message{u"TOPIC&Q", 0, {}});
+        const api::RegisteredEvent absent = configuration
+                                                ? api::RegisteredEvent(q::events::Message{u"TOPIC&Q", 0, {}})
+                                                : api::RegisteredEvent(q::events::Configuration{u"TOPIC&Q", 0, 0, {}});
+        CHECK(filter.getEventCategory(event) == u"physical");
+        CHECK(filter.getCategory(type, api::SubscriptionSelector::plain(u"TOPIC&Q")) == u"physical");
+        CHECK_FALSE(filter.accept(configuration ? api::EventType::MESSAGE : api::EventType::CONFIGURATION,
+                                  api::SubscriptionSelector::plain(u"TOPIC&Q")));
+        CHECK_FALSE(filter.acceptEvent(absent));
+    }
 }

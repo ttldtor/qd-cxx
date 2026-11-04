@@ -36,7 +36,11 @@ enum class EventSelection {
     TRADE_TRADE_ETH_SUMMARY = 28,         ///< Selected TRADE, TRADE_ETH, SUMMARY routes.
     QUOTE_TRADE_TRADE_ETH_SUMMARY = 29,   ///< Selected QUOTE, TRADE, TRADE_ETH, SUMMARY routes.
     PROFILE_TRADE_TRADE_ETH_SUMMARY = 30, ///< Selected PROFILE, TRADE, TRADE_ETH, SUMMARY routes.
-    ALL = 127,                            ///< Selected QUOTE, PROFILE, TRADE, TRADE_ETH, SUMMARY routes.
+    TEXT_MESSAGE = 32,                    ///< Selected TextMessage routes.
+    TEXT_CONFIGURATION = 64,              ///< Selected TextConfiguration routes.
+    MESSAGE = 128,                        ///< Selected serialized Message routes.
+    CONFIGURATION = 256,                  ///< Selected serialized Configuration routes.
+    ALL = 511,                            ///< Every supported event route.
 };
 
 /** Test a finite supported-kind selection without depending on local record positions.
@@ -45,6 +49,12 @@ enum class EventSelection {
  * @return Whether this kind belongs to the selected type set.
  */
 constexpr bool selectsEvent(EventSelection selection, EventType type) noexcept {
+    if (type != EventType::QUOTE && type != EventType::PROFILE && type != EventType::TRADE &&
+        type != EventType::TRADE_ETH && type != EventType::SUMMARY && type != EventType::TEXT_MESSAGE &&
+        type != EventType::TEXT_CONFIGURATION && type != EventType::MESSAGE && type != EventType::CONFIGURATION) {
+        return false;
+    }
+
     return (static_cast<unsigned>(selection) & (1U << static_cast<unsigned>(type))) != 0;
 }
 
@@ -57,6 +67,8 @@ enum class EventDelivery {
     SUMMARY,            ///< Complete owning session-summary values.
     TEXT_MESSAGE,       ///< Owning text messages.
     TEXT_CONFIGURATION, ///< Owning text configurations.
+    MESSAGE,            ///< Owning serialized Message values.
+    CONFIGURATION,      ///< Owning serialized Configuration values.
     REGISTERED          ///< Owning public RegisteredEvent variants, restricted by EventSelection.
 };
 } // namespace org::ttldtor::qdcxx::api::detail

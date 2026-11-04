@@ -776,3 +776,7 @@ tests/fixtures/subscription-observer/*.tsv -text -whitespace
 tests/fixtures/subscription-observer/*.json text eol=lf
 tests/fixtures/feed-filter/*.tsv -text -whitespace
 tests/fixtures/feed-filter/*.json text eol=lf
+tests/fixtures/configuration-version/capture-v1/** -text -whitespace
+tests/fixtures/configuration-version/provenance.json text eol=lf
+tools/upstream/configuration-version-oracle/*.java text eol=lf
+tools/upstream/configuration-version-oracle/*.ps1 text eol=lf

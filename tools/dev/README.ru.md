@@ -355,3 +355,6 @@ native writer files pinned Java reader. Сеть, SDK build и новая depend
 
 - [Subscription observer oracle](../upstream/subscription-observer-oracle/README.ru.md): реальные pinned production introspection/change callbacks, reentry/exception traces, ограниченные capture/verify и EN/RU help без рабочих входов.
 - [Feed filter oracles](../upstream/feed-filter-oracle/README.ru.md): production-свидетельства QD grammar/classifier, IPF identity/update и source config с конечными ресурсами, неизменяемыми class inventories и EN/RU help без рабочих входов.
+- [Oracle версий Configuration](../upstream/configuration-version-oracle/README.ru.md): production collectors/delegate, первое отрицательное default-событие, signed bounds, batch и STREAM; native Feed tests отдельно покрывают
+поздний replay cache при подписке. EN/RU/Get-Help без входов, конечный JDK8 Capture/Verify с точными
+class/resource inventories.

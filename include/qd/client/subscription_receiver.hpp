@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 #pragma once
 
+#include "qd/events/configuration.hpp"
 #include "qd/events/profile.hpp"
 #include "qd/events/quote.hpp"
 #include "qd/events/summary.hpp"
@@ -26,13 +27,15 @@ struct ReceiverPlan;
 
 /** Existing prepared business projections; other records remain fully generic. */
 enum class PreparedEventKind {
-    QUOTE,             ///< Existing schema-bound Quote projection.
-    PROFILE,           ///< Existing schema-bound Profile projection.
-    TRADE,             ///< Complete owning Trade projection.
-    TRADE_ETH,         ///< Complete distinct owning extended-hours projection.
-    SUMMARY,           ///< Complete owning session-summary projection.
-    TEXT_MESSAGE,      ///< Owning text message projection.
-    TEXT_CONFIGURATION ///< Owning text configuration projection.
+    QUOTE,              ///< Existing schema-bound Quote projection.
+    PROFILE,            ///< Existing schema-bound Profile projection.
+    TRADE,              ///< Complete owning Trade projection.
+    TRADE_ETH,          ///< Complete distinct owning extended-hours projection.
+    SUMMARY,            ///< Complete owning session-summary projection.
+    TEXT_MESSAGE,       ///< Owning text message projection.
+    TEXT_CONFIGURATION, ///< Owning text configuration projection.
+    MESSAGE = 7,        ///< Owning serialized Message projection.
+    CONFIGURATION = 8   ///< Owning serialized Configuration projection.
 };
 
 /** Explicit source for optional event metadata; indexed identity is never a timestamp substitute. */
@@ -49,6 +52,7 @@ struct PreparedSubscriptionBinding {
     events::EventValueLimits valueLimits; ///< Owned result bounds; stringUnits bounds each selected owning text value.
     ReceiverEventTimePolicy eventTimePolicy =
         ReceiverEventTimePolicy::UNSPECIFIED; ///< Explicit source of optional event timestamp metadata.
+    std::size_t attachmentBytes = 65536;      ///< Finite serialized-body copy bound for attachment event routes.
 };
 
 /** Aggregate immutable plan bounds, separate from queue reservations and application captures. */
@@ -88,7 +92,7 @@ struct ReceiverFailure {
 /** Fully owning optional projection; generic records are represented by monostate. */
 struct SubscriptionProjection {
     std::variant<std::monostate, events::Quote, events::Profile, events::Trade, events::TradeETH, events::Summary,
-                 events::TextMessage, events::TextConfiguration>
+                 events::TextMessage, events::TextConfiguration, events::Message, events::Configuration>
         value;                               ///< Owned event or explicit generic route.
     std::optional<std::int64_t> eventTimeMs; ///< Actual selected FIELD metadata only; rawTime stays independent.
 };

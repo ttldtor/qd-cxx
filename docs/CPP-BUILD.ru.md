@@ -1085,3 +1085,7 @@ Sealed HTTP/TLS SDK не меняется. Pure IPF/feed при transfer OFF н�
 намеренные ZIP отличия и EN/RU help без работы. C++ tests читают готовые fixtures без Java.
 
 ORG_TTLDTOR_QDCXX_BUILD_IPF_LIVE=ON требует явных IPF_TRANSFER/TLS prerequisites и экспортирует qdcxx_ipf_live с connection header. Pure IPF/default OFF не получает worker или transfer dependency. См. [live connection](IPF-CONNECTION.ru.md).
+
+## События с сериализованными вложениями
+
+`qdcxx_attachments` и `qdcxx_misc_events` — экспортируемые targets без SDK: [API Message/Configuration и кодеков](MISC-EVENTS.ru.md). Новые native tests: `attachment_codec_contract` и `misc_event_projections`; public Feed option также включает `misc_feed` с собственным конечным loopback peer. Existing attachment fixtures остаются в `attachment_serialized_contract` и `attachment_fixture_negatives`. Для public Feed сохраняются зависимости CLIENT/RUNTIME/RECOVERY.

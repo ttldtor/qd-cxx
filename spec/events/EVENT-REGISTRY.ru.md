@@ -25,7 +25,7 @@ Const-наблюдение реестра допускается одновре�
 
 ## Явные mappings
 
-`EventType::QUOTE`, `EventType::PROFILE`, `EventType::TRADE`, `EventType::TRADE_ETH`, `EventType::SUMMARY`, `EventType::TEXT_MESSAGE` и `EventType::TEXT_CONFIGURATION` выбирают существующие prepared adapters.
+`EventType::QUOTE`, `EventType::PROFILE`, `EventType::TRADE`, `EventType::TRADE_ETH`, `EventType::SUMMARY`, `EventType::TEXT_MESSAGE` и `EventType::TEXT_CONFIGURATION`, `EventType::MESSAGE` и `EventType::CONFIGURATION` выбирают существующие prepared adapters.
 Имя записи не определяет тип события. Каждый маршрут задаёт явный local record ID,
 конечные `MappingLimits` и `EventTimePolicy`. Сохраняется требование `LocalSchema`:
 каждый ID равен позиции записи в полном каталоге.
@@ -85,8 +85,10 @@ resource, work или allocation. Ошибка маршрута содержит
 ## Значения по умолчанию и пределы receiving
 
 `builtIn` использует ту же границу регистрации: полный default Quote record0
-с восемью полями, Profile record1 с шестнадцатью, composite Trade record2 с тринадцатью
-composite TradeETH record3 с двенадцатью и Summary record4 с десятью полями, с существующими lookup
+с восемью полями, Profile record1 с шестнадцатью, composite Trade record2 с тринадцатью полями,
+composite TradeETH record3 с двенадцатью, Summary record4 с десятью полями, TextMessage record5 с тремя,
+TextConfiguration record6 с четырьмя, Message record7 с одним SERIAL_OBJECT и Configuration record8
+с Version и SERIAL_OBJECT, с существующими lookup
 aliases и бизнес-поведением. Endpoint без явного реестра выбирает эти значения.
 Глобальной регистрации процесса и изменения живого реестра нет.
 
@@ -105,7 +107,7 @@ selections/work, пределы callback projection и ёмкости desired co
 и каждой подписки с проверкой арифметики, включая подписки после connect.
 Фактическое максимальное
 число полей записи задаёт полный предел полей кадра с сохранением исходного минимума16.
-Со встроенным реестром interest reservations покрывают пять маршрутов на символ.
+Со встроенным реестром interest reservations покрывают девять маршрутов на символ.
 Пределы схемы и данных frame/queue сохраняются.
 
 Региональная маршрутизация demand удерживает фиксированный массив16 exchange-кодов
@@ -169,7 +171,7 @@ reflection, произвольных delegate factories, всех классов
 wire semantics. Закреплённый reference и существующая provenance адаптеров находятся
 в `upstream.lock` и [доказательствах configured events](../../tests/fixtures/events/mapping/COVERAGE.ru.md).
 
-Trade добавлен как явный EventType::TRADE; см. [полный контракт](TRADE.ru.md). Сто двадцать семь finite type sets хранят fixed16 index arrays; finite stack copy16 bindings и её initialization/read/write work включены в preparation. Quote/Trade/TradeETH/Summary выбирают regional fallback независимо; Profile сохраняет exact logical symbol. Record/field caps не расширены.
+Trade добавлен как явный EventType::TRADE; см. [полный контракт](TRADE.ru.md). Пятьсот одиннадцать finite type sets хранят fixed511 selection index arrays; finite stack copy16 bindings и её initialization/read/write work включены в preparation. Quote/Trade/TradeETH/Summary выбирают regional fallback независимо; Profile сохраняет exact logical symbol. Record/field caps не расширены.
 
 TradeETH регистрируется отдельно как EventType::TRADE_ETH; см. [TradeETH](TRADE-ETH.ru.md). Raw ETH bit и отсутствие Tick fallback отличают его от обычного Trade.
 

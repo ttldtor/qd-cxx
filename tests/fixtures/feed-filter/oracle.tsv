@@ -1409,3 +1409,58 @@ text-subscription	TextMessage	star	false	null
 text-subscription	TextConfiguration	star	false	null
 text-subscription	TextMessage	star-prefix	false	null
 text-subscription	TextConfiguration	star-prefix	false	null
+attachment-event-error	Message	<null>	null	java.lang.NullPointerException
+attachment-event-error	Configuration	<null>	null	java.lang.NullPointerException
+attachment-event-error	Message	<null>	empty-object	java.lang.NullPointerException
+attachment-event-error	Configuration	<null>	empty-object	java.lang.NullPointerException
+attachment-event-error	Message	<null>	opaque-object	java.lang.NullPointerException
+attachment-event-error	Configuration	<null>	opaque-object	java.lang.NullPointerException
+attachment-event	Message		null	true	message
+attachment-event	Configuration		null	true	configuration
+attachment-event	Message		empty-object	true	message
+attachment-event	Configuration		empty-object	true	configuration
+attachment-event	Message		opaque-object	true	message
+attachment-event	Configuration		opaque-object	true	configuration
+attachment-event	Message	TOPIC	null	true	message
+attachment-event	Configuration	TOPIC	null	true	configuration
+attachment-event	Message	TOPIC	empty-object	true	message
+attachment-event	Configuration	TOPIC	empty-object	true	configuration
+attachment-event	Message	TOPIC	opaque-object	true	message
+attachment-event	Configuration	TOPIC	opaque-object	true	configuration
+attachment-event	Message	TOPIC&Q	null	true	decorated
+attachment-event	Configuration	TOPIC&Q	null	true	decorated
+attachment-event	Message	TOPIC&Q	empty-object	true	decorated
+attachment-event	Configuration	TOPIC&Q	empty-object	true	decorated
+attachment-event	Message	TOPIC&Q	opaque-object	true	decorated
+attachment-event	Configuration	TOPIC&Q	opaque-object	true	decorated
+attachment-event	Message	*	null	true	decorated
+attachment-event	Configuration	*	null	true	decorated
+attachment-event	Message	*	empty-object	true	decorated
+attachment-event	Configuration	*	empty-object	true	decorated
+attachment-event	Message	*	opaque-object	true	decorated
+attachment-event	Configuration	*	opaque-object	true	decorated
+attachment-event	Message	*A	null	true	message
+attachment-event	Configuration	*A	null	true	configuration
+attachment-event	Message	*A	empty-object	true	message
+attachment-event	Configuration	*A	empty-object	true	configuration
+attachment-event	Message	*A	opaque-object	true	message
+attachment-event	Configuration	*A	opaque-object	true	configuration
+attachment-event-error	Message	<null>	default	java.lang.NullPointerException
+attachment-event-error	Configuration	<null>	default	java.lang.NullPointerException
+attachment-null-model	java.lang.NullPointerException
+attachment-subscription	Message	plain	true	decorated
+attachment-subscription	Configuration	plain	true	decorated
+attachment-subscription	Message	indexed0	true	decorated
+attachment-subscription	Configuration	indexed0	true	decorated
+attachment-subscription	Message	indexed1	false	null
+attachment-subscription	Configuration	indexed1	false	null
+attachment-subscription	Message	indexed-negative	true	decorated
+attachment-subscription	Configuration	indexed-negative	true	decorated
+attachment-subscription	Message	time-series	false	null
+attachment-subscription	Configuration	time-series	false	null
+attachment-subscription	Message	all	true	decorated
+attachment-subscription	Configuration	all	true	decorated
+attachment-subscription	Message	star	false	null
+attachment-subscription	Configuration	star	false	null
+attachment-subscription	Message	star-prefix	false	null
+attachment-subscription	Configuration	star-prefix	false	null

@@ -342,3 +342,5 @@ The [serialized attachment oracle](../upstream/attachment-oracle/README.md) capt
 
 - [Subscription observer oracle](../upstream/subscription-observer-oracle/README.md): actual pinned production introspection/change callbacks, reentry/exception traces, bounded capture/verify and no-input EN/RU help.
 - [Feed filter oracles](../upstream/feed-filter-oracle/README.md): QD grammar/classifier, IPF identity/update and source-config production witnesses with finite resources, immutable class inventories and no-input EN/RU help.
+- [Configuration version oracle](../upstream/configuration-version-oracle/README.md): actual production collectors/delegate, first-negative default event, signed bounds, batch and STREAM; native Feed tests cover late-subscription
+cache replay. Input-free EN/RU/Get-Help, bounded JDK8 Capture/Verify with exact class/resource inventories.

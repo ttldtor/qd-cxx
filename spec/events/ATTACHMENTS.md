@@ -2,10 +2,10 @@
 
 [Русская версия](ATTACHMENTS.ru.md). English is authoritative.
 
-This is the selected portable contract for subsequent Message/Configuration receiving APIs,
+This is the selected portable contract for Message/Configuration receiving APIs,
 under [ADR-0014](../../docs/decisions/ADR-0014-portable-attachment-semantics.md).
-Typed projections, codec registration and explicit decoding remain unimplemented by this decision.
-No public C++ type, method or error-enumerator spelling is approved here.
+The [receiving API](../../docs/MISC-EVENTS.md) implements owning projections and explicit local codec
+registration. ADR-0014 records the preceding policy decision; concrete public names are specified by the API.
 The current [generic field API](../encoding/FIELD-TYPES.md) preserves the bytes already.
 
 ## Representation and ownership
@@ -53,7 +53,9 @@ the input are outside this owning contract.
 
 Calls on one codec registration are serialized; reentry into that same registration is rejected
 before invoking its callback. Different independent registrations may run concurrently. Callbacks
-are invoked without a registry mutation lock. Registration mutation is unavailable through the
+compete through nonblocking admission: contention returns a typed busy failure without waiting,
+queuing or retry. This also prevents cross-registration nested decode from creating an SDK lock cycle.
+Callbacks are invoked without a registry mutation lock. Registration mutation is unavailable through the
 immutable snapshot, so codec execution cannot invalidate the selected registration. No asynchronous
 callback, cancellation or background task is implied. A future asynchronous API needs a separate
 lifetime and completion contract.
@@ -70,7 +72,7 @@ explicitly includes and consumes that suffix. No successful partial result is pu
 Explicit decode returns either an owning native result or a typed failure. Required distinguishable
 failure meanings are unknown codec, unsupported format version, output-type mismatch, malformed
 body, resource limit, allocation failure, codec exception and forbidden same-registration reentry.
-Names and concrete result types belong to implementation review. Error diagnostics are bounded
+The [API](../../docs/MISC-EVENTS.md) specifies concrete result types and resource units. Error diagnostics are bounded
 and do not dump payload content or application exceptions. A caught codec exception is translated
 to codec-exception failure; `std::bad_alloc` is classified as allocation failure. Ordinary C++
 exceptions do not escape the codec call boundary. Process faults are outside the recoverable
@@ -97,10 +99,10 @@ is enabled by this mechanism.
 ## Configuration and text boundaries
 
 Configuration's signed 32-bit event version is ordinary event metadata. Pinned Java drops lower
-versions only for TICKER when that field is enabled; equal versions and STREAM behavior require
-the receiving leaf's own production evidence. Codec format-version selection never reads, advances
+versions only for TICKER when that field is enabled; [production collector observations](../../tests/fixtures/configuration-version/README.md)
+qualify equal versions, STREAM, batch selection and the fresh default-zero record. Codec format-version selection never reads, advances
 or resets this state. Decode success/failure is independent of whether a Configuration event was
-admitted. Version-filter implementation is a separate receiving concern.
+admitted. Version-filter implementation is a separate receiving concern described by the receiving API.
 
 TextMessage and TextConfiguration keep a separate nullable String API with exact UTF-16 semantics
 and their own field/mapping qualification. They are not convenience decoders for serialized Object

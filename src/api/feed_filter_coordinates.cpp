@@ -28,6 +28,8 @@ bool supported(const EventRegistry &registry, EventType type) noexcept {
     case EventType::SUMMARY:
     case EventType::TEXT_MESSAGE:
     case EventType::TEXT_CONFIGURATION:
+    case EventType::MESSAGE:
+    case EventType::CONFIGURATION:
         return true;
     }
 
@@ -40,9 +42,10 @@ bool usesRegionalCoordinates(EventType type) noexcept {
            type == EventType::SUMMARY;
 }
 
-/** The text projections use the generic source-selection rule, rather than MarketEventDelegateSet. */
+/** Non-market projections use the generic source-selection rule, rather than MarketEventDelegateSet. */
 bool usesGenericSourceSelection(EventType type) noexcept {
-    return type == EventType::TEXT_MESSAGE || type == EventType::TEXT_CONFIGURATION;
+    return type == EventType::TEXT_MESSAGE || type == EventType::TEXT_CONFIGURATION || type == EventType::MESSAGE ||
+           type == EventType::CONFIGURATION;
 }
 
 std::vector<FilterCoordinate> coordinates(const EventRegistry &registry, DeliveryContract contract, EventType type,
@@ -66,7 +69,7 @@ std::vector<FilterCoordinate> coordinates(const EventRegistry &registry, Deliver
         }
 
         const auto &record = registry.schema().records()[static_cast<std::size_t>(route.localRecordId)];
-        // Profile and generic text routes preserve their complete logical symbols, even for regional-looking names.
+        // Profile and generic routes preserve their complete logical symbols, even for regional-looking names.
         const auto routeExchange =
             usesRegionalCoordinates(type) ? events::market_symbols::getExchangeCode(record.name) : 0;
         regional = regional || (exchange != 0 && routeExchange == exchange);
@@ -175,6 +178,10 @@ std::vector<FilterCoordinate> filterEventCoordinates(const EventRegistry &regist
                     return EventType::TEXT_MESSAGE;
                 } else if constexpr (std::is_same_v<Event, events::TextConfiguration>) {
                     return EventType::TEXT_CONFIGURATION;
+                } else if constexpr (std::is_same_v<Event, events::Message>) {
+                    return EventType::MESSAGE;
+                } else if constexpr (std::is_same_v<Event, events::Configuration>) {
+                    return EventType::CONFIGURATION;
                 } else {
                     static_assert(std::is_same_v<Event, void>, "Add explicit filter coordinates for a new event");
                 }

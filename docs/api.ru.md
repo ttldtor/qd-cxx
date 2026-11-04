@@ -36,3 +36,5 @@
 - [CFI и дополнительные базовые активы](GLOSSARY-VALUES.ru.md): `qd/glossary/`, необязательная `qdcxx_ipf`.
 
 - [Ценовые шаги инструмента](PRICE-INCREMENTS.ru.md): диапазоны, точность и округление цены через `qdcxx_ipf`.
+
+- [Message и Configuration](MISC-EVENTS.ru.md): владеющие сериализованные вложения и явные нативные кодеки через `qdcxx_misc_events`/`qdcxx_attachments`; Message STREAM и Configuration STREAM/TICKER.

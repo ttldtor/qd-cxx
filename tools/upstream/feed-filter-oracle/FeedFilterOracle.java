@@ -14,6 +14,8 @@ import com.dxfeed.api.osub.WildcardSymbol;
 import com.dxfeed.event.EventType;
 import com.dxfeed.event.IndexedEventSource;
 import com.dxfeed.event.market.Quote;
+import com.dxfeed.event.misc.Configuration;
+import com.dxfeed.event.misc.Message;
 import com.dxfeed.event.misc.TextConfiguration;
 import com.dxfeed.event.misc.TextMessage;
 import java.io.IOException;
@@ -307,6 +309,113 @@ public final class FeedFilterOracle {
     }
   }
 
+  private static void attachmentEventRow(
+      DXFeedFilter filter, EventType<?> event, String kind, String symbol, String payload) {
+    String label = symbol == null ? "<null>" : safe(symbol);
+    try {
+      System.out.println(
+          "attachment-event\t"
+              + kind
+              + "\t"
+              + label
+              + "\t"
+              + payload
+              + "\t"
+              + filter.acceptEvent(event)
+              + "\t"
+              + filter.getEventCategory(event));
+    } catch (RuntimeException failure) {
+      System.out.println(
+          "attachment-event-error\t"
+              + kind
+              + "\t"
+              + label
+              + "\t"
+              + payload
+              + "\t"
+              + failure.getClass().getName());
+    }
+  }
+
+  private static void attachmentEvents() {
+    DXEndpoint endpoint = DXEndpoint.create();
+    try {
+      DXFeedFilter filter =
+          DXFeedFilter.newBuilder(endpoint)
+              .withCategory("decorated", "TOPIC[&]Q")
+              .withCategory("message", ":Message*")
+              .withCategory("configuration", ":Configuration*")
+              .build();
+      Object opaque =
+          new Object() {
+            @Override
+            public String toString() {
+              throw new AssertionError("attachment must not be inspected");
+            }
+          };
+      Object[] payloads = {null, new byte[0], opaque};
+      for (String symbol : new String[] {null, "", "TOPIC", "TOPIC&Q", "*", "*A"}) {
+        for (int i = 0; i < payloads.length; i++) {
+          String payload = i == 0 ? "null" : i == 1 ? "empty-object" : "opaque-object";
+          Message message = new Message(symbol, payloads[i]);
+          Configuration configuration =
+              new Configuration(symbol, payloads[i], i == 2 ? Integer.MIN_VALUE : 0);
+          if (i == 2) {
+            message.setEventTime(Long.MIN_VALUE);
+            configuration.setEventTime(Long.MIN_VALUE);
+          }
+          attachmentEventRow(filter, message, "Message", symbol, payload);
+          attachmentEventRow(filter, configuration, "Configuration", symbol, payload);
+        }
+      }
+      attachmentEventRow(filter, new Message(), "Message", null, "default");
+      attachmentEventRow(filter, new Configuration(), "Configuration", null, "default");
+      try {
+        filter.acceptEvent(null);
+        System.out.println("attachment-null-model\tACCEPTED");
+      } catch (RuntimeException failure) {
+        System.out.println("attachment-null-model\t" + failure.getClass().getName());
+      }
+      Object[] symbols = {
+        "TOPIC&Q",
+        new IndexedEventSubscriptionSymbol<String>("TOPIC&Q", IndexedEventSource.DEFAULT),
+        new IndexedEventSubscriptionSymbol<String>("TOPIC&Q", new IndexedEventSource(1, "ONE")),
+        new IndexedEventSubscriptionSymbol<String>(
+            "TOPIC&Q", new IndexedEventSource(-1, "NEGATIVE")),
+        new TimeSeriesSubscriptionSymbol<String>("TOPIC&Q", 123),
+        WildcardSymbol.ALL,
+        "*",
+        "*A"
+      };
+      String[] labels = {
+        "plain",
+        "indexed0",
+        "indexed1",
+        "indexed-negative",
+        "time-series",
+        "all",
+        "star",
+        "star-prefix"
+      };
+      for (int i = 0; i < symbols.length; i++) {
+        for (boolean configuration : new boolean[] {false, true}) {
+          Class<? extends EventType<?>> type = configuration ? Configuration.class : Message.class;
+          System.out.println(
+              "attachment-subscription\t"
+                  + type.getSimpleName()
+                  + "\t"
+                  + labels[i]
+                  + "\t"
+                  + filter.accept(type, symbols[i])
+                  + "\t"
+                  + filter.getCategory(type, symbols[i]));
+        }
+      }
+    } finally {
+      endpoint.close();
+    }
+  }
+
   public static void main(String[] args) throws Exception {
     if (args.length != 1) {
       throw new IllegalArgumentException("Expected output TSV path");
@@ -317,6 +426,7 @@ public final class FeedFilterOracle {
       correlations();
       categories();
       textEvents();
+      attachmentEvents();
       output.flush();
       output.close();
       if (output.checkError()) {

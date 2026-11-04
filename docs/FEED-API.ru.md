@@ -3,7 +3,7 @@
 [English version](FEED-API.md) · [Практические руководства](guides.ru.md) · [Справочник API](api.ru.md)
 
 Подключите `qd/api/feed.hpp` и линкуйте `qdcxx_feed`, чтобы получать типизированные
-`events::Quote`, `events::Profile`, `events::Trade`, `events::TradeETH`, `events::Summary`, `events::TextMessage` и `events::TextConfiguration` через рабочий поток библиотеки. Приложение создаёт
+`events::Quote`, `events::Profile`, `events::Trade`, `events::TradeETH`, `events::Summary`, `events::TextMessage`, `events::TextConfiguration`, `events::Message` и `events::Configuration` через рабочий поток библиотеки. Приложение создаёт
 endpoint, обработчики и подписки на точные символы; библиотека продвигает соединение,
 конечные переподключения, очереди и доставку. Подписки можно создавать до и после
 `connect()`.
@@ -152,7 +152,7 @@ Endpoint копирует неизменяемый владеющий снимо
 до native activation; усечения нет. См. полный
 [контракт владения, ошибок и пределов реестра](../spec/events/EVENT-REGISTRY.ru.md).
 
-Подготовленные Quote/Profile/Trade/TradeETH/Summary используют исчерпывающие
+Подготовленные Quote/Profile/Trade/TradeETH/Summary/Message/Configuration используют исчерпывающие
 [правила преобразования полей](../spec/events/FIELD-CONVERSIONS.ru.md): допустимые числа
 сохраняют WideDecimal поля и предоставляют прямые Java business getters вроде
 `quote.getBidPrice()`/`profile.getBeta()` без LONG-to-wide округления. Raw int свойства сохраняют Java physical-slot поведение,

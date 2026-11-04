@@ -10,8 +10,8 @@ Both acceptance and classification use the same selected coordinate set.
 
 ## Existing coordinate capabilities
 
-The native registry currently supports Quote, Profile, Trade, TradeETH, Summary, TextMessage
-and TextConfiguration. A query uses actual configured record names and physical symbols; it never infers an event type
+The native registry currently supports Quote, Profile, Trade, TradeETH, Summary, TextMessage,
+TextConfiguration, Message and Configuration. A query uses actual configured record names and physical symbols; it never infers an event type
 from a record spelling. Regional selection uses an exact available route, otherwise the
 composite fallback. A selected regional route removes the symbol's exchange suffix while
 preserving attributes. The current native Profile receiving adapter uses text coordinates
@@ -24,11 +24,12 @@ invent source capabilities for market records. A plain string starting with `*` 
 subscription delegates; explicit ALL remains a distinct typed query. Event queries use
 publisher coordinates and do not apply that subscription reserved-prefix rule.
 
-TextMessage and TextConfiguration use generic delegate coordinates: the complete symbol,
+TextMessage, TextConfiguration, Message and Configuration use generic delegate coordinates: the complete symbol,
 including `&Q`, is preserved even when a caller record name looks regional. In an indexed
 query, source0 and negative IDs select the available delegates; a positive ID gives no match.
 This differs from MarketEventDelegateSet and does not change the existing market rules.
 Null/empty/body payload, version and time metadata do not participate in classification.
+Message and Configuration retain opaque serialized attachment bytes; classification does not decode them or invoke a codec.
 The owning C++ symbol is a `std::u16string`: empty corresponds to an explicit empty Java
 symbol, while a Java null symbol/model is not representable by this value API. Raw production
 Java throws NullPointerException for null, including an event without an assigned symbol;

@@ -1058,3 +1058,7 @@ The [fixture oracle](../tests/fixtures/ipf/compression/README.md) documents actu
 intentional ZIP deviations and EN/RU no-work help. C++ tests replay checked fixtures without Java.
 
 Enable ORG_TTLDTOR_QDCXX_BUILD_IPF_LIVE=ON only with explicit IPF_TRANSFER/TLS prerequisites; it exports qdcxx_ipf_live and the connection header. Pure IPF and default OFF do not acquire a worker or transfer dependency. See [live connection](IPF-CONNECTION.md).
+
+## Serialized attachment events
+
+`qdcxx_attachments` and `qdcxx_misc_events` are SDK-free exported targets, with the [Message/Configuration and codec API](MISC-EVENTS.md). New native tests are `attachment_codec_contract` and `misc_event_projections`; the public Feed option also enables `misc_feed`. The latter uses an owned finite loopback peer. Existing attachment fixtures remain part of `attachment_serialized_contract` and `attachment_fixture_negatives`. Public Feed receiving retains its existing CLIENT/RUNTIME/RECOVERY prerequisites.

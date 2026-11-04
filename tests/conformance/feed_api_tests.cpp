@@ -3595,3 +3595,51 @@ TEST_CASE("public subscription observations retain admitted text types and norma
     CHECK(closed.load() == 3);
     CHECK(retained.eventTypes == mixedTypes);
 }
+
+TEST_CASE("serialized events preserve nine-type observation and change-listener dispatch") {
+    api::ApiRuntime runtime(runtimeOptions());
+    auto options = endpointOptions();
+    options.contract = api::DeliveryContract::STREAM;
+    auto endpoint = runtime.createEndpoint(options);
+    auto feed = endpoint->getFeed();
+    auto message = feed->createSubscription<events::Message>();
+    auto configuration = feed->createSubscription<events::Configuration>();
+    const std::vector messageTypes{api::EventType::MESSAGE};
+    const std::vector configurationTypes{api::EventType::CONFIGURATION};
+    CHECK(message->getEventTypes() == messageTypes);
+    CHECK(configuration->getEventTypes() == configurationTypes);
+    const std::vector allTypes{api::EventType::QUOTE,
+                               api::EventType::PROFILE,
+                               api::EventType::TRADE,
+                               api::EventType::TRADE_ETH,
+                               api::EventType::SUMMARY,
+                               api::EventType::TEXT_MESSAGE,
+                               api::EventType::TEXT_CONFIGURATION,
+                               api::EventType::MESSAGE,
+                               api::EventType::CONFIGURATION};
+    auto mixed = feed->createSubscription({api::EventType::CONFIGURATION, api::EventType::TEXT_CONFIGURATION,
+                                           api::EventType::MESSAGE, api::EventType::TEXT_MESSAGE,
+                                           api::EventType::SUMMARY, api::EventType::TRADE_ETH, api::EventType::TRADE,
+                                           api::EventType::PROFILE, api::EventType::QUOTE, api::EventType::MESSAGE});
+    CHECK(mixed->getEventTypes() == allTypes);
+    std::atomic<unsigned> added{0};
+    auto capture = std::make_shared<int>(1);
+    std::weak_ptr<int> lifetime = capture;
+    mixed->addChangeListener([&, capture](const api::SubscriptionChange &change) {
+        CHECK(change.snapshot.eventTypes == allTypes);
+
+        if (change.kind == api::SubscriptionChangeKind::ADDED) {
+            ++added;
+        }
+    });
+    capture.reset();
+    CHECK_FALSE(lifetime.expired());
+    mixed->addSymbols("ALL");
+    CHECK(added.load() == 1);
+    const auto retained = mixed->getSnapshot();
+    CHECK(endpoint->closeAndAwaitTermination().drained);
+    CHECK(lifetime.expired());
+    CHECK(retained.eventTypes == allTypes);
+    REQUIRE(retained.symbols.size() == 1);
+    CHECK(retained.symbols.front().eventSymbol() == u"ALL");
+}

@@ -2,13 +2,13 @@
 
 [Русская версия](FEED-API.ru.md) · [Practical guides](guides.md) · [API reference](api.md)
 
-Use `qd/api/feed.hpp` and link `qdcxx_feed` to receive typed `events::Quote`, `events::Profile`, `events::Trade`, `events::TradeETH`, `events::Summary`, `events::TextMessage` and `events::TextConfiguration` through a library-owned worker. Applications create endpoints,
+Use `qd/api/feed.hpp` and link `qdcxx_feed` to receive typed `events::Quote`, `events::Profile`, `events::Trade`, `events::TradeETH`, `events::Summary`, `events::TextMessage`, `events::TextConfiguration`, `events::Message` and `events::Configuration` through a library-owned worker. Applications create endpoints,
 listeners and exact symbol subscriptions; the library progresses connection,
 finite recovery, queues and delivery. Subscriptions can be created before or after
 `connect()`.
 
 This API supports plain binary QTP over TCP with built-in full Quote/Profile/Trade/TradeETH/Summary
-and text-event schemas or explicit validated caller schemas and registered mappings.
+and text/serialized-event schemas or explicit validated caller schemas and registered mappings.
 An endpoint chooses TICKER (default, latest values with possible
 conflation) or STREAM (every admitted selected source record). TLS, credentials,
 HISTORY and wildcard selectors are outside this API. Schema loading is separate. The
@@ -150,7 +150,7 @@ name units. A registry valid under larger bounds is refused at `profile-schema`
 before native activation; it is never truncated. See the complete
 [registry ownership, errors and bounds contract](../spec/events/EVENT-REGISTRY.md).
 
-Prepared Quote/Profile/Trade/TradeETH/Summary use the exhaustive [field conversion rules](../spec/events/FIELD-CONVERSIONS.md):
+Prepared Quote/Profile/Trade/TradeETH/Summary/Message/Configuration use the exhaustive [field conversion rules](../spec/events/FIELD-CONVERSIONS.md):
 supported numbers retain WideDecimal fields and expose direct Java business getters such as
 `quote.getBidPrice()`/`profile.getBeta()` without LONG-to-wide rounding. Raw int
 properties preserve Java physical-slot behavior, and UTF_CHAR_ARRAY/STRING preserve nullable

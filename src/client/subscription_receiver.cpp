@@ -70,7 +70,8 @@ bool validBinding(const PreparedSubscriptionBinding &binding) noexcept {
     return (binding.kind == PreparedEventKind::QUOTE || binding.kind == PreparedEventKind::PROFILE ||
             binding.kind == PreparedEventKind::TRADE || binding.kind == PreparedEventKind::TRADE_ETH ||
             binding.kind == PreparedEventKind::SUMMARY || binding.kind == PreparedEventKind::TEXT_MESSAGE ||
-            binding.kind == PreparedEventKind::TEXT_CONFIGURATION) &&
+            binding.kind == PreparedEventKind::TEXT_CONFIGURATION || binding.kind == PreparedEventKind::MESSAGE ||
+            binding.kind == PreparedEventKind::CONFIGURATION) &&
            (binding.eventTimePolicy == ReceiverEventTimePolicy::UNSPECIFIED ||
             binding.eventTimePolicy == ReceiverEventTimePolicy::FIELD_METADATA);
 }
@@ -81,12 +82,14 @@ namespace detail {
 struct ReceiverRoute {
     core::RecordContext context; ///< Retained exact origin/record identity, without declaration names.
     std::variant<events::PreparedQuote, events::PreparedProfile, events::PreparedTrade, events::PreparedTradeETH,
-                 events::PreparedSummary, events::PreparedTextMessage, events::PreparedTextConfiguration>
+                 events::PreparedSummary, events::PreparedTextMessage, events::PreparedTextConfiguration,
+                 events::PreparedMessage, events::PreparedConfiguration>
         mapping;                          ///< Existing owned immutable mapper.
     events::EventValueLimits valueLimits; ///< Per-result owned text bounds.
     ReceiverEventTimePolicy timePolicy;   ///< Explicit optional timestamp source.
     std::size_t shapeFields;              ///< Complete shape inspection allowance, including unselected extra fields.
-    std::size_t selectionVisits; ///< Declared mapper selection allowance, including absent optional properties.
+    std::size_t selectionVisits;         ///< Declared mapper selection allowance, including absent optional properties.
+    std::size_t attachmentBytes = 65536; ///< Finite copied serialized-body allowance for attachment routes.
 };
 
 /** Finite immutable adapter backing; no desired map, handle or endpoint is retained. */
@@ -152,13 +155,18 @@ SubscriptionBatch::project(std::size_t index, ReceiverProjectionWork &work) cons
             const bool textMessage = std::holds_alternative<events::PreparedTextMessage>(route.mapping);
             const bool textConfiguration = std::holds_alternative<events::PreparedTextConfiguration>(route.mapping);
             const bool profile = std::holds_alternative<events::PreparedProfile>(route.mapping);
-            const bool quote = !profile && !textMessage && !textConfiguration;
-            const auto units = quote ? std::min(route.valueLimits.symbolUnits, route.valueLimits.totalUnits)
-                                     : route.valueLimits.totalUnits;
+            const bool attachment = std::holds_alternative<events::PreparedMessage>(route.mapping) ||
+                                    std::holds_alternative<events::PreparedConfiguration>(route.mapping);
+            const bool symbolOnly = !profile && !textMessage && !textConfiguration;
+            const bool quote = symbolOnly && !attachment;
+            const auto units = symbolOnly ? std::min(route.valueLimits.symbolUnits, route.valueLimits.totalUnits)
+                                          : route.valueLimits.totalUnits;
             // Each owned string may need a terminator; this is logical copy work, not allocator overhead.
-            const auto textValues = quote ? std::size_t{1} : (profile ? std::size_t{3} : std::size_t{2});
-            const auto bytes = checkedSum(sizeof(SubscriptionProjection),
-                                          checkedProduct(checkedSum(units, textValues), sizeof(char16_t)));
+            const auto textValues = symbolOnly ? std::size_t{1} : (profile ? std::size_t{3} : std::size_t{2});
+            const auto payloadBytes = attachment ? route.attachmentBytes : 0;
+            const auto bytes =
+                checkedSum(payloadBytes, checkedSum(sizeof(SubscriptionProjection),
+                                                    checkedProduct(checkedSum(units, textValues), sizeof(char16_t))));
             debit(work.visits, checkedSum(route.shapeFields, checkedSum(route.selectionVisits, 1)));
 
             if (units > work.textUnits || bytes > work.bytes)
@@ -173,6 +181,31 @@ SubscriptionBatch::project(std::size_t index, ReceiverProjectionWork &work) cons
                 eventTime = record.versionDefault ? 0 : record.source->fieldTime->eventTimeMs();
 
             const events::BorrowedRecordValueView values{record.context, record.typedValues};
+
+            const events::AttachmentEventLimits attachmentLimits{
+                units, payloadBytes, checkedSum(checkedProduct(units, sizeof(char16_t)), payloadBytes)};
+
+            if (std::holds_alternative<events::PreparedMessage>(route.mapping)) {
+                auto mapped = std::get<events::PreparedMessage>(route.mapping)
+                                  .mapView(record.symbol, values, attachmentLimits, eventTime.value_or(0));
+
+                if (!mapped) {
+                    return std::unexpected(ReceiverProjectionFailure{mapped.error()});
+                }
+
+                return SubscriptionProjection{std::move(*mapped), eventTime};
+            }
+
+            if (std::holds_alternative<events::PreparedConfiguration>(route.mapping)) {
+                auto mapped = std::get<events::PreparedConfiguration>(route.mapping)
+                                  .mapView(record.symbol, values, attachmentLimits, eventTime.value_or(0));
+
+                if (!mapped) {
+                    return std::unexpected(ReceiverProjectionFailure{mapped.error()});
+                }
+
+                return SubscriptionProjection{std::move(*mapped), eventTime};
+            }
 
             if (textMessage) {
                 auto mapped = std::get<events::PreparedTextMessage>(route.mapping)
@@ -339,6 +372,26 @@ openSubscriptionReceiver(mux::MuxQueue &queue, const core::LocalSchema &schema, 
 
                 plan.routes.push_back({schema.recordContext(binding.localId), std::move(*prepared), binding.valueLimits,
                                        binding.eventTimePolicy, fields, binding.mappingLimits.selections});
+            } else if (binding.kind == PreparedEventKind::MESSAGE) {
+                auto prepared = events::PreparedMessage::prepare(schema, binding.localId, binding.mappingLimits);
+
+                if (!prepared) {
+                    return std::unexpected(ReceiverFailure{prepared.error(), i});
+                }
+
+                plan.routes.push_back({schema.recordContext(binding.localId), std::move(*prepared), binding.valueLimits,
+                                       binding.eventTimePolicy, fields, binding.mappingLimits.selections,
+                                       binding.attachmentBytes});
+            } else if (binding.kind == PreparedEventKind::CONFIGURATION) {
+                auto prepared = events::PreparedConfiguration::prepare(schema, binding.localId, binding.mappingLimits);
+
+                if (!prepared) {
+                    return std::unexpected(ReceiverFailure{prepared.error(), i});
+                }
+
+                plan.routes.push_back({schema.recordContext(binding.localId), std::move(*prepared), binding.valueLimits,
+                                       binding.eventTimePolicy, fields, binding.mappingLimits.selections,
+                                       binding.attachmentBytes});
             } else if (binding.kind == PreparedEventKind::TEXT_MESSAGE) {
                 auto prepared = events::PreparedTextMessage::prepare(schema, binding.localId, binding.mappingLimits);
 

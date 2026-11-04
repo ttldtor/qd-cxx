@@ -24,7 +24,7 @@ remain alive. The registry retains no application callable or capture.
 
 ## Explicit mappings
 
-`EventType::QUOTE`, `EventType::PROFILE`, `EventType::TRADE`, `EventType::TRADE_ETH`, `EventType::SUMMARY`, `EventType::TEXT_MESSAGE` and `EventType::TEXT_CONFIGURATION` select the existing prepared adapters.
+`EventType::QUOTE`, `EventType::PROFILE`, `EventType::TRADE`, `EventType::TRADE_ETH`, `EventType::SUMMARY`, `EventType::TEXT_MESSAGE` and `EventType::TEXT_CONFIGURATION`, `EventType::MESSAGE` and `EventType::CONFIGURATION` select the existing prepared adapters.
 Record names do not infer a type. Each route supplies an explicit local record ID,
 finite `MappingLimits` and an `EventTimePolicy`. IDs retain the `LocalSchema`
 requirement: each ID equals its position in the complete record catalog.
@@ -82,8 +82,10 @@ publication. Registry construction translates allocation exceptions.
 ## Defaults and receiving limits
 
 `builtIn` uses the same registration boundary: complete default Quote record0
-with eight fields, Profile record1 with sixteen fields, composite Trade record2 with thirteen fields
-composite TradeETH record3 with twelve fields and Summary record4 with ten fields, with their existing
+with eight fields, Profile record1 with sixteen fields, composite Trade record2 with thirteen fields,
+composite TradeETH record3 with twelve fields, Summary record4 with ten fields, TextMessage record5 with
+three fields, TextConfiguration record6 with four fields, Message record7 with one SERIAL_OBJECT field
+and Configuration record8 with Version and SERIAL_OBJECT fields, with their existing
 lookup aliases and business behavior. An endpoint without an explicit registry
 selects those defaults. There is no process-global registration or live mutation.
 
@@ -102,7 +104,7 @@ The total registered route count scales endpoint and per-subscription interest
 reservations with checked arithmetic, including subscriptions created after connect.
 Actual maximum record field count
 sets the complete frame field allowance, retaining the default minimum of16.
-With the built-in registry, interest reservations cover all five routes per symbol.
+With the built-in registry, interest reservations cover all nine routes per symbol.
 The schema and frame/queue data ceilings remain unchanged.
 
 Regional demand routing retains a fixed16-code exchange array (32 bytes) in the
@@ -162,7 +164,7 @@ reflection, arbitrary delegate factories, all event classes or new wire semantic
 The pinned reference and existing adapter provenance are in `upstream.lock` and
 [configured event evidence](../../tests/fixtures/events/mapping/COVERAGE.md).
 
-Trade is explicitly registered as EventType::TRADE; see its [complete contract](TRADE.md). One hundred twenty-seven finite type sets retain fixed16 index arrays; a finite16-entry stack binding copy and initialization/read/write work are included in preparation. Quote/Trade/TradeETH/Summary select regional fallback independently; Profile preserves exact logical symbols. Record/field caps are unchanged.
+Trade is explicitly registered as EventType::TRADE; see its [complete contract](TRADE.md). Five hundred eleven finite type sets retain fixed511 selection index arrays; a finite16-entry stack binding copy and initialization/read/write work are included in preparation. Quote/Trade/TradeETH/Summary select regional fallback independently; Profile preserves exact logical symbols. Record/field caps are unchanged.
 
 TradeETH is independently registered as EventType::TRADE_ETH; see [TradeETH](TRADE-ETH.md). Its raw ETH bit and lack of Tick fallback are distinct from ordinary Trade.
 

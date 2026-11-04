@@ -180,7 +180,12 @@ void field(std::vector<std::byte> &bytes, const core::FieldValue &field) {
             field.units ? std::optional<std::u16string_view>(*field.units) : std::nullopt, encoded, {8192, 1024});
         require(result.status == e::Status::OK);
         bytes.insert(bytes.end(), encoded.begin(), encoded.begin() + static_cast<std::ptrdiff_t>(result.written));
-    } else if (field.type == core::SerialFieldType::BYTE_ARRAY) {
+    } else if (field.type == core::SerialFieldType::BYTE_ARRAY || field.type == core::SerialFieldType::CUSTOM_OBJECT ||
+               field.type == core::SerialFieldType::SERIAL_OBJECT) {
+        // Canonical nonnegative int32 lengths have the same compact INT/LONG bytes. The SERIAL_OBJECT
+        // reader keeps its distinct projected-INT acceptance grammar; this peer emits canonical forms only.
+        require(!field.bytes ||
+                field.bytes->size() <= static_cast<std::size_t>(std::numeric_limits<std::int32_t>::max()));
         number(bytes, field.bytes ? static_cast<std::int64_t>(field.bytes->size()) : -1);
 
         if (field.bytes) {

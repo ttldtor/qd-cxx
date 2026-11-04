@@ -36,3 +36,5 @@ The `qd/mux/queue.hpp` header requires `qdcxx_mux_queue`; this optional queue is
 - [CFI and additional underlyings](GLOSSARY-VALUES.md): `qd/glossary/`, optional `qdcxx_ipf`.
 
 - [Instrument price increments](PRICE-INCREMENTS.md): owned ranges, precision and price rounding through `qdcxx_ipf`.
+
+- [Message and Configuration](MISC-EVENTS.md): owning serialized attachments and explicit native codecs through `qdcxx_misc_events`/`qdcxx_attachments`; STREAM Message and STREAM/TICKER Configuration receiving.
