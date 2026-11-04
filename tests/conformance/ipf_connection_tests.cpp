@@ -425,6 +425,8 @@ TEST_CASE("TLS error after COMPLETE preserves profile but refuses metadata commi
     CHECK(owner->closeAndAwaitTermination());
     CHECK(symbols(model) == std::vector<std::u16string>{u"A"});
     CHECK(connection->observation().initialSnapshotComplete);
+    CHECK(connection->awaitCompleted(std::chrono::steady_clock::time_point::min()) ==
+          i::IpfCompletionWaitStatus::COMPLETED);
     CHECK_FALSE(connection->getLastModified());
     REQUIRE(connection->observation().lastAttempt);
     CHECK(connection->observation().lastAttempt->nativeRetired);
@@ -719,6 +721,8 @@ TEST_CASE("gzip trailer error after marker preserves live owning prefix and sepa
     REQUIRE(snapshot);
     CHECK((*snapshot)->profiles().size() == 1);
     CHECK(connection->observation().initialSnapshotComplete);
+    CHECK(connection->awaitCompleted(std::chrono::steady_clock::time_point::min()) ==
+          i::IpfCompletionWaitStatus::COMPLETED);
     REQUIRE(connection->observation().lastAttempt);
     CHECK_FALSE(connection->observation().lastAttempt->envelope.finished);
     CHECK(connection->observation().lastAttempt->nativeRetired);
@@ -958,4 +962,318 @@ TEST_CASE("request-only close wakes an infinite retry wait before creator shutdo
     CHECK(connection->observation().state == i::IpfConnectionState::CLOSED);
     CHECK(owner->closeAndAwaitTermination());
     CHECK(symbols(model) == std::vector<std::u16string>{u"A"});
+}
+
+TEST_CASE("public completion wait preserves Java terminal and caller cancellation precedence") {
+    using S = i::IpfCompletionWaitStatus;
+    auto bootstrap = t::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    auto owner = runtime(*bootstrap);
+    auto created = owner->createConnection("http://127.0.0.1:1/unused", collector());
+    REQUIRE(created);
+    auto connection = std::move(*created);
+    std::stop_source stop;
+    stop.request_stop();
+    CHECK(connection->awaitCompleted(std::chrono::steady_clock::time_point::min()) == S::TIMED_OUT);
+    CHECK(connection->awaitCompleted(std::chrono::steady_clock::time_point::min(), stop.get_token()) == S::CANCELLED);
+    CHECK(connection->getState() == i::IpfConnectionState::NOT_CONNECTED);
+    CHECK_FALSE(connection->observation().diagnostic);
+    connection->close();
+    CHECK(connection->awaitCompleted(std::chrono::steady_clock::time_point::min(), stop.get_token()) == S::CLOSED);
+    CHECK_FALSE(connection->observation().retired);
+    CHECK(owner->closeAndAwaitTermination());
+    owner.reset();
+    CHECK(connection->awaitCompleted(std::chrono::steady_clock::time_point::max()) == S::CLOSED);
+}
+
+TEST_CASE("first snapshot wait completes before live HTTP EOF and remains sticky after close") {
+    auto bootstrap = t::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    auto owner = runtime(*bootstrap);
+    const auto body = std::string(HEADER) + "STOCK,A\n##COMPLETE\n";
+    h::IpfHttpPeer peer({"HTTP/1.1 200 OK\r\nX-Live: provided\r\nContent-Length: 9999\r\n\r\n" + body}, 5, true);
+    auto model = collector();
+    auto created = owner->createConnection(url(peer.port()), model);
+    REQUIRE(created);
+    auto connection = std::move(*created);
+    REQUIRE(connection->start());
+    auto completed = connection->awaitCompleted(std::chrono::steady_clock::now() + 3s);
+    CHECK(completed == i::IpfCompletionWaitStatus::COMPLETED);
+    const auto observed = connection->observation();
+    CHECK(observed.activeAttempt);
+    CHECK_FALSE(observed.lastAttempt);
+    CHECK_FALSE(observed.retired);
+    CHECK(symbols(model) == std::vector<std::u16string>{u"A"});
+    connection->close();
+    CHECK(owner->closeAndAwaitTermination());
+    std::stop_source stop;
+    stop.request_stop();
+    CHECK(connection->awaitCompleted(std::chrono::steady_clock::time_point::min(), stop.get_token()) ==
+          i::IpfCompletionWaitStatus::COMPLETED);
+}
+
+TEST_CASE("caller cancellation ends only the snapshot wait during a real blocked header attempt") {
+    auto bootstrap = t::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    auto owner = runtime(*bootstrap);
+    h::IpfHttpPeer peer({""}, 1, true);
+    auto created = owner->createConnection(url(peer.port()), collector());
+    REQUIRE(created);
+    auto connection = std::move(*created);
+    REQUIRE(connection->start());
+    CHECK(reached([&] {
+        return peer.accepted() == 1;
+    }));
+    std::stop_source stop;
+    std::atomic<bool> entered{false};
+    std::jthread cancellation([&] {
+        while (!entered.load()) {
+            std::this_thread::yield();
+        }
+
+        stop.request_stop();
+    });
+    entered.store(true);
+    const auto result = connection->awaitCompleted(std::chrono::steady_clock::time_point::max(), stop.get_token());
+    cancellation.join();
+    CHECK(result == i::IpfCompletionWaitStatus::CANCELLED);
+    CHECK(connection->getState() != i::IpfConnectionState::CLOSED);
+    CHECK(connection->observation().activeAttempt);
+    CHECK_FALSE(connection->observation().initialSnapshotComplete);
+    connection->close();
+    CHECK(owner->closeAndAwaitTermination());
+}
+
+TEST_CASE("request-only close wakes a pre-start snapshot waiter before creator join") {
+    auto bootstrap = t::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    auto owner = runtime(*bootstrap);
+    auto created = owner->createConnection("http://127.0.0.1:1/unused", collector());
+    REQUIRE(created);
+    auto connection = std::move(*created);
+    std::optional<std::expected<i::IpfCompletionWaitStatus, i::IpfConnectionDiagnostic>> result;
+    std::jthread waiter([&] {
+        result = connection->awaitCompleted(std::chrono::steady_clock::now() + 3s);
+    });
+    connection->close();
+    waiter.join();
+    REQUIRE(result);
+    CHECK(*result == i::IpfCompletionWaitStatus::CLOSED);
+    CHECK_FALSE(connection->observation().retired);
+    CHECK(owner->closeAndAwaitTermination());
+}
+
+TEST_CASE("worker callback refuses blocking self wait but can query completion and close") {
+    auto bootstrap = t::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    auto owner = runtime(*bootstrap);
+    h::IpfHttpPeer peer({response(std::string(HEADER) + "STOCK,A\n##COMPLETE\n")});
+    auto created = owner->createConnection(url(peer.port()), collector());
+    REQUIRE(created);
+    auto connection = std::move(*created);
+    std::atomic<bool> refused{false}, queried{false}, wrongJoin{false};
+    auto listener = connection->addStateChangeListener([&](auto, auto state) {
+        if (state == i::IpfConnectionState::CONNECTED) {
+            const auto wait = connection->awaitCompleted(std::chrono::steady_clock::now() + 1s);
+            refused.store(!wait && wait.error().transfer.stage == "connection-wait-self");
+            const auto join = owner->closeAndAwaitTermination();
+            wrongJoin.store(!join && join.error().transfer.error == i::IpfTransferError::WRONG_THREAD);
+        } else if (state == i::IpfConnectionState::COMPLETED) {
+            queried.store(connection->awaitCompleted(std::chrono::steady_clock::time_point::min()) ==
+                          i::IpfCompletionWaitStatus::COMPLETED);
+            connection->close();
+        }
+    });
+    REQUIRE(listener);
+    REQUIRE(connection->start());
+    CHECK(connection->awaitCompleted(std::chrono::steady_clock::now() + 3s) == i::IpfCompletionWaitStatus::COMPLETED);
+    CHECK(owner->closeAndAwaitTermination());
+    CHECK(refused.load());
+    CHECK(queried.load());
+    CHECK(wrongJoin.load());
+    CHECK(connection->getState() == i::IpfConnectionState::CLOSED);
+}
+
+TEST_CASE("zero wait grants refuse only pending waits and backing overflow is rejected before startup") {
+    auto bootstrap = t::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+
+    for (bool turns : {false, true}) {
+        i::IpfConnectionRuntimeOptions options;
+        options.limits.completionWaiters = turns ? 1 : 0;
+        options.limits.completionWaitTurns = turns ? 0 : 1;
+        auto owner = runtime(*bootstrap, options);
+        auto created = owner->createConnection("http://127.0.0.1:1/unused", collector());
+        REQUIRE(created);
+        auto connection = std::move(*created);
+        const auto pending = connection->awaitCompleted(std::chrono::steady_clock::time_point::max());
+        REQUIRE_FALSE(pending);
+        CHECK(pending.error().transfer.error ==
+              (turns ? i::IpfTransferError::WORK_LIMIT : i::IpfTransferError::RESOURCE_LIMIT));
+        CHECK(connection->awaitCompleted(std::chrono::steady_clock::time_point::min()) ==
+              i::IpfCompletionWaitStatus::TIMED_OUT);
+        CHECK_FALSE(connection->observation().diagnostic);
+        CHECK(owner->closeAndAwaitTermination());
+    }
+
+    i::IpfConnectionRuntimeOptions overflowing;
+    overflowing.limits.completionWaiters = std::numeric_limits<std::size_t>::max();
+    auto failed = i::InstrumentProfileConnectionRuntime::create(*bootstrap, overflowing);
+    REQUIRE_FALSE(failed);
+    CHECK(failed.error().transfer.stage == "connection-owner-backing");
+}
+
+TEST_CASE("sticky first snapshot wait coexists with failed retry304 equal date and completed replacement") {
+    auto bootstrap = t::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    i::IpfConnectionRuntimeOptions options;
+    options.limits.attempts = 5;
+    options.limits.batchProfiles = 1;
+    auto owner = runtime(*bootstrap, options);
+    const std::string format = "#STOCK::=TYPE,SYMBOL,DESCRIPTION\n";
+    const std::string date1 = "Last-Modified: Sun, 06 Nov 1994 08:49:37 GMT\r\n";
+    const std::string date2 = "Last-Modified: Sun, 06 Nov 1994 08:49:38 GMT\r\n";
+    const std::string date3 = "Last-Modified: Sun, 06 Nov 1994 08:49:40 GMT\r\n";
+    h::IpfHttpPeer peer({response(format + "STOCK,A,old\nSTOCK,B,retained\n", date1),
+                         response(format + "STOCK,A,new\nSTOCK,bad,too,many\n", date2),
+                         "HTTP/1.1 304 Not Modified\r\n\r\n", response("not IPF", date1),
+                         response(format + "STOCK,C,replacement\n", date3)},
+                        23);
+    auto model = collector();
+    auto created = owner->createConnection(url(peer.port()) + "[update=0]", model);
+    REQUIRE(created);
+    auto connection = std::move(*created);
+    std::shared_ptr<const i::ProfileBatch> firstSnapshot;
+    std::atomic<bool> pendingRetainsOld{false}, stickyDuringRetry{false};
+    auto stateListener = connection->addStateChangeListener([&](auto, auto state) {
+        if (state == i::IpfConnectionState::COMPLETED) {
+            auto snapshot = model->snapshot();
+
+            if (snapshot) {
+                firstSnapshot = *snapshot;
+            }
+        }
+    });
+    REQUIRE(stateListener);
+    auto updates = model->addUpdateListener([&](auto batch) {
+        for (const auto &revision : batch->profiles()) {
+            if (revision->profile.getSymbol() == u"A" && revision->profile.getDescription() == u"new") {
+                pendingRetainsOld.store(symbols(model) == std::vector<std::u16string>{u"A", u"B"});
+                stickyDuringRetry.store(connection->awaitCompleted(std::chrono::steady_clock::time_point::min()) ==
+                                        i::IpfCompletionWaitStatus::COMPLETED);
+            }
+        }
+    });
+    REQUIRE(updates);
+    REQUIRE(connection->start());
+    CHECK(connection->awaitCompleted(std::chrono::steady_clock::now() + 3s) == i::IpfCompletionWaitStatus::COMPLETED);
+    CHECK(reached([&] {
+        return connection->observation().retired;
+    }));
+    CHECK(owner->closeAndAwaitTermination());
+    CHECK(connection->observation().attempts == 5);
+    CHECK(pendingRetainsOld.load());
+    CHECK(stickyDuringRetry.load());
+    CHECK(symbols(model) == std::vector<std::u16string>{u"C"});
+    REQUIRE(firstSnapshot);
+    REQUIRE(firstSnapshot->profiles().size() == 2);
+    CHECK(firstSnapshot->profiles()[1]->profile.getSymbol() == u"B");
+    CHECK(firstSnapshot->profiles()[1]->profile.getDescription() == u"retained");
+    const auto expected = std::chrono::sys_days{std::chrono::year{1994} / 11 / 6} + 8h + 49min + 40s;
+    CHECK(connection->getLastModified() == expected);
+    auto requests = peer.requests();
+    REQUIRE(requests.size() == 5);
+
+    for (std::size_t index = 1; index < requests.size(); ++index) {
+        CHECK(requests[index].find("If-Modified-Since: Sun, 06 Nov 1994 08:49:37 GMT\r\n") != std::string::npos);
+    }
+
+    CHECK(connection->awaitCompleted(std::chrono::steady_clock::time_point::min()) ==
+          i::IpfCompletionWaitStatus::COMPLETED);
+}
+
+TEST_CASE("live partial UTF8 control and gzip header need input without exhausting drain turns") {
+    const std::string format = "#STOCK::=TYPE,SYMBOL,DESCRIPTION\n";
+    const std::array<std::string, 3> prefixes = {format + "STOCK,A,\xe2", std::string(HEADER) + "##COMP",
+                                                 std::string("\x1f\x8b\x08", 3)};
+
+    for (const auto &prefix : prefixes) {
+        auto bootstrap = t::RuntimeBootstrap::create();
+        REQUIRE(bootstrap);
+        i::IpfConnectionRuntimeOptions options;
+        options.transfer.limits.turns = 4096;
+        auto owner = runtime(*bootstrap, options);
+        h::IpfHttpPeer peer({"HTTP/1.1 200 OK\r\nX-Live: provided\r\nContent-Length: 9999\r\n\r\n" + prefix}, 4096,
+                            true);
+        auto created = owner->createConnection(url(peer.port()), collector());
+        REQUIRE(created);
+        auto connection = std::move(*created);
+        REQUIRE(connection->start());
+        CHECK(reached([&] {
+            return peer.sentBytes() != 0;
+        }));
+        CHECK(connection->awaitCompleted(std::chrono::steady_clock::now() + 50ms) ==
+              i::IpfCompletionWaitStatus::TIMED_OUT);
+        CHECK(connection->observation().activeAttempt);
+        CHECK_FALSE(connection->observation().diagnostic);
+        connection->close();
+        CHECK(owner->closeAndAwaitTermination());
+    }
+}
+
+TEST_CASE("live UTF8 row and COMPLETE straddled over single byte input satisfy first snapshot") {
+    auto bootstrap = t::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    i::IpfConnectionRuntimeOptions options;
+    options.transfer.limits.turns = 8192;
+    auto owner = runtime(*bootstrap, options);
+    const std::string body = "#STOCK::=TYPE,SYMBOL,DESCRIPTION\nSTOCK,A,\xe2\x82\xac\n##COMPLETE\n";
+    h::IpfHttpPeer peer({"HTTP/1.1 200 OK\r\nX-Live: provided\r\nContent-Length: 9999\r\n\r\n" + body}, 1, true, 1ms);
+    auto model = collector();
+    auto created = owner->createConnection(url(peer.port()), model);
+    REQUIRE(created);
+    auto connection = std::move(*created);
+    REQUIRE(connection->start());
+    CHECK(connection->awaitCompleted(std::chrono::steady_clock::now() + 3s) == i::IpfCompletionWaitStatus::COMPLETED);
+    auto snapshot = model->snapshot();
+    REQUIRE(snapshot);
+    REQUIRE((*snapshot)->profiles().size() == 1);
+    CHECK((*snapshot)->profiles().front()->profile.getDescription() == u"\u20ac");
+    CHECK(connection->observation().activeAttempt);
+    CHECK_FALSE(connection->observation().lastAttempt);
+    connection->close();
+    CHECK(owner->closeAndAwaitTermination());
+}
+
+TEST_CASE("empty fallback snapshots complete and a later empty replacement removes stale profiles") {
+    for (bool initialEmpty : {true, false}) {
+        auto bootstrap = t::RuntimeBootstrap::create();
+        REQUIRE(bootstrap);
+        i::IpfConnectionRuntimeOptions options;
+        options.limits.attempts = initialEmpty ? 1 : 2;
+        auto owner = runtime(*bootstrap, options);
+        std::vector<std::string> replies;
+
+        if (!initialEmpty) {
+            replies.push_back(
+                response(std::string(HEADER) + "STOCK,A\n", "Last-Modified: Sun, 06 Nov 1994 08:49:37 GMT\r\n"));
+        }
+
+        replies.push_back(response({}, "Last-Modified: Sun, 06 Nov 1994 08:49:40 GMT\r\n"));
+        h::IpfHttpPeer peer(std::move(replies));
+        auto model = collector();
+        auto created = owner->createConnection(url(peer.port()) + "[update=0]", model);
+        REQUIRE(created);
+        auto connection = std::move(*created);
+        REQUIRE(connection->start());
+        CHECK(connection->awaitCompleted(std::chrono::steady_clock::now() + 3s) ==
+              i::IpfCompletionWaitStatus::COMPLETED);
+        CHECK(reached([&] {
+            return connection->observation().retired;
+        }));
+        CHECK(owner->closeAndAwaitTermination());
+        CHECK(symbols(model).empty());
+        CHECK(connection->observation().initialSnapshotComplete);
+        CHECK(connection->observation().attempts == (initialEmpty ? 1 : 2));
+    }
 }

@@ -63,3 +63,20 @@ EOF, carryover, поколения,304/date, close/reentry/delete, first cause, 
 moved bootstrap identity и отдельные installed/moved consumers.
 
 Connection резервирует непереиспользуемый nonzero domain под collector mutex с конечным identity exhaustion. Публичные integer tags сохраняют domain0. Removal сравнивает domain и generation; равное значение обновляет оба без notification. Разные runtime не удаляют profiles друг друга или manual domain0. Внутренний model entry дополнен8-byte domain; collector limits остаются counts/UTF-16/work, а не точными allocator bytes/RSS. Резервирование domain списывает одну lifetime connection work unit до публикации.
+
+## Адаптация ожидания первого снимка
+
+Закреплённый waitUntilCompleted регистрирует advisory listener, возвращает sticky completed даже
+после close и восстанавливает Java interrupt flag. Ограниченный JDK8
+[wait witness](../../tests/fixtures/ipf/live/completion-wait-provenance.json) наблюдает эти случаи и
+конечный worker-side CONNECTED wait с false: его producer не продвигается во время собственного
+ожидания. Повторение бесконечного self-wait помешало бы drain явного runtime.
+
+C++ различает completed/closed/cancelled/deadline outcomes, использует caller stop token вместо JVM
+interrupt и отказывает would-block wait на producer worker. Immediate completion/cutoff/stop/expired
+queries сохраняют обычный приоритет и на worker. Это не меняет generation/metadata первого снимка
+и не разрешает callback-owned runtime destruction/join. Конечные concurrent slots/per-call turns с
+actual fixed-frame backing в resident admission явно задают wait capacity. Приложения заменяют
+listener/polling readiness glue на awaitCompleted и сохраняют creator closeAndAwaitTermination для
+shutdown. Отдельные проверки покрывают terminal-before-registration, cancel handoff, callback
+close/self-wait, границы и reconnect replacement.

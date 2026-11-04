@@ -15,6 +15,7 @@ reuse. Independent runtimes may share an explicit bootstrap only when borrow cap
 and truthful combined same-image TLS funding/history cover them.
 
 ~~~cpp
+#include <chrono>
 #include <iostream>
 #include <qd/ipf/instrument_profile_connection.hpp>
 
@@ -50,16 +51,20 @@ int main() {
         return 4;
     }
 
-    // Run the application's ordinary work here; no transport polling is required.
+    auto completed = connection->awaitCompleted(std::chrono::steady_clock::now() + std::chrono::seconds(30));
     connection->close();
 
-    return runtime->closeAndAwaitTermination() ? 0 : 5;
+    if (!runtime->closeAndAwaitTermination()) {
+        return 5;
+    }
+
+    return completed == IpfCompletionWaitStatus::COMPLETED ? 0 : 6;
 }
 ~~~
 
-This example starts and immediately closes; replace the marked application work with
-the application's lifecycle. Creator-thread join is shutdown, not a snapshot-completion
-wait. No completion-wait API is provided here.
+The example waits up to30seconds for the first application snapshot, then explicitly closes
+and joins on the creator. A timeout or caller cancellation ends only that wait; the connection
+continues until closed. Creator-thread join requests shutdown and is separate from snapshot readiness.
 
 start is one-shot. NOT_CONNECTED → CONNECTING → CONNECTED → COMPLETED → CLOSED records
 the initial phase; retries do not reset it. initialSnapshotComplete remains sticky
@@ -108,3 +113,32 @@ See [contract](../spec/ipf/CONNECTION.md), [collector](IPF-COLLECTOR.md),
 [source reader](../spec/ipf/URL-READER.md) and [ownership decision](decisions/ADR-0009-live-ipf-connection-ownership.md).
 
 Pending copy admission reserves aggregate requested backing before allocation: a possible empty-map sentinel, custom node/key/value objects, every standard/custom string capacity plus terminator and a conservative library alignment-request allowance. Supported tree headers use a four-pointer allowance; actual allocation-counting regressions bind the MSVC/GCC profile. Inline string capacity/padding are conservatively counted again. Fixed vector objects and the existing logical pending-unit reservation are included once in resident admission; unused resident backing, including that reservation, funds simultaneous copies. Dense custom data may exhaust resident backing before logical unit/profile limits. Flush releases copy bytes only after destroying pending values; failed copy restores storage reservation without refunding work. This is new connection-owned backing, without changing the normal source-reader or collector logical-budget contracts.
+
+## Await the first snapshot
+
+awaitCompleted(deadline, stopToken) returns an expected IpfCompletionWaitStatus.
+At each protected observation the priority is COMPLETED, CLOSED, CANCELLED, TIMED_OUT.
+Completion is sticky across reconnects, later errors and close; this method does not wait
+for a new generation or authenticate HTTP framing, gzip/ZIP integrity, parser EOF or native retirement.
+A validated COMPLETE may satisfy the wait while a live response remains open. Clean fallback
+EOF also completes the first snapshot. Published owning revisions remain valid after later removal.
+
+Use an absolute std::chrono::steady_clock deadline. An already expired deadline is an immediate
+query; clock minimum/maximum are supported. An optional std::stop_token lets an existing application
+thread cancel this wait through its stop_source.request_stop(), without accessing the facade or SDK.
+It neither closes the connection nor clears its first error, metadata, generation or work history.
+Successful completion already observed takes precedence over a pre-requested token.
+
+Waiters retain stable control independently of runtime/facade drain. Synchronize facade destruction
+with method entry; callback close/deletion after admission cannot invalidate the retained wait state.
+Do not hold application locks needed by worker callbacks. A worker callback may query an already
+selected outcome; a would-block worker wait returns INVALID_STATE rather than blocking its own producer.
+Creator-owned runtime join remains separate and is never performed by awaitCompleted.
+
+completionWaiters (default16) bounds simultaneous calls including cancellation-callback retirement.
+completionWaitTurns (default1024) bounds pending predicate/wait turns per call; spurious or unrelated notifications
+consume turns without renewing them. Zero permits immediate outcomes but refuses a pending wait.
+Capacity/work refusal is returned only to that caller and does not close or overwrite the connection.
+Resident preflight conservatively includes completionWaiters*sizeof(actual fixed wait frame);
+the frame uses automatic storage with no listener-node allocation or hidden queue. Caller thread
+stacks and allocator/RSS bookkeeping remain outside the requested owner-backing contract.

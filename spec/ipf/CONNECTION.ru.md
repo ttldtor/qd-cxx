@@ -111,3 +111,34 @@ Connection резервирует непереиспользуемый nonzero d
 До allocation pending copy резервирует общий requested backing: возможный empty-map sentinel, custom node/key/value objects, capacities всех standard/custom strings с terminators и консервативной library alignment-request добавкой. Для поддержанных tree headers заложены четыре указателя; actual allocation-counting regressions связывают оценку с профилем MSVC/GCC. Inline string capacity/padding консервативно учтены повторно. Fixed vector objects и прежний logical pending-unit reserve входят в resident admission один раз; остаток resident backing вместе с этим резервом финансирует одновременно живущие копии. Dense custom data может исчерпать backing раньше logical limits. Flush освобождает copy bytes после уничтожения values; failed copy откатывает storage reserve без возврата work. Это новый connection backing, без изменения logical-budget контрактов обычного reader/collector.
 
 Request-only close публикует cutoff под port mutex, освобождает его и синхронизирует notification через runtime control mutex, используемый при retry wait. Поэтому уведомление не теряется между проверкой false predicate и переходом в ожидание. Stop request выполняется вне обоих owner locks. Завершение worker не зависит от дополнительного уведомления при creator shutdown.
+
+## Контракт ожидания первого снимка
+
+Публичный wait с абсолютным steady-clock deadline сохраняет обычную sticky-first-completion
+семантику QD. Под port mutex COMPLETED приоритетнее CLOSED, caller stop и deadline; CLOSED
+приоритетнее stop/deadline, stop приоритетнее deadline. Immediate result не требует waiter grant.
+Pending wait резервирует конечный slot до регистрации stack stop callback. Независимые per-call
+turns конечны и не обновляются из-за notifications, retry или reconnect.
+
+Fixed frame удерживает Control, atomic slot lease, stop callback, gate lock и remaining turns.
+Preflight учитывает actual sizeof(frame) каждого slot с checked arithmetic. Lock объявлен после
+callback и освобождается первым; deregistration callback заканчивается до освобождения slot и
+последнего Control lease. Отмена регистрируется вне Control, затем берёт тот же Control gate перед
+notification. Публикация snapshot/close освобождает Port до Control. Waiter проверяет predicate
+в порядке Control→Port; completion, close и cancellation не теряются в false-predicate/atomic-wait
+окне. Wait/stop callback не используют listener budget, native/provider/user calls, SDK cleanup,
+worker join или новые шаги connection.
+
+Worker identity публикуется под Control до state callbacks. Would-block wait на этом worker
+получает отказ; immediate terminal/cancel/expired queries остаются допустимыми. Это C++ owner
+adaptation из ADR-0009, а не Java API/interrupt parity. Caller не удерживает application locks,
+нужные producer. Уничтожение facade синхронизируется с входом в метод; admitted wait использует
+только собственные Port/Control leases.
+
+Успех относится к первому application snapshot, не к последней попытке. Прежняя per-collector
+domain/generation замена не меняется: failed prefixes/старые поколения живут до completed replacement;
+304/equal Last-Modified не создают новое completed generation. Поздняя чистая замена удаляет stale
+domain/generation entries, сохраняя уже owning revisions. Last-Modified коммитится только после
+успешного native retirement с сохранением прежнего first-cause правила.
+
+Live HTTP delivery обрабатывает уже owning decoded/parser rows до запроса новых native bytes. Каждый progress/event проходит новый outer checkpoint и конечный single-record work slice; callbacks нескольких строк не выполняются циклом внутри parser/native. NEED_INPUT без debit/event переходит к обычному input, поэтому partial UTF-8/control/compressed header не создаёт drain spin. Pending data без возможного progress в исходном slice получает отказ без увеличения/возврата grants. Snapshot reader instantiation/layout и cumulative HTTP/decoder/source counters не меняются.

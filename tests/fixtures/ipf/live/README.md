@@ -34,3 +34,21 @@ flush-before-error, conditional304, equal-date skip, exact live capability, live
 one generation across COMPLETE, sticky completion and one-shot public lifecycle.
 See [connection contract](../../../../spec/ipf/CONNECTION.md) and
 [ownership/metadata adaptation](../../../../docs/decisions/ADR-0009-live-ipf-connection-ownership.md).
+
+## Completion wait oracle
+
+CompletionWaitOracle.java observes23 pinned production waitUntilCompleted outcomes on JDK8:
+terminal-before-wait, zero/negative timeout, waiting before start, pending close/interruption,
+restored interrupt status, sticky completion after close/interruption, and worker callback waits.
+It uses one owned regular temporary IPF source, no network. Private reflection only identifies
+registered public waiters and retains actual handler threads for cleanup; it does not replace the
+production wait algorithm. Every owned thread is interrupted/joined within finite cleanup bounds.
+
+Compile/run with the same explicit existing classpath and outputClasses conventions above,
+substituting CompletionWaitOracle.java and CompletionWaitOracle. No arguments, --help and --help-ru
+start no source/threads. --run creates/deletes its temporary file, prints TSV plus ordinary QD logs;
+exit0 means complete observations, exit1 exception, exit2 invalid arguments. Preserve full logs and
+select only the tab-separated observation rows for completion-wait-outcomes.tsv.
+completion-wait-provenance.json binds the actual helper, capture, pinned source and observed classes.
+The C++ self-wait/stop-token adaptation is explicit in ADR-0009; these rows are not overwritten
+with C++ outcomes. Earlier ConnectionOracle captures/provenance remain unchanged.

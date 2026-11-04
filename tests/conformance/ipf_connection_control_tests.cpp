@@ -7,6 +7,7 @@
 #    include "transfer_file.hpp"
 #endif
 #include "connection_control.hpp"
+#include "connection_wait.hpp"
 #include <atomic>
 #include <cstdlib>
 #include <doctest/doctest.h>
@@ -370,3 +371,248 @@ TEST_CASE("native file timestamp preserves full signed64 milliseconds and negati
     CHECK_FALSE(d::transferFileModificationTime(0, 1000000000));
 }
 #endif
+
+namespace {
+/** Wait only for an internal admission barrier in finite tests.
+ * @param predicate Atomic observation without SDK/user callbacks.
+ * @return True before the two-second fixture bound.
+ */
+template <class Predicate> bool waitForAdmission(Predicate predicate) {
+    const auto end = c::Clock::now() + std::chrono::seconds(2);
+
+    while (!predicate() && c::Clock::now() < end) {
+        std::this_thread::yield();
+    }
+
+    return predicate();
+}
+} // namespace
+
+TEST_CASE("completion wait selects sticky first-snapshot outcomes without allocation or retained listener") {
+    using S = i::IpfCompletionWaitStatus;
+    auto gate = std::make_shared<c::Control>();
+    auto port = std::make_shared<c::Port>(gate, i::IpfConnectionLimits{});
+    std::stop_source stop;
+    stop.request_stop();
+    rejectAllocation = true;
+    auto cancelled = c::awaitCompleted(port, c::Clock::time_point::min(), stop.get_token());
+    auto expired = c::awaitCompleted(port, c::Clock::time_point::min(), {});
+    port->close();
+    auto closed = c::awaitCompleted(port, c::Clock::time_point::min(), stop.get_token());
+    rejectAllocation = false;
+    CHECK(cancelled == S::CANCELLED);
+    CHECK(expired == S::TIMED_OUT);
+    CHECK(closed == S::CLOSED);
+    CHECK(port->observers.empty());
+    CHECK(gate->completionWaiters.load() == 0);
+    CHECK(port->observed.workUnits == 0);
+
+    auto completed = std::make_shared<c::Port>(gate, i::IpfConnectionLimits{});
+    completed->transition(i::IpfConnectionState::CONNECTING);
+    completed->transition(i::IpfConnectionState::CONNECTED);
+    completed->completeInitialSnapshot();
+    completed->close();
+    completed->retire();
+    gate.reset();
+    rejectAllocation = true;
+    auto result = c::awaitCompleted(completed, c::Clock::time_point::min(), stop.get_token());
+    rejectAllocation = false;
+    CHECK(result == S::COMPLETED);
+    CHECK(rejectedAllocations == 0);
+}
+
+TEST_CASE("completion wait refuses only blocking worker self-waits and preserves terminal observations") {
+    auto gate = std::make_shared<c::Control>();
+    gate->worker = std::this_thread::get_id();
+    auto port = std::make_shared<c::Port>(gate, i::IpfConnectionLimits{});
+    auto self = c::awaitCompleted(port, c::Clock::now() + std::chrono::seconds(1), {});
+    REQUIRE_FALSE(self);
+    CHECK(self.error().transfer.stage == "connection-wait-self");
+    CHECK(c::awaitCompleted(port, c::Clock::time_point::min(), {}) == i::IpfCompletionWaitStatus::TIMED_OUT);
+    port->close();
+    CHECK(c::awaitCompleted(port, c::Clock::time_point::max(), {}) == i::IpfCompletionWaitStatus::CLOSED);
+    CHECK(gate->completionWaiters.load() == 0);
+    CHECK_FALSE(port->observed.diagnostic);
+}
+
+TEST_CASE("completion wait pre-admits capacity and zero turns before any callback backing") {
+    for (bool noTurns : {false, true}) {
+        auto gate = std::make_shared<c::Control>();
+        i::IpfConnectionLimits limits;
+        limits.completionWaiters = noTurns ? 1 : 0;
+        limits.completionWaitTurns = noTurns ? 0 : 1;
+        auto port = std::make_shared<c::Port>(gate, limits);
+        const auto oldRejected = rejectedAllocations;
+        rejectAllocation = true;
+        auto result = c::awaitCompleted(port, c::Clock::time_point::max(), {});
+        rejectAllocation = false;
+        REQUIRE_FALSE(result);
+        CHECK(result.error().transfer.error ==
+              (noTurns ? i::IpfTransferError::WORK_LIMIT : i::IpfTransferError::RESOURCE_LIMIT));
+        CHECK(rejectedAllocations == oldRejected);
+        CHECK(gate->completionWaiters.load() == 0);
+        CHECK_FALSE(port->closed.load());
+        CHECK_FALSE(port->observed.diagnostic);
+    }
+}
+
+TEST_CASE("completion wait admits one turn and times out without allocations or connection cutoff") {
+    auto gate = std::make_shared<c::Control>();
+    i::IpfConnectionLimits limits;
+    limits.completionWaiters = 1;
+    limits.completionWaitTurns = 1;
+    auto port = std::make_shared<c::Port>(gate, limits);
+    const auto oldRejected = rejectedAllocations;
+    rejectAllocation = true;
+    auto result = c::awaitCompleted(port, c::Clock::now() + std::chrono::milliseconds(10), {});
+    rejectAllocation = false;
+    CHECK(result == i::IpfCompletionWaitStatus::TIMED_OUT);
+    CHECK(rejectedAllocations == oldRejected);
+    CHECK(gate->completionWaiters.load() == 0);
+    CHECK_FALSE(port->closed.load());
+}
+
+TEST_CASE("completion wait cancellation uses a stable gate and leaves source state running") {
+    auto gate = std::make_shared<c::Control>();
+    auto port = std::make_shared<c::Port>(gate, i::IpfConnectionLimits{});
+    std::stop_source stop;
+    std::optional<std::expected<i::IpfCompletionWaitStatus, i::IpfConnectionDiagnostic>> result;
+    std::atomic<std::size_t> allocations{0};
+    std::jthread waiter([&] {
+        rejectAllocation = true;
+        result = c::awaitCompleted(port, c::Clock::time_point::max(), stop.get_token());
+        allocations.store(rejectedAllocations);
+        rejectAllocation = false;
+    });
+    CHECK(waitForAdmission([&] {
+        return gate->completionWaiters.load() == 1;
+    }));
+    stop.request_stop();
+    waiter.join();
+    REQUIRE(result);
+    CHECK(*result == i::IpfCompletionWaitStatus::CANCELLED);
+    CHECK(allocations.load() == 0);
+    CHECK(gate->completionWaiters.load() == 0);
+    CHECK_FALSE(port->closed.load());
+    CHECK(port->observed.state == i::IpfConnectionState::NOT_CONNECTED);
+    CHECK(port->observed.workUnits == 0);
+    CHECK(port->observers.empty());
+}
+
+TEST_CASE("completion wait slots include callback retirement and are reusable after return") {
+    auto gate = std::make_shared<c::Control>();
+    i::IpfConnectionLimits limits;
+    limits.completionWaiters = 1;
+    auto port = std::make_shared<c::Port>(gate, limits);
+    std::stop_source stop;
+    std::optional<std::expected<i::IpfCompletionWaitStatus, i::IpfConnectionDiagnostic>> first;
+    std::jthread waiter([&] {
+        first = c::awaitCompleted(port, c::Clock::now() + std::chrono::seconds(2), stop.get_token());
+    });
+    CHECK(waitForAdmission([&] {
+        return gate->completionWaiters.load() == 1;
+    }));
+    auto refused = c::awaitCompleted(port, c::Clock::now() + std::chrono::seconds(1), {});
+    CHECK_FALSE(refused);
+
+    if (!refused) {
+        CHECK(refused.error().transfer.stage == "connection-wait-capacity");
+    }
+
+    stop.request_stop();
+    waiter.join();
+    REQUIRE(first);
+    CHECK(*first == i::IpfCompletionWaitStatus::CANCELLED);
+    CHECK(gate->completionWaiters.load() == 0);
+    CHECK(c::awaitCompleted(port, c::Clock::now() + std::chrono::milliseconds(1), {}) ==
+          i::IpfCompletionWaitStatus::TIMED_OUT);
+    CHECK(gate->completionWaiters.load() == 0);
+}
+
+TEST_CASE("completion publication wakes all admitted waiters before final callbacks or native retirement") {
+    auto gate = std::make_shared<c::Control>();
+    auto port = std::make_shared<c::Port>(gate, i::IpfConnectionLimits{});
+    port->transition(i::IpfConnectionState::CONNECTING);
+    port->transition(i::IpfConnectionState::CONNECTED);
+    std::array<std::optional<std::expected<i::IpfCompletionWaitStatus, i::IpfConnectionDiagnostic>>, 2> results;
+    std::jthread first([&] {
+        results[0] = c::awaitCompleted(port, c::Clock::now() + std::chrono::seconds(2), {});
+    });
+    std::jthread second([&] {
+        results[1] = c::awaitCompleted(port, c::Clock::now() + std::chrono::seconds(2), {});
+    });
+    CHECK(waitForAdmission([&] {
+        return gate->completionWaiters.load() == 2;
+    }));
+    port->completeInitialSnapshot();
+    first.join();
+    second.join();
+
+    for (const auto &result : results) {
+        REQUIRE(result);
+        CHECK(*result == i::IpfCompletionWaitStatus::COMPLETED);
+    }
+
+    CHECK_FALSE(port->observed.retired);
+    CHECK(gate->completionWaiters.load() == 0);
+}
+
+TEST_CASE("admitted completion wait retains control through owner disappearance and close") {
+    auto gate = std::make_shared<c::Control>();
+    std::weak_ptr<c::Control> identity = gate;
+    auto port = std::make_shared<c::Port>(gate, i::IpfConnectionLimits{});
+    std::optional<std::expected<i::IpfCompletionWaitStatus, i::IpfConnectionDiagnostic>> result;
+    std::jthread waiter([&] {
+        result = c::awaitCompleted(port, c::Clock::now() + std::chrono::seconds(2), {});
+    });
+    CHECK(waitForAdmission([&] {
+        return gate->completionWaiters.load() == 1;
+    }));
+    gate.reset();
+    CHECK_FALSE(identity.expired());
+    port->close();
+    waiter.join();
+    REQUIRE(result);
+    CHECK(*result == i::IpfCompletionWaitStatus::CLOSED);
+    CHECK(identity.expired());
+}
+
+TEST_CASE("actual parser partial UTF8 and control rows return NEED_INPUT without charging an empty drain") {
+    const std::array<std::string, 2> prefixes = {"#STOCK::=TYPE,SYMBOL,DESCRIPTION\nSTOCK,A,\xe2",
+                                                 "#STOCK::=TYPE,SYMBOL\n##COMP"};
+
+    for (const auto &prefix : prefixes) {
+        i::IpfReadOptions options;
+        i::InstrumentProfileParser parser(options);
+        const auto input = std::as_bytes(std::span(prefix.data(), prefix.size()));
+        std::size_t consumed = 0;
+        bool needInput = false;
+
+        for (unsigned turn = 0; turn < 8 && !needInput; ++turn) {
+            auto work = options.turnWork;
+            work.records = 1;
+            auto step = parser.feed(input.subspan(consumed), work);
+            CHECK(step.status != i::IpfReadStatus::FAILED);
+            consumed += step.accepted;
+            needInput = step.status == i::IpfReadStatus::NEED_INPUT;
+        }
+
+        REQUIRE(needInput);
+        REQUIRE(consumed == input.size());
+        const auto progress = parser.progress();
+        auto work = options.turnWork;
+        work.records = 1;
+        const auto before = work;
+        auto empty = parser.feed({}, work);
+        CHECK(empty.status == i::IpfReadStatus::NEED_INPUT);
+        CHECK(empty.accepted == 0);
+        CHECK_FALSE(empty.item);
+        CHECK(work.inputBytes == before.inputBytes);
+        CHECK(work.decodedUnits == before.decodedUnits);
+        CHECK(work.fields == before.fields);
+        CHECK(work.records == before.records);
+        CHECK(parser.progress().inputBytes == progress.inputBytes);
+        CHECK(parser.progress().records == progress.records);
+        CHECK_FALSE(parser.progress().completionSeen);
+    }
+}

@@ -7,6 +7,7 @@
 #include "connection_control.hpp"
 #include "connection_pending.hpp"
 #include "connection_sink.hpp"
+#include "connection_wait.hpp"
 #include "profile_access.hpp"
 #include "transfer_source.hpp"
 #include <cmath>
@@ -389,14 +390,7 @@ struct Sink final : StreamConsumer {
         }
 
         old.clear();
-        {
-            std::lock_guard lock(port->mutex);
-
-            if (port->observed.state == IpfConnectionState::CONNECTED) {
-                port->observed.initialSnapshotComplete = true;
-                port->transition(IpfConnectionState::COMPLETED);
-            }
-        }
+        port->completeInitialSnapshot();
         port->dispatch();
 
         return !port->closed.load();
@@ -590,7 +584,8 @@ struct Runtime {
             return true;
         };
 
-        if (!add(limits.batchProfiles, sizeof(InstrumentProfile)) || !add(limits.pendingUnits, sizeof(char16_t)) ||
+        if (!add(limits.completionWaiters, sizeof(CompletionWaitFrame)) ||
+            !add(limits.batchProfiles, sizeof(InstrumentProfile)) || !add(limits.pendingUnits, sizeof(char16_t)) ||
             !add(limits.oldGenerations, sizeof(std::uint64_t)) ||
             !add(limits.listenerSlots,
                  sizeof(Observer) + 2 * sizeof(std::shared_ptr<Observer>) + OBSERVER_CONTROL_BYTES) ||
@@ -630,6 +625,7 @@ struct Runtime {
         } catch (const std::system_error &) {
             return std::unexpected(diagnostic(IpfTransferError::RESOURCE_LIMIT, "connection-thread-start"));
         }
+        control->worker = worker.get_id();
         value->started = true;
         value->transition(IpfConnectionState::CONNECTING);
         control->condition.notify_one();
@@ -898,6 +894,14 @@ IpfConnectionObservation InstrumentProfileConnection::observation() const {
     std::lock_guard lock(port->mutex);
 
     return port->observed;
+}
+
+std::expected<IpfCompletionWaitStatus, IpfConnectionDiagnostic>
+InstrumentProfileConnection::awaitCompleted(std::chrono::steady_clock::time_point deadline,
+                                            std::stop_token stop) const {
+    auto port = port_;
+
+    return connection_detail::awaitCompleted(port, deadline, stop);
 }
 
 std::chrono::milliseconds InstrumentProfileConnection::getUpdatePeriod() const {

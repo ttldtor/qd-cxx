@@ -72,3 +72,20 @@ replacement,304/date skip, close/reentry/delete, first cause, finite admission,
 moved bootstrap identity and separate installed/moved consumers.
 
 Connections reserve non-reused nonzero domains under the collector mutex, with finite identity exhaustion. Public collector integer tags retain domain zero. Removal matches both domain and attempt generation; equal values refresh both without notification. Independent runtimes sharing a collector cannot remove one another or manual domain-zero updates. The internal model entry carries an additional8-byte domain field; collector limits remain logical counts/UTF-16/work bounds, not exact allocator-byte/RSS bounds. Reserving a domain consumes one lifetime connection work unit before publication.
+
+## First-snapshot waiting adaptation
+
+Pinned waitUntilCompleted registers an advisory listener, returns sticky completed even after close,
+and restores the Java interrupt flag on interruption. The bounded JDK8
+[wait witness](../../tests/fixtures/ipf/live/completion-wait-provenance.json) observes those cases and
+a finite worker-side CONNECTED wait returning false because its own producer cannot advance during
+that wait. Reproducing an indefinitely blocking self-wait would prevent the explicit runtime from draining.
+
+C++ therefore returns distinct completed/closed/cancelled/deadline outcomes, uses a caller stop token
+rather than JVM interruption, and refuses a would-block wait on its producer worker. Immediate
+completion/cutoff/stop/expired queries retain their normal priority even on that worker. This does not
+change first-snapshot generation/metadata rules or authorize callback-owned runtime destruction/join.
+Finite concurrent-slot and per-call-turn grants, with actual fixed-frame backing in resident admission,
+make waiting capacity explicit. Applications migrate listener/polling readiness glue to awaitCompleted
+and keep creator-thread closeAndAwaitTermination for shutdown. Tests separately cover terminal-before-
+registration, cancellation handoff, callback close/self-wait, bounds and reconnect replacement.

@@ -10,6 +10,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <stop_token>
 #include <string_view>
 
 namespace org::ttldtor::qdcxx::ipf {
@@ -25,6 +26,14 @@ enum class IpfConnectionState {
     CONNECTED,     ///< A changed source was accepted.
     COMPLETED,     ///< Initial application snapshot was completed.
     CLOSED         ///< Request-only terminal cutoff; retirement can still be in progress.
+};
+
+/** Result of one first-snapshot wait; independent of current attempt/native retirement. */
+enum class IpfCompletionWaitStatus {
+    COMPLETED, ///< Sticky first application snapshot was completed, even if later closed.
+    CLOSED,    ///< Request cutoff preceded first completion; retirement may still be pending.
+    TIMED_OUT, ///< Absolute monotonic deadline reached before another selected outcome.
+    CANCELLED  ///< Caller cancelled only this wait; connection activity is unchanged.
 };
 
 /** Detached connection failure, without peer/source/credential text. */
@@ -46,6 +55,8 @@ struct IpfConnectionLimits {
     std::size_t residentBytes =
         16 * 1024 * 1024; ///< Owner/port/options/batch requested backing; lower-layer bounds separate.
     std::chrono::milliseconds lifetime{86400000}; ///< Cooperative whole-connection lifetime.
+    std::size_t completionWaiters = 16;     ///< Simultaneous admitted waits, including retiring cancellation callbacks.
+    std::size_t completionWaitTurns = 1024; ///< Pending predicate/wait turns per call; spurious wakes consume turns.
 };
 
 /** Explicit standalone runtime profile, independent of ApiRuntime and process properties. */
@@ -136,6 +147,19 @@ class InstrumentProfileConnection {
      * @return Detached owning observation with no SDK or source borrow.
      */
     [[nodiscard]] IpfConnectionObservation observation() const;
+    /** Await the sticky first snapshot without client polling, native work or runtime join.
+     * Completion wins over close, caller cancellation and an expired deadline at each protected observation;
+     * close wins over cancellation/deadline. A successful snapshot is semantic evidence, not HTTP/container/TLS EOF.
+     * An admitted call retains its control lease independently of callback-side facade close/deletion.
+     * The caller must synchronize facade destruction with method entry and must not hold application locks
+     * needed by worker callbacks. Waiting on the worker is refused only when it would block.
+     * @param deadline Absolute steady-clock deadline; an expired deadline performs an immediate observation.
+     * @param stop Cancellation of this wait only; request_stop may be called from another thread.
+     * @return Completion/closed/cancelled/timed-out result, or detached self/capacity/per-call-work refusal.
+     * @throws std::system_error The platform mutex/condition-variable operation fails.
+     */
+    [[nodiscard]] std::expected<IpfCompletionWaitStatus, IpfConnectionDiagnostic>
+    awaitCompleted(std::chrono::steady_clock::time_point deadline, std::stop_token stop = {}) const;
     /** Register an advisory observer, without an initial callback or inline invocation.
      * @param listener Nonempty callback; captures and arbitrary callback work remain caller-owned.
      * @return Non-reused token or detached finite-capacity/state refusal.

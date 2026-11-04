@@ -26,3 +26,20 @@ TSV и обычные QD logs: полный лог сохраняют отдел
 carryover после ошибки, flush-before-error,304, равная дата, exact live capability,
 live EOF, одно поколение после COMPLETE и однократный public lifecycle. См.
 [контракт](../../../../spec/ipf/CONNECTION.ru.md), [адаптацию владения/metadata](../../../../docs/decisions/ADR-0009-live-ipf-connection-ownership.ru.md).
+
+## Oracle ожидания completion
+
+CompletionWaitOracle.java наблюдает23 outcomes production waitUntilCompleted закреплённого QD/JDK8:
+terminal-before-wait, zero/negative timeout, wait до start, pending close/interrupt, восстановление
+interrupt flag, sticky completion после close/interrupt и worker callback waits. Используется
+один собственный regular temporary IPF source, без сети. Private reflection только наблюдает
+регистрацию public waiter и сохраняет actual handler threads для cleanup; production wait не
+переписывается. Все собственные threads получают interrupt/join с конечными cleanup bounds.
+
+Используйте прежние явные existing classpath/outputClasses правила, заменив имя source/class
+на CompletionWaitOracle.java/CompletionWaitOracle. Без аргументов, --help и --help-ru source/threads
+не создаются. --run создаёт/удаляет temp file, выводит TSV и обычные QD logs; exit0 — полные
+наблюдения, exit1 — exception, exit2 — неверные аргументы. Сохраняйте full logs отдельно и выбирайте
+только TSV observations в completion-wait-outcomes.tsv. completion-wait-provenance.json связывает
+helper/capture/pinned source/observed classes. Адаптация C++ self-wait/stop-token описана ADR-0009;
+Java rows не заменяются C++ expectations. Прежние ConnectionOracle captures/provenance не меняются.

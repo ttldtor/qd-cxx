@@ -692,6 +692,33 @@ struct InstrumentProfileReader::Impl {
             bool eofDelivered = false;
 
             while (checkpoint()) {
+                if constexpr (std::is_same_v<ProfilePipe, detail::StreamingProfiles>) {
+                    if (profiles.hasOwnedInput()) {
+                        auto parserWork = host->options.ipf.turnWork;
+                        parserWork.records = (std::min)(parserWork.records, std::size_t{1});
+                        const auto before = parserWork;
+                        const auto drained = profiles.drain(parserWork);
+                        const auto staged = profiles.staged();
+                        const auto progressed = parserWork.inputBytes != before.inputBytes ||
+                                                parserWork.decodedUnits != before.decodedUnits ||
+                                                parserWork.fields != before.fields ||
+                                                parserWork.records != before.records;
+
+                        if (!publishItems() || profiles.failed()) {
+                            break;
+                        }
+
+                        if (progressed || staged) {
+                            continue;
+                        }
+
+                        if (!drained) {
+                            fail(result, {IpfTransferError::WORK_LIMIT, "connection-owned-parser-progress"});
+                            break;
+                        }
+                    }
+                }
+
                 auto available = bytes()->input();
 
                 if (!available) {

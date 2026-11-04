@@ -1,0 +1,62 @@
+{
+  "upstreamCommit": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "java": "Zulu OpenJDK1.8.0_422",
+  "heap": "128MiB",
+  "oracle": "CompletionWaitOracle.java",
+  "oracleSha256": "64ef3a9a53a62c205bd1d2db3bfd718637c26acd49e6721c5661bd61ff095455",
+  "capture": "completion-wait-outcomes.tsv",
+  "captureSha256": "08f0b7a1842d02292455f24522e44571e02e6908cc83a52b50b1e759582e0474",
+  "rows": 23,
+  "scope": "Actual public pinned QD waitUntilCompleted/start/close using one owned regular temporary IPF source; reflection only listener-registration barrier/handler retention; finite owned thread cleanup; no network",
+  "filter": "Only anchored TSV observation rows selected; full nondeterministic QD logs retained separately",
+  "sources": [
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/ipf/live/InstrumentProfileConnection.java",
+      "sha256": "f74fdef8ba4ff480860d902fa4aaf96527d3486fc87813ea8ab2966ddcdf63f1"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/ipf/live/InstrumentProfileCollector.java",
+      "sha256": "7e3c83dc76cce0bc13198fd1cf96c4848bcabb48ea02412414eee515fea6b48c"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/ipf/InstrumentProfileReader.java",
+      "sha256": "319785ddfd931d7487b629ca7f744a8e215dbc471a1035bd7070911468d11661"
+    },
+    {
+      "path": "dxlib/src/main/java/com/devexperts/io/URLInputStream.java",
+      "sha256": "8489cea5f3bc5dc0d8c796963ae2d40434cb96039615a382db2f1bbb3890aadf"
+    },
+    {
+      "path": "dxlib/src/main/java/com/devexperts/util/TimePeriod.java",
+      "sha256": "341f0f6be9d46eb0106ea81a73fd52ad45f7fa4aabfdf4f4ce9e0a0a55b0a8ad"
+    }
+  ],
+  "classes": [
+    {
+      "path": "dxfeed-api/target/classes/com/dxfeed/ipf/live/InstrumentProfileConnection.class",
+      "sha256": "09868031bd93c2e63bb43bb7a66ec72013afcb6ac452b54ce8082d0bb573f0ea"
+    },
+    {
+      "path": "dxfeed-api/target/classes/com/dxfeed/ipf/live/InstrumentProfileConnection$Handler.class",
+      "sha256": "23c7b8d9f86ce10e7c43881a33460421f560928eb60f4eff07ec92980f605ed9"
+    },
+    {
+      "path": "dxfeed-api/target/classes/com/dxfeed/ipf/live/InstrumentProfileCollector.class",
+      "sha256": "6269f692521e9e14a43fe5b5b722d025e27a0ff4176775d3a08626b7c0dc6b6f"
+    },
+    {
+      "path": "dxfeed-api/target/classes/com/dxfeed/ipf/InstrumentProfileReader.class",
+      "sha256": "70598b58cb496a84ba37875a74938542950f3cbfd3f0d5104a190d8e59c99f67"
+    },
+    {
+      "path": "dxlib/target/classes/com/devexperts/io/URLInputStream.class",
+      "sha256": "c71b6e421835044921ae00478f794dae66bebba400ea70b59fdb052e64fd0b4e"
+    },
+    {
+      "path": "dxlib/target/classes/com/devexperts/util/TimePeriod.class",
+      "sha256": "c0010dfcb8fe01b9514b131c5440470f4c92371ecbeba7c30e489bf26140f215"
+    }
+  ],
+  "classBinding": "Existing pinned production classes observed, not rebuilt; source hashes do not assert fresh source-to-class reproduction",
+  "adaptation": "C++ explicit stop token/status and would-block worker self-wait refusal are documented in ADR-0009; actual Java rows unchanged"
+}

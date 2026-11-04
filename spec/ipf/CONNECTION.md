@@ -124,3 +124,34 @@ Connections reserve non-reused nonzero domains under the collector mutex, with f
 Pending copy admission reserves aggregate requested backing before allocation: a possible empty-map sentinel, custom node/key/value objects, every standard/custom string capacity plus terminator and a conservative library alignment-request allowance. Supported tree headers use a four-pointer allowance; actual allocation-counting regressions bind the MSVC/GCC profile. Inline string capacity/padding are conservatively counted again. Fixed vector objects and the existing logical pending-unit reservation are included once in resident admission; unused resident backing, including that reservation, funds simultaneous copies. Dense custom data may exhaust resident backing before logical unit/profile limits. Flush releases copy bytes only after destroying pending values; failed copy restores storage reservation without refunding work. This is new connection-owned backing, without changing the normal source-reader or collector logical-budget contracts.
 
 Request-only close publishes its cutoff under the port mutex, releases that mutex, and serializes notification with the runtime control mutex used for retry waits. This prevents a notification from being lost between a false predicate check and the wait handoff. Stop requests occur outside both owner locks. Worker retirement does not depend on creator shutdown sending a second notification.
+
+## First-snapshot wait contract
+
+The public absolute steady-clock wait preserves QD's ordinary sticky-first-completion semantics.
+COMPLETED has priority over CLOSED, caller stop and deadline at one port-mutex observation.
+CLOSED has priority over stop/deadline; stop has priority over deadline. Immediate results require
+no waiter grant. A pending wait reserves a finite slot before registering a stack stop callback.
+Its independent per-call turns are finite and never refill on notifications, retries or reconnects.
+
+The fixed frame retains Control, an atomic slot lease, stop callback, gate lock and remaining turns.
+Preflight uses the actual sizeof(frame) for every admitted slot, with checked arithmetic.
+The lock is declared after the callback and releases first; callback deregistration finishes before
+slot release and final Control release. Cancellation registers outside Control, then locks the same
+Control gate before notifying. Snapshot publication and close release Port before taking Control.
+Waiters use Control→Port for predicate checks, so false-predicate/atomic-wait handoffs cannot lose
+completion, close or cancellation. No listener budget, native/provider/user invocation, SDK cleanup,
+worker join or new connection progress occurs in the wait or its stop callback.
+
+Worker identity is published under Control before state callbacks. A would-block wait on that worker
+is refused; immediate terminal/cancel/expired queries remain usable there. This is the explicit C++
+owner adaptation recorded in ADR-0009, not Java API/thread-interruption parity. The caller must not
+hold application locks required for producer progress. Other facade destruction requires synchronized
+method entry; an admitted wait operates only on its retained Port/Control leases.
+
+A successful wait describes the first application snapshot, not the latest attempt. Existing per-
+collector domain/generation replacement remains unchanged: failed prefixes and old generations survive
+until a completed replacement;304/equal Last-Modified checks cannot invent a new completed generation.
+Later clean replacement removes stale domain/generation entries while already owning revisions survive.
+Last-Modified commits only after successful native retirement, preserving the existing first-cause rule.
+
+Live HTTP delivery drains already owned decoded/parser rows before requesting more native input. Each progress/event gets a new outer checkpoint and a fresh bounded single-record work slice; no multiple-row callback loop runs inside parser/native code. NEED_INPUT without a debit/event falls through to ordinary input, so incomplete UTF-8, control rows or compressed headers cannot cause a drain spin. Pending data that cannot make progress under the original slice is refused without increasing/refunding any grant. The snapshot reader instantiation/layout and cumulative HTTP/decoder/source counters remain unchanged.

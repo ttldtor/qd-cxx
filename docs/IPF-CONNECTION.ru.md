@@ -15,9 +15,9 @@
 
 Проверяемый пример C++ дан в нормативной английской версии. Создайте runtime и shared
 collector, зарегистрируйте owning update listener, вызовите createConnection и однократный
-start. Приложению не нужен transport polling. После обычной работы приложения вызовите
+start, затем awaitCompleted с абсолютным steady-clock deadline. Приложению не нужен transport polling. После ожидания вызовите
 request-only connection.close и creator-thread runtime.closeAndAwaitTermination.
-Join завершает работу; отдельного API ожидания готовности снимка здесь нет.
+Пример ожидает первый снимок до30секунд. Timeout/caller cancellation завершают только wait; connection продолжает работу до close. Creator join запрашивает shutdown и отделён от готовности снимка.
 
 NOT_CONNECTED → CONNECTING → CONNECTED → COMPLETED → CLOSED отражает первоначальную фазу;
 retry её не сбрасывает. initialSnapshotComplete остаётся sticky при следующих активных
@@ -63,3 +63,32 @@ STL backing admission задаёт консервативный requested storag
 Уточнение потоков: state/auth callbacks выполняются на worker своего connection. Collector notifications следуют его независимому outside-lock dispatcher и при concurrent/nested update могут выполняться на другом текущем updating thread.
 
 До allocation pending copy резервирует общий requested backing: возможный empty-map sentinel, custom node/key/value objects, capacities всех standard/custom strings с terminators и консервативной library alignment-request добавкой. Для поддержанных tree headers заложены четыре указателя; actual allocation-counting regressions связывают оценку с профилем MSVC/GCC. Inline string capacity/padding консервативно учтены повторно. Fixed vector objects и прежний logical pending-unit reserve входят в resident admission один раз; остаток resident backing вместе с этим резервом финансирует одновременно живущие копии. Dense custom data может исчерпать backing раньше logical limits. Flush освобождает copy bytes после уничтожения values; failed copy откатывает storage reserve без возврата work. Это новый connection backing, без изменения logical-budget контрактов обычного reader/collector.
+
+## Ожидание первого снимка
+
+awaitCompleted(deadline, stopToken) возвращает expected IpfCompletionWaitStatus.
+При каждой защищённой проверке приоритет: COMPLETED, CLOSED, CANCELLED, TIMED_OUT.
+Первое completion сохраняется при reconnect, поздней ошибке и close. Метод не ожидает новое
+поколение и не подтверждает HTTP framing, gzip/ZIP integrity, parser EOF или native retirement.
+Валидный COMPLETE может завершить wait при ещё открытом live response; чистый fallback EOF
+также завершает первый снимок. Owning revisions остаются действительными после позднего removal.
+
+Передавайте абсолютный std::chrono::steady_clock deadline. Истёкший deadline даёт немедленную
+проверку; minimum/maximum clock поддержаны. Необязательный std::stop_token позволяет существующему
+потоку приложения вызвать stop_source.request_stop() без доступа к facade/SDK. Отмена завершает
+только этот wait, не закрывает connection и не очищает его first error, metadata, generation/work
+history. Уже наблюдаемое completion имеет приоритет над заранее запрошенной отменой.
+
+Waiter удерживает stable control независимо от runtime/facade drain. Синхронизируйте уничтожение
+facade с входом в метод; callback close/deletion после admission не инвалидирует retained wait state.
+Не удерживайте application locks, необходимые worker callbacks. Worker callback может немедленно
+прочитать готовый outcome; would-block self-wait возвращает INVALID_STATE, не останавливая своего
+producer. Creator runtime join остаётся отдельным и никогда не выполняется awaitCompleted.
+
+completionWaiters (по умолчанию16) ограничивает одновременно живущие calls, включая retirement stop callback.
+completionWaitTurns (по умолчанию1024) ограничивает pending predicate/wait turns каждого call; spurious/посторонние
+notifications расходуют turns без обновления grants. Ноль разрешает immediate outcomes, но
+отказывает pending wait. Capacity/work refusal возвращается только caller и не закрывает connection
+или переписывает его ошибку. Resident preflight консервативно включает
+completionWaiters*sizeof(actual fixed wait frame); frame имеет automatic storage без listener-node
+allocation/скрытой очереди. Caller thread stacks и allocator/RSS overhead остаются вне owner backing.

@@ -8,6 +8,7 @@
 #include <condition_variable>
 #include <limits>
 #include <mutex>
+#include <thread>
 
 namespace org::ttldtor::qdcxx::ipf::connection_detail {
 using Clock = std::chrono::steady_clock;
@@ -82,6 +83,8 @@ struct Control {
     std::condition_variable condition;
     Runtime *runtime = nullptr;
     bool stopping = false;
+    std::thread::id worker{};                ///< Immutable worker identity, published under this gate before callbacks.
+    std::atomic_size_t completionWaiters{0}; ///< Includes callback deregistration/slot retirement.
 };
 
 /** One immutable ordered state transition; four reserved slots cover the one-shot phase graph. */
@@ -153,6 +156,25 @@ struct Port {
         if (auto gate = control.lock()) {
             // Serialize publication with the waiter's false-predicate/unlock handoff.
             std::lock_guard wake(gate->mutex);
+            gate->condition.notify_all();
+        }
+    }
+
+    /** Publish first-snapshot completion, then synchronize notification outside the port lock. */
+    void completeInitialSnapshot() {
+        {
+            std::lock_guard lock(mutex);
+
+            if (observed.state != IpfConnectionState::CONNECTED) {
+                return;
+            }
+
+            observed.initialSnapshotComplete = true;
+            transition(IpfConnectionState::COMPLETED);
+        }
+
+        if (auto gate = control.lock()) {
+            std::lock_guard lock(gate->mutex);
             gate->condition.notify_all();
         }
     }
