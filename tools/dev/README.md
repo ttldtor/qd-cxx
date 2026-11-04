@@ -317,3 +317,5 @@ native writer files through the pinned Java reader. No network, SDK build or new
   Get-Help and no-argument help need no operational paths.
 
 The [IPF compression fixture oracle](../../tests/fixtures/ipf/compression/README.md) records bounded JDK8 gzip/ZIP and actual IPF outcomes. CompressionOracle --help/--help-ru requires no output path and performs no file, network or native SDK work.
+
+- [CollectorOracle](../../tests/fixtures/ipf/collector/README.md): pinned JDK8/QD collector TSV; explicit --run, input-free noargs/EN/RU help, no network/workers.

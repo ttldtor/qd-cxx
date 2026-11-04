@@ -330,3 +330,5 @@ native writer files pinned Java reader. Сеть, SDK build и новая depend
   Get-Help и справка без аргументов не требуют рабочих путей.
 
 [Oracle IPF compression fixtures](../../tests/fixtures/ipf/compression/README.ru.md) фиксирует конечные JDK8 gzip/ZIP и реальные IPF outcomes. CompressionOracle --help/--help-ru не требует output path и не выполняет file/network/native SDK работу.
+
+- [CollectorOracle](../../tests/fixtures/ipf/collector/README.ru.md): TSV закреплённого JDK8/QD collector; явный --run, справка без входов noargs/EN/RU, без сети/workers.

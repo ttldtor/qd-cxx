@@ -695,3 +695,7 @@ tools/upstream/trade-eth-oracle/*.java text eol=lf
 tools/upstream/trade-eth-oracle/*.ps1 text eol=lf
 tests/fixtures/trade-eth/oracle.tsv -text -whitespace
 tests/fixtures/trade-eth/provenance.json text eol=lf
+
+tests/fixtures/ipf/collector/*.java text eol=lf
+tests/fixtures/ipf/collector/*.tsv -text -whitespace
+tests/fixtures/ipf/collector/provenance.json text eol=lf

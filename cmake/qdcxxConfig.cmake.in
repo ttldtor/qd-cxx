@@ -21,7 +21,7 @@ if(NOT qdcxx_FOUND)
     return()
 endif()
 
-if(@ORG_TTLDTOR_QDCXX_BUILD_RUNTIME@ OR @ORG_TTLDTOR_QDCXX_BUILD_CLIENT@)
+if(@ORG_TTLDTOR_QDCXX_BUILD_RUNTIME@ OR @ORG_TTLDTOR_QDCXX_BUILD_CLIENT@ OR @ORG_TTLDTOR_QDCXX_BUILD_IPF@)
     include(CMakeFindDependencyMacro)
     find_dependency(Threads)
 endif()

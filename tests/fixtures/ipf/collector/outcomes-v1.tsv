@@ -1,0 +1,14 @@
+empty-listener-calls	0
+insert	STOCK:A:standard:ownedΩ
+equal-calls	1
+equal-time-unchanged	true
+old-generation-calls	1
+new-generation-removal	REMOVED:A::
+changed-time-floor	true
+absent-removed-calls	2
+empty-view	true
+initial	STOCK:A:standard:ownedΩ
+supplied-removal	REMOVED:A:standard:ownedΩ
+queued-latest	STOCK:A:latest:ownedΩ,REMOVED:B:standard:ownedΩ
+queued-calls	1
+collector-class	com.dxfeed.ipf.live.InstrumentProfileCollector

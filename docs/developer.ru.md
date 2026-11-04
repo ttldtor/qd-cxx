@@ -43,6 +43,8 @@
 
 - [Ценовые шаги инструмента](PRICE-INCREMENTS.ru.md): диапазоны, точность и округление цены через `qdcxx_ipf`.
 
+- [Контракт IPF collector](../spec/ipf/COLLECTOR.ru.md): SDK-free потокобезопасная модель, конечное удержание/работа и callback cutoff; [Java oracle](../tests/fixtures/ipf/collector/README.ru.md).
+
 ## Утилиты значений событий
 
 [Oracle значений событий](../tools/upstream/event-values-oracle/README.ru.md) захватывает и проверяет точные закреплённые Java-преобразования без сборки SDK и endpoint. См. встроенную EN/RU справку и [публичные контракты](../spec/events/EVENT-VALUES.ru.md). [Installed consumer](../tests/conformance/event_values_consumer/CMakeLists.txt) отдельно компилирует каждый новый публичный заголовок и проверяет сохранение raw, преобразования и ошибки входов; он линкует SDK-free value target либо совместимый feed target.

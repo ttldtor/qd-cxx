@@ -28,3 +28,5 @@ before choosing an integration.
 - [CFI and additional underlyings](GLOSSARY-VALUES.md): `qd/glossary/`, optional `qdcxx_ipf`.
 
 - [Instrument price increments](PRICE-INCREMENTS.md): owned ranges, precision and price rounding through `qdcxx_ipf`.
+
+- [Live instrument-profile collector](IPF-COLLECTOR.md): owning revisions, removals and safe listener callbacks.

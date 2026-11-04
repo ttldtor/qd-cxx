@@ -1,0 +1,57 @@
+{
+  "upstreamCommit": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "oracleJdk": "Zulu 1.8.0_422",
+  "helper": "CollectorOracle.java",
+  "helperSha256": "57bf4ef365704156a0294d51d40a5848b6044d7c3c16b80921aef4331446b2c2",
+  "outcomesSha256": "b926a1ad6d41405df25886a9a0ed32380bc98414e1036036c5c57ff5a12e7abf",
+  "scope": "Actual existing production classes; no production rebuild, no claim that source hashes reproduce class bytes. Direct and bounded queued executor observations; ownership/snapshot scheduling differences documented in COLLECTOR.",
+  "inputs": [
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/ipf/live/InstrumentProfileCollector.java",
+      "sha256": "7e3c83dc76cce0bc13198fd1cf96c4848bcabb48ea02412414eee515fea6b48c"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/ipf/live/InstrumentProfileConnection.java",
+      "sha256": "f74fdef8ba4ff480860d902fa4aaf96527d3486fc87813ea8ab2966ddcdf63f1"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/ipf/live/InstrumentProfileUpdateListener.java",
+      "sha256": "d839cc31a7e775893c2964f080add682939cfa06606df1b1c2ae37a3e1886d10"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/ipf/InstrumentProfile.java",
+      "sha256": "4ef87d9d20e8b5b8f963c29dc2295e4dc5b1cea065e56a21c788d697ef12dfd1"
+    },
+    {
+      "path": "dxfeed-api/target/classes/com/dxfeed/ipf/live/InstrumentProfileCollector.class",
+      "sha256": "6269f692521e9e14a43fe5b5b722d025e27a0ff4176775d3a08626b7c0dc6b6f"
+    },
+    {
+      "path": "dxfeed-api/target/classes/com/dxfeed/ipf/live/InstrumentProfileCollector$Agent.class",
+      "sha256": "b01ee34507596a0fd5fe167f725ee13665b149af11f3225d4aff0ed23f561f2c"
+    },
+    {
+      "path": "dxfeed-api/target/classes/com/dxfeed/ipf/live/InstrumentProfileCollector$Entry.class",
+      "sha256": "29553f884e6c9ed95429b716b2e3504de2600ce3f6184624c478a6a207209e40"
+    },
+    {
+      "path": "dxfeed-api/target/classes/com/dxfeed/ipf/live/InstrumentProfileCollector$Node.class",
+      "sha256": "3cf204cc18216124a096615ebbefbab960f8cca3db21e4f788d42ab50ed295f8"
+    },
+    {
+      "path": "dxfeed-api/target/classes/com/dxfeed/ipf/live/InstrumentProfileUpdateListener.class",
+      "sha256": "479b1d6f765056e8387d16847b8e211168a18097b17fba4216f9bcbe3ae166c0"
+    },
+    {
+      "path": "dxfeed-api/target/classes/com/dxfeed/ipf/InstrumentProfile.class",
+      "sha256": "0cf32076173bc957393be3305caed76a9d0003872b093a2b85f70ffe6da5ae6a"
+    }
+  ],
+  "captureVersion": 2,
+  "outcomes": "outcomes-v2.tsv",
+  "previousCapture": {
+    "outcomes": "outcomes-v1.tsv",
+    "sha256": "103011d7e8d24330e9a19f8eb4d77c3c5bc965c20d76f879ab3bf4cb7cc05f12",
+    "helperSha256": "b90057b6954e5e160d7a33d9023160b1eebdf44051e78ceb2e9b41c04d81830d"
+  }
+}

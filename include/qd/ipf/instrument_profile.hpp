@@ -15,6 +15,9 @@
 #include <vector>
 
 namespace org::ttldtor::qdcxx::ipf {
+namespace collector_detail {
+struct CollectorProfileAccess;
+}
 /** Standard instrument-profile fields; names are exact and case-sensitive. */
 enum class InstrumentProfileField {
     TYPE,                   ///< Standard TYPE field.
@@ -110,6 +113,8 @@ struct ProfileLimits {
  * Failed move preparation preserves both the source and any assignment destination.
  */
 class InstrumentProfile {
+    friend struct collector_detail::CollectorProfileAccess;
+
     /** One owned standard field; empty backing construction precedes every move swap. */
     struct Value {
         std::u16string text; ///< Owned exact textual value.

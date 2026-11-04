@@ -70,8 +70,9 @@ set_target_properties(qdcxx_java_double PROPERTIES CXX_EXTENSIONS OFF POSITION_I
 
 option(ORG_TTLDTOR_QDCXX_BUILD_IPF "Build the independent instrument-profile value model" OFF)
 if(ORG_TTLDTOR_QDCXX_BUILD_IPF)
-    add_library(qdcxx_ipf src/ipf/instrument_profile.cpp src/ipf/reader.cpp src/ipf/writer.cpp src/ipf/option_chains.cpp src/glossary/cfi.cpp src/glossary/additional_underlyings.cpp src/glossary/price_increments.cpp src/glossary/price_decimal.cpp)
-    target_link_libraries(qdcxx_ipf PRIVATE qdcxx_java_double)
+    add_library(qdcxx_ipf src/ipf/instrument_profile.cpp src/ipf/reader.cpp src/ipf/writer.cpp src/ipf/option_chains.cpp src/ipf/collector.cpp src/glossary/cfi.cpp src/glossary/additional_underlyings.cpp src/glossary/price_increments.cpp src/glossary/price_decimal.cpp)
+    find_package(Threads REQUIRED)
+    target_link_libraries(qdcxx_ipf PRIVATE qdcxx_java_double Threads::Threads)
     target_include_directories(qdcxx_ipf PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
         "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
     target_compile_features(qdcxx_ipf PUBLIC cxx_std_23)
@@ -441,6 +442,11 @@ if(BUILD_TESTING)
             add_test(NAME option_chains_oracle_help COMMAND ${CMAKE_COMMAND}
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/option_chains_oracle_help.cmake")
         endif()
+        add_executable(qdcxx_ipf_collector_tests tests/conformance/ipf_collector_tests.cpp)
+        target_link_libraries(qdcxx_ipf_collector_tests PRIVATE qdcxx_ipf doctest::doctest Threads::Threads)
+        set_target_properties(qdcxx_ipf_collector_tests PROPERTIES CXX_EXTENSIONS OFF)
+        add_test(NAME ipf_collector COMMAND qdcxx_ipf_collector_tests)
+        set_tests_properties(ipf_collector PROPERTIES TIMEOUT 60)
         add_executable(qdcxx_ipf_tests tests/conformance/ipf_tests.cpp)
         target_link_libraries(qdcxx_ipf_tests PRIVATE qdcxx_ipf doctest::doctest)
         target_compile_definitions(qdcxx_ipf_tests PRIVATE
