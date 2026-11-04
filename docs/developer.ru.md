@@ -52,3 +52,4 @@
 - [Контракт live IPF connection](../spec/ipf/CONNECTION.ru.md): явный joined runtime, private incremental sink, конечные накопленные grants; [actual Java oracle](../tests/fixtures/ipf/live/README.ru.md).
 
 - [Проверки текста событий](../tests/conformance/EVENT-TEXT-VALIDATION.ru.md): production Java profiles, точные различия эталона, числовое округление, ограниченное владение и установленные consumers.
+- [Публичный пример live IPF](../examples/ipf_live/README.ru.md): отдельный installed consumer, EN/RU help без inputs, конечные duration/revision capture и creator shutdown; [shutdown oracle](../tests/fixtures/ipf/live/README.ru.md#shutdown-oracle) использует pinned JDK8 с конечным собственным cleanup.

@@ -36,7 +36,7 @@ CMake 3.25 path grammar treats that character as a separator. Windows path separ
 
 Default discovery includes tracked and nonignored new files under `include/` (`*.hpp`), `src/`
 (`*.cpp`), `tests/conformance/` (`*.cpp`), and `tools/qtp-inspect/`, `tools/tape-inspect/`, `tools/tape-write/`,
-`tools/dev/`, `tools/subscribe/`, `examples/subscriptions/` and `examples/feed_quote/`, `examples/event_text/` (`*.cpp`, `*.hpp`).
+`tools/dev/`, `tools/subscribe/`, `examples/subscriptions/`, `examples/feed_quote/`, `examples/event_text/` and `examples/ipf_live/` (`*.cpp`, `*.hpp`).
 Git C-quoted filenames are decoded before selection.
 `upstream`, `generated` and `fixtures` directory segments are excluded. Explicit manifests admit
 `.cpp` and `.hpp` in those roots and `.work/` for deliberate controls; other roots/extensions fail.
@@ -78,10 +78,14 @@ existing filesystem reparse points are rejected too. Only installations containi
 executable are published. Extraction failures preserve the previous installation; temporary staging
 and downloads are cleaned on failure. Windows archives do not provide Linux-native executables.
 
-The unchanged optional [Format-Cpp.ps1](Format-Cpp.ps1) and historical
-[setup_cpp.py](setup_cpp.py) retain their original interfaces and scopes. The PowerShell wrapper does
+The optional [Format-Cpp.ps1](Format-Cpp.ps1) and historical
+[setup_cpp.py](setup_cpp.py) retain their original interfaces. The PowerShell wrapper does
 not automatically acquire the new driver's `tools/dev/` discovery scope. Its historical
 [setup checks](../../tests/conformance/python-migration/Test-SetupCpp.ps1) cover hostile archives,
 cold/warm Windows acquisition and wrapper behavior; their cold-cache run needs network access.
 The original [formatting validation](../../tests/conformance/encoding/VALIDATION.md) remains historical.
 Java formatting and oracle provenance in [README](README.md) remain separate and unchanged.
+
+Both the portable driver and the optional PowerShell wrapper admit only the new
+examples/ipf_live directory for the live IPF sample; other example roots retain their previous
+scope. Explicit Format/Check uses the same pinned pipeline and unchanged root configurations.

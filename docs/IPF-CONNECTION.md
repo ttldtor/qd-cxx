@@ -142,3 +142,25 @@ Capacity/work refusal is returned only to that caller and does not close or over
 Resident preflight conservatively includes completionWaiters*sizeof(actual fixed wait frame);
 the frame uses automatic storage with no listener-node allocation or hidden queue. Caller thread
 stacks and allocator/RSS bookkeeping remain outside the requested owner-backing contract.
+
+## Listener and source shutdown
+
+Listener removal prevents future selection but is advisory for an invocation already selected or
+running. Callback failure is contained and counted independently; another listener can still receive
+the same update/state. Capture storage and its listener allowance are released only after the
+selected invocation retires. User callbacks and last capture destruction occur outside owner locks.
+
+Connection close requests a cutoff; creator-owned runtime closeAndAwaitTermination joins its one
+worker and owned notifications before SDK cleanup. It does not join arbitrary external collector
+producers, simultaneous facade callers, or application close threads. Join those participants and
+synchronize facade method entry/destruction separately. An owning revision may survive every facade.
+
+An interrupted HTTP body or producer stop preserves already published owning revisions. A flushed
+prefix without validated COMPLETE or clean fallback EOF cannot complete the first snapshot.
+HTTP framing, IPF completion, compressed-envelope integrity and native retirement remain separate;
+neither cancellation nor a callback exception fabricates successful completion.
+
+The [finite public sample](../examples/ipf_live/README.md) uses one application condition-variable
+wait, a duration/revision bound, and creator close/join before output. Its installed sources build
+independently through find_package. See [shutdown Java observations](../tests/fixtures/ipf/live/README.md#shutdown-oracle)
+for the exact pinned ordinary behavior and the existing explicit C++ ownership adaptation.

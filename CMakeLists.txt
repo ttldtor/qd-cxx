@@ -273,6 +273,16 @@ if(ORG_TTLDTOR_QDCXX_BUILD_EXAMPLES AND ORG_TTLDTOR_QDCXX_BUILD_SCHEDULE)
     add_subdirectory(examples/schedule_queries)
 endif()
 
+
+if(ORG_TTLDTOR_QDCXX_BUILD_IPF_LIVE)
+    if(ORG_TTLDTOR_QDCXX_BUILD_EXAMPLES)
+        add_subdirectory(examples/ipf_live)
+        install(TARGETS qdcxx_ipf_live_sample RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+    endif()
+    install(FILES examples/ipf_live/main.cpp examples/ipf_live/CMakeLists.txt
+        examples/ipf_live/README.md examples/ipf_live/README.ru.md
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/qdcxx/examples/ipf_live")
+endif()
 include(CMakePackageConfigHelpers)
 install(FILES include/qd/api/subscription_selector.hpp DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qd/api")
 install(TARGETS qdcxx_encoding qdcxx_core qdcxx_protocol qdcxx_collectors qdcxx_mux
@@ -1063,6 +1073,20 @@ if(BUILD_TESTING)
                 add_dependencies(qdcxx_ipf_connection_tests qdcxx_tls_test_peer)
                 set_target_properties(qdcxx_ipf_connection_tests PROPERTIES CXX_EXTENSIONS OFF)
                 add_test(NAME ipf_connection COMMAND qdcxx_ipf_connection_tests)
+                if(TARGET qdcxx_ipf_live_sample)
+                    add_executable(qdcxx_ipf_live_sample_tests tests/conformance/ipf_live_sample_tests.cpp
+                        tests/conformance/ipf_http_peer.cpp)
+                    target_link_libraries(qdcxx_ipf_live_sample_tests PRIVATE qdcxx_ipf_live)
+                    set_target_properties(qdcxx_ipf_live_sample_tests PROPERTIES CXX_EXTENSIONS OFF)
+                    add_dependencies(qdcxx_ipf_live_sample_tests qdcxx_ipf_live_sample)
+                    if(WIN32)
+                        target_compile_definitions(qdcxx_ipf_live_sample_tests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+                    endif()
+                    add_test(NAME ipf_live_sample COMMAND qdcxx_ipf_live_sample_tests
+                        "$<TARGET_FILE:qdcxx_ipf_live_sample>" "${CMAKE_CURRENT_BINARY_DIR}/ipf-live-sample-captures")
+                    set_tests_properties(ipf_live_sample PROPERTIES TIMEOUT 40)
+                endif()
+
             endif()
             add_executable(qdcxx_ipf_transfer_tests tests/conformance/ipf_transfer_tests.cpp
                 tests/conformance/ipf_http_peer.cpp tests/conformance/transport/tls_test_peer.cpp)

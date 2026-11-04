@@ -36,7 +36,7 @@ CMake 3.25 трактует этот символ как разделитель.
 
 Автоматический поиск включает tracked и nonignored new файлы из `include/` (`*.hpp`), `src/`
 (`*.cpp`), `tests/conformance/` (`*.cpp`), а также `tools/qtp-inspect/`, `tools/tape-inspect/`, `tools/tape-write/`,
-`tools/dev/`, `tools/subscribe/`, `examples/subscriptions/` и `examples/feed_quote/`, `examples/event_text/` (`*.cpp`, `*.hpp`).
+`tools/dev/`, `tools/subscribe/`, `examples/subscriptions/`, `examples/feed_quote/`, `examples/event_text/` и `examples/ipf_live/` (`*.cpp`, `*.hpp`).
 Git C-quoted имена декодируются до отбора.
 Сегменты каталогов `upstream`, `generated` и `fixtures` исключаются. Явный manifest допускает
 `.cpp` и `.hpp` в этих корнях и `.work/` для намеренных контрольных примеров; другие корни/расширения отклоняются.
@@ -78,10 +78,14 @@ data streams, Windows device/неоднозначные имена, дублик
 исполняемым файлом. Сбой распаковки сохраняет прежнюю установку; временные staging и загрузки
 удаляются при сбое. Windows-архивы не предоставляют нативные Linux-программы.
 
-Неизменённые необязательный [Format-Cpp.ps1](Format-Cpp.ps1) и исторический
-[setup_cpp.py](setup_cpp.py) сохраняют прежние интерфейсы и области поиска. PowerShell-обёртка
+Необязательный [Format-Cpp.ps1](Format-Cpp.ps1) и исторический
+[setup_cpp.py](setup_cpp.py) сохраняют прежние интерфейсы. PowerShell-обёртка
 не получает автоматически новую область поиска `tools/dev/`. Её исторические
 [setup checks](../../tests/conformance/python-migration/Test-SetupCpp.ps1) охватывают враждебные архивы,
 cold/warm Windows acquisition и поведение обёртки; cold-cache запуск требует сети.
 Первоначальная [проверка форматирования](../../tests/conformance/encoding/VALIDATION.ru.md) остаётся исторической.
 Java formatting и oracle provenance из [README](README.ru.md) остаются отдельными и неизменными.
+
+Portable driver и необязательная PowerShell-обёртка дополнительно допускают только каталог
+examples/ipf_live для live IPF sample; остальные example roots сохраняют прежнюю область.
+Явные Format/Check используют ту же закреплённую pipeline и неизменные корневые configs.

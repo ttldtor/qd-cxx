@@ -92,3 +92,26 @@ notifications расходуют turns без обновления grants. Но�
 или переписывает его ошибку. Resident preflight консервативно включает
 completionWaiters*sizeof(actual fixed wait frame); frame имеет automatic storage без listener-node
 allocation/скрытой очереди. Caller thread stacks и allocator/RSS overhead остаются вне owner backing.
+
+## Listener и source shutdown
+
+Удаление listener запрещает последующий выбор, но advisory для уже выбранного или выполняющегося
+callback. Исключение callback изолируется и учитывается отдельно; другой listener продолжает
+получать update/state. Capture storage и allowance listener освобождаются после retirement
+выбранного вызова. User callbacks и уничтожение последнего capture выполняются вне owner locks.
+
+Connection close запрашивает cutoff; creator closeAndAwaitTermination присоединяет единственный
+worker runtime и его уведомления до SDK cleanup. Он не присоединяет произвольные внешние collector
+producers, конкурентные facade callers или application close threads. Такие участники требуют
+собственных joins и синхронизации входа в методы с уничтожением facade.
+Owning revision может пережить все facade.
+
+Оборванный HTTP body и producer stop сохраняют уже опубликованные owning revisions. Flushed prefix
+без validated COMPLETE или clean fallback EOF не завершает first snapshot. HTTP framing,
+IPF completion, compressed-envelope integrity и native retirement различны; cancellation
+и callback exception не создают успешное completion.
+
+[Конечный публичный пример](../examples/ipf_live/README.ru.md) использует application condition-variable
+wait, предел времени/revisions и creator close/join до вывода. Установленные исходники отдельно
+собираются через find_package. [Shutdown Java observations](../tests/fixtures/ipf/live/README.ru.md#shutdown-oracle)
+фиксируют точное обычное поведение и прежнюю явную C++ ownership adaptation.

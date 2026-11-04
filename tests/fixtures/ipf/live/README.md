@@ -52,3 +52,23 @@ select only the tab-separated observation rows for completion-wait-outcomes.tsv.
 completion-wait-provenance.json binds the actual helper, capture, pinned source and observed classes.
 The C++ self-wait/stop-token adaptation is explicit in ADR-0009; these rows are not overwritten
 with C++ outcomes. Earlier ConnectionOracle captures/provenance remain unchanged.
+
+## Shutdown oracle
+
+ShutdownOracle.java records12 actual pinned QD/JDK8 observations in shutdown-outcomes.tsv.
+It proves that removal can return while a selected callback is active, a removed listener receives
+no later state, state/collector callback exceptions are contained, surviving listeners still receive
+completion/profiles, and the actual connection handlers retire after close. The collector uses an
+explicit direct executor; this capture does not claim parity with an arbitrary asynchronous executor.
+
+Compile/run as above with ShutdownOracle.java and ShutdownOracle. No arguments, --help and --help-ru
+start no source or threads. --run uses one owned temporary regular IPF file, no network, finite
+three-second callback/wait bounds and four-second handler joins. It deletes the file and retires
+its threads on ordinary/error paths. Exit0: observations complete; exit1: exception; exit2: invalid
+arguments. Reflection only retains actual public-start handlers for cleanup. Ordinary QD exception
+logs are expected; select exactly the anchored TSV rows for the committed capture, retaining full
+logs separately. shutdown-provenance.json binds helper/capture/pinned sources and observed classes.
+
+These rows describe Java ordinary behavior, not its monitor ownership or C++ API spelling.
+See ADR-0009 and the public shutdown contract. The C++ sample/loopback regressions separately cover
+interrupted HTTP, request-only stop, owning prefixes and joined-worker notification barriers.

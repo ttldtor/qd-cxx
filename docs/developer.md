@@ -50,3 +50,4 @@ The [event-value oracle](../tools/upstream/event-values-oracle/README.md) captur
 - [Live IPF connection contract](../spec/ipf/CONNECTION.md): explicit joined runtime, private incremental sink, finite cumulative grants; [bounded actual Java oracle](../tests/fixtures/ipf/live/README.md).
 
 - [Event text validation](../tests/conformance/EVENT-TEXT-VALIDATION.md): production Java profiles, exact reference differences, numeric rounding, finite ownership and installed consumers.
+- [Live IPF public sample](../examples/ipf_live/README.md): installed independent consumer, input-free EN/RU help, bounded duration/revision capture and creator shutdown; [shutdown oracle](../tests/fixtures/ipf/live/README.md#shutdown-oracle) uses pinned JDK8 with finite owned cleanup.

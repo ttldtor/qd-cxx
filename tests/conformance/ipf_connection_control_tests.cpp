@@ -9,10 +9,12 @@
 #include "connection_control.hpp"
 #include "connection_wait.hpp"
 #include <atomic>
+#include <condition_variable>
 #include <cstdlib>
 #include <doctest/doctest.h>
 #include <iostream>
 #include <new>
+#include <stdexcept>
 #include <thread>
 
 namespace {
@@ -614,5 +616,86 @@ TEST_CASE("actual parser partial UTF8 and control rows return NEED_INPUT without
         CHECK(parser.progress().inputBytes == progress.inputBytes);
         CHECK(parser.progress().records == progress.records);
         CHECK_FALSE(parser.progress().completionSeen);
+    }
+}
+
+TEST_CASE("in-flight observer removal retains its slot until the selected callback and capture retire") {
+    for (unsigned iteration = 0; iteration != 32; ++iteration) {
+        auto gate = std::make_shared<c::Control>();
+        i::IpfConnectionLimits limits;
+        limits.listenerSlots = 1;
+        auto port = std::make_shared<c::Port>(gate, limits);
+        std::mutex barrier;
+        std::condition_variable changed;
+        bool entered = false;
+        bool release = false;
+        std::atomic<unsigned> destroyed{0};
+
+        struct Capture {
+            std::weak_ptr<c::Port> port;      ///< Only a weak reentry target; no ownership cycle.
+            std::atomic<unsigned> *destroyed; ///< Joined test participant counter.
+
+            /** Prove last user-capture destruction can safely reenter the port mutex. */
+            ~Capture() {
+                if (auto value = port.lock()) {
+                    std::lock_guard lock(value->mutex);
+                    (void)value->observed;
+                }
+
+                destroyed->fetch_add(1);
+            }
+        };
+
+        auto capture = std::make_shared<Capture>();
+        capture->port = port;
+        capture->destroyed = &destroyed;
+        auto token = port->listen([&, capture](auto, auto) {
+            std::unique_lock lock(barrier);
+            entered = true;
+            changed.notify_all();
+
+            if (!changed.wait_for(lock, std::chrono::seconds(3), [&] {
+                    return release;
+                })) {
+                throw std::runtime_error("owned callback release deadline");
+            }
+
+            throw std::runtime_error("contained in-flight failure");
+        });
+        REQUIRE(token);
+        capture.reset();
+        {
+            std::lock_guard lock(port->mutex);
+            port->transition(i::IpfConnectionState::CONNECTING);
+        }
+        std::jthread producer([&] {
+            port->dispatch();
+        });
+        {
+            std::unique_lock lock(barrier);
+            REQUIRE(changed.wait_for(lock, std::chrono::seconds(3), [&] {
+                return entered;
+            }));
+        }
+        CHECK(port->forget(*token));
+        CHECK(destroyed.load() == 0);
+        CHECK_FALSE(port->listen([](auto, auto) {
+        }));
+        CHECK(port->observerLedger->used.load() == 1);
+        {
+            std::lock_guard lock(barrier);
+            release = true;
+        }
+        changed.notify_all();
+        producer.join();
+        CHECK(destroyed.load() == 1);
+        CHECK(port->observerLedger->used.load() == 0);
+        CHECK(port->observed.callbackFailures == 1);
+        auto replacement = port->listen([](auto, auto) {
+        });
+        REQUIRE(replacement);
+        port->close();
+        port->retire();
+        CHECK(port->observerLedger->used.load() == 0);
     }
 }

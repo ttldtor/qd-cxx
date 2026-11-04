@@ -155,3 +155,17 @@ Later clean replacement removes stale domain/generation entries while already ow
 Last-Modified commits only after successful native retirement, preserving the existing first-cause rule.
 
 Live HTTP delivery drains already owned decoded/parser rows before requesting more native input. Each progress/event gets a new outer checkpoint and a fresh bounded single-record work slice; no multiple-row callback loop runs inside parser/native code. NEED_INPUT without a debit/event falls through to ordinary input, so incomplete UTF-8, control rows or compressed headers cannot cause a drain spin. Pending data that cannot make progress under the original slice is refused without increasing/refunding any grant. The snapshot reader instantiation/layout and cumulative HTTP/decoder/source counters remain unchanged.
+
+## Shutdown qualification boundary
+
+The selected/in-flight observer removal profile holds the callback at an explicit participant barrier,
+removes its registration concurrently, and verifies that its slot/capture remain retained until
+callback retirement. A throwing callback is advisory and cannot suppress another admitted observer.
+No-later-notification checks require the owned runtime worker and all test producer/remover threads
+to have joined; they do not assert global collector quiescence.
+
+A response interrupted after a flushed profile and within a UTF-8 prefix retains that immutable
+profile, reports incomplete HTTP/IPF, and retires native work without first-snapshot completion.
+The same retained-prefix rule applies to request-only stop during a held response. Callback failure
+counts stay independent of the transfer first cause. The public application sample prints only
+after creator join and distinguishes a completed initial snapshot from unfinished live framing.

@@ -7,11 +7,13 @@
 #include "transport/tls_test_support.hpp"
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <cstdlib>
 #include <doctest/doctest.h>
 #include <fstream>
 #include <mutex>
 #include <new>
+#include <stdexcept>
 #include <thread>
 
 namespace {
@@ -1275,5 +1277,144 @@ TEST_CASE("empty fallback snapshots complete and a later empty replacement remov
         CHECK(symbols(model).empty());
         CHECK(connection->observation().initialSnapshotComplete);
         CHECK(connection->observation().attempts == (initialEmpty ? 1 : 2));
+    }
+}
+
+TEST_CASE("live selected observer may finish after concurrent removal and request-only close") {
+    auto bootstrap = t::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    // Captured participant state outlives creator runtime cleanup on assertion failure too.
+    std::mutex barrier;
+    std::condition_variable changed;
+    bool entered = false;
+    bool release = false;
+    std::atomic<unsigned> activeCalls{0};
+    std::atomic<unsigned> survivorCalls{0};
+    auto owner = runtime(*bootstrap);
+    h::IpfHttpPeer peer({response(std::string(HEADER) + "STOCK,A\n##COMPLETE\n", "X-Live: provided\r\n")});
+    auto created = owner->createConnection(url(peer.port()), collector());
+    REQUIRE(created);
+    auto connection = *created;
+    auto token = connection->addStateChangeListener([&](auto, auto state) {
+        ++activeCalls;
+
+        if (state == i::IpfConnectionState::CONNECTED) {
+            std::unique_lock lock(barrier);
+            entered = true;
+            changed.notify_all();
+
+            if (!changed.wait_for(lock, 3s, [&] {
+                    return release;
+                })) {
+                throw std::runtime_error("owned callback release deadline");
+            }
+
+            throw std::runtime_error("contained selected observer");
+        }
+    });
+    REQUIRE(token);
+    auto survivor = connection->addStateChangeListener([&](auto, auto) {
+        ++survivorCalls;
+    });
+    REQUIRE(survivor);
+    REQUIRE(connection->start());
+    {
+        std::unique_lock lock(barrier);
+        REQUIRE(changed.wait_for(lock, 3s, [&] {
+            return entered;
+        }));
+    }
+    std::jthread remover([&] {
+        (void)connection->removeStateChangeListener(*token);
+        connection->close();
+    });
+    remover.join();
+    CHECK_FALSE(connection->observation().retired);
+    {
+        std::lock_guard lock(barrier);
+        release = true;
+    }
+    changed.notify_all();
+    CHECK(owner->closeAndAwaitTermination());
+    CHECK(connection->observation().retired);
+    CHECK(connection->observation().callbackFailures == 1);
+    CHECK_FALSE(connection->observation().initialSnapshotComplete);
+    CHECK(activeCalls.load() == 2);
+    CHECK(survivorCalls.load() == 3);
+    connection.reset();
+    owner.reset();
+    CHECK(activeCalls.load() == 2);
+    CHECK(survivorCalls.load() == 3);
+}
+
+TEST_CASE("interrupted response and producer stop retain owning flushed revisions without completion") {
+    for (const bool stop : {false, true}) {
+        CAPTURE(stop);
+        auto bootstrap = t::RuntimeBootstrap::create();
+        REQUIRE(bootstrap);
+        i::IpfConnectionRuntimeOptions options;
+        options.limits.attempts = 1;
+        // Keep callback inputs alive through destructor-driven runtime cleanup on failed assertions.
+        auto model = collector();
+        std::atomic<std::shared_ptr<const i::ProfileRevision>> prefix;
+        std::atomic<unsigned> notifications{0};
+        auto owner = runtime(*bootstrap, options);
+        const auto body = std::string(HEADER) + "STOCK,A\n##\nSTOCK," + char(0xc3);
+        h::IpfHttpPeer peer({"HTTP/1.1 200 OK\r\nX-Live: provided\r\nContent-Length: 9999\r\n\r\n" + body}, 7, stop);
+        auto failed = model->addUpdateListener([](auto batch) {
+            if (!batch->profiles().empty()) {
+                throw std::runtime_error("contained collector failure");
+            }
+        });
+        REQUIRE(failed);
+        auto delivered = model->addUpdateListener([&](auto batch) {
+            if (!batch->profiles().empty()) {
+                prefix.store(batch->profiles().front());
+                ++notifications;
+            }
+        });
+        REQUIRE(delivered);
+        auto created = owner->createConnection(url(peer.port()) + "[update=0]", model);
+        REQUIRE(created);
+        auto connection = *created;
+        REQUIRE(connection->start());
+        REQUIRE(reached([&] {
+            return static_cast<bool>(prefix.load());
+        }));
+
+        if (stop) {
+            std::jthread producer([&] {
+                connection->close();
+            });
+            producer.join();
+        } else {
+            CHECK(reached([&] {
+                return connection->observation().retired;
+            }));
+        }
+
+        CHECK(owner->closeAndAwaitTermination());
+        const auto observed = connection->observation();
+        CHECK(observed.retired);
+        CHECK_FALSE(observed.initialSnapshotComplete);
+        CHECK(connection->awaitCompleted(std::chrono::steady_clock::time_point::min()) ==
+              i::IpfCompletionWaitStatus::CLOSED);
+        REQUIRE(observed.lastAttempt);
+        CHECK_FALSE(observed.lastAttempt->httpFinished);
+        CHECK_FALSE(observed.lastAttempt->ipfFinished);
+        CHECK(observed.lastAttempt->nativeRetired);
+        REQUIRE(observed.diagnostic);
+        CHECK((observed.diagnostic->transfer.error == i::IpfTransferError::CANCELLED) == stop);
+        CHECK(model->callbackFailures() == 1);
+        CHECK(notifications.load() == 1);
+        auto retained = prefix.load();
+        REQUIRE(retained);
+        connection.reset();
+        owner.reset();
+        model->close();
+        model.reset();
+        CHECK(retained->profile.getType() == u"STOCK");
+        CHECK(retained->profile.getSymbol() == u"A");
+        CHECK(notifications.load() == 1);
     }
 }

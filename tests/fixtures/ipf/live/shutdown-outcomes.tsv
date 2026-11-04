@@ -1,0 +1,12 @@
+remove-returned-while-active	true
+selected-calls-before-release	2
+removed-survivor-completed	true
+removed-selected-final-calls	2
+removed-survivor-completion-count	1
+removed-handler-retired	true
+throwing-first-snapshot	true
+throwing-callback-count	1
+throwing-survivor-completion-count	1
+throwing-handler-retired	true
+collector-contained-failure-count	1
+collector-survivor-profile-count	2

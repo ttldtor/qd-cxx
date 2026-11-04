@@ -142,3 +142,16 @@ domain/generation entries, сохраняя уже owning revisions. Last-Modifi
 успешного native retirement с сохранением прежнего first-cause правила.
 
 Live HTTP delivery обрабатывает уже owning decoded/parser rows до запроса новых native bytes. Каждый progress/event проходит новый outer checkpoint и конечный single-record work slice; callbacks нескольких строк не выполняются циклом внутри parser/native. NEED_INPUT без debit/event переходит к обычному input, поэтому partial UTF-8/control/compressed header не создаёт drain spin. Pending data без возможного progress в исходном slice получает отказ без увеличения/возврата grants. Snapshot reader instantiation/layout и cumulative HTTP/decoder/source counters не меняются.
+
+## Граница shutdown qualification
+
+Selected/in-flight observer удерживается явным participant barrier. Конкурентное удаление
+registration сохраняет slot/capture до retirement callback. Исключение callback advisory
+и не подавляет другого admitted observer. Проверки отсутствия поздних notifications требуют join
+собственного runtime worker и всех test producer/remover threads; это не global collector quiescence.
+
+Ответ, оборванный после flushed profile внутри UTF-8 prefix, сохраняет immutable profile,
+показывает неполные HTTP/IPF и выполняет native retirement без first-snapshot completion.
+Тот же retained-prefix contract действует при request-only stop held response.
+Счётчики callback failures независимы от первого transfer cause. Public sample печатает после
+creator join и различает завершённый initial snapshot и незавершённый live framing.

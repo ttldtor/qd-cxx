@@ -1,0 +1,28 @@
+# Copyright (c) 2026 ttldtor.
+# SPDX-License-Identifier: BSL-1.0
+cmake_minimum_required(VERSION 3.28)
+if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+    project(qdcxx_ipf_live_sample LANGUAGES CXX)
+endif()
+if(NOT TARGET qdcxx_ipf_live)
+    find_package(qdcxx CONFIG REQUIRED)
+endif()
+if(NOT TARGET qdcxx_ipf_live)
+    message(FATAL_ERROR "The installed package requires ORG_TTLDTOR_QDCXX_BUILD_IPF_LIVE=ON and its IPF_TRANSFER prerequisites.")
+endif()
+add_executable(qdcxx_ipf_live_sample main.cpp)
+target_link_libraries(qdcxx_ipf_live_sample PRIVATE qdcxx_ipf_live)
+target_compile_features(qdcxx_ipf_live_sample PRIVATE cxx_std_23)
+target_compile_options(qdcxx_ipf_live_sample PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+set_target_properties(qdcxx_ipf_live_sample PROPERTIES OUTPUT_NAME qdcxx-ipf-live CXX_EXTENSIONS OFF)
+
+if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+    enable_testing()
+    add_test(NAME sample_noargs COMMAND qdcxx_ipf_live_sample)
+    add_test(NAME sample_help COMMAND qdcxx_ipf_live_sample --help)
+    add_test(NAME sample_help_ru COMMAND qdcxx_ipf_live_sample --help-ru)
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/sample-profiles.ipf" "#STOCK::=TYPE,SYMBOL\nSTOCK,SAMPLE\n##COMPLETE\n")
+    add_test(NAME sample_local COMMAND qdcxx_ipf_live_sample --run
+        --source "${CMAKE_CURRENT_BINARY_DIR}/sample-profiles.ipf" --duration-ms 1000)
+    set_tests_properties(sample_noargs sample_help sample_help_ru sample_local PROPERTIES TIMEOUT 15)
+endif()
