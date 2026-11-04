@@ -760,3 +760,9 @@ tests/fixtures/attachments/provenance.json text eol=lf
 tools/upstream/attachment-oracle/*.java text eol=lf
 tools/upstream/attachment-oracle/*.ps1 text eol=lf
 tests/conformance/attachment_fixture_negatives.cmake text eol=lf
+
+# Preserve exact text-event Java wire observations.
+tests/fixtures/text-events/capture-v1/** -text -whitespace
+tests/fixtures/text-events/provenance.json text eol=lf
+tools/upstream/text-events-oracle/*.java text eol=lf
+tools/upstream/text-events-oracle/*.ps1 text eol=lf

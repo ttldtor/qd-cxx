@@ -48,4 +48,5 @@ Exact conformance results belong to the [developer reading path](../docs/develop
 
 - [Summary receiving](events/SUMMARY.md): session prices/days, exact business OpenInterest, PriceType and five-type delivery.
 
+- [Text-event receiving](events/TEXT-EVENTS.md): nullable UTF-16 payloads, packed time and TICKER version semantics.
 - [Event text](events/EVENT-TEXT.md): explicit context, numeric/date representation, UTF-16/UTF-8 and finite ownership/work contracts.

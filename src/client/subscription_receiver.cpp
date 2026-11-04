@@ -69,7 +69,8 @@ std::size_t preparationAllowance(events::MappingLimits limits) {
 bool validBinding(const PreparedSubscriptionBinding &binding) noexcept {
     return (binding.kind == PreparedEventKind::QUOTE || binding.kind == PreparedEventKind::PROFILE ||
             binding.kind == PreparedEventKind::TRADE || binding.kind == PreparedEventKind::TRADE_ETH ||
-            binding.kind == PreparedEventKind::SUMMARY) &&
+            binding.kind == PreparedEventKind::SUMMARY || binding.kind == PreparedEventKind::TEXT_MESSAGE ||
+            binding.kind == PreparedEventKind::TEXT_CONFIGURATION) &&
            (binding.eventTimePolicy == ReceiverEventTimePolicy::UNSPECIFIED ||
             binding.eventTimePolicy == ReceiverEventTimePolicy::FIELD_METADATA);
 }
@@ -80,7 +81,7 @@ namespace detail {
 struct ReceiverRoute {
     core::RecordContext context; ///< Retained exact origin/record identity, without declaration names.
     std::variant<events::PreparedQuote, events::PreparedProfile, events::PreparedTrade, events::PreparedTradeETH,
-                 events::PreparedSummary>
+                 events::PreparedSummary, events::PreparedTextMessage, events::PreparedTextConfiguration>
         mapping;                          ///< Existing owned immutable mapper.
     events::EventValueLimits valueLimits; ///< Per-result owned text bounds.
     ReceiverEventTimePolicy timePolicy;   ///< Explicit optional timestamp source.
@@ -148,11 +149,14 @@ SubscriptionBatch::project(std::size_t index, ReceiverProjectionWork &work) cons
             if (!route.context.matches(record.context))
                 continue;
 
-            const bool quote = !std::holds_alternative<events::PreparedProfile>(route.mapping);
+            const bool textMessage = std::holds_alternative<events::PreparedTextMessage>(route.mapping);
+            const bool textConfiguration = std::holds_alternative<events::PreparedTextConfiguration>(route.mapping);
+            const bool profile = std::holds_alternative<events::PreparedProfile>(route.mapping);
+            const bool quote = !profile && !textMessage && !textConfiguration;
             const auto units = quote ? std::min(route.valueLimits.symbolUnits, route.valueLimits.totalUnits)
                                      : route.valueLimits.totalUnits;
             // Each owned string may need a terminator; this is logical copy work, not allocator overhead.
-            const auto textValues = quote ? std::size_t{1} : std::size_t{3};
+            const auto textValues = quote ? std::size_t{1} : (profile ? std::size_t{3} : std::size_t{2});
             const auto bytes = checkedSum(sizeof(SubscriptionProjection),
                                           checkedProduct(checkedSum(units, textValues), sizeof(char16_t)));
             debit(work.visits, checkedSum(route.shapeFields, checkedSum(route.selectionVisits, 1)));
@@ -166,9 +170,29 @@ SubscriptionBatch::project(std::size_t index, ReceiverProjectionWork &work) cons
 
             if (route.timePolicy == ReceiverEventTimePolicy::FIELD_METADATA && record.source &&
                 record.source->fieldTime)
-                eventTime = record.source->fieldTime->eventTimeMs();
+                eventTime = record.versionDefault ? 0 : record.source->fieldTime->eventTimeMs();
 
             const events::BorrowedRecordValueView values{record.context, record.typedValues};
+
+            if (textMessage) {
+                auto mapped = std::get<events::PreparedTextMessage>(route.mapping)
+                                  .mapView(record.symbol, values, route.valueLimits, eventTime.value_or(0));
+
+                if (!mapped)
+                    return std::unexpected(ReceiverProjectionFailure{mapped.error()});
+
+                return SubscriptionProjection{std::move(*mapped), eventTime};
+            }
+
+            if (textConfiguration) {
+                auto mapped = std::get<events::PreparedTextConfiguration>(route.mapping)
+                                  .mapView(record.symbol, values, route.valueLimits, eventTime.value_or(0));
+
+                if (!mapped)
+                    return std::unexpected(ReceiverProjectionFailure{mapped.error()});
+
+                return SubscriptionProjection{std::move(*mapped), eventTime};
+            }
 
             if (std::holds_alternative<events::PreparedTrade>(route.mapping)) {
                 auto mapped = std::get<events::PreparedTrade>(route.mapping)
@@ -309,6 +333,23 @@ openSubscriptionReceiver(mux::MuxQueue &queue, const core::LocalSchema &schema, 
                                        binding.eventTimePolicy, fields, binding.mappingLimits.selections});
             } else if (binding.kind == PreparedEventKind::SUMMARY) {
                 auto prepared = events::PreparedSummary::prepare(schema, binding.localId, binding.mappingLimits);
+
+                if (!prepared)
+                    return std::unexpected(ReceiverFailure{prepared.error(), i});
+
+                plan.routes.push_back({schema.recordContext(binding.localId), std::move(*prepared), binding.valueLimits,
+                                       binding.eventTimePolicy, fields, binding.mappingLimits.selections});
+            } else if (binding.kind == PreparedEventKind::TEXT_MESSAGE) {
+                auto prepared = events::PreparedTextMessage::prepare(schema, binding.localId, binding.mappingLimits);
+
+                if (!prepared)
+                    return std::unexpected(ReceiverFailure{prepared.error(), i});
+
+                plan.routes.push_back({schema.recordContext(binding.localId), std::move(*prepared), binding.valueLimits,
+                                       binding.eventTimePolicy, fields, binding.mappingLimits.selections});
+            } else if (binding.kind == PreparedEventKind::TEXT_CONFIGURATION) {
+                auto prepared =
+                    events::PreparedTextConfiguration::prepare(schema, binding.localId, binding.mappingLimits);
 
                 if (!prepared)
                     return std::unexpected(ReceiverFailure{prepared.error(), i});

@@ -14,7 +14,7 @@ and ownership. Use the namespace/type indexes beside this page to find individua
 | Encodings | `qd/encoding/` | `qdcxx_encoding` | [Encoding specifications](../spec/README.md#encoding-contracts) |
 | Schemas and record identity | `qd/core/` | `qdcxx_core` | [Schema specifications](../spec/README.md#schema-contracts) |
 | Frames, binding and tapes | `qd/protocol/` | `qdcxx_protocol` | [Protocol specifications](../spec/README.md#protocol-contracts) |
-| Standard events | `qd/events/` | `qdcxx_quote`, `qdcxx_profile`, `qdcxx_trade`, `qdcxx_trade_eth`, `qdcxx_summary`, `qdcxx_event_mapping` | [Configuration](CONFIGURATION.md), [Trade](../spec/events/TRADE.md), [TradeETH](../spec/events/TRADE-ETH.md), [Summary](../spec/events/SUMMARY.md) |
+| Standard events | `qd/events/` | `qdcxx_quote`, `qdcxx_profile`, `qdcxx_trade`, `qdcxx_trade_eth`, `qdcxx_summary`, `qdcxx_text_events`, `qdcxx_event_mapping` | [Configuration](CONFIGURATION.md), [Trade](../spec/events/TRADE.md), [TradeETH](../spec/events/TRADE-ETH.md), [Summary](../spec/events/SUMMARY.md), [text events](../spec/events/TEXT-EVENTS.md) |
 | Candle periods | `qd/events/candle_period.hpp` | `qdcxx_candle_values` | [Types, text and interval estimates](../spec/events/CANDLE-PERIOD.md); no Candle receiving |
 | Candle attributes | `qd/events/candle_attributes.hpp` | `qdcxx_candle_values` | [Values and symbol operations](../spec/events/CANDLE-ATTRIBUTES.md); no aggregation |
 | Candle symbols | `qd/events/candle_symbol.hpp` | `qdcxx_candle_values` | [Owning values and object selectors](CANDLE-SYMBOLS.md); no Candle receiving |

@@ -25,7 +25,7 @@ Const-наблюдение реестра допускается одновре�
 
 ## Явные mappings
 
-`EventType::QUOTE`, `EventType::PROFILE`, `EventType::TRADE`, `EventType::TRADE_ETH` и `EventType::SUMMARY` выбирают существующие prepared adapters.
+`EventType::QUOTE`, `EventType::PROFILE`, `EventType::TRADE`, `EventType::TRADE_ETH`, `EventType::SUMMARY`, `EventType::TEXT_MESSAGE` и `EventType::TEXT_CONFIGURATION` выбирают существующие prepared adapters.
 Имя записи не определяет тип события. Каждый маршрут задаёт явный local record ID,
 конечные `MappingLimits` и `EventTimePolicy`. Сохраняется требование `LocalSchema`:
 каждый ID равен позиции записи в полном каталоге.
@@ -169,6 +169,8 @@ reflection, произвольных delegate factories, всех классов
 wire semantics. Закреплённый reference и существующая provenance адаптеров находятся
 в `upstream.lock` и [доказательствах configured events](../../tests/fixtures/events/mapping/COVERAGE.ru.md).
 
-Trade добавлен как явный EventType::TRADE; см. [полный контракт](TRADE.ru.md). Тридцать один finite type sets хранят fixed16 index arrays; finite stack copy16 bindings и её initialization/read/write work включены в preparation. Quote/Trade/TradeETH/Summary выбирают regional fallback независимо; Profile сохраняет exact logical symbol. Record/field caps не расширены.
+Trade добавлен как явный EventType::TRADE; см. [полный контракт](TRADE.ru.md). Сто двадцать семь finite type sets хранят fixed16 index arrays; finite stack copy16 bindings и её initialization/read/write work включены в preparation. Quote/Trade/TradeETH/Summary выбирают regional fallback независимо; Profile сохраняет exact logical symbol. Record/field caps не расширены.
 
 TradeETH регистрируется отдельно как EventType::TRADE_ETH; см. [TradeETH](TRADE-ETH.ru.md). Raw ETH bit и отсутствие Tick fallback отличают его от обычного Trade.
+
+TextMessage и TextConfiguration сохраняют точные nonmarket-символы. Поведение STREAM и TICKER описано в [контракте](TEXT-EVENTS.ru.md).

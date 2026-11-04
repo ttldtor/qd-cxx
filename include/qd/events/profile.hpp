@@ -28,13 +28,6 @@ inline constexpr std::array<core::SerialFieldType, 16> PROFILE_FIELD_TYPES{
     core::SerialFieldType::TIME_SECONDS,  core::SerialFieldType::COMPACT_INT,  core::SerialFieldType::UTF_CHAR_ARRAY,
     core::SerialFieldType::UTF_CHAR_ARRAY};
 
-/** Mandatory logical UTF-16 ownership bounds for one complete event. */
-struct EventValueLimits {
-    std::size_t symbolUnits; ///< Maximum copied symbol units.
-    std::size_t stringUnits; ///< Maximum units in each copied nullable field string.
-    std::size_t totalUnits;  ///< Maximum combined symbol, Description and StatusReason units.
-};
-
 /** Owned Profile business projection, independent of schema and decoder storage. */
 struct Profile {
     std::u16string symbol;                      ///< Exact owned UTF-16 symbol.

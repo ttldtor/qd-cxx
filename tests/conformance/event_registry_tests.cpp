@@ -137,12 +137,12 @@ std::vector<core::FieldValue> values(const core::LocalRecord &record) {
 }
 } // namespace
 
-TEST_CASE("built-in registry preserves existing ordinals and appends complete Summary4") {
+TEST_CASE("built-in registry preserves existing ordinals and appends text events") {
     api::EventRegistryWork work;
     auto result = api::EventRegistry::builtIn({}, work);
     REQUIRE(result);
     CHECK(result->valid());
-    REQUIRE(result->registrations().size() == 5);
+    REQUIRE(result->registrations().size() == 7);
     CHECK(result->registrations()[0].type == api::EventType::QUOTE);
     CHECK(result->registrations()[0].localRecordId == 0);
     CHECK(result->registrations()[1].type == api::EventType::PROFILE);
@@ -160,9 +160,39 @@ TEST_CASE("built-in registry preserves existing ordinals and appends complete Su
     CHECK(result->registrations()[4].type == api::EventType::SUMMARY);
     CHECK(result->schema().records()[4].name == u"Summary");
     CHECK(result->schema().records()[4].fields.size() == 10);
+    CHECK(result->registrations()[5].type == api::EventType::TEXT_MESSAGE);
+    CHECK(result->schema().records()[5].name == u"TextMessage");
+    CHECK(result->schema().records()[5].fields.size() == 3);
+    CHECK(result->registrations()[6].type == api::EventType::TEXT_CONFIGURATION);
+    CHECK(result->schema().records()[6].name == u"TextConfiguration");
+    CHECK(result->schema().records()[6].fields.size() == 4);
+    CHECK_FALSE(result->versionField(5));
+    REQUIRE(result->versionField(6));
+    CHECK(*result->versionField(6) == 2);
+    CHECK_FALSE(result->versionField(99));
     CHECK(result->storageBytes() <= api::EventRegistryLimits{}.storageBytes);
     CHECK(work.visits < api::EventRegistryWork{}.visits);
     CHECK(work.preparation < api::EventRegistryWork{}.preparation);
+}
+
+TEST_CASE("TextConfiguration registry retains the prepared optional version selection") {
+    core::LocalRecord record{0, u"Custom", false, {{10}, {8}, {8}}, {{u"Text", 0}, {u"Extra", 1}, {u"Version", 2}}};
+    auto schema = core::LocalSchema::create(std::span(&record, 1), SCHEMA_LIMITS, core::LocalProfile::BINARY_FIELDS_V1);
+    REQUIRE(schema);
+    const api::EventRegistration route{api::EventType::TEXT_CONFIGURATION, 0};
+    api::EventRegistryWork work;
+    auto registry = api::EventRegistry::create(*schema, std::span(&route, 1), {}, work);
+    REQUIRE(registry);
+    REQUIRE(registry->versionField(0));
+    CHECK(*registry->versionField(0) == 2);
+    record.lookups.back().name = u"UnusedVersion";
+    auto withoutVersion =
+        core::LocalSchema::create(std::span(&record, 1), SCHEMA_LIMITS, core::LocalProfile::BINARY_FIELDS_V1);
+    REQUIRE(withoutVersion);
+    api::EventRegistryWork secondWork;
+    auto second = api::EventRegistry::create(*withoutVersion, std::span(&route, 1), {}, secondWork);
+    REQUIRE(second);
+    CHECK_FALSE(second->versionField(0));
 }
 
 TEST_CASE("custom registry preserves aliases extra fields generic records and multiple same-kind routes") {

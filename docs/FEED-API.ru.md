@@ -3,13 +3,13 @@
 [English version](FEED-API.md) · [Практические руководства](guides.ru.md) · [Справочник API](api.ru.md)
 
 Подключите `qd/api/feed.hpp` и линкуйте `qdcxx_feed`, чтобы получать типизированные
-`events::Quote`, `events::Profile`, `events::Trade`, `events::TradeETH` и `events::Summary` через рабочий поток библиотеки. Приложение создаёт
+`events::Quote`, `events::Profile`, `events::Trade`, `events::TradeETH`, `events::Summary`, `events::TextMessage` и `events::TextConfiguration` через рабочий поток библиотеки. Приложение создаёт
 endpoint, обработчики и подписки на точные символы; библиотека продвигает соединение,
 конечные переподключения, очереди и доставку. Подписки можно создавать до и после
 `connect()`.
 
 Поддержан обычный бинарный QTP поверх TCP со встроенными полными схемами Quote/Profile/Trade/TradeETH/Summary
-либо явными валидированными схемами вызывающего кода и зарегистрированными mappings Quote/Profile/Trade/TradeETH/Summary.
+и текстовых событий либо явными валидированными схемами вызывающего кода и зарегистрированными mappings.
 Endpoint выбирает TICKER (по умолчанию: последние значения с возможным объединением
 обновлений) или STREAM (каждая принятая выбранная запись источника). TLS, credentials,
 HISTORY и wildcard-селекторы в этот API не входят. Загрузка схем является отдельной задачей.
@@ -108,7 +108,7 @@ trades->addSymbols({"AAPL"});
 ```
 
 Runtime/endpoint прогрессируют через SDK; клиент не опрашивает queue или work budgets. Копия Trade
-владеет символом и inline snapshot, callback span действует только во время вызова. Все тридцать один непустых наборов Quote/Profile/Trade/TradeETH/Summary можно
+владеет символом и inline snapshot, callback span действует только во время вызова. Непустые наборы зарегистрированных типов с учётом выбранного delivery contract можно
 выбирать mixed-подпиской; предел полной receiving-схемы16 records сохраняется.
 
 ## Явный реестр событий
@@ -176,7 +176,7 @@ Composite и regional interests различаются в смешанной п�
 изменение, прежний desired set сохраняется. Composite fallback оставляет эти буквальные
 символы без изменений. Обычная форма с атрибутами `AAPL&Q{x=y}` представима.
 
-Встроенный registry сохраняет composite Quote/Profile/Trade/TradeETH/Summary. Этот путь через явный ограниченный
+Встроенный registry содержит composite Quote/Profile/Trade/TradeETH/Summary и оба текстовых события. Этот путь через явный ограниченный
 registry не загружает полный региональный каталог и не реализует более широкие selectors.
 [Контракт времени и вариантов](../spec/events/EVENT-TIME.ru.md) задаёт необязательные
 Sequence/nanoseconds, секунды/миллисекунды Quote, halt-секунды Profile, независимые метаданные
@@ -213,7 +213,7 @@ mixed->addSymbols({"AAPL", "IBM"});
 enum даёт `INVALID_ARGUMENT`; отсутствие поддержанного типа в реестре endpoint —
 `UNSUPPORTED_PROFILE`, без публикации подписки.
 
-`RegisteredEvent` — владеющий `std::variant<events::Quote, events::Profile, events::Trade, events::TradeETH, events::Summary>`.
+`RegisteredEvent` — владеющий variant всех поддержанных зарегистрированных событий, включая TextMessage и TextConfiguration.
 Скопируйте значение, чтобы сохранить его после callback span. Конкретные и смешанные
 подписки могут независимо перекрываться; закрытие одной отзывает только её оставшиеся
 исключительные interests. Границы callback batch следуют очереди; один batch может
@@ -374,7 +374,7 @@ endpoint. Лимиты учитывают ожидающие, активные �
 | Endpoint option | По умолчанию |
 | --- | --- |
 | `contract` | `TICKER` |
-| `eventRegistry` | Отсутствует: встроенные Quote0/Profile1/Trade2/TradeETH3/Summary4; явное значение копируется как неизменяемый снимок |
+| `eventRegistry` | Отсутствует: встроенные Quote0/Profile1/Trade2/TradeETH3/Summary4/TextMessage5/TextConfiguration6; явное значение копируется как неизменяемый снимок |
 | `connectTimeout`, `dnsTimeout`, `writeTimeout` | По 5000 мс |
 | `readTimeout` | 30000 мс |
 | `pollInterval` | 1 мс |
@@ -454,3 +454,5 @@ signed дни, не business timestamps. PriceType берётся из flags. П
 ## Явные decorated selectors
 
 Owning `SubscriptionSelector` и `addSelectors`/`setSelectors`/`removeSelector` сохраняют typed kind/source identity отдельно от physical demand. Текущие пять market types игнорируют IES source ID как production Java; TSS typed Feed атомарно неподдержан. `EndpointOptions::enableWildcard=true` разрешает explicit All только для STREAM и по умолчанию выключен. Literal leading-star не включает wildcard; прежние string/Candle API остаются plain exact. [Полный контракт, пример, конечное хранение и known-binding source adapter and time value conversion](../spec/subscriptions/DECORATED-SELECTORS.ru.md).
+
+TextMessage требует endpoint STREAM. TextConfiguration использует STREAM или TICKER; владеющий nullable-текст и политика версии описаны в [контракте](../spec/events/TEXT-EVENTS.ru.md).

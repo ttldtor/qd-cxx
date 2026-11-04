@@ -1263,6 +1263,8 @@ template class Subscription<events::Profile>;
 template class Subscription<events::Trade>;
 template class Subscription<events::TradeETH>;
 template class Subscription<events::Summary>;
+template class Subscription<events::TextMessage>;
+template class Subscription<events::TextConfiguration>;
 template class Subscription<RegisteredEvent>;
 
 Feed::Feed(std::shared_ptr<detail::EndpointPort> port) : port_(std::move(port)) {
@@ -1301,6 +1303,8 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
         bool trade = false;
         bool tradeETH = false;
         bool summary = false;
+        bool textMessage = false;
+        bool textConfiguration = false;
 
         for (const auto type : types) {
             switch (type) {
@@ -1319,19 +1323,28 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             case EventType::SUMMARY:
                 summary = true;
                 break;
+            case EventType::TEXT_MESSAGE:
+                textMessage = true;
+                break;
+            case EventType::TEXT_CONFIGURATION:
+                textConfiguration = true;
+                break;
             default:
                 reject(ErrorCode::INVALID_ARGUMENT, "subscription-event-types");
             }
         }
 
         const auto selection = static_cast<detail::EventSelection>(
-            (quote ? 1U : 0U) | (profile ? 2U : 0U) | (trade ? 4U : 0U) | (tradeETH ? 8U : 0U) | (summary ? 16U : 0U));
+            (quote ? 1U : 0U) | (profile ? 2U : 0U) | (trade ? 4U : 0U) | (tradeETH ? 8U : 0U) | (summary ? 16U : 0U) |
+            (textMessage ? 32U : 0U) | (textConfiguration ? 64U : 0U));
         const auto delivery = registeredDelivery ? detail::EventDelivery::REGISTERED
                               : quote            ? detail::EventDelivery::QUOTE
                               : profile          ? detail::EventDelivery::PROFILE
                               : trade            ? detail::EventDelivery::TRADE
                               : tradeETH         ? detail::EventDelivery::TRADE_ETH
-                                                 : detail::EventDelivery::SUMMARY;
+                              : summary          ? detail::EventDelivery::SUMMARY
+                              : textMessage      ? detail::EventDelivery::TEXT_MESSAGE
+                                                 : detail::EventDelivery::TEXT_CONFIGURATION;
         auto subscription = std::make_shared<detail::SubscriptionPort>();
         subscription->control = port_->control;
         subscription->endpoint = port_;
@@ -1354,11 +1367,17 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                 reject(ErrorCode::CLOSED, "endpoint-closed");
             }
 
+            if (textMessage && port_->options.contract != DeliveryContract::STREAM) {
+                reject(ErrorCode::UNSUPPORTED_PROFILE, "text-message-requires-stream");
+            }
+
             bool registeredQuote = !port_->options.eventRegistry;
             bool registeredProfile = !port_->options.eventRegistry;
             bool registeredTrade = !port_->options.eventRegistry;
             bool registeredTradeETH = !port_->options.eventRegistry;
             bool registeredSummary = !port_->options.eventRegistry;
+            bool registeredTextMessage = !port_->options.eventRegistry;
+            bool registeredTextConfiguration = !port_->options.eventRegistry;
 
             if (port_->options.eventRegistry) {
                 for (const auto &registration : port_->options.eventRegistry->registrations()) {
@@ -1367,6 +1386,9 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                     registeredTrade = registeredTrade || registration.type == EventType::TRADE;
                     registeredTradeETH = registeredTradeETH || registration.type == EventType::TRADE_ETH;
                     registeredSummary = registeredSummary || registration.type == EventType::SUMMARY;
+                    registeredTextMessage = registeredTextMessage || registration.type == EventType::TEXT_MESSAGE;
+                    registeredTextConfiguration =
+                        registeredTextConfiguration || registration.type == EventType::TEXT_CONFIGURATION;
                 }
             }
 
@@ -1374,7 +1396,8 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             const auto missingProfile = profile && !registeredProfile;
 
             if (missingQuote || missingProfile || (trade && !registeredTrade) || (tradeETH && !registeredTradeETH) ||
-                (summary && !registeredSummary)) {
+                (summary && !registeredSummary) || (textMessage && !registeredTextMessage) ||
+                (textConfiguration && !registeredTextConfiguration)) {
                 reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-unregistered-event");
             }
 
@@ -1597,6 +1620,10 @@ class TypedConsumer final : public client::SubscriptionConsumer {
                     projectedEvents.emplace_back(std::move(*tradeETH));
                 } else if (auto *summary = std::get_if<events::Summary>(&projected->value)) {
                     projectedEvents.emplace_back(std::move(*summary));
+                } else if (auto *message = std::get_if<events::TextMessage>(&projected->value)) {
+                    projectedEvents.emplace_back(std::move(*message));
+                } else if (auto *configuration = std::get_if<events::TextConfiguration>(&projected->value)) {
+                    projectedEvents.emplace_back(std::move(*configuration));
                 } else if (auto *profile = std::get_if<events::Profile>(&projected->value)) {
                     projectedEvents.emplace_back(std::move(*profile));
                 } else {
@@ -1690,6 +1717,10 @@ class TypedConsumer final : public client::SubscriptionConsumer {
                 return deliver<events::TradeETH>(batch, listeners);
             case EventDelivery::SUMMARY:
                 return deliver<events::Summary>(batch, listeners);
+            case EventDelivery::TEXT_MESSAGE:
+                return deliver<events::TextMessage>(batch, listeners);
+            case EventDelivery::TEXT_CONFIGURATION:
+                return deliver<events::TextConfiguration>(batch, listeners);
             case EventDelivery::REGISTERED:
                 return deliver<RegisteredEvent>(batch, listeners);
             default:

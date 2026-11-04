@@ -9,6 +9,7 @@
 #include "qd/events/profile.hpp"
 #include "qd/events/quote.hpp"
 #include "qd/events/summary.hpp"
+#include "qd/events/text_events.hpp"
 #include "qd/events/trade.hpp"
 #include "qd/events/trade_eth.hpp"
 #include "qd/transport/tcp_runtime.hpp"
@@ -166,7 +167,8 @@ class Endpoint;
 class Feed;
 
 /** Independently owning supported event value; inspect its actual class with std::visit or std::get_if. */
-using RegisteredEvent = std::variant<events::Quote, events::Profile, events::Trade, events::TradeETH, events::Summary>;
+using RegisteredEvent = std::variant<events::Quote, events::Profile, events::Trade, events::TradeETH, events::Summary,
+                                     events::TextMessage, events::TextConfiguration>;
 
 /** Typed logical subscription, backed by the existing receiver and shared queue.
  * Methods are producer-safe. Event-listener calls are serialized on the runtime's SDK worker.
@@ -177,7 +179,8 @@ using RegisteredEvent = std::variant<events::Quote, events::Profile, events::Tra
 template <class Event> class Subscription final {
     static_assert(std::is_same_v<Event, events::Quote> || std::is_same_v<Event, events::Profile> ||
                   std::is_same_v<Event, events::Trade> || std::is_same_v<Event, events::TradeETH> ||
-                  std::is_same_v<Event, events::Summary> || std::is_same_v<Event, RegisteredEvent>);
+                  std::is_same_v<Event, events::Summary> || std::is_same_v<Event, events::TextMessage> ||
+                  std::is_same_v<Event, events::TextConfiguration> || std::is_same_v<Event, RegisteredEvent>);
     std::shared_ptr<detail::SubscriptionPort> port_;
     friend class Feed;
     explicit Subscription(std::shared_ptr<detail::SubscriptionPort> port) noexcept;
@@ -335,6 +338,8 @@ extern template class Subscription<events::Profile>;
 extern template class Subscription<events::Trade>;
 extern template class Subscription<events::TradeETH>;
 extern template class Subscription<events::Summary>;
+extern template class Subscription<events::TextMessage>;
+extern template class Subscription<events::TextConfiguration>;
 extern template class Subscription<RegisteredEvent>;
 
 /** Endpoint's typed registration entry point; owns no SDK thread or bootstrap. */
@@ -365,13 +370,17 @@ class Feed final {
     template <class Event> [[nodiscard]] std::shared_ptr<Subscription<Event>> createSubscription() {
         static_assert(std::is_same_v<Event, events::Quote> || std::is_same_v<Event, events::Profile> ||
                       std::is_same_v<Event, events::Trade> || std::is_same_v<Event, events::TradeETH> ||
-                      std::is_same_v<Event, events::Summary>);
+                      std::is_same_v<Event, events::Summary> || std::is_same_v<Event, events::TextMessage> ||
+                      std::is_same_v<Event, events::TextConfiguration>);
         auto subscription = std::shared_ptr<Subscription<Event>>(new Subscription<Event>({}));
-        subscription->port_ = createSubscriptionPort(std::is_same_v<Event, events::Quote>      ? EventType::QUOTE
-                                                     : std::is_same_v<Event, events::Profile>  ? EventType::PROFILE
-                                                     : std::is_same_v<Event, events::Trade>    ? EventType::TRADE
-                                                     : std::is_same_v<Event, events::TradeETH> ? EventType::TRADE_ETH
-                                                                                               : EventType::SUMMARY);
+        subscription->port_ =
+            createSubscriptionPort(std::is_same_v<Event, events::Quote>         ? EventType::QUOTE
+                                   : std::is_same_v<Event, events::Profile>     ? EventType::PROFILE
+                                   : std::is_same_v<Event, events::Trade>       ? EventType::TRADE
+                                   : std::is_same_v<Event, events::TradeETH>    ? EventType::TRADE_ETH
+                                   : std::is_same_v<Event, events::Summary>     ? EventType::SUMMARY
+                                   : std::is_same_v<Event, events::TextMessage> ? EventType::TEXT_MESSAGE
+                                                                                : EventType::TEXT_CONFIGURATION);
 
         return subscription;
     }

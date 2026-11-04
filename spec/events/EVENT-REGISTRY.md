@@ -24,7 +24,7 @@ remain alive. The registry retains no application callable or capture.
 
 ## Explicit mappings
 
-`EventType::QUOTE`, `EventType::PROFILE`, `EventType::TRADE`, `EventType::TRADE_ETH` and `EventType::SUMMARY` select the existing prepared adapters.
+`EventType::QUOTE`, `EventType::PROFILE`, `EventType::TRADE`, `EventType::TRADE_ETH`, `EventType::SUMMARY`, `EventType::TEXT_MESSAGE` and `EventType::TEXT_CONFIGURATION` select the existing prepared adapters.
 Record names do not infer a type. Each route supplies an explicit local record ID,
 finite `MappingLimits` and an `EventTimePolicy`. IDs retain the `LocalSchema`
 requirement: each ID equals its position in the complete record catalog.
@@ -162,6 +162,8 @@ reflection, arbitrary delegate factories, all event classes or new wire semantic
 The pinned reference and existing adapter provenance are in `upstream.lock` and
 [configured event evidence](../../tests/fixtures/events/mapping/COVERAGE.md).
 
-Trade is explicitly registered as EventType::TRADE; see its [complete contract](TRADE.md). Thirty-one finite type sets retain fixed16 index arrays; a finite16-entry stack binding copy and initialization/read/write work are included in preparation. Quote/Trade/TradeETH/Summary select regional fallback independently; Profile preserves exact logical symbols. Record/field caps are unchanged.
+Trade is explicitly registered as EventType::TRADE; see its [complete contract](TRADE.md). One hundred twenty-seven finite type sets retain fixed16 index arrays; a finite16-entry stack binding copy and initialization/read/write work are included in preparation. Quote/Trade/TradeETH/Summary select regional fallback independently; Profile preserves exact logical symbols. Record/field caps are unchanged.
 
 TradeETH is independently registered as EventType::TRADE_ETH; see [TradeETH](TRADE-ETH.md). Its raw ETH bit and lack of Tick fallback are distinct from ordinary Trade.
+
+TextMessage and TextConfiguration preserve exact nonmarket symbols. See [their contract](TEXT-EVENTS.md) for STREAM and TICKER behavior.

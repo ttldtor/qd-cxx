@@ -28,7 +28,8 @@ struct ListenerLedger {
 using ListenerFunction =
     std::variant<std::monostate, Subscription<events::Quote>::Listener, Subscription<events::Profile>::Listener,
                  Subscription<events::Trade>::Listener, Subscription<events::TradeETH>::Listener,
-                 Subscription<events::Summary>::Listener, Subscription<RegisteredEvent>::Listener,
+                 Subscription<events::Summary>::Listener, Subscription<events::TextMessage>::Listener,
+                 Subscription<events::TextConfiguration>::Listener, Subscription<RegisteredEvent>::Listener,
                  Endpoint::StateChangeListener, Subscription<events::Quote>::StateChangeListener>;
 
 /** Shared application callable; its last release never occurs under a control mutex. */

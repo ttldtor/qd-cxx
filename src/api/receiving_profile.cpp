@@ -232,10 +232,19 @@ void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, s
             const auto index = profile.bindings.size();
             const auto &record = profile.schema.records()[static_cast<std::size_t>(registration.localRecordId)];
             profile.bindingExchanges[index] =
-                registration.type == EventType::PROFILE ? 0 : events::market_symbols::getExchangeCode(record.name);
+                (registration.type == EventType::PROFILE || registration.type == EventType::TEXT_MESSAGE ||
+                 registration.type == EventType::TEXT_CONFIGURATION)
+                    ? 0
+                    : events::market_symbols::getExchangeCode(record.name);
             const auto policy = registration.eventTimePolicy == EventTimePolicy::FIELD_METADATA
                                     ? client::ReceiverEventTimePolicy::FIELD_METADATA
                                     : client::ReceiverEventTimePolicy::UNSPECIFIED;
+
+            if (const auto version = registry.versionField(registration.localRecordId)) {
+                profile.versionBindings[profile.versionBindingCount++] = {
+                    profile.schema.recordContext(registration.localRecordId), registration.localRecordId, *version};
+            }
+
             profile.bindings.push_back({registration.localRecordId,
                                         static_cast<client::PreparedEventKind>(registration.type),
                                         registration.mappingLimits, values, policy});
@@ -260,9 +269,11 @@ void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, s
                     add(add(mapping.typeAlternatives, mapping.nameUnits),
                         add(mapping.totalNameUnits, mapping.comparisonWork)));
             const auto fields = profile.schema.records()[static_cast<std::size_t>(binding.localId)].fields.size();
-            const bool text = binding.kind == client::PreparedEventKind::PROFILE;
+            const bool profileText = binding.kind == client::PreparedEventKind::PROFILE;
+            const bool text = profileText || binding.kind == client::PreparedEventKind::TEXT_MESSAGE ||
+                              binding.kind == client::PreparedEventKind::TEXT_CONFIGURATION;
             const auto units = text ? values.totalUnits : values.symbolUnits;
-            const auto strings = text ? std::size_t{3} : std::size_t{1};
+            const auto strings = profileText ? std::size_t{3} : (text ? std::size_t{2} : std::size_t{1});
             const auto bytes =
                 add(sizeof(client::SubscriptionProjection), multiply(add(units, strings), sizeof(char16_t)));
             plan.bindingIndices[plan.bindingCount++] = index;
@@ -431,7 +442,7 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
                                      multiply(subscriptionEntries, sizeof(core::SubscriptionRequest))),
                                  textBacking);
     routing.retainedMetadataBytes =
-        add(sizeof(result.bindingExchanges),
+        add(add(sizeof(result.bindingExchanges), sizeof(result.versionBindings)),
             add(sizeof(result.eventPlans),
                 sizeof(std::array<client::PreparedSubscriptionBinding, MAXIMUM_RECEIVING_RECORDS>)));
     // Snapshot copy, suffix/representability scans, physical conversion and conservative retirement.
@@ -532,7 +543,8 @@ void validateReceivingSymbol(const EventRegistry *registry, EventSelection selec
     const auto exchange = events::market_symbols::getExchangeCode(symbol);
 
     for (const auto &route : registry->registrations()) {
-        if (route.type == EventType::PROFILE || !selectsEvent(selection, route.type)) {
+        if (route.type == EventType::PROFILE || route.type == EventType::TEXT_MESSAGE ||
+            route.type == EventType::TEXT_CONFIGURATION || !selectsEvent(selection, route.type)) {
             continue;
         }
 
@@ -597,7 +609,9 @@ std::expected<mux::MuxQueue, mux::QueueFailure> createReceivingQueue(const Recei
                                                                      mux::QueueWork &work) {
     if (profile.family == core::SubscriptionFamily::TICKER) {
         return mux::MuxQueue::createTicker(profile.schema, profile.interests, profile.tickerLimits,
-                                           {false, 100, profile.recoveryOptions.selectors}, profile.queueLimits, work);
+                                           {false, 100, profile.recoveryOptions.selectors,
+                                            std::span(profile.versionBindings).first(profile.versionBindingCount)},
+                                           profile.queueLimits, work);
     }
 
     return mux::MuxQueue::createStream(profile.schema, profile.interests, profile.endpoint.settings().budgets.desired,

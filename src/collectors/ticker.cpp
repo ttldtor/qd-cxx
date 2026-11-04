@@ -166,6 +166,45 @@ bool equalData(const protocol::LiveRecordView &left, const protocol::LiveRecordV
 
     return true;
 }
+
+/** Read the first Java physical int slot of an admitted scalar field.
+ * @param field Complete canonical logical scalar, validated through the local schema.
+ * @return Signed high32 for two-slot types, otherwise the signed raw int slot.
+ */
+std::int32_t physicalVersion(const protocol::LiveFieldValueView &field) noexcept {
+    if (field.type == core::SerialFieldType::LONG || field.type == core::SerialFieldType::WIDE_DECIMAL ||
+        field.type == core::SerialFieldType::TIME_MILLIS) {
+        return static_cast<std::int32_t>(field.raw >> 32);
+    }
+
+    return static_cast<std::int32_t>(field.raw);
+}
+
+/** Admit only exact generic scalar identities with a Java int storage slot.
+ * @param type Exact local full type, never inferred from serialization bits alone.
+ * @return Whether a version comparison can use its first physical int slot.
+ */
+bool versionType(core::SerialFieldType type) noexcept {
+    switch (type) {
+    case core::SerialFieldType::VOID_FIELD:
+    case core::SerialFieldType::BYTE:
+    case core::SerialFieldType::UTF_CHAR:
+    case core::SerialFieldType::SHORT:
+    case core::SerialFieldType::INT:
+    case core::SerialFieldType::COMPACT_INT:
+    case core::SerialFieldType::DECIMAL:
+    case core::SerialFieldType::SHORT_STRING:
+    case core::SerialFieldType::TIME_SECONDS:
+    case core::SerialFieldType::SEQUENCE:
+    case core::SerialFieldType::DATE:
+    case core::SerialFieldType::LONG:
+    case core::SerialFieldType::WIDE_DECIMAL:
+    case core::SerialFieldType::TIME_MILLIS:
+        return true;
+    default:
+        return false;
+    }
+}
 } // namespace
 
 TickerToken::TickerToken(TickerIdentity *origin, std::size_t slot, std::uint64_t generation) noexcept
@@ -222,6 +261,7 @@ struct TickerCollector::Impl {
         const protocol::LiveRecordView *record = nullptr; ///< Null for an unused slot.
         std::size_t frame = NONE;                         ///< Owning frame, or incoming candidate discriminator.
         std::uint64_t generation = 0;                     ///< Original source binding generation.
+        bool defaultValue = false; ///< Fresh negative version materializes a canonical zero/null cursor.
     };
 
     /** Unique whole-event owner; views never own these independently. */
@@ -258,9 +298,15 @@ struct TickerCollector::Impl {
         Queues queues;                                  ///< Active per-view queue state.
     };
 
-    core::LocalSchema schema;                    ///< Immutable exact source/local provenance and configured layout.
-    TickerLimits limits;                         ///< Required immutable capacities.
-    TickerOptions options;                       ///< Explicit retention and scheduling.
+    core::LocalSchema schema;                     ///< Immutable exact source/local provenance and configured layout.
+    TickerLimits limits;                          ///< Required immutable capacities.
+    TickerOptions options;                        ///< Explicit retention and scheduling; no borrowed bindings.
+    std::unique_ptr<std::size_t[]> versionFields; ///< Owned local-ID indexed optional scalar position; NONE disables.
+    std::unique_ptr<protocol::LiveFieldValueView[]>
+        defaultFields; ///< Canonical zero/null fields, immutable after create.
+    std::unique_ptr<std::span<const protocol::LiveFieldValueView>[]> defaultShapes; ///< Per-record default field spans.
+    std::unique_ptr<std::int32_t[]> defaultLegacy; ///< Shared zero compact-only fields, immutable after create.
+    std::unique_ptr<protocol::LiveRecordView[]> defaultRecords; ///< Per-cache-slot stable normalized default views.
     TickerIdentity *origin = nullptr;            ///< One collector reference plus detached token references.
     std::unique_ptr<Entry[]> entries;            ///< Active fixed cache metadata.
     std::unique_ptr<Entry[]> candidate;          ///< Fixed whole-frame candidate metadata.
@@ -403,6 +449,36 @@ struct TickerCollector::Impl {
         }
 
         return NONE;
+    }
+
+    /** Build a temporary canonical default value without changing source/key metadata or allocating.
+     * @param source Original immutable event record retained by the cache.
+     * @return Value-copy metadata with all declared fields at their canonical zero/null defaults.
+     */
+    protocol::LiveRecordView defaultRecord(const protocol::LiveRecordView &source) const noexcept {
+        auto result = source;
+        result.typedValues = defaultShapes[static_cast<std::size_t>(source.localId)];
+        result.values = {defaultLegacy.get(), source.values.size()};
+        result.eventFlags = 0;
+        result.removalTime.reset();
+
+        if (result.fieldTime) {
+            result.fieldTime->rawSeconds = 0;
+
+            if (result.fieldTime->rawSequence) {
+                result.fieldTime->rawSequence = 0;
+            }
+        }
+
+        return result;
+    }
+
+    /** Borrow the selected cached value, including explicit fresh-version defaults.
+     * @param index Valid occupied cache slot.
+     * @return Stable view until the collector's documented next invalidation.
+     */
+    const protocol::LiveRecordView *valueRecord(std::size_t index) const noexcept {
+        return entries[index].defaultValue ? &defaultRecords[index] : entries[index].record;
     }
 
     /** Append one fixed link if not already queued.
@@ -812,6 +888,32 @@ std::expected<TickerCollector, TickerError> TickerCollector::create(core::LocalS
             return std::unexpected(TickerError::INVALID_CONFIGURATION);
         }
 
+        if (options.versionBindings.size() > schema.records().size()) {
+            return std::unexpected(TickerError::INVALID_CONFIGURATION);
+        }
+
+        spend(work, 0,
+              sum(options.versionBindings.size(),
+                  product(options.versionBindings.size(), options.versionBindings.size())));
+
+        for (std::size_t i = 0; i < options.versionBindings.size(); ++i) {
+            const auto &binding = options.versionBindings[i];
+            const auto id = binding.localRecordId;
+
+            if (!schema.recordContext(id).matches(binding.context) ||
+                binding.fieldIndex >= schema.records()[static_cast<std::size_t>(id)].fields.size() ||
+                !versionType(static_cast<core::SerialFieldType>(
+                    schema.records()[static_cast<std::size_t>(id)].fields[binding.fieldIndex].serialTypeId))) {
+                return std::unexpected(TickerError::INVALID_CONFIGURATION);
+            }
+
+            for (std::size_t j = 0; j < i; ++j) {
+                if (options.versionBindings[j].context.matches(binding.context)) {
+                    return std::unexpected(TickerError::INVALID_CONFIGURATION);
+                }
+            }
+        }
+
         const auto failure = TickerError::INVALID_CONFIGURATION;
         const auto cells = product(limits.viewSlots, limits.cacheKeys, failure);
         auto fixed = sum(sizeof(Impl), sizeof(TickerIdentity), failure);
@@ -820,6 +922,23 @@ std::expected<TickerCollector, TickerError> TickerCollector::create(core::LocalS
         fixed = sum(fixed, product(limits.viewSlots, sizeof(Impl::View) + sizeof(Impl::Queues), failure), failure);
         fixed = sum(fixed, product(cells, 2 * sizeof(Impl::Pending), failure), failure);
         fixed = sum(fixed, schema.storageBytes() - sizeof(core::LocalSchema), failure);
+        const auto versionSlots = options.versionBindings.empty() ? 0 : schema.records().size();
+        fixed = sum(fixed, product(versionSlots, sizeof(std::size_t), failure), failure);
+        std::size_t defaultFieldCount = 0;
+        std::size_t defaultLegacyCount = 0;
+
+        for (const auto &binding : options.versionBindings) {
+            const auto fields = schema.records()[static_cast<std::size_t>(binding.localRecordId)].fields.size();
+            defaultFieldCount = sum(defaultFieldCount, fields, failure);
+            defaultLegacyCount = std::max(defaultLegacyCount, fields);
+        }
+
+        const auto defaultRecordCount = versionSlots ? limits.cacheKeys : 0;
+        fixed = sum(fixed, product(defaultFieldCount, sizeof(protocol::LiveFieldValueView), failure), failure);
+        fixed =
+            sum(fixed, product(versionSlots, sizeof(std::span<const protocol::LiveFieldValueView>), failure), failure);
+        fixed = sum(fixed, product(defaultLegacyCount, sizeof(std::int32_t), failure), failure);
+        fixed = sum(fixed, product(defaultRecordCount, sizeof(protocol::LiveRecordView), failure), failure);
 
         if (fixed > limits.residentBytes) {
             return std::unexpected(TickerError::RESOURCE_LIMIT);
@@ -831,6 +950,9 @@ std::expected<TickerCollector, TickerError> TickerCollector::create(core::LocalS
         initialization = sum(initialization, product(2, limits.cachedFrames));
         initialization = sum(initialization, product(2, limits.viewSlots));
         initialization = sum(initialization, product(2, cells));
+        initialization = sum(initialization, versionSlots);
+        initialization =
+            sum(initialization, sum(defaultFieldCount, sum(versionSlots, sum(defaultLegacyCount, defaultRecordCount))));
         spend(work, 0, initialization, 0, fixed);
         // Allocate every fallible fixed owner before the schema's final move.
         auto entries = std::make_unique<Impl::Entry[]>(limits.cacheKeys);
@@ -843,6 +965,35 @@ std::expected<TickerCollector, TickerError> TickerCollector::create(core::LocalS
         auto references = std::make_unique<std::size_t[]>(limits.cachedFrames);
         auto order = std::make_unique<std::size_t[]>(limits.cacheKeys);
         auto origin = std::make_unique<TickerIdentity>();
+        std::unique_ptr<std::size_t[]> versionFields;
+        std::unique_ptr<protocol::LiveFieldValueView[]> defaultFields;
+        std::unique_ptr<std::span<const protocol::LiveFieldValueView>[]> defaultShapes;
+        std::unique_ptr<std::int32_t[]> defaultLegacy;
+        std::unique_ptr<protocol::LiveRecordView[]> defaultRecords;
+
+        if (versionSlots) {
+            versionFields = std::make_unique<std::size_t[]>(versionSlots);
+            std::fill_n(versionFields.get(), versionSlots, NONE);
+            defaultFields = std::make_unique<protocol::LiveFieldValueView[]>(defaultFieldCount);
+            defaultShapes = std::make_unique<std::span<const protocol::LiveFieldValueView>[]>(versionSlots);
+            defaultLegacy = std::make_unique<std::int32_t[]>(defaultLegacyCount);
+            defaultRecords = std::make_unique<protocol::LiveRecordView[]>(defaultRecordCount);
+        }
+
+        std::size_t defaultOffset = 0;
+
+        for (const auto &binding : options.versionBindings) {
+            const auto id = static_cast<std::size_t>(binding.localRecordId);
+            versionFields[id] = binding.fieldIndex;
+            const auto &fields = schema.records()[id].fields;
+            defaultShapes[id] = {defaultFields.get() + defaultOffset, fields.size()};
+
+            for (const auto &field : fields) {
+                defaultFields[defaultOffset++] = {static_cast<core::SerialFieldType>(field.serialTypeId), 0, {}, {}};
+            }
+        }
+
+        options.versionBindings = {};
         // Impl allocation is also fallible: allocate raw storage before consuming schema.
         auto *storage = ::operator new(sizeof(Impl));
         std::unique_ptr<Impl> impl(new (storage) Impl(std::move(schema), limits, options, fixed));
@@ -856,6 +1007,11 @@ std::expected<TickerCollector, TickerError> TickerCollector::create(core::LocalS
         impl->references = std::move(references);
         impl->order = std::move(order);
         impl->origin = origin.release();
+        impl->versionFields = std::move(versionFields);
+        impl->defaultFields = std::move(defaultFields);
+        impl->defaultShapes = std::move(defaultShapes);
+        impl->defaultLegacy = std::move(defaultLegacy);
+        impl->defaultRecords = std::move(defaultRecords);
 
         return TickerCollector(std::move(impl));
     } catch (TickerError error) {
@@ -1181,6 +1337,11 @@ std::expected<TickerStage, TickerError> TickerCollector::stage(protocol::LiveEve
         spend(work, 0,
               sum(product(4, cells), sum(sum(product(8, s.limits.cacheKeys), product(6, s.limits.cachedFrames)),
                                          product(6, s.limits.viewSlots))));
+
+        if (s.versionFields) {
+            spend(work, 0, s.limits.cacheKeys);
+        }
+
         Guard guard{s};
 
         for (std::size_t i = 0; i < s.limits.cacheKeys; ++i) {
@@ -1218,8 +1379,29 @@ std::expected<TickerStage, TickerError> TickerCollector::stage(protocol::LiveEve
             }
 
             auto index = s.find(s.candidate.get(), record, work);
+            bool materializeDefault = false;
 
-            if (index != NONE && equalData(*s.candidate[index].record, record, work)) {
+            if (s.versionFields) {
+                const auto field = s.versionFields[static_cast<std::size_t>(record.localId)];
+
+                if (field != NONE) {
+                    spend(work, 0, 2);
+                    const auto prior = index == NONE || s.candidate[index].defaultValue
+                                           ? 0
+                                           : physicalVersion(s.candidate[index].record->typedValues[field]);
+
+                    if (physicalVersion(record.typedValues[field]) < prior && index != NONE) {
+                        ++result.ignored;
+                        continue;
+                    }
+
+                    materializeDefault = index == NONE && physicalVersion(record.typedValues[field]) < 0;
+                }
+            }
+
+            if (index != NONE && equalData(s.candidate[index].defaultValue ? s.defaultRecord(*s.candidate[index].record)
+                                                                           : *s.candidate[index].record,
+                                           record, work)) {
                 ++result.equal;
                 continue;
             }
@@ -1242,7 +1424,7 @@ std::expected<TickerStage, TickerError> TickerCollector::stage(protocol::LiveEve
                 ++keyCount;
             }
 
-            s.candidate[index] = {&record, NONE, identity.generation()};
+            s.candidate[index] = {&record, NONE, identity.generation(), materializeDefault};
             ++result.changed;
 
             for (std::size_t v = 0; v < s.limits.viewSlots; ++v) {
@@ -1332,6 +1514,10 @@ std::expected<TickerStage, TickerError> TickerCollector::stage(protocol::LiveEve
         if (result.changed) {
             for (std::size_t i = 0; i < s.limits.cacheKeys; ++i) {
                 s.entries[i] = s.candidate[i];
+
+                if (s.entries[i].record && s.entries[i].defaultValue) {
+                    s.defaultRecords[i] = s.defaultRecord(*s.entries[i].record);
+                }
             }
 
             for (std::size_t i = 0; i < cells; ++i) {
@@ -1402,12 +1588,12 @@ std::expected<std::optional<TickerDelivery>, TickerError> TickerCollector::front
         const auto &item = s.rows(s.pending.get(), *slot)[q.offered];
         const auto &entry = s.entries[q.offered];
 
-        return std::optional<TickerDelivery>{
-            {{entry.record, TickerEpochToken(s.origin, NONE, s.generation), entry.generation, true},
-             item.membership,
-             item.revision,
-             item.first ? TickerDeliveryKind::INITIAL : TickerDeliveryKind::LIVE,
-             0}};
+        return std::optional<TickerDelivery>{{{s.valueRecord(q.offered), TickerEpochToken(s.origin, NONE, s.generation),
+                                               entry.generation, true, entry.record, entry.defaultValue},
+                                              item.membership,
+                                              item.revision,
+                                              item.first ? TickerDeliveryKind::INITIAL : TickerDeliveryKind::LIVE,
+                                              0}};
     } catch (TickerError error) {
         return std::unexpected(error);
     }
@@ -1498,8 +1684,9 @@ std::expected<std::optional<TickerValue>, TickerError> TickerCollector::latest(c
             spend(work, 0, 0, sum(entry.record->symbol.size(), key.symbol.size()));
 
             if (entry.record->symbol == key.symbol) {
-                return std::optional<TickerValue>{{entry.record, TickerEpochToken(s.origin, NONE, s.generation),
-                                                   entry.generation, s.state == TickerState::CURRENT}};
+                return std::optional<TickerValue>{{s.valueRecord(i), TickerEpochToken(s.origin, NONE, s.generation),
+                                                   entry.generation, s.state == TickerState::CURRENT, entry.record,
+                                                   entry.defaultValue}};
             }
         }
 

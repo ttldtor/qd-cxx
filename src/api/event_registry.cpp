@@ -5,6 +5,7 @@
 #include "qd/events/profile.hpp"
 #include "qd/events/quote.hpp"
 #include "qd/events/summary.hpp"
+#include "qd/events/text_events.hpp"
 #include "qd/events/trade.hpp"
 #include "qd/events/trade_eth.hpp"
 
@@ -161,7 +162,8 @@ std::size_t mappingWork(events::MappingLimits limits) {
 bool validRegistration(const EventRegistration &registration) noexcept {
     return (registration.type == EventType::QUOTE || registration.type == EventType::PROFILE ||
             registration.type == EventType::TRADE || registration.type == EventType::TRADE_ETH ||
-            registration.type == EventType::SUMMARY) &&
+            registration.type == EventType::SUMMARY || registration.type == EventType::TEXT_MESSAGE ||
+            registration.type == EventType::TEXT_CONFIGURATION) &&
            (registration.eventTimePolicy == EventTimePolicy::UNSPECIFIED ||
             registration.eventTimePolicy == EventTimePolicy::FIELD_METADATA);
 }
@@ -170,16 +172,20 @@ bool validRegistration(const EventRegistration &registration) noexcept {
 /** Complete shared immutable storage; sharing never retains caller containers or callbacks. */
 struct EventRegistry::State {
     core::LocalSchema schema; ///< Complete independently owned declarations, retaining validated provenance.
-    std::vector<EventRegistration> registrations; ///< Caller order, with unique exact local record routes.
-    std::size_t storageBytes;                     ///< Complete schema/container/shared-allocation request backing.
+    std::vector<EventRegistration> registrations;          ///< Caller order, with unique exact local record routes.
+    std::vector<std::optional<std::size_t>> versionFields; ///< Exact prepared version selections aligned with routes.
+    std::size_t storageBytes; ///< Complete schema/container/shared-allocation request backing.
 
     /** Adopt complete candidate storage after all route checks succeeded.
      * @param schema Independently owned bounded schema copy.
      * @param registrations Independently owned bounded route declarations.
+     * @param versionFields Optional selected version positions aligned with routes.
      * @param storageBytes Checked logical retained backing.
      */
-    State(core::LocalSchema schema, std::vector<EventRegistration> registrations, std::size_t storageBytes)
-        : schema(std::move(schema)), registrations(std::move(registrations)), storageBytes(storageBytes) {
+    State(core::LocalSchema schema, std::vector<EventRegistration> registrations,
+          std::vector<std::optional<std::size_t>> versionFields, std::size_t storageBytes)
+        : schema(std::move(schema)), registrations(std::move(registrations)), versionFields(std::move(versionFields)),
+          storageBytes(storageBytes) {
     }
 };
 
@@ -202,8 +208,9 @@ EventRegistry::create(const core::LocalSchema &schema, std::span<const EventRegi
             return std::unexpected(EventRegistryFailure{EventRegistryError::RESOURCE_LIMIT, {}});
         }
 
-        const auto minimumBytes = add(add(sizeof(State), schema.storageBytes() - sizeof(core::LocalSchema)),
-                                      multiply(registrations.size(), sizeof(EventRegistration)));
+        const auto minimumBytes =
+            add(add(sizeof(State), schema.storageBytes() - sizeof(core::LocalSchema)),
+                multiply(registrations.size(), sizeof(EventRegistration) + sizeof(std::optional<std::size_t>)));
 
         if (minimumBytes > limits.storageBytes) {
             return std::unexpected(EventRegistryFailure{EventRegistryError::RESOURCE_LIMIT, {}});
@@ -219,12 +226,15 @@ EventRegistry::create(const core::LocalSchema &schema, std::span<const EventRegi
 
         std::vector<EventRegistration> routes;
         routes.reserve(registrations.size());
+        std::vector<std::optional<std::size_t>> versionFields;
+        versionFields.reserve(registrations.size());
 
         for (std::size_t position = 0; position < registrations.size(); ++position) {
             index = position;
             debit(work.visits, 1);
 
             const auto &registration = registrations[position];
+            std::optional<std::size_t> versionField;
 
             if (!validRegistration(registration) || registration.localRecordId < 0 ||
                 static_cast<std::size_t>(registration.localRecordId) >= ownedSchema->records().size()) {
@@ -269,6 +279,22 @@ EventRegistry::create(const core::LocalSchema &schema, std::span<const EventRegi
                 if (!mapping) {
                     return std::unexpected(EventRegistryFailure{mapping.error(), index});
                 }
+            } else if (registration.type == EventType::TEXT_MESSAGE) {
+                const auto mapping = events::PreparedTextMessage::prepare(*ownedSchema, registration.localRecordId,
+                                                                          registration.mappingLimits);
+
+                if (!mapping) {
+                    return std::unexpected(EventRegistryFailure{mapping.error(), index});
+                }
+            } else if (registration.type == EventType::TEXT_CONFIGURATION) {
+                const auto mapping = events::PreparedTextConfiguration::prepare(
+                    *ownedSchema, registration.localRecordId, registration.mappingLimits);
+
+                if (!mapping) {
+                    return std::unexpected(EventRegistryFailure{mapping.error(), index});
+                }
+
+                versionField = mapping->versionField();
             } else {
                 const auto mapping = events::PreparedProfile::prepare(*ownedSchema, registration.localRecordId,
                                                                       registration.mappingLimits);
@@ -279,21 +305,24 @@ EventRegistry::create(const core::LocalSchema &schema, std::span<const EventRegi
             }
 
             routes.push_back(registration);
+            versionFields.push_back(versionField);
         }
 
         index.reset();
 
         // The rebound allocator counts State and its control block, including State's inline schema object.
         const auto backingBytes = add(ownedSchema->storageBytes() - sizeof(core::LocalSchema),
-                                      multiply(routes.capacity(), sizeof(EventRegistration)));
+                                      add(multiply(routes.capacity(), sizeof(EventRegistration)),
+                                          multiply(versionFields.capacity(), sizeof(std::optional<std::size_t>))));
 
         if (backingBytes > limits.storageBytes) {
             return std::unexpected(EventRegistryFailure{EventRegistryError::RESOURCE_LIMIT, {}});
         }
 
         std::size_t sharedBytes = 0;
-        auto state = std::allocate_shared<State>(StateAllocator<State>{sharedBytes, limits.storageBytes - backingBytes},
-                                                 std::move(*ownedSchema), std::move(routes), 0);
+        auto state =
+            std::allocate_shared<State>(StateAllocator<State>{sharedBytes, limits.storageBytes - backingBytes},
+                                        std::move(*ownedSchema), std::move(routes), std::move(versionFields), 0);
         state->storageBytes = add(backingBytes, sharedBytes);
 
         return EventRegistry(std::move(state));
@@ -309,7 +338,7 @@ EventRegistry::create(const core::LocalSchema &schema, std::span<const EventRegi
 std::expected<EventRegistry, EventRegistryFailure> EventRegistry::builtIn(EventRegistryLimits limits,
                                                                           EventRegistryWork &work) {
     try {
-        // Prepay construction of all five fixed input catalogs and their aliases before allocating them.
+        // Prepay construction of all seven fixed input catalogs and their aliases before allocating them.
         constexpr std::size_t DEFAULT_CONSTRUCTION_WORK = 4096;
         debit(work.visits, DEFAULT_CONSTRUCTION_WORK);
 
@@ -318,6 +347,8 @@ std::expected<EventRegistry, EventRegistryFailure> EventRegistry::builtIn(EventR
         auto trade = events::defaultTradeSchema(limits.schema);
         auto tradeETH = events::defaultTradeETHSchema(limits.schema);
         auto summary = events::defaultSummarySchema(limits.schema);
+        auto textMessage = events::defaultTextMessageSchema(limits.schema);
+        auto textConfiguration = events::defaultTextConfigurationSchema(limits.schema);
 
         if (!quote || !profile) {
             return std::unexpected(EventRegistryFailure{!quote ? quote.error() : profile.error(), {}});
@@ -334,8 +365,18 @@ std::expected<EventRegistry, EventRegistryFailure> EventRegistry::builtIn(EventR
             return std::unexpected(EventRegistryFailure{summary.error(), {}});
         }
 
-        std::array records{quote->records()[0], profile->records()[0], trade->records()[0], tradeETH->records()[0],
-                           summary->records()[0]};
+        if (!textMessage || !textConfiguration) {
+            return std::unexpected(
+                EventRegistryFailure{!textMessage ? textMessage.error() : textConfiguration.error(), {}});
+        }
+
+        std::array records{quote->records()[0],
+                           profile->records()[0],
+                           trade->records()[0],
+                           tradeETH->records()[0],
+                           summary->records()[0],
+                           textMessage->records()[0],
+                           textConfiguration->records()[0]};
 
         for (std::size_t index = 0; index < records.size(); ++index) {
             records[index].id = static_cast<std::int32_t>(index);
@@ -347,10 +388,13 @@ std::expected<EventRegistry, EventRegistryFailure> EventRegistry::builtIn(EventR
             return std::unexpected(EventRegistryFailure{combined.error(), {}});
         }
 
-        const std::array registrations{EventRegistration{EventType::QUOTE, 0}, EventRegistration{EventType::PROFILE, 1},
+        const std::array registrations{EventRegistration{EventType::QUOTE, 0},
+                                       EventRegistration{EventType::PROFILE, 1},
                                        EventRegistration{EventType::TRADE, 2},
                                        EventRegistration{EventType::TRADE_ETH, 3},
-                                       EventRegistration{EventType::SUMMARY, 4}};
+                                       EventRegistration{EventType::SUMMARY, 4},
+                                       EventRegistration{EventType::TEXT_MESSAGE, 5},
+                                       EventRegistration{EventType::TEXT_CONFIGURATION, 6}};
 
         return create(*combined, registrations, limits, work);
     } catch (EventRegistryError error) {
@@ -372,6 +416,16 @@ const core::LocalSchema &EventRegistry::schema() const noexcept {
 
 std::span<const EventRegistration> EventRegistry::registrations() const noexcept {
     return state_->registrations;
+}
+
+std::optional<std::size_t> EventRegistry::versionField(std::int32_t localRecordId) const noexcept {
+    for (std::size_t index = 0; index < state_->registrations.size(); ++index) {
+        if (state_->registrations[index].localRecordId == localRecordId) {
+            return state_->versionFields[index];
+        }
+    }
+
+    return std::nullopt;
 }
 
 std::size_t EventRegistry::storageBytes() const noexcept {

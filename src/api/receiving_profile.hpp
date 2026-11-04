@@ -15,7 +15,7 @@
 
 namespace org::ttldtor::qdcxx::api::detail {
 inline constexpr std::size_t MAXIMUM_RECEIVING_RECORDS = 16; ///< Existing complete receiving catalog ceiling.
-inline constexpr std::size_t RECEIVING_EVENT_KINDS = 5;      ///< Quote, Profile, Trade, TradeETH and Summary.
+inline constexpr std::size_t RECEIVING_EVENT_KINDS = 7;      ///< Explicitly supported native event kinds.
 inline constexpr std::size_t RECEIVING_EVENT_SELECTIONS = (1U << RECEIVING_EVENT_KINDS) - 1;
 
 ///< Every nonempty finite selection; no dynamic type registry or catalog expansion.
@@ -67,7 +67,9 @@ struct ReceivingProfile {
     std::vector<client::PreparedSubscriptionBinding> bindings; ///< Explicit routes grouped by business type.
     std::array<char16_t, MAXIMUM_RECEIVING_RECORDS> bindingExchanges{};
     ///< Exact aligned Quote/Trade record suffixes; fixed backing is included in sizeof(ReceivingProfile).
-    ReceivingRoutingLimits routing; ///< Explicit additional routing workspace and pre-allocation work charge.
+    std::array<collectors::TickerVersionBinding, MAXIMUM_RECEIVING_RECORDS> versionBindings{};
+    std::size_t versionBindingCount = 0; ///< Explicit schema-bound TICKER version gates.
+    ReceivingRoutingLimits routing;      ///< Explicit additional routing workspace and pre-allocation work charge.
     std::array<ReceivingEventPlan, RECEIVING_EVENT_SELECTIONS> eventPlans;
     ///< Prepaid bounded plans for each nonempty supported type mask, independent of record IDs.
     mux::QueueSubmitWork submitWork;                    ///< One whole desired replacement admission.

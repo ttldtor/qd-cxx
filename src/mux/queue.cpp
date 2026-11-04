@@ -1755,7 +1755,8 @@ struct MuxQueue::State {
     record(Client &c, core::SubscriptionKey key, std::optional<std::int64_t> time, std::int32_t flags,
            std::span<const std::int32_t> legacy, std::span<const Field> fields, MuxMembership membership,
            std::uint64_t sourceRevision, std::optional<RawSourceMetadata> raw,
-           std::optional<collectors::HistorySourceMetadata> trigger, QueueWork &work, bool retainedInitial = false) {
+           std::optional<collectors::HistorySourceMetadata> trigger, QueueWork &work, bool retainedInitial = false,
+           bool versionDefault = false) {
         auto &l = c.port->budget->limits;
         const auto fieldCount = sum(legacy.size(), fields.size());
         std::size_t units = 0, bytes = 0;
@@ -1816,6 +1817,7 @@ struct MuxQueue::State {
         out->view.epoch = epoch();
         out->view.source = raw;
         out->view.trigger = trigger;
+        out->view.versionDefault = versionDefault;
         auto *scalars = arena.take<std::int32_t>(legacy.size());
         std::copy(legacy.begin(), legacy.end(), scalars);
         out->view.values = {scalars, legacy.size()};
@@ -2561,11 +2563,13 @@ std::expected<bool, QueueFailure> MuxQueue::State::route(Client &c, QueueWork &w
 
             if (m) {
                 try {
-                    const RawSourceMetadata raw{r.senderId,    r.cipher,    r.eventFlags,
-                                                r.removalTime, r.fieldTime, o.value.bindingGeneration};
+                    const auto &original = o.value.rawSourceRecord ? *o.value.rawSourceRecord : r;
+                    const RawSourceMetadata raw{original.senderId,    original.cipher,    original.eventFlags,
+                                                original.removalTime, original.fieldTime, o.value.bindingGeneration};
                     value = record(c, {r.context, r.symbol}, {}, o.deliveryFlags, r.values, r.typedValues, m->mux,
                                    o.revision, raw, {}, work,
-                                   retainedOnly && o.kind == collectors::TickerDeliveryKind::INITIAL);
+                                   retainedOnly && o.kind == collectors::TickerDeliveryKind::INITIAL,
+                                   o.value.versionDefault);
                 } catch (QueueError e) {
                     if (e != QueueError::RESOURCE_LIMIT) {
                         throw;

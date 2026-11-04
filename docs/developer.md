@@ -34,6 +34,7 @@ reruns are different evidence; none is a general security certification or an RS
 [remaining product direction](NEXT-STEPS.md). Conformance captures and technical specifications remain
 part of the source distribution; the navigation above does not turn proposals into supported behavior.
 
+- [Text-event Java oracle](../tools/upstream/text-events-oracle/README.md): finite standard text delegate and wire observations.
 - [Event-source oracle](../tools/upstream/event-source-oracle/README.md): capture/verify pinned Java source identities, with help and bounded processes.
 - [Order-source capability oracle](../tools/upstream/order-source-capability-oracle/README.md): six event families, full-book support and specific-source values.
 

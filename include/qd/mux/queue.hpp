@@ -266,6 +266,8 @@ struct MuxRecordView {
     QueueIdentity epoch;                                      ///< Detached local source epoch.
     std::optional<RawSourceMetadata> source;                  ///< Actual source provenance, never fabricated.
     std::optional<collectors::HistorySourceMetadata> trigger; ///< Actual HISTORY trigger, when present.
+    bool versionDefault =
+        false; ///< Explicit TICKER zero/null cursor projection; source remains original raw provenance.
 };
 
 /** Thread-safe immutable composite lease; final release reaches no protocol/callable owner. */

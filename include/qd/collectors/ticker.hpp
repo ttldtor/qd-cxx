@@ -119,12 +119,21 @@ struct TickerLimits {
     core::SubscriptionLimits viewSubscriptions; ///< Independently enforced desired-state scope for every view.
 };
 
+/** Explicit schema-bound first-physical-int version gate, independent of record names and codecs. */
+struct TickerVersionBinding {
+    core::RecordContext context; ///< Exact origin and local record identity from the supplied immutable schema.
+    std::int32_t localRecordId;  ///< Explicit dense record ID; validated against context before publication.
+    std::size_t fieldIndex;      ///< Logical scalar field whose first signed physical int is the version.
+};
+
 /** Explicit source-compatible retention and retrieval scheduling; no ambient property lookup. */
 struct TickerOptions {
     bool storeEverything;         ///< False evicts after last interest; true retains unrequested source keys.
     std::size_t retrievalQuantum; ///< Positive initial/update credit quantum; locked Java default is 100.
     core::SubscriptionSelectorPolicy selectorPolicy =
         core::SubscriptionSelectorPolicy::EXACT_ONLY; ///< Immutable symbol domain; no All.
+    std::span<const TickerVersionBinding> versionBindings{};
+    ///< Borrowed only during create; unique valid scalar bindings are copied into bounded owned storage.
 };
 
 /** Caller-delimited operation credits, including failed work; never refunded. */
@@ -145,7 +154,7 @@ struct TickerCommandError {
 struct TickerStage {
     std::size_t changed; ///< Effective source changes, including intermediate changes later conflated.
     std::size_t equal;   ///< Interested/stored inputs equal to the preceding candidate data.
-    std::size_t ignored; ///< Inputs outside every interest when storeEverything is false.
+    std::size_t ignored; ///< Unrequested inputs or lower versions rejected by an explicit version binding.
     bool retained;       ///< True only when this collector consumed the event owner.
 };
 
@@ -154,10 +163,14 @@ struct TickerStage {
  * reset, move or destruction invalidates this result. Failed/no-op operations and equal-only stage preserve it.
  */
 struct TickerValue {
-    const protocol::LiveRecordView *sourceRecord; ///< Raw source metadata/payload, owned by a retained whole event.
+    const protocol::LiveRecordView *sourceRecord; ///< Selected value; an explicit fresh-negative policy yields
+                                                  ///< zero/null fields and zero event time.
     TickerEpochToken epoch;          ///< Detached local epoch scope; it does not retain the borrowed record.
     std::uint64_t bindingGeneration; ///< Original binding generation within the pinned source epoch.
     bool current;                    ///< False for explicitly inspected stale cache evidence.
+    const protocol::LiveRecordView *rawSourceRecord =
+        nullptr;                 ///< Original immutable wire record, retained separately from normalized defaults.
+    bool versionDefault = false; ///< Selected value materializes a fresh zero-version cursor after a negative input.
 };
 
 /** Prepared single delivery; pop acknowledges collector state, not execution of application code. */
@@ -173,7 +186,7 @@ struct TickerDelivery {
 struct TickerCounts {
     std::size_t changed = 0;   ///< Effective admitted source changes.
     std::size_t equal = 0;     ///< Admitted equal inputs.
-    std::size_t ignored = 0;   ///< Admitted unrequested inputs.
+    std::size_t ignored = 0;   ///< Admitted unrequested or explicitly obsolete-version inputs.
     std::size_t delivered = 0; ///< Explicitly popped pending values across views.
     std::size_t withdrawn = 0; ///< Pending values retired by desired mutation or close.
     std::size_t discarded = 0; ///< Pending values discarded by reset.

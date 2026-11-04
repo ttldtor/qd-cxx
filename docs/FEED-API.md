@@ -2,13 +2,13 @@
 
 [Русская версия](FEED-API.ru.md) · [Practical guides](guides.md) · [API reference](api.md)
 
-Use `qd/api/feed.hpp` and link `qdcxx_feed` to receive typed `events::Quote`, `events::Profile`, `events::Trade`, `events::TradeETH` and `events::Summary` through a library-owned worker. Applications create endpoints,
+Use `qd/api/feed.hpp` and link `qdcxx_feed` to receive typed `events::Quote`, `events::Profile`, `events::Trade`, `events::TradeETH`, `events::Summary`, `events::TextMessage` and `events::TextConfiguration` through a library-owned worker. Applications create endpoints,
 listeners and exact symbol subscriptions; the library progresses connection,
 finite recovery, queues and delivery. Subscriptions can be created before or after
 `connect()`.
 
 This API supports plain binary QTP over TCP with built-in full Quote/Profile/Trade/TradeETH/Summary
-schemas or explicit validated caller schemas and registered Quote/Profile/Trade/TradeETH/Summary mappings.
+and text-event schemas or explicit validated caller schemas and registered mappings.
 An endpoint chooses TICKER (default, latest values with possible
 conflation) or STREAM (every admitted selected source record). TLS, credentials,
 HISTORY and wildcard selectors are outside this API. Schema loading is separate. The
@@ -107,8 +107,7 @@ trades->addSymbols({"AAPL"});
 
 The runtime/endpoint provide SDK progress; the application does not poll queues or work budgets.
 A Trade copy owns its symbol and inline snapshot; the callback span lasts only during invocation.
-Mixed subscriptions accept all thirty-one nonempty
-Quote/Profile/Trade/TradeETH/Summary type sets; the complete receiving-schema ceiling remains16 records.
+Mixed subscriptions accept nonempty sets of registered types, subject to the selected delivery contract; the complete receiving-schema ceiling remains16 records.
 
 ## Explicit event registry
 
@@ -174,7 +173,7 @@ such as `AAPL&N&Q` or `AAPL{x=y}&Q` throw `INVALID_ARGUMENT` at
 is refused and the previous desired set remains. Composite fallback keeps these literals
 unchanged. The ordinary attributed form `AAPL&Q{x=y}` is representable.
 
-The built-in registry remains composite Quote/Profile/Trade/TradeETH/Summary. This explicit bounded registry
+The built-in registry includes composite Quote/Profile/Trade/TradeETH/Summary and both text events. This explicit bounded registry
 path does not load the complete regional catalog or implement broader selectors.
 The [time and variant contract](../spec/events/EVENT-TIME.md) specifies optional
 Sequence/nanoseconds, Quote seconds/milliseconds, Profile halt seconds, independent
@@ -211,7 +210,7 @@ is copied and remains fixed for that subscription. A runtime array can use the
 `INVALID_ARGUMENT`; a supported type absent from the endpoint registry rejects
 with `UNSUPPORTED_PROFILE`, without publishing a subscription.
 
-`RegisteredEvent` is an owning `std::variant<events::Quote, events::Profile, events::Trade, events::TradeETH, events::Summary>`.
+`RegisteredEvent` is an owning variant of all supported registered event types, including TextMessage and TextConfiguration.
 Copy a value to retain it beyond its callback span. Concrete subscriptions and
 mixed subscriptions can overlap independently; closing one withdraws only its
 remaining exclusive interests. Callback batches follow queue delivery boundaries
@@ -368,7 +367,7 @@ substantial backing storage, and unsupported capacity arithmetic rejects explici
 | Endpoint option | Default |
 | --- | --- |
 | `contract` | `TICKER` |
-| `eventRegistry` | Absent: built-in Quote0/Profile1/Trade2/TradeETH3/Summary4; an explicit value is copied as an immutable snapshot |
+| `eventRegistry` | Absent: built-in Quote0/Profile1/Trade2/TradeETH3/Summary4/TextMessage5/TextConfiguration6; an explicit value is copied as an immutable snapshot |
 | `connectTimeout`, `dnsTimeout`, `writeTimeout` | 5000 ms each |
 | `readTimeout` | 30000 ms |
 | `pollInterval` | 1 ms |
@@ -445,3 +444,5 @@ See [Summary](../spec/events/SUMMARY.md) for all fields, defaults and regional O
 ## Explicit decorated selectors
 
 Owning `SubscriptionSelector` and `addSelectors`/`setSelectors`/`removeSelector` preserve typed kind/source identity separately from physical demand. Current five market types ignore IES source ID as production Java does; typed Feed TSS is atomically unsupported. `EndpointOptions::enableWildcard=true` permits explicit All only for STREAM and is disabled by default. Literal leading-star text does not enable wildcard; existing string/Candle APIs remain plain exact. [Complete contract, example, finite storage and known-binding source adapter and time value conversion](../spec/subscriptions/DECORATED-SELECTORS.md).
+
+TextMessage requires a STREAM endpoint. TextConfiguration uses STREAM or TICKER; its nullable owning text and version policy are specified in [Text events](../spec/events/TEXT-EVENTS.md).

@@ -48,4 +48,5 @@
 
 - [Приём Summary](events/SUMMARY.ru.md): цены/дни сессии, точный business OpenInterest, PriceType и доставка пяти типов.
 
+- [Приём текстовых событий](events/TEXT-EVENTS.ru.md): nullable UTF-16, packed time и семантика версии TICKER.
 - [Текст событий](events/EVENT-TEXT.ru.md): явный контекст, числа/даты, UTF-16/UTF-8 и ограниченные контракты владения/работы.

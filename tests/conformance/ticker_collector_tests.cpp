@@ -304,12 +304,18 @@ struct Fixture {
  * @param quantum Explicit source-compatible retrieval balance.
  * @return Ready external session plus empty-view collector.
  */
-Fixture fixture(bool storeEverything = false, s::TickerLimits bounds = limits(), std::size_t quantum = 100) {
+Fixture fixture(bool storeEverything = false, s::TickerLimits bounds = limits(), std::size_t quantum = 100,
+                std::optional<std::size_t> versionField = {}) {
     auto local = schema();
     auto live = session(local);
     auto copy = local;
     auto work = turn();
-    auto ticker = s::TickerCollector::create(std::move(copy), bounds, {storeEverything, quantum}, work);
+    const std::array bindings{s::TickerVersionBinding{local.recordContext(0), 0, versionField.value_or(0)}};
+    auto ticker = s::TickerCollector::create(std::move(copy), bounds,
+                                             {storeEverything, quantum, c::SubscriptionSelectorPolicy::EXACT_ONLY,
+                                              versionField ? std::span<const s::TickerVersionBinding>(bindings)
+                                                           : std::span<const s::TickerVersionBinding>{}},
+                                             work);
     REQUIRE(ticker);
 
     return {std::move(local), std::move(live), std::move(*ticker)};
@@ -507,6 +513,93 @@ TEST_CASE("TICKER selected retention latest equality and late view share the act
         remove(f, late, u"ALPHA");
         add(f, one, u"ALPHA");
         CHECK(drain(f, one).size() == (store ? 1 : 0));
+    }
+}
+
+TEST_CASE("explicit TICKER versions reject lower staged updates before shared cache and late replay") {
+    auto f = fixture(true, limits(), 100, 2);
+    auto view = open(f);
+    add(f, view, u"ALPHA");
+    const Input seed[]{{0, u"ALPHA", 1, -7}};
+    CHECK(stage(f, seed).changed == 1);
+    const auto initialDefault = drain(f, view);
+    REQUIRE(initialDefault.size() == 1);
+    CHECK(initialDefault[0].value == 0);
+    CHECK(initialDefault[0].time == 0);
+    const Input oneBatch[]{{0, u"ALPHA", 2, 5}, {0, u"ALPHA", 99, 3}, {0, u"ALPHA", 3, 5}, {0, u"ALPHA", 100, -1}};
+    const auto admitted = stage(f, oneBatch);
+    CHECK(admitted.changed == 2);
+    CHECK(admitted.ignored == 2);
+    const auto live = drain(f, view);
+    REQUIRE(live.size() == 1);
+    CHECK(live[0].value == 5);
+    CHECK(live[0].time == 3);
+    auto late = open(f);
+    add(f, late, u"ALPHA");
+    const auto replay = drain(f, late);
+    REQUIRE(replay.size() == 1);
+    CHECK(replay[0].value == 5);
+    CHECK(replay[0].time == 3);
+    const Input lower[]{{0, u"ALPHA", 101, std::numeric_limits<std::int32_t>::min()}};
+    CHECK(stage(f, lower).ignored == 1);
+    CHECK(drain(f, view).empty());
+    CHECK(drain(f, late).empty());
+    const Input other[]{{1, u"BETA", 5, 10}, {1, u"BETA", 6, -10}};
+    CHECK(stage(f, other).changed == 2);
+    auto generic = open(f);
+    add(f, generic, u"BETA", 1);
+    const auto ordinary = drain(f, generic);
+    REQUIRE(ordinary.size() == 1);
+    CHECK(ordinary[0].value == -10);
+}
+
+TEST_CASE("TICKER version bindings reject foreign origin duplicates and invalid scalar positions atomically") {
+    auto local = schema();
+    auto foreign = schema();
+
+    for (const auto mode : {0, 1, 2}) {
+        auto copy = local;
+        const std::array bindings{s::TickerVersionBinding{mode == 0 ? foreign.recordContext(0) : local.recordContext(0),
+                                                          0, mode == 2 ? std::size_t{99} : std::size_t{2}},
+                                  s::TickerVersionBinding{local.recordContext(0), 0, 2}};
+        auto work = turn();
+        const auto selected = std::span(bindings).first(mode == 1 ? 2 : 1);
+        const auto result = s::TickerCollector::create(
+            std::move(copy), limits(), {true, 100, c::SubscriptionSelectorPolicy::EXACT_ONLY, selected}, work);
+        REQUIRE_FALSE(result);
+        CHECK(result.error() == Error::INVALID_CONFIGURATION);
+        CHECK(copy.recordContext(0).matches(local.recordContext(0)));
+    }
+}
+
+TEST_CASE("fresh TICKER signed version extrema materialize zero only for negative first values") {
+    for (const auto version :
+         {std::numeric_limits<std::int32_t>::min(), -7, 0, std::numeric_limits<std::int32_t>::max()}) {
+        auto f = fixture(true, limits(), 100, 2);
+        auto view = open(f);
+        add(f, view, u"ALPHA");
+        const Input input[]{{0, u"ALPHA", 1234, version}};
+        CHECK(stage(f, input).changed == 1);
+        auto work = turn();
+        auto latest = f.ticker.latest({f.schema.recordContext(0), u"ALPHA"}, work);
+        REQUIRE(latest);
+        REQUIRE(*latest);
+        const auto &cached = **latest;
+        REQUIRE(cached.rawSourceRecord);
+        CHECK(cached.rawSourceRecord->typedValues[2].raw == version);
+        CHECK(cached.versionDefault == (version < 0));
+        CHECK(cached.sourceRecord->typedValues[2].raw == (version < 0 ? 0 : version));
+        const auto first = drain(f, view);
+        REQUIRE(first.size() == 1);
+        CHECK(first[0].symbol == u"ALPHA");
+        CHECK(first[0].value == (version < 0 ? 0 : version));
+        CHECK(first[0].time == (version < 0 ? 0 : 1234));
+        auto late = open(f);
+        add(f, late, u"ALPHA");
+        const auto replay = drain(f, late);
+        REQUIRE(replay.size() == 1);
+        CHECK(replay[0].value == first[0].value);
+        CHECK(replay[0].time == first[0].time);
     }
 }
 

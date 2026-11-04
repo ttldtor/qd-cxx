@@ -55,6 +55,13 @@ struct MappingLimits {
     std::size_t comparisonWork;   ///< Key comparisons cost max(lengths)+1; present-field type comparisons cost one.
 };
 
+/** Mandatory logical UTF-16 ownership bounds for one complete event. */
+struct EventValueLimits {
+    std::size_t symbolUnits; ///< Maximum copied symbol units.
+    std::size_t stringUnits; ///< Maximum units in each copied nullable field string.
+    std::size_t totalUnits;  ///< Maximum combined symbol and selected field string units.
+};
+
 /** Borrowed complete local tagged values carrying explicit immutable provenance. */
 struct RecordValueView {
     core::RecordContext context;              ///< Owned source schema/record identity, without its declarations.
