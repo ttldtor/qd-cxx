@@ -33,3 +33,5 @@ before choosing an integration.
 - [Live instrument-profile collector](IPF-COLLECTOR.md): owning revisions, removals and safe listener callbacks.
 
 - [Live instrument-profile connections](IPF-CONNECTION.md): background delivery, explicit worker runtime and safe close.
+
+- [Print event/value text](EVENT-TEXT.md): explicit context, exact UTF-16 and direct UTF-8 output; [console example](../examples/event_text/README.md).

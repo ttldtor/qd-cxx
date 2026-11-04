@@ -1,0 +1,3 @@
+fixed:1234	999	19700101-000001	19700101-000002	TimeFormat-UTC-second-cache-with-subsecond-offset
+fixed:-2147483648	999	19691207-032836	19691207-032837	TimeFormat-UTC-second-cache-with-subsecond-offset
+fixed:2147483647	999	19700125-203123	19700125-203124	TimeFormat-UTC-second-cache-with-subsecond-offset

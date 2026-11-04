@@ -736,3 +736,9 @@ tests/fixtures/ipf/live/*provenance.json text eol=lf
 /tests/fixtures/schedule-query/tzdb2026f.tsv -text -whitespace
 /tests/fixtures/schedule-query/tzdb2026f-provenance.json text eol=lf
 /tests/fixtures/schedule-query/containing-day-correction.json text eol=lf
+
+# Preserve exact event-text observations and canonical oracle source/provenance.
+tools/upstream/event-text-oracle/*.java text eol=lf
+tools/upstream/event-text-oracle/*.ps1 text eol=lf
+tests/fixtures/event-text/*.tsv -text -whitespace
+tests/fixtures/event-text/provenance.json text eol=lf

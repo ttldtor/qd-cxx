@@ -20,3 +20,5 @@ the [Quote console example](examples/feed_quote/README.md). The library owns con
 The independent [schedule-rules API](docs/SCHEDULE-RULES.md) parses trading hours with explicit calendar contexts.
 [Developer documentation](docs/developer.md) contains build options, tools and verification results.
 [Build the documentation](tools/docs/README.md) to browse the same reading paths locally.
+
+[Event text](docs/EVENT-TEXT.md) prints supported events and values with an explicit immutable context and direct UTF-8 output.

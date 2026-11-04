@@ -1,0 +1,187 @@
+{
+  "revision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "javaVersion": "openjdk version \"25.0.4\" 2026-07-21 LTS",
+  "javaSha256": "58df5c13e5d6e68f242ad9b724479122828523008ef0907d3f2a02f54afaff23",
+  "javacSha256": "1ab76798cda580b3dd0cd07102992083ed153bbc5cbb6e6cf04e461df1802d28",
+  "harnessSha256": "239c2926650f463b6d83c653b75bbc8859ae83db3ba92c5c4be29aa25caae687",
+  "launcherSha256": "e3e33e2e42517c4c76f35fdad038848613c816964eb469b39f634306f7941a54",
+  "upstreamSources": [
+    {
+      "path": "dxlib/src/main/java/com/devexperts/util/TimeFormat.java",
+      "sha256": "7115871e99bb10f1454824909da742628993a3c5049e320a8a06d5add1c777ec"
+    },
+    {
+      "path": "dxlib/src/main/java/com/devexperts/util/DayUtil.java",
+      "sha256": "9586f03a4c45d3a9fa4efd7bb67d4abb9ffb59f93399312a102346c76417c11a"
+    },
+    {
+      "path": "dxlib/src/main/java/com/devexperts/util/WideDecimal.java",
+      "sha256": "0fd3e295e88f36e94a24ed9ebf69429985ddf4ba24e4b896e28015266a39d6d8"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/impl/EventUtil.java",
+      "sha256": "25261155e73e31e349c07d76b55f0f158b87e86f67462870f7448196ba403010"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/IndexedEventSource.java",
+      "sha256": "5b2df5fd210f02e641188dcf657b65e11a6d1d042203d47c8bad43559c9e61ea"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/OrderSource.java",
+      "sha256": "3b0d0b0e83f685efd688b87dba479003a76d9ad69097867326b74206dc3a2a45"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/Quote.java",
+      "sha256": "4cb3db3e132c1d0b71428bf4fa3da5a1c25226250ace6c6b55fb8ce3e8fd4b68"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/Profile.java",
+      "sha256": "a355d7cd875e4bd7bf8a6ccb372f8233903235d8218edd9ebd958c87d1f3fbf1"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/Summary.java",
+      "sha256": "8ce4cd5b23b3c0e003e8d0b42af196964717c091330efdb9ad12b9ffc36a242f"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/TradeBase.java",
+      "sha256": "307d51b8963be36b5adece55ef6e3be098e48bac380d7ee6fab12aca98c20246"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/Trade.java",
+      "sha256": "3e38ee68b4a7f86b98e6d5f4415ec021b49e4f544a24d038e2e00d0e1b29605c"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/TradeETH.java",
+      "sha256": "edf3fd110b830c0db3bfb2300717e787455589acd66a774533a5501b61cef398"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/Direction.java",
+      "sha256": "5aaad25f70e0632f5ee06f4c73026775212b5bdce169deb53bccb581780ac291"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/TradingStatus.java",
+      "sha256": "bcca47319bdf2eb3cdf4dc1c46e0de01a4eb57a73362a2a93ec7fc5e01adcb4a"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/ShortSaleRestriction.java",
+      "sha256": "8655426869bd9a9d2758c9eca429458a44044752420cfb58e10dd3d66168c134"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/Side.java",
+      "sha256": "f8bef7d85108494293b74315e2e5234036c162e428ee505d2aabe301d0a938d0"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/Scope.java",
+      "sha256": "ab25150fb12ed7a652d81ae80e809981f00b504f99032327faf58c58416098ce"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/OrderAction.java",
+      "sha256": "270c34b8376b6e0e6de4ff40a231d396f93dbd04c283ebcf16ad07e4dfdaf8b5"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/IcebergType.java",
+      "sha256": "0761bed348fcec79a65bc46f918b724adb029b548044778b40f090d3318e0b81"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/PriceType.java",
+      "sha256": "ca80cc315734497e016b8d189b8dc69aa0e226d44f5c87814ef3de11c674429d"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/OtcMarketsPriceType.java",
+      "sha256": "9f0da8279d5e51c0979074de3de153f02b92cce78ee89e613e52cd465f53f0dd"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/TimeAndSaleType.java",
+      "sha256": "68fcbdc5f8ba8cfad85f32c74abdd4d6c92c9c077906624dadd21761f13d2d48"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/AuctionType.java",
+      "sha256": "b5573febec833993c31a2678e2563aaf81b6420d0da6cfa55ac513757f700274"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/ImbalanceSide.java",
+      "sha256": "968c7933746ee30eef0dad9f0fd7b0b4fb0cfd3a61f16c1bb47d5695cb816111"
+    }
+  ],
+  "productionClassInventorySha256": "90a478b5d3737246d8c897322c9f9db60887846e20117572588e05ae78fbc6d8",
+  "fixtureSha256": "d2c319e26409a5ea37f3fea0fece8d8ee35df74875f0f10be786883dcf94de08",
+  "rows": 182957,
+  "profiles": [
+    {
+      "id": "UTC",
+      "rows": 180851,
+      "sha256": "759e2e006cf79ab5e9a1a36289247123b3ba67bfa6f3cda6565b94b360a496f4"
+    },
+    {
+      "id": "fixed:19800000",
+      "rows": 162,
+      "sha256": "1afc1e41d1467e82e44d4c697eb27a8e1488f02de9914456158345977670cbe1"
+    },
+    {
+      "id": "fixed:-27000000",
+      "rows": 162,
+      "sha256": "bf0b2444ab8e120ea2d295ecaa967ceaa6520b5205fc0d1eab684dae33175868"
+    },
+    {
+      "id": "fixed:1234",
+      "rows": 162,
+      "sha256": "749a48768ab9d6940b30fdf4bd1aba6705d6bb2718186b8b240b490fb0717bbc"
+    },
+    {
+      "id": "fixed:-2147483648",
+      "rows": 162,
+      "sha256": "75c8da09e3215e207974523a32c0e53942313ea13fcaa77dac349fd51bd67ee9"
+    },
+    {
+      "id": "fixed:2147483647",
+      "rows": 162,
+      "sha256": "235237685262a09e30dfdf23458bc70662b43ffcbd3b9c5095800ff09f231901"
+    },
+    {
+      "id": "America/New_York",
+      "rows": 162,
+      "sha256": "2fa2eb1e66b1a73f098af908197cbed3431ae526e9f084bc787d21ea0e940f9d"
+    },
+    {
+      "id": "Europe/Berlin",
+      "rows": 162,
+      "sha256": "afe93d60cd67dc3a41877873e48ef3878927b7a53dc7d6590f5e2d7ea90e55c7"
+    },
+    {
+      "id": "Asia/Kathmandu",
+      "rows": 162,
+      "sha256": "f2eca0c9463e0082d34925e0c3a4b1dcdcf590c13a350033b94f8ecb53934532"
+    },
+    {
+      "id": "Australia/Lord_Howe",
+      "rows": 162,
+      "sha256": "3ae9fed2f48e65d4e8dbb05514b48a9283c60d090367297a9937811ff4ad5286"
+    },
+    {
+      "id": "Europe/Dublin",
+      "rows": 162,
+      "sha256": "8fb704cf9d552992f7905f26e823783b888f305d68dbd5ccddc85c18f7872474"
+    },
+    {
+      "id": "Pacific/Apia",
+      "rows": 162,
+      "sha256": "0d9cfbc82f6c256d23d5b7f58d627201af457f978d55160525593dce6e29181b"
+    },
+    {
+      "id": "SystemV/EST5EDT",
+      "rows": 162,
+      "sha256": "4e19ccd39988bf7f4195c85a9c7c4156bedb0e0746cd702ac7608cd349c5ca1b"
+    },
+    {
+      "id": "Asia/Tokyo",
+      "rows": 162,
+      "sha256": "81ebfe5b9ae3435a819aca3ab107442721b1a5ce3796d1616272176f06dd8960"
+    }
+  ],
+  "localeInvariant": true,
+  "numericProfile": "Java25 Double.toString",
+  "legacyJavaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
+  "numericProofSha256": "811eb7bafaa4bdf6e71f71270ecbaed26836251b11678be1fa7e6e60e9d0033e",
+  "numericVerifierSha256": "a1c84ac4a352d863a8e5fc007a0932f8da798c30fd72aabe7c01cdc1c0e70d70",
+  "cacheProofSha256": "4fdf07cb42c2b139c9eaa9ff2d0a648845ded63d03637c70a34b7a2560ebf431"
+}

@@ -47,3 +47,5 @@ Exact conformance results belong to the [developer reading path](../docs/develop
 - [TradeETH receiving](events/TRADE-ETH.md): distinct extended-hours fields, raw flags and all fifteen mixed selections.
 
 - [Summary receiving](events/SUMMARY.md): session prices/days, exact business OpenInterest, PriceType and five-type delivery.
+
+- [Event text](events/EVENT-TEXT.md): explicit context, numeric/date representation, UTF-16/UTF-8 and finite ownership/work contracts.

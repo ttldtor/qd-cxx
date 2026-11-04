@@ -225,11 +225,11 @@ template <typename Field> [[nodiscard]] constexpr bool validFieldValueImpl(const
     case SerialFieldType::VOID_FIELD:
         return value.raw == 0;
     case SerialFieldType::BYTE:
-        return value.raw >= std::numeric_limits<std::int8_t>::min() &&
-               value.raw <= std::numeric_limits<std::int8_t>::max();
+        return value.raw >= (std::numeric_limits<std::int8_t>::min)() &&
+               value.raw <= (std::numeric_limits<std::int8_t>::max)();
     case SerialFieldType::SHORT:
-        return value.raw >= std::numeric_limits<std::int16_t>::min() &&
-               value.raw <= std::numeric_limits<std::int16_t>::max();
+        return value.raw >= (std::numeric_limits<std::int16_t>::min)() &&
+               value.raw <= (std::numeric_limits<std::int16_t>::max)();
     case SerialFieldType::INT:
     case SerialFieldType::DECIMAL:
     case SerialFieldType::COMPACT_INT:
@@ -237,8 +237,8 @@ template <typename Field> [[nodiscard]] constexpr bool validFieldValueImpl(const
     case SerialFieldType::TIME_SECONDS:
     case SerialFieldType::SEQUENCE:
     case SerialFieldType::DATE:
-        return value.raw >= std::numeric_limits<std::int32_t>::min() &&
-               value.raw <= std::numeric_limits<std::int32_t>::max();
+        return value.raw >= (std::numeric_limits<std::int32_t>::min)() &&
+               value.raw <= (std::numeric_limits<std::int32_t>::max)();
     case SerialFieldType::UTF_CHAR: {
         constexpr std::int64_t MAX_CODE_POINT = 0x10ffff;
 

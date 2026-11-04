@@ -47,3 +47,5 @@
 - [Приём TradeETH](events/TRADE-ETH.ru.md): отдельные ETH fields, raw flags и пятнадцать mixed selections.
 
 - [Приём Summary](events/SUMMARY.ru.md): цены/дни сессии, точный business OpenInterest, PriceType и доставка пяти типов.
+
+- [Текст событий](events/EVENT-TEXT.ru.md): явный контекст, числа/даты, UTF-16/UTF-8 и ограниченные контракты владения/работы.

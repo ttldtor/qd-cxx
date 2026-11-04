@@ -173,6 +173,10 @@ add_library(qdcxx_quote src/events/quote.cpp)
 target_link_libraries(qdcxx_quote PUBLIC qdcxx_event_mapping PRIVATE qdcxx_market_event_symbols)
 set_target_properties(qdcxx_quote PROPERTIES CXX_EXTENSIONS OFF)
 
+add_library(qdcxx_event_text src/events/event_text.cpp)
+target_link_libraries(qdcxx_event_text PUBLIC qdcxx_time_zone_data qdcxx_quote qdcxx_profile qdcxx_trade qdcxx_trade_eth qdcxx_summary qdcxx_event_values qdcxx_event_sources
+    PRIVATE qdcxx_java_double)
+set_target_properties(qdcxx_event_text PROPERTIES CXX_EXTENSIONS OFF)
 add_library(qdcxx_protocol src/protocol/frame_reader.cpp src/protocol/describe_records.cpp src/protocol/static_binding.cpp src/protocol/stream_data.cpp src/protocol/tape_reader.cpp src/protocol/tape_writer.cpp src/protocol/tape_admission.cpp src/protocol/subscription_writer.cpp src/protocol/live_session.cpp)
 target_link_libraries(qdcxx_protocol PUBLIC qdcxx_encoding qdcxx_core)
 set_target_properties(qdcxx_protocol PROPERTIES CXX_EXTENSIONS OFF)
@@ -255,6 +259,9 @@ if(ORG_TTLDTOR_QDCXX_BUILD_FEED_API)
     install(FILES include/qd/api/feed.hpp include/qd/api/event_registry.hpp DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qd/api")
 endif()
 
+if(ORG_TTLDTOR_QDCXX_BUILD_EXAMPLES)
+    add_subdirectory(examples/event_text)
+endif()
 if(ORG_TTLDTOR_QDCXX_BUILD_EXAMPLES AND ORG_TTLDTOR_QDCXX_BUILD_FEED_API)
     add_subdirectory(examples/feed_quote)
 endif()
@@ -265,7 +272,7 @@ endif()
 
 include(CMakePackageConfigHelpers)
 install(TARGETS qdcxx_encoding qdcxx_core qdcxx_protocol qdcxx_collectors qdcxx_mux
-    qdcxx_event_values qdcxx_event_mapping qdcxx_quote qdcxx_profile qdcxx_trade qdcxx_trade_eth qdcxx_summary qdcxx_market_event_symbols qdcxx_event_sources qdcxx_order_index qdcxx_candle_values qdcxx_java_double EXPORT qdcxxTargets
+    qdcxx_event_values qdcxx_event_mapping qdcxx_quote qdcxx_profile qdcxx_trade qdcxx_trade_eth qdcxx_summary qdcxx_market_event_symbols qdcxx_event_sources qdcxx_order_index qdcxx_candle_values qdcxx_java_double qdcxx_event_text EXPORT qdcxxTargets
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
@@ -446,6 +453,48 @@ if(BUILD_TESTING)
             add_test(NAME schedule_example_run COMMAND qdcxx_schedule_example --run)
             set_tests_properties(schedule_example_run PROPERTIES TIMEOUT 30)
         endif()
+    endif()
+    add_executable(qdcxx_event_text_rounding_tests tests/conformance/event_text_rounding_tests.cpp)
+    target_link_libraries(qdcxx_event_text_rounding_tests PRIVATE qdcxx_event_text)
+    target_compile_definitions(qdcxx_event_text_rounding_tests PRIVATE
+        ORG_TTLDTOR_QDCXX_EVENT_TEXT_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/event-text/oracle.tsv")
+    set_target_properties(qdcxx_event_text_rounding_tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME event_text_rounding COMMAND qdcxx_event_text_rounding_tests)
+    set_tests_properties(event_text_rounding PROPERTIES TIMEOUT 120)
+    add_executable(qdcxx_event_text_allocation_tests tests/conformance/event_text_allocation_tests.cpp)
+    target_link_libraries(qdcxx_event_text_allocation_tests PRIVATE qdcxx_event_text)
+    set_target_properties(qdcxx_event_text_allocation_tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME event_text_allocations COMMAND qdcxx_event_text_allocation_tests)
+    set_tests_properties(event_text_allocations PROPERTIES TIMEOUT 30)
+    add_executable(qdcxx_event_text_tests tests/conformance/event_text_tests.cpp)
+    find_package(Threads REQUIRED)
+    target_link_libraries(qdcxx_event_text_tests PRIVATE qdcxx_event_text doctest::doctest Threads::Threads)
+    target_compile_definitions(qdcxx_event_text_tests PRIVATE
+        ORG_TTLDTOR_QDCXX_EVENT_TEXT_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/event-text/oracle.tsv"
+        ORG_TTLDTOR_QDCXX_EVENT_TEXT_CACHE_PROOF="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/event-text/upstream-cache-differences.tsv")
+    if(qdcxxTimeZoneDataBuilt)
+        target_compile_definitions(qdcxx_event_text_tests PRIVATE
+            ORG_TTLDTOR_QDCXX_EVENT_TEXT_ZONE_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/resources/time-zone-data/tzdb-2026f")
+    endif()
+    set_target_properties(qdcxx_event_text_tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME event_text COMMAND qdcxx_event_text_tests --no-colors --no-path-filenames)
+    set_tests_properties(event_text PROPERTIES TIMEOUT 120)
+    add_test(NAME event_text_summary COMMAND qdcxx_event_text_tests --no-colors --no-path-filenames "--test-case=Summary*")
+    set_tests_properties(event_text_summary PROPERTIES TIMEOUT 120)
+    find_program(ORG_TTLDTOR_QDCXX_EVENT_TEXT_ORACLE_PWSH NAMES pwsh)
+    if(ORG_TTLDTOR_QDCXX_EVENT_TEXT_ORACLE_PWSH)
+        add_test(NAME event_text_oracle_help COMMAND "${CMAKE_COMMAND}"
+            "-DORG_TTLDTOR_QDCXX_EVENT_TEXT_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DORG_TTLDTOR_QDCXX_EVENT_TEXT_ORACLE_PWSH=${ORG_TTLDTOR_QDCXX_EVENT_TEXT_ORACLE_PWSH}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/event_text_oracle_help.cmake")
+        set_tests_properties(event_text_oracle_help PROPERTIES TIMEOUT 90)
+    endif()
+    if(TARGET qdcxx_event_text_example)
+        add_test(NAME event_text_example_help COMMAND "${CMAKE_COMMAND}"
+            "-DPROGRAM=$<TARGET_FILE:qdcxx_event_text_example>"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/event_text_example_help.cmake")
+        add_test(NAME event_text_example_run COMMAND qdcxx_event_text_example --run)
+        set_tests_properties(event_text_example_run PROPERTIES TIMEOUT 30)
     endif()
     add_executable(qdcxx_order_index_tests tests/conformance/order_index_tests.cpp)
     target_link_libraries(qdcxx_order_index_tests PRIVATE qdcxx_order_index doctest::doctest)
