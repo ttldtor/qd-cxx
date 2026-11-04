@@ -732,6 +732,8 @@ tests/fixtures/ipf/live/*provenance.json text eol=lf
 /tools/upstream/schedule-query-oracle/Invoke-Oracle.ps1 text eol=lf
 /tests/fixtures/schedule-query/cases.tsv -text -whitespace
 /tests/fixtures/schedule-query/oracle.tsv -text -whitespace
+/tests/fixtures/schedule-midnight/cases.tsv -text -whitespace
+/tests/fixtures/schedule-midnight/oracle.tsv -text -whitespace
 /tests/fixtures/schedule-query/provenance.json text eol=lf
 /tests/fixtures/schedule-query/tzdb2026f.tsv -text -whitespace
 /tests/fixtures/schedule-query/tzdb2026f-provenance.json text eol=lf

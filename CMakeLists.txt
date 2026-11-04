@@ -431,6 +431,8 @@ if(BUILD_TESTING)
             ORG_TTLDTOR_QDCXX_QUERY_DATA="${CMAKE_CURRENT_SOURCE_DIR}/resources/time-zone-data/tzdb-2026f"
             ORG_TTLDTOR_QDCXX_QUERY_CASES="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/schedule-query/cases.tsv"
             ORG_TTLDTOR_QDCXX_QUERY_ORACLE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/schedule-query/oracle.tsv"
+            ORG_TTLDTOR_QDCXX_MIDNIGHT_CASES="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/schedule-midnight/cases.tsv"
+            ORG_TTLDTOR_QDCXX_MIDNIGHT_ORACLE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/schedule-midnight/oracle.tsv"
             ORG_TTLDTOR_QDCXX_FILTER_CASES="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/schedule-filter/cases.tsv"
             ORG_TTLDTOR_QDCXX_FILTER_ORACLE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/schedule-filter/oracle.tsv"
             ORG_TTLDTOR_QDCXX_QUERY_CONTEXTUAL="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/schedule-query/tzdb2026f.tsv")

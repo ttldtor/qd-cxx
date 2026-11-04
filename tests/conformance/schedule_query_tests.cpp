@@ -102,6 +102,19 @@ TEST_CASE("actual Java filtered navigation observations") {
     }
 }
 
+TEST_CASE("midnight and day IDs match actual Java observations") {
+    const auto cases = lines(ORG_TTLDTOR_QDCXX_MIDNIGHT_CASES);
+    const auto oracle = lines(ORG_TTLDTOR_QDCXX_MIDNIGHT_ORACLE);
+    REQUIRE(cases.size() == 5);
+    REQUIRE(cases.size() == oracle.size());
+    fixture::QueryProjection projection(data());
+
+    for (std::size_t index = 0; index < cases.size(); ++index) {
+        CAPTURE(index);
+        CHECK(projection.observe(cases[index]) == oracle[index]);
+    }
+}
+
 TEST_CASE("filtered navigation preserves conjunction, order and typed failures") {
     const auto context = domain();
     const auto source = schedule(context, u"(tz=UTC;td=12345;0=0900120013001700;hd=20241225;sd=20241224)");

@@ -143,6 +143,11 @@ The corpus includes DST gaps/overlaps, historical/pre-1900 and 1582 labels, endp
 60000-day shifts, session boundaries, strategies and hot updates. It does not claim exhaustive
 comparison of every timezone transition in both datasets.
 
+The separate [midnight observations](../tests/fixtures/schedule-midnight/provenance.json) compare
+the instant immediately before, at and after the UTC epoch with day IDs -1 and 0. They use the same
+production Java driver without changing its earlier captures. The existing `hot-owned-day-session`
+case covers a rules update; the timezone data capability itself is process-initialized, not hot-reloaded.
+
 The [containing-day correction](../tests/fixtures/schedule-query/containing-day-correction.json)
 records a confirmed public-contract violation separately from timezone data differences. Java's
 `getDayByTime(0)` for `(tz=UTC;td=1234567;0=d00000000)` returns empty Day1, which cannot contain0,

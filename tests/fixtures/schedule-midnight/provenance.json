@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "revision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "javaVersion": "Zulu OpenJDK 1.8.0_422-b05",
+  "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
+  "javacSha256": "633143e961aa18051c09112b85333f5cdbd845b54eb39678eb15b91ca8bbb527",
+  "tzdbSha256": "e37fc7662b34281f15687f2bbdb054cf192131c09e8a4917261b74ed5e2a3db2",
+  "harnessSha256": "673c53e138e969a333114a9c31080d1c5c44a9112163614e9b83621097aa5905",
+  "casesSha256": "f3fd6ce0fa3e1a00a96578d668ddd5772e2263ccc44046fa00a087a0dc42773c",
+  "fixtureSha256": "c92e18fb0cf4b5d6871ef6948e7435a1d6c69195c1a8b4cf14f936d4919c3603",
+  "rows": 5,
+  "timezoneLocaleInvariant": true,
+  "classInventoryNote": "A post-capture inventory of 800 production classpath files (795 class files and 5 resources) matches the retained query-oracle pre-capture inventory; no new pre-capture inventory was recorded.",
+  "scope": "Actual production Schedule queries for UTC midnight and adjacent day IDs; UTC/en and Pacific/Honolulu/fr outputs agree. This does not qualify differing timezone datasets."
+}

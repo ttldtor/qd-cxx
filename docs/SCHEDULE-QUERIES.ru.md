@@ -107,6 +107,11 @@ Logical model accounting не включает overhead стандартного
 сдвиги 60000 дней, стратегии, session boundaries и hot updates. Полное сравнение каждого transition
 во всех зонах двух наборов данных не заявлено.
 
+Отдельные [наблюдения полуночи](../tests/fixtures/schedule-midnight/provenance.json) сопоставляют
+моменты непосредственно до, в момент и после эпохи UTC с day ID -1 и 0. Они используют тот же
+production Java driver без изменения прежних записей. Существующий случай `hot-owned-day-session`
+покрывает обновление правил; данные часовых поясов инициализируются для процесса и не обновляются на лету.
+
 [Исправление containing-day](../tests/fixtures/schedule-query/containing-day-correction.json)
 фиксирует подтверждённое нарушение public contract отдельно от timezone data differences.
 Java `getDayByTime(0)` для `(tz=UTC;td=1234567;0=d00000000)` возвращает пустой Day1, не содержащий0,
