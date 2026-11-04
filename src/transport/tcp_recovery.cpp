@@ -140,6 +140,17 @@ class PlainRecoveryBackend final : public detail::RecoveryBackend {
         runtime_.reset();
     }
 
+    ConnectionStatistics statistics() const noexcept override {
+        return runtime_ ? runtime_->statistics() : ConnectionStatistics{};
+    }
+
+    ConnectionStatistics retireStatistics() noexcept override {
+        const auto result = runtime_ ? detail::TcpRuntimeFactory::retireStatistics(*runtime_) : ConnectionStatistics{};
+        dispose();
+
+        return result;
+    }
+
     detail::RecoveryAttemptFacts facts() const noexcept override {
         if (!runtime_)
             return {};
@@ -330,6 +341,14 @@ RecoveryStatus TcpRecovery::status() const noexcept {
     result.stopped = true;
 
     return result;
+}
+
+ConnectionStatistics TcpRecovery::statistics() const noexcept {
+    return impl_ ? impl_->core.statistics() : ConnectionStatistics{};
+}
+
+ConnectionStatistics detail::TcpRecoveryFactory::retireStatistics(TcpRecovery &recovery) noexcept {
+    return recovery.impl_ ? recovery.impl_->core.retireStatistics() : ConnectionStatistics{};
 }
 
 RecoveryCapacity TcpRecovery::capacity() const noexcept {

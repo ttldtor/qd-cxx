@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 #pragma once
 
+#include "qd/core/statistics.hpp"
 #include "qd/protocol/subscription_writer.hpp"
 
 #include <cstddef>
@@ -13,6 +14,12 @@
 #include <string_view>
 
 namespace org::ttldtor::qdcxx::protocol {
+
+/** Detached counters at framing and atomic DATA-commit boundaries, before projection or fan-out. */
+struct LiveInputStatistics {
+    core::StatisticCounter messages;    ///< Structurally accepted complete QTP frames, including rejected payloads.
+    core::StatisticCounter dataRecords; ///< Validated wire occurrences, including skipped local records.
+};
 
 /** Pure live-session failures; diagnostics never retain credential or peer text. */
 enum class LiveError {
@@ -345,6 +352,10 @@ class LivePendingOutput {
      * @return Bytes valid until destruction/replacement; moving transfers their lifetime.
      */
     [[nodiscard]] std::span<const std::byte> bytes() const noexcept;
+    /** Inspect exact ADD/REMOVE wire occurrences in this immutable composed frame.
+     * @return Zero for control/descriptions, otherwise actual composed subscription occurrences.
+     */
+    [[nodiscard]] std::uint64_t subscriptionRecords() const noexcept;
     /** Borrow the exact local unsent suffix.
      * @return Immutable suffix; consumed backing stays reserved until owner destruction.
      */
@@ -384,6 +395,10 @@ class LiveSession {
     explicit LiveSession(std::unique_ptr<Impl> impl) noexcept;
 
     public:
+    /** Inspect a detached serialized-owner cut without parsing or advancing the session.
+     * @return Lifetime framing and committed DATA counters; zero for a moved-from session.
+     */
+    [[nodiscard]] LiveInputStatistics inputStatistics() const noexcept;
     /** Transfer this epoch without invalidating existing owning results.
      * @param other Source session, made unusable.
      */

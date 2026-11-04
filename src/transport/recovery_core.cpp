@@ -268,8 +268,7 @@ RecoveryCore::RecoveryCore(RecoveryConfiguration &&configuration, RecoveryBacken
 RecoveryCore::~RecoveryCore() {
     cutoff();
     // Active public operations retain the enclosing Impl, so this fallback is outside its callbacks.
-    captureWire();
-    backend_.dispose();
+    (void)retireStatistics();
 
     if (event_) {
         const auto bytes = event_->releaseBytes();
@@ -394,6 +393,39 @@ void RecoveryCore::observeRetiringBackend(bool afterFence) noexcept {
 void RecoveryCore::captureWire() noexcept {
     if (const auto actual = backend_.wireTerminal())
         wire_ = actual;
+
+    if (backend_.facts().present) {
+        retiredStatistics_.merge(backend_.statistics());
+    }
+}
+
+ConnectionStatistics RecoveryCore::statistics() const noexcept {
+    auto result = retiredStatistics_;
+    const auto current = state_.status();
+    result.connectionAttempts.value = current.attempts;
+
+    if (backend_.facts().present) {
+        const auto active = backend_.statistics();
+        result.merge(active);
+        result.activeConnections = active.activeConnections;
+        result.attemptIdentity = current.attempts;
+
+        if (active.sourceEpoch) {
+            result.sourceEpoch = result.establishedConnections.value;
+        }
+    }
+
+    return result;
+}
+
+ConnectionStatistics RecoveryCore::retireStatistics() noexcept {
+    cutoff();
+
+    if (backend_.facts().present) {
+        retiredStatistics_.merge(backend_.retireStatistics());
+    }
+
+    return statistics();
 }
 
 void RecoveryCore::publishTerminal() noexcept {

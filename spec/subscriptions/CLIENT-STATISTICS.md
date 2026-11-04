@@ -2,9 +2,10 @@
 
 [Русская версия](CLIENT-STATISTICS.ru.md). English is authoritative.
 
-This is a planned contract, not implemented counters or callable API syntax.
-The current [feed facade](../../docs/FEED-API.md) exposes lifecycle and diagnostics,
-not these statistics. Instrumentation/publication remain separate work.
+The endpoint IO/recovery subset is available through `Endpoint::getStatistics()`;
+see the [feed guide](../../docs/FEED-API.md#endpoint-statistics) for its publication boundary.
+The subscription catalog and derived-value operations remain planned contracts,
+not implemented subscription counters or callable rate/reset APIs.
 
 ## Evidence and decisions
 

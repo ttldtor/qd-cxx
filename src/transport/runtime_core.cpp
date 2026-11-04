@@ -189,6 +189,10 @@ RuntimeCore::RuntimeCore(RuntimeBootstrap::State &process, BootstrapLease &&borr
 
 /** Release the bootstrap borrow after every owned descriptor/handler is retired. */
 RuntimeCore::~RuntimeCore() {
+    retire();
+}
+
+void RuntimeCore::retire() noexcept {
     if (owner != std::this_thread::get_id()) {
         std::terminate();
     }
@@ -203,6 +207,39 @@ RuntimeCore::~RuntimeCore() {
     }
 
     finishClose();
+}
+
+ConnectionStatistics RuntimeCore::statistics() const noexcept {
+    auto result = ioStatistics;
+    result.writeAcceptanceUnknown = outcome.writeAcceptanceUnknown;
+
+#ifdef _WIN32
+
+    // Completion precedes owner cursor accounting. Include that same actual prefix without mutating output;
+    // accountWrite later folds it into the totals and clears writeReady, so neither cut counts it twice.
+    if (writeReady) {
+        result.writtenBytes.add(writeCount);
+
+        if (!engine && output && writeCount != 0 && writeCount == output->pendingBytes().size()) {
+            result.writtenMessages.add(1);
+            result.writtenSubscriptionRecords.add(output->subscriptionRecords());
+        }
+    }
+
+#endif
+
+    if (!engine && !session.raw()) {
+        const auto inputStatistics = session->inputStatistics();
+        result.readMessages = inputStatistics.messages;
+        result.readDataRecords = inputStatistics.dataRecords;
+    } else {
+        result.readMessages.availability = core::StatisticAvailability::UNSUPPORTED;
+        result.readDataRecords.availability = core::StatisticAvailability::UNSUPPORTED;
+        result.writtenMessages.availability = core::StatisticAvailability::UNSUPPORTED;
+        result.writtenSubscriptionRecords.availability = core::StatisticAvailability::UNSUPPORTED;
+    }
+
+    return result;
 }
 
 /** Check immutable affinity before a checked public operation touches mutable state.
@@ -308,6 +345,7 @@ void RuntimeCore::accountWrite() noexcept {
     if (writeReady && (output || engine || session.raw())) {
         // Each submission checked the representable cumulative offset before starting I/O.
         outcome.reportedWriteBytes += writeCount;
+        ioStatistics.writtenBytes.add(writeCount);
         (void)consumeWire(writeCount);
     }
 
@@ -323,6 +361,13 @@ void RuntimeCore::finishClose() noexcept {
     }
 
     accountWrite();
+
+    if (ioStatistics.establishedConnections.value != 0) {
+        ioStatistics.closedConnections.add(1);
+        ioStatistics.activeConnections = 0;
+        ioStatistics.sourceEpoch.reset();
+    }
+
     outcome.discardedInputBytes = inputEnd - inputBegin + (engine ? 0 : frameBytes);
 #ifdef _WIN32
 
@@ -355,6 +400,9 @@ void RuntimeCore::completed(bool reading, asio::error_code error, std::size_t by
     ++callbackDepth;
 
     if (reading) {
+#ifdef _WIN32
+        ioStatistics.readBytes.add(bytes);
+#endif
         readPending = false;
         readReady = true;
         readError = error;
@@ -431,6 +479,11 @@ bool RuntimeCore::consumeApplication(std::size_t bytes) noexcept {
         fail(protocolDiagnostic(consumed.error()));
 
         return false;
+    }
+
+    if (!engine && bytes != 0 && output->pendingBytes().empty()) {
+        ioStatistics.writtenMessages.add(1);
+        ioStatistics.writtenSubscriptionRecords.add(output->subscriptionRecords());
     }
 
     return true;
@@ -569,6 +622,9 @@ void RuntimeCore::connectStep() {
 
                 connecting = false;
                 runState = TcpState::CONNECTED;
+                ioStatistics.establishedConnections.add(1);
+                ioStatistics.activeConnections = 1;
+                ioStatistics.sourceEpoch = 1;
                 (void)setDeadline(readDeadline, options.readTimeout);
 
                 if (output || !applicationBytes().empty()) {
@@ -625,6 +681,9 @@ void RuntimeCore::connectStep() {
         }
 
         runState = TcpState::CONNECTED;
+        ioStatistics.establishedConnections.add(1);
+        ioStatistics.activeConnections = 1;
+        ioStatistics.sourceEpoch = 1;
         (void)setDeadline(readDeadline, options.readTimeout);
 
         if (output || !applicationBytes().empty()) {
@@ -677,6 +736,7 @@ void RuntimeCore::readStep() noexcept {
     const auto bytes = ::recv(socket.native_handle(), input.get(), options.limits.inputBytes, MSG_DONTWAIT);
 
     if (bytes > 0) {
+        ioStatistics.readBytes.add(static_cast<std::uint64_t>(bytes));
         inputEnd = static_cast<std::size_t>(bytes);
         (void)setDeadline(readDeadline, options.readTimeout);
     } else if (bytes == 0) {
@@ -748,6 +808,7 @@ void RuntimeCore::writeStep() noexcept {
         progressed = true;
         const auto count = static_cast<std::size_t>(written);
         outcome.reportedWriteBytes += count;
+        ioStatistics.writtenBytes.add(count);
         (void)consumeWire(count);
     } else if (written < 0) {
         const auto error = socketError();
@@ -1079,6 +1140,8 @@ std::expected<void, TcpDiagnostic> RuntimeCore::start() {
     const auto now = Clock::now();
 
     if (this->namedEndpoint) {
+        ioStatistics.connectionAttempts.add(1);
+        ioStatistics.attemptIdentity = 1;
         this->runState = TcpState::RESOLVING;
 
         if (!this->setDeadline(this->dnsDeadline, this->options.dnsTimeout)) {
@@ -1087,6 +1150,8 @@ std::expected<void, TcpDiagnostic> RuntimeCore::start() {
 
         this->dnsTick = now;
     } else {
+        ioStatistics.connectionAttempts.add(1);
+        ioStatistics.attemptIdentity = 1;
         this->runState = TcpState::CONNECTING;
 
         if (!this->setDeadline(this->connectDeadline, this->options.connectTimeout)) {

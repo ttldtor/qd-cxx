@@ -392,6 +392,10 @@ TEST_CASE("public recovery separates pre-entry copy work pause from terminal fir
     CHECK(enteredRecoveryBytes != 0);
     CHECK(failed.phase == t::RecoveryPhase::FAILED);
     CHECK(failed.attempts == 1);
+    CHECK(owner->statistics().connectionAttempts.value == 1);
+    CHECK(owner->statistics().establishedConnections.value == 0);
+    CHECK(owner->statistics().closedConnections.value == 0);
+    CHECK_FALSE(owner->statistics().sourceEpoch);
     CHECK(failed.first.error == t::RecoveryError::WORK_LIMIT);
     CHECK(failed.first.stage == "runtime-create-attempt");
     CHECK(failed.first.transport.error == t::TcpError::WORK_LIMIT);

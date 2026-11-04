@@ -124,8 +124,9 @@ struct RuntimeCore {
     std::optional<protocol::LivePendingOutput>
         output;                               ///< Sole whole-envelope output owner, including consumed backing.
     TcpState runState = TcpState::CONFIGURED; ///< Serialized run lifecycle.
-    TcpTerminal outcome;            ///< Reserved primary/cleanup/terminal metadata, independent of data saturation.
-    bool closeRequested = false;    ///< Immediate ordinary-admission cutoff.
+    TcpTerminal outcome;               ///< Reserved primary/cleanup/terminal metadata, independent of data saturation.
+    ConnectionStatistics ioStatistics; ///< Owner-local actual I/O and source-lifetime totals.
+    bool closeRequested = false;       ///< Immediate ordinary-admission cutoff.
     bool pauseCancellation = false; ///< Only explicit plain pause may classify its later local read abort as expected.
     bool closeApplied = false;      ///< Owned descriptor retirement has been applied once.
     bool terminalPublished = false; ///< Completion is observable only after all handlers return.
@@ -160,6 +161,12 @@ struct RuntimeCore {
 
     /** Release the bootstrap borrow after every owned descriptor/handler is retired. */
     ~RuntimeCore();
+    /** Retire owned native completions before taking a final detached statistics cut. */
+    void retire() noexcept;
+    /** Inspect actual counters on the serialized owner.
+     * @return One detached native/protocol cut, without progress.
+     */
+    [[nodiscard]] ConnectionStatistics statistics() const noexcept;
 
     /** Check immutable affinity before a checked public operation touches mutable state.
      * @return Empty on the owner, otherwise static WRONG_THREAD evidence.

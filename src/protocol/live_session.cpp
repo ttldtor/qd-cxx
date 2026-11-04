@@ -1365,9 +1365,10 @@ struct LivePendingOutput::State {
     OwnerLedger ledger;                   ///< Retains epoch/object accounting until all backing is released.
     std::unique_ptr<std::byte[]> backing; ///< Fixed requested control allocation, when not a composer owner.
     std::optional<PendingSubscriptionOutput> subscription; ///< Existing exact subscription output.
-    std::size_t capacity = 0; ///< Globally charged full backing, including unused/consumed slots.
-    std::size_t size = 0;     ///< Exposed initialized envelope bytes.
-    std::size_t consumed = 0; ///< Local partial-write cursor, never peer acknowledgement.
+    std::size_t capacity = 0;              ///< Globally charged full backing, including unused/consumed slots.
+    std::size_t size = 0;                  ///< Exposed initialized envelope bytes.
+    std::size_t consumed = 0;              ///< Local partial-write cursor, never peer acknowledgement.
+    std::uint64_t subscriptionRecords = 0; ///< Exact composed ADD/REMOVE occurrences; zero for controls.
 
     /** Adopt pre-admitted output metadata.
      * @param storage Serialized epoch ledger.
@@ -1608,8 +1609,9 @@ struct LiveSession::Impl {
     SubscriptionWriter composer;         ///< Fresh outgoing layouts and exact composer output credits.
     std::unique_ptr<FrameReader> framer; ///< Independent fixed framing state.
     LiveSnapshot peer;                   ///< Current complete immutable protocol/binding generation.
-    LiveStatus status = LiveStatus::NEED_INPUT;                           ///< Input lifecycle.
-    LiveDiagnostic diagnostic;                                            ///< First terminal static/numeric evidence.
+    LiveStatus status = LiveStatus::NEED_INPUT; ///< Input lifecycle.
+    LiveDiagnostic diagnostic;                  ///< First terminal static/numeric evidence.
+    LiveInputStatistics statistics;             ///< Serialized framing/commit totals, independent of event retention.
     LiveAuthentication authentication = LiveAuthentication::UNCHALLENGED; ///< Protocol-derived auth state.
     bool historySnapshot = false;                                         ///< Cached exact negotiated hs intersection.
 
@@ -1745,6 +1747,7 @@ struct LiveSession::Impl {
             }
 
             event->complete(work);
+            statistics.dataRecords.add(event->decoded.processedRecords);
         }
 
         auto nextAuthentication = authentication;
@@ -1829,6 +1832,7 @@ struct LiveSession::Impl {
         output->capacity = actual;
         output->size = actual;
         output->subscription.emplace(std::move(*result));
+        output->subscriptionRecords = message ? requests.size() : 0;
 
         return LivePendingOutput(std::move(output));
     }
@@ -1986,6 +1990,10 @@ std::span<const std::byte> LivePendingOutput::bytes() const noexcept {
     return state_ ? state_->bytes() : std::span<const std::byte>{};
 }
 
+std::uint64_t LivePendingOutput::subscriptionRecords() const noexcept {
+    return state_ ? state_->subscriptionRecords : 0;
+}
+
 std::span<const std::byte> LivePendingOutput::pendingBytes() const noexcept {
     return state_ ? state_->bytes().subspan(state_->consumed) : std::span<const std::byte>{};
 }
@@ -2006,6 +2014,10 @@ LiveSession::LiveSession(std::unique_ptr<Impl> impl) noexcept : impl_(std::move(
 LiveSession::LiveSession(LiveSession &&other) noexcept = default;
 LiveSession &LiveSession::operator=(LiveSession &&other) noexcept = default;
 LiveSession::~LiveSession() = default;
+
+LiveInputStatistics LiveSession::inputStatistics() const noexcept {
+    return impl_ ? impl_->statistics : LiveInputStatistics{};
+}
 
 std::expected<LiveSession, LiveError> LiveSession::create(core::LocalSchema &&schema, SubscriptionWriter &&composer,
                                                           LiveLimits limits, LiveWork &work) {
@@ -2101,6 +2113,7 @@ LiveFeedResult LiveSession::feed(std::span<const std::byte> input, LiveWork &wor
                         : impl_->framer->error() == FrameError::OFFSET_OVERFLOW  ? Error::IDENTITY_EXHAUSTED
                                                                                  : Error::MALFORMED);
         } else if (framed.status == FrameStatus::FRAME_READY) {
+            impl_->statistics.messages.add(1);
             result.event.emplace(impl_->dispatch(*framed.frame, work));
             result.status = LiveStatus::EVENT;
 

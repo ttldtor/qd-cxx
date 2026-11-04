@@ -9,6 +9,11 @@ namespace org::ttldtor::qdcxx::transport::detail {
 
 /** Private recovery assembly from stable process state, independent of its movable public facade. */
 struct TcpRecoveryFactory {
+    /** Quiesce only the owned native attempt before final detached facade statistics publication.
+     * @param recovery Existing worker-owned recovery; no application callback is invoked.
+     * @return Preserved actual lifetime totals after native callback retirement.
+     */
+    [[nodiscard]] static ConnectionStatistics retireStatistics(TcpRecovery &recovery) noexcept;
     /** Prepare from a counted outer lease; SDK progress and worker affinity remain caller driven.
      * @param bootstrap Outer lease retained across all native and callback retirement.
      * @param endpoint Original immutable route configuration.

@@ -458,3 +458,48 @@ Observer exceptions are advisory through `getChangeDiagnostic()`; event-listener
 `Endpoint::createFilter(orderedCategories, context)` builds an independent classifier using the endpoint's actual registry and delivery contract; an advanced builder also accepts an explicit registry and finite limits. It changes no subscription demand. The optional context is supplied once for explicit resource capabilities. [Filter queries, categories, trackers and IPF source ownership](FEED-FILTERS.md) describe their separate lifetimes and optional backend.
 
 The installed/relocated [public consumer](../tests/conformance/subscription_observer_consumer/CMakeLists.txt) builds only against `find_package(qdcxx CONFIG REQUIRED COMPONENTS feed)` and `qdcxx::feed`. It includes each public header independently and exercises detached snapshots, callback phases, classifier queries, refusal and offline retirement without private headers or source paths.
+
+## Endpoint statistics
+
+`endpoint->getStatistics()` copies the last coherent publication into an owning
+`EndpointStatistics`. It can be read concurrently from producer threads and after
+runtime shutdown. `ownerIdentity` retains only an opaque bounded token; compare it
+for equality, without interpreting its address. Distinct owners cannot alias while
+an old observation survives. `generation` stays one for this owner lifetime.
+`observedAt` is the steady-clock publication time, rather than the time of the read.
+Reads allocate no storage, perform no IO/DNS, dispatch no callbacks and reset no work.
+A blocked worker callback delays publication; readers keep seeing the preceding cut.
+
+The `connection` fields separate physical native IO from protocol completion:
+`readBytes`/`writtenBytes` count positive OS receive/send completion octets, including
+partial transfers and subsequently discarded input. Plain Feed TCP carries QTP stream
+octets. A complete structurally accepted incoming frame counts before payload
+processing, so a rejected payload still contributes one `readMessages`. DATA counts
+only after whole-payload validation and event construction, including wire records
+skipped by local schema binding, before projection or subscription fan-out. Outgoing
+messages and ADD/REMOVE records count only when the last frame byte is accepted by
+the socket. Queued output and desired selectors contribute nothing; real replay counts
+again. Socket acceptance does not prove peer acknowledgement. If an interrupted
+Windows write has an unreported prefix, sticky `writeAcceptanceUnknown` identifies
+the reported byte count as a lower bound; complete-frame counts cover reported progress.
+
+`connectionAttempts` counts actual recovery factory entries, including DNS/connect
+failures. `attemptIdentity` is that owner's current factory ordinal, absent without
+an attempt. `sourceEpoch` is an established source ordinal, absent for an unestablished
+attempt and after retirement. Within unsaturated totals, `establishedConnections =
+closedConnections + activeConnections`; protocol readiness is a separate state.
+Reconnect changes the source, preserving lifetime totals and generation. Baselines
+are independent consumer copies; there is no destructive reset or rate helper.
+
+Each `StatisticCounter` carries its own `availability`. Available idle counts are
+zero; overflow saturates at `UINT64_MAX` with sticky `SATURATED`, disabling exact
+deltas for that field. Incoming subscriptions, outgoing DATA and QD lag/RTT currently
+report `UNSUPPORTED`. No event timestamp or callback duration substitutes for wire
+timing. This accessor instruments the existing plain Feed path; a future Feed TLS
+path must separately identify encrypted transport and plaintext QTP boundaries.
+
+Native totals are preserved after all owned completions return. `final` becomes true
+only after native, listener and callable-capture quiescence, including subscription-change
+and state observers; totals and timestamp then freeze. CLOSED alone is not that barrier. A saved
+snapshot remains detached from sockets, schemas, callbacks and runtime owners.
+See the complete [layered contract](../spec/subscriptions/CLIENT-STATISTICS.md).

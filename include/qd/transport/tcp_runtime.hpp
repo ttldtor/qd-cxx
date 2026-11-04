@@ -16,6 +16,48 @@
 
 namespace org::ttldtor::qdcxx::transport {
 
+/** Detached actual plain-TCP/QTP measurements. Counts saturate independently; reads never reset work. */
+struct ConnectionStatistics {
+    core::StatisticCounter readBytes;    ///< Positive native receive/completion octets, including discarded prefixes.
+    core::StatisticCounter writtenBytes; ///< Positive native send/completion octets; never queued buffer sizes.
+    core::StatisticCounter readMessages; ///< Complete structurally accepted QTP frames, before payload processing.
+    core::StatisticCounter writtenMessages; ///< Plain QTP frames whose final byte was accepted by the native socket.
+    core::StatisticCounter readDataRecords; ///< Complete validated DATA occurrences, before local projection.
+    core::StatisticCounter writtenDataRecords{0,
+                                              core::StatisticAvailability::UNSUPPORTED}; ///< No outgoing DATA profile.
+    core::StatisticCounter readSubscriptionRecords{
+        0, core::StatisticAvailability::UNSUPPORTED};  ///< No incoming ADD/REMOVE profile.
+    core::StatisticCounter writtenSubscriptionRecords; ///< ADD/REMOVE occurrences in fully transferred frames.
+    core::StatisticCounter connectionAttempts;     ///< Actual combined-factory entries, including DNS/connect failures.
+    core::StatisticCounter establishedConnections; ///< Actual established native sources, never protocol readiness.
+    core::StatisticCounter closedConnections;      ///< Established sources retired after native callback quiescence.
+    std::uint64_t activeConnections = 0;           ///< Established, not yet retired native sources; zero or one.
+    std::optional<std::uint64_t> attemptIdentity;  ///< Actual current factory ordinal, absent without an attempt owner.
+    std::optional<std::uint64_t>
+        sourceEpoch;                     ///< Established source ordinal, absent before establishment/after retirement.
+    bool writeAcceptanceUnknown = false; ///< Sticky Windows interrupted-write uncertainty; byte count is a lower bound.
+    core::StatisticCounter dataLagRead{0,
+                                       core::StatisticAvailability::UNSUPPORTED}; ///< No verified QD timing producer.
+    core::StatisticCounter dataLagWrite{0,
+                                        core::StatisticAvailability::UNSUPPORTED}; ///< No verified QD timing producer.
+    core::StatisticCounter roundTripTime{0, core::StatisticAvailability::UNSUPPORTED}; ///< No verified QD RTT producer.
+
+    /** Fold a distinct retired plain source exactly once; current identities/gauge are not accumulated.
+     * @param other Source totals with the same metric definitions.
+     */
+    void merge(const ConnectionStatistics &other) noexcept {
+        readBytes.merge(other.readBytes);
+        writtenBytes.merge(other.writtenBytes);
+        readMessages.merge(other.readMessages);
+        writtenMessages.merge(other.writtenMessages);
+        readDataRecords.merge(other.readDataRecords);
+        writtenSubscriptionRecords.merge(other.writtenSubscriptionRecords);
+        establishedConnections.merge(other.establishedConnections);
+        closedConnections.merge(other.closedConnections);
+        writeAcceptanceUnknown = writeAcceptanceUnknown || other.writeAcceptanceUnknown;
+    }
+};
+
 namespace detail {
 struct BootstrapFactory;
 class BootstrapLease;
@@ -206,6 +248,10 @@ class TcpRuntime {
     explicit TcpRuntime(std::unique_ptr<detail::RuntimeCore> impl) noexcept;
 
     public:
+    /** Inspect actual detached counters on the serialized creating owner; performs no native progress.
+     * @return One current cut; empty counts for a moved-from handle.
+     */
+    [[nodiscard]] ConnectionStatistics statistics() const noexcept;
     /** Transfer stable runtime ownership on its recorded owner thread.
      * @param other Source run, made unusable.
      */

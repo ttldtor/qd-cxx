@@ -480,6 +480,36 @@ TEST_CASE("public feed bounds atomic desired sets listeners and inactive retirem
     runtime.closeAndAwaitTermination();
 }
 
+TEST_CASE("endpoint statistics retain only detached identity and freeze after inactive retirement") {
+    std::optional<api::EndpointStatistics> detached;
+    {
+        api::ApiRuntime runtime(runtimeOptions());
+        auto endpoint = runtime.createEndpoint(endpointOptions());
+        auto baseline = endpoint->getStatistics();
+        REQUIRE(baseline.ownerIdentity);
+        CHECK_FALSE(baseline.final);
+        allocation_probe::failNext = true;
+        const auto read = endpoint->getStatistics();
+        const bool allocated = !allocation_probe::failNext;
+        allocation_probe::failNext = false;
+        CHECK_FALSE(allocated);
+        CHECK(read.observedAt == baseline.observedAt);
+        CHECK(endpoint->closeAndAwaitTermination().drained);
+        detached = endpoint->getStatistics();
+        CHECK(detached->final);
+        CHECK(detached->connection.connectionAttempts.value == 0);
+        CHECK(detached->connection.activeConnections == 0);
+        baseline.connection.connectionAttempts.value = 999;
+        CHECK(endpoint->getStatistics().connection.connectionAttempts.value == 0);
+    }
+
+    api::ApiRuntime replacement(runtimeOptions());
+    auto endpoint = replacement.createEndpoint(endpointOptions());
+    CHECK(endpoint->getStatistics().ownerIdentity != detached->ownerIdentity);
+    CHECK(detached->final);
+    CHECK(detached->connection.connectionAttempts.value == 0);
+}
+
 TEST_CASE("public feed rejects foreign thread waits and preserves detached closed ports") {
     std::shared_ptr<api::Endpoint> endpoint;
     std::shared_ptr<api::Subscription<events::Quote>> subscription;
@@ -821,6 +851,15 @@ TEST_CASE("public feed close retains ownership while an application callback blo
     });
     CHECK(endpoint->getDiagnostic().code == api::ErrorCode::NONE);
 
+    const auto blockedStatistics = endpoint->getStatistics();
+    CHECK_FALSE(blockedStatistics.final);
+
+    for (unsigned read = 0; read != 100; ++read) {
+        const auto observation = endpoint->getStatistics();
+        CHECK_FALSE(observation.final);
+        CHECK(observation.ownerIdentity == blockedStatistics.ownerIdentity);
+    }
+
     // This test-owned helper always releases the callback; no failure path can leave a blocked worker.
     std::thread releaser([&] {
         std::this_thread::sleep_for(50ms);
@@ -840,6 +879,7 @@ TEST_CASE("public feed close retains ownership while an application callback blo
     CHECK_FALSE(prematureReturn.load());
     CHECK(terminal.deadlineExpired);
     CHECK_FALSE(terminal.drained);
+    CHECK(endpoint->getStatistics().final);
     checkRetiredEndpoint(endpoint);
 }
 
@@ -2068,6 +2108,27 @@ std::size_t checkLifecycleAdds(std::span<const std::byte> bytes) {
 
     return adds;
 }
+
+/** Count complete framed messages in actual bounded peer captures, without interpreting payloads.
+ * @param bytes Exact wire bytes captured by the independent peer.
+ * @return Complete frame occurrences; a trailing incomplete frame fails the test.
+ */
+std::size_t capturedMessages(std::span<const std::byte> bytes) {
+    root::protocol::FrameReader reader({8192, 8201});
+    std::size_t messages = 0;
+
+    while (!bytes.empty()) {
+        const auto result = reader.feed(bytes);
+        REQUIRE(result.status != root::protocol::FrameStatus::FAILED);
+        REQUIRE(result.accepted != 0);
+        bytes = bytes.subspan(result.accepted);
+        messages += result.frame.has_value();
+    }
+
+    CHECK(reader.finish() == root::protocol::FrameStatus::FINISHED);
+
+    return messages;
+}
 } // namespace
 
 TEST_CASE("public lifecycle notification capacity includes selected callbacks and reserves close") {
@@ -2225,6 +2286,7 @@ TEST_CASE("public lifecycle reconnect replays unchanged desired Quote on a real 
     const std::vector<peer::Record> secondRecords{{u"IBM", secondValues}};
     root::test::TcpPeerConfig config;
     config.sessions.resize(2);
+    std::size_t expectedReadBytes = 0;
 
     for (std::size_t index = 0; index < 2; ++index) {
         auto &script = config.sessions[index];
@@ -2233,6 +2295,7 @@ TEST_CASE("public lifecycle reconnect replays unchanged desired Quote on a real 
             peer::fixturePeerData(index == 0 ? firstRecords : secondRecords, core::SubscriptionFamily::TICKER, true);
         script.readThroughMessage = 11;
         script.waitForClientClose = true;
+        expectedReadBytes += script.initialBytes.size() + script.replyBytes.size();
     }
 
     root::test::OwnedTcpPeer source(std::move(config));
@@ -2241,6 +2304,31 @@ TEST_CASE("public lifecycle reconnect replays unchanged desired Quote on a real 
     settings.maximumAttempts = 2;
     settings.retryDelay = 1ms;
     auto endpoint = runtime.createEndpoint(settings);
+    const auto initialStatistics = endpoint->getStatistics();
+    REQUIRE(initialStatistics.ownerIdentity);
+    CHECK(initialStatistics.connection.connectionAttempts.value == 0);
+    std::atomic<bool> coherent{true};
+    std::atomic<unsigned> observations{0};
+    std::jthread reader([&](std::stop_token stop) {
+        auto previous = initialStatistics;
+
+        while (!stop.stop_requested()) {
+            const auto next = endpoint->getStatistics();
+            const auto &counts = next.connection;
+
+            if (next.ownerIdentity != initialStatistics.ownerIdentity ||
+                next.generation != initialStatistics.generation || next.observedAt < previous.observedAt ||
+                counts.readBytes.value < previous.connection.readBytes.value ||
+                counts.writtenBytes.value < previous.connection.writtenBytes.value ||
+                counts.establishedConnections.value != counts.closedConnections.value + counts.activeConnections) {
+                coherent = false;
+            }
+
+            previous = next;
+            ++observations;
+            std::this_thread::yield();
+        }
+    });
     auto subscription = endpoint->getFeed()->createSubscription<events::Quote>();
     subscription->addEventListener([&](std::span<const events::Quote> quotes) {
         for (const auto &quote : quotes) {
@@ -2264,6 +2352,11 @@ TEST_CASE("public lifecycle reconnect replays unchanged desired Quote on a real 
         return first.load() == 1;
     }));
     CHECK(endpoint->getDiagnostic().code == api::ErrorCode::NONE);
+    REQUIRE(eventually([&] {
+        return endpoint->getStatistics().connection.readDataRecords.value == 1;
+    }));
+    const auto firstStatistics = endpoint->getStatistics();
+    CHECK(firstStatistics.connection.sourceEpoch == 1);
     endpoint->reconnect();
     CHECK(endpoint->getState() == api::EndpointState::CONNECTING);
     const bool deliveredSecond = eventually([&] {
@@ -2285,6 +2378,11 @@ TEST_CASE("public lifecycle reconnect replays unchanged desired Quote on a real 
     }
 
     REQUIRE(deliveredSecond);
+    REQUIRE(eventually([&] {
+        const auto counts = endpoint->getStatistics().connection;
+
+        return counts.readDataRecords.value == 2 && counts.sourceEpoch == 2;
+    }));
     CHECK(unexpected.load() == 0);
     CHECK(first.load() == 1);
     REQUIRE(endpoint->awaitState(api::EndpointState::CONNECTED, std::chrono::steady_clock::now() + 2s).status ==
@@ -2306,6 +2404,35 @@ TEST_CASE("public lifecycle reconnect replays unchanged desired Quote on a real 
 
     static_cast<void>(endpoint->closeAndAwaitTermination());
     checkRetiredEndpoint(endpoint);
+    REQUIRE(eventually([&] {
+        const auto captured = source.snapshot();
+
+        return captured.sessions[0].completed && captured.sessions[1].completed;
+    }));
+    const auto finalStatistics = endpoint->getStatistics();
+    const auto captured = source.snapshot();
+    const auto &counts = finalStatistics.connection;
+    CHECK(finalStatistics.final);
+    CHECK(counts.connectionAttempts.value == 2);
+    CHECK(counts.establishedConnections.value == 2);
+    CHECK(counts.closedConnections.value == 2);
+    CHECK(counts.activeConnections == 0);
+    CHECK_FALSE(counts.sourceEpoch);
+    CHECK(counts.readBytes.value == expectedReadBytes);
+    CHECK(counts.writtenBytes.value == captured.sessions[0].received.size() + captured.sessions[1].received.size());
+    CHECK(counts.readMessages.value == 6);
+    CHECK(counts.writtenMessages.value ==
+          capturedMessages(captured.sessions[0].received) + capturedMessages(captured.sessions[1].received));
+    CHECK(counts.readDataRecords.value == 2);
+    CHECK(counts.writtenSubscriptionRecords.value == 2);
+    CHECK(counts.writtenDataRecords.availability == core::StatisticAvailability::UNSUPPORTED);
+    CHECK(counts.readSubscriptionRecords.availability == core::StatisticAvailability::UNSUPPORTED);
+    CHECK(counts.roundTripTime.availability == core::StatisticAvailability::UNSUPPORTED);
+    runtime.closeAndAwaitTermination();
+    CHECK(endpoint->getStatistics().observedAt == finalStatistics.observedAt);
+    CHECK(firstStatistics.connection.readDataRecords.value == 1);
+    CHECK(coherent.load());
+    CHECK(observations.load() != 0);
 }
 
 TEST_CASE("public lifecycle offline cached Quote replay survives pause and clear fences every later selection") {
@@ -2890,6 +3017,32 @@ TEST_CASE("public subscription observation retires captures outside locks and ch
     subscription->addChangeListener([](const auto &) {
     });
     CHECK(endpoint->closeAndAwaitTermination().drained);
+}
+
+TEST_CASE("endpoint statistics final waits for subscription observer and capture retirement") {
+    api::ApiRuntime runtime(runtimeOptions());
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    auto subscription = endpoint->getFeed()->createSubscription<events::Quote>();
+    bool closed = false;
+    bool captureRetired = false;
+    auto capture = std::make_shared<CaptureAction>();
+    capture->action = [&] {
+        CHECK(closed);
+        CHECK_FALSE(endpoint->getStatistics().final);
+        captureRetired = true;
+    };
+    subscription->addChangeListener([&, capture](const auto &change) {
+        if (change.kind == api::SubscriptionChangeKind::CLOSED) {
+            CHECK_FALSE(endpoint->getStatistics().final);
+            closed = true;
+        }
+    });
+    capture.reset();
+    CHECK_FALSE(endpoint->getStatistics().final);
+    CHECK(endpoint->closeAndAwaitTermination().drained);
+    CHECK(closed);
+    CHECK(captureRetired);
+    CHECK(endpoint->getStatistics().final);
 }
 
 TEST_CASE("public subscription observation is deferred until the complete real data selection returns") {

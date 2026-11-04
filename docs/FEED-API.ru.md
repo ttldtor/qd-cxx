@@ -468,3 +468,51 @@ Observer exceptions являются advisory и доступны через `ge
 `Endpoint::createFilter(orderedCategories, context)` строит независимый classifier с фактическим registry и delivery contract endpoint; advanced builder также принимает явный registry и finite limits. Он не меняет subscription demand. Optional context задаётся один раз для явных resource capabilities. [Filter queries, categories, trackers и владение IPF source](FEED-FILTERS.ru.md) описывают отдельные lifetimes и optional backend.
 
 Installed/relocated [public consumer](../tests/conformance/subscription_observer_consumer/CMakeLists.txt) собирается только через `find_package(qdcxx CONFIG REQUIRED COMPONENTS feed)` и `qdcxx::feed`. Он независимо включает каждый публичный header и проверяет detached snapshots, callback phases, classifier queries, refusal и offline retirement без private headers и source paths.
+
+## Статистика endpoint
+
+`endpoint->getStatistics()` копирует последнюю согласованную публикацию в
+владеющий `EndpointStatistics`. Чтение разрешено параллельно из потоков producer
+и после завершения runtime. `ownerIdentity` удерживает только ограниченный
+непрозрачный токен; сравнивайте его на равенство, не интерпретируя адрес. Разные
+владельцы не совпадут, пока сохранено старое наблюдение. `generation` остаётся
+равным единице в течение жизни владельца. `observedAt` — монотонное время
+публикации, а не чтения. Чтение не выделяет память, не выполняет IO/DNS, не вызывает
+callback и не сбрасывает работу. Заблокированный callback задерживает следующую
+публикацию; читатели продолжают видеть предыдущий согласованный срез.
+
+Поля `connection` разделяют физический IO ОС и завершение протокола.
+`readBytes`/`writtenBytes` учитывают положительные результаты native receive/send
+и completion, включая частичные передачи и впоследствии отброшенный вход. В plain
+Feed TCP это октеты потока QTP. Полный структурно принятый входной кадр увеличивает
+`readMessages` до обработки payload, поэтому отвергнутый payload тоже даёт один
+кадр. DATA учитывается после проверки всего payload и построения события, включая
+wire records, пропущенные локальной привязкой схемы, до проекции и fan-out.
+Исходящие сообщения и записи ADD/REMOVE учитываются после принятия сокетом
+последнего байта кадра. Очередь и desired selectors ничего не добавляют; реальный
+replay считается повторно. Принятие сокетом не доказывает peer acknowledgement.
+При неизвестном префиксе прерванной Windows write sticky `writeAcceptanceUnknown`
+обозначает число байтов как нижнюю границу; полные кадры считаются по сообщённому
+прогрессу.
+
+`connectionAttempts` считает реальные входы в recovery factory, включая ошибки
+DNS/connect. `attemptIdentity` — текущий порядковый номер factory этого владельца;
+без владельца попытки значение отсутствует. `sourceEpoch` — номер установленного
+источника; до установления и после retirement он отсутствует. Для ненасыщенных
+итогов `establishedConnections = closedConnections + activeConnections`;
+готовность протокола — отдельное состояние. Reconnect меняет источник, сохраняя
+итоги и generation. Baseline — независимая копия потребителя; разрушительного
+reset и метода расчёта скорости нет.
+
+Каждый `StatisticCounter` содержит собственный `availability`. Доступные счётчики
+в простое равны нулю; переполнение насыщается до `UINT64_MAX` со sticky `SATURATED`,
+после чего точные дельты этого поля недоступны. Входящие подписки, исходящий DATA
+и QD lag/RTT сейчас возвращают `UNSUPPORTED`. Метки событий и длительность callback
+не заменяют wire timing. Метод инструментирует существующий plain Feed path;
+будущий Feed TLS должен отдельно определить границы encrypted transport и plaintext QTP.
+
+Native итоги сохраняются после возврата всех собственных completion. `final`
+становится true лишь после retirement native, listeners и callable captures,
+включая наблюдателей изменений подписки и состояния; после этого итоги и время неизменны.
+Само CLOSED не является этим барьером. Сохранённый снимок не удерживает сокеты,
+схемы, callback или runtime. Полный [послойный контракт](../spec/subscriptions/CLIENT-STATISTICS.ru.md).

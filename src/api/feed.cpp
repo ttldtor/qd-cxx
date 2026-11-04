@@ -548,6 +548,8 @@ bool retireEndpoint(const std::shared_ptr<detail::EndpointPort> &port, CloseResu
     {
         // Publish under the wait predicate's mutex so notification cannot fall between its check and wait.
         std::lock_guard lock(port->mutex);
+        port->statistics.final = true;
+        port->statistics.observedAt = std::chrono::steady_clock::now();
         port->retired.store(true, std::memory_order_release);
     }
     port->retiredCondition.notify_all();
@@ -1680,6 +1682,12 @@ EndpointState Endpoint::getState() const noexcept {
     return port_->state;
 }
 
+EndpointStatistics Endpoint::getStatistics() const noexcept {
+    std::lock_guard lock(port_->mutex);
+
+    return port_->statistics;
+}
+
 StateWaitResult<EndpointState>
 Endpoint::awaitState(EndpointState target, std::chrono::steady_clock::time_point deadline, std::stop_token stop) const {
     return awaitCurrentState(port_, target, deadline, stop);
@@ -2279,6 +2287,12 @@ EndpointProgress progressEndpoint(NativeEndpoint &endpoint, transport::RecoveryT
     }
 
     const auto polled = endpoint.recovery->poll(work);
+    const auto statistics = endpoint.recovery->statistics();
+    {
+        std::lock_guard lock(endpoint.port->mutex);
+        endpoint.port->statistics.connection = statistics;
+        endpoint.port->statistics.observedAt = std::chrono::steady_clock::now();
+    }
 
     if (!polled) {
         if (!firstPoll && polled.error().error == transport::RecoveryError::WORK_LIMIT) {
@@ -2336,6 +2350,12 @@ void retireNative(std::unique_ptr<NativeEndpoint> &endpoint) noexcept {
     requestEndpointClose(port);
     const auto status = endpoint->recovery->status();
     auto result = closeResult(port, status);
+    const auto statistics = transport::detail::TcpRecoveryFactory::retireStatistics(*endpoint->recovery);
+    {
+        std::lock_guard lock(port->mutex);
+        port->statistics.connection = statistics;
+        port->statistics.observedAt = std::chrono::steady_clock::now();
+    }
     endpoint.reset();
     retireEndpoint(port, result);
 }
@@ -2763,6 +2783,8 @@ std::shared_ptr<Endpoint> ApiRuntime::createEndpoint(EndpointOptions options) {
         validateEndpointOptions(options);
         const auto control = impl_->control;
         auto port = std::make_shared<detail::EndpointPort>();
+        port->statistics.ownerIdentity = std::make_shared<const std::byte>();
+        port->statistics.observedAt = std::chrono::steady_clock::now();
         port->control = control;
         port->owner = control->owner;
         port->limits = impl_->options;

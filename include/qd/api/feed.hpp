@@ -477,6 +477,18 @@ class Feed final {
     createSubscription(std::initializer_list<EventType> types);
 };
 
+/** Detached last-published endpoint cut; keeping it retains only an opaque identity token.
+ * Plain TCP counts actual native QTP-stream octets; complete-message/record counts have distinct boundaries.
+ * Reads never progress the worker or wait for callbacks. A blocked callback can delay the next publication.
+ */
+struct EndpointStatistics {
+    std::shared_ptr<const void> ownerIdentity; ///< Opaque non-aliasing token; compare only for owner equality.
+    std::uint64_t generation = 1; ///< Owner-lifetime observation generation; reconnect/baselines never reset it.
+    std::chrono::steady_clock::time_point observedAt; ///< Monotonic time of this coherent publication, not read time.
+    transport::ConnectionStatistics connection;       ///< Lifetime actual transport/protocol/recovery measurements.
+    bool final = false; ///< True only after native and all callback/capture retirement; totals then remain frozen.
+};
+
 /** Producer endpoint handle; destruction requests asynchronous close and never joins its own worker. */
 class Endpoint final {
     std::shared_ptr<detail::EndpointPort> port_;
@@ -561,6 +573,11 @@ class Endpoint final {
      * @return Detached lifecycle state, not peer acknowledgement.
      */
     [[nodiscard]] EndpointState getState() const noexcept;
+    /** Copy the last coherent worker publication without network progress, callback wait or reset.
+     * Values survive endpoint/runtime shutdown and preserve owner identity across source epochs.
+     * @return Bounded detached owning snapshot; final becomes true only after actual capture quiescence.
+     */
+    [[nodiscard]] EndpointStatistics getStatistics() const noexcept;
     /** Wait for a current endpoint state without connecting, closing or progressing native work.
      * Only the runtime creator may wait. Worker/foreign calls reject WRONG_THREAD; any creator callback/
      * capture-retirement context rejects INVALID_STATE, even if already ready. Synchronous rejections throw Error.

@@ -945,6 +945,11 @@ TEST_CASE("a real standard Quote traverses byte fragments and retained owners su
     REQUIRE(created->terminal()->primary.error == t::TcpError::NONE);
     CHECK(created->terminal()->peerEnded);
     CHECK(created->resources().pendingOperations == 0);
+    const auto counts = created->statistics();
+    CHECK(counts.readBytes.value == peer.sent);
+    CHECK(counts.readBytes.value == peer.script.size());
+    CHECK(counts.readMessages.value == events.size());
+    CHECK(counts.readDataRecords.value == 1);
     const auto retainedBytes = created->resources().sessionBytes;
     CHECK(retainedBytes > 0);
     std::optional<q::Quote> quote;
@@ -995,8 +1000,81 @@ TEST_CASE("owned output survives repeated one-byte partial writes and full-slot 
     CHECK(peer.received == expectedBytes);
     retire(run);
     CHECK(run.terminal()->reportedWriteBytes == expectedBytes.size());
+    const auto counts = run.statistics();
+    CHECK(counts.writtenBytes.value == peer.received.size());
+    CHECK(counts.writtenMessages.value == 1);
+    CHECK(counts.writtenSubscriptionRecords.value == 0);
+    CHECK(counts.connectionAttempts.value == 1);
+    CHECK(counts.establishedConnections.value == 1);
+    CHECK(counts.closedConnections.value == 1);
+    CHECK(counts.activeConnections == 0);
+    CHECK_FALSE(counts.sourceEpoch);
     CHECK(run.terminal()->pendingOutputBytes == 0);
     CHECK(run.terminal()->aborted);
+}
+
+TEST_CASE("native partial output abort preserves actual bytes without completing its QTP frame") {
+    auto bootstrap = t::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    Peer peer;
+    auto config = options(peer.port);
+    config.limits.writeBytes = 1;
+    auto run = runtime(*bootstrap, config);
+    auto work = liveTurn();
+    REQUIRE(run.composeHeartbeat({}, work));
+    REQUIRE(run.start());
+    pump(run, &peer, [&] {
+        return run.statistics().writtenBytes.value == 1;
+    });
+    CHECK(run.statistics().writtenMessages.value == 0);
+    retire(run);
+    const auto counts = run.statistics();
+    CHECK(counts.writtenBytes.value == 1);
+    CHECK(counts.writtenMessages.value == 0);
+    CHECK(counts.writtenSubscriptionRecords.value == 0);
+    CHECK(run.terminal()->pendingOutputBytes == 2);
+}
+
+TEST_CASE("final native cut charges a real read completion retired before session admission") {
+    auto bootstrap = t::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    auto borrow = td::BootstrapLease::acquire(*bootstrap);
+    REQUIRE(borrow);
+    Peer peer;
+    peer.script = {std::byte{2}};
+    auto source = configuration();
+    auto preparation = liveTurn();
+    auto core = td::RuntimeCore::create(borrow->state(), std::move(source.schema), std::move(source.writer),
+                                        liveLimits(), options(peer.port), preparation);
+    REQUIRE(core);
+    REQUIRE((*core)->start());
+    bool completed = false;
+    const auto deadline = Clock::now() + 3s;
+
+    while (!completed && Clock::now() < deadline) {
+        peer.step();
+        auto work = runtimeTurn();
+        auto protocolWork = liveTurn();
+        REQUIRE((*core)->poll(work, protocolWork));
+#ifdef _WIN32
+        completed = (*core)->readReady && (*core)->readCount != 0;
+#else
+        completed = (*core)->inputEnd != (*core)->inputBegin;
+#endif
+        std::this_thread::sleep_for(1ms);
+    }
+
+    REQUIRE(completed);
+    (*core)->retire();
+    const auto final = (*core)->statistics();
+    CHECK(final.readBytes.value == peer.sent);
+    CHECK(final.readBytes.value == 1);
+    CHECK(final.readMessages.value == 0);
+    CHECK(final.readDataRecords.value == 0);
+    CHECK(final.activeConnections == 0);
+    CHECK(final.establishedConnections.value == final.closedConnections.value);
+    (*core)->retire();
+    CHECK((*core)->statistics().closedConnections.value == final.closedConnections.value);
 }
 
 TEST_CASE("pending input cancellation drains every handler and each fresh run stays independent") {
@@ -1135,6 +1213,9 @@ TEST_CASE("idle read deadline is a failure and incomplete input never becomes cl
         CHECK(run.terminal()->primary.error == t::TcpError::PROTOCOL_FAILURE);
         CHECK_FALSE(run.terminal()->peerEnded);
         CHECK(run.terminal()->discardedInputBytes == peer.script.size());
+        CHECK(run.statistics().readBytes.value == peer.sent);
+        CHECK(run.statistics().readMessages.value == 0);
+        CHECK(run.statistics().readDataRecords.value == 0);
     }
 }
 
@@ -1269,6 +1350,10 @@ TEST_CASE("DNS ignores unrelated addresses and rejects unsupported aliases loops
                               : mode == DnsMode::ESCAPED ? t::TcpError::UNSUPPORTED_DNS_NAME
                                                          : t::TcpError::DNS_FAILURE;
         CHECK(run.terminal()->primary.error == expected);
+        CHECK(run.statistics().connectionAttempts.value == 1);
+        CHECK(run.statistics().establishedConnections.value == 0);
+        CHECK(run.statistics().closedConnections.value == 0);
+        CHECK(run.statistics().readBytes.value == 0);
         CHECK(run.resources().pendingOperations == 0);
         CHECK(run.resources().dnsEnvelopeBytes == 0);
 
@@ -1587,6 +1672,89 @@ TEST_CASE("whole admitted records and snapshots retain only their pure epoch aft
 }
 
 #ifdef _WIN32
+TEST_CASE("Windows completed write then read has coherent counters before output cursor accounting") {
+    auto bootstrap = t::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    auto borrow = td::BootstrapLease::acquire(*bootstrap);
+    REQUIRE(borrow);
+    Peer peer;
+    peer.script = ready();
+    peer.chunk = peer.script.size();
+    auto source = configuration();
+    const auto context = source.schema.recordContext(0);
+    auto preparation = liveTurn();
+    auto config = options(peer.port);
+    config.limits.writeBytes = 8192;
+    auto core = td::RuntimeCore::create(borrow->state(), std::move(source.schema), std::move(source.writer),
+                                        liveLimits(), config, preparation);
+    REQUIRE(core);
+    REQUIRE((*core)->start());
+    bool negotiated = false;
+    const auto deadline = Clock::now() + 3s;
+
+    while (!negotiated && Clock::now() < deadline) {
+        peer.step();
+        auto work = runtimeTurn();
+        auto protocolWork = liveTurn();
+        const auto polled = (*core)->poll(work, protocolWork);
+        REQUIRE(polled);
+        negotiated = polled->event && polled->event->kind() == p::LiveEventKind::PROTOCOL;
+        std::this_thread::sleep_for(1ms);
+    }
+
+    REQUIRE(negotiated);
+    REQUIRE_FALSE((*core)->readPending);
+    const auto before = (*core)->statistics();
+    const c::SubscriptionRequest requests[]{{{context, u"IBM"}, std::nullopt}, {{context, u"AAPL"}, std::nullopt}};
+    auto work = liveTurn();
+    REQUIRE((*core)->subscribe(p::SubscriptionMessage::STREAM_ADD, requests, work));
+    const auto bytes = (*core)->output->pendingBytes().size();
+    REQUIRE((*core)->output->subscriptionRecords() == 2);
+    (*core)->beginWrite();
+
+    while (!(*core)->writeReady && Clock::now() < deadline) {
+        peer.step();
+        (*core)->context.restart();
+        (*core)->context.poll_one();
+        std::this_thread::sleep_for(1ms);
+    }
+
+    REQUIRE((*core)->writeReady);
+    REQUIRE((*core)->writeCount == bytes);
+    REQUIRE((*core)->output->pendingBytes().size() == bytes);
+    peer.script.push_back(std::byte{0});
+    (*core)->beginRead();
+
+    while (!(*core)->readReady && Clock::now() < deadline) {
+        peer.step();
+        (*core)->context.restart();
+        (*core)->context.poll_one();
+        std::this_thread::sleep_for(1ms);
+    }
+
+    REQUIRE((*core)->readReady);
+    REQUIRE((*core)->readCount == 1);
+    const auto completed = (*core)->statistics();
+    CHECK(completed.readBytes.value == before.readBytes.value + 1);
+    CHECK(completed.writtenBytes.value == bytes);
+    CHECK(completed.writtenMessages.value == 1);
+    CHECK(completed.writtenSubscriptionRecords.value == 2);
+    (*core)->accountWrite();
+    CHECK((*core)->statistics().writtenBytes.value == bytes);
+    CHECK((*core)->statistics().writtenMessages.value == 1);
+    CHECK((*core)->statistics().writtenSubscriptionRecords.value == 2);
+    (*core)->accountWrite();
+    (*core)->retire();
+    const auto final = (*core)->statistics();
+    CHECK(final.writtenBytes.value == bytes);
+    CHECK(final.writtenMessages.value == 1);
+    CHECK(final.writtenSubscriptionRecords.value == 2);
+    CHECK(final.readBytes.value == before.readBytes.value + 1);
+    CHECK(final.closedConnections.value == 1);
+    peer.step();
+    CHECK(peer.received.size() == bytes);
+}
+
 TEST_CASE("a dispatched non-cancellation write failure survives abort before output accounting") {
     auto bootstrap = t::RuntimeBootstrap::create();
     REQUIRE(bootstrap);

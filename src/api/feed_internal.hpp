@@ -224,8 +224,9 @@ struct EndpointPort {
     std::atomic<bool> retirementOnMain{false};  ///< Future workers skip an already claimed inactive main cleanup.
     bool retirementResultPrepared = false;      ///< Frozen native outcome survives deferred producer capture cleanup.
     EndpointState state = EndpointState::NOT_CONNECTED; ///< Detached worker observation.
-    Diagnostic diagnostic; ///< First asynchronous failure, retained after native destruction.
-    CloseResult terminal;  ///< Frozen actual local outcome, published before retired.
+    Diagnostic diagnostic;         ///< First asynchronous failure, retained after native destruction.
+    EndpointStatistics statistics; ///< Coherent bounded publication, protected by mutex through final retirement.
+    CloseResult terminal;          ///< Frozen actual local outcome, published before retired.
 };
 
 /** Shared producer dispatch gate. It owns no bootstrap, native state or joinable thread. */

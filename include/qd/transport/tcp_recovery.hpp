@@ -107,6 +107,10 @@ class TcpRecovery {
      * @return Detached evidence; moved-from handles report CLOSED/stopped.
      */
     [[nodiscard]] RecoveryStatus status() const noexcept;
+    /** Inspect one actual lifetime counter cut on the serialized creating owner, without progress.
+     * @return Retired-source totals plus the current actual source; attempts never reset on reconnect.
+     */
+    [[nodiscard]] ConnectionStatistics statistics() const noexcept;
     /** Inspect admitted scopes with their explicit byte/count overlap.
      * @return Logical resource vector, or zeros after move; never process RSS.
      */

@@ -175,6 +175,14 @@ int exercise(bool borrowed) {
     }
 
     const auto calls = observation.calls.load();
+    const auto statistics = endpoint->getStatistics();
+
+    if (!statistics.final || !statistics.ownerIdentity || statistics.generation != 1 ||
+        statistics.connection.connectionAttempts.value != 0 || statistics.connection.activeConnections != 0 ||
+        statistics.connection.writtenDataRecords.availability != q::core::StatisticAvailability::UNSUPPORTED) {
+        return 13;
+    }
+
     std::weak_ptr<q::api::Endpoint> endpointWitness = endpoint;
     std::weak_ptr<Subscription> subscriptionWitness = subscription;
     std::atomic<bool> foreignPassed{false};
@@ -207,6 +215,10 @@ int exercise(bool borrowed) {
     if (!foreignPassed.load() || !endpointWitness.expired() || !subscriptionWitness.expired() ||
         observation.calls.load() != calls) {
         return 10;
+    }
+
+    if (!statistics.final || statistics.connection.readBytes.value != 0) {
+        return 14;
     }
 
     // The host thread joins before its pre-thread bootstrap is destroyed; closed handles never own SDK cleanup.

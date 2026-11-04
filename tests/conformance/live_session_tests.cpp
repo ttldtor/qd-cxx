@@ -499,6 +499,8 @@ TEST_CASE("whole-frame data admission preserves earlier completed frames and dro
     CHECK(failed.status == p::LiveStatus::FAILED);
     CHECK_FALSE(failed.event);
     CHECK(f.session.diagnostic().error == Error::MALFORMED);
+    CHECK(f.session.inputStatistics().messages.value == 4);
+    CHECK(f.session.inputStatistics().dataRecords.value == 1);
     CHECK(earlier.records()[0].symbol == u"PREFIX");
     CHECK(earlier.records()[0].typedValues[0].raw == 17);
     const auto eventBytes = earlier.residentBytes();
@@ -508,6 +510,34 @@ TEST_CASE("whole-frame data admission preserves earlier completed frames and dro
     CHECK(moved.residentBytes() == eventBytes);
     CHECK(moved.releaseBytes() == f.session.residentBytes());
     CHECK(moved.records()[0].symbol == u"PREFIX");
+}
+
+TEST_CASE("framing statistics distinguish unknown payload rejection from malformed incomplete framing") {
+    auto rejected = fixture();
+    auto work = turn();
+    const auto unknown = rejected.session.feed(frame(999, {}), work);
+    CHECK(unknown.status == p::LiveStatus::FAILED);
+    CHECK(rejected.session.inputStatistics().messages.value == 1);
+    CHECK(rejected.session.inputStatistics().dataRecords.value == 0);
+
+    auto truncated = fixture();
+    auto bytes = frame(15, std::array{std::byte{0}});
+    bytes.pop_back();
+    work = turn();
+    CHECK(truncated.session.feed(bytes, work).status == p::LiveStatus::NEED_INPUT);
+    CHECK(truncated.session.finish() == p::LiveStatus::FAILED);
+    CHECK(truncated.session.inputStatistics().messages.value == 0);
+
+    c::StatisticCounter finite{std::numeric_limits<std::uint64_t>::max() - 1};
+    finite.add(1);
+    CHECK(finite.value == std::numeric_limits<std::uint64_t>::max());
+    finite.add(1);
+    CHECK(finite.availability == c::StatisticAvailability::SATURATED);
+    finite.add(99);
+    CHECK(finite.value == std::numeric_limits<std::uint64_t>::max());
+    c::StatisticCounter retired;
+    retired.merge(finite);
+    CHECK(retired.availability == c::StatisticAvailability::SATURATED);
 }
 
 TEST_CASE("all captured heartbeat masks round trip canonical compact widths and remain controls") {
@@ -737,6 +767,8 @@ TEST_CASE("unknown described records skip exact fields without losing following 
     REQUIRE(event.records().size() == 1);
     CHECK(event.records()[0].symbol == u"KEEP");
     CHECK(event.records()[0].senderId == 7);
+    CHECK(f.session.inputStatistics().messages.value == 4);
+    CHECK(f.session.inputStatistics().dataRecords.value == 2);
 }
 
 TEST_CASE("requested outgoing layouts history raw bounds and partial writes retain their full owners") {
@@ -763,6 +795,7 @@ TEST_CASE("requested outgoing layouts history raw bounds and partial writes reta
         auto output = f.session.subscribe(p::SubscriptionMessage::HISTORY_ADD, std::span(&request, 1), work);
         REQUIRE(output);
         const auto bytes = output->bytes();
+        CHECK(output->subscriptionRecords() == 1);
         const auto before = f.session.residentBytes();
         REQUIRE(output->consume(1));
         CHECK(output->pendingBytes().size() + 1 == bytes.size());

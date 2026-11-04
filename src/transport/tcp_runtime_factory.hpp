@@ -8,6 +8,11 @@ namespace org::ttldtor::qdcxx::transport::detail {
 
 /** Private plain assembly path shared by public facade creation and stable recovery borrows. */
 struct TcpRuntimeFactory {
+    /** Retire only this owned runtime and return its final native/protocol counters.
+     * @param runtime Existing serialized-owner handle, kept alive until all owned completions return.
+     * @return Detached final cut; no application callback is invoked.
+     */
+    [[nodiscard]] static ConnectionStatistics retireStatistics(TcpRuntime &runtime) noexcept;
     /** Create one independent native attempt from stable process state.
      * @param lease Live process borrow retained by the outer owner through all attempts.
      * @param schema Owned schema, adopted only after preparation succeeds.

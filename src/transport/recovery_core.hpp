@@ -98,6 +98,32 @@ class RecoveryBackend {
 
     /** Destroy the terminal runtime, completing actual private SDK/native owner disposal. */
     virtual void dispose() noexcept = 0;
+
+    /** Inspect actual source counters; uninstrumented adapters explicitly provide no metric producer.
+     * @return Detached owner-local cut without progress.
+     */
+    [[nodiscard]] virtual ConnectionStatistics statistics() const noexcept {
+        ConnectionStatistics result;
+        result.readBytes.availability = core::StatisticAvailability::UNSUPPORTED;
+        result.writtenBytes.availability = core::StatisticAvailability::UNSUPPORTED;
+        result.readMessages.availability = core::StatisticAvailability::UNSUPPORTED;
+        result.writtenMessages.availability = core::StatisticAvailability::UNSUPPORTED;
+        result.readDataRecords.availability = core::StatisticAvailability::UNSUPPORTED;
+        result.writtenSubscriptionRecords.availability = core::StatisticAvailability::UNSUPPORTED;
+
+        return result;
+    }
+
+    /** Retire owned native callbacks before preserving their actual final counters.
+     * @return Detached final cut; default adapters retain their existing disposal path.
+     */
+    [[nodiscard]] virtual ConnectionStatistics retireStatistics() noexcept {
+        const auto result = statistics();
+        dispose();
+
+        return result;
+    }
+
     /** Inspect actual current facts without retaining a protocol owner.
      * @return Fixed detached state.
      */
@@ -133,6 +159,7 @@ class RecoveryCore {
     RecoveryDrain drain_;                      ///< Earliest local-drain deadline and monotonic abort policy.
     std::optional<RecoveryTerminal> terminal_; ///< Frozen after all actual owned retirement barriers.
     std::optional<TcpTerminal> wire_; ///< Latest actually retired attempt; cleared at the next factory-entry commit.
+    ConnectionStatistics retiredStatistics_; ///< Distinct disposed sources folded once, never reset by reconnect.
     std::optional<std::size_t> nativeOperationsAtCutoff_; ///< First explicit fence sample, including an observed zero.
     std::array<bool, 3> converged_{};      ///< Cached funded bank comparison at the exact represented revision.
     std::array<bool, 3> resetRequested_{}; ///< Actual reset-publication acceptance for the current retiring epoch.
@@ -273,6 +300,14 @@ class RecoveryCore {
      * @return Detached public phase/attempt/cause evidence.
      */
     [[nodiscard]] RecoveryStatus status() const noexcept;
+    /** Inspect one actual owner-local lifetime cut without progress.
+     * @return Retired-source totals and current actual counters/identities.
+     */
+    [[nodiscard]] ConnectionStatistics statistics() const noexcept;
+    /** Quiesce only the current owned native attempt before a facade's final detached publication.
+     * @return Preserved lifetime counters, including raced native completions.
+     */
+    [[nodiscard]] ConnectionStatistics retireStatistics() noexcept;
     /** Inspect immutable admitted resources.
      * @return Explicit logical vector with documented byte overlap.
      */

@@ -64,6 +64,11 @@ TEST_CASE("plain recovery requires actual protocol input even with empty demand 
     CHECK(backoff);
     CHECK(status.phase == t::RecoveryPhase::EXHAUSTED);
     CHECK(status.attempts == 2);
+    const auto counters = owner->statistics();
+    CHECK(counters.connectionAttempts.value == 2);
+    CHECK(counters.establishedConnections.value == 2);
+    CHECK(counters.closedConnections.value == 2);
+    CHECK(counters.activeConnections == 0);
     CHECK(status.first.stage == "recovery-protocol-inactivity");
     peer.stop();
     CHECK(peer.snapshot().sessions[0].accepted);

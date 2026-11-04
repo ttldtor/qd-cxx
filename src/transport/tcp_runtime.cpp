@@ -26,6 +26,18 @@ TcpRuntime::TcpRuntime(TcpRuntime &&other) noexcept = default;
 TcpRuntime &TcpRuntime::operator=(TcpRuntime &&other) noexcept = default;
 TcpRuntime::~TcpRuntime() = default;
 
+ConnectionStatistics TcpRuntime::statistics() const noexcept {
+    return impl_ ? impl_->statistics() : ConnectionStatistics{};
+}
+
+ConnectionStatistics detail::TcpRuntimeFactory::retireStatistics(TcpRuntime &runtime) noexcept {
+    if (runtime.impl_) {
+        runtime.impl_->retire();
+    }
+
+    return runtime.statistics();
+}
+
 std::expected<TcpRuntime, TcpDiagnostic> TcpRuntime::create(RuntimeBootstrap &bootstrap, core::LocalSchema &&schema,
                                                             protocol::SubscriptionWriter &&composer,
                                                             protocol::LiveLimits sessionLimits, TcpOptions options,
