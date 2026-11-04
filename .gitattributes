@@ -690,3 +690,8 @@ tools/upstream/event-values-oracle/*.java text eol=lf
 tools/upstream/event-values-oracle/*.ps1 text eol=lf
 tests/fixtures/event-values/oracle.tsv -text -whitespace
 tests/fixtures/event-values/provenance.json text eol=lf
+
+tools/upstream/trade-eth-oracle/*.java text eol=lf
+tools/upstream/trade-eth-oracle/*.ps1 text eol=lf
+tests/fixtures/trade-eth/oracle.tsv -text -whitespace
+tests/fixtures/trade-eth/provenance.json text eol=lf

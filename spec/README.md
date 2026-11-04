@@ -43,3 +43,5 @@ Exact conformance results belong to the [developer reading path](../docs/develop
 
 - [Market event values](events/EVENT-VALUES.md): raw-preserving business enums/flags and exact nano, packed-sequence, Gregorian day-ID and SHORT_STRING conversions.
 - [Schedule rules and timezones](schedule/RULES-AND-TIMEZONES.md): compatibility target, provider/data ownership and controlled-profile constraints; Schedule implementation is separate.
+
+- [TradeETH receiving](events/TRADE-ETH.md): distinct extended-hours fields, raw flags and all fifteen mixed selections.

@@ -1162,6 +1162,7 @@ template <class Event> Diagnostic Subscription<Event>::getDiagnostic() const noe
 template class Subscription<events::Quote>;
 template class Subscription<events::Profile>;
 template class Subscription<events::Trade>;
+template class Subscription<events::TradeETH>;
 template class Subscription<RegisteredEvent>;
 
 Feed::Feed(std::shared_ptr<detail::EndpointPort> port) : port_(std::move(port)) {
@@ -1198,6 +1199,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
         bool quote = false;
         bool profile = false;
         bool trade = false;
+        bool tradeETH = false;
 
         for (const auto type : types) {
             switch (type) {
@@ -1210,17 +1212,21 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             case EventType::TRADE:
                 trade = true;
                 break;
+            case EventType::TRADE_ETH:
+                tradeETH = true;
+                break;
             default:
                 reject(ErrorCode::INVALID_ARGUMENT, "subscription-event-types");
             }
         }
 
-        const auto selection =
-            static_cast<detail::EventSelection>((quote ? 1U : 0U) | (profile ? 2U : 0U) | (trade ? 4U : 0U));
+        const auto selection = static_cast<detail::EventSelection>((quote ? 1U : 0U) | (profile ? 2U : 0U) |
+                                                                   (trade ? 4U : 0U) | (tradeETH ? 8U : 0U));
         const auto delivery = registeredDelivery ? detail::EventDelivery::REGISTERED
                               : quote            ? detail::EventDelivery::QUOTE
                               : profile          ? detail::EventDelivery::PROFILE
-                                                 : detail::EventDelivery::TRADE;
+                              : trade            ? detail::EventDelivery::TRADE
+                                                 : detail::EventDelivery::TRADE_ETH;
         auto subscription = std::make_shared<detail::SubscriptionPort>();
         subscription->control = port_->control;
         subscription->endpoint = port_;
@@ -1246,19 +1252,21 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             bool registeredQuote = !port_->options.eventRegistry;
             bool registeredProfile = !port_->options.eventRegistry;
             bool registeredTrade = !port_->options.eventRegistry;
+            bool registeredTradeETH = !port_->options.eventRegistry;
 
             if (port_->options.eventRegistry) {
                 for (const auto &registration : port_->options.eventRegistry->registrations()) {
                     registeredQuote = registeredQuote || registration.type == EventType::QUOTE;
                     registeredProfile = registeredProfile || registration.type == EventType::PROFILE;
                     registeredTrade = registeredTrade || registration.type == EventType::TRADE;
+                    registeredTradeETH = registeredTradeETH || registration.type == EventType::TRADE_ETH;
                 }
             }
 
             const auto missingQuote = quote && !registeredQuote;
             const auto missingProfile = profile && !registeredProfile;
 
-            if (missingQuote || missingProfile || (trade && !registeredTrade)) {
+            if (missingQuote || missingProfile || (trade && !registeredTrade) || (tradeETH && !registeredTradeETH)) {
                 reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-unregistered-event");
             }
 
@@ -1477,6 +1485,8 @@ class TypedConsumer final : public client::SubscriptionConsumer {
                     projectedEvents.emplace_back(std::move(*quote));
                 } else if (auto *trade = std::get_if<events::Trade>(&projected->value)) {
                     projectedEvents.emplace_back(std::move(*trade));
+                } else if (auto *tradeETH = std::get_if<events::TradeETH>(&projected->value)) {
+                    projectedEvents.emplace_back(std::move(*tradeETH));
                 } else if (auto *profile = std::get_if<events::Profile>(&projected->value)) {
                     projectedEvents.emplace_back(std::move(*profile));
                 } else {
@@ -1566,6 +1576,8 @@ class TypedConsumer final : public client::SubscriptionConsumer {
                 return deliver<events::Profile>(batch, listeners);
             case EventDelivery::TRADE:
                 return deliver<events::Trade>(batch, listeners);
+            case EventDelivery::TRADE_ETH:
+                return deliver<events::TradeETH>(batch, listeners);
             case EventDelivery::REGISTERED:
                 return deliver<RegisteredEvent>(batch, listeners);
             default:

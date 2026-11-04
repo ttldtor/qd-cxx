@@ -312,7 +312,13 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
     }
 
     // A mixed subscription may be created after connect; reserve the complete immutable registered selection.
-    const auto maximumRoutes = std::max(std::size_t{1}, add(add(routes[0], routes[1]), routes[2]));
+    std::size_t routeCount = 0;
+
+    for (const auto count : routes) {
+        routeCount = add(routeCount, count);
+    }
+
+    const auto maximumRoutes = std::max(std::size_t{1}, routeCount);
     auto configured = client::controlledStreamSettings();
 
     if (!configured) {

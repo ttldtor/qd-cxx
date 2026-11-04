@@ -1,0 +1,122 @@
+{
+  "revision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "javaVersion": "openjdk version \"1.8.0_422\"",
+  "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
+  "javacSha256": "633143e961aa18051c09112b85333f5cdbd845b54eb39678eb15b91ca8bbb527",
+  "harnessSha256": "72aa3ffe4eb04f07356c1a69c0c3fad23e4c60be200463f9304e937604d213ed",
+  "launcherSha256": "b1f882772aea70f289d481a6aa5cd5848dbac7142f0fa95ce277bae68b530d58",
+  "upstreamSources": [
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/Quote.java",
+      "sha256": "4cb3db3e132c1d0b71428bf4fa3da5a1c25226250ace6c6b55fb8ce3e8fd4b68"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/TradeETH.java",
+      "sha256": "edf3fd110b830c0db3bfb2300717e787455589acd66a774533a5501b61cef398"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/TradeBase.java",
+      "sha256": "307d51b8963be36b5adece55ef6e3be098e48bac380d7ee6fab12aca98c20246"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/Direction.java",
+      "sha256": "5aaad25f70e0632f5ee06f4c73026775212b5bdce169deb53bccb581780ac291"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/MarketEventSymbols.java",
+      "sha256": "7d693cc4b6e1b81d05858d9106b72ba368671887c337db2f5158f1763662708e"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/impl/QuoteMapping.java",
+      "sha256": "bbc56ec541e7d9e80bceee54111ea3d6be8374061b015e46441e521f82e2fe96"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/impl/TradeETHMapping.java",
+      "sha256": "0061f1ed6dcb1ef0bb9ae7ad937228a029b6d5e74895ebaf3d4d36acff5eee8b"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/impl/MarketEventMapping.java",
+      "sha256": "8c88dbc8c84cbf9055d3807e0070dc66244662a8aad7290c992d8ef8b02c4265"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/QuoteDelegate.java",
+      "sha256": "c1897cb1b161ddc6566d18b5c0fb984b4290472eb1f22bf426c6e66af6e8e469"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/TradeETHDelegate.java",
+      "sha256": "788bbe77a16d03cea2d270176a06ae3f4dec5b00d2e723b6d6b8332ffad29708"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/MarketEventDelegateImpl.java",
+      "sha256": "50e88d9408c2c8f9a88cb1c6e0e2058ecce80e76f48ca428507d359b6c61aff4"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/MarketFactoryImpl.java",
+      "sha256": "c74b324b2f99d2a351963fead08419c2ba1d92573c633d30740295acc9d0bac4"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/api/impl/EventDelegate.java",
+      "sha256": "5e6c90ed4115f57708d01f697dedcdc6bc168e41d254b6e245516feb073f5593"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/ng/RecordMapping.java",
+      "sha256": "f2871d535918a418d97b6bc4a6afe920cd83f2a35a076f17d2a1ddcb7fd27515"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/MarketEventDelegateSet.java",
+      "sha256": "9e24ece8e776e917ac8ac252294e19e22a8262fb6779bd48cf4bb9f9f51b7867"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/api/impl/EventDelegateSet.java",
+      "sha256": "50d60da8d08b8c6308bf60d4fe9a05b64361d3d62e7b4c954e19e53c005bc3f0"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/util/TimeSequenceUtil.java",
+      "sha256": "ee1fc453383b8b978693475e80fa22f89ef70b947db637a417e66895f70a8596"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/impl/TimeNanosUtil.java",
+      "sha256": "112441a9ce2b1fcc71be89e00c078506592808f3043582b8a3e8b879e7466537"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/api/impl/SchemeProperties.java",
+      "sha256": "e996d90987bb731e2255301c42e5ba766a08cf0d491d4aea475527376a9f058a"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/Trade.java",
+      "sha256": "3e38ee68b4a7f86b98e6d5f4415ec021b49e4f544a24d038e2e00d0e1b29605c"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/impl/TradeMapping.java",
+      "sha256": "cca61e6e6a8e25ff4e626ef649a5a3797d8be64a4673c44b89d61084a4a2da47"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/TradeDelegate.java",
+      "sha256": "8764cd3d96a6df41accc7cf0deb53d3412c23639378afdc062a500c888de6b8b"
+    },
+    {
+      "path": "dxlib/src/main/java/com/devexperts/util/WideDecimal.java",
+      "sha256": "0fd3e295e88f36e94a24ed9ebf69429985ddf4ba24e4b896e28015266a39d6d8"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/util/Decimal.java",
+      "sha256": "824c49639b1114120a187a6a567aaa54d94cd859499055e32bce0df233dac318"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/ng/RecordCursor.java",
+      "sha256": "b765e929cc5736432c36661c847151278c9a3f94e352b492818c5456dedb724e"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/kit/StringField.java",
+      "sha256": "06b29e2cc173db0d1e602fa8b42fe1337be22f70588a1fb7c3c5e914fdfe115b"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/SerialFieldType.java",
+      "sha256": "3cd21dec85308505ee2036c575449928e5f9e8ab1970a19aeb970340e56b6d16"
+    }
+  ],
+  "productionClassInventorySha256": "90a478b5d3737246d8c897322c9f9db60887846e20117572588e05ae78fbc6d8",
+  "fixtureSha256": "4dfd35880a06224e9c187cf12e71941bcd2946b57a2fe89a543a076f87c662f8",
+  "rows": 57354,
+  "timezoneInvariant": true
+}

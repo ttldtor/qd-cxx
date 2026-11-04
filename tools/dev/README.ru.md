@@ -325,4 +325,8 @@ native writer files pinned Java reader. Сеть, SDK build и новая depend
 - [Oracle ценовых шагов](../upstream/price-increments-oracle/README.ru.md): захват/проверка правил production Java8; `-Help` и `-HelpRu` без рабочих входов.
 - [Oracle символов Candle](../upstream/candle-symbol-oracle/README.ru.md): production factories/getters/identity и raw getter bits; noargs/EN/RU help без работы, Verify по умолчанию, JDK8, heap128MiB/timeout60s, exits0/1.
 
+- [Production oracle TradeETH](../upstream/trade-eth-oracle/README.ru.md): закреплённые mapping/delegate,
+  composite/regional схемы, business double, переходы flags и ограниченные Capture/Verify.
+  Get-Help и справка без аргументов не требуют рабочих путей.
+
 [Oracle IPF compression fixtures](../../tests/fixtures/ipf/compression/README.ru.md) фиксирует конечные JDK8 gzip/ZIP и реальные IPF outcomes. CompressionOracle --help/--help-ru не требует output path и не выполняет file/network/native SDK работу.

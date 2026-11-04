@@ -16,9 +16,10 @@
 namespace org::ttldtor::qdcxx::api {
 /** Supported business projections; custom records remain part of the complete generic schema. */
 enum class EventType {
-    QUOTE,   ///< Existing schema-bound Quote adapter.
-    PROFILE, ///< Existing schema-bound Profile adapter.
-    TRADE    ///< Schema-bound composite or regional Trade adapter.
+    QUOTE,    ///< Existing schema-bound Quote adapter.
+    PROFILE,  ///< Existing schema-bound Profile adapter.
+    TRADE,    ///< Schema-bound composite or regional Trade adapter.
+    TRADE_ETH ///< Distinct extended-hours TradeETH adapter, including applicable regional records.
 };
 
 /** Explicit source of optional event metadata, independent of indexed record identity. */
@@ -92,7 +93,7 @@ class EventRegistry final {
     create(const core::LocalSchema &schema, std::span<const EventRegistration> registrations,
            EventRegistryLimits limits, EventRegistryWork &work);
 
-    /** Prepare the compatible Quote0/Profile1/Trade2 default through the normal registration boundary.
+    /** Prepare Quote0/Profile1/Trade2/TradeETH3 through the normal registration boundary.
      * @param limits Finite complete schema, route and retained-storage allowances.
      * @param work Remaining preparation credits; attempted construction consumes them on refusal.
      * @return Immutable complete default registry or original schema/mapper/registry error.

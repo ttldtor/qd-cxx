@@ -312,4 +312,8 @@ native writer files through the pinned Java reader. No network, SDK build or new
 - [Price-increment oracle](../upstream/price-increments-oracle/README.md): capture/verify actual Java8 price rules; input-free `-Help` and `-HelpRu`.
 - [Candle-symbol oracle](../upstream/candle-symbol-oracle/README.md): full production factories/getters/identity and raw getter bits; safe noargs/EN/RU help, Verify default, JDK8, heap128MiB/timeout60s, exits0/1.
 
+- [TradeETH production oracle](../upstream/trade-eth-oracle/README.md): locked production mapping/delegate,
+  composite/regional schemas, direct business doubles, flags transitions and bounded Capture/Verify.
+  Get-Help and no-argument help need no operational paths.
+
 The [IPF compression fixture oracle](../../tests/fixtures/ipf/compression/README.md) records bounded JDK8 gzip/ZIP and actual IPF outcomes. CompressionOracle --help/--help-ru requires no output path and performs no file, network or native SDK work.

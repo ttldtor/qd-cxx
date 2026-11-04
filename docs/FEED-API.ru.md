@@ -3,13 +3,13 @@
 [English version](FEED-API.md) · [Практические руководства](guides.ru.md) · [Справочник API](api.ru.md)
 
 Подключите `qd/api/feed.hpp` и линкуйте `qdcxx_feed`, чтобы получать типизированные
-`events::Quote`, `events::Profile` и `events::Trade` через рабочий поток библиотеки. Приложение создаёт
+`events::Quote`, `events::Profile`, `events::Trade` и `events::TradeETH` через рабочий поток библиотеки. Приложение создаёт
 endpoint, обработчики и подписки на точные символы; библиотека продвигает соединение,
 конечные переподключения, очереди и доставку. Подписки можно создавать до и после
 `connect()`.
 
-Поддержан обычный бинарный QTP поверх TCP со встроенными полными схемами Quote/Profile/Trade
-либо явными валидированными схемами вызывающего кода и зарегистрированными mappings Quote/Profile/Trade.
+Поддержан обычный бинарный QTP поверх TCP со встроенными полными схемами Quote/Profile/Trade/TradeETH
+либо явными валидированными схемами вызывающего кода и зарегистрированными mappings Quote/Profile/Trade/TradeETH.
 Endpoint выбирает TICKER (по умолчанию: последние значения с возможным объединением
 обновлений) или STREAM (каждая принятая выбранная запись источника). TLS, credentials,
 HISTORY и wildcard-селекторы в этот API не входят. Загрузка схем является отдельной задачей.
@@ -108,8 +108,8 @@ trades->addSymbols({"AAPL"});
 ```
 
 Runtime/endpoint прогрессируют через SDK; клиент не опрашивает queue или work budgets. Копия Trade
-владеет символом и inline snapshot, callback span действует только во время вызова. TradeETH/Summary
-ещё не являются поддерживаемыми typed events. Все семь непустых наборов Quote/Profile/Trade можно
+владеет символом и inline snapshot, callback span действует только во время вызова. Summary
+пока не поддерживается как typed event. Все пятнадцать непустых наборов Quote/Profile/Trade/TradeETH можно
 выбирать mixed-подпиской; предел полной receiving-схемы16 records сохраняется.
 
 ## Явный реестр событий
@@ -153,7 +153,7 @@ Endpoint копирует неизменяемый владеющий снимо
 до native activation; усечения нет. См. полный
 [контракт владения, ошибок и пределов реестра](../spec/events/EVENT-REGISTRY.ru.md).
 
-Подготовленные Quote/Profile/Trade используют исчерпывающие
+Подготовленные Quote/Profile/Trade/TradeETH используют исчерпывающие
 [правила преобразования полей](../spec/events/FIELD-CONVERSIONS.ru.md): допустимые числа
 сохраняют WideDecimal поля и предоставляют прямые Java business getters вроде
 `quote.getBidPrice()`/`profile.getBeta()` без LONG-to-wide округления. Raw int свойства сохраняют Java physical-slot поведение,
@@ -177,7 +177,7 @@ Composite и regional interests различаются в смешанной п�
 изменение, прежний desired set сохраняется. Composite fallback оставляет эти буквальные
 символы без изменений. Обычная форма с атрибутами `AAPL&Q{x=y}` представима.
 
-Встроенный registry сохраняет composite Quote/Profile/Trade. Этот путь через явный ограниченный
+Встроенный registry сохраняет composite Quote/Profile/Trade/TradeETH. Этот путь через явный ограниченный
 registry не загружает полный региональный каталог и не реализует более широкие selectors.
 [Контракт времени и вариантов](../spec/events/EVENT-TIME.ru.md) задаёт необязательные
 Sequence/nanoseconds, секунды/миллисекунды Quote, halt-секунды Profile, независимые метаданные
@@ -214,7 +214,7 @@ mixed->addSymbols({"AAPL", "IBM"});
 enum даёт `INVALID_ARGUMENT`; отсутствие поддержанного типа в реестре endpoint —
 `UNSUPPORTED_PROFILE`, без публикации подписки.
 
-`RegisteredEvent` — владеющий `std::variant<events::Quote, events::Profile, events::Trade>`.
+`RegisteredEvent` — владеющий `std::variant<events::Quote, events::Profile, events::Trade, events::TradeETH>`.
 Скопируйте значение, чтобы сохранить его после callback span. Конкретные и смешанные
 подписки могут независимо перекрываться; закрытие одной отзывает только её оставшиеся
 исключительные interests. Границы callback batch следуют очереди; один batch может
@@ -375,7 +375,7 @@ endpoint. Лимиты учитывают ожидающие, активные �
 | Endpoint option | По умолчанию |
 | --- | --- |
 | `contract` | `TICKER` |
-| `eventRegistry` | Отсутствует: встроенные Quote0/Profile1/Trade2; явное значение копируется как неизменяемый снимок |
+| `eventRegistry` | Отсутствует: встроенные Quote0/Profile1/Trade2/TradeETH3; явное значение копируется как неизменяемый снимок |
 | `connectTimeout`, `dnsTimeout`, `writeTimeout` | По 5000 мс |
 | `readTimeout` | 30000 мс |
 | `pollInterval` | 1 мс |
@@ -435,3 +435,10 @@ callback/освобождения захватов на потоке-созда�
 `awaitState(CLOSED)` может вернуться до освобождения подключённых наблюдателей
 состояния; полный барьер quiescence — `closeAndAwaitTermination()`.
 См. [результаты ожидания, отмену и время жизни обработки сигналов](../spec/subscriptions/FEED-WAITS.ru.md).
+
+## Получить TradeETH
+
+Создайте `createSubscription<q::events::TradeETH>()` с getPrice()/getSizeAsDouble(), как в примере
+Trade. Builtin TradeETH3 — composite; явная TRADE_ETH registration включает настоящий TradeETH&Q.
+ETH bit может быть false при переходе в RTH. Nano key — Last.TimeNanoPart, Tick fallback отсутствует.
+Полные поля, defaults и конечные ограничения: [TradeETH](../spec/events/TRADE-ETH.ru.md).

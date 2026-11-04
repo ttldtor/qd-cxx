@@ -142,3 +142,7 @@ The CLI creates one application signal-reader thread in addition to the SDK work
 both retire before runtime bootstrap destruction.
 
 For owning Trade, use the same endpoint and createSubscription<events::Trade>() with getPrice()/getSizeAsDouble(); the [short example](../../docs/FEED-API.md) uses SDK progress without application polling. Built-in Trade is composite; a regional record requires an explicit registry, as specified in [Trade](../../spec/events/TRADE.md). This console executable retains its Quote output; a public live connection is distinct from deterministic installed-consumer checks.
+
+For the distinct extended-hours snapshot use createSubscription<events::TradeETH>() with the same
+business getters. The console remains a Quote example; [TradeETH](../../spec/events/TRADE-ETH.md)
+describes its separate required flags and regional registration.

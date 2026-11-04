@@ -6,7 +6,7 @@
 
 `Feed::createSubscription(std::span<const EventType>)` and its initializer-list
 overload return one `Subscription<RegisteredEvent>`. `RegisteredEvent` is
-`std::variant<events::Quote, events::Profile, events::Trade>`. Existing concrete
+`std::variant<events::Quote, events::Profile, events::Trade, events::TradeETH>`. Existing concrete
 `createSubscription<events::Quote>()` and `createSubscription<events::Profile>()`
 retain their listener types and behavior.
 
@@ -24,7 +24,7 @@ Raw arguments are bounded by the positive runtime option
 This bounds inspected entries and work, including duplicates; it is independent
 of the number of supported event kinds. `{QUOTE, PROFILE, QUOTE}` is accepted
 within that bound. The same default remains meaningful if more kinds are added.
-QUOTE, PROFILE and TRADE are supported; all seven nonempty subsets are distinct immutable selections.
+QUOTE, PROFILE, TRADE and TRADE_ETH are supported; all fifteen nonempty subsets are distinct immutable selections.
 
 Validation observes this order:
 
@@ -77,7 +77,7 @@ native reservations. With `S` maximum subscriptions, `N` maximum symbols per
 subscription and `R` registered routes, per-subscription desired capacity is
 `N * max(1, R)` and endpoint desired capacity is `S * N * max(1, R)`, with checked
 arithmetic and corresponding symbol-unit bounds. The default built-in registry
-therefore reserves three possible interests per symbol.
+therefore reserves four possible interests per symbol.
 
 Complete mixed mapping limits, duplicate-route preparation visits and callback
 projection allowances aggregate all selected routes before activation. Receiving
@@ -93,8 +93,10 @@ Pinned QD3.355
 creates and attaches one subscription for a class array.
 [DXFeedSubscription](https://github.com/devexperts/QD/blob/0ddc0a09779fb61d74cc0b37c6449ff47dcb715f/dxfeed-api/src/main/java/com/dxfeed/api/DXFeedSubscription.java)
 rejects an empty array and retains an immutable set with duplicates coalesced.
-The native owning variant expresses type-safe delivery for the three supported
+The native owning variant expresses type-safe delivery for the four supported
 prepared adapters; it does not add arbitrary application-class ABI, reflection,
 wire messages, source families or schema loaders.
 
-Trade also participates in RegisteredEvent and typed createSubscription<events::Trade>(). All seven nonempty Quote/Profile/Trade sets have finite plans; fixed16 indices select nonconsecutive kinds without extra record routes. Trade regional fallback is independent of Quote; see [Trade](TRADE.md). Existing callback/ownership/error guarantees are unchanged.
+Trade also participates in RegisteredEvent and typed createSubscription<events::Trade>(). All fifteen nonempty Quote/Profile/Trade/TradeETH sets have finite plans; fixed16 indices select nonconsecutive kinds without extra record routes. Trade regional fallback is independent of Quote; see [Trade](TRADE.md). Existing callback/ownership/error guarantees are unchanged.
+
+TradeETH is independently registered as EventType::TRADE_ETH; see [TradeETH](TRADE-ETH.md). Its raw ETH bit and lack of Tick fallback are distinct from ordinary Trade.

@@ -43,3 +43,5 @@
 
 - [Рыночные значения событий](events/EVENT-VALUES.ru.md): сохраняющие raw business enums/flags и точные преобразования nano, packed sequence, Gregorian day ID и SHORT_STRING.
 - [Правила расписаний и часовые пояса](schedule/RULES-AND-TIMEZONES.ru.md): цели совместимости, владение провайдером/данными и границы контролируемого профиля; реализация Schedule ведётся отдельно.
+
+- [Приём TradeETH](events/TRADE-ETH.ru.md): отдельные ETH fields, raw flags и пятнадцать mixed selections.

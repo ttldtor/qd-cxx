@@ -3,8 +3,8 @@
 [Русская версия](TRADE.ru.md). English is authoritative.
 
 This contract covers an owning `events::Trade`, `PreparedTrade`, registered composite and regional
-Trade records, typed `Subscription<Trade>` and mixed `RegisteredEvent` delivery. TradeETH and Summary
-are separate unsupported typed events. Generic records remain available independently.
+Trade records, typed `Subscription<Trade>` and mixed `RegisteredEvent` delivery.
+[TradeETH](TRADE-ETH.md) has its own separate supported type; Summary remains unsupported. Generic records remain available independently.
 
 The reference is Java QD 3.355 at the revision in `upstream.lock`: `TradeBase`, `Trade`, generated
 `TradeMapping` and `TradeDelegate`, `MarketEventMapping`, `MarketEventDelegateSet` and `Direction`.
@@ -94,7 +94,7 @@ Direction occupies flags bits1..3: UNDEFINED0, DOWN1, ZERO_DOWN2, ZERO3, ZERO_UP
 read as UNDEFINED. The production delegate then checks `Last.Tick` only when direction is UNDEFINED:
 tick1 replaces direction with ZERO_UP, tick2 with ZERO_DOWN, and other ticks leave all flags intact.
 This replacement preserves every other flag bit, including bit0 extended-hours status. Trade itself
-can report extended hours; this does not implement the separate TradeETH event.
+can report extended hours; [TradeETH](TRADE-ETH.md) uses its separate record and no Tick fallback.
 
 ## Regional demand and delivery
 
@@ -106,7 +106,7 @@ in implementation. Recognized trailing attributes are preserved by the existing 
 If no matching regional record is registered, the composite route retains the logical selector.
 
 Quote and Trade choose their regional fallback independently. Profile keeps its ordinary exact
-symbol route. All seven nonempty selections of Quote/Profile/Trade are finite immutable plans over
+symbol route. All fifteen nonempty selections of Quote/Profile/Trade/TradeETH are finite immutable plans over
 at most16 unique bindings, including nonconsecutive type selections. Fixed plan index arrays and a
 temporary16-entry stack binding copy are included in retained/work accounting. Initialization plus
 metadata read/write work and both index-validation/copy visits are prepaid before copying; one-below

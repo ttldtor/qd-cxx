@@ -197,7 +197,7 @@ TEST_CASE("Trade defaults snapshots raw edits and exact preparation boundaries r
     a::EventRegistryWork work;
     auto builtin = a::EventRegistry::builtIn({}, work);
     REQUIRE(builtin);
-    CHECK(builtin->registrations().size() == 3);
+    CHECK(builtin->registrations().size() == 4);
     CHECK(builtin->registrations()[2].type == a::EventType::TRADE);
 }
 

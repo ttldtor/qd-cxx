@@ -4,7 +4,7 @@
 
 Контракт охватывает владеющий `events::Trade`, `PreparedTrade`, зарегистрированные composite и
 региональные записи Trade, типизированную `Subscription<Trade>` и mixed-доставку `RegisteredEvent`.
-TradeETH и Summary остаются отдельными неподдерживаемыми типизированными событиями. Generic-записи
+[TradeETH](TRADE-ETH.ru.md) поддержан отдельным типом; Summary пока не поддерживается. Generic-записи
 доступны независимо.
 
 Эталон — Java QD3.355 из `upstream.lock`: TradeBase, Trade, generated TradeMapping/TradeDelegate,
@@ -90,7 +90,7 @@ Direction занимает flags bits1..3: UNDEFINED0, DOWN1, ZERO_DOWN2, ZERO3,
 читаются как UNDEFINED. Только для UNDEFINED production delegate смотрит Last.Tick:1 заменяет
 direction на ZERO_UP,2 — на ZERO_DOWN, остальные значения оставляют flags без изменений. Замена
 сохраняет остальные биты, включая extended-hours bit0. Trade может сообщать extended hours;
-это не реализация отдельного TradeETH.
+отдельный [TradeETH](TRADE-ETH.ru.md) использует собственную запись без Tick fallback.
 
 ## Региональный demand и доставка
 
@@ -101,7 +101,7 @@ direction на ZERO_UP,2 — на ZERO_DOWN, остальные значения
 При отсутствии matching regional record composite route сохраняет логический selector.
 
 Quote и Trade выбирают regional fallback независимо; Profile использует обычный exact symbol.
-Семь непустых наборов Quote/Profile/Trade имеют конечные immutable plans максимум по16 уникальным
+Пятнадцать непустых наборов Quote/Profile/Trade/TradeETH имеют конечные immutable plans максимум по16 уникальным
 bindings, включая непоследовательные сочетания типов. Fixed index arrays и временная stack-копия
 16 bindings включены в retained/work accounting. Инициализация, чтение/запись metadata и обе проверки
 индексов/копирования оплачиваются до копирования; one-below отказ не меняет output или credits.
