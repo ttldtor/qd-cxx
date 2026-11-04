@@ -1,0 +1,22 @@
+initial	true	true	false	true
+initial-current	true
+no-listener-stale	true
+catchup	false	false	true	true
+old-stable	true	true	false	true
+catchup-notification	0
+updated	true	true	false	true
+change-notification	1
+same-content	true	1
+failed-update-keeps	true	1
+throw-contained	2	1
+last-listener-stops-current	true
+restart-catchup	true	2
+selected-removal-trailing	1
+trading-hours-only-update	1	true	true
+trading-hours-order	0	true
+trading-hours-association	0	true
+trading-hours-duplicates	0	true
+trading-hours-set-change	1	true
+snapshot-after-endpoint-close	true
+incomplete-initial	ACCEPTED	1	false
+malformed-after-complete	com.devexperts.qd.kit.FilterSyntaxException

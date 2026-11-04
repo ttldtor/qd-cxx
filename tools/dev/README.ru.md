@@ -352,3 +352,6 @@ native writer files pinned Java reader. Сеть, SDK build и новая depend
 [Production oracle selectors](../upstream/selector-oracle/README.ru.md) проверяет pinned Java8 typed identity, source/regional/wildcard delegate demand и signed time bounds. Noargs/ENRU/Get-Help не требуют входов и не запускают Java; четыре operational пути, heap128MiB/60s, fresh evidence и Capture/Verify описаны вместе с инструментом.
 
 [Oracle сериализованных вложений](../upstream/attachment-oracle/README.ru.md) отдельно проверяет тела стандартных Message/Configuration записей и Java Object access. Справка EN/RU без входов не запускает Java; ограниченный Capture/Verify сохраняет точные class/resource inventories и raw wire/tape fixtures.
+
+- [Subscription observer oracle](../upstream/subscription-observer-oracle/README.ru.md): реальные pinned production introspection/change callbacks, reentry/exception traces, ограниченные capture/verify и EN/RU help без рабочих входов.
+- [Feed filter oracles](../upstream/feed-filter-oracle/README.ru.md): production-свидетельства QD grammar/classifier, IPF identity/update и source config с конечными ресурсами, неизменяемыми class inventories и EN/RU help без рабочих входов.

@@ -3,6 +3,7 @@
 // Internal CTest runner: public API, finite controlled peers, no external endpoint or ambient resolver.
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "qd/api/feed.hpp"
+#include "qd/api/feed_filter.hpp"
 #include "qd/transport/recovery.hpp"
 
 #include "connect_peer.hpp"
@@ -14,10 +15,12 @@
 #include <doctest/doctest.h>
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <cstdlib>
+#include <fstream>
 #include <functional>
 #include <limits>
 #include <mutex>
@@ -2614,4 +2617,981 @@ TEST_CASE("detached explicit All selector keeps CLOSED rejection after endpoint 
     CHECK(errorCode([&] {
               detached->removeSelector(all);
           }) == api::ErrorCode::CLOSED);
+}
+
+TEST_CASE("public subscription observation owns one committed logical snapshot and normalized types") {
+    api::SubscriptionSnapshot retained;
+    std::shared_ptr<api::Subscription<api::RegisteredEvent>> detached;
+    {
+        api::ApiRuntime runtime(runtimeOptions());
+        auto endpoint = runtime.createEndpoint(endpointOptions());
+        detached = endpoint->getFeed()->createSubscription(
+            {api::EventType::PROFILE, api::EventType::QUOTE, api::EventType::QUOTE});
+        REQUIRE(detached->getEventTypes().size() == 2);
+        CHECK(detached->containsEventType(api::EventType::PROFILE));
+        CHECK_FALSE(detached->containsEventType(static_cast<api::EventType>(900)));
+        detached->setSymbols({"AAPL", "IBM"});
+        retained = detached->getSnapshot();
+        CHECK(retained.revision == 1);
+        detached->setSymbols({"IBM", "AAPL"});
+        CHECK(detached->getSnapshot().revision == 1);
+        detached->addSymbols("IBM");
+        detached->removeSymbols("ABSENT");
+        CHECK(detached->getSnapshot().revision == 1);
+        detached->setSymbols({"MSFT"});
+        CHECK(detached->getSnapshot().revision == 2);
+        CHECK(endpoint->closeAndAwaitTermination().drained);
+    }
+    REQUIRE(retained.symbols.size() == 2);
+    CHECK(retained.symbols[0].eventSymbol() == u"AAPL");
+    CHECK(detached->getSnapshot().revision == 2);
+    REQUIRE(detached->getSnapshot().symbols.size() == 1);
+    CHECK(detached->getSnapshot().symbols[0].eventSymbol() == u"MSFT");
+}
+
+TEST_CASE("public subscription observation is synchronous offline and removes before adding one revision") {
+    std::vector<std::pair<api::SubscriptionChangeKind, std::uint64_t>> changes;
+    const auto owner = std::this_thread::get_id();
+    api::ApiRuntime runtime(runtimeOptions());
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    auto subscription = endpoint->getFeed()->createSubscription<events::Quote>();
+    subscription->addSymbols("AAPL");
+    const auto id = subscription->addChangeListener([&](const api::SubscriptionChange &change) {
+        CHECK(std::this_thread::get_id() == owner);
+        CHECK(change.snapshot.revision == subscription->getSnapshot().revision);
+        changes.emplace_back(change.kind, change.snapshot.revision);
+    });
+    REQUIRE(changes.size() == 1);
+    CHECK(changes[0].first == api::SubscriptionChangeKind::ADDED);
+    subscription->setSymbols({"IBM"});
+    REQUIRE(changes.size() == 3);
+    CHECK(changes[1] == std::pair{api::SubscriptionChangeKind::REMOVED, std::uint64_t{2}});
+    CHECK(changes[2] == std::pair{api::SubscriptionChangeKind::ADDED, std::uint64_t{2}});
+    subscription->removeChangeListener(id);
+    CHECK(changes.back().first == api::SubscriptionChangeKind::CLOSED);
+    const auto count = changes.size();
+    subscription->removeChangeListener(id);
+    subscription->clearSymbols();
+    CHECK(changes.size() == count);
+    CHECK(endpoint->closeAndAwaitTermination().drained);
+}
+
+TEST_CASE("public subscription observation defers self removal and suppresses the later addition phase") {
+    unsigned depth = 0;
+    unsigned maximumDepth = 0;
+    std::vector<api::SubscriptionChangeKind> first;
+    std::vector<api::SubscriptionChangeKind> second;
+    api::ApiRuntime runtime(runtimeOptions());
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    auto subscription = endpoint->getFeed()->createSubscription<events::Quote>();
+    api::Subscription<events::Quote>::ChangeListenerId firstId = 0;
+    firstId = subscription->addChangeListener([&](const auto &change) {
+        maximumDepth = std::max(maximumDepth, ++depth);
+        first.push_back(change.kind);
+
+        if (change.kind == api::SubscriptionChangeKind::REMOVED) {
+            subscription->removeChangeListener(firstId);
+            CHECK(change.snapshot.symbols[0].eventSymbol() == u"IBM");
+        }
+
+        --depth;
+    });
+    subscription->addChangeListener([&](const auto &change) {
+        maximumDepth = std::max(maximumDepth, ++depth);
+        second.push_back(change.kind);
+        --depth;
+    });
+    subscription->addSymbols("AAPL");
+    first.clear();
+    second.clear();
+    subscription->setSymbols({"IBM"});
+    CHECK(maximumDepth == 1);
+    REQUIRE(first.size() == 2);
+    CHECK(first[0] == api::SubscriptionChangeKind::REMOVED);
+    CHECK(first[1] == api::SubscriptionChangeKind::CLOSED);
+    REQUIRE(second.size() == 2);
+    CHECK(second[0] == api::SubscriptionChangeKind::REMOVED);
+    CHECK(second[1] == api::SubscriptionChangeKind::ADDED);
+    CHECK(endpoint->closeAndAwaitTermination().drained);
+}
+
+TEST_CASE("public subscription observation bounds an entire reentrant turn before committing") {
+    unsigned calls = 0;
+    api::ErrorCode refused = api::ErrorCode::NONE;
+    auto options = runtimeOptions();
+    options.maximumSubscriptionChangesPerTurn = 3;
+    api::ApiRuntime runtime(options);
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    auto subscription = endpoint->getFeed()->createSubscription<events::Quote>();
+    constexpr std::string_view SYMBOLS[] = {"A", "B", "C", "D"};
+    subscription->addChangeListener([&](const auto &change) {
+        if (change.kind != api::SubscriptionChangeKind::ADDED) {
+            return;
+        }
+
+        ++calls;
+        refused = errorCode([&] {
+            subscription->addSymbols(SYMBOLS[calls]);
+        });
+    });
+    subscription->addSymbols("A");
+    CHECK(calls == 3);
+    CHECK(refused == api::ErrorCode::WORK_LIMIT);
+    CHECK(subscription->getSnapshot().revision == 3);
+    CHECK(subscription->getSnapshot().symbols.size() == 3);
+    subscription->clearSymbols();
+    CHECK(subscription->getSnapshot().revision == 4);
+    CHECK(endpoint->closeAndAwaitTermination().drained);
+}
+
+TEST_CASE("public subscription observation keeps executing capacity and reserves close without waiting") {
+    std::mutex mutex;
+    std::condition_variable condition;
+    bool entered = false;
+    bool release = false;
+    std::atomic<unsigned> closed{0};
+    auto options = runtimeOptions();
+    options.maximumChangeListenersPerSubscription = 1;
+    options.maximumPendingSubscriptionChanges = 1;
+    api::ApiRuntime runtime(options);
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    auto subscription = endpoint->getFeed()->createSubscription<events::Quote>();
+    const auto id = subscription->addChangeListener([&](const auto &change) {
+        if (change.kind == api::SubscriptionChangeKind::CLOSED) {
+            ++closed;
+
+            return;
+        }
+
+        std::unique_lock lock(mutex);
+        entered = true;
+        condition.notify_all();
+        condition.wait(lock, [&] {
+            return release;
+        });
+    });
+    std::thread producer([&] {
+        subscription->addSymbols("AAPL");
+    });
+    {
+        std::unique_lock lock(mutex);
+        const bool reached = condition.wait_for(lock, 3s, [&] {
+            return entered;
+        });
+        CHECK(reached);
+    }
+    const auto refused = errorCode([&] {
+        subscription->addSymbols("IBM");
+    });
+    const auto observed = subscription->getSnapshot();
+    subscription->removeChangeListener(id);
+    const auto capacity = errorCode([&] {
+        subscription->addChangeListener([](const auto &) {
+        });
+    });
+    {
+        std::lock_guard lock(mutex);
+        release = true;
+    }
+    condition.notify_all();
+    producer.join();
+    CHECK(refused == api::ErrorCode::RESOURCE_LIMIT);
+    CHECK(capacity == api::ErrorCode::RESOURCE_LIMIT);
+    CHECK(observed.revision == 1);
+    CHECK(observed.symbols.size() == 1);
+    CHECK(closed.load() == 1);
+    subscription->addChangeListener([](const auto &) {
+    });
+    CHECK(endpoint->closeAndAwaitTermination().drained);
+}
+
+TEST_CASE("public subscription observation records advisory throws and rejects self waits before ready") {
+    unsigned delivered = 0;
+    api::ApiRuntime runtime(runtimeOptions());
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    auto subscription = endpoint->getFeed()->createSubscription<events::Quote>();
+    subscription->addChangeListener([](const auto &) {
+        throw std::runtime_error("observer failure");
+    });
+    subscription->addChangeListener([&](const auto &) {
+        ++delivered;
+        CHECK(errorCode([&] {
+                  static_cast<void>(subscription->awaitState(subscription->getState()));
+              }) == api::ErrorCode::INVALID_STATE);
+        CHECK(errorCode([&] {
+                  static_cast<void>(endpoint->closeAndAwaitTermination());
+              }) == api::ErrorCode::INVALID_STATE);
+        CHECK(errorCode([&] {
+                  runtime.closeAndAwaitTermination();
+              }) == api::ErrorCode::INVALID_STATE);
+    });
+    subscription->addSymbols("AAPL");
+    CHECK(delivered == 1);
+    CHECK(subscription->getChangeDiagnostic().code == api::ErrorCode::CALLBACK_FAILURE);
+    CHECK(subscription->getDiagnostic().code == api::ErrorCode::NONE);
+    CHECK(subscription->getState() == api::SubscriptionState::CONFIGURED);
+    CHECK(endpoint->closeAndAwaitTermination().drained);
+    CHECK(delivered == 2);
+}
+
+TEST_CASE("public subscription observation failure preserves revision and listener admission") {
+    api::ApiRuntime runtime(runtimeOptions());
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    auto subscription = endpoint->getFeed()->createSubscription<events::Quote>();
+    subscription->addSymbols("AAPL");
+    unsigned calls = 0;
+    allocation_probe::failNext = true;
+    const auto admission = errorCode([&] {
+        subscription->addChangeListener([&](const auto &) {
+            ++calls;
+        });
+    });
+    CHECK(admission == api::ErrorCode::ALLOCATION_FAILURE);
+    CHECK(calls == 0);
+    CHECK(subscription->getSnapshot().revision == 1);
+    subscription->addChangeListener([&](const auto &) {
+        ++calls;
+    });
+    CHECK(calls == 1);
+    allocation_probe::failNext = true;
+    const auto mutation = errorCode([&] {
+        subscription->setSymbols({"IBM"});
+    });
+    CHECK(mutation == api::ErrorCode::ALLOCATION_FAILURE);
+    CHECK(subscription->getSnapshot().revision == 1);
+    CHECK(calls == 1);
+    CHECK(endpoint->closeAndAwaitTermination().drained);
+}
+
+TEST_CASE("public subscription observation retires captures outside locks and charges final destruction") {
+    bool destroyed = false;
+    api::ErrorCode charged = api::ErrorCode::NONE;
+    auto limits = runtimeOptions();
+    limits.maximumChangeListenersPerSubscription = 1;
+    api::ApiRuntime runtime(limits);
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    auto subscription = endpoint->getFeed()->createSubscription<events::Quote>();
+    auto capture = std::make_shared<CaptureAction>();
+    capture->action = [&] {
+        CHECK(subscription->getSnapshot().revision == 0);
+        charged = errorCode([&] {
+            subscription->addChangeListener([](const auto &) {
+            });
+        });
+        subscription->clearSymbols();
+        destroyed = true;
+    };
+    const auto id = subscription->addChangeListener([capture](const auto &) {
+    });
+    capture.reset();
+    subscription->removeChangeListener(id);
+    CHECK(destroyed);
+    CHECK(charged == api::ErrorCode::RESOURCE_LIMIT);
+    subscription->addChangeListener([](const auto &) {
+    });
+    CHECK(endpoint->closeAndAwaitTermination().drained);
+}
+
+TEST_CASE("public subscription observation is deferred until the complete real data selection returns") {
+    std::atomic<bool> inData{false};
+    std::atomic<unsigned> remainder{0};
+    std::atomic<unsigned> observedRemoval{0};
+    api::ApiRuntime runtime(runtimeOptions());
+    auto schema = standardSchema(false);
+    const std::vector<peer::Record> records{{u"IBM", standardValues(schema)}};
+    root::test::TcpPeerConfig config;
+    config.sessions.resize(1);
+    auto &script = config.sessions[0];
+    script.initialBytes = peer::fixturePeerPrefix(schema, core::SubscriptionFamily::TICKER);
+    script.replyBytes = peer::fixturePeerData(records, core::SubscriptionFamily::TICKER, true);
+    script.readThroughMessage = 11;
+    script.waitForClientClose = true;
+    root::test::OwnedTcpPeer source(std::move(config));
+    REQUIRE(source.port() != 0);
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    auto subscription = endpoint->getFeed()->createSubscription<events::Quote>();
+    subscription->addChangeListener([&](const auto &change) {
+        CHECK_FALSE(inData.load());
+
+        if (change.kind == api::SubscriptionChangeKind::REMOVED) {
+            CHECK(remainder.load() == 1);
+            CHECK(change.snapshot.symbols.empty());
+            ++observedRemoval;
+        }
+    });
+    subscription->addEventListener([&](auto batch) {
+        inData.store(true);
+        REQUIRE(batch.size() == 1);
+        subscription->clearSymbols();
+        CHECK(observedRemoval.load() == 0);
+    });
+    subscription->addEventListener([&](auto batch) {
+        REQUIRE(batch.size() == 1);
+        CHECK(observedRemoval.load() == 0);
+        ++remainder;
+        inData.store(false);
+    });
+    subscription->addSymbols("IBM");
+    endpoint->connect("127.0.0.1:" + std::to_string(source.port()));
+    REQUIRE(eventually([&] {
+        return observedRemoval.load() == 1;
+    }));
+    endpoint->disconnect();
+    const auto before = subscription->getSnapshot().revision;
+    subscription->addSymbols("AAPL");
+    CHECK(subscription->getSnapshot().revision == before + 1);
+    CHECK(endpoint->closeAndAwaitTermination().drained);
+    CHECK(source.snapshot().error == root::test::TcpPeerError::NONE);
+}
+
+TEST_CASE("public subscription observation preserves typed identities while demand is shared") {
+    std::atomic<unsigned> firstCalls{0};
+    std::atomic<unsigned> secondCalls{0};
+    std::atomic<unsigned> removals{0};
+    api::ApiRuntime runtime(runtimeOptions());
+    auto schema = standardSchema(false);
+    const std::vector<peer::Record> records{{u"IBM", standardValues(schema)}};
+    root::test::TcpPeerConfig config;
+    config.sessions.resize(1);
+    auto &script = config.sessions[0];
+    script.initialBytes = peer::fixturePeerPrefix(schema, core::SubscriptionFamily::TICKER);
+    script.replyBytes = peer::fixturePeerData(records, core::SubscriptionFamily::TICKER, true);
+    script.readThroughMessage = 11;
+    script.waitForClientClose = true;
+    root::test::OwnedTcpPeer source(std::move(config));
+    REQUIRE(source.port() != 0);
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    auto first = endpoint->getFeed()->createSubscription<events::Quote>();
+    auto second = endpoint->getFeed()->createSubscription<events::Quote>();
+    const auto indexed = api::SubscriptionSelector::indexed(u"IBM", {0, u"ignored"});
+    const std::array selectors{api::SubscriptionSelector::plain(u"IBM"), indexed};
+    first->setSelectors(selectors);
+    second->addSymbols("IBM");
+    const auto observerId = first->addChangeListener([&](const auto &change) {
+        if (change.kind == api::SubscriptionChangeKind::REMOVED) {
+            CHECK(change.symbols.size() == 1);
+            CHECK(change.symbols[0].kind() == api::SubscriptionSymbolKind::PLAIN);
+            CHECK(change.snapshot.symbols.size() == 1);
+            ++removals;
+        }
+    });
+    first->addEventListener([&](auto batch) {
+        CHECK(batch.size() == 1);
+        first->removeSymbols("IBM");
+        ++firstCalls;
+    });
+    second->addEventListener([&](auto batch) {
+        CHECK(batch.size() == 1);
+        ++secondCalls;
+    });
+    endpoint->connect("127.0.0.1:" + std::to_string(source.port()));
+    REQUIRE(eventually([&] {
+        return secondCalls.load() == 1 && removals.load() == 1;
+    }));
+    CHECK(firstCalls.load() == 1);
+    CHECK(first->getSnapshot().symbols.size() == 1);
+    CHECK(second->getSnapshot().symbols.size() == 1);
+    first->removeChangeListener(observerId);
+    first->clearSymbols();
+    CHECK(second->getSnapshot().symbols.size() == 1);
+    CHECK(endpoint->closeAndAwaitTermination().drained);
+    CHECK(source.snapshot().error == root::test::TcpPeerError::NONE);
+}
+
+TEST_CASE("public subscription observation matches pinned production Java membership phases") {
+    std::ifstream oracle(ORG_TTLDTOR_QDCXX_SUBSCRIPTION_OBSERVER_FIXTURE);
+    REQUIRE(oracle.is_open());
+    std::vector<std::string> expected;
+    std::string line;
+
+    while (std::getline(oracle, line)) {
+        if (!line.starts_with("ordinary\tL.")) {
+            continue;
+        }
+
+        auto value = line.substr(std::string_view("ordinary\t").size());
+        const auto monitor = value.find(";monitor=");
+
+        if (monitor != std::string::npos) {
+            value.erase(monitor);
+        }
+
+        if (value.starts_with("L.closed\t")) {
+            value = "L.closed";
+        }
+
+        expected.push_back(std::move(value));
+    }
+
+    REQUIRE(expected.size() == 6);
+    const auto values = [](std::span<const api::SubscriptionSelector> symbols) {
+        std::vector<std::string> names;
+
+        for (const auto &symbol : symbols) {
+            const auto text = symbol.eventSymbol();
+            std::string name = "String:";
+
+            for (const auto unit : text) {
+                CHECK(unit <= 0x7f);
+                name.push_back(static_cast<char>(unit));
+            }
+
+            names.push_back(std::move(name));
+        }
+
+        std::ranges::sort(names);
+        std::string result = "[";
+
+        for (const auto &name : names) {
+            if (result.size() != 1) {
+                result += ", ";
+            }
+
+            result += name;
+        }
+
+        return result + "]";
+    };
+    std::vector<std::string> observed;
+    api::ApiRuntime runtime(runtimeOptions());
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    auto subscription = endpoint->getFeed()->createSubscription<events::Quote>();
+    const auto id = subscription->addChangeListener([&](const auto &change) {
+        if (change.kind == api::SubscriptionChangeKind::CLOSED) {
+            observed.emplace_back("L.closed");
+
+            return;
+        }
+
+        observed.push_back(
+            std::string(change.kind == api::SubscriptionChangeKind::ADDED ? "L.added\t" : "L.removed\t") +
+            values(change.symbols) + ";current=" + values(change.snapshot.symbols));
+    });
+    subscription->addSymbols({"A", "B"});
+    subscription->addSymbols("A");
+    subscription->setSymbols({"B", "C"});
+    subscription->removeSymbols("ABSENT");
+    subscription->removeSymbols("B");
+    subscription->clearSymbols();
+    subscription->clearSymbols();
+    subscription->removeChangeListener(id);
+    subscription->removeChangeListener(id);
+    subscription->addSymbols("D");
+    CHECK(observed == expected);
+    CHECK(endpoint->closeAndAwaitTermination().drained);
+}
+
+TEST_CASE("public subscription observation refuses a two phase replace before publishing either phase") {
+    unsigned calls = 0;
+    auto limits = runtimeOptions();
+    limits.maximumPendingSubscriptionChanges = 1;
+    api::ApiRuntime runtime(limits);
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    auto subscription = endpoint->getFeed()->createSubscription<events::Quote>();
+    subscription->addSymbols("AAPL");
+    subscription->addChangeListener([&](const auto &) {
+        ++calls;
+    });
+    CHECK(calls == 1);
+    const auto code = errorCode([&] {
+        subscription->setSymbols({"IBM"});
+    });
+    CHECK(code == api::ErrorCode::RESOURCE_LIMIT);
+    const auto snapshot = subscription->getSnapshot();
+    CHECK(snapshot.revision == 1);
+    REQUIRE(snapshot.symbols.size() == 1);
+    CHECK(snapshot.symbols[0].eventSymbol() == u"AAPL");
+    CHECK(calls == 1);
+    CHECK(endpoint->closeAndAwaitTermination().drained);
+}
+
+TEST_CASE("public subscription observation shares finite nonrecursive work across sibling subscriptions") {
+    unsigned depth = 0;
+    unsigned maximumDepth = 0;
+    api::ErrorCode bounded = api::ErrorCode::NONE;
+    auto limits = runtimeOptions();
+    limits.maximumSubscriptionChangesPerTurn = 2;
+    api::ApiRuntime runtime(limits);
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    auto first = endpoint->getFeed()->createSubscription<events::Quote>();
+    auto second = endpoint->getFeed()->createSubscription<events::Profile>();
+    first->addChangeListener([&](const auto &change) {
+        if (change.kind != api::SubscriptionChangeKind::ADDED) {
+            return;
+        }
+
+        maximumDepth = std::max(maximumDepth, ++depth);
+        second->addSymbols("B");
+        --depth;
+    });
+    second->addChangeListener([&](const auto &change) {
+        if (change.kind != api::SubscriptionChangeKind::ADDED) {
+            return;
+        }
+
+        maximumDepth = std::max(maximumDepth, ++depth);
+        bounded = errorCode([&] {
+            first->addSymbols("C");
+        });
+        --depth;
+    });
+    first->addSymbols("A");
+    CHECK(maximumDepth == 1);
+    CHECK(bounded == api::ErrorCode::WORK_LIMIT);
+    CHECK(first->getSnapshot().revision == 1);
+    CHECK(second->getSnapshot().revision == 1);
+    CHECK(endpoint->closeAndAwaitTermination().drained);
+}
+
+TEST_CASE("public subscription observation preserves cross runtime mutations with one finite causal root") {
+    unsigned depth = 0;
+    unsigned maximumDepth = 0;
+    unsigned secondCalls = 0;
+    api::ErrorCode bounded = api::ErrorCode::NONE;
+    std::vector<std::u16string> order;
+    auto bootstrap = root::transport::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    auto firstLimits = runtimeOptions();
+    firstLimits.maximumSubscriptionChangesPerTurn = 3;
+    api::ApiRuntime firstRuntime(*bootstrap, firstLimits);
+    api::ApiRuntime secondRuntime(*bootstrap, runtimeOptions());
+    auto firstEndpoint = firstRuntime.createEndpoint(endpointOptions());
+    auto secondEndpoint = secondRuntime.createEndpoint(endpointOptions());
+    auto first = firstEndpoint->getFeed()->createSubscription<events::Quote>();
+    auto second = secondEndpoint->getFeed()->createSubscription<events::Quote>();
+    first->addChangeListener([&](const auto &change) {
+        if (change.kind != api::SubscriptionChangeKind::ADDED) {
+            return;
+        }
+
+        maximumDepth = std::max(maximumDepth, ++depth);
+        const std::u16string symbol(change.symbols[0].eventSymbol());
+        order.push_back(symbol);
+
+        if (symbol == u"A") {
+            second->addSymbols("B");
+            CHECK(second->getSnapshot().revision == 1);
+            CHECK(secondCalls == 0);
+        } else if (symbol == u"C") {
+            bounded = errorCode([&] {
+                second->addSymbols("REFUSED");
+            });
+        }
+
+        --depth;
+    });
+    second->addChangeListener([&](const auto &change) {
+        if (change.kind != api::SubscriptionChangeKind::ADDED) {
+            return;
+        }
+
+        maximumDepth = std::max(maximumDepth, ++depth);
+        ++secondCalls;
+        order.emplace_back(change.symbols[0].eventSymbol());
+        first->addSymbols("C");
+        --depth;
+    });
+    first->addSymbols("A");
+    CHECK(maximumDepth == 1);
+    CHECK(order == std::vector<std::u16string>{u"A", u"B", u"C"});
+    CHECK(bounded == api::ErrorCode::WORK_LIMIT);
+    CHECK(first->getSnapshot().revision == 2);
+    CHECK(second->getSnapshot().revision == 1);
+    CHECK(firstEndpoint->closeAndAwaitTermination().drained);
+    CHECK(secondEndpoint->closeAndAwaitTermination().drained);
+}
+
+TEST_CASE("public subscription observation close remains a fence until offline owner retirement") {
+    unsigned calls = 0;
+    unsigned closed = 0;
+    api::ApiRuntime runtime(runtimeOptions());
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    auto subscription = endpoint->getFeed()->createSubscription<events::Quote>();
+    subscription->addChangeListener([&](const auto &change) {
+        ++calls;
+
+        if (change.kind == api::SubscriptionChangeKind::CLOSED) {
+            ++closed;
+        }
+    });
+    subscription->addSymbols("AAPL");
+    CHECK(calls == 1);
+    subscription->close();
+    CHECK(closed == 0);
+    CHECK(errorCode([&] {
+              subscription->addSymbols("IBM");
+          }) == api::ErrorCode::CLOSED);
+    CHECK(subscription->getSnapshot().revision == 1);
+    CHECK(endpoint->closeAndAwaitTermination().drained);
+    CHECK(closed == 1);
+    subscription->close();
+    CHECK(closed == 1);
+}
+
+TEST_CASE("public subscription observation holds cross runtime selection until the source callback returns") {
+    std::mutex mutex;
+    std::condition_variable condition;
+    bool busy = false;
+    bool release = false;
+    bool producerReturned = false;
+    std::atomic<unsigned> crossCalls{0};
+    api::ErrorCode causalLimit = api::ErrorCode::NONE;
+    auto bootstrap = root::transport::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    auto limits = runtimeOptions();
+    limits.maximumSubscriptionChangesPerTurn = 2;
+    api::ApiRuntime firstRuntime(*bootstrap, limits);
+    api::ApiRuntime secondRuntime(*bootstrap, runtimeOptions());
+    auto firstEndpoint = firstRuntime.createEndpoint(endpointOptions());
+    auto secondEndpoint = secondRuntime.createEndpoint(endpointOptions());
+    auto first = firstEndpoint->getFeed()->createSubscription<events::Quote>();
+    auto second = secondEndpoint->getFeed()->createSubscription<events::Quote>();
+    second->addChangeListener([&](const auto &change) {
+        if (change.kind != api::SubscriptionChangeKind::ADDED) {
+            return;
+        }
+
+        if (change.symbols[0].eventSymbol() == u"BUSY") {
+            std::unique_lock lock(mutex);
+            busy = true;
+            condition.notify_all();
+            condition.wait(lock, [&] {
+                return release;
+            });
+        } else {
+            ++crossCalls;
+            causalLimit = errorCode([&] {
+                first->addSymbols("ROOT-CAP-REFUSAL");
+            });
+        }
+    });
+    std::thread producer([&] {
+        second->addSymbols("BUSY");
+        std::lock_guard lock(mutex);
+        producerReturned = true;
+        condition.notify_all();
+    });
+    {
+        std::unique_lock lock(mutex);
+        CHECK(condition.wait_for(lock, 3s, [&] {
+            return busy;
+        }));
+    }
+    first->addChangeListener([&](const auto &change) {
+        if (change.kind != api::SubscriptionChangeKind::ADDED) {
+            return;
+        }
+
+        second->addSymbols("CROSS");
+        {
+            std::lock_guard lock(mutex);
+            release = true;
+        }
+        condition.notify_all();
+        std::unique_lock lock(mutex);
+        CHECK(condition.wait_for(lock, 3s, [&] {
+            return producerReturned;
+        }));
+        CHECK(crossCalls.load() == 0);
+    });
+    first->addSymbols("A");
+    producer.join();
+    CHECK(crossCalls.load() == 1);
+    CHECK(causalLimit == api::ErrorCode::WORK_LIMIT);
+    CHECK(first->getSnapshot().revision == 1);
+    CHECK(second->getSnapshot().revision == 2);
+    CHECK(firstEndpoint->closeAndAwaitTermination().drained);
+    CHECK(secondEndpoint->closeAndAwaitTermination().drained);
+}
+
+TEST_CASE("public subscription observation continues from real data into an offline foreign runtime") {
+    std::atomic<bool> inData{false};
+    std::atomic<unsigned> foreignCalls{0};
+    auto bootstrap = root::transport::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    api::ApiRuntime firstRuntime(*bootstrap, runtimeOptions());
+    api::ApiRuntime secondRuntime(*bootstrap, runtimeOptions());
+    auto schema = standardSchema(false);
+    const std::vector<peer::Record> records{{u"IBM", standardValues(schema)}};
+    root::test::TcpPeerConfig config;
+    config.sessions.resize(1);
+    auto &script = config.sessions[0];
+    script.initialBytes = peer::fixturePeerPrefix(schema, core::SubscriptionFamily::TICKER);
+    script.replyBytes = peer::fixturePeerData(records, core::SubscriptionFamily::TICKER, true);
+    script.readThroughMessage = 11;
+    script.waitForClientClose = true;
+    root::test::OwnedTcpPeer source(std::move(config));
+    REQUIRE(source.port() != 0);
+    auto firstEndpoint = firstRuntime.createEndpoint(endpointOptions());
+    auto secondEndpoint = secondRuntime.createEndpoint(endpointOptions());
+    auto first = firstEndpoint->getFeed()->createSubscription<events::Quote>();
+    auto second = secondEndpoint->getFeed()->createSubscription<events::Profile>();
+    second->addChangeListener([&](const auto &change) {
+        if (change.kind == api::SubscriptionChangeKind::ADDED) {
+            CHECK_FALSE(inData.load());
+            CHECK(second->getState() == api::SubscriptionState::CONFIGURED);
+            ++foreignCalls;
+        }
+    });
+    first->addEventListener([&](auto) {
+        inData.store(true);
+        second->addSymbols("FOREIGN");
+        CHECK(foreignCalls.load() == 0);
+    });
+    first->addEventListener([&](auto) {
+        inData.store(false);
+    });
+    first->addSymbols("IBM");
+    firstEndpoint->connect("127.0.0.1:" + std::to_string(source.port()));
+    REQUIRE(eventually([&] {
+        return foreignCalls.load() == 1;
+    }));
+    CHECK(firstEndpoint->closeAndAwaitTermination().drained);
+    CHECK(secondEndpoint->closeAndAwaitTermination().drained);
+    CHECK(source.snapshot().error == root::test::TcpPeerError::NONE);
+}
+
+TEST_CASE("public subscription observation keeps detached continuation captures through reentrant destruction") {
+    unsigned depth = 0;
+    unsigned maximumDepth = 0;
+    bool inDestructor = false;
+    bool destroyed = false;
+    unsigned foreignAdded = 0;
+    unsigned foreignClosed = 0;
+    auto bootstrap = root::transport::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    api::ApiRuntime firstRuntime(*bootstrap, runtimeOptions());
+    api::ApiRuntime secondRuntime(*bootstrap, runtimeOptions());
+    auto firstEndpoint = firstRuntime.createEndpoint(endpointOptions());
+    auto secondEndpoint = secondRuntime.createEndpoint(endpointOptions());
+    auto first = firstEndpoint->getFeed()->createSubscription<events::Quote>();
+    auto second = secondEndpoint->getFeed()->createSubscription<events::Quote>();
+    std::weak_ptr<api::Subscription<events::Quote>> weak = second;
+    auto capture = std::make_shared<CaptureAction>();
+    capture->action = [&] {
+        inDestructor = true;
+        CHECK(first->getSnapshot().revision == 1);
+        first->addSymbols("CAPTURE");
+        destroyed = true;
+        inDestructor = false;
+    };
+    second->addChangeListener([&, capture](const auto &change) {
+        maximumDepth = std::max(maximumDepth, ++depth);
+
+        if (change.kind == api::SubscriptionChangeKind::CLOSED) {
+            ++foreignClosed;
+        } else {
+            ++foreignAdded;
+        }
+
+        --depth;
+    });
+    capture.reset();
+    first->addChangeListener([&](const auto &change) {
+        if (change.kind != api::SubscriptionChangeKind::ADDED) {
+            return;
+        }
+
+        maximumDepth = std::max(maximumDepth, ++depth);
+        CHECK_FALSE(inDestructor);
+
+        if (change.symbols[0].eventSymbol() == u"A") {
+            second->addSymbols("B");
+            second.reset();
+            CHECK(weak.expired());
+            CHECK(foreignClosed == 0);
+        }
+
+        --depth;
+    });
+    first->addSymbols("A");
+    CHECK(maximumDepth == 1);
+    CHECK(foreignAdded == 0);
+    CHECK(foreignClosed == 1);
+    CHECK(destroyed);
+    CHECK(first->getSnapshot().revision == 2);
+    CHECK(firstEndpoint->closeAndAwaitTermination().drained);
+    CHECK(secondEndpoint->closeAndAwaitTermination().drained);
+}
+
+TEST_CASE("public subscription observation initializes a reentrant listener before its ordinary deltas") {
+    std::vector<std::uint64_t> revisions;
+    unsigned registrations = 0;
+    api::ApiRuntime runtime(runtimeOptions());
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    auto subscription = endpoint->getFeed()->createSubscription<events::Quote>();
+    subscription->addChangeListener([&](const auto &change) {
+        if (change.kind == api::SubscriptionChangeKind::REMOVED && registrations++ == 0) {
+            subscription->addChangeListener([&](const auto &next) {
+                if (next.kind != api::SubscriptionChangeKind::CLOSED) {
+                    revisions.push_back(next.snapshot.revision);
+                }
+            });
+        }
+    });
+    subscription->addSymbols("A");
+    subscription->setSymbols({"B"});
+    CHECK(revisions == std::vector<std::uint64_t>{2});
+    subscription->addSymbols("C");
+    CHECK(revisions == std::vector<std::uint64_t>{2, 3});
+    CHECK(endpoint->closeAndAwaitTermination().drained);
+}
+
+TEST_CASE("public endpoint classifier preserves custom registry and detached immutable options") {
+    api::ApiRuntime runtime(runtimeOptions());
+    const std::array categories{api::FeedFilterCategory{u"A", u"A*"}, api::FeedFilterCategory{u"other", u"*"}};
+    auto ordinary = runtime.createEndpoint(endpointOptions());
+    const auto plain = api::SubscriptionSelector::plain(u"AAPL");
+    auto defaultFilter = ordinary->createFilter(categories);
+    CHECK(defaultFilter.accept(api::EventType::QUOTE, plain));
+    REQUIRE(defaultFilter.getCategory(api::EventType::QUOTE, plain));
+    CHECK(*defaultFilter.getCategory(api::EventType::QUOTE, plain) == u"A");
+    CHECK(errorCode([&] {
+              static_cast<void>(ordinary->createFilter({}));
+          }) == api::ErrorCode::INVALID_ARGUMENT);
+    auto profileSchema = standardSchema(true);
+    const std::array registrations{api::EventRegistration{api::EventType::PROFILE, 0}};
+    api::EventRegistryWork work;
+    auto registry = api::EventRegistry::create(profileSchema, registrations, {}, work);
+    REQUIRE(registry);
+    auto options = endpointOptions();
+    options.eventRegistry = *registry;
+    auto custom = runtime.createEndpoint(options);
+    auto profileFilter = custom->createFilter(categories);
+    CHECK_FALSE(profileFilter.accept(api::EventType::QUOTE, plain));
+    CHECK(profileFilter.accept(api::EventType::PROFILE, plain));
+    CHECK(ordinary->closeAndAwaitTermination().drained);
+    CHECK(custom->closeAndAwaitTermination().drained);
+    const auto retained = custom->createFilter(categories);
+    CHECK_FALSE(retained.accept(api::EventType::QUOTE, plain));
+    CHECK(retained.accept(api::EventType::PROFILE, plain));
+}
+
+TEST_CASE("public subscription observation keeps detached feed creation a checked CLOSED refusal") {
+    std::shared_ptr<api::Feed> retained;
+    {
+        api::ApiRuntime runtime(runtimeOptions());
+        auto endpoint = runtime.createEndpoint(endpointOptions());
+        retained = endpoint->getFeed();
+        CHECK(endpoint->closeAndAwaitTermination().drained);
+    }
+    CHECK(errorCode([&] {
+              static_cast<void>(retained->createSubscription<events::Quote>());
+          }) == api::ErrorCode::CLOSED);
+}
+
+TEST_CASE("public subscription observation keeps the data capture retirement fence through self removal") {
+    std::atomic<unsigned> foreignCalls{0};
+    std::atomic<bool> destroying{false};
+    std::atomic<bool> destroyed{false};
+    auto bootstrap = root::transport::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    api::ApiRuntime firstRuntime(*bootstrap, runtimeOptions());
+    api::ApiRuntime secondRuntime(*bootstrap, runtimeOptions());
+    auto schema = standardSchema(false);
+    const std::vector<peer::Record> records{{u"IBM", standardValues(schema)}};
+    root::test::TcpPeerConfig config;
+    config.sessions.resize(1);
+    auto &script = config.sessions[0];
+    script.initialBytes = peer::fixturePeerPrefix(schema, core::SubscriptionFamily::TICKER);
+    script.replyBytes = peer::fixturePeerData(records, core::SubscriptionFamily::TICKER, true);
+    script.readThroughMessage = 11;
+    script.waitForClientClose = true;
+    root::test::OwnedTcpPeer source(std::move(config));
+    REQUIRE(source.port() != 0);
+    auto firstEndpoint = firstRuntime.createEndpoint(endpointOptions());
+    auto secondEndpoint = secondRuntime.createEndpoint(endpointOptions());
+    auto first = firstEndpoint->getFeed()->createSubscription<events::Quote>();
+    auto second = secondEndpoint->getFeed()->createSubscription<events::Profile>();
+    second->addChangeListener([&](const auto &change) {
+        if (change.kind == api::SubscriptionChangeKind::ADDED) {
+            CHECK(destroyed.load());
+            CHECK_FALSE(destroying.load());
+            ++foreignCalls;
+        }
+    });
+    auto capture = std::make_shared<CaptureAction>();
+    capture->action = [&] {
+        destroying.store(true);
+        CHECK(foreignCalls.load() == 0);
+        second->addSymbols("FROM-CAPTURE");
+        CHECK(foreignCalls.load() == 0);
+        destroyed.store(true);
+        destroying.store(false);
+    };
+    api::Subscription<events::Quote>::ListenerId id = 0;
+    id = first->addEventListener([&, capture](auto) {
+        first->removeEventListener(id);
+        second->addSymbols("FROM-DATA");
+        CHECK(foreignCalls.load() == 0);
+    });
+    capture.reset();
+    first->addSymbols("IBM");
+    firstEndpoint->connect("127.0.0.1:" + std::to_string(source.port()));
+    REQUIRE(eventually([&] {
+        return foreignCalls.load() == 2;
+    }));
+    CHECK(destroyed.load());
+    CHECK(firstEndpoint->closeAndAwaitTermination().drained);
+    CHECK(secondEndpoint->closeAndAwaitTermination().drained);
+    CHECK(source.snapshot().error == root::test::TcpPeerError::NONE);
+}
+
+TEST_CASE("public subscription observations retain admitted text types and normalize mixed registry arguments") {
+    api::ApiRuntime runtime(runtimeOptions());
+    auto options = endpointOptions();
+    options.contract = api::DeliveryContract::STREAM;
+    auto endpoint = runtime.createEndpoint(options);
+    auto feed = endpoint->getFeed();
+    auto message = feed->createSubscription<events::TextMessage>();
+    auto configuration = feed->createSubscription<events::TextConfiguration>();
+    auto mixed = feed->createSubscription({api::EventType::TEXT_CONFIGURATION, api::EventType::QUOTE,
+                                           api::EventType::TEXT_MESSAGE, api::EventType::TEXT_CONFIGURATION});
+    const std::vector messageTypes{api::EventType::TEXT_MESSAGE};
+    const std::vector configurationTypes{api::EventType::TEXT_CONFIGURATION};
+    const std::vector mixedTypes{api::EventType::QUOTE, api::EventType::TEXT_MESSAGE,
+                                 api::EventType::TEXT_CONFIGURATION};
+    CHECK(message->getEventTypes() == messageTypes);
+    CHECK(configuration->getEventTypes() == configurationTypes);
+    CHECK(mixed->getEventTypes() == mixedTypes);
+    CHECK(message->containsEventType(api::EventType::TEXT_MESSAGE));
+    CHECK_FALSE(message->containsEventType(api::EventType::TEXT_CONFIGURATION));
+    CHECK(mixed->containsEventType(api::EventType::TEXT_CONFIGURATION));
+    std::atomic<unsigned> additions{0};
+    std::atomic<unsigned> removals{0};
+    std::atomic<unsigned> closed{0};
+    auto listener = [&](std::vector<api::EventType> types) {
+        return [&, types = std::move(types)](const api::SubscriptionChange &change) {
+            CHECK(change.snapshot.eventTypes == types);
+
+            if (change.kind == api::SubscriptionChangeKind::ADDED) {
+                ++additions;
+            } else if (change.kind == api::SubscriptionChangeKind::REMOVED) {
+                ++removals;
+            } else {
+                ++closed;
+            }
+        };
+    };
+    message->addChangeListener(listener(messageTypes));
+    configuration->addChangeListener(listener(configurationTypes));
+    mixed->addChangeListener(listener(mixedTypes));
+    message->addSymbols("MESSAGE");
+    configuration->addSymbols("CONFIGURATION");
+    mixed->addSymbols("FIRST");
+    const auto retained = mixed->getSnapshot();
+    mixed->setSymbols({"SECOND"});
+    CHECK(retained.revision == 1);
+    REQUIRE(retained.symbols.size() == 1);
+    CHECK(retained.symbols.front().eventSymbol() == u"FIRST");
+    CHECK(retained.eventTypes == mixedTypes);
+    CHECK(mixed->getSnapshot().revision == 2);
+    CHECK(mixed->getSnapshot().eventTypes == mixedTypes);
+    CHECK(additions.load() == 4);
+    CHECK(removals.load() == 1);
+    mixed->close();
+    CHECK(closed.load() == 0);
+    CHECK(endpoint->closeAndAwaitTermination().drained);
+    CHECK(closed.load() == 3);
+    CHECK(retained.eventTypes == mixedTypes);
 }

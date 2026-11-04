@@ -1,0 +1,49 @@
+ordinary	empty-registration	returned
+ordinary	L.added	[String:A, String:B];current=[String:A, String:B];monitor=true
+ordinary	add-A-B.return	success
+ordinary	add-A-again.return	success
+ordinary	L.removed	[String:A];current=[String:B, String:C];monitor=true
+ordinary	L.added	[String:C];current=[String:B, String:C];monitor=true
+ordinary	replace-B-C.return	success
+ordinary	remove-absent.return	success
+ordinary	L.removed	[String:B];current=[String:C];monitor=true
+ordinary	remove-B.return	success
+ordinary	L.removed	[String:C];current=[];monitor=true
+ordinary	clear.return	success
+ordinary	clear-again.return	success
+ordinary	L.closed	closed=false;monitor=true
+ordinary	remove-listener.return	success
+ordinary	remove-listener-again.return	success
+ordinary	after-removal.return	success
+ordinary	close.return	success
+ordinary	closed-symbols	[String:D]
+ordinary	add-listener-after-close.return	success
+introspection	types	[Profile, Quote]
+introspection	contains-Quote	true
+introspection	contains-String	false
+introspection	mutate-types.return	UnsupportedOperationException
+introspection	mutate-symbols.return	UnsupportedOperationException
+introspection	mutate-decorated.return	UnsupportedOperationException
+introspection	L.added	[String:A];current=[String:A];monitor=true
+introspection	initial-registration.return	success
+introspection	L.closed	closed=true;monitor=true
+decorated	L.added	[IES:A:7];current=[IES:A:7];monitor=true
+decorated	add-indexed.return	success
+decorated	same-indexed.return	success
+decorated	L.removed	[IES:A:7];current=[];monitor=true
+decorated	remove-equal-indexed.return	success
+decorated	L.added	[ALL, String:A];current=[ALL, String:A];monitor=true
+decorated	add-plain-all.return	success
+decorated	L.removed	[ALL, String:A];current=[];monitor=true
+decorated	clear.return	success
+decorated	L.closed	closed=true;monitor=true
+reentry	added	[String:A]
+reentry	removed	depth=1;current=[String:B]
+reentry	closed	depth=2
+reentry	remove-self-return	depth=1
+reentry	replace.return	success
+failure	first.added	[String:A]
+failure	second.added	[String:A];current=[String:A];monitor=true
+failure	add.return	IllegalStateException
+failure	after-failure	[String:A];closed=false
+failure	second.closed	closed=true;monitor=true

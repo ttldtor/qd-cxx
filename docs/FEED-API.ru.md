@@ -456,3 +456,15 @@ signed дни, не business timestamps. PriceType берётся из flags. П
 Owning `SubscriptionSelector` и `addSelectors`/`setSelectors`/`removeSelector` сохраняют typed kind/source identity отдельно от physical demand. Текущие пять market types игнорируют IES source ID как production Java; TSS typed Feed атомарно неподдержан. `EndpointOptions::enableWildcard=true` разрешает explicit All только для STREAM и по умолчанию выключен. Literal leading-star не включает wildcard; прежние string/Candle API остаются plain exact. [Полный контракт, пример, конечное хранение и known-binding source adapter and time value conversion](../spec/subscriptions/DECORATED-SELECTORS.ru.md).
 
 TextMessage требует endpoint STREAM. TextConfiguration использует STREAM или TICKER; владеющий nullable-текст и политика версии описаны в [контракте](../spec/events/TEXT-EVENTS.ru.md).
+
+## Наблюдение принятых подписок и query classifiers
+
+`getSnapshot()` копирует одну полную принятую desired revision, точные типизированные логические selectors и неизменяемый нормализованный набор event types. Результат переживает мутацию и завершение runtime. `getEventTypes()` и `containsEventType()` читают этот неизменяемый набор. Accepted revision отличается от worker application, физического спроса и peer acknowledgement.
+
+`addChangeListener()` сообщает начальное непустое состояние и committed REMOVED/ADDED phases. Replace сначала удаляет, затем добавляет с одной ревизией. Callback заимствует аргументы; для независимого хранения копируйте `change.snapshot` или selectors. Вызовы происходят вне control locks. Reentry и concurrent calls используют конечное after-return continuation, включая разные runtime и выход всего выбранного data callback. Caller не опрашивает состояние, не управляет очередями и не продвигает сеть.
+
+Observer exceptions являются advisory и доступны через `getChangeDiagnostic()`; прежняя политика ошибок event listeners сохраняется. `close()` остаётся nonblocking fence. Фактический worker retirement либо creator `closeAndAwaitTermination()` доставляет terminal CLOSED и включает выбранные callbacks и разрушение captures. Перед зависимостью от native timing differences относительно Java прочитайте точный [контракт observation/lifetime/budgets](../spec/subscriptions/OBSERVABLE-SUBSCRIPTIONS.ru.md).
+
+`Endpoint::createFilter(orderedCategories, context)` строит независимый classifier с фактическим registry и delivery contract endpoint; advanced builder также принимает явный registry и finite limits. Он не меняет subscription demand. Optional context задаётся один раз для явных resource capabilities. [Filter queries, categories, trackers и владение IPF source](FEED-FILTERS.ru.md) описывают отдельные lifetimes и optional backend.
+
+Installed/relocated [public consumer](../tests/conformance/subscription_observer_consumer/CMakeLists.txt) собирается только через `find_package(qdcxx CONFIG REQUIRED COMPONENTS feed)` и `qdcxx::feed`. Он независимо включает каждый публичный header и проверяет detached snapshots, callback phases, classifier queries, refusal и offline retirement без private headers и source paths.

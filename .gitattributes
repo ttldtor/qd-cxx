@@ -766,3 +766,13 @@ tests/fixtures/text-events/capture-v1/** -text -whitespace
 tests/fixtures/text-events/provenance.json text eol=lf
 tools/upstream/text-events-oracle/*.java text eol=lf
 tools/upstream/text-events-oracle/*.ps1 text eol=lf
+
+# Preserve exact subscription/filter observations and canonical hashed oracle sources/provenance.
+tools/upstream/subscription-observer-oracle/*.java text eol=lf
+tools/upstream/subscription-observer-oracle/*.ps1 text eol=lf
+tools/upstream/feed-filter-oracle/*.java text eol=lf
+tools/upstream/feed-filter-oracle/*.ps1 text eol=lf
+tests/fixtures/subscription-observer/*.tsv -text -whitespace
+tests/fixtures/subscription-observer/*.json text eol=lf
+tests/fixtures/feed-filter/*.tsv -text -whitespace
+tests/fixtures/feed-filter/*.json text eol=lf

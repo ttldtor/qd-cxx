@@ -109,7 +109,7 @@ else()
         if(line MATCHES "[\r\n]")
             fail("CR/LF-containing filenames are unsupported")
         endif()
-        if(line MATCHES "^(include/.*\\.hpp|src/.*\\.cpp|tests/conformance/.*\\.cpp|examples/(subscriptions|feed_quote|event_text|ipf_live)/.*\\.(cpp|hpp)|tools/(qtp-inspect|tape-inspect|tape-write|subscribe|dev)/.*\\.(cpp|hpp))$"
+        if(line MATCHES "^(include/.*\\.hpp|src/.*\\.cpp|src/(api/(feed_internal|subscription_observer|feed_filter_(coordinates|expression|ipf_config))|detail/qd_time_period)\\.hpp|tests/conformance/.*\\.cpp|examples/(subscriptions|feed_quote|event_text|ipf_live)/.*\\.(cpp|hpp)|tools/(qtp-inspect|tape-inspect|tape-write|subscribe|dev)/.*\\.(cpp|hpp))$"
             AND NOT line MATCHES "(^|/)(upstream|generated|fixtures)/")
             jsonString(quoted "${line}")
             string(JSON selected SET "${selected}" ${index} "${quoted}")

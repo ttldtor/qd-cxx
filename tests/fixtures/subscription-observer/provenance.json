@@ -1,0 +1,42 @@
+{
+  "revision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "javaVersion": "openjdk version \"1.8.0_422\"",
+  "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
+  "javacSha256": "633143e961aa18051c09112b85333f5cdbd845b54eb39678eb15b91ca8bbb527",
+  "harnessSha256": "c8c8925a6938278111a33b8109458ac59830378f451d3b831d5621886f7fa3ee",
+  "launcherSha256": "b16a8d230962b36bd44c2bcb56d7c655a547926067c5c7d98126220bba9cd010",
+  "upstreamSources": [
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/api/DXFeedSubscription.java",
+      "sha256": "172f2c6bef874f60dfa53ebd8ead92deea1ec32cbbf5bc105136c15e39f50129"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/api/osub/ObservableSubscription.java",
+      "sha256": "7a5754e4792a4c51ee9c51ccb9d5b87b4cce16b60dedb7099a8b31791438f899"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/api/osub/ObservableSubscriptionChangeListener.java",
+      "sha256": "dda1fb4519227e9f238e8c458680631cb4fb2c799dc9ea025151fa51bee83913"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/api/osub/IndexedEventSubscriptionSymbol.java",
+      "sha256": "f847a984bee45a4070ee2c9539209f6c66afdf5f8dc24d7cd78e7ddce93984e9"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/api/osub/TimeSeriesSubscriptionSymbol.java",
+      "sha256": "98ccbcb5d20e47e219f17cd3797ea83fc033484a8e05349dff9d847df5d0e229"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/api/osub/WildcardSymbol.java",
+      "sha256": "ed51fe4be958afa975c42bf1933a104dd9f22ebb1c756f44dad33aac3e74567f"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/IndexedEventSource.java",
+      "sha256": "5b2df5fd210f02e641188dcf657b65e11a6d1d042203d47c8bad43559c9e61ea"
+    }
+  ],
+  "productionClassInventorySha256": "90a478b5d3737246d8c897322c9f9db60887846e20117572588e05ae78fbc6d8",
+  "fixtureSha256": "9586e357390c515e50bcd6ae1b775220eb00f54b6e25f883217a3aa5c1728d39",
+  "rows": 49,
+  "timezoneInvariant": true
+}

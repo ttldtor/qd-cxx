@@ -95,6 +95,10 @@ struct RuntimeOptions {
     std::size_t maximumEventTypeArgumentsPerSubscription = 64;
     ///< Maximum raw type arguments inspected during one subscription creation, including duplicates.
     std::size_t maximumPendingStateChangesPerEndpoint = 8; ///< Pending/executing/retiring state selections together.
+    std::size_t maximumChangeListenersPerSubscription = 4; ///< Accepted, selected and capture-retiring observers.
+    std::size_t maximumPendingSubscriptionChanges =
+        8; ///< Pending/executing symbol notification phases per subscription.
+    std::size_t maximumSubscriptionChangesPerTurn = 32; ///< Shared runtime admission credits during one callback turn.
 };
 
 /** Existing delivery semantics selected for one high-level endpoint. */
@@ -165,10 +169,37 @@ struct CloseResult {
 
 class Endpoint;
 class Feed;
+class FeedFilter;
+class FeedFilterContext;
+struct FeedFilterCategory;
 
 /** Independently owning supported event value; inspect its actual class with std::visit or std::get_if. */
 using RegisteredEvent = std::variant<events::Quote, events::Profile, events::Trade, events::TradeETH, events::Summary,
                                      events::TextMessage, events::TextConfiguration>;
+
+/** Independently owned observation of one complete accepted local subscription revision. */
+struct SubscriptionSnapshot {
+    std::uint64_t revision = 0; ///< Accepted desired revision, never a worker application or peer acknowledgement.
+    std::vector<SubscriptionSelector> symbols; ///< Exact typed logical identities, independently owned.
+    std::vector<EventType> eventTypes;         ///< Immutable normalized supported business types, not local record IDs.
+};
+
+/** Ordered subscription-observer phase; replacement removes before adding at the same revision. */
+enum class SubscriptionChangeKind {
+    ADDED,   ///< Initial nonempty state or additions to an accepted revision.
+    REMOVED, ///< Actual removed typed identities; the complete post-change set is already published.
+    CLOSED   ///< This observer was removed or its subscription closed; symbols is empty.
+};
+
+/** Borrowed notification, valid only through its callback; copy snapshot or symbols to retain owned values. */
+struct SubscriptionChange {
+    SubscriptionChangeKind kind;                   ///< Actual notification phase.
+    const SubscriptionSnapshot &snapshot;          ///< Complete owning backing snapshot, borrowed for this invocation.
+    std::span<const SubscriptionSelector> symbols; ///< Phase identities, borrowed from immutable selected storage.
+};
+
+/** Advisory observer; callbacks run outside all mutation/container locks and never recursively. */
+using SubscriptionChangeListener = std::function<void(const SubscriptionChange &)>;
 
 /** Typed logical subscription, backed by the existing receiver and shared queue.
  * Methods are producer-safe. Event-listener calls are serialized on the runtime's SDK worker.
@@ -197,6 +228,42 @@ template <class Event> class Subscription final {
         std::function<void(SubscriptionState, SubscriptionState)>; ///< Advisory old/new observation.
     using StateChangeListenerId =
         std::uint64_t; ///< Non-reused state-observer identity, separate from event identities.
+    using ChangeListener = SubscriptionChangeListener; ///< Advisory accepted-symbol observer.
+    using ChangeListenerId = std::uint64_t; ///< Non-reused identity, separate from event and state listeners.
+    /** Copy one complete accepted local revision, including exact decorated identities.
+     * The result remains valid after mutation and runtime retirement. It does not advance native progress.
+     * @return Independently owned symbols/types/revision; allocation failures throw Error without mutation.
+     */
+    [[nodiscard]] SubscriptionSnapshot getSnapshot() const;
+    /** Copy the immutable normalized event-type set.
+     * @return Owning finite set in EventType declaration order; allocation failures throw Error.
+     */
+    [[nodiscard]] std::vector<EventType> getEventTypes() const;
+    /** Test the immutable business-type set, without consulting record IDs or progressing the network.
+     * @param type Supported or unknown enumeration value; unknown values are absent.
+     * @return True only for a selected supported type.
+     */
+    [[nodiscard]] bool containsEventType(EventType type) const noexcept;
+    /** Register an accepted-symbol observer, delivering existing nonempty state first.
+     * An uncontended caller dispatches synchronously after commit, before returning, including offline.
+     * Reentrant/concurrent calls reserve finite deferred phases and return without waiting; the current
+     * callback owner delivers them after return. Admission refusal leaves the old revision and selection intact.
+     * Exceptions are advisory, recorded separately; selected fanout continues and effects are never retried.
+     * @param listener Nonempty callable; borrowed arguments expire at return, and captures remain charged until
+     * destroyed.
+     * @return Non-reused removal identity; throws Error for invalid, closed or finite-capacity/work refusal.
+     */
+    ChangeListenerId addChangeListener(ChangeListener listener);
+    /** Remove an observer and reserve its exactly-once CLOSED phase, including after subscription close.
+     * A currently selected phase can finish. Removal/closed-capture retirement occurs outside all locks.
+     * @param id Previously returned observer identity; absent identities are idempotent no-ops.
+     * @throws Error On allocation or finite reentrant/concurrent work/continuation refusal, before removal.
+     */
+    void removeChangeListener(ChangeListenerId id);
+    /** Inspect the first observer exception, independently of event delivery and lifecycle errors.
+     * @return Detached CALLBACK_FAILURE or NONE.
+     */
+    [[nodiscard]] Diagnostic getChangeDiagnostic() const noexcept;
     /** Add an advisory state observer; no initial notification is made.
      * Selection is atomic with each distinct transition; selected observers run in registration order outside locks.
      * Calls use the SDK worker, or creator-thread retirement if this runtime has never started its worker.
@@ -436,6 +503,15 @@ class Endpoint final {
      * @return Shared producer facade; keeping it does not extend the native runtime lifetime.
      */
     [[nodiscard]] std::shared_ptr<Feed> getFeed() const noexcept;
+    /** Build an independent classifier using this endpoint's immutable registry and delivery contract.
+     * Include qd/api/feed_filter.hpp when calling this method. No endpoint/control lock is held during build.
+     * Plain categories start no I/O; an explicit context resolver may perform its finite bootstrap wait.
+     * @param categories Ordered owning category values, borrowed while the complete classifier is prepared.
+     * @param context Optional explicit resource capability; absence keeps ordinary classification independent of I/O.
+     * @return Immutable independent filter; invalid input or finite preparation failure throws Error before return.
+     */
+    [[nodiscard]] FeedFilter createFilter(std::span<const FeedFilterCategory> categories,
+                                          std::shared_ptr<FeedFilterContext> context = {}) const;
     /** Start an asynchronous plain binary-QTP connection; no I/O or callbacks run on this caller.
      * The first accepted address is fixed. Repeating it while logically online is a no-op; after disconnect
      * the same address resumes with a fresh source epoch. Another address or

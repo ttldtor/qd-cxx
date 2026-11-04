@@ -7,6 +7,7 @@
 #include "../transport/bootstrap_lease.hpp"
 #include "event_selection.hpp"
 
+#include <array>
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
@@ -30,12 +31,14 @@ using ListenerFunction =
                  Subscription<events::Trade>::Listener, Subscription<events::TradeETH>::Listener,
                  Subscription<events::Summary>::Listener, Subscription<events::TextMessage>::Listener,
                  Subscription<events::TextConfiguration>::Listener, Subscription<RegisteredEvent>::Listener,
-                 Endpoint::StateChangeListener, Subscription<events::Quote>::StateChangeListener>;
+                 Endpoint::StateChangeListener, Subscription<events::Quote>::StateChangeListener,
+                 SubscriptionChangeListener>;
 
 /** Shared application callable; its last release never occurs under a control mutex. */
 struct ListenerBox {
     std::shared_ptr<ListenerLedger> ledger; ///< Keeps the detached count alive through callback destruction.
     ListenerFunction function;              ///< Application captures, moved in before publication.
+    mutable bool changeInitialized = true;  ///< Change observers enter ordinary fanout after their initial phase.
 
     /** Adopt one already charged callable only after this box's allocation has succeeded.
      * A failed box allocation leaves captures with the caller until its reservation has been released.
@@ -71,7 +74,88 @@ struct StateListeners {
     Diagnostic diagnostic;          ///< First observer exception; never changes the owner's lifecycle diagnostic.
 };
 
-/** Producer-only subscription state; no queue, receiver, schema or native owner can escape here. */
+struct SubscriptionChangeDomain;
+
+/** One selected callback epoch; data and change owners can overlap on different threads. */
+struct SubscriptionCallbackFence {
+    std::atomic<std::uint64_t> epoch{0}; ///< Checked nonwrapping callback identity within this execution channel.
+    std::atomic<bool> active{false};     ///< False only after user code and final selected capture release return.
+};
+
+/** Weak after-return dependency; an expired owner necessarily completed its selected callback. */
+struct SubscriptionCallbackBarrier {
+    std::weak_ptr<SubscriptionChangeDomain> owner; ///< Detached execution domain, never a native/runtime owner.
+    std::uint64_t epoch = 0; ///< Exact source callback epoch; a later callback cannot block this phase.
+    std::size_t channel = 0; ///< Existing data selection or serialized change selection.
+};
+
+/** Complete immutable transition backing, charged by its pending/executing notification slots. */
+struct SubscriptionChangeFrame {
+    SubscriptionSnapshot snapshot;       ///< Full accepted post-change revision, never a physical application receipt.
+    SubscriptionCallbackBarrier barrier; ///< Source callback must return before this frame can be selected.
+    std::vector<SubscriptionSelector> added;   ///< Exact newly demanded logical identities.
+    std::vector<SubscriptionSelector> removed; ///< Exact actually removed logical identities.
+};
+
+/** One causal root credit lease; final release is atomic and owns no native/runtime state. */
+struct SubscriptionChangeLease {
+    std::shared_ptr<SubscriptionChangeDomain> root; ///< Detached root kept alive through selected capture retirement.
+    SubscriptionChangeLease() noexcept = default;
+    /** @param root Validated root; one preflighted phase/terminal lease is charged without allocation. */
+    explicit SubscriptionChangeLease(std::shared_ptr<SubscriptionChangeDomain> root) noexcept;
+    SubscriptionChangeLease(const SubscriptionChangeLease &) = delete;
+    SubscriptionChangeLease &operator=(const SubscriptionChangeLease &) = delete;
+    SubscriptionChangeLease(SubscriptionChangeLease &&other) noexcept;
+    SubscriptionChangeLease &operator=(SubscriptionChangeLease &&other) noexcept;
+    /** Release the causal root credit only after selected application capture retirement. */
+    ~SubscriptionChangeLease();
+};
+
+/** One bounded phase; initial notifications can target a single newly accepted observer. */
+struct SubscriptionChangePhase {
+    SubscriptionChangeKind kind = SubscriptionChangeKind::ADDED; ///< Phase order within the owning revision.
+    SubscriptionChangeLease lease; ///< Causal root budget survives a concurrent dispatcher handoff.
+    std::shared_ptr<const SubscriptionChangeFrame> frame; ///< Immutable arguments, retained through final release.
+    std::shared_ptr<const ListenerSnapshot> target; ///< Initial-only selection; ordinary phases select live observers.
+};
+
+/** Runtime-local detached callback owner; it owns no runtime facade, thread, socket or native progress. */
+struct SubscriptionChangeDomain {
+    std::mutex mutex; ///< Serializes bounded notification admission and dispatch claims, never application code.
+    std::vector<std::weak_ptr<SubscriptionPort>> ports; ///< Fixed pending/active/retiring logical slots.
+    std::vector<std::shared_ptr<SubscriptionChangeDomain>> continuations; ///< Fixed root-turn target reservations.
+    std::array<SubscriptionCallbackFence, 2> fences; ///< Separate data/change callback lifetime channels.
+    std::atomic<std::size_t> leases{0}; ///< Pending/executing causal phases, including foreign target handoff.
+    std::size_t maximumWork = 0;        ///< Finite phase/registration admissions for one outer callback turn.
+    std::size_t remainingWork = 0;      ///< Shared by all concurrent and reentrant callers until the turn retires.
+    std::size_t dataCallbacks = 0;      ///< Existing data callback owners postpone nested observer delivery.
+    bool dispatching = false;           ///< One caller owns detached notification delivery outside locks.
+};
+
+/** Reserved terminal arguments, independent of the ordinary phase ring. */
+struct SubscriptionClosedSelection {
+    ListenerEntry listener{};            ///< Exactly one charged observer to retire; zero ID denotes an empty slot.
+    SubscriptionChangeLease lease;       ///< Reserved terminal phase retains its own causal dispatch budget.
+    SubscriptionCallbackBarrier barrier; ///< Removal/close callback origin, independent of the older snapshot.
+    std::shared_ptr<const SubscriptionChangeFrame> frame; ///< Accepted snapshot at removal or close.
+};
+
+/** Accepted and selected/retiring subscription-change observers. Protected by the domain mutex. */
+struct SubscriptionObservers {
+    std::shared_ptr<ListenerLedger> ledger; ///< Captures stay charged through selected and retiring releases.
+    std::shared_ptr<const ListenerSnapshot> listeners; ///< Accepted immutable observer registry.
+    std::vector<SubscriptionChangePhase> phases;       ///< Fixed ring; executing head remains occupied until release.
+    std::vector<SubscriptionClosedSelection> closed;   ///< Reserved one terminal slot per possible charged callable.
+    std::shared_ptr<const SubscriptionChangeFrame>
+        latest;                     ///< Current accepted snapshot for reserved terminal delivery.
+    std::size_t head = 0;           ///< Oldest pending/executing phase.
+    std::size_t count = 0;          ///< Includes executing phase and final selected capture release.
+    std::uint64_t nextListener = 1; ///< Non-reused observer identity.
+    Diagnostic diagnostic;          ///< First advisory callback failure.
+    bool closing = false;           ///< Exactly-once terminal selection has fenced future ordinary notifications.
+};
+
+/** Producer-only subscription state; no receiver, schema or native owner can escape here. */
 struct SubscriptionPort {
     mutable std::mutex mutex;               ///< Protects accepted snapshots and detached observations only.
     std::condition_variable stateCondition; ///< Creator current-state wait; publication uses this port mutex.
@@ -81,11 +165,15 @@ struct SubscriptionPort {
     std::shared_ptr<ListenerLedger> listenerLedger;    ///< Selected/retiring callback reservation.
     std::shared_ptr<const ListenerSnapshot> listeners; ///< Complete accepted bounded selection.
     StateListeners stateListeners; ///< Opt-in advisory lifecycle observations, retired after event captures.
+    std::shared_ptr<SubscriptionChangeDomain>
+        changes;                               ///< Detached local observer dispatch, independent of network state.
+    SubscriptionObservers observers;           ///< Finite accepted-symbol notifications and capture reservations.
     std::vector<SubscriptionSelector> symbols; ///< Complete accepted typed logical desired set.
     std::size_t maximumSymbols;                ///< Original per-registration selector count.
     std::size_t maximumSymbolUnits;            ///< Original per-selector capacity.
     std::uint64_t revision = 0;                ///< Accepted local desired revision, separate from queue tickets.
     std::uint64_t nextListener = 1;            ///< Non-reused listener identity, zero never issued.
+    std::vector<EventType> eventTypes;         ///< Immutable normalized actual validated subscription arguments.
     EventSelection eventSelection; ///< Immutable normalized set, independent of explicit local record routes.
     EventDelivery
         eventDelivery; ///< Exact listener value shape, assigned together with the selection before publication.
@@ -141,6 +229,7 @@ struct EndpointPort {
 
 /** Shared producer dispatch gate. It owns no bootstrap, native state or joinable thread. */
 struct RuntimeControl {
+    std::shared_ptr<SubscriptionChangeDomain> changes; ///< Detached synchronous observer owner, with finite work.
     std::mutex mutex;                  ///< Protects dispatch pointer, registry, stop admission and wake sequence.
     std::condition_variable condition; ///< Wakeable worker cadence/control wait.
     RuntimeImpl *runtime = nullptr;    ///< Accessible only while mutex holds the lifetime gate.

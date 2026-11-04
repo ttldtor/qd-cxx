@@ -1,0 +1,1411 @@
+match	A&B	Quote	AAPL	false
+match	A&B	Quote	MSFT	false
+match	A&B	Quote	A\u00e9	false
+match	A&B	Quote	A\ud83d\ude00	false
+match	A&B	Quote	ABC	false
+match	A&B	Quote	ABBC	false
+match	A&B	Quote	*	false
+wildcard	A&B	Quote	false
+match	A&B	Quote&Q	AAPL	false
+match	A&B	Quote&Q	MSFT	false
+match	A&B	Quote&Q	A\u00e9	false
+match	A&B	Quote&Q	A\ud83d\ude00	false
+match	A&B	Quote&Q	ABC	false
+match	A&B	Quote&Q	ABBC	false
+match	A&B	Quote&Q	*	false
+wildcard	A&B	Quote&Q	false
+match	A&B	Profile	AAPL	false
+match	A&B	Profile	MSFT	false
+match	A&B	Profile	A\u00e9	false
+match	A&B	Profile	A\ud83d\ude00	false
+match	A&B	Profile	ABC	false
+match	A&B	Profile	ABBC	false
+match	A&B	Profile	*	false
+wildcard	A&B	Profile	false
+match	A&!A	Quote	AAPL	false
+match	A&!A	Quote	MSFT	false
+match	A&!A	Quote	A\u00e9	false
+match	A&!A	Quote	A\ud83d\ude00	false
+match	A&!A	Quote	ABC	false
+match	A&!A	Quote	ABBC	false
+match	A&!A	Quote	*	false
+wildcard	A&!A	Quote	false
+match	A&!A	Quote&Q	AAPL	false
+match	A&!A	Quote&Q	MSFT	false
+match	A&!A	Quote&Q	A\u00e9	false
+match	A&!A	Quote&Q	A\ud83d\ude00	false
+match	A&!A	Quote&Q	ABC	false
+match	A&!A	Quote&Q	ABBC	false
+match	A&!A	Quote&Q	*	false
+wildcard	A&!A	Quote&Q	false
+match	A&!A	Profile	AAPL	false
+match	A&!A	Profile	MSFT	false
+match	A&!A	Profile	A\u00e9	false
+match	A&!A	Profile	A\ud83d\ude00	false
+match	A&!A	Profile	ABC	false
+match	A&!A	Profile	ABBC	false
+match	A&!A	Profile	*	false
+wildcard	A&!A	Profile	false
+match	A*&!A*	Quote	AAPL	false
+match	A*&!A*	Quote	MSFT	false
+match	A*&!A*	Quote	A\u00e9	false
+match	A*&!A*	Quote	A\ud83d\ude00	false
+match	A*&!A*	Quote	ABC	false
+match	A*&!A*	Quote	ABBC	false
+match	A*&!A*	Quote	*	true
+wildcard	A*&!A*	Quote	true
+match	A*&!A*	Quote&Q	AAPL	false
+match	A*&!A*	Quote&Q	MSFT	false
+match	A*&!A*	Quote&Q	A\u00e9	false
+match	A*&!A*	Quote&Q	A\ud83d\ude00	false
+match	A*&!A*	Quote&Q	ABC	false
+match	A*&!A*	Quote&Q	ABBC	false
+match	A*&!A*	Quote&Q	*	true
+wildcard	A*&!A*	Quote&Q	true
+match	A*&!A*	Profile	AAPL	false
+match	A*&!A*	Profile	MSFT	false
+match	A*&!A*	Profile	A\u00e9	false
+match	A*&!A*	Profile	A\ud83d\ude00	false
+match	A*&!A*	Profile	ABC	false
+match	A*&!A*	Profile	ABBC	false
+match	A*&!A*	Profile	*	true
+wildcard	A*&!A*	Profile	true
+match	(A,B)&!A&!B	Quote	AAPL	false
+match	(A,B)&!A&!B	Quote	MSFT	false
+match	(A,B)&!A&!B	Quote	A\u00e9	false
+match	(A,B)&!A&!B	Quote	A\ud83d\ude00	false
+match	(A,B)&!A&!B	Quote	ABC	false
+match	(A,B)&!A&!B	Quote	ABBC	false
+match	(A,B)&!A&!B	Quote	*	false
+wildcard	(A,B)&!A&!B	Quote	false
+match	(A,B)&!A&!B	Quote&Q	AAPL	false
+match	(A,B)&!A&!B	Quote&Q	MSFT	false
+match	(A,B)&!A&!B	Quote&Q	A\u00e9	false
+match	(A,B)&!A&!B	Quote&Q	A\ud83d\ude00	false
+match	(A,B)&!A&!B	Quote&Q	ABC	false
+match	(A,B)&!A&!B	Quote&Q	ABBC	false
+match	(A,B)&!A&!B	Quote&Q	*	false
+wildcard	(A,B)&!A&!B	Quote&Q	false
+match	(A,B)&!A&!B	Profile	AAPL	false
+match	(A,B)&!A&!B	Profile	MSFT	false
+match	(A,B)&!A&!B	Profile	A\u00e9	false
+match	(A,B)&!A&!B	Profile	A\ud83d\ude00	false
+match	(A,B)&!A&!B	Profile	ABC	false
+match	(A,B)&!A&!B	Profile	ABBC	false
+match	(A,B)&!A&!B	Profile	*	false
+wildcard	(A,B)&!A&!B	Profile	false
+match	[*]&A	Quote	AAPL	false
+match	[*]&A	Quote	MSFT	false
+match	[*]&A	Quote	A\u00e9	false
+match	[*]&A	Quote	A\ud83d\ude00	false
+match	[*]&A	Quote	ABC	false
+match	[*]&A	Quote	ABBC	false
+match	[*]&A	Quote	*	false
+wildcard	[*]&A	Quote	false
+match	[*]&A	Quote&Q	AAPL	false
+match	[*]&A	Quote&Q	MSFT	false
+match	[*]&A	Quote&Q	A\u00e9	false
+match	[*]&A	Quote&Q	A\ud83d\ude00	false
+match	[*]&A	Quote&Q	ABC	false
+match	[*]&A	Quote&Q	ABBC	false
+match	[*]&A	Quote&Q	*	false
+wildcard	[*]&A	Quote&Q	false
+match	[*]&A	Profile	AAPL	false
+match	[*]&A	Profile	MSFT	false
+match	[*]&A	Profile	A\u00e9	false
+match	[*]&A	Profile	A\ud83d\ude00	false
+match	[*]&A	Profile	ABC	false
+match	[*]&A	Profile	ABBC	false
+match	[*]&A	Profile	*	false
+wildcard	[*]&A	Profile	false
+match	[*]&![*]	Quote	AAPL	false
+match	[*]&![*]	Quote	MSFT	false
+match	[*]&![*]	Quote	A\u00e9	false
+match	[*]&![*]	Quote	A\ud83d\ude00	false
+match	[*]&![*]	Quote	ABC	false
+match	[*]&![*]	Quote	ABBC	false
+match	[*]&![*]	Quote	*	true
+wildcard	[*]&![*]	Quote	true
+match	[*]&![*]	Quote&Q	AAPL	false
+match	[*]&![*]	Quote&Q	MSFT	false
+match	[*]&![*]	Quote&Q	A\u00e9	false
+match	[*]&![*]	Quote&Q	A\ud83d\ude00	false
+match	[*]&![*]	Quote&Q	ABC	false
+match	[*]&![*]	Quote&Q	ABBC	false
+match	[*]&![*]	Quote&Q	*	true
+wildcard	[*]&![*]	Quote&Q	true
+match	[*]&![*]	Profile	AAPL	false
+match	[*]&![*]	Profile	MSFT	false
+match	[*]&![*]	Profile	A\u00e9	false
+match	[*]&![*]	Profile	A\ud83d\ude00	false
+match	[*]&![*]	Profile	ABC	false
+match	[*]&![*]	Profile	ABBC	false
+match	[*]&![*]	Profile	*	true
+wildcard	[*]&![*]	Profile	true
+match	([*],A)&([*],B)	Quote	AAPL	false
+match	([*],A)&([*],B)	Quote	MSFT	false
+match	([*],A)&([*],B)	Quote	A\u00e9	false
+match	([*],A)&([*],B)	Quote	A\ud83d\ude00	false
+match	([*],A)&([*],B)	Quote	ABC	false
+match	([*],A)&([*],B)	Quote	ABBC	false
+match	([*],A)&([*],B)	Quote	*	true
+wildcard	([*],A)&([*],B)	Quote	true
+match	([*],A)&([*],B)	Quote&Q	AAPL	false
+match	([*],A)&([*],B)	Quote&Q	MSFT	false
+match	([*],A)&([*],B)	Quote&Q	A\u00e9	false
+match	([*],A)&([*],B)	Quote&Q	A\ud83d\ude00	false
+match	([*],A)&([*],B)	Quote&Q	ABC	false
+match	([*],A)&([*],B)	Quote&Q	ABBC	false
+match	([*],A)&([*],B)	Quote&Q	*	true
+wildcard	([*],A)&([*],B)	Quote&Q	true
+match	([*],A)&([*],B)	Profile	AAPL	false
+match	([*],A)&([*],B)	Profile	MSFT	false
+match	([*],A)&([*],B)	Profile	A\u00e9	false
+match	([*],A)&([*],B)	Profile	A\ud83d\ude00	false
+match	([*],A)&([*],B)	Profile	ABC	false
+match	([*],A)&([*],B)	Profile	ABBC	false
+match	([*],A)&([*],B)	Profile	*	true
+wildcard	([*],A)&([*],B)	Profile	true
+match	A[]&A*	Quote	AAPL	false
+match	A[]&A*	Quote	MSFT	false
+match	A[]&A*	Quote	A\u00e9	false
+match	A[]&A*	Quote	A\ud83d\ude00	false
+match	A[]&A*	Quote	ABC	false
+match	A[]&A*	Quote	ABBC	false
+match	A[]&A*	Quote	*	false
+wildcard	A[]&A*	Quote	false
+match	A[]&A*	Quote&Q	AAPL	false
+match	A[]&A*	Quote&Q	MSFT	false
+match	A[]&A*	Quote&Q	A\u00e9	false
+match	A[]&A*	Quote&Q	A\ud83d\ude00	false
+match	A[]&A*	Quote&Q	ABC	false
+match	A[]&A*	Quote&Q	ABBC	false
+match	A[]&A*	Quote&Q	*	false
+wildcard	A[]&A*	Quote&Q	false
+match	A[]&A*	Profile	AAPL	false
+match	A[]&A*	Profile	MSFT	false
+match	A[]&A*	Profile	A\u00e9	false
+match	A[]&A*	Profile	A\ud83d\ude00	false
+match	A[]&A*	Profile	ABC	false
+match	A[]&A*	Profile	ABBC	false
+match	A[]&A*	Profile	*	false
+wildcard	A[]&A*	Profile	false
+match	[][^]&A*	Quote	AAPL	false
+match	[][^]&A*	Quote	MSFT	false
+match	[][^]&A*	Quote	A\u00e9	false
+match	[][^]&A*	Quote	A\ud83d\ude00	false
+match	[][^]&A*	Quote	ABC	false
+match	[][^]&A*	Quote	ABBC	false
+match	[][^]&A*	Quote	*	true
+wildcard	[][^]&A*	Quote	true
+match	[][^]&A*	Quote&Q	AAPL	false
+match	[][^]&A*	Quote&Q	MSFT	false
+match	[][^]&A*	Quote&Q	A\u00e9	false
+match	[][^]&A*	Quote&Q	A\ud83d\ude00	false
+match	[][^]&A*	Quote&Q	ABC	false
+match	[][^]&A*	Quote&Q	ABBC	false
+match	[][^]&A*	Quote&Q	*	true
+wildcard	[][^]&A*	Quote&Q	true
+match	[][^]&A*	Profile	AAPL	false
+match	[][^]&A*	Profile	MSFT	false
+match	[][^]&A*	Profile	A\u00e9	false
+match	[][^]&A*	Profile	A\ud83d\ude00	false
+match	[][^]&A*	Profile	ABC	false
+match	[][^]&A*	Profile	ABBC	false
+match	[][^]&A*	Profile	*	true
+wildcard	[][^]&A*	Profile	true
+match	[A-J][A-J][A-J][A-J]&![A-J][A-J][A-J][A-J]	Quote	AAPL	false
+match	[A-J][A-J][A-J][A-J]&![A-J][A-J][A-J][A-J]	Quote	MSFT	false
+match	[A-J][A-J][A-J][A-J]&![A-J][A-J][A-J][A-J]	Quote	A\u00e9	false
+match	[A-J][A-J][A-J][A-J]&![A-J][A-J][A-J][A-J]	Quote	A\ud83d\ude00	false
+match	[A-J][A-J][A-J][A-J]&![A-J][A-J][A-J][A-J]	Quote	ABC	false
+match	[A-J][A-J][A-J][A-J]&![A-J][A-J][A-J][A-J]	Quote	ABBC	false
+match	[A-J][A-J][A-J][A-J]&![A-J][A-J][A-J][A-J]	Quote	*	false
+wildcard	[A-J][A-J][A-J][A-J]&![A-J][A-J][A-J][A-J]	Quote	false
+match	[A-J][A-J][A-J][A-J]&![A-J][A-J][A-J][A-J]	Quote&Q	AAPL	false
+match	[A-J][A-J][A-J][A-J]&![A-J][A-J][A-J][A-J]	Quote&Q	MSFT	false
+match	[A-J][A-J][A-J][A-J]&![A-J][A-J][A-J][A-J]	Quote&Q	A\u00e9	false
+match	[A-J][A-J][A-J][A-J]&![A-J][A-J][A-J][A-J]	Quote&Q	A\ud83d\ude00	false
+match	[A-J][A-J][A-J][A-J]&![A-J][A-J][A-J][A-J]	Quote&Q	ABC	false
+match	[A-J][A-J][A-J][A-J]&![A-J][A-J][A-J][A-J]	Quote&Q	ABBC	false
+match	[A-J][A-J][A-J][A-J]&![A-J][A-J][A-J][A-J]	Quote&Q	*	false
+wildcard	[A-J][A-J][A-J][A-J]&![A-J][A-J][A-J][A-J]	Quote&Q	false
+match	[A-J][A-J][A-J][A-J]&![A-J][A-J][A-J][A-J]	Profile	AAPL	false
+match	[A-J][A-J][A-J][A-J]&![A-J][A-J][A-J][A-J]	Profile	MSFT	false
+match	[A-J][A-J][A-J][A-J]&![A-J][A-J][A-J][A-J]	Profile	A\u00e9	false
+match	[A-J][A-J][A-J][A-J]&![A-J][A-J][A-J][A-J]	Profile	A\ud83d\ude00	false
+match	[A-J][A-J][A-J][A-J]&![A-J][A-J][A-J][A-J]	Profile	ABC	false
+match	[A-J][A-J][A-J][A-J]&![A-J][A-J][A-J][A-J]	Profile	ABBC	false
+match	[A-J][A-J][A-J][A-J]&![A-J][A-J][A-J][A-J]	Profile	*	false
+wildcard	[A-J][A-J][A-J][A-J]&![A-J][A-J][A-J][A-J]	Profile	false
+match	[A-K][A-K][A-K][A-K]&![A-K][A-K][A-K][A-K]	Quote	AAPL	false
+match	[A-K][A-K][A-K][A-K]&![A-K][A-K][A-K][A-K]	Quote	MSFT	false
+match	[A-K][A-K][A-K][A-K]&![A-K][A-K][A-K][A-K]	Quote	A\u00e9	false
+match	[A-K][A-K][A-K][A-K]&![A-K][A-K][A-K][A-K]	Quote	A\ud83d\ude00	false
+match	[A-K][A-K][A-K][A-K]&![A-K][A-K][A-K][A-K]	Quote	ABC	false
+match	[A-K][A-K][A-K][A-K]&![A-K][A-K][A-K][A-K]	Quote	ABBC	false
+match	[A-K][A-K][A-K][A-K]&![A-K][A-K][A-K][A-K]	Quote	*	true
+wildcard	[A-K][A-K][A-K][A-K]&![A-K][A-K][A-K][A-K]	Quote	true
+match	[A-K][A-K][A-K][A-K]&![A-K][A-K][A-K][A-K]	Quote&Q	AAPL	false
+match	[A-K][A-K][A-K][A-K]&![A-K][A-K][A-K][A-K]	Quote&Q	MSFT	false
+match	[A-K][A-K][A-K][A-K]&![A-K][A-K][A-K][A-K]	Quote&Q	A\u00e9	false
+match	[A-K][A-K][A-K][A-K]&![A-K][A-K][A-K][A-K]	Quote&Q	A\ud83d\ude00	false
+match	[A-K][A-K][A-K][A-K]&![A-K][A-K][A-K][A-K]	Quote&Q	ABC	false
+match	[A-K][A-K][A-K][A-K]&![A-K][A-K][A-K][A-K]	Quote&Q	ABBC	false
+match	[A-K][A-K][A-K][A-K]&![A-K][A-K][A-K][A-K]	Quote&Q	*	true
+wildcard	[A-K][A-K][A-K][A-K]&![A-K][A-K][A-K][A-K]	Quote&Q	true
+match	[A-K][A-K][A-K][A-K]&![A-K][A-K][A-K][A-K]	Profile	AAPL	false
+match	[A-K][A-K][A-K][A-K]&![A-K][A-K][A-K][A-K]	Profile	MSFT	false
+match	[A-K][A-K][A-K][A-K]&![A-K][A-K][A-K][A-K]	Profile	A\u00e9	false
+match	[A-K][A-K][A-K][A-K]&![A-K][A-K][A-K][A-K]	Profile	A\ud83d\ude00	false
+match	[A-K][A-K][A-K][A-K]&![A-K][A-K][A-K][A-K]	Profile	ABC	false
+match	[A-K][A-K][A-K][A-K]&![A-K][A-K][A-K][A-K]	Profile	ABBC	false
+match	[A-K][A-K][A-K][A-K]&![A-K][A-K][A-K][A-K]	Profile	*	true
+wildcard	[A-K][A-K][A-K][A-K]&![A-K][A-K][A-K][A-K]	Profile	true
+match	*:Quote	Quote	AAPL	false
+match	*:Quote	Quote	MSFT	false
+match	*:Quote	Quote	A\u00e9	false
+match	*:Quote	Quote	A\ud83d\ude00	false
+match	*:Quote	Quote	ABC	false
+match	*:Quote	Quote	ABBC	false
+match	*:Quote	Quote	*	true
+wildcard	*:Quote	Quote	true
+match	*:Quote	Quote&Q	AAPL	false
+match	*:Quote	Quote&Q	MSFT	false
+match	*:Quote	Quote&Q	A\u00e9	false
+match	*:Quote	Quote&Q	A\ud83d\ude00	false
+match	*:Quote	Quote&Q	ABC	false
+match	*:Quote	Quote&Q	ABBC	false
+match	*:Quote	Quote&Q	*	true
+wildcard	*:Quote	Quote&Q	true
+match	*:Quote	Profile	AAPL	false
+match	*:Quote	Profile	MSFT	false
+match	*:Quote	Profile	A\u00e9	false
+match	*:Quote	Profile	A\ud83d\ude00	false
+match	*:Quote	Profile	ABC	false
+match	*:Quote	Profile	ABBC	false
+match	*:Quote	Profile	*	true
+wildcard	*:Quote	Profile	true
+match	!:Quote*	Quote	AAPL	false
+match	!:Quote*	Quote	MSFT	false
+match	!:Quote*	Quote	A\u00e9	false
+match	!:Quote*	Quote	A\ud83d\ude00	false
+match	!:Quote*	Quote	ABC	false
+match	!:Quote*	Quote	ABBC	false
+match	!:Quote*	Quote	*	false
+wildcard	!:Quote*	Quote	false
+match	!:Quote*	Quote&Q	AAPL	false
+match	!:Quote*	Quote&Q	MSFT	false
+match	!:Quote*	Quote&Q	A\u00e9	false
+match	!:Quote*	Quote&Q	A\ud83d\ude00	false
+match	!:Quote*	Quote&Q	ABC	false
+match	!:Quote*	Quote&Q	ABBC	false
+match	!:Quote*	Quote&Q	*	false
+wildcard	!:Quote*	Quote&Q	false
+match	!:Quote*	Profile	AAPL	true
+match	!:Quote*	Profile	MSFT	true
+match	!:Quote*	Profile	A\u00e9	true
+match	!:Quote*	Profile	A\ud83d\ude00	true
+match	!:Quote*	Profile	ABC	true
+match	!:Quote*	Profile	ABBC	true
+match	!:Quote*	Profile	*	true
+wildcard	!:Quote*	Profile	true
+match	!A*	Quote	AAPL	false
+match	!A*	Quote	MSFT	true
+match	!A*	Quote	A\u00e9	false
+match	!A*	Quote	A\ud83d\ude00	false
+match	!A*	Quote	ABC	false
+match	!A*	Quote	ABBC	false
+match	!A*	Quote	*	true
+wildcard	!A*	Quote	true
+match	!A*	Quote&Q	AAPL	false
+match	!A*	Quote&Q	MSFT	true
+match	!A*	Quote&Q	A\u00e9	false
+match	!A*	Quote&Q	A\ud83d\ude00	false
+match	!A*	Quote&Q	ABC	false
+match	!A*	Quote&Q	ABBC	false
+match	!A*	Quote&Q	*	true
+wildcard	!A*	Quote&Q	true
+match	!A*	Profile	AAPL	false
+match	!A*	Profile	MSFT	true
+match	!A*	Profile	A\u00e9	false
+match	!A*	Profile	A\ud83d\ude00	false
+match	!A*	Profile	ABC	false
+match	!A*	Profile	ABBC	false
+match	!A*	Profile	*	true
+wildcard	!A*	Profile	true
+match	!*	Quote	AAPL	false
+match	!*	Quote	MSFT	false
+match	!*	Quote	A\u00e9	false
+match	!*	Quote	A\ud83d\ude00	false
+match	!*	Quote	ABC	false
+match	!*	Quote	ABBC	false
+match	!*	Quote	*	false
+wildcard	!*	Quote	false
+match	!*	Quote&Q	AAPL	false
+match	!*	Quote&Q	MSFT	false
+match	!*	Quote&Q	A\u00e9	false
+match	!*	Quote&Q	A\ud83d\ude00	false
+match	!*	Quote&Q	ABC	false
+match	!*	Quote&Q	ABBC	false
+match	!*	Quote&Q	*	false
+wildcard	!*	Quote&Q	false
+match	!*	Profile	AAPL	false
+match	!*	Profile	MSFT	false
+match	!*	Profile	A\u00e9	false
+match	!*	Profile	A\ud83d\ude00	false
+match	!*	Profile	ABC	false
+match	!*	Profile	ABBC	false
+match	!*	Profile	*	false
+wildcard	!*	Profile	false
+match	!(:Quote*&A*)	Quote	AAPL	false
+match	!(:Quote*&A*)	Quote	MSFT	true
+match	!(:Quote*&A*)	Quote	A\u00e9	false
+match	!(:Quote*&A*)	Quote	A\ud83d\ude00	false
+match	!(:Quote*&A*)	Quote	ABC	false
+match	!(:Quote*&A*)	Quote	ABBC	false
+match	!(:Quote*&A*)	Quote	*	true
+wildcard	!(:Quote*&A*)	Quote	true
+match	!(:Quote*&A*)	Quote&Q	AAPL	false
+match	!(:Quote*&A*)	Quote&Q	MSFT	true
+match	!(:Quote*&A*)	Quote&Q	A\u00e9	false
+match	!(:Quote*&A*)	Quote&Q	A\ud83d\ude00	false
+match	!(:Quote*&A*)	Quote&Q	ABC	false
+match	!(:Quote*&A*)	Quote&Q	ABBC	false
+match	!(:Quote*&A*)	Quote&Q	*	true
+wildcard	!(:Quote*&A*)	Quote&Q	true
+match	!(:Quote*&A*)	Profile	AAPL	true
+match	!(:Quote*&A*)	Profile	MSFT	true
+match	!(:Quote*&A*)	Profile	A\u00e9	true
+match	!(:Quote*&A*)	Profile	A\ud83d\ude00	true
+match	!(:Quote*&A*)	Profile	ABC	true
+match	!(:Quote*&A*)	Profile	ABBC	true
+match	!(:Quote*&A*)	Profile	*	true
+wildcard	!(:Quote*&A*)	Profile	true
+match	!:Quote*,!A*	Quote	AAPL	false
+match	!:Quote*,!A*	Quote	MSFT	true
+match	!:Quote*,!A*	Quote	A\u00e9	false
+match	!:Quote*,!A*	Quote	A\ud83d\ude00	false
+match	!:Quote*,!A*	Quote	ABC	false
+match	!:Quote*,!A*	Quote	ABBC	false
+match	!:Quote*,!A*	Quote	*	true
+wildcard	!:Quote*,!A*	Quote	true
+match	!:Quote*,!A*	Quote&Q	AAPL	false
+match	!:Quote*,!A*	Quote&Q	MSFT	true
+match	!:Quote*,!A*	Quote&Q	A\u00e9	false
+match	!:Quote*,!A*	Quote&Q	A\ud83d\ude00	false
+match	!:Quote*,!A*	Quote&Q	ABC	false
+match	!:Quote*,!A*	Quote&Q	ABBC	false
+match	!:Quote*,!A*	Quote&Q	*	true
+wildcard	!:Quote*,!A*	Quote&Q	true
+match	!:Quote*,!A*	Profile	AAPL	true
+match	!:Quote*,!A*	Profile	MSFT	true
+match	!:Quote*,!A*	Profile	A\u00e9	true
+match	!:Quote*,!A*	Profile	A\ud83d\ude00	true
+match	!:Quote*,!A*	Profile	ABC	true
+match	!:Quote*,!A*	Profile	ABBC	true
+match	!:Quote*,!A*	Profile	*	true
+wildcard	!:Quote*,!A*	Profile	true
+match	!(:Quote*,A*)	Quote	AAPL	false
+match	!(:Quote*,A*)	Quote	MSFT	false
+match	!(:Quote*,A*)	Quote	A\u00e9	false
+match	!(:Quote*,A*)	Quote	A\ud83d\ude00	false
+match	!(:Quote*,A*)	Quote	ABC	false
+match	!(:Quote*,A*)	Quote	ABBC	false
+match	!(:Quote*,A*)	Quote	*	false
+wildcard	!(:Quote*,A*)	Quote	false
+match	!(:Quote*,A*)	Quote&Q	AAPL	false
+match	!(:Quote*,A*)	Quote&Q	MSFT	false
+match	!(:Quote*,A*)	Quote&Q	A\u00e9	false
+match	!(:Quote*,A*)	Quote&Q	A\ud83d\ude00	false
+match	!(:Quote*,A*)	Quote&Q	ABC	false
+match	!(:Quote*,A*)	Quote&Q	ABBC	false
+match	!(:Quote*,A*)	Quote&Q	*	false
+wildcard	!(:Quote*,A*)	Quote&Q	false
+match	!(:Quote*,A*)	Profile	AAPL	false
+match	!(:Quote*,A*)	Profile	MSFT	true
+match	!(:Quote*,A*)	Profile	A\u00e9	false
+match	!(:Quote*,A*)	Profile	A\ud83d\ude00	false
+match	!(:Quote*,A*)	Profile	ABC	false
+match	!(:Quote*,A*)	Profile	ABBC	false
+match	!(:Quote*,A*)	Profile	*	true
+wildcard	!(:Quote*,A*)	Profile	true
+match	:Quote*&!A*	Quote	AAPL	false
+match	:Quote*&!A*	Quote	MSFT	true
+match	:Quote*&!A*	Quote	A\u00e9	false
+match	:Quote*&!A*	Quote	A\ud83d\ude00	false
+match	:Quote*&!A*	Quote	ABC	false
+match	:Quote*&!A*	Quote	ABBC	false
+match	:Quote*&!A*	Quote	*	true
+wildcard	:Quote*&!A*	Quote	true
+match	:Quote*&!A*	Quote&Q	AAPL	false
+match	:Quote*&!A*	Quote&Q	MSFT	true
+match	:Quote*&!A*	Quote&Q	A\u00e9	false
+match	:Quote*&!A*	Quote&Q	A\ud83d\ude00	false
+match	:Quote*&!A*	Quote&Q	ABC	false
+match	:Quote*&!A*	Quote&Q	ABBC	false
+match	:Quote*&!A*	Quote&Q	*	true
+wildcard	:Quote*&!A*	Quote&Q	true
+match	:Quote*&!A*	Profile	AAPL	false
+match	:Quote*&!A*	Profile	MSFT	false
+match	:Quote*&!A*	Profile	A\u00e9	false
+match	:Quote*&!A*	Profile	A\ud83d\ude00	false
+match	:Quote*&!A*	Profile	ABC	false
+match	:Quote*&!A*	Profile	ABBC	false
+match	:Quote*&!A*	Profile	*	false
+wildcard	:Quote*&!A*	Profile	false
+match	!nwc	Quote	AAPL	false
+match	!nwc	Quote	MSFT	false
+match	!nwc	Quote	A\u00e9	false
+match	!nwc	Quote	A\ud83d\ude00	false
+match	!nwc	Quote	ABC	false
+match	!nwc	Quote	ABBC	false
+match	!nwc	Quote	*	true
+wildcard	!nwc	Quote	true
+match	!nwc	Quote&Q	AAPL	false
+match	!nwc	Quote&Q	MSFT	false
+match	!nwc	Quote&Q	A\u00e9	false
+match	!nwc	Quote&Q	A\ud83d\ude00	false
+match	!nwc	Quote&Q	ABC	false
+match	!nwc	Quote&Q	ABBC	false
+match	!nwc	Quote&Q	*	true
+wildcard	!nwc	Quote&Q	true
+match	!nwc	Profile	AAPL	false
+match	!nwc	Profile	MSFT	false
+match	!nwc	Profile	A\u00e9	false
+match	!nwc	Profile	A\ud83d\ude00	false
+match	!nwc	Profile	ABC	false
+match	!nwc	Profile	ABBC	false
+match	!nwc	Profile	*	true
+wildcard	!nwc	Profile	true
+match	[A-Z]*	Quote	AAPL	true
+match	[A-Z]*	Quote	MSFT	true
+match	[A-Z]*	Quote	A\u00e9	true
+match	[A-Z]*	Quote	A\ud83d\ude00	true
+match	[A-Z]*	Quote	ABC	true
+match	[A-Z]*	Quote	ABBC	true
+match	[A-Z]*	Quote	*	true
+wildcard	[A-Z]*	Quote	true
+match	[A-Z]*	Quote&Q	AAPL	true
+match	[A-Z]*	Quote&Q	MSFT	true
+match	[A-Z]*	Quote&Q	A\u00e9	true
+match	[A-Z]*	Quote&Q	A\ud83d\ude00	true
+match	[A-Z]*	Quote&Q	ABC	true
+match	[A-Z]*	Quote&Q	ABBC	true
+match	[A-Z]*	Quote&Q	*	true
+wildcard	[A-Z]*	Quote&Q	true
+match	[A-Z]*	Profile	AAPL	true
+match	[A-Z]*	Profile	MSFT	true
+match	[A-Z]*	Profile	A\u00e9	true
+match	[A-Z]*	Profile	A\ud83d\ude00	true
+match	[A-Z]*	Profile	ABC	true
+match	[A-Z]*	Profile	ABBC	true
+match	[A-Z]*	Profile	*	true
+wildcard	[A-Z]*	Profile	true
+match	A*B*C	Quote	AAPL	false
+match	A*B*C	Quote	MSFT	false
+match	A*B*C	Quote	A\u00e9	false
+match	A*B*C	Quote	A\ud83d\ude00	false
+match	A*B*C	Quote	ABC	true
+match	A*B*C	Quote	ABBC	true
+match	A*B*C	Quote	*	true
+wildcard	A*B*C	Quote	true
+match	A*B*C	Quote&Q	AAPL	false
+match	A*B*C	Quote&Q	MSFT	false
+match	A*B*C	Quote&Q	A\u00e9	false
+match	A*B*C	Quote&Q	A\ud83d\ude00	false
+match	A*B*C	Quote&Q	ABC	true
+match	A*B*C	Quote&Q	ABBC	true
+match	A*B*C	Quote&Q	*	true
+wildcard	A*B*C	Quote&Q	true
+match	A*B*C	Profile	AAPL	false
+match	A*B*C	Profile	MSFT	false
+match	A*B*C	Profile	A\u00e9	false
+match	A*B*C	Profile	A\ud83d\ude00	false
+match	A*B*C	Profile	ABC	true
+match	A*B*C	Profile	ABBC	true
+match	A*B*C	Profile	*	true
+wildcard	A*B*C	Profile	true
+invalid	A**B	com.devexperts.qd.kit.FilterSyntaxException
+invalid	A*B*C*D	com.devexperts.qd.kit.FilterSyntaxException
+match	[a]bc	Quote	AAPL	false
+match	[a]bc	Quote	MSFT	false
+match	[a]bc	Quote	A\u00e9	false
+match	[a]bc	Quote	A\ud83d\ude00	false
+match	[a]bc	Quote	ABC	false
+match	[a]bc	Quote	ABBC	false
+match	[a]bc	Quote	*	true
+wildcard	[a]bc	Quote	true
+match	[a]bc	Quote&Q	AAPL	false
+match	[a]bc	Quote&Q	MSFT	false
+match	[a]bc	Quote&Q	A\u00e9	false
+match	[a]bc	Quote&Q	A\ud83d\ude00	false
+match	[a]bc	Quote&Q	ABC	false
+match	[a]bc	Quote&Q	ABBC	false
+match	[a]bc	Quote&Q	*	true
+wildcard	[a]bc	Quote&Q	true
+match	[a]bc	Profile	AAPL	false
+match	[a]bc	Profile	MSFT	false
+match	[a]bc	Profile	A\u00e9	false
+match	[a]bc	Profile	A\ud83d\ude00	false
+match	[a]bc	Profile	ABC	false
+match	[a]bc	Profile	ABBC	false
+match	[a]bc	Profile	*	true
+wildcard	[a]bc	Profile	true
+invalid	abc	com.devexperts.qd.kit.FilterSyntaxException
+invalid	A?	com.devexperts.qd.kit.FilterSyntaxException
+match	A[]	Quote	AAPL	false
+match	A[]	Quote	MSFT	false
+match	A[]	Quote	A\u00e9	false
+match	A[]	Quote	A\ud83d\ude00	false
+match	A[]	Quote	ABC	false
+match	A[]	Quote	ABBC	false
+match	A[]	Quote	*	true
+wildcard	A[]	Quote	true
+match	A[]	Quote&Q	AAPL	false
+match	A[]	Quote&Q	MSFT	false
+match	A[]	Quote&Q	A\u00e9	false
+match	A[]	Quote&Q	A\ud83d\ude00	false
+match	A[]	Quote&Q	ABC	false
+match	A[]	Quote&Q	ABBC	false
+match	A[]	Quote&Q	*	true
+wildcard	A[]	Quote&Q	true
+match	A[]	Profile	AAPL	false
+match	A[]	Profile	MSFT	false
+match	A[]	Profile	A\u00e9	false
+match	A[]	Profile	A\ud83d\ude00	false
+match	A[]	Profile	ABC	false
+match	A[]	Profile	ABBC	false
+match	A[]	Profile	*	true
+wildcard	A[]	Profile	true
+match	A[^]	Quote	AAPL	false
+match	A[^]	Quote	MSFT	false
+match	A[^]	Quote	A\u00e9	true
+match	A[^]	Quote	A\ud83d\ude00	false
+match	A[^]	Quote	ABC	false
+match	A[^]	Quote	ABBC	false
+match	A[^]	Quote	*	true
+wildcard	A[^]	Quote	true
+match	A[^]	Quote&Q	AAPL	false
+match	A[^]	Quote&Q	MSFT	false
+match	A[^]	Quote&Q	A\u00e9	true
+match	A[^]	Quote&Q	A\ud83d\ude00	false
+match	A[^]	Quote&Q	ABC	false
+match	A[^]	Quote&Q	ABBC	false
+match	A[^]	Quote&Q	*	true
+wildcard	A[^]	Quote&Q	true
+match	A[^]	Profile	AAPL	false
+match	A[^]	Profile	MSFT	false
+match	A[^]	Profile	A\u00e9	true
+match	A[^]	Profile	A\ud83d\ude00	false
+match	A[^]	Profile	ABC	false
+match	A[^]	Profile	ABBC	false
+match	A[^]	Profile	*	true
+wildcard	A[^]	Profile	true
+match	A[Z-A]	Quote	AAPL	false
+match	A[Z-A]	Quote	MSFT	false
+match	A[Z-A]	Quote	A\u00e9	false
+match	A[Z-A]	Quote	A\ud83d\ude00	false
+match	A[Z-A]	Quote	ABC	false
+match	A[Z-A]	Quote	ABBC	false
+match	A[Z-A]	Quote	*	true
+wildcard	A[Z-A]	Quote	true
+match	A[Z-A]	Quote&Q	AAPL	false
+match	A[Z-A]	Quote&Q	MSFT	false
+match	A[Z-A]	Quote&Q	A\u00e9	false
+match	A[Z-A]	Quote&Q	A\ud83d\ude00	false
+match	A[Z-A]	Quote&Q	ABC	false
+match	A[Z-A]	Quote&Q	ABBC	false
+match	A[Z-A]	Quote&Q	*	true
+wildcard	A[Z-A]	Quote&Q	true
+match	A[Z-A]	Profile	AAPL	false
+match	A[Z-A]	Profile	MSFT	false
+match	A[Z-A]	Profile	A\u00e9	false
+match	A[Z-A]	Profile	A\ud83d\ude00	false
+match	A[Z-A]	Profile	ABC	false
+match	A[Z-A]	Profile	ABBC	false
+match	A[Z-A]	Profile	*	true
+wildcard	A[Z-A]	Profile	true
+match	A\u005c 	Quote	AAPL	false
+match	A\u005c 	Quote	MSFT	false
+match	A\u005c 	Quote	A\u00e9	false
+match	A\u005c 	Quote	A\ud83d\ude00	false
+match	A\u005c 	Quote	ABC	false
+match	A\u005c 	Quote	ABBC	false
+match	A\u005c 	Quote	*	true
+wildcard	A\u005c 	Quote	true
+match	A\u005c 	Quote&Q	AAPL	false
+match	A\u005c 	Quote&Q	MSFT	false
+match	A\u005c 	Quote&Q	A\u00e9	false
+match	A\u005c 	Quote&Q	A\ud83d\ude00	false
+match	A\u005c 	Quote&Q	ABC	false
+match	A\u005c 	Quote&Q	ABBC	false
+match	A\u005c 	Quote&Q	*	true
+wildcard	A\u005c 	Quote&Q	true
+match	A\u005c 	Profile	AAPL	false
+match	A\u005c 	Profile	MSFT	false
+match	A\u005c 	Profile	A\u00e9	false
+match	A\u005c 	Profile	A\ud83d\ude00	false
+match	A\u005c 	Profile	ABC	false
+match	A\u005c 	Profile	ABBC	false
+match	A\u005c 	Profile	*	true
+wildcard	A\u005c 	Profile	true
+match	\u005cQABC\u005cE	Quote	AAPL	false
+match	\u005cQABC\u005cE	Quote	MSFT	false
+match	\u005cQABC\u005cE	Quote	A\u00e9	false
+match	\u005cQABC\u005cE	Quote	A\ud83d\ude00	false
+match	\u005cQABC\u005cE	Quote	ABC	true
+match	\u005cQABC\u005cE	Quote	ABBC	false
+match	\u005cQABC\u005cE	Quote	*	true
+wildcard	\u005cQABC\u005cE	Quote	true
+match	\u005cQABC\u005cE	Quote&Q	AAPL	false
+match	\u005cQABC\u005cE	Quote&Q	MSFT	false
+match	\u005cQABC\u005cE	Quote&Q	A\u00e9	false
+match	\u005cQABC\u005cE	Quote&Q	A\ud83d\ude00	false
+match	\u005cQABC\u005cE	Quote&Q	ABC	true
+match	\u005cQABC\u005cE	Quote&Q	ABBC	false
+match	\u005cQABC\u005cE	Quote&Q	*	true
+wildcard	\u005cQABC\u005cE	Quote&Q	true
+match	\u005cQABC\u005cE	Profile	AAPL	false
+match	\u005cQABC\u005cE	Profile	MSFT	false
+match	\u005cQABC\u005cE	Profile	A\u00e9	false
+match	\u005cQABC\u005cE	Profile	A\ud83d\ude00	false
+match	\u005cQABC\u005cE	Profile	ABC	true
+match	\u005cQABC\u005cE	Profile	ABBC	false
+match	\u005cQABC\u005cE	Profile	*	true
+wildcard	\u005cQABC\u005cE	Profile	true
+match	record Quote	Quote	AAPL	true
+match	record Quote	Quote	MSFT	true
+match	record Quote	Quote	A\u00e9	true
+match	record Quote	Quote	A\ud83d\ude00	true
+match	record Quote	Quote	ABC	true
+match	record Quote	Quote	ABBC	true
+match	record Quote	Quote	*	true
+wildcard	record Quote	Quote	true
+match	record Quote	Quote&Q	AAPL	false
+match	record Quote	Quote&Q	MSFT	false
+match	record Quote	Quote&Q	A\u00e9	false
+match	record Quote	Quote&Q	A\ud83d\ude00	false
+match	record Quote	Quote&Q	ABC	false
+match	record Quote	Quote&Q	ABBC	false
+match	record Quote	Quote&Q	*	false
+wildcard	record Quote	Quote&Q	false
+match	record Quote	Profile	AAPL	false
+match	record Quote	Profile	MSFT	false
+match	record Quote	Profile	A\u00e9	false
+match	record Quote	Profile	A\ud83d\ude00	false
+match	record Quote	Profile	ABC	false
+match	record Quote	Profile	ABBC	false
+match	record Quote	Profile	*	false
+wildcard	record Quote	Profile	false
+match	any	Quote	AAPL	true
+match	any	Quote	MSFT	true
+match	any	Quote	A\u00e9	true
+match	any	Quote	A\ud83d\ude00	true
+match	any	Quote	ABC	true
+match	any	Quote	ABBC	true
+match	any	Quote	*	true
+wildcard	any	Quote	true
+match	any	Quote&Q	AAPL	true
+match	any	Quote&Q	MSFT	true
+match	any	Quote&Q	A\u00e9	true
+match	any	Quote&Q	A\ud83d\ude00	true
+match	any	Quote&Q	ABC	true
+match	any	Quote&Q	ABBC	true
+match	any	Quote&Q	*	true
+wildcard	any	Quote&Q	true
+match	any	Profile	AAPL	true
+match	any	Profile	MSFT	true
+match	any	Profile	A\u00e9	true
+match	any	Profile	A\ud83d\ude00	true
+match	any	Profile	ABC	true
+match	any	Profile	ABBC	true
+match	any	Profile	*	true
+wildcard	any	Profile	true
+match	feed	Quote	AAPL	true
+match	feed	Quote	MSFT	true
+match	feed	Quote	A\u00e9	true
+match	feed	Quote	A\ud83d\ude00	true
+match	feed	Quote	ABC	true
+match	feed	Quote	ABBC	true
+match	feed	Quote	*	true
+wildcard	feed	Quote	true
+match	feed	Quote&Q	AAPL	true
+match	feed	Quote&Q	MSFT	true
+match	feed	Quote&Q	A\u00e9	true
+match	feed	Quote&Q	A\ud83d\ude00	true
+match	feed	Quote&Q	ABC	true
+match	feed	Quote&Q	ABBC	true
+match	feed	Quote&Q	*	true
+wildcard	feed	Quote&Q	true
+match	feed	Profile	AAPL	true
+match	feed	Profile	MSFT	true
+match	feed	Profile	A\u00e9	true
+match	feed	Profile	A\ud83d\ude00	true
+match	feed	Profile	ABC	true
+match	feed	Profile	ABBC	true
+match	feed	Profile	*	true
+wildcard	feed	Profile	true
+match	compfeed	Quote	AAPL	true
+match	compfeed	Quote	MSFT	true
+match	compfeed	Quote	A\u00e9	true
+match	compfeed	Quote	A\ud83d\ude00	true
+match	compfeed	Quote	ABC	true
+match	compfeed	Quote	ABBC	true
+match	compfeed	Quote	*	true
+wildcard	compfeed	Quote	true
+match	compfeed	Quote&Q	AAPL	false
+match	compfeed	Quote&Q	MSFT	false
+match	compfeed	Quote&Q	A\u00e9	false
+match	compfeed	Quote&Q	A\ud83d\ude00	false
+match	compfeed	Quote&Q	ABC	false
+match	compfeed	Quote&Q	ABBC	false
+match	compfeed	Quote&Q	*	false
+wildcard	compfeed	Quote&Q	false
+match	compfeed	Profile	AAPL	true
+match	compfeed	Profile	MSFT	true
+match	compfeed	Profile	A\u00e9	true
+match	compfeed	Profile	A\ud83d\ude00	true
+match	compfeed	Profile	ABC	true
+match	compfeed	Profile	ABBC	true
+match	compfeed	Profile	*	true
+wildcard	compfeed	Profile	true
+match	regfeed	Quote	AAPL	false
+match	regfeed	Quote	MSFT	false
+match	regfeed	Quote	A\u00e9	false
+match	regfeed	Quote	A\ud83d\ude00	false
+match	regfeed	Quote	ABC	false
+match	regfeed	Quote	ABBC	false
+match	regfeed	Quote	*	false
+wildcard	regfeed	Quote	false
+match	regfeed	Quote&Q	AAPL	true
+match	regfeed	Quote&Q	MSFT	true
+match	regfeed	Quote&Q	A\u00e9	true
+match	regfeed	Quote&Q	A\ud83d\ude00	true
+match	regfeed	Quote&Q	ABC	true
+match	regfeed	Quote&Q	ABBC	true
+match	regfeed	Quote&Q	*	true
+wildcard	regfeed	Quote&Q	true
+match	regfeed	Profile	AAPL	false
+match	regfeed	Profile	MSFT	false
+match	regfeed	Profile	A\u00e9	false
+match	regfeed	Profile	A\ud83d\ude00	false
+match	regfeed	Profile	ABC	false
+match	regfeed	Profile	ABBC	false
+match	regfeed	Profile	*	false
+wildcard	regfeed	Profile	false
+match	chartdata	Quote	AAPL	false
+match	chartdata	Quote	MSFT	false
+match	chartdata	Quote	A\u00e9	false
+match	chartdata	Quote	A\ud83d\ude00	false
+match	chartdata	Quote	ABC	false
+match	chartdata	Quote	ABBC	false
+match	chartdata	Quote	*	false
+wildcard	chartdata	Quote	false
+match	chartdata	Quote&Q	AAPL	false
+match	chartdata	Quote&Q	MSFT	false
+match	chartdata	Quote&Q	A\u00e9	false
+match	chartdata	Quote&Q	A\ud83d\ude00	false
+match	chartdata	Quote&Q	ABC	false
+match	chartdata	Quote&Q	ABBC	false
+match	chartdata	Quote&Q	*	false
+wildcard	chartdata	Quote&Q	false
+match	chartdata	Profile	AAPL	false
+match	chartdata	Profile	MSFT	false
+match	chartdata	Profile	A\u00e9	false
+match	chartdata	Profile	A\ud83d\ude00	false
+match	chartdata	Profile	ABC	false
+match	chartdata	Profile	ABBC	false
+match	chartdata	Profile	*	false
+wildcard	chartdata	Profile	false
+match	convrates	Quote	AAPL	false
+match	convrates	Quote	MSFT	false
+match	convrates	Quote	A\u00e9	false
+match	convrates	Quote	A\ud83d\ude00	false
+match	convrates	Quote	ABC	false
+match	convrates	Quote	ABBC	false
+match	convrates	Quote	*	true
+wildcard	convrates	Quote	true
+match	convrates	Quote&Q	AAPL	false
+match	convrates	Quote&Q	MSFT	false
+match	convrates	Quote&Q	A\u00e9	false
+match	convrates	Quote&Q	A\ud83d\ude00	false
+match	convrates	Quote&Q	ABC	false
+match	convrates	Quote&Q	ABBC	false
+match	convrates	Quote&Q	*	true
+wildcard	convrates	Quote&Q	true
+match	convrates	Profile	AAPL	false
+match	convrates	Profile	MSFT	false
+match	convrates	Profile	A\u00e9	false
+match	convrates	Profile	A\ud83d\ude00	false
+match	convrates	Profile	ABC	false
+match	convrates	Profile	ABBC	false
+match	convrates	Profile	*	false
+wildcard	convrates	Profile	false
+match	nwc	Quote	AAPL	true
+match	nwc	Quote	MSFT	true
+match	nwc	Quote	A\u00e9	true
+match	nwc	Quote	A\ud83d\ude00	true
+match	nwc	Quote	ABC	true
+match	nwc	Quote	ABBC	true
+match	nwc	Quote	*	false
+wildcard	nwc	Quote	false
+match	nwc	Quote&Q	AAPL	true
+match	nwc	Quote&Q	MSFT	true
+match	nwc	Quote&Q	A\u00e9	true
+match	nwc	Quote&Q	A\ud83d\ude00	true
+match	nwc	Quote&Q	ABC	true
+match	nwc	Quote&Q	ABBC	true
+match	nwc	Quote&Q	*	false
+wildcard	nwc	Quote&Q	false
+match	nwc	Profile	AAPL	true
+match	nwc	Profile	MSFT	true
+match	nwc	Profile	A\u00e9	true
+match	nwc	Profile	A\ud83d\ude00	true
+match	nwc	Profile	ABC	true
+match	nwc	Profile	ABBC	true
+match	nwc	Profile	*	false
+wildcard	nwc	Profile	false
+match	bs	Quote	AAPL	true
+match	bs	Quote	MSFT	true
+match	bs	Quote	A\u00e9	true
+match	bs	Quote	A\ud83d\ude00	true
+match	bs	Quote	ABC	true
+match	bs	Quote	ABBC	true
+match	bs	Quote	*	true
+wildcard	bs	Quote	true
+match	bs	Quote&Q	AAPL	true
+match	bs	Quote&Q	MSFT	true
+match	bs	Quote&Q	A\u00e9	true
+match	bs	Quote&Q	A\ud83d\ude00	true
+match	bs	Quote&Q	ABC	true
+match	bs	Quote&Q	ABBC	true
+match	bs	Quote&Q	*	true
+wildcard	bs	Quote&Q	true
+match	bs	Profile	AAPL	true
+match	bs	Profile	MSFT	true
+match	bs	Profile	A\u00e9	true
+match	bs	Profile	A\ud83d\ude00	true
+match	bs	Profile	ABC	true
+match	bs	Profile	ABBC	true
+match	bs	Profile	*	true
+wildcard	bs	Profile	true
+match	bssymbol	Quote	AAPL	true
+match	bssymbol	Quote	MSFT	true
+match	bssymbol	Quote	A\u00e9	true
+match	bssymbol	Quote	A\ud83d\ude00	true
+match	bssymbol	Quote	ABC	true
+match	bssymbol	Quote	ABBC	true
+match	bssymbol	Quote	*	true
+wildcard	bssymbol	Quote	true
+match	bssymbol	Quote&Q	AAPL	true
+match	bssymbol	Quote&Q	MSFT	true
+match	bssymbol	Quote&Q	A\u00e9	true
+match	bssymbol	Quote&Q	A\ud83d\ude00	true
+match	bssymbol	Quote&Q	ABC	true
+match	bssymbol	Quote&Q	ABBC	true
+match	bssymbol	Quote&Q	*	true
+wildcard	bssymbol	Quote&Q	true
+match	bssymbol	Profile	AAPL	true
+match	bssymbol	Profile	MSFT	true
+match	bssymbol	Profile	A\u00e9	true
+match	bssymbol	Profile	A\ud83d\ude00	true
+match	bssymbol	Profile	ABC	true
+match	bssymbol	Profile	ABBC	true
+match	bssymbol	Profile	*	true
+wildcard	bssymbol	Profile	true
+match	fut	Quote	AAPL	false
+match	fut	Quote	MSFT	false
+match	fut	Quote	A\u00e9	false
+match	fut	Quote	A\ud83d\ude00	false
+match	fut	Quote	ABC	false
+match	fut	Quote	ABBC	false
+match	fut	Quote	*	true
+wildcard	fut	Quote	true
+match	fut	Quote&Q	AAPL	false
+match	fut	Quote&Q	MSFT	false
+match	fut	Quote&Q	A\u00e9	false
+match	fut	Quote&Q	A\ud83d\ude00	false
+match	fut	Quote&Q	ABC	false
+match	fut	Quote&Q	ABBC	false
+match	fut	Quote&Q	*	true
+wildcard	fut	Quote&Q	true
+match	fut	Profile	AAPL	false
+match	fut	Profile	MSFT	false
+match	fut	Profile	A\u00e9	false
+match	fut	Profile	A\ud83d\ude00	false
+match	fut	Profile	ABC	false
+match	fut	Profile	ABBC	false
+match	fut	Profile	*	true
+wildcard	fut	Profile	true
+match	futsymbol	Quote	AAPL	false
+match	futsymbol	Quote	MSFT	false
+match	futsymbol	Quote	A\u00e9	false
+match	futsymbol	Quote	A\ud83d\ude00	false
+match	futsymbol	Quote	ABC	false
+match	futsymbol	Quote	ABBC	false
+match	futsymbol	Quote	*	true
+wildcard	futsymbol	Quote	true
+match	futsymbol	Quote&Q	AAPL	false
+match	futsymbol	Quote&Q	MSFT	false
+match	futsymbol	Quote&Q	A\u00e9	false
+match	futsymbol	Quote&Q	A\ud83d\ude00	false
+match	futsymbol	Quote&Q	ABC	false
+match	futsymbol	Quote&Q	ABBC	false
+match	futsymbol	Quote&Q	*	true
+wildcard	futsymbol	Quote&Q	true
+match	futsymbol	Profile	AAPL	false
+match	futsymbol	Profile	MSFT	false
+match	futsymbol	Profile	A\u00e9	false
+match	futsymbol	Profile	A\ud83d\ude00	false
+match	futsymbol	Profile	ABC	false
+match	futsymbol	Profile	ABBC	false
+match	futsymbol	Profile	*	true
+wildcard	futsymbol	Profile	true
+match	opt	Quote	AAPL	false
+match	opt	Quote	MSFT	false
+match	opt	Quote	A\u00e9	false
+match	opt	Quote	A\ud83d\ude00	false
+match	opt	Quote	ABC	false
+match	opt	Quote	ABBC	false
+match	opt	Quote	*	true
+wildcard	opt	Quote	true
+match	opt	Quote&Q	AAPL	false
+match	opt	Quote&Q	MSFT	false
+match	opt	Quote&Q	A\u00e9	false
+match	opt	Quote&Q	A\ud83d\ude00	false
+match	opt	Quote&Q	ABC	false
+match	opt	Quote&Q	ABBC	false
+match	opt	Quote&Q	*	true
+wildcard	opt	Quote&Q	true
+match	opt	Profile	AAPL	false
+match	opt	Profile	MSFT	false
+match	opt	Profile	A\u00e9	false
+match	opt	Profile	A\ud83d\ude00	false
+match	opt	Profile	ABC	false
+match	opt	Profile	ABBC	false
+match	opt	Profile	*	true
+wildcard	opt	Profile	true
+match	optsymbol	Quote	AAPL	false
+match	optsymbol	Quote	MSFT	false
+match	optsymbol	Quote	A\u00e9	false
+match	optsymbol	Quote	A\ud83d\ude00	false
+match	optsymbol	Quote	ABC	false
+match	optsymbol	Quote	ABBC	false
+match	optsymbol	Quote	*	true
+wildcard	optsymbol	Quote	true
+match	optsymbol	Quote&Q	AAPL	false
+match	optsymbol	Quote&Q	MSFT	false
+match	optsymbol	Quote&Q	A\u00e9	false
+match	optsymbol	Quote&Q	A\ud83d\ude00	false
+match	optsymbol	Quote&Q	ABC	false
+match	optsymbol	Quote&Q	ABBC	false
+match	optsymbol	Quote&Q	*	true
+wildcard	optsymbol	Quote&Q	true
+match	optsymbol	Profile	AAPL	false
+match	optsymbol	Profile	MSFT	false
+match	optsymbol	Profile	A\u00e9	false
+match	optsymbol	Profile	A\ud83d\ude00	false
+match	optsymbol	Profile	ABC	false
+match	optsymbol	Profile	ABBC	false
+match	optsymbol	Profile	*	true
+wildcard	optsymbol	Profile	true
+match	spread	Quote	AAPL	false
+match	spread	Quote	MSFT	false
+match	spread	Quote	A\u00e9	false
+match	spread	Quote	A\ud83d\ude00	false
+match	spread	Quote	ABC	false
+match	spread	Quote	ABBC	false
+match	spread	Quote	*	true
+wildcard	spread	Quote	true
+match	spread	Quote&Q	AAPL	false
+match	spread	Quote&Q	MSFT	false
+match	spread	Quote&Q	A\u00e9	false
+match	spread	Quote&Q	A\ud83d\ude00	false
+match	spread	Quote&Q	ABC	false
+match	spread	Quote&Q	ABBC	false
+match	spread	Quote&Q	*	true
+wildcard	spread	Quote&Q	true
+match	spread	Profile	AAPL	false
+match	spread	Profile	MSFT	false
+match	spread	Profile	A\u00e9	false
+match	spread	Profile	A\ud83d\ude00	false
+match	spread	Profile	ABC	false
+match	spread	Profile	ABBC	false
+match	spread	Profile	*	true
+wildcard	spread	Profile	true
+match	spreadsymbol	Quote	AAPL	false
+match	spreadsymbol	Quote	MSFT	false
+match	spreadsymbol	Quote	A\u00e9	false
+match	spreadsymbol	Quote	A\ud83d\ude00	false
+match	spreadsymbol	Quote	ABC	false
+match	spreadsymbol	Quote	ABBC	false
+match	spreadsymbol	Quote	*	true
+wildcard	spreadsymbol	Quote	true
+match	spreadsymbol	Quote&Q	AAPL	false
+match	spreadsymbol	Quote&Q	MSFT	false
+match	spreadsymbol	Quote&Q	A\u00e9	false
+match	spreadsymbol	Quote&Q	A\ud83d\ude00	false
+match	spreadsymbol	Quote&Q	ABC	false
+match	spreadsymbol	Quote&Q	ABBC	false
+match	spreadsymbol	Quote&Q	*	true
+wildcard	spreadsymbol	Quote&Q	true
+match	spreadsymbol	Profile	AAPL	false
+match	spreadsymbol	Profile	MSFT	false
+match	spreadsymbol	Profile	A\u00e9	false
+match	spreadsymbol	Profile	A\ud83d\ude00	false
+match	spreadsymbol	Profile	ABC	false
+match	spreadsymbol	Profile	ABBC	false
+match	spreadsymbol	Profile	*	true
+wildcard	spreadsymbol	Profile	true
+match	cssymbol	Quote	AAPL	true
+match	cssymbol	Quote	MSFT	true
+match	cssymbol	Quote	A\u00e9	true
+match	cssymbol	Quote	A\ud83d\ude00	true
+match	cssymbol	Quote	ABC	true
+match	cssymbol	Quote	ABBC	true
+match	cssymbol	Quote	*	true
+wildcard	cssymbol	Quote	true
+match	cssymbol	Quote&Q	AAPL	true
+match	cssymbol	Quote&Q	MSFT	true
+match	cssymbol	Quote&Q	A\u00e9	true
+match	cssymbol	Quote&Q	A\ud83d\ude00	true
+match	cssymbol	Quote&Q	ABC	true
+match	cssymbol	Quote&Q	ABBC	true
+match	cssymbol	Quote&Q	*	true
+wildcard	cssymbol	Quote&Q	true
+match	cssymbol	Profile	AAPL	true
+match	cssymbol	Profile	MSFT	true
+match	cssymbol	Profile	A\u00e9	true
+match	cssymbol	Profile	A\ud83d\ude00	true
+match	cssymbol	Profile	ABC	true
+match	cssymbol	Profile	ABBC	true
+match	cssymbol	Profile	*	true
+wildcard	cssymbol	Profile	true
+match	csoptsymbol	Quote	AAPL	false
+match	csoptsymbol	Quote	MSFT	false
+match	csoptsymbol	Quote	A\u00e9	false
+match	csoptsymbol	Quote	A\ud83d\ude00	false
+match	csoptsymbol	Quote	ABC	false
+match	csoptsymbol	Quote	ABBC	false
+match	csoptsymbol	Quote	*	true
+wildcard	csoptsymbol	Quote	true
+match	csoptsymbol	Quote&Q	AAPL	false
+match	csoptsymbol	Quote&Q	MSFT	false
+match	csoptsymbol	Quote&Q	A\u00e9	false
+match	csoptsymbol	Quote&Q	A\ud83d\ude00	false
+match	csoptsymbol	Quote&Q	ABC	false
+match	csoptsymbol	Quote&Q	ABBC	false
+match	csoptsymbol	Quote&Q	*	true
+wildcard	csoptsymbol	Quote&Q	true
+match	csoptsymbol	Profile	AAPL	false
+match	csoptsymbol	Profile	MSFT	false
+match	csoptsymbol	Profile	A\u00e9	false
+match	csoptsymbol	Profile	A\ud83d\ude00	false
+match	csoptsymbol	Profile	ABC	false
+match	csoptsymbol	Profile	ABBC	false
+match	csoptsymbol	Profile	*	true
+wildcard	csoptsymbol	Profile	true
+match	bsoptsymbol	Quote	AAPL	false
+match	bsoptsymbol	Quote	MSFT	false
+match	bsoptsymbol	Quote	A\u00e9	false
+match	bsoptsymbol	Quote	A\ud83d\ude00	false
+match	bsoptsymbol	Quote	ABC	false
+match	bsoptsymbol	Quote	ABBC	false
+match	bsoptsymbol	Quote	*	true
+wildcard	bsoptsymbol	Quote	true
+match	bsoptsymbol	Quote&Q	AAPL	false
+match	bsoptsymbol	Quote&Q	MSFT	false
+match	bsoptsymbol	Quote&Q	A\u00e9	false
+match	bsoptsymbol	Quote&Q	A\ud83d\ude00	false
+match	bsoptsymbol	Quote&Q	ABC	false
+match	bsoptsymbol	Quote&Q	ABBC	false
+match	bsoptsymbol	Quote&Q	*	true
+wildcard	bsoptsymbol	Quote&Q	true
+match	bsoptsymbol	Profile	AAPL	false
+match	bsoptsymbol	Profile	MSFT	false
+match	bsoptsymbol	Profile	A\u00e9	false
+match	bsoptsymbol	Profile	A\ud83d\ude00	false
+match	bsoptsymbol	Profile	ABC	false
+match	bsoptsymbol	Profile	ABBC	false
+match	bsoptsymbol	Profile	*	true
+wildcard	bsoptsymbol	Profile	true
+match	futoptsymbol	Quote	AAPL	false
+match	futoptsymbol	Quote	MSFT	false
+match	futoptsymbol	Quote	A\u00e9	false
+match	futoptsymbol	Quote	A\ud83d\ude00	false
+match	futoptsymbol	Quote	ABC	false
+match	futoptsymbol	Quote	ABBC	false
+match	futoptsymbol	Quote	*	true
+wildcard	futoptsymbol	Quote	true
+match	futoptsymbol	Quote&Q	AAPL	false
+match	futoptsymbol	Quote&Q	MSFT	false
+match	futoptsymbol	Quote&Q	A\u00e9	false
+match	futoptsymbol	Quote&Q	A\ud83d\ude00	false
+match	futoptsymbol	Quote&Q	ABC	false
+match	futoptsymbol	Quote&Q	ABBC	false
+match	futoptsymbol	Quote&Q	*	true
+wildcard	futoptsymbol	Quote&Q	true
+match	futoptsymbol	Profile	AAPL	false
+match	futoptsymbol	Profile	MSFT	false
+match	futoptsymbol	Profile	A\u00e9	false
+match	futoptsymbol	Profile	A\ud83d\ude00	false
+match	futoptsymbol	Profile	ABC	false
+match	futoptsymbol	Profile	ABBC	false
+match	futoptsymbol	Profile	*	true
+wildcard	futoptsymbol	Profile	true
+match	indsymbol	Quote	AAPL	false
+match	indsymbol	Quote	MSFT	false
+match	indsymbol	Quote	A\u00e9	false
+match	indsymbol	Quote	A\ud83d\ude00	false
+match	indsymbol	Quote	ABC	false
+match	indsymbol	Quote	ABBC	false
+match	indsymbol	Quote	*	true
+wildcard	indsymbol	Quote	true
+match	indsymbol	Quote&Q	AAPL	false
+match	indsymbol	Quote&Q	MSFT	false
+match	indsymbol	Quote&Q	A\u00e9	false
+match	indsymbol	Quote&Q	A\ud83d\ude00	false
+match	indsymbol	Quote&Q	ABC	false
+match	indsymbol	Quote&Q	ABBC	false
+match	indsymbol	Quote&Q	*	true
+wildcard	indsymbol	Quote&Q	true
+match	indsymbol	Profile	AAPL	false
+match	indsymbol	Profile	MSFT	false
+match	indsymbol	Profile	A\u00e9	false
+match	indsymbol	Profile	A\ud83d\ude00	false
+match	indsymbol	Profile	ABC	false
+match	indsymbol	Profile	ABBC	false
+match	indsymbol	Profile	*	true
+wildcard	indsymbol	Profile	true
+match	prodsymbol	Quote	AAPL	false
+match	prodsymbol	Quote	MSFT	false
+match	prodsymbol	Quote	A\u00e9	false
+match	prodsymbol	Quote	A\ud83d\ude00	false
+match	prodsymbol	Quote	ABC	false
+match	prodsymbol	Quote	ABBC	false
+match	prodsymbol	Quote	*	true
+wildcard	prodsymbol	Quote	true
+match	prodsymbol	Quote&Q	AAPL	false
+match	prodsymbol	Quote&Q	MSFT	false
+match	prodsymbol	Quote&Q	A\u00e9	false
+match	prodsymbol	Quote&Q	A\ud83d\ude00	false
+match	prodsymbol	Quote&Q	ABC	false
+match	prodsymbol	Quote&Q	ABBC	false
+match	prodsymbol	Quote&Q	*	true
+wildcard	prodsymbol	Quote&Q	true
+match	prodsymbol	Profile	AAPL	false
+match	prodsymbol	Profile	MSFT	false
+match	prodsymbol	Profile	A\u00e9	false
+match	prodsymbol	Profile	A\ud83d\ude00	false
+match	prodsymbol	Profile	ABC	false
+match	prodsymbol	Profile	ABBC	false
+match	prodsymbol	Profile	*	true
+wildcard	prodsymbol	Profile	true
+match	fxsymbol	Quote	AAPL	false
+match	fxsymbol	Quote	MSFT	false
+match	fxsymbol	Quote	A\u00e9	false
+match	fxsymbol	Quote	A\ud83d\ude00	false
+match	fxsymbol	Quote	ABC	false
+match	fxsymbol	Quote	ABBC	false
+match	fxsymbol	Quote	*	true
+wildcard	fxsymbol	Quote	true
+match	fxsymbol	Quote&Q	AAPL	false
+match	fxsymbol	Quote&Q	MSFT	false
+match	fxsymbol	Quote&Q	A\u00e9	false
+match	fxsymbol	Quote&Q	A\ud83d\ude00	false
+match	fxsymbol	Quote&Q	ABC	false
+match	fxsymbol	Quote&Q	ABBC	false
+match	fxsymbol	Quote&Q	*	true
+wildcard	fxsymbol	Quote&Q	true
+match	fxsymbol	Profile	AAPL	false
+match	fxsymbol	Profile	MSFT	false
+match	fxsymbol	Profile	A\u00e9	false
+match	fxsymbol	Profile	A\ud83d\ude00	false
+match	fxsymbol	Profile	ABC	false
+match	fxsymbol	Profile	ABBC	false
+match	fxsymbol	Profile	*	true
+wildcard	fxsymbol	Profile	true
+match	hash0of2	Quote	AAPL	false
+match	hash0of2	Quote	MSFT	false
+match	hash0of2	Quote	A\u00e9	true
+match	hash0of2	Quote	A\ud83d\ude00	true
+match	hash0of2	Quote	ABC	false
+match	hash0of2	Quote	ABBC	false
+match	hash0of2	Quote	*	true
+wildcard	hash0of2	Quote	true
+match	hash0of2	Quote&Q	AAPL	false
+match	hash0of2	Quote&Q	MSFT	false
+match	hash0of2	Quote&Q	A\u00e9	true
+match	hash0of2	Quote&Q	A\ud83d\ude00	true
+match	hash0of2	Quote&Q	ABC	false
+match	hash0of2	Quote&Q	ABBC	false
+match	hash0of2	Quote&Q	*	true
+wildcard	hash0of2	Quote&Q	true
+match	hash0of2	Profile	AAPL	false
+match	hash0of2	Profile	MSFT	false
+match	hash0of2	Profile	A\u00e9	true
+match	hash0of2	Profile	A\ud83d\ude00	true
+match	hash0of2	Profile	ABC	false
+match	hash0of2	Profile	ABBC	false
+match	hash0of2	Profile	*	true
+wildcard	hash0of2	Profile	true
+match	hash1of2	Quote	AAPL	true
+match	hash1of2	Quote	MSFT	true
+match	hash1of2	Quote	A\u00e9	false
+match	hash1of2	Quote	A\ud83d\ude00	false
+match	hash1of2	Quote	ABC	true
+match	hash1of2	Quote	ABBC	true
+match	hash1of2	Quote	*	true
+wildcard	hash1of2	Quote	true
+match	hash1of2	Quote&Q	AAPL	true
+match	hash1of2	Quote&Q	MSFT	true
+match	hash1of2	Quote&Q	A\u00e9	false
+match	hash1of2	Quote&Q	A\ud83d\ude00	false
+match	hash1of2	Quote&Q	ABC	true
+match	hash1of2	Quote&Q	ABBC	true
+match	hash1of2	Quote&Q	*	true
+wildcard	hash1of2	Quote&Q	true
+match	hash1of2	Profile	AAPL	true
+match	hash1of2	Profile	MSFT	true
+match	hash1of2	Profile	A\u00e9	false
+match	hash1of2	Profile	A\ud83d\ude00	false
+match	hash1of2	Profile	ABC	true
+match	hash1of2	Profile	ABBC	true
+match	hash1of2	Profile	*	true
+wildcard	hash1of2	Profile	true
+invalid	hash0of1	com.devexperts.qd.kit.FilterSyntaxException
+match	range-A-M-	Quote	AAPL	true
+match	range-A-M-	Quote	MSFT	false
+match	range-A-M-	Quote	A\u00e9	true
+match	range-A-M-	Quote	A\ud83d\ude00	true
+match	range-A-M-	Quote	ABC	true
+match	range-A-M-	Quote	ABBC	true
+match	range-A-M-	Quote	*	true
+wildcard	range-A-M-	Quote	true
+match	range-A-M-	Quote&Q	AAPL	true
+match	range-A-M-	Quote&Q	MSFT	false
+match	range-A-M-	Quote&Q	A\u00e9	true
+match	range-A-M-	Quote&Q	A\ud83d\ude00	true
+match	range-A-M-	Quote&Q	ABC	true
+match	range-A-M-	Quote&Q	ABBC	true
+match	range-A-M-	Quote&Q	*	true
+wildcard	range-A-M-	Quote&Q	true
+match	range-A-M-	Profile	AAPL	true
+match	range-A-M-	Profile	MSFT	false
+match	range-A-M-	Profile	A\u00e9	true
+match	range-A-M-	Profile	A\ud83d\ude00	true
+match	range-A-M-	Profile	ABC	true
+match	range-A-M-	Profile	ABBC	true
+match	range-A-M-	Profile	*	true
+wildcard	range-A-M-	Profile	true
+match	range---	Quote	AAPL	true
+match	range---	Quote	MSFT	true
+match	range---	Quote	A\u00e9	true
+match	range---	Quote	A\ud83d\ude00	true
+match	range---	Quote	ABC	true
+match	range---	Quote	ABBC	true
+match	range---	Quote	*	true
+wildcard	range---	Quote	true
+match	range---	Quote&Q	AAPL	true
+match	range---	Quote&Q	MSFT	true
+match	range---	Quote&Q	A\u00e9	true
+match	range---	Quote&Q	A\ud83d\ude00	true
+match	range---	Quote&Q	ABC	true
+match	range---	Quote&Q	ABBC	true
+match	range---	Quote&Q	*	true
+wildcard	range---	Quote&Q	true
+match	range---	Profile	AAPL	true
+match	range---	Profile	MSFT	true
+match	range---	Profile	A\u00e9	true
+match	range---	Profile	A\ud83d\ude00	true
+match	range---	Profile	ABC	true
+match	range---	Profile	ABBC	true
+match	range---	Profile	*	true
+wildcard	range---	Profile	true
+invalid	range-Z-A-	com.devexperts.qd.kit.FilterSyntaxException
+correlation	A&B	A	false
+correlation	A&B	B	false
+correlation	A&B	C	false
+correlation	A&B	ALL	false
+correlation	A&!A	A	false
+correlation	A&!A	B	false
+correlation	A&!A	C	false
+correlation	A&!A	ALL	false
+correlation	A*&!A*	A	false
+correlation	A*&!A*	B	false
+correlation	A*&!A*	C	false
+correlation	A*&!A*	ALL	true
+correlation	(A,B)&!A&!B	A	false
+correlation	(A,B)&!A&!B	B	false
+correlation	(A,B)&!A&!B	C	false
+correlation	(A,B)&!A&!B	ALL	false
+category	String	AAPL	true	composite
+category	String	AAPL&Q	true	regional
+category	String	AAPL&N	true	composite
+category	String	*	false	null
+category	String	*A	false	null
+category	WildcardSymbol	*	true	regional
+category	IndexedEventSubscriptionSymbol	AAPL&Q{source=DEFAULT}	true	regional
+category	TimeSeriesSubscriptionSymbol	AAPL&Q{fromTimeMillis=123}	false	null
+event	AAPL	true	composite
+event	AAPL&Q	true	regional
+event	AAPL&N	true	composite
+event	*	true	composite
+event	*A	true	composite
+static-tracker	false	true
+text-event-error	TextMessage	<null>	null	java.lang.NullPointerException
+text-event-error	TextConfiguration	<null>	null	java.lang.NullPointerException
+text-event-error	TextMessage	<null>	empty	java.lang.NullPointerException
+text-event-error	TextConfiguration	<null>	empty	java.lang.NullPointerException
+text-event-error	TextMessage	<null>	body	java.lang.NullPointerException
+text-event-error	TextConfiguration	<null>	body	java.lang.NullPointerException
+text-event	TextMessage		null	true	message
+text-event	TextConfiguration		null	true	configuration
+text-event	TextMessage		empty	true	message
+text-event	TextConfiguration		empty	true	configuration
+text-event	TextMessage		body	true	message
+text-event	TextConfiguration		body	true	configuration
+text-event	TextMessage	TOPIC	null	true	message
+text-event	TextConfiguration	TOPIC	null	true	configuration
+text-event	TextMessage	TOPIC	empty	true	message
+text-event	TextConfiguration	TOPIC	empty	true	configuration
+text-event	TextMessage	TOPIC	body	true	message
+text-event	TextConfiguration	TOPIC	body	true	configuration
+text-event	TextMessage	TOPIC&Q	null	true	decorated
+text-event	TextConfiguration	TOPIC&Q	null	true	decorated
+text-event	TextMessage	TOPIC&Q	empty	true	decorated
+text-event	TextConfiguration	TOPIC&Q	empty	true	decorated
+text-event	TextMessage	TOPIC&Q	body	true	decorated
+text-event	TextConfiguration	TOPIC&Q	body	true	decorated
+text-event	TextMessage	*	null	true	decorated
+text-event	TextConfiguration	*	null	true	decorated
+text-event	TextMessage	*	empty	true	decorated
+text-event	TextConfiguration	*	empty	true	decorated
+text-event	TextMessage	*	body	true	decorated
+text-event	TextConfiguration	*	body	true	decorated
+text-event	TextMessage	*A	null	true	message
+text-event	TextConfiguration	*A	null	true	configuration
+text-event	TextMessage	*A	empty	true	message
+text-event	TextConfiguration	*A	empty	true	configuration
+text-event	TextMessage	*A	body	true	message
+text-event	TextConfiguration	*A	body	true	configuration
+text-event-error	TextMessage	<null>	default	java.lang.NullPointerException
+text-event-error	TextConfiguration	<null>	default	java.lang.NullPointerException
+text-null-model	java.lang.NullPointerException
+text-subscription	TextMessage	plain	true	decorated
+text-subscription	TextConfiguration	plain	true	decorated
+text-subscription	TextMessage	indexed0	true	decorated
+text-subscription	TextConfiguration	indexed0	true	decorated
+text-subscription	TextMessage	indexed1	false	null
+text-subscription	TextConfiguration	indexed1	false	null
+text-subscription	TextMessage	indexed-negative	true	decorated
+text-subscription	TextConfiguration	indexed-negative	true	decorated
+text-subscription	TextMessage	time-series	false	null
+text-subscription	TextConfiguration	time-series	false	null
+text-subscription	TextMessage	all	true	decorated
+text-subscription	TextConfiguration	all	true	decorated
+text-subscription	TextMessage	star	false	null
+text-subscription	TextConfiguration	star	false	null
+text-subscription	TextMessage	star-prefix	false	null
+text-subscription	TextConfiguration	star-prefix	false	null

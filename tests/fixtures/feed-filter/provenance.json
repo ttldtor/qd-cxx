@@ -1,0 +1,140 @@
+{
+  "revision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "javaVersion": "openjdk version \"1.8.0_422\"",
+  "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
+  "javacSha256": "633143e961aa18051c09112b85333f5cdbd845b54eb39678eb15b91ca8bbb527",
+  "harnessSha256": "24f6397bf2da92228d5025aa3dbe1fac018ede85abd2e8d5c48fd7688fe809d4",
+  "launcherSha256": "27c7c2863ed740fccfc58ce3377fbc2909c46d505ca873bbfe391d2bb728c503",
+  "upstreamSources": [
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/misc/TextMessage.java",
+      "sha256": "88586609f8c89be3b3a7c8692c916e9086d344128bc786e1f5fcd00f82cda75f"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/misc/TextConfiguration.java",
+      "sha256": "b090a9222b191cd56260a89ef557a59f3acfb36c8d85a0bee6b1bacb3f8c20ce"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/misc/TextMessageDelegate.java",
+      "sha256": "3f7285df09b6cda649310575bfba518d505a315a443e7a4581207e023639f0af"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/misc/TextConfigurationDelegate.java",
+      "sha256": "39223e4505c693e6f967a69f85dcb26910bd79baa1bc6393af755fc903f57d65"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/misc/MiscFactoryImpl.java",
+      "sha256": "8f67bbe7bc62d6bf7432ea199ec53e4a9b8d82001ac39bba0e2301b08d0f65b4"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/ng/RecordMapping.java",
+      "sha256": "f2871d535918a418d97b6bc4a6afe920cd83f2a35a076f17d2a1ddcb7fd27515"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/kit/CompositeFilters.java",
+      "sha256": "454ccf1eedf48f003eb0595fcf34eb3520d5bec32127d32d689207af0c75ed4b"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/kit/PatternFilter.java",
+      "sha256": "e1c05887631596af70149eaa7ea06b834d940386bd83175d4df327a727835e7a"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/kit/NotFilter.java",
+      "sha256": "5a9027504032afe138d6b8f06fef8a20faff0b51d05481a9e0fae4878beca8ec"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/kit/HashFilter.java",
+      "sha256": "5984fd80ccdd2d20e24e46153db234f2bfc2a9bac388a247604a343b75cb4a03"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/kit/HashStriper.java",
+      "sha256": "7cdd8f865f52bb4806ecfdf085fa7476f197e649d04b56e776eb0ae015009361"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/kit/RangeFilter.java",
+      "sha256": "38558693ba973f8005e9c9fc56b4081f5378384efa1c519897d9346e9e6ecb73"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/kit/RangeUtil.java",
+      "sha256": "c4b1be20f6062270ea74cd2aa785790bd37189d0bee7846d7dabec02f2527670"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/api/DXFeedFilter.java",
+      "sha256": "b9fb8380b62d01651d6604393b2a20e6be65cd70eb9c6c2e4d093dcf4ef29a71"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/api/impl/DXFeedFilterImpl.java",
+      "sha256": "dca341053561ae95cb16cba738fb73be36347385dfbaf989cd62d09cd535ec6e"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/api/impl/DXFeedFilterTrackerImpl.java",
+      "sha256": "cf34535e527f5deb875694f7310f5e0e79fa9fa99caae62135e1e6d0025d2e24"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/api/impl/FilterFactoryImpl.java",
+      "sha256": "dd0374607461c01fd46c106c82b22ca7a4405999f896b181af81cac412859e97"
+    },
+    {
+      "path": "dxfeed-ipf-filter/src/main/java/com/dxfeed/ipf/filter/IPFSymbolFilter.java",
+      "sha256": "a93f84dc7984dee73f32da3ccf1eccf48ad4fcebc01e5a65b8d2abc9c5fd05f7"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/api/osub/IndexedEventSubscriptionSymbol.java",
+      "sha256": "f847a984bee45a4070ee2c9539209f6c66afdf5f8dc24d7cd78e7ddce93984e9"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/api/osub/TimeSeriesSubscriptionSymbol.java",
+      "sha256": "98ccbcb5d20e47e219f17cd3797ea83fc033484a8e05349dff9d847df5d0e229"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/api/osub/WildcardSymbol.java",
+      "sha256": "ed51fe4be958afa975c42bf1933a104dd9f22ebb1c756f44dad33aac3e74567f"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/IndexedEventSource.java",
+      "sha256": "5b2df5fd210f02e641188dcf657b65e11a6d1d042203d47c8bad43559c9e61ea"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/OrderSource.java",
+      "sha256": "3b0d0b0e83f685efd688b87dba479003a76d9ad69097867326b74206dc3a2a45"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/api/impl/DXFeedImpl.java",
+      "sha256": "7402a8be3bb5deaa84fc907c6b69bc91d0ec58d1883bf3c97b8260b1d1017caf"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/api/impl/EventDelegate.java",
+      "sha256": "5e6c90ed4115f57708d01f697dedcdc6bc168e41d254b6e245516feb073f5593"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/api/impl/EventDelegateSet.java",
+      "sha256": "50d60da8d08b8c6308bf60d4fe9a05b64361d3d62e7b4c954e19e53c005bc3f0"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/MarketEventDelegateSet.java",
+      "sha256": "9e24ece8e776e917ac8ac252294e19e22a8262fb6779bd48cf4bb9f9f51b7867"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/SourceBasedDelegateSet.java",
+      "sha256": "a237613ab0cc2b34e7cbe6cc3ac6c8a6a712190fe89ffc194253d91b0274e9de"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/MarketFactoryImpl.java",
+      "sha256": "c74b324b2f99d2a351963fead08419c2ba1d92573c633d30740295acc9d0bac4"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/util/TimeSequenceUtil.java",
+      "sha256": "ee1fc453383b8b978693475e80fa22f89ef70b947db637a417e66895f70a8596"
+    },
+    {
+      "path": "dxlib/src/main/java/com/devexperts/util/TimeUtil.java",
+      "sha256": "3aeba61ca5d1c6580ae7915be0b4d4cacf3264a0e907345b85da726a529dfbc3"
+    }
+  ],
+  "productionClassFiles": 1290,
+  "productionResourceFiles": 27,
+  "productionClassInventorySha256": "90a478b5d3737246d8c897322c9f9db60887846e20117572588e05ae78fbc6d8",
+  "fixtureSha256": "64d13237e91cd3ea4e04547bdd85822089c0bcf7f93bc633e5dc765e459883d4",
+  "rows": 1411,
+  "timezoneInvariant": true
+}

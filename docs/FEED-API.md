@@ -446,3 +446,15 @@ See [Summary](../spec/events/SUMMARY.md) for all fields, defaults and regional O
 Owning `SubscriptionSelector` and `addSelectors`/`setSelectors`/`removeSelector` preserve typed kind/source identity separately from physical demand. Current five market types ignore IES source ID as production Java does; typed Feed TSS is atomically unsupported. `EndpointOptions::enableWildcard=true` permits explicit All only for STREAM and is disabled by default. Literal leading-star text does not enable wildcard; existing string/Candle APIs remain plain exact. [Complete contract, example, finite storage and known-binding source adapter and time value conversion](../spec/subscriptions/DECORATED-SELECTORS.md).
 
 TextMessage requires a STREAM endpoint. TextConfiguration uses STREAM or TICKER; its nullable owning text and version policy are specified in [Text events](../spec/events/TEXT-EVENTS.md).
+
+## Accepted subscription observations and query classifiers
+
+`getSnapshot()` copies one complete accepted desired revision, exact typed logical selectors and the immutable normalized event-type set. The result survives mutation and runtime retirement. `getEventTypes()` and `containsEventType()` inspect that immutable set. An accepted revision is separate from worker application, physical demand and peer acknowledgement.
+
+`addChangeListener()` reports initial nonempty state and committed REMOVED/ADDED phases. Replacement removes before adding at one revision. Callbacks borrow their arguments; copy `change.snapshot` or its selectors to retain independent values. They run outside control locks. Reentry and concurrent calls use finite after-return continuation, including between runtimes and from a complete selected data callback. No caller polling, queue management or network progress is required.
+
+Observer exceptions are advisory through `getChangeDiagnostic()`; event-listener failure policy is unchanged. `close()` remains a nonblocking fence. Actual worker retirement or creator `closeAndAwaitTermination()` delivers terminal CLOSED and includes selected callbacks and capture destruction. Read the exact [observation/lifetime/budget contract](../spec/subscriptions/OBSERVABLE-SUBSCRIPTIONS.md) before depending on native timing differences from Java.
+
+`Endpoint::createFilter(orderedCategories, context)` builds an independent classifier using the endpoint's actual registry and delivery contract; an advanced builder also accepts an explicit registry and finite limits. It changes no subscription demand. The optional context is supplied once for explicit resource capabilities. [Filter queries, categories, trackers and IPF source ownership](FEED-FILTERS.md) describe their separate lifetimes and optional backend.
+
+The installed/relocated [public consumer](../tests/conformance/subscription_observer_consumer/CMakeLists.txt) builds only against `find_package(qdcxx CONFIG REQUIRED COMPONENTS feed)` and `qdcxx::feed`. It includes each public header independently and exercises detached snapshots, callback phases, classifier queries, refusal and offline retirement without private headers or source paths.

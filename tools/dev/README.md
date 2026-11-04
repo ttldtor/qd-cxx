@@ -339,3 +339,6 @@ The [event-text oracle](../upstream/event-text-oracle/README.md) captures/verifi
 The [production selector oracle](../upstream/selector-oracle/README.md) checks pinned Java8 typed identity, source/regional/wildcard delegate demand and signed time bounds. Noargs/ENRU/Get-Help needs no inputs and starts no Java; four operational paths, heap128MiB/60s, fresh evidence and Capture/Verify are documented with the tool.
 
 The [serialized attachment oracle](../upstream/attachment-oracle/README.md) captures/verifies actual Message/Configuration standard-record bodies and Java Object access separately. Input-free EN/RU help starts no Java; bounded Capture/Verify retains exact class/resource inventories and raw wire/tape fixtures.
+
+- [Subscription observer oracle](../upstream/subscription-observer-oracle/README.md): actual pinned production introspection/change callbacks, reentry/exception traces, bounded capture/verify and no-input EN/RU help.
+- [Feed filter oracles](../upstream/feed-filter-oracle/README.md): QD grammar/classifier, IPF identity/update and source-config production witnesses with finite resources, immutable class inventories and no-input EN/RU help.

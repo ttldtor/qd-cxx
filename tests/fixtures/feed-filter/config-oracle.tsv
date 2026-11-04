@@ -1,0 +1,54 @@
+period	0	0
+period	0s	0
+period	1	1000
+period	1s	1000
+period	1d	86400000
+period	1h	3600000
+period	1m	60000
+period	P1DT2H3M4.005S	93784005
+period	PT0.0004S	0
+period	PT0.0005S	1
+period	PT0.0015S	2
+period	1.9995	2000
+period	.5	500
+period	1.	1000
+period	inf	9223372036854775807
+period	INF	9223372036854775807
+period	U0130nf	9223372036854775807
+period	U0131nf	9223372036854775807
+period	1U017f	1000
+period	U0661D	86400000
+period	Uff11H	3600000
+period-invalid	-1	com.devexperts.util.InvalidFormatException
+period-invalid	P	com.devexperts.util.InvalidFormatException
+period-invalid	PT	com.devexperts.util.InvalidFormatException
+period-invalid	1T	com.devexperts.util.InvalidFormatException
+period-invalid	1ms	com.devexperts.util.InvalidFormatException
+period-invalid	1w	com.devexperts.util.InvalidFormatException
+period	2147483647D	185542587100800000
+period-invalid	2147483648D	com.devexperts.util.InvalidFormatException
+period	9223372036854775.807s	9223372036854775807
+period	9223372036854775807	9223372036854775807
+period-invalid	 1s	com.devexperts.util.InvalidFormatException
+period-invalid	1s 	com.devexperts.util.InvalidFormatException
+period-invalid	NaN	com.devexperts.util.InvalidFormatException
+config	0	ipf	fixture	0	<null>
+config	1	ipf	fixture	86400000	<null>
+config	2	ipf	fixture	1	<null>
+config	3	ipf	fixture	1000	<null>
+config	4	ipf	fi,xture	1000	<null>
+config	5	ipf	fixture	1000	
+config-invalid	6	com.devexperts.qd.kit.FilterSyntaxException
+config-invalid	7	com.devexperts.qd.kit.FilterSyntaxException
+config	8	ipf	fixture	2000	<null>
+config-invalid	9	com.devexperts.qd.util.InvalidFormatException
+config-invalid	10	com.devexperts.util.InvalidFormatException
+config-invalid	11	com.devexperts.util.InvalidFormatException
+config	12	ipf	fixture	1000	<null>
+config	13	ipf	fixture	1000	<null>
+config-invalid	14	com.devexperts.util.InvalidFormatException
+config	15	ipf	fixture	1000	X(a=b)
+config	16	ipf	fixture	1000	[x,y]
+config	17	ipf	fixture	1000	
+config	18	ipf	fixture	1000	X(a=\\,b)
+config-invalid	19	com.devexperts.qd.util.InvalidFormatException

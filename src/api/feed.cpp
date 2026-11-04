@@ -1,10 +1,12 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/api/feed.hpp"
+#include "qd/api/feed_filter.hpp"
 
 #include "../transport/tcp_recovery_factory.hpp"
 #include "feed_internal.hpp"
 #include "receiving_profile.hpp"
+#include "subscription_observer.hpp"
 #include "system_dns.hpp"
 
 #include <algorithm>
@@ -386,7 +388,7 @@ StateWaitResult<State> awaitCurrentState(std::shared_ptr<Port> port, State targe
         reject(ErrorCode::WRONG_THREAD, "state-await-thread");
     }
 
-    if (retirementFrame) {
+    if (retirementFrame || detail::subscriptionObserverCallbackActive()) {
         reject(ErrorCode::INVALID_STATE, "state-await-retirement-reentry");
     }
 
@@ -440,19 +442,18 @@ StateWaitResult<State> awaitCurrentState(std::shared_ptr<Port> port, State targe
  */
 bool retireSubscription(const std::shared_ptr<detail::SubscriptionPort> &port) noexcept {
     port->closeRequested.store(true, std::memory_order_release);
+    detail::closeSubscriptionObservers(port);
     observeState(port, SubscriptionState::CLOSING);
     std::shared_ptr<const detail::ListenerSnapshot> listeners;
-    std::vector<SubscriptionSelector> symbols;
     {
         std::lock_guard lock(port->mutex);
         listeners = std::move(port->listeners);
-        symbols = std::move(port->symbols);
     }
 
     listeners.reset();
-    symbols.clear();
 
-    if (port->listenerLedger->count.load(std::memory_order_acquire) != 0) {
+    if (port->listenerLedger->count.load(std::memory_order_acquire) != 0 ||
+        port->observers.ledger->count.load(std::memory_order_acquire) != 0) {
         return false;
     }
 
@@ -572,6 +573,7 @@ bool capturesRetired(const detail::EndpointPort &port) noexcept {
         std::lock_guard lock(subscription->mutex);
 
         return subscription->listenerLedger->count.load(std::memory_order_acquire) == 0 &&
+               subscription->observers.ledger->count.load(std::memory_order_acquire) == 0 &&
                (subscription->stateListeners.snapshot ||
                 subscription->stateListeners.ledger->count.load(std::memory_order_acquire) == 0);
     });
@@ -862,6 +864,7 @@ void mutateDesired(const std::shared_ptr<detail::SubscriptionPort> &port, std::s
         }
 
         {
+            detail::SubscriptionObserverAdmission admission(port->changes);
             std::lock_guard lock(port->mutex);
             requireOpen(*port);
             std::vector<SubscriptionSelector> candidate;
@@ -890,8 +893,10 @@ void mutateDesired(const std::shared_ptr<detail::SubscriptionPort> &port, std::s
             }
 
             const bool unchanged =
-                std::ranges::equal(candidate, port->symbols, [](const auto &left, const auto &right) {
-                    return left.sameDemand(right);
+                candidate.size() == port->symbols.size() && std::ranges::all_of(candidate, [&](const auto &symbol) {
+                    const auto previous = std::ranges::find(port->symbols, symbol);
+
+                    return previous != port->symbols.end() && symbol.sameDemand(*previous);
                 });
 
             if (!unchanged) {
@@ -899,12 +904,14 @@ void mutateDesired(const std::shared_ptr<detail::SubscriptionPort> &port, std::s
                     reject(ErrorCode::RESOURCE_LIMIT, "subscription-revision");
                 }
 
+                detail::prepareSubscriptionChangeLocked(*port, candidate, port->revision + 1);
                 port->symbols.swap(candidate);
                 ++port->revision;
             }
         }
 
         wake(port->control);
+        detail::dispatchSubscriptionChanges(port->changes);
     });
 }
 
@@ -1087,6 +1094,43 @@ template <class Event>
 Subscription<Event>::Subscription(std::shared_ptr<detail::SubscriptionPort> port) noexcept : port_(std::move(port)) {
 }
 
+template <class Event> SubscriptionSnapshot Subscription<Event>::getSnapshot() const {
+    return producerAction([&] {
+        std::lock_guard lock(port_->mutex);
+
+        return detail::subscriptionSnapshotLocked(*port_);
+    });
+}
+
+template <class Event> std::vector<EventType> Subscription<Event>::getEventTypes() const {
+    return producerAction([&] {
+        return port_->eventTypes;
+    });
+}
+
+template <class Event> bool Subscription<Event>::containsEventType(EventType type) const noexcept {
+    return std::ranges::find(port_->eventTypes, type) != port_->eventTypes.end();
+}
+
+template <class Event>
+typename Subscription<Event>::ChangeListenerId Subscription<Event>::addChangeListener(ChangeListener listener) {
+    return producerAction([&] {
+        return detail::addSubscriptionObserver(port_, std::move(listener));
+    });
+}
+
+template <class Event> void Subscription<Event>::removeChangeListener(ChangeListenerId id) {
+    producerAction([&] {
+        detail::removeSubscriptionObserver(port_, id);
+    });
+}
+
+template <class Event> Diagnostic Subscription<Event>::getChangeDiagnostic() const noexcept {
+    std::lock_guard lock(port_->changes->mutex);
+
+    return port_->observers.diagnostic;
+}
+
 template <class Event>
 typename Subscription<Event>::StateChangeListenerId
 Subscription<Event>::addStateChangeListener(StateChangeListener listener) {
@@ -1235,6 +1279,7 @@ template <class Event> void Subscription<Event>::clearSymbols() {
 template <class Event> void Subscription<Event>::close() noexcept {
     if (port_) {
         port_->closeRequested.store(true, std::memory_order_release);
+        detail::closeSubscriptionObservers(port_, false);
         wake(port_->control);
     }
 }
@@ -1349,6 +1394,10 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
         subscription->control = port_->control;
         subscription->endpoint = port_;
         subscription->owner = port_->owner;
+        subscription->eventTypes.assign(types.begin(), types.end());
+        std::ranges::sort(subscription->eventTypes);
+        const auto uniqueTypes = std::ranges::unique(subscription->eventTypes);
+        subscription->eventTypes.erase(uniqueTypes.begin(), uniqueTypes.end());
         subscription->eventSelection = selection;
         subscription->eventDelivery = delivery;
         subscription->maximumSymbols = port_->limits.maximumSymbolsPerSubscription;
@@ -1359,6 +1408,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
         subscription->listenerLedger->endpoint = port_;
         subscription->listeners = std::make_shared<const detail::ListenerSnapshot>();
         subscription->stateListeners = makeStateListeners(port_, port_->limits.maximumStateListenersPerSubscription);
+        detail::initializeSubscriptionObservers(subscription, port_->limits);
         {
             std::lock_guard lock(port_->mutex);
 
@@ -1441,6 +1491,48 @@ Endpoint::~Endpoint() {
 
 std::shared_ptr<Feed> Endpoint::getFeed() const noexcept {
     return feed_;
+}
+
+FeedFilter Endpoint::createFilter(std::span<const FeedFilterCategory> categories,
+                                  std::shared_ptr<FeedFilterContext> context) const {
+    return producerAction([&] {
+        std::optional<EventRegistry> registry;
+        DeliveryContract contract;
+        {
+            std::lock_guard lock(port_->mutex);
+            registry = port_->options.eventRegistry;
+            contract = port_->options.contract;
+        }
+
+        if (!registry) {
+            EventRegistryWork work;
+            auto prepared = EventRegistry::builtIn({}, work);
+
+            if (!prepared) {
+                auto code = ErrorCode::UNSUPPORTED_PROFILE;
+
+                if (const auto *own = std::get_if<EventRegistryError>(&prepared.error().cause)) {
+                    code = *own == EventRegistryError::ALLOCATION_FAILURE ? ErrorCode::ALLOCATION_FAILURE
+                           : *own == EventRegistryError::WORK_LIMIT       ? ErrorCode::WORK_LIMIT
+                           : *own == EventRegistryError::RESOURCE_LIMIT   ? ErrorCode::RESOURCE_LIMIT
+                                                                          : ErrorCode::INVALID_ARGUMENT;
+                }
+
+                throw Error({code, "endpoint-filter-registry"});
+            }
+
+            registry = std::move(*prepared);
+        }
+
+        FeedFilter::Builder builder(std::move(*registry), contract);
+        builder.withResourceContext(std::move(context));
+
+        for (const auto &category : categories) {
+            builder.withCategory(category.name, category.expression);
+        }
+
+        return builder.build();
+    });
 }
 
 void Endpoint::connect(std::string_view address) {
@@ -1534,7 +1626,7 @@ CloseResult Endpoint::closeAndAwaitTermination() {
         reject(ErrorCode::WRONG_THREAD, "endpoint-await-thread");
     }
 
-    if (retirementReentered(port_.get())) {
+    if (retirementReentered(port_.get()) || detail::subscriptionObserverCallbackActive()) {
         reject(ErrorCode::INVALID_STATE, "endpoint-retirement-reentry");
     }
 
@@ -1680,6 +1772,7 @@ class TypedConsumer final : public client::SubscriptionConsumer {
             return mux::BatchAction::PAUSE;
         }
 
+        SubscriptionDataCallbackScope callbackScope(port_->changes);
         std::shared_ptr<const ListenerSnapshot> listeners;
         {
             // Endpoint-to-subscription order makes the whole selection atomic with producer source/clear fences.
@@ -2228,6 +2321,11 @@ RuntimeImpl::RuntimeImpl(transport::detail::BootstrapLease bootstrap, RuntimeOpt
     : bootstrap(std::move(bootstrap)), options(std::move(options)), control(std::make_shared<RuntimeControl>()) {
     control->owner = std::this_thread::get_id();
     control->endpoints.resize(this->options.maximumEndpoints);
+    control->changes = std::make_shared<SubscriptionChangeDomain>();
+    control->changes->ports.resize(this->options.maximumEndpoints * this->options.maximumSubscriptionsPerEndpoint);
+    control->changes->continuations.resize(this->options.maximumSubscriptionChangesPerTurn);
+    control->changes->maximumWork = this->options.maximumSubscriptionChangesPerTurn;
+    control->changes->remainingWork = control->changes->maximumWork;
     control->runtime = this;
 }
 
@@ -2270,7 +2368,7 @@ void RuntimeImpl::shutdown() {
         reject(ErrorCode::WRONG_THREAD, "runtime-await-thread");
     }
 
-    if (shutdownInProgress || retirementFrame) {
+    if (shutdownInProgress || retirementFrame || subscriptionObserverCallbackActive()) {
         reject(ErrorCode::INVALID_STATE, "runtime-retirement-reentry");
     }
 
@@ -2525,15 +2623,51 @@ RuntimeOptions prepareRuntimeOptions(RuntimeOptions options) {
         !options.maximumStateListenersPerEndpoint || !options.maximumStateListenersPerSubscription ||
         !options.maximumSymbolUnits || options.maximumSymbolUnits > 128 ||
         !options.maximumEventTypeArgumentsPerSubscription || !options.maximumPendingStateChangesPerEndpoint ||
-        options.dnsServers.size() > 4 || options.dnsPort == 0) {
+        !options.maximumChangeListenersPerSubscription || !options.maximumPendingSubscriptionChanges ||
+        !options.maximumSubscriptionChangesPerTurn || options.dnsServers.size() > 4 || options.dnsPort == 0) {
         reject(ErrorCode::INVALID_ARGUMENT, "runtime-options");
+    }
+
+    if (options.maximumEndpoints > std::numeric_limits<std::size_t>::max() / options.maximumSubscriptionsPerEndpoint /
+                                       sizeof(std::weak_ptr<detail::SubscriptionPort>) ||
+        options.maximumSubscriptionChangesPerTurn >
+            std::numeric_limits<std::size_t>::max() / sizeof(std::shared_ptr<detail::SubscriptionChangeDomain>) ||
+        options.maximumPendingSubscriptionChanges >
+            std::numeric_limits<std::size_t>::max() / sizeof(detail::SubscriptionChangePhase) ||
+        options.maximumChangeListenersPerSubscription >
+            std::numeric_limits<std::size_t>::max() / sizeof(detail::SubscriptionClosedSelection)) {
+        reject(ErrorCode::RESOURCE_LIMIT, "runtime-change-storage");
+    }
+
+    const auto observerPorts = options.maximumEndpoints * options.maximumSubscriptionsPerEndpoint;
+
+    if (options.maximumChangeListenersPerSubscription >
+        (std::numeric_limits<std::size_t>::max() - options.maximumSubscriptionChangesPerTurn) / observerPorts) {
+        reject(ErrorCode::RESOURCE_LIMIT, "runtime-change-leases");
     }
 
     constexpr std::size_t FRONTEND_SELECTOR_BANKS = 4; // Old, parsed, candidate and one conversion/retirement bank.
     const auto selectorBytes = sizeof(SubscriptionSelector) + (options.maximumSymbolUnits + 1) * sizeof(char16_t);
 
-    if (options.maximumSymbolsPerSubscription >
-        std::numeric_limits<std::size_t>::max() / selectorBytes / FRONTEND_SELECTOR_BANKS) {
+    constexpr std::size_t SELECTOR_BANKS_PER_CHANGE_FRAME = 3; // Snapshot, removed and added identities.
+    constexpr std::size_t PREPARING_CHANGE_FRAMES = 2;         // Current retained snapshot and one complete candidate.
+    const auto maximum = std::numeric_limits<std::size_t>::max();
+
+    if (options.maximumPendingSubscriptionChanges >
+        maximum - PREPARING_CHANGE_FRAMES - options.maximumChangeListenersPerSubscription) {
+        reject(ErrorCode::RESOURCE_LIMIT, "runtime-change-snapshots");
+    }
+
+    const auto frames = options.maximumPendingSubscriptionChanges + options.maximumChangeListenersPerSubscription +
+                        PREPARING_CHANGE_FRAMES;
+
+    if (frames > (maximum - FRONTEND_SELECTOR_BANKS) / SELECTOR_BANKS_PER_CHANGE_FRAME) {
+        reject(ErrorCode::RESOURCE_LIMIT, "runtime-change-snapshots");
+    }
+
+    const auto selectorBanks = FRONTEND_SELECTOR_BANKS + frames * SELECTOR_BANKS_PER_CHANGE_FRAME;
+
+    if (options.maximumSymbolsPerSubscription > maximum / selectorBytes / selectorBanks) {
         reject(ErrorCode::RESOURCE_LIMIT, "runtime-selector-storage");
     }
 
