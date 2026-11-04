@@ -2516,3 +2516,39 @@ TEST_CASE("public lifecycle inactive and terminal controls are idempotent withou
     CHECK(changes.snapshot() == before);
     checkStateOrder(before, api::EndpointState::NOT_CONNECTED, api::EndpointState::CLOSED);
 }
+
+TEST_CASE("public feed uses canonical Candle object identity in its atomic desired subscription map") {
+    auto options = runtimeOptions();
+    options.maximumSymbolsPerSubscription = 1;
+    api::ApiRuntime runtime(options);
+    auto endpoint = runtime.createEndpoint(endpointOptions());
+    auto subscription = endpoint->getFeed()->createSubscription<events::Quote>();
+    auto first = events::CandleSymbol::valueOf(u"AAPL&Q{=15Minutes,price=BID}");
+    auto equivalent = events::CandleSymbol::valueOf(u"AAPL&Q{=15m,price=bid}");
+    subscription->setSymbols({first, equivalent});
+    subscription->addSymbols("AAPL&Q{=15m,price=bid}");
+    CHECK(errorCode([&] {
+              subscription->addSymbols("OTHER");
+          }) == api::ErrorCode::RESOURCE_LIMIT);
+    auto invalid = events::CandleSymbol::valueOf(std::u16string{u'B', static_cast<char16_t>(0xd800)});
+    CHECK(errorCode([&] {
+              subscription->setSymbols({first, invalid});
+          }) == api::ErrorCode::INVALID_ARGUMENT);
+    CHECK(errorCode([&] {
+              subscription->addSymbols("OTHER");
+          }) == api::ErrorCode::RESOURCE_LIMIT);
+    auto nullSymbol = events::CandleSymbol::valueOf(std::nullopt);
+    CHECK(errorCode([&] {
+              subscription->setSymbols({nullSymbol});
+          }) == api::ErrorCode::INVALID_ARGUMENT);
+    CHECK(errorCode([&] {
+              subscription->removeSymbols(nullSymbol);
+          }) == api::ErrorCode::INVALID_ARGUMENT);
+    subscription->removeSymbols(equivalent);
+    subscription->addSymbols("OTHER");
+    subscription->setSymbols({});
+    subscription->addSymbols({first, equivalent});
+    subscription->removeSymbols(equivalent);
+    subscription->addSymbols("OTHER");
+    CHECK(endpoint->closeAndAwaitTermination().drained);
+}

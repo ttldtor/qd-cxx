@@ -97,7 +97,7 @@ target_include_directories(qdcxx_market_event_symbols PUBLIC "$<BUILD_INTERFACE:
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 target_compile_features(qdcxx_market_event_symbols PUBLIC cxx_std_23)
 set_target_properties(qdcxx_market_event_symbols PROPERTIES CXX_EXTENSIONS OFF)
-add_library(qdcxx_candle_values src/events/candle_period.cpp src/events/candle_attributes.cpp)
+add_library(qdcxx_candle_values src/events/candle_period.cpp src/events/candle_attributes.cpp src/events/candle_symbol.cpp)
 target_include_directories(qdcxx_candle_values PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 target_compile_features(qdcxx_candle_values PUBLIC cxx_std_23)
@@ -383,6 +383,13 @@ if(BUILD_TESTING)
         add_test(NAME order_source_capability_oracle_help COMMAND ${CMAKE_COMMAND}
             -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/order_source_capability_oracle_help.cmake")
     endif()
+    add_executable(qdcxx_candle_symbol_tests tests/conformance/candle_symbol_tests.cpp)
+    target_link_libraries(qdcxx_candle_symbol_tests PRIVATE qdcxx_candle_values doctest::doctest)
+    target_compile_definitions(qdcxx_candle_symbol_tests PRIVATE
+        ORG_TTLDTOR_QDCXX_CANDLE_SYMBOL_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/events/candle/symbol-oracle.tsv")
+    set_target_properties(qdcxx_candle_symbol_tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME candle_symbol_values COMMAND qdcxx_candle_symbol_tests)
+    set_tests_properties(candle_symbol_values PROPERTIES TIMEOUT 120)
     add_executable(qdcxx_candle_attributes_tests tests/conformance/candle_attributes_tests.cpp)
     target_link_libraries(qdcxx_candle_attributes_tests PRIVATE qdcxx_candle_values doctest::doctest)
     target_compile_definitions(qdcxx_candle_attributes_tests PRIVATE
@@ -399,6 +406,10 @@ if(BUILD_TESTING)
     set_tests_properties(candle_period_values PROPERTIES TIMEOUT 30)
     find_program(ORG_TTLDTOR_QDCXX_CANDLE_ORACLE_PWSH NAMES pwsh)
     if(ORG_TTLDTOR_QDCXX_CANDLE_ORACLE_PWSH)
+        add_test(NAME candle_symbol_oracle_help COMMAND "${CMAKE_COMMAND}"
+            "-DPOWERSHELL=${ORG_TTLDTOR_QDCXX_CANDLE_ORACLE_PWSH}" "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/candle_symbol_oracle_help.cmake")
+        set_tests_properties(candle_symbol_oracle_help PROPERTIES TIMEOUT 45)
         add_test(NAME candle_attributes_oracle_help COMMAND "${CMAKE_COMMAND}"
             "-DPOWERSHELL=${ORG_TTLDTOR_QDCXX_CANDLE_ORACLE_PWSH}" "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/candle_attributes_oracle_help.cmake")

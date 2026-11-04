@@ -855,6 +855,61 @@ void mutateSymbols(const std::shared_ptr<detail::SubscriptionPort> &port, std::s
     });
 }
 
+/** Convert a bounded unique canonical object set before entering the existing atomic producer path.
+ * @param port Detached producer owner with immutable limits.
+ * @param inputs Borrowed immutable Candle values; no input view survives this call.
+ * @param mutation Complete desired transformation.
+ */
+void mutateCandleSymbols(const std::shared_ptr<detail::SubscriptionPort> &port,
+                         std::span<const events::CandleSymbol> inputs, SymbolMutation mutation) {
+    producerAction([&] {
+        std::vector<std::string> owned;
+        owned.reserve(std::min(inputs.size(), port->maximumSymbols));
+
+        for (const auto &input : inputs) {
+            auto text = input.getSymbol();
+
+            if (!text || text->empty() || text->size() > port->maximumSymbolUnits || text->front() == u'*' ||
+                !std::ranges::all_of(*text, [](char16_t unit) {
+                    return unit >= FIRST_PRINTABLE_ASCII && unit <= LAST_PRINTABLE_ASCII;
+                })) {
+                reject(ErrorCode::INVALID_ARGUMENT, "subscription-symbol");
+            }
+
+            bool duplicate = std::ranges::any_of(owned, [&](const auto &other) {
+                return std::equal(text->begin(), text->end(), other.begin(), other.end(),
+                                  [](char16_t left, unsigned char right) {
+                                      return left == right;
+                                  });
+            });
+
+            if (duplicate) {
+                continue;
+            }
+
+            if (owned.size() >= port->maximumSymbols) {
+                reject(ErrorCode::RESOURCE_LIMIT, "subscription-symbol-count");
+            }
+
+            auto &result = owned.emplace_back();
+            result.reserve(text->size());
+
+            for (char16_t unit : *text) {
+                result.push_back(static_cast<char>(unit));
+            }
+        }
+
+        std::vector<std::string_view> views;
+        views.reserve(owned.size());
+
+        for (const auto &text : owned) {
+            views.push_back(text);
+        }
+
+        mutateSymbols(port, views, mutation);
+    });
+}
+
 /** Validate the public policy before reserving an endpoint slot.
  * @param options Caller-selected finite policy.
  */
@@ -1056,6 +1111,22 @@ template <class Event> void Subscription<Event>::removeSymbols(std::string_view 
 
 template <class Event> void Subscription<Event>::setSymbols(std::initializer_list<std::string_view> symbols) {
     mutateSymbols(port_, std::span(symbols.begin(), symbols.size()), SymbolMutation::REPLACE);
+}
+
+template <class Event> void Subscription<Event>::addSymbols(const events::CandleSymbol &symbol) {
+    mutateCandleSymbols(port_, std::span(&symbol, 1), SymbolMutation::ADD);
+}
+
+template <class Event> void Subscription<Event>::addCandleSymbols(std::span<const events::CandleSymbol> symbols) {
+    mutateCandleSymbols(port_, symbols, SymbolMutation::ADD);
+}
+
+template <class Event> void Subscription<Event>::removeSymbols(const events::CandleSymbol &symbol) {
+    mutateCandleSymbols(port_, std::span(&symbol, 1), SymbolMutation::REMOVE);
+}
+
+template <class Event> void Subscription<Event>::setCandleSymbols(std::span<const events::CandleSymbol> symbols) {
+    mutateCandleSymbols(port_, symbols, SymbolMutation::REPLACE);
 }
 
 template <class Event> void Subscription<Event>::clearSymbols() {

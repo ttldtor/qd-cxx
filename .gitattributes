@@ -672,3 +672,9 @@ tools/upstream/trade-oracle/*.java text eol=lf
 tools/upstream/trade-oracle/*.ps1 text eol=lf
 tests/fixtures/trade/oracle.tsv -text -whitespace
 tests/fixtures/trade/provenance.json text eol=lf
+
+# Preserve complete Candle-symbol observations and canonical oracle sources.
+tools/upstream/candle-symbol-oracle/*.java text eol=lf
+tools/upstream/candle-symbol-oracle/*.ps1 text eol=lf
+tests/fixtures/events/candle/symbol-oracle.tsv -text -whitespace
+tests/fixtures/events/candle/symbol-provenance.json text eol=lf

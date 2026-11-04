@@ -4,6 +4,7 @@
 
 #include "qd/api/event_registry.hpp"
 #include "qd/client/endpoint_options.hpp"
+#include "qd/events/candle_symbol.hpp"
 #include "qd/events/profile.hpp"
 #include "qd/events/quote.hpp"
 #include "qd/events/trade.hpp"
@@ -174,6 +175,10 @@ template <class Event> class Subscription final {
     std::shared_ptr<detail::SubscriptionPort> port_;
     friend class Feed;
     explicit Subscription(std::shared_ptr<detail::SubscriptionPort> port) noexcept;
+    /** @param symbols Complete borrowed canonical batch, validated before one atomic add. */
+    void addCandleSymbols(std::span<const events::CandleSymbol> symbols);
+    /** @param symbols Complete borrowed canonical batch, validated before one atomic replacement. */
+    void setCandleSymbols(std::span<const events::CandleSymbol> symbols);
 
     public:
     using Listener =
@@ -238,6 +243,41 @@ template <class Event> class Subscription final {
      * previously accepted selectors remain unchanged and no partial replacement is sent.
      */
     void setSymbols(std::initializer_list<std::string_view> symbols);
+
+    /** Accept one CandleSymbol's canonical identity through the existing exact-selector policy.
+     * @param symbol Immutable value, borrowed for this call; no input views are retained.
+     * @throws Error INVALID_ARGUMENT for null/non-ASCII/unsupported selector text, before mutation.
+     */
+    void addSymbols(const events::CandleSymbol &symbol);
+
+    /** Atomically add an object batch; equal canonical texts coalesce.
+     * @tparam Symbol Exactly events::CandleSymbol; empty braces keep the original string overload.
+     * @param symbols Complete borrowed object batch; all inputs are validated before publication.
+     * @throws Error Existing argument, count, route or allocation refusal; the old desired set remains.
+     */
+    template <class Symbol>
+        requires std::is_same_v<Symbol, events::CandleSymbol>
+    void addSymbols(std::initializer_list<Symbol> symbols) {
+        addCandleSymbols(std::span(symbols.begin(), symbols.size()));
+    }
+
+    /** Remove by canonical Candle identity; absent values are idempotent.
+     * @param symbol Borrowed object; null/non-ASCII text is rejected before mutation.
+     * @throws Error Existing exact-selector validation, closed-state or allocation refusal.
+     */
+    void removeSymbols(const events::CandleSymbol &symbol);
+
+    /** Atomically replace with canonical object identities; duplicates coalesce.
+     * @tparam Symbol Exactly events::CandleSymbol; empty braces keep the original string overload.
+     * @param symbols Complete borrowed batch, never retained.
+     * @throws Error Existing argument, count, route or allocation refusal; the old desired set remains.
+     */
+    template <class Symbol>
+        requires std::is_same_v<Symbol, events::CandleSymbol>
+    void setSymbols(std::initializer_list<Symbol> symbols) {
+        setCandleSymbols(std::span(symbols.begin(), symbols.size()));
+    }
+
     /** Withdraw all accepted selectors asynchronously. */
     void clearSymbols();
     /** Request closure without waiting, including from a listener; ordinary capacity cannot block it. */

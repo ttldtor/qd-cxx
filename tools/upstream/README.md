@@ -23,3 +23,4 @@ documents the separate manual help regression and optional native compression co
 - [Event-source oracle](event-source-oracle/README.md): exact source identities and invalid-input policy.
 
 - [Candle-period oracle](candle-period-oracle/README.md): exact aggregation types, multipliers and short names.
+- [Candle-symbol oracle](candle-symbol-oracle/README.md): production canonical identity, getters, explicit attributes and equality.

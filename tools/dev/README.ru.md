@@ -323,3 +323,4 @@ native writer files pinned Java reader. Сеть, SDK build и новая depend
 - [CFI и дополнительные базовые активы oracle](../upstream/glossary-oracle/README.ru.md): Production oracle CFI/AdditionalUnderlyings: справка без входов на EN/RU, JDK8, heap128MiB/60s, Git30s.
 
 - [Oracle ценовых шагов](../upstream/price-increments-oracle/README.ru.md): захват/проверка правил production Java8; `-Help` и `-HelpRu` без рабочих входов.
+- [Oracle символов Candle](../upstream/candle-symbol-oracle/README.ru.md): production factories/getters/identity и raw getter bits; noargs/EN/RU help без работы, Verify по умолчанию, JDK8, heap128MiB/timeout60s, exits0/1.

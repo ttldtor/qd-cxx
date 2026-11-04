@@ -39,3 +39,4 @@ Exact conformance results belong to the [developer reading path](../docs/develop
 [Option-chain grouping](ipf/OPTION-CHAINS.md) defines profile-based series/strike ordering, replacement and finite-resource admission.
 
 - [Candle attributes](events/CANDLE-ATTRIBUTES.md): exact price, session, alignment, price-level, data-type and exchange values and symbol operations.
+- [Complete Candle symbols](events/CANDLE-SYMBOL.md): canonical identity, explicit getters and exact-selector subscription bridge.

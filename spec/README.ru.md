@@ -39,3 +39,4 @@
 [Группировка option chains](ipf/OPTION-CHAINS.ru.md) определяет порядок серий/strike, замену и допуск в конечных ресурсных лимитах.
 
 - [Атрибуты Candle](events/CANDLE-ATTRIBUTES.ru.md): точные значения price/session/alignment/price-level/data-type/exchange и операции с символами.
+- [Полные символы Candle](events/CANDLE-SYMBOL.ru.md): каноническая идентичность, явные getters и exact-selector bridge подписки.

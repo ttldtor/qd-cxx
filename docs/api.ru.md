@@ -15,6 +15,7 @@
 | Стандартные события | `qd/events/` | `qdcxx_quote`, `qdcxx_profile`, `qdcxx_trade`, `qdcxx_event_mapping` | [Конфигурация](CONFIGURATION.ru.md), [Trade](../spec/events/TRADE.ru.md) |
 | Периоды Candle | `qd/events/candle_period.hpp` | `qdcxx_candle_values` | [Типы, текст и оценки интервала](../spec/events/CANDLE-PERIOD.ru.md); без приёма Candle |
 | Атрибуты Candle | `qd/events/candle_attributes.hpp` | `qdcxx_candle_values` | [Значения и операции с символами](../spec/events/CANDLE-ATTRIBUTES.ru.md); без агрегации |
+| Символы Candle | `qd/events/candle_symbol.hpp` | `qdcxx_candle_values` | [Владеющие значения и object selectors](CANDLE-SYMBOLS.ru.md); без приёма Candle |
 | Коллекторы и мультиплексирование | `qd/collectors/`, `qd/mux/` | `qdcxx_collectors`, `qdcxx_mux`, `qdcxx_mux_queue` | [Контракты подписок](../spec/subscriptions/CONTRACTS.ru.md) |
 | JSON-схемы | `qd/schema/json_schema.hpp` | `qdcxx_schema_json` | [Нативный JSON](../spec/schema/NATIVE-JSON.ru.md); устанавливается при `ORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON=ON` (по умолчанию ON) |
 | Автономный replay | `qd/replay/tape_replay.hpp` | `qdcxx_replay` — только дерево сборки | [Контракт replay](../spec/protocol/OFFLINE-REPLAY.ru.md); `ORG_TTLDTOR_QDCXX_BUILD_REPLAY=ON` (по умолчанию OFF), без установки/экспорта пакета |
