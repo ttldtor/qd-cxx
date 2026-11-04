@@ -678,3 +678,9 @@ tools/upstream/candle-symbol-oracle/*.java text eol=lf
 tools/upstream/candle-symbol-oracle/*.ps1 text eol=lf
 tests/fixtures/events/candle/symbol-oracle.tsv -text -whitespace
 tests/fixtures/events/candle/symbol-provenance.json text eol=lf
+
+# Preserve exact IPF container inputs, oracle observations and source provenance.
+tests/fixtures/ipf/compression/*.bin -text -whitespace
+tests/fixtures/ipf/compression/*.tsv -text -whitespace
+tests/fixtures/ipf/compression/CompressionOracle.java text eol=lf
+tests/fixtures/ipf/compression/provenance.json text eol=lf

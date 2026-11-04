@@ -45,7 +45,8 @@ bool charge(std::size_t &used, std::size_t amount, std::size_t maximum) noexcept
 
 TransferProfiles::TransferProfiles(IpfReadOptions options, IpfTransferResult &result, TransferWork &work,
                                    const IpfTransferLimits &limits)
-    : parser_(options), result_(result), work_(work), limits_(limits), profileLimit_(options.limits.profiles) {
+    : parser_(options), result_(result), work_(work), limits_(limits), profileLimit_(options.limits.profiles),
+      envelope_(limits.envelope, result) {
 }
 
 void TransferProfiles::observe(IpfReadStep step) {
@@ -95,62 +96,13 @@ void TransferProfiles::observe(IpfReadStep step) {
     }
 }
 
-bool TransferProfiles::checkInitial() {
-    if (initialChecked_) {
-        return !failed_;
-    }
-
-    const auto b = [&](std::size_t i) {
-        return std::to_integer<unsigned char>(initial_[i]);
-    };
-    const auto gzip = initialSize_ >= 2 && b(0) == 0x1f && b(1) == 0x8b;
-    const auto zip = initialSize_ >= 4 && b(0) == 'P' && b(1) == 'K' &&
-                     ((b(2) == 3 && b(3) == 4) || (b(2) == 5 && b(3) == 6) || (b(2) == 7 && b(3) == 8));
-    initialChecked_ = true;
-
-    if (gzip || zip) {
-        failed_ = true;
-        firstFailure(result_, IpfTransferError::UNSUPPORTED_SOURCE, "compressed-content");
-    }
-
-    return !failed_;
-}
-
-std::size_t TransferProfiles::feed(std::span<const std::byte> input, IpfReadWork &work) {
-    std::size_t accepted = 0;
-
-    if (!initialChecked_) {
-        const auto count = (std::min)(input.size(), initial_.size() - initialSize_);
-
-        if (count != 0) {
-            std::memcpy(initial_.data() + initialSize_, input.data(), count);
-        }
-
-        initialSize_ += count;
-        accepted += count;
-        input = input.subspan(count);
-
-        if (initialSize_ < initial_.size() || !checkInitial()) {
-            return accepted;
-        }
-    }
-
-    while (initialConsumed_ < initialSize_ && !failed_) {
-        auto step = parser_.feed(std::span(initial_).first(initialSize_).subspan(initialConsumed_), work);
-        initialConsumed_ += step.accepted;
+bool TransferProfiles::drain(IpfReadWork &work) {
+    while ((!envelope_.output().empty() || parserPending_) && !failed_) {
+        auto step = parser_.feed(envelope_.output(), work);
+        envelope_.consume(step.accepted);
         const auto status = step.status;
-        observe(std::move(step));
-
-        if (status == IpfReadStatus::WORK_EXHAUSTED || status == IpfReadStatus::FAILED) {
-            return accepted;
-        }
-    }
-
-    while (!input.empty() && !failed_) {
-        auto step = parser_.feed(input, work);
-        input = input.subspan(step.accepted);
-        accepted += step.accepted;
-        const auto status = step.status;
+        parserPending_ =
+            status != IpfReadStatus::NEED_INPUT && status != IpfReadStatus::FAILED && status != IpfReadStatus::FINISHED;
         observe(std::move(step));
 
         if (status == IpfReadStatus::WORK_EXHAUSTED || status == IpfReadStatus::FAILED) {
@@ -158,26 +110,46 @@ std::size_t TransferProfiles::feed(std::span<const std::byte> input, IpfReadWork
         }
     }
 
+    return (envelope_.output().empty() && !parserPending_) || failed_;
+}
+
+std::size_t TransferProfiles::feed(std::span<const std::byte> input, IpfReadWork &work) {
+    if (!drain(work) || failed_) {
+        return 0;
+    }
+
+    auto accepted = envelope_.feed(input);
+    parserPending_ = !envelope_.output().empty();
+    const auto drained = drain(work);
+
+    // A staged sniff/header transition may consume no new source bytes. At most one extra
+    // finite decoder step preserves ordinary plain-input progress without an unbounded loop.
+    if (accepted == 0 && !input.empty() && drained && !failed_ && !envelope_.failed()) {
+        accepted = envelope_.feed(input);
+        parserPending_ = !envelope_.output().empty();
+        (void)drain(work);
+    }
+
     return accepted;
 }
 
 bool TransferProfiles::finish(IpfReadWork &work) {
-    if (!checkInitial()) {
+    if (!drain(work)) {
+        return false;
+    }
+
+    if (failed_ || envelope_.failed()) {
         return true;
     }
 
-    while (initialConsumed_ < initialSize_ && !failed_) {
-        auto step = parser_.feed(std::span(initial_).first(initialSize_).subspan(initialConsumed_), work);
-        initialConsumed_ += step.accepted;
-        const auto status = step.status;
-        observe(std::move(step));
+    if (!envelope_.finish()) {
+        parserPending_ = parserPending_ || !envelope_.output().empty();
+        (void)drain(work);
 
-        if (status == IpfReadStatus::WORK_EXHAUSTED) {
-            return false;
-        }
+        return false;
     }
 
-    if (failed_) {
+    if (envelope_.failed()) {
         return true;
     }
 
@@ -277,10 +249,17 @@ void TransferResponse::on_field_impl(boost::beast::http::field field, boost::bea
         break;
     case boost::beast::http::field::content_encoding:
 
-        if (!boost::beast::iequals(value, "identity")) {
+        if (codingSeen_) {
+            fail(IpfTransferError::HTTP_FAILURE, "http-duplicate-content-encoding", ec);
+        } else if (boost::beast::iequals(value, "gzip")) {
+            if (status == 200 && !profiles_.declareGzip()) {
+                fail(IpfTransferError::HTTP_FAILURE, "http-gzip-state", ec);
+            }
+        } else if (!boost::beast::iequals(value, "identity")) {
             fail(IpfTransferError::UNSUPPORTED_SOURCE, "http-content-encoding", ec);
         }
 
+        codingSeen_ = true;
         break;
     default:
         break;

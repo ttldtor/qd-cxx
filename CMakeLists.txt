@@ -308,35 +308,7 @@ if(ORG_TTLDTOR_QDCXX_BUILD_TAPE_INSPECT OR BUILD_TESTING)
     target_compile_features(qdcxx_tape_compression PUBLIC cxx_std_23)
     set_target_properties(qdcxx_tape_compression PROPERTIES CXX_EXTENSIONS OFF)
     if(ORG_TTLDTOR_QDCXX_BUILD_TAPE_COMPRESSION)
-        # A source-directory override would bypass archive verification; accept only an exact archive.
-        if(FETCHCONTENT_SOURCE_DIR_QDCXX_ZLIB)
-            message(FATAL_ERROR "Use the hash-verified archive override, not an arbitrary source tree")
-        endif()
-        set(qdcxxZlibArchive "https://zlib.net/zlib-1.3.2.tar.gz")
-        if(ORG_TTLDTOR_QDCXX_ZLIB_ARCHIVE)
-            file(SHA256 "${ORG_TTLDTOR_QDCXX_ZLIB_ARCHIVE}" qdcxxZlibHash)
-            if(NOT qdcxxZlibHash STREQUAL "bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16")
-                message(FATAL_ERROR "zlib archive hash mismatch")
-            endif()
-            set(qdcxxZlibArchive "${ORG_TTLDTOR_QDCXX_ZLIB_ARCHIVE}")
-        endif()
-        # Keep the default/unused optional profile CXX-only and independent of compression acquisition.
-        enable_language(C)
-        include(FetchContent)
-        set(ZLIB_BUILD_TESTING OFF CACHE BOOL "" FORCE)
-        set(ZLIB_BUILD_SHARED OFF CACHE BOOL "" FORCE)
-        set(ZLIB_BUILD_STATIC ON CACHE BOOL "" FORCE)
-        set(ZLIB_INSTALL OFF CACHE BOOL "" FORCE)
-        FetchContent_Declare(qdcxx_zlib URL "${qdcxxZlibArchive}"
-            URL_HASH SHA256=bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16
-            DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
-        FetchContent_MakeAvailable(qdcxx_zlib)
-        file(SHA256 "${qdcxx_zlib_SOURCE_DIR}/LICENSE" qdcxxZlibLicenseHash)
-        file(STRINGS "${qdcxx_zlib_SOURCE_DIR}/zlib.h" qdcxxZlibVersion REGEX "^#define ZLIB_VERSION ")
-        if(NOT qdcxxZlibLicenseHash STREQUAL "e32ff4e00d9d94930537635291da39e7e612703334bf6fde8c7f1686fe8a45a2" OR
-           NOT qdcxxZlibVersion STREQUAL "#define ZLIB_VERSION \"1.3.2\"")
-            message(FATAL_ERROR "zlib version/license differs from the accepted pin")
-        endif()
+        include(cmake/Zlib.cmake)
         target_compile_definitions(qdcxx_tape_compression PRIVATE ORG_TTLDTOR_QDCXX_HAS_ZLIB)
         target_link_libraries(qdcxx_tape_compression PRIVATE ZLIB::ZLIBSTATIC)
     endif()
@@ -829,17 +801,28 @@ if(BUILD_TESTING)
         endif()
         add_dependencies(qdcxx_tls_byte_tests qdcxx_tls_test_peer)
         if(ORG_TTLDTOR_QDCXX_BUILD_IPF_TRANSFER)
+            add_executable(qdcxx_ipf_compression_tests tests/conformance/ipf_compression_tests.cpp)
+            target_link_libraries(qdcxx_ipf_compression_tests PRIVATE qdcxx_ipf_transfer qdcxx_private::url
+                ZLIB::ZLIBSTATIC doctest::doctest)
+            target_include_directories(qdcxx_ipf_compression_tests PRIVATE src/ipf)
+            target_compile_definitions(qdcxx_ipf_compression_tests PRIVATE
+                "ORG_TTLDTOR_QDCXX_IPF_COMPRESSION_FIXTURES=\"${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/ipf/compression\"")
+            set_target_properties(qdcxx_ipf_compression_tests PROPERTIES CXX_EXTENSIONS OFF)
+            add_test(NAME ipf_compression COMMAND qdcxx_ipf_compression_tests)
+            set_tests_properties(ipf_compression PROPERTIES TIMEOUT 30)
             add_executable(qdcxx_ipf_transfer_tests tests/conformance/ipf_transfer_tests.cpp
                 tests/conformance/ipf_http_peer.cpp tests/conformance/transport/tls_test_peer.cpp)
-            target_link_libraries(qdcxx_ipf_transfer_tests PRIVATE qdcxx_ipf_transfer doctest::doctest c-ares::cares qdcxx_private::url qdcxx_tls_ssl qdcxx_tls_crypto)
+            target_link_libraries(qdcxx_ipf_transfer_tests PRIVATE qdcxx_ipf_transfer ZLIB::ZLIBSTATIC doctest::doctest c-ares::cares qdcxx_private::url qdcxx_tls_ssl qdcxx_tls_crypto)
             target_include_directories(qdcxx_ipf_transfer_tests PRIVATE src/ipf src/transport tests/conformance/transport)
             target_include_directories(qdcxx_ipf_transfer_tests SYSTEM PRIVATE "${ORG_TTLDTOR_QDCXX_ASIO_INCLUDE}")
             target_compile_definitions(qdcxx_ipf_transfer_tests PRIVATE
+                "ORG_TTLDTOR_QDCXX_IPF_COMPRESSION_FIXTURES=\"${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/ipf/compression\""
                 "ORG_TTLDTOR_QDCXX_TLS_TEST_PEER=\"$<TARGET_FILE:qdcxx_tls_test_peer>\""
                 "ORG_TTLDTOR_QDCXX_TLS_TEST_FIXTURES=\"${ORG_TTLDTOR_QDCXX_TLS_TEST_FIXTURES}\""
                 "ORG_TTLDTOR_QDCXX_TLS_TEST_CONTROL=\"${CMAKE_CURRENT_BINARY_DIR}/ipf-tls-test-control\"")
             if(WIN32)
-                target_compile_definitions(qdcxx_ipf_transfer_tests PRIVATE WIN32_LEAN_AND_MEAN _WIN32_WINNT=0x0A00)
+                target_compile_definitions(qdcxx_ipf_transfer_tests PRIVATE
+                "ORG_TTLDTOR_QDCXX_IPF_COMPRESSION_FIXTURES=\"${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/ipf/compression\"" WIN32_LEAN_AND_MEAN _WIN32_WINNT=0x0A00)
                 set_property(SOURCE tests/conformance/ipf_transfer_tests.cpp tests/conformance/ipf_http_peer.cpp
                     APPEND PROPERTY COMPILE_DEFINITIONS NOMINMAX)
                 target_link_libraries(qdcxx_ipf_transfer_tests PRIVATE ws2_32)

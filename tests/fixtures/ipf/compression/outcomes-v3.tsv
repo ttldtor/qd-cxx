@@ -1,0 +1,6 @@
+case	decodedBytes	decodeOutcome	ipfOutcome
+zip64-descriptor64-nosignature-small	42	ZipException:invalid entry size (expected 0 but got 42 bytes)	ZipException:invalid entry size (expected 0 but got 42 bytes)
+zip64-directory-nosignature-first	0	ZipException:invalid entry size (expected 0 but got 2 bytes)	ZipException:invalid entry size (expected 0 but got 2 bytes)
+gzip-next-header-invalid	42	OK	OK:1
+gzip-header-truncated	0	EOFException:null	EOFException:null
+zip-header-truncated	0	IOException:No file entries in zip	IOException:No file entries in zip

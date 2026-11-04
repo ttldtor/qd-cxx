@@ -1,0 +1,347 @@
+{
+  "schema": "ipf-compression-fixtures-v1",
+  "repository": "https://github.com/devexperts/QD.git",
+  "revision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "oracle": "Actual cached pinned QD production classes with existing Zulu OpenJDK1.8.0_422; no production rebuild",
+  "bytecodeReproduction": "not claimed; source and observed bytecode identities recorded separately",
+  "javaOptions": [
+    "-Dfile.encoding=UTF-8",
+    "-Duser.timezone=UTC"
+  ],
+  "generator": "CompressionOracle.java",
+  "generatorSHA256": "560244c5c4da6bf92727a85ac25a975d960a0b45a45085748ee78dea72f43eae",
+  "generation": "synthetic IPF; JDK gzip/raw Deflater; handcrafted local ZIP/ZIP64 descriptors; ordinary ZipOutputStream with fixed1980 metadata",
+  "primaryCapture": "outcomes-v5.tsv",
+  "primaryCaptureSHA256": "fdc4fa05efe51ecdded948b03bb3de596960786f4b70fbc2f63ddb24e9bcd310",
+  "historicalCaptures": [
+    "outcomes.tsv",
+    "outcomes-v2.tsv",
+    "outcomes-v3.tsv"
+  ],
+  "divergence": "ADR-0007: valid unsigned and small ZIP64 descriptors supported beyond JDK8 defects; inconsistent ZIP64+32-bit descriptor rejected",
+  "outputBoundBytes": 1048576,
+  "productionClasses": [
+    {
+      "path": "dxlib/target/classes/com/devexperts/io/StreamCompression.class",
+      "major": 52,
+      "sha256": "754bf48e03fbcb1b2d1673f6144f267b6d0d74bb0137f2e04cb1512b8a9593e7"
+    },
+    {
+      "path": "dxlib/target/classes/com/devexperts/io/StreamCompression$GZIPInput.class",
+      "major": 52,
+      "sha256": "3cc75d3aa362acf87060689418513e5d20b6471f205343a09f05036becc3184d"
+    },
+    {
+      "path": "dxlib/target/classes/com/devexperts/io/StreamCompression$GZIPOutput.class",
+      "major": 52,
+      "sha256": "f7f446aaf0d27b4d095dbd808e18cb9e9236fa5d8f97d5009a56121fc4920e0d"
+    },
+    {
+      "path": "dxlib/target/classes/com/devexperts/io/StreamCompression$ZipInput.class",
+      "major": 52,
+      "sha256": "6a94445f99f417eb590e50c3c49fdf7149a737d8ee35aceaa5d11c3772e09945"
+    },
+    {
+      "path": "dxlib/target/classes/com/devexperts/io/StreamCompression$ZipOutput.class",
+      "major": 52,
+      "sha256": "ab367ca8f279139dac935aa63bccae4d40afcb6221cb3dacd5295db28d8156cb"
+    },
+    {
+      "path": "dxfeed-api/target/classes/com/dxfeed/ipf/InstrumentProfileReader.class",
+      "major": 52,
+      "sha256": "70598b58cb496a84ba37875a74938542950f3cbfd3f0d5104a190d8e59c99f67"
+    }
+  ],
+  "productionSources": [
+    {
+      "path": "dxlib/src/main/java/com/devexperts/io/StreamCompression.java",
+      "sha256": "2a1b1909641d6bcb08edcee7cea3e1fce40f34dca909f5faab8525487c3c3e86"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/ipf/InstrumentProfileReader.java",
+      "sha256": "319785ddfd931d7487b629ca7f744a8e215dbc471a1035bd7070911468d11661"
+    }
+  ],
+  "fixtures": [
+    {
+      "path": "gzip-bad-crc.bin",
+      "bytes": 59,
+      "sha256": "f0b07a241ed9eab964d1e54c0a1f6abde47f4df9bd5961078d60bcda07af5e60",
+      "cppEnvelope": "CONTAINER_FAILURE",
+      "javaParityClaim": true
+    },
+    {
+      "path": "gzip-bad-size.bin",
+      "bytes": 59,
+      "sha256": "7efa258ac7e2eaae8a3ba442f15a1fc71a3a00ac7dce6704d3441204e095f0b5",
+      "cppEnvelope": "CONTAINER_FAILURE",
+      "javaParityClaim": true
+    },
+    {
+      "path": "gzip-concat-second-bad.bin",
+      "bytes": 118,
+      "sha256": "3ce0ff31b23ff229afa1634130b4e4dfb1fbb82e0d6256555f321fdce19f8ea5",
+      "cppEnvelope": "CONTAINER_FAILURE",
+      "javaParityClaim": true
+    },
+    {
+      "path": "gzip-concatenated.bin",
+      "bytes": 82,
+      "sha256": "f7e2867f6a9578e97c235cbbfa0060fcc2b0aebd3fd8d436e907fc9522a5fdb9",
+      "cppEnvelope": "OK",
+      "javaParityClaim": true
+    },
+    {
+      "path": "gzip-expansion.bin",
+      "bytes": 269,
+      "sha256": "152af7d53263aa125473ef5ed9b578bf3720fbee42398cc16810e9eb98674941",
+      "cppEnvelope": "OK",
+      "javaParityClaim": true
+    },
+    {
+      "path": "gzip-header-truncated.bin",
+      "bytes": 8,
+      "sha256": "87bcdd44f7d4d2605074cefe3f0a5e41dfdab2700c027148a4e8273fb1d4284a",
+      "cppEnvelope": "CONTAINER_FAILURE",
+      "javaParityClaim": true
+    },
+    {
+      "path": "gzip-missing-marker.bin",
+      "bytes": 48,
+      "sha256": "48272e614c3af3ff676520822d45705ad192a9642c08a40c0870c49e6d0916e8",
+      "cppEnvelope": "OK",
+      "javaParityClaim": true
+    },
+    {
+      "path": "gzip-nested.bin",
+      "bytes": 76,
+      "sha256": "fce9d3918f33539a47999d30df467ec76ad7662138a0e820cd88b8ff5bf5a6a5",
+      "cppEnvelope": "OK",
+      "javaParityClaim": true
+    },
+    {
+      "path": "gzip-next-header-invalid.bin",
+      "bytes": 69,
+      "sha256": "97f661cc1c7eb440a9a385b0a289fb121d76bfe2db20f5f788f86fa5d6def549",
+      "cppEnvelope": "OK",
+      "javaParityClaim": true
+    },
+    {
+      "path": "gzip-next-header-truncated.bin",
+      "bytes": 62,
+      "sha256": "b95c50a58390b50330b5166995d785f7b35244de1f9bdb37d642becbe9c07b19",
+      "cppEnvelope": "OK",
+      "javaParityClaim": true
+    },
+    {
+      "path": "gzip-optional.bin",
+      "bytes": 70,
+      "sha256": "2edf186f5e105ff3f74e42497d50a27bc52f383d39d2e1f9c2dfb7dfb53e6b94",
+      "cppEnvelope": "OK",
+      "javaParityClaim": true
+    },
+    {
+      "path": "gzip-trailing-junk.bin",
+      "bytes": 62,
+      "sha256": "0ae9156042acf9bf0636a6b91c5da0d7af6bf43e862aba423679b64b2d4163f6",
+      "cppEnvelope": "OK",
+      "javaParityClaim": true
+    },
+    {
+      "path": "gzip-truncated.bin",
+      "bytes": 55,
+      "sha256": "7a06128e14ed6e3ac56d7365de43edefcadf338f70181fb3a4d6822b773f9cdb",
+      "cppEnvelope": "CONTAINER_FAILURE",
+      "javaParityClaim": true
+    },
+    {
+      "path": "gzip.bin",
+      "bytes": 59,
+      "sha256": "74d3ab98dbff7ad0b472c23df96376c04fc0e37dd092dcd9b5f0f06169df4bb5",
+      "cppEnvelope": "OK",
+      "javaParityClaim": true
+    },
+    {
+      "path": "plain.bin",
+      "bytes": 42,
+      "sha256": "2afd73c3fc8fbafae7d0570225d5e39d25f01c5627db0a2747bed02eaf286f7f",
+      "cppEnvelope": "OK",
+      "javaParityClaim": true
+    },
+    {
+      "path": "zip-bad-crc.bin",
+      "bytes": 80,
+      "sha256": "172e20c538d6a021146798a70c621eb1f06caa1db1ff946909ee89535164d6e6",
+      "cppEnvelope": "CONTAINER_FAILURE",
+      "javaParityClaim": true
+    },
+    {
+      "path": "zip-bad-size.bin",
+      "bytes": 80,
+      "sha256": "6a6c03e4f8fbbf9295e9786bdcc753bb52ea007da598ea4a2b6fccb842677749",
+      "cppEnvelope": "CONTAINER_FAILURE",
+      "javaParityClaim": true
+    },
+    {
+      "path": "zip-deflate.bin",
+      "bytes": 80,
+      "sha256": "ba1b7c5dd861a709228ddb1a3e6f04e887579b59307e0c2252968bb7b3ac8185",
+      "cppEnvelope": "OK",
+      "javaParityClaim": true
+    },
+    {
+      "path": "zip-descriptor-nosignature-followed.bin",
+      "bytes": 96,
+      "sha256": "87a24dafde95ab771cf71dd7eebe0ba06707a9955f6cf1aa88506a4f24fcaa14",
+      "cppEnvelope": "OK",
+      "javaParityClaim": true
+    },
+    {
+      "path": "zip-descriptor-nosignature.bin",
+      "bytes": 92,
+      "sha256": "41066a6e1ebebd9a9645892c46c944031fb867a7842badfa0ccb75e2c7a654f5",
+      "cppEnvelope": "OK",
+      "javaParityClaim": false
+    },
+    {
+      "path": "zip-descriptor.bin",
+      "bytes": 96,
+      "sha256": "07e7444bb4ea998650f362a637d1ef59c2ece1096faa2bf5dc68529b7a133ac9",
+      "cppEnvelope": "OK",
+      "javaParityClaim": true
+    },
+    {
+      "path": "zip-directory-first.bin",
+      "bytes": 140,
+      "sha256": "0bdee3d4c1b97980a397868aeb281eb7f93303033f158e9bde1ff2f5291b12ff",
+      "cppEnvelope": "OK",
+      "javaParityClaim": true
+    },
+    {
+      "path": "zip-directory-nosignature-first.bin",
+      "bytes": 136,
+      "sha256": "beb6f2cfd78cc2589bbf54a4cf8723f4bc7695585aab7be1a46b5cac12a338e1",
+      "cppEnvelope": "OK",
+      "javaParityClaim": false
+    },
+    {
+      "path": "zip-directory-only.bin",
+      "bytes": 40,
+      "sha256": "8b777d892e5ac67ee0475856217800f2821fff7cda0b7597a036847cbb1f959f",
+      "cppEnvelope": "CONTAINER_FAILURE",
+      "javaParityClaim": true
+    },
+    {
+      "path": "zip-empty-eocd.bin",
+      "bytes": 8,
+      "sha256": "f18366628a466f286ac60a27d59cadd5fd347730c9d55e04ce70ffda96cb236f",
+      "cppEnvelope": "OK",
+      "javaParityClaim": true
+    },
+    {
+      "path": "zip-encrypted.bin",
+      "bytes": 80,
+      "sha256": "f57a64c512c73b6ad951a1309573a10a871db018349edea468ab1e380c7817dd",
+      "cppEnvelope": "CONTAINER_FAILURE",
+      "javaParityClaim": true
+    },
+    {
+      "path": "zip-followed-corruption.bin",
+      "bytes": 85,
+      "sha256": "269b55cdd0976c7c60a0984c9c9ecf1b5d2968d0b9768d3852a19742bfec836f",
+      "cppEnvelope": "OK",
+      "javaParityClaim": true
+    },
+    {
+      "path": "zip-followed-file.bin",
+      "bytes": 142,
+      "sha256": "264375bdf7e45e2c13309d6894ad9a0f8b81a2f43c25e5c6851bf3ae731f21a0",
+      "cppEnvelope": "OK",
+      "javaParityClaim": true
+    },
+    {
+      "path": "zip-full-archive.bin",
+      "bytes": 444,
+      "sha256": "d5c94b36b19f33d0c4b0298d232c61cd1a9abf6bbbfadb832ace437d10db9bfe",
+      "cppEnvelope": "OK",
+      "javaParityClaim": true
+    },
+    {
+      "path": "zip-header-truncated.bin",
+      "bytes": 12,
+      "sha256": "0d764bdad74e3f2f0a0a08feb7cc072d38ea024a7cd9e6a8a7928b877c33f5f8",
+      "cppEnvelope": "CONTAINER_FAILURE",
+      "javaParityClaim": true
+    },
+    {
+      "path": "zip-stored-descriptor.bin",
+      "bytes": 97,
+      "sha256": "6172fb7903fa45de82a3c61a2cddd6fc00eb8d2e2a9d9d85ca12f2fd58ae1a1e",
+      "cppEnvelope": "CONTAINER_FAILURE",
+      "javaParityClaim": true
+    },
+    {
+      "path": "zip-stored.bin",
+      "bytes": 81,
+      "sha256": "96eee9d053a9069ccf8e9d9b7eb183dd5f450fc68e9477f686f0d59345ebf0e3",
+      "cppEnvelope": "OK",
+      "javaParityClaim": true
+    },
+    {
+      "path": "zip-truncated-descriptor.bin",
+      "bytes": 93,
+      "sha256": "730b19115960699d425573336377226f9d9b09b3e065e77c9f172399f57187c7",
+      "cppEnvelope": "CONTAINER_FAILURE",
+      "javaParityClaim": true
+    },
+    {
+      "path": "zip-truncated.bin",
+      "bytes": 77,
+      "sha256": "37c728d12cfc3626508488a2a487732a4a2cb2fd61320969287320151930f08b",
+      "cppEnvelope": "CONTAINER_FAILURE",
+      "javaParityClaim": true
+    },
+    {
+      "path": "zip64-descriptor-small.bin",
+      "bytes": 116,
+      "sha256": "560e84c0e027e8381fa8fb770d3014e6df9d0d698bf3691dbdfee10037a0f921",
+      "cppEnvelope": "CONTAINER_FAILURE",
+      "javaParityClaim": false
+    },
+    {
+      "path": "zip64-descriptor64-nosignature-small.bin",
+      "bytes": 120,
+      "sha256": "f245b48d24a4ff7a98b5ff1104f9e909469e62d6c5fdf8bf77a90affe78b832d",
+      "cppEnvelope": "OK",
+      "javaParityClaim": false
+    },
+    {
+      "path": "zip64-descriptor64-small.bin",
+      "bytes": 124,
+      "sha256": "2f2e9d8f57536061458656a346a57ddeb14dde44496f8eef8241be393407660f",
+      "cppEnvelope": "OK",
+      "javaParityClaim": false
+    },
+    {
+      "path": "zip64-directory-nosignature-first.bin",
+      "bytes": 164,
+      "sha256": "b21581041e48afb5de4af084a516ea0cd429b5450946a60a3af6ba3f9d6e9aa9",
+      "cppEnvelope": "OK",
+      "javaParityClaim": false
+    },
+    {
+      "path": "zip64-small.bin",
+      "bytes": 100,
+      "sha256": "2e1f074d4e66d19a65c4413ae5c846ca92b1818e6393f41efcc1b32c5e420c0e",
+      "cppEnvelope": "OK",
+      "javaParityClaim": true
+    },
+    {
+      "path": "zip64-stored-small.bin",
+      "bytes": 101,
+      "sha256": "39f79283c7cc830142859c9898ab224f69affdbb1f51f7321624dfa1f9d3ad04",
+      "cppEnvelope": "OK",
+      "javaParityClaim": true
+    }
+  ]
+}

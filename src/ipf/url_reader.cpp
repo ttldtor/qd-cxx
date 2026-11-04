@@ -1013,7 +1013,7 @@ struct InstrumentProfileReader::Impl {
 
         for (const auto bytes :
              {options.limits.inputBytes, options.limits.requestBytes, options.limits.authorizationBytes,
-              options.limits.authorizationBytes, options.trustPem.size(),
+              options.limits.authorizationBytes, options.trustPem.size(), options.limits.envelope.inflaterBytes,
               // Host options and temporary caller EndpointTls coexist with B's independently funded snapshot.
               options.trustPem.size(), sizeof(client::EndpointTls), sizeof(detail::TransferSource{}.host),
               std::size_t(2 * (inlineCapacity + 1)), std::size_t(4 * sizeof(transport::DnsServer)),
@@ -1083,6 +1083,12 @@ struct InstrumentProfileReader::Impl {
 
             try {
                 operation.run(source);
+
+                // Failure drain consumes only the owned decoded cache, without source/SDK/provider progress.
+                while (operation.profiles.hasOwnedInput() && operation.checkpoint()) {
+                    auto parserWork = state->options.ipf.turnWork;
+                    (void)operation.profiles.drain(parserWork);
+                }
             } catch (const std::bad_alloc &) {
                 fail(operation.result, {IpfTransferError::ALLOCATION_FAILURE, "transfer-allocation"});
             } catch (const std::length_error &) {

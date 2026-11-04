@@ -35,11 +35,27 @@ HTTPS требует явных trustPem, квалифицированных TLS
 System trust/default resolver и plaintext fallback отсутствуют. Обязательства embedding описаны в
 [TLS resources](../transport/TLS-RESOURCES.ru.md).
 
+## Чтение сжатых snapshots
+
+Тот же loadURL читает plain, gzip и ZIP по содержимому, независимо от расширения. ZIP пропускает
+каталоги и читает IPF из первого файла. Content-Encoding:gzip выбирает один gzip слой; отсутствие
+заголовка/identity включает magic detection. Вложенные контейнеры и прочие HTTP codings не
+декодируются рекурсивно.
+
+result.envelope сообщает kind, входные/выходные байты, конечную работу и завершение выбранного
+контейнера. Ошибка gzip/ZIP trailer возвращает CONTAINER_FAILURE и сохраняет целые уже принятые
+профили. envelope.finished, httpFinished, nativeRetired и ipf.finished/completionSeen — разные
+границы. Наличие COMPLETE само по себе не делает повреждённый ответ успешным.
+
+limits.envelope независимо задаёт inputBytes, outputBytes, calls, workBytes, inflaterBytes,
+metadataBytes и entries. Выход включает payload пропущенных каталогов. Reader заранее резервирует
+фиксированный decoder и весь inflater allowance, включая plain чтение. Подробности:
+[контракт](COMPRESSION.ru.md), [ZIP interoperability](../../docs/decisions/ADR-0007-ipf-container-interoperability.ru.md).
+
 ## Источники и credentials
 
 Принимаются локальные пути, квалифицированные file URI, HTTP и HTTPS. Сокращение host:port с портом
-1..65535 разворачивается в http://host:port/ipf/all.ipf.gz с сохранением query и не включает
-декомпрессию. File URI допускает пустой/localhost authority, без userinfo/port/query/fragment;
+1..65535 разворачивается в http://host:port/ipf/all.ipf.gz с сохранением query. Контейнер выбирается по содержимому независимо от суффикса. File URI допускает пустой/localhost authority, без userinfo/port/query/fragment;
 percent-decoded UTF-8 path ограничен и не содержит NUL. Windows drive/drive-relative формы применяют
 Windows-only правило reference после классификации сокращения. Неизвестная URI scheme отвергается
 до acquisition/I/O без fallback к локальному пути.
@@ -135,8 +151,7 @@ maxima. Reader-lifetime TLS credits расходуются через loads/redi
 и child retirement не возмещают и не переинициализируют shared SDK history/host storage. Host maxima
 должны оставаться истинными для cooperating/foreign users до final retirement.
 
-Compression и live collection — отдельные pipeline implementations; отсутствие не исключает их
-из complete-client цели. Compressed signatures/unsupported Content-Encoding дают явный отказ.
+Live collection остаётся отдельной pipeline implementation. Контейнеры определены в [COMPRESSION](COMPRESSION.ru.md).
 
 ## Первичные источники
 

@@ -1593,3 +1593,166 @@ TEST_CASE("IPF temporary settings trust overlap is funded before exact-cap real 
     CHECK(result.nativeRetired);
     CHECK(result.metadataCommitted);
 }
+
+namespace {
+/** Load one finite encoded oracle fixture without filename-based format selection.
+ * @param name Synthetic fixture basename.
+ * @return Exact encoded body.
+ */
+std::string encodedFixture(std::string_view name) {
+    std::ifstream stream(std::string(ORG_TTLDTOR_QDCXX_IPF_COMPRESSION_FIXTURES) + "/" + std::string(name) + ".bin",
+                         std::ios::binary);
+    REQUIRE(stream);
+
+    return {std::istreambuf_iterator<char>(stream), {}};
+}
+} // namespace
+
+TEST_CASE("IPF compressed local files HTTP body splits and declared gzip share one bounded stage") {
+    auto bootstrap = t::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    auto facade = reader(*bootstrap);
+
+    for (const auto name :
+         {"gzip", "gzip-optional", "gzip-concatenated", "zip-stored", "zip-descriptor", "zip64-small",
+          "zip-directory-first", "zip-followed-corruption", "zip-full-archive", "zip-descriptor-nosignature",
+          "zip64-descriptor64-small", "zip64-directory-nosignature-first"}) {
+        CAPTURE(name);
+        const auto local = std::string(ORG_TTLDTOR_QDCXX_IPF_COMPRESSION_FIXTURES) + "/" + name + ".bin";
+        auto file = facade->loadURL(local);
+        INFO((file.error ? file.error->stage : "none"));
+        REQUIRE_FALSE(file.error);
+        CHECK(file.ipf.profiles.size() == 1);
+        CHECK(file.ipf.complete);
+        CHECK(file.envelope.finished);
+        CHECK(file.nativeRetired);
+        CHECK_FALSE(file.httpFinished);
+        h::IpfHttpPeer peer({response(encodedFixture(name))}, 1);
+        auto http = facade->loadURL(url(peer.port(), "/no-compression-suffix"));
+        INFO((http.error ? http.error->stage : "none"));
+        REQUIRE_FALSE(http.error);
+        CHECK(http.httpFinished);
+        CHECK(http.envelope.finished);
+        CHECK(http.nativeRetired);
+        CHECK(http.ipf.profiles.size() == 1);
+        CHECK(http.ipf.acceptedBytes == COMPLETE_IPF.size());
+        CHECK(http.envelope.inputBytes == encodedFixture(name).size());
+    }
+
+    h::IpfHttpPeer declared({response(encodedFixture("gzip"), "Content-Encoding: gzip\r\n")}, 1);
+    auto gzip = facade->loadURL(url(declared.port()));
+    REQUIRE_FALSE(gzip.error);
+    CHECK(gzip.envelope.kind == i::IpfEnvelopeKind::GZIP);
+    CHECK(gzip.ipf.complete);
+    CHECK(gzip.httpFinished);
+    CHECK(gzip.nativeRetired);
+}
+
+TEST_CASE("IPF gzip integrity failure preserves the owned marker prefix without success") {
+    auto bootstrap = t::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    i::IpfTransferOptions options;
+    options.ipf.turnWork = {1, 1, 1, 1};
+    auto facade = reader(*bootstrap, options);
+
+    for (const auto name : {"gzip-bad-crc", "gzip-truncated", "zip-bad-crc", "zip-truncated-descriptor"}) {
+        CAPTURE(name);
+        h::IpfHttpPeer peer({response(encodedFixture(name))});
+        auto result = facade->loadURL(url(peer.port()));
+        REQUIRE(result.error);
+        CHECK(result.error->error == i::IpfTransferError::CONTAINER_FAILURE);
+        CHECK(result.ipf.profiles.size() == 1);
+        CHECK(result.ipf.completionSeen);
+        CHECK_FALSE(result.envelope.finished);
+        CHECK_FALSE(result.metadataCommitted);
+        CHECK(result.nativeRetired);
+    }
+
+    for (const auto fields :
+         {"Content-Encoding: br\r\n", "Content-Encoding: deflate\r\n", "Content-Encoding: gzip, gzip\r\n",
+          "Content-Encoding: gzip\r\nContent-Encoding: identity\r\n"}) {
+        CAPTURE(fields);
+        h::IpfHttpPeer peer({response(encodedFixture("gzip"), fields)});
+        auto result = facade->loadURL(url(peer.port()));
+        REQUIRE(result.error);
+        CHECK(result.ipf.profiles.empty());
+        CHECK_FALSE(result.metadataCommitted);
+    }
+
+    h::IpfHttpPeer invalid({response(COMPLETE_IPF, "Content-Encoding: gzip\r\n")});
+    auto plain = facade->loadURL(url(invalid.port()));
+    REQUIRE(plain.error);
+    CHECK(plain.error->error == i::IpfTransferError::CONTAINER_FAILURE);
+    CHECK(plain.ipf.profiles.empty());
+}
+
+TEST_CASE("IPF compressed container and missing IPF completion are distinct") {
+    auto bootstrap = t::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    i::IpfTransferOptions options;
+    options.ipf.completion = i::IpfCompletionPolicy::REQUIRE;
+    auto facade = reader(*bootstrap, options);
+    h::IpfHttpPeer peer({response(encodedFixture("gzip-missing-marker"))});
+    auto result = facade->loadURL(url(peer.port()));
+    REQUIRE(result.error);
+    CHECK(result.error->error == i::IpfTransferError::IPF_FAILURE);
+    CHECK(result.envelope.finished);
+    CHECK(result.httpFinished);
+    CHECK(result.nativeRetired);
+    CHECK(result.ipf.profiles.size() == 1);
+    REQUIRE(result.ipf.error);
+    CHECK(result.ipf.error->error == i::IpfReadError::MISSING_COMPLETE);
+}
+
+TEST_CASE("IPF gzip over verified HTTPS uses clean TLS retirement") {
+    auto bootstrap = t::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    auto facade = reader(*bootstrap, tlsOptions());
+    auto peer = tlsPeer(response(encodedFixture("gzip"), "Content-Encoding: gzip\r\n"));
+    auto result = facade->loadURL(url(peer.port(), "/profiles.ipf", true));
+    INFO((result.error ? result.error->stage : "none"));
+    REQUIRE_FALSE(result.error);
+    CHECK(result.ipf.complete);
+    CHECK(result.envelope.finished);
+    CHECK(result.httpFinished);
+    CHECK(result.nativeRetired);
+    CHECK(result.metadataCommitted);
+}
+
+TEST_CASE("IPF compressed wait cancellation from another thread never calls SDK there") {
+    auto bootstrap = t::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    auto facade = reader(*bootstrap);
+    auto reply = response(encodedFixture("gzip"), "Content-Encoding: gzip\r\n");
+    reply.resize(reply.size() - 8);
+    h::IpfHttpPeer peer({reply}, 4096, true);
+    std::stop_source stop;
+    std::jthread requester([&] {
+        const auto until = std::chrono::steady_clock::now() + 2s;
+
+        while (peer.sentBytes() < reply.size() && std::chrono::steady_clock::now() < until) {
+            std::this_thread::sleep_for(1ms);
+        }
+
+        stop.request_stop();
+    });
+    const auto result = facade->loadURL(url(peer.port()), {}, stop.get_token());
+    REQUIRE(result.error);
+    CHECK(result.error->error == i::IpfTransferError::CANCELLED);
+    CHECK(result.nativeRetired);
+    CHECK_FALSE(result.envelope.finished);
+    CHECK_FALSE(result.metadataCommitted);
+}
+
+TEST_CASE("IPF gzip envelope is not recursively decoded after HTTP coding") {
+    auto bootstrap = t::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    auto facade = reader(*bootstrap);
+    h::IpfHttpPeer peer({response(encodedFixture("gzip-nested"), "Content-Encoding: gzip\r\n")}, 1);
+    auto result = facade->loadURL(url(peer.port()));
+    REQUIRE(result.error);
+    CHECK(result.error->error == i::IpfTransferError::IPF_FAILURE);
+    CHECK(result.envelope.kind == i::IpfEnvelopeKind::GZIP);
+    CHECK(result.ipf.profiles.empty());
+    CHECK(result.nativeRetired);
+}

@@ -1023,3 +1023,24 @@ Report-v2 contains 21 numeric words, including SNI flags and suite/group/hash/ti
 signature-size metadata; it emits no certificate/signature contents. On POSIX the parent preserves
 waitable `SIGCHLD` without `SIG_IGN`/`SA_NOCLDWAIT` and exclusively reaps its child; known incompatible
 pre-start state returns `PROCESS_START`.
+
+## IPF source compression dependency
+
+When ORG_TTLDTOR_QDCXX_BUILD_IPF_TRANSFER=ON, the producer privately builds the existing pinned
+zlib1.3.2 profile through [cmake/Zlib.cmake](../cmake/Zlib.cmake), independently of tape tools.
+ORG_TTLDTOR_QDCXX_ZLIB_ARCHIVE can name an exact local archive; its SHA256 must be
+bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16.
+The producer also verifies the version header and LICENSE SHA256
+e32ff4e00d9d94930537635291da39e7e612703334bf6fde8c7f1686fe8a45a2.
+The source-directory bypass is rejected. With no explicit archive, the selected ON profile uses
+the same pinned upstream URL and hash. No system zlib discovery or new version is substituted.
+
+The producer install includes a private qdcxx_ipf_zlib static archive and the upstream Zlib license.
+Installed/relocated consumers use that closure without zlib headers, source checkout or a separate
+compression SDK. The sealed HTTP/TLS SDK profile is unchanged. Pure IPF/feed with transfer OFF does
+not invoke this dependency helper or fetch/discover zlib; the tape compression option retains its
+independent meaning.
+
+The [compression contract](../spec/ipf/COMPRESSION.md) specifies finite allocator/work accounting.
+The [fixture oracle](../tests/fixtures/ipf/compression/README.md) documents actual JDK8 comparison,
+intentional ZIP deviations and EN/RU no-work help. C++ tests replay checked fixtures without Java.

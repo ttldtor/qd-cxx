@@ -37,11 +37,29 @@ and positive reader-lifetime tlsWork. DNS names require the explicit numeric DNS
 There is no system trust/default resolver or plaintext fallback. See
 [TLS resources](../transport/TLS-RESOURCES.md) for the same-image embedding obligations.
 
+## Reading compressed snapshots
+
+The same loadURL call reads plain, gzip and ZIP sources; the filename is not a selector.
+ZIP skips directories and returns the first file's IPF data. HTTP Content-Encoding:gzip selects
+one gzip layer; absent/identity coding selects by content magic. Nested envelopes and other HTTP
+codings are rejected rather than decoded recursively.
+
+Inspect result.envelope for the selected kind, admitted encoded/decoded byte counts, finite work
+and selected container completion. A gzip/ZIP trailer failure returns CONTAINER_FAILURE while
+retaining whole profiles already accepted by the IPF parser. envelope.finished, httpFinished,
+nativeRetired and ipf.finished/completionSeen report different boundaries. A COMPLETE marker
+alone does not make a corrupt compressed response successful.
+
+limits.envelope sets finite inputBytes, outputBytes, calls, workBytes, inflaterBytes, metadataBytes
+and entries. Output includes skipped directory payload. The compression-capable reader reserves
+its fixed decoder plus the entire inflater allowance before loading, including for plain input.
+See [container contract](COMPRESSION.md) and [ZIP interoperability decision](../../docs/decisions/ADR-0007-ipf-container-interoperability.md)
+for supported forms, Java runtime differences and resource units.
+
 ## Sources and credentials
 
 Sources are local paths, qualified file URIs, HTTP or HTTPS. The host:port shorthand with a valid
-port in1..65535 expands to http://host:port/ipf/all.ipf.gz and preserves the query. It does not
-enable compression. File URIs admit empty/localhost authority, no userinfo/port/query/fragment,
+port in1..65535 expands to http://host:port/ipf/all.ipf.gz and preserves the query. The compression envelope is selected from content, independently of that suffix. File URIs admit empty/localhost authority, no userinfo/port/query/fragment,
 and bounded percent-decoded UTF-8 path bytes without NUL. Windows drive and drive-relative forms
 follow the reference's Windows-only drive adjustment after shorthand classification. Unknown URI
 schemes fail before acquisition/I/O without local fallback.
@@ -147,8 +165,7 @@ thread/failure maxima. Reader-lifetime TLS credits are debited across loads/redi
 cancel, parser reset or child retirement refunds/reinitializes shared SDK history or host storage.
 Keep host maxima truthful across cooperating and foreign SDK users through final retirement.
 
-Compression and live collection are separate pipeline implementations; their absence is not a
-complete-client exclusion. Compressed signatures or unsupported Content-Encoding fail explicitly.
+Live collection remains a separate pipeline implementation. Supported source envelopes are defined in [COMPRESSION](COMPRESSION.md).
 
 ## References
 

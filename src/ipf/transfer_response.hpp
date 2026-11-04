@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 #pragma once
 
+#include "source_envelope.hpp"
 #include "transfer_source.hpp"
 
 #include <boost/beast/http/basic_parser.hpp>
@@ -28,24 +29,18 @@ struct TransferWork {
 
 /** Existing incremental IPF parser plus detached whole-profile collection. */
 class TransferProfiles {
-    InstrumentProfileParser parser_;     ///< Existing independent UTF-8/IPF parser.
-    IpfTransferResult &result_;          ///< Stable enclosing operation result.
-    TransferWork &work_;                 ///< Whole-load copy-work accounting, including profile-vector growth.
-    const IpfTransferLimits &limits_;    ///< Stable copy-work ceilings.
-    std::size_t profileLimit_;           ///< Existing logical profile limit, never increased by capacity growth.
-    std::array<std::byte, 4> initial_{}; ///< Finite compression-signature staging.
-    std::size_t initialSize_ = 0;        ///< Initialized signature prefix.
-    std::size_t initialConsumed_ = 0;    ///< Staged bytes accepted by the IPF parser.
-    bool failed_ = false;                ///< Parser/signature failure, independent of an earlier transport cause.
-    bool initialChecked_ = false;        ///< Signature check is committed once.
+    InstrumentProfileParser parser_;  ///< Existing independent UTF-8/IPF parser.
+    IpfTransferResult &result_;       ///< Stable enclosing operation result.
+    TransferWork &work_;              ///< Whole-load copy-work accounting, including profile-vector growth.
+    const IpfTransferLimits &limits_; ///< Stable copy-work ceilings.
+    std::size_t profileLimit_;        ///< Existing logical profile limit, never increased by capacity growth.
+    bool parserPending_ = false;      ///< Accepted bytes may still have a whole row/item pending before NEED_INPUT.
+    SourceEnvelope envelope_;         ///< Owned single-layer finite decoder, never a caller-input borrow.
+    bool failed_ = false;             ///< IPF parser failure independent of an envelope/native cause.
     /** Commit one existing parser step and detached progress.
      * @param step Owned parser result.
      */
     void observe(IpfReadStep step);
-    /** Check actual compressed-content signatures without assuming filename support.
-     * @return True for uncompressed staging, false with a typed unsupported cause.
-     */
-    [[nodiscard]] bool checkInitial();
 
     public:
     /** Prepare existing bounded parser and stable result borrow.
@@ -67,7 +62,27 @@ class TransferProfiles {
      * @return True only after a parser/signature failure.
      */
     [[nodiscard]] bool failed() const noexcept {
-        return failed_;
+        return failed_ || envelope_.failed();
+    }
+
+    /** Select the same single gzip envelope from HTTP metadata before any payload.
+     * @return False for conflicting/late selection.
+     */
+    bool declareGzip() noexcept {
+        return envelope_.declareGzip();
+    }
+
+    /** Parse only already owned decoded bytes; never invokes decoder/native/provider progress.
+     * @param work Finite existing IPF credits.
+     * @return True when no owned decoded prefix remains or the IPF parser failed.
+     */
+    bool drain(IpfReadWork &work);
+
+    /** Check whether failure retirement still has decoded prefix to publish.
+     * @return True for nonempty decoded cache and an eligible parser.
+     */
+    bool hasOwnedInput() const noexcept {
+        return !failed_ && (!envelope_.output().empty() || parserPending_);
     }
 
     /** Perform one finite EOF turn after a valid HTTP/local end.
@@ -87,6 +102,7 @@ class TransferResponse final : public boost::beast::http::basic_parser<false> {
     std::size_t trailers_ = 0;                     ///< Current message trailer count.
     bool locationSeen_ = false;                    ///< Duplicate Location is rejected.
     bool modifiedSeen_ = false;                    ///< Duplicate Last-Modified is rejected.
+    bool codingSeen_ = false;                      ///< Duplicate/stacked Content-Encoding is refused.
     bool liveSeen_ = false;                        ///< Duplicate X-Live is rejected.
     std::array<char, SOURCE_CAPACITY> location_{}; ///< Bounded derived redirect value.
     std::size_t locationSize_ = 0;                 ///< Initialized Location bytes.

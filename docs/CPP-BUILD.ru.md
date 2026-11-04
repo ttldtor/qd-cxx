@@ -1052,3 +1052,21 @@ exact read → reply; каждая byte script ограничена 4 MiB, дв�
 suite/group/hash/tickets/signature scheme/signature size; содержимое сертификатов/подписей не выводится.
 На POSIX родитель сохраняет waitable `SIGCHLD` без `SIG_IGN`/`SA_NOCLDWAIT` и исключительно reap своего child;
 известное несовместимое состояние до запуска возвращает `PROCESS_START`.
+
+## Зависимость сжатия IPF sources
+
+При ORG_TTLDTOR_QDCXX_BUILD_IPF_TRANSFER=ON producer приватно собирает прежний pinned zlib1.3.2
+через [cmake/Zlib.cmake](../cmake/Zlib.cmake), независимо от tape tools.
+ORG_TTLDTOR_QDCXX_ZLIB_ARCHIVE задаёт точный локальный архив; проверяются SHA256 архива,
+version header и SHA256 LICENSE, приведённые в английской версии. Обход через произвольный
+source directory отклоняется. Без явного архива выбранный ON profile использует прежние pinned
+URL/hash. Системный zlib и другая версия не подставляются.
+
+Install включает приватный static archive qdcxx_ipf_zlib и upstream Zlib license. Installed/relocated
+consumer использует эту поставку без zlib headers/source checkout/отдельного compression SDK.
+Sealed HTTP/TLS SDK не меняется. Pure IPF/feed при transfer OFF не вызывает helper и не получает/
+ищет zlib; tape compression option сохраняет отдельный смысл.
+
+[Контракт](../spec/ipf/COMPRESSION.ru.md) описывает конечные allocator/work budgets.
+[Fixture oracle](../tests/fixtures/ipf/compression/README.ru.md) фиксирует JDK8 comparison,
+намеренные ZIP отличия и EN/RU help без работы. C++ tests читают готовые fixtures без Java.

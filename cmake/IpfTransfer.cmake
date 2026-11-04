@@ -10,7 +10,8 @@ if(NOT IS_ABSOLUTE "${ORG_TTLDTOR_QDCXX_IPF_TRANSFER_SDK}" OR
 endif()
 find_package(qdcxx_ipf_transfer_sdk CONFIG REQUIRED NO_DEFAULT_PATH
     PATHS "${ORG_TTLDTOR_QDCXX_IPF_TRANSFER_SDK}/lib/cmake/qdcxx_ipf_transfer_sdk")
-add_library(qdcxx_ipf_transfer src/ipf/transfer_source.cpp src/ipf/transfer_response.cpp src/ipf/url_reader.cpp)
+include(cmake/Zlib.cmake)
+add_library(qdcxx_ipf_transfer src/ipf/transfer_source.cpp src/ipf/transfer_response.cpp src/ipf/source_envelope.cpp src/ipf/url_reader.cpp)
 target_link_libraries(qdcxx_ipf_transfer PUBLIC qdcxx_ipf qdcxx_tls PRIVATE qdcxx_private::url qdcxx_tls_ssl qdcxx_tls_crypto
     "$<BUILD_INTERFACE:c-ares::cares>")
 target_include_directories(qdcxx_ipf_transfer SYSTEM PRIVATE "${ORG_TTLDTOR_QDCXX_ASIO_INCLUDE}")
@@ -18,3 +19,14 @@ target_compile_definitions(qdcxx_ipf_transfer PRIVATE ASIO_STANDALONE ASIO_NO_DE
 set_target_properties(qdcxx_ipf_transfer PROPERTIES CXX_EXTENSIONS OFF)
 install(TARGETS qdcxx_ipf_transfer EXPORT qdcxxTargets ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 install(FILES include/qd/ipf/instrument_profile_url_reader.hpp DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qd/ipf")
+
+target_link_libraries(qdcxx_ipf_transfer PRIVATE
+    "$<BUILD_INTERFACE:ZLIB::ZLIBSTATIC>" "$<INSTALL_INTERFACE:qdcxx_ipf_zlib>")
+if(WIN32)
+    set(qdcxxIpfZlibInstalledName "qdcxx_ipf_zlib.lib")
+else()
+    set(qdcxxIpfZlibInstalledName "libqdcxx_ipf_zlib.a")
+endif()
+install(FILES "$<TARGET_FILE:ZLIB::ZLIBSTATIC>" DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    RENAME "${qdcxxIpfZlibInstalledName}")
+install(FILES "${qdcxx_zlib_SOURCE_DIR}/LICENSE" DESTINATION "${CMAKE_INSTALL_DATADIR}/qdcxx/licenses/zlib-1.3.2")

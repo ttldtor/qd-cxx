@@ -22,7 +22,7 @@ namespace org::ttldtor::qdcxx::ipf {
 enum class IpfTransferError {
     INVALID_OPTIONS,       ///< Finite limits, work, trust or timeout settings are incompatible.
     INVALID_SOURCE,        ///< Source syntax or the selected local/HTTP(S) form is invalid.
-    UNSUPPORTED_SOURCE,    ///< Scheme, file authority or compression is unsupported.
+    UNSUPPORTED_SOURCE,    ///< Scheme, file authority or HTTP content coding is unsupported.
     RESOURCE_LIMIT,        ///< A configured byte/count/backing bound refused admission.
     WORK_LIMIT,            ///< Cumulative finite progress/copy/parser work was exhausted.
     WRONG_THREAD,          ///< A checked facade operation ran outside its creating thread.
@@ -37,7 +37,8 @@ enum class IpfTransferError {
     AUTHORIZATION_FAILURE, ///< Selected authorization was unavailable, invalid or stale.
     IPF_FAILURE,           ///< The existing IPF parser failed, preserving its whole owned prefix.
     DEADLINE,              ///< A cooperative monotonic admission deadline expired.
-    CANCELLED              ///< Stop token, creator cancel or public-facade retirement cut off admission.
+    CANCELLED,             ///< Stop token, creator cancel or public-facade retirement cut off admission.
+    CONTAINER_FAILURE      ///< Selected gzip/ZIP framing, integrity or required end is invalid.
 };
 
 /** Static diagnostic with detached lower-layer evidence; no URL/token/exception formatting. */
@@ -61,6 +62,37 @@ enum class IpfLiveSupport {
     ABSENT,   ///< No X-Live response field.
     PROVIDED, ///< Exact documented provided response value.
     OTHER     ///< Present with another bounded value; no live collector is implied.
+};
+
+/** Magic-selected IPF envelope; HTTP gzip coding selects the same single GZIP layer. */
+enum class IpfEnvelopeKind {
+    NONE, ///< Uncompressed IPF bytes, independent of filename.
+    GZIP, ///< One or more gzip members under the stream compatibility contract.
+    ZIP   ///< Directories skipped, first file entry only; later archive entries are not interpreted.
+};
+
+/** Finite independent envelope ceilings; zero grants no corresponding work/storage. */
+struct IpfEnvelopeLimits {
+    std::size_t inputBytes = 67108864;   ///< Admitted encoded source/body bytes, including ignored trailing bytes.
+    std::size_t outputBytes = 67108864;  ///< Produced bytes, including skipped ZIP directory payload.
+    std::size_t calls = 1000000;         ///< Decoder turns, including no-progress/failing calls.
+    std::size_t workBytes = 1073741824;  ///< Offered input/output and zeroed allocation byte visits, never refunded.
+    std::size_t inflaterBytes = 131072;  ///< Simultaneously owned zlib allocations, including aligned headers.
+    std::size_t metadataBytes = 1048576; ///< Cumulative ZIP local name/extra/header bytes.
+    std::size_t entries = 1024;          ///< Gzip members or ZIP directories plus selected file.
+};
+
+/** Detached envelope progress; completion never authenticates HTTP/native or IPF completion. */
+struct IpfEnvelopeProgress {
+    IpfEnvelopeKind kind = IpfEnvelopeKind::NONE; ///< Selected once before payload publication.
+    std::size_t inputBytes = 0;                   ///< Accepted encoded bytes.
+    std::size_t outputBytes = 0;                  ///< Produced decoded bytes, including skipped directories.
+    std::size_t calls = 0;                        ///< Irreversible decoder call charges.
+    std::size_t workBytes = 0;                    ///< Irreversible preparation/progress byte visits.
+    std::size_t peakInflaterBytes = 0;            ///< Peak simultaneous zlib backing.
+    std::size_t entries = 0;                      ///< Admitted members/local entries.
+    std::size_t metadataBytes = 0;                ///< Admitted ZIP local header/name/extra bytes.
+    bool finished = false;                        ///< Required selected envelope integrity/end observed.
 };
 
 /** Finite whole-load bounds, in bytes/counts; zero grants no capacity. */
@@ -87,6 +119,7 @@ struct IpfTransferLimits {
     std::size_t inputBytes = 131072;  ///< Fixed contiguous HTTP input window.
     std::size_t requestBytes = 32768; ///< Fixed whole-request output slot.
     std::size_t residentBytes = 16 * 1024 * 1024; ///< Transfer-owned backing allowance, excluding lower-layer bounds.
+    IpfEnvelopeLimits envelope{};                 ///< Independent encoded/decoded/work/backing ceilings for one load.
 };
 
 /** Finite native/HTTP progress configuration, copied before activation; no ambient resolver/trust. */
@@ -204,6 +237,7 @@ struct IpfTransferResult {
     bool nativeRetired = false;                   ///< All owned native callbacks and buffers drained before return.
     std::size_t wireBytes = 0;                    ///< Admitted plaintext HTTP syntax/payload bytes.
     std::size_t redirects = 0;                    ///< Followed redirects.
+    IpfEnvelopeProgress envelope{}; ///< Owned envelope evidence, independent of HTTP/native/IPF completion.
 };
 
 /** Synchronous source reader over private bounded HTTP/native owners, without an application poll loop.
