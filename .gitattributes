@@ -748,3 +748,6 @@ tests/fixtures/event-text/provenance.json text eol=lf
 /tests/fixtures/schedule-filter/provenance.json text eol=lf
 /tools/upstream/schedule-query-oracle/FilterObservation.java text eol=lf
 /tools/upstream/schedule-query-oracle/ScheduleFilterOracle.java text eol=lf
+
+tests/fixtures/selectors/*.tsv -text -whitespace
+tests/fixtures/selectors/*.json text eol=lf

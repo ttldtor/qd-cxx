@@ -424,6 +424,9 @@ Peer::Peer(const core::LocalSchema &schema, std::span<const Record> records, std
       afterFinalRemove_(script.afterFinalRemove && !script.afterFinalRemove->empty()
                             ? data(*script.afterFinalRemove, wireFamily(script.family), script.canonicalSymbols)
                             : std::vector<std::byte>{}),
+      afterFollowupAdd_(script.afterFollowupAdd && !script.afterFollowupAdd->empty()
+                            ? data(*script.afterFollowupAdd, wireFamily(script.family), script.canonicalSymbols)
+                            : std::vector<std::byte>{}),
       expected_(expected.begin(), expected.end()), chunk_(chunk), mode_(mode), script_(std::move(script)),
       dataReleased_(!script_.waitForDataRelease) {
     require(chunk != 0);
@@ -457,6 +460,19 @@ Peer::Peer(const core::LocalSchema &schema, std::span<const Record> records, std
         require(script_.removeSequence && !script_.removeSequence->empty());
 
         for (const auto &record : *script_.afterFinalRemove) {
+            require(record.fieldTime.has_value() == script_.fieldMetadata);
+        }
+    }
+
+    if (script_.followupAdd) {
+        require(!script_.followupAdd->unordered && !script_.followupAdd->symbols.empty());
+        require(script_.followupAdd->symbols.size() == script_.followupAdd->recordIds.size());
+    }
+
+    if (script_.afterFollowupAdd) {
+        require(script_.followupAdd.has_value());
+
+        for (const auto &record : *script_.afterFollowupAdd) {
             require(record.fieldTime.has_value() == script_.fieldMetadata);
         }
     }
@@ -515,6 +531,8 @@ void Peer::serve(std::stop_token stop) noexcept {
         std::size_t initialEnd = 0;
         std::size_t afterRemoveEnd = 0;
         std::size_t addTuples = 0;
+        std::size_t followupTuples = 0;
+        bool followupReceived = false;
         std::size_t removeTuples = 0;
         std::size_t removeSet = 0;
         std::vector<unsigned char> removeMatches;
@@ -587,7 +605,8 @@ void Peer::serve(std::stop_token stop) noexcept {
                         addReceived = false;
                         reconnected = true;
                         initialEnd = afterRemoveEnd = 0;
-                        addTuples = removeTuples = removeSet = 0;
+                        addTuples = removeTuples = removeSet = followupTuples = 0;
+                        followupReceived = false;
                         removeMatches.clear();
                         reader.reset();
 
@@ -617,7 +636,13 @@ void Peer::serve(std::stop_token stop) noexcept {
                                 expectedIds = command.recordIds;
                             }
 
-                            auto &tuples = adding ? addTuples : removeTuples;
+                            if (adding && addReceived) {
+                                require(script_.followupAdd.has_value() && !followupReceived);
+                                expected = script_.followupAdd->symbols;
+                                expectedIds = script_.followupAdd->recordIds;
+                            }
+
+                            auto &tuples = adding ? (addReceived ? followupTuples : addTuples) : removeTuples;
                             std::span<unsigned char> matched;
 
                             if (!adding && script_.removeSequence && (*script_.removeSequence)[removeSet].unordered) {
@@ -636,8 +661,13 @@ void Peer::serve(std::stop_token stop) noexcept {
                             }
 
                             if (adding) {
-                                require(!addReceived);
-                                addReceived = true;
+                                if (!addReceived) {
+                                    addReceived = true;
+                                } else {
+                                    followupReceived = true;
+                                    output.insert(output.end(), afterFollowupAdd_.begin(), afterFollowupAdd_.end());
+                                }
+
                                 ++adds_;
                             } else {
                                 if (script_.removeSequence) {

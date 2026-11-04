@@ -30,13 +30,15 @@ struct ReceivingSymbol {
     std::u16string physical; ///< Owned suffix-free text, shared by matching regional routes of this selector.
     char16_t exchange = 0;   ///< Syntactic logical exchange, preserving trailing attributes.
     std::array<bool, RECEIVING_EVENT_KINDS> regional{}; ///< Exact regional match per business kind.
+    core::SubscriptionSelectorKind selector = core::SubscriptionSelectorKind::EXACT; ///< Explicit ALL has no text.
 };
 
-/** Separate finite reservation for desired routing temporaries, excluding frontend and queue-owned storage. */
+/** Worker routing reservation plus a separate producer-attempt metric; queue-owned storage remains separate. */
 struct ReceivingRoutingLimits {
     std::size_t symbols = 0;               ///< Maximum logical snapshot and physical-copy slots.
     std::size_t temporaryTextUnits = 0;    ///< Combined logical snapshot plus physical UTF-16 units.
     std::size_t temporaryBytes = 0;        ///< Logical wrapper/input/text backing including terminators, not heap/RSS.
+    std::size_t frontendSelectorBytes = 0; ///< Four banks for one producer attempt, separate from worker/queue copies.
     std::size_t retainedMetadataBytes = 0; ///< Fixed exchange array backing, separately retained in the profile.
     mux::QueueSubmitWork work{};           ///< Conservative per-attempt scans, copies, backing and disposal charge.
 };

@@ -59,6 +59,8 @@ struct PeerScript {
     ///< Hold the first connection until client close, then accept one fresh connection and validate its replayed ADD.
     std::optional<std::vector<Record>> afterFinalRemove;
     ///< Override only the last scripted REMOVE response; an empty vector sends no further DATA frame.
+    std::optional<ExpectedSubscription> followupAdd; ///< At most one ordered exact additional ADD group per session.
+    std::optional<std::vector<Record>> afterFollowupAdd; ///< Data queued only after the entire followup ADD matched.
 };
 
 /** Encode the existing independent peer readiness/complete-description fixture without opening a socket.
@@ -93,6 +95,7 @@ class Peer {
     std::vector<std::byte> afterRemove_;
     std::vector<std::byte> afterReconnect_;
     std::vector<std::byte> afterFinalRemove_;
+    std::vector<std::byte> afterFollowupAdd_;
     std::vector<std::u16string> expected_;
     std::size_t chunk_;
     PeerMode mode_;

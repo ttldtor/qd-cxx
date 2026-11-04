@@ -1,0 +1,66 @@
+{
+  "revision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "javaVersion": "openjdk version \"1.8.0_422\"",
+  "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
+  "javacSha256": "633143e961aa18051c09112b85333f5cdbd845b54eb39678eb15b91ca8bbb527",
+  "harnessSha256": "cf278f9ef0920339ca4163986ee1b5808f8c7ff11c103153e224341f6fb23b94",
+  "launcherSha256": "573b97f0d8024867b8cd6d1ba2937b2627599260da4218343098eb0ceef22514",
+  "upstreamSources": [
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/api/osub/IndexedEventSubscriptionSymbol.java",
+      "sha256": "f847a984bee45a4070ee2c9539209f6c66afdf5f8dc24d7cd78e7ddce93984e9"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/api/osub/TimeSeriesSubscriptionSymbol.java",
+      "sha256": "98ccbcb5d20e47e219f17cd3797ea83fc033484a8e05349dff9d847df5d0e229"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/api/osub/WildcardSymbol.java",
+      "sha256": "ed51fe4be958afa975c42bf1933a104dd9f22ebb1c756f44dad33aac3e74567f"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/IndexedEventSource.java",
+      "sha256": "5b2df5fd210f02e641188dcf657b65e11a6d1d042203d47c8bad43559c9e61ea"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/OrderSource.java",
+      "sha256": "3b0d0b0e83f685efd688b87dba479003a76d9ad69097867326b74206dc3a2a45"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/api/impl/DXFeedImpl.java",
+      "sha256": "7402a8be3bb5deaa84fc907c6b69bc91d0ec58d1883bf3c97b8260b1d1017caf"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/api/impl/EventDelegate.java",
+      "sha256": "5e6c90ed4115f57708d01f697dedcdc6bc168e41d254b6e245516feb073f5593"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/api/impl/EventDelegateSet.java",
+      "sha256": "50d60da8d08b8c6308bf60d4fe9a05b64361d3d62e7b4c954e19e53c005bc3f0"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/MarketEventDelegateSet.java",
+      "sha256": "9e24ece8e776e917ac8ac252294e19e22a8262fb6779bd48cf4bb9f9f51b7867"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/SourceBasedDelegateSet.java",
+      "sha256": "a237613ab0cc2b34e7cbe6cc3ac6c8a6a712190fe89ffc194253d91b0274e9de"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/MarketFactoryImpl.java",
+      "sha256": "c74b324b2f99d2a351963fead08419c2ba1d92573c633d30740295acc9d0bac4"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/util/TimeSequenceUtil.java",
+      "sha256": "ee1fc453383b8b978693475e80fa22f89ef70b947db637a417e66895f70a8596"
+    },
+    {
+      "path": "dxlib/src/main/java/com/devexperts/util/TimeUtil.java",
+      "sha256": "3aeba61ca5d1c6580ae7915be0b4d4cacf3264a0e907345b85da726a529dfbc3"
+    }
+  ],
+  "productionClassInventorySha256": "90a478b5d3737246d8c897322c9f9db60887846e20117572588e05ae78fbc6d8",
+  "fixtureSha256": "aab1700491f72c4011a6bc00ba772e9019c95e832bdf793f147c1d911d485bdc",
+  "rows": 90,
+  "timezoneInvariant": true
+}

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "qd/api/event_registry.hpp"
+#include "qd/api/subscription_selector.hpp"
 #include "qd/client/endpoint_options.hpp"
 #include "qd/events/candle_symbol.hpp"
 #include "qd/events/profile.hpp"
@@ -81,9 +82,9 @@ class Error final : public std::runtime_error {
 struct RuntimeOptions {
     std::size_t maximumEndpoints = 4;                ///< Maximum pending, active and retiring endpoint slots together.
     std::size_t maximumSubscriptionsPerEndpoint = 8; ///< Pending, active and retiring registrations together.
-    std::size_t maximumSymbolsPerSubscription = 16;  ///< Maximum distinct exact ASCII selectors per subscription.
+    std::size_t maximumSymbolsPerSubscription = 16;  ///< Maximum distinct logical selector identities per subscription.
     std::size_t maximumListenersPerSubscription = 4; ///< Pending, active and selected/retiring listener slots together.
-    std::size_t maximumSymbolUnits = 128;            ///< Maximum units of one exact printable ASCII selector.
+    std::size_t maximumSymbolUnits = 128; ///< Maximum event-text units in one activated printable ASCII selector.
     std::vector<transport::DnsServer>
         dnsServers;             ///< Explicit IPv4 resolvers; empty discovers a bounded system snapshot.
     std::uint16_t dnsPort = 53; ///< Shared UDP/TCP resolver port, in 1..65535.
@@ -113,7 +114,8 @@ struct EndpointOptions {
     std::chrono::milliseconds drainTimeout{1000}; ///< Local admitted-prefix retirement allowance.
     std::uint32_t maximumAttempts = 3;            ///< Total connection attempts, including the initial attempt.
     std::optional<EventRegistry>
-        eventRegistry; ///< Immutable owning snapshot; absence selects built-in Quote/Profile/Trade.
+        eventRegistry;           ///< Immutable owning snapshot; absence selects the current built-in market registry.
+    bool enableWildcard = false; ///< Explicit controlled-peer STREAM All permission; never enabled by text or peer.
 };
 
 /** Last SDK-worker observation, never an upstream acknowledgement or a whole-network guarantee. */
@@ -282,6 +284,22 @@ template <class Event> class Subscription final {
         setCandleSymbols(std::span(symbols.begin(), symbols.size()));
     }
 
+    /** Atomically add explicit selectors. Current market types ignore INDEXED source IDs as Java does.
+     * @param selectors Borrowed batch of at most maximumSymbolsPerSubscription values, including duplicates.
+     * @throws Error Unsupported TIME_SERIES, disabled/non-STREAM ALL, invalid text or finite capacity refusal;
+     * no part of the batch is published. No caller value or source name is retained by reference.
+     */
+    void addSelectors(std::span<const SubscriptionSelector> selectors);
+    /** Atomically replace the complete logical selector set.
+     * @param selectors Borrowed bounded batch; empty withdraws all demand. Identity includes kind and source ID.
+     * @throws Error Same atomic validation and finite-capacity refusals as addSelectors.
+     */
+    void setSelectors(std::span<const SubscriptionSelector> selectors);
+    /** Remove one typed identity; an absent identity is an idempotent no-op.
+     * @param selector Borrowed value; removing PLAIN never removes an overlapping INDEXED or ALL identity.
+     * @throws Error Existing validation, closed-state or allocation refusal.
+     */
+    void removeSelector(const SubscriptionSelector &selector);
     /** Withdraw all accepted selectors asynchronously. */
     void clearSymbols();
     /** Request closure without waiting, including from a listener; ordinary capacity cannot block it. */

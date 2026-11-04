@@ -1,0 +1,90 @@
+pair	ies-self	com.dxfeed.api.osub.IndexedEventSubscriptionSymbol	com.dxfeed.api.osub.IndexedEventSubscriptionSymbol	true	true	2001436	2001436
+pair	ies-same-id-different-name	com.dxfeed.api.osub.IndexedEventSubscriptionSymbol	com.dxfeed.api.osub.IndexedEventSubscriptionSymbol	true	true	2001436	2001436
+pair	ies-same-id-null-name	com.dxfeed.api.osub.IndexedEventSubscriptionSymbol	com.dxfeed.api.osub.IndexedEventSubscriptionSymbol	true	true	2001436	2001436
+pair	ies-different-source	com.dxfeed.api.osub.IndexedEventSubscriptionSymbol	com.dxfeed.api.osub.IndexedEventSubscriptionSymbol	false	false	2001436	2001467
+pair	ies-tss-zero	com.dxfeed.api.osub.IndexedEventSubscriptionSymbol	com.dxfeed.api.osub.TimeSeriesSubscriptionSymbol	true	false	2001436	2001436
+pair	ies-tss-minus	com.dxfeed.api.osub.IndexedEventSubscriptionSymbol	com.dxfeed.api.osub.TimeSeriesSubscriptionSymbol	true	false	2001436	2001436
+pair	ies-tss-plus	com.dxfeed.api.osub.IndexedEventSubscriptionSymbol	com.dxfeed.api.osub.TimeSeriesSubscriptionSymbol	true	false	2001436	2001436
+pair	ies-tss-max	com.dxfeed.api.osub.IndexedEventSubscriptionSymbol	com.dxfeed.api.osub.TimeSeriesSubscriptionSymbol	true	false	2001436	2001436
+pair	ies-tss-min	com.dxfeed.api.osub.IndexedEventSubscriptionSymbol	com.dxfeed.api.osub.TimeSeriesSubscriptionSymbol	true	false	2001436	2001436
+pair	other-source-tss	com.dxfeed.api.osub.IndexedEventSubscriptionSymbol	com.dxfeed.api.osub.TimeSeriesSubscriptionSymbol	false	false	2001467	2001436
+pair	tss-zero-minus	com.dxfeed.api.osub.TimeSeriesSubscriptionSymbol	com.dxfeed.api.osub.TimeSeriesSubscriptionSymbol	true	true	2001436	2001436
+pair	tss-zero-plus	com.dxfeed.api.osub.TimeSeriesSubscriptionSymbol	com.dxfeed.api.osub.TimeSeriesSubscriptionSymbol	true	true	2001436	2001436
+pair	tss-zero-max	com.dxfeed.api.osub.TimeSeriesSubscriptionSymbol	com.dxfeed.api.osub.TimeSeriesSubscriptionSymbol	true	true	2001436	2001436
+pair	tss-zero-min	com.dxfeed.api.osub.TimeSeriesSubscriptionSymbol	com.dxfeed.api.osub.TimeSeriesSubscriptionSymbol	true	true	2001436	2001436
+pair	tss-other-symbol	com.dxfeed.api.osub.TimeSeriesSubscriptionSymbol	com.dxfeed.api.osub.TimeSeriesSubscriptionSymbol	false	false	2001436	2375924
+pair	ies-plain-text	com.dxfeed.api.osub.IndexedEventSubscriptionSymbol	java.lang.String	false	false	2001436	2001436
+pair	tss-plain-text	com.dxfeed.api.osub.TimeSeriesSubscriptionSymbol	java.lang.String	false	false	2001436	2001436
+pair	wildcard-self	com.dxfeed.api.osub.WildcardSymbol	com.dxfeed.api.osub.WildcardSymbol	true	true	42	42
+pair	wildcard-literal-star	com.dxfeed.api.osub.WildcardSymbol	java.lang.String	false	false	42	42
+pair	wildcard-leading-star	com.dxfeed.api.osub.WildcardSymbol	java.lang.String	false	false	42	40789318
+value	tss-zero	0	0
+value	tss-max	9223372036854775807	0
+value	tss-min	-9223372036854775808	0
+value	wildcard-text	*	*
+collection	HashSet-ies-then-tss	2
+collection	HashSet-tss-then-ies	1
+construction	ies-null-symbol	java.lang.NullPointerException
+construction	ies-null-source	java.lang.NullPointerException
+construction	tss-null-symbol	java.lang.NullPointerException
+route	Quote	AAPL	-1	1	Quote	AAPL
+route	Quote	AAPL	0	1	Quote	AAPL
+route	Quote	AAPL	1	1	Quote	AAPL
+route	Quote	AAPL	5133398	1	Quote	AAPL
+time-series-delegates	Quote	AAPL	0
+route	Quote	AAPL&Q	-1	1	Quote&Q	AAPL
+route	Quote	AAPL&Q	0	1	Quote&Q	AAPL
+route	Quote	AAPL&Q	1	1	Quote&Q	AAPL
+route	Quote	AAPL&Q	5133398	1	Quote&Q	AAPL
+time-series-delegates	Quote	AAPL&Q	0
+route	Quote	AAPL&N	-1	1	Quote	AAPL&N
+route	Quote	AAPL&N	0	1	Quote	AAPL&N
+route	Quote	AAPL&N	1	1	Quote	AAPL&N
+route	Quote	AAPL&N	5133398	1	Quote	AAPL&N
+time-series-delegates	Quote	AAPL&N	0
+route	Quote	AAPL&Q{x=y}	-1	1	Quote&Q	AAPL{x=y}
+route	Quote	AAPL&Q{x=y}	0	1	Quote&Q	AAPL{x=y}
+route	Quote	AAPL&Q{x=y}	1	1	Quote&Q	AAPL{x=y}
+route	Quote	AAPL&Q{x=y}	5133398	1	Quote&Q	AAPL{x=y}
+time-series-delegates	Quote	AAPL&Q{x=y}	0
+route	Quote	AB*	-1	1	Quote	AB*
+route	Quote	AB*	0	1	Quote	AB*
+route	Quote	AB*	1	1	Quote	AB*
+route	Quote	AB*	5133398	1	Quote	AB*
+time-series-delegates	Quote	AB*	0
+route	Quote	A?	-1	1	Quote	A?
+route	Quote	A?	0	1	Quote	A?
+route	Quote	A?	1	1	Quote	A?
+route	Quote	A?	5133398	1	Quote	A?
+time-series-delegates	Quote	A?	0
+route	Quote	*	-1	0	-	-
+route	Quote	*	0	0	-	-
+route	Quote	*	1	0	-	-
+route	Quote	*	5133398	0	-	-
+time-series-delegates	Quote	*	0
+route	Quote	*A	-1	0	-	-
+route	Quote	*A	0	0	-	-
+route	Quote	*A	1	0	-	-
+route	Quote	*A	5133398	0	-	-
+time-series-delegates	Quote	*A	0
+wildcard-delegates	Quote	2
+time	-9223372036854775808	-9223372036049469440
+time	-9223372036854775807	-9223372036045275136
+time	-2147483648001	-9223372032664666112
+time	-1001	-4399824896
+time	-1	-104857600
+time	0	0
+time	1	4194304
+time	999	4190109696
+time	1000	4294967296
+time	2147483647999	9223372036749918208
+time	2147483648000	9223372032559808512
+time	9223372036854775806	9223372035940417536
+time	9223372036854775807	9223372036854775807
+source-route	Order	-1	3	Order|Order#NTV|Order#BYX
+source-route	Order	-2	3	Order|Order#NTV|Order#BYX
+source-route	Order	-2147483648	3	Order|Order#NTV|Order#BYX
+source-route	Order	0	1	Order
+source-route	Order	5133398	1	Order#NTV
+source-route	Order	4348248	1	Order#BYX
+source-route	Order	123456789	0	-

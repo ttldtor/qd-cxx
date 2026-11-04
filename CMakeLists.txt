@@ -134,6 +134,9 @@ if(ORG_TTLDTOR_QDCXX_BUILD_SCHEDULE)
         resources/schedule/manifest.json DESTINATION "${CMAKE_INSTALL_DATADIR}/qdcxx/schedule")
     install(FILES licenses/schedule/MPL-2.0.txt DESTINATION "${CMAKE_INSTALL_DATADIR}/qdcxx/licenses/schedule")
 endif()
+add_library(qdcxx_subscription_selectors src/api/subscription_selector.cpp)
+target_link_libraries(qdcxx_subscription_selectors PUBLIC qdcxx_order_index qdcxx_event_values)
+set_target_properties(qdcxx_subscription_selectors PROPERTIES CXX_EXTENSIONS OFF)
 add_library(qdcxx_event_mapping src/events/event_mapping.cpp)
 add_library(qdcxx_order_index src/events/order_index.cpp)
 target_link_libraries(qdcxx_order_index PUBLIC qdcxx_event_mapping qdcxx_event_sources)
@@ -249,7 +252,7 @@ if(ORG_TTLDTOR_QDCXX_BUILD_FEED_API)
     add_library(qdcxx_feed src/api/feed.cpp src/api/receiving_profile.cpp src/api/event_registry.cpp src/api/system_dns.cpp)
     add_library(qdcxx::feed ALIAS qdcxx_feed)
     target_include_directories(qdcxx_feed PRIVATE src/api)
-    target_link_libraries(qdcxx_feed PUBLIC qdcxx_recovery qdcxx_quote qdcxx_profile qdcxx_trade qdcxx_trade_eth qdcxx_summary qdcxx_market_event_symbols qdcxx_event_sources qdcxx_order_index qdcxx_candle_values)
+    target_link_libraries(qdcxx_feed PUBLIC qdcxx_subscription_selectors qdcxx_recovery qdcxx_quote qdcxx_profile qdcxx_trade qdcxx_trade_eth qdcxx_summary qdcxx_market_event_symbols qdcxx_event_sources qdcxx_order_index qdcxx_candle_values)
     set_target_properties(qdcxx_feed PROPERTIES CXX_EXTENSIONS OFF)
     if(WIN32)
         target_compile_definitions(qdcxx_feed PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN _WIN32_WINNT=0x0A00)
@@ -271,8 +274,9 @@ if(ORG_TTLDTOR_QDCXX_BUILD_EXAMPLES AND ORG_TTLDTOR_QDCXX_BUILD_SCHEDULE)
 endif()
 
 include(CMakePackageConfigHelpers)
+install(FILES include/qd/api/subscription_selector.hpp DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qd/api")
 install(TARGETS qdcxx_encoding qdcxx_core qdcxx_protocol qdcxx_collectors qdcxx_mux
-    qdcxx_event_values qdcxx_event_mapping qdcxx_quote qdcxx_profile qdcxx_trade qdcxx_trade_eth qdcxx_summary qdcxx_market_event_symbols qdcxx_event_sources qdcxx_order_index qdcxx_candle_values qdcxx_java_double qdcxx_event_text EXPORT qdcxxTargets
+    qdcxx_subscription_selectors qdcxx_event_values qdcxx_event_mapping qdcxx_quote qdcxx_profile qdcxx_trade qdcxx_trade_eth qdcxx_summary qdcxx_market_event_symbols qdcxx_event_sources qdcxx_order_index qdcxx_candle_values qdcxx_java_double qdcxx_event_text EXPORT qdcxxTargets
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
@@ -498,6 +502,22 @@ if(BUILD_TESTING)
         add_test(NAME event_text_example_run COMMAND qdcxx_event_text_example --run)
         set_tests_properties(event_text_example_run PROPERTIES TIMEOUT 30)
     endif()
+
+    find_program(ORG_TTLDTOR_QDCXX_SELECTOR_ORACLE_PWSH NAMES pwsh)
+    if(ORG_TTLDTOR_QDCXX_SELECTOR_ORACLE_PWSH)
+        add_test(NAME selector_oracle_help COMMAND "${CMAKE_COMMAND}"
+            "-DORG_TTLDTOR_QDCXX_SELECTOR_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DORG_TTLDTOR_QDCXX_SELECTOR_ORACLE_PWSH=${ORG_TTLDTOR_QDCXX_SELECTOR_ORACLE_PWSH}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/selector_oracle_help.cmake")
+        set_tests_properties(selector_oracle_help PROPERTIES TIMEOUT 120)
+    endif()
+    add_executable(qdcxx_subscription_selector_tests tests/conformance/subscription_selector_tests.cpp)
+    target_link_libraries(qdcxx_subscription_selector_tests PRIVATE qdcxx_subscription_selectors doctest::doctest)
+    target_compile_definitions(qdcxx_subscription_selector_tests PRIVATE
+        ORG_TTLDTOR_QDCXX_SELECTOR_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/selectors/oracle.tsv")
+    set_target_properties(qdcxx_subscription_selector_tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME subscription_selectors COMMAND qdcxx_subscription_selector_tests)
+    set_tests_properties(subscription_selectors PROPERTIES TIMEOUT 60)
     add_executable(qdcxx_order_index_tests tests/conformance/order_index_tests.cpp)
     target_link_libraries(qdcxx_order_index_tests PRIVATE qdcxx_order_index doctest::doctest)
     target_compile_definitions(qdcxx_order_index_tests PRIVATE
@@ -736,6 +756,24 @@ if(BUILD_TESTING)
             endif()
             add_test(NAME event_registry_feed COMMAND qdcxx_event_registry_feed_tests)
             set_tests_properties(event_registry_feed PROPERTIES TIMEOUT 45)
+            add_executable(qdcxx_selector_profile_tests tests/conformance/selector_profile_tests.cpp)
+            target_include_directories(qdcxx_selector_profile_tests PRIVATE src/api)
+            target_link_libraries(qdcxx_selector_profile_tests PRIVATE qdcxx_feed doctest::doctest)
+            set_target_properties(qdcxx_selector_profile_tests PROPERTIES CXX_EXTENSIONS OFF)
+            add_test(NAME selector_profile COMMAND qdcxx_selector_profile_tests)
+            set_tests_properties(selector_profile PROPERTIES TIMEOUT 60)
+            add_executable(qdcxx_selector_feed_tests tests/conformance/selector_feed_tests.cpp tests/conformance/connect_peer.cpp)
+            target_link_libraries(qdcxx_selector_feed_tests PRIVATE qdcxx_feed)
+            set_target_properties(qdcxx_selector_feed_tests PROPERTIES CXX_EXTENSIONS OFF)
+            if(WIN32)
+                target_compile_definitions(qdcxx_selector_feed_tests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+                target_link_libraries(qdcxx_selector_feed_tests PRIVATE ws2_32)
+            endif()
+            add_test(NAME selector_feed COMMAND qdcxx_selector_feed_tests "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/event-times/oracle.tsv"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/summary/oracle.tsv"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/trade/oracle.tsv"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/trade-eth/oracle.tsv")
+            set_tests_properties(selector_feed PROPERTIES TIMEOUT 60)
             add_executable(qdcxx_event_time_feed_tests tests/conformance/event_time_feed_tests.cpp tests/conformance/connect_peer.cpp)
             target_link_libraries(qdcxx_event_time_feed_tests PRIVATE qdcxx_feed)
             set_target_properties(qdcxx_event_time_feed_tests PROPERTIES CXX_EXTENSIONS OFF)

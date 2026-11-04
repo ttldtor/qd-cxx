@@ -19,11 +19,13 @@
 #include <condition_variable>
 #include <cstdlib>
 #include <functional>
+#include <limits>
 #include <mutex>
 #include <new>
 #include <optional>
 #include <stdexcept>
 #include <thread>
+#include <type_traits>
 #include <utility>
 
 /** Test-executable-only allocation faults; production targets have no fault hook. */
@@ -2551,4 +2553,65 @@ TEST_CASE("public feed uses canonical Candle object identity in its atomic desir
     subscription->removeSymbols(equivalent);
     subscription->addSymbols("OTHER");
     CHECK(endpoint->closeAndAwaitTermination().drained);
+}
+
+TEST_CASE("decorated selector copy assignment preserves typed invariant on allocation refusal") {
+    using Selector = api::SubscriptionSelector;
+    static_assert(std::is_nothrow_move_constructible_v<Selector>);
+    static_assert(std::is_nothrow_move_assignable_v<Selector>);
+    auto target = Selector::indexed(u"A", {7, std::nullopt});
+    const auto source = Selector::timeSeries(std::u16string(128, u'B'), std::numeric_limits<std::int64_t>::max());
+    const auto before = target;
+    bool refused = false;
+    allocation_probe::failNext = true;
+    try {
+        target = source;
+    } catch (const std::bad_alloc &) {
+        refused = true;
+    }
+    allocation_probe::failNext = false;
+    REQUIRE(refused);
+    CHECK(target.sameDemand(before));
+    CHECK(target.kind() == api::SubscriptionSymbolKind::INDEXED);
+    CHECK(target.sourceId() == 7);
+    CHECK_FALSE(target.fromTime());
+    target = source;
+    CHECK(target.sameDemand(source));
+    const auto copied = target;
+    target = target;
+    CHECK(target.sameDemand(copied));
+    auto moved = std::move(target);
+    CHECK(moved.sameDemand(copied));
+    target = std::move(moved);
+    CHECK(target.sameDemand(copied));
+    target = std::move(target);
+    // Moved-from and self-moved values stay valid with unspecified text, not guaranteed previous contents.
+    CHECK(target.kind() == api::SubscriptionSymbolKind::TIME_SERIES);
+    CHECK(target.sourceId() == 0);
+    CHECK(target.fromTime().has_value());
+    target = Selector::plain(u"RECOVERED");
+    CHECK(target.sameDemand(Selector::plain(u"RECOVERED")));
+}
+
+TEST_CASE("detached explicit All selector keeps CLOSED rejection after endpoint owner retirement") {
+    std::shared_ptr<api::Subscription<events::Quote>> detached;
+    const auto all = api::SubscriptionSelector::all();
+    {
+        api::RuntimeOptions limits;
+        limits.dnsServers.push_back({{127, 0, 0, 1}});
+        api::ApiRuntime runtime(limits);
+        api::EndpointOptions options;
+        options.contract = api::DeliveryContract::STREAM;
+        options.enableWildcard = true;
+        auto endpoint = runtime.createEndpoint(options);
+        detached = endpoint->getFeed()->createSubscription<events::Quote>();
+        detached->setSelectors(std::span(&all, 1));
+        runtime.closeAndAwaitTermination();
+    }
+    CHECK(errorCode([&] {
+              detached->addSelectors(std::span(&all, 1));
+          }) == api::ErrorCode::CLOSED);
+    CHECK(errorCode([&] {
+              detached->removeSelector(all);
+          }) == api::ErrorCode::CLOSED);
 }

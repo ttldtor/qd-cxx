@@ -335,3 +335,5 @@ The [IPF compression fixture oracle](../../tests/fixtures/ipf/compression/README
 - [CompletionWaitOracle](../../tests/fixtures/ipf/live/README.md): pinned JDK8 first-snapshot wait/interrupt/close observations; input-free EN/RU help, one owned temporary regular file, finite owned thread cleanup; no network.
 
 The [event-text oracle](../upstream/event-text-oracle/README.md) captures/verifies actual explicit-context event/value output, per-case JDK numeric version changes and three fresh-instance TimeFormat cache corrections. No arguments, EN/RU help and Get-Help require no working paths and start no Java. The [UTF-8 console example](../../examples/event_text/README.md) prints a complete owned string through std::cout; its input-free help starts no context/provider work.
+
+The [production selector oracle](../upstream/selector-oracle/README.md) checks pinned Java8 typed identity, source/regional/wildcard delegate demand and signed time bounds. Noargs/ENRU/Get-Help needs no inputs and starts no Java; four operational paths, heap128MiB/60s, fresh evidence and Capture/Verify are documented with the tool.

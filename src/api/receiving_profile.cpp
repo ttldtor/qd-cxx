@@ -28,7 +28,6 @@ constexpr std::size_t CONTROL_BYTES = 256 * MEBIBYTE;     ///< Qualified logical
 constexpr std::size_t DNS_ENVELOPE_BYTES = 80 * MEBIBYTE; ///< Separate documented DNS SDK envelope.
 constexpr std::uint64_t DNS_PROGRESS_UNITS = 351280142190671838ULL; ///< Complete documented DNS logical charge.
 constexpr std::size_t WRITER_CONFIGURATION_BYTES = 4 * MEBIBYTE;    ///< Retained complete writer reservation.
-constexpr auto SELECTORS = core::SubscriptionSelectorPolicy::CANONICAL_EXACT_V1; ///< Exact ASCII selector domain.
 
 /** Reject before activating any native state.
  * @param code Detached high-level category.
@@ -374,7 +373,9 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
     ReceivingProfile result(std::move(schema), std::move(*endpoint));
     result.family = options.contract == DeliveryContract::TICKER ? core::SubscriptionFamily::TICKER
                                                                  : core::SubscriptionFamily::STREAM;
-    result.recoveryOptions.selectors = SELECTORS;
+    result.recoveryOptions.selectors = options.enableWildcard
+                                           ? core::SubscriptionSelectorPolicy::CANONICAL_STREAM_ALL_V1
+                                           : core::SubscriptionSelectorPolicy::CANONICAL_EXACT_V1;
     result.recoveryOptions.dns.serverCount = runtime.dnsServers.size();
     result.recoveryOptions.dns.port = runtime.dnsPort;
     std::ranges::copy(runtime.dnsServers, result.recoveryOptions.dns.servers.begin());
@@ -419,6 +420,10 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
     auto &routing = result.routing;
     routing.symbols = runtime.maximumSymbolsPerSubscription;
     const auto logicalUnits = multiply(routing.symbols, runtime.maximumSymbolUnits);
+    constexpr std::size_t FRONTEND_SELECTOR_BANKS = 4;
+    routing.frontendSelectorBytes =
+        multiply(FRONTEND_SELECTOR_BANKS, add(multiply(routing.symbols, sizeof(SubscriptionSelector)),
+                                              multiply(add(logicalUnits, routing.symbols), sizeof(char16_t))));
     routing.temporaryTextUnits = multiply(2, logicalUnits);
     // The port's retained logical set and the queue's owned command copies have their own existing bounds.
     const auto textBacking = multiply(add(routing.temporaryTextUnits, multiply(2, routing.symbols)), sizeof(char16_t));
@@ -547,8 +552,14 @@ void prepareReceivingSymbols(const ReceivingProfile &profile, const ReceivingEve
                              std::span<ReceivingSymbol> symbols) {
     for (auto &symbol : symbols) {
         symbol.regional = {};
-        // Retire any previous physical backing before constructing its replacement, including helper reuse.
+        symbol.exchange = 0;
+        // Retire previous physical backing before either Exact conversion or an unused-text All key.
         std::u16string{}.swap(symbol.physical);
+
+        if (symbol.selector == core::SubscriptionSelectorKind::ALL) {
+            continue;
+        }
+
         symbol.exchange = events::market_symbols::getExchangeCode(symbol.logical);
 
         for (std::size_t offset = 0; offset < plan.bindingCount; ++offset) {
@@ -578,18 +589,19 @@ bool receivingSymbolMatches(const ReceivingProfile &profile, std::size_t binding
     const auto kind = static_cast<std::size_t>(profile.bindings[bindingIndex].kind);
     const auto exchange = profile.bindingExchanges[bindingIndex];
 
-    return exchange ? exchange == symbol.exchange : !symbol.regional[kind];
+    return symbol.selector == core::SubscriptionSelectorKind::ALL ||
+           (exchange ? exchange == symbol.exchange : !symbol.regional[kind]);
 }
 
 std::expected<mux::MuxQueue, mux::QueueFailure> createReceivingQueue(const ReceivingProfile &profile,
                                                                      mux::QueueWork &work) {
     if (profile.family == core::SubscriptionFamily::TICKER) {
         return mux::MuxQueue::createTicker(profile.schema, profile.interests, profile.tickerLimits,
-                                           {false, 100, SELECTORS}, profile.queueLimits, work);
+                                           {false, 100, profile.recoveryOptions.selectors}, profile.queueLimits, work);
     }
 
     return mux::MuxQueue::createStream(profile.schema, profile.interests, profile.endpoint.settings().budgets.desired,
                                        profile.endpoint.settings().budgets.collector, profile.queueLimits, work,
-                                       SELECTORS);
+                                       profile.recoveryOptions.selectors);
 }
 } // namespace org::ttldtor::qdcxx::api::detail

@@ -441,3 +441,7 @@ source business doubles and getOpenInterest() for full mapping-long OI, correcti
 delegate narrowing loss under [ADR-0010](decisions/ADR-0010-summary-open-interest-width.md). Builtin Summary4 is composite; an explicit SUMMARY registration enables actual Summary&Q.
 Day IDs are signed days, not business timestamps. PriceType comes from complete flags.
 See [Summary](../spec/events/SUMMARY.md) for all fields, defaults and regional OpenInterest absence.
+
+## Explicit decorated selectors
+
+Owning `SubscriptionSelector` and `addSelectors`/`setSelectors`/`removeSelector` preserve typed kind/source identity separately from physical demand. Current five market types ignore IES source ID as production Java does; typed Feed TSS is atomically unsupported. `EndpointOptions::enableWildcard=true` permits explicit All only for STREAM and is disabled by default. Literal leading-star text does not enable wildcard; existing string/Candle APIs remain plain exact. [Complete contract, example, finite storage and known-binding source adapter and time value conversion](../spec/subscriptions/DECORATED-SELECTORS.md).

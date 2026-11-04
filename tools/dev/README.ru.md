@@ -348,3 +348,5 @@ native writer files pinned Java reader. Сеть, SDK build и новая depend
 - [CompletionWaitOracle](../../tests/fixtures/ipf/live/README.ru.md): pinned JDK8 first-snapshot wait/interrupt/close observations; EN/RU help без входов, собственный temporary regular file и конечный thread cleanup, без сети.
 
 [Оракул текста событий](../upstream/event-text-oracle/README.ru.md) захватывает/проверяет фактический вывод событий/значений с явным контекстом, числовые изменения JDK по отдельным случаям и три исправления кеша TimeFormat по свежим instances. Без аргументов, EN/RU-справка и Get-Help не требуют рабочих путей и не запускают Java. [UTF-8 консольный пример](../../examples/event_text/README.ru.md) выводит готовую собственную строку через std::cout; входонезависимая справка не создаёт контекст/provider.
+
+[Production oracle selectors](../upstream/selector-oracle/README.ru.md) проверяет pinned Java8 typed identity, source/regional/wildcard delegate demand и signed time bounds. Noargs/ENRU/Get-Help не требуют входов и не запускают Java; четыре operational пути, heap128MiB/60s, fresh evidence и Capture/Verify описаны вместе с инструментом.

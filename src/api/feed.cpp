@@ -442,7 +442,7 @@ bool retireSubscription(const std::shared_ptr<detail::SubscriptionPort> &port) n
     port->closeRequested.store(true, std::memory_order_release);
     observeState(port, SubscriptionState::CLOSING);
     std::shared_ptr<const detail::ListenerSnapshot> listeners;
-    std::vector<std::u16string> symbols;
+    std::vector<SubscriptionSelector> symbols;
     {
         std::lock_guard lock(port->mutex);
         listeners = std::move(port->listeners);
@@ -790,28 +790,69 @@ std::u16string exactSymbol(std::string_view symbol, std::size_t maximumUnits) {
 /** Accepted desired-state mutation kind; there is no producer command FIFO. */
 enum class SymbolMutation { ADD, REMOVE, REPLACE };
 
-/** Atomically replace one bounded frontend desired snapshot.
- * @param port Detached producer state.
- * @param inputs Borrowed bounded requested selectors.
- * @param mutation Complete desired transformation.
+/** Validate a typed value before copying caller-owned text or publishing any desired state.
+ * @param port Detached logical owner with immutable selector bounds.
+ * @param selector Caller-owned value, borrowed only during this call.
+ * @param mutation Removal does not repeat regional representability checks.
  */
-void mutateSymbols(const std::shared_ptr<detail::SubscriptionPort> &port, std::span<const std::string_view> inputs,
-                   SymbolMutation mutation) {
+void validateSelector(const detail::SubscriptionPort &port, const SubscriptionSelector &selector,
+                      SymbolMutation mutation) {
+    const auto endpoint = port.endpoint.lock();
+
+    if (selector.kind() == SubscriptionSymbolKind::TIME_SERIES) {
+        reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-time-series");
+    }
+
+    if (selector.kind() == SubscriptionSymbolKind::ALL && !endpoint) {
+        reject(ErrorCode::CLOSED, "subscription-closed");
+    }
+
+    if (selector.kind() == SubscriptionSymbolKind::ALL) {
+        if (!endpoint || !endpoint->options.enableWildcard || endpoint->options.contract != DeliveryContract::STREAM) {
+            reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-wildcard");
+        }
+
+        return;
+    }
+
+    const auto text = selector.eventSymbol();
+
+    if (text.empty() || text.size() > port.maximumSymbolUnits || text.front() == u'*' ||
+        !std::ranges::all_of(text, [](char16_t unit) {
+            return unit >= FIRST_PRINTABLE_ASCII && unit <= LAST_PRINTABLE_ASCII;
+        })) {
+        reject(ErrorCode::INVALID_ARGUMENT, "subscription-symbol");
+    }
+
+    if (mutation != SymbolMutation::REMOVE && endpoint) {
+        detail::validateReceivingSymbol(endpoint->options.eventRegistry ? &*endpoint->options.eventRegistry : nullptr,
+                                        port.eventSelection, text);
+    }
+}
+
+/** Transform a complete bounded desired set, preserving typed identity and effective attributes.
+ * @tparam Input Borrowed string view or selector type.
+ * @tparam Parse Validating conversion into an owned selector.
+ * @param port Detached producer state.
+ * @param inputs Borrowed inputs; each conversion validates before copying its text.
+ * @param mutation Complete desired transformation.
+ * @param parse Conversion invoked only while caller input is alive.
+ */
+template <class Input, class Parse>
+void mutateDesired(const std::shared_ptr<detail::SubscriptionPort> &port, std::span<const Input> inputs,
+                   SymbolMutation mutation, Parse parse) {
     producerAction([&] {
-        const auto endpoint = port->endpoint.lock();
-        std::vector<std::u16string> parsed;
-        parsed.reserve(std::min(inputs.size(), port->maximumSymbols));
+        std::vector<SubscriptionSelector> parsed;
+        parsed.reserve(port->maximumSymbols);
 
-        for (const auto input : inputs) {
-            auto symbol = exactSymbol(input, port->maximumSymbolUnits);
+        for (const auto &input : inputs) {
+            auto symbol = parse(input);
+            validateSelector(*port, symbol, mutation);
+            const auto found = std::ranges::find(parsed, symbol);
 
-            if (mutation != SymbolMutation::REMOVE && endpoint) {
-                detail::validateReceivingSymbol(endpoint->options.eventRegistry ? &*endpoint->options.eventRegistry
-                                                                                : nullptr,
-                                                port->eventSelection, symbol);
-            }
-
-            if (std::ranges::find(parsed, symbol) == parsed.end()) {
+            if (found != parsed.end()) {
+                *found = std::move(symbol);
+            } else {
                 if (parsed.size() >= port->maximumSymbols) {
                     reject(ErrorCode::RESOURCE_LIMIT, "subscription-symbol-count");
                 }
@@ -823,7 +864,12 @@ void mutateSymbols(const std::shared_ptr<detail::SubscriptionPort> &port, std::s
         {
             std::lock_guard lock(port->mutex);
             requireOpen(*port);
-            auto candidate = mutation == SymbolMutation::REPLACE ? std::vector<std::u16string>{} : port->symbols;
+            std::vector<SubscriptionSelector> candidate;
+            candidate.reserve(port->maximumSymbols);
+
+            if (mutation != SymbolMutation::REPLACE) {
+                candidate.insert(candidate.end(), port->symbols.begin(), port->symbols.end());
+            }
 
             for (auto &symbol : parsed) {
                 const auto found = std::ranges::find(candidate, symbol);
@@ -833,15 +879,22 @@ void mutateSymbols(const std::shared_ptr<detail::SubscriptionPort> &port, std::s
                         candidate.erase(found);
                     }
                 } else if (found == candidate.end()) {
+                    if (candidate.size() >= port->maximumSymbols) {
+                        reject(ErrorCode::RESOURCE_LIMIT, "subscription-symbol-count");
+                    }
+
                     candidate.push_back(std::move(symbol));
+                } else {
+                    *found = std::move(symbol);
                 }
             }
 
-            if (candidate.size() > port->maximumSymbols) {
-                reject(ErrorCode::RESOURCE_LIMIT, "subscription-symbol-count");
-            }
+            const bool unchanged =
+                std::ranges::equal(candidate, port->symbols, [](const auto &left, const auto &right) {
+                    return left.sameDemand(right);
+                });
 
-            if (candidate != port->symbols) {
+            if (!unchanged) {
                 if (port->revision == std::numeric_limits<std::uint64_t>::max()) {
                     reject(ErrorCode::RESOURCE_LIMIT, "subscription-revision");
                 }
@@ -852,6 +905,36 @@ void mutateSymbols(const std::shared_ptr<detail::SubscriptionPort> &port, std::s
         }
 
         wake(port->control);
+    });
+}
+
+/** Preserve the original exact string API over plain typed identities.
+ * @param port Detached producer state.
+ * @param inputs Borrowed exact ASCII spellings.
+ * @param mutation Complete desired transformation.
+ */
+void mutateSymbols(const std::shared_ptr<detail::SubscriptionPort> &port, std::span<const std::string_view> inputs,
+                   SymbolMutation mutation) {
+    mutateDesired(port, inputs, mutation, [&](std::string_view input) {
+        return SubscriptionSelector::plain(exactSymbol(input, port->maximumSymbolUnits));
+    });
+}
+
+/** Validate bounded typed input before any text copy; no caller decorator is retained.
+ * @param port Detached producer state.
+ * @param inputs Borrowed selector batch, including duplicates.
+ * @param mutation Complete desired transformation.
+ */
+void mutateSelectors(const std::shared_ptr<detail::SubscriptionPort> &port,
+                     std::span<const SubscriptionSelector> inputs, SymbolMutation mutation) {
+    if (inputs.size() > port->maximumSymbols) {
+        reject(ErrorCode::RESOURCE_LIMIT, "subscription-selector-arguments");
+    }
+
+    mutateDesired(port, inputs, mutation, [&](const SubscriptionSelector &input) {
+        validateSelector(*port, input, mutation);
+
+        return input;
     });
 }
 
@@ -914,6 +997,10 @@ void mutateCandleSymbols(const std::shared_ptr<detail::SubscriptionPort> &port,
  * @param options Caller-selected finite policy.
  */
 void validateEndpointOptions(const EndpointOptions &options) {
+    if (options.enableWildcard && options.contract != DeliveryContract::STREAM) {
+        reject(ErrorCode::UNSUPPORTED_PROFILE, "endpoint-wildcard-contract");
+    }
+
     if (options.eventRegistry && !options.eventRegistry->valid()) {
         reject(ErrorCode::INVALID_ARGUMENT, "endpoint-registry");
     }
@@ -1127,6 +1214,18 @@ template <class Event> void Subscription<Event>::removeSymbols(const events::Can
 
 template <class Event> void Subscription<Event>::setCandleSymbols(std::span<const events::CandleSymbol> symbols) {
     mutateCandleSymbols(port_, symbols, SymbolMutation::REPLACE);
+}
+
+template <class Event> void Subscription<Event>::addSelectors(std::span<const SubscriptionSelector> selectors) {
+    mutateSelectors(port_, selectors, SymbolMutation::ADD);
+}
+
+template <class Event> void Subscription<Event>::setSelectors(std::span<const SubscriptionSelector> selectors) {
+    mutateSelectors(port_, selectors, SymbolMutation::REPLACE);
+}
+
+template <class Event> void Subscription<Event>::removeSelector(const SubscriptionSelector &selector) {
+    mutateSelectors(port_, std::span(&selector, 1), SymbolMutation::REMOVE);
 }
 
 template <class Event> void Subscription<Event>::clearSymbols() {
@@ -1798,7 +1897,12 @@ void applyDesired(NativeEndpoint &endpoint, NativeSubscription &subscription, mu
         symbols.reserve(subscription.port->symbols.size());
 
         for (const auto &symbol : subscription.port->symbols) {
-            symbols.push_back({symbol});
+            symbols.push_back({std::u16string(symbol.eventSymbol()),
+                               {},
+                               0,
+                               {},
+                               symbol.kind() == SubscriptionSymbolKind::ALL ? core::SubscriptionSelectorKind::ALL
+                                                                            : core::SubscriptionSelectorKind::EXACT});
         }
     }
 
@@ -1819,7 +1923,7 @@ void applyDesired(NativeEndpoint &endpoint, NativeSubscription &subscription, mu
         for (const auto &symbol : symbols) {
             if (receivingSymbolMatches(endpoint.profile, index, symbol)) {
                 const auto &physical = endpoint.profile.bindingExchanges[index] ? symbol.physical : symbol.logical;
-                requests.push_back({{context, physical}, {}});
+                requests.push_back({{context, physical, symbol.selector}, {}});
             }
         }
     }
@@ -2392,6 +2496,14 @@ RuntimeOptions prepareRuntimeOptions(RuntimeOptions options) {
         !options.maximumEventTypeArgumentsPerSubscription || !options.maximumPendingStateChangesPerEndpoint ||
         options.dnsServers.size() > 4 || options.dnsPort == 0) {
         reject(ErrorCode::INVALID_ARGUMENT, "runtime-options");
+    }
+
+    constexpr std::size_t FRONTEND_SELECTOR_BANKS = 4; // Old, parsed, candidate and one conversion/retirement bank.
+    const auto selectorBytes = sizeof(SubscriptionSelector) + (options.maximumSymbolUnits + 1) * sizeof(char16_t);
+
+    if (options.maximumSymbolsPerSubscription >
+        std::numeric_limits<std::size_t>::max() / selectorBytes / FRONTEND_SELECTOR_BANKS) {
+        reject(ErrorCode::RESOURCE_LIMIT, "runtime-selector-storage");
     }
 
     if (options.dnsServers.empty()) {

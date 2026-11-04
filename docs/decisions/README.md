@@ -13,3 +13,5 @@ Name records `ADR-NNNN-short-title.md`. Each record should include status, conte
 - [ADR-0011: Java event text reference](ADR-0011-java-event-text-reference.md) ([Русский](ADR-0011-java-event-text-reference.ru.md)).
 
 - [ADR0013: Containing-day postcondition](ADR-0013-schedule-time-lookup-postcondition.md) / [RU](ADR-0013-schedule-time-lookup-postcondition.ru.md): typed refusal for a confirmed non-containing Java time-query result.
+
+- [ADR-0012: Decorated subscription identity](ADR-0012-decorated-subscription-identity.md) ([Русский](ADR-0012-decorated-subscription-identity.ru.md)).

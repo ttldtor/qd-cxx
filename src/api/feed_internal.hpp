@@ -79,13 +79,13 @@ struct SubscriptionPort {
     std::weak_ptr<EndpointPort> endpoint;              ///< Endpoint policy/status domain, without a producer cycle.
     std::shared_ptr<ListenerLedger> listenerLedger;    ///< Selected/retiring callback reservation.
     std::shared_ptr<const ListenerSnapshot> listeners; ///< Complete accepted bounded selection.
-    StateListeners stateListeners;       ///< Opt-in advisory lifecycle observations, retired after event captures.
-    std::vector<std::u16string> symbols; ///< Complete accepted exact desired set.
-    std::size_t maximumSymbols;          ///< Original per-registration selector count.
-    std::size_t maximumSymbolUnits;      ///< Original per-selector capacity.
-    std::uint64_t revision = 0;          ///< Accepted local desired revision, separate from queue tickets.
-    std::uint64_t nextListener = 1;      ///< Non-reused listener identity, zero never issued.
-    EventSelection eventSelection;       ///< Immutable normalized set, independent of explicit local record routes.
+    StateListeners stateListeners; ///< Opt-in advisory lifecycle observations, retired after event captures.
+    std::vector<SubscriptionSelector> symbols; ///< Complete accepted typed logical desired set.
+    std::size_t maximumSymbols;                ///< Original per-registration selector count.
+    std::size_t maximumSymbolUnits;            ///< Original per-selector capacity.
+    std::uint64_t revision = 0;                ///< Accepted local desired revision, separate from queue tickets.
+    std::uint64_t nextListener = 1;            ///< Non-reused listener identity, zero never issued.
+    EventSelection eventSelection; ///< Immutable normalized set, independent of explicit local record routes.
     EventDelivery
         eventDelivery; ///< Exact listener value shape, assigned together with the selection before publication.
     std::atomic<bool> closeRequested{false}; ///< Reserved monotonic control, independent of ordinary capacity.

@@ -450,3 +450,7 @@ business double, getOpenInterest() — полный mapping-long OI с испр�
 Builtin Summary4 — composite, явная SUMMARY registration включает настоящий Summary&Q. Day IDs —
 signed дни, не business timestamps. PriceType берётся из flags. Поля, defaults и региональное
 отсутствие OpenInterest: [Summary](../spec/events/SUMMARY.ru.md).
+
+## Явные decorated selectors
+
+Owning `SubscriptionSelector` и `addSelectors`/`setSelectors`/`removeSelector` сохраняют typed kind/source identity отдельно от physical demand. Текущие пять market types игнорируют IES source ID как production Java; TSS typed Feed атомарно неподдержан. `EndpointOptions::enableWildcard=true` разрешает explicit All только для STREAM и по умолчанию выключен. Literal leading-star не включает wildcard; прежние string/Candle API остаются plain exact. [Полный контракт, пример, конечное хранение и known-binding source adapter and time value conversion](../spec/subscriptions/DECORATED-SELECTORS.ru.md).
