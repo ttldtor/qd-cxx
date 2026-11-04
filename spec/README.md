@@ -52,3 +52,5 @@ Exact conformance results belong to the [developer reading path](../docs/develop
 - [Event text](events/EVENT-TEXT.md): explicit context, numeric/date representation, UTF-16/UTF-8 and finite ownership/work contracts.
 
 - [Serialized attachments](events/ATTACHMENTS.md) and [Message/Configuration receiving](../docs/MISC-EVENTS.md): owning nullable bytes, explicit local codecs and collector version admission.
+
+- [Instance-local endpoint configuration](transport/ENDPOINT-CONFIGURATION.md): pure validation, immutable precedence and explicit activation.

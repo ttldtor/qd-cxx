@@ -4,6 +4,7 @@
 #include "qd/api/feed_filter.hpp"
 
 #include "../transport/tcp_recovery_factory.hpp"
+#include "endpoint_configuration.hpp"
 #include "feed_internal.hpp"
 #include "receiving_profile.hpp"
 #include "subscription_observer.hpp"
@@ -20,10 +21,8 @@
 
 namespace org::ttldtor::qdcxx::api {
 namespace {
-constexpr unsigned char FIRST_PRINTABLE_ASCII = 0x20;                 ///< Exact selector minimum byte.
-constexpr unsigned char LAST_PRINTABLE_ASCII = 0x7e;                  ///< Exact selector maximum byte.
-constexpr std::size_t MAXIMUM_HOST_BYTES = 253;                       ///< Existing bounded DNS A-label route ceiling.
-constexpr std::size_t MAXIMUM_ADDRESS_BYTES = MAXIMUM_HOST_BYTES + 8; ///< Brackets, colon and maximum port spelling.
+constexpr unsigned char FIRST_PRINTABLE_ASCII = 0x20; ///< Exact selector minimum byte.
+constexpr unsigned char LAST_PRINTABLE_ASCII = 0x7e;  ///< Exact selector maximum byte.
 
 /** Throw a detached synchronous rejection without formatting caller or peer data.
  * @param code High-level category.
@@ -1002,77 +1001,6 @@ void mutateCandleSymbols(const std::shared_ptr<detail::SubscriptionPort> &port,
     });
 }
 
-/** Validate the public policy before reserving an endpoint slot.
- * @param options Caller-selected finite policy.
- */
-void validateEndpointOptions(const EndpointOptions &options) {
-    if (options.enableWildcard && options.contract != DeliveryContract::STREAM) {
-        reject(ErrorCode::UNSUPPORTED_PROFILE, "endpoint-wildcard-contract");
-    }
-
-    if (options.eventRegistry && !options.eventRegistry->valid()) {
-        reject(ErrorCode::INVALID_ARGUMENT, "endpoint-registry");
-    }
-
-    const auto durationValid = [](std::chrono::milliseconds value) {
-        return value.count() > 0 && value.count() <= INT_MAX;
-    };
-
-    if ((options.contract != DeliveryContract::TICKER && options.contract != DeliveryContract::STREAM) ||
-        !durationValid(options.connectTimeout) || !durationValid(options.dnsTimeout) ||
-        !durationValid(options.readTimeout) || !durationValid(options.writeTimeout) ||
-        !durationValid(options.pollInterval) || !durationValid(options.drainTimeout) || options.maximumAttempts == 0 ||
-        (options.maximumAttempts > 1 && !durationValid(options.retryDelay))) {
-        reject(ErrorCode::INVALID_ARGUMENT, "endpoint-options");
-    }
-}
-
-/** Validate and split only plain bounded host:port syntax; existing endpoint validates route spelling.
- * @param address Explicit borrowed address.
- * @return Owning host and nonzero port.
- */
-std::pair<std::string, std::uint16_t> parseAddress(std::string_view address) {
-    if (address.empty() || address.size() > MAXIMUM_ADDRESS_BYTES ||
-        !std::ranges::all_of(address, [](unsigned char value) {
-            return value > FIRST_PRINTABLE_ASCII && value <= LAST_PRINTABLE_ASCII;
-        })) {
-        reject(ErrorCode::INVALID_ARGUMENT, "endpoint-address");
-    }
-
-    const auto separator = address.rfind(':');
-
-    if (separator == std::string_view::npos || separator == 0) {
-        reject(ErrorCode::INVALID_ARGUMENT, "endpoint-address");
-    }
-
-    auto host = address.substr(0, separator);
-    const auto portText = address.substr(separator + 1);
-    unsigned port = 0;
-    const auto converted = std::from_chars(portText.data(), portText.data() + portText.size(), port);
-
-    if (portText.empty() || portText.size() > 5 || converted.ec != std::errc{} ||
-        converted.ptr != portText.data() + portText.size() || port == 0 ||
-        port > std::numeric_limits<std::uint16_t>::max()) {
-        reject(ErrorCode::INVALID_ARGUMENT, "endpoint-address");
-    }
-
-    if (host.front() == '[') {
-        if (host.size() < 3 || host.back() != ']' || host.find(':') == std::string_view::npos) {
-            reject(ErrorCode::INVALID_ARGUMENT, "endpoint-address");
-        }
-
-        host.remove_prefix(1);
-        host.remove_suffix(1);
-    } else if (host.find(':') != std::string_view::npos) {
-        reject(ErrorCode::INVALID_ARGUMENT, "endpoint-address");
-    }
-
-    if (host.empty() || host.size() > MAXIMUM_HOST_BYTES || host.find_first_of("/[]@?=#\\") != std::string_view::npos) {
-        reject(ErrorCode::INVALID_ARGUMENT, "endpoint-address");
-    }
-
-    return {std::string(host), static_cast<std::uint16_t>(port)};
-}
 } // namespace
 
 Error::Error(Diagnostic diagnostic) : std::runtime_error(diagnostic.stage.data()), diagnostic_(diagnostic) {
@@ -1561,8 +1489,7 @@ FeedFilter Endpoint::createFilter(std::span<const FeedFilterCategory> categories
 
 void Endpoint::connect(std::string_view address) {
     producerAction([&] {
-        auto [host, port] = parseAddress(address);
-        std::string copiedAddress(address);
+        auto parsed = detail::parseEndpointAddress(address);
         const auto control = port_->control.lock();
 
         if (!control) {
@@ -1585,7 +1512,7 @@ void Endpoint::connect(std::string_view address) {
             }
 
             if (port_->connectRequested) {
-                if (port_->address != copiedAddress) {
+                if (port_->address != parsed.spelling) {
                     reject(ErrorCode::INVALID_STATE, "endpoint-address-fixed");
                 }
 
@@ -1605,9 +1532,9 @@ void Endpoint::connect(std::string_view address) {
             control->runtime->startWorker();
 
             if (!port_->connectRequested) {
-                port_->address = std::move(copiedAddress);
-                port_->host = std::move(host);
-                port_->port = port;
+                port_->address = std::move(parsed.spelling);
+                port_->host = std::move(parsed.host);
+                port_->port = parsed.port;
                 port_->connectRequested = true;
             }
 
@@ -1623,6 +1550,36 @@ void Endpoint::connect(std::string_view address) {
 
         port_->stateCondition.notify_all();
         control->condition.notify_one();
+    });
+}
+
+void Endpoint::connect() {
+    producerAction([&] {
+        const auto configuration = port_->configuration->snapshot();
+
+        if (!configuration.configuredAddress) {
+            reject(ErrorCode::INVALID_ARGUMENT, "endpoint-address-not-configured");
+        }
+
+        connect(*configuration.configuredAddress);
+    });
+}
+
+EndpointConfigurationSnapshot Endpoint::getEffectiveConfiguration() const {
+    return producerAction([&] {
+        auto snapshot = port_->configuration->snapshot();
+        std::lock_guard lock(port_->mutex);
+
+        if (port_->connectRequested) {
+            snapshot.acceptedAddress = port_->address;
+        }
+
+        snapshot.activationRequested =
+            port_->connectionIntent && !port_->closeRequested.load(std::memory_order_acquire) &&
+            !port_->retired.load(std::memory_order_acquire) && port_->state != EndpointState::FAILED;
+        snapshot.connectionRevision = port_->connectionRevision;
+
+        return snapshot;
     });
 }
 
@@ -2779,8 +2736,12 @@ ApiRuntime::ApiRuntime(transport::RuntimeBootstrap &bootstrap, RuntimeOptions op
 ApiRuntime::~ApiRuntime() = default;
 
 std::shared_ptr<Endpoint> ApiRuntime::createEndpoint(EndpointOptions options) {
+    return createEndpoint(EndpointConfiguration::create(options));
+}
+
+std::shared_ptr<Endpoint> ApiRuntime::createEndpoint(const EndpointConfiguration &configuration) {
     return producerAction([&] {
-        validateEndpointOptions(options);
+        const auto &options = configuration.options();
         const auto control = impl_->control;
         auto port = std::make_shared<detail::EndpointPort>();
         port->statistics.ownerIdentity = std::make_shared<const std::byte>();
@@ -2789,6 +2750,7 @@ std::shared_ptr<Endpoint> ApiRuntime::createEndpoint(EndpointOptions options) {
         port->owner = control->owner;
         port->limits = impl_->options;
         port->options = options;
+        port->configuration = configuration;
         port->stateListeners = makeStateListeners(port, impl_->options.maximumStateListenersPerEndpoint);
         port->subscriptions.resize(impl_->options.maximumSubscriptionsPerEndpoint);
         port->stateChanges.resize(impl_->options.maximumPendingStateChangesPerEndpoint);

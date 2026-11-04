@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 // Internal CTest runner: public API, finite controlled peers, no external endpoint or ambient resolver.
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "qd/api/endpoint_configuration.hpp"
 #include "qd/api/feed.hpp"
 #include "qd/api/feed_filter.hpp"
 #include "qd/transport/recovery.hpp"
@@ -3795,4 +3796,25 @@ TEST_CASE("serialized events preserve nine-type observation and change-listener 
     CHECK(retained.eventTypes == allTypes);
     REQUIRE(retained.symbols.size() == 1);
     CHECK(retained.symbols.front().eventSymbol() == u"ALL");
+}
+
+TEST_CASE("public configuration allocation refusal publishes no endpoint and snapshot failure preserves intent") {
+    auto limits = runtimeOptions();
+    limits.maximumEndpoints = 1;
+    api::ApiRuntime runtime(limits);
+    allocation_probe::failNext = true;
+    CHECK(errorCode([&] {
+              static_cast<void>(runtime.createEndpoint());
+          }) == api::ErrorCode::ALLOCATION_FAILURE);
+    auto endpoint = runtime.createEndpoint();
+    allocation_probe::failNext = true;
+    CHECK(errorCode([&] {
+              static_cast<void>(endpoint->getEffectiveConfiguration());
+          }) == api::ErrorCode::ALLOCATION_FAILURE);
+    const auto snapshot = endpoint->getEffectiveConfiguration();
+    CHECK(snapshot.connectionRevision == 0);
+    CHECK_FALSE(snapshot.activationRequested);
+    CHECK_FALSE(snapshot.acceptedAddress);
+    CHECK(endpoint->getState() == api::EndpointState::NOT_CONNECTED);
+    static_cast<void>(endpoint->closeAndAwaitTermination());
 }

@@ -52,3 +52,5 @@
 - [Текст событий](events/EVENT-TEXT.ru.md): явный контекст, числа/даты, UTF-16/UTF-8 и ограниченные контракты владения/работы.
 
 - [Сериализованные вложения](events/ATTACHMENTS.ru.md) и [получение Message/Configuration](../docs/MISC-EVENTS.ru.md): владеющие nullable bytes, явные локальные кодеки и version admission collector.
+
+- [Конфигурация экземпляра endpoint](transport/ENDPOINT-CONFIGURATION.ru.md): pure validation, immutable precedence и explicit activation.

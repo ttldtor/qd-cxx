@@ -183,3 +183,6 @@ int main() {
 ```
 
 Expected stdout: Independent endpoint snapshots: 7301, 7302. The program exits 0. The installed consumer passed on Windows and Linux.
+
+
+[Endpoint configuration](ENDPOINT-CONFIGURATION.md): explicit addresses/properties, immutable snapshots, effective local values and Java compatibility boundaries.

@@ -32,6 +32,9 @@
 #include <vector>
 
 namespace org::ttldtor::qdcxx::api {
+class EndpointConfiguration;
+struct EndpointConfigurationSnapshot;
+
 namespace detail {
 struct RuntimeImpl;
 struct EndpointPort;
@@ -539,6 +542,16 @@ class Endpoint final {
      * @param address ASCII host:port or [IPv6]:port; no TLS/URI/login/configuration extensions.
      */
     void connect(std::string_view address);
+    /** Activate the immutable configured route explicitly; construction never auto-connects.
+     * Include qd/api/endpoint_configuration.hpp to construct the configuration.
+     * @throws Error If no route was configured, or ordinary connect admission rejects.
+     */
+    void connect();
+    /** Inspect owning immutable local policy and the current accepted connection intent.
+     * Include qd/api/endpoint_configuration.hpp for the returned value's definition.
+     * @return Detached snapshot; acceptedAddress is a local request, never peer/DNS/negotiation evidence.
+     */
+    [[nodiscard]] EndpointConfigurationSnapshot getEffectiveConfiguration() const;
     /** Disconnect logically now, retaining desired interests and projected cache while physically offline.
      * Actual native retirement is asynchronous. New old-attempt native input is fenced immediately;
      * an already selected whole listener snapshot may finish. After native pause quiescence, projected cache
@@ -635,6 +648,11 @@ class ApiRuntime final {
      * @return Endpoint facade; no socket is opened and no listener is called inline.
      */
     [[nodiscard]] std::shared_ptr<Endpoint> createEndpoint(EndpointOptions options = {});
+    /** Create an independent endpoint from an already resolved immutable explicit configuration.
+     * @param configuration Validated owning policy and optional route; retained independently of its caller.
+     * @return Inactive endpoint. Call connect() explicitly to activate its configured route.
+     */
+    [[nodiscard]] std::shared_ptr<Endpoint> createEndpoint(const EndpointConfiguration &configuration);
     /** Close every endpoint, join the SDK worker and preserve bootstrap until safe main-thread cleanup.
      * Only the creating main/owner thread may call this operation; worker calls reject immediately.
      * Reentrant shutdown or shutdown from accepted capture destruction rejects with INVALID_STATE.

@@ -358,3 +358,5 @@ native writer files pinned Java reader. Сеть, SDK build и новая depend
 - [Oracle версий Configuration](../upstream/configuration-version-oracle/README.ru.md): production collectors/delegate, первое отрицательное default-событие, signed bounds, batch и STREAM; native Feed tests отдельно покрывают
 поздний replay cache при подписке. EN/RU/Get-Help без входов, конечный JDK8 Capture/Verify с точными
 class/resource inventories.
+
+- [Endpoint configuration oracle](../upstream/endpoint-configuration-oracle/README.ru.md): реальные pinned address/property/lifecycle consumers, собственный loopback, finite Capture/Verify и EN/RU help.

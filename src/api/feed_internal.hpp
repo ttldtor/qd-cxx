@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 #pragma once
 
-#include "qd/api/feed.hpp"
+#include "qd/api/endpoint_configuration.hpp"
 
 #include "../transport/bootstrap_lease.hpp"
 #include "event_selection.hpp"
@@ -200,6 +200,7 @@ struct EndpointPort {
     std::thread::id owner;   ///< Creator/main await affinity remains available after runtime destruction.
     RuntimeOptions limits;   ///< Finite immutable limits and resolved DNS snapshot.
     EndpointOptions options; ///< Finite immutable endpoint policy.
+    std::optional<EndpointConfiguration> configuration; ///< Immutable data-only policy retained after retirement.
     std::vector<std::shared_ptr<SubscriptionPort>> subscriptions; ///< Fixed slots, including retiring registrations.
     StateListeners stateListeners; ///< Opt-in advisory lifecycle observations, retired after all subscriptions.
     std::vector<EndpointStateChange> stateChanges; ///< Fixed ring; selection lease remains charged through release.

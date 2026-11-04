@@ -503,3 +503,5 @@ only after native, listener and callable-capture quiescence, including subscript
 and state observers; totals and timestamp then freeze. CLOSED alone is not that barrier. A saved
 snapshot remains detached from sockets, schemas, callbacks and runtime owners.
 See the complete [layered contract](../spec/subscriptions/CLIENT-STATISTICS.md).
+
+[Endpoint configuration](ENDPOINT-CONFIGURATION.md): explicit addresses/properties, immutable snapshots, effective local values and Java compatibility boundaries.

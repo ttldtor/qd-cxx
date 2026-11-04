@@ -184,3 +184,6 @@ int main() {
 ```
 
 Ожидаемый stdout: Independent endpoint snapshots: 7301, 7302. Программа завершается кодом 0. Установленный consumer прошёл на Windows и Linux.
+
+
+[Конфигурация endpoint](ENDPOINT-CONFIGURATION.ru.md): явные адреса/свойства, неизменяемые снимки, эффективные локальные значения и границы совместимости Java.

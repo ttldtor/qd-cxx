@@ -1,0 +1,64 @@
+{
+  "revision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "javaVersion": "openjdk version \"1.8.0_422\"",
+  "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
+  "javacSha256": "633143e961aa18051c09112b85333f5cdbd845b54eb39678eb15b91ca8bbb527",
+  "harnessSha256": "5a87b36a2f055f492cbe512e45dcc4268b40492788b18367a2c160688cb1221e",
+  "launcherSha256": "f5129570ce20046ccc0cee79bac055ad4859816ca517606fa6dbd08d54e5f0a8",
+  "upstreamSources": [
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/api/DXEndpoint.java",
+      "sha256": "824636ff1044530fdcac057af629d25886fd9d1e4946f03316303ebd49f32488"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/api/impl/DXEndpointImpl.java",
+      "sha256": "32b962cc562848869d5eb8014c7fd5e3a59ae543958dba4cd0bc2e0c2dd2896b"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/MessageConnectors.java",
+      "sha256": "3fd96096d4ce983cb2032655f344f6dda5a73efc67e668c76e9200a5dcc2cfe3"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/MessageConnector.java",
+      "sha256": "0610d148e4dc9167058ae577d890c519a266dd3004dcacae4f390cc5c904fc4b"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/AbstractMessageConnector.java",
+      "sha256": "cad82f1805db1e46a58fe7ba47c35aed98137a6bb56a9e34d662646c4c523975"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/QDEndpoint.java",
+      "sha256": "a6e71b7031410e9dcc01ea3f7f7f5e98a2e854c51d94ef2d0a6db38e2767c057"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/socket/SocketUtil.java",
+      "sha256": "50a926052fee7da030c2d88bea93f842fed99af7c66454f3b46cb2597eb88195"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/socket/SocketAddress.java",
+      "sha256": "dfb05c8297b8d9da7ed040b0c1e47274fc64541e3f7c2ece03ef396cbe44021e"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/socket/ClientSocketConnector.java",
+      "sha256": "b8ea286e1f7207744386f49570c2dcbd772433fabad4ab0e71a8796193e2b63b"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/util/QDConfig.java",
+      "sha256": "9bfb8ef2f855ad759831a7e8660f3ffdc3141c8a520762f75e6ff56ab13d6833"
+    },
+    {
+      "path": "proto/src/main/java/com/devexperts/connector/proto/ConfigurableObject.java",
+      "sha256": "b047338e3d4d865faa2d759891a4192eb86de02d0db0cd34b544db1f17bc7386"
+    },
+    {
+      "path": "proto/src/main/java/com/devexperts/connector/proto/ApplicationConnectionFactory.java",
+      "sha256": "7f3f9908c98a42a04a170a8e949998fbb969c7960c5673c60917afabf32917b5"
+    }
+  ],
+  "productionClassFiles": 1290,
+  "productionResourceFiles": 27,
+  "productionClassInventorySha256": "90a478b5d3737246d8c897322c9f9db60887846e20117572588e05ae78fbc6d8",
+  "fixtureSha256": "987837fe3bd443ebf955098e29c8b8f87ab948a184fad207be32e9213a3988d9",
+  "rows": 44,
+  "timezoneInvariant": true
+}

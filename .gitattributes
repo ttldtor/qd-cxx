@@ -780,3 +780,9 @@ tests/fixtures/configuration-version/capture-v1/** -text -whitespace
 tests/fixtures/configuration-version/provenance.json text eol=lf
 tools/upstream/configuration-version-oracle/*.java text eol=lf
 tools/upstream/configuration-version-oracle/*.ps1 text eol=lf
+
+# Preserve exact endpoint-configuration observations and canonical oracle source bindings.
+tools/upstream/endpoint-configuration-oracle/*.java text eol=lf
+tools/upstream/endpoint-configuration-oracle/*.ps1 text eol=lf
+tests/fixtures/endpoint-configuration/*.tsv -text -whitespace
+tests/fixtures/endpoint-configuration/*.json text eol=lf

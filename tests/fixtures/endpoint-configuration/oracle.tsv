@@ -1,0 +1,44 @@
+address	0	ok	1	localhost:1234
+address	1	ok	1	127.0.0.1:1234
+address	2	ok	1	::1:1234
+address	3	ok	1	2001:db8::1:65535
+address	4	ok	1	host:0
+address	5	ok	1	host:-1
+address	6	ok	1	host:1
+address	7	ok	1	host:65536
+address	8	error	AddressSyntaxException
+address	9	error	AddressSyntaxException
+address	10	ok	2	host1:1234|host2:1234
+address	11	ok	2	host1:11|host2:22
+address	12	error	AddressSyntaxException
+address	13	error	AddressSyntaxException
+address	14	ok	1	bad_host:1234
+address	15	ok	1	host name:1234
+connector	0	ok	1	10000	false	false	false
+connector	1	ok	1	17	false	false	false
+connector	2	ok	1	29	false	false	false
+connector	3	ok	1	31	false	false	false
+connector	4	ok	1	37	false	false	false
+connector	5	ok	1	0	false	false	false
+connector	6	ok	1	-1	false	false	false
+connector	7	error	AddressSyntaxException
+connector	8	error	AddressSyntaxException
+connector	9	ok	1	10000	false	false	false
+connector	10	ok	1	10000	false	false	false
+connector	11	ok	1	10000	false	false	false
+property	last-duplicate	last
+property	false-override	false
+property	unknown-ignored	true
+property	input-owning	last
+property	builder-mutation-visible	later
+property	stream-address-not-auto	0
+property	inline-before-connect	true
+property	supported-name	true
+property	unsupported-native-key	false
+property	malformed-boolean-retained	truthy
+defaults	file-before-system	true
+defaults	file-name	file
+defaults	explicit-before-file	false
+defaults	explicit-name	explicit
+lifecycle	feed-build-autoconnect	1	true
+lifecycle	inline-at-activation	53
