@@ -31,3 +31,5 @@ The `qd/mux/queue.hpp` header requires `qdcxx_mux_queue`; this optional queue is
 [Option chains](OPTION-CHAINS.md): `qd/ipf/option_chains.hpp`, optional `qdcxx_ipf` with `ORG_TTLDTOR_QDCXX_BUILD_IPF=ON`.
 
 - [CFI and additional underlyings](GLOSSARY-VALUES.md): `qd/glossary/`, optional `qdcxx_ipf`.
+
+- [Instrument price increments](PRICE-INCREMENTS.md): owned ranges, precision and price rounding through `qdcxx_ipf`.

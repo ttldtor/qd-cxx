@@ -70,7 +70,7 @@ set_target_properties(qdcxx_java_double PROPERTIES CXX_EXTENSIONS OFF POSITION_I
 
 option(ORG_TTLDTOR_QDCXX_BUILD_IPF "Build the independent instrument-profile value model" OFF)
 if(ORG_TTLDTOR_QDCXX_BUILD_IPF)
-    add_library(qdcxx_ipf src/ipf/instrument_profile.cpp src/ipf/reader.cpp src/ipf/writer.cpp src/ipf/option_chains.cpp src/glossary/cfi.cpp src/glossary/additional_underlyings.cpp)
+    add_library(qdcxx_ipf src/ipf/instrument_profile.cpp src/ipf/reader.cpp src/ipf/writer.cpp src/ipf/option_chains.cpp src/glossary/cfi.cpp src/glossary/additional_underlyings.cpp src/glossary/price_increments.cpp src/glossary/price_decimal.cpp)
     target_link_libraries(qdcxx_ipf PRIVATE qdcxx_java_double)
     target_include_directories(qdcxx_ipf PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
         "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
@@ -80,6 +80,7 @@ if(ORG_TTLDTOR_QDCXX_BUILD_IPF)
         LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}" RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
     install(DIRECTORY include/qd/ipf include/qd/glossary DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qd" FILES_MATCHING PATTERN "*.hpp" PATTERN "instrument_profile_url_reader.hpp" EXCLUDE)
     install(FILES licenses/cfi/LICENSE.txt DESTINATION "${CMAKE_INSTALL_DATADIR}/qdcxx/licenses/cfi")
+    install(FILES licenses/price_increments/LICENSE.txt DESTINATION "${CMAKE_INSTALL_DATADIR}/qdcxx/licenses/price_increments")
 endif()
 
 add_library(qdcxx_event_mapping src/events/event_mapping.cpp)
@@ -411,6 +412,12 @@ if(BUILD_TESTING)
         ORG_TTLDTOR_QDCXX_MARKET_ATTRIBUTE_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/market-attributes/oracle.tsv")
     add_test(NAME market_event_symbols COMMAND qdcxx_market_event_symbols_tests)
     if(ORG_TTLDTOR_QDCXX_BUILD_IPF)
+        add_executable(qdcxx_price_increments_tests tests/conformance/price_increments_tests.cpp)
+        target_link_libraries(qdcxx_price_increments_tests PRIVATE qdcxx_ipf doctest::doctest)
+        target_compile_definitions(qdcxx_price_increments_tests PRIVATE ORG_TTLDTOR_QDCXX_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+        set_target_properties(qdcxx_price_increments_tests PROPERTIES CXX_EXTENSIONS OFF)
+        add_test(NAME price_increments COMMAND qdcxx_price_increments_tests)
+        set_tests_properties(price_increments PROPERTIES TIMEOUT 60)
         add_executable(qdcxx_glossary_tests tests/conformance/glossary_tests.cpp)
         target_link_libraries(qdcxx_glossary_tests PRIVATE qdcxx_ipf doctest::doctest)
         target_compile_definitions(qdcxx_glossary_tests PRIVATE
@@ -420,6 +427,10 @@ if(BUILD_TESTING)
         set_tests_properties(glossary PROPERTIES TIMEOUT 60)
         find_program(ORG_TTLDTOR_QDCXX_GLOSSARY_ORACLE_PWSH NAMES pwsh)
         if(ORG_TTLDTOR_QDCXX_GLOSSARY_ORACLE_PWSH)
+            add_test(NAME price_increments_oracle_help COMMAND ${CMAKE_COMMAND}
+                "-DORG_TTLDTOR_QDCXX_PWSH=${ORG_TTLDTOR_QDCXX_GLOSSARY_ORACLE_PWSH}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/price_increments_oracle_help.cmake")
+            set_tests_properties(price_increments_oracle_help PROPERTIES TIMEOUT 60)
             add_test(NAME glossary_oracle_help COMMAND ${CMAKE_COMMAND}
                 -DORG_TTLDTOR_QDCXX_PWSH=${ORG_TTLDTOR_QDCXX_GLOSSARY_ORACLE_PWSH}
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/glossary_oracle_help.cmake")

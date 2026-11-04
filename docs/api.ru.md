@@ -31,3 +31,5 @@
 [Цепочки опционов](OPTION-CHAINS.ru.md): `qd/ipf/option_chains.hpp`, необязательная `qdcxx_ipf` при `ORG_TTLDTOR_QDCXX_BUILD_IPF=ON`.
 
 - [CFI и дополнительные базовые активы](GLOSSARY-VALUES.ru.md): `qd/glossary/`, необязательная `qdcxx_ipf`.
+
+- [Ценовые шаги инструмента](PRICE-INCREMENTS.ru.md): диапазоны, точность и округление цены через `qdcxx_ipf`.

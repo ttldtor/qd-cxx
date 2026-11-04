@@ -38,3 +38,5 @@ part of the source distribution; the navigation above does not turn proposals in
 - [Order-source capability oracle](../tools/upstream/order-source-capability-oracle/README.md): six event families, full-book support and specific-source values.
 
 - [CFI and additional underlyings oracle](../tools/upstream/glossary-oracle/README.md): Production glossary oracle: CFI, AdditionalUnderlyings, noargs/EN/RU help, JDK8, heap128MiB/60s, Git30s.
+
+- [Instrument price increments](PRICE-INCREMENTS.md): owned ranges, precision and price rounding through `qdcxx_ipf`.

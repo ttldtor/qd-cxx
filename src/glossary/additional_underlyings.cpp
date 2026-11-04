@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/glossary/additional_underlyings.hpp"
 #include "../detail/java_double.hpp"
+#include "numeric_text.hpp"
 
 #include <algorithm>
 #include <array>
@@ -288,6 +289,16 @@ void checkText(std::size_t units, AdditionalUnderlyingLimits limits) {
     }
 }
 } // namespace
+
+namespace detail {
+double parseAdditionalNumber(std::u16string_view text) noexcept {
+    return parseNumber(text);
+}
+
+std::u16string formatAdditionalNumber(double value) {
+    return formatNumber(value);
+}
+} // namespace detail
 
 AdditionalUnderlyings::AdditionalUnderlyings(AdditionalUnderlyings &&other) noexcept(
     std::is_nothrow_default_constructible_v<std::u16string> && std::is_nothrow_default_constructible_v<Map>) {

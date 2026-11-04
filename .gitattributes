@@ -661,3 +661,8 @@ tests/fixtures/glossary/provenance.json text eol=lf
 tools/upstream/glossary-oracle/*.java text eol=lf
 tools/upstream/glossary-oracle/*.ps1 text eol=lf
 licenses/cfi/LICENSE.txt -text -whitespace
+
+tests/fixtures/price_increments/*.tsv -text -whitespace
+tests/fixtures/price_increments/*.json text eol=lf
+tools/upstream/price-increments-oracle/*.java text eol=lf
+tools/upstream/price-increments-oracle/*.ps1 text eol=lf

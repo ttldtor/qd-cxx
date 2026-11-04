@@ -306,3 +306,5 @@ native writer files through the pinned Java reader. No network, SDK build or new
 - [Candle-attribute oracle](../upstream/candle-attributes-oracle/README.md): production values and symbol operations; input-free EN/RU help, Verify default, JDK8, heap128MiB/timeout60s, exit0/1.
 
 - [CFI and additional underlyings oracle](../upstream/glossary-oracle/README.md): Production glossary oracle: CFI, AdditionalUnderlyings, noargs/EN/RU help, JDK8, heap128MiB/60s, Git30s.
+
+- [Price-increment oracle](../upstream/price-increments-oracle/README.md): capture/verify actual Java8 price rules; input-free `-Help` and `-HelpRu`.

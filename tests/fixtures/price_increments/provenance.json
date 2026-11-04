@@ -1,0 +1,29 @@
+{
+  "revision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "javaVersion": "openjdk version \"1.8.0_422\"",
+  "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
+  "javacSha256": "633143e961aa18051c09112b85333f5cdbd845b54eb39678eb15b91ca8bbb527",
+  "harnessSha256": "b35c5004ef3ffc2b43a4b28a4d350f9c8b08339978a08cf89d0b355de21f0ed8",
+  "launcherSha256": "00b7a4021866bcec0dc6dc10ca5eaf66995ba0b3dac821f6f8a98ab1751e111b",
+  "fixtureSha256": "09840cab470c6434ead443fcefe3d2732ea58fe414eea7ff6a1c55f9cb47b38a",
+  "upstreamSources": [
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/glossary/PriceIncrements.java",
+      "sha256": "eabaa64e1c9668538b02b96c98e772befa2c4f7616385f583109ef98ccaecbbb"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/glossary/AdditionalUnderlyings.java",
+      "sha256": "f21d497c3a3e416b0f79c29251c1c6db1bf4867ec62d58d4349263391d2ed72f"
+    },
+    {
+      "path": "dxlib/src/main/java/com/devexperts/util/MathUtil.java",
+      "sha256": "98b58d2dc51af2255a4ef681de9c8bdd490279a320163fae538bd4989279a39a"
+    },
+    {
+      "path": "dxlib/src/main/java/com/devexperts/util/FastDoubleUtil.java",
+      "sha256": "fdfd9c7855ed6f9a11e7fcea2cd6c8495670656f7b161d52aba62ae4f7a6f9f1"
+    }
+  ],
+  "productionClassInventorySha256": "134205aec565b781ba7a485392c4188e89af87c1609b7626011038abd2800599",
+  "rows": 42594
+}

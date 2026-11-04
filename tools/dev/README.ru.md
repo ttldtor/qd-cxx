@@ -319,3 +319,5 @@ native writer files pinned Java reader. Сеть, SDK build и новая depend
 - [Oracle атрибутов Candle](../upstream/candle-attributes-oracle/README.ru.md): production-значения и операции с символами; EN/RU справка без входов, Verify по умолчанию, JDK8, heap128MiB/timeout60s, exit0/1.
 
 - [CFI и дополнительные базовые активы oracle](../upstream/glossary-oracle/README.ru.md): Production oracle CFI/AdditionalUnderlyings: справка без входов на EN/RU, JDK8, heap128MiB/60s, Git30s.
+
+- [Oracle ценовых шагов](../upstream/price-increments-oracle/README.ru.md): захват/проверка правил production Java8; `-Help` и `-HelpRu` без рабочих входов.
