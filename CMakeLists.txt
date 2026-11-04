@@ -89,6 +89,26 @@ target_include_directories(qdcxx_event_values PUBLIC "$<BUILD_INTERFACE:${CMAKE_
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 target_compile_features(qdcxx_event_values PUBLIC cxx_std_23)
 set_target_properties(qdcxx_event_values PROPERTIES CXX_EXTENSIONS OFF)
+
+option(ORG_TTLDTOR_QDCXX_BUILD_SCHEDULE "Build explicit bounded trading schedule rules and calendar contexts" OFF)
+if(ORG_TTLDTOR_QDCXX_BUILD_SCHEDULE)
+    find_package(Threads REQUIRED)
+    include(cmake/ScheduleData.cmake)
+    qdcxx_schedule_data("${CMAKE_CURRENT_BINARY_DIR}/generated/schedule/schedule_data.hpp")
+    add_library(qdcxx_schedule src/schedule/parser.cpp src/schedule/defaults_data.cpp src/schedule/schedule.cpp)
+    target_include_directories(qdcxx_schedule PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+        "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
+        PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated/schedule")
+    target_compile_features(qdcxx_schedule PUBLIC cxx_std_23)
+    target_link_libraries(qdcxx_schedule PRIVATE qdcxx_event_values Threads::Threads)
+    set_target_properties(qdcxx_schedule PROPERTIES CXX_EXTENSIONS OFF)
+    install(TARGETS qdcxx_schedule EXPORT qdcxxTargets ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}" RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+    install(DIRECTORY include/qd/schedule DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qd" FILES_MATCHING PATTERN "*.hpp")
+    install(FILES resources/schedule/schedule.properties resources/schedule/java8-zone-ids.txt
+        resources/schedule/manifest.json DESTINATION "${CMAKE_INSTALL_DATADIR}/qdcxx/schedule")
+    install(FILES licenses/schedule/MPL-2.0.txt DESTINATION "${CMAKE_INSTALL_DATADIR}/qdcxx/licenses/schedule")
+endif()
 add_library(qdcxx_event_mapping src/events/event_mapping.cpp)
 add_library(qdcxx_order_index src/events/order_index.cpp)
 target_link_libraries(qdcxx_order_index PUBLIC qdcxx_event_mapping qdcxx_event_sources)
@@ -196,6 +216,9 @@ endif()
 
 if(ORG_TTLDTOR_QDCXX_BUILD_EXAMPLES AND ORG_TTLDTOR_QDCXX_BUILD_FEED_API)
     add_subdirectory(examples/feed_quote)
+endif()
+if(ORG_TTLDTOR_QDCXX_BUILD_EXAMPLES AND ORG_TTLDTOR_QDCXX_BUILD_SCHEDULE)
+    add_subdirectory(examples/schedule_rules)
 endif()
 
 include(CMakePackageConfigHelpers)
@@ -337,6 +360,28 @@ if(BUILD_TESTING)
         DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     )
     FetchContent_MakeAvailable(doctest)
+    if(ORG_TTLDTOR_QDCXX_BUILD_SCHEDULE)
+        add_executable(qdcxx_schedule_tests tests/conformance/schedule_tests.cpp tests/conformance/schedule_allocations.cpp)
+        target_include_directories(qdcxx_schedule_tests PRIVATE src/schedule)
+        target_link_libraries(qdcxx_schedule_tests PRIVATE qdcxx_schedule doctest::doctest Threads::Threads)
+        target_compile_definitions(qdcxx_schedule_tests PRIVATE
+            ORG_TTLDTOR_QDCXX_SCHEDULE_CASES="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/schedule/cases.tsv"
+            ORG_TTLDTOR_QDCXX_SCHEDULE_ORACLE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/schedule/oracle.tsv")
+        set_target_properties(qdcxx_schedule_tests PROPERTIES CXX_EXTENSIONS OFF)
+        add_test(NAME schedule_rules COMMAND qdcxx_schedule_tests --no-colors --no-path-filenames)
+        set_tests_properties(schedule_rules PROPERTIES TIMEOUT 120)
+        if(WIN32)
+            add_test(NAME schedule_oracle_help COMMAND "${CMAKE_COMMAND}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/schedule_oracle_help.cmake")
+        endif()
+        if(TARGET qdcxx_schedule_example)
+            add_test(NAME schedule_example_help COMMAND "${CMAKE_COMMAND}"
+                "-DPROGRAM=$<TARGET_FILE:qdcxx_schedule_example>"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/schedule_example_help.cmake")
+            add_test(NAME schedule_example_run COMMAND qdcxx_schedule_example --run)
+            set_tests_properties(schedule_example_run PROPERTIES TIMEOUT 30)
+        endif()
+    endif()
     add_executable(qdcxx_order_index_tests tests/conformance/order_index_tests.cpp)
     target_link_libraries(qdcxx_order_index_tests PRIVATE qdcxx_order_index doctest::doctest)
     target_compile_definitions(qdcxx_order_index_tests PRIVATE

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "upstreamRevision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "calendar": {
+    "path": "schedule.properties",
+    "source": "dxfeed-api/src/main/resources/com/dxfeed/schedule/schedule.properties",
+    "sourceUrl": "https://github.com/devexperts/QD/blob/0ddc0a09779fb61d74cc0b37c6449ff47dcb715f/dxfeed-api/src/main/resources/com/dxfeed/schedule/schedule.properties",
+    "sha256": "dba44f5fbe985199230815a760eb9433348c9b0716c97b32c41c04b1d8822811",
+    "bytes": 62083,
+    "dateText": "20260323-170000+0000",
+    "versionMillis": 1774285200000,
+    "license": "MPL-2.0"
+  },
+  "zoneIdentityProfile": {
+    "path": "java8-zone-ids.txt",
+    "sha256": "c06ac0d05e666601114b0cf83a653d2308a5a8d8a4cf4f966b61d80060031b06",
+    "namedIds": 631,
+    "referenceRuntime": "Zulu Java8 1.8.0_422",
+    "referenceTZDB": "2024a",
+    "timeUtilSource": "dxlib/src/main/java/com/devexperts/util/TimeUtil.java",
+    "timeUtilSha256": "3aeba61ca5d1c6580ae7915be0b4d4cacf3264a0e907345b85da726a529dfbc3",
+    "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
+    "tzdbSha256": "e37fc7662b34281f15687f2bbdb054cf192131c09e8a4917261b74ed5e2a3db2",
+    "customIds": "Exact GMT+HH:MM or GMT-HH:MM, HH00..23 MM00..59; signed zero forms preserved",
+    "scope": "Identity validation only; no timezone transitions/provider data/query API"
+  }
+}

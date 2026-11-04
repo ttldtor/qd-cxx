@@ -2,6 +2,8 @@
 
 [Русская версия](README.ru.md). English is authoritative.
 
+The [schedule production oracle](../upstream/schedule-oracle/README.md) captures/verifies the complete pinned constructor grammar, named/default rules and timezone identities against Java 8. No arguments, EN/RU help and Get-Help require no inputs and start no Java. The [schedule console example](../../examples/schedule_rules/README.md) demonstrates installed public API use; no arguments and `--help`/`--help-ru` perform no context initialization.
+
 The [Trade production oracle](../upstream/trade-oracle/README.md) observes composite/regional fields, raw slots, time/flags/defaults and direct business doubles. Noargs/ENRU/Get-Help starts no Java; Capture/Verify uses four explicit paths, finite subprocess limits and fresh private run directories.
 
 The [field conversion oracle](../upstream/field-conversion-oracle/README.md) captures/verifies

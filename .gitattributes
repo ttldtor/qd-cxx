@@ -699,3 +699,11 @@ tests/fixtures/trade-eth/provenance.json text eol=lf
 tests/fixtures/ipf/collector/*.java text eol=lf
 tests/fixtures/ipf/collector/*.tsv -text -whitespace
 tests/fixtures/ipf/collector/provenance.json text eol=lf
+
+resources/schedule/schedule.properties -text -whitespace
+resources/schedule/java8-zone-ids.txt -text -whitespace
+resources/schedule/manifest.json text eol=lf
+tools/upstream/schedule-oracle/*.java text eol=lf
+tools/upstream/schedule-oracle/*.ps1 text eol=lf
+tests/fixtures/schedule/*.tsv -text -whitespace
+tests/fixtures/schedule/provenance.json text eol=lf

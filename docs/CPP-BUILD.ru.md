@@ -1,5 +1,14 @@
 # Ограниченные компоненты C++23
 
+Независимому [компоненту правил расписаний](SCHEDULE-RULES.ru.md) runtime SDK не нужен.
+Задайте `-DORG_TTLDTOR_QDCXX_BUILD_SCHEDULE=ON` (по умолчанию OFF) и линкуйте `qdcxx_schedule`
+либо запрашивайте установленный компонент `schedule`. Точный отслеживаемый manifest календаря/ID
+проверяется при configure; шага загрузки нет. Параметр
+`-DORG_TTLDTOR_QDCXX_BUILD_EXAMPLES=ON` добавляет `qdcxx_schedule_example`;
+[инструкция примера](../examples/schedule_rules/README.ru.md) включает EN/RU-справку без входов.
+Target реализует разбор, идентичности и типизированные defaults календаря;
+timezone-query backend и Day/Session-запросы в него не входят.
+
 Сначала подготовьте точные [исходники runtime SDK](../cmake/runtime-profile/README.ru.md). Явный [шаг подготовки зависимостей](../tools/deps/README.ru.md) предоставляет закреплённые Asio/c-ares с offline/cache и без глобальной установки; обычный configure их не загружает.
 
 ## Переносимые профили Feed и minimal {#portable-feed-profiles-ru}

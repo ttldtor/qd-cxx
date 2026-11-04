@@ -2,7 +2,7 @@
 
 [Русская версия](RULES-AND-TIMEZONES.ru.md). English is authoritative.
 
-Status: **compatibility specification; production Schedule implementation is separate work**. The provider/data ownership decision and controlled provider boundary are accepted and qualified in [ADR-0008](../../docs/decisions/ADR-0008-schedule-timezone-data-ownership.md). The grammar and compatibility rules below define the target behavior; they do not claim that the production parser, day/session generation, or filters are implemented.
+Status: **compatibility specification; constructor grammar and typed calendar contexts are implemented** in the optional [schedule-rules component](../../docs/SCHEDULE-RULES.md). Day/Session queries and filters remain separate work. The provider/data ownership decision and controlled provider boundary are accepted and qualified in [ADR-0008](../../docs/decisions/ADR-0008-schedule-timezone-data-ownership.md); the parser validates identities without linking a timezone-query backend.
 
 ## Authority and independent datasets
 
@@ -17,6 +17,8 @@ Public data identity distinguishes calendar date/hash, timezone version/hash, pr
 A schedule is a venue followed by a parenthesized property list, for example `XNYS()` or `(tz=UTC;0=09001700)`. An instrument may contain several venue portions. The default factory selects the first portion; an explicit venue factory selects that named portion or reports absence. A known venue inherits its named defaults; inline properties override them. An unknown venue can work with sufficient explicit properties, while `UNKNOWN()` fails for its missing timezone.
 
 Properties are separated by semicolons. The reference parser accepts multiple keys joined by `=` with the last cell used as their value; repeated keys use the last occurrence and its ordering. It does not perform general whitespace normalization. Unknown ordinary properties can be ignored, so a stricter generic key/value validator would change compatibility.
+
+Portion selection and venue enumeration deliberately use different source algorithms. Factories select the first opening parenthesis and its next closing parenthesis, taking the venue after the preceding closing parenthesis or semicolon. Named selection scans these portions. Enumeration instead uses ASCII-word `\w*` regex-find semantics and excludes nested parentheses. The native parser preserves both paths.
 
 | Property | Required behavior/source default |
 | --- | --- |
@@ -38,9 +40,13 @@ Day strategies include `closed`, `normal`, `def:<day definition>` and `ec:<offse
 
 The supported grammar is this complete pinned source family, including named/default rules, date-list algebra, day shifts and strategies. Implementations must preserve it rather than reduce support to one UTC interval or fixed offsets.
 
+Direct `de`/`rt` time fields retain the source's character-arithmetic behavior without a digit precheck; session groups require decimal digits. Date-list tokens require eight decimal digits and a month from 1 through 12, while year zero and day values such as 00 or 99 remain admitted. These construction rules do not impose the later query methods' label ranges. The C++ defaults update accepts a typed comparison version and ordered entries; it does not expose the raw-byte Java `TimeFormat.GMT` header loader.
+
 ## Timezone and calendar policy
 
 Zone IDs are case-sensitive. Preserve the accepted Java-compatible identifiers and aliases, including `UTC`, `US/Eastern`, `PST`, `EST`, both `Asia/Kathmandu` and `Asia/Katmandu`, and normalized custom IDs such as `GMT+05:30`. Reject unknown IDs and IDs whose normalized Java form differs from the requested spelling; retain the requested alias as the public identity. Do not derive the accepted-ID policy from platform/provider aliases. Custom GMT offsets require explicit compatibility handling.
+
+The parser's tracked [identity manifest](../../resources/schedule/manifest.json) records all 631 accepted named IDs observed from the pinned Java 8 runtime, plus the normalized custom-offset algorithm. This identity table is deterministic validation data and contains no timezone transitions.
 
 Calendar local-time conversion moves a nonexistent local time through the gap by its duration and selects the later occurrence in an overlap. Examples: New York 2024-03-10 02:30 maps to 07:30Z; New York 2024-11-03 01:30 maps to 06:30Z. Lord Howe's 2024-10-06 02:15 half-hour gap maps to 2024-10-05 15:45Z, and its 2024-04-07 01:45 overlap selects 2024-04-06 15:15Z. Apia's skipped 2011-12-30 at noon maps to 2011-12-30 22:00Z, preserving the next local date's noon result.
 
@@ -66,4 +72,4 @@ Initialization accepts an explicit data root and validates a fixed snapshot befo
 
 The provider profile bounds admission to 11 files, 1,100,000 source bytes, 1,024 bytes per line, 35,000 lines, and 12,000 source records; native construction is bounded to 600 zones, 400 links, 10,000 rules, and 32,768 cumulative model insertions. It uses the standard allocator and makes no configurable hard heap/RSS-cap claim; measured peak memory is not a guaranteed limit. Provider initialization failure publishes no usable context. Calendar data contexts and retained calendar generations are separately owned; the provider's one-generation-per-process rule does not cap the number of future public `ScheduleDataContext` instances.
 
-Timezone provider/data updates require an offline, maintainer-reviewed update followed by deployment and process restart. Market-calendar defaults remain independently versioned. A future context-owned calendar update must validate a complete generation before publishing it; previously returned immutable Day/Session values retain their original generation. These ownership requirements do not claim that the Schedule implementation exists.
+Timezone provider/data updates require an offline, maintainer-reviewed update followed by deployment and process restart. Market-calendar defaults remain independently versioned. The implemented typed context update validates a complete generation before publication. Future immutable Day/Session values must retain their original generation; those query types remain separate work.

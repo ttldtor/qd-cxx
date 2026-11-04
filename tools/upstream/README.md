@@ -2,6 +2,8 @@
 
 This directory is reserved for reproducible tools that inspect the locked Java QD checkout or capture oracle output for fixtures.
 
+The [schedule oracle](schedule-oracle/README.md) observes complete constructor/default grammar and accepted timezone identities through the actual pinned Java 8 production classes. Capture/Verify uses explicit inputs, fresh bounded run directories and unchanged class inventories. Input-free EN/RU help starts no Java.
+
 Tools must:
 
 - require or verify the expected upstream commit;

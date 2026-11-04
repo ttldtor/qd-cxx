@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "revision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "javaVersion": "openjdk version \"1.8.0_422\"\nOpenJDK Runtime Environment (Zulu 8.80.0.17-CA-win64) (build 1.8.0_422-b05)\nOpenJDK 64-Bit Server VM (Zulu 8.80.0.17-CA-win64) (build 25.422-b05, mixed mode)",
+  "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
+  "javacSha256": "633143e961aa18051c09112b85333f5cdbd845b54eb39678eb15b91ca8bbb527",
+  "tzdbSha256": "e37fc7662b34281f15687f2bbdb054cf192131c09e8a4917261b74ed5e2a3db2",
+  "harnessSha256": "6dd7074cc2b80d8abdc0f23fe76bb1cc4dfd65d6eb4a4cecbf1ceaa8f061f798",
+  "launcherSha256": "91c8f2f18d088d2268a5997eebe8664b3a7631fdd64e31edbc693c69a8bda14d",
+  "casesSha256": "6c2df8981d549139b482ad2dcae586397042d1a10aa3ee36d8d64c9060c6829b",
+  "upstreamSources": [
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/schedule/Schedule.java",
+      "sha256": "8cc313b998be40da7fd7ee9309c4f5b1483d5396844327ac3790177ecb17c1ca"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/schedule/Day.java",
+      "sha256": "4ccdfddddb513231a9b76f6acd2ec21ed24bc91956399cea24409b445f895355"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/schedule/Session.java",
+      "sha256": "6a4549b9ca6360d7fcaf4dcc005824d58bc1026b133499cf0336bae3d9cd372e"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/schedule/SessionType.java",
+      "sha256": "59e9cf5614f971f001b021e4b1c49d4142099977e717c16fbf2917981b86ff23"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/ipf/InstrumentProfile.java",
+      "sha256": "4ef87d9d20e8b5b8f963c29dc2295e4dc5b1cea065e56a21c788d697ef12dfd1"
+    },
+    {
+      "path": "dxfeed-api/src/main/resources/com/dxfeed/schedule/schedule.properties",
+      "sha256": "dba44f5fbe985199230815a760eb9433348c9b0716c97b32c41c04b1d8822811"
+    },
+    {
+      "path": "dxlib/src/main/java/com/devexperts/util/TimeUtil.java",
+      "sha256": "3aeba61ca5d1c6580ae7915be0b4d4cacf3264a0e907345b85da726a529dfbc3"
+    },
+    {
+      "path": "dxlib/src/main/java/com/devexperts/util/DayUtil.java",
+      "sha256": "9586f03a4c45d3a9fa4efd7bb67d4abb9ffb59f93399312a102346c76417c11a"
+    },
+    {
+      "path": "dxlib/src/main/java/com/devexperts/util/TimeFormat.java",
+      "sha256": "7115871e99bb10f1454824909da742628993a3c5049e320a8a06d5add1c777ec"
+    }
+  ],
+  "productionClassInventorySha256": "e2714e42136525fb804c7a627d047449b8c6297a815042c2bbc5ca82dda87b76",
+  "fixtureSha256": "1989bd86f33ffd170f43137ff6a17e1381777cf24e86d480a8d5696bac39830b",
+  "rows": 867,
+  "timezoneLocaleInvariant": true,
+  "scope": "Actual production factories and constructed rule fields; no date-specific Day/Session query implementation"
+}

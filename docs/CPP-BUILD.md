@@ -1,5 +1,13 @@
 # Bounded C++23 components
 
+The independent [schedule-rules component](SCHEDULE-RULES.md) needs no runtime SDK. Configure with
+`-DORG_TTLDTOR_QDCXX_BUILD_SCHEDULE=ON` (default OFF) and link `qdcxx_schedule` or request the
+installed `schedule` component. Its exact tracked calendar/ID manifest is checked at configure;
+there is no acquisition step. Add `-DORG_TTLDTOR_QDCXX_BUILD_EXAMPLES=ON` for
+`qdcxx_schedule_example`; [example instructions](../examples/schedule_rules/README.md) include
+input-free EN/RU help. This target implements parsing, identities and typed calendar defaults;
+it does not link a timezone-query backend or implement Day/Session queries.
+
 Prepare the exact [runtime SDK sources](../cmake/runtime-profile/README.md) first. The explicit [dependency provisioning step](../tools/deps/README.md) supplies pinned Asio/c-ares with offline/cache support and no global installation; ordinary configure never downloads them.
 
 ## Portable Feed and minimal profiles {#portable-feed-profiles}

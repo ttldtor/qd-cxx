@@ -2,6 +2,8 @@
 
 [English version](README.md). Английская версия нормативная.
 
+[Production oracle расписаний](../upstream/schedule-oracle/README.ru.md) захватывает/проверяет полную закреплённую грамматику конструктора, named/default rules и timezone IDs через Java 8. Без аргументов, EN/RU-справка и Get-Help не требуют входов и не запускают Java. [Консольный пример расписаний](../../examples/schedule_rules/README.ru.md) использует установленный публичный API; без аргументов и с `--help`/`--help-ru` контекст не инициализируется.
+
 [Production oracle Trade](../upstream/trade-oracle/README.ru.md) проверяет composite/regional fields, raw slots, time/flags/defaults и прямые business doubles. Noargs/ENRU/Get-Help не запускают Java; Capture/Verify используют четыре явных пути, finite subprocess limits и новые private run directories.
 
 [Oracle преобразования полей](../upstream/field-conversion-oracle/README.ru.md) захватывает/проверяет
