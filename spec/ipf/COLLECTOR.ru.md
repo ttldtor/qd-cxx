@@ -100,3 +100,5 @@ C++ всегда владеет неизменяемыми ревизиями. �
 удаление при обходе; C++ snapshot фиксирует одно состояние и сохраняет его. Планирование
 Java executor и identity iterator не являются контрактами C++ API. Connection, reload,
 completion wait и scheduler в этот компонент не входят.
+
+Private live connections используют независимые collector-local generation domains; публичные integer tags остаются в domain0. Equal-value update обновляет ownership без notification. Добавлен один8-byte внутренний domain на model entry; counts/units/work limits не меняются и не обещают точные allocator bytes/RSS.

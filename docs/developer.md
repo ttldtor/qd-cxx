@@ -46,3 +46,5 @@ part of the source distribution; the navigation above does not turn proposals in
 ## Event value utilities
 
 The [event-value oracle](../tools/upstream/event-values-oracle/README.md) captures and verifies exact pinned Java conversions without an SDK rebuild or endpoint. See its built-in EN/RU help and [public contracts](../spec/events/EVENT-VALUES.md). The [installed consumer](../tests/conformance/event_values_consumer/CMakeLists.txt) compiles every new public header separately and exercises raw preservation, conversions and input errors; it can link the SDK-free value target or the compatible feed target.
+
+- [Live IPF connection contract](../spec/ipf/CONNECTION.md): explicit joined runtime, private incremental sink, finite cumulative grants; [bounded actual Java oracle](../tests/fixtures/ipf/live/README.md).

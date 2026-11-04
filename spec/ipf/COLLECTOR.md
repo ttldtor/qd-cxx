@@ -107,3 +107,5 @@ C++ always supplies owning immutable revisions. Java's weak concurrent iterator 
 expose a removal during traversal; the C++ snapshot captures one committed state and
 keeps it stable. Java executor scheduling and iterator object identity are not C++ API
 contracts. No connection, source reload, completion wait or scheduler is implemented here.
+
+Private live connections use independent collector-local generation domains; public integer tags remain in domain zero. Equal-value updates refresh ownership without notification. This adds one8-byte internal domain per model entry; the documented count/unit/work limits remain unchanged and do not promise exact allocator bytes/RSS.

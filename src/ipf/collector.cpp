@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/ipf/instrument_profile_collector.hpp"
 
+#include "collector_connection.hpp"
+#include "profile_access.hpp"
+
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -13,26 +16,6 @@
 #include <utility>
 
 namespace org::ttldtor::qdcxx::ipf {
-namespace collector_detail {
-/** Allocation-free inspection of existing value backing for collector admission. */
-struct CollectorProfileAccess {
-    /** Read retained UTF-16 units without converting numeric fields.
-     * @param profile Stable source value.
-     * @return Combined actual retained text/name lengths.
-     */
-    static std::size_t units(const InstrumentProfile &profile) noexcept {
-        return profile.totalUnits_;
-    }
-
-    /** Read nonempty custom-field count without allocating a name list.
-     * @param profile Stable source value.
-     * @return Number of custom map entries.
-     */
-    static std::size_t fields(const InstrumentProfile &profile) noexcept {
-        return profile.custom_.size();
-    }
-};
-} // namespace collector_detail
 
 namespace {
 /** Admission interruption, kept distinct from allocator exceptions. */
@@ -160,6 +143,7 @@ struct ProfileCollectorState {
     /** Current immutable value and independently replaceable generation. */
     struct Entry {
         Revision revision;
+        std::uint64_t domain;
         std::uint64_t generation;
     };
 
@@ -190,6 +174,7 @@ struct ProfileCollectorState {
     std::size_t cycleReserved = 0;
     std::uint64_t revision = 0;
     std::uint64_t listenerIdentity = 0;
+    std::uint64_t connectionIdentity = 0;
     std::uint64_t failures = 0;
     std::int64_t updated = wallMillis();
     std::int64_t reported = 0;
@@ -316,12 +301,13 @@ struct ProfileCollectorState {
      * @param generation Replacement generation, zero meaning none.
      * @param tags Stable generation tags when removing.
      * @param removing Select generation-removal mode.
+     * @param domain Collector-local private namespace; zero preserves the public integer-tag contract.
      * @return Published counts, or an unchanged-state admission failure.
      */
     std::expected<ProfileCollectorChange, ProfileCollectorError> apply(std::span<const InstrumentProfile> input,
                                                                        std::uint64_t generation,
                                                                        std::span<const std::uint64_t> tags,
-                                                                       bool removing) {
+                                                                       bool removing, std::uint64_t domain = 0) {
         Model staged;
         std::vector<Revision> changed;
         std::vector<Revision> superseded;
@@ -348,6 +334,11 @@ struct ProfileCollectorState {
             }
 
             spend(work, model.size());
+
+            if (domain != 0) {
+                spend(work, model.size());
+            }
+
             spend(work, count);
             staged = model;
             changed.reserve(count);
@@ -373,6 +364,7 @@ struct ProfileCollectorState {
                 }
 
                 if (old != staged.end() && old->second.revision->profile == profile) {
+                    old->second.domain = domain;
                     old->second.generation = tag;
 
                     return;
@@ -400,7 +392,7 @@ struct ProfileCollectorState {
                         throw Admission{ProfileCollectorError::LIMIT_EXCEEDED};
                     }
 
-                    staged.emplace(value->profile.getSymbol(), Entry{value, tag});
+                    staged.emplace(value->profile.getSymbol(), Entry{value, domain, tag});
                 }
 
                 changed.push_back(std::move(value));
@@ -410,7 +402,8 @@ struct ProfileCollectorState {
                 for (const auto &[symbol, entry] : model) {
                     spend(work, tags.size());
 
-                    if (entry.generation != 0 && std::find(tags.begin(), tags.end(), entry.generation) != tags.end()) {
+                    if (entry.domain == domain && entry.generation != 0 &&
+                        std::find(tags.begin(), tags.end(), entry.generation) != tags.end()) {
                         if (symbol.size() > std::numeric_limits<std::size_t>::max() - 7) {
                             throw Admission{ProfileCollectorError::LIMIT_EXCEEDED};
                         }
@@ -475,6 +468,43 @@ struct ProfileCollectorState {
     }
 };
 } // namespace collector_detail
+
+std::expected<std::uint64_t, ProfileCollectorError>
+collector_detail::ConnectionCollectorAccess::reserve(InstrumentProfileCollector &collector) {
+    auto state = collector.state_;
+    std::lock_guard lock(state->mutex);
+
+    if (state->closed) {
+        return std::unexpected(ProfileCollectorError::CLOSED);
+    }
+
+    if (state->limits.workUnits == 0) {
+        return std::unexpected(ProfileCollectorError::LIMIT_EXCEEDED);
+    }
+
+    if (state->connectionIdentity == std::numeric_limits<std::uint64_t>::max()) {
+        return std::unexpected(ProfileCollectorError::IDENTITY_EXHAUSTED);
+    }
+
+    return ++state->connectionIdentity;
+}
+
+std::expected<ProfileCollectorChange, ProfileCollectorError>
+collector_detail::ConnectionCollectorAccess::update(InstrumentProfileCollector &collector,
+                                                    std::span<const InstrumentProfile> profiles, std::uint64_t domain,
+                                                    std::uint64_t generation) {
+    auto state = collector.state_;
+
+    return state->apply(profiles, generation, {}, false, domain);
+}
+
+std::expected<ProfileCollectorChange, ProfileCollectorError>
+collector_detail::ConnectionCollectorAccess::remove(InstrumentProfileCollector &collector,
+                                                    std::span<const std::uint64_t> generations, std::uint64_t domain) {
+    auto state = collector.state_;
+
+    return state->apply({}, 0, generations, true, domain);
+}
 
 InstrumentProfileCollector::InstrumentProfileCollector(std::shared_ptr<collector_detail::ProfileCollectorState> state)
     : state_(std::move(state)) {

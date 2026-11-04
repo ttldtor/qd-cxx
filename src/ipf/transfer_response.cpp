@@ -1,6 +1,7 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #include "transfer_response.hpp"
+#include "live_transfer.hpp"
 
 #include <boost/beast/http/error.hpp>
 #include <boost/url/parse.hpp>
@@ -160,25 +161,31 @@ bool TransferProfiles::finish(IpfReadWork &work) {
     return status == IpfReadStatus::FINISHED || status == IpfReadStatus::FAILED;
 }
 
-TransferResponse::TransferResponse(const IpfTransferLimits &limits, TransferWork &work, TransferProfiles &profiles,
-                                   IpfTransferResult &result)
+template <class Profiles>
+BasicTransferResponse<Profiles>::BasicTransferResponse(const IpfTransferLimits &limits, TransferWork &work,
+                                                       Profiles &profiles, IpfTransferResult &result)
     : limits_(limits), work_(work), profiles_(profiles), result_(result) {
     header_limit(static_cast<std::uint32_t>(limits.headerBytes));
     body_limit(limits.bodyBytes);
     eager(false);
 }
 
-void TransferResponse::fail(IpfTransferError error, std::string_view stage, boost::system::error_code &ec) {
+template <class Profiles>
+void BasicTransferResponse<Profiles>::fail(IpfTransferError error, std::string_view stage,
+                                           boost::system::error_code &ec) {
     firstFailure(result_, error, stage);
     ec = boost::beast::http::error::bad_value;
 }
 
-void TransferResponse::on_request_impl(boost::beast::http::verb, boost::beast::string_view, boost::beast::string_view,
-                                       int, boost::system::error_code &ec) {
+template <class Profiles>
+void BasicTransferResponse<Profiles>::on_request_impl(boost::beast::http::verb, boost::beast::string_view,
+                                                      boost::beast::string_view, int, boost::system::error_code &ec) {
     fail(IpfTransferError::HTTP_FAILURE, "http-response-only", ec);
 }
 
-void TransferResponse::on_response_impl(int code, boost::beast::string_view, int, boost::system::error_code &ec) {
+template <class Profiles>
+void BasicTransferResponse<Profiles>::on_response_impl(int code, boost::beast::string_view, int,
+                                                       boost::system::error_code &ec) {
     status = static_cast<unsigned>(code);
     result_.httpStatus = status;
     result_.lastModified.reset();
@@ -189,8 +196,9 @@ void TransferResponse::on_response_impl(int code, boost::beast::string_view, int
     }
 }
 
-void TransferResponse::on_field_impl(boost::beast::http::field field, boost::beast::string_view name,
-                                     boost::beast::string_view value, boost::system::error_code &ec) {
+template <class Profiles>
+void BasicTransferResponse<Profiles>::on_field_impl(boost::beast::http::field field, boost::beast::string_view name,
+                                                    boost::beast::string_view value, boost::system::error_code &ec) {
     if (++fields_ > limits_.headerFields) {
         fail(IpfTransferError::RESOURCE_LIMIT, "http-header-fields", ec);
 
@@ -266,8 +274,10 @@ void TransferResponse::on_field_impl(boost::beast::http::field field, boost::bea
     }
 }
 
-void TransferResponse::on_trailer_field_impl(boost::beast::http::field field, boost::beast::string_view name,
-                                             boost::beast::string_view, boost::system::error_code &ec) {
+template <class Profiles>
+void BasicTransferResponse<Profiles>::on_trailer_field_impl(boost::beast::http::field field,
+                                                            boost::beast::string_view name, boost::beast::string_view,
+                                                            boost::system::error_code &ec) {
     if (++trailers_ > limits_.trailerFields) {
         fail(IpfTransferError::RESOURCE_LIMIT, "http-trailer-fields", ec);
 
@@ -303,15 +313,18 @@ void TransferResponse::on_trailer_field_impl(boost::beast::http::field field, bo
     }
 }
 
-void TransferResponse::on_header_impl(boost::system::error_code &) {
+template <class Profiles> void BasicTransferResponse<Profiles>::on_header_impl(boost::system::error_code &) {
     // Beast adds the final chunk CRLF to this allowance before parsing the trailer fields.
     header_limit(static_cast<std::uint32_t>(limits_.trailerBytes - 2));
 }
 
-void TransferResponse::on_body_init_impl(boost::optional<std::uint64_t> const &, boost::system::error_code &) {
+template <class Profiles>
+void BasicTransferResponse<Profiles>::on_body_init_impl(boost::optional<std::uint64_t> const &,
+                                                        boost::system::error_code &) {
 }
 
-std::size_t TransferResponse::body(boost::beast::string_view value, boost::system::error_code &ec) {
+template <class Profiles>
+std::size_t BasicTransferResponse<Profiles>::body(boost::beast::string_view value, boost::system::error_code &ec) {
     const auto available = limits_.bodyBytes - (std::min)(limits_.bodyBytes, work_.body);
     const auto count = (std::min)(value.size(), available);
 
@@ -332,28 +345,34 @@ std::size_t TransferResponse::body(boost::beast::string_view value, boost::syste
     return accepted;
 }
 
-std::size_t TransferResponse::on_body_impl(boost::beast::string_view value, boost::system::error_code &ec) {
+template <class Profiles>
+std::size_t BasicTransferResponse<Profiles>::on_body_impl(boost::beast::string_view value,
+                                                          boost::system::error_code &ec) {
     return body(value, ec);
 }
 
-void TransferResponse::on_chunk_header_impl(std::uint64_t, boost::beast::string_view extensions,
-                                            boost::system::error_code &ec) {
+template <class Profiles>
+void BasicTransferResponse<Profiles>::on_chunk_header_impl(std::uint64_t, boost::beast::string_view extensions,
+                                                           boost::system::error_code &ec) {
     if (extensions.size() > limits_.chunkExtensionBytes ||
         !charge(work_.extensions, extensions.size(), limits_.totalChunkExtensionBytes)) {
         fail(IpfTransferError::RESOURCE_LIMIT, "http-chunk-extensions", ec);
     }
 }
 
-std::size_t TransferResponse::on_chunk_body_impl(std::uint64_t, boost::beast::string_view value,
-                                                 boost::system::error_code &ec) {
+template <class Profiles>
+std::size_t BasicTransferResponse<Profiles>::on_chunk_body_impl(std::uint64_t, boost::beast::string_view value,
+                                                                boost::system::error_code &ec) {
     return body(value, ec);
 }
 
-void TransferResponse::on_finish_impl(boost::system::error_code &) {
+template <class Profiles> void BasicTransferResponse<Profiles>::on_finish_impl(boost::system::error_code &) {
 }
 
-std::string_view TransferResponse::location() const noexcept {
+template <class Profiles> std::string_view BasicTransferResponse<Profiles>::location() const noexcept {
     return {location_.data(), locationSize_};
 }
 
+template class BasicTransferResponse<TransferProfiles>;
+template class BasicTransferResponse<StreamingProfiles>;
 } // namespace org::ttldtor::qdcxx::ipf::detail

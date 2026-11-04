@@ -17,6 +17,9 @@
 #include <vector>
 
 namespace org::ttldtor::qdcxx::ipf {
+namespace connection_detail {
+class TransferHost;
+}
 
 /** Detached source/HTTP/operation failures; diagnostic text never contains caller or peer text. */
 enum class IpfTransferError {
@@ -248,6 +251,7 @@ struct IpfTransferResult {
  * until native retirement. No facade access follows callback entry. No hidden worker is created.
  */
 class InstrumentProfileReader {
+    friend class connection_detail::TransferHost;
     struct Impl;
     std::shared_ptr<Impl> impl_; ///< Stable host/operation lifetime, independent of public liveness.
     /** Adopt fully prepared host state.

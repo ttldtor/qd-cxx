@@ -48,3 +48,5 @@
 ## Утилиты значений событий
 
 [Oracle значений событий](../tools/upstream/event-values-oracle/README.ru.md) захватывает и проверяет точные закреплённые Java-преобразования без сборки SDK и endpoint. См. встроенную EN/RU справку и [публичные контракты](../spec/events/EVENT-VALUES.ru.md). [Installed consumer](../tests/conformance/event_values_consumer/CMakeLists.txt) отдельно компилирует каждый новый публичный заголовок и проверяет сохранение raw, преобразования и ошибки входов; он линкует SDK-free value target либо совместимый feed target.
+
+- [Контракт live IPF connection](../spec/ipf/CONNECTION.ru.md): явный joined runtime, private incremental sink, конечные накопленные grants; [actual Java oracle](../tests/fixtures/ipf/live/README.ru.md).

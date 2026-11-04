@@ -92,11 +92,13 @@ class TransferProfiles {
     [[nodiscard]] bool finish(IpfReadWork &work);
 };
 
-/** Allocation-free derived HTTP parser; no dynamic fields/body container or application callback. */
-class TransferResponse final : public boost::beast::http::basic_parser<false> {
+/** Allocation-free derived HTTP parser; no dynamic fields/body container or application callback.
+ * @tparam Profiles Snapshot or single-record private pipeline with the same synchronous interface.
+ */
+template <class Profiles> class BasicTransferResponse final : public boost::beast::http::basic_parser<false> {
     const IpfTransferLimits &limits_;              ///< Stable immutable operation settings.
     TransferWork &work_;                           ///< Whole-load counters shared by every response.
-    TransferProfiles &profiles_;                   ///< Existing owned IPF pipeline.
+    Profiles &profiles_;                           ///< Existing owned IPF pipeline.
     IpfTransferResult &result_;                    ///< Stable result; preserves first cause.
     std::size_t fields_ = 0;                       ///< Current message field count.
     std::size_t trailers_ = 0;                     ///< Current message trailer count.
@@ -196,12 +198,13 @@ class TransferResponse final : public boost::beast::http::basic_parser<false> {
      * @param profiles Existing bounded collector.
      * @param result Stable detached output.
      */
-    TransferResponse(const IpfTransferLimits &limits, TransferWork &work, TransferProfiles &profiles,
-                     IpfTransferResult &result);
+    BasicTransferResponse(const IpfTransferLimits &limits, TransferWork &work, Profiles &profiles,
+                          IpfTransferResult &result);
     /** Borrow the bounded current Location value.
      * @return View valid through this parser's retirement.
      */
     [[nodiscard]] std::string_view location() const noexcept;
 };
 
+using TransferResponse = BasicTransferResponse<TransferProfiles>;
 } // namespace org::ttldtor::qdcxx::ipf::detail

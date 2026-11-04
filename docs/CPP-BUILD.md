@@ -1052,3 +1052,5 @@ independent meaning.
 The [compression contract](../spec/ipf/COMPRESSION.md) specifies finite allocator/work accounting.
 The [fixture oracle](../tests/fixtures/ipf/compression/README.md) documents actual JDK8 comparison,
 intentional ZIP deviations and EN/RU no-work help. C++ tests replay checked fixtures without Java.
+
+Enable ORG_TTLDTOR_QDCXX_BUILD_IPF_LIVE=ON only with explicit IPF_TRANSFER/TLS prerequisites; it exports qdcxx_ipf_live and the connection header. Pure IPF and default OFF do not acquire a worker or transfer dependency. See [live connection](IPF-CONNECTION.md).

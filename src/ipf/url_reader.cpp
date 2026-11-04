@@ -3,6 +3,7 @@
 #include "qd/ipf/instrument_profile_url_reader.hpp"
 
 #include "../transport/tls_byte_owner.hpp"
+#include "live_transfer.hpp"
 #include "transfer_control.hpp"
 #include "transfer_file.hpp"
 #include "transfer_native.hpp"
@@ -185,12 +186,12 @@ struct InstrumentProfileReader::Impl {
     }
 
     /** Stable synchronous operation, independent of facade address/lifetime. */
-    struct Operation {
+    template <class ProfilePipe = detail::TransferProfiles> struct Operation {
         std::shared_ptr<Impl> host;         ///< Strong lease across user code/drain.
         std::stop_token stop;               ///< Thread-safe request observation only.
         IpfTransferResult result;           ///< Detached prefix and first cause.
         detail::TransferWork work;          ///< Whole-load HTTP counters.
-        detail::TransferProfiles profiles;  ///< Existing incremental IPF parser.
+        ProfilePipe profiles;               ///< Existing incremental IPF parser.
         transport::TcpWork cleanupWork{};   ///< Original native grant partition reserved only for retirement.
         transport::TcpWork nativeWork;      ///< Whole-load native credits.
         protocol::LiveWork byteWork;        ///< Whole-load copy/preparation credits.
@@ -234,10 +235,35 @@ struct InstrumentProfileReader::Impl {
             retire(false);
         }
 
+        /** Deliver the single staged item outside parser/native frames.
+         * @return True after sink admission.
+         */
+        bool publishItems() {
+            if constexpr (std::is_same_v<ProfilePipe, detail::StreamingProfiles>) {
+                if (!profiles.publish()) {
+                    fail(result, profiles.consumer().refusal().value_or(
+                                     IpfTransferDiagnostic{IpfTransferError::CANCELLED, "connection-item-cutoff"}));
+
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
         /** Observe cutoff and debit one finite internal turn.
          * @return True for permitted ordinary work.
          */
         bool checkpoint() {
+            if constexpr (std::is_same_v<ProfilePipe, detail::StreamingProfiles>) {
+                if (!profiles.consumer().checkpoint()) {
+                    fail(result, profiles.consumer().refusal().value_or(
+                                     IpfTransferDiagnostic{IpfTransferError::CANCELLED, "connection-cutoff"}));
+
+                    return false;
+                }
+            }
+
             if (detail::transferCancelled(host->live, host->cancelRequested, stop)) {
                 fail(result, {IpfTransferError::CANCELLED, "transfer-cancelled"});
 
@@ -619,7 +645,9 @@ struct InstrumentProfileReader::Impl {
 
             if (!append("GET ") || !append({target.data(), target.size()}) || !append(" HTTP/1.1\r\nHost: ") ||
                 !append({authority.data(), authority.size()}) ||
-                !append("\r\nConnection: close\r\nX-Live: no\r\nAccept-Encoding: identity\r\n") ||
+                !append(std::is_same_v<ProfilePipe, detail::StreamingProfiles>
+                            ? "\r\nConnection: close\r\nX-Live: yes\r\nAccept-Encoding: identity\r\n"
+                            : "\r\nConnection: close\r\nX-Live: no\r\nAccept-Encoding: identity\r\n") ||
                 (!date.empty() && (!append("If-Modified-Since: ") || !append(date) || !append("\r\n"))) ||
                 (!token.empty() && (!append("Authorization: ") || !append(token) || !append("\r\n"))) ||
                 !append("\r\n") || !detail::charge(work.presented, size, host->options.limits.presentedBytes)) {
@@ -656,7 +684,9 @@ struct InstrumentProfileReader::Impl {
          * @return Owned bounded Location for redirect, empty for final/error.
          */
         std::optional<std::string> receive() {
-            std::optional<detail::TransferResponse> response;
+            using Response = detail::BasicTransferResponse<ProfilePipe>;
+            std::optional<Response> response;
+            bool headersObserved = false;
             response.emplace(host->options.limits, work, profiles, result);
             bool needMore = true;
             bool eofDelivered = false;
@@ -729,6 +759,34 @@ struct InstrumentProfileReader::Impl {
                     inputSize -= consumed;
                     needMore = error == boost::beast::http::error::need_more;
 
+                    if (!publishItems()) {
+                        break;
+                    }
+
+                    if constexpr (std::is_same_v<ProfilePipe, detail::StreamingProfiles>) {
+                        if (!headersObserved && response->is_header_done() && response->status == 200) {
+                            headersObserved = true;
+                            const auto modified =
+                                result.lastModified
+                                    ? std::optional(
+                                          std::chrono::time_point_cast<std::chrono::milliseconds>(*result.lastModified))
+                                    : std::nullopt;
+                            const auto action = profiles.consumer().headers(result, modified);
+
+                            if (action == connection_detail::HeaderAction::SKIP) {
+                                profiles.skip();
+                                result.status = IpfTransferStatus::NOT_MODIFIED;
+
+                                return std::nullopt;
+                            }
+
+                            if (action == connection_detail::HeaderAction::REJECT || !checkpoint()) {
+                                fail(result, {IpfTransferError::CANCELLED, "connection-header-cutoff"});
+                                break;
+                            }
+                        }
+                    }
+
                     if (error && !needMore) {
                         if (!result.error) {
                             fail(result, {IpfTransferError::HTTP_FAILURE, "http-parse"});
@@ -745,6 +803,7 @@ struct InstrumentProfileReader::Impl {
                                 break;
                             }
 
+                            headersObserved = false;
                             response.reset();
                             response.emplace(host->options.limits, work, profiles, result);
                             needMore = false;
@@ -850,7 +909,9 @@ struct InstrumentProfileReader::Impl {
             while (checkpoint()) {
                 auto parserWork = host->options.ipf.turnWork;
 
-                if (profiles.finish(parserWork)) {
+                const auto finished = profiles.finish(parserWork);
+
+                if (!publishItems() || finished) {
                     break;
                 }
             }
@@ -868,6 +929,27 @@ struct InstrumentProfileReader::Impl {
                 fail(result, file.error());
 
                 return;
+            }
+
+            if constexpr (std::is_same_v<ProfilePipe, detail::StreamingProfiles>) {
+                const auto modified = file->modified();
+
+                if (modified) {
+                    result.lastModified = std::chrono::floor<std::chrono::seconds>(*modified);
+                }
+
+                const auto action = profiles.consumer().headers(result, modified);
+
+                if (action == connection_detail::HeaderAction::SKIP) {
+                    profiles.skip();
+                    result.status = IpfTransferStatus::NOT_MODIFIED;
+
+                    return;
+                }
+
+                if (action == connection_detail::HeaderAction::REJECT || !checkpoint()) {
+                    return;
+                }
             }
 
             while (checkpoint()) {
@@ -895,6 +977,10 @@ struct InstrumentProfileReader::Impl {
                     auto parserWork = host->options.ipf.turnWork;
                     consumed += profiles.feed(std::span(input.get(), count).subspan(consumed), parserWork);
 
+                    if (!publishItems()) {
+                        break;
+                    }
+
                     if (result.error) {
                         break;
                     }
@@ -908,7 +994,9 @@ struct InstrumentProfileReader::Impl {
                     while (checkpoint()) {
                         auto parserWork = host->options.ipf.turnWork;
 
-                        if (profiles.finish(parserWork)) {
+                        const auto finished = profiles.finish(parserWork);
+
+                        if (!publishItems() || finished) {
                             break;
                         }
                     }
@@ -1005,8 +1093,9 @@ struct InstrumentProfileReader::Impl {
      * @param options Validated finite settings.
      * @return Exact declared reservation refusal, empty when all simultaneous owned capacities fit.
      */
-    static std::optional<IpfTransferDiagnostic> validateBacking(const IpfTransferOptions &options) noexcept {
-        std::size_t total = sizeof(Impl) + HOST_CONTROL_BYTES + sizeof(InstrumentProfileReader) + sizeof(Operation) +
+    static std::optional<IpfTransferDiagnostic> validateBacking(const IpfTransferOptions &options,
+                                                                std::size_t extra = 0) noexcept {
+        std::size_t total = sizeof(Impl) + HOST_CONTROL_BYTES + sizeof(InstrumentProfileReader) + sizeof(Operation<>) +
                             sizeof(detail::TransferResponse) + detail::transferSourceWorkingBytes() +
                             detail::TRANSFER_FILE_PATH_BYTES + sizeof(detail::TransferFile);
         const auto inlineCapacity = std::string{}.capacity();
@@ -1021,6 +1110,10 @@ struct InstrumentProfileReader::Impl {
             if (!detail::charge(total, bytes, options.limits.residentBytes)) {
                 return IpfTransferDiagnostic{IpfTransferError::RESOURCE_LIMIT, "transfer-resident"};
             }
+        }
+
+        if (extra != 0 && !detail::charge(total, extra, options.limits.residentBytes)) {
+            return IpfTransferDiagnostic{IpfTransferError::RESOURCE_LIMIT, "connection-stream-backing"};
         }
 
         return std::nullopt;
@@ -1079,7 +1172,7 @@ struct InstrumentProfileReader::Impl {
         } reset{*state};
 
         try {
-            Operation operation(state, request, stop);
+            Operation<> operation(state, request, stop);
 
             try {
                 operation.run(source);
@@ -1214,5 +1307,156 @@ std::expected<void, IpfTransferDiagnostic> InstrumentProfileReader::cancel() noe
 
     return {};
 }
+
+namespace connection_detail {
+/** Persistent worker-owned grants; every retry consumes the same native/TLS/HTTP/envelope domain. */
+struct TransferHost::Impl {
+    using Reader = InstrumentProfileReader::Impl;
+    std::shared_ptr<Reader> reader;
+    detail::TransferWork work{};
+    std::size_t turns = 0;
+    std::size_t attempts = 0;
+    std::size_t wire = 0;
+    std::size_t redirects = 0;
+
+    /** Retain the worker-affine host.
+     * @param value Stable prepared reader state.
+     */
+    explicit Impl(std::shared_ptr<Reader> value) : reader(std::move(value)) {
+    }
+};
+
+TransferHost::TransferHost(std::unique_ptr<Impl> impl) noexcept : impl_(std::move(impl)) {
+}
+
+TransferHost::~TransferHost() = default;
+
+std::expected<void, IpfTransferDiagnostic> TransferHost::validate(const IpfTransferOptions &options) {
+    if (const auto error = validateOptions(options)) {
+        return std::unexpected(*error);
+    }
+
+    using Reader = InstrumentProfileReader::Impl;
+    constexpr auto extraFixed = sizeof(Reader::Operation<detail::StreamingProfiles>) - sizeof(Reader::Operation<>) +
+                                sizeof(Impl) + sizeof(TransferHost) + 2 * sizeof(InstrumentProfile);
+    auto extra = extraFixed;
+    // Parser-to-single-slot MSVC handoff and the staged slot can coexist; no zero-cost streaming claim.
+    const auto units = options.ipf.limits.profile.totalUnits;
+
+    if (units > (std::numeric_limits<std::size_t>::max() - extra) / (2 * sizeof(char16_t))) {
+        return std::unexpected(IpfTransferDiagnostic{IpfTransferError::RESOURCE_LIMIT, "connection-profile-backing"});
+    }
+
+    extra += units * 2 * sizeof(char16_t);
+
+    if (const auto error = Reader::validateBacking(options, extra)) {
+        return std::unexpected(*error);
+    }
+
+    return {};
+}
+
+std::expected<std::unique_ptr<TransferHost>, IpfTransferDiagnostic>
+TransferHost::create(const transport::detail::BootstrapLease &bootstrap, const IpfTransferOptions &options) {
+    const auto valid = validate(options);
+
+    if (!valid) {
+        return std::unexpected(valid.error());
+    }
+
+    auto lease = td::BootstrapLease::acquire(bootstrap);
+
+    if (!lease) {
+        return std::unexpected(
+            IpfTransferDiagnostic{IpfTransferError::TRANSPORT_FAILURE, "connection-bootstrap", lease.error()});
+    }
+
+    try {
+        using Reader = InstrumentProfileReader::Impl;
+        auto reader =
+            std::allocate_shared<Reader>(TransferHostAllocator<Reader>(sizeof(Reader) + HOST_CONTROL_BYTES), options);
+        reader->bootstrapLease.emplace(std::move(*lease));
+        auto impl = std::make_unique<Impl>(std::move(reader));
+
+        return std::unique_ptr<TransferHost>(new TransferHost(std::move(impl)));
+    } catch (const std::bad_alloc &) {
+        return std::unexpected(IpfTransferDiagnostic{IpfTransferError::ALLOCATION_FAILURE, "connection-host"});
+    } catch (const std::length_error &) {
+        return std::unexpected(IpfTransferDiagnostic{IpfTransferError::RESOURCE_LIMIT, "connection-host-capacity"});
+    }
+}
+
+IpfTransferResult TransferHost::attempt(std::string_view source, const IpfUrlRequest &request, std::stop_token stop,
+                                        StreamConsumer &consumer) {
+    auto state = impl_->reader;
+    IpfTransferResult early;
+    early.nativeRetired = true;
+
+    if (state->owner != std::this_thread::get_id() || state->busy) {
+        early.error = IpfTransferDiagnostic{IpfTransferError::WRONG_THREAD, "connection-attempt-owner"};
+
+        return early;
+    }
+
+    state->busy = true;
+
+    struct Reset {
+        InstrumentProfileReader::Impl &state;
+
+        ~Reset() {
+            state.busy = false;
+        }
+    } reset{*state};
+
+    try {
+        InstrumentProfileReader::Impl::Operation<detail::StreamingProfiles> operation(state, request, stop);
+        operation.profiles.bind(consumer);
+        operation.work = impl_->work;
+        operation.turns = impl_->turns;
+        operation.attempts = impl_->attempts;
+        operation.result.wireBytes = impl_->wire;
+        operation.result.redirects = impl_->redirects;
+        try {
+            operation.run(source);
+
+            while (operation.profiles.hasOwnedInput() && operation.checkpoint()) {
+                auto work = state->options.ipf.turnWork;
+                (void)operation.profiles.drain(work);
+
+                if (!operation.publishItems()) {
+                    break;
+                }
+            }
+        } catch (const std::bad_alloc &) {
+            fail(operation.result, {IpfTransferError::ALLOCATION_FAILURE, "connection-attempt-allocation"});
+        } catch (const std::length_error &) {
+            fail(operation.result, {IpfTransferError::RESOURCE_LIMIT, "connection-attempt-length"});
+        }
+        operation.retire(false);
+        impl_->work = operation.work;
+        impl_->turns = operation.turns;
+        impl_->attempts = operation.attempts;
+        impl_->wire = operation.result.wireBytes;
+        impl_->redirects = operation.result.redirects;
+        state->options.nativeWork = operation.nativeWork;
+        state->options.byteWork = operation.byteWork;
+        auto &limits = state->options.limits.envelope;
+        const auto &used = operation.result.envelope;
+        limits.inputBytes -= std::min(limits.inputBytes, used.inputBytes);
+        limits.outputBytes -= std::min(limits.outputBytes, used.outputBytes);
+        limits.calls -= std::min(limits.calls, used.calls);
+        limits.workBytes -= std::min(limits.workBytes, used.workBytes);
+        limits.entries -= std::min(limits.entries, used.entries);
+        limits.metadataBytes -= std::min(limits.metadataBytes, used.metadataBytes);
+        publish(operation.result);
+
+        return std::move(operation.result);
+    } catch (const std::bad_alloc &) {
+        early.error = IpfTransferDiagnostic{IpfTransferError::ALLOCATION_FAILURE, "connection-attempt-prepare"};
+
+        return early;
+    }
+}
+} // namespace connection_detail
 
 } // namespace org::ttldtor::qdcxx::ipf

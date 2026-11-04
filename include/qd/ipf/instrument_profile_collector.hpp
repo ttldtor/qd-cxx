@@ -15,7 +15,8 @@
 namespace org::ttldtor::qdcxx::ipf {
 namespace collector_detail {
 struct ProfileCollectorState;
-}
+struct ConnectionCollectorAccess;
+} // namespace collector_detail
 
 /** Checked collector admission failure. Allocation failures throw std::bad_alloc before publication. */
 enum class ProfileCollectorError {
@@ -94,6 +95,7 @@ struct ProfileCollectorChange {
  */
 class InstrumentProfileCollector {
     std::shared_ptr<collector_detail::ProfileCollectorState> state_;
+    friend struct collector_detail::ConnectionCollectorAccess;
     /** Bind a fresh stable state.
      * @param state Independently owned collector state.
      */

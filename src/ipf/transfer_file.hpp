@@ -5,6 +5,7 @@
 #include "transfer_source.hpp"
 
 #include <cstring>
+#include <limits>
 #include <utility>
 
 #ifdef _WIN32
@@ -28,6 +29,52 @@ using TransferPathChar = char; ///< Native strictly validated UTF-8 POSIX path e
 inline constexpr std::size_t TRANSFER_FILE_PATH_BYTES =
     (SOURCE_CAPACITY + 1) * sizeof(TransferPathChar); ///< Whole NUL-terminated native open workspace.
 
+#ifndef _WIN32
+/** Convert native floor-seconds/fraction without overflowing the full millisecond domain.
+ * @param seconds Native whole UTC seconds, including negative floor seconds.
+ * @param nanoseconds Fraction in0..999999999; invalid fractions produce unknown metadata.
+ * @return Exact floor UTC milliseconds, or unknown only outside the representable/input domain.
+ */
+inline std::optional<std::chrono::sys_time<std::chrono::milliseconds>>
+transferFileModificationTime(std::int64_t seconds, std::int64_t nanoseconds) noexcept {
+    constexpr std::int64_t MILLIS_PER_SECOND = 1000;
+    constexpr std::int64_t NANOS_PER_MILLI = 1000000;
+    constexpr auto MINIMUM = std::numeric_limits<std::int64_t>::min();
+    constexpr auto MAXIMUM = std::numeric_limits<std::int64_t>::max();
+    constexpr auto MIN_SECONDS = MINIMUM / MILLIS_PER_SECOND - 1;
+    constexpr auto MIN_REMAINDER = MILLIS_PER_SECOND + MINIMUM % MILLIS_PER_SECOND;
+    constexpr auto MAX_SECONDS = MAXIMUM / MILLIS_PER_SECOND;
+    constexpr auto MAX_REMAINDER = MAXIMUM % MILLIS_PER_SECOND;
+
+    if (nanoseconds < 0 || nanoseconds >= MILLIS_PER_SECOND * NANOS_PER_MILLI) {
+        return {};
+    }
+
+    const auto fraction = nanoseconds / NANOS_PER_MILLI;
+
+    if (seconds < MIN_SECONDS || seconds > MAX_SECONDS) {
+        return {};
+    }
+
+    std::int64_t count;
+
+    if (seconds == MIN_SECONDS) {
+        if (fraction < MIN_REMAINDER) {
+            return {};
+        }
+
+        count = MINIMUM + (fraction - MIN_REMAINDER);
+    } else {
+        if (seconds == MAX_SECONDS && fraction > MAX_REMAINDER) {
+            return {};
+        }
+
+        count = seconds * MILLIS_PER_SECOND + fraction;
+    }
+
+    return std::chrono::sys_time<std::chrono::milliseconds>{std::chrono::milliseconds{count}};
+}
+#endif
 /** Sole regular-file handle; special streams are rejected by the opened identity before any read.
  * Acquisition on POSIX is nonblocking, including FIFO/device candidates. Ordinary filesystem
  * open/stat/read scheduling is native progress, without a hard disk/network-filesystem latency bound.
@@ -137,6 +184,34 @@ class TransferFile {
 #endif
 
         return TransferFile(descriptor);
+    }
+
+    /** Read modification time from the opened regular identity.
+     * @return UTC milliseconds, or unknown after metadata failure.
+     */
+    std::optional<std::chrono::sys_time<std::chrono::milliseconds>> modified() const noexcept {
+#ifdef _WIN32
+        BY_HANDLE_FILE_INFORMATION information{};
+
+        if (!GetFileInformationByHandle(descriptor_, &information)) {
+            return std::nullopt;
+        }
+
+        const auto ticks = (std::uint64_t(information.ftLastWriteTime.dwHighDateTime) << 32) |
+                           information.ftLastWriteTime.dwLowDateTime;
+        constexpr std::int64_t WINDOWS_EPOCH_MILLISECONDS = 11644473600000LL;
+
+        return std::chrono::sys_time<std::chrono::milliseconds>{
+            std::chrono::milliseconds{static_cast<std::int64_t>(ticks / 10000) - WINDOWS_EPOCH_MILLISECONDS}};
+#else
+        struct stat information{};
+
+        if (::fstat(descriptor_, &information) != 0) {
+            return std::nullopt;
+        }
+
+        return transferFileModificationTime(information.st_mtim.tv_sec, information.st_mtim.tv_nsec);
+#endif
     }
 
     /** Read one bounded chunk from the already verified regular identity.

@@ -715,3 +715,7 @@ tests/fixtures/summary/provenance.json text eol=lf
 
 tests/fixtures/summary/open-interest-*-v1.tsv -text -whitespace
 tests/fixtures/summary/open-interest-long-v1.provenance.json text eol=lf
+
+tests/fixtures/ipf/live/*.java text eol=lf
+tests/fixtures/ipf/live/*.tsv -text -whitespace
+tests/fixtures/ipf/live/*provenance.json text eol=lf

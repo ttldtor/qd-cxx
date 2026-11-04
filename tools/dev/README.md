@@ -326,3 +326,5 @@ The [IPF compression fixture oracle](../../tests/fixtures/ipf/compression/README
   default/tiny/int schemas and regional absence; input-free EN/RU help, bounded Git/Java Capture/Verify.
 
 - [Summary OI long reference](../upstream/summary-oracle/README.md#corrected-openinterest-long-reference): separate Invoke-OpenInterest.ps1, input-free EN/RU help and bounded Capture/Verify; preserves raw delegate observations under ADR-0010.
+
+- [ConnectionOracle](../../tests/fixtures/ipf/live/README.md): pinned JDK8/QD live/conditional/carryover observations, input-free EN/RU help, bounded owned loopback/server/handler threads.

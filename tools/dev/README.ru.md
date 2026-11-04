@@ -339,3 +339,5 @@ native writer files pinned Java reader. Сеть, SDK build и новая depend
   default/tiny/int схемы и regional absence; EN/RU help без входов, bounded Git/Java Capture/Verify.
 
 - [Summary OI long reference](../upstream/summary-oracle/README.ru.md#исправленный-openinterest-long-reference): отдельный Invoke-OpenInterest.ps1, EN/RU help без входов, bounded Capture/Verify с сохранением raw delegate по ADR-0010.
+
+- [ConnectionOracle](../../tests/fixtures/ipf/live/README.ru.md): закреплённый JDK8/QD live/conditional/carryover oracle, справка EN/RU без входов, конечные собственные loopback/server/handler threads.
