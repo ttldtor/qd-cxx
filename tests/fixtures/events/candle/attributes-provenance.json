@@ -1,0 +1,38 @@
+{
+  "revision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "javaVersion": "openjdk version \"1.8.0_422\"",
+  "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
+  "javacSha256": "633143e961aa18051c09112b85333f5cdbd845b54eb39678eb15b91ca8bbb527",
+  "harnessSha256": "1d78d62e20950b6f32ef180af10f3b5d15b8fb6390a9cee6e0effdb737f91446",
+  "launcherSha256": "600bf3dd668ef157bf4d77ff04d3a0812e4d5b7be784cfd5a65ab2776b8a9cbc",
+  "upstreamSources": [
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/candle/CandlePrice.java",
+      "sha256": "7e388286236f9424597ae1a228cfb0f7c387b2f9bd22b292de71ccc8a2ca651e"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/candle/CandleSession.java",
+      "sha256": "42e5b95fa0e67f517d1054b1086b25dfa14c2228e15154afd4c8b510f567e480"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/candle/CandleAlignment.java",
+      "sha256": "b1b2bf65b5240be5bfdc2c7c6ae44d0bcd0fa8b4f4dd994cc6809d02aedee9bf"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/candle/CandlePriceLevel.java",
+      "sha256": "84bc2fc02324a5cf67332191737e09155d196a0364c7075fb813577c2c3013ef"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/candle/CandleDataType.java",
+      "sha256": "d5ad665b9a220e7587a4964a220d72c2d62c2298d9923166e926fc7b293f28e3"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/candle/CandleExchange.java",
+      "sha256": "6635afc8b74ceb322d69469a0eeb13399b6b0d7a2e9a5b33c2613803cc693671"
+    }
+  ],
+  "productionClassInventorySha256": "e2714e42136525fb804c7a627d047449b8c6297a815042c2bbc5ca82dda87b76",
+  "fixtureSha256": "5cd5b54a49a94bd0ce906cb953fccc5397f20d304af2d730bb6f97c2f4726c47",
+  "rows": 265722,
+  "timezoneInvariant": true
+}

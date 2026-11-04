@@ -95,11 +95,11 @@ target_include_directories(qdcxx_market_event_symbols PUBLIC "$<BUILD_INTERFACE:
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 target_compile_features(qdcxx_market_event_symbols PUBLIC cxx_std_23)
 set_target_properties(qdcxx_market_event_symbols PROPERTIES CXX_EXTENSIONS OFF)
-add_library(qdcxx_candle_values src/events/candle_period.cpp)
+add_library(qdcxx_candle_values src/events/candle_period.cpp src/events/candle_attributes.cpp)
 target_include_directories(qdcxx_candle_values PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 target_compile_features(qdcxx_candle_values PUBLIC cxx_std_23)
-target_link_libraries(qdcxx_candle_values PRIVATE qdcxx_java_double)
+target_link_libraries(qdcxx_candle_values PRIVATE qdcxx_java_double PUBLIC qdcxx_market_event_symbols)
 set_target_properties(qdcxx_candle_values PROPERTIES CXX_EXTENSIONS OFF)
 
 target_link_libraries(qdcxx_event_mapping PUBLIC qdcxx_core)
@@ -373,6 +373,13 @@ if(BUILD_TESTING)
         add_test(NAME order_source_capability_oracle_help COMMAND ${CMAKE_COMMAND}
             -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/order_source_capability_oracle_help.cmake")
     endif()
+    add_executable(qdcxx_candle_attributes_tests tests/conformance/candle_attributes_tests.cpp)
+    target_link_libraries(qdcxx_candle_attributes_tests PRIVATE qdcxx_candle_values doctest::doctest)
+    target_compile_definitions(qdcxx_candle_attributes_tests PRIVATE
+        ORG_TTLDTOR_QDCXX_CANDLE_ATTRIBUTES_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/events/candle/attributes-oracle.tsv")
+    set_target_properties(qdcxx_candle_attributes_tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME candle_attribute_values COMMAND qdcxx_candle_attributes_tests)
+    set_tests_properties(candle_attribute_values PROPERTIES TIMEOUT 120)
     add_executable(qdcxx_candle_period_tests tests/conformance/candle_period_tests.cpp)
     target_link_libraries(qdcxx_candle_period_tests PRIVATE qdcxx_candle_values doctest::doctest)
     target_compile_definitions(qdcxx_candle_period_tests PRIVATE
@@ -382,6 +389,10 @@ if(BUILD_TESTING)
     set_tests_properties(candle_period_values PROPERTIES TIMEOUT 30)
     find_program(ORG_TTLDTOR_QDCXX_CANDLE_ORACLE_PWSH NAMES pwsh)
     if(ORG_TTLDTOR_QDCXX_CANDLE_ORACLE_PWSH)
+        add_test(NAME candle_attributes_oracle_help COMMAND "${CMAKE_COMMAND}"
+            "-DPOWERSHELL=${ORG_TTLDTOR_QDCXX_CANDLE_ORACLE_PWSH}" "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/candle_attributes_oracle_help.cmake")
+        set_tests_properties(candle_attributes_oracle_help PROPERTIES TIMEOUT 45)
         add_test(NAME candle_period_oracle_help COMMAND "${CMAKE_COMMAND}"
             "-DPOWERSHELL=${ORG_TTLDTOR_QDCXX_CANDLE_ORACLE_PWSH}" "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/candle_period_oracle_help.cmake")

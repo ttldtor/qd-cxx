@@ -82,73 +82,6 @@ bool namePrefix(std::u16string_view name, std::u16string_view text) noexcept {
     return true;
 }
 
-/** @param value Any binary64 value.
- * @return Java narrowing conversion: NaN zero, saturated overflow, truncation otherwise.
- */
-std::int64_t javaLong(double value) noexcept {
-    if (std::isnan(value)) {
-        return 0;
-    }
-
-    if (value >= 0x1p63) {
-        return std::numeric_limits<std::int64_t>::max();
-    }
-
-    if (value <= -0x1p63) {
-        return std::numeric_limits<std::int64_t>::min();
-    }
-
-    return static_cast<std::int64_t>(value);
-}
-
-/** @param text ASCII numeric text.
- * @return Independently owned UTF-16 copy.
- * @throws std::bad_alloc Output allocation fails.
- */
-std::u16string widen(std::string_view text) {
-    return {text.begin(), text.end()};
-}
-
-/** @param value Multiplier outside the signed64 rendering branch, including nonfinite values.
- * @return Java Double.toString spelling using the shared reference digit engine.
- * @throws std::bad_alloc Output allocation fails.
- */
-std::u16string doubleText(double value) {
-    if (std::isnan(value)) {
-        return u"NaN";
-    }
-
-    if (std::isinf(value)) {
-        return value < 0 ? u"-Infinity" : u"Infinity";
-    }
-
-    auto magnitude = std::abs(value);
-    auto decimal = detail::decimalDigits(magnitude);
-    std::string text;
-
-    if (magnitude >= 1e-3 && magnitude < 1e7) {
-        auto point = decimal.exponent + 1;
-
-        if (point <= 0) {
-            text = "0." + std::string(static_cast<std::size_t>(-point), '0') + decimal.digits;
-        } else if (static_cast<std::size_t>(point) >= decimal.digits.size()) {
-            text = decimal.digits + std::string(static_cast<std::size_t>(point) - decimal.digits.size(), '0') + ".0";
-        } else {
-            text = decimal.digits;
-            text.insert(static_cast<std::size_t>(point), 1, '.');
-        }
-    } else {
-        text = decimal.digits.substr(0, 1) + ".";
-        text += decimal.digits.size() == 1 ? "0" : decimal.digits.substr(1);
-        text += "E" + std::to_string(decimal.exponent);
-    }
-
-    if (value < 0) {
-        text.insert(text.begin(), '-');
-    }
-
-    return widen(text);
-}
 } // namespace
 
 std::u16string_view candleTypeShortName(CandleType type) {
@@ -196,7 +129,7 @@ CandleType CandlePeriod::getType() const noexcept {
 }
 
 std::int64_t CandlePeriod::getPeriodIntervalMillis() const noexcept {
-    return javaLong(static_cast<double>(TYPES[static_cast<unsigned>(type_)].millis) * value_);
+    return detail::javaLong(static_cast<double>(TYPES[static_cast<unsigned>(type_)].millis) * value_);
 }
 
 std::u16string CandlePeriod::toString() const {
@@ -206,8 +139,7 @@ std::u16string CandlePeriod::toString() const {
         return std::u16string(type);
     }
 
-    auto integer = javaLong(value_);
-    auto value = value_ == static_cast<double>(integer) ? widen(std::to_string(integer)) : doubleText(value_);
+    auto value = detail::formatCandleDouble(value_);
     value += type;
 
     return value;

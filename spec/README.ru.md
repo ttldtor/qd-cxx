@@ -36,3 +36,5 @@
 Точные результаты conformance-проверок находятся в [разделе разработчика](../docs/developer.ru.md).
 
 [Группировка option chains](ipf/OPTION-CHAINS.ru.md) определяет порядок серий/strike, замену и допуск в конечных ресурсных лимитах.
+
+- [Атрибуты Candle](events/CANDLE-ATTRIBUTES.ru.md): точные значения price/session/alignment/price-level/data-type/exchange и операции с символами.

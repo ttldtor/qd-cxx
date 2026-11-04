@@ -301,3 +301,4 @@ native writer files through the pinned Java reader. No network, SDK build or new
 - [Candle-period oracle](../upstream/candle-period-oracle/README.md): production aggregation types, numeric boundaries and exact period text; input-free EN/RU help.
 
 - [Option-chain oracle](../upstream/option-chains-oracle/README.md): production profile grouping, series/strike ordering and selection; noargs/EN/RU help without inputs, bounded JDK8 capture/verify.
+- [Candle-attribute oracle](../upstream/candle-attributes-oracle/README.md): production values and symbol operations; input-free EN/RU help, Verify default, JDK8, heap128MiB/timeout60s, exit0/1.

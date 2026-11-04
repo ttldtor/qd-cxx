@@ -650,3 +650,9 @@ tools/upstream/option-chains-oracle/*.java text eol=lf
 tools/upstream/option-chains-oracle/*.ps1 text eol=lf
 tests/fixtures/option-chains/*.tsv -text -whitespace
 tests/fixtures/option-chains/provenance.json text eol=lf
+
+# Preserve exact Candle-attribute observations and canonical oracle provenance.
+tools/upstream/candle-attributes-oracle/*.java text eol=lf
+tools/upstream/candle-attributes-oracle/*.ps1 text eol=lf
+tests/fixtures/events/candle/attributes-oracle.tsv -text -whitespace
+tests/fixtures/events/candle/attributes-provenance.json text eol=lf

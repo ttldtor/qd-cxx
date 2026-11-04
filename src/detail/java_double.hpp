@@ -1,6 +1,7 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #pragma once
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -31,4 +32,14 @@ int compareBinaryToDecimal(double value, std::string_view text);
  * @throws std::length_error Temporary string exceeds its maximum size.
  */
 std::optional<double> parseJavaDouble(std::u16string_view value);
+/** @param value Any binary64 value.
+ * @return Java signed64 narrowing: NaN zero, saturated overflow, truncation otherwise.
+ */
+std::int64_t javaLong(double value) noexcept;
+/** @param value Any binary64 value.
+ * @return Owned Candle numeric text with Java integer-first rendering and Java 8 double digits.
+ * @throws std::bad_alloc Output allocation fails.
+ * @throws std::length_error Output exceeds string capacity.
+ */
+std::u16string formatCandleDouble(double value);
 } // namespace org::ttldtor::qdcxx::detail
