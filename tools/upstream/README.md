@@ -30,3 +30,5 @@ documents the separate manual help regression and optional native compression co
 - [Event-value oracle](event-values-oracle/README.md): raw-preserving market codes, bit fields, numeric time/day-ID and existing SHORT_STRING business conversions.
 
 The [schedule query oracle](schedule-query-oracle/README.md) captures actual Day/Session/calendar/raw-reference behavior with separate source-derived TZDB2026f data expectations and input-free EN/RU help.
+
+The [serialized attachment oracle](attachment-oracle/README.md) witnesses real Message/Configuration delegates, serialized Object bytes and explicit Java getter failures, with input-free EN/RU help.

@@ -1520,6 +1520,16 @@ if(BUILD_TESTING)
     target_link_libraries(qdcxx_object_field_value_tests PRIVATE qdcxx_protocol doctest::doctest)
     set_target_properties(qdcxx_object_field_value_tests PROPERTIES CXX_EXTENSIONS OFF)
     add_test(NAME object_field_owned_values COMMAND qdcxx_object_field_value_tests)
+    add_executable(qdcxx_attachment_contract_tests tests/conformance/attachment_contract_tests.cpp)
+    target_link_libraries(qdcxx_attachment_contract_tests PRIVATE qdcxx_protocol doctest::doctest)
+    set_target_properties(qdcxx_attachment_contract_tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME attachment_serialized_contract COMMAND qdcxx_attachment_contract_tests
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/attachments/capture-v1")
+    add_test(NAME attachment_fixture_negatives COMMAND "${CMAKE_COMMAND}"
+        "-DPROGRAM=$<TARGET_FILE:qdcxx_attachment_contract_tests>"
+        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/attachments/capture-v1"
+        "-DRUN=${CMAKE_CURRENT_BINARY_DIR}/attachment-fixture-negatives"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/attachment_fixture_negatives.cmake")
     add_executable(qdcxx_indexed_schema_tests tests/conformance/indexed_schema_tests.cpp)
     target_link_libraries(qdcxx_indexed_schema_tests PRIVATE qdcxx_protocol doctest::doctest)
     set_target_properties(qdcxx_indexed_schema_tests PROPERTIES CXX_EXTENSIONS OFF)

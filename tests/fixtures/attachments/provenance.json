@@ -1,0 +1,232 @@
+{
+  "revision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "javaVersion": "openjdk version \"1.8.0_422\"",
+  "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
+  "javacSha256": "633143e961aa18051c09112b85333f5cdbd845b54eb39678eb15b91ca8bbb527",
+  "harnessSha256": "6bb5c6f2fa4153e757e601ab71c87008abb697bab5e21ef0818a0bf1398e13e7",
+  "launcherSha256": "443a1ae4ab7d67c37d55d409781281895d91208233e278ed9018b5076f27c299",
+  "upstreamSources": [
+    {
+      "path": "dxlib/src/main/java/com/devexperts/io/Marshalled.java",
+      "sha256": "2eb47d09d9f0572f8ab6ac1c5d879609c2dc90ac2f72ee4a41d1dc96d3d6be25"
+    },
+    {
+      "path": "dxlib/src/main/java/com/devexperts/io/Marshaller.java",
+      "sha256": "88fe4206d1071c15fa51e2b1edb32094d597e3ff1b1f7df84581e356a7ef8d16"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/kit/MarshalledObjField.java",
+      "sha256": "6cea2be578e1901d89b46ccc29a3137414287279fa28b60c4e8496f1d2a5524a"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/BinaryRecordDesc.java",
+      "sha256": "38591f97045e2bcce4c37befa024a7824bc5f63ae1cd19ddc5af17668563aec9"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/misc/Message.java",
+      "sha256": "ed4ffa997ac47891461a149af4572daf072f8cc6130806fa0ebbb0f5ce1140af"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/misc/MessageDelegate.java",
+      "sha256": "77670cda9fdf3f33a31888423bf7edf86979075d7662ba14400348a727c05047"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/misc/impl/MessageMapping.java",
+      "sha256": "792cb777ab67709e0ba391f62d36a62bfd5a2e9815b0cd651fb2f27f3fdf3726"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/misc/Configuration.java",
+      "sha256": "4c338c7fc9054361aa4883ad3057e0a51d62c7d5e3dab453ab6fc5857cb87cc1"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/misc/ConfigurationDelegate.java",
+      "sha256": "62bd95a3bde1ae7347065faac97c1a2262122ad17847893784e89fa3320ce9e0"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/misc/impl/ConfigurationMapping.java",
+      "sha256": "aadc009069a1007357ceeb9810fc0e6d38f45d09993c9848825990a2f14419b1"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/misc/TextMessage.java",
+      "sha256": "88586609f8c89be3b3a7c8692c916e9086d344128bc786e1f5fcd00f82cda75f"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/misc/TextMessageDelegate.java",
+      "sha256": "3f7285df09b6cda649310575bfba518d505a315a443e7a4581207e023639f0af"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/misc/impl/TextMessageMapping.java",
+      "sha256": "fa0193903048c9f70640a11c8103b9f2f0d9ded17c24acf42b858ac9b65bace9"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/misc/TextConfiguration.java",
+      "sha256": "b090a9222b191cd56260a89ef557a59f3acfb36c8d85a0bee6b1bacb3f8c20ce"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/misc/TextConfigurationDelegate.java",
+      "sha256": "39223e4505c693e6f967a69f85dcb26910bd79baa1bc6393af755fc903f57d65"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/misc/impl/TextConfigurationMapping.java",
+      "sha256": "afb16fdb6b00e3f5990dfdd5a952236cd7a9f410f06fda0515dfc822a53ecf1b"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/misc/MiscFactoryImpl.java",
+      "sha256": "8f67bbe7bc62d6bf7432ea199ec53e4a9b8d82001ac39bba0e2301b08d0f65b4"
+    }
+  ],
+  "productionClassInventorySha256": "90a478b5d3737246d8c897322c9f9db60887846e20117572588e05ae78fbc6d8",
+  "classpathRoots": 14,
+  "classes": 1290,
+  "resources": 27,
+  "artifacts": [
+    {
+      "path": "Configuration-bytes-content.qtp",
+      "size": 84,
+      "sha256": "c7bd711b36e2d78011112188f752c85b2a47277b1e1e7dc346f3eaf67de4865a"
+    },
+    {
+      "path": "Configuration-bytes-content.tape",
+      "size": 143,
+      "sha256": "bc77204fc1bb38bd18e6d453fb29b212f9cb06b836f56901df2d508ccee480b2"
+    },
+    {
+      "path": "Configuration-bytes-empty.qtp",
+      "size": 81,
+      "sha256": "6abeab0d723df124f6c563202d4bc53fbe90cbc746da1bddb3219d03dbd2e929"
+    },
+    {
+      "path": "Configuration-bytes-empty.tape",
+      "size": 140,
+      "sha256": "f39627983ebd06fdba8b53dd530f02270edd03f581a9c341b0e888f56eeb23de"
+    },
+    {
+      "path": "Configuration-custom.qtp",
+      "size": 174,
+      "sha256": "66e646edb41ff7212b20d6fc70b48289707edfa6cb3e0d76eee4a2638a86a087"
+    },
+    {
+      "path": "Configuration-custom.tape",
+      "size": 233,
+      "sha256": "d3abfdd8b887194c65a67de854ed3ef23e39667031f99e3351178fab1bd0d92f"
+    },
+    {
+      "path": "Configuration-null.qtp",
+      "size": 54,
+      "sha256": "2211c72db9a549febe0db14eb395c7ba29ad961e91f15b44ab5bba200cd1dad4"
+    },
+    {
+      "path": "Configuration-null.tape",
+      "size": 113,
+      "sha256": "eda3ed6b0e93637c402f61baec064ccb67aefd4d1614effb9d352094ec46d34a"
+    },
+    {
+      "path": "Configuration-raw-empty.qtp",
+      "size": 54,
+      "sha256": "c1b83e3720e96e1185559c5ad7f74ed1fc68d72e67251325d2b275b9828fd64d"
+    },
+    {
+      "path": "Configuration-raw-empty.tape",
+      "size": 113,
+      "sha256": "28a27154297ec62cd095666d9f33a6b98789804ce25736714abf81a69fb5efd9"
+    },
+    {
+      "path": "Configuration-raw-malformed.qtp",
+      "size": 57,
+      "sha256": "0728e17598049d6135e9cd753b317e8cb64e3901c84a366b75084d61f9b93633"
+    },
+    {
+      "path": "Configuration-raw-malformed.tape",
+      "size": 116,
+      "sha256": "cf6a32b317465420ef2fb781dc0246ebe058a58a2b79879c2aa23ac2058498ff"
+    },
+    {
+      "path": "Configuration-string.qtp",
+      "size": 66,
+      "sha256": "53a8f474e923014f17d792243002916869b59a889e6c4fb294f00ea0133220f7"
+    },
+    {
+      "path": "Configuration-string.tape",
+      "size": 125,
+      "sha256": "6458ac030d8ca3a0927c713971ed104acf545b2a3dc699427d0519869d05324b"
+    },
+    {
+      "path": "Message-bytes-content.qtp",
+      "size": 62,
+      "sha256": "dfac731980e973c1a0713c79e44af97c34c0b3c11813a1d8a52a4f3847097a86"
+    },
+    {
+      "path": "Message-bytes-content.tape",
+      "size": 121,
+      "sha256": "4e4b21b85fdd2e055d9efc44ec492ded81e2d2465b04fa785cd139542f5bde5a"
+    },
+    {
+      "path": "Message-bytes-empty.qtp",
+      "size": 59,
+      "sha256": "3283915cb914d1ad39d7a700100695cf862aa5b9babfbf7db2342c0c498436ef"
+    },
+    {
+      "path": "Message-bytes-empty.tape",
+      "size": 118,
+      "sha256": "2176c8139180d8839da33b6367ee9b1ad46f12ec518cab7d49d649762b039154"
+    },
+    {
+      "path": "Message-custom.qtp",
+      "size": 152,
+      "sha256": "f01bb7831e65ba5d7ae804b032090ae7513de85c0c3f4a3ee98f25fadd5df82c"
+    },
+    {
+      "path": "Message-custom.tape",
+      "size": 211,
+      "sha256": "257fefd1cf93d79593141cb65c96cd5a5459ad775d1c6e7eba84d05aa6da2000"
+    },
+    {
+      "path": "Message-null.qtp",
+      "size": 32,
+      "sha256": "383830ebcb7dd497fe7bd4c33226db15f291471873aa6617476660f31f4bba5b"
+    },
+    {
+      "path": "Message-null.tape",
+      "size": 91,
+      "sha256": "b0cf3abffb519057f7dade4b88f89824d88ca770296cadcb8b416b525a579976"
+    },
+    {
+      "path": "Message-raw-empty.qtp",
+      "size": 32,
+      "sha256": "e03376e4ca62012adfedb87e36a8336091c48652a5418628369b8d0efef1bdd7"
+    },
+    {
+      "path": "Message-raw-empty.tape",
+      "size": 91,
+      "sha256": "519a14c2f3f8e3403d4edb920aac2d660c415b507df8f1390427fb63d26ab03b"
+    },
+    {
+      "path": "Message-raw-malformed.qtp",
+      "size": 35,
+      "sha256": "c5adf1e2676f0eebc056aa5f00f85403c7f21eb35c98618683f033d320b93249"
+    },
+    {
+      "path": "Message-raw-malformed.tape",
+      "size": 94,
+      "sha256": "d2d0f05eb749f8987632f8fbfd7c673850c6e8433957529f96e09356d92378cc"
+    },
+    {
+      "path": "Message-string.qtp",
+      "size": 44,
+      "sha256": "df314b2d2b7b6620237d8b17d87fe238926e9a1f1b1f15871da1a4420de84ccb"
+    },
+    {
+      "path": "Message-string.tape",
+      "size": 103,
+      "sha256": "a6b75b01a9803d928b9482248dbaf739c00ab91c5584777be0628122931db321"
+    },
+    {
+      "path": "oracle.tsv",
+      "size": 3733,
+      "sha256": "5aed6cd8941e22ead01211f6c0a0fd62ea6bc8dee2d5671eca0aa2ba64bd0e1f"
+    }
+  ],
+  "fixtureSha256": "5aed6cd8941e22ead01211f6c0a0fd62ea6bc8dee2d5671eca0aa2ba64bd0e1f",
+  "rows": 16,
+  "timezoneInvariant": true
+}

@@ -753,3 +753,10 @@ tests/fixtures/event-text/provenance.json text eol=lf
 
 tests/fixtures/selectors/*.tsv -text -whitespace
 tests/fixtures/selectors/*.json text eol=lf
+
+# Preserve serialized attachment captures and reproducible oracle sources.
+tests/fixtures/attachments/capture-v1/** -text -whitespace
+tests/fixtures/attachments/provenance.json text eol=lf
+tools/upstream/attachment-oracle/*.java text eol=lf
+tools/upstream/attachment-oracle/*.ps1 text eol=lf
+tests/conformance/attachment_fixture_negatives.cmake text eol=lf

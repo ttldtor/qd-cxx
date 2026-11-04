@@ -70,6 +70,10 @@ encoding, project signed low32, then validate -1..INT32_MAX. All three preserve
 nullable owned body bytes, without Java object execution, deserialization, class
 loading or content validation. Null and engaged-empty bytes remain distinct.
 
+The [portable attachment contract](../events/ATTACHMENTS.md) preserves this representation
+for future standard Message/Configuration APIs. Explicit native codec execution is separate;
+opaque preservation alone does not implement Java Object access or a codec registry.
+
 Full137 STRING reads UTFString's compact LONG byte length (-1..4*INT32_MAX), then
 exact UTF-16 units. This differs from10's character count. Supplementary scalars
 become two units; accepted overlong UTF and CESU/unpaired surrogates are preserved.
