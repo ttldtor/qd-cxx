@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: BSL-1.0
 #pragma once
 
+#include "qd/core/statistics.hpp"
+
 #include "qd/collectors/history.hpp"
 #include "qd/collectors/stream.hpp"
 #include "qd/collectors/ticker.hpp"
@@ -306,6 +308,24 @@ class BorrowedMuxBatch {
 
 /** Caller-created callback; arbitrary application capture memory is outside queue byte accounting. */
 class MuxConsumer {
+    friend class MuxQueue;
+    std::shared_ptr<core::detail::DeliveryStatisticsState> statistics_; ///< Optional pure facade accounting owner.
+
+    protected:
+    /** Retain optional delivery accounting without retaining an operational owner.
+     * @param statistics Internal shared accounting state; empty for ordinary lower-level consumers.
+     */
+    explicit MuxConsumer(std::shared_ptr<core::detail::DeliveryStatisticsState> statistics = {}) noexcept
+        : statistics_(std::move(statistics)) {
+    }
+
+    /** Inspect the internal accounting attachment, without callbacks or allocation.
+     * @return Pure detached accounting owner, or empty when not requested.
+     */
+    [[nodiscard]] const std::shared_ptr<core::detail::DeliveryStatisticsState> &deliveryStatistics() const noexcept {
+        return statistics_;
+    }
+
     public:
     /** Release application callback storage; library-held references retire in the owner domain. */
     virtual ~MuxConsumer() = default;

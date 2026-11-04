@@ -402,11 +402,11 @@ q::api::ApiRuntime runtime(options);
 This option chooses the DNS server transport; it does not enable TLS or change the
 endpoint's exact symbol/delivery policy.
 
-## Planned statistics
+## Statistics
 
 The [layered statistics contract](../spec/subscriptions/CLIENT-STATISTICS.md) defines
-future endpoint/subscription counters, epoch and availability rules. These counters
-are not exposed by the current facade; lifecycle diagnostics remain available.
+the endpoint/subscription counters below, epoch and availability rules. Rate and
+baseline helpers remain planned; lifecycle diagnostics stay independent.
 
 ## Wait for a current state
 
@@ -505,3 +505,59 @@ snapshot remains detached from sockets, schemas, callbacks and runtime owners.
 See the complete [layered contract](../spec/subscriptions/CLIENT-STATISTICS.md).
 
 [Endpoint configuration](ENDPOINT-CONFIGURATION.md): explicit addresses/properties, immutable snapshots, effective local values and Java compatibility boundaries.
+
+## Subscription statistics
+
+`subscription->getStatistics()` returns a detached `SubscriptionStatistics` under
+one subscription-local accounting mutex. Actual collector/FIFO admission, selection,
+cleanup and user invocation transitions update this same owner. Reads allocate no
+storage and perform no IO, dispatch, reset or callback wait. User callbacks run outside
+the accounting and control locks. `ownerIdentity`, `generation`, `observedAt` and `final`
+have the endpoint observation rules above; endpoint and subscription reads are separate
+cuts. `sourceEpoch` is the latest observed established endpoint source, absent when
+inactive; lifetime totals and old pending work survive source changes without retagging
+their internal origin. Final publication waits for event, state and change-observer
+captures to retire, including their destructors. Values and timestamp then freeze.
+
+`desiredSelectors` counts accepted logical selectors once, independently of selected
+event types, qualified by `desiredRevision`. `activeSelectors` is published only after
+the complete actual source mapping commits, qualified by `activeDesiredRevision` and
+the observed `sourceEpoch`. A pending/failed mapping does not claim the next command
+active; a subsequent submission cannot relabel an older mapping candidate. Unchanged
+commands preserve the physical mapping and publish their own logical qualification.
+An actually cleared/reset mapping and retirement have zero active selectors and no
+active revision. This is local application, not peer acknowledgement.
+`queueCapacityEvents` is the actual reserved FIFO capacity plus TICKER view pending slots,
+zero before native registration. It describes slots, not free capacity or process memory.
+`pendingEvents` includes source-view pending values and detached FIFO events;
+`inFlightEvents` covers the complete selected adapter call, including blocked listeners.
+
+Before saturation, the lifetime conservation rule is:
+
+```text
+admittedEvents = deliveredEvents + conflatedEvents + discardedEvents +
+                 callbackFailedEvents + evictedOverflowEvents + pendingEvents + inFlightEvents
+droppedEvents = rejectedOverflowEvents + evictedOverflowEvents
+```
+
+One occurrence matching two subscriptions is admitted once by each. Listener fanout
+does not multiply admission or delivered events. `deliveredEvents` requires normal
+completion of the whole selected listener set. No listeners, projection refusal,
+source/clear fencing and cancellation retire admitted events as `discardedEvents`.
+A throwing listener charges the whole selected batch once to `callbackFailedEvents`,
+including events seen by an earlier listener; remaining queued events are discarded.
+Close may suppress not-yet-entered listeners without claiming completed delivery.
+
+`droppedEvents` counts known overflow only. STREAM rejects incoming per-registration
+FIFO candidates; TICKER can retire already admitted source-view candidates as overflow
+victims. Superseded pending TICKER values count as `conflatedEvents`, never as dropped.
+Equal/filtered input and unclassified shared STREAM source loss are not fabricated as
+subscription admissions or drops; the existing gap/unknown-eligibility diagnostics
+remain authoritative for such unmaterialized loss.
+
+`callbackCalls`/`callbackFailures` count actual event-listener invocations/throws.
+`callbackDurationSamples`, `callbackDurationTotal` and `callbackDurationMaximum` measure
+completed invocations with the steady clock, in nanoseconds, including throws and
+blocking; queue wait and state/change observers are excluded. Timing has `NO_SAMPLE`
+until the first call finishes. Count and sum overflow saturate per field with the
+existing sticky availability marker; reads and reconnect never reset totals.

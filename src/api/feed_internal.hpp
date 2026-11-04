@@ -158,6 +158,7 @@ struct SubscriptionObservers {
 
 /** Producer-only subscription state; no receiver, schema or native owner can escape here. */
 struct SubscriptionPort {
+    std::shared_ptr<core::detail::DeliveryStatisticsState> statistics; ///< Pure coherent delivery accounting owner.
     mutable std::mutex mutex;               ///< Protects accepted snapshots and detached observations only.
     std::condition_variable stateCondition; ///< Creator current-state wait; publication uses this port mutex.
     std::thread::id owner; ///< Immutable runtime creator affinity, retained after endpoint/runtime destruction.

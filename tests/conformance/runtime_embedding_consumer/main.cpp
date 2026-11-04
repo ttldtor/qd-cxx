@@ -176,6 +176,14 @@ int exercise(bool borrowed) {
 
     const auto calls = observation.calls.load();
     const auto statistics = endpoint->getStatistics();
+    const auto delivery = subscription->getStatistics();
+
+    if (!delivery.final || !delivery.ownerIdentity || delivery.generation != 1 || delivery.pendingEvents != 0 ||
+        delivery.inFlightEvents != 0 || delivery.activeSelectors != 0 || delivery.activeDesiredRevision ||
+        delivery.callbackCalls.value != 0 ||
+        delivery.callbackDurationMaximum.availability != q::core::StatisticAvailability::NO_SAMPLE) {
+        return 15;
+    }
 
     if (!statistics.final || !statistics.ownerIdentity || statistics.generation != 1 ||
         statistics.connection.connectionAttempts.value != 0 || statistics.connection.activeConnections != 0 ||
@@ -217,7 +225,8 @@ int exercise(bool borrowed) {
         return 10;
     }
 
-    if (!statistics.final || statistics.connection.readBytes.value != 0) {
+    if (!statistics.final || statistics.connection.readBytes.value != 0 || !delivery.final ||
+        delivery.admittedEvents.value != 0 || !delivery.ownerIdentity) {
         return 14;
     }
 

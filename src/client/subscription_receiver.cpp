@@ -108,7 +108,7 @@ class SubscriptionReceiver final : public mux::MuxConsumer {
      * @param consumer Application callable retained by the adapter.
      */
     SubscriptionReceiver(ReceiverPlan plan, std::shared_ptr<SubscriptionConsumer> consumer)
-        : plan_(std::move(plan)), consumer_(std::move(consumer)) {
+        : MuxConsumer(consumer->deliveryStatistics()), plan_(std::move(plan)), consumer_(std::move(consumer)) {
     }
 
     /** Preserve exactly one application invocation and the queue's existing exception boundary.

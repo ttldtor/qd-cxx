@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "qd/core/statistics.hpp"
 #include "qd/core/subscription.hpp"
 #include "qd/protocol/live_session.hpp"
 
@@ -257,6 +258,13 @@ class TickerCollector {
      * @return Fresh origin-bound token, or rejection leaving other views unchanged.
      */
     [[nodiscard]] std::expected<TickerViewToken, TickerError> openView(TickerWork &work);
+    /** Open a view with an internal pure accounting attachment, preserving the ordinary openView signature.
+     * @param work Actual finite view preparation credits.
+     * @param statistics Optional internal detached accounting, retaining no operational owner.
+     * @return Actual fresh view or the same typed preparation refusal as openView.
+     */
+    [[nodiscard]] std::expected<TickerViewToken, TickerError>
+    openObservedView(TickerWork &work, std::shared_ptr<core::detail::DeliveryStatisticsState> statistics);
     /** Retire a view and evict keys no other interest retains in false mode.
      * @param view Exact live view token.
      * @param work Turn credits including conservative release cost.

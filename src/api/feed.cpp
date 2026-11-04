@@ -1,6 +1,7 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/api/feed.hpp"
+#include "../core/delivery_statistics.hpp"
 #include "qd/api/feed_filter.hpp"
 
 #include "../transport/tcp_recovery_factory.hpp"
@@ -471,6 +472,12 @@ bool retireSubscription(const std::shared_ptr<detail::SubscriptionPort> &port) n
     {
         // Publish under the wait predicate's mutex so notification cannot fall between its check and wait.
         std::lock_guard lock(port->mutex);
+        port->statistics->update([](auto &s) {
+            s.activeSelectors = 0;
+            s.activeDesiredRevision.reset();
+            s.sourceEpoch.reset();
+            s.final = true;
+        });
         port->retired.store(true, std::memory_order_release);
     }
 
@@ -908,6 +915,10 @@ void mutateDesired(const std::shared_ptr<detail::SubscriptionPort> &port, std::s
                 detail::prepareSubscriptionChangeLocked(*port, candidate, port->revision + 1);
                 port->symbols.swap(candidate);
                 ++port->revision;
+                port->statistics->update([&](auto &s) {
+                    s.desiredSelectors = port->symbols.size();
+                    s.desiredRevision = port->revision;
+                });
             }
         }
 
@@ -1030,6 +1041,10 @@ template <class Event> SubscriptionSnapshot Subscription<Event>::getSnapshot() c
 
         return detail::subscriptionSnapshotLocked(*port_);
     });
+}
+
+template <class Event> SubscriptionStatistics Subscription<Event>::getStatistics() const noexcept {
+    return port_->statistics->snapshot();
 }
 
 template <class Event> std::vector<EventType> Subscription<Event>::getEventTypes() const {
@@ -1334,6 +1349,9 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                               : message           ? detail::EventDelivery::MESSAGE
                                                   : detail::EventDelivery::CONFIGURATION;
         auto subscription = std::make_shared<detail::SubscriptionPort>();
+        subscription->statistics = std::make_shared<core::detail::DeliveryStatisticsState>();
+        subscription->statistics->value.ownerIdentity = std::make_shared<const std::byte>();
+        subscription->statistics->value.observedAt = std::chrono::steady_clock::now();
         subscription->control = port_->control;
         subscription->endpoint = port_;
         subscription->owner = port_->owner;
@@ -1668,6 +1686,25 @@ class TypedConsumer final : public client::SubscriptionConsumer {
     std::shared_ptr<SubscriptionPort> port_; ///< Detached state; callback capture cycles end at runtime retirement.
     client::ReceiverProjectionWork projectionWork_; ///< Finite whole-callback seed, never shared with queue work.
 
+    enum class DispatchOutcome { DISCARDED, DELIVERED, CALLBACK_FAILED };
+
+    /** Finalize selected events after all adapter-local callback captures and callback scopes have retired. */
+    struct DispatchCompletion {
+        std::shared_ptr<core::detail::DeliveryStatisticsState> state;
+        std::size_t events;
+        DispatchOutcome outcome = DispatchOutcome::DISCARDED;
+
+        ~DispatchCompletion() {
+            state->update([&](auto &s) {
+                s.inFlightEvents -= events;
+                auto &counter = outcome == DispatchOutcome::DELIVERED         ? s.deliveredEvents
+                                : outcome == DispatchOutcome::CALLBACK_FAILED ? s.callbackFailedEvents
+                                                                              : s.discardedEvents;
+                counter.add(events);
+            });
+        }
+    };
+
     /** Project and deliver one complete event type under a stable listener selection.
      * @tparam Event Existing owning Quote, Profile or their RegisteredEvent variant.
      * @param batch Existing receiver's callback-only projection service.
@@ -1676,7 +1713,7 @@ class TypedConsumer final : public client::SubscriptionConsumer {
      */
     template <class Event>
     mux::BatchAction deliver(const client::SubscriptionBatch &batch,
-                             const std::shared_ptr<const ListenerSnapshot> &listeners) {
+                             const std::shared_ptr<const ListenerSnapshot> &listeners, DispatchCompletion &completion) {
         std::vector<Event> projectedEvents;
         projectedEvents.reserve(batch.records().size());
         auto work = projectionWork_;
@@ -1726,19 +1763,55 @@ class TypedConsumer final : public client::SubscriptionConsumer {
         }
 
         // One selection lasts through the whole underlying batch. Reentrant mutation affects a later batch.
+        bool complete = true;
+
         for (const auto &listener : *listeners) {
             if (port_->closeRequested.load(std::memory_order_acquire)) {
+                complete = false;
                 break;
             }
 
+            port_->statistics->update([](auto &s) {
+                s.callbackCalls.add(1);
+            });
+            const auto started = std::chrono::steady_clock::now();
+            bool failed = false;
             try {
                 std::get<typename Subscription<Event>::Listener>(listener.callback->function)(projectedEvents);
             } catch (...) {
+                failed = true;
+            }
+            const auto elapsed =
+                std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - started)
+                    .count();
+            port_->statistics->update([&](auto &s) {
+                if (failed)
+                    s.callbackFailures.add(1);
+
+                const auto duration = static_cast<std::uint64_t>(std::max<decltype(elapsed)>(0, elapsed));
+
+                if (s.callbackDurationTotal.availability == core::StatisticAvailability::NO_SAMPLE)
+                    s.callbackDurationTotal.availability = core::StatisticAvailability::AVAILABLE;
+
+                s.callbackDurationTotal.add(duration);
+
+                if (s.callbackDurationMaximum.availability == core::StatisticAvailability::NO_SAMPLE)
+                    s.callbackDurationMaximum.availability = core::StatisticAvailability::AVAILABLE;
+
+                s.callbackDurationMaximum.value = std::max(s.callbackDurationMaximum.value, duration);
+                s.callbackDurationSamples.add(1);
+            });
+
+            if (failed) {
+                completion.outcome = DispatchOutcome::CALLBACK_FAILED;
                 failSubscription(port_, {ErrorCode::CALLBACK_FAILURE, "subscription-listener"});
 
                 return mux::BatchAction::PAUSE;
             }
         }
+
+        if (complete)
+            completion.outcome = DispatchOutcome::DELIVERED;
 
         return mux::BatchAction::CONTINUE;
     }
@@ -1749,7 +1822,7 @@ class TypedConsumer final : public client::SubscriptionConsumer {
      * @param projectionWork Finite independently replenished callback-boundary seed.
      */
     TypedConsumer(std::shared_ptr<SubscriptionPort> port, client::ReceiverProjectionWork projectionWork)
-        : port_(std::move(port)), projectionWork_(projectionWork) {
+        : SubscriptionConsumer(port->statistics), port_(std::move(port)), projectionWork_(projectionWork) {
     }
 
     /** Invoke ready owning values with no control mutex held.
@@ -1757,6 +1830,7 @@ class TypedConsumer final : public client::SubscriptionConsumer {
      * @return Queue action; application exceptions fail only this logical subscription.
      */
     mux::BatchAction onBatch(const client::SubscriptionBatch &batch) override {
+        DispatchCompletion completion{port_->statistics, batch.records().size()};
         const auto endpoint = port_->endpoint.lock();
 
         if (port_->closeRequested.load(std::memory_order_acquire) || !endpoint) {
@@ -1792,25 +1866,25 @@ class TypedConsumer final : public client::SubscriptionConsumer {
         try {
             switch (port_->eventDelivery) {
             case EventDelivery::QUOTE:
-                return deliver<events::Quote>(batch, listeners);
+                return deliver<events::Quote>(batch, listeners, completion);
             case EventDelivery::PROFILE:
-                return deliver<events::Profile>(batch, listeners);
+                return deliver<events::Profile>(batch, listeners, completion);
             case EventDelivery::TRADE:
-                return deliver<events::Trade>(batch, listeners);
+                return deliver<events::Trade>(batch, listeners, completion);
             case EventDelivery::TRADE_ETH:
-                return deliver<events::TradeETH>(batch, listeners);
+                return deliver<events::TradeETH>(batch, listeners, completion);
             case EventDelivery::MESSAGE:
-                return deliver<events::Message>(batch, listeners);
+                return deliver<events::Message>(batch, listeners, completion);
             case EventDelivery::CONFIGURATION:
-                return deliver<events::Configuration>(batch, listeners);
+                return deliver<events::Configuration>(batch, listeners, completion);
             case EventDelivery::SUMMARY:
-                return deliver<events::Summary>(batch, listeners);
+                return deliver<events::Summary>(batch, listeners, completion);
             case EventDelivery::TEXT_MESSAGE:
-                return deliver<events::TextMessage>(batch, listeners);
+                return deliver<events::TextMessage>(batch, listeners, completion);
             case EventDelivery::TEXT_CONFIGURATION:
-                return deliver<events::TextConfiguration>(batch, listeners);
+                return deliver<events::TextConfiguration>(batch, listeners, completion);
             case EventDelivery::REGISTERED:
-                return deliver<RegisteredEvent>(batch, listeners);
+                return deliver<RegisteredEvent>(batch, listeners, completion);
             default:
                 throw Error({ErrorCode::UNSUPPORTED_PROFILE, "subscription-event-type"});
             }
@@ -1958,6 +2032,11 @@ std::unique_ptr<NativeSubscription> registerSubscription(NativeEndpoint &endpoin
     }
 
     result->handle = std::move(*handle);
+    port->statistics->update([&](auto &s) {
+        s.queueCapacityEvents =
+            endpoint.profile.clientLimits.dataItems +
+            (endpoint.profile.family == core::SubscriptionFamily::TICKER ? endpoint.profile.tickerLimits.cacheKeys : 0);
+    });
     observeState(port, SubscriptionState::ACTIVE);
 
     return result;
@@ -2047,6 +2126,11 @@ void applyDesired(NativeEndpoint &endpoint, NativeSubscription &subscription, mu
         }
     }
 
+    {
+        std::lock_guard lock(subscription.port->statistics->mutex);
+        subscription.port->statistics->submittedSelectors = symbols.size();
+        subscription.port->statistics->submittedDesiredRevision = revision;
+    }
     auto accepted = subscription.handle.replace(requests, work);
 
     if (!accepted) {
@@ -2245,6 +2329,14 @@ EndpointProgress progressEndpoint(NativeEndpoint &endpoint, transport::RecoveryT
 
     const auto polled = endpoint.recovery->poll(work);
     const auto statistics = endpoint.recovery->statistics();
+
+    for (const auto &subscription : endpoint.subscriptions) {
+        if (subscription)
+            subscription->port->statistics->update([&](auto &s) {
+                s.sourceEpoch = statistics.sourceEpoch;
+            });
+    }
+
     {
         std::lock_guard lock(endpoint.port->mutex);
         endpoint.port->statistics.connection = statistics;

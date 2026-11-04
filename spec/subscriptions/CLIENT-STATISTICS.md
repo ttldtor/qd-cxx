@@ -4,8 +4,9 @@
 
 The endpoint IO/recovery subset is available through `Endpoint::getStatistics()`;
 see the [feed guide](../../docs/FEED-API.md#endpoint-statistics) for its publication boundary.
-The subscription catalog and derived-value operations remain planned contracts,
-not implemented subscription counters or callable rate/reset APIs.
+The subscription catalog is available through `Subscription<Event>::getStatistics()`;
+see the [delivery accounting boundary](../../docs/FEED-API.md#subscription-statistics).
+Derived-value operations remain planned contracts, without callable rate/reset APIs.
 
 ## Evidence and decisions
 

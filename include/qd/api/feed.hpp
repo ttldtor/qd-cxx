@@ -189,6 +189,8 @@ struct SubscriptionSnapshot {
     std::vector<EventType> eventTypes;         ///< Immutable normalized supported business types, not local record IDs.
 };
 
+using SubscriptionStatistics = core::SubscriptionStatistics; ///< Detached event-delivery lifetime counters and gauges.
+
 /** Ordered subscription-observer phase; replacement removes before adding at the same revision. */
 enum class SubscriptionChangeKind {
     ADDED,   ///< Initial nonempty state or additions to an accepted revision.
@@ -241,6 +243,11 @@ template <class Event> class Subscription final {
      * @return Independently owned symbols/types/revision; allocation failures throw Error without mutation.
      */
     [[nodiscard]] SubscriptionSnapshot getSnapshot() const;
+    /** Copy one coherent subscription-local accounting cut, without native progress or callback waiting.
+     * The detached value retains no callback/schema/runtime and survives shutdown. Final means capture quiescence.
+     * @return Owner identity, lifetime counters, bounded gauges and monotonic observation time.
+     */
+    [[nodiscard]] SubscriptionStatistics getStatistics() const noexcept;
     /** Copy the immutable normalized event-type set.
      * @return Owning finite set in EventType declaration order; allocation failures throw Error.
      */

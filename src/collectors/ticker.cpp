@@ -1,6 +1,7 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/collectors/ticker.hpp"
+#include "../core/delivery_statistics.hpp"
 #include "qd/encoding/penta_symbol.hpp"
 
 #include <algorithm>
@@ -282,6 +283,8 @@ struct TickerCollector::Impl {
 
     /** Scalar queue/offer state copied into preallocated candidate scratch. */
     struct Queues {
+        std::size_t admissions = 0;         ///< Transaction-local accepted occurrences, published only at commit.
+        std::size_t conflations = 0;        ///< Transaction-local superseded pending occurrences.
         std::size_t head[2]{NONE, NONE};    ///< Initial and update heads.
         std::size_t tail[2]{NONE, NONE};    ///< Initial and update tails.
         std::size_t pending = 0;            ///< Distinct dirty keys, never more than cache cardinality.
@@ -293,9 +296,10 @@ struct TickerCollector::Impl {
 
     /** Independently bounded local desired owner and scalar queues. */
     struct View {
-        std::optional<core::SubscriptionState> desired; ///< No protocol owner or callable.
-        std::uint64_t activation = 0;                   ///< Non-reused selection within this origin.
-        Queues queues;                                  ///< Active per-view queue state.
+        std::shared_ptr<core::detail::DeliveryStatisticsState> statistics; ///< Optional pure delivery accounting.
+        std::optional<core::SubscriptionState> desired;                    ///< No protocol owner or callable.
+        std::uint64_t activation = 0;                                      ///< Non-reused selection within this origin.
+        Queues queues;                                                     ///< Active per-view queue state.
     };
 
     core::LocalSchema schema;                     ///< Immutable exact source/local provenance and configured layout.
@@ -342,6 +346,14 @@ struct TickerCollector::Impl {
 
     /** Destroy source owners before dropping the fixed detached origin. */
     ~Impl() {
+        if (views)
+            for (std::size_t v = 0; v < limits.viewSlots; ++v) {
+                core::detail::updateDelivery(views[v].statistics, [&](auto &s) {
+                    s.pendingEvents -= views[v].queues.pending;
+                    s.discardedEvents.add(views[v].queues.pending);
+                });
+            }
+
         release(origin);
     }
 
@@ -678,6 +690,10 @@ struct TickerCollector::Impl {
         if (data[index].dirty) {
             --state.pending;
             count(counts.withdrawn, 1, counts.saturated);
+            core::detail::updateDelivery(views[slot].statistics, [](auto &s) {
+                --s.pendingEvents;
+                s.discardedEvents.add(1);
+            });
         }
 
         unlink(state, data, index, INITIAL);
@@ -696,6 +712,10 @@ struct TickerCollector::Impl {
     void dirty(Queues &state, Pending *data, std::size_t index, const core::SubscriptionEntry &entry,
                std::uint64_t revision) noexcept {
         auto &item = data[index];
+        ++state.admissions;
+
+        if (item.dirty)
+            ++state.conflations;
 
         if (!item.dirty) {
             ++state.pending;
@@ -835,7 +855,31 @@ struct TickerCollector::Impl {
             }
         }
 
+        publishAdmissions(slot, views[slot].queues);
         evict();
+    }
+
+    /** Publish one committed view mutation; scratch counters never escape rejected staging.
+     * @param slot Actual admitted view.
+     * @param queues Committed transaction-local admission/conflation amounts.
+     */
+    void publishAdmissions(std::size_t slot, Queues &queues) noexcept {
+        core::detail::updateDelivery(views[slot].statistics, [&](auto &s) {
+            s.admittedEvents.add(queues.admissions);
+            s.conflatedEvents.add(queues.conflations);
+            s.pendingEvents += queues.admissions - queues.conflations;
+        });
+        queues.admissions = queues.conflations = 0;
+    }
+
+    /** Charge exactly classified effective incoming view occurrences from a rejected staging transaction. */
+    void rejectAdmissions() noexcept {
+        for (std::size_t v = 0; v < limits.viewSlots; ++v) {
+            core::detail::updateDelivery(views[v].statistics, [&](auto &s) {
+                s.rejectedOverflowEvents.add(queues[v].admissions);
+                s.droppedEvents.add(queues[v].admissions);
+            });
+        }
     }
 
     /** Mark shared freshness failure without consuming the rejected input.
@@ -1022,6 +1066,11 @@ std::expected<TickerCollector, TickerError> TickerCollector::create(core::LocalS
 }
 
 std::expected<TickerViewToken, TickerError> TickerCollector::openView(TickerWork &work) {
+    return openObservedView(work, {});
+}
+
+std::expected<TickerViewToken, TickerError>
+TickerCollector::openObservedView(TickerWork &work, std::shared_ptr<core::detail::DeliveryStatisticsState> statistics) {
     try {
         spend(work, 1);
 
@@ -1055,6 +1104,7 @@ std::expected<TickerViewToken, TickerError> TickerCollector::openView(TickerWork
             s.views[v].desired.emplace(std::move(*desired));
             s.views[v].activation = ++s.nextActivation;
             s.views[v].queues = {};
+            s.views[v].statistics = std::move(statistics);
 
             return TickerViewToken(s.origin, v, s.views[v].activation);
         }
@@ -1091,6 +1141,7 @@ std::expected<void, TickerError> TickerCollector::closeView(const TickerViewToke
 
         s.views[*slot].desired.reset();
         s.views[*slot].queues = {};
+        s.views[*slot].statistics.reset();
         s.evict();
 
         return {};
@@ -1354,6 +1405,7 @@ std::expected<TickerStage, TickerError> TickerCollector::stage(protocol::LiveEve
 
         for (std::size_t v = 0; v < s.limits.viewSlots; ++v) {
             s.queues[v] = s.views[v].queues;
+            s.queues[v].admissions = s.queues[v].conflations = 0;
         }
 
         TickerStage result{0, 0, 0, false};
@@ -1418,6 +1470,12 @@ std::expected<TickerStage, TickerError> TickerCollector::stage(protocol::LiveEve
 
                 if (index == NONE) {
                     overflow = true;
+
+                    for (std::size_t v = 0; v < s.limits.viewSlots; ++v) {
+                        if (s.match(v, record, &work))
+                            ++s.queues[v].admissions;
+                    }
+
                     continue;
                 }
 
@@ -1437,6 +1495,7 @@ std::expected<TickerStage, TickerError> TickerCollector::stage(protocol::LiveEve
         }
 
         if (overflow) {
+            s.rejectAdmissions();
             s.stale(event.records().size());
 
             return std::unexpected(TickerError::RESOURCE_LIMIT);
@@ -1466,6 +1525,7 @@ std::expected<TickerStage, TickerError> TickerCollector::stage(protocol::LiveEve
             (s.frameCount == s.limits.cachedFrames ||
              incomingBytes > s.limits.cacheBytes - std::min(s.bytes, s.limits.cacheBytes) ||
              incomingBytes > s.limits.residentBytes - std::min(sum(s.fixed, s.bytes), s.limits.residentBytes))) {
+            s.rejectAdmissions();
             s.stale(event.records().size());
 
             return std::unexpected(TickerError::RESOURCE_LIMIT);
@@ -1527,6 +1587,7 @@ std::expected<TickerStage, TickerError> TickerCollector::stage(protocol::LiveEve
             for (std::size_t v = 0; v < s.limits.viewSlots; ++v) {
                 s.views[v].queues = s.queues[v];
                 s.views[v].queues.offered = NONE;
+                s.publishAdmissions(v, s.views[v].queues);
             }
 
             s.keys = keyCount;
@@ -1745,6 +1806,10 @@ std::expected<TickerResetNotice, TickerError> TickerCollector::reset(TickerWork 
         }
 
         for (std::size_t v = 0; v < s.limits.viewSlots; ++v) {
+            core::detail::updateDelivery(s.views[v].statistics, [&](auto &statistics) {
+                statistics.pendingEvents -= s.views[v].queues.pending;
+                statistics.discardedEvents.add(s.views[v].queues.pending);
+            });
             s.views[v].queues = {};
         }
 

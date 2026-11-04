@@ -1,6 +1,7 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/mux/queue.hpp"
+#include "../core/delivery_statistics.hpp"
 
 #include <algorithm>
 #include <array>
@@ -1303,18 +1304,20 @@ struct MuxQueue::State {
         collectors::TickerViewToken ticker;                                 ///< Actual shared-cache view.
         collectors::HistoryViewToken history;                               ///< Actual history view.
         detail::Vector<std::shared_ptr<const detail::QueueRecord>> records; ///< Fixed queue links.
-        detail::Vector<std::uint8_t> selection; ///< Fixed owner eligibility/cleanup scratch.
-        detail::Vector<Mapping> mapping;        ///< Fixed paired source-view metadata.
-        std::size_t head = 0;                   ///< Stored ranges.
-        std::size_t size = 0;                   ///< Stored ranges.
-        std::size_t mappingCount = 0;           ///< Stored ranges.
-        std::uint64_t desiredRevision = 0;      ///< Authoritative application versus synchronization.
-        std::uint64_t mappingRevision = 0;      ///< Authoritative application versus synchronization.
-        bool sync = true;                       ///< Owner gates.
-        bool paused = false;                    ///< A reserved pause gates later callbacks.
-        bool closing = false;                   ///< Owner gates.
-        bool sourceClosed = false;              ///< Owner gates.
-        bool muxClosed = false;                 ///< Owner gates.
+        detail::Vector<std::uint8_t> selection;     ///< Fixed owner eligibility/cleanup scratch.
+        detail::Vector<Mapping> mapping;            ///< Fixed paired source-view metadata.
+        std::size_t head = 0;                       ///< Stored ranges.
+        std::size_t size = 0;                       ///< Stored ranges.
+        std::size_t mappingCount = 0;               ///< Stored ranges.
+        std::uint64_t desiredRevision = 0;          ///< Authoritative application versus synchronization.
+        std::uint64_t mappingRevision = 0;          ///< Authoritative application versus synchronization.
+        std::size_t candidateLogicalSelectors = 0;  ///< APPLIED command count, independent of next-submission metadata.
+        std::uint64_t candidateLogicalRevision = 0; ///< Logical revision belonging to that mapping candidate.
+        bool sync = true;                           ///< Owner gates.
+        bool paused = false;                        ///< A reserved pause gates later callbacks.
+        bool closing = false;                       ///< Owner gates.
+        bool sourceClosed = false;                  ///< Owner gates.
+        bool muxClosed = false;                     ///< Owner gates.
         bool hadGap = false;   ///< Continuity is incomplete because of known or unclassified excluded delivery.
         bool epochGap = false; ///< Owner gates.
         bool unknownEligibility = false;     ///< Lost source eligibility was not classified into exact client copies.
@@ -1323,6 +1326,7 @@ struct MuxQueue::State {
         std::optional<QueueFailure> primary; ///< First non-cancellation failure, preserved through stop and retirement.
         std::optional<QueueFailure> secondary; ///< Later bounded failure; never replaces the primary cause.
         QueueCounts counts;                    ///< Local evidence.
+        std::shared_ptr<core::detail::DeliveryStatisticsState> statistics; ///< Optional pure facade accounting.
 
         /** Bind all fixed client arrays to exact requested-block accounting.
          * @param source Pure generation counters.
@@ -1638,6 +1642,26 @@ struct MuxQueue::State {
         }
     }
 
+    /** Publish a successful source mapping for its captured logical command.
+     * @param c Registration whose actual mapping transaction committed.
+     */
+    void publishMapping(Client &c) noexcept {
+        core::detail::updateDelivery(c.statistics, [&](auto &s) {
+            s.activeSelectors = c.candidateLogicalSelectors;
+            s.activeDesiredRevision = c.candidateLogicalRevision;
+        });
+    }
+
+    /** Clear qualification when the actual mapping is cleared or its source resets.
+     * @param c Registration with no complete currently applied mapping.
+     */
+    void clearMappingStatistics(Client &c) noexcept {
+        core::detail::updateDelivery(c.statistics, [](auto &s) {
+            s.activeSelectors = 0;
+            s.activeDesiredRevision.reset();
+        });
+    }
+
     /** Current exact source mapping, without raw HISTORY time filtering.
      * @param c Registration.
      * @param key Actual projected exact key.
@@ -1856,6 +1880,12 @@ struct MuxQueue::State {
         ++c.size;
         count(c.counts.queueAdmitted, 1, c.counts.saturated);
         count(counts.queueAdmitted, 1, counts.saturated);
+
+        if (!ticker)
+            core::detail::updateDelivery(c.statistics, [](auto &s) {
+                s.admittedEvents.add(1);
+                ++s.pendingEvents;
+            });
     }
 
     /** Drop one stored link after its unlink work was reserved.
@@ -1866,6 +1896,10 @@ struct MuxQueue::State {
         c.records[c.head].reset();
         c.head = (c.head + 1) % c.records.size();
         --c.size;
+        core::detail::updateDelivery(c.statistics, [](auto &s) {
+            --s.pendingEvents;
+            s.discardedEvents.add(1);
+        });
 
         if (withdrawn) {
             count(c.counts.withdrawn, 1, c.counts.saturated);
@@ -2213,6 +2247,7 @@ std::expected<MuxHandle, QueueFailure> MuxQueue::open(ClientLimits limits, const
 
         c->port = port;
         c->consumer = consumer;
+        c->statistics = consumer->deliveryStatistics();
         c->interest = s.fixedClients[slot];
         c->records.resize(limits.dataItems);
         c->selection.resize(limits.dataItems);
@@ -2230,7 +2265,7 @@ std::expected<MuxHandle, QueueFailure> MuxQueue::open(ClientLimits limits, const
                 .load(); // This is the final fallible component operation; no published MUX mutation needs rollback.
 
         if (s.ticker) {
-            auto view = s.ticker->openView(work.ticker);
+            auto view = s.ticker->openObservedView(work.ticker, c->statistics);
 
             if (!view) {
                 return std::unexpected(sourceFailure(view.error()));
@@ -2286,6 +2321,7 @@ std::expected<bool, QueueFailure> MuxQueue::State::sync(Client &c, QueueWork &wo
         if (!unionDirty) {
             c.sync = false;
             c.mappingRevision = c.desiredRevision;
+            publishMapping(c);
             publishState(c);
 
             return true;
@@ -2311,6 +2347,7 @@ std::expected<bool, QueueFailure> MuxQueue::State::sync(Client &c, QueueWork &wo
             if (peer && !peer->closing) {
                 peer->sync = false;
                 peer->mappingRevision = peer->desiredRevision;
+                publishMapping(*peer);
                 publishState(*peer);
             }
         }
@@ -2322,6 +2359,7 @@ std::expected<bool, QueueFailure> MuxQueue::State::sync(Client &c, QueueWork &wo
         old = Mapping{};
 
     c.mappingCount = 0;
+    clearMappingStatistics(c);
 
     struct ClearRequests {
         State &s;
@@ -2418,6 +2456,7 @@ std::expected<bool, QueueFailure> MuxQueue::State::sync(Client &c, QueueWork &wo
 
     c.sync = false;
     c.mappingRevision = c.desiredRevision;
+    publishMapping(c);
     publishState(c);
 
     return true;
@@ -2473,8 +2512,18 @@ std::expected<bool, QueueFailure> MuxQueue::State::command(Client &c, QueueWork 
 
         if (applied) {
             result.status = CommandStatus::APPLIED;
+
+            if (c.statistics) {
+                std::lock_guard lock(c.statistics->mutex);
+                c.candidateLogicalSelectors = c.statistics->submittedSelectors;
+                c.candidateLogicalRevision = c.statistics->submittedDesiredRevision;
+            }
+
             result.revision = applied->revision;
             result.changed = applied->changed;
+
+            if (!applied->changed && !c.sync)
+                publishMapping(c);
 
             if (applied->changed) {
                 c.desiredRevision = applied->revision;
@@ -2661,6 +2710,16 @@ std::expected<bool, QueueFailure> MuxQueue::State::route(Client &c, QueueWork &w
 
         if (overflow) {
             fail(c, {QueueError::RESOURCE_LIMIT, {}});
+            core::detail::updateDelivery(c.statistics, [&](auto &s) {
+                s.droppedEvents.add(1);
+
+                if (ticker) {
+                    --s.pendingEvents;
+                    s.evictedOverflowEvents.add(1);
+                } else {
+                    s.rejectedOverflowEvents.add(1);
+                }
+            });
             count(c.counts.discarded, 1, c.counts.saturated);
             count(counts.discarded, 1, counts.saturated);
         } else if (unwanted) {
@@ -2786,6 +2845,10 @@ std::expected<bool, QueueFailure> MuxQueue::State::routeStream(QueueWork &work) 
 
             if (candidateFailure[v]) {
                 fail(*c, {QueueError::RESOURCE_LIMIT, {}});
+                core::detail::updateDelivery(c->statistics, [&](auto &s) {
+                    s.droppedEvents.add(candidateCounts[v]);
+                    s.rejectedOverflowEvents.add(candidateCounts[v]);
+                });
                 count(c->counts.discarded, candidateCounts[v], c->counts.saturated);
                 count(counts.discarded, candidateCounts[v], counts.saturated);
             } else {
@@ -2910,6 +2973,10 @@ std::expected<bool, QueueFailure> MuxQueue::State::callback(Client &c, QueueWork
         count(c.counts.callbackStartedRecords, selected, c.counts.saturated);
         count(counts.callbackStartedBatches, 1, counts.saturated);
         count(counts.callbackStartedRecords, selected, counts.saturated);
+        core::detail::updateDelivery(c.statistics, [&](auto &s) {
+            s.pendingEvents -= selected;
+            s.inFlightEvents += selected;
+        });
         auto guard = c.consumer;
         BorrowedMuxBatch borrowed;
         borrowed.state_ = batch;
@@ -3090,6 +3157,7 @@ std::expected<bool, QueueFailure> MuxQueue::State::close(Client &c, QueueWork &w
 
         c.mappingCount = 0;
         c.sourceClosed = true;
+        clearMappingStatistics(c);
 
         return true;
     }
@@ -3468,6 +3536,7 @@ std::expected<QueueProgress, QueueFailure> MuxQueue::State::resetStep(QueueWork 
         for (auto &c : clients) {
             if (c && !c->closing) {
                 c->sync = true;
+                clearMappingStatistics(*c);
                 publishState(*c);
             }
         }
@@ -3925,6 +3994,7 @@ std::expected<QueueProgress, QueueFailure> MuxQueue::progressImpl(QueueWork &wor
                         if (peer && !peer->closing) {
                             peer->sync = false;
                             peer->mappingRevision = peer->desiredRevision;
+                            s.publishMapping(*peer);
                             s.publishState(*peer);
                         }
                 }
@@ -4253,7 +4323,13 @@ MuxQueue::State::~State() {
             count(c->counts.discarded, 1, c->counts.saturated);
         }
 
+        core::detail::updateDelivery(c->statistics, [&](auto &s) {
+            s.pendingEvents -= c->size;
+            s.discardedEvents.add(c->size);
+        });
+
         c->size = 0;
+        clearMappingStatistics(*c);
         c->consumer.reset();
         QueueTerminal result;
         result.outcome = c->primary ? TerminalOutcome::FAILED : TerminalOutcome::ABORTED;

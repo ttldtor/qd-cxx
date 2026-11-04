@@ -433,6 +433,111 @@ void checkStateOrder(const std::vector<std::pair<State, State>> &changes, State 
 
 } // namespace
 
+TEST_CASE("subscription statistics reconcile overlap listener fanout failure and absent listeners") {
+    api::ApiRuntime runtime(runtimeOptions());
+    auto schema = standardSchema();
+    const std::vector<std::u16string> symbols{u"IBM"};
+    const std::vector<peer::Record> records{{u"IBM", standardValues(schema)}, {u"IBM", standardValues(schema)}};
+    peer::Peer source(schema, records, symbols, 8192, peer::PeerMode::HOLD, script(core::SubscriptionFamily::STREAM));
+    auto endpoint = runtime.createEndpoint(endpointOptions(api::DeliveryContract::STREAM));
+    auto healthy = endpoint->getFeed()->createSubscription<events::Quote>();
+    auto broken = endpoint->getFeed()->createSubscription<events::Quote>();
+    auto silent = endpoint->getFeed()->createSubscription<events::Quote>();
+    CHECK(healthy->getStatistics().callbackDurationTotal.availability == core::StatisticAvailability::NO_SAMPLE);
+    std::atomic<unsigned> seen{0};
+    healthy->addEventListener([&](auto batch) {
+        seen += static_cast<unsigned>(batch.size());
+    });
+    healthy->addEventListener([&](auto batch) {
+        seen += static_cast<unsigned>(batch.size());
+    });
+    broken->addEventListener([](auto) {
+    });
+    broken->addEventListener([](auto) {
+        throw std::runtime_error("second selected event listener");
+    });
+    healthy->addSymbols("IBM");
+    broken->addSymbols("IBM");
+    silent->addSymbols("IBM");
+    CHECK(healthy->getStatistics().desiredSelectors == 1);
+    CHECK(healthy->getStatistics().desiredRevision == 1);
+    CHECK_FALSE(healthy->getStatistics().activeDesiredRevision);
+    std::atomic<bool> coherent{true};
+    std::atomic<unsigned> observations{0};
+    std::jthread reader([&](std::stop_token stop) {
+        auto previous = healthy->getStatistics();
+
+        while (!stop.stop_requested()) {
+            for (const auto &subscription : {healthy, broken, silent}) {
+                const auto cut = subscription->getStatistics();
+                const auto completed = cut.deliveredEvents.value + cut.conflatedEvents.value +
+                                       cut.discardedEvents.value + cut.callbackFailedEvents.value +
+                                       cut.evictedOverflowEvents.value + cut.pendingEvents + cut.inFlightEvents;
+
+                if (cut.admittedEvents.value != completed ||
+                    cut.droppedEvents.value != cut.rejectedOverflowEvents.value + cut.evictedOverflowEvents.value)
+                    coherent = false;
+            }
+
+            const auto next = healthy->getStatistics();
+
+            if (next.ownerIdentity != previous.ownerIdentity || next.observedAt < previous.observedAt ||
+                next.admittedEvents.value < previous.admittedEvents.value)
+                coherent = false;
+
+            previous = next;
+            ++observations;
+            std::this_thread::yield();
+        }
+    });
+    endpoint->connect(address(source));
+    REQUIRE(eventually([&] {
+        return seen == 4 && healthy->getStatistics().deliveredEvents.value == 2 &&
+               broken->getStatistics().callbackFailedEvents.value == 2 &&
+               silent->getStatistics().discardedEvents.value == 2;
+    }));
+    const auto active = healthy->getStatistics();
+    CHECK(active.activeSelectors == 1);
+    CHECK(active.activeDesiredRevision == active.desiredRevision);
+    CHECK(active.sourceEpoch == 1);
+    CHECK(active.queueCapacityEvents >= active.pendingEvents);
+    static_cast<void>(endpoint->closeAndAwaitTermination());
+    reader.request_stop();
+    reader.join();
+    CHECK(coherent.load());
+    CHECK(observations.load() > 0);
+    CHECK(endpoint->getStatistics().connection.readDataRecords.value == 2);
+
+    for (const auto &subscription : {healthy, broken, silent}) {
+        const auto cut = subscription->getStatistics();
+        CHECK(cut.final);
+        CHECK(cut.admittedEvents.value == 2);
+        CHECK(cut.pendingEvents == 0);
+        CHECK(cut.inFlightEvents == 0);
+        CHECK(cut.activeSelectors == 0);
+        CHECK_FALSE(cut.activeDesiredRevision);
+        CHECK(cut.droppedEvents.value == 0);
+    }
+
+    const auto delivered = healthy->getStatistics();
+    const auto failed = broken->getStatistics();
+    const auto discarded = silent->getStatistics();
+    CHECK(delivered.callbackCalls.value == 2);
+    CHECK(delivered.callbackFailures.value == 0);
+    CHECK(delivered.callbackDurationSamples.value == 2);
+    CHECK(delivered.callbackDurationTotal.availability == core::StatisticAvailability::AVAILABLE);
+    CHECK(delivered.callbackDurationTotal.value >= delivered.callbackDurationMaximum.value);
+    CHECK(failed.callbackCalls.value == 2);
+    CHECK(failed.callbackFailures.value == 1);
+    CHECK(failed.callbackDurationSamples.value == 2);
+    CHECK(failed.deliveredEvents.value == 0);
+    CHECK(discarded.callbackCalls.value == 0);
+    CHECK(discarded.callbackDurationMaximum.availability == core::StatisticAvailability::NO_SAMPLE);
+    CHECK(delivered.ownerIdentity != failed.ownerIdentity);
+    runtime.closeAndAwaitTermination();
+    CHECK(healthy->getStatistics().observedAt == delivered.observedAt);
+}
+
 TEST_CASE("public feed bounds atomic desired sets listeners and inactive retirement") {
     auto options = runtimeOptions();
     options.maximumEndpoints = 1;
@@ -854,11 +959,21 @@ TEST_CASE("public feed close retains ownership while an application callback blo
 
     const auto blockedStatistics = endpoint->getStatistics();
     CHECK_FALSE(blockedStatistics.final);
+    const auto blockedDelivery = subscription->getStatistics();
+    CHECK(blockedDelivery.admittedEvents.value == 1);
+    CHECK(blockedDelivery.inFlightEvents == 1);
+    CHECK(blockedDelivery.pendingEvents == 0);
+    CHECK(blockedDelivery.deliveredEvents.value == 0);
+    CHECK(blockedDelivery.callbackCalls.value == 1);
+    CHECK(blockedDelivery.callbackDurationSamples.value == 0);
 
     for (unsigned read = 0; read != 100; ++read) {
         const auto observation = endpoint->getStatistics();
         CHECK_FALSE(observation.final);
         CHECK(observation.ownerIdentity == blockedStatistics.ownerIdentity);
+        const auto delivery = subscription->getStatistics();
+        CHECK(delivery.inFlightEvents == 1);
+        CHECK_FALSE(delivery.final);
     }
 
     // This test-owned helper always releases the callback; no failure path can leave a blocked worker.
@@ -881,6 +996,10 @@ TEST_CASE("public feed close retains ownership while an application callback blo
     CHECK(terminal.deadlineExpired);
     CHECK_FALSE(terminal.drained);
     CHECK(endpoint->getStatistics().final);
+    CHECK(subscription->getStatistics().final);
+    CHECK(subscription->getStatistics().inFlightEvents == 0);
+    CHECK(subscription->getStatistics().deliveredEvents.value == 1);
+    CHECK(subscription->getStatistics().callbackDurationSamples.value == 1);
     checkRetiredEndpoint(endpoint);
 }
 
@@ -2305,6 +2424,7 @@ TEST_CASE("public lifecycle reconnect replays unchanged desired Quote on a real 
     settings.maximumAttempts = 2;
     settings.retryDelay = 1ms;
     auto endpoint = runtime.createEndpoint(settings);
+    auto subscription = endpoint->getFeed()->createSubscription<events::Quote>();
     const auto initialStatistics = endpoint->getStatistics();
     REQUIRE(initialStatistics.ownerIdentity);
     CHECK(initialStatistics.connection.connectionAttempts.value == 0);
@@ -2316,6 +2436,13 @@ TEST_CASE("public lifecycle reconnect replays unchanged desired Quote on a real 
         while (!stop.stop_requested()) {
             const auto next = endpoint->getStatistics();
             const auto &counts = next.connection;
+            const auto delivery = subscription->getStatistics();
+
+            if (delivery.admittedEvents.value !=
+                delivery.deliveredEvents.value + delivery.conflatedEvents.value + delivery.discardedEvents.value +
+                    delivery.callbackFailedEvents.value + delivery.evictedOverflowEvents.value +
+                    delivery.pendingEvents + delivery.inFlightEvents)
+                coherent = false;
 
             if (next.ownerIdentity != initialStatistics.ownerIdentity ||
                 next.generation != initialStatistics.generation || next.observedAt < previous.observedAt ||
@@ -2330,7 +2457,6 @@ TEST_CASE("public lifecycle reconnect replays unchanged desired Quote on a real 
             std::this_thread::yield();
         }
     });
-    auto subscription = endpoint->getFeed()->createSubscription<events::Quote>();
     subscription->addEventListener([&](std::span<const events::Quote> quotes) {
         for (const auto &quote : quotes) {
             if (quote.bidTimeMs == 3000) {
@@ -2357,6 +2483,11 @@ TEST_CASE("public lifecycle reconnect replays unchanged desired Quote on a real 
         return endpoint->getStatistics().connection.readDataRecords.value == 1;
     }));
     const auto firstStatistics = endpoint->getStatistics();
+    const auto firstDeliveryStatistics = subscription->getStatistics();
+    CHECK(firstDeliveryStatistics.admittedEvents.value == 1);
+    CHECK(firstDeliveryStatistics.deliveredEvents.value == 1);
+    CHECK(firstDeliveryStatistics.sourceEpoch == 1);
+    CHECK(firstDeliveryStatistics.activeDesiredRevision == firstDeliveryStatistics.desiredRevision);
     CHECK(firstStatistics.connection.sourceEpoch == 1);
     endpoint->reconnect();
     CHECK(endpoint->getState() == api::EndpointState::CONNECTING);
@@ -2384,6 +2515,8 @@ TEST_CASE("public lifecycle reconnect replays unchanged desired Quote on a real 
 
         return counts.readDataRecords.value == 2 && counts.sourceEpoch == 2;
     }));
+    CHECK(subscription->getStatistics().sourceEpoch == 2);
+    CHECK(subscription->getStatistics().activeDesiredRevision == subscription->getStatistics().desiredRevision);
     CHECK(unexpected.load() == 0);
     CHECK(first.load() == 1);
     REQUIRE(endpoint->awaitState(api::EndpointState::CONNECTED, std::chrono::steady_clock::now() + 2s).status ==
@@ -2429,6 +2562,17 @@ TEST_CASE("public lifecycle reconnect replays unchanged desired Quote on a real 
     CHECK(counts.writtenDataRecords.availability == core::StatisticAvailability::UNSUPPORTED);
     CHECK(counts.readSubscriptionRecords.availability == core::StatisticAvailability::UNSUPPORTED);
     CHECK(counts.roundTripTime.availability == core::StatisticAvailability::UNSUPPORTED);
+    const auto finalDeliveryStatistics = subscription->getStatistics();
+    CHECK(finalDeliveryStatistics.final);
+    CHECK(finalDeliveryStatistics.ownerIdentity == firstDeliveryStatistics.ownerIdentity);
+    CHECK(finalDeliveryStatistics.generation == firstDeliveryStatistics.generation);
+    CHECK(finalDeliveryStatistics.admittedEvents.value == 2);
+    CHECK(finalDeliveryStatistics.deliveredEvents.value == 2);
+    CHECK(finalDeliveryStatistics.callbackCalls.value == 2);
+    CHECK(finalDeliveryStatistics.droppedEvents.value == 0);
+    CHECK(finalDeliveryStatistics.pendingEvents == 0);
+    CHECK(finalDeliveryStatistics.inFlightEvents == 0);
+    CHECK_FALSE(finalDeliveryStatistics.activeDesiredRevision);
     runtime.closeAndAwaitTermination();
     CHECK(endpoint->getStatistics().observedAt == finalStatistics.observedAt);
     CHECK(firstStatistics.connection.readDataRecords.value == 1);
@@ -3030,11 +3174,13 @@ TEST_CASE("endpoint statistics final waits for subscription observer and capture
     capture->action = [&] {
         CHECK(closed);
         CHECK_FALSE(endpoint->getStatistics().final);
+        CHECK_FALSE(subscription->getStatistics().final);
         captureRetired = true;
     };
     subscription->addChangeListener([&, capture](const auto &change) {
         if (change.kind == api::SubscriptionChangeKind::CLOSED) {
             CHECK_FALSE(endpoint->getStatistics().final);
+            CHECK_FALSE(subscription->getStatistics().final);
             closed = true;
         }
     });
@@ -3044,6 +3190,8 @@ TEST_CASE("endpoint statistics final waits for subscription observer and capture
     CHECK(closed);
     CHECK(captureRetired);
     CHECK(endpoint->getStatistics().final);
+    CHECK(subscription->getStatistics().final);
+    CHECK(subscription->getStatistics().callbackCalls.value == 0);
 }
 
 TEST_CASE("public subscription observation is deferred until the complete real data selection returns") {

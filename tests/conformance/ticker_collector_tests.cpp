@@ -1,6 +1,7 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "../../src/core/delivery_statistics.hpp"
 #include "qd/collectors/ticker.hpp"
 #include "qd/encoding/char_array.hpp"
 #include "qd/encoding/compact.hpp"
@@ -27,6 +28,7 @@
 #include <string>
 #include <thread>
 #include <tuple>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -37,6 +39,8 @@ namespace e = org::ttldtor::qdcxx::encoding;
 namespace s = org::ttldtor::qdcxx::collectors;
 namespace q = org::ttldtor::qdcxx::events;
 using Error = s::TickerError;
+using OriginalOpenView = std::expected<s::TickerViewToken, s::TickerError> (s::TickerCollector::*)(s::TickerWork &);
+static_assert(std::is_same_v<decltype(&s::TickerCollector::openView), OriginalOpenView>);
 bool failAllocations = false;         ///< Enabled only around an explicit production operation.
 std::size_t allocationsRemaining = 0; ///< Successful ordinary allocation requests allowed before failure.
 
@@ -677,6 +681,35 @@ TEST_CASE("TICKER reset is a reserved exact global owner barrier and foreign epo
     auto fresh = f.ticker.front(view, work);
     REQUIRE((fresh && *fresh));
     CHECK_FALSE(oldEpoch.matches((**fresh).value.epoch));
+}
+
+TEST_CASE("delivery statistics classify rejected TICKER source admission and reset cancellation") {
+    auto bounds = limits();
+    bounds.cacheKeys = 1;
+    auto f = fixture(false, bounds);
+    auto statistics = std::make_shared<c::detail::DeliveryStatisticsState>();
+    auto work = turn();
+    auto opened = f.ticker.openObservedView(work, statistics);
+    REQUIRE(opened);
+    auto view = std::move(*opened);
+    add(f, view, u"ALPHA");
+    add(f, view, u"BETA");
+    const Input seed[]{{0, u"ALPHA", 1, 10}};
+    stage(f, seed);
+    const Input rejected[]{{0, u"BETA", 2, 20}};
+    auto incoming = admit(f.live, data(rejected));
+    work = turn();
+    REQUIRE(f.ticker.stage(std::move(incoming), work).error() == Error::RESOURCE_LIMIT);
+    const auto cut = statistics->snapshot();
+    CHECK(cut.admittedEvents.value == 1);
+    CHECK(cut.pendingEvents == 1);
+    CHECK(cut.rejectedOverflowEvents.value == 1);
+    CHECK(cut.droppedEvents.value == 1);
+    work = turn();
+    REQUIRE(f.ticker.closeView(view, work));
+    CHECK(statistics->snapshot().pendingEvents == 0);
+    CHECK(statistics->snapshot().discardedEvents.value == 1);
+    CHECK(statistics->snapshot().deliveredEvents.value == 0);
 }
 
 TEST_CASE("TICKER shared overflow retains unconsumed frame but invalidates current offers") {

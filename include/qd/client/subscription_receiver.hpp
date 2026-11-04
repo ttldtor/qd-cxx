@@ -155,6 +155,24 @@ class SubscriptionBatch {
 
 /** Application-created callable, held strongly through its one whole-batch invocation. */
 class SubscriptionConsumer {
+    friend class detail::SubscriptionReceiver;
+    std::shared_ptr<core::detail::DeliveryStatisticsState> statistics_; ///< Optional facade accounting attachment.
+
+    protected:
+    /** Retain finite internal delivery accounting, independently of callback storage.
+     * @param statistics Optional pure accounting owner; ordinary consumers leave this empty.
+     */
+    explicit SubscriptionConsumer(std::shared_ptr<core::detail::DeliveryStatisticsState> statistics = {}) noexcept
+        : statistics_(std::move(statistics)) {
+    }
+
+    /** Inspect internal delivery accounting without progressing the receiver.
+     * @return Optional pure accounting owner, retaining no operational state.
+     */
+    [[nodiscard]] const std::shared_ptr<core::detail::DeliveryStatisticsState> &deliveryStatistics() const noexcept {
+        return statistics_;
+    }
+
     public:
     /** Release application callback state; arbitrary application work is outside receiver accounting. */
     virtual ~SubscriptionConsumer() = default;

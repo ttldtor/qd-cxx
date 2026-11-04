@@ -1,6 +1,7 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "../../src/core/delivery_statistics.hpp"
 #include "qd/encoding/compact.hpp"
 #include "qd/encoding/utf_char.hpp"
 #include "qd/encoding/utf_string.hpp"
@@ -305,6 +306,10 @@ m::ClientLimits clientLimits() {
 
 /** Actual callback observes scalar values without retaining borrowed spans. */
 struct Recorder : m::MuxConsumer {
+    explicit Recorder(std::shared_ptr<c::detail::DeliveryStatisticsState> statistics = {})
+        : MuxConsumer(std::move(statistics)) {
+    }
+
     std::vector<std::int64_t> values;               ///< Deep copied observation only.
     std::vector<std::int32_t> flags;                ///< Produced flags.
     std::vector<std::optional<std::int64_t>> times; ///< Actual optional raw index.
@@ -477,6 +482,159 @@ m::QueueRangeStatus range(Fixture &f, const m::MuxHandle &h) {
     return std::move(*r);
 }
 } // namespace
+
+TEST_CASE("delivery statistics publish command qualified selectors only after actual mapping commit") {
+    for (const auto family : {c::SubscriptionFamily::STREAM, c::SubscriptionFamily::TICKER}) {
+        auto f = fixture(family);
+        auto statistics = std::make_shared<c::detail::DeliveryStatisticsState>();
+        auto recorder = std::make_shared<Recorder>(statistics);
+        auto handle = open(f, recorder);
+        const c::SubscriptionRequest firstRequest{{f.schema.recordContext(0), u"ALPHA"}, {}};
+        statistics->update([&](auto &) {
+            statistics->submittedSelectors = 1;
+            statistics->submittedDesiredRevision = 10;
+        });
+        auto submit = submitTurn();
+        auto first = handle.replace(std::span(&firstRequest, 1), submit);
+        REQUIRE(first);
+        applyBeforeSourceSync(f, *first);
+        CHECK(statistics->snapshot().activeSelectors == 0);
+        CHECK_FALSE(statistics->snapshot().activeDesiredRevision);
+        bool sawWorkLimit = false;
+
+        for (unsigned attempt = 0; attempt < 100 && !sawWorkLimit; ++attempt) {
+            auto work = turn();
+            work.operations = 1;
+            work.ticker.operations = 0;
+            work.desired.commands = 0;
+            const auto result = f.queue.progress(work);
+            REQUIRE((result || result.error().error == m::QueueError::WORK_LIMIT));
+            sawWorkLimit = !result;
+        }
+
+        REQUIRE(sawWorkLimit);
+        CHECK(statistics->snapshot().activeSelectors == 0);
+        CHECK_FALSE(statistics->snapshot().activeDesiredRevision);
+        const c::SubscriptionRequest secondRequests[] = {firstRequest, {{f.schema.recordContext(0), u"BETA"}, {}}};
+        statistics->update([&](auto &) {
+            statistics->submittedSelectors = 2;
+            statistics->submittedDesiredRevision = 20;
+        });
+        submit = submitTurn();
+        auto second = handle.replace(secondRequests, submit);
+        REQUIRE(second);
+        until(f, [&] {
+            return handle.state() == m::QueueClientState::ACTIVE;
+        });
+        CHECK_FALSE(second->result());
+        CHECK(statistics->snapshot().activeSelectors == 1);
+        CHECK(statistics->snapshot().activeDesiredRevision == 10);
+        applyBeforeSourceSync(f, *second);
+        CHECK(statistics->snapshot().activeSelectors == 1);
+        CHECK(statistics->snapshot().activeDesiredRevision == 10);
+        until(f, [&] {
+            return handle.state() == m::QueueClientState::ACTIVE;
+        });
+        CHECK(statistics->snapshot().activeSelectors == 2);
+        CHECK(statistics->snapshot().activeDesiredRevision == 20);
+        statistics->update([&](auto &) {
+            statistics->submittedDesiredRevision = 30;
+        });
+        submit = submitTurn();
+        auto unchanged = handle.replace(secondRequests, submit);
+        REQUIRE(unchanged);
+        applyBeforeSourceSync(f, *unchanged);
+        CHECK_FALSE(unchanged->result()->changed);
+        CHECK(statistics->snapshot().activeSelectors == 2);
+        CHECK(statistics->snapshot().activeDesiredRevision == 30);
+    }
+}
+
+TEST_CASE("delivery statistics reconcile actual bounded materialization overflow before callbacks") {
+    for (const auto family : {c::SubscriptionFamily::STREAM, c::SubscriptionFamily::TICKER}) {
+        auto f = fixture(family);
+        auto statistics = std::make_shared<c::detail::DeliveryStatisticsState>();
+        auto recorder = std::make_shared<Recorder>(statistics);
+        auto limits = clientLimits();
+        limits.dataItems = 1;
+        limits.recordArenaBytes = 1;
+        auto handle = open(f, recorder, limits);
+        add(f, handle);
+        auto progressWithoutCallbacks = [&](const auto &ready) {
+            for (unsigned attempt = 0; attempt < 1000 && !ready(); ++attempt) {
+                auto work = turn();
+                work.callbacks = 0;
+                const auto result = f.queue.progress(work);
+                REQUIRE((result || result.error().error == m::QueueError::WORK_LIMIT));
+            }
+
+            REQUIRE(ready());
+        };
+        send(f, {{0, u"ALPHA", 1, 10, 0}, {0, u"ALPHA", 2, 20, 0}});
+        progressWithoutCallbacks([&] {
+            return handle.terminal().has_value();
+        });
+        const auto cut = statistics->snapshot();
+        CHECK(recorder->values.empty());
+        CHECK(cut.pendingEvents == 0);
+        CHECK(cut.inFlightEvents == 0);
+        CHECK(cut.discardedEvents.value == 0);
+
+        if (family == c::SubscriptionFamily::STREAM) {
+            CHECK(cut.admittedEvents.value == 0);
+            CHECK(cut.rejectedOverflowEvents.value == 2);
+            CHECK(cut.evictedOverflowEvents.value == 0);
+            CHECK(cut.droppedEvents.value == 2);
+        } else {
+            CHECK(cut.admittedEvents.value == 2);
+            CHECK(cut.rejectedOverflowEvents.value == 0);
+            CHECK(cut.evictedOverflowEvents.value == 1);
+            CHECK(cut.conflatedEvents.value == 1);
+            CHECK(cut.droppedEvents.value == 1);
+        }
+    }
+}
+
+TEST_CASE("delivery statistics count committed TICKER conflation and preserve saturation on actual admission") {
+    for (const bool saturate : {false, true}) {
+        auto f = fixture(c::SubscriptionFamily::TICKER);
+        auto statistics = std::make_shared<c::detail::DeliveryStatisticsState>();
+        auto recorder = std::make_shared<Recorder>(statistics);
+        auto handle = open(f, recorder);
+        add(f, handle);
+
+        if (saturate)
+            statistics->update([](auto &s) {
+                s.admittedEvents.value = UINT64_MAX - 1;
+            });
+
+        send(f, {{0, u"ALPHA", 1, 10, 0}, {0, u"ALPHA", 2, 20, 0}});
+        const auto expected = saturate ? UINT64_MAX : 2;
+
+        for (unsigned attempt = 0; attempt < 1000 && statistics->snapshot().admittedEvents.value != expected;
+             ++attempt) {
+            auto work = turn();
+            work.callbacks = 0;
+            const auto result = f.queue.progress(work);
+            REQUIRE((result || result.error().error == m::QueueError::WORK_LIMIT));
+        }
+
+        auto cut = statistics->snapshot();
+        CHECK(cut.admittedEvents.value == expected);
+        CHECK(cut.conflatedEvents.value == 1);
+        CHECK(cut.pendingEvents == 1);
+        CHECK(cut.droppedEvents.value == 0);
+        CHECK(cut.admittedEvents.availability ==
+              (saturate ? c::StatisticAvailability::SATURATED : c::StatisticAvailability::AVAILABLE));
+        CHECK(cut.conflatedEvents.availability == c::StatisticAvailability::AVAILABLE);
+        handle.requestStop(m::StopMode::ABORT);
+        until(f, [&] {
+            return handle.terminal().has_value();
+        });
+        CHECK(statistics->snapshot().pendingEvents == 0);
+        CHECK(statistics->snapshot().deliveredEvents.value == 0);
+    }
+}
 
 TEST_CASE("MUX queue STREAM duplicates reach both clients and public generation reservations are explicit") {
     auto f = fixture(c::SubscriptionFamily::STREAM);

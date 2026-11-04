@@ -409,11 +409,11 @@ q::api::ApiRuntime runtime(options);
 `192.0.2.53` — адрес-заполнитель документации; замените его реальным DNS-сервером.
 Эта настройка выбирает транспорт DNS-сервера, а не TLS или политику символов/доставки.
 
-## Планируемая статистика
+## Статистика
 
 [Контракт послойной статистики](../spec/subscriptions/CLIENT-STATISTICS.ru.md) определяет
-будущие счётчики endpoint/подписки, эпохи и доступность. Текущий фасад не предоставляет
-эти счётчики; наблюдения состояния и диагностики остаются доступны.
+описанные ниже счётчики endpoint/подписки, эпохи и доступность. Методы скоростей и
+baseline остаются планируемыми; диагностика жизненного цикла независима.
 
 ## Ожидание текущего состояния
 
@@ -518,3 +518,60 @@ Native итоги сохраняются после возврата всех с
 схемы, callback или runtime. Полный [послойный контракт](../spec/subscriptions/CLIENT-STATISTICS.ru.md).
 
 [Конфигурация endpoint](ENDPOINT-CONFIGURATION.ru.md): явные адреса/свойства, неизменяемые снимки, эффективные локальные значения и границы совместимости Java.
+
+## Статистика подписки
+
+`subscription->getStatistics()` возвращает detached `SubscriptionStatistics` под
+одним mutex учёта подписки. Реальные переходы collector/FIFO admission, selection,
+cleanup и пользовательских вызовов обновляют этого же владельца. Чтение не выделяет
+память, не выполняет IO, dispatch, reset и не ждёт callback. Пользовательский код
+работает вне mutex учёта и управления. Для `ownerIdentity`, `generation`, `observedAt`
+и `final` действуют описанные выше правила endpoint; чтения двух владельцев дают
+разные cuts. `sourceEpoch` — последний наблюдённый установленный источник endpoint,
+отсутствующий при неактивном соединении. Lifetime итоги и старые pending события
+переживают смену источника без изменения внутреннего provenance. Final ждёт retirement
+event, state и change-observer captures вместе с деструкторами; затем значения и время
+замораживаются.
+
+`desiredSelectors` считает принятые логические селекторы один раз независимо от типов
+событий и квалифицируется `desiredRevision`. `activeSelectors` публикуется только после
+полного фактического source mapping commit, с `activeDesiredRevision` и наблюдённым
+`sourceEpoch`. Pending/failed mapping не объявляет следующую команду active; последующий
+submit не переименовывает старый mapping candidate. Unchanged команды сохраняют
+физический mapping и публикуют собственную логическую квалификацию. После фактического
+clear/reset mapping и retirement active selectors ноль, active revision отсутствует.
+Это локальное применение, не peer acknowledgement.
+`queueCapacityEvents` — реально зарезервированные FIFO slots плюс pending slots TICKER
+view; до native регистрации ноль. Это slots, не свободная ёмкость или память процесса.
+`pendingEvents` включает pending значения source view и detached FIFO события;
+`inFlightEvents` охватывает полный выбранный вызов адаптера, включая блокировку listener.
+
+До насыщения выполняется lifetime равенство:
+
+```text
+admittedEvents = deliveredEvents + conflatedEvents + discardedEvents +
+                 callbackFailedEvents + evictedOverflowEvents + pendingEvents + inFlightEvents
+droppedEvents = rejectedOverflowEvents + evictedOverflowEvents
+```
+
+Совпадение одного события с двумя подписками даёт admission каждой. Fanout listeners
+не умножает admission или delivered events. `deliveredEvents` требует нормального
+завершения всей выбранной группы listeners. Отсутствие listeners, отказ projection,
+source/clear fence и отмена относятся к `discardedEvents`. Исключение listener относит
+весь выбранный batch один раз к `callbackFailedEvents`, даже если предыдущий listener
+его видел; оставшиеся queued события discarded. Close может подавить ещё не начатые
+вызовы, не объявляя dispatch завершённым.
+
+`droppedEvents` считает только известный overflow. STREAM отклоняет входящие
+per-registration FIFO candidates; TICKER может потерять уже admitted source-view
+candidates как overflow victims. Замещённые pending TICKER значения относятся к
+`conflatedEvents`, не dropped. Equal/filtered input и неклассифицированная потеря общего
+STREAM source не превращаются в выдуманные admission/drop подписки: сохраняются
+существующие gap/unknown-eligibility diagnostics для нематериализованной потери.
+
+`callbackCalls`/`callbackFailures` считают реальные вызовы/исключения event listeners.
+`callbackDurationSamples`, `callbackDurationTotal` и `callbackDurationMaximum` измеряют
+завершённые вызовы steady clock в наносекундах, включая исключения и блокировки;
+queue wait, state/change observers исключены. До завершения первого вызова timing имеет
+`NO_SAMPLE`. Переполнение count/sum насыщает отдельное поле со sticky availability;
+чтение и reconnect никогда не сбрасывают итоги.
