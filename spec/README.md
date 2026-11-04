@@ -42,3 +42,4 @@ Exact conformance results belong to the [developer reading path](../docs/develop
 - [Complete Candle symbols](events/CANDLE-SYMBOL.md): canonical identity, explicit getters and exact-selector subscription bridge.
 
 - [Market event values](events/EVENT-VALUES.md): raw-preserving business enums/flags and exact nano, packed-sequence, Gregorian day-ID and SHORT_STRING conversions.
+- [Schedule rules and timezones](schedule/RULES-AND-TIMEZONES.md): compatibility target, provider/data ownership and controlled-profile constraints; Schedule implementation is separate.
