@@ -9,3 +9,5 @@ Name records `ADR-NNNN-short-title.md`. Each record should include status, conte
 
 - [ADR-0009: Live IPF connection ownership](ADR-0009-live-ipf-connection-ownership.md) ([Русский](ADR-0009-live-ipf-connection-ownership.ru.md)).
 - [ADR-0010: Summary OpenInterest width](ADR-0010-summary-open-interest-width.md) ([Русский](ADR-0010-summary-open-interest-width.ru.md)).
+
+- [ADR0013: Containing-day postcondition](ADR-0013-schedule-time-lookup-postcondition.md) / [RU](ADR-0013-schedule-time-lookup-postcondition.ru.md): typed refusal for a confirmed non-containing Java time-query result.

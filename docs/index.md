@@ -13,3 +13,6 @@ selected QD encodings, records, tapes and controlled transport profiles. Start w
 
 [Developer documentation](developer.md) contains build options, verification profiles and conformance
 results. [Compatibility policy](COMPATIBILITY.md) explains which Java QD behavior the library preserves.
+
+- [Schedule days and sessions](SCHEDULE-QUERIES.md): owning generation snapshots, calendar queries, limits and actual oracle.
+- [Explicit timezone data](TIME-ZONE-DATA.md): shared CORE binding, optional backend, pinned offline dependency and relocation.

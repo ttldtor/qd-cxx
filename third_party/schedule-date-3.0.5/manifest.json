@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "provider": "Howard Hinnant date/tz",
+  "version": "3.0.5",
+  "commit": "179a6b921ccd6179b5b04dce812a89f71a51b4df",
+  "sourceUrl": "https://github.com/HowardHinnant/date/tree/179a6b921ccd6179b5b04dce812a89f71a51b4df",
+  "tagArchiveSha256": "ef786edc203daec76475825640b3af247bd08e31fc52217e5ce8f76107b4bb05",
+  "fullCommitArchiveSha256": "4d162515b38cd522cd7b9bbf8b04ece43574ee39107f6a054adc2706d5ea86f7",
+  "privateNamespace": "org_ttldtor_qdcxx_date_305_v1",
+  "license": "MIT",
+  "sources": [
+    {
+      "path": "include/date/date.h",
+      "upstreamSha256": "8c295bc53964ec02fa99ef10816c190a4c34fdcbf1ce2dcc8e451a29932f9d2c",
+      "qualifiedProfileSha256": "e33dcfeff458e5b6ebdcd527ce342e4f60d8f1776807745252e698d031b69c7b",
+      "sha256": "e33dcfeff458e5b6ebdcd527ce342e4f60d8f1776807745252e698d031b69c7b"
+    },
+    {
+      "path": "include/date/tz.h",
+      "upstreamSha256": "4eea064c1e67351a81e5c5d3c8b50801a95c6a7fb0021b4833124838c91db324",
+      "qualifiedProfileSha256": "41ca6851cf326d3d1680b1a73eecfd73df9d7c5f87ba27e9da7e38bdb5f12ea9",
+      "sha256": "41ca6851cf326d3d1680b1a73eecfd73df9d7c5f87ba27e9da7e38bdb5f12ea9"
+    },
+    {
+      "path": "include/date/tz_private.h",
+      "upstreamSha256": "c84252b8e543feaaec328bfe9a256b8dc48f3eaac9d7d48a7864d81d2aa10101",
+      "qualifiedProfileSha256": "cdc26e5db7f58b46140f982e1efcb5a5ae87b7f37c9fdc9f4484a1ea6fe734c6",
+      "sha256": "cdc26e5db7f58b46140f982e1efcb5a5ae87b7f37c9fdc9f4484a1ea6fe734c6"
+    },
+    {
+      "path": "src/tz.cpp",
+      "upstreamSha256": "9e302779366fd2cb01a08cd079ff59433cdd0fc81a774bb7f2b9a73351511bb8",
+      "qualifiedProfileSha256": "e982b175ff3116e4d52b800656380fe7c089dfac3b0b1b8ebc45ec26eda97d7c",
+      "sha256": "89b8a5619a22b8e73c8f514d551ecb4308f37d9c7246a880427341a0428a7775"
+    }
+  ],
+  "patch": "patches/controlled-profile.patch",
+  "profile": [
+    "Owned admitted memory snapshot only",
+    "Finite native insertions before growth",
+    "No remote API, download, home/OS discovery, current_zone or reload",
+    "Eager zone initialization before publication",
+    "Failure diagnostics avoid recursive registry access; failed empty zonelet cleanup guarded",
+    "Production memory-input callback namespace binding only; private provider namespace unchanged"
+  ],
+  "patchSha256": "31a4cdab27160ded3c536a05079a79bee2567dd3167f0290059c055cfcba96c8",
+  "licenseSha256": "c90f6c00fb961170560299cbda28ca2d45804913aa8b2a9f36dbb8e0028d6930"
+}

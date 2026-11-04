@@ -6,8 +6,12 @@
 проверяется при configure; шага загрузки нет. Параметр
 `-DORG_TTLDTOR_QDCXX_BUILD_EXAMPLES=ON` добавляет `qdcxx_schedule_example`;
 [инструкция примера](../examples/schedule_rules/README.ru.md) включает EN/RU-справку без входов.
-Target реализует разбор, идентичности и типизированные defaults календаря;
-timezone-query backend и Day/Session-запросы в него не входят.
+Target также предоставляет [владеющие Day/Session-запросы](SCHEDULE-QUERIES.ru.md) и линкует
+[контролируемый private timezone backend](TIME-ZONE-DATA.ru.md), без отдельного runtime SDK.
+Всегда экспортируемый `qdcxx_time_zone_data` поддерживает fixed bindings с backend OFF. Для named
+bindings без Schedule задайте `ORG_TTLDTOR_QDCXX_BUILD_TIME_ZONE_DATA=ON`; installed component
+`time_zone_data_backend` проверяет обязательное наличие native backend. Target примера запросов —
+`qdcxx_schedule_queries_example`; каталог установленного TZDB передаётся явно.
 
 Сначала подготовьте точные [исходники runtime SDK](../cmake/runtime-profile/README.ru.md). Явный [шаг подготовки зависимостей](../tools/deps/README.ru.md) предоставляет закреплённые Asio/c-ares с offline/cache и без глобальной установки; обычный configure их не загружает.
 

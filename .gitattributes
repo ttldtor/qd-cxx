@@ -719,3 +719,20 @@ tests/fixtures/summary/open-interest-long-v1.provenance.json text eol=lf
 tests/fixtures/ipf/live/*.java text eol=lf
 tests/fixtures/ipf/live/*.tsv -text -whitespace
 tests/fixtures/ipf/live/*provenance.json text eol=lf
+
+# Controlled schedule timezone profile: preserve exact pinned upstream/data bytes.
+/third_party/schedule-date-3.0.5/** -text -whitespace
+/resources/time-zone-data/tzdb-2026f/** -text -whitespace
+/third_party/schedule-date-3.0.5/manifest.json text eol=lf
+/resources/time-zone-data/tzdb-2026f/manifest.json text eol=lf
+/resources/time-zone-data/java8-zone-metadata.tsv -text -whitespace
+/resources/time-zone-data/java8-systemv-transitions.tsv -text -whitespace
+/resources/time-zone-data/calendar-offset-conventions.json text eol=lf
+/tools/upstream/schedule-query-oracle/ScheduleQueryOracle.java text eol=lf
+/tools/upstream/schedule-query-oracle/Invoke-Oracle.ps1 text eol=lf
+/tests/fixtures/schedule-query/cases.tsv -text -whitespace
+/tests/fixtures/schedule-query/oracle.tsv -text -whitespace
+/tests/fixtures/schedule-query/provenance.json text eol=lf
+/tests/fixtures/schedule-query/tzdb2026f.tsv -text -whitespace
+/tests/fixtures/schedule-query/tzdb2026f-provenance.json text eol=lf
+/tests/fixtures/schedule-query/containing-day-correction.json text eol=lf

@@ -13,3 +13,6 @@
 
 [Документация разработчика](developer.ru.md) содержит параметры сборки, профили проверок и результаты
 conformance-тестов. [Политика совместимости](COMPATIBILITY.ru.md) объясняет, какое поведение Java QD сохраняет библиотека.
+
+- [Дни и сессии Schedule](SCHEDULE-QUERIES.ru.md): владеющие снимки поколений, calendar queries, лимиты и actual oracle.
+- [Явные timezone-данные](TIME-ZONE-DATA.ru.md): shared CORE binding, optional backend, закреплённая offline-зависимость и перенос.

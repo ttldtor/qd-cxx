@@ -1,0 +1,2445 @@
+diff --git a/include/date/date.h b/include/date/date.h
+index 6e6bdd0..e51dc83 100644
+--- a/include/date/date.h
++++ b/include/date/date.h
+@@ -90,7 +90,7 @@
+ #  define OPERATOR_LITERAL(suffix) operator""_##suffix
+ #endif
+ 
+-namespace date
++namespace org_ttldtor_qdcxx_date_305_v1
+ {
+ 
+ //---------------+
+@@ -502,9 +502,9 @@ class weekday_indexed
+ 
+ public:
+     weekday_indexed() = default;
+-    CONSTCD11 weekday_indexed(const date::weekday& wd, unsigned index) NOEXCEPT;
++    CONSTCD11 weekday_indexed(const org_ttldtor_qdcxx_date_305_v1::weekday& wd, unsigned index) NOEXCEPT;
+ 
+-    CONSTCD11 date::weekday weekday() const NOEXCEPT;
++    CONSTCD11 org_ttldtor_qdcxx_date_305_v1::weekday weekday() const NOEXCEPT;
+     CONSTCD11 unsigned index() const NOEXCEPT;
+     CONSTCD11 bool ok() const NOEXCEPT;
+ };
+@@ -520,12 +520,12 @@ operator<<(std::basic_ostream<CharT, Traits>& os, const weekday_indexed& wdi);
+ 
+ class weekday_last
+ {
+-    date::weekday wd_;
++    org_ttldtor_qdcxx_date_305_v1::weekday wd_;
+ 
+ public:
+-    explicit CONSTCD11 weekday_last(const date::weekday& wd) NOEXCEPT;
++    explicit CONSTCD11 weekday_last(const org_ttldtor_qdcxx_date_305_v1::weekday& wd) NOEXCEPT;
+ 
+-    CONSTCD11 date::weekday weekday() const NOEXCEPT;
++    CONSTCD11 org_ttldtor_qdcxx_date_305_v1::weekday weekday() const NOEXCEPT;
+     CONSTCD11 bool ok() const NOEXCEPT;
+ };
+ 
+@@ -547,15 +547,15 @@ struct unspecified_month_disambiguator {};
+ 
+ class year_month
+ {
+-    date::year  y_;
+-    date::month m_;
++    org_ttldtor_qdcxx_date_305_v1::year  y_;
++    org_ttldtor_qdcxx_date_305_v1::month m_;
+ 
+ public:
+     year_month() = default;
+-    CONSTCD11 year_month(const date::year& y, const date::month& m) NOEXCEPT;
++    CONSTCD11 year_month(const org_ttldtor_qdcxx_date_305_v1::year& y, const org_ttldtor_qdcxx_date_305_v1::month& m) NOEXCEPT;
+ 
+-    CONSTCD11 date::year  year()  const NOEXCEPT;
+-    CONSTCD11 date::month month() const NOEXCEPT;
++    CONSTCD11 org_ttldtor_qdcxx_date_305_v1::year  year()  const NOEXCEPT;
++    CONSTCD11 org_ttldtor_qdcxx_date_305_v1::month month() const NOEXCEPT;
+ 
+     template<class = detail::unspecified_month_disambiguator>
+     CONSTCD14 year_month& operator+=(const months& dm) NOEXCEPT;
+@@ -594,15 +594,15 @@ operator<<(std::basic_ostream<CharT, Traits>& os, const year_month& ym);
+ 
+ class month_day
+ {
+-    date::month m_;
+-    date::day   d_;
++    org_ttldtor_qdcxx_date_305_v1::month m_;
++    org_ttldtor_qdcxx_date_305_v1::day   d_;
+ 
+ public:
+     month_day() = default;
+-    CONSTCD11 month_day(const date::month& m, const date::day& d) NOEXCEPT;
++    CONSTCD11 month_day(const org_ttldtor_qdcxx_date_305_v1::month& m, const org_ttldtor_qdcxx_date_305_v1::day& d) NOEXCEPT;
+ 
+-    CONSTCD11 date::month month() const NOEXCEPT;
+-    CONSTCD11 date::day   day() const NOEXCEPT;
++    CONSTCD11 org_ttldtor_qdcxx_date_305_v1::month month() const NOEXCEPT;
++    CONSTCD11 org_ttldtor_qdcxx_date_305_v1::day   day() const NOEXCEPT;
+ 
+     CONSTCD14 bool ok() const NOEXCEPT;
+ };
+@@ -622,12 +622,12 @@ operator<<(std::basic_ostream<CharT, Traits>& os, const month_day& md);
+ 
+ class month_day_last
+ {
+-    date::month m_;
++    org_ttldtor_qdcxx_date_305_v1::month m_;
+ 
+ public:
+-    CONSTCD11 explicit month_day_last(const date::month& m) NOEXCEPT;
++    CONSTCD11 explicit month_day_last(const org_ttldtor_qdcxx_date_305_v1::month& m) NOEXCEPT;
+ 
+-    CONSTCD11 date::month month() const NOEXCEPT;
++    CONSTCD11 org_ttldtor_qdcxx_date_305_v1::month month() const NOEXCEPT;
+     CONSTCD11 bool ok() const NOEXCEPT;
+ };
+ 
+@@ -646,14 +646,14 @@ operator<<(std::basic_ostream<CharT, Traits>& os, const month_day_last& mdl);
+ 
+ class month_weekday
+ {
+-    date::month           m_;
+-    date::weekday_indexed wdi_;
++    org_ttldtor_qdcxx_date_305_v1::month           m_;
++    org_ttldtor_qdcxx_date_305_v1::weekday_indexed wdi_;
+ public:
+-    CONSTCD11 month_weekday(const date::month& m,
+-                            const date::weekday_indexed& wdi) NOEXCEPT;
++    CONSTCD11 month_weekday(const org_ttldtor_qdcxx_date_305_v1::month& m,
++                            const org_ttldtor_qdcxx_date_305_v1::weekday_indexed& wdi) NOEXCEPT;
+ 
+-    CONSTCD11 date::month           month()           const NOEXCEPT;
+-    CONSTCD11 date::weekday_indexed weekday_indexed() const NOEXCEPT;
++    CONSTCD11 org_ttldtor_qdcxx_date_305_v1::month           month()           const NOEXCEPT;
++    CONSTCD11 org_ttldtor_qdcxx_date_305_v1::weekday_indexed weekday_indexed() const NOEXCEPT;
+ 
+     CONSTCD11 bool ok() const NOEXCEPT;
+ };
+@@ -669,15 +669,15 @@ operator<<(std::basic_ostream<CharT, Traits>& os, const month_weekday& mwd);
+ 
+ class month_weekday_last
+ {
+-    date::month        m_;
+-    date::weekday_last wdl_;
++    org_ttldtor_qdcxx_date_305_v1::month        m_;
++    org_ttldtor_qdcxx_date_305_v1::weekday_last wdl_;
+ 
+ public:
+-    CONSTCD11 month_weekday_last(const date::month& m,
+-                                 const date::weekday_last& wd) NOEXCEPT;
++    CONSTCD11 month_weekday_last(const org_ttldtor_qdcxx_date_305_v1::month& m,
++                                 const org_ttldtor_qdcxx_date_305_v1::weekday_last& wd) NOEXCEPT;
+ 
+-    CONSTCD11 date::month        month()        const NOEXCEPT;
+-    CONSTCD11 date::weekday_last weekday_last() const NOEXCEPT;
++    CONSTCD11 org_ttldtor_qdcxx_date_305_v1::month        month()        const NOEXCEPT;
++    CONSTCD11 org_ttldtor_qdcxx_date_305_v1::weekday_last weekday_last() const NOEXCEPT;
+ 
+     CONSTCD11 bool ok() const NOEXCEPT;
+ };
+@@ -695,14 +695,14 @@ operator<<(std::basic_ostream<CharT, Traits>& os, const month_weekday_last& mwdl
+ 
+ class year_month_day
+ {
+-    date::year  y_;
+-    date::month m_;
+-    date::day   d_;
++    org_ttldtor_qdcxx_date_305_v1::year  y_;
++    org_ttldtor_qdcxx_date_305_v1::month m_;
++    org_ttldtor_qdcxx_date_305_v1::day   d_;
+ 
+ public:
+     year_month_day() = default;
+-    CONSTCD11 year_month_day(const date::year& y, const date::month& m,
+-                             const date::day& d) NOEXCEPT;
++    CONSTCD11 year_month_day(const org_ttldtor_qdcxx_date_305_v1::year& y, const org_ttldtor_qdcxx_date_305_v1::month& m,
++                             const org_ttldtor_qdcxx_date_305_v1::day& d) NOEXCEPT;
+     CONSTCD14 year_month_day(const year_month_day_last& ymdl) NOEXCEPT;
+ 
+     CONSTCD14 year_month_day(sys_days dp) NOEXCEPT;
+@@ -715,9 +715,9 @@ public:
+     CONSTCD14 year_month_day& operator+=(const years& y)  NOEXCEPT;
+     CONSTCD14 year_month_day& operator-=(const years& y)  NOEXCEPT;
+ 
+-    CONSTCD11 date::year  year()  const NOEXCEPT;
+-    CONSTCD11 date::month month() const NOEXCEPT;
+-    CONSTCD11 date::day   day()   const NOEXCEPT;
++    CONSTCD11 org_ttldtor_qdcxx_date_305_v1::year  year()  const NOEXCEPT;
++    CONSTCD11 org_ttldtor_qdcxx_date_305_v1::month month() const NOEXCEPT;
++    CONSTCD11 org_ttldtor_qdcxx_date_305_v1::day   day()   const NOEXCEPT;
+ 
+     CONSTCD14 operator sys_days() const NOEXCEPT;
+     CONSTCD14 explicit operator local_days() const NOEXCEPT;
+@@ -753,12 +753,12 @@ operator<<(std::basic_ostream<CharT, Traits>& os, const year_month_day& ymd);
+ 
+ class year_month_day_last
+ {
+-    date::year           y_;
+-    date::month_day_last mdl_;
++    org_ttldtor_qdcxx_date_305_v1::year           y_;
++    org_ttldtor_qdcxx_date_305_v1::month_day_last mdl_;
+ 
+ public:
+-    CONSTCD11 year_month_day_last(const date::year& y,
+-                                  const date::month_day_last& mdl) NOEXCEPT;
++    CONSTCD11 year_month_day_last(const org_ttldtor_qdcxx_date_305_v1::year& y,
++                                  const org_ttldtor_qdcxx_date_305_v1::month_day_last& mdl) NOEXCEPT;
+ 
+     template<class = detail::unspecified_month_disambiguator>
+     CONSTCD14 year_month_day_last& operator+=(const months& m) NOEXCEPT;
+@@ -767,10 +767,10 @@ public:
+     CONSTCD14 year_month_day_last& operator+=(const years& y)  NOEXCEPT;
+     CONSTCD14 year_month_day_last& operator-=(const years& y)  NOEXCEPT;
+ 
+-    CONSTCD11 date::year           year()           const NOEXCEPT;
+-    CONSTCD11 date::month          month()          const NOEXCEPT;
+-    CONSTCD11 date::month_day_last month_day_last() const NOEXCEPT;
+-    CONSTCD14 date::day            day()            const NOEXCEPT;
++    CONSTCD11 org_ttldtor_qdcxx_date_305_v1::year           year()           const NOEXCEPT;
++    CONSTCD11 org_ttldtor_qdcxx_date_305_v1::month          month()          const NOEXCEPT;
++    CONSTCD11 org_ttldtor_qdcxx_date_305_v1::month_day_last month_day_last() const NOEXCEPT;
++    CONSTCD14 org_ttldtor_qdcxx_date_305_v1::day            day()            const NOEXCEPT;
+ 
+     CONSTCD14 operator sys_days() const NOEXCEPT;
+     CONSTCD14 explicit operator local_days() const NOEXCEPT;
+@@ -825,14 +825,14 @@ operator<<(std::basic_ostream<CharT, Traits>& os, const year_month_day_last& ymd
+ 
+ class year_month_weekday
+ {
+-    date::year            y_;
+-    date::month           m_;
+-    date::weekday_indexed wdi_;
++    org_ttldtor_qdcxx_date_305_v1::year            y_;
++    org_ttldtor_qdcxx_date_305_v1::month           m_;
++    org_ttldtor_qdcxx_date_305_v1::weekday_indexed wdi_;
+ 
+ public:
+     year_month_weekday() = default;
+-    CONSTCD11 year_month_weekday(const date::year& y, const date::month& m,
+-                                   const date::weekday_indexed& wdi) NOEXCEPT;
++    CONSTCD11 year_month_weekday(const org_ttldtor_qdcxx_date_305_v1::year& y, const org_ttldtor_qdcxx_date_305_v1::month& m,
++                                   const org_ttldtor_qdcxx_date_305_v1::weekday_indexed& wdi) NOEXCEPT;
+     CONSTCD14 year_month_weekday(const sys_days& dp) NOEXCEPT;
+     CONSTCD14 explicit year_month_weekday(const local_days& dp) NOEXCEPT;
+ 
+@@ -843,11 +843,11 @@ public:
+     CONSTCD14 year_month_weekday& operator+=(const years& y)  NOEXCEPT;
+     CONSTCD14 year_month_weekday& operator-=(const years& y)  NOEXCEPT;
+ 
+-    CONSTCD11 date::year year() const NOEXCEPT;
+-    CONSTCD11 date::month month() const NOEXCEPT;
+-    CONSTCD11 date::weekday weekday() const NOEXCEPT;
++    CONSTCD11 org_ttldtor_qdcxx_date_305_v1::year year() const NOEXCEPT;
++    CONSTCD11 org_ttldtor_qdcxx_date_305_v1::month month() const NOEXCEPT;
++    CONSTCD11 org_ttldtor_qdcxx_date_305_v1::weekday weekday() const NOEXCEPT;
+     CONSTCD11 unsigned index() const NOEXCEPT;
+-    CONSTCD11 date::weekday_indexed weekday_indexed() const NOEXCEPT;
++    CONSTCD11 org_ttldtor_qdcxx_date_305_v1::weekday_indexed weekday_indexed() const NOEXCEPT;
+ 
+     CONSTCD14 operator sys_days() const NOEXCEPT;
+     CONSTCD14 explicit operator local_days() const NOEXCEPT;
+@@ -898,13 +898,13 @@ operator<<(std::basic_ostream<CharT, Traits>& os, const year_month_weekday& ymwd
+ 
+ class year_month_weekday_last
+ {
+-    date::year y_;
+-    date::month m_;
+-    date::weekday_last wdl_;
++    org_ttldtor_qdcxx_date_305_v1::year y_;
++    org_ttldtor_qdcxx_date_305_v1::month m_;
++    org_ttldtor_qdcxx_date_305_v1::weekday_last wdl_;
+ 
+ public:
+-    CONSTCD11 year_month_weekday_last(const date::year& y, const date::month& m,
+-                                      const date::weekday_last& wdl) NOEXCEPT;
++    CONSTCD11 year_month_weekday_last(const org_ttldtor_qdcxx_date_305_v1::year& y, const org_ttldtor_qdcxx_date_305_v1::month& m,
++                                      const org_ttldtor_qdcxx_date_305_v1::weekday_last& wdl) NOEXCEPT;
+ 
+     template<class = detail::unspecified_month_disambiguator>
+     CONSTCD14 year_month_weekday_last& operator+=(const months& m) NOEXCEPT;
+@@ -913,10 +913,10 @@ public:
+     CONSTCD14 year_month_weekday_last& operator+=(const years& y) NOEXCEPT;
+     CONSTCD14 year_month_weekday_last& operator-=(const years& y) NOEXCEPT;
+ 
+-    CONSTCD11 date::year year() const NOEXCEPT;
+-    CONSTCD11 date::month month() const NOEXCEPT;
+-    CONSTCD11 date::weekday weekday() const NOEXCEPT;
+-    CONSTCD11 date::weekday_last weekday_last() const NOEXCEPT;
++    CONSTCD11 org_ttldtor_qdcxx_date_305_v1::year year() const NOEXCEPT;
++    CONSTCD11 org_ttldtor_qdcxx_date_305_v1::month month() const NOEXCEPT;
++    CONSTCD11 org_ttldtor_qdcxx_date_305_v1::weekday weekday() const NOEXCEPT;
++    CONSTCD11 org_ttldtor_qdcxx_date_305_v1::weekday_last weekday_last() const NOEXCEPT;
+ 
+     CONSTCD14 operator sys_days() const NOEXCEPT;
+     CONSTCD14 explicit operator local_days() const NOEXCEPT;
+@@ -969,32 +969,32 @@ operator<<(std::basic_ostream<CharT, Traits>& os, const year_month_weekday_last&
+ inline namespace literals
+ {
+ 
+-CONSTCD11 date::day  OPERATOR_LITERAL(d)(unsigned long long d) NOEXCEPT;
+-CONSTCD11 date::year OPERATOR_LITERAL(y)(unsigned long long y) NOEXCEPT;
++CONSTCD11 org_ttldtor_qdcxx_date_305_v1::day  OPERATOR_LITERAL(d)(unsigned long long d) NOEXCEPT;
++CONSTCD11 org_ttldtor_qdcxx_date_305_v1::year OPERATOR_LITERAL(y)(unsigned long long y) NOEXCEPT;
+ 
+ }  // inline namespace literals
+ #endif // !defined(_MSC_VER) || (_MSC_VER >= 1900)
+ 
+-// CONSTDATA date::month January{1};
+-// CONSTDATA date::month February{2};
+-// CONSTDATA date::month March{3};
+-// CONSTDATA date::month April{4};
+-// CONSTDATA date::month May{5};
+-// CONSTDATA date::month June{6};
+-// CONSTDATA date::month July{7};
+-// CONSTDATA date::month August{8};
+-// CONSTDATA date::month September{9};
+-// CONSTDATA date::month October{10};
+-// CONSTDATA date::month November{11};
+-// CONSTDATA date::month December{12};
++// CONSTDATA org_ttldtor_qdcxx_date_305_v1::month January{1};
++// CONSTDATA org_ttldtor_qdcxx_date_305_v1::month February{2};
++// CONSTDATA org_ttldtor_qdcxx_date_305_v1::month March{3};
++// CONSTDATA org_ttldtor_qdcxx_date_305_v1::month April{4};
++// CONSTDATA org_ttldtor_qdcxx_date_305_v1::month May{5};
++// CONSTDATA org_ttldtor_qdcxx_date_305_v1::month June{6};
++// CONSTDATA org_ttldtor_qdcxx_date_305_v1::month July{7};
++// CONSTDATA org_ttldtor_qdcxx_date_305_v1::month August{8};
++// CONSTDATA org_ttldtor_qdcxx_date_305_v1::month September{9};
++// CONSTDATA org_ttldtor_qdcxx_date_305_v1::month October{10};
++// CONSTDATA org_ttldtor_qdcxx_date_305_v1::month November{11};
++// CONSTDATA org_ttldtor_qdcxx_date_305_v1::month December{12};
+ //
+-// CONSTDATA date::weekday Sunday{0u};
+-// CONSTDATA date::weekday Monday{1u};
+-// CONSTDATA date::weekday Tuesday{2u};
+-// CONSTDATA date::weekday Wednesday{3u};
+-// CONSTDATA date::weekday Thursday{4u};
+-// CONSTDATA date::weekday Friday{5u};
+-// CONSTDATA date::weekday Saturday{6u};
++// CONSTDATA org_ttldtor_qdcxx_date_305_v1::weekday Sunday{0u};
++// CONSTDATA org_ttldtor_qdcxx_date_305_v1::weekday Monday{1u};
++// CONSTDATA org_ttldtor_qdcxx_date_305_v1::weekday Tuesday{2u};
++// CONSTDATA org_ttldtor_qdcxx_date_305_v1::weekday Wednesday{3u};
++// CONSTDATA org_ttldtor_qdcxx_date_305_v1::weekday Thursday{4u};
++// CONSTDATA org_ttldtor_qdcxx_date_305_v1::weekday Friday{5u};
++// CONSTDATA org_ttldtor_qdcxx_date_305_v1::weekday Saturday{6u};
+ 
+ #if HAS_VOID_T
+ 
+@@ -1333,7 +1333,7 @@ std::chrono::time_point<Clock, To>
+ floor(const std::chrono::time_point<Clock, FromDuration>& tp)
+ {
+     using std::chrono::time_point;
+-    return time_point<Clock, To>{date::floor<To>(tp.time_since_epoch())};
++    return time_point<Clock, To>{org_ttldtor_qdcxx_date_305_v1::floor<To>(tp.time_since_epoch())};
+ }
+ 
+ // round to nearest, to even on tie
+@@ -1977,68 +1977,68 @@ inline namespace literals
+ 
+ CONSTCD11
+ inline
+-date::day
++org_ttldtor_qdcxx_date_305_v1::day
+ OPERATOR_LITERAL(d)(unsigned long long d) NOEXCEPT
+ {
+-    return date::day{static_cast<unsigned>(d)};
++    return org_ttldtor_qdcxx_date_305_v1::day{static_cast<unsigned>(d)};
+ }
+ 
+ CONSTCD11
+ inline
+-date::year
++org_ttldtor_qdcxx_date_305_v1::year
+ OPERATOR_LITERAL(y)(unsigned long long y) NOEXCEPT
+ {
+-    return date::year(static_cast<int>(y));
++    return org_ttldtor_qdcxx_date_305_v1::year(static_cast<int>(y));
+ }
+ #endif  // !defined(_MSC_VER) || (_MSC_VER >= 1900)
+ 
+-CONSTDATA date::last_spec last{};
+-
+-CONSTDATA date::month jan{1};
+-CONSTDATA date::month feb{2};
+-CONSTDATA date::month mar{3};
+-CONSTDATA date::month apr{4};
+-CONSTDATA date::month may{5};
+-CONSTDATA date::month jun{6};
+-CONSTDATA date::month jul{7};
+-CONSTDATA date::month aug{8};
+-CONSTDATA date::month sep{9};
+-CONSTDATA date::month oct{10};
+-CONSTDATA date::month nov{11};
+-CONSTDATA date::month dec{12};
+-
+-CONSTDATA date::weekday sun{0u};
+-CONSTDATA date::weekday mon{1u};
+-CONSTDATA date::weekday tue{2u};
+-CONSTDATA date::weekday wed{3u};
+-CONSTDATA date::weekday thu{4u};
+-CONSTDATA date::weekday fri{5u};
+-CONSTDATA date::weekday sat{6u};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::last_spec last{};
++
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::month jan{1};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::month feb{2};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::month mar{3};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::month apr{4};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::month may{5};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::month jun{6};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::month jul{7};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::month aug{8};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::month sep{9};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::month oct{10};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::month nov{11};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::month dec{12};
++
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::weekday sun{0u};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::weekday mon{1u};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::weekday tue{2u};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::weekday wed{3u};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::weekday thu{4u};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::weekday fri{5u};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::weekday sat{6u};
+ 
+ #if !defined(_MSC_VER) || (_MSC_VER >= 1900)
+ }  // inline namespace literals
+ #endif
+ 
+-CONSTDATA date::month January{1};
+-CONSTDATA date::month February{2};
+-CONSTDATA date::month March{3};
+-CONSTDATA date::month April{4};
+-CONSTDATA date::month May{5};
+-CONSTDATA date::month June{6};
+-CONSTDATA date::month July{7};
+-CONSTDATA date::month August{8};
+-CONSTDATA date::month September{9};
+-CONSTDATA date::month October{10};
+-CONSTDATA date::month November{11};
+-CONSTDATA date::month December{12};
+-
+-CONSTDATA date::weekday Monday{1};
+-CONSTDATA date::weekday Tuesday{2};
+-CONSTDATA date::weekday Wednesday{3};
+-CONSTDATA date::weekday Thursday{4};
+-CONSTDATA date::weekday Friday{5};
+-CONSTDATA date::weekday Saturday{6};
+-CONSTDATA date::weekday Sunday{7};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::month January{1};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::month February{2};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::month March{3};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::month April{4};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::month May{5};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::month June{6};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::month July{7};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::month August{8};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::month September{9};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::month October{10};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::month November{11};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::month December{12};
++
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::weekday Monday{1};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::weekday Tuesday{2};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::weekday Wednesday{3};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::weekday Thursday{4};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::weekday Friday{5};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::weekday Saturday{6};
++CONSTDATA org_ttldtor_qdcxx_date_305_v1::weekday Sunday{7};
+ 
+ // weekday_indexed
+ 
+@@ -2047,7 +2047,7 @@ inline
+ weekday
+ weekday_indexed::weekday() const NOEXCEPT
+ {
+-    return date::weekday{static_cast<unsigned>(wd_)};
++    return org_ttldtor_qdcxx_date_305_v1::weekday{static_cast<unsigned>(wd_)};
+ }
+ 
+ CONSTCD11 inline unsigned weekday_indexed::index() const NOEXCEPT {return index_;}
+@@ -2067,7 +2067,7 @@ weekday_indexed::ok() const NOEXCEPT
+ 
+ CONSTCD11
+ inline
+-weekday_indexed::weekday_indexed(const date::weekday& wd, unsigned index) NOEXCEPT
++weekday_indexed::weekday_indexed(const org_ttldtor_qdcxx_date_305_v1::weekday& wd, unsigned index) NOEXCEPT
+     : wd_(static_cast<decltype(wd_)>(static_cast<unsigned>(wd.wd_)))
+     , index_(static_cast<decltype(index_)>(index))
+     {}
+@@ -2125,9 +2125,9 @@ operator!=(const weekday_indexed& x, const weekday_indexed& y) NOEXCEPT
+ 
+ // weekday_last
+ 
+-CONSTCD11 inline date::weekday weekday_last::weekday() const NOEXCEPT {return wd_;}
++CONSTCD11 inline org_ttldtor_qdcxx_date_305_v1::weekday weekday_last::weekday() const NOEXCEPT {return wd_;}
+ CONSTCD11 inline bool weekday_last::ok() const NOEXCEPT {return wd_.ok();}
+-CONSTCD11 inline weekday_last::weekday_last(const date::weekday& wd) NOEXCEPT : wd_(wd) {}
++CONSTCD11 inline weekday_last::weekday_last(const org_ttldtor_qdcxx_date_305_v1::weekday& wd) NOEXCEPT : wd_(wd) {}
+ 
+ CONSTCD11
+ inline
+@@ -2180,7 +2180,7 @@ weekday::operator[](last_spec) const NOEXCEPT
+ 
+ CONSTCD11
+ inline
+-year_month::year_month(const date::year& y, const date::month& m) NOEXCEPT
++year_month::year_month(const org_ttldtor_qdcxx_date_305_v1::year& y, const org_ttldtor_qdcxx_date_305_v1::month& m) NOEXCEPT
+     : y_(y)
+     , m_(m)
+     {}
+@@ -2368,27 +2368,27 @@ operator<<(std::basic_ostream<CharT, Traits>& os, const year_month& ym)
+ 
+ CONSTCD11
+ inline
+-month_day::month_day(const date::month& m, const date::day& d) NOEXCEPT
++month_day::month_day(const org_ttldtor_qdcxx_date_305_v1::month& m, const org_ttldtor_qdcxx_date_305_v1::day& d) NOEXCEPT
+     : m_(m)
+     , d_(d)
+     {}
+ 
+-CONSTCD11 inline date::month month_day::month() const NOEXCEPT {return m_;}
+-CONSTCD11 inline date::day month_day::day() const NOEXCEPT {return d_;}
++CONSTCD11 inline org_ttldtor_qdcxx_date_305_v1::month month_day::month() const NOEXCEPT {return m_;}
++CONSTCD11 inline org_ttldtor_qdcxx_date_305_v1::day month_day::day() const NOEXCEPT {return d_;}
+ 
+ CONSTCD14
+ inline
+ bool
+ month_day::ok() const NOEXCEPT
+ {
+-    CONSTDATA date::day d[] =
++    CONSTDATA org_ttldtor_qdcxx_date_305_v1::day d[] =
+     {
+-        date::day(31), date::day(29), date::day(31),
+-        date::day(30), date::day(31), date::day(30),
+-        date::day(31), date::day(31), date::day(30),
+-        date::day(31), date::day(30), date::day(31)
++        org_ttldtor_qdcxx_date_305_v1::day(31), org_ttldtor_qdcxx_date_305_v1::day(29), org_ttldtor_qdcxx_date_305_v1::day(31),
++        org_ttldtor_qdcxx_date_305_v1::day(30), org_ttldtor_qdcxx_date_305_v1::day(31), org_ttldtor_qdcxx_date_305_v1::day(30),
++        org_ttldtor_qdcxx_date_305_v1::day(31), org_ttldtor_qdcxx_date_305_v1::day(31), org_ttldtor_qdcxx_date_305_v1::day(30),
++        org_ttldtor_qdcxx_date_305_v1::day(31), org_ttldtor_qdcxx_date_305_v1::day(30), org_ttldtor_qdcxx_date_305_v1::day(31)
+     };
+-    return m_.ok() && date::day{1} <= d_ && d_ <= d[static_cast<unsigned>(m_)-1];
++    return m_.ok() && org_ttldtor_qdcxx_date_305_v1::day{1} <= d_ && d_ <= d[static_cast<unsigned>(m_)-1];
+ }
+ 
+ CONSTCD11
+@@ -2469,7 +2469,7 @@ operator<<(std::basic_ostream<CharT, Traits>& os, const month_day& md)
+ 
+ CONSTCD11 inline month month_day_last::month() const NOEXCEPT {return m_;}
+ CONSTCD11 inline bool month_day_last::ok() const NOEXCEPT {return m_.ok();}
+-CONSTCD11 inline month_day_last::month_day_last(const date::month& m) NOEXCEPT : m_(m) {}
++CONSTCD11 inline month_day_last::month_day_last(const org_ttldtor_qdcxx_date_305_v1::month& m) NOEXCEPT : m_(m) {}
+ 
+ CONSTCD11
+ inline
+@@ -2546,8 +2546,8 @@ operator<<(std::basic_ostream<CharT, Traits>& os, const month_day_last& mdl)
+ 
+ CONSTCD11
+ inline
+-month_weekday::month_weekday(const date::month& m,
+-                             const date::weekday_indexed& wdi) NOEXCEPT
++month_weekday::month_weekday(const org_ttldtor_qdcxx_date_305_v1::month& m,
++                             const org_ttldtor_qdcxx_date_305_v1::weekday_indexed& wdi) NOEXCEPT
+     : m_(m)
+     , wdi_(wdi)
+     {}
+@@ -2614,8 +2614,8 @@ operator<<(std::basic_ostream<CharT, Traits>& os, const month_weekday& mwd)
+ 
+ CONSTCD11
+ inline
+-month_weekday_last::month_weekday_last(const date::month& m,
+-                                       const date::weekday_last& wdl) NOEXCEPT
++month_weekday_last::month_weekday_last(const org_ttldtor_qdcxx_date_305_v1::month& m,
++                                       const org_ttldtor_qdcxx_date_305_v1::weekday_last& wdl) NOEXCEPT
+     : m_(m)
+     , wdl_(wdl)
+     {}
+@@ -2682,8 +2682,8 @@ operator<<(std::basic_ostream<CharT, Traits>& os, const month_weekday_last& mwdl
+ 
+ CONSTCD11
+ inline
+-year_month_day_last::year_month_day_last(const date::year& y,
+-                                         const date::month_day_last& mdl) NOEXCEPT
++year_month_day_last::year_month_day_last(const org_ttldtor_qdcxx_date_305_v1::year& y,
++                                         const org_ttldtor_qdcxx_date_305_v1::month_day_last& mdl) NOEXCEPT
+     : y_(y)
+     , mdl_(mdl)
+     {}
+@@ -2742,15 +2742,15 @@ inline
+ day
+ year_month_day_last::day() const NOEXCEPT
+ {
+-    CONSTDATA date::day d[] =
++    CONSTDATA org_ttldtor_qdcxx_date_305_v1::day d[] =
+     {
+-        date::day(31), date::day(28), date::day(31),
+-        date::day(30), date::day(31), date::day(30),
+-        date::day(31), date::day(31), date::day(30),
+-        date::day(31), date::day(30), date::day(31)
++        org_ttldtor_qdcxx_date_305_v1::day(31), org_ttldtor_qdcxx_date_305_v1::day(28), org_ttldtor_qdcxx_date_305_v1::day(31),
++        org_ttldtor_qdcxx_date_305_v1::day(30), org_ttldtor_qdcxx_date_305_v1::day(31), org_ttldtor_qdcxx_date_305_v1::day(30),
++        org_ttldtor_qdcxx_date_305_v1::day(31), org_ttldtor_qdcxx_date_305_v1::day(31), org_ttldtor_qdcxx_date_305_v1::day(30),
++        org_ttldtor_qdcxx_date_305_v1::day(31), org_ttldtor_qdcxx_date_305_v1::day(30), org_ttldtor_qdcxx_date_305_v1::day(31)
+     };
+     return (month() != February || !y_.is_leap()) && mdl_.ok() ?
+-        d[static_cast<unsigned>(month()) - 1] : date::day{29};
++        d[static_cast<unsigned>(month()) - 1] : org_ttldtor_qdcxx_date_305_v1::day{29};
+ }
+ 
+ CONSTCD14
+@@ -2904,8 +2904,8 @@ operator-(const year_month_day_last& ymdl, const years& dy) NOEXCEPT
+ 
+ CONSTCD11
+ inline
+-year_month_day::year_month_day(const date::year& y, const date::month& m,
+-                               const date::day& d) NOEXCEPT
++year_month_day::year_month_day(const org_ttldtor_qdcxx_date_305_v1::year& y, const org_ttldtor_qdcxx_date_305_v1::month& m,
++                               const org_ttldtor_qdcxx_date_305_v1::day& d) NOEXCEPT
+     : y_(y)
+     , m_(m)
+     , d_(d)
+@@ -3013,7 +3013,7 @@ year_month_day::ok() const NOEXCEPT
+ {
+     if (!(y_.ok() && m_.ok()))
+         return false;
+-    return date::day{1} <= d_ && d_ <= (y_ / m_ / last).day();
++    return org_ttldtor_qdcxx_date_305_v1::day{1} <= d_ && d_ <= (y_ / m_ / last).day();
+ }
+ 
+ CONSTCD11
+@@ -3105,7 +3105,7 @@ year_month_day::from_days(days dp) NOEXCEPT
+     auto const mp = (5*doy + 2)/153;                                   // [0, 11]
+     auto const d = doy - (153*mp+2)/5 + 1;                             // [1, 31]
+     auto const m = mp < 10 ? mp+3 : mp-9;                              // [1, 12]
+-    return year_month_day{date::year{y + (m <= 2)}, date::month(m), date::day(d)};
++    return year_month_day{org_ttldtor_qdcxx_date_305_v1::year{y + (m <= 2)}, org_ttldtor_qdcxx_date_305_v1::month(m), org_ttldtor_qdcxx_date_305_v1::day(d)};
+ }
+ 
+ template<class>
+@@ -3163,8 +3163,8 @@ operator-(const year_month_day& ymd, const years& dy) NOEXCEPT
+ 
+ CONSTCD11
+ inline
+-year_month_weekday::year_month_weekday(const date::year& y, const date::month& m,
+-                                       const date::weekday_indexed& wdi)
++year_month_weekday::year_month_weekday(const org_ttldtor_qdcxx_date_305_v1::year& y, const org_ttldtor_qdcxx_date_305_v1::month& m,
++                                       const org_ttldtor_qdcxx_date_305_v1::weekday_indexed& wdi)
+         NOEXCEPT
+     : y_(y)
+     , m_(m)
+@@ -3271,7 +3271,7 @@ year_month_weekday::ok() const NOEXCEPT
+         return false;
+     if (wdi_.index() <= 4)
+         return true;
+-    auto d2 = wdi_.weekday() - date::weekday(static_cast<sys_days>(y_/m_/1)) +
++    auto d2 = wdi_.weekday() - org_ttldtor_qdcxx_date_305_v1::weekday(static_cast<sys_days>(y_/m_/1)) +
+                   days((wdi_.index()-1)*7 + 1);
+     return static_cast<unsigned>(d2.count()) <= static_cast<unsigned>((y_/m_/last).day());
+ }
+@@ -3282,7 +3282,7 @@ year_month_weekday
+ year_month_weekday::from_days(days d) NOEXCEPT
+ {
+     sys_days dp{d};
+-    auto const wd = date::weekday(dp);
++    auto const wd = org_ttldtor_qdcxx_date_305_v1::weekday(dp);
+     auto const ymd = year_month_day(dp);
+     return {ymd.year(), ymd.month(), wd[(static_cast<unsigned>(ymd.day())-1)/7+1]};
+ }
+@@ -3293,7 +3293,7 @@ days
+ year_month_weekday::to_days() const NOEXCEPT
+ {
+     auto d = sys_days(y_/m_/1);
+-    return (d + (wdi_.weekday() - date::weekday(d) + days{(wdi_.index()-1)*7})
++    return (d + (wdi_.weekday() - org_ttldtor_qdcxx_date_305_v1::weekday(d) + days{(wdi_.index()-1)*7})
+            ).time_since_epoch();
+ }
+ 
+@@ -3382,9 +3382,9 @@ operator-(const year_month_weekday& ymwd, const years& dy) NOEXCEPT
+ 
+ CONSTCD11
+ inline
+-year_month_weekday_last::year_month_weekday_last(const date::year& y,
+-                                                 const date::month& m,
+-                                                 const date::weekday_last& wdl) NOEXCEPT
++year_month_weekday_last::year_month_weekday_last(const org_ttldtor_qdcxx_date_305_v1::year& y,
++                                                 const org_ttldtor_qdcxx_date_305_v1::month& m,
++                                                 const org_ttldtor_qdcxx_date_305_v1::weekday_last& wdl) NOEXCEPT
+     : y_(y)
+     , m_(m)
+     , wdl_(wdl)
+@@ -3475,7 +3475,7 @@ days
+ year_month_weekday_last::to_days() const NOEXCEPT
+ {
+     auto const d = sys_days(y_/m_/last);
+-    return (d - (date::weekday{d} - wdl_.weekday())).time_since_epoch();
++    return (d - (org_ttldtor_qdcxx_date_305_v1::weekday{d} - wdl_.weekday())).time_since_epoch();
+ }
+ 
+ CONSTCD11
+@@ -4004,7 +4004,7 @@ public:
+     std::basic_ostream<CharT, Traits>&
+     print(std::basic_ostream<CharT, Traits>& os, std::true_type) const
+     {
+-        date::detail::save_ostream<CharT, Traits> _(os);
++        org_ttldtor_qdcxx_date_305_v1::detail::save_ostream<CharT, Traits> _(os);
+         std::chrono::duration<rep> d = s_ + sub_s_;
+         if (d < std::chrono::seconds{10})
+             os << '0';
+@@ -4017,7 +4017,7 @@ public:
+     std::basic_ostream<CharT, Traits>&
+     print(std::basic_ostream<CharT, Traits>& os, std::false_type) const
+     {
+-        date::detail::save_ostream<CharT, Traits> _(os);
++        org_ttldtor_qdcxx_date_305_v1::detail::save_ostream<CharT, Traits> _(os);
+         os.fill('0');
+         os.flags(std::ios::dec | std::ios::right);
+         os.width(2);
+@@ -4029,7 +4029,7 @@ public:
+ #else
+             os << '.';
+ #endif
+-            date::detail::save_ostream<CharT, Traits> _s(os);
++            org_ttldtor_qdcxx_date_305_v1::detail::save_ostream<CharT, Traits> _s(os);
+             os.imbue(std::locale::classic());
+             os.width(width);
+             os << sub_s_.count();
+@@ -4131,14 +4131,14 @@ private:
+     template <class CharT, class Traits, class Duration2>
+     friend
+     std::basic_ostream<CharT, Traits>&
+-    date::to_stream(std::basic_ostream<CharT, Traits>& os, const CharT* fmt,
++    org_ttldtor_qdcxx_date_305_v1::to_stream(std::basic_ostream<CharT, Traits>& os, const CharT* fmt,
+           const fields<Duration2>& fds, const std::string* abbrev,
+           const std::chrono::seconds* offset_sec);
+ 
+     template <class CharT, class Traits, class Duration2, class Alloc>
+     friend
+     std::basic_istream<CharT, Traits>&
+-    date::from_stream(std::basic_istream<CharT, Traits>& is, const CharT* fmt,
++    org_ttldtor_qdcxx_date_305_v1::from_stream(std::basic_istream<CharT, Traits>& is, const CharT* fmt,
+           fields<Duration2>& fds,
+           std::basic_string<CharT, Traits, Alloc>* abbrev, std::chrono::minutes* offset);
+ };
+@@ -4217,7 +4217,7 @@ typename std::enable_if
+ >::type
+ operator<<(std::basic_ostream<CharT, Traits>& os, const sys_time<Duration>& tp)
+ {
+-    auto const dp = date::floor<days>(tp);
++    auto const dp = org_ttldtor_qdcxx_date_305_v1::floor<days>(tp);
+     return os << year_month_day(dp) << ' ' << make_time(tp-dp);
+ }
+ 
+@@ -4234,7 +4234,7 @@ inline
+ std::basic_ostream<CharT, Traits>&
+ operator<<(std::basic_ostream<CharT, Traits>& os, const local_time<Duration>& ut)
+ {
+-    return (date::operator<<(os, sys_time<Duration>{ut.time_since_epoch()}));
++    return (org_ttldtor_qdcxx_date_305_v1::operator<<(os, sys_time<Duration>{ut.time_since_epoch()}));
+ }
+ 
+ namespace detail
+@@ -5064,7 +5064,7 @@ to_stream(std::basic_ostream<CharT, Traits>& os, const CharT* fmt,
+     using std::chrono::seconds;
+     using std::chrono::minutes;
+     using std::chrono::hours;
+-    date::detail::save_ostream<CharT, Traits> ss(os);
++    org_ttldtor_qdcxx_date_305_v1::detail::save_ostream<CharT, Traits> ss(os);
+     os.fill(' ');
+     os.flags(std::ios::skipws | std::ios::dec);
+     os.width(0);
+@@ -5396,7 +5396,7 @@ to_stream(std::basic_ostream<CharT, Traits>& os, const CharT* fmt,
+                     if (modified == CharT{})
+ #endif
+                     {
+-                        auto h = *fmt == CharT{'I'} ? date::make12(hms.hours()) : hms.hours();
++                        auto h = *fmt == CharT{'I'} ? org_ttldtor_qdcxx_date_305_v1::make12(hms.hours()) : hms.hours();
+                         if (h < hours{10})
+                             os << CharT{'0'};
+                         os << h.count();
+@@ -5552,7 +5552,7 @@ to_stream(std::basic_ostream<CharT, Traits>& os, const CharT* fmt,
+                     tm.tm_hour = static_cast<int>(fds.tod.hours().count());
+                     facet.put(os, os, os.fill(), &tm, std::begin(f), std::end(f));
+ #else
+-                    if (date::is_am(fds.tod.hours()))
++                    if (org_ttldtor_qdcxx_date_305_v1::is_am(fds.tod.hours()))
+                         os << ampm_names().first[0];
+                     else
+                         os << ampm_names().first[1];
+@@ -5610,12 +5610,12 @@ to_stream(std::basic_ostream<CharT, Traits>& os, const CharT* fmt,
+                     save_ostream<CharT, Traits> _(os);
+                     os.fill('0');
+                     os.width(2);
+-                    os << date::make12(tod.hours()).count() << CharT{':'};
++                    os << org_ttldtor_qdcxx_date_305_v1::make12(tod.hours()).count() << CharT{':'};
+                     os.width(2);
+                     os << tod.minutes().count() << CharT{':'};
+                     os.width(2);
+                     os << tod.seconds().count() << CharT{' '};
+-                    if (date::is_am(tod.hours()))
++                    if (org_ttldtor_qdcxx_date_305_v1::is_am(tod.hours()))
+                         os << ampm_names().first[0];
+                     else
+                         os << ampm_names().first[1];
+@@ -6026,7 +6026,7 @@ to_stream(std::basic_ostream<CharT, Traits>& os, const CharT* fmt,
+                 }
+                 auto m = duration_cast<minutes>(*offset_sec);
+                 auto neg = m < minutes{0};
+-                m = date::abs(m);
++                m = org_ttldtor_qdcxx_date_305_v1::abs(m);
+                 auto h = duration_cast<hours>(m);
+                 m -= h;
+                 if (neg)
+@@ -6592,7 +6592,7 @@ from_stream(std::basic_istream<CharT, Traits>& is, const CharT* fmt,
+     typename std::basic_istream<CharT, Traits>::sentry ok{is, true};
+     if (ok)
+     {
+-        date::detail::save_istream<CharT, Traits> ss(is);
++        org_ttldtor_qdcxx_date_305_v1::detail::save_istream<CharT, Traits> ss(is);
+         is.fill(' ');
+         is.flags(std::ios::skipws | std::ios::dec);
+         is.width(0);
+@@ -7925,7 +7925,7 @@ from_stream(std::basic_istream<CharT, Traits>& is, const CharT* fmt, year& y,
+ {
+     using CT = std::chrono::seconds;
+     fields<CT> fds{};
+-    date::from_stream(is, fmt, fds, abbrev, offset);
++    org_ttldtor_qdcxx_date_305_v1::from_stream(is, fmt, fds, abbrev, offset);
+     if (!fds.ymd.year().ok())
+         is.setstate(std::ios::failbit);
+     if (!is.fail())
+@@ -7941,7 +7941,7 @@ from_stream(std::basic_istream<CharT, Traits>& is, const CharT* fmt, month& m,
+ {
+     using CT = std::chrono::seconds;
+     fields<CT> fds{};
+-    date::from_stream(is, fmt, fds, abbrev, offset);
++    org_ttldtor_qdcxx_date_305_v1::from_stream(is, fmt, fds, abbrev, offset);
+     if (!fds.ymd.month().ok())
+         is.setstate(std::ios::failbit);
+     if (!is.fail())
+@@ -7957,7 +7957,7 @@ from_stream(std::basic_istream<CharT, Traits>& is, const CharT* fmt, day& d,
+ {
+     using CT = std::chrono::seconds;
+     fields<CT> fds{};
+-    date::from_stream(is, fmt, fds, abbrev, offset);
++    org_ttldtor_qdcxx_date_305_v1::from_stream(is, fmt, fds, abbrev, offset);
+     if (!fds.ymd.day().ok())
+         is.setstate(std::ios::failbit);
+     if (!is.fail())
+@@ -7973,7 +7973,7 @@ from_stream(std::basic_istream<CharT, Traits>& is, const CharT* fmt, weekday& wd
+ {
+     using CT = std::chrono::seconds;
+     fields<CT> fds{};
+-    date::from_stream(is, fmt, fds, abbrev, offset);
++    org_ttldtor_qdcxx_date_305_v1::from_stream(is, fmt, fds, abbrev, offset);
+     if (!fds.wd.ok())
+         is.setstate(std::ios::failbit);
+     if (!is.fail())
+@@ -7989,7 +7989,7 @@ from_stream(std::basic_istream<CharT, Traits>& is, const CharT* fmt, year_month&
+ {
+     using CT = std::chrono::seconds;
+     fields<CT> fds{};
+-    date::from_stream(is, fmt, fds, abbrev, offset);
++    org_ttldtor_qdcxx_date_305_v1::from_stream(is, fmt, fds, abbrev, offset);
+     if (!fds.ymd.month().ok())
+         is.setstate(std::ios::failbit);
+     if (!is.fail())
+@@ -8005,7 +8005,7 @@ from_stream(std::basic_istream<CharT, Traits>& is, const CharT* fmt, month_day&
+ {
+     using CT = std::chrono::seconds;
+     fields<CT> fds{};
+-    date::from_stream(is, fmt, fds, abbrev, offset);
++    org_ttldtor_qdcxx_date_305_v1::from_stream(is, fmt, fds, abbrev, offset);
+     if (!fds.ymd.month().ok() || !fds.ymd.day().ok())
+         is.setstate(std::ios::failbit);
+     if (!is.fail())
+@@ -8021,7 +8021,7 @@ from_stream(std::basic_istream<CharT, Traits>& is, const CharT* fmt,
+ {
+     using CT = std::chrono::seconds;
+     fields<CT> fds{};
+-    date::from_stream(is, fmt, fds, abbrev, offset);
++    org_ttldtor_qdcxx_date_305_v1::from_stream(is, fmt, fds, abbrev, offset);
+     if (!fds.ymd.ok())
+         is.setstate(std::ios::failbit);
+     if (!is.fail())
+@@ -8040,7 +8040,7 @@ from_stream(std::basic_istream<CharT, Traits>& is, const CharT* fmt,
+     std::chrono::minutes offset_local = std::chrono::minutes::min();
+     fields<CT> fds{};
+     fds.has_tod = true;
+-    date::from_stream(is, fmt, fds, abbrev, &offset_local);
++    org_ttldtor_qdcxx_date_305_v1::from_stream(is, fmt, fds, abbrev, &offset_local);
+     if (!fds.ymd.ok() || !fds.tod.in_conventional_range())
+         is.setstate(std::ios::failbit);
+     if (!is.fail())
+@@ -8069,7 +8069,7 @@ from_stream(std::basic_istream<CharT, Traits>& is, const CharT* fmt,
+     using detail::round_i;
+     fields<CT> fds{};
+     fds.has_tod = true;
+-    date::from_stream(is, fmt, fds, abbrev, offset);
++    org_ttldtor_qdcxx_date_305_v1::from_stream(is, fmt, fds, abbrev, offset);
+     if (!fds.ymd.ok() || !fds.tod.in_conventional_range())
+         is.setstate(std::ios::failbit);
+     if (!is.fail())
+@@ -8088,7 +8088,7 @@ from_stream(std::basic_istream<CharT, Traits>& is, const CharT* fmt,
+     using CT = typename std::common_type<Duration, std::chrono::seconds>::type;
+     using detail::round_i;
+     fields<CT> fds{};
+-    date::from_stream(is, fmt, fds, abbrev, offset);
++    org_ttldtor_qdcxx_date_305_v1::from_stream(is, fmt, fds, abbrev, offset);
+     if (!fds.has_tod)
+         is.setstate(std::ios::failbit);
+     if (!is.fail())
+@@ -8143,14 +8143,14 @@ std::basic_istream<CharT, Traits>&
+ operator>>(std::basic_istream<CharT, Traits>& is,
+            const parse_manip<Parsable, CharT, Traits, Alloc>& x)
+ {
+-    return date::from_stream(is, x.format_.c_str(), x.tp_, x.abbrev_, x.offset_);
++    return org_ttldtor_qdcxx_date_305_v1::from_stream(is, x.format_.c_str(), x.tp_, x.abbrev_, x.offset_);
+ }
+ 
+ template <class Parsable, class CharT, class Traits, class Alloc>
+ inline
+ auto
+ parse(const std::basic_string<CharT, Traits, Alloc>& format, Parsable& tp)
+-    -> decltype(date::from_stream(std::declval<std::basic_istream<CharT, Traits>&>(),
++    -> decltype(org_ttldtor_qdcxx_date_305_v1::from_stream(std::declval<std::basic_istream<CharT, Traits>&>(),
+                             format.c_str(), tp),
+                 parse_manip<Parsable, CharT, Traits, Alloc>{format, tp})
+ {
+@@ -8162,7 +8162,7 @@ inline
+ auto
+ parse(const std::basic_string<CharT, Traits, Alloc>& format, Parsable& tp,
+       std::basic_string<CharT, Traits, Alloc>& abbrev)
+-    -> decltype(date::from_stream(std::declval<std::basic_istream<CharT, Traits>&>(),
++    -> decltype(org_ttldtor_qdcxx_date_305_v1::from_stream(std::declval<std::basic_istream<CharT, Traits>&>(),
+                             format.c_str(), tp, &abbrev),
+                 parse_manip<Parsable, CharT, Traits, Alloc>{format, tp, &abbrev})
+ {
+@@ -8174,7 +8174,7 @@ inline
+ auto
+ parse(const std::basic_string<CharT, Traits, Alloc>& format, Parsable& tp,
+       std::chrono::minutes& offset)
+-    -> decltype(date::from_stream(std::declval<std::basic_istream<CharT, Traits>&>(),
++    -> decltype(org_ttldtor_qdcxx_date_305_v1::from_stream(std::declval<std::basic_istream<CharT, Traits>&>(),
+                             format.c_str(), tp,
+                             std::declval<std::basic_string<CharT, Traits, Alloc>*>(),
+                             &offset),
+@@ -8188,7 +8188,7 @@ inline
+ auto
+ parse(const std::basic_string<CharT, Traits, Alloc>& format, Parsable& tp,
+       std::basic_string<CharT, Traits, Alloc>& abbrev, std::chrono::minutes& offset)
+-    -> decltype(date::from_stream(std::declval<std::basic_istream<CharT, Traits>&>(),
++    -> decltype(org_ttldtor_qdcxx_date_305_v1::from_stream(std::declval<std::basic_istream<CharT, Traits>&>(),
+                             format.c_str(), tp, &abbrev, &offset),
+                 parse_manip<Parsable, CharT, Traits, Alloc>{format, tp, &abbrev, &offset})
+ {
+@@ -8201,7 +8201,7 @@ template <class Parsable, class CharT>
+ inline
+ auto
+ parse(const CharT* format, Parsable& tp)
+-    -> decltype(date::from_stream(std::declval<std::basic_istream<CharT>&>(), format, tp),
++    -> decltype(org_ttldtor_qdcxx_date_305_v1::from_stream(std::declval<std::basic_istream<CharT>&>(), format, tp),
+                 parse_manip<Parsable, CharT>{format, tp})
+ {
+     return {format, tp};
+@@ -8211,7 +8211,7 @@ template <class Parsable, class CharT, class Traits, class Alloc>
+ inline
+ auto
+ parse(const CharT* format, Parsable& tp, std::basic_string<CharT, Traits, Alloc>& abbrev)
+-    -> decltype(date::from_stream(std::declval<std::basic_istream<CharT, Traits>&>(), format,
++    -> decltype(org_ttldtor_qdcxx_date_305_v1::from_stream(std::declval<std::basic_istream<CharT, Traits>&>(), format,
+                             tp, &abbrev),
+                 parse_manip<Parsable, CharT, Traits, Alloc>{format, tp, &abbrev})
+ {
+@@ -8222,7 +8222,7 @@ template <class Parsable, class CharT>
+ inline
+ auto
+ parse(const CharT* format, Parsable& tp, std::chrono::minutes& offset)
+-    -> decltype(date::from_stream(std::declval<std::basic_istream<CharT>&>(), format,
++    -> decltype(org_ttldtor_qdcxx_date_305_v1::from_stream(std::declval<std::basic_istream<CharT>&>(), format,
+                             tp, std::declval<std::basic_string<CharT>*>(), &offset),
+                 parse_manip<Parsable, CharT>{format, tp, nullptr, &offset})
+ {
+@@ -8234,7 +8234,7 @@ inline
+ auto
+ parse(const CharT* format, Parsable& tp,
+       std::basic_string<CharT, Traits, Alloc>& abbrev, std::chrono::minutes& offset)
+-    -> decltype(date::from_stream(std::declval<std::basic_istream<CharT, Traits>&>(), format,
++    -> decltype(org_ttldtor_qdcxx_date_305_v1::from_stream(std::declval<std::basic_istream<CharT, Traits>&>(), format,
+                             tp, &abbrev, &offset),
+                 parse_manip<Parsable, CharT, Traits, Alloc>{format, tp, &abbrev, &offset})
+ {
+@@ -8360,7 +8360,7 @@ operator<<(std::basic_ostream<CharT, Traits>& os,
+                  detail::get_units<CharT>(typename Period::type{});
+ }
+ 
+-}  // namespace date
++}  // namespace org_ttldtor_qdcxx_date_305_v1
+ 
+ #ifdef _MSC_VER
+ #   pragma warning(pop)
+diff --git a/include/date/tz.h b/include/date/tz.h
+index e25a3ee..cd22548 100644
+--- a/include/date/tz.h
++++ b/include/date/tz.h
+@@ -134,7 +134,7 @@ static_assert(HAS_REMOTE_API == 0 ? AUTO_DOWNLOAD == 0 : true,
+ #  endif
+ #endif
+ 
+-namespace date
++namespace org_ttldtor_qdcxx_date_305_v1
+ {
+ 
+ enum class choose {earliest, latest};
+@@ -239,7 +239,7 @@ nonexistent_local_time::make_msg(local_time<Duration> tp, const local_info& i)
+        << local_seconds{i.second.begin.time_since_epoch()} + i.second.offset << ' '
+        << i.second.abbrev
+        << " which are both equivalent to\n";
+-    date::operator<<(os, i.first.end) << " UTC";
++    org_ttldtor_qdcxx_date_305_v1::operator<<(os, i.first.end) << " UTC";
+     return os.str();
+ }
+ 
+@@ -300,7 +300,7 @@ struct zoned_traits<const time_zone*>
+     const time_zone*
+     default_zone()
+     {
+-        return date::locate_zone("Etc/UTC");
++        return org_ttldtor_qdcxx_date_305_v1::locate_zone("Etc/UTC");
+     }
+ 
+ #if HAS_STRING_VIEW
+@@ -309,7 +309,7 @@ struct zoned_traits<const time_zone*>
+     const time_zone*
+     locate_zone(std::string_view name)
+     {
+-        return date::locate_zone(name);
++        return org_ttldtor_qdcxx_date_305_v1::locate_zone(name);
+     }
+ 
+ #else  // !HAS_STRING_VIEW
+@@ -318,14 +318,14 @@ struct zoned_traits<const time_zone*>
+     const time_zone*
+     locate_zone(const std::string& name)
+     {
+-        return date::locate_zone(name);
++        return org_ttldtor_qdcxx_date_305_v1::locate_zone(name);
+     }
+ 
+     static
+     const time_zone*
+     locate_zone(const char* name)
+     {
+-        return date::locate_zone(name);
++        return org_ttldtor_qdcxx_date_305_v1::locate_zone(name);
+     }
+ 
+ #endif  // !HAS_STRING_VIEW
+@@ -900,7 +900,7 @@ inline
+ sys_info
+ time_zone::get_info(sys_time<Duration> st) const
+ {
+-    return get_info_impl(date::floor<std::chrono::seconds>(st));
++    return get_info_impl(org_ttldtor_qdcxx_date_305_v1::floor<std::chrono::seconds>(st));
+ }
+ 
+ template <class Duration>
+@@ -908,7 +908,7 @@ inline
+ local_info
+ time_zone::get_info(local_time<Duration> tp) const
+ {
+-    return get_info_impl(date::floor<std::chrono::seconds>(tp));
++    return get_info_impl(org_ttldtor_qdcxx_date_305_v1::floor<std::chrono::seconds>(tp));
+ }
+ 
+ template <class Duration>
+@@ -1919,7 +1919,7 @@ utc_clock::from_sys(const sys_time<Duration>& st)
+ // If ut is during a leap second insertion, that leap second is included in the count
+ template <class Duration>
+ std::pair<bool, std::chrono::seconds>
+-is_leap_second(date::utc_time<Duration> const& ut)
++is_leap_second(org_ttldtor_qdcxx_date_305_v1::utc_time<Duration> const& ut)
+ {
+     using std::chrono::seconds;
+     using duration = typename std::common_type<Duration, seconds>::type;
+@@ -1950,7 +1950,7 @@ struct leap_second_info
+ 
+ template <class Duration>
+ leap_second_info
+-get_leap_second_info(date::utc_time<Duration> const& ut)
++get_leap_second_info(org_ttldtor_qdcxx_date_305_v1::utc_time<Duration> const& ut)
+ {
+     auto p = is_leap_second(ut);
+     return {p.first, p.second};
+@@ -2077,12 +2077,12 @@ public:
+ 
+     template<typename Duration>
+     static
+-    std::chrono::time_point<local_t, typename std::common_type<Duration, date::days>::type>
++    std::chrono::time_point<local_t, typename std::common_type<Duration, org_ttldtor_qdcxx_date_305_v1::days>::type>
+     to_local(const std::chrono::time_point<tai_clock, Duration>&) NOEXCEPT;
+ 
+     template<typename Duration>
+     static
+-    std::chrono::time_point<tai_clock, typename std::common_type<Duration, date::days>::type>
++    std::chrono::time_point<tai_clock, typename std::common_type<Duration, org_ttldtor_qdcxx_date_305_v1::days>::type>
+     from_local(const std::chrono::time_point<local_t, Duration>&) NOEXCEPT;
+ };
+ 
+@@ -2122,20 +2122,20 @@ tai_clock::now()
+ 
+ template <class Duration>
+ inline
+-local_time<typename std::common_type<Duration, date::days>::type>
++local_time<typename std::common_type<Duration, org_ttldtor_qdcxx_date_305_v1::days>::type>
+ tai_clock::to_local(const tai_time<Duration>& t) NOEXCEPT
+ {
+-    using CD = typename std::common_type<Duration, date::days>::type;
++    using CD = typename std::common_type<Duration, org_ttldtor_qdcxx_date_305_v1::days>::type;
+     return local_time<CD>{t.time_since_epoch()} -
+            (local_days(year{1970}/January/1) - local_days(year{1958}/January/1));
+ }
+ 
+ template <class Duration>
+ inline
+-tai_time<typename std::common_type<Duration, date::days>::type>
++tai_time<typename std::common_type<Duration, org_ttldtor_qdcxx_date_305_v1::days>::type>
+ tai_clock::from_local(const local_time<Duration>& t) NOEXCEPT
+ {
+-    using CD = typename std::common_type<Duration, date::days>::type;
++    using CD = typename std::common_type<Duration, org_ttldtor_qdcxx_date_305_v1::days>::type;
+     return tai_time<CD>{t.time_since_epoch()} +
+             (local_days(year{1970}/January/1) - local_days(year{1958}/January/1));
+ }
+@@ -2197,12 +2197,12 @@ public:
+ 
+     template<typename Duration>
+     static
+-    std::chrono::time_point<local_t, typename std::common_type<Duration, date::days>::type>
++    std::chrono::time_point<local_t, typename std::common_type<Duration, org_ttldtor_qdcxx_date_305_v1::days>::type>
+     to_local(const std::chrono::time_point<gps_clock, Duration>&) NOEXCEPT;
+ 
+     template<typename Duration>
+     static
+-    std::chrono::time_point<gps_clock, typename std::common_type<Duration, date::days>::type>
++    std::chrono::time_point<gps_clock, typename std::common_type<Duration, org_ttldtor_qdcxx_date_305_v1::days>::type>
+     from_local(const std::chrono::time_point<local_t, Duration>&) NOEXCEPT;
+ };
+ 
+@@ -2244,20 +2244,20 @@ gps_clock::now()
+ 
+ template <class Duration>
+ inline
+-local_time<typename std::common_type<Duration, date::days>::type>
++local_time<typename std::common_type<Duration, org_ttldtor_qdcxx_date_305_v1::days>::type>
+ gps_clock::to_local(const gps_time<Duration>& t) NOEXCEPT
+ {
+-    using CD = typename std::common_type<Duration, date::days>::type;
++    using CD = typename std::common_type<Duration, org_ttldtor_qdcxx_date_305_v1::days>::type;
+     return local_time<CD>{t.time_since_epoch()} +
+             (local_days(year{1980}/January/Sunday[1]) - local_days(year{1970}/January/1));
+ }
+ 
+ template <class Duration>
+ inline
+-gps_time<typename std::common_type<Duration, date::days>::type>
++gps_time<typename std::common_type<Duration, org_ttldtor_qdcxx_date_305_v1::days>::type>
+ gps_clock::from_local(const local_time<Duration>& t) NOEXCEPT
+ {
+-    using CD = typename std::common_type<Duration, date::days>::type;
++    using CD = typename std::common_type<Duration, org_ttldtor_qdcxx_date_305_v1::days>::type;
+     return gps_time<CD>{t.time_since_epoch()} -
+             (local_days(year{1980}/January/Sunday[1]) - local_days(year{1970}/January/1));
+ }
+@@ -2804,6 +2804,6 @@ to_gps_time(const tai_time<Duration>& t)
+     return gps_clock::from_utc(tai_clock::to_utc(t));
+ }
+ 
+-}  // namespace date
++}  // namespace org_ttldtor_qdcxx_date_305_v1
+ 
+ #endif  // TZ_H
+diff --git a/include/date/tz_private.h b/include/date/tz_private.h
+index 1a01f17..2ab600e 100644
+--- a/include/date/tz_private.h
++++ b/include/date/tz_private.h
+@@ -34,7 +34,7 @@
+ #include <vector>
+ #endif
+ 
+-namespace date
++namespace org_ttldtor_qdcxx_date_305_v1
+ {
+ 
+ namespace detail
+@@ -56,14 +56,14 @@ private:
+     struct pair
+     {
+ #if defined(_MSC_VER) && (_MSC_VER < 1900)
+-        pair() : month_day_(date::jan / 1), weekday_(0U) {}
++        pair() : month_day_(org_ttldtor_qdcxx_date_305_v1::jan / 1), weekday_(0U) {}
+ 
+-        pair(const date::month_day& month_day, const date::weekday& weekday)
++        pair(const org_ttldtor_qdcxx_date_305_v1::month_day& month_day, const org_ttldtor_qdcxx_date_305_v1::weekday& weekday)
+             : month_day_(month_day), weekday_(weekday) {}
+ #endif
+ 
+-        date::month_day month_day_;
+-        date::weekday   weekday_;
++        org_ttldtor_qdcxx_date_305_v1::month_day month_day_;
++        org_ttldtor_qdcxx_date_305_v1::weekday   weekday_;
+     };
+ 
+     enum Type {month_day, month_last_dow, lteq, gteq};
+@@ -76,22 +76,22 @@ private:
+     struct U
+ #endif
+     {
+-        date::month_day          month_day_;
+-        date::month_weekday_last month_weekday_last_;
++        org_ttldtor_qdcxx_date_305_v1::month_day          month_day_;
++        org_ttldtor_qdcxx_date_305_v1::month_weekday_last month_weekday_last_;
+         pair                     month_day_weekday_;
+ 
+ #if !defined(_MSC_VER) || (_MSC_VER >= 1900)
+-        U() : month_day_{date::jan/1} {}
++        U() : month_day_{org_ttldtor_qdcxx_date_305_v1::jan/1} {}
+ #else
+         U() :
+-            month_day_(date::jan/1),
+-            month_weekday_last_(date::month(0U), date::weekday_last(date::weekday(0U)))
++            month_day_(org_ttldtor_qdcxx_date_305_v1::jan/1),
++            month_weekday_last_(org_ttldtor_qdcxx_date_305_v1::month(0U), org_ttldtor_qdcxx_date_305_v1::weekday_last(org_ttldtor_qdcxx_date_305_v1::weekday(0U)))
+         {}
+ 
+ #endif // !defined(_MSC_VER) || (_MSC_VER >= 1900)
+ 
+-        U& operator=(const date::month_day& x);
+-        U& operator=(const date::month_weekday_last& x);
++        U& operator=(const org_ttldtor_qdcxx_date_305_v1::month_day& x);
++        U& operator=(const org_ttldtor_qdcxx_date_305_v1::month_weekday_last& x);
+         U& operator=(const pair& x);
+     } u;
+ 
+@@ -103,20 +103,20 @@ private:
+ public:
+     MonthDayTime() = default;
+     MonthDayTime(local_seconds tp, tz timezone);
+-    MonthDayTime(const date::month_day& md, tz timezone);
++    MonthDayTime(const org_ttldtor_qdcxx_date_305_v1::month_day& md, tz timezone);
+ 
+-    date::day day() const;
+-    date::month month() const;
++    org_ttldtor_qdcxx_date_305_v1::day day() const;
++    org_ttldtor_qdcxx_date_305_v1::month month() const;
+     tz zone() const {return zone_;}
+ 
+-    void canonicalize(date::year y);
++    void canonicalize(org_ttldtor_qdcxx_date_305_v1::year y);
+ 
+     sys_seconds
+-       to_sys(date::year y, std::chrono::seconds offset, std::chrono::seconds save) const;
+-    sys_days to_sys_days(date::year y) const;
++       to_sys(org_ttldtor_qdcxx_date_305_v1::year y, std::chrono::seconds offset, std::chrono::seconds save) const;
++    sys_days to_sys_days(org_ttldtor_qdcxx_date_305_v1::year y) const;
+ 
+-    sys_seconds to_time_point(date::year y) const;
+-    int compare(date::year y, const MonthDayTime& x, date::year yx,
++    sys_seconds to_time_point(org_ttldtor_qdcxx_date_305_v1::year y) const;
++    int compare(org_ttldtor_qdcxx_date_305_v1::year y, const MonthDayTime& x, org_ttldtor_qdcxx_date_305_v1::year yx,
+                 std::chrono::seconds offset, std::chrono::minutes prev_save) const;
+ 
+     friend std::istream& operator>>(std::istream& is, MonthDayTime& x);
+@@ -135,10 +135,10 @@ public:
+ class Rule;
+ bool operator==(const Rule& x, const Rule& y);
+ bool operator<(const Rule& x, const Rule& y);
+-bool operator==(const Rule& x, const date::year& y);
+-bool operator<(const Rule& x, const date::year& y);
+-bool operator==(const date::year& x, const Rule& y);
+-bool operator<(const date::year& x, const Rule& y);
++bool operator==(const Rule& x, const org_ttldtor_qdcxx_date_305_v1::year& y);
++bool operator<(const Rule& x, const org_ttldtor_qdcxx_date_305_v1::year& y);
++bool operator==(const org_ttldtor_qdcxx_date_305_v1::year& x, const Rule& y);
++bool operator<(const org_ttldtor_qdcxx_date_305_v1::year& x, const Rule& y);
+ bool operator==(const Rule& x, const std::string& y);
+ bool operator<(const Rule& x, const std::string& y);
+ bool operator==(const std::string& x, const Rule& y);
+@@ -149,8 +149,8 @@ class Rule
+ {
+ private:
+     std::string          name_;
+-    date::year           starting_year_{0};
+-    date::year           ending_year_{0};
++    org_ttldtor_qdcxx_date_305_v1::year           starting_year_{0};
++    org_ttldtor_qdcxx_date_305_v1::year           ending_year_{0};
+     MonthDayTime         starting_at_;
+     std::chrono::minutes save_{0};
+     std::string          abbrev_;
+@@ -158,24 +158,24 @@ private:
+ public:
+     Rule() = default;
+     explicit Rule(const std::string& s);
+-    Rule(const Rule& r, date::year starting_year, date::year ending_year);
++    Rule(const Rule& r, org_ttldtor_qdcxx_date_305_v1::year starting_year, org_ttldtor_qdcxx_date_305_v1::year ending_year);
+ 
+     const std::string& name() const {return name_;}
+     const std::string& abbrev() const {return abbrev_;}
+ 
+     const MonthDayTime&         mdt()           const {return starting_at_;}
+-    const date::year&           starting_year() const {return starting_year_;}
+-    const date::year&           ending_year()   const {return ending_year_;}
++    const org_ttldtor_qdcxx_date_305_v1::year&           starting_year() const {return starting_year_;}
++    const org_ttldtor_qdcxx_date_305_v1::year&           ending_year()   const {return ending_year_;}
+     const std::chrono::minutes& save()          const {return save_;}
+ 
+     static void split_overlaps(std::vector<Rule>& rules);
+ 
+     friend bool operator==(const Rule& x, const Rule& y);
+     friend bool operator<(const Rule& x, const Rule& y);
+-    friend bool operator==(const Rule& x, const date::year& y);
+-    friend bool operator<(const Rule& x, const date::year& y);
+-    friend bool operator==(const date::year& x, const Rule& y);
+-    friend bool operator<(const date::year& x, const Rule& y);
++    friend bool operator==(const Rule& x, const org_ttldtor_qdcxx_date_305_v1::year& y);
++    friend bool operator<(const Rule& x, const org_ttldtor_qdcxx_date_305_v1::year& y);
++    friend bool operator==(const org_ttldtor_qdcxx_date_305_v1::year& x, const Rule& y);
++    friend bool operator<(const org_ttldtor_qdcxx_date_305_v1::year& x, const Rule& y);
+     friend bool operator==(const Rule& x, const std::string& y);
+     friend bool operator<(const Rule& x, const std::string& y);
+     friend bool operator==(const std::string& x, const Rule& y);
+@@ -184,8 +184,8 @@ public:
+     friend std::ostream& operator<<(std::ostream& os, const Rule& r);
+ 
+ private:
+-    date::day day() const;
+-    date::month month() const;
++    org_ttldtor_qdcxx_date_305_v1::day day() const;
++    org_ttldtor_qdcxx_date_305_v1::month month() const;
+     static void split_overlaps(std::vector<Rule>& rules, std::size_t i, std::size_t& e);
+     static bool overlaps(const Rule& x, const Rule& y);
+     static void split(std::vector<Rule>& rules, std::size_t i, std::size_t k,
+@@ -197,15 +197,15 @@ inline bool operator> (const Rule& x, const Rule& y) {return   y < x;}
+ inline bool operator<=(const Rule& x, const Rule& y) {return !(y < x);}
+ inline bool operator>=(const Rule& x, const Rule& y) {return !(x < y);}
+ 
+-inline bool operator!=(const Rule& x, const date::year& y) {return !(x == y);}
+-inline bool operator> (const Rule& x, const date::year& y) {return   y < x;}
+-inline bool operator<=(const Rule& x, const date::year& y) {return !(y < x);}
+-inline bool operator>=(const Rule& x, const date::year& y) {return !(x < y);}
++inline bool operator!=(const Rule& x, const org_ttldtor_qdcxx_date_305_v1::year& y) {return !(x == y);}
++inline bool operator> (const Rule& x, const org_ttldtor_qdcxx_date_305_v1::year& y) {return   y < x;}
++inline bool operator<=(const Rule& x, const org_ttldtor_qdcxx_date_305_v1::year& y) {return !(y < x);}
++inline bool operator>=(const Rule& x, const org_ttldtor_qdcxx_date_305_v1::year& y) {return !(x < y);}
+ 
+-inline bool operator!=(const date::year& x, const Rule& y) {return !(x == y);}
+-inline bool operator> (const date::year& x, const Rule& y) {return   y < x;}
+-inline bool operator<=(const date::year& x, const Rule& y) {return !(y < x);}
+-inline bool operator>=(const date::year& x, const Rule& y) {return !(x < y);}
++inline bool operator!=(const org_ttldtor_qdcxx_date_305_v1::year& x, const Rule& y) {return !(x == y);}
++inline bool operator> (const org_ttldtor_qdcxx_date_305_v1::year& x, const Rule& y) {return   y < x;}
++inline bool operator<=(const org_ttldtor_qdcxx_date_305_v1::year& x, const Rule& y) {return !(y < x);}
++inline bool operator>=(const org_ttldtor_qdcxx_date_305_v1::year& x, const Rule& y) {return !(x < y);}
+ 
+ inline bool operator!=(const Rule& x, const std::string& y) {return !(x == y);}
+ inline bool operator> (const Rule& x, const std::string& y) {return   y < x;}
+@@ -240,15 +240,15 @@ struct zonelet
+     } u;
+ 
+     std::string                        format_;
+-    date::year                         until_year_{0};
++    org_ttldtor_qdcxx_date_305_v1::year                         until_year_{0};
+     MonthDayTime                       until_date_;
+     sys_seconds                        until_utc_;
+     local_seconds                      until_std_;
+     local_seconds                      until_loc_;
+     std::chrono::minutes               initial_save_{0};
+     std::string                        initial_abbrev_;
+-    std::pair<const Rule*, date::year> first_rule_{nullptr, date::year::min()};
+-    std::pair<const Rule*, date::year> last_rule_{nullptr, date::year::max()};
++    std::pair<const Rule*, org_ttldtor_qdcxx_date_305_v1::year> first_rule_{nullptr, org_ttldtor_qdcxx_date_305_v1::year::min()};
++    std::pair<const Rule*, org_ttldtor_qdcxx_date_305_v1::year> last_rule_{nullptr, org_ttldtor_qdcxx_date_305_v1::year::max()};
+ 
+     ~zonelet();
+     zonelet();
+@@ -289,7 +289,7 @@ struct transition
+     std::ostream&
+     operator<<(std::ostream& os, const transition& t)
+     {
+-        date::operator<<(os, t.timepoint) << "Z ";
++        org_ttldtor_qdcxx_date_305_v1::operator<<(os, t.timepoint) << "Z ";
+         if (t.info->offset >= std::chrono::seconds{0})
+             os << '+';
+         os << make_time(t.info->offset);
+@@ -306,7 +306,7 @@ struct transition
+ 
+ }  // namespace detail
+ 
+-}  // namespace date
++}  // namespace org_ttldtor_qdcxx_date_305_v1
+ 
+ #if defined(_MSC_VER) && (_MSC_VER < 1900)
+ #include "tz.h"
+diff --git a/src/tz.cpp b/src/tz.cpp
+index 6849706..28a2eff 100644
+--- a/src/tz.cpp
++++ b/src/tz.cpp
+@@ -84,6 +84,8 @@
+ #endif  // _WIN32
+ 
+ #include "date/tz_private.h"
++#include "snapshot.hpp"
++namespace qdcxx_timezone_input = org::ttldtor::qdcxx::time::detail::provider::input;
+ 
+ #ifdef __APPLE__
+ #  include "date/ios.h"
+@@ -298,7 +300,7 @@ std::string
+ expand_path(std::string path)
+ {
+ #      if TARGET_OS_IPHONE
+-    return date::iOSUtils::get_tzdata_path();
++    return org_ttldtor_qdcxx_date_305_v1::iOSUtils::get_tzdata_path();
+ #      else  // !TARGET_OS_IPHONE
+     ::wordexp_t w{};
+     std::unique_ptr<::wordexp_t, void(*)(::wordexp_t*)> hold{&w, ::wordfree};
+@@ -406,7 +408,7 @@ private:
+ 
+ #endif  // !USE_OS_TZDB
+ 
+-namespace date
++namespace org_ttldtor_qdcxx_date_305_v1
+ {
+ // +---------------------+
+ // | Begin Configuration |
+@@ -420,22 +422,7 @@ static
+ std::string&
+ access_install()
+ {
+-    static std::string install
+-#ifndef INSTALL
+-
+-    = get_download_folder() + folder_delimiter + "tzdata";
+-
+-#else   // !INSTALL
+-
+-#  define STRINGIZEIMP(x) #x
+-#  define STRINGIZE(x) STRINGIZEIMP(x)
+-
+-    = STRINGIZE(INSTALL) + std::string(1, folder_delimiter) + "tzdata";
+-
+-    #undef STRINGIZEIMP
+-    #undef STRINGIZE
+-#endif  // !INSTALL
+-
++    static std::string install;
+     return install;
+ }
+ 
+@@ -466,11 +453,11 @@ get_download_gz_file(const std::string& version)
+ #endif  // !USE_OS_TZDB
+ 
+ // These can be used to reduce the range of the database to save memory
+-CONSTDATA auto min_year = date::year::min();
+-CONSTDATA auto max_year = date::year::max();
++CONSTDATA auto min_year = org_ttldtor_qdcxx_date_305_v1::year::min();
++CONSTDATA auto max_year = org_ttldtor_qdcxx_date_305_v1::year::max();
+ 
+-CONSTDATA auto min_day = date::January/1;
+-CONSTDATA auto max_day = date::December/31;
++CONSTDATA auto min_day = org_ttldtor_qdcxx_date_305_v1::January/1;
++CONSTDATA auto max_day = org_ttldtor_qdcxx_date_305_v1::December/31;
+ 
+ #if USE_OS_TZDB
+ 
+@@ -684,11 +671,11 @@ parse_month(std::istream& in)
+ 
+ static
+ void
+-sort_zone_mappings(std::vector<date::detail::timezone_mapping>& mappings)
++sort_zone_mappings(std::vector<org_ttldtor_qdcxx_date_305_v1::detail::timezone_mapping>& mappings)
+ {
+     std::sort(mappings.begin(), mappings.end(),
+-        [](const date::detail::timezone_mapping& lhs,
+-           const date::detail::timezone_mapping& rhs)->bool
++        [](const org_ttldtor_qdcxx_date_305_v1::detail::timezone_mapping& lhs,
++           const org_ttldtor_qdcxx_date_305_v1::detail::timezone_mapping& rhs)->bool
+     {
+         auto other_result = lhs.other.compare(rhs.other);
+         if (other_result < 0)
+@@ -721,7 +708,7 @@ native_to_standard_timezone_name(const std::string& native_tz_name,
+     }
+     standard_tz_name.clear();
+     // TODO! we can improve on linear search.
+-    const auto& mappings = date::get_tzdb().mappings;
++    const auto& mappings = org_ttldtor_qdcxx_date_305_v1::get_tzdb().mappings;
+     for (const auto& tzm : mappings)
+     {
+         if (tzm.other == native_tz_name)
+@@ -947,8 +934,8 @@ parse_signed_time(std::istream& in)
+ detail::MonthDayTime::MonthDayTime(local_seconds tp, tz timezone)
+     : zone_(timezone)
+ {
+-    using namespace date;
+-    const auto dp = date::floor<days>(tp);
++    using namespace org_ttldtor_qdcxx_date_305_v1;
++    const auto dp = org_ttldtor_qdcxx_date_305_v1::floor<days>(tp);
+     const auto hms = make_time(tp - dp);
+     const auto ymd = year_month_day(dp);
+     u = ymd.month() / ymd.day();
+@@ -957,13 +944,13 @@ detail::MonthDayTime::MonthDayTime(local_seconds tp, tz timezone)
+     s_ = hms.seconds();
+ }
+ 
+-detail::MonthDayTime::MonthDayTime(const date::month_day& md, tz timezone)
++detail::MonthDayTime::MonthDayTime(const org_ttldtor_qdcxx_date_305_v1::month_day& md, tz timezone)
+     : zone_(timezone)
+ {
+     u = md;
+ }
+ 
+-date::day
++org_ttldtor_qdcxx_date_305_v1::day
+ detail::MonthDayTime::day() const
+ {
+     switch (type_)
+@@ -971,7 +958,7 @@ detail::MonthDayTime::day() const
+     case month_day:
+         return u.month_day_.day();
+     case month_last_dow:
+-        return date::day{31};
++        return org_ttldtor_qdcxx_date_305_v1::day{31};
+     case lteq:
+     case gteq:
+         break;
+@@ -979,7 +966,7 @@ detail::MonthDayTime::day() const
+     return u.month_day_weekday_.month_day_.day();
+ }
+ 
+-date::month
++org_ttldtor_qdcxx_date_305_v1::month
+ detail::MonthDayTime::month() const
+ {
+     switch (type_)
+@@ -996,7 +983,7 @@ detail::MonthDayTime::month() const
+ }
+ 
+ int
+-detail::MonthDayTime::compare(date::year y, const MonthDayTime& x, date::year yx,
++detail::MonthDayTime::compare(org_ttldtor_qdcxx_date_305_v1::year y, const MonthDayTime& x, org_ttldtor_qdcxx_date_305_v1::year yx,
+                       std::chrono::seconds offset, std::chrono::minutes prev_save) const
+ {
+     if (zone_ != x.zone_)
+@@ -1038,10 +1025,10 @@ detail::MonthDayTime::compare(date::year y, const MonthDayTime& x, date::year yx
+ }
+ 
+ sys_seconds
+-detail::MonthDayTime::to_sys(date::year y, std::chrono::seconds offset,
++detail::MonthDayTime::to_sys(org_ttldtor_qdcxx_date_305_v1::year y, std::chrono::seconds offset,
+                      std::chrono::seconds save) const
+ {
+-    using namespace date;
++    using namespace org_ttldtor_qdcxx_date_305_v1;
+     using namespace std::chrono;
+     auto until_utc = to_time_point(y);
+     if (zone_ == tz::standard)
+@@ -1052,14 +1039,14 @@ detail::MonthDayTime::to_sys(date::year y, std::chrono::seconds offset,
+ }
+ 
+ detail::MonthDayTime::U&
+-detail::MonthDayTime::U::operator=(const date::month_day& x)
++detail::MonthDayTime::U::operator=(const org_ttldtor_qdcxx_date_305_v1::month_day& x)
+ {
+     month_day_ = x;
+     return *this;
+ }
+ 
+ detail::MonthDayTime::U&
+-detail::MonthDayTime::U::operator=(const date::month_weekday_last& x)
++detail::MonthDayTime::U::operator=(const org_ttldtor_qdcxx_date_305_v1::month_weekday_last& x)
+ {
+     month_weekday_last_ = x;
+     return *this;
+@@ -1072,11 +1059,11 @@ detail::MonthDayTime::U::operator=(const pair& x)
+     return *this;
+ }
+ 
+-date::sys_days
+-detail::MonthDayTime::to_sys_days(date::year y) const
++org_ttldtor_qdcxx_date_305_v1::sys_days
++detail::MonthDayTime::to_sys_days(org_ttldtor_qdcxx_date_305_v1::year y) const
+ {
+     using namespace std::chrono;
+-    using namespace date;
++    using namespace org_ttldtor_qdcxx_date_305_v1;
+     switch (type_)
+     {
+     case month_day:
+@@ -1100,17 +1087,17 @@ detail::MonthDayTime::to_sys_days(date::year y) const
+ }
+ 
+ sys_seconds
+-detail::MonthDayTime::to_time_point(date::year y) const
++detail::MonthDayTime::to_time_point(org_ttldtor_qdcxx_date_305_v1::year y) const
+ {
+     // Add seconds first to promote to largest rep early to prevent overflow
+     return to_sys_days(y) + s_ + h_ + m_;
+ }
+ 
+ void
+-detail::MonthDayTime::canonicalize(date::year y)
++detail::MonthDayTime::canonicalize(org_ttldtor_qdcxx_date_305_v1::year y)
+ {
+     using namespace std::chrono;
+-    using namespace date;
++    using namespace org_ttldtor_qdcxx_date_305_v1;
+     switch (type_)
+     {
+     case month_day:
+@@ -1148,7 +1135,7 @@ detail::MonthDayTime::canonicalize(date::year y)
+ std::istream&
+ detail::operator>>(std::istream& is, MonthDayTime& x)
+ {
+-    using namespace date;
++    using namespace org_ttldtor_qdcxx_date_305_v1;
+     using namespace std::chrono;
+     assert(((std::ios::failbit | std::ios::badbit) & is.exceptions()) ==
+             (std::ios::failbit | std::ios::badbit));
+@@ -1164,7 +1151,7 @@ detail::operator>>(std::istream& is, MonthDayTime& x)
+                     is.get();
+                 auto dow = parse_dow(is);
+                 x.type_ = MonthDayTime::month_last_dow;
+-                x.u = date::month(m)/weekday(dow)[last];
++                x.u = org_ttldtor_qdcxx_date_305_v1::month(m)/weekday(dow)[last];
+             }
+             else if (std::isalpha(is.peek()))
+             {
+@@ -1183,7 +1170,7 @@ detail::operator>>(std::istream& is, MonthDayTime& x)
+                         throw std::runtime_error(std::string("bad operator: ") + c + c2
+                                  + std::to_string(d));
+                     x.type_ = c == '<' ? MonthDayTime::lteq : MonthDayTime::gteq;
+-                    x.u = MonthDayTime::pair{ date::month(m) / d, date::weekday(dow) };
++                    x.u = MonthDayTime::pair{ org_ttldtor_qdcxx_date_305_v1::month(m) / d, org_ttldtor_qdcxx_date_305_v1::weekday(dow) };
+                 }
+                 else
+                     throw std::runtime_error(std::string("bad operator: ") + c);
+@@ -1196,7 +1183,7 @@ detail::operator>>(std::istream& is, MonthDayTime& x)
+                     throw std::runtime_error(std::string("day of month: ")
+                              + std::to_string(d));
+                 x.type_ = MonthDayTime::month_day;
+-                x.u = date::month(m)/d;
++                x.u = org_ttldtor_qdcxx_date_305_v1::month(m)/d;
+             }
+             if (!is.eof() && ws(is) && !is.eof() && is.peek() != '#')
+             {
+@@ -1268,7 +1255,7 @@ detail::operator<<(std::ostream& os, const MonthDayTime& x)
+         }
+         break;
+     }
+-    os << date::make_time(x.s_ + x.h_ + x.m_);
++    os << org_ttldtor_qdcxx_date_305_v1::make_time(x.s_ + x.h_ + x.m_);
+     if (x.zone_ == tz::utc)
+         os << "UTC   ";
+     else if (x.zone_ == tz::standard)
+@@ -1284,7 +1271,7 @@ detail::Rule::Rule(const std::string& s)
+ {
+     try
+     {
+-        using namespace date;
++        using namespace org_ttldtor_qdcxx_date_305_v1;
+         using namespace std::chrono;
+         std::istringstream in(s);
+         in.exceptions(std::ios::failbit | std::ios::badbit);
+@@ -1338,13 +1325,11 @@ detail::Rule::Rule(const std::string& s)
+     }
+     catch (...)
+     {
+-        std::cerr << s << '\n';
+-        std::cerr << *this << '\n';
+         throw;
+     }
+ }
+ 
+-detail::Rule::Rule(const Rule& r, date::year starting_year, date::year ending_year)
++detail::Rule::Rule(const Rule& r, org_ttldtor_qdcxx_date_305_v1::year starting_year, org_ttldtor_qdcxx_date_305_v1::year ending_year)
+     : name_(r.name_)
+     , starting_year_(starting_year)
+     , ending_year_(ending_year)
+@@ -1379,25 +1364,25 @@ detail::operator<(const Rule& x, const Rule& y)
+ }
+ 
+ bool
+-detail::operator==(const Rule& x, const date::year& y)
++detail::operator==(const Rule& x, const org_ttldtor_qdcxx_date_305_v1::year& y)
+ {
+     return x.starting_year_ <= y && y <= x.ending_year_;
+ }
+ 
+ bool
+-detail::operator<(const Rule& x, const date::year& y)
++detail::operator<(const Rule& x, const org_ttldtor_qdcxx_date_305_v1::year& y)
+ {
+     return x.ending_year_ < y;
+ }
+ 
+ bool
+-detail::operator==(const date::year& x, const Rule& y)
++detail::operator==(const org_ttldtor_qdcxx_date_305_v1::year& x, const Rule& y)
+ {
+     return y.starting_year_ <= x && x <= y.ending_year_;
+ }
+ 
+ bool
+-detail::operator<(const date::year& x, const Rule& y)
++detail::operator<(const org_ttldtor_qdcxx_date_305_v1::year& x, const Rule& y)
+ {
+     return x < y.starting_year_;
+ }
+@@ -1429,7 +1414,7 @@ detail::operator<(const std::string& x, const Rule& y)
+ std::ostream&
+ detail::operator<<(std::ostream& os, const Rule& r)
+ {
+-    using namespace date;
++    using namespace org_ttldtor_qdcxx_date_305_v1;
+     using namespace std::chrono;
+     detail::save_ostream<char> _(os);
+     os.fill(' ');
+@@ -1440,18 +1425,18 @@ detail::operator<<(std::ostream& os, const Rule& r)
+     os << r.starting_at_;
+     if (r.save_ >= minutes{0})
+         os << ' ';
+-    os << date::make_time(r.save_) << "   ";
++    os << org_ttldtor_qdcxx_date_305_v1::make_time(r.save_) << "   ";
+     os << r.abbrev_;
+     return os;
+ }
+ 
+-date::day
++org_ttldtor_qdcxx_date_305_v1::day
+ detail::Rule::day() const
+ {
+     return starting_at_.day();
+ }
+ 
+-date::month
++org_ttldtor_qdcxx_date_305_v1::month
+ detail::Rule::month() const
+ {
+     return starting_at_.month();
+@@ -1488,7 +1473,7 @@ detail::Rule::overlaps(const Rule& x, const Rule& y)
+ void
+ detail::Rule::split(std::vector<Rule>& rules, std::size_t i, std::size_t k, std::size_t& e)
+ {
+-    using namespace date;
++    using namespace org_ttldtor_qdcxx_date_305_v1;
+     using difference_type = std::vector<Rule>::iterator::difference_type;
+     // rules[i].starting_year_ <= rules[k].starting_year_ &&
+     //     rules[i].ending_year_ >= rules[k].starting_year_ &&
+@@ -1502,6 +1487,7 @@ detail::Rule::split(std::vector<Rule>& rules, std::size_t i, std::size_t k, std:
+     {
+         if (rules[k].ending_year_ < rules[i].ending_year_)
+         {
++            qdcxx_timezone_input::admitNativeModel();
+             rules.insert(rules.begin() + static_cast<difference_type>(k+1),
+                          Rule(rules[i], rules[k].ending_year_ + years{1},
+                               std::move(rules[i].ending_year_)));
+@@ -1510,6 +1496,7 @@ detail::Rule::split(std::vector<Rule>& rules, std::size_t i, std::size_t k, std:
+         }
+         else  // rules[k].ending_year_ > rules[i].ending_year_
+         {
++            qdcxx_timezone_input::admitNativeModel();
+             rules.insert(rules.begin() + static_cast<difference_type>(k+1),
+                          Rule(rules[k], rules[i].ending_year_ + years{1},
+                               std::move(rules[k].ending_year_)));
+@@ -1521,9 +1508,11 @@ detail::Rule::split(std::vector<Rule>& rules, std::size_t i, std::size_t k, std:
+     {
+         if (rules[k].ending_year_ < rules[i].ending_year_)
+         {
++            qdcxx_timezone_input::admitNativeModel();
+             rules.insert(rules.begin() + static_cast<difference_type>(k),
+                          Rule(rules[i], rules[k].starting_year_, rules[k].ending_year_));
+             ++k;
++            qdcxx_timezone_input::admitNativeModel();
+             rules.insert(rules.begin() + static_cast<difference_type>(k+1),
+                          Rule(rules[i], rules[k].ending_year_ + years{1},
+                               std::move(rules[i].ending_year_)));
+@@ -1532,9 +1521,11 @@ detail::Rule::split(std::vector<Rule>& rules, std::size_t i, std::size_t k, std:
+         }
+         else if (rules[k].ending_year_ > rules[i].ending_year_)
+         {
++            qdcxx_timezone_input::admitNativeModel();
+             rules.insert(rules.begin() + static_cast<difference_type>(k),
+                          Rule(rules[i], rules[k].starting_year_, rules[i].ending_year_));
+             ++k;
++            qdcxx_timezone_input::admitNativeModel();
+             rules.insert(rules.begin() + static_cast<difference_type>(k+1),
+                          Rule(rules[k], rules[i].ending_year_ + years{1},
+                          std::move(rules[k].ending_year_)));
+@@ -1544,6 +1535,7 @@ detail::Rule::split(std::vector<Rule>& rules, std::size_t i, std::size_t k, std:
+         }
+         else  // rules[k].ending_year_ == rules[i].ending_year_
+         {
++            qdcxx_timezone_input::admitNativeModel();
+             rules.insert(rules.begin() + static_cast<difference_type>(k),
+                          Rule(rules[i], rules[k].starting_year_,
+                          std::move(rules[i].ending_year_)));
+@@ -1624,10 +1616,10 @@ detail::Rule::split_overlaps(std::vector<Rule>& rules)
+ // Preconditions:
+ //     r->starting_year() <= y && y <= r->ending_year()
+ static
+-std::pair<const Rule*, date::year>
+-find_previous_rule(const Rule* r, date::year y)
++std::pair<const Rule*, org_ttldtor_qdcxx_date_305_v1::year>
++find_previous_rule(const Rule* r, org_ttldtor_qdcxx_date_305_v1::year y)
+ {
+-    using namespace date;
++    using namespace org_ttldtor_qdcxx_date_305_v1;
+     auto const& rules = get_tzdb().rules;
+     if (y == r->starting_year())
+     {
+@@ -1660,10 +1652,10 @@ find_previous_rule(const Rule* r, date::year y)
+ //     first <= r && r < last && r->starting_year() <= y && y <= r->ending_year()
+ //     [first, last) all have the same name
+ static
+-std::pair<const Rule*, date::year>
+-find_next_rule(const Rule* first_rule, const Rule* last_rule, const Rule* r, date::year y)
++std::pair<const Rule*, org_ttldtor_qdcxx_date_305_v1::year>
++find_next_rule(const Rule* first_rule, const Rule* last_rule, const Rule* r, org_ttldtor_qdcxx_date_305_v1::year y)
+ {
+-    using namespace date;
++    using namespace org_ttldtor_qdcxx_date_305_v1;
+     if (y == r->ending_year())
+     {
+         if (r == last_rule-1)
+@@ -1691,10 +1683,10 @@ find_next_rule(const Rule* first_rule, const Rule* last_rule, const Rule* r, dat
+ // Preconditions:
+ //     r->starting_year() <= y && y <= r->ending_year()
+ static
+-std::pair<const Rule*, date::year>
+-find_next_rule(const Rule* r, date::year y)
++std::pair<const Rule*, org_ttldtor_qdcxx_date_305_v1::year>
++find_next_rule(const Rule* r, org_ttldtor_qdcxx_date_305_v1::year y)
+ {
+-    using namespace date;
++    using namespace org_ttldtor_qdcxx_date_305_v1;
+     auto const& rules = get_tzdb().rules;
+     if (y == r->ending_year())
+     {
+@@ -1734,16 +1726,16 @@ find_first_std_rule(const std::pair<const Rule*, const Rule*>& eqr)
+ }
+ 
+ static
+-std::pair<const Rule*, date::year>
++std::pair<const Rule*, org_ttldtor_qdcxx_date_305_v1::year>
+ find_rule_for_zone(const std::pair<const Rule*, const Rule*>& eqr,
+-                   const date::year& y, const std::chrono::seconds& offset,
++                   const org_ttldtor_qdcxx_date_305_v1::year& y, const std::chrono::seconds& offset,
+                    const MonthDayTime& mdt)
+ {
+     assert(eqr.first != nullptr);
+     assert(eqr.second != nullptr);
+ 
+     using namespace std::chrono;
+-    using namespace date;
++    using namespace org_ttldtor_qdcxx_date_305_v1;
+     auto r = eqr.first;
+     auto ry = r->starting_year();
+     auto prev_save = minutes{0};
+@@ -1762,14 +1754,14 @@ find_rule_for_zone(const std::pair<const Rule*, const Rule*>& eqr,
+ }
+ 
+ static
+-std::pair<const Rule*, date::year>
++std::pair<const Rule*, org_ttldtor_qdcxx_date_305_v1::year>
+ find_rule_for_zone(const std::pair<const Rule*, const Rule*>& eqr,
+                    const sys_seconds& tp_utc,
+                    const local_seconds& tp_std,
+                    const local_seconds& tp_loc)
+ {
+     using namespace std::chrono;
+-    using namespace date;
++    using namespace org_ttldtor_qdcxx_date_305_v1;
+     auto r = eqr.first;
+     auto ry = r->starting_year();
+     auto prev_save = minutes{0};
+@@ -1802,14 +1794,14 @@ find_rule_for_zone(const std::pair<const Rule*, const Rule*>& eqr,
+ 
+ static
+ sys_info
+-find_rule(const std::pair<const Rule*, date::year>& first_rule,
+-          const std::pair<const Rule*, date::year>& last_rule,
+-          const date::year& y, const std::chrono::seconds& offset,
++find_rule(const std::pair<const Rule*, org_ttldtor_qdcxx_date_305_v1::year>& first_rule,
++          const std::pair<const Rule*, org_ttldtor_qdcxx_date_305_v1::year>& last_rule,
++          const org_ttldtor_qdcxx_date_305_v1::year& y, const std::chrono::seconds& offset,
+           const MonthDayTime& mdt, const std::chrono::minutes& initial_save,
+           const std::string& initial_abbrev)
+ {
+     using namespace std::chrono;
+-    using namespace date;
++    using namespace org_ttldtor_qdcxx_date_305_v1;
+     auto r = first_rule.first;
+     auto ry = first_rule.second;
+     sys_info x{sys_days(year::min()/min_day), sys_days(year::max()/max_day),
+@@ -2501,7 +2493,7 @@ time_zone::time_zone(const std::string& s, detail::undocumented)
+ {
+     try
+     {
+-        using namespace date;
++        using namespace org_ttldtor_qdcxx_date_305_v1;
+         std::istringstream in(s);
+         in.exceptions(std::ios::failbit | std::ios::badbit);
+         std::string word;
+@@ -2510,9 +2502,8 @@ time_zone::time_zone(const std::string& s, detail::undocumented)
+     }
+     catch (...)
+     {
+-        std::cerr << s << '\n';
+-        std::cerr << *this << '\n';
+-        zonelets_.pop_back();
++        if (!zonelets_.empty())
++            zonelets_.pop_back();
+         throw;
+     }
+ }
+@@ -2561,9 +2552,8 @@ time_zone::add(const std::string& s)
+     }
+     catch (...)
+     {
+-        std::cerr << s << '\n';
+-        std::cerr << *this << '\n';
+-        zonelets_.pop_back();
++        if (!zonelets_.empty())
++            zonelets_.pop_back();
+         throw;
+     }
+ }
+@@ -2571,8 +2561,9 @@ time_zone::add(const std::string& s)
+ void
+ time_zone::parse_info(std::istream& in)
+ {
+-    using namespace date;
++    using namespace org_ttldtor_qdcxx_date_305_v1;
+     using namespace std::chrono;
++    qdcxx_timezone_input::admitNativeModel();
+     zonelets_.emplace_back();
+     auto& zonelet = zonelets_.back();
+     zonelet.gmtoff_ = parse_signed_time(in);
+@@ -2597,14 +2588,15 @@ time_zone::parse_info(std::istream& in)
+     }
+     if ((zonelet.until_year_ < min_year) ||
+             (zonelets_.size() > 1 && zonelets_.end()[-2].until_year_ > max_year))
+-        zonelets_.pop_back();
++        if (!zonelets_.empty())
++            zonelets_.pop_back();
+ }
+ 
+ void
+ time_zone::adjust_infos(const std::vector<Rule>& rules)
+ {
+     using namespace std::chrono;
+-    using namespace date;
++    using namespace org_ttldtor_qdcxx_date_305_v1;
+     const zonelet* prev_zonelet = nullptr;
+     for (auto& z : zonelets_)
+     {
+@@ -2745,14 +2737,14 @@ format_abbrev(std::string format, const std::string& variable, std::chrono::seco
+                 }
+                 else
+                     temp = '+';
+-                auto h = date::floor<hours>(off);
++                auto h = org_ttldtor_qdcxx_date_305_v1::floor<hours>(off);
+                 off -= h;
+                 if (h < hours{10})
+                     temp += '0';
+                 temp += std::to_string(h.count());
+                 if (off > seconds{0})
+                 {
+-                    auto m = date::floor<minutes>(off);
++                    auto m = org_ttldtor_qdcxx_date_305_v1::floor<minutes>(off);
+                     off -= m;
+                     if (m < minutes{10})
+                         temp += '0';
+@@ -2775,7 +2767,7 @@ sys_info
+ time_zone::get_info_impl(sys_seconds tp, int tz_int) const
+ {
+     using namespace std::chrono;
+-    using namespace date;
++    using namespace org_ttldtor_qdcxx_date_305_v1;
+     tz timezone = static_cast<tz>(tz_int);
+     assert(timezone != tz::standard);
+     auto y = year_month_day(floor<days>(tp)).year();
+@@ -2837,7 +2829,7 @@ time_zone::get_info_impl(sys_seconds tp, int tz_int) const
+ std::ostream&
+ operator<<(std::ostream& os, const time_zone& z)
+ {
+-    using namespace date;
++    using namespace org_ttldtor_qdcxx_date_305_v1;
+     using namespace std::chrono;
+     detail::save_ostream<char> _(os);
+     os.fill(' ');
+@@ -2869,7 +2861,7 @@ operator<<(std::ostream& os, const time_zone& z)
+         os << s.format_ << "   ";
+         os << s.until_year_ << ' ' << s.until_date_;
+         os << "   ";
+-        date::operator<<(os, s.until_utc_) << " UTC";
++        org_ttldtor_qdcxx_date_305_v1::operator<<(os, s.until_utc_) << " UTC";
+         os << "   " << s.until_std_ << " STD";
+         os << "   " << s.until_loc_;
+         os << "   " << make_time(s.initial_save_);
+@@ -2894,7 +2886,7 @@ operator<<(std::ostream& os, const time_zone& z)
+ std::ostream&
+ operator<<(std::ostream& os, const leap_second& x)
+ {
+-    return date::operator<<(os, x.date_) << "  +";
++    return org_ttldtor_qdcxx_date_305_v1::operator<<(os, x.date_) << "  +";
+ }
+ 
+ #if USE_OS_TZDB
+@@ -3106,7 +3098,7 @@ init_tzdb()
+ 
+ time_zone_link::time_zone_link(const std::string& s)
+ {
+-    using namespace date;
++    using namespace org_ttldtor_qdcxx_date_305_v1;
+     std::istringstream in(s);
+     in.exceptions(std::ios::failbit | std::ios::badbit);
+     std::string word;
+@@ -3116,7 +3108,7 @@ time_zone_link::time_zone_link(const std::string& s)
+ std::ostream&
+ operator<<(std::ostream& os, const time_zone_link& x)
+ {
+-    using namespace date;
++    using namespace org_ttldtor_qdcxx_date_305_v1;
+     detail::save_ostream<char> _(os);
+     os.fill(' ');
+     os.flags(std::ios::dec | std::ios::left);
+@@ -3128,7 +3120,7 @@ operator<<(std::ostream& os, const time_zone_link& x)
+ 
+ leap_second::leap_second(const std::string& s, detail::undocumented)
+ {
+-    using namespace date;
++    using namespace org_ttldtor_qdcxx_date_305_v1;
+     std::istringstream in(s);
+     in.exceptions(std::ios::failbit | std::ios::badbit);
+     std::string word;
+@@ -3760,62 +3752,11 @@ static
+ std::unique_ptr<tzdb>
+ init_tzdb()
+ {
+-    using namespace date;
+-    const std::string install = get_install();
+-    const std::string path = install + folder_delimiter;
++    using namespace org_ttldtor_qdcxx_date_305_v1;
+     std::string line;
+     bool continue_zone = false;
+     std::unique_ptr<tzdb> db(new tzdb);
+-
+-#if AUTO_DOWNLOAD
+-    if (!file_exists(install))
+-    {
+-        auto rv = remote_version();
+-        if (!rv.empty() && remote_download(rv))
+-        {
+-            if (!remote_install(rv))
+-            {
+-                std::string msg = "Timezone database version \"";
+-                msg += rv;
+-                msg += "\" did not install correctly to \"";
+-                msg += install;
+-                msg += "\"";
+-                throw std::runtime_error(msg);
+-            }
+-        }
+-        if (!file_exists(install))
+-        {
+-            std::string msg = "Timezone database not found at \"";
+-            msg += install;
+-            msg += "\"";
+-            throw std::runtime_error(msg);
+-        }
+-        db->version = get_version(path);
+-    }
+-    else
+-    {
+-        db->version = get_version(path);
+-        auto rv = remote_version();
+-        if (!rv.empty() && db->version != rv)
+-        {
+-            if (remote_download(rv))
+-            {
+-                remote_install(rv);
+-                db->version = get_version(path);
+-            }
+-        }
+-    }
+-#else  // !AUTO_DOWNLOAD
+-    if (!file_exists(install))
+-    {
+-        std::string msg = "Timezone database not found at \"";
+-        msg += install;
+-        msg += "\"";
+-        throw std::runtime_error(msg);
+-    }
+-    db->version = get_version(path);
+-#endif  // !AUTO_DOWNLOAD
+-
++    db->version = "2026f";
+     CONSTDATA char*const files[] =
+     {
+         "africa", "antarctica", "asia", "australasia", "backward", "etcetera", "europe",
+@@ -3824,13 +3765,10 @@ init_tzdb()
+ 
+     for (const auto& filename : files)
+     {
+-        std::string file_path = path + filename;
+-        if (!file_exists(file_path))
+-        {
+-          continue;
+-        }
+-        file_streambuf inbuf(file_path);
+-        std::istream infile(&inbuf);
++        const auto* bytes = qdcxx_timezone_input::snapshotFile(filename);
++        if (bytes == nullptr)
++            continue;
++        std::istringstream infile(*bytes);
+         while (infile)
+         {
+             std::getline(infile, line);
+@@ -3846,21 +3784,25 @@ init_tzdb()
+                 tolower(word);
+                 if (is_prefix_of(word, "rule"))
+                 {
++                    qdcxx_timezone_input::admitNativeModel();
+                     db->rules.push_back(Rule(line));
+                     continue_zone = false;
+                 }
+                 else if (is_prefix_of(word, "link"))
+                 {
++                    qdcxx_timezone_input::admitNativeModel();
+                     db->links.push_back(time_zone_link(line));
+                     continue_zone = false;
+                 }
+                 else if (is_prefix_of(word, "leap"))
+                 {
++                    qdcxx_timezone_input::admitNativeModel();
+                     db->leap_seconds.push_back(leap_second(line, detail::undocumented{}));
+                     continue_zone = false;
+                 }
+                 else if (is_prefix_of(word, "zone"))
+                 {
++                    qdcxx_timezone_input::admitNativeModel();
+                     db->zones.push_back(time_zone(line, detail::undocumented{}));
+                     continue_zone = true;
+                 }
+@@ -3888,11 +3830,7 @@ init_tzdb()
+     std::sort(db->leap_seconds.begin(), db->leap_seconds.end());
+     db->leap_seconds.shrink_to_fit();
+ 
+-#ifdef _WIN32
+-    std::string mapping_file = get_install() + folder_delimiter + "windowsZones.xml";
+-    db->mappings = load_timezone_mappings_from_xml_file(mapping_file);
+-    sort_zone_mappings(db->mappings);
+-#endif // _WIN32
++// Explicit IANA IDs need no machine-zone mapping dataset.
+ 
+     return db;
+ }
+@@ -3900,15 +3838,8 @@ init_tzdb()
+ const tzdb&
+ reload_tzdb()
+ {
+-#if AUTO_DOWNLOAD
+-    auto const& v = get_tzdb_list().front().version;
+-    if (!v.empty() && v == remote_version())
+-        return get_tzdb_list().front();
+-#endif  // AUTO_DOWNLOAD
+-    tzdb_list::undocumented_helper::push_front(get_tzdb_list(), init_tzdb().release());
+-    return get_tzdb_list().front();
++    throw std::logic_error("Timezone replacement requires deployment/restart");
+ }
+-
+ #endif  // !USE_OS_TZDB
+ 
+ const tzdb&
+@@ -4105,273 +4036,18 @@ operator<<(std::ostream& os, const tzdb& db)
+ 
+ #endif  // !USE_OS_TZDB
+ 
+-// -----------------------
+-
+-#ifdef _WIN32
+-
+-static
+-std::string
+-getTimeZoneKeyName()
+-{
+-    DYNAMIC_TIME_ZONE_INFORMATION dtzi{};
+-    auto result = GetDynamicTimeZoneInformation(&dtzi);
+-    if (result == TIME_ZONE_ID_INVALID)
+-        throw std::runtime_error("current_zone(): GetDynamicTimeZoneInformation()"
+-                                 " reported TIME_ZONE_ID_INVALID.");
+-    auto wlen = wcslen(dtzi.TimeZoneKeyName);
+-    char buf[128] = {};
+-    assert(sizeof(buf) >= wlen+1);
+-    wcstombs(buf, dtzi.TimeZoneKeyName, wlen);
+-    if (strcmp(buf, "Coordinated Universal Time") == 0)
+-        return "UTC";
+-    return buf;
+-}
+-
+-const time_zone*
+-tzdb::current_zone() const
+-{
+-    std::string win_tzid = getTimeZoneKeyName();
+-    std::string standard_tzid;
+-    if (!native_to_standard_timezone_name(win_tzid, standard_tzid))
+-    {
+-        std::string msg;
+-        msg = "current_zone() failed: A mapping from the Windows Time Zone id \"";
+-        msg += win_tzid;
+-        msg += "\" was not found in the time zone mapping database.";
+-        throw std::runtime_error(msg);
+-    }
+-    return locate_zone(standard_tzid);
+-}
+-
+-#else  // !_WIN32
+-
+-#if HAS_STRING_VIEW
+-
+-static
+-std::string_view
+-extract_tz_name(char const* rp)
+-{
+-    using namespace std;
+-    string_view result = rp;
+-    CONSTDATA string_view zoneinfo = "zoneinfo";
+-    size_t pos = result.rfind(zoneinfo);
+-    if (pos == result.npos)
+-        throw runtime_error(
+-            "current_zone() failed to find \"zoneinfo\" in " + string(result));
+-    pos = result.find('/', pos);
+-    result.remove_prefix(pos + 1);
+-    return result;
+-}
+-
+-#else  // !HAS_STRING_VIEW
+-
+-static
+-std::string
+-extract_tz_name(char const* rp)
+-{
+-    using namespace std;
+-    string result = rp;
+-    CONSTDATA char zoneinfo[] = "zoneinfo";
+-    size_t pos = result.rfind(zoneinfo);
+-    if (pos == result.npos)
+-        throw runtime_error(
+-            "current_zone() failed to find \"zoneinfo\" in " + result);
+-    pos = result.find('/', pos);
+-    result.erase(0, pos + 1);
+-    return result;
+-}
+-
+-#endif  // HAS_STRING_VIEW
+-
+-static
+-bool
+-sniff_realpath(const char* timezone)
+-{
+-    using namespace std;
+-    unique_ptr<char, decltype(free) *> rp(realpath(timezone, nullptr), free);
+-    if (rp.get() == nullptr)
+-        throw system_error(errno, system_category(), "realpath() failed");
+-    auto result = extract_tz_name(rp.get());
+-    if (result.find("posix") == 0)
+-        return false;
+-    return result != "posixrules";
+-}
+-
+ const time_zone*
+ tzdb::current_zone() const
+ {
+-    // On some OS's a file called /etc/localtime may
+-    // exist and it may be either a real file
+-    // containing time zone details or a symlink to such a file.
+-    // On MacOS and BSD Unix if this file is a symlink it
+-    // might resolve to a path like this:
+-    // "/usr/share/zoneinfo/America/Los_Angeles"
+-    // If it does, we try to determine the current
+-    // timezone from the remainder of the path by removing the prefix
+-    // and hoping the rest resolves to a valid timezone.
+-    // It may not always work though. If it doesn't then an
+-    // exception will be thrown by local_timezone.
+-    // The path may also take a relative form:
+-    // "../usr/share/zoneinfo/America/Los_Angeles".
+-    {
+-        struct stat sb;
+-        CONSTDATA auto timezone = "/etc/localtime";
+-        if (lstat(timezone, &sb) == 0 && S_ISLNK(sb.st_mode) && sb.st_size > 0)
+-        {
+-            using namespace std;
+-            static const bool use_realpath = sniff_realpath(timezone);
+-            if (use_realpath)
+-            {
+-                unique_ptr<char, decltype(free) *> rp(realpath(timezone, nullptr), free);
+-                if (rp.get() == nullptr)
+-                    throw system_error(errno, system_category(), "realpath() failed");
+-                return locate_zone(extract_tz_name(rp.get()));
+-            }
+-            else
+-            {
+-                // +1 because st_size doesn't include the '\0' terminator
+-                const auto rp_size = sb.st_size + 1;
+-                unique_ptr<char[]> rp(new char[rp_size]);
+-                const auto rp_length = readlink(timezone, rp.get(), rp_size);
+-                if (rp_length <= 0)
+-                    throw system_error(errno, system_category(), "readlink() failed");
+-                rp.get()[rp_length] = '\0'; // readlink doesn't null-terminate
+-                return locate_zone(extract_tz_name(rp.get()));
+-            }
+-        }
+-    }
+-    // On embedded systems e.g. buildroot with uclibc the timezone is linked
+-    // into /etc/TZ which is a symlink to path like this:
+-    // "/usr/share/zoneinfo/uclibc/America/Los_Angeles"
+-    // If it does, we try to determine the current
+-    // timezone from the remainder of the path by removing the prefix
+-    // and hoping the rest resolves to valid timezone.
+-    // It may not always work though. If it doesn't then an
+-    // exception will be thrown by local_timezone.
+-    // The path may also take a relative form:
+-    // "../usr/share/zoneinfo/uclibc/America/Los_Angeles".
+-    {
+-        struct stat sb;
+-        CONSTDATA auto timezone = "/etc/TZ";
+-        if (lstat(timezone, &sb) == 0 && S_ISLNK(sb.st_mode) && sb.st_size > 0) {
+-            using namespace std;
+-            string result;
+-            unique_ptr<char[]> rp(new char[sb.st_size]);
+-            const auto rp_length = readlink(timezone, rp.get(), sb.st_size);
+-            if (rp_length > 0)
+-                result = string(rp.get(), rp_length); // readlink doesn't null-terminate
+-            else
+-                throw system_error(errno, system_category(), "readlink() failed");
+-
+-            const size_t pos = result.find(get_tz_dir());
+-            if (pos != result.npos)
+-                result.erase(0, get_tz_dir().size() + 1 + pos);
+-            return locate_zone(result);
+-        }
+-    }
+-    {
+-    // On some versions of some linux distro's (e.g. Ubuntu),
+-    // the current timezone might be in the first line of
+-    // the /etc/timezone file.
+-        std::ifstream timezone_file("/etc/timezone");
+-        if (timezone_file.is_open())
+-        {
+-            std::string result;
+-            std::getline(timezone_file, result);
+-            if (!result.empty())
+-                return locate_zone(result);
+-        }
+-        // Fall through to try other means.
+-    }
+-    {
+-    // On some versions of some bsd distro's (e.g. FreeBSD),
+-    // the current timezone might be in the first line of
+-    // the /var/db/zoneinfo file.
+-        std::ifstream timezone_file("/var/db/zoneinfo");
+-        if (timezone_file.is_open())
+-        {
+-            std::string result;
+-            std::getline(timezone_file, result);
+-            if (!result.empty())
+-                return locate_zone(result);
+-        }
+-        // Fall through to try other means.
+-    }
+-    {
+-    // On some versions of some bsd distro's (e.g. iOS),
+-    // it is not possible to use file based approach,
+-    // we switch to system API, calling functions in
+-    // CoreFoundation framework.
+-#if TARGET_OS_IPHONE
+-        std::string result = date::iOSUtils::get_current_timezone();
+-        if (!result.empty())
+-            return locate_zone(result);
+-#endif
+-    // Fall through to try other means.
+-    }
+-    {
+-    // On Android, it is not possible to use file based approach either,
+-    // we have to ask the value of `persist.sys.timezone` system property
+-#if defined(ANDROID) || defined(__ANDROID__)
+-    char sys_timezone[PROP_VALUE_MAX];
+-    if (__system_property_get("persist.sys.timezone", sys_timezone) > 0)
+-    {
+-        return locate_zone(sys_timezone);
+-    }
+-#endif // defined(ANDROID) || defined(__ANDROID__)
+-    // Fall through to try other means.
+-    }
+-    {
+-    // On some versions of some linux distro's (e.g. Red Hat),
+-    // the current timezone might be in the first line of
+-    // the /etc/sysconfig/clock file as:
+-    // ZONE="US/Eastern"
+-        std::ifstream timezone_file("/etc/sysconfig/clock");
+-        std::string result;
+-        while (timezone_file)
+-        {
+-            std::getline(timezone_file, result);
+-            auto p = result.find("ZONE=\"");
+-            if (p != std::string::npos)
+-            {
+-                result.erase(0, p+6);
+-                result.erase(result.rfind('"'));
+-                return locate_zone(result);
+-            }
+-        }
+-        // Fall through to try other means.
+-    }
+-    // On OpenWRT we need to check /etc/config/system
+-    // It will have a line with the following structure
+-    //   ...
+-    //   option zoneName 'Europe/Berlin'
+-    //   ...
+-    {
+-        std::ifstream timezone_file("/etc/config/system");
+-        if (timezone_file.is_open())
+-        {
+-            for(std::string result; std::getline(timezone_file, result);) {
+-                std::string findStr = "option zoneName '";
+-                size_t startPos = result.find(findStr);
+-                if (startPos != std::string::npos) {
+-                    size_t endPos = result.find("'", startPos + findStr.size());
+-                    return locate_zone(result.substr(startPos + findStr.size(), endPos - startPos - findStr.size()));
+-                }
+-            }
+-        }
+-    }
+-    throw std::runtime_error("Could not get current timezone");
++    throw std::logic_error("Explicit zone IDs are required by this profile");
+ }
+ 
+-#endif  // !_WIN32
+-
+ const time_zone*
+ current_zone()
+ {
+-    return get_tzdb().current_zone();
++    throw std::logic_error("Explicit zone IDs are required by this profile");
+ }
+-
+-}  // namespace date
++}  // namespace org_ttldtor_qdcxx_date_305_v1
+ 
+ #if defined(__GNUC__) && __GNUC__ < 5
+ # pragma GCC diagnostic pop

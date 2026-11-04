@@ -24,6 +24,12 @@ std::size_t &counter(ScheduleUsage &usage, RetainedKind kind) noexcept {
         return usage.ruleModels;
     case RetainedKind::BUNDLE:
         return usage.bundles;
+    case RetainedKind::DAY:
+        return usage.days;
+    case RetainedKind::SESSION:
+        return usage.sessions;
+    case RetainedKind::DAY_CACHE:
+        return usage.dayCaches;
     }
 
     std::terminate();
@@ -43,6 +49,12 @@ std::size_t capacity(const ScheduleLimits &limits, RetainedKind kind) noexcept {
         return limits.retainedRuleModels;
     case RetainedKind::BUNDLE:
         return limits.retainedBundles;
+    case RetainedKind::DAY:
+        return limits.retainedDays;
+    case RetainedKind::SESSION:
+        return limits.retainedSessions;
+    case RetainedKind::DAY_CACHE:
+        return limits.retainedDayCaches;
     }
 
     std::terminate();
@@ -212,6 +224,11 @@ std::expected<Schedule, ScheduleError> instance(const std::shared_ptr<Context> &
         auto collected = collectInactive(context, base, construction);
         base = std::move(collected);
         auto rules = parseRules(selected, base->defaults, construction);
+
+        if (context->timeZones) {
+            stampTimeZone(*rules, *context, rawReference(*context), construction);
+        }
+
         construction.allocate(sizeof(Identity));
         auto identity = std::make_shared<Identity>();
         identity->definition = construction.copy(selected);
@@ -242,13 +259,13 @@ std::expected<Schedule, ScheduleError> instance(const std::shared_ptr<Context> &
 Lease::~Lease() {
     if (ledger != nullptr) {
         std::lock_guard lock(ledger->mutex);
-        --counter(ledger->usage, kind);
+        counter(ledger->usage, kind) -= units;
         ledger->usage.logicalBytes -= bytes;
     }
 }
 
 std::shared_ptr<const Lease> acquire(const std::shared_ptr<Ledger> &ledger, RetainedKind kind, std::size_t bytes,
-                                     Construction &construction) {
+                                     Construction &construction, std::size_t units) {
     // Allocate the uncharged lease first; all quota-failure destruction then occurs after the lock.
     construction.allocate(sizeof(Lease));
     auto lease = std::make_shared<Lease>();
@@ -264,9 +281,9 @@ std::shared_ptr<const Lease> acquire(const std::shared_ptr<Ledger> &ledger, Reta
         std::lock_guard lock(ledger->mutex);
         auto &count = counter(ledger->usage, kind);
 
-        if (count < capacity(ledger->limits, kind) &&
+        if (units <= capacity(ledger->limits, kind) - count &&
             bytes <= ledger->limits.retainedBytes - ledger->usage.logicalBytes) {
-            ++count;
+            count += units;
             ledger->usage.logicalBytes += bytes;
             admitted = true;
         }
@@ -278,6 +295,7 @@ std::shared_ptr<const Lease> acquire(const std::shared_ptr<Ledger> &ledger, Reta
 
     lease->kind = kind;
     lease->bytes = bytes;
+    lease->units = units;
     lease->ledger = ledger;
 
     return lease;
@@ -285,6 +303,10 @@ std::shared_ptr<const Lease> acquire(const std::shared_ptr<Ledger> &ledger, Reta
 
 const std::shared_ptr<Context> &Access::context(const ScheduleDataContext &context) noexcept {
     return context.state_;
+}
+
+const std::shared_ptr<Context> &Access::context(const Schedule &schedule) noexcept {
+    return schedule.context_;
 }
 
 std::shared_ptr<const Rules> Access::rules(const Schedule &schedule) {
@@ -345,6 +367,19 @@ std::expected<ScheduleDataContext, ScheduleError> ScheduleDataContext::create(Sc
     });
 }
 
+std::expected<ScheduleDataContext, ScheduleError> ScheduleDataContext::create(const ScheduleTimeZoneData &timeZones,
+                                                                              ScheduleLimits limits,
+                                                                              ScheduleQueryOptions options) {
+    auto result = create(limits);
+
+    if (result) {
+        result->state_->timeZones = timeZones;
+        result->state_->queryOptions = options;
+    }
+
+    return result;
+}
+
 std::expected<DefaultsUpdate, ScheduleError> ScheduleDataContext::setDefaults(CalendarDefaults defaults) const {
     return detail::guarded<DefaultsUpdate>([&] {
         detail::Construction construction{state_->limits};
@@ -359,6 +394,7 @@ std::expected<DefaultsUpdate, ScheduleError> ScheduleDataContext::setDefaults(Ca
                                                    candidateDefaults->modelBytes, construction);
         std::vector<detail::Entry> entries;
         std::vector<const detail::Identity *> removed;
+        const auto reference = state_->timeZones ? detail::rawReference(*state_) : 0;
 
         for (const auto &entry : base->entries) {
             construction.inspect(1);
@@ -370,6 +406,11 @@ std::expected<DefaultsUpdate, ScheduleError> ScheduleDataContext::setDefaults(Ca
             }
 
             auto rules = detail::parseRules(entry.identity->definition, candidateDefaults, construction);
+
+            if (state_->timeZones) {
+                detail::stampTimeZone(*rules, *state_, reference, construction);
+            }
+
             rules->lease =
                 detail::acquire(state_->ledger, detail::RetainedKind::RULES, rules->modelBytes, construction);
             construction.allocate(sizeof(detail::Entry));

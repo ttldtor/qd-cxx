@@ -328,3 +328,6 @@ The [IPF compression fixture oracle](../../tests/fixtures/ipf/compression/README
 - [Summary OI long reference](../upstream/summary-oracle/README.md#corrected-openinterest-long-reference): separate Invoke-OpenInterest.ps1, input-free EN/RU help and bounded Capture/Verify; preserves raw delegate observations under ADR-0010.
 
 - [ConnectionOracle](../../tests/fixtures/ipf/live/README.md): pinned JDK8/QD live/conditional/carryover observations, input-free EN/RU help, bounded owned loopback/server/handler threads.
+
+- [Schedule query oracle](../upstream/schedule-query-oracle/README.md): actual Day/Session/range/DST/hot-update projections, explicit2026f data differences, input-free EN/RU help; bounded JDK8 Capture/Verify.
+- [Schedule query example](../../examples/schedule_queries/README.md): explicit pinned data initialization, owning Day/Session values and input-free --help/--help-ru.

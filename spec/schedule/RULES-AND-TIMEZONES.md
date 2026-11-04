@@ -2,7 +2,7 @@
 
 [Русская версия](RULES-AND-TIMEZONES.ru.md). English is authoritative.
 
-Status: **compatibility specification; constructor grammar and typed calendar contexts are implemented** in the optional [schedule-rules component](../../docs/SCHEDULE-RULES.md). Day/Session queries and filters remain separate work. The provider/data ownership decision and controlled provider boundary are accepted and qualified in [ADR-0008](../../docs/decisions/ADR-0008-schedule-timezone-data-ownership.md); the parser validates identities without linking a timezone-query backend.
+Status: **implemented constructor/calendar and owning Day/Session query contract** in the optional [schedule component](../../docs/SCHEDULE-QUERIES.md). Filters remain separate. The accepted [provider/data boundary](../../docs/decisions/ADR-0008-schedule-timezone-data-ownership.md) is integrated through the shared [timezone component](../../docs/TIME-ZONE-DATA.md); parser-only contexts initialize no provider.
 
 ## Authority and independent datasets
 
@@ -64,12 +64,14 @@ Time lookup admits the inclusive millisecond range `[-62135424000000, 2534021280
 
 Invalid YMD values can normalize to the lowest valid later label: 20240230 becomes 20240301 and 20241301 becomes 20250101. Session/day membership is half-open `[start,end)`; zero-length intervals contain no time. Filters and nearest/next/previous search must preserve the complete supported grammar and these boundary semantics.
 
-## Provider boundary and future Schedule contexts
+## Provider boundary and explicit Schedule contexts
 
-The selected provider/data profile uses Howard Hinnant `date/tz` v3.0.5 at commit `179a6b921ccd6179b5b04dce812a89f71a51b4df` and IANA TZDB 2026f. Its qualification establishes the controlled provider/data boundary only; it does not implement parsing, day/session construction, filters, or a complete Schedule client.
+The selected provider/data profile uses Howard Hinnant `date/tz` v3.0.5 at commit `179a6b921ccd6179b5b04dce812a89f71a51b4df` and IANA TZDB 2026f. The maintained product integration and shared CORE binding are described in [timezone data](../../docs/TIME-ZONE-DATA.md); [owning Day/Session queries](../../docs/SCHEDULE-QUERIES.md) retain independent calendar generations. Filters remain separate.
 
 Initialization accepts an explicit data root and validates a fixed snapshot before parsing that owned snapshot. It performs no ambient home/OS lookup, CURL or remote access, or runtime reload. One private provider generation is initialized per process. All lazy provider work completes before `READY`; published queries use immutable provider state. Initialization failure is terminal and bounded, while an invalid argument rejected before compare-and-set admission does not consume the initialization attempt.
 
-The provider profile bounds admission to 11 files, 1,100,000 source bytes, 1,024 bytes per line, 35,000 lines, and 12,000 source records; native construction is bounded to 600 zones, 400 links, 10,000 rules, and 32,768 cumulative model insertions. It uses the standard allocator and makes no configurable hard heap/RSS-cap claim; measured peak memory is not a guaranteed limit. Provider initialization failure publishes no usable context. Calendar data contexts and retained calendar generations are separately owned; the provider's one-generation-per-process rule does not cap the number of future public `ScheduleDataContext` instances.
+The provider profile bounds admission to 11 files, 1,100,000 source bytes, 1,024 bytes per line, 35,000 lines, and 12,000 source records; native construction is bounded to 600 zones, 400 links, 10,000 rules, and 32,768 cumulative model insertions. It uses the standard allocator and makes no configurable hard heap/RSS-cap claim; measured peak memory is not a guaranteed limit. Provider initialization failure publishes no usable context. Calendar data contexts and retained calendar generations are separately owned; the provider's one-generation-per-process rule does not cap the number of public `ScheduleDataContext` instances.
 
-Timezone provider/data updates require an offline, maintainer-reviewed update followed by deployment and process restart. Market-calendar defaults remain independently versioned. The implemented typed context update validates a complete generation before publication. Future immutable Day/Session values must retain their original generation; those query types remain separate work.
+Timezone provider/data updates require an offline, maintainer-reviewed update followed by deployment and process restart. Market-calendar defaults remain independently versioned. The implemented typed context update validates a complete generation before publication. Immutable Day/Session values retain their original generation, including navigation; getSchedule returns the live identity. One constructor raw-reference instant is captured per model, or once per complete defaults rebuild, with an explicit deterministic override. Pre-1900 actual offset uses the final standard base independently of a historical reference. The actual Java oracle and the explicit36 contextual2026f expectations remain separate.
+
+The [containing-day postcondition correction](../../tests/fixtures/schedule-query/containing-day-correction.json) is a confirmed Java public-contract violation, separate from data differences: a non-containing result from the original two-pass time lookup returns typed NO_SESSION. Direct empty-day factories remain valid; no new search or parser narrowing occurs.

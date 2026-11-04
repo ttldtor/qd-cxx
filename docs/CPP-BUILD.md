@@ -5,8 +5,12 @@ The independent [schedule-rules component](SCHEDULE-RULES.md) needs no runtime S
 installed `schedule` component. Its exact tracked calendar/ID manifest is checked at configure;
 there is no acquisition step. Add `-DORG_TTLDTOR_QDCXX_BUILD_EXAMPLES=ON` for
 `qdcxx_schedule_example`; [example instructions](../examples/schedule_rules/README.md) include
-input-free EN/RU help. This target implements parsing, identities and typed calendar defaults;
-it does not link a timezone-query backend or implement Day/Session queries.
+input-free EN/RU help. The target also provides [owning Day/Session queries](SCHEDULE-QUERIES.md) and links the controlled
+[private timezone backend](TIME-ZONE-DATA.md). No separate runtime SDK is needed. The always-exported
+`qdcxx_time_zone_data` target supports fixed bindings with its optional backend OFF. Configure
+`ORG_TTLDTOR_QDCXX_BUILD_TIME_ZONE_DATA=ON` for named bindings without Schedule; request the
+installed `time_zone_data_backend` component when native availability is required. The query sample
+target is `qdcxx_schedule_queries_example`; pass an explicit installed data directory.
 
 Prepare the exact [runtime SDK sources](../cmake/runtime-profile/README.md) first. The explicit [dependency provisioning step](../tools/deps/README.md) supplies pinned Asio/c-ares with offline/cache support and no global installation; ordinary configure never downloads them.
 

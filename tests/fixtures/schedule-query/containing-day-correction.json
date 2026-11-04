@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "upstreamCommit": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "sourceUrl": "https://github.com/devexperts/QD/blob/0ddc0a09779fb61d74cc0b37c6449ff47dcb715f/dxfeed-api/src/main/java/com/dxfeed/schedule/Schedule.java#L252",
+  "sourceSha256": "8cc313b998be40da7fd7ee9309c4f5b1483d5396844327ac3790177ecb17c1ca",
+  "contract": "getDayByTime returns a day containing the supplied instant; Day.containsTime is [start,end)",
+  "input": "(tz=UTC;td=1234567;0=d00000000), time=0",
+  "correction": "After the original two-pass lookup, reject non-containing results with NO_SESSION; no new search or parser restriction. Direct day factories keep empty models.",
+  "javaFixtureSha256": "5b846233876dbc2ea2f495b92b5a5a228b26994cfa467cc9e5203d4acd7aa6d3",
+  "dataDifference": false,
+  "cases": [
+    {
+      "id": "empty-day-time",
+      "actualJava": "DAY\tempty-day-time\t1,19700102,1970,1,2,5,0,0,0,86400000,86400000,86400000\t1:NO_TRADING:86400000:86400000:0:1:0:0;\t0,19700101,1970,1,1,4,0,0,0,0,0,0\t2,19700103,1970,1,3,6,0,0,0,172800000,172800000,172800000\t1:NO_TRADING:86400000:86400000:0:1\t1:NO_TRADING:86400000:86400000:0:1\t0:NO_TRADING:0:0:0:1\t2:NO_TRADING:172800000:172800000:0:1\t0,0",
+      "actualNativeBeforeCorrection": "DAY\tempty-day-time\t1,19700102,1970,1,2,5,0,0,0,86400000,86400000,86400000\t1:NO_TRADING:86400000:86400000:0:1:0:0;\t0,19700101,1970,1,1,4,0,0,0,0,0,0\t2,19700103,1970,1,3,6,0,0,0,172800000,172800000,172800000\t1:NO_TRADING:86400000:86400000:0:1\t1:NO_TRADING:86400000:86400000:0:1\t0:NO_TRADING:0:0:0:1\t2:NO_TRADING:172800000:172800000:0:1\t0,0",
+      "cppExpected": "ERROR\tempty-day-time\tNoSuchElementException",
+      "classification": "Confirmed containing-day postcondition violation; typed refusal corrects it"
+    },
+    {
+      "id": "empty-day-session",
+      "actualJava": "ERROR\tempty-day-session\tNoSuchElementException",
+      "actualNativeBeforeCorrection": "ERROR\tempty-day-session\tNoSuchElementException",
+      "cppExpected": "ERROR\tempty-day-session\tNoSuchElementException",
+      "classification": "Existing typed no-session behavior remains unchanged"
+    }
+  ]
+}

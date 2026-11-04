@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "version": "2026f",
+  "archiveUrl": "https://data.iana.org/time-zones/releases/tzdata2026f.tar.gz",
+  "archiveSha256": "01b4a91cec5167ed48c11e8ab78f2048cead78ce94b0cafcad0ae8c5a3044d3d",
+  "license": "IANA tzdb LICENSE",
+  "files": [
+    {
+      "path": "africa",
+      "bytes": 58273,
+      "sha256": "f2851d4be4a4925cbdc9d56e10d780bccadb89d6ffb9aed78c3e35f97c200aed"
+    },
+    {
+      "path": "antarctica",
+      "bytes": 14080,
+      "sha256": "e410ad71c9450828c592d21419301d41ac79ce50159fd0ac2d6c5031cb6bdfe6"
+    },
+    {
+      "path": "asia",
+      "bytes": 193525,
+      "sha256": "02b69728085f6b0c999da70de2f1f9a2d8952b533a450d53bb41e03eb7d0e92e"
+    },
+    {
+      "path": "australasia",
+      "bytes": 98595,
+      "sha256": "846ba455578e3e0f9eb850f05be3cc06d02ff51bbe4b726f755be9dc765f16c9"
+    },
+    {
+      "path": "backward",
+      "bytes": 14051,
+      "sha256": "b8296b9ef1ece72d813878132c0f17e2c52b26af6004eeb9c37d049b64cd9401"
+    },
+    {
+      "path": "etcetera",
+      "bytes": 3124,
+      "sha256": "7281f095b42c13c4ae36b8bcba884e81dbb38127221fc1d9805c4dbf852487db"
+    },
+    {
+      "path": "europe",
+      "bytes": 188472,
+      "sha256": "fec11bf6c6bd0619a8777bbdaa2ecd184fde291cb4b97efa87d334c7145ba3c2"
+    },
+    {
+      "path": "northamerica",
+      "bytes": 185726,
+      "sha256": "da7366f6e0862ed15cb787dd056dca3a255df2ec50d19ff0a9f54eeb1562083a"
+    },
+    {
+      "path": "southamerica",
+      "bytes": 96359,
+      "sha256": "df4f2ae71a6980a76038f51bfc4cdaaca9af5ba8799df0b5bc73283db68c8cd6"
+    },
+    {
+      "path": "leapseconds",
+      "bytes": 3612,
+      "sha256": "bda8e68912eed87517c372cda05973a88392a286f96571dba9acaf295eef7984"
+    },
+    {
+      "path": "version",
+      "bytes": 6,
+      "sha256": "9f9a9e6bfd18cd6a0a4d65764931072577edcbb731981a068ef52bba6615b1de"
+    }
+  ],
+  "nativeProfile": {
+    "zones": 344,
+    "links": 253,
+    "rules": 2596,
+    "cumulativeModelInsertions": 5191
+  },
+  "scope": "Exact fixed private provider dataset; independent of QD market calendar and Java compatibility identity metadata",
+  "licenseSha256": "0613408568889f5739e5ae252b722a2659c02002839ad970a63dc5e9174b27cf"
+}

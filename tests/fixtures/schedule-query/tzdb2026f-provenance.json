@@ -1,0 +1,244 @@
+{
+  "schemaVersion": 1,
+  "source": "https://data.iana.org/time-zones/releases/tzdata2026f.tar.gz",
+  "sourceArchiveSha256": "01b4a91cec5167ed48c11e8ab78f2048cead78ce94b0cafcad0ae8c5a3044d3d",
+  "basis": "Source-derived deltas from exact zone/rule eras and links, checked against actual native queries; actual Java oracle remains unchanged. This qualifies these contextual observations only, not arbitrary TZDB differences.",
+  "javaFixtureSha256": "5b846233876dbc2ea2f495b92b5a5a228b26994cfa467cc9e5203d4acd7aa6d3",
+  "expectedSha256": "b8d724c9d8e7c34d73d087fc3a3f11fe8676d2cc75afd1c6a6d4ee08d197259b",
+  "sourceFiles": [
+    {
+      "path": "resources/time-zone-data/tzdb-2026f/northamerica",
+      "sha256": "da7366f6e0862ed15cb787dd056dca3a255df2ec50d19ff0a9f54eeb1562083a"
+    },
+    {
+      "path": "resources/time-zone-data/tzdb-2026f/southamerica",
+      "sha256": "df4f2ae71a6980a76038f51bfc4cdaaca9af5ba8799df0b5bc73283db68c8cd6"
+    },
+    {
+      "path": "resources/time-zone-data/tzdb-2026f/africa",
+      "sha256": "f2851d4be4a4925cbdc9d56e10d780bccadb89d6ffb9aed78c3e35f97c200aed"
+    },
+    {
+      "path": "resources/time-zone-data/tzdb-2026f/backward",
+      "sha256": "b8296b9ef1ece72d813878132c0f17e2c52b26af6004eeb9c37d049b64cd9401"
+    }
+  ],
+  "rows": [
+    {
+      "id": "all-id-Africa/Casablanca",
+      "rule": "morocco-permanent-zero-from-java2024a",
+      "utcThresholdMillis": -9223372036854775808,
+      "deltaMillis": 3600000
+    },
+    {
+      "id": "all-id-Africa/El_Aaiun",
+      "rule": "morocco-permanent-zero-from-java2024a",
+      "utcThresholdMillis": -9223372036854775808,
+      "deltaMillis": 3600000
+    },
+    {
+      "id": "all-id-America/Edmonton",
+      "rule": "permanent-offset-minus-one-hour-from-java2024a",
+      "utcThresholdMillis": -9223372036854775808,
+      "deltaMillis": -3600000
+    },
+    {
+      "id": "all-id-America/Havana",
+      "rule": "permanent-offset-minus-one-hour-from-java2024a",
+      "utcThresholdMillis": -9223372036854775808,
+      "deltaMillis": -3600000
+    },
+    {
+      "id": "all-id-America/Inuvik",
+      "rule": "permanent-offset-minus-one-hour-from-java2024a",
+      "utcThresholdMillis": -9223372036854775808,
+      "deltaMillis": -3600000
+    },
+    {
+      "id": "all-id-America/Rainy_River",
+      "rule": "permanent-offset-minus-one-hour-from-java2024a",
+      "utcThresholdMillis": -9223372036854775808,
+      "deltaMillis": -3600000
+    },
+    {
+      "id": "all-id-America/Vancouver",
+      "rule": "permanent-offset-minus-one-hour-from-java2024a",
+      "utcThresholdMillis": -9223372036854775808,
+      "deltaMillis": -3600000
+    },
+    {
+      "id": "all-id-America/Winnipeg",
+      "rule": "permanent-offset-minus-one-hour-from-java2024a",
+      "utcThresholdMillis": -9223372036854775808,
+      "deltaMillis": -3600000
+    },
+    {
+      "id": "all-id-America/Yellowknife",
+      "rule": "permanent-offset-minus-one-hour-from-java2024a",
+      "utcThresholdMillis": -9223372036854775808,
+      "deltaMillis": -3600000
+    },
+    {
+      "id": "all-id-Canada/Central",
+      "rule": "permanent-offset-minus-one-hour-from-java2024a",
+      "utcThresholdMillis": -9223372036854775808,
+      "deltaMillis": -3600000
+    },
+    {
+      "id": "all-id-Canada/Mountain",
+      "rule": "permanent-offset-minus-one-hour-from-java2024a",
+      "utcThresholdMillis": -9223372036854775808,
+      "deltaMillis": -3600000
+    },
+    {
+      "id": "all-id-Canada/Pacific",
+      "rule": "permanent-offset-minus-one-hour-from-java2024a",
+      "utcThresholdMillis": -9223372036854775808,
+      "deltaMillis": -3600000
+    },
+    {
+      "id": "all-id-Cuba",
+      "rule": "permanent-offset-minus-one-hour-from-java2024a",
+      "utcThresholdMillis": -9223372036854775808,
+      "deltaMillis": -3600000
+    },
+    {
+      "id": "raw-id-America/Asuncion",
+      "rule": "paraguay-final-standard-minus03",
+      "utcThresholdMillis": -9223372036854775808,
+      "deltaMillis": 0
+    },
+    {
+      "id": "raw-id-America/Edmonton",
+      "rule": "canada-final-standard-permanent-dst",
+      "utcThresholdMillis": -9223372036854775808,
+      "deltaMillis": 0
+    },
+    {
+      "id": "raw-id-America/Inuvik",
+      "rule": "canada-final-standard-permanent-dst",
+      "utcThresholdMillis": -9223372036854775808,
+      "deltaMillis": 0
+    },
+    {
+      "id": "raw-id-America/Rainy_River",
+      "rule": "canada-final-standard-permanent-dst",
+      "utcThresholdMillis": -9223372036854775808,
+      "deltaMillis": 0
+    },
+    {
+      "id": "raw-id-America/Vancouver",
+      "rule": "canada-final-standard-permanent-dst",
+      "utcThresholdMillis": -9223372036854775808,
+      "deltaMillis": 0
+    },
+    {
+      "id": "raw-id-America/Winnipeg",
+      "rule": "canada-final-standard-permanent-dst",
+      "utcThresholdMillis": -9223372036854775808,
+      "deltaMillis": 0
+    },
+    {
+      "id": "raw-id-America/Yellowknife",
+      "rule": "canada-final-standard-permanent-dst",
+      "utcThresholdMillis": -9223372036854775808,
+      "deltaMillis": 0
+    },
+    {
+      "id": "raw-id-Canada/Central",
+      "rule": "canada-final-standard-permanent-dst",
+      "utcThresholdMillis": -9223372036854775808,
+      "deltaMillis": 0
+    },
+    {
+      "id": "raw-id-Canada/Mountain",
+      "rule": "canada-final-standard-permanent-dst",
+      "utcThresholdMillis": -9223372036854775808,
+      "deltaMillis": 0
+    },
+    {
+      "id": "raw-id-Canada/Pacific",
+      "rule": "canada-final-standard-permanent-dst",
+      "utcThresholdMillis": -9223372036854775808,
+      "deltaMillis": 0
+    },
+    {
+      "id": "transition-America/Havana-20261101",
+      "rule": "cuba-cancelled-fall-2026-11-01T05Z",
+      "utcThresholdMillis": 1793509200000,
+      "deltaMillis": -3600000
+    },
+    {
+      "id": "transition-America/Winnipeg-20261101",
+      "rule": "manitoba-cancelled-fall-2026-11-01T07Z",
+      "utcThresholdMillis": 1793516400000,
+      "deltaMillis": -3600000
+    },
+    {
+      "id": "transition-Africa/Casablanca-20260920",
+      "rule": "morocco-permanent-zero-2026-09-20T01Z",
+      "utcThresholdMillis": 1789866000000,
+      "deltaMillis": 3600000
+    },
+    {
+      "id": "raw-ref-America/Winnipeg--9223372036854775808",
+      "rule": "canada-final-standard-permanent-dst",
+      "utcThresholdMillis": -9223372036854775808,
+      "deltaMillis": 0
+    },
+    {
+      "id": "raw-ref-America/Winnipeg--2208988800001",
+      "rule": "canada-final-standard-permanent-dst",
+      "utcThresholdMillis": -9223372036854775808,
+      "deltaMillis": 0
+    },
+    {
+      "id": "raw-ref-America/Winnipeg-1793793600000",
+      "rule": "canada-final-standard-permanent-dst",
+      "utcThresholdMillis": -9223372036854775808,
+      "deltaMillis": 0
+    },
+    {
+      "id": "raw-ref-America/Winnipeg-9223372036854775807",
+      "rule": "canada-final-standard-permanent-dst",
+      "utcThresholdMillis": -9223372036854775808,
+      "deltaMillis": 0
+    },
+    {
+      "id": "raw-ref-America/Asuncion--9223372036854775808",
+      "rule": "paraguay-final-standard-minus03",
+      "utcThresholdMillis": -9223372036854775808,
+      "deltaMillis": 0
+    },
+    {
+      "id": "raw-ref-America/Asuncion--2208988800001",
+      "rule": "paraguay-final-standard-minus03",
+      "utcThresholdMillis": -9223372036854775808,
+      "deltaMillis": 0
+    },
+    {
+      "id": "raw-ref-America/Asuncion-1767225600000",
+      "rule": "paraguay-final-standard-minus03",
+      "utcThresholdMillis": -9223372036854775808,
+      "deltaMillis": 0
+    },
+    {
+      "id": "raw-ref-America/Asuncion-1793059200000",
+      "rule": "paraguay-final-standard-minus03",
+      "utcThresholdMillis": -9223372036854775808,
+      "deltaMillis": 0
+    },
+    {
+      "id": "raw-ref-America/Asuncion-1793793600000",
+      "rule": "paraguay-final-standard-minus03",
+      "utcThresholdMillis": -9223372036854775808,
+      "deltaMillis": 0
+    },
+    {
+      "id": "raw-ref-America/Asuncion-9223372036854775807",
+      "rule": "paraguay-final-standard-minus03",
+      "utcThresholdMillis": -9223372036854775808,
+      "deltaMillis": 0
+    }
+  ]
+}

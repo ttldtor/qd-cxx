@@ -4,8 +4,8 @@
 
 The optional `qdcxx_schedule` library provides owning `Schedule` identities, complete parsing of the
 pinned trading-hours grammar, explicit calendar contexts and typed calendar-default updates.
-It returns names and validated timezone identities. Date-specific Day/Session construction, instant
-queries and filters remain separate capabilities. Parsing does not load or query a timezone provider.
+[Day/Session queries](SCHEDULE-QUERIES.md) use an explicit ready timezone capability; parser-only
+contexts perform no provider initialization. Filters remain a separate capability.
 
 ## Use an explicit context
 
@@ -104,9 +104,9 @@ no timezone transitions and is not a claim that IANA aliases alone implement Jav
 
 The [manifest](../resources/schedule/manifest.json) records source/runtime/data hashes. No Java runtime
 is required to build or use the C++ library. The selected production transition dataset remains IANA
-TZDB 2026f with its separately qualified private provider. The parser target acquires and links no
-date/tz SDK, CURL or timezone-query backend. Future instant-query integration must retain the accepted
-compatibility and provider boundaries.
+TZDB2026f with the maintained controlled private provider. The target links the shared
+[timezone backend](TIME-ZONE-DATA.md), while parser-only contexts perform no native initialization.
+The build requires no acquisition, CURL or runtime SDK.
 
 ## Finite resources and concurrency
 

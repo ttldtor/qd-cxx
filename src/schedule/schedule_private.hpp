@@ -82,7 +82,7 @@ struct VenueDefaults {
     Properties properties;
 };
 
-enum class RetainedKind { GENERATION, IDENTITY, RULES, BUNDLE };
+enum class RetainedKind { GENERATION, IDENTITY, RULES, BUNDLE, DAY, SESSION, DAY_CACHE };
 struct Ledger;
 
 /** Shared logical charge, released independently of the context commit lock. */
@@ -90,6 +90,7 @@ struct Lease {
     std::shared_ptr<Ledger> ledger;
     RetainedKind kind;
     std::size_t bytes;
+    std::size_t units = 1;
     ~Lease();
 };
 
@@ -125,12 +126,41 @@ struct Rules {
     std::vector<std::int32_t> holidays;
     std::vector<std::int32_t> shortDays;
     std::int64_t dayOffset = 0;
+    std::int64_t rawOffsetSeconds = 0;
+    std::int64_t rawOffsetReferenceTime = 0;
+    std::optional<time::ZoneBinding> timeZoneBinding;
     std::int64_t earlyClose = 0;
     std::int32_t joinNextTradingDay = 0;
     std::array<std::size_t, 9> weekDays;
     std::vector<DayDefinition> definitions;
     std::vector<DayStrategy> overrides;
     std::size_t modelBytes = 0;
+};
+
+/** Scalar immutable session record; its owning day supplies identity and generation lifetime. */
+struct SessionRecord {
+    SessionType type;
+    std::int64_t start;
+    std::int64_t end;
+};
+
+/** Complete immutable constructed day, without live Schedule handles or context ownership cycles. */
+struct DayModel {
+    std::shared_ptr<const Lease> lease;
+    std::shared_ptr<const Lease> sessionLease;
+    std::shared_ptr<const Rules> rules;
+    std::int32_t dayId;
+    std::int32_t yearMonthDay;
+    bool holiday;
+    bool shortDay;
+    std::int64_t reset;
+    std::vector<SessionRecord> sessions;
+};
+
+/** Bounded immutable weak lookup snapshot; unused entries cannot pin calendar generations. */
+struct DayCache {
+    std::shared_ptr<const Lease> lease;
+    std::vector<std::weak_ptr<const DayModel>> entries;
 };
 
 /** One exact selected definition; no context pointer/cycle is retained here. */
@@ -169,6 +199,9 @@ struct Context {
     std::shared_ptr<Ledger> ledger;
     std::mutex commitMutex;
     std::atomic<std::shared_ptr<const Bundle>> current;
+    std::optional<time::TimeZoneData> timeZones;
+    ScheduleQueryOptions queryOptions;
+    std::atomic<std::shared_ptr<const DayCache>> dayCache;
 };
 
 /** Private bridge shared by public metadata methods and future date-specific queries. */
@@ -177,6 +210,10 @@ struct Access {
      * @return Shared internal domain, without allocation.
      */
     static const std::shared_ptr<Context> &context(const ScheduleDataContext &context) noexcept;
+    /** @param schedule Live identity handle.
+     * @return Its owning context, without allocation.
+     */
+    static const std::shared_ptr<Context> &context(const Schedule &schedule) noexcept;
     /** @param schedule Public owning identity.
      * @return Immutable current rules, pinned for the entire caller operation.
      */
@@ -191,6 +228,32 @@ struct Access {
      * @return Public handle adopting that reservation without allocation or throwing.
      */
     static Schedule makeReserved(std::shared_ptr<Context> context, std::shared_ptr<const Identity> identity) noexcept;
+    /** @param schedule Live owning Schedule identity.
+     * @param model Complete immutable constructed day.
+     * @return Owning public day; the cache model itself never owns a live handle.
+     */
+    static Day makeDay(Schedule schedule, std::shared_ptr<const DayModel> model) noexcept;
+    /** @param day Owning day snapshot.
+     * @param index Existing session record index.
+     * @return Owning public session.
+     */
+    static Session makeSession(Day day, std::size_t index) noexcept;
+    /** @param day Owning day snapshot.
+     * @return Its immutable model pin.
+     */
+    static const std::shared_ptr<const DayModel> &model(const Day &day) noexcept;
+    /** @param day Owning snapshot.
+     * @return Its live Schedule identity.
+     */
+    static const Schedule &schedule(const Day &day) noexcept;
+    /** @param session Owning session.
+     * @return Its pinned day, without a handle copy.
+     */
+    static const Day &day(const Session &session) noexcept;
+    /** @param session Owning session.
+     * @return Its immutable record index.
+     */
+    static std::size_t index(const Session &session) noexcept;
 };
 
 /** @param text Exact selected definition.
@@ -220,8 +283,25 @@ std::u16string_view selectDefinition(std::u16string_view text, const std::u16str
  * @param kind Distinct model category.
  * @param bytes Complete logical owned-field backing.
  * @param construction Operation-wide staging counters, charged before lease allocation.
+ * @param units Distinct records charged by the lease; normally1, or the complete session-record count.
  * @return Lease acquired before publication, or typed quota/allocation failure.
  */
 std::shared_ptr<const Lease> acquire(const std::shared_ptr<Ledger> &ledger, RetainedKind kind, std::size_t bytes,
-                                     Construction &construction);
+                                     Construction &construction, std::size_t units = 1);
+
+/** @param context Explicit domain whose options may override the constructor clock.
+ * @return One signed Unix millisecond reference, captured outside the commit lock.
+ */
+std::int64_t rawReference(const Context &context) noexcept;
+/** @param rules Candidate parsed model to finish before publication.
+ * @param context Explicit owning timezone domain; parser-only contexts perform no timezone/clock work.
+ * @param reference One captured constructor/reference instant shared by an atomic defaults rebuild.
+ * @param construction Finite construction counters.
+ */
+void stampTimeZone(Rules &rules, const Context &context, std::int64_t reference, Construction &construction);
+
+/** @param error Shared timezone refusal.
+ * @return Equivalent schedule-boundary error.
+ */
+ScheduleError timeZoneError(time::TimeZoneError error) noexcept;
 } // namespace org::ttldtor::qdcxx::schedule::detail

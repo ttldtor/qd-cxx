@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "version": "java-calendar-conventions-v1-tzdb2026f",
+  "providerDataVersion": "2026f",
+  "defaultReferencePolicy": "Capture current signed Unix milliseconds once per new Schedule model and once per complete atomic calendar rebuild; no query-time clock reads",
+  "explicitReferencePolicy": "Caller-supplied signed Unix milliseconds replaces constructor clock; queried day/session dates remain independent",
+  "optionalDeterministicReference": {
+    "utc": "2026-10-27T00:00:00Z",
+    "millis": 1793059200000,
+    "meaning": "Explicit optional profile reference date only; not a release timestamp or default"
+  },
+  "preTransitionBoundaryMillis": -2208988800000,
+  "preTransitionPolicy": "ZoneInfo before UTC1900 uses the final standard raw base, independently of a historical constructor/raw reference; no local mean time",
+  "rawConventions": [
+    {
+      "nativeCanonicalZone": "Europe/Dublin",
+      "beginUtcMillis": 57722400000,
+      "endUtcMillis": 9223372036854775807,
+      "rawAdjustmentSeconds": -3600,
+      "sourceFile": "europe",
+      "sourceEvidence": "ziguard.awk:107-121; rearguard fixed BST until1971 then zero-base GB-Eire/EU"
+    },
+    {
+      "nativeCanonicalZone": "Africa/Windhoek",
+      "beginUtcMillis": 764200800000,
+      "endUtcMillis": 1508796000000,
+      "rawAdjustmentSeconds": -3600,
+      "sourceFile": "africa",
+      "sourceEvidence": "ziguard.awk:123-140; rearguard one-hour base during1994-2017 Namibia rules"
+    },
+    {
+      "nativeCanonicalZone": "Europe/Prague",
+      "beginUtcMillis": -728517600000,
+      "endUtcMillis": -721260000000,
+      "rawAdjustmentSeconds": -3600,
+      "sourceFile": "europe",
+      "sourceEvidence": "ziguard.awk:96-105; rearguard zero-base fixed winter interval"
+    },
+    {
+      "nativeCanonicalZone": "Africa/Casablanca",
+      "beginUtcMillis": 1540692000000,
+      "endUtcMillis": 1789866000000,
+      "rawAdjustmentSeconds": -3600,
+      "sourceFile": "africa",
+      "sourceEvidence": "ziguard.awk:261-299; negative Morocco SAVE becomes positive with zero-base"
+    },
+    {
+      "nativeCanonicalZone": "Africa/El_Aaiun",
+      "beginUtcMillis": 1540692000000,
+      "endUtcMillis": 1789866000000,
+      "rawAdjustmentSeconds": -3600,
+      "sourceFile": "africa",
+      "sourceEvidence": "Same exact Morocco rule set and source-era boundaries as Casablanca"
+    }
+  ],
+  "sourceFiles": [
+    {
+      "path": "europe",
+      "sha256": "fec11bf6c6bd0619a8777bbdaa2ecd184fde291cb4b97efa87d334c7145ba3c2",
+      "url": "https://data.iana.org/time-zones/releases/tzdata2026f.tar.gz"
+    },
+    {
+      "path": "africa",
+      "sha256": "f2851d4be4a4925cbdc9d56e10d780bccadb89d6ffb9aed78c3e35f97c200aed",
+      "url": "https://data.iana.org/time-zones/releases/tzdata2026f.tar.gz"
+    },
+    {
+      "path": "ziguard.awk",
+      "sha256": "d01a09ded697379bc6df555fa6ce9b976dfb502df01c3741fca69fbd07f27569",
+      "url": "https://data.iana.org/time-zones/releases/tzdata2026f.tar.gz"
+    }
+  ],
+  "reference": {
+    "jdk": "Zulu Java8 1.8.0_422",
+    "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
+    "tzdb": "2024a",
+    "tzdbSha256": "e37fc7662b34281f15687f2bbdb054cf192131c09e8a4917261b74ed5e2a3db2",
+    "zoneInfoSource": "sun/util/calendar/ZoneInfo.java",
+    "zoneInfoSha256": "025db9448c0d2bbe23deeee4fc24bb82eb940b1e00cab9fe49a2cc39c8c9d21b",
+    "zoneInfoFileSource": "sun/util/calendar/ZoneInfoFile.java",
+    "zoneInfoFileSha256": "401d770965321e2ee0e12424761b02f4ee63e8ff3088db149dcbd1344ef12cbf"
+  },
+  "metadata": {
+    "path": "java8-zone-metadata.tsv",
+    "rows": 631,
+    "sha256": "da8426c8745bbbbe773df0b614cef50c92f923a8655b13041a73e30a0c1e702b",
+    "columns": [
+      "requestedId",
+      "actualToZoneId",
+      "referenceRawMillis",
+      "referenceDstSavingsMillis",
+      "referenceUseDaylightTime",
+      "offsetBefore1900",
+      "offsetAt1900",
+      "offsetAtEpoch",
+      "offset2026January",
+      "offset2026July",
+      "offset2026November"
+    ]
+  },
+  "legacyTransitions": {
+    "path": "java8-systemv-transitions.tsv",
+    "rows": 936,
+    "sha256": "62f3851a25de6bffd2808e395a0065552eec6e6d29c5d0fc5506932de35963ab",
+    "columns": [
+      "actualSystemVId",
+      "transitionEpochSeconds",
+      "offsetBeforeSeconds",
+      "offsetAfterSeconds"
+    ],
+    "recurringRules": "Actual Java ZoneRules last Sunday in April02:00wall and last Sunday in October02:00wall; raw+3600 summer, raw winter",
+    "scope": "Independent legacy Java identity conventions; not replacement IANA2026f transition truth"
+  },
+  "scope": "Java compatibility identity/raw/DST conventions; per-reference native raw values use pinned2026f and have separate contextual expected differences from Java2024a"
+}

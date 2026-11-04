@@ -2,10 +2,14 @@
 // SPDX-License-Identifier: BSL-1.0
 #pragma once
 
+#include "qd/time/time_zone_data.hpp"
+
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <filesystem>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -17,6 +21,7 @@ struct Context;
 struct Identity;
 struct Access;
 struct ReservedHandle;
+struct DayModel;
 } // namespace detail
 
 /** Typed parser, transaction and logical-resource failures; no partial update is published. */
@@ -27,9 +32,19 @@ enum class ScheduleError {
     UNKNOWN_TIME_ZONE,  ///< The exact ID is outside the pinned compatibility identity profile.
     RESOURCE_LIMIT,     ///< A finite input/work/staging/cache/retained-model limit would be exceeded.
     ALLOCATION,         ///< An owning allocation failed before publication.
-    CONCURRENT_CHANGE   ///< A conflicting bounded transaction committed; the caller may explicitly retry.
+    CONCURRENT_CHANGE,  ///< A conflicting bounded transaction committed; the caller may explicitly retry.
+    NOT_READY,          ///< This parser-only context has no explicitly initialized timezone data.
+    OUT_OF_RANGE,       ///< The argument is outside this particular query method's supported range.
+    NO_SESSION,         ///< No interval selected by the day/session lookup contains the requested instant.
+    TIME_ZONE_DATA      ///< Controlled timezone initialization or an identity/data lookup failed.
 };
 
+/** Shared CORE timezone capability; market-calendar generations remain independent. */
+using ScheduleTimeZoneData = time::TimeZoneData;
+/** Shared finite provider admission bounds. */
+using TimeZoneLimits = time::TimeZoneLimits;
+/** Shared explicit constructor/raw-reference options; no clock is read by date queries. */
+using ScheduleQueryOptions = time::TimeZoneBindingOptions;
 /** Ordered source entry in a calendar generation. */
 enum class CalendarEntryKind {
     HOLIDAY_DAYS, ///< Named hd list; references may use earlier holiday entries.
@@ -69,6 +84,13 @@ struct ScheduleLimits {
     std::size_t retainedBundles = 16;      ///< Published/candidate bundles retained across readers.
     std::size_t inactiveCacheTarget =
         64; ///< Inactive collection target on explicit factory turns; retainedSchedules bounds all entries.
+    std::size_t queryWork = 100000;          ///< Cumulative inspection/conversion credits per date query.
+    std::size_t queryStagingBytes = 4194304; ///< Cumulative logical construction bytes per date query.
+    std::size_t retainedDays = 4096;         ///< Distinct retained immutable date-specific day models.
+    std::size_t retainedSessions = 65536;    ///< Session records retained inside all live day models.
+    std::size_t querySessionsPerDay = 16384; ///< Maximum records in a constructed day, including joined days/gaps.
+    std::size_t dayCacheEntries = 1024;      ///< Maximum weak day-cache entries; zero disables the cache.
+    std::size_t retainedDayCaches = 16;      ///< Distinct immutable current/candidate/reader cache snapshots.
 };
 
 /** Current shared-retention observations; caller-owned handle copies are not distinct models. */
@@ -78,6 +100,9 @@ struct ScheduleUsage {
     std::size_t identities = 0;   ///< Distinct retained exact selected definitions.
     std::size_t ruleModels = 0;   ///< Distinct retained parsed definition/generation models.
     std::size_t bundles = 0;      ///< Immutable bundles retained by context, transactions or readers.
+    std::size_t days = 0;         ///< Distinct retained date-specific immutable models.
+    std::size_t sessions = 0;     ///< Retained session records; handle copies do not create records.
+    std::size_t dayCaches = 0;    ///< Retained immutable weak-cache snapshots.
 };
 
 /** Result of an explicit typed calendar replacement. */
@@ -115,6 +140,14 @@ class ScheduleDataContext final {
      * @return Fully initialized context or a typed failure, with no partial domain exposed.
      */
     [[nodiscard]] static std::expected<ScheduleDataContext, ScheduleError> create(ScheduleLimits limits = {});
+    /** Create an independent calendar/cache domain sharing an explicitly ready timezone generation.
+     * @param timeZones Owning ready capability; no file/native initialization occurs in this factory.
+     * @param limits Finite parser/query/retention limits shared by the new domain.
+     * @param options Explicit raw-metadata reference; it does not restrict queried dates.
+     * @return Fully initialized query-capable context or a typed failure.
+     */
+    [[nodiscard]] static std::expected<ScheduleDataContext, ScheduleError>
+    create(const ScheduleTimeZoneData &timeZones, ScheduleLimits limits = {}, ScheduleQueryOptions options = {});
     /** Prepare a complete typed calendar generation and rebuild all live schedule identities.
      * No raw-byte TimeFormat/date-header loader is implied. Invalid/over-budget/allocation/conflict
      * failures preserve the current generation. Inactive cache entries may be discarded atomically;
@@ -129,11 +162,26 @@ class ScheduleDataContext final {
     [[nodiscard]] ScheduleUsage getUsage() const noexcept;
 };
 
-/** Owning Java-like schedule identity in an explicit context, without Day/Session queries.
- * Getters use the current completely published calendar generation; copies share identity and
- * retain the context. Input views are never retained. Metadata returns owning values where a
- * concurrent defaults replacement could otherwise invalidate a borrowed view. No callbacks,
- * implicit source discovery, timezone querying or worker/progress work occurs in getters.
+class Day;
+class Session;
+
+/** Date-specific session kinds, including zero-duration trading sessions. */
+enum class SessionType {
+    NO_TRADING,  ///< No trading activity.
+    PRE_MARKET,  ///< Trading before the regular market.
+    REGULAR,     ///< Regular market trading.
+    AFTER_MARKET ///< Trading after the regular market.
+};
+
+/** @param type Session kind to inspect.
+ * @return Whether this kind is trading; duration does not affect its trading type.
+ */
+[[nodiscard]] bool isTrading(SessionType type) noexcept;
+
+/** Owning Java-like schedule identity in an explicit context.
+ * Metadata uses the current atomically published calendar generation. Day and Session results own
+ * immutable generation snapshots and retain this live identity. Input views are never retained.
+ * Ordinary getters and queries perform no file/network discovery, callbacks or worker progress.
  */
 class Schedule final {
     std::shared_ptr<detail::Context> context_;
@@ -192,9 +240,137 @@ class Schedule final {
      * @throws std::bad_alloc The result copy cannot be allocated.
      */
     [[nodiscard]] std::u16string getTimeZoneId() const;
+    /** @param dayId DayUtil label in the inclusive method-specific range [-719160, 2932894].
+     * @return Owning day pinned to one complete current calendar generation, or typed refusal.
+     */
+    [[nodiscard]] std::expected<Day, ScheduleError> getDayById(std::int32_t dayId) const;
+    /** @param yearMonthDay Packed YMD in [10103, 99991229]; invalid labels normalize to the lowest later label.
+     * @return Owning day pinned to one current generation, or typed refusal.
+     */
+    [[nodiscard]] std::expected<Day, ScheduleError> getDayByYearMonthDay(std::int32_t yearMonthDay) const;
+    /** @param time Signed Unix milliseconds in [-62135424000000, 253402128000000], both ends inclusive.
+     * @return The owning day containing time; its label can exceed the direct-label factory's bounds.
+     */
+    [[nodiscard]] std::expected<Day, ScheduleError> getDayByTime(std::int64_t time) const;
+    /** @param time Signed Unix milliseconds, with the same method range as getDayByTime.
+     * @return Owning nonempty session containing time, or typed refusal.
+     */
+    [[nodiscard]] std::expected<Session, ScheduleError> getSessionByTime(std::int64_t time) const;
     /** @param other Schedule identity to compare.
      * @return True only for the same retained identity in the same context; defaults updates preserve it.
      */
     [[nodiscard]] bool operator==(const Schedule &other) const noexcept;
+};
+
+/** Owning immutable day snapshot; navigation retains its original calendar/provider generation.
+ * The contained live Schedule identity keeps getSchedule valid, while the model pins old rules.
+ * Moves preserve the source handle. Copies share models; concurrent replacement of one handle
+ * requires external synchronization. Identity equality follows Schedule identity plus day-id.
+ */
+class Day final {
+    Schedule schedule_;
+    std::shared_ptr<const detail::DayModel> model_;
+    Day(Schedule schedule, std::shared_ptr<const detail::DayModel> model) noexcept;
+    friend struct detail::Access;
+
+    public:
+    /** @param other Identity and immutable snapshot to share without allocation. */
+    Day(const Day &other) noexcept = default;
+    /** @param other Snapshot to share; the original handle remains valid. */
+    Day(Day &&other) noexcept;
+    /** @param other Snapshot to share.
+     * @return This handle after replacement.
+     */
+    Day &operator=(const Day &other) noexcept = default;
+    /** @param other Snapshot to share; the original handle remains valid.
+     * @return This handle after replacement.
+     */
+    Day &operator=(Day &&other) noexcept;
+    /** @return Owning live Schedule identity; direct queries through it observe current defaults. */
+    [[nodiscard]] Schedule getSchedule() const noexcept;
+    /** @return Original pinned calendar comparison version, independent of live Schedule metadata. */
+    [[nodiscard]] std::int64_t getDefaultsVersion() const noexcept;
+    /** @return Consecutive DayUtil day-id label; independent of physical interval duration. */
+    [[nodiscard]] std::int32_t getDayId() const noexcept;
+    /** @return Packed proleptic Gregorian YMD label. */
+    [[nodiscard]] std::int32_t getYearMonthDay() const noexcept;
+    /** @return Gregorian year of the day label. */
+    [[nodiscard]] std::int32_t getYear() const noexcept;
+    /** @return Month from 1 through 12. */
+    [[nodiscard]] std::int32_t getMonthOfYear() const noexcept;
+    /** @return Day-of-month label. */
+    [[nodiscard]] std::int32_t getDayOfMonth() const noexcept;
+    /** @return ISO weekday from Monday1 through Sunday7. */
+    [[nodiscard]] std::int32_t getDayOfWeek() const noexcept;
+    /** @return Whether the pinned holiday list contains this label; joined final days retain source handling. */
+    [[nodiscard]] bool isHoliday() const noexcept;
+    /** @return Whether the pinned short-day list contains this label. */
+    [[nodiscard]] bool isShortDay() const noexcept;
+    /** @return Whether any session has a trading type, including zero-duration sessions. */
+    [[nodiscard]] bool isTrading() const noexcept;
+    /** @return Inclusive start in signed Unix milliseconds. */
+    [[nodiscard]] std::int64_t getStartTime() const noexcept;
+    /** @return Exclusive end in signed Unix milliseconds. */
+    [[nodiscard]] std::int64_t getEndTime() const noexcept;
+    /** @return Reset instant in signed Unix milliseconds. */
+    [[nodiscard]] std::int64_t getResetTime() const noexcept;
+    /** @param time Signed Unix milliseconds.
+     * @return Membership in [start,end); empty days contain no instant.
+     */
+    [[nodiscard]] bool containsTime(std::int64_t time) const noexcept;
+    /** @return Ordered owning sessions; zero-duration records are preserved.
+     * @throws std::bad_alloc The caller-owned output cannot be allocated.
+     */
+    [[nodiscard]] std::vector<Session> getSessions() const;
+    /** @param time Signed Unix milliseconds; this method searches only this day's existing records.
+     * @return Owning containing session or NO_SESSION; empty sessions never contain time.
+     */
+    [[nodiscard]] std::expected<Session, ScheduleError> getSessionByTime(std::int64_t time) const;
+    /** @return Owning first session, with the unfiltered source ANY behavior. */
+    [[nodiscard]] Session getFirstSession() const noexcept;
+    /** @return Owning last session, with the unfiltered source ANY behavior. */
+    [[nodiscard]] Session getLastSession() const noexcept;
+    /** @return Previous labelled day in the pinned generation; direct day-id method bounds apply. */
+    [[nodiscard]] std::expected<Day, ScheduleError> getPrevDay() const;
+    /** @return Next labelled day in the pinned generation; direct day-id method bounds apply. */
+    [[nodiscard]] std::expected<Day, ScheduleError> getNextDay() const;
+    /** @param other Day identity to compare, possibly from a different calendar snapshot.
+     * @return True for the same Schedule identity and day-id, as in the source equality contract.
+     */
+    [[nodiscard]] bool operator==(const Day &other) const noexcept;
+};
+
+/** Owning session handle; its Day pin and record index avoid model cycles and borrowed references. */
+class Session final {
+    Day day_;
+    std::size_t index_;
+    Session(Day day, std::size_t index) noexcept;
+    friend struct detail::Access;
+
+    public:
+    /** @return Owning immutable day snapshot. */
+    [[nodiscard]] Day getDay() const noexcept;
+    /** @return Source session kind, independent of its duration. */
+    [[nodiscard]] SessionType getType() const noexcept;
+    /** @return Whether its type is trading; zero-duration trading sessions remain trading. */
+    [[nodiscard]] bool isTrading() const noexcept;
+    /** @return Whether start is at or after end, including permitted inverted no-trading records. */
+    [[nodiscard]] bool isEmpty() const noexcept;
+    /** @return Inclusive signed Unix millisecond start. */
+    [[nodiscard]] std::int64_t getStartTime() const noexcept;
+    /** @return Exclusive signed Unix millisecond end. */
+    [[nodiscard]] std::int64_t getEndTime() const noexcept;
+    /** @param time Signed Unix milliseconds.
+     * @return Membership in [start,end); an empty session contains no instant.
+     */
+    [[nodiscard]] bool containsTime(std::int64_t time) const noexcept;
+    /** @return Previous session in source ordering, crossing a day boundary in the pinned generation. */
+    [[nodiscard]] std::expected<Session, ScheduleError> getPrevSession() const;
+    /** @return Next session in source ordering, crossing a day boundary in the pinned generation. */
+    [[nodiscard]] std::expected<Session, ScheduleError> getNextSession() const;
+    /** @param other Session to compare.
+     * @return Source equality: day identity, type and exact interval endpoints.
+     */
+    [[nodiscard]] bool operator==(const Session &other) const noexcept;
 };
 } // namespace org::ttldtor::qdcxx::schedule
