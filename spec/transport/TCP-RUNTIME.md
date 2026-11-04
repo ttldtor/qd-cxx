@@ -141,3 +141,5 @@ see [current evidence](../../tests/conformance/transport/TLS-VALIDATION.md).
 ### Current TLS evidence boundary
 
 The TLS runtime is implemented. The focused current-source suite passed 39 native tests: Windows MSVC 19.42 x64 Release /MD, 11,486 assertions; Linux GCC 13.3 x64 Debug ASan+UBSan, 11,625 assertions, with LSan disabled. Full regression passed on each OS: 58/58 tests with JSON enabled and 57/57 with JSON disabled. Generated-reference verification is recorded separately. The refreshed installed package passed four TLS 1.2/1.3 cases across both OSes. These observations do not establish release, complete subscriptions or security certification. The TLS qualification page linked above distinguishes executed cases from source-only reasoning.
+
+The private protocol-neutral byte operation is specified separately in [BYTE-OWNER](BYTE-OWNER.md).

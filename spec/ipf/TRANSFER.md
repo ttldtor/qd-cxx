@@ -7,8 +7,10 @@
 The selected transfer layer uses **Boost 1.92.0 Beast HTTP/1 parser headers and compiled static
 Boost.URL**. Boost is a private dependency of a separate optional transfer layer. It must not
 become a dependency, discovery step or fetch of the independent IPF value/local reader/writer
-target or `qdcxx_feed`. This decision adds no URL loader, production API, dependency target or SDK
-installation. The current local APIs remain described by [READER](READER.md) and [WRITER](WRITER.md).
+target or `qdcxx_feed`. The optional implementation is [InstrumentProfileReader](URL-READER.md) in
+`qdcxx_ipf_transfer`. It uses an explicitly selected qualified SDK; the local APIs remain
+[READER](READER.md) and [WRITER](WRITER.md). Selecting pure IPF/feed without this option performs
+no Boost discovery or download.
 
 The selection covers HTTP/HTTPS/file acquisition requirements. Compression and the live collector
 remain separate implementations; their absence is not an accepted complete-client exclusion.
@@ -162,7 +164,7 @@ invoke a stale provider or publish a successful complete snapshot.
 
 ## Implementation qualification required before availability
 
-The next implementation must preserve the accepted local APIs and prove:
+The optional implementation must preserve the accepted local APIs and qualify:
 
 - Exact dependency/source/license/CRT artifacts, selected ON and dependency-free OFF graphs;
   separate self-contained installed/physically relocated consumers on both required platforms.
@@ -177,7 +179,6 @@ The next implementation must preserve the accepted local APIs and prove:
 - MSVC 19.42 x64 Release/MD and GCC 13.3 Debug ASan/UBSan checks on final source, independent review
   and actual generated documentation/link/source-hash binding.
 
-This is an accepted dependency/ownership decision with source/document verification. It is not an
-executed HTTP/TLS runtime, SDK qualification, new API, proxy/compression/collector implementation,
-release or complete-client acceptance. Future unsupported cases must be explicit; they are not
-silently approved exclusions.
+The dependency/ownership decision and the optional implementation are distinct from release or
+complete-client acceptance. Proxy, compression and live collection remain separate implementations;
+unsupported cases fail explicitly. Availability requires the final-source gates above.

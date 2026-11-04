@@ -26,6 +26,8 @@ namespace {
 namespace t = org::ttldtor::qdcxx::test;
 using Tcp = asio::ip::tcp;      ///< Ordinary IPv4 loopback transport.
 using Error = asio::error_code; ///< Asio errors are reduced to numeric flags, never printed.
+constexpr std::uint64_t CONTROL_MAGIC_HTTP =
+    0x5144435854503036ULL; ///< Bounded HTTP header extension; ordinary v5 remains unchanged.
 constexpr std::uint64_t CONTROL_MAGIC = 0x5144435854503035ULL;       ///< Internal binary control version 5.
 constexpr std::uint64_t CONTROL_MAGIC_V4 = 0x5144435854503034ULL;    ///< Accepted original ticket-control input.
 constexpr std::uint64_t CONTROL_MAGIC_V3 = 0x5144435854503033ULL;    ///< Accepted policy-control compatibility input.
@@ -101,13 +103,14 @@ t::PeerOptions readControl(const std::filesystem::path &file) {
     require(fileSize <= MAX_CONTROL_BYTES);
     std::ifstream input(file, std::ios::binary);
     const auto magic = readWord(input);
-    require(magic == CONTROL_MAGIC || magic == CONTROL_MAGIC_V4 || magic == CONTROL_MAGIC_V3 ||
-            magic == CONTROL_MAGIC_V2);
+    require(magic == CONTROL_MAGIC_HTTP || magic == CONTROL_MAGIC || magic == CONTROL_MAGIC_V4 ||
+            magic == CONTROL_MAGIC_V3 || magic == CONTROL_MAGIC_V2);
     t::PeerOptions options;
     const auto version = readWord(input);
     const auto mode = readWord(input);
     const auto policy = magic != CONTROL_MAGIC_V2 ? readWord(input) : 0;
-    const auto tickets = magic == CONTROL_MAGIC || magic == CONTROL_MAGIC_V4 ? readWord(input) : 0;
+    const auto tickets =
+        (magic == CONTROL_MAGIC_HTTP || magic == CONTROL_MAGIC || magic == CONTROL_MAGIC_V4) ? readWord(input) : 0;
     require(version >= 10 && version <= 13 && mode <= 2 && policy <= 3 &&
             ((policy != 1 && policy != 3) || version == 12) && (version >= 12 || policy == 0) && tickets <= 2 &&
             (tickets == 0 || version == 13));
@@ -145,7 +148,7 @@ t::PeerOptions readControl(const std::filesystem::path &file) {
     options.initialBytes.resize(static_cast<std::size_t>(initialSize));
     input.read(reinterpret_cast<char *>(options.initialBytes.data()), static_cast<std::streamsize>(initialSize));
 
-    if (magic == CONTROL_MAGIC) {
+    if (magic == CONTROL_MAGIC || magic == CONTROL_MAGIC_HTTP) {
         const auto capture = readWord(input);
         require(capture <= 1);
         const auto hasReplyExpected = readWord(input);
@@ -207,6 +210,13 @@ t::PeerOptions readControl(const std::filesystem::path &file) {
             next.finalBytes.resize(static_cast<std::size_t>(nextFinalSize));
             input.read(reinterpret_cast<char *>(next.finalBytes.data()), static_cast<std::streamsize>(nextFinalSize));
         }
+    }
+
+    if (magic == CONTROL_MAGIC_HTTP) {
+        require(readWord(input) == 1 && !options.captureUntilClose && !options.successor &&
+                !options.expectedReplyClientBytes && options.initialBytes.empty() &&
+                (!options.expectedClientBytes || options.expectedClientBytes->size() <= 32768));
+        options.readHttpHeaders = true;
     }
 
     require(static_cast<bool>(input) && input.peek() == std::char_traits<char>::eof());
@@ -314,6 +324,7 @@ class PeerSession {
     asio::steady_timer stopPoll_;
     t::PeerOptions options_;
     std::filesystem::path directory_;
+    std::string httpHeaders_; ///< Opt-in fixed maximum32768-byte request framing capture.
     std::vector<std::uint8_t> received_;
     std::vector<std::uint8_t> captured_; ///< Opt-in synthetic plaintext, bounded independently of every read.
     std::array<std::uint8_t, 4096> captureBuffer_{}; ///< Async-read storage retained through cancellation drain.
@@ -455,7 +466,7 @@ class PeerSession {
             ++report_.completedSessions;
         }
 
-        if (options_.captureUntilClose) {
+        if (options_.captureUntilClose || options_.readHttpHeaders) {
             std::ofstream capture(directory_ / (ordinal_ == 1 ? "capture-1" : "capture-2"),
                                   std::ios::binary | std::ios::trunc);
             capture.write(reinterpret_cast<const char *>(captured_.data()),
@@ -669,10 +680,38 @@ class PeerSession {
         });
     }
 
+    /** Read one finite HTTP request header before replying, preserving normal TLS shutdown. */
+    void readHttpHeaders() {
+        constexpr std::size_t MAX_HTTP_HEADERS = 32768;
+        httpHeaders_.assign(received_.begin(), received_.end());
+        const auto prefix = httpHeaders_.size();
+        armOperation(options_.readTimeout);
+        asio::async_read_until(stream_, asio::dynamic_buffer(httpHeaders_, MAX_HTTP_HEADERS), "\r\n\r\n",
+                               [this, prefix](Error error, std::size_t size) {
+                                   if (finished_) {
+                                       return;
+                                   }
+
+                                   report_.bytesRead += httpHeaders_.size() - prefix;
+                                   captured_.assign(httpHeaders_.begin(), httpHeaders_.end());
+                                   publish();
+
+                                   if (error || size > MAX_HTTP_HEADERS) {
+                                       finish(true);
+                                   } else {
+                                       writeReply();
+                                   }
+                               });
+    }
+
     /** Read and compare only the configured exact byte count; no protocol interpretation occurs. */
     void readExpected() {
         if (!options_.expectedClientBytes) {
-            writeReply();
+            if (options_.readHttpHeaders) {
+                readHttpHeaders();
+            } else {
+                writeReply();
+            }
 
             return;
         }
@@ -682,7 +721,12 @@ class PeerSession {
         if (received_.empty()) {
             report_.expectedBytesMatched = true;
             ++report_.matchedSessions;
-            writeReply();
+
+            if (options_.readHttpHeaders) {
+                readHttpHeaders();
+            } else {
+                writeReply();
+            }
 
             return;
         }
@@ -713,7 +757,11 @@ class PeerSession {
             if (!report_.expectedBytesMatched) {
                 finish(true);
             } else {
-                writeReply();
+                if (options_.readHttpHeaders) {
+                    readHttpHeaders();
+                } else {
+                    writeReply();
+                }
             }
         });
     }

@@ -118,3 +118,5 @@ Every typed failure retains the owned complete profile prefix.
 owned stream. Binary mode preserves quoted CRLF on Windows. Opening failure returns IO_ERROR.
 No URL resolution, HTTP, credentials, decompression, writing, live collection, option-chain or
 schedule interpretation is provided. See the [application guide](../../docs/INSTRUMENT-PROFILES.md).
+
+Optional URL/file/HTTP(S) acquisition is documented separately in [URL-READER](URL-READER.md); the local functions here do not resolve URLs.

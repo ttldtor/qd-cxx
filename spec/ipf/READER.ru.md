@@ -118,3 +118,5 @@ Streambuf может предварительно прочитать физич�
 только его. Binary mode сохраняет quoted CRLF на Windows. Ошибка открытия даёт IO_ERROR.
 Нет URL resolution, HTTP, credentials, decompression, writing, live collection, option-chain и
 толкования schedule. См. [прикладное руководство](../../docs/INSTRUMENT-PROFILES.ru.md).
+
+URL/file/HTTP(S) acquisition описан отдельно в [URL-READER](URL-READER.ru.md); локальные функции этого документа не разрешают URL.

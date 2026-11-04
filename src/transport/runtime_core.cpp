@@ -5,6 +5,7 @@
 #include "deadline.hpp"
 #include "dns_resolver.hpp"
 #include "fixed_arena.hpp"
+#include "raw_byte_state.hpp"
 #include "runtime_bootstrap.hpp"
 
 #include <asio/bind_allocator.hpp>
@@ -262,6 +263,8 @@ bool RuntimeCore::setDeadline(Clock::time_point &target, std::chrono::millisecon
 void RuntimeCore::observePeak() noexcept {
     if (session) {
         peakBytes = (std::max)(peakBytes, adapterBytes + dns.envelopeBytes() + session->peakBytes());
+    } else if (session.raw()) {
+        peakBytes = (std::max)(peakBytes, adapterBytes + dns.envelopeBytes());
     }
 }
 
@@ -302,7 +305,7 @@ void RuntimeCore::applyClose() noexcept {
 void RuntimeCore::accountWrite() noexcept {
 #ifdef _WIN32
 
-    if (writeReady && (output || engine)) {
+    if (writeReady && (output || engine || session.raw())) {
         // Each submission checked the representable cumulative offset before starting I/O.
         outcome.reportedWriteBytes += writeCount;
         (void)consumeWire(writeCount);
@@ -329,8 +332,13 @@ void RuntimeCore::finishClose() noexcept {
 
 #endif
     outcome.pendingOutputBytes = wireBytes().size();
-    pendingApplicationAtClose = output ? output->pendingBytes().size() : 0;
+    pendingApplicationAtClose = applicationBytes().size();
     output.reset();
+
+    if (auto *raw = session.raw()) {
+        raw->retireOutput();
+    }
+
     inputBegin = inputEnd = frameBytes = readCount = 0;
     readReady = false;
     writeReady = false;
@@ -395,7 +403,37 @@ std::span<const std::byte> RuntimeCore::wireBytes() const noexcept {
         return engine->ciphertext();
     }
 
+    return applicationBytes();
+}
+
+std::span<const std::byte> RuntimeCore::applicationBytes() const noexcept {
+    if (const auto *raw = session.raw()) {
+        return raw->output();
+    }
+
     return output ? output->pendingBytes() : std::span<const std::byte>{};
+}
+
+bool RuntimeCore::consumeApplication(std::size_t bytes) noexcept {
+    if (auto *raw = session.raw()) {
+        if (!raw->consumeOutput(bytes)) {
+            fail(diagnostic(TcpError::RESOURCE_LIMIT, "raw-output-count"));
+
+            return false;
+        }
+
+        return true;
+    }
+
+    const auto consumed = output->consume(bytes);
+
+    if (!consumed) {
+        fail(protocolDiagnostic(consumed.error()));
+
+        return false;
+    }
+
+    return true;
 }
 
 /** Account native acceptance without advancing an application span on a codec WANT result.
@@ -413,15 +451,7 @@ bool RuntimeCore::consumeWire(std::size_t bytes) noexcept {
         return true;
     }
 
-    const auto consumed = output->consume(bytes);
-
-    if (!consumed) {
-        fail(protocolDiagnostic(consumed.error()));
-
-        return false;
-    }
-
-    return true;
+    return consumeApplication(bytes);
 }
 
 /** Begin a single owned read/readiness operation; its handler never rearms itself. */
@@ -541,7 +571,7 @@ void RuntimeCore::connectStep() {
                 runState = TcpState::CONNECTED;
                 (void)setDeadline(readDeadline, options.readTimeout);
 
-                if (output) {
+                if (output || !applicationBytes().empty()) {
                     (void)setDeadline(writeDeadline, options.writeTimeout);
                 }
 
@@ -597,7 +627,7 @@ void RuntimeCore::connectStep() {
         runState = TcpState::CONNECTED;
         (void)setDeadline(readDeadline, options.readTimeout);
 
-        if (output) {
+        if (output || !applicationBytes().empty()) {
             (void)setDeadline(writeDeadline, options.writeTimeout);
         }
 
@@ -662,7 +692,7 @@ void RuntimeCore::readStep() noexcept {
 #endif
 }
 
-/** End pure input explicitly; an incomplete frame is a failure, never successful EOF. */
+/** End the selected input path; raw EOF is byte evidence, while QTP still requires complete frames. */
 void RuntimeCore::peerEnd() noexcept {
     if (engine) {
         if (const auto error = engine->nativeEnd()) {
@@ -670,6 +700,13 @@ void RuntimeCore::peerEnd() noexcept {
 
             return;
         }
+    }
+
+    if (session.raw()) {
+        outcome.peerEnded = true;
+        closeRequested = true;
+
+        return;
     }
 
     if (session->finish() == protocol::LiveStatus::CLOSED) {
@@ -754,11 +791,13 @@ void RuntimeCore::writeStep() noexcept {
     }
 
     if (runState == TcpState::CONNECTED) {
-        if (readReady || writeReady || inputBegin != inputEnd || (output && !writePending) || !readPending) {
+        if (readReady || writeReady || inputBegin != inputEnd ||
+            ((output || !applicationBytes().empty()) && !writePending) || !readPending) {
             return Clock::now();
         }
 
-        const auto deadline = output ? (std::min)(readDeadline, writeDeadline) : readDeadline;
+        const auto deadline =
+            (output || !applicationBytes().empty()) ? (std::min)(readDeadline, writeDeadline) : readDeadline;
 
         const auto cadence = detail::deadlineAfter(Clock::now(), options.pollInterval);
 
@@ -923,6 +962,111 @@ RuntimeCore::create(RuntimeBootstrap::State *bootstrap, core::LocalSchema &&sche
     }
 }
 
+std::expected<std::unique_ptr<RuntimeCore>, TcpDiagnostic>
+RuntimeCore::createRaw(RuntimeBootstrap::State *bootstrap, RawByteState &raw, std::size_t externalBytes,
+                       TcpOptions options, protocol::LiveWork &work, std::unique_ptr<ByteEngine> codec) {
+    if (work.operations == 0) {
+        return std::unexpected(diagnostic(TcpError::WORK_LIMIT, "runtime-create-attempt"));
+    }
+
+    --work.operations;
+    const auto &limits = options.limits;
+
+    if (!bootstrap || !bootstrap->dnsInitialized || !validEndpointSettings(options) || !validSocketLimits(limits) ||
+        !validTimingSettings(options)) {
+        return std::unexpected(diagnostic(TcpError::INVALID_CONFIGURATION, "runtime-configuration"));
+    }
+
+    std::array<char, MAX_HOST_BYTES + 2> name{};
+    std::copy(options.endpoint.begin(), options.endpoint.end(), name.begin());
+    asio::error_code addressError;
+    const auto address = asio::ip::make_address(name.data(), addressError);
+
+    const bool namedEndpoint = static_cast<bool>(addressError);
+
+    if (namedEndpoint) {
+        const auto zeroServer = std::ranges::any_of(options.dnsServers, [](const DnsServer &server) {
+            return std::ranges::all_of(server.address, [](std::uint8_t octet) {
+                return octet == 0;
+            });
+        });
+
+        if (!detail::DnsResolver::validName(options.endpoint) || options.dnsServers.empty() || options.dnsPort == 0 ||
+            zeroServer) {
+            return std::unexpected(diagnostic(TcpError::INVALID_CONFIGURATION, "dns-configuration"));
+        }
+    }
+
+    std::size_t backing = sizeof(RuntimeCore) + sizeof(RuntimeBootstrap::State);
+
+    if (!addBytes(backing, limits.inputBytes) || !addBytes(backing, limits.contextBytes) ||
+        !addBytes(backing, limits.handlerBytes)) {
+        return std::unexpected(diagnostic(TcpError::RESOURCE_LIMIT, "runtime-reservation"));
+    }
+
+    std::size_t totalReservation = backing;
+
+    if ((namedEndpoint && !addBytes(totalReservation, detail::DnsResolver::ENVELOPE_BYTES)) ||
+        !addBytes(totalReservation, externalBytes) || totalReservation > limits.residentBytes) {
+        return std::unexpected(diagnostic(TcpError::RESOURCE_LIMIT, "runtime-reservation"));
+    }
+
+    constexpr auto PREPARATION_VISITS = 2 * detail::FixedArena::MAX_BLOCKS * detail::FixedArena::MAX_BLOCKS;
+    constexpr std::size_t PREPARATION_BYTE_PASSES =
+        3; // Zeroed backing, SDK initialization and fixed configuration copy.
+
+    const auto dnsPreparation =
+        namedEndpoint ? detail::DnsResolver::preparationWork(options.dnsServers.size()) : protocol::LiveWork{};
+    std::size_t preparationBytes = backing;
+
+    if (preparationBytes > std::numeric_limits<std::size_t>::max() / PREPARATION_BYTE_PASSES) {
+        return std::unexpected(diagnostic(TcpError::WORK_LIMIT, "runtime-preparation-work"));
+    }
+
+    preparationBytes *= PREPARATION_BYTE_PASSES;
+
+    if (!addBytes(preparationBytes, dnsPreparation.bytes) || work.bytes < preparationBytes ||
+        work.visits < PREPARATION_VISITS + dnsPreparation.visits) {
+        return std::unexpected(diagnostic(TcpError::WORK_LIMIT, "runtime-preparation-work"));
+    }
+
+    work.bytes -= preparationBytes;
+    work.visits -= PREPARATION_VISITS + dnsPreparation.visits;
+
+    auto borrow = BootstrapLease::acquire(bootstrap);
+
+    if (!borrow) {
+        return std::unexpected(borrow.error());
+    }
+
+    try {
+        auto impl = std::make_unique<RuntimeCore>(*bootstrap, std::move(*borrow), options);
+        impl->engine = std::move(codec);
+        impl->adapterBytes = backing + externalBytes;
+        impl->namedEndpoint = namedEndpoint;
+
+        if (namedEndpoint) {
+            auto initialized = impl->dns.initialize(impl->options);
+
+            if (!initialized) {
+                return std::unexpected(initialized.error());
+            }
+        } else {
+            impl->addresses[0] = {address, options.port};
+            impl->addressCount = 1;
+        }
+
+        impl->session.selectRaw(raw);
+        impl->peakBytes = totalReservation;
+
+        return impl;
+    } catch (const std::bad_alloc &) {
+        return std::unexpected(diagnostic(TcpError::ALLOCATION_FAILURE, "runtime-storage"));
+    } catch (const asio::system_error &error) {
+        return std::unexpected(diagnostic(TcpError::INVALID_CONFIGURATION, "runtime-host", error.code().value()));
+    }
+}
+
 std::expected<void, TcpDiagnostic> RuntimeCore::start() {
     if (const auto error = this->wrongThread()) {
         return std::unexpected(*error);
@@ -968,7 +1112,10 @@ RuntimeCore::dnsPreparationWorkRequirement(std::size_t serverCount) noexcept {
  * @return One bounded action/event/yield observation; no application callback is invoked.
  */
 TcpPollResult RuntimeCore::pollEngine(TcpWork &work, protocol::LiveWork &sessionWork) {
-    const bool decodePaused = sessionWork.operations == 0 && !engine->plaintext().empty();
+    auto *raw = session.raw();
+    const bool decodePaused =
+        (!raw ? sessionWork.operations == 0 : sessionWork.operations == 0 || !raw->input().empty()) &&
+        !engine->plaintext().empty();
 
     if (writeReady) {
 #ifndef _WIN32
@@ -985,7 +1132,7 @@ TcpPollResult RuntimeCore::pollEngine(TcpWork &work, protocol::LiveWork &session
         return {TcpPollStatus::PROGRESS, std::nullopt};
     }
 
-    if (readReady && !decodePaused) {
+    if (readReady && !decodePaused && (!raw || engine->plaintext().empty())) {
 #ifndef _WIN32
 
         if (work.socketBytes < options.limits.inputBytes) {
@@ -1004,6 +1151,21 @@ TcpPollResult RuntimeCore::pollEngine(TcpWork &work, protocol::LiveWork &session
             fail(diagnostic(TcpError::INVALID_CONFIGURATION, "unverified-plaintext"));
 
             return {TcpPollStatus::PROGRESS, std::nullopt};
+        }
+
+        if (raw) {
+            const auto count = (std::min)(engine->plaintext().size(), sessionWork.bytes);
+
+            if (sessionWork.operations == 0 || count == 0 || !raw->input().empty()) {
+                return {TcpPollStatus::YIELD, std::nullopt};
+            }
+
+            --sessionWork.operations;
+            const auto accepted = raw->acceptInput(engine->plaintext().first(count));
+            sessionWork.bytes -= accepted;
+            engine->consumePlaintext(accepted);
+
+            return {accepted == 0 ? TcpPollStatus::YIELD : TcpPollStatus::PROGRESS, std::nullopt};
         }
 
         if (sessionWork.operations != 0) {
@@ -1027,7 +1189,7 @@ TcpPollResult RuntimeCore::pollEngine(TcpWork &work, protocol::LiveWork &session
     }
 
     if (!decodePaused && engine->finished()) {
-        if (session->finish() == protocol::LiveStatus::CLOSED) {
+        if (raw || session->finish() == protocol::LiveStatus::CLOSED) {
             outcome.peerEnded = true;
             closeRequested = true;
         } else {
@@ -1057,9 +1219,9 @@ TcpPollResult RuntimeCore::pollEngine(TcpWork &work, protocol::LiveWork &session
         return {TcpPollStatus::YIELD, std::nullopt};
     }
 
-    if (engine->needsStep(inputBegin != inputEnd, output.has_value())) {
+    if (engine->needsStep(inputBegin != inputEnd, output.has_value() || (raw && !raw->output().empty()))) {
         const auto inputBytes = std::span<const std::byte>{input.get() + inputBegin, inputEnd - inputBegin};
-        const auto outputBytes = output ? output->pendingBytes() : std::span<const std::byte>{};
+        const auto outputBytes = applicationBytes();
         const auto step = engine->advance(inputBytes, outputBytes);
 
         if (step.inputConsumed > inputBytes.size() || step.outputConsumed > outputBytes.size()) {
@@ -1075,11 +1237,7 @@ TcpPollResult RuntimeCore::pollEngine(TcpWork &work, protocol::LiveWork &session
         }
 
         if (step.outputConsumed != 0) {
-            const auto consumed = output->consume(step.outputConsumed);
-
-            if (!consumed) {
-                fail(protocolDiagnostic(consumed.error()));
-            } else if (output->pendingBytes().empty()) {
+            if (consumeApplication(step.outputConsumed) && output && output->pendingBytes().empty()) {
                 output.reset();
             }
         }
@@ -1140,8 +1298,9 @@ std::expected<TcpPollResult, TcpDiagnostic> RuntimeCore::poll(TcpWork &work, pro
     if (!state.closeRequested && ((state.runState == TcpState::RESOLVING && now >= state.dnsDeadline) ||
                                   (state.runState == TcpState::CONNECTING && now >= state.connectDeadline) ||
                                   (state.runState == TcpState::CONNECTED &&
-                                   (now >= state.readDeadline ||
-                                    ((state.output || !state.wireBytes().empty()) && now >= state.writeDeadline))))) {
+                                   (now >= state.readDeadline || ((state.output || !state.applicationBytes().empty() ||
+                                                                   !state.wireBytes().empty()) &&
+                                                                  now >= state.writeDeadline))))) {
         state.fail(diagnostic(TcpError::DEADLINE, "operation-deadline"));
     }
 
@@ -1231,7 +1390,7 @@ std::expected<TcpPollResult, TcpDiagnostic> RuntimeCore::poll(TcpWork &work, pro
 
         if (state.writeReady) {
 #ifndef _WIN32
-            const auto bytes = (std::min)(state.options.limits.writeBytes, state.output->pendingBytes().size());
+            const auto bytes = (std::min)(state.options.limits.writeBytes, state.wireBytes().size());
 
             if (work.socketBytes < bytes) {
                 return TcpPollResult{TcpPollStatus::YIELD, std::nullopt};
@@ -1251,6 +1410,25 @@ std::expected<TcpPollResult, TcpDiagnostic> RuntimeCore::poll(TcpWork &work, pro
 #endif
             state.readStep();
         } else if (state.inputBegin != state.inputEnd && sessionWork.operations != 0) {
+            if (auto *raw = state.session.raw()) {
+                const auto count = (std::min)(state.inputEnd - state.inputBegin, sessionWork.bytes);
+
+                if (count == 0 || !raw->input().empty()) {
+                    return TcpPollResult{TcpPollStatus::YIELD, std::nullopt};
+                }
+
+                --sessionWork.operations;
+                const auto accepted = raw->acceptInput({state.input.get() + state.inputBegin, count});
+                sessionWork.bytes -= accepted;
+                state.inputBegin += accepted;
+
+                if (state.inputBegin == state.inputEnd) {
+                    state.inputBegin = state.inputEnd = 0;
+                }
+
+                return TcpPollResult{accepted == 0 ? TcpPollStatus::YIELD : TcpPollStatus::PROGRESS, std::nullopt};
+            }
+
             auto result = state.session->feed({state.input.get() + state.inputBegin, state.inputEnd - state.inputBegin},
                                               sessionWork);
             state.inputBegin += result.accepted;
@@ -1279,9 +1457,9 @@ std::expected<TcpPollResult, TcpDiagnostic> RuntimeCore::poll(TcpWork &work, pro
             } else {
                 state.fail(diagnostic(TcpError::READ_FAILURE, "socket-read", state.readError.value()));
             }
-        } else if (state.output && !state.writePending) {
+        } else if ((state.output || !state.applicationBytes().empty()) && !state.writePending) {
 #ifdef _WIN32
-            const auto bytes = (std::min)(state.options.limits.writeBytes, state.output->pendingBytes().size());
+            const auto bytes = (std::min)(state.options.limits.writeBytes, state.wireBytes().size());
 
             if (work.socketBytes < bytes) {
                 return TcpPollResult{TcpPollStatus::YIELD, std::nullopt};
@@ -1290,7 +1468,8 @@ std::expected<TcpPollResult, TcpDiagnostic> RuntimeCore::poll(TcpWork &work, pro
             work.socketBytes -= bytes;
 #endif
             state.beginWrite();
-        } else if (state.inputBegin == state.inputEnd && !state.readPending) {
+        } else if (state.inputBegin == state.inputEnd && !state.readPending &&
+                   (!state.session.raw() || state.session.raw()->input().empty())) {
 #ifdef _WIN32
 
             if (work.socketBytes < state.options.limits.inputBytes) {
@@ -1400,7 +1579,7 @@ protocol::LiveAuthentication RuntimeCore::authentication() const noexcept {
 }
 
 TcpResources RuntimeCore::resources() noexcept {
-    const auto current = this->session->residentBytes();
+    const auto current = this->session ? this->session->residentBytes() : 0;
     const auto dns = this->dns.envelopeBytes();
     this->observePeak();
 

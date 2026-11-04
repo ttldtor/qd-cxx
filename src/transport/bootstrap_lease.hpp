@@ -55,6 +55,16 @@ class BootstrapLease {
      */
     [[nodiscard]] static std::expected<BootstrapLease, TcpDiagnostic> acquire(RuntimeBootstrap &bootstrap) noexcept;
 
+    /** Acquire an independent child borrow from an already retained stable process identity.
+     * The original application owner, possibly in a moved-to facade, must outlive every child/drain.
+     * Native child affinity remains independent of process cleanup affinity, as in facade acquisition.
+     * @param lease Live outer borrow; a moved-from token rejects through the existing state validation.
+     * @return Existing provenance/capacity refusal or one independently counted borrow; no SDK calls.
+     */
+    [[nodiscard]] static std::expected<BootstrapLease, TcpDiagnostic> acquire(const BootstrapLease &lease) noexcept {
+        return acquire(lease.state_);
+    }
+
     /** Acquire for the high-level runtime on the bootstrap creator thread, without SDK initialization.
      * @param bootstrap Existing live same-instance owner; original pre-thread startup remains a precondition.
      * @return Stable lease or configuration/thread/capacity refusal; no global SDK calls.

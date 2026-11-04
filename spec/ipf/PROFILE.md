@@ -80,6 +80,14 @@ remain representable: signed32 minimum/maximum format as `5877521-03-03`/`588158
 ## Ownership, errors and limits
 
 Copies own independent storage and limits; moves leave the source empty with its original limits.
+Move is conditionally noexcept: actual empty backing construction, limits copy and every body swap
+must be nonthrowing. An allocating map sentinel can make move preparation throw std::bad_alloc
+before changing the source. Assignment constructs its by-value replacement before its nonthrowing
+swap body, so failed preparation preserves both source and destination. Do not assume the same
+nothrow trait across standard-library implementations; value layout and logical limits are unchanged.
+Vectors may copy the old prefix when move can throw. Reader growth can temporarily retain both
+old/candidate text; this remains bounded by twice the admitted logical output-unit envelope,
+without turning logical limits into an allocator/RSS bound.
 Getter text views borrow this profile and are invalidated by mutation, assignment or destruction.
 Custom-name enumeration returns independent owned strings. Callers serialize mutation and
 observation; simultaneous read-only use is supported. No callbacks or deferred work exist.

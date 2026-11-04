@@ -809,6 +809,68 @@ TEST_CASE("bootstrap readiness rejection preserves foreign SDK ownership and lea
 #endif
 }
 
+TEST_CASE("QTP raw selection preserves exact native backing, preparation and output reservations") {
+    auto bootstrap = t::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    auto witness = td::BootstrapLease::acquire(*bootstrap);
+    REQUIRE(witness);
+    auto config = options(1);
+    const auto limits = liveLimits();
+    const auto backing = sizeof(td::RuntimeCore) + sizeof(*witness->state()) + config.limits.inputBytes +
+                         config.limits.contextBytes + config.limits.handlerBytes;
+    config.limits.residentBytes = backing + limits.residentBytes;
+    auto initial = liveTurn();
+    auto remaining = initial;
+    auto source = configuration();
+    auto prepared = td::RuntimeCore::create(witness->state(), std::move(source.schema), std::move(source.writer),
+                                            limits, config, remaining);
+    REQUIRE(prepared);
+    CHECK((*prepared)->resources().adapterBytes == backing);
+    CHECK((*prepared)->session);
+    CHECK((*prepared)->session.raw() == nullptr);
+    CHECK(sizeof(td::RuntimeSessionSlot) == sizeof(std::optional<p::LiveSession>));
+    auto outputWork = liveTurn();
+    REQUIRE((*prepared)->composeProtocol({{}, {}, {}}, outputWork));
+    REQUIRE((*prepared)->output);
+    CHECK((*prepared)->output->pendingBytes().size() <= limits.outputBytes);
+    CHECK((*prepared)->resources().peakBytes <= config.limits.residentBytes);
+    prepared->reset();
+    const auto usedOperations = initial.operations - remaining.operations;
+    const auto usedVisits = initial.visits - remaining.visits;
+    const auto usedText = initial.textUnits - remaining.textUnits;
+    const auto usedBytes = initial.bytes - remaining.bytes;
+
+    for (const auto coordinate : {0, 1, 2, 3}) {
+        auto selected = config;
+        auto work = p::LiveWork{usedOperations, usedVisits, usedText, usedBytes};
+
+        if (coordinate == 1) {
+            --selected.limits.residentBytes;
+        } else if (coordinate == 2) {
+            --work.bytes;
+        } else if (coordinate == 3) {
+            --work.visits;
+        }
+
+        auto current = configuration();
+        auto result = td::RuntimeCore::create(witness->state(), std::move(current.schema), std::move(current.writer),
+                                              limits, selected, work);
+
+        if (coordinate == 0) {
+            REQUIRE(result);
+            CHECK(work.operations == 0);
+            CHECK(work.visits == 0);
+            CHECK(work.textUnits == 0);
+            CHECK(work.bytes == 0);
+        } else {
+            REQUIRE_FALSE(result);
+            CHECK(result.error().error == (coordinate == 1 ? t::TcpError::RESOURCE_LIMIT : t::TcpError::WORK_LIMIT));
+            CHECK_FALSE(current.schema.records().empty());
+            CHECK(current.writer.matchesSchema(current.schema));
+        }
+    }
+}
+
 TEST_CASE("runtime preparation failures preserve schema and composer without activation") {
     auto bootstrap = t::RuntimeBootstrap::create();
     REQUIRE(bootstrap);
@@ -866,7 +928,7 @@ TEST_CASE("a real standard Quote traverses byte fragments and retained owners su
     peer.script = quoteScript();
     peer.endInput = true;
     auto source = configuration();
-    auto mapping = q::PreparedQuote::prepare(source.schema, 0, {128, 256, 32, 64, 64, 128, 16384, 1000000});
+    auto mapping = q::PreparedQuote::prepare(source.schema, 0, {128, 256, 32, 64, 128, 128, 16384, 1000000});
     REQUIRE(mapping);
     auto work = liveTurn();
     auto created = t::TcpRuntime::create(*bootstrap, std::move(source.schema), std::move(source.writer), liveLimits(),

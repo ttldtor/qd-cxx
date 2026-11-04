@@ -7,9 +7,10 @@
 Для слоя загрузки выбраны **заголовки HTTP/1 parser Beast из Boost 1.92.0 и скомпилированная
 статическая библиотека Boost.URL**. Boost является приватной зависимостью отдельного optional слоя
 загрузки. Он не должен становиться зависимостью, шагом поиска или загрузки независимого target
-IPF values/local reader/writer либо `qdcxx_feed`. Это решение не добавляет URL loader, production
-API, dependency target или установку SDK. Текущие локальные API описаны в
-[READER](READER.ru.md) и [WRITER](WRITER.ru.md).
+IPF values/local reader/writer либо `qdcxx_feed`. Optional реализация — [InstrumentProfileReader](URL-READER.ru.md) в
+`qdcxx_ipf_transfer`. Она использует явно выбранный квалифицированный SDK; локальные API
+сохраняются в [READER](READER.ru.md) и [WRITER](WRITER.ru.md). Pure IPF/feed без этой опции
+не выполняет поиск или загрузку Boost.
 
 Решение охватывает требования к HTTP/HTTPS/file sources. Сжатие и live collector реализуются
 отдельно; их отсутствие не является принятым исключением из полного клиента. Решение не добавляет
@@ -168,7 +169,7 @@ credential owners живут до соответствующего completion/dr
 
 ## Обязательная квалификация до доступности реализации
 
-Следующая реализация должна сохранить принятые local APIs и доказать:
+Optional реализация должна сохранить принятые local APIs и квалифицировать:
 
 - Exact dependency/source/license/CRT artifacts, выбранные ON и dependency-free OFF graphs;
   отдельные self-contained installed/physically relocated consumers на обеих обязательных платформах.
@@ -184,7 +185,6 @@ credential owners живут до соответствующего completion/dr
 - MSVC 19.42 x64 Release/MD и GCC 13.3 Debug ASan/UBSan на final source, независимое ревью и actual
   generated documentation/link/source-hash binding.
 
-Это принятое решение о dependency/ownership, проверенное по source/document evidence. Оно не
-является выполненным HTTP/TLS runtime, SDK qualification, новым API, реализацией proxy/compression/
-collector, release или приёмкой полного клиента. Будущие неподдержанные случаи должны быть явными;
-они не становятся тихо одобренными исключениями.
+Решение о dependency/ownership и optional реализация не означают release или приёмку полного
+клиента. Proxy, сжатие и live collection остаются отдельными реализациями; неподдержанные случаи
+отклоняются явно. Доступность требует перечисленных final-source gates.

@@ -368,7 +368,11 @@ int compareTypes(std::u16string_view left, std::u16string_view right) noexcept {
 InstrumentProfile::InstrumentProfile(ProfileLimits limits) : limits_(limits) {
 }
 
-InstrumentProfile::InstrumentProfile(InstrumentProfile &&other) noexcept : limits_(other.limits_) {
+InstrumentProfile::InstrumentProfile(InstrumentProfile &&other) noexcept(NOTHROW_MOVE_CONSTRUCTION)
+    : limits_(other.limits_) {
+    static_assert(std::is_nothrow_default_constructible_v<Values> ==
+                  std::is_nothrow_default_constructible_v<decltype(Value::text)>);
+
     values_.swap(other.values_);
     custom_.swap(other.custom_);
     std::swap(totalUnits_, other.totalUnits_);

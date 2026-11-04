@@ -81,8 +81,9 @@ struct PeerOptions {
     std::chrono::milliseconds pauseBeforeHandshake{0};            ///< Delay after accept, before handshake.
     std::chrono::milliseconds readDelay{0};   ///< Delay after handshake, before reading; allows backpressure tests.
     std::chrono::milliseconds stopGrace{250}; ///< Parent grace before terminating only its owned child.
-    bool captureUntilClose{false};            ///< Opt-in bounded synthetic plaintext capture through client TLS EOF.
-    std::optional<PeerSuccessor> successor;   ///< At most one independent successor, requiring captureUntilClose.
+    bool readHttpHeaders{false};   ///< Opt-in32768-byte CRLFCRLF request read before reply; ordinary CLEAN shutdown.
+    bool captureUntilClose{false}; ///< Opt-in bounded synthetic plaintext capture through client TLS EOF.
+    std::optional<PeerSuccessor> successor; ///< At most one independent successor, requiring captureUntilClose.
 };
 
 /** Numeric observations and explicitly enabled bounded synthetic client captures, retained after stop. */

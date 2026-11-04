@@ -79,6 +79,8 @@ production-библиотек. Корневой `BUILD_TESTING=OFF` не соб�
 
 [Oracle локального IPF reader](../upstream/ipf-reader-oracle/README.ru.md) захватывает/проверяет именованные grammar, UTF-8 и complete-prefix outcomes; `-Help`/`-HelpRu` не начинают Java или рабочую I/O.
 
+[Явная подготовка зависимости IPF transfer](../deps/IPF-TRANSFER.ru.md) предоставляет pinned Boost1.92.0 sources, отдельную static URL сборку, EN/RU help helpers, offline/cache checks и sealed переносимый private SDK. Она не добавляет production transfer API и не получает зависимости при ordinary configure либо dependency OFF.
+
 ## Первая сборка
 
 Запускать из корня репозитория. Bootstrap — явное исключение логирования первой сборки:

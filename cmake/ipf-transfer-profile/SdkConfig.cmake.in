@@ -1,0 +1,7 @@
+# Copyright (c) 2026 ttldtor.
+# SPDX-License-Identifier: BSL-1.0
+get_filename_component(qdcxxIpfSdkRoot "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
+include("${CMAKE_CURRENT_LIST_DIR}/VerifyIpfTransferSdk.cmake")
+qdcxxCheckIpfTransferHost()
+qdcxxVerifyIpfTransferSdk("${qdcxxIpfSdkRoot}" "@sourceManifestHash@" "@platform@")
+include("${CMAKE_CURRENT_LIST_DIR}/qdcxxIpfTransferSdkTargets.cmake")

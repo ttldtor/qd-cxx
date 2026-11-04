@@ -30,7 +30,7 @@ qdcxxVerifyTlsProfile("${qdcxxTlsProfile}" "${qdcxxTlsPlatform}" "${ORG_TTLDTOR_
 qdcxxImportTlsSdk("${ORG_TTLDTOR_QDCXX_OPENSSL_ROOT}" "${qdcxxTlsPlatform}")
 
 add_library(qdcxx_tls src/transport/tls_resources.cpp src/transport/tls_policy.cpp
-    src/transport/tls_engine.cpp src/transport/tls_runtime.cpp)
+    src/transport/tls_engine.cpp src/transport/tls_runtime.cpp src/transport/tls_byte_owner.cpp)
 target_link_libraries(qdcxx_tls PUBLIC qdcxx_transport qdcxx_client PRIVATE qdcxx_tls_ssl qdcxx_tls_crypto)
 target_include_directories(qdcxx_tls SYSTEM PRIVATE "${ORG_TTLDTOR_QDCXX_ASIO_INCLUDE}")
 target_link_libraries(qdcxx_tls PRIVATE "$<BUILD_INTERFACE:c-ares::cares>")

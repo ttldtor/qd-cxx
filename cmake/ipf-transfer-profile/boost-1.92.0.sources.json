@@ -1,0 +1,1682 @@
+{
+  "sdk": "Boost Beast contiguous basic_parser headers and compiled static Boost.URL",
+  "archiveSha256": "c4a3b310ddd2472416e091067166b0713be97c63f38c212c484ada022fd296ce",
+  "releaseCommit": "afdfa32505af73e3d208144b3f623f0096cb62b6",
+  "files": [
+    {
+      "path": "boost/align/aligned_alloc.hpp",
+      "sha256": "c103dd9cd1acbf6599c91029acf9d98cdfc0d0c699b17645cecccba90fef0e4a"
+    },
+    {
+      "path": "boost/align/detail/aligned_alloc_msvc.hpp",
+      "sha256": "d9e6a641ee63d4d5fca862a0d55edfd0d015e116521f66eb103bff87412037bf"
+    },
+    {
+      "path": "boost/align/detail/is_alignment.hpp",
+      "sha256": "cee580a1ac986921cf248371b9ff6d4cfd46af53d8e41c166b1a74bf896b5ca9"
+    },
+    {
+      "path": "boost/asio/buffer.hpp",
+      "sha256": "cb9cec7d75ab40cf94450e9daadd53339e457f63b5b171d91b6ec89eb955503e"
+    },
+    {
+      "path": "boost/asio/detail/array_fwd.hpp",
+      "sha256": "205c377a7cb521689aac24a566e0417b7843642e3db049f7fdbe4efdad6f7aa1"
+    },
+    {
+      "path": "boost/asio/detail/config.hpp",
+      "sha256": "be2ff484edb3f0bc46b6874f8e9595b4802132c4c052ca675d3c7d4359da8352"
+    },
+    {
+      "path": "boost/asio/detail/cstdint.hpp",
+      "sha256": "4b69a3f0f2cc1342fdfd6d500f5c6e629597f29be7af193e26f18547a9d51029"
+    },
+    {
+      "path": "boost/asio/detail/is_buffer_sequence.hpp",
+      "sha256": "89e15c010a0a2004b795404e920db60194c27a85195d9e455b8a65f6d0b95c2f"
+    },
+    {
+      "path": "boost/asio/detail/memory.hpp",
+      "sha256": "b2242c09860cd8ec278de470c88f5a2312b96dca1aac0148e386c16c6a342ee9"
+    },
+    {
+      "path": "boost/asio/detail/pop_options.hpp",
+      "sha256": "81f1003b6cd80daca6533cc445823d3d113ab7cfaa6783eeff63f7408903d528"
+    },
+    {
+      "path": "boost/asio/detail/push_options.hpp",
+      "sha256": "c474bf12270f7b477f09ed97b9ee320cbacb56b65a987b5eea3eaffb91d3b7f8"
+    },
+    {
+      "path": "boost/asio/detail/string_view.hpp",
+      "sha256": "348259832325125494b20d08c64f3318edef6b627b6746900fc95da1d6e90c4b"
+    },
+    {
+      "path": "boost/asio/detail/throw_exception.hpp",
+      "sha256": "b5545b7385c09551225ad7908b3857e58d70ccb6fe78cf67ed2f3780720f0f7c"
+    },
+    {
+      "path": "boost/asio/detail/type_traits.hpp",
+      "sha256": "bb0c0f0ff3f0c0d6d91b13bae051d661c8ec08b66a180adeb0af8d1642fc0b77"
+    },
+    {
+      "path": "boost/asio/is_contiguous_iterator.hpp",
+      "sha256": "80d82412942b60a3721bebb08a4a2ee57c00e749041ce5060f70b06a3594343d"
+    },
+    {
+      "path": "boost/asio/version.hpp",
+      "sha256": "99351e4fbed5ffc419853690fb1f11b92617fb63d4f4f3d4ceb944b13dedafc3"
+    },
+    {
+      "path": "boost/assert.hpp",
+      "sha256": "8c34a3e3d049c1f26c1ec8c03dea8ea3cf72e1377d64271234f4ec7cd7ae87a6"
+    },
+    {
+      "path": "boost/assert/source_location.hpp",
+      "sha256": "ad76405105ee3b1c8d557f3eaeb51d429beac4dc336950a10cde2c06d53f3c01"
+    },
+    {
+      "path": "boost/beast/core/buffer_traits.hpp",
+      "sha256": "85b930ea44710fb458e6f73b237ae0acd389bbf67536d5bde26cf5a87503526c"
+    },
+    {
+      "path": "boost/beast/core/detail/buffer_traits.hpp",
+      "sha256": "92f3ba31bebac80689b9bea4a72bdf7032d6064576350406086bc9e1e532a836"
+    },
+    {
+      "path": "boost/beast/core/detail/char_buffer.hpp",
+      "sha256": "3ee5a181107f6aec057115962157efaf4f683fac54646c7c32d68b80b313486f"
+    },
+    {
+      "path": "boost/beast/core/detail/clamp.hpp",
+      "sha256": "184bd17cba4dc7f2a978fbcac890ce88e16d1daf00aa66a5a234fa5f763aebf3"
+    },
+    {
+      "path": "boost/beast/core/detail/config.hpp",
+      "sha256": "41c0f90f6a03075004fc1e0a1fcca3ec974dc20193f0c254c4f5757028d3a39c"
+    },
+    {
+      "path": "boost/beast/core/detail/static_const.hpp",
+      "sha256": "3353f9ccf55da08fe0dde85fb61f02e5ef0fff7ad59eef26be28add20f0140c3"
+    },
+    {
+      "path": "boost/beast/core/detail/string.hpp",
+      "sha256": "7a530887a5da99415cd156968323a4b94a1168e6f69a0f3511faa06a5adc2542"
+    },
+    {
+      "path": "boost/beast/core/error.hpp",
+      "sha256": "c14cddde9519d68def1590bb4d7b37689fa32bf16a3a97ea2facef0d6d095673"
+    },
+    {
+      "path": "boost/beast/core/impl/error.hpp",
+      "sha256": "c1051ddf37adc49486d9ab6f941c46d3bcf44fb0d41365217d9cfb19450ad542"
+    },
+    {
+      "path": "boost/beast/core/impl/error.ipp",
+      "sha256": "95aabd692a76a249abbcaf86555c0c2e26236b8af50b19a17bc777843c9df785"
+    },
+    {
+      "path": "boost/beast/core/impl/string.ipp",
+      "sha256": "54c843460c40e50b9be78db67c6a519dfe2db30371641a9885f81cd58697d6ac"
+    },
+    {
+      "path": "boost/beast/core/string_type.hpp",
+      "sha256": "30a18fb719da09206a16169f2a21760fda7cf9c486608727ca4b274cd014ec10"
+    },
+    {
+      "path": "boost/beast/core/string.hpp",
+      "sha256": "5dd8661cc58d587d2acf436e2a9e0fbdb07de51b3e1078eceb75ab4c1d418c91"
+    },
+    {
+      "path": "boost/beast/http/basic_parser.hpp",
+      "sha256": "c74f69f2b30ebbee261eb82f308bb75905ac8bc2385733bdd711af24802a57c5"
+    },
+    {
+      "path": "boost/beast/http/detail/basic_parsed_list.hpp",
+      "sha256": "2245d061c8a6540eac86fab5f738992653fa7375d20db441229d1708837e69c4"
+    },
+    {
+      "path": "boost/beast/http/detail/basic_parser.hpp",
+      "sha256": "56f7b5e9da602d152a70b9077537358484852bbf1c7a3a7604dc58f4d578eb45"
+    },
+    {
+      "path": "boost/beast/http/detail/basic_parser.ipp",
+      "sha256": "47733a65047763b50b1be7d76fe99dab7eddc9712ed9a1c4ad9e7f4f4cce6764"
+    },
+    {
+      "path": "boost/beast/http/detail/rfc7230.hpp",
+      "sha256": "9b84d6d5adc615b0dcf5fa2d08b2f6d20cbc501c19c4b8bf3afa9e711f3bfe66"
+    },
+    {
+      "path": "boost/beast/http/detail/rfc7230.ipp",
+      "sha256": "d9d020cbb67cdaf4753dc793edc528c2e57cbf3b6093159d7b88e6833625885e"
+    },
+    {
+      "path": "boost/beast/http/error.hpp",
+      "sha256": "1efe93bef58f048a72246b7dcdbd499f9b7f3528d22944ed3847d828141d9527"
+    },
+    {
+      "path": "boost/beast/http/field.hpp",
+      "sha256": "35d4345db100cdee606688d101e3160afa2dfb512a0c3fb17b50eee8b1866e57"
+    },
+    {
+      "path": "boost/beast/http/impl/basic_parser.hpp",
+      "sha256": "9ea2c88b314b758f955d55266c36690f4df2b83604f3f893816573359ce1f923"
+    },
+    {
+      "path": "boost/beast/http/impl/basic_parser.ipp",
+      "sha256": "c4382876446bbeeec8bfb003305141bfb9c71f77d00266b2c709a78455c9c6fe"
+    },
+    {
+      "path": "boost/beast/http/impl/error.hpp",
+      "sha256": "86b91213b4aa76af35c9646d10107af98e439f8a16edf858d65c240b3973596e"
+    },
+    {
+      "path": "boost/beast/http/impl/error.ipp",
+      "sha256": "2221e019a5d7d23ef03bca772293de198efd0c9e53d303c4afa6b454a69b21da"
+    },
+    {
+      "path": "boost/beast/http/impl/field.ipp",
+      "sha256": "d423466ce11a1648ac01739fa95dcb89cba1a8a68e927b73d38282d1941b29cb"
+    },
+    {
+      "path": "boost/beast/http/impl/rfc7230.hpp",
+      "sha256": "5a40e4b4c7669b5f62f31ae6fa9feb904150ed574049c23d291caeb74fea5b89"
+    },
+    {
+      "path": "boost/beast/http/impl/rfc7230.ipp",
+      "sha256": "0daf86cd74ebf9a046a523b2f6c667b06491ebb22c5c9373c132da76d84205ed"
+    },
+    {
+      "path": "boost/beast/http/impl/verb.ipp",
+      "sha256": "0cd00120722b2d237feebd1e08502dd03f9344bf9f5ccbd44e125dc8a13d1ff3"
+    },
+    {
+      "path": "boost/beast/http/rfc7230.hpp",
+      "sha256": "b3db0eabcdc16f30ff445ad3e13a998b5fda0d72d6348ca0584e6d5a7237b17c"
+    },
+    {
+      "path": "boost/beast/http/verb.hpp",
+      "sha256": "ada4b3eacc92c71e44f6f2a6d9fd70041e1cf40ff31181229a99c4463828000c"
+    },
+    {
+      "path": "boost/compat/detail/returns.hpp",
+      "sha256": "cc278344fb6f610fd2ea5b421c30017cd6ee44979586dd1a3496fa52ddf7ce83"
+    },
+    {
+      "path": "boost/compat/invoke.hpp",
+      "sha256": "d5694ad7e48452f5a7972c711cc7af975689ac3180eaf629ccaf2049faacb24c"
+    },
+    {
+      "path": "boost/compat/mem_fn.hpp",
+      "sha256": "c27fe549382f265a0343e6b9f9410d2784e9f355dbcaa567270fbc075ab6a072"
+    },
+    {
+      "path": "boost/compat/type_traits.hpp",
+      "sha256": "69c0305d067a139895e44d7a798571c035a928bc8727c8d867aefba093dd4c86"
+    },
+    {
+      "path": "boost/config.hpp",
+      "sha256": "373206390d20aa5bb9e2628eb08543399d73b853af7bfc5f1d2bd9a00bc07593"
+    },
+    {
+      "path": "boost/config/compiler/gcc.hpp",
+      "sha256": "4d72f17a36be0b38d8f7a96a21306a56f7fa8bb48ccdccaaea05c9397ee6de4d"
+    },
+    {
+      "path": "boost/config/compiler/visualc.hpp",
+      "sha256": "c0830b1f8f6c71338156166fb5b893ac1c13f0ede3c5024fd402d6c11a8661eb"
+    },
+    {
+      "path": "boost/config/detail/cxx_composite.hpp",
+      "sha256": "a61b5f665f2594048f5b679ab0071a779e25df9b3c5784eaff6010a65ab8456a"
+    },
+    {
+      "path": "boost/config/detail/posix_features.hpp",
+      "sha256": "bba105d0af558c09307941fe64ce5ce9d775990b96684708adf4a9a92070fc0a"
+    },
+    {
+      "path": "boost/config/detail/select_compiler_config.hpp",
+      "sha256": "73059f6ceb2952375b9cfb71ee609bd29c595d9f82014a01676fcc47c3a692d3"
+    },
+    {
+      "path": "boost/config/detail/select_platform_config.hpp",
+      "sha256": "b24a891ef5cf8b032f1073c3e7d7416bba54657e58fec6f89e66c8ff9439665e"
+    },
+    {
+      "path": "boost/config/detail/select_stdlib_config.hpp",
+      "sha256": "d26cb12104c9942b2031500c291ee13754dbb43b1d944fb30a7b98b119b83456"
+    },
+    {
+      "path": "boost/config/detail/suffix.hpp",
+      "sha256": "f46a617b5bd44d2076c978ad7151b31f9921517d881f57ee927b26ae4c2383ec"
+    },
+    {
+      "path": "boost/config/helper_macros.hpp",
+      "sha256": "ecf739b9b06545ebb0d691e8207cf7b70a5d42d7cb378d5d5502c0c96eefafc2"
+    },
+    {
+      "path": "boost/config/platform/linux.hpp",
+      "sha256": "f508f04c0fe1e1dab43a5c5cb287bb5514b58f63ea3d4705d3aafea528be2341"
+    },
+    {
+      "path": "boost/config/platform/win32.hpp",
+      "sha256": "eaa82c93bc49969f4e91edd333e1068bb4aeeb97c9a3dcdf51c0f8dab05dc225"
+    },
+    {
+      "path": "boost/config/pragma_message.hpp",
+      "sha256": "1951b59b8db3e8bf1e02c622605c7f45067dc3ce86eee8fba00f656099c64ab9"
+    },
+    {
+      "path": "boost/config/stdlib/dinkumware.hpp",
+      "sha256": "6f8b6f608e92d92e18e436aefe1a56a157b2ad119ad1dec0122e057f1ad11a15"
+    },
+    {
+      "path": "boost/config/stdlib/libstdcpp3.hpp",
+      "sha256": "3568e83c96b9f7fb823b9ae3f5ae0cc126ee5da3cfd613dd3724d5cb6cd352ed"
+    },
+    {
+      "path": "boost/config/user.hpp",
+      "sha256": "d24c2d771df2ee757c930466d69a0fac11cf721aaf89820f32c05c923a4ebca7"
+    },
+    {
+      "path": "boost/config/workaround.hpp",
+      "sha256": "cf56acc9048aa845887bbc29815e6f41f8170c568960b7d5491bc223693dd40e"
+    },
+    {
+      "path": "boost/core/addressof.hpp",
+      "sha256": "c4a07c20efae1a947f198721961dcd902b43e5615ea0d3d9b2da140a9099b880"
+    },
+    {
+      "path": "boost/core/bit.hpp",
+      "sha256": "b3e5cea0e7e95f4ed98a302358c2efd1edfbcfd3388db5cf3ccc2091ae100c73"
+    },
+    {
+      "path": "boost/core/detail/is_same.hpp",
+      "sha256": "2e3395e79145533ac53ee8a2ba5e5690d59316589a862de5324d4c5c88168a27"
+    },
+    {
+      "path": "boost/core/detail/static_assert.hpp",
+      "sha256": "60dd42804bf8de46a2bb82b80362f53e1e6743cbcb6d4ef52ad62f973db28550"
+    },
+    {
+      "path": "boost/core/detail/string_view.hpp",
+      "sha256": "ac1f2b8adbe860bffb220ff12839b8ea464c9fcf0c6204067a007e76bc20577d"
+    },
+    {
+      "path": "boost/core/empty_value.hpp",
+      "sha256": "eb1822b1461298277898a98e9d4512956da07877863f0d9de8e4743f19d7a657"
+    },
+    {
+      "path": "boost/core/enable_if.hpp",
+      "sha256": "b4aefa20fb7a5d673ee4023e693ca74738dd84ffd5a4c248ddc06c1df812229e"
+    },
+    {
+      "path": "boost/core/ignore_unused.hpp",
+      "sha256": "6888d1bb68db21f5241ab728c8fbe1a3988a2c1c3a889d6c5e5fea0c9a5b8ab5"
+    },
+    {
+      "path": "boost/core/invoke_swap.hpp",
+      "sha256": "d12bd16dc765118f4af0915a0be9edc9f3d18a4821ed5d76c0f7e0cf87bbdfe0"
+    },
+    {
+      "path": "boost/cstdint.hpp",
+      "sha256": "dbbf2bba3a0b6316d7f1850ff656eb4567bb2aa10197435a525cb8ff70b6d8f5"
+    },
+    {
+      "path": "boost/detail/workaround.hpp",
+      "sha256": "5d88074d61d7d93196d72b84fa62ede29be62a3f68386b78bda63eea7b32f2ba"
+    },
+    {
+      "path": "boost/exception/exception.hpp",
+      "sha256": "94c28410f1a52862258cb97040c98ed4e916540a6c88d0f6e67b9f3a443e9028"
+    },
+    {
+      "path": "boost/make_unique.hpp",
+      "sha256": "42cf482bf6d03f01eddeeae6432daf04955700a74caebefb79718c89aad18c19"
+    },
+    {
+      "path": "boost/mp11.hpp",
+      "sha256": "83512a97a4cf73b4cb34c4fad13c014b9ef37e8fc4a42f48c43f278b6504b371"
+    },
+    {
+      "path": "boost/mp11/algorithm.hpp",
+      "sha256": "1ed92dbd10ce982cba72c1aa19efb7aa5b0cc89ea2985060a5213dfccf4f6ba3"
+    },
+    {
+      "path": "boost/mp11/bind.hpp",
+      "sha256": "686588a6459c0d3f26b7c1e66473955e28fc3742bd37fb9e936f8cd32260277e"
+    },
+    {
+      "path": "boost/mp11/detail/config.hpp",
+      "sha256": "670b615f3aa2d61eb4f3174f7d325f238de20a87f2226395053d8544aaffd4cf"
+    },
+    {
+      "path": "boost/mp11/detail/mp_append.hpp",
+      "sha256": "4cb2a02b245ec7121ec45a3722a431da580b67c5a3f961c3eaf1dbaa90565126"
+    },
+    {
+      "path": "boost/mp11/detail/mp_copy_if.hpp",
+      "sha256": "aabfdd7bbc8acbb5814037a32d8555d6172b3aff8a47340061bcf0f931822bf9"
+    },
+    {
+      "path": "boost/mp11/detail/mp_count.hpp",
+      "sha256": "7f413d342b508858c80140ab2aa67f7c1984cb9bc4cae1524c33d6d8e67c9fc9"
+    },
+    {
+      "path": "boost/mp11/detail/mp_defer.hpp",
+      "sha256": "cc33d4e004c7bd3feee19b1de100489ace31b636c5adbabdd61b348dac8bf533"
+    },
+    {
+      "path": "boost/mp11/detail/mp_fold.hpp",
+      "sha256": "d987988f0303e54cb7536e2e59ddb441dd152f67d909cddc90bd925725493a7b"
+    },
+    {
+      "path": "boost/mp11/detail/mp_front.hpp",
+      "sha256": "049bcfc7bd007736005b61322ac68c099c558d5322d8b146bdd94103927e78c4"
+    },
+    {
+      "path": "boost/mp11/detail/mp_is_list.hpp",
+      "sha256": "d89daf12a8e701dadd9bffa909cc13ff08ee94b33e5554f7c136f9d86d762586"
+    },
+    {
+      "path": "boost/mp11/detail/mp_is_value_list.hpp",
+      "sha256": "1d6001c2b479ae396cdf2ff009a596974c5eb9dde63525b3506485d5915d1c4b"
+    },
+    {
+      "path": "boost/mp11/detail/mp_list_v.hpp",
+      "sha256": "1e9b7bc702a0fec478dcfaf2af1543271d67de89e8733cddf696e3d48b482677"
+    },
+    {
+      "path": "boost/mp11/detail/mp_list.hpp",
+      "sha256": "c2413dc3ed97d171a276c3de93e6406792162d5a99f3fc1b0616f47376833978"
+    },
+    {
+      "path": "boost/mp11/detail/mp_map_find.hpp",
+      "sha256": "b76b0ba6df5ccd7bcd3efcc52d9f6d76a16dd20407d18b0167826989783e794a"
+    },
+    {
+      "path": "boost/mp11/detail/mp_min_element.hpp",
+      "sha256": "98a7e8ab0827c563bf80d84f111793f680c95acd8a64bfb7cf8345ec0df52c7b"
+    },
+    {
+      "path": "boost/mp11/detail/mp_plus.hpp",
+      "sha256": "9fed767b29dab714be1f0e3e49b0161a7b653cec347fc8cd156fd7c396d63492"
+    },
+    {
+      "path": "boost/mp11/detail/mp_remove_if.hpp",
+      "sha256": "fa3922ed87346e437f6e3f57b32779ecc3c28f474e87510d3ccbfbcecc3ed95e"
+    },
+    {
+      "path": "boost/mp11/detail/mp_rename.hpp",
+      "sha256": "b1a6ae78b132eba56b8a40a73e910eb930eaa3447f1a6a069ef948350ffbb15d"
+    },
+    {
+      "path": "boost/mp11/detail/mp_value.hpp",
+      "sha256": "c4920907bf95b31fc7c7db7e09f9351bb4fa4cb48e7246d0f6e6115d8d141deb"
+    },
+    {
+      "path": "boost/mp11/detail/mp_void.hpp",
+      "sha256": "265e064f85a6db5078b38251bf02a5a298274b75969c86cb38fd5d50c2c730ed"
+    },
+    {
+      "path": "boost/mp11/detail/mp_with_index.hpp",
+      "sha256": "628a24718b3d07de800c7cb888f1a682266ceed9f6c98fc09a5a9555c9695e12"
+    },
+    {
+      "path": "boost/mp11/function.hpp",
+      "sha256": "1536531b2cd7332b55b64cb66c46c287abd4e2880c184484a73def6b2d9d20b1"
+    },
+    {
+      "path": "boost/mp11/integer_sequence.hpp",
+      "sha256": "41acd03710152acff124abaf8ff12ab86d76fb6c06c65e7d0203b9098072dd3c"
+    },
+    {
+      "path": "boost/mp11/integral.hpp",
+      "sha256": "02032a46a2888c0104e279994becfca1e0264c6fbccc4f00daa85a107951a184"
+    },
+    {
+      "path": "boost/mp11/lambda.hpp",
+      "sha256": "7cbeaef7d42523ea3417ef5eea27ca6687334e0d3468e2fc5fc62200b1d2f112"
+    },
+    {
+      "path": "boost/mp11/list.hpp",
+      "sha256": "98ec8cf7f258133795a01e867e28f31c9f225034a1fd30599323762ee2ee6431"
+    },
+    {
+      "path": "boost/mp11/map.hpp",
+      "sha256": "f4ea61c8a0c6ef25c0df4046d1a77139b779e3783d896799afdbdb03e584a0ed"
+    },
+    {
+      "path": "boost/mp11/set.hpp",
+      "sha256": "19208c06b5ee9c42f13b2cd1de47ae090777d42b87939ec7c49f16548fe9e6b9"
+    },
+    {
+      "path": "boost/mp11/tuple.hpp",
+      "sha256": "b49f3194fab9e6bcc0db12ef5650090c32f0a7b03c67581700914098eabf67ff"
+    },
+    {
+      "path": "boost/mp11/utility.hpp",
+      "sha256": "952369f292878cf999237a9973832144df7abc833c168c047d0c45a66e247bd3"
+    },
+    {
+      "path": "boost/mp11/version.hpp",
+      "sha256": "02ed2553a80149dec2264fb5838a5f6b9b1c7fdfd16f7471eb0e345f4502e5f1"
+    },
+    {
+      "path": "boost/none_t.hpp",
+      "sha256": "2705874806992b802c4051944ea8bdc5952c7c4013cbae2cc96d62ee4c47c90a"
+    },
+    {
+      "path": "boost/none.hpp",
+      "sha256": "25d02d537c680c3c6bfdb75d986b39cb01c73aaa998eb008cf30b158cf462099"
+    },
+    {
+      "path": "boost/optional.hpp",
+      "sha256": "16d908fd6e41382a0789009f707100011eee8329747447c1b619d0a9bb757650"
+    },
+    {
+      "path": "boost/optional/bad_optional_access.hpp",
+      "sha256": "47634e26ec9473a3d8dc0757e13b3abe024e004ca074fc3c0824c25fff82c154"
+    },
+    {
+      "path": "boost/optional/detail/optional_common_defs.hpp",
+      "sha256": "b5f21c6cc815cbe048d725bab3e73e88b8a842a939f69261cdb1da2c7cdba927"
+    },
+    {
+      "path": "boost/optional/detail/optional_factory_support.hpp",
+      "sha256": "a3dbe28186bf400188f8e14333342dcbe55c8741b6a0b710e9f1f5d99f51b6f6"
+    },
+    {
+      "path": "boost/optional/detail/optional_hash.hpp",
+      "sha256": "a066e1e158c2efab436e1b027bd75b08827cb2003a43a77291a0dd4e5febe4af"
+    },
+    {
+      "path": "boost/optional/detail/optional_nonmember_interface.hpp",
+      "sha256": "d17a9d8e84ba3e3164d4cca86abf2d01584b8236b5ad385acb6de21cfb290829"
+    },
+    {
+      "path": "boost/optional/detail/optional_reference_spec.hpp",
+      "sha256": "ab1f334450873bac072ce26b3be1b29e9e10b40fc731ec58c78a7ab2a37e8c55"
+    },
+    {
+      "path": "boost/optional/detail/optional_relops.hpp",
+      "sha256": "263fe4257883eb26ff9fc36a2aac0fa43e4a442e04f6f8fbb91bbed33e48c5c8"
+    },
+    {
+      "path": "boost/optional/detail/optional_select_implementation.hpp",
+      "sha256": "8839600f6447f65d0cf5577daa37831e16043c5091bdd81631e5b57f5f30d04d"
+    },
+    {
+      "path": "boost/optional/detail/union_optional.hpp",
+      "sha256": "c83c5f213d55d7a4292fd4db24693a923bf45c743940dd62390dd66984a49ade"
+    },
+    {
+      "path": "boost/optional/optional.hpp",
+      "sha256": "581cf919860d059b48b530102bce769395f3f4fbac15103af3cd07e5f57ea899"
+    },
+    {
+      "path": "boost/predef/detail/os_detected.h",
+      "sha256": "4b575705f932b165c9282867d283df29afc6f9e5d17b79f1250964e9d16f8bff"
+    },
+    {
+      "path": "boost/predef/detail/platform_detected.h",
+      "sha256": "c173711895acaa0f30bc6952c4b2643b65f34d5f578c9b394b5195ff59d4779c"
+    },
+    {
+      "path": "boost/predef/detail/test.h",
+      "sha256": "4a4b5be3b09fc4e81da4734ca6a604ba3528d479874bc5f0f2d4c235fa003a97"
+    },
+    {
+      "path": "boost/predef/make.h",
+      "sha256": "ec5ee94c1e2d0e0e556d1707edf8600f1f6362bb2e1050f5f1663d965d58b287"
+    },
+    {
+      "path": "boost/predef/os/ios.h",
+      "sha256": "ab5295eecc3c13630d9f3faf3567ef2a48101206fb00dfa466498c2e7a00ab3c"
+    },
+    {
+      "path": "boost/predef/os/windows.h",
+      "sha256": "a458debc523142f8b2c8e3e2910e358b766f7206c3234d0566a05931be90a016"
+    },
+    {
+      "path": "boost/predef/platform.h",
+      "sha256": "d050591a26103738a1aa9281c1399decef7c9eaed477cb390f1fdaf8bfffc3fc"
+    },
+    {
+      "path": "boost/predef/platform/android.h",
+      "sha256": "8361c3f4e318fbfcdf4e7794d34e3dec006f03926d6fc48e44c584084b9fa128"
+    },
+    {
+      "path": "boost/predef/platform/cloudabi.h",
+      "sha256": "7234417663ea17357e7d2f48081e87865fb52af0773632c9c50ff08088ab884b"
+    },
+    {
+      "path": "boost/predef/platform/ios.h",
+      "sha256": "2dbdbf48a7e2093c64597803b1a9a3a1e319c3f56cab471cf86d265c8ba14966"
+    },
+    {
+      "path": "boost/predef/platform/mingw.h",
+      "sha256": "45c7220e87d547b3b8698671df5cab96ba4de8bdc2a68fc16864707f9ffd6bd3"
+    },
+    {
+      "path": "boost/predef/platform/mingw32.h",
+      "sha256": "f43cf1784435173268b42195f57618fa1d78c538947ae3788224c4cd361403c9"
+    },
+    {
+      "path": "boost/predef/platform/mingw64.h",
+      "sha256": "eeeae1a2228a7574cd8972e01384755727a53c36e2eb8e3387e1b49a43a0453a"
+    },
+    {
+      "path": "boost/predef/platform/windows_desktop.h",
+      "sha256": "1a4be41710e08abd9dc5f1e89ed1edcd0207459e3af8c1eddb1c3ba1bfa6d84c"
+    },
+    {
+      "path": "boost/predef/platform/windows_phone.h",
+      "sha256": "279b43c4d0ddaa1de9498bf8e899f6760a5d98c8ea8d6f81f157e163af620d0b"
+    },
+    {
+      "path": "boost/predef/platform/windows_runtime.h",
+      "sha256": "c0a723dcefd245bfed431f26fe608e4d571f9f19712027876dab9157d2cb53ce"
+    },
+    {
+      "path": "boost/predef/platform/windows_server.h",
+      "sha256": "5d074bbdeccf1f4a4a252a9ef89f20fddbe1a7e2c1f40ffa99093592ed382f62"
+    },
+    {
+      "path": "boost/predef/platform/windows_store.h",
+      "sha256": "288327505fb3a175ea21ede7e6f42c157b6b70e682480f3a2efec1da85147343"
+    },
+    {
+      "path": "boost/predef/platform/windows_system.h",
+      "sha256": "15ba2be63f39090c4624c2564ab3470b0b4c8900fbbd1da60460330ac5b778b1"
+    },
+    {
+      "path": "boost/predef/platform/windows_uwp.h",
+      "sha256": "0ee0035df43fdc3bb5f0d2af7f10c0a6715755dd9fd2d25049d6c410c6873b13"
+    },
+    {
+      "path": "boost/predef/version_number.h",
+      "sha256": "e30fb59f4e04d32139df8b2dcda4e8c0d857190806225e4ee3e20381535e6e37"
+    },
+    {
+      "path": "boost/smart_ptr/detail/sp_type_traits.hpp",
+      "sha256": "f55fc65f7d8ba00e2fe370a56ff66833b53fbaa38fef36e9960b19b1b8eb7789"
+    },
+    {
+      "path": "boost/smart_ptr/make_unique.hpp",
+      "sha256": "677301ddb5c037a6492a9cf5fea7a61aeacbb8327bddb09cfea07d3815a3f87d"
+    },
+    {
+      "path": "boost/static_assert.hpp",
+      "sha256": "216e0899e4a94061df2fafe33d36c20a91e8f9b1f2d5bce77fc1224b6371138a"
+    },
+    {
+      "path": "boost/system/api_config.hpp",
+      "sha256": "ec0d3a1c9b697441a6e3662779be0ab6caf5b9e4a3236e0f13939b887144a185"
+    },
+    {
+      "path": "boost/system/detail/append_int.hpp",
+      "sha256": "ebe630ff4bf27abfca973cb867c4685f34f9a3f0963214b4a1ad3e2d8a9d79e7"
+    },
+    {
+      "path": "boost/system/detail/cerrno.hpp",
+      "sha256": "c52271122810cd0ca7229b2822b4021af71ad8f5fba9c778239f1047a4382965"
+    },
+    {
+      "path": "boost/system/detail/config.hpp",
+      "sha256": "bdf5904addc7bc16cc400406561335dff5fc156351bb26cf5333d6d903150650"
+    },
+    {
+      "path": "boost/system/detail/enable_if.hpp",
+      "sha256": "ad107d0e0f7f7c592b02227408df06b5feff6daa41328fc020a132621c443356"
+    },
+    {
+      "path": "boost/system/detail/errc.hpp",
+      "sha256": "a55d806c80fb771b2f8998cc513075760f4ec9df2345ed4464a6198624d617b0"
+    },
+    {
+      "path": "boost/system/detail/error_category_impl.hpp",
+      "sha256": "8cdc0c1509778589821297d5333ca53cb74a1b2b3d4834e5052270090effacf8"
+    },
+    {
+      "path": "boost/system/detail/error_category.hpp",
+      "sha256": "c4cc6632b507d00c99d1645f9973e07e915b189c7a207fdf1b707b1253853ba0"
+    },
+    {
+      "path": "boost/system/detail/error_code.hpp",
+      "sha256": "b2df980cf5351364ad6850011ccf0e7f4415f0a5502e498acf16d23257e43b9b"
+    },
+    {
+      "path": "boost/system/detail/error_condition.hpp",
+      "sha256": "f7ceceb0f3e1fdde054abb583938f14070f2ea78304f0d70a947a8826dc32ab6"
+    },
+    {
+      "path": "boost/system/detail/generic_category_message.hpp",
+      "sha256": "4bc3862f98498c440496b3d7d94e28a232865a4d95db77dc0bf1d8ff86210c81"
+    },
+    {
+      "path": "boost/system/detail/generic_category.hpp",
+      "sha256": "3f7add8a9502690fbe4e2226b07d4a50070becd85a759bbdaac28a1fbfe873d1"
+    },
+    {
+      "path": "boost/system/detail/interop_category.hpp",
+      "sha256": "b5c286fb6de1352acebef96bd4649e25a0cc68b2e2aa0abacd01313fbb3f362c"
+    },
+    {
+      "path": "boost/system/detail/is_same.hpp",
+      "sha256": "0989ae7697b93bd6aee7f93b5a4b273aa464fe9754cc59717bd933b4aa9138c9"
+    },
+    {
+      "path": "boost/system/detail/mutex.hpp",
+      "sha256": "43bbd4d38e929e26848bb2af4b9cac35f479aa600bd53bafd654dff73193dfba"
+    },
+    {
+      "path": "boost/system/detail/snprintf.hpp",
+      "sha256": "a1ae9f0a6b0da661fcd503315181dca852b86c55531249a035ca1c053aad2762"
+    },
+    {
+      "path": "boost/system/detail/std_category_impl.hpp",
+      "sha256": "98a1ff592283d8f12467585182daf8fce8012ac22c8df98ab9f91becddb0b07b"
+    },
+    {
+      "path": "boost/system/detail/std_category.hpp",
+      "sha256": "fbeca810876655765ef9869323c644d330972ff4d206e626d12f87805b6063a3"
+    },
+    {
+      "path": "boost/system/detail/system_category_condition_win32.hpp",
+      "sha256": "bc79f560e6a26d15f82e6408dba6f1bdeac3f398d5794a3bd1d44450bbd00b35"
+    },
+    {
+      "path": "boost/system/detail/system_category_impl.hpp",
+      "sha256": "e886221995398e1ec0e48f6b14f39cf0df0892b5bf35e227a148262f68da15e9"
+    },
+    {
+      "path": "boost/system/detail/system_category_message_win32.hpp",
+      "sha256": "74eec695b8a1b32269c132ec807618ff355abb6e3ce85065bd5df2c93cfe4e61"
+    },
+    {
+      "path": "boost/system/detail/system_category_message.hpp",
+      "sha256": "19811eb6e78961e393769ed5b4d493101d36dc63012c89ac422012938730bccb"
+    },
+    {
+      "path": "boost/system/detail/system_category.hpp",
+      "sha256": "e0819351d2760f72a299467dcf448063f48531686b8f145fb70552b71142aa8c"
+    },
+    {
+      "path": "boost/system/detail/throws.hpp",
+      "sha256": "fcaa783076772ae42bb1a839f93c959eb78fe68c61ad85c2967a8afe8264a7bc"
+    },
+    {
+      "path": "boost/system/errc.hpp",
+      "sha256": "5c5ad7ba8d66e193d97f0cdf782aeba90f24f74c21f1b44c8b6721b1aa6ea2e2"
+    },
+    {
+      "path": "boost/system/error_category.hpp",
+      "sha256": "c2820bffeef9bffa739f10c3fe330442c703fe6cbeb3baed291e093fbe444ae2"
+    },
+    {
+      "path": "boost/system/error_code.hpp",
+      "sha256": "2ec3f249caceb5ef18cca73878426c2afeaaffdc510fd5ccccfa31d71651baae"
+    },
+    {
+      "path": "boost/system/error_condition.hpp",
+      "sha256": "f6222502442630b36ee1fd90e63042ccf5ea4287387315769d46f407bf79c420"
+    },
+    {
+      "path": "boost/system/generic_category.hpp",
+      "sha256": "bb1bf8b54f2c0d5daab489b03049f61dd4ea3819260698f51576c3f1269f9d04"
+    },
+    {
+      "path": "boost/system/is_error_code_enum.hpp",
+      "sha256": "dd2a0fafe6c1ef9c190362d9f0d08ca99ac8f75e57c1c972060070bb68676cbc"
+    },
+    {
+      "path": "boost/system/is_error_condition_enum.hpp",
+      "sha256": "452889fbb61cad7b24e1db4b34cf3bd9621b74db300980be9fc36bbee6e95ceb"
+    },
+    {
+      "path": "boost/system/result.hpp",
+      "sha256": "58879c400f6b49c46dafb1a948b39b38f5586fc6737bc7bc73c9196aea3c501e"
+    },
+    {
+      "path": "boost/system/system_category.hpp",
+      "sha256": "da841722125a04fa8d3d11e77a879261a767367c754977f9e5d8a03003d17bbc"
+    },
+    {
+      "path": "boost/system/system_error.hpp",
+      "sha256": "1b3d22a32914a8798554f813c77046398f985034674876c653e42a0d71035c65"
+    },
+    {
+      "path": "boost/throw_exception.hpp",
+      "sha256": "fbf66a8b406e803d30dde7c616c15e0f1407bf0325f1d4f9665a8788aeedd745"
+    },
+    {
+      "path": "boost/type_traits/add_const.hpp",
+      "sha256": "e0097bd4b39041632548f9f7951edcfb229b908969120972560123366f3a114a"
+    },
+    {
+      "path": "boost/type_traits/add_volatile.hpp",
+      "sha256": "f7cdb4a75b87025798455461fe1b0f5228091fb95765ebc0f281ececbb130e9e"
+    },
+    {
+      "path": "boost/type_traits/alignment_of.hpp",
+      "sha256": "0c4500a7de2a2214cbf2d18f5b03856ffc112b98634ea813ee9707b6ac5aeefe"
+    },
+    {
+      "path": "boost/type_traits/conditional.hpp",
+      "sha256": "72744e48a710e2645ecc6a696b150c63d45507cb33b8090fbc7cb8827b2a3ba7"
+    },
+    {
+      "path": "boost/type_traits/copy_cv.hpp",
+      "sha256": "b4c0fdb1476d4b7dc493fafbfe450196eb0891327043305485b54d33d0605fdb"
+    },
+    {
+      "path": "boost/type_traits/detail/config.hpp",
+      "sha256": "22c6676f0907a3e6733f0a0f883bb559955ca2b06cdc26aa47610567a8522edb"
+    },
+    {
+      "path": "boost/type_traits/detail/is_member_function_pointer_cxx_11.hpp",
+      "sha256": "39cbec89e4db01eadb1691694c6c8f888705265e29089d4674b95accf477656b"
+    },
+    {
+      "path": "boost/type_traits/integral_constant.hpp",
+      "sha256": "757707f9a8f1972da0c8bf11781240410f8f1fa8c6cf06852bf681520c4d167f"
+    },
+    {
+      "path": "boost/type_traits/intrinsics.hpp",
+      "sha256": "1981687d37f11a103020b6bec6321ae25f9683e01476968f62f8a175bf625c38"
+    },
+    {
+      "path": "boost/type_traits/is_arithmetic.hpp",
+      "sha256": "f937c0f8958d61efc196a30838fbfc085e6ed6a862fed86bec42e671e5ebe7f3"
+    },
+    {
+      "path": "boost/type_traits/is_const.hpp",
+      "sha256": "1dc59162cf36e20d626a6ec7f46cf22afdf353df30d566492bfe35898286b0b6"
+    },
+    {
+      "path": "boost/type_traits/is_enum.hpp",
+      "sha256": "099fec769a429ee66e417d92e93a76586814a9e6545e376db53768d99c382114"
+    },
+    {
+      "path": "boost/type_traits/is_final.hpp",
+      "sha256": "508b8b7ff4512402e6e5e45525a7d58419e711d33111336fd1c13974e2c49063"
+    },
+    {
+      "path": "boost/type_traits/is_floating_point.hpp",
+      "sha256": "a3feea29f37289f32dfe2ca1efde2a1711f1ca6057c57d6f274aafa2a32661e6"
+    },
+    {
+      "path": "boost/type_traits/is_integral.hpp",
+      "sha256": "44a55b50004642c81f775f8783cc1a2dfa90276262bb337f4fe94321179cb652"
+    },
+    {
+      "path": "boost/type_traits/is_member_function_pointer.hpp",
+      "sha256": "03a81adac172e6e051751acec360a666ff2bd202325560391a9feeb2a71658c7"
+    },
+    {
+      "path": "boost/type_traits/is_member_pointer.hpp",
+      "sha256": "a5c437cb34f43d184ea8c3eaef3e44a553d8bf5ef9d5db3a7c91a058feadc3ed"
+    },
+    {
+      "path": "boost/type_traits/is_pod.hpp",
+      "sha256": "75f2db547a494219e7584ac998dd84486e6558b7b804fcdb273bae5d3876693c"
+    },
+    {
+      "path": "boost/type_traits/is_pointer.hpp",
+      "sha256": "582df44459acba171bfaf5f9e7098e6bd051acaf9f83f964245c9c94e886b1be"
+    },
+    {
+      "path": "boost/type_traits/is_scalar.hpp",
+      "sha256": "0b1de36f8f54fbd342fae4dd7ce27fa26887e1150828121c3cb4618ed08287a6"
+    },
+    {
+      "path": "boost/type_traits/is_void.hpp",
+      "sha256": "9e043155d858ee74fb856cfb228922e4b9fff5fbe6dc0cc4f3ad28bdf55ba2aa"
+    },
+    {
+      "path": "boost/type_traits/is_volatile.hpp",
+      "sha256": "0fe43f8c2c8dae4df59b50cb62b33fcb8be351b1ca78e4a6afb479faf77a4ef9"
+    },
+    {
+      "path": "boost/type_traits/make_void.hpp",
+      "sha256": "f791e8956d2dbfbaa118aae3bb7e6efa0fb29780016ce4dcf2be7c4fa1c7fcf5"
+    },
+    {
+      "path": "boost/type_traits/remove_cv.hpp",
+      "sha256": "440d007534b548b472dd33f0f8c3b18da347527ec3d501566f9ed4257c762497"
+    },
+    {
+      "path": "boost/type_traits/type_with_alignment.hpp",
+      "sha256": "590b909884617845e2068df83c1e32332af03109553bcbc10e6bc093e85e203c"
+    },
+    {
+      "path": "boost/url/authority_view.hpp",
+      "sha256": "a4044252d5917b704f2ad3955e9b5e0c71663b800badc865f73c1cf7476b9dcc"
+    },
+    {
+      "path": "boost/url/decode_view.hpp",
+      "sha256": "86b350ccb3ae46977c49afd91ee10db4a3bb622d59b4e7a3ea85cca302b14714"
+    },
+    {
+      "path": "boost/url/detail/any_params_iter.hpp",
+      "sha256": "ec579b5dda54f534a23743a58dcb401faa58278f29b289ea3851553399c25d64"
+    },
+    {
+      "path": "boost/url/detail/any_segments_iter.hpp",
+      "sha256": "34c3d8472fd02a5a48c0dc1aaa23b85f80ac36ac7eb3e8b0f6e4935b63860ca4"
+    },
+    {
+      "path": "boost/url/detail/config.hpp",
+      "sha256": "2d46449fb66da9da7a3d14d20e6a22a2b56db36e3c4476a3648d9c0af419a1ab"
+    },
+    {
+      "path": "boost/url/detail/decode.hpp",
+      "sha256": "14ffe227a9ead722e8b8aca9985fec64f2a74e894b2d6075150dec7e41ffcad1"
+    },
+    {
+      "path": "boost/url/detail/encode.hpp",
+      "sha256": "ba85371deee8561154b7c828cbda5c6fdf4e2d54023f162bd6e070231d4221ab"
+    },
+    {
+      "path": "boost/url/detail/except.hpp",
+      "sha256": "46e22edeab262de439170845939034dffd22e2b99f5541bd109f345d0870669f"
+    },
+    {
+      "path": "boost/url/detail/fnv_1a.hpp",
+      "sha256": "fb843364e9067bcc944286bc5f627929cbdaabd1704d322767b94d5e3a4fc0fb"
+    },
+    {
+      "path": "boost/url/detail/format_args.hpp",
+      "sha256": "fdc3aaaa3b1929998f24418b15f0834afab52907ec67262d00735ed9b971995a"
+    },
+    {
+      "path": "boost/url/detail/impl/any_params_iter.hpp",
+      "sha256": "72a47bb4781cdf61d89e3e047b463465b043b61b15f976aedd7cc078b6c2a075"
+    },
+    {
+      "path": "boost/url/detail/impl/any_segments_iter.hpp",
+      "sha256": "73e6af40a88fe38d9a8edad44aba0ab6801284d2434b67c5fdfde53f3e9c82d4"
+    },
+    {
+      "path": "boost/url/detail/impl/format_args.hpp",
+      "sha256": "8f70714ae94cbca40a227bd4164e50b5a1e22ab8cff613626715be145bcf40a2"
+    },
+    {
+      "path": "boost/url/detail/impl/params_iter_impl.hpp",
+      "sha256": "db0f3c67a7fbb13e90a713db41847813e01000004b94253c64b2126fd04cf916"
+    },
+    {
+      "path": "boost/url/detail/impl/segments_iter_impl.hpp",
+      "sha256": "2dc942855ed2ef91d96d7c3683d9162f417a3ba63d75b97fcc4467569dbbf449"
+    },
+    {
+      "path": "boost/url/detail/impl/url_impl.hpp",
+      "sha256": "d32780adfba1102b4f888ce78d99d4485ca38c92f8c0f3dccfe843f26ee4f1ab"
+    },
+    {
+      "path": "boost/url/detail/memcpy.hpp",
+      "sha256": "4d28f603914f38427f62d75478e18ba3ebfe03648268e4cd12034c567348ebc5"
+    },
+    {
+      "path": "boost/url/detail/move_chars.hpp",
+      "sha256": "e69ac70ef3cc92252d3f1950b4fb84b71e1bbb718453da8741749e31a8021789"
+    },
+    {
+      "path": "boost/url/detail/normalize.hpp",
+      "sha256": "b090ee66bc2b04f812fbade1e29b64e2db8714f136e0e47c9da896c381a722f7"
+    },
+    {
+      "path": "boost/url/detail/optional_string.hpp",
+      "sha256": "0e197416957a71449e3025b21c042a3fab526e94ca8be753820f326e2b3d5f8c"
+    },
+    {
+      "path": "boost/url/detail/over_allocator.hpp",
+      "sha256": "558a7098964d7d7e0361abfba6d6a4b091f99042e3bfbbee3fed5d2573eca496"
+    },
+    {
+      "path": "boost/url/detail/params_iter_impl.hpp",
+      "sha256": "d914f52c72eec162e7f66689af526082e5b5dea55be9c761540c296d5cc746c9"
+    },
+    {
+      "path": "boost/url/detail/parts_base.hpp",
+      "sha256": "f3bc7efb2b7c04ba34b731ab5eb70b00162cbefc3f9d035c278c20235428df31"
+    },
+    {
+      "path": "boost/url/detail/path.hpp",
+      "sha256": "912f40a8a1928f9fdd620a7e9007278b2a674c2ae60dda96f0289a41b867c50c"
+    },
+    {
+      "path": "boost/url/detail/print.hpp",
+      "sha256": "5750001488027b0f5471d6077634845d59359d75893b3fd20a2a4625ffcd94f5"
+    },
+    {
+      "path": "boost/url/detail/replacement_field_rule.hpp",
+      "sha256": "7c9eb67e56fb99165ba12e9adfd4a45679126bf53cd6b52fe2321cf3e19f911b"
+    },
+    {
+      "path": "boost/url/detail/segments_iter_impl.hpp",
+      "sha256": "193e25b1d49336284e938bd90c2ff2d211d5955ca472fcb716cc1cacb7821ac3"
+    },
+    {
+      "path": "boost/url/detail/segments_range.hpp",
+      "sha256": "68dc8ee92fd128c7565f4de593ab1a2ca69799218ec45a61e775a4b9cadfebe6"
+    },
+    {
+      "path": "boost/url/detail/string_view.hpp",
+      "sha256": "a726611810ec6ad990b8d6d0cf835125ffa962526aaec84dcba5134659ff9358"
+    },
+    {
+      "path": "boost/url/detail/url_impl.hpp",
+      "sha256": "7aa214b52d1c00fce065364b81d3341c6b346b05278ca98c9ad0af967eb8ee7b"
+    },
+    {
+      "path": "boost/url/detail/vformat.hpp",
+      "sha256": "6bb5cf4ac22b064dba2239b8de364dc708c87279b1a0e2a68823cb1932632932"
+    },
+    {
+      "path": "boost/url/encode.hpp",
+      "sha256": "cce1efdc8134dadce030dd236406995fb7224761039317824d318571e76f0682"
+    },
+    {
+      "path": "boost/url/encoding_opts.hpp",
+      "sha256": "f21ec6822123a538cb96e387818fdc23d55f861c75296ccc8e3179be79f1aa56"
+    },
+    {
+      "path": "boost/url/error_types.hpp",
+      "sha256": "4f5fcdeeefa548891412f2d743a5d6834074d72278b892001120f219175c49ba"
+    },
+    {
+      "path": "boost/url/error.hpp",
+      "sha256": "0f05ce959598ce1373ce12ecb4a50038fea8ac571632ba5f7984d462434b9f73"
+    },
+    {
+      "path": "boost/url/grammar/all_chars.hpp",
+      "sha256": "8d46567834b0e220713fcf6394ead0b7fee4057f8b35a6e13411cff750c16987"
+    },
+    {
+      "path": "boost/url/grammar/alnum_chars.hpp",
+      "sha256": "69c3686d8d46a95998d0e5023b76f82363b6b603e482325a8665a12c5af6a091"
+    },
+    {
+      "path": "boost/url/grammar/alpha_chars.hpp",
+      "sha256": "b486f3573fb14083c97a696734252125a246d7380ecb028a54d454681cce5b51"
+    },
+    {
+      "path": "boost/url/grammar/charset.hpp",
+      "sha256": "0c8205d0993ec7ef2d45566fff4b74e2c615e6f23b9e260922aab5a861b1180d"
+    },
+    {
+      "path": "boost/url/grammar/ci_string.hpp",
+      "sha256": "5e7cb3517b570ddb59040356f9ec3547c74f480889301fdee619afe8fae3ed40"
+    },
+    {
+      "path": "boost/url/grammar/dec_octet_rule.hpp",
+      "sha256": "e55776cbe11b47ec08dd44055c9d562b7853d5f2df1b2387a1c700bb340db952"
+    },
+    {
+      "path": "boost/url/grammar/delim_rule.hpp",
+      "sha256": "48efec41a536d753d3b1fbdb5a8905d18169b8b8c7080db62a10f127ce6cd7f4"
+    },
+    {
+      "path": "boost/url/grammar/detail/charset.hpp",
+      "sha256": "c9b76bd5bdaf7278d0cf8d0ac5ad51cacd4dc5ee0f1fe00c9b683017a323cf0e"
+    },
+    {
+      "path": "boost/url/grammar/detail/ci_string.hpp",
+      "sha256": "df560fd147214e28d509f830233877f7cf94418086747d1dce4806266d388074"
+    },
+    {
+      "path": "boost/url/grammar/detail/range_rule.hpp",
+      "sha256": "6b333287e0052946676671b8b88dfb4b2dfb8a88eabb3ebc9dce766a2879e5c6"
+    },
+    {
+      "path": "boost/url/grammar/detail/recycled.hpp",
+      "sha256": "617ae564770d7a6807da521a147244aa918e8a6a5cb4353ddeb04475a3657869"
+    },
+    {
+      "path": "boost/url/grammar/detail/tuple.hpp",
+      "sha256": "396e59b3c6f399d965f7af93f6e302febec51766bbf554421603435e3f43e254"
+    },
+    {
+      "path": "boost/url/grammar/digit_chars.hpp",
+      "sha256": "14cebcfcbe4d18eeac9e897672396e5bbf4af8d69370922c95b13dfb55f12d41"
+    },
+    {
+      "path": "boost/url/grammar/error.hpp",
+      "sha256": "98ec4bee7240088f2ca1b612767c9313a205fc2feaf344371b43baeb97a46067"
+    },
+    {
+      "path": "boost/url/grammar/hexdig_chars.hpp",
+      "sha256": "f2d3f02031554a1d713b3d2c3097bfb4ad041d883b40da0958d35c2dc330a763"
+    },
+    {
+      "path": "boost/url/grammar/impl/dec_octet_rule.hpp",
+      "sha256": "089d01a5a285c68133b3681969936c41d74eafcb23f41ff3f2b6e18023134aba"
+    },
+    {
+      "path": "boost/url/grammar/impl/delim_rule.hpp",
+      "sha256": "2028215877c1bdeeaf1e11115851650ebf6e1934b92eccc0ebfad81c3adaf724"
+    },
+    {
+      "path": "boost/url/grammar/impl/error.hpp",
+      "sha256": "6a960718fc174cb5c6b4959a9cae03d4a0d85e1b03c0a067ffe9357f55cf5418"
+    },
+    {
+      "path": "boost/url/grammar/impl/optional_rule.hpp",
+      "sha256": "50b88471017bdbe76f77af526b16c9bd4785873beba3c4d1cf8ae78cb8b93f56"
+    },
+    {
+      "path": "boost/url/grammar/impl/parse.hpp",
+      "sha256": "a433dc3c8330fd7daced76f65790ad7bb52aca93c7dcde17d9d3cffa217ab7d3"
+    },
+    {
+      "path": "boost/url/grammar/impl/range_rule.hpp",
+      "sha256": "6ff193788329e5793a35f7587533134e21f8b96fa55ab6ec1d844d9bfba18465"
+    },
+    {
+      "path": "boost/url/grammar/impl/recycled.hpp",
+      "sha256": "a577565b47270dea73d323542ce5c3265f9945f8ae7cd1b5dfc114447ba26961"
+    },
+    {
+      "path": "boost/url/grammar/impl/token_rule.hpp",
+      "sha256": "e30d80fb689d8d9ad367374d7c26a666a22e04dabd12ac764ccf86cccd49fced"
+    },
+    {
+      "path": "boost/url/grammar/impl/tuple_rule.hpp",
+      "sha256": "e8d1f1a5c1dba42ad8eff6a5fb8a12fd0d34e554041c2b4ff80fd2da066ee863"
+    },
+    {
+      "path": "boost/url/grammar/impl/unsigned_rule.hpp",
+      "sha256": "cef3e17617398c63b4a68a8b5b9f31c395cb90fb6830584ab589c64329c9c95d"
+    },
+    {
+      "path": "boost/url/grammar/impl/variant_rule.hpp",
+      "sha256": "1915ce69a7640633854ed1c5394107d3298ec1473207b393f3c068a7956c9c35"
+    },
+    {
+      "path": "boost/url/grammar/lut_chars.hpp",
+      "sha256": "6df41d8b96bf62aa5b5e33de453069f1f93a2927185ea394d6c4f8953852f0ed"
+    },
+    {
+      "path": "boost/url/grammar/optional_rule.hpp",
+      "sha256": "d0cecc4918c7fde52ef2876acee0f06aa9216679bd7e460e3b079686f321517f"
+    },
+    {
+      "path": "boost/url/grammar/parse.hpp",
+      "sha256": "1654c9ffb4e2ec91cba85cf4ab7f36d207e6eba3221897c7d5c5ceee360b21f1"
+    },
+    {
+      "path": "boost/url/grammar/range_rule.hpp",
+      "sha256": "50bb5aba1249023fd057a4fb008739af247bc36b7f098680c7bee6520d9d5838"
+    },
+    {
+      "path": "boost/url/grammar/recycled.hpp",
+      "sha256": "bdf073bfe39112859a50660f2a9392096675c7690609d394cd44c2d6163d2bbb"
+    },
+    {
+      "path": "boost/url/grammar/string_token.hpp",
+      "sha256": "c51b2b2ca7e3c2175fa59d3857117adde8b3587c7b39c662b3463f8e34766566"
+    },
+    {
+      "path": "boost/url/grammar/string_view_base.hpp",
+      "sha256": "d1dbb6bed9fb553c5d37d8de5e54e22722852eeca6d093f3f78c01af765a75b6"
+    },
+    {
+      "path": "boost/url/grammar/token_rule.hpp",
+      "sha256": "fbe4753b0bfdeb94a0f98c0dc4b50d3fef25ee644a16fb3164f487d8e4f27c47"
+    },
+    {
+      "path": "boost/url/grammar/tuple_rule.hpp",
+      "sha256": "d4bb7cbe8bb1fb7293837a871d1c1a3bb8e0009fa6bcd0994b34bf3a41596e33"
+    },
+    {
+      "path": "boost/url/grammar/type_traits.hpp",
+      "sha256": "1d2900f261a1649c98a78e2b0f7bc4516015c1e57da2e0287f9f1302c312c638"
+    },
+    {
+      "path": "boost/url/grammar/unsigned_rule.hpp",
+      "sha256": "2919595b817549d464043ea2be193ac2a223e5e89b8e11f4e95039e54bface0f"
+    },
+    {
+      "path": "boost/url/grammar/variant_rule.hpp",
+      "sha256": "4a5f91805d42a7272b0f70fb65259be622b943000bc3a83e3307fdc3eb6c26d3"
+    },
+    {
+      "path": "boost/url/grammar/vchars.hpp",
+      "sha256": "dec0826145c6cd9ae0fa535325b7b4f5aa0a6dc929e09759609da299902c61e1"
+    },
+    {
+      "path": "boost/url/host_type.hpp",
+      "sha256": "0cd327ffb573a5009e8772f84f2f4fb688ab8652a95ced1f5d6a8bbb601c1e28"
+    },
+    {
+      "path": "boost/url/ignore_case.hpp",
+      "sha256": "f5f79c547827756165bf4b7e0a3ebfeca0ab1c10f3ea5dfd7de8edaa197f3690"
+    },
+    {
+      "path": "boost/url/impl/authority_view.hpp",
+      "sha256": "4cd3aa9e600b71bc92eacf055b7eefbe09f734ee3656633280ba645625a9579a"
+    },
+    {
+      "path": "boost/url/impl/decode_view.hpp",
+      "sha256": "4e25b1f43247ec32037d6a6f7a23aee046f17664f2472749473ea7333a370b6a"
+    },
+    {
+      "path": "boost/url/impl/encode.hpp",
+      "sha256": "49cbc8710a2e88b59f46270c67316f617ad0a47255ad05d0e51a142beffb6723"
+    },
+    {
+      "path": "boost/url/impl/error.hpp",
+      "sha256": "6777b428c77570b42f825ccd113fe117a765c633c43a15813ec650ada374b8e1"
+    },
+    {
+      "path": "boost/url/impl/params_base.hpp",
+      "sha256": "a5ecce97e4c9e128c3453597512ca8f1ee93f59c73e763244804b1afa0b53ba9"
+    },
+    {
+      "path": "boost/url/impl/params_encoded_base.hpp",
+      "sha256": "11830629de77730548e0525b0938464eba6be332b5032b71b1c61f28329aa844"
+    },
+    {
+      "path": "boost/url/impl/params_encoded_ref.hpp",
+      "sha256": "d25b654ad0b307507bb6b8bd105a0c36ee396ba3b18985cc5ee5602cfbf7d0a6"
+    },
+    {
+      "path": "boost/url/impl/params_encoded_view.hpp",
+      "sha256": "9d87218bc2297a82e73129cda56af1ac26fd84a032b0559ec659fd9714007dfd"
+    },
+    {
+      "path": "boost/url/impl/params_ref.hpp",
+      "sha256": "c9b09fdcce0631b6120100e6a1308d5b4fe48db3ee58fa6e208029cac6f65b5f"
+    },
+    {
+      "path": "boost/url/impl/params_view.hpp",
+      "sha256": "0a7085aa984c70b08b8efe7cfe26e04aba66c5a545b37ec3332e0115c2207a4f"
+    },
+    {
+      "path": "boost/url/impl/parse.hpp",
+      "sha256": "55a07ac0d9e7897e97ea84121ab368e571514e9679331dfc85ce143a92b01bed"
+    },
+    {
+      "path": "boost/url/impl/scheme.hpp",
+      "sha256": "b7687c2b43b57ca24eaba26135c08ee6a93fde9c259b62d394ed97157ab9c2b6"
+    },
+    {
+      "path": "boost/url/impl/segments_base.hpp",
+      "sha256": "9d12dfb7bb42a837b708f9812183fcb249c9628880007ee451caea3da1a00b33"
+    },
+    {
+      "path": "boost/url/impl/segments_encoded_base.hpp",
+      "sha256": "c59a0cb4fe84a7d41a4ac18d604b1ac04d09d0a0fff66889212daaea6be32e4e"
+    },
+    {
+      "path": "boost/url/impl/segments_encoded_ref.hpp",
+      "sha256": "9ce41c3aa2e1e04f9dd85d0e5a1fe3ca6b52772902b5220aa9610ab75e2e5dab"
+    },
+    {
+      "path": "boost/url/impl/segments_encoded_view.hpp",
+      "sha256": "943e1c98237eb20d94b3b5a85f417812b4fbde0de4054c8dc2e1c8037ca763cf"
+    },
+    {
+      "path": "boost/url/impl/segments_ref.hpp",
+      "sha256": "e1a194cdc4228e1b97a5835de42168550c646c0eacb1944df351a9be2222dbbf"
+    },
+    {
+      "path": "boost/url/impl/segments_view.hpp",
+      "sha256": "bbbc509888f06afe29ed91ace18b0559ab683b5ce962fcead1442df2bbd04e1d"
+    },
+    {
+      "path": "boost/url/impl/url_base.hpp",
+      "sha256": "883006d99233774c0105f99a9044553e2b0ace69f5575d9c42f8469df2bde4c8"
+    },
+    {
+      "path": "boost/url/impl/url_view_base.hpp",
+      "sha256": "b1bc45d7d6da6fad727cf73d16f14907b4c5dac417649f78f14a92293cebc269"
+    },
+    {
+      "path": "boost/url/impl/url_view.hpp",
+      "sha256": "4039a68bdd4f44df8f5315ff6b57bd8834b0334ceabc10d9ff112509581420ef"
+    },
+    {
+      "path": "boost/url/impl/url.hpp",
+      "sha256": "20ae927f94f0cef767d2cdb229e52f9328cddb572dedb61b5ce826fdf08d3032"
+    },
+    {
+      "path": "boost/url/ipv4_address.hpp",
+      "sha256": "065c73028eff1b73e5c9ab567de9a175af6934ef7bc128caeab3072f605b2510"
+    },
+    {
+      "path": "boost/url/ipv6_address.hpp",
+      "sha256": "cec1e22f0b4049021a19d124df9cad58516d5340bcc393ca2c35ea778f6a6f0b"
+    },
+    {
+      "path": "boost/url/optional.hpp",
+      "sha256": "24cee38dcc0ddd19f333e011221a5737dd60978ff4ae1e4622f9079ea4aa8063"
+    },
+    {
+      "path": "boost/url/param.hpp",
+      "sha256": "c525d283e1c19b1efc1a7bd8312b243a33b62d57f3eb50a82ef70672d8ad5575"
+    },
+    {
+      "path": "boost/url/params_base.hpp",
+      "sha256": "d77575397343d94f593eaaede1ddcbc13972d224ceeeca883f3469daf5e35885"
+    },
+    {
+      "path": "boost/url/params_encoded_base.hpp",
+      "sha256": "090d89225b95f37914f8707f378cbb2054211e189e8ea1b5f427eb5b682351cb"
+    },
+    {
+      "path": "boost/url/params_encoded_ref.hpp",
+      "sha256": "1ffda379ee31b6fddc00a28bce9298c2c70cc6817ff9d20f0573919012880686"
+    },
+    {
+      "path": "boost/url/params_encoded_view.hpp",
+      "sha256": "ea8195a911c210dcf651a7b0fddf745574f3302d9a698feed0518e6d0e2c5b00"
+    },
+    {
+      "path": "boost/url/params_ref.hpp",
+      "sha256": "01065742ddec354416d1c16ff2e6c56e07c98e0ebc33117e07c1e258a2a86531"
+    },
+    {
+      "path": "boost/url/params_view.hpp",
+      "sha256": "40425082c77ca8bc909f9f810f40b55ed1573b441bcd0a89880022ee2814bd05"
+    },
+    {
+      "path": "boost/url/parse_path.hpp",
+      "sha256": "cf44ddaad38b85227d9bf765cf0fdec0787fa39783dfd9301ae891b879661708"
+    },
+    {
+      "path": "boost/url/parse_query.hpp",
+      "sha256": "fc9f83f942f946cf219a978faeff98a20285ab077b4904e57963ec59da299369"
+    },
+    {
+      "path": "boost/url/parse.hpp",
+      "sha256": "1b9145b81ecd9e007f6e088b43b8971d03eaca12f54c6de6a21305bf7a425c0b"
+    },
+    {
+      "path": "boost/url/pct_string_view.hpp",
+      "sha256": "3b9b448bd63f460de2b88db8630bd403fba412236ed7ee4d89a6817f427c8bd3"
+    },
+    {
+      "path": "boost/url/rfc/absolute_uri_rule.hpp",
+      "sha256": "088851e7e731a875c1f1ebc7ff4c23e009482c8c22472477c041c79e7b1f3041"
+    },
+    {
+      "path": "boost/url/rfc/authority_rule.hpp",
+      "sha256": "ad6f71c87d06d6ae7afa95e5e1257c941076ffca6dd1ab4610b6107f8d078373"
+    },
+    {
+      "path": "boost/url/rfc/detail/charsets.hpp",
+      "sha256": "9b73c064369f22b3fc630472dcb5b491ec81d6e69fe0e9ef4fb45aa0a6364645"
+    },
+    {
+      "path": "boost/url/rfc/detail/fragment_part_rule.hpp",
+      "sha256": "36a1a365b8de437caec4bc5f076fe0192da28ad3544deca6cff8473d27c324df"
+    },
+    {
+      "path": "boost/url/rfc/detail/h16_rule.hpp",
+      "sha256": "688818c3d372ea9bf5b282a37bca9df016c7664a06411ea283f3b68e43293590"
+    },
+    {
+      "path": "boost/url/rfc/detail/hier_part_rule.hpp",
+      "sha256": "2ae85904cfda31477a98d6da0672303fff0a915b9a97c86cc401c8d748fbe9af"
+    },
+    {
+      "path": "boost/url/rfc/detail/host_rule.hpp",
+      "sha256": "99747604408b3da378bda7f5f7ca6641fdc4f3c5b6b48f77bcb8286f16b58354"
+    },
+    {
+      "path": "boost/url/rfc/detail/impl/h16_rule.hpp",
+      "sha256": "420ebc0db22247b0043afc18f80f1aacffed50b81d4e700db2b6e7ca63b2d9f6"
+    },
+    {
+      "path": "boost/url/rfc/detail/impl/hier_part_rule.hpp",
+      "sha256": "3554ce5faf8048e1fca97cfc500c9319841515b670971138753fc64c790e4e7a"
+    },
+    {
+      "path": "boost/url/rfc/detail/impl/host_rule.hpp",
+      "sha256": "b23ad104584f7b978358b536121339ad8e5a32cff77ea45b3d5f0892be683aa8"
+    },
+    {
+      "path": "boost/url/rfc/detail/impl/ip_literal_rule.hpp",
+      "sha256": "568969f44e50fd22c07eedf993e9be2ab8ec3eca8036b221ff8388db84ea31ea"
+    },
+    {
+      "path": "boost/url/rfc/detail/impl/ipv6_addrz_rule.hpp",
+      "sha256": "a0076fbd4555cc7383eb22206302566980df584d70d2b74c8c9f91c2f3bb21ca"
+    },
+    {
+      "path": "boost/url/rfc/detail/impl/ipvfuture_rule.hpp",
+      "sha256": "f5db2bef845b199f0bec36e4835d55c5c659f327d8b6447c38f5ad3b86bd5d5a"
+    },
+    {
+      "path": "boost/url/rfc/detail/impl/port_rule.hpp",
+      "sha256": "ab57b1b062f61ed089e9c29b15d55a9a2fef04c120c16cb4f9c8d41e74842641"
+    },
+    {
+      "path": "boost/url/rfc/detail/impl/relative_part_rule.hpp",
+      "sha256": "676b799375b58df1b0ff566e4404f4ce2839aee22bee5190941b9a8ec31ac82b"
+    },
+    {
+      "path": "boost/url/rfc/detail/impl/scheme_rule.hpp",
+      "sha256": "59b42eadf433cec8a8a40684500e2dae8b7de479c3548c315f8b11c3b76c78a4"
+    },
+    {
+      "path": "boost/url/rfc/detail/impl/userinfo_rule.hpp",
+      "sha256": "74f99bb516784287a7bced142c3ce90a1c8a63abfbfcdcd9ed7fa146723ddcf4"
+    },
+    {
+      "path": "boost/url/rfc/detail/ip_literal_rule.hpp",
+      "sha256": "4d4db601a1ece07077ea512e62a2c45eb0910797cee409348a4a808094c1c4ce"
+    },
+    {
+      "path": "boost/url/rfc/detail/ipv6_addrz_rule.hpp",
+      "sha256": "cc8e2a895c3b9e1aad1a318d52eb869f72fe1c7b1b0d707548594b6cb362e754"
+    },
+    {
+      "path": "boost/url/rfc/detail/ipvfuture_rule.hpp",
+      "sha256": "28f635a889c1e8d36b0916e7fcb834673f1976bcb616fff0b35b1a396326e544"
+    },
+    {
+      "path": "boost/url/rfc/detail/path_rules.hpp",
+      "sha256": "c5de69c6128f58fa8fa20a6dff801adf80fe5468bf7349b93dd013cd86441780"
+    },
+    {
+      "path": "boost/url/rfc/detail/port_rule.hpp",
+      "sha256": "b2815b36a583899aa5bb4cd4557603de0a15b69c232e7b9540ee34ebf3b5bed8"
+    },
+    {
+      "path": "boost/url/rfc/detail/query_part_rule.hpp",
+      "sha256": "5b8525c83f61ef87018eeeb809b177e660dc5edeb385519c7d0b425622fd61a0"
+    },
+    {
+      "path": "boost/url/rfc/detail/reg_name_rule.hpp",
+      "sha256": "2943beeb1aad90a6e51b1df308ae6e951462d0c2f8f9863d8219aaa065e0c992"
+    },
+    {
+      "path": "boost/url/rfc/detail/relative_part_rule.hpp",
+      "sha256": "e85bbf2532b21119c1a42d8b2c08f06bc9bd0b3d2349c9a5b017a316bac4bcc2"
+    },
+    {
+      "path": "boost/url/rfc/detail/scheme_rule.hpp",
+      "sha256": "98acd868e032a2da94a994a3dd5f416c5afd57b847705fb6070f36e95cd07d91"
+    },
+    {
+      "path": "boost/url/rfc/detail/userinfo_rule.hpp",
+      "sha256": "5b64260702dff029225927094004496111d31d84e277460bb66e0b65ad9ea9f9"
+    },
+    {
+      "path": "boost/url/rfc/impl/absolute_uri_rule.hpp",
+      "sha256": "e0ef170e834f19272fb24db5c57f60efe6fd024ca1078ca36b75a4a0ab1a81b7"
+    },
+    {
+      "path": "boost/url/rfc/impl/authority_rule.hpp",
+      "sha256": "b260f30cdef4a2f84de91673a9d8a33487c4e240d826f6ced1f7f80fec4be656"
+    },
+    {
+      "path": "boost/url/rfc/impl/ipv4_address_rule.hpp",
+      "sha256": "e3bbd98180d7a6f985a0070691b33165b4f881ae2e874af87591b1054b5f3a4e"
+    },
+    {
+      "path": "boost/url/rfc/impl/ipv6_address_rule.hpp",
+      "sha256": "60da85cc8deb458ab682c0ebc43967f5b333f7a888d67817d4c27da31a5b3aa6"
+    },
+    {
+      "path": "boost/url/rfc/impl/origin_form_rule.hpp",
+      "sha256": "dcde38acc06f9b4ab377e0dab3d5d93c3f48bea1137b2b52762f8f6b08f07c4e"
+    },
+    {
+      "path": "boost/url/rfc/impl/pct_encoded_rule.hpp",
+      "sha256": "a2715e1930eb4134996226a19fccbd9d841506c14cac06829205f2bd33dec5ad"
+    },
+    {
+      "path": "boost/url/rfc/impl/query_rule.hpp",
+      "sha256": "37eaa5796d28373a9385d384d7bb210bd0e0ce46ef9b3737fd833ca346a7c769"
+    },
+    {
+      "path": "boost/url/rfc/impl/relative_ref_rule.hpp",
+      "sha256": "a684bb940a9f5393c446a7b8ae4a65d091745006d8d13e2dfda5f3f24cfddf4b"
+    },
+    {
+      "path": "boost/url/rfc/impl/uri_reference_rule.hpp",
+      "sha256": "a920837040c6feef18777069be934ef2ac9e6719caa7b5856431e706ed44a45d"
+    },
+    {
+      "path": "boost/url/rfc/impl/uri_rule.hpp",
+      "sha256": "d133d21141fa680031671afe7bf0a48391fad3dfdc1a0f01f3629f3d46cdad2b"
+    },
+    {
+      "path": "boost/url/rfc/ipv4_address_rule.hpp",
+      "sha256": "86f9e8ad4353e1a188eae2015dd46bc653801631f49f9be80293296474fae8f0"
+    },
+    {
+      "path": "boost/url/rfc/ipv6_address_rule.hpp",
+      "sha256": "3472c9bb3970621e2313e50b6344f9ef6df6f256605a7a4812b17fa4cec76956"
+    },
+    {
+      "path": "boost/url/rfc/origin_form_rule.hpp",
+      "sha256": "0aebd977da2cf4f0ada5fad16ae95c53d33efa8171021601402fa90f16ba29b0"
+    },
+    {
+      "path": "boost/url/rfc/pchars.hpp",
+      "sha256": "ef13e7617428ad54e6091ce3d852c72c4f2e01d722504b00cd873b0c1ac52e5c"
+    },
+    {
+      "path": "boost/url/rfc/pct_encoded_rule.hpp",
+      "sha256": "a7b4be46077d07c65046be051e065b0f1c6ec32806f932b1017f0427ca5c3419"
+    },
+    {
+      "path": "boost/url/rfc/query_rule.hpp",
+      "sha256": "3d2427792307c166ae89285470161868fc19f6d3b6e3c024cb785af60e96c5c9"
+    },
+    {
+      "path": "boost/url/rfc/relative_ref_rule.hpp",
+      "sha256": "e4ea8cb65498642ec6d4a1c2256e703f171a9df1d3aab2bb9069e8836b5ccf90"
+    },
+    {
+      "path": "boost/url/rfc/sub_delim_chars.hpp",
+      "sha256": "2d0e8c509e31857df23052b8be35f2b411ec11cda99e464d06bd78bfdf993588"
+    },
+    {
+      "path": "boost/url/rfc/unreserved_chars.hpp",
+      "sha256": "499dd0ce712481077a1fc466a8e4cab6c3e549d6c6977c1a9f42c63adbeb7636"
+    },
+    {
+      "path": "boost/url/rfc/uri_reference_rule.hpp",
+      "sha256": "325817a1649aa4728aabf51f24a23a39fc5409a3d94688ac5314d79580d1f3bc"
+    },
+    {
+      "path": "boost/url/rfc/uri_rule.hpp",
+      "sha256": "ac79ebfe64c8fae4332629740a348f45b4c3139cd2acbf7072470dc13e9ea746"
+    },
+    {
+      "path": "boost/url/scheme.hpp",
+      "sha256": "e033902339cc41bcd039f5cfa02ec742a626b16b04d2832ba06cb7d86f8a5745"
+    },
+    {
+      "path": "boost/url/segments_base.hpp",
+      "sha256": "4f16f18fff87ca454027630578db50c472e7756f58c883c939ee79e93d04a122"
+    },
+    {
+      "path": "boost/url/segments_encoded_base.hpp",
+      "sha256": "edcb0c2deb56c3797d507ca8413500bb68b0e5e62e55bfb46e003c395908cfaf"
+    },
+    {
+      "path": "boost/url/segments_encoded_ref.hpp",
+      "sha256": "aacaef38d7b6c7df2c94cb47be01708e356c40050ff9b28091d00959976bf900"
+    },
+    {
+      "path": "boost/url/segments_encoded_view.hpp",
+      "sha256": "a22049ecf05a6a5d98c2449bb0159841b24cacb73b906a2fbdee95c7ad021793"
+    },
+    {
+      "path": "boost/url/segments_ref.hpp",
+      "sha256": "1673c890515c99ae1139795cc8e3523351f3094ed032a55159de5744f9e6cecd"
+    },
+    {
+      "path": "boost/url/segments_view.hpp",
+      "sha256": "0662b350d3c782fe895e48551485c881add618c0676b696bc6dc7b8428be6c4f"
+    },
+    {
+      "path": "boost/url/url_base.hpp",
+      "sha256": "21973f0f9e61a047a271a059012d7a24d392beffe27632ea16bd1de4be2b13c9"
+    },
+    {
+      "path": "boost/url/url_view_base.hpp",
+      "sha256": "49e1c83f62dc7d3a22701963b1c4cc4f38cb5bbf17f9f6e22f2a38c5dd2f7925"
+    },
+    {
+      "path": "boost/url/url_view.hpp",
+      "sha256": "cc2c291a58a3e024d0f50fa0df771878f70afb420d6d62c513c65da69bae5227"
+    },
+    {
+      "path": "boost/url/url.hpp",
+      "sha256": "01ddcfa6da4933fedc9c8b206789244fe727ba88eaf3fbe29f8edc210166890c"
+    },
+    {
+      "path": "boost/url/variant.hpp",
+      "sha256": "1fc6cb74dd3d8ec1f84088b9e2c9d90543e674c2661db0e04f50be5c0a2c0635"
+    },
+    {
+      "path": "boost/variant2/variant.hpp",
+      "sha256": "0833e3addd03236e11d683584a7e50a613591a54f118745b11e3e55499b96a75"
+    },
+    {
+      "path": "boost/version.hpp",
+      "sha256": "cf992d9d2c4f2294b69d8819e334927644a48b978bfea3c525e3f9c6dbc7cb9f"
+    },
+    {
+      "path": "boost/winapi/basic_types.hpp",
+      "sha256": "697d8e0b2f451d85605d42c071b96626e8158c5f7bf16139406a45a864963200"
+    },
+    {
+      "path": "boost/winapi/character_code_conversion.hpp",
+      "sha256": "128eb59693cf86678dfbd99093488c62172890065c2e8af452d28d5c11c08b02"
+    },
+    {
+      "path": "boost/winapi/config.hpp",
+      "sha256": "ad69927f1399eee1dead128cf76d2ca3c57f654573869f2a4016020c828aa49b"
+    },
+    {
+      "path": "boost/winapi/detail/footer.hpp",
+      "sha256": "91921bd0ec6ae8273e3b37f36bea69ca5c1370213d13f86d7432546071e32a7d"
+    },
+    {
+      "path": "boost/winapi/detail/header.hpp",
+      "sha256": "ed6670606f1f9bc78bfc56dd96b10d0ac8bd272a594c75b59390efd3127d0cd6"
+    },
+    {
+      "path": "boost/winapi/error_codes.hpp",
+      "sha256": "b8eba603c85f34d1adf58de590acd592470ef57e3ff952d679f281a0a328b755"
+    },
+    {
+      "path": "boost/winapi/error_handling.hpp",
+      "sha256": "81ec0125fa7a17d7d628c6e6c5c323843a1d3910d930ac1c4e5c11fae8538cc7"
+    },
+    {
+      "path": "boost/winapi/get_last_error.hpp",
+      "sha256": "c38d735588d3d03b51502783f86a1a46a41c8e9e950d6fca5d5b6b1fbcb64aed"
+    },
+    {
+      "path": "boost/winapi/local_memory.hpp",
+      "sha256": "9fb1b31a41ec7baf4580496a9fdd0578e2d2f3fb1375da2c97c65bace57f5f76"
+    },
+    {
+      "path": "libs/url/src/decode_view.cpp",
+      "sha256": "22890fa2994b5175d6cd955011eddc64a2125cc5f5ded55010dc5919639a3e6b"
+    },
+    {
+      "path": "libs/url/src/detail/decode.cpp",
+      "sha256": "b8bd4e1c7562c7bc4fc592a70dd5e893f0979901df21f44b76441987249578e4"
+    },
+    {
+      "path": "libs/url/src/detail/except.cpp",
+      "sha256": "d7927b5d277020739404066b67c2cf42b933c6c42908f58b9a6fa8473aebb71d"
+    },
+    {
+      "path": "libs/url/src/detail/format_args.cpp",
+      "sha256": "2f2b6017229c0b86f9f3045095ad390fe2d546fad00c1b29b590fb864ccdc794"
+    },
+    {
+      "path": "libs/url/src/detail/normalize.cpp",
+      "sha256": "32b3e907a8a3a867a6d52dbe006a89e0997af40a2952af819c4ef6c403159cd5"
+    },
+    {
+      "path": "libs/url/src/detail/pattern.cpp",
+      "sha256": "9aa26d2539e61fb0f4f1e6bb33737b16cb2c9da61fc4cdfee33f5ac9f77be3fb"
+    },
+    {
+      "path": "libs/url/src/detail/pattern.hpp",
+      "sha256": "ba099880c7c22f157f57c49ecd64d129d13371ab457c60404280cf4427920778"
+    },
+    {
+      "path": "libs/url/src/detail/pct_format.cpp",
+      "sha256": "b27519380e093473271a7fb7c5251af41bc4bc6845ae601829f9cc55a6dfea10"
+    },
+    {
+      "path": "libs/url/src/detail/pct_format.hpp",
+      "sha256": "7e578aa3cfd91cbc8bae02b93aa30b2bf98f4a052a1fd8dd7b962114dd700ec3"
+    },
+    {
+      "path": "libs/url/src/detail/replacement_field_rule.cpp",
+      "sha256": "bed6d790970cffc661c3ad51571357ce4bfa159ae2e8b7426e4ed10a38651ec1"
+    },
+    {
+      "path": "libs/url/src/detail/vformat.cpp",
+      "sha256": "01e01394170efdad7c8d51790ac86294573bb97000569e85c2b9d8e10ad89436"
+    },
+    {
+      "path": "libs/url/src/error.cpp",
+      "sha256": "f91df03901f9110834f302eadd8323bd564258a438fcdc9bd7c86e0636ad23b1"
+    },
+    {
+      "path": "libs/url/src/grammar/ci_string.cpp",
+      "sha256": "af7b4fe8e5a812e727d1970e17c3c41f36f6b5e52a45fa7896b540f76c5f8770"
+    },
+    {
+      "path": "libs/url/src/grammar/detail/recycled.cpp",
+      "sha256": "380acd7265180851dbef4762af3648306bbe264bcc4bd3af59c11c7f4d5d3f7c"
+    },
+    {
+      "path": "libs/url/src/grammar/error.cpp",
+      "sha256": "5a568a13a09b7c07c6dd9742d706fe6fe12e8845b9fba61f140b1fda222e4824"
+    },
+    {
+      "path": "libs/url/src/grammar/string_view_base.cpp",
+      "sha256": "76c6f0b559ce9b5576f5b83c8f5ff5ef404a7738c720535a703dcf8e08d52840"
+    },
+    {
+      "path": "libs/url/src/ipv4_address.cpp",
+      "sha256": "49298421c3286d35380ea670d272b8b82a90efeb15a074be5f1b68965c656ef1"
+    },
+    {
+      "path": "libs/url/src/ipv6_address.cpp",
+      "sha256": "2564726e981955986412ea915b20deab14ebc0217837451579600e057d69b8c8"
+    },
+    {
+      "path": "libs/url/src/parse_path.cpp",
+      "sha256": "dfb077681f33bdacccb48cf80ee17a8ed488a611196be027f4590c33c3164f3c"
+    },
+    {
+      "path": "libs/url/src/parse_query.cpp",
+      "sha256": "289d7c73d82effc5ca7987bb60fd9e9cd2c021dbed132823deb66ea49ed87102"
+    },
+    {
+      "path": "libs/url/src/pct_string_view.cpp",
+      "sha256": "e8de174d4fecc1452b1aa442d22c8457121c8fcf37aa898e37f1ee15cd1bf054"
+    },
+    {
+      "path": "LICENSE_1_0.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566"
+    }
+  ],
+  "beastCommit": "7c1e061f91e2ef542217b76286c314d006c0c8fc",
+  "license": "BSL-1.0",
+  "selection": "Union of MSVC19.42 x64 Release MD and GCC13.3 x86-64 Debug ASanUBSan compiler dependency lists for URL sources and contiguous parser/URI probe, plus complete URL src and license/version header; selected macro profile only; no general minimality claim",
+  "version": "1.92.0",
+  "archiveUrl": "https://archives.boost.io/release/1.92.0/source/boost_1_92_0.tar.gz",
+  "urlCommit": "a34f3a4a1a0e695f679453af71dfc050a59170e6",
+  "schemaVersion": 1
+}

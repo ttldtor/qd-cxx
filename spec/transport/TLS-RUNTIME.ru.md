@@ -220,3 +220,5 @@ bootstrap/снимком/компоновщиком/условиями прил�
 [[nodiscard]] std::expected<TlsPollResult, TlsDiagnostic> poll(TcpWork &runtimeWork, TlsWork &tlsWork,
                                                                    protocol::LiveWork &sessionWork);
 ```
+
+Приватная байтовая операция с проверенным TLS описана отдельно в [BYTE-OWNER](BYTE-OWNER.ru.md).

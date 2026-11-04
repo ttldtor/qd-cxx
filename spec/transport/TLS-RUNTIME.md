@@ -202,3 +202,5 @@ bootstrap/snapshot/composer/host qualification has separate native TLS evidence 
 [[nodiscard]] std::expected<TlsPollResult, TlsDiagnostic> poll(TcpWork &runtimeWork, TlsWork &tlsWork,
                                                                    protocol::LiveWork &sessionWork);
 ```
+
+The private verified-TLS byte operation is specified separately in [BYTE-OWNER](BYTE-OWNER.md).

@@ -83,6 +83,13 @@ signed32 minimum/maximum выводятся как `5877521-03-03`/`5881580-07-1
 ## Владение, ошибки и лимиты
 
 Копии независимо владеют хранилищем и лимитами; move оставляет источник пустым с прежними лимитами.
+Move условно noexcept: фактическое создание пустого backing, копирование limits и все body swaps
+должны быть nonthrowing. Аллокация map sentinel может дать std::bad_alloc до изменения source.
+By-value replacement присваивания создаётся до nonthrowing swap body; failed preparation сохраняет
+source и destination. Nothrow trait может различаться между standard libraries; layout и logical
+limits не меняются. Если move может бросить, vector копирует старый prefix. При growth временно
+сосуществуют old/candidate text в пределах удвоенного admitted output-unit envelope; logical limits
+не превращаются в allocator/RSS bound.
 Текстовые getter views заимствуют профиль и инвалидируются его изменением, присваиванием или
 уничтожением. Перечисление имён возвращает независимые владеющие строки. Вызывающая сторона
 сериализует изменение и наблюдение; одновременное чтение поддержано. Callbacks и отложенной работы нет.

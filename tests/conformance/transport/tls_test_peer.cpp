@@ -27,14 +27,15 @@ extern char **environ;
 
 namespace org::ttldtor::qdcxx::test {
 namespace {
-using Clock = std::chrono::steady_clock;                       ///< Monotonic parent deadlines.
-constexpr std::uint64_t CONTROL_MAGIC = 0x5144435854503035ULL; ///< Internal control format version 5.
-constexpr std::uint64_t REPORT_MAGIC = 0x5144435852503031ULL;  ///< Internal numeric report version 1.
-constexpr std::size_t MAX_SCRIPT_BYTES = 4U * 1024U * 1024U;   ///< Finite test-only script ceiling per direction.
-constexpr std::size_t MAX_REPORT_BYTES = 512;                  ///< Finite numeric report input ceiling.
-constexpr std::size_t MAX_PATH_BYTES = 4096;                   ///< Finite UTF-8 path encoding ceiling.
-constexpr auto POLL_INTERVAL = std::chrono::milliseconds(10);  ///< Bounded local polling cadence.
-constexpr auto TERMINATE_WAIT = std::chrono::seconds(2);       ///< Finite forced-child retirement observation.
+using Clock = std::chrono::steady_clock;                            ///< Monotonic parent deadlines.
+constexpr std::uint64_t CONTROL_MAGIC_HTTP = 0x5144435854503036ULL; ///< Opt-in bounded HTTP header control extension.
+constexpr std::uint64_t CONTROL_MAGIC = 0x5144435854503035ULL;      ///< Internal control format version 5.
+constexpr std::uint64_t REPORT_MAGIC = 0x5144435852503031ULL;       ///< Internal numeric report version 1.
+constexpr std::size_t MAX_SCRIPT_BYTES = 4U * 1024U * 1024U;        ///< Finite test-only script ceiling per direction.
+constexpr std::size_t MAX_REPORT_BYTES = 512;                       ///< Finite numeric report input ceiling.
+constexpr std::size_t MAX_PATH_BYTES = 4096;                        ///< Finite UTF-8 path encoding ceiling.
+constexpr auto POLL_INTERVAL = std::chrono::milliseconds(10);       ///< Bounded local polling cadence.
+constexpr auto TERMINATE_WAIT = std::chrono::seconds(2);            ///< Finite forced-child retirement observation.
 std::atomic<std::uint64_t> directorySequence{}; ///< Process-local collision avoidance for owned directories.
 
 /** Encode a path without locale-dependent narrow conversion.
@@ -73,6 +74,12 @@ bool validPath(const std::filesystem::path &path) {
 bool validOptions(const PeerOptions &options) {
     if (!validPath(options.childExecutable) || !validPath(options.certificateFile) ||
         !validPath(options.privateKeyFile) || !validPath(options.controlRoot)) {
+        return false;
+    }
+
+    if (options.readHttpHeaders && (options.captureUntilClose || options.successor ||
+                                    options.expectedReplyClientBytes || !options.initialBytes.empty() ||
+                                    (options.expectedClientBytes && options.expectedClientBytes->size() > 32768))) {
         return false;
     }
 
@@ -542,7 +549,7 @@ std::expected<TlsTestPeer, PeerError> TlsTestPeer::start(PeerOptions options) {
 
         const auto control = state->directory / "control";
         std::ofstream output(control, std::ios::binary | std::ios::trunc);
-        writeWord(output, CONTROL_MAGIC);
+        writeWord(output, options.readHttpHeaders ? CONTROL_MAGIC_HTTP : CONTROL_MAGIC);
         writeWord(output, static_cast<std::uint32_t>(options.tlsVersion));
         writeWord(output, static_cast<std::uint32_t>(options.closeMode));
         writeWord(output, static_cast<std::uint32_t>(options.policy));
@@ -611,6 +618,10 @@ std::expected<TlsTestPeer, PeerError> TlsTestPeer::start(PeerOptions options) {
 
             output.write(reinterpret_cast<const char *>(next.finalBytes.data()),
                          static_cast<std::streamsize>(next.finalBytes.size()));
+        }
+
+        if (options.readHttpHeaders) {
+            writeWord(output, 1);
         }
 
         output.close();

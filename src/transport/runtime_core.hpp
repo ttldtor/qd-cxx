@@ -8,6 +8,7 @@
 #include "dns_resolver.hpp"
 #include "fixed_arena.hpp"
 #include "runtime_bootstrap.hpp"
+#include "runtime_session_slot.hpp"
 
 #include <asio/io_context.hpp>
 #include <asio/ip/tcp.hpp>
@@ -112,8 +113,7 @@ struct RuntimeCore {
     detail::DnsResolver dns;         ///< Stable independent channel/callback domain, retired before bootstrap release.
     std::unique_ptr<ByteEngine> engine; ///< Optional finite internal codec; null preserves the plain byte path.
     std::unique_ptr<std::byte[]> input; ///< Whole counted input backing, never borrowed from the caller.
-    std::optional<protocol::LiveSession>
-        session; ///< One immutable pure epoch, installed only after fallible preparation.
+    RuntimeSessionSlot session; ///< Exclusive QTP epoch or stable raw-state borrow, installed after preparation.
     std::array<asio::ip::tcp::endpoint, MAX_ADDRESSES> addresses{}; ///< Bounded serial attempt list.
     std::size_t addressCount = 0;                                   ///< Number of initialized eligible endpoints.
     std::size_t addressIndex = 0;                                   ///< Next serial connection candidate.
@@ -206,6 +206,15 @@ struct RuntimeCore {
      * @return Engine ciphertext or unchanged plain application output.
      */
     [[nodiscard]] std::span<const std::byte> wireBytes() const noexcept;
+    /** Inspect application output independently of its selected codec.
+     * @return Immutable raw/QTP output suffix, retained through matching acceptance.
+     */
+    [[nodiscard]] std::span<const std::byte> applicationBytes() const noexcept;
+    /** Account a checked application prefix on the selected raw/QTP path.
+     * @param bytes Accepted application prefix.
+     * @return True unless the selected output rejects the count.
+     */
+    [[nodiscard]] bool consumeApplication(std::size_t bytes) noexcept;
     /** Account native acceptance without advancing an application span on a codec WANT result.
      * @param bytes Native accepted prefix of wireBytes().
      * @return True for an eligible prefix; otherwise records the detached consistency failure.
@@ -234,7 +243,7 @@ struct RuntimeCore {
     /** Process one completed input action; Linux executes exactly one native receive attempt. */
     void readStep() noexcept;
 
-    /** End pure input explicitly; an incomplete frame is a failure, never successful EOF. */
+    /** End the selected input path; raw EOF is byte evidence, while QTP still requires complete frames. */
     void peerEnd() noexcept;
 
     /** Process one completed output action; Linux executes exactly one native send attempt. */
@@ -271,6 +280,18 @@ struct RuntimeCore {
     create(RuntimeBootstrap::State *bootstrap, core::LocalSchema &&schema, protocol::SubscriptionWriter &&composer,
            protocol::LiveLimits sessionLimits, TcpOptions options, protocol::LiveWork &work,
            std::unique_ptr<ByteEngine> engine = {});
+    /** Prepare the same native spine with an explicit raw-state borrow and no QTP configuration.
+     * @param bootstrap Stable process state retained by the enclosing outer lease.
+     * @param raw Stable byte backing, retained beyond this core's destruction.
+     * @param externalBytes Whole separately prepaid raw owner/backing reservation.
+     * @param options Explicit copied finite native settings.
+     * @param work Mutable native preparation credits, never refunded.
+     * @param engine Optional prepared codec; its owner funds every entry separately.
+     * @return Stable unactivated core or detached rejection.
+     */
+    [[nodiscard]] static std::expected<std::unique_ptr<RuntimeCore>, TcpDiagnostic>
+    createRaw(RuntimeBootstrap::State *bootstrap, RawByteState &raw, std::size_t externalBytes, TcpOptions options,
+              protocol::LiveWork &work, std::unique_ptr<ByteEngine> engine = {});
     /** Inspect conservative DNS-only preparation credits without SDK/bootstrap access.
      * @param serverCount Explicit server cardinality in1..4.
      * @return Sufficient unchanged DNS preparation credits, or invalid configuration.

@@ -10,6 +10,8 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 namespace org::ttldtor::qdcxx::ipf {
@@ -103,9 +105,30 @@ struct ProfileLimits {
  * are retained. Read-only concurrent use is allowed; callers serialize mutation and observation.
  * Borrowed getter views are invalidated by mutation, assignment or destruction of this profile.
  * Checked edit failures preserve the complete value. Allocation failure throws std::bad_alloc and
- * preserves an edited profile; ordinary copy construction may also throw std::bad_alloc.
+ * preserves an edited profile; copy construction and allocating move-backing construction may also throw.
+ * Move is conditionally noexcept only when actual backing construction and all swaps are nonthrowing.
+ * Failed move preparation preserves both the source and any assignment destination.
  */
 class InstrumentProfile {
+    /** One owned standard field; empty backing construction precedes every move swap. */
+    struct Value {
+        std::u16string text; ///< Owned exact textual value.
+        double number = 0;   ///< Cached Java-compatible numeric value.
+    };
+
+    using Values = std::array<Value, 31>; ///< Existing fixed standard-field backing.
+    using CustomValues = std::map<std::u16string, std::u16string, std::less<>>; ///< Existing exact custom backing.
+    // Value adds only a literal-initialized scalar to its string. Verify the full array after
+    // this enclosing class is complete; early array construction is rejected by supported GCC.
+    static constexpr bool NOTHROW_MOVE_CONSTRUCTION =
+        std::is_nothrow_copy_constructible_v<ProfileLimits> &&
+        std::is_nothrow_default_constructible_v<decltype(Value::text)> &&
+        std::is_nothrow_default_constructible_v<CustomValues> &&
+        noexcept(std::declval<Values &>().swap(std::declval<Values &>())) &&
+        noexcept(std::declval<CustomValues &>().swap(std::declval<CustomValues &>())) &&
+        std::is_nothrow_swappable_v<std::size_t>;
+    ///< Default backing, limits copy and all body swaps must actually be nonthrowing.
+
     public:
     /** Create an empty profile with independent finite limits.
      * @param limits Explicit per-instance limits; zero allows only operations fitting zero capacity.
@@ -115,10 +138,10 @@ class InstrumentProfile {
      * @param other Source value; no storage is shared with the result.
      */
     InstrumentProfile(const InstrumentProfile &other) = default;
-    /** Move all owned values and limits.
+    /** Move all owned values and limits; allocating empty backing may throw before any source change.
      * @param other Source value; it remains valid with its original limits and an empty value.
      */
-    InstrumentProfile(InstrumentProfile &&other) noexcept;
+    InstrumentProfile(InstrumentProfile &&other) noexcept(NOTHROW_MOVE_CONSTRUCTION);
     /** Replace this value atomically by an independently owned copy/move.
      * @param other Independent replacement value, constructed before this method starts.
      * @return This profile after replacement.
@@ -854,14 +877,9 @@ class InstrumentProfile {
     }
 
     private:
-    struct Value {
-        std::u16string text;
-        double number = 0;
-    };
-
     ProfileLimits limits_;
-    std::array<Value, 31> values_;
-    std::map<std::u16string, std::u16string, std::less<>> custom_;
+    Values values_;
+    CustomValues custom_;
     std::size_t totalUnits_ = 0;
     std::expected<void, ProfileError> store(std::u16string_view name, std::u16string text, double number);
 };

@@ -77,6 +77,8 @@ The [IPF value oracle](../upstream/ipf-value-oracle/README.md) captures/verifies
 
 The [plain IPF reader oracle](../upstream/ipf-reader-oracle/README.md) captures/verifies named local grammar, UTF-8 and complete-prefix outcomes; `-Help`/`-HelpRu` start no Java or working I/O.
 
+[Explicit IPF transfer dependency preparation](../deps/IPF-TRANSFER.md) provides pinned Boost1.92.0 sources, a standalone static URL build, EN/RU helper help, offline/cache checks and a sealed relocatable private SDK. It adds no production transfer API and performs no acquisition in ordinary configure or dependency OFF mode.
+
 ## First build
 
 Run from the repository root. This bootstrap is the explicit first-build logging exception:
