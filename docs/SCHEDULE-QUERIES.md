@@ -3,7 +3,7 @@
 [Русская версия](SCHEDULE-QUERIES.ru.md). English is authoritative.
 
 `qdcxx_schedule` constructs owning `Day` and `Session` values from the complete
-[rule grammar](SCHEDULE-RULES.md). Filters are a separate capability. Queries use the shared
+[rule grammar](SCHEDULE-RULES.md). Queries use the shared
 [explicit timezone data component](TIME-ZONE-DATA.md); parser-only contexts remain file-free.
 
 ```cpp
@@ -71,6 +71,22 @@ cache entries before a later refusal; this is not a rollback guarantee for cache
 A Day or Session pins its Schedule as a live handle, preventing accidental eviction of that identity.
 
 ## Calendar behavior and ranges
+
+`DayFilter` combines a weekday bit mask (Monday is bit 1, Sunday bit 7; zero ignores
+weekday) with optional holiday, short-day and trading flags. `SessionFilter` combines
+an optional type and trading flag. Every specified condition must match. Named values
+cover the source's common filters; contradictory conditions simply match nothing.
+Empty and inverted sessions participate in filtering in their stored order.
+
+The `find` methods return an empty optional when no match is found, and preserve typed
+query failures separately. The corresponding filtered `get` methods return `NO_MATCH`
+for an exhausted search; this is distinct from the `NO_SESSION` time-lookup failure.
+Day navigation excludes the current day and searches at most
+366 labels in the requested direction. Session navigation first searches the remaining
+records of the current day, then at most 366 neighbouring days. Day-local first/last
+searches inspect only that day. Navigation retains the originating calendar snapshot.
+The query work and staging budgets are cumulative across each navigation, so a finite
+resource limit or the supported day-id range can stop a search before its 366-day bound.
 
 The implementation preserves noon-anchor Calendar construction, proleptic DayUtil labels, complete
 weekday/date overrides, holiday and short-day strategies, early close and joined non-trading days.

@@ -427,6 +427,8 @@ if(BUILD_TESTING)
             ORG_TTLDTOR_QDCXX_QUERY_DATA="${CMAKE_CURRENT_SOURCE_DIR}/resources/time-zone-data/tzdb-2026f"
             ORG_TTLDTOR_QDCXX_QUERY_CASES="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/schedule-query/cases.tsv"
             ORG_TTLDTOR_QDCXX_QUERY_ORACLE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/schedule-query/oracle.tsv"
+            ORG_TTLDTOR_QDCXX_FILTER_CASES="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/schedule-filter/cases.tsv"
+            ORG_TTLDTOR_QDCXX_FILTER_ORACLE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/schedule-filter/oracle.tsv"
             ORG_TTLDTOR_QDCXX_QUERY_CONTEXTUAL="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/schedule-query/tzdb2026f.tsv")
         set_target_properties(qdcxx_schedule_query_tests PROPERTIES CXX_EXTENSIONS OFF)
         add_test(NAME schedule_queries COMMAND qdcxx_schedule_query_tests --no-colors --no-path-filenames)

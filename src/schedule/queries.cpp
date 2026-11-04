@@ -20,6 +20,7 @@ constexpr std::int64_t MIN_QUERY_TIME = -62135424000000LL;
 constexpr std::int64_t MAX_QUERY_TIME = 253402128000000LL;
 constexpr std::int64_t MILLIS_PER_SECOND = 1000;
 constexpr std::int64_t NOON_MILLIS = DAY_MILLIS / 2;
+constexpr int FILTER_SEARCH_DAYS = 366;
 
 /** @param id Source signed label.
  * @param shift Signed source arithmetic increment.
@@ -71,6 +72,21 @@ template <class Result, class Function> std::expected<Result, ScheduleError> que
     } catch (const std::length_error &) {
         return std::unexpected(ScheduleError::RESOURCE_LIMIT);
     }
+}
+
+/** @param result Completed filtered search, including any typed refusal.
+ * @return Matching value, NO_MATCH for an exhausted search, or the original refusal.
+ */
+template <class T> std::expected<T, ScheduleError> requireMatch(std::expected<std::optional<T>, ScheduleError> result) {
+    if (!result) {
+        return std::unexpected(result.error());
+    }
+
+    if (!*result) {
+        return std::unexpected(ScheduleError::NO_MATCH);
+    }
+
+    return **result;
 }
 
 /** @param context Explicit parser/query domain.
@@ -524,6 +540,39 @@ bool isTrading(SessionType type) noexcept {
     return type != SessionType::NO_TRADING;
 }
 
+bool DayFilter::accept(const Day &day) const noexcept {
+    return (weekdays_ == 0 || (weekdays_ & (1U << day.getDayOfWeek())) != 0) &&
+           (!holiday_ || *holiday_ == day.isHoliday()) && (!shortDay_ || *shortDay_ == day.isShortDay()) &&
+           (!trading_ || *trading_ == day.isTrading());
+}
+
+constinit const DayFilter DayFilter::ANY{};
+constinit const DayFilter DayFilter::TRADING{0, {}, {}, true};
+constinit const DayFilter DayFilter::NON_TRADING{0, {}, {}, false};
+constinit const DayFilter DayFilter::HOLIDAY{0, true};
+constinit const DayFilter DayFilter::SHORT_DAY{0, {}, true};
+constinit const DayFilter DayFilter::MONDAY{1U << 1};
+constinit const DayFilter DayFilter::TUESDAY{1U << 2};
+constinit const DayFilter DayFilter::WEDNESDAY{1U << 3};
+constinit const DayFilter DayFilter::THURSDAY{1U << 4};
+constinit const DayFilter DayFilter::FRIDAY{1U << 5};
+constinit const DayFilter DayFilter::SATURDAY{1U << 6};
+constinit const DayFilter DayFilter::SUNDAY{1U << 7};
+constinit const DayFilter DayFilter::WEEK_DAY{0x3e};
+constinit const DayFilter DayFilter::WEEK_END{0xc0};
+
+bool SessionFilter::accept(const Session &session) const noexcept {
+    return (!type_ || *type_ == session.getType()) && (!trading_ || *trading_ == session.isTrading());
+}
+
+constinit const SessionFilter SessionFilter::ANY{};
+constinit const SessionFilter SessionFilter::TRADING{{}, true};
+constinit const SessionFilter SessionFilter::NON_TRADING{{}, false};
+constinit const SessionFilter SessionFilter::NO_TRADING{SessionType::NO_TRADING};
+constinit const SessionFilter SessionFilter::PRE_MARKET{SessionType::PRE_MARKET};
+constinit const SessionFilter SessionFilter::REGULAR{SessionType::REGULAR};
+constinit const SessionFilter SessionFilter::AFTER_MARKET{SessionType::AFTER_MARKET};
+
 std::expected<Day, ScheduleError> Schedule::getDayById(std::int32_t id) const {
     return detail::labelledDay(*this, detail::Access::rules(*this), id);
 }
@@ -726,6 +775,102 @@ std::expected<Day, ScheduleError> Day::getNextDay() const {
     return detail::labelledDay(schedule_, model_->rules, detail::advanceDay(model_->dayId, 1));
 }
 
+std::optional<Session> Day::findFirstSession(const SessionFilter &filter) const noexcept {
+    for (std::size_t i = 0; i < model_->sessions.size(); ++i) {
+        auto session = detail::Access::makeSession(*this, i);
+
+        if (filter.accept(session)) {
+            return session;
+        }
+    }
+
+    return std::nullopt;
+}
+
+std::optional<Session> Day::findLastSession(const SessionFilter &filter) const noexcept {
+    for (std::size_t i = model_->sessions.size(); i > 0; --i) {
+        auto session = detail::Access::makeSession(*this, i - 1);
+
+        if (filter.accept(session)) {
+            return session;
+        }
+    }
+
+    return std::nullopt;
+}
+
+std::expected<std::optional<Day>, ScheduleError> Day::findPrevDay(const DayFilter &filter) const {
+    return detail::queryGuard<std::optional<Day>>([&]() -> std::optional<Day> {
+        const auto limits = detail::queryLimits(*detail::Access::context(schedule_));
+        detail::Construction construction{limits};
+        auto id = getDayId();
+
+        for (int i = 0; i < detail::FILTER_SEARCH_DAYS; ++i) {
+            id = detail::advanceDay(id, -1);
+
+            if (id < detail::MIN_DAY_ID || id > detail::MAX_DAY_ID) {
+                throw detail::Failure{ScheduleError::OUT_OF_RANGE};
+            }
+
+            construction.inspect(1);
+            auto day = detail::ownedDay(schedule_, model_->rules, id, construction);
+            construction.inspect(detail::Access::model(day)->sessions.size());
+
+            if (filter.accept(day)) {
+                return day;
+            }
+        }
+
+        return std::nullopt;
+    });
+}
+
+std::expected<std::optional<Day>, ScheduleError> Day::findNextDay(const DayFilter &filter) const {
+    return detail::queryGuard<std::optional<Day>>([&]() -> std::optional<Day> {
+        const auto limits = detail::queryLimits(*detail::Access::context(schedule_));
+        detail::Construction construction{limits};
+        auto id = getDayId();
+
+        for (int i = 0; i < detail::FILTER_SEARCH_DAYS; ++i) {
+            id = detail::advanceDay(id, 1);
+
+            if (id < detail::MIN_DAY_ID || id > detail::MAX_DAY_ID) {
+                throw detail::Failure{ScheduleError::OUT_OF_RANGE};
+            }
+
+            construction.inspect(1);
+            auto day = detail::ownedDay(schedule_, model_->rules, id, construction);
+            construction.inspect(detail::Access::model(day)->sessions.size());
+
+            if (filter.accept(day)) {
+                return day;
+            }
+        }
+
+        return std::nullopt;
+    });
+}
+
+std::expected<Session, ScheduleError> Day::getFirstSession(const SessionFilter &filter) const {
+    auto result = findFirstSession(filter);
+
+    return result ? std::expected<Session, ScheduleError>(*result) : std::unexpected(ScheduleError::NO_MATCH);
+}
+
+std::expected<Session, ScheduleError> Day::getLastSession(const SessionFilter &filter) const {
+    auto result = findLastSession(filter);
+
+    return result ? std::expected<Session, ScheduleError>(*result) : std::unexpected(ScheduleError::NO_MATCH);
+}
+
+std::expected<Day, ScheduleError> Day::getPrevDay(const DayFilter &filter) const {
+    return detail::requireMatch(findPrevDay(filter));
+}
+
+std::expected<Day, ScheduleError> Day::getNextDay(const DayFilter &filter) const {
+    return detail::requireMatch(findNextDay(filter));
+}
+
 bool Day::operator==(const Day &other) const noexcept {
     return schedule_ == other.schedule_ && getDayId() == other.getDayId();
 }
@@ -787,6 +932,96 @@ std::expected<Session, ScheduleError> Session::getNextSession() const {
     }
 
     return day->getFirstSession();
+}
+
+std::expected<std::optional<Session>, ScheduleError> Session::findPrevSession(const SessionFilter &filter) const {
+    return detail::queryGuard<std::optional<Session>>([&]() -> std::optional<Session> {
+        const auto schedule = day_.getSchedule();
+        const auto limits = detail::queryLimits(*detail::Access::context(schedule));
+        detail::Construction construction{limits};
+
+        for (std::size_t i = index_; i > 0; --i) {
+            construction.inspect(1);
+            auto session = detail::Access::makeSession(day_, i - 1);
+
+            if (filter.accept(session)) {
+                return session;
+            }
+        }
+
+        auto id = day_.getDayId();
+
+        for (int i = 0; i < detail::FILTER_SEARCH_DAYS; ++i) {
+            id = detail::advanceDay(id, -1);
+
+            if (id < detail::MIN_DAY_ID || id > detail::MAX_DAY_ID) {
+                throw detail::Failure{ScheduleError::OUT_OF_RANGE};
+            }
+
+            auto day = detail::ownedDay(schedule, detail::Access::model(day_)->rules, id, construction);
+            const auto &records = detail::Access::model(day)->sessions;
+
+            for (std::size_t j = records.size(); j > 0; --j) {
+                construction.inspect(1);
+                auto session = detail::Access::makeSession(day, j - 1);
+
+                if (filter.accept(session)) {
+                    return session;
+                }
+            }
+        }
+
+        return std::nullopt;
+    });
+}
+
+std::expected<std::optional<Session>, ScheduleError> Session::findNextSession(const SessionFilter &filter) const {
+    return detail::queryGuard<std::optional<Session>>([&]() -> std::optional<Session> {
+        const auto schedule = day_.getSchedule();
+        const auto limits = detail::queryLimits(*detail::Access::context(schedule));
+        detail::Construction construction{limits};
+
+        for (std::size_t i = index_ + 1; i < detail::Access::model(day_)->sessions.size(); ++i) {
+            construction.inspect(1);
+            auto session = detail::Access::makeSession(day_, i);
+
+            if (filter.accept(session)) {
+                return session;
+            }
+        }
+
+        auto id = day_.getDayId();
+
+        for (int i = 0; i < detail::FILTER_SEARCH_DAYS; ++i) {
+            id = detail::advanceDay(id, 1);
+
+            if (id < detail::MIN_DAY_ID || id > detail::MAX_DAY_ID) {
+                throw detail::Failure{ScheduleError::OUT_OF_RANGE};
+            }
+
+            auto day = detail::ownedDay(schedule, detail::Access::model(day_)->rules, id, construction);
+            const auto &records = detail::Access::model(day)->sessions;
+
+            for (std::size_t j = 0; j < records.size(); ++j) {
+                construction.inspect(1);
+                auto session = detail::Access::makeSession(day, j);
+
+                if (filter.accept(session)) {
+                    return session;
+                }
+            }
+        }
+
+        return std::nullopt;
+    });
+}
+
+std::expected<Session, ScheduleError> Session::getPrevSession(const SessionFilter &filter) const {
+    return detail::requireMatch(findPrevSession(filter));
+}
+
+std::expected<Session, ScheduleError> Session::getNextSession(const SessionFilter &filter) const {
+    return detail::requireMatch(findNextSession(filter));
 }
 
 bool Session::operator==(const Session &other) const noexcept {

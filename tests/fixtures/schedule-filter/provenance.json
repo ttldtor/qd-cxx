@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "revision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "javaVersion": "Zulu OpenJDK 1.8.0_422-b05",
+  "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
+  "javacSha256": "633143e961aa18051c09112b85333f5cdbd845b54eb39678eb15b91ca8bbb527",
+  "tzdbSha256": "e37fc7662b34281f15687f2bbdb054cf192131c09e8a4917261b74ed5e2a3db2",
+  "runnerSha256": "d42f7fa3a3ddc5ae5b3e2787daa56e121dc072bb40a43db55865e1d7830bf7b3",
+  "helperSha256": "e4cd8b550b577c816987816ba4b982982ba2920290647ac84a012d34c88273ee",
+  "casesSha256": "81e0ff38215bbb32c82a48fb0a7d8df1b1c3593317a36a9dedfb848c81ab1245",
+  "fixtureSha256": "741b14b407fa1992a22eb13ae0becf9eda027b197b31224d2a117e4f5564a0d2",
+  "rows": 6,
+  "timezoneLocaleInvariant": true,
+  "sourceFiles": [
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/schedule/Schedule.java",
+      "sha256": "8cc313b998be40da7fd7ee9309c4f5b1483d5396844327ac3790177ecb17c1ca"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/schedule/Day.java",
+      "sha256": "4ccdfddddb513231a9b76f6acd2ec21ed24bc91956399cea24409b445f895355"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/schedule/Session.java",
+      "sha256": "6a4549b9ca6360d7fcaf4dcc005824d58bc1026b133499cf0336bae3d9cd372e"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/schedule/DayFilter.java",
+      "sha256": "4fe9c080b273b5af0c337d8fbc42f413fd4975e8b3b65f2691b6badef7cdcaab"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/schedule/SessionFilter.java",
+      "sha256": "8c2cbfa9b2808b6284f085d73b4bb256d1028a53e20be76f17bd73b33eb9742d"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/schedule/SessionType.java",
+      "sha256": "59e9cf5614f971f001b021e4b1c49d4142099977e717c16fbf2917981b86ff23"
+    }
+  ],
+  "postCaptureClassInventorySha256": "e2714e42136525fb804c7a627d047449b8c6297a815042c2bbc5ca82dda87b76",
+  "classInventoryNote": "Post-capture inventory matches the retained earlier query-oracle inventory; no new pre-capture inventory was recorded.",
+  "scope": "Actual production filter and navigation observations; UTC cases do not cover TZDB-version differences."
+}

@@ -329,7 +329,7 @@ The [IPF compression fixture oracle](../../tests/fixtures/ipf/compression/README
 
 - [ConnectionOracle](../../tests/fixtures/ipf/live/README.md): pinned JDK8/QD live/conditional/carryover observations, input-free EN/RU help, bounded owned loopback/server/handler threads.
 
-- [Schedule query oracle](../upstream/schedule-query-oracle/README.md): actual Day/Session/range/DST/hot-update projections, explicit2026f data differences, input-free EN/RU help; bounded JDK8 Capture/Verify.
+- [Schedule query and filter oracles](../upstream/schedule-query-oracle/README.md): actual Day/Session/range/DST/hot-update and filter projections, explicit2026f data differences, input-free EN/RU help; bounded JDK8 capture and comparison.
 - [Schedule query example](../../examples/schedule_queries/README.md): explicit pinned data initialization, owning Day/Session values and input-free --help/--help-ru.
 
 - [CompletionWaitOracle](../../tests/fixtures/ipf/live/README.md): pinned JDK8 first-snapshot wait/interrupt/close observations; input-free EN/RU help, one owned temporary regular file, finite owned thread cleanup; no network.

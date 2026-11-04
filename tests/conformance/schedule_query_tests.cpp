@@ -89,6 +89,91 @@ void update(const ScheduleDataContext &context, std::int64_t version, std::u16st
 }
 } // namespace
 
+TEST_CASE("actual Java filtered navigation observations") {
+    const auto cases = lines(ORG_TTLDTOR_QDCXX_FILTER_CASES);
+    const auto oracle = lines(ORG_TTLDTOR_QDCXX_FILTER_ORACLE);
+    REQUIRE(cases.size() == 6);
+    REQUIRE(cases.size() == oracle.size());
+    fixture::QueryProjection projection(data());
+
+    for (std::size_t i = 0; i < cases.size(); ++i) {
+        CAPTURE(i);
+        CHECK(projection.observe(cases[i]) == oracle[i]);
+    }
+}
+
+TEST_CASE("filtered navigation preserves conjunction, order and typed failures") {
+    const auto context = domain();
+    const auto source = schedule(context, u"(tz=UTC;td=12345;0=0900120013001700;hd=20241225;sd=20241224)");
+    const auto tuesday = value(source.getDayByYearMonthDay(20241224));
+    const auto holiday = value(source.getDayByYearMonthDay(20241225));
+    CHECK(DayFilter::TUESDAY.accept(tuesday));
+    CHECK(DayFilter::SHORT_DAY.accept(tuesday));
+    CHECK(DayFilter::HOLIDAY.accept(holiday));
+    CHECK(DayFilter::NON_TRADING.accept(holiday));
+    CHECK_FALSE((DayFilter{1U << 2, {}, {}, false}.accept(tuesday)));
+    CHECK_FALSE(DayFilter{1U << 0}.accept(tuesday));
+    CHECK(value(tuesday.getNextDay(DayFilter::TRADING)).getYearMonthDay() == 20241226);
+    CHECK(value(holiday.getPrevDay(DayFilter::TRADING)).getYearMonthDay() == 20241224);
+    CHECK(value(tuesday.getFirstSession(SessionFilter::REGULAR)).getType() == SessionType::REGULAR);
+    CHECK_FALSE(holiday.findFirstSession(SessionFilter::TRADING));
+    const auto absent = holiday.getFirstSession(SessionFilter::TRADING);
+    REQUIRE_FALSE(absent);
+    CHECK(absent.error() == ScheduleError::NO_MATCH);
+    const SessionFilter impossible{SessionType::REGULAR, false};
+    CHECK_FALSE(tuesday.findFirstSession(impossible));
+    const auto first = value(tuesday.getFirstSession(SessionFilter::REGULAR));
+    const auto next = value(first.getNextSession(SessionFilter::REGULAR));
+    CHECK(first.getStartTime() == 1735030800000LL);
+    CHECK(next.getStartTime() == 1735045200000LL);
+    CHECK(next.getStartTime() > first.getStartTime());
+    CHECK(value(next.getPrevSession(SessionFilter::REGULAR)) == first);
+    CHECK(value(tuesday.getLastSession(SessionFilter::REGULAR)) == next);
+    const auto limitDay = value(source.getDayById(2932894));
+    const auto range = limitDay.findNextDay(DayFilter::TRADING);
+    REQUIRE_FALSE(range);
+    CHECK(range.error() == ScheduleError::OUT_OF_RANGE);
+}
+
+TEST_CASE("filtered search exhaustion, budgets and retained generations") {
+    ScheduleLimits limits;
+    limits.queryWork = 10000000;
+    limits.queryStagingBytes = 64000000;
+    const auto context = domain(limits);
+    update(context, 1780000000000LL, u"name=before;tz=UTC;td=12345;0=09001700");
+    const auto source = schedule(context, u"TST()");
+    const auto friday = value(source.getDayByYearMonthDay(20241227));
+    const DayFilter impossible{0, true, {}, true};
+    const auto missing = friday.findNextDay(impossible);
+    REQUIRE(missing);
+    CHECK_FALSE(*missing);
+    const auto required = friday.getNextDay(impossible);
+    REQUIRE_FALSE(required);
+    CHECK(required.error() == ScheduleError::NO_MATCH);
+    const SessionFilter impossibleSession{SessionType::REGULAR, false};
+    const auto last = friday.getLastSession();
+    const auto missingSession = last.findNextSession(impossibleSession);
+    REQUIRE(missingSession);
+    CHECK_FALSE(*missingSession);
+    const auto requiredSession = last.getNextSession(impossibleSession);
+    REQUIRE_FALSE(requiredSession);
+    CHECK(requiredSession.error() == ScheduleError::NO_MATCH);
+    update(context, 1780000001000LL, u"name=after;tz=UTC;td=1234567;0=10001800");
+    const auto oldNext = value(friday.getNextDay(DayFilter::TRADING));
+    CHECK(oldNext.getYearMonthDay() == 20241230);
+    CHECK(oldNext.getDefaultsVersion() == 1780000000000LL);
+    CHECK(value(source.getDayByYearMonthDay(20241228)).isTrading());
+
+    ScheduleLimits tight;
+    tight.queryWork = 1000;
+    const auto tightContext = domain(tight);
+    const auto tightSource = schedule(tightContext);
+    const auto tightDay = value(tightSource.getDayByYearMonthDay(20241224));
+    const auto refused = tightDay.findNextDay(DayFilter{1});
+    REQUIRE_FALSE(refused);
+    CHECK(refused.error() == ScheduleError::RESOURCE_LIMIT);
+}
+
 TEST_CASE("actual Java queries with explicit per-case pinned-data differences") {
     const auto cases = lines(ORG_TTLDTOR_QDCXX_QUERY_CASES);
     const auto oracle = lines(ORG_TTLDTOR_QDCXX_QUERY_ORACLE);

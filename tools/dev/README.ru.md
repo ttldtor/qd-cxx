@@ -342,7 +342,7 @@ native writer files pinned Java reader. Сеть, SDK build и новая depend
 
 - [ConnectionOracle](../../tests/fixtures/ipf/live/README.ru.md): закреплённый JDK8/QD live/conditional/carryover oracle, справка EN/RU без входов, конечные собственные loopback/server/handler threads.
 
-- [Schedule query oracle](../upstream/schedule-query-oracle/README.ru.md): actual Day/Session/range/DST/hot-update, отдельные2026f differences, EN/RU-справка без входов; конечные JDK8 Capture/Verify.
+- [Schedule query и filter oracle](../upstream/schedule-query-oracle/README.ru.md): actual Day/Session/range/DST/hot-update и фильтры, отдельные2026f differences, EN/RU-справка без входов; ограниченный JDK8 захват и сравнение.
 - [Пример запросов Schedule](../../examples/schedule_queries/README.ru.md): явная инициализация данных, владеющие Day/Session, --help/--help-ru без входов.
 
 - [CompletionWaitOracle](../../tests/fixtures/ipf/live/README.ru.md): pinned JDK8 first-snapshot wait/interrupt/close observations; EN/RU help без входов, собственный temporary regular file и конечный thread cleanup, без сети.

@@ -22,6 +22,7 @@ std::string errorName(ScheduleError error) {
     case ScheduleError::INVALID_DEFAULTS:
         return "IllegalArgumentException";
     case ScheduleError::NO_SESSION:
+    case ScheduleError::NO_MATCH:
         return "NoSuchElementException";
     default:
         return "NATIVE_ERROR:" + std::to_string(static_cast<int>(error));
@@ -119,6 +120,38 @@ std::string core(const Session &value) {
  */
 template <class Value> std::string projected(std::expected<Value, ScheduleError> result) {
     return result ? core(*result) : "ERROR:" + errorName(result.error());
+}
+
+std::string optionalDay(std::expected<std::optional<Day>, ScheduleError> result) {
+    const auto match = requireValue(std::move(result));
+
+    return match ? std::to_string(match->getYearMonthDay()) : "NONE";
+}
+
+std::string optionalSession(const std::optional<Session> &result) {
+    return result ? core(*result) : "NONE";
+}
+
+std::string optionalSession(std::expected<std::optional<Session>, ScheduleError> result) {
+    return optionalSession(requireValue(std::move(result)));
+}
+
+std::string projectFilter(const Day &day) {
+    const DayFilter neverDay{1};
+    const SessionFilter neverSession{SessionType::REGULAR, false};
+    const auto first = day.getFirstSession();
+    const auto last = day.getLastSession();
+
+    return std::to_string(DayFilter::TRADING.accept(day)) + "," + std::to_string(DayFilter::HOLIDAY.accept(day)) + "," +
+           std::to_string(DayFilter::SHORT_DAY.accept(day)) + "," + std::to_string(DayFilter::WEEK_DAY.accept(day)) +
+           "\t" + optionalDay(day.findPrevDay(DayFilter::TRADING)) + "\t" +
+           optionalDay(day.findNextDay(DayFilter::TRADING)) + "\t" + optionalDay(day.findNextDay(neverDay)) + "\t" +
+           projected(day.getNextDay(neverDay)) + "\t" + optionalSession(day.findFirstSession(SessionFilter::TRADING)) +
+           "\t" + optionalSession(day.findLastSession(SessionFilter::TRADING)) + "\t" +
+           optionalSession(day.findFirstSession(neverSession)) + "\t" + projected(day.getFirstSession(neverSession)) +
+           "\t" + optionalSession(first.findNextSession(SessionFilter::REGULAR)) + "\t" +
+           optionalSession(last.findPrevSession(SessionFilter::REGULAR)) + "\t" +
+           optionalSession(last.findNextSession(neverSession));
 }
 
 /** @param value Actual owning day.
@@ -291,6 +324,22 @@ std::string QueryProjection::observe(std::string_view line) {
                    std::to_string(oldSession == current.getFirstSession()) + "\t" +
                    encodeHex(old.getSchedule().getName()) + "\t" + beforeNext + "\t" + projected(old.getNextDay()) +
                    "\t" + projected(current.getNextDay());
+        }
+
+        if (cells[1] == "F") {
+            ScheduleLimits limits;
+            limits.queryWork = 10000000;
+            limits.queryStagingBytes = 64000000;
+            auto domain = requireValue(ScheduleDataContext::create(data_, limits));
+            const auto schedule = requireValue(Schedule::getInstance(domain, definition));
+
+            const auto day = requireValue(schedule.getDayByYearMonthDay(static_cast<std::int32_t>(argument)));
+
+            if (cells[5] == "B") {
+                return "BOUNDARY\t" + id + "\t" + optionalDay(day.findNextDay(DayFilter::HOLIDAY));
+            }
+
+            return "FILTER\t" + id + "\t" + projectFilter(day);
         }
 
         const auto schedule = requireValue(Schedule::getInstance(context(REFERENCE_MILLIS), definition));

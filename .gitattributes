@@ -742,3 +742,9 @@ tools/upstream/event-text-oracle/*.java text eol=lf
 tools/upstream/event-text-oracle/*.ps1 text eol=lf
 tests/fixtures/event-text/*.tsv -text -whitespace
 tests/fixtures/event-text/provenance.json text eol=lf
+
+# Preserve exact schedule-filter observations and reproducible oracle sources.
+/tests/fixtures/schedule-filter/*.tsv -text -whitespace
+/tests/fixtures/schedule-filter/provenance.json text eol=lf
+/tools/upstream/schedule-query-oracle/FilterObservation.java text eol=lf
+/tools/upstream/schedule-query-oracle/ScheduleFilterOracle.java text eol=lf

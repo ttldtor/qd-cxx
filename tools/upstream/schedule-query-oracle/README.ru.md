@@ -2,6 +2,16 @@
 
 [English version](README.md) является нормативной.
 
+Отдельный `ScheduleFilterOracle` с помощником `FilterObservation` фиксирует
+[корпус фильтров](../../../tests/fixtures/schedule-filter/cases.tsv), не изменяя прежний oracle и его
+provenance. Команды компиляции и побайтовой проверки приведены в английской версии; нужны готовые
+production classes закреплённого QD и JDK8. Без аргументов, `--help` и `--help-ru` запускается
+только справка, без входов и вычисления расписания. Вход ограничен 4096 строками и 16 MiB; вывод —
+новый UTF-8 LF файл. Код 0 означает успех, ненулевой — ошибку ввода, записи или Java QD. После
+ошибки записи может остаться неполный файл. Входы и upstream classes не изменяются; для захвата
+повторите UTC/en и Pacific/Honolulu/fr и сравните байты. UTC-примеры не доказывают совместимость
+разных выпусков TZDB.
+
 `ScheduleQueryOracle.java` вызывает закреплённые production Schedule/Day/Session, actual Java TimeZone
 raw components, все631identity и полный captured SystemV transition profile; отдельного календарного
 алгоритма нет. `Invoke-Oracle.ps1` по умолчанию Verify; Capture пишет новые actual fixture/provenance

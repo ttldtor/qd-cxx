@@ -31,3 +31,29 @@ and explicitly tests its stronger immutable navigation policy from H. The
 [36 source-derived2026f data expectations](../../../tests/fixtures/schedule-query/tzdb2026f-provenance.json)
 are separate and per-case. Invalid or degenerate Java operations that would not terminate are not
 run as oracle captures; C++ finite-work refusal has its own bounded test.
+
+## Filter observations
+
+`ScheduleFilterOracle` and its `FilterObservation` helper capture the separate
+[filter corpus](../../../tests/fixtures/schedule-filter/cases.tsv), without changing the earlier
+query oracle or its provenance. Compile both files against the same pinned production classes and
+JDK8, then run with a new output path. The semicolon classpath below is for PowerShell on Windows;
+use `:` on Unix. `javac` and `java` refer to that JDK's executables.
+
+```powershell
+$qdRoot = 'C:/path/to/pinned-qd'
+$classes = 'C:/path/to/existing-empty-classes-directory'
+$output = 'C:/path/to/new-observations.tsv'
+$cp = "$qdRoot/dxfeed-api/target/classes;$qdRoot/dxlib/target/classes;$qdRoot/qd-core/target/classes"
+javac -encoding UTF-8 -cp $cp -d $classes tools/upstream/schedule-query-oracle/FilterObservation.java tools/upstream/schedule-query-oracle/ScheduleFilterOracle.java
+java -cp $classes qdcxx.oracle.ScheduleFilterOracle --help
+java '-Duser.timezone=UTC' '-Duser.language=en' '-Dcom.dxfeed.schedule.download=' -cp "$classes;$cp" qdcxx.oracle.ScheduleFilterOracle tests/fixtures/schedule-filter/cases.tsv $output
+(Get-FileHash $output).Hash -eq (Get-FileHash tests/fixtures/schedule-filter/oracle.tsv).Hash
+```
+
+No arguments, `--help` and `--help-ru` need only the compiled runner and start no schedule work.
+The runner accepts at most 4096 rows and 16 MiB of input, requires a new output, and writes UTF-8 LF.
+It exits zero on success and nonzero on malformed input, I/O or production errors; a failure after
+output creation can leave a partial output. It does not change input or upstream classes. For a
+fresh capture, repeat in UTC/en and Pacific/Honolulu/fr and compare exact bytes. The fixture uses
+UTC definitions, so these results do not establish compatibility across differing TZDB releases.

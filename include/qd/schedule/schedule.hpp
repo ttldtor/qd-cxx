@@ -36,7 +36,8 @@ enum class ScheduleError {
     NOT_READY,          ///< This parser-only context has no explicitly initialized timezone data.
     OUT_OF_RANGE,       ///< The argument is outside this particular query method's supported range.
     NO_SESSION,         ///< No interval selected by the day/session lookup contains the requested instant.
-    TIME_ZONE_DATA      ///< Controlled timezone initialization or an identity/data lookup failed.
+    TIME_ZONE_DATA,     ///< Controlled timezone initialization or an identity/data lookup failed.
+    NO_MATCH            ///< A filtered get search completed without an accepted day or session.
 };
 
 /** Shared CORE timezone capability; market-calendar generations remain independent. */
@@ -177,6 +178,64 @@ enum class SessionType {
  * @return Whether this kind is trading; duration does not affect its trading type.
  */
 [[nodiscard]] bool isTrading(SessionType type) noexcept;
+
+/** Immutable conjunction of weekday mask and optional day attributes; zero mask ignores weekdays. */
+class DayFilter final {
+    std::uint32_t weekdays_;
+    std::optional<bool> holiday_, shortDay_, trading_;
+
+    public:
+    /** @param weekdays Weekday bits 1 through 7, or zero to ignore weekday.
+     * @param holiday Required holiday flag, or empty to ignore it.
+     * @param shortDay Required short-day flag, or empty to ignore it.
+     * @param trading Required trading flag, or empty to ignore it.
+     */
+    explicit constexpr DayFilter(std::uint32_t weekdays = 0, std::optional<bool> holiday = {},
+                                 std::optional<bool> shortDay = {}, std::optional<bool> trading = {}) noexcept
+        : weekdays_(weekdays), holiday_(holiday), shortDay_(shortDay), trading_(trading) {
+    }
+
+    /** @param day Day to inspect. @return Whether all specified conditions match. */
+    [[nodiscard]] bool accept(const Day &day) const noexcept;
+    static const DayFilter ANY;         ///< Accepts every day.
+    static const DayFilter TRADING;     ///< Accepts days with a trading session, including an empty trading session.
+    static const DayFilter NON_TRADING; ///< Accepts days without a trading session.
+    static const DayFilter HOLIDAY;     ///< Accepts days whose holiday flag is true.
+    static const DayFilter SHORT_DAY;   ///< Accepts days whose short-day flag is true.
+    static const DayFilter MONDAY;      ///< Accepts Mondays.
+    static const DayFilter TUESDAY;     ///< Accepts Tuesdays.
+    static const DayFilter WEDNESDAY;   ///< Accepts Wednesdays.
+    static const DayFilter THURSDAY;    ///< Accepts Thursdays.
+    static const DayFilter FRIDAY;      ///< Accepts Fridays.
+    static const DayFilter SATURDAY;    ///< Accepts Saturdays.
+    static const DayFilter SUNDAY;      ///< Accepts Sundays.
+    static const DayFilter WEEK_DAY;    ///< Accepts Monday through Friday, regardless of trading status.
+    static const DayFilter WEEK_END;    ///< Accepts Saturday and Sunday, regardless of trading status.
+};
+
+/** Immutable conjunction of optional session type and trading flag. */
+class SessionFilter final {
+    std::optional<SessionType> type_;
+    std::optional<bool> trading_;
+
+    public:
+    /** @param type Required type, or empty to ignore it.
+     * @param trading Required trading flag, or empty to ignore it.
+     */
+    explicit constexpr SessionFilter(std::optional<SessionType> type = {}, std::optional<bool> trading = {}) noexcept
+        : type_(type), trading_(trading) {
+    }
+
+    /** @param session Session to inspect. @return Whether all specified conditions match. */
+    [[nodiscard]] bool accept(const Session &session) const noexcept;
+    static const SessionFilter ANY;          ///< Accepts every session, including empty sessions.
+    static const SessionFilter TRADING;      ///< Accepts trading types, including zero-duration sessions.
+    static const SessionFilter NON_TRADING;  ///< Accepts sessions whose trading flag is false.
+    static const SessionFilter NO_TRADING;   ///< Accepts sessions of the NO_TRADING type.
+    static const SessionFilter PRE_MARKET;   ///< Accepts sessions of the PRE_MARKET type.
+    static const SessionFilter REGULAR;      ///< Accepts sessions of the REGULAR type.
+    static const SessionFilter AFTER_MARKET; ///< Accepts sessions of the AFTER_MARKET type.
+};
 
 /** Owning Java-like schedule identity in an explicit context.
  * Metadata uses the current atomically published calendar generation. Day and Session results own
@@ -334,6 +393,26 @@ class Day final {
     [[nodiscard]] std::expected<Day, ScheduleError> getPrevDay() const;
     /** @return Next labelled day in the pinned generation; direct day-id method bounds apply. */
     [[nodiscard]] std::expected<Day, ScheduleError> getNextDay() const;
+    /** @param filter Conditions to match. @return First matching session, or empty. */
+    [[nodiscard]] std::optional<Session> findFirstSession(const SessionFilter &filter) const noexcept;
+    /** @param filter Conditions to match. @return Last matching session, or empty. */
+    [[nodiscard]] std::optional<Session> findLastSession(const SessionFilter &filter) const noexcept;
+    /** @param filter Conditions to match within 366 preceding days.
+     * @return Matching pinned day, empty if absent, or an underlying query failure.
+     */
+    [[nodiscard]] std::expected<std::optional<Day>, ScheduleError> findPrevDay(const DayFilter &filter) const;
+    /** @param filter Conditions to match within 366 following days.
+     * @return Matching pinned day, empty if absent, or an underlying query failure.
+     */
+    [[nodiscard]] std::expected<std::optional<Day>, ScheduleError> findNextDay(const DayFilter &filter) const;
+    /** @param filter Conditions to match. @return First matching session or NO_MATCH. */
+    [[nodiscard]] std::expected<Session, ScheduleError> getFirstSession(const SessionFilter &filter) const;
+    /** @param filter Conditions to match. @return Last matching session or NO_MATCH. */
+    [[nodiscard]] std::expected<Session, ScheduleError> getLastSession(const SessionFilter &filter) const;
+    /** @param filter Conditions to match. @return Previous matching day, NO_MATCH or a typed failure. */
+    [[nodiscard]] std::expected<Day, ScheduleError> getPrevDay(const DayFilter &filter) const;
+    /** @param filter Conditions to match. @return Next matching day, NO_MATCH or a typed failure. */
+    [[nodiscard]] std::expected<Day, ScheduleError> getNextDay(const DayFilter &filter) const;
     /** @param other Day identity to compare, possibly from a different calendar snapshot.
      * @return True for the same Schedule identity and day-id, as in the source equality contract.
      */
@@ -368,6 +447,20 @@ class Session final {
     [[nodiscard]] std::expected<Session, ScheduleError> getPrevSession() const;
     /** @return Next session in source ordering, crossing a day boundary in the pinned generation. */
     [[nodiscard]] std::expected<Session, ScheduleError> getNextSession() const;
+    /** @param filter Conditions to match in source order and up to 366 preceding days.
+     * @return Matching pinned session, empty if absent, or an underlying query failure.
+     */
+    [[nodiscard]] std::expected<std::optional<Session>, ScheduleError>
+    findPrevSession(const SessionFilter &filter) const;
+    /** @param filter Conditions to match in source order and up to 366 following days.
+     * @return Matching pinned session, empty if absent, or an underlying query failure.
+     */
+    [[nodiscard]] std::expected<std::optional<Session>, ScheduleError>
+    findNextSession(const SessionFilter &filter) const;
+    /** @param filter Conditions to match. @return Previous matching session, NO_MATCH or a typed failure. */
+    [[nodiscard]] std::expected<Session, ScheduleError> getPrevSession(const SessionFilter &filter) const;
+    /** @param filter Conditions to match. @return Next matching session, NO_MATCH or a typed failure. */
+    [[nodiscard]] std::expected<Session, ScheduleError> getNextSession(const SessionFilter &filter) const;
     /** @param other Session to compare.
      * @return Source equality: day identity, type and exact interval endpoints.
      */
