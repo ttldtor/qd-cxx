@@ -25,7 +25,7 @@ Const-наблюдение реестра допускается одновре�
 
 ## Явные mappings
 
-`EventType::QUOTE` и `EventType::PROFILE` выбирают существующие prepared adapters.
+`EventType::QUOTE`, `EventType::PROFILE` и `EventType::TRADE` выбирают существующие prepared adapters.
 Имя записи не определяет тип события. Каждый маршрут задаёт явный local record ID,
 конечные `MappingLimits` и `EventTimePolicy`. Сохраняется требование `LocalSchema`:
 каждый ID равен позиции записи в полном каталоге.
@@ -48,7 +48,7 @@ business key с любой совместимой позицией поля. В�
 
 Исчерпывающая [таблица преобразований полей](FIELD-CONVERSIONS.ru.md) принадлежит каждому
 подготовленному адаптеру. Default registration допускает 128 точных альтернатив типов и
-консервативно оплачивает сравнения; Quote требует 72, Profile 108. Явные меньшие границы
+консервативно оплачивает сравнения; Quote требует72, Profile108 и Trade110. Явные меньшие границы
 по-прежнему дают атомарный отказ. Полные receive caps сохраняют 16 записей и 128 полей.
 
 `FIELD_METADATA` выбирает фактический исходный FIELD event time при его наличии;
@@ -85,7 +85,7 @@ resource, work или allocation. Ошибка маршрута содержит
 ## Значения по умолчанию и пределы receiving
 
 `builtIn` использует ту же границу регистрации: полный default Quote record0
-с восемью полями и Profile record1 с шестнадцатью полями, с существующими lookup
+с восемью полями, Profile record1 с шестнадцатью и composite Trade record2 с тринадцатью полями, с существующими lookup
 aliases и бизнес-поведением. Endpoint без явного реестра выбирает эти значения.
 Глобальной регистрации процесса и изменения живого реестра нет.
 
@@ -104,7 +104,7 @@ selections/work, пределы callback projection и ёмкости desired co
 и каждой подписки с проверкой арифметики, включая подписки после connect.
 Фактическое максимальное
 число полей записи задаёт полный предел полей кадра с сохранением исходного минимума16.
-Со встроенным реестром interest reservations покрывают оба маршрута на символ.
+Со встроенным реестром interest reservations покрывают три маршрута на символ.
 Пределы схемы и данных frame/queue сохраняются.
 
 Региональная маршрутизация demand удерживает фиксированный массив16 exchange-кодов
@@ -167,3 +167,5 @@ auto registry = api::EventRegistry::create(schema, routes, {}, work);
 reflection, произвольных delegate factories, всех классов событий или новых
 wire semantics. Закреплённый reference и существующая provenance адаптеров находятся
 в `upstream.lock` и [доказательствах configured events](../../tests/fixtures/events/mapping/COVERAGE.ru.md).
+
+Trade добавлен как явный EventType::TRADE; см. [полный контракт](TRADE.ru.md). Семь finite type sets хранят fixed16 index arrays; finite stack copy16 bindings и её initialization/read/write work включены в preparation. Quote/Trade выбирают regional fallback независимо; Profile сохраняет exact logical symbol. Record/field caps не расширены.

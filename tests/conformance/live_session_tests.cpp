@@ -973,7 +973,7 @@ TEST_CASE("real default Quote Java fields traverse a live generation into prepar
     REQUIRE(defaultSchema);
     auto local = c::LocalSchema::create(defaultSchema->records(), schemaBounds, c::LocalProfile::BINARY_FIELDS_V1);
     REQUIRE(local);
-    auto mapping = q::PreparedQuote::prepare(*local, 0, {128, 256, 32, 64, 64, 128, 16384, 1000000});
+    auto mapping = q::PreparedQuote::prepare(*local, 0, {128, 256, 32, 64, 128, 128, 16384, 1000000});
     REQUIRE(mapping);
     p::OutgoingRecord declaration{17, 0, u"Quote", {}};
     const auto &record = local->records()[0];

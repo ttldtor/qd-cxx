@@ -4,6 +4,7 @@
 
 #include "qd/events/profile.hpp"
 #include "qd/events/quote.hpp"
+#include "qd/events/trade.hpp"
 #include "qd/mux/queue.hpp"
 
 #include <cstddef>
@@ -22,8 +23,9 @@ struct ReceiverPlan;
 
 /** Existing prepared business projections; other records remain fully generic. */
 enum class PreparedEventKind {
-    QUOTE,  ///< Existing schema-bound Quote projection.
-    PROFILE ///< Existing schema-bound Profile projection.
+    QUOTE,   ///< Existing schema-bound Quote projection.
+    PROFILE, ///< Existing schema-bound Profile projection.
+    TRADE    ///< Complete owning Trade projection.
 };
 
 /** Explicit source for optional event metadata; indexed identity is never a timestamp substitute. */
@@ -78,7 +80,8 @@ struct ReceiverFailure {
 
 /** Fully owning optional projection; generic records are represented by monostate. */
 struct SubscriptionProjection {
-    std::variant<std::monostate, events::Quote, events::Profile> value; ///< Owned event or explicit generic route.
+    std::variant<std::monostate, events::Quote, events::Profile, events::Trade>
+        value;                               ///< Owned event or explicit generic route.
     std::optional<std::int64_t> eventTimeMs; ///< Actual selected FIELD metadata only; rawTime stays independent.
 };
 
@@ -131,7 +134,7 @@ class SubscriptionBatch {
     /** Synchronously project one record without hidden input copies or result caching.
      * @param index Position in records(); out-of-range is an explicit error.
      * @param work Remaining caller credits; repeated calls debit them again, including failed attempts.
-     * @return Independent owned Quote/Profile, generic monostate or typed failure. No callback or state mutation
+     * @return Independent owned Quote/Profile/Trade, generic monostate or typed failure. No callback or state mutation
      * occurs; result ownership is separate from the queue ledger. The wrapper cannot be used after callback return.
      */
     [[nodiscard]] std::expected<SubscriptionProjection, ReceiverProjectionFailure>

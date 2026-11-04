@@ -12,7 +12,7 @@ and ownership. Use the namespace/type indexes beside this page to find individua
 | Encodings | `qd/encoding/` | `qdcxx_encoding` | [Encoding specifications](../spec/README.md#encoding-contracts) |
 | Schemas and record identity | `qd/core/` | `qdcxx_core` | [Schema specifications](../spec/README.md#schema-contracts) |
 | Frames, binding and tapes | `qd/protocol/` | `qdcxx_protocol` | [Protocol specifications](../spec/README.md#protocol-contracts) |
-| Standard events | `qd/events/` | `qdcxx_quote`, `qdcxx_profile`, `qdcxx_event_mapping` | [Configuration](CONFIGURATION.md) |
+| Standard events | `qd/events/` | `qdcxx_quote`, `qdcxx_profile`, `qdcxx_trade`, `qdcxx_event_mapping` | [Configuration](CONFIGURATION.md), [Trade](../spec/events/TRADE.md) |
 | Candle periods | `qd/events/candle_period.hpp` | `qdcxx_candle_values` | [Types, text and interval estimates](../spec/events/CANDLE-PERIOD.md); no Candle receiving |
 | Candle attributes | `qd/events/candle_attributes.hpp` | `qdcxx_candle_values` | [Values and symbol operations](../spec/events/CANDLE-ATTRIBUTES.md); no aggregation |
 | Collectors and multiplexing | `qd/collectors/`, `qd/mux/` | `qdcxx_collectors`, `qdcxx_mux`, `qdcxx_mux_queue` | [Subscription contracts](../spec/subscriptions/CONTRACTS.md) |

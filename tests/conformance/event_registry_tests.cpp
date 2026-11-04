@@ -137,12 +137,12 @@ std::vector<core::FieldValue> values(const core::LocalRecord &record) {
 }
 } // namespace
 
-TEST_CASE("built-in registry preserves complete Quote0 Profile1 defaults") {
+TEST_CASE("built-in registry preserves Quote0 Profile1 and appends complete Trade2") {
     api::EventRegistryWork work;
     auto result = api::EventRegistry::builtIn({}, work);
     REQUIRE(result);
     CHECK(result->valid());
-    REQUIRE(result->registrations().size() == 2);
+    REQUIRE(result->registrations().size() == 3);
     CHECK(result->registrations()[0].type == api::EventType::QUOTE);
     CHECK(result->registrations()[0].localRecordId == 0);
     CHECK(result->registrations()[1].type == api::EventType::PROFILE);
@@ -151,6 +151,9 @@ TEST_CASE("built-in registry preserves complete Quote0 Profile1 defaults") {
     CHECK(result->schema().records()[0].fields.size() == 8);
     CHECK(result->schema().records()[1].name == u"Profile");
     CHECK(result->schema().records()[1].fields.size() == 16);
+    CHECK(result->registrations()[2].type == api::EventType::TRADE);
+    CHECK(result->schema().records()[2].name == u"Trade");
+    CHECK(result->schema().records()[2].fields.size() == 13);
     CHECK(result->storageBytes() <= api::EventRegistryLimits{}.storageBytes);
     CHECK(work.visits < api::EventRegistryWork{}.visits);
     CHECK(work.preparation < api::EventRegistryWork{}.preparation);
@@ -355,7 +358,7 @@ TEST_CASE("receiving preparation selects all explicit same-kind routes and deriv
     CHECK(profile.eventPlans[0].bindingCount == 2);
     CHECK(profile.eventPlans[0].limits.bindings == 2);
     CHECK(profile.eventPlans[0].limits.shapeFields == 18);
-    CHECK(profile.eventPlans[1].firstBinding == 2);
+    CHECK(profile.eventPlans[1].bindingIndices[0] == 2);
     CHECK(profile.eventPlans[1].bindingCount == 1);
     CHECK(profile.clientLimits.commandEntries == 15);
     CHECK(profile.endpoint.settings().budgets.desired.entries == 30);
@@ -383,7 +386,7 @@ TEST_CASE("receiving preparation selects all explicit same-kind routes and deriv
     auto plan = profile.eventPlans[0];
     auto handle = root::client::openSubscriptionReceiver(
         *queue, profile.schema, profile.family, core::SubscriptionSelectorPolicy::CANONICAL_EXACT_V1,
-        std::span(profile.bindings).subspan(plan.firstBinding, plan.bindingCount), consumer, plan.limits,
+        std::span(profile.bindings).subspan(plan.bindingIndices[0], plan.bindingCount), consumer, plan.limits,
         profile.clientLimits, plan.work, queueWork);
     REQUIRE(handle);
 }

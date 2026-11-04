@@ -22,6 +22,7 @@
 [Смешанные зарегистрированные подписки](events/MIXED-SUBSCRIPTIONS.ru.md) выбирают
 несколько поддержанных типов через одну логическую подписку на владеющие variant values.
 
+- [Приём Trade](events/TRADE.ru.md): полные owning fields, business numeric views и явные composite/regional Feed routes.
 - [Значения периодов Candle](events/CANDLE-PERIOD.ru.md): чистые типы агрегации и текст периодов, отдельно от приёма Candle.
 
 ## Контракты протокола {#protocol-contracts-ru}

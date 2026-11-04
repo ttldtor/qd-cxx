@@ -22,6 +22,7 @@ typed projections over complete caller schemas.
 [Mixed registered subscriptions](events/MIXED-SUBSCRIPTIONS.md) select several
 supported types through one owning variant-valued logical subscription.
 
+- [Trade receiving](events/TRADE.md): complete owning fields, business numeric views and explicit composite/regional Feed routes.
 - [Candle period values](events/CANDLE-PERIOD.md): pure aggregation types and period text, independent of Candle receiving.
 
 ## Protocol contracts {#protocol-contracts}

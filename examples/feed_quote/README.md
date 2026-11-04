@@ -140,3 +140,5 @@ OS behavior. Pending real POSIX signals racing restoration retain prior OS seman
 See the [complete wait and signal contract](../../spec/subscriptions/FEED-WAITS.md).
 The CLI creates one application signal-reader thread in addition to the SDK worker;
 both retire before runtime bootstrap destruction.
+
+For owning Trade, use the same endpoint and createSubscription<events::Trade>() with getPrice()/getSizeAsDouble(); the [short example](../../docs/FEED-API.md) uses SDK progress without application polling. Built-in Trade is composite; a regional record requires an explicit registry, as specified in [Trade](../../spec/events/TRADE.md). This console executable retains its Quote output; a public live connection is distinct from deterministic installed-consumer checks.

@@ -4,6 +4,7 @@
 
 #include "qd/events/profile.hpp"
 #include "qd/events/quote.hpp"
+#include "qd/events/trade.hpp"
 
 #include <array>
 #include <limits>
@@ -156,7 +157,8 @@ std::size_t mappingWork(events::MappingLimits limits) {
  * @return Whether the projection and timestamp policy are known.
  */
 bool validRegistration(const EventRegistration &registration) noexcept {
-    return (registration.type == EventType::QUOTE || registration.type == EventType::PROFILE) &&
+    return (registration.type == EventType::QUOTE || registration.type == EventType::PROFILE ||
+            registration.type == EventType::TRADE) &&
            (registration.eventTimePolicy == EventTimePolicy::UNSPECIFIED ||
             registration.eventTimePolicy == EventTimePolicy::FIELD_METADATA);
 }
@@ -243,6 +245,13 @@ EventRegistry::create(const core::LocalSchema &schema, std::span<const EventRegi
                 if (!mapping) {
                     return std::unexpected(EventRegistryFailure{mapping.error(), index});
                 }
+            } else if (registration.type == EventType::TRADE) {
+                const auto mapping = events::PreparedTrade::prepare(*ownedSchema, registration.localRecordId,
+                                                                    registration.mappingLimits);
+
+                if (!mapping) {
+                    return std::unexpected(EventRegistryFailure{mapping.error(), index});
+                }
             } else {
                 const auto mapping = events::PreparedProfile::prepare(*ownedSchema, registration.localRecordId,
                                                                       registration.mappingLimits);
@@ -283,18 +292,23 @@ EventRegistry::create(const core::LocalSchema &schema, std::span<const EventRegi
 std::expected<EventRegistry, EventRegistryFailure> EventRegistry::builtIn(EventRegistryLimits limits,
                                                                           EventRegistryWork &work) {
     try {
-        // Prepay construction of both fixed input catalogs and their aliases before allocating them.
+        // Prepay construction of all three fixed input catalogs and their aliases before allocating them.
         constexpr std::size_t DEFAULT_CONSTRUCTION_WORK = 4096;
         debit(work.visits, DEFAULT_CONSTRUCTION_WORK);
 
         auto quote = events::defaultQuoteSchema(limits.schema);
         auto profile = events::defaultProfileSchema(limits.schema);
+        auto trade = events::defaultTradeSchema(limits.schema);
+
+        if (!trade)
+            return std::unexpected(EventRegistryFailure{trade.error(), {}});
 
         if (!quote || !profile) {
             return std::unexpected(EventRegistryFailure{!quote ? quote.error() : profile.error(), {}});
         }
 
-        std::array records{quote->records()[0], profile->records()[0]};
+        std::array records{quote->records()[0], profile->records()[0], trade->records()[0]};
+        records[2].id = 2;
         records[1].id = 1;
 
         auto combined = core::LocalSchema::create(records, limits.schema, core::LocalProfile::BINARY_FIELDS_V1);
@@ -303,8 +317,8 @@ std::expected<EventRegistry, EventRegistryFailure> EventRegistry::builtIn(EventR
             return std::unexpected(EventRegistryFailure{combined.error(), {}});
         }
 
-        const std::array registrations{EventRegistration{EventType::QUOTE, 0},
-                                       EventRegistration{EventType::PROFILE, 1}};
+        const std::array registrations{EventRegistration{EventType::QUOTE, 0}, EventRegistration{EventType::PROFILE, 1},
+                                       EventRegistration{EventType::TRADE, 2}};
 
         return create(*combined, registrations, limits, work);
     } catch (EventRegistryError error) {

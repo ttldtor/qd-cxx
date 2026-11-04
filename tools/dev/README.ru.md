@@ -2,6 +2,8 @@
 
 [English version](README.md). Английская версия нормативная.
 
+[Production oracle Trade](../upstream/trade-oracle/README.ru.md) проверяет composite/regional fields, raw slots, time/flags/defaults и прямые business doubles. Noargs/ENRU/Get-Help не запускают Java; Capture/Verify используют четыре явных пути, finite subprocess limits и новые private run directories.
+
 [Oracle преобразования полей](../upstream/field-conversion-oracle/README.ru.md) захватывает/проверяет
 фактическое numeric, physical-slot, nullable String и missing-field поведение. Без аргументов,
 EN/RU справка и Get-Help не требуют рабочих входов и не запускают Java.

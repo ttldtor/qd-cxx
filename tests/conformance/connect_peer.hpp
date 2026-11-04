@@ -39,6 +39,7 @@ enum class PeerMode {
 struct ExpectedSubscription {
     std::vector<std::u16string> symbols; ///< Exact expected tuple symbols, in composer order.
     std::vector<std::int32_t> recordIds; ///< Matching client outgoing IDs, never peer source sender IDs.
+    bool unordered = false; ///< Opt in to exact multiset matching across frames; duplicates/extras still fail.
 };
 
 /** Optional explicit receiving script; defaults preserve the original STREAM peer and replay-after-remove. */
@@ -56,6 +57,8 @@ struct PeerScript {
     bool fieldMetadata = false; ///< Declare leading EventTime56/EventSequence72; every DATA tuple supplies both words.
     std::optional<std::vector<Record>> afterReconnect;
     ///< Hold the first connection until client close, then accept one fresh connection and validate its replayed ADD.
+    std::optional<std::vector<Record>> afterFinalRemove;
+    ///< Override only the last scripted REMOVE response; an empty vector sends no further DATA frame.
 };
 
 /** Encode the existing independent peer readiness/complete-description fixture without opening a socket.
@@ -89,6 +92,7 @@ class Peer {
     std::vector<std::byte> data_;
     std::vector<std::byte> afterRemove_;
     std::vector<std::byte> afterReconnect_;
+    std::vector<std::byte> afterFinalRemove_;
     std::vector<std::u16string> expected_;
     std::size_t chunk_;
     PeerMode mode_;

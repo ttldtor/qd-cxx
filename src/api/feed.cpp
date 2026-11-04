@@ -1090,6 +1090,7 @@ template <class Event> Diagnostic Subscription<Event>::getDiagnostic() const noe
 
 template class Subscription<events::Quote>;
 template class Subscription<events::Profile>;
+template class Subscription<events::Trade>;
 template class Subscription<RegisteredEvent>;
 
 Feed::Feed(std::shared_ptr<detail::EndpointPort> port) : port_(std::move(port)) {
@@ -1125,6 +1126,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
 
         bool quote = false;
         bool profile = false;
+        bool trade = false;
 
         for (const auto type : types) {
             switch (type) {
@@ -1134,17 +1136,20 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             case EventType::PROFILE:
                 profile = true;
                 break;
+            case EventType::TRADE:
+                trade = true;
+                break;
             default:
                 reject(ErrorCode::INVALID_ARGUMENT, "subscription-event-types");
             }
         }
 
-        const auto selection = quote && profile ? detail::EventSelection::BOTH
-                               : quote          ? detail::EventSelection::QUOTE
-                                                : detail::EventSelection::PROFILE;
+        const auto selection =
+            static_cast<detail::EventSelection>((quote ? 1U : 0U) | (profile ? 2U : 0U) | (trade ? 4U : 0U));
         const auto delivery = registeredDelivery ? detail::EventDelivery::REGISTERED
                               : quote            ? detail::EventDelivery::QUOTE
-                                                 : detail::EventDelivery::PROFILE;
+                              : profile          ? detail::EventDelivery::PROFILE
+                                                 : detail::EventDelivery::TRADE;
         auto subscription = std::make_shared<detail::SubscriptionPort>();
         subscription->control = port_->control;
         subscription->endpoint = port_;
@@ -1169,18 +1174,20 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
 
             bool registeredQuote = !port_->options.eventRegistry;
             bool registeredProfile = !port_->options.eventRegistry;
+            bool registeredTrade = !port_->options.eventRegistry;
 
             if (port_->options.eventRegistry) {
                 for (const auto &registration : port_->options.eventRegistry->registrations()) {
                     registeredQuote = registeredQuote || registration.type == EventType::QUOTE;
                     registeredProfile = registeredProfile || registration.type == EventType::PROFILE;
+                    registeredTrade = registeredTrade || registration.type == EventType::TRADE;
                 }
             }
 
             const auto missingQuote = quote && !registeredQuote;
             const auto missingProfile = profile && !registeredProfile;
 
-            if (missingQuote || missingProfile) {
+            if (missingQuote || missingProfile || (trade && !registeredTrade)) {
                 reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-unregistered-event");
             }
 
@@ -1397,6 +1404,8 @@ class TypedConsumer final : public client::SubscriptionConsumer {
             if constexpr (std::is_same_v<Event, RegisteredEvent>) {
                 if (auto *quote = std::get_if<events::Quote>(&projected->value)) {
                     projectedEvents.emplace_back(std::move(*quote));
+                } else if (auto *trade = std::get_if<events::Trade>(&projected->value)) {
+                    projectedEvents.emplace_back(std::move(*trade));
                 } else if (auto *profile = std::get_if<events::Profile>(&projected->value)) {
                     projectedEvents.emplace_back(std::move(*profile));
                 } else {
@@ -1484,6 +1493,8 @@ class TypedConsumer final : public client::SubscriptionConsumer {
                 return deliver<events::Quote>(batch, listeners);
             case EventDelivery::PROFILE:
                 return deliver<events::Profile>(batch, listeners);
+            case EventDelivery::TRADE:
+                return deliver<events::Trade>(batch, listeners);
             case EventDelivery::REGISTERED:
                 return deliver<RegisteredEvent>(batch, listeners);
             default:
@@ -1592,9 +1603,15 @@ std::unique_ptr<NativeSubscription> registerSubscription(NativeEndpoint &endpoin
     result->consumer = std::make_shared<TypedConsumer>(port, plan.projectionWork);
     auto receiverWork = plan.work;
     auto queueWork = endpoint.profile.queueWork;
+    std::array<client::PreparedSubscriptionBinding, MAXIMUM_RECEIVING_RECORDS> selectedBindings{};
+
+    if (!copyReceivingBindings(endpoint.profile, plan, selectedBindings, receiverWork)) {
+        throw Error({ErrorCode::RESOURCE_LIMIT, "subscription-binding-copy"});
+    }
+
     auto handle = endpoint.recovery->openSubscriptionReceiver(
-        endpoint.profile.family, std::span(endpoint.profile.bindings).subspan(plan.firstBinding, plan.bindingCount),
-        result->consumer, plan.limits, endpoint.profile.clientLimits, receiverWork, queueWork);
+        endpoint.profile.family, std::span(selectedBindings).first(plan.bindingCount), result->consumer, plan.limits,
+        endpoint.profile.clientLimits, receiverWork, queueWork);
 
     if (!handle) {
         if (const auto *failure = std::get_if<transport::RecoveryDiagnostic>(&handle.error())) {
@@ -1699,7 +1716,7 @@ void applyDesired(NativeEndpoint &endpoint, NativeSubscription &subscription, mu
     prepareReceivingSymbols(endpoint.profile, plan, symbols);
 
     for (std::size_t offset = 0; offset < plan.bindingCount; ++offset) {
-        const auto index = plan.firstBinding + offset;
+        const auto index = plan.bindingIndices[offset];
         const auto &binding = endpoint.profile.bindings[index];
         const auto context = endpoint.profile.schema.recordContext(binding.localId);
 

@@ -141,3 +141,5 @@ SIGPIPE изменяется на POSIX только пока живы выво�
 семантику ОС. См. [полный контракт ожидания и обработки сигналов](../../spec/subscriptions/FEED-WAITS.ru.md).
 CLI создаёт один application signal-reader thread помимо SDK worker; оба
 завершаются до уничтожения runtime bootstrap.
+
+Для owning Trade используйте тот же endpoint и createSubscription<events::Trade>() с getPrice()/getSizeAsDouble(); [короткий пример](../../docs/FEED-API.ru.md) использует SDK progress без клиентского polling. Built-in Trade composite; региональная запись требует явного registry, см. [Trade](../../spec/events/TRADE.ru.md). Этот console executable сохраняет Quote output; публичное live-подключение не подменяет deterministic installed-consumer checks.

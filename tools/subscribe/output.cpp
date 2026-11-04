@@ -10,8 +10,8 @@
 namespace org::ttldtor::qdcxx::connect {
 namespace {
 constexpr std::string_view HEX_DIGITS = "0123456789ABCDEF"; ///< Exact locale-independent uppercase alphabet.
-constexpr events::MappingLimits MAPPING_LIMITS{128, 256, 32,    64,
-                                               64,  128, 16384, 1000000}; ///< Finite prepared mapping work.
+constexpr events::MappingLimits MAPPING_LIMITS{
+    128, 256, 32, 64, 128, 128, 16384, 1000000}; ///< Finite work including declared type alternatives.
 
 /** Copy within the same finite application schema profile before output traversal.
  * @param schema Immutable source with preserved provenance.

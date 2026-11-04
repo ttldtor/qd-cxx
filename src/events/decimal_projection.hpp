@@ -15,7 +15,7 @@
 namespace org::ttldtor::qdcxx::events::detail {
 
 /** Select a source business snapshot only while the associated public raw decimal is unchanged.
- * @tparam Count Fixed number of numeric fields, four for Quote and ten for Profile.
+ * @tparam Count Fixed number of numeric fields, four for Quote, ten for Profile and five for Trade.
  * @param value Current public decimal value, including manual raw edits.
  * @param snapshots Optional inline owning projection state; no source data is borrowed.
  * @param index Valid constant numeric property index smaller than Count.

@@ -70,7 +70,7 @@ TEST_CASE("routing exactly matches actual production delegate-set regional selec
         std::size_t matches = 0;
 
         for (std::size_t offset = 0; offset < plan.bindingCount; ++offset) {
-            const auto index = plan.firstBinding + offset;
+            const auto index = plan.bindingIndices[offset];
 
             if (detail::receivingSymbolMatches(selected, index, symbols[0])) {
                 const auto id = selected.bindings[index].localId;
@@ -102,8 +102,10 @@ TEST_CASE("routing workspace is separate finite storage with an attainable exact
     const auto corpus = f::read(fixture);
     auto selected = profile(corpus.at("millis"), true);
     const auto &limits = selected.routing;
-    CHECK(limits.retainedMetadataBytes == sizeof(selected.bindingExchanges));
-    CHECK(limits.retainedMetadataBytes == 32);
+    CHECK(limits.retainedMetadataBytes ==
+          sizeof(selected.bindingExchanges) + sizeof(selected.eventPlans) +
+              sizeof(std::array<q::client::PreparedSubscriptionBinding, detail::MAXIMUM_RECEIVING_RECORDS>));
+    CHECK(sizeof(selected.bindingExchanges) == 32);
     CHECK(limits.symbols == 5);
     CHECK(limits.temporaryTextUnits == 2 * 5 * 128);
     CHECK(limits.temporaryBytes >= 5 * sizeof(detail::ReceivingSymbol));

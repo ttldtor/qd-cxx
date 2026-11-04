@@ -6,6 +6,7 @@
 #include "qd/client/endpoint_options.hpp"
 #include "qd/events/profile.hpp"
 #include "qd/events/quote.hpp"
+#include "qd/events/trade.hpp"
 #include "qd/transport/tcp_runtime.hpp"
 
 #include <chrono>
@@ -108,7 +109,8 @@ struct EndpointOptions {
     std::chrono::milliseconds retryDelay{250};    ///< Delay between finite fresh recovery attempts.
     std::chrono::milliseconds drainTimeout{1000}; ///< Local admitted-prefix retirement allowance.
     std::uint32_t maximumAttempts = 3;            ///< Total connection attempts, including the initial attempt.
-    std::optional<EventRegistry> eventRegistry; ///< Immutable owning snapshot; absence selects built-in Quote/Profile.
+    std::optional<EventRegistry>
+        eventRegistry; ///< Immutable owning snapshot; absence selects built-in Quote/Profile/Trade.
 };
 
 /** Last SDK-worker observation, never an upstream acknowledgement or a whole-network guarantee. */
@@ -159,16 +161,16 @@ class Endpoint;
 class Feed;
 
 /** Independently owning supported event value; inspect its actual class with std::visit or std::get_if. */
-using RegisteredEvent = std::variant<events::Quote, events::Profile>;
+using RegisteredEvent = std::variant<events::Quote, events::Profile, events::Trade>;
 
 /** Typed logical subscription, backed by the existing receiver and shared queue.
  * Methods are producer-safe. Event-listener calls are serialized on the runtime's SDK worker.
  * A listener's span lasts only through that invocation; copying an Event produces an owning value.
- * @tparam Event Existing events::Quote, events::Profile or the owning RegisteredEvent variant.
+ * @tparam Event Existing events::Quote, events::Profile, events::Trade or the owning RegisteredEvent variant.
  */
 template <class Event> class Subscription final {
     static_assert(std::is_same_v<Event, events::Quote> || std::is_same_v<Event, events::Profile> ||
-                  std::is_same_v<Event, RegisteredEvent>);
+                  std::is_same_v<Event, events::Trade> || std::is_same_v<Event, RegisteredEvent>);
     std::shared_ptr<detail::SubscriptionPort> port_;
     friend class Feed;
     explicit Subscription(std::shared_ptr<detail::SubscriptionPort> port) noexcept;
@@ -216,13 +218,13 @@ template <class Event> class Subscription final {
     void removeEventListener(ListenerId id);
     /** Accept an exact selector; application return is not a wire acknowledgement.
      * @param symbol Nonempty printable ASCII, within runtime limits, without All/wildcard syntax.
-     * @throws Error INVALID_ARGUMENT at subscription-symbol-representation if a selected regional Quote route
+     * @throws Error INVALID_ARGUMENT at subscription-symbol-representation if a selected regional Quote/Trade route
      * cannot restore this exact spelling; no part of the desired mutation is published.
      */
     void addSymbols(std::string_view symbol);
     /** Atomically accept several exact selectors, with duplicates coalesced.
      * @param symbols Complete bounded set to add.
-     * @throws Error INVALID_ARGUMENT if any selected regional Quote symbol is not exactly representable;
+     * @throws Error INVALID_ARGUMENT if any selected regional Quote/Trade symbol is not exactly representable;
      * the whole batch is refused at subscription-symbol-representation.
      */
     void addSymbols(std::initializer_list<std::string_view> symbols);
@@ -268,6 +270,7 @@ template <class Event> class Subscription final {
 
 extern template class Subscription<events::Quote>;
 extern template class Subscription<events::Profile>;
+extern template class Subscription<events::Trade>;
 extern template class Subscription<RegisteredEvent>;
 
 /** Endpoint's typed registration entry point; owns no SDK thread or bootstrap. */
@@ -291,14 +294,17 @@ class Feed final {
     public:
     /** Create a bounded logical registration, before or after connect, without application polling.
      * All registered records of the selected type participate; an unregistered type rejects synchronously.
-     * @tparam Event Existing Quote or Profile, explicitly registered for this endpoint or provided by its defaults.
+     * @tparam Event Existing Quote, Profile or Trade, explicitly registered for this endpoint or provided by its
+     * defaults.
      * @return Producer handle; native preparation failures are observed asynchronously by its diagnostic.
      */
     template <class Event> [[nodiscard]] std::shared_ptr<Subscription<Event>> createSubscription() {
-        static_assert(std::is_same_v<Event, events::Quote> || std::is_same_v<Event, events::Profile>);
+        static_assert(std::is_same_v<Event, events::Quote> || std::is_same_v<Event, events::Profile> ||
+                      std::is_same_v<Event, events::Trade>);
         auto subscription = std::shared_ptr<Subscription<Event>>(new Subscription<Event>({}));
-        subscription->port_ =
-            createSubscriptionPort(std::is_same_v<Event, events::Quote> ? EventType::QUOTE : EventType::PROFILE);
+        subscription->port_ = createSubscriptionPort(std::is_same_v<Event, events::Quote>     ? EventType::QUOTE
+                                                     : std::is_same_v<Event, events::Profile> ? EventType::PROFILE
+                                                                                              : EventType::TRADE);
 
         return subscription;
     }
@@ -308,7 +314,7 @@ class Feed final {
      * reject INVALID_ARGUMENT.
      * Duplicates coalesce. Closed admission precedes missing registered types and logical-slot checks.
      * Every requested type must be registered; refusal opens no native/producer registration.
-     * @param types Caller-owned bounded type list, borrowed only during this call; Quote/Profile are supported.
+     * @param types Caller-owned bounded type list, borrowed only during this call; Quote/Profile/Trade are supported.
      * @return One variant-valued producer handle; throws Error on atomic validation/resource refusal.
      */
     [[nodiscard]] std::shared_ptr<Subscription<RegisteredEvent>> createSubscription(std::span<const EventType> types);
@@ -445,8 +451,8 @@ class ApiRuntime final {
     ApiRuntime &operator=(const ApiRuntime &) = delete;
     ApiRuntime(ApiRuntime &&) = delete;
     ApiRuntime &operator=(ApiRuntime &&) = delete;
-    /** Create an independent producer endpoint with its immutable registry or built-in full Quote/Profile defaults.
-     * Failed wrapper/control allocation rolls back its reservation without publishing an active endpoint.
+    /** Create an independent producer endpoint with its immutable registry or built-in full Quote/Profile/Trade
+     * defaults. Failed wrapper/control allocation rolls back its reservation without publishing an active endpoint.
      * Producer dispatch uses a lifetime-gated detached control port, never an unprotected RuntimeImpl*.
      * @param options Existing policy/deadlines and optional immutable registry; finite capacities use RuntimeOptions.
      * @return Endpoint facade; no socket is opened and no listener is called inline.

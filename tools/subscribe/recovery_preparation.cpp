@@ -65,15 +65,15 @@ constexpr std::size_t WRITER_CONFIGURATION_BYTES = 4 * MEBIBYTE; ///< Retained w
 constexpr std::size_t EPOCH_LABEL_BYTES = MEBIBYTE;       ///< Separate fixed app presentation token-array ceiling.
 constexpr std::size_t DNS_ENVELOPE_BYTES = 80 * MEBIBYTE; ///< Initial per-channel logical SDK reservation.
 constexpr std::uint64_t DNS_PROGRESS_UNITS = 351280142190671838ULL; ///< Pinned complete DNS logical progress charge.
-constexpr std::size_t DNS_TURN_PACKETS = 10000;          ///< Distinct resolver callback/datagram turn allowance.
-constexpr std::size_t DNS_TURN_BYTES = 10000000;         ///< Distinct DNS logical byte work, not reserved storage.
-constexpr std::size_t UTF16_COPY_PADDING = 8;            ///< Qualified fresh-copy SSO/terminator envelope per string.
-constexpr std::size_t ASCII_COPY_PADDING = 16;           ///< Qualified fresh ASCII SSO/terminator envelope.
-constexpr std::size_t SCHEMA_COPY_PEAK = 3;              ///< Endpoint, fresh composer and live-session schema coexist.
-constexpr std::size_t ENDPOINT_TEXT_COPY_PEAK = 2;       ///< Temporary settings and immutable state text coexist.
-constexpr std::size_t MAPPING_SELECTIONS = 32;           ///< Existing Quote/Profile request-selection allowance.
-constexpr std::size_t MAPPING_KEYS = 64;                 ///< Existing complete request-key allowance.
-constexpr std::size_t MAPPING_TYPE_ALTERNATIVES = 64;    ///< Existing complete exact-type request allowance.
+constexpr std::size_t DNS_TURN_PACKETS = 10000;        ///< Distinct resolver callback/datagram turn allowance.
+constexpr std::size_t DNS_TURN_BYTES = 10000000;       ///< Distinct DNS logical byte work, not reserved storage.
+constexpr std::size_t UTF16_COPY_PADDING = 8;          ///< Qualified fresh-copy SSO/terminator envelope per string.
+constexpr std::size_t ASCII_COPY_PADDING = 16;         ///< Qualified fresh ASCII SSO/terminator envelope.
+constexpr std::size_t SCHEMA_COPY_PEAK = 3;            ///< Endpoint, fresh composer and live-session schema coexist.
+constexpr std::size_t ENDPOINT_TEXT_COPY_PEAK = 2;     ///< Temporary settings and immutable state text coexist.
+constexpr std::size_t MAPPING_SELECTIONS = 32;         ///< Existing Quote/Profile request-selection allowance.
+constexpr std::size_t MAPPING_KEYS = 64;               ///< Existing complete request-key allowance.
+constexpr std::size_t MAPPING_TYPE_ALTERNATIVES = 128; ///< Covers Quote72/Profile108 declared exact-type alternatives.
 constexpr std::size_t MAPPING_REQUEST_NAME_UNITS = 4096; ///< Additional fixed request-key text allowance.
 
 struct Refusal {

@@ -15,13 +15,21 @@
 
 namespace org::ttldtor::qdcxx::api::detail {
 inline constexpr std::size_t MAXIMUM_RECEIVING_RECORDS = 16; ///< Existing complete receiving catalog ceiling.
+inline constexpr std::size_t RECEIVING_EVENT_KINDS = 3;      ///< Quote, Profile and Trade, without neighboring events.
+inline constexpr std::size_t RECEIVING_EVENT_SELECTIONS = (1U << RECEIVING_EVENT_KINDS) - 1;
+
+///< Every nonempty finite selection; no dynamic type registry or catalog expansion.
+
+/** Conservative stack initialization plus complete metadata read/write work; no dynamic allocation. */
+inline constexpr std::size_t RECEIVING_BINDING_COPY_WORK =
+    3 * sizeof(std::array<client::PreparedSubscriptionBinding, MAXIMUM_RECEIVING_RECORDS>);
 
 /** One temporary logical selector and at most one physical regional copy, never shared with a callback. */
 struct ReceivingSymbol {
-    std::u16string logical;         ///< Owned immutable frontend snapshot, kept through synchronous desired submission.
-    std::u16string physical;        ///< Owned suffix-free text, shared by matching regional routes of this selector.
-    char16_t exchange = 0;          ///< Syntactic logical exchange, preserving trailing attributes.
-    std::array<bool, 2> regional{}; ///< Exact regional match per Quote/Profile kind within this selection.
+    std::u16string logical;  ///< Owned immutable frontend snapshot, kept through synchronous desired submission.
+    std::u16string physical; ///< Owned suffix-free text, shared by matching regional routes of this selector.
+    char16_t exchange = 0;   ///< Syntactic logical exchange, preserving trailing attributes.
+    std::array<bool, RECEIVING_EVENT_KINDS> regional{}; ///< Exact regional match per business kind.
 };
 
 /** Separate finite reservation for desired routing temporaries, excluding frontend and queue-owned storage. */
@@ -35,7 +43,8 @@ struct ReceivingRoutingLimits {
 
 /** Complete independently bounded plan for every registered record in one supported type selection. */
 struct ReceivingEventPlan {
-    std::size_t firstBinding = 0;                    ///< First route in ReceivingProfile::bindings.
+    std::array<std::size_t, MAXIMUM_RECEIVING_RECORDS> bindingIndices{};
+    ///< Exact selected indices in the unique immutable binding catalog, including nonconsecutive mixed kinds.
     std::size_t bindingCount = 0;                    ///< Number of consecutive routes in this type selection.
     client::ReceiverLimits limits{};                 ///< Aggregate complete immutable receiver plan allowance.
     client::ReceiverWork work{};                     ///< Aggregate per-registration preparation seed.
@@ -55,12 +64,12 @@ struct ReceivingProfile {
     collectors::TickerLimits tickerLimits;           ///< Existing shared cache and independent desired views.
     std::vector<client::PreparedSubscriptionBinding> bindings; ///< Explicit routes grouped by business type.
     std::array<char16_t, MAXIMUM_RECEIVING_RECORDS> bindingExchanges{};
-    ///< Exact aligned Quote record suffixes; fixed backing is included in sizeof(ReceivingProfile).
+    ///< Exact aligned Quote/Trade record suffixes; fixed backing is included in sizeof(ReceivingProfile).
     ReceivingRoutingLimits routing; ///< Explicit additional routing workspace and pre-allocation work charge.
-    std::array<ReceivingEventPlan, 2> eventPlans; ///< Aggregate Quote/Profile plans, independent of record IDs.
-    ReceivingEventPlan allEvents;    ///< Aggregate plan for one logical selection of both supported event kinds.
-    mux::QueueSubmitWork submitWork; ///< One whole desired replacement admission.
-    mux::QueueWork queueWork;        ///< Identical initialization, normal and drain coordinates.
+    std::array<ReceivingEventPlan, RECEIVING_EVENT_SELECTIONS> eventPlans;
+    ///< Prepaid bounded plans for each nonempty supported type mask, independent of record IDs.
+    mux::QueueSubmitWork submitWork;                    ///< One whole desired replacement admission.
+    mux::QueueWork queueWork;                           ///< Identical initialization, normal and drain coordinates.
     transport::RecoveryPreparationWork preparationWork; ///< Original recovery/writer/queue preparation seed.
     transport::RecoveryTurnWork turnWork;               ///< Identical normal and drain owner-turn coordinates.
 
@@ -87,6 +96,17 @@ struct ReceivingProfile {
  * @return Borrowed complete per-type plan; throws a detached unsupported-profile error for an unknown type.
  */
 [[nodiscard]] const ReceivingEventPlan &receivingEventPlan(const ReceivingProfile &profile, EventSelection selection);
+
+/** Prepay and copy selected immutable binding metadata into finite caller stack backing.
+ * @param profile Valid complete immutable binding catalog.
+ * @param plan Valid mask plan belonging to that catalog.
+ * @param output Exactly MAXIMUM_RECEIVING_RECORDS slots; only the selected prefix is written.
+ * @param work Receiver construction credits, debited once for attempted successful copying.
+ * @return False before changing output or credits if shape or finite funding is insufficient.
+ */
+[[nodiscard]] bool copyReceivingBindings(const ReceivingProfile &profile, const ReceivingEventPlan &plan,
+                                         std::span<client::PreparedSubscriptionBinding> output,
+                                         client::ReceiverWork &work) noexcept;
 
 /** Debit the complete conservative routing workspace before snapshot allocation or publication.
  * @param profile Immutable checked capacities and additional routing allowance.

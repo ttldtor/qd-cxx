@@ -71,6 +71,8 @@ The fixed input profile permits at most 16 schema records, 128 logical fields, 2
 mappings and profile excess reject before activation. Live data can exhaust fixed queues/caches;
 this is a visible failure without hidden budget growth. Numeric routes bypass DNS; named routes
 require an explicit resolver and use the documented extra 80 MiB logical requested-payload reserve.
+Both legacy and recovery typed output allow 128 declared exact-type alternatives in their finite
+preparation profile; the complete current Quote and Profile mappings require 72 and 108 respectively.
 
 ## Schemas, TLS and output
 

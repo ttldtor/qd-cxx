@@ -666,3 +666,9 @@ tests/fixtures/price_increments/*.tsv -text -whitespace
 tests/fixtures/price_increments/*.json text eol=lf
 tools/upstream/price-increments-oracle/*.java text eol=lf
 tools/upstream/price-increments-oracle/*.ps1 text eol=lf
+
+# Preserve exact Trade oracle bytes and canonical provenance bindings.
+tools/upstream/trade-oracle/*.java text eol=lf
+tools/upstream/trade-oracle/*.ps1 text eol=lf
+tests/fixtures/trade/oracle.tsv -text -whitespace
+tests/fixtures/trade/provenance.json text eol=lf

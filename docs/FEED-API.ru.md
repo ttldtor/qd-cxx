@@ -3,13 +3,13 @@
 [English version](FEED-API.md) · [Практические руководства](guides.ru.md) · [Справочник API](api.ru.md)
 
 Подключите `qd/api/feed.hpp` и линкуйте `qdcxx_feed`, чтобы получать типизированные
-`events::Quote` и `events::Profile` через рабочий поток библиотеки. Приложение создаёт
+`events::Quote`, `events::Profile` и `events::Trade` через рабочий поток библиотеки. Приложение создаёт
 endpoint, обработчики и подписки на точные символы; библиотека продвигает соединение,
 конечные переподключения, очереди и доставку. Подписки можно создавать до и после
 `connect()`.
 
-Поддержан обычный бинарный QTP поверх TCP со встроенными полными схемами Quote/Profile
-либо явными валидированными схемами вызывающего кода и зарегистрированными mappings Quote/Profile.
+Поддержан обычный бинарный QTP поверх TCP со встроенными полными схемами Quote/Profile/Trade
+либо явными валидированными схемами вызывающего кода и зарегистрированными mappings Quote/Profile/Trade.
 Endpoint выбирает TICKER (по умолчанию: последние значения с возможным объединением
 обновлений) или STREAM (каждая принятая выбранная запись источника). TLS, credentials,
 HISTORY и wildcard-селекторы в этот API не входят. Загрузка схем является отдельной задачей.
@@ -87,6 +87,31 @@ int main() {
 `EndpointOptions::contract = DeliveryContract::STREAM` перед `createEndpoint(options)`.
 Выбранный контракт доставки действует для всех подписок этого endpoint.
 
+## Получить Trade
+
+Built-in registry добавляет composite Trade2, сохраняя Quote0/Profile1. Используйте owning
+`events::Trade` с Java business getters; LONG может отличаться от wide-to-double на1ULP.
+Для реального regional Trade&Q передайте явный экспортированный registry с соответствующим
+`EventType::TRADE`. Selector AAPL&Q тогда отправляется как physical(Trade&Q,AAPL); простого
+переименования символа после generic decoding недостаточно. Полные fields/types/defaults, flags,
+packed time и явная граница однослотового TradeId описаны в [Trade](../spec/events/TRADE.ru.md).
+
+```cpp
+auto trades = endpoint->getFeed()->createSubscription<q::events::Trade>();
+trades->addEventListener([](std::span<const q::events::Trade> batch) {
+    for (const auto &trade : batch) {
+        std::cout << trade.getTime() << ' ' << trade.getPrice() << ' '
+                  << trade.getSizeAsDouble() << '\n';
+    }
+});
+trades->addSymbols({"AAPL"});
+```
+
+Runtime/endpoint прогрессируют через SDK; клиент не опрашивает queue или work budgets. Копия Trade
+владеет символом и inline snapshot, callback span действует только во время вызова. TradeETH/Summary
+ещё не являются поддерживаемыми typed events. Все семь непустых наборов Quote/Profile/Trade можно
+выбирать mixed-подпиской; предел полной receiving-схемы16 records сохраняется.
+
 ## Явный реестр событий
 
 Для значений по умолчанию настраивать реестр не требуется. Для валидированной
@@ -128,7 +153,7 @@ Endpoint копирует неизменяемый владеющий снимо
 до native activation; усечения нет. См. полный
 [контракт владения, ошибок и пределов реестра](../spec/events/EVENT-REGISTRY.ru.md).
 
-Подготовленные Quote/Profile используют исчерпывающие
+Подготовленные Quote/Profile/Trade используют исчерпывающие
 [правила преобразования полей](../spec/events/FIELD-CONVERSIONS.ru.md): допустимые числа
 сохраняют WideDecimal поля и предоставляют прямые Java business getters вроде
 `quote.getBidPrice()`/`profile.getBeta()` без LONG-to-wide округления. Raw int свойства сохраняют Java physical-slot поведение,
@@ -152,7 +177,7 @@ Composite и regional interests различаются в смешанной п�
 изменение, прежний desired set сохраняется. Composite fallback оставляет эти буквальные
 символы без изменений. Обычная форма с атрибутами `AAPL&Q{x=y}` представима.
 
-Встроенный registry сохраняет composite Quote/Profile. Этот путь через явный ограниченный
+Встроенный registry сохраняет composite Quote/Profile/Trade. Этот путь через явный ограниченный
 registry не загружает полный региональный каталог и не реализует более широкие selectors.
 [Контракт времени и вариантов](../spec/events/EVENT-TIME.ru.md) задаёт необязательные
 Sequence/nanoseconds, секунды/миллисекунды Quote, halt-секунды Profile, независимые метаданные
@@ -189,7 +214,7 @@ mixed->addSymbols({"AAPL", "IBM"});
 enum даёт `INVALID_ARGUMENT`; отсутствие поддержанного типа в реестре endpoint —
 `UNSUPPORTED_PROFILE`, без публикации подписки.
 
-`RegisteredEvent` — владеющий `std::variant<events::Quote, events::Profile>`.
+`RegisteredEvent` — владеющий `std::variant<events::Quote, events::Profile, events::Trade>`.
 Скопируйте значение, чтобы сохранить его после callback span. Конкретные и смешанные
 подписки могут независимо перекрываться; закрытие одной отзывает только её оставшиеся
 исключительные interests. Границы callback batch следуют очереди; один batch может
@@ -350,7 +375,7 @@ endpoint. Лимиты учитывают ожидающие, активные �
 | Endpoint option | По умолчанию |
 | --- | --- |
 | `contract` | `TICKER` |
-| `eventRegistry` | Отсутствует: встроенные Quote0/Profile1; явное значение копируется как неизменяемый снимок |
+| `eventRegistry` | Отсутствует: встроенные Quote0/Profile1/Trade2; явное значение копируется как неизменяемый снимок |
 | `connectTimeout`, `dnsTimeout`, `writeTimeout` | По 5000 мс |
 | `readTimeout` | 30000 мс |
 | `pollInterval` | 1 мс |

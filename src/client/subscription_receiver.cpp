@@ -67,7 +67,8 @@ std::size_t preparationAllowance(events::MappingLimits limits) {
  * @return Whether the mapper and timestamp policy are known.
  */
 bool validBinding(const PreparedSubscriptionBinding &binding) noexcept {
-    return (binding.kind == PreparedEventKind::QUOTE || binding.kind == PreparedEventKind::PROFILE) &&
+    return (binding.kind == PreparedEventKind::QUOTE || binding.kind == PreparedEventKind::PROFILE ||
+            binding.kind == PreparedEventKind::TRADE) &&
            (binding.eventTimePolicy == ReceiverEventTimePolicy::UNSPECIFIED ||
             binding.eventTimePolicy == ReceiverEventTimePolicy::FIELD_METADATA);
 }
@@ -77,10 +78,11 @@ namespace detail {
 /** One independently owned immutable mapper and its explicit projection bounds. */
 struct ReceiverRoute {
     core::RecordContext context; ///< Retained exact origin/record identity, without declaration names.
-    std::variant<events::PreparedQuote, events::PreparedProfile> mapping; ///< Existing owned immutable mapper.
-    events::EventValueLimits valueLimits;                                 ///< Per-result owned text bounds.
-    ReceiverEventTimePolicy timePolicy;                                   ///< Explicit optional timestamp source.
-    std::size_t shapeFields;     ///< Complete shape inspection allowance, including unselected extra fields.
+    std::variant<events::PreparedQuote, events::PreparedProfile, events::PreparedTrade>
+        mapping;                          ///< Existing owned immutable mapper.
+    events::EventValueLimits valueLimits; ///< Per-result owned text bounds.
+    ReceiverEventTimePolicy timePolicy;   ///< Explicit optional timestamp source.
+    std::size_t shapeFields;              ///< Complete shape inspection allowance, including unselected extra fields.
     std::size_t selectionVisits; ///< Declared mapper selection allowance, including absent optional properties.
 };
 
@@ -144,7 +146,7 @@ SubscriptionBatch::project(std::size_t index, ReceiverProjectionWork &work) cons
             if (!route.context.matches(record.context))
                 continue;
 
-            const bool quote = std::holds_alternative<events::PreparedQuote>(route.mapping);
+            const bool quote = !std::holds_alternative<events::PreparedProfile>(route.mapping);
             const auto units = quote ? std::min(route.valueLimits.symbolUnits, route.valueLimits.totalUnits)
                                      : route.valueLimits.totalUnits;
             // Each owned string may need a terminator; this is logical copy work, not allocator overhead.
@@ -165,6 +167,16 @@ SubscriptionBatch::project(std::size_t index, ReceiverProjectionWork &work) cons
                 eventTime = record.source->fieldTime->eventTimeMs();
 
             const events::BorrowedRecordValueView values{record.context, record.typedValues};
+
+            if (std::holds_alternative<events::PreparedTrade>(route.mapping)) {
+                auto mapped = std::get<events::PreparedTrade>(route.mapping)
+                                  .mapView(record.symbol, values, units, eventTime.value_or(0));
+
+                if (!mapped)
+                    return std::unexpected(ReceiverProjectionFailure{mapped.error()});
+
+                return SubscriptionProjection{std::move(*mapped), eventTime};
+            }
 
             if (quote) {
                 auto mapped = std::get<events::PreparedQuote>(route.mapping)
@@ -249,6 +261,14 @@ openSubscriptionReceiver(mux::MuxQueue &queue, const core::LocalSchema &schema, 
 
             if (binding.kind == PreparedEventKind::QUOTE) {
                 auto prepared = events::PreparedQuote::prepare(schema, binding.localId, binding.mappingLimits);
+
+                if (!prepared)
+                    return std::unexpected(ReceiverFailure{prepared.error(), i});
+
+                plan.routes.push_back({schema.recordContext(binding.localId), std::move(*prepared), binding.valueLimits,
+                                       binding.eventTimePolicy, fields, binding.mappingLimits.selections});
+            } else if (binding.kind == PreparedEventKind::TRADE) {
+                auto prepared = events::PreparedTrade::prepare(schema, binding.localId, binding.mappingLimits);
 
                 if (!prepared)
                     return std::unexpected(ReceiverFailure{prepared.error(), i});

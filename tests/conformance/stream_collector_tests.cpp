@@ -1107,7 +1107,7 @@ TEST_CASE("STREAM full standard Quote capture retains all fields and provenance 
     REQUIRE(defaults->records()[0].fields.size() == 8);
     auto local = c::LocalSchema::create(defaults->records(), schemaBounds, c::LocalProfile::BINARY_FIELDS_V1);
     REQUIRE(local);
-    auto mapping = q::PreparedQuote::prepare(*local, 0, {128, 256, 32, 64, 64, 128, 16384, 1000000});
+    auto mapping = q::PreparedQuote::prepare(*local, 0, {128, 256, 32, 64, 128, 128, 16384, 1000000});
     REQUIRE(mapping);
     auto stream = collector(state(*local));
     const c::SubscriptionRequest request{{local->recordContext(0), u"IBM"}, {}};

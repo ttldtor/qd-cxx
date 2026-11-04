@@ -328,17 +328,20 @@ std::vector<std::byte> data(std::span<const Record> records, WireFamily family, 
 
 /** Decode the actual received exact subscription tuples, without treating composition as receipt.
  * @param bytes Complete frame payload after message identity.
- * @param expected Exact expected client symbol sequence.
+ * @param expected Exact client symbol sequence, or multiset when membership marks are supplied.
  * @param historyBound Actual expected raw bound for HISTORY ADD, absent for other commands.
  * @param recordId Exact expected client outgoing record identity, independent of the peer's sender identity.
  * @param recordIds Optional explicit client outgoing ID for each expected tuple; empty preserves recordId.
  * @param completed Complete tuples already validated in preceding frames of this one expected command.
+ * @param matched Optional complete group membership marks; empty preserves ordered matching.
  * @return True only for identical complete frame tuples; completed advances atomically on success.
  */
 bool exactSubscription(std::span<const std::byte> bytes, std::span<const std::u16string> expected,
                        std::optional<std::int64_t> historyBound, std::int32_t recordId,
-                       std::span<const std::int32_t> recordIds, std::size_t &completed) {
-    if (!recordIds.empty() && recordIds.size() != expected.size()) {
+                       std::span<const std::int32_t> recordIds, std::size_t &completed,
+                       std::span<unsigned char> matched = {}) {
+    if ((!recordIds.empty() && recordIds.size() != expected.size()) ||
+        (!matched.empty() && matched.size() != expected.size())) {
         return false;
     }
 
@@ -349,15 +352,29 @@ bool exactSubscription(std::span<const std::byte> bytes, std::span<const std::u1
         auto symbol = symbols.read(bytes);
 
         if (symbol.status != e::SymbolStatus::OK || index == expected.size() || symbol.value->eventFlags != 0 ||
-            symbol.value->units != expected[index]) {
+            (matched.empty() && symbol.value->units != expected[index])) {
             return false;
         }
 
         bytes = bytes.subspan(symbol.consumed);
         const auto id = e::readCompactInt(bytes);
 
-        if (id.status != e::Status::OK || id.value != (recordIds.empty() ? recordId : recordIds[index])) {
+        if (id.status != e::Status::OK ||
+            (matched.empty() && id.value != (recordIds.empty() ? recordId : recordIds[index]))) {
             return false;
+        }
+
+        std::size_t member = index;
+
+        if (!matched.empty()) {
+            member = 0;
+
+            while (member < expected.size() && (matched[member] || symbol.value->units != expected[member] ||
+                                                id.value != (recordIds.empty() ? recordId : recordIds[member])))
+                ++member;
+
+            if (member == expected.size())
+                return false;
         }
 
         bytes = bytes.subspan(id.consumed);
@@ -370,6 +387,9 @@ bool exactSubscription(std::span<const std::byte> bytes, std::span<const std::u1
 
             bytes = bytes.subspan(bound.consumed);
         }
+
+        if (!matched.empty())
+            matched[member] = 1;
 
         ++index;
     }
@@ -401,6 +421,9 @@ Peer::Peer(const core::LocalSchema &schema, std::span<const Record> records, std
       afterReconnect_(script.afterReconnect
                           ? data(*script.afterReconnect, wireFamily(script.family), script.canonicalSymbols)
                           : std::vector<std::byte>{}),
+      afterFinalRemove_(script.afterFinalRemove && !script.afterFinalRemove->empty()
+                            ? data(*script.afterFinalRemove, wireFamily(script.family), script.canonicalSymbols)
+                            : std::vector<std::byte>{}),
       expected_(expected.begin(), expected.end()), chunk_(chunk), mode_(mode), script_(std::move(script)),
       dataReleased_(!script_.waitForDataRelease) {
     require(chunk != 0);
@@ -427,6 +450,14 @@ Peer::Peer(const core::LocalSchema &schema, std::span<const Record> records, std
     if (script_.removeSequence) {
         for (const auto &command : *script_.removeSequence) {
             require(!command.symbols.empty() && command.symbols.size() == command.recordIds.size());
+        }
+    }
+
+    if (script_.afterFinalRemove) {
+        require(script_.removeSequence && !script_.removeSequence->empty());
+
+        for (const auto &record : *script_.afterFinalRemove) {
+            require(record.fieldTime.has_value() == script_.fieldMetadata);
         }
     }
 
@@ -486,6 +517,7 @@ void Peer::serve(std::stop_token stop) noexcept {
         std::size_t addTuples = 0;
         std::size_t removeTuples = 0;
         std::size_t removeSet = 0;
+        std::vector<unsigned char> removeMatches;
         const auto family = wireFamily(script_.family);
         p::FrameReader reader({8192, 8201});
 
@@ -556,6 +588,7 @@ void Peer::serve(std::stop_token stop) noexcept {
                         reconnected = true;
                         initialEnd = afterRemoveEnd = 0;
                         addTuples = removeTuples = removeSet = 0;
+                        removeMatches.clear();
                         reader.reset();
 
                         continue;
@@ -585,9 +618,18 @@ void Peer::serve(std::stop_token stop) noexcept {
                             }
 
                             auto &tuples = adding ? addTuples : removeTuples;
+                            std::span<unsigned char> matched;
+
+                            if (!adding && script_.removeSequence && (*script_.removeSequence)[removeSet].unordered) {
+                                if (removeMatches.empty())
+                                    removeMatches.resize(expected.size());
+
+                                matched = removeMatches;
+                            }
+
                             require(exactSubscription(next.frame->payload, expected,
                                                       adding ? script_.historyBound : std::nullopt,
-                                                      script_.subscriptionRecordId, expectedIds, tuples));
+                                                      script_.subscriptionRecordId, expectedIds, tuples, matched));
 
                             if (tuples != expected.size()) {
                                 continue;
@@ -601,12 +643,16 @@ void Peer::serve(std::stop_token stop) noexcept {
                                 if (script_.removeSequence) {
                                     ++removeSet;
                                     removeTuples = 0;
+                                    removeMatches.clear();
                                 } else {
                                     require(removes_.load() == 0);
                                 }
 
                                 ++removes_;
-                                output.insert(output.end(), afterRemove_.begin(), afterRemove_.end());
+                                const bool finalResponse = script_.afterFinalRemove && script_.removeSequence &&
+                                                           removeSet == script_.removeSequence->size();
+                                const auto &response = finalResponse ? afterFinalRemove_ : afterRemove_;
+                                output.insert(output.end(), response.begin(), response.end());
                                 afterRemoveEnd = output.size();
                             }
                         }

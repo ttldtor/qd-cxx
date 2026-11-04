@@ -6,7 +6,7 @@
 
 `Feed::createSubscription(std::span<const EventType>)` и перегрузка с initializer-list
 возвращают одну `Subscription<RegisteredEvent>`. `RegisteredEvent` — это
-`std::variant<events::Quote, events::Profile>`. Существующие конкретные
+`std::variant<events::Quote, events::Profile, events::Trade>`. Существующие конкретные
 `createSubscription<events::Quote>()` и `createSubscription<events::Profile>()`
 сохраняют типы обработчиков и поведение.
 
@@ -23,7 +23,8 @@ ID не выбирают тип C++.
 `maximumEventTypeArgumentsPerSubscription` с инженерным значением по умолчанию 64.
 Она ограничивает число просмотренных элементов и работу, включая повторы, независимо
 от числа поддержанных типов. `{QUOTE, PROFILE, QUOTE}` принимается в этих пределах.
-То же значение остаётся осмысленным при добавлении типов. Сейчас поддержаны только
+То же значение остаётся осмысленным при добавлении типов.
+
 существующие QUOTE и PROFILE.
 
 Порядок проверок:
@@ -75,7 +76,7 @@ endpoint и runtime. Копии, удерживаемые приложением
 native reservations. При `S` максимальных подписках, `N` максимальных символах
 подписки и `R` маршрутах desired capacity подписки равна `N * max(1, R)`, endpoint —
 `S * N * max(1, R)`, с проверкой арифметики и соответствующими пределами symbol units.
-Поэтому встроенный реестр по умолчанию резервирует два возможных interest на символ.
+Поэтому встроенный реестр по умолчанию резервирует три возможных interest на символ.
 
 Полные mixed mapping limits, visits подготовки с проверкой повторов маршрутов и
 пределы callback projection суммируются до активации. Пределы receiving schema
@@ -91,6 +92,8 @@ native reservations. При `S` максимальных подписках, `N`
 создаёт и присоединяет одну подписку для массива классов.
 [DXFeedSubscription](https://github.com/devexperts/QD/blob/0ddc0a09779fb61d74cc0b37c6449ff47dcb715f/dxfeed-api/src/main/java/com/dxfeed/api/DXFeedSubscription.java)
 отклоняет пустой массив и хранит неизменяемый набор с объединёнными повторами.
-Владеющий native variant выражает типобезопасную доставку для двух существующих
+Владеющий native variant выражает типобезопасную доставку для трёх поддержанных
 prepared adapters; он не добавляет ABI произвольных классов приложения, reflection,
 wire messages, source families или schema loaders.
+
+Trade входит в RegisteredEvent и typed createSubscription<events::Trade>(). Все семь непустых Quote/Profile/Trade sets имеют отдельные finite plans; fixed16 indices позволяют выбирать непоследовательные kinds без лишних record routes. Региональный fallback Trade независим от Quote, см. [Trade](TRADE.ru.md). Прежние callback/ownership/error guarantees сохраняются.

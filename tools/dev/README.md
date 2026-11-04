@@ -2,6 +2,8 @@
 
 [Русская версия](README.ru.md). English is authoritative.
 
+The [Trade production oracle](../upstream/trade-oracle/README.md) observes composite/regional fields, raw slots, time/flags/defaults and direct business doubles. Noargs/ENRU/Get-Help starts no Java; Capture/Verify uses four explicit paths, finite subprocess limits and fresh private run directories.
+
 The [field conversion oracle](../upstream/field-conversion-oracle/README.md) captures/verifies
 actual numeric, physical-slot, nullable String and missing-field behavior. Noargs, EN/RU help
 and Get-Help require no operational inputs and start no Java process.

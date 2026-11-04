@@ -128,12 +128,27 @@ std::vector<protocol::OutgoingRecord> prepareBlueprint(const core::LocalSchema &
 /** Create an explicit finite multi-registration work seed from the existing qualified one-client profile.
  * Normal turns and drain use this same seed, with no retry-time top-up.
  * @param scale Simultaneous registration/selector reservation multiplier.
+ * @param interests Complete finite authoritative interest capacities.
+ * @param recordCount Actual retained schema record count used by MuxState queries.
+ * @param routeRecords Maximum records in one atomic STREAM routing chunk.
  * @return Independent finite queue/component work coordinates.
  */
-mux::QueueWork queueWork(std::size_t scale) {
+mux::QueueWork queueWork(std::size_t scale, const mux::MuxLimits &interests, std::size_t recordCount,
+                         std::size_t routeRecords) {
     const auto operations = multiply(scale, CONTROL_OPERATIONS);
     const auto visits = multiply(scale, CONTROL_VISITS);
     const auto bytes = multiply(scale, CONTROL_BYTES);
+    // MuxState::reserve(1) prepays every exact select before inspecting current demand. An atomic
+    // STREAM chunk selects each offered record for every client and cannot commit a partial fanout.
+    constexpr std::size_t QUERY_WORK_PASSES = 32;
+    constexpr std::size_t QUERY_FIXED_TERMS = 2; // One base visit plus the one query input.
+    const auto outer = add(add(add(add(QUERY_FIXED_TERMS, interests.clients), recordCount), interests.entries),
+                           interests.aggregateEntries);
+    const auto inner = add(interests.entries, QUERY_FIXED_TERMS);
+    const auto queryVisits = multiply(QUERY_WORK_PASSES, multiply(outer, inner));
+    const auto routeQueries = multiply(routeRecords, interests.clients);
+    const auto routeVisits = multiply(routeQueries, queryVisits);
+    const auto routeText = multiply(routeVisits, interests.symbolUnits);
 
     return {operations,
             visits,
@@ -142,7 +157,7 @@ mux::QueueWork queueWork(std::size_t scale) {
             bytes,
             multiply(scale, 10000),
             multiply(scale, 10000),
-            {operations, visits, visits, bytes},
+            {operations, add(visits, routeVisits), add(visits, routeText), bytes},
             {operations, visits, visits},
             {operations, visits, visits, bytes},
             {operations, visits, visits, bytes},
@@ -207,79 +222,63 @@ void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, s
     const events::EventValueLimits values{symbolUnits, FIELD_TEXT_UNITS, add(symbolUnits, 2 * FIELD_TEXT_UNITS)};
     profile.bindings.reserve(registry.registrations().size());
 
-    if (profile.bindings.capacity() > SCHEMA_LIMITS.records) {
+    if (profile.bindings.capacity() > SCHEMA_LIMITS.records)
         refuse(ErrorCode::RESOURCE_LIMIT, "profile-mapping-storage");
+
+    for (std::size_t kind = 0; kind < RECEIVING_EVENT_KINDS; ++kind) {
+        for (const auto &registration : registry.registrations()) {
+            if (static_cast<std::size_t>(registration.type) != kind)
+                continue;
+
+            const auto index = profile.bindings.size();
+            const auto &record = profile.schema.records()[static_cast<std::size_t>(registration.localRecordId)];
+            profile.bindingExchanges[index] =
+                registration.type == EventType::PROFILE ? 0 : events::market_symbols::getExchangeCode(record.name);
+            const auto policy = registration.eventTimePolicy == EventTimePolicy::FIELD_METADATA
+                                    ? client::ReceiverEventTimePolicy::FIELD_METADATA
+                                    : client::ReceiverEventTimePolicy::UNSPECIFIED;
+            profile.bindings.push_back({registration.localRecordId,
+                                        static_cast<client::PreparedEventKind>(registration.type),
+                                        registration.mappingLimits, values, policy});
+        }
     }
 
-    for (std::size_t kind = 0; kind < profile.eventPlans.size(); ++kind) {
-        const auto quote = kind == 0;
-        const auto type = quote ? EventType::QUOTE : EventType::PROFILE;
-        auto &plan = profile.eventPlans[kind];
-        plan.firstBinding = profile.bindings.size();
+    for (std::size_t mask = 1; mask <= RECEIVING_EVENT_SELECTIONS; ++mask) {
+        auto &plan = profile.eventPlans[mask - 1];
         plan.work.visits = 16;
+        // One bounded stack copy is made before the existing receiver factory consumes its normal credits.
+        plan.work.preparationWork = RECEIVING_BINDING_COPY_WORK;
 
-        for (const auto &registration : registry.registrations()) {
-            if (registration.type != type) {
+        for (std::size_t index = 0; index < profile.bindings.size(); ++index) {
+            const auto &binding = profile.bindings[index];
+
+            if (!selectsEvent(static_cast<EventSelection>(mask), static_cast<EventType>(binding.kind)))
                 continue;
-            }
 
-            const auto mapping = registration.mappingLimits;
+            const auto mapping = binding.mappingLimits;
             const auto preparation =
                 add(add(add(mapping.fields, mapping.lookups), add(mapping.selections, mapping.keys)),
                     add(add(mapping.typeAlternatives, mapping.nameUnits),
                         add(mapping.totalNameUnits, mapping.comparisonWork)));
-            const auto policy = registration.eventTimePolicy == EventTimePolicy::FIELD_METADATA
-                                    ? client::ReceiverEventTimePolicy::FIELD_METADATA
-                                    : client::ReceiverEventTimePolicy::UNSPECIFIED;
-            const auto &record = profile.schema.records()[static_cast<std::size_t>(registration.localRecordId)];
-            profile.bindingExchanges[profile.bindings.size()] =
-                quote ? events::market_symbols::getExchangeCode(record.name) : 0;
-            profile.bindings.push_back({registration.localRecordId,
-                                        quote ? client::PreparedEventKind::QUOTE : client::PreparedEventKind::PROFILE,
-                                        mapping, values, policy});
-            const auto fields =
-                profile.schema.records()[static_cast<std::size_t>(registration.localRecordId)].fields.size();
-            const auto units = quote ? values.symbolUnits : values.totalUnits;
-            const auto strings = quote ? std::size_t{1} : std::size_t{3};
+            const auto fields = profile.schema.records()[static_cast<std::size_t>(binding.localId)].fields.size();
+            const bool text = binding.kind == client::PreparedEventKind::PROFILE;
+            const auto units = text ? values.totalUnits : values.symbolUnits;
+            const auto strings = text ? std::size_t{3} : std::size_t{1};
             const auto bytes =
                 add(sizeof(client::SubscriptionProjection), multiply(add(units, strings), sizeof(char16_t)));
-            const client::ReceiverProjectionWork projection{
-                multiply(CALLBACK_RECORDS, add(fields, add(mapping.selections, 3))), multiply(CALLBACK_RECORDS, units),
-                multiply(CALLBACK_RECORDS, bytes)};
-            plan.bindingCount = add(plan.bindingCount, 1);
+            plan.bindingIndices[plan.bindingCount++] = index;
             plan.limits.bindings = plan.bindingCount;
             plan.limits.shapeFields = add(plan.limits.shapeFields, fields);
             plan.limits.selections = add(plan.limits.selections, mapping.selections);
             plan.work.preparationWork = add(plan.work.preparationWork, preparation);
-            plan.work.visits = add(plan.work.visits, add(plan.bindingCount, 1));
-            // Any callback can contain this route; summing bounds covers heterogeneous complete batches.
-            plan.projectionWork.visits = add(plan.projectionWork.visits, projection.visits);
-            plan.projectionWork.textUnits = add(plan.projectionWork.textUnits, projection.textUnits);
-            plan.projectionWork.bytes = add(plan.projectionWork.bytes, projection.bytes);
+            plan.work.visits = add(plan.work.visits, add(plan.bindingCount, 3));
+            plan.projectionWork.visits =
+                add(plan.projectionWork.visits, multiply(CALLBACK_RECORDS, add(fields, add(mapping.selections, 3))));
+            plan.projectionWork.textUnits = add(plan.projectionWork.textUnits, multiply(CALLBACK_RECORDS, units));
+            plan.projectionWork.bytes = add(plan.projectionWork.bytes, multiply(CALLBACK_RECORDS, bytes));
         }
 
-        // Each projection scans preceding routes even when its matching record is last in the plan.
         plan.projectionWork.visits = add(plan.projectionWork.visits, multiply(CALLBACK_RECORDS, plan.bindingCount));
-    }
-
-    auto &all = profile.allEvents;
-    all.firstBinding = 0;
-    all.bindingCount = profile.bindings.size();
-    all.limits.bindings = all.bindingCount;
-    all.work.visits = 16;
-
-    for (std::size_t index = 0; index < all.bindingCount; ++index) {
-        // One validation and one construction visit, plus every preceding-route duplicate inspection.
-        all.work.visits = add(all.work.visits, add(index, 2));
-    }
-
-    for (const auto &plan : profile.eventPlans) {
-        all.limits.shapeFields = add(all.limits.shapeFields, plan.limits.shapeFields);
-        all.limits.selections = add(all.limits.selections, plan.limits.selections);
-        all.work.preparationWork = add(all.work.preparationWork, plan.work.preparationWork);
-        all.projectionWork.visits = add(all.projectionWork.visits, plan.projectionWork.visits);
-        all.projectionWork.textUnits = add(all.projectionWork.textUnits, plan.projectionWork.textUnits);
-        all.projectionWork.bytes = add(all.projectionWork.bytes, plan.projectionWork.bytes);
     }
 }
 } // namespace
@@ -300,11 +299,11 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
     }
 
     auto schema = std::move(*copied);
-    std::array<std::size_t, 2> routes{};
+    std::array<std::size_t, RECEIVING_EVENT_KINDS> routes{};
     std::size_t maximumFields = 16;
 
     for (const auto &registration : selected.registrations()) {
-        const auto kind = registration.type == EventType::QUOTE ? std::size_t{0} : std::size_t{1};
+        const auto kind = static_cast<std::size_t>(registration.type);
         routes[kind] = add(routes[kind], 1);
     }
 
@@ -313,7 +312,7 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
     }
 
     // A mixed subscription may be created after connect; reserve the complete immutable registered selection.
-    const auto maximumRoutes = std::max(std::size_t{1}, add(routes[0], routes[1]));
+    const auto maximumRoutes = std::max(std::size_t{1}, add(add(routes[0], routes[1]), routes[2]));
     auto configured = client::controlledStreamSettings();
 
     if (!configured) {
@@ -420,13 +419,17 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
     routing.temporaryBytes = add(add(multiply(routing.symbols, sizeof(ReceivingSymbol)),
                                      multiply(subscriptionEntries, sizeof(core::SubscriptionRequest))),
                                  textBacking);
-    routing.retainedMetadataBytes = sizeof(result.bindingExchanges);
+    routing.retainedMetadataBytes =
+        add(sizeof(result.bindingExchanges),
+            add(sizeof(result.eventPlans),
+                sizeof(std::array<client::PreparedSubscriptionBinding, MAXIMUM_RECEIVING_RECORDS>)));
     // Snapshot copy, suffix/representability scans, physical conversion and conservative retirement.
     constexpr std::size_t ROUTING_TEXT_PASSES = 11;
     routing.work = {0, add(multiply(routing.symbols, add(multiply(2, maximumRoutes), 8)), maximumRoutes),
                     multiply(ROUTING_TEXT_PASSES, logicalUnits),
                     add(multiply(2, routing.temporaryBytes), routing.retainedMetadataBytes)};
-    result.queueWork = queueWork(scale);
+    result.queueWork =
+        queueWork(scale, result.interests, result.schema.records().size(), result.queueLimits.routeRecords);
     result.submitWork = {16, add(multiply(scale, CONTROL_VISITS), multiply(clients, routing.work.visits)),
                          add(multiply(scale, CONTROL_VISITS), multiply(clients, routing.work.textUnits)),
                          add(multiply(scale, CONTROL_BYTES), multiply(clients, routing.work.bytes))};
@@ -447,16 +450,34 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
 }
 
 const ReceivingEventPlan &receivingEventPlan(const ReceivingProfile &profile, EventSelection selection) {
-    switch (selection) {
-    case EventSelection::QUOTE:
-        return profile.eventPlans[0];
-    case EventSelection::PROFILE:
-        return profile.eventPlans[1];
-    case EventSelection::BOTH:
-        return profile.allEvents;
-    default:
+    const auto mask = static_cast<std::size_t>(selection);
+
+    if (!mask || mask > RECEIVING_EVENT_SELECTIONS)
         refuse(ErrorCode::UNSUPPORTED_PROFILE, "subscription-event-type");
+
+    return profile.eventPlans[mask - 1];
+}
+
+bool copyReceivingBindings(const ReceivingProfile &profile, const ReceivingEventPlan &plan,
+                           std::span<client::PreparedSubscriptionBinding> output, client::ReceiverWork &work) noexcept {
+    const auto visits = plan.bindingCount <= MAXIMUM_RECEIVING_RECORDS ? 2 * plan.bindingCount : 0;
+
+    if (output.size() != MAXIMUM_RECEIVING_RECORDS || plan.bindingCount > MAXIMUM_RECEIVING_RECORDS ||
+        work.visits < visits || work.preparationWork < RECEIVING_BINDING_COPY_WORK)
+        return false;
+
+    for (std::size_t index = 0; index < plan.bindingCount; ++index) {
+        if (plan.bindingIndices[index] >= profile.bindings.size())
+            return false;
     }
+
+    work.visits -= visits;
+    work.preparationWork -= RECEIVING_BINDING_COPY_WORK;
+
+    for (std::size_t index = 0; index < plan.bindingCount; ++index)
+        output[index] = profile.bindings[plan.bindingIndices[index]];
+
+    return true;
 }
 
 bool prepayReceivingRouting(const ReceivingProfile &profile, mux::QueueSubmitWork &work) noexcept {
@@ -500,7 +521,7 @@ void validateReceivingSymbol(const EventRegistry *registry, EventSelection selec
     const auto exchange = events::market_symbols::getExchangeCode(symbol);
 
     for (const auto &route : registry->registrations()) {
-        if (route.type != EventType::QUOTE) {
+        if (route.type == EventType::PROFILE || !selectsEvent(selection, route.type)) {
             continue;
         }
 
@@ -525,16 +546,18 @@ void prepareReceivingSymbols(const ReceivingProfile &profile, const ReceivingEve
         symbol.exchange = events::market_symbols::getExchangeCode(symbol.logical);
 
         for (std::size_t offset = 0; offset < plan.bindingCount; ++offset) {
-            const auto index = plan.firstBinding + offset;
+            const auto index = plan.bindingIndices[offset];
             const auto exchange = profile.bindingExchanges[index];
 
             if (exchange && exchange == symbol.exchange) {
-                const auto kind = profile.bindings[index].kind == client::PreparedEventKind::QUOTE ? 0U : 1U;
+                const auto kind = static_cast<std::size_t>(profile.bindings[index].kind);
                 symbol.regional[kind] = true;
             }
         }
 
-        if (symbol.regional[0] || symbol.regional[1]) {
+        if (std::ranges::any_of(symbol.regional, [](bool value) {
+                return value;
+            })) {
             if (!regionalSymbolRepresentable(symbol.logical)) {
                 refuse(ErrorCode::INVALID_ARGUMENT, "subscription-symbol-representation");
             }
@@ -546,7 +569,7 @@ void prepareReceivingSymbols(const ReceivingProfile &profile, const ReceivingEve
 
 bool receivingSymbolMatches(const ReceivingProfile &profile, std::size_t bindingIndex,
                             const ReceivingSymbol &symbol) noexcept {
-    const auto kind = profile.bindings[bindingIndex].kind == client::PreparedEventKind::QUOTE ? 0U : 1U;
+    const auto kind = static_cast<std::size_t>(profile.bindings[bindingIndex].kind);
     const auto exchange = profile.bindingExchanges[bindingIndex];
 
     return exchange ? exchange == symbol.exchange : !symbol.regional[kind];
