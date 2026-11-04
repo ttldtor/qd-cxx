@@ -6,3 +6,5 @@ Name records `ADR-NNNN-short-title.md`. Each record should include status, conte
 
 - [ADR-0007: IPF container interoperability](ADR-0007-ipf-container-interoperability.md) ([Русский](ADR-0007-ipf-container-interoperability.ru.md)).
 - [ADR-0008: Schedule and timezone data ownership](ADR-0008-schedule-timezone-data-ownership.md) ([Русский](ADR-0008-schedule-timezone-data-ownership.ru.md)).
+
+- [ADR-0010: Summary OpenInterest width](ADR-0010-summary-open-interest-width.md) ([Русский](ADR-0010-summary-open-interest-width.ru.md)).

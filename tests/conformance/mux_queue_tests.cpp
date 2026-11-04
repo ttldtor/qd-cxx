@@ -403,6 +403,22 @@ void until(Fixture &f, const std::function<bool()> &ready) {
     FAIL("bounded deterministic owner progress did not reach condition");
 }
 
+/** Stop at authoritative command completion before its later derived source synchronization.
+ * @param f Actual deterministic owner graph.
+ * @param ticket Accepted bounded command completion.
+ */
+void applyBeforeSourceSync(Fixture &f, m::MuxCommandTicket &ticket) {
+    for (unsigned attempt = 0; attempt < 1000 && !ticket.result(); ++attempt) {
+        auto work = turn();
+        work.operations = 1;
+        auto result = f.queue.progress(work);
+        REQUIRE((result || result.error().error == m::QueueError::WORK_LIMIT));
+    }
+
+    REQUIRE(ticket.result());
+    REQUIRE(ticket.result()->status == m::CommandStatus::APPLIED);
+}
+
 /** Apply desired interest and synchronize its actual view.
  * @param f Actual graph.
  * @param h Public registration.
@@ -1173,6 +1189,110 @@ TEST_CASE("MUX queue graceful prefix preserves TICKER and HISTORY projections ac
             CHECK(f.queue.resources().dataItems == 0);
         }
     }
+}
+
+TEST_CASE("MUX queue graceful TICKER empty applied desired drains pending source synchronization") {
+    auto f = fixture(c::SubscriptionFamily::TICKER);
+    auto consumer = std::make_shared<Recorder>();
+    auto handle = open(f, consumer);
+    add(f, handle);
+    send(f, {{0, u"ALPHA", 1, 10, 0}});
+    until(f, [&] {
+        return consumer->values.size() == 1;
+    });
+    auto submit = submitTurn();
+    auto ticket = handle.clear(submit);
+    REQUIRE(ticket);
+    applyBeforeSourceSync(f, *ticket);
+    REQUIRE(ticket->result()->changed);
+    REQUIRE(handle.state() == m::QueueClientState::SYNC_PENDING);
+    REQUIRE(f.queue.resources(handle));
+    REQUIRE(f.queue.resources(handle)->queuedRecords == 0);
+    f.queue.requestStop(m::StopMode::GRACEFUL);
+    until(f, [&] {
+        return f.queue.terminal().has_value();
+    });
+    const auto terminal = *f.queue.terminal();
+    CHECK(terminal.counts.callbackCompletedRecords == 1);
+    CHECK(terminal.counts.discarded == 0);
+    CHECK(terminal.outcome == m::TerminalOutcome::DRAINED);
+    CHECK_FALSE(terminal.hadGap);
+}
+
+TEST_CASE("MUX queue graceful TICKER nonempty initial synchronization preserves unread gap") {
+    auto f = fixture(c::SubscriptionFamily::TICKER);
+    auto keeperConsumer = std::make_shared<Recorder>();
+    auto keeper = open(f, keeperConsumer);
+    add(f, keeper);
+    send(f, {{0, u"ALPHA", 1, 10, 0}});
+    until(f, [&] {
+        return keeperConsumer->values.size() == 1;
+    });
+    auto consumer = std::make_shared<Recorder>();
+    auto handle = open(f, consumer);
+    const c::SubscriptionRequest wanted{{f.schema.recordContext(0), u"ALPHA"}, {}};
+    auto submit = submitTurn();
+    auto ticket = handle.add(std::span(&wanted, 1), submit);
+    REQUIRE(ticket);
+    applyBeforeSourceSync(f, *ticket);
+    REQUIRE(handle.state() == m::QueueClientState::SYNC_PENDING);
+    REQUIRE(consumer->values.empty());
+    f.queue.requestStop(m::StopMode::GRACEFUL);
+    until(f, [&] {
+        return f.queue.terminal().has_value();
+    });
+    const auto terminal = *f.queue.terminal();
+    CHECK(terminal.outcome == m::TerminalOutcome::ABORTED);
+    CHECK(terminal.hadGap);
+    CHECK(consumer->values.empty());
+}
+
+TEST_CASE("MUX queue graceful TICKER empty synchronization retries one below source operation grant") {
+    auto f = fixture(c::SubscriptionFamily::TICKER);
+    auto consumer = std::make_shared<Recorder>();
+    auto handle = open(f, consumer);
+    add(f, handle);
+    send(f, {{0, u"ALPHA", 1, 10, 0}});
+    until(f, [&] {
+        return consumer->values.size() == 1;
+    });
+    auto submit = submitTurn();
+    auto ticket = handle.clear(submit);
+    REQUIRE(ticket);
+    applyBeforeSourceSync(f, *ticket);
+    REQUIRE(handle.state() == m::QueueClientState::SYNC_PENDING);
+    f.queue.requestStop(m::StopMode::GRACEFUL);
+    bool blocked = false;
+
+    for (unsigned attempt = 0; attempt < 100 && !blocked; ++attempt) {
+        auto work = turn();
+        work.operations = 1;
+        work.ticker.operations = 0;
+        const auto result = f.queue.progress(work);
+
+        if (!result) {
+            REQUIRE(result.error().error == m::QueueError::WORK_LIMIT);
+            blocked = true;
+        }
+    }
+
+    REQUIRE(blocked);
+    CHECK(handle.state() == m::QueueClientState::SYNC_PENDING);
+    CHECK_FALSE(handle.terminal());
+    CHECK_FALSE(f.queue.terminal());
+    auto exact = turn();
+    exact.operations = 1;
+    exact.ticker.operations = 1;
+    const auto synchronized = f.queue.progress(exact);
+    REQUIRE(synchronized);
+    CHECK(exact.ticker.operations == 0);
+    CHECK(handle.state() == m::QueueClientState::CLOSING);
+    until(f, [&] {
+        return f.queue.terminal().has_value();
+    });
+    CHECK(f.queue.terminal()->outcome == m::TerminalOutcome::DRAINED);
+    CHECK_FALSE(f.queue.terminal()->hadGap);
+    CHECK(f.queue.terminal()->counts.discarded == 0);
 }
 
 TEST_CASE("MUX queue graceful prefix escalation accounts unrouted source separately from client copies") {

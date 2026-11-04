@@ -4,7 +4,7 @@
 
 This contract covers an owning `events::Trade`, `PreparedTrade`, registered composite and regional
 Trade records, typed `Subscription<Trade>` and mixed `RegisteredEvent` delivery.
-[TradeETH](TRADE-ETH.md) has its own separate supported type; Summary remains unsupported. Generic records remain available independently.
+[TradeETH](TRADE-ETH.md) has its own separate supported type; [Summary](SUMMARY.md) is a separate supported session snapshot. Generic records remain available independently.
 
 The reference is Java QD 3.355 at the revision in `upstream.lock`: `TradeBase`, `Trade`, generated
 `TradeMapping` and `TradeDelegate`, `MarketEventMapping`, `MarketEventDelegateSet` and `Direction`.
@@ -106,7 +106,7 @@ in implementation. Recognized trailing attributes are preserved by the existing 
 If no matching regional record is registered, the composite route retains the logical selector.
 
 Quote and Trade choose their regional fallback independently. Profile keeps its ordinary exact
-symbol route. All fifteen nonempty selections of Quote/Profile/Trade/TradeETH are finite immutable plans over
+symbol route. All thirty-one nonempty selections of Quote/Profile/Trade/TradeETH/Summary are finite immutable plans over
 at most16 unique bindings, including nonconsecutive type selections. Fixed plan index arrays and a
 temporary16-entry stack binding copy are included in retained/work accounting. Initialization plus
 metadata read/write work and both index-validation/copy visits are prepaid before copying; one-below

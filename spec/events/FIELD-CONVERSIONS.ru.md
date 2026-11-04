@@ -133,3 +133,8 @@ defaults через owned и borrowed mapping entry points. Точные гра�
 registry, provenance/complete-shape validation и конечное владение текстом сохраняют обязательность.
 Детерминированная wire delivery, installed/relocated package consumers и platform results —
 отдельные выполненные проверки; одна исходная таблица их не доказывает.
+
+Summary использует эти шесть numeric типов для business double и wide view. OpenInterest следует
+actual getAsLong, исправляя доказанную потерю delegate по [ADR-0010](../../docs/decisions/ADR-0010-summary-open-interest-width.ru.md).
+LONG/WIDE не используют double intermediate; физическая ширина INT сохраняется. См. [Summary](SUMMARY.ru.md).
+Промежуточный business double→int меняет fractional/overflow результаты.

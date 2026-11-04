@@ -2,13 +2,13 @@
 
 [Русская версия](FEED-API.ru.md) · [Practical guides](guides.md) · [API reference](api.md)
 
-Use `qd/api/feed.hpp` and link `qdcxx_feed` to receive typed `events::Quote`, `events::Profile`, `events::Trade` and `events::TradeETH` through a library-owned worker. Applications create endpoints,
+Use `qd/api/feed.hpp` and link `qdcxx_feed` to receive typed `events::Quote`, `events::Profile`, `events::Trade`, `events::TradeETH` and `events::Summary` through a library-owned worker. Applications create endpoints,
 listeners and exact symbol subscriptions; the library progresses connection,
 finite recovery, queues and delivery. Subscriptions can be created before or after
 `connect()`.
 
-This API supports plain binary QTP over TCP with built-in full Quote/Profile/Trade/TradeETH
-schemas or explicit validated caller schemas and registered Quote/Profile/Trade/TradeETH mappings.
+This API supports plain binary QTP over TCP with built-in full Quote/Profile/Trade/TradeETH/Summary
+schemas or explicit validated caller schemas and registered Quote/Profile/Trade/TradeETH/Summary mappings.
 An endpoint chooses TICKER (default, latest values with possible
 conflation) or STREAM (every admitted selected source record). TLS, credentials,
 HISTORY and wildcard selectors are outside this API. Schema loading is separate. The
@@ -107,8 +107,8 @@ trades->addSymbols({"AAPL"});
 
 The runtime/endpoint provide SDK progress; the application does not poll queues or work budgets.
 A Trade copy owns its symbol and inline snapshot; the callback span lasts only during invocation.
-Summary remains unsupported as a typed event. Mixed subscriptions accept all fifteen nonempty
-Quote/Profile/Trade/TradeETH type sets; the complete receiving-schema ceiling remains16 records.
+Mixed subscriptions accept all thirty-one nonempty
+Quote/Profile/Trade/TradeETH/Summary type sets; the complete receiving-schema ceiling remains16 records.
 
 ## Explicit event registry
 
@@ -151,7 +151,7 @@ name units. A registry valid under larger bounds is refused at `profile-schema`
 before native activation; it is never truncated. See the complete
 [registry ownership, errors and bounds contract](../spec/events/EVENT-REGISTRY.md).
 
-Prepared Quote/Profile/Trade/TradeETH use the exhaustive [field conversion rules](../spec/events/FIELD-CONVERSIONS.md):
+Prepared Quote/Profile/Trade/TradeETH/Summary use the exhaustive [field conversion rules](../spec/events/FIELD-CONVERSIONS.md):
 supported numbers retain WideDecimal fields and expose direct Java business getters such as
 `quote.getBidPrice()`/`profile.getBeta()` without LONG-to-wide rounding. Raw int
 properties preserve Java physical-slot behavior, and UTF_CHAR_ARRAY/STRING preserve nullable
@@ -174,7 +174,7 @@ such as `AAPL&N&Q` or `AAPL{x=y}&Q` throw `INVALID_ARGUMENT` at
 is refused and the previous desired set remains. Composite fallback keeps these literals
 unchanged. The ordinary attributed form `AAPL&Q{x=y}` is representable.
 
-The built-in registry remains composite Quote/Profile/Trade/TradeETH. This explicit bounded registry
+The built-in registry remains composite Quote/Profile/Trade/TradeETH/Summary. This explicit bounded registry
 path does not load the complete regional catalog or implement broader selectors.
 The [time and variant contract](../spec/events/EVENT-TIME.md) specifies optional
 Sequence/nanoseconds, Quote seconds/milliseconds, Profile halt seconds, independent
@@ -211,7 +211,7 @@ is copied and remains fixed for that subscription. A runtime array can use the
 `INVALID_ARGUMENT`; a supported type absent from the endpoint registry rejects
 with `UNSUPPORTED_PROFILE`, without publishing a subscription.
 
-`RegisteredEvent` is an owning `std::variant<events::Quote, events::Profile, events::Trade, events::TradeETH>`.
+`RegisteredEvent` is an owning `std::variant<events::Quote, events::Profile, events::Trade, events::TradeETH, events::Summary>`.
 Copy a value to retain it beyond its callback span. Concrete subscriptions and
 mixed subscriptions can overlap independently; closing one withdraws only its
 remaining exclusive interests. Callback batches follow queue delivery boundaries
@@ -368,7 +368,7 @@ substantial backing storage, and unsupported capacity arithmetic rejects explici
 | Endpoint option | Default |
 | --- | --- |
 | `contract` | `TICKER` |
-| `eventRegistry` | Absent: built-in Quote0/Profile1/Trade2/TradeETH3; an explicit value is copied as an immutable snapshot |
+| `eventRegistry` | Absent: built-in Quote0/Profile1/Trade2/TradeETH3/Summary4; an explicit value is copied as an immutable snapshot |
 | `connectTimeout`, `dnsTimeout`, `writeTimeout` | 5000 ms each |
 | `readTimeout` | 30000 ms |
 | `pollInterval` | 1 ms |
@@ -433,3 +433,11 @@ Create `createSubscription<q::events::TradeETH>()` and use getPrice()/getSizeAsD
 example. Builtin TradeETH3 is composite; explicit TRADE_ETH registrations enable actual TradeETH&Q.
 The ETH bit may be false during an RTH transition. Nano uses Last.TimeNanoPart and there is no Tick
 fallback. See [TradeETH](../spec/events/TRADE-ETH.md) for complete fields, defaults and finite limits.
+
+## Receive Summary
+
+Create `createSubscription<q::events::Summary>()` and use getDayOpenPrice()/getPrevDayVolume() for
+source business doubles and getOpenInterest() for full mapping-long OI, correcting the pinned
+delegate narrowing loss under [ADR-0010](decisions/ADR-0010-summary-open-interest-width.md). Builtin Summary4 is composite; an explicit SUMMARY registration enables actual Summary&Q.
+Day IDs are signed days, not business timestamps. PriceType comes from complete flags.
+See [Summary](../spec/events/SUMMARY.md) for all fields, defaults and regional OpenInterest absence.

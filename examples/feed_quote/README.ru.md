@@ -147,3 +147,7 @@ CLI создаёт один application signal-reader thread помимо SDK wo
 Для отдельного extended-hours snapshot используйте createSubscription<events::TradeETH>() с теми же
 business getters. Консоль остаётся примером Quote; [TradeETH](../../spec/events/TRADE-ETH.ru.md)
 описывает отдельные обязательные flags и региональную регистрацию.
+
+Для session snapshot используйте createSubscription<events::Summary>() с getDayOpenPrice(),
+getPrevDayVolume(), getOpenInterest(); [Summary](../../spec/events/SUMMARY.ru.md) задаёт точную
+business-int конверсию и региональное отсутствие OpenInterest. Этот executable сохраняет Quote output.

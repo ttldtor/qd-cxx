@@ -334,3 +334,8 @@ native writer files pinned Java reader. Сеть, SDK build и новая depend
 [Oracle IPF compression fixtures](../../tests/fixtures/ipf/compression/README.ru.md) фиксирует конечные JDK8 gzip/ZIP и реальные IPF outcomes. CompressionOracle --help/--help-ru не требует output path и не выполняет file/network/native SDK работу.
 
 - [CollectorOracle](../../tests/fixtures/ipf/collector/README.ru.md): TSV закреплённого JDK8/QD collector; явный --run, справка без входов noargs/EN/RU, без сети/workers.
+
+- [Production oracle Summary](../upstream/summary-oracle/README.ru.md): настоящий delegate, classified corrected long OpenInterest,
+  default/tiny/int схемы и regional absence; EN/RU help без входов, bounded Git/Java Capture/Verify.
+
+- [Summary OI long reference](../upstream/summary-oracle/README.ru.md#исправленный-openinterest-long-reference): отдельный Invoke-OpenInterest.ps1, EN/RU help без входов, bounded Capture/Verify с сохранением raw delegate по ADR-0010.

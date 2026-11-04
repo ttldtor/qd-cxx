@@ -13,7 +13,7 @@
 | Кодировки | `qd/encoding/` | `qdcxx_encoding` | [Спецификации кодировок](../spec/README.ru.md#encoding-contracts-ru) |
 | Схемы и идентичность записей | `qd/core/` | `qdcxx_core` | [Спецификации схем](../spec/README.ru.md#schema-contracts-ru) |
 | Кадры, привязка и tape | `qd/protocol/` | `qdcxx_protocol` | [Спецификации протокола](../spec/README.ru.md#protocol-contracts-ru) |
-| Стандартные события | `qd/events/` | `qdcxx_quote`, `qdcxx_profile`, `qdcxx_trade`, `qdcxx_trade_eth`, `qdcxx_event_mapping` | [Конфигурация](CONFIGURATION.ru.md), [Trade](../spec/events/TRADE.ru.md), [TradeETH](../spec/events/TRADE-ETH.ru.md) |
+| Стандартные события | `qd/events/` | `qdcxx_quote`, `qdcxx_profile`, `qdcxx_trade`, `qdcxx_trade_eth`, `qdcxx_summary`, `qdcxx_event_mapping` | [Конфигурация](CONFIGURATION.ru.md), [Trade](../spec/events/TRADE.ru.md), [TradeETH](../spec/events/TRADE-ETH.ru.md), [Summary](../spec/events/SUMMARY.ru.md) |
 | Периоды Candle | `qd/events/candle_period.hpp` | `qdcxx_candle_values` | [Типы, текст и оценки интервала](../spec/events/CANDLE-PERIOD.ru.md); без приёма Candle |
 | Атрибуты Candle | `qd/events/candle_attributes.hpp` | `qdcxx_candle_values` | [Значения и операции с символами](../spec/events/CANDLE-ATTRIBUTES.ru.md); без агрегации |
 | Символы Candle | `qd/events/candle_symbol.hpp` | `qdcxx_candle_values` | [Владеющие значения и object selectors](CANDLE-SYMBOLS.ru.md); без приёма Candle |

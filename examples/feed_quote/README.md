@@ -146,3 +146,7 @@ For owning Trade, use the same endpoint and createSubscription<events::Trade>() 
 For the distinct extended-hours snapshot use createSubscription<events::TradeETH>() with the same
 business getters. The console remains a Quote example; [TradeETH](../../spec/events/TRADE-ETH.md)
 describes its separate required flags and regional registration.
+
+For session snapshots use createSubscription<events::Summary>() with getDayOpenPrice(),
+getPrevDayVolume() and getOpenInterest(); [Summary](../../spec/events/SUMMARY.md) specifies its exact
+business-int conversion and regional OpenInterest absence. This executable retains its Quote output.

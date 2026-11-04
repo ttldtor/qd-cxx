@@ -45,3 +45,5 @@ Exact conformance results belong to the [developer reading path](../docs/develop
 - [Schedule rules and timezones](schedule/RULES-AND-TIMEZONES.md): compatibility target, provider/data ownership and controlled-profile constraints; Schedule implementation is separate.
 
 - [TradeETH receiving](events/TRADE-ETH.md): distinct extended-hours fields, raw flags and all fifteen mixed selections.
+
+- [Summary receiving](events/SUMMARY.md): session prices/days, exact business OpenInterest, PriceType and five-type delivery.

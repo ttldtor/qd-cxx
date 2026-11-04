@@ -707,3 +707,11 @@ tools/upstream/schedule-oracle/*.java text eol=lf
 tools/upstream/schedule-oracle/*.ps1 text eol=lf
 tests/fixtures/schedule/*.tsv -text -whitespace
 tests/fixtures/schedule/provenance.json text eol=lf
+
+tools/upstream/summary-oracle/*.java text eol=lf
+tools/upstream/summary-oracle/*.ps1 text eol=lf
+tests/fixtures/summary/oracle.tsv -text -whitespace
+tests/fixtures/summary/provenance.json text eol=lf
+
+tests/fixtures/summary/open-interest-*-v1.tsv -text -whitespace
+tests/fixtures/summary/open-interest-long-v1.provenance.json text eol=lf

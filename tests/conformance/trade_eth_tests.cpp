@@ -264,7 +264,7 @@ TEST_CASE("TradeETH defaults snapshots raw edits and exact preparation boundarie
     a::EventRegistryWork work;
     auto builtin = a::EventRegistry::builtIn({}, work);
     REQUIRE(builtin);
-    CHECK(builtin->registrations().size() == 4);
+    CHECK(builtin->registrations().size() == 5);
     CHECK(builtin->registrations()[3].type == a::EventType::TRADE_ETH);
 }
 
@@ -314,7 +314,7 @@ TEST_CASE("fresh receiving grant funds a whole atomic fanout and real select bil
     runtime.maximumSymbolsPerSubscription = 2;
     runtime.dnsServers.push_back({{127, 0, 0, 1}});
     auto profile = a::detail::prepareReceivingProfile(runtime, options, "127.0.0.1", 12345);
-    CHECK(profile.eventPlans.size() == 15);
+    CHECK(profile.eventPlans.size() == 31);
     CHECK(profile.schema.records().size() == 6);
     CHECK(profile.interests.clients == 17);
     std::size_t fieldCount = 0;

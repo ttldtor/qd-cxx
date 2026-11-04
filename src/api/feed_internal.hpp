@@ -25,10 +25,11 @@ struct ListenerLedger {
     std::weak_ptr<EndpointPort> endpoint;  ///< Notify inactive main retirement without owning the endpoint.
 };
 
-using ListenerFunction = std::variant<std::monostate, Subscription<events::Quote>::Listener,
-                                      Subscription<events::Profile>::Listener, Subscription<events::Trade>::Listener,
-                                      Subscription<events::TradeETH>::Listener, Subscription<RegisteredEvent>::Listener,
-                                      Endpoint::StateChangeListener, Subscription<events::Quote>::StateChangeListener>;
+using ListenerFunction =
+    std::variant<std::monostate, Subscription<events::Quote>::Listener, Subscription<events::Profile>::Listener,
+                 Subscription<events::Trade>::Listener, Subscription<events::TradeETH>::Listener,
+                 Subscription<events::Summary>::Listener, Subscription<RegisteredEvent>::Listener,
+                 Endpoint::StateChangeListener, Subscription<events::Quote>::StateChangeListener>;
 
 /** Shared application callable; its last release never occurs under a control mutex. */
 struct ListenerBox {

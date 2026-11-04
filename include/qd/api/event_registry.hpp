@@ -16,10 +16,11 @@
 namespace org::ttldtor::qdcxx::api {
 /** Supported business projections; custom records remain part of the complete generic schema. */
 enum class EventType {
-    QUOTE,    ///< Existing schema-bound Quote adapter.
-    PROFILE,  ///< Existing schema-bound Profile adapter.
-    TRADE,    ///< Schema-bound composite or regional Trade adapter.
-    TRADE_ETH ///< Distinct extended-hours TradeETH adapter, including applicable regional records.
+    QUOTE,     ///< Existing schema-bound Quote adapter.
+    PROFILE,   ///< Existing schema-bound Profile adapter.
+    TRADE,     ///< Schema-bound composite or regional Trade adapter.
+    TRADE_ETH, ///< Distinct extended-hours TradeETH adapter, including applicable regional records.
+    SUMMARY    ///< Complete owning trading-session summary, including applicable regional records.
 };
 
 /** Explicit source of optional event metadata, independent of indexed record identity. */

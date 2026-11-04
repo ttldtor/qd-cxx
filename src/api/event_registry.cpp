@@ -4,6 +4,7 @@
 
 #include "qd/events/profile.hpp"
 #include "qd/events/quote.hpp"
+#include "qd/events/summary.hpp"
 #include "qd/events/trade.hpp"
 #include "qd/events/trade_eth.hpp"
 
@@ -159,7 +160,8 @@ std::size_t mappingWork(events::MappingLimits limits) {
  */
 bool validRegistration(const EventRegistration &registration) noexcept {
     return (registration.type == EventType::QUOTE || registration.type == EventType::PROFILE ||
-            registration.type == EventType::TRADE || registration.type == EventType::TRADE_ETH) &&
+            registration.type == EventType::TRADE || registration.type == EventType::TRADE_ETH ||
+            registration.type == EventType::SUMMARY) &&
            (registration.eventTimePolicy == EventTimePolicy::UNSPECIFIED ||
             registration.eventTimePolicy == EventTimePolicy::FIELD_METADATA);
 }
@@ -260,6 +262,13 @@ EventRegistry::create(const core::LocalSchema &schema, std::span<const EventRegi
                 if (!mapping) {
                     return std::unexpected(EventRegistryFailure{mapping.error(), index});
                 }
+            } else if (registration.type == EventType::SUMMARY) {
+                const auto mapping = events::PreparedSummary::prepare(*ownedSchema, registration.localRecordId,
+                                                                      registration.mappingLimits);
+
+                if (!mapping) {
+                    return std::unexpected(EventRegistryFailure{mapping.error(), index});
+                }
             } else {
                 const auto mapping = events::PreparedProfile::prepare(*ownedSchema, registration.localRecordId,
                                                                       registration.mappingLimits);
@@ -300,7 +309,7 @@ EventRegistry::create(const core::LocalSchema &schema, std::span<const EventRegi
 std::expected<EventRegistry, EventRegistryFailure> EventRegistry::builtIn(EventRegistryLimits limits,
                                                                           EventRegistryWork &work) {
     try {
-        // Prepay construction of all three fixed input catalogs and their aliases before allocating them.
+        // Prepay construction of all five fixed input catalogs and their aliases before allocating them.
         constexpr std::size_t DEFAULT_CONSTRUCTION_WORK = 4096;
         debit(work.visits, DEFAULT_CONSTRUCTION_WORK);
 
@@ -308,22 +317,29 @@ std::expected<EventRegistry, EventRegistryFailure> EventRegistry::builtIn(EventR
         auto profile = events::defaultProfileSchema(limits.schema);
         auto trade = events::defaultTradeSchema(limits.schema);
         auto tradeETH = events::defaultTradeETHSchema(limits.schema);
-
-        if (!tradeETH) {
-            return std::unexpected(EventRegistryFailure{tradeETH.error(), {}});
-        }
-
-        if (!trade)
-            return std::unexpected(EventRegistryFailure{trade.error(), {}});
+        auto summary = events::defaultSummarySchema(limits.schema);
 
         if (!quote || !profile) {
             return std::unexpected(EventRegistryFailure{!quote ? quote.error() : profile.error(), {}});
         }
 
-        std::array records{quote->records()[0], profile->records()[0], trade->records()[0], tradeETH->records()[0]};
-        records[2].id = 2;
-        records[3].id = 3;
-        records[1].id = 1;
+        if (!trade)
+            return std::unexpected(EventRegistryFailure{trade.error(), {}});
+
+        if (!tradeETH) {
+            return std::unexpected(EventRegistryFailure{tradeETH.error(), {}});
+        }
+
+        if (!summary) {
+            return std::unexpected(EventRegistryFailure{summary.error(), {}});
+        }
+
+        std::array records{quote->records()[0], profile->records()[0], trade->records()[0], tradeETH->records()[0],
+                           summary->records()[0]};
+
+        for (std::size_t index = 0; index < records.size(); ++index) {
+            records[index].id = static_cast<std::int32_t>(index);
+        }
 
         auto combined = core::LocalSchema::create(records, limits.schema, core::LocalProfile::BINARY_FIELDS_V1);
 
@@ -333,7 +349,8 @@ std::expected<EventRegistry, EventRegistryFailure> EventRegistry::builtIn(EventR
 
         const std::array registrations{EventRegistration{EventType::QUOTE, 0}, EventRegistration{EventType::PROFILE, 1},
                                        EventRegistration{EventType::TRADE, 2},
-                                       EventRegistration{EventType::TRADE_ETH, 3}};
+                                       EventRegistration{EventType::TRADE_ETH, 3},
+                                       EventRegistration{EventType::SUMMARY, 4}};
 
         return create(*combined, registrations, limits, work);
     } catch (EventRegistryError error) {

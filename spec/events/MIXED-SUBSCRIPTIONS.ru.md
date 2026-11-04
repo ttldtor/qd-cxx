@@ -6,7 +6,7 @@
 
 `Feed::createSubscription(std::span<const EventType>)` и перегрузка с initializer-list
 возвращают одну `Subscription<RegisteredEvent>`. `RegisteredEvent` — это
-`std::variant<events::Quote, events::Profile, events::Trade, events::TradeETH>`. Существующие конкретные
+`std::variant<events::Quote, events::Profile, events::Trade, events::TradeETH, events::Summary>`. Существующие конкретные
 `createSubscription<events::Quote>()` и `createSubscription<events::Profile>()`
 сохраняют типы обработчиков и поведение.
 
@@ -25,7 +25,7 @@ ID не выбирают тип C++.
 от числа поддержанных типов. `{QUOTE, PROFILE, QUOTE}` принимается в этих пределах.
 То же значение остаётся осмысленным при добавлении типов.
 
-Поддержаны QUOTE, PROFILE, TRADE и TRADE_ETH: все пятнадцать непустых наборов имеют отдельные immutable selections.
+Поддержаны QUOTE, PROFILE, TRADE, TRADE_ETH и SUMMARY: все тридцать один непустых наборов имеют отдельные immutable selections.
 
 Порядок проверок:
 
@@ -76,7 +76,7 @@ endpoint и runtime. Копии, удерживаемые приложением
 native reservations. При `S` максимальных подписках, `N` максимальных символах
 подписки и `R` маршрутах desired capacity подписки равна `N * max(1, R)`, endpoint —
 `S * N * max(1, R)`, с проверкой арифметики и соответствующими пределами symbol units.
-Поэтому встроенный реестр по умолчанию резервирует четыре возможных interest на символ.
+Поэтому встроенный реестр по умолчанию резервирует пять возможных interest на символ.
 
 Полные mixed mapping limits, visits подготовки с проверкой повторов маршрутов и
 пределы callback projection суммируются до активации. Пределы receiving schema
@@ -92,7 +92,7 @@ native reservations. При `S` максимальных подписках, `N`
 создаёт и присоединяет одну подписку для массива классов.
 [DXFeedSubscription](https://github.com/devexperts/QD/blob/0ddc0a09779fb61d74cc0b37c6449ff47dcb715f/dxfeed-api/src/main/java/com/dxfeed/api/DXFeedSubscription.java)
 отклоняет пустой массив и хранит неизменяемый набор с объединёнными повторами.
-Владеющий native variant выражает типобезопасную доставку для четырёх поддержанных
+Владеющий native variant выражает типобезопасную доставку для пяти поддержанных
 prepared adapters; он не добавляет ABI произвольных классов приложения, reflection,
 wire messages, source families или schema loaders.
 

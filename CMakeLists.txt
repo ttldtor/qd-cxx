@@ -141,6 +141,9 @@ set_target_properties(qdcxx_trade PROPERTIES CXX_EXTENSIONS OFF)
 add_library(qdcxx_trade_eth src/events/trade_eth.cpp)
 target_link_libraries(qdcxx_trade_eth PUBLIC qdcxx_event_mapping PRIVATE qdcxx_market_event_symbols)
 set_target_properties(qdcxx_trade_eth PROPERTIES CXX_EXTENSIONS OFF)
+add_library(qdcxx_summary src/events/summary.cpp)
+target_link_libraries(qdcxx_summary PUBLIC qdcxx_event_mapping qdcxx_event_values PRIVATE qdcxx_market_event_symbols)
+set_target_properties(qdcxx_summary PROPERTIES CXX_EXTENSIONS OFF)
 add_library(qdcxx_quote src/events/quote.cpp)
 target_link_libraries(qdcxx_quote PUBLIC qdcxx_event_mapping PRIVATE qdcxx_market_event_symbols)
 set_target_properties(qdcxx_quote PROPERTIES CXX_EXTENSIONS OFF)
@@ -165,7 +168,7 @@ if(ORG_TTLDTOR_QDCXX_BUILD_CLIENT)
         RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
     add_library(qdcxx_mux_queue src/mux/queue.cpp)
     target_link_libraries(qdcxx_mux_queue PUBLIC qdcxx_mux qdcxx_collectors Threads::Threads)
-    target_link_libraries(qdcxx_client PUBLIC qdcxx_mux_queue qdcxx_quote qdcxx_profile qdcxx_trade qdcxx_trade_eth)
+    target_link_libraries(qdcxx_client PUBLIC qdcxx_mux_queue qdcxx_quote qdcxx_profile qdcxx_trade qdcxx_trade_eth qdcxx_summary)
     set_target_properties(qdcxx_mux_queue PROPERTIES CXX_EXTENSIONS OFF)
     install(TARGETS qdcxx_mux_queue EXPORT qdcxxTargets
         ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
@@ -204,7 +207,7 @@ if(ORG_TTLDTOR_QDCXX_BUILD_FEED_API)
     add_library(qdcxx_feed src/api/feed.cpp src/api/receiving_profile.cpp src/api/event_registry.cpp src/api/system_dns.cpp)
     add_library(qdcxx::feed ALIAS qdcxx_feed)
     target_include_directories(qdcxx_feed PRIVATE src/api)
-    target_link_libraries(qdcxx_feed PUBLIC qdcxx_recovery qdcxx_quote qdcxx_profile qdcxx_trade qdcxx_trade_eth qdcxx_market_event_symbols qdcxx_event_sources qdcxx_order_index qdcxx_candle_values)
+    target_link_libraries(qdcxx_feed PUBLIC qdcxx_recovery qdcxx_quote qdcxx_profile qdcxx_trade qdcxx_trade_eth qdcxx_summary qdcxx_market_event_symbols qdcxx_event_sources qdcxx_order_index qdcxx_candle_values)
     set_target_properties(qdcxx_feed PROPERTIES CXX_EXTENSIONS OFF)
     if(WIN32)
         target_compile_definitions(qdcxx_feed PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN _WIN32_WINNT=0x0A00)
@@ -223,7 +226,7 @@ endif()
 
 include(CMakePackageConfigHelpers)
 install(TARGETS qdcxx_encoding qdcxx_core qdcxx_protocol qdcxx_collectors qdcxx_mux
-    qdcxx_event_values qdcxx_event_mapping qdcxx_quote qdcxx_profile qdcxx_trade qdcxx_trade_eth qdcxx_market_event_symbols qdcxx_event_sources qdcxx_order_index qdcxx_candle_values qdcxx_java_double EXPORT qdcxxTargets
+    qdcxx_event_values qdcxx_event_mapping qdcxx_quote qdcxx_profile qdcxx_trade qdcxx_trade_eth qdcxx_summary qdcxx_market_event_symbols qdcxx_event_sources qdcxx_order_index qdcxx_candle_values qdcxx_java_double EXPORT qdcxxTargets
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
@@ -624,6 +627,18 @@ if(BUILD_TESTING)
             endif()
             add_test(NAME event_time_feed COMMAND qdcxx_event_time_feed_tests "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/event-times/oracle.tsv")
             set_tests_properties(event_time_feed PROPERTIES TIMEOUT 45)
+            add_executable(qdcxx_summary_feed_tests tests/conformance/summary_feed_tests.cpp tests/conformance/connect_peer.cpp)
+            target_link_libraries(qdcxx_summary_feed_tests PRIVATE qdcxx_feed)
+            set_target_properties(qdcxx_summary_feed_tests PROPERTIES CXX_EXTENSIONS OFF)
+            if(WIN32)
+                target_compile_definitions(qdcxx_summary_feed_tests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+                target_link_libraries(qdcxx_summary_feed_tests PRIVATE ws2_32)
+            endif()
+            add_test(NAME summary_feed COMMAND qdcxx_summary_feed_tests
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/summary/oracle.tsv"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/trade/oracle.tsv"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/trade-eth/oracle.tsv")
+            set_tests_properties(summary_feed PROPERTIES TIMEOUT 120)
             add_executable(qdcxx_trade_feed_tests tests/conformance/trade_feed_tests.cpp tests/conformance/connect_peer.cpp)
            target_link_libraries(qdcxx_trade_feed_tests PRIVATE qdcxx_feed)
            set_target_properties(qdcxx_trade_feed_tests PROPERTIES CXX_EXTENSIONS OFF)
@@ -1232,6 +1247,16 @@ if(BUILD_TESTING)
     set_target_properties(qdcxx_event_time_tests PROPERTIES CXX_EXTENSIONS OFF)
     add_test(NAME event_time_java COMMAND qdcxx_event_time_tests "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/event-times/oracle.tsv")
     if(TARGET qdcxx_feed)
+        add_executable(qdcxx_summary_tests tests/conformance/summary_tests.cpp)
+        target_include_directories(qdcxx_summary_tests PRIVATE src/api)
+        target_link_libraries(qdcxx_summary_tests PRIVATE qdcxx_feed doctest::doctest)
+        target_compile_definitions(qdcxx_summary_tests PRIVATE
+            ORG_TTLDTOR_QDCXX_SUMMARY_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/summary/oracle.tsv"
+            ORG_TTLDTOR_QDCXX_SUMMARY_ETH_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/trade-eth/oracle.tsv"
+            ORG_TTLDTOR_QDCXX_SUMMARY_TRADE_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/trade/oracle.tsv")
+        set_target_properties(qdcxx_summary_tests PROPERTIES CXX_EXTENSIONS OFF)
+        add_test(NAME summary_java COMMAND qdcxx_summary_tests)
+        set_tests_properties(summary_java PROPERTIES TIMEOUT 90)
         add_executable(qdcxx_trade_tests tests/conformance/trade_tests.cpp)
         target_include_directories(qdcxx_trade_tests PRIVATE src/api)
        target_link_libraries(qdcxx_trade_tests PRIVATE qdcxx_feed doctest::doctest)
@@ -1247,6 +1272,14 @@ if(BUILD_TESTING)
         set_target_properties(qdcxx_trade_eth_tests PROPERTIES CXX_EXTENSIONS OFF)
         add_test(NAME trade_eth_java COMMAND qdcxx_trade_eth_tests)
         set_tests_properties(trade_eth_java PROPERTIES TIMEOUT 90)
+        find_program(ORG_TTLDTOR_QDCXX_SUMMARY_ORACLE_PWSH NAMES pwsh)
+        if(ORG_TTLDTOR_QDCXX_SUMMARY_ORACLE_PWSH)
+            add_test(NAME summary_oracle_help COMMAND ${CMAKE_COMMAND}
+                "-DORG_TTLDTOR_QDCXX_SUMMARY_ORACLE_PWSH=${ORG_TTLDTOR_QDCXX_SUMMARY_ORACLE_PWSH}"
+                "-DORG_TTLDTOR_QDCXX_SUMMARY_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/summary_oracle_help.cmake")
+            set_tests_properties(summary_oracle_help PROPERTIES TIMEOUT 90)
+        endif()
         find_program(ORG_TTLDTOR_QDCXX_TRADE_ETH_ORACLE_PWSH NAMES pwsh)
         if(ORG_TTLDTOR_QDCXX_TRADE_ETH_ORACLE_PWSH)
             add_test(NAME trade_eth_oracle_help COMMAND ${CMAKE_COMMAND}

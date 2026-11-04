@@ -15,7 +15,7 @@
 
 namespace org::ttldtor::qdcxx::api::detail {
 inline constexpr std::size_t MAXIMUM_RECEIVING_RECORDS = 16; ///< Existing complete receiving catalog ceiling.
-inline constexpr std::size_t RECEIVING_EVENT_KINDS = 4;      ///< Quote, Profile, Trade and distinct TradeETH.
+inline constexpr std::size_t RECEIVING_EVENT_KINDS = 5;      ///< Quote, Profile, Trade, TradeETH and Summary.
 inline constexpr std::size_t RECEIVING_EVENT_SELECTIONS = (1U << RECEIVING_EVENT_KINDS) - 1;
 
 ///< Every nonempty finite selection; no dynamic type registry or catalog expansion.

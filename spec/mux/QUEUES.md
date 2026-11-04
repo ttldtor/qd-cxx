@@ -188,6 +188,13 @@ callback, command and source-view cleanup quiescence. Destructor fallback perfor
 traversal without starting callbacks; arbitrary consumer-destructor work and wall time are excluded.
 This does not close sockets or implement a whole-application stop protocol.
 
+An applied empty TICKER desired set may still have a pending source-view withdrawal. Graceful stop
+finishes that existing, fully charged synchronization before closing the registration. WORK_LIMIT
+retries with a fresh grant without publishing closing, a gap or a terminal for that registration.
+A pending nonempty initial synchronization can still exclude an unread projection and retains the
+existing abort/gap classification. A wire REMOVE or command APPLIED result alone does not fence all
+local source views.
+
 The local prefix starts at successful whole-event `admit`, including events that still require
 staging or several routing turns. Decoded or socket-buffered input that was never admitted is
 outside that prefix; a closing rejection leaves the input event owned by its caller. STREAM drains

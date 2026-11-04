@@ -3,8 +3,7 @@
 [English version](TRADE-ETH.md). Английский текст нормативный.
 
 TradeETH — отдельный владеющий агрегат последней сделки расширенной сессии и её дневных итогов.
-Subscription<TradeETH> и RegisteredEvent доставляют его независимо от обычного Trade. Summary пока
-не поддерживается как typed event. Основание — закреплённые production Java QD3.355 TradeETH,
+Subscription<TradeETH> и RegisteredEvent доставляют его независимо от обычного Trade. [Summary](SUMMARY.ru.md) поддержан отдельным snapshot. Основание — закреплённые production Java QD3.355 TradeETH,
 TradeBase, TradeETHMapping, TradeETHDelegate и [корпус](../../tests/fixtures/trade-eth/CAPTURES.ru.md).
 
 Все скаляры инициализированы; пять decimal-полей начинают с raw0 (NaN). Встроенный optional snapshot
@@ -57,9 +56,9 @@ Builtin сохраняет Quote0/Profile1/Trade2 и добавляет TradeETH
 выбирают fallback независимо; Profile сохраняет точный символ. Непредставимые selectors отклоняются
 до публикации demand по [контракту Trade](TRADE.ru.md).
 
-Все15 непустых наборов имеют immutable plans с максимум16индексами. Существующий sizeof-учёт покрывает
-15планов и временные копии. Checked atomic grant зависит от настроенных клиентов и реальных записей.
-Public defaults остаются8subscriptions/16records/128fields. All-mask fixture явно задаёт17subscriptions
+Все 31 непустых наборов имеют immutable plans с максимум16индексами. Существующий sizeof-учёт покрывает
+31 план и временные копии. Checked atomic grant зависит от настроенных клиентов и реальных записей.
+Public defaults остаются8subscriptions/16records/128fields. Fixture для четырёх типов явно задаёт 17 subscriptions
 (15mixed, typed ETH, thrower),2символа,6записей/72поля. Exact/one-below на реальном MuxState доказывает
 прогресс без повышения public caps.
 

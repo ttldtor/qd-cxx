@@ -45,3 +45,5 @@
 - [Правила расписаний и часовые пояса](schedule/RULES-AND-TIMEZONES.ru.md): цели совместимости, владение провайдером/данными и границы контролируемого профиля; реализация Schedule ведётся отдельно.
 
 - [Приём TradeETH](events/TRADE-ETH.ru.md): отдельные ETH fields, raw flags и пятнадцать mixed selections.
+
+- [Приём Summary](events/SUMMARY.ru.md): цены/дни сессии, точный business OpenInterest, PriceType и доставка пяти типов.

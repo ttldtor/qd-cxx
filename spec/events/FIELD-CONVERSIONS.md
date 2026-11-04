@@ -131,3 +131,8 @@ times, text and defaults through both owned and borrowed mapping entry points. E
 boundaries, default registry use, provenance/complete-shape validation and finite text ownership
 remain required. Deterministic wire delivery, installed/relocated package consumers and platform
 results are separate executed gates; a source table alone does not establish them.
+
+Summary reuses these six numeric source types for its business doubles and wide view. OpenInterest
+uses actual getAsLong semantics, correcting a demonstrated delegate narrowing defect under
+[ADR-0010](../../docs/decisions/ADR-0010-summary-open-interest-width.md); see [Summary](SUMMARY.md).
+LONG/WIDE do not pass through double, and physical INT width remains unchanged.

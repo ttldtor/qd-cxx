@@ -321,3 +321,8 @@ native writer files through the pinned Java reader. No network, SDK build or new
 The [IPF compression fixture oracle](../../tests/fixtures/ipf/compression/README.md) records bounded JDK8 gzip/ZIP and actual IPF outcomes. CompressionOracle --help/--help-ru requires no output path and performs no file, network or native SDK work.
 
 - [CollectorOracle](../../tests/fixtures/ipf/collector/README.md): pinned JDK8/QD collector TSV; explicit --run, input-free noargs/EN/RU help, no network/workers.
+
+- [Summary production oracle](../upstream/summary-oracle/README.md): actual generated delegate plus separately classified corrected long OpenInterest,
+  default/tiny/int schemas and regional absence; input-free EN/RU help, bounded Git/Java Capture/Verify.
+
+- [Summary OI long reference](../upstream/summary-oracle/README.md#corrected-openinterest-long-reference): separate Invoke-OpenInterest.ps1, input-free EN/RU help and bounded Capture/Verify; preserves raw delegate observations under ADR-0010.

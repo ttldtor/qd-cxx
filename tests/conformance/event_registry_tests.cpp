@@ -137,12 +137,12 @@ std::vector<core::FieldValue> values(const core::LocalRecord &record) {
 }
 } // namespace
 
-TEST_CASE("built-in registry preserves existing ordinals and appends complete TradeETH3") {
+TEST_CASE("built-in registry preserves existing ordinals and appends complete Summary4") {
     api::EventRegistryWork work;
     auto result = api::EventRegistry::builtIn({}, work);
     REQUIRE(result);
     CHECK(result->valid());
-    REQUIRE(result->registrations().size() == 4);
+    REQUIRE(result->registrations().size() == 5);
     CHECK(result->registrations()[0].type == api::EventType::QUOTE);
     CHECK(result->registrations()[0].localRecordId == 0);
     CHECK(result->registrations()[1].type == api::EventType::PROFILE);
@@ -157,6 +157,9 @@ TEST_CASE("built-in registry preserves existing ordinals and appends complete Tr
     CHECK(result->registrations()[3].type == api::EventType::TRADE_ETH);
     CHECK(result->schema().records()[3].name == u"TradeETH");
     CHECK(result->schema().records()[3].fields.size() == 12);
+    CHECK(result->registrations()[4].type == api::EventType::SUMMARY);
+    CHECK(result->schema().records()[4].name == u"Summary");
+    CHECK(result->schema().records()[4].fields.size() == 10);
     CHECK(result->storageBytes() <= api::EventRegistryLimits{}.storageBytes);
     CHECK(work.visits < api::EventRegistryWork{}.visits);
     CHECK(work.preparation < api::EventRegistryWork{}.preparation);

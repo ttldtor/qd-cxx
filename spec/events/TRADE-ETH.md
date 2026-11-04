@@ -4,7 +4,7 @@
 
 `events::TradeETH` is a distinct owning aggregate for the last extended-hours trade and its day totals,
 delivered by `Subscription<TradeETH>` and `RegisteredEvent`. Regular Trade keeps its independent
-type, API and routes. Summary remains unsupported as a typed event. The reference is locked Java
+type, API and routes. [Summary](SUMMARY.md) is a separate supported session snapshot. The reference is locked Java
 QD3.355 TradeETH, TradeBase, generated TradeETHMapping and TradeETHDelegate; see the
 [capture layout](../../tests/fixtures/trade-eth/CAPTURES.md).
 
@@ -68,10 +68,10 @@ route retains the selector. Quote/Trade/TradeETH regional fallback is independen
 symbols. Unrepresentable regional selectors fail before demand publication under [Trade](TRADE.md).
 Renaming a generic record after decoding does not establish this binding.
 
-All15 nonempty Quote/Profile/Trade/TradeETH sets have immutable plans with at most16 binding indices.
-Existing sizeof-based preparation/storage accounting includes fifteen plans and temporary copies.
+All 31 nonempty Quote/Profile/Trade/TradeETH/Summary sets have immutable plans with at most16 binding indices.
+Existing sizeof-based preparation/storage accounting includes thirty-one plans and temporary copies.
 The checked whole-atomic-fanout grant uses configured clients and actual records. Public defaults
-remain8subscriptions/16records/128fields. The all-mask fixture explicitly configures17subscriptions
+remain8subscriptions/16records/128fields. The four-type subset fixture explicitly configures 17 subscriptions
 (15mixed, typed ETH, thrower),2symbols and6records/72fields. Actual MuxState exact/one-below tests prove
 whole-query progress without raising public caps.
 

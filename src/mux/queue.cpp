@@ -3807,6 +3807,23 @@ std::expected<QueueProgress, QueueFailure> MuxQueue::progressImpl(QueueWork &wor
             const auto requested = std::max(c->port->stop.load(std::memory_order_acquire), s.stopMode);
 
             if (requested) {
+                if (requested == 1 && c->stopMode < 2 && c->sync && !c->closing && s.ticker) {
+                    spend(work, 1);
+                    const auto desired = s.interest.clientEntries(c->interest);
+
+                    if (!desired)
+                        throw sourceFailure(desired.error());
+
+                    if (desired->empty()) {
+                        // Applied withdrawal has no unread desired projection. Finish its existing
+                        // paid source transaction before closing; insufficient work retries this frontier.
+                        auto synced = s.sync(*c, work);
+
+                        if (!synced)
+                            throw synced.error();
+                    }
+                }
+
                 c->closing = true;
                 c->stopMode = std::max(c->stopMode, requested);
 
