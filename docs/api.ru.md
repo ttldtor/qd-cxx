@@ -26,3 +26,5 @@
 от доставки другой стороне. Наличие объявления в справочнике не означает реализации всех запланированных семейств протокола и настроек.
 
 Заголовок `qd/mux/queue.hpp` требует `qdcxx_mux_queue`; эта необязательная очередь включается вместе с `ORG_TTLDTOR_QDCXX_BUILD_CLIENT=ON`.
+
+[Цепочки опционов](OPTION-CHAINS.ru.md): `qd/ipf/option_chains.hpp`, необязательная `qdcxx_ipf` при `ORG_TTLDTOR_QDCXX_BUILD_IPF=ON`.

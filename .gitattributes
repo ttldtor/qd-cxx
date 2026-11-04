@@ -644,3 +644,9 @@ tools/upstream/field-conversion-oracle/*.java text eol=lf
 tools/upstream/field-conversion-oracle/*.ps1 text eol=lf
 tests/fixtures/field-conversions/oracle.tsv -text -whitespace
 tests/fixtures/field-conversions/provenance.json text eol=lf
+
+# Preserve exact option-chain oracle inputs/observations and canonical provenance.
+tools/upstream/option-chains-oracle/*.java text eol=lf
+tools/upstream/option-chains-oracle/*.ps1 text eol=lf
+tests/fixtures/option-chains/*.tsv -text -whitespace
+tests/fixtures/option-chains/provenance.json text eol=lf

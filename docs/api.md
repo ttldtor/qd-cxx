@@ -26,3 +26,5 @@ borrowed views, owning values, finite work credits and local acceptance from pee
 declaration is not a promise that every planned protocol family or configuration is implemented.
 
 The `qd/mux/queue.hpp` header requires `qdcxx_mux_queue`; this optional queue is enabled by `ORG_TTLDTOR_QDCXX_BUILD_CLIENT=ON`.
+
+[Option chains](OPTION-CHAINS.md): `qd/ipf/option_chains.hpp`, optional `qdcxx_ipf` with `ORG_TTLDTOR_QDCXX_BUILD_IPF=ON`.

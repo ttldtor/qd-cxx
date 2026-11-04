@@ -162,3 +162,7 @@ file result нужен успешный owned close. Resource limits не зад
 [контракт dependency/ownership загрузки](../spec/ipf/TRANSFER.ru.md) определяет Beast HTTP parser,
 скомпилированный статический Boost.URL и повторное использование controlled TLS profile. Он задаёт
 владение source/credentials и квалификацию до доступности URL loading, но не добавляет URL API.
+
+## Цепочки опционов
+
+Тот же необязательный IPF-компонент включает [владеющие снимки option chains](OPTION-CHAINS.ru.md) с точным Java-порядком серий/strike и конечными лимитами хранения, временных копий и работы.

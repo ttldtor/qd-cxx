@@ -70,7 +70,7 @@ set_target_properties(qdcxx_java_double PROPERTIES CXX_EXTENSIONS OFF POSITION_I
 
 option(ORG_TTLDTOR_QDCXX_BUILD_IPF "Build the independent instrument-profile value model" OFF)
 if(ORG_TTLDTOR_QDCXX_BUILD_IPF)
-    add_library(qdcxx_ipf src/ipf/instrument_profile.cpp src/ipf/reader.cpp src/ipf/writer.cpp)
+    add_library(qdcxx_ipf src/ipf/instrument_profile.cpp src/ipf/reader.cpp src/ipf/writer.cpp src/ipf/option_chains.cpp)
     target_link_libraries(qdcxx_ipf PRIVATE qdcxx_java_double)
     target_include_directories(qdcxx_ipf PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
         "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
@@ -394,6 +394,17 @@ if(BUILD_TESTING)
         ORG_TTLDTOR_QDCXX_MARKET_ATTRIBUTE_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/market-attributes/oracle.tsv")
     add_test(NAME market_event_symbols COMMAND qdcxx_market_event_symbols_tests)
     if(ORG_TTLDTOR_QDCXX_BUILD_IPF)
+        add_executable(qdcxx_option_chains_tests tests/conformance/option_chains_tests.cpp)
+        target_link_libraries(qdcxx_option_chains_tests PRIVATE qdcxx_ipf doctest::doctest)
+        target_compile_definitions(qdcxx_option_chains_tests PRIVATE
+            ORG_TTLDTOR_QDCXX_OPTION_CHAINS_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/option-chains/oracle.tsv")
+        set_target_properties(qdcxx_option_chains_tests PROPERTIES CXX_EXTENSIONS OFF)
+        add_test(NAME option_chains COMMAND qdcxx_option_chains_tests)
+        set_tests_properties(option_chains PROPERTIES TIMEOUT 60)
+        if(WIN32)
+            add_test(NAME option_chains_oracle_help COMMAND ${CMAKE_COMMAND}
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/option_chains_oracle_help.cmake")
+        endif()
         add_executable(qdcxx_ipf_tests tests/conformance/ipf_tests.cpp)
         target_link_libraries(qdcxx_ipf_tests PRIVATE qdcxx_ipf doctest::doctest)
         target_compile_definitions(qdcxx_ipf_tests PRIVATE

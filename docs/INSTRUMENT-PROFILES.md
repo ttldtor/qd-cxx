@@ -159,3 +159,7 @@ Local value/read/write APIs remain independent of network dependencies. The sele
 [transfer dependency and ownership contract](../spec/ipf/TRANSFER.md) specifies Beast HTTP parser,
 compiled static Boost.URL and reuse of the controlled TLS profile. It defines source/credential
 ownership and the qualification required before URL loading becomes available; it adds no URL API.
+
+## Option chains
+
+The same optional IPF component includes [owning option-chain snapshots](OPTION-CHAINS.md), with exact Java series/strike ordering and finite aggregate/staging/work limits.

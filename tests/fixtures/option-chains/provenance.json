@@ -1,0 +1,38 @@
+{
+  "revision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "javaVersion": "openjdk version \"1.8.0_422\"",
+  "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
+  "javacSha256": "633143e961aa18051c09112b85333f5cdbd845b54eb39678eb15b91ca8bbb527",
+  "harnessSha256": "b838590f85255a8c118d1eee477121178072d6143e0fea493441110d1aaa4ee0",
+  "launcherSha256": "9b67971a5752dfff6f69b8a4f74fc91b044745700b33a4bd29ee18a507dd7fa2",
+  "inputSha256": "f4e119d420a31e3dab5266b1505e50445f338ba211bae5e4dd750202b5510f8b",
+  "fixtureSha256": "ff4ebb98847832444d43fd38f50eb77f3ded333dfb4fbe5fefefd1f3c9c995e8",
+  "upstreamSources": [
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/ipf/option/OptionChainsBuilder.java",
+      "sha256": "1a2a5ac0512893afa3cb219f5c0ee0d39f504522610ed914e68bdc124c4e274a"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/ipf/option/OptionChain.java",
+      "sha256": "7110a4eaf5edaadc9d7ce7464722d312d204609c91c92ffdfb3f94c4994b3296"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/ipf/option/OptionSeries.java",
+      "sha256": "2f22ca596194934851b76118bf1b5dbe0d4ee46d23ebd7946d5ab76655effa72"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/ipf/InstrumentProfile.java",
+      "sha256": "4ef87d9d20e8b5b8f963c29dc2295e4dc5b1cea065e56a21c788d697ef12dfd1"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/ipf/InstrumentProfileField.java",
+      "sha256": "a42362fd76e47946066d87a3a5869945bec6f049421c801967be6d780df87f33"
+    },
+    {
+      "path": "dxlib/src/main/java/com/devexperts/util/DayUtil.java",
+      "sha256": "9586f03a4c45d3a9fa4efd7bb67d4abb9ffb59f93399312a102346c76417c11a"
+    }
+  ],
+  "productionClassInventorySha256": "134205aec565b781ba7a485392c4188e89af87c1609b7626011038abd2800599",
+  "rows": 875
+}
