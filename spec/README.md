@@ -40,3 +40,5 @@ Exact conformance results belong to the [developer reading path](../docs/develop
 
 - [Candle attributes](events/CANDLE-ATTRIBUTES.md): exact price, session, alignment, price-level, data-type and exchange values and symbol operations.
 - [Complete Candle symbols](events/CANDLE-SYMBOL.md): canonical identity, explicit getters and exact-selector subscription bridge.
+
+- [Market event values](events/EVENT-VALUES.md): raw-preserving business enums/flags and exact nano, packed-sequence, Gregorian day-ID and SHORT_STRING conversions.

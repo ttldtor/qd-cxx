@@ -40,3 +40,7 @@ part of the source distribution; the navigation above does not turn proposals in
 - [CFI and additional underlyings oracle](../tools/upstream/glossary-oracle/README.md): Production glossary oracle: CFI, AdditionalUnderlyings, noargs/EN/RU help, JDK8, heap128MiB/60s, Git30s.
 
 - [Instrument price increments](PRICE-INCREMENTS.md): owned ranges, precision and price rounding through `qdcxx_ipf`.
+
+## Event value utilities
+
+The [event-value oracle](../tools/upstream/event-values-oracle/README.md) captures and verifies exact pinned Java conversions without an SDK rebuild or endpoint. See its built-in EN/RU help and [public contracts](../spec/events/EVENT-VALUES.md). The [installed consumer](../tests/conformance/event_values_consumer/CMakeLists.txt) compiles every new public header separately and exercises raw preservation, conversions and input errors; it can link the SDK-free value target or the compatible feed target.

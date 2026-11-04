@@ -24,3 +24,5 @@ documents the separate manual help regression and optional native compression co
 
 - [Candle-period oracle](candle-period-oracle/README.md): exact aggregation types, multipliers and short names.
 - [Candle-symbol oracle](candle-symbol-oracle/README.md): production canonical identity, getters, explicit attributes and equality.
+
+- [Event-value oracle](event-values-oracle/README.md): raw-preserving market codes, bit fields, numeric time/day-ID and existing SHORT_STRING business conversions.

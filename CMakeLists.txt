@@ -83,6 +83,11 @@ if(ORG_TTLDTOR_QDCXX_BUILD_IPF)
     install(FILES licenses/price_increments/LICENSE.txt DESTINATION "${CMAKE_INSTALL_DATADIR}/qdcxx/licenses/price_increments")
 endif()
 
+add_library(qdcxx_event_values src/events/event_flags.cpp src/events/time_helpers.cpp src/events/short_string.cpp)
+target_include_directories(qdcxx_event_values PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
+target_compile_features(qdcxx_event_values PUBLIC cxx_std_23)
+set_target_properties(qdcxx_event_values PROPERTIES CXX_EXTENSIONS OFF)
 add_library(qdcxx_event_mapping src/events/event_mapping.cpp)
 add_library(qdcxx_order_index src/events/order_index.cpp)
 target_link_libraries(qdcxx_order_index PUBLIC qdcxx_event_mapping qdcxx_event_sources)
@@ -107,10 +112,10 @@ set_target_properties(qdcxx_candle_values PROPERTIES CXX_EXTENSIONS OFF)
 target_link_libraries(qdcxx_event_mapping PUBLIC qdcxx_core)
 set_target_properties(qdcxx_event_mapping PROPERTIES CXX_EXTENSIONS OFF)
 add_library(qdcxx_profile src/events/profile.cpp)
-target_link_libraries(qdcxx_profile PUBLIC qdcxx_event_mapping)
+target_link_libraries(qdcxx_profile PUBLIC qdcxx_event_mapping qdcxx_event_values)
 set_target_properties(qdcxx_profile PROPERTIES CXX_EXTENSIONS OFF)
 add_library(qdcxx_trade src/events/trade.cpp)
-target_link_libraries(qdcxx_trade PUBLIC qdcxx_event_mapping PRIVATE qdcxx_market_event_symbols)
+target_link_libraries(qdcxx_trade PUBLIC qdcxx_event_mapping qdcxx_event_values PRIVATE qdcxx_market_event_symbols)
 set_target_properties(qdcxx_trade PROPERTIES CXX_EXTENSIONS OFF)
 add_library(qdcxx_quote src/events/quote.cpp)
 target_link_libraries(qdcxx_quote PUBLIC qdcxx_event_mapping PRIVATE qdcxx_market_event_symbols)
@@ -191,7 +196,7 @@ endif()
 
 include(CMakePackageConfigHelpers)
 install(TARGETS qdcxx_encoding qdcxx_core qdcxx_protocol qdcxx_collectors qdcxx_mux
-    qdcxx_event_mapping qdcxx_quote qdcxx_profile qdcxx_trade qdcxx_market_event_symbols qdcxx_event_sources qdcxx_order_index qdcxx_candle_values qdcxx_java_double EXPORT qdcxxTargets
+    qdcxx_event_values qdcxx_event_mapping qdcxx_quote qdcxx_profile qdcxx_trade qdcxx_market_event_symbols qdcxx_event_sources qdcxx_order_index qdcxx_candle_values qdcxx_java_double EXPORT qdcxxTargets
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
@@ -1140,6 +1145,19 @@ if(BUILD_TESTING)
     endif()
     add_subdirectory(tools/dev)
     include(tests/conformance/tooling/register.cmake)
+    add_executable(qdcxx_event_values_tests tests/conformance/event_values_tests.cpp)
+    target_link_libraries(qdcxx_event_values_tests PRIVATE qdcxx_event_values qdcxx_trade qdcxx_profile doctest::doctest)
+    target_compile_definitions(qdcxx_event_values_tests PRIVATE ORG_TTLDTOR_QDCXX_EVENT_VALUES_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/event-values/oracle.tsv")
+    set_target_properties(qdcxx_event_values_tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME event_values_java COMMAND qdcxx_event_values_tests)
+    find_program(ORG_TTLDTOR_QDCXX_EVENT_VALUES_ORACLE_PWSH NAMES pwsh)
+    if(ORG_TTLDTOR_QDCXX_EVENT_VALUES_ORACLE_PWSH)
+        add_test(NAME event_values_oracle_help COMMAND "${CMAKE_COMMAND}"
+            "-DORG_TTLDTOR_QDCXX_EVENT_VALUES_ORACLE_PWSH=${ORG_TTLDTOR_QDCXX_EVENT_VALUES_ORACLE_PWSH}"
+            "-DORG_TTLDTOR_QDCXX_EVENT_VALUES_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/event_values_oracle_help.cmake")
+        set_tests_properties(event_values_oracle_help PROPERTIES TIMEOUT 90)
+    endif()
     add_executable(qdcxx_event_mapping_tests tests/conformance/event_mapping_tests.cpp)
     target_link_libraries(qdcxx_event_mapping_tests PRIVATE qdcxx_event_mapping qdcxx_protocol doctest::doctest)
     add_test(NAME event_mapping_contract COMMAND qdcxx_event_mapping_tests)

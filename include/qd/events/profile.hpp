@@ -4,6 +4,7 @@
 
 #include "qd/core/wide_decimal.hpp"
 #include "qd/events/event_mapping.hpp"
+#include "qd/events/market_enums.hpp"
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -26,20 +27,6 @@ inline constexpr std::array<core::SerialFieldType, 16> PROFILE_FIELD_TYPES{
     core::SerialFieldType::WIDE_DECIMAL,  core::SerialFieldType::WIDE_DECIMAL, core::SerialFieldType::TIME_SECONDS,
     core::SerialFieldType::TIME_SECONDS,  core::SerialFieldType::COMPACT_INT,  core::SerialFieldType::UTF_CHAR_ARRAY,
     core::SerialFieldType::UTF_CHAR_ARRAY};
-
-/** Public interpretation of Profile business flag bits zero and one. */
-enum class TradingStatus {
-    UNDEFINED = 0, ///< Unspecified or reserved raw code.
-    HALTED = 1,    ///< Trading is halted.
-    ACTIVE = 2     ///< Trading is active.
-};
-
-/** Public interpretation of Profile business flag bits two and three. */
-enum class ShortSaleRestriction {
-    UNDEFINED = 0, ///< Unspecified or reserved raw code.
-    ACTIVE = 1,    ///< Short-sale restriction is active.
-    INACTIVE = 2   ///< Short-sale restriction is inactive.
-};
 
 /** Mandatory logical UTF-16 ownership bounds for one complete event. */
 struct EventValueLimits {

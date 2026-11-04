@@ -1,0 +1,106 @@
+{
+  "revision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "javaVersion": "openjdk version \"1.8.0_422\"",
+  "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
+  "javacSha256": "633143e961aa18051c09112b85333f5cdbd845b54eb39678eb15b91ca8bbb527",
+  "harnessSha256": "874d1010e3c989b71eb531dce45369eea7923943c54d98e2bcbd5f0c5b53921c",
+  "launcherSha256": "f6899aab8e94d9dd6a77ffef082a457929099f033822e2324aaff0fbb71e6e48",
+  "upstreamSources": [
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/impl/EventUtil.java",
+      "sha256": "25261155e73e31e349c07d76b55f0f158b87e86f67462870f7448196ba403010"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/impl/TimeNanosUtil.java",
+      "sha256": "112441a9ce2b1fcc71be89e00c078506592808f3043582b8a3e8b879e7466537"
+    },
+    {
+      "path": "dxlib/src/main/java/com/devexperts/util/DayUtil.java",
+      "sha256": "9586f03a4c45d3a9fa4efd7bb67d4abb9ffb59f93399312a102346c76417c11a"
+    },
+    {
+      "path": "dxlib/src/main/java/com/devexperts/util/TimeUtil.java",
+      "sha256": "3aeba61ca5d1c6580ae7915be0b4d4cacf3264a0e907345b85da726a529dfbc3"
+    },
+    {
+      "path": "dxlib/src/main/java/com/devexperts/util/MathUtil.java",
+      "sha256": "98b58d2dc51af2255a4ef681de9c8bdd490279a320163fae538bd4989279a39a"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/IndexedEvent.java",
+      "sha256": "bf8c6f98ad213cce97446557f5cb479fb74ccc82d8fcbc4cbb65f7e450225d48"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/TradeBase.java",
+      "sha256": "307d51b8963be36b5adece55ef6e3be098e48bac380d7ee6fab12aca98c20246"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/util/ShortString.java",
+      "sha256": "78b3c6a31bef675b20786a3984679607330e2dd69137df00ffd63999ee788d7a"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/kit/ShortStringField.java",
+      "sha256": "36057a62f99b73b74e7910af431ef047903876f4aed92491ce953eebd6bc2168"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/SerialFieldType.java",
+      "sha256": "3cd21dec85308505ee2036c575449928e5f9e8ab1970a19aeb970340e56b6d16"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/MarketFactoryImpl.java",
+      "sha256": "c74b324b2f99d2a351963fead08419c2ba1d92573c633d30740295acc9d0bac4"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/Direction.java",
+      "sha256": "5aaad25f70e0632f5ee06f4c73026775212b5bdce169deb53bccb581780ac291"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/TradingStatus.java",
+      "sha256": "bcca47319bdf2eb3cdf4dc1c46e0de01a4eb57a73362a2a93ec7fc5e01adcb4a"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/ShortSaleRestriction.java",
+      "sha256": "8655426869bd9a9d2758c9eca429458a44044752420cfb58e10dd3d66168c134"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/Side.java",
+      "sha256": "f8bef7d85108494293b74315e2e5234036c162e428ee505d2aabe301d0a938d0"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/Scope.java",
+      "sha256": "ab25150fb12ed7a652d81ae80e809981f00b504f99032327faf58c58416098ce"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/OrderAction.java",
+      "sha256": "270c34b8376b6e0e6de4ff40a231d396f93dbd04c283ebcf16ad07e4dfdaf8b5"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/IcebergType.java",
+      "sha256": "0761bed348fcec79a65bc46f918b724adb029b548044778b40f090d3318e0b81"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/PriceType.java",
+      "sha256": "ca80cc315734497e016b8d189b8dc69aa0e226d44f5c87814ef3de11c674429d"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/OtcMarketsPriceType.java",
+      "sha256": "9f0da8279d5e51c0979074de3de153f02b92cce78ee89e613e52cd465f53f0dd"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/TimeAndSaleType.java",
+      "sha256": "68fcbdc5f8ba8cfad85f32c74abdd4d6c92c9c077906624dadd21761f13d2d48"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/AuctionType.java",
+      "sha256": "b5573febec833993c31a2678e2563aaf81b6420d0da6cfa55ac513757f700274"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/ImbalanceSide.java",
+      "sha256": "968c7933746ee30eef0dad9f0fd7b0b4fb0cfd3a61f16c1bb47d5695cb816111"
+    }
+  ],
+  "productionClassInventorySha256": "90a478b5d3737246d8c897322c9f9db60887846e20117572588e05ae78fbc6d8",
+  "fixtureSha256": "88917a294f98026463f78303c2aab618a3923eb2b584650b00f28ab27d707349",
+  "rows": 20987,
+  "timezoneInvariant": true
+}

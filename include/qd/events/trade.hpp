@@ -4,6 +4,7 @@
 
 #include "qd/core/wide_decimal.hpp"
 #include "qd/events/event_mapping.hpp"
+#include "qd/events/market_enums.hpp"
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -14,16 +15,6 @@
 #include <string_view>
 
 namespace org::ttldtor::qdcxx::events {
-/** Java trade-price movement codes; reserved flag patterns are exposed as UNDEFINED. */
-enum class Direction {
-    UNDEFINED, ///< Unknown or uncomputed movement.
-    DOWN,      ///< Lower than the preceding price.
-    ZERO_DOWN, ///< Unchanged after a downward movement.
-    ZERO,      ///< Equal to the only available comparison price.
-    ZERO_UP,   ///< Unchanged after an upward movement.
-    UP         ///< Higher than the preceding price.
-};
-
 /** Independently owned Trade; decimal raw and source business-double views are separate. */
 struct Trade {
     std::u16string symbol;            ///< Exact logical symbol, including a regional record suffix.

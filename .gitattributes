@@ -684,3 +684,9 @@ tests/fixtures/ipf/compression/*.bin -text -whitespace
 tests/fixtures/ipf/compression/*.tsv -text -whitespace
 tests/fixtures/ipf/compression/CompressionOracle.java text eol=lf
 tests/fixtures/ipf/compression/provenance.json text eol=lf
+
+# Preserve raw event-value observations and canonical source/provenance text.
+tools/upstream/event-values-oracle/*.java text eol=lf
+tools/upstream/event-values-oracle/*.ps1 text eol=lf
+tests/fixtures/event-values/oracle.tsv -text -whitespace
+tests/fixtures/event-values/provenance.json text eol=lf

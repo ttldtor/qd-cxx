@@ -40,3 +40,5 @@
 
 - [Атрибуты Candle](events/CANDLE-ATTRIBUTES.ru.md): точные значения price/session/alignment/price-level/data-type/exchange и операции с символами.
 - [Полные символы Candle](events/CANDLE-SYMBOL.ru.md): каноническая идентичность, явные getters и exact-selector bridge подписки.
+
+- [Рыночные значения событий](events/EVENT-VALUES.ru.md): сохраняющие raw business enums/flags и точные преобразования nano, packed sequence, Gregorian day ID и SHORT_STRING.
