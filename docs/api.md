@@ -29,3 +29,5 @@ declaration is not a promise that every planned protocol family or configuration
 The `qd/mux/queue.hpp` header requires `qdcxx_mux_queue`; this optional queue is enabled by `ORG_TTLDTOR_QDCXX_BUILD_CLIENT=ON`.
 
 [Option chains](OPTION-CHAINS.md): `qd/ipf/option_chains.hpp`, optional `qdcxx_ipf` with `ORG_TTLDTOR_QDCXX_BUILD_IPF=ON`.
+
+- [CFI and additional underlyings](GLOSSARY-VALUES.md): `qd/glossary/`, optional `qdcxx_ipf`.

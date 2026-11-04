@@ -38,3 +38,5 @@
 
 - [Oracle источников событий](../tools/upstream/event-source-oracle/README.ru.md): захват/проверка идентичности источников закреплённого Java, справка и ограниченные процессы.
 - [Oracle возможностей источников](../tools/upstream/order-source-capability-oracle/README.ru.md): шесть семейств, полная книга и выбор конкретного источника.
+
+- [CFI и дополнительные базовые активы oracle](../tools/upstream/glossary-oracle/README.ru.md): Production oracle CFI/AdditionalUnderlyings: справка без входов на EN/RU, JDK8, heap128MiB/60s, Git30s.

@@ -315,3 +315,5 @@ native writer files pinned Java reader. Сеть, SDK build и новая depend
 
 - [Oracle option chains](../upstream/option-chains-oracle/README.ru.md): production-группировка профилей, порядок серий/strike и выборка; справка без аргументов/EN/RU без входов, ограниченный JDK8 capture/verify.
 - [Oracle атрибутов Candle](../upstream/candle-attributes-oracle/README.ru.md): production-значения и операции с символами; EN/RU справка без входов, Verify по умолчанию, JDK8, heap128MiB/timeout60s, exit0/1.
+
+- [CFI и дополнительные базовые активы oracle](../upstream/glossary-oracle/README.ru.md): Production oracle CFI/AdditionalUnderlyings: справка без входов на EN/RU, JDK8, heap128MiB/60s, Git30s.

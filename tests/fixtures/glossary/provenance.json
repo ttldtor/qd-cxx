@@ -1,0 +1,29 @@
+{
+  "revision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "javaVersion": "openjdk version \"1.8.0_422\"",
+  "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
+  "javacSha256": "633143e961aa18051c09112b85333f5cdbd845b54eb39678eb15b91ca8bbb527",
+  "harnessSha256": "b563c616070df0face85cf7bb07bc3a1a70c07013e496e5257193845e3924c61",
+  "launcherSha256": "87a8eec7e07a1a8f15eebbec62f4a5ee653e1fe12cfb17ef653fb088cb3e89a8",
+  "fixtureSha256": "a845502fb96139cc6378a1081e185d4306b5da4ba3a971e0d708fee9d53e25f4",
+  "upstreamSources": [
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/glossary/CFI.java",
+      "sha256": "108181bdff08cb44c45fa6d3c7e1b3ff69ab35085d06f4e43aa0a3df1cce340d"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/glossary/AdditionalUnderlyings.java",
+      "sha256": "f21d497c3a3e416b0f79c29251c1c6db1bf4867ec62d58d4349263391d2ed72f"
+    },
+    {
+      "path": "dxlib/src/main/java/com/devexperts/util/MathUtil.java",
+      "sha256": "98b58d2dc51af2255a4ef681de9c8bdd490279a320163fae538bd4989279a39a"
+    },
+    {
+      "path": "dxlib/src/main/java/com/devexperts/util/FastDoubleUtil.java",
+      "sha256": "fdfd9c7855ed6f9a11e7fcea2cd6c8495670656f7b161d52aba62ae4f7a6f9f1"
+    }
+  ],
+  "productionClassInventorySha256": "134205aec565b781ba7a485392c4188e89af87c1609b7626011038abd2800599",
+  "rows": 16712
+}

@@ -656,3 +656,8 @@ tools/upstream/candle-attributes-oracle/*.java text eol=lf
 tools/upstream/candle-attributes-oracle/*.ps1 text eol=lf
 tests/fixtures/events/candle/attributes-oracle.tsv -text -whitespace
 tests/fixtures/events/candle/attributes-provenance.json text eol=lf
+tests/fixtures/glossary/*.tsv -text -whitespace
+tests/fixtures/glossary/provenance.json text eol=lf
+tools/upstream/glossary-oracle/*.java text eol=lf
+tools/upstream/glossary-oracle/*.ps1 text eol=lf
+licenses/cfi/LICENSE.txt -text -whitespace

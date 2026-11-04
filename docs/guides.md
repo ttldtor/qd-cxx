@@ -24,3 +24,5 @@ shared subscription facade remain separate capabilities. Check [current support]
 before choosing an integration.
 
 - [Indexed and order event sources](EVENT-SOURCES.md): owned ID/name values without subscription routing.
+
+- [CFI and additional underlyings](GLOSSARY-VALUES.md): `qd/glossary/`, optional `qdcxx_ipf`.

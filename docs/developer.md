@@ -36,3 +36,5 @@ part of the source distribution; the navigation above does not turn proposals in
 
 - [Event-source oracle](../tools/upstream/event-source-oracle/README.md): capture/verify pinned Java source identities, with help and bounded processes.
 - [Order-source capability oracle](../tools/upstream/order-source-capability-oracle/README.md): six event families, full-book support and specific-source values.
+
+- [CFI and additional underlyings oracle](../tools/upstream/glossary-oracle/README.md): Production glossary oracle: CFI, AdditionalUnderlyings, noargs/EN/RU help, JDK8, heap128MiB/60s, Git30s.
