@@ -5,6 +5,7 @@
 #include "qd/api/endpoint_configuration.hpp"
 #include "qd/api/feed.hpp"
 #include "qd/api/feed_filter.hpp"
+#include "qd/api/statistics.hpp"
 #include "qd/transport/recovery.hpp"
 
 #include "connect_peer.hpp"
@@ -3978,4 +3979,163 @@ TEST_CASE("public configuration allocation refusal publishes no endpoint and sna
     CHECK_FALSE(snapshot.acceptedAddress);
     CHECK(endpoint->getState() == api::EndpointState::NOT_CONNECTED);
     static_cast<void>(endpoint->closeAndAwaitTermination());
+}
+
+TEST_CASE("detached statistics baselines preserve independent rates and weighted callback means") {
+    using namespace org::ttldtor::qdcxx;
+    using namespace std::chrono_literals;
+
+    api::SubscriptionStatistics first;
+    first.ownerIdentity = std::make_shared<int>(0);
+    first.observedAt = std::chrono::steady_clock::time_point{} + 1s;
+    auto second = first;
+    second.observedAt += 2s;
+    second.admittedEvents.value = 10;
+    second.callbackDurationTotal = {100, core::StatisticAvailability::AVAILABLE};
+    second.callbackDurationSamples.value = 2;
+    api::StatisticsBaseline baseline(first);
+    auto independent = baseline;
+    const auto rate =
+        api::statisticsLifetimeRate(baseline.value(), second, &api::SubscriptionStatistics::admittedEvents);
+    REQUIRE(rate);
+    CHECK(rate->perSecond == 5.0);
+    const auto mean = api::statisticsCallbackMean(baseline.value(), second);
+    REQUIRE(mean);
+    CHECK(*mean == 50.0);
+    baseline.reset(second);
+    CHECK(independent.value().admittedEvents.value == 0);
+    CHECK_FALSE(api::statisticsLifetimeRate(baseline.value(), second, &api::SubscriptionStatistics::admittedEvents));
+    CHECK_FALSE(api::statisticsCallbackMean(baseline.value(), second));
+    auto incompatible = second;
+    incompatible.ownerIdentity = std::make_shared<int>(0);
+    CHECK_FALSE(api::statisticsLifetimeRate(first, incompatible, &api::SubscriptionStatistics::admittedEvents));
+    incompatible = second;
+    incompatible.generation++;
+    CHECK_FALSE(api::statisticsLifetimeRate(first, incompatible, &api::SubscriptionStatistics::admittedEvents));
+    incompatible = second;
+    incompatible.admittedEvents.availability = core::StatisticAvailability::SATURATED;
+    CHECK_FALSE(api::statisticsLifetimeRate(first, incompatible, &api::SubscriptionStatistics::admittedEvents));
+    CHECK_FALSE(api::statisticsLifetimeRate(first, second, &api::SubscriptionStatistics::callbackDurationMaximum));
+    incompatible = second;
+    incompatible.admittedEvents.value = std::numeric_limits<std::uint64_t>::max();
+    const auto large = api::statisticsLifetimeRate(first, incompatible, &api::SubscriptionStatistics::admittedEvents);
+    REQUIRE(large);
+    CHECK(std::isfinite(large->perSecond));
+    incompatible = second;
+    incompatible.admittedEvents.value = 0;
+    auto decreasing = first;
+    decreasing.admittedEvents.value = 1;
+    CHECK_FALSE(api::statisticsLifetimeRate(decreasing, incompatible, &api::SubscriptionStatistics::admittedEvents));
+    incompatible = second;
+    incompatible.callbackDurationSamples.value = 0;
+    CHECK_FALSE(api::statisticsCallbackMean(first, incompatible));
+    auto later = second;
+    later.observedAt += 1s;
+    later.callbackDurationTotal.value = 110;
+    later.callbackDurationSamples.value = 3;
+    const auto laterMean = api::statisticsCallbackMean(second, later);
+    REQUIRE(laterMean);
+    CHECK(*laterMean == 10.0);
+}
+
+TEST_CASE("endpoint lifetime rate preserves per-field write uncertainty") {
+    using namespace org::ttldtor::qdcxx;
+    using namespace std::chrono_literals;
+
+    api::EndpointStatistics first;
+    first.ownerIdentity = std::make_shared<int>(0);
+    first.observedAt = std::chrono::steady_clock::time_point{} + 1s;
+    auto second = first;
+    second.observedAt += 1s;
+    second.connection.writtenBytes.value = 7;
+    second.connection.readBytes.value = 9;
+    second.connection.writeAcceptanceUnknown = true;
+    CHECK_FALSE(api::statisticsLifetimeRate(first, second, &transport::ConnectionStatistics::writtenBytes));
+    const auto read = api::statisticsLifetimeRate(first, second, &transport::ConnectionStatistics::readBytes);
+    REQUIRE(read);
+    CHECK(read->perSecond == 9.0);
+    CHECK_FALSE(api::statisticsLifetimeRate(first, second, &transport::ConnectionStatistics::roundTripTime));
+}
+
+TEST_CASE("epoch statistics subtract prior lifetime totals only for qualified source identity") {
+    using namespace org::ttldtor::qdcxx;
+    using namespace std::chrono_literals;
+
+    api::EndpointStatistics first;
+    first.ownerIdentity = std::make_shared<int>(0);
+    first.observedAt = std::chrono::steady_clock::time_point{} + 1s;
+    first.connection.sourceEpoch = 7;
+    first.connection.establishedConnections.value = 7;
+    first.connection.readBytes.value = 100;
+    auto second = first;
+    second.observedAt += 1s;
+    second.connection.readBytes.value = 125;
+    const auto rate = api::statisticsEpochRate(first, second, &transport::ConnectionStatistics::readBytes);
+    REQUIRE(rate);
+    CHECK(rate->sourceEpoch == 7);
+    CHECK(rate->perSecond == 25.0);
+    auto incompatible = second;
+    incompatible.connection.sourceEpoch = 8;
+    CHECK_FALSE(api::statisticsEpochRate(first, incompatible, &transport::ConnectionStatistics::readBytes));
+    incompatible = second;
+    incompatible.connection.establishedConnections.availability = core::StatisticAvailability::SATURATED;
+    CHECK_FALSE(api::statisticsEpochRate(first, incompatible, &transport::ConnectionStatistics::readBytes));
+    first.connection.sourceEpoch.reset();
+    incompatible = second;
+    incompatible.connection.sourceEpoch.reset();
+    CHECK_FALSE(api::statisticsEpochRate(first, incompatible, &transport::ConnectionStatistics::readBytes));
+    api::SubscriptionStatistics subscriptionFirst;
+    subscriptionFirst.ownerIdentity = first.ownerIdentity;
+    subscriptionFirst.observedAt = first.observedAt;
+    subscriptionFirst.sourceEpoch = 7;
+    subscriptionFirst.admittedEvents.value = 100;
+    auto subscriptionLast = subscriptionFirst;
+    subscriptionLast.observedAt += 1s;
+    subscriptionLast.admittedEvents.value = 125;
+    const auto subscriptionRate =
+        api::statisticsEpochRate(subscriptionFirst, subscriptionLast, &api::SubscriptionStatistics::admittedEvents);
+    REQUIRE(subscriptionRate);
+    CHECK(subscriptionRate->perSecond == 25.0);
+    subscriptionLast.sourceEpoch = 8;
+    CHECK_FALSE(
+        api::statisticsEpochRate(subscriptionFirst, subscriptionLast, &api::SubscriptionStatistics::admittedEvents));
+    subscriptionFirst.sourceEpoch.reset();
+    subscriptionLast.sourceEpoch.reset();
+    CHECK_FALSE(
+        api::statisticsEpochRate(subscriptionFirst, subscriptionLast, &api::SubscriptionStatistics::admittedEvents));
+    subscriptionFirst.sourceEpoch = std::numeric_limits<std::uint64_t>::max();
+    subscriptionLast.sourceEpoch = subscriptionFirst.sourceEpoch;
+    CHECK_FALSE(
+        api::statisticsEpochRate(subscriptionFirst, subscriptionLast, &api::SubscriptionStatistics::admittedEvents));
+}
+
+TEST_CASE("statistics rates retain positive elapsed ticks across clock origins and reject duration counters") {
+    using namespace org::ttldtor::qdcxx;
+    using Clock = std::chrono::steady_clock;
+    using Rep = Clock::duration::rep;
+    api::SubscriptionStatistics first;
+    first.ownerIdentity = std::make_shared<int>(0);
+    auto second = first;
+    second.admittedEvents.value = 1;
+    const auto checkOneTick = [&](Rep origin) {
+        first.observedAt = Clock::time_point{Clock::duration{origin}};
+        second.observedAt = Clock::time_point{Clock::duration{static_cast<Rep>(origin + 1)}};
+        const auto rate = api::statisticsLifetimeRate(first, second, &api::SubscriptionStatistics::admittedEvents);
+        REQUIRE(rate);
+        CHECK(rate->perSecond ==
+              doctest::Approx(static_cast<double>(Clock::period::den) / Clock::period::num).epsilon(1e-12));
+    };
+    checkOneTick(0);
+    checkOneTick(-1);
+    checkOneTick(std::numeric_limits<Rep>::min());
+    checkOneTick(std::numeric_limits<Rep>::max() - 1);
+    first.observedAt = Clock::time_point{Clock::duration{std::numeric_limits<Rep>::min()}};
+    second.observedAt = Clock::time_point{Clock::duration{std::numeric_limits<Rep>::max()}};
+    CHECK(api::statisticsLifetimeRate(first, second, &api::SubscriptionStatistics::admittedEvents));
+    first.callbackDurationTotal = {0, core::StatisticAvailability::AVAILABLE};
+    second.callbackDurationTotal = {100, core::StatisticAvailability::AVAILABLE};
+    CHECK_FALSE(api::statisticsLifetimeRate(first, second, &api::SubscriptionStatistics::callbackDurationTotal));
+    first.sourceEpoch = 1;
+    second.sourceEpoch = 1;
+    CHECK_FALSE(api::statisticsEpochRate(first, second, &api::SubscriptionStatistics::callbackDurationTotal));
 }

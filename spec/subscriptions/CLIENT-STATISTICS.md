@@ -6,7 +6,7 @@ The endpoint IO/recovery subset is available through `Endpoint::getStatistics()`
 see the [feed guide](../../docs/FEED-API.md#endpoint-statistics) for its publication boundary.
 The subscription catalog is available through `Subscription<Event>::getStatistics()`;
 see the [delivery accounting boundary](../../docs/FEED-API.md#subscription-statistics).
-Derived-value operations remain planned contracts, without callable rate/reset APIs.
+The value-only helpers in [statistics.hpp](../../include/qd/api/statistics.hpp) provide reader-owned baselines, interval rates and callback means.
 
 ## Evidence and decisions
 
@@ -152,6 +152,20 @@ overflow; units are items/second or bytes/second with documented precision.
 Means require positive matching sample deltas; combine numerators/weights, never
 average interval averages. Readers and their baselines are independent.
 
+The public `StatisticsBaseline` owns a detached cut. Reset replaces that reader's
+copy only; readers synchronize shared mutation of the same baseline themselves.
+Lifetime rates explicitly use `LifetimeStatisticRate` and can cross reconnect.
+Epoch rates require the same positive, non-saturated established source ordinal;
+endpoint qualification also requires available established-connection counters.
+The selected member identifies the same cumulative metric at both cuts; the
+callback duration sum and maximum cannot be selected for these count rates.
+A sticky unknown write acceptance makes written-byte rates unavailable without
+affecting other fields. Rates use floating-point seconds and return rounded `double`
+values; nonpositive or unrepresentable intervals and incompatible, decreasing,
+missing or saturated inputs yield no value. Callback means divide the difference
+of duration totals by the positive difference of completed-sample counts; an
+initial supported no-sample total with zero samples contributes zero. Helpers do
+not wait for callbacks, drive network progress, or retain runtime owners.
 ## Accounting and required implementation cases
 
 These are requirements for later tests, not executed runtime evidence:
