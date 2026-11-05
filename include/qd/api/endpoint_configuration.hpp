@@ -23,7 +23,8 @@ enum class EndpointPropertyOrigin {
     BASE_OPTIONS,        ///< Typed fallback options, whether supplied by the caller or default constructed.
     DEFAULT_PROPERTIES,  ///< Explicit caller-provided lower-priority property layer.
     EXPLICIT_PROPERTIES, ///< Explicit caller-provided overriding property layer.
-    ADDRESS_PROPERTIES   ///< Supported trailing address properties, resolved during construction only.
+    ADDRESS_PROPERTIES,  ///< Supported trailing address properties, resolved during construction only.
+    RUNTIME_UPDATE       ///< Current requested-aggregation intent changed through the explicit endpoint setter.
 };
 
 /** Finite complete construction envelope, separate from transport/runtime grants. */
@@ -36,10 +37,11 @@ struct EndpointConfigurationLimits {
 
 /** Owning local policy observation. Credentials are unsupported and never enter this value. */
 struct EffectiveEndpointProperty {
-    std::string key;               ///< Canonical supported key, without arbitrary rejected input.
-    std::string requestedValue;    ///< Selected local value before consumer-specific normalization.
-    std::string effectiveValue;    ///< Applied local policy or metadata value; never a server report.
-    EndpointPropertyOrigin origin; ///< Selected construction layer; no inferred ambient origin.
+    std::string key;            ///< Canonical supported key, without arbitrary rejected input.
+    std::string requestedValue; ///< Selected local value before consumer-specific normalization.
+    std::string effectiveValue; ///< Applied local policy or metadata value; never a server report.
+    EndpointPropertyOrigin
+        origin; ///< Selected construction layer or explicit requested-aggregation update; no ambient origin.
 };
 
 /** Independent configuration/accepted-request observation; no native state or runtime is retained. */
@@ -48,9 +50,10 @@ struct EndpointConfigurationSnapshot {
     std::optional<std::string> configuredAddress;      ///< Validated plain route, without trailing property text.
     EndpointPropertyOrigin addressOrigin = EndpointPropertyOrigin::BASE_OPTIONS;
     ///< Source of configuredAddress, if present. An explicit later connect argument may select another first route.
-    std::optional<std::string> acceptedAddress; ///< First accepted local connect spelling; not DNS/peer evidence.
-    bool activationRequested = false;           ///< Whether a local connect intent is currently admitted.
-    std::uint64_t connectionRevision = 0;       ///< Local accepted control revision, not a remote acknowledgement.
+    std::optional<std::string> acceptedAddress;     ///< First accepted local connect spelling; not DNS/peer evidence.
+    bool activationRequested = false;               ///< Whether a local connect intent is currently admitted.
+    std::uint64_t connectionRevision = 0;           ///< Local accepted control revision, not a remote acknowledgement.
+    std::uint64_t requestedAggregationRevision = 0; ///< Local coalesced request revision; never a peer ACK.
 };
 
 /** Immutable instance-local address/policy snapshot. Resolution performs no files, DNS, SDK or user callbacks.

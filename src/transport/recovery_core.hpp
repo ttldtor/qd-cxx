@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 #pragma once
 
+#include "aggregation.hpp"
 #include "recovery_configuration.hpp"
 #include "recovery_drain.hpp"
 
@@ -167,10 +168,14 @@ class RecoveryCore {
     std::uint64_t readiness_ = 0;      ///< Checked readiness change identity, never inferred from schema shape.
     std::uint64_t peerGeneration_ = 0; ///< Last actual current generation.
     protocol::LiveAuthentication authentication_ = protocol::LiveAuthentication::UNCHALLENGED; ///< Last actual gate.
-    std::size_t description_ = 0;     ///< Next outgoing declaration in this fresh attempt.
-    std::size_t family_ = 0;          ///< Fixed fair family cursor.
-    std::size_t controlFamily_ = 0;   ///< Independent bounded offline/control-progress cursor.
-    bool descriptor_ = false;         ///< The local initial descriptor was actually admitted in this attempt.
+    std::size_t description_ = 0;   ///< Next outgoing declaration in this fresh attempt.
+    std::size_t family_ = 0;        ///< Fixed fair family cursor.
+    std::size_t controlFamily_ = 0; ///< Independent bounded offline/control-progress cursor.
+    bool descriptor_ = false;       ///< The local initial descriptor was actually admitted in this attempt.
+    std::optional<std::chrono::milliseconds> requestedAggregation_; ///< Worker-owned coalesced local request.
+    std::optional<AggregationPeriodInfo> aggregationInfo_;          ///< Only actual current-source descriptor reports.
+    bool aggregationEnabled_ = false; ///< Private high-level feature; legacy low-level output remains unchanged.
+    bool aggregationPending_ = false; ///< One latest request, sharing the existing bounded native output slot.
     bool connectionFenced_ = false;   ///< Explicit nonterminal control blocks old native intake/output/delivery.
     bool cutoff_ = false;             ///< No new factory/input/output; only an active local drain may dispatch.
     bool executing_ = false;          ///< Reject recursive public progress without replacing active caller budgets.
@@ -304,6 +309,13 @@ class RecoveryCore {
      * @return Retired-source totals and current actual counters/identities.
      */
     [[nodiscard]] ConnectionStatistics statistics() const noexcept;
+    /** Apply one fixed local intent outside progress; emits nothing inline.
+     * @param period Validated optional request. @return Owner/range refusal or accepted coalesced intent.
+     */
+    std::expected<void, RecoveryDiagnostic>
+    requestAggregationPeriod(std::optional<std::chrono::milliseconds> period) noexcept;
+    /** @return Last current-source peer report, otherwise unknown; no request inference or progress. */
+    std::optional<AggregationPeriodInfo> aggregationPeriodInfo() const noexcept;
     /** Quiesce only the current owned native attempt before a facade's final detached publication.
      * @return Preserved lifetime counters, including raced native completions.
      */

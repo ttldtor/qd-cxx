@@ -13,6 +13,8 @@ struct EndpointAddress {
 
 /** @param options Immutable local policy. @throws Error before publication for invalid policy. */
 void validateEndpointOptions(const EndpointOptions &options);
+/** @param period Validated current local request. @return Owning canonical text or empty reset, never peer info. */
+std::string aggregationPropertyValue(std::optional<std::chrono::milliseconds> period);
 /** @param address Complete plain host:port or [IPv6]:port; construction properties are unsupported here.
  * @return Independently owning validated route; no DNS/native work occurs.
  */

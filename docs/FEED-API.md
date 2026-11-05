@@ -561,3 +561,5 @@ completed invocations with the steady clock, in nanoseconds, including throws an
 blocking; queue wait and state/change observers are excluded. Timing has `NO_SAMPLE`
 until the first call finishes. Count and sum overflow saturate per field with the
 existing sticky availability marker; reads and reconnect never reset totals.
+
+[Server aggregation](SERVER-AGGREGATION.md): separate local requests and current-peer reports, bounded descriptor updates and explicit unknown states.

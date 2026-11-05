@@ -1571,6 +1571,51 @@ void Endpoint::connect(std::string_view address) {
     });
 }
 
+std::optional<std::chrono::milliseconds> Endpoint::getRequestedAggregationPeriod() const noexcept {
+    std::lock_guard lock(port_->mutex);
+
+    return port_->requestedAggregationPeriod;
+}
+
+void Endpoint::setRequestedAggregationPeriod(std::optional<std::chrono::milliseconds> period) {
+    producerAction([&] {
+        if (period && (period->count() < 0 || *period > transport::MAXIMUM_REQUESTED_AGGREGATION_PERIOD))
+            reject(ErrorCode::INVALID_ARGUMENT, "endpoint-aggregation-period");
+
+        {
+            std::lock_guard lock(port_->mutex);
+
+            if (port_->requestedAggregationPeriod == period)
+                return;
+
+            if (port_->requestedAggregationRevision == std::numeric_limits<std::uint64_t>::max())
+                reject(ErrorCode::RESOURCE_LIMIT, "endpoint-aggregation-revision");
+
+            port_->requestedAggregationPeriod = period;
+            ++port_->requestedAggregationRevision;
+        }
+
+        if (const auto control = port_->control.lock()) {
+            {
+                std::lock_guard gate(control->mutex);
+                ++control->wakeSequence;
+            }
+            control->condition.notify_one();
+        }
+    });
+}
+
+std::optional<transport::AggregationPeriodInfo> Endpoint::getAggregationPeriodInfo() const noexcept {
+    std::lock_guard lock(port_->mutex);
+
+    if (!port_->connectionIntent || port_->closeRequested.load(std::memory_order_acquire) ||
+        port_->retired.load(std::memory_order_acquire) || port_->state == EndpointState::FAILED ||
+        port_->aggregationSourceRevision != port_->connectionRevision)
+        return {};
+
+    return port_->aggregationInfo;
+}
+
 void Endpoint::connect() {
     producerAction([&] {
         const auto configuration = port_->configuration->snapshot();
@@ -1596,6 +1641,17 @@ EndpointConfigurationSnapshot Endpoint::getEffectiveConfiguration() const {
             port_->connectionIntent && !port_->closeRequested.load(std::memory_order_acquire) &&
             !port_->retired.load(std::memory_order_acquire) && port_->state != EndpointState::FAILED;
         snapshot.connectionRevision = port_->connectionRevision;
+        snapshot.requestedAggregationRevision = port_->requestedAggregationRevision;
+
+        if (port_->requestedAggregationRevision != 0) {
+            for (auto &property : snapshot.properties) {
+                if (property.key == "dxfeed.requestedAggregationPeriod") {
+                    property.requestedValue = detail::aggregationPropertyValue(port_->requestedAggregationPeriod);
+                    property.effectiveValue = property.requestedValue;
+                    property.origin = EndpointPropertyOrigin::RUNTIME_UPDATE;
+                }
+            }
+        }
 
         return snapshot;
     });
@@ -1916,9 +1972,11 @@ struct NativeEndpoint {
     std::optional<transport::TcpRecovery> recovery; ///< Sole native/protocol/queue owner on this worker.
     std::vector<std::unique_ptr<NativeSubscription>> subscriptions; ///< Fixed native registration slots.
     bool draining = false;                                          ///< Actual admitted-prefix drain requested once.
-    std::uint64_t appliedRevision = 0;      ///< Latest physical control captured/applied on this worker.
-    std::uint64_t appliedClearRevision = 0; ///< Sticky clear included in that physical control.
-    std::uint32_t actualAttempts = 0;       ///< Last actual factory-entry count, never inferred from desired state.
+    std::uint64_t appliedRevision = 0;            ///< Latest physical control captured/applied on this worker.
+    std::uint64_t appliedAggregationRevision = 0; ///< Latest intent copied into the fixed recovery slot.
+    bool aggregationConfigured = false;           ///< Initial default/reset is also an actual protocol property.
+    std::uint64_t appliedClearRevision = 0;       ///< Sticky clear included in that physical control.
+    std::uint32_t actualAttempts = 0; ///< Last actual factory-entry count, never inferred from desired state.
 
     /** Adopt nonnative immutable preparation on the worker.
      * @param port Detached endpoint route/policy.
@@ -2309,6 +2367,29 @@ EndpointProgress progressEndpoint(NativeEndpoint &endpoint, transport::RecoveryT
         }
     }
 
+    std::optional<std::chrono::milliseconds> aggregationPeriod;
+    std::uint64_t aggregationRevision = 0;
+    {
+        std::lock_guard lock(endpoint.port->mutex);
+        aggregationPeriod = endpoint.port->requestedAggregationPeriod;
+        aggregationRevision = endpoint.port->requestedAggregationRevision;
+    }
+
+    if (!endpoint.port->closeRequested.load(std::memory_order_acquire) &&
+        (!endpoint.aggregationConfigured || endpoint.appliedAggregationRevision != aggregationRevision)) {
+        const auto accepted =
+            transport::detail::TcpRecoveryFactory::requestAggregationPeriod(*endpoint.recovery, aggregationPeriod);
+
+        if (!accepted) {
+            failEndpoint(endpoint.port, recoveryDiagnostic(accepted.error()));
+
+            return EndpointProgress::RETIRED;
+        }
+
+        endpoint.appliedAggregationRevision = aggregationRevision;
+        endpoint.aggregationConfigured = true;
+    }
+
     progressSubscriptions(endpoint, submitWork);
 
     if (endpoint.port->closeRequested.load(std::memory_order_acquire) && !endpoint.draining) {
@@ -2337,9 +2418,17 @@ EndpointProgress progressEndpoint(NativeEndpoint &endpoint, transport::RecoveryT
             });
     }
 
+    const auto aggregationInfo = transport::detail::TcpRecoveryFactory::aggregationPeriodInfo(*endpoint.recovery);
     {
         std::lock_guard lock(endpoint.port->mutex);
         endpoint.port->statistics.connection = statistics;
+
+        if (endpoint.appliedRevision == endpoint.port->connectionRevision && endpoint.port->connectionIntent &&
+            !endpoint.port->closeRequested.load(std::memory_order_acquire)) {
+            endpoint.port->aggregationInfo = aggregationInfo;
+            endpoint.port->aggregationSourceRevision = endpoint.appliedRevision;
+        }
+
         endpoint.port->statistics.observedAt = std::chrono::steady_clock::now();
     }
 
@@ -2843,6 +2932,7 @@ std::shared_ptr<Endpoint> ApiRuntime::createEndpoint(const EndpointConfiguration
         port->limits = impl_->options;
         port->options = options;
         port->configuration = configuration;
+        port->requestedAggregationPeriod = options.requestedAggregationPeriod;
         port->stateListeners = makeStateListeners(port, impl_->options.maximumStateListenersPerEndpoint);
         port->subscriptions.resize(impl_->options.maximumSubscriptionsPerEndpoint);
         port->stateChanges.resize(impl_->options.maximumPendingStateChangesPerEndpoint);

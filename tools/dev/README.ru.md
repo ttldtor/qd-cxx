@@ -360,3 +360,5 @@ native writer files pinned Java reader. Сеть, SDK build и новая depend
 class/resource inventories.
 
 - [Endpoint configuration oracle](../upstream/endpoint-configuration-oracle/README.ru.md): реальные pinned address/property/lifecycle consumers, собственный loopback, finite Capture/Verify и EN/RU help.
+
+- [Oracle серверной агрегации](../upstream/server-aggregation-oracle/README.ru.md): actual Java public bounds, full/delta/reset/clamp, TimePeriodInfo и реальный reconnect; input-free EN/RU help, finite Capture/Verify.

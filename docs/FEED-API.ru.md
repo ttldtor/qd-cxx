@@ -575,3 +575,5 @@ STREAM source не превращаются в выдуманные admission/dr
 queue wait, state/change observers исключены. До завершения первого вызова timing имеет
 `NO_SAMPLE`. Переполнение count/sum насыщает отдельное поле со sticky availability;
 чтение и reconnect никогда не сбрасывают итоги.
+
+[Серверная агрегация](SERVER-AGGREGATION.ru.md): отдельные local request и peer report, bounded descriptor updates и явный UNKNOWN.

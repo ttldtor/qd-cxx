@@ -548,6 +548,11 @@ if(BUILD_TESTING)
             "-DORG_TTLDTOR_QDCXX_SELECTOR_ORACLE_PWSH=${ORG_TTLDTOR_QDCXX_SELECTOR_ORACLE_PWSH}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/endpoint_configuration_oracle_help.cmake")
         set_tests_properties(endpoint_configuration_oracle_help PROPERTIES TIMEOUT 120)
+        add_test(NAME server_aggregation_oracle_help COMMAND "${CMAKE_COMMAND}"
+            "-DORG_TTLDTOR_QDCXX_SELECTOR_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DORG_TTLDTOR_QDCXX_SELECTOR_ORACLE_PWSH=${ORG_TTLDTOR_QDCXX_SELECTOR_ORACLE_PWSH}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/server_aggregation_oracle_help.cmake")
+        set_tests_properties(server_aggregation_oracle_help PROPERTIES TIMEOUT 120)
     endif()
     add_executable(qdcxx_subscription_selector_tests tests/conformance/subscription_selector_tests.cpp)
     target_link_libraries(qdcxx_subscription_selector_tests PRIVATE qdcxx_subscription_selectors doctest::doctest)
@@ -755,6 +760,19 @@ if(BUILD_TESTING)
         add_test(NAME transport_recovery_receiver COMMAND qdcxx_recovery_receiver_tests)
         set_tests_properties(transport_recovery_receiver PROPERTIES TIMEOUT 120)
         if(ORG_TTLDTOR_QDCXX_BUILD_FEED_API)
+            add_executable(qdcxx_server_aggregation_tests tests/conformance/server_aggregation_tests.cpp
+                tests/conformance/recovery_test_peer.cpp)
+            target_include_directories(qdcxx_server_aggregation_tests PRIVATE src/transport)
+            target_link_libraries(qdcxx_server_aggregation_tests PRIVATE qdcxx_feed doctest::doctest)
+            target_compile_definitions(qdcxx_server_aggregation_tests PRIVATE
+                ORG_TTLDTOR_QDCXX_AGGREGATION_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/server-aggregation/oracle.tsv")
+            set_target_properties(qdcxx_server_aggregation_tests PROPERTIES CXX_EXTENSIONS OFF)
+            if(WIN32)
+                target_compile_definitions(qdcxx_server_aggregation_tests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+                target_link_libraries(qdcxx_server_aggregation_tests PRIVATE ws2_32)
+            endif()
+            add_test(NAME server_aggregation COMMAND qdcxx_server_aggregation_tests)
+            set_tests_properties(server_aggregation PROPERTIES TIMEOUT 60)
             add_executable(qdcxx_endpoint_configuration_tests tests/conformance/endpoint_configuration_tests.cpp
                 tests/conformance/recovery_test_peer.cpp)
             target_link_libraries(qdcxx_endpoint_configuration_tests PRIVATE qdcxx_feed doctest::doctest)

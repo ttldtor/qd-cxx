@@ -202,6 +202,10 @@ struct EndpointPort {
     RuntimeOptions limits;   ///< Finite immutable limits and resolved DNS snapshot.
     EndpointOptions options; ///< Finite immutable endpoint policy.
     std::optional<EndpointConfiguration> configuration; ///< Immutable data-only policy retained after retirement.
+    std::optional<std::chrono::milliseconds> requestedAggregationPeriod; ///< Mutable coalesced local intent only.
+    std::uint64_t requestedAggregationRevision = 0; ///< Checked local request commits, independent of reconnect.
+    std::optional<transport::AggregationPeriodInfo> aggregationInfo; ///< Worker-published actual source report.
+    std::uint64_t aggregationSourceRevision = 0; ///< Control fence for the report; never a request ACK.
     std::vector<std::shared_ptr<SubscriptionPort>> subscriptions; ///< Fixed slots, including retiring registrations.
     StateListeners stateListeners; ///< Opt-in advisory lifecycle observations, retired after all subscriptions.
     std::vector<EndpointStateChange> stateChanges; ///< Fixed ring; selection lease remains charged through release.

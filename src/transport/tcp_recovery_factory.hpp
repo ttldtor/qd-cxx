@@ -3,6 +3,7 @@
 #pragma once
 
 #include "bootstrap_lease.hpp"
+#include "qd/transport/aggregation.hpp"
 #include "qd/transport/tcp_recovery.hpp"
 
 namespace org::ttldtor::qdcxx::transport::detail {
@@ -14,6 +15,14 @@ struct TcpRecoveryFactory {
      * @return Preserved actual lifetime totals after native callback retirement.
      */
     [[nodiscard]] static ConnectionStatistics retireStatistics(TcpRecovery &recovery) noexcept;
+    /** @param recovery Worker-owned actual recovery. @param period Validated optional intent.
+     * @return Coalesced acceptance or owner/range refusal; no inline native progress.
+     */
+    [[nodiscard]] static std::expected<void, RecoveryDiagnostic>
+    requestAggregationPeriod(TcpRecovery &recovery, std::optional<std::chrono::milliseconds> period) noexcept;
+    /** @param recovery Existing worker-owned recovery. @return Only actual current-source peer info. */
+    [[nodiscard]] static std::optional<AggregationPeriodInfo>
+    aggregationPeriodInfo(const TcpRecovery &recovery) noexcept;
     /** Prepare from a counted outer lease; SDK progress and worker affinity remain caller driven.
      * @param bootstrap Outer lease retained across all native and callback retirement.
      * @param endpoint Original immutable route configuration.

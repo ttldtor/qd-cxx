@@ -418,6 +418,33 @@ ConnectionStatistics RecoveryCore::statistics() const noexcept {
     return result;
 }
 
+std::expected<void, RecoveryDiagnostic>
+RecoveryCore::requestAggregationPeriod(std::optional<std::chrono::milliseconds> period) noexcept {
+    if (const auto refused = rejection())
+        return std::unexpected(*refused);
+
+    if (period && (period->count() < 0 || *period > MAXIMUM_REQUESTED_AGGREGATION_PERIOD))
+        return std::unexpected(RecoveryDiagnostic{RecoveryError::INVALID_CONFIGURATION, "recovery-aggregation-period"});
+
+    if (!aggregationEnabled_ || requestedAggregation_ != period) {
+        requestedAggregation_ = period;
+        aggregationEnabled_ = true;
+        aggregationPending_ = true;
+    }
+
+    return {};
+}
+
+std::optional<AggregationPeriodInfo> RecoveryCore::aggregationPeriodInfo() const noexcept {
+    const auto actual = backend_.facts();
+
+    if (!aggregationEnabled_ || cutoff_ || connectionFenced_ || !actual.present || !actual.connected ||
+        !actual.authenticated || actual.terminal)
+        return {};
+
+    return aggregationInfo_;
+}
+
 ConnectionStatistics RecoveryCore::retireStatistics() noexcept {
     cutoff();
 
@@ -894,6 +921,8 @@ RecoveryObservation RecoveryCore::execute(RecoveryTicket ticket, RecoveryTurnWor
             connectionFenced_ = false;
             configuration_.firstWriter.reset();
             descriptor_ = false;
+            aggregationInfo_.reset();
+            aggregationPending_ = aggregationEnabled_;
             description_ = 0;
             resetRequested_ = {};
             converged_ = {};
@@ -912,11 +941,32 @@ RecoveryObservation RecoveryCore::execute(RecoveryTicket ticket, RecoveryTurnWor
             return failure(started.error(), classified.cause, classified.retryable);
         }
         case RecoveryAction::POLL_ATTEMPT: {
+            const auto observeAggregation = [&] {
+                if (!aggregationEnabled_ || !event_ || event_->kind() != protocol::LiveEventKind::PROTOCOL)
+                    return true;
+
+                const auto snapshot = event_->snapshot();
+                bool complete = false;
+                const auto observed =
+                    peerAggregationPeriodInfo(snapshot.protocol(),
+                                              {configuration_.queue(0).has_value(), configuration_.queue(1).has_value(),
+                                               configuration_.queue(2).has_value()},
+                                              work.session, &complete);
+
+                if (complete)
+                    aggregationInfo_ = observed;
+
+                return complete;
+            };
+
             if (model.currentCause != RecoveryCause::NONE && !abortIssued_) {
                 return recoveryResult(ticket, RecoveryCompletion::DEFERRED);
             }
 
             if (event_ && event_->kind() != protocol::LiveEventKind::DATA) {
+                if (!observeAggregation())
+                    return recoveryResult(ticket, RecoveryCompletion::DEFERRED);
+
                 (void)releaseEvent(work.session);
             }
 
@@ -936,6 +986,32 @@ RecoveryObservation RecoveryCore::execute(RecoveryTicket ticket, RecoveryTurnWor
                 } else if (admitted.error().error != mux::QueueError::BUSY &&
                            admitted.error().error != mux::QueueError::WORK_LIMIT) {
                     return failure(queueFailure(admitted.error()), RecoveryCause::RESOURCE);
+                }
+            }
+
+            if (aggregationEnabled_ && aggregationPending_ && descriptor_ && !cutoff_ && !connectionFenced_) {
+                const auto actual = backend_.facts();
+
+                if (actual.connected && actual.authenticated && !actual.terminal) {
+                    const auto text = aggregationRequestText(requestedAggregation_);
+                    const std::array<protocol::LivePropertyView, 1> values{
+                        {{u"requestedAggregationPeriod", text.view()}}};
+                    std::array<protocol::LiveMessageView, 3> receive{};
+                    constexpr std::array<std::int32_t, 3> ids{10, 15, 20};
+                    constexpr std::array<std::u16string_view, 3> names{u"TICKER_DATA", u"STREAM_DATA", u"HISTORY_DATA"};
+                    std::size_t count = 0;
+
+                    for (std::size_t family = 0; family != 3; ++family)
+                        if (configuration_.queue(family))
+                            receive[count++] = {ids[family], names[family], values};
+
+                    const auto admitted = backend_.protocol({{}, {}, {receive.data(), count}}, work.session);
+
+                    if (admitted)
+                        aggregationPending_ = false;
+                    else if (admitted.error().error != RecoveryError::WORK_LIMIT &&
+                             !recoveryOutputBlocked(admitted.error()))
+                        return failure(admitted.error(), RecoveryCause::RESOURCE);
                 }
             }
 
@@ -973,6 +1049,9 @@ RecoveryObservation RecoveryCore::execute(RecoveryTicket ticket, RecoveryTurnWor
             }
 
             if (event_ && (event_->kind() != protocol::LiveEventKind::DATA || cutoff_ || connectionFenced_)) {
+                if (!cutoff_ && !connectionFenced_ && !observeAggregation())
+                    return recoveryResult(ticket, RecoveryCompletion::DEFERRED);
+
                 (void)releaseEvent(work.session);
             }
 
@@ -1057,6 +1136,9 @@ RecoveryObservation RecoveryCore::execute(RecoveryTicket ticket, RecoveryTurnWor
                     u"TICKER_REMOVE_SUBSCRIPTION", u"STREAM_REMOVE_SUBSCRIPTION", u"HISTORY_REMOVE_SUBSCRIPTION"};
                 constexpr std::array<std::u16string_view, 3> dataNames{u"TICKER_DATA", u"STREAM_DATA", u"HISTORY_DATA"};
                 std::size_t sent = commonNames.size(), received = commonNames.size();
+                const auto aggregation = aggregationRequestText(requestedAggregation_);
+                const std::array<protocol::LivePropertyView, 1> aggregationProperties{
+                    {{u"requestedAggregationPeriod", aggregation.view()}}};
 
                 for (std::size_t family = 0; family != 3; ++family) {
                     if (!configuration_.queue(family))
@@ -1064,7 +1146,10 @@ RecoveryObservation RecoveryCore::execute(RecoveryTicket ticket, RecoveryTurnWor
 
                     send[sent++] = {adds[family], addNames[family], {}};
                     send[sent++] = {adds[family] + 1, removeNames[family], {}};
-                    receive[received++] = {data[family], dataNames[family], {}};
+                    receive[received++] = {data[family], dataNames[family],
+                                           aggregationEnabled_
+                                               ? std::span<const protocol::LivePropertyView>{aggregationProperties}
+                                               : std::span<const protocol::LivePropertyView>{}};
                 }
 
                 const std::array<protocol::LivePropertyView, 1> history{{{u"opt", u"hs"}}};
@@ -1074,8 +1159,10 @@ RecoveryObservation RecoveryCore::execute(RecoveryTicket ticket, RecoveryTurnWor
                 auto admitted = output(
                     backend_.protocol({properties, {send.data(), sent}, {receive.data(), received}}, work.session));
 
-                if (admitted.outputAdmitted)
+                if (admitted.outputAdmitted) {
                     descriptor_ = true;
+                    aggregationPending_ = false;
+                }
 
                 return admitted;
             } else if (description_ < configuration_.blueprint.size()) {

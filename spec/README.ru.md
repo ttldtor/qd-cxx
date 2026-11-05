@@ -54,3 +54,5 @@
 - [Сериализованные вложения](events/ATTACHMENTS.ru.md) и [получение Message/Configuration](../docs/MISC-EVENTS.ru.md): владеющие nullable bytes, явные локальные кодеки и version admission collector.
 
 - [Конфигурация экземпляра endpoint](transport/ENDPOINT-CONFIGURATION.ru.md): pure validation, immutable precedence и explicit activation.
+
+[Запрошенная серверная агрегация](transport/SERVER-AGGREGATION.ru.md): существующие QTP request/info properties, timing и finite ownership.

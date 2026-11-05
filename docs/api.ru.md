@@ -40,3 +40,5 @@
 - [Message и Configuration](MISC-EVENTS.ru.md): владеющие сериализованные вложения и явные нативные кодеки через `qdcxx_misc_events`/`qdcxx_attachments`; Message STREAM и Configuration STREAM/TICKER.
 
 [Конфигурация endpoint](ENDPOINT-CONFIGURATION.ru.md): явные адреса/свойства, неизменяемые снимки, эффективные локальные значения и границы совместимости Java.
+
+[Серверная агрегация](SERVER-AGGREGATION.ru.md): отдельные local request и peer report, bounded descriptor updates и явный UNKNOWN.

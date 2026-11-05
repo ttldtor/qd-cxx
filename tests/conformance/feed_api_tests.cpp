@@ -438,7 +438,8 @@ TEST_CASE("subscription statistics reconcile overlap listener fanout failure and
     auto schema = standardSchema();
     const std::vector<std::u16string> symbols{u"IBM"};
     const std::vector<peer::Record> records{{u"IBM", standardValues(schema)}, {u"IBM", standardValues(schema)}};
-    peer::Peer source(schema, records, symbols, 8192, peer::PeerMode::HOLD, script(core::SubscriptionFamily::STREAM));
+    peer::Peer source(schema, records, symbols, 8192, peer::PeerMode::HOLD,
+                      script(core::SubscriptionFamily::STREAM, true));
     auto endpoint = runtime.createEndpoint(endpointOptions(api::DeliveryContract::STREAM));
     auto healthy = endpoint->getFeed()->createSubscription<events::Quote>();
     auto broken = endpoint->getFeed()->createSubscription<events::Quote>();
@@ -491,6 +492,18 @@ TEST_CASE("subscription statistics reconcile overlap listener fanout failure and
         }
     });
     endpoint->connect(address(source));
+    REQUIRE(eventually([&] {
+        const auto first = healthy->getStatistics();
+        const auto second = broken->getStatistics();
+        const auto third = silent->getStatistics();
+
+        return first.sourceEpoch && *first.sourceEpoch > 0 && first.sourceEpoch == second.sourceEpoch &&
+               first.sourceEpoch == third.sourceEpoch && first.activeSelectors == 1 && second.activeSelectors == 1 &&
+               third.activeSelectors == 1 && first.activeDesiredRevision == first.desiredRevision &&
+               second.activeDesiredRevision == second.desiredRevision &&
+               third.activeDesiredRevision == third.desiredRevision;
+    }));
+    source.releaseData();
     REQUIRE(eventually([&] {
         return seen == 4 && healthy->getStatistics().deliveredEvents.value == 2 &&
                broken->getStatistics().callbackFailedEvents.value == 2 &&

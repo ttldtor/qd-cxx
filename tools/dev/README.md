@@ -346,3 +346,5 @@ The [serialized attachment oracle](../upstream/attachment-oracle/README.md) capt
 cache replay. Input-free EN/RU/Get-Help, bounded JDK8 Capture/Verify with exact class/resource inventories.
 
 - [Endpoint configuration oracle](../upstream/endpoint-configuration-oracle/README.md): actual pinned address/property/lifecycle consumers, owned loopback, finite Capture/Verify and EN/RU help.
+
+- [Server aggregation oracle](../upstream/server-aggregation-oracle/README.md): production Java public bounds, full/delta/reset/clamp, TimePeriodInfo and real reconnect; input-free EN/RU help, bounded Capture/Verify.

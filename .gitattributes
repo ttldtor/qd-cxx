@@ -786,3 +786,9 @@ tools/upstream/endpoint-configuration-oracle/*.java text eol=lf
 tools/upstream/endpoint-configuration-oracle/*.ps1 text eol=lf
 tests/fixtures/endpoint-configuration/*.tsv -text -whitespace
 tests/fixtures/endpoint-configuration/*.json text eol=lf
+
+# Preserve exact production server-aggregation observations and source bindings.
+tools/upstream/server-aggregation-oracle/*.java text eol=lf
+tools/upstream/server-aggregation-oracle/*.ps1 text eol=lf
+tests/fixtures/server-aggregation/*.tsv -text -whitespace
+tests/fixtures/server-aggregation/*.json text eol=lf

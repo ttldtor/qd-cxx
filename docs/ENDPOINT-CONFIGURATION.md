@@ -63,6 +63,7 @@ insensitive and means milliseconds, as in the pinned Java consumer.
 | Key | Default | Accepted value |
 | --- | --- | --- |
 | dxfeed.address | absent | Validated plain route, optionally followed by flat property blocks at construction |
+| dxfeed.requestedAggregationPeriod | absent | QD TimePeriod text from zero through 24 hours; see [server aggregation](SERVER-AGGREGATION.md) |
 | qdcxx.name | empty | Printable ASCII local metadata label, at most 128 bytes; does not rename SDK threads |
 | qdcxx.deliveryContract | ticker | ticker or stream |
 | dxfeed.wildcard.enable | false | ASCII case insensitive true/false; true requires STREAM |
@@ -93,21 +94,21 @@ localhost:7300[reconnectDelay=250,qdcxx.name=quotes][qdcxx.maximumAttempts=3]
 ~~~
 
 Blocks retain original order. Native name/timeouts/attempts and the verified reconnectDelay
-alias are supported inside them. Address, delivery-contract and wildcard keys in these blocks
+alias, and requestedAggregationPeriod (empty resets), are supported inside them. Address, delivery-contract and wildcard keys in these blocks
 reject. Nested blocks, parentheses, escaping, URI/codec prefixes, host lists, proxy/listen/file
 connectors and credentials reject. This profile adds no TLS or negotiated authentication.
 
 ## Inspection, errors and limits
 
-snapshot() returns eleven owning canonical policy rows and the optional stripped configured
+snapshot() returns twelve owning canonical policy rows and the optional stripped configured
 address. getEffectiveConfiguration() additionally copies the first accepted route spelling,
-current admitted connect intent and control revision under the endpoint mutex. Local policy,
+current admitted connect intent and control revision under the endpoint mutex. The explicit aggregation setter updates only its current local row and requestedAggregationRevision; the original EndpointConfiguration stays immutable. Local policy,
 metadata and accepted requests do not establish DNS resolution, peer delivery or negotiated
 server values. The snapshot remains readable after endpoint/runtime retirement.
 
 EndpointConfigurationLimits bounds combined entries (64), key bytes (96), value/address
 bytes (4096) and scanned key/value bytes (16384). Inline entries consume this same envelope
-in addition to their containing address value. Output has eleven policy rows and at most two
+in addition to their containing address value. Output has twelve policy rows and at most two
 route strings. These are logical input/output limits, not an exact allocator/RSS cap. Ordinary
 runtime, registry, network and retained-copy limits continue independently.
 

@@ -57,12 +57,14 @@ handle допускает только уничтожение или присв�
 
 ## Поддерживаемая политика
 
-Ключи чувствительны к регистру. Только inline alias connector reconnectDelay сравнивается
-без учёта ASCII-регистра и означает миллисекунды, как в pinned Java consumer.
+Ключи чувствительны к регистру. Inline aliases reconnectDelay и requestedAggregationPeriod
+сравниваются без учёта ASCII-регистра. reconnectDelay означает миллисекунды.
+requestedAggregationPeriod использует QD TimePeriod: bare 1 означает одну секунду.
 
 | Ключ | По умолчанию | Значение |
 | --- | --- | --- |
 | dxfeed.address | отсутствует | Проверенный plain маршрут; при конструировании допустимы flat-блоки свойств |
+| dxfeed.requestedAggregationPeriod | отсутствует | QD TimePeriod от нуля до 24 часов; см. [серверную агрегацию](SERVER-AGGREGATION.ru.md) |
 | qdcxx.name | пустое | Локальная metadata-метка printable ASCII до 128 байт; потоки SDK не переименовывает |
 | qdcxx.deliveryContract | ticker | ticker или stream |
 | dxfeed.wildcard.enable | false | true/false без учёта ASCII-регистра; true требует STREAM |
@@ -92,14 +94,14 @@ handle допускает только уничтожение или присв�
 localhost:7300[reconnectDelay=250,qdcxx.name=quotes][qdcxx.maximumAttempts=3]
 ~~~
 
-Блоки сохраняют исходный порядок. В них допустимы нативные name/timeouts/attempts и проверенный
-alias reconnectDelay. Address, delivery-contract и wildcard в блоках отклоняются.
+Блоки сохраняют исходный порядок. В них допустимы нативные name/timeouts/attempts и проверенные
+aliases reconnectDelay и requestedAggregationPeriod (пустой reset). Address, delivery-contract и wildcard в блоках отклоняются.
 Nested blocks, parentheses, escaping, URI/codec prefixes, списки hosts, proxy/listen/file
 connectors и credentials отклоняются. Этот профиль не добавляет TLS или negotiated authentication.
 
 ## Просмотр, ошибки и ограничения
 
-snapshot() возвращает одиннадцать владеющих canonical policy rows и необязательный адрес без
+snapshot() возвращает двенадцать владеющих canonical policy rows и необязательный адрес без
 inline-текста. getEffectiveConfiguration() дополнительно копирует первое принятое написание
 маршрута, текущий принятый connect intent и control revision под mutex endpoint. Локальные policy,
 metadata и запросы не подтверждают DNS, доставку peer или согласованные сервером значения.
@@ -107,7 +109,7 @@ metadata и запросы не подтверждают DNS, доставку p
 
 EndpointConfigurationLimits ограничивает совокупное число записей (64), длину ключа (96),
 value/address (4096) и просмотренные байты ключей/значений (16384). Inline-записи дополнительно
-расходуют тот же бюджет поверх содержащего их адреса. Выход содержит одиннадцать policy rows
+расходуют тот же бюджет поверх содержащего их адреса. Выход содержит двенадцать policy rows
 и не более двух строк маршрута. Это логические пределы, а не точный allocator/RSS cap.
 Runtime, registry, network и retained copies сохраняют свои независимые ограничения.
 
@@ -140,3 +142,4 @@ defaults, explicit builder values побеждают; native получает с
 Полный configuration catalogue, TLS/authentication handoff, failover/multiple hosts,
 proxy/listen/file connectors и server aggregation остаются отдельными возможностями.
 Этот профиль не объявляет полную веху принимающего клиента завершённой.
+Явный aggregation setter меняет только текущую локальную aggregation row и requestedAggregationRevision; исходная EndpointConfiguration остаётся immutable. Inline alias requestedAggregationPeriod допускает пустой reset.

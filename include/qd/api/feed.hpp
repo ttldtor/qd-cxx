@@ -13,6 +13,7 @@
 #include "qd/events/text_events.hpp"
 #include "qd/events/trade.hpp"
 #include "qd/events/trade_eth.hpp"
+#include "qd/transport/aggregation.hpp"
 #include "qd/transport/tcp_runtime.hpp"
 
 #include <chrono>
@@ -125,6 +126,8 @@ struct EndpointOptions {
     std::optional<EventRegistry>
         eventRegistry;           ///< Immutable owning snapshot; absence selects the current built-in market registry.
     bool enableWildcard = false; ///< Explicit controlled-peer STREAM All permission; never enabled by text or peer.
+    std::optional<std::chrono::milliseconds> requestedAggregationPeriod; ///< Initial server request; null asks for
+                                                                         ///< server default, never an effective result.
 };
 
 /** Last SDK-worker observation, never an upstream acknowledgement or a whole-network guarantee. */
@@ -549,6 +552,21 @@ class Endpoint final {
      * @param address ASCII host:port or [IPv6]:port; no TLS/URI/login/configuration extensions.
      */
     void connect(std::string_view address);
+    /** Inspect current local intent without progressing native work; absent means server default.
+     * @return Owning millisecond value, including zero, independently of any peer-reported range.
+     */
+    [[nodiscard]] std::optional<std::chrono::milliseconds> getRequestedAggregationPeriod() const noexcept;
+    /** Commit a local request; the existing worker coalesces updates into bounded protocol output.
+     * This does not reconnect or start a worker. Offline/closed handles retain local intent only.
+     * Peer reports can describe an earlier request and are not acknowledgements of this mutation.
+     * @param period Nonnegative milliseconds up to the accepted maximum, or null to request server default.
+     * @throws Error Invalid value or exhausted local request revision; no partial intent change.
+     */
+    void setRequestedAggregationPeriod(std::optional<std::chrono::milliseconds> period);
+    /** Inspect the current source's last peer-reported range without I/O or request inference.
+     * @return Owning range, or absent for unknown/legacy/malformed/unavailable/offline state.
+     */
+    [[nodiscard]] std::optional<transport::AggregationPeriodInfo> getAggregationPeriodInfo() const noexcept;
     /** Activate the immutable configured route explicitly; construction never auto-connects.
      * Include qd/api/endpoint_configuration.hpp to construct the configuration.
      * @throws Error If no route was configured, or ordinary connect admission rejects.

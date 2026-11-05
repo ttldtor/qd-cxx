@@ -351,6 +351,17 @@ ConnectionStatistics detail::TcpRecoveryFactory::retireStatistics(TcpRecovery &r
     return recovery.impl_ ? recovery.impl_->core.retireStatistics() : ConnectionStatistics{};
 }
 
+std::expected<void, RecoveryDiagnostic>
+detail::TcpRecoveryFactory::requestAggregationPeriod(TcpRecovery &recovery,
+                                                     std::optional<std::chrono::milliseconds> period) noexcept {
+    return recovery.impl_ ? recovery.impl_->core.requestAggregationPeriod(period) : std::unexpected(moved());
+}
+
+std::optional<AggregationPeriodInfo>
+detail::TcpRecoveryFactory::aggregationPeriodInfo(const TcpRecovery &recovery) noexcept {
+    return recovery.impl_ ? recovery.impl_->core.aggregationPeriodInfo() : std::nullopt;
+}
+
 RecoveryCapacity TcpRecovery::capacity() const noexcept {
     return impl_ ? impl_->core.capacity() : RecoveryCapacity{};
 }

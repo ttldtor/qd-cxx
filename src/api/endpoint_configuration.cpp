@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: BSL-1.0
 #include "endpoint_configuration.hpp"
 #include "../client/endpoint_host.hpp"
+#include "../detail/qd_time_period.hpp"
+#include "../transport/aggregation.hpp"
 
 #include <algorithm>
 #include <array>
@@ -21,7 +23,7 @@ constexpr std::size_t MAXIMUM_ROUTE_BYTES =
 constexpr std::size_t MAXIMUM_LABEL_BYTES = 128; ///< Local diagnostic label, never a connector/thread name alias.
 constexpr unsigned char FIRST_ASCII = 0x20;
 constexpr unsigned char LAST_ASCII = 0x7e;
-constexpr std::array<std::string_view, 12> KEYS{"qdcxx.name",
+constexpr std::array<std::string_view, 13> KEYS{"qdcxx.name",
                                                 "dxfeed.wildcard.enable",
                                                 "qdcxx.connectTimeoutMillis",
                                                 "qdcxx.dnsTimeoutMillis",
@@ -32,9 +34,24 @@ constexpr std::array<std::string_view, 12> KEYS{"qdcxx.name",
                                                 "qdcxx.drainTimeoutMillis",
                                                 "qdcxx.maximumAttempts",
                                                 "qdcxx.deliveryContract",
+                                                "dxfeed.requestedAggregationPeriod",
                                                 "dxfeed.address"};
 
-enum Key : std::size_t { NAME, WILDCARD, CONNECT, DNS, READ, WRITE, POLL, RETRY, DRAIN, ATTEMPTS, CONTRACT, ADDRESS };
+enum Key : std::size_t {
+    NAME,
+    WILDCARD,
+    CONNECT,
+    DNS,
+    READ,
+    WRITE,
+    POLL,
+    RETRY,
+    DRAIN,
+    ATTEMPTS,
+    CONTRACT,
+    REQUESTED,
+    ADDRESS
+};
 
 struct Selected {
     std::string_view value;
@@ -85,11 +102,14 @@ std::size_t keyIndex(std::string_view key, bool inlineProperty) {
     if (inlineProperty && equalAscii(key, "reconnectDelay"))
         return RETRY;
 
+    if (inlineProperty && equalAscii(key, "requestedAggregationPeriod"))
+        return REQUESTED;
+
     const auto found = std::ranges::find(KEYS, key);
 
     if (found == KEYS.end() ||
-        (inlineProperty &&
-         (found - KEYS.begin() == ADDRESS || found - KEYS.begin() == WILDCARD || found - KEYS.begin() == CONTRACT))) {
+        (inlineProperty && (found - KEYS.begin() == ADDRESS || found - KEYS.begin() == WILDCARD ||
+                            found - KEYS.begin() == CONTRACT || found - KEYS.begin() == REQUESTED))) {
         reject(ErrorCode::UNSUPPORTED_PROFILE, "endpoint-property-unsupported");
     }
 
@@ -223,12 +243,29 @@ std::array<std::string, ADDRESS> values(const EndpointOptions &options, const st
             std::to_string(options.retryDelay.count()),
             std::to_string(options.drainTimeout.count()),
             std::to_string(options.maximumAttempts),
-            options.contract == DeliveryContract::STREAM ? "stream" : "ticker"};
+            options.contract == DeliveryContract::STREAM ? "stream" : "ticker",
+            detail::aggregationPropertyValue(options.requestedAggregationPeriod)};
 }
 } // namespace
 
 namespace detail {
+std::string aggregationPropertyValue(std::optional<std::chrono::milliseconds> period) {
+    const auto encoded = transport::detail::aggregationRequestText(period);
+    std::string result;
+    result.reserve(encoded.size);
+
+    for (const auto unit : encoded.view())
+        result.push_back(static_cast<char>(unit));
+
+    return result;
+}
+
 void validateEndpointOptions(const EndpointOptions &options) {
+    if (options.requestedAggregationPeriod &&
+        (options.requestedAggregationPeriod->count() < 0 ||
+         *options.requestedAggregationPeriod > transport::MAXIMUM_REQUESTED_AGGREGATION_PERIOD))
+        reject(ErrorCode::INVALID_ARGUMENT, "endpoint-aggregation-period");
+
     if (options.enableWildcard && options.contract != DeliveryContract::STREAM)
         reject(ErrorCode::UNSUPPORTED_PROFILE, "endpoint-wildcard-contract");
 
@@ -343,6 +380,17 @@ EndpointConfiguration EndpointConfiguration::create(const EndpointOptions &fallb
                     options.contract = DeliveryContract::TICKER;
                 else
                     reject(ErrorCode::INVALID_ARGUMENT, "endpoint-property-value");
+            } else if (key == REQUESTED) {
+                if (text.empty() && selected[key].origin == EndpointPropertyOrigin::ADDRESS_PROPERTIES)
+                    options.requestedAggregationPeriod.reset();
+                else {
+                    const auto parsed = org::ttldtor::qdcxx::detail::parseQdTimePeriod(text);
+
+                    if (!parsed || *parsed > transport::MAXIMUM_REQUESTED_AGGREGATION_PERIOD)
+                        reject(ErrorCode::INVALID_ARGUMENT, "endpoint-aggregation-period");
+
+                    options.requestedAggregationPeriod = *parsed;
+                }
             } else if (key == ATTEMPTS)
                 options.maximumAttempts =
                     static_cast<std::uint32_t>(integer(text, std::numeric_limits<std::uint32_t>::max()));

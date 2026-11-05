@@ -1,0 +1,92 @@
+{
+  "revision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "javaVersion": "openjdk version \"1.8.0_422\"",
+  "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
+  "javacSha256": "633143e961aa18051c09112b85333f5cdbd845b54eb39678eb15b91ca8bbb527",
+  "harnessSha256": "c93e8f5f857d60ee17a70280975614b75d9b2c65f3f62d257de1cb04a63fce96",
+  "launcherSha256": "e02597a30fd9a0e91fa2b046b557fdf2657144e5aff3beeff102fc62f24aa3cc",
+  "upstreamSources": [
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/api/DXEndpoint.java",
+      "sha256": "824636ff1044530fdcac057af629d25886fd9d1e4946f03316303ebd49f32488"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/api/impl/DXEndpointImpl.java",
+      "sha256": "32b962cc562848869d5eb8014c7fd5e3a59ae543958dba4cd0bc2e0c2dd2896b"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/QDEndpoint.java",
+      "sha256": "a6e71b7031410e9dcc01ea3f7f7f5e98a2e854c51d94ef2d0a6db38e2767c057"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/MessageAdapter.java",
+      "sha256": "5c697275f38f3642557343136984dc27a0d414322470f0b994ac63719f9432f5"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/DistributorAdapter.java",
+      "sha256": "4b6662bcc3b0a1227e5d298dacec84676c576118e1d82034595e59e15bd400cb"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/AgentAdapter.java",
+      "sha256": "799c80c5db63cf72a4ed5f022e1fd0bf8ff5e8c455e979dad9c3b258ed5937e8"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/ChannelShaper.java",
+      "sha256": "02bc48a2a30666dd3e21b2710eb468f8109a491f5d9598cb46efd15560aa5655"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/ProtocolDescriptor.java",
+      "sha256": "f47ba6af6a874a0646cdc4ced41e1d3620580ab672cb974e0bb2ac4818d21ddb"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/MessageDescriptor.java",
+      "sha256": "8640f4aaf36e030679bef1f74b05828f239a2f08905827609fa6b326bd607fcf"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/BinaryQTPParser.java",
+      "sha256": "785d4e9fec8129a6b2a6f0e875771e992183c20413614a43e6de3234775c02c8"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/AbstractQTPComposer.java",
+      "sha256": "24ab932a300e9bf1c07a9425bef414fa66683a03ae5b21b6aea221961f59ab37"
+    },
+    {
+      "path": "dxlib/src/main/java/com/devexperts/util/TimePeriod.java",
+      "sha256": "341f0f6be9d46eb0106ea81a73fd52ad45f7fa4aabfdf4f4ce9e0a0a55b0a8ad"
+    },
+    {
+      "path": "dxlib/src/main/java/com/devexperts/util/TimePeriodInfo.java",
+      "sha256": "95713995a7ab6f18918b364a7a6e4d5c2158ca102f4bb5649f5286094f967569"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/BinaryQTPComposer.java",
+      "sha256": "fd158524cc8b9ebbf63cbc4ba97f6a39e95a0e07368a6589f9a44b0dba1e42da"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/MessageConnectors.java",
+      "sha256": "3fd96096d4ce983cb2032655f344f6dda5a73efc67e668c76e9200a5dcc2cfe3"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/socket/ClientSocketConnector.java",
+      "sha256": "b8ea286e1f7207744386f49570c2dcbd772433fabad4ab0e71a8796193e2b63b"
+    },
+    {
+      "path": "dxlib/src/main/java/com/devexperts/io/StreamInput.java",
+      "sha256": "3724f411521d52584f69fd7afc230387797b1df87fcea8f6f06a942b3032cbb6"
+    },
+    {
+      "path": "dxlib/src/main/java/com/devexperts/util/FastDoubleUtil.java",
+      "sha256": "fdfd9c7855ed6f9a11e7fcea2cd6c8495670656f7b161d52aba62ae4f7a6f9f1"
+    },
+    {
+      "path": "dxlib/src/main/java/com/devexperts/io/BufferedInput.java",
+      "sha256": "740aab757acd847b0e0086449322a82f5c65ca133cb6fa4c26432e238ce60cd9"
+    }
+  ],
+  "productionClassFiles": 1290,
+  "productionResourceFiles": 27,
+  "productionClassInventorySha256": "90a478b5d3737246d8c897322c9f9db60887846e20117572588e05ae78fbc6d8",
+  "fixtureSha256": "b83a74c9f70d77270ae81ad80c768ef9d26171078462f33eb414dec83fd12946",
+  "rows": 68,
+  "timezoneInvariant": true
+}

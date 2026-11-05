@@ -5,7 +5,7 @@ if(NOT ORG_TTLDTOR_QDCXX_BUILD_CLIENT OR NOT ORG_TTLDTOR_QDCXX_BUILD_RUNTIME)
     message(FATAL_ERROR "BUILD_RECOVERY requires explicit BUILD_CLIENT=ON and BUILD_RUNTIME=ON")
 endif()
 
-add_library(qdcxx_recovery src/transport/recovery_state.cpp src/transport/recovery_copy_profile.cpp
+add_library(qdcxx_recovery src/transport/aggregation.cpp src/transport/recovery_state.cpp src/transport/recovery_copy_profile.cpp
     src/transport/recovery_configuration.cpp src/transport/recovery_core.cpp
     src/transport/recovery_core_replay.cpp src/transport/tcp_recovery.cpp)
 target_link_libraries(qdcxx_recovery PUBLIC qdcxx_transport qdcxx_client qdcxx_mux_queue)
@@ -15,7 +15,7 @@ install(TARGETS qdcxx_recovery EXPORT qdcxxTargets
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
-install(FILES include/qd/transport/recovery.hpp include/qd/transport/tcp_recovery.hpp
+install(FILES include/qd/transport/aggregation.hpp include/qd/transport/recovery.hpp include/qd/transport/tcp_recovery.hpp
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qd/transport")
 
 if(ORG_TTLDTOR_QDCXX_BUILD_TLS)

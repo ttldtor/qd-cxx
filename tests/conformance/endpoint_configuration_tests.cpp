@@ -67,7 +67,7 @@ TEST_CASE("configuration owns explicit layers and reports selected origins and c
     auto configuration = api::EndpointConfiguration::create({}, defaults, overrides);
     label.assign("changed");
     auto snapshot = configuration.snapshot();
-    CHECK(snapshot.properties.size() == 11);
+    CHECK(snapshot.properties.size() == 12);
     CHECK(snapshot.configuredAddress == "localhost:1234");
     CHECK_FALSE(snapshot.acceptedAddress);
     CHECK_FALSE(snapshot.activationRequested);
