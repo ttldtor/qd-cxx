@@ -362,3 +362,5 @@ class/resource inventories.
 - [Endpoint configuration oracle](../upstream/endpoint-configuration-oracle/README.ru.md): реальные pinned address/property/lifecycle consumers, собственный loopback, finite Capture/Verify и EN/RU help.
 
 - [Oracle серверной агрегации](../upstream/server-aggregation-oracle/README.ru.md): actual Java public bounds, full/delta/reset/clamp, TimePeriodInfo и реальный reconnect; input-free EN/RU help, finite Capture/Verify.
+
+- [Time-series oracle](../upstream/time-series-oracle/README.ru.md): закреплённые Java8 identity/range/capability, наследование, bounded Capture/Verify и справка EN/RU без входных путей.

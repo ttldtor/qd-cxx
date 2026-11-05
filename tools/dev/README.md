@@ -348,3 +348,5 @@ cache replay. Input-free EN/RU/Get-Help, bounded JDK8 Capture/Verify with exact 
 - [Endpoint configuration oracle](../upstream/endpoint-configuration-oracle/README.md): actual pinned address/property/lifecycle consumers, owned loopback, finite Capture/Verify and EN/RU help.
 
 - [Server aggregation oracle](../upstream/server-aggregation-oracle/README.md): production Java public bounds, full/delta/reset/clamp, TimePeriodInfo and real reconnect; input-free EN/RU help, bounded Capture/Verify.
+
+- [Time-series oracle](../upstream/time-series-oracle/README.md): pinned Java8 identity/range/capability and inheritance, bounded Capture/Verify and input-free EN/RU help.

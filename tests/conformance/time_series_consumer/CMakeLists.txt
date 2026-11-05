@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.25)
+project(time_series_consumer LANGUAGES CXX)
+find_package(qdcxx CONFIG REQUIRED)
+add_executable(time_series_consumer main.cpp header.cpp)
+target_link_libraries(time_series_consumer PRIVATE qdcxx_subscription_selectors)
+set_target_properties(time_series_consumer PROPERTIES CXX_EXTENSIONS OFF)

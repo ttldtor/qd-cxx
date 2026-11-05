@@ -32,3 +32,5 @@ documents the separate manual help regression and optional native compression co
 The [schedule query oracle](schedule-query-oracle/README.md) captures actual Day/Session/calendar/raw-reference behavior with separate source-derived TZDB2026f data expectations and input-free EN/RU help.
 
 The [serialized attachment oracle](attachment-oracle/README.md) witnesses real Message/Configuration delegates, serialized Object bytes and explicit Java getter failures, with input-free EN/RU help.
+
+- [Time-series oracle](time-series-oracle/README.md): pinned Java8 identity/range/capability and inheritance, bounded Capture/Verify and input-free EN/RU help.

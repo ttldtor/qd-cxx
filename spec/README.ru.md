@@ -56,3 +56,5 @@
 - [Конфигурация экземпляра endpoint](transport/ENDPOINT-CONFIGURATION.ru.md): pure validation, immutable precedence и explicit activation.
 
 [Запрошенная серверная агрегация](transport/SERVER-AGGREGATION.ru.md): существующие QTP request/info properties, timing и finite ownership.
+
+- [Идентичность time-series и логический диапазон](subscriptions/TIME-SERIES-IDENTITY.ru.md): явная capability, owning-обёртки и атомарные мутации, отдельно от HISTORY receiving.

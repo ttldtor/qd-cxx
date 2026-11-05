@@ -56,3 +56,5 @@ Exact conformance results belong to the [developer reading path](../docs/develop
 - [Instance-local endpoint configuration](transport/ENDPOINT-CONFIGURATION.md): pure validation, immutable precedence and explicit activation.
 
 [Requested server aggregation](transport/SERVER-AGGREGATION.md): existing QTP request/info properties, timing and bounded ownership.
+
+- [Time-series identity and logical ranges](subscriptions/TIME-SERIES-IDENTITY.md): explicit capability, owning wrappers and atomic mutations, separate from HISTORY receiving.

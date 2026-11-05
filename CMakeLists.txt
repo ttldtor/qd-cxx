@@ -134,8 +134,9 @@ if(ORG_TTLDTOR_QDCXX_BUILD_SCHEDULE)
         resources/schedule/manifest.json DESTINATION "${CMAKE_INSTALL_DATADIR}/qdcxx/schedule")
     install(FILES licenses/schedule/MPL-2.0.txt DESTINATION "${CMAKE_INSTALL_DATADIR}/qdcxx/licenses/schedule")
 endif()
-add_library(qdcxx_subscription_selectors src/api/subscription_selector.cpp)
-target_link_libraries(qdcxx_subscription_selectors PUBLIC qdcxx_order_index qdcxx_event_values)
+add_library(qdcxx_subscription_selectors src/api/subscription_selector.cpp src/api/time_series_subscription.cpp)
+find_package(Threads REQUIRED)
+target_link_libraries(qdcxx_subscription_selectors PUBLIC qdcxx_order_index qdcxx_event_values Threads::Threads)
 set_target_properties(qdcxx_subscription_selectors PROPERTIES CXX_EXTENSIONS OFF)
 add_library(qdcxx_event_mapping src/events/event_mapping.cpp)
 add_library(qdcxx_order_index src/events/order_index.cpp)
@@ -300,7 +301,7 @@ if(ORG_TTLDTOR_QDCXX_BUILD_IPF_LIVE)
         DESTINATION "${CMAKE_INSTALL_DATADIR}/qdcxx/examples/ipf_live")
 endif()
 include(CMakePackageConfigHelpers)
-install(FILES include/qd/api/subscription_selector.hpp DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qd/api")
+install(FILES include/qd/api/subscription_selector.hpp include/qd/api/time_series_subscription.hpp DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qd/api")
 install(TARGETS qdcxx_encoding qdcxx_core qdcxx_protocol qdcxx_collectors qdcxx_mux
     qdcxx_subscription_selectors qdcxx_event_values qdcxx_event_mapping qdcxx_quote qdcxx_profile qdcxx_trade qdcxx_trade_eth qdcxx_summary qdcxx_text_events qdcxx_attachments qdcxx_misc_events qdcxx_market_event_symbols qdcxx_event_sources qdcxx_order_index qdcxx_candle_values qdcxx_java_double qdcxx_event_text EXPORT qdcxxTargets
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
@@ -553,6 +554,11 @@ if(BUILD_TESTING)
             "-DORG_TTLDTOR_QDCXX_SELECTOR_ORACLE_PWSH=${ORG_TTLDTOR_QDCXX_SELECTOR_ORACLE_PWSH}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/server_aggregation_oracle_help.cmake")
         set_tests_properties(server_aggregation_oracle_help PROPERTIES TIMEOUT 120)
+        add_test(NAME time_series_oracle_help COMMAND "${CMAKE_COMMAND}"
+            "-DORG_TTLDTOR_QDCXX_SELECTOR_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DORG_TTLDTOR_QDCXX_SELECTOR_ORACLE_PWSH=${ORG_TTLDTOR_QDCXX_SELECTOR_ORACLE_PWSH}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/time_series_oracle_help.cmake")
+        set_tests_properties(time_series_oracle_help PROPERTIES TIMEOUT 120)
     endif()
     add_executable(qdcxx_subscription_selector_tests tests/conformance/subscription_selector_tests.cpp)
     target_link_libraries(qdcxx_subscription_selector_tests PRIVATE qdcxx_subscription_selectors doctest::doctest)
@@ -561,6 +567,13 @@ if(BUILD_TESTING)
     set_target_properties(qdcxx_subscription_selector_tests PROPERTIES CXX_EXTENSIONS OFF)
     add_test(NAME subscription_selectors COMMAND qdcxx_subscription_selector_tests)
     set_tests_properties(subscription_selectors PROPERTIES TIMEOUT 60)
+    add_executable(qdcxx_time_series_subscription_tests tests/conformance/time_series_subscription_tests.cpp)
+    target_link_libraries(qdcxx_time_series_subscription_tests PRIVATE qdcxx_subscription_selectors doctest::doctest Threads::Threads)
+    target_compile_definitions(qdcxx_time_series_subscription_tests PRIVATE
+        ORG_TTLDTOR_QDCXX_TIME_SERIES_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/time-series/oracle.tsv")
+    set_target_properties(qdcxx_time_series_subscription_tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME time_series_subscription COMMAND qdcxx_time_series_subscription_tests)
+    set_tests_properties(time_series_subscription PROPERTIES TIMEOUT 60)
     add_executable(qdcxx_order_index_tests tests/conformance/order_index_tests.cpp)
     target_link_libraries(qdcxx_order_index_tests PRIVATE qdcxx_order_index doctest::doctest)
     target_compile_definitions(qdcxx_order_index_tests PRIVATE

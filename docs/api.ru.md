@@ -8,6 +8,7 @@
 
 | Компонент | Публичные заголовки | Цель линковки | Подробный контракт |
 | --- | --- | --- | --- |
+| Логические time-series значения | `qd/api/time_series_subscription.hpp` | `qdcxx_subscription_selectors` | [Идентичность, capability и диапазон](TIME-SERIES-SUBSCRIPTIONS.ru.md); без HISTORY-получателя Feed |
 | Текст событий | qd/events/event_text.hpp | qdcxx_event_text | [Вывод UTF-16/UTF-8 с явным контекстом](EVENT-TEXT.ru.md) |
 | Правила расписаний | `qd/schedule/schedule.hpp` | `qdcxx_schedule` | [Владеющие идентичности и типизированные поколения календаря](SCHEDULE-RULES.ru.md); `ORG_TTLDTOR_QDCXX_BUILD_SCHEDULE=ON` (по умолчанию OFF); без Day/Session-запросов и фильтров |
 | Публичный типизированный feed | `qd/api/feed.hpp`, `qd/api/event_registry.hpp` | `qdcxx_feed` | [Endpoint, Feed и типизированные подписки](FEED-API.ru.md), [неизменяемый реестр](../spec/events/EVENT-REGISTRY.ru.md), [смешанные подписки](../spec/events/MIXED-SUBSCRIPTIONS.ru.md); `ORG_TTLDTOR_QDCXX_BUILD_FEED_API=ON` (по умолчанию OFF), требует CLIENT/RUNTIME/RECOVERY |

@@ -1,0 +1,123 @@
+symbol	T(S:,-9223372036854775808)	0	0
+pair	time-ignored	T(S:,-9223372036854775808)	T(S:,0)	true	true	0	0	1	1
+symbol	T(S:,-1)	0	0
+pair	time-ignored	T(S:,-1)	T(S:,0)	true	true	0	0	1	1
+symbol	T(S:,0)	0	0
+pair	time-ignored	T(S:,0)	T(S:,0)	true	true	0	0	1	1
+symbol	T(S:,1)	0	0
+pair	time-ignored	T(S:,1)	T(S:,0)	true	true	0	0	1	1
+symbol	T(S:,1000)	0	0
+pair	time-ignored	T(S:,1000)	T(S:,0)	true	true	0	0	1	1
+symbol	T(S:,9223372036854775807)	0	0
+pair	time-ignored	T(S:,9223372036854775807)	T(S:,0)	true	true	0	0	1	1
+symbol	T(S:00490042004d,-9223372036854775808)	0	72276
+pair	time-ignored	T(S:00490042004d,-9223372036854775808)	T(S:00490042004d,0)	true	true	72276	72276	1	1
+symbol	T(S:00490042004d,-1)	0	72276
+pair	time-ignored	T(S:00490042004d,-1)	T(S:00490042004d,0)	true	true	72276	72276	1	1
+symbol	T(S:00490042004d,0)	0	72276
+pair	time-ignored	T(S:00490042004d,0)	T(S:00490042004d,0)	true	true	72276	72276	1	1
+symbol	T(S:00490042004d,1)	0	72276
+pair	time-ignored	T(S:00490042004d,1)	T(S:00490042004d,0)	true	true	72276	72276	1	1
+symbol	T(S:00490042004d,1000)	0	72276
+pair	time-ignored	T(S:00490042004d,1000)	T(S:00490042004d,0)	true	true	72276	72276	1	1
+symbol	T(S:00490042004d,9223372036854775807)	0	72276
+pair	time-ignored	T(S:00490042004d,9223372036854775807)	T(S:00490042004d,0)	true	true	72276	72276	1	1
+symbol	T(S:004100410050004c007b003d006d007d,-9223372036854775808)	0	1535965294
+pair	time-ignored	T(S:004100410050004c007b003d006d007d,-9223372036854775808)	T(S:004100410050004c007b003d006d007d,0)	true	true	1535965294	1535965294	1	1
+symbol	T(S:004100410050004c007b003d006d007d,-1)	0	1535965294
+pair	time-ignored	T(S:004100410050004c007b003d006d007d,-1)	T(S:004100410050004c007b003d006d007d,0)	true	true	1535965294	1535965294	1	1
+symbol	T(S:004100410050004c007b003d006d007d,0)	0	1535965294
+pair	time-ignored	T(S:004100410050004c007b003d006d007d,0)	T(S:004100410050004c007b003d006d007d,0)	true	true	1535965294	1535965294	1	1
+symbol	T(S:004100410050004c007b003d006d007d,1)	0	1535965294
+pair	time-ignored	T(S:004100410050004c007b003d006d007d,1)	T(S:004100410050004c007b003d006d007d,0)	true	true	1535965294	1535965294	1	1
+symbol	T(S:004100410050004c007b003d006d007d,1000)	0	1535965294
+pair	time-ignored	T(S:004100410050004c007b003d006d007d,1000)	T(S:004100410050004c007b003d006d007d,0)	true	true	1535965294	1535965294	1	1
+symbol	T(S:004100410050004c007b003d006d007d,9223372036854775807)	0	1535965294
+pair	time-ignored	T(S:004100410050004c007b003d006d007d,9223372036854775807)	T(S:004100410050004c007b003d006d007d,0)	true	true	1535965294	1535965294	1	1
+symbol	T(S:002a,-9223372036854775808)	0	42
+pair	time-ignored	T(S:002a,-9223372036854775808)	T(S:002a,0)	true	true	42	42	1	1
+symbol	T(S:002a,-1)	0	42
+pair	time-ignored	T(S:002a,-1)	T(S:002a,0)	true	true	42	42	1	1
+symbol	T(S:002a,0)	0	42
+pair	time-ignored	T(S:002a,0)	T(S:002a,0)	true	true	42	42	1	1
+symbol	T(S:002a,1)	0	42
+pair	time-ignored	T(S:002a,1)	T(S:002a,0)	true	true	42	42	1	1
+symbol	T(S:002a,1000)	0	42
+pair	time-ignored	T(S:002a,1000)	T(S:002a,0)	true	true	42	42	1	1
+symbol	T(S:002a,9223372036854775807)	0	42
+pair	time-ignored	T(S:002a,9223372036854775807)	T(S:002a,0)	true	true	42	42	1	1
+symbol	T(S:03a9d8000000,-9223372036854775808)	0	2614633
+pair	time-ignored	T(S:03a9d8000000,-9223372036854775808)	T(S:03a9d8000000,0)	true	true	2614633	2614633	1	1
+symbol	T(S:03a9d8000000,-1)	0	2614633
+pair	time-ignored	T(S:03a9d8000000,-1)	T(S:03a9d8000000,0)	true	true	2614633	2614633	1	1
+symbol	T(S:03a9d8000000,0)	0	2614633
+pair	time-ignored	T(S:03a9d8000000,0)	T(S:03a9d8000000,0)	true	true	2614633	2614633	1	1
+symbol	T(S:03a9d8000000,1)	0	2614633
+pair	time-ignored	T(S:03a9d8000000,1)	T(S:03a9d8000000,0)	true	true	2614633	2614633	1	1
+symbol	T(S:03a9d8000000,1000)	0	2614633
+pair	time-ignored	T(S:03a9d8000000,1000)	T(S:03a9d8000000,0)	true	true	2614633	2614633	1	1
+symbol	T(S:03a9d8000000,9223372036854775807)	0	2614633
+pair	time-ignored	T(S:03a9d8000000,9223372036854775807)	T(S:03a9d8000000,0)	true	true	2614633	2614633	1	1
+pair	approved-ADR12-cross-kind	I(S:00490042004d,0)	T(S:00490042004d,7)	true	false	72276	72276	2	1
+pair	nested-ADR12-cross-kind	T(I(S:00490042004d,0),0)	T(T(S:00490042004d,7),0)	true	false	72276	72276	2	1
+pair	nested-time-ignored	T(T(S:00490042004d,7),-1)	T(T(S:00490042004d,8),9223372036854775807)	true	true	72276	72276	1	1
+pair	wildcard-not-text	T(ALL,0)	T(S:002a,0)	false	false	42	42	2	2
+attempt	null-symbol	NullPointerException
+attempt	empty-types	IllegalArgumentException
+attempt	null-type	NullPointerException
+capability	market.Quote	false	false
+attempt	raw-constructor-market.Quote	ACCEPTED
+capability	market.Profile	false	false
+attempt	raw-constructor-market.Profile	ACCEPTED
+capability	market.Trade	false	false
+attempt	raw-constructor-market.Trade	ACCEPTED
+capability	market.TradeETH	false	false
+attempt	raw-constructor-market.TradeETH	ACCEPTED
+capability	market.Summary	false	false
+attempt	raw-constructor-market.Summary	ACCEPTED
+capability	misc.TextMessage	false	false
+attempt	raw-constructor-misc.TextMessage	ACCEPTED
+capability	misc.TextConfiguration	false	false
+attempt	raw-constructor-misc.TextConfiguration	ACCEPTED
+capability	misc.Message	false	false
+attempt	raw-constructor-misc.Message	ACCEPTED
+capability	misc.Configuration	false	false
+attempt	raw-constructor-misc.Configuration	ACCEPTED
+capability	market.Order	true	false
+attempt	raw-constructor-market.Order	ACCEPTED
+capability	market.TimeAndSale	true	true
+attempt	raw-constructor-market.TimeAndSale	ACCEPTED
+capability	candle.Candle	true	true
+attempt	raw-constructor-candle.Candle	ACCEPTED
+capability	option.Greeks	true	true
+attempt	raw-constructor-option.Greeks	ACCEPTED
+capability	option.TheoPrice	true	true
+attempt	raw-constructor-option.TheoPrice	ACCEPTED
+capability	option.Underlying	true	true
+attempt	raw-constructor-option.Underlying	ACCEPTED
+capability	option.Series	true	false
+attempt	raw-constructor-option.Series	ACCEPTED
+capability	custom.NuamTimeAndSale	true	true
+attempt	raw-constructor-custom.NuamTimeAndSale	ACCEPTED
+capability	custom-inherited	true	true
+attempt	raw-constructor-custom-inherited	ACCEPTED
+state	initial	9223372036854775807			false
+notice	added	T(S:004100410050004c,9223372036854775807);T(S:00490042004d,9223372036854775807)
+state	symbols-before-range	9223372036854775807	S:004100410050004c;S:00490042004d	T(S:004100410050004c,9223372036854775807);T(S:00490042004d,9223372036854775807)	false
+notice	added	T(S:004100410050004c,0);T(S:00490042004d,0)
+state	range-zero	0	S:004100410050004c;S:00490042004d	T(S:004100410050004c,0);T(S:00490042004d,0)	false
+state	range-zero-noop	0	S:004100410050004c;S:00490042004d	T(S:004100410050004c,0);T(S:00490042004d,0)	false
+notice	added	T(S:004100410050004c,-9223372036854775808);T(S:00490042004d,-9223372036854775808)
+state	range-min	-9223372036854775808	S:004100410050004c;S:00490042004d	T(S:004100410050004c,-9223372036854775808);T(S:00490042004d,-9223372036854775808)	false
+notice	added	T(S:004100410050004c,9223372036854775807);T(S:00490042004d,9223372036854775807)
+state	range-max	9223372036854775807	S:004100410050004c;S:00490042004d	T(S:004100410050004c,9223372036854775807);T(S:00490042004d,9223372036854775807)	false
+notice	removed	T(S:004100410050004c,9223372036854775807);T(S:00490042004d,9223372036854775807)
+notice	added	T(ALL,9223372036854775807);T(I(S:00490042004d,0),9223372036854775807);T(S:002a,9223372036854775807);T(T(S:00490042004d,7),9223372036854775807)
+state	nested-inputs	9223372036854775807	ALL;I(S:00490042004d,0);S:002a	T(ALL,9223372036854775807);T(I(S:00490042004d,0),9223372036854775807);T(S:002a,9223372036854775807)	false
+protected	decorate-nested	T(T(S:00490042004d,7),9223372036854775807)
+protected	undecorate-plain	null
+attempt	undecorate-null	NullPointerException
+notice	removed	T(ALL,9223372036854775807);T(I(S:00490042004d,0),9223372036854775807);T(S:002a,9223372036854775807)
+state	empty-range-change	-1			false
+notice	closed
+state	closed-range-change	42			true

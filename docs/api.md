@@ -8,6 +8,7 @@ and ownership. Use the namespace/type indexes beside this page to find individua
 
 | Component | Public headers | Link target | Detailed contract |
 | --- | --- | --- | --- |
+| Time-series logical values | `qd/api/time_series_subscription.hpp` | `qdcxx_subscription_selectors` | [Owned identity, capability and mutable range](TIME-SERIES-SUBSCRIPTIONS.md); no Feed HISTORY receiver |
 | Event text | qd/events/event_text.hpp | qdcxx_event_text | [Explicit-context UTF-16/UTF-8 rendering](EVENT-TEXT.md) |
 | Schedule rules | `qd/schedule/schedule.hpp` | `qdcxx_schedule` | [Owned schedule identities and typed calendar generations](SCHEDULE-RULES.md); `ORG_TTLDTOR_QDCXX_BUILD_SCHEDULE=ON` (default OFF); no Day/Session queries or filters |
 | Public typed feed | `qd/api/feed.hpp`, `qd/api/event_registry.hpp` | `qdcxx_feed` | [Endpoint, Feed and typed subscriptions](FEED-API.md), [immutable registry](../spec/events/EVENT-REGISTRY.md), [mixed subscriptions](../spec/events/MIXED-SUBSCRIPTIONS.md); `ORG_TTLDTOR_QDCXX_BUILD_FEED_API=ON` (default OFF), requires CLIENT/RUNTIME/RECOVERY |
