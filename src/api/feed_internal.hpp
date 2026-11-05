@@ -5,6 +5,7 @@
 #include "qd/api/endpoint_configuration.hpp"
 
 #include "../transport/bootstrap_lease.hpp"
+#include "callback_execution.hpp"
 #include "event_selection.hpp"
 
 #include <array>
@@ -88,6 +89,9 @@ struct SubscriptionCallbackBarrier {
     std::weak_ptr<SubscriptionChangeDomain> owner; ///< Detached execution domain, never a native/runtime owner.
     std::uint64_t epoch = 0; ///< Exact source callback epoch; a later callback cannot block this phase.
     std::size_t channel = 0; ///< Existing data selection or serialized change selection.
+    std::shared_ptr<CallbackSlotPool> packetPool; ///< Pure fixed identity storage, never a selected payload owner.
+    std::size_t packetIndex = 0;
+    std::uint64_t packetGeneration = 0; ///< Exact packet retirement dependency, independent of thread scopes.
 };
 
 /** Complete immutable transition backing, charged by its pending/executing notification slots. */
@@ -120,12 +124,27 @@ struct SubscriptionChangePhase {
     std::shared_ptr<const ListenerSnapshot> target; ///< Initial-only selection; ordinary phases select live observers.
 };
 
+/** One fixed, charged after-return task identity; it never retains a callback packet. */
+struct DeferredCallbackTask {
+    std::shared_ptr<CallbackSlotPool> pool;
+    std::size_t index = 0;
+    std::uint64_t generation = 0;
+    SubscriptionCallbackBarrier barrier;
+    SubscriptionChangeLease lease;
+};
+
+/** One existing causal-driver reservation; targets and event tasks share the same finite storage. */
+struct SubscriptionContinuation {
+    std::shared_ptr<SubscriptionChangeDomain> target;
+    DeferredCallbackTask callback;
+};
+
 /** Runtime-local detached callback owner; it owns no runtime facade, thread, socket or native progress. */
 struct SubscriptionChangeDomain {
     std::mutex mutex; ///< Serializes bounded notification admission and dispatch claims, never application code.
-    std::vector<std::weak_ptr<SubscriptionPort>> ports; ///< Fixed pending/active/retiring logical slots.
-    std::vector<std::shared_ptr<SubscriptionChangeDomain>> continuations; ///< Fixed root-turn target reservations.
-    std::array<SubscriptionCallbackFence, 2> fences; ///< Separate data/change callback lifetime channels.
+    std::vector<std::weak_ptr<SubscriptionPort>> ports;  ///< Fixed pending/active/retiring logical slots.
+    std::vector<SubscriptionContinuation> continuations; ///< Fixed shared root-turn target/task reservations.
+    std::array<SubscriptionCallbackFence, 2> fences;     ///< Separate data/change callback lifetime channels.
     std::atomic<std::size_t> leases{0}; ///< Pending/executing causal phases, including foreign target handoff.
     std::size_t maximumWork = 0;        ///< Finite phase/registration admissions for one outer callback turn.
     std::size_t remainingWork = 0;      ///< Shared by all concurrent and reentrant callers until the turn retires.
@@ -167,6 +186,13 @@ struct SubscriptionPort {
     std::weak_ptr<EndpointPort> endpoint;              ///< Endpoint policy/status domain, without a producer cycle.
     std::shared_ptr<ListenerLedger> listenerLedger;    ///< Selected/retiring callback reservation.
     std::shared_ptr<const ListenerSnapshot> listeners; ///< Complete accepted bounded selection.
+    std::shared_ptr<CallbackExecutor> eventExecutor;   ///< Null inherits endpoint policy; released outside locks.
+    std::shared_ptr<CallbackSlotPool> callbackPool;    ///< Pure stable fixed identities, never native state.
+    std::size_t callbackSlot = CallbackSlotPool::NO_SLOT;
+    Diagnostic callbackDispatchDiagnostic;
+    std::uint64_t callbackSynchronousRetirementRevision = 0; ///< Existing worker-path actual completed selections.
+    bool callbackSynchronousExecuting = false; ///< Protected by this port mutex; never inferred from post acceptance.
+
     StateListeners stateListeners; ///< Opt-in advisory lifecycle observations, retired after event captures.
     std::shared_ptr<SubscriptionChangeDomain>
         changes;                               ///< Detached local observer dispatch, independent of network state.
@@ -202,6 +228,10 @@ struct EndpointPort {
     std::thread::id owner;   ///< Creator/main await affinity remains available after runtime destruction.
     RuntimeOptions limits;   ///< Finite immutable limits and resolved DNS snapshot.
     EndpointOptions options; ///< Finite immutable endpoint policy.
+    std::shared_ptr<CallbackExecutor> eventExecutor; ///< Explicit event-only default; null is SDK worker.
+    transport::detail::CallbackRetirementFence
+        callbackFence; ///< Embedded; native owner borrows, registry pins through retirement.
+
     std::optional<EndpointConfiguration> configuration; ///< Immutable data-only policy retained after retirement.
     std::optional<std::chrono::milliseconds> requestedAggregationPeriod; ///< Mutable coalesced local intent only.
     std::uint64_t requestedAggregationRevision = 0; ///< Checked local request commits, independent of reconnect.
@@ -239,6 +269,9 @@ struct EndpointPort {
 /** Shared producer dispatch gate. It owns no bootstrap, native state or joinable thread. */
 struct RuntimeControl {
     std::shared_ptr<SubscriptionChangeDomain> changes; ///< Detached synchronous observer owner, with finite work.
+    std::mutex callbackPolicyMutex; ///< Serializes transactional endpoint/subscription policy reservations.
+    std::shared_ptr<CallbackSlotPool> callbackPool; ///< Lazy fixed pool, one allocation per opted-in runtime.
+
     std::mutex mutex;                  ///< Protects dispatch pointer, registry, stop admission and wake sequence.
     std::condition_variable condition; ///< Wakeable worker cadence/control wait.
     RuntimeImpl *runtime = nullptr;    ///< Accessible only while mutex holds the lifetime gate.

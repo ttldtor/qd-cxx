@@ -123,10 +123,16 @@ TEST_CASE("passive HISTORY reads fence accepted clear desired source and callbac
         std::lock_guard lock(f.port->mutex);
         --f.port->revision;
     }
-    f.port->changes->fences[0].active.store(true);
+    {
+        std::lock_guard lock(f.port->mutex);
+        f.port->callbackSynchronousExecuting = true;
+    }
     CHECK(d::copyHistorySnapshot(f.port).state == a::HistoryObservationState::CALLBACK_PENDING);
-    f.port->changes->fences[0].active.store(false);
-    f.port->changes->fences[0].epoch.store(1);
+    {
+        std::lock_guard lock(f.port->mutex);
+        f.port->callbackSynchronousExecuting = false;
+        ++f.port->callbackSynchronousRetirementRevision;
+    }
     CHECK(d::copyHistorySnapshot(f.port).state == a::HistoryObservationState::CALLBACK_PENDING);
     CHECK(before.ranges[0].status.completeDeliveredRange);
     CHECK(before.acceptedClearRevision == 2);

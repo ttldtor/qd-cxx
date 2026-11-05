@@ -355,3 +355,5 @@ cache replay. Input-free EN/RU/Get-Help, bounded JDK8 Capture/Verify with exact 
 
 - [Order production oracle](../upstream/order-oracle/README.md): complete source/index, physical VOID mapping,
   actual HISTORY parser/delegate values, numeric/FOB/flags/removal boundaries; input-free EN/RU help.
+
+- [Callback execution oracle](../upstream/callback-execution-oracle/README.md): actual Java policy inheritance/override, inline and two-worker serial delivery; bounded Capture/Verify and input-free EN/RU help.

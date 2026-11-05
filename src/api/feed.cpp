@@ -79,6 +79,41 @@ void wake(const std::weak_ptr<detail::RuntimeControl> &weak) noexcept {
     }
 }
 
+/** Create one finite pure pool only after explicit opt-in; caller holds callbackPolicyMutex. */
+std::shared_ptr<detail::CallbackSlotPool> callbackPool(detail::RuntimeControl &control, const RuntimeOptions &limits) {
+    if (control.callbackPool)
+        return control.callbackPool;
+
+    const auto slots = limits.maximumEndpoints * limits.maximumSubscriptionsPerEndpoint;
+    const auto storage = detail::CallbackSlotPool::storageBytes(slots);
+
+    if (storage >= limits.maximumCallbackBytes)
+        reject(ErrorCode::RESOURCE_LIMIT, "callback-pool-budget");
+
+    const auto packets = std::min(limits.maximumCustomCallbackSubscriptions,
+                                  (limits.maximumCallbackBytes - storage) / detail::CallbackSlotPool::PACKET_BYTES);
+
+    if (!packets)
+        reject(ErrorCode::RESOURCE_LIMIT, "callback-packet-budget");
+
+    control.callbackPool = std::make_shared<detail::CallbackSlotPool>(slots, packets);
+
+    return control.callbackPool;
+}
+
+/** Caller owns policy, endpoint and subscription locks; no application reference is released. */
+void reserveCallbackPolicy(detail::SubscriptionPort &port, const std::shared_ptr<detail::CallbackSlotPool> &pool,
+                           bool custom) {
+    if (!port.callbackPool && custom) {
+        const auto slot = pool->assign();
+        port.callbackPool = pool;
+        port.callbackSlot = slot;
+    }
+
+    if (port.callbackPool)
+        port.callbackPool->reserve(port.callbackSlot, custom);
+}
+
 /** Reserve the first absolute drain deadline before publishing its monotonic cutoff.
  * A listener may block the SDK worker; that delay must not restart the admitted close allowance.
  * @param port Detached endpoint whose immutable drain policy remains available.
@@ -290,26 +325,52 @@ void requestConnectionChange(const std::shared_ptr<detail::EndpointPort> &port, 
     });
 }
 
-/** Preserve a subscription's first bounded asynchronous failure.
- * @param port Detached producer state.
- * @param diagnostic Static/numeric failure snapshot.
+/** Record detached failure and admission cutoff without invoking application code.
+ * @param port Detached subscription. @param diagnostic Static/numeric failure.
+ * @return False only after CLOSED admission.
+ */
+bool recordSubscriptionFailure(const std::shared_ptr<detail::SubscriptionPort> &port, Diagnostic diagnostic) noexcept {
+    std::lock_guard lock(port->mutex);
+
+    if (port->state == SubscriptionState::CLOSED)
+        return false;
+
+    if (port->diagnostic.code == ErrorCode::NONE)
+        port->diagnostic = diagnostic;
+
+    port->closeRequested.store(true, std::memory_order_release);
+
+    return true;
+}
+
+/** Preserve the existing immediate failure publication on the SDK worker.
+ * @param port Detached subscription. @param diagnostic Static/numeric failure.
  */
 void failSubscription(const std::shared_ptr<detail::SubscriptionPort> &port, Diagnostic diagnostic) noexcept {
+    if (recordSubscriptionFailure(port, diagnostic))
+        observeState(port, SubscriptionState::FAILED);
+}
+
+/** Host event execution requests failure without dispatching the separate state-observer channel.
+ * @param port Detached subscription. @param diagnostic Static/numeric failure, with no application text.
+ */
+void requestSubscriptionFailure(const std::shared_ptr<detail::SubscriptionPort> &port, Diagnostic diagnostic) noexcept {
+    if (recordSubscriptionFailure(port, diagnostic))
+        wake(port->control);
+}
+
+/** Publish requested failure from worker progress or existing owner retirement.
+ * @param port Detached subscription; no callback packet or control lock is held by this caller.
+ */
+void publishRequestedSubscriptionFailure(const std::shared_ptr<detail::SubscriptionPort> &port) noexcept {
+    bool requested;
     {
         std::lock_guard lock(port->mutex);
-
-        if (port->state == SubscriptionState::CLOSED) {
-            return;
-        }
-
-        if (port->diagnostic.code == ErrorCode::NONE) {
-            port->diagnostic = diagnostic;
-        }
-
-        port->closeRequested.store(true, std::memory_order_release);
+        requested = port->diagnostic.code != ErrorCode::NONE;
     }
 
-    observeState(port, SubscriptionState::FAILED);
+    if (requested)
+        observeState(port, SubscriptionState::FAILED);
 }
 
 /** Preserve an endpoint's first bounded asynchronous failure.
@@ -444,14 +505,32 @@ StateWaitResult<State> awaitCurrentState(std::shared_ptr<Port> port, State targe
  */
 bool retireSubscription(const std::shared_ptr<detail::SubscriptionPort> &port) noexcept {
     port->closeRequested.store(true, std::memory_order_release);
+    publishRequestedSubscriptionFailure(port);
+    std::shared_ptr<detail::CallbackSlotPool> callbackPool;
+    std::size_t callbackSlot;
+    {
+        std::lock_guard lock(port->mutex);
+        callbackPool = port->callbackPool;
+        callbackSlot = port->callbackSlot;
+    }
+
+    if (callbackPool) {
+        callbackPool->cancel(callbackSlot, {ErrorCode::CALLBACK_CANCELLED, "callback-close"});
+
+        if (!callbackPool->snapshot(callbackSlot).quiescent)
+            return false;
+    }
+
     detail::closeSubscriptionObservers(port);
     observeState(port, SubscriptionState::CLOSING);
     std::shared_ptr<const detail::ListenerSnapshot> listeners;
+    std::shared_ptr<CallbackExecutor> eventExecutor;
     {
         std::lock_guard lock(port->mutex);
         listeners = std::move(port->listeners);
+        eventExecutor = std::move(port->eventExecutor);
     }
-
+    eventExecutor.reset();
     listeners.reset();
 
     if (port->listenerLedger->count.load(std::memory_order_acquire) != 0 ||
@@ -474,6 +553,18 @@ bool retireSubscription(const std::shared_ptr<detail::SubscriptionPort> &port) n
     {
         // Publish under the wait predicate's mutex so notification cannot fall between its check and wait.
         std::lock_guard lock(port->mutex);
+
+        if (port->callbackPool) {
+            const auto customRevision = port->callbackPool->snapshot(port->callbackSlot).retirementRevision;
+            port->callbackSynchronousRetirementRevision =
+                customRevision > UINT64_MAX - port->callbackSynchronousRetirementRevision
+                    ? UINT64_MAX
+                    : customRevision + port->callbackSynchronousRetirementRevision;
+            port->callbackPool->release(port->callbackSlot);
+            port->callbackPool.reset();
+            port->callbackSlot = detail::CallbackSlotPool::NO_SLOT;
+        }
+
         port->statistics->update([](auto &s) {
             s.activeSelectors = 0;
             s.activeDesiredRevision.reset();
@@ -545,6 +636,12 @@ bool retireEndpoint(const std::shared_ptr<detail::EndpointPort> &port, CloseResu
         port->terminal.diagnostic = port->diagnostic;
     }
 
+    std::shared_ptr<CallbackExecutor> eventExecutor;
+    {
+        std::lock_guard lock(port->mutex);
+        eventExecutor = std::move(port->eventExecutor);
+    }
+    eventExecutor.reset();
     observeState(port,
                  port->terminal.diagnostic.code == ErrorCode::NONE ? EndpointState::CLOSED : EndpointState::FAILED);
     std::shared_ptr<const detail::ListenerSnapshot> listeners;
@@ -1262,21 +1359,6 @@ template <class Event> Diagnostic Subscription<Event>::getDiagnostic() const noe
     return port_->diagnostic;
 }
 
-template class Subscription<events::Quote>;
-template class Subscription<events::Profile>;
-template class Subscription<events::Trade>;
-template class Subscription<events::TradeETH>;
-template class Subscription<events::Summary>;
-template class Subscription<events::TextMessage>;
-template class Subscription<events::TextConfiguration>;
-template class Subscription<events::Message>;
-template class Subscription<events::Configuration>;
-template class Subscription<events::Order>;
-template class Subscription<RegisteredEvent>;
-
-Feed::Feed(std::shared_ptr<detail::EndpointPort> port) : port_(std::move(port)) {
-}
-
 std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(EventType type) {
     return createSubscriptionPort(std::span(&type, 1), false);
 }
@@ -1368,6 +1450,12 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                               : message           ? detail::EventDelivery::MESSAGE
                               : order             ? detail::EventDelivery::ORDER
                                                   : detail::EventDelivery::CONFIGURATION;
+        const auto control = port_->control.lock();
+
+        if (!control)
+            reject(ErrorCode::CLOSED, "runtime-closed");
+
+        std::unique_lock policyGate(control->callbackPolicyMutex);
         auto subscription = std::make_shared<detail::SubscriptionPort>();
         subscription->statistics = std::make_shared<core::detail::DeliveryStatisticsState>();
         subscription->statistics->value.ownerIdentity = std::make_shared<const std::byte>();
@@ -1462,13 +1550,133 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                 reject(ErrorCode::RESOURCE_LIMIT, "endpoint-subscription-count");
             }
 
+            if (port_->eventExecutor) {
+                auto pool = callbackPool(*control, port_->limits);
+
+                if (!pool->canReserve(1))
+                    reject(ErrorCode::RESOURCE_LIMIT, "callback-packet-budget");
+
+                reserveCallbackPolicy(*subscription, pool, true);
+            }
+
             *free = subscription;
         }
-
+        policyGate.unlock();
         wake(port_->control);
 
         return subscription;
     });
+}
+
+template <class Event> void Subscription<Event>::setEventExecutor(std::shared_ptr<CallbackExecutor> executor) {
+    producerAction([&] {
+        const auto control = port_->control.lock();
+        const auto endpoint = port_->endpoint.lock();
+
+        if (!control || !endpoint)
+            reject(ErrorCode::CLOSED, "callback-policy-closed");
+
+        std::shared_ptr<CallbackExecutor> previous;
+        {
+            std::lock_guard gate(control->callbackPolicyMutex);
+            std::lock_guard endpointLock(endpoint->mutex);
+            std::lock_guard lock(port_->mutex);
+
+            if (port_->closeRequested.load(std::memory_order_acquire) ||
+                endpoint->closeRequested.load(std::memory_order_acquire))
+                reject(ErrorCode::CLOSED, "callback-policy-closed");
+
+            const bool custom = executor || endpoint->eventExecutor;
+            auto pool = custom ? callbackPool(*control, endpoint->limits) : port_->callbackPool;
+
+            if (custom && (!port_->callbackPool || !pool->reserved(port_->callbackSlot)) && !pool->canReserve(1))
+                reject(ErrorCode::RESOURCE_LIMIT, "callback-packet-budget");
+
+            reserveCallbackPolicy(*port_, pool, custom);
+            previous = std::exchange(port_->eventExecutor, std::move(executor));
+        }
+        previous.reset();
+    });
+}
+
+template <class Event> std::shared_ptr<CallbackExecutor> Subscription<Event>::getEventExecutor() const {
+    std::lock_guard lock(port_->mutex);
+
+    return port_->eventExecutor;
+}
+
+template <class Event> Diagnostic Subscription<Event>::getCallbackDispatchDiagnostic() const noexcept {
+    std::lock_guard lock(port_->mutex);
+
+    return port_->callbackDispatchDiagnostic;
+}
+
+void Endpoint::setEventExecutor(std::shared_ptr<CallbackExecutor> executor) {
+    producerAction([&] {
+        const auto control = port_->control.lock();
+
+        if (!control)
+            reject(ErrorCode::CLOSED, "callback-policy-closed");
+
+        std::shared_ptr<CallbackExecutor> previous;
+        {
+            std::lock_guard gate(control->callbackPolicyMutex);
+            std::lock_guard endpointLock(port_->mutex);
+
+            if (port_->closeRequested.load(std::memory_order_acquire))
+                reject(ErrorCode::CLOSED, "callback-policy-closed");
+
+            auto pool = executor ? callbackPool(*control, port_->limits) : control->callbackPool;
+            std::size_t additional = 0;
+
+            for (const auto &sub : port_->subscriptions) {
+                if (!sub || sub->retired.load(std::memory_order_acquire))
+                    continue;
+
+                std::lock_guard lock(sub->mutex);
+
+                if (executor && !sub->eventExecutor && (!sub->callbackPool || !pool->reserved(sub->callbackSlot)))
+                    ++additional;
+            }
+
+            if (executor && !pool->canReserve(additional))
+                reject(ErrorCode::RESOURCE_LIMIT, "callback-packet-budget");
+
+            for (const auto &sub : port_->subscriptions) {
+                if (!sub || sub->retired.load(std::memory_order_acquire))
+                    continue;
+
+                std::lock_guard lock(sub->mutex);
+
+                if (!sub->eventExecutor)
+                    reserveCallbackPolicy(*sub, pool, executor != nullptr);
+            }
+
+            previous = std::exchange(port_->eventExecutor, std::move(executor));
+        }
+        previous.reset();
+    });
+}
+
+std::shared_ptr<CallbackExecutor> Endpoint::getEventExecutor() const {
+    std::lock_guard lock(port_->mutex);
+
+    return port_->eventExecutor;
+}
+
+template class Subscription<events::Quote>;
+template class Subscription<events::Profile>;
+template class Subscription<events::Trade>;
+template class Subscription<events::TradeETH>;
+template class Subscription<events::Summary>;
+template class Subscription<events::TextMessage>;
+template class Subscription<events::TextConfiguration>;
+template class Subscription<events::Message>;
+template class Subscription<events::Configuration>;
+template class Subscription<events::Order>;
+template class Subscription<RegisteredEvent>;
+
+Feed::Feed(std::shared_ptr<detail::EndpointPort> port) : port_(std::move(port)) {
 }
 
 Endpoint::Endpoint(std::shared_ptr<detail::EndpointPort> port) : port_(std::move(port)), feed_(new Feed(port_)) {
@@ -1783,8 +1991,13 @@ class TypedConsumer final : public client::SubscriptionConsumer {
         std::shared_ptr<core::detail::DeliveryStatisticsState> state;
         std::size_t events;
         DispatchOutcome outcome = DispatchOutcome::DISCARDED;
+        bool active = true;
+        std::shared_ptr<SubscriptionPort> synchronousPort;
 
-        ~DispatchCompletion() {
+        void finish() noexcept {
+            if (!std::exchange(active, false))
+                return;
+
             state->update([&](auto &s) {
                 s.inFlightEvents -= events;
                 auto &counter = outcome == DispatchOutcome::DELIVERED         ? s.deliveredEvents
@@ -1792,29 +2005,33 @@ class TypedConsumer final : public client::SubscriptionConsumer {
                                                                               : s.discardedEvents;
                 counter.add(events);
             });
+
+            if (synchronousPort) {
+                std::lock_guard lock(synchronousPort->mutex);
+                synchronousPort->callbackSynchronousExecuting = false;
+
+                if (synchronousPort->callbackSynchronousRetirementRevision != UINT64_MAX)
+                    ++synchronousPort->callbackSynchronousRetirementRevision;
+            }
+        }
+
+        ~DispatchCompletion() {
+            finish();
         }
     };
 
-    /** Project and deliver one complete event type under a stable listener selection.
-     * @tparam Event Existing owning Quote, Profile or their RegisteredEvent variant.
-     * @param batch Existing receiver's callback-only projection service.
-     * @param listeners Whole-batch immutable callable selection.
-     * @return Existing queue acknowledgement/pause action.
-     */
     template <class Event>
-    mux::BatchAction deliver(const client::SubscriptionBatch &batch,
-                             const std::shared_ptr<const ListenerSnapshot> &listeners, DispatchCompletion &completion) {
+    static std::vector<Event> project(const client::SubscriptionBatch &batch,
+                                      client::ReceiverProjectionWork projectionWork) {
         std::vector<Event> projectedEvents;
         projectedEvents.reserve(batch.records().size());
-        auto work = projectionWork_;
+        auto work = projectionWork;
 
         for (std::size_t index = 0; index < batch.records().size(); ++index) {
             auto projected = batch.project(index, work);
 
             if (!projected) {
-                failSubscription(port_, {ErrorCode::PROTOCOL_FAILURE, "subscription-projection"});
-
-                return mux::BatchAction::PAUSE;
+                throw Error({ErrorCode::PROTOCOL_FAILURE, "subscription-projection"});
             }
 
             if constexpr (std::is_same_v<Event, RegisteredEvent>) {
@@ -1839,21 +2056,25 @@ class TypedConsumer final : public client::SubscriptionConsumer {
                 } else if (auto *profile = std::get_if<events::Profile>(&projected->value)) {
                     projectedEvents.emplace_back(std::move(*profile));
                 } else {
-                    failSubscription(port_, {ErrorCode::PROTOCOL_FAILURE, "subscription-projection"});
-
-                    return mux::BatchAction::PAUSE;
+                    throw Error({ErrorCode::PROTOCOL_FAILURE, "subscription-projection"});
                 }
             } else {
                 if (!std::holds_alternative<Event>(projected->value)) {
-                    failSubscription(port_, {ErrorCode::PROTOCOL_FAILURE, "subscription-projection"});
-
-                    return mux::BatchAction::PAUSE;
+                    throw Error({ErrorCode::PROTOCOL_FAILURE, "subscription-projection"});
                 }
 
                 projectedEvents.push_back(std::get<Event>(std::move(projected->value)));
             }
         }
 
+        return projectedEvents;
+    }
+
+    template <class Event>
+    static mux::BatchAction invoke(const std::shared_ptr<SubscriptionPort> &port_,
+                                   const std::vector<Event> &projectedEvents,
+                                   const std::shared_ptr<const ListenerSnapshot> &listeners,
+                                   DispatchCompletion &completion, bool asynchronous = false) {
         // One selection lasts through the whole underlying batch. Reentrant mutation affects a later batch.
         bool complete = true;
 
@@ -1896,7 +2117,11 @@ class TypedConsumer final : public client::SubscriptionConsumer {
 
             if (failed) {
                 completion.outcome = DispatchOutcome::CALLBACK_FAILED;
-                failSubscription(port_, {ErrorCode::CALLBACK_FAILURE, "subscription-listener"});
+
+                if (asynchronous)
+                    requestSubscriptionFailure(port_, {ErrorCode::CALLBACK_FAILURE, "subscription-listener"});
+                else
+                    failSubscription(port_, {ErrorCode::CALLBACK_FAILURE, "subscription-listener"});
 
                 return mux::BatchAction::PAUSE;
             }
@@ -1906,6 +2131,76 @@ class TypedConsumer final : public client::SubscriptionConsumer {
             completion.outcome = DispatchOutcome::DELIVERED;
 
         return mux::BatchAction::CONTINUE;
+    }
+
+    template <class Event> struct Invocation final : CallbackInvocation {
+        std::shared_ptr<SubscriptionPort> port;
+        std::shared_ptr<const ListenerSnapshot> listeners;
+        std::shared_ptr<CallbackExecutor> executor;
+        const client::SubscriptionBatch *batch;
+        client::ReceiverProjectionWork projectionWork;
+        std::vector<Event> events;
+        DispatchCompletion completion;
+
+        Invocation(std::shared_ptr<SubscriptionPort> port, std::shared_ptr<const ListenerSnapshot> listeners,
+                   std::shared_ptr<CallbackExecutor> executor, const client::SubscriptionBatch &batch,
+                   client::ReceiverProjectionWork work)
+            : port(std::move(port)), listeners(std::move(listeners)), executor(std::move(executor)), batch(&batch),
+              projectionWork(work), completion{this->port->statistics, batch.records().size()} {
+        }
+
+        void prepare() override {
+            events = project<Event>(*batch, projectionWork);
+            batch = nullptr;
+        }
+
+        CallbackPostResult post(CallbackTask task) override {
+            return executor->post(std::move(task));
+        }
+
+        void execute() noexcept override {
+            static_cast<void>(invoke<Event>(port, events, listeners, completion, true));
+        }
+
+        void finish(Diagnostic diagnostic) noexcept override {
+            if (diagnostic.code != ErrorCode::NONE) {
+                {
+                    std::lock_guard lock(port->mutex);
+                    port->callbackDispatchDiagnostic = diagnostic;
+                }
+
+                if (diagnostic.code == ErrorCode::CALLBACK_CANCELLED) {
+                    if (auto endpoint = port->endpoint.lock()) {
+                        std::lock_guard lock(endpoint->mutex);
+                        endpoint->terminal.hadGap = endpoint->terminal.hadGap || completion.events != 0;
+                    }
+                } else {
+                    requestSubscriptionFailure(port, diagnostic);
+                }
+            }
+
+            listeners.reset();
+            executor.reset();
+            events.clear();
+            completion.finish();
+        }
+    };
+
+    template <class Event>
+    mux::BatchAction deliver(const client::SubscriptionBatch &batch, std::shared_ptr<const ListenerSnapshot> &listeners,
+                             std::shared_ptr<CallbackExecutor> &executor, DispatchCompletion &completion) {
+        if (executor) {
+            auto packet = std::make_unique<Invocation<Event>>(port_, std::move(listeners), std::move(executor), batch,
+                                                              projectionWork_);
+            completion.active = false; // The packet now owns the exact selected statistics completion.
+            port_->callbackPool->submit(port_->callbackSlot, std::move(packet));
+
+            return mux::BatchAction::PAUSE;
+        }
+
+        auto values = project<Event>(batch, projectionWork_);
+
+        return invoke<Event>(port_, values, listeners, completion);
     }
 
     public:
@@ -1922,15 +2217,23 @@ class TypedConsumer final : public client::SubscriptionConsumer {
      * @return Queue action; application exceptions fail only this logical subscription.
      */
     mux::BatchAction onBatch(const client::SubscriptionBatch &batch) override {
+        std::optional<SubscriptionDataCallbackScope> callbackScope;
         DispatchCompletion completion{port_->statistics, batch.records().size()};
+        {
+            std::lock_guard lock(port_->mutex);
+            port_->callbackSynchronousExecuting = true;
+            completion.synchronousPort = port_;
+        }
         const auto endpoint = port_->endpoint.lock();
 
         if (port_->closeRequested.load(std::memory_order_acquire) || !endpoint) {
             return mux::BatchAction::PAUSE;
         }
 
-        SubscriptionDataCallbackScope callbackScope(port_->changes);
         std::shared_ptr<const ListenerSnapshot> listeners;
+        std::shared_ptr<CallbackExecutor> executor;
+        bool customPrepared = false;
+        Diagnostic preparationDiagnostic;
         {
             // Endpoint-to-subscription order makes the whole selection atomic with producer source/clear fences.
             std::lock_guard endpointLock(endpoint->mutex);
@@ -1949,6 +2252,34 @@ class TypedConsumer final : public client::SubscriptionConsumer {
 
             std::lock_guard lock(port_->mutex);
             listeners = port_->listeners;
+            executor = port_->eventExecutor ? port_->eventExecutor : endpoint->eventExecutor;
+            const auto customRevision =
+                port_->callbackPool ? port_->callbackPool->snapshot(port_->callbackSlot).retirementRevision : 0;
+
+            if (customRevision >= UINT64_MAX - port_->callbackSynchronousRetirementRevision) {
+                preparationDiagnostic = {ErrorCode::RESOURCE_LIMIT, "callback-retirement-revision"};
+            } else if (executor && listeners && !listeners->empty()) {
+                try {
+                    port_->callbackPool->begin(port_->callbackSlot,
+                                               {port_->changes, &endpoint->callbackFence, port_->control});
+                    // Transfer one selected completion without a false-quiescent intermediate cut.
+                    port_->callbackSynchronousExecuting = false;
+                    completion.synchronousPort.reset();
+                    customPrepared = true;
+                } catch (const Error &error) {
+                    preparationDiagnostic = error.diagnostic();
+                }
+            }
+        }
+
+        if (!customPrepared) {
+            callbackScope.emplace(port_->changes);
+        }
+
+        if (preparationDiagnostic.code != ErrorCode::NONE) {
+            failSubscription(port_, preparationDiagnostic);
+
+            return mux::BatchAction::PAUSE;
         }
 
         if (!listeners || listeners->empty()) {
@@ -1958,27 +2289,27 @@ class TypedConsumer final : public client::SubscriptionConsumer {
         try {
             switch (port_->eventDelivery) {
             case EventDelivery::QUOTE:
-                return deliver<events::Quote>(batch, listeners, completion);
+                return deliver<events::Quote>(batch, listeners, executor, completion);
             case EventDelivery::PROFILE:
-                return deliver<events::Profile>(batch, listeners, completion);
+                return deliver<events::Profile>(batch, listeners, executor, completion);
             case EventDelivery::TRADE:
-                return deliver<events::Trade>(batch, listeners, completion);
+                return deliver<events::Trade>(batch, listeners, executor, completion);
             case EventDelivery::TRADE_ETH:
-                return deliver<events::TradeETH>(batch, listeners, completion);
+                return deliver<events::TradeETH>(batch, listeners, executor, completion);
             case EventDelivery::MESSAGE:
-                return deliver<events::Message>(batch, listeners, completion);
+                return deliver<events::Message>(batch, listeners, executor, completion);
             case EventDelivery::CONFIGURATION:
-                return deliver<events::Configuration>(batch, listeners, completion);
+                return deliver<events::Configuration>(batch, listeners, executor, completion);
             case EventDelivery::SUMMARY:
-                return deliver<events::Summary>(batch, listeners, completion);
+                return deliver<events::Summary>(batch, listeners, executor, completion);
             case EventDelivery::ORDER:
-                return deliver<events::Order>(batch, listeners, completion);
+                return deliver<events::Order>(batch, listeners, executor, completion);
             case EventDelivery::TEXT_MESSAGE:
-                return deliver<events::TextMessage>(batch, listeners, completion);
+                return deliver<events::TextMessage>(batch, listeners, executor, completion);
             case EventDelivery::TEXT_CONFIGURATION:
-                return deliver<events::TextConfiguration>(batch, listeners, completion);
+                return deliver<events::TextConfiguration>(batch, listeners, executor, completion);
             case EventDelivery::REGISTERED:
-                return deliver<RegisteredEvent>(batch, listeners, completion);
+                return deliver<RegisteredEvent>(batch, listeners, executor, completion);
             default:
                 throw Error({ErrorCode::UNSUPPORTED_PROFILE, "subscription-event-type"});
             }
@@ -1986,6 +2317,14 @@ class TypedConsumer final : public client::SubscriptionConsumer {
             failSubscription(port_, {ErrorCode::ALLOCATION_FAILURE, "subscription-projection"});
         } catch (...) {
             failSubscription(port_, {ErrorCode::RESOURCE_LIMIT, "subscription-projection"});
+        }
+
+        if (customPrepared && completion.active) {
+            callbackScope.emplace(port_->changes);
+            listeners.reset();
+            executor.reset();
+            completion.finish();
+            port_->callbackPool->abortPreparation(port_->callbackSlot);
         }
 
         return mux::BatchAction::PAUSE;
@@ -2062,6 +2401,7 @@ std::unique_ptr<NativeEndpoint> activate(const transport::detail::BootstrapLease
     }
 
     native->recovery.emplace(std::move(*recovery));
+    transport::detail::TcpRecoveryFactory::setCallbackRetirementFence(*native->recovery, &port->callbackFence);
     const auto started = native->recovery->start();
 
     if (!started) {
@@ -2269,6 +2609,24 @@ void progressSubscriptions(NativeEndpoint &endpoint, mux::QueueSubmitWork &submi
             continue;
         }
 
+        publishRequestedSubscriptionFailure(port);
+        std::shared_ptr<CallbackSlotPool> callbackPool;
+        std::size_t callbackSlot;
+        {
+            std::lock_guard lock(port->mutex);
+            callbackPool = port->callbackPool;
+            callbackSlot = port->callbackSlot;
+        }
+
+        if (callbackPool) {
+            if (port->closeRequested.load(std::memory_order_acquire) ||
+                endpoint.port->closeRequested.load(std::memory_order_acquire))
+                callbackPool->cancel(callbackSlot, {ErrorCode::CALLBACK_CANCELLED, "callback-close"});
+
+            if (native && callbackPool->snapshot(callbackSlot).quiescent)
+                static_cast<void>(native->handle.requestResume());
+        }
+
         if (!native && !port->closeRequested.load(std::memory_order_acquire) &&
             !endpoint.port->closeRequested.load(std::memory_order_acquire)) {
             try {
@@ -2359,6 +2717,31 @@ CloseResult closeResult(const std::shared_ptr<EndpointPort> &endpoint, const tra
 }
 
 /** Actual endpoint result after one poll from its finite shared-work burst. */
+/** Cancel not-started selected work without requiring executor progress. */
+void cancelEndpointCallbacks(const std::shared_ptr<EndpointPort> &endpoint, std::string_view stage) noexcept {
+    for (std::size_t index = 0; index < endpoint->subscriptions.size(); ++index) {
+        std::shared_ptr<SubscriptionPort> port;
+        {
+            std::lock_guard lock(endpoint->mutex);
+            port = endpoint->subscriptions[index];
+        }
+
+        if (!port)
+            continue;
+
+        std::shared_ptr<CallbackSlotPool> pool;
+        std::size_t slot;
+        {
+            std::lock_guard lock(port->mutex);
+            pool = port->callbackPool;
+            slot = port->callbackSlot;
+        }
+
+        if (pool)
+            pool->cancel(slot, {ErrorCode::CALLBACK_CANCELLED, stage});
+    }
+}
+
 enum class EndpointProgress {
     PENDING,       ///< More lower-level work may remain; no idle acknowledgement is inferred.
     RETIRED,       ///< Native retirement completed or a visible fixed-profile refusal requires fallback disposal.
@@ -2390,6 +2773,7 @@ EndpointProgress progressEndpoint(NativeEndpoint &endpoint, transport::RecoveryT
     }
 
     if (!endpoint.port->closeRequested.load(std::memory_order_acquire) && endpoint.appliedRevision != revision) {
+        cancelEndpointCallbacks(endpoint.port, "callback-source-change");
         const bool clear = clearRevision > endpoint.appliedClearRevision;
         const auto disconnected = endpoint.recovery->requestDisconnect(clear);
 
@@ -2458,6 +2842,10 @@ EndpointProgress progressEndpoint(NativeEndpoint &endpoint, transport::RecoveryT
     }
 
     const auto polled = endpoint.recovery->poll(work);
+
+    if (endpoint.port->callbackFence.cancelQueuedRequested.exchange(false, std::memory_order_acq_rel))
+        cancelEndpointCallbacks(endpoint.port, "callback-source-reset");
+
     const auto statistics = endpoint.recovery->statistics();
 
     for (const auto &subscription : endpoint.subscriptions) {
@@ -2877,7 +3265,7 @@ RuntimeOptions prepareRuntimeOptions(RuntimeOptions options) {
     if (options.maximumEndpoints > std::numeric_limits<std::size_t>::max() / options.maximumSubscriptionsPerEndpoint /
                                        sizeof(std::weak_ptr<detail::SubscriptionPort>) ||
         options.maximumSubscriptionChangesPerTurn >
-            std::numeric_limits<std::size_t>::max() / sizeof(std::shared_ptr<detail::SubscriptionChangeDomain>) ||
+            std::numeric_limits<std::size_t>::max() / sizeof(detail::SubscriptionContinuation) ||
         options.maximumPendingSubscriptionChanges >
             std::numeric_limits<std::size_t>::max() / sizeof(detail::SubscriptionChangePhase) ||
         options.maximumChangeListenersPerSubscription >

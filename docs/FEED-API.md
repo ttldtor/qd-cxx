@@ -255,7 +255,9 @@ with `CLOSED`. These handles retain no SDK lease and cannot resume native work
 after runtime destruction. A retained native failure stays `FAILED` with its
 original diagnostic rather than becoming a successful `CLOSED`.
 
-Listeners run serially on the worker. Their span expires when that invocation
+Event listeners run serially per subscription, on the SDK worker by default. An explicit
+[event executor policy](CALLBACK-EXECUTION.md) can borrow application workers while preserving serial
+selection, actual completion accounting and source-epoch fences. Their span expires when that invocation
 returns; copy an event to retain its owning strings and values. Such application
 copies do not retain a queue or runtime, and application retention is outside the
 library's finite reservations. Keep callbacks short: a blocked callback delays

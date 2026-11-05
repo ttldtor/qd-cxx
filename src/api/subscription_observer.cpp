@@ -13,7 +13,10 @@ constexpr std::size_t CHANGE_CHANNEL = 1; ///< Serialized advisory fanout and fi
 thread_local std::shared_ptr<SubscriptionChangeDomain> driverRoot; ///< Iterative physical continuation dispatcher.
 thread_local std::shared_ptr<SubscriptionChangeDomain> turnRoot;   ///< Finite causal admission root, across runtimes.
 thread_local std::shared_ptr<SubscriptionChangeDomain> callbackOwner; ///< Actual currently selected callback owner.
-thread_local std::size_t callbackChannel = CHANGE_CHANNEL;            ///< Current source lifetime-fence channel.
+thread_local std::shared_ptr<CallbackSlotPool> callbackPacketPool;
+thread_local std::size_t callbackPacketIndex = 0;
+thread_local std::uint64_t callbackPacketGeneration = 0;
+thread_local std::size_t callbackChannel = CHANGE_CHANNEL; ///< Current source lifetime-fence channel.
 
 /** @param code Static refusal category. @param stage Library-owned diagnostic checkpoint. */
 [[noreturn]] void refuse(ErrorCode code, std::string_view stage) {
@@ -37,12 +40,16 @@ SubscriptionCallbackBarrier callbackBarrier() noexcept {
         return {};
     }
 
-    return {callbackOwner, callbackOwner->fences[callbackChannel].epoch.load(std::memory_order_acquire),
-            callbackChannel};
+    return {callbackOwner,       callbackOwner->fences[callbackChannel].epoch.load(std::memory_order_acquire),
+            callbackChannel,     callbackPacketPool,
+            callbackPacketIndex, callbackPacketGeneration};
 }
 
 /** @param barrier Exact source callback lifetime. @return True until that invocation and its captures return. */
 bool blocked(const SubscriptionCallbackBarrier &barrier) noexcept {
+    if (barrier.packetPool)
+        return barrier.packetPool->outstanding(barrier.packetIndex, barrier.packetGeneration);
+
     const auto owner = barrier.owner.lock();
 
     return owner && owner->fences[barrier.channel].active.load(std::memory_order_acquire) &&
@@ -101,11 +108,23 @@ bool needsContinuation(const std::shared_ptr<SubscriptionChangeDomain> &target) 
     return callbackOwner && turnRoot && target != turnRoot;
 }
 
+/** @param root Locked driver. @param target Exact detached domain. @return Existing target reservation. */
+auto findTarget(SubscriptionChangeDomain &root, const std::shared_ptr<SubscriptionChangeDomain> &target) {
+    return std::ranges::find(root.continuations, target, &SubscriptionContinuation::target);
+}
+
+/** @param root Locked driver. @return One unoccupied target/task reservation. */
+auto findFreeContinuation(SubscriptionChangeDomain &root) {
+    return std::ranges::find_if(root.continuations, [](const auto &slot) {
+        return !slot.target && !slot.callback.pool;
+    });
+}
+
 /** @param target Locked target; the causal root is also held by the admission guard. */
 void checkContinuation(const std::shared_ptr<SubscriptionChangeDomain> &target) {
     const auto check = [](SubscriptionChangeDomain &root, const std::shared_ptr<SubscriptionChangeDomain> &next) {
-        if (std::ranges::find(root.continuations, next) == root.continuations.end() &&
-            std::ranges::find(root.continuations, nullptr) == root.continuations.end()) {
+        if (findTarget(root, next) == root.continuations.end() &&
+            findFreeContinuation(root) == root.continuations.end()) {
             refuse(ErrorCode::WORK_LIMIT, "subscription-change-continuations");
         }
     };
@@ -122,8 +141,8 @@ void checkContinuation(const std::shared_ptr<SubscriptionChangeDomain> &target) 
 /** @param target Preflighted target; publication cannot allocate or fail. */
 void publishContinuation(const std::shared_ptr<SubscriptionChangeDomain> &target) noexcept {
     const auto publish = [](SubscriptionChangeDomain &root, const std::shared_ptr<SubscriptionChangeDomain> &next) {
-        if (std::ranges::find(root.continuations, next) == root.continuations.end()) {
-            *std::ranges::find(root.continuations, nullptr) = next;
+        if (findTarget(root, next) == root.continuations.end()) {
+            findFreeContinuation(root)->target = next;
         }
     };
 
@@ -246,13 +265,18 @@ bool selectChange(SubscriptionChangeDomain &domain, SelectedChange &selected) no
 
 /** @param domain Locked target. @return Whether any unretired phase remains, including blocked work. */
 bool hasPending(const SubscriptionChangeDomain &domain) noexcept {
-    return std::ranges::any_of(domain.ports, [](const auto &weak) {
-        const auto port = weak.lock();
+    return std::ranges::any_of(domain.continuations,
+                               [](const auto &entry) {
+                                   return bool(entry.callback.pool);
+                               }) ||
+           std::ranges::any_of(domain.ports, [](const auto &weak) {
+               const auto port = weak.lock();
 
-        return port && (port->observers.count != 0 || std::ranges::any_of(port->observers.closed, [](const auto &slot) {
-                            return slot.listener.id != 0;
-                        }));
-    });
+               return port &&
+                      (port->observers.count != 0 || std::ranges::any_of(port->observers.closed, [](const auto &slot) {
+                           return slot.listener.id != 0;
+                       }));
+           });
 }
 
 /** @param domain Exclusive claimed callback owner. @param channel Existing data or change channel. */
@@ -330,6 +354,7 @@ void drainDomain(const std::shared_ptr<SubscriptionChangeDomain> &domain) noexce
         callbackOwner = std::move(previousOwner);
         callbackChannel = previousChannel;
         turnRoot = std::move(previousRoot);
+        auto completedRoot = selected.phase.lease.root;
         selected.phase.lease = {};
 
         if (selected.ordinary) {
@@ -338,6 +363,9 @@ void drainDomain(const std::shared_ptr<SubscriptionChangeDomain> &domain) noexce
             observers.head = (observers.head + 1) % observers.phases.size();
             --observers.count;
         }
+
+        if (completedRoot && completedRoot != domain)
+            dispatchSubscriptionChanges(completedRoot);
     }
 }
 } // namespace
@@ -597,6 +625,23 @@ void closeSubscriptionObservers(const std::shared_ptr<SubscriptionPort> &port, b
 }
 
 void dispatchSubscriptionChanges(const std::shared_ptr<SubscriptionChangeDomain> &domain) noexcept {
+    if (!callbackOwner && driverRoot && driverRoot != domain) {
+        // A nested packet retired on the existing iterative driver. Reuse its funded target slot;
+        // starting a second driver here would reset causal credits and recursively invoke callbacks.
+        std::lock_guard lock(driverRoot->mutex);
+
+        if (findTarget(*driverRoot, domain) == driverRoot->continuations.end()) {
+            const auto free = findFreeContinuation(*driverRoot);
+
+            if (free == driverRoot->continuations.end())
+                std::terminate();
+
+            free->target = domain;
+        }
+
+        return;
+    }
+
     if (callbackOwner) {
         return; // Admission already reserved the root's finite after-return continuation.
     }
@@ -622,15 +667,38 @@ void dispatchSubscriptionChanges(const std::shared_ptr<SubscriptionChangeDomain>
             drainDomain(current);
 
             if (current != domain) {
-                std::lock_guard lock(current->mutex);
+                // The root keeps this target reserved while an exact packet barrier is still blocked.
+                std::scoped_lock lock(current->mutex, domain->mutex);
                 current->dispatching = false;
 
                 if (!hasPending(*current)) {
                     refreshWork(*current);
+                    auto slot = findTarget(*domain, current);
+
+                    if (slot != domain->continuations.end())
+                        slot->target.reset();
                 }
             }
 
             current.reset();
+        }
+
+        DeferredCallbackTask callback;
+        {
+            std::lock_guard lock(domain->mutex);
+            const auto ready = std::ranges::find_if(domain->continuations, [](const auto &entry) {
+                return entry.callback.pool && !blocked(entry.callback.barrier);
+            });
+
+            if (ready != domain->continuations.end())
+                callback = std::move(ready->callback);
+        }
+
+        if (callback.pool) {
+            static_cast<void>(callback.pool->resume(callback.index, callback.generation));
+            callback = {};
+            current = domain;
+            continue;
         }
 
         std::shared_ptr<SubscriptionChangeDomain> next;
@@ -644,14 +712,59 @@ void dispatchSubscriptionChanges(const std::shared_ptr<SubscriptionChangeDomain>
 
                 return; // Existing data callback exit retains and drains all reserved target continuations.
             }
+        }
 
-            const auto slot = std::ranges::find_if(domain->continuations, [](const auto &target) {
-                return target != nullptr;
-            });
+        for (std::size_t index = 0; index < domain->continuations.size(); ++index) {
+            std::shared_ptr<SubscriptionChangeDomain> candidate;
+            {
+                std::lock_guard lock(domain->mutex);
+                candidate = domain->continuations[index].target;
+            }
 
-            if (slot != domain->continuations.end()) {
-                next = std::move(*slot);
-            } else {
+            if (!candidate)
+                continue;
+
+            {
+                std::scoped_lock lock(candidate->mutex, domain->mutex);
+
+                if (!hasPending(*candidate)) {
+                    if (domain->continuations[index].target == candidate)
+                        domain->continuations[index].target.reset();
+
+                    continue;
+                }
+            }
+            bool ready;
+            {
+                std::lock_guard lock(candidate->mutex);
+                ready = candidate->dataCallbacks == 0 && !candidate->dispatching &&
+                        (!hasPending(*candidate) ||
+                         std::ranges::any_of(candidate->continuations,
+                                             [](const auto &entry) {
+                                                 return entry.callback.pool && !blocked(entry.callback.barrier);
+                                             }) ||
+                         std::ranges::any_of(candidate->ports, [](const auto &weak) {
+                             const auto port = weak.lock();
+
+                             return port && ((port->observers.count &&
+                                              !blocked(port->observers.phases[port->observers.head].frame->barrier)) ||
+                                             std::ranges::any_of(port->observers.closed, [](const auto &entry) {
+                                                 return entry.listener.id && !blocked(entry.barrier);
+                                             }));
+                         }));
+            }
+
+            if (ready) {
+                std::lock_guard lock(domain->mutex);
+                next = domain->continuations[index].target;
+                break;
+            }
+        }
+
+        {
+            std::lock_guard lock(domain->mutex);
+
+            if (!next) {
                 // One final root pass catches reentry from the last foreign target without recursive dispatch.
                 const bool rootPending = std::ranges::any_of(domain->ports, [](const auto &weak) {
                     const auto port = weak.lock();
@@ -698,26 +811,66 @@ bool subscriptionObserverCallbackActive() noexcept {
     return callbackOwner != nullptr;
 }
 
-SubscriptionDataCallbackScope::SubscriptionDataCallbackScope(std::shared_ptr<SubscriptionChangeDomain> domain) noexcept
+void enterDataCallbackCohort(const std::shared_ptr<SubscriptionChangeDomain> &domain) noexcept {
+    std::lock_guard lock(domain->mutex);
+
+    if (domain->dataCallbacks++ == 0)
+        beginCallback(*domain, DATA_CHANNEL);
+}
+
+SubscriptionCallbackBarrier currentSubscriptionCallbackBarrier() noexcept {
+    return callbackBarrier();
+}
+
+void deferCallbackTask(std::shared_ptr<CallbackSlotPool> pool, std::size_t index, std::uint64_t generation,
+                       const SubscriptionCallbackBarrier *source) {
+    auto root = driverRoot ? driverRoot : callbackOwner;
+    SubscriptionObserverAdmission admission(callbackOwner);
+    checkWork(*callbackOwner, 1);
+    auto slot = findFreeContinuation(*root);
+
+    if (slot == root->continuations.end())
+        refuse(ErrorCode::WORK_LIMIT, "callback-nested-continuations");
+
+    spendWork(*callbackOwner, 1);
+    slot->callback = DeferredCallbackTask{std::move(pool), index, generation, source ? *source : callbackBarrier(),
+                                          SubscriptionChangeLease(root)};
+}
+
+SubscriptionDataCallbackScope::SubscriptionDataCallbackScope(std::shared_ptr<SubscriptionChangeDomain> domain,
+                                                             std::shared_ptr<CallbackSlotPool> packetPool,
+                                                             std::size_t packetIndex,
+                                                             std::uint64_t packetGeneration) noexcept
     : domain_(std::move(domain)), previousDriver_(std::move(driverRoot)), previousRoot_(std::move(turnRoot)),
-      previousOwner_(std::move(callbackOwner)), previousChannel_(callbackChannel) {
+      previousOwner_(std::move(callbackOwner)), previousPacketPool_(callbackPacketPool),
+      previousPacketIndex_(callbackPacketIndex), previousPacketGeneration_(callbackPacketGeneration),
+      previousChannel_(callbackChannel) {
     driverRoot = previousDriver_ ? previousDriver_ : domain_;
     turnRoot = previousRoot_ ? previousRoot_ : domain_;
     callbackOwner = domain_;
     callbackChannel = DATA_CHANNEL;
-    std::lock_guard lock(domain_->mutex);
-    ++domain_->dataCallbacks;
-    beginCallback(*domain_, DATA_CHANNEL);
+
+    if (packetPool) {
+        callbackPacketPool = std::move(packetPool);
+        callbackPacketIndex = packetIndex;
+        callbackPacketGeneration = packetGeneration;
+    }
+
+    enterDataCallbackCohort(domain_);
 }
 
 SubscriptionDataCallbackScope::~SubscriptionDataCallbackScope() {
-    domain_->fences[DATA_CHANNEL].active.store(false, std::memory_order_release);
     {
         std::lock_guard lock(domain_->mutex);
-        --domain_->dataCallbacks;
+
+        if (--domain_->dataCallbacks == 0)
+            domain_->fences[DATA_CHANNEL].active.store(false, std::memory_order_release);
     }
 
     callbackOwner = std::move(previousOwner_);
+    callbackPacketPool = std::move(previousPacketPool_);
+    callbackPacketIndex = previousPacketIndex_;
+    callbackPacketGeneration = previousPacketGeneration_;
     callbackChannel = previousChannel_;
     turnRoot = std::move(previousRoot_);
     driverRoot = std::move(previousDriver_);

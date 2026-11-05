@@ -3,6 +3,7 @@
 #pragma once
 
 #include "bootstrap_lease.hpp"
+#include "callback_retirement.hpp"
 #include "qd/transport/aggregation.hpp"
 #include "qd/transport/tcp_recovery.hpp"
 
@@ -10,6 +11,9 @@ namespace org::ttldtor::qdcxx::transport::detail {
 
 /** Private recovery assembly from stable process state, independent of its movable public facade. */
 struct TcpRecoveryFactory {
+    /** Bind actual high-level packet retirement before start; default low-level callers have no fence. */
+    static void setCallbackRetirementFence(TcpRecovery &recovery, CallbackRetirementFence *fence) noexcept;
+
     /** Quiesce only the owned native attempt before final detached facade statistics publication.
      * @param recovery Existing worker-owned recovery; no application callback is invoked.
      * @return Preserved actual lifetime totals after native callback retirement.

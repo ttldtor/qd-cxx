@@ -1,6 +1,7 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #pragma once
+#include "callback_retirement.hpp"
 
 #include "aggregation.hpp"
 #include "recovery_configuration.hpp"
@@ -149,6 +150,7 @@ class RecoveryBackend {
  * construction, so its pure-state origin/tickets cannot target a replacement public handle.
  */
 class RecoveryCore {
+    CallbackRetirementFence *callbackFence_ = nullptr; ///< Optional high-level actual packet retirement barrier.
     RecoveryConfiguration configuration_; ///< Complete candidates, followed by one explicit input adoption.
     RecoveryBackend &backend_;            ///< Embedded adapter, declared earlier in the enclosing stable Impl.
     RecoveryState state_;                 ///< Approved actual production scheduler, with this stable origin.
@@ -249,6 +251,11 @@ class RecoveryCore {
     std::expected<const mux::MuxQueue *, RecoveryDiagnostic> historyObservationQueue() const;
 
     public:
+    /** Install the pure high-level fence before start; no callable or SDK owner is retained. */
+    void setCallbackRetirementFence(CallbackRetirementFence *fence) noexcept {
+        callbackFence_ = fence;
+    }
+
     /** Construct the stable Core after all candidate preparation and before final input adoption.
      * @param configuration Fully prepared, still-uncommitted candidate.
      * @param backend Embedded adapter that outlives this Core.

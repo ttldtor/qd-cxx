@@ -347,6 +347,12 @@ ConnectionStatistics TcpRecovery::statistics() const noexcept {
     return impl_ ? impl_->core.statistics() : ConnectionStatistics{};
 }
 
+void detail::TcpRecoveryFactory::setCallbackRetirementFence(TcpRecovery &recovery,
+                                                            CallbackRetirementFence *fence) noexcept {
+    if (recovery.impl_)
+        recovery.impl_->core.setCallbackRetirementFence(fence);
+}
+
 ConnectionStatistics detail::TcpRecoveryFactory::retireStatistics(TcpRecovery &recovery) noexcept {
     return recovery.impl_ ? recovery.impl_->core.retireStatistics() : ConnectionStatistics{};
 }

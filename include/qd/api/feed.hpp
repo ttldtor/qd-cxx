@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 #pragma once
 
+#include "qd/api/callback_execution.hpp"
 #include "qd/api/event_registry.hpp"
 #include "qd/api/history_snapshot.hpp"
 #include "qd/api/subscription_selector.hpp"
@@ -46,21 +47,26 @@ struct SubscriptionPort;
 
 /** Detached high-level failures. No peer payload, credential or address is diagnostic text. */
 enum class ErrorCode {
-    NONE,               ///< No failure has been recorded.
-    INVALID_ARGUMENT,   ///< Caller input does not satisfy the public contract.
-    INVALID_STATE,      ///< Operation conflicts with the accepted lifecycle or fixed address.
-    RESOURCE_LIMIT,     ///< A finite configured capacity or native thread reservation was exhausted.
-    WORK_LIMIT,         ///< The derived bounded preparation or progress allowance was exhausted.
-    ALLOCATION_FAILURE, ///< Required owned storage could not be allocated.
-    WRONG_THREAD,       ///< A checked operation used an incompatible creator thread.
-    CLOSED,             ///< Admission is fenced by endpoint, subscription or runtime retirement.
-    CALLBACK_FAILURE,   ///< Event listener failure closes its subscription; advisory state failure is recorded
-                        ///< separately.
-    TRANSPORT_FAILURE,  ///< Connection, recovery or native I/O failed; inspect the static stage and codes.
-    PROTOCOL_FAILURE,   ///< Peer input failed the existing bounded protocol profile.
-    BOOTSTRAP_FAILURE,  ///< The explicit process/main-thread runtime bootstrap could not be acquired.
-    DNS_CONFIGURATION,  ///< No supported bounded IPv4 resolver snapshot could be obtained.
-    UNSUPPORTED_PROFILE ///< The requested combination is outside this public receiving profile.
+    NONE,                ///< No failure has been recorded.
+    INVALID_ARGUMENT,    ///< Caller input does not satisfy the public contract.
+    INVALID_STATE,       ///< Operation conflicts with the accepted lifecycle or fixed address.
+    RESOURCE_LIMIT,      ///< A finite configured capacity or native thread reservation was exhausted.
+    WORK_LIMIT,          ///< The derived bounded preparation or progress allowance was exhausted.
+    ALLOCATION_FAILURE,  ///< Required owned storage could not be allocated.
+    WRONG_THREAD,        ///< A checked operation used an incompatible creator thread.
+    CLOSED,              ///< Admission is fenced by endpoint, subscription or runtime retirement.
+    CALLBACK_FAILURE,    ///< Event listener failure closes its subscription; advisory state failure is recorded
+                         ///< separately.
+    TRANSPORT_FAILURE,   ///< Connection, recovery or native I/O failed; inspect the static stage and codes.
+    PROTOCOL_FAILURE,    ///< Peer input failed the existing bounded protocol profile.
+    BOOTSTRAP_FAILURE,   ///< The explicit process/main-thread runtime bootstrap could not be acquired.
+    DNS_CONFIGURATION,   ///< No supported bounded IPv4 resolver snapshot could be obtained.
+    UNSUPPORTED_PROFILE, ///< The requested combination is outside this public receiving profile.
+    EXECUTOR_REJECTED,   ///< Host explicitly refused an event task; no retry.
+    EXECUTOR_FAILURE,    ///< Host post threw before completion.
+    EXECUTOR_DROPPED,    ///< Accepted task was destroyed without running.
+    EXECUTOR_CONTRACT,   ///< Host refused or threw after actual execution began.
+    CALLBACK_CANCELLED   ///< Queued event selection cancelled by close or source reset; advisory.
 };
 
 /** Static/numeric failure snapshot, independent of runtime and native owners. */
@@ -105,7 +111,10 @@ struct RuntimeOptions {
     std::size_t maximumChangeListenersPerSubscription = 4; ///< Accepted, selected and capture-retiring observers.
     std::size_t maximumPendingSubscriptionChanges =
         8; ///< Pending/executing symbol notification phases per subscription.
-    std::size_t maximumSubscriptionChangesPerTurn = 32; ///< Shared runtime admission credits during one callback turn.
+    std::size_t maximumSubscriptionChangesPerTurn = 32;  ///< Shared runtime admission credits during one callback turn.
+    std::size_t maximumCustomCallbackSubscriptions = 16; ///< Simultaneous selected/custom reservations.
+    std::size_t maximumCallbackBytes =
+        32 * 1024 * 1024; ///< Conservative logical owned packet budget, excluding host captures.
 };
 
 /** Existing delivery semantics selected for one high-level endpoint. */
@@ -321,6 +330,19 @@ template <class Event> class Subscription final {
      * @return Detached CALLBACK_FAILURE or NONE; owner state and getDiagnostic() are unaffected.
      */
     [[nodiscard]] Diagnostic getStateChangeDiagnostic() const noexcept;
+    /** Inspect event scheduling failure or benign queued cancellation independently of state observers.
+     * @return Detached typed/static diagnostic; does not progress host tasks.
+     */
+    [[nodiscard]] Diagnostic getCallbackDispatchDiagnostic() const noexcept;
+    /** Select the event executor; null inherits the endpoint policy (endpoint null means SDK worker).
+     * Selection is sampled with listeners; already selected work keeps its original policy.
+     * @param executor Owned policy object; workers remain application-owned. Throws Error after close or on capacity
+     * refusal.
+     */
+    void setEventExecutor(std::shared_ptr<CallbackExecutor> executor);
+    /** Inspect accepted event policy intent, without waiting for an old selection. @return Override or null. */
+    [[nodiscard]] std::shared_ptr<CallbackExecutor> getEventExecutor() const;
+
     /** Request nonblocking close; native/callback retirement stays with the runtime owner. */
     ~Subscription();
     Subscription(const Subscription &) = delete;
@@ -555,6 +577,15 @@ class Endpoint final {
      * @return Detached CALLBACK_FAILURE or NONE; getDiagnostic(), state and CloseResult remain unaffected.
      */
     [[nodiscard]] Diagnostic getStateChangeDiagnostic() const noexcept;
+    /** Select the default event executor; null restores the SDK worker.
+     * Selection is sampled with listeners; already selected work keeps its original policy.
+     * @param executor Owned policy object; workers remain application-owned. Throws Error after close or on capacity
+     * refusal.
+     */
+    void setEventExecutor(std::shared_ptr<CallbackExecutor> executor);
+    /** Inspect accepted default event policy intent without waiting. @return Policy or null for SDK worker. */
+    [[nodiscard]] std::shared_ptr<CallbackExecutor> getEventExecutor() const;
+
     ~Endpoint();
     Endpoint(const Endpoint &) = delete;
     Endpoint &operator=(const Endpoint &) = delete;

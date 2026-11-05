@@ -43,3 +43,5 @@
 [Конфигурация endpoint](ENDPOINT-CONFIGURATION.ru.md): явные адреса/свойства, неизменяемые снимки, эффективные локальные значения и границы совместимости Java.
 
 [Серверная агрегация](SERVER-AGGREGATION.ru.md): отдельные local request и peer report, bounded descriptor updates и явный UNKNOWN.
+
+[Исполнение event callback](CALLBACK-EXECUTION.ru.md): конечные policies, serial selection, отказы и фактический retirement.

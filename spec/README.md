@@ -60,3 +60,5 @@ Exact conformance results belong to the [developer reading path](../docs/develop
 - [Time-series identity and logical ranges](subscriptions/TIME-SERIES-IDENTITY.md): explicit capability, owning wrappers and atomic mutations, separate from HISTORY receiving.
 
 - [Owned HISTORY receiving](subscriptions/HISTORY-RECEIVING.md): worker-owned ranges, detached AS-OF completeness/reset observations and explicit business eligibility.
+
+[Event callback execution](subscriptions/CALLBACK-EXECUTION.md): owned packets, borrowed schedulers, finite reentry and source retirement.

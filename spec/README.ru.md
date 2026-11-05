@@ -60,3 +60,5 @@
 - [Идентичность time-series и логический диапазон](subscriptions/TIME-SERIES-IDENTITY.ru.md): явная capability, owning-обёртки и атомарные мутации, отдельно от HISTORY receiving.
 
 - [Приём HISTORY с владением SDK](subscriptions/HISTORY-RECEIVING.ru.md): диапазоны worker, отделённые AS-OF наблюдения полноты/reset и явная пригодность бизнес-типов.
+
+[Исполнение event callback](subscriptions/CALLBACK-EXECUTION.ru.md): owning packets, borrowed schedulers, конечные reentry и source retirement.

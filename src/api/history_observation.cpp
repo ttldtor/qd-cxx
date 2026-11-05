@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 #include "history_observation.hpp"
 #include "../core/delivery_statistics.hpp"
+#include "callback_execution.hpp"
 
 #include <limits>
 
@@ -54,17 +55,15 @@ void qualify(const EndpointPort &endpoint, const SubscriptionPort &port,
 } // namespace
 
 HistoryCallbackRetirement historyCallbackRetirement(const SubscriptionPort &port) noexcept {
-    const auto &fence = port.changes->fences[0];
-    const auto first = fence.epoch.load(std::memory_order_acquire);
-    const bool active = fence.active.load(std::memory_order_acquire);
-    const auto statistics = port.statistics->snapshot();
-    const auto second = fence.epoch.load(std::memory_order_acquire);
+    const auto callback = callbackRetirementSnapshot(port);
 
-    return {!active && first == second && statistics.inFlightEvents == 0, second};
+    return {callback.quiescent, callback.retirementRevision};
 }
 
 HistoryCallbackRetirement historyCallbackRetirementLocked(const SubscriptionPort &port) noexcept {
-    return historyCallbackRetirement(port);
+    const auto callback = callbackRetirementSnapshotLocked(port);
+
+    return {callback.quiescent, callback.retirementRevision};
 }
 
 HistorySubscriptionSnapshot copyHistorySnapshot(const std::shared_ptr<SubscriptionPort> &port) {

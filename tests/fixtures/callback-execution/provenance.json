@@ -1,0 +1,33 @@
+{
+  "revision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "actualRevision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "javaVersion": "openjdk version \"1.8.0_422\"",
+  "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
+  "javacSha256": "633143e961aa18051c09112b85333f5cdbd845b54eb39678eb15b91ca8bbb527",
+  "harnessSha256": "11e3856f743c4e7fe43485410ad31a4490102b2d99fba4f3945d7c1ad01c9ec6",
+  "launcherSha256": "9b467cf41758ba5383c4de66c575cfd8bb9c71cc22b86d818f3d30189d23a72d",
+  "upstreamSources": [
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/api/DXEndpoint.java",
+      "sha256": "824636ff1044530fdcac057af629d25886fd9d1e4946f03316303ebd49f32488"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/api/DXFeedSubscription.java",
+      "sha256": "172f2c6bef874f60dfa53ebd8ead92deea1ec32cbbf5bc105136c15e39f50129"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/api/impl/DXEndpointImpl.java",
+      "sha256": "32b962cc562848869d5eb8014c7fd5e3a59ae543958dba4cd0bc2e0c2dd2896b"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/api/impl/DXFeedImpl.java",
+      "sha256": "7402a8be3bb5deaa84fc907c6b69bc91d0ec58d1883bf3c97b8260b1d1017caf"
+    }
+  ],
+  "productionClassFiles": 1290,
+  "productionResourceFiles": 27,
+  "productionClassInventorySha256": "90a478b5d3737246d8c897322c9f9db60887846e20117572588e05ae78fbc6d8",
+  "fixtureSha256": "63e57165c50d1bd0047c36257b7708b083d0af016e7c0612c99a93336ab5f865",
+  "rows": 14,
+  "timezoneInvariant": true
+}

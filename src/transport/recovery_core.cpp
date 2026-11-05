@@ -732,6 +732,12 @@ std::optional<RecoveryDiagnostic> RecoveryCore::controls(RecoveryTurnWork &work)
 RecoveryObservation RecoveryCore::reset(RecoveryTicket ticket, RecoveryTurnWork &work) {
     auto result = recoveryResult(ticket, RecoveryCompletion::DEFERRED);
 
+    if (callbackFence_ && callbackFence_->outstanding.load(std::memory_order_acquire) != 0) {
+        callbackFence_->cancelQueuedRequested.store(true, std::memory_order_release);
+
+        return result;
+    }
+
     if (!releaseEvent(work.session))
         return result;
 

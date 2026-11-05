@@ -65,17 +65,32 @@ void closeSubscriptionObservers(const std::shared_ptr<SubscriptionPort> &port, b
  */
 [[nodiscard]] bool subscriptionObserverCallbackActive() noexcept;
 
+/** Reserve one nested task on the existing causal driver. Throws before admission on finite exhaustion. */
+void deferCallbackTask(std::shared_ptr<CallbackSlotPool> pool, std::size_t index, std::uint64_t generation,
+                       const SubscriptionCallbackBarrier *source = nullptr);
+/** Exact currently selected callback dependency, used before entering an executor post scope. */
+[[nodiscard]] SubscriptionCallbackBarrier currentSubscriptionCallbackBarrier() noexcept;
+
 /** Defer symbol-observer dispatch through an existing complete data callback selection. */
 class SubscriptionDataCallbackScope final {
     std::shared_ptr<SubscriptionChangeDomain> domain_;
     std::shared_ptr<SubscriptionChangeDomain> previousDriver_; ///< Existing same-thread continuation dispatcher.
     std::shared_ptr<SubscriptionChangeDomain> previousRoot_;   ///< Existing same-thread bounded continuation root.
     std::shared_ptr<SubscriptionChangeDomain> previousOwner_;  ///< Existing same-thread selected callback owner.
-    std::size_t previousChannel_ = 0;                          ///< Existing selected callback fence channel.
+    std::shared_ptr<CallbackSlotPool> previousPacketPool_;
+    std::size_t previousPacketIndex_ = 0;
+    std::uint64_t previousPacketGeneration_ = 0;
+    std::size_t previousChannel_ = 0; ///< Existing selected callback fence channel.
 
     public:
-    /** @param domain Runtime-local detached observer owner; no native state is retained. */
-    explicit SubscriptionDataCallbackScope(std::shared_ptr<SubscriptionChangeDomain> domain) noexcept;
+    /** @param domain Runtime-local detached observer owner; no native state is retained.
+     * @param packetPool Optional fixed pure packet identity owner, independent of the current thread epoch.
+     * @param packetIndex Exact physical slot when packetPool is present.
+     * @param packetGeneration Non-reused selection identity, retained through final capture retirement.
+     */
+    explicit SubscriptionDataCallbackScope(std::shared_ptr<SubscriptionChangeDomain> domain,
+                                           std::shared_ptr<CallbackSlotPool> packetPool = {},
+                                           std::size_t packetIndex = 0, std::uint64_t packetGeneration = 0) noexcept;
     /** Leave the data domain, then perform finite admitted deferred notifications outside all locks. */
     ~SubscriptionDataCallbackScope();
     SubscriptionDataCallbackScope(const SubscriptionDataCallbackScope &) = delete;

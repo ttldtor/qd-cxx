@@ -369,3 +369,5 @@ class/resource inventories.
 
 - [Production oracle Order](../upstream/order-oracle/README.ru.md): полные source/index, physical VOID mapping,
   реальные HISTORY parser/delegate values, numeric/FOB/flags/removal границы; EN/RU справка без входов.
+
+- [Oracle исполнения callback](../upstream/callback-execution-oracle/README.ru.md): actual Java inheritance/override, inline и serial delivery на двух workers; конечные Capture/Verify и EN/RU help без входных путей.

@@ -43,3 +43,5 @@ The `qd/mux/queue.hpp` header requires `qdcxx_mux_queue`; this optional queue is
 [Endpoint configuration](ENDPOINT-CONFIGURATION.md): explicit addresses/properties, immutable snapshots, effective local values and Java compatibility boundaries.
 
 [Server aggregation](SERVER-AGGREGATION.md): separate local requests and current-peer reports, bounded descriptor updates and explicit unknown states.
+
+[Event callback execution](CALLBACK-EXECUTION.md): finite event policies, serial selection, rejection and actual retirement.

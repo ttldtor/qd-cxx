@@ -1,0 +1,14 @@
+subscription.initial.inherits	true
+accepted.before.callback	true
+endpoint.selected	endpoint
+subscription.override.identity	true
+override.selected	override
+subscription.reset.inherits	true
+reset.selected	endpoint
+three.actual.notifications	true
+closed.subscription.setter	true
+null.endpoint	NullPointerException
+inline.callback.before.publish.return	true
+same.subscription.while.first.running	true
+same.subscription.maximum.active	1
+owned.executor.terminated	true
