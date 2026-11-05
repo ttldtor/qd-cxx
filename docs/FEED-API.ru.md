@@ -3,7 +3,7 @@
 [English version](FEED-API.md) · [Практические руководства](guides.ru.md) · [Справочник API](api.ru.md)
 
 Подключите `qd/api/feed.hpp` и линкуйте `qdcxx_feed`, чтобы получать типизированные
-`events::Quote`, `events::Profile`, `events::Trade`, `events::TradeETH`, `events::Summary`, `events::TextMessage`, `events::TextConfiguration`, `events::Message` и `events::Configuration` через рабочий поток библиотеки. Приложение создаёт
+`events::Quote`, `events::Profile`, `events::Trade`, `events::TradeETH`, `events::Summary`, `events::TextMessage`, `events::TextConfiguration`, `events::Message`, `events::Configuration` и `events::Order` через рабочий поток библиотеки. Приложение создаёт
 endpoint, обработчики и подписки на точные символы; библиотека продвигает соединение,
 конечные переподключения, очереди и доставку. Подписки можно создавать до и после
 `connect()`.
@@ -12,9 +12,10 @@ endpoint, обработчики и подписки на точные симв�
 и текстовых событий либо явными валидированными схемами вызывающего кода и зарегистрированными mappings.
 Endpoint выбирает TICKER (по умолчанию: последние значения с возможным объединением
 обновлений), STREAM (каждая принятая выбранная запись источника) либо явный HISTORY
-(индексируемое общее хранилище и независимые views). Текущие бизнес-mappers поддерживают
-TICKER/STREAM; HISTORY требует проверенного бизнес-route и отклоняет эти девять типов до
-native-регистрации. TLS и credentials остаются отдельными профилями приёма. Wildcard-селекторы
+(индексируемое общее хранилище и независимые views). Order требует HISTORY; стандартная схема
+Order принадлежит SDK и не требует схемы от приложения. Остальные девять типов сохраняют
+существующие профили TICKER/STREAM и отклоняют HISTORY до native-регистрации. TLS и credentials
+остаются отдельными профилями приёма. Wildcard-селекторы
 требуют существующего явного разрешения STREAM. Загрузка схем является отдельной задачей.
 [Низкоуровневые API получения](SUBSCRIPTIONS.ru.md) предоставляют отдельные профили.
 
@@ -456,7 +457,7 @@ signed дни, не business timestamps. PriceType берётся из flags. П
 
 ## Явные decorated selectors
 
-Owning `SubscriptionSelector` и `addSelectors`/`setSelectors`/`removeSelector` сохраняют typed kind/source identity отдельно от physical demand. Текущие пять market types игнорируют IES source ID как production Java; TSS typed Feed атомарно неподдержан. `EndpointOptions::enableWildcard=true` разрешает explicit All только для STREAM и по умолчанию выключен. Literal leading-star не включает wildcard; прежние string/Candle API остаются plain exact. [Полный контракт, пример, конечное хранение и known-binding source adapter and time value conversion](../spec/subscriptions/DECORATED-SELECTORS.ru.md).
+Owning `SubscriptionSelector` и `addSelectors`/`setSelectors`/`removeSelector` сохраняют typed kind/source identity отдельно от physical demand. Quote/Profile/Trade/TradeETH/Summary игнорируют IES source ID как production Java. Order направляет явные source IDs в зарегистрированные записи Order; plain-селекторы и отрицательные source IDs выбирают доступное объединение sources. См. [получение индексируемого Order](ORDER.ru.md). TSS typed Feed атомарно неподдержан. `EndpointOptions::enableWildcard=true` разрешает explicit All только для STREAM и по умолчанию выключен. Literal leading-star не включает wildcard; прежние string/Candle API остаются plain exact. [Полный контракт, пример, конечное хранение и known-binding source adapter and time value conversion](../spec/subscriptions/DECORATED-SELECTORS.ru.md).
 
 TextMessage требует endpoint STREAM. TextConfiguration использует STREAM или TICKER; владеющий nullable-текст и политика версии описаны в [контракте](../spec/events/TEXT-EVENTS.ru.md).
 
@@ -583,4 +584,4 @@ queue wait, state/change observers исключены. До завершения
 
 ## Наблюдения диапазонов HISTORY
 
-Выбирайте `DeliveryContract::HISTORY` явно. Worker владеет collector, независимыми views, replay и ACK reset. `Subscription<Event>::getHistorySnapshot()` возвращает пассивный владеющий срез AS-OF; getter не выполняет I/O и не ждёт callback. Current completion требует настоящих данных о доставленном диапазоне и соответствия принятым logical/source/clear/callback fences. У текущих девяти бизнес-типов нет проверенного HISTORY route: они отклоняются до native-регистрации. Точные состояния, конечные storage limits и сырые индексируемые координаты описаны в [контракте HISTORY](../spec/subscriptions/HISTORY-RECEIVING.ru.md).
+Выбирайте `DeliveryContract::HISTORY` явно. Worker владеет collector, независимыми views, replay и ACK reset. `Subscription<Event>::getHistorySnapshot()` возвращает пассивный владеющий срез AS-OF; getter не выполняет I/O и не ждёт callback. Current completion требует настоящих данных о доставленном диапазоне и соответствия принятым logical/source/clear/callback fences. Order — первый поддерживаемый типизированный HISTORY route: endpoint без явного registry использует стандартную схему Order, принадлежащую SDK. Это индексируемое событие. Остальные девять бизнес-типов отклоняют HISTORY до native-регистрации. См. [поля Order, source-селекторы и владение](ORDER.ru.md). Точные состояния, конечные storage limits и сырые индексируемые координаты описаны в [контракте HISTORY](../spec/subscriptions/HISTORY-RECEIVING.ru.md).

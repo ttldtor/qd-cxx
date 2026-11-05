@@ -6,6 +6,7 @@
 
 #include "../transport/tcp_recovery_factory.hpp"
 #include "endpoint_configuration.hpp"
+#include "event_registry_defaults.hpp"
 #include "feed_internal.hpp"
 #include "history_observation.hpp"
 #include "receiving_profile.hpp"
@@ -1270,6 +1271,7 @@ template class Subscription<events::TextMessage>;
 template class Subscription<events::TextConfiguration>;
 template class Subscription<events::Message>;
 template class Subscription<events::Configuration>;
+template class Subscription<events::Order>;
 template class Subscription<RegisteredEvent>;
 
 Feed::Feed(std::shared_ptr<detail::EndpointPort> port) : port_(std::move(port)) {
@@ -1312,6 +1314,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
         bool textConfiguration = false;
         bool message = false;
         bool configuration = false;
+        bool order = false;
 
         for (const auto type : types) {
             switch (type) {
@@ -1342,6 +1345,9 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             case EventType::TEXT_CONFIGURATION:
                 textConfiguration = true;
                 break;
+            case EventType::ORDER:
+                order = true;
+                break;
             default:
                 reject(ErrorCode::INVALID_ARGUMENT, "subscription-event-types");
             }
@@ -1350,7 +1356,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
         const auto selection = static_cast<detail::EventSelection>(
             (quote ? 1U : 0U) | (profile ? 2U : 0U) | (trade ? 4U : 0U) | (tradeETH ? 8U : 0U) | (summary ? 16U : 0U) |
             (textMessage ? 32U : 0U) | (textConfiguration ? 64U : 0U) | (message ? 128U : 0U) |
-            (configuration ? 256U : 0U));
+            (configuration ? 256U : 0U) | (order ? 512U : 0U));
         const auto delivery = registeredDelivery  ? detail::EventDelivery::REGISTERED
                               : quote             ? detail::EventDelivery::QUOTE
                               : profile           ? detail::EventDelivery::PROFILE
@@ -1360,6 +1366,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                               : textMessage       ? detail::EventDelivery::TEXT_MESSAGE
                               : textConfiguration ? detail::EventDelivery::TEXT_CONFIGURATION
                               : message           ? detail::EventDelivery::MESSAGE
+                              : order             ? detail::EventDelivery::ORDER
                                                   : detail::EventDelivery::CONFIGURATION;
         auto subscription = std::make_shared<detail::SubscriptionPort>();
         subscription->statistics = std::make_shared<core::detail::DeliveryStatisticsState>();
@@ -1392,10 +1399,13 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                 reject(ErrorCode::CLOSED, "endpoint-closed");
             }
 
-            // A registry entry is not permission to use an unsupported delivery contract.
-            // The current native business mappers do not implement HISTORY projections.
-            if (port_->options.contract == DeliveryContract::HISTORY) {
+            // Business capability is explicit; an indexed layout alone does not make a TimeSeriesEvent.
+            if (port_->options.contract == DeliveryContract::HISTORY && selection != detail::EventSelection::ORDER) {
                 reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-history-event-type");
+            }
+
+            if (order && port_->options.contract != DeliveryContract::HISTORY) {
+                reject(ErrorCode::UNSUPPORTED_PROFILE, "order-requires-history");
             }
 
             if (message && port_->options.contract != DeliveryContract::STREAM) {
@@ -1415,11 +1425,14 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             bool registeredTextConfiguration = !port_->options.eventRegistry;
             bool registeredMessage = !port_->options.eventRegistry;
             bool registeredConfiguration = !port_->options.eventRegistry;
+            bool registeredOrder =
+                !port_->options.eventRegistry && port_->options.contract == DeliveryContract::HISTORY;
 
             if (port_->options.eventRegistry) {
                 for (const auto &registration : port_->options.eventRegistry->registrations()) {
                     registeredMessage = registeredMessage || registration.type == EventType::MESSAGE;
                     registeredConfiguration = registeredConfiguration || registration.type == EventType::CONFIGURATION;
+                    registeredOrder = registeredOrder || registration.type == EventType::ORDER;
                     registeredQuote = registeredQuote || registration.type == EventType::QUOTE;
                     registeredProfile = registeredProfile || registration.type == EventType::PROFILE;
                     registeredTrade = registeredTrade || registration.type == EventType::TRADE;
@@ -1437,7 +1450,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             if (missingQuote || missingProfile || (trade && !registeredTrade) || (tradeETH && !registeredTradeETH) ||
                 (summary && !registeredSummary) || (textMessage && !registeredTextMessage) ||
                 (textConfiguration && !registeredTextConfiguration) || (message && !registeredMessage) ||
-                (configuration && !registeredConfiguration)) {
+                (configuration && !registeredConfiguration) || (order && !registeredOrder)) {
                 reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-unregistered-event");
             }
 
@@ -1496,7 +1509,8 @@ FeedFilter Endpoint::createFilter(std::span<const FeedFilterCategory> categories
 
         if (!registry) {
             EventRegistryWork work;
-            auto prepared = EventRegistry::builtIn({}, work);
+            auto prepared = contract == DeliveryContract::HISTORY ? detail::defaultHistoryEventRegistry({}, work)
+                                                                  : EventRegistry::builtIn({}, work);
 
             if (!prepared) {
                 auto code = ErrorCode::UNSUPPORTED_PROFILE;
@@ -1814,6 +1828,8 @@ class TypedConsumer final : public client::SubscriptionConsumer {
                     projectedEvents.emplace_back(std::move(*message));
                 } else if (auto *configuration = std::get_if<events::Configuration>(&projected->value)) {
                     projectedEvents.emplace_back(std::move(*configuration));
+                } else if (auto *order = std::get_if<events::Order>(&projected->value)) {
+                    projectedEvents.emplace_back(std::move(*order));
                 } else if (auto *summary = std::get_if<events::Summary>(&projected->value)) {
                     projectedEvents.emplace_back(std::move(*summary));
                 } else if (auto *message = std::get_if<events::TextMessage>(&projected->value)) {
@@ -1955,6 +1971,8 @@ class TypedConsumer final : public client::SubscriptionConsumer {
                 return deliver<events::Configuration>(batch, listeners, completion);
             case EventDelivery::SUMMARY:
                 return deliver<events::Summary>(batch, listeners, completion);
+            case EventDelivery::ORDER:
+                return deliver<events::Order>(batch, listeners, completion);
             case EventDelivery::TEXT_MESSAGE:
                 return deliver<events::TextMessage>(batch, listeners, completion);
             case EventDelivery::TEXT_CONFIGURATION:
@@ -2183,7 +2201,8 @@ void applyDesired(NativeEndpoint &endpoint, NativeSubscription &subscription, mu
                                0,
                                {},
                                symbol.kind() == SubscriptionSymbolKind::ALL ? core::SubscriptionSelectorKind::ALL
-                                                                            : core::SubscriptionSelectorKind::EXACT});
+                                                                            : core::SubscriptionSelectorKind::EXACT,
+                               symbol.sourceId()});
         }
     }
 

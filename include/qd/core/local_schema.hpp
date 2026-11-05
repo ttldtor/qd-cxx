@@ -47,8 +47,13 @@ struct IndexedTimeSingleInt64 {
     std::size_t field; ///< Logical field ID; no physical VOID tail is materialized.
 };
 
+/** One exact COMPACT_INT low word with a physical VOID high slot omitted from logical fields. */
+struct IndexedTimeLowInt32 {
+    std::size_t field; ///< Logical low-word contributor; normal source high word is zero.
+};
+
 /** Finite explicit source-time mapping; never inferred from a record or field name. */
-using IndexedTimeLayout = std::variant<IndexedTimePairInt32, IndexedTimeSingleInt64>;
+using IndexedTimeLayout = std::variant<IndexedTimePairInt32, IndexedTimeSingleInt64, IndexedTimeLowInt32>;
 
 /** Loader-independent input subset; not a serialized DataScheme. */
 struct LocalRecord {

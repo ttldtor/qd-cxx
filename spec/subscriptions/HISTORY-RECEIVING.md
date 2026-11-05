@@ -8,8 +8,11 @@ mapping, replay, transport progress, source reset and reset acknowledgements. Ap
 create a collector or supply turn-work credits. TICKER remains the default; STREAM and HISTORY
 are explicit, distinct contracts.
 
-A business type must have a verified HISTORY route. The current nine built-in Feed types have no
-such route and subscription creation rejects them with `UNSUPPORTED_PROFILE` at
+Order is the first supported typed HISTORY route. Without an explicit registry the SDK selects its
+standard default Order schema; source-specific records use the existing immutable EventRegistry.
+Order requires HISTORY and remains an indexed event with separate source identity. The nine ordinary
+Feed types (Quote, Profile, Trade, TradeETH, Summary, TextMessage, TextConfiguration, Message and
+Configuration) reject HISTORY with `UNSUPPORTED_PROFILE` at
 `subscription-history-event-type`, before native registration. A generic indexed layout or a
 caller-declared time-series capability does not grant business-mapper permission. The common
 HISTORY receiver can retain complete custom schemas through the existing lower receiver API;
@@ -57,14 +60,16 @@ publication yields explicit unknown evidence, never a partial vector with stale 
 `requestedFrom` and `rawTime` are signed raw indexed-record coordinates. They are not Unix
 milliseconds. Standard TimeAndSale binds physical Time/Sequence slots explicitly; its verified
 Java delegate converts milliseconds into that record coordinate. General indexed requests use
-their delegate's full-index bound. Logical time-series identity/capability remains distinct from
+their delegate's full-index bound. Order requests raw bound `0` and retains independent source-record
+partitions; its business Time/Sequence does not select that bound. See the [Order contract](../events/ORDER.md).
+Logical time-series identity/capability remains distinct from
 receiving availability, and live range mutation remains a separate contract.
 
 Accepted disconnect/clear and desired changes invalidate current completion immediately through
 detached facade fences. Fresh source completeness requires the real reset/mapping/ACK path and
 callback retirement. Old immutable batches remain valid independently. No getter performs an ACK
 or advances reconnection. The actual pinned Java oracle and native controlled-peer test cover the
-common standard-schema receiver; a positive typed public business route must be verified separately.
+common standard-schema receiver. The [Order guide](../../docs/ORDER.md) shows supported typed public reception.
 
 See [the oracle](../../tools/upstream/history-receiver-oracle/README.md),
 [logical time-series identity](TIME-SERIES-IDENTITY.md) and [statistics](CLIENT-STATISTICS.md).

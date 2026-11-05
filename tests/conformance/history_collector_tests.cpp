@@ -2255,3 +2255,102 @@ TEST_CASE("HISTORY retains original binding generations while later descriptions
     CHECK((**next).trigger->bindingGeneration == later);
     CHECK((**next).epoch.matches(epoch));
 }
+
+TEST_CASE("HISTORY physical VOID high slot preserves full removal identity separately from logical low index") {
+    const c::LocalRecord record{
+        0, u"Order#NTV", true, {{8}, {8}}, {{u"Index", 0}, {u"Value", 1}}, c::IndexedTimeLowInt32{0}};
+    const std::array declarations{record};
+    auto local = c::LocalSchema::create(declarations, {1, 2, 2, 32, 128}, c::LocalProfile::BINARY_FIELDS_V1);
+    REQUIRE(local);
+    auto live = genericSession(*local);
+    std::vector<std::byte> describe;
+    number(describe, 17);
+    text(describe, u"Order#NTV");
+    number(describe, 3);
+
+    for (const auto &[name, type] :
+         std::array<std::pair<std::u16string_view, std::int32_t>, 3>{{{u"Void", 0}, {u"Index", 8}, {u"Value", 8}}}) {
+        text(describe, name);
+        number(describe, type);
+    }
+
+    (void)admit(live, frame(2, describe));
+    auto copied = *local;
+    auto work = turn();
+    auto history = s::HistoryCollector::create(std::move(copied), limits(), {false, 100, 10000}, work);
+    REQUIRE(history);
+    auto view = history->openView({false}, work);
+    REQUIRE(view);
+    const c::SubscriptionRequest request{{local->recordContext(0), u"AAPL"}, std::numeric_limits<std::int64_t>::min()};
+    auto coreWork = command();
+    REQUIRE(history->add(*view, std::span(&request, 1), coreWork, work));
+    const auto stage = [&](std::int64_t index, std::int32_t flags) {
+        std::vector<std::byte> body;
+        prefix(body, flags, u"AAPL", 17);
+        number(body, index);
+
+        if (!(flags & 2)) {
+            number(body, 123);
+        }
+
+        auto event = admit(live, frame(20, body));
+        REQUIRE(event.records().size() == 1);
+
+        if (flags & 2) {
+            REQUIRE(event.records()[0].removalTime);
+            CHECK(*event.records()[0].removalTime == index);
+        }
+
+        auto credits = turn();
+        REQUIRE(history->stage(std::move(event), credits));
+    };
+    const auto take = [&](std::int64_t raw, std::int32_t low) {
+        INFO("expected collector key=", raw);
+        auto credits = turn();
+        auto front = history->front(*view, credits);
+        REQUIRE(front);
+        REQUIRE(*front);
+        CHECK((**front).record.rawTime == raw);
+        CHECK((**front).record.fields[0].raw == low);
+
+        if ((**front).trigger) {
+            CHECK((**front).trigger->rawTime == raw);
+        }
+
+        REQUIRE(history->pop(*view, credits));
+    };
+    stage(5, 0);
+    take(5, 5);
+    CHECK(history->pointCount() == 1);
+    constexpr std::int64_t HIGH_REMOVAL = (std::int64_t{1} << 32) | 5;
+    stage(HIGH_REMOVAL, 2);
+    // An unchanged unknown removal is suppressed by the production collector projection.
+    work = turn();
+    auto unchanged = history->front(*view, work);
+    REQUIRE(unchanged);
+    CHECK_FALSE(*unchanged);
+    CHECK(history->pointCount() == 1);
+    stage(0, 0);
+    take(0, 0);
+    CHECK(history->pointCount() == 2);
+    stage(0, 2);
+    take(0, 0);
+    CHECK(history->pointCount() == 1);
+    stage(5, 2);
+    take(5, 5);
+    CHECK(history->pointCount() == 0);
+    stage(-1, 0);
+    take(4294967295LL, -1);
+    CHECK(history->pointCount() == 1);
+    stage(std::numeric_limits<std::int64_t>::max(), 2);
+    CHECK(history->pointCount() == 1);
+    work = turn();
+    auto sentinel = history->front(*view, work);
+    REQUIRE(sentinel);
+
+    if (*sentinel) {
+        CHECK((**sentinel).record.rawTime == std::numeric_limits<std::int64_t>::max());
+        CHECK((**sentinel).record.fields[0].raw == -1);
+        REQUIRE(history->pop(*view, work));
+    }
+}

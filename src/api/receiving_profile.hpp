@@ -15,7 +15,7 @@
 
 namespace org::ttldtor::qdcxx::api::detail {
 inline constexpr std::size_t MAXIMUM_RECEIVING_RECORDS = 16; ///< Existing complete receiving catalog ceiling.
-inline constexpr std::size_t RECEIVING_EVENT_KINDS = 9;      ///< Explicitly supported native event kinds.
+inline constexpr std::size_t RECEIVING_EVENT_KINDS = 10;     ///< Explicitly supported native event kinds.
 inline constexpr std::size_t RECEIVING_EVENT_SELECTIONS = (1U << RECEIVING_EVENT_KINDS) - 1;
 
 ///< Every nonempty finite selection; no dynamic type registry or catalog expansion.
@@ -31,6 +31,7 @@ struct ReceivingSymbol {
     char16_t exchange = 0;   ///< Syntactic logical exchange, preserving trailing attributes.
     std::array<bool, RECEIVING_EVENT_KINDS> regional{}; ///< Exact regional match per business kind.
     core::SubscriptionSelectorKind selector = core::SubscriptionSelectorKind::EXACT; ///< Explicit ALL has no text.
+    std::optional<std::int32_t> sourceId; ///< Explicit indexed selector ID; absent PLAIN demands every Order source.
 };
 
 /** Worker routing reservation plus a separate producer-attempt metric; queue-owned storage remains separate. */
@@ -68,6 +69,8 @@ struct ReceivingProfile {
     std::vector<client::PreparedSubscriptionBinding> bindings; ///< Explicit routes grouped by business type.
     std::array<char16_t, MAXIMUM_RECEIVING_RECORDS> bindingExchanges{};
     ///< Exact aligned Quote/Trade record suffixes; fixed backing is included in sizeof(ReceivingProfile).
+    std::array<std::optional<std::int32_t>, MAXIMUM_RECEIVING_RECORDS> bindingSources{};
+    ///< Exact aligned Order sources; absent for nonindexed business projections.
     std::array<collectors::TickerVersionBinding, MAXIMUM_RECEIVING_RECORDS> versionBindings{};
     std::size_t versionBindingCount = 0; ///< Explicit schema-bound TICKER version gates.
     ReceivingRoutingLimits routing;      ///< Explicit additional routing workspace and pre-allocation work charge.

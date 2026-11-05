@@ -1,6 +1,7 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/events/order_index.hpp"
+#include "order_record_source.hpp"
 
 #include <array>
 #include <bit>
@@ -79,27 +80,13 @@ PreparedOrderSource::prepare(const core::LocalSchema &schema, std::int32_t local
 
     const auto &name = schema.records()[static_cast<std::size_t>(localId)].name;
 
-    if (name.size() > limits.nameUnits || name.size() > limits.totalNameUnits || name.size() > limits.comparisonWork) {
-        return std::unexpected(MappingError::RESOURCE_LIMIT);
+    auto source = detail::prepareRecordOrderSource(name, limits);
+
+    if (!source) {
+        return std::unexpected(source.error());
     }
 
-    limits.totalNameUnits -= name.size();
-    limits.comparisonWork -= name.size();
-
     try {
-        const auto separator = name.rfind(u'#');
-        auto source = OrderSource::DEFAULT;
-
-        if (separator != std::u16string::npos) {
-            const auto suffix = std::u16string_view(name).substr(separator + 1);
-
-            if (suffix.empty() || suffix.size() > 4) {
-                return std::unexpected(MappingError::INVALID_INPUT);
-            }
-
-            source = OrderSource::valueOf(suffix);
-        }
-
         constexpr std::array<std::u16string_view, 1> KEYS{u"Index"};
         constexpr std::array<core::SerialFieldType, 1> TYPES{core::SerialFieldType::COMPACT_INT};
         const std::array requests{FieldRequest{KEYS, TYPES, true}};
@@ -109,7 +96,7 @@ PreparedOrderSource::prepare(const core::LocalSchema &schema, std::int32_t local
             return std::unexpected(mapping.error());
         }
 
-        return PreparedOrderSource(std::move(*mapping), std::move(source));
+        return PreparedOrderSource(std::move(*mapping), std::move(*source));
     } catch (const std::invalid_argument &) {
         return std::unexpected(MappingError::INVALID_INPUT);
     } catch (const std::bad_alloc &) {

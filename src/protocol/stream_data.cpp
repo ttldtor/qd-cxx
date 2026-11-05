@@ -142,6 +142,8 @@ StreamDataContext::createWithFieldTimePolicy(const core::LocalSchema &schema,
                     // Current validated field IDs equal dense positions; make this resolution explicit.
                     if (const auto *pair = std::get_if<core::IndexedTimePairInt32>(&*local.indexedTimeLayout)) {
                         indexedLayout = ResolvedIndexedTimePairInt32{pair->firstField, pair->secondField};
+                    } else if (const auto *low = std::get_if<core::IndexedTimeLowInt32>(&*local.indexedTimeLayout)) {
+                        indexedLayout = ResolvedIndexedTimeLowInt32{low->field};
                     } else {
                         indexedLayout = ResolvedIndexedTimeSingleInt64{
                             std::get<core::IndexedTimeSingleInt64>(*local.indexedTimeLayout).field};
@@ -487,6 +489,8 @@ void applyRemovalTime(Values &values, const std::optional<ResolvedIndexedTimeLay
         const auto bits = std::bit_cast<std::uint64_t>(time);
         values[pair->firstValueIndex].raw = std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(bits >> WORD_BITS));
         values[pair->secondValueIndex].raw = std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(bits));
+    } else if (const auto *low = std::get_if<ResolvedIndexedTimeLowInt32>(&*layout)) {
+        values[low->valueIndex].raw = std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(time));
     } else {
         values[std::get<ResolvedIndexedTimeSingleInt64>(*layout).valueIndex].raw = time;
     }

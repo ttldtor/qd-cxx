@@ -71,7 +71,7 @@ bool validBinding(const PreparedSubscriptionBinding &binding) noexcept {
             binding.kind == PreparedEventKind::TRADE || binding.kind == PreparedEventKind::TRADE_ETH ||
             binding.kind == PreparedEventKind::SUMMARY || binding.kind == PreparedEventKind::TEXT_MESSAGE ||
             binding.kind == PreparedEventKind::TEXT_CONFIGURATION || binding.kind == PreparedEventKind::MESSAGE ||
-            binding.kind == PreparedEventKind::CONFIGURATION) &&
+            binding.kind == PreparedEventKind::CONFIGURATION || binding.kind == PreparedEventKind::ORDER) &&
            (binding.eventTimePolicy == ReceiverEventTimePolicy::UNSPECIFIED ||
             binding.eventTimePolicy == ReceiverEventTimePolicy::FIELD_METADATA);
 }
@@ -83,7 +83,7 @@ struct ReceiverRoute {
     core::RecordContext context; ///< Retained exact origin/record identity, without declaration names.
     std::variant<events::PreparedQuote, events::PreparedProfile, events::PreparedTrade, events::PreparedTradeETH,
                  events::PreparedSummary, events::PreparedTextMessage, events::PreparedTextConfiguration,
-                 events::PreparedMessage, events::PreparedConfiguration>
+                 events::PreparedMessage, events::PreparedConfiguration, events::PreparedOrder>
         mapping;                          ///< Existing owned immutable mapper.
     events::EventValueLimits valueLimits; ///< Per-result owned text bounds.
     ReceiverEventTimePolicy timePolicy;   ///< Explicit optional timestamp source.
@@ -157,7 +157,8 @@ SubscriptionBatch::project(std::size_t index, ReceiverProjectionWork &work) cons
             const bool profile = std::holds_alternative<events::PreparedProfile>(route.mapping);
             const bool attachment = std::holds_alternative<events::PreparedMessage>(route.mapping) ||
                                     std::holds_alternative<events::PreparedConfiguration>(route.mapping);
-            const bool symbolOnly = !profile && !textMessage && !textConfiguration;
+            const bool order = std::holds_alternative<events::PreparedOrder>(route.mapping);
+            const bool symbolOnly = !profile && !textMessage && !textConfiguration && !order;
             const bool quote = symbolOnly && !attachment;
             const auto units = symbolOnly ? std::min(route.valueLimits.symbolUnits, route.valueLimits.totalUnits)
                                           : route.valueLimits.totalUnits;
@@ -243,6 +244,18 @@ SubscriptionBatch::project(std::size_t index, ReceiverProjectionWork &work) cons
 
                 if (!mapped)
                     return std::unexpected(ReceiverProjectionFailure{mapped.error()});
+
+                return SubscriptionProjection{std::move(*mapped), eventTime};
+            }
+
+            if (order) {
+                auto mapped =
+                    std::get<events::PreparedOrder>(route.mapping)
+                        .mapView(record.symbol, values, route.valueLimits, eventTime.value_or(0), record.eventFlags);
+
+                if (!mapped) {
+                    return std::unexpected(ReceiverProjectionFailure{mapped.error()});
+                }
 
                 return SubscriptionProjection{std::move(*mapped), eventTime};
             }
@@ -357,6 +370,15 @@ openSubscriptionReceiver(mux::MuxQueue &queue, const core::LocalSchema &schema, 
                                        binding.eventTimePolicy, fields, binding.mappingLimits.selections});
             } else if (binding.kind == PreparedEventKind::TRADE_ETH) {
                 auto prepared = events::PreparedTradeETH::prepare(schema, binding.localId, binding.mappingLimits);
+
+                if (!prepared) {
+                    return std::unexpected(ReceiverFailure{prepared.error(), i});
+                }
+
+                plan.routes.push_back({schema.recordContext(binding.localId), std::move(*prepared), binding.valueLimits,
+                                       binding.eventTimePolicy, fields, binding.mappingLimits.selections});
+            } else if (binding.kind == PreparedEventKind::ORDER) {
+                auto prepared = events::PreparedOrder::prepare(schema, binding.localId, binding.mappingLimits);
 
                 if (!prepared) {
                     return std::unexpected(ReceiverFailure{prepared.error(), i});

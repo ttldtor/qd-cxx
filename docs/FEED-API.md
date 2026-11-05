@@ -2,7 +2,7 @@
 
 [Русская версия](FEED-API.ru.md) · [Practical guides](guides.md) · [API reference](api.md)
 
-Use `qd/api/feed.hpp` and link `qdcxx_feed` to receive typed `events::Quote`, `events::Profile`, `events::Trade`, `events::TradeETH`, `events::Summary`, `events::TextMessage`, `events::TextConfiguration`, `events::Message` and `events::Configuration` through a library-owned worker. Applications create endpoints,
+Use `qd/api/feed.hpp` and link `qdcxx_feed` to receive typed `events::Quote`, `events::Profile`, `events::Trade`, `events::TradeETH`, `events::Summary`, `events::TextMessage`, `events::TextConfiguration`, `events::Message`, `events::Configuration` and `events::Order` through a library-owned worker. Applications create endpoints,
 listeners and exact symbol subscriptions; the library progresses connection,
 finite recovery, queues and delivery. Subscriptions can be created before or after
 `connect()`.
@@ -11,8 +11,9 @@ This API supports plain binary QTP over TCP with built-in full Quote/Profile/Tra
 and text/serialized-event schemas or explicit validated caller schemas and registered mappings.
 An endpoint chooses TICKER (default, latest values with possible
 conflation), STREAM (every admitted selected source record), or explicit HISTORY (indexed shared storage
-and independent views). Current business mappers support TICKER/STREAM; HISTORY requires a verified
-business route and currently rejects these nine types before native registration. TLS and credentials
+and independent views). Order requires HISTORY; its SDK-owned default registry needs no caller schema.
+The other nine types retain their existing TICKER/STREAM profiles and reject HISTORY before native
+registration. TLS and credentials
 remain separate receiving profiles. Wildcard selectors require the existing explicit STREAM permission.
 Schema loading is separate. The
 [lower-level receiving APIs](SUBSCRIPTIONS.md) expose separate profiles.
@@ -446,7 +447,7 @@ See [Summary](../spec/events/SUMMARY.md) for all fields, defaults and regional O
 
 ## Explicit decorated selectors
 
-Owning `SubscriptionSelector` and `addSelectors`/`setSelectors`/`removeSelector` preserve typed kind/source identity separately from physical demand. Current five market types ignore IES source ID as production Java does; typed Feed TSS is atomically unsupported. `EndpointOptions::enableWildcard=true` permits explicit All only for STREAM and is disabled by default. Literal leading-star text does not enable wildcard; existing string/Candle APIs remain plain exact. [Complete contract, example, finite storage and known-binding source adapter and time value conversion](../spec/subscriptions/DECORATED-SELECTORS.md).
+Owning `SubscriptionSelector` and `addSelectors`/`setSelectors`/`removeSelector` preserve typed kind/source identity separately from physical demand. Quote/Profile/Trade/TradeETH/Summary ignore IES source ID as production Java does. Order routes explicit source IDs to registered Order records; plain and negative-source selectors select the available source union. See [indexed Order reception](ORDER.md). Typed Feed TSS is atomically unsupported. `EndpointOptions::enableWildcard=true` permits explicit All only for STREAM and is disabled by default. Literal leading-star text does not enable wildcard; existing string/Candle APIs remain plain exact. [Complete contract, example, finite storage and known-binding source adapter and time value conversion](../spec/subscriptions/DECORATED-SELECTORS.md).
 
 TextMessage requires a STREAM endpoint. TextConfiguration uses STREAM or TICKER; its nullable owning text and version policy are specified in [Text events](../spec/events/TEXT-EVENTS.md).
 
@@ -569,4 +570,4 @@ existing sticky availability marker; reads and reconnect never reset totals.
 
 ## HISTORY range observations
 
-Select `DeliveryContract::HISTORY` explicitly. The worker owns the collector, independent views, replay and reset acknowledgements. `Subscription<Event>::getHistorySnapshot()` returns a passive owning AS-OF cut; reads perform no I/O or callback waiting. Current completion requires both actual delivered range evidence and matching accepted logical/source/clear/callback fences. The current nine business types have no verified HISTORY route and fail before native registration. See the [HISTORY contract](../spec/subscriptions/HISTORY-RECEIVING.md) for exact states, finite storage limits and raw indexed range units.
+Select `DeliveryContract::HISTORY` explicitly. The worker owns the collector, independent views, replay and reset acknowledgements. `Subscription<Event>::getHistorySnapshot()` returns a passive owning AS-OF cut; reads perform no I/O or callback waiting. Current completion requires both actual delivered range evidence and matching accepted logical/source/clear/callback fences. Order is the first supported typed HISTORY route; an endpoint without an explicit registry uses the standard SDK-owned Order schema. It is an indexed event. The other nine business types reject HISTORY before native registration. See [Order fields, source selectors and ownership](ORDER.md). See the [HISTORY contract](../spec/subscriptions/HISTORY-RECEIVING.md) for exact states, finite storage limits and raw indexed range units.

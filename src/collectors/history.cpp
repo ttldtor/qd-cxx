@@ -686,6 +686,13 @@ struct HistoryCollector::Impl {
             return std::bit_cast<std::int64_t>(bits);
         }
 
+        if (const auto *low = std::get_if<core::IndexedTimeLowInt32>(&layout)) {
+            // Physical VOID storage can contain a nonzero high word on a raw removal.
+            // Preserve that collector key independently of the public source/low-index projection.
+            return r.removalTime ? *r.removalTime
+                                 : static_cast<std::int64_t>(static_cast<std::uint32_t>(raw(low->field)));
+        }
+
         return raw(std::get<core::IndexedTimeSingleInt64>(layout).field);
     }
 
@@ -1584,6 +1591,8 @@ struct HistoryCollector::Impl {
             const auto bits = std::bit_cast<std::uint64_t>(value.time);
             out[pair->firstField].raw = std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(bits >> TIME_WORD_BITS));
             out[pair->secondField].raw = std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(bits));
+        } else if (const auto *low = std::get_if<core::IndexedTimeLowInt32>(&layout)) {
+            out[low->field].raw = std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(value.time));
         } else {
             out[std::get<core::IndexedTimeSingleInt64>(layout).field].raw = value.time;
         }

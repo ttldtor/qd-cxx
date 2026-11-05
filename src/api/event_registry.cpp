@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/api/event_registry.hpp"
 
+#include "event_registry_defaults.hpp"
 #include "qd/events/configuration.hpp"
+#include "qd/events/order.hpp"
 #include "qd/events/profile.hpp"
 #include "qd/events/quote.hpp"
 #include "qd/events/summary.hpp"
@@ -10,6 +12,7 @@
 #include "qd/events/trade.hpp"
 #include "qd/events/trade_eth.hpp"
 
+#include <algorithm>
 #include <array>
 #include <limits>
 #include <new>
@@ -165,7 +168,7 @@ bool validRegistration(const EventRegistration &registration) noexcept {
             registration.type == EventType::TRADE || registration.type == EventType::TRADE_ETH ||
             registration.type == EventType::SUMMARY || registration.type == EventType::TEXT_MESSAGE ||
             registration.type == EventType::TEXT_CONFIGURATION || registration.type == EventType::MESSAGE ||
-            registration.type == EventType::CONFIGURATION) &&
+            registration.type == EventType::CONFIGURATION || registration.type == EventType::ORDER) &&
            (registration.eventTimePolicy == EventTimePolicy::UNSPECIFIED ||
             registration.eventTimePolicy == EventTimePolicy::FIELD_METADATA);
 }
@@ -273,6 +276,25 @@ EventRegistry::create(const core::LocalSchema &schema, std::span<const EventRegi
 
                 if (!mapping) {
                     return std::unexpected(EventRegistryFailure{mapping.error(), index});
+                }
+            } else if (registration.type == EventType::ORDER) {
+                const auto mapping = events::PreparedOrder::prepare(*ownedSchema, registration.localRecordId,
+                                                                    registration.mappingLimits);
+
+                if (!mapping) {
+                    return std::unexpected(EventRegistryFailure{mapping.error(), index});
+                }
+
+                const auto &record = ownedSchema->records()[static_cast<std::size_t>(registration.localRecordId)];
+                const auto *low = record.indexedTimeLayout
+                                      ? std::get_if<core::IndexedTimeLowInt32>(&*record.indexedTimeLayout)
+                                      : nullptr;
+                const auto lookup = std::ranges::find_if(record.lookups, [](const auto &key) {
+                    return key.name == u"Index";
+                });
+
+                if (!low || lookup == record.lookups.end() || low->field != lookup->fieldId) {
+                    return std::unexpected(EventRegistryFailure{EventRegistryError::INVALID_INPUT, index});
                 }
             } else if (registration.type == EventType::SUMMARY) {
                 const auto mapping = events::PreparedSummary::prepare(*ownedSchema, registration.localRecordId,
@@ -460,4 +482,28 @@ std::size_t EventRegistry::storageBytes() const noexcept {
     return state_ ? state_->storageBytes : 0;
 }
 
+namespace detail {
+std::expected<EventRegistry, EventRegistryFailure> defaultHistoryEventRegistry(EventRegistryLimits limits,
+                                                                               EventRegistryWork &work) {
+    try {
+        constexpr std::size_t DEFAULT_ORDER_CONSTRUCTION_WORK = 512;
+        debit(work.visits, DEFAULT_ORDER_CONSTRUCTION_WORK);
+        auto schema = events::defaultOrderSchema(limits.schema);
+
+        if (!schema) {
+            return std::unexpected(EventRegistryFailure{schema.error(), {}});
+        }
+
+        const std::array routes{EventRegistration{EventType::ORDER, 0}};
+
+        return EventRegistry::create(*schema, routes, limits, work);
+    } catch (EventRegistryError error) {
+        return std::unexpected(EventRegistryFailure{error, {}});
+    } catch (const std::bad_alloc &) {
+        return std::unexpected(EventRegistryFailure{EventRegistryError::ALLOCATION_FAILURE, {}});
+    } catch (const std::length_error &) {
+        return std::unexpected(EventRegistryFailure{EventRegistryError::ALLOCATION_FAILURE, {}});
+    }
+}
+} // namespace detail
 } // namespace org::ttldtor::qdcxx::api

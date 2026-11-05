@@ -24,7 +24,8 @@ enum class EventType {
     TEXT_MESSAGE,       ///< Owning message with nullable exact text.
     TEXT_CONFIGURATION, ///< Owning lasting configuration with nullable exact text.
     MESSAGE = 7,        ///< Exact owning serialized Message attachment; STREAM only.
-    CONFIGURATION = 8   ///< Owning serialized Configuration with independent signed version metadata.
+    CONFIGURATION = 8,  ///< Owning serialized Configuration with independent signed version metadata.
+    ORDER = 9           ///< Complete owning ordinary indexed Order; high-level reception requires HISTORY.
 };
 
 /** Explicit source of optional event metadata, independent of indexed record identity. */

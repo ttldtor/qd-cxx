@@ -112,6 +112,14 @@ std::optional<SchemaError> validateIndexedLayout(const LocalRecord &record, Loca
                 return SchemaError::UNSUPPORTED_PROFILE;
             }
         }
+    } else if (const auto *low = std::get_if<IndexedTimeLowInt32>(&*record.indexedTimeLayout)) {
+        if (low->field >= record.fields.size()) {
+            return SchemaError::INVALID_SCHEMA;
+        }
+
+        if (record.fields[low->field].serialTypeId != std::to_underlying(SerialFieldType::COMPACT_INT)) {
+            return SchemaError::UNSUPPORTED_PROFILE;
+        }
     } else {
         const auto fieldId = std::get<IndexedTimeSingleInt64>(*record.indexedTimeLayout).field;
 

@@ -366,3 +366,6 @@ class/resource inventories.
 - [Time-series oracle](../upstream/time-series-oracle/README.ru.md): закреплённые Java8 identity/range/capability, наследование, bounded Capture/Verify и справка EN/RU без входных путей.
 
 - [Oracle HISTORY receiver](../upstream/history-receiver-oracle/README.ru.md): настоящие стандартные TimeAndSale delegate/collector, два диапазона и точный Java wire, конечные Capture/Verify и EN/RU справка без входных путей.
+
+- [Production oracle Order](../upstream/order-oracle/README.ru.md): полные source/index, physical VOID mapping,
+  реальные HISTORY parser/delegate values, numeric/FOB/flags/removal границы; EN/RU справка без входов.

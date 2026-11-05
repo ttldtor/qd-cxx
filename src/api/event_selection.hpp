@@ -40,7 +40,8 @@ enum class EventSelection {
     TEXT_CONFIGURATION = 64,              ///< Selected TextConfiguration routes.
     MESSAGE = 128,                        ///< Selected serialized Message routes.
     CONFIGURATION = 256,                  ///< Selected serialized Configuration routes.
-    ALL = 511,                            ///< Every supported event route.
+    ORDER = 512,                          ///< Selected ordinary indexed Order routes.
+    ALL = 1023,                           ///< Every supported event route.
 };
 
 /** Test a finite supported-kind selection without depending on local record positions.
@@ -51,7 +52,8 @@ enum class EventSelection {
 constexpr bool selectsEvent(EventSelection selection, EventType type) noexcept {
     if (type != EventType::QUOTE && type != EventType::PROFILE && type != EventType::TRADE &&
         type != EventType::TRADE_ETH && type != EventType::SUMMARY && type != EventType::TEXT_MESSAGE &&
-        type != EventType::TEXT_CONFIGURATION && type != EventType::MESSAGE && type != EventType::CONFIGURATION) {
+        type != EventType::TEXT_CONFIGURATION && type != EventType::MESSAGE && type != EventType::CONFIGURATION &&
+        type != EventType::ORDER) {
         return false;
     }
 
@@ -69,6 +71,7 @@ enum class EventDelivery {
     TEXT_CONFIGURATION, ///< Owning text configurations.
     MESSAGE,            ///< Owning serialized Message values.
     CONFIGURATION,      ///< Owning serialized Configuration values.
+    ORDER,              ///< Complete owning ordinary indexed Order values.
     REGISTERED          ///< Owning public RegisteredEvent variants, restricted by EventSelection.
 };
 } // namespace org::ttldtor::qdcxx::api::detail

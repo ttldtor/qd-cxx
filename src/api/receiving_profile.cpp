@@ -1,6 +1,7 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #include "receiving_profile.hpp"
+#include "event_registry_defaults.hpp"
 
 #include "qd/events/market_event_symbols.hpp"
 
@@ -79,7 +80,8 @@ EventRegistry selectRegistry(const EndpointOptions &options) {
     }
 
     EventRegistryWork work;
-    auto result = EventRegistry::builtIn({}, work);
+    auto result = options.contract == DeliveryContract::HISTORY ? defaultHistoryEventRegistry({}, work)
+                                                                : EventRegistry::builtIn({}, work);
 
     if (!result) {
         const auto allocation = std::visit(
@@ -278,9 +280,21 @@ void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, s
             profile.bindingExchanges[index] =
                 (registration.type == EventType::PROFILE || registration.type == EventType::TEXT_MESSAGE ||
                  registration.type == EventType::TEXT_CONFIGURATION || registration.type == EventType::MESSAGE ||
-                 registration.type == EventType::CONFIGURATION)
+                 registration.type == EventType::CONFIGURATION || registration.type == EventType::ORDER)
                     ? 0
                     : events::market_symbols::getExchangeCode(record.name);
+
+            if (registration.type == EventType::ORDER) {
+                const auto source = events::PreparedOrderSource::prepare(profile.schema, registration.localRecordId,
+                                                                         registration.mappingLimits);
+
+                if (!source) {
+                    refuse(ErrorCode::UNSUPPORTED_PROFILE, "profile-order-source");
+                }
+
+                profile.bindingSources[index] = source->source().id();
+            }
+
             const auto policy = registration.eventTimePolicy == EventTimePolicy::FIELD_METADATA
                                     ? client::ReceiverEventTimePolicy::FIELD_METADATA
                                     : client::ReceiverEventTimePolicy::UNSPECIFIED;
@@ -316,7 +330,8 @@ void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, s
             const auto fields = profile.schema.records()[static_cast<std::size_t>(binding.localId)].fields.size();
             const bool profileText = binding.kind == client::PreparedEventKind::PROFILE;
             const bool text = profileText || binding.kind == client::PreparedEventKind::TEXT_MESSAGE ||
-                              binding.kind == client::PreparedEventKind::TEXT_CONFIGURATION;
+                              binding.kind == client::PreparedEventKind::TEXT_CONFIGURATION ||
+                              binding.kind == client::PreparedEventKind::ORDER;
             const auto units = text ? values.totalUnits : values.symbolUnits;
             const auto strings = profileText ? std::size_t{3} : (text ? std::size_t{2} : std::size_t{1});
             const auto bytes =
@@ -529,7 +544,7 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
                                      multiply(subscriptionEntries, sizeof(core::SubscriptionRequest))),
                                  textBacking);
     routing.retainedMetadataBytes =
-        add(add(sizeof(result.bindingExchanges), sizeof(result.versionBindings)),
+        add(add(add(sizeof(result.bindingExchanges), sizeof(result.bindingSources)), sizeof(result.versionBindings)),
             add(sizeof(result.eventPlans),
                 sizeof(std::array<client::PreparedSubscriptionBinding, MAXIMUM_RECEIVING_RECORDS>)));
     // Snapshot copy, suffix/representability scans, physical conversion and conservative retirement.
@@ -647,7 +662,8 @@ void validateReceivingSymbol(const EventRegistry *registry, EventSelection selec
     for (const auto &route : registry->registrations()) {
         if (route.type == EventType::PROFILE || route.type == EventType::TEXT_MESSAGE ||
             route.type == EventType::TEXT_CONFIGURATION || route.type == EventType::MESSAGE ||
-            route.type == EventType::CONFIGURATION || !selectsEvent(selection, route.type)) {
+            route.type == EventType::CONFIGURATION || route.type == EventType::ORDER ||
+            !selectsEvent(selection, route.type)) {
             continue;
         }
 
@@ -703,6 +719,12 @@ bool receivingSymbolMatches(const ReceivingProfile &profile, std::size_t binding
                             const ReceivingSymbol &symbol) noexcept {
     const auto kind = static_cast<std::size_t>(profile.bindings[bindingIndex].kind);
     const auto exchange = profile.bindingExchanges[bindingIndex];
+
+    if (profile.bindings[bindingIndex].kind == client::PreparedEventKind::ORDER) {
+        const auto source = profile.bindingSources[bindingIndex];
+
+        return source && (!symbol.sourceId || *symbol.sourceId < 0 || *symbol.sourceId == *source);
+    }
 
     return symbol.selector == core::SubscriptionSelectorKind::ALL ||
            (exchange ? exchange == symbol.exchange : !symbol.regional[kind]);

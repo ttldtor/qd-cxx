@@ -172,7 +172,7 @@ void check(bool ticker, int versionType, bool firstOnly, std::int32_t seed = -7)
     auto endpoint = runtime.createEndpoint(options);
     auto feed = endpoint->getFeed();
 
-    for (const auto unknown : {-1, 9}) {
+    for (const auto unknown : {-1, std::numeric_limits<int>::max()}) {
         bool refused = false;
         try {
             static_cast<void>(feed->createSubscription({static_cast<q::api::EventType>(unknown)}));

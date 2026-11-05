@@ -1,0 +1,41 @@
+# Copyright (c) 2026 ttldtor.
+# SPDX-License-Identifier: BSL-1.0
+
+# Internal check: cmake -DPWSH=<pwsh> -P tests/conformance/order_oracle_help.cmake.
+# Reads the launcher help without SDK/input paths; no output files or Java work are requested.
+# Missing PowerShell, help/invalid-argument contract failures produce a CMake error.
+if(NOT PWSH)
+    find_program(PWSH pwsh REQUIRED)
+endif()
+get_filename_component(repo "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
+set(launcher "${repo}/tools/upstream/order-oracle/Invoke-Oracle.ps1")
+foreach(mode IN ITEMS noargs help ru invalid)
+    set(args)
+    if(mode STREQUAL "help")
+        set(args -Help)
+    elseif(mode STREQUAL "ru")
+        set(args -HelpRu)
+    elseif(mode STREQUAL "invalid")
+        set(args -Mode Verify)
+    endif()
+    execute_process(COMMAND "${PWSH}" -NoProfile -File "${launcher}" ${args}
+        RESULT_VARIABLE code OUTPUT_VARIABLE out ERROR_VARIABLE err TIMEOUT 15)
+    if(mode STREQUAL "invalid")
+        if(code EQUAL 0 OR NOT err MATCHES "Required inputs missing")
+            message(FATAL_ERROR "Incomplete invocation did not fail with actionable input error: ${code}: ${err}")
+        endif()
+    else()
+        if(NOT code EQUAL 0 OR NOT err STREQUAL "" OR out STREQUAL "")
+            message(FATAL_ERROR "Help failed: ${mode}: ${code}: ${err}")
+        endif()
+        if(mode STREQUAL "noargs")
+            set(noargs "${out}")
+        elseif(mode STREQUAL "help" AND NOT out STREQUAL noargs)
+            message(FATAL_ERROR "No-argument and -Help outputs differ")
+        endif()
+        if(mode STREQUAL "ru" AND NOT out MATCHES "Exit0")
+            message(FATAL_ERROR "Russian help lacks exit contract")
+        endif()
+    endif()
+endforeach()
+message(STATUS "Order oracle noargs/EN/RU help and incomplete invocation PASS")

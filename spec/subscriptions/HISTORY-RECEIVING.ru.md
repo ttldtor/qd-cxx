@@ -8,8 +8,11 @@ HISTORY collector, независимые представления подпи�
 Приложение не создаёт collector и не передаёт бюджеты отдельных тактов. По умолчанию остаётся
 TICKER; STREAM и HISTORY выбираются явно как разные контракты.
 
-Бизнес-типу нужен проверенный HISTORY route. У текущих девяти встроенных Feed-типов такого
-route нет: создание подписки возвращает `UNSUPPORTED_PROFILE` со стадией
+Order — первый поддерживаемый типизированный HISTORY route. Без явного registry SDK выбирает
+свою стандартную схему Order; записи отдельных sources задаются через неизменяемый EventRegistry.
+Order требует HISTORY и остаётся индексируемым событием с отдельной source identity. Девять обычных
+Feed-типов (Quote, Profile, Trade, TradeETH, Summary, TextMessage, TextConfiguration, Message и
+Configuration) отклоняют HISTORY: создание подписки возвращает `UNSUPPORTED_PROFILE` со стадией
 `subscription-history-event-type` до native-регистрации. Сырой индексируемый layout и заявленная
 вызывающей стороной time-series capability не разрешают бизнес-mapper. Общий HISTORY receiver
 сохраняет полные пользовательские схемы через существующий нижний receiver API; это не добавляет
@@ -56,14 +59,16 @@ resident backing collector, pending updates каждого view и два бан
 `requestedFrom` и `rawTime` — знаковые сырые координаты индексируемой записи, а не Unix-миллисекунды.
 Стандартная TimeAndSale явно связывает физические Time/Sequence slots; её проверенный Java delegate
 преобразует миллисекунды в эту координату. Общие indexed-запросы используют full-index bound своего
-delegate. Логическая time-series identity/capability отделена от доступности приёма; живая мутация
+delegate. Order запрашивает сырую границу `0` и сохраняет независимые разделы записей sources;
+бизнес-поля Time/Sequence не выбирают эту границу. См. [контракт Order](../events/ORDER.ru.md).
+Логическая time-series identity/capability отделена от доступности приёма; живая мутация
 диапазона остаётся отдельным контрактом.
 
 Принятые disconnect/clear и desired-изменения немедленно инвалидируют current completion через
 отделённые facade fences. Новая полнота требует настоящего reset/mapping/ACK пути и retirement
 callback. Старые неизменяемые batches сохраняют независимую валидность. Getter не выполняет ACK
 и не продвигает reconnect. Pinned Java oracle и native controlled-peer test проверяют общий
-receiver стандартной схемы; положительный типизированный публичный route проверяется отдельно.
+receiver стандартной схемы. [Руководство Order](../../docs/ORDER.ru.md) показывает поддерживаемый типизированный публичный приём.
 
 См. [oracle](../../tools/upstream/history-receiver-oracle/README.ru.md),
 [логическую time-series identity](TIME-SERIES-IDENTITY.ru.md) и [статистику](CLIENT-STATISTICS.ru.md).

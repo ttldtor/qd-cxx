@@ -175,7 +175,7 @@ void check(bool configuration, bool ticker = false, bool equalUpdate = false, bo
 void checkTextMessageRejectsTicker() {
     q::api::RuntimeOptions runtimeOptions;
     q::api::ApiRuntime runtime(runtimeOptions);
-    auto endpoint = runtime.createEndpoint({});
+    auto endpoint = runtime.createEndpoint();
     bool rejected = false;
     try {
         static_cast<void>(endpoint->getFeed()->createSubscription<q::events::TextMessage>());

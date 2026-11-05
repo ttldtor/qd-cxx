@@ -47,8 +47,14 @@ struct ResolvedIndexedTimeSingleInt64 {
     std::size_t valueIndex; ///< Complete logical64 value; physical tails remain absent.
 };
 
+/** Resolved low-word output position with no logical high-word field. */
+struct ResolvedIndexedTimeLowInt32 {
+    std::size_t valueIndex; ///< Exact COMPACT_INT contributor; full removal identity stays in metadata.
+};
+
 /** Owned decoding positions, distinct from the logical IDs supplied to LocalRecord. */
-using ResolvedIndexedTimeLayout = std::variant<ResolvedIndexedTimePairInt32, ResolvedIndexedTimeSingleInt64>;
+using ResolvedIndexedTimeLayout =
+    std::variant<ResolvedIndexedTimePairInt32, ResolvedIndexedTimeSingleInt64, ResolvedIndexedTimeLowInt32>;
 
 /** Owned validated plan with the output shape needed after schema destruction. */
 struct StreamRecordPlan {

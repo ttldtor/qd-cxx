@@ -3,6 +3,7 @@
 #pragma once
 
 #include "qd/events/configuration.hpp"
+#include "qd/events/order.hpp"
 #include "qd/events/profile.hpp"
 #include "qd/events/quote.hpp"
 #include "qd/events/summary.hpp"
@@ -35,7 +36,8 @@ enum class PreparedEventKind {
     TEXT_MESSAGE,       ///< Owning text message projection.
     TEXT_CONFIGURATION, ///< Owning text configuration projection.
     MESSAGE = 7,        ///< Owning serialized Message projection.
-    CONFIGURATION = 8   ///< Owning serialized Configuration projection.
+    CONFIGURATION = 8,  ///< Owning serialized Configuration projection.
+    ORDER = 9           ///< Complete owning ordinary indexed Order projection.
 };
 
 /** Explicit source for optional event metadata; indexed identity is never a timestamp substitute. */
@@ -92,7 +94,7 @@ struct ReceiverFailure {
 /** Fully owning optional projection; generic records are represented by monostate. */
 struct SubscriptionProjection {
     std::variant<std::monostate, events::Quote, events::Profile, events::Trade, events::TradeETH, events::Summary,
-                 events::TextMessage, events::TextConfiguration, events::Message, events::Configuration>
+                 events::TextMessage, events::TextConfiguration, events::Message, events::Configuration, events::Order>
         value;                               ///< Owned event or explicit generic route.
     std::optional<std::int64_t> eventTimeMs; ///< Actual selected FIELD metadata only; rawTime stays independent.
 };

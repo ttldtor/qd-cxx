@@ -158,7 +158,10 @@ std::vector<std::byte> frame(std::int32_t type, std::span<const std::byte> paylo
  * @param field Exact typed local value.
  */
 void field(std::vector<std::byte> &bytes, const core::FieldValue &field) {
-    if (field.type == core::SerialFieldType::UTF_CHAR) {
+    if (field.type == core::SerialFieldType::VOID_FIELD) {
+        // Physical VOID slots retain schema identity but occupy no wire bytes.
+        return;
+    } else if (field.type == core::SerialFieldType::UTF_CHAR) {
         character(bytes, static_cast<std::int32_t>(field.raw));
     } else if (field.type == core::SerialFieldType::INT) {
         constexpr unsigned BYTE_BITS = 8;

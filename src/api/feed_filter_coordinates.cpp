@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 #include "feed_filter_coordinates.hpp"
 
+#include "../events/order_record_source.hpp"
 #include "qd/events/market_event_symbols.hpp"
 
 #include <algorithm>
@@ -30,6 +31,7 @@ bool supported(const EventRegistry &registry, EventType type) noexcept {
     case EventType::TEXT_CONFIGURATION:
     case EventType::MESSAGE:
     case EventType::CONFIGURATION:
+    case EventType::ORDER:
         return true;
     }
 
@@ -48,8 +50,34 @@ bool usesGenericSourceSelection(EventType type) noexcept {
            type == EventType::CONFIGURATION;
 }
 
+/** Match explicit Order source identity using the already validated record qualification rules.
+ * @param registry Immutable complete registered schema.
+ * @param route Existing supported route.
+ * @param sourceId Optional selector/event source; negative selectors choose the available source set.
+ * @return True for a non-Order route, an unrestricted source set or an exact source match.
+ */
+bool matchesOrderSource(const EventRegistry &registry, const EventRegistration &route,
+                        std::optional<std::int32_t> sourceId) {
+    if (route.type != EventType::ORDER || !sourceId || *sourceId < 0) {
+        return true;
+    }
+
+    auto limits = route.mappingLimits;
+    const auto &record = registry.schema().records()[static_cast<std::size_t>(route.localRecordId)];
+    const auto source = events::detail::prepareRecordOrderSource(record.name, limits);
+
+    if (!source) {
+        refuse(source.error() == events::MappingError::ALLOCATION_FAILURE ? ErrorCode::ALLOCATION_FAILURE
+                                                                          : ErrorCode::UNSUPPORTED_PROFILE,
+               "filter-order-source");
+    }
+
+    return source->id() == *sourceId;
+}
+
 std::vector<FilterCoordinate> coordinates(const EventRegistry &registry, DeliveryContract contract, EventType type,
-                                          std::u16string_view symbol, bool wildcard, const FeedFilterLimits &limits) {
+                                          std::u16string_view symbol, bool wildcard, const FeedFilterLimits &limits,
+                                          std::optional<std::int32_t> sourceId = {}) {
     if (!registry.valid() || !supported(registry, type) ||
         (contract != DeliveryContract::TICKER && contract != DeliveryContract::STREAM &&
          contract != DeliveryContract::HISTORY)) {
@@ -65,7 +93,7 @@ std::vector<FilterCoordinate> coordinates(const EventRegistry &registry, Deliver
     std::size_t selected = 0;
 
     for (const auto &route : registry.registrations()) {
-        if (route.type != type) {
+        if (route.type != type || !matchesOrderSource(registry, route, sourceId)) {
             continue;
         }
 
@@ -77,7 +105,7 @@ std::vector<FilterCoordinate> coordinates(const EventRegistry &registry, Deliver
     }
 
     for (const auto &route : registry.registrations()) {
-        if (route.type != type) {
+        if (route.type != type || !matchesOrderSource(registry, route, sourceId)) {
             continue;
         }
 
@@ -98,7 +126,7 @@ std::vector<FilterCoordinate> coordinates(const EventRegistry &registry, Deliver
     result.reserve(selected);
 
     for (const auto &route : registry.registrations()) {
-        if (route.type != type) {
+        if (route.type != type || !matchesOrderSource(registry, route, sourceId)) {
             continue;
         }
 
@@ -137,7 +165,7 @@ std::vector<FilterCoordinate> filterSubscriptionCoordinates(const EventRegistry 
         refuse(ErrorCode::RESOURCE_LIMIT, "filter-symbol-units");
     }
 
-    // Time-series is checked before indexed: the current receiving projections have no history delegate.
+    // Indexed Order has no time-series business capability; source layout is not event-time permission.
     if (selector.kind() == SubscriptionSymbolKind::TIME_SERIES) {
         return {};
     }
@@ -147,13 +175,19 @@ std::vector<FilterCoordinate> filterSubscriptionCoordinates(const EventRegistry 
         return {};
     }
 
+    if (type == EventType::ORDER &&
+        (contract != DeliveryContract::HISTORY || selector.kind() == SubscriptionSymbolKind::ALL)) {
+        return {};
+    }
+
     const bool wildcard = selector.kind() == SubscriptionSymbolKind::ALL;
 
     if (!wildcard && selector.eventSymbol().starts_with(u'*')) {
         return {};
     }
 
-    return coordinates(registry, contract, type, selector.eventSymbol(), wildcard, limits);
+    return coordinates(registry, contract, type, selector.eventSymbol(), wildcard, limits,
+                       type == EventType::ORDER ? selector.sourceId() : std::nullopt);
 }
 
 std::vector<FilterCoordinate> filterEventCoordinates(const EventRegistry &registry, DeliveryContract contract,
@@ -184,12 +218,22 @@ std::vector<FilterCoordinate> filterEventCoordinates(const EventRegistry &regist
                     return EventType::MESSAGE;
                 } else if constexpr (std::is_same_v<Event, events::Configuration>) {
                     return EventType::CONFIGURATION;
+                } else if constexpr (std::is_same_v<Event, events::Order>) {
+                    return EventType::ORDER;
                 } else {
                     static_assert(std::is_same_v<Event, void>, "Add explicit filter coordinates for a new event");
                 }
             }();
 
-            return coordinates(registry, contract, type, value.symbol, false, limits);
+            if constexpr (std::is_same_v<Event, events::Order>) {
+                if (value.getSourceId() < 0) {
+                    return std::vector<FilterCoordinate>{};
+                }
+
+                return coordinates(registry, contract, type, value.symbol, false, limits, value.getSourceId());
+            } else {
+                return coordinates(registry, contract, type, value.symbol, false, limits);
+            }
         },
         event);
 }

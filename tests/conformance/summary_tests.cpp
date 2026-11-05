@@ -249,8 +249,8 @@ TEST_CASE("Summary plain default initialization snapshots and exact75 versus74 l
     a::EventRegistryWork work;
     auto builtin = a::EventRegistry::builtIn({}, work);
     REQUIRE(builtin);
-    CHECK(builtin->registrations().size() == 5);
-    CHECK(builtin->schema().records().size() == 5);
+    CHECK(builtin->registrations().size() == 9);
+    CHECK(builtin->schema().records().size() == 9);
     CHECK(builtin->registrations()[4].type == a::EventType::SUMMARY);
     std::size_t fields = 0;
 
@@ -258,10 +258,10 @@ TEST_CASE("Summary plain default initialization snapshots and exact75 versus74 l
         fields += record.fields.size();
     }
 
-    CHECK(fields == 59);
+    CHECK(fields == 69);
 }
 
-TEST_CASE("all thirty-one finite receiving selections include only their kinds and prepay binding copies atomically") {
+TEST_CASE("all finite receiving selections include only registered kinds and prepay binding copies atomically") {
     auto registry = std::optional<a::EventRegistry>{mixedRegistry()};
     REQUIRE(registry);
     a::EndpointOptions options;
@@ -272,7 +272,7 @@ TEST_CASE("all thirty-one finite receiving selections include only their kinds a
     runtime.dnsServers.push_back({{127, 0, 0, 1}});
     auto profile = a::detail::prepareReceivingProfile(runtime, options, "127.0.0.1", 12345);
 
-    for (unsigned mask = 1; mask <= 31; ++mask) {
+    for (unsigned mask = 1; mask <= 1023; ++mask) {
         const auto &plan = a::detail::receivingEventPlan(profile, static_cast<a::detail::EventSelection>(mask));
         CHECK(plan.bindingCount == ((mask & 1 ? 1 : 0) + (mask & 2 ? 1 : 0) + (mask & 4 ? 2 : 0) + (mask & 8 ? 2 : 0) +
                                     (mask & 16 ? 2 : 0)));
@@ -293,8 +293,9 @@ TEST_CASE("all thirty-one finite receiving selections include only their kinds a
         }
 
         auto seed = plan.work;
+
         REQUIRE(a::detail::copyReceivingBindings(profile, plan, selected, seed));
-        CHECK(seed.preparationWork > 0);
+        CHECK((seed.preparationWork > 0) == (plan.bindingCount > 0));
         CHECK(seed.visits >= plan.bindingCount);
     }
 }
@@ -309,7 +310,7 @@ TEST_CASE("fresh receiving grant funds a whole atomic fanout and real select bil
     runtime.maximumSymbolsPerSubscription = 2;
     runtime.dnsServers.push_back({{127, 0, 0, 1}});
     auto profile = a::detail::prepareReceivingProfile(runtime, options, "127.0.0.1", 12345);
-    CHECK(profile.eventPlans.size() == 31);
+    CHECK(profile.eventPlans.size() == 1023);
     CHECK(profile.schema.records().size() == 8);
     CHECK(profile.interests.clients == 33);
     std::size_t fieldCount = 0;
