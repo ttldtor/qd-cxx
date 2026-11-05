@@ -350,3 +350,5 @@ cache replay. Input-free EN/RU/Get-Help, bounded JDK8 Capture/Verify with exact 
 - [Server aggregation oracle](../upstream/server-aggregation-oracle/README.md): production Java public bounds, full/delta/reset/clamp, TimePeriodInfo and real reconnect; input-free EN/RU help, bounded Capture/Verify.
 
 - [Time-series oracle](../upstream/time-series-oracle/README.md): pinned Java8 identity/range/capability and inheritance, bounded Capture/Verify and input-free EN/RU help.
+
+- [HISTORY receiver oracle](../upstream/history-receiver-oracle/README.md): actual standard TimeAndSale delegate and collector, two ranges and exact Java-composed wire, bounded Capture/Verify and input-free EN/RU help.

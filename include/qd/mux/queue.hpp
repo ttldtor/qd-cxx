@@ -15,7 +15,9 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <string>
 #include <variant>
+#include <vector>
 
 namespace org::ttldtor::qdcxx::mux {
 namespace detail {
@@ -483,6 +485,14 @@ struct QueueRangeStatus {
     bool completeDeliveredRange = false; ///< Only scoped synchronized covered clean delivered state.
 };
 
+/** Owning HISTORY key and its exact owner-local observation; contains no data payload or callable. */
+struct QueueRangeObservation {
+    core::RecordContext context; ///< Immutable schema/record provenance, independent of a live queue.
+    std::u16string symbol;       ///< Exact copied physical symbol; source-specific records remain distinct contexts.
+    core::SubscriptionSelectorKind selector; ///< Actual authoritative selector domain.
+    QueueRangeStatus status;                 ///< Actual source/mapping/delivery evidence for this key.
+};
+
 /** Accepted owner reset request; not source/reset/ACK completion. */
 struct ResetAdmission {
     ResetAdmissionKind kind;       ///< New acceptance or joining an existing finite operation.
@@ -769,6 +779,14 @@ class MuxQueue {
      */
     std::expected<QueueRangeStatus, QueueFailure> rangeStatus(const MuxHandle &client, core::SubscriptionKey key,
                                                               QueueWork &work) const;
+    /** Copy observations for the exact current applied HISTORY interests of one registration.
+     * Owner-serialized and nonreentrant; no progress, callback or reset acknowledgement occurs.
+     * @param client Current registration in this queue's exact owner scope.
+     * @param work One finite observation seed; attempts, copies and every per-key query consume it.
+     * @return Owning pure key/status rows or a refusal; no partial vector or delivery/cache mutation escapes.
+     */
+    [[nodiscard]] std::expected<std::vector<QueueRangeObservation>, QueueFailure> rangeSnapshot(const MuxHandle &client,
+                                                                                                QueueWork &work) const;
     /** Inspect queue and separate source scopes.
      * @return Requested logical counters, not RSS. Concurrent detached release may expose adjacent instants
      * across independently sampled counters; quiescent values are exact.

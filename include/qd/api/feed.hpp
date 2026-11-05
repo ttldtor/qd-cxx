@@ -3,6 +3,7 @@
 #pragma once
 
 #include "qd/api/event_registry.hpp"
+#include "qd/api/history_snapshot.hpp"
 #include "qd/api/subscription_selector.hpp"
 #include "qd/client/endpoint_options.hpp"
 #include "qd/events/candle_symbol.hpp"
@@ -109,7 +110,19 @@ struct RuntimeOptions {
 /** Existing delivery semantics selected for one high-level endpoint. */
 enum class DeliveryContract {
     TICKER, ///< Initial/latest delivery with possible conflation, as for ordinary Java FEED Quote subscriptions.
-    STREAM  ///< Every admitted selected source record, including equal consecutive records.
+    STREAM, ///< Every admitted selected source record, including equal consecutive records.
+    HISTORY ///< Indexed shared storage and per-subscription range delivery; only verified HISTORY routes qualify.
+};
+
+/** Finite shared HISTORY storage policy, separate from per-subscription delivery FIFO reservations. */
+struct HistoryReceivingOptions {
+    std::size_t maximumPoints = 4096; ///< Shared distinct indexed points across all physical record/symbol partitions.
+    std::size_t maximumFrames = 256;  ///< Peak retained source frames, including old plus incoming replacement.
+    std::size_t maximumBytes = 64 * 1024 * 1024; ///< Peak shared source-event backing; excludes session/desired scopes.
+    std::size_t maximumResidentBytes = 128 * 1024 * 1024; ///< Collector fixed backing plus shared source-frame peak.
+    std::size_t pendingUpdatesPerSubscription = 128;      ///< Independent collector update FIFO item capacity per view.
+    std::size_t maximumObservationBytes = 8 * 1024 * 1024;     ///< Two SDK-owned per-subscription publication banks.
+    std::size_t pendingBytesPerSubscription = 4 * 1024 * 1024; ///< Independent whole-source-owner backing per view.
 };
 
 /** Endpoint policy; defaults need no caller-owned queue or turn-work objects. */
@@ -128,6 +141,7 @@ struct EndpointOptions {
     bool enableWildcard = false; ///< Explicit controlled-peer STREAM All permission; never enabled by text or peer.
     std::optional<std::chrono::milliseconds> requestedAggregationPeriod; ///< Initial server request; null asks for
                                                                          ///< server default, never an effective result.
+    HistoryReceivingOptions history; ///< Used only by the explicit HISTORY contract; never application work credits.
 };
 
 /** Last SDK-worker observation, never an upstream acknowledgement or a whole-network guarantee. */
@@ -251,6 +265,12 @@ template <class Event> class Subscription final {
      * @return Owner identity, lifetime counters, bounded gauges and monotonic observation time.
      */
     [[nodiscard]] SubscriptionStatistics getStatistics() const noexcept;
+    /** Copy the last worker HISTORY observation and qualify it against current accepted facade fences.
+     * Reads perform no native progress or callback waiting. A CURRENT cut is AS-OF, not a promise about
+     * unread network input or future freshness; another contract reports UNSUPPORTED.
+     * @return Owning bounded ranges and reset evidence; allocation failures throw Error without mutation.
+     */
+    [[nodiscard]] HistorySubscriptionSnapshot getHistorySnapshot() const;
     /** Copy the immutable normalized event-type set.
      * @return Owning finite set in EventType declaration order; allocation failures throw Error.
      */

@@ -364,3 +364,5 @@ class/resource inventories.
 - [Oracle серверной агрегации](../upstream/server-aggregation-oracle/README.ru.md): actual Java public bounds, full/delta/reset/clamp, TimePeriodInfo и реальный reconnect; input-free EN/RU help, finite Capture/Verify.
 
 - [Time-series oracle](../upstream/time-series-oracle/README.ru.md): закреплённые Java8 identity/range/capability, наследование, bounded Capture/Verify и справка EN/RU без входных путей.
+
+- [Oracle HISTORY receiver](../upstream/history-receiver-oracle/README.ru.md): настоящие стандартные TimeAndSale delegate/collector, два диапазона и точный Java wire, конечные Capture/Verify и EN/RU справка без входных путей.

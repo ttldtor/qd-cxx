@@ -58,3 +58,5 @@ Exact conformance results belong to the [developer reading path](../docs/develop
 [Requested server aggregation](transport/SERVER-AGGREGATION.md): existing QTP request/info properties, timing and bounded ownership.
 
 - [Time-series identity and logical ranges](subscriptions/TIME-SERIES-IDENTITY.md): explicit capability, owning wrappers and atomic mutations, separate from HISTORY receiving.
+
+- [Owned HISTORY receiving](subscriptions/HISTORY-RECEIVING.md): worker-owned ranges, detached AS-OF completeness/reset observations and explicit business eligibility.

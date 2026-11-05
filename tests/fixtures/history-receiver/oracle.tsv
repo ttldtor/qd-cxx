@@ -1,0 +1,242 @@
+wire-options	hs
+schema	TimeAndSale	true	15	0
+delegate	com.dxfeed.event.market.TimeAndSaleDelegate	History	true
+int-field	0	TimeAndSale.Time	Time	56
+int-field	1	TimeAndSale.Sequence	Sequence	72
+int-field	2	TimeAndSale.Exchange	ExchangeCode	2
+int-field	3	TimeAndSale.TradeId	TradeId	104
+int-field	4	TimeAndSale.TradeId$VoidTail	TradeId$VoidTail	0
+int-field	5	TimeAndSale.Price	Price	120
+int-field	6	TimeAndSale.Price$VoidTail	Price$VoidTail	0
+int-field	7	TimeAndSale.Size	Size	120
+int-field	8	TimeAndSale.Size$VoidTail	Size$VoidTail	0
+int-field	9	TimeAndSale.Bid.Price	BidPrice	120
+int-field	10	TimeAndSale.Bid.Price$VoidTail	BidPrice$VoidTail	0
+int-field	11	TimeAndSale.Ask.Price	AskPrice	120
+int-field	12	TimeAndSale.Ask.Price$VoidTail	AskPrice$VoidTail	0
+int-field	13	TimeAndSale.ExchangeSaleConditions	SaleConditions	40
+int-field	14	TimeAndSale.Flags	Flags	8
+bound	-9223372036854775808	-9223372036049469440
+bound	-1001	-4399824896
+bound	-1	-104857600
+bound	0	0
+bound	1	4194304
+bound	999	4190109696
+bound	1000	4294967296
+bound	9223372036854775807	9223372036854775807
+demand	two-ranges	1	TimeAndSale	IBM	0
+count	two-ranges	1
+input	3000	0	12884901888	4	12884901888
+input	2000	0	8589934592	0	8589934592
+output	low-partial	1	TimeAndSale	IBM	12884901888	4	12884901888	3000	30.25	100.5
+raw	low-partial	1	0	56	3
+raw	low-partial	1	1	72	0
+raw	low-partial	1	2	2	0
+raw	low-partial	1	3	104	0
+raw	low-partial	1	5	120	774530
+raw	low-partial	1	7	120	2572930
+raw	low-partial	1	9	120	0
+raw	low-partial	1	11	120	0
+raw	low-partial	1	13	40	0
+raw	low-partial	1	14	8	0
+output	low-partial	2	TimeAndSale	IBM	8589934592	0	8589934592	2000	20.25	100.5
+raw	low-partial	2	0	56	2
+raw	low-partial	2	1	72	0
+raw	low-partial	2	2	2	0
+raw	low-partial	2	3	104	0
+raw	low-partial	2	5	120	518530
+raw	low-partial	2	7	120	2572930
+raw	low-partial	2	9	120	0
+raw	low-partial	2	11	120	0
+raw	low-partial	2	13	40	0
+raw	low-partial	2	14	8	0
+count	low-partial	2
+output	high-covered	1	TimeAndSale	IBM	12884901888	4	12884901888	3000	30.25	100.5
+raw	high-covered	1	0	56	3
+raw	high-covered	1	1	72	0
+raw	high-covered	1	2	2	0
+raw	high-covered	1	3	104	0
+raw	high-covered	1	5	120	774530
+raw	high-covered	1	7	120	2572930
+raw	high-covered	1	9	120	0
+raw	high-covered	1	11	120	0
+raw	high-covered	1	13	40	0
+raw	high-covered	1	14	8	0
+output	high-covered	2	TimeAndSale	IBM	8589934592	8	8589934592	2000	20.25	100.5
+raw	high-covered	2	0	56	2
+raw	high-covered	2	1	72	0
+raw	high-covered	2	2	2	0
+raw	high-covered	2	3	104	0
+raw	high-covered	2	5	120	518530
+raw	high-covered	2	7	120	2572930
+raw	high-covered	2	9	120	0
+raw	high-covered	2	11	120	0
+raw	high-covered	2	13	40	0
+raw	high-covered	2	14	8	0
+count	high-covered	2
+input	0	0	0	10	0
+output	low-completed	1	TimeAndSale	IBM	0	10	0	0	NaN	NaN
+raw	low-completed	1	0	56	0
+raw	low-completed	1	1	72	0
+raw	low-completed	1	2	2	0
+raw	low-completed	1	3	104	0
+raw	low-completed	1	5	120	0
+raw	low-completed	1	7	120	0
+raw	low-completed	1	9	120	0
+raw	low-completed	1	11	120	0
+raw	low-completed	1	13	40	0
+raw	low-completed	1	14	8	0
+count	low-completed	1
+count	high-after-source-end	0
+input	2000	1	8589934593	1	8589934593
+output	low-pending	1	TimeAndSale	IBM	8589934593	1	8589934593	2000	21.25	100.5
+raw	low-pending	1	0	56	2
+raw	low-pending	1	1	72	1
+raw	low-pending	1	2	2	0
+raw	low-pending	1	3	104	0
+raw	low-pending	1	5	120	544130
+raw	low-pending	1	7	120	2572930
+raw	low-pending	1	9	120	0
+raw	low-pending	1	11	120	0
+raw	low-pending	1	13	40	0
+raw	low-pending	1	14	8	0
+count	low-pending	1
+input	2000	1	8589934593	0	8589934593
+output	low-commit	1	TimeAndSale	IBM	8589934593	0	8589934593	2000	22.25	100.5
+raw	low-commit	1	0	56	2
+raw	low-commit	1	1	72	1
+raw	low-commit	1	2	2	0
+raw	low-commit	1	3	104	0
+raw	low-commit	1	5	120	569730
+raw	low-commit	1	7	120	2572930
+raw	low-commit	1	9	120	0
+raw	low-commit	1	11	120	0
+raw	low-commit	1	13	40	0
+raw	low-commit	1	14	8	0
+count	low-commit	1
+input	4000	0	17179869184	4	17179869184
+input	2000	0	8589934592	16	8589934592
+output	low-snipped	1	TimeAndSale	IBM	17179869184	1	17179869184	4000	40.25	100.5
+raw	low-snipped	1	0	56	4
+raw	low-snipped	1	1	72	0
+raw	low-snipped	1	2	2	0
+raw	low-snipped	1	3	104	0
+raw	low-snipped	1	5	120	1030530
+raw	low-snipped	1	7	120	2572930
+raw	low-snipped	1	9	120	0
+raw	low-snipped	1	11	120	0
+raw	low-snipped	1	13	40	0
+raw	low-snipped	1	14	8	0
+output	low-snipped	2	TimeAndSale	IBM	12884901888	3	12884901888	3000	NaN	NaN
+raw	low-snipped	2	0	56	3
+raw	low-snipped	2	1	72	0
+raw	low-snipped	2	2	2	0
+raw	low-snipped	2	3	104	0
+raw	low-snipped	2	5	120	0
+raw	low-snipped	2	7	120	0
+raw	low-snipped	2	9	120	0
+raw	low-snipped	2	11	120	0
+raw	low-snipped	2	13	40	0
+raw	low-snipped	2	14	8	0
+output	low-snipped	3	TimeAndSale	IBM	8589934593	3	8589934593	2000	NaN	NaN
+raw	low-snipped	3	0	56	2
+raw	low-snipped	3	1	72	1
+raw	low-snipped	3	2	2	0
+raw	low-snipped	3	3	104	0
+raw	low-snipped	3	5	120	0
+raw	low-snipped	3	7	120	0
+raw	low-snipped	3	9	120	0
+raw	low-snipped	3	11	120	0
+raw	low-snipped	3	13	40	0
+raw	low-snipped	3	14	8	0
+output	low-snipped	4	TimeAndSale	IBM	8589934592	16	8589934592	2000	23.25	100.5
+raw	low-snipped	4	0	56	2
+raw	low-snipped	4	1	72	0
+raw	low-snipped	4	2	2	0
+raw	low-snipped	4	3	104	0
+raw	low-snipped	4	5	120	595330
+raw	low-snipped	4	7	120	2572930
+raw	low-snipped	4	9	120	0
+raw	low-snipped	4	11	120	0
+raw	low-snipped	4	13	40	0
+raw	low-snipped	4	14	8	0
+count	low-snipped	4
+output	high-snipped	1	TimeAndSale	IBM	8589934593	0	8589934593	2000	22.25	100.5
+raw	high-snipped	1	0	56	2
+raw	high-snipped	1	1	72	1
+raw	high-snipped	1	2	2	0
+raw	high-snipped	1	3	104	0
+raw	high-snipped	1	5	120	569730
+raw	high-snipped	1	7	120	2572930
+raw	high-snipped	1	9	120	0
+raw	high-snipped	1	11	120	0
+raw	high-snipped	1	13	40	0
+raw	high-snipped	1	14	8	0
+output	high-snipped	2	TimeAndSale	IBM	17179869184	1	17179869184	4000	40.25	100.5
+raw	high-snipped	2	0	56	4
+raw	high-snipped	2	1	72	0
+raw	high-snipped	2	2	2	0
+raw	high-snipped	2	3	104	0
+raw	high-snipped	2	5	120	1030530
+raw	high-snipped	2	7	120	2572930
+raw	high-snipped	2	9	120	0
+raw	high-snipped	2	11	120	0
+raw	high-snipped	2	13	40	0
+raw	high-snipped	2	14	8	0
+output	high-snipped	3	TimeAndSale	IBM	12884901888	3	12884901888	3000	NaN	NaN
+raw	high-snipped	3	0	56	3
+raw	high-snipped	3	1	72	0
+raw	high-snipped	3	2	2	0
+raw	high-snipped	3	3	104	0
+raw	high-snipped	3	5	120	0
+raw	high-snipped	3	7	120	0
+raw	high-snipped	3	9	120	0
+raw	high-snipped	3	11	120	0
+raw	high-snipped	3	13	40	0
+raw	high-snipped	3	14	8	0
+output	high-snipped	4	TimeAndSale	IBM	8589934593	3	8589934593	2000	NaN	NaN
+raw	high-snipped	4	0	56	2
+raw	high-snipped	4	1	72	1
+raw	high-snipped	4	2	2	0
+raw	high-snipped	4	3	104	0
+raw	high-snipped	4	5	120	0
+raw	high-snipped	4	7	120	0
+raw	high-snipped	4	9	120	0
+raw	high-snipped	4	11	120	0
+raw	high-snipped	4	13	40	0
+raw	high-snipped	4	14	8	0
+output	high-snipped	5	TimeAndSale	IBM	8589934592	16	8589934592	2000	23.25	100.5
+raw	high-snipped	5	0	56	2
+raw	high-snipped	5	1	72	0
+raw	high-snipped	5	2	2	0
+raw	high-snipped	5	3	104	0
+raw	high-snipped	5	5	120	595330
+raw	high-snipped	5	7	120	2572930
+raw	high-snipped	5	9	120	0
+raw	high-snipped	5	11	120	0
+raw	high-snipped	5	13	40	0
+raw	high-snipped	5	14	8	0
+count	high-snipped	5
+output	reattached-agent	1	TimeAndSale	IBM	17179869184	4	17179869184	4000	40.25	100.5
+raw	reattached-agent	1	0	56	4
+raw	reattached-agent	1	1	72	0
+raw	reattached-agent	1	2	2	0
+raw	reattached-agent	1	3	104	0
+raw	reattached-agent	1	5	120	1030530
+raw	reattached-agent	1	7	120	2572930
+raw	reattached-agent	1	9	120	0
+raw	reattached-agent	1	11	120	0
+raw	reattached-agent	1	13	40	0
+raw	reattached-agent	1	14	8	0
+output	reattached-agent	2	TimeAndSale	IBM	8589934592	16	8589934592	2000	23.25	100.5
+raw	reattached-agent	2	0	56	2
+raw	reattached-agent	2	1	72	0
+raw	reattached-agent	2	2	2	0
+raw	reattached-agent	2	3	104	0
+raw	reattached-agent	2	5	120	595330
+raw	reattached-agent	2	7	120	2572930
+raw	reattached-agent	2	9	120	0
+raw	reattached-agent	2	11	120	0
+raw	reattached-agent	2	13	40	0
+raw	reattached-agent	2	14	8	0
+count	reattached-agent	2

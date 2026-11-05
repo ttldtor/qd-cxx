@@ -7,6 +7,7 @@
 #include "../transport/tcp_recovery_factory.hpp"
 #include "endpoint_configuration.hpp"
 #include "feed_internal.hpp"
+#include "history_observation.hpp"
 #include "receiving_profile.hpp"
 #include "subscription_observer.hpp"
 #include "system_dns.hpp"
@@ -478,6 +479,12 @@ bool retireSubscription(const std::shared_ptr<detail::SubscriptionPort> &port) n
             s.sourceEpoch.reset();
             s.final = true;
         });
+        port->history.final = true;
+        port->history.state = HistoryObservationState::RETIRED;
+
+        for (auto &range : port->history.ranges)
+            range.status.completeDeliveredRange = false;
+
         port->retired.store(true, std::memory_order_release);
     }
 
@@ -1047,6 +1054,12 @@ template <class Event> SubscriptionStatistics Subscription<Event>::getStatistics
     return port_->statistics->snapshot();
 }
 
+template <class Event> HistorySubscriptionSnapshot Subscription<Event>::getHistorySnapshot() const {
+    return producerAction([&] {
+        return detail::copyHistorySnapshot(port_);
+    });
+}
+
 template <class Event> std::vector<EventType> Subscription<Event>::getEventTypes() const {
     return producerAction([&] {
         return port_->eventTypes;
@@ -1352,6 +1365,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
         subscription->statistics = std::make_shared<core::detail::DeliveryStatisticsState>();
         subscription->statistics->value.ownerIdentity = std::make_shared<const std::byte>();
         subscription->statistics->value.observedAt = std::chrono::steady_clock::now();
+        subscription->history.ownerIdentity = subscription->statistics->value.ownerIdentity;
         subscription->control = port_->control;
         subscription->endpoint = port_;
         subscription->owner = port_->owner;
@@ -1376,6 +1390,12 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             if (port_->closeRequested.load(std::memory_order_acquire) ||
                 port_->retired.load(std::memory_order_acquire)) {
                 reject(ErrorCode::CLOSED, "endpoint-closed");
+            }
+
+            // A registry entry is not permission to use an unsupported delivery contract.
+            // The current native business mappers do not implement HISTORY projections.
+            if (port_->options.contract == DeliveryContract::HISTORY) {
+                reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-history-event-type");
             }
 
             if (message && port_->options.contract != DeliveryContract::STREAM) {
@@ -2008,6 +2028,8 @@ std::unique_ptr<NativeEndpoint> activate(const transport::detail::BootstrapLease
 
     if (native->profile.family == core::SubscriptionFamily::TICKER) {
         queues.ticker.emplace(std::move(*queue));
+    } else if (native->profile.family == core::SubscriptionFamily::HISTORY) {
+        queues.history.emplace(std::move(*queue));
     } else {
         queues.stream.emplace(std::move(*queue));
     }
@@ -2093,7 +2115,10 @@ std::unique_ptr<NativeSubscription> registerSubscription(NativeEndpoint &endpoin
     port->statistics->update([&](auto &s) {
         s.queueCapacityEvents =
             endpoint.profile.clientLimits.dataItems +
-            (endpoint.profile.family == core::SubscriptionFamily::TICKER ? endpoint.profile.tickerLimits.cacheKeys : 0);
+            (endpoint.profile.family == core::SubscriptionFamily::TICKER ? endpoint.profile.tickerLimits.cacheKeys
+             : endpoint.profile.family == core::SubscriptionFamily::HISTORY
+                 ? endpoint.profile.historyLimits.points + endpoint.profile.historyLimits.pendingItems
+                 : 0);
     });
     observeState(port, SubscriptionState::ACTIVE);
 
@@ -2179,7 +2204,12 @@ void applyDesired(NativeEndpoint &endpoint, NativeSubscription &subscription, mu
         for (const auto &symbol : symbols) {
             if (receivingSymbolMatches(endpoint.profile, index, symbol)) {
                 const auto &physical = endpoint.profile.bindingExchanges[index] ? symbol.physical : symbol.logical;
-                requests.push_back({{context, physical, symbol.selector}, {}});
+                // General indexed subscriptions request the full raw index domain from zero. Time-series
+                // millisecond ranges require their own verified mapper and are not inferred here.
+                requests.push_back({{context, physical, symbol.selector},
+                                    endpoint.profile.family == core::SubscriptionFamily::HISTORY
+                                        ? std::optional<std::int64_t>{0}
+                                        : std::nullopt});
             }
         }
     }
@@ -2687,6 +2717,7 @@ void RuntimeImpl::run() noexcept {
 
                     auto work = native[index]->profile.turnWork;
                     auto submitWork = native[index]->profile.submitWork;
+                    auto observationWork = native[index]->profile.historyObservationWork;
                     bool retired = false;
 
                     for (std::size_t poll = 0; poll < MAXIMUM_RECOVERY_POLLS_PER_TURN; ++poll) {
@@ -2706,6 +2737,14 @@ void RuntimeImpl::run() noexcept {
 
                     if (retired) {
                         continue;
+                    }
+
+                    if (native[index]->profile.family == core::SubscriptionFamily::HISTORY) {
+                        for (const auto &subscription : native[index]->subscriptions) {
+                            if (subscription && !subscription->stopping)
+                                publishHistorySnapshot(*native[index]->recovery, subscription->handle,
+                                                       subscription->port, observationWork);
+                        }
                     }
 
                     auto wakeAt = std::chrono::steady_clock::now() + port->options.pollInterval;

@@ -64,6 +64,7 @@ struct ReceivingProfile {
     mux::QueueLimits queueLimits;                    ///< Aggregate registration and detached-data reservations.
     mux::ClientLimits clientLimits;                  ///< Independent per-registration reservations.
     collectors::TickerLimits tickerLimits;           ///< Existing shared cache and independent desired views.
+    collectors::HistoryLimits historyLimits{}; ///< Real shared HISTORY source and independent desired-view backing.
     std::vector<client::PreparedSubscriptionBinding> bindings; ///< Explicit routes grouped by business type.
     std::array<char16_t, MAXIMUM_RECEIVING_RECORDS> bindingExchanges{};
     ///< Exact aligned Quote/Trade record suffixes; fixed backing is included in sizeof(ReceivingProfile).
@@ -72,8 +73,9 @@ struct ReceivingProfile {
     ReceivingRoutingLimits routing;      ///< Explicit additional routing workspace and pre-allocation work charge.
     std::array<ReceivingEventPlan, RECEIVING_EVENT_SELECTIONS> eventPlans;
     ///< Prepaid bounded plans for each nonempty supported type mask, independent of record IDs.
-    mux::QueueSubmitWork submitWork;                    ///< One whole desired replacement admission.
-    mux::QueueWork queueWork;                           ///< Identical initialization, normal and drain coordinates.
+    mux::QueueSubmitWork submitWork;         ///< One whole desired replacement admission.
+    mux::QueueWork queueWork;                ///< Identical initialization, normal and drain coordinates.
+    mux::QueueWork historyObservationWork{}; ///< One aggregate observation seed per complete outer worker turn.
     transport::RecoveryPreparationWork preparationWork; ///< Original recovery/writer/queue preparation seed.
     transport::RecoveryTurnWork turnWork;               ///< Identical normal and drain owner-turn coordinates.
 

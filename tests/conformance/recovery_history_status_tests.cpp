@@ -385,6 +385,31 @@ TEST_CASE("recovery HISTORY query forwards actual covered RECEIVING range and ex
     CHECK(detached.requestedFrom == 2);
 }
 
+TEST_CASE("recovery HISTORY snapshot enumerates real applied interests without backend progress and preserves guards") {
+    Fixture fixture(true, true);
+    fixture.start();
+    fixture.complete();
+    const auto advancing = fixture.backend.advancingCalls;
+    auto work = r::queueWork();
+    const auto actual = fixture.owner->historyRangeSnapshot(fixture.handle, work);
+    REQUIRE(actual);
+    REQUIRE(actual->size() == 1);
+    CHECK((*actual)[0].context.matches(fixture.schema.recordContext(0)));
+    CHECK((*actual)[0].symbol == u"A");
+    CHECK((*actual)[0].status.requestedFrom == 2);
+    CHECK((*actual)[0].status.completeDeliveredRange);
+    CHECK(fixture.backend.advancingCalls == advancing);
+    fixture.backend.actual.authenticated = false;
+    auto gatedWork = r::queueWork();
+    const auto before = h::coordinates(gatedWork);
+    const auto gated = fixture.owner->historyRangeSnapshot(fixture.handle, gatedWork);
+    REQUIRE_FALSE(gated);
+    CHECK(gated.error().error == t::RecoveryError::INVALID_STATE);
+    CHECK(h::coordinates(gatedWork) == before);
+    CHECK(fixture.backend.advancingCalls == advancing);
+    CHECK((*actual)[0].status.completeDeliveredRange); // An older owning AS-OF cut does not mutate itself.
+}
+
 TEST_CASE("recovery HISTORY query exposes unknown expanded pending snipped and paused delivered states") {
     SUBCASE("unknown then expanded bound cannot reuse earlier covered prefix") {
         Fixture fixture;

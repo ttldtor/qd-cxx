@@ -10,6 +10,7 @@
 #include <limits>
 #include <mutex>
 #include <new>
+#include <stdexcept>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -4180,6 +4181,71 @@ std::expected<QueueRangeStatus, QueueFailure> MuxQueue::rangeStatus(const MuxHan
         return std::unexpected(e);
     } catch (QueueError e) {
         return std::unexpected(QueueFailure{e, {}});
+    }
+}
+
+std::expected<std::vector<QueueRangeObservation>, QueueFailure> MuxQueue::rangeSnapshot(const MuxHandle &handle,
+                                                                                        QueueWork &work) const {
+    try {
+        debit(work.operations, 1);
+
+        if (!state_ || !state_->history)
+            throw QueueError::INVALID_STATE;
+
+        auto &s = *state_;
+
+        if (s.executing)
+            throw QueueError::REENTRANT;
+
+        auto *client = s.client(handle);
+
+        if (!client || client->sourceClosed)
+            throw QueueError::INVALID_CLIENT;
+
+        auto entries = s.interest.clientEntries(client->interest);
+
+        if (!entries)
+            throw sourceFailure(entries.error());
+
+        std::size_t units = 0;
+
+        for (const auto &entry : *entries)
+            units = sum(units, sum(entry.key.symbol.size(), 1));
+
+        // Preparation plus final disposal; fixed string slack covers the qualified native STL profiles.
+        const auto bytes = sum(product(entries->size(), sum(sizeof(QueueRangeObservation), 64)),
+                               product(product(units, sizeof(char16_t)), 2));
+        spend(work, entries->size(), 0, units, product(bytes, 2));
+        std::vector<QueueRangeObservation> result;
+        result.reserve(entries->size());
+
+        for (const auto &entry : *entries) {
+            auto status = rangeStatus(handle, entry.key, work);
+
+            if (!status)
+                throw status.error();
+
+            result.push_back(
+                {entry.key.context, std::u16string(entry.key.symbol), entry.key.selector, std::move(*status)});
+        }
+
+        // Reserved stop can be admitted concurrently; it cannot leave an earlier row current-complete.
+        if (client->port->stop.load(std::memory_order_acquire)) {
+            for (auto &row : result) {
+                row.status.mappingCurrent = false;
+                row.status.completeDeliveredRange = false;
+            }
+        }
+
+        return result;
+    } catch (const std::bad_alloc &) {
+        return std::unexpected(QueueFailure{QueueError::ALLOCATION_FAILURE, {}});
+    } catch (const std::length_error &) {
+        return std::unexpected(QueueFailure{QueueError::RESOURCE_LIMIT, {}});
+    } catch (QueueFailure error) {
+        return std::unexpected(error);
+    } catch (QueueError error) {
+        return std::unexpected(QueueFailure{error, {}});
     }
 }
 

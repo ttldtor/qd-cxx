@@ -243,7 +243,9 @@ std::array<std::string, ADDRESS> values(const EndpointOptions &options, const st
             std::to_string(options.retryDelay.count()),
             std::to_string(options.drainTimeout.count()),
             std::to_string(options.maximumAttempts),
-            options.contract == DeliveryContract::STREAM ? "stream" : "ticker",
+            options.contract == DeliveryContract::STREAM    ? "stream"
+            : options.contract == DeliveryContract::HISTORY ? "history"
+                                                            : "ticker",
             detail::aggregationPropertyValue(options.requestedAggregationPeriod)};
 }
 } // namespace
@@ -276,7 +278,8 @@ void validateEndpointOptions(const EndpointOptions &options) {
         return value.count() > 0 && value.count() <= INT_MAX;
     };
 
-    if ((options.contract != DeliveryContract::TICKER && options.contract != DeliveryContract::STREAM) ||
+    if ((options.contract != DeliveryContract::TICKER && options.contract != DeliveryContract::STREAM &&
+         options.contract != DeliveryContract::HISTORY) ||
         !durationValid(options.connectTimeout) || !durationValid(options.dnsTimeout) ||
         !durationValid(options.readTimeout) || !durationValid(options.writeTimeout) ||
         !durationValid(options.pollInterval) || !durationValid(options.drainTimeout) || options.maximumAttempts == 0 ||
@@ -378,6 +381,8 @@ EndpointConfiguration EndpointConfiguration::create(const EndpointOptions &fallb
                     options.contract = DeliveryContract::STREAM;
                 else if (text == "ticker")
                     options.contract = DeliveryContract::TICKER;
+                else if (text == "history")
+                    options.contract = DeliveryContract::HISTORY;
                 else
                     reject(ErrorCode::INVALID_ARGUMENT, "endpoint-property-value");
             } else if (key == REQUESTED) {

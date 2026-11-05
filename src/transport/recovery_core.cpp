@@ -1458,8 +1458,7 @@ std::expected<mux::MuxHandle, RecoveryReceiverFailure> RecoveryCore::openSubscri
     return std::move(*opened);
 }
 
-std::expected<mux::QueueRangeStatus, RecoveryDiagnostic>
-RecoveryCore::historyRangeStatus(const mux::MuxHandle &handle, core::SubscriptionKey key, mux::QueueWork &work) const {
+std::expected<const mux::MuxQueue *, RecoveryDiagnostic> RecoveryCore::historyObservationQueue() const {
     if (const auto error = rejection()) {
         return std::unexpected(*error);
     }
@@ -1483,11 +1482,36 @@ RecoveryCore::historyRangeStatus(const mux::MuxHandle &handle, core::Subscriptio
         return std::unexpected(RecoveryDiagnostic{RecoveryError::INVALID_STATE, "recovery-history-ineligible"});
     }
 
-    auto observed = history->rangeStatus(handle, key, work);
+    return &*history;
+}
+
+std::expected<mux::QueueRangeStatus, RecoveryDiagnostic>
+RecoveryCore::historyRangeStatus(const mux::MuxHandle &handle, core::SubscriptionKey key, mux::QueueWork &work) const {
+    auto history = historyObservationQueue();
+
+    if (!history)
+        return std::unexpected(history.error());
+
+    auto observed = (*history)->rangeStatus(handle, key, work);
 
     if (!observed) {
         return std::unexpected(queueFailure(observed.error()));
     }
+
+    return std::move(*observed);
+}
+
+std::expected<std::vector<mux::QueueRangeObservation>, RecoveryDiagnostic>
+RecoveryCore::historyRangeSnapshot(const mux::MuxHandle &handle, mux::QueueWork &work) const {
+    auto history = historyObservationQueue();
+
+    if (!history)
+        return std::unexpected(history.error());
+
+    auto observed = (*history)->rangeSnapshot(handle, work);
+
+    if (!observed)
+        return std::unexpected(queueFailure(observed.error()));
 
     return std::move(*observed);
 }

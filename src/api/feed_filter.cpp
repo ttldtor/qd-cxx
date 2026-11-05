@@ -706,7 +706,8 @@ bool FeedFilter::isDynamic() const noexcept {
 
 FeedFilter::Builder::Builder(EventRegistry registry, DeliveryContract contract, FeedFilterLimits limits)
     : registry_(std::move(registry)), contract_(contract), limits_(limits) {
-    if (!registry_.valid() || (contract != DeliveryContract::TICKER && contract != DeliveryContract::STREAM)) {
+    if (!registry_.valid() || (contract != DeliveryContract::TICKER && contract != DeliveryContract::STREAM &&
+                               contract != DeliveryContract::HISTORY)) {
         refuse(ErrorCode::INVALID_ARGUMENT, "filter-builder");
     }
 }

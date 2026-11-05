@@ -1,0 +1,79 @@
+{
+  "revision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "javaVersion": "openjdk version \"1.8.0_422\"",
+  "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
+  "javacSha256": "633143e961aa18051c09112b85333f5cdbd845b54eb39678eb15b91ca8bbb527",
+  "harnessSha256": "076c433bd9ce6c3781b56f5f7cb0f59a3b7266927f42f2ee1ef2e950bace3369",
+  "launcherSha256": "3ef99913f9b9ada2d942253ceebd9e9b49f8354eb7cb2e2b1c876d340d9fd431",
+  "upstreamSources": [
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/TimeSeriesEvent.java",
+      "sha256": "62ede58d767a62e959a1c1206c64aaa194fe75ca7cf78826a0d21b1eb48934b4"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/TimeAndSale.java",
+      "sha256": "bf3cff336518c851c3f43c78fcb8782453a6d123b4d7e7fe19c03e48cc21b246"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/api/impl/EventDelegate.java",
+      "sha256": "5e6c90ed4115f57708d01f697dedcdc6bc168e41d254b6e245516feb073f5593"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/api/impl/DXFeedImpl.java",
+      "sha256": "7402a8be3bb5deaa84fc907c6b69bc91d0ec58d1883bf3c97b8260b1d1017caf"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/TimeAndSaleDelegate.java",
+      "sha256": "20d0eae38d6fb4c53df4b55e923aa16c0109ffca493fb29dee3d4fbdf27150ff"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/MarketFactoryImpl.java",
+      "sha256": "c74b324b2f99d2a351963fead08419c2ba1d92573c633d30740295acc9d0bac4"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/impl/matrix/History.java",
+      "sha256": "462c4cf966c1db8bd6db4072c0512e5713454fd6165ad5b744113c629ac3a42d"
+    }
+  ],
+  "productionClassInventorySha256": "90a478b5d3737246d8c897322c9f9db60887846e20117572588e05ae78fbc6d8",
+  "fixtureSha256": "ec23285cf8c44921d214db4471b56731ad03189841255ba39add4bfb5e5699d1",
+  "rows": 242,
+  "timezoneInvariant": true,
+  "wire": [
+    {
+      "path": "wire-step-0.qtp",
+      "sha256": "adabf775048c8771b633a5ba04af0055ef67229bfac5048bfa33abed74de3883",
+      "bytes": 142
+    },
+    {
+      "path": "wire-step-1.qtp",
+      "sha256": "77bb779c9c0889e539c5110c0a6fd5921be3b0fba3d72559fc436fd223f997d2",
+      "bytes": 21
+    },
+    {
+      "path": "wire-step-2.qtp",
+      "sha256": "9358954a48e8e4c7f8dcdd591a530d60ab64a5ae3d99395498807f651c820f83",
+      "bytes": 9
+    },
+    {
+      "path": "wire-step-3.qtp",
+      "sha256": "9790d7f9461cb51ab3b8f831f785e59bf0a1de4c1e662a03f93f17e5e5e83b80",
+      "bytes": 22
+    },
+    {
+      "path": "wire-step-4.qtp",
+      "sha256": "5b341b66fa59d0d65e4cd9490b716a63de4404678ab260018cffdeefb7b0a3d5",
+      "bytes": 21
+    },
+    {
+      "path": "wire-step-5.qtp",
+      "sha256": "b5e185b74f6b0d3793a79c7ebb5d48051d289d277b0119c648d5aee1ce87ab08",
+      "bytes": 23
+    },
+    {
+      "path": "wire-step-6.qtp",
+      "sha256": "aae2d128eda9183ef3a37c57c4399f80f5639bba82319df7d9fb7e9a18807414",
+      "bytes": 23
+    }
+  ]
+}

@@ -147,6 +147,13 @@ class TcpRecovery {
      */
     [[nodiscard]] std::expected<mux::QueueRangeStatus, RecoveryDiagnostic>
     historyRangeStatus(const mux::MuxHandle &handle, core::SubscriptionKey key, mux::QueueWork &work) const;
+    /** Copy all exact applied HISTORY keys using the same eligible owner cut as historyRangeStatus.
+     * @param handle Current adopted HISTORY registration.
+     * @param work One finite lookup/copy seed, consumed across all keys without internal replenishment.
+     * @return Owning pure observations or an owner/state/queue refusal; no I/O, callback or reset ACK.
+     */
+    [[nodiscard]] std::expected<std::vector<mux::QueueRangeObservation>, RecoveryDiagnostic>
+    historyRangeSnapshot(const mux::MuxHandle &handle, mux::QueueWork &work) const;
     /** Inspect the earliest monotonic/native hint without registering a timer.
      * @return Wake hint, or empty when no progress deadline remains.
      */

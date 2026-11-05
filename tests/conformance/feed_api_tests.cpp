@@ -2496,6 +2496,12 @@ TEST_CASE("public lifecycle reconnect replays unchanged desired Quote on a real 
     REQUIRE(eventually([&] {
         return endpoint->getStatistics().connection.readDataRecords.value == 1;
     }));
+    REQUIRE(eventually([&] {
+        const auto delivery = subscription->getStatistics();
+
+        return delivery.deliveredEvents.value == 1 && delivery.inFlightEvents == 0 && delivery.pendingEvents == 0 &&
+               delivery.sourceEpoch == 1;
+    }));
     const auto firstStatistics = endpoint->getStatistics();
     const auto firstDeliveryStatistics = subscription->getStatistics();
     CHECK(firstDeliveryStatistics.admittedEvents.value == 1);

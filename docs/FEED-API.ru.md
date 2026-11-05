@@ -11,8 +11,11 @@ endpoint, обработчики и подписки на точные симв�
 Поддержан обычный бинарный QTP поверх TCP со встроенными полными схемами Quote/Profile/Trade/TradeETH/Summary
 и текстовых событий либо явными валидированными схемами вызывающего кода и зарегистрированными mappings.
 Endpoint выбирает TICKER (по умолчанию: последние значения с возможным объединением
-обновлений) или STREAM (каждая принятая выбранная запись источника). TLS, credentials,
-HISTORY и wildcard-селекторы в этот API не входят. Загрузка схем является отдельной задачей.
+обновлений), STREAM (каждая принятая выбранная запись источника) либо явный HISTORY
+(индексируемое общее хранилище и независимые views). Текущие бизнес-mappers поддерживают
+TICKER/STREAM; HISTORY требует проверенного бизнес-route и отклоняет эти девять типов до
+native-регистрации. TLS и credentials остаются отдельными профилями приёма. Wildcard-селекторы
+требуют существующего явного разрешения STREAM. Загрузка схем является отдельной задачей.
 [Низкоуровневые API получения](SUBSCRIPTIONS.ru.md) предоставляют отдельные профили.
 
 ## Получить Quote
@@ -577,3 +580,7 @@ queue wait, state/change observers исключены. До завершения
 чтение и reconnect никогда не сбрасывают итоги.
 
 [Серверная агрегация](SERVER-AGGREGATION.ru.md): отдельные local request и peer report, bounded descriptor updates и явный UNKNOWN.
+
+## Наблюдения диапазонов HISTORY
+
+Выбирайте `DeliveryContract::HISTORY` явно. Worker владеет collector, независимыми views, replay и ACK reset. `Subscription<Event>::getHistorySnapshot()` возвращает пассивный владеющий срез AS-OF; getter не выполняет I/O и не ждёт callback. Current completion требует настоящих данных о доставленном диапазоне и соответствия принятым logical/source/clear/callback fences. У текущих девяти бизнес-типов нет проверенного HISTORY route: они отклоняются до native-регистрации. Точные состояния, конечные storage limits и сырые индексируемые координаты описаны в [контракте HISTORY](../spec/subscriptions/HISTORY-RECEIVING.ru.md).

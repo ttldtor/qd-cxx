@@ -23,7 +23,10 @@ TEST_CASE("typed selector routing has a finite measured workspace and exact one-
     options.enableWildcard = true;
     auto profile = d::prepareReceivingProfile(runtime, options, "127.0.0.1", 12345);
     CHECK(profile.recoveryOptions.selectors == q::core::SubscriptionSelectorPolicy::CANONICAL_STREAM_ALL_V1);
-    CHECK(profile.eventPlans.size() == 31);
+    REQUIRE(d::RECEIVING_EVENT_KINDS < std::numeric_limits<std::size_t>::digits);
+    const auto nonemptyMasks = (std::size_t{1} << d::RECEIVING_EVENT_KINDS) - 1;
+    CHECK(static_cast<std::size_t>(d::EventSelection::ALL) == nonemptyMasks);
+    CHECK(profile.eventPlans.size() == nonemptyMasks);
     CHECK(profile.routing.symbols == 4);
     CHECK(profile.routing.temporaryTextUnits == 2 * 4 * 128);
     CHECK(profile.routing.frontendSelectorBytes == 4 * 4 * (sizeof(a::SubscriptionSelector) + 129 * sizeof(char16_t)));
@@ -74,11 +77,16 @@ TEST_CASE("typed selector routing has a finite measured workspace and exact one-
     symbols[1].physical = u"STALE";
     symbols[1].exchange = u'Q';
     const auto &plan = d::receivingEventPlan(profile, d::EventSelection::ALL);
+    CHECK(plan.bindingCount == profile.bindings.size());
+    std::array<bool, d::MAXIMUM_RECEIVING_RECORDS> selected{};
     d::prepareReceivingSymbols(profile, plan, symbols);
     CHECK(symbols[1].physical.empty());
     CHECK(symbols[1].exchange == 0);
 
     for (std::size_t index = 0; index < plan.bindingCount; ++index) {
+        REQUIRE(plan.bindingIndices[index] < profile.bindings.size());
+        CHECK_FALSE(selected[plan.bindingIndices[index]]);
+        selected[plan.bindingIndices[index]] = true;
         CHECK(d::receivingSymbolMatches(profile, plan.bindingIndices[index], symbols[1]));
     }
 }

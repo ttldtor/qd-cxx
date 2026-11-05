@@ -51,7 +51,8 @@ bool usesGenericSourceSelection(EventType type) noexcept {
 std::vector<FilterCoordinate> coordinates(const EventRegistry &registry, DeliveryContract contract, EventType type,
                                           std::u16string_view symbol, bool wildcard, const FeedFilterLimits &limits) {
     if (!registry.valid() || !supported(registry, type) ||
-        (contract != DeliveryContract::TICKER && contract != DeliveryContract::STREAM)) {
+        (contract != DeliveryContract::TICKER && contract != DeliveryContract::STREAM &&
+         contract != DeliveryContract::HISTORY)) {
         refuse(ErrorCode::INVALID_ARGUMENT, "filter-coordinates");
     }
 
@@ -127,7 +128,8 @@ std::vector<FilterCoordinate> filterSubscriptionCoordinates(const EventRegistry 
                                                             EventType type, const SubscriptionSelector &selector,
                                                             const FeedFilterLimits &limits) {
     if (!registry.valid() || !supported(registry, type) ||
-        (contract != DeliveryContract::TICKER && contract != DeliveryContract::STREAM)) {
+        (contract != DeliveryContract::TICKER && contract != DeliveryContract::STREAM &&
+         contract != DeliveryContract::HISTORY)) {
         refuse(ErrorCode::INVALID_ARGUMENT, "filter-coordinates");
     }
 

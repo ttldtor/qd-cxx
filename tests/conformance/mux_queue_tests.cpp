@@ -3319,6 +3319,61 @@ TEST_CASE("MUX queue HISTORY range query prepays every queued exact-symbol compa
     CHECK(f.queue.resources(handle)->queuedRecords == 0);
 }
 
+TEST_CASE("MUX HISTORY snapshot owns exact applied keys and never returns a partial vector after work exhaustion") {
+    auto f = fixture(c::SubscriptionFamily::HISTORY);
+    auto consumer = std::make_shared<Recorder>();
+    auto handle = open(f, consumer);
+    const std::array<c::SubscriptionRequest, 2> requests{
+        {{{f.schema.recordContext(0), u"ALPHA"}, 0}, {{f.schema.recordContext(1), u"BETA"}, 2}}};
+    auto submit = submitTurn();
+    auto ticket = handle.replace(requests, submit);
+    REQUIRE(ticket);
+    until(f, [&] {
+        return ticket->result().has_value();
+    });
+    REQUIRE(ticket->result()->status == m::CommandStatus::APPLIED);
+    send(f, {{0, u"ALPHA", 3, 30, 4}, {0, u"ALPHA", 0, 0, 10}});
+    until(f, [&] {
+        auto work = turn();
+        auto status = f.queue.rangeStatus(handle, requests[0].key, work);
+
+        return status && status->completeDeliveredRange;
+    });
+    auto work = turn();
+    const auto snapshot = f.queue.rangeSnapshot(handle, work);
+    REQUIRE(snapshot);
+    REQUIRE(snapshot->size() == 2);
+    const auto alpha = std::ranges::find_if(*snapshot, [](const auto &row) {
+        return row.symbol == u"ALPHA";
+    });
+    const auto beta = std::ranges::find_if(*snapshot, [](const auto &row) {
+        return row.symbol == u"BETA";
+    });
+    REQUIRE(alpha != snapshot->end());
+    REQUIRE(beta != snapshot->end());
+    CHECK(alpha->context.matches(f.schema.recordContext(0)));
+    CHECK(alpha->status.completeDeliveredRange);
+    CHECK(beta->status.requestedFrom == 2);
+    CHECK_FALSE(beta->status.completeDeliveredRange);
+    const auto before = f.queue.resources(handle);
+    REQUIRE(before);
+    auto insufficient = turn();
+    insufficient.operations = 2; // Snapshot plus one full key; the second key cannot begin.
+    const auto failed = f.queue.rangeSnapshot(handle, insufficient);
+    REQUIRE_FALSE(failed);
+    CHECK(failed.error().error == m::QueueError::WORK_LIMIT);
+    CHECK(f.queue.resources(handle)->queuedRecords == before->queuedRecords);
+    CHECK(alpha->status.completeDeliveredRange);
+    CHECK(beta->symbol == u"BETA");
+    REQUIRE(handle.requestStop(m::StopMode::ABORT) == m::ControlAdmission::RECORDED);
+    auto afterStopWork = turn();
+    auto afterStop = f.queue.rangeSnapshot(handle, afterStopWork);
+    REQUIRE(afterStop);
+
+    for (const auto &row : *afterStop)
+        CHECK_FALSE(row.status.completeDeliveredRange);
+}
+
 TEST_CASE(
     "MUX queue aggregate reserved controls reject zero and one then recover exact two after retired result release") {
     for (const std::size_t capacity : {0u, 1u, 2u}) {

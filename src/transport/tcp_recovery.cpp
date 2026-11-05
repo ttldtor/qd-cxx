@@ -373,6 +373,13 @@ TcpRecovery::historyRangeStatus(const mux::MuxHandle &handle, core::Subscription
     return lease ? lease->core.historyRangeStatus(handle, key, work) : std::unexpected(moved());
 }
 
+std::expected<std::vector<mux::QueueRangeObservation>, RecoveryDiagnostic>
+TcpRecovery::historyRangeSnapshot(const mux::MuxHandle &handle, mux::QueueWork &work) const {
+    const auto lease = impl_;
+
+    return lease ? lease->core.historyRangeSnapshot(handle, work) : std::unexpected(moved());
+}
+
 std::expected<mux::MuxHandle, RecoveryReceiverFailure> TcpRecovery::openSubscriptionReceiver(
     core::SubscriptionFamily family, std::span<const client::PreparedSubscriptionBinding> bindings,
     const std::shared_ptr<client::SubscriptionConsumer> &consumer, client::ReceiverLimits receiverLimits,

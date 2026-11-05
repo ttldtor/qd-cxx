@@ -243,6 +243,10 @@ class RecoveryCore {
      * @return Matching actual barrier evidence or continuing result.
      */
     RecoveryObservation reset(RecoveryTicket ticket, RecoveryTurnWork &work);
+    /** Qualify a read-only HISTORY observation after owner progress.
+     * @return Exact adopted queue or a lifecycle/backend refusal; never publishes readiness or progresses I/O.
+     */
+    std::expected<const mux::MuxQueue *, RecoveryDiagnostic> historyObservationQueue() const;
 
     public:
     /** Construct the stable Core after all candidate preparation and before final input adoption.
@@ -346,6 +350,13 @@ class RecoveryCore {
      */
     [[nodiscard]] std::expected<mux::QueueRangeStatus, RecoveryDiagnostic>
     historyRangeStatus(const mux::MuxHandle &handle, core::SubscriptionKey key, mux::QueueWork &work) const;
+    /** Observe all applied HISTORY keys after owner progress, without mutating backend readiness.
+     * @param handle Exact adopted registration.
+     * @param work Shared finite observation credits.
+     * @return Owning key/status observations or an exact gated refusal.
+     */
+    std::expected<std::vector<mux::QueueRangeObservation>, RecoveryDiagnostic>
+    historyRangeSnapshot(const mux::MuxHandle &handle, mux::QueueWork &work) const;
     /** Inspect the earliest native/model wake hint.
      * @return Monotonic hint without a notifier.
      */

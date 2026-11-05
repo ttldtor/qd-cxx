@@ -64,10 +64,12 @@ std::size_t multiply(std::size_t count, std::size_t amount) {
 }
 
 /** Select an immutable caller registry or prepare compatible defaults without native work.
- * @param registry Optional explicit registry, borrowed during selection.
+ * @param options Immutable endpoint policy and optional explicit registry.
  * @return Owning immutable snapshot or detached registry refusal.
  */
-EventRegistry selectRegistry(const EventRegistry *registry) {
+EventRegistry selectRegistry(const EndpointOptions &options) {
+    const auto *registry = options.eventRegistry ? &*options.eventRegistry : nullptr;
+
     if (registry) {
         if (!registry->valid()) {
             refuse(ErrorCode::INVALID_ARGUMENT, "profile-registry");
@@ -163,6 +165,45 @@ mux::QueueWork queueWork(std::size_t scale, const mux::MuxLimits &interests, std
             {operations, visits, visits, bytes}};
 }
 
+/** Fund a whole maximum DATA frame and conservative collector maintenance from actual finite capacities.
+ * The source stage prepays its quadratic point scans and independent view/frame scans before mutation.
+ * These credits are conservative logical work, not measured instructions or a latency guarantee.
+ * @param profile Complete finite collector and session reservations, modified before publication.
+ * @param maximumFields Largest complete retained record shape, including unregistered fields.
+ */
+void fundHistoryWork(ReceivingProfile &profile, std::size_t maximumFields) {
+    const auto &limits = profile.historyLimits;
+    const auto frames = add(add(limits.cacheFrames, multiply(limits.viewSlots, limits.pendingFrames)), 1);
+    const auto perView =
+        add(add(limits.viewSubscriptions.entries, limits.pendingItems), add(add(frames, limits.points), 4));
+    const auto viewScan = multiply(add(limits.points, 1), multiply(limits.viewSlots, perView));
+    constexpr std::size_t STAGE_SCAN_PASSES = 64;
+    const auto rowVisits =
+        multiply(STAGE_SCAN_PASSES, add(add(limits.partitions, multiply(limits.points, limits.points)),
+                                        add(viewScan, add(maximumFields, 8))));
+    const auto viewSlots =
+        multiply(limits.viewSlots, add(add(limits.pendingItems, limits.viewSubscriptions.entries), maximumFields));
+    const auto dimensions = add(add(add(limits.partitions, limits.points), add(frames, limits.viewSlots)),
+                                add(add(viewSlots, profile.schema.records().size()), 8));
+    // Covers fixed clone, cleanup, selection and source-owner accounting scans, including zero dimensions.
+    constexpr std::size_t MAINTENANCE_SCAN_PASSES = 128;
+    const auto maintenanceVisits = multiply(MAINTENANCE_SCAN_PASSES, multiply(dimensions, dimensions));
+    auto &work = profile.queueWork.history;
+    work.visits = add(work.visits, add(multiply(FRAME_RECORDS, rowVisits), maintenanceVisits));
+    constexpr std::size_t TEXT_SCAN_PASSES = 8;
+    const auto maintenanceText = multiply(
+        TEXT_SCAN_PASSES,
+        multiply(add(limits.partitions, 1),
+                 multiply(add(limits.viewSlots, 1), add(limits.viewSubscriptions.totalSymbolUnits,
+                                                        multiply(limits.partitions, limits.symbolUnitsPerPartition)))));
+    const auto inputText = multiply(
+        TEXT_SCAN_PASSES,
+        multiply(FRAME_RECORDS, multiply(add(limits.partitions, 1), multiply(2, limits.symbolUnitsPerPartition))));
+    work.textUnits = add(work.textUnits, add(maintenanceText, inputText));
+    work.bytes =
+        add(work.bytes, add(multiply(2, limits.residentBytes), profile.endpoint.settings().budgets.session.eventBytes));
+}
+
 /** Reserve actual complete schema/blueprint copies and three replay banks.
  * @param profile Complete preparation, modified before publication.
  */
@@ -202,13 +243,16 @@ void prepareCopies(ReceivingProfile &profile) {
     const auto &host = profile.endpoint.settings().host;
     limits.endpointCopyBytes = multiply(2, std::max(add(host.capacity(), 1), add(host.size(), 16)));
     limits.writerConfigurationBytes = WRITER_CONFIGURATION_BYTES;
-    const auto family = static_cast<std::size_t>(profile.family == core::SubscriptionFamily::TICKER
-                                                     ? transport::RecoveryFamily::TICKER
-                                                     : transport::RecoveryFamily::STREAM);
+    const auto family = static_cast<std::size_t>(
+        profile.family == core::SubscriptionFamily::TICKER    ? transport::RecoveryFamily::TICKER
+        : profile.family == core::SubscriptionFamily::HISTORY ? transport::RecoveryFamily::HISTORY
+                                                              : transport::RecoveryFamily::STREAM);
     const auto &desired = profile.endpoint.settings().budgets.desired;
     // Recovery inspects the actual collector owner maxima, including each independent TICKER view.
     // The queue requires every view's desired scope to cover its aggregate interest reservation.
-    const auto owners = profile.family == core::SubscriptionFamily::TICKER ? profile.tickerLimits.viewSlots : 1;
+    const auto owners = profile.family == core::SubscriptionFamily::TICKER    ? profile.tickerLimits.viewSlots
+                        : profile.family == core::SubscriptionFamily::HISTORY ? profile.historyLimits.viewSlots
+                                                                              : 1;
     limits.replay[family] = {multiply(owners, desired.entries), multiply(owners, desired.totalSymbolUnits)};
 }
 
@@ -304,7 +348,7 @@ ReceivingProfile::ReceivingProfile(core::LocalSchema schema, client::EndpointOpt
 
 ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const EndpointOptions &options,
                                          const std::string &host, std::uint16_t port) {
-    auto selected = selectRegistry(options.eventRegistry ? &*options.eventRegistry : nullptr);
+    auto selected = selectRegistry(options);
     auto copied = selected.schema().boundedCopy(SCHEMA_LIMITS);
 
     if (!copied) {
@@ -354,6 +398,7 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
     const auto scale = multiply(clients, add(subscriptionEntries, 15) / 16);
     auto &budgets = settings.budgets;
     budgets.session.events = protocol::DataEventPolicy::BINARY_CATALOG_V1;
+    budgets.session.historySnapshot = options.contract == DeliveryContract::HISTORY;
     budgets.session.fieldTime = protocol::FieldTimePolicy::READ;
     budgets.session.data.processedRecords = budgets.session.data.emittedRecords = FRAME_RECORDS;
     budgets.session.data.wireFields = budgets.session.data.emittedValues = multiply(FRAME_RECORDS, maximumFields);
@@ -387,8 +432,21 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
     }
 
     ReceivingProfile result(std::move(schema), std::move(*endpoint));
-    result.family = options.contract == DeliveryContract::TICKER ? core::SubscriptionFamily::TICKER
-                                                                 : core::SubscriptionFamily::STREAM;
+
+    switch (options.contract) {
+    case DeliveryContract::TICKER:
+        result.family = core::SubscriptionFamily::TICKER;
+        break;
+    case DeliveryContract::STREAM:
+        result.family = core::SubscriptionFamily::STREAM;
+        break;
+    case DeliveryContract::HISTORY:
+        result.family = core::SubscriptionFamily::HISTORY;
+        break;
+    default:
+        refuse(ErrorCode::INVALID_ARGUMENT, "profile-contract");
+    }
+
     result.recoveryOptions.selectors = options.enableWildcard
                                            ? core::SubscriptionSelectorPolicy::CANONICAL_STREAM_ALL_V1
                                            : core::SubscriptionSelectorPolicy::CANONICAL_EXACT_V1;
@@ -430,6 +488,30 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
     const auto tickerBytes = multiply(tickerFrames, multiply(2, budgets.session.eventBytes));
     result.tickerLimits = {
         clients, entries, tickerFrames, tickerBytes, add(tickerBytes, multiply(scale, 8 * MEBIBYTE)), budgets.desired};
+    result.historyLimits = {entries,
+                            options.history.maximumPoints,
+                            runtime.maximumSymbolUnits,
+                            options.history.maximumFrames,
+                            options.history.maximumBytes,
+                            clients,
+                            options.history.pendingUpdatesPerSubscription,
+                            options.history.maximumFrames,
+                            options.history.pendingBytesPerSubscription,
+                            options.history.maximumResidentBytes,
+                            budgets.desired};
+
+    if (result.family == core::SubscriptionFamily::HISTORY) {
+        const auto retainedOwners =
+            add(options.history.maximumBytes, multiply(clients, options.history.pendingBytesPerSubscription));
+
+        if (retainedOwners > options.history.maximumResidentBytes) {
+            refuse(ErrorCode::RESOURCE_LIMIT, "profile-history-resident-capacity");
+        }
+
+        static_cast<void>(
+            add(QUEUED_RECORDS, add(options.history.maximumPoints, options.history.pendingUpdatesPerSubscription)));
+    }
+
     result.blueprint = prepareBlueprint(result.schema);
     prepareCopies(result);
     prepareMappings(result, selected, runtime.maximumSymbolUnits);
@@ -457,6 +539,21 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
                     add(multiply(2, routing.temporaryBytes), routing.retainedMetadataBytes)};
     result.queueWork =
         queueWork(scale, result.interests, result.schema.records().size(), result.queueLimits.routeRecords);
+
+    if (result.family == core::SubscriptionFamily::HISTORY) {
+        fundHistoryWork(result, maximumFields);
+        const auto rowBytes = add(sizeof(mux::QueueRangeObservation),
+                                  add(64, multiply(add(runtime.maximumSymbolUnits, 1), 4 * sizeof(char16_t))));
+        const auto publicationBytes =
+            multiply(2, add(sizeof(HistorySubscriptionSnapshot), multiply(subscriptionEntries, rowBytes)));
+
+        if (publicationBytes > options.history.maximumObservationBytes) {
+            refuse(ErrorCode::RESOURCE_LIMIT, "profile-history-observation-capacity");
+        }
+
+        result.historyObservationWork = result.queueWork;
+    }
+
     result.submitWork = {16, add(multiply(scale, CONTROL_VISITS), multiply(clients, routing.work.visits)),
                          add(multiply(scale, CONTROL_VISITS), multiply(clients, routing.work.textUnits)),
                          add(multiply(scale, CONTROL_BYTES), multiply(clients, routing.work.bytes))};
@@ -618,6 +715,12 @@ std::expected<mux::MuxQueue, mux::QueueFailure> createReceivingQueue(const Recei
                                            {false, 100, profile.recoveryOptions.selectors,
                                             std::span(profile.versionBindings).first(profile.versionBindingCount)},
                                            profile.queueLimits, work);
+    }
+
+    if (profile.family == core::SubscriptionFamily::HISTORY) {
+        return mux::MuxQueue::createHistory(profile.schema, profile.interests, profile.historyLimits,
+                                            {false, 100, 10000, profile.recoveryOptions.selectors}, profile.queueLimits,
+                                            work);
     }
 
     return mux::MuxQueue::createStream(profile.schema, profile.interests, profile.endpoint.settings().budgets.desired,

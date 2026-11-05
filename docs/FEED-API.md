@@ -10,8 +10,11 @@ finite recovery, queues and delivery. Subscriptions can be created before or aft
 This API supports plain binary QTP over TCP with built-in full Quote/Profile/Trade/TradeETH/Summary
 and text/serialized-event schemas or explicit validated caller schemas and registered mappings.
 An endpoint chooses TICKER (default, latest values with possible
-conflation) or STREAM (every admitted selected source record). TLS, credentials,
-HISTORY and wildcard selectors are outside this API. Schema loading is separate. The
+conflation), STREAM (every admitted selected source record), or explicit HISTORY (indexed shared storage
+and independent views). Current business mappers support TICKER/STREAM; HISTORY requires a verified
+business route and currently rejects these nine types before native registration. TLS and credentials
+remain separate receiving profiles. Wildcard selectors require the existing explicit STREAM permission.
+Schema loading is separate. The
 [lower-level receiving APIs](SUBSCRIPTIONS.md) expose separate profiles.
 
 ## Receive Quote
@@ -563,3 +566,7 @@ until the first call finishes. Count and sum overflow saturate per field with th
 existing sticky availability marker; reads and reconnect never reset totals.
 
 [Server aggregation](SERVER-AGGREGATION.md): separate local requests and current-peer reports, bounded descriptor updates and explicit unknown states.
+
+## HISTORY range observations
+
+Select `DeliveryContract::HISTORY` explicitly. The worker owns the collector, independent views, replay and reset acknowledgements. `Subscription<Event>::getHistorySnapshot()` returns a passive owning AS-OF cut; reads perform no I/O or callback waiting. Current completion requires both actual delivered range evidence and matching accepted logical/source/clear/callback fences. The current nine business types have no verified HISTORY route and fail before native registration. See the [HISTORY contract](../spec/subscriptions/HISTORY-RECEIVING.md) for exact states, finite storage limits and raw indexed range units.
