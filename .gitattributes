@@ -792,3 +792,7 @@ tools/upstream/server-aggregation-oracle/*.java text eol=lf
 tools/upstream/server-aggregation-oracle/*.ps1 text eol=lf
 tests/fixtures/server-aggregation/*.tsv -text -whitespace
 tests/fixtures/server-aggregation/*.json text eol=lf
+
+# Preserve exact Order observations and binary QTP fixtures.
+tests/fixtures/order/*.tsv -text -whitespace
+tests/fixtures/order/wire/*.qtp -text -whitespace
