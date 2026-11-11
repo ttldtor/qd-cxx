@@ -1,0 +1,20 @@
+record	113	Greeks	true
+field	0	56	Time	Time
+field	1	72	Sequence	Sequence
+field	2	24	Greeks.Price	Price
+field	3	24	Volatility	Volatility
+field	4	24	Delta	Delta
+field	5	24	Gamma	Gamma
+field	6	24	Theta	Theta
+field	7	24	Rho	Rho
+field	8	24	Vega	Vega
+event	AAPL	7200	0	0	-100663297	-1	4194303	4623367229960880128	4598175219545276416	-4620693217682128896	9221120237041090560	-4615063718147915776	9218868437227405312	-4503599627370496
+raw	Time	-1
+raw	Sequence	-100663297
+raw	Greeks.Price	20411
+raw	Volatility	411
+raw	Delta	-70
+raw	Gamma	0
+raw	Theta	-1989
+raw	Rho	16
+raw	Vega	-16

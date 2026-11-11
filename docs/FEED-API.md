@@ -108,6 +108,20 @@ exhausts a subscription's reservation, the SDK rejects that prefix for the affec
 reports the overflow through its state and statistics. TICKER can conflate pending values for the
 same key before detached delivery. Use `getStatistics()` to distinguish conflation from overflow.
 
+## Receive Greeks
+
+`events::Greeks` provides option price, volatility, delta, gamma, theta, rho and vega.
+Use `createSubscription<events::Greeks>()` on a TICKER endpoint for latest values.
+On a HISTORY endpoint, use `createTimeSeriesSubscription<events::Greeks>()` and
+set an inclusive `setFromTime()` bound in Unix milliseconds before adding symbols.
+
+The indexed source is DEFAULT. The packed index retains the signed seconds and
+millisecond/sequence word, and the event flags carry the HISTORY snapshot and
+transaction state. Independent FIELD event time is available when sent by the
+peer. Use `getHistorySnapshot()` for the last observed range coverage.
+The built-in registry uses wide decimals. Select an explicit registry with the
+peer's field types for a configured tiny-decimal schema.
+
 ## Receive Trade
 
 The built-in registry appends composite Trade2 while retaining Quote0/Profile1. Use owning

@@ -1432,6 +1432,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
         bool otcMarketsOrder = false;
         bool orderImbalance = false;
         bool series = false;
+        bool greeks = false;
 
         for (const auto type : types) {
             switch (type) {
@@ -1480,6 +1481,9 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             case EventType::SERIES:
                 series = true;
                 break;
+            case EventType::GREEKS:
+                greeks = true;
+                break;
             case EventType::ORDER_IMBALANCE:
                 orderImbalance = true;
                 break;
@@ -1493,7 +1497,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             (textMessage ? 32U : 0U) | (textConfiguration ? 64U : 0U) | (message ? 128U : 0U) |
             (configuration ? 256U : 0U) | (order ? 512U : 0U) | (marketMaker ? 1024U : 0U) |
             (spreadOrder ? 1U << 11 : 0U) | (analyticOrder ? 1U << 12 : 0U) | (otcMarketsOrder ? 1U << 13 : 0U) |
-            (orderImbalance ? 1U << 14 : 0U) | (series ? 1U << 15 : 0U));
+            (orderImbalance ? 1U << 14 : 0U) | (series ? 1U << 15 : 0U) | (greeks ? 1U << 16 : 0U));
         const auto delivery = registeredDelivery  ? detail::EventDelivery::REGISTERED
                               : quote             ? detail::EventDelivery::QUOTE
                               : profile           ? detail::EventDelivery::PROFILE
@@ -1509,6 +1513,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                               : otcMarketsOrder   ? detail::EventDelivery::OTC_MARKETS_ORDER
                               : orderImbalance    ? detail::EventDelivery::ORDER_IMBALANCE
                               : series            ? detail::EventDelivery::SERIES
+                              : greeks            ? detail::EventDelivery::GREEKS
                               : order             ? detail::EventDelivery::ORDER
                                                   : detail::EventDelivery::CONFIGURATION;
         const auto control = port_->control.lock();
@@ -1564,7 +1569,8 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                                           static_cast<unsigned>(detail::EventSelection::SPREAD_ORDER) |
                                           static_cast<unsigned>(detail::EventSelection::ANALYTIC_ORDER) |
                                           static_cast<unsigned>(detail::EventSelection::OTC_MARKETS_ORDER) |
-                                          static_cast<unsigned>(detail::EventSelection::SERIES);
+                                          static_cast<unsigned>(detail::EventSelection::SERIES) |
+                                          static_cast<unsigned>(detail::EventSelection::GREEKS);
 
             if (port_->options.contract == DeliveryContract::HISTORY &&
                 (static_cast<unsigned>(selection) & ~historyTypes)) {
@@ -1579,6 +1585,10 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
 
             if (series && port_->options.contract != DeliveryContract::HISTORY) {
                 reject(ErrorCode::UNSUPPORTED_PROFILE, "series-requires-history");
+            }
+
+            if (greeks && port_->options.contract == DeliveryContract::STREAM) {
+                reject(ErrorCode::UNSUPPORTED_PROFILE, "greeks-requires-ticker-or-history");
             }
 
             if (orderImbalance && port_->options.contract != DeliveryContract::TICKER) {
@@ -1610,6 +1620,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             bool registeredAnalyticOrder = registeredMarketMaker;
             bool registeredOtcMarketsOrder = registeredMarketMaker;
             bool registeredSeries = registeredMarketMaker;
+            bool registeredGreeks = !port_->options.eventRegistry;
             bool registeredOrderImbalance =
                 !port_->options.eventRegistry && port_->options.contract == DeliveryContract::TICKER;
 
@@ -1627,6 +1638,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                     registeredOrderImbalance =
                         registeredOrderImbalance || registration.type == EventType::ORDER_IMBALANCE;
                     registeredSeries = registeredSeries || registration.type == EventType::SERIES;
+                    registeredGreeks = registeredGreeks || registration.type == EventType::GREEKS;
                     registeredMessage = registeredMessage || registration.type == EventType::MESSAGE;
                     registeredConfiguration = registeredConfiguration || registration.type == EventType::CONFIGURATION;
                     registeredOrder = registeredOrder || registration.type == EventType::ORDER;
@@ -1650,7 +1662,8 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                 (configuration && !registeredConfiguration) || (order && !registeredOrder) ||
                 (marketMaker && !registeredMarketMaker) || (spreadOrder && !registeredSpreadOrder) ||
                 (analyticOrder && !registeredAnalyticOrder) || (otcMarketsOrder && !registeredOtcMarketsOrder) ||
-                (orderImbalance && !registeredOrderImbalance) || (series && !registeredSeries)) {
+                (orderImbalance && !registeredOrderImbalance) || (series && !registeredSeries) ||
+                (greeks && !registeredGreeks)) {
                 reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-unregistered-event");
             }
 
@@ -1792,6 +1805,7 @@ template class Subscription<events::AnalyticOrder>;
 template class Subscription<events::OtcMarketsOrder>;
 template class Subscription<events::OrderImbalance>;
 template class Subscription<events::Series>;
+template class Subscription<events::Greeks>;
 template class Subscription<RegisteredEvent>;
 
 Feed::Feed(std::shared_ptr<detail::EndpointPort> port) : port_(std::move(port)) {
@@ -2485,6 +2499,8 @@ class TypedConsumer final : public client::SubscriptionConsumer {
                 return deliver<events::OtcMarketsOrder>(batch, listeners, executor, completion, historyRevision);
             case EventDelivery::SERIES:
                 return deliver<events::Series>(batch, listeners, executor, completion, historyRevision);
+            case EventDelivery::GREEKS:
+                return deliver<events::Greeks>(batch, listeners, executor, completion, historyRevision);
             case EventDelivery::ORDER_IMBALANCE:
                 return deliver<events::OrderImbalance>(batch, listeners, executor, completion, historyRevision);
             case EventDelivery::ORDER:
