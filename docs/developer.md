@@ -56,4 +56,5 @@ The [event-value oracle](../tools/upstream/event-values-oracle/README.md) captur
 - [Message/Configuration receiving and codecs](MISC-EVENTS.md): owning payloads, explicit decode and Java-compatible Configuration version admission; [version oracle](../tools/upstream/configuration-version-oracle/README.md).
 
 - [Indexed Order reception](ORDER.md): explicit HISTORY, complete owning fields and overlapping source selectors.
+- [MarketMaker/derived Order oracle](../tools/upstream/market-maker-order-oracle/README.md): full types, physical time, delegate sources and real binary parser observations.
 - [Order parser/delegate oracle](../tools/upstream/order-oracle/README.md): original physical slots and bounded standard-schema observations.

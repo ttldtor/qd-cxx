@@ -24,7 +24,7 @@ This sequence configures local demand; connect the endpoint and perform checked 
 synchronous handling. A listener span expires when its callback returns. Copy an Order to retain its
 symbol, fields and nullable MarketMaker independently of the subscription/runtime lifetime.
 
-HISTORY without an explicit registry uses an SDK-owned standard default Order schema. Source-specific
+HISTORY without an explicit registry uses SDK-owned standard Order and MarketMaker schemas. This page describes native Order; [derived Order sources](MARKET-MAKER-ORDER.md) additionally project Quote on TICKER and MarketMaker on HISTORY. Source-specific
 schemas are supplied through the existing immutable EventRegistry; register every selected record as
 EventType::ORDER. Each native indexed layout must explicitly select its exact COMPACT_INT Index with
 IndexedTimeLowInt32. Source names are resolved from the record; schema names and extra fields remain

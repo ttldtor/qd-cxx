@@ -3,6 +3,9 @@
 #pragma once
 
 #include "qd/events/configuration.hpp"
+#include "qd/events/derived_order.hpp"
+#include "qd/events/event_projection.hpp"
+#include "qd/events/market_maker.hpp"
 #include "qd/events/order.hpp"
 #include "qd/events/profile.hpp"
 #include "qd/events/quote.hpp"
@@ -12,6 +15,7 @@
 #include "qd/events/trade_eth.hpp"
 #include "qd/mux/queue.hpp"
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -37,7 +41,8 @@ enum class PreparedEventKind {
     TEXT_CONFIGURATION, ///< Owning text configuration projection.
     MESSAGE = 7,        ///< Owning serialized Message projection.
     CONFIGURATION = 8,  ///< Owning serialized Configuration projection.
-    ORDER = 9           ///< Complete owning ordinary indexed Order projection.
+    ORDER = 9,          ///< Owning ordinary or explicitly derived indexed Order projection.
+    MARKET_MAKER = 10   ///< Owning indexed MarketMaker projection.
 };
 
 /** Explicit source for optional event metadata; indexed identity is never a timestamp substitute. */
@@ -55,6 +60,7 @@ struct PreparedSubscriptionBinding {
     ReceiverEventTimePolicy eventTimePolicy =
         ReceiverEventTimePolicy::UNSPECIFIED; ///< Explicit source of optional event timestamp metadata.
     std::size_t attachmentBytes = 65536;      ///< Finite serialized-body copy bound for attachment event routes.
+    events::EventProjection projection = events::EventProjection::NATIVE; ///< Verified native or derived group.
 };
 
 /** Aggregate immutable plan bounds, separate from queue reservations and application captures. */
@@ -94,9 +100,16 @@ struct ReceiverFailure {
 /** Fully owning optional projection; generic records are represented by monostate. */
 struct SubscriptionProjection {
     std::variant<std::monostate, events::Quote, events::Profile, events::Trade, events::TradeETH, events::Summary,
-                 events::TextMessage, events::TextConfiguration, events::Message, events::Configuration, events::Order>
+                 events::TextMessage, events::TextConfiguration, events::Message, events::Configuration, events::Order,
+                 events::MarketMaker>
         value;                               ///< Owned event or explicit generic route.
     std::optional<std::int64_t> eventTimeMs; ///< Actual selected FIELD metadata only; rawTime stays independent.
+};
+
+/** Fixed complete owning group for one physical record; unitary bid/ask never escape partially. */
+struct SubscriptionProjectionGroup {
+    std::array<SubscriptionProjection, core::MAX_DELIVERY_PROJECTIONS> values{}; ///< No variable container allocation.
+    std::size_t size = 0; ///< Number of complete selected outputs, in actual delegate order.
 };
 
 /** Projection refusal, independent of queue delivery/acknowledgement. */
@@ -147,6 +160,17 @@ class SubscriptionBatch {
      * @return Existing owning batch lease; it retains no receiver plan, callable, queue or transport.
      */
     [[nodiscard]] mux::OwnedMuxBatch retain() const noexcept;
+    /** Count captured business occurrences, independently of the physical record span.
+     * @return Bounded sum of selected per-record projection bits; no progress or allocation occurs.
+     */
+    [[nodiscard]] std::size_t eventCount() const noexcept;
+    /** Project every selected delegate for one physical record with whole-group prepayment.
+     * @param index Position in records(); unknown or unprepared projection roles are refused.
+     * @param work Remaining visits/text/byte credits, consumed before output allocation.
+     * @return Complete fixed owning group or typed refusal; no partial group/callback is exposed.
+     */
+    [[nodiscard]] std::expected<SubscriptionProjectionGroup, ReceiverProjectionFailure>
+    projectAll(std::size_t index, ReceiverProjectionWork &work) const;
     /** Synchronously project one record without hidden input copies or result caching.
      * @param index Position in records(); out-of-range is an explicit error.
      * @param work Remaining caller credits; repeated calls debit them again, including failed attempts.

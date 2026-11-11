@@ -4,6 +4,7 @@
 
 #include "qd/core/local_schema.hpp"
 #include "qd/events/event_mapping.hpp"
+#include "qd/events/event_projection.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -25,7 +26,8 @@ enum class EventType {
     TEXT_CONFIGURATION, ///< Owning lasting configuration with nullable exact text.
     MESSAGE = 7,        ///< Exact owning serialized Message attachment; STREAM only.
     CONFIGURATION = 8,  ///< Owning serialized Configuration with independent signed version metadata.
-    ORDER = 9           ///< Complete owning ordinary indexed Order; high-level reception requires HISTORY.
+    ORDER = 9,          ///< Owning indexed Order with an explicit native or derived projection family.
+    MARKET_MAKER = 10   ///< Owning indexed MarketMaker; ordinary reception requires HISTORY.
 };
 
 /** Explicit source of optional event metadata, independent of indexed record identity. */
@@ -40,13 +42,15 @@ struct EventRegistration {
     std::int32_t localRecordId; ///< Explicit dense record position in the supplied validated schema.
     events::MappingLimits mappingLimits{128, 256, 32, 64, 128, 128, 20480, 256 * 64 * 129 + 32 * 128};
     ///< Finite per-route preparation bounds for existing exact-key and exact-type validation.
-    EventTimePolicy eventTimePolicy = EventTimePolicy::FIELD_METADATA; ///< Source of optional event metadata.
+    EventTimePolicy eventTimePolicy = EventTimePolicy::FIELD_METADATA;    ///< Source of optional event metadata.
+    events::EventProjection projection = events::EventProjection::NATIVE; ///< Explicit physical-to-business family.
 };
 
 /** Independent finite bounds for one immutable registry, excluding caller inputs and allocator bookkeeping. */
 struct EventRegistryLimits {
     core::SchemaLimits schema{16, 128, 256, 128, 16384}; ///< Complete retained schema, including generic records.
-    std::size_t registrations = 16; ///< Maximum explicit routes; duplicate local record positions are invalid.
+    std::size_t registrations =
+        16; ///< Maximum explicit routes; each physical record permits one native plus one compatible derived family.
     std::size_t storageBytes = 8 * 1024 * 1024; ///< Schema/container/shared allocation-request bytes, not process RSS.
 };
 
@@ -99,7 +103,7 @@ class EventRegistry final {
     create(const core::LocalSchema &schema, std::span<const EventRegistration> registrations,
            EventRegistryLimits limits, EventRegistryWork &work);
 
-    /** Prepare the seven standard routes through the normal registration boundary.
+    /** Prepare the nine standard native routes through the normal registration boundary.
      * @param limits Finite complete schema, route and retained-storage allowances.
      * @param work Remaining preparation credits; attempted construction consumes them on refusal.
      * @return Immutable complete default registry or original schema/mapper/registry error.

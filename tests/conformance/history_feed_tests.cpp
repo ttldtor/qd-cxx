@@ -81,9 +81,10 @@ TEST_CASE("live fromTime API refuses unverified native types and ordinary mode a
     historyOptions.contract = a::DeliveryContract::HISTORY;
     auto history = runtime.createEndpoint(historyOptions);
 
-    for (auto type : {a::EventType::QUOTE, a::EventType::PROFILE, a::EventType::TRADE, a::EventType::TRADE_ETH,
-                      a::EventType::SUMMARY, a::EventType::TEXT_MESSAGE, a::EventType::TEXT_CONFIGURATION,
-                      a::EventType::MESSAGE, a::EventType::CONFIGURATION, a::EventType::ORDER}) {
+    for (auto type :
+         {a::EventType::QUOTE, a::EventType::PROFILE, a::EventType::TRADE, a::EventType::TRADE_ETH,
+          a::EventType::SUMMARY, a::EventType::TEXT_MESSAGE, a::EventType::TEXT_CONFIGURATION, a::EventType::MESSAGE,
+          a::EventType::CONFIGURATION, a::EventType::ORDER, a::EventType::MARKET_MAKER}) {
         try {
             static_cast<void>(history->getFeed()->createTimeSeriesSubscription({type}));
             FAIL("an enum or raw indexed layout is not a verified time-series mapper");
@@ -92,6 +93,18 @@ TEST_CASE("live fromTime API refuses unverified native types and ordinary mode a
             CHECK(error.diagnostic().stage == "subscription-time-series-event-type");
         }
     }
+
+    const auto refuseIndexed = [&]<class Event> {
+        try {
+            static_cast<void>(history->getFeed()->createTimeSeriesSubscription<Event>());
+            FAIL("a native indexed event must not acquire a timestamp range");
+        } catch (const a::Error &error) {
+            CHECK(error.diagnostic().code == a::ErrorCode::UNSUPPORTED_PROFILE);
+            CHECK(error.diagnostic().stage == "subscription-time-series-event-type");
+        }
+    };
+    refuseIndexed.operator()<q::events::Order>();
+    refuseIndexed.operator()<q::events::MarketMaker>();
 
     static_cast<void>(history->closeAndAwaitTermination());
     runtime.closeAndAwaitTermination();

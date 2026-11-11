@@ -58,4 +58,5 @@
 - [Получение Message/Configuration и кодеки](MISC-EVENTS.ru.md): владеющие payload, явный decode и Java-совместимый version admission Configuration; [version oracle](../tools/upstream/configuration-version-oracle/README.ru.md).
 
 - [Приём индексного Order](ORDER.ru.md): явный HISTORY, полные владеющие поля и перекрывающиеся source selectors.
+- [Oracle MarketMaker/производного Order](../tools/upstream/market-maker-order-oracle/README.ru.md): полные типы, physical time, источники delegates и реальный binary parser.
 - [Oracle parser/delegate Order](../tools/upstream/order-oracle/README.ru.md): исходные physical slots и ограниченные наблюдения стандартных схем.

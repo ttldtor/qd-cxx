@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: BSL-1.0
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "../../src/core/delivery_statistics.hpp"
+#include "../../src/events/derived_order_sources.hpp"
 #include "qd/encoding/compact.hpp"
 #include "qd/encoding/utf_char.hpp"
 #include "qd/encoding/utf_string.hpp"
+#include "qd/events/market_maker.hpp"
 #include "qd/events/profile.hpp"
 #include "qd/events/quote.hpp"
 #include "qd/mux/queue.hpp"
@@ -3753,4 +3755,239 @@ TEST_CASE("HISTORY observed replay preserves committed source phase through mapp
     until(f, [&] {
         return f.queue.terminal().has_value();
     });
+}
+
+TEST_CASE("TICKER source expansion preserves transferred FIFO provenance and business conservation") {
+    auto f = fixture(c::SubscriptionFamily::TICKER);
+    auto statistics = std::make_shared<c::detail::DeliveryStatisticsState>();
+    auto consumer = std::make_shared<Recorder>(statistics);
+    auto handle = open(f, consumer);
+    const c::SubscriptionKey key{f.schema.recordContext(0), u"ALPHA"};
+    auto progressWithoutCallbacks = [&](const auto &ready) {
+        for (unsigned attempt = 0; attempt < 10000 && !ready(); ++attempt) {
+            auto work = turn();
+            work.callbacks = 0;
+            auto result = f.queue.progress(work);
+            REQUIRE((result || result.error().error == m::QueueError::WORK_LIMIT));
+        }
+
+        REQUIRE(ready());
+    };
+    auto replace = [&](c::DeliveryProjectionMask mask) {
+        auto submit = submitTurn();
+        auto ticket = handle.replace(std::array{c::SubscriptionRequest{key, {}, mask}}, submit);
+        REQUIRE(ticket);
+        progressWithoutCallbacks([&] {
+            return ticket->result().has_value();
+        });
+        REQUIRE(ticket->result()->status == m::CommandStatus::APPLIED);
+        progressWithoutCallbacks([&] {
+            return handle.state() == m::QueueClientState::ACTIVE;
+        });
+    };
+    replace(2);
+    send(f, {{0, u"ALPHA", 1, 10, 0}});
+    progressWithoutCallbacks([&] {
+        auto r = f.queue.resources(handle);
+
+        return r && r->queuedRecords == 1;
+    });
+    CHECK(statistics->snapshot().admittedEvents.value == 1);
+    CHECK(statistics->snapshot().pendingEvents == 1);
+    replace(26);
+    progressWithoutCallbacks([&] {
+        auto r = f.queue.resources(handle);
+
+        return r && r->queuedRecords == 2;
+    });
+    auto cut = statistics->snapshot();
+    CHECK(cut.admittedEvents.value == 4);
+    CHECK(cut.pendingEvents == 4);
+    CHECK(cut.conflatedEvents.value == 0);
+    CHECK(consumer->values.empty());
+    replace(24);
+    progressWithoutCallbacks([&] {
+        return statistics->snapshot().discardedEvents.value == 2;
+    });
+    cut = statistics->snapshot();
+    CHECK(cut.pendingEvents == 2);
+    CHECK(cut.conflatedEvents.value == 0);
+    replace(24);
+    CHECK(statistics->snapshot().discardedEvents.value == 2);
+    handle.requestStop(m::StopMode::ABORT);
+    progressWithoutCallbacks([&] {
+        return handle.terminal().has_value();
+    });
+    cut = statistics->snapshot();
+    CHECK(cut.pendingEvents == 0);
+    CHECK(cut.inFlightEvents == 0);
+    CHECK(cut.admittedEvents.value == cut.discardedEvents.value);
+    CHECK(cut.conflatedEvents.value == 0);
+}
+
+TEST_CASE("MarketMaker HISTORY replay discards the remaining business projections of detached FIFO rows") {
+    bool contractBeforeReplay = false;
+    SUBCASE("native and both derived sides remain queued") {
+        contractBeforeReplay = false;
+    }
+    SUBCASE("a previous cut withdrew one derived side") {
+        contractBeforeReplay = true;
+    }
+
+    auto local = q::defaultMarketMakerSchema({4, 128, 256, 128, 16384});
+    REQUIRE(local);
+    const auto &record = local->records()[0];
+    constexpr std::int32_t SENDER_ID = 17;
+    p::OutgoingRecord declaration{SENDER_ID, 0, record.name, {}};
+    std::vector<std::byte> describe;
+    number(describe, SENDER_ID);
+    text(describe, record.name);
+    number(describe, static_cast<std::int64_t>(record.fields.size()));
+
+    for (std::size_t field = 0; field < record.fields.size(); ++field) {
+        const auto key = std::ranges::find_if(record.lookups, [&](const auto &lookup) {
+            return lookup.fieldId == field;
+        });
+        REQUIRE(key != record.lookups.end());
+        declaration.fields.push_back({key->name, record.fields[field].serialTypeId, static_cast<std::int32_t>(field)});
+        text(describe, key->name);
+        number(describe, record.fields[field].serialTypeId);
+    }
+
+    p::SubscriptionWriterWork writerWork{10000, 1000000, 1000000, 1000000};
+    auto writer =
+        p::SubscriptionWriter::create(*local, {&declaration, 1}, {{16, 128, 256, 128, 16384}, 16, 128, 128, 16384},
+                                      {8192, 8201, 512, 1024, {8192, 1024}, 65536, 65536, 128}, writerWork);
+    REQUIRE(writer);
+    auto liveWork = liveTurn();
+    auto live = p::LiveSession::create(c::LocalSchema(*local), std::move(*writer), liveLimits(), liveWork);
+    REQUIRE(live);
+    (void)admit(*live, ready());
+    (void)admit(*live, frame(2, describe));
+
+    auto work = turn();
+    auto queue = m::MuxQueue::createHistory(
+        *local, muxLimits(),
+        {32, 256, 128, 64, 4 * 1024 * 1024, 4, 128, 64, 4 * 1024 * 1024, 32 * 1024 * 1024, desiredLimits()},
+        {false, 100, 10000}, queueLimits(), work);
+    REQUIRE(queue);
+    auto statistics = std::make_shared<c::detail::DeliveryStatisticsState>();
+
+    class MarketMakerRecorder final : public m::MuxConsumer {
+        public:
+        explicit MarketMakerRecorder(std::shared_ptr<c::detail::DeliveryStatisticsState> state)
+            : m::MuxConsumer(std::move(state)) {
+        }
+
+        m::BatchAction onBatch(const m::BorrowedMuxBatch &batch) override {
+            std::size_t weight = 0;
+
+            for (const auto &value : batch.records()) {
+                CHECK(value.typedValues.size() == 10);
+                weight += value.projections.count();
+            }
+
+            deliveryStatistics()->update([&](auto &s) {
+                s.inFlightEvents -= weight;
+                s.deliveredEvents.add(weight);
+            });
+
+            return m::BatchAction::CONTINUE;
+        }
+    };
+
+    auto receiver = std::make_shared<MarketMakerRecorder>(statistics);
+    auto handle = queue->open(clientLimits(), receiver, work);
+    REQUIRE(handle);
+
+    constexpr auto NATIVE_AND_BID = c::NATIVE_DELIVERY_PROJECTION | q::detail::DERIVED_BID;
+    constexpr auto NATIVE_AND_BOTH_SIDES = c::NATIVE_DELIVERY_PROJECTION | q::detail::DERIVED_SEPARATE_PAIR;
+    const c::SubscriptionKey key{local->recordContext(0), u"AAPL"};
+
+    const auto pump = [&](const auto &ready, bool callbacks) {
+        for (unsigned attempt = 0; attempt < 1000 && !ready(); ++attempt) {
+            auto credits = turn();
+
+            if (!callbacks)
+                credits.callbacks = 0;
+
+            const auto result = queue->progress(credits);
+            REQUIRE((result || result.error().error == m::QueueError::WORK_LIMIT));
+        }
+
+        REQUIRE(ready());
+    };
+    const auto submit = [&](std::uint64_t revision, c::DeliveryProjectionMask mask, bool replay) {
+        statistics->update([&](auto &) {
+            statistics->submittedSelectors = 1;
+            statistics->submittedDesiredRevision = revision;
+            statistics->historyReplayRequired = replay;
+        });
+        auto credits = submitTurn();
+        auto ticket = handle->replace(std::array{c::SubscriptionRequest{key, 0, mask}}, credits);
+        REQUIRE(ticket);
+        pump(
+            [&] {
+                return ticket->result().has_value();
+            },
+            false);
+        REQUIRE(ticket->result()->status == m::CommandStatus::APPLIED);
+    };
+    const auto mapped = [&](std::uint64_t revision) {
+        pump(
+            [&] {
+                return statistics->snapshot().activeDesiredRevision == revision;
+            },
+            false);
+    };
+
+    submit(1, NATIVE_AND_BOTH_SIDES, false);
+    mapped(1);
+
+    // One standard MarketMaker record completes a snapshot at the requested raw bound.
+    std::vector<std::byte> body{std::byte{0xf9}};
+    number(body, 12);
+    body.push_back(std::byte{0xfd});
+    text(body, key.symbol); // ASCII fixture: byte and code-unit counts are equal.
+    number(body, SENDER_ID);
+
+    for (const auto field : std::array<std::int64_t, 10>{0, 0, 0, 384, 384, 384, 0, 384, 384, 384})
+        number(body, field);
+
+    auto event = admit(*live, frame(20, body));
+    work = turn();
+    REQUIRE(queue->admit(std::move(event), work));
+    pump(
+        [&] {
+            const auto resources = queue->resources(*handle);
+
+            return resources && resources->queuedRecords == 1;
+        },
+        false);
+    REQUIRE(statistics->snapshot().pendingEvents == 3);
+    CHECK(statistics->snapshot().admittedEvents.value == 3);
+
+    std::uint64_t revision = 1;
+    const auto mask = contractBeforeReplay ? NATIVE_AND_BID : NATIVE_AND_BOTH_SIDES;
+    const std::size_t replayWeight = contractBeforeReplay ? 2 : 3;
+
+    if (contractBeforeReplay) {
+        submit(++revision, mask, false);
+        mapped(revision);
+        CHECK(statistics->snapshot().pendingEvents == 2);
+        CHECK(statistics->snapshot().discardedEvents.value == 1);
+    }
+
+    submit(++revision, mask, true);
+    mapped(revision);
+    CHECK(statistics->snapshot().discardedEvents.value == 3);
+    pump(
+        [&] {
+            return statistics->snapshot().deliveredEvents.value == replayWeight;
+        },
+        true);
+    const auto cut = statistics->snapshot();
+    CHECK(cut.pendingEvents == 0);
+    CHECK(cut.inFlightEvents == 0);
+    CHECK(cut.admittedEvents.value == cut.deliveredEvents.value + cut.discardedEvents.value);
 }

@@ -274,9 +274,10 @@ p::LiveSession session(const c::LocalSchema &local, bool fieldTime) {
     REQUIRE(result);
     std::vector<std::byte> ready{std::byte{'D'}, std::byte{'X'}, std::byte{'P'}, std::byte{'3'}};
     number(ready, 0);
-    number(ready, 2);
+    number(ready, 3);
 
-    for (const auto &[id, name] : std::array{std::pair{15, u"STREAM_DATA"}, std::pair{20, u"HISTORY_DATA"}}) {
+    for (const auto &[id, name] :
+         std::array{std::pair{15, u"STREAM_DATA"}, std::pair{20, u"HISTORY_DATA"}, std::pair{10, u"TICKER_DATA"}}) {
         number(ready, id);
         text(ready, name);
         number(ready, 0);
@@ -324,22 +325,28 @@ struct Fixture {
  * @param fieldTime Enable actual physical FIELD metadata in incoming descriptions.
  * @return Independent composed graph.
  */
-Fixture fixture(c::LocalSchema local, bool history, bool fieldTime) {
+Fixture fixture(c::LocalSchema local, bool history, bool fieldTime, bool ticker = false) {
     auto live = session(local, fieldTime);
     auto work = turn();
     const c::SubscriptionLimits desired{16, 32, 128, 4096, 64, 8192, 64};
     const m::MuxLimits interests{16, 4, 32, 32, 128, 4096, 64, 4 * 1024 * 1024};
     const m::QueueLimits limits{4, 128, 16, 4, 16, 256, 4 * 1024 * 1024, 64, 1024 * 1024, 32, 64, 8, 16 * 1024 * 1024};
-    auto owner = history ? m::MuxQueue::createHistory(local, interests,
-                                                      {32, 256, 128, 64, 4 * 1024 * 1024, 4, 128, 64, 4 * 1024 * 1024,
-                                                       32 * 1024 * 1024, desired},
-                                                      {false, 100, 10000}, limits, work)
-                         : m::MuxQueue::createStream(local, interests, desired,
-                                                     {8, 256, 4 * 1024 * 1024, 8 * 1024 * 1024}, limits, work);
+    auto owner =
+        history ? m::MuxQueue::createHistory(
+                      local, interests,
+                      {32, 256, 128, 64, 4 * 1024 * 1024, 4, 128, 64, 4 * 1024 * 1024, 32 * 1024 * 1024, desired},
+                      {false, 100, 10000}, limits, work)
+        : ticker ? m::MuxQueue::createTicker(local, interests, {4, 32, 64, 4 * 1024 * 1024, 16 * 1024 * 1024, desired},
+                                             {false, 100}, limits, work)
+                 : m::MuxQueue::createStream(local, interests, desired, {8, 256, 4 * 1024 * 1024, 8 * 1024 * 1024},
+                                             limits, work);
     REQUIRE(owner);
 
     return {std::move(local), std::move(live), std::move(*owner),
-            history ? c::SubscriptionFamily::HISTORY : c::SubscriptionFamily::STREAM, fieldTime};
+            history  ? c::SubscriptionFamily::HISTORY
+            : ticker ? c::SubscriptionFamily::TICKER
+                     : c::SubscriptionFamily::STREAM,
+            fieldTime};
 }
 
 /** Create the combined real-event/custom graph with finite existing queue profiles.
@@ -396,7 +403,8 @@ void stageBatch(Fixture &graph, const m::MuxHandle &handle, std::size_t records)
 
         auto work = turn();
         work.callbacks = 0;
-        REQUIRE(graph.queue.progress(work));
+        const auto progressed = graph.queue.progress(work);
+        REQUIRE((progressed || progressed.error().error == m::QueueError::WORK_LIMIT));
     }
 
     FAIL("bounded callback-gated progress did not prepare the complete batch");
@@ -564,7 +572,10 @@ void send(Fixture &graph, std::initializer_list<Input> inputs) {
         }
     }
 
-    auto event = admit(graph.live, frame(graph.family == c::SubscriptionFamily::HISTORY ? 20 : 15, payload));
+    auto event = admit(graph.live, frame(graph.family == c::SubscriptionFamily::HISTORY  ? 20
+                                         : graph.family == c::SubscriptionFamily::TICKER ? 10
+                                                                                         : 15,
+                                         payload));
 
     for (std::size_t attempt = 0; attempt < 20000; ++attempt) {
         auto work = turn();
@@ -1043,4 +1054,152 @@ TEST_CASE("receiver callback failure remains isolated from a healthy same-symbol
     quiet(graph);
     CHECK(failing->callbacks == 1);
     CHECK(healthy->callbacks == 2);
+}
+
+TEST_CASE("one physical Quote projects an atomic prepaid native plus four actual delegates") {
+    auto graph = fixture(schema(), false, false, true);
+    auto observer = std::make_shared<Observer>();
+    auto routes = bindings();
+    a::PreparedSubscriptionBinding derived{0, a::PreparedEventKind::ORDER, MAPPING_LIMITS, {16, 128, 256}};
+    derived.projection = q::EventProjection::QUOTE_ORDERS;
+    const std::array selected{routes[0], derived};
+    auto handle = open(graph, observer, selected);
+    observer->action = [&](const a::SubscriptionBatch &batch) {
+        REQUIRE(batch.records().size() == 1);
+        CHECK(batch.eventCount() == 5);
+        auto insufficient = projectionTurn();
+        insufficient.bytes = 0;
+        auto refused = batch.projectAll(0, insufficient);
+        REQUIRE_FALSE(refused);
+        CHECK(std::get<a::ReceiverError>(refused.error()) == a::ReceiverError::WORK_LIMIT);
+        auto work = projectionTurn();
+        auto singular = batch.project(0, work);
+        REQUIRE_FALSE(singular);
+        CHECK(std::get<a::ReceiverError>(singular.error()) == a::ReceiverError::INVALID_INPUT);
+        work = projectionTurn();
+        auto group = batch.projectAll(0, work);
+        REQUIRE(group);
+        REQUIRE(group->size == 5);
+        CHECK(std::holds_alternative<q::Quote>(group->values[0].value));
+        constexpr std::array sourceIds{1, 2, 7, 7};
+
+        for (std::size_t i = 0; i < sourceIds.size(); ++i) {
+            const auto &order = std::get<q::Order>(group->values[i + 1].value);
+            CHECK(order.symbol == u"SYM");
+            CHECK(order.getSourceId() == sourceIds[i]);
+            CHECK(order.getPrice() == (i % 2 ? 56 : 12));
+            CHECK(order.eventFlags == (i == 2 ? 1 : 0));
+            observer->projections.push_back(std::move(group->values[i + 1]));
+        }
+
+        return m::BatchAction::CONTINUE;
+    };
+    const std::array desired{c::SubscriptionRequest{{graph.local.recordContext(0), u"SYM"}, {}, 31}};
+    auto submit = submitTurn();
+    auto ticket = handle.replace(desired, submit);
+    REQUIRE(ticket);
+    until(graph, [&] {
+        return ticket->result().has_value();
+    });
+    REQUIRE(ticket->result()->status == m::CommandStatus::APPLIED);
+    until(graph, [&] {
+        return handle.state() == m::QueueClientState::ACTIVE;
+    });
+    send(graph, {{0}});
+    until(graph, [&] {
+        INFO("state=", static_cast<int>(handle.state()), " callbacks=", observer->callbacks,
+             " terminal=", handle.terminal().has_value());
+
+        return observer->projections.size() == 4;
+    });
+    auto retained = observer->projections;
+    handle.requestStop(m::StopMode::ABORT);
+    until(graph, [&] {
+        return handle.terminal().has_value();
+    });
+    CHECK(std::get<q::Order>(retained[0].value).getPrice() == 12);
+}
+
+TEST_CASE("four physical rows preserve twenty atomic owning callback outputs") {
+    auto original = schema();
+    std::vector<c::LocalRecord> records;
+
+    for (std::int32_t id = 0; id < 4; ++id) {
+        auto record = original.records()[0];
+        record.id = id;
+        record.name = id == 0 ? u"Quote" : u"Quote&" + std::u16string(1, static_cast<char16_t>(u'A' + id - 1));
+        records.push_back(std::move(record));
+    }
+
+    auto local = c::LocalSchema::create(records, SCHEMA_LIMITS, c::LocalProfile::BINARY_FIELDS_V1);
+    REQUIRE(local);
+    auto graph = fixture(std::move(*local), false, false, true);
+    auto observer = std::make_shared<Observer>();
+    std::vector<a::PreparedSubscriptionBinding> routes;
+    std::vector<c::SubscriptionRequest> desired;
+
+    for (std::int32_t id = 0; id < 4; ++id) {
+        routes.push_back({id, a::PreparedEventKind::QUOTE, MAPPING_LIMITS, {16, 128, 256}});
+        auto derived = routes.back();
+        derived.kind = a::PreparedEventKind::ORDER;
+        derived.projection = q::EventProjection::QUOTE_ORDERS;
+        routes.push_back(derived);
+        desired.push_back({{graph.local.recordContext(id), u"SYM"}, {}, 31});
+    }
+
+    auto receiverWork = a::ReceiverWork{1000000, 2000000};
+    auto work = turn();
+    auto opened =
+        a::openSubscriptionReceiver(graph.queue, graph.local, graph.family, c::SubscriptionSelectorPolicy::EXACT_ONLY,
+                                    routes, observer, {8, 128, 256}, clientLimits(), receiverWork, work);
+    REQUIRE(opened);
+    auto handle = std::move(*opened);
+    observer->action = [&](const a::SubscriptionBatch &batch) {
+        CHECK(batch.records().size() == 4);
+        CHECK(batch.eventCount() == 20);
+        auto credits = projectionTurn();
+
+        for (std::size_t i = 0; i < batch.records().size(); ++i) {
+            auto group = batch.projectAll(i, credits);
+            REQUIRE(group);
+            REQUIRE(group->size == 5);
+
+            for (std::size_t j = 0; j < group->size; ++j) {
+                observer->projections.push_back(std::move(group->values[j]));
+            }
+        }
+
+        return m::BatchAction::CONTINUE;
+    };
+    auto submit = submitTurn();
+    auto ticket = handle.replace(desired, submit);
+    REQUIRE(ticket);
+    until(graph, [&] {
+        return ticket->result().has_value();
+    });
+    until(graph, [&] {
+        return handle.state() == m::QueueClientState::ACTIVE;
+    });
+    const auto projectGroup = observer->action;
+    observer->action = [&](const a::SubscriptionBatch &) {
+        return m::BatchAction::PAUSE;
+    };
+    send(graph, {{0}});
+    until(graph, [&] {
+        return handle.state() == m::QueueClientState::PAUSED;
+    });
+    observer->action = projectGroup;
+    const auto fields = values(0, 1);
+    send(graph, {{0, 0, 0, {}, fields}, {1, 0, 0, {}, fields}, {2, 0, 0, {}, fields}, {3, 0, 0, {}, fields}});
+    stageBatch(graph, handle, 4);
+    handle.requestResume();
+    until(graph, [&] {
+        return observer->projections.size() == 20;
+    });
+    CHECK(observer->callbacks == 2);
+    handle.requestStop(m::StopMode::ABORT);
+    until(graph, [&] {
+        return handle.terminal().has_value();
+    });
+    CHECK(std::get<q::Order>(observer->projections[19].value).getSourceId() == 8);
 }

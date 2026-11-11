@@ -1,8 +1,10 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #include "receiving_profile.hpp"
+#include "callback_execution.hpp"
 #include "event_registry_defaults.hpp"
 
+#include "../events/derived_order_sources.hpp"
 #include "qd/events/market_event_symbols.hpp"
 #include "qd/events/time_helpers.hpp"
 
@@ -14,10 +16,10 @@
 namespace org::ttldtor::qdcxx::api::detail {
 namespace {
 constexpr std::size_t MEBIBYTE = 1024 * 1024; ///< Independent logical byte unit.
-constexpr core::SchemaLimits SCHEMA_LIMITS{MAXIMUM_RECEIVING_RECORDS, 128, 256, 128, 16384};
+constexpr core::SchemaLimits SCHEMA_LIMITS{MAXIMUM_RECEIVING_RECORDS, 284, 724, 128, 16384};
 ///< Complete declarations and aliases; regional binding does not expand this ceiling.
-constexpr std::size_t FRAME_RECORDS = 64;                 ///< Whole admitted DATA frame record ceiling.
-constexpr std::size_t CALLBACK_RECORDS = 4;               ///< Whole callback projection ceiling.
+constexpr std::size_t FRAME_RECORDS = 64; ///< Whole admitted DATA frame record ceiling.
+constexpr std::size_t CALLBACK_RECORDS = CallbackSlotPool::PHYSICAL_RECORDS; ///< Whole callback projection ceiling.
 constexpr std::size_t FIELD_TEXT_UNITS = 8192;            ///< Aggregate text copied from one complete record.
 constexpr std::size_t FIELD_BYTE_UNITS = 16384;           ///< Aggregate opaque payload copied from one record.
 constexpr std::size_t RECORD_ARENA_BYTES = 65536;         ///< Complete detached per-record arena request ceiling.
@@ -80,9 +82,7 @@ EventRegistry selectRegistry(const EndpointOptions &options) {
         return *registry;
     }
 
-    EventRegistryWork work;
-    auto result = options.contract == DeliveryContract::HISTORY ? defaultHistoryEventRegistry({}, work)
-                                                                : EventRegistry::builtIn({}, work);
+    auto result = defaultReceivingRegistry(options.contract);
 
     if (!result) {
         const auto allocation = std::visit(
@@ -96,6 +96,72 @@ EventRegistry selectRegistry(const EndpointOptions &options) {
     }
 
     return std::move(*result);
+}
+
+/** Bound distinct physical coordinates for any one logical selector before reserving desired storage.
+ * @param registry Immutable schema-bound route catalog, already bounded to the receiving ceilings.
+ * @param contract Exact route eligibility policy used by mapping preparation.
+ * @return Checked coordinate-domain ceiling; this does not change the physical schema record count.
+ */
+std::size_t receivingCoordinateCapacity(const EventRegistry &registry, DeliveryContract contract) {
+    struct Context {
+        bool registered = false;
+        bool eligible = false;
+        bool nativeQuote = false;
+        bool derivedQuote = false;
+        char16_t exchange = 0;
+    };
+
+    std::array<Context, MAXIMUM_RECEIVING_RECORDS> contexts{};
+    // This complete bounded scan is paid before desired storage allocation or native publication.
+    auto visits =
+        add(MAXIMUM_RECEIVING_BINDINGS, multiply(MAXIMUM_RECEIVING_RECORDS, add(MAXIMUM_RECEIVING_RECORDS, 1)));
+    const auto visit = [&] {
+        if (visits == 0) {
+            refuse(ErrorCode::RESOURCE_LIMIT, "profile-coordinate-work");
+        }
+
+        --visits;
+    };
+
+    for (const auto &route : registry.registrations()) {
+        visit();
+        const auto id = static_cast<std::size_t>(route.localRecordId);
+        auto &context = contexts[id];
+        context.registered = true;
+
+        if (!receivingRouteSupportsContract(route, contract)) {
+            continue;
+        }
+
+        context.eligible = true;
+        context.nativeQuote |= route.type == EventType::QUOTE && route.projection == events::EventProjection::NATIVE;
+        context.derivedQuote |= route.projection == events::EventProjection::QUOTE_ORDERS;
+        context.exchange = events::market_symbols::getExchangeCode(registry.schema().records()[id].name);
+    }
+
+    std::size_t registered = 0;
+    std::size_t eligible = 0;
+    std::size_t largestDoubleBucket = 0;
+
+    for (const auto &context : contexts) {
+        visit();
+        registered = add(registered, context.registered);
+        eligible = add(eligible, context.eligible);
+        std::size_t bucket = 0;
+
+        for (const auto &other : contexts) {
+            visit();
+
+            if (context.exchange && context.exchange == other.exchange && other.nativeQuote && other.derivedQuote) {
+                bucket = add(bucket, 1);
+            }
+        }
+
+        largestDoubleBucket = std::max(largestDoubleBucket, bucket);
+    }
+
+    return std::max(registered, add(eligible, largestDoubleBucket));
 }
 
 /** Copy every complete field using its first explicit wire alias.
@@ -207,6 +273,22 @@ void fundHistoryWork(ReceivingProfile &profile, std::size_t maximumFields) {
         add(work.bytes, add(multiply(2, limits.residentBytes), profile.endpoint.settings().budgets.session.eventBytes));
 }
 
+/** Fund the existing complete snapshot binding scans from this profile's finite schema/descriptor bounds.
+ * A burst shares one seed; this is prepayment before parsing, never a retry-time refill.
+ * @param settings Complete candidate settings, not yet published.
+ * @param records Actual retained local record cardinality used by LiveSnapshot::complete.
+ */
+void fundContextBindingText(client::EndpointSettings &settings, std::size_t records) {
+    const auto &session = settings.budgets.session;
+    const auto fields = std::min(
+        {session.descriptions.fieldsPerDescription, session.descriptions.totalFields, session.context.bindings.fields});
+    const auto perDescription = multiply(
+        add(session.descriptions.totalNameUnits, session.context.schema.totalNameUnits), add(add(fields, records), 1));
+    const auto wholeFrame = multiply(session.context.descriptions, perDescription);
+    settings.budgets.protocolTurn.textUnits =
+        add(settings.budgets.protocolTurn.textUnits, multiply(RECEIVING_OWNER_POLLS_PER_TURN, wholeFrame));
+}
+
 /** Reserve actual complete schema/blueprint copies and three replay banks.
  * @param profile Complete preparation, modified before publication.
  */
@@ -268,24 +350,29 @@ void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, s
     const events::EventValueLimits values{symbolUnits, FIELD_TEXT_UNITS, add(symbolUnits, 2 * FIELD_TEXT_UNITS)};
     profile.bindings.reserve(registry.registrations().size());
 
-    if (profile.bindings.capacity() > SCHEMA_LIMITS.records)
+    if (profile.bindings.capacity() > MAXIMUM_RECEIVING_BINDINGS)
         refuse(ErrorCode::RESOURCE_LIMIT, "profile-mapping-storage");
 
     for (std::size_t kind = 0; kind < RECEIVING_EVENT_KINDS; ++kind) {
         for (const auto &registration : registry.registrations()) {
-            if (static_cast<std::size_t>(registration.type) != kind)
+            if (static_cast<std::size_t>(registration.type) != kind ||
+                !receivingRouteSupportsContract(
+                    registration, profile.family == core::SubscriptionFamily::TICKER    ? DeliveryContract::TICKER
+                                  : profile.family == core::SubscriptionFamily::HISTORY ? DeliveryContract::HISTORY
+                                                                                        : DeliveryContract::STREAM))
                 continue;
 
             const auto index = profile.bindings.size();
             const auto &record = profile.schema.records()[static_cast<std::size_t>(registration.localRecordId)];
             profile.bindingExchanges[index] =
-                (registration.type == EventType::PROFILE || registration.type == EventType::TEXT_MESSAGE ||
-                 registration.type == EventType::TEXT_CONFIGURATION || registration.type == EventType::MESSAGE ||
-                 registration.type == EventType::CONFIGURATION || registration.type == EventType::ORDER)
+                (registration.type == EventType::PROFILE || registration.type == EventType::MARKET_MAKER ||
+                 registration.type == EventType::TEXT_MESSAGE || registration.type == EventType::TEXT_CONFIGURATION ||
+                 registration.type == EventType::MESSAGE || registration.type == EventType::CONFIGURATION ||
+                 (registration.type == EventType::ORDER && registration.projection == events::EventProjection::NATIVE))
                     ? 0
                     : events::market_symbols::getExchangeCode(record.name);
 
-            if (registration.type == EventType::ORDER) {
+            if (registration.type == EventType::ORDER && registration.projection == events::EventProjection::NATIVE) {
                 const auto source = events::PreparedOrderSource::prepare(profile.schema, registration.localRecordId,
                                                                          registration.mappingLimits);
 
@@ -305,15 +392,22 @@ void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, s
                     profile.schema.recordContext(registration.localRecordId), registration.localRecordId, *version};
             }
 
-            profile.bindings.push_back({registration.localRecordId,
-                                        static_cast<client::PreparedEventKind>(registration.type),
-                                        registration.mappingLimits, values, policy, FIELD_BYTE_UNITS});
+            profile.bindings.push_back(
+                {registration.localRecordId, static_cast<client::PreparedEventKind>(registration.type),
+                 registration.mappingLimits, values, policy, FIELD_BYTE_UNITS, registration.projection});
         }
+    }
+
+    profile.eventPlans.resize(RECEIVING_EVENT_SELECTIONS);
+
+    if (profile.eventPlans.capacity() != RECEIVING_EVENT_SELECTIONS) {
+        refuse(ErrorCode::RESOURCE_LIMIT, "profile-selection-storage");
     }
 
     for (std::size_t mask = 1; mask <= RECEIVING_EVENT_SELECTIONS; ++mask) {
         auto &plan = profile.eventPlans[mask - 1];
         plan.work.visits = 16;
+        plan.projectionWork.bytes = multiply(CALLBACK_RECORDS, sizeof(client::SubscriptionProjectionGroup));
         // One bounded stack copy is made before the existing receiver factory consumes its normal credits.
         plan.work.preparationWork = RECEIVING_BINDING_COPY_WORK;
 
@@ -347,16 +441,59 @@ void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, s
             plan.limits.selections = add(plan.limits.selections, mapping.selections);
             plan.work.preparationWork = add(plan.work.preparationWork, preparation);
             plan.work.visits = add(plan.work.visits, add(plan.bindingCount, 3));
+            constexpr std::size_t DERIVED_DELEGATES = core::MAX_DELIVERY_PROJECTIONS - 1;
+            const auto outputs = multiply(
+                CALLBACK_RECORDS, binding.projection == events::EventProjection::NATIVE ? 1 : DERIVED_DELEGATES);
             plan.projectionWork.visits =
-                add(plan.projectionWork.visits, multiply(CALLBACK_RECORDS, add(fields, add(mapping.selections, 3))));
-            plan.projectionWork.textUnits = add(plan.projectionWork.textUnits, multiply(CALLBACK_RECORDS, units));
-            plan.projectionWork.bytes = add(plan.projectionWork.bytes, multiply(CALLBACK_RECORDS, bytes));
+                add(plan.projectionWork.visits, multiply(outputs, add(fields, add(mapping.selections, 3))));
+            plan.projectionWork.textUnits = add(plan.projectionWork.textUnits, multiply(outputs, units));
+            plan.projectionWork.bytes = add(plan.projectionWork.bytes, multiply(outputs, bytes));
         }
 
         plan.projectionWork.visits = add(plan.projectionWork.visits, multiply(CALLBACK_RECORDS, plan.bindingCount));
     }
 }
 } // namespace
+
+std::expected<EventRegistry, EventRegistryFailure> defaultReceivingRegistry(DeliveryContract contract) {
+    if (contract != DeliveryContract::TICKER && contract != DeliveryContract::STREAM &&
+        contract != DeliveryContract::HISTORY) {
+        return std::unexpected(EventRegistryFailure{EventRegistryError::INVALID_INPUT, {}});
+    }
+
+    EventRegistryWork work;
+    EventRegistryLimits limits;
+    limits.schema = SCHEMA_LIMITS;
+    // Keep seven spare routes from the previous nine-of-sixteen default catalog.
+    limits.registrations = 69;
+    constexpr std::size_t DEFAULT_PREPARATION_WORK = 147580512;
+    work.preparation = DEFAULT_PREPARATION_WORK;
+
+    return contract == DeliveryContract::HISTORY  ? defaultHistoryEventRegistry(limits, work)
+           : contract == DeliveryContract::TICKER ? defaultTickerEventRegistry(limits, work)
+                                                  : EventRegistry::builtIn(limits, work);
+}
+
+bool receivingRouteSupportsContract(const EventRegistration &route, DeliveryContract contract) noexcept {
+    if (route.projection == events::EventProjection::QUOTE_ORDERS) {
+        return contract == DeliveryContract::TICKER;
+    }
+
+    if (route.projection == events::EventProjection::MARKET_MAKER_ORDERS || route.type == EventType::ORDER ||
+        route.type == EventType::MARKET_MAKER) {
+        return contract == DeliveryContract::HISTORY;
+    }
+
+    if (contract == DeliveryContract::HISTORY) {
+        return false;
+    }
+
+    if (route.type == EventType::MESSAGE || route.type == EventType::TEXT_MESSAGE) {
+        return contract == DeliveryContract::STREAM;
+    }
+
+    return contract == DeliveryContract::TICKER || contract == DeliveryContract::STREAM;
+}
 
 ReceivingProfile::ReceivingProfile(core::LocalSchema schema, client::EndpointOptions endpoint)
     : schema(std::move(schema)), endpoint(std::move(endpoint)) {
@@ -393,7 +530,11 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
         routeCount = add(routeCount, count);
     }
 
-    const auto maximumRoutes = std::max(std::size_t{1}, routeCount);
+    if (routeCount > MAXIMUM_RECEIVING_BINDINGS) {
+        refuse(ErrorCode::UNSUPPORTED_PROFILE, "profile-route-count");
+    }
+
+    const auto maximumRoutes = std::max(std::size_t{1}, receivingCoordinateCapacity(selected, options.contract));
     auto configured = client::controlledStreamSettings();
 
     if (!configured) {
@@ -413,6 +554,13 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
     const auto symbolUnits = multiply(entries, runtime.maximumSymbolUnits);
     const auto scale = multiply(clients, add(subscriptionEntries, 15) / 16);
     auto &budgets = settings.budgets;
+    budgets.schema = SCHEMA_LIMITS;
+    budgets.layout = {SCHEMA_LIMITS, SCHEMA_LIMITS.records, SCHEMA_LIMITS.fields, SCHEMA_LIMITS.nameUnits,
+                      SCHEMA_LIMITS.totalNameUnits};
+    budgets.session.context.schema = SCHEMA_LIMITS;
+    budgets.session.context.descriptions = SCHEMA_LIMITS.records;
+    budgets.session.descriptions.descriptions = SCHEMA_LIMITS.records;
+    budgets.session.descriptions.totalFields = SCHEMA_LIMITS.fields;
     budgets.session.events = protocol::DataEventPolicy::BINARY_CATALOG_V1;
     budgets.session.historySnapshot = options.contract == DeliveryContract::HISTORY;
     budgets.session.fieldTime = protocol::FieldTimePolicy::READ;
@@ -441,6 +589,7 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
     budgets.runtimeTurn.dnsBytes = 10000000;
     budgets.runtimeTurn.dnsUnits = DNS_PROGRESS_UNITS;
 
+    fundContextBindingText(settings, schema.records().size());
     auto endpoint = client::EndpointOptions::create(schema, settings);
 
     if (!endpoint) {
@@ -448,6 +597,8 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
     }
 
     ReceivingProfile result(std::move(schema), std::move(*endpoint));
+    result.physicalRouteCount = maximumRoutes;
+    result.unitaryOrderSources = options.unitaryOrderSources;
 
     switch (options.contract) {
     case DeliveryContract::TICKER:
@@ -548,11 +699,13 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
         add(add(add(add(sizeof(result.bindingExchanges), sizeof(result.bindingSources)),
                     sizeof(result.bindingTimeEncodings)),
                 sizeof(result.versionBindings)),
-            add(sizeof(result.eventPlans),
-                sizeof(std::array<client::PreparedSubscriptionBinding, MAXIMUM_RECEIVING_RECORDS>)));
+            add(multiply(result.eventPlans.capacity(), sizeof(ReceivingEventPlan)),
+                sizeof(std::array<client::PreparedSubscriptionBinding, MAXIMUM_RECEIVING_BINDINGS>)));
     // Snapshot copy, suffix/representability scans, physical conversion and conservative retirement.
     constexpr std::size_t ROUTING_TEXT_PASSES = 11;
-    routing.work = {0, add(multiply(routing.symbols, add(multiply(2, maximumRoutes), 8)), maximumRoutes),
+    const auto routeScans = multiply(multiply(routing.symbols, selected.registrations().size()), subscriptionEntries);
+    routing.work = {0,
+                    add(routeScans, add(multiply(routing.symbols, add(multiply(2, maximumRoutes), 8)), maximumRoutes)),
                     multiply(ROUTING_TEXT_PASSES, logicalUnits),
                     add(multiply(2, routing.temporaryBytes), routing.retainedMetadataBytes)};
     // Every routed candidate may compare its key and complete text with every previous candidate.
@@ -607,9 +760,9 @@ const ReceivingEventPlan &receivingEventPlan(const ReceivingProfile &profile, Ev
 
 bool copyReceivingBindings(const ReceivingProfile &profile, const ReceivingEventPlan &plan,
                            std::span<client::PreparedSubscriptionBinding> output, client::ReceiverWork &work) noexcept {
-    const auto visits = plan.bindingCount <= MAXIMUM_RECEIVING_RECORDS ? 2 * plan.bindingCount : 0;
+    const auto visits = plan.bindingCount <= MAXIMUM_RECEIVING_BINDINGS ? 2 * plan.bindingCount : 0;
 
-    if (output.size() != MAXIMUM_RECEIVING_RECORDS || plan.bindingCount > MAXIMUM_RECEIVING_RECORDS ||
+    if (output.size() != MAXIMUM_RECEIVING_BINDINGS || plan.bindingCount > MAXIMUM_RECEIVING_BINDINGS ||
         work.visits < visits || work.preparationWork < RECEIVING_BINDING_COPY_WORK)
         return false;
 
@@ -705,7 +858,8 @@ void prepareReceivingSymbols(const ReceivingProfile &profile, const ReceivingEve
             const auto index = plan.bindingIndices[offset];
             const auto exchange = profile.bindingExchanges[index];
 
-            if (exchange && exchange == symbol.exchange) {
+            if (exchange && exchange == symbol.exchange &&
+                profile.bindings[index].projection == events::EventProjection::NATIVE) {
                 const auto kind = static_cast<std::size_t>(profile.bindings[index].kind);
                 symbol.regional[kind] = true;
             }
@@ -723,25 +877,74 @@ void prepareReceivingSymbols(const ReceivingProfile &profile, const ReceivingEve
     }
 }
 
-bool receivingSymbolMatches(const ReceivingProfile &profile, std::size_t bindingIndex,
-                            const ReceivingSymbol &symbol) noexcept {
-    const auto kind = static_cast<std::size_t>(profile.bindings[bindingIndex].kind);
+core::DeliveryProjectionMask receivingProjectionMask(const ReceivingProfile &profile, std::size_t bindingIndex,
+                                                     const ReceivingSymbol &symbol) noexcept {
+    const auto &binding = profile.bindings[bindingIndex];
     const auto exchange = profile.bindingExchanges[bindingIndex];
 
-    if (profile.bindings[bindingIndex].kind == client::PreparedEventKind::ORDER) {
-        const auto source = profile.bindingSources[bindingIndex];
+    if (binding.projection != events::EventProjection::NATIVE) {
+        const bool maker = binding.projection == events::EventProjection::MARKET_MAKER_ORDERS;
+        const auto sources = events::detail::derivedOrderSourceIds(
+            maker ? events::DerivedOrderKind::MARKET_MAKER : events::DerivedOrderKind::QUOTE, exchange);
 
-        return source && (!symbol.sourceId || *symbol.sourceId < 0 || *symbol.sourceId == *source);
+        // The SDK default matches the production non-unitary configuration: both separate sides.
+        if (!symbol.sourceId || *symbol.sourceId < 0) {
+            return profile.unitaryOrderSources ? events::detail::DERIVED_UNITARY_PAIR
+                                               : events::detail::DERIVED_SEPARATE_PAIR;
+        }
+
+        if (*symbol.sourceId == sources.bid) {
+            return events::detail::DERIVED_BID;
+        }
+
+        if (*symbol.sourceId == sources.ask) {
+            return events::detail::DERIVED_ASK;
+        }
+
+        if (*symbol.sourceId == sources.unitary) {
+            return events::detail::DERIVED_UNITARY_PAIR;
+        }
+
+        return 0;
     }
 
+    if (binding.kind == client::PreparedEventKind::ORDER) {
+        const auto source = profile.bindingSources[bindingIndex];
+
+        return source && (!symbol.sourceId || *symbol.sourceId < 0 || *symbol.sourceId == *source)
+                   ? core::NATIVE_DELIVERY_PROJECTION
+                   : 0;
+    }
+
+    if (binding.kind == client::PreparedEventKind::MARKET_MAKER) {
+        return !symbol.sourceId || *symbol.sourceId <= 0 ? core::NATIVE_DELIVERY_PROJECTION : 0;
+    }
+
+    const auto kind = static_cast<std::size_t>(binding.kind);
+
     return symbol.selector == core::SubscriptionSelectorKind::ALL ||
-           (exchange ? exchange == symbol.exchange : !symbol.regional[kind]);
+                   (exchange ? exchange == symbol.exchange : !symbol.regional[kind])
+               ? core::NATIVE_DELIVERY_PROJECTION
+               : 0;
+}
+
+bool receivingSymbolMatches(const ReceivingProfile &profile, std::size_t bindingIndex,
+                            const ReceivingSymbol &symbol) noexcept {
+    return receivingProjectionMask(profile, bindingIndex, symbol) != 0;
+}
+
+const std::u16string &receivingPhysicalSymbol(const ReceivingProfile &profile, std::size_t bindingIndex,
+                                              const ReceivingSymbol &symbol) noexcept {
+    return profile.bindingExchanges[bindingIndex] &&
+                   profile.bindings[bindingIndex].projection == events::EventProjection::NATIVE
+               ? symbol.physical
+               : symbol.logical;
 }
 
 void appendReceivingDesiredRequest(std::vector<core::SubscriptionRequest> &requests, core::RecordContext context,
                                    std::u16string_view symbol, core::SubscriptionSelectorKind selector,
                                    core::SubscriptionFamily family, std::optional<std::int64_t> fromTime,
-                                   HistoryRangeEncoding encoding) {
+                                   HistoryRangeEncoding encoding, core::DeliveryProjectionMask projections) {
     std::optional<std::int64_t> bound;
 
     if (family == core::SubscriptionFamily::HISTORY) {
@@ -763,10 +966,15 @@ void appendReceivingDesiredRequest(std::vector<core::SubscriptionRequest> &reque
     });
 
     if (found == requests.end()) {
-        requests.push_back({{context, symbol, selector}, bound});
-    } else if (bound && *bound < *found->historyBound) {
-        found->historyBound = bound;
+        requests.push_back({{context, symbol, selector}, bound, projections});
+
+        return;
     }
+
+    if (bound && *bound < *found->historyBound)
+        found->historyBound = bound;
+
+    found->projectionMask |= projections;
 }
 
 std::expected<mux::MuxQueue, mux::QueueFailure> createReceivingQueue(const ReceivingProfile &profile,

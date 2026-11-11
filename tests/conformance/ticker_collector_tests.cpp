@@ -2069,3 +2069,89 @@ TEST_CASE("TICKER front work rejection preserves a prepared offer and retry perf
     CHECK(f.ticker.pendingKeys(view) == 0);
     CHECK(f.ticker.counts().delivered == 1);
 }
+
+TEST_CASE("TICKER dirty projection weights conflate only the surviving source-owned group") {
+    for (const bool contractBeforeReplacement : {false, true}) {
+        auto f = fixture();
+        auto statistics = std::make_shared<c::detail::DeliveryStatisticsState>();
+        auto work = turn();
+        auto view = f.ticker.openObservedView(work, statistics);
+        REQUIRE(view);
+        const c::SubscriptionKey key{f.schema.recordContext(0), u"ALPHA"};
+        auto replace = [&](c::DeliveryProjectionMask mask) {
+            const std::array request{c::SubscriptionRequest{key, {}, mask}};
+            auto commandWork = command();
+            auto ownerWork = turn();
+            REQUIRE(f.ticker.replace(*view, request, commandWork, ownerWork));
+        };
+        replace(31);
+        stage(f, std::array{Input{0, u"ALPHA", 1, 10}});
+        CHECK(f.ticker.pendingKeys(*view) == 1);
+        CHECK(statistics->snapshot().admittedEvents.value == 5);
+        CHECK(statistics->snapshot().pendingEvents == 5);
+        replace(7);
+        CHECK(statistics->snapshot().discardedEvents.value == 2);
+        CHECK(statistics->snapshot().pendingEvents == 3);
+
+        if (contractBeforeReplacement) {
+            replace(3);
+        }
+
+        stage(f, std::array{Input{0, u"ALPHA", 2, 20}});
+        auto cut = statistics->snapshot();
+        CHECK(cut.admittedEvents.value == (contractBeforeReplacement ? 7 : 8));
+        CHECK(cut.conflatedEvents.value == (contractBeforeReplacement ? 2 : 3));
+        CHECK(cut.pendingEvents == (contractBeforeReplacement ? 2 : 3));
+        CHECK(cut.discardedEvents.value == (contractBeforeReplacement ? 3 : 2));
+        replace(3);
+        replace(3); // Repeated pruning cannot terminalize the same removed contribution twice.
+        cut = statistics->snapshot();
+        CHECK(cut.pendingEvents == 2);
+        CHECK(cut.discardedEvents.value == 3);
+        work = turn();
+        auto offered = f.ticker.front(*view, work);
+        REQUIRE(offered);
+        REQUIRE(*offered);
+        CHECK((**offered).projections.mask == 3);
+        REQUIRE(f.ticker.closeView(*view, work));
+        cut = statistics->snapshot();
+        CHECK(cut.pendingEvents == 0);
+        CHECK(cut.admittedEvents.value == cut.conflatedEvents.value + cut.discardedEvents.value);
+    }
+}
+
+TEST_CASE("TICKER expansion replays the whole group and cannot conflate a transferred offer") {
+    for (const bool transfer : {false, true}) {
+        auto f = fixture();
+        auto statistics = std::make_shared<c::detail::DeliveryStatisticsState>();
+        auto work = turn();
+        auto view = f.ticker.openObservedView(work, statistics);
+        REQUIRE(view);
+        const c::SubscriptionKey key{f.schema.recordContext(0), u"ALPHA"};
+        auto commandWork = command();
+        REQUIRE(f.ticker.add(*view, std::array{c::SubscriptionRequest{key, {}, 2}}, commandWork, work));
+        stage(f, std::array{Input{0, u"ALPHA", 1, 10}});
+        auto first = f.ticker.front(*view, work);
+        REQUIRE(first);
+        REQUIRE(*first);
+        const auto original = (**first).projections;
+        REQUIRE(original.mask == 2);
+
+        if (transfer) {
+            REQUIRE(f.ticker.pop(*view, work));
+        }
+
+        REQUIRE(f.ticker.add(*view, std::array{c::SubscriptionRequest{key, {}, 26}}, commandWork, work));
+        auto expanded = f.ticker.front(*view, work);
+        REQUIRE(expanded);
+        REQUIRE(*expanded);
+        CHECK((**expanded).projections.mask == 26);
+        CHECK(f.ticker.desired(*view)->currentProjectionMask(original) == 2);
+        const auto cut = statistics->snapshot();
+        CHECK(cut.admittedEvents.value == 4);
+        CHECK(cut.conflatedEvents.value == (transfer ? 0 : 1));
+        CHECK(cut.pendingEvents == (transfer ? 4 : 3));
+        REQUIRE(f.ticker.closeView(*view, work));
+        CHECK(statistics->snapshot().pendingEvents == (transfer ? 1 : 0));
+    }
+}

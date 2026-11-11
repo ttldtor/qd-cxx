@@ -3260,7 +3260,9 @@ TEST_CASE("public subscription observation is deferred until the complete real d
     script.waitForClientClose = true;
     root::test::OwnedTcpPeer source(std::move(config));
     REQUIRE(source.port() != 0);
-    auto endpoint = runtime.createEndpoint(endpointOptions());
+    auto options = endpointOptions();
+    options.drainTimeout = api::EndpointOptions{}.drainTimeout;
+    auto endpoint = runtime.createEndpoint(options);
     auto subscription = endpoint->getFeed()->createSubscription<events::Quote>();
     subscription->addChangeListener([&](const auto &change) {
         CHECK_FALSE(inData.load());
@@ -3289,6 +3291,13 @@ TEST_CASE("public subscription observation is deferred until the complete real d
         return observedRemoval.load() == 1;
     }));
     endpoint->disconnect();
+    // NOT_CONNECTED is published before the asynchronous source retires.
+    REQUIRE(eventually([&] {
+        const auto connection = endpoint->getStatistics().connection;
+
+        return !connection.attemptIdentity && connection.activeConnections == 0 &&
+               connection.closedConnections.value == 1;
+    }));
     const auto before = subscription->getSnapshot().revision;
     subscription->addSymbols("AAPL");
     CHECK(subscription->getSnapshot().revision == before + 1);
@@ -4222,13 +4231,15 @@ TEST_CASE("HISTORY early obsolete onBatch requests replay before any Invocation 
     root::connect_tests::Peer peer(schema, source, symbols, 8192, root::connect_tests::PeerMode::HOLD, script);
     auto endpoint = runtime.createEndpoint(endpointOptions(api::DeliveryContract::HISTORY));
     auto sub = endpoint->getFeed()->createSubscription<events::Order>();
+    const auto ibmSelector = api::SubscriptionSelector::indexed(u"IBM", events::OrderSource::DEFAULT.indexedSource());
+    const auto msftSelector = api::SubscriptionSelector::indexed(u"MSFT", events::OrderSource::DEFAULT.indexedSource());
     std::atomic<unsigned> calls{0};
     sub->addEventListener([&](std::span<const events::Order> batch) {
         REQUIRE(batch.size() == 1);
         CHECK(batch[0].symbol == u"IBM");
         ++calls;
     });
-    sub->addSymbols("IBM");
+    sub->addSelectors(std::array{ibmSelector});
     allocation_probe::WorkerPause gate{runtime};
     gate.ready = [&] {
         return sub->getStatistics().pendingEvents == 1;
@@ -4241,8 +4252,8 @@ TEST_CASE("HISTORY early obsolete onBatch requests replay before any Invocation 
     CHECK(sub->getStatistics().pendingEvents == 1);
     CHECK(sub->getStatistics().inFlightEvents == 0);
     CHECK(calls.load() == 0);
-    sub->setSymbols({"MSFT"});
-    sub->setSymbols({"IBM"});
+    sub->setSelectors(std::array{msftSelector});
+    sub->setSelectors(std::array{ibmSelector});
     const auto accepted = sub->getSnapshot();
     gate.release.store(true, std::memory_order_release);
     REQUIRE(eventually([&] {

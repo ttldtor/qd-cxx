@@ -29,8 +29,7 @@ Record names do not infer a type. Each route supplies an explicit local record I
 finite `MappingLimits` and an `EventTimePolicy`. IDs retain the `LocalSchema`
 requirement: each ID equals its position in the complete record catalog.
 
-Distinct records may project the same event type. Duplicate routes for the same
-local record ID reject atomically, including routes with different types. Route
+Distinct records may project the same event type. Each physical record permits at most one native route and one compatible explicit `EventProjection` derived family. Two native routes, even with different business types, two derived groups, or an incompatible native/group pair reject atomically. Quote pairs with QUOTE_ORDERS; MarketMaker pairs with MARKET_MAKER_ORDERS. Route
 inspection preserves input order. A single-type feed subscription selects registered
 routes of that type, applying the [regional Quote exchange rules](EVENT-TIME.md);
 several selected types use the
@@ -47,7 +46,7 @@ that same field. No aliases, conversions or arbitrary C++ event classes are infe
 The exhaustive [field conversion table](FIELD-CONVERSIONS.md) belongs to each prepared adapter.
 Default registration bounds allow 128 exact type alternatives and conservatively charge their
 comparison work; Quote requires72, Profile108, Trade110, TradeETH99 and Summary75. Explicit lower bounds still fail atomically.
-The complete receive schema caps remain 16 records and 128 fields.
+The complete receiving caps are 42 records and284 fields; the public built-in catalog retains its caller-supplied limits.
 
 `FIELD_METADATA` selects actual original FIELD event time when present;
 `UNSPECIFIED` asserts no event timestamp. Neither uses indexed identity as time.
@@ -87,10 +86,10 @@ composite TradeETH record3 with twelve fields, Summary record4 with ten fields, 
 three fields, TextConfiguration record6 with four fields, Message record7 with one SERIAL_OBJECT field
 and Configuration record8 with Version and SERIAL_OBJECT fields, with their existing
 lookup aliases and business behavior. An endpoint without an explicit registry
-selects those defaults. There is no process-global registration or live mutation.
+selects a contract-aware SDK catalog: TICKER has the nine native declarations plus26 real regional Quote records and27 Quote-derived Order groups; HISTORY has native Order, native MarketMaker and its derived Order group. STREAM retains the nine native declarations. Ordinary contract permission remains separate from registration. See [MarketMaker and derived Order](../../docs/MARKET-MAKER-ORDER.md). There is no process-global registration or live mutation.
 
 The high-level plain receiving profile retains its qualified complete-schema
-ceiling:16 records,128 total fields,256 lookup entries,128 UTF-16 units per name
+ceiling: 42 records, 284 total fields, 724 lookup entries, 128 UTF-16 units per name
 and16384 total name units. A registry can be valid under larger caller-selected
 bounds and still be refused by that receiving profile at `profile-schema`, before
 native activation. This is an explicit receiving limitation, not truncation or
@@ -99,17 +98,23 @@ rejection by the generic schema boundary.
 Within that ceiling, preparation preserves the exact schema identity and groups
 routes by type. It checks and aggregates complete mapping shape/selection/work
 coordinates, callback projection allowances and desired-command capacities.
-Each accepted symbol requires one interest per matching selected local record route.
-The total registered route count scales endpoint and per-subscription interest
-reservations with checked arithmetic, including subscriptions created after connect.
-Actual maximum record field count
-sets the complete frame field allowance, retaining the default minimum of16.
-With the built-in registry, interest reservations cover all nine routes per symbol.
-The schema and frame/queue data ceilings remain unchanged.
+Each accepted symbol requires one interest per distinct matching physical key. Native/derived overlap
+coalesces projection bits before the complete desired command is submitted. Native regional Quote
+uses a suffix-free physical symbol while derived Order keeps the literal symbol. One logical selector
+can therefore require two physical keys for a compatible regional context. Capacity is the maximum of
+registered context count and eligible context count plus the largest same-exchange regional native/derived
+bucket, using the same contract eligibility guard. Generic unregistered records do not increase it.
+Default 35 coordinate domains reserve 560 physical entries per subscription and 4480 for 8 subscriptions.
+Custom 42 paired contexts can require 84 domains, or 1344/10752 entries. These coordinate domains do not
+change the 42-record schema ceiling. Actual maximum field count sets the frame allowance, retaining
+the minimum 16.
+Four physical callback records can produce at most20 owning business outputs. Registry, receiver,
+queue and callback preparation include the retained group metadata and complete projection cost.
 
-Regional demand routing retains a fixed16-code exchange array (32 bytes) in the
-receiving profile's own fixed object. Its name inspection is bounded by the existing
-16×128-unit schema ceiling; the suffix helper can scan each name at most three times.
+Regional routing retains84 aligned exchange/source slots and42 optional version gates. The finite
+2047 selection plans each hold at most84 route indices in one independently owned vector allocation;
+its exact capacity/storage is checked and charged before publication. It is not placed on the native
+worker stack. Complete catalog names remain bounded to128 units each and16384 total units.
 Each desired revision additionally owns a logical snapshot and at most one suffix-free
 physical string per logical symbol. Matching regional routes share that physical string;
 Profile or composite fallback may simultaneously use the original logical copy.
@@ -164,7 +169,7 @@ reflection, arbitrary delegate factories, all event classes or new wire semantic
 The pinned reference and existing adapter provenance are in `upstream.lock` and
 [configured event evidence](../../tests/fixtures/events/mapping/COVERAGE.md).
 
-Trade is explicitly registered as EventType::TRADE; see its [complete contract](TRADE.md). Five hundred eleven finite type sets retain fixed511 selection index arrays; a finite16-entry stack binding copy and initialization/read/write work are included in preparation. Quote/Trade/TradeETH/Summary select regional fallback independently; Profile preserves exact logical symbols. Record/field caps are unchanged.
+Trade is explicitly registered as EventType::TRADE; see its [complete contract](TRADE.md). The finite84-entry stack binding copy and initialization/read/write work are included in preparation. Quote/Trade/TradeETH/Summary select regional fallback independently; Profile preserves exact logical symbols. Derived Order uses literal physical symbols.
 
 TradeETH is independently registered as EventType::TRADE_ETH; see [TradeETH](TRADE-ETH.md). Its raw ETH bit and lack of Tick fallback are distinct from ordinary Trade.
 

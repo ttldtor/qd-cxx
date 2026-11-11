@@ -4,6 +4,8 @@
 
 #include "event_registry_defaults.hpp"
 #include "qd/events/configuration.hpp"
+#include "qd/events/derived_order.hpp"
+#include "qd/events/market_maker.hpp"
 #include "qd/events/order.hpp"
 #include "qd/events/profile.hpp"
 #include "qd/events/quote.hpp"
@@ -168,9 +170,83 @@ bool validRegistration(const EventRegistration &registration) noexcept {
             registration.type == EventType::TRADE || registration.type == EventType::TRADE_ETH ||
             registration.type == EventType::SUMMARY || registration.type == EventType::TEXT_MESSAGE ||
             registration.type == EventType::TEXT_CONFIGURATION || registration.type == EventType::MESSAGE ||
-            registration.type == EventType::CONFIGURATION || registration.type == EventType::ORDER) &&
+            registration.type == EventType::CONFIGURATION || registration.type == EventType::ORDER ||
+            registration.type == EventType::MARKET_MAKER) &&
            (registration.eventTimePolicy == EventTimePolicy::UNSPECIFIED ||
-            registration.eventTimePolicy == EventTimePolicy::FIELD_METADATA);
+            registration.eventTimePolicy == EventTimePolicy::FIELD_METADATA) &&
+           (registration.projection == events::EventProjection::NATIVE ||
+            (registration.type == EventType::ORDER &&
+             (registration.projection == events::EventProjection::QUOTE_ORDERS ||
+              registration.projection == events::EventProjection::MARKET_MAKER_ORDERS)));
+}
+
+/** Construct the fixed nine native declarations once, without preparing duplicate registry routes.
+ * @param limits Complete schema and registry bounds.
+ * @param work Remaining attempted preparation work.
+ * @return Independently owned validated complete native schema or atomic refusal.
+ */
+std::expected<core::LocalSchema, EventRegistryFailure> defaultNativeSchema(
+    EventRegistryLimits limits,
+    EventRegistryWork
+        &work) { // Prepay construction of all nine fixed input catalogs and their aliases before allocating them.
+    constexpr std::size_t DEFAULT_CONSTRUCTION_WORK = 4096;
+    debit(work.visits, DEFAULT_CONSTRUCTION_WORK);
+
+    auto quote = events::defaultQuoteSchema(limits.schema);
+    auto profile = events::defaultProfileSchema(limits.schema);
+    auto trade = events::defaultTradeSchema(limits.schema);
+    auto tradeETH = events::defaultTradeETHSchema(limits.schema);
+    auto summary = events::defaultSummarySchema(limits.schema);
+    auto textMessage = events::defaultTextMessageSchema(limits.schema);
+    auto textConfiguration = events::defaultTextConfigurationSchema(limits.schema);
+    auto message = events::defaultMessageSchema(limits.schema);
+    auto configuration = events::defaultConfigurationSchema(limits.schema);
+
+    if (!message || !configuration) {
+        return std::unexpected(EventRegistryFailure{!message ? message.error() : configuration.error(), {}});
+    }
+
+    if (!quote || !profile) {
+        return std::unexpected(EventRegistryFailure{!quote ? quote.error() : profile.error(), {}});
+    }
+
+    if (!trade)
+        return std::unexpected(EventRegistryFailure{trade.error(), {}});
+
+    if (!tradeETH) {
+        return std::unexpected(EventRegistryFailure{tradeETH.error(), {}});
+    }
+
+    if (!summary) {
+        return std::unexpected(EventRegistryFailure{summary.error(), {}});
+    }
+
+    if (!textMessage || !textConfiguration) {
+        return std::unexpected(
+            EventRegistryFailure{!textMessage ? textMessage.error() : textConfiguration.error(), {}});
+    }
+
+    std::array records{quote->records()[0],
+                       profile->records()[0],
+                       trade->records()[0],
+                       tradeETH->records()[0],
+                       summary->records()[0],
+                       textMessage->records()[0],
+                       textConfiguration->records()[0],
+                       message->records()[0],
+                       configuration->records()[0]};
+
+    for (std::size_t index = 0; index < records.size(); ++index) {
+        records[index].id = static_cast<std::int32_t>(index);
+    }
+
+    auto combined = core::LocalSchema::create(records, limits.schema, core::LocalProfile::BINARY_FIELDS_V1);
+
+    if (!combined) {
+        return std::unexpected(EventRegistryFailure{combined.error(), {}});
+    }
+
+    return std::move(*combined);
 }
 } // namespace
 
@@ -250,13 +326,44 @@ EventRegistry::create(const core::LocalSchema &schema, std::span<const EventRegi
                 debit(work.visits, 1);
 
                 if (previous.localRecordId == registration.localRecordId) {
-                    return std::unexpected(EventRegistryFailure{EventRegistryError::INVALID_INPUT, index});
+                    const bool native = registration.projection == events::EventProjection::NATIVE;
+                    const bool previousNative = previous.projection == events::EventProjection::NATIVE;
+
+                    if (native == previousNative) {
+                        return std::unexpected(EventRegistryFailure{EventRegistryError::INVALID_INPUT, index});
+                    }
+
+                    const auto nativeType = native ? registration.type : previous.type;
+                    const auto derived = native ? previous.projection : registration.projection;
+
+                    if ((derived == events::EventProjection::QUOTE_ORDERS && nativeType != EventType::QUOTE) ||
+                        (derived == events::EventProjection::MARKET_MAKER_ORDERS &&
+                         nativeType != EventType::MARKET_MAKER)) {
+                        return std::unexpected(EventRegistryFailure{EventRegistryError::INVALID_INPUT, index});
+                    }
                 }
             }
 
             debit(work.preparation, mappingWork(registration.mappingLimits));
 
-            if (registration.type == EventType::QUOTE) {
+            if (registration.projection != events::EventProjection::NATIVE) {
+                const auto kind = registration.projection == events::EventProjection::QUOTE_ORDERS
+                                      ? events::DerivedOrderKind::QUOTE
+                                      : events::DerivedOrderKind::MARKET_MAKER;
+                const auto mapping = events::PreparedDerivedOrder::prepare(*ownedSchema, registration.localRecordId,
+                                                                           kind, registration.mappingLimits);
+
+                if (!mapping) {
+                    return std::unexpected(EventRegistryFailure{mapping.error(), index});
+                }
+            } else if (registration.type == EventType::MARKET_MAKER) {
+                const auto mapping = events::PreparedMarketMaker::prepare(*ownedSchema, registration.localRecordId,
+                                                                          registration.mappingLimits);
+
+                if (!mapping) {
+                    return std::unexpected(EventRegistryFailure{mapping.error(), index});
+                }
+            } else if (registration.type == EventType::QUOTE) {
                 const auto mapping = events::PreparedQuote::prepare(*ownedSchema, registration.localRecordId,
                                                                     registration.mappingLimits);
 
@@ -378,62 +485,10 @@ EventRegistry::create(const core::LocalSchema &schema, std::span<const EventRegi
 std::expected<EventRegistry, EventRegistryFailure> EventRegistry::builtIn(EventRegistryLimits limits,
                                                                           EventRegistryWork &work) {
     try {
-        // Prepay construction of all nine fixed input catalogs and their aliases before allocating them.
-        constexpr std::size_t DEFAULT_CONSTRUCTION_WORK = 4096;
-        debit(work.visits, DEFAULT_CONSTRUCTION_WORK);
-
-        auto quote = events::defaultQuoteSchema(limits.schema);
-        auto profile = events::defaultProfileSchema(limits.schema);
-        auto trade = events::defaultTradeSchema(limits.schema);
-        auto tradeETH = events::defaultTradeETHSchema(limits.schema);
-        auto summary = events::defaultSummarySchema(limits.schema);
-        auto textMessage = events::defaultTextMessageSchema(limits.schema);
-        auto textConfiguration = events::defaultTextConfigurationSchema(limits.schema);
-        auto message = events::defaultMessageSchema(limits.schema);
-        auto configuration = events::defaultConfigurationSchema(limits.schema);
-
-        if (!message || !configuration) {
-            return std::unexpected(EventRegistryFailure{!message ? message.error() : configuration.error(), {}});
-        }
-
-        if (!quote || !profile) {
-            return std::unexpected(EventRegistryFailure{!quote ? quote.error() : profile.error(), {}});
-        }
-
-        if (!trade)
-            return std::unexpected(EventRegistryFailure{trade.error(), {}});
-
-        if (!tradeETH) {
-            return std::unexpected(EventRegistryFailure{tradeETH.error(), {}});
-        }
-
-        if (!summary) {
-            return std::unexpected(EventRegistryFailure{summary.error(), {}});
-        }
-
-        if (!textMessage || !textConfiguration) {
-            return std::unexpected(
-                EventRegistryFailure{!textMessage ? textMessage.error() : textConfiguration.error(), {}});
-        }
-
-        std::array records{quote->records()[0],
-                           profile->records()[0],
-                           trade->records()[0],
-                           tradeETH->records()[0],
-                           summary->records()[0],
-                           textMessage->records()[0],
-                           textConfiguration->records()[0],
-                           message->records()[0],
-                           configuration->records()[0]};
-
-        for (std::size_t index = 0; index < records.size(); ++index) {
-            records[index].id = static_cast<std::int32_t>(index);
-        }
-
-        auto combined = core::LocalSchema::create(records, limits.schema, core::LocalProfile::BINARY_FIELDS_V1);
+        auto combined = defaultNativeSchema(limits, work);
 
         if (!combined) {
-            return std::unexpected(EventRegistryFailure{combined.error(), {}});
+            return std::unexpected(combined.error());
         }
 
         const std::array registrations{EventRegistration{EventType::QUOTE, 0},
@@ -483,18 +538,123 @@ std::size_t EventRegistry::storageBytes() const noexcept {
 }
 
 namespace detail {
-std::expected<EventRegistry, EventRegistryFailure> defaultHistoryEventRegistry(EventRegistryLimits limits,
-                                                                               EventRegistryWork &work) {
+namespace {
+/** Build an explicit derived route while retaining the ordinary finite mapper defaults.
+ * @param id Exact physical local record ID.
+ * @param family Verified physical-to-business delegate family.
+ * @return Complete ordinary Order route declaration.
+ */
+EventRegistration derivedRegistration(std::int32_t id, events::EventProjection family) {
+    EventRegistration result{EventType::ORDER, id};
+    result.projection = family;
+
+    return result;
+}
+} // namespace
+
+std::expected<EventRegistry, EventRegistryFailure> defaultTickerEventRegistry(EventRegistryLimits limits,
+                                                                              EventRegistryWork &work) {
     try {
-        constexpr std::size_t DEFAULT_ORDER_CONSTRUCTION_WORK = 512;
-        debit(work.visits, DEFAULT_ORDER_CONSTRUCTION_WORK);
-        auto schema = events::defaultOrderSchema(limits.schema);
+        // Fixed catalogs are prepaid before their first candidate allocation.
+        constexpr std::size_t REGIONAL_CONSTRUCTION_WORK = 16384;
+        debit(work.visits, REGIONAL_CONSTRUCTION_WORK);
+        auto base = defaultNativeSchema(limits, work);
+
+        if (!base) {
+            return std::unexpected(base.error());
+        }
+
+        std::vector<core::LocalRecord> records(base->records().begin(), base->records().end());
+        std::vector<EventRegistration> routes{{EventType::QUOTE, 0},
+                                              {EventType::PROFILE, 1},
+                                              {EventType::TRADE, 2},
+                                              {EventType::TRADE_ETH, 3},
+                                              {EventType::SUMMARY, 4},
+                                              {EventType::TEXT_MESSAGE, 5},
+                                              {EventType::TEXT_CONFIGURATION, 6},
+                                              {EventType::MESSAGE, 7},
+                                              {EventType::CONFIGURATION, 8}};
+        constexpr std::size_t DEFAULT_PHYSICAL_RECORDS = 35;
+        constexpr std::size_t DEFAULT_ROUTES = 62;
+        records.reserve(DEFAULT_PHYSICAL_RECORDS);
+        routes.reserve(DEFAULT_ROUTES);
+        routes.push_back(derivedRegistration(0, events::EventProjection::QUOTE_ORDERS));
+        // Regional production records omit the two exchange fields; the record suffix supplies that fact.
+        const auto composite = records[0];
+
+        for (char16_t exchange = u'A'; exchange <= u'Z'; ++exchange) {
+            core::LocalRecord regional{
+                static_cast<std::int32_t>(records.size()), u"Quote&" + std::u16string(1, exchange), false, {}, {}};
+
+            for (std::size_t field = 0; field < composite.fields.size(); ++field) {
+                constexpr std::size_t BID_EXCHANGE_FIELD = 1, ASK_EXCHANGE_FIELD = 5;
+
+                if (field == BID_EXCHANGE_FIELD || field == ASK_EXCHANGE_FIELD) {
+                    continue;
+                }
+
+                const auto target = regional.fields.size();
+                regional.fields.push_back(composite.fields[field]);
+
+                for (const auto &lookup : composite.lookups) {
+                    if (lookup.fieldId != field) {
+                        continue;
+                    }
+
+                    auto name = lookup.name;
+
+                    if (name.starts_with(u"Quote.")) {
+                        name = regional.name + name.substr(5);
+                    }
+
+                    regional.lookups.push_back({std::move(name), target});
+                }
+            }
+
+            const auto id = regional.id;
+            records.push_back(std::move(regional));
+            routes.push_back({EventType::QUOTE, id});
+            routes.push_back(derivedRegistration(id, events::EventProjection::QUOTE_ORDERS));
+        }
+
+        auto schema = core::LocalSchema::create(records, limits.schema, core::LocalProfile::BINARY_FIELDS_V1);
 
         if (!schema) {
             return std::unexpected(EventRegistryFailure{schema.error(), {}});
         }
 
-        const std::array routes{EventRegistration{EventType::ORDER, 0}};
+        return EventRegistry::create(*schema, routes, limits, work);
+    } catch (EventRegistryError error) {
+        return std::unexpected(EventRegistryFailure{error, {}});
+    } catch (const std::bad_alloc &) {
+        return std::unexpected(EventRegistryFailure{EventRegistryError::ALLOCATION_FAILURE, {}});
+    } catch (const std::length_error &) {
+        return std::unexpected(EventRegistryFailure{EventRegistryError::ALLOCATION_FAILURE, {}});
+    }
+}
+
+std::expected<EventRegistry, EventRegistryFailure> defaultHistoryEventRegistry(EventRegistryLimits limits,
+                                                                               EventRegistryWork &work) {
+    try {
+        constexpr std::size_t DEFAULT_INDEXED_CONSTRUCTION_WORK = 1024;
+        debit(work.visits, DEFAULT_INDEXED_CONSTRUCTION_WORK);
+        auto order = events::defaultOrderSchema(limits.schema);
+        auto maker = events::defaultMarketMakerSchema(limits.schema);
+
+        if (!order || !maker) {
+            return std::unexpected(EventRegistryFailure{!order ? order.error() : maker.error(), {}});
+        }
+
+        std::array records{order->records()[0], maker->records()[0]};
+        records[1].id = 1;
+        auto schema = core::LocalSchema::create(records, limits.schema, core::LocalProfile::BINARY_FIELDS_V1);
+
+        if (!schema) {
+            return std::unexpected(EventRegistryFailure{schema.error(), {}});
+        }
+
+        const std::array routes{EventRegistration{EventType::ORDER, 0}, EventRegistration{EventType::MARKET_MAKER, 1},
+                                derivedRegistration(1, events::EventProjection::MARKET_MAKER_ORDERS)};
 
         return EventRegistry::create(*schema, routes, limits, work);
     } catch (EventRegistryError error) {

@@ -1,9 +1,12 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/client/subscription_receiver.hpp"
+#include "../events/derived_order_sources.hpp"
+#include "qd/events/event_flags.hpp"
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <limits>
 #include <new>
 #include <stdexcept>
@@ -71,9 +74,14 @@ bool validBinding(const PreparedSubscriptionBinding &binding) noexcept {
             binding.kind == PreparedEventKind::TRADE || binding.kind == PreparedEventKind::TRADE_ETH ||
             binding.kind == PreparedEventKind::SUMMARY || binding.kind == PreparedEventKind::TEXT_MESSAGE ||
             binding.kind == PreparedEventKind::TEXT_CONFIGURATION || binding.kind == PreparedEventKind::MESSAGE ||
-            binding.kind == PreparedEventKind::CONFIGURATION || binding.kind == PreparedEventKind::ORDER) &&
+            binding.kind == PreparedEventKind::CONFIGURATION || binding.kind == PreparedEventKind::ORDER ||
+            binding.kind == PreparedEventKind::MARKET_MAKER) &&
            (binding.eventTimePolicy == ReceiverEventTimePolicy::UNSPECIFIED ||
-            binding.eventTimePolicy == ReceiverEventTimePolicy::FIELD_METADATA);
+            binding.eventTimePolicy == ReceiverEventTimePolicy::FIELD_METADATA) &&
+           (binding.projection == events::EventProjection::NATIVE ||
+            (binding.kind == PreparedEventKind::ORDER &&
+             (binding.projection == events::EventProjection::QUOTE_ORDERS ||
+              binding.projection == events::EventProjection::MARKET_MAKER_ORDERS)));
 }
 } // namespace
 
@@ -83,7 +91,9 @@ struct ReceiverRoute {
     core::RecordContext context; ///< Retained exact origin/record identity, without declaration names.
     std::variant<events::PreparedQuote, events::PreparedProfile, events::PreparedTrade, events::PreparedTradeETH,
                  events::PreparedSummary, events::PreparedTextMessage, events::PreparedTextConfiguration,
-                 events::PreparedMessage, events::PreparedConfiguration, events::PreparedOrder>
+                 events::PreparedMessage, events::PreparedConfiguration, events::PreparedOrder,
+                 events::PreparedMarketMaker,
+                 events::PreparedDerivedOrder>
         mapping;                          ///< Existing owned immutable mapper.
     events::EventValueLimits valueLimits; ///< Per-result owned text bounds.
     ReceiverEventTimePolicy timePolicy;   ///< Explicit optional timestamp source.
@@ -139,159 +149,374 @@ mux::OwnedMuxBatch SubscriptionBatch::retain() const noexcept {
     return batch_->retain();
 }
 
+namespace {
+/** Conservative paid projection work for one actual owning result.
+ * @param route Independently owned prepared route.
+ * @return Exact checked declared allowances; actual copied text may be shorter.
+ */
+ReceiverProjectionWork projectionAllowance(const detail::ReceiverRoute &route) {
+    const bool profile = std::holds_alternative<events::PreparedProfile>(route.mapping);
+    const bool text = std::holds_alternative<events::PreparedTextMessage>(route.mapping) ||
+                      std::holds_alternative<events::PreparedTextConfiguration>(route.mapping);
+    const bool order = std::holds_alternative<events::PreparedOrder>(route.mapping) ||
+                       std::holds_alternative<events::PreparedDerivedOrder>(route.mapping);
+    const bool attachment = std::holds_alternative<events::PreparedMessage>(route.mapping) ||
+                            std::holds_alternative<events::PreparedConfiguration>(route.mapping);
+    const bool symbolOnly = !profile && !text && !order;
+    const auto units = symbolOnly ? std::min(route.valueLimits.symbolUnits, route.valueLimits.totalUnits)
+                                  : route.valueLimits.totalUnits;
+    const auto strings = symbolOnly ? std::size_t{1} : (profile ? std::size_t{3} : std::size_t{2});
+    const auto bytes = checkedSum(
+        attachment ? route.attachmentBytes : 0,
+        checkedSum(sizeof(SubscriptionProjection), checkedProduct(checkedSum(units, strings), sizeof(char16_t))));
+
+    return {checkedSum(route.shapeFields, checkedSum(route.selectionVisits, 1)), units, bytes};
+}
+
+/** Debit the complete attempted result/group before its first allocation.
+ * @param work Remaining caller credits.
+ * @param amount Complete checked logical work allowance.
+ */
+void prepayProjection(ReceiverProjectionWork &work, ReceiverProjectionWork amount) {
+    debit(work.visits, amount.visits);
+
+    if (amount.textUnits > work.textUnits || amount.bytes > work.bytes) {
+        throw ReceiverError::WORK_LIMIT;
+    }
+
+    work.textUnits -= amount.textUnits;
+    work.bytes -= amount.bytes;
+}
+
+/** Execute one already prepaid mapper without retaining the callback borrow.
+ * @param record Actual immutable physical projection.
+ * @param route Independently owned prepared mapper.
+ * @param role Explicit derived delegate, absent for native routes.
+ * @return One independent owning result or atomic typed refusal.
+ */
+std::expected<SubscriptionProjection, ReceiverProjectionFailure>
+projectPrepared(const mux::MuxRecordView &record, const detail::ReceiverRoute &route,
+                std::optional<events::DerivedOrderRole> role) {
+    const bool textMessage = std::holds_alternative<events::PreparedTextMessage>(route.mapping);
+    const bool textConfiguration = std::holds_alternative<events::PreparedTextConfiguration>(route.mapping);
+    const bool order = std::holds_alternative<events::PreparedOrder>(route.mapping);
+    const bool attachment = std::holds_alternative<events::PreparedMessage>(route.mapping) ||
+                            std::holds_alternative<events::PreparedConfiguration>(route.mapping);
+    const bool quote = std::holds_alternative<events::PreparedQuote>(route.mapping);
+    const auto units = projectionAllowance(route).textUnits;
+    const auto payloadBytes = attachment ? route.attachmentBytes : 0;
+    std::optional<std::int64_t> eventTime;
+
+    if (route.timePolicy == ReceiverEventTimePolicy::FIELD_METADATA && record.source && record.source->fieldTime)
+        eventTime = record.versionDefault ? 0 : record.source->fieldTime->eventTimeMs();
+
+    const events::BorrowedRecordValueView values{record.context, record.typedValues};
+    const auto indexedRemovalTime =
+        (record.eventFlags & events::indexed_event_flags::REMOVE_EVENT) ? record.rawTime : std::nullopt;
+
+    if (std::holds_alternative<events::PreparedDerivedOrder>(route.mapping)) {
+        if (!role) {
+            return std::unexpected(ReceiverProjectionFailure{ReceiverError::INVALID_INPUT});
+        }
+
+        auto mapped =
+            std::get<events::PreparedDerivedOrder>(route.mapping)
+                .mapView(record.symbol, values, *role, route.valueLimits, eventTime.value_or(0), record.eventFlags,
+                         std::get<events::PreparedDerivedOrder>(route.mapping).kind() ==
+                                 events::DerivedOrderKind::MARKET_MAKER
+                             ? indexedRemovalTime
+                             : std::nullopt);
+
+        if (!mapped) {
+            return std::unexpected(ReceiverProjectionFailure{mapped.error()});
+        }
+
+        return SubscriptionProjection{std::move(*mapped), eventTime};
+    }
+
+    if (std::holds_alternative<events::PreparedMarketMaker>(route.mapping)) {
+        auto mapped = std::get<events::PreparedMarketMaker>(route.mapping)
+                          .mapView(record.symbol, values, route.valueLimits, eventTime.value_or(0), record.eventFlags,
+                                   indexedRemovalTime);
+
+        if (!mapped) {
+            return std::unexpected(ReceiverProjectionFailure{mapped.error()});
+        }
+
+        return SubscriptionProjection{std::move(*mapped), eventTime};
+    }
+
+    const events::AttachmentEventLimits attachmentLimits{
+        units, payloadBytes, checkedSum(checkedProduct(units, sizeof(char16_t)), payloadBytes)};
+
+    if (std::holds_alternative<events::PreparedMessage>(route.mapping)) {
+        auto mapped = std::get<events::PreparedMessage>(route.mapping)
+                          .mapView(record.symbol, values, attachmentLimits, eventTime.value_or(0));
+
+        if (!mapped) {
+            return std::unexpected(ReceiverProjectionFailure{mapped.error()});
+        }
+
+        return SubscriptionProjection{std::move(*mapped), eventTime};
+    }
+
+    if (std::holds_alternative<events::PreparedConfiguration>(route.mapping)) {
+        auto mapped = std::get<events::PreparedConfiguration>(route.mapping)
+                          .mapView(record.symbol, values, attachmentLimits, eventTime.value_or(0));
+
+        if (!mapped) {
+            return std::unexpected(ReceiverProjectionFailure{mapped.error()});
+        }
+
+        return SubscriptionProjection{std::move(*mapped), eventTime};
+    }
+
+    if (textMessage) {
+        auto mapped = std::get<events::PreparedTextMessage>(route.mapping)
+                          .mapView(record.symbol, values, route.valueLimits, eventTime.value_or(0));
+
+        if (!mapped)
+            return std::unexpected(ReceiverProjectionFailure{mapped.error()});
+
+        return SubscriptionProjection{std::move(*mapped), eventTime};
+    }
+
+    if (textConfiguration) {
+        auto mapped = std::get<events::PreparedTextConfiguration>(route.mapping)
+                          .mapView(record.symbol, values, route.valueLimits, eventTime.value_or(0));
+
+        if (!mapped)
+            return std::unexpected(ReceiverProjectionFailure{mapped.error()});
+
+        return SubscriptionProjection{std::move(*mapped), eventTime};
+    }
+
+    if (std::holds_alternative<events::PreparedTrade>(route.mapping)) {
+        auto mapped =
+            std::get<events::PreparedTrade>(route.mapping).mapView(record.symbol, values, units, eventTime.value_or(0));
+
+        if (!mapped)
+            return std::unexpected(ReceiverProjectionFailure{mapped.error()});
+
+        return SubscriptionProjection{std::move(*mapped), eventTime};
+    }
+
+    if (std::holds_alternative<events::PreparedTradeETH>(route.mapping)) {
+        auto mapped = std::get<events::PreparedTradeETH>(route.mapping)
+                          .mapView(record.symbol, values, units, eventTime.value_or(0));
+
+        if (!mapped)
+            return std::unexpected(ReceiverProjectionFailure{mapped.error()});
+
+        return SubscriptionProjection{std::move(*mapped), eventTime};
+    }
+
+    if (order) {
+        auto mapped = std::get<events::PreparedOrder>(route.mapping)
+                          .mapView(record.symbol, values, route.valueLimits, eventTime.value_or(0), record.eventFlags);
+
+        if (!mapped) {
+            return std::unexpected(ReceiverProjectionFailure{mapped.error()});
+        }
+
+        return SubscriptionProjection{std::move(*mapped), eventTime};
+    }
+
+    if (std::holds_alternative<events::PreparedSummary>(route.mapping)) {
+        auto mapped = std::get<events::PreparedSummary>(route.mapping)
+                          .mapView(record.symbol, values, units, eventTime.value_or(0));
+
+        if (!mapped) {
+            return std::unexpected(ReceiverProjectionFailure{mapped.error()});
+        }
+
+        return SubscriptionProjection{std::move(*mapped), eventTime};
+    }
+
+    if (quote) {
+        auto mapped =
+            std::get<events::PreparedQuote>(route.mapping).mapView(record.symbol, values, units, eventTime.value_or(0));
+
+        if (!mapped)
+            return std::unexpected(ReceiverProjectionFailure{mapped.error()});
+
+        return SubscriptionProjection{std::move(*mapped), eventTime};
+    }
+
+    auto mapped = std::get<events::PreparedProfile>(route.mapping)
+                      .mapView(record.symbol, values, route.valueLimits, eventTime.value_or(0));
+
+    if (!mapped)
+        return std::unexpected(ReceiverProjectionFailure{mapped.error()});
+
+    return SubscriptionProjection{std::move(*mapped), eventTime};
+}
+} // namespace
+
+std::size_t SubscriptionBatch::eventCount() const noexcept {
+    std::size_t count = 0;
+
+    for (const auto &record : records()) {
+        count += record.projections.count();
+    }
+
+    return count;
+}
+
+std::expected<SubscriptionProjectionGroup, ReceiverProjectionFailure>
+SubscriptionBatch::projectAll(std::size_t index, ReceiverProjectionWork &work) const {
+    try {
+        debit(work.visits, 1);
+        const auto input = records();
+
+        if (index >= input.size()) {
+            return std::unexpected(ReceiverProjectionFailure{ReceiverError::INVALID_INPUT});
+        }
+
+        const auto &record = input[index];
+        const auto mask = record.projections.mask;
+        constexpr auto UNITARY_MASK = events::detail::DERIVED_UNITARY_PAIR;
+
+        if (!core::validDeliveryProjectionMask(mask) ||
+            ((mask & UNITARY_MASK) != 0 && (mask & UNITARY_MASK) != UNITARY_MASK)) {
+            return std::unexpected(ReceiverProjectionFailure{ReceiverError::INVALID_INPUT});
+        }
+
+        const detail::ReceiverRoute *native = nullptr, *derived = nullptr;
+
+        for (const auto &route : plan_->routes) {
+            debit(work.visits, 1);
+
+            if (!route.context.matches(record.context)) {
+                continue;
+            }
+
+            if (std::holds_alternative<events::PreparedDerivedOrder>(route.mapping)) {
+                derived = &route;
+            } else {
+                native = &route;
+            }
+        }
+
+        if ((mask & ~core::NATIVE_DELIVERY_PROJECTION) && !derived) {
+            return std::unexpected(ReceiverProjectionFailure{ReceiverError::INVALID_INPUT});
+        }
+
+        ReceiverProjectionWork paid{0, 0, sizeof(SubscriptionProjectionGroup)};
+        const auto pay = [&](const detail::ReceiverRoute *route) {
+            if (!route) {
+                return;
+            }
+
+            const auto one = projectionAllowance(*route);
+            paid.visits = checkedSum(paid.visits, one.visits);
+            paid.textUnits = checkedSum(paid.textUnits, one.textUnits);
+            paid.bytes = checkedSum(paid.bytes, one.bytes - sizeof(SubscriptionProjection));
+        };
+
+        if (mask & core::NATIVE_DELIVERY_PROJECTION) {
+            pay(native);
+        }
+
+        for (std::size_t i = 1; i < core::MAX_DELIVERY_PROJECTIONS; ++i) {
+            if (mask & (1U << i)) {
+                pay(derived);
+            }
+        }
+
+        prepayProjection(work, paid);
+        SubscriptionProjectionGroup result;
+        const auto addNative = [&]() -> std::expected<void, ReceiverProjectionFailure> {
+            if (!(mask & core::NATIVE_DELIVERY_PROJECTION)) {
+                return {};
+            }
+
+            if (!native) {
+                ++result.size;
+
+                return {};
+            }
+
+            auto projected = projectPrepared(record, *native, {});
+
+            if (!projected) {
+                return std::unexpected(projected.error());
+            }
+
+            result.values[result.size++] = std::move(*projected);
+
+            return {};
+        };
+        const bool maker = native && std::holds_alternative<events::PreparedMarketMaker>(native->mapping);
+
+        if (!maker) {
+            if (auto added = addNative(); !added) {
+                return std::unexpected(added.error());
+            }
+        }
+
+        for (std::size_t i = 1; i < core::MAX_DELIVERY_PROJECTIONS; ++i) {
+            if (!(mask & (1U << i))) {
+                continue;
+            }
+
+            auto projected = projectPrepared(record, *derived, static_cast<events::DerivedOrderRole>(i - 1));
+
+            if (!projected) {
+                return std::unexpected(projected.error());
+            }
+
+            result.values[result.size++] = std::move(*projected);
+        }
+
+        if (maker) {
+            if (auto added = addNative(); !added) {
+                return std::unexpected(added.error());
+            }
+        }
+
+        return result;
+    } catch (ReceiverError error) {
+        return std::unexpected(ReceiverProjectionFailure{error});
+    }
+}
+
 std::expected<SubscriptionProjection, ReceiverProjectionFailure>
 SubscriptionBatch::project(std::size_t index, ReceiverProjectionWork &work) const {
     try {
         debit(work.visits, 1);
         const auto input = records();
 
-        if (index >= input.size())
+        if (index >= input.size() || input[index].projections.count() != 1) {
             return std::unexpected(ReceiverProjectionFailure{ReceiverError::INVALID_INPUT});
+        }
 
         const auto &record = input[index];
+        const auto mask = record.projections.mask;
+
+        if (!core::validDeliveryProjectionMask(mask) || (mask & events::detail::DERIVED_UNITARY_PAIR)) {
+            return std::unexpected(ReceiverProjectionFailure{ReceiverError::INVALID_INPUT});
+        }
+
+        const bool native = (mask & core::NATIVE_DELIVERY_PROJECTION) != 0;
 
         for (const auto &route : plan_->routes) {
             debit(work.visits, 1);
 
-            if (!route.context.matches(record.context))
+            if (!route.context.matches(record.context) ||
+                native == std::holds_alternative<events::PreparedDerivedOrder>(route.mapping)) {
                 continue;
-
-            const bool textMessage = std::holds_alternative<events::PreparedTextMessage>(route.mapping);
-            const bool textConfiguration = std::holds_alternative<events::PreparedTextConfiguration>(route.mapping);
-            const bool profile = std::holds_alternative<events::PreparedProfile>(route.mapping);
-            const bool attachment = std::holds_alternative<events::PreparedMessage>(route.mapping) ||
-                                    std::holds_alternative<events::PreparedConfiguration>(route.mapping);
-            const bool order = std::holds_alternative<events::PreparedOrder>(route.mapping);
-            const bool symbolOnly = !profile && !textMessage && !textConfiguration && !order;
-            const bool quote = symbolOnly && !attachment;
-            const auto units = symbolOnly ? std::min(route.valueLimits.symbolUnits, route.valueLimits.totalUnits)
-                                          : route.valueLimits.totalUnits;
-            // Each owned string may need a terminator; this is logical copy work, not allocator overhead.
-            const auto textValues = symbolOnly ? std::size_t{1} : (profile ? std::size_t{3} : std::size_t{2});
-            const auto payloadBytes = attachment ? route.attachmentBytes : 0;
-            const auto bytes =
-                checkedSum(payloadBytes, checkedSum(sizeof(SubscriptionProjection),
-                                                    checkedProduct(checkedSum(units, textValues), sizeof(char16_t))));
-            debit(work.visits, checkedSum(route.shapeFields, checkedSum(route.selectionVisits, 1)));
-
-            if (units > work.textUnits || bytes > work.bytes)
-                return std::unexpected(ReceiverProjectionFailure{ReceiverError::WORK_LIMIT});
-
-            work.textUnits -= units;
-            work.bytes -= bytes;
-            std::optional<std::int64_t> eventTime;
-
-            if (route.timePolicy == ReceiverEventTimePolicy::FIELD_METADATA && record.source &&
-                record.source->fieldTime)
-                eventTime = record.versionDefault ? 0 : record.source->fieldTime->eventTimeMs();
-
-            const events::BorrowedRecordValueView values{record.context, record.typedValues};
-
-            const events::AttachmentEventLimits attachmentLimits{
-                units, payloadBytes, checkedSum(checkedProduct(units, sizeof(char16_t)), payloadBytes)};
-
-            if (std::holds_alternative<events::PreparedMessage>(route.mapping)) {
-                auto mapped = std::get<events::PreparedMessage>(route.mapping)
-                                  .mapView(record.symbol, values, attachmentLimits, eventTime.value_or(0));
-
-                if (!mapped) {
-                    return std::unexpected(ReceiverProjectionFailure{mapped.error()});
-                }
-
-                return SubscriptionProjection{std::move(*mapped), eventTime};
             }
 
-            if (std::holds_alternative<events::PreparedConfiguration>(route.mapping)) {
-                auto mapped = std::get<events::PreparedConfiguration>(route.mapping)
-                                  .mapView(record.symbol, values, attachmentLimits, eventTime.value_or(0));
+            prepayProjection(work, projectionAllowance(route));
+            const auto role = native ? std::optional<events::DerivedOrderRole>{}
+                                     : std::optional{static_cast<events::DerivedOrderRole>(std::countr_zero(mask) - 1)};
 
-                if (!mapped) {
-                    return std::unexpected(ReceiverProjectionFailure{mapped.error()});
-                }
+            return projectPrepared(record, route, role);
+        }
 
-                return SubscriptionProjection{std::move(*mapped), eventTime};
-            }
-
-            if (textMessage) {
-                auto mapped = std::get<events::PreparedTextMessage>(route.mapping)
-                                  .mapView(record.symbol, values, route.valueLimits, eventTime.value_or(0));
-
-                if (!mapped)
-                    return std::unexpected(ReceiverProjectionFailure{mapped.error()});
-
-                return SubscriptionProjection{std::move(*mapped), eventTime};
-            }
-
-            if (textConfiguration) {
-                auto mapped = std::get<events::PreparedTextConfiguration>(route.mapping)
-                                  .mapView(record.symbol, values, route.valueLimits, eventTime.value_or(0));
-
-                if (!mapped)
-                    return std::unexpected(ReceiverProjectionFailure{mapped.error()});
-
-                return SubscriptionProjection{std::move(*mapped), eventTime};
-            }
-
-            if (std::holds_alternative<events::PreparedTrade>(route.mapping)) {
-                auto mapped = std::get<events::PreparedTrade>(route.mapping)
-                                  .mapView(record.symbol, values, units, eventTime.value_or(0));
-
-                if (!mapped)
-                    return std::unexpected(ReceiverProjectionFailure{mapped.error()});
-
-                return SubscriptionProjection{std::move(*mapped), eventTime};
-            }
-
-            if (std::holds_alternative<events::PreparedTradeETH>(route.mapping)) {
-                auto mapped = std::get<events::PreparedTradeETH>(route.mapping)
-                                  .mapView(record.symbol, values, units, eventTime.value_or(0));
-
-                if (!mapped)
-                    return std::unexpected(ReceiverProjectionFailure{mapped.error()});
-
-                return SubscriptionProjection{std::move(*mapped), eventTime};
-            }
-
-            if (order) {
-                auto mapped =
-                    std::get<events::PreparedOrder>(route.mapping)
-                        .mapView(record.symbol, values, route.valueLimits, eventTime.value_or(0), record.eventFlags);
-
-                if (!mapped) {
-                    return std::unexpected(ReceiverProjectionFailure{mapped.error()});
-                }
-
-                return SubscriptionProjection{std::move(*mapped), eventTime};
-            }
-
-            if (std::holds_alternative<events::PreparedSummary>(route.mapping)) {
-                auto mapped = std::get<events::PreparedSummary>(route.mapping)
-                                  .mapView(record.symbol, values, units, eventTime.value_or(0));
-
-                if (!mapped) {
-                    return std::unexpected(ReceiverProjectionFailure{mapped.error()});
-                }
-
-                return SubscriptionProjection{std::move(*mapped), eventTime};
-            }
-
-            if (quote) {
-                auto mapped = std::get<events::PreparedQuote>(route.mapping)
-                                  .mapView(record.symbol, values, units, eventTime.value_or(0));
-
-                if (!mapped)
-                    return std::unexpected(ReceiverProjectionFailure{mapped.error()});
-
-                return SubscriptionProjection{std::move(*mapped), eventTime};
-            }
-
-            auto mapped = std::get<events::PreparedProfile>(route.mapping)
-                              .mapView(record.symbol, values, route.valueLimits, eventTime.value_or(0));
-
-            if (!mapped)
-                return std::unexpected(ReceiverProjectionFailure{mapped.error()});
-
-            return SubscriptionProjection{std::move(*mapped), eventTime};
+        if (!native) {
+            return std::unexpected(ReceiverProjectionFailure{ReceiverError::INVALID_INPUT});
         }
 
         return SubscriptionProjection{};
@@ -330,11 +555,36 @@ openSubscriptionReceiver(mux::MuxQueue &queue, const core::LocalSchema &schema, 
                 static_cast<std::size_t>(binding.localId) >= schema.records().size())
                 return std::unexpected(ReceiverFailure{ReceiverError::INVALID_INPUT, i});
 
+            if ((binding.projection == events::EventProjection::QUOTE_ORDERS &&
+                 family != core::SubscriptionFamily::TICKER) ||
+                ((binding.projection == events::EventProjection::MARKET_MAKER_ORDERS ||
+                  binding.kind == PreparedEventKind::MARKET_MAKER) &&
+                 family != core::SubscriptionFamily::HISTORY)) {
+                return std::unexpected(ReceiverFailure{ReceiverError::INVALID_INPUT, i});
+            }
+
             for (std::size_t previous = 0; previous < i; ++previous) {
                 debit(receiverWork.visits, 1);
 
-                if (bindings[previous].localId == binding.localId)
-                    return std::unexpected(ReceiverFailure{ReceiverError::INVALID_INPUT, i});
+                if (bindings[previous].localId == binding.localId) {
+                    const auto &other = bindings[previous];
+                    const bool native = binding.projection == events::EventProjection::NATIVE;
+                    const bool previousNative = other.projection == events::EventProjection::NATIVE;
+
+                    if (native == previousNative) {
+                        return std::unexpected(ReceiverFailure{ReceiverError::INVALID_INPUT, i});
+                    }
+
+                    const auto nativeKind = native ? binding.kind : other.kind;
+                    const auto derivedKind = native ? other.projection : binding.projection;
+
+                    if ((derivedKind == events::EventProjection::QUOTE_ORDERS &&
+                         nativeKind != PreparedEventKind::QUOTE) ||
+                        (derivedKind == events::EventProjection::MARKET_MAKER_ORDERS &&
+                         nativeKind != PreparedEventKind::MARKET_MAKER)) {
+                        return std::unexpected(ReceiverFailure{ReceiverError::INVALID_INPUT, i});
+                    }
+                }
             }
 
             const auto fields = schema.records()[static_cast<std::size_t>(binding.localId)].fields.size();
@@ -356,7 +606,30 @@ openSubscriptionReceiver(mux::MuxQueue &queue, const core::LocalSchema &schema, 
             debit(receiverWork.preparationWork, preparationAllowance(binding.mappingLimits));
             const auto fields = schema.records()[static_cast<std::size_t>(binding.localId)].fields.size();
 
-            if (binding.kind == PreparedEventKind::QUOTE) {
+            if (binding.projection != events::EventProjection::NATIVE) {
+                auto prepared =
+                    events::PreparedDerivedOrder::prepare(schema, binding.localId,
+                                                          binding.projection == events::EventProjection::QUOTE_ORDERS
+                                                              ? events::DerivedOrderKind::QUOTE
+                                                              : events::DerivedOrderKind::MARKET_MAKER,
+                                                          binding.mappingLimits);
+
+                if (!prepared) {
+                    return std::unexpected(ReceiverFailure{prepared.error(), i});
+                }
+
+                plan.routes.push_back({schema.recordContext(binding.localId), std::move(*prepared), binding.valueLimits,
+                                       binding.eventTimePolicy, fields, binding.mappingLimits.selections});
+            } else if (binding.kind == PreparedEventKind::MARKET_MAKER) {
+                auto prepared = events::PreparedMarketMaker::prepare(schema, binding.localId, binding.mappingLimits);
+
+                if (!prepared) {
+                    return std::unexpected(ReceiverFailure{prepared.error(), i});
+                }
+
+                plan.routes.push_back({schema.recordContext(binding.localId), std::move(*prepared), binding.valueLimits,
+                                       binding.eventTimePolicy, fields, binding.mappingLimits.selections});
+            } else if (binding.kind == PreparedEventKind::QUOTE) {
                 auto prepared = events::PreparedQuote::prepare(schema, binding.localId, binding.mappingLimits);
 
                 if (!prepared)

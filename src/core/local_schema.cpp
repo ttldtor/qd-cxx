@@ -102,7 +102,8 @@ std::optional<SchemaError> validateIndexedLayout(const LocalRecord &record, Loca
         for (const auto fieldId : {pair->firstField, pair->secondField}) {
             const auto type = record.fields[fieldId].serialTypeId;
 
-            if (type != std::to_underlying(SerialFieldType::INT) &&
+            if (type != std::to_underlying(SerialFieldType::UTF_CHAR) &&
+                type != std::to_underlying(SerialFieldType::INT) &&
                 type != std::to_underlying(SerialFieldType::COMPACT_INT) &&
                 type != std::to_underlying(SerialFieldType::DECIMAL) &&
                 type != std::to_underlying(SerialFieldType::SHORT_STRING) &&

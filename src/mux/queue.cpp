@@ -1025,8 +1025,11 @@ submit(const std::shared_ptr<detail::QueuePort> &port, detail::QueueCommandKind 
             const core::SubscriptionKey copied{key.context, std::u16string_view(destination, key.symbol.size()),
                                                key.selector};
             command.keys[i] = copied;
-            command.requests[i] = {copied, kind == detail::QueueCommandKind::REMOVE ? std::optional<std::int64_t>{}
-                                                                                    : requests[i].historyBound};
+            command.requests[i] = {copied,
+                                   kind == detail::QueueCommandKind::REMOVE ? std::optional<std::int64_t>{}
+                                                                            : requests[i].historyBound,
+                                   kind == detail::QueueCommandKind::REMOVE ? core::NATIVE_DELIVERY_PROJECTION
+                                                                            : requests[i].projectionMask};
             offset += key.symbol.size() + 1;
         }
 
@@ -1303,6 +1306,7 @@ struct MuxQueue::State {
         std::optional<std::int64_t> bound;         ///< Exact current source-view request.
         std::uint64_t sourceRevision = 0;          ///< Independent core revision domain.
         collectors::HistoryEpochToken sourceEpoch; ///< Actual detached HISTORY epoch.
+        core::CapturedDeliveryProjections<MuxMembership> projections{}; ///< Current paired authoritative bit choices.
     };
 
     /** One registration; callbacks live only here, never in ports/identities/retained values. */
@@ -1315,6 +1319,8 @@ struct MuxQueue::State {
         collectors::TickerViewToken ticker;                                 ///< Actual shared-cache view.
         collectors::HistoryViewToken history;                               ///< Actual history view.
         detail::Vector<std::shared_ptr<const detail::QueueRecord>> records; ///< Fixed queue links.
+        detail::Vector<core::DeliveryProjectionMask>
+            remaining;                              ///< Mutable queue-link weight; detached records stay immutable.
         detail::Vector<std::uint8_t> selection;     ///< Fixed owner eligibility/cleanup scratch.
         detail::Vector<Mapping> mapping;            ///< Fixed paired source-view metadata.
         std::size_t head = 0;                       ///< Stored ranges.
@@ -1347,6 +1353,7 @@ struct MuxQueue::State {
         explicit Client(detail::BudgetLease source)
             : budget(source),
               records(detail::QueueAllocator<std::shared_ptr<const detail::QueueRecord>>{detail::clientScope(source)}),
+              remaining(detail::QueueAllocator<core::DeliveryProjectionMask>{detail::clientScope(source)}),
               selection(detail::QueueAllocator<std::uint8_t>{detail::clientScope(source)}),
               mapping(detail::QueueAllocator<Mapping>{detail::clientScope(source)}) {
         }
@@ -1382,9 +1389,10 @@ struct MuxQueue::State {
     detail::Vector<collectors::StreamDelivery> offers;                     ///< Fixed source-chunk metadata.
     detail::Vector<core::SubscriptionRequest> requests;                    ///< Fixed owner desired snapshot scratch.
     detail::Vector<std::shared_ptr<const detail::QueueRecord>> candidates; ///< Fixed unpublished fanout slots.
-    detail::Vector<std::size_t> candidateCounts;                           ///< Fixed per-client chunk prefix counts.
-    detail::Vector<std::uint8_t> candidateFailure;                         ///< Fixed local failure plans.
-    std::optional<protocol::LiveEvent> pending; ///< Sole accepted owner; never enters producer metadata.
+    detail::Vector<std::size_t> candidateWeights;  ///< Per-client business occurrences in the atomic routing candidate.
+    detail::Vector<std::size_t> candidateCounts;   ///< Fixed per-client chunk prefix counts.
+    detail::Vector<std::uint8_t> candidateFailure; ///< Fixed local failure plans.
+    std::optional<protocol::LiveEvent> pending;    ///< Sole accepted owner; never enters producer metadata.
     enum class Pending {
         NONE,         ///< No accepted event owner remains.
         UNSTAGED,     ///< The admitted owner must stage before ordinary commands.
@@ -1438,6 +1446,7 @@ struct MuxQueue::State {
           offers(detail::QueueAllocator<collectors::StreamDelivery>{detail::ownerScope(context)}),
           requests(detail::QueueAllocator<core::SubscriptionRequest>{detail::ownerScope(context)}),
           candidates(detail::QueueAllocator<std::shared_ptr<const detail::QueueRecord>>{detail::ownerScope(context)}),
+          candidateWeights(detail::QueueAllocator<std::size_t>{detail::ownerScope(context)}),
           candidateCounts(detail::QueueAllocator<std::size_t>{detail::ownerScope(context)}),
           candidateFailure(detail::QueueAllocator<std::uint8_t>{detail::ownerScope(context)}),
           resetDiscards(detail::QueueAllocator<std::size_t>{detail::ownerScope(context)}) {
@@ -1475,7 +1484,7 @@ struct MuxQueue::State {
         auto fixed = sum(sizeof(State), sum(sizeof(detail::ContextLedger),
                                             shape[static_cast<std::size_t>(detail::ControlKind::ORIGIN)]));
         fixed = sum(fixed, product(local.records().size(), sizeof(detail::ContextEntry)));
-        fixed = sum(fixed, product(ql.clients, sum(sum(sizeof(ClientOwner), product(sizeof(std::size_t), 2)),
+        fixed = sum(fixed, product(ql.clients, sum(sum(sizeof(ClientOwner), product(sizeof(std::size_t), 3)),
                                                    sum(sizeof(std::uint8_t), sizeof(MuxClient)))));
         fixed = sum(fixed, product(ql.routeRecords, sizeof(collectors::StreamDelivery)));
         fixed = sum(fixed, product(ml.entries, sizeof(core::SubscriptionRequest)));
@@ -1529,6 +1538,7 @@ struct MuxQueue::State {
         result->requests.resize(ml.entries);
         result->candidates.resize(cells);
         result->candidateCounts.resize(ql.clients);
+        result->candidateWeights.resize(ql.clients);
         result->candidateFailure.resize(ql.clients);
         result->resetDiscards.resize(ql.clients);
 
@@ -1711,6 +1721,44 @@ struct MuxQueue::State {
         return nullptr;
     }
 
+    /** Retire only withdrawn original FIFO bits, independently of physical-link retention or callback pause.
+     * @param c Actual owner registration.
+     * @param work Complete read-only query and fixed scratch/commit allowance.
+     * @return Success or typed refusal before any weight is retired.
+     */
+    std::expected<void, QueueFailure> pruneQueuedProjections(Client &c, QueueWork &work) {
+        spend(work, product(c.size, 2), 0, 0, product(c.size, sizeof(core::DeliveryProjectionMask)));
+
+        for (std::size_t i = 0; i < c.size; ++i) {
+            const auto slot = (c.head + i) % c.records.size();
+            const auto current =
+                interest.currentProjectionMask(c.interest, c.records[slot]->view.projections, work.interest);
+
+            if (!current) {
+                return std::unexpected(sourceFailure(current.error()));
+            }
+
+            c.selection[i] = static_cast<std::uint8_t>(*current & c.remaining[slot]);
+        }
+
+        std::size_t removed = 0;
+
+        for (std::size_t i = 0; i < c.size; ++i) {
+            const auto slot = (c.head + i) % c.records.size();
+            removed +=
+                static_cast<std::size_t>(std::popcount(c.remaining[slot])) -
+                static_cast<std::size_t>(std::popcount(static_cast<core::DeliveryProjectionMask>(c.selection[i])));
+            c.remaining[slot] = c.selection[i];
+        }
+
+        core::detail::updateDelivery(c.statistics, [&](auto &s) {
+            s.pendingEvents -= removed;
+            s.discardedEvents.add(removed);
+        });
+
+        return {};
+    }
+
     /** Release a sole pending event only after complete current conservative disposal preflight.
      * @param work Remaining caller work.
      * @param discarded Whether this is explicit loss rather than zero-selection/control release.
@@ -1789,7 +1837,7 @@ struct MuxQueue::State {
      * @param flags Produced delivery flags.
      * @param legacy Actual compact-only values.
      * @param fields Actual tagged generic values.
-     * @param membership Captured authoritative activation.
+     * @param projections Captured physical and per-bit authoritative activations.
      * @param sourceRevision Actual collector admission revision.
      * @param raw Optional true raw provenance.
      * @param trigger Optional actual HISTORY trigger.
@@ -1800,11 +1848,16 @@ struct MuxQueue::State {
     template <class Field>
     std::shared_ptr<const detail::QueueRecord>
     record(Client &c, core::SubscriptionKey key, std::optional<std::int64_t> time, std::int32_t flags,
-           std::span<const std::int32_t> legacy, std::span<const Field> fields, MuxMembership membership,
-           std::uint64_t sourceRevision, std::optional<RawSourceMetadata> raw,
-           std::optional<collectors::HistorySourceMetadata> trigger, QueueWork &work, bool retainedInitial = false,
-           bool versionDefault = false) {
+           std::span<const std::int32_t> legacy, std::span<const Field> fields,
+           core::CapturedDeliveryProjections<MuxMembership> projections, std::uint64_t sourceRevision,
+           std::optional<RawSourceMetadata> raw, std::optional<collectors::HistorySourceMetadata> trigger,
+           QueueWork &work, bool retainedInitial = false, bool versionDefault = false) {
         auto &l = c.port->budget->limits;
+
+        if (!core::validDeliveryProjectionMask(projections.mask)) {
+            throw QueueError::INVALID_CONFIGURATION;
+        }
+
         const auto fieldCount = sum(legacy.size(), fields.size());
         std::size_t units = 0, bytes = 0;
         spend(work, 1, product(fields.size(), 2));
@@ -1858,7 +1911,8 @@ struct MuxQueue::State {
         out->view.symbol = arena.text(key.symbol);
         out->view.rawTime = time;
         out->view.eventFlags = flags;
-        out->view.membership = std::move(membership);
+        out->view.membership = projections.physical;
+        out->view.projections = std::move(projections);
         out->view.revision = c.desiredRevision;
         out->view.admissionRevision = sourceRevision;
         out->view.epoch = epoch();
@@ -1899,15 +1953,18 @@ struct MuxQueue::State {
      */
     void enqueue(Client &c, std::shared_ptr<const detail::QueueRecord> value) noexcept {
         const auto tail = (c.head + c.size) % c.records.size();
+        const auto mask = value->view.projections.mask;
         c.records[tail] = std::move(value);
+        c.remaining[tail] = mask;
         ++c.size;
         count(c.counts.queueAdmitted, 1, c.counts.saturated);
         count(counts.queueAdmitted, 1, counts.saturated);
 
         if (!ticker)
-            core::detail::updateDelivery(c.statistics, [](auto &s) {
-                s.admittedEvents.add(1);
-                ++s.pendingEvents;
+            core::detail::updateDelivery(c.statistics, [&](auto &s) {
+                const auto weight = static_cast<std::size_t>(std::popcount(mask));
+                s.admittedEvents.add(weight);
+                s.pendingEvents += weight;
             });
     }
 
@@ -1916,12 +1973,14 @@ struct MuxQueue::State {
      * @param withdrawn Retired membership rather than explicit discard.
      */
     void drop(Client &c, bool withdrawn) noexcept {
+        const auto weight = static_cast<std::size_t>(std::popcount(c.remaining[c.head]));
         c.records[c.head].reset();
+        c.remaining[c.head] = 0;
         c.head = (c.head + 1) % c.records.size();
         --c.size;
-        core::detail::updateDelivery(c.statistics, [](auto &s) {
-            --s.pendingEvents;
-            s.discardedEvents.add(1);
+        core::detail::updateDelivery(c.statistics, [&](auto &s) {
+            s.pendingEvents -= weight;
+            s.discardedEvents.add(weight);
         });
 
         if (withdrawn) {
@@ -2164,8 +2223,9 @@ std::expected<MuxHandle, QueueFailure> MuxQueue::open(ClientLimits limits, const
         auto fixed = sum(sizeof(State::Client), sum(sizeof(detail::ClientBudget),
                                                     layout[static_cast<std::size_t>(detail::ControlKind::PORT)]));
         fixed = sum(fixed, product(s.contexts.size(), sizeof(core::RecordContext)));
-        fixed = sum(fixed, product(limits.dataItems,
-                                   sum(sizeof(std::shared_ptr<const detail::QueueRecord>), sizeof(std::uint8_t))));
+        fixed =
+            sum(fixed, product(limits.dataItems, sum(sizeof(std::shared_ptr<const detail::QueueRecord>),
+                                                     sum(sizeof(std::uint8_t), sizeof(core::DeliveryProjectionMask)))));
         fixed = sum(fixed, product(s.interestLimits.entries, sizeof(State::Mapping)));
         fixed = sum(fixed, product(limits.commandSlots,
                                    sum(sizeof(detail::QueueCommand),
@@ -2177,7 +2237,7 @@ std::expected<MuxHandle, QueueFailure> MuxQueue::open(ClientLimits limits, const
                                                     sizeof(std::shared_ptr<detail::QueueCompletion>))));
         const auto reservation = sum(fixed, sum(limits.recordBytes, limits.batchBytes));
         const auto initializedSlots = sum(
-            sum(s.interestLimits.entries, product(limits.dataItems, 2)),
+            sum(s.interestLimits.entries, product(limits.dataItems, 3)),
             sum(product(limits.commandSlots, sum(product(limits.commandEntries, 2), sum(limits.commandSymbolUnits, 1))),
                 sum(product(limits.resultSlots, 2), s.contexts.size())));
         constexpr std::size_t fixedPortObjects = 3; ///< Client, budget and port object initialization/disposal.
@@ -2274,6 +2334,7 @@ std::expected<MuxHandle, QueueFailure> MuxQueue::open(ClientLimits limits, const
         c->interest = s.fixedClients[slot];
         c->records.resize(limits.dataItems);
         c->selection.resize(limits.dataItems);
+        c->remaining.resize(limits.dataItems);
         c->mapping.resize(s.interestLimits.entries);
         c->desiredRevision = s.interest.revision();
         c->mappingRevision = c->desiredRevision;
@@ -2341,6 +2402,10 @@ std::expected<bool, QueueFailure> MuxQueue::State::sync(Client &c, QueueWork &wo
     }
 
     if (stream) {
+        if (auto pruned = pruneQueuedProjections(c, work); !pruned) {
+            return std::unexpected(pruned.error());
+        }
+
         if (!unionDirty) {
             c.sync = false;
             c.mappingRevision = c.desiredRevision;
@@ -2395,7 +2460,7 @@ std::expected<bool, QueueFailure> MuxQueue::State::sync(Client &c, QueueWork &wo
     } clearRequests{*this, desired->size()};
 
     for (std::size_t i = 0; i < desired->size(); ++i) {
-        requests[i] = {(*desired)[i].key, (*desired)[i].historyBound};
+        requests[i] = {(*desired)[i].key, (*desired)[i].historyBound, (*desired)[i].projectionMask};
     }
 
     const auto candidate = std::span<const core::SubscriptionRequest>(requests.data(), desired->size());
@@ -2420,9 +2485,10 @@ std::expected<bool, QueueFailure> MuxQueue::State::sync(Client &c, QueueWork &wo
 
         if (replay) {
             // Fund every potentially last detached-record release before the source transaction can commit.
+            constexpr auto FIFO_RELEASE_BYTES =
+                sizeof(std::shared_ptr<const detail::QueueRecord>) + 2 * sizeof(core::DeliveryProjectionMask);
             spend(work, c.size, 0, 0,
-                  sum(product(c.size, sizeof(std::shared_ptr<const detail::QueueRecord>)),
-                      c.size ? c.port->budget->limits.recordBytes : 0));
+                  sum(product(c.size, FIFO_RELEASE_BYTES), c.size ? c.port->budget->limits.recordBytes : 0));
         }
 
         auto result = replay ? collectors::detail::HistoryReplayAccess::replace(*history, c.history, candidate,
@@ -2441,18 +2507,22 @@ std::expected<bool, QueueFailure> MuxQueue::State::sync(Client &c, QueueWork &wo
         }
 
         if (replay) {
-            const auto discarded = c.size;
+            std::size_t discardedWeight = 0;
 
-            for (std::size_t index = 0; index < c.size; ++index)
-                c.records[(c.head + index) % c.records.size()].reset();
+            for (std::size_t index = 0; index < c.size; ++index) {
+                const auto slot = (c.head + index) % c.records.size();
+                discardedWeight += static_cast<std::size_t>(std::popcount(c.remaining[slot]));
+                c.records[slot].reset();
+                c.remaining[slot] = 0;
+            }
 
             c.head = 0;
             c.size = 0;
             count(c.counts.discarded, discardedTotal, c.counts.saturated);
             count(counts.discarded, discardedTotal, counts.saturated);
             core::detail::updateDelivery(c.statistics, [&](auto &s) {
-                s.pendingEvents -= discarded;
-                s.discardedEvents.add(discarded);
+                s.pendingEvents -= discardedWeight;
+                s.discardedEvents.add(discardedWeight);
             });
             c.historyReplayCommitted = true;
         }
@@ -2487,6 +2557,9 @@ std::expected<bool, QueueFailure> MuxQueue::State::sync(Client &c, QueueWork &wo
         }
 
         Mapping m{entry.key, entry.membership, match->membership, entry.historyBound, view->revision(), {}};
+        m.projections.physical = match->membership;
+        m.projections.mask = match->projectionMask;
+        m.projections.memberships = match->projectionMemberships;
 
         if (history) {
             auto status = history->rangeStatus(c.history, entry.key, work.history);
@@ -2505,6 +2578,10 @@ std::expected<bool, QueueFailure> MuxQueue::State::sync(Client &c, QueueWork &wo
         }
 
         c.mapping[c.mappingCount++] = std::move(m);
+    }
+
+    if (auto pruned = pruneQueuedProjections(c, work); !pruned) {
+        return std::unexpected(pruned.error());
     }
 
     c.sync = false;
@@ -2637,6 +2714,7 @@ std::expected<bool, QueueFailure> MuxQueue::State::route(Client &c, QueueWork &w
     try {
         std::shared_ptr<const detail::QueueRecord> value;
         bool unwanted = false, overflow = false;
+        std::size_t offeredWeight = 0, businessWeight = 0;
 
         if (ticker) {
             auto offer = ticker->front(c.ticker, work.ticker);
@@ -2662,6 +2740,7 @@ std::expected<bool, QueueFailure> MuxQueue::State::route(Client &c, QueueWork &w
 
             const auto &o = **offer;
             const auto &r = *o.value.sourceRecord;
+            offeredWeight = o.projections.count();
             auto *m = mapping(c, {r.context, r.symbol}, work);
             unwanted = !m;
 
@@ -2670,8 +2749,11 @@ std::expected<bool, QueueFailure> MuxQueue::State::route(Client &c, QueueWork &w
                     const auto &original = o.value.rawSourceRecord ? *o.value.rawSourceRecord : r;
                     const RawSourceMetadata raw{original.senderId,    original.cipher,    original.eventFlags,
                                                 original.removalTime, original.fieldTime, o.value.bindingGeneration};
-                    value = record(c, {r.context, r.symbol}, {}, o.deliveryFlags, r.values, r.typedValues, m->mux,
-                                   o.revision, raw, {}, work,
+                    auto projections = m->projections;
+                    projections.mask &= o.projections.mask;
+                    businessWeight = projections.count();
+                    value = record(c, {r.context, r.symbol}, {}, o.deliveryFlags, r.values, r.typedValues,
+                                   std::move(projections), o.revision, raw, {}, work,
                                    retainedOnly && o.kind == collectors::TickerDeliveryKind::INITIAL,
                                    o.value.versionDefault);
                 } catch (QueueError e) {
@@ -2736,7 +2818,8 @@ std::expected<bool, QueueFailure> MuxQueue::State::route(Client &c, QueueWork &w
                         legacy = s.values;
                     }
 
-                    value = record(c, {r.context, r.symbol}, r.rawTime, r.eventFlags, legacy, r.fields, m->mux,
+                    businessWeight = m->projections.count();
+                    value = record(c, {r.context, r.symbol}, r.rawTime, r.eventFlags, legacy, r.fields, m->projections,
                                    o.admissionRevision, raw, o.trigger, work,
                                    retainedOnly && o.kind == collectors::HistoryDeliveryKind::INITIAL);
                 } catch (QueueError e) {
@@ -2760,19 +2843,27 @@ std::expected<bool, QueueFailure> MuxQueue::State::route(Client &c, QueueWork &w
             }
         }
 
+        if (ticker && offeredWeight > businessWeight) {
+            core::detail::updateDelivery(c.statistics, [&](auto &s) {
+                const auto retired = offeredWeight - businessWeight;
+                s.pendingEvents -= retired;
+                s.discardedEvents.add(retired);
+            });
+        }
+
         count(counts.collectorAcknowledged, 1, counts.saturated);
         count(c.counts.collectorAcknowledged, 1, c.counts.saturated);
 
         if (overflow) {
             fail(c, {QueueError::RESOURCE_LIMIT, {}});
             core::detail::updateDelivery(c.statistics, [&](auto &s) {
-                s.droppedEvents.add(1);
+                s.droppedEvents.add(businessWeight);
 
                 if (ticker) {
-                    --s.pendingEvents;
-                    s.evictedOverflowEvents.add(1);
+                    s.pendingEvents -= businessWeight;
+                    s.evictedOverflowEvents.add(businessWeight);
                 } else {
-                    s.rejectedOverflowEvents.add(1);
+                    s.rejectedOverflowEvents.add(businessWeight);
                 }
             });
             count(c.counts.discarded, 1, c.counts.saturated);
@@ -2823,6 +2914,7 @@ std::expected<bool, QueueFailure> MuxQueue::State::routeStream(QueueWork &work) 
                       product(limits.routeRecords, sizeof(collectors::StreamDelivery)))));
         clear.active = true;
         std::fill(candidateCounts.begin(), candidateCounts.end(), 0);
+        std::fill(candidateWeights.begin(), candidateWeights.end(), 0);
         std::fill(candidateFailure.begin(), candidateFailure.end(), 0);
         auto prepared = stream->prepareBatch(offers, work.stream);
 
@@ -2842,17 +2934,18 @@ std::expected<bool, QueueFailure> MuxQueue::State::routeStream(QueueWork &work) 
 
             for (const auto &offer : *prepared) {
                 const auto &r = *offer.record;
-                auto selected = interest.select(c->interest, {r.context, r.symbol}, {}, work.interest);
+                auto selected = interest.selectProjections(c->interest, {r.context, r.symbol}, {}, work.interest);
 
                 if (!selected) {
                     return std::unexpected(sourceFailure(selected.error()));
                 }
 
-                if (!*selected) {
+                if (!selected->mask) {
                     continue;
                 }
 
                 const auto index = candidateCounts[v]++;
+                candidateWeights[v] = sum(candidateWeights[v], selected->count());
 
                 if (candidateFailure[v]) {
                     continue;
@@ -2862,8 +2955,8 @@ std::expected<bool, QueueFailure> MuxQueue::State::routeStream(QueueWork &work) 
                     const RawSourceMetadata raw{r.senderId,    r.cipher,    r.eventFlags,
                                                 r.removalTime, r.fieldTime, offer.bindingGeneration};
                     candidates[v * limits.routeRecords + index] =
-                        record(*c, {r.context, r.symbol}, {}, r.eventFlags, r.values, r.typedValues, **selected,
-                               offer.revision, raw, {}, work);
+                        record(*c, {r.context, r.symbol}, {}, r.eventFlags, r.values, r.typedValues,
+                               std::move(*selected), offer.revision, raw, {}, work);
                 } catch (QueueError e) {
                     if (e != QueueError::RESOURCE_LIMIT) {
                         throw;
@@ -2901,8 +2994,8 @@ std::expected<bool, QueueFailure> MuxQueue::State::routeStream(QueueWork &work) 
             if (candidateFailure[v]) {
                 fail(*c, {QueueError::RESOURCE_LIMIT, {}});
                 core::detail::updateDelivery(c->statistics, [&](auto &s) {
-                    s.droppedEvents.add(candidateCounts[v]);
-                    s.rejectedOverflowEvents.add(candidateCounts[v]);
+                    s.droppedEvents.add(candidateWeights[v]);
+                    s.rejectedOverflowEvents.add(candidateWeights[v]);
                 });
                 count(c->counts.discarded, candidateCounts[v], c->counts.saturated);
                 count(counts.discarded, candidateCounts[v], counts.saturated);
@@ -2941,11 +3034,14 @@ std::expected<bool, QueueFailure> MuxQueue::State::callback(Client &c, QueueWork
         const auto maximum = std::min(c.port->budget->limits.batchRecords, c.size);
         spend(work, sum(product(c.size, 3), maximum), 0, 0,
               sum(sum(sizeof(Client), product(sizeof(QueueCounts), 2)),
-                  product(product(c.size, 3),
-                          sum(sizeof(std::shared_ptr<const detail::QueueRecord>), sizeof(std::uint8_t)))));
+                  product(product(c.size, 3), sum(sizeof(std::shared_ptr<const detail::QueueRecord>),
+                                                  sum(sizeof(std::uint8_t), sizeof(core::DeliveryProjectionMask))))));
         constexpr std::uint8_t WITHDRAWN = 0;
-        constexpr std::uint8_t SELECTED = 1;
-        constexpr std::uint8_t FENCED = 2;
+
+        constexpr std::uint8_t FENCED = static_cast<std::uint8_t>(core::ALL_DELIVERY_PROJECTIONS + 1);
+        const auto selectedMask = [&](std::uint8_t value) {
+            return value != WITHDRAWN && value != FENCED;
+        };
         auto dropUnselected = [&](std::uint8_t selection) {
             const bool fenced = selection == FENCED;
 
@@ -2957,21 +3053,26 @@ std::expected<bool, QueueFailure> MuxQueue::State::callback(Client &c, QueueWork
 
             drop(c, !fenced);
         };
-        std::size_t prefix = 0, selected = 0;
+        std::size_t prefix = 0, selected = 0, selectedWeight = 0;
 
         // Read-only selection first: work failure cannot withdraw an earlier queue prefix.
         for (; prefix < c.size && selected < maximum; ++prefix) {
-            const auto &r = c.records[(c.head + prefix) % c.records.size()];
-            auto current = interest.isCurrent(c.interest, r->view.membership, work.interest);
+            const auto slot = (c.head + prefix) % c.records.size();
+            const auto &r = c.records[slot];
+            auto current = interest.currentProjectionMask(c.interest, r->view.projections, work.interest);
 
             if (!current) {
                 return std::unexpected(sourceFailure(current.error()));
             }
 
-            c.selection[prefix] = !*current ? WITHDRAWN : retainedOnly && !r->retainedInitial ? FENCED : SELECTED;
+            const auto surviving = *current & c.remaining[slot];
+            c.selection[prefix] = !surviving                            ? WITHDRAWN
+                                  : retainedOnly && !r->retainedInitial ? FENCED
+                                                                        : static_cast<std::uint8_t>(surviving);
 
-            if (c.selection[prefix] == SELECTED) {
+            if (selectedMask(c.selection[prefix])) {
                 ++selected;
+                selectedWeight = sum(selectedWeight, static_cast<std::size_t>(std::popcount(surviving)));
             }
         }
 
@@ -3005,9 +3106,10 @@ std::expected<bool, QueueFailure> MuxQueue::State::callback(Client &c, QueueWork
         for (std::size_t i = 0; i < prefix; ++i) {
             const auto &r = c.records[(c.head + i) % c.records.size()];
 
-            if (c.selection[i] == SELECTED) {
+            if (selectedMask(c.selection[i])) {
                 batch->roots.push_back(r);
                 batch->views.push_back(r->view);
+                batch->views.back().projections.mask = c.selection[i];
             }
         }
 
@@ -3020,7 +3122,15 @@ std::expected<bool, QueueFailure> MuxQueue::State::callback(Client &c, QueueWork
 
             if (eligible) {
                 ++index;
+                const auto oldWeight = static_cast<std::size_t>(std::popcount(c.remaining[c.head]));
+                const auto nextWeight =
+                    static_cast<std::size_t>(std::popcount(static_cast<core::DeliveryProjectionMask>(c.selection[i])));
+                core::detail::updateDelivery(c.statistics, [&](auto &s) {
+                    s.pendingEvents -= oldWeight - nextWeight;
+                    s.discardedEvents.add(oldWeight - nextWeight);
+                });
                 c.records[c.head].reset();
+                c.remaining[c.head] = 0;
                 c.head = (c.head + 1) % c.records.size();
                 --c.size;
             } else {
@@ -3033,8 +3143,8 @@ std::expected<bool, QueueFailure> MuxQueue::State::callback(Client &c, QueueWork
         count(counts.callbackStartedBatches, 1, counts.saturated);
         count(counts.callbackStartedRecords, selected, counts.saturated);
         core::detail::updateDelivery(c.statistics, [&](auto &s) {
-            s.pendingEvents -= selected;
-            s.inFlightEvents += selected;
+            s.pendingEvents -= selectedWeight;
+            s.inFlightEvents += selectedWeight;
         });
         auto guard = c.consumer;
         BorrowedMuxBatch borrowed;
@@ -3501,11 +3611,12 @@ std::expected<QueueProgress, QueueFailure> MuxQueue::State::resetStep(QueueWork 
             if (c && c->size) {
                 const auto n = std::min(c->size, limits.cleanupRecords);
                 spend(work, product(n, 2), 0, 0,
-                      product(n, sum(sizeof(std::shared_ptr<const detail::QueueRecord>), sizeof(std::uint8_t))));
+                      product(n, sum(sizeof(std::shared_ptr<const detail::QueueRecord>),
+                                     sum(sizeof(std::uint8_t), sizeof(core::DeliveryProjectionMask)))));
 
                 for (std::size_t i = 0; i < n; ++i) {
-                    auto current = interest.isCurrent(
-                        c->interest, c->records[(c->head + i) % c->records.size()]->view.membership, work.interest);
+                    auto current = interest.currentProjectionMask(
+                        c->interest, c->records[(c->head + i) % c->records.size()]->view.projections, work.interest);
 
                     if (!current)
                         return std::unexpected(sourceFailure(current.error()));
@@ -4451,14 +4562,19 @@ MuxQueue::State::~State() {
         stop(*c->port, 2);
         c->hadGap = c->hadGap || c->size != 0;
 
+        std::size_t discardedWeight = 0;
+
         for (std::size_t i = 0; i < c->size; ++i) {
-            c->records[(c->head + i) % c->records.size()].reset();
+            const auto slot = (c->head + i) % c->records.size();
+            discardedWeight += static_cast<std::size_t>(std::popcount(c->remaining[slot]));
+            c->records[slot].reset();
+            c->remaining[slot] = 0;
             count(c->counts.discarded, 1, c->counts.saturated);
         }
 
         core::detail::updateDelivery(c->statistics, [&](auto &s) {
-            s.pendingEvents -= c->size;
-            s.discardedEvents.add(c->size);
+            s.pendingEvents -= discardedWeight;
+            s.discardedEvents.add(discardedWeight);
         });
 
         c->size = 0;

@@ -79,6 +79,32 @@ bool equalKey(const SubscriptionKey &left, const SubscriptionKey &right, Subscri
 
 } // namespace
 
+CapturedDeliveryProjections<SubscriptionMembership>
+captureDeliveryProjections(const SubscriptionEntry &first, const SubscriptionEntry *second) noexcept {
+    CapturedDeliveryProjections<SubscriptionMembership> result;
+    result.physical = second ? SubscriptionMembership::anyOf(first.membership, second->membership) : first.membership;
+
+    for (std::size_t i = 0; i < MAX_DELIVERY_PROJECTIONS; ++i) {
+        const auto bit = DeliveryProjectionMask{1} << i;
+        const bool a = (first.projectionMask & bit) != 0;
+        const bool b = second && (second->projectionMask & bit) != 0;
+
+        if (!a && !b) {
+            continue;
+        }
+
+        result.mask |= bit;
+        result.memberships[i] = a ? first.projectionMemberships[i] : second->projectionMemberships[i];
+
+        if (a && b) {
+            result.memberships[i] =
+                SubscriptionMembership::anyOf(first.projectionMemberships[i], second->projectionMemberships[i]);
+        }
+    }
+
+    return result;
+}
+
 SubscriptionKey allSymbols(RecordContext context) noexcept {
     return {std::move(context), u"", SubscriptionSelectorKind::ALL};
 }
@@ -252,6 +278,10 @@ SubscriptionState::apply(Command command, std::span<const SubscriptionRequest> r
             }
 
             if (command != Command::REMOVE) {
+                if (!validDeliveryProjectionMask(requests[i].projectionMask)) {
+                    throw Rejected{SubscriptionError::INVALID_SELECTOR};
+                }
+
                 const auto hasBound = requests[i].historyBound.has_value();
 
                 if ((family_ == SubscriptionFamily::HISTORY && !hasBound) ||
@@ -264,7 +294,8 @@ SubscriptionState::apply(Command command, std::span<const SubscriptionRequest> r
                 const auto &previousKey = command == Command::REMOVE ? keys[previous] : requests[previous].key;
 
                 if (equalKey(key, previousKey, work) && command != Command::REMOVE &&
-                    requests[i].historyBound != requests[previous].historyBound) {
+                    (requests[i].historyBound != requests[previous].historyBound ||
+                     requests[i].projectionMask != requests[previous].projectionMask)) {
                     throw Rejected{SubscriptionError::CONTRADICTORY_INPUT};
                 }
             }
@@ -302,7 +333,9 @@ SubscriptionState::apply(Command command, std::span<const SubscriptionRequest> r
                 const auto bound =
                     input && command != Command::REMOVE ? requests[*input].historyBound : entry.historyBound;
 
-                visit(entry.key, bound, &entry);
+                const auto mask =
+                    input && command != Command::REMOVE ? requests[*input].projectionMask : entry.projectionMask;
+                visit(entry.key, bound, mask, &entry);
             }
 
             if (command == Command::REMOVE) {
@@ -323,7 +356,7 @@ SubscriptionState::apply(Command command, std::span<const SubscriptionRequest> r
                 }
 
                 if (!present) {
-                    visit(requests[i].key, requests[i].historyBound, nullptr);
+                    visit(requests[i].key, requests[i].historyBound, requests[i].projectionMask, nullptr);
                 }
             }
         };
@@ -333,20 +366,34 @@ SubscriptionState::apply(Command command, std::span<const SubscriptionRequest> r
         std::uint64_t activations = 0;
         bool changed = false;
 
-        visitCandidate(
-            [&](const SubscriptionKey &key, std::optional<std::int64_t> bound, const SubscriptionEntry *previous) {
-                candidateSize = addCapacity(candidateSize, 1, limits_.entries);
-                candidateUnits = addCapacity(candidateUnits, key.symbol.size(), limits_.totalSymbolUnits);
+        visitCandidate([&](const SubscriptionKey &key, std::optional<std::int64_t> bound, DeliveryProjectionMask mask,
+                           const SubscriptionEntry *previous) {
+            candidateSize = addCapacity(candidateSize, 1, limits_.entries);
+            candidateUnits = addCapacity(candidateUnits, key.symbol.size(), limits_.totalSymbolUnits);
 
-                if (!previous || previous->historyBound != bound) {
-                    if (activations == std::numeric_limits<std::uint64_t>::max()) {
-                        throw Rejected{SubscriptionError::IDENTITY_EXHAUSTED};
-                    }
-
-                    ++activations;
-                    changed = true;
+            const bool renewed = !previous || previous->historyBound != bound;
+            const auto issue = [&] {
+                if (activations == std::numeric_limits<std::uint64_t>::max()) {
+                    throw Rejected{SubscriptionError::IDENTITY_EXHAUSTED};
                 }
-            });
+
+                ++activations;
+            };
+
+            if (renewed || (mask & ~previous->projectionMask)) {
+                issue();
+            }
+
+            for (std::size_t i = 0; i < MAX_DELIVERY_PROJECTIONS; ++i) {
+                const auto bit = DeliveryProjectionMask{1} << i;
+
+                if ((mask & bit) && (renewed || !(previous->projectionMask & bit))) {
+                    issue();
+                }
+            }
+
+            changed = changed || renewed || previous->projectionMask != mask;
+        });
 
         changed = changed || candidateSize != size_;
 
@@ -386,31 +433,47 @@ SubscriptionState::apply(Command command, std::span<const SubscriptionRequest> r
         std::size_t symbolOffset = 0;
         auto lastActivation = lastActivation_;
 
-        visitCandidate(
-            [&](const SubscriptionKey &key, std::optional<std::int64_t> bound, const SubscriptionEntry *previous) {
-                charge(work.symbolUnits, key.symbol.size());
+        visitCandidate([&](const SubscriptionKey &key, std::optional<std::int64_t> bound, DeliveryProjectionMask mask,
+                           const SubscriptionEntry *previous) {
+            charge(work.symbolUnits, key.symbol.size());
 
-                const auto *symbol = u"";
+            const auto *symbol = u"";
 
-                if (!key.symbol.empty()) {
-                    std::copy_n(key.symbol.data(), key.symbol.size(), candidateSymbols.get() + symbolOffset);
-                    symbol = candidateSymbols.get() + symbolOffset;
+            if (!key.symbol.empty()) {
+                std::copy_n(key.symbol.data(), key.symbol.size(), candidateSymbols.get() + symbolOffset);
+                symbol = candidateSymbols.get() + symbolOffset;
+            }
+
+            auto &entry = candidateEntries[entryOffset++];
+
+            entry.key = {key.context, std::u16string_view(symbol, key.symbol.size()), key.selector};
+            entry.historyBound = bound;
+            entry.projectionMask = mask;
+
+            if (previous && previous->historyBound == bound && !(mask & ~previous->projectionMask)) {
+                entry.membership = previous->membership;
+            } else {
+                entry.membership.identity_ = identity_;
+                entry.membership.activation_ = ++lastActivation;
+            }
+
+            for (std::size_t i = 0; i < MAX_DELIVERY_PROJECTIONS; ++i) {
+                const auto bit = DeliveryProjectionMask{1} << i;
+
+                if (!(mask & bit)) {
+                    continue;
                 }
 
-                auto &entry = candidateEntries[entryOffset++];
-
-                entry.key = {key.context, std::u16string_view(symbol, key.symbol.size()), key.selector};
-                entry.historyBound = bound;
-
-                if (previous && previous->historyBound == bound) {
-                    entry.membership = previous->membership;
+                if (previous && previous->historyBound == bound && (previous->projectionMask & bit)) {
+                    entry.projectionMemberships[i] = previous->projectionMemberships[i];
                 } else {
-                    entry.membership.identity_ = identity_;
-                    entry.membership.activation_ = ++lastActivation;
+                    entry.projectionMemberships[i].identity_ = identity_;
+                    entry.projectionMemberships[i].activation_ = ++lastActivation;
                 }
+            }
 
-                symbolOffset += key.symbol.size();
-            });
+            symbolOffset += key.symbol.size();
+        });
 
         // Releasing old entry owners is also finite command work, reserved before publication.
         charge(work.keyVisits, size_);
@@ -463,9 +526,31 @@ bool SubscriptionState::isCurrent(const SubscriptionMembership &membership) cons
             (membership.alternateActivation_ != 0 && entry.membership.activation_ == membership.alternateActivation_)) {
             return true;
         }
+
+        for (const auto &projection : entry.projectionMemberships) {
+            if (projection.activation_ == membership.activation_ ||
+                (membership.alternateActivation_ != 0 && projection.activation_ == membership.alternateActivation_)) {
+                return true;
+            }
+        }
     }
 
     return false;
+}
+
+DeliveryProjectionMask SubscriptionState::currentProjectionMask(
+    const CapturedDeliveryProjections<SubscriptionMembership> &captured) const noexcept {
+    DeliveryProjectionMask result = 0;
+
+    for (std::size_t i = 0; i < MAX_DELIVERY_PROJECTIONS; ++i) {
+        const auto bit = DeliveryProjectionMask{1} << i;
+
+        if ((captured.mask & bit) && isCurrent(captured.memberships[i])) {
+            result |= bit;
+        }
+    }
+
+    return result;
 }
 
 std::uint64_t SubscriptionState::revision() const noexcept {

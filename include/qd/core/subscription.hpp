@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "qd/core/delivery_projection.hpp"
 #include "qd/core/local_schema.hpp"
 
 #include <cstddef>
@@ -92,6 +93,7 @@ struct SubscriptionKey {
 struct SubscriptionRequest {
     SubscriptionKey key;                      ///< Record and exact symbol retained by copy on success.
     std::optional<std::int64_t> historyBound; ///< Raw indexed record time, never Unix milliseconds.
+    DeliveryProjectionMask projectionMask = NATIVE_DELIVERY_PROJECTION; ///< Local output identities only.
 };
 
 /** Owning eligibility token; desired entries are singleton activations, delivery may capture two original choices.
@@ -128,8 +130,19 @@ class SubscriptionMembership {
 struct SubscriptionEntry {
     SubscriptionKey key;                      ///< Immutable borrowed exact key in the owner arena.
     std::optional<std::int64_t> historyBound; ///< Absent except for HISTORY.
-    SubscriptionMembership membership;        ///< Activation belonging to this owner only.
+    SubscriptionMembership membership;        ///< Physical-key activation belonging to this owner only.
+    DeliveryProjectionMask projectionMask = NATIVE_DELIVERY_PROJECTION; ///< Current independently activated bits.
+    std::array<SubscriptionMembership, MAX_DELIVERY_PROJECTIONS>
+        projectionMemberships{}; ///< Per-bit singleton activations.
 };
+
+/** Capture only the original exact/all contributions already matched to one concrete record.
+ * @param first Original matched desired entry.
+ * @param second Optional original alternate entry for that same physical record/symbol.
+ * @return Detached bounded per-bit choices; no later desired mask is consulted.
+ */
+[[nodiscard]] CapturedDeliveryProjections<SubscriptionMembership>
+captureDeliveryProjections(const SubscriptionEntry &first, const SubscriptionEntry *second = nullptr) noexcept;
 
 /** Application barrier for a fully validated synchronous command. */
 struct SubscriptionChange {
@@ -239,6 +252,12 @@ class SubscriptionState {
      * @return True only for a current activation in this exact owner; bounded by resident entries.
      */
     [[nodiscard]] bool isCurrent(const SubscriptionMembership &membership) const noexcept;
+    /** Prune captured choices using only their original activations.
+     * @param captured Original detached per-bit choices.
+     * @return Surviving subset; removed and re-added bits are never acquired by an old capture.
+     */
+    [[nodiscard]] DeliveryProjectionMask
+    currentProjectionMask(const CapturedDeliveryProjections<SubscriptionMembership> &captured) const noexcept;
     /** Inspect the published revision without consuming turn work.
      * @return Current revision; zero for a moved-from owner.
      */

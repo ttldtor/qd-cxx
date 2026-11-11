@@ -9,6 +9,7 @@
 #include "qd/client/endpoint_options.hpp"
 #include "qd/events/candle_symbol.hpp"
 #include "qd/events/configuration.hpp"
+#include "qd/events/market_maker.hpp"
 #include "qd/events/order.hpp"
 #include "qd/events/profile.hpp"
 #include "qd/events/quote.hpp"
@@ -151,7 +152,9 @@ struct EndpointOptions {
     bool enableWildcard = false; ///< Explicit controlled-peer STREAM All permission; never enabled by text or peer.
     std::optional<std::chrono::milliseconds> requestedAggregationPeriod; ///< Initial server request; null asks for
                                                                          ///< server default, never an effective result.
-    HistoryReceivingOptions history; ///< Used only by the explicit HISTORY contract; never application work credits.
+    HistoryReceivingOptions history;  ///< Used only by the explicit HISTORY contract; never application work credits.
+    bool unitaryOrderSources = false; ///< SDK default/plain/negative sources use unitary bid/ask pairs when true;
+                                      ///< explicit sources are independent.
 };
 
 /** Last SDK-worker observation, never an upstream acknowledgement or a whole-network guarantee. */
@@ -207,7 +210,7 @@ struct FeedFilterCategory;
 /** Independently owning supported event value; inspect its actual class with std::visit or std::get_if. */
 using RegisteredEvent =
     std::variant<events::Quote, events::Profile, events::Trade, events::TradeETH, events::Summary, events::TextMessage,
-                 events::TextConfiguration, events::Message, events::Configuration, events::Order>;
+                 events::TextConfiguration, events::Message, events::Configuration, events::Order, events::MarketMaker>;
 
 /** Independently owned observation of one complete accepted local subscription revision. */
 struct SubscriptionSnapshot {
@@ -240,16 +243,16 @@ using SubscriptionChangeListener = std::function<void(const SubscriptionChange &
  * Methods are producer-safe. Event-listener calls are serialized on the runtime's SDK worker.
  * A listener's span lasts only through that invocation; copying an Event produces an owning value.
  * @tparam Event Existing events::Quote, events::Profile, events::Trade, events::TradeETH, events::Summary,
- * events::TextMessage, events::TextConfiguration, events::Message, events::Configuration, events::Order or
- * RegisteredEvent.
+ * events::TextMessage, events::TextConfiguration, events::Message, events::Configuration, events::Order,
+ * events::MarketMaker or RegisteredEvent.
  */
 template <class Event> class Subscription final {
     static_assert(std::is_same_v<Event, events::Quote> || std::is_same_v<Event, events::Profile> ||
                   std::is_same_v<Event, events::Trade> || std::is_same_v<Event, events::TradeETH> ||
                   std::is_same_v<Event, events::Summary> || std::is_same_v<Event, events::TextMessage> ||
                   std::is_same_v<Event, events::TextConfiguration> || std::is_same_v<Event, events::Message> ||
-                  std::is_same_v<Event, events::Configuration> || std::is_same_v<Event, events::Order> ||
-                  std::is_same_v<Event, RegisteredEvent>);
+                  std::is_same_v<Event, events::Configuration> || std::is_same_v<Event, events::MarketMaker> ||
+                  std::is_same_v<Event, events::Order> || std::is_same_v<Event, RegisteredEvent>);
     std::shared_ptr<detail::SubscriptionPort> port_;
     friend class Feed;
     explicit Subscription(std::shared_ptr<detail::SubscriptionPort> port) noexcept;
@@ -482,6 +485,7 @@ extern template class Subscription<events::TextConfiguration>;
 extern template class Subscription<events::Message>;
 extern template class Subscription<events::Configuration>;
 extern template class Subscription<events::Order>;
+extern template class Subscription<events::MarketMaker>;
 extern template class Subscription<RegisteredEvent>;
 
 /** Endpoint's typed registration entry point; owns no SDK thread or bootstrap. */
@@ -509,7 +513,8 @@ class Feed final {
                       std::is_same_v<Event, events::Trade> || std::is_same_v<Event, events::TradeETH> ||
                       std::is_same_v<Event, events::Summary> || std::is_same_v<Event, events::TextMessage> ||
                       std::is_same_v<Event, events::TextConfiguration> || std::is_same_v<Event, events::Message> ||
-                      std::is_same_v<Event, events::Configuration> || std::is_same_v<Event, events::Order>);
+                      std::is_same_v<Event, events::Configuration> || std::is_same_v<Event, events::MarketMaker> ||
+                      std::is_same_v<Event, events::Order>);
 
         if constexpr (std::is_same_v<Event, events::Quote>)
             return EventType::QUOTE;
@@ -529,6 +534,8 @@ class Feed final {
             return EventType::MESSAGE;
         else if constexpr (std::is_same_v<Event, events::Configuration>)
             return EventType::CONFIGURATION;
+        else if constexpr (std::is_same_v<Event, events::MarketMaker>)
+            return EventType::MARKET_MAKER;
         else
             return EventType::ORDER;
     }
@@ -536,9 +543,10 @@ class Feed final {
     public:
     /** Create a bounded logical registration, before or after connect, without application polling.
      * All registered records of the selected type participate; an unregistered type rejects synchronously.
-     * Order requires explicit HISTORY; unsupported typed/mixed contract selections reject before publication.
+     * Ordinary Order and MarketMaker require HISTORY; Quote-derived Order uses TICKER. Unsupported selections reject
+     * before publication.
      * @tparam Event Existing Quote, Profile, Trade, TradeETH, Summary, TextMessage, TextConfiguration, Message or
-     * Configuration or indexed Order, explicitly registered for this endpoint or provided by its defaults.
+     * Configuration, indexed Order or MarketMaker, explicitly registered for this endpoint or provided by its defaults.
      * @return Producer handle; native preparation failures are observed asynchronously by its diagnostic.
      */
     template <class Event> [[nodiscard]] std::shared_ptr<Subscription<Event>> createSubscription() {

@@ -3,6 +3,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "receiving_profile.hpp"
 #include <array>
+#include <bit>
 #include <doctest/doctest.h>
 #include <iostream>
 #include <limits>
@@ -78,7 +79,7 @@ TEST_CASE("typed selector routing has a finite measured workspace and exact one-
     symbols[1].exchange = u'Q';
     const auto &plan = d::receivingEventPlan(profile, d::EventSelection::ALL);
     CHECK(plan.bindingCount == profile.bindings.size());
-    std::array<bool, d::MAXIMUM_RECEIVING_RECORDS> selected{};
+    std::array<bool, d::MAXIMUM_RECEIVING_BINDINGS> selected{};
     d::prepareReceivingSymbols(profile, plan, symbols);
     CHECK(symbols[1].physical.empty());
     CHECK(symbols[1].exchange == 0);
@@ -101,5 +102,74 @@ TEST_CASE("unrepresentable frontend selector banks refuse before allocation or n
     } catch (const a::Error &error) {
         CHECK(error.diagnostic().code == a::ErrorCode::RESOURCE_LIMIT);
         CHECK(error.diagnostic().stage == "runtime-selector-storage");
+    }
+}
+
+TEST_CASE("derived routes preserve literal symbols and choose only actual source delegates") {
+    a::RuntimeOptions runtime;
+    runtime.dnsServers.push_back({{127, 0, 0, 1}});
+    auto profile = d::prepareReceivingProfile(runtime, {}, "127.0.0.1", 12345);
+    const auto &plan = d::receivingEventPlan(profile, d::EventSelection::ORDER);
+    REQUIRE(plan.bindingCount == 27);
+
+    for (const auto source : std::array<std::optional<std::int32_t>, 7>{{{}, -1, 0, 1, 3, 7, 8}}) {
+        std::array<d::ReceivingSymbol, 1> symbols{{{u"AAPL&Q"}}};
+        symbols[0].sourceId = source;
+        d::prepareReceivingSymbols(profile, plan, symbols);
+        std::size_t physical = 0, events = 0;
+
+        for (std::size_t i = 0; i < plan.bindingCount; ++i) {
+            const auto binding = plan.bindingIndices[i];
+            const auto mask = d::receivingProjectionMask(profile, binding, symbols[0]);
+
+            if (!mask) {
+                continue;
+            }
+
+            ++physical;
+            events += std::popcount(mask);
+            CHECK(d::receivingPhysicalSymbol(profile, binding, symbols[0]) == u"AAPL&Q");
+        }
+
+        const bool defaults = !source || *source < 0;
+        CHECK(physical == (defaults ? 27 : (*source == 0 ? 0 : (*source == 3 || *source == 8 ? 26 : 1))));
+        CHECK(
+            events ==
+            (defaults ? 54 : (*source == 0 ? 0 : (*source == 8 ? 52 : (*source == 3 ? 26 : (*source == 7 ? 2 : 1))))));
+    }
+
+    a::EndpointOptions options;
+    options.contract = a::DeliveryContract::HISTORY;
+    auto history = d::prepareReceivingProfile(runtime, options, "127.0.0.1", 12345);
+    const auto &all = d::receivingEventPlan(history, static_cast<d::EventSelection>(512 | 1024));
+    CHECK(all.bindingCount == 3);
+    std::array<d::ReceivingSymbol, 1> plain{{{u"AAPL"}}};
+    d::prepareReceivingSymbols(history, all, plain);
+    std::size_t count = 0;
+
+    for (std::size_t i = 0; i < all.bindingCount; ++i) {
+        count += std::popcount(d::receivingProjectionMask(history, all.bindingIndices[i], plain[0]));
+    }
+
+    CHECK(count == 4); // Native Order, native MarketMaker and the separate aggregate bid/ask.
+}
+
+TEST_CASE("immutable unitary default changes plain and negative delegates without overriding explicit sources") {
+    a::RuntimeOptions runtime;
+    runtime.dnsServers.push_back({{127, 0, 0, 1}});
+
+    for (const bool unitary : {false, true}) {
+        a::EndpointOptions options;
+        options.unitaryOrderSources = unitary;
+        auto profile = d::prepareReceivingProfile(runtime, options, "127.0.0.1", 12345);
+        const auto &plan = d::receivingEventPlan(profile, d::EventSelection::ORDER);
+
+        for (const auto source : std::array<std::optional<std::int32_t>, 4>{{{}, -1, 1, 7}}) {
+            d::ReceivingSymbol symbol{u"AAPL"};
+            symbol.sourceId = source;
+            const auto composite = plan.bindingIndices[0];
+            const auto mask = d::receivingProjectionMask(profile, composite, symbol);
+            CHECK(mask == (!source || *source < 0 ? (unitary ? 24 : 6) : (*source == 1 ? 2 : 24)));
+        }
     }
 }

@@ -14,15 +14,19 @@
 #include <vector>
 
 namespace org::ttldtor::qdcxx::api::detail {
-inline constexpr std::size_t MAXIMUM_RECEIVING_RECORDS = 16; ///< Existing complete receiving catalog ceiling.
-inline constexpr std::size_t RECEIVING_EVENT_KINDS = 10;     ///< Explicitly supported native event kinds.
+inline constexpr std::size_t RECEIVING_OWNER_POLLS_PER_TURN =
+    64; ///< One shared finite protocol/queue seed across the existing worker burst.
+inline constexpr std::size_t MAXIMUM_RECEIVING_RECORDS = 42; ///< Existing complete receiving catalog ceiling.
+inline constexpr std::size_t MAXIMUM_RECEIVING_BINDINGS =
+    2 * MAXIMUM_RECEIVING_RECORDS;                       ///< Native plus compatible derived family per physical record.
+inline constexpr std::size_t RECEIVING_EVENT_KINDS = 11; ///< Explicitly supported native event kinds.
 inline constexpr std::size_t RECEIVING_EVENT_SELECTIONS = (1U << RECEIVING_EVENT_KINDS) - 1;
 
 ///< Every nonempty finite selection; no dynamic type registry or catalog expansion.
 
 /** Conservative stack initialization plus complete metadata read/write work; no dynamic allocation. */
 inline constexpr std::size_t RECEIVING_BINDING_COPY_WORK =
-    3 * sizeof(std::array<client::PreparedSubscriptionBinding, MAXIMUM_RECEIVING_RECORDS>);
+    3 * sizeof(std::array<client::PreparedSubscriptionBinding, MAXIMUM_RECEIVING_BINDINGS>);
 
 /** One temporary logical selector and at most one physical regional copy, never shared with a callback. */
 struct ReceivingSymbol {
@@ -50,7 +54,7 @@ struct ReceivingRoutingLimits {
 
 /** Complete independently bounded plan for every registered record in one supported type selection. */
 struct ReceivingEventPlan {
-    std::array<std::size_t, MAXIMUM_RECEIVING_RECORDS> bindingIndices{};
+    std::array<std::size_t, MAXIMUM_RECEIVING_BINDINGS> bindingIndices{};
     ///< Exact selected indices in the unique immutable binding catalog, including nonconsecutive mixed kinds.
     std::size_t bindingCount = 0;                    ///< Number of consecutive routes in this type selection.
     client::ReceiverLimits limits{};                 ///< Aggregate complete immutable receiver plan allowance.
@@ -60,9 +64,12 @@ struct ReceivingEventPlan {
 
 /** Worker-owned immutable receiving configuration; it owns no native object or callback. */
 struct ReceivingProfile {
-    core::LocalSchema schema;         ///< Complete selected declarations, preserving validated registry provenance.
-    client::EndpointOptions endpoint; ///< Independently owned validated endpoint snapshot.
-    core::SubscriptionFamily family;  ///< Selected existing source delivery semantics.
+    core::LocalSchema schema;           ///< Complete selected declarations, preserving validated registry provenance.
+    client::EndpointOptions endpoint;   ///< Independently owned validated endpoint snapshot.
+    bool unitaryOrderSources = false;   ///< Immutable SDK source-selection policy; not an ambient process property.
+    std::size_t physicalRouteCount = 0; ///< Maximum distinct physical coordinate domains per logical selector,
+                                        ///< including regional native/derived splits.
+    core::SubscriptionFamily family;    ///< Selected existing source delivery semantics.
     transport::RecoveryOptions recoveryOptions;      ///< Explicit route and finite replay/copy reservations.
     std::vector<protocol::OutgoingRecord> blueprint; ///< Complete outgoing declarations, transferred once.
     mux::MuxLimits interests;                        ///< Aggregate capacities for independent logical subscriptions.
@@ -71,16 +78,16 @@ struct ReceivingProfile {
     collectors::TickerLimits tickerLimits;           ///< Existing shared cache and independent desired views.
     collectors::HistoryLimits historyLimits{}; ///< Real shared HISTORY source and independent desired-view backing.
     std::vector<client::PreparedSubscriptionBinding> bindings; ///< Explicit routes grouped by business type.
-    std::array<char16_t, MAXIMUM_RECEIVING_RECORDS> bindingExchanges{};
+    std::array<char16_t, MAXIMUM_RECEIVING_BINDINGS> bindingExchanges{};
     ///< Exact aligned Quote/Trade record suffixes; fixed backing is included in sizeof(ReceivingProfile).
-    std::array<std::optional<std::int32_t>, MAXIMUM_RECEIVING_RECORDS> bindingSources{};
+    std::array<std::optional<std::int32_t>, MAXIMUM_RECEIVING_BINDINGS> bindingSources{};
     ///< Exact aligned Order sources; absent for nonindexed business projections.
-    std::array<HistoryRangeEncoding, MAXIMUM_RECEIVING_RECORDS> bindingTimeEncodings{};
+    std::array<HistoryRangeEncoding, MAXIMUM_RECEIVING_BINDINGS> bindingTimeEncodings{};
     ///< Explicit verified mapper policies; existing non-time-series bindings retain INDEX_DOMAIN.
     std::array<collectors::TickerVersionBinding, MAXIMUM_RECEIVING_RECORDS> versionBindings{};
     std::size_t versionBindingCount = 0; ///< Explicit schema-bound TICKER version gates.
     ReceivingRoutingLimits routing;      ///< Explicit additional routing workspace and pre-allocation work charge.
-    std::array<ReceivingEventPlan, RECEIVING_EVENT_SELECTIONS> eventPlans;
+    std::vector<ReceivingEventPlan> eventPlans;
     ///< Prepaid bounded plans for each nonempty supported type mask, independent of record IDs.
     mux::QueueSubmitWork submitWork;         ///< One whole desired replacement admission.
     mux::QueueWork queueWork;                ///< Identical initialization, normal and drain coordinates.
@@ -95,6 +102,12 @@ struct ReceivingProfile {
     ReceivingProfile(core::LocalSchema schema, client::EndpointOptions endpoint);
 };
 
+/** Check verified route permission independently of record names/layout inference.
+ * @param route Explicit prepared native or derived business route.
+ * @param contract Selected ordinary receiving contract.
+ * @return Whether the actual delegate supports this receiving contract.
+ */
+[[nodiscard]] bool receivingRouteSupportsContract(const EventRegistration &route, DeliveryContract contract) noexcept;
 /** Validate and prepare the finite plain receiving profile without activating SDK/native state.
  * @param runtime Explicit registry and symbol capacities, with resolved DNS snapshot.
  * @param options Explicit endpoint policy.
@@ -165,6 +178,24 @@ void prepareReceivingSymbols(const ReceivingProfile &profile, const ReceivingEve
 [[nodiscard]] bool receivingSymbolMatches(const ReceivingProfile &profile, std::size_t bindingIndex,
                                           const ReceivingSymbol &symbol) noexcept;
 
+/** Select captured delegate bits from explicit source identity and immutable verified route facts.
+ * @param profile Complete immutable route metadata.
+ * @param bindingIndex Exact prepared binding position.
+ * @param symbol Owning logical selector retained through desired submission.
+ * @return Zero for no matching delegate; otherwise a finite native/separate/paired-unitary mask.
+ */
+[[nodiscard]] core::DeliveryProjectionMask receivingProjectionMask(const ReceivingProfile &profile,
+                                                                   std::size_t bindingIndex,
+                                                                   const ReceivingSymbol &symbol) noexcept;
+/** Inspect the exact physical selector spelling for one verified route.
+ * @param profile Immutable route metadata.
+ * @param bindingIndex Exact selected route.
+ * @param symbol Prepared owning logical/physical spelling.
+ * @return Borrowed text valid through symbol mutation/destruction; derived delegates retain literal QD spelling.
+ */
+[[nodiscard]] const std::u16string &receivingPhysicalSymbol(const ReceivingProfile &profile, std::size_t bindingIndex,
+                                                            const ReceivingSymbol &symbol) noexcept;
+
 /** Append one physical route and coalesce equal keys to their minimum HISTORY bound.
  * The whole bounded routing attempt, including quadratic key comparisons, is prepaid by the caller.
  * @param requests Owned candidate vector with sufficient admitted capacity; symbols are borrowed until submission.
@@ -174,11 +205,13 @@ void prepareReceivingSymbols(const ReceivingProfile &profile, const ReceivingEve
  * @param family Actual selected collector family.
  * @param fromTime Optional Unix-millisecond attribute from the same accepted logical cut.
  * @param encoding Verified native mapper policy; caller descriptors cannot configure it.
+ * @param projections Eligible local delivery identities, unioned across equal physical keys.
  */
 void appendReceivingDesiredRequest(std::vector<core::SubscriptionRequest> &requests, core::RecordContext context,
                                    std::u16string_view symbol, core::SubscriptionSelectorKind selector,
                                    core::SubscriptionFamily family, std::optional<std::int64_t> fromTime,
-                                   HistoryRangeEncoding encoding);
+                                   HistoryRangeEncoding encoding,
+                                   core::DeliveryProjectionMask projections = core::NATIVE_DELIVERY_PROJECTION);
 
 /** Construct the selected existing queue without opening registrations or activating native work.
  * @param profile Complete immutable prepared configuration.

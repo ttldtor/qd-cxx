@@ -7,6 +7,7 @@
 #include "qd/encoding/compact.hpp"
 #include "qd/encoding/utf_char.hpp"
 #include "qd/encoding/utf_string.hpp"
+#include "qd/events/market_maker.hpp"
 #include "qd/events/profile.hpp"
 #include "qd/events/quote.hpp"
 
@@ -2436,4 +2437,97 @@ TEST_CASE("HISTORY private replay prepays exact work and preserves sibling view 
     REQUIRE(s::detail::HistoryReplayAccess::replace(f.history, view, {&request, 1}, coreWork, credits));
     CHECK_FALSE(status(view).completeRequestedRange);
     CHECK_FALSE(status(view).epoch.matches(before.epoch));
+}
+
+TEST_CASE("MarketMaker HISTORY keeps full removal keys independently of narrowed public exchange identity") {
+    auto local = q::defaultMarketMakerSchema({4, 128, 256, 128, 16384});
+    REQUIRE(local);
+    auto live = genericSession(*local);
+    std::vector<std::byte> describe;
+    number(describe, 17);
+    text(describe, u"MarketMaker");
+    number(describe, 10);
+    const auto &record = local->records()[0];
+
+    for (std::size_t field = 0; field < record.fields.size(); ++field) {
+        const auto key = std::ranges::find_if(record.lookups, [&](const auto &lookup) {
+            return lookup.fieldId == field;
+        });
+        REQUIRE(key != record.lookups.end());
+        text(describe, key->name);
+        number(describe, record.fields[field].serialTypeId);
+    }
+
+    (void)admit(live, frame(2, describe));
+    auto copy = *local;
+    auto work = turn();
+    auto history = s::HistoryCollector::create(std::move(copy), limits(), {false, 100, 10000}, work);
+    REQUIRE(history);
+    auto view = history->openView({false}, work);
+    REQUIRE(view);
+    const c::SubscriptionRequest request{{local->recordContext(0), u"AAPL"}, std::numeric_limits<std::int64_t>::min()};
+    auto desired = command();
+    REQUIRE(history->add(*view, std::span(&request, 1), desired, work));
+    auto stage = [&](std::int64_t time, std::int32_t flags) {
+        std::vector<std::byte> body;
+        prefix(body, flags, u"AAPL", 17);
+
+        if (flags & 2) {
+            number(body, time);
+        } else {
+            constexpr std::array<std::int64_t, 10> fields{0, 0, 0, 384, 384, 384, 0, 384, 384, 384};
+
+            for (const auto value : fields) {
+                number(body, value);
+            }
+        }
+
+        auto event = admit(live, frame(20, body));
+        REQUIRE(event.records().size() == 1);
+
+        if (flags & 2) {
+            CHECK(event.records()[0].removalTime == time);
+            const auto bits = static_cast<std::uint64_t>(time);
+            CHECK(event.records()[0].typedValues[0].raw ==
+                  std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(bits >> 32)));
+            CHECK(event.records()[0].typedValues[1].raw ==
+                  std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(bits)));
+        }
+
+        auto credits = turn();
+        REQUIRE(history->stage(std::move(event), credits));
+    };
+    stage(0, 0);
+    work = turn();
+    auto first = history->front(*view, work);
+    REQUIRE(first);
+    REQUIRE(*first);
+    CHECK((**first).record.rawTime == 0);
+    REQUIRE(history->pop(*view, work));
+    CHECK(history->pointCount() == 1);
+
+    // These are the same exact full removal words captured from the actual Java composer/parser.
+    for (const auto time : std::array<std::int64_t, 4>{std::numeric_limits<std::int64_t>::min(), -1,
+                                                       std::numeric_limits<std::int64_t>::max(), 4294967301LL}) {
+        stage(time, 2);
+        CHECK(history->pointCount() == 1);
+        work = turn();
+        auto offered = history->front(*view, work);
+        REQUIRE(offered);
+
+        if (*offered) {
+            CHECK((**offered).record.rawTime == time);
+            REQUIRE(history->pop(*view, work));
+        }
+    }
+
+    stage(0, 2);
+    CHECK(history->pointCount() == 0);
+    work = turn();
+    auto removed = history->front(*view, work);
+    REQUIRE(removed);
+    REQUIRE(*removed);
+    CHECK((**removed).record.rawTime == 0);
+    CHECK((**removed).record.fields[0].raw == 0);
+    REQUIRE(history->pop(*view, work));
 }

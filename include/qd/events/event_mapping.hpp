@@ -76,6 +76,26 @@ struct BorrowedRecordValueView {
 
 /** Immutable local-to-event selections, independent of protocol and preparation input lifetime. */
 class EventMapping {
+    friend class PreparedMarketMaker;
+    friend class PreparedDerivedOrder;
+    /** Validate an actual indexed removal using the mapper's retained schema layout.
+     * @param record Complete owning values; no payload is copied.
+     * @param layout Actual independently retained source-time mapping.
+     * @param rawTime Full signed removal identity, not public business index.
+     * @return Complete validation, permitting exact UTF_CHAR pair words only in this explicit context.
+     */
+    [[nodiscard]] std::expected<void, MappingError> validateIndexedRemoval(RecordValueView record,
+                                                                           const core::IndexedTimeLayout &layout,
+                                                                           std::int64_t rawTime) const noexcept;
+    /** Validate borrowed indexed removal fields without normalizing their raw words.
+     * @param record Complete callback-borrowed values.
+     * @param layout Actual retained source-time mapping.
+     * @param rawTime Full signed removal identity.
+     * @return Complete shape/context/canonical-or-index-word validation without allocation.
+     */
+    [[nodiscard]] std::expected<void, MappingError> validateIndexedRemoval(BorrowedRecordValueView record,
+                                                                           const core::IndexedTimeLayout &layout,
+                                                                           std::int64_t rawTime) const noexcept;
     core::RecordContext context_;
     std::vector<core::SerialFieldType> shape_;
     std::vector<std::optional<std::size_t>> selections_;

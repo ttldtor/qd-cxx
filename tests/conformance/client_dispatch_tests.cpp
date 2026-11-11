@@ -1192,7 +1192,8 @@ TEST_CASE("client full standard Quote Java fixture reaches callback and prepared
     REQUIRE(defaults->records()[0].fields.size() == 8);
     auto local = c::LocalSchema::create(defaults->records(), schemaBounds, c::LocalProfile::BINARY_FIELDS_V1);
     REQUIRE(local);
-    auto mapping = q::PreparedQuote::prepare(*local, 0, {128, 256, 32, 64, 64, 128, 16384, 1000000});
+    // The Quote plan charges all 72 full-type alternatives, including absent optional fields.
+    auto mapping = q::PreparedQuote::prepare(*local, 0, {128, 256, 32, 64, 128, 128, 16384, 1000000});
     REQUIRE(mapping);
     p::OutgoingRecord declaration{17, 0, u"Quote", {}};
     const auto &record = local->records()[0];

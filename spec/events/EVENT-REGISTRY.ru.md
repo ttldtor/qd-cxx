@@ -30,8 +30,7 @@ Const-наблюдение реестра допускается одновре�
 конечные `MappingLimits` и `EventTimePolicy`. Сохраняется требование `LocalSchema`:
 каждый ID равен позиции записи в полном каталоге.
 
-Разные записи могут проецироваться в один тип события. Повторные маршруты для
-одного local record ID отклоняются атомарно, в том числе для разных типов.
+Разные записи могут проецироваться в один тип события. На физическую запись допускаются максимум один native route и одна совместимая явная EventProjection family. Два native любого business type, две derived groups либо несовместимая пара отклоняются атомарно. Quote совместим с QUOTE_ORDERS, MarketMaker — с MARKET_MAKER_ORDERS.
 Наблюдение маршрутов сохраняет порядок входа. Подписка feed на один тип выбирает
 зарегистрированные маршруты этого типа с учётом
 [региональных exchange-правил Quote](EVENT-TIME.ru.md); несколько выбранных типов используют
@@ -49,7 +48,7 @@ business key с любой совместимой позицией поля. В�
 Исчерпывающая [таблица преобразований полей](FIELD-CONVERSIONS.ru.md) принадлежит каждому
 подготовленному адаптеру. Default registration допускает 128 точных альтернатив типов и
 консервативно оплачивает сравнения; Quote требует72, Profile108, Trade110, TradeETH99 и Summary75. Явные меньшие границы
-по-прежнему дают атомарный отказ. Полные receive caps сохраняют 16 записей и 128 полей.
+по-прежнему дают атомарный отказ. Полные receive caps составляют42 записи и284 поля; публичный builtIn сохраняет caller limits.
 
 `FIELD_METADATA` выбирает фактический исходный FIELD event time при его наличии;
 `UNSPECIFIED` не утверждает timestamp события. Ни одна политика не использует
@@ -89,11 +88,11 @@ resource, work или allocation. Ошибка маршрута содержит
 composite TradeETH record3 с двенадцатью, Summary record4 с десятью полями, TextMessage record5 с тремя,
 TextConfiguration record6 с четырьмя, Message record7 с одним SERIAL_OBJECT и Configuration record8
 с Version и SERIAL_OBJECT, с существующими lookup
-aliases и бизнес-поведением. Endpoint без явного реестра выбирает эти значения.
+aliases и бизнес-поведением. Endpoint без явного реестра выбирает SDK-owned каталог своего receiving contract; состав описан ниже.
 Глобальной регистрации процесса и изменения живого реестра нет.
 
 Высокоуровневый plain receiving profile сохраняет квалифицированный предел полной
-схемы:16 записей,128 полей суммарно,256 lookup entries,128 UTF-16 units на имя
+схемы:42 записи,284 поля суммарно,724 lookup entries, 128 UTF-16 units на имя
 и16384 units всех имён. Реестр может быть допустим при больших явно выбранных
 пределах и всё же отклоняться этим receiving profile на `profile-schema`, до
 native activation. Это явное ограничение receiving, а не усечение или отклонение
@@ -102,18 +101,10 @@ native activation. Это явное ограничение receiving, а не �
 В этих пределах подготовка сохраняет точную идентичность схемы и группирует
 маршруты по типу. Она проверяет и суммирует координаты полной формы mapping,
 selections/work, пределы callback projection и ёмкости desired commands.
-Каждый принятый символ требует одного interest на совпадающий выбранный маршрут local record.
-Полное число зарегистрированных маршрутов масштабирует резервы interests endpoint
-и каждой подписки с проверкой арифметики, включая подписки после connect.
-Фактическое максимальное
-число полей записи задаёт полный предел полей кадра с сохранением исходного минимума16.
-Со встроенным реестром interest reservations покрывают девять маршрутов на символ.
-Пределы схемы и данных frame/queue сохраняются.
+Каждый принятый символ требует одного interest на distinct matching physical key. Native/derived overlap объединяет bits до полного desired submit. Native regional Quote использует suffix-free physical symbol, derived Order сохраняет literal symbol; один context может требовать двух keys. Checked capacity равна max(registered contexts, eligible contexts + наибольшая same-exchange native/derived regional bucket) с тем же contract guard. Generic unregistered records её не увеличивают. Default 35 domains дают 560 slots на подписку/4480 на 8 подписок; custom 42 paired contexts — до 84 domains и 1344/10752 slots, без изменения schema ceiling 42. Максимальная полная форма записи задаёт field allowance кадра с прежним минимумом16. Четыре физических callback rows дают максимум20 owning outputs, включая полную оплату group metadata/projection.
 
-Региональная маршрутизация demand удерживает фиксированный массив16 exchange-кодов
-(32 байта) внутри собственного фиксированного объекта receiving profile. Проверка
-имён ограничена прежним пределом схемы16×128 units; suffix helper может проходить
-каждое имя до трёх раз. Каждая desired revision дополнительно владеет логическим
+Региональная маршрутизация удерживает84 exchange/source slots и42 optional version gates. Конечные2047 selection plans с максимум84 indices каждый находятся в одном owning vector; его фактическая capacity/storage проверяются и оплачиваются до publication, без большого объекта на worker stack.
+Каждая desired revision дополнительно владеет логическим
 снимком и не более чем одной физической строкой без суффикса на логический символ.
 Совпадающие региональные маршруты используют эту общую физическую строку; Profile
 или composite fallback могут одновременно использовать исходную логическую копию.
@@ -171,8 +162,10 @@ reflection, произвольных delegate factories, всех классов
 wire semantics. Закреплённый reference и существующая provenance адаптеров находятся
 в `upstream.lock` и [доказательствах configured events](../../tests/fixtures/events/mapping/COVERAGE.ru.md).
 
-Trade добавлен как явный EventType::TRADE; см. [полный контракт](TRADE.ru.md). Пятьсот одиннадцать finite type sets хранят fixed511 selection index arrays; finite stack copy16 bindings и её initialization/read/write work включены в preparation. Quote/Trade/TradeETH/Summary выбирают regional fallback независимо; Profile сохраняет exact logical symbol. Record/field caps не расширены.
+Trade добавлен как явный EventType::TRADE; см. [полный контракт](TRADE.ru.md). Finite stack copy84 bindings и её initialization/read/write work включены в preparation. Quote/Trade/TradeETH/Summary выбирают regional fallback независимо; Profile сохраняет exact logical symbol, derived Order — literal physical symbol.
 
 TradeETH регистрируется отдельно как EventType::TRADE_ETH; см. [TradeETH](TRADE-ETH.ru.md). Raw ETH bit и отсутствие Tick fallback отличают его от обычного Trade.
 
 TextMessage и TextConfiguration сохраняют точные nonmarket-символы. Поведение STREAM и TICKER описано в [контракте](TEXT-EVENTS.ru.md).
+
+SDK-owned TICKER catalog:35 физических записей,225 полей,607 lookups,62 native/derived routes. HISTORY: native Order, native MarketMaker и его derived group; STREAM сохраняет9 native declarations. Контракт разрешается отдельно от регистрации. Physical overlap объединяет bits до desired submit; резерв учитывает distinct coordinate domains, включая native regional suffix-free/derived literal split и наибольшую same-exchange bucket: default 35→560/4480 slots, custom 42 paired contexts→до 84 domains/1344/10752 slots. Generic unregistered records его не увеличивают. Четыре физических callback rows дают максимум20 owning outputs с полным prepaid budget. См. [MarketMaker и derived Order](../../docs/MARKET-MAKER-ORDER.ru.md).

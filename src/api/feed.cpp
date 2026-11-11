@@ -1426,6 +1426,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
         bool message = false;
         bool configuration = false;
         bool order = false;
+        bool marketMaker = false;
 
         for (const auto type : types) {
             switch (type) {
@@ -1459,6 +1460,9 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             case EventType::ORDER:
                 order = true;
                 break;
+            case EventType::MARKET_MAKER:
+                marketMaker = true;
+                break;
             default:
                 reject(ErrorCode::INVALID_ARGUMENT, "subscription-event-types");
             }
@@ -1467,7 +1471,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
         const auto selection = static_cast<detail::EventSelection>(
             (quote ? 1U : 0U) | (profile ? 2U : 0U) | (trade ? 4U : 0U) | (tradeETH ? 8U : 0U) | (summary ? 16U : 0U) |
             (textMessage ? 32U : 0U) | (textConfiguration ? 64U : 0U) | (message ? 128U : 0U) |
-            (configuration ? 256U : 0U) | (order ? 512U : 0U));
+            (configuration ? 256U : 0U) | (order ? 512U : 0U) | (marketMaker ? 1024U : 0U));
         const auto delivery = registeredDelivery  ? detail::EventDelivery::REGISTERED
                               : quote             ? detail::EventDelivery::QUOTE
                               : profile           ? detail::EventDelivery::PROFILE
@@ -1477,6 +1481,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                               : textMessage       ? detail::EventDelivery::TEXT_MESSAGE
                               : textConfiguration ? detail::EventDelivery::TEXT_CONFIGURATION
                               : message           ? detail::EventDelivery::MESSAGE
+                              : marketMaker       ? detail::EventDelivery::MARKET_MAKER
                               : order             ? detail::EventDelivery::ORDER
                                                   : detail::EventDelivery::CONFIGURATION;
         const auto control = port_->control.lock();
@@ -1527,11 +1532,13 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             }
 
             // Business capability is explicit; an indexed layout alone does not make a TimeSeriesEvent.
-            if (port_->options.contract == DeliveryContract::HISTORY && selection != detail::EventSelection::ORDER) {
+            if (port_->options.contract == DeliveryContract::HISTORY &&
+                (static_cast<unsigned>(selection) & ~(512U | 1024U))) {
                 reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-history-event-type");
             }
 
-            if (order && port_->options.contract != DeliveryContract::HISTORY) {
+            if ((order && port_->options.contract == DeliveryContract::STREAM) ||
+                (marketMaker && port_->options.contract != DeliveryContract::HISTORY)) {
                 reject(ErrorCode::UNSUPPORTED_PROFILE, "order-requires-history");
             }
 
@@ -1552,11 +1559,17 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             bool registeredTextConfiguration = !port_->options.eventRegistry;
             bool registeredMessage = !port_->options.eventRegistry;
             bool registeredConfiguration = !port_->options.eventRegistry;
-            bool registeredOrder =
+            bool registeredOrder = !port_->options.eventRegistry && port_->options.contract != DeliveryContract::STREAM;
+            bool registeredMarketMaker =
                 !port_->options.eventRegistry && port_->options.contract == DeliveryContract::HISTORY;
 
             if (port_->options.eventRegistry) {
                 for (const auto &registration : port_->options.eventRegistry->registrations()) {
+                    if (!detail::receivingRouteSupportsContract(registration, port_->options.contract)) {
+                        continue;
+                    }
+
+                    registeredMarketMaker = registeredMarketMaker || registration.type == EventType::MARKET_MAKER;
                     registeredMessage = registeredMessage || registration.type == EventType::MESSAGE;
                     registeredConfiguration = registeredConfiguration || registration.type == EventType::CONFIGURATION;
                     registeredOrder = registeredOrder || registration.type == EventType::ORDER;
@@ -1577,7 +1590,8 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             if (missingQuote || missingProfile || (trade && !registeredTrade) || (tradeETH && !registeredTradeETH) ||
                 (summary && !registeredSummary) || (textMessage && !registeredTextMessage) ||
                 (textConfiguration && !registeredTextConfiguration) || (message && !registeredMessage) ||
-                (configuration && !registeredConfiguration) || (order && !registeredOrder)) {
+                (configuration && !registeredConfiguration) || (order && !registeredOrder) ||
+                (marketMaker && !registeredMarketMaker)) {
                 reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-unregistered-event");
             }
 
@@ -1713,6 +1727,7 @@ template class Subscription<events::TextConfiguration>;
 template class Subscription<events::Message>;
 template class Subscription<events::Configuration>;
 template class Subscription<events::Order>;
+template class Subscription<events::MarketMaker>;
 template class Subscription<RegisteredEvent>;
 
 Feed::Feed(std::shared_ptr<detail::EndpointPort> port) : port_(std::move(port)) {
@@ -1755,9 +1770,7 @@ FeedFilter Endpoint::createFilter(std::span<const FeedFilterCategory> categories
         }
 
         if (!registry) {
-            EventRegistryWork work;
-            auto prepared = contract == DeliveryContract::HISTORY ? detail::defaultHistoryEventRegistry({}, work)
-                                                                  : EventRegistry::builtIn({}, work);
+            auto prepared = detail::defaultReceivingRegistry(contract);
 
             if (!prepared) {
                 auto code = ErrorCode::UNSUPPORTED_PROFILE;
@@ -2016,7 +2029,7 @@ namespace {
 /** Finite fair owner actions before a cadence wait, identical for normal operation and local drain.
  * All polls in this burst share one unchanged RecoveryTurnWork seed; no exhausted coordinate is refilled.
  */
-constexpr std::size_t MAXIMUM_RECOVERY_POLLS_PER_TURN = 64;
+constexpr std::size_t MAXIMUM_RECOVERY_POLLS_PER_TURN = RECEIVING_OWNER_POLLS_PER_TURN;
 
 /** Receiver adapter projects the entire typed batch before selecting any application callback. */
 class TypedConsumer final : public client::SubscriptionConsumer {
@@ -2063,46 +2076,38 @@ class TypedConsumer final : public client::SubscriptionConsumer {
     static std::vector<Event> project(const client::SubscriptionBatch &batch,
                                       client::ReceiverProjectionWork projectionWork) {
         std::vector<Event> projectedEvents;
-        projectedEvents.reserve(batch.records().size());
+        projectedEvents.reserve(batch.eventCount());
         auto work = projectionWork;
 
         for (std::size_t index = 0; index < batch.records().size(); ++index) {
-            auto projected = batch.project(index, work);
+            auto group = batch.projectAll(index, work);
 
-            if (!projected) {
+            if (!group) {
                 throw Error({ErrorCode::PROTOCOL_FAILURE, "subscription-projection"});
             }
 
-            if constexpr (std::is_same_v<Event, RegisteredEvent>) {
-                if (auto *quote = std::get_if<events::Quote>(&projected->value)) {
-                    projectedEvents.emplace_back(std::move(*quote));
-                } else if (auto *trade = std::get_if<events::Trade>(&projected->value)) {
-                    projectedEvents.emplace_back(std::move(*trade));
-                } else if (auto *tradeETH = std::get_if<events::TradeETH>(&projected->value)) {
-                    projectedEvents.emplace_back(std::move(*tradeETH));
-                } else if (auto *message = std::get_if<events::Message>(&projected->value)) {
-                    projectedEvents.emplace_back(std::move(*message));
-                } else if (auto *configuration = std::get_if<events::Configuration>(&projected->value)) {
-                    projectedEvents.emplace_back(std::move(*configuration));
-                } else if (auto *order = std::get_if<events::Order>(&projected->value)) {
-                    projectedEvents.emplace_back(std::move(*order));
-                } else if (auto *summary = std::get_if<events::Summary>(&projected->value)) {
-                    projectedEvents.emplace_back(std::move(*summary));
-                } else if (auto *message = std::get_if<events::TextMessage>(&projected->value)) {
-                    projectedEvents.emplace_back(std::move(*message));
-                } else if (auto *configuration = std::get_if<events::TextConfiguration>(&projected->value)) {
-                    projectedEvents.emplace_back(std::move(*configuration));
-                } else if (auto *profile = std::get_if<events::Profile>(&projected->value)) {
-                    projectedEvents.emplace_back(std::move(*profile));
-                } else {
-                    throw Error({ErrorCode::PROTOCOL_FAILURE, "subscription-projection"});
-                }
-            } else {
-                if (!std::holds_alternative<Event>(projected->value)) {
-                    throw Error({ErrorCode::PROTOCOL_FAILURE, "subscription-projection"});
-                }
+            for (std::size_t output = 0; output < group->size; ++output) {
+                auto &projected = group->values[output];
 
-                projectedEvents.push_back(std::get<Event>(std::move(projected->value)));
+                if constexpr (std::is_same_v<Event, RegisteredEvent>) {
+                    std::visit(
+                        [&](auto &&value) {
+                            using Value = std::remove_cvref_t<decltype(value)>;
+
+                            if constexpr (std::is_same_v<Value, std::monostate>) {
+                                throw Error({ErrorCode::PROTOCOL_FAILURE, "subscription-projection"});
+                            } else {
+                                projectedEvents.emplace_back(std::move(value));
+                            }
+                        },
+                        std::move(projected.value));
+                } else {
+                    if (!std::holds_alternative<Event>(projected.value)) {
+                        throw Error({ErrorCode::PROTOCOL_FAILURE, "subscription-projection"});
+                    }
+
+                    projectedEvents.push_back(std::get<Event>(std::move(projected.value)));
+                }
             }
         }
 
@@ -2219,7 +2224,7 @@ class TypedConsumer final : public client::SubscriptionConsumer {
                    std::shared_ptr<CallbackExecutor> executor, const client::SubscriptionBatch &batch,
                    client::ReceiverProjectionWork work, std::optional<std::uint64_t> historyRevision)
             : port(std::move(port)), listeners(std::move(listeners)), executor(std::move(executor)), batch(&batch),
-              projectionWork(work), completion{this->port->statistics, batch.records().size()},
+              projectionWork(work), completion{this->port->statistics, batch.eventCount()},
               historyRevision(historyRevision) {
         }
 
@@ -2307,7 +2312,7 @@ class TypedConsumer final : public client::SubscriptionConsumer {
      */
     mux::BatchAction onBatch(const client::SubscriptionBatch &batch) override {
         std::optional<SubscriptionDataCallbackScope> callbackScope;
-        DispatchCompletion completion{port_->statistics, batch.records().size()};
+        DispatchCompletion completion{port_->statistics, batch.eventCount()};
         {
             std::lock_guard lock(port_->mutex);
             port_->callbackSynchronousExecuting = true;
@@ -2406,6 +2411,8 @@ class TypedConsumer final : public client::SubscriptionConsumer {
                 return deliver<events::Configuration>(batch, listeners, executor, completion, historyRevision);
             case EventDelivery::SUMMARY:
                 return deliver<events::Summary>(batch, listeners, executor, completion, historyRevision);
+            case EventDelivery::MARKET_MAKER:
+                return deliver<events::MarketMaker>(batch, listeners, executor, completion, historyRevision);
             case EventDelivery::ORDER:
                 return deliver<events::Order>(batch, listeners, executor, completion, historyRevision);
             case EventDelivery::TEXT_MESSAGE:
@@ -2533,7 +2540,7 @@ std::unique_ptr<NativeSubscription> registerSubscription(NativeEndpoint &endpoin
     result->consumer = std::make_shared<TypedConsumer>(port, plan.projectionWork);
     auto receiverWork = plan.work;
     auto queueWork = endpoint.profile.queueWork;
-    std::array<client::PreparedSubscriptionBinding, MAXIMUM_RECEIVING_RECORDS> selectedBindings{};
+    std::array<client::PreparedSubscriptionBinding, MAXIMUM_RECEIVING_BINDINGS> selectedBindings{};
 
     if (!copyReceivingBindings(endpoint.profile, plan, selectedBindings, receiverWork)) {
         throw Error({ErrorCode::RESOURCE_LIMIT, "subscription-binding-copy"});
@@ -2657,11 +2664,13 @@ void applyDesired(NativeEndpoint &endpoint, NativeSubscription &subscription, mu
 
     std::vector<core::SubscriptionRequest> requests;
 
-    if (plan.bindingCount == 0 || symbols.size() > endpoint.profile.clientLimits.commandEntries / plan.bindingCount) {
+    const auto physicalRecords = endpoint.profile.physicalRouteCount;
+
+    if (!physicalRecords || symbols.size() > endpoint.profile.clientLimits.commandEntries / physicalRecords) {
         throw Error({ErrorCode::RESOURCE_LIMIT, "subscription-route-entries"});
     }
 
-    requests.reserve(symbols.size() * plan.bindingCount);
+    requests.reserve(symbols.size() * physicalRecords);
     prepareReceivingSymbols(endpoint.profile, plan, symbols);
 
     for (std::size_t offset = 0; offset < plan.bindingCount; ++offset) {
@@ -2670,11 +2679,15 @@ void applyDesired(NativeEndpoint &endpoint, NativeSubscription &subscription, mu
         const auto context = endpoint.profile.schema.recordContext(binding.localId);
 
         for (const auto &symbol : symbols) {
-            if (receivingSymbolMatches(endpoint.profile, index, symbol)) {
-                const auto &physical = endpoint.profile.bindingExchanges[index] ? symbol.physical : symbol.logical;
-                appendReceivingDesiredRequest(requests, context, physical, symbol.selector, endpoint.profile.family,
-                                              symbol.fromTime, endpoint.profile.bindingTimeEncodings[index]);
+            const auto projections = receivingProjectionMask(endpoint.profile, index, symbol);
+
+            if (!projections) {
+                continue;
             }
+
+            const auto &physical = receivingPhysicalSymbol(endpoint.profile, index, symbol);
+            appendReceivingDesiredRequest(requests, context, physical, symbol.selector, endpoint.profile.family,
+                                          symbol.fromTime, endpoint.profile.bindingTimeEncodings[index], projections);
         }
     }
 

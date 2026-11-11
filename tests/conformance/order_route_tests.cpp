@@ -58,7 +58,9 @@ TEST_CASE("Order HISTORY defaults preserve the existing ordinary built-in catalo
     q::api::EventRegistryWork historyWork;
     auto history = d::defaultHistoryEventRegistry({}, historyWork);
     REQUIRE(history);
-    REQUIRE(history->registrations().size() == 1);
+    REQUIRE(history->registrations().size() == 3);
+    CHECK(history->registrations()[1].type == q::api::EventType::MARKET_MAKER);
+    CHECK(history->registrations()[2].projection == q::events::EventProjection::MARKET_MAKER_ORDERS);
     CHECK(history->registrations()[0].type == q::api::EventType::ORDER);
     CHECK(history->schema().records()[0].hasTime);
     q::api::EventRegistryWork emptyWork{0, 0};

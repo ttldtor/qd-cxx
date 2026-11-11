@@ -181,6 +181,8 @@ struct TickerDelivery {
     std::uint64_t revision;                  ///< View revision at initial admission or latest effective update.
     TickerDeliveryKind kind;                 ///< First membership value or subsequent live update.
     std::int32_t deliveryFlags; ///< Selected default-field TICKER projection, zero independently of raw source flags.
+    core::CapturedDeliveryProjections<core::SubscriptionMembership>
+        projections{}; ///< Original remaining business choices, transferred by pop.
 };
 
 /** Saturating cumulative local observations, never a quantified upstream-loss claim. */

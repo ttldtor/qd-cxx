@@ -855,7 +855,8 @@ TEST_CASE("custom Order HISTORY completion waits for accepted task and final sel
         sub->removeEventListener(id);
     });
     capture.reset();
-    sub->addSymbols("IBM");
+    sub->setSelectors(
+        std::array{api::SubscriptionSelector::indexed(u"IBM", qd::events::OrderSource::DEFAULT.indexedSource())});
     RuntimeJoin join{runtime};
     endpoint->connect("127.0.0.1:" + std::to_string(peer.port()));
     {
@@ -1301,6 +1302,10 @@ TEST_CASE("HISTORY revision cancels held work before mapping wait and replays co
     settings.contract = api::DeliveryContract::HISTORY;
     auto endpoint = runtime.createEndpoint(settings);
     auto sub = endpoint->getFeed()->createSubscription<qd::events::Order>();
+    const auto ibmSelector =
+        api::SubscriptionSelector::indexed(u"IBM", qd::events::OrderSource::DEFAULT.indexedSource());
+    const auto msftSelector =
+        api::SubscriptionSelector::indexed(u"MSFT", qd::events::OrderSource::DEFAULT.indexedSource());
     std::mutex mutex;
     std::condition_variable condition;
     std::vector<api::CallbackTask> tasks;
@@ -1344,7 +1349,7 @@ TEST_CASE("HISTORY revision cancels held work before mapping wait and replays co
         }
     } release{mutex, condition, releasePost};
 
-    sub->addSymbols("IBM");
+    sub->addSelectors(std::array{ibmSelector});
     endpoint->connect("127.0.0.1:" + std::to_string(peer.port()));
     std::optional<api::CallbackTask> old;
     {
@@ -1365,14 +1370,14 @@ TEST_CASE("HISTORY revision cancels held work before mapping wait and replays co
     });
 
     if (removeReadd)
-        sub->removeSymbols("IBM");
+        sub->removeSelector(ibmSelector);
     else
-        sub->setSymbols({"MSFT"});
+        sub->setSelectors(std::array{msftSelector});
 
-    sub->addSymbols("IBM");
+    sub->addSelectors(std::array{ibmSelector});
 
     if (!removeReadd)
-        sub->removeSymbols("MSFT");
+        sub->removeSelector(msftSelector);
 
     const auto accepted = sub->getSnapshot();
     CHECK(accepted.revision > before.revision);
@@ -1448,6 +1453,10 @@ TEST_CASE("HISTORY running BEGIN may finish while newer mapping waits for full c
     settings.contract = api::DeliveryContract::HISTORY;
     auto endpoint = runtime.createEndpoint(settings);
     auto sub = endpoint->getFeed()->createSubscription<qd::events::Order>();
+    const auto ibmSelector =
+        api::SubscriptionSelector::indexed(u"IBM", qd::events::OrderSource::DEFAULT.indexedSource());
+    const auto msftSelector =
+        api::SubscriptionSelector::indexed(u"MSFT", qd::events::OrderSource::DEFAULT.indexedSource());
     std::mutex mutex;
     std::condition_variable condition;
     std::optional<api::CallbackTask> task;
@@ -1493,7 +1502,7 @@ TEST_CASE("HISTORY running BEGIN may finish while newer mapping waits for full c
         }
     } release{mutex, condition, releaseCallback};
 
-    sub->addSymbols("IBM");
+    sub->addSelectors(std::array{ibmSelector});
     endpoint->connect("127.0.0.1:" + std::to_string(peer.port()));
     {
         std::unique_lock lock(mutex);
@@ -1512,7 +1521,7 @@ TEST_CASE("HISTORY running BEGIN may finish while newer mapping waits for full c
         }));
     }
     const auto publication = endpoint->getStatistics().observedAt;
-    sub->setSymbols({"MSFT"});
+    sub->setSelectors(std::array{msftSelector});
     const auto accepted = sub->getSnapshot().revision;
     REQUIRE(accepted > applied);
     REQUIRE(eventually([&] {
@@ -1562,6 +1571,10 @@ TEST_CASE("HISTORY obsolete delivery replays current remaining keys once and lea
     auto endpoint = runtime.createEndpoint(settings);
     auto keeper = endpoint->getFeed()->createSubscription<qd::events::Order>();
     auto sub = endpoint->getFeed()->createSubscription<qd::events::Order>();
+    const auto ibmSelector =
+        api::SubscriptionSelector::indexed(u"IBM", qd::events::OrderSource::DEFAULT.indexedSource());
+    const auto msftSelector =
+        api::SubscriptionSelector::indexed(u"MSFT", qd::events::OrderSource::DEFAULT.indexedSource());
     std::atomic<unsigned> keeperCalls{0}, ibm{0}, msft{0};
     keeper->addEventListener([&](auto batch) {
         keeperCalls += static_cast<unsigned>(batch.size());
@@ -1622,8 +1635,8 @@ TEST_CASE("HISTORY obsolete delivery replays current remaining keys once and lea
 
         return task;
     };
-    keeper->addSymbols("IBM");
-    sub->addSymbols("MSFT");
+    keeper->addSelectors(std::array{ibmSelector});
+    sub->addSelectors(std::array{msftSelector});
     endpoint->connect("127.0.0.1:" + std::to_string(peer.port()));
     auto first = take();
     CHECK(first.run() == api::CallbackTaskRunResult::COMPLETED);
@@ -1633,12 +1646,12 @@ TEST_CASE("HISTORY obsolete delivery replays current remaining keys once and lea
     }));
     const auto keeperBefore = keeper->getHistorySnapshot();
     REQUIRE(keeperBefore.sourceEpoch);
-    sub->addSymbols("IBM");
+    sub->addSelectors(std::array{ibmSelector});
     auto obsolete = take();
     const auto wire = endpoint->getStatistics().connection.writtenSubscriptionRecords.value;
     CHECK(sub->getStatistics().inFlightEvents == 1);
-    sub->removeSymbols("IBM");
-    sub->addSymbols("IBM");
+    sub->removeSelector(ibmSelector);
+    sub->addSelectors(std::array{ibmSelector});
     {
         std::lock_guard lock(mutex);
         releasePost = true;

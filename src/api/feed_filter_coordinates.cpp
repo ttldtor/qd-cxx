@@ -1,7 +1,9 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #include "feed_filter_coordinates.hpp"
+#include "receiving_profile.hpp"
 
+#include "../events/derived_order_sources.hpp"
 #include "../events/order_record_source.hpp"
 #include "qd/events/market_event_symbols.hpp"
 
@@ -31,6 +33,7 @@ bool supported(const EventRegistry &registry, EventType type) noexcept {
     case EventType::TEXT_CONFIGURATION:
     case EventType::MESSAGE:
     case EventType::CONFIGURATION:
+    case EventType::MARKET_MAKER:
     case EventType::ORDER:
         return true;
     }
@@ -47,7 +50,7 @@ bool usesRegionalCoordinates(EventType type) noexcept {
 /** Non-market projections use the generic source-selection rule, rather than MarketEventDelegateSet. */
 bool usesGenericSourceSelection(EventType type) noexcept {
     return type == EventType::TEXT_MESSAGE || type == EventType::TEXT_CONFIGURATION || type == EventType::MESSAGE ||
-           type == EventType::CONFIGURATION;
+           type == EventType::CONFIGURATION || type == EventType::MARKET_MAKER;
 }
 
 /** Match explicit Order source identity using the already validated record qualification rules.
@@ -62,6 +65,16 @@ bool matchesOrderSource(const EventRegistry &registry, const EventRegistration &
         return true;
     }
 
+    if (route.projection != events::EventProjection::NATIVE) {
+        const auto &record = registry.schema().records()[static_cast<std::size_t>(route.localRecordId)];
+        const bool maker = route.projection == events::EventProjection::MARKET_MAKER_ORDERS;
+        const auto exchange = events::market_symbols::getExchangeCode(record.name);
+        const auto sources = events::detail::derivedOrderSourceIds(
+            maker ? events::DerivedOrderKind::MARKET_MAKER : events::DerivedOrderKind::QUOTE, exchange);
+
+        return *sourceId == sources.bid || *sourceId == sources.ask || *sourceId == sources.unitary;
+    }
+
     auto limits = route.mappingLimits;
     const auto &record = registry.schema().records()[static_cast<std::size_t>(route.localRecordId)];
     const auto source = events::detail::prepareRecordOrderSource(record.name, limits);
@@ -73,6 +86,26 @@ bool matchesOrderSource(const EventRegistry &registry, const EventRegistration &
     }
 
     return source->id() == *sourceId;
+}
+
+/** Select a filter route while preserving generic classification outside ordinary receiving contracts.
+ * @param registry Immutable complete registered schema.
+ * @param route Prepared business route and its physical projection.
+ * @param contract Collector contract used to disambiguate the indexed MarketMaker and Order delegates.
+ * @param type Requested event kind.
+ * @param sourceId Optional selector/event source.
+ * @return True for a matching route and applicable indexed delegate.
+ */
+bool matchesFilterRoute(const EventRegistry &registry, const EventRegistration &route, DeliveryContract contract,
+                        EventType type, std::optional<std::int32_t> sourceId) {
+    if (route.type != type)
+        return false;
+
+    if ((type == EventType::ORDER || type == EventType::MARKET_MAKER) &&
+        !receivingRouteSupportsContract(route, contract))
+        return false;
+
+    return matchesOrderSource(registry, route, sourceId);
 }
 
 std::vector<FilterCoordinate> coordinates(const EventRegistry &registry, DeliveryContract contract, EventType type,
@@ -93,7 +126,7 @@ std::vector<FilterCoordinate> coordinates(const EventRegistry &registry, Deliver
     std::size_t selected = 0;
 
     for (const auto &route : registry.registrations()) {
-        if (route.type != type || !matchesOrderSource(registry, route, sourceId)) {
+        if (!matchesFilterRoute(registry, route, contract, type, sourceId)) {
             continue;
         }
 
@@ -105,7 +138,7 @@ std::vector<FilterCoordinate> coordinates(const EventRegistry &registry, Deliver
     }
 
     for (const auto &route : registry.registrations()) {
-        if (route.type != type || !matchesOrderSource(registry, route, sourceId)) {
+        if (!matchesFilterRoute(registry, route, contract, type, sourceId)) {
             continue;
         }
 
@@ -126,7 +159,7 @@ std::vector<FilterCoordinate> coordinates(const EventRegistry &registry, Deliver
     result.reserve(selected);
 
     for (const auto &route : registry.registrations()) {
-        if (route.type != type || !matchesOrderSource(registry, route, sourceId)) {
+        if (!matchesFilterRoute(registry, route, contract, type, sourceId)) {
             continue;
         }
 
@@ -176,7 +209,7 @@ std::vector<FilterCoordinate> filterSubscriptionCoordinates(const EventRegistry 
     }
 
     if (type == EventType::ORDER &&
-        (contract != DeliveryContract::HISTORY || selector.kind() == SubscriptionSymbolKind::ALL)) {
+        (contract == DeliveryContract::STREAM || selector.kind() == SubscriptionSymbolKind::ALL)) {
         return {};
     }
 
@@ -187,7 +220,8 @@ std::vector<FilterCoordinate> filterSubscriptionCoordinates(const EventRegistry 
     }
 
     return coordinates(registry, contract, type, selector.eventSymbol(), wildcard, limits,
-                       type == EventType::ORDER ? selector.sourceId() : std::nullopt);
+                       type == EventType::ORDER || type == EventType::MARKET_MAKER ? selector.sourceId()
+                                                                                   : std::nullopt);
 }
 
 std::vector<FilterCoordinate> filterEventCoordinates(const EventRegistry &registry, DeliveryContract contract,
@@ -218,6 +252,8 @@ std::vector<FilterCoordinate> filterEventCoordinates(const EventRegistry &regist
                     return EventType::MESSAGE;
                 } else if constexpr (std::is_same_v<Event, events::Configuration>) {
                     return EventType::CONFIGURATION;
+                } else if constexpr (std::is_same_v<Event, events::MarketMaker>) {
+                    return EventType::MARKET_MAKER;
                 } else if constexpr (std::is_same_v<Event, events::Order>) {
                     return EventType::ORDER;
                 } else {

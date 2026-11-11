@@ -447,8 +447,9 @@ void checkDefaultRegistry(const f::Scenario &scenario) {
 
             observed->append(batch);
         });
-    const auto symbol = q::api::SubscriptionSelector::plain(u"AAPL");
-    const auto marker = q::api::SubscriptionSelector::plain(u"MARKER");
+    const auto symbol = q::api::SubscriptionSelector::indexed(u"AAPL", q::events::OrderSource::DEFAULT.indexedSource());
+    const auto marker =
+        q::api::SubscriptionSelector::indexed(u"MARKER", q::events::OrderSource::DEFAULT.indexedSource());
     subscription->setSelectors(std::array{symbol});
     const std::array initial{sourceRecord(scenario, physical, 0, 3, SNAPSHOT_BEGIN, {}, false)};
     peer::PeerScript script;

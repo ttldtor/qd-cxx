@@ -23,7 +23,7 @@ orders->addSymbols("AAPL");
 `consume` обозначает собственную синхронную обработку приложения. Span действителен до возврата callback.
 Копия Order владеет symbol, полями и nullable MarketMaker независимо от subscription/runtime.
 
-HISTORY без явного registry использует стандартную схему default Order внутри SDK. Source-specific схемы
+HISTORY без явного registry использует стандартные SDK-owned схемы Order и MarketMaker. Эта страница описывает native Order; [производные источники](MARKET-MAKER-ORDER.ru.md) добавляют Quote на TICKER и MarketMaker на HISTORY. Source-specific схемы
 передаются через существующий immutable EventRegistry, каждый выбранный record регистрируется как
 EventType::ORDER. Native indexed layout явно выбирает точный COMPACT_INT Index через IndexedTimeLowInt32.
 Source определяется из имени записи; имена и дополнительные поля схемы остаются явной конфигурацией.

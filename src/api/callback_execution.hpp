@@ -3,6 +3,7 @@
 #pragma once
 #include "../transport/callback_retirement.hpp"
 #include "qd/api/feed.hpp"
+#include "qd/core/delivery_projection.hpp"
 #include <limits>
 #include <mutex>
 
@@ -70,7 +71,13 @@ class CallbackSlotPool final : public std::enable_shared_from_this<CallbackSlotP
 
     public:
     static constexpr std::size_t NO_SLOT = std::numeric_limits<std::size_t>::max();
-    static constexpr std::size_t PACKET_BYTES = 1024 * 1024 + 4096 + 4 * sizeof(RegisteredEvent);
+    // Four physical rows, at most five outputs each. Even charging every output the independent
+    // maximum symbol (128), two selected text fields (8192 each), terminators and opaque body
+    // (16384) remains below the prepaid one-MiB payload allowance. No source batch is retained.
+    static constexpr std::size_t PHYSICAL_RECORDS = 4;
+    static constexpr std::size_t MAXIMUM_EVENTS = PHYSICAL_RECORDS * core::MAX_DELIVERY_PROJECTIONS;
+    static_assert(MAXIMUM_EVENTS * (2 * (128 + 2 * 8192 + 3) + 16384) <= 1024 * 1024);
+    static constexpr std::size_t PACKET_BYTES = 1024 * 1024 + 4096 + MAXIMUM_EVENTS * sizeof(RegisteredEvent);
     [[nodiscard]] static std::size_t storageBytes(std::size_t slots);
     CallbackSlotPool(std::size_t slots, std::size_t reservations);
     /** Caller serializes a whole multi-subscription policy commit before using these reservations. */

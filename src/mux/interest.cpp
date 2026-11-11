@@ -285,7 +285,30 @@ struct MuxState::State {
         auto &entry = bank.entries[bank.entryCount++];
         entry = {{request.key.context, {text, request.key.symbol.size()}, request.key.selector},
                  request.historyBound,
-                 std::move(membership)};
+                 std::move(membership),
+                 request.projectionMask,
+                 {}};
+
+        for (std::size_t i = 0; i < core::MAX_DELIVERY_PROJECTIONS; ++i) {
+            const auto bit = core::DeliveryProjectionMask{1} << i;
+
+            if (!(request.projectionMask & bit)) {
+                continue;
+            }
+
+            if (previous && previous->historyBound == request.historyBound && (previous->projectionMask & bit)) {
+                entry.projectionMemberships[i] = previous->projectionMemberships[i];
+            } else {
+                if (nextMembership == std::numeric_limits<std::uint64_t>::max()) {
+                    return std::unexpected(MuxError::IDENTITY_EXHAUSTED);
+                }
+
+                auto &projection = entry.projectionMemberships[i];
+                projection.identity_ = identity;
+                projection.clientActivation_ = clientActivation;
+                projection.activation_ = ++nextMembership;
+            }
+        }
 
         for (std::size_t i = 0; i < bank.aggregateCount; ++i) {
             auto &aggregate = bank.aggregate[i];
@@ -493,9 +516,14 @@ std::expected<MuxChange, MuxError> MuxState::apply(Command command, const MuxCli
             return std::unexpected(MuxError::INVALID_HISTORY);
         }
 
+        if (command != Command::REMOVE && !core::validDeliveryProjectionMask(requests[i].projectionMask)) {
+            return std::unexpected(MuxError::INVALID_SELECTOR);
+        }
+
         if (command != Command::REMOVE) {
             for (std::size_t j = 0; j < i; ++j) {
-                if (sameKey(key, requests[j].key) && requests[i].historyBound != requests[j].historyBound) {
+                if (sameKey(key, requests[j].key) && (requests[i].historyBound != requests[j].historyBound ||
+                                                      requests[i].projectionMask != requests[j].projectionMask)) {
                     return std::unexpected(MuxError::CONTRADICTORY_INPUT);
                 }
             }
@@ -516,7 +544,7 @@ std::expected<MuxChange, MuxError> MuxState::apply(Command command, const MuxCli
         if (!selected || command == Command::ADD || command == Command::REMOVE) {
             for (std::size_t i = 0; i < oldRange.count; ++i) {
                 const auto &entry = old.entries[oldRange.offset + i];
-                core::SubscriptionRequest desired{entry.key, entry.historyBound};
+                core::SubscriptionRequest desired{entry.key, entry.historyBound, entry.projectionMask};
                 bool removed = false;
 
                 if (selected) {
@@ -582,7 +610,7 @@ std::expected<MuxChange, MuxError> MuxState::apply(Command command, const MuxCli
     for (std::size_t i = 0; !changed && i < previousRange.count; ++i) {
         const auto &entry = old.entries[previousRange.offset + i];
         const auto *next = state.find(candidate, nextRange, entry.key);
-        changed = !next || next->historyBound != entry.historyBound;
+        changed = !next || next->historyBound != entry.historyBound || next->projectionMask != entry.projectionMask;
     }
 
     if (!changed) {
@@ -771,9 +799,111 @@ std::expected<bool, MuxError> MuxState::isCurrent(const MuxClient &client, const
              bank.entries[range.offset + i].membership.activation_ == membership.alternateActivation_)) {
             return true;
         }
+
+        for (const auto &projection : bank.entries[range.offset + i].projectionMemberships) {
+            if (projection.activation_ == membership.activation_ ||
+                (membership.alternateActivation_ != 0 && projection.activation_ == membership.alternateActivation_)) {
+                return true;
+            }
+        }
     }
 
     return false;
+}
+
+std::expected<core::CapturedDeliveryProjections<MuxMembership>, MuxError>
+MuxState::selectProjections(const MuxClient &client, core::SubscriptionKey key, std::optional<std::int64_t> rawTime,
+                            MuxWork &work) const {
+    const auto physical = select(client, key, rawTime, work);
+
+    if (!physical) {
+        return std::unexpected(physical.error());
+    }
+
+    core::CapturedDeliveryProjections<MuxMembership> result;
+
+    if (!*physical) {
+        return result;
+    }
+
+    result.physical = **physical;
+    const auto &bank = state_->banks[state_->published];
+    const auto range = bank.ranges[client.slot_];
+    std::size_t visits = 1;
+    std::size_t units = 0;
+
+    if (!accumulate(visits, range.count, core::MAX_DELIVERY_PROJECTIONS + 2) ||
+        !accumulate(units, range.count, key.symbol.size()) || !accumulate(units, units)) {
+        return std::unexpected(MuxError::RESOURCE_LIMIT);
+    }
+
+    if (!charge(work.visits, visits) || !charge(work.symbolUnits, units)) {
+        return std::unexpected(MuxError::WORK_LIMIT);
+    }
+
+    for (std::size_t n = 0; n < range.count; ++n) {
+        const auto &entry = bank.entries[range.offset + n];
+
+        if (!entry.key.context.matches(key.context) ||
+            (entry.key.selector != core::SubscriptionSelectorKind::ALL && entry.key.symbol != key.symbol) ||
+            (rawTime && *rawTime < *entry.historyBound)) {
+            continue;
+        }
+
+        for (std::size_t i = 0; i < core::MAX_DELIVERY_PROJECTIONS; ++i) {
+            const auto bit = core::DeliveryProjectionMask{1} << i;
+
+            if (!(entry.projectionMask & bit)) {
+                continue;
+            }
+
+            if (!(result.mask & bit)) {
+                result.memberships[i] = entry.projectionMemberships[i];
+            } else if (result.memberships[i].activation_ != entry.projectionMemberships[i].activation_) {
+                result.memberships[i].alternateActivation_ = entry.projectionMemberships[i].activation_;
+            }
+
+            result.mask |= bit;
+        }
+    }
+
+    return result;
+}
+
+std::expected<core::DeliveryProjectionMask, MuxError>
+MuxState::currentProjectionMask(const MuxClient &client,
+                                const core::CapturedDeliveryProjections<MuxMembership> &captured, MuxWork &work) const {
+    core::DeliveryProjectionMask result = 0;
+
+    if (captured.mask == 0) {
+        const auto owner = isCurrent(client, {}, work);
+
+        if (!owner) {
+            return std::unexpected(owner.error());
+        }
+
+        return result;
+    }
+
+    for (std::size_t i = 0; i < core::MAX_DELIVERY_PROJECTIONS; ++i) {
+        const auto bit = core::DeliveryProjectionMask{1} << i;
+
+        if (!(captured.mask & bit)) {
+            continue;
+        }
+
+        const auto current = isCurrent(client, captured.memberships[i], work);
+
+        if (!current) {
+            return std::unexpected(current.error());
+        }
+
+        if (*current) {
+            result |= bit;
+        }
+    }
+
+    return result;
 }
 
 core::SubscriptionSelectorPolicy MuxState::selectorPolicy() const noexcept {

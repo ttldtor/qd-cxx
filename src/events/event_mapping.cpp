@@ -6,6 +6,7 @@
 #include "../core/schema_validation.hpp"
 
 #include <algorithm>
+#include <bit>
 #include <new>
 #include <stdexcept>
 #include <utility>
@@ -34,12 +35,68 @@ std::expected<void, MappingError> validateValues(const core::RecordContext &cont
     }
 
     for (std::size_t i = 0; i < shape.size(); ++i) {
-        if (record.values[i].type != shape[i] || !validator(record.values[i])) {
+        if (record.values[i].type != shape[i] || !validator(record.values[i], i)) {
             return std::unexpected(MappingError::INVALID_VALUES);
         }
     }
 
     return {};
+}
+
+/** Validate complete indexed-removal words without broadening ordinary UTF_CHAR values.
+ * @tparam Record Owning or borrowed complete field representation.
+ * @tparam Validator Its unchanged canonical field validator.
+ * @param context Exact expected provenance.
+ * @param shape Entire retained source shape.
+ * @param record Complete caller fields, retained only during this call.
+ * @param layout Actual source-time layout copied by the prepared mapper.
+ * @param rawTime Full signed removal identity.
+ * @param canonical Unchanged ordinary field validator.
+ * @return Complete validation or typed refusal, without allocating or modifying fields.
+ */
+template <class Record, class Validator>
+std::expected<void, MappingError>
+validateRemovalValues(const core::RecordContext &context, std::span<const core::SerialFieldType> shape, Record record,
+                      const core::IndexedTimeLayout &layout, std::int64_t rawTime, Validator canonical) noexcept {
+    if (!context.matches(record.context)) {
+        return std::unexpected(MappingError::WRONG_CONTEXT);
+    }
+
+    if (record.values.size() != shape.size()) {
+        return std::unexpected(MappingError::INVALID_VALUES);
+    }
+
+    const auto bits = static_cast<std::uint64_t>(rawTime);
+    const auto high = std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(bits >> 32));
+    const auto low = std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(bits));
+    const auto *pair = std::get_if<core::IndexedTimePairInt32>(&layout);
+
+    if (pair) {
+        if (pair->firstField >= shape.size() || pair->secondField >= shape.size() ||
+            pair->firstField == pair->secondField || record.values[pair->firstField].raw != high ||
+            record.values[pair->secondField].raw != low) {
+            return std::unexpected(MappingError::INVALID_VALUES);
+        }
+    } else if (const auto *single = std::get_if<core::IndexedTimeSingleInt64>(&layout)) {
+        if (single->field >= shape.size() || record.values[single->field].raw != rawTime) {
+            return std::unexpected(MappingError::INVALID_VALUES);
+        }
+    } else {
+        const auto field = std::get<core::IndexedTimeLowInt32>(layout).field;
+
+        if (field >= shape.size() || record.values[field].raw != low) {
+            return std::unexpected(MappingError::INVALID_VALUES);
+        }
+    }
+
+    return validateValues(context, shape, record, [&](const auto &field, std::size_t index) {
+        if (canonical(field)) {
+            return true;
+        }
+
+        return pair && (index == pair->firstField || index == pair->secondField) &&
+               field.type == core::SerialFieldType::UTF_CHAR && !field.units && !field.bytes;
+    });
 }
 } // namespace
 
@@ -175,11 +232,30 @@ std::expected<EventMapping, MappingError> EventMapping::prepare(const core::Loca
 }
 
 std::expected<void, MappingError> EventMapping::validate(RecordValueView record) const noexcept {
-    return validateValues(context_, shape_, record, core::validFieldValue);
+    return validateValues(context_, shape_, record, [](const auto &field, std::size_t) {
+        return core::validFieldValue(field);
+    });
 }
 
 std::expected<void, MappingError> EventMapping::validateView(BorrowedRecordValueView record) const noexcept {
-    return validateValues(context_, shape_, record, core::validFieldValueView);
+    return validateValues(context_, shape_, record, [](const auto &field, std::size_t) {
+        return core::validFieldValueView(field);
+    });
 }
 
+std::expected<void, MappingError> EventMapping::validateIndexedRemoval(RecordValueView record,
+                                                                       const core::IndexedTimeLayout &layout,
+                                                                       std::int64_t rawTime) const noexcept {
+    return validateRemovalValues(context_, shape_, record, layout, rawTime, [](const auto &field) {
+        return core::validFieldValue(field);
+    });
+}
+
+std::expected<void, MappingError> EventMapping::validateIndexedRemoval(BorrowedRecordValueView record,
+                                                                       const core::IndexedTimeLayout &layout,
+                                                                       std::int64_t rawTime) const noexcept {
+    return validateRemovalValues(context_, shape_, record, layout, rawTime, [](const auto &field) {
+        return core::validFieldValueView(field);
+    });
+}
 } // namespace org::ttldtor::qdcxx::events

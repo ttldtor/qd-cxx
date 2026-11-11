@@ -7,6 +7,7 @@
 #include "qd/events/profile.hpp"
 #include "qd/events/quote.hpp"
 
+#include "event_registry_defaults.hpp"
 #include "receiving_profile.hpp"
 
 #include <doctest/doctest.h>
@@ -442,7 +443,7 @@ TEST_CASE("receiving preparation selects all explicit same-kind routes and deriv
 
 TEST_CASE("receiving preparation refuses valid registries beyond its qualified schema ceiling") {
     auto limits = SCHEMA_LIMITS;
-    limits.fields = limits.lookups = 129;
+    limits.fields = limits.lookups = 285;
     core::LocalRecord record{0, u"Generic", false, {}, {}};
 
     for (std::size_t index = 0; index < limits.fields; ++index) {
@@ -540,4 +541,80 @@ TEST_CASE("registry byte ceiling includes actual shared state and control alloca
     CHECK(std::get<api::EventRegistryError>(refused.error().cause) == api::EventRegistryError::RESOURCE_LIMIT);
     CHECK_FALSE(refused.error().registrationIndex);
     CHECK(work.preparation < api::EventRegistryWork{}.preparation);
+}
+
+TEST_CASE("SDK defaults retain all real regional records and explicit physical delegate families") {
+    auto ticker = api::detail::defaultReceivingRegistry(api::DeliveryContract::TICKER);
+    REQUIRE(ticker);
+    CHECK(ticker->schema().records().size() == 35);
+    CHECK(ticker->registrations().size() == 62);
+    std::size_t fields = 0, lookups = 0;
+
+    for (const auto &record : ticker->schema().records()) {
+        fields += record.fields.size();
+        lookups += record.lookups.size();
+    }
+
+    CHECK(fields == 225);
+    CHECK(lookups == 607);
+
+    for (char16_t exchange = u'A'; exchange <= u'Z'; ++exchange) {
+        const auto name = u"Quote&" + std::u16string(1, exchange);
+        CHECK(std::ranges::count_if(ticker->schema().records(), [&](const auto &record) {
+                  return record.name == name;
+              }) == 1);
+    }
+
+    auto history = api::detail::defaultReceivingRegistry(api::DeliveryContract::HISTORY);
+    REQUIRE(history);
+    CHECK(history->schema().records().size() == 2);
+    CHECK(history->registrations().size() == 3);
+    auto defaults = api::EventRegistryLimits{};
+    api::EventRegistryWork work;
+    auto unchanged = api::EventRegistry::builtIn(defaults, work);
+    REQUIRE(unchanged);
+    CHECK(unchanged->schema().records().size() == 9);
+    CHECK(unchanged->registrations().size() == 9);
+
+    api::RuntimeOptions runtime;
+    runtime.dnsServers.push_back({{127, 0, 0, 1}});
+    const auto profile = api::detail::prepareReceivingProfile(runtime, {}, "127.0.0.1", 12345);
+    CHECK(profile.physicalRouteCount == 35);
+    CHECK(profile.clientLimits.commandEntries == 16 * 35);
+    CHECK(profile.interests.entries == 8 * 16 * 35);
+    CHECK(profile.endpoint.settings().budgets.schema.records == 42);
+    CHECK(profile.endpoint.settings().budgets.layout.records == 42);
+    CHECK(profile.endpoint.settings().budgets.session.context.descriptions == 42);
+    CHECK(profile.eventPlans.size() == 2047);
+    CHECK(profile.routing.retainedMetadataBytes >=
+          profile.eventPlans.capacity() * sizeof(api::detail::ReceivingEventPlan));
+    std::cout << "DERIVED_DEFAULT_STORAGE registry=" << ticker->storageBytes()
+              << " profile=" << sizeof(api::detail::ReceivingProfile)
+              << " plan=" << sizeof(api::detail::ReceivingEventPlan)
+              << " retained=" << profile.routing.retainedMetadataBytes << '\n';
+}
+
+TEST_CASE("one physical record admits only one native and one compatible derived group") {
+    auto source = events::defaultQuoteSchema(SCHEMA_LIMITS);
+    REQUIRE(source);
+    api::EventRegistration derived{api::EventType::ORDER, 0};
+    derived.projection = events::EventProjection::QUOTE_ORDERS;
+    api::EventRegistryWork work;
+    auto accepted = api::EventRegistry::create(
+        *source, std::array{api::EventRegistration{api::EventType::QUOTE, 0}, derived}, {}, work);
+    REQUIRE(accepted);
+    CHECK(accepted->registrations().size() == 2);
+    auto refuse = [&](auto routes) {
+        api::EventRegistryWork attempt;
+        auto result = api::EventRegistry::create(*source, routes, {}, attempt);
+        REQUIRE_FALSE(result);
+        REQUIRE(std::holds_alternative<api::EventRegistryError>(result.error().cause));
+        CHECK(std::get<api::EventRegistryError>(result.error().cause) == api::EventRegistryError::INVALID_INPUT);
+    };
+    refuse(
+        std::array{api::EventRegistration{api::EventType::QUOTE, 0}, api::EventRegistration{api::EventType::ORDER, 0}});
+    auto otherDerived = derived;
+    otherDerived.projection = events::EventProjection::MARKET_MAKER_ORDERS;
+    refuse(std::array{derived, otherDerived});
+    refuse(std::array{api::EventRegistration{api::EventType::QUOTE, 0}, otherDerived});
 }

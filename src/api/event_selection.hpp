@@ -41,7 +41,8 @@ enum class EventSelection {
     MESSAGE = 128,                        ///< Selected serialized Message routes.
     CONFIGURATION = 256,                  ///< Selected serialized Configuration routes.
     ORDER = 512,                          ///< Selected ordinary indexed Order routes.
-    ALL = 1023,                           ///< Every supported event route.
+    MARKET_MAKER = 1024,                  ///< Selected indexed MarketMaker routes.
+    ALL = 2047,                           ///< Every supported event route.
 };
 
 /** Test a finite supported-kind selection without depending on local record positions.
@@ -53,7 +54,7 @@ constexpr bool selectsEvent(EventSelection selection, EventType type) noexcept {
     if (type != EventType::QUOTE && type != EventType::PROFILE && type != EventType::TRADE &&
         type != EventType::TRADE_ETH && type != EventType::SUMMARY && type != EventType::TEXT_MESSAGE &&
         type != EventType::TEXT_CONFIGURATION && type != EventType::MESSAGE && type != EventType::CONFIGURATION &&
-        type != EventType::ORDER) {
+        type != EventType::ORDER && type != EventType::MARKET_MAKER) {
         return false;
     }
 
@@ -72,6 +73,7 @@ enum class EventDelivery {
     MESSAGE,            ///< Owning serialized Message values.
     CONFIGURATION,      ///< Owning serialized Configuration values.
     ORDER,              ///< Complete owning ordinary indexed Order values.
+    MARKET_MAKER,       ///< Complete owning indexed MarketMaker values.
     REGISTERED          ///< Owning public RegisteredEvent variants, restricted by EventSelection.
 };
 } // namespace org::ttldtor::qdcxx::api::detail

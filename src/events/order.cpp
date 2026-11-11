@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/events/order.hpp"
 #include "decimal_projection.hpp"
+#include "numeric_int_projection.hpp"
 #include "order_record_source.hpp"
 #include "qd/events/event_flags.hpp"
 #include "qd/events/short_string.hpp"
-#include "wide_integer_projection.hpp"
 #include <bit>
 #include <cmath>
 #include <limits>
@@ -149,35 +149,6 @@ constexpr std::size_t SELECTION_COUNT = 16;
 constexpr std::array NUMERIC_SELECTIONS{OrderField::PRICE, OrderField::SIZE, OrderField::EXECUTED_SIZE,
                                         OrderField::TRADE_PRICE, OrderField::TRADE_SIZE};
 
-/** Apply the generated Count getAsInt accessor, not a business-double-to-long substitute.
- * @param type Exact previously selected numeric type.
- * @param raw Complete canonical logical bits.
- * @return Signed32 production result widened by the Order delegate to signed64.
- */
-std::int32_t orderCount(core::SerialFieldType type, std::int64_t raw) noexcept {
-    if (type == core::SerialFieldType::DECIMAL) {
-        const auto value = detail::projectPresentBusinessDouble(type, raw);
-
-        if (std::isnan(value)) {
-            return 0;
-        }
-
-        if (value >= 0x1p31) {
-            return std::numeric_limits<std::int32_t>::max();
-        }
-
-        if (value <= -0x1p31) {
-            return std::numeric_limits<std::int32_t>::min();
-        }
-
-        return static_cast<std::int32_t>(value);
-    }
-
-    const auto value = type == core::SerialFieldType::WIDE_DECIMAL ? detail::projectWideInteger(raw) : raw;
-
-    return std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(value));
-}
-
 /** Produce owning fields only after complete schema and canonical-value validation.
  * @tparam Field Existing owned or callback-borrowed canonical field representation.
  * @param symbol Complete exact event symbol, borrowed through return.
@@ -239,7 +210,7 @@ std::expected<Order, MappingError> projectOrder(std::u16string_view symbol, std:
 
         if (selected[fieldIndex(OrderField::COUNT)]) {
             const auto &f = fields[*selected[fieldIndex(OrderField::COUNT)]];
-            result.count = orderCount(f.type, f.raw);
+            result.count = detail::projectPresentInt(f.type, f.raw);
         }
 
         std::array<detail::BusinessNumericSnapshot, 5> snapshots{};

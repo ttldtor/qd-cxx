@@ -274,11 +274,14 @@ struct TickerCollector::Impl {
     /** One membership's two queue links and single pending value. */
     struct Pending {
         core::SubscriptionMembership membership; ///< Owning fixed core activation, not source storage.
-        std::uint64_t revision = 0;              ///< Desired revision at effective source/initial admission.
-        std::size_t next[2]{NONE, NONE};         ///< Next initial/update links.
-        bool queued[2]{false, false};            ///< Each key occupies at most one node in either queue.
-        bool first = true;                       ///< No value has yet been acknowledged for this activation.
-        bool dirty = false;                      ///< Single logical pending value across both links.
+        core::CapturedDeliveryProjections<core::SubscriptionMembership>
+            projections{};                            ///< Known original bit activations, including acknowledged bits.
+        core::DeliveryProjectionMask pendingMask = 0; ///< Remaining source-owned business outputs only.
+        std::uint64_t revision = 0;                   ///< Desired revision at effective source/initial admission.
+        std::size_t next[2]{NONE, NONE};              ///< Next initial/update links.
+        bool queued[2]{false, false};                 ///< Each key occupies at most one node in either queue.
+        bool first = true;                            ///< No value has yet been acknowledged for this activation.
+        bool dirty = false;                           ///< Single logical pending value across both links.
     };
 
     /** Scalar queue/offer state copied into preallocated candidate scratch. */
@@ -288,6 +291,7 @@ struct TickerCollector::Impl {
         std::size_t head[2]{NONE, NONE};    ///< Initial and update heads.
         std::size_t tail[2]{NONE, NONE};    ///< Initial and update tails.
         std::size_t pending = 0;            ///< Distinct dirty keys, never more than cache cardinality.
+        std::size_t pendingWeight = 0;      ///< Source-owned remaining business outputs; excludes transferred Mux FIFO.
         std::size_t credit = 0;             ///< Initial/update balance at the single-record retrieval boundary.
         std::size_t offered = NONE;         ///< Current prepared cache index.
         std::size_t offeredQueue = INITIAL; ///< Queue traversed by the prepared single-record retrieval.
@@ -349,8 +353,8 @@ struct TickerCollector::Impl {
         if (views)
             for (std::size_t v = 0; v < limits.viewSlots; ++v) {
                 core::detail::updateDelivery(views[v].statistics, [&](auto &s) {
-                    s.pendingEvents -= views[v].queues.pending;
-                    s.discardedEvents.add(views[v].queues.pending);
+                    s.pendingEvents -= views[v].queues.pendingWeight;
+                    s.discardedEvents.add(views[v].queues.pendingWeight);
                 });
             }
 
@@ -689,16 +693,58 @@ struct TickerCollector::Impl {
 
         if (data[index].dirty) {
             --state.pending;
+            const auto weight = static_cast<std::size_t>(std::popcount(data[index].pendingMask));
+            state.pendingWeight -= weight;
             count(counts.withdrawn, 1, counts.saturated);
-            core::detail::updateDelivery(views[slot].statistics, [](auto &s) {
-                --s.pendingEvents;
-                s.discardedEvents.add(1);
+            core::detail::updateDelivery(views[slot].statistics, [&](auto &s) {
+                s.pendingEvents -= weight;
+                s.discardedEvents.add(weight);
             });
         }
 
         unlink(state, data, index, INITIAL);
         unlink(state, data, index, UPDATE);
         data[index] = {};
+        state.offered = NONE;
+    }
+
+    /** Prune only original pending bits; acknowledged bits carry no remaining source weight.
+     * @param slot Actual source view.
+     * @param index Stable cache slot.
+     */
+    void pruneProjections(std::size_t slot, std::size_t index) noexcept {
+        auto &state = views[slot].queues;
+        auto *data = rows(pending.get(), slot);
+        auto &item = data[index];
+        const auto current = views[slot].desired->currentProjectionMask(item.projections);
+        const auto removed = item.pendingMask & ~current;
+        const auto removedWeight = static_cast<std::size_t>(std::popcount(removed));
+
+        if (removedWeight) {
+            state.pendingWeight -= removedWeight;
+            core::detail::updateDelivery(views[slot].statistics, [&](auto &s) {
+                s.pendingEvents -= removedWeight;
+                s.discardedEvents.add(removedWeight);
+            });
+        }
+
+        item.projections.mask &= current;
+        item.pendingMask &= current;
+
+        if (item.dirty && item.pendingMask == 0) {
+            --state.pending;
+            item.dirty = false;
+            count(counts.withdrawn, 1, counts.saturated);
+            unlink(state, data, index, INITIAL);
+            unlink(state, data, index, UPDATE);
+        }
+
+        if (!current && !views[slot].desired->isCurrent(item.membership)) {
+            unlink(state, data, index, INITIAL);
+            unlink(state, data, index, UPDATE);
+            item = {};
+        }
+
         state.offered = NONE;
     }
 
@@ -712,10 +758,12 @@ struct TickerCollector::Impl {
     void dirty(Queues &state, Pending *data, std::size_t index, const core::SubscriptionEntry &entry,
                std::uint64_t revision) noexcept {
         auto &item = data[index];
-        ++state.admissions;
-
-        if (item.dirty)
-            ++state.conflations;
+        const auto next = core::captureDeliveryProjections(entry);
+        const auto oldWeight = static_cast<std::size_t>(std::popcount(item.pendingMask));
+        state.admissions += next.count();
+        state.conflations += oldWeight;
+        state.pendingWeight -= oldWeight;
+        state.pendingWeight += next.count();
 
         if (!item.dirty) {
             ++state.pending;
@@ -723,6 +771,8 @@ struct TickerCollector::Impl {
         }
 
         item.membership = entry.membership;
+        item.projections = next;
+        item.pendingMask = next.mask;
         item.revision = revision;
 
         if (item.first) {
@@ -741,7 +791,7 @@ struct TickerCollector::Impl {
         // Unlink/retirement can revisit each queue; membership validation, ordered initial
         // lookup and last-interest eviction each scan desired entries independently.
         constexpr std::size_t QUEUE_PASSES = 8;
-        constexpr std::size_t MEMBERSHIP_PASSES = 4;
+        constexpr std::size_t MEMBERSHIP_PASSES = 4 * (core::MAX_DELIVERY_PROJECTIONS + 1);
         auto visits = product(sum(limits.cacheKeys, 4), sum(limits.cacheKeys, 1));
         visits = product(product(visits, sum(limits.viewSlots, 1)), QUEUE_PASSES);
         visits =
@@ -839,9 +889,7 @@ struct TickerCollector::Impl {
         auto *data = rows(pending.get(), slot);
 
         for (std::size_t i = 0; i < limits.cacheKeys; ++i) {
-            if (!views[slot].desired->isCurrent(data[i].membership)) {
-                withdraw(slot, i);
-            }
+            pruneProjections(slot, i);
         }
 
         if (state != TickerState::STALE && state != TickerState::RESET_PENDING) {
@@ -849,7 +897,9 @@ struct TickerCollector::Impl {
                 const auto i = order[n];
                 const auto *entry = match(slot, *entries[i].record);
 
-                if (entry && !views[slot].desired->isCurrent(data[i].membership)) {
+                if (entry && (!views[slot].desired->isCurrent(data[i].membership) ||
+                              (entry->projectionMask & ~data[i].projections.mask))) {
+                    data[i].first = true;
                     dirty(views[slot].queues, data, i, *entry, views[slot].desired->revision());
                 }
             }
@@ -867,7 +917,8 @@ struct TickerCollector::Impl {
         core::detail::updateDelivery(views[slot].statistics, [&](auto &s) {
             s.admittedEvents.add(queues.admissions);
             s.conflatedEvents.add(queues.conflations);
-            s.pendingEvents += queues.admissions - queues.conflations;
+            s.pendingEvents -= queues.conflations;
+            s.pendingEvents += queues.admissions;
         });
         queues.admissions = queues.conflations = 0;
     }
@@ -1648,13 +1699,16 @@ std::expected<std::optional<TickerDelivery>, TickerError> TickerCollector::front
         q.nextCredit = selected.nextCredit;
         const auto &item = s.rows(s.pending.get(), *slot)[q.offered];
         const auto &entry = s.entries[q.offered];
+        auto projections = item.projections;
+        projections.mask = item.pendingMask;
 
         return std::optional<TickerDelivery>{{{s.valueRecord(q.offered), TickerEpochToken(s.origin, NONE, s.generation),
                                                entry.generation, true, entry.record, entry.defaultValue},
                                               item.membership,
                                               item.revision,
                                               item.first ? TickerDeliveryKind::INITIAL : TickerDeliveryKind::LIVE,
-                                              0}};
+                                              0,
+                                              std::move(projections)}};
     } catch (TickerError error) {
         return std::unexpected(error);
     }
@@ -1691,6 +1745,8 @@ std::expected<void, TickerError> TickerCollector::pop(const TickerViewToken &vie
         }
 
         s.unlink(q, data, index, q.offeredQueue);
+        q.pendingWeight -= static_cast<std::size_t>(std::popcount(data[index].pendingMask));
+        data[index].pendingMask = 0;
         data[index].dirty = false;
         data[index].first = false;
         --q.pending;
@@ -1807,8 +1863,8 @@ std::expected<TickerResetNotice, TickerError> TickerCollector::reset(TickerWork 
 
         for (std::size_t v = 0; v < s.limits.viewSlots; ++v) {
             core::detail::updateDelivery(s.views[v].statistics, [&](auto &statistics) {
-                statistics.pendingEvents -= s.views[v].queues.pending;
-                statistics.discardedEvents.add(s.views[v].queues.pending);
+                statistics.pendingEvents -= s.views[v].queues.pendingWeight;
+                statistics.discardedEvents.add(s.views[v].queues.pendingWeight);
             });
             s.views[v].queues = {};
         }

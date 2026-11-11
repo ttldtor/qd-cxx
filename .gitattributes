@@ -808,3 +808,10 @@ tools/upstream/live-history-range-oracle/*.java text eol=lf
 tools/upstream/live-history-range-oracle/*.ps1 text eol=lf
 tests/fixtures/live-history-range/*.tsv -text -whitespace
 tests/fixtures/live-history-range/*.json text eol=lf
+
+# Preserve exact MarketMaker and derived Order observations and QTP fixtures.
+tests/fixtures/market-maker-order/*.tsv -text -whitespace
+tests/fixtures/market-maker-order/wire/*.qtp -text -whitespace
+tests/fixtures/market-maker-order/*.json text eol=lf
+tools/upstream/market-maker-order-oracle/*.java text eol=lf
+tools/upstream/market-maker-order-oracle/*.ps1 text eol=lf

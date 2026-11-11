@@ -89,6 +89,9 @@ struct MuxEntry {
     core::SubscriptionKey key;                ///< Exact provenance and symbol owned by the published bank.
     std::optional<std::int64_t> historyBound; ///< Signed raw lower bound only for HISTORY.
     MuxMembership membership;                 ///< Activation belonging to this client and this owner.
+    core::DeliveryProjectionMask projectionMask = core::NATIVE_DELIVERY_PROJECTION; ///< Local selected outputs only.
+    std::array<MuxMembership, core::MAX_DELIVERY_PROJECTIONS>
+        projectionMemberships{}; ///< Independently stable original bit activations.
 };
 
 /** Local application barrier; neither wire emission nor peer acknowledgement is implied. */
@@ -164,6 +167,25 @@ class MuxState {
     /** Inspect the immutable explicit selector profile.
      * @return Chosen profile; EXACT_ONLY when moved from. No work, allocation or mutation occurs.
      */
+    /** Capture independently activated projections after matching original exact/all choices.
+     * @param client Exact current logical client identity.
+     * @param key Concrete physical record/symbol, never an All selector.
+     * @param rawTime Actual indexed raw time for HISTORY only.
+     * @param work Remaining attempt, matching and fixed metadata visits.
+     * @return Original bounded per-bit capture, empty when no physical choice is eligible, or typed refusal.
+     */
+    [[nodiscard]] std::expected<core::CapturedDeliveryProjections<MuxMembership>, MuxError>
+    selectProjections(const MuxClient &client, core::SubscriptionKey key, std::optional<std::int64_t> rawTime,
+                      MuxWork &work) const;
+    /** Prune only original captured bit activations, never looking up a new desired mask.
+     * @param client Exact current client identity.
+     * @param captured Detached original choices.
+     * @param work Remaining finite membership inspections.
+     * @return Surviving subset or explicit owner/work failure.
+     */
+    [[nodiscard]] std::expected<core::DeliveryProjectionMask, MuxError>
+    currentProjectionMask(const MuxClient &client, const core::CapturedDeliveryProjections<MuxMembership> &captured,
+                          MuxWork &work) const;
     [[nodiscard]] core::SubscriptionSelectorPolicy selectorPolicy() const noexcept;
     /** Activate one fixed slot; even an empty new client advances the global revision.
      * @param work Remaining turn credits, charged before scanning slots.

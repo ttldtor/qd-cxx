@@ -102,10 +102,12 @@ TEST_CASE("routing workspace is separate finite storage with an attainable exact
     const auto corpus = f::read(fixture);
     auto selected = profile(corpus.at("millis"), true);
     const auto &limits = selected.routing;
+    CHECK(selected.bindingExchanges.size() == detail::MAXIMUM_RECEIVING_BINDINGS);
+    CHECK(selected.eventPlans.size() == detail::RECEIVING_EVENT_SELECTIONS);
     CHECK(limits.retainedMetadataBytes ==
-          sizeof(selected.bindingExchanges) + sizeof(selected.eventPlans) +
-              sizeof(std::array<q::client::PreparedSubscriptionBinding, detail::MAXIMUM_RECEIVING_RECORDS>));
-    CHECK(sizeof(selected.bindingExchanges) == 32);
+          sizeof(selected.bindingExchanges) + sizeof(selected.bindingSources) + sizeof(selected.bindingTimeEncodings) +
+              sizeof(selected.versionBindings) + selected.eventPlans.capacity() * sizeof(detail::ReceivingEventPlan) +
+              sizeof(std::array<q::client::PreparedSubscriptionBinding, detail::MAXIMUM_RECEIVING_BINDINGS>));
     CHECK(limits.symbols == 5);
     CHECK(limits.temporaryTextUnits == 2 * 5 * 128);
     CHECK(limits.temporaryBytes >= 5 * sizeof(detail::ReceivingSymbol));
