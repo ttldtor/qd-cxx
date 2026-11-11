@@ -586,14 +586,25 @@ TEST_CASE("SDK defaults retain all real regional records and explicit physical d
 
     auto history = api::detail::defaultReceivingRegistry(api::DeliveryContract::HISTORY);
     REQUIRE(history);
-    REQUIRE(history->schema().records().size() == 6);
-    REQUIRE(history->registrations().size() == 7);
+    REQUIRE(history->schema().records().size() == 7);
+    REQUIRE(history->registrations().size() == 8);
     CHECK(history->schema().records()[2].name == u"SpreadOrder");
     CHECK(history->schema().records()[3].name == u"AnalyticOrder");
     CHECK(history->schema().records()[4].name == u"OtcMarketsOrder");
     CHECK(history->schema().records()[5].name == u"OtcMarketsOrder#pink");
     CHECK(history->registrations()[5].type == api::EventType::OTC_MARKETS_ORDER);
     CHECK(history->registrations()[6].type == api::EventType::OTC_MARKETS_ORDER);
+    constexpr std::int32_t SERIES_RECORD_ID = 6;
+    const auto &series = history->schema().records()[SERIES_RECORD_ID];
+    CHECK(series.name == u"Series");
+    CHECK(series.hasTime);
+    REQUIRE(series.indexedTimeLayout);
+    const auto *index = std::get_if<core::IndexedTimeLowInt32>(&*series.indexedTimeLayout);
+    REQUIRE(index);
+    REQUIRE(index->field < series.lookups.size());
+    CHECK(series.lookups[index->field].name == u"Index");
+    CHECK(history->registrations()[7].type == api::EventType::SERIES);
+    CHECK(history->registrations()[7].localRecordId == SERIES_RECORD_ID);
     auto defaults = api::EventRegistryLimits{};
     api::EventRegistryWork work;
     auto unchanged = api::EventRegistry::builtIn(defaults, work);

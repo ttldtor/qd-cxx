@@ -2,7 +2,7 @@
 
 [Русская версия](FEED-API.ru.md) · [Practical guides](guides.md) · [API reference](api.md)
 
-Use `qd/api/feed.hpp` and link `qdcxx_feed` to receive typed `events::Quote`, `events::Profile`, `events::Trade`, `events::TradeETH`, `events::Summary`, `events::TextMessage`, `events::TextConfiguration`, `events::Message`, `events::Configuration`, `events::Order`, `events::MarketMaker`, `events::SpreadOrder`, `events::AnalyticOrder`, `events::OtcMarketsOrder` and `events::OrderImbalance` through a library-owned worker. Applications create endpoints,
+Use `qd/api/feed.hpp` and link `qdcxx_feed` to receive typed `events::Quote`, `events::Profile`, `events::Trade`, `events::TradeETH`, `events::Summary`, `events::TextMessage`, `events::TextConfiguration`, `events::Message`, `events::Configuration`, `events::Order`, `events::MarketMaker`, `events::SpreadOrder`, `events::AnalyticOrder`, `events::OtcMarketsOrder`, `events::OrderImbalance` and `events::Series` through a library-owned worker. Applications create endpoints,
 listeners and exact symbol subscriptions; the library progresses connection,
 finite recovery, queues and delivery. Subscriptions can be created before or after
 `connect()`.
@@ -11,7 +11,7 @@ This API supports plain binary QTP over TCP with built-in full Quote/Profile/Tra
 and text/serialized-event schemas or explicit validated caller schemas and registered mappings.
 An endpoint chooses TICKER (default, latest values with possible
 conflation), STREAM (every admitted selected source record), or explicit HISTORY (indexed shared storage
-and independent views). Ordinary Order, MarketMaker, SpreadOrder, AnalyticOrder and OtcMarketsOrder
+and independent views). Ordinary Order, MarketMaker, SpreadOrder, AnalyticOrder, OtcMarketsOrder and Series
 use HISTORY. Quote-derived Order and OrderImbalance use TICKER. The SDK owns both standard
 catalogs, including regional A..Z sources. See [MarketMaker and derived Order](MARKET-MAKER-ORDER.md),
 [order variants](ORDER-VARIANTS.md) and [OTC orders and auction imbalance](AUCTION-ORDER-EVENTS.md).
@@ -577,6 +577,14 @@ until the first call finishes. Count and sum overflow saturate per field with th
 existing sticky availability marker; reads and reconnect never reset totals.
 
 [Server aggregation](SERVER-AGGREGATION.md): separate local requests and current-peer reports, bounded descriptor updates and explicit unknown states.
+
+## Indexed option series
+
+Use `Feed::createSubscription<events::Series>()` on a HISTORY endpoint. The default
+HISTORY registry includes `Series`. A plain symbol and the indexed DEFAULT selector
+share one exact physical demand. A positive source ID selects no Series record.
+Series retains the original symbol, including exchange-looking suffixes. Its business
+time does not set a subscription range. See [Series fields and schema](SERIES-EVENT.md).
 
 ## HISTORY range observations
 

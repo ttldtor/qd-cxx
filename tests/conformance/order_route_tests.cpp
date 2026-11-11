@@ -58,8 +58,8 @@ TEST_CASE("Order HISTORY defaults preserve the existing ordinary built-in catalo
     q::api::EventRegistryWork historyWork;
     auto history = d::defaultHistoryEventRegistry({}, historyWork);
     REQUIRE(history);
-    REQUIRE(history->registrations().size() == 7);
-    REQUIRE(history->schema().records().size() == 6);
+    REQUIRE(history->registrations().size() == 8);
+    REQUIRE(history->schema().records().size() == 7);
     CHECK(history->registrations()[3].type == q::api::EventType::SPREAD_ORDER);
     CHECK(history->registrations()[4].type == q::api::EventType::ANALYTIC_ORDER);
     CHECK(history->registrations()[1].type == q::api::EventType::MARKET_MAKER);
@@ -70,6 +70,8 @@ TEST_CASE("Order HISTORY defaults preserve the existing ordinary built-in catalo
     CHECK(history->registrations()[6].type == q::api::EventType::OTC_MARKETS_ORDER);
     CHECK(history->schema().records()[4].name == u"OtcMarketsOrder");
     CHECK(history->schema().records()[5].name == u"OtcMarketsOrder#pink");
+    CHECK(history->registrations()[7].type == q::api::EventType::SERIES);
+    CHECK(history->schema().records()[6].name == u"Series");
     q::api::EventRegistryWork emptyWork{0, 0};
     CHECK_FALSE(d::defaultHistoryEventRegistry({}, emptyWork));
 }

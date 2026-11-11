@@ -268,7 +268,7 @@ void contracts() {
     const auto tickerRegistry = q::api::detail::defaultReceivingRegistry(q::api::DeliveryContract::TICKER);
     const auto historyRegistry = q::api::detail::defaultReceivingRegistry(q::api::DeliveryContract::HISTORY);
     require(tickerRegistry.has_value() && historyRegistry.has_value(), "default receiving catalogs");
-    require(tickerRegistry->schema().records().size() == 39 && historyRegistry->schema().records().size() == 6,
+    require(tickerRegistry->schema().records().size() == 39 && historyRegistry->schema().records().size() == 7,
             "default named source variants");
 
     const auto exactPink =

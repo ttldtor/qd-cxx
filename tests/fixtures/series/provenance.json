@@ -1,0 +1,135 @@
+{
+  "revision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "version": "QD 3.355",
+  "jdk": "Zulu OpenJDK 1.8.0_422",
+  "locale": "en-US",
+  "timeZones": [
+    "UTC",
+    "Pacific/Honolulu"
+  ],
+  "tools": [
+    "DXFeedScheme",
+    "OptionFactoryImpl",
+    "SeriesDelegate",
+    "SeriesMapping",
+    "BinaryQTPComposer",
+    "BinaryQTPParser"
+  ],
+  "classpathModules": [
+    "dxlib",
+    "mars",
+    "dxfeed-promise",
+    "dxfeed-api",
+    "dxlib-qd-sandbox",
+    "auth",
+    "proto",
+    "qd-core",
+    "proto-ssl",
+    "qd-rmi",
+    "dxfeed-impl",
+    "dxfeed-scheme",
+    "dxfeed-ipf-filter",
+    "qds-file"
+  ],
+  "unchangedClassFiles": 1317,
+  "oracle": {
+    "path": "tools/upstream/series-oracle/SeriesOracle.java",
+    "sha256": "3464b497112d2eef0bb731a4a466994655c1e8849ec168edaeee1a65e9d690c5"
+  },
+  "upstreamSourceHashes": [
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/option/Series.java",
+      "sha256": "74382783f0675e0a080a050de27fcc124b7f974c48c89d24a1daa4acc60bfdc2"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/option/SeriesDelegate.java",
+      "sha256": "0090b7943799884efefcdbf00c10010b4eba08b3995549779e59a7a5537fb6d5"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/option/impl/SeriesMapping.java",
+      "sha256": "a226ea56e711daffad9decd38b65b9c0b6df7a3875ad4f6143e07818aa21ece2"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/option/OptionFactoryImpl.java",
+      "sha256": "eb51ceff7418f828ec236adb8c07c8993bce520c28691c9cec8f08b5f2a5076a"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/api/impl/EventDelegate.java",
+      "sha256": "5e6c90ed4115f57708d01f697dedcdc6bc168e41d254b6e245516feb073f5593"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/api/impl/DXFeedScheme.java",
+      "sha256": "2494c3ff9234f599843aafbbc38aa2f6a09fb2a197aa31d429706f7c67ea9fb2"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/ng/EventFlag.java",
+      "sha256": "2276f1bbd99d5efd264d0b3aab6948bcbcbc866c6d7a71c3360c3b8b3b061bb5"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/ng/RecordCursor.java",
+      "sha256": "b765e929cc5736432c36661c847151278c9a3f94e352b492818c5456dedb724e"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/ng/RecordMapping.java",
+      "sha256": "f2871d535918a418d97b6bc4a6afe920cd83f2a35a076f17d2a1ddcb7fd27515"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/BinaryQTPParser.java",
+      "sha256": "785d4e9fec8129a6b2a6f0e875771e992183c20413614a43e6de3234775c02c8"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/BinaryQTPComposer.java",
+      "sha256": "fd158524cc8b9ebbf63cbc4ba97f6a39e95a0e07368a6589f9a44b0dba1e42da"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/BinaryRecordDesc.java",
+      "sha256": "38591f97045e2bcce4c37befa024a7824bc5f63ae1cd19ddc5af17668563aec9"
+    }
+  ],
+  "fixtures": [
+    {
+      "path": "standard/oracle.tsv",
+      "sha256": "79cd0135edca80e43c8ad6fc59e97c72aeb45da499b67430a3ed36cef6e086a3"
+    },
+    {
+      "path": "standard/series.qtp",
+      "sha256": "f443fc13211fbec3fca24a67a92286a8cdc4fa489c2c645687401c6e7d435f38"
+    },
+    {
+      "path": "tiny/oracle.tsv",
+      "sha256": "1f293b87fda367843b3e23ab32e8c2d2cb19bbfbb94a3886b8d84849804733f8"
+    },
+    {
+      "path": "tiny/series.qtp",
+      "sha256": "3ff9ae2c5c9e583adc83d84d0be535260cc715346e27dc0e48c42679d74a50b0"
+    },
+    {
+      "path": "optional/oracle.tsv",
+      "sha256": "28bd64c1e178b5ccbe9a6ecff369bc8edc9bcd43f2c7fc2c7575c48592b51ea0"
+    },
+    {
+      "path": "optional/series.qtp",
+      "sha256": "47bc7583011d0693fffa0ef98767c90e34907e72afecd273e4518bc27671d352"
+    },
+    {
+      "path": "optional/optional.tsv",
+      "sha256": "ce5b7729cccbe8d4323db0e2cf6c57fc6b84685b10757301c67921bc6bfaab14"
+    },
+    {
+      "path": "field/oracle.tsv",
+      "sha256": "a6db4d0f7c1ab50962df11a28947454b680ab7ae77ad0ed62f2cbc7e243f90b0"
+    },
+    {
+      "path": "field/series.qtp",
+      "sha256": "bd0dd290c00b98ffc8b13fcd6d65e413b1b54be754fed561cae006812647526f"
+    },
+    {
+      "path": "field/text-UTC.tsv",
+      "sha256": "4fe885e13d3a34a4e726df15e68fbd9023ef76a0b7872ffdf11153d63ea8846d"
+    },
+    {
+      "path": "field/text-Pacific-Honolulu.tsv",
+      "sha256": "4920ee9e499c9e0e8894084e48c4e3f506d3898c342f58b025a11e00a8682ebe"
+    }
+  ]
+}

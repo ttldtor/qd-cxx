@@ -59,3 +59,4 @@ The [event-value oracle](../tools/upstream/event-values-oracle/README.md) captur
 - [MarketMaker/derived Order oracle](../tools/upstream/market-maker-order-oracle/README.md): full types, physical time, delegate sources and real binary parser observations.
 - [SpreadOrder and AnalyticOrder oracle](../tools/upstream/order-variants-oracle/README.md): source-specific records, physical FIELD time and actual QTP bytes.
 - [Order parser/delegate oracle](../tools/upstream/order-oracle/README.md): original physical slots and bounded standard-schema observations.
+- [Series oracle](../tools/upstream/series-oracle/README.md): pinned HISTORY binary round trip, schema variants and indexed option values.

@@ -1431,6 +1431,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
         bool analyticOrder = false;
         bool otcMarketsOrder = false;
         bool orderImbalance = false;
+        bool series = false;
 
         for (const auto type : types) {
             switch (type) {
@@ -1476,6 +1477,9 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             case EventType::OTC_MARKETS_ORDER:
                 otcMarketsOrder = true;
                 break;
+            case EventType::SERIES:
+                series = true;
+                break;
             case EventType::ORDER_IMBALANCE:
                 orderImbalance = true;
                 break;
@@ -1489,7 +1493,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             (textMessage ? 32U : 0U) | (textConfiguration ? 64U : 0U) | (message ? 128U : 0U) |
             (configuration ? 256U : 0U) | (order ? 512U : 0U) | (marketMaker ? 1024U : 0U) |
             (spreadOrder ? 1U << 11 : 0U) | (analyticOrder ? 1U << 12 : 0U) | (otcMarketsOrder ? 1U << 13 : 0U) |
-            (orderImbalance ? 1U << 14 : 0U));
+            (orderImbalance ? 1U << 14 : 0U) | (series ? 1U << 15 : 0U));
         const auto delivery = registeredDelivery  ? detail::EventDelivery::REGISTERED
                               : quote             ? detail::EventDelivery::QUOTE
                               : profile           ? detail::EventDelivery::PROFILE
@@ -1504,6 +1508,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                               : analyticOrder     ? detail::EventDelivery::ANALYTIC_ORDER
                               : otcMarketsOrder   ? detail::EventDelivery::OTC_MARKETS_ORDER
                               : orderImbalance    ? detail::EventDelivery::ORDER_IMBALANCE
+                              : series            ? detail::EventDelivery::SERIES
                               : order             ? detail::EventDelivery::ORDER
                                                   : detail::EventDelivery::CONFIGURATION;
         const auto control = port_->control.lock();
@@ -1558,7 +1563,8 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                                           static_cast<unsigned>(detail::EventSelection::MARKET_MAKER) |
                                           static_cast<unsigned>(detail::EventSelection::SPREAD_ORDER) |
                                           static_cast<unsigned>(detail::EventSelection::ANALYTIC_ORDER) |
-                                          static_cast<unsigned>(detail::EventSelection::OTC_MARKETS_ORDER);
+                                          static_cast<unsigned>(detail::EventSelection::OTC_MARKETS_ORDER) |
+                                          static_cast<unsigned>(detail::EventSelection::SERIES);
 
             if (port_->options.contract == DeliveryContract::HISTORY &&
                 (static_cast<unsigned>(selection) & ~historyTypes)) {
@@ -1569,6 +1575,10 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                 ((marketMaker || spreadOrder || analyticOrder || otcMarketsOrder) &&
                  port_->options.contract != DeliveryContract::HISTORY)) {
                 reject(ErrorCode::UNSUPPORTED_PROFILE, "order-requires-history");
+            }
+
+            if (series && port_->options.contract != DeliveryContract::HISTORY) {
+                reject(ErrorCode::UNSUPPORTED_PROFILE, "series-requires-history");
             }
 
             if (orderImbalance && port_->options.contract != DeliveryContract::TICKER) {
@@ -1599,6 +1609,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             bool registeredSpreadOrder = registeredMarketMaker;
             bool registeredAnalyticOrder = registeredMarketMaker;
             bool registeredOtcMarketsOrder = registeredMarketMaker;
+            bool registeredSeries = registeredMarketMaker;
             bool registeredOrderImbalance =
                 !port_->options.eventRegistry && port_->options.contract == DeliveryContract::TICKER;
 
@@ -1615,6 +1626,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                         registeredOtcMarketsOrder || registration.type == EventType::OTC_MARKETS_ORDER;
                     registeredOrderImbalance =
                         registeredOrderImbalance || registration.type == EventType::ORDER_IMBALANCE;
+                    registeredSeries = registeredSeries || registration.type == EventType::SERIES;
                     registeredMessage = registeredMessage || registration.type == EventType::MESSAGE;
                     registeredConfiguration = registeredConfiguration || registration.type == EventType::CONFIGURATION;
                     registeredOrder = registeredOrder || registration.type == EventType::ORDER;
@@ -1638,7 +1650,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                 (configuration && !registeredConfiguration) || (order && !registeredOrder) ||
                 (marketMaker && !registeredMarketMaker) || (spreadOrder && !registeredSpreadOrder) ||
                 (analyticOrder && !registeredAnalyticOrder) || (otcMarketsOrder && !registeredOtcMarketsOrder) ||
-                (orderImbalance && !registeredOrderImbalance)) {
+                (orderImbalance && !registeredOrderImbalance) || (series && !registeredSeries)) {
                 reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-unregistered-event");
             }
 
@@ -1779,6 +1791,7 @@ template class Subscription<events::SpreadOrder>;
 template class Subscription<events::AnalyticOrder>;
 template class Subscription<events::OtcMarketsOrder>;
 template class Subscription<events::OrderImbalance>;
+template class Subscription<events::Series>;
 template class Subscription<RegisteredEvent>;
 
 Feed::Feed(std::shared_ptr<detail::EndpointPort> port) : port_(std::move(port)) {
@@ -2470,6 +2483,8 @@ class TypedConsumer final : public client::SubscriptionConsumer {
                 return deliver<events::AnalyticOrder>(batch, listeners, executor, completion, historyRevision);
             case EventDelivery::OTC_MARKETS_ORDER:
                 return deliver<events::OtcMarketsOrder>(batch, listeners, executor, completion, historyRevision);
+            case EventDelivery::SERIES:
+                return deliver<events::Series>(batch, listeners, executor, completion, historyRevision);
             case EventDelivery::ORDER_IMBALANCE:
                 return deliver<events::OrderImbalance>(batch, listeners, executor, completion, historyRevision);
             case EventDelivery::ORDER:

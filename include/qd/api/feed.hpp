@@ -16,6 +16,7 @@
 #include "qd/events/otc_markets_order.hpp"
 #include "qd/events/profile.hpp"
 #include "qd/events/quote.hpp"
+#include "qd/events/series.hpp"
 #include "qd/events/spread_order.hpp"
 #include "qd/events/summary.hpp"
 #include "qd/events/text_events.hpp"
@@ -215,7 +216,8 @@ struct FeedFilterCategory;
 using RegisteredEvent =
     std::variant<events::Quote, events::Profile, events::Trade, events::TradeETH, events::Summary, events::TextMessage,
                  events::TextConfiguration, events::Message, events::Configuration, events::Order, events::MarketMaker,
-                 events::SpreadOrder, events::AnalyticOrder, events::OtcMarketsOrder, events::OrderImbalance>;
+                 events::SpreadOrder, events::AnalyticOrder, events::OtcMarketsOrder, events::OrderImbalance,
+                 events::Series>;
 
 /** Independently owned observation of one complete accepted local subscription revision. */
 struct SubscriptionSnapshot {
@@ -250,7 +252,7 @@ using SubscriptionChangeListener = std::function<void(const SubscriptionChange &
  * @tparam Event Existing events::Quote, events::Profile, events::Trade, events::TradeETH, events::Summary,
  * events::TextMessage, events::TextConfiguration, events::Message, events::Configuration, events::Order,
  * events::MarketMaker, events::SpreadOrder, events::AnalyticOrder, events::OtcMarketsOrder,
- * events::OrderImbalance or RegisteredEvent.
+ * events::OrderImbalance, events::Series or RegisteredEvent.
  */
 template <class Event> class Subscription final {
     static_assert(std::is_same_v<Event, events::Quote> || std::is_same_v<Event, events::Profile> ||
@@ -260,7 +262,8 @@ template <class Event> class Subscription final {
                   std::is_same_v<Event, events::Configuration> || std::is_same_v<Event, events::MarketMaker> ||
                   std::is_same_v<Event, events::SpreadOrder> || std::is_same_v<Event, events::AnalyticOrder> ||
                   std::is_same_v<Event, events::OtcMarketsOrder> || std::is_same_v<Event, events::OrderImbalance> ||
-                  std::is_same_v<Event, events::Order> || std::is_same_v<Event, RegisteredEvent>);
+                  std::is_same_v<Event, events::Series> || std::is_same_v<Event, events::Order> ||
+                  std::is_same_v<Event, RegisteredEvent>);
     std::shared_ptr<detail::SubscriptionPort> port_;
     friend class Feed;
     explicit Subscription(std::shared_ptr<detail::SubscriptionPort> port) noexcept;
@@ -498,6 +501,7 @@ extern template class Subscription<events::SpreadOrder>;
 extern template class Subscription<events::AnalyticOrder>;
 extern template class Subscription<events::OtcMarketsOrder>;
 extern template class Subscription<events::OrderImbalance>;
+extern template class Subscription<events::Series>;
 extern template class Subscription<RegisteredEvent>;
 
 /** Endpoint's typed registration entry point; owns no SDK thread or bootstrap. */
@@ -528,7 +532,7 @@ class Feed final {
                       std::is_same_v<Event, events::Configuration> || std::is_same_v<Event, events::MarketMaker> ||
                       std::is_same_v<Event, events::SpreadOrder> || std::is_same_v<Event, events::AnalyticOrder> ||
                       std::is_same_v<Event, events::OtcMarketsOrder> || std::is_same_v<Event, events::OrderImbalance> ||
-                      std::is_same_v<Event, events::Order>);
+                      std::is_same_v<Event, events::Series> || std::is_same_v<Event, events::Order>);
 
         if constexpr (std::is_same_v<Event, events::Quote>)
             return EventType::QUOTE;
@@ -558,6 +562,8 @@ class Feed final {
             return EventType::OTC_MARKETS_ORDER;
         else if constexpr (std::is_same_v<Event, events::OrderImbalance>)
             return EventType::ORDER_IMBALANCE;
+        else if constexpr (std::is_same_v<Event, events::Series>)
+            return EventType::SERIES;
         else
             return EventType::ORDER;
     }
@@ -569,7 +575,7 @@ class Feed final {
      * Quote-derived Order and source-specific OrderImbalance use TICKER. Unsupported selections reject
      * before publication.
      * @tparam Event Existing Quote, Profile, Trade, TradeETH, Summary, TextMessage, TextConfiguration, Message or
-     * Configuration, indexed Order, MarketMaker, SpreadOrder, AnalyticOrder, OtcMarketsOrder or OrderImbalance,
+     * Configuration, indexed Order, MarketMaker, SpreadOrder, AnalyticOrder, OtcMarketsOrder, OrderImbalance or Series,
      * explicitly registered for this endpoint or provided by its defaults.
      * @return Producer handle; native preparation failures are observed asynchronously by its diagnostic.
      */

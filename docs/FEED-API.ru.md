@@ -3,7 +3,7 @@
 [English version](FEED-API.md) · [Практические руководства](guides.ru.md) · [Справочник API](api.ru.md)
 
 Подключите `qd/api/feed.hpp` и линкуйте `qdcxx_feed`, чтобы получать типизированные
-`events::Quote`, `events::Profile`, `events::Trade`, `events::TradeETH`, `events::Summary`, `events::TextMessage`, `events::TextConfiguration`, `events::Message`, `events::Configuration`, `events::Order`, `events::MarketMaker`, `events::SpreadOrder`, `events::AnalyticOrder`, `events::OtcMarketsOrder` и `events::OrderImbalance` через рабочий поток библиотеки. Приложение создаёт
+`events::Quote`, `events::Profile`, `events::Trade`, `events::TradeETH`, `events::Summary`, `events::TextMessage`, `events::TextConfiguration`, `events::Message`, `events::Configuration`, `events::Order`, `events::MarketMaker`, `events::SpreadOrder`, `events::AnalyticOrder`, `events::OtcMarketsOrder`, `events::OrderImbalance` и `events::Series` через рабочий поток библиотеки. Приложение создаёт
 endpoint, обработчики и подписки на точные символы; библиотека продвигает соединение,
 конечные переподключения, очереди и доставку. Подписки можно создавать до и после
 `connect()`.
@@ -13,7 +13,7 @@ endpoint, обработчики и подписки на точные симв�
 Endpoint выбирает TICKER (по умолчанию: последние значения с возможным объединением
 обновлений), STREAM (каждая принятая выбранная запись источника) либо явный HISTORY
 (индексируемое общее хранилище и независимые представления). Обычный Order, MarketMaker,
-SpreadOrder, AnalyticOrder и OtcMarketsOrder используют HISTORY. Производный от Quote
+SpreadOrder, AnalyticOrder, OtcMarketsOrder и Series используют HISTORY. Производный от Quote
 Order и OrderImbalance используют TICKER.
 [MarketMaker и производный Order](MARKET-MAKER-ORDER.ru.md) описывает источники A..Z,
 которыми владеет SDK. Стандартная схема
@@ -594,6 +594,15 @@ queue wait, state/change observers исключены. До завершения
 чтение и reconnect никогда не сбрасывают итоги.
 
 [Серверная агрегация](SERVER-AGGREGATION.ru.md): отдельные local request и peer report, bounded descriptor updates и явный UNKNOWN.
+
+## Индексированные опционные серии
+
+Используйте `Feed::createSubscription<events::Series>()` на endpoint с HISTORY.
+Стандартный реестр HISTORY включает `Series`. Обычный символ и индексный селектор
+DEFAULT используют одну физическую подписку на точный символ. Положительный ID
+источника не выбирает ни одной записи Series. Событие сохраняет исходный символ,
+включая суффиксы, похожие на биржевые. Время серии не задаёт диапазон подписки.
+См. [поля и схему Series](SERIES-EVENT.ru.md).
 
 ## Наблюдения диапазонов HISTORY
 

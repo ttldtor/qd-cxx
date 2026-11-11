@@ -61,3 +61,4 @@
 - [Oracle MarketMaker/производного Order](../tools/upstream/market-maker-order-oracle/README.ru.md): полные типы, physical time, источники delegates и реальный binary parser.
 - [Oracle SpreadOrder и AnalyticOrder](../tools/upstream/order-variants-oracle/README.ru.md): записи конкретных источников, физическое время FIELD и исходные байты QTP.
 - [Oracle parser/delegate Order](../tools/upstream/order-oracle/README.ru.md): исходные physical slots и ограниченные наблюдения стандартных схем.
+- [Оракул Series](../tools/upstream/series-oracle/README.ru.md): двоичная запись и чтение HISTORY закреплённой версией, варианты схем и значения опционных серий.

@@ -1,0 +1,5 @@
+absent	0	0	9221120237041090560	9221120237041090560	9221120237041090560	9221120237041090560
+reject	Expiration	IllegalArgumentException
+reject	Volatility	IllegalArgumentException
+reject	PutCallRatio	IllegalArgumentException
+reject	ForwardPrice	IllegalArgumentException

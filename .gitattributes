@@ -1,4 +1,11 @@
 * text=auto
+
+# Preserve original Java Series observations, their binary captures and recorded hashes.
+tools/upstream/series-oracle/*.java text eol=lf
+tests/fixtures/series/provenance.json text eol=lf
+tests/fixtures/series/**/*.tsv -text -whitespace
+tests/fixtures/series/**/*.qtp -text
+
 # Order source capability observations retain exact bytes; launcher/provenance hashes use LF.
 tools/upstream/order-source-capability-oracle/*.ps1 text eol=lf
 tests/fixtures/order-source-capabilities/provenance.json text eol=lf
