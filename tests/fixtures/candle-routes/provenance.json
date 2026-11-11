@@ -1,0 +1,46 @@
+{
+  "qdRevision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "java": "Zulu JDK 8",
+  "classEntries": 1317,
+  "classInventoryEqual": true,
+  "zones": [
+    "UTC",
+    "Pacific/Honolulu"
+  ],
+  "zonesByteIdentical": true,
+  "harnessSha256": "31b1985851a4fc6bc7c2a1b19d4ab54876d1ad9f2c70102d3c1c17201f23c2be",
+  "sources": [
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/candle/CandleEventDelegateSet.java",
+      "sha256": "f59c247927368fc86bcbb1bfa70513d02c8640a84bf62836daada9142bf4e3cc"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/candle/impl/CandleEventMapping.java",
+      "sha256": "55377c2880310af8b819cda4d7a3c13c6d02c7dea7063a0ff53974660bdb1a40"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/candle/CandleFactoryImpl.java",
+      "sha256": "fff00e2992b1d962eca2478e51b3718c40d5a9d804d2e678ad2dde375f26a68c"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/api/impl/EventDelegateSet.java",
+      "sha256": "50d60da8d08b8c6308bf60d4fe9a05b64361d3d62e7b4c954e19e53c005bc3f0"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/candle/CandlePeriod.java",
+      "sha256": "dace2c3fefd87f69a088cf58bde136e37d93efbae053a497d8eeb34b2046b791"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/candle/CandleSymbol.java",
+      "sha256": "b3ff2f13e8d2e2b25241a9f34cd6d29d9eecad9d9d00cb6d0c986e1400ecd35a"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/candle/CandlePrice.java",
+      "sha256": "7e388286236f9424597ae1a228cfb0f7c387b2f9bd22b292de71ccc8a2ca651e"
+    }
+  ],
+  "artifact": {
+    "path": "routes.tsv",
+    "sha256": "e8522e5747d03853d61d9e9784f69985562a630677e96e7804490840ffec03b9"
+  }
+}

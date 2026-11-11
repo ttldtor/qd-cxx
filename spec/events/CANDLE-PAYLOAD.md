@@ -5,6 +5,7 @@
 `qd/events/candle.hpp` provides owning `Candle` values and `PreparedCandle`.
 Link `qdcxx_candle` in the source tree or from the installed package.
 The mapper takes an explicit local record and a resolved `CandleSymbol`.
+Use the [physical route catalog](CANDLE-ROUTES.md) to choose the record and restore its symbol.
 
 | Physical mapping | Required fields | Optional fields |
 | --- | --- | --- |

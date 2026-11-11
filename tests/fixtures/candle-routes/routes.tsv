@@ -1,0 +1,258 @@
+record	all	0	Candle	true
+field	all	0	56	Time	Time
+field	all	0	72	Sequence	Sequence
+field	all	0	120	Count	Count
+field	all	0	120	Open	Open
+field	all	0	120	High	High
+field	all	0	120	Low	Low
+field	all	0	120	Close	Close
+field	all	0	120	Volume	Volume
+field	all	0	120	VWAP	VWAP
+field	all	0	120	Bid.Volume	BidVolume
+field	all	0	120	Ask.Volume	AskVolume
+field	all	0	120	ImpVolatility	ImpVolatility
+field	all	0	120	OpenInterest	OpenInterest
+record	all	1	TradeHistory	true
+field	all	1	56	Time	Time
+field	all	1	72	Sequence	Sequence
+field	all	1	2	Exchange	ExchangeCode
+field	all	1	120	Price	Close
+field	all	1	120	Size	Volume
+field	all	1	120	Bid	BidPrice
+field	all	1	120	Ask	AskPrice
+record	all	2	Trade.1min	true
+field	all	2	56	Time	Time
+field	all	2	72	Sequence	Sequence
+field	all	2	120	Count	Count
+field	all	2	120	Open	Open
+field	all	2	120	High	High
+field	all	2	120	Low	Low
+field	all	2	120	Close	Close
+field	all	2	120	Volume	Volume
+field	all	2	120	VWAP	VWAP
+field	all	2	120	Bid.Volume	BidVolume
+field	all	2	120	Ask.Volume	AskVolume
+field	all	2	120	ImpVolatility	ImpVolatility
+field	all	2	120	OpenInterest	OpenInterest
+record	all	3	Candle{=m,price=bid}	true
+field	all	3	56	Time	Time
+field	all	3	72	Sequence	Sequence
+field	all	3	120	Count	Count
+field	all	3	120	Open	Open
+field	all	3	120	High	High
+field	all	3	120	Low	Low
+field	all	3	120	Close	Close
+field	all	3	120	Volume	Volume
+field	all	3	120	VWAP	VWAP
+field	all	3	120	Bid.Volume	BidVolume
+field	all	3	120	Ask.Volume	AskVolume
+field	all	3	120	ImpVolatility	ImpVolatility
+field	all	3	120	OpenInterest	OpenInterest
+record	all	4	Trade.5min	true
+field	all	4	56	Time	Time
+field	all	4	72	Sequence	Sequence
+field	all	4	120	Count	Count
+field	all	4	120	Open	Open
+field	all	4	120	High	High
+field	all	4	120	Low	Low
+field	all	4	120	Close	Close
+field	all	4	120	Volume	Volume
+field	all	4	120	VWAP	VWAP
+field	all	4	120	Bid.Volume	BidVolume
+field	all	4	120	Ask.Volume	AskVolume
+field	all	4	120	ImpVolatility	ImpVolatility
+field	all	4	120	OpenInterest	OpenInterest
+record	all	5	Candle{=m,price=ask}	true
+field	all	5	56	Time	Time
+field	all	5	72	Sequence	Sequence
+field	all	5	120	Count	Count
+field	all	5	120	Open	Open
+field	all	5	120	High	High
+field	all	5	120	Low	Low
+field	all	5	120	Close	Close
+field	all	5	120	Volume	Volume
+field	all	5	120	VWAP	VWAP
+field	all	5	120	Bid.Volume	BidVolume
+field	all	5	120	Ask.Volume	AskVolume
+field	all	5	120	ImpVolatility	ImpVolatility
+field	all	5	120	OpenInterest	OpenInterest
+route	all	Ticker	IBM	1	TradeHistory	IBM	TRADE_HISTORY	IBM
+route	all	Ticker	IBM{price=bid}	1	TradeHistory	IBM{price=bid}	TRADE_HISTORY	IBM{price=bid}
+route	all	Ticker	IBM&Q{=m}	1	Trade.1min	IBM&Q	CANDLE	IBM&Q{=m}
+route	all	Ticker	IBM&Q{=m,price=bid}	1	Candle{=m,price=bid}	IBM&Q	CANDLE	IBM&Q{=m,price=bid}
+route	all	Ticker	IBM{=m,price=ask}	1	Candle{=m,price=ask}	IBM	CANDLE	IBM{=m,price=ask}
+route	all	Ticker	IBM{=m,price=mark}	1	Trade.1min	IBM{price=mark}	CANDLE	IBM{=m,price=mark}
+route	all	Ticker	IBM{=5m,price=bid}	1	Trade.5min	IBM{price=bid}	CANDLE	IBM{=5m,price=bid}
+route	all	Ticker	IBM{=7m}	1	Candle	IBM{=7m}	CANDLE	IBM{=7m}
+route	all	Ticker	IBM{=m,price=bid,tho=true}	1	Candle{=m,price=bid}	IBM{tho=true}	CANDLE	IBM{=m,price=bid,tho=true}
+route	all	Ticker	IBM{=m,price=s}	1	Trade.1min	IBM{price=s}	CANDLE	IBM{=m,price=s}
+route	all	History	IBM	1	TradeHistory	IBM	TRADE_HISTORY	IBM
+route	all	History	IBM{price=bid}	1	TradeHistory	IBM{price=bid}	TRADE_HISTORY	IBM{price=bid}
+route	all	History	IBM&Q{=m}	1	Trade.1min	IBM&Q	CANDLE	IBM&Q{=m}
+route	all	History	IBM&Q{=m,price=bid}	1	Candle{=m,price=bid}	IBM&Q	CANDLE	IBM&Q{=m,price=bid}
+route	all	History	IBM{=m,price=ask}	1	Candle{=m,price=ask}	IBM	CANDLE	IBM{=m,price=ask}
+route	all	History	IBM{=m,price=mark}	1	Trade.1min	IBM{price=mark}	CANDLE	IBM{=m,price=mark}
+route	all	History	IBM{=5m,price=bid}	1	Trade.5min	IBM{price=bid}	CANDLE	IBM{=5m,price=bid}
+route	all	History	IBM{=7m}	1	Candle	IBM{=7m}	CANDLE	IBM{=7m}
+route	all	History	IBM{=m,price=bid,tho=true}	1	Candle{=m,price=bid}	IBM{tho=true}	CANDLE	IBM{=m,price=bid,tho=true}
+route	all	History	IBM{=m,price=s}	1	Trade.1min	IBM{price=s}	CANDLE	IBM{=m,price=s}
+record	generic	0	Candle	true
+field	generic	0	56	Time	Time
+field	generic	0	72	Sequence	Sequence
+field	generic	0	120	Count	Count
+field	generic	0	120	Open	Open
+field	generic	0	120	High	High
+field	generic	0	120	Low	Low
+field	generic	0	120	Close	Close
+field	generic	0	120	Volume	Volume
+field	generic	0	120	VWAP	VWAP
+field	generic	0	120	Bid.Volume	BidVolume
+field	generic	0	120	Ask.Volume	AskVolume
+field	generic	0	120	ImpVolatility	ImpVolatility
+field	generic	0	120	OpenInterest	OpenInterest
+record	generic	1	TradeHistory	true
+field	generic	1	56	Time	Time
+field	generic	1	72	Sequence	Sequence
+field	generic	1	2	Exchange	ExchangeCode
+field	generic	1	120	Price	Close
+field	generic	1	120	Size	Volume
+field	generic	1	120	Bid	BidPrice
+field	generic	1	120	Ask	AskPrice
+route	generic	Ticker	IBM	1	TradeHistory	IBM	TRADE_HISTORY	IBM
+route	generic	Ticker	IBM{price=bid}	1	TradeHistory	IBM{price=bid}	TRADE_HISTORY	IBM{price=bid}
+route	generic	Ticker	IBM&Q{=m}	1	Candle	IBM&Q{=m}	CANDLE	IBM&Q{=m}
+route	generic	Ticker	IBM&Q{=m,price=bid}	1	Candle	IBM&Q{=m,price=bid}	CANDLE	IBM&Q{=m,price=bid}
+route	generic	Ticker	IBM{=m,price=ask}	1	Candle	IBM{=m,price=ask}	CANDLE	IBM{=m,price=ask}
+route	generic	Ticker	IBM{=m,price=mark}	1	Candle	IBM{=m,price=mark}	CANDLE	IBM{=m,price=mark}
+route	generic	Ticker	IBM{=5m,price=bid}	1	Candle	IBM{=5m,price=bid}	CANDLE	IBM{=5m,price=bid}
+route	generic	Ticker	IBM{=7m}	1	Candle	IBM{=7m}	CANDLE	IBM{=7m}
+route	generic	Ticker	IBM{=m,price=bid,tho=true}	1	Candle	IBM{=m,price=bid,tho=true}	CANDLE	IBM{=m,price=bid,tho=true}
+route	generic	Ticker	IBM{=m,price=s}	1	Candle	IBM{=m,price=s}	CANDLE	IBM{=m,price=s}
+route	generic	History	IBM	1	TradeHistory	IBM	TRADE_HISTORY	IBM
+route	generic	History	IBM{price=bid}	1	TradeHistory	IBM{price=bid}	TRADE_HISTORY	IBM{price=bid}
+route	generic	History	IBM&Q{=m}	1	Candle	IBM&Q{=m}	CANDLE	IBM&Q{=m}
+route	generic	History	IBM&Q{=m,price=bid}	1	Candle	IBM&Q{=m,price=bid}	CANDLE	IBM&Q{=m,price=bid}
+route	generic	History	IBM{=m,price=ask}	1	Candle	IBM{=m,price=ask}	CANDLE	IBM{=m,price=ask}
+route	generic	History	IBM{=m,price=mark}	1	Candle	IBM{=m,price=mark}	CANDLE	IBM{=m,price=mark}
+route	generic	History	IBM{=5m,price=bid}	1	Candle	IBM{=5m,price=bid}	CANDLE	IBM{=5m,price=bid}
+route	generic	History	IBM{=7m}	1	Candle	IBM{=7m}	CANDLE	IBM{=7m}
+route	generic	History	IBM{=m,price=bid,tho=true}	1	Candle	IBM{=m,price=bid,tho=true}	CANDLE	IBM{=m,price=bid,tho=true}
+route	generic	History	IBM{=m,price=s}	1	Candle	IBM{=m,price=s}	CANDLE	IBM{=m,price=s}
+record	tick-only	0	TradeHistory	true
+field	tick-only	0	56	Time	Time
+field	tick-only	0	72	Sequence	Sequence
+field	tick-only	0	2	Exchange	ExchangeCode
+field	tick-only	0	120	Price	Close
+field	tick-only	0	120	Size	Volume
+field	tick-only	0	120	Bid	BidPrice
+field	tick-only	0	120	Ask	AskPrice
+route	tick-only	Ticker	IBM	1	TradeHistory	IBM	TRADE_HISTORY	IBM
+route	tick-only	Ticker	IBM{price=bid}	1	TradeHistory	IBM{price=bid}	TRADE_HISTORY	IBM{price=bid}
+route	tick-only	Ticker	IBM&Q{=m}	0	-	-	-	-
+route	tick-only	Ticker	IBM&Q{=m,price=bid}	0	-	-	-	-
+route	tick-only	Ticker	IBM{=m,price=ask}	0	-	-	-	-
+route	tick-only	Ticker	IBM{=m,price=mark}	0	-	-	-	-
+route	tick-only	Ticker	IBM{=5m,price=bid}	0	-	-	-	-
+route	tick-only	Ticker	IBM{=7m}	0	-	-	-	-
+route	tick-only	Ticker	IBM{=m,price=bid,tho=true}	0	-	-	-	-
+route	tick-only	Ticker	IBM{=m,price=s}	0	-	-	-	-
+route	tick-only	History	IBM	1	TradeHistory	IBM	TRADE_HISTORY	IBM
+route	tick-only	History	IBM{price=bid}	1	TradeHistory	IBM{price=bid}	TRADE_HISTORY	IBM{price=bid}
+route	tick-only	History	IBM&Q{=m}	0	-	-	-	-
+route	tick-only	History	IBM&Q{=m,price=bid}	0	-	-	-	-
+route	tick-only	History	IBM{=m,price=ask}	0	-	-	-	-
+route	tick-only	History	IBM{=m,price=mark}	0	-	-	-	-
+route	tick-only	History	IBM{=5m,price=bid}	0	-	-	-	-
+route	tick-only	History	IBM{=7m}	0	-	-	-	-
+route	tick-only	History	IBM{=m,price=bid,tho=true}	0	-	-	-	-
+route	tick-only	History	IBM{=m,price=s}	0	-	-	-	-
+record	bid-generic	0	Candle	true
+field	bid-generic	0	56	Time	Time
+field	bid-generic	0	72	Sequence	Sequence
+field	bid-generic	0	120	Count	Count
+field	bid-generic	0	120	Open	Open
+field	bid-generic	0	120	High	High
+field	bid-generic	0	120	Low	Low
+field	bid-generic	0	120	Close	Close
+field	bid-generic	0	120	Volume	Volume
+field	bid-generic	0	120	VWAP	VWAP
+field	bid-generic	0	120	Bid.Volume	BidVolume
+field	bid-generic	0	120	Ask.Volume	AskVolume
+field	bid-generic	0	120	ImpVolatility	ImpVolatility
+field	bid-generic	0	120	OpenInterest	OpenInterest
+record	bid-generic	1	Candle{=m,price=bid}	true
+field	bid-generic	1	56	Time	Time
+field	bid-generic	1	72	Sequence	Sequence
+field	bid-generic	1	120	Count	Count
+field	bid-generic	1	120	Open	Open
+field	bid-generic	1	120	High	High
+field	bid-generic	1	120	Low	Low
+field	bid-generic	1	120	Close	Close
+field	bid-generic	1	120	Volume	Volume
+field	bid-generic	1	120	VWAP	VWAP
+field	bid-generic	1	120	Bid.Volume	BidVolume
+field	bid-generic	1	120	Ask.Volume	AskVolume
+field	bid-generic	1	120	ImpVolatility	ImpVolatility
+field	bid-generic	1	120	OpenInterest	OpenInterest
+route	bid-generic	Ticker	IBM	1	Candle	IBM	CANDLE	IBM
+route	bid-generic	Ticker	IBM{price=bid}	1	Candle	IBM{price=bid}	CANDLE	IBM{price=bid}
+route	bid-generic	Ticker	IBM&Q{=m}	1	Candle	IBM&Q{=m}	CANDLE	IBM&Q{=m}
+route	bid-generic	Ticker	IBM&Q{=m,price=bid}	1	Candle{=m,price=bid}	IBM&Q	CANDLE	IBM&Q{=m,price=bid}
+route	bid-generic	Ticker	IBM{=m,price=ask}	1	Candle	IBM{=m,price=ask}	CANDLE	IBM{=m,price=ask}
+route	bid-generic	Ticker	IBM{=m,price=mark}	1	Candle	IBM{=m,price=mark}	CANDLE	IBM{=m,price=mark}
+route	bid-generic	Ticker	IBM{=5m,price=bid}	1	Candle	IBM{=5m,price=bid}	CANDLE	IBM{=5m,price=bid}
+route	bid-generic	Ticker	IBM{=7m}	1	Candle	IBM{=7m}	CANDLE	IBM{=7m}
+route	bid-generic	Ticker	IBM{=m,price=bid,tho=true}	1	Candle{=m,price=bid}	IBM{tho=true}	CANDLE	IBM{=m,price=bid,tho=true}
+route	bid-generic	Ticker	IBM{=m,price=s}	1	Candle	IBM{=m,price=s}	CANDLE	IBM{=m,price=s}
+route	bid-generic	History	IBM	1	Candle	IBM	CANDLE	IBM
+route	bid-generic	History	IBM{price=bid}	1	Candle	IBM{price=bid}	CANDLE	IBM{price=bid}
+route	bid-generic	History	IBM&Q{=m}	1	Candle	IBM&Q{=m}	CANDLE	IBM&Q{=m}
+route	bid-generic	History	IBM&Q{=m,price=bid}	1	Candle{=m,price=bid}	IBM&Q	CANDLE	IBM&Q{=m,price=bid}
+route	bid-generic	History	IBM{=m,price=ask}	1	Candle	IBM{=m,price=ask}	CANDLE	IBM{=m,price=ask}
+route	bid-generic	History	IBM{=m,price=mark}	1	Candle	IBM{=m,price=mark}	CANDLE	IBM{=m,price=mark}
+route	bid-generic	History	IBM{=5m,price=bid}	1	Candle	IBM{=5m,price=bid}	CANDLE	IBM{=5m,price=bid}
+route	bid-generic	History	IBM{=7m}	1	Candle	IBM{=7m}	CANDLE	IBM{=7m}
+route	bid-generic	History	IBM{=m,price=bid,tho=true}	1	Candle{=m,price=bid}	IBM{tho=true}	CANDLE	IBM{=m,price=bid,tho=true}
+route	bid-generic	History	IBM{=m,price=s}	1	Candle	IBM{=m,price=s}	CANDLE	IBM{=m,price=s}
+record	bid-only	0	Candle{=m,price=bid}	true
+field	bid-only	0	56	Time	Time
+field	bid-only	0	72	Sequence	Sequence
+field	bid-only	0	120	Count	Count
+field	bid-only	0	120	Open	Open
+field	bid-only	0	120	High	High
+field	bid-only	0	120	Low	Low
+field	bid-only	0	120	Close	Close
+field	bid-only	0	120	Volume	Volume
+field	bid-only	0	120	VWAP	VWAP
+field	bid-only	0	120	Bid.Volume	BidVolume
+field	bid-only	0	120	Ask.Volume	AskVolume
+field	bid-only	0	120	ImpVolatility	ImpVolatility
+field	bid-only	0	120	OpenInterest	OpenInterest
+route	bid-only	Ticker	IBM	0	-	-	-	-
+route	bid-only	Ticker	IBM{price=bid}	0	-	-	-	-
+route	bid-only	Ticker	IBM&Q{=m}	0	-	-	-	-
+route	bid-only	Ticker	IBM&Q{=m,price=bid}	1	Candle{=m,price=bid}	IBM&Q	CANDLE	IBM&Q{=m,price=bid}
+route	bid-only	Ticker	IBM{=m,price=ask}	0	-	-	-	-
+route	bid-only	Ticker	IBM{=m,price=mark}	0	-	-	-	-
+route	bid-only	Ticker	IBM{=5m,price=bid}	0	-	-	-	-
+route	bid-only	Ticker	IBM{=7m}	0	-	-	-	-
+route	bid-only	Ticker	IBM{=m,price=bid,tho=true}	1	Candle{=m,price=bid}	IBM{tho=true}	CANDLE	IBM{=m,price=bid,tho=true}
+route	bid-only	Ticker	IBM{=m,price=s}	0	-	-	-	-
+route	bid-only	History	IBM	0	-	-	-	-
+route	bid-only	History	IBM{price=bid}	0	-	-	-	-
+route	bid-only	History	IBM&Q{=m}	0	-	-	-	-
+route	bid-only	History	IBM&Q{=m,price=bid}	1	Candle{=m,price=bid}	IBM&Q	CANDLE	IBM&Q{=m,price=bid}
+route	bid-only	History	IBM{=m,price=ask}	0	-	-	-	-
+route	bid-only	History	IBM{=m,price=mark}	0	-	-	-	-
+route	bid-only	History	IBM{=5m,price=bid}	0	-	-	-	-
+route	bid-only	History	IBM{=7m}	0	-	-	-	-
+route	bid-only	History	IBM{=m,price=bid,tho=true}	1	Candle{=m,price=bid}	IBM{tho=true}	CANDLE	IBM{=m,price=bid,tho=true}
+route	bid-only	History	IBM{=m,price=s}	0	-	-	-	-
+reject	duplicate-period	Ticker	IllegalArgumentException
+reject	invalid-price-period	Ticker	IllegalArgumentException
+reject	invalid-price	Ticker	NO_DELEGATE
+reject	unsupported-attributes	Ticker	NO_DELEGATE
+reject	duplicate-period	History	IllegalArgumentException
+reject	invalid-price-period	History	IllegalArgumentException
+reject	invalid-price	History	NO_DELEGATE
+reject	unsupported-attributes	History	NO_DELEGATE

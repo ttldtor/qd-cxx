@@ -26,6 +26,10 @@ tests/fixtures/candle-payload/provenance.json text eol=lf
 tests/fixtures/candle-payload/**/*.tsv -text -whitespace
 tests/fixtures/candle-payload/**/*.qtp -text
 
+# Preserve the pinned Candle route oracle observations.
+tests/fixtures/candle-routes/provenance.json text eol=lf
+tests/fixtures/candle-routes/routes.tsv -text -whitespace
+
 # Order source capability observations retain exact bytes; launcher/provenance hashes use LF.
 tools/upstream/order-source-capability-oracle/*.ps1 text eol=lf
 tests/fixtures/order-source-capabilities/provenance.json text eol=lf
