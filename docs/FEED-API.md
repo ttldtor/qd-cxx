@@ -97,6 +97,17 @@ taking `std::span<const q::events::Profile>`. For STREAM, set
 `EndpointOptions::contract = DeliveryContract::STREAM` before `createEndpoint(options)`.
 The delivery contract applies to every subscription on that endpoint.
 
+Set the typed `EndpointOptions::batchRecords` to cap whole physical records per callback selection
+(default and maximum 4). One physical record can yield several business events. Set
+`EndpointOptions::pendingRecords` to bound detached physical records per subscription (default and
+maximum 128), including records selected for a callback. Both limits must be positive and
+`batchRecords` cannot exceed `pendingRecords`. HISTORY source storage has its own limits.
+
+STREAM preserves order and duplicates while capacity is available. If staging the next prefix
+exhausts a subscription's reservation, the SDK rejects that prefix for the affected subscription and
+reports the overflow through its state and statistics. TICKER can conflate pending values for the
+same key before detached delivery. Use `getStatistics()` to distinguish conflation from overflow.
+
 ## Receive Trade
 
 The built-in registry appends composite Trade2 while retaining Quote0/Profile1. Use owning

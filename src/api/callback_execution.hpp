@@ -74,7 +74,7 @@ class CallbackSlotPool final : public std::enable_shared_from_this<CallbackSlotP
     // Four physical rows, at most five outputs each. Even charging every output the independent
     // maximum symbol (128), two selected text fields (8192 each), terminators and opaque body
     // (16384) remains below the prepaid one-MiB payload allowance. No source batch is retained.
-    static constexpr std::size_t PHYSICAL_RECORDS = 4;
+    static constexpr std::size_t PHYSICAL_RECORDS = EndpointOptions::MAXIMUM_BATCH_RECORDS;
     static constexpr std::size_t MAXIMUM_EVENTS = PHYSICAL_RECORDS * core::MAX_DELIVERY_PROJECTIONS;
     static_assert(MAXIMUM_EVENTS * (2 * (128 + 2 * 8192 + 3) + 16384) <= 1024 * 1024);
     static constexpr std::size_t PACKET_BYTES = 1024 * 1024 + 4096 + MAXIMUM_EVENTS * sizeof(RegisteredEvent);

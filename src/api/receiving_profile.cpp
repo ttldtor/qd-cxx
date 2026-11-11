@@ -26,7 +26,6 @@ constexpr std::size_t FIELD_TEXT_UNITS = 8192;             ///< Aggregate text c
 constexpr std::size_t FIELD_BYTE_UNITS = 16384;            ///< Aggregate opaque payload copied from one record.
 constexpr std::size_t RECORD_ARENA_BYTES = 65536;          ///< Complete detached per-record arena request ceiling.
 constexpr std::size_t SESSION_SNAPSHOT_BYTES = 128 * 1024; ///< Maximum backing for a Feed snapshot.
-constexpr std::size_t QUEUED_RECORDS = 128;                ///< Independent detached-record slots per registration.
 constexpr std::size_t RECORD_BYTES = 16 * MEBIBYTE;        ///< Per-registration detached backing ceiling.
 constexpr std::size_t BATCH_BYTES = MEBIBYTE;              ///< Per-registration composite backing ceiling.
 constexpr std::size_t CONTROL_OPERATIONS = 100000;         ///< Qualified finite one-client owner work seed.
@@ -658,11 +657,11 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
     std::ranges::copy(runtime.dnsServers, result.recoveryOptions.dns.servers.begin());
     result.interests = {SCHEMA_LIMITS.records,      clients,     entries, entries,
                         runtime.maximumSymbolUnits, symbolUnits, entries, multiply(scale, 4 * MEBIBYTE)};
-    result.clientLimits = {QUEUED_RECORDS,
+    result.clientLimits = {options.pendingRecords,
                            RECORD_BYTES,
                            8,
                            BATCH_BYTES,
-                           CALLBACK_RECORDS,
+                           options.batchRecords,
                            SCHEMA_LIMITS.fields,
                            runtime.maximumSymbolUnits,
                            FIELD_TEXT_UNITS,
@@ -675,9 +674,9 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
     result.queueLimits = {clients,
                           FRAME_RECORDS,
                           16,
-                          CALLBACK_RECORDS,
+                          options.batchRecords,
                           16,
-                          multiply(clients, QUEUED_RECORDS),
+                          multiply(clients, options.pendingRecords),
                           multiply(clients, RECORD_BYTES),
                           multiply(clients, 8),
                           multiply(clients, BATCH_BYTES),
@@ -711,8 +710,8 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
             refuse(ErrorCode::RESOURCE_LIMIT, "profile-history-resident-capacity");
         }
 
-        static_cast<void>(
-            add(QUEUED_RECORDS, add(options.history.maximumPoints, options.history.pendingUpdatesPerSubscription)));
+        static_cast<void>(add(options.pendingRecords,
+                              add(options.history.maximumPoints, options.history.pendingUpdatesPerSubscription)));
     }
 
     result.blueprint = prepareBlueprint(result.schema);
