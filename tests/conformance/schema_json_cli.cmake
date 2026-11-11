@@ -1,4 +1,6 @@
 # External input must be validated before tape IO and preserve generic typed rows.
+cmake_minimum_required(VERSION 3.25)
+
 file(MAKE_DIRECTORY "${RUN}")
 include("${CMAKE_CURRENT_LIST_DIR}/cli_help.cmake")
 qdcxx_assert_cli_help("${PROGRAM}")
