@@ -4,6 +4,7 @@
 #include "connect_peer.hpp"
 #include "qd/api/feed.hpp"
 #include "qd/client/subscription_receiver.hpp"
+#include "registered_event_test_support.hpp"
 #include "trade_fixture.hpp"
 #include <array>
 #include <atomic>
@@ -312,11 +313,7 @@ void check(const std::map<std::string, f::Scenario> &corpus, const std::string &
 
         for (const auto &event : values[mask - 1]->events) {
             require((mask & (1U << event.index())) != 0, "Cross-kind mixed delivery");
-            std::visit(
-                [&](const auto &value) {
-                    require(value.symbol == logical, "Cross-route logical symbol leak");
-                },
-                event);
+            require(q::feed_tests::registeredEventSymbol(event) == logical, "Cross-route logical symbol leak");
 
             if (const auto *trade = std::get_if<q::events::Trade>(&event))
                 require(f::matches(*trade, regional.expected), "Mixed Trade differs");

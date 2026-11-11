@@ -4,6 +4,7 @@
 #include "connect_peer.hpp"
 #include "event_time_fixture.hpp"
 #include "qd/api/feed.hpp"
+#include "registered_event_test_support.hpp"
 #include "summary_fixture.hpp"
 #include "trade_eth_fixture.hpp"
 #include "trade_fixture.hpp"
@@ -375,11 +376,7 @@ void check(const f::Scenario &scenario, bool reconnect, bool wrongMarker, Callba
     std::map<std::u16string, std::size_t> symbols;
 
     for (const auto &value : observed->values) {
-        std::visit(
-            [&](const auto &event) {
-                ++symbols[event.symbol];
-            },
-            value);
+        ++symbols[std::u16string{q::feed_tests::registeredEventSymbol(value)}];
     }
 
     require(symbols.contains(u"*") && symbols.contains(u"*&Q") && symbols.contains(u"AB*") && symbols.contains(u"A?"),
