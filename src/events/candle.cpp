@@ -1,6 +1,7 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/events/candle.hpp"
+#include "qd/events/event_flags.hpp"
 
 #include "decimal_projection.hpp"
 #include "qd/events/time_helpers.hpp"
@@ -296,8 +297,9 @@ std::expected<core::LocalSchema, core::SchemaError> defaultCandleSchema(core::Sc
     }
 }
 
-PreparedCandle::PreparedCandle(EventMapping mapping, CandleRecordKind kind) noexcept
-    : mapping_(std::move(mapping)), kind_(kind) {
+PreparedCandle::PreparedCandle(EventMapping mapping, CandleRecordKind kind,
+                               std::optional<core::IndexedTimeLayout> indexedTimeLayout) noexcept
+    : mapping_(std::move(mapping)), kind_(kind), indexedTimeLayout_(indexedTimeLayout) {
 }
 
 std::expected<PreparedCandle, MappingError> PreparedCandle::prepare(const core::LocalSchema &schema,
@@ -322,7 +324,15 @@ std::expected<PreparedCandle, MappingError> PreparedCandle::prepare(const core::
     if (!mapping)
         return std::unexpected(mapping.error());
 
-    return PreparedCandle(std::move(*mapping), kind);
+    std::optional<core::IndexedTimeLayout> indexedTimeLayout;
+    const auto &declaredLayout = schema.records()[static_cast<std::size_t>(localId)].indexedTimeLayout;
+    const auto *pair = declaredLayout ? std::get_if<core::IndexedTimePairInt32>(&*declaredLayout) : nullptr;
+    const auto selected = mapping->selections();
+
+    if (pair && selected[0] == pair->firstField && selected[1] == pair->secondField)
+        indexedTimeLayout = *pair;
+
+    return PreparedCandle(std::move(*mapping), kind, indexedTimeLayout);
 }
 
 const core::RecordContext &PreparedCandle::context() const noexcept {
@@ -342,6 +352,19 @@ std::expected<Candle, MappingError> PreparedCandle::mapView(const CandleSymbol &
                                                             std::size_t symbolUnits, std::int64_t eventTime,
                                                             std::int32_t eventFlags) const {
     if (const auto valid = mapping_.validateView(values); !valid)
+        return std::unexpected(valid.error());
+
+    return project(symbol, values.values, mapping_.selections(), kind_, symbolUnits, eventTime, eventFlags);
+}
+
+std::expected<Candle, MappingError>
+PreparedCandle::mapIndexedRemovalView(const CandleSymbol &symbol, BorrowedRecordValueView values,
+                                      std::size_t symbolUnits, std::int64_t eventTime, std::int32_t eventFlags,
+                                      std::int64_t rawTime) const {
+    if (!indexedTimeLayout_ || !(eventFlags & indexed_event_flags::REMOVE_EVENT))
+        return std::unexpected(MappingError::INVALID_INPUT);
+
+    if (const auto valid = mapping_.validateIndexedRemoval(values, *indexedTimeLayout_, rawTime); !valid)
         return std::unexpected(valid.error());
 
     return project(symbol, values.values, mapping_.selections(), kind_, symbolUnits, eventTime, eventFlags);

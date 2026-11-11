@@ -76,6 +76,7 @@ struct BorrowedRecordValueView {
 
 /** Immutable local-to-event selections, independent of protocol and preparation input lifetime. */
 class EventMapping {
+    friend class PreparedCandle;
     friend class PreparedGreeks;
     friend class PreparedUnderlying;
     friend class PreparedTheoPrice;

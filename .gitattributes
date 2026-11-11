@@ -860,3 +860,9 @@ tests/fixtures/market-maker-order/wire/*.qtp -text -whitespace
 tests/fixtures/market-maker-order/*.json text eol=lf
 tools/upstream/market-maker-order-oracle/*.java text eol=lf
 tools/upstream/market-maker-order-oracle/*.ps1 text eol=lf
+
+# Preserve exact Candle HISTORY observations, source chunks and oracle source.
+tools/upstream/candle-lifecycle-oracle/*.java text eol=lf
+tests/fixtures/candle-lifecycle/*.tsv -text -whitespace
+tests/fixtures/candle-lifecycle/*.qtp -text -whitespace
+tests/fixtures/candle-lifecycle/*.json text eol=lf

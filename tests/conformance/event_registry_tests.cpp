@@ -548,8 +548,8 @@ TEST_CASE("registry byte ceiling includes actual shared state and control alloca
 }
 
 TEST_CASE("SDK defaults retain all real regional records and explicit physical delegate families") {
-    constexpr std::size_t TICKER_RECORDS = 42;
-    constexpr std::size_t TICKER_ROUTES = 69;
+    constexpr std::size_t TICKER_RECORDS = 44;
+    constexpr std::size_t TICKER_ROUTES = 71;
     auto ticker = api::detail::defaultReceivingRegistry(api::DeliveryContract::TICKER);
     REQUIRE(ticker);
     REQUIRE(ticker->schema().records().size() == TICKER_RECORDS);
@@ -561,8 +561,8 @@ TEST_CASE("SDK defaults retain all real regional records and explicit physical d
         lookups += record.lookups.size();
     }
 
-    CHECK(fields == 282);
-    CHECK(lookups == 680);
+    CHECK(fields == 302);
+    CHECK(lookups == 705);
 
     for (char16_t exchange = u'A'; exchange <= u'Z'; ++exchange) {
         const auto name = u"Quote&" + std::u16string(1, exchange);
@@ -598,8 +598,8 @@ TEST_CASE("SDK defaults retain all real regional records and explicit physical d
 
     auto history = api::detail::defaultReceivingRegistry(api::DeliveryContract::HISTORY);
     REQUIRE(history);
-    REQUIRE(history->schema().records().size() == 10);
-    REQUIRE(history->registrations().size() == 11);
+    REQUIRE(history->schema().records().size() == 12);
+    REQUIRE(history->registrations().size() == 13);
     CHECK(history->schema().records()[2].name == u"SpreadOrder");
     CHECK(history->schema().records()[3].name == u"AnalyticOrder");
     CHECK(history->schema().records()[4].name == u"OtcMarketsOrder");
@@ -626,6 +626,18 @@ TEST_CASE("SDK defaults retain all real regional records and explicit physical d
     CHECK(history->schema().records()[9].name == u"TheoPrice");
     CHECK(history->registrations()[10].type == api::EventType::THEO_PRICE);
     CHECK(history->registrations()[10].localRecordId == 9);
+    CHECK(ticker->schema().records()[42].name == u"Candle");
+    CHECK(ticker->schema().records()[43].name == u"TradeHistory");
+    CHECK(ticker->registrations()[69].type == api::EventType::CANDLE);
+    CHECK(ticker->registrations()[69].localRecordId == 42);
+    CHECK(ticker->registrations()[70].type == api::EventType::CANDLE);
+    CHECK(ticker->registrations()[70].localRecordId == 43);
+    CHECK(history->schema().records()[10].name == u"Candle");
+    CHECK(history->schema().records()[11].name == u"TradeHistory");
+    CHECK(history->registrations()[11].type == api::EventType::CANDLE);
+    CHECK(history->registrations()[11].localRecordId == 10);
+    CHECK(history->registrations()[12].type == api::EventType::CANDLE);
+    CHECK(history->registrations()[12].localRecordId == 11);
     auto defaults = api::EventRegistryLimits{};
     api::EventRegistryWork work;
     auto unchanged = api::EventRegistry::builtIn(defaults, work);
@@ -639,16 +651,48 @@ TEST_CASE("SDK defaults retain all real regional records and explicit physical d
     CHECK(profile.physicalRouteCount == TICKER_RECORDS);
     CHECK(profile.clientLimits.commandEntries == 16 * TICKER_RECORDS);
     CHECK(profile.interests.entries == 8 * 16 * TICKER_RECORDS);
-    CHECK(profile.endpoint.settings().budgets.schema.records == 42);
-    CHECK(profile.endpoint.settings().budgets.layout.records == 42);
-    CHECK(profile.endpoint.settings().budgets.session.context.descriptions == 42);
-    CHECK(profile.eventPlans.size() == 4096);
+    CHECK(profile.endpoint.settings().budgets.schema.records == TICKER_RECORDS);
+    CHECK(profile.endpoint.settings().budgets.layout.records == TICKER_RECORDS);
+    CHECK(profile.endpoint.settings().budgets.session.context.descriptions == TICKER_RECORDS);
+    CHECK(profile.eventPlans.size() == 8192);
     CHECK(profile.routing.retainedMetadataBytes >=
           profile.eventPlans.capacity() * sizeof(api::detail::ReceivingEventPlan));
     std::cout << "DERIVED_DEFAULT_STORAGE registry=" << ticker->storageBytes()
               << " profile=" << sizeof(api::detail::ReceivingProfile)
               << " plan=" << sizeof(api::detail::ReceivingEventPlan)
               << " retained=" << profile.routing.retainedMetadataBytes << '\n';
+}
+
+TEST_CASE("Candle receiving plans choose only the resolved physical record per logical symbol") {
+    api::RuntimeOptions runtime;
+    runtime.dnsServers.push_back({{127, 0, 0, 1}});
+
+    for (const auto contract : {api::DeliveryContract::TICKER, api::DeliveryContract::HISTORY}) {
+        api::EndpointOptions options;
+        options.contract = contract;
+        const auto profile = api::detail::prepareReceivingProfile(runtime, options, "127.0.0.1", 12345);
+        const auto &plan = api::detail::receivingEventPlan(profile, api::detail::EventSelection::CANDLE);
+        REQUIRE(plan.bindingCount == 2);
+        std::array<api::detail::ReceivingSymbol, 2> symbols{};
+        symbols[0].logical = u"SPY{=m}";
+        symbols[1].logical = u"SPY";
+        api::detail::prepareReceivingSymbols(profile, plan, symbols);
+
+        const auto generic = plan.bindingIndices[0];
+        const auto tick = plan.bindingIndices[1];
+        CHECK(api::detail::receivingSymbolMatches(profile, generic, symbols[0]));
+        CHECK_FALSE(api::detail::receivingSymbolMatches(profile, tick, symbols[0]));
+        CHECK(api::detail::receivingPhysicalSymbol(profile, generic, symbols[0]) == u"SPY{=m}");
+        CHECK_FALSE(api::detail::receivingSymbolMatches(profile, generic, symbols[1]));
+        CHECK(api::detail::receivingSymbolMatches(profile, tick, symbols[1]));
+        CHECK(api::detail::receivingPhysicalSymbol(profile, tick, symbols[1]) == u"SPY");
+
+        if (contract == api::DeliveryContract::HISTORY) {
+            CHECK(profile.bindingTimeEncodings[generic] ==
+                  api::detail::HistoryRangeEncoding::UNIX_MILLISECONDS_SEQUENCE);
+            CHECK(profile.bindingTimeEncodings[tick] == api::detail::HistoryRangeEncoding::UNIX_MILLISECONDS_SEQUENCE);
+        }
+    }
 }
 
 TEST_CASE("one physical record admits only one native and one compatible derived group") {

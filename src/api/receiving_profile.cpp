@@ -4,6 +4,7 @@
 #include "callback_execution.hpp"
 #include "event_registry_defaults.hpp"
 
+#include "../events/candle_receiving_limits.hpp"
 #include "../events/derived_order_sources.hpp"
 #include "../events/order_record_source.hpp"
 #include "qd/events/market_event_symbols.hpp"
@@ -18,8 +19,9 @@
 namespace org::ttldtor::qdcxx::api::detail {
 namespace {
 constexpr std::size_t MEBIBYTE = 1024 * 1024; ///< Independent logical byte unit.
-constexpr core::SchemaLimits SCHEMA_LIMITS{MAXIMUM_RECEIVING_RECORDS, 284, 724, 128, 16384};
-///< Complete declarations and aliases; regional binding does not expand this ceiling.
+constexpr core::SchemaLimits BASE_SCHEMA_LIMITS{42, 284, 724, 128, 16384};
+// Reserve exactly the two records, 20 fields and 25 lookups of the Candle/TradeHistory declarations.
+constexpr core::SchemaLimits CANDLE_SCHEMA_LIMITS{MAXIMUM_RECEIVING_RECORDS, 284 + 20, 724 + 25, 128, 16384};
 constexpr std::size_t FRAME_RECORDS = 64; ///< Whole admitted DATA frame record ceiling.
 constexpr std::size_t CALLBACK_RECORDS = CallbackSlotPool::PHYSICAL_RECORDS; ///< Whole callback projection ceiling.
 constexpr std::size_t FIELD_TEXT_UNITS = 8192;             ///< Aggregate text copied from one complete record.
@@ -350,6 +352,10 @@ void prepareCopies(ReceivingProfile &profile) {
  */
 void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, std::size_t symbolUnits) {
     const events::EventValueLimits values{symbolUnits, FIELD_TEXT_UNITS, add(symbolUnits, 2 * FIELD_TEXT_UNITS)};
+    const auto contract = profile.family == core::SubscriptionFamily::TICKER    ? DeliveryContract::TICKER
+                          : profile.family == core::SubscriptionFamily::HISTORY ? DeliveryContract::HISTORY
+                                                                                : DeliveryContract::STREAM;
+    profile.candleRoutes = prepareReceivingCandleRoutes(registry, profile.schema, contract, symbolUnits);
     profile.bindings.reserve(registry.registrations().size());
 
     if (profile.bindings.capacity() > MAXIMUM_RECEIVING_BINDINGS)
@@ -358,21 +364,20 @@ void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, s
     for (std::size_t kind = 0; kind < RECEIVING_EVENT_KINDS; ++kind) {
         for (const auto &registration : registry.registrations()) {
             if (static_cast<std::size_t>(registration.type) != kind ||
-                !receivingRouteSupportsContract(
-                    registration, profile.family == core::SubscriptionFamily::TICKER    ? DeliveryContract::TICKER
-                                  : profile.family == core::SubscriptionFamily::HISTORY ? DeliveryContract::HISTORY
-                                                                                        : DeliveryContract::STREAM))
+                !receivingRouteSupportsContract(registration, contract))
                 continue;
 
             const auto index = profile.bindings.size();
             const auto &record = profile.schema.records()[static_cast<std::size_t>(registration.localRecordId)];
 
-            if (isOptionTimeSeriesEvent(registration.type) && profile.family == core::SubscriptionFamily::HISTORY) {
+            if ((isOptionTimeSeriesEvent(registration.type) || registration.type == EventType::CANDLE) &&
+                profile.family == core::SubscriptionFamily::HISTORY) {
                 if (!record.hasTime)
                     refuse(ErrorCode::UNSUPPORTED_PROFILE,
                            registration.type == EventType::GREEKS       ? "profile-greeks-time"
                            : registration.type == EventType::UNDERLYING ? "profile-underlying-time"
-                                                                        : "profile-theo-price-time");
+                           : registration.type == EventType::THEO_PRICE ? "profile-theo-price-time"
+                                                                        : "profile-candle-time");
 
                 profile.bindingTimeEncodings[index] = HistoryRangeEncoding::UNIX_MILLISECONDS_SEQUENCE;
             }
@@ -380,8 +385,9 @@ void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, s
             profile.bindingExchanges[index] =
                 (registration.type == EventType::PROFILE || registration.type == EventType::MARKET_MAKER ||
                  registration.type == EventType::SERIES || isOptionTimeSeriesEvent(registration.type) ||
-                 registration.type == EventType::TEXT_MESSAGE || registration.type == EventType::TEXT_CONFIGURATION ||
-                 registration.type == EventType::MESSAGE || registration.type == EventType::CONFIGURATION ||
+                 registration.type == EventType::CANDLE || registration.type == EventType::TEXT_MESSAGE ||
+                 registration.type == EventType::TEXT_CONFIGURATION || registration.type == EventType::MESSAGE ||
+                 registration.type == EventType::CONFIGURATION ||
                  (usesOrderSource(registration.type) && registration.projection == events::EventProjection::NATIVE))
                     ? 0
                     : events::market_symbols::getExchangeCode(record.name);
@@ -453,22 +459,32 @@ void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, s
                         add(mapping.totalNameUnits, mapping.comparisonWork)));
             const auto fields = profile.schema.records()[static_cast<std::size_t>(binding.localId)].fields.size();
             const bool profileText = binding.kind == client::PreparedEventKind::PROFILE;
+            const bool candle = binding.kind == client::PreparedEventKind::CANDLE;
             const bool text = profileText || binding.kind == client::PreparedEventKind::TEXT_MESSAGE ||
                               binding.kind == client::PreparedEventKind::TEXT_CONFIGURATION ||
                               isOrderSourceEvent(static_cast<EventType>(binding.kind));
-            const auto units = text ? values.totalUnits : values.symbolUnits;
+            const auto units = candle ? multiply(values.symbolUnits, events::detail::CANDLE_SYMBOL_TEXT_PASSES)
+                               : text ? values.totalUnits
+                                      : values.symbolUnits;
             const auto strings = profileText ? std::size_t{3} : (text ? std::size_t{2} : std::size_t{1});
             const auto bytes =
                 add(add(sizeof(client::SubscriptionProjection), multiply(add(units, strings), sizeof(char16_t))),
                     binding.kind == client::PreparedEventKind::MESSAGE ||
                             binding.kind == client::PreparedEventKind::CONFIGURATION
                         ? binding.attachmentBytes
-                        : 0);
+                    : candle ? events::detail::CANDLE_SYMBOL_FIXED_BYTES
+                             : 0);
             plan.bindingIndices[plan.bindingCount++] = index;
             plan.limits.bindings = plan.bindingCount;
             plan.limits.shapeFields = add(plan.limits.shapeFields, fields);
             plan.limits.selections = add(plan.limits.selections, mapping.selections);
             plan.work.preparationWork = add(plan.work.preparationWork, preparation);
+
+            if (candle) {
+                plan.work.preparationWork = add(plan.work.preparationWork, preparation);
+                plan.work.visits = add(plan.work.visits, mapping.lookups);
+            }
+
             plan.work.visits = add(plan.work.visits, add(plan.bindingCount, 3));
 
             if (binding.kind == client::PreparedEventKind::SPREAD_ORDER ||
@@ -500,8 +516,8 @@ std::expected<EventRegistry, EventRegistryFailure> defaultReceivingRegistry(Deli
 
     EventRegistryWork work;
     EventRegistryLimits limits;
-    limits.schema = SCHEMA_LIMITS;
-    // Keep seven spare routes from the previous nine-of-sixteen default catalog.
+    limits.schema = contract == DeliveryContract::STREAM ? BASE_SCHEMA_LIMITS : CANDLE_SCHEMA_LIMITS;
+    // Both appended physical Candle routes fit in the existing maximum registration capacity.
     limits.registrations = 73;
     constexpr auto defaultMapping = EventRegistration{EventType::QUOTE, 0}.mappingLimits;
     constexpr auto preparationPerRoute = defaultMapping.fields + defaultMapping.lookups + defaultMapping.selections +
@@ -529,7 +545,7 @@ bool receivingRouteSupportsContract(const EventRegistration &route, DeliveryCont
         return contract == DeliveryContract::TICKER;
     }
 
-    if (isOptionTimeSeriesEvent(route.type)) {
+    if (isOptionTimeSeriesEvent(route.type) || route.type == EventType::CANDLE) {
         return contract == DeliveryContract::TICKER || contract == DeliveryContract::HISTORY;
     }
 
@@ -544,6 +560,97 @@ bool receivingRouteSupportsContract(const EventRegistration &route, DeliveryCont
     return contract == DeliveryContract::TICKER || contract == DeliveryContract::STREAM;
 }
 
+std::optional<events::PreparedCandleRoutes> prepareReceivingCandleRoutes(const EventRegistry &registry,
+                                                                         const core::LocalSchema &schema,
+                                                                         DeliveryContract contract,
+                                                                         std::size_t symbolUnits) {
+    std::array<std::int32_t, MAXIMUM_RECEIVING_RECORDS> ids{};
+    std::size_t count = 0;
+    auto mapping = EventRegistration{EventType::CANDLE, 0}.mappingLimits;
+
+    for (const auto &route : registry.registrations()) {
+        if (route.type != EventType::CANDLE || !receivingRouteSupportsContract(route, contract))
+            continue;
+
+        if (count == ids.size())
+            refuse(ErrorCode::RESOURCE_LIMIT, "profile-candle-records");
+
+        if (contract == DeliveryContract::HISTORY &&
+            !schema.records()[static_cast<std::size_t>(route.localRecordId)].hasTime)
+            refuse(ErrorCode::UNSUPPORTED_PROFILE, "profile-candle-time");
+
+        ids[count++] = route.localRecordId;
+        const auto &limit = route.mappingLimits;
+        mapping.fields = std::max(mapping.fields, limit.fields);
+        mapping.lookups = std::max(mapping.lookups, limit.lookups);
+        mapping.selections = std::max(mapping.selections, limit.selections);
+        mapping.keys = std::max(mapping.keys, limit.keys);
+        mapping.typeAlternatives = std::max(mapping.typeAlternatives, limit.typeAlternatives);
+        mapping.nameUnits = std::max(mapping.nameUnits, limit.nameUnits);
+        mapping.totalNameUnits = std::max(mapping.totalNameUnits, limit.totalNameUnits);
+        mapping.comparisonWork = std::max(mapping.comparisonWork, limit.comparisonWork);
+    }
+
+    if (count == 0)
+        return std::nullopt;
+
+    auto prepared = events::PreparedCandleRoutes::prepare(
+        schema, std::span(ids).first(count), {count, CANDLE_SCHEMA_LIMITS.nameUnits, symbolUnits, mapping});
+
+    if (!prepared) {
+        using RouteError = events::CandleRouteError;
+        const auto &failure = prepared.error();
+        refuse(failure.error == RouteError::ALLOCATION_FAILURE ||
+                       failure.mappingError == events::MappingError::ALLOCATION_FAILURE
+                   ? ErrorCode::ALLOCATION_FAILURE
+               : failure.error == RouteError::RESOURCE_LIMIT ||
+                       failure.mappingError == events::MappingError::RESOURCE_LIMIT
+                   ? ErrorCode::RESOURCE_LIMIT
+                   : ErrorCode::UNSUPPORTED_PROFILE,
+               "profile-candle-routes");
+    }
+
+    return std::move(*prepared);
+}
+
+std::optional<events::PreparedCandleRoutes> prepareReceivingCandleRoutes(const EndpointOptions &options,
+                                                                         std::size_t symbolUnits) {
+    const auto registry = selectRegistry(options);
+
+    return prepareReceivingCandleRoutes(registry, registry.schema(), options.contract, symbolUnits);
+}
+
+events::CandlePhysicalRoute resolveReceivingCandle(const events::PreparedCandleRoutes &routes,
+                                                   std::u16string_view symbol) {
+    try {
+        auto route = routes.resolve(events::CandleSymbol::valueOf(symbol));
+
+        if (route)
+            return std::move(*route);
+
+        using RouteError = events::CandleRouteError;
+
+        switch (route.error().error) {
+        case RouteError::ALLOCATION_FAILURE:
+            refuse(ErrorCode::ALLOCATION_FAILURE, "subscription-candle-route");
+        case RouteError::RESOURCE_LIMIT:
+            refuse(ErrorCode::RESOURCE_LIMIT, "subscription-candle-route");
+        case RouteError::INVALID_INPUT:
+            refuse(ErrorCode::INVALID_ARGUMENT, "subscription-candle-route");
+        default:
+            refuse(ErrorCode::UNSUPPORTED_PROFILE, "subscription-candle-route");
+        }
+    } catch (const std::invalid_argument &) {
+        refuse(ErrorCode::INVALID_ARGUMENT, "subscription-candle-route");
+    } catch (const std::out_of_range &) {
+        refuse(ErrorCode::INVALID_ARGUMENT, "subscription-candle-route");
+    } catch (const std::length_error &) {
+        refuse(ErrorCode::RESOURCE_LIMIT, "subscription-candle-route");
+    } catch (const std::bad_alloc &) {
+        refuse(ErrorCode::ALLOCATION_FAILURE, "subscription-candle-route");
+    }
+}
+
 ReceivingProfile::ReceivingProfile(core::LocalSchema schema, client::EndpointOptions endpoint)
     : schema(std::move(schema)), endpoint(std::move(endpoint)) {
 }
@@ -551,7 +658,11 @@ ReceivingProfile::ReceivingProfile(core::LocalSchema schema, client::EndpointOpt
 ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const EndpointOptions &options,
                                          const std::string &host, std::uint16_t port) {
     auto selected = selectRegistry(options);
-    auto copied = selected.schema().boundedCopy(SCHEMA_LIMITS);
+    const auto hasCandle = std::ranges::any_of(selected.registrations(), [&](const EventRegistration &route) {
+        return route.type == EventType::CANDLE && receivingRouteSupportsContract(route, options.contract);
+    });
+    const auto schemaLimits = hasCandle ? CANDLE_SCHEMA_LIMITS : BASE_SCHEMA_LIMITS;
+    auto copied = selected.schema().boundedCopy(schemaLimits);
 
     if (!copied) {
         refuse(copied.error() == core::SchemaError::ALLOCATION_FAILURE ? ErrorCode::ALLOCATION_FAILURE
@@ -603,14 +714,14 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
     const auto symbolUnits = multiply(entries, runtime.maximumSymbolUnits);
     const auto scale = multiply(clients, add(subscriptionEntries, 15) / 16);
     auto &budgets = settings.budgets;
-    budgets.schema = SCHEMA_LIMITS;
-    budgets.layout = {SCHEMA_LIMITS, SCHEMA_LIMITS.records, SCHEMA_LIMITS.fields, SCHEMA_LIMITS.nameUnits,
-                      SCHEMA_LIMITS.totalNameUnits};
-    budgets.session.context.schema = SCHEMA_LIMITS;
-    budgets.session.context.descriptions = SCHEMA_LIMITS.records;
+    budgets.schema = schemaLimits;
+    budgets.layout = {schemaLimits, schemaLimits.records, schemaLimits.fields, schemaLimits.nameUnits,
+                      schemaLimits.totalNameUnits};
+    budgets.session.context.schema = schemaLimits;
+    budgets.session.context.descriptions = schemaLimits.records;
     budgets.session.snapshotBytes = SESSION_SNAPSHOT_BYTES;
-    budgets.session.descriptions.descriptions = SCHEMA_LIMITS.records;
-    budgets.session.descriptions.totalFields = SCHEMA_LIMITS.fields;
+    budgets.session.descriptions.descriptions = schemaLimits.records;
+    budgets.session.descriptions.totalFields = schemaLimits.fields;
     budgets.session.events = protocol::DataEventPolicy::BINARY_CATALOG_V1;
     budgets.session.historySnapshot = options.contract == DeliveryContract::HISTORY;
     budgets.session.fieldTime = protocol::FieldTimePolicy::READ;
@@ -619,7 +730,7 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
     budgets.session.data.symbol.codeUnits = budgets.session.data.symbol.stateUnits = runtime.maximumSymbolUnits;
     budgets.session.data.ownedFieldUnits = FIELD_TEXT_UNITS;
     budgets.session.data.ownedPayloadBytes = FIELD_BYTE_UNITS;
-    budgets.desired = {SCHEMA_LIMITS.records,    entries, runtime.maximumSymbolUnits, symbolUnits, multiply(2, entries),
+    budgets.desired = {schemaLimits.records,     entries, runtime.maximumSymbolUnits, symbolUnits, multiply(2, entries),
                        multiply(2, symbolUnits), entries};
     budgets.writer.operationEntries = std::max(budgets.writer.operationEntries, entries);
 
@@ -670,14 +781,14 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
     result.recoveryOptions.dns.serverCount = runtime.dnsServers.size();
     result.recoveryOptions.dns.port = runtime.dnsPort;
     std::ranges::copy(runtime.dnsServers, result.recoveryOptions.dns.servers.begin());
-    result.interests = {SCHEMA_LIMITS.records,      clients,     entries, entries,
+    result.interests = {schemaLimits.records,       clients,     entries, entries,
                         runtime.maximumSymbolUnits, symbolUnits, entries, multiply(scale, 4 * MEBIBYTE)};
     result.clientLimits = {options.pendingRecords,
                            RECORD_BYTES,
                            8,
                            BATCH_BYTES,
                            options.batchRecords,
-                           SCHEMA_LIMITS.fields,
+                           schemaLimits.fields,
                            runtime.maximumSymbolUnits,
                            FIELD_TEXT_UNITS,
                            FIELD_BYTE_UNITS,
@@ -739,24 +850,37 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
     routing.frontendSelectorBytes =
         multiply(FRONTEND_SELECTOR_BANKS, add(multiply(routing.symbols, sizeof(SubscriptionSelector)),
                                               multiply(add(logicalUnits, routing.symbols), sizeof(char16_t))));
-    routing.temporaryTextUnits = multiply(2, logicalUnits);
+    const auto candlePasses = result.candleRoutes ? events::detail::CANDLE_SYMBOL_TEXT_PASSES : 0;
+    routing.temporaryTextUnits = multiply(add(2, candlePasses), logicalUnits);
     // The port's retained logical set and the queue's owned command copies have their own existing bounds.
     const auto textBacking = multiply(add(routing.temporaryTextUnits, multiply(2, routing.symbols)), sizeof(char16_t));
-    routing.temporaryBytes = add(add(multiply(routing.symbols, sizeof(ReceivingSymbol)),
-                                     multiply(subscriptionEntries, sizeof(core::SubscriptionRequest))),
-                                 textBacking);
+    routing.temporaryBytes =
+        add(add(multiply(routing.symbols, add(sizeof(ReceivingSymbol),
+                                              result.candleRoutes ? events::detail::CANDLE_SYMBOL_FIXED_BYTES : 0)),
+                multiply(subscriptionEntries, sizeof(core::SubscriptionRequest))),
+            textBacking);
     routing.retainedMetadataBytes =
         add(add(add(add(sizeof(result.bindingExchanges), sizeof(result.bindingSources)),
                     sizeof(result.bindingTimeEncodings)),
                 sizeof(result.versionBindings)),
             add(multiply(result.eventPlans.capacity(), sizeof(ReceivingEventPlan)),
                 sizeof(std::array<client::PreparedSubscriptionBinding, MAXIMUM_RECEIVING_BINDINGS>)));
+
+    if (result.candleRoutes) {
+        // One retained descriptor per selected record at most, including its provenance.
+        constexpr auto descriptorBytes = sizeof(events::CandlePhysicalRoute) +
+                                         sizeof(std::optional<events::CandlePeriod>) +
+                                         sizeof(std::optional<events::CandlePrice>);
+        routing.retainedMetadataBytes =
+            add(routing.retainedMetadataBytes, multiply(result.schema.records().size(), descriptorBytes));
+    }
+
     // Snapshot copy, suffix/representability scans, physical conversion and conservative retirement.
     constexpr std::size_t ROUTING_TEXT_PASSES = 11;
     const auto routeScans = multiply(multiply(routing.symbols, selected.registrations().size()), subscriptionEntries);
     routing.work = {0,
                     add(routeScans, add(multiply(routing.symbols, add(multiply(2, maximumRoutes), 8)), maximumRoutes)),
-                    multiply(ROUTING_TEXT_PASSES, logicalUnits),
+                    multiply(add(ROUTING_TEXT_PASSES, candlePasses), logicalUnits),
                     add(multiply(2, routing.temporaryBytes), routing.retainedMetadataBytes)};
     // Every routed candidate may compare its key and complete text with every previous candidate.
     const auto comparisons = multiply(subscriptionEntries, subscriptionEntries);
@@ -878,7 +1002,7 @@ void validateReceivingSymbol(const EventRegistry *registry, EventSelection selec
         return;
     }
 
-    if (registry->schema().records().size() > SCHEMA_LIMITS.records) {
+    if (registry->schema().records().size() > CANDLE_SCHEMA_LIMITS.records) {
         refuse(ErrorCode::UNSUPPORTED_PROFILE, "profile-schema");
     }
 
@@ -888,14 +1012,14 @@ void validateReceivingSymbol(const EventRegistry *registry, EventSelection selec
         if (route.type == EventType::PROFILE || route.type == EventType::TEXT_MESSAGE ||
             route.type == EventType::TEXT_CONFIGURATION || route.type == EventType::MESSAGE ||
             route.type == EventType::CONFIGURATION || route.type == EventType::SERIES ||
-            isOptionTimeSeriesEvent(route.type) || usesOrderSource(route.type) ||
+            isOptionTimeSeriesEvent(route.type) || route.type == EventType::CANDLE || usesOrderSource(route.type) ||
             !selectsEvent(selection, route.type)) {
             continue;
         }
 
         const auto &record = registry->schema().records()[static_cast<std::size_t>(route.localRecordId)];
 
-        if (record.name.size() > SCHEMA_LIMITS.nameUnits) {
+        if (record.name.size() > CANDLE_SCHEMA_LIMITS.nameUnits) {
             refuse(ErrorCode::UNSUPPORTED_PROFILE, "profile-schema");
         }
 
@@ -907,15 +1031,25 @@ void validateReceivingSymbol(const EventRegistry *registry, EventSelection selec
 
 void prepareReceivingSymbols(const ReceivingProfile &profile, const ReceivingEventPlan &plan,
                              std::span<ReceivingSymbol> symbols) {
+    const auto candleSelected =
+        profile.candleRoutes &&
+        std::ranges::any_of(std::span(plan.bindingIndices).first(plan.bindingCount), [&](std::size_t index) {
+            return profile.bindings[index].kind == client::PreparedEventKind::CANDLE;
+        });
+
     for (auto &symbol : symbols) {
         symbol.regional = {};
         symbol.exchange = 0;
         // Retire previous physical backing before either Exact conversion or an unused-text All key.
         std::u16string{}.swap(symbol.physical);
+        symbol.candle.reset();
 
         if (symbol.selector == core::SubscriptionSelectorKind::ALL) {
             continue;
         }
+
+        if (candleSelected)
+            symbol.candle = resolveReceivingCandle(*profile.candleRoutes, symbol.logical);
 
         symbol.exchange = events::market_symbols::getExchangeCode(symbol.logical);
 
@@ -946,6 +1080,13 @@ core::DeliveryProjectionMask receivingProjectionMask(const ReceivingProfile &pro
                                                      const ReceivingSymbol &symbol) noexcept {
     const auto &binding = profile.bindings[bindingIndex];
     const auto exchange = profile.bindingExchanges[bindingIndex];
+
+    if (binding.kind == client::PreparedEventKind::CANDLE) {
+        return symbol.candle && symbol.candle->recordId == binding.localId &&
+                       (!symbol.sourceId || *symbol.sourceId <= 0)
+                   ? core::NATIVE_DELIVERY_PROJECTION
+                   : 0;
+    }
 
     if (binding.projection != events::EventProjection::NATIVE) {
         const bool maker = binding.projection == events::EventProjection::MARKET_MAKER_ORDERS;
@@ -1001,6 +1142,9 @@ bool receivingSymbolMatches(const ReceivingProfile &profile, std::size_t binding
 
 const std::u16string &receivingPhysicalSymbol(const ReceivingProfile &profile, std::size_t bindingIndex,
                                               const ReceivingSymbol &symbol) noexcept {
+    if (profile.bindings[bindingIndex].kind == client::PreparedEventKind::CANDLE && symbol.candle)
+        return symbol.candle->symbol;
+
     return profile.bindingExchanges[bindingIndex] &&
                    profile.bindings[bindingIndex].projection == events::EventProjection::NATIVE
                ? symbol.physical

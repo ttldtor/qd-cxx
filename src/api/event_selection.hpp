@@ -50,7 +50,8 @@ enum class EventSelection {
     GREEKS = 1 << 16,                     ///< Selected option Greeks routes.
     UNDERLYING = 1 << 17,                 ///< Selected underlying option activity routes.
     THEO_PRICE = 1 << 18,                 ///< Selected option theoretical price routes.
-    ALL = (1 << 19) - 1,                  ///< Every supported event route.
+    CANDLE = 1 << 19,                     ///< Selected native Candle routes.
+    ALL = (1 << 20) - 1,                  ///< Every supported event route.
 };
 
 /** Test a finite supported-kind selection without depending on local record positions.
@@ -65,7 +66,7 @@ constexpr bool selectsEvent(EventSelection selection, EventType type) noexcept {
         type != EventType::ORDER && type != EventType::MARKET_MAKER && type != EventType::SPREAD_ORDER &&
         type != EventType::ANALYTIC_ORDER && type != EventType::OTC_MARKETS_ORDER &&
         type != EventType::ORDER_IMBALANCE && type != EventType::SERIES && type != EventType::GREEKS &&
-        type != EventType::UNDERLYING && type != EventType::THEO_PRICE) {
+        type != EventType::UNDERLYING && type != EventType::THEO_PRICE && type != EventType::CANDLE) {
         return false;
     }
 
@@ -109,6 +110,7 @@ enum class EventDelivery {
     GREEKS,             ///< Complete owning option risk sensitivities.
     UNDERLYING,         ///< Complete owning underlying option activity.
     THEO_PRICE,         ///< Complete owning option theoretical price.
+    CANDLE,             ///< Complete owning Candle values.
     REGISTERED          ///< Owning public RegisteredEvent variants, restricted by EventSelection.
 };
 

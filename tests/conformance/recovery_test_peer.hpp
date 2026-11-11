@@ -21,6 +21,8 @@ struct TcpPeerScript {
     bool waitForControllerReply{};     ///< Gate reply bytes until allowReply(index), stop, or deadline.
     std::optional<std::int32_t> readThroughMessage; ///< Alternative bounded capture through one complete frame type.
     bool waitForClientClose = false; ///< Capture until client EOF/reset, without creating a server peer-end race.
+    std::vector<std::vector<std::byte>> stagedBytes;
+    ///< At most 16 complete owned segments, each held until its numbered controller permit.
 };
 
 /** Finite resource limits validated before a native listener is created. */
@@ -38,6 +40,7 @@ struct TcpPeerSessionSnapshot {
     std::vector<std::byte> received;   ///< Bounded received prefix retained for test-side comparisons.
     std::size_t initialBytesWritten{}; ///< Successfully sent initial byte count.
     std::size_t replyBytesWritten{};   ///< Successfully sent reply byte count.
+    std::size_t stagedBytesWritten{};  ///< Aggregate bytes actually sent across controller-permitted segments.
     bool accepted{};                   ///< A connection was accepted for this script.
     bool matched{};                    ///< Exact expected prefix matched, or an unverified requested prefix was read.
     int clientCloseCode{}; ///< Actual reset code when explicitly waiting for client termination; zero for EOF.
@@ -81,6 +84,11 @@ class OwnedTcpPeer {
      * @param index Zero-based session index; out-of-range indices have no effect.
      */
     void allowReply(std::size_t index);
+    /** Permit the first count staged segments. Earlier permits are never revoked.
+     * @param index Zero-based session index; out-of-range indices have no effect.
+     * @param count Number of sequential segments allowed to start, at most the configured count.
+     */
+    void allowStages(std::size_t index, std::size_t count);
     /** Permit the designated script to close after its writes and reads finish.
      * @param index Zero-based session index; out-of-range indices have no effect.
      */

@@ -1,8 +1,10 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/client/subscription_receiver.hpp"
+#include "../events/candle_receiving_limits.hpp"
 #include "../events/derived_order_sources.hpp"
 #include "../events/order_index_coordinate.hpp"
+#include "qd/events/candle_routes.hpp"
 #include "qd/events/event_flags.hpp"
 
 #include <algorithm>
@@ -80,7 +82,7 @@ bool validBinding(const PreparedSubscriptionBinding &binding) noexcept {
             binding.kind == PreparedEventKind::ANALYTIC_ORDER || binding.kind == PreparedEventKind::OTC_MARKETS_ORDER ||
             binding.kind == PreparedEventKind::ORDER_IMBALANCE || binding.kind == PreparedEventKind::SERIES ||
             binding.kind == PreparedEventKind::GREEKS || binding.kind == PreparedEventKind::UNDERLYING ||
-            binding.kind == PreparedEventKind::THEO_PRICE) &&
+            binding.kind == PreparedEventKind::THEO_PRICE || binding.kind == PreparedEventKind::CANDLE) &&
            (binding.eventTimePolicy == ReceiverEventTimePolicy::UNSPECIFIED ||
             binding.eventTimePolicy == ReceiverEventTimePolicy::FIELD_METADATA) &&
            (binding.projection == events::EventProjection::NATIVE ||
@@ -88,9 +90,29 @@ bool validBinding(const PreparedSubscriptionBinding &binding) noexcept {
              (binding.projection == events::EventProjection::QUOTE_ORDERS ||
               binding.projection == events::EventProjection::MARKET_MAKER_ORDERS)));
 }
+
+std::variant<ReceiverError, events::MappingError> candleFailure(const events::CandleRouteFailure &failure) noexcept {
+    if (failure.mappingError)
+        return *failure.mappingError;
+
+    switch (failure.error) {
+    case events::CandleRouteError::RESOURCE_LIMIT:
+        return ReceiverError::RESOURCE_LIMIT;
+    case events::CandleRouteError::ALLOCATION_FAILURE:
+        return ReceiverError::ALLOCATION_FAILURE;
+    default:
+        return ReceiverError::INVALID_INPUT;
+    }
+}
 } // namespace
 
 namespace detail {
+struct CandleReceiverMapping {
+    std::int32_t localId;
+    events::PreparedCandle mapper;
+    events::PreparedCandleRoutes routes;
+};
+
 /** One independently owned immutable mapper and its explicit projection bounds. */
 struct ReceiverRoute {
     core::RecordContext context; ///< Retained exact origin/record identity, without declaration names.
@@ -100,7 +122,7 @@ struct ReceiverRoute {
                  events::PreparedMarketMaker, events::PreparedSpreadOrder, events::PreparedAnalyticOrder,
                  events::PreparedOtcMarketsOrder, events::PreparedOrderImbalance, events::PreparedSeries,
                  events::PreparedGreeks, events::PreparedUnderlying, events::PreparedTheoPrice,
-                 events::PreparedDerivedOrder>
+                 events::PreparedDerivedOrder, CandleReceiverMapping>
         mapping;                          ///< Existing owned immutable mapper.
     events::EventValueLimits valueLimits; ///< Per-result owned text bounds.
     ReceiverEventTimePolicy timePolicy;   ///< Explicit optional timestamp source.
@@ -162,6 +184,15 @@ namespace {
  * @return Exact checked declared allowances; actual copied text may be shorter.
  */
 ReceiverProjectionWork projectionAllowance(const detail::ReceiverRoute &route) {
+    if (std::holds_alternative<detail::CandleReceiverMapping>(route.mapping)) {
+        const auto units = checkedProduct(route.valueLimits.symbolUnits, events::detail::CANDLE_SYMBOL_TEXT_PASSES);
+        const auto bytes =
+            checkedSum(checkedSum(sizeof(SubscriptionProjection), events::detail::CANDLE_SYMBOL_FIXED_BYTES),
+                       checkedProduct(checkedSum(units, 1), sizeof(char16_t)));
+
+        return {checkedSum(route.shapeFields, checkedSum(route.selectionVisits, 1)), units, bytes};
+    }
+
     const bool profile = std::holds_alternative<events::PreparedProfile>(route.mapping);
     const bool text = std::holds_alternative<events::PreparedTextMessage>(route.mapping) ||
                       std::holds_alternative<events::PreparedTextConfiguration>(route.mapping);
@@ -393,6 +424,25 @@ projectPrepared(const mux::MuxRecordView &record, const detail::ReceiverRoute &r
         if (!mapped) {
             return std::unexpected(ReceiverProjectionFailure{mapped.error()});
         }
+
+        return SubscriptionProjection{std::move(*mapped), eventTime};
+    }
+
+    if (const auto *prepared = std::get_if<detail::CandleReceiverMapping>(&route.mapping)) {
+        const auto symbol = prepared->routes.restore(prepared->localId, record.symbol);
+
+        if (!symbol)
+            return std::unexpected(candleFailure(symbol.error()));
+
+        auto mapped =
+            indexedRemovalTime
+                ? prepared->mapper.mapIndexedRemovalView(*symbol, values, route.valueLimits.symbolUnits,
+                                                         eventTime.value_or(0), record.eventFlags, *indexedRemovalTime)
+                : prepared->mapper.mapView(*symbol, values, route.valueLimits.symbolUnits, eventTime.value_or(0),
+                                           record.eventFlags);
+
+        if (!mapped)
+            return std::unexpected(ReceiverProjectionFailure{mapped.error()});
 
         return SubscriptionProjection{std::move(*mapped), eventTime};
     }
@@ -665,7 +715,7 @@ openSubscriptionReceiver(mux::MuxQueue &queue, const core::LocalSchema &schema, 
             const auto &record = schema.records()[static_cast<std::size_t>(binding.localId)];
 
             if ((binding.kind == PreparedEventKind::GREEKS || binding.kind == PreparedEventKind::UNDERLYING ||
-                 binding.kind == PreparedEventKind::THEO_PRICE) &&
+                 binding.kind == PreparedEventKind::THEO_PRICE || binding.kind == PreparedEventKind::CANDLE) &&
                 (family == core::SubscriptionFamily::STREAM ||
                  (family == core::SubscriptionFamily::HISTORY && !record.hasTime))) {
                 return std::unexpected(ReceiverFailure{ReceiverError::INVALID_INPUT, i});
@@ -847,6 +897,32 @@ openSubscriptionReceiver(mux::MuxQueue &queue, const core::LocalSchema &schema, 
                 }
 
                 plan.routes.push_back({schema.recordContext(binding.localId), std::move(*prepared), binding.valueLimits,
+                                       binding.eventTimePolicy, fields, binding.mappingLimits.selections});
+            } else if (binding.kind == PreparedEventKind::CANDLE) {
+                const auto &record = schema.records()[static_cast<std::size_t>(binding.localId)];
+                debit(receiverWork.preparationWork, preparationAllowance(binding.mappingLimits));
+                debit(receiverWork.visits, record.lookups.size());
+                auto routes = events::PreparedCandleRoutes::prepare(
+                    schema, std::span(&binding.localId, 1),
+                    {1, binding.mappingLimits.nameUnits, binding.valueLimits.symbolUnits, binding.mappingLimits});
+
+                if (!routes) {
+                    return std::visit(
+                        [&](auto cause) {
+                            return std::unexpected(ReceiverFailure{cause, i});
+                        },
+                        candleFailure(routes.error()));
+                }
+
+                const auto kind = record.name == u"TradeHistory" ? events::CandleRecordKind::TRADE_HISTORY
+                                                                 : events::CandleRecordKind::CANDLE;
+                auto mapper = events::PreparedCandle::prepare(schema, binding.localId, kind, binding.mappingLimits);
+
+                if (!mapper)
+                    return std::unexpected(ReceiverFailure{mapper.error(), i});
+
+                detail::CandleReceiverMapping prepared{binding.localId, std::move(*mapper), std::move(*routes)};
+                plan.routes.push_back({schema.recordContext(binding.localId), std::move(prepared), binding.valueLimits,
                                        binding.eventTimePolicy, fields, binding.mappingLimits.selections});
             } else if (binding.kind == PreparedEventKind::ORDER_IMBALANCE) {
                 auto prepared = events::PreparedOrderImbalance::prepare(schema, binding.localId, binding.mappingLimits);

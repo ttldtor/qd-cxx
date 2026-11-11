@@ -666,3 +666,9 @@ SDK применяет demand и снимает устаревшую HISTORY д�
 в [контракте живых диапазонов HISTORY](../spec/subscriptions/LIVE-HISTORY-RANGES.ru.md).
 
 Выбирайте `DeliveryContract::HISTORY` явно. Worker владеет collector, независимыми views, replay и ACK reset. `Subscription<Event>::getHistorySnapshot()` возвращает пассивный владеющий срез AS-OF; getter не выполняет I/O и не ждёт callback. Current completion требует настоящих данных о доставленном диапазоне и соответствия принятым logical/source/clear/callback fences. Стандартный реестр HISTORY из SDK включает перечисленные выше индексируемые семейства событий. Подписки без маршрута HISTORY отклоняются до native-регистрации. См. [поля Order, source-селекторы и владение](ORDER.ru.md) и [MarketMaker и производный Order](MARKET-MAKER-ORDER.ru.md). Точные состояния, конечные storage limits и сырые индексируемые координаты описаны в [контракте HISTORY](../spec/subscriptions/HISTORY-RECEIVING.ru.md).
+
+## Получение Candle
+
+Для последнего полученного значения используйте `createSubscription<Candle>()` на endpoint с контрактом TICKER. Для снимка за диапазон и последующих изменений используйте `createTimeSeriesSubscription<Candle>()` на endpoint с контрактом HISTORY. Передайте `CandleSymbol` в `addSymbols()` и задайте начало диапазона через `setFromTime()`. Обработчик получает копируемое значение Candle с логическим `CandleSymbol`, который запросило приложение.
+
+Стандартный реестр приёма поддерживает записи `Candle` и `TradeHistory`. В собственном реестре можно указать другие поддерживаемые физические варианты. Атрибуты символа определяют совместимую запись до изменения подписки. Клиент получает готовые свечи, без расчёта по сделкам и заполнения пропущенных периодов. См. [маршрутизацию Candle](../spec/events/CANDLE-ROUTES.ru.md) и [поля Candle](../spec/events/CANDLE-PAYLOAD.ru.md).

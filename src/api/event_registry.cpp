@@ -6,6 +6,7 @@
 #include "event_registry_defaults.hpp"
 #include "event_selection.hpp"
 #include "qd/events/analytic_order.hpp"
+#include "qd/events/candle_routes.hpp"
 #include "qd/events/configuration.hpp"
 #include "qd/events/derived_order.hpp"
 #include "qd/events/greeks.hpp"
@@ -181,8 +182,8 @@ bool validRegistration(const EventRegistration &registration) noexcept {
             registration.type == EventType::SUMMARY || registration.type == EventType::TEXT_MESSAGE ||
             registration.type == EventType::TEXT_CONFIGURATION || registration.type == EventType::MESSAGE ||
             registration.type == EventType::CONFIGURATION || registration.type == EventType::MARKET_MAKER ||
-            registration.type == EventType::SERIES || detail::isOptionTimeSeriesEvent(registration.type) ||
-            detail::usesOrderSource(registration.type)) &&
+            registration.type == EventType::SERIES || registration.type == EventType::CANDLE ||
+            detail::isOptionTimeSeriesEvent(registration.type) || detail::usesOrderSource(registration.type)) &&
            (registration.eventTimePolicy == EventTimePolicy::UNSPECIFIED ||
             registration.eventTimePolicy == EventTimePolicy::FIELD_METADATA) &&
            (registration.projection == events::EventProjection::NATIVE ||
@@ -451,6 +452,24 @@ EventRegistry::create(const core::LocalSchema &schema, std::span<const EventRegi
                 if (!mapping) {
                     return std::unexpected(EventRegistryFailure{mapping.error(), index});
                 }
+            } else if (registration.type == EventType::CANDLE) {
+                const auto id = registration.localRecordId;
+                const auto candle = events::PreparedCandleRoutes::prepare(
+                    *ownedSchema, std::span(&id, 1),
+                    {1, limits.schema.nameUnits, limits.schema.nameUnits, registration.mappingLimits});
+
+                if (!candle) {
+                    if (candle.error().mappingError)
+                        return std::unexpected(EventRegistryFailure{*candle.error().mappingError, index});
+
+                    const auto error = candle.error().error == events::CandleRouteError::ALLOCATION_FAILURE
+                                           ? EventRegistryError::ALLOCATION_FAILURE
+                                       : candle.error().error == events::CandleRouteError::RESOURCE_LIMIT
+                                           ? EventRegistryError::RESOURCE_LIMIT
+                                           : EventRegistryError::INVALID_INPUT;
+
+                    return std::unexpected(EventRegistryFailure{error, index});
+                }
             } else if (registration.type == EventType::THEO_PRICE) {
                 const auto mapping = events::PreparedTheoPrice::prepare(*ownedSchema, registration.localRecordId,
                                                                         registration.mappingLimits);
@@ -614,6 +633,46 @@ std::size_t EventRegistry::storageBytes() const noexcept {
 
 namespace detail {
 namespace {
+/** Append the two standard Candle delegates without moving existing local IDs. */
+std::expected<void, core::SchemaError> appendStandardCandleRecords(std::vector<core::LocalRecord> &records,
+                                                                   std::vector<EventRegistration> &routes,
+                                                                   core::SchemaLimits limits) {
+    const auto candle = events::defaultCandleSchema(limits);
+
+    if (!candle)
+        return std::unexpected(candle.error());
+
+    auto candleRecord = candle->records().front();
+    candleRecord.id = static_cast<std::int32_t>(records.size());
+    routes.push_back({EventType::CANDLE, candleRecord.id});
+    records.push_back(std::move(candleRecord));
+
+    // Production wide TradeHistory from the Candle payload oracle, with physical VOID tails omitted.
+    using Type = core::SerialFieldType;
+    core::LocalRecord trade{static_cast<std::int32_t>(records.size()), u"TradeHistory", true, {}, {},
+                            core::IndexedTimePairInt32{0, 1}};
+    const auto append = [&](std::u16string_view name, Type type) {
+        trade.lookups.push_back({std::u16string(name), trade.fields.size()});
+        trade.fields.push_back({std::to_underlying(type)});
+    };
+    append(u"Time", Type::TIME_SECONDS);
+    append(u"Sequence", Type::SEQUENCE);
+    append(u"Exchange", Type::UTF_CHAR);
+    append(u"Price", Type::WIDE_DECIMAL);
+    append(u"Size", Type::WIDE_DECIMAL);
+    append(u"Bid", Type::WIDE_DECIMAL);
+    append(u"Ask", Type::WIDE_DECIMAL);
+    trade.lookups.push_back({u"ExchangeCode", 2});
+    trade.lookups.push_back({u"Close", 3});
+    trade.lookups.push_back({u"Volume", 4});
+    trade.lookups.push_back({u"BidPrice", 5});
+    trade.lookups.push_back({u"AskPrice", 6});
+    routes.push_back({EventType::CANDLE, trade.id});
+    records.push_back(std::move(trade));
+
+    return {};
+}
+
 /** Build an explicit derived route while retaining the ordinary finite mapper defaults.
  * @param id Exact physical local record ID.
  * @param family Verified physical-to-business delegate family.
@@ -655,8 +714,8 @@ std::expected<EventRegistry, EventRegistryFailure> defaultTickerEventRegistry(Ev
             return std::unexpected(EventRegistryFailure{imbalance.error(), {}});
         }
 
-        constexpr std::size_t DEFAULT_PHYSICAL_RECORDS = 42;
-        constexpr std::size_t DEFAULT_ROUTES = 69;
+        constexpr std::size_t DEFAULT_PHYSICAL_RECORDS = 44;
+        constexpr std::size_t DEFAULT_ROUTES = 71;
         records.reserve(DEFAULT_PHYSICAL_RECORDS);
         routes.reserve(DEFAULT_ROUTES);
         routes.push_back(derivedRegistration(0, events::EventProjection::QUOTE_ORDERS));
@@ -738,6 +797,9 @@ std::expected<EventRegistry, EventRegistryFailure> defaultTickerEventRegistry(Ev
         routes.push_back({EventType::THEO_PRICE, theoPriceRecord.id});
         records.push_back(std::move(theoPriceRecord));
 
+        if (const auto candle = appendStandardCandleRecords(records, routes, limits.schema); !candle)
+            return std::unexpected(EventRegistryFailure{candle.error(), {}});
+
         auto schema = core::LocalSchema::create(records, limits.schema, core::LocalProfile::BINARY_FIELDS_V1);
 
         if (!schema) {
@@ -813,32 +875,34 @@ std::expected<EventRegistry, EventRegistryFailure> defaultHistoryEventRegistry(E
             return std::unexpected(EventRegistryFailure{theoPrice.error(), {}});
         }
 
-        std::array records{order->records()[0],    maker->records()[0],  spread->records()[0],
-                           analytic->records()[0], otc->records()[0],    otc->records()[1],
-                           series->records()[0],   greeks->records()[0], underlying->records()[0],
-                           theoPrice->records()[0]};
+        std::vector records{order->records()[0],    maker->records()[0],  spread->records()[0],
+                            analytic->records()[0], otc->records()[0],    otc->records()[1],
+                            series->records()[0],   greeks->records()[0], underlying->records()[0],
+                            theoPrice->records()[0]};
 
         for (std::size_t index = 0; index < records.size(); ++index) {
             records[index].id = static_cast<std::int32_t>(index);
         }
 
+        std::vector routes{EventRegistration{EventType::ORDER, 0},
+                           EventRegistration{EventType::MARKET_MAKER, 1},
+                           derivedRegistration(1, events::EventProjection::MARKET_MAKER_ORDERS),
+                           EventRegistration{EventType::SPREAD_ORDER, 2},
+                           EventRegistration{EventType::ANALYTIC_ORDER, 3},
+                           EventRegistration{EventType::OTC_MARKETS_ORDER, 4},
+                           EventRegistration{EventType::OTC_MARKETS_ORDER, 5},
+                           EventRegistration{EventType::SERIES, 6},
+                           EventRegistration{EventType::GREEKS, 7},
+                           EventRegistration{EventType::UNDERLYING, 8},
+                           EventRegistration{EventType::THEO_PRICE, 9}};
+
+        if (const auto candle = appendStandardCandleRecords(records, routes, limits.schema); !candle)
+            return std::unexpected(EventRegistryFailure{candle.error(), {}});
+
         auto schema = core::LocalSchema::create(records, limits.schema, core::LocalProfile::BINARY_FIELDS_V1);
 
-        if (!schema) {
+        if (!schema)
             return std::unexpected(EventRegistryFailure{schema.error(), {}});
-        }
-
-        const std::array routes{EventRegistration{EventType::ORDER, 0},
-                                EventRegistration{EventType::MARKET_MAKER, 1},
-                                derivedRegistration(1, events::EventProjection::MARKET_MAKER_ORDERS),
-                                EventRegistration{EventType::SPREAD_ORDER, 2},
-                                EventRegistration{EventType::ANALYTIC_ORDER, 3},
-                                EventRegistration{EventType::OTC_MARKETS_ORDER, 4},
-                                EventRegistration{EventType::OTC_MARKETS_ORDER, 5},
-                                EventRegistration{EventType::SERIES, 6},
-                                EventRegistration{EventType::GREEKS, 7},
-                                EventRegistration{EventType::UNDERLYING, 8},
-                                EventRegistration{EventType::THEO_PRICE, 9}};
 
         return EventRegistry::create(*schema, routes, limits, work);
     } catch (EventRegistryError error) {

@@ -121,6 +121,11 @@ bool validConfig(const TcpPeerConfig &config) {
     }
 
     for (const auto &script : config.sessions) {
+        constexpr std::size_t MAXIMUM_STAGES = 16;
+
+        if (script.stagedBytes.size() > MAXIMUM_STAGES)
+            return false;
+
         if (script.waitForClientClose && script.waitForControllerClose) {
             return false;
         }
@@ -147,6 +152,13 @@ bool validConfig(const TcpPeerConfig &config) {
 
             remaining -= size;
         }
+
+        for (const auto &segment : script.stagedBytes) {
+            if (segment.size() > remaining)
+                return false;
+
+            remaining -= segment.size();
+        }
     }
 
     return true;
@@ -159,6 +171,7 @@ struct OwnedTcpPeer::Impl {
     TcpPeerSnapshot status;
     std::array<bool, MAXIMUM_SESSIONS> closeAllowed{};
     std::array<bool, MAXIMUM_SESSIONS> replyAllowed{};
+    std::array<std::size_t, MAXIMUM_SESSIONS> stagesAllowed{};
     std::atomic<bool> stopping{};
     SocketOwner listener;
     std::thread worker;
@@ -262,7 +275,8 @@ struct OwnedTcpPeer::Impl {
         return false;
     }
 
-    bool sendBytes(Socket socket, const std::vector<std::byte> &bytes, std::size_t index, bool reply) {
+    bool sendBytes(Socket socket, const std::vector<std::byte> &bytes, std::size_t index, bool reply,
+                   bool staged = false) {
         std::size_t sent = 0;
 
         while (sent < bytes.size() && waitReady(socket, true)) {
@@ -279,7 +293,11 @@ struct OwnedTcpPeer::Impl {
                 sent += static_cast<std::size_t>(result);
                 const std::lock_guard lock(mutex);
                 auto &session = status.sessions[index];
-                (reply ? session.replyBytesWritten : session.initialBytesWritten) = sent;
+
+                if (staged)
+                    session.stagedBytesWritten += static_cast<std::size_t>(result);
+                else
+                    (reply ? session.replyBytesWritten : session.initialBytesWritten) = sent;
             } else if (result == 0) {
                 fail(TcpPeerError::PEER_CLOSED);
 
@@ -298,9 +316,18 @@ struct OwnedTcpPeer::Impl {
         return sent == bytes.size() && active();
     }
 
+    std::size_t stagedSize(const TcpPeerScript &script) const noexcept {
+        std::size_t result = 0;
+
+        for (const auto &segment : script.stagedBytes)
+            result += segment.size();
+
+        return result;
+    }
+
     bool receiveBytes(Socket socket, const TcpPeerScript &script, std::size_t index) {
         const auto required = script.readThroughMessage ? config.maximumBytesPerSession - script.initialBytes.size() -
-                                                              script.replyBytes.size()
+                                                              script.replyBytes.size() - stagedSize(script)
                               : script.expectedClientBytes.empty() ? script.clientBytesToRead
                                                                    : script.expectedClientBytes.size();
         std::optional<protocol::FrameReader> reader;
@@ -431,6 +458,22 @@ struct OwnedTcpPeer::Impl {
         if (!active() || !sendBytes(connection.value, script.replyBytes, index, true))
             return false;
 
+        for (std::size_t stage = 0; stage < script.stagedBytes.size(); ++stage) {
+            while (active()) {
+                {
+                    const std::lock_guard lock(mutex);
+
+                    if (stagesAllowed[index] > stage)
+                        break;
+                }
+
+                std::this_thread::sleep_for(POLL_INTERVAL);
+            }
+
+            if (!active() || !sendBytes(connection.value, script.stagedBytes[stage], index, true, true))
+                return false;
+        }
+
         if (script.waitForClientClose) {
             std::array<std::byte, 16384> bytes{};
 
@@ -464,8 +507,8 @@ struct OwnedTcpPeer::Impl {
                 {
                     const std::lock_guard lock(mutex);
                     auto &capture = status.sessions[index].received;
-                    const auto maximum =
-                        config.maximumBytesPerSession - script.initialBytes.size() - script.replyBytes.size();
+                    const auto maximum = config.maximumBytesPerSession - script.initialBytes.size() -
+                                         script.replyBytes.size() - stagedSize(script);
                     exceeded = static_cast<std::size_t>(count) > maximum - capture.size();
 
                     if (!exceeded) {
@@ -532,8 +575,8 @@ struct OwnedTcpPeer::Impl {
         for (std::size_t index = 0; index < config.sessions.size(); ++index) {
             const auto &script = config.sessions[index];
             status.sessions[index].received.reserve(
-                script.readThroughMessage
-                    ? config.maximumBytesPerSession - script.initialBytes.size() - script.replyBytes.size()
+                script.readThroughMessage ? config.maximumBytesPerSession - script.initialBytes.size() -
+                                                script.replyBytes.size() - stagedSize(script)
                 : script.expectedClientBytes.empty() ? script.clientBytesToRead
                                                      : script.expectedClientBytes.size());
         }
@@ -634,6 +677,14 @@ void OwnedTcpPeer::allowReply(std::size_t index) {
 
     if (index < impl_->config.sessions.size() && index < MAXIMUM_SESSIONS)
         impl_->replyAllowed[index] = true;
+}
+
+void OwnedTcpPeer::allowStages(std::size_t index, std::size_t count) {
+    const std::lock_guard lock(impl_->mutex);
+
+    if (index < impl_->config.sessions.size() && index < MAXIMUM_SESSIONS &&
+        count <= impl_->config.sessions[index].stagedBytes.size())
+        impl_->stagesAllowed[index] = std::max(impl_->stagesAllowed[index], count);
 }
 
 void OwnedTcpPeer::stop() {
