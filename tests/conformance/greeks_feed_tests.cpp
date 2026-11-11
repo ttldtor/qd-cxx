@@ -8,6 +8,7 @@
 #include "recovery_test_peer.hpp"
 #include "recovery_test_support.hpp"
 
+#include <array>
 #include <bit>
 #include <chrono>
 #include <condition_variable>
@@ -16,6 +17,7 @@
 #include <fstream>
 #include <iterator>
 #include <mutex>
+#include <optional>
 #include <sstream>
 #include <thread>
 
@@ -58,6 +60,11 @@ auto businessValues(const e::Underlying &value) {
                       value.getPutCallRatio()};
 }
 
+auto businessValues(const e::TheoPrice &value) {
+    return std::array{value.getPrice(), value.getUnderlyingPrice(), value.getDelta(),
+                      value.getGamma(), value.getDividend(),        value.getInterest()};
+}
+
 template <class Event> void checkEvent(const Event &value, const std::vector<std::string> &row) {
     CHECK(value.symbol == std::u16string(row[1].begin(), row[1].end()));
     CHECK(value.eventTime == std::stoll(row[2]));
@@ -74,7 +81,7 @@ template <class Event> void checkEvent(const Event &value, const std::vector<std
 
 template <class Event, class Schema>
 void verify(const std::filesystem::path &root, a::EventType type, Schema defaultSchema, bool history, bool tiny,
-            std::int64_t fromTime) {
+            std::int64_t fromTime, bool reconnect = false) {
     const auto stem = history ? "history" : "ticker";
     const auto rows = eventRows(root / (std::string(stem) + ".tsv"));
     REQUIRE(rows.size() == (history ? 3 : 1));
@@ -91,7 +98,12 @@ void verify(const std::filesystem::path &root, a::EventType type, Schema default
     script.readThroughMessage =
         std::to_underlying(history ? SubscriptionMessage::HISTORY_ADD : SubscriptionMessage::TICKER_ADD);
     script.waitForClientClose = true;
-    q::test::OwnedTcpPeer peer({{std::move(script)}});
+    q::test::TcpPeerConfig config{{script}};
+
+    if (reconnect)
+        config.sessions.push_back(std::move(script));
+
+    q::test::OwnedTcpPeer peer(std::move(config));
     REQUIRE(peer.port() != 0);
     std::mutex mutex;
     std::condition_variable changed;
@@ -100,7 +112,7 @@ void verify(const std::filesystem::path &root, a::EventType type, Schema default
     runtimeOptions.dnsServers.push_back({{127, 0, 0, 1}});
     a::ApiRuntime runtime(runtimeOptions);
     a::EndpointOptions options;
-    options.maximumAttempts = 1;
+    options.maximumAttempts = reconnect ? 2 : 1;
     options.contract = history ? a::DeliveryContract::HISTORY : a::DeliveryContract::TICKER;
 
     if (tiny) {
@@ -139,24 +151,26 @@ void verify(const std::filesystem::path &root, a::EventType type, Schema default
 
         changed.notify_all();
     });
-    endpoint->connect("127.0.0.1:" + std::to_string(peer.port()));
-    {
+    const auto waitForRecords = [&](std::size_t count) {
         std::unique_lock lock(mutex);
         const bool delivered = changed.wait_for(lock, 5s, [&] {
-            return received.size() >= expectedCount;
+            return received.size() >= count;
         });
         INFO("endpoint=", static_cast<int>(endpoint->getState()), " stage=", endpoint->getDiagnostic().stage,
              " subscription=", static_cast<int>(subscription->getState()),
              " stage=", subscription->getDiagnostic().stage, " records=", received.size());
         REQUIRE(delivered);
-    }
+    };
+    endpoint->connect("127.0.0.1:" + std::to_string(peer.port()));
+    waitForRecords(expectedCount);
 
-    if (history) {
+    const auto awaitCoverage = [&](std::optional<std::uint64_t> previousEpoch) {
         const auto deadline = std::chrono::steady_clock::now() + 3s;
         auto snapshot = subscription->getHistorySnapshot();
         const auto complete = [&] {
             return snapshot.state == a::HistoryObservationState::CURRENT && snapshot.ranges.size() == 1 &&
-                   snapshot.ranges.front().status.completeDeliveredRange;
+                   snapshot.ranges.front().status.completeDeliveredRange && snapshot.sourceEpoch &&
+                   snapshot.sourceEpoch != previousEpoch;
         };
 
         while (!complete() && std::chrono::steady_clock::now() < deadline) {
@@ -166,10 +180,28 @@ void verify(const std::filesystem::path &root, a::EventType type, Schema default
 
         REQUIRE(complete());
         CHECK(snapshot.ranges.front().status.requestedFrom == e::withTimeSequenceTime(0, fromTime));
+
+        return snapshot.sourceEpoch;
+    };
+    const auto initialEpoch = history ? awaitCoverage({}) : std::nullopt;
+
+    if (reconnect) {
+        endpoint->reconnect();
+        waitForRecords(2 * expectedCount);
+
+        if (history)
+            static_cast<void>(awaitCoverage(initialEpoch));
     }
 
-    REQUIRE(endpoint->closeAndAwaitTermination().drained);
-    REQUIRE(received.size() == expectedCount);
+    const auto closed = endpoint->closeAndAwaitTermination();
+    REQUIRE_FALSE(closed.deadlineExpired);
+    CHECK(endpoint->getStatistics().final);
+    CHECK(subscription->getStatistics().final);
+
+    if (!reconnect)
+        CHECK(closed.drained);
+
+    REQUIRE(received.size() == (reconnect ? 2 : 1) * expectedCount);
 
     if (narrowed) {
         checkEvent(received.front(), rows.front());
@@ -179,11 +211,19 @@ void verify(const std::filesystem::path &root, a::EventType type, Schema default
     } else {
         for (std::size_t index = 0; index < rows.size(); ++index)
             checkEvent(received[index], rows[index]);
+
+        if (reconnect)
+            for (std::size_t index = 0; index < rows.size(); ++index)
+                checkEvent(received[expectedCount + index], rows[index]);
     }
 
     CHECK(received.front().eventFlags == std::stoi(rows.front()[3]));
     CHECK(received.back().eventFlags == std::stoi(rows.back()[3]));
-    CHECK(peer.snapshot().sessions.front().matched);
+    const auto peerStatus = peer.snapshot();
+    CHECK(peerStatus.sessions.front().matched);
+
+    if (reconnect)
+        CHECK(peerStatus.sessions.back().matched);
 }
 
 void verifyGreeks(const std::filesystem::path &root, bool history, bool tiny = false, std::int64_t fromTime = 0) {
@@ -192,6 +232,10 @@ void verifyGreeks(const std::filesystem::path &root, bool history, bool tiny = f
 
 void verifyUnderlying(const std::filesystem::path &root, bool history, bool tiny = false) {
     verify<e::Underlying>(root, a::EventType::UNDERLYING, e::defaultUnderlyingSchema, history, tiny, 0);
+}
+
+void verifyTheoPrice(const std::filesystem::path &root, bool history, bool tiny = false, bool reconnect = false) {
+    verify<e::TheoPrice>(root, a::EventType::THEO_PRICE, e::defaultTheoPriceSchema, history, tiny, 0, reconnect);
 }
 } // namespace
 
@@ -227,5 +271,21 @@ TEST_CASE("Public Underlying matches pinned QD TICKER and time-series HISTORY va
     }
     SUBCASE("HISTORY tiny") {
         verifyUnderlying(root / "tiny", true, true);
+    }
+}
+
+TEST_CASE("Public TheoPrice matches pinned QD values and replays the time-series range after reconnect") {
+    const std::filesystem::path root(QDCXX_THEO_PRICE_FIXTURES);
+    SUBCASE("TICKER wide") {
+        verifyTheoPrice(root / "wide", false);
+    }
+    SUBCASE("TICKER tiny") {
+        verifyTheoPrice(root / "tiny", false, true);
+    }
+    SUBCASE("HISTORY wide with a new connection") {
+        verifyTheoPrice(root / "wide", true, false, true);
+    }
+    SUBCASE("HISTORY tiny") {
+        verifyTheoPrice(root / "tiny", true, true);
     }
 }

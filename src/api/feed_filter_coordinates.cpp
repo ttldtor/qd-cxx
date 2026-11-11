@@ -43,6 +43,7 @@ bool supported(const EventRegistry &registry, EventType type) noexcept {
     case EventType::SERIES:
     case EventType::GREEKS:
     case EventType::UNDERLYING:
+    case EventType::THEO_PRICE:
         return true;
     }
 
@@ -277,6 +278,8 @@ std::vector<FilterCoordinate> filterEventCoordinates(const EventRegistry &regist
                     return EventType::GREEKS;
                 } else if constexpr (std::is_same_v<Event, events::Underlying>) {
                     return EventType::UNDERLYING;
+                } else if constexpr (std::is_same_v<Event, events::TheoPrice>) {
+                    return EventType::THEO_PRICE;
                 } else if constexpr (std::is_same_v<Event, events::Order>) {
                     return EventType::ORDER;
                 } else {

@@ -132,6 +132,18 @@ bound on HISTORY. The indexed source is DEFAULT.
 Missing numerical fields return NaN. `getOptionVolume()` sums both available volumes
 or returns the available side when one is missing. It returns NaN when both are missing.
 
+## Receive TheoPrice
+
+`events::TheoPrice` provides theoretical and underlying price, delta, gamma,
+dividend and interest. Use `createSubscription<events::TheoPrice>()` on TICKER,
+or `createTimeSeriesSubscription<events::TheoPrice>()` on HISTORY. Set the
+inclusive `setFromTime()` bound in milliseconds on the HISTORY subscription.
+
+Absent optional dividend and interest values return NaN. A missing optional
+Sequence maps to zero in a non-indexed configured schema. HISTORY requires a
+physical Time and Sequence pair for the raw range coordinate. After reconnect,
+the endpoint replays the accepted range on the fresh connection.
+
 ## Receive Trade
 
 The built-in registry appends composite Trade2 while retaining Quote0/Profile1. Use owning

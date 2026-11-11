@@ -74,6 +74,7 @@ bool isTimeSeriesEventType(EventType type) noexcept {
     switch (type) {
     case EventType::GREEKS:
     case EventType::UNDERLYING:
+    case EventType::THEO_PRICE:
         return true;
     case EventType::QUOTE:
     case EventType::PROFILE:

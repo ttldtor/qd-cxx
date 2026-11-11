@@ -370,7 +370,9 @@ void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, s
             if (isOptionTimeSeriesEvent(registration.type) && profile.family == core::SubscriptionFamily::HISTORY) {
                 if (!record.hasTime)
                     refuse(ErrorCode::UNSUPPORTED_PROFILE,
-                           registration.type == EventType::GREEKS ? "profile-greeks-time" : "profile-underlying-time");
+                           registration.type == EventType::GREEKS       ? "profile-greeks-time"
+                           : registration.type == EventType::UNDERLYING ? "profile-underlying-time"
+                                                                        : "profile-theo-price-time");
 
                 profile.bindingTimeEncodings[index] = HistoryRangeEncoding::UNIX_MILLISECONDS_SEQUENCE;
             }

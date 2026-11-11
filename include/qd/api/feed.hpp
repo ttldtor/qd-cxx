@@ -21,6 +21,7 @@
 #include "qd/events/spread_order.hpp"
 #include "qd/events/summary.hpp"
 #include "qd/events/text_events.hpp"
+#include "qd/events/theo_price.hpp"
 #include "qd/events/trade.hpp"
 #include "qd/events/trade_eth.hpp"
 #include "qd/events/underlying.hpp"
@@ -223,7 +224,7 @@ using RegisteredEvent =
     std::variant<events::Quote, events::Profile, events::Trade, events::TradeETH, events::Summary, events::TextMessage,
                  events::TextConfiguration, events::Message, events::Configuration, events::Order, events::MarketMaker,
                  events::SpreadOrder, events::AnalyticOrder, events::OtcMarketsOrder, events::OrderImbalance,
-                 events::Series, events::Greeks, events::Underlying>;
+                 events::Series, events::Greeks, events::Underlying, events::TheoPrice>;
 
 /** Independently owned observation of one complete accepted local subscription revision. */
 struct SubscriptionSnapshot {
@@ -269,8 +270,8 @@ template <class Event> class Subscription final {
                   std::is_same_v<Event, events::SpreadOrder> || std::is_same_v<Event, events::AnalyticOrder> ||
                   std::is_same_v<Event, events::OtcMarketsOrder> || std::is_same_v<Event, events::OrderImbalance> ||
                   std::is_same_v<Event, events::Series> || std::is_same_v<Event, events::Greeks> ||
-                  std::is_same_v<Event, events::Underlying> || std::is_same_v<Event, events::Order> ||
-                  std::is_same_v<Event, RegisteredEvent>);
+                  std::is_same_v<Event, events::Underlying> || std::is_same_v<Event, events::TheoPrice> ||
+                  std::is_same_v<Event, events::Order> || std::is_same_v<Event, RegisteredEvent>);
     std::shared_ptr<detail::SubscriptionPort> port_;
     friend class Feed;
     explicit Subscription(std::shared_ptr<detail::SubscriptionPort> port) noexcept;
@@ -511,6 +512,7 @@ extern template class Subscription<events::OrderImbalance>;
 extern template class Subscription<events::Series>;
 extern template class Subscription<events::Greeks>;
 extern template class Subscription<events::Underlying>;
+extern template class Subscription<events::TheoPrice>;
 extern template class Subscription<RegisteredEvent>;
 
 /** Endpoint's typed registration entry point; owns no SDK thread or bootstrap. */
@@ -542,7 +544,8 @@ class Feed final {
                       std::is_same_v<Event, events::SpreadOrder> || std::is_same_v<Event, events::AnalyticOrder> ||
                       std::is_same_v<Event, events::OtcMarketsOrder> || std::is_same_v<Event, events::OrderImbalance> ||
                       std::is_same_v<Event, events::Series> || std::is_same_v<Event, events::Greeks> ||
-                      std::is_same_v<Event, events::Underlying> || std::is_same_v<Event, events::Order>);
+                      std::is_same_v<Event, events::Underlying> || std::is_same_v<Event, events::TheoPrice> ||
+                      std::is_same_v<Event, events::Order>);
 
         if constexpr (std::is_same_v<Event, events::Quote>)
             return EventType::QUOTE;
@@ -578,6 +581,8 @@ class Feed final {
             return EventType::GREEKS;
         else if constexpr (std::is_same_v<Event, events::Underlying>)
             return EventType::UNDERLYING;
+        else if constexpr (std::is_same_v<Event, events::TheoPrice>)
+            return EventType::THEO_PRICE;
         else
             return EventType::ORDER;
     }
