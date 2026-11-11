@@ -5,13 +5,17 @@
 #include "qd/api/feed_filter.hpp"
 #include "qd/events/event_flags.hpp"
 #include "qd/events/series.hpp"
+#include "qd/protocol/subscription_writer.hpp"
+#include "recovery_test_peer.hpp"
 
 #include <array>
 #include <chrono>
 #include <condition_variable>
 #include <cstdio>
+#include <limits>
 #include <mutex>
 #include <stdexcept>
+#include <thread>
 #include <utility>
 #include <variant>
 
@@ -51,12 +55,14 @@ class Observation {
         changed_.notify_all();
     }
 
-    /** @return Complete independent snapshot after the two expected records arrive. */
-    std::vector<e::Series> snapshot() {
+    /** @param count Minimum expected number of delivered records.
+     * @return Independent copy after the requested records arrive.
+     */
+    std::vector<e::Series> snapshot(std::size_t count = 2) {
         std::unique_lock guard(mutex_);
         require(changed_.wait_for(guard, 10s,
                                   [&] {
-                                      return values_.size() >= 2;
+                                      return values_.size() >= count;
                                   }),
                 "Series snapshot callback timeout");
 
@@ -222,11 +228,118 @@ void run() {
     require(endpoint->closeAndAwaitTermination().drained, "Series callbacks did not drain on close");
     runtime.closeAndAwaitTermination();
 }
+
+/** @param boundary END, SNIP, or a live removal that leaves TX_PENDING set. */
+void verifyTransactionBoundary(std::int32_t boundary) {
+    using namespace e::indexed_event_flags;
+    using q::collectors::HistorySnapshotState;
+    const auto logical = e::defaultSeriesSchema(SCHEMA);
+    require(bool(logical), "Series standard logical schema refused");
+    const auto physical = physicalSchema(*logical);
+    auto events = records(physical);
+    const bool liveRemoval = boundary == TX_PENDING;
+    const bool truncated = boundary == SNAPSHOT_SNIP;
+    auto reply = events.back();
+    reply.flags = REMOVE_EVENT | boundary;
+    // Series uses a zero high word and an unsigned 32-bit collector coordinate.
+    constexpr std::int64_t highIndex = std::numeric_limits<std::uint32_t>::max();
+    reply.removalTime = liveRemoval ? highIndex : truncated ? 1 : 0;
+
+    if (!liveRemoval)
+        events.front().flags |= TX_PENDING;
+
+    a::RuntimeOptions runtimeOptions;
+    runtimeOptions.dnsServers.push_back({{127, 0, 0, 1}});
+    a::ApiRuntime runtime(runtimeOptions);
+    q::test::TcpPeerScript script;
+    script.initialBytes = peer::fixturePeerPrefix(physical, c::SubscriptionFamily::HISTORY, false, true);
+    const std::size_t initialCount = liveRemoval ? 2 : 1;
+    const auto initial =
+        peer::fixturePeerData(std::span(events).first(initialCount), c::SubscriptionFamily::HISTORY, true);
+    script.initialBytes.insert(script.initialBytes.end(), initial.begin(), initial.end());
+    script.replyBytes = peer::fixturePeerData(std::span(&reply, 1), c::SubscriptionFamily::HISTORY, true);
+    script.readThroughMessage = std::to_underlying(q::protocol::SubscriptionMessage::HISTORY_ADD);
+    script.waitForControllerReply = true;
+    script.waitForClientClose = true;
+    q::test::OwnedTcpPeer source({{std::move(script)}, 1024 * 1024, 25s});
+    require(source.port() != 0, "Series transaction peer failed to listen");
+
+    a::EndpointOptions options;
+    options.contract = a::DeliveryContract::HISTORY;
+    options.maximumAttempts = 1;
+    options.readTimeout = 20000ms;
+    const auto endpoint = runtime.createEndpoint(options);
+    const auto subscription = endpoint->getFeed()->createSubscription<e::Series>();
+    const auto values = std::make_shared<Observation>();
+    subscription->addEventListener([values](auto batch) {
+        values->append(batch);
+    });
+    subscription->setSelectors(std::array{a::SubscriptionSelector::plain(u"AAPL&Q")});
+    endpoint->connect("127.0.0.1:" + std::to_string(source.port()));
+
+    const auto observe = [&](auto predicate) {
+        const auto deadline = std::chrono::steady_clock::now() + 3s;
+
+        do {
+            auto cut = subscription->getHistorySnapshot();
+
+            if (cut.state == a::HistoryObservationState::CURRENT && cut.ranges.size() == 1 &&
+                cut.ranges.front().status.source && predicate(cut.ranges.front().status)) {
+                return cut;
+            }
+
+            std::this_thread::sleep_for(1ms);
+        } while (std::chrono::steady_clock::now() < deadline);
+
+        throw std::runtime_error("Series transaction HISTORY observation timeout");
+    };
+
+    const auto initialValues = values->snapshot(initialCount);
+    require(initialValues.size() == initialCount &&
+                initialValues.front().eventFlags == (liveRemoval ? SNAPSHOT_BEGIN : SNAPSHOT_BEGIN | TX_PENDING),
+            "Public Series lost snapshot BEGIN flags");
+    const auto beforeReply = observe([&](const auto &status) {
+        return status.source->sourceTransactionPending == !liveRemoval &&
+               status.source->snapshot ==
+                   (liveRemoval ? HistorySnapshotState::COMPLETE : HistorySnapshotState::RECEIVING);
+    });
+    require(beforeReply.ranges.front().status.completeDeliveredRange == liveRemoval,
+            "Public HISTORY misclassified initial range coverage");
+
+    source.allowReply(0);
+    const auto finished = values->snapshot(initialCount + 1);
+    require(finished.size() == initialCount + 1 && finished.back().eventFlags == reply.flags &&
+                finished.back().getIndex() == (liveRemoval ? -1 : *reply.removalTime),
+            "Public Series lost the transaction boundary or its removal coordinate");
+    const auto settled = observe([&](const auto &status) {
+        return status.source->sourceTransactionPending == liveRemoval &&
+               status.source->snapshot ==
+                   (truncated ? HistorySnapshotState::TRUNCATED : HistorySnapshotState::COMPLETE);
+    });
+    const auto &status = settled.ranges.front().status;
+    require(status.completeDeliveredRange == (!truncated && !liveRemoval) &&
+                (!truncated || status.source->snipFrontier == reply.removalTime),
+            "Public HISTORY confused truncation or transaction state with range coverage");
+    require(beforeReply.ranges.front().status.source->sourceTransactionPending == !liveRemoval,
+            "Later source progress mutated the retained observation");
+    const auto closed = endpoint->closeAndAwaitTermination();
+    require(!closed.deadlineExpired, "Series HISTORY close exceeded its drain deadline");
+    require(subscription->getHistorySnapshot().state == a::HistoryObservationState::RETIRED,
+            "Closed Series subscription retained current HISTORY coverage");
+    require(!status.completeDeliveredRange || closed.drained, "Series HISTORY did not drain a covered range");
+    runtime.closeAndAwaitTermination();
+    const auto peerStatus = source.snapshot();
+    require(peerStatus.error == q::test::TcpPeerError::NONE && peerStatus.sessions.front().matched,
+            "Series transaction peer did not receive HISTORY ADD");
+}
 } // namespace
 
 int main() {
     try {
         run();
+        verifyTransactionBoundary(e::indexed_event_flags::SNAPSHOT_END);
+        verifyTransactionBoundary(e::indexed_event_flags::SNAPSHOT_SNIP);
+        verifyTransactionBoundary(e::indexed_event_flags::TX_PENDING);
 
         return 0;
     } catch (const std::exception &error) {
