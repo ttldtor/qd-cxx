@@ -122,6 +122,16 @@ peer. Use `getHistorySnapshot()` for the last observed range coverage.
 The built-in registry uses wide decimals. Select an explicit registry with the
 peer's field types for a configured tiny-decimal schema.
 
+## Receive Underlying
+
+`events::Underlying` provides underlying, front and back volatility, call and put volume,
+and the put-to-call ratio. Use `createSubscription<events::Underlying>()` on TICKER or
+`createTimeSeriesSubscription<events::Underlying>()` with an inclusive `setFromTime()`
+bound on HISTORY. The indexed source is DEFAULT.
+
+Missing numerical fields return NaN. `getOptionVolume()` sums both available volumes
+or returns the available side when one is missing. It returns NaN when both are missing.
+
 ## Receive Trade
 
 The built-in registry appends composite Trade2 while retaining Quote0/Profile1. Use owning

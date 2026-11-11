@@ -79,7 +79,7 @@ bool validBinding(const PreparedSubscriptionBinding &binding) noexcept {
             binding.kind == PreparedEventKind::MARKET_MAKER || binding.kind == PreparedEventKind::SPREAD_ORDER ||
             binding.kind == PreparedEventKind::ANALYTIC_ORDER || binding.kind == PreparedEventKind::OTC_MARKETS_ORDER ||
             binding.kind == PreparedEventKind::ORDER_IMBALANCE || binding.kind == PreparedEventKind::SERIES ||
-            binding.kind == PreparedEventKind::GREEKS) &&
+            binding.kind == PreparedEventKind::GREEKS || binding.kind == PreparedEventKind::UNDERLYING) &&
            (binding.eventTimePolicy == ReceiverEventTimePolicy::UNSPECIFIED ||
             binding.eventTimePolicy == ReceiverEventTimePolicy::FIELD_METADATA) &&
            (binding.projection == events::EventProjection::NATIVE ||
@@ -98,7 +98,7 @@ struct ReceiverRoute {
                  events::PreparedMessage, events::PreparedConfiguration, events::PreparedOrder,
                  events::PreparedMarketMaker, events::PreparedSpreadOrder, events::PreparedAnalyticOrder,
                  events::PreparedOtcMarketsOrder, events::PreparedOrderImbalance, events::PreparedSeries,
-                 events::PreparedGreeks,
+                 events::PreparedGreeks, events::PreparedUnderlying,
                  events::PreparedDerivedOrder>
         mapping;                          ///< Existing owned immutable mapper.
     events::EventValueLimits valueLimits; ///< Per-result owned text bounds.
@@ -364,6 +364,17 @@ projectPrepared(const mux::MuxRecordView &record, const detail::ReceiverRoute &r
     }
 
     if (const auto *prepared = std::get_if<events::PreparedGreeks>(&route.mapping)) {
+        auto mapped = prepared->mapView(record.symbol, values, units, eventTime.value_or(0), record.eventFlags,
+                                        indexedRemovalTime);
+
+        if (!mapped) {
+            return std::unexpected(ReceiverProjectionFailure{mapped.error()});
+        }
+
+        return SubscriptionProjection{std::move(*mapped), eventTime};
+    }
+
+    if (const auto *prepared = std::get_if<events::PreparedUnderlying>(&route.mapping)) {
         auto mapped = prepared->mapView(record.symbol, values, units, eventTime.value_or(0), record.eventFlags,
                                         indexedRemovalTime);
 
@@ -641,7 +652,7 @@ openSubscriptionReceiver(mux::MuxQueue &queue, const core::LocalSchema &schema, 
 
             const auto &record = schema.records()[static_cast<std::size_t>(binding.localId)];
 
-            if (binding.kind == PreparedEventKind::GREEKS &&
+            if ((binding.kind == PreparedEventKind::GREEKS || binding.kind == PreparedEventKind::UNDERLYING) &&
                 (family == core::SubscriptionFamily::STREAM ||
                  (family == core::SubscriptionFamily::HISTORY && !record.hasTime))) {
                 return std::unexpected(ReceiverFailure{ReceiverError::INVALID_INPUT, i});
@@ -799,6 +810,15 @@ openSubscriptionReceiver(mux::MuxQueue &queue, const core::LocalSchema &schema, 
                                        binding.eventTimePolicy, fields, binding.mappingLimits.selections});
             } else if (binding.kind == PreparedEventKind::GREEKS) {
                 auto prepared = events::PreparedGreeks::prepare(schema, binding.localId, binding.mappingLimits);
+
+                if (!prepared) {
+                    return std::unexpected(ReceiverFailure{prepared.error(), i});
+                }
+
+                plan.routes.push_back({schema.recordContext(binding.localId), std::move(*prepared), binding.valueLimits,
+                                       binding.eventTimePolicy, fields, binding.mappingLimits.selections});
+            } else if (binding.kind == PreparedEventKind::UNDERLYING) {
+                auto prepared = events::PreparedUnderlying::prepare(schema, binding.localId, binding.mappingLimits);
 
                 if (!prepared) {
                     return std::unexpected(ReceiverFailure{prepared.error(), i});

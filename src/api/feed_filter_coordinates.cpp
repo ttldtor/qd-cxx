@@ -42,6 +42,7 @@ bool supported(const EventRegistry &registry, EventType type) noexcept {
     case EventType::ORDER_IMBALANCE:
     case EventType::SERIES:
     case EventType::GREEKS:
+    case EventType::UNDERLYING:
         return true;
     }
 
@@ -58,7 +59,7 @@ bool usesRegionalCoordinates(EventType type) noexcept {
 bool usesGenericSourceSelection(EventType type) noexcept {
     return type == EventType::TEXT_MESSAGE || type == EventType::TEXT_CONFIGURATION || type == EventType::MESSAGE ||
            type == EventType::CONFIGURATION || type == EventType::MARKET_MAKER || type == EventType::SERIES ||
-           type == EventType::GREEKS;
+           isOptionTimeSeriesEvent(type);
 }
 
 /** Match explicit Order source identity using the already validated record qualification rules.
@@ -110,7 +111,7 @@ bool matchesFilterRoute(const EventRegistry &registry, const EventRegistration &
         return false;
 
     if ((usesOrderSource(type) || type == EventType::MARKET_MAKER || type == EventType::SERIES ||
-         type == EventType::GREEKS) &&
+         isOptionTimeSeriesEvent(type)) &&
         !receivingRouteSupportsContract(route, contract))
         return false;
 
@@ -217,7 +218,7 @@ std::vector<FilterCoordinate> filterSubscriptionCoordinates(const EventRegistry 
         return {};
     }
 
-    if ((usesOrderSource(type) || type == EventType::SERIES || type == EventType::GREEKS) &&
+    if ((usesOrderSource(type) || type == EventType::SERIES || isOptionTimeSeriesEvent(type)) &&
         (contract == DeliveryContract::STREAM || selector.kind() == SubscriptionSymbolKind::ALL)) {
         return {};
     }
@@ -274,6 +275,8 @@ std::vector<FilterCoordinate> filterEventCoordinates(const EventRegistry &regist
                     return EventType::SERIES;
                 } else if constexpr (std::is_same_v<Event, events::Greeks>) {
                     return EventType::GREEKS;
+                } else if constexpr (std::is_same_v<Event, events::Underlying>) {
+                    return EventType::UNDERLYING;
                 } else if constexpr (std::is_same_v<Event, events::Order>) {
                     return EventType::ORDER;
                 } else {

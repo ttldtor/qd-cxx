@@ -40,28 +40,41 @@ std::vector<std::vector<std::string>> eventRows(const std::filesystem::path &pat
         for (std::string cell; std::getline(cells, cell, '\t');)
             fields.push_back(std::move(cell));
 
-        REQUIRE(fields.size() == 15);
+        REQUIRE(fields.size() > 8);
         result.push_back(std::move(fields));
     }
 
     return result;
 }
 
-void checkEvent(const e::Greeks &value, const std::vector<std::string> &row) {
+auto businessValues(const e::Greeks &value) {
+    return std::array{value.getPrice(), value.getVolatility(), value.getDelta(), value.getGamma(),
+                      value.getTheta(), value.getRho(),        value.getVega()};
+}
+
+auto businessValues(const e::Underlying &value) {
+    return std::array{value.getVolatility(),  value.getFrontVolatility(), value.getBackVolatility(),
+                      value.getCallVolume(),  value.getPutVolume(),       value.getOptionVolume(),
+                      value.getPutCallRatio()};
+}
+
+template <class Event> void checkEvent(const Event &value, const std::vector<std::string> &row) {
     CHECK(value.symbol == std::u16string(row[1].begin(), row[1].end()));
     CHECK(value.eventTime == std::stoll(row[2]));
     CHECK(value.getSource().id() == std::stoi(row[4]));
     CHECK(value.getIndex() == std::stoll(row[5]));
     CHECK(value.getTime() == std::stoll(row[6]));
     CHECK(value.getSequence() == std::stoi(row[7]));
-    const std::array numeric{value.getPrice(), value.getVolatility(), value.getDelta(), value.getGamma(),
-                             value.getTheta(), value.getRho(),        value.getVega()};
+    const auto numeric = businessValues(value);
+    REQUIRE(row.size() == numeric.size() + 8);
 
     for (std::size_t index = 0; index < numeric.size(); ++index)
         CHECK(std::bit_cast<std::int64_t>(numeric[index]) == std::stoll(row[index + 8]));
 }
 
-void verify(const std::filesystem::path &root, bool history, bool tiny = false, std::int64_t fromTime = 0) {
+template <class Event, class Schema>
+void verify(const std::filesystem::path &root, a::EventType type, Schema defaultSchema, bool history, bool tiny,
+            std::int64_t fromTime) {
     const auto stem = history ? "history" : "ticker";
     const auto rows = eventRows(root / (std::string(stem) + ".tsv"));
     REQUIRE(rows.size() == (history ? 3 : 1));
@@ -82,7 +95,7 @@ void verify(const std::filesystem::path &root, bool history, bool tiny = false, 
     REQUIRE(peer.port() != 0);
     std::mutex mutex;
     std::condition_variable changed;
-    std::vector<e::Greeks> received;
+    std::vector<Event> received;
     a::RuntimeOptions runtimeOptions;
     runtimeOptions.dnsServers.push_back({{127, 0, 0, 1}});
     a::ApiRuntime runtime(runtimeOptions);
@@ -92,7 +105,7 @@ void verify(const std::filesystem::path &root, bool history, bool tiny = false, 
 
     if (tiny) {
         a::EventRegistryLimits limits;
-        const auto standard = e::defaultGreeksSchema(limits.schema);
+        const auto standard = defaultSchema(limits.schema);
         REQUIRE(standard);
         auto record = standard->records().front();
 
@@ -103,7 +116,7 @@ void verify(const std::filesystem::path &root, bool history, bool tiny = false, 
         const auto schema =
             q::core::LocalSchema::create(std::span(&record, 1), limits.schema, q::core::LocalProfile::BINARY_FIELDS_V1);
         REQUIRE(schema);
-        const std::array routes{a::EventRegistration{a::EventType::GREEKS, 0}};
+        const std::array routes{a::EventRegistration{type, 0}};
         a::EventRegistryWork work;
         const auto registry = a::EventRegistry::create(*schema, routes, limits, work);
         REQUIRE(registry);
@@ -112,14 +125,13 @@ void verify(const std::filesystem::path &root, bool history, bool tiny = false, 
 
     auto endpoint = runtime.createEndpoint(options);
     auto feed = endpoint->getFeed();
-    auto subscription =
-        history ? feed->createTimeSeriesSubscription<e::Greeks>() : feed->createSubscription<e::Greeks>();
+    auto subscription = history ? feed->createTimeSeriesSubscription<Event>() : feed->createSubscription<Event>();
 
     if (history)
         subscription->setFromTime(fromTime);
 
     subscription->addSymbols("AAPL");
-    subscription->addEventListener([&](std::span<const e::Greeks> batch) {
+    subscription->addEventListener([&](std::span<const Event> batch) {
         {
             const std::lock_guard lock(mutex);
             received.insert(received.end(), batch.begin(), batch.end());
@@ -173,23 +185,47 @@ void verify(const std::filesystem::path &root, bool history, bool tiny = false, 
     CHECK(received.back().eventFlags == std::stoi(rows.back()[3]));
     CHECK(peer.snapshot().sessions.front().matched);
 }
+
+void verifyGreeks(const std::filesystem::path &root, bool history, bool tiny = false, std::int64_t fromTime = 0) {
+    verify<e::Greeks>(root, a::EventType::GREEKS, e::defaultGreeksSchema, history, tiny, fromTime);
+}
+
+void verifyUnderlying(const std::filesystem::path &root, bool history, bool tiny = false) {
+    verify<e::Underlying>(root, a::EventType::UNDERLYING, e::defaultUnderlyingSchema, history, tiny, 0);
+}
 } // namespace
 
 TEST_CASE("Public Greeks matches pinned QD TICKER and time-series HISTORY values") {
     const std::filesystem::path root(QDCXX_GREEKS_FIXTURES);
     SUBCASE("TICKER wide") {
-        verify(root / "wide", false);
+        verifyGreeks(root / "wide", false);
     }
     SUBCASE("TICKER tiny") {
-        verify(root / "tiny", false, true);
+        verifyGreeks(root / "tiny", false, true);
     }
     SUBCASE("HISTORY wide") {
-        verify(root / "wide", true);
+        verifyGreeks(root / "wide", true);
     }
     SUBCASE("HISTORY tiny") {
-        verify(root / "tiny", true, true);
+        verifyGreeks(root / "tiny", true, true);
     }
     SUBCASE("HISTORY converts a nonzero time-series bound and projects the inclusive boundary") {
-        verify(root / "wide", true, false, 1000);
+        verifyGreeks(root / "wide", true, false, 1000);
+    }
+}
+
+TEST_CASE("Public Underlying matches pinned QD TICKER and time-series HISTORY values") {
+    const std::filesystem::path root(QDCXX_UNDERLYING_FIXTURES);
+    SUBCASE("TICKER wide") {
+        verifyUnderlying(root / "wide", false);
+    }
+    SUBCASE("TICKER tiny") {
+        verifyUnderlying(root / "tiny", false, true);
+    }
+    SUBCASE("HISTORY wide") {
+        verifyUnderlying(root / "wide", true);
+    }
+    SUBCASE("HISTORY tiny") {
+        verifyUnderlying(root / "tiny", true, true);
     }
 }

@@ -11,6 +11,11 @@ tests/fixtures/greeks/provenance.json text eol=lf
 tests/fixtures/greeks/**/*.tsv -text -whitespace
 tests/fixtures/greeks/**/*.qtp -text
 
+# Preserve the pinned Underlying oracle captures and canonical provenance bytes.
+tests/fixtures/underlying/provenance.json text eol=lf
+tests/fixtures/underlying/**/*.tsv -text -whitespace
+tests/fixtures/underlying/**/*.qtp -text
+
 # Order source capability observations retain exact bytes; launcher/provenance hashes use LF.
 tools/upstream/order-source-capability-oracle/*.ps1 text eol=lf
 tests/fixtures/order-source-capabilities/provenance.json text eol=lf
