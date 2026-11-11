@@ -143,11 +143,13 @@ struct HistoryReceivingOptions {
 
 /** Endpoint policy; defaults need no caller-owned queue or turn-work objects. */
 struct EndpointOptions {
-    DeliveryContract contract = DeliveryContract::TICKER; ///< Selected source contract for this endpoint.
-    std::chrono::milliseconds connectTimeout{5000};       ///< Whole native connection attempt deadline.
-    std::chrono::milliseconds dnsTimeout{5000};           ///< Whole two-family lookup deadline.
-    std::chrono::milliseconds readTimeout{30000};         ///< Connected input inactivity deadline.
-    std::chrono::milliseconds writeTimeout{5000};         ///< Pending-output inactivity deadline.
+    static constexpr std::size_t MAXIMUM_BATCH_RECORDS = 4;     ///< Qualified physical callback record ceiling.
+    static constexpr std::size_t MAXIMUM_PENDING_RECORDS = 128; ///< Qualified detached record slot ceiling.
+    DeliveryContract contract = DeliveryContract::TICKER;       ///< Selected source contract for this endpoint.
+    std::chrono::milliseconds connectTimeout{5000};             ///< Whole native connection attempt deadline.
+    std::chrono::milliseconds dnsTimeout{5000};                 ///< Whole two-family lookup deadline.
+    std::chrono::milliseconds readTimeout{30000};               ///< Connected input inactivity deadline.
+    std::chrono::milliseconds writeTimeout{5000};               ///< Pending-output inactivity deadline.
     std::chrono::milliseconds pollInterval{1};    ///< SDK worker progress cadence; not a thread per subscription.
     std::chrono::milliseconds retryDelay{250};    ///< Delay between finite fresh recovery attempts.
     std::chrono::milliseconds drainTimeout{1000}; ///< Local admitted-prefix retirement allowance.
@@ -160,6 +162,8 @@ struct EndpointOptions {
     HistoryReceivingOptions history;  ///< Used only by the explicit HISTORY contract; never application work credits.
     bool unitaryOrderSources = false; ///< SDK default/plain/negative sources use unitary bid/ask pairs when true;
                                       ///< explicit sources are independent.
+    std::size_t batchRecords = MAXIMUM_BATCH_RECORDS;     ///< Maximum whole physical records per callback selection.
+    std::size_t pendingRecords = MAXIMUM_PENDING_RECORDS; ///< Detached record slots per subscription.
 };
 
 /** Last SDK-worker observation, never an upstream acknowledgement or a whole-network guarantee. */

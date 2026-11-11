@@ -2847,15 +2847,20 @@ void progressSubscriptions(NativeEndpoint &endpoint, mux::QueueSubmitWork &submi
             continue;
         }
 
-        if (port->closeRequested.load(std::memory_order_acquire)) {
-            if (!native->stopping) {
-                native->handle.requestStop(mux::StopMode::ABORT);
-                native->stopping = true;
-            }
+        const auto terminal =
+            native->handle.state() == mux::QueueClientState::TERMINAL ? native->handle.terminal() : std::nullopt;
 
-            if (native->handle.terminal()) {
+        if (terminal && terminal->primary && terminal->primary->error == mux::QueueError::RESOURCE_LIMIT) {
+            failSubscription(port, queueDiagnostic(terminal->primary->error, "subscription-delivery-capacity"));
+        }
+
+        if (port->closeRequested.load(std::memory_order_acquire)) {
+            if (terminal) {
                 native.reset();
                 retireSubscription(port);
+            } else if (!native->stopping) {
+                native->handle.requestStop(mux::StopMode::ABORT);
+                native->stopping = true;
             }
 
             continue;

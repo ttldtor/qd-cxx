@@ -17,6 +17,7 @@
 
 #include "qd/encoding/compact.hpp"
 #include "qd/encoding/symbol_reader.hpp"
+#include "qd/protocol/subscription_writer.hpp"
 
 #include <doctest/doctest.h>
 
@@ -3242,6 +3243,103 @@ TEST_CASE("endpoint statistics final waits for subscription observer and capture
     CHECK(endpoint->getStatistics().final);
     CHECK(subscription->getStatistics().final);
     CHECK(subscription->getStatistics().callbackCalls.value == 0);
+}
+
+TEST_CASE("Feed batch and record limits preserve STREAM records and expose overload by contract") {
+    auto options = endpointOptions();
+    options.batchRecords = 1;
+    options.pendingRecords = 8;
+    bool overflow = false;
+    bool ticker = false;
+
+    SUBCASE("STREAM bounds each callback without splitting or dropping records") {
+    }
+    SUBCASE("STREAM refuses the complete staged prefix when its reservation is exhausted") {
+        options.pendingRecords = 1;
+        overflow = true;
+    }
+    SUBCASE("TICKER conflates one key within the source frame even with one detached slot") {
+        options.pendingRecords = 1;
+        ticker = true;
+    }
+
+    const auto family = ticker ? core::SubscriptionFamily::TICKER : core::SubscriptionFamily::STREAM;
+    options.contract = ticker ? api::DeliveryContract::TICKER : api::DeliveryContract::STREAM;
+    const auto schema = standardSchema();
+    std::vector<peer::Record> records;
+
+    for (std::int64_t time : {3, 4, 5}) {
+        auto fields = standardValues(schema);
+
+        for (auto &field : fields)
+            if (field.type == core::SerialFieldType::TIME_SECONDS)
+                field.raw = time;
+
+        records.push_back({u"IBM", std::move(fields)});
+    }
+
+    root::test::TcpPeerScript wire;
+    wire.initialBytes = peer::fixturePeerPrefix(schema, family);
+    wire.replyBytes = peer::fixturePeerData(records, family, true);
+    wire.readThroughMessage = std::to_underlying(ticker ? root::protocol::SubscriptionMessage::TICKER_ADD
+                                                        : root::protocol::SubscriptionMessage::STREAM_ADD);
+    wire.waitForClientClose = true;
+    root::test::OwnedTcpPeer source({{std::move(wire)}});
+    REQUIRE(source.port() != 0);
+    std::atomic<unsigned> seen{0};
+    api::ApiRuntime runtime(runtimeOptions());
+    const auto endpoint = runtime.createEndpoint(options);
+    const auto subscription = endpoint->getFeed()->createSubscription<events::Quote>();
+    subscription->addEventListener([&](std::span<const events::Quote> batch) {
+        REQUIRE(batch.size() == 1);
+        CHECK(batch.front().symbol == u"IBM");
+        CHECK(batch.front().bidTimeMs == (ticker ? 5000 : 3000 + 1000 * seen.load()));
+        CHECK(batch.front().askTimeMs == batch.front().bidTimeMs);
+        ++seen;
+    });
+    subscription->addSymbols("IBM");
+    endpoint->connect("127.0.0.1:" + std::to_string(source.port()));
+
+    if (overflow) {
+        const bool failed = eventually([&] {
+            return subscription->getState() == api::SubscriptionState::FAILED &&
+                   subscription->getStatistics().rejectedOverflowEvents.value == records.size();
+        });
+        const auto rejected = subscription->getStatistics();
+        INFO("state=", static_cast<int>(subscription->getState()), " diagnostic=", subscription->getDiagnostic().stage,
+             " delivered=", rejected.deliveredEvents.value, " rejected=", rejected.rejectedOverflowEvents.value,
+             " dropped=", rejected.droppedEvents.value, " callbacks=", seen.load());
+        REQUIRE(failed);
+        CHECK(subscription->getDiagnostic().code == api::ErrorCode::RESOURCE_LIMIT);
+        CHECK(seen.load() == 0);
+    } else {
+        const std::size_t expected = ticker ? 1 : records.size();
+        REQUIRE(eventually([&] {
+            return subscription->getStatistics().deliveredEvents.value == expected;
+        }));
+        CHECK(seen.load() == expected);
+    }
+
+    const auto statistics = subscription->getStatistics();
+    CHECK(statistics.droppedEvents.value == (overflow ? records.size() : 0));
+    CHECK(statistics.conflatedEvents.value == (ticker ? records.size() - 1 : 0));
+    static_cast<void>(endpoint->closeAndAwaitTermination());
+    runtime.closeAndAwaitTermination();
+}
+
+TEST_CASE("Feed rejects unqualified batch and pending record limits before endpoint creation") {
+    api::EndpointOptions options;
+    options.batchRecords = 0;
+    CHECK_THROWS_AS(static_cast<void>(api::EndpointConfiguration::create(options)), api::Error);
+    options.batchRecords = api::EndpointOptions::MAXIMUM_BATCH_RECORDS + 1;
+    CHECK_THROWS_AS(static_cast<void>(api::EndpointConfiguration::create(options)), api::Error);
+    options.batchRecords = api::EndpointOptions::MAXIMUM_BATCH_RECORDS;
+    options.pendingRecords = options.batchRecords - 1;
+    CHECK_THROWS_AS(static_cast<void>(api::EndpointConfiguration::create(options)), api::Error);
+    options.pendingRecords = api::EndpointOptions::MAXIMUM_PENDING_RECORDS + 1;
+    CHECK_THROWS_AS(static_cast<void>(api::EndpointConfiguration::create(options)), api::Error);
+    options.pendingRecords = options.batchRecords;
+    CHECK(api::EndpointConfiguration::create(options).options().pendingRecords == options.pendingRecords);
 }
 
 TEST_CASE("public subscription observation is deferred until the complete real data selection returns") {

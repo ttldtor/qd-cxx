@@ -283,7 +283,10 @@ void validateEndpointOptions(const EndpointOptions &options) {
         !durationValid(options.connectTimeout) || !durationValid(options.dnsTimeout) ||
         !durationValid(options.readTimeout) || !durationValid(options.writeTimeout) ||
         !durationValid(options.pollInterval) || !durationValid(options.drainTimeout) || options.maximumAttempts == 0 ||
-        (options.maximumAttempts > 1 && !durationValid(options.retryDelay))) {
+        (options.maximumAttempts > 1 && !durationValid(options.retryDelay)) || options.batchRecords == 0 ||
+        options.batchRecords > EndpointOptions::MAXIMUM_BATCH_RECORDS || options.pendingRecords == 0 ||
+        options.pendingRecords > EndpointOptions::MAXIMUM_PENDING_RECORDS ||
+        options.batchRecords > options.pendingRecords) {
         reject(ErrorCode::INVALID_ARGUMENT, "endpoint-options");
     }
 }
