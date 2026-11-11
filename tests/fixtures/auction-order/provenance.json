@@ -1,0 +1,212 @@
+{
+  "revision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "javaVersion": "openjdk version \"1.8.0_422\"",
+  "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
+  "javacSha256": "633143e961aa18051c09112b85333f5cdbd845b54eb39678eb15b91ca8bbb527",
+  "harnessSha256": "d772ce9187d10be062c1509dca3818c6b969cbe65f6c13d9c09c89e4e7b961b6",
+  "launcherSha256": "77667d19011a618e093dfd3315138f17d70520a5041fdf78dd4d150b059dd4a9",
+  "upstreamSources": [
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/OrderBase.java",
+      "sha256": "94df739d6a931f0c215c2c32ac7d591b8a0b9d567bb4f41da1769b44ea82a195"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/Order.java",
+      "sha256": "a521309fa94e41ec1790f980758aa8680cb495ce090c712741f2f0b1b5d58bb5"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/OrderSource.java",
+      "sha256": "3b0d0b0e83f685efd688b87dba479003a76d9ad69097867326b74206dc3a2a45"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/OtcMarketsOrder.java",
+      "sha256": "ccc44697881bb940256962ab85d48cad40b9691fbe567c6c7e527bcde3af723f"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/OtcMarketsPriceType.java",
+      "sha256": "9f0da8279d5e51c0979074de3de153f02b92cce78ee89e613e52cd465f53f0dd"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/OrderImbalance.java",
+      "sha256": "91ce97e0b5d13ef7983d8bcfbe2f9f085d631d000f2bb601fbe3dcc4017da6d1"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/AuctionType.java",
+      "sha256": "b5573febec833993c31a2678e2563aaf81b6420d0da6cfa55ac513757f700274"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/ImbalanceSide.java",
+      "sha256": "968c7933746ee30eef0dad9f0fd7b0b4fb0cfd3a61f16c1bb47d5695cb816111"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/OtcMarketsOrderDelegate.java",
+      "sha256": "013b005552a12699ae99cb34eff66c4d866c71d0e8046186eb84e4e7704ff840"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/OrderImbalanceDelegate.java",
+      "sha256": "1ef395a65a9def3a497a506756e84f6ca09b572fdd351553e725cd4bc55a0698"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/impl/OtcMarketsOrderMapping.java",
+      "sha256": "90962a7028417f9f1971ff5b3d0d49b7d6d318a02dd2ce1b9849c2dffcd638eb"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/impl/OrderImbalanceMapping.java",
+      "sha256": "91166d53795270c39a5f2dbd769f7defd99d46006b75d5ece304945f4b504a9f"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/impl/MarketEventMapping.java",
+      "sha256": "8c88dbc8c84cbf9055d3807e0070dc66244662a8aad7290c992d8ef8b02c4265"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/MarketFactoryImpl.java",
+      "sha256": "c74b324b2f99d2a351963fead08419c2ba1d92573c633d30740295acc9d0bac4"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/api/impl/EventDelegate.java",
+      "sha256": "5e6c90ed4115f57708d01f697dedcdc6bc168e41d254b6e245516feb073f5593"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/api/impl/SchemeBuilder.java",
+      "sha256": "5aef33897ed1a9a27ea1dc793e3a341683ed5edffbcbbf42f8a5d87ece7b13ed"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/api/impl/SchemeProperties.java",
+      "sha256": "e996d90987bb731e2255301c42e5ba766a08cf0d491d4aea475527376a9f058a"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/BinaryQTPComposer.java",
+      "sha256": "fd158524cc8b9ebbf63cbc4ba97f6a39e95a0e07368a6589f9a44b0dba1e42da"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/BinaryQTPParser.java",
+      "sha256": "785d4e9fec8129a6b2a6f0e875771e992183c20413614a43e6de3234775c02c8"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/ProtocolOption.java",
+      "sha256": "3ab357aae1bebd446e9ea6d68db02cea4f4bb23e7cb84f3db7fd541bb9e724dd"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/ng/RecordMapping.java",
+      "sha256": "f2871d535918a418d97b6bc4a6afe920cd83f2a35a076f17d2a1ddcb7fd27515"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/util/Decimal.java",
+      "sha256": "824c49639b1114120a187a6a567aaa54d94cd859499055e32bce0df233dac318"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/util/ShortString.java",
+      "sha256": "78b3c6a31bef675b20786a3984679607330e2dd69137df00ffd63999ee788d7a"
+    },
+    {
+      "path": "dxlib/src/main/java/com/devexperts/util/WideDecimal.java",
+      "sha256": "0fd3e295e88f36e94a24ed9ebf69429985ddf4ba24e4b896e28015266a39d6d8"
+    }
+  ],
+  "productionClassInventorySha256": "90a478b5d3737246d8c897322c9f9db60887846e20117572588e05ae78fbc6d8",
+  "fixtureSha256": "c76a3ec570563ff7e400913670c8a769d3a9cd7a2a9b5f91f9d350f6a2533977",
+  "rows": 4680,
+  "timezoneInvariant": true,
+  "wireFiles": [
+    {
+      "name": "default-OrderImbalance-ARCA.qtp",
+      "sha256": "d794f44d21ae1f4ce644ef131778e5ea66b3942ccec1e16b4b46107b8ed506b0"
+    },
+    {
+      "name": "fob-OrderImbalance.qtp",
+      "sha256": "17ec68ada186369b036b4287078b8b8c29a7f7af4ecac1caea447e230e973737"
+    },
+    {
+      "name": "fob-OrderImbalance-NUAM.qtp",
+      "sha256": "eaec16e4511bca40067c88bc7ec305b0e6ce2fe3b5f2ba49d5c4dbf138b245f8"
+    },
+    {
+      "name": "fob-OrderImbalance-NTV.qtp",
+      "sha256": "cb5b4872101f171f87004544f9115cb047a22cadaa8bc1d7723c424b8996569b"
+    },
+    {
+      "name": "fob-OrderImbalance-ARCA.qtp",
+      "sha256": "d794f44d21ae1f4ce644ef131778e5ea66b3942ccec1e16b4b46107b8ed506b0"
+    },
+    {
+      "name": "int-OtcMarketsOrder.qtp",
+      "sha256": "525e5ea5815257dcdcf3a6882fd645f2c63e56a7352ee4adbde8fb52272e9385"
+    },
+    {
+      "name": "int-OtcMarketsOrder-pink.qtp",
+      "sha256": "20be78dbed98a981476ec8a28d6a302be30fbd3c9af89db490216bf22aec4202"
+    },
+    {
+      "name": "int-OrderImbalance.qtp",
+      "sha256": "f789978d84c562920e0eee4a599103ab26bdbd70528864c6eb50659f7e282801"
+    },
+    {
+      "name": "int-OrderImbalance-NUAM.qtp",
+      "sha256": "18d425154a6f016b4e893a96f6f4923ec98817ab073cd015bd552dbc05a7e9b2"
+    },
+    {
+      "name": "int-OrderImbalance-NTV.qtp",
+      "sha256": "74e1584011ce08fdd646cd94d8c798ab285f30450323f8d3d80fdf3391255494"
+    },
+    {
+      "name": "int-OrderImbalance-ARCA.qtp",
+      "sha256": "ee4a5c39fef46ddefa10271954cc2ac09ab031ed6c5b5f78c29f1d7d6354938b"
+    },
+    {
+      "name": "fob-OtcMarketsOrder-pink.qtp",
+      "sha256": "54deb5c68f3456dd27813c3b52ef00b6cd05a35afe4da144aa58ee576ad1cf7f"
+    },
+    {
+      "name": "tiny-OtcMarketsOrder.qtp",
+      "sha256": "4f54d45cc3ddfeb88312b94cec6e873eb66920db8f3d57b0cbb3cae5e92b182d"
+    },
+    {
+      "name": "tiny-OrderImbalance.qtp",
+      "sha256": "8e1d5d8c9d2ca443c2c34ffb1ec8e908bbddcafa6cba6b161e2f91e82c522e8f"
+    },
+    {
+      "name": "tiny-OrderImbalance-NUAM.qtp",
+      "sha256": "87397cc71f29354da88c220dadfe40af48c553d343fca1a03b1a94b03015f75d"
+    },
+    {
+      "name": "tiny-OrderImbalance-NTV.qtp",
+      "sha256": "d0f9e17d511d636019a8c50bf62ef300bbba0ab579f205aa3ed265db0c4473af"
+    },
+    {
+      "name": "tiny-OrderImbalance-ARCA.qtp",
+      "sha256": "edbb284a288dbd505d5e9f31d7ebf7c1df3eaa2d3a5e021e9a986c5b16e45c30"
+    },
+    {
+      "name": "missing-optional.qtp",
+      "sha256": "dc30d22671df7f33851a2fa4d2fdf9487b5b58c2eb58a969b116a1dbea1c0c98"
+    },
+    {
+      "name": "default-OtcMarketsOrder.qtp",
+      "sha256": "e84453da905e0037915d76a25455759d7ae2f5a90a2f08d50bba854186758c18"
+    },
+    {
+      "name": "default-OtcMarketsOrder-pink.qtp",
+      "sha256": "1d9872861ad2a38877bca7158a5a071e698bd2eb52942389857c4bd15a316444"
+    },
+    {
+      "name": "default-OrderImbalance.qtp",
+      "sha256": "17ec68ada186369b036b4287078b8b8c29a7f7af4ecac1caea447e230e973737"
+    },
+    {
+      "name": "default-OrderImbalance-NUAM.qtp",
+      "sha256": "eaec16e4511bca40067c88bc7ec305b0e6ce2fe3b5f2ba49d5c4dbf138b245f8"
+    },
+    {
+      "name": "default-OrderImbalance-NTV.qtp",
+      "sha256": "cb5b4872101f171f87004544f9115cb047a22cadaa8bc1d7723c424b8996569b"
+    },
+    {
+      "name": "tiny-OtcMarketsOrder-pink.qtp",
+      "sha256": "c4e88f1e2ba5a70a20c7ddb1912326ac4fc72a5b5300eb83667ca4af38b18e72"
+    },
+    {
+      "name": "fob-OtcMarketsOrder.qtp",
+      "sha256": "9756d2d9cf1c7e043d88d787c38f3cad1aa6d2a3c278518f957e5b1ac1c937f0"
+    }
+  ]
+}

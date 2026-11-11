@@ -370,11 +370,11 @@ void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, s
                 (registration.type == EventType::PROFILE || registration.type == EventType::MARKET_MAKER ||
                  registration.type == EventType::TEXT_MESSAGE || registration.type == EventType::TEXT_CONFIGURATION ||
                  registration.type == EventType::MESSAGE || registration.type == EventType::CONFIGURATION ||
-                 (isOrderSourceEvent(registration.type) && registration.projection == events::EventProjection::NATIVE))
+                 (usesOrderSource(registration.type) && registration.projection == events::EventProjection::NATIVE))
                     ? 0
                     : events::market_symbols::getExchangeCode(record.name);
 
-            if (isOrderSourceEvent(registration.type) && registration.projection == events::EventProjection::NATIVE) {
+            if (usesOrderSource(registration.type) && registration.projection == events::EventProjection::NATIVE) {
                 auto mappingLimits = registration.mappingLimits;
                 const auto source = events::detail::prepareRecordOrderSource(record.name, mappingLimits);
 
@@ -460,7 +460,8 @@ void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, s
             plan.work.visits = add(plan.work.visits, add(plan.bindingCount, 3));
 
             if (binding.kind == client::PreparedEventKind::SPREAD_ORDER ||
-                binding.kind == client::PreparedEventKind::ANALYTIC_ORDER) {
+                binding.kind == client::PreparedEventKind::ANALYTIC_ORDER ||
+                binding.kind == client::PreparedEventKind::OTC_MARKETS_ORDER) {
                 plan.work.visits = add(plan.work.visits, mapping.lookups);
             }
 
@@ -488,9 +489,13 @@ std::expected<EventRegistry, EventRegistryFailure> defaultReceivingRegistry(Deli
     EventRegistryLimits limits;
     limits.schema = SCHEMA_LIMITS;
     // Keep seven spare routes from the previous nine-of-sixteen default catalog.
-    limits.registrations = 69;
-    constexpr std::size_t DEFAULT_PREPARATION_WORK = 147580512;
-    work.preparation = DEFAULT_PREPARATION_WORK;
+    limits.registrations = 73;
+    constexpr auto defaultMapping = EventRegistration{EventType::QUOTE, 0}.mappingLimits;
+    constexpr auto preparationPerRoute = defaultMapping.fields + defaultMapping.lookups + defaultMapping.selections +
+                                         defaultMapping.keys + defaultMapping.typeAlternatives +
+                                         defaultMapping.nameUnits + defaultMapping.totalNameUnits +
+                                         defaultMapping.comparisonWork;
+    work.preparation = limits.registrations * preparationPerRoute;
 
     return contract == DeliveryContract::HISTORY  ? defaultHistoryEventRegistry(limits, work)
            : contract == DeliveryContract::TICKER ? defaultTickerEventRegistry(limits, work)
@@ -505,6 +510,10 @@ bool receivingRouteSupportsContract(const EventRegistration &route, DeliveryCont
     if (route.projection == events::EventProjection::MARKET_MAKER_ORDERS || isOrderSourceEvent(route.type) ||
         route.type == EventType::MARKET_MAKER) {
         return contract == DeliveryContract::HISTORY;
+    }
+
+    if (route.type == EventType::ORDER_IMBALANCE) {
+        return contract == DeliveryContract::TICKER;
     }
 
     if (contract == DeliveryContract::HISTORY) {
@@ -860,7 +869,7 @@ void validateReceivingSymbol(const EventRegistry *registry, EventSelection selec
     for (const auto &route : registry->registrations()) {
         if (route.type == EventType::PROFILE || route.type == EventType::TEXT_MESSAGE ||
             route.type == EventType::TEXT_CONFIGURATION || route.type == EventType::MESSAGE ||
-            route.type == EventType::CONFIGURATION || isOrderSourceEvent(route.type) ||
+            route.type == EventType::CONFIGURATION || usesOrderSource(route.type) ||
             !selectsEvent(selection, route.type)) {
             continue;
         }
@@ -945,7 +954,7 @@ core::DeliveryProjectionMask receivingProjectionMask(const ReceivingProfile &pro
         return 0;
     }
 
-    if (isOrderSourceEvent(static_cast<EventType>(binding.kind))) {
+    if (usesOrderSource(static_cast<EventType>(binding.kind))) {
         const auto source = profile.bindingSources[bindingIndex];
 
         return source && (!symbol.sourceId || *symbol.sourceId < 0 || *symbol.sourceId == *source)

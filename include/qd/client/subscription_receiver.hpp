@@ -8,6 +8,8 @@
 #include "qd/events/event_projection.hpp"
 #include "qd/events/market_maker.hpp"
 #include "qd/events/order.hpp"
+#include "qd/events/order_imbalance.hpp"
+#include "qd/events/otc_markets_order.hpp"
 #include "qd/events/profile.hpp"
 #include "qd/events/quote.hpp"
 #include "qd/events/spread_order.hpp"
@@ -34,19 +36,21 @@ struct ReceiverPlan;
 
 /** Existing prepared business projections; other records remain fully generic. */
 enum class PreparedEventKind {
-    QUOTE,              ///< Existing schema-bound Quote projection.
-    PROFILE,            ///< Existing schema-bound Profile projection.
-    TRADE,              ///< Complete owning Trade projection.
-    TRADE_ETH,          ///< Complete distinct owning extended-hours projection.
-    SUMMARY,            ///< Complete owning session-summary projection.
-    TEXT_MESSAGE,       ///< Owning text message projection.
-    TEXT_CONFIGURATION, ///< Owning text configuration projection.
-    MESSAGE = 7,        ///< Owning serialized Message projection.
-    CONFIGURATION = 8,  ///< Owning serialized Configuration projection.
-    ORDER = 9,          ///< Owning ordinary or explicitly derived indexed Order projection.
-    MARKET_MAKER = 10,  ///< Owning indexed MarketMaker projection.
-    SPREAD_ORDER = 11,  ///< Owning indexed SpreadOrder projection.
-    ANALYTIC_ORDER = 12 ///< Owning indexed AnalyticOrder projection.
+    QUOTE,                  ///< Existing schema-bound Quote projection.
+    PROFILE,                ///< Existing schema-bound Profile projection.
+    TRADE,                  ///< Complete owning Trade projection.
+    TRADE_ETH,              ///< Complete distinct owning extended-hours projection.
+    SUMMARY,                ///< Complete owning session-summary projection.
+    TEXT_MESSAGE,           ///< Owning text message projection.
+    TEXT_CONFIGURATION,     ///< Owning text configuration projection.
+    MESSAGE = 7,            ///< Owning serialized Message projection.
+    CONFIGURATION = 8,      ///< Owning serialized Configuration projection.
+    ORDER = 9,              ///< Owning ordinary or explicitly derived indexed Order projection.
+    MARKET_MAKER = 10,      ///< Owning indexed MarketMaker projection.
+    SPREAD_ORDER = 11,      ///< Owning indexed SpreadOrder projection.
+    ANALYTIC_ORDER = 12,    ///< Owning indexed AnalyticOrder projection.
+    OTC_MARKETS_ORDER = 13, ///< Owning indexed OtcMarketsOrder projection.
+    ORDER_IMBALANCE = 14    ///< Owning source-specific TICKER OrderImbalance projection.
 };
 
 /** Explicit source for optional event metadata; indexed identity is never a timestamp substitute. */
@@ -105,7 +109,8 @@ struct ReceiverFailure {
 struct SubscriptionProjection {
     std::variant<std::monostate, events::Quote, events::Profile, events::Trade, events::TradeETH, events::Summary,
                  events::TextMessage, events::TextConfiguration, events::Message, events::Configuration, events::Order,
-                 events::MarketMaker, events::SpreadOrder, events::AnalyticOrder>
+                 events::MarketMaker, events::SpreadOrder, events::AnalyticOrder, events::OtcMarketsOrder,
+                 events::OrderImbalance>
         value;                               ///< Owned event or explicit generic route.
     std::optional<std::int64_t> eventTimeMs; ///< Actual selected FIELD metadata only; rawTime stays independent.
 };

@@ -2,7 +2,7 @@
 
 [Русская версия](FEED-API.ru.md) · [Practical guides](guides.md) · [API reference](api.md)
 
-Use `qd/api/feed.hpp` and link `qdcxx_feed` to receive typed `events::Quote`, `events::Profile`, `events::Trade`, `events::TradeETH`, `events::Summary`, `events::TextMessage`, `events::TextConfiguration`, `events::Message`, `events::Configuration`, `events::Order`, `events::MarketMaker`, `events::SpreadOrder` and `events::AnalyticOrder` through a library-owned worker. Applications create endpoints,
+Use `qd/api/feed.hpp` and link `qdcxx_feed` to receive typed `events::Quote`, `events::Profile`, `events::Trade`, `events::TradeETH`, `events::Summary`, `events::TextMessage`, `events::TextConfiguration`, `events::Message`, `events::Configuration`, `events::Order`, `events::MarketMaker`, `events::SpreadOrder`, `events::AnalyticOrder`, `events::OtcMarketsOrder` and `events::OrderImbalance` through a library-owned worker. Applications create endpoints,
 listeners and exact symbol subscriptions; the library progresses connection,
 finite recovery, queues and delivery. Subscriptions can be created before or after
 `connect()`.
@@ -11,10 +11,15 @@ This API supports plain binary QTP over TCP with built-in full Quote/Profile/Tra
 and text/serialized-event schemas or explicit validated caller schemas and registered mappings.
 An endpoint chooses TICKER (default, latest values with possible
 conflation), STREAM (every admitted selected source record), or explicit HISTORY (indexed shared storage
-and independent views). Ordinary Order, MarketMaker, SpreadOrder and AnalyticOrder use HISTORY; Quote-derived Order uses TICKER. The SDK owns both standard catalogs, including regional A..Z sources. See [MarketMaker and derived Order](MARKET-MAKER-ORDER.md) and [order variants](ORDER-VARIANTS.md).
+and independent views). Ordinary Order, MarketMaker, SpreadOrder, AnalyticOrder and OtcMarketsOrder
+use HISTORY. Quote-derived Order and OrderImbalance use TICKER. The SDK owns both standard
+catalogs, including regional A..Z sources. See [MarketMaker and derived Order](MARKET-MAKER-ORDER.md),
+[order variants](ORDER-VARIANTS.md) and [OTC orders and auction imbalance](AUCTION-ORDER-EVENTS.md).
 The default HISTORY registry supplies both DEFAULT variants. Use an explicit validated registry for
 record variants such as `SpreadOrder#ISE` or `AnalyticOrder#NTV`, and select the exact source
 with `SubscriptionSelector::indexed`. SpreadOrder selectors name the underlying instrument.
+The same selector chooses a named OtcMarketsOrder or OrderImbalance source. A plain symbol
+selects all available sources for that event type.
 The existing nine nonindexed types retain their existing TICKER/STREAM profiles and reject HISTORY before native
 registration. TLS and credentials
 remain separate receiving profiles. Wildcard selectors require the existing explicit STREAM permission.
@@ -583,4 +588,4 @@ change together; the SDK applies demand and withdraws obsolete not-started HISTO
 See [live HISTORY ranges](../spec/subscriptions/LIVE-HISTORY-RANGES.md) for capability, callback
 BEGIN, finite work, overlap, output refusal and recovery boundaries.
 
-Select `DeliveryContract::HISTORY` explicitly. The worker owns the collector, independent views, replay and reset acknowledgements. `Subscription<Event>::getHistorySnapshot()` returns a passive owning AS-OF cut; reads perform no I/O or callback waiting. Current completion requires both actual delivered range evidence and matching accepted logical/source/clear/callback fences. The default HISTORY registry includes the standard indexed Order and MarketMaker records and the MarketMaker-derived Order delegates. Other business types reject HISTORY before native registration. See [Order fields, source selectors and ownership](ORDER.md) and [MarketMaker and derived Order](MARKET-MAKER-ORDER.md). See the [HISTORY contract](../spec/subscriptions/HISTORY-RECEIVING.md) for exact states, finite storage limits and raw indexed range units.
+Select `DeliveryContract::HISTORY` explicitly. The worker owns the collector, independent views, replay and reset acknowledgements. `Subscription<Event>::getHistorySnapshot()` returns a passive owning AS-OF cut; reads perform no I/O or callback waiting. Current completion requires both actual delivered range evidence and matching accepted logical/source/clear/callback fences. The default SDK HISTORY registry includes the indexed event families documented above. Types without a HISTORY route are rejected before native registration. See [Order fields, source selectors and ownership](ORDER.md) and [MarketMaker and derived Order](MARKET-MAKER-ORDER.md). See the [HISTORY contract](../spec/subscriptions/HISTORY-RECEIVING.md) for exact states, finite storage limits and raw indexed range units.

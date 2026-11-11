@@ -3,7 +3,7 @@
 [English version](FEED-API.md) · [Практические руководства](guides.ru.md) · [Справочник API](api.ru.md)
 
 Подключите `qd/api/feed.hpp` и линкуйте `qdcxx_feed`, чтобы получать типизированные
-`events::Quote`, `events::Profile`, `events::Trade`, `events::TradeETH`, `events::Summary`, `events::TextMessage`, `events::TextConfiguration`, `events::Message`, `events::Configuration`, `events::Order`, `events::MarketMaker`, `events::SpreadOrder` и `events::AnalyticOrder` через рабочий поток библиотеки. Приложение создаёт
+`events::Quote`, `events::Profile`, `events::Trade`, `events::TradeETH`, `events::Summary`, `events::TextMessage`, `events::TextConfiguration`, `events::Message`, `events::Configuration`, `events::Order`, `events::MarketMaker`, `events::SpreadOrder`, `events::AnalyticOrder`, `events::OtcMarketsOrder` и `events::OrderImbalance` через рабочий поток библиотеки. Приложение создаёт
 endpoint, обработчики и подписки на точные символы; библиотека продвигает соединение,
 конечные переподключения, очереди и доставку. Подписки можно создавать до и после
 `connect()`.
@@ -12,11 +12,18 @@ endpoint, обработчики и подписки на точные симв�
 и текстовых событий либо явными валидированными схемами вызывающего кода и зарегистрированными mappings.
 Endpoint выбирает TICKER (по умолчанию: последние значения с возможным объединением
 обновлений), STREAM (каждая принятая выбранная запись источника) либо явный HISTORY
-(индексируемое общее хранилище и независимые views). Обычный Order, MarketMaker, SpreadOrder и AnalyticOrder требуют HISTORY, производный от Quote Order использует TICKER. [MarketMaker и производный Order](MARKET-MAKER-ORDER.ru.md) описывает SDK-owned A..Z sources. Стандартная схема
+(индексируемое общее хранилище и независимые представления). Обычный Order, MarketMaker,
+SpreadOrder, AnalyticOrder и OtcMarketsOrder используют HISTORY. Производный от Quote
+Order и OrderImbalance используют TICKER.
+[MarketMaker и производный Order](MARKET-MAKER-ORDER.ru.md) описывает источники A..Z,
+которыми владеет SDK. Стандартная схема
 Order принадлежит SDK и не требует схемы от приложения. Стандартный HISTORY-реестр также
 включает оба варианта с источником DEFAULT. Для записей `SpreadOrder#ISE` или
 `AnalyticOrder#NTV` передайте явный проверенный реестр и выберите точный источник через
 `SubscriptionSelector::indexed`. Символ подписки SpreadOrder обозначает базовый инструмент.
+Тот же селектор выбирает конкретный источник OtcMarketsOrder или OrderImbalance.
+Обычный символ выбирает все доступные источники этого типа события.
+См. [ордера OTC и аукционный дисбаланс](AUCTION-ORDER-EVENTS.ru.md).
 Подробнее о [вариантах Order](ORDER-VARIANTS.ru.md). Остальные девять типов сохраняют
 существующие профили TICKER/STREAM и отклоняют HISTORY до native-регистрации. TLS и credentials
 остаются отдельными профилями приёма. Wildcard-селекторы
@@ -598,4 +605,4 @@ SDK применяет demand и снимает устаревшую HISTORY д�
 Границы capability, callback BEGIN, конечного work, пересечений, output refusal и recovery описаны
 в [контракте живых диапазонов HISTORY](../spec/subscriptions/LIVE-HISTORY-RANGES.ru.md).
 
-Выбирайте `DeliveryContract::HISTORY` явно. Worker владеет collector, независимыми views, replay и ACK reset. `Subscription<Event>::getHistorySnapshot()` возвращает пассивный владеющий срез AS-OF; getter не выполняет I/O и не ждёт callback. Current completion требует настоящих данных о доставленном диапазоне и соответствия принятым logical/source/clear/callback fences. Реестр HISTORY по умолчанию включает стандартные индексируемые записи Order и MarketMaker и делегаты Order, производные от MarketMaker. Для остальных типов событий HISTORY отклоняется до native-регистрации. См. [поля Order, source-селекторы и владение](ORDER.ru.md) и [MarketMaker и производный Order](MARKET-MAKER-ORDER.ru.md). Точные состояния, конечные storage limits и сырые индексируемые координаты описаны в [контракте HISTORY](../spec/subscriptions/HISTORY-RECEIVING.ru.md).
+Выбирайте `DeliveryContract::HISTORY` явно. Worker владеет collector, независимыми views, replay и ACK reset. `Subscription<Event>::getHistorySnapshot()` возвращает пассивный владеющий срез AS-OF; getter не выполняет I/O и не ждёт callback. Current completion требует настоящих данных о доставленном диапазоне и соответствия принятым logical/source/clear/callback fences. Стандартный реестр HISTORY из SDK включает перечисленные выше индексируемые семейства событий. Подписки без маршрута HISTORY отклоняются до native-регистрации. См. [поля Order, source-селекторы и владение](ORDER.ru.md) и [MarketMaker и производный Order](MARKET-MAKER-ORDER.ru.md). Точные состояния, конечные storage limits и сырые индексируемые координаты описаны в [контракте HISTORY](../spec/subscriptions/HISTORY-RECEIVING.ru.md).

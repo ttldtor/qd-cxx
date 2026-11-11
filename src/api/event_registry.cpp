@@ -10,6 +10,8 @@
 #include "qd/events/derived_order.hpp"
 #include "qd/events/market_maker.hpp"
 #include "qd/events/order.hpp"
+#include "qd/events/order_imbalance.hpp"
+#include "qd/events/otc_markets_order.hpp"
 #include "qd/events/profile.hpp"
 #include "qd/events/quote.hpp"
 #include "qd/events/spread_order.hpp"
@@ -175,7 +177,7 @@ bool validRegistration(const EventRegistration &registration) noexcept {
             registration.type == EventType::SUMMARY || registration.type == EventType::TEXT_MESSAGE ||
             registration.type == EventType::TEXT_CONFIGURATION || registration.type == EventType::MESSAGE ||
             registration.type == EventType::CONFIGURATION || registration.type == EventType::MARKET_MAKER ||
-            detail::isOrderSourceEvent(registration.type)) &&
+            detail::usesOrderSource(registration.type)) &&
            (registration.eventTimePolicy == EventTimePolicy::UNSPECIFIED ||
             registration.eventTimePolicy == EventTimePolicy::FIELD_METADATA) &&
            (registration.projection == events::EventProjection::NATIVE ||
@@ -409,6 +411,24 @@ EventRegistry::create(const core::LocalSchema &schema, std::span<const EventRegi
                 if (!mapping) {
                     return std::unexpected(EventRegistryFailure{mapping.error(), index});
                 }
+            } else if (registration.type == EventType::OTC_MARKETS_ORDER) {
+                const auto mapping = events::PreparedOtcMarketsOrder::prepare(*ownedSchema, registration.localRecordId,
+                                                                              registration.mappingLimits);
+
+                if (!mapping) {
+                    return std::unexpected(EventRegistryFailure{mapping.error(), index});
+                }
+            } else if (registration.type == EventType::ORDER_IMBALANCE) {
+                const auto mapping = events::PreparedOrderImbalance::prepare(*ownedSchema, registration.localRecordId,
+                                                                             registration.mappingLimits);
+
+                if (!mapping) {
+                    return std::unexpected(EventRegistryFailure{mapping.error(), index});
+                }
+
+                if (ownedSchema->records()[static_cast<std::size_t>(registration.localRecordId)].hasTime) {
+                    return std::unexpected(EventRegistryFailure{EventRegistryError::INVALID_INPUT, index});
+                }
             } else if (registration.type == EventType::SUMMARY) {
                 const auto mapping = events::PreparedSummary::prepare(*ownedSchema, registration.localRecordId,
                                                                       registration.mappingLimits);
@@ -589,8 +609,14 @@ std::expected<EventRegistry, EventRegistryFailure> defaultTickerEventRegistry(Ev
                                               {EventType::TEXT_CONFIGURATION, 6},
                                               {EventType::MESSAGE, 7},
                                               {EventType::CONFIGURATION, 8}};
-        constexpr std::size_t DEFAULT_PHYSICAL_RECORDS = 35;
-        constexpr std::size_t DEFAULT_ROUTES = 62;
+        const auto imbalance = events::defaultOrderImbalanceSchema(limits.schema);
+
+        if (!imbalance) {
+            return std::unexpected(EventRegistryFailure{imbalance.error(), {}});
+        }
+
+        constexpr std::size_t DEFAULT_PHYSICAL_RECORDS = 39;
+        constexpr std::size_t DEFAULT_ROUTES = 66;
         records.reserve(DEFAULT_PHYSICAL_RECORDS);
         routes.reserve(DEFAULT_ROUTES);
         routes.push_back(derivedRegistration(0, events::EventProjection::QUOTE_ORDERS));
@@ -632,6 +658,13 @@ std::expected<EventRegistry, EventRegistryFailure> defaultTickerEventRegistry(Ev
             routes.push_back(derivedRegistration(id, events::EventProjection::QUOTE_ORDERS));
         }
 
+        for (const auto &sourceRecord : imbalance->records()) {
+            auto record = sourceRecord;
+            record.id = static_cast<std::int32_t>(records.size());
+            routes.push_back({EventType::ORDER_IMBALANCE, record.id});
+            records.push_back(std::move(record));
+        }
+
         auto schema = core::LocalSchema::create(records, limits.schema, core::LocalProfile::BINARY_FIELDS_V1);
 
         if (!schema) {
@@ -671,13 +704,20 @@ std::expected<EventRegistry, EventRegistryFailure> defaultHistoryEventRegistry(E
             return std::unexpected(EventRegistryFailure{spread.error(), {}});
         }
 
+        auto otc = events::defaultOtcMarketsOrderSchema(limits.schema);
+
+        if (!otc) {
+            return std::unexpected(EventRegistryFailure{otc.error(), {}});
+        }
+
         auto analytic = events::defaultAnalyticOrderSchema(limits.schema);
 
         if (!analytic) {
             return std::unexpected(EventRegistryFailure{analytic.error(), {}});
         }
 
-        std::array records{order->records()[0], maker->records()[0], spread->records()[0], analytic->records()[0]};
+        std::array records{order->records()[0],    maker->records()[0], spread->records()[0],
+                           analytic->records()[0], otc->records()[0],   otc->records()[1]};
 
         for (std::size_t index = 0; index < records.size(); ++index) {
             records[index].id = static_cast<std::int32_t>(index);
@@ -689,10 +729,13 @@ std::expected<EventRegistry, EventRegistryFailure> defaultHistoryEventRegistry(E
             return std::unexpected(EventRegistryFailure{schema.error(), {}});
         }
 
-        const std::array routes{EventRegistration{EventType::ORDER, 0}, EventRegistration{EventType::MARKET_MAKER, 1},
+        const std::array routes{EventRegistration{EventType::ORDER, 0},
+                                EventRegistration{EventType::MARKET_MAKER, 1},
                                 derivedRegistration(1, events::EventProjection::MARKET_MAKER_ORDERS),
                                 EventRegistration{EventType::SPREAD_ORDER, 2},
-                                EventRegistration{EventType::ANALYTIC_ORDER, 3}};
+                                EventRegistration{EventType::ANALYTIC_ORDER, 3},
+                                EventRegistration{EventType::OTC_MARKETS_ORDER, 4},
+                                EventRegistration{EventType::OTC_MARKETS_ORDER, 5}};
 
         return EventRegistry::create(*schema, routes, limits, work);
     } catch (EventRegistryError error) {

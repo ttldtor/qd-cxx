@@ -805,6 +805,12 @@ tests/fixtures/order-variants/*.json text eol=lf
 tests/fixtures/order-variants/wire/*.qtp -text -whitespace
 tests/fixtures/order-variants/field-wire/*.qtp -text -whitespace
 
+# Preserve exact OTC and imbalance observations and canonical oracle sources.
+tools/upstream/auction-order-oracle/*.ps1 text eol=lf
+tests/fixtures/auction-order/*.tsv -text -whitespace
+tests/fixtures/auction-order/*.json text eol=lf
+tests/fixtures/auction-order/wire/*.qtp -text -whitespace
+
 # Preserve exact production callback-execution observations and source bindings.
 tools/upstream/callback-execution-oracle/*.java text eol=lf
 tools/upstream/callback-execution-oracle/*.ps1 text eol=lf

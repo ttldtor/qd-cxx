@@ -77,7 +77,8 @@ bool validBinding(const PreparedSubscriptionBinding &binding) noexcept {
             binding.kind == PreparedEventKind::TEXT_CONFIGURATION || binding.kind == PreparedEventKind::MESSAGE ||
             binding.kind == PreparedEventKind::CONFIGURATION || binding.kind == PreparedEventKind::ORDER ||
             binding.kind == PreparedEventKind::MARKET_MAKER || binding.kind == PreparedEventKind::SPREAD_ORDER ||
-            binding.kind == PreparedEventKind::ANALYTIC_ORDER) &&
+            binding.kind == PreparedEventKind::ANALYTIC_ORDER || binding.kind == PreparedEventKind::OTC_MARKETS_ORDER ||
+            binding.kind == PreparedEventKind::ORDER_IMBALANCE) &&
            (binding.eventTimePolicy == ReceiverEventTimePolicy::UNSPECIFIED ||
             binding.eventTimePolicy == ReceiverEventTimePolicy::FIELD_METADATA) &&
            (binding.projection == events::EventProjection::NATIVE ||
@@ -95,7 +96,7 @@ struct ReceiverRoute {
                  events::PreparedSummary, events::PreparedTextMessage, events::PreparedTextConfiguration,
                  events::PreparedMessage, events::PreparedConfiguration, events::PreparedOrder,
                  events::PreparedMarketMaker, events::PreparedSpreadOrder, events::PreparedAnalyticOrder,
-                 events::PreparedDerivedOrder>
+                 events::PreparedOtcMarketsOrder, events::PreparedOrderImbalance, events::PreparedDerivedOrder>
         mapping;                          ///< Existing owned immutable mapper.
     events::EventValueLimits valueLimits; ///< Per-result owned text bounds.
     ReceiverEventTimePolicy timePolicy;   ///< Explicit optional timestamp source.
@@ -163,7 +164,8 @@ ReceiverProjectionWork projectionAllowance(const detail::ReceiverRoute &route) {
     const bool order = std::holds_alternative<events::PreparedOrder>(route.mapping) ||
                        std::holds_alternative<events::PreparedDerivedOrder>(route.mapping) ||
                        std::holds_alternative<events::PreparedSpreadOrder>(route.mapping) ||
-                       std::holds_alternative<events::PreparedAnalyticOrder>(route.mapping);
+                       std::holds_alternative<events::PreparedAnalyticOrder>(route.mapping) ||
+                       std::holds_alternative<events::PreparedOtcMarketsOrder>(route.mapping);
     const bool attachment = std::holds_alternative<events::PreparedMessage>(route.mapping) ||
                             std::holds_alternative<events::PreparedConfiguration>(route.mapping);
     const bool symbolOnly = !profile && !text && !order;
@@ -329,6 +331,27 @@ projectPrepared(const mux::MuxRecordView &record, const detail::ReceiverRoute &r
     if (const auto *prepared = std::get_if<events::PreparedAnalyticOrder>(&route.mapping)) {
         auto mapped =
             prepared->mapView(record.symbol, values, route.valueLimits, eventTime.value_or(0), record.eventFlags);
+
+        if (!mapped) {
+            return std::unexpected(ReceiverProjectionFailure{mapped.error()});
+        }
+
+        return SubscriptionProjection{std::move(*mapped), eventTime};
+    }
+
+    if (const auto *prepared = std::get_if<events::PreparedOtcMarketsOrder>(&route.mapping)) {
+        auto mapped =
+            prepared->mapView(record.symbol, values, route.valueLimits, eventTime.value_or(0), record.eventFlags);
+
+        if (!mapped) {
+            return std::unexpected(ReceiverProjectionFailure{mapped.error()});
+        }
+
+        return SubscriptionProjection{std::move(*mapped), eventTime};
+    }
+
+    if (const auto *prepared = std::get_if<events::PreparedOrderImbalance>(&route.mapping)) {
+        auto mapped = prepared->mapView(record.symbol, values, route.valueLimits, eventTime.value_or(0));
 
         if (!mapped) {
             return std::unexpected(ReceiverProjectionFailure{mapped.error()});
@@ -585,18 +608,26 @@ openSubscriptionReceiver(mux::MuxQueue &queue, const core::LocalSchema &schema, 
                  family != core::SubscriptionFamily::TICKER) ||
                 ((binding.projection == events::EventProjection::MARKET_MAKER_ORDERS ||
                   binding.kind == PreparedEventKind::MARKET_MAKER || binding.kind == PreparedEventKind::SPREAD_ORDER ||
-                  binding.kind == PreparedEventKind::ANALYTIC_ORDER) &&
-                 family != core::SubscriptionFamily::HISTORY)) {
+                  binding.kind == PreparedEventKind::ANALYTIC_ORDER ||
+                  binding.kind == PreparedEventKind::OTC_MARKETS_ORDER) &&
+                 family != core::SubscriptionFamily::HISTORY) ||
+                (binding.kind == PreparedEventKind::ORDER_IMBALANCE && family != core::SubscriptionFamily::TICKER)) {
                 return std::unexpected(ReceiverFailure{ReceiverError::INVALID_INPUT, i});
             }
 
-            if (binding.kind == PreparedEventKind::SPREAD_ORDER || binding.kind == PreparedEventKind::ANALYTIC_ORDER) {
-                const auto &record = schema.records()[static_cast<std::size_t>(binding.localId)];
+            const auto &record = schema.records()[static_cast<std::size_t>(binding.localId)];
+
+            if (binding.kind == PreparedEventKind::SPREAD_ORDER || binding.kind == PreparedEventKind::ANALYTIC_ORDER ||
+                binding.kind == PreparedEventKind::OTC_MARKETS_ORDER) {
                 debit(receiverWork.visits, record.lookups.size());
 
                 if (!events::detail::hasOrderIndexCoordinate(record)) {
                     return std::unexpected(ReceiverFailure{ReceiverError::INVALID_INPUT, i});
                 }
+            }
+
+            if (binding.kind == PreparedEventKind::ORDER_IMBALANCE && record.hasTime) {
+                return std::unexpected(ReceiverFailure{ReceiverError::INVALID_INPUT, i});
             }
 
             for (std::size_t previous = 0; previous < i; ++previous) {
@@ -710,6 +741,25 @@ openSubscriptionReceiver(mux::MuxQueue &queue, const core::LocalSchema &schema, 
                                        binding.eventTimePolicy, fields, binding.mappingLimits.selections});
             } else if (binding.kind == PreparedEventKind::ANALYTIC_ORDER) {
                 auto prepared = events::PreparedAnalyticOrder::prepare(schema, binding.localId, binding.mappingLimits);
+
+                if (!prepared) {
+                    return std::unexpected(ReceiverFailure{prepared.error(), i});
+                }
+
+                plan.routes.push_back({schema.recordContext(binding.localId), std::move(*prepared), binding.valueLimits,
+                                       binding.eventTimePolicy, fields, binding.mappingLimits.selections});
+            } else if (binding.kind == PreparedEventKind::OTC_MARKETS_ORDER) {
+                auto prepared =
+                    events::PreparedOtcMarketsOrder::prepare(schema, binding.localId, binding.mappingLimits);
+
+                if (!prepared) {
+                    return std::unexpected(ReceiverFailure{prepared.error(), i});
+                }
+
+                plan.routes.push_back({schema.recordContext(binding.localId), std::move(*prepared), binding.valueLimits,
+                                       binding.eventTimePolicy, fields, binding.mappingLimits.selections});
+            } else if (binding.kind == PreparedEventKind::ORDER_IMBALANCE) {
+                auto prepared = events::PreparedOrderImbalance::prepare(schema, binding.localId, binding.mappingLimits);
 
                 if (!prepared) {
                     return std::unexpected(ReceiverFailure{prepared.error(), i});

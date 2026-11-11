@@ -44,7 +44,9 @@ enum class EventSelection {
     MARKET_MAKER = 1024,                  ///< Selected indexed MarketMaker routes.
     SPREAD_ORDER = 1 << 11,               ///< Selected indexed SpreadOrder routes.
     ANALYTIC_ORDER = 1 << 12,             ///< Selected indexed AnalyticOrder routes.
-    ALL = (1 << 13) - 1,                  ///< Every supported event route.
+    OTC_MARKETS_ORDER = 1 << 13,          ///< Selected indexed OTC routes.
+    ORDER_IMBALANCE = 1 << 14,            ///< Selected source-specific auction imbalance routes.
+    ALL = (1 << 15) - 1,                  ///< Every supported event route.
 };
 
 /** Test a finite supported-kind selection without depending on local record positions.
@@ -57,7 +59,8 @@ constexpr bool selectsEvent(EventSelection selection, EventType type) noexcept {
         type != EventType::TRADE_ETH && type != EventType::SUMMARY && type != EventType::TEXT_MESSAGE &&
         type != EventType::TEXT_CONFIGURATION && type != EventType::MESSAGE && type != EventType::CONFIGURATION &&
         type != EventType::ORDER && type != EventType::MARKET_MAKER && type != EventType::SPREAD_ORDER &&
-        type != EventType::ANALYTIC_ORDER) {
+        type != EventType::ANALYTIC_ORDER && type != EventType::OTC_MARKETS_ORDER &&
+        type != EventType::ORDER_IMBALANCE) {
         return false;
     }
 
@@ -69,7 +72,15 @@ constexpr bool selectsEvent(EventSelection selection, EventType type) noexcept {
  * @return True when this family uses OrderSource suffixes and ordinary indexed coordinates.
  */
 constexpr bool isOrderSourceEvent(EventType type) noexcept {
-    return type == EventType::ORDER || type == EventType::SPREAD_ORDER || type == EventType::ANALYTIC_ORDER;
+    return type == EventType::ORDER || type == EventType::SPREAD_ORDER || type == EventType::ANALYTIC_ORDER ||
+           type == EventType::OTC_MARKETS_ORDER;
+}
+
+/** @param type Business event type.
+ * @return Whether the named physical record contributes an exact order-source ID.
+ */
+constexpr bool usesOrderSource(EventType type) noexcept {
+    return isOrderSourceEvent(type) || type == EventType::ORDER_IMBALANCE;
 }
 
 /** Exact owning value shape expected by the logical subscription's listeners. */
@@ -87,6 +98,8 @@ enum class EventDelivery {
     MARKET_MAKER,       ///< Complete owning indexed MarketMaker values.
     SPREAD_ORDER,       ///< Complete owning indexed SpreadOrder values.
     ANALYTIC_ORDER,     ///< Complete owning indexed AnalyticOrder values.
+    OTC_MARKETS_ORDER,  ///< Complete owning indexed OtcMarketsOrder values.
+    ORDER_IMBALANCE,    ///< Complete owning source-specific OrderImbalance values.
     REGISTERED          ///< Owning public RegisteredEvent variants, restricted by EventSelection.
 };
 } // namespace org::ttldtor::qdcxx::api::detail

@@ -1429,6 +1429,8 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
         bool marketMaker = false;
         bool spreadOrder = false;
         bool analyticOrder = false;
+        bool otcMarketsOrder = false;
+        bool orderImbalance = false;
 
         for (const auto type : types) {
             switch (type) {
@@ -1471,6 +1473,12 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             case EventType::ANALYTIC_ORDER:
                 analyticOrder = true;
                 break;
+            case EventType::OTC_MARKETS_ORDER:
+                otcMarketsOrder = true;
+                break;
+            case EventType::ORDER_IMBALANCE:
+                orderImbalance = true;
+                break;
             default:
                 reject(ErrorCode::INVALID_ARGUMENT, "subscription-event-types");
             }
@@ -1480,7 +1488,8 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             (quote ? 1U : 0U) | (profile ? 2U : 0U) | (trade ? 4U : 0U) | (tradeETH ? 8U : 0U) | (summary ? 16U : 0U) |
             (textMessage ? 32U : 0U) | (textConfiguration ? 64U : 0U) | (message ? 128U : 0U) |
             (configuration ? 256U : 0U) | (order ? 512U : 0U) | (marketMaker ? 1024U : 0U) |
-            (spreadOrder ? 1U << 11 : 0U) | (analyticOrder ? 1U << 12 : 0U));
+            (spreadOrder ? 1U << 11 : 0U) | (analyticOrder ? 1U << 12 : 0U) | (otcMarketsOrder ? 1U << 13 : 0U) |
+            (orderImbalance ? 1U << 14 : 0U));
         const auto delivery = registeredDelivery  ? detail::EventDelivery::REGISTERED
                               : quote             ? detail::EventDelivery::QUOTE
                               : profile           ? detail::EventDelivery::PROFILE
@@ -1493,6 +1502,8 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                               : marketMaker       ? detail::EventDelivery::MARKET_MAKER
                               : spreadOrder       ? detail::EventDelivery::SPREAD_ORDER
                               : analyticOrder     ? detail::EventDelivery::ANALYTIC_ORDER
+                              : otcMarketsOrder   ? detail::EventDelivery::OTC_MARKETS_ORDER
+                              : orderImbalance    ? detail::EventDelivery::ORDER_IMBALANCE
                               : order             ? detail::EventDelivery::ORDER
                                                   : detail::EventDelivery::CONFIGURATION;
         const auto control = port_->control.lock();
@@ -1546,7 +1557,8 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             constexpr auto historyTypes = static_cast<unsigned>(detail::EventSelection::ORDER) |
                                           static_cast<unsigned>(detail::EventSelection::MARKET_MAKER) |
                                           static_cast<unsigned>(detail::EventSelection::SPREAD_ORDER) |
-                                          static_cast<unsigned>(detail::EventSelection::ANALYTIC_ORDER);
+                                          static_cast<unsigned>(detail::EventSelection::ANALYTIC_ORDER) |
+                                          static_cast<unsigned>(detail::EventSelection::OTC_MARKETS_ORDER);
 
             if (port_->options.contract == DeliveryContract::HISTORY &&
                 (static_cast<unsigned>(selection) & ~historyTypes)) {
@@ -1554,9 +1566,13 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             }
 
             if ((order && port_->options.contract == DeliveryContract::STREAM) ||
-                ((marketMaker || spreadOrder || analyticOrder) &&
+                ((marketMaker || spreadOrder || analyticOrder || otcMarketsOrder) &&
                  port_->options.contract != DeliveryContract::HISTORY)) {
                 reject(ErrorCode::UNSUPPORTED_PROFILE, "order-requires-history");
+            }
+
+            if (orderImbalance && port_->options.contract != DeliveryContract::TICKER) {
+                reject(ErrorCode::UNSUPPORTED_PROFILE, "order-imbalance-requires-ticker");
             }
 
             if (message && port_->options.contract != DeliveryContract::STREAM) {
@@ -1582,6 +1598,9 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
 
             bool registeredSpreadOrder = registeredMarketMaker;
             bool registeredAnalyticOrder = registeredMarketMaker;
+            bool registeredOtcMarketsOrder = registeredMarketMaker;
+            bool registeredOrderImbalance =
+                !port_->options.eventRegistry && port_->options.contract == DeliveryContract::TICKER;
 
             if (port_->options.eventRegistry) {
                 for (const auto &registration : port_->options.eventRegistry->registrations()) {
@@ -1592,6 +1611,10 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                     registeredMarketMaker = registeredMarketMaker || registration.type == EventType::MARKET_MAKER;
                     registeredSpreadOrder = registeredSpreadOrder || registration.type == EventType::SPREAD_ORDER;
                     registeredAnalyticOrder = registeredAnalyticOrder || registration.type == EventType::ANALYTIC_ORDER;
+                    registeredOtcMarketsOrder =
+                        registeredOtcMarketsOrder || registration.type == EventType::OTC_MARKETS_ORDER;
+                    registeredOrderImbalance =
+                        registeredOrderImbalance || registration.type == EventType::ORDER_IMBALANCE;
                     registeredMessage = registeredMessage || registration.type == EventType::MESSAGE;
                     registeredConfiguration = registeredConfiguration || registration.type == EventType::CONFIGURATION;
                     registeredOrder = registeredOrder || registration.type == EventType::ORDER;
@@ -1614,7 +1637,8 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                 (textConfiguration && !registeredTextConfiguration) || (message && !registeredMessage) ||
                 (configuration && !registeredConfiguration) || (order && !registeredOrder) ||
                 (marketMaker && !registeredMarketMaker) || (spreadOrder && !registeredSpreadOrder) ||
-                (analyticOrder && !registeredAnalyticOrder)) {
+                (analyticOrder && !registeredAnalyticOrder) || (otcMarketsOrder && !registeredOtcMarketsOrder) ||
+                (orderImbalance && !registeredOrderImbalance)) {
                 reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-unregistered-event");
             }
 
@@ -1753,6 +1777,8 @@ template class Subscription<events::Order>;
 template class Subscription<events::MarketMaker>;
 template class Subscription<events::SpreadOrder>;
 template class Subscription<events::AnalyticOrder>;
+template class Subscription<events::OtcMarketsOrder>;
+template class Subscription<events::OrderImbalance>;
 template class Subscription<RegisteredEvent>;
 
 Feed::Feed(std::shared_ptr<detail::EndpointPort> port) : port_(std::move(port)) {
@@ -2442,6 +2468,10 @@ class TypedConsumer final : public client::SubscriptionConsumer {
                 return deliver<events::SpreadOrder>(batch, listeners, executor, completion, historyRevision);
             case EventDelivery::ANALYTIC_ORDER:
                 return deliver<events::AnalyticOrder>(batch, listeners, executor, completion, historyRevision);
+            case EventDelivery::OTC_MARKETS_ORDER:
+                return deliver<events::OtcMarketsOrder>(batch, listeners, executor, completion, historyRevision);
+            case EventDelivery::ORDER_IMBALANCE:
+                return deliver<events::OrderImbalance>(batch, listeners, executor, completion, historyRevision);
             case EventDelivery::ORDER:
                 return deliver<events::Order>(batch, listeners, executor, completion, historyRevision);
             case EventDelivery::TEXT_MESSAGE:
