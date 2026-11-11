@@ -214,6 +214,7 @@ struct SubscriptionSnapshot {
     std::uint64_t revision = 0; ///< Accepted desired revision, never a worker application or peer acknowledgement.
     std::vector<SubscriptionSelector> symbols; ///< Exact typed logical identities, independently owned.
     std::vector<EventType> eventTypes;         ///< Immutable normalized supported business types, not local record IDs.
+    std::optional<std::int64_t> fromTime; ///< Time-series mode's signed Unix milliseconds; absent for ordinary mode.
 };
 
 using SubscriptionStatistics = core::SubscriptionStatistics; ///< Detached event-delivery lifetime counters and gauges.
@@ -272,6 +273,16 @@ template <class Event> class Subscription final {
      * @return Independently owned symbols/types/revision; allocation failures throw Error without mutation.
      */
     [[nodiscard]] SubscriptionSnapshot getSnapshot() const;
+    /** Read the retained time-series range property without native progress, including after close.
+     * @return Signed Unix milliseconds, initially MAX; ordinary subscriptions throw UNSUPPORTED_PROFILE.
+     */
+    [[nodiscard]] std::int64_t getFromTime() const;
+    /** Replace the time-series range and effective selectors in one accepted local revision.
+     * Equal values do nothing. Failure preserves the complete old range, symbols and revision.
+     * Already begun callbacks may finish; obsolete not-started HISTORY delivery is withdrawn by the SDK.
+     * @param fromTime Signed Unix milliseconds; MAX disables ordinary historical data while retaining demand.
+     */
+    void setFromTime(std::int64_t fromTime);
     /** Copy one coherent subscription-local accounting cut, without native progress or callback waiting.
      * The detached value retains no callback/schema/runtime and survives shutdown. Final means capture quiescence.
      * @return Owner identity, lifetime counters, bounded gauges and monotonic observation time.
@@ -486,10 +497,41 @@ class Feed final {
     /** Normalize one bounded borrowed input before atomically publishing a logical registration.
      * @param types Raw supported type arguments, including duplicates, borrowed only during the call.
      * @param registeredDelivery True selects owning variants; false is used only by the one-type wrapper.
+     * @param timeSeries True selects verified time-series mode; false preserves ordinary admission.
      * @return One port with its complete immutable selection and exact listener value shape.
      */
     std::shared_ptr<detail::SubscriptionPort> createSubscriptionPort(std::span<const EventType> types,
-                                                                     bool registeredDelivery);
+                                                                     bool registeredDelivery, bool timeSeries = false);
+
+    /** @tparam Event Supported owning native business type. @return Its immutable registration identity. */
+    template <class Event> static constexpr EventType eventTypeFor() {
+        static_assert(std::is_same_v<Event, events::Quote> || std::is_same_v<Event, events::Profile> ||
+                      std::is_same_v<Event, events::Trade> || std::is_same_v<Event, events::TradeETH> ||
+                      std::is_same_v<Event, events::Summary> || std::is_same_v<Event, events::TextMessage> ||
+                      std::is_same_v<Event, events::TextConfiguration> || std::is_same_v<Event, events::Message> ||
+                      std::is_same_v<Event, events::Configuration> || std::is_same_v<Event, events::Order>);
+
+        if constexpr (std::is_same_v<Event, events::Quote>)
+            return EventType::QUOTE;
+        else if constexpr (std::is_same_v<Event, events::Profile>)
+            return EventType::PROFILE;
+        else if constexpr (std::is_same_v<Event, events::Trade>)
+            return EventType::TRADE;
+        else if constexpr (std::is_same_v<Event, events::TradeETH>)
+            return EventType::TRADE_ETH;
+        else if constexpr (std::is_same_v<Event, events::Summary>)
+            return EventType::SUMMARY;
+        else if constexpr (std::is_same_v<Event, events::TextMessage>)
+            return EventType::TEXT_MESSAGE;
+        else if constexpr (std::is_same_v<Event, events::TextConfiguration>)
+            return EventType::TEXT_CONFIGURATION;
+        else if constexpr (std::is_same_v<Event, events::Message>)
+            return EventType::MESSAGE;
+        else if constexpr (std::is_same_v<Event, events::Configuration>)
+            return EventType::CONFIGURATION;
+        else
+            return EventType::ORDER;
+    }
 
     public:
     /** Create a bounded logical registration, before or after connect, without application polling.
@@ -500,23 +542,8 @@ class Feed final {
      * @return Producer handle; native preparation failures are observed asynchronously by its diagnostic.
      */
     template <class Event> [[nodiscard]] std::shared_ptr<Subscription<Event>> createSubscription() {
-        static_assert(std::is_same_v<Event, events::Quote> || std::is_same_v<Event, events::Profile> ||
-                      std::is_same_v<Event, events::Trade> || std::is_same_v<Event, events::TradeETH> ||
-                      std::is_same_v<Event, events::Summary> || std::is_same_v<Event, events::TextMessage> ||
-                      std::is_same_v<Event, events::TextConfiguration> || std::is_same_v<Event, events::Message> ||
-                      std::is_same_v<Event, events::Configuration> || std::is_same_v<Event, events::Order>);
         auto subscription = std::shared_ptr<Subscription<Event>>(new Subscription<Event>({}));
-        subscription->port_ =
-            createSubscriptionPort(std::is_same_v<Event, events::Quote>               ? EventType::QUOTE
-                                   : std::is_same_v<Event, events::Profile>           ? EventType::PROFILE
-                                   : std::is_same_v<Event, events::Trade>             ? EventType::TRADE
-                                   : std::is_same_v<Event, events::TradeETH>          ? EventType::TRADE_ETH
-                                   : std::is_same_v<Event, events::Summary>           ? EventType::SUMMARY
-                                   : std::is_same_v<Event, events::TextMessage>       ? EventType::TEXT_MESSAGE
-                                   : std::is_same_v<Event, events::TextConfiguration> ? EventType::TEXT_CONFIGURATION
-                                   : std::is_same_v<Event, events::Message>           ? EventType::MESSAGE
-                                   : std::is_same_v<Event, events::Configuration>     ? EventType::CONFIGURATION
-                                                                                      : EventType::ORDER);
+        subscription->port_ = createSubscriptionPort(eventTypeFor<Event>());
 
         return subscription;
     }
@@ -536,6 +563,30 @@ class Feed final {
      */
     [[nodiscard]] std::shared_ptr<Subscription<RegisteredEvent>>
     createSubscription(std::initializer_list<EventType> types);
+
+    /** Create a HISTORY registration whose range is owned and applied by the SDK.
+     * Only an actual native time-series mapper grants eligibility. Current business types reject
+     * UNSUPPORTED_PROFILE before native admission; caller-declared descriptors do not grant eligibility.
+     * @tparam Event Native owning business type with a verified time-series mapper.
+     * @return The existing subscription facade with an initial MAX fromTime, or a synchronous Error.
+     */
+    template <class Event> [[nodiscard]] std::shared_ptr<Subscription<Event>> createTimeSeriesSubscription() {
+        const auto type = eventTypeFor<Event>();
+        auto subscription = std::shared_ptr<Subscription<Event>>(new Subscription<Event>({}));
+        subscription->port_ = createSubscriptionPort(std::span(&type, 1), false, true);
+
+        return subscription;
+    }
+
+    /** Create a variant registration with the same verified HISTORY eligibility and range semantics.
+     * @param types Bounded immutable business type arguments, normalized as by createSubscription.
+     * @return One owning time-series mode facade, or an atomic synchronous Error.
+     */
+    [[nodiscard]] std::shared_ptr<Subscription<RegisteredEvent>>
+    createTimeSeriesSubscription(std::span<const EventType> types);
+    /** @param types Inline business type arguments. @return The same owning facade as the span overload. */
+    [[nodiscard]] std::shared_ptr<Subscription<RegisteredEvent>>
+    createTimeSeriesSubscription(std::initializer_list<EventType> types);
 };
 
 /** Detached last-published endpoint cut; keeping it retains only an opaque identity token.

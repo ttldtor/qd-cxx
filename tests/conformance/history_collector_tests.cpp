@@ -1,6 +1,7 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "../../src/collectors/history_replay.hpp"
 #include "qd/collectors/history.hpp"
 #include "qd/encoding/char_array.hpp"
 #include "qd/encoding/compact.hpp"
@@ -2353,4 +2354,86 @@ TEST_CASE("HISTORY physical VOID high slot preserves full removal identity separ
         CHECK((**sentinel).record.fields[0].raw == -1);
         REQUIRE(history->pop(*view, work));
     }
+}
+
+TEST_CASE("HISTORY private replay prepays exact work and preserves sibling view epoch and failed cuts") {
+    auto f = fixture();
+    auto view = open(f);
+    auto sibling = open(f);
+    add(f, view);
+    add(f, sibling);
+    send(f, {{0, u"ALPHA", 3, 30, 4}, {0, u"ALPHA", 2, 20, 0}, {0, u"ALPHA", 0, 0, 10}});
+    REQUIRE(drain(f, view).size() == 3);
+    REQUIRE(drain(f, sibling).size() == 3);
+    const c::SubscriptionKey key{f.schema.recordContext(0), u"ALPHA"};
+    const c::SubscriptionRequest request{key, 0};
+    auto status = [&](const auto &token) {
+        auto work = turn();
+        auto result = f.history.rangeStatus(token, key, work);
+        REQUIRE(result);
+
+        return *result;
+    };
+    const auto before = status(view), healthy = status(sibling);
+    REQUIRE(before.completeRequestedRange);
+    CHECK_FALSE(before.initialPending);
+    auto credits = turn();
+    const auto supplied = credits;
+    auto coreWork = command();
+    REQUIRE(s::detail::HistoryReplayAccess::replace(f.history, view, {&request, 1}, coreWork, credits));
+    const s::HistoryWork exact{supplied.operations - credits.operations, supplied.visits - credits.visits,
+                               supplied.textUnits - credits.textUnits, supplied.bytes - credits.bytes};
+    const auto replayed = status(view);
+    CHECK(replayed.observationSerial == before.observationSerial + 1);
+    CHECK(replayed.initialPending);
+    CHECK(replayed.epoch.matches(before.epoch));
+    CHECK_FALSE(status(sibling).initialPending);
+    CHECK(status(sibling).epoch.matches(healthy.epoch));
+    CHECK(drain(f, sibling).empty());
+
+    for (unsigned kind = 0; kind < 2; ++kind) {
+        auto shortWork = exact;
+
+        if (kind == 0)
+            shortWork = {};
+        else {
+            REQUIRE(shortWork.visits > 0);
+            --shortWork.visits;
+        }
+
+        coreWork = command();
+        const auto result =
+            s::detail::HistoryReplayAccess::replace(f.history, view, {&request, 1}, coreWork, shortWork);
+        REQUIRE_FALSE(result);
+        CHECK(result.error().error == Error::WORK_LIMIT);
+        CHECK(status(view).observationSerial == replayed.observationSerial);
+        CHECK(status(view).initialPending);
+    }
+
+    credits = exact;
+    coreWork = command();
+    REQUIRE(s::detail::HistoryReplayAccess::replace(f.history, view, {&request, 1}, coreWork, credits));
+    CHECK(credits.operations == 0);
+    CHECK(credits.visits == 0);
+    CHECK(credits.textUnits == 0);
+    CHECK(credits.bytes == 0);
+    CHECK(status(view).observationSerial == replayed.observationSerial + 1);
+    REQUIRE(drain(f, view).size() == 3);
+    CHECK(drain(f, sibling).empty());
+    credits = turn();
+    coreWork = command();
+    const s::HistoryViewToken invalid;
+    const auto refused = s::detail::HistoryReplayAccess::replace(f.history, invalid, {&request, 1}, coreWork, credits);
+    REQUIRE_FALSE(refused);
+    CHECK(refused.error().error == Error::INVALID_VIEW);
+    CHECK(status(view).epoch.matches(before.epoch));
+    credits = turn();
+    auto reset = f.history.reset(credits);
+    REQUIRE(reset);
+    REQUIRE(f.history.acknowledgeReset(reset->sequence));
+    credits = turn();
+    coreWork = command();
+    REQUIRE(s::detail::HistoryReplayAccess::replace(f.history, view, {&request, 1}, coreWork, credits));
+    CHECK_FALSE(status(view).completeRequestedRange);
+    CHECK_FALSE(status(view).epoch.matches(before.epoch));
 }

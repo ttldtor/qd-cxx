@@ -14,6 +14,9 @@
 #include <span>
 
 namespace org::ttldtor::qdcxx::collectors {
+namespace detail {
+struct HistoryReplayAccess;
+}
 
 /** Typed owner failures; no outcome implies callback, wire or peer completion. */
 enum class HistoryError {
@@ -278,6 +281,7 @@ struct HistoryRetentionReport {
  * forgetUnobserved releases only empty, unobserved metadata without resetting healthy views.
  */
 class HistoryCollector {
+    friend struct detail::HistoryReplayAccess;
     struct Impl;
     std::unique_ptr<Impl> impl_; ///< Serialized complete state.
     /** Adopt complete fixed storage.

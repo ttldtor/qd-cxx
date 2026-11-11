@@ -290,6 +290,10 @@ class OwnedMuxBatch {
      * @return Origin/epoch token or invalid for empty.
      */
     [[nodiscard]] QueueIdentity epoch() const noexcept;
+    /** Read the facade command identity captured at successful mapping commit, when attached.
+     * @return Applied logical revision, or nullopt for an unobserved lower-level registration.
+     */
+    [[nodiscard]] std::optional<std::uint64_t> appliedDesiredRevision() const noexcept;
 };
 
 /** Callback-only borrow; copying this view does not extend lifetime. */
@@ -302,6 +306,8 @@ class BorrowedMuxBatch {
      * @return Exact immutable span, expiring on return/exception.
      */
     [[nodiscard]] std::span<const MuxRecordView> records() const noexcept;
+    /** @return Actual applied facade revision for this immutable selection, or nullopt without observation. */
+    [[nodiscard]] std::optional<std::uint64_t> appliedDesiredRevision() const noexcept;
     /** Retain already constructed detached backing without allocation.
      * @return Independent cross-thread owning lease.
      */

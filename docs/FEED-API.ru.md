@@ -586,4 +586,12 @@ queue wait, state/change observers исключены. До завершения
 
 ## Наблюдения диапазонов HISTORY
 
+`Feed::createTimeSeriesSubscription<Event>()` использует тот же владеющий facade подписки с
+`getFromTime()`/`setFromTime(ms)` и начальным знаковым64 MAX. Нужны проверенный native time-series
+mapper и явный HISTORY endpoint; текущие десять типов отклоняются до регистрации. Обычные подписки
+отклоняют операции диапазона. Принятые range/set/revision и observer snapshots меняются вместе;
+SDK применяет demand и снимает устаревшую HISTORY доставку, которая ещё не началась.
+Границы capability, callback BEGIN, конечного work, пересечений, output refusal и recovery описаны
+в [контракте живых диапазонов HISTORY](../spec/subscriptions/LIVE-HISTORY-RANGES.ru.md).
+
 Выбирайте `DeliveryContract::HISTORY` явно. Worker владеет collector, независимыми views, replay и ACK reset. `Subscription<Event>::getHistorySnapshot()` возвращает пассивный владеющий срез AS-OF; getter не выполняет I/O и не ждёт callback. Current completion требует настоящих данных о доставленном диапазоне и соответствия принятым logical/source/clear/callback fences. Order — первый поддерживаемый типизированный HISTORY route: endpoint без явного registry использует стандартную схему Order, принадлежащую SDK. Это индексируемое событие. Остальные девять бизнес-типов отклоняют HISTORY до native-регистрации. См. [поля Order, source-селекторы и владение](ORDER.ru.md). Точные состояния, конечные storage limits и сырые индексируемые координаты описаны в [контракте HISTORY](../spec/subscriptions/HISTORY-RECEIVING.ru.md).

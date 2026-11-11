@@ -62,3 +62,5 @@
 - [Приём HISTORY с владением SDK](subscriptions/HISTORY-RECEIVING.ru.md): диапазоны worker, отделённые AS-OF наблюдения полноты/reset и явная пригодность бизнес-типов.
 
 [Исполнение event callback](subscriptions/CALLBACK-EXECUTION.ru.md): owning packets, borrowed schedulers, конечные reentry и source retirement.
+
+- [Живые диапазоны HISTORY](subscriptions/LIVE-HISTORY-RANGES.ru.md): транзакции fromTime/set, applied fences доставки и сходимость wire demand.

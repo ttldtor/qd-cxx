@@ -8,7 +8,11 @@
 #include "qd/api/statistics.hpp"
 #include "qd/transport/recovery.hpp"
 
+#include "../../src/api/subscription_desired.hpp"
+#include "../../src/api/subscription_observer.hpp"
+#include "../../src/core/delivery_statistics.hpp"
 #include "connect_peer.hpp"
+#include "history_order_input.hpp"
 #include "recovery_test_peer.hpp"
 
 #include "qd/encoding/compact.hpp"
@@ -36,8 +40,10 @@
 /** Test-executable-only allocation faults; production targets have no fault hook. */
 namespace allocation_probe {
 struct WorkerFault;
+struct WorkerPause;
 thread_local bool failNext = false;         ///< One creator-thread owned-storage refusal, reset before throwing.
 std::atomic<WorkerFault *> worker{nullptr}; ///< Explicit one-worker scenario, never armed during ordinary tests.
+std::atomic<WorkerPause *> pause{nullptr};  ///< One deterministic actual queued-record/early-selection scenario.
 
 /** Bounded scheduling barrier at the sole worker's first allocation, before it owns any native state. */
 struct WorkerFault {
@@ -66,8 +72,32 @@ struct WorkerFault {
     }
 };
 
+/** Pause the SDK at a test-owned allocation after actual queue admission; never inject a product fault. */
+struct WorkerPause {
+    org::ttldtor::qdcxx::api::ApiRuntime &runtime;
+    const std::thread::id owner = std::this_thread::get_id();
+    std::function<bool()> ready;
+    std::atomic<bool> claimed{false}, entered{false}, release{false};
+
+    ~WorkerPause() {
+        release.store(true, std::memory_order_release);
+        pause.store(nullptr, std::memory_order_release);
+        runtime.closeAndAwaitTermination();
+    }
+};
+
 /** Refuse one requested allocation before allocating application storage. */
 void beforeAllocation() {
+    auto *gate = pause.load(std::memory_order_acquire);
+
+    if (gate && std::this_thread::get_id() != gate->owner && !gate->claimed.load() && gate->ready() &&
+        !gate->claimed.exchange(true)) {
+        gate->entered.store(true, std::memory_order_release);
+
+        while (!gate->release.load(std::memory_order_acquire))
+            std::this_thread::yield();
+    }
+
     if (std::exchange(failNext, false)) {
         throw std::bad_alloc();
     }
@@ -4144,4 +4174,89 @@ TEST_CASE("statistics rates retain positive elapsed ticks across clock origins a
     first.sourceEpoch = 1;
     second.sourceEpoch = 1;
     CHECK_FALSE(api::statisticsEpochRate(first, second, &api::SubscriptionStatistics::callbackDurationTotal));
+}
+
+TEST_CASE("live fromTime observer allocation refusal preserves the accepted property set and revision") {
+    namespace detail = api::detail;
+    detail::SubscriptionPort port;
+    port.statistics = std::make_shared<org::ttldtor::qdcxx::core::detail::DeliveryStatisticsState>();
+    port.changes = std::make_shared<detail::SubscriptionChangeDomain>();
+    port.changes->maximumWork = 8;
+    port.timeSeries = true;
+    port.fromTime = 2000;
+    port.revision = 5;
+    port.symbols = {api::SubscriptionSelector::timeSeries(std::u16string(128, u'A'), 2000)};
+    port.observers.listeners = std::make_shared<const detail::ListenerSnapshot>(1);
+    port.observers.phases.resize(1);
+    std::vector<api::SubscriptionSelector> candidate{
+        api::SubscriptionSelector::timeSeries(std::u16string(128, u'A'), 3000)};
+    detail::SubscriptionObserverAdmission admission(port.changes);
+    std::lock_guard lock(port.mutex);
+    bool refused = false;
+    allocation_probe::failNext = true;
+    try {
+        static_cast<void>(detail::commitSubscriptionDesiredLocked(port, std::move(candidate), 3000));
+    } catch (const std::bad_alloc &) {
+        refused = true;
+    }
+    allocation_probe::failNext = false;
+    REQUIRE(refused);
+    CHECK(port.revision == 5);
+    CHECK(port.fromTime == 2000);
+    REQUIRE(port.symbols.size() == 1);
+    CHECK(port.symbols[0].fromTime() == 2000);
+    CHECK(port.observers.count == 0);
+    CHECK_FALSE(port.observers.latest);
+    CHECK(port.statistics->snapshot().desiredRevision == 0);
+}
+
+TEST_CASE("HISTORY early obsolete onBatch requests replay before any Invocation or BEGIN exists") {
+    auto [schema, fields] = history_test::orderInput();
+    api::ApiRuntime runtime(runtimeOptions());
+    root::connect_tests::PeerScript script;
+    script.family = root::core::SubscriptionFamily::HISTORY;
+    script.historyBound = 0;
+    script.canonicalSymbols = true;
+    const std::array source{root::connect_tests::Record{u"IBM", std::move(fields), 12}};
+    const std::array<std::u16string, 1> symbols{u"IBM"};
+    root::connect_tests::Peer peer(schema, source, symbols, 8192, root::connect_tests::PeerMode::HOLD, script);
+    auto endpoint = runtime.createEndpoint(endpointOptions(api::DeliveryContract::HISTORY));
+    auto sub = endpoint->getFeed()->createSubscription<events::Order>();
+    std::atomic<unsigned> calls{0};
+    sub->addEventListener([&](std::span<const events::Order> batch) {
+        REQUIRE(batch.size() == 1);
+        CHECK(batch[0].symbol == u"IBM");
+        ++calls;
+    });
+    sub->addSymbols("IBM");
+    allocation_probe::WorkerPause gate{runtime};
+    gate.ready = [&] {
+        return sub->getStatistics().pendingEvents == 1;
+    };
+    allocation_probe::pause.store(&gate, std::memory_order_release);
+    endpoint->connect("127.0.0.1:" + std::to_string(peer.port()));
+    REQUIRE(eventually([&] {
+        return gate.entered.load(std::memory_order_acquire);
+    }));
+    CHECK(sub->getStatistics().pendingEvents == 1);
+    CHECK(sub->getStatistics().inFlightEvents == 0);
+    CHECK(calls.load() == 0);
+    sub->setSymbols({"MSFT"});
+    sub->setSymbols({"IBM"});
+    const auto accepted = sub->getSnapshot();
+    gate.release.store(true, std::memory_order_release);
+    REQUIRE(eventually([&] {
+        const auto cut = sub->getHistorySnapshot();
+
+        return calls.load() == 1 && cut.state == api::HistoryObservationState::CURRENT &&
+               cut.mappingLogicalRevision == accepted.revision && cut.ranges.size() == 1 &&
+               cut.ranges[0].status.completeDeliveredRange;
+    }));
+    const auto counters = sub->getStatistics();
+    CHECK(counters.discardedEvents.value == 1);
+    CHECK(counters.deliveredEvents.value == 1);
+    CHECK(counters.admittedEvents.value == 2);
+    CHECK(counters.pendingEvents == 0);
+    CHECK(counters.inFlightEvents == 0);
+    CHECK_FALSE(peer.failed());
 }

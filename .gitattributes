@@ -802,3 +802,9 @@ tools/upstream/callback-execution-oracle/*.java text eol=lf
 tools/upstream/callback-execution-oracle/*.ps1 text eol=lf
 tests/fixtures/callback-execution/*.tsv -text -whitespace
 tests/fixtures/callback-execution/*.json text eol=lf
+
+# Preserve exact live HISTORY range observations and source bindings.
+tools/upstream/live-history-range-oracle/*.java text eol=lf
+tools/upstream/live-history-range-oracle/*.ps1 text eol=lf
+tests/fixtures/live-history-range/*.tsv -text -whitespace
+tests/fixtures/live-history-range/*.json text eol=lf

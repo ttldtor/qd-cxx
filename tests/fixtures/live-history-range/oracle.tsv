@@ -1,0 +1,57 @@
+property	initial	moving	9223372036854775807	0
+wire-demand	MAX-with-symbol	ADD	TimeAndSale	IBM	9223372036854775807
+demand-count	MAX-with-symbol	ADD	1
+demand-count	MAX-with-symbol	REMOVE	0
+property	first-range	moving	2000	1
+wire-demand	first-range	ADD	TimeAndSale	IBM	8589934592
+demand-count	first-range	ADD	1
+demand-count	first-range	REMOVE	0
+delivery	first-range	moving	2000	IBM	12884901888	3000	4	30.25
+delivery	first-range	moving	2000	IBM	8589934592	2000	8	20.25
+queued	queued-before-shrink	1
+property	queued-after-shrink	moving	3000	1
+wire-demand	queued-after-shrink	ADD	TimeAndSale	IBM	12884901888
+demand-count	queued-after-shrink	ADD	1
+demand-count	queued-after-shrink	REMOVE	0
+delivery	queued-after-shrink	moving	3000	IBM	12884901888	3000	12	30.25
+delivery	expand	moving	1000	IBM	12884901888	3000	4	30.25
+property	expand	moving	1000	1
+wire-demand	expand	ADD	TimeAndSale	IBM	4294967296
+demand-count	expand	ADD	1
+demand-count	expand	REMOVE	0
+delivery	expand	moving	1000	IBM	8589934592	2000	1	20.25
+delivery	expand	moving	1000	IBM	4294967296	1000	11	NaN
+delivery	expand	moving	1000	IBM	17179869184	4000	1	40.25
+delivery	expand	moving	1000	IBM	12884901888	3000	2	NaN
+property	disable	moving	9223372036854775807	1
+wire-demand	disable	ADD	TimeAndSale	IBM	9223372036854775807
+demand-count	disable	ADD	1
+demand-count	disable	REMOVE	0
+disabled-events	0
+property	rapid-latest	moving	3000	1
+wire-demand	rapid-latest	ADD	TimeAndSale	IBM	12884901888
+demand-count	rapid-latest	ADD	1
+demand-count	rapid-latest	REMOVE	0
+property	empty-property	moving	-1001	0
+demand-count	empty-property	ADD	0
+wire-demand	empty-property	REMOVE	TimeAndSale	IBM	0
+demand-count	empty-property	REMOVE	1
+wire-demand	overlap	ADD	TimeAndSale	IBM	0
+demand-count	overlap	ADD	1
+demand-count	overlap	REMOVE	0
+delivery	overlap	moving	2000	IBM	12884901888	3000	4	31.25
+delivery	overlap	moving	2000	IBM	8589934592	2000	8	21.25
+delivery	overlap	keeper	0	IBM	12884901888	3000	4	31.25
+delivery	overlap	keeper	0	IBM	8589934592	2000	0	21.25
+delivery	overlap	keeper	0	IBM	4294967296	1000	0	11.25
+delivery	overlap	keeper	0	IBM	0	0	10	NaN
+delivery	overlap-shrink	moving	3000	IBM	12884901888	3000	12	31.25
+demand-count	overlap-shrink	ADD	0
+demand-count	overlap-shrink	REMOVE	0
+demand-count	remove-moving	ADD	0
+demand-count	remove-moving	REMOVE	0
+demand-count	close-keeper	ADD	0
+wire-demand	close-keeper	REMOVE	TimeAndSale	IBM	0
+demand-count	close-keeper	REMOVE	1
+property	closed-property	moving	3000	0
+total-events	15

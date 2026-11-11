@@ -3620,3 +3620,137 @@ TEST_CASE("MUX STREAM reset preserves handles old detached values and exact clie
     CHECK(f.queue.resources().batchBytes < retainedCurrentBytes);
     CHECK(receiver->retained[0].records()[0].typedValues[2].raw == 30);
 }
+
+TEST_CASE("HISTORY observed replay preserves committed source phase through mapping work retry and reset") {
+    bool resetBetween = false;
+    SUBCASE("mapping metadata work retry") {
+        resetBetween = false;
+    }
+    SUBCASE("source reset during deferred mapping") {
+        resetBetween = true;
+    }
+    auto f = fixture(c::SubscriptionFamily::HISTORY);
+    auto statistics = std::make_shared<c::detail::DeliveryStatisticsState>();
+    statistics->submittedSelectors = 1;
+    statistics->submittedDesiredRevision = 1;
+    auto receiver = std::make_shared<Recorder>(statistics);
+    std::size_t retired = 0;
+    receiver->action = [&] {
+        const auto completed = receiver->values.size() - retired;
+        retired = receiver->values.size();
+        statistics->update([&](auto &s) {
+            s.inFlightEvents -= completed;
+            s.deliveredEvents.add(completed);
+        });
+    };
+    auto siblingReceiver = std::make_shared<Recorder>();
+    auto handle = open(f, receiver), sibling = open(f, siblingReceiver);
+    add(f, handle);
+    add(f, sibling);
+    send(f, {{0, u"ALPHA", 3, 30, 4}, {0, u"ALPHA", 2, 20, 0}, {0, u"ALPHA", 0, 0, 10}});
+    until(f, [&] {
+        return receiver->values.size() == 3 && siblingReceiver->values.size() == 3;
+    });
+    const c::SubscriptionKey key{f.schema.recordContext(0), u"ALPHA"};
+    auto sourceStatus = [&] {
+        auto work = turn();
+        auto range = f.queue.rangeStatus(sibling, key, work);
+        REQUIRE(range);
+        REQUIRE(range->source);
+
+        return *range->source;
+    };
+    const auto before = sourceStatus();
+    {
+        std::lock_guard lock(statistics->mutex);
+        statistics->submittedDesiredRevision = 2;
+        statistics->historyReplayRequired = true; // Controlled actual-delivery intent, independent of public counters.
+    }
+    const c::SubscriptionRequest request{key, 0};
+    auto submit = submitTurn();
+    auto ticket = handle.replace({&request, 1}, submit);
+    REQUIRE(ticket);
+    applyBeforeSourceSync(f, *ticket);
+    CHECK(statistics->snapshot().activeDesiredRevision != 2);
+    std::uint64_t replaySerial = before.observationSerial;
+
+    for (unsigned attempt = 0; attempt < 32 && replaySerial == before.observationSerial; ++attempt) {
+        auto work = turn();
+        work.history.operations = 1;
+        work.callbacks = 0;
+        work.fields = 0;
+        const auto result = f.queue.progress(work);
+        REQUIRE((result || result.error().error == m::QueueError::WORK_LIMIT));
+        replaySerial = sourceStatus().observationSerial;
+    }
+
+    CHECK(replaySerial == before.observationSerial + 1);
+    CHECK(statistics->snapshot().activeDesiredRevision != 2);
+    {
+        std::lock_guard lock(statistics->mutex);
+        CHECK(statistics->historyReplayRequired);
+    }
+    CHECK(receiver->values.size() == 3);
+    CHECK(siblingReceiver->values.size() == 3);
+
+    if (!resetBetween) {
+        for (unsigned attempt = 0; attempt < 32 && statistics->snapshot().activeDesiredRevision != 2; ++attempt) {
+            auto work = turn();
+            work.history.operations = 2;
+            work.callbacks = 0;
+            work.fields = 0;
+            const auto result = f.queue.progress(work);
+            REQUIRE((result || result.error().error == m::QueueError::WORK_LIMIT));
+        }
+
+        REQUIRE(statistics->snapshot().activeDesiredRevision == 2);
+        CHECK(sourceStatus().observationSerial == replaySerial); // A committed replay was not restarted on retry.
+        CHECK(sourceStatus().epoch.matches(before.epoch));
+        {
+            std::lock_guard lock(statistics->mutex);
+            CHECK_FALSE(statistics->historyReplayRequired);
+        }
+        until(f, [&] {
+            return receiver->values.size() == 6;
+        });
+        CHECK(siblingReceiver->values.size() == 3);
+    } else {
+        auto work = turn();
+        REQUIRE(f.queue.resetSource(work));
+        until(f, [&] {
+            return f.queue.resetStatus().phase == m::ResetPhase::NONE;
+        });
+        {
+            std::lock_guard lock(statistics->mutex);
+            CHECK(statistics->historyReplayRequired);
+        }
+        const auto notice = handle.resetNotice(), siblingNotice = sibling.resetNotice();
+        REQUIRE(notice);
+        REQUIRE(siblingNotice);
+        REQUIRE(handle.acknowledgeReset(notice->sequence) == m::ControlAdmission::RECORDED);
+        REQUIRE(sibling.acknowledgeReset(siblingNotice->sequence) == m::ControlAdmission::RECORDED);
+        until(f, [&] {
+            return handle.state() == m::QueueClientState::ACTIVE && sibling.state() == m::QueueClientState::ACTIVE;
+        });
+        CHECK(receiver->values.size() == 3);
+        {
+            std::lock_guard lock(statistics->mutex);
+            CHECK_FALSE(statistics->historyReplayRequired);
+        }
+        f.live = session(f.schema);
+        send(f, {{0, u"ALPHA", 3, 31, 4}, {0, u"ALPHA", 0, 0, 10}});
+        until(f, [&] {
+            return receiver->values.size() == 5 && siblingReceiver->values.size() == 5;
+        });
+        CHECK_FALSE(sourceStatus().epoch.matches(before.epoch));
+    }
+
+    const auto counts = statistics->snapshot();
+    CHECK(counts.pendingEvents == 0);
+    CHECK(counts.inFlightEvents == 0);
+    CHECK(counts.admittedEvents.value == counts.deliveredEvents.value + counts.discardedEvents.value);
+    f.queue.requestStop(m::StopMode::ABORT);
+    until(f, [&] {
+        return f.queue.terminal().has_value();
+    });
+}

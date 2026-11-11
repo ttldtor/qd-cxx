@@ -48,6 +48,11 @@ registration and selected callback captures have actually retired.
 
 ## Bounds, range units and reset
 
+Changing only the lower bound of an existing physical HISTORY key is an ADD upsert. It does not
+remove that key first. A removed key emits REMOVE; overlapping logical views keep the aggregate
+minimum bound. Signed MAX remains an actual disabled-sentinel demand bound, rather than being
+silently omitted. These transitions follow the pinned QD time-series subscription path.
+
 `HistoryReceivingOptions` independently bounds shared points, retained frames/bytes, collector
 resident backing, per-view pending updates and the two observation publication banks. Defaults are
 4096 points, 256 frames, 64MiB shared frame backing, 128MiB resident collector backing, 128 pending

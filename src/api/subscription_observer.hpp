@@ -39,6 +39,14 @@ void initializeSubscriptionObservers(const std::shared_ptr<SubscriptionPort> &po
  */
 void prepareSubscriptionChangeLocked(SubscriptionPort &port, const std::vector<SubscriptionSelector> &symbols,
                                      std::uint64_t revision);
+/** Prepare one range-qualified candidate before any accepted desired state changes.
+ * @param port Owner protected by change-domain then subscription mutex.
+ * @param symbols Complete effective candidate, copied before publication.
+ * @param revision Checked next accepted identity.
+ * @param fromTime Candidate range property, absent in ordinary mode.
+ */
+void prepareSubscriptionRangeChangeLocked(SubscriptionPort &port, const std::vector<SubscriptionSelector> &symbols,
+                                          std::uint64_t revision, std::optional<std::int64_t> fromTime);
 /** Drain admitted local changes without native/network progress or waiting on another callback owner.
  * @param domain Detached shared owner; reentry/concurrent calls leave delivery to its existing claimant.
  */

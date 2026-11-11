@@ -3,6 +3,7 @@
 #include "qd/api/feed.hpp"
 #include "../core/delivery_statistics.hpp"
 #include "qd/api/feed_filter.hpp"
+#include "qd/api/time_series_subscription.hpp"
 
 #include "../transport/tcp_recovery_factory.hpp"
 #include "endpoint_configuration.hpp"
@@ -10,6 +11,7 @@
 #include "feed_internal.hpp"
 #include "history_observation.hpp"
 #include "receiving_profile.hpp"
+#include "subscription_desired.hpp"
 #include "subscription_observer.hpp"
 #include "system_dns.hpp"
 
@@ -914,8 +916,14 @@ void validateSelector(const detail::SubscriptionPort &port, const SubscriptionSe
                       SymbolMutation mutation) {
     const auto endpoint = port.endpoint.lock();
 
-    if (selector.kind() == SubscriptionSymbolKind::TIME_SERIES) {
+    if (selector.kind() == SubscriptionSymbolKind::TIME_SERIES &&
+        (port.timeSeries || !endpoint || endpoint->options.contract != DeliveryContract::HISTORY ||
+         !std::ranges::all_of(port.eventTypes, isTimeSeriesEventType))) {
         reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-time-series");
+    }
+
+    if (port.timeSeries && selector.kind() != SubscriptionSymbolKind::PLAIN) {
+        reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-time-series-nested-symbol");
     }
 
     if (selector.kind() == SubscriptionSymbolKind::ALL && !endpoint) {
@@ -988,6 +996,10 @@ void mutateDesired(const std::shared_ptr<detail::SubscriptionPort> &port, std::s
             }
 
             for (auto &symbol : parsed) {
+                if (port->timeSeries) {
+                    symbol = SubscriptionSelector::timeSeries(std::u16string(symbol.eventSymbol()), *port->fromTime);
+                }
+
                 const auto found = std::ranges::find(candidate, symbol);
 
                 if (mutation == SymbolMutation::REMOVE) {
@@ -1005,26 +1017,7 @@ void mutateDesired(const std::shared_ptr<detail::SubscriptionPort> &port, std::s
                 }
             }
 
-            const bool unchanged =
-                candidate.size() == port->symbols.size() && std::ranges::all_of(candidate, [&](const auto &symbol) {
-                    const auto previous = std::ranges::find(port->symbols, symbol);
-
-                    return previous != port->symbols.end() && symbol.sameDemand(*previous);
-                });
-
-            if (!unchanged) {
-                if (port->revision == std::numeric_limits<std::uint64_t>::max()) {
-                    reject(ErrorCode::RESOURCE_LIMIT, "subscription-revision");
-                }
-
-                detail::prepareSubscriptionChangeLocked(*port, candidate, port->revision + 1);
-                port->symbols.swap(candidate);
-                ++port->revision;
-                port->statistics->update([&](auto &s) {
-                    s.desiredSelectors = port->symbols.size();
-                    s.desiredRevision = port->revision;
-                });
-            }
+            detail::commitSubscriptionDesiredLocked(*port, std::move(candidate), port->fromTime);
         }
 
         wake(port->control);
@@ -1145,6 +1138,28 @@ template <class Event> SubscriptionSnapshot Subscription<Event>::getSnapshot() c
         std::lock_guard lock(port_->mutex);
 
         return detail::subscriptionSnapshotLocked(*port_);
+    });
+}
+
+template <class Event> std::int64_t Subscription<Event>::getFromTime() const {
+    std::lock_guard lock(port_->mutex);
+
+    if (!port_->timeSeries)
+        reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-time-series-mode");
+
+    return *port_->fromTime;
+}
+
+template <class Event> void Subscription<Event>::setFromTime(std::int64_t fromTime) {
+    producerAction([&] {
+        {
+            detail::SubscriptionObserverAdmission admission(port_->changes);
+            std::lock_guard lock(port_->mutex);
+            requireOpen(*port_);
+            detail::replaceSubscriptionFromTimeLocked(*port_, fromTime);
+        }
+        wake(port_->control);
+        detail::dispatchSubscriptionChanges(port_->changes);
     });
 }
 
@@ -1376,8 +1391,22 @@ std::shared_ptr<Subscription<RegisteredEvent>> Feed::createSubscription(std::ini
     return createSubscription(std::span(types.begin(), types.size()));
 }
 
+std::shared_ptr<Subscription<RegisteredEvent>> Feed::createTimeSeriesSubscription(std::span<const EventType> types) {
+    return producerAction([&] {
+        auto subscription = std::shared_ptr<Subscription<RegisteredEvent>>(new Subscription<RegisteredEvent>({}));
+        subscription->port_ = createSubscriptionPort(types, true, true);
+
+        return subscription;
+    });
+}
+
+std::shared_ptr<Subscription<RegisteredEvent>>
+Feed::createTimeSeriesSubscription(std::initializer_list<EventType> types) {
+    return createTimeSeriesSubscription(std::span(types.begin(), types.size()));
+}
+
 std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span<const EventType> types,
-                                                                       bool registeredDelivery) {
+                                                                       bool registeredDelivery, bool timeSeries) {
     return producerAction([&] {
         if (types.size() > port_->limits.maximumEventTypeArgumentsPerSubscription) {
             reject(ErrorCode::RESOURCE_LIMIT, "subscription-event-type-arguments");
@@ -1470,6 +1499,11 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
         subscription->eventTypes.erase(uniqueTypes.begin(), uniqueTypes.end());
         subscription->eventSelection = selection;
         subscription->eventDelivery = delivery;
+        subscription->timeSeries = timeSeries;
+
+        if (timeSeries)
+            subscription->fromTime = TIME_SERIES_FROM_TIME_DISABLED;
+
         subscription->maximumSymbols = port_->limits.maximumSymbolsPerSubscription;
         subscription->maximumSymbolUnits = port_->limits.maximumSymbolUnits;
         subscription->listenerLedger = std::make_shared<detail::ListenerLedger>();
@@ -1485,6 +1519,11 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             if (port_->closeRequested.load(std::memory_order_acquire) ||
                 port_->retired.load(std::memory_order_acquire)) {
                 reject(ErrorCode::CLOSED, "endpoint-closed");
+            }
+
+            if (timeSeries && (port_->options.contract != DeliveryContract::HISTORY ||
+                               !std::ranges::all_of(subscription->eventTypes, isTimeSeriesEventType))) {
+                reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-time-series-event-type");
             }
 
             // Business capability is explicit; an indexed layout alone does not make a TimeSeriesEvent.
@@ -2133,6 +2172,38 @@ class TypedConsumer final : public client::SubscriptionConsumer {
         return mux::BatchAction::CONTINUE;
     }
 
+    /** One HISTORY invocation claim, distinct from task execution and close admission. */
+    enum class HistoryBegin { CURRENT, OBSOLETE, CLOSED };
+
+    /** @param port Detached owner; its private delivery intent shares the command-publication mutex. */
+    static void requireHistoryReplay(SubscriptionPort &port) noexcept {
+        std::lock_guard lock(port.statistics->mutex);
+        port.statistics->historyReplayRequired = true;
+    }
+
+    /** Claim one complete HISTORY invocation against accepted state, outside every pool lock.
+     * @param port Detached subscription; the mutex defines BEGIN before any user instruction.
+     * @param revision Immutable actually applied selection, absent for unchanged TICKER/STREAM semantics.
+     * @return CURRENT permits invocation; OBSOLETE requests replay; CLOSED preserves the close fence.
+     */
+    static HistoryBegin claimHistoryBegin(SubscriptionPort &port, std::optional<std::uint64_t> revision) {
+        if (!revision)
+            return HistoryBegin::CURRENT;
+
+        std::lock_guard lock(port.mutex);
+
+        if (port.closeRequested.load(std::memory_order_acquire))
+            return HistoryBegin::CLOSED;
+
+        if (port.revision != *revision) {
+            requireHistoryReplay(port);
+
+            return HistoryBegin::OBSOLETE;
+        }
+
+        return HistoryBegin::CURRENT;
+    }
+
     template <class Event> struct Invocation final : CallbackInvocation {
         std::shared_ptr<SubscriptionPort> port;
         std::shared_ptr<const ListenerSnapshot> listeners;
@@ -2141,12 +2212,15 @@ class TypedConsumer final : public client::SubscriptionConsumer {
         client::ReceiverProjectionWork projectionWork;
         std::vector<Event> events;
         DispatchCompletion completion;
+        const std::optional<std::uint64_t> historyRevision;
+        bool obsolete = false;
 
         Invocation(std::shared_ptr<SubscriptionPort> port, std::shared_ptr<const ListenerSnapshot> listeners,
                    std::shared_ptr<CallbackExecutor> executor, const client::SubscriptionBatch &batch,
-                   client::ReceiverProjectionWork work)
+                   client::ReceiverProjectionWork work, std::optional<std::uint64_t> historyRevision)
             : port(std::move(port)), listeners(std::move(listeners)), executor(std::move(executor)), batch(&batch),
-              projectionWork(work), completion{this->port->statistics, batch.records().size()} {
+              projectionWork(work), completion{this->port->statistics, batch.records().size()},
+              historyRevision(historyRevision) {
         }
 
         void prepare() override {
@@ -2159,10 +2233,21 @@ class TypedConsumer final : public client::SubscriptionConsumer {
         }
 
         void execute() noexcept override {
-            static_cast<void>(invoke<Event>(port, events, listeners, completion, true));
+            const auto begin = claimHistoryBegin(*port, historyRevision);
+            obsolete = begin == HistoryBegin::OBSOLETE;
+
+            if (begin == HistoryBegin::CURRENT)
+                static_cast<void>(invoke<Event>(port, events, listeners, completion, true));
         }
 
         void finish(Diagnostic diagnostic) noexcept override {
+            if (obsolete && diagnostic.code == ErrorCode::NONE)
+                diagnostic = {ErrorCode::CALLBACK_CANCELLED, "callback-history-revision"};
+
+            if (historyRevision && diagnostic.code == ErrorCode::CALLBACK_CANCELLED &&
+                diagnostic.stage == "callback-history-revision")
+                requireHistoryReplay(*port);
+
             if (diagnostic.code != ErrorCode::NONE) {
                 {
                     std::lock_guard lock(port->mutex);
@@ -2188,10 +2273,11 @@ class TypedConsumer final : public client::SubscriptionConsumer {
 
     template <class Event>
     mux::BatchAction deliver(const client::SubscriptionBatch &batch, std::shared_ptr<const ListenerSnapshot> &listeners,
-                             std::shared_ptr<CallbackExecutor> &executor, DispatchCompletion &completion) {
+                             std::shared_ptr<CallbackExecutor> &executor, DispatchCompletion &completion,
+                             std::optional<std::uint64_t> historyRevision) {
         if (executor) {
             auto packet = std::make_unique<Invocation<Event>>(port_, std::move(listeners), std::move(executor), batch,
-                                                              projectionWork_);
+                                                              projectionWork_, historyRevision);
             completion.active = false; // The packet now owns the exact selected statistics completion.
             port_->callbackPool->submit(port_->callbackSlot, std::move(packet));
 
@@ -2199,6 +2285,9 @@ class TypedConsumer final : public client::SubscriptionConsumer {
         }
 
         auto values = project<Event>(batch, projectionWork_);
+
+        if (claimHistoryBegin(*port_, historyRevision) != HistoryBegin::CURRENT)
+            return mux::BatchAction::CONTINUE;
 
         return invoke<Event>(port_, values, listeners, completion);
     }
@@ -2231,6 +2320,7 @@ class TypedConsumer final : public client::SubscriptionConsumer {
         }
 
         std::shared_ptr<const ListenerSnapshot> listeners;
+        std::optional<std::uint64_t> historyRevision;
         std::shared_ptr<CallbackExecutor> executor;
         bool customPrepared = false;
         Diagnostic preparationDiagnostic;
@@ -2251,6 +2341,19 @@ class TypedConsumer final : public client::SubscriptionConsumer {
             }
 
             std::lock_guard lock(port_->mutex);
+
+            if (endpoint->options.contract == DeliveryContract::HISTORY &&
+                batch.appliedDesiredRevision() != port_->revision) {
+                if (!port_->closeRequested.load(std::memory_order_acquire) && port_->listeners &&
+                    !port_->listeners->empty() && !batch.records().empty())
+                    requireHistoryReplay(*port_);
+
+                return mux::BatchAction::CONTINUE;
+            }
+
+            if (endpoint->options.contract == DeliveryContract::HISTORY)
+                historyRevision = batch.appliedDesiredRevision();
+
             listeners = port_->listeners;
             executor = port_->eventExecutor ? port_->eventExecutor : endpoint->eventExecutor;
             const auto customRevision =
@@ -2266,6 +2369,7 @@ class TypedConsumer final : public client::SubscriptionConsumer {
                     port_->callbackSynchronousExecuting = false;
                     completion.synchronousPort.reset();
                     customPrepared = true;
+                    port_->callbackHistoryRevision = historyRevision;
                 } catch (const Error &error) {
                     preparationDiagnostic = error.diagnostic();
                 }
@@ -2289,27 +2393,27 @@ class TypedConsumer final : public client::SubscriptionConsumer {
         try {
             switch (port_->eventDelivery) {
             case EventDelivery::QUOTE:
-                return deliver<events::Quote>(batch, listeners, executor, completion);
+                return deliver<events::Quote>(batch, listeners, executor, completion, historyRevision);
             case EventDelivery::PROFILE:
-                return deliver<events::Profile>(batch, listeners, executor, completion);
+                return deliver<events::Profile>(batch, listeners, executor, completion, historyRevision);
             case EventDelivery::TRADE:
-                return deliver<events::Trade>(batch, listeners, executor, completion);
+                return deliver<events::Trade>(batch, listeners, executor, completion, historyRevision);
             case EventDelivery::TRADE_ETH:
-                return deliver<events::TradeETH>(batch, listeners, executor, completion);
+                return deliver<events::TradeETH>(batch, listeners, executor, completion, historyRevision);
             case EventDelivery::MESSAGE:
-                return deliver<events::Message>(batch, listeners, executor, completion);
+                return deliver<events::Message>(batch, listeners, executor, completion, historyRevision);
             case EventDelivery::CONFIGURATION:
-                return deliver<events::Configuration>(batch, listeners, executor, completion);
+                return deliver<events::Configuration>(batch, listeners, executor, completion, historyRevision);
             case EventDelivery::SUMMARY:
-                return deliver<events::Summary>(batch, listeners, executor, completion);
+                return deliver<events::Summary>(batch, listeners, executor, completion, historyRevision);
             case EventDelivery::ORDER:
-                return deliver<events::Order>(batch, listeners, executor, completion);
+                return deliver<events::Order>(batch, listeners, executor, completion, historyRevision);
             case EventDelivery::TEXT_MESSAGE:
-                return deliver<events::TextMessage>(batch, listeners, executor, completion);
+                return deliver<events::TextMessage>(batch, listeners, executor, completion, historyRevision);
             case EventDelivery::TEXT_CONFIGURATION:
-                return deliver<events::TextConfiguration>(batch, listeners, executor, completion);
+                return deliver<events::TextConfiguration>(batch, listeners, executor, completion, historyRevision);
             case EventDelivery::REGISTERED:
-                return deliver<RegisteredEvent>(batch, listeners, executor, completion);
+                return deliver<RegisteredEvent>(batch, listeners, executor, completion, historyRevision);
             default:
                 throw Error({ErrorCode::UNSUPPORTED_PROFILE, "subscription-event-type"});
             }
@@ -2489,6 +2593,10 @@ std::unique_ptr<NativeSubscription> registerSubscription(NativeEndpoint &endpoin
  * @param work Remaining desired submission coordinates for this whole bounded endpoint turn.
  */
 void applyDesired(NativeEndpoint &endpoint, NativeSubscription &subscription, mux::QueueSubmitWork &work) {
+    if (endpoint.profile.family == core::SubscriptionFamily::HISTORY &&
+        !historyCallbackRetirement(*subscription.port).quiescent)
+        return;
+
     if (subscription.ticket.id()) {
         const auto completed = subscription.ticket.result();
 
@@ -2542,7 +2650,8 @@ void applyDesired(NativeEndpoint &endpoint, NativeSubscription &subscription, mu
                                {},
                                symbol.kind() == SubscriptionSymbolKind::ALL ? core::SubscriptionSelectorKind::ALL
                                                                             : core::SubscriptionSelectorKind::EXACT,
-                               symbol.sourceId()});
+                               symbol.sourceId(),
+                               symbol.fromTime()});
         }
     }
 
@@ -2563,12 +2672,8 @@ void applyDesired(NativeEndpoint &endpoint, NativeSubscription &subscription, mu
         for (const auto &symbol : symbols) {
             if (receivingSymbolMatches(endpoint.profile, index, symbol)) {
                 const auto &physical = endpoint.profile.bindingExchanges[index] ? symbol.physical : symbol.logical;
-                // General indexed subscriptions request the full raw index domain from zero. Time-series
-                // millisecond ranges require their own verified mapper and are not inferred here.
-                requests.push_back({{context, physical, symbol.selector},
-                                    endpoint.profile.family == core::SubscriptionFamily::HISTORY
-                                        ? std::optional<std::int64_t>{0}
-                                        : std::nullopt});
+                appendReceivingDesiredRequest(requests, context, physical, symbol.selector, endpoint.profile.family,
+                                              symbol.fromTime, endpoint.profile.bindingTimeEncodings[index]);
             }
         }
     }
@@ -2612,16 +2717,22 @@ void progressSubscriptions(NativeEndpoint &endpoint, mux::QueueSubmitWork &submi
         publishRequestedSubscriptionFailure(port);
         std::shared_ptr<CallbackSlotPool> callbackPool;
         std::size_t callbackSlot;
+        bool obsoleteHistory = false;
         {
             std::lock_guard lock(port->mutex);
             callbackPool = port->callbackPool;
             callbackSlot = port->callbackSlot;
+            obsoleteHistory = endpoint.profile.family == core::SubscriptionFamily::HISTORY &&
+                              port->callbackHistoryRevision && *port->callbackHistoryRevision != port->revision;
         }
 
         if (callbackPool) {
             if (port->closeRequested.load(std::memory_order_acquire) ||
                 endpoint.port->closeRequested.load(std::memory_order_acquire))
                 callbackPool->cancel(callbackSlot, {ErrorCode::CALLBACK_CANCELLED, "callback-close"});
+            else if (obsoleteHistory)
+                // This worker is the sole packet publisher for the fixed slot: no newer packet can intervene.
+                callbackPool->cancel(callbackSlot, {ErrorCode::CALLBACK_CANCELLED, "callback-history-revision"});
 
             if (native && callbackPool->snapshot(callbackSlot).quiescent)
                 static_cast<void>(native->handle.requestResume());

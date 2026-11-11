@@ -371,3 +371,5 @@ class/resource inventories.
   реальные HISTORY parser/delegate values, numeric/FOB/flags/removal границы; EN/RU справка без входов.
 
 - [Oracle исполнения callback](../upstream/callback-execution-oracle/README.ru.md): actual Java inheritance/override, inline и serial delivery на двух workers; конечные Capture/Verify и EN/RU help без входных путей.
+
+- [Oracle живого диапазона HISTORY](../upstream/live-history-range-oracle/README.ru.md): настоящие публичные Java-мутации диапазона, demand и удержанные callbacks, конечные Capture/Verify и EN/RU справка без входных путей.

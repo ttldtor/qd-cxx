@@ -15,6 +15,7 @@ struct DeliveryStatisticsState {
     std::size_t submittedSelectors = 0; ///< One facade command's logical selector count until actual application.
 
     std::uint64_t submittedDesiredRevision = 0; ///< Logical revision belonging to the queued facade command.
+    bool historyReplayRequired = false; ///< Private delivery intent after obsolete HISTORY loss; not a statistic.
 
     /** Apply one complete accounting transition without allocation or user code.
      * @param operation Library-only bounded mutation, required not to throw.

@@ -189,6 +189,7 @@ struct SubscriptionPort {
     std::shared_ptr<CallbackExecutor> eventExecutor;   ///< Null inherits endpoint policy; released outside locks.
     std::shared_ptr<CallbackSlotPool> callbackPool;    ///< Pure stable fixed identities, never native state.
     std::size_t callbackSlot = CallbackSlotPool::NO_SLOT;
+    std::optional<std::uint64_t> callbackHistoryRevision; ///< Last custom selection's actual applied mapping cut.
     Diagnostic callbackDispatchDiagnostic;
     std::uint64_t callbackSynchronousRetirementRevision = 0; ///< Existing worker-path actual completed selections.
     bool callbackSynchronousExecuting = false; ///< Protected by this port mutex; never inferred from post acceptance.
@@ -198,12 +199,14 @@ struct SubscriptionPort {
         changes;                               ///< Detached local observer dispatch, independent of network state.
     SubscriptionObservers observers;           ///< Finite accepted-symbol notifications and capture reservations.
     std::vector<SubscriptionSelector> symbols; ///< Complete accepted typed logical desired set.
-    std::size_t maximumSymbols;                ///< Original per-registration selector count.
-    std::size_t maximumSymbolUnits;            ///< Original per-selector capacity.
-    std::uint64_t revision = 0;                ///< Accepted local desired revision, separate from queue tickets.
-    std::uint64_t nextListener = 1;            ///< Non-reused listener identity, zero never issued.
-    std::vector<EventType> eventTypes;         ///< Immutable normalized actual validated subscription arguments.
-    EventSelection eventSelection; ///< Immutable normalized set, independent of explicit local record routes.
+    std::optional<std::int64_t> fromTime;      ///< Present only in SDK-owned time-series mode, protected by mutex.
+    bool timeSeries = false;        ///< Immutable mode; never inferred from a caller descriptor or raw record layout.
+    std::size_t maximumSymbols;     ///< Original per-registration selector count.
+    std::size_t maximumSymbolUnits; ///< Original per-selector capacity.
+    std::uint64_t revision = 0;     ///< Accepted local desired revision, separate from queue tickets.
+    std::uint64_t nextListener = 1; ///< Non-reused listener identity, zero never issued.
+    std::vector<EventType> eventTypes; ///< Immutable normalized actual validated subscription arguments.
+    EventSelection eventSelection;     ///< Immutable normalized set, independent of explicit local record routes.
     EventDelivery
         eventDelivery; ///< Exact listener value shape, assigned together with the selection before publication.
     std::atomic<bool> closeRequested{false}; ///< Reserved monotonic control, independent of ordinary capacity.

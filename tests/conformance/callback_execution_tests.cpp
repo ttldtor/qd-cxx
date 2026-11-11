@@ -7,6 +7,7 @@
 #include "connect_peer.hpp"
 #include "feed_internal.hpp"
 #include "history_observation.hpp"
+#include "history_order_input.hpp"
 #include "qd/api/statistics.hpp"
 #include "subscription_observer.hpp"
 #include <atomic>
@@ -168,6 +169,7 @@ std::vector<qd::core::FieldValue> quoteFields(const qd::core::LocalSchema &schem
 
     return result;
 }
+
 } // namespace
 
 TEST_CASE("callback tasks run once, cancel without host progress and reject old generations") {
@@ -1273,4 +1275,407 @@ TEST_CASE("async event failure preserves SDK worker publication of subscription 
     CHECK(sub->getStatistics().callbackFailedEvents.value == 1);
     CHECK(sub->getStatistics().inFlightEvents == 0);
     runtime.closeAndAwaitTermination();
+}
+
+TEST_CASE("HISTORY revision cancels held work before mapping wait and replays coalesced current demand") {
+    bool removeReadd = false;
+    SUBCASE("A to B to A") {
+        removeReadd = false;
+    }
+    SUBCASE("remove and add the same symbol") {
+        removeReadd = true;
+    }
+    auto [schema, fields] = history_test::orderInput();
+    auto limits = runtimeOptions();
+    limits.maximumSubscriptionsPerEndpoint = 1;
+    limits.maximumCustomCallbackSubscriptions = 1;
+    api::ApiRuntime runtime(limits);
+    qd::connect_tests::PeerScript script;
+    script.family = qd::core::SubscriptionFamily::HISTORY;
+    script.historyBound = 0;
+    script.canonicalSymbols = true;
+    const std::array source{qd::connect_tests::Record{u"IBM", std::move(fields), 12}};
+    const std::array<std::u16string, 1> symbols{u"IBM"};
+    qd::connect_tests::Peer peer(schema, source, symbols, 8192, qd::connect_tests::PeerMode::HOLD, script);
+    auto settings = endpointOptions();
+    settings.contract = api::DeliveryContract::HISTORY;
+    auto endpoint = runtime.createEndpoint(settings);
+    auto sub = endpoint->getFeed()->createSubscription<qd::events::Order>();
+    std::mutex mutex;
+    std::condition_variable condition;
+    std::vector<api::CallbackTask> tasks;
+    bool releasePost = false;
+    unsigned posts = 0;
+    std::atomic<unsigned> oldCalls{0}, newCalls{0};
+    auto policy = std::make_shared<Policy>();
+    policy->action = [&](api::CallbackTask task) {
+        std::unique_lock lock(mutex);
+        tasks.push_back(std::move(task));
+        ++posts;
+        condition.notify_all();
+
+        if (posts == 1)
+            CHECK(condition.wait_for(lock, 5s, [&] {
+                return releasePost;
+            }));
+
+        return api::CallbackPostResult::ACCEPTED;
+    };
+    sub->setEventExecutor(policy);
+    auto capture = std::make_shared<int>(7);
+    std::weak_ptr<int> weak = capture;
+    auto oldListener = sub->addEventListener([&, capture](auto) {
+        ++oldCalls;
+    });
+    capture.reset();
+    RuntimeJoin join{runtime};
+
+    struct Release {
+        std::mutex &mutex;
+        std::condition_variable &condition;
+        bool &release;
+
+        ~Release() {
+            {
+                std::lock_guard lock(mutex);
+                release = true;
+            }
+            condition.notify_all();
+        }
+    } release{mutex, condition, releasePost};
+
+    sub->addSymbols("IBM");
+    endpoint->connect("127.0.0.1:" + std::to_string(peer.port()));
+    std::optional<api::CallbackTask> old;
+    {
+        std::unique_lock lock(mutex);
+        REQUIRE(condition.wait_for(lock, 5s, [&] {
+            return tasks.size() == 1;
+        }));
+        old.emplace(std::move(tasks.front()));
+        tasks.clear();
+    }
+    const auto before = sub->getSnapshot();
+    REQUIRE(sub->getStatistics().inFlightEvents == 1);
+    sub->removeEventListener(oldListener);
+    sub->addEventListener([&](std::span<const qd::events::Order> batch) {
+        REQUIRE(batch.size() == 1);
+        CHECK(batch[0].symbol == u"IBM");
+        ++newCalls;
+    });
+
+    if (removeReadd)
+        sub->removeSymbols("IBM");
+    else
+        sub->setSymbols({"MSFT"});
+
+    sub->addSymbols("IBM");
+
+    if (!removeReadd)
+        sub->removeSymbols("MSFT");
+
+    const auto accepted = sub->getSnapshot();
+    CHECK(accepted.revision > before.revision);
+    REQUIRE(accepted.symbols.size() == 1);
+    CHECK(accepted.symbols[0].eventSymbol() == u"IBM");
+    {
+        std::lock_guard lock(mutex);
+        releasePost = true;
+    }
+    condition.notify_all();
+    REQUIRE(eventually([&] {
+        return weak.expired() && sub->getStatistics().discardedEvents.value == 1;
+    }));
+    CHECK(old->run() == api::CallbackTaskRunResult::CANCELLED);
+    CHECK(oldCalls.load() == 0);
+    CHECK(sub->getStatistics().discardedEvents.value == 1);
+    const bool reposted = eventually([&] {
+        std::lock_guard lock(mutex);
+
+        return !tasks.empty();
+    });
+
+    if (!reposted) {
+        const auto cut = sub->getHistorySnapshot();
+        const auto counters = sub->getStatistics();
+        std::cout << "HISTORY_REVISION_NO_REPOST state=" << static_cast<int>(cut.state)
+                  << " accepted=" << cut.acceptedLogicalRevision
+                  << " mapping=" << cut.mappingLogicalRevision.value_or(0) << " ranges=" << cut.ranges.size()
+                  << " admitted=" << counters.admittedEvents.value << " discarded=" << counters.discardedEvents.value
+                  << " delivered=" << counters.deliveredEvents.value << " inflight=" << counters.inFlightEvents;
+
+        if (!cut.ranges.empty())
+            std::cout << " complete=" << cut.ranges[0].status.completeDeliveredRange;
+
+        std::cout << '\n';
+    }
+
+    REQUIRE(reposted);
+    std::optional<api::CallbackTask> current;
+    {
+        std::lock_guard lock(mutex);
+        current.emplace(std::move(tasks.front()));
+        tasks.clear();
+    }
+    CHECK(current->run() == api::CallbackTaskRunResult::COMPLETED);
+    REQUIRE(eventually([&] {
+        const auto cut = sub->getHistorySnapshot();
+
+        return cut.state == api::HistoryObservationState::CURRENT && cut.ranges.size() == 1 &&
+               cut.mappingLogicalRevision == accepted.revision && cut.ranges[0].status.completeDeliveredRange;
+    }));
+    CHECK(newCalls.load() == 1);
+    const auto counters = sub->getStatistics();
+    CHECK(counters.inFlightEvents == 0);
+    CHECK(counters.pendingEvents == 0);
+    CHECK(counters.deliveredEvents.value == 1);
+    CHECK(counters.admittedEvents.value == counters.deliveredEvents.value + counters.discardedEvents.value);
+    CHECK_FALSE(peer.failed());
+}
+
+TEST_CASE("HISTORY running BEGIN may finish while newer mapping waits for full callback retirement") {
+    auto [schema, fields] = history_test::orderInput();
+    api::ApiRuntime runtime(runtimeOptions());
+    qd::connect_tests::PeerScript script;
+    script.family = qd::core::SubscriptionFamily::HISTORY;
+    script.historyBound = 0;
+    script.canonicalSymbols = true;
+    script.followupAdd = qd::connect_tests::ExpectedSubscription{{u"MSFT"}, {0}};
+    const std::array source{qd::connect_tests::Record{u"IBM", std::move(fields), 12}};
+    const std::array<std::u16string, 1> symbols{u"IBM"};
+    qd::connect_tests::Peer peer(schema, source, symbols, 8192, qd::connect_tests::PeerMode::HOLD, script);
+    auto settings = endpointOptions();
+    settings.contract = api::DeliveryContract::HISTORY;
+    auto endpoint = runtime.createEndpoint(settings);
+    auto sub = endpoint->getFeed()->createSubscription<qd::events::Order>();
+    std::mutex mutex;
+    std::condition_variable condition;
+    std::optional<api::CallbackTask> task;
+    bool entered = false, releaseCallback = false;
+    std::atomic<unsigned> calls{0};
+    auto policy = std::make_shared<Policy>();
+    policy->action = [&](api::CallbackTask value) {
+        {
+            std::lock_guard lock(mutex);
+            task.emplace(std::move(value));
+        }
+        condition.notify_all();
+
+        return api::CallbackPostResult::ACCEPTED;
+    };
+    sub->setEventExecutor(policy);
+    sub->addEventListener([&](std::span<const qd::events::Order> batch) {
+        REQUIRE(batch.size() == 1);
+        CHECK(batch[0].symbol == u"IBM");
+        CHECK(sub->getSnapshot().symbols[0].eventSymbol() == u"IBM"); // User code holds no port mutex.
+        ++calls;
+        std::unique_lock lock(mutex);
+        entered = true;
+        condition.notify_all();
+        CHECK(condition.wait_for(lock, 5s, [&] {
+            return releaseCallback;
+        }));
+    });
+    std::jthread host;
+    RuntimeJoin join{runtime};
+
+    struct Release {
+        std::mutex &mutex;
+        std::condition_variable &condition;
+        bool &value;
+
+        ~Release() {
+            {
+                std::lock_guard lock(mutex);
+                value = true;
+            }
+            condition.notify_all();
+        }
+    } release{mutex, condition, releaseCallback};
+
+    sub->addSymbols("IBM");
+    endpoint->connect("127.0.0.1:" + std::to_string(peer.port()));
+    {
+        std::unique_lock lock(mutex);
+        REQUIRE(condition.wait_for(lock, 5s, [&] {
+            return task.has_value();
+        }));
+    }
+    const auto applied = sub->getSnapshot().revision;
+    host = std::jthread([&] {
+        CHECK(task->run() == api::CallbackTaskRunResult::COMPLETED);
+    });
+    {
+        std::unique_lock lock(mutex);
+        REQUIRE(condition.wait_for(lock, 5s, [&] {
+            return entered;
+        }));
+    }
+    const auto publication = endpoint->getStatistics().observedAt;
+    sub->setSymbols({"MSFT"});
+    const auto accepted = sub->getSnapshot().revision;
+    REQUIRE(accepted > applied);
+    REQUIRE(eventually([&] {
+        return endpoint->getStatistics().observedAt > publication;
+    }));
+    CHECK(sub->getStatistics().activeDesiredRevision == applied);
+    CHECK(sub->getStatistics().inFlightEvents == 1);
+    CHECK(sub->getHistorySnapshot().state != api::HistoryObservationState::CURRENT);
+    {
+        std::lock_guard lock(mutex);
+        releaseCallback = true;
+    }
+    condition.notify_all();
+    host.join();
+    REQUIRE(eventually([&] {
+        const auto cut = sub->getHistorySnapshot();
+
+        return cut.mappingLogicalRevision == accepted && cut.ranges.size() == 1 && cut.ranges[0].symbol == u"MSFT";
+    }));
+    REQUIRE(eventually([&] {
+        return peer.adds() == 2;
+    }));
+    CHECK(calls.load() == 1);
+    CHECK(sub->getStatistics().deliveredEvents.value == 1);
+    CHECK(sub->getStatistics().discardedEvents.value == 0);
+    CHECK(sub->getStatistics().inFlightEvents == 0);
+    CHECK(task->run() == api::CallbackTaskRunResult::CANCELLED);
+    CHECK_FALSE(peer.failed());
+}
+
+TEST_CASE("HISTORY obsolete delivery replays current remaining keys once and leaves sibling wire epoch intact") {
+    auto [schema, fields] = history_test::orderInput();
+    auto limits = runtimeOptions();
+    limits.maximumSubscriptionsPerEndpoint = 2;
+    limits.maximumCustomCallbackSubscriptions = 1;
+    api::ApiRuntime runtime(limits);
+    qd::connect_tests::PeerScript script;
+    script.family = qd::core::SubscriptionFamily::HISTORY;
+    script.historyBound = 0;
+    script.canonicalSymbols = true;
+    const std::array source{qd::connect_tests::Record{u"IBM", fields, 12},
+                            qd::connect_tests::Record{u"MSFT", fields, 12}};
+    const std::array<std::u16string, 2> symbols{u"IBM", u"MSFT"};
+    qd::connect_tests::Peer peer(schema, source, symbols, 8192, qd::connect_tests::PeerMode::HOLD, script);
+    auto settings = endpointOptions();
+    settings.contract = api::DeliveryContract::HISTORY;
+    auto endpoint = runtime.createEndpoint(settings);
+    auto keeper = endpoint->getFeed()->createSubscription<qd::events::Order>();
+    auto sub = endpoint->getFeed()->createSubscription<qd::events::Order>();
+    std::atomic<unsigned> keeperCalls{0}, ibm{0}, msft{0};
+    keeper->addEventListener([&](auto batch) {
+        keeperCalls += static_cast<unsigned>(batch.size());
+    });
+    std::mutex mutex;
+    std::condition_variable condition;
+    std::vector<api::CallbackTask> tasks;
+    unsigned posts = 0;
+    bool releasePost = false;
+    auto policy = std::make_shared<Policy>();
+    policy->action = [&](api::CallbackTask task) {
+        std::unique_lock lock(mutex);
+        tasks.push_back(std::move(task));
+        ++posts;
+        condition.notify_all();
+
+        if (posts == 2)
+            CHECK(condition.wait_for(lock, 5s, [&] {
+                return releasePost;
+            }));
+
+        return api::CallbackPostResult::ACCEPTED;
+    };
+    sub->setEventExecutor(policy);
+    sub->addEventListener([&](std::span<const qd::events::Order> batch) {
+        for (const auto &event : batch) {
+            if (event.symbol == u"IBM")
+                ++ibm;
+            else if (event.symbol == u"MSFT")
+                ++msft;
+            else
+                FAIL("unexpected remaining key");
+        }
+    });
+    RuntimeJoin join{runtime};
+
+    struct Release {
+        std::mutex &mutex;
+        std::condition_variable &condition;
+        bool &flag;
+
+        ~Release() {
+            {
+                std::lock_guard lock(mutex);
+                flag = true;
+            }
+            condition.notify_all();
+        }
+    } release{mutex, condition, releasePost};
+
+    auto take = [&] {
+        std::unique_lock lock(mutex);
+        REQUIRE(condition.wait_for(lock, 5s, [&] {
+            return !tasks.empty();
+        }));
+        auto task = std::move(tasks.front());
+        tasks.erase(tasks.begin());
+
+        return task;
+    };
+    keeper->addSymbols("IBM");
+    sub->addSymbols("MSFT");
+    endpoint->connect("127.0.0.1:" + std::to_string(peer.port()));
+    auto first = take();
+    CHECK(first.run() == api::CallbackTaskRunResult::COMPLETED);
+    REQUIRE(eventually([&] {
+        return msft.load() == 1 && keeperCalls.load() == 1 &&
+               sub->getHistorySnapshot().state == api::HistoryObservationState::CURRENT;
+    }));
+    const auto keeperBefore = keeper->getHistorySnapshot();
+    REQUIRE(keeperBefore.sourceEpoch);
+    sub->addSymbols("IBM");
+    auto obsolete = take();
+    const auto wire = endpoint->getStatistics().connection.writtenSubscriptionRecords.value;
+    CHECK(sub->getStatistics().inFlightEvents == 1);
+    sub->removeSymbols("IBM");
+    sub->addSymbols("IBM");
+    {
+        std::lock_guard lock(mutex);
+        releasePost = true;
+    }
+    condition.notify_all();
+    REQUIRE(eventually([&] {
+        return sub->getStatistics().discardedEvents.value == 1;
+    }));
+    CHECK(obsolete.run() == api::CallbackTaskRunResult::CANCELLED);
+    const auto deadline = std::chrono::steady_clock::now() + 5s;
+
+    while ((ibm.load() != 1 || msft.load() != 2) && std::chrono::steady_clock::now() < deadline) {
+        auto task = take();
+        CHECK(task.run() == api::CallbackTaskRunResult::COMPLETED);
+    }
+
+    CHECK(ibm.load() == 1);
+    CHECK(msft.load() == 2); // Full affected-view replay explicitly repeats the delivered key.
+    REQUIRE(eventually([&] {
+        const auto cut = sub->getHistorySnapshot();
+
+        return cut.state == api::HistoryObservationState::CURRENT && cut.ranges.size() == 2 &&
+               std::ranges::all_of(cut.ranges, [](const auto &range) {
+                   return range.status.completeDeliveredRange;
+               });
+    }));
+    const auto keeperAfter = keeper->getHistorySnapshot();
+    CHECK(keeperCalls.load() == 1);
+    CHECK(keeperAfter.sourceEpoch == keeperBefore.sourceEpoch);
+    CHECK(keeperAfter.state == api::HistoryObservationState::CURRENT);
+    CHECK(keeperAfter.ranges[0].status.completeDeliveredRange);
+    CHECK(endpoint->getStatistics().connection.writtenSubscriptionRecords.value == wire);
+    const auto counts = sub->getStatistics();
+    CHECK(counts.deliveredEvents.value == 3);
+    CHECK(counts.discardedEvents.value == 1);
+    CHECK(counts.admittedEvents.value == 4);
+    CHECK(counts.pendingEvents == 0);
+    CHECK(counts.inFlightEvents == 0);
+    CHECK_FALSE(peer.failed());
 }

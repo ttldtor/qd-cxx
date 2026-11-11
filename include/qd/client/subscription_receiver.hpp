@@ -141,6 +141,8 @@ class SubscriptionBatch {
      * @return Direct immutable record span, valid during this callback or an independently retained batch lease.
      */
     [[nodiscard]] std::span<const mux::MuxRecordView> records() const noexcept;
+    /** @return Actual applied facade mapping revision, or nullopt for an unobserved registration. */
+    [[nodiscard]] std::optional<std::uint64_t> appliedDesiredRevision() const noexcept;
     /** Retain only detached generic record backing without allocation.
      * @return Existing owning batch lease; it retains no receiver plan, callable, queue or transport.
      */

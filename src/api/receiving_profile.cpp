@@ -4,6 +4,7 @@
 #include "event_registry_defaults.hpp"
 
 #include "qd/events/market_event_symbols.hpp"
+#include "qd/events/time_helpers.hpp"
 
 #include <algorithm>
 #include <array>
@@ -544,7 +545,9 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
                                      multiply(subscriptionEntries, sizeof(core::SubscriptionRequest))),
                                  textBacking);
     routing.retainedMetadataBytes =
-        add(add(add(sizeof(result.bindingExchanges), sizeof(result.bindingSources)), sizeof(result.versionBindings)),
+        add(add(add(add(sizeof(result.bindingExchanges), sizeof(result.bindingSources)),
+                    sizeof(result.bindingTimeEncodings)),
+                sizeof(result.versionBindings)),
             add(sizeof(result.eventPlans),
                 sizeof(std::array<client::PreparedSubscriptionBinding, MAXIMUM_RECEIVING_RECORDS>)));
     // Snapshot copy, suffix/representability scans, physical conversion and conservative retirement.
@@ -552,6 +555,11 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
     routing.work = {0, add(multiply(routing.symbols, add(multiply(2, maximumRoutes), 8)), maximumRoutes),
                     multiply(ROUTING_TEXT_PASSES, logicalUnits),
                     add(multiply(2, routing.temporaryBytes), routing.retainedMetadataBytes)};
+    // Every routed candidate may compare its key and complete text with every previous candidate.
+    const auto comparisons = multiply(subscriptionEntries, subscriptionEntries);
+    routing.work.visits = add(routing.work.visits, comparisons);
+    routing.work.textUnits =
+        add(routing.work.textUnits, multiply(multiply(2, runtime.maximumSymbolUnits), comparisons));
     result.queueWork =
         queueWork(scale, result.interests, result.schema.records().size(), result.queueLimits.routeRecords);
 
@@ -728,6 +736,37 @@ bool receivingSymbolMatches(const ReceivingProfile &profile, std::size_t binding
 
     return symbol.selector == core::SubscriptionSelectorKind::ALL ||
            (exchange ? exchange == symbol.exchange : !symbol.regional[kind]);
+}
+
+void appendReceivingDesiredRequest(std::vector<core::SubscriptionRequest> &requests, core::RecordContext context,
+                                   std::u16string_view symbol, core::SubscriptionSelectorKind selector,
+                                   core::SubscriptionFamily family, std::optional<std::int64_t> fromTime,
+                                   HistoryRangeEncoding encoding) {
+    std::optional<std::int64_t> bound;
+
+    if (family == core::SubscriptionFamily::HISTORY) {
+        bound = 0;
+
+        if (fromTime) {
+            if (encoding != HistoryRangeEncoding::UNIX_MILLISECONDS_SEQUENCE)
+                refuse(ErrorCode::UNSUPPORTED_PROFILE, "subscription-time-series-mapper");
+
+            bound = *fromTime == std::numeric_limits<std::int64_t>::max() ? *fromTime
+                                                                          : events::withTimeSequenceTime(0, *fromTime);
+        }
+    } else if (fromTime) {
+        refuse(ErrorCode::UNSUPPORTED_PROFILE, "subscription-time-series-contract");
+    }
+
+    const auto found = std::ranges::find_if(requests, [&](const auto &request) {
+        return request.key.context.matches(context) && request.key.selector == selector && request.key.symbol == symbol;
+    });
+
+    if (found == requests.end()) {
+        requests.push_back({{context, symbol, selector}, bound});
+    } else if (bound && *bound < *found->historyBound) {
+        found->historyBound = bound;
+    }
 }
 
 std::expected<mux::MuxQueue, mux::QueueFailure> createReceivingQueue(const ReceivingProfile &profile,

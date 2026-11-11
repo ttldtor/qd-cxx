@@ -1,6 +1,7 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/collectors/history.hpp"
+#include "history_replay.hpp"
 #include "qd/encoding/penta_symbol.hpp"
 
 #include <algorithm>
@@ -1655,11 +1656,17 @@ struct HistoryCollector::Impl {
      * @param work Collector scans/peak/disposal credits.
      * @return Exact core barrier or typed error; failed/no-op commands preserve offers.
      */
-    std::expected<core::SubscriptionChange, HistoryFailure>
-    change(const HistoryViewToken &token, Command command, std::span<const core::SubscriptionRequest> requests,
-           std::span<const core::SubscriptionKey> keys, core::SubscriptionWork &coreWork, HistoryWork &work) {
+    std::expected<core::SubscriptionChange, HistoryFailure> change(const HistoryViewToken &token, Command command,
+                                                                   std::span<const core::SubscriptionRequest> requests,
+                                                                   std::span<const core::SubscriptionKey> keys,
+                                                                   core::SubscriptionWork &coreWork, HistoryWork &work,
+                                                                   bool restartInitial = false) {
         const auto v = view(token);
         maintenance(work);
+
+        if (restartInitial)
+            spend(work, 0, sum(limits.viewSubscriptions.entries, limits.pendingItems));
+
         nextPublication();
         const auto inputs = sum(requests.size(), keys.size());
         spend(work, 0,
@@ -1726,13 +1733,28 @@ struct HistoryCollector::Impl {
             return std::unexpected(HistoryFailure{HistoryError::CORE_REJECTED, result.error()});
         }
 
-        if (!result->changed) {
+        if (!result->changed && !restartInitial) {
             clear(b);
 
             return *result;
         }
 
         // All storage/identity/release requirements were validated before this core publication.
+        if (restartInitial) {
+            const auto base = v * limits.viewSubscriptions.entries;
+
+            for (std::size_t index = 0; index < limits.viewSubscriptions.entries; ++index)
+                b.parts[base + index] = ViewPart{};
+
+            const auto pending = v * limits.pendingItems;
+
+            for (std::size_t index = 0; index < limits.pendingItems; ++index)
+                b.pending[pending + index] = Pending{};
+
+            b.views[v].size = 0;
+            b.views[v].balance = 0;
+        }
+
         reconcile(b, v);
         trim(b);
         commit();
@@ -2062,6 +2084,25 @@ HistoryCollector::clear(const HistoryViewToken &view, core::SubscriptionWork &co
         }
 
         return std::unexpected(failure(e));
+    }
+}
+
+std::expected<core::SubscriptionChange, HistoryFailure>
+detail::HistoryReplayAccess::replace(HistoryCollector &owner, const HistoryViewToken &view,
+                                     std::span<const core::SubscriptionRequest> requests,
+                                     core::SubscriptionWork &coreWork, HistoryWork &work) {
+    try {
+        spend(work, 1);
+
+        if (!owner.impl_)
+            throw HistoryError::INVALID_STATE;
+
+        return owner.impl_->change(view, HistoryCollector::Impl::Command::REPLACE, requests, {}, coreWork, work, true);
+    } catch (HistoryError error) {
+        if (owner.impl_)
+            owner.impl_->abandon();
+
+        return std::unexpected(failure(error));
     }
 }
 

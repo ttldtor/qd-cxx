@@ -1,0 +1,54 @@
+{
+  "revision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "javaVersion": "openjdk version \"1.8.0_422\"",
+  "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
+  "javacSha256": "633143e961aa18051c09112b85333f5cdbd845b54eb39678eb15b91ca8bbb527",
+  "harnessSha256": "a4484d1be7c780b7dee51de8d9e61aa7db13b3880e4a8aec7d5b38a32b0e5a47",
+  "launcherSha256": "d436a3be23afc5f7db24610419ba09df25e7186851d8440fb39a38c2191dc491",
+  "upstreamSources": [
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/api/DXFeedTimeSeriesSubscription.java",
+      "sha256": "af8c2699a40f4e9bdeece504ee10376c51b5b5e39d9b771900ab66be912218f8"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/api/DXFeedSubscription.java",
+      "sha256": "172f2c6bef874f60dfa53ebd8ead92deea1ec32cbbf5bc105136c15e39f50129"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/api/impl/DXEndpointImpl.java",
+      "sha256": "32b962cc562848869d5eb8014c7fd5e3a59ae543958dba4cd0bc2e0c2dd2896b"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/TimeSeriesEvent.java",
+      "sha256": "62ede58d767a62e959a1c1206c64aaa194fe75ca7cf78826a0d21b1eb48934b4"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/TimeAndSale.java",
+      "sha256": "bf3cff336518c851c3f43c78fcb8782453a6d123b4d7e7fe19c03e48cc21b246"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/api/impl/EventDelegate.java",
+      "sha256": "5e6c90ed4115f57708d01f697dedcdc6bc168e41d254b6e245516feb073f5593"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/api/impl/DXFeedImpl.java",
+      "sha256": "7402a8be3bb5deaa84fc907c6b69bc91d0ec58d1883bf3c97b8260b1d1017caf"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/TimeAndSaleDelegate.java",
+      "sha256": "20d0eae38d6fb4c53df4b55e923aa16c0109ffca493fb29dee3d4fbdf27150ff"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/MarketFactoryImpl.java",
+      "sha256": "c74b324b2f99d2a351963fead08419c2ba1d92573c633d30740295acc9d0bac4"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/impl/matrix/History.java",
+      "sha256": "462c4cf966c1db8bd6db4072c0512e5713454fd6165ad5b744113c629ac3a42d"
+    }
+  ],
+  "productionClassInventorySha256": "90a478b5d3737246d8c897322c9f9db60887846e20117572588e05ae78fbc6d8",
+  "fixtureSha256": "63dee8e21a9505da850af707385bed8a8d034c7dd2267a9b4821131bb16aeee0",
+  "rows": 57,
+  "timezoneInvariant": true
+}

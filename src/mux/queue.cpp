@@ -1,6 +1,7 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/mux/queue.hpp"
+#include "../collectors/history_replay.hpp"
 #include "../core/delivery_statistics.hpp"
 
 #include <algorithm>
@@ -820,9 +821,10 @@ struct QueueRecord {
 
 /** Composite immutable backing; records are shared without payload recopying. */
 struct QueueBatch {
-    BudgetLease budget;                               ///< Pure generation resource scope.
-    Vector<std::shared_ptr<const QueueRecord>> roots; ///< Exact accounted record references.
-    Vector<MuxRecordView> views;                      ///< Exact accounted immutable callback metadata.
+    BudgetLease budget;                                  ///< Pure generation resource scope.
+    Vector<std::shared_ptr<const QueueRecord>> roots;    ///< Exact accounted record references.
+    Vector<MuxRecordView> views;                         ///< Exact accounted immutable callback metadata.
+    std::optional<std::uint64_t> appliedDesiredRevision; ///< Actual mapping candidate identity, never submitted state.
 
     /** Bind empty arrays to the batch byte domain.
      * @param source Pure generation scope.
@@ -1073,8 +1075,16 @@ QueueIdentity OwnedMuxBatch::epoch() const noexcept {
     return state_ && !state_->views.empty() ? state_->views[0].epoch : QueueIdentity{};
 }
 
+std::optional<std::uint64_t> OwnedMuxBatch::appliedDesiredRevision() const noexcept {
+    return state_ ? state_->appliedDesiredRevision : std::nullopt;
+}
+
 std::span<const MuxRecordView> BorrowedMuxBatch::records() const noexcept {
     return state_ ? std::span<const MuxRecordView>(state_->views) : std::span<const MuxRecordView>{};
+}
+
+std::optional<std::uint64_t> BorrowedMuxBatch::appliedDesiredRevision() const noexcept {
+    return state_ ? state_->appliedDesiredRevision : std::nullopt;
 }
 
 OwnedMuxBatch BorrowedMuxBatch::retain() const noexcept {
@@ -1314,11 +1324,13 @@ struct MuxQueue::State {
         std::uint64_t mappingRevision = 0;          ///< Authoritative application versus synchronization.
         std::size_t candidateLogicalSelectors = 0;  ///< APPLIED command count, independent of next-submission metadata.
         std::uint64_t candidateLogicalRevision = 0; ///< Logical revision belonging to that mapping candidate.
-        bool sync = true;                           ///< Owner gates.
-        bool paused = false;                        ///< A reserved pause gates later callbacks.
-        bool closing = false;                       ///< Owner gates.
-        bool sourceClosed = false;                  ///< Owner gates.
-        bool muxClosed = false;                     ///< Owner gates.
+        bool historyReplay = false;          ///< Captured private delivery intent, qualified by this APPLIED candidate.
+        bool historyReplayCommitted = false; ///< Source replay survives mapping-metadata WORK_LIMIT retries.
+        bool sync = true;                    ///< Owner gates.
+        bool paused = false;                 ///< A reserved pause gates later callbacks.
+        bool closing = false;                ///< Owner gates.
+        bool sourceClosed = false;           ///< Owner gates.
+        bool muxClosed = false;              ///< Owner gates.
         bool hadGap = false;   ///< Continuity is incomplete because of known or unclassified excluded delivery.
         bool epochGap = false; ///< Owner gates.
         bool unknownEligibility = false;     ///< Lost source eligibility was not classified into exact client copies.
@@ -1647,10 +1659,20 @@ struct MuxQueue::State {
      * @param c Registration whose actual mapping transaction committed.
      */
     void publishMapping(Client &c) noexcept {
-        core::detail::updateDelivery(c.statistics, [&](auto &s) {
-            s.activeSelectors = c.candidateLogicalSelectors;
-            s.activeDesiredRevision = c.candidateLogicalRevision;
-        });
+        if (!c.statistics)
+            return;
+
+        std::lock_guard lock(c.statistics->mutex);
+        auto &s = c.statistics->value;
+        s.activeSelectors = c.candidateLogicalSelectors;
+        s.activeDesiredRevision = c.candidateLogicalRevision;
+        s.observedAt = std::chrono::steady_clock::now();
+
+        if (c.historyReplay && c.historyReplayCommitted) {
+            c.statistics->historyReplayRequired = false;
+            c.historyReplay = false;
+            c.historyReplayCommitted = false;
+        }
     }
 
     /** Clear qualification when the actual mapping is cleared or its source resets.
@@ -2392,7 +2414,20 @@ std::expected<bool, QueueFailure> MuxQueue::State::sync(Client &c, QueueWork &wo
             return true;
         }
     } else {
-        auto result = history->replace(c.history, candidate, work.desired, work.history);
+        const bool replay = c.historyReplay && !c.historyReplayCommitted;
+        const auto oldPending = replay ? history->pendingCount(c.history) : 0;
+        const auto discardedTotal = replay ? sum(c.size, oldPending) : 0;
+
+        if (replay) {
+            // Fund every potentially last detached-record release before the source transaction can commit.
+            spend(work, c.size, 0, 0,
+                  sum(product(c.size, sizeof(std::shared_ptr<const detail::QueueRecord>)),
+                      c.size ? c.port->budget->limits.recordBytes : 0));
+        }
+
+        auto result = replay ? collectors::detail::HistoryReplayAccess::replace(*history, c.history, candidate,
+                                                                                work.desired, work.history)
+                             : history->replace(c.history, candidate, work.desired, work.history);
 
         if (!result) {
             if (result.error().error == collectors::HistoryError::WORK_LIMIT ||
@@ -2403,6 +2438,23 @@ std::expected<bool, QueueFailure> MuxQueue::State::sync(Client &c, QueueWork &wo
             fail(c, sourceFailure(result.error().error));
 
             return true;
+        }
+
+        if (replay) {
+            const auto discarded = c.size;
+
+            for (std::size_t index = 0; index < c.size; ++index)
+                c.records[(c.head + index) % c.records.size()].reset();
+
+            c.head = 0;
+            c.size = 0;
+            count(c.counts.discarded, discardedTotal, c.counts.saturated);
+            count(counts.discarded, discardedTotal, counts.saturated);
+            core::detail::updateDelivery(c.statistics, [&](auto &s) {
+                s.pendingEvents -= discarded;
+                s.discardedEvents.add(discarded);
+            });
+            c.historyReplayCommitted = true;
         }
     }
 
@@ -2518,15 +2570,17 @@ std::expected<bool, QueueFailure> MuxQueue::State::command(Client &c, QueueWork 
                 std::lock_guard lock(c.statistics->mutex);
                 c.candidateLogicalSelectors = c.statistics->submittedSelectors;
                 c.candidateLogicalRevision = c.statistics->submittedDesiredRevision;
+                c.historyReplay = history && c.statistics->historyReplayRequired;
+                c.historyReplayCommitted = false;
             }
 
             result.revision = applied->revision;
             result.changed = applied->changed;
 
-            if (!applied->changed && !c.sync)
+            if (!applied->changed && !c.sync && !c.historyReplay)
                 publishMapping(c);
 
-            if (applied->changed) {
+            if (applied->changed || c.historyReplay) {
                 c.desiredRevision = applied->revision;
                 c.sync = true;
 
@@ -2941,6 +2995,10 @@ std::expected<bool, QueueFailure> MuxQueue::State::callback(Client &c, QueueWork
         spend(work, 0, 0, 0, l.batchBytes);
         auto batch = detail::shared<detail::QueueBatch>(
             detail::clientScope(c.port->budget, detail::AllocationTag::BATCH), c.port->budget);
+
+        if (c.statistics)
+            batch->appliedDesiredRevision = c.candidateLogicalRevision;
+
         batch->roots.reserve(selected);
         batch->views.reserve(selected); // Reuse the complete preflight selection; no fallible matching remains.
 
@@ -3158,6 +3216,14 @@ std::expected<bool, QueueFailure> MuxQueue::State::close(Client &c, QueueWork &w
 
         c.mappingCount = 0;
         c.sourceClosed = true;
+        c.historyReplay = false;
+        c.historyReplayCommitted = false;
+
+        if (c.statistics) {
+            std::lock_guard lock(c.statistics->mutex);
+            c.statistics->historyReplayRequired = false;
+        }
+
         clearMappingStatistics(c);
 
         return true;
@@ -3537,6 +3603,7 @@ std::expected<QueueProgress, QueueFailure> MuxQueue::State::resetStep(QueueWork 
         for (auto &c : clients) {
             if (c && !c->closing) {
                 c->sync = true;
+                c->historyReplayCommitted = false;
                 clearMappingStatistics(*c);
                 publishState(*c);
             }

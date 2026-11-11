@@ -131,6 +131,10 @@ std::span<const mux::MuxRecordView> SubscriptionBatch::records() const noexcept 
     return batch_->records();
 }
 
+std::optional<std::uint64_t> SubscriptionBatch::appliedDesiredRevision() const noexcept {
+    return batch_->appliedDesiredRevision();
+}
+
 mux::OwnedMuxBatch SubscriptionBatch::retain() const noexcept {
     return batch_->retain();
 }

@@ -357,3 +357,5 @@ cache replay. Input-free EN/RU/Get-Help, bounded JDK8 Capture/Verify with exact 
   actual HISTORY parser/delegate values, numeric/FOB/flags/removal boundaries; input-free EN/RU help.
 
 - [Callback execution oracle](../upstream/callback-execution-oracle/README.md): actual Java policy inheritance/override, inline and two-worker serial delivery; bounded Capture/Verify and input-free EN/RU help.
+
+- [Attached live HISTORY range oracle](../upstream/live-history-range-oracle/README.md): real public Java range mutations, underlying demand and held callbacks, bounded Capture/Verify and input-free EN/RU help.

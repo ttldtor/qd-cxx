@@ -262,7 +262,7 @@ if(ORG_TTLDTOR_QDCXX_BUILD_FEED_API)
     if(NOT ORG_TTLDTOR_QDCXX_BUILD_CLIENT OR NOT ORG_TTLDTOR_QDCXX_BUILD_RUNTIME OR NOT ORG_TTLDTOR_QDCXX_BUILD_RECOVERY)
         message(FATAL_ERROR "BUILD_FEED_API requires explicit CLIENT, RUNTIME and RECOVERY enablement")
     endif()
-    add_library(qdcxx_feed src/api/feed.cpp src/api/history_observation.cpp src/api/endpoint_configuration.cpp src/api/subscription_observer.cpp src/api/callback_execution.cpp src/api/feed_filter.cpp src/api/feed_filter_expression.cpp src/api/feed_filter_coordinates.cpp src/api/feed_filter_ipf_config.cpp src/api/receiving_profile.cpp src/api/event_registry.cpp src/api/system_dns.cpp)
+    add_library(qdcxx_feed src/api/feed.cpp src/api/history_observation.cpp src/api/endpoint_configuration.cpp src/api/subscription_observer.cpp src/api/callback_execution.cpp src/api/subscription_desired.cpp src/api/feed_filter.cpp src/api/feed_filter_expression.cpp src/api/feed_filter_coordinates.cpp src/api/feed_filter_ipf_config.cpp src/api/receiving_profile.cpp src/api/event_registry.cpp src/api/system_dns.cpp)
     add_library(qdcxx::feed ALIAS qdcxx_feed)
     target_include_directories(qdcxx_feed PRIVATE src/api)
     target_link_libraries(qdcxx_feed PUBLIC qdcxx_subscription_selectors qdcxx_recovery qdcxx_quote qdcxx_profile qdcxx_trade qdcxx_trade_eth qdcxx_summary qdcxx_order qdcxx_text_events qdcxx_misc_events qdcxx_market_event_symbols qdcxx_event_sources qdcxx_order_index qdcxx_candle_values)
@@ -568,6 +568,12 @@ if(BUILD_TESTING)
             "-DORG_TTLDTOR_QDCXX_SELECTOR_ORACLE_PWSH=${ORG_TTLDTOR_QDCXX_SELECTOR_ORACLE_PWSH}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/callback_execution_oracle_help.cmake")
         set_tests_properties(callback_execution_oracle_help PROPERTIES TIMEOUT 120)
+
+        add_test(NAME live_history_range_oracle_help COMMAND "${CMAKE_COMMAND}"
+            "-DORG_TTLDTOR_QDCXX_SELECTOR_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DORG_TTLDTOR_QDCXX_SELECTOR_ORACLE_PWSH=${ORG_TTLDTOR_QDCXX_SELECTOR_ORACLE_PWSH}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/live_history_range_oracle_help.cmake")
+        set_tests_properties(live_history_range_oracle_help PROPERTIES TIMEOUT 120)
     endif()
     add_executable(qdcxx_subscription_selector_tests tests/conformance/subscription_selector_tests.cpp)
     target_link_libraries(qdcxx_subscription_selector_tests PRIVATE qdcxx_subscription_selectors doctest::doctest)

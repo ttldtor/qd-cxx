@@ -34,6 +34,9 @@ class Backend final : public detail::RecoveryBackend {
     std::size_t advancingCalls = 0;     ///< Prepare/start/poll/compose/abort/dispose calls, excluding facts.
     std::size_t eventTransfers = 0;     ///< Actual owning events handed to Core.
     bool deferAuthentication = false;   ///< Reproduce WORK_LIMIT after an actual authentication-state change.
+    bool deferSubscriptions = false;    ///< Hold actual replay before its admission/bank commit.
+    std::optional<std::pair<p::SubscriptionMessage, std::optional<std::int64_t>>> lastSubscription;
+    std::vector<std::pair<p::SubscriptionMessage, std::optional<std::int64_t>>> admittedSubscriptions;
 
     /** Decode a real complete frame through the private backend's actual pure-session epoch.
      * @param bytes Complete independent binary frame.
@@ -118,9 +121,17 @@ class Backend final : public detail::RecoveryBackend {
     }
 
     /** @copydoc detail::RecoveryBackend::subscribe */
-    std::expected<void, t::RecoveryDiagnostic>
-    subscribe(p::SubscriptionMessage, std::span<const c::SubscriptionRequest>, p::LiveWork &) override {
+    std::expected<void, t::RecoveryDiagnostic> subscribe(p::SubscriptionMessage message,
+                                                         std::span<const c::SubscriptionRequest> requests,
+                                                         p::LiveWork &) override {
         ++advancingCalls;
+        REQUIRE(requests.size() == 1);
+        lastSubscription = std::pair{message, requests[0].historyBound};
+
+        if (deferSubscriptions)
+            return std::unexpected(t::RecoveryDiagnostic{t::RecoveryError::WORK_LIMIT, "controlled-replay-work"});
+
+        admittedSubscriptions.push_back(*lastSubscription);
 
         return {};
     }
@@ -680,4 +691,103 @@ TEST_CASE("recovery HISTORY eligible query preserves direct queue errors foreign
     REQUIRE_FALSE(stale);
     REQUIRE(stale.error().queue);
     CHECK(stale.error().queue->error == m::QueueError::INVALID_CLIENT);
+}
+
+TEST_CASE("HISTORY bound upsert coalesces blocked replay without publishing an unadmitted bank") {
+    Fixture fixture;
+    fixture.start();
+    fixture.until([&] {
+        return fixture.backend.admittedSubscriptions.size() == 1;
+    });
+    CHECK(fixture.backend.admittedSubscriptions[0].first == p::SubscriptionMessage::HISTORY_ADD);
+    CHECK(fixture.backend.admittedSubscriptions[0].second == 2);
+    fixture.backend.deferSubscriptions = true;
+    auto narrow = h::replace(fixture.handle, fixture.schema, 3);
+    fixture.until([&] {
+        return narrow.result() && fixture.backend.lastSubscription && fixture.backend.lastSubscription->second == 3;
+    });
+    CHECK(fixture.backend.admittedSubscriptions.size() == 1);
+    CHECK(fixture.backend.lastSubscription->first == p::SubscriptionMessage::HISTORY_ADD);
+    auto expand = h::replace(fixture.handle, fixture.schema, 1);
+    fixture.until([&] {
+        return expand.result() && fixture.backend.lastSubscription && fixture.backend.lastSubscription->second == 1;
+    });
+    CHECK(fixture.backend.admittedSubscriptions.size() == 1);
+    fixture.backend.deferSubscriptions = false;
+    fixture.until([&] {
+        return fixture.backend.admittedSubscriptions.size() == 2;
+    });
+    CHECK(fixture.backend.admittedSubscriptions[1].first == p::SubscriptionMessage::HISTORY_ADD);
+    CHECK(fixture.backend.admittedSubscriptions[1].second == 1);
+    fixture.until([&] {
+        auto work = r::queueWork();
+        const auto range = fixture.owner->historyRangeStatus(fixture.handle, fixture.key(), work);
+
+        return range && range->requestedFrom == 1;
+    });
+    CHECK(fixture.range().requestedFrom == 1);
+}
+
+TEST_CASE("HISTORY range mutation and removal preserve an overlapping lower view and its physical demand") {
+    Fixture fixture(true, true);
+    fixture.start();
+    fixture.send(
+        h::data({{3, 30, h::SNAPSHOT_BEGIN}, {2, 20, 0}, {1, 10, 0}, {0, 0, h::SNAPSHOT_END | h::REMOVE_EVENT}}),
+        [](const auto &range) {
+            return range.completeDeliveredRange;
+        });
+    const auto records = [](const auto &recorder) {
+        std::size_t count = 0;
+
+        for (const auto &batch : recorder->batches)
+            count += batch.records().size();
+
+        return count;
+    };
+    fixture.until([&] {
+        return records(fixture.lowerRecorder) == 4;
+    });
+    REQUIRE(fixture.backend.admittedSubscriptions.size() == 1);
+    CHECK(fixture.backend.admittedSubscriptions[0].second == 0);
+    const auto lowerCount = records(fixture.lowerRecorder);
+    const auto oldBatches = fixture.recorder->batches.size();
+    auto shrink = h::replace(fixture.handle, fixture.schema, 3);
+    fixture.until([&] {
+        auto work = r::queueWork();
+        const auto range = fixture.owner->historyRangeStatus(fixture.handle, fixture.key(), work);
+
+        return shrink.result() && range && range->requestedFrom == 3 && range->completeDeliveredRange &&
+               fixture.recorder->batches.size() > oldBatches;
+    });
+
+    for (std::size_t index = oldBatches; index < fixture.recorder->batches.size(); ++index)
+        for (const auto &record : fixture.recorder->batches[index].records())
+            CHECK(record.rawTime >= 3);
+
+    CHECK(records(fixture.lowerRecorder) == lowerCount);
+    CHECK(fixture.backend.admittedSubscriptions.size() == 1);
+    auto expand = h::replace(fixture.handle, fixture.schema, 1);
+    fixture.until([&] {
+        auto work = r::queueWork();
+        const auto range = fixture.owner->historyRangeStatus(fixture.handle, fixture.key(), work);
+
+        return expand.result() && range && range->requestedFrom == 1 && range->completeDeliveredRange;
+    });
+    CHECK(records(fixture.lowerRecorder) == lowerCount);
+    CHECK(fixture.backend.admittedSubscriptions.size() == 1);
+    m::QueueSubmitWork work{10000, 1000000, 1000000, 1000000};
+    auto removed = fixture.handle.clear(work);
+    REQUIRE(removed);
+    fixture.until([&] {
+        auto queryWork = r::queueWork();
+        const auto ranges = fixture.owner->historyRangeSnapshot(fixture.handle, queryWork);
+
+        return removed->result() && ranges && ranges->empty();
+    });
+    CHECK(fixture.backend.admittedSubscriptions.size() == 1);
+    auto lowerWork = r::queueWork();
+    const auto lower = fixture.owner->historyRangeStatus(fixture.lowerHandle, fixture.key(), lowerWork);
+    REQUIRE(lower);
+    CHECK(lower->requestedFrom == 0);
+    CHECK(lower->completeDeliveredRange);
 }

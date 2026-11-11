@@ -572,4 +572,12 @@ existing sticky availability marker; reads and reconnect never reset totals.
 
 ## HISTORY range observations
 
+`Feed::createTimeSeriesSubscription<Event>()` uses the same owning subscription facade with
+`getFromTime()`/`setFromTime(ms)` and an initial signed64 MAX. A verified native time-series mapper
+and explicit HISTORY endpoint are required; the current ten types reject before registration.
+Ordinary subscriptions reject range operations. Accepted range/set/revision and observer snapshots
+change together; the SDK applies demand and withdraws obsolete not-started HISTORY delivery.
+See [live HISTORY ranges](../spec/subscriptions/LIVE-HISTORY-RANGES.md) for capability, callback
+BEGIN, finite work, overlap, output refusal and recovery boundaries.
+
 Select `DeliveryContract::HISTORY` explicitly. The worker owns the collector, independent views, replay and reset acknowledgements. `Subscription<Event>::getHistorySnapshot()` returns a passive owning AS-OF cut; reads perform no I/O or callback waiting. Current completion requires both actual delivered range evidence and matching accepted logical/source/clear/callback fences. Order is the first supported typed HISTORY route; an endpoint without an explicit registry uses the standard SDK-owned Order schema. It is an indexed event. The other nine business types reject HISTORY before native registration. See [Order fields, source selectors and ownership](ORDER.md). See the [HISTORY contract](../spec/subscriptions/HISTORY-RECEIVING.md) for exact states, finite storage limits and raw indexed range units.

@@ -31,8 +31,12 @@ struct ReceivingSymbol {
     char16_t exchange = 0;   ///< Syntactic logical exchange, preserving trailing attributes.
     std::array<bool, RECEIVING_EVENT_KINDS> regional{}; ///< Exact regional match per business kind.
     core::SubscriptionSelectorKind selector = core::SubscriptionSelectorKind::EXACT; ///< Explicit ALL has no text.
-    std::optional<std::int32_t> sourceId; ///< Explicit indexed selector ID; absent PLAIN demands every Order source.
+    std::optional<std::int32_t> sourceId; ///< Typed source identity, preserved independently of range.
+    std::optional<std::int64_t> fromTime; ///< Exact Unix milliseconds only for a time-series logical selector.
 };
+
+/** SDK-owned mapper policy, never inferred from a timestamp field or caller-declared capability. */
+enum class HistoryRangeEncoding { INDEX_DOMAIN, UNIX_MILLISECONDS_SEQUENCE };
 
 /** Worker routing reservation plus a separate producer-attempt metric; queue-owned storage remains separate. */
 struct ReceivingRoutingLimits {
@@ -71,6 +75,8 @@ struct ReceivingProfile {
     ///< Exact aligned Quote/Trade record suffixes; fixed backing is included in sizeof(ReceivingProfile).
     std::array<std::optional<std::int32_t>, MAXIMUM_RECEIVING_RECORDS> bindingSources{};
     ///< Exact aligned Order sources; absent for nonindexed business projections.
+    std::array<HistoryRangeEncoding, MAXIMUM_RECEIVING_RECORDS> bindingTimeEncodings{};
+    ///< Explicit verified mapper policies; existing non-time-series bindings retain INDEX_DOMAIN.
     std::array<collectors::TickerVersionBinding, MAXIMUM_RECEIVING_RECORDS> versionBindings{};
     std::size_t versionBindingCount = 0; ///< Explicit schema-bound TICKER version gates.
     ReceivingRoutingLimits routing;      ///< Explicit additional routing workspace and pre-allocation work charge.
@@ -158,6 +164,21 @@ void prepareReceivingSymbols(const ReceivingProfile &profile, const ReceivingEve
  */
 [[nodiscard]] bool receivingSymbolMatches(const ReceivingProfile &profile, std::size_t bindingIndex,
                                           const ReceivingSymbol &symbol) noexcept;
+
+/** Append one physical route and coalesce equal keys to their minimum HISTORY bound.
+ * The whole bounded routing attempt, including quadratic key comparisons, is prepaid by the caller.
+ * @param requests Owned candidate vector with sufficient admitted capacity; symbols are borrowed until submission.
+ * @param context Actual schema-bound physical route, never guessed from a field name.
+ * @param symbol Exact prepared physical spelling, retained by the routing snapshot.
+ * @param selector Exact or explicitly permitted ALL key.
+ * @param family Actual selected collector family.
+ * @param fromTime Optional Unix-millisecond attribute from the same accepted logical cut.
+ * @param encoding Verified native mapper policy; caller descriptors cannot configure it.
+ */
+void appendReceivingDesiredRequest(std::vector<core::SubscriptionRequest> &requests, core::RecordContext context,
+                                   std::u16string_view symbol, core::SubscriptionSelectorKind selector,
+                                   core::SubscriptionFamily family, std::optional<std::int64_t> fromTime,
+                                   HistoryRangeEncoding encoding);
 
 /** Construct the selected existing queue without opening registrations or activating native work.
  * @param profile Complete immutable prepared configuration.

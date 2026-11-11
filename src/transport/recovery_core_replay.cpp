@@ -172,18 +172,26 @@ RecoveryObservation RecoveryCore::replay(RecoveryTicket ticket, RecoveryTurnWork
         const auto &latest = maps.banks[0];
         const auto &emitted = maps.banks[1];
         std::optional<std::size_t> removed;
+        std::optional<std::size_t> replaced;
         const core::SubscriptionRequest *added = nullptr;
 
         for (std::size_t index = 0; index != emitted.size; ++index) {
             const auto target = find(latest, emitted.entries[index], work.recovery);
 
-            if (!target || latest.entries[*target].historyBound != emitted.entries[index].historyBound) {
+            if (!target) {
                 removed = index;
+                break;
+            }
+
+            if (latest.entries[*target].historyBound != emitted.entries[index].historyBound) {
+                // HISTORY ADD replaces this key's lower bound; do not withdraw healthy overlapping views.
+                replaced = index;
+                added = &latest.entries[*target];
                 break;
             }
         }
 
-        if (!removed) {
+        if (!removed && !replaced) {
             for (std::size_t index = 0; index != latest.size; ++index) {
                 if (!find(emitted, latest.entries[index], work.recovery)) {
                     added = &latest.entries[index];
@@ -198,7 +206,7 @@ RecoveryObservation RecoveryCore::replay(RecoveryTicket ticket, RecoveryTurnWork
         }
 
         converged_[family] = false;
-        candidate(maps, removed, added, work.recovery);
+        candidate(maps, removed ? removed : replaced, added, work.recovery);
         auto request = removed ? emitted.entries[*removed] : *added;
 
         if (removed)

@@ -158,10 +158,11 @@ void publishContinuation(const std::shared_ptr<SubscriptionChangeDomain> &target
 /** @param port Protected owner. @param symbols Complete candidate. @param revision Checked next accepted identity.
  * @return Fully owned immutable backing; no callback, native state or caller view is retained.
  */
-std::shared_ptr<SubscriptionChangeFrame>
-frameFor(const SubscriptionPort &port, const std::vector<SubscriptionSelector> &symbols, std::uint64_t revision) {
+std::shared_ptr<SubscriptionChangeFrame> frameFor(const SubscriptionPort &port,
+                                                  const std::vector<SubscriptionSelector> &symbols,
+                                                  std::uint64_t revision, std::optional<std::int64_t> fromTime) {
     auto frame = std::make_shared<SubscriptionChangeFrame>();
-    frame->snapshot = {revision, symbols, port.eventTypes};
+    frame->snapshot = {revision, symbols, port.eventTypes, fromTime};
     frame->barrier = callbackBarrier();
 
     return frame;
@@ -420,7 +421,7 @@ SubscriptionChangeLease::~SubscriptionChangeLease() {
 }
 
 SubscriptionSnapshot subscriptionSnapshotLocked(const SubscriptionPort &port) {
-    return {port.revision, port.symbols, port.eventTypes};
+    return {port.revision, port.symbols, port.eventTypes, port.fromTime};
 }
 
 void initializeSubscriptionObservers(const std::shared_ptr<SubscriptionPort> &port, const RuntimeOptions &limits) {
@@ -456,13 +457,18 @@ void initializeSubscriptionObservers(const std::shared_ptr<SubscriptionPort> &po
 
 void prepareSubscriptionChangeLocked(SubscriptionPort &port, const std::vector<SubscriptionSelector> &symbols,
                                      std::uint64_t revision) {
+    prepareSubscriptionRangeChangeLocked(port, symbols, revision, port.fromTime);
+}
+
+void prepareSubscriptionRangeChangeLocked(SubscriptionPort &port, const std::vector<SubscriptionSelector> &symbols,
+                                          std::uint64_t revision, std::optional<std::int64_t> fromTime) {
     auto &observers = port.observers;
 
     if (!observers.listeners || observers.listeners->empty()) {
         return;
     }
 
-    auto frame = frameFor(port, symbols, revision);
+    auto frame = frameFor(port, symbols, revision, fromTime);
 
     for (const auto &old : port.symbols) {
         if (std::ranges::find(symbols, old) == symbols.end()) {
@@ -530,7 +536,7 @@ std::uint64_t addSubscriptionObserver(const std::shared_ptr<SubscriptionPort> &p
             checkContinuation(port->changes);
         }
 
-        auto frame = frameFor(*port, port->symbols, port->revision);
+        auto frame = frameFor(*port, port->symbols, port->revision, port->fromTime);
         frame->added = port->symbols;
         auto candidate = std::make_shared<ListenerSnapshot>(*observers.listeners);
         auto target = std::make_shared<ListenerSnapshot>();

@@ -62,3 +62,5 @@ Exact conformance results belong to the [developer reading path](../docs/develop
 - [Owned HISTORY receiving](subscriptions/HISTORY-RECEIVING.md): worker-owned ranges, detached AS-OF completeness/reset observations and explicit business eligibility.
 
 [Event callback execution](subscriptions/CALLBACK-EXECUTION.md): owned packets, borrowed schedulers, finite reentry and source retirement.
+
+- [Live HISTORY ranges](subscriptions/LIVE-HISTORY-RANGES.md): accepted fromTime/set transactions, applied delivery fences and convergent wire demand.

@@ -6,14 +6,18 @@
 #include "history_observation.hpp"
 #include "qd/api/endpoint_configuration.hpp"
 #include "qd/api/feed.hpp"
+#include "qd/encoding/symbol_reader.hpp"
+#include "qd/protocol/frame_reader.hpp"
 #include "receiving_profile.hpp"
 #include "recovery_test_peer.hpp"
 #include "recovery_test_support.hpp"
+#include "subscription_desired.hpp"
 #include "subscription_observer.hpp"
 
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <charconv>
 #include <doctest/doctest.h>
 #include <filesystem>
 #include <fstream>
@@ -55,6 +59,109 @@ struct ObservationFixture {
     }
 };
 } // namespace
+
+TEST_CASE("live fromTime API refuses unverified native types and ordinary mode atomically") {
+    a::RuntimeOptions limits;
+    limits.maximumSubscriptionsPerEndpoint = 1;
+    limits.dnsServers.push_back({{127, 0, 0, 1}});
+    a::ApiRuntime runtime(limits);
+    auto endpoint = runtime.createEndpoint();
+    auto feed = endpoint->getFeed();
+    CHECK_THROWS_AS(static_cast<void>(feed->createTimeSeriesSubscription<q::events::Quote>()), a::Error);
+    auto ordinary = feed->createSubscription<q::events::Quote>();
+    ordinary->addSymbols("IBM");
+    const auto before = ordinary->getSnapshot();
+    CHECK_FALSE(before.fromTime);
+    CHECK_THROWS_AS(static_cast<void>(ordinary->getFromTime()), a::Error);
+    CHECK_THROWS_AS(ordinary->setFromTime(2000), a::Error);
+    CHECK(ordinary->getSnapshot().revision == before.revision);
+    CHECK(ordinary->getSnapshot().symbols == before.symbols);
+    static_cast<void>(endpoint->closeAndAwaitTermination());
+    auto historyOptions = a::EndpointOptions{};
+    historyOptions.contract = a::DeliveryContract::HISTORY;
+    auto history = runtime.createEndpoint(historyOptions);
+
+    for (auto type : {a::EventType::QUOTE, a::EventType::PROFILE, a::EventType::TRADE, a::EventType::TRADE_ETH,
+                      a::EventType::SUMMARY, a::EventType::TEXT_MESSAGE, a::EventType::TEXT_CONFIGURATION,
+                      a::EventType::MESSAGE, a::EventType::CONFIGURATION, a::EventType::ORDER}) {
+        try {
+            static_cast<void>(history->getFeed()->createTimeSeriesSubscription({type}));
+            FAIL("an enum or raw indexed layout is not a verified time-series mapper");
+        } catch (const a::Error &error) {
+            CHECK(error.diagnostic().code == a::ErrorCode::UNSUPPORTED_PROFILE);
+            CHECK(error.diagnostic().stage == "subscription-time-series-event-type");
+        }
+    }
+
+    static_cast<void>(history->closeAndAwaitTermination());
+    runtime.closeAndAwaitTermination();
+}
+
+TEST_CASE("live fromTime observer candidates contain the new range and refusal preserves the whole cut") {
+    ObservationFixture f;
+    f.port->timeSeries = true;
+    f.port->fromTime = 2000;
+    f.port->maximumSymbols = 2;
+    f.port->symbols = {a::SubscriptionSelector::timeSeries(u"IBM", 2000)};
+    f.port->changes->maximumWork = 8;
+    // Preparation needs a nonempty observer registry, but this test never invokes a synthetic callback.
+    f.port->observers.listeners = std::make_shared<const d::ListenerSnapshot>(1);
+    f.port->observers.phases.resize(1);
+    {
+        d::SubscriptionObserverAdmission admission(f.port->changes);
+        std::lock_guard lock(f.port->mutex);
+        REQUIRE(d::replaceSubscriptionFromTimeLocked(*f.port, 3000));
+        CHECK(f.port->revision == 8);
+        CHECK(f.port->fromTime == 3000);
+        REQUIRE(f.port->observers.latest);
+        CHECK(f.port->observers.latest->snapshot.fromTime == 3000);
+        CHECK(f.port->observers.latest->snapshot.revision == 8);
+        CHECK(f.port->observers.latest->snapshot.symbols[0].fromTime() == 3000);
+        CHECK(f.port->observers.latest->added[0].fromTime() == 3000);
+        CHECK(f.port->observers.latest->removed.empty()); // Range is not identity.
+        const auto saved = f.port->observers.latest;
+        CHECK_FALSE(d::replaceSubscriptionFromTimeLocked(*f.port, 3000));
+        CHECK(f.port->revision == 8);
+        CHECK_THROWS_AS(d::replaceSubscriptionFromTimeLocked(*f.port, 1000), a::Error);
+        CHECK(f.port->revision == 8);
+        CHECK(f.port->fromTime == 3000);
+        CHECK(f.port->symbols[0].fromTime() == 3000);
+        CHECK(f.port->observers.latest == saved);
+        CHECK(f.port->statistics->snapshot().desiredRevision == 8);
+    }
+    f.port->observers.phases.clear();
+    f.port->observers.count = 0;
+    f.port->observers.phases.resize(1);
+    f.port->changes->maximumWork = 0;
+    {
+        d::SubscriptionObserverAdmission admission(f.port->changes);
+        std::lock_guard lock(f.port->mutex);
+        try {
+            static_cast<void>(d::replaceSubscriptionFromTimeLocked(*f.port, 1000));
+            FAIL("observer work must be funded before accepted range publication");
+        } catch (const a::Error &error) {
+            CHECK(error.diagnostic().code == a::ErrorCode::WORK_LIMIT);
+        }
+        CHECK(f.port->revision == 8);
+        CHECK(f.port->fromTime == 3000);
+        CHECK(f.port->observers.count == 0);
+    }
+    f.port->changes->maximumWork = 8;
+    f.port->observers.listeners = std::make_shared<const d::ListenerSnapshot>();
+    {
+        d::SubscriptionObserverAdmission admission(f.port->changes);
+        std::lock_guard lock(f.port->mutex);
+        REQUIRE(d::commitSubscriptionDesiredLocked(*f.port, {}, 3000));
+        REQUIRE(d::replaceSubscriptionFromTimeLocked(*f.port, -1001));
+        CHECK(f.port->symbols.empty());
+        CHECK(f.port->revision == 10);
+        CHECK(f.port->fromTime == -1001);
+        f.port->revision = std::numeric_limits<std::uint64_t>::max();
+        CHECK_THROWS_AS(d::replaceSubscriptionFromTimeLocked(*f.port, 0), a::Error);
+        CHECK(f.port->fromTime == -1001);
+        CHECK(f.port->symbols.empty());
+    }
+}
 
 TEST_CASE("public HISTORY contract is explicit and current business mappers fail before native registration") {
     a::RuntimeOptions runtimeOptions;
@@ -223,6 +330,38 @@ std::vector<std::byte> wireStep(unsigned step) {
         bytes.push_back(static_cast<std::byte>(static_cast<unsigned char>(unit)));
 
     return bytes;
+}
+
+/** Read a physical bound from the actual attached Java subscription fixture, not a native recomputation.
+ * @param phase Unique captured ADD phase under the standard TimeAndSale route.
+ * @return Exact observed signed raw HISTORY bound.
+ */
+std::int64_t attachedDemandBound(std::string_view phase) {
+    const auto path =
+        std::filesystem::path(__FILE__).parent_path().parent_path() / "fixtures" / "live-history-range" / "oracle.tsv";
+    std::ifstream input(path);
+    REQUIRE(input);
+    const auto prefix = std::string("wire-demand\t") + std::string(phase) + "\tADD\tTimeAndSale\tIBM\t";
+
+    for (std::string line; std::getline(input, line);) {
+        if (!line.empty() && line.back() == '\r')
+            line.pop_back();
+
+        if (!line.starts_with(prefix))
+            continue;
+
+        std::int64_t result = 0;
+        const auto text = std::string_view(line).substr(prefix.size());
+        const auto parsed = std::from_chars(text.data(), text.data() + text.size(), result);
+        REQUIRE(parsed.ec == std::errc{});
+        REQUIRE(parsed.ptr == text.data() + text.size());
+
+        return result;
+    }
+
+    FAIL("attached Java demand phase is missing");
+
+    return 0;
 }
 
 /** Generic lower receiver only; it exercises the same production queue, receiver and facade observation helpers.
@@ -667,4 +806,387 @@ TEST_CASE("HISTORY defaults activate all eight reserved views and exact resident
     auto overflow = options;
     overflow.history.pendingBytesPerSubscription = std::numeric_limits<std::size_t>::max();
     CHECK_THROWS_AS(static_cast<void>(d::prepareReceivingProfile(runtime, overflow, "127.0.0.1", 1234)), a::Error);
+}
+
+TEST_CASE("live HISTORY physical demand preserves MAX and coalesces range attributes without granting capability") {
+    const auto schema = timeAndSaleSchema();
+    std::vector<c::SubscriptionRequest> requests;
+    requests.reserve(4);
+    const auto append = [&](std::optional<std::int64_t> from, d::HistoryRangeEncoding encoding) {
+        d::appendReceivingDesiredRequest(requests, schema.recordContext(0), u"IBM", c::SubscriptionSelectorKind::EXACT,
+                                         c::SubscriptionFamily::HISTORY, from, encoding);
+    };
+    append(std::numeric_limits<std::int64_t>::max(), d::HistoryRangeEncoding::UNIX_MILLISECONDS_SEQUENCE);
+    REQUIRE(requests.size() == 1);
+    CHECK(requests[0].historyBound == std::numeric_limits<std::int64_t>::max());
+    append(3000, d::HistoryRangeEncoding::UNIX_MILLISECONDS_SEQUENCE);
+    CHECK(requests[0].historyBound == 12884901888LL); // Actual attached Java demand.
+    append(2000, d::HistoryRangeEncoding::UNIX_MILLISECONDS_SEQUENCE);
+    CHECK(requests[0].historyBound == 8589934592LL);
+    CHECK_THROWS_AS(append(1000, d::HistoryRangeEncoding::INDEX_DOMAIN), a::Error);
+    CHECK(requests[0].historyBound == 8589934592LL);
+    append({}, d::HistoryRangeEncoding::INDEX_DOMAIN);
+    CHECK(requests[0].historyBound == 0); // Ordinary/indexed view keeps the full physical range.
+    CHECK(requests.size() == 1);
+    CHECK_THROWS_AS(d::appendReceivingDesiredRequest(requests, schema.recordContext(0), u"IBM",
+                                                     c::SubscriptionSelectorKind::EXACT, c::SubscriptionFamily::STREAM,
+                                                     1000, d::HistoryRangeEncoding::UNIX_MILLISECONDS_SEQUENCE),
+                    a::Error);
+}
+
+TEST_CASE("live HISTORY production ranges shrink expand disable remove and replay without cross-range callbacks") {
+    auto bootstrap = t::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    q::test::TcpPeerScript script;
+    script.initialBytes = r::ready();
+    r::append(script.initialBytes, wireStep(0));
+    r::append(script.initialBytes, wireStep(1));
+    // Expansion invalidates old coverage; the peer responds with a fresh actual BEGIN-through-END snapshot.
+    script.replyBytes = wireStep(0);
+    r::append(script.replyBytes, wireStep(1));
+    r::append(script.replyBytes, wireStep(2));
+    script.readThroughMessage = 21;
+    script.waitForControllerReply = true;
+    script.waitForClientClose = true;
+    q::test::TcpPeerScript reconnected;
+    reconnected.initialBytes = r::ready();
+    reconnected.replyBytes = script.replyBytes;
+    reconnected.readThroughMessage = 21;
+    reconnected.waitForClientClose = true;
+    q::test::OwnedTcpPeer peer({{std::move(script), std::move(reconnected)}});
+    REQUIRE(peer.port() != 0);
+    const auto schema = timeAndSaleSchema();
+    a::EventRegistryWork registryWork;
+    auto registry = a::EventRegistry::create(schema, {}, {}, registryWork);
+    REQUIRE(registry);
+    a::RuntimeOptions limits;
+    limits.maximumSymbolsPerSubscription = 1;
+    limits.dnsServers.push_back({{127, 0, 0, 1}});
+    a::EndpointOptions options;
+    options.contract = a::DeliveryContract::HISTORY;
+    options.eventRegistry = *registry;
+    auto profile = d::prepareReceivingProfile(limits, options, "127.0.0.1", peer.port());
+    CHECK(profile.bindings.empty()); // No invented public TimeAndSale mapper.
+    auto exactRouting = profile.routing.work;
+    CHECK(d::prepayReceivingRouting(profile, exactRouting));
+    CHECK(exactRouting.visits == 0);
+    CHECK(exactRouting.textUnits == 0);
+    CHECK(exactRouting.bytes == 0);
+    auto shortRouting = profile.routing.work;
+    REQUIRE(shortRouting.visits > 0);
+    --shortRouting.visits;
+    const auto savedRouting = shortRouting;
+    CHECK_FALSE(d::prepayReceivingRouting(profile, shortRouting));
+    CHECK(shortRouting.visits == savedRouting.visits);
+    CHECK(shortRouting.textUnits == savedRouting.textUnits);
+    CHECK(shortRouting.bytes == savedRouting.bytes);
+    m::QueueSubmitWork noRouting{};
+    CHECK_FALSE(d::prepayReceivingRouting(profile, noRouting));
+    auto initialWork = profile.queueWork;
+    auto queue = d::createReceivingQueue(profile, initialWork);
+    REQUIRE(queue);
+    ObservationFixture f;
+    f.endpoint->options = options;
+    f.port->timeSeries = true;
+    f.port->maximumSymbols = 1;
+    f.port->fromTime = 2000;
+    f.port->symbols = {a::SubscriptionSelector::timeSeries(u"IBM", 2000)};
+    f.port->history.ranges.clear();
+    f.port->history.state = a::HistoryObservationState::NOT_MAPPED;
+    auto consumer = std::make_shared<HistoryRecorder>(f.port);
+    q::client::ReceiverWork receiverWork{100, 1000000};
+    auto openWork = profile.queueWork;
+    auto opened =
+        q::client::openSubscriptionReceiver(*queue, profile.schema, profile.family, profile.recoveryOptions.selectors,
+                                            {}, consumer, {0, 0, 0}, profile.clientLimits, receiverWork, openWork);
+    REQUIRE(opened);
+    auto handle = std::move(*opened);
+    auto submit = [&] {
+        std::lock_guard lock(f.port->mutex);
+        std::vector<c::SubscriptionRequest> requests;
+        requests.reserve(1);
+
+        for (const auto &symbol : f.port->symbols)
+            d::appendReceivingDesiredRequest(requests, schema.recordContext(0), symbol.eventSymbol(),
+                                             c::SubscriptionSelectorKind::EXACT, profile.family, symbol.fromTime(),
+                                             d::HistoryRangeEncoding::UNIX_MILLISECONDS_SEQUENCE);
+
+        {
+            std::lock_guard statisticsLock(f.port->statistics->mutex);
+            f.port->statistics->submittedSelectors = f.port->symbols.size();
+            f.port->statistics->submittedDesiredRevision = f.port->revision;
+        }
+        auto work = profile.submitWork;
+        auto ticket = handle.replace(requests, work);
+        REQUIRE(ticket);
+
+        return std::move(*ticket);
+    };
+    auto ticket = submit();
+
+    for (unsigned turn = 0; turn < 256 && !ticket.result(); ++turn) {
+        auto work = profile.queueWork;
+        REQUIRE(queue->progress(work));
+    }
+
+    REQUIRE(ticket.result());
+    t::RecoveryQueues queues;
+    queues.history = std::move(*queue);
+    auto preparation = profile.preparationWork;
+    auto owner = t::TcpRecovery::create(*bootstrap, profile.endpoint, std::move(profile.blueprint), std::move(queues),
+                                        profile.recoveryOptions, preparation);
+    REQUIRE(owner);
+    REQUIRE(owner->start());
+    std::string_view phase = "initial";
+    auto pump = [&](auto predicate) {
+        const auto deadline = std::chrono::steady_clock::now() + 5s;
+
+        do {
+            auto work = profile.turnWork;
+
+            for (unsigned action = 0; action < 64; ++action)
+                REQUIRE(owner->poll(work));
+
+            auto observation = profile.historyObservationWork;
+            d::publishHistorySnapshot(*owner, handle, f.port, observation);
+
+            if (predicate())
+                return;
+
+            std::this_thread::yield();
+        } while (std::chrono::steady_clock::now() < deadline);
+
+        INFO("phase=", static_cast<int>(owner->status().phase), " stage=", owner->status().first.stage,
+             " callbacks=", consumer->records(), " revision=", f.port->revision);
+        INFO("testPhase=", phase, " written=", owner->statistics().writtenSubscriptionRecords.value,
+             " activeRevision=", f.port->statistics->snapshot().activeDesiredRevision.value_or(0),
+             " readMessages=", owner->statistics().readMessages.value);
+        const auto observed = d::copyHistorySnapshot(f.port);
+        std::cout << "LIVE_RANGE state=" << static_cast<int>(observed.state) << " ranges=" << observed.ranges.size()
+                  << " peerError=" << static_cast<int>(peer.snapshot().error)
+                  << " replyWritten=" << peer.snapshot().sessions[0].replyBytesWritten
+                  << " clientState=" << static_cast<int>(handle.state()) << '\n';
+
+        if (const auto terminal = handle.terminal(); terminal && terminal->primary) {
+            std::cout << "LIVE_RANGE terminal=" << static_cast<int>(terminal->primary->error);
+
+            if (terminal->primary->source)
+                std::cout << " source="
+                          << std::visit(
+                                 [](auto error) {
+                                     return static_cast<int>(error);
+                                 },
+                                 *terminal->primary->source);
+
+            std::cout << '\n';
+        }
+
+        for (const auto &range : observed.ranges) {
+            std::cout << "LIVE_RANGE requested=" << range.status.requestedFrom
+                      << " mapped=" << range.status.mappingCurrent << " queued=" << range.status.queuedForKey
+                      << " gap=" << range.status.hadGap << " complete=" << range.status.completeDeliveredRange;
+
+            if (range.status.source)
+                std::cout << " sourceFrontier=" << range.status.source->sourceFrontier
+                          << " sourceComplete=" << range.status.source->completeRequestedRange;
+
+            std::cout << '\n';
+        }
+
+        for (const auto &batch : consumer->batches) {
+            for (const auto &record : batch.records()) {
+                std::cout << "LIVE_RANGE batchRevision=" << batch.appliedDesiredRevision().value_or(0)
+                          << " rawTime=" << record.rawTime.value_or(-1) << " flags=" << record.eventFlags << '\n';
+            }
+        }
+
+        REQUIRE(predicate());
+    };
+    auto mapped = [&] {
+        return ticket.result() && f.port->statistics->snapshot().activeDesiredRevision == f.port->revision;
+    };
+    pump([&] {
+        return consumer->records() == 2 && owner->statistics().writtenSubscriptionRecords.value == 1;
+    });
+    const auto first = d::copyHistorySnapshot(f.port);
+    REQUIRE(first.ranges.size() == 1);
+    CHECK(first.ranges[0].status.completeDeliveredRange);
+    const auto retained = consumer->batches.front();
+    REQUIRE(retained.appliedDesiredRevision() == 7);
+    auto change = [&](std::int64_t fromTime) {
+        {
+            d::SubscriptionObserverAdmission admission(f.port->changes);
+            std::lock_guard lock(f.port->mutex);
+            REQUIRE(d::replaceSubscriptionFromTimeLocked(*f.port, fromTime));
+        }
+        CHECK(d::copyHistorySnapshot(f.port).state == a::HistoryObservationState::NOT_MAPPED);
+        ticket = submit();
+    };
+    std::atomic<unsigned> reads{0};
+    std::atomic<bool> coherent{true};
+    std::jthread reader([&](std::stop_token stop) {
+        while (!stop.stop_requested()) {
+            const auto cut = d::copyHistorySnapshot(f.port);
+
+            if (cut.state == a::HistoryObservationState::CURRENT && cut.logicalRevision != cut.acceptedLogicalRevision)
+                coherent = false;
+
+            ++reads;
+            std::this_thread::yield();
+        }
+    });
+    const auto beforeShrink = consumer->records();
+    const auto beforeShrinkBatches = consumer->batches.size();
+    phase = "shrink";
+    change(3000);
+    pump([&] {
+        return mapped() && owner->statistics().writtenSubscriptionRecords.value == 2 &&
+               consumer->records() > beforeShrink;
+    });
+
+    for (std::size_t batch = beforeShrinkBatches; batch < consumer->batches.size(); ++batch)
+        for (const auto &record : consumer->batches[batch].records())
+            CHECK(record.rawTime >= 12884901888LL);
+
+    const auto beforeExpand = consumer->records();
+    phase = "expand";
+    change(1000);
+    pump([&] {
+        return mapped() && owner->statistics().writtenSubscriptionRecords.value == 3 &&
+               consumer->records() > beforeExpand;
+    });
+    const auto partial = d::copyHistorySnapshot(f.port);
+    REQUIRE(partial.ranges.size() == 1);
+    CHECK_FALSE(partial.ranges[0].status.completeDeliveredRange);
+    peer.allowReply(0);
+    phase = "expanded-fresh-coverage";
+    pump([&] {
+        const auto cut = d::copyHistorySnapshot(f.port);
+
+        return cut.ranges.size() == 1 && cut.ranges[0].status.completeDeliveredRange;
+    });
+    const auto beforeDisable = consumer->records();
+    change(std::numeric_limits<std::int64_t>::max());
+    pump([&] {
+        return mapped() && owner->statistics().writtenSubscriptionRecords.value == 4;
+    });
+    CHECK(consumer->records() == beforeDisable);
+    {
+        d::SubscriptionObserverAdmission admission(f.port->changes);
+        std::lock_guard lock(f.port->mutex);
+        // Accepted changes coalesce before the worker captures a replacement; none of these ranges leak to wire.
+        REQUIRE(d::replaceSubscriptionFromTimeLocked(*f.port, 1000));
+        REQUIRE(d::replaceSubscriptionFromTimeLocked(*f.port, 2000));
+        REQUIRE(d::commitSubscriptionDesiredLocked(*f.port, {}, f.port->fromTime));
+    }
+    ticket = submit();
+    pump([&] {
+        return mapped() && owner->statistics().writtenSubscriptionRecords.value == 5;
+    });
+    CHECK(d::copyHistorySnapshot(f.port).ranges.empty());
+    CHECK(retained.appliedDesiredRevision() == 7);
+    CHECK(retained.records()[0].symbol == u"IBM");
+    CHECK(first.ranges[0].status.completeDeliveredRange);
+    const auto oldSourceEpoch = first.sourceEpoch;
+    // Keep the selected old lease, but release completed test captures before the eight-batch reservation fills.
+    consumer->batches.clear();
+    const auto beforeReconnect = consumer->records();
+    REQUIRE(owner->requestDisconnect(true));
+    phase = "disconnect";
+    pump([&] {
+        if (const auto notice = handle.resetNotice())
+            static_cast<void>(handle.acknowledgeReset(notice->sequence));
+
+        return owner->status().phase == t::RecoveryPhase::SUSPENDED;
+    });
+    {
+        std::lock_guard lock(f.endpoint->mutex);
+        ++f.endpoint->connectionRevision;
+        f.endpoint->activeDeliveryRevision = f.endpoint->connectionRevision;
+    }
+    {
+        d::SubscriptionObserverAdmission admission(f.port->changes);
+        std::lock_guard lock(f.port->mutex);
+        REQUIRE(d::replaceSubscriptionFromTimeLocked(*f.port, 1000));
+        REQUIRE(d::commitSubscriptionDesiredLocked(*f.port, {a::SubscriptionSelector::timeSeries(u"IBM", 1000)},
+                                                   f.port->fromTime));
+    }
+    ticket = submit();
+    REQUIRE(owner->requestReconnect());
+    phase = "reconnected-latest-range";
+    pump([&] {
+        const auto cut = d::copyHistorySnapshot(f.port);
+
+        return mapped() && consumer->records() > beforeReconnect && cut.ranges.size() == 1 &&
+               cut.ranges[0].status.requestedFrom == 4294967296LL && cut.ranges[0].status.completeDeliveredRange;
+    });
+    const auto fresh = d::copyHistorySnapshot(f.port);
+    REQUIRE(fresh.sourceEpoch);
+    REQUIRE(oldSourceEpoch);
+    CHECK(*fresh.sourceEpoch > *oldSourceEpoch);
+    CHECK_FALSE(fresh.ranges[0].status.epoch.matches(first.ranges[0].status.epoch));
+    CHECK(first.ranges[0].status.completeDeliveredRange);
+    REQUIRE(owner->requestStop());
+    pump([&] {
+        return owner->status().phase == t::RecoveryPhase::CLOSED;
+    });
+    reader.request_stop();
+    reader.join();
+    CHECK(reads.load() > 0);
+    CHECK(coherent.load());
+    const auto finish = std::chrono::steady_clock::now() + 5s;
+
+    while (!peer.snapshot().finished && std::chrono::steady_clock::now() < finish)
+        std::this_thread::yield();
+
+    const auto captured = peer.snapshot();
+    REQUIRE(captured.error == q::test::TcpPeerError::NONE);
+    REQUIRE(captured.finished);
+    auto decodeDemand = [&](std::span<const std::byte> bytes) {
+        q::protocol::FrameReader frames({65536, 65545});
+        std::vector<std::pair<std::int32_t, std::optional<std::int64_t>>> demand;
+
+        while (!bytes.empty()) {
+            auto frame = frames.feed(bytes);
+            bytes = bytes.subspan(frame.accepted);
+            REQUIRE(frame.status != q::protocol::FrameStatus::FAILED);
+
+            if (!frame.frame || (frame.frame->type != 21 && frame.frame->type != 22))
+                continue;
+
+            auto payload = std::span<const std::byte>(frame.frame->payload);
+            q::encoding::SymbolReader symbols({128, 128, 128}, 1);
+            auto symbol = symbols.read(payload);
+            REQUIRE(symbol.value);
+            CHECK(symbol.value->units == u"IBM");
+            payload = payload.subspan(symbol.consumed);
+            const auto id = q::encoding::readCompactInt(payload);
+            REQUIRE(id.status == q::encoding::Status::OK);
+            payload = payload.subspan(id.consumed);
+            std::optional<std::int64_t> bound;
+
+            if (frame.frame->type == 21) {
+                const auto value = q::encoding::readCompactLong(payload);
+                REQUIRE(value.status == q::encoding::Status::OK);
+                payload = payload.subspan(value.consumed);
+                bound = value.value;
+            }
+
+            CHECK(payload.empty());
+            demand.emplace_back(*frame.frame->type, bound);
+        }
+
+        return demand;
+    };
+    const auto demand = decodeDemand(captured.sessions[0].received);
+    const std::vector<std::pair<std::int32_t, std::optional<std::int64_t>>> expected{
+        {21, attachedDemandBound("first-range")},
+        {21, attachedDemandBound("queued-after-shrink")},
+        {21, attachedDemandBound("expand")},
+        {21, attachedDemandBound("disable")},
+        {22, {}}};
+    CHECK(demand == expected); // Actual attached Java transition semantics, independently decoded native wire.
+    const std::vector<std::pair<std::int32_t, std::optional<std::int64_t>>> reconnectedDemand{
+        {21, attachedDemandBound("expand")}};
+    CHECK(decodeDemand(captured.sessions[1].received) == reconnectedDemand);
 }
