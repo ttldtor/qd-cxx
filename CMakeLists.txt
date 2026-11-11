@@ -1616,6 +1616,7 @@ if(BUILD_TESTING)
         set_target_properties(qdcxx_large_tape_tests PROPERTIES CXX_EXTENSIONS OFF)
         add_test(NAME source_sequence_large COMMAND qdcxx_large_tape_tests
             "${CMAKE_CURRENT_BINARY_DIR}/large-tape-streaming")
+        set_tests_properties(source_sequence_large PROPERTIES TIMEOUT 300)
         add_test(NAME source_sequence_cli COMMAND "${CMAKE_COMMAND}"
             "-DPROGRAM=$<TARGET_FILE:qdcxx_tape_inspect>"
             "-DCOMPARATOR=$<TARGET_FILE:qdcxx_large_tape_tests>"
