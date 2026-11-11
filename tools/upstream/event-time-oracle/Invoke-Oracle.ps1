@@ -109,7 +109,8 @@ try {
     }
     Invoke-Logged 'java-version' $java @('-Xmx128m','-version')
     $version = ([IO.File]::ReadAllText((Join-Path $run 'java-version.stderr')) + [IO.File]::ReadAllText((Join-Path $run 'java-version.stdout'))).Trim()
-    if ($version -notmatch 'version "1\.8\.') { throw 'Oracle requires JDK8' }
+    $javaVersion = [regex]::Match($version, '(?m)^(?:\S+Z )?((?:openjdk|java) version "1\.8\.[^"\r\n]+")\r?$').Groups[1].Value
+    if (!$javaVersion) { throw 'Oracle requires JDK8' }
     $harness = Join-Path $PSScriptRoot 'EventTimeOracle.java'
     $classes = Join-Path $run 'classes'
     Invoke-Logged 'javac' $javac @('-J-Xmx128m','-encoding','UTF-8','-cp',($classpath -join ';'),'-d',$classes,$harness)
@@ -133,7 +134,7 @@ try {
     $after = @(ClassInventory)
     $after | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $run 'classes-after.json')
     if(($before|ConvertTo-Json -Depth 5 -Compress) -cne ($after|ConvertTo-Json -Depth 5 -Compress)) { throw 'Production classes changed during capture' }
-    $publicProvenance=[ordered]@{revision=$expectedRevision;javaVersion=($version -split "`n")[0];javaSha256=(Get-FileHash $java).Hash.ToLowerInvariant();javacSha256=(Get-FileHash $javac).Hash.ToLowerInvariant();harnessSha256=(Get-FileHash $harness).Hash.ToLowerInvariant();launcherSha256=(Get-FileHash $PSCommandPath).Hash.ToLowerInvariant();upstreamSources=$sources;productionClassInventorySha256=(Get-FileHash (Join-Path $run 'classes-before.json')).Hash.ToLowerInvariant();fixtureSha256=$observedHash;rows=@(Get-Content -LiteralPath $observed).Count;timezoneInvariant=$true}
+    $publicProvenance=[ordered]@{revision=$expectedRevision;javaVersion=$javaVersion;javaSha256=(Get-FileHash $java).Hash.ToLowerInvariant();javacSha256=(Get-FileHash $javac).Hash.ToLowerInvariant();harnessSha256=(Get-FileHash $harness).Hash.ToLowerInvariant();launcherSha256=(Get-FileHash $PSCommandPath).Hash.ToLowerInvariant();upstreamSources=$sources;productionClassInventorySha256=(Get-FileHash (Join-Path $run 'classes-before.json')).Hash.ToLowerInvariant();fixtureSha256=$observedHash;rows=@(Get-Content -LiteralPath $observed).Count;timezoneInvariant=$true}
     $fixture=Join-Path $repo 'tests/fixtures/event-times/oracle.tsv'
     $representationFixture=Join-Path $repo 'tests/fixtures/event-times/representability.tsv'
     $provenance=Join-Path $repo 'tests/fixtures/event-times/provenance.json'

@@ -48,10 +48,9 @@ does not mean a script runs in CTest. None of these scripts is a production C++ 
 | `tests/conformance/protocol/human-inspection/design_fixtures.py`, `prepare_evidence.py`, `format_negative.py` | Manual designed-fixture generation, temporary byte reproduction/build metadata and formatter rejection. prepare_evidence invokes design_fixtures with sys.executable and writes reports: do not run it to refresh historical evidence. Replace generator with a test-only C++ fixture producer, metadata/formatter orchestration with PowerShell; prove identical designed bytes in a fresh directory. These are designed expectations, not Java oracle captures. |
 | `tests/conformance/probe_utf_reuse.py` | Historical UTF library-reuse experiment: generates C++/CMake in ignored work storage from pinned inputs. Not current CTest; keep archived reproducibility unless reused, then migrate bounded generator to C++/CMake. It must not become a current prerequisite. |
 
-The scoped Java oracle `Invoke-Oracle.ps1` workflows and tape `Audit-Evidence.ps1` already provide
-non-Python paths. This does not prove all older audits are replaced or that their negative checks
-are equivalent. No workflow was retired by this task. Current library-only tests and
-BUILD_TESTING=OFF have no CMake Python requirement; documented logging/acquisition can still need it.
+The Java oracle launchers under `tools/upstream/` provide non-Python verification. The historical
+tape evidence audit and other task-specific audits are archived with their original inputs.
+Current library-only tests and BUILD_TESTING=OFF have no CMake Python requirement.
 
 ## Ordered migration acceptance
 

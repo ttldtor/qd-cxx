@@ -4,7 +4,7 @@
   "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
   "javacSha256": "633143e961aa18051c09112b85333f5cdbd845b54eb39678eb15b91ca8bbb527",
   "harnessSha256": "27c78b4320b54d9173395e1185c2ab2fef0894daeae15fb602332f0abfeb6fe8",
-  "launcherSha256": "2707c169c9f100b8360f8507ea257f6a3483c3e98af1a2f3a5fc38577d74cb45",
+  "launcherSha256": "a26f42f77ae3d81049cdb62948b54e557f58a9d53c7c6a788b207a4c870bc9c1",
   "upstreamSources": [
     {
       "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/Quote.java",

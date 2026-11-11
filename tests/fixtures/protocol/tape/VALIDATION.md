@@ -54,12 +54,9 @@ unchanged for build/format/verification logs. New oracle generation and strict v
 Java, launched through PowerShell. The existing tracked Python cache modification was left intact;
 no evidence was removed as cleanup.
 
-EN/RU technical claims were manually synchronized; the audit checks links and shared evidence
-targets, not translation semantics. Review can run the [launcher recipe](../../../../tools/upstream/tape-oracle/README.md)
-and `pwsh -NoProfile -File tests/fixtures/protocol/tape/Audit-Evidence.ps1` independently.
-The recorded local audit adds `-CheckPreexistingState` to check the unrelated tracked cache against
-its starting hash too. Omit that switch on a fresh checkout: interpreter cache bytes are local
-session state, not portable oracle expectations, and the default audit excludes `__pycache__`.
+To reproduce the Java comparison from a fresh checkout, follow the
+[launcher recipe](../../../../tools/upstream/tape-oracle/README.md). The original local audit and
+its workspace-specific inputs are archived together.
 
 The QDCXX-018 status correction in state/task index reflects **prior** independent review:
 MSVC Release/GCC ASan+UBSan, ten suites each, format Check and hash/diff checks. Copies of the
