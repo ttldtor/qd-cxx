@@ -548,8 +548,8 @@ TEST_CASE("registry byte ceiling includes actual shared state and control alloca
 }
 
 TEST_CASE("SDK defaults retain all real regional records and explicit physical delegate families") {
-    constexpr std::size_t TICKER_RECORDS = 39;
-    constexpr std::size_t TICKER_ROUTES = 66;
+    constexpr std::size_t TICKER_RECORDS = 40;
+    constexpr std::size_t TICKER_ROUTES = 67;
     auto ticker = api::detail::defaultReceivingRegistry(api::DeliveryContract::TICKER);
     REQUIRE(ticker);
     REQUIRE(ticker->schema().records().size() == TICKER_RECORDS);
@@ -561,8 +561,8 @@ TEST_CASE("SDK defaults retain all real regional records and explicit physical d
         lookups += record.lookups.size();
     }
 
-    CHECK(fields == 257);
-    CHECK(lookups == 639);
+    CHECK(fields == 266);
+    CHECK(lookups == 650);
 
     for (char16_t exchange = u'A'; exchange <= u'Z'; ++exchange) {
         const auto name = u"Quote&" + std::u16string(1, exchange);
@@ -575,19 +575,23 @@ TEST_CASE("SDK defaults retain all real regional records and explicit physical d
                                         u"OrderImbalance#NUAM"};
 
     for (std::size_t i = 0; i < imbalanceNames.size(); ++i) {
-        const auto recordId = TICKER_RECORDS - imbalanceNames.size() + i;
+        const auto recordId = 35 + i;
         const auto &record = ticker->schema().records()[recordId];
-        const auto &route = ticker->registrations()[TICKER_ROUTES - imbalanceNames.size() + i];
+        const auto &route = ticker->registrations()[62 + i];
         CHECK(record.name == imbalanceNames[i]);
         CHECK_FALSE(record.hasTime);
         CHECK(route.type == api::EventType::ORDER_IMBALANCE);
         CHECK(route.localRecordId == static_cast<std::int32_t>(recordId));
     }
 
+    CHECK(ticker->schema().records()[39].name == u"Greeks");
+    CHECK(ticker->registrations()[66].type == api::EventType::GREEKS);
+    CHECK(ticker->registrations()[66].localRecordId == 39);
+
     auto history = api::detail::defaultReceivingRegistry(api::DeliveryContract::HISTORY);
     REQUIRE(history);
-    REQUIRE(history->schema().records().size() == 7);
-    REQUIRE(history->registrations().size() == 8);
+    REQUIRE(history->schema().records().size() == 8);
+    REQUIRE(history->registrations().size() == 9);
     CHECK(history->schema().records()[2].name == u"SpreadOrder");
     CHECK(history->schema().records()[3].name == u"AnalyticOrder");
     CHECK(history->schema().records()[4].name == u"OtcMarketsOrder");
@@ -605,6 +609,9 @@ TEST_CASE("SDK defaults retain all real regional records and explicit physical d
     CHECK(series.lookups[index->field].name == u"Index");
     CHECK(history->registrations()[7].type == api::EventType::SERIES);
     CHECK(history->registrations()[7].localRecordId == SERIES_RECORD_ID);
+    CHECK(history->schema().records()[7].name == u"Greeks");
+    CHECK(history->registrations()[8].type == api::EventType::GREEKS);
+    CHECK(history->registrations()[8].localRecordId == 7);
     auto defaults = api::EventRegistryLimits{};
     api::EventRegistryWork work;
     auto unchanged = api::EventRegistry::builtIn(defaults, work);
@@ -621,7 +628,7 @@ TEST_CASE("SDK defaults retain all real regional records and explicit physical d
     CHECK(profile.endpoint.settings().budgets.schema.records == 42);
     CHECK(profile.endpoint.settings().budgets.layout.records == 42);
     CHECK(profile.endpoint.settings().budgets.session.context.descriptions == 42);
-    CHECK(profile.eventPlans.size() == 512);
+    CHECK(profile.eventPlans.size() == 1024);
     CHECK(profile.routing.retainedMetadataBytes >=
           profile.eventPlans.capacity() * sizeof(api::detail::ReceivingEventPlan));
     std::cout << "DERIVED_DEFAULT_STORAGE registry=" << ticker->storageBytes()
