@@ -1427,6 +1427,8 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
         bool configuration = false;
         bool order = false;
         bool marketMaker = false;
+        bool spreadOrder = false;
+        bool analyticOrder = false;
 
         for (const auto type : types) {
             switch (type) {
@@ -1463,6 +1465,12 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             case EventType::MARKET_MAKER:
                 marketMaker = true;
                 break;
+            case EventType::SPREAD_ORDER:
+                spreadOrder = true;
+                break;
+            case EventType::ANALYTIC_ORDER:
+                analyticOrder = true;
+                break;
             default:
                 reject(ErrorCode::INVALID_ARGUMENT, "subscription-event-types");
             }
@@ -1471,7 +1479,8 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
         const auto selection = static_cast<detail::EventSelection>(
             (quote ? 1U : 0U) | (profile ? 2U : 0U) | (trade ? 4U : 0U) | (tradeETH ? 8U : 0U) | (summary ? 16U : 0U) |
             (textMessage ? 32U : 0U) | (textConfiguration ? 64U : 0U) | (message ? 128U : 0U) |
-            (configuration ? 256U : 0U) | (order ? 512U : 0U) | (marketMaker ? 1024U : 0U));
+            (configuration ? 256U : 0U) | (order ? 512U : 0U) | (marketMaker ? 1024U : 0U) |
+            (spreadOrder ? 1U << 11 : 0U) | (analyticOrder ? 1U << 12 : 0U));
         const auto delivery = registeredDelivery  ? detail::EventDelivery::REGISTERED
                               : quote             ? detail::EventDelivery::QUOTE
                               : profile           ? detail::EventDelivery::PROFILE
@@ -1482,6 +1491,8 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                               : textConfiguration ? detail::EventDelivery::TEXT_CONFIGURATION
                               : message           ? detail::EventDelivery::MESSAGE
                               : marketMaker       ? detail::EventDelivery::MARKET_MAKER
+                              : spreadOrder       ? detail::EventDelivery::SPREAD_ORDER
+                              : analyticOrder     ? detail::EventDelivery::ANALYTIC_ORDER
                               : order             ? detail::EventDelivery::ORDER
                                                   : detail::EventDelivery::CONFIGURATION;
         const auto control = port_->control.lock();
@@ -1532,13 +1543,19 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             }
 
             // Business capability is explicit; an indexed layout alone does not make a TimeSeriesEvent.
+            constexpr auto historyTypes = static_cast<unsigned>(detail::EventSelection::ORDER) |
+                                          static_cast<unsigned>(detail::EventSelection::MARKET_MAKER) |
+                                          static_cast<unsigned>(detail::EventSelection::SPREAD_ORDER) |
+                                          static_cast<unsigned>(detail::EventSelection::ANALYTIC_ORDER);
+
             if (port_->options.contract == DeliveryContract::HISTORY &&
-                (static_cast<unsigned>(selection) & ~(512U | 1024U))) {
+                (static_cast<unsigned>(selection) & ~historyTypes)) {
                 reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-history-event-type");
             }
 
             if ((order && port_->options.contract == DeliveryContract::STREAM) ||
-                (marketMaker && port_->options.contract != DeliveryContract::HISTORY)) {
+                ((marketMaker || spreadOrder || analyticOrder) &&
+                 port_->options.contract != DeliveryContract::HISTORY)) {
                 reject(ErrorCode::UNSUPPORTED_PROFILE, "order-requires-history");
             }
 
@@ -1563,6 +1580,9 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             bool registeredMarketMaker =
                 !port_->options.eventRegistry && port_->options.contract == DeliveryContract::HISTORY;
 
+            bool registeredSpreadOrder = registeredMarketMaker;
+            bool registeredAnalyticOrder = registeredMarketMaker;
+
             if (port_->options.eventRegistry) {
                 for (const auto &registration : port_->options.eventRegistry->registrations()) {
                     if (!detail::receivingRouteSupportsContract(registration, port_->options.contract)) {
@@ -1570,6 +1590,8 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                     }
 
                     registeredMarketMaker = registeredMarketMaker || registration.type == EventType::MARKET_MAKER;
+                    registeredSpreadOrder = registeredSpreadOrder || registration.type == EventType::SPREAD_ORDER;
+                    registeredAnalyticOrder = registeredAnalyticOrder || registration.type == EventType::ANALYTIC_ORDER;
                     registeredMessage = registeredMessage || registration.type == EventType::MESSAGE;
                     registeredConfiguration = registeredConfiguration || registration.type == EventType::CONFIGURATION;
                     registeredOrder = registeredOrder || registration.type == EventType::ORDER;
@@ -1591,7 +1613,8 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                 (summary && !registeredSummary) || (textMessage && !registeredTextMessage) ||
                 (textConfiguration && !registeredTextConfiguration) || (message && !registeredMessage) ||
                 (configuration && !registeredConfiguration) || (order && !registeredOrder) ||
-                (marketMaker && !registeredMarketMaker)) {
+                (marketMaker && !registeredMarketMaker) || (spreadOrder && !registeredSpreadOrder) ||
+                (analyticOrder && !registeredAnalyticOrder)) {
                 reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-unregistered-event");
             }
 
@@ -1728,6 +1751,8 @@ template class Subscription<events::Message>;
 template class Subscription<events::Configuration>;
 template class Subscription<events::Order>;
 template class Subscription<events::MarketMaker>;
+template class Subscription<events::SpreadOrder>;
+template class Subscription<events::AnalyticOrder>;
 template class Subscription<RegisteredEvent>;
 
 Feed::Feed(std::shared_ptr<detail::EndpointPort> port) : port_(std::move(port)) {
@@ -2413,6 +2438,10 @@ class TypedConsumer final : public client::SubscriptionConsumer {
                 return deliver<events::Summary>(batch, listeners, executor, completion, historyRevision);
             case EventDelivery::MARKET_MAKER:
                 return deliver<events::MarketMaker>(batch, listeners, executor, completion, historyRevision);
+            case EventDelivery::SPREAD_ORDER:
+                return deliver<events::SpreadOrder>(batch, listeners, executor, completion, historyRevision);
+            case EventDelivery::ANALYTIC_ORDER:
+                return deliver<events::AnalyticOrder>(batch, listeners, executor, completion, historyRevision);
             case EventDelivery::ORDER:
                 return deliver<events::Order>(batch, listeners, executor, completion, historyRevision);
             case EventDelivery::TEXT_MESSAGE:

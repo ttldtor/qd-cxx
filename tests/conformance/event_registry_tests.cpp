@@ -405,11 +405,15 @@ TEST_CASE("receiving preparation selects all explicit same-kind routes and deriv
     CHECK(profile.bindings[0].localId == 2);
     CHECK(profile.bindings[1].localId == 3);
     CHECK(profile.bindings[2].localId == 1);
-    CHECK(profile.eventPlans[0].bindingCount == 2);
-    CHECK(profile.eventPlans[0].limits.bindings == 2);
-    CHECK(profile.eventPlans[0].limits.shapeFields == 18);
-    CHECK(profile.eventPlans[1].bindingIndices[0] == 2);
-    CHECK(profile.eventPlans[1].bindingCount == 1);
+    const auto &quotes = api::detail::receivingEventPlan(profile, api::detail::EventSelection::QUOTE);
+    const auto &profiles = api::detail::receivingEventPlan(profile, api::detail::EventSelection::PROFILE);
+    CHECK(quotes.bindingCount == 2);
+    CHECK(quotes.limits.bindings == 2);
+    CHECK(quotes.limits.shapeFields == 18);
+    CHECK(profiles.bindingIndices[0] == 2);
+    CHECK(profiles.bindingCount == 1);
+    CHECK(profile.eventPlans.size() == 4);
+    CHECK(api::detail::receivingEventPlan(profile, api::detail::EventSelection::ANALYTIC_ORDER).bindingCount == 0);
     CHECK(profile.clientLimits.commandEntries == 15);
     CHECK(profile.endpoint.settings().budgets.desired.entries == 30);
     CHECK(profile.endpoint.settings().budgets.desired.totalSymbolUnits == 30 * runtime.maximumSymbolUnits);
@@ -433,7 +437,7 @@ TEST_CASE("receiving preparation selects all explicit same-kind routes and deriv
     };
 
     const auto consumer = std::make_shared<Consumer>();
-    auto plan = profile.eventPlans[0];
+    auto plan = api::detail::receivingEventPlan(profile, api::detail::EventSelection::QUOTE);
     auto handle = root::client::openSubscriptionReceiver(
         *queue, profile.schema, profile.family, core::SubscriptionSelectorPolicy::CANONICAL_EXACT_V1,
         std::span(profile.bindings).subspan(plan.bindingIndices[0], plan.bindingCount), consumer, plan.limits,
@@ -502,7 +506,7 @@ TEST_CASE("maximum same-kind route list receives complete duplicate-inspection p
     api::EndpointOptions options;
     options.eventRegistry = *configured;
     auto profile = api::detail::prepareReceivingProfile(runtime, options, "127.0.0.1", 12345);
-    const auto &plan = profile.eventPlans[0];
+    const auto &plan = api::detail::receivingEventPlan(profile, api::detail::EventSelection::QUOTE);
     REQUIRE(plan.bindingCount == 16);
     // Existing receiver visits once, twice per route and once per preceding route during duplicate checks.
     CHECK(plan.work.visits >= 1 + 2 * plan.bindingCount + plan.bindingCount * (plan.bindingCount - 1) / 2);
@@ -567,8 +571,10 @@ TEST_CASE("SDK defaults retain all real regional records and explicit physical d
 
     auto history = api::detail::defaultReceivingRegistry(api::DeliveryContract::HISTORY);
     REQUIRE(history);
-    CHECK(history->schema().records().size() == 2);
-    CHECK(history->registrations().size() == 3);
+    REQUIRE(history->schema().records().size() == 4);
+    CHECK(history->registrations().size() == 5);
+    CHECK(history->schema().records()[2].name == u"SpreadOrder");
+    CHECK(history->schema().records()[3].name == u"AnalyticOrder");
     auto defaults = api::EventRegistryLimits{};
     api::EventRegistryWork work;
     auto unchanged = api::EventRegistry::builtIn(defaults, work);
@@ -585,7 +591,7 @@ TEST_CASE("SDK defaults retain all real regional records and explicit physical d
     CHECK(profile.endpoint.settings().budgets.schema.records == 42);
     CHECK(profile.endpoint.settings().budgets.layout.records == 42);
     CHECK(profile.endpoint.settings().budgets.session.context.descriptions == 42);
-    CHECK(profile.eventPlans.size() == 2047);
+    CHECK(profile.eventPlans.size() == 256);
     CHECK(profile.routing.retainedMetadataBytes >=
           profile.eventPlans.capacity() * sizeof(api::detail::ReceivingEventPlan));
     std::cout << "DERIVED_DEFAULT_STORAGE registry=" << ticker->storageBytes()

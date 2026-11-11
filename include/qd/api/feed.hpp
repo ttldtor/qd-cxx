@@ -7,12 +7,14 @@
 #include "qd/api/history_snapshot.hpp"
 #include "qd/api/subscription_selector.hpp"
 #include "qd/client/endpoint_options.hpp"
+#include "qd/events/analytic_order.hpp"
 #include "qd/events/candle_symbol.hpp"
 #include "qd/events/configuration.hpp"
 #include "qd/events/market_maker.hpp"
 #include "qd/events/order.hpp"
 #include "qd/events/profile.hpp"
 #include "qd/events/quote.hpp"
+#include "qd/events/spread_order.hpp"
 #include "qd/events/summary.hpp"
 #include "qd/events/text_events.hpp"
 #include "qd/events/trade.hpp"
@@ -210,7 +212,8 @@ struct FeedFilterCategory;
 /** Independently owning supported event value; inspect its actual class with std::visit or std::get_if. */
 using RegisteredEvent =
     std::variant<events::Quote, events::Profile, events::Trade, events::TradeETH, events::Summary, events::TextMessage,
-                 events::TextConfiguration, events::Message, events::Configuration, events::Order, events::MarketMaker>;
+                 events::TextConfiguration, events::Message, events::Configuration, events::Order, events::MarketMaker,
+                 events::SpreadOrder, events::AnalyticOrder>;
 
 /** Independently owned observation of one complete accepted local subscription revision. */
 struct SubscriptionSnapshot {
@@ -244,7 +247,7 @@ using SubscriptionChangeListener = std::function<void(const SubscriptionChange &
  * A listener's span lasts only through that invocation; copying an Event produces an owning value.
  * @tparam Event Existing events::Quote, events::Profile, events::Trade, events::TradeETH, events::Summary,
  * events::TextMessage, events::TextConfiguration, events::Message, events::Configuration, events::Order,
- * events::MarketMaker or RegisteredEvent.
+ * events::MarketMaker, events::SpreadOrder, events::AnalyticOrder or RegisteredEvent.
  */
 template <class Event> class Subscription final {
     static_assert(std::is_same_v<Event, events::Quote> || std::is_same_v<Event, events::Profile> ||
@@ -252,6 +255,7 @@ template <class Event> class Subscription final {
                   std::is_same_v<Event, events::Summary> || std::is_same_v<Event, events::TextMessage> ||
                   std::is_same_v<Event, events::TextConfiguration> || std::is_same_v<Event, events::Message> ||
                   std::is_same_v<Event, events::Configuration> || std::is_same_v<Event, events::MarketMaker> ||
+                  std::is_same_v<Event, events::SpreadOrder> || std::is_same_v<Event, events::AnalyticOrder> ||
                   std::is_same_v<Event, events::Order> || std::is_same_v<Event, RegisteredEvent>);
     std::shared_ptr<detail::SubscriptionPort> port_;
     friend class Feed;
@@ -486,6 +490,8 @@ extern template class Subscription<events::Message>;
 extern template class Subscription<events::Configuration>;
 extern template class Subscription<events::Order>;
 extern template class Subscription<events::MarketMaker>;
+extern template class Subscription<events::SpreadOrder>;
+extern template class Subscription<events::AnalyticOrder>;
 extern template class Subscription<RegisteredEvent>;
 
 /** Endpoint's typed registration entry point; owns no SDK thread or bootstrap. */
@@ -514,6 +520,7 @@ class Feed final {
                       std::is_same_v<Event, events::Summary> || std::is_same_v<Event, events::TextMessage> ||
                       std::is_same_v<Event, events::TextConfiguration> || std::is_same_v<Event, events::Message> ||
                       std::is_same_v<Event, events::Configuration> || std::is_same_v<Event, events::MarketMaker> ||
+                      std::is_same_v<Event, events::SpreadOrder> || std::is_same_v<Event, events::AnalyticOrder> ||
                       std::is_same_v<Event, events::Order>);
 
         if constexpr (std::is_same_v<Event, events::Quote>)
@@ -536,6 +543,10 @@ class Feed final {
             return EventType::CONFIGURATION;
         else if constexpr (std::is_same_v<Event, events::MarketMaker>)
             return EventType::MARKET_MAKER;
+        else if constexpr (std::is_same_v<Event, events::SpreadOrder>)
+            return EventType::SPREAD_ORDER;
+        else if constexpr (std::is_same_v<Event, events::AnalyticOrder>)
+            return EventType::ANALYTIC_ORDER;
         else
             return EventType::ORDER;
     }
@@ -543,10 +554,11 @@ class Feed final {
     public:
     /** Create a bounded logical registration, before or after connect, without application polling.
      * All registered records of the selected type participate; an unregistered type rejects synchronously.
-     * Ordinary Order and MarketMaker require HISTORY; Quote-derived Order uses TICKER. Unsupported selections reject
-     * before publication.
+     * Ordinary Order, MarketMaker, SpreadOrder and AnalyticOrder require HISTORY; Quote-derived Order uses TICKER.
+     * Unsupported selections reject before publication.
      * @tparam Event Existing Quote, Profile, Trade, TradeETH, Summary, TextMessage, TextConfiguration, Message or
-     * Configuration, indexed Order or MarketMaker, explicitly registered for this endpoint or provided by its defaults.
+     * Configuration, indexed Order, MarketMaker, SpreadOrder or AnalyticOrder, explicitly registered for this endpoint
+     * or provided by its defaults.
      * @return Producer handle; native preparation failures are observed asynchronously by its diagnostic.
      */
     template <class Event> [[nodiscard]] std::shared_ptr<Subscription<Event>> createSubscription() {

@@ -524,8 +524,9 @@ TEST_CASE("mixed complete plan prepays cross-kind duplicate checks at the sixtee
     api::EndpointOptions options;
     options.eventRegistry = *configured;
     auto profile = api::detail::prepareReceivingProfile(runtime, options, "127.0.0.1", 12345);
-    CHECK(profile.eventPlans[2].bindingCount == 16);
-    CHECK(profile.eventPlans[2].work.visits >= 153);
+    const auto &mixedPlan = api::detail::receivingEventPlan(profile, api::detail::EventSelection::BOTH);
+    CHECK(mixedPlan.bindingCount == 16);
+    CHECK(mixedPlan.work.visits >= 153);
     CHECK(profile.clientLimits.commandEntries == 16);
     CHECK(profile.endpoint.settings().budgets.desired.entries == 16);
     auto queueWork = profile.queueWork;
@@ -546,10 +547,10 @@ TEST_CASE("mixed complete plan prepays cross-kind duplicate checks at the sixtee
         }
     };
 
-    auto preparation = profile.eventPlans[2].work;
+    auto preparation = mixedPlan.work;
     auto consumer = std::make_shared<Consumer>();
     auto handle = root::client::openSubscriptionReceiver(
         *queue, profile.schema, profile.family, core::SubscriptionSelectorPolicy::CANONICAL_EXACT_V1, profile.bindings,
-        consumer, profile.eventPlans[2].limits, profile.clientLimits, preparation, queueWork);
+        consumer, mixedPlan.limits, profile.clientLimits, preparation, queueWork);
     REQUIRE(handle);
 }

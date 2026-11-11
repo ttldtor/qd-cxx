@@ -353,6 +353,7 @@ cache replay. Input-free EN/RU/Get-Help, bounded JDK8 Capture/Verify with exact 
 
 - [HISTORY receiver oracle](../upstream/history-receiver-oracle/README.md): actual standard TimeAndSale delegate and collector, two ranges and exact Java-composed wire, bounded Capture/Verify and input-free EN/RU help.
 
+- [SpreadOrder and AnalyticOrder oracle](../upstream/order-variants-oracle/README.md): variants, explicit sources and independent FIELD time.
 - [Order production oracle](../upstream/order-oracle/README.md): complete source/index, physical VOID mapping,
   actual HISTORY parser/delegate values, numeric/FOB/flags/removal boundaries; input-free EN/RU help.
 

@@ -35,6 +35,8 @@ bool supported(const EventRegistry &registry, EventType type) noexcept {
     case EventType::CONFIGURATION:
     case EventType::MARKET_MAKER:
     case EventType::ORDER:
+    case EventType::SPREAD_ORDER:
+    case EventType::ANALYTIC_ORDER:
         return true;
     }
 
@@ -61,7 +63,7 @@ bool usesGenericSourceSelection(EventType type) noexcept {
  */
 bool matchesOrderSource(const EventRegistry &registry, const EventRegistration &route,
                         std::optional<std::int32_t> sourceId) {
-    if (route.type != EventType::ORDER || !sourceId || *sourceId < 0) {
+    if (!isOrderSourceEvent(route.type) || !sourceId || *sourceId < 0) {
         return true;
     }
 
@@ -101,7 +103,7 @@ bool matchesFilterRoute(const EventRegistry &registry, const EventRegistration &
     if (route.type != type)
         return false;
 
-    if ((type == EventType::ORDER || type == EventType::MARKET_MAKER) &&
+    if ((isOrderSourceEvent(type) || type == EventType::MARKET_MAKER) &&
         !receivingRouteSupportsContract(route, contract))
         return false;
 
@@ -208,7 +210,7 @@ std::vector<FilterCoordinate> filterSubscriptionCoordinates(const EventRegistry 
         return {};
     }
 
-    if (type == EventType::ORDER &&
+    if (isOrderSourceEvent(type) &&
         (contract == DeliveryContract::STREAM || selector.kind() == SubscriptionSymbolKind::ALL)) {
         return {};
     }
@@ -220,7 +222,7 @@ std::vector<FilterCoordinate> filterSubscriptionCoordinates(const EventRegistry 
     }
 
     return coordinates(registry, contract, type, selector.eventSymbol(), wildcard, limits,
-                       type == EventType::ORDER || type == EventType::MARKET_MAKER ? selector.sourceId()
+                       isOrderSourceEvent(type) || type == EventType::MARKET_MAKER ? selector.sourceId()
                                                                                    : std::nullopt);
 }
 
@@ -254,6 +256,10 @@ std::vector<FilterCoordinate> filterEventCoordinates(const EventRegistry &regist
                     return EventType::CONFIGURATION;
                 } else if constexpr (std::is_same_v<Event, events::MarketMaker>) {
                     return EventType::MARKET_MAKER;
+                } else if constexpr (std::is_same_v<Event, events::SpreadOrder>) {
+                    return EventType::SPREAD_ORDER;
+                } else if constexpr (std::is_same_v<Event, events::AnalyticOrder>) {
+                    return EventType::ANALYTIC_ORDER;
                 } else if constexpr (std::is_same_v<Event, events::Order>) {
                     return EventType::ORDER;
                 } else {
@@ -261,7 +267,7 @@ std::vector<FilterCoordinate> filterEventCoordinates(const EventRegistry &regist
                 }
             }();
 
-            if constexpr (std::is_same_v<Event, events::Order>) {
+            if constexpr (isOrderSourceEvent(type)) {
                 if (value.getSourceId() < 0) {
                     return std::vector<FilterCoordinate>{};
                 }

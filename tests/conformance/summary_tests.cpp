@@ -276,7 +276,7 @@ TEST_CASE("all finite receiving selections include only registered kinds and pre
         const auto &plan = a::detail::receivingEventPlan(profile, static_cast<a::detail::EventSelection>(mask));
         CHECK(plan.bindingCount == ((mask & 1 ? 1 : 0) + (mask & 2 ? 1 : 0) + (mask & 4 ? 2 : 0) + (mask & 8 ? 2 : 0) +
                                     (mask & 16 ? 2 : 0)));
-        std::array<q::client::PreparedSubscriptionBinding, a::detail::MAXIMUM_RECEIVING_RECORDS> selected{};
+        std::array<q::client::PreparedSubscriptionBinding, a::detail::MAXIMUM_RECEIVING_BINDINGS> selected{};
         selected[0].localId = -1;
         q::client::ReceiverWork credits{2 * plan.bindingCount, a::detail::RECEIVING_BINDING_COPY_WORK - 1};
         CHECK_FALSE(a::detail::copyReceivingBindings(profile, plan, selected, credits));
@@ -310,7 +310,7 @@ TEST_CASE("fresh receiving grant funds a whole atomic fanout and real select bil
     runtime.maximumSymbolsPerSubscription = 2;
     runtime.dnsServers.push_back({{127, 0, 0, 1}});
     auto profile = a::detail::prepareReceivingProfile(runtime, options, "127.0.0.1", 12345);
-    CHECK(profile.eventPlans.size() == 1023);
+    CHECK(profile.eventPlans.size() == 32);
     CHECK(profile.schema.records().size() == 8);
     CHECK(profile.interests.clients == 33);
     std::size_t fieldCount = 0;

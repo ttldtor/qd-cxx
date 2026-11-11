@@ -57,4 +57,5 @@ The [event-value oracle](../tools/upstream/event-values-oracle/README.md) captur
 
 - [Indexed Order reception](ORDER.md): explicit HISTORY, complete owning fields and overlapping source selectors.
 - [MarketMaker/derived Order oracle](../tools/upstream/market-maker-order-oracle/README.md): full types, physical time, delegate sources and real binary parser observations.
+- [SpreadOrder and AnalyticOrder oracle](../tools/upstream/order-variants-oracle/README.md): source-specific records, physical FIELD time and actual QTP bytes.
 - [Order parser/delegate oracle](../tools/upstream/order-oracle/README.md): original physical slots and bounded standard-schema observations.

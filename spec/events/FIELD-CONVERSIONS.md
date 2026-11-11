@@ -95,7 +95,7 @@ context checks still precede every projection, including fields not selected by 
 
 The complete Quote table declares 72 exact alternatives and Profile declares 108, including all
 optional selections even when absent. `EventRegistration.mappingLimits.typeAlternatives` defaults
-to 128; explicit smaller limits remain meaningful. Exact 72/108 allowances succeed and one below
+to 160; explicit smaller limits remain meaningful. Exact 72/108 allowances succeed and one below
 returns RESOURCE_LIMIT without a partial mapping. Comparison work is separately charged for all
 actual name and type comparisons. The default comparison allowance conservatively includes the
 new finite type budget; registry preparation still sums every declared allowance using checked

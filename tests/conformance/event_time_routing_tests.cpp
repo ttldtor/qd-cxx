@@ -103,7 +103,7 @@ TEST_CASE("routing workspace is separate finite storage with an attainable exact
     auto selected = profile(corpus.at("millis"), true);
     const auto &limits = selected.routing;
     CHECK(selected.bindingExchanges.size() == detail::MAXIMUM_RECEIVING_BINDINGS);
-    CHECK(selected.eventPlans.size() == detail::RECEIVING_EVENT_SELECTIONS);
+    CHECK(selected.eventPlans.size() == 4);
     CHECK(limits.retainedMetadataBytes ==
           sizeof(selected.bindingExchanges) + sizeof(selected.bindingSources) + sizeof(selected.bindingTimeEncodings) +
               sizeof(selected.versionBindings) + selected.eventPlans.capacity() * sizeof(detail::ReceivingEventPlan) +

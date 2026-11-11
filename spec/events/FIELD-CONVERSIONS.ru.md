@@ -94,7 +94,7 @@ Halt поля Profile всегда умножают этот raw signed 32 slot 
 ## Конечная подготовка
 
 Полная таблица Quote объявляет 72 точные альтернативы, Profile — 108, включая необязательные
-выборки даже при отсутствии. `EventRegistration.mappingLimits.typeAlternatives` по умолчанию 128;
+выборки даже при отсутствии. `EventRegistration.mappingLimits.typeAlternatives` по умолчанию 160;
 явные меньшие лимиты сохраняют смысл. Точные 72/108 проходят; на единицу меньше дают
 RESOURCE_LIMIT без частичного mapping. Comparison work отдельно оплачивает все фактические
 сравнения имён и типов. Default comparison allowance консервативно включает новый конечный

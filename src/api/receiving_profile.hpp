@@ -19,10 +19,7 @@ inline constexpr std::size_t RECEIVING_OWNER_POLLS_PER_TURN =
 inline constexpr std::size_t MAXIMUM_RECEIVING_RECORDS = 42; ///< Existing complete receiving catalog ceiling.
 inline constexpr std::size_t MAXIMUM_RECEIVING_BINDINGS =
     2 * MAXIMUM_RECEIVING_RECORDS;                       ///< Native plus compatible derived family per physical record.
-inline constexpr std::size_t RECEIVING_EVENT_KINDS = 11; ///< Explicitly supported native event kinds.
-inline constexpr std::size_t RECEIVING_EVENT_SELECTIONS = (1U << RECEIVING_EVENT_KINDS) - 1;
-
-///< Every nonempty finite selection; no dynamic type registry or catalog expansion.
+inline constexpr std::size_t RECEIVING_EVENT_KINDS = 13; ///< Explicitly supported native event kinds.
 
 /** Conservative stack initialization plus complete metadata read/write work; no dynamic allocation. */
 inline constexpr std::size_t RECEIVING_BINDING_COPY_WORK =
@@ -87,8 +84,9 @@ struct ReceivingProfile {
     std::array<collectors::TickerVersionBinding, MAXIMUM_RECEIVING_RECORDS> versionBindings{};
     std::size_t versionBindingCount = 0; ///< Explicit schema-bound TICKER version gates.
     ReceivingRoutingLimits routing;      ///< Explicit additional routing workspace and pre-allocation work charge.
+    unsigned boundKinds = 0;             ///< Native event-type bits actually used by this endpoint's bindings.
     std::vector<ReceivingEventPlan> eventPlans;
-    ///< Prepaid bounded plans for each nonempty supported type mask, independent of record IDs.
+    ///< Prepaid plans indexed by dense subsets of boundKinds, including the empty subset.
     mux::QueueSubmitWork submitWork;         ///< One whole desired replacement admission.
     mux::QueueWork queueWork;                ///< Identical initialization, normal and drain coordinates.
     mux::QueueWork historyObservationWork{}; ///< One aggregate observation seed per complete outer worker turn.

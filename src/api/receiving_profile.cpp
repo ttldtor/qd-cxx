@@ -5,11 +5,13 @@
 #include "event_registry_defaults.hpp"
 
 #include "../events/derived_order_sources.hpp"
+#include "../events/order_record_source.hpp"
 #include "qd/events/market_event_symbols.hpp"
 #include "qd/events/time_helpers.hpp"
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <limits>
 #include <utility>
 
@@ -368,19 +370,19 @@ void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, s
                 (registration.type == EventType::PROFILE || registration.type == EventType::MARKET_MAKER ||
                  registration.type == EventType::TEXT_MESSAGE || registration.type == EventType::TEXT_CONFIGURATION ||
                  registration.type == EventType::MESSAGE || registration.type == EventType::CONFIGURATION ||
-                 (registration.type == EventType::ORDER && registration.projection == events::EventProjection::NATIVE))
+                 (isOrderSourceEvent(registration.type) && registration.projection == events::EventProjection::NATIVE))
                     ? 0
                     : events::market_symbols::getExchangeCode(record.name);
 
-            if (registration.type == EventType::ORDER && registration.projection == events::EventProjection::NATIVE) {
-                const auto source = events::PreparedOrderSource::prepare(profile.schema, registration.localRecordId,
-                                                                         registration.mappingLimits);
+            if (isOrderSourceEvent(registration.type) && registration.projection == events::EventProjection::NATIVE) {
+                auto mappingLimits = registration.mappingLimits;
+                const auto source = events::detail::prepareRecordOrderSource(record.name, mappingLimits);
 
                 if (!source) {
                     refuse(ErrorCode::UNSUPPORTED_PROFILE, "profile-order-source");
                 }
 
-                profile.bindingSources[index] = source->source().id();
+                profile.bindingSources[index] = source->id();
             }
 
             const auto policy = registration.eventTimePolicy == EventTimePolicy::FIELD_METADATA
@@ -392,20 +394,35 @@ void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, s
                     profile.schema.recordContext(registration.localRecordId), registration.localRecordId, *version};
             }
 
+            profile.boundKinds |= 1U << kind;
             profile.bindings.push_back(
                 {registration.localRecordId, static_cast<client::PreparedEventKind>(registration.type),
                  registration.mappingLimits, values, policy, FIELD_BYTE_UNITS, registration.projection});
         }
     }
 
-    profile.eventPlans.resize(RECEIVING_EVENT_SELECTIONS);
+    const auto planCount = std::size_t{1} << std::popcount(profile.boundKinds);
+    profile.eventPlans.resize(planCount);
 
-    if (profile.eventPlans.capacity() != RECEIVING_EVENT_SELECTIONS) {
+    if (profile.eventPlans.capacity() != planCount) {
         refuse(ErrorCode::RESOURCE_LIMIT, "profile-selection-storage");
     }
 
-    for (std::size_t mask = 1; mask <= RECEIVING_EVENT_SELECTIONS; ++mask) {
-        auto &plan = profile.eventPlans[mask - 1];
+    for (std::size_t denseMask = 0; denseMask < planCount; ++denseMask) {
+        auto &plan = profile.eventPlans[denseMask];
+        unsigned mask = 0;
+        std::size_t denseBit = 1;
+
+        for (unsigned kindBit = 1; kindBit <= profile.boundKinds; kindBit <<= 1) {
+            if ((profile.boundKinds & kindBit) != 0) {
+                if ((denseMask & denseBit) != 0) {
+                    mask |= kindBit;
+                }
+
+                denseBit <<= 1;
+            }
+        }
+
         plan.work.visits = 16;
         plan.projectionWork.bytes = multiply(CALLBACK_RECORDS, sizeof(client::SubscriptionProjectionGroup));
         // One bounded stack copy is made before the existing receiver factory consumes its normal credits.
@@ -426,7 +443,7 @@ void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, s
             const bool profileText = binding.kind == client::PreparedEventKind::PROFILE;
             const bool text = profileText || binding.kind == client::PreparedEventKind::TEXT_MESSAGE ||
                               binding.kind == client::PreparedEventKind::TEXT_CONFIGURATION ||
-                              binding.kind == client::PreparedEventKind::ORDER;
+                              isOrderSourceEvent(static_cast<EventType>(binding.kind));
             const auto units = text ? values.totalUnits : values.symbolUnits;
             const auto strings = profileText ? std::size_t{3} : (text ? std::size_t{2} : std::size_t{1});
             const auto bytes =
@@ -441,6 +458,12 @@ void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, s
             plan.limits.selections = add(plan.limits.selections, mapping.selections);
             plan.work.preparationWork = add(plan.work.preparationWork, preparation);
             plan.work.visits = add(plan.work.visits, add(plan.bindingCount, 3));
+
+            if (binding.kind == client::PreparedEventKind::SPREAD_ORDER ||
+                binding.kind == client::PreparedEventKind::ANALYTIC_ORDER) {
+                plan.work.visits = add(plan.work.visits, mapping.lookups);
+            }
+
             constexpr std::size_t DERIVED_DELEGATES = core::MAX_DELIVERY_PROJECTIONS - 1;
             const auto outputs = multiply(
                 CALLBACK_RECORDS, binding.projection == events::EventProjection::NATIVE ? 1 : DERIVED_DELEGATES);
@@ -479,7 +502,7 @@ bool receivingRouteSupportsContract(const EventRegistration &route, DeliveryCont
         return contract == DeliveryContract::TICKER;
     }
 
-    if (route.projection == events::EventProjection::MARKET_MAKER_ORDERS || route.type == EventType::ORDER ||
+    if (route.projection == events::EventProjection::MARKET_MAKER_ORDERS || isOrderSourceEvent(route.type) ||
         route.type == EventType::MARKET_MAKER) {
         return contract == DeliveryContract::HISTORY;
     }
@@ -752,10 +775,24 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
 const ReceivingEventPlan &receivingEventPlan(const ReceivingProfile &profile, EventSelection selection) {
     const auto mask = static_cast<std::size_t>(selection);
 
-    if (!mask || mask > RECEIVING_EVENT_SELECTIONS || (mask & ~static_cast<std::size_t>(EventSelection::ALL)))
+    if (!mask || (mask & ~static_cast<std::size_t>(EventSelection::ALL))) {
         refuse(ErrorCode::UNSUPPORTED_PROFILE, "subscription-event-type");
+    }
 
-    return profile.eventPlans[mask - 1];
+    std::size_t denseMask = 0;
+    std::size_t denseBit = 1;
+
+    for (unsigned kindBit = 1; kindBit <= profile.boundKinds; kindBit <<= 1) {
+        if ((profile.boundKinds & kindBit) != 0) {
+            if ((mask & kindBit) != 0) {
+                denseMask |= denseBit;
+            }
+
+            denseBit <<= 1;
+        }
+    }
+
+    return profile.eventPlans[denseMask];
 }
 
 bool copyReceivingBindings(const ReceivingProfile &profile, const ReceivingEventPlan &plan,
@@ -823,7 +860,7 @@ void validateReceivingSymbol(const EventRegistry *registry, EventSelection selec
     for (const auto &route : registry->registrations()) {
         if (route.type == EventType::PROFILE || route.type == EventType::TEXT_MESSAGE ||
             route.type == EventType::TEXT_CONFIGURATION || route.type == EventType::MESSAGE ||
-            route.type == EventType::CONFIGURATION || route.type == EventType::ORDER ||
+            route.type == EventType::CONFIGURATION || isOrderSourceEvent(route.type) ||
             !selectsEvent(selection, route.type)) {
             continue;
         }
@@ -908,7 +945,7 @@ core::DeliveryProjectionMask receivingProjectionMask(const ReceivingProfile &pro
         return 0;
     }
 
-    if (binding.kind == client::PreparedEventKind::ORDER) {
+    if (isOrderSourceEvent(static_cast<EventType>(binding.kind))) {
         const auto source = profile.bindingSources[bindingIndex];
 
         return source && (!symbol.sourceId || *symbol.sourceId < 0 || *symbol.sourceId == *source)

@@ -27,7 +27,9 @@ enum class EventType {
     MESSAGE = 7,        ///< Exact owning serialized Message attachment; STREAM only.
     CONFIGURATION = 8,  ///< Owning serialized Configuration with independent signed version metadata.
     ORDER = 9,          ///< Owning indexed Order with an explicit native or derived projection family.
-    MARKET_MAKER = 10   ///< Owning indexed MarketMaker; ordinary reception requires HISTORY.
+    MARKET_MAKER = 10,  ///< Owning indexed MarketMaker; ordinary reception requires HISTORY.
+    SPREAD_ORDER = 11,  ///< Owning indexed SpreadOrder; reception requires HISTORY.
+    ANALYTIC_ORDER = 12 ///< Owning indexed AnalyticOrder; reception requires HISTORY.
 };
 
 /** Explicit source of optional event metadata, independent of indexed record identity. */
@@ -40,7 +42,7 @@ enum class EventTimePolicy {
 struct EventRegistration {
     EventType type;             ///< Actual supported projection, never inferred from a record name.
     std::int32_t localRecordId; ///< Explicit dense record position in the supplied validated schema.
-    events::MappingLimits mappingLimits{128, 256, 32, 64, 128, 128, 20480, 256 * 64 * 129 + 32 * 128};
+    events::MappingLimits mappingLimits{128, 256, 32, 64, 160, 128, 20480, 256 * 64 * 129 + 32 * 128};
     ///< Finite per-route preparation bounds for existing exact-key and exact-type validation.
     EventTimePolicy eventTimePolicy = EventTimePolicy::FIELD_METADATA;    ///< Source of optional event metadata.
     events::EventProjection projection = events::EventProjection::NATIVE; ///< Explicit physical-to-business family.

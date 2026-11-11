@@ -33,7 +33,8 @@ using ListenerFunction =
                  Subscription<events::Summary>::Listener, Subscription<events::TextMessage>::Listener,
                  Subscription<events::TextConfiguration>::Listener, Subscription<events::Message>::Listener,
                  Subscription<events::Configuration>::Listener, Subscription<events::Order>::Listener,
-                 Subscription<events::MarketMaker>::Listener, Subscription<RegisteredEvent>::Listener,
+                 Subscription<events::MarketMaker>::Listener, Subscription<events::SpreadOrder>::Listener,
+                 Subscription<events::AnalyticOrder>::Listener, Subscription<RegisteredEvent>::Listener,
                  Endpoint::StateChangeListener, Subscription<events::Quote>::StateChangeListener,
                  SubscriptionChangeListener>;
 

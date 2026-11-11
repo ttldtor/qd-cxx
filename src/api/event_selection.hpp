@@ -42,7 +42,9 @@ enum class EventSelection {
     CONFIGURATION = 256,                  ///< Selected serialized Configuration routes.
     ORDER = 512,                          ///< Selected ordinary indexed Order routes.
     MARKET_MAKER = 1024,                  ///< Selected indexed MarketMaker routes.
-    ALL = 2047,                           ///< Every supported event route.
+    SPREAD_ORDER = 1 << 11,               ///< Selected indexed SpreadOrder routes.
+    ANALYTIC_ORDER = 1 << 12,             ///< Selected indexed AnalyticOrder routes.
+    ALL = (1 << 13) - 1,                  ///< Every supported event route.
 };
 
 /** Test a finite supported-kind selection without depending on local record positions.
@@ -54,11 +56,20 @@ constexpr bool selectsEvent(EventSelection selection, EventType type) noexcept {
     if (type != EventType::QUOTE && type != EventType::PROFILE && type != EventType::TRADE &&
         type != EventType::TRADE_ETH && type != EventType::SUMMARY && type != EventType::TEXT_MESSAGE &&
         type != EventType::TEXT_CONFIGURATION && type != EventType::MESSAGE && type != EventType::CONFIGURATION &&
-        type != EventType::ORDER && type != EventType::MARKET_MAKER) {
+        type != EventType::ORDER && type != EventType::MARKET_MAKER && type != EventType::SPREAD_ORDER &&
+        type != EventType::ANALYTIC_ORDER) {
         return false;
     }
 
     return (static_cast<unsigned>(selection) & (1U << static_cast<unsigned>(type))) != 0;
+}
+
+/** Native order record families whose source identity is derived from the exact record suffix.
+ * @param type Business type.
+ * @return True when this family uses OrderSource suffixes and ordinary indexed coordinates.
+ */
+constexpr bool isOrderSourceEvent(EventType type) noexcept {
+    return type == EventType::ORDER || type == EventType::SPREAD_ORDER || type == EventType::ANALYTIC_ORDER;
 }
 
 /** Exact owning value shape expected by the logical subscription's listeners. */
@@ -74,6 +85,8 @@ enum class EventDelivery {
     CONFIGURATION,      ///< Owning serialized Configuration values.
     ORDER,              ///< Complete owning ordinary indexed Order values.
     MARKET_MAKER,       ///< Complete owning indexed MarketMaker values.
+    SPREAD_ORDER,       ///< Complete owning indexed SpreadOrder values.
+    ANALYTIC_ORDER,     ///< Complete owning indexed AnalyticOrder values.
     REGISTERED          ///< Owning public RegisteredEvent variants, restricted by EventSelection.
 };
 } // namespace org::ttldtor::qdcxx::api::detail

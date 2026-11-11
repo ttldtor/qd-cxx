@@ -264,7 +264,7 @@ TEST_CASE("TradeETH defaults snapshots raw edits and exact preparation boundarie
     a::EventRegistryWork work;
     auto builtin = a::EventRegistry::builtIn({}, work);
     REQUIRE(builtin);
-    CHECK(builtin->registrations().size() == 5);
+    REQUIRE(builtin->registrations().size() == 9);
     CHECK(builtin->registrations()[3].type == a::EventType::TRADE_ETH);
 }
 
@@ -282,7 +282,7 @@ TEST_CASE("all fifteen finite receiving selections include only their kinds and 
     for (unsigned mask = 1; mask <= 15; ++mask) {
         const auto &plan = a::detail::receivingEventPlan(profile, static_cast<a::detail::EventSelection>(mask));
         CHECK(plan.bindingCount == ((mask & 1 ? 1 : 0) + (mask & 2 ? 1 : 0) + (mask & 4 ? 2 : 0) + (mask & 8 ? 2 : 0)));
-        std::array<q::client::PreparedSubscriptionBinding, a::detail::MAXIMUM_RECEIVING_RECORDS> selected{};
+        std::array<q::client::PreparedSubscriptionBinding, a::detail::MAXIMUM_RECEIVING_BINDINGS> selected{};
         selected[0].localId = -1;
         q::client::ReceiverWork credits{2 * plan.bindingCount, a::detail::RECEIVING_BINDING_COPY_WORK - 1};
         CHECK_FALSE(a::detail::copyReceivingBindings(profile, plan, selected, credits));
@@ -314,7 +314,7 @@ TEST_CASE("fresh receiving grant funds a whole atomic fanout and real select bil
     runtime.maximumSymbolsPerSubscription = 2;
     runtime.dnsServers.push_back({{127, 0, 0, 1}});
     auto profile = a::detail::prepareReceivingProfile(runtime, options, "127.0.0.1", 12345);
-    CHECK(profile.eventPlans.size() == 31);
+    CHECK(profile.eventPlans.size() == 16);
     CHECK(profile.schema.records().size() == 6);
     CHECK(profile.interests.clients == 17);
     std::size_t fieldCount = 0;

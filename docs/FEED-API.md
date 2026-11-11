@@ -2,7 +2,7 @@
 
 [Русская версия](FEED-API.ru.md) · [Practical guides](guides.md) · [API reference](api.md)
 
-Use `qd/api/feed.hpp` and link `qdcxx_feed` to receive typed `events::Quote`, `events::Profile`, `events::Trade`, `events::TradeETH`, `events::Summary`, `events::TextMessage`, `events::TextConfiguration`, `events::Message`, `events::Configuration`, `events::Order` and `events::MarketMaker` through a library-owned worker. Applications create endpoints,
+Use `qd/api/feed.hpp` and link `qdcxx_feed` to receive typed `events::Quote`, `events::Profile`, `events::Trade`, `events::TradeETH`, `events::Summary`, `events::TextMessage`, `events::TextConfiguration`, `events::Message`, `events::Configuration`, `events::Order`, `events::MarketMaker`, `events::SpreadOrder` and `events::AnalyticOrder` through a library-owned worker. Applications create endpoints,
 listeners and exact symbol subscriptions; the library progresses connection,
 finite recovery, queues and delivery. Subscriptions can be created before or after
 `connect()`.
@@ -11,7 +11,10 @@ This API supports plain binary QTP over TCP with built-in full Quote/Profile/Tra
 and text/serialized-event schemas or explicit validated caller schemas and registered mappings.
 An endpoint chooses TICKER (default, latest values with possible
 conflation), STREAM (every admitted selected source record), or explicit HISTORY (indexed shared storage
-and independent views). Ordinary Order and MarketMaker use HISTORY; Quote-derived Order uses TICKER. The SDK owns both standard catalogs, including regional A..Z sources. See [MarketMaker and derived Order](MARKET-MAKER-ORDER.md).
+and independent views). Ordinary Order, MarketMaker, SpreadOrder and AnalyticOrder use HISTORY; Quote-derived Order uses TICKER. The SDK owns both standard catalogs, including regional A..Z sources. See [MarketMaker and derived Order](MARKET-MAKER-ORDER.md) and [order variants](ORDER-VARIANTS.md).
+The default HISTORY registry supplies both DEFAULT variants. Use an explicit validated registry for
+record variants such as `SpreadOrder#ISE` or `AnalyticOrder#NTV`, and select the exact source
+with `SubscriptionSelector::indexed`. SpreadOrder selectors name the underlying instrument.
 The existing nine nonindexed types retain their existing TICKER/STREAM profiles and reject HISTORY before native
 registration. TLS and credentials
 remain separate receiving profiles. Wildcard selectors require the existing explicit STREAM permission.

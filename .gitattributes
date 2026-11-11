@@ -797,6 +797,14 @@ tests/fixtures/server-aggregation/*.json text eol=lf
 tests/fixtures/order/*.tsv -text -whitespace
 tests/fixtures/order/wire/*.qtp -text -whitespace
 
+# Preserve exact SpreadOrder and AnalyticOrder QTP observations and oracle source bindings.
+tools/upstream/order-variants-oracle/*.java text eol=lf
+tools/upstream/order-variants-oracle/*.ps1 text eol=lf
+tests/fixtures/order-variants/*.tsv -text -whitespace
+tests/fixtures/order-variants/*.json text eol=lf
+tests/fixtures/order-variants/wire/*.qtp -text -whitespace
+tests/fixtures/order-variants/field-wire/*.qtp -text -whitespace
+
 # Preserve exact production callback-execution observations and source bindings.
 tools/upstream/callback-execution-oracle/*.java text eol=lf
 tools/upstream/callback-execution-oracle/*.ps1 text eol=lf

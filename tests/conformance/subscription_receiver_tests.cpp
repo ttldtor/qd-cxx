@@ -8,6 +8,7 @@
 #include "qd/encoding/utf_string.hpp"
 #include "qd/protocol/live_session.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -1202,4 +1203,32 @@ TEST_CASE("four physical rows preserve twenty atomic owning callback outputs") {
         return handle.terminal().has_value();
     });
     CHECK(std::get<q::Order>(observer->projections[19].value).getSourceId() == 8);
+}
+
+TEST_CASE("variant HISTORY receiver rejects a valid compact field other than Index before admission") {
+    constexpr q::MappingLimits limits{64, 128, 32, 64, 160, 128, 8192, 100000};
+    const auto native = q::defaultAnalyticOrderSchema(SCHEMA_LIMITS);
+    REQUIRE(native);
+    auto record = native->records().front();
+    const auto flags = std::ranges::find_if(record.lookups, [](const auto &lookup) {
+        return lookup.name == u"Flags";
+    });
+    REQUIRE(flags != record.lookups.end());
+    record.indexedTimeLayout = c::IndexedTimeLowInt32{flags->fieldId};
+    auto wrong = c::LocalSchema::create(std::array{record}, SCHEMA_LIMITS, c::LocalProfile::BINARY_FIELDS_V1);
+    REQUIRE(wrong);
+
+    auto graph = fixture(std::move(*wrong), true, false);
+    auto observer = std::make_shared<Observer>();
+    const std::array routes{
+        a::PreparedSubscriptionBinding{0, a::PreparedEventKind::ANALYTIC_ORDER, limits, {16, 128, 256}}};
+    a::ReceiverWork receiverWork{100000, 1000000};
+    auto queueWork = turn();
+    const auto result =
+        a::openSubscriptionReceiver(graph.queue, graph.local, graph.family, c::SubscriptionSelectorPolicy::EXACT_ONLY,
+                                    routes, observer, {4, 64, 128}, clientLimits(), receiverWork, queueWork);
+    REQUIRE_FALSE(result);
+    CHECK(result.error().bindingIndex == 0);
+    CHECK(std::get<a::ReceiverError>(result.error().cause) == a::ReceiverError::INVALID_INPUT);
+    CHECK(observer->callbacks == 0);
 }

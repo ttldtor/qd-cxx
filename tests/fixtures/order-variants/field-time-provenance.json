@@ -1,0 +1,156 @@
+{
+  "revision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "javaVersion": "openjdk version \"1.8.0_422\"",
+  "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
+  "javacSha256": "633143e961aa18051c09112b85333f5cdbd845b54eb39678eb15b91ca8bbb527",
+  "harnessSha256": "627416716d41e1505ae00350dce9be8f69c3010e46d98c269e2c8fa154b21ed0",
+  "launcherSha256": "936204f9f35d6a2a2e02030afe3a6cdce88c2cf68ef475c0dc763c628ad6962a",
+  "upstreamSources": [
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/OrderBase.java",
+      "sha256": "94df739d6a931f0c215c2c32ac7d591b8a0b9d567bb4f41da1769b44ea82a195"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/Order.java",
+      "sha256": "a521309fa94e41ec1790f980758aa8680cb495ce090c712741f2f0b1b5d58bb5"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/OrderSource.java",
+      "sha256": "3b0d0b0e83f685efd688b87dba479003a76d9ad69097867326b74206dc3a2a45"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/Side.java",
+      "sha256": "f8bef7d85108494293b74315e2e5234036c162e428ee505d2aabe301d0a938d0"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/Scope.java",
+      "sha256": "ab25150fb12ed7a652d81ae80e809981f00b504f99032327faf58c58416098ce"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/OrderAction.java",
+      "sha256": "270c34b8376b6e0e6de4ff40a231d396f93dbd04c283ebcf16ad07e4dfdaf8b5"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/impl/OrderMapping.java",
+      "sha256": "8d82def9cb2894b3cbbc3ada52dab76d735289fbc3b9db5c5c645bbdd3d84455"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/impl/OrderBaseMapping.java",
+      "sha256": "ccb4b9fadc340b6120e0339d81a10673c77f2219b3af3e1f613cf169780757a5"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/impl/MarketEventMapping.java",
+      "sha256": "8c88dbc8c84cbf9055d3807e0070dc66244662a8aad7290c992d8ef8b02c4265"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/OrderDelegate.java",
+      "sha256": "a81a4f7356b1847ca3a96e09227dbdd43668122c58adecf0ef02ada74df35f2a"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/MarketEventDelegateImpl.java",
+      "sha256": "50e88d9408c2c8f9a88cb1c6e0e2058ecce80e76f48ca428507d359b6c61aff4"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/MarketFactoryImpl.java",
+      "sha256": "c74b324b2f99d2a351963fead08419c2ba1d92573c633d30740295acc9d0bac4"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/api/impl/EventDelegate.java",
+      "sha256": "5e6c90ed4115f57708d01f697dedcdc6bc168e41d254b6e245516feb073f5593"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/ng/RecordMapping.java",
+      "sha256": "f2871d535918a418d97b6bc4a6afe920cd83f2a35a076f17d2a1ddcb7fd27515"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/ng/RecordCursor.java",
+      "sha256": "b765e929cc5736432c36661c847151278c9a3f94e352b492818c5456dedb724e"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/ProtocolOption.java",
+      "sha256": "3ab357aae1bebd446e9ea6d68db02cea4f4bb23e7cb84f3db7fd541bb9e724dd"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/BinaryQTPParser.java",
+      "sha256": "785d4e9fec8129a6b2a6f0e875771e992183c20413614a43e6de3234775c02c8"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/BinaryQTPComposer.java",
+      "sha256": "fd158524cc8b9ebbf63cbc4ba97f6a39e95a0e07368a6589f9a44b0dba1e42da"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/BinaryRecordDesc.java",
+      "sha256": "38591f97045e2bcce4c37befa024a7824bc5f63ae1cd19ddc5af17668563aec9"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/api/impl/SchemeProperties.java",
+      "sha256": "e996d90987bb731e2255301c42e5ba766a08cf0d491d4aea475527376a9f058a"
+    },
+    {
+      "path": "dxlib/src/main/java/com/devexperts/util/WideDecimal.java",
+      "sha256": "0fd3e295e88f36e94a24ed9ebf69429985ddf4ba24e4b896e28015266a39d6d8"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/util/Decimal.java",
+      "sha256": "824c49639b1114120a187a6a567aaa54d94cd859499055e32bce0df233dac318"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/util/MappingUtil.java",
+      "sha256": "ec334d41b3fcac73ca0845e3ebd7f0e1bceaf8eb1623ea19c7c3dadaccea8eae"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/util/ShortString.java",
+      "sha256": "78b3c6a31bef675b20786a3984679607330e2dd69137df00ffd63999ee788d7a"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/api/impl/SchemeBuilder.java",
+      "sha256": "5aef33897ed1a9a27ea1dc793e3a341683ed5edffbcbbf42f8a5d87ece7b13ed"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/SpreadOrder.java",
+      "sha256": "44109ffcfd504e677320d4c899134078a10089faaedce9872dc7922a9c93e873"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/AnalyticOrder.java",
+      "sha256": "273ce6ff44541f4318b0493f182abf6c62948c291b8dbca577a29830dafc67bc"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/IcebergType.java",
+      "sha256": "0761bed348fcec79a65bc46f918b724adb029b548044778b40f090d3318e0b81"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/SpreadOrderDelegate.java",
+      "sha256": "bac996dd2a66d6e5fd8505428aa8265d10e592c9a51d2dca7c18676621da537a"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/AnalyticOrderDelegate.java",
+      "sha256": "74349adc37f715cf8b9fe2f943d8cdb25859216e1287200bd2a17c8807f26ce2"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/impl/SpreadOrderMapping.java",
+      "sha256": "851ed101efe25f99a7f2ab9c62004d7e858070bcff70a37f1efa87d70134c663"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/impl/AnalyticOrderMapping.java",
+      "sha256": "346f254774e0384c51c0528398ac512e3dc2e6c757aabe97199f9fec2b5c72ce"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/util/TimeSequenceUtil.java",
+      "sha256": "ee1fc453383b8b978693475e80fa22f89ef70b947db637a417e66895f70a8596"
+    }
+  ],
+  "productionClassInventorySha256": "90a478b5d3737246d8c897322c9f9db60887846e20117572588e05ae78fbc6d8",
+  "fixtureSha256": "7bf208db007a89b0312b5291de3fb3ebb1021eb07e916394be952a7e4abc6e88",
+  "rows": 51,
+  "timezoneInvariant": true,
+  "wireFiles": [
+    {
+      "name": "with-time.qtp",
+      "sha256": "6998019a141cf2d337e23cea8ff522867cb63ac1d0413864e010fd1d126b32e8"
+    },
+    {
+      "name": "without-time.qtp",
+      "sha256": "68f8d9d9b9cbfe6e6f6fd002dfdfe21043636f841ae1763788a281cdc5900785"
+    }
+  ]
+}

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 #pragma once
 
+#include "qd/events/analytic_order.hpp"
 #include "qd/events/configuration.hpp"
 #include "qd/events/derived_order.hpp"
 #include "qd/events/event_projection.hpp"
@@ -9,6 +10,7 @@
 #include "qd/events/order.hpp"
 #include "qd/events/profile.hpp"
 #include "qd/events/quote.hpp"
+#include "qd/events/spread_order.hpp"
 #include "qd/events/summary.hpp"
 #include "qd/events/text_events.hpp"
 #include "qd/events/trade.hpp"
@@ -42,7 +44,9 @@ enum class PreparedEventKind {
     MESSAGE = 7,        ///< Owning serialized Message projection.
     CONFIGURATION = 8,  ///< Owning serialized Configuration projection.
     ORDER = 9,          ///< Owning ordinary or explicitly derived indexed Order projection.
-    MARKET_MAKER = 10   ///< Owning indexed MarketMaker projection.
+    MARKET_MAKER = 10,  ///< Owning indexed MarketMaker projection.
+    SPREAD_ORDER = 11,  ///< Owning indexed SpreadOrder projection.
+    ANALYTIC_ORDER = 12 ///< Owning indexed AnalyticOrder projection.
 };
 
 /** Explicit source for optional event metadata; indexed identity is never a timestamp substitute. */
@@ -101,7 +105,7 @@ struct ReceiverFailure {
 struct SubscriptionProjection {
     std::variant<std::monostate, events::Quote, events::Profile, events::Trade, events::TradeETH, events::Summary,
                  events::TextMessage, events::TextConfiguration, events::Message, events::Configuration, events::Order,
-                 events::MarketMaker>
+                 events::MarketMaker, events::SpreadOrder, events::AnalyticOrder>
         value;                               ///< Owned event or explicit generic route.
     std::optional<std::int64_t> eventTimeMs; ///< Actual selected FIELD metadata only; rawTime stays independent.
 };

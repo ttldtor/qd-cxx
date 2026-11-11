@@ -2,13 +2,17 @@
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/api/event_registry.hpp"
 
+#include "../events/order_index_coordinate.hpp"
 #include "event_registry_defaults.hpp"
+#include "event_selection.hpp"
+#include "qd/events/analytic_order.hpp"
 #include "qd/events/configuration.hpp"
 #include "qd/events/derived_order.hpp"
 #include "qd/events/market_maker.hpp"
 #include "qd/events/order.hpp"
 #include "qd/events/profile.hpp"
 #include "qd/events/quote.hpp"
+#include "qd/events/spread_order.hpp"
 #include "qd/events/summary.hpp"
 #include "qd/events/text_events.hpp"
 #include "qd/events/trade.hpp"
@@ -170,8 +174,8 @@ bool validRegistration(const EventRegistration &registration) noexcept {
             registration.type == EventType::TRADE || registration.type == EventType::TRADE_ETH ||
             registration.type == EventType::SUMMARY || registration.type == EventType::TEXT_MESSAGE ||
             registration.type == EventType::TEXT_CONFIGURATION || registration.type == EventType::MESSAGE ||
-            registration.type == EventType::CONFIGURATION || registration.type == EventType::ORDER ||
-            registration.type == EventType::MARKET_MAKER) &&
+            registration.type == EventType::CONFIGURATION || registration.type == EventType::MARKET_MAKER ||
+            detail::isOrderSourceEvent(registration.type)) &&
            (registration.eventTimePolicy == EventTimePolicy::UNSPECIFIED ||
             registration.eventTimePolicy == EventTimePolicy::FIELD_METADATA) &&
            (registration.projection == events::EventProjection::NATIVE ||
@@ -391,17 +395,19 @@ EventRegistry::create(const core::LocalSchema &schema, std::span<const EventRegi
                 if (!mapping) {
                     return std::unexpected(EventRegistryFailure{mapping.error(), index});
                 }
+            } else if (registration.type == EventType::SPREAD_ORDER) {
+                const auto mapping = events::PreparedSpreadOrder::prepare(*ownedSchema, registration.localRecordId,
+                                                                          registration.mappingLimits);
 
-                const auto &record = ownedSchema->records()[static_cast<std::size_t>(registration.localRecordId)];
-                const auto *low = record.indexedTimeLayout
-                                      ? std::get_if<core::IndexedTimeLowInt32>(&*record.indexedTimeLayout)
-                                      : nullptr;
-                const auto lookup = std::ranges::find_if(record.lookups, [](const auto &key) {
-                    return key.name == u"Index";
-                });
+                if (!mapping) {
+                    return std::unexpected(EventRegistryFailure{mapping.error(), index});
+                }
+            } else if (registration.type == EventType::ANALYTIC_ORDER) {
+                const auto mapping = events::PreparedAnalyticOrder::prepare(*ownedSchema, registration.localRecordId,
+                                                                            registration.mappingLimits);
 
-                if (!low || lookup == record.lookups.end() || low->field != lookup->fieldId) {
-                    return std::unexpected(EventRegistryFailure{EventRegistryError::INVALID_INPUT, index});
+                if (!mapping) {
+                    return std::unexpected(EventRegistryFailure{mapping.error(), index});
                 }
             } else if (registration.type == EventType::SUMMARY) {
                 const auto mapping = events::PreparedSummary::prepare(*ownedSchema, registration.localRecordId,
@@ -448,6 +454,15 @@ EventRegistry::create(const core::LocalSchema &schema, std::span<const EventRegi
 
                 if (!mapping) {
                     return std::unexpected(EventRegistryFailure{mapping.error(), index});
+                }
+            }
+
+            if (registration.projection == events::EventProjection::NATIVE &&
+                detail::isOrderSourceEvent(registration.type)) {
+                const auto &record = ownedSchema->records()[static_cast<std::size_t>(registration.localRecordId)];
+
+                if (!events::detail::hasOrderIndexCoordinate(record)) {
+                    return std::unexpected(EventRegistryFailure{EventRegistryError::INVALID_INPUT, index});
                 }
             }
 
@@ -636,17 +651,38 @@ std::expected<EventRegistry, EventRegistryFailure> defaultTickerEventRegistry(Ev
 std::expected<EventRegistry, EventRegistryFailure> defaultHistoryEventRegistry(EventRegistryLimits limits,
                                                                                EventRegistryWork &work) {
     try {
-        constexpr std::size_t DEFAULT_INDEXED_CONSTRUCTION_WORK = 1024;
+        constexpr std::size_t DEFAULT_INDEXED_CONSTRUCTION_WORK = 2048;
         debit(work.visits, DEFAULT_INDEXED_CONSTRUCTION_WORK);
         auto order = events::defaultOrderSchema(limits.schema);
-        auto maker = events::defaultMarketMakerSchema(limits.schema);
 
-        if (!order || !maker) {
-            return std::unexpected(EventRegistryFailure{!order ? order.error() : maker.error(), {}});
+        if (!order) {
+            return std::unexpected(EventRegistryFailure{order.error(), {}});
         }
 
-        std::array records{order->records()[0], maker->records()[0]};
-        records[1].id = 1;
+        auto maker = events::defaultMarketMakerSchema(limits.schema);
+
+        if (!maker) {
+            return std::unexpected(EventRegistryFailure{maker.error(), {}});
+        }
+
+        auto spread = events::defaultSpreadOrderSchema(limits.schema);
+
+        if (!spread) {
+            return std::unexpected(EventRegistryFailure{spread.error(), {}});
+        }
+
+        auto analytic = events::defaultAnalyticOrderSchema(limits.schema);
+
+        if (!analytic) {
+            return std::unexpected(EventRegistryFailure{analytic.error(), {}});
+        }
+
+        std::array records{order->records()[0], maker->records()[0], spread->records()[0], analytic->records()[0]};
+
+        for (std::size_t index = 0; index < records.size(); ++index) {
+            records[index].id = static_cast<std::int32_t>(index);
+        }
+
         auto schema = core::LocalSchema::create(records, limits.schema, core::LocalProfile::BINARY_FIELDS_V1);
 
         if (!schema) {
@@ -654,7 +690,9 @@ std::expected<EventRegistry, EventRegistryFailure> defaultHistoryEventRegistry(E
         }
 
         const std::array routes{EventRegistration{EventType::ORDER, 0}, EventRegistration{EventType::MARKET_MAKER, 1},
-                                derivedRegistration(1, events::EventProjection::MARKET_MAKER_ORDERS)};
+                                derivedRegistration(1, events::EventProjection::MARKET_MAKER_ORDERS),
+                                EventRegistration{EventType::SPREAD_ORDER, 2},
+                                EventRegistration{EventType::ANALYTIC_ORDER, 3}};
 
         return EventRegistry::create(*schema, routes, limits, work);
     } catch (EventRegistryError error) {

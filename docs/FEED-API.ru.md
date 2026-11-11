@@ -3,7 +3,7 @@
 [English version](FEED-API.md) · [Практические руководства](guides.ru.md) · [Справочник API](api.ru.md)
 
 Подключите `qd/api/feed.hpp` и линкуйте `qdcxx_feed`, чтобы получать типизированные
-`events::Quote`, `events::Profile`, `events::Trade`, `events::TradeETH`, `events::Summary`, `events::TextMessage`, `events::TextConfiguration`, `events::Message`, `events::Configuration` `events::Order` и `events::MarketMaker` через рабочий поток библиотеки. Приложение создаёт
+`events::Quote`, `events::Profile`, `events::Trade`, `events::TradeETH`, `events::Summary`, `events::TextMessage`, `events::TextConfiguration`, `events::Message`, `events::Configuration`, `events::Order`, `events::MarketMaker`, `events::SpreadOrder` и `events::AnalyticOrder` через рабочий поток библиотеки. Приложение создаёт
 endpoint, обработчики и подписки на точные символы; библиотека продвигает соединение,
 конечные переподключения, очереди и доставку. Подписки можно создавать до и после
 `connect()`.
@@ -12,8 +12,12 @@ endpoint, обработчики и подписки на точные симв�
 и текстовых событий либо явными валидированными схемами вызывающего кода и зарегистрированными mappings.
 Endpoint выбирает TICKER (по умолчанию: последние значения с возможным объединением
 обновлений), STREAM (каждая принятая выбранная запись источника) либо явный HISTORY
-(индексируемое общее хранилище и независимые views). Обычный Order и MarketMaker требуют HISTORY, производный от Quote Order использует TICKER. [MarketMaker и производный Order](MARKET-MAKER-ORDER.ru.md) описывает SDK-owned A..Z sources. Стандартная схема
-Order принадлежит SDK и не требует схемы от приложения. Остальные девять типов сохраняют
+(индексируемое общее хранилище и независимые views). Обычный Order, MarketMaker, SpreadOrder и AnalyticOrder требуют HISTORY, производный от Quote Order использует TICKER. [MarketMaker и производный Order](MARKET-MAKER-ORDER.ru.md) описывает SDK-owned A..Z sources. Стандартная схема
+Order принадлежит SDK и не требует схемы от приложения. Стандартный HISTORY-реестр также
+включает оба варианта с источником DEFAULT. Для записей `SpreadOrder#ISE` или
+`AnalyticOrder#NTV` передайте явный проверенный реестр и выберите точный источник через
+`SubscriptionSelector::indexed`. Символ подписки SpreadOrder обозначает базовый инструмент.
+Подробнее о [вариантах Order](ORDER-VARIANTS.ru.md). Остальные девять типов сохраняют
 существующие профили TICKER/STREAM и отклоняют HISTORY до native-регистрации. TLS и credentials
 остаются отдельными профилями приёма. Wildcard-селекторы
 требуют существующего явного разрешения STREAM. Загрузка схем является отдельной задачей.
