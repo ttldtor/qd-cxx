@@ -189,6 +189,9 @@ set_target_properties(qdcxx_underlying PROPERTIES CXX_EXTENSIONS OFF)
 add_library(qdcxx_theo_price src/events/theo_price.cpp)
 target_link_libraries(qdcxx_theo_price PUBLIC qdcxx_event_mapping qdcxx_event_values qdcxx_event_sources)
 set_target_properties(qdcxx_theo_price PROPERTIES CXX_EXTENSIONS OFF)
+add_library(qdcxx_candle src/events/candle.cpp)
+target_link_libraries(qdcxx_candle PUBLIC qdcxx_event_mapping qdcxx_event_values qdcxx_event_sources qdcxx_candle_values)
+set_target_properties(qdcxx_candle PROPERTIES CXX_EXTENSIONS OFF)
 add_library(qdcxx_market_maker src/events/market_maker.cpp)
 target_link_libraries(qdcxx_market_maker PUBLIC qdcxx_event_mapping qdcxx_event_values qdcxx_event_sources)
 set_target_properties(qdcxx_market_maker PROPERTIES CXX_EXTENSIONS OFF)
@@ -326,7 +329,7 @@ endif()
 include(CMakePackageConfigHelpers)
 install(FILES include/qd/api/subscription_selector.hpp include/qd/api/time_series_subscription.hpp DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qd/api")
 install(TARGETS qdcxx_encoding qdcxx_core qdcxx_protocol qdcxx_collectors qdcxx_mux
-    qdcxx_subscription_selectors qdcxx_event_values qdcxx_event_mapping qdcxx_quote qdcxx_profile qdcxx_trade qdcxx_trade_eth qdcxx_summary qdcxx_order qdcxx_series qdcxx_greeks qdcxx_underlying qdcxx_theo_price qdcxx_market_maker qdcxx_derived_order qdcxx_text_events qdcxx_attachments qdcxx_misc_events qdcxx_market_event_symbols qdcxx_event_sources qdcxx_order_index qdcxx_candle_values qdcxx_java_double qdcxx_event_text EXPORT qdcxxTargets
+    qdcxx_subscription_selectors qdcxx_event_values qdcxx_event_mapping qdcxx_quote qdcxx_profile qdcxx_trade qdcxx_trade_eth qdcxx_summary qdcxx_order qdcxx_series qdcxx_greeks qdcxx_underlying qdcxx_theo_price qdcxx_market_maker qdcxx_derived_order qdcxx_text_events qdcxx_attachments qdcxx_misc_events qdcxx_market_event_symbols qdcxx_event_sources qdcxx_order_index qdcxx_candle_values qdcxx_candle qdcxx_java_double qdcxx_event_text EXPORT qdcxxTargets
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
@@ -640,6 +643,12 @@ if(BUILD_TESTING)
     target_link_libraries(qdcxx_theo_price_tests PRIVATE qdcxx_theo_price doctest::doctest)
     set_target_properties(qdcxx_theo_price_tests PROPERTIES CXX_EXTENSIONS OFF)
     add_test(NAME theo_price COMMAND qdcxx_theo_price_tests --no-colors --no-path-filenames)
+    add_executable(qdcxx_candle_tests tests/conformance/candle_tests.cpp)
+    target_link_libraries(qdcxx_candle_tests PRIVATE qdcxx_candle doctest::doctest)
+    target_compile_definitions(qdcxx_candle_tests PRIVATE
+        ORG_TTLDTOR_QDCXX_CANDLE_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/candle-payload")
+    set_target_properties(qdcxx_candle_tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME candle_payload COMMAND qdcxx_candle_tests --no-colors --no-path-filenames)
     set_tests_properties(series PROPERTIES TIMEOUT 30)
     add_executable(qdcxx_auction_order_tests tests/conformance/auction_order_tests.cpp)
     target_link_libraries(qdcxx_auction_order_tests PRIVATE qdcxx_order qdcxx_protocol doctest::doctest)

@@ -1,0 +1,118 @@
+{
+  "qdRevision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "java": "Zulu JDK 8",
+  "classEntries": 1317,
+  "classInventoryEqual": true,
+  "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
+  "javacSha256": "633143e961aa18051c09112b85333f5cdbd845b54eb39678eb15b91ca8bbb527",
+  "zones": [
+    "UTC",
+    "Pacific/Honolulu"
+  ],
+  "zonesByteIdentical": true,
+  "harnessSha256": "d9a9d9ad4a5727a9347078098ce9b2def107ce028263ba514470378fd7712930",
+  "sources": [
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/candle/Candle.java",
+      "sha256": "6c75e3bf24278273d8f7061b7c7ad2914b194652e5c40bf65134f76e4c08adbd"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/candle/CandleFactoryImpl.java",
+      "sha256": "fff00e2992b1d962eca2478e51b3718c40d5a9d804d2e678ad2dde375f26a68c"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/candle/CandleDelegate.java",
+      "sha256": "dd711b196668702d29b7a4521af206a97637169264085273c77b417097d225f3"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/candle/CandleByTradeHistoryDelegate.java",
+      "sha256": "d1e2ae8de93f9fd939a5fb6a7e0883ecda382e4f343014187f8bf436b65a88b8"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/candle/impl/CandleMapping.java",
+      "sha256": "e025e8b63ed8826d90c8a5146eb403a4da715ed68d5af040da303e8660c5f24f"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/candle/impl/TradeHistoryMapping.java",
+      "sha256": "d71a18898393b72028fba2c7f22fba1daa9704acb981888416f842a8c31d1118"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/candle/impl/CandleEventMapping.java",
+      "sha256": "55377c2880310af8b819cda4d7a3c13c6d02c7dea7063a0ff53974660bdb1a40"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/ng/RecordMapping.java",
+      "sha256": "f2871d535918a418d97b6bc4a6afe920cd83f2a35a076f17d2a1ddcb7fd27515"
+    },
+    {
+      "path": "dxlib/src/main/java/com/devexperts/util/WideDecimal.java",
+      "sha256": "0fd3e295e88f36e94a24ed9ebf69429985ddf4ba24e4b896e28015266a39d6d8"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "standard/oracle.tsv",
+      "sha256": "7995704a8e519bae7f0c6af87365043c59935cbad4d717bbd45116e07672d039"
+    },
+    {
+      "path": "standard/candle.qtp",
+      "sha256": "b767991879f82dd69995cc3ca98bbf2cb8112f87840000335b63e2e0dc627d3d"
+    },
+    {
+      "path": "tiny/oracle.tsv",
+      "sha256": "538f95a89ba41c654f58f5c4239fb4348c5762ac2b6693cd2aba4062fbec270b"
+    },
+    {
+      "path": "tiny/candle.qtp",
+      "sha256": "74d75437fcde38c0596d0cb0b2252b6e3593de9d3152fe0649d2d0b0074a993c"
+    },
+    {
+      "path": "optional/oracle.tsv",
+      "sha256": "ae2dca673145e9b7bea817a7045c05f9246fe368bbd1e7fb80e100a0832a9c6f"
+    },
+    {
+      "path": "optional/candle.qtp",
+      "sha256": "74bc7b45cbf8276afd6d1b9cdf88c32b5c42115dd0b83c0f75e8a0a509819882"
+    },
+    {
+      "path": "optional/required.tsv",
+      "sha256": "0e08295a16fa0143f347be3d371aa6e2d3a9700f3275e115d0417d7f0f1fbe7b"
+    },
+    {
+      "path": "long/oracle.tsv",
+      "sha256": "9b8e03ed66a0fe607079b31230f973e73ddee3306c4ae5e603c931489f09cf4b"
+    },
+    {
+      "path": "long/candle.qtp",
+      "sha256": "7ad26c6dd13467d2af051b56c2f3590b4a350767961016825bc986821d741202"
+    },
+    {
+      "path": "numeric-long/oracle.tsv",
+      "sha256": "80943a460dc0d2cd0639df2b1cb86b207105f6410a3636527a0a2a3348869b99"
+    },
+    {
+      "path": "numeric-long/candle.qtp",
+      "sha256": "48cfffe39f1d411f31f8fff501cf59c144425fc6b3c57ae6a83479bdbb2a066a"
+    },
+    {
+      "path": "trade/oracle.tsv",
+      "sha256": "71f0069376516c05b0e729b5f7a937bb7c6b33e846d3a9a9c3ac3fc4a45007b6"
+    },
+    {
+      "path": "trade/candle.qtp",
+      "sha256": "ae24d7f36289d0022848b0550cb79e76734794174544242f4a6b46d33e9f5e03"
+    },
+    {
+      "path": "trade/required.tsv",
+      "sha256": "80f662f02d776ff3ddeae6a4c6f54d1d453a5fb4b4b350e1bc1ee50a91c4ad9d"
+    },
+    {
+      "path": "period/oracle.tsv",
+      "sha256": "49371743a1288dc01e1ae649280b74abeb012d787632cbedb0ea921c1cb971ac"
+    },
+    {
+      "path": "period/candle.qtp",
+      "sha256": "f7c19aed7f69ad043f89b152d96f2a83dcf05d5e1dfe0612e58142e57bcc19f8"
+    }
+  ]
+}

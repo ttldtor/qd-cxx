@@ -4,6 +4,7 @@
 
 Подключите `<qd/events/candle_symbol.hpp>` и `qdcxx_candle_values` либо установленную
 `qdcxx::feed`. Требуется прежний C++23; операциям значений не нужны SDK/runtime.
+[Mapper полей Candle](../spec/events/CANDLE-PAYLOAD.ru.md) принимает разрешённый CandleSymbol.
 
 ```cpp
 using namespace org::ttldtor::qdcxx::events;

@@ -4,6 +4,7 @@
 
 Include `<qd/events/candle_symbol.hpp>` and link `qdcxx_candle_values`, or use the installed
 `qdcxx::feed` target. Build requirements remain C++23. Value operations require no SDK or runtime.
+The [Candle payload mapper](../spec/events/CANDLE-PAYLOAD.md) accepts a resolved CandleSymbol.
 
 ```cpp
 using namespace org::ttldtor::qdcxx::events;
