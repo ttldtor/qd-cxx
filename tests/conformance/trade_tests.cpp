@@ -197,7 +197,7 @@ TEST_CASE("Trade defaults snapshots raw edits and exact preparation boundaries r
     a::EventRegistryWork work;
     auto builtin = a::EventRegistry::builtIn({}, work);
     REQUIRE(builtin);
-    CHECK(builtin->registrations().size() == 5);
+    CHECK(builtin->registrations().size() == 9);
     CHECK(builtin->registrations()[2].type == a::EventType::TRADE);
 }
 
@@ -214,7 +214,7 @@ TEST_CASE("all seven finite receiving selections include only their kinds and pr
     for (unsigned mask = 1; mask <= 7; ++mask) {
         const auto &plan = a::detail::receivingEventPlan(profile, static_cast<a::detail::EventSelection>(mask));
         CHECK(plan.bindingCount == std::popcount(mask));
-        std::array<q::client::PreparedSubscriptionBinding, a::detail::MAXIMUM_RECEIVING_RECORDS> selected{};
+        std::array<q::client::PreparedSubscriptionBinding, a::detail::MAXIMUM_RECEIVING_BINDINGS> selected{};
         selected[0].localId = -1;
         q::client::ReceiverWork credits{2 * plan.bindingCount, a::detail::RECEIVING_BINDING_COPY_WORK - 1};
         CHECK_FALSE(a::detail::copyReceivingBindings(profile, plan, selected, credits));

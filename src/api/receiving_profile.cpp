@@ -22,16 +22,17 @@ constexpr core::SchemaLimits SCHEMA_LIMITS{MAXIMUM_RECEIVING_RECORDS, 284, 724, 
 ///< Complete declarations and aliases; regional binding does not expand this ceiling.
 constexpr std::size_t FRAME_RECORDS = 64; ///< Whole admitted DATA frame record ceiling.
 constexpr std::size_t CALLBACK_RECORDS = CallbackSlotPool::PHYSICAL_RECORDS; ///< Whole callback projection ceiling.
-constexpr std::size_t FIELD_TEXT_UNITS = 8192;            ///< Aggregate text copied from one complete record.
-constexpr std::size_t FIELD_BYTE_UNITS = 16384;           ///< Aggregate opaque payload copied from one record.
-constexpr std::size_t RECORD_ARENA_BYTES = 65536;         ///< Complete detached per-record arena request ceiling.
-constexpr std::size_t QUEUED_RECORDS = 128;               ///< Independent detached-record slots per registration.
-constexpr std::size_t RECORD_BYTES = 16 * MEBIBYTE;       ///< Per-registration detached backing ceiling.
-constexpr std::size_t BATCH_BYTES = MEBIBYTE;             ///< Per-registration composite backing ceiling.
-constexpr std::size_t CONTROL_OPERATIONS = 100000;        ///< Qualified finite one-client owner work seed.
-constexpr std::size_t CONTROL_VISITS = 100000000;         ///< Qualified finite metadata/equality work seed.
-constexpr std::size_t CONTROL_BYTES = 256 * MEBIBYTE;     ///< Qualified logical copy/disposal seed.
-constexpr std::size_t DNS_ENVELOPE_BYTES = 80 * MEBIBYTE; ///< Separate documented DNS SDK envelope.
+constexpr std::size_t FIELD_TEXT_UNITS = 8192;             ///< Aggregate text copied from one complete record.
+constexpr std::size_t FIELD_BYTE_UNITS = 16384;            ///< Aggregate opaque payload copied from one record.
+constexpr std::size_t RECORD_ARENA_BYTES = 65536;          ///< Complete detached per-record arena request ceiling.
+constexpr std::size_t SESSION_SNAPSHOT_BYTES = 128 * 1024; ///< Maximum backing for a Feed snapshot.
+constexpr std::size_t QUEUED_RECORDS = 128;                ///< Independent detached-record slots per registration.
+constexpr std::size_t RECORD_BYTES = 16 * MEBIBYTE;        ///< Per-registration detached backing ceiling.
+constexpr std::size_t BATCH_BYTES = MEBIBYTE;              ///< Per-registration composite backing ceiling.
+constexpr std::size_t CONTROL_OPERATIONS = 100000;         ///< Qualified finite one-client owner work seed.
+constexpr std::size_t CONTROL_VISITS = 100000000;          ///< Qualified finite metadata/equality work seed.
+constexpr std::size_t CONTROL_BYTES = 256 * MEBIBYTE;      ///< Qualified logical copy/disposal seed.
+constexpr std::size_t DNS_ENVELOPE_BYTES = 80 * MEBIBYTE;  ///< Separate documented DNS SDK envelope.
 constexpr std::uint64_t DNS_PROGRESS_UNITS = 351280142190671838ULL; ///< Complete documented DNS logical charge.
 constexpr std::size_t WRITER_CONFIGURATION_BYTES = 4 * MEBIBYTE;    ///< Retained complete writer reservation.
 
@@ -593,6 +594,7 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
                       SCHEMA_LIMITS.totalNameUnits};
     budgets.session.context.schema = SCHEMA_LIMITS;
     budgets.session.context.descriptions = SCHEMA_LIMITS.records;
+    budgets.session.snapshotBytes = SESSION_SNAPSHOT_BYTES;
     budgets.session.descriptions.descriptions = SCHEMA_LIMITS.records;
     budgets.session.descriptions.totalFields = SCHEMA_LIMITS.fields;
     budgets.session.events = protocol::DataEventPolicy::BINARY_CATALOG_V1;

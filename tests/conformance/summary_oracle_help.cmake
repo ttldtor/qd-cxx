@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: BSL-1.0
 # CTest caller supplies the explicit prefixed PowerShell/source variables below. This checks
 # help/invalid-input exits without operational paths, Java, network or workload output creation.
+cmake_minimum_required(VERSION 3.25)
+
 foreach(launcher_name IN ITEMS Invoke-Oracle.ps1 Invoke-OpenInterest.ps1)
 set(launcher "${ORG_TTLDTOR_QDCXX_SUMMARY_SOURCE}/tools/upstream/summary-oracle/${launcher_name}")
 foreach(mode IN ITEMS noargs en ru invalid_paths incomplete)

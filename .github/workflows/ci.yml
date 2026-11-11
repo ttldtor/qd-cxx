@@ -23,7 +23,7 @@ jobs:
       ASAN_OPTIONS: detect_leaks=0:halt_on_error=1
       UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
       # Existing failures are reported separately until their contracts are repaired.
-      KNOWN_FAILURES: '^(schema_json_contract|indexed_schema_layout|profile_inspection_io|profile_inspection_cli|inspection_cli_negatives)$'
+      KNOWN_FAILURES: ${{ matrix.known_failures }}
     strategy:
       fail-fast: false
       matrix:
@@ -31,9 +31,11 @@ jobs:
           - name: Windows core and tools (MSVC Release)
             runner: windows-2022
             build_dir: build/qdcxx-minimal-windows
+            known_failures: '^(schema_json_contract|indexed_schema_layout|profile_inspection_io|profile_inspection_cli|inspection_cli_negatives)$'
           - name: Linux Feed and tools (GCC ASan/UBSan)
             runner: ubuntu-24.04
             build_dir: build/qdcxx-feed-linux
+            known_failures: '^(schema_json_contract|indexed_schema_layout|profile_inspection_io|profile_inspection_cli)$'
     steps:
       - uses: actions/checkout@v6
         with:
