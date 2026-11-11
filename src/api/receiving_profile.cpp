@@ -366,11 +366,19 @@ void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, s
 
             const auto index = profile.bindings.size();
             const auto &record = profile.schema.records()[static_cast<std::size_t>(registration.localRecordId)];
+
+            if (registration.type == EventType::GREEKS && profile.family == core::SubscriptionFamily::HISTORY) {
+                if (!record.hasTime)
+                    refuse(ErrorCode::UNSUPPORTED_PROFILE, "profile-greeks-time");
+
+                profile.bindingTimeEncodings[index] = HistoryRangeEncoding::UNIX_MILLISECONDS_SEQUENCE;
+            }
+
             profile.bindingExchanges[index] =
                 (registration.type == EventType::PROFILE || registration.type == EventType::MARKET_MAKER ||
-                 registration.type == EventType::SERIES || registration.type == EventType::TEXT_MESSAGE ||
-                 registration.type == EventType::TEXT_CONFIGURATION || registration.type == EventType::MESSAGE ||
-                 registration.type == EventType::CONFIGURATION ||
+                 registration.type == EventType::SERIES || registration.type == EventType::GREEKS ||
+                 registration.type == EventType::TEXT_MESSAGE || registration.type == EventType::TEXT_CONFIGURATION ||
+                 registration.type == EventType::MESSAGE || registration.type == EventType::CONFIGURATION ||
                  (usesOrderSource(registration.type) && registration.projection == events::EventProjection::NATIVE))
                     ? 0
                     : events::market_symbols::getExchangeCode(record.name);
@@ -516,6 +524,10 @@ bool receivingRouteSupportsContract(const EventRegistration &route, DeliveryCont
 
     if (route.type == EventType::ORDER_IMBALANCE) {
         return contract == DeliveryContract::TICKER;
+    }
+
+    if (route.type == EventType::GREEKS) {
+        return contract == DeliveryContract::TICKER || contract == DeliveryContract::HISTORY;
     }
 
     if (contract == DeliveryContract::HISTORY) {
@@ -872,8 +884,8 @@ void validateReceivingSymbol(const EventRegistry *registry, EventSelection selec
     for (const auto &route : registry->registrations()) {
         if (route.type == EventType::PROFILE || route.type == EventType::TEXT_MESSAGE ||
             route.type == EventType::TEXT_CONFIGURATION || route.type == EventType::MESSAGE ||
-            route.type == EventType::CONFIGURATION || route.type == EventType::SERIES || usesOrderSource(route.type) ||
-            !selectsEvent(selection, route.type)) {
+            route.type == EventType::CONFIGURATION || route.type == EventType::SERIES ||
+            route.type == EventType::GREEKS || usesOrderSource(route.type) || !selectsEvent(selection, route.type)) {
             continue;
         }
 
@@ -965,7 +977,8 @@ core::DeliveryProjectionMask receivingProjectionMask(const ReceivingProfile &pro
                    : 0;
     }
 
-    if (binding.kind == client::PreparedEventKind::MARKET_MAKER || binding.kind == client::PreparedEventKind::SERIES) {
+    if (binding.kind == client::PreparedEventKind::MARKET_MAKER || binding.kind == client::PreparedEventKind::SERIES ||
+        binding.kind == client::PreparedEventKind::GREEKS) {
         return !symbol.sourceId || *symbol.sourceId <= 0 ? core::NATIVE_DELIVERY_PROJECTION : 0;
     }
 

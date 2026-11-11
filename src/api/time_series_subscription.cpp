@@ -72,6 +72,8 @@ bool TimeSeriesEventDescriptor::operator==(const TimeSeriesEventDescriptor &othe
 
 bool isTimeSeriesEventType(EventType type) noexcept {
     switch (type) {
+    case EventType::GREEKS:
+        return true;
     case EventType::QUOTE:
     case EventType::PROFILE:
     case EventType::TRADE:

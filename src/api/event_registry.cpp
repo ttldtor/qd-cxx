@@ -8,6 +8,7 @@
 #include "qd/events/analytic_order.hpp"
 #include "qd/events/configuration.hpp"
 #include "qd/events/derived_order.hpp"
+#include "qd/events/greeks.hpp"
 #include "qd/events/market_maker.hpp"
 #include "qd/events/order.hpp"
 #include "qd/events/order_imbalance.hpp"
@@ -178,7 +179,8 @@ bool validRegistration(const EventRegistration &registration) noexcept {
             registration.type == EventType::SUMMARY || registration.type == EventType::TEXT_MESSAGE ||
             registration.type == EventType::TEXT_CONFIGURATION || registration.type == EventType::MESSAGE ||
             registration.type == EventType::CONFIGURATION || registration.type == EventType::MARKET_MAKER ||
-            registration.type == EventType::SERIES || detail::usesOrderSource(registration.type)) &&
+            registration.type == EventType::SERIES || registration.type == EventType::GREEKS ||
+            detail::usesOrderSource(registration.type)) &&
            (registration.eventTimePolicy == EventTimePolicy::UNSPECIFIED ||
             registration.eventTimePolicy == EventTimePolicy::FIELD_METADATA) &&
            (registration.projection == events::EventProjection::NATIVE ||
@@ -433,6 +435,13 @@ EventRegistry::create(const core::LocalSchema &schema, std::span<const EventRegi
                 if (!events::detail::hasOrderIndexCoordinate(record)) {
                     return std::unexpected(EventRegistryFailure{EventRegistryError::INVALID_INPUT, index});
                 }
+            } else if (registration.type == EventType::GREEKS) {
+                const auto mapping = events::PreparedGreeks::prepare(*ownedSchema, registration.localRecordId,
+                                                                     registration.mappingLimits);
+
+                if (!mapping) {
+                    return std::unexpected(EventRegistryFailure{mapping.error(), index});
+                }
             } else if (registration.type == EventType::ORDER_IMBALANCE) {
                 const auto mapping = events::PreparedOrderImbalance::prepare(*ownedSchema, registration.localRecordId,
                                                                              registration.mappingLimits);
@@ -630,8 +639,8 @@ std::expected<EventRegistry, EventRegistryFailure> defaultTickerEventRegistry(Ev
             return std::unexpected(EventRegistryFailure{imbalance.error(), {}});
         }
 
-        constexpr std::size_t DEFAULT_PHYSICAL_RECORDS = 39;
-        constexpr std::size_t DEFAULT_ROUTES = 66;
+        constexpr std::size_t DEFAULT_PHYSICAL_RECORDS = 40;
+        constexpr std::size_t DEFAULT_ROUTES = 67;
         records.reserve(DEFAULT_PHYSICAL_RECORDS);
         routes.reserve(DEFAULT_ROUTES);
         routes.push_back(derivedRegistration(0, events::EventProjection::QUOTE_ORDERS));
@@ -679,6 +688,17 @@ std::expected<EventRegistry, EventRegistryFailure> defaultTickerEventRegistry(Ev
             routes.push_back({EventType::ORDER_IMBALANCE, record.id});
             records.push_back(std::move(record));
         }
+
+        const auto greeks = events::defaultGreeksSchema(limits.schema);
+
+        if (!greeks) {
+            return std::unexpected(EventRegistryFailure{greeks.error(), {}});
+        }
+
+        auto greeksRecord = greeks->records()[0];
+        greeksRecord.id = static_cast<std::int32_t>(records.size());
+        routes.push_back({EventType::GREEKS, greeksRecord.id});
+        records.push_back(std::move(greeksRecord));
 
         auto schema = core::LocalSchema::create(records, limits.schema, core::LocalProfile::BINARY_FIELDS_V1);
 
@@ -737,8 +757,14 @@ std::expected<EventRegistry, EventRegistryFailure> defaultHistoryEventRegistry(E
             return std::unexpected(EventRegistryFailure{series.error(), {}});
         }
 
+        const auto greeks = events::defaultGreeksSchema(limits.schema);
+
+        if (!greeks) {
+            return std::unexpected(EventRegistryFailure{greeks.error(), {}});
+        }
+
         std::array records{order->records()[0], maker->records()[0], spread->records()[0], analytic->records()[0],
-                           otc->records()[0],   otc->records()[1],   series->records()[0]};
+                           otc->records()[0],   otc->records()[1],   series->records()[0], greeks->records()[0]};
 
         for (std::size_t index = 0; index < records.size(); ++index) {
             records[index].id = static_cast<std::int32_t>(index);
@@ -757,7 +783,8 @@ std::expected<EventRegistry, EventRegistryFailure> defaultHistoryEventRegistry(E
                                 EventRegistration{EventType::ANALYTIC_ORDER, 3},
                                 EventRegistration{EventType::OTC_MARKETS_ORDER, 4},
                                 EventRegistration{EventType::OTC_MARKETS_ORDER, 5},
-                                EventRegistration{EventType::SERIES, 6}};
+                                EventRegistration{EventType::SERIES, 6},
+                                EventRegistration{EventType::GREEKS, 7}};
 
         return EventRegistry::create(*schema, routes, limits, work);
     } catch (EventRegistryError error) {

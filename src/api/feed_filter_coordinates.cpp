@@ -1,6 +1,7 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #include "feed_filter_coordinates.hpp"
+#include "qd/api/time_series_subscription.hpp"
 #include "receiving_profile.hpp"
 
 #include "../events/derived_order_sources.hpp"
@@ -40,6 +41,7 @@ bool supported(const EventRegistry &registry, EventType type) noexcept {
     case EventType::OTC_MARKETS_ORDER:
     case EventType::ORDER_IMBALANCE:
     case EventType::SERIES:
+    case EventType::GREEKS:
         return true;
     }
 
@@ -55,7 +57,8 @@ bool usesRegionalCoordinates(EventType type) noexcept {
 /** Non-market projections use the generic source-selection rule, rather than MarketEventDelegateSet. */
 bool usesGenericSourceSelection(EventType type) noexcept {
     return type == EventType::TEXT_MESSAGE || type == EventType::TEXT_CONFIGURATION || type == EventType::MESSAGE ||
-           type == EventType::CONFIGURATION || type == EventType::MARKET_MAKER || type == EventType::SERIES;
+           type == EventType::CONFIGURATION || type == EventType::MARKET_MAKER || type == EventType::SERIES ||
+           type == EventType::GREEKS;
 }
 
 /** Match explicit Order source identity using the already validated record qualification rules.
@@ -106,7 +109,8 @@ bool matchesFilterRoute(const EventRegistry &registry, const EventRegistration &
     if (route.type != type)
         return false;
 
-    if ((usesOrderSource(type) || type == EventType::MARKET_MAKER || type == EventType::SERIES) &&
+    if ((usesOrderSource(type) || type == EventType::MARKET_MAKER || type == EventType::SERIES ||
+         type == EventType::GREEKS) &&
         !receivingRouteSupportsContract(route, contract))
         return false;
 
@@ -203,8 +207,8 @@ std::vector<FilterCoordinate> filterSubscriptionCoordinates(const EventRegistry 
         refuse(ErrorCode::RESOURCE_LIMIT, "filter-symbol-units");
     }
 
-    // Indexed Order has no time-series business capability; source layout is not event-time permission.
-    if (selector.kind() == SubscriptionSymbolKind::TIME_SERIES) {
+    if (selector.kind() == SubscriptionSymbolKind::TIME_SERIES &&
+        (contract != DeliveryContract::HISTORY || !isTimeSeriesEventType(type))) {
         return {};
     }
 
@@ -213,7 +217,7 @@ std::vector<FilterCoordinate> filterSubscriptionCoordinates(const EventRegistry 
         return {};
     }
 
-    if ((usesOrderSource(type) || type == EventType::SERIES) &&
+    if ((usesOrderSource(type) || type == EventType::SERIES || type == EventType::GREEKS) &&
         (contract == DeliveryContract::STREAM || selector.kind() == SubscriptionSymbolKind::ALL)) {
         return {};
     }
@@ -268,6 +272,8 @@ std::vector<FilterCoordinate> filterEventCoordinates(const EventRegistry &regist
                     return EventType::ORDER_IMBALANCE;
                 } else if constexpr (std::is_same_v<Event, events::Series>) {
                     return EventType::SERIES;
+                } else if constexpr (std::is_same_v<Event, events::Greeks>) {
+                    return EventType::GREEKS;
                 } else if constexpr (std::is_same_v<Event, events::Order>) {
                     return EventType::ORDER;
                 } else {

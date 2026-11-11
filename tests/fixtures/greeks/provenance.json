@@ -1,0 +1,66 @@
+{
+  "qdRevision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "java": "Zulu JDK 8",
+  "profiles": [
+    "default wide decimal",
+    "-Ddxscheme.wide=false"
+  ],
+  "zones": [
+    "UTC",
+    "Pacific/Honolulu"
+  ],
+  "zonesByteIdentical": true,
+  "harnessSha256": "dbaa84464a20c6a7228ac63077d561a6588bedcfbcc4e6aa5fbbf9dfdc90f7cb",
+  "sources": [
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/option/Greeks.java",
+      "sha256": "dc346a19f0fb58f3033e69e71da997400fbf3c292364f62842df1273ee3df735"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/option/GreeksDelegate.java",
+      "sha256": "6bdc7df4c14a3cddd7ab335c03b382ab62e172047716552e5bcab5ce39eff98b"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/option/impl/GreeksMapping.java",
+      "sha256": "8f0b95c53f2837fc76aa400bede81b00c6c01f3356c35c5d436868fe570b7768"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/option/OptionFactoryImpl.java",
+      "sha256": "eb51ceff7418f828ec236adb8c07c8993bce520c28691c9cec8f08b5f2a5076a"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "wide/ticker.qtp",
+      "sha256": "81b69519c2d8d2bece9becc7aa0ca353469de4803e0265f364f470d0dc36f71d"
+    },
+    {
+      "path": "wide/history.qtp",
+      "sha256": "8fb31d4a184a8bc0e9d68d2c83cd6b5ac2371b39c16df29f6a63bbb095f2b226"
+    },
+    {
+      "path": "wide/ticker.tsv",
+      "sha256": "73f5da3a7114f482f189c44a2be226afde8c1b4a497fb40575344dffa7f132a1"
+    },
+    {
+      "path": "wide/history.tsv",
+      "sha256": "a253b6e3136feabd1aa667835a2f93a0c99e309af6357afc080a7ed498013bb0"
+    },
+    {
+      "path": "tiny/ticker.qtp",
+      "sha256": "987d95af91ee492ea97bef6390b963fd313d81d84364e6de4d52b52e7e139497"
+    },
+    {
+      "path": "tiny/history.qtp",
+      "sha256": "54413d7d0f5a41c57ae6ef7ee2193e605c5cbc9d961eee5c4518099e00b9961f"
+    },
+    {
+      "path": "tiny/ticker.tsv",
+      "sha256": "fe8e3d7a1bd6c8155edaa685a922386c750d73970c45530a465ea93b4b987809"
+    },
+    {
+      "path": "tiny/history.tsv",
+      "sha256": "41fde537e9b8baa6b3998aa9a015568ba50fe027ba231405dfdaa1fd9aeda88a"
+    }
+  ]
+}
