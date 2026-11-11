@@ -126,7 +126,7 @@ struct ReceivingProfile {
 /** Prepay and copy selected immutable binding metadata into finite caller stack backing.
  * @param profile Valid complete immutable binding catalog.
  * @param plan Valid mask plan belonging to that catalog.
- * @param output Exactly MAXIMUM_RECEIVING_RECORDS slots; only the selected prefix is written.
+ * @param output Exactly MAXIMUM_RECEIVING_BINDINGS slots; only the selected prefix is written.
  * @param work Receiver construction credits, debited once for attempted successful copying.
  * @return False before changing output or credits if shape or finite funding is insufficient.
  */

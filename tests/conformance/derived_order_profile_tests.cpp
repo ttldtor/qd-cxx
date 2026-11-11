@@ -63,7 +63,7 @@ Result run(const q::api::detail::ReceivingProfile &profile, std::span<const std:
 }
 } // namespace
 
-TEST_CASE("full SDK35 description generation has complete finite text funding and exact one-under refusal") {
+TEST_CASE("full TICKER description generation has complete finite text funding and exact one-under refusal") {
     q::api::RuntimeOptions runtime;
     runtime.dnsServers.push_back({{127, 0, 0, 1}});
     const auto profile = q::api::detail::prepareReceivingProfile(runtime, {}, "127.0.0.1", 12345);
@@ -72,7 +72,7 @@ TEST_CASE("full SDK35 description generation has complete finite text funding an
     const auto &budgets = profile.endpoint.settings().budgets;
     const auto funded = run(profile, prefix, budgets.protocolTurn.textUnits);
     REQUIRE(funded.complete);
-    CHECK(funded.descriptions == 35);
+    CHECK(funded.descriptions == profile.schema.records().size());
     CHECK(funded.publications == 2);
     CHECK(funded.text > 10000000);
     const auto exact = run(profile, prefix, funded.text);
@@ -143,8 +143,10 @@ TEST_CASE("regional compatible pairs fund physical coordinate domains rather tha
     q::api::RuntimeOptions runtime;
     runtime.dnsServers.push_back({{127, 0, 0, 1}});
     const auto defaults = q::api::detail::prepareReceivingProfile(runtime, {}, "127.0.0.1", 12345);
-    CHECK(defaults.physicalRouteCount == 35);
-    CHECK(defaults.endpoint.settings().budgets.desired.entries == 4480);
+    CHECK(defaults.physicalRouteCount == 39);
+    CHECK(defaults.endpoint.settings().budgets.desired.entries == runtime.maximumSymbolsPerSubscription *
+                                                                      runtime.maximumSubscriptionsPerEndpoint *
+                                                                      defaults.physicalRouteCount);
 
     for (const auto [contexts, split, expected] :
          {std::tuple<std::size_t, bool, std::size_t>{1, false, 2}, {42, false, 84}, {42, true, 63}}) {

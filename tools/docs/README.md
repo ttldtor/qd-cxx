@@ -19,6 +19,13 @@ The [main page](../../docs/index.md) is the same entry in source Markdown. Use t
 switch between light and dark rendering. An older documentation directory is not modified when you
 choose a fresh `OUTPUT`.
 
+GitHub Actions builds the same HTML for pull requests targeting `master`. Windows checks the core
+and offline tools. Linux checks Feed and the offline tools with ASan/UBSan. Once both jobs and
+the documentation build pass on `master`, Actions publishes the HTML to
+[GitHub Pages](https://ttldtor.github.io/qd-cxx/).
+The workflow reports the named existing contract failures separately. That diagnostic step does
+not block the build or deployment.
+
 ## Parameters and results
 
 | Parameter | Default | Meaning |

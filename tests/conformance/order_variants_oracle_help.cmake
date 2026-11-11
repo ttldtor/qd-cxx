@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: BSL-1.0
 # Internal caller: cmake -DPWSH=<pwsh> -P tests/conformance/order_variants_oracle_help.cmake.
 # Checks both new launchers without operational inputs or Java work; contract failures are terminal.
+cmake_minimum_required(VERSION 3.25)
+
 if(NOT PWSH)
     find_program(PWSH pwsh REQUIRED)
 endif()

@@ -5,6 +5,7 @@
 
 #include "connect_peer.hpp"
 #include "event_time_fixture.hpp"
+#include "registered_event_test_support.hpp"
 
 #include <algorithm>
 #include <array>
@@ -376,11 +377,7 @@ void checkCompositeBoundary(const std::map<std::string, f::Scenario> &corpus, co
     std::map<std::pair<bool, std::u16string>, unsigned> received;
 
     for (const auto &value : observation->events) {
-        const auto symbol = std::visit(
-            [](const auto &event) {
-                return event.symbol;
-            },
-            value);
+        const std::u16string symbol{q::feed_tests::registeredEventSymbol(value)};
         ++received[{std::holds_alternative<q::events::Quote>(value), symbol}];
     }
 

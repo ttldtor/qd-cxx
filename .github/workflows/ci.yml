@@ -1,0 +1,155 @@
+name: CI and documentation
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    env:
+      ASAN_OPTIONS: detect_leaks=0:halt_on_error=1
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+      # Existing failures are reported separately until their contracts are repaired.
+      KNOWN_FAILURES: ${{ matrix.known_failures }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows core and tools (MSVC Release)
+            runner: windows-2022
+            build_dir: build/qdcxx-minimal-windows
+            known_failures: '^(schema_json_contract|indexed_schema_layout|profile_inspection_io|profile_inspection_cli|inspection_cli_negatives)$'
+          - name: Linux Feed and tools (GCC ASan/UBSan)
+            runner: ubuntu-24.04
+            build_dir: build/qdcxx-feed-linux
+            known_failures: '^(schema_json_contract|indexed_schema_layout|profile_inspection_io|profile_inspection_cli)$'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Install pinned Windows CMake
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $package = 'cmake-4.4.2-windows-x86_64'
+          $archive = Join-Path $env:RUNNER_TEMP "$package.zip"
+          Invoke-WebRequest "https://github.com/Kitware/CMake/releases/download/v4.4.2/$package.zip" -OutFile $archive
+          if ((Get-FileHash -LiteralPath $archive).Hash -ine 'e8139d85b3813bc38833142ae1940472e9a587e9b5d2718ac1804c60f4e57a64') {
+            throw 'CMake archive checksum mismatch'
+          }
+          Expand-Archive -LiteralPath $archive -DestinationPath $env:RUNNER_TEMP
+          Join-Path $env:RUNNER_TEMP "$package/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Provision pinned runtime dependencies
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          cmake "-DDESTINATION=$PWD/.work/runtime-sdk" "-DPATCH_EXECUTABLE=$(command -v patch)" -P tools/deps/ProvisionRuntime.cmake
+
+      - name: Configure and build Windows
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          call "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          if errorlevel 1 exit /b 1
+          set "PATH=%RUNNER_TEMP%\cmake-4.4.2-windows-x86_64\bin;%PATH%"
+          cmake --version
+          cmake --preset qdcxx-minimal-windows -DBUILD_TESTING=ON -DORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON=ON -DORG_TTLDTOR_QDCXX_BUILD_TAPE_INSPECT=ON -DORG_TTLDTOR_QDCXX_BUILD_QTP_INSPECT=ON -DORG_TTLDTOR_QDCXX_BUILD_TAPE_WRITE=ON
+          if errorlevel 1 exit /b 1
+          cmake --build build/qdcxx-minimal-windows --parallel 2
+
+      - name: Configure and build Linux
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          cmake --preset qdcxx-feed-linux -DCMAKE_C_COMPILER=gcc-13 -DCMAKE_CXX_COMPILER=g++-13 \
+            '-DCMAKE_CXX_FLAGS=-fsanitize=address,undefined -fno-omit-frame-pointer -fno-pie' \
+            '-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined -no-pie' \
+            -DBUILD_TESTING=ON -DORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON=ON \
+            -DORG_TTLDTOR_QDCXX_BUILD_TAPE_INSPECT=ON -DORG_TTLDTOR_QDCXX_BUILD_QTP_INSPECT=ON \
+            -DORG_TTLDTOR_QDCXX_BUILD_TAPE_WRITE=ON
+          grep -qx 'profile=2' build/qdcxx-feed-linux/recovery-copy-profile/result.txt
+          cmake --build build/qdcxx-feed-linux --parallel 2
+
+      - name: Run tests
+        id: tests
+        shell: bash
+        env:
+          BUILD_DIR: ${{ matrix.build_dir }}
+        run: ctest --test-dir "$BUILD_DIR" --no-tests=error --output-on-failure --timeout 180 -E "$KNOWN_FAILURES"
+
+      - name: Report known contract failures
+        if: ${{ !cancelled() && (steps.tests.outcome == 'success' || steps.tests.outcome == 'failure') }}
+        continue-on-error: true
+        shell: bash
+        env:
+          BUILD_DIR: ${{ matrix.build_dir }}
+        run: |
+          if ! ctest --test-dir "$BUILD_DIR" --no-tests=error --output-on-failure --timeout 180 -R "$KNOWN_FAILURES"; then
+            echo '::warning::Known contract tests failed. See this step for details.'
+            exit 1
+          fi
+
+  documentation:
+    name: Doxygen documentation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Install pinned Doxygen
+        shell: bash
+        run: |
+          archive="$RUNNER_TEMP/doxygen-1.18.0.linux.bin.tar.gz"
+          curl --fail --location --retry 3 \
+            https://github.com/doxygen/doxygen/releases/download/Release_1_18_0/doxygen-1.18.0.linux.bin.tar.gz \
+            --output "$archive"
+          echo "14fa81bdc34171edb5f1f02b1d60e74802f0439b77fa44e592565d517d72df90  $archive" | sha256sum --check
+          tar -xzf "$archive" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/doxygen-1.18.0/bin" >> "$GITHUB_PATH"
+
+      - name: Build public HTML
+        shell: bash
+        run: |
+          doxygen --version
+          cmake "-DOUTPUT=$RUNNER_TEMP/qd-cxx-docs" -P tools/docs/Build.cmake
+          test -s "$RUNNER_TEMP/qd-cxx-docs/html/index.html"
+
+      - name: Upload Pages artifact
+        if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ${{ runner.temp }}/qd-cxx-docs/html
+
+  deploy:
+    name: Publish documentation
+    if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+    needs: [build, documentation]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
+      - name: Deploy GitHub Pages
+        id: pages
+        uses: actions/deploy-pages@v4

@@ -212,7 +212,7 @@ TEST_CASE("Candle attributes match unmodified production Java observations") {
 
 TEST_CASE("Candle attribute API owns data and distinguishes parsing from symbol recognition") {
     CHECK(parseCandlePrice(u"b") == CandlePrice::BID);
-    CHECK(parseCandlePrice(u"ſ") == CandlePrice::SETTLEMENT);
+    CHECK(parseCandlePrice(u"\u017f") == CandlePrice::SETTLEMENT);
     CHECK(parseCandleSession(u"t") == CandleSession::REGULAR);
     CHECK(getCandleSession(u"A{tho=t}") == CandleSession::ANY);
     CHECK(getCandleSession(u"A{tho=TRUE}") == CandleSession::REGULAR);
