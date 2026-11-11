@@ -109,7 +109,7 @@ else()
         if(line MATCHES "[\r\n]")
             fail("CR/LF-containing filenames are unsupported")
         endif()
-        if(line MATCHES "^(include/.*\\.hpp|src/.*\\.cpp|src/(api/(callback_execution|endpoint_configuration|feed_internal|subscription_observer|feed_filter_(coordinates|expression|ipf_config))|transport/(aggregation|callback_retirement)|client/endpoint_host|detail/qd_time_period)\\.hpp|tests/conformance/.*\\.cpp|examples/(subscriptions|feed_quote|event_text|ipf_live)/.*\\.(cpp|hpp)|tools/(qtp-inspect|tape-inspect|tape-write|subscribe|dev)/.*\\.(cpp|hpp))$"
+        if(line MATCHES "^(include/.*\\.hpp|src/.*\\.cpp|src/(api/(callback_execution|endpoint_configuration|feed_internal|subscription_observer|feed_filter_(coordinates|expression|ipf_config))|transport/(aggregation|callback_retirement)|client/endpoint_host|detail/qd_time_period)\\.hpp|tests/conformance/.*\\.cpp|examples/(subscriptions|feed_quote|feed_market|event_text|ipf_live)/.*\\.(cpp|hpp)|tools/(qtp-inspect|tape-inspect|tape-write|subscribe|dev)/.*\\.(cpp|hpp))$"
             AND NOT line MATCHES "(^|/)(upstream|generated|fixtures)/")
             jsonString(quoted "${line}")
             string(JSON selected SET "${selected}" ${index} "${quoted}")
@@ -142,7 +142,7 @@ foreach(index RANGE 0 ${last})
     if(WIN32)
         string(TOLOWER "${relative}" relative)
     endif()
-    if(NOT relative MATCHES "^(include/|src/|tests/conformance/|examples/(subscriptions|feed_quote|event_text|ipf_live)/|tools/(qtp-inspect|tape-inspect|tape-write|subscribe|dev)/|\\.work/)"
+    if(NOT relative MATCHES "^(include/|src/|tests/conformance/|examples/(subscriptions|feed_quote|feed_market|event_text|ipf_live)/|tools/(qtp-inspect|tape-inspect|tape-write|subscribe|dev)/|\\.work/)"
         OR relative MATCHES "(^|/)(upstream|generated|fixtures)/" OR NOT relative MATCHES "\\.(cpp|hpp)$")
         fail("Outside formatting scope: ${path}")
     endif()
@@ -154,7 +154,7 @@ foreach(index RANGE 0 ${last})
     if(WIN32)
         string(TOLOWER "${relative}" relative)
     endif()
-    if(NOT relative MATCHES "^(include/|src/|tests/conformance/|examples/(subscriptions|feed_quote|event_text|ipf_live)/|tools/(qtp-inspect|tape-inspect|tape-write|subscribe|dev)/|\\.work/)"
+    if(NOT relative MATCHES "^(include/|src/|tests/conformance/|examples/(subscriptions|feed_quote|feed_market|event_text|ipf_live)/|tools/(qtp-inspect|tape-inspect|tape-write|subscribe|dev)/|\\.work/)"
         OR relative MATCHES "(^|/)(upstream|generated|fixtures)/" OR NOT relative MATCHES "\\.(cpp|hpp)$")
         fail("Resolved source outside formatting scope: ${path}")
     endif()

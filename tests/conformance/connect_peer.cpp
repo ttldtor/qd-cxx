@@ -543,6 +543,7 @@ void Peer::serve(std::stop_token stop) noexcept {
         bool followupReceived = false;
         std::size_t removeTuples = 0;
         std::size_t removeSet = 0;
+        std::vector<unsigned char> addMatches;
         std::vector<unsigned char> removeMatches;
         const auto family = wireFamily(script_.family);
         p::FrameReader reader({8192, 8201});
@@ -614,6 +615,7 @@ void Peer::serve(std::stop_token stop) noexcept {
                         reconnected = true;
                         initialEnd = afterRemoveEnd = 0;
                         addTuples = removeTuples = removeSet = followupTuples = 0;
+                        addMatches.clear();
                         followupReceived = false;
                         removeMatches.clear();
                         reader.reset();
@@ -653,7 +655,14 @@ void Peer::serve(std::stop_token stop) noexcept {
                             auto &tuples = adding ? (addReceived ? followupTuples : addTuples) : removeTuples;
                             std::span<unsigned char> matched;
 
-                            if (!adding && script_.removeSequence && (*script_.removeSequence)[removeSet].unordered) {
+                            if (adding && script_.unorderedAdds) {
+                                if (addMatches.empty()) {
+                                    addMatches.resize(expected.size());
+                                }
+
+                                matched = addMatches;
+                            } else if (!adding && script_.removeSequence &&
+                                       (*script_.removeSequence)[removeSet].unordered) {
                                 if (removeMatches.empty())
                                     removeMatches.resize(expected.size());
 
@@ -676,6 +685,7 @@ void Peer::serve(std::stop_token stop) noexcept {
                                     output.insert(output.end(), afterFollowupAdd_.begin(), afterFollowupAdd_.end());
                                 }
 
+                                addMatches.clear();
                                 ++adds_;
                             } else {
                                 if (script_.removeSequence) {

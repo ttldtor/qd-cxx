@@ -50,6 +50,7 @@ struct PeerScript {
     bool waitForDataRelease = false; ///< Test-controlled barrier after full ADD parsing, without a timer race.
     bool canonicalSymbols = false;   ///< Explicit canonical DATA encoding; false preserves legacy FD/cipher-zero bytes.
     std::int32_t subscriptionRecordId = 0; ///< Expected client outgoing record identity; independent of peer sender17.
+    bool unorderedAdds = false;            ///< Compare exact ADD multisets across frames, including one followup.
     bool describeAllRecords = false;       ///< Explicitly describe every source record as sender17+local ID.
     std::vector<std::int32_t> subscriptionRecordIds; ///< Optional exact client ID per expected symbol tuple.
     std::optional<std::vector<ExpectedSubscription>> removeSequence;
