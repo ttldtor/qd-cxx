@@ -298,6 +298,64 @@ TEST_CASE("active latest request keeps the tape refusal after a stop before file
     CHECK(failure.stage == "latest-event-request-tape");
 }
 
+TEST_CASE("active latest request batch settles pending tape children and preserves duplicate cancellation") {
+    api::ApiRuntime runtime(runtimeOptions());
+    const auto endpoint = runtime.createEndpoint();
+    const auto feed = endpoint->getFeed();
+    const auto deadline = std::chrono::steady_clock::now() + 5s;
+    const auto requests = feed->requestLastEvents<q::events::Quote>({"IBM", "IBM", "MSFT"}, deadline);
+    REQUIRE(requests.size() == 3);
+    CHECK(requests[0].getSymbol() == u"IBM");
+    CHECK(requests[1].getSymbol() == u"IBM");
+    CHECK(requests[2].getSymbol() == u"MSFT");
+    REQUIRE(requests[0].cancel());
+    CHECK_FALSE(requests[1].isDone());
+    CHECK_FALSE(requests[2].isDone());
+    CHECK(endpoint->getStatistics().connection.connectionAttempts.value == 0);
+
+    const auto diagnostic = [](auto operation) {
+        try {
+            operation();
+        } catch (const api::Error &error) {
+            return error.diagnostic();
+        }
+
+        return api::Diagnostic{};
+    };
+
+    endpoint->connectTape(RAW_QUOTE, {.initiallyPaused = true});
+    CHECK(requests[1].isDone());
+    CHECK(requests[2].isDone());
+
+    const auto cancelled = diagnostic([&] {
+        static_cast<void>(requests[0].await());
+    });
+    CHECK(cancelled.code == api::ErrorCode::REQUEST_CANCELLED);
+    CHECK(cancelled.stage == "latest-event-request-cancelled");
+
+    CHECK_FALSE(requests[0].cancel());
+
+    for (std::size_t index = 1; index < requests.size(); ++index) {
+        const auto &request = requests[index];
+        CHECK_FALSE(request.cancel());
+        const auto selected = diagnostic([&] {
+            static_cast<void>(request.await());
+        });
+        CHECK(selected.code == api::ErrorCode::UNSUPPORTED_PROFILE);
+        CHECK(selected.stage == "latest-event-request-tape");
+    }
+
+    const auto fixed = diagnostic([&] {
+        static_cast<void>(feed->requestLastEvents<q::events::Quote>({"IBM", "MSFT"}, deadline));
+    });
+    CHECK(fixed.code == api::ErrorCode::UNSUPPORTED_PROFILE);
+    CHECK(fixed.stage == "latest-event-request-tape");
+
+    REQUIRE(endpoint->awaitState(api::EndpointState::CONNECTED, deadline).status == api::WaitStatus::REACHED);
+    endpoint->setTapePaused(false);
+    expectCleanEof(endpoint);
+}
+
 TEST_CASE("explicit HISTORY tape preserves typed trades and does not produce STREAM events") {
     for (const auto contract : {api::DeliveryContract::HISTORY, api::DeliveryContract::STREAM}) {
         CAPTURE(contract);

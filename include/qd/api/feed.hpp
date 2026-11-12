@@ -41,6 +41,7 @@
 #include <functional>
 #include <initializer_list>
 #include <memory>
+#include <new>
 #include <optional>
 #include <span>
 #include <stdexcept>
@@ -270,6 +271,8 @@ using RegisteredEvent =
                  events::NuamOrder>;
 
 namespace detail {
+[[nodiscard]] std::u16string_view
+latestEventRequestSymbol(const std::shared_ptr<LatestEventRequestState> &state) noexcept;
 [[nodiscard]] bool latestEventRequestDone(const std::shared_ptr<LatestEventRequestState> &state) noexcept;
 bool cancelLatestEventRequest(const std::shared_ptr<LatestEventRequestState> &state) noexcept;
 [[nodiscard]] RegisteredEvent awaitLatestEventRequest(const std::shared_ptr<LatestEventRequestState> &state);
@@ -307,6 +310,11 @@ template <class Event> class LatestEventRequest final {
     /** Cancel any pending request and release its detached result storage. */
     ~LatestEventRequest() {
         cancel();
+    }
+
+    /** @return Exact logical symbol, borrowed while the handle retains its state. A moved-from handle is empty. */
+    [[nodiscard]] std::u16string_view getSymbol() const noexcept {
+        return detail::latestEventRequestSymbol(state_);
     }
 
     /** @return Whether this live request has reached any terminal outcome. */
@@ -686,6 +694,40 @@ class Feed final {
     startLatestEventRequest(EventType type, std::string_view symbol,
                             std::chrono::steady_clock::time_point deadline) const;
 
+    [[nodiscard]] std::vector<std::shared_ptr<detail::LatestEventRequestState>>
+    prepareLatestEventRequests(EventType type, std::span<const std::u16string_view> symbols,
+                               std::chrono::steady_clock::time_point deadline) const;
+    [[nodiscard]] std::vector<std::shared_ptr<detail::LatestEventRequestState>>
+    prepareLatestEventRequests(EventType type, std::span<const std::string_view> symbols,
+                               std::chrono::steady_clock::time_point deadline) const;
+    [[nodiscard]] std::vector<std::shared_ptr<detail::LatestEventRequestState>>
+    prepareLatestEventRequests(EventType type, std::span<const events::CandleSymbol> symbols,
+                               std::chrono::steady_clock::time_point deadline) const;
+    void admitLatestEventRequests(const std::vector<std::shared_ptr<detail::LatestEventRequestState>> &requests) const;
+
+    /** Reserve all caller-visible handles before committing the complete batch. */
+    template <class Event, class Symbol>
+    [[nodiscard]] std::vector<LatestEventRequest<Event>>
+    requestLatestEventBatch(std::span<const Symbol> symbols, std::chrono::steady_clock::time_point deadline) const {
+        auto states = prepareLatestEventRequests(eventTypeFor<Event>(), symbols, deadline);
+        std::vector<LatestEventRequest<Event>> result;
+
+        try {
+            result.reserve(states.size());
+        } catch (const std::bad_alloc &) {
+            throw Error({ErrorCode::ALLOCATION_FAILURE, "latest-event-request-handles"});
+        } catch (const std::length_error &) {
+            throw Error({ErrorCode::RESOURCE_LIMIT, "latest-event-request-handles"});
+        }
+
+        admitLatestEventRequests(states);
+
+        for (auto &state : states)
+            result.push_back(LatestEventRequest<Event>(std::move(state)));
+
+        return result;
+    }
+
     /** @tparam Event Supported owning native business type. @return Its immutable registration identity. */
     template <class Event> static constexpr EventType eventTypeFor() {
         static_assert(std::is_same_v<Event, events::Quote> || std::is_same_v<Event, events::Profile> ||
@@ -824,7 +866,7 @@ class Feed final {
     }
 
     /** Request one real TICKER value from TCP, opening temporary exact demand on a cache miss.
-     * The endpoint connects only on explicit connect. One request per endpoint can be pending or retiring.
+     * The endpoint connects only on explicit connect. This uses the endpoint's one request-group slot.
      * A tape-fixed endpoint refuses admission. Selecting tape after admission completes the request with
      * UNSUPPORTED_PROFILE.
      * @tparam Event Supported owning LastingEvent type.
@@ -864,6 +906,66 @@ class Feed final {
     [[nodiscard]] LatestEventRequest<Event> requestLastEvent(const events::CandleSymbol &symbol,
                                                              std::chrono::steady_clock::time_point deadline) const {
         return requestLastEvent<Event>(symbol.getSymbol().value_or(std::u16string_view{}), deadline);
+    }
+
+    /** Admit one finite group of independent latest TICKER requests from TCP.
+     * All symbol text is copied before admission. Results preserve input order, including duplicates.
+     * Duplicate pending symbols share exact demand; cancelling a handle affects only its own result.
+     * A tape-fixed endpoint refuses admission. Selecting tape after admission completes each pending request with
+     * UNSUPPORTED_PROFILE and preserves existing terminal outcomes.
+     * @tparam Event Supported owning LastingEvent type.
+     * @param symbols Borrowed exact UTF-16 logical symbols. The raw count is bounded by the subscription symbol limit.
+     * @param deadline Shared absolute steady-clock deadline for each individual terminal outcome.
+     * @return One move-only request per input. An empty input returns an empty vector.
+     * @throws Error Invalid input or refused whole-group admission. Deferred failures are available from each await().
+     */
+    template <class Event>
+    [[nodiscard]] std::vector<LatestEventRequest<Event>>
+    requestLastEvents(std::span<const std::u16string_view> symbols,
+                      std::chrono::steady_clock::time_point deadline) const {
+        return requestLatestEventBatch<Event>(symbols, deadline);
+    }
+
+    /** Admit the same independent request group using exact ASCII symbols.
+     * @tparam Event Supported owning LastingEvent type.
+     * @param symbols Borrowed exact ASCII symbols.
+     * @param deadline Shared absolute steady-clock deadline.
+     * @return One move-only request per input, in order.
+     * @throws Error Same refusals as the UTF-16 overload.
+     */
+    template <class Event>
+    [[nodiscard]] std::vector<LatestEventRequest<Event>>
+    requestLastEvents(std::span<const std::string_view> symbols, std::chrono::steady_clock::time_point deadline) const {
+        return requestLatestEventBatch<Event>(symbols, deadline);
+    }
+
+    /** Admit an exact ASCII request group from a brace-initialized list.
+     * @tparam Event Supported owning LastingEvent type.
+     * @param symbols Borrowed exact ASCII symbols.
+     * @param deadline Shared absolute steady-clock deadline.
+     * @return One move-only request per input, in order.
+     * @throws Error Same refusals as the UTF-16 overload.
+     */
+    template <class Event>
+    [[nodiscard]] std::vector<LatestEventRequest<Event>>
+    requestLastEvents(std::initializer_list<std::string_view> symbols,
+                      std::chrono::steady_clock::time_point deadline) const {
+        return requestLastEvents<Event>(std::span(symbols.begin(), symbols.size()), deadline);
+    }
+
+    /** Admit independent requests using already parsed canonical Candle symbols.
+     * @tparam Event The owning Candle type.
+     * @param symbols Borrowed Candle symbols. Each spelling must be present.
+     * @param deadline Shared absolute steady-clock deadline.
+     * @return One move-only request per input, in order.
+     * @throws Error Same refusals as the UTF-16 overload.
+     */
+    template <class Event>
+        requires std::is_same_v<Event, events::Candle>
+    [[nodiscard]] std::vector<LatestEventRequest<Event>>
+    requestLastEvents(std::span<const events::CandleSymbol> symbols,
+                      std::chrono::steady_clock::time_point deadline) const {
+        return requestLatestEventBatch<Event>(symbols, deadline);
     }
 
     /** Create a bounded logical registration, before or after connect, without application polling.
