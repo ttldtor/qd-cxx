@@ -348,7 +348,8 @@ class RecoveryCore {
     [[nodiscard]] std::expected<mux::MuxHandle, RecoveryReceiverFailure> openSubscriptionReceiver(
         core::SubscriptionFamily family, std::span<const client::PreparedSubscriptionBinding> bindings,
         const std::shared_ptr<client::SubscriptionConsumer> &consumer, client::ReceiverLimits receiverLimits,
-        mux::ClientLimits clientLimits, client::ReceiverWork &receiverWork, mux::QueueWork &queueWork);
+        mux::ClientLimits clientLimits, client::ReceiverWork &receiverWork, mux::QueueWork &queueWork,
+        const client::detail::ReceiverPlan **observationPlan = nullptr);
     /** Observe the adopted HISTORY queue only under current owner/backend eligibility.
      * @param handle Exact adopted HISTORY registration.
      * @param key Borrowed key used synchronously; nothing is retained.
@@ -364,6 +365,17 @@ class RecoveryCore {
      */
     std::expected<std::vector<mux::QueueRangeObservation>, RecoveryDiagnostic>
     historyRangeSnapshot(const mux::MuxHandle &handle, mux::QueueWork &work) const;
+    /** Visit current TICKER cache only while the exact recovery owner remains eligible.
+     * @param handle Current TICKER registration.
+     * @param key Borrowed exact source key.
+     * @param work Finite queue and collector lookup credits.
+     * @param context Caller-owned context borrowed synchronously.
+     * @param visitor Nonthrowing visitor which retains no borrowed source data.
+     * @return True if a current value was visited, false if absent, or typed owner/refusal.
+     */
+    [[nodiscard]] std::expected<mux::TickerLatestObservation, RecoveryDiagnostic>
+    visitTickerLatest(const mux::MuxHandle &handle, core::SubscriptionKey key, mux::QueueWork &work, void *context,
+                      void (*visitor)(void *, const collectors::TickerValue &) noexcept) const;
     /** Inspect the earliest native/model wake hint.
      * @return Monotonic hint without a notifier.
      */

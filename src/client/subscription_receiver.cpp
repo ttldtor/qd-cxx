@@ -6,6 +6,7 @@
 #include "../events/order_index_coordinate.hpp"
 #include "qd/events/candle_routes.hpp"
 #include "qd/events/event_flags.hpp"
+#include "subscription_receiver_observation.hpp"
 
 #include <algorithm>
 #include <array>
@@ -153,6 +154,11 @@ class SubscriptionReceiver final : public mux::MuxConsumer {
      */
     SubscriptionReceiver(ReceiverPlan plan, std::shared_ptr<SubscriptionConsumer> consumer)
         : MuxConsumer(consumer->deliveryStatistics()), plan_(std::move(plan)), consumer_(std::move(consumer)) {
+    }
+
+    /** @return Adapter-owned plan, borrowed only while this exact queue registration is live. */
+    const ReceiverPlan *observationPlan() const noexcept {
+        return &plan_;
     }
 
     /** Preserve exactly one application invocation and the queue's existing exception boundary.
@@ -566,6 +572,64 @@ projectPrepared(const mux::MuxRecordView &record, const detail::ReceiverRoute &r
 }
 } // namespace
 
+std::expected<SubscriptionProjection, ReceiverProjectionFailure>
+detail::projectTickerLatest(const ReceiverPlan &plan, const collectors::TickerValue &value,
+                            ReceiverProjectionWork &work) {
+    try {
+        if (!value.sourceRecord || !value.current)
+            return std::unexpected(ReceiverProjectionFailure{ReceiverError::INVALID_INPUT});
+
+        const auto &source = *value.sourceRecord;
+        const ReceiverRoute *selected = nullptr;
+
+        for (const auto &route : plan.routes) {
+            debit(work.visits, 1);
+
+            if (route.context.matches(source.context) &&
+                !std::holds_alternative<events::PreparedDerivedOrder>(route.mapping)) {
+                selected = &route;
+                break;
+            }
+        }
+
+        if (!selected || source.typedValues.size() != selected->shapeFields)
+            return std::unexpected(ReceiverProjectionFailure{ReceiverError::INVALID_INPUT});
+
+        auto allowance = projectionAllowance(*selected);
+        allowance.visits = checkedSum(allowance.visits, source.typedValues.size());
+        allowance.bytes =
+            checkedSum(allowance.bytes, checkedProduct(source.typedValues.size(), sizeof(core::FieldValueView)));
+        prepayProjection(work, allowance);
+
+        std::vector<core::FieldValueView> fields;
+        fields.reserve(source.typedValues.size());
+
+        if (fields.capacity() != source.typedValues.size())
+            return std::unexpected(ReceiverProjectionFailure{ReceiverError::RESOURCE_LIMIT});
+
+        for (const auto &field : source.typedValues)
+            fields.push_back({field.type, field.raw, field.units, field.bytes});
+
+        const auto &raw = value.rawSourceRecord ? *value.rawSourceRecord : source;
+        mux::MuxRecordView record{};
+        record.family = core::SubscriptionFamily::TICKER;
+        record.context = source.context;
+        record.symbol = source.symbol;
+        record.typedValues = fields;
+        record.source = mux::RawSourceMetadata{raw.senderId,    raw.cipher,    raw.eventFlags,
+                                               raw.removalTime, raw.fieldTime, value.bindingGeneration};
+        record.versionDefault = value.versionDefault;
+
+        return projectPrepared(record, *selected, {});
+    } catch (ReceiverError error) {
+        return std::unexpected(ReceiverProjectionFailure{error});
+    } catch (const std::bad_alloc &) {
+        return std::unexpected(ReceiverProjectionFailure{ReceiverError::ALLOCATION_FAILURE});
+    } catch (const std::length_error &) {
+        return std::unexpected(ReceiverProjectionFailure{ReceiverError::RESOURCE_LIMIT});
+    }
+}
+
 std::size_t SubscriptionBatch::eventCount() const noexcept {
     std::size_t count = 0;
 
@@ -738,11 +802,15 @@ SubscriptionBatch::project(std::size_t index, ReceiverProjectionWork &work) cons
     }
 }
 
-std::expected<mux::MuxHandle, ReceiverFailure>
-openSubscriptionReceiver(mux::MuxQueue &queue, const core::LocalSchema &schema, core::SubscriptionFamily family,
-                         core::SubscriptionSelectorPolicy policy, std::span<const PreparedSubscriptionBinding> bindings,
-                         const std::shared_ptr<SubscriptionConsumer> &consumer, ReceiverLimits receiverLimits,
-                         mux::ClientLimits clientLimits, ReceiverWork &receiverWork, mux::QueueWork &queueWork) {
+std::expected<mux::MuxHandle, ReceiverFailure> detail::openObservedSubscriptionReceiver(
+    mux::MuxQueue &queue, const core::LocalSchema &schema, core::SubscriptionFamily family,
+    core::SubscriptionSelectorPolicy policy, std::span<const PreparedSubscriptionBinding> bindings,
+    const std::shared_ptr<SubscriptionConsumer> &consumer, ReceiverLimits receiverLimits,
+    mux::ClientLimits clientLimits, ReceiverWork &receiverWork, mux::QueueWork &queueWork,
+    const ReceiverPlan **observationPlan) {
+    if (observationPlan)
+        *observationPlan = nullptr;
+
     std::optional<std::size_t> bindingIndex;
 
     try {
@@ -1118,6 +1186,9 @@ openSubscriptionReceiver(mux::MuxQueue &queue, const core::LocalSchema &schema, 
         if (!handle)
             return std::unexpected(ReceiverFailure{handle.error(), {}});
 
+        if (observationPlan)
+            *observationPlan = adapter->observationPlan();
+
         return std::move(*handle);
     } catch (ReceiverError error) {
         return std::unexpected(ReceiverFailure{error, bindingIndex});
@@ -1126,5 +1197,14 @@ openSubscriptionReceiver(mux::MuxQueue &queue, const core::LocalSchema &schema, 
     } catch (const std::length_error &) {
         return std::unexpected(ReceiverFailure{ReceiverError::ALLOCATION_FAILURE, bindingIndex});
     }
+}
+
+std::expected<mux::MuxHandle, ReceiverFailure>
+openSubscriptionReceiver(mux::MuxQueue &queue, const core::LocalSchema &schema, core::SubscriptionFamily family,
+                         core::SubscriptionSelectorPolicy policy, std::span<const PreparedSubscriptionBinding> bindings,
+                         const std::shared_ptr<SubscriptionConsumer> &consumer, ReceiverLimits receiverLimits,
+                         mux::ClientLimits clientLimits, ReceiverWork &receiverWork, mux::QueueWork &queueWork) {
+    return detail::openObservedSubscriptionReceiver(queue, schema, family, policy, bindings, consumer, receiverLimits,
+                                                    clientLimits, receiverWork, queueWork, nullptr);
 }
 } // namespace org::ttldtor::qdcxx::client

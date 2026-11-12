@@ -232,6 +232,24 @@ struct EndpointStateChange {
     std::shared_ptr<const ListenerSnapshot> listeners;     ///< Complete immutable selection, released outside locks.
 };
 
+/** One charged passive request. Its private completion lock never guards native owner work. */
+struct LatestEventRead {
+    EventType type;        ///< Exact LastingEvent identity.
+    std::u16string symbol; ///< Independently owned bounded logical symbol.
+    bool ifSubscribed;     ///< Exact-demand and default-event policy.
+    std::mutex mutex;      ///< Completion and timeout state only.
+    std::condition_variable condition;
+    bool completed = false;
+    bool cancelled = false;
+    Diagnostic failure;
+    std::optional<RegisteredEvent> result;
+
+    /** Copy the admitted request input; no caller-owned text survives submission. */
+    LatestEventRead(EventType type, std::u16string_view symbol, bool ifSubscribed)
+        : type(type), symbol(symbol), ifSubscribed(ifSubscribed) {
+    }
+};
+
 /** Producer-only endpoint state; native lifetime is exclusively worker-owned. */
 struct EndpointPort {
     mutable std::mutex mutex;                 ///< Protects bounded registration/address and detached observation state.
@@ -251,6 +269,7 @@ struct EndpointPort {
     std::optional<transport::AggregationPeriodInfo> aggregationInfo; ///< Worker-published actual source report.
     std::uint64_t aggregationSourceRevision = 0; ///< Control fence for the report; never a request ACK.
     std::vector<std::shared_ptr<SubscriptionPort>> subscriptions; ///< Fixed slots, including retiring registrations.
+    std::shared_ptr<LatestEventRead> latestRead; ///< One pending/executing owner observation, protected by mutex.
     StateListeners stateListeners; ///< Opt-in advisory lifecycle observations, retired after all subscriptions.
     std::vector<EndpointStateChange> stateChanges; ///< Fixed ring; selection lease remains charged through release.
     std::size_t stateChangeHead = 0;     ///< Oldest pending/executing entry, reused only after its lease release.
