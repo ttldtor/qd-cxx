@@ -19,6 +19,7 @@
 #include "qd/events/text_events.hpp"
 #include "qd/events/trade.hpp"
 #include "qd/events/trade_eth.hpp"
+#include "qd/events/underlying.hpp"
 #include "qd/mux/queue.hpp"
 
 #include <array>
@@ -54,7 +55,8 @@ enum class PreparedEventKind {
     OTC_MARKETS_ORDER = 13, ///< Owning indexed OtcMarketsOrder projection.
     ORDER_IMBALANCE = 14,   ///< Owning source-specific TICKER OrderImbalance projection.
     SERIES = 15,            ///< Owning indexed option Series projection.
-    GREEKS = 16             ///< Owning option risk sensitivities projection.
+    GREEKS = 16,            ///< Owning option risk sensitivities projection.
+    UNDERLYING = 17         ///< Owning underlying option activity projection.
 };
 
 /** Explicit source for optional event metadata; indexed identity is never a timestamp substitute. */
@@ -114,7 +116,7 @@ struct SubscriptionProjection {
     std::variant<std::monostate, events::Quote, events::Profile, events::Trade, events::TradeETH, events::Summary,
                  events::TextMessage, events::TextConfiguration, events::Message, events::Configuration, events::Order,
                  events::MarketMaker, events::SpreadOrder, events::AnalyticOrder, events::OtcMarketsOrder,
-                 events::OrderImbalance, events::Series, events::Greeks>
+                 events::OrderImbalance, events::Series, events::Greeks, events::Underlying>
         value;                               ///< Owned event or explicit generic route.
     std::optional<std::int64_t> eventTimeMs; ///< Actual selected FIELD metadata only; rawTime stays independent.
 };

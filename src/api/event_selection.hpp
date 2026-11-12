@@ -48,7 +48,8 @@ enum class EventSelection {
     ORDER_IMBALANCE = 1 << 14,            ///< Selected source-specific auction imbalance routes.
     SERIES = 1 << 15,                     ///< Selected indexed option Series routes.
     GREEKS = 1 << 16,                     ///< Selected option Greeks routes.
-    ALL = (1 << 17) - 1,                  ///< Every supported event route.
+    UNDERLYING = 1 << 17,                 ///< Selected underlying option activity routes.
+    ALL = (1 << 18) - 1,                  ///< Every supported event route.
 };
 
 /** Test a finite supported-kind selection without depending on local record positions.
@@ -62,7 +63,8 @@ constexpr bool selectsEvent(EventSelection selection, EventType type) noexcept {
         type != EventType::TEXT_CONFIGURATION && type != EventType::MESSAGE && type != EventType::CONFIGURATION &&
         type != EventType::ORDER && type != EventType::MARKET_MAKER && type != EventType::SPREAD_ORDER &&
         type != EventType::ANALYTIC_ORDER && type != EventType::OTC_MARKETS_ORDER &&
-        type != EventType::ORDER_IMBALANCE && type != EventType::SERIES && type != EventType::GREEKS) {
+        type != EventType::ORDER_IMBALANCE && type != EventType::SERIES && type != EventType::GREEKS &&
+        type != EventType::UNDERLYING) {
         return false;
     }
 
@@ -104,6 +106,14 @@ enum class EventDelivery {
     ORDER_IMBALANCE,    ///< Complete owning source-specific OrderImbalance values.
     SERIES,             ///< Complete owning indexed option Series values.
     GREEKS,             ///< Complete owning option risk sensitivities.
+    UNDERLYING,         ///< Complete owning underlying option activity.
     REGISTERED          ///< Owning public RegisteredEvent variants, restricted by EventSelection.
 };
+
+/** @param type Registered event kind.
+ * @return Whether the route is a single-source option metric on TICKER and time-series HISTORY.
+ */
+constexpr bool isOptionTimeSeriesEvent(EventType type) noexcept {
+    return type == EventType::GREEKS || type == EventType::UNDERLYING;
+}
 } // namespace org::ttldtor::qdcxx::api::detail

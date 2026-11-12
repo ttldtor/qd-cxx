@@ -548,8 +548,8 @@ TEST_CASE("registry byte ceiling includes actual shared state and control alloca
 }
 
 TEST_CASE("SDK defaults retain all real regional records and explicit physical delegate families") {
-    constexpr std::size_t TICKER_RECORDS = 40;
-    constexpr std::size_t TICKER_ROUTES = 67;
+    constexpr std::size_t TICKER_RECORDS = 41;
+    constexpr std::size_t TICKER_ROUTES = 68;
     auto ticker = api::detail::defaultReceivingRegistry(api::DeliveryContract::TICKER);
     REQUIRE(ticker);
     REQUIRE(ticker->schema().records().size() == TICKER_RECORDS);
@@ -561,8 +561,8 @@ TEST_CASE("SDK defaults retain all real regional records and explicit physical d
         lookups += record.lookups.size();
     }
 
-    CHECK(fields == 266);
-    CHECK(lookups == 650);
+    CHECK(fields == 274);
+    CHECK(lookups == 658);
 
     for (char16_t exchange = u'A'; exchange <= u'Z'; ++exchange) {
         const auto name = u"Quote&" + std::u16string(1, exchange);
@@ -588,10 +588,14 @@ TEST_CASE("SDK defaults retain all real regional records and explicit physical d
     CHECK(ticker->registrations()[66].type == api::EventType::GREEKS);
     CHECK(ticker->registrations()[66].localRecordId == 39);
 
+    CHECK(ticker->schema().records()[40].name == u"Underlying");
+    CHECK(ticker->registrations()[67].type == api::EventType::UNDERLYING);
+    CHECK(ticker->registrations()[67].localRecordId == 40);
+
     auto history = api::detail::defaultReceivingRegistry(api::DeliveryContract::HISTORY);
     REQUIRE(history);
-    REQUIRE(history->schema().records().size() == 8);
-    REQUIRE(history->registrations().size() == 9);
+    REQUIRE(history->schema().records().size() == 9);
+    REQUIRE(history->registrations().size() == 10);
     CHECK(history->schema().records()[2].name == u"SpreadOrder");
     CHECK(history->schema().records()[3].name == u"AnalyticOrder");
     CHECK(history->schema().records()[4].name == u"OtcMarketsOrder");
@@ -612,6 +616,9 @@ TEST_CASE("SDK defaults retain all real regional records and explicit physical d
     CHECK(history->schema().records()[7].name == u"Greeks");
     CHECK(history->registrations()[8].type == api::EventType::GREEKS);
     CHECK(history->registrations()[8].localRecordId == 7);
+    CHECK(history->schema().records()[8].name == u"Underlying");
+    CHECK(history->registrations()[9].type == api::EventType::UNDERLYING);
+    CHECK(history->registrations()[9].localRecordId == 8);
     auto defaults = api::EventRegistryLimits{};
     api::EventRegistryWork work;
     auto unchanged = api::EventRegistry::builtIn(defaults, work);
@@ -628,7 +635,7 @@ TEST_CASE("SDK defaults retain all real regional records and explicit physical d
     CHECK(profile.endpoint.settings().budgets.schema.records == 42);
     CHECK(profile.endpoint.settings().budgets.layout.records == 42);
     CHECK(profile.endpoint.settings().budgets.session.context.descriptions == 42);
-    CHECK(profile.eventPlans.size() == 1024);
+    CHECK(profile.eventPlans.size() == 2048);
     CHECK(profile.routing.retainedMetadataBytes >=
           profile.eventPlans.capacity() * sizeof(api::detail::ReceivingEventPlan));
     std::cout << "DERIVED_DEFAULT_STORAGE registry=" << ticker->storageBytes()

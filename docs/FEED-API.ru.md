@@ -129,6 +129,17 @@ HISTORY. Отдельное время события доступно, если
 Встроенный реестр использует wide-decimal. Для настроенной схемы tiny-decimal
 передайте явный реестр с типами полей источника.
 
+## Получить Underlying
+
+`events::Underlying` содержит общую, ближнюю и дальнюю волатильность базового актива,
+объёмы call и put и отношение объёмов put к call. Для TICKER используйте
+`createSubscription<events::Underlying>()`, для HISTORY —
+`createTimeSeriesSubscription<events::Underlying>()` с включительной границей
+`setFromTime()`. Источник индексированного события — DEFAULT.
+
+Отсутствующие числовые поля дают NaN. `getOptionVolume()` суммирует доступные объёмы,
+возвращает один из них при отсутствии второго и даёт NaN при отсутствии обоих.
+
 ## Получить Trade
 
 Built-in registry добавляет composite Trade2, сохраняя Quote0/Profile1. Используйте owning
