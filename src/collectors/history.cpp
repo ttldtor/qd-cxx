@@ -1284,7 +1284,8 @@ struct HistoryCollector::Impl {
         }
 
         const auto total = minimum(b, k);
-        const HistorySourceMetadata metadata{r.senderId, r.cipher, flags, t, generation, r.fieldTime};
+        const HistorySourceMetadata metadata{r.senderId,  r.cipher,           flags, t, generation,
+                                             r.fieldTime, r.tapeMessageTimeMs};
         p.trigger = metadata;
         const bool sendSnapshot =
             (flags & (BEGIN | MODE)) != 0 && (!p.mode || (retransmitSnapshots && retransmitSnapshots[recordIndex]));

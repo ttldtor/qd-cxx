@@ -60,6 +60,13 @@ struct QueueFailure {
     QueueError error;                       ///< Local category.
     std::optional<QueueSourceError> source; ///< Actual nested error, never an invented exception message.
 };
+/** Result of a passive exact TICKER observation. */
+enum class TickerLatestObservation {
+    UNMAPPED, ///< The registration has no applied mapping for the key.
+    ABSENT,   ///< The applied mapping has no current committed value.
+    VISITED,  ///< The visitor received the current committed value.
+};
+
 /** Context-local lifecycle; external runtime completion is separate. */
 enum class QueueState {
     OPEN,     ///< Ordinary admission remains open.
@@ -253,6 +260,7 @@ struct RawSourceMetadata {
     std::optional<std::int64_t> removalTime;           ///< Actual optional raw removal time.
     std::optional<protocol::FieldEventTime> fieldTime; ///< Actual optional virtual metadata.
     std::uint64_t bindingGeneration;                   ///< Original snapshot generation within source epoch.
+    std::optional<std::int64_t> tapeMessageTimeMs{};   ///< Tape MESSAGE cursor time when the source supplied one.
 };
 
 /** Immutable detached projection; not an admitted protocol record. */
@@ -795,6 +803,19 @@ class MuxQueue {
      */
     [[nodiscard]] std::expected<std::vector<QueueRangeObservation>, QueueFailure> rangeSnapshot(const MuxHandle &client,
                                                                                                 QueueWork &work) const;
+    /** Visit one current TICKER value for an applied exact registration.
+     * The owner invokes the nonthrowing visitor synchronously. During the call, keep the queue alive and
+     * stationary, do not retain the borrowed value, and do not reenter the queue.
+     * @param client Exact registration in this queue.
+     * @param key Borrowed exact source key.
+     * @param work Finite queue and TICKER lookup credits.
+     * @param context Caller-owned state borrowed for the invocation.
+     * @param visitor Non-null bounded callback which cannot throw.
+     * @return Exact mapping/value disposition, or typed refusal.
+     */
+    [[nodiscard]] std::expected<TickerLatestObservation, QueueFailure>
+    visitTickerLatest(const MuxHandle &client, core::SubscriptionKey key, QueueWork &work, void *context,
+                      void (*visitor)(void *, const collectors::TickerValue &) noexcept) const;
     /** Inspect queue and separate source scopes.
      * @return Requested logical counters, not RSS. Concurrent detached release may expose adjacent instants
      * across independently sampled counters; quiescent values are exact.

@@ -86,8 +86,12 @@ HistorySubscriptionSnapshot copyHistorySnapshot(const std::shared_ptr<Subscripti
     return snapshot;
 }
 
-void publishHistorySnapshot(const transport::TcpRecovery &recovery, const mux::MuxHandle &handle,
-                            const std::shared_ptr<SubscriptionPort> &port, mux::QueueWork &work) noexcept {
+namespace {
+using ObservedRanges = std::expected<std::vector<mux::QueueRangeObservation>, HistoryObservationState>;
+
+template <class ReadRanges>
+void publishHistoryCut(std::optional<std::uint64_t> sourceEpoch, bool sourceResetPending,
+                       const std::shared_ptr<SubscriptionPort> &port, ReadRanges readRanges) noexcept {
     const auto endpoint = port->endpoint.lock();
 
     if (!endpoint)
@@ -118,8 +122,8 @@ void publishHistorySnapshot(const transport::TcpRecovery &recovery, const mux::M
         }
         const auto statistics = port->statistics->snapshot();
         candidate.mappingLogicalRevision = statistics.activeDesiredRevision;
-        candidate.sourceEpoch = recovery.statistics().sourceEpoch;
-        candidate.sourceResetPending = recovery.status().sourceResetPending;
+        candidate.sourceEpoch = sourceEpoch;
+        candidate.sourceResetPending = sourceResetPending;
         const auto callback = historyCallbackRetirement(*port);
         candidate.callbackRetirementRevision = callback.revision;
         candidate.observedAt = std::chrono::steady_clock::now();
@@ -130,7 +134,7 @@ void publishHistorySnapshot(const transport::TcpRecovery &recovery, const mux::M
         } else if (candidate.sourceResetPending) {
             candidate.state = HistoryObservationState::RESET_PENDING;
         } else {
-            auto ranges = recovery.historyRangeSnapshot(handle, work);
+            auto ranges = readRanges();
 
             if (ranges) {
                 candidate.ranges = std::move(*ranges);
@@ -149,9 +153,7 @@ void publishHistorySnapshot(const transport::TcpRecovery &recovery, const mux::M
                         candidate.state = HistoryObservationState::NOT_MAPPED;
                 }
             } else {
-                candidate.state = ranges.error().error == transport::RecoveryError::INVALID_STATE
-                                      ? HistoryObservationState::SOURCE_INACTIVE
-                                      : HistoryObservationState::PUBLICATION_FAILED;
+                candidate.state = ranges.error();
             }
         }
 
@@ -170,6 +172,38 @@ void publishHistorySnapshot(const transport::TcpRecovery &recovery, const mux::M
         std::lock_guard lock(port->mutex);
         invalidate(port->history, HistoryObservationState::PUBLICATION_FAILED);
     }
+}
+} // namespace
+
+void publishHistorySnapshot(const transport::TcpRecovery &recovery, const mux::MuxHandle &handle,
+                            const std::shared_ptr<SubscriptionPort> &port, mux::QueueWork &work) noexcept {
+    publishHistoryCut(recovery.statistics().sourceEpoch, recovery.status().sourceResetPending, port,
+                      [&]() -> ObservedRanges {
+                          auto ranges = recovery.historyRangeSnapshot(handle, work);
+
+                          if (!ranges) {
+                              return std::unexpected(ranges.error().error == transport::RecoveryError::INVALID_STATE
+                                                         ? HistoryObservationState::SOURCE_INACTIVE
+                                                         : HistoryObservationState::PUBLICATION_FAILED);
+                          }
+
+                          return std::move(*ranges);
+                      });
+}
+
+void publishTapeHistorySnapshot(const mux::MuxQueue &queue, std::uint64_t epoch, const mux::MuxHandle &handle,
+                                const std::shared_ptr<SubscriptionPort> &port, mux::QueueWork &work) noexcept {
+    publishHistoryCut(epoch, false, port, [&]() -> ObservedRanges {
+        auto ranges = queue.rangeSnapshot(handle, work);
+
+        if (!ranges) {
+            return std::unexpected(ranges.error().error == mux::QueueError::INVALID_STATE
+                                       ? HistoryObservationState::SOURCE_INACTIVE
+                                       : HistoryObservationState::PUBLICATION_FAILED);
+        }
+
+        return std::move(*ranges);
+    });
 }
 
 } // namespace org::ttldtor::qdcxx::api::detail

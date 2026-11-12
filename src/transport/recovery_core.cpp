@@ -1,6 +1,7 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #include "recovery_core.hpp"
+#include "../client/subscription_receiver_observation.hpp"
 
 #include "recovery_core_support.hpp"
 
@@ -1407,7 +1408,8 @@ RecoveryCapacity RecoveryCore::capacity() const noexcept {
 std::expected<mux::MuxHandle, RecoveryReceiverFailure> RecoveryCore::openSubscriptionReceiver(
     core::SubscriptionFamily family, std::span<const client::PreparedSubscriptionBinding> bindings,
     const std::shared_ptr<client::SubscriptionConsumer> &consumer, client::ReceiverLimits receiverLimits,
-    mux::ClientLimits clientLimits, client::ReceiverWork &receiverWork, mux::QueueWork &queueWork) {
+    mux::ClientLimits clientLimits, client::ReceiverWork &receiverWork, mux::QueueWork &queueWork,
+    const client::detail::ReceiverPlan **observationPlan) {
     if (const auto error = rejection()) {
         return std::unexpected(RecoveryReceiverFailure{*error});
     }
@@ -1453,9 +1455,9 @@ std::expected<mux::MuxHandle, RecoveryReceiverFailure> RecoveryCore::openSubscri
         }
     } registration(executing_);
 
-    auto opened = client::openSubscriptionReceiver(*queue, configuration_.endpoint.schema(), family,
-                                                   configuration_.options.selectors, bindings, consumer, receiverLimits,
-                                                   clientLimits, receiverWork, queueWork);
+    auto opened = client::detail::openObservedSubscriptionReceiver(
+        *queue, configuration_.endpoint.schema(), family, configuration_.options.selectors, bindings, consumer,
+        receiverLimits, clientLimits, receiverWork, queueWork, observationPlan);
 
     if (!opened) {
         return std::unexpected(RecoveryReceiverFailure{std::move(opened.error())});
@@ -1489,6 +1491,37 @@ std::expected<const mux::MuxQueue *, RecoveryDiagnostic> RecoveryCore::historyOb
     }
 
     return &*history;
+}
+
+std::expected<mux::TickerLatestObservation, RecoveryDiagnostic>
+RecoveryCore::visitTickerLatest(const mux::MuxHandle &handle, core::SubscriptionKey key, mux::QueueWork &work,
+                                void *context,
+                                void (*visitor)(void *, const collectors::TickerValue &) noexcept) const {
+    if (thread_ != std::this_thread::get_id())
+        return std::unexpected(RecoveryDiagnostic{RecoveryError::WRONG_THREAD, "recovery-owner-thread"});
+
+    // This reads only the committed collector cut. A decoded but uncommitted envelope
+    // cannot change that cut, and a delivery callback remains under the owner's execution gate.
+    const auto &ticker = configuration_.queues.ticker;
+    const auto phase = state_.status().phase;
+
+    const auto actual = backend_.facts();
+    const bool active = phase == RecoveryPhase::ACTIVE && !connectionFenced_ && !state_.sourceResetPending() &&
+                        actual.present && actual.connected && actual.authenticated && !actual.terminal &&
+                        actual.generation == peerGeneration_ && actual.authentication == authentication_;
+    // A disposed attempt owes a reset before the next attempt. While suspended the stable queue
+    // remains readable under the same native absence fence used for retained delivery.
+    const bool paused = phase == RecoveryPhase::SUSPENDED && !actual.present && !event_;
+
+    if (!ticker || cutoff_ || (!active && !paused))
+        return std::unexpected(RecoveryDiagnostic{RecoveryError::INVALID_STATE, "recovery-ticker-ineligible"});
+
+    auto observed = ticker->visitTickerLatest(handle, key, work, context, visitor);
+
+    if (!observed)
+        return std::unexpected(queueFailure(observed.error()));
+
+    return *observed;
 }
 
 std::expected<mux::QueueRangeStatus, RecoveryDiagnostic>

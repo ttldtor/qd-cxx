@@ -21,7 +21,21 @@ namespace {
 constexpr std::size_t MEBIBYTE = 1024 * 1024; ///< Independent logical byte unit.
 constexpr core::SchemaLimits BASE_SCHEMA_LIMITS{42, 284, 724, 128, 16384};
 // Reserve exactly the two records, 20 fields and 25 lookups of the Candle/TradeHistory declarations.
-constexpr core::SchemaLimits CANDLE_SCHEMA_LIMITS{MAXIMUM_RECEIVING_RECORDS, 284 + 20, 724 + 25, 128, 16384};
+constexpr core::SchemaLimits CANDLE_SCHEMA_LIMITS{44, 284 + 20, 724 + 25, 128, 16384};
+
+/** Reserve the default NuamTrade record, its fields and aliases.
+ * @param limits Existing complete schema allowances.
+ * @return Allowances including the composite NuamTrade record.
+ */
+constexpr core::SchemaLimits withNuamTradeLimits(core::SchemaLimits limits) noexcept {
+    constexpr std::size_t FIELDS = 18;
+    constexpr std::size_t LOOKUPS = 28;
+    ++limits.records;
+    limits.fields += FIELDS;
+    limits.lookups += LOOKUPS;
+
+    return limits;
+}
 
 /** Reserve the standard OptionSale logical fields and aliases.
  * @param limits Existing complete schema allowances.
@@ -44,6 +58,15 @@ constexpr core::SchemaLimits withTimeAndSaleLimits(core::SchemaLimits limits) no
     constexpr std::size_t LOOKUPS_PER_RECORD = 14;
     limits.fields += TIME_AND_SALE_DEFAULT_RECORDS * FIELDS_PER_RECORD;
     limits.lookups += TIME_AND_SALE_DEFAULT_RECORDS * LOOKUPS_PER_RECORD;
+
+    return limits;
+}
+
+/** Reserve the composite Nuam sale declaration in a default schema. */
+constexpr core::SchemaLimits withNuamTimeAndSaleLimits(core::SchemaLimits limits) noexcept {
+    ++limits.records;
+    limits.fields += 11;
+    limits.lookups += 15;
 
     return limits;
 }
@@ -397,7 +420,8 @@ void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, s
             const auto &record = profile.schema.records()[static_cast<std::size_t>(registration.localRecordId)];
 
             if ((isOptionTimeSeriesEvent(registration.type) || registration.type == EventType::CANDLE ||
-                 registration.type == EventType::TIME_AND_SALE) &&
+                 (registration.type == EventType::TIME_AND_SALE ||
+                  registration.type == EventType::NUAM_TIME_AND_SALE)) &&
                 profile.family == core::SubscriptionFamily::HISTORY) {
                 if (!record.hasTime)
                     refuse(ErrorCode::UNSUPPORTED_PROFILE,
@@ -493,7 +517,8 @@ void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, s
             const bool profileText = binding.kind == client::PreparedEventKind::PROFILE ||
                                      binding.kind == client::PreparedEventKind::OPTION_SALE;
             const bool candle = binding.kind == client::PreparedEventKind::CANDLE;
-            const bool timeAndSale = binding.kind == client::PreparedEventKind::TIME_AND_SALE;
+            const bool timeAndSale = binding.kind == client::PreparedEventKind::TIME_AND_SALE ||
+                                     binding.kind == client::PreparedEventKind::NUAM_TIME_AND_SALE;
             const bool text = profileText || binding.kind == client::PreparedEventKind::TEXT_MESSAGE ||
                               binding.kind == client::PreparedEventKind::TEXT_CONFIGURATION || timeAndSale ||
                               isOrderSourceEvent(static_cast<EventType>(binding.kind));
@@ -553,12 +578,13 @@ std::expected<EventRegistry, EventRegistryFailure> defaultReceivingRegistry(Deli
 
     EventRegistryWork work;
     EventRegistryLimits limits;
-    limits.schema = contract == DeliveryContract::STREAM ? withTimeAndSaleLimits(BASE_SCHEMA_LIMITS)
+    limits.schema = contract == DeliveryContract::STREAM
+                        ? withNuamTimeAndSaleLimits(withNuamTradeLimits(withTimeAndSaleLimits(BASE_SCHEMA_LIMITS)))
                     : contract == DeliveryContract::HISTORY
-                        ? withOptionSaleLimits(withTimeAndSaleLimits(CANDLE_SCHEMA_LIMITS))
-                        : CANDLE_SCHEMA_LIMITS;
+                        ? withNuamTimeAndSaleLimits(withOptionSaleLimits(withTimeAndSaleLimits(CANDLE_SCHEMA_LIMITS)))
+                        : withNuamTradeLimits(CANDLE_SCHEMA_LIMITS);
     // Both appended physical Candle routes fit in the existing maximum registration capacity.
-    limits.registrations = 73;
+    limits.registrations = 74;
     constexpr auto defaultMapping = EventRegistration{EventType::QUOTE, 0}.mappingLimits;
     constexpr auto preparationPerRoute = defaultMapping.fields + defaultMapping.lookups + defaultMapping.selections +
                                          defaultMapping.keys + defaultMapping.typeAlternatives +
@@ -590,7 +616,7 @@ bool receivingRouteSupportsContract(const EventRegistration &route, DeliveryCont
         return contract == DeliveryContract::TICKER || contract == DeliveryContract::HISTORY;
     }
 
-    if (route.type == EventType::TIME_AND_SALE) {
+    if (route.type == EventType::TIME_AND_SALE || route.type == EventType::NUAM_TIME_AND_SALE) {
         return contract == DeliveryContract::STREAM || contract == DeliveryContract::HISTORY;
     }
 
@@ -696,12 +722,12 @@ events::CandlePhysicalRoute resolveReceivingCandle(const events::PreparedCandleR
     }
 }
 
-ReceivingProfile::ReceivingProfile(core::LocalSchema schema, client::EndpointOptions endpoint)
+ReceivingProfile::ReceivingProfile(core::LocalSchema schema, ReceivingSettings endpoint)
     : schema(std::move(schema)), endpoint(std::move(endpoint)) {
 }
 
 ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const EndpointOptions &options,
-                                         const std::string &host, std::uint16_t port) {
+                                         const std::string &host, std::uint16_t port, bool tape) {
     auto selected = selectRegistry(options);
     const auto hasCandle = std::ranges::any_of(selected.registrations(), [&](const EventRegistration &route) {
         return route.type == EventType::CANDLE && receivingRouteSupportsContract(route, options.contract);
@@ -712,7 +738,40 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
     const auto hasOptionSale = std::ranges::any_of(selected.registrations(), [&](const EventRegistration &route) {
         return route.type == EventType::OPTION_SALE && receivingRouteSupportsContract(route, options.contract);
     });
+    const auto hasNuamTrade = std::ranges::any_of(selected.registrations(), [&](const EventRegistration &route) {
+        return route.type == EventType::NUAM_TRADE && receivingRouteSupportsContract(route, options.contract);
+    });
+    const auto nuamTimeAndSaleRoutes =
+        std::ranges::count_if(selected.registrations(), [&](const EventRegistration &route) {
+            return route.type == EventType::NUAM_TIME_AND_SALE &&
+                   receivingRouteSupportsContract(route, options.contract);
+        });
     auto schemaLimits = hasCandle ? CANDLE_SCHEMA_LIMITS : BASE_SCHEMA_LIMITS;
+
+    if (nuamTimeAndSaleRoutes > 0) {
+        for (const auto &route : selected.registrations()) {
+            if (route.type != EventType::NUAM_TIME_AND_SALE || !receivingRouteSupportsContract(route, options.contract))
+                continue;
+
+            const auto &record = selected.schema().records()[static_cast<std::size_t>(route.localRecordId)];
+            schemaLimits.records = std::min(MAXIMUM_RECEIVING_RECORDS, add(schemaLimits.records, 1));
+            schemaLimits.fields = add(schemaLimits.fields, record.fields.size());
+            schemaLimits.lookups = add(schemaLimits.lookups, record.lookups.size());
+        }
+    }
+
+    if (hasNuamTrade) {
+        for (const auto &route : selected.registrations()) {
+            if (route.type != EventType::NUAM_TRADE || !receivingRouteSupportsContract(route, options.contract)) {
+                continue;
+            }
+
+            const auto &record = selected.schema().records()[static_cast<std::size_t>(route.localRecordId)];
+            schemaLimits.records = std::min(MAXIMUM_RECEIVING_RECORDS, add(schemaLimits.records, 1));
+            schemaLimits.fields = add(schemaLimits.fields, record.fields.size());
+            schemaLimits.lookups = add(schemaLimits.lookups, record.lookups.size());
+        }
+    }
 
     if (hasOptionSale) {
         schemaLimits = withOptionSaleLimits(schemaLimits);
@@ -720,6 +779,10 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
 
     if (hasTimeAndSale) {
         schemaLimits = withTimeAndSaleLimits(schemaLimits);
+    }
+
+    if (selected.schema().records().size() > MAXIMUM_RECEIVING_RECORDS) {
+        refuse(ErrorCode::UNSUPPORTED_PROFILE, "profile-schema");
     }
 
     auto copied = selected.schema().boundedCopy(schemaLimits);
@@ -797,6 +860,18 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
         bindings.totalNameUnits = std::max(bindings.totalNameUnits, descriptions.totalNameUnits);
     }
 
+    if (nuamTimeAndSaleRoutes > 0) {
+        auto &descriptions = budgets.session.descriptions;
+        auto &bindings = budgets.session.context.bindings;
+        constexpr std::size_t EXTRA_WIRE_FIELDS = 5;
+        constexpr std::size_t EXTRA_WIRE_NAME_UNITS = 160;
+        const auto routeCount = static_cast<std::size_t>(nuamTimeAndSaleRoutes);
+        descriptions.totalFields = add(descriptions.totalFields, multiply(routeCount, EXTRA_WIRE_FIELDS));
+        descriptions.totalNameUnits = add(descriptions.totalNameUnits, multiply(routeCount, EXTRA_WIRE_NAME_UNITS));
+        bindings.fields = std::max(bindings.fields, descriptions.totalFields);
+        bindings.totalNameUnits = std::max(bindings.totalNameUnits, descriptions.totalNameUnits);
+    }
+
     budgets.session.events = protocol::DataEventPolicy::BINARY_CATALOG_V1;
     budgets.session.historySnapshot = options.contract == DeliveryContract::HISTORY;
     budgets.session.fieldTime = protocol::FieldTimePolicy::READ;
@@ -821,27 +896,37 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
                        multiply(2, symbolUnits), entries};
     budgets.writer.operationEntries = std::max(budgets.writer.operationEntries, entries);
 
-    // A complete named-route preparation and progress allowance is independent of queue reservations.
-    const auto dns = transport::TcpRuntime::dnsPreparationWorkRequirement(runtime.dnsServers.size());
+    if (!tape) {
+        // A complete named-route preparation and progress allowance is independent of queue reservations.
+        const auto dns = transport::TcpRuntime::dnsPreparationWorkRequirement(runtime.dnsServers.size());
 
-    if (!dns) {
-        refuse(ErrorCode::DNS_CONFIGURATION, "profile-dns");
+        if (!dns) {
+            refuse(ErrorCode::DNS_CONFIGURATION, "profile-dns");
+        }
+
+        budgets.tcp.residentBytes = add(budgets.tcp.residentBytes, DNS_ENVELOPE_BYTES);
+        budgets.protocolTurn.operations = add(budgets.protocolTurn.operations, dns->operations);
+        budgets.protocolTurn.visits = add(budgets.protocolTurn.visits, dns->visits);
+        budgets.protocolTurn.textUnits = add(budgets.protocolTurn.textUnits, dns->textUnits);
+        budgets.protocolTurn.bytes = add(budgets.protocolTurn.bytes, dns->bytes);
+        budgets.runtimeTurn.dnsCalls = budgets.runtimeTurn.dnsPackets = 10000;
+        budgets.runtimeTurn.dnsBytes = 10000000;
+        budgets.runtimeTurn.dnsUnits = DNS_PROGRESS_UNITS;
     }
 
-    budgets.tcp.residentBytes = add(budgets.tcp.residentBytes, DNS_ENVELOPE_BYTES);
-    budgets.protocolTurn.operations = add(budgets.protocolTurn.operations, dns->operations);
-    budgets.protocolTurn.visits = add(budgets.protocolTurn.visits, dns->visits);
-    budgets.protocolTurn.textUnits = add(budgets.protocolTurn.textUnits, dns->textUnits);
-    budgets.protocolTurn.bytes = add(budgets.protocolTurn.bytes, dns->bytes);
-    budgets.runtimeTurn.dnsCalls = budgets.runtimeTurn.dnsPackets = 10000;
-    budgets.runtimeTurn.dnsBytes = 10000000;
-    budgets.runtimeTurn.dnsUnits = DNS_PROGRESS_UNITS;
-
     fundContextBindingText(settings, schema.records().size());
-    auto endpoint = client::EndpointOptions::create(schema, settings);
+    std::optional<ReceivingSettings> endpoint;
 
-    if (!endpoint) {
-        refuse(ErrorCode::UNSUPPORTED_PROFILE, "profile-endpoint");
+    if (tape) {
+        endpoint.emplace(settings);
+    } else {
+        auto validated = client::EndpointOptions::create(schema, settings);
+
+        if (!validated) {
+            refuse(ErrorCode::UNSUPPORTED_PROFILE, "profile-endpoint");
+        }
+
+        endpoint.emplace(std::move(*validated));
     }
 
     ReceivingProfile result(std::move(schema), std::move(*endpoint));
@@ -927,8 +1012,11 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
                               add(options.history.maximumPoints, options.history.pendingUpdatesPerSubscription)));
     }
 
-    result.blueprint = prepareBlueprint(result.schema);
-    prepareCopies(result);
+    if (!tape) {
+        result.blueprint = prepareBlueprint(result.schema);
+        prepareCopies(result);
+    }
+
     prepareMappings(result, selected, runtime.maximumSymbolUnits);
     auto &routing = result.routing;
     routing.symbols = runtime.maximumSymbolsPerSubscription;
@@ -1089,7 +1177,7 @@ void validateReceivingSymbol(const EventRegistry *registry, EventSelection selec
         return;
     }
 
-    if (registry->schema().records().size() > CANDLE_SCHEMA_LIMITS.records) {
+    if (registry->schema().records().size() > MAXIMUM_RECEIVING_RECORDS) {
         refuse(ErrorCode::UNSUPPORTED_PROFILE, "profile-schema");
     }
 
@@ -1215,6 +1303,9 @@ core::DeliveryProjectionMask receivingProjectionMask(const ReceivingProfile &pro
         binding.kind == client::PreparedEventKind::OPTION_SALE) {
         return !symbol.sourceId || *symbol.sourceId <= 0 ? core::NATIVE_DELIVERY_PROJECTION : 0;
     }
+
+    if (binding.kind == client::PreparedEventKind::NUAM_TIME_AND_SALE && symbol.sourceId && *symbol.sourceId > 0)
+        return 0;
 
     const auto kind = static_cast<std::size_t>(binding.kind);
 

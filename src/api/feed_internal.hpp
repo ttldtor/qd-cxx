@@ -40,6 +40,7 @@ using ListenerFunction =
                  Subscription<events::Greeks>::Listener, Subscription<events::Underlying>::Listener,
                  Subscription<events::TheoPrice>::Listener, Subscription<events::Candle>::Listener,
                  Subscription<events::TimeAndSale>::Listener, Subscription<events::OptionSale>::Listener,
+                 Subscription<events::NuamTrade>::Listener, Subscription<events::NuamTimeAndSale>::Listener,
                  Subscription<RegisteredEvent>::Listener, Endpoint::StateChangeListener,
                  Subscription<events::Quote>::StateChangeListener, SubscriptionChangeListener>;
 
@@ -230,6 +231,30 @@ struct EndpointStateChange {
     std::shared_ptr<const ListenerSnapshot> listeners;     ///< Complete immutable selection, released outside locks.
 };
 
+/** Complete immutable local-source admission. The worker alone opens the file. */
+struct TapeSourceRequest {
+    std::filesystem::path path; ///< Independently owned stable regular file path.
+    TapeSourceOptions options;  ///< Explicit finite input allowances.
+};
+
+/** One charged passive request. Its private completion lock never guards native owner work. */
+struct LatestEventRead {
+    EventType type;        ///< Exact LastingEvent identity.
+    std::u16string symbol; ///< Independently owned bounded logical symbol.
+    bool ifSubscribed;     ///< Exact-demand and default-event policy.
+    std::mutex mutex;      ///< Completion and timeout state only.
+    std::condition_variable condition;
+    bool completed = false;
+    bool cancelled = false;
+    Diagnostic failure;
+    std::optional<RegisteredEvent> result;
+
+    /** Copy the admitted request input; no caller-owned text survives submission. */
+    LatestEventRead(EventType type, std::u16string_view symbol, bool ifSubscribed)
+        : type(type), symbol(symbol), ifSubscribed(ifSubscribed) {
+    }
+};
+
 /** Producer-only endpoint state; native lifetime is exclusively worker-owned. */
 struct EndpointPort {
     mutable std::mutex mutex;                 ///< Protects bounded registration/address and detached observation state.
@@ -249,6 +274,7 @@ struct EndpointPort {
     std::optional<transport::AggregationPeriodInfo> aggregationInfo; ///< Worker-published actual source report.
     std::uint64_t aggregationSourceRevision = 0; ///< Control fence for the report; never a request ACK.
     std::vector<std::shared_ptr<SubscriptionPort>> subscriptions; ///< Fixed slots, including retiring registrations.
+    std::shared_ptr<LatestEventRead> latestRead; ///< One pending/executing owner observation, protected by mutex.
     StateListeners stateListeners; ///< Opt-in advisory lifecycle observations, retired after all subscriptions.
     std::vector<EndpointStateChange> stateChanges; ///< Fixed ring; selection lease remains charged through release.
     std::size_t stateChangeHead = 0;     ///< Oldest pending/executing entry, reused only after its lease release.
@@ -263,8 +289,12 @@ struct EndpointPort {
     std::uint64_t clearedRevision = 0; ///< Latest actual applied reset/global-ACK completion, not inferred from state.
     std::string address;               ///< First accepted bounded spelling; immutable after connect publication.
     std::string host;                  ///< Validated bounded route, copied only once before worker publication.
-    std::uint16_t port = 0;            ///< Original nonzero route port.
-    bool connectRequested = false;     ///< Published once under the endpoint mutex.
+    std::optional<TapeSourceRequest> tape; ///< Fixed non-network source, absent for TCP.
+    bool tapePaused = false;               ///< Latest local pause intent under the endpoint mutex.
+    bool tapeAbortRequested = false;       ///< Monotonic explicit terminal abort for this tape endpoint.
+    std::chrono::steady_clock::time_point tapeRestartDeadline; ///< First deadline of the pending restart revision.
+    std::uint16_t port = 0;                                    ///< Original nonzero route port.
+    bool connectRequested = false;                             ///< Published once under the endpoint mutex.
     std::atomic<std::chrono::steady_clock::duration::rep> closeDeadline{0}; ///< First admitted absolute drain deadline.
     std::atomic<bool> closeRequested{false};                                ///< Reserved monotonic drain admission.
     std::atomic<bool> retired{false};           ///< Native owner and all captures have retired.

@@ -38,13 +38,15 @@ enum class EventType {
     THEO_PRICE = 18,        ///< Owning option theoretical price, available on TICKER and HISTORY.
     CANDLE = 19,            ///< Owning Candle values from qualified TICKER or HISTORY records.
     TIME_AND_SALE = 20,     ///< Owning trade reports, available on STREAM and HISTORY.
-    OPTION_SALE = 21        ///< Owning indexed option sale.
+    OPTION_SALE = 21,       ///< Owning indexed option sale.
+    NUAM_TRADE = 22,        ///< Owning Nuam Trade and statistics.
+    NUAM_TIME_AND_SALE = 23 ///< Owning Nuam indexed trade report.
 };
 
 /** Explicit source of optional event metadata, independent of indexed record identity. */
 enum class EventTimePolicy {
     UNSPECIFIED,   ///< Do not assert an event timestamp.
-    FIELD_METADATA ///< Use original FIELD metadata when present; otherwise remain unspecified.
+    FIELD_METADATA ///< Use original FIELD metadata, with inherited MESSAGE time as a tape fallback.
 };
 
 /** One explicit schema-bound route; several different records may project the same business type. */

@@ -1,0 +1,66 @@
+record	305	NuamTimeAndSale&Q	true
+int-field	0	56	Time	Time
+int-field	1	72	Sequence	Sequence
+int-field	2	8	TimeNanoPart	TimeNanoPart
+int-field	3	2	Exchange	ExchangeCode
+int-field	4	104	TradeId	TradeId
+int-field	5	0	TradeId$VoidTail	TradeId$VoidTail
+int-field	6	120	Price	Price
+int-field	7	0	Price$VoidTail	Price$VoidTail
+int-field	8	120	Size	Size
+int-field	9	0	Size$VoidTail	Size$VoidTail
+int-field	10	120	Bid.Price	BidPrice
+int-field	11	0	Bid.Price$VoidTail	BidPrice$VoidTail
+int-field	12	120	Ask.Price	AskPrice
+int-field	13	0	Ask.Price$VoidTail	AskPrice$VoidTail
+int-field	14	40	ExchangeSaleConditions	SaleConditions
+int-field	15	8	Flags	Flags
+int-field	16	104	MatchId	MatchId
+int-field	17	0	MatchId$VoidTail	MatchId$VoidTail
+object-field	0	10	Buyer	Buyer
+object-field	1	10	Seller	Seller
+event	0	AAPL&Q	7200	0	0	8594128898	2001	2001765432	765432	2	88	9007199254740993	4629207835727626240	4636772475726725120	100	4628996729495093248	4629454126332248064	AB	20828	81	2	true	true	true	0	true	false	false	buyer		9223372036854775800
+int	0	Time	2
+int	0	Sequence	4194306
+int	0	TimeNanoPart	765432
+int	0	Exchange	88
+int	0	TradeId	9007199254740993
+int	0	Price	774530
+int	0	Size	2572930
+int	0	Bid.Price	755330
+int	0	Ask.Price	7968131
+int	0	ExchangeSaleConditions	16706
+int	0	Flags	20828
+int	0	MatchId	9223372036854775800
+object	0	Buyer	buyer
+object	0	Seller	
+event	1	AAPL&Q	0	0	0	4315938823	1005	1005765432	765432	7	88	9007199254740994	-4609152743636992000	4612248968380809216	2	4628996729495093248	4629454126332248064	<null>	16677	65	1	false	false	true	1	false	true	false	buyer	seller	9223372036854775801
+int	1	Time	1
+int	1	Sequence	20971527
+int	1	TimeNanoPart	765432
+int	1	Exchange	88
+int	1	TradeId	9007199254740994
+int	1	Price	-799869
+int	1	Size	57730
+int	1	Bid.Price	755330
+int	1	Ask.Price	7968131
+int	1	ExchangeSaleConditions	0
+int	1	Flags	16677
+int	1	MatchId	9223372036854775801
+object	1	Buyer	buyer
+object	1	Seller	seller
+event	2	AAPL&Q	0	0	0	0	0	765432	765432	0	88	9007199254740996	9221120237041090560	4612248968380809216	2	4628996729495093248	4629454126332248064	<null>	99	0	0	false	false	false	0	true	false	false	buyer	seller	-9223372036854775808
+int	2	Time	0
+int	2	Sequence	0
+int	2	TimeNanoPart	765432
+int	2	Exchange	88
+int	2	TradeId	9007199254740996
+int	2	Price	0
+int	2	Size	57730
+int	2	Bid.Price	755330
+int	2	Ask.Price	7968131
+int	2	ExchangeSaleConditions	0
+int	2	Flags	99
+int	2	MatchId	-9223372036854775808
+object	2	Buyer	buyer
+object	2	Seller	seller
