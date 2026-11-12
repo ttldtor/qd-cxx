@@ -143,7 +143,7 @@ TEST_CASE("regional compatible pairs fund physical coordinate domains rather tha
     q::api::RuntimeOptions runtime;
     runtime.dnsServers.push_back({{127, 0, 0, 1}});
     const auto defaults = q::api::detail::prepareReceivingProfile(runtime, {}, "127.0.0.1", 12345);
-    CHECK(defaults.physicalRouteCount == 42);
+    CHECK(defaults.physicalRouteCount == 44);
     CHECK(defaults.endpoint.settings().budgets.desired.entries == runtime.maximumSymbolsPerSubscription *
                                                                       runtime.maximumSubscriptionsPerEndpoint *
                                                                       defaults.physicalRouteCount);

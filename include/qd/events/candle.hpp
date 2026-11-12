@@ -94,11 +94,14 @@ enum class CandleRecordKind {
 class PreparedCandle {
     EventMapping mapping_;
     CandleRecordKind kind_;
+    std::optional<core::IndexedTimeLayout> indexedTimeLayout_;
 
     /** @param mapping Complete owned field shape and selections.
      * @param kind Explicit physical delegate kind.
+     * @param indexedTimeLayout Exact matching physical pair, if the schema provides one.
      */
-    explicit PreparedCandle(EventMapping mapping, CandleRecordKind kind) noexcept;
+    explicit PreparedCandle(EventMapping mapping, CandleRecordKind kind,
+                            std::optional<core::IndexedTimeLayout> indexedTimeLayout) noexcept;
 
     public:
     /** Prepare the required and optional fields of one explicitly selected record.
@@ -135,6 +138,18 @@ class PreparedCandle {
                                                               BorrowedRecordValueView values, std::size_t symbolUnits,
                                                               std::int64_t eventTime = 0,
                                                               std::int32_t eventFlags = 0) const;
+    /** Validate and project a removal using the prepared physical Time/Sequence pair.
+     * @param symbol Already resolved immutable Candle symbol, borrowed through return.
+     * @param values Complete borrowed local values, including the exact physical removal words.
+     * @param symbolUnits Maximum UTF-16 units in the canonical symbol.
+     * @param eventTime Independent FIELD timestamp.
+     * @param eventFlags Raw indexed flags, including REMOVE_EVENT.
+     * @param rawTime Exact packed removal coordinate supplied by the collector.
+     * @return Independent candle or structured refusal.
+     */
+    [[nodiscard]] std::expected<Candle, MappingError>
+    mapIndexedRemovalView(const CandleSymbol &symbol, BorrowedRecordValueView values, std::size_t symbolUnits,
+                          std::int64_t eventTime, std::int32_t eventFlags, std::int64_t rawTime) const;
 };
 
 } // namespace org::ttldtor::qdcxx::events

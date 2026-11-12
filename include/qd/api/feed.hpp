@@ -8,6 +8,7 @@
 #include "qd/api/subscription_selector.hpp"
 #include "qd/client/endpoint_options.hpp"
 #include "qd/events/analytic_order.hpp"
+#include "qd/events/candle.hpp"
 #include "qd/events/candle_symbol.hpp"
 #include "qd/events/configuration.hpp"
 #include "qd/events/greeks.hpp"
@@ -224,7 +225,7 @@ using RegisteredEvent =
     std::variant<events::Quote, events::Profile, events::Trade, events::TradeETH, events::Summary, events::TextMessage,
                  events::TextConfiguration, events::Message, events::Configuration, events::Order, events::MarketMaker,
                  events::SpreadOrder, events::AnalyticOrder, events::OtcMarketsOrder, events::OrderImbalance,
-                 events::Series, events::Greeks, events::Underlying, events::TheoPrice>;
+                 events::Series, events::Greeks, events::Underlying, events::TheoPrice, events::Candle>;
 
 /** Independently owned observation of one complete accepted local subscription revision. */
 struct SubscriptionSnapshot {
@@ -271,7 +272,8 @@ template <class Event> class Subscription final {
                   std::is_same_v<Event, events::OtcMarketsOrder> || std::is_same_v<Event, events::OrderImbalance> ||
                   std::is_same_v<Event, events::Series> || std::is_same_v<Event, events::Greeks> ||
                   std::is_same_v<Event, events::Underlying> || std::is_same_v<Event, events::TheoPrice> ||
-                  std::is_same_v<Event, events::Order> || std::is_same_v<Event, RegisteredEvent>);
+                  std::is_same_v<Event, events::Candle> || std::is_same_v<Event, events::Order> ||
+                  std::is_same_v<Event, RegisteredEvent>);
     std::shared_ptr<detail::SubscriptionPort> port_;
     friend class Feed;
     explicit Subscription(std::shared_ptr<detail::SubscriptionPort> port) noexcept;
@@ -513,6 +515,7 @@ extern template class Subscription<events::Series>;
 extern template class Subscription<events::Greeks>;
 extern template class Subscription<events::Underlying>;
 extern template class Subscription<events::TheoPrice>;
+extern template class Subscription<events::Candle>;
 extern template class Subscription<RegisteredEvent>;
 
 /** Endpoint's typed registration entry point; owns no SDK thread or bootstrap. */
@@ -545,7 +548,7 @@ class Feed final {
                       std::is_same_v<Event, events::OtcMarketsOrder> || std::is_same_v<Event, events::OrderImbalance> ||
                       std::is_same_v<Event, events::Series> || std::is_same_v<Event, events::Greeks> ||
                       std::is_same_v<Event, events::Underlying> || std::is_same_v<Event, events::TheoPrice> ||
-                      std::is_same_v<Event, events::Order>);
+                      std::is_same_v<Event, events::Candle> || std::is_same_v<Event, events::Order>);
 
         if constexpr (std::is_same_v<Event, events::Quote>)
             return EventType::QUOTE;
@@ -583,19 +586,19 @@ class Feed final {
             return EventType::UNDERLYING;
         else if constexpr (std::is_same_v<Event, events::TheoPrice>)
             return EventType::THEO_PRICE;
+        else if constexpr (std::is_same_v<Event, events::Candle>)
+            return EventType::CANDLE;
         else
             return EventType::ORDER;
     }
 
     public:
     /** Create a bounded logical registration, before or after connect, without application polling.
-     * All registered records of the selected type participate; an unregistered type rejects synchronously.
+     * An unregistered type rejects synchronously. A Candle selector uses exactly one qualified source record.
      * Ordinary Order, MarketMaker, SpreadOrder, AnalyticOrder and OtcMarketsOrder require HISTORY.
-     * Quote-derived Order and source-specific OrderImbalance use TICKER. Unsupported selections reject
-     * before publication.
-     * @tparam Event Existing Quote, Profile, Trade, TradeETH, Summary, TextMessage, TextConfiguration, Message or
-     * Configuration, indexed Order, MarketMaker, SpreadOrder, AnalyticOrder, OtcMarketsOrder, OrderImbalance or Series,
-     * explicitly registered for this endpoint or provided by its defaults.
+     * Quote-derived Order and source-specific OrderImbalance use TICKER. Candle uses TICKER or HISTORY.
+     * Unsupported selections reject before publication.
+     * @tparam Event Supported owning event type registered for this endpoint or provided by its defaults.
      * @return Producer handle; native preparation failures are observed asynchronously by its diagnostic.
      */
     template <class Event> [[nodiscard]] std::shared_ptr<Subscription<Event>> createSubscription() {
@@ -622,8 +625,8 @@ class Feed final {
     createSubscription(std::initializer_list<EventType> types);
 
     /** Create a HISTORY registration whose range is owned and applied by the SDK.
-     * Only an actual native time-series mapper grants eligibility. Current business types reject
-     * UNSUPPORTED_PROFILE before native admission; caller-declared descriptors do not grant eligibility.
+     * A supported native time-series mapper such as Candle grants eligibility. Unsupported types reject
+     * UNSUPPORTED_PROFILE before native admission.
      * @tparam Event Native owning business type with a verified time-series mapper.
      * @return The existing subscription facade with an initial MAX fromTime, or a synchronous Error.
      */

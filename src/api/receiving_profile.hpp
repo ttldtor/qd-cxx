@@ -5,6 +5,7 @@
 #include "qd/api/event_registry.hpp"
 #include "qd/api/feed.hpp"
 #include "qd/client/subscription_receiver.hpp"
+#include "qd/events/candle_routes.hpp"
 #include "qd/transport/tcp_recovery.hpp"
 
 #include "event_selection.hpp"
@@ -16,16 +17,16 @@
 namespace org::ttldtor::qdcxx::api::detail {
 inline constexpr std::size_t RECEIVING_OWNER_POLLS_PER_TURN =
     64; ///< One shared finite protocol/queue seed across the existing worker burst.
-inline constexpr std::size_t MAXIMUM_RECEIVING_RECORDS = 42; ///< Existing complete receiving catalog ceiling.
+inline constexpr std::size_t MAXIMUM_RECEIVING_RECORDS = 44; ///< Prior 42 records plus Candle and TradeHistory.
 inline constexpr std::size_t MAXIMUM_RECEIVING_BINDINGS =
     2 * MAXIMUM_RECEIVING_RECORDS;                       ///< Native plus compatible derived family per physical record.
-inline constexpr std::size_t RECEIVING_EVENT_KINDS = 19; ///< Explicitly supported native event kinds.
+inline constexpr std::size_t RECEIVING_EVENT_KINDS = 20; ///< Explicitly supported native event kinds.
 
 /** Conservative stack initialization plus complete metadata read/write work; no dynamic allocation. */
 inline constexpr std::size_t RECEIVING_BINDING_COPY_WORK =
     3 * sizeof(std::array<client::PreparedSubscriptionBinding, MAXIMUM_RECEIVING_BINDINGS>);
 
-/** One temporary logical selector and at most one physical regional copy, never shared with a callback. */
+/** One temporary logical selector with separate regional and exact Candle routing storage. */
 struct ReceivingSymbol {
     std::u16string logical;  ///< Owned immutable frontend snapshot, kept through synchronous desired submission.
     std::u16string physical; ///< Owned suffix-free text, shared by matching regional routes of this selector.
@@ -34,6 +35,7 @@ struct ReceivingSymbol {
     core::SubscriptionSelectorKind selector = core::SubscriptionSelectorKind::EXACT; ///< Explicit ALL has no text.
     std::optional<std::int32_t> sourceId; ///< Typed source identity, preserved independently of range.
     std::optional<std::int64_t> fromTime; ///< Exact Unix milliseconds only for a time-series logical selector.
+    std::optional<events::CandlePhysicalRoute> candle; ///< One exact owned Candle route, when selected.
 };
 
 /** SDK-owned mapper policy, never inferred from a timestamp field or caller-declared capability. */
@@ -75,6 +77,7 @@ struct ReceivingProfile {
     collectors::TickerLimits tickerLimits;           ///< Existing shared cache and independent desired views.
     collectors::HistoryLimits historyLimits{}; ///< Real shared HISTORY source and independent desired-view backing.
     std::vector<client::PreparedSubscriptionBinding> bindings; ///< Explicit routes grouped by business type.
+    std::optional<events::PreparedCandleRoutes> candleRoutes;  ///< Complete catalog of eligible Candle bindings.
     std::array<char16_t, MAXIMUM_RECEIVING_BINDINGS> bindingExchanges{};
     ///< Exact aligned Quote/Trade record suffixes; fixed backing is included in sizeof(ReceivingProfile).
     std::array<std::optional<std::int32_t>, MAXIMUM_RECEIVING_BINDINGS> bindingSources{};
@@ -99,6 +102,20 @@ struct ReceivingProfile {
      */
     ReceivingProfile(core::LocalSchema schema, client::EndpointOptions endpoint);
 };
+
+/** Prepare a catalog only when the endpoint has eligible registered Candle routes. */
+[[nodiscard]] std::optional<events::PreparedCandleRoutes> prepareReceivingCandleRoutes(const EventRegistry &registry,
+                                                                                       const core::LocalSchema &schema,
+                                                                                       DeliveryContract contract,
+                                                                                       std::size_t symbolUnits);
+
+/** Independently prepare the producer's validation catalog before publishing a Candle subscription. */
+[[nodiscard]] std::optional<events::PreparedCandleRoutes> prepareReceivingCandleRoutes(const EndpointOptions &options,
+                                                                                       std::size_t symbolUnits);
+
+/** Resolve bounded exact Candle text. Malformed/unsupported forms fail synchronously. */
+[[nodiscard]] events::CandlePhysicalRoute resolveReceivingCandle(const events::PreparedCandleRoutes &routes,
+                                                                 std::u16string_view symbol);
 
 /** Check verified route permission independently of record names/layout inference.
  * @param route Explicit prepared native or derived business route.

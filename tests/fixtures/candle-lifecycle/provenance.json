@@ -1,0 +1,85 @@
+{
+  "status": "PASS",
+  "revision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "timezoneByteIdentical": true,
+  "oracleSha256": "2a82c4cbd907d32171a07d2b7a8e7e52ab49ea8d33f5df107da97cc10285fbd6",
+  "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
+  "sources": [
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/candle/Candle.java",
+      "sha256": "6c75e3bf24278273d8f7061b7c7ad2914b194652e5c40bf65134f76e4c08adbd"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/candle/CandleSymbol.java",
+      "sha256": "b3ff2f13e8d2e2b25241a9f34cd6d29d9eecad9d9d00cb6d0c986e1400ecd35a"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/candle/CandleDelegate.java",
+      "sha256": "dd711b196668702d29b7a4521af206a97637169264085273c77b417097d225f3"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/candle/CandleFactoryImpl.java",
+      "sha256": "fff00e2992b1d962eca2478e51b3718c40d5a9d804d2e678ad2dde375f26a68c"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/impl/matrix/History.java",
+      "sha256": "462c4cf966c1db8bd6db4072c0512e5713454fd6165ad5b744113c629ac3a42d"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/qtp/BinaryQTPComposer.java",
+      "sha256": "fd158524cc8b9ebbf63cbc4ba97f6a39e95a0e07368a6589f9a44b0dba1e42da"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "first-completed.qtp",
+      "sha256": "7b86f6d673927fd341666cedf5642cce379bb6e748edce2a900e72835a1ca19b",
+      "bytes": 21
+    },
+    {
+      "path": "first-correction.qtp",
+      "sha256": "fbb08d58cf89cc3cca46ae627dded3020c592a37c14d2cb7ab25f415ddc7c0e9",
+      "bytes": 30
+    },
+    {
+      "path": "first-partial.qtp",
+      "sha256": "70de792ac8fd3c4a49ee0509d374fa42431e52d85decddeb07e55bb875f2ca35",
+      "bytes": 169
+    },
+    {
+      "path": "oracle.tsv",
+      "sha256": "0115c0064b226dbf13c21fdc022b3f080e703f5fbfa8713fefb2a9e41299ac5e",
+      "bytes": 1413
+    },
+    {
+      "path": "second-correction.qtp",
+      "sha256": "fbb08d58cf89cc3cca46ae627dded3020c592a37c14d2cb7ab25f415ddc7c0e9",
+      "bytes": 30
+    },
+    {
+      "path": "second-replay.qtp",
+      "sha256": "2b5cc3501455ef2a78694d4f481685873eb45f2506130bc0e7002a4174cfd725",
+      "bytes": 179
+    },
+    {
+      "path": "source-begin.qtp",
+      "sha256": "70de792ac8fd3c4a49ee0509d374fa42431e52d85decddeb07e55bb875f2ca35",
+      "bytes": 169
+    },
+    {
+      "path": "source-correction.qtp",
+      "sha256": "fbb08d58cf89cc3cca46ae627dded3020c592a37c14d2cb7ab25f415ddc7c0e9",
+      "bytes": 30
+    },
+    {
+      "path": "source-end.qtp",
+      "sha256": "7b86f6d673927fd341666cedf5642cce379bb6e748edce2a900e72835a1ca19b",
+      "bytes": 21
+    },
+    {
+      "path": "third-replay.qtp",
+      "sha256": "2db44d4cb12c2485a4b2d18b01f30d421907ef26e42a68e9d8cabcdb0b0c479b",
+      "bytes": 179
+    }
+  ]
+}

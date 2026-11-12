@@ -60,3 +60,4 @@ The [event-value oracle](../tools/upstream/event-values-oracle/README.md) captur
 - [SpreadOrder and AnalyticOrder oracle](../tools/upstream/order-variants-oracle/README.md): source-specific records, physical FIELD time and actual QTP bytes.
 - [Order parser/delegate oracle](../tools/upstream/order-oracle/README.md): original physical slots and bounded standard-schema observations.
 - [Series oracle](../tools/upstream/series-oracle/README.md): pinned HISTORY binary round trip, schema variants and indexed option values.
+- The [Candle HISTORY oracle](../tools/upstream/candle-lifecycle-oracle/README.md) captures exact Java snapshots, local replay, same-index corrections and source QTP.

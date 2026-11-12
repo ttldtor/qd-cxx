@@ -44,6 +44,7 @@ bool supported(const EventRegistry &registry, EventType type) noexcept {
     case EventType::GREEKS:
     case EventType::UNDERLYING:
     case EventType::THEO_PRICE:
+    case EventType::CANDLE:
         return true;
     }
 
@@ -60,7 +61,7 @@ bool usesRegionalCoordinates(EventType type) noexcept {
 bool usesGenericSourceSelection(EventType type) noexcept {
     return type == EventType::TEXT_MESSAGE || type == EventType::TEXT_CONFIGURATION || type == EventType::MESSAGE ||
            type == EventType::CONFIGURATION || type == EventType::MARKET_MAKER || type == EventType::SERIES ||
-           isOptionTimeSeriesEvent(type);
+           isOptionTimeSeriesEvent(type) || type == EventType::CANDLE;
 }
 
 /** Match explicit Order source identity using the already validated record qualification rules.
@@ -130,6 +131,33 @@ std::vector<FilterCoordinate> coordinates(const EventRegistry &registry, Deliver
 
     if (symbol.size() > limits.symbolUnits) {
         refuse(ErrorCode::RESOURCE_LIMIT, "filter-symbol-units");
+    }
+
+    if (type == EventType::CANDLE) {
+        if (wildcard || symbol.empty() || symbol.front() == u'*')
+            return {};
+
+        const auto routes = prepareReceivingCandleRoutes(registry, registry.schema(), contract, limits.symbolUnits);
+
+        if (!routes)
+            return {};
+
+        try {
+            auto route = resolveReceivingCandle(*routes, symbol);
+
+            if (limits.coordinates == 0)
+                refuse(ErrorCode::RESOURCE_LIMIT, "filter-coordinate-count");
+
+            const auto &record = registry.schema().records()[static_cast<std::size_t>(route.recordId)];
+
+            return {{record.name, std::move(route.symbol), false}};
+        } catch (const Error &error) {
+            if (error.diagnostic().code == ErrorCode::UNSUPPORTED_PROFILE ||
+                error.diagnostic().code == ErrorCode::INVALID_ARGUMENT)
+                return {};
+
+            throw;
+        }
     }
 
     const auto exchange = events::market_symbols::getExchangeCode(symbol);
@@ -219,7 +247,8 @@ std::vector<FilterCoordinate> filterSubscriptionCoordinates(const EventRegistry 
         return {};
     }
 
-    if ((usesOrderSource(type) || type == EventType::SERIES || isOptionTimeSeriesEvent(type)) &&
+    if ((usesOrderSource(type) || type == EventType::SERIES || isOptionTimeSeriesEvent(type) ||
+         type == EventType::CANDLE) &&
         (contract == DeliveryContract::STREAM || selector.kind() == SubscriptionSymbolKind::ALL)) {
         return {};
     }
@@ -280,6 +309,8 @@ std::vector<FilterCoordinate> filterEventCoordinates(const EventRegistry &regist
                     return EventType::UNDERLYING;
                 } else if constexpr (std::is_same_v<Event, events::TheoPrice>) {
                     return EventType::THEO_PRICE;
+                } else if constexpr (std::is_same_v<Event, events::Candle>) {
+                    return EventType::CANDLE;
                 } else if constexpr (std::is_same_v<Event, events::Order>) {
                     return EventType::ORDER;
                 } else {
@@ -287,7 +318,12 @@ std::vector<FilterCoordinate> filterEventCoordinates(const EventRegistry &regist
                 }
             }();
 
-            if constexpr (usesOrderSource(type)) {
+            if constexpr (std::is_same_v<Event, events::Candle>) {
+                const auto symbol = value.eventSymbol ? value.eventSymbol->getSymbol() : std::nullopt;
+
+                return symbol ? coordinates(registry, contract, type, *symbol, false, limits)
+                              : std::vector<FilterCoordinate>{};
+            } else if constexpr (usesOrderSource(type)) {
                 if (value.getSourceId() < 0) {
                     return std::vector<FilterCoordinate>{};
                 }

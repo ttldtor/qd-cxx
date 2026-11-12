@@ -3,6 +3,7 @@
 #pragma once
 
 #include "qd/api/endpoint_configuration.hpp"
+#include "qd/events/candle_routes.hpp"
 
 #include "../transport/bootstrap_lease.hpp"
 #include "callback_execution.hpp"
@@ -37,9 +38,9 @@ using ListenerFunction =
                  Subscription<events::AnalyticOrder>::Listener, Subscription<events::OtcMarketsOrder>::Listener,
                  Subscription<events::OrderImbalance>::Listener, Subscription<events::Series>::Listener,
                  Subscription<events::Greeks>::Listener, Subscription<events::Underlying>::Listener,
-                 Subscription<events::TheoPrice>::Listener, Subscription<RegisteredEvent>::Listener,
-                 Endpoint::StateChangeListener, Subscription<events::Quote>::StateChangeListener,
-                 SubscriptionChangeListener>;
+                 Subscription<events::TheoPrice>::Listener, Subscription<events::Candle>::Listener,
+                 Subscription<RegisteredEvent>::Listener, Endpoint::StateChangeListener,
+                 Subscription<events::Quote>::StateChangeListener, SubscriptionChangeListener>;
 
 /** Shared application callable; its last release never occurs under a control mutex. */
 struct ListenerBox {
@@ -212,6 +213,7 @@ struct SubscriptionPort {
     std::uint64_t nextListener = 1; ///< Non-reused listener identity, zero never issued.
     std::vector<EventType> eventTypes; ///< Immutable normalized actual validated subscription arguments.
     EventSelection eventSelection;     ///< Immutable normalized set, independent of explicit local record routes.
+    std::optional<events::PreparedCandleRoutes> candleRoutes; ///< Immutable producer-side Candle validation.
     EventDelivery
         eventDelivery; ///< Exact listener value shape, assigned together with the selection before publication.
     std::atomic<bool> closeRequested{false}; ///< Reserved monotonic control, independent of ordinary capacity.

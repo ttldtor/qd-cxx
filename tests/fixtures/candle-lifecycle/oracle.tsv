@@ -1,0 +1,23 @@
+schema	Candle	true	24	0
+bound	1000	4294967296
+demand	initial-add	1	Candle	AAPL{=m}	4294967296
+count	initial-add	1
+input	source-begin	1	Candle	AAPL{=m}	8589934599	4	AAPL{=m}	8589934599	2000	7	11	4636807660098813952
+output	first-partial	1	Candle	AAPL{=m}	8589934599	4	AAPL{=m}	8589934599	2000	7	11	4636807660098813952
+count	first-partial	1
+input	source-end	1	Candle	AAPL{=m}	4294967296	10	AAPL{=m}	4294967296	1000	0	0	9221120237041090560
+output	first-completed	1	Candle	AAPL{=m}	4294967296	10	AAPL{=m}	4294967296	1000	0	0	9221120237041090560
+count	first-completed	1
+count	second-add	0
+output	second-replay	1	Candle	AAPL{=m}	8589934599	4	AAPL{=m}	8589934599	2000	7	11	4636807660098813952
+output	second-replay	2	Candle	AAPL{=m}	4294967296	10	AAPL{=m}	4294967296	1000	0	0	9221120237041090560
+count	second-replay	2
+input	source-correction	1	Candle	AAPL{=m}	8589934599	0	AAPL{=m}	8589934599	2000	7	5	4636878028842991616
+output	first-correction	1	Candle	AAPL{=m}	8589934599	0	AAPL{=m}	8589934599	2000	7	5	4636878028842991616
+count	first-correction	1
+output	second-correction	1	Candle	AAPL{=m}	8589934599	0	AAPL{=m}	8589934599	2000	7	5	4636878028842991616
+count	second-correction	1
+count	third-add	0
+output	third-replay	1	Candle	AAPL{=m}	8589934599	4	AAPL{=m}	8589934599	2000	7	5	4636878028842991616
+output	third-replay	2	Candle	AAPL{=m}	4294967296	10	AAPL{=m}	4294967296	1000	0	0	9221120237041090560
+count	third-replay	2

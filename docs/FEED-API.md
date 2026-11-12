@@ -644,3 +644,9 @@ See [live HISTORY ranges](../spec/subscriptions/LIVE-HISTORY-RANGES.md) for capa
 BEGIN, finite work, overlap, output refusal and recovery boundaries.
 
 Select `DeliveryContract::HISTORY` explicitly. The worker owns the collector, independent views, replay and reset acknowledgements. `Subscription<Event>::getHistorySnapshot()` returns a passive owning AS-OF cut; reads perform no I/O or callback waiting. Current completion requires both actual delivered range evidence and matching accepted logical/source/clear/callback fences. The default SDK HISTORY registry includes the indexed event families documented above. Types without a HISTORY route are rejected before native registration. See [Order fields, source selectors and ownership](ORDER.md) and [MarketMaker and derived Order](MARKET-MAKER-ORDER.md). See the [HISTORY contract](../spec/subscriptions/HISTORY-RECEIVING.md) for exact states, finite storage limits and raw indexed range units.
+
+## Receive Candle
+
+Use `createSubscription<Candle>()` on a TICKER endpoint for the latest received value, or `createTimeSeriesSubscription<Candle>()` on a HISTORY endpoint for a ranged snapshot and subsequent changes. Pass a `CandleSymbol` to `addSymbols()` and set the HISTORY range with `setFromTime()`. The callback owns a copyable Candle value whose event symbol uses the logical `CandleSymbol` requested by the application.
+
+The default receiving registry supports the standard `Candle` and `TradeHistory` wire records. A custom registry can select other supported physical variants. Symbol attributes select a compatible record before the subscription changes. Receiving Candle does not compute candles from trades or fill missing periods. See [Candle routing](../spec/events/CANDLE-ROUTES.md) for the physical record rules and [Candle payload](../spec/events/CANDLE-PAYLOAD.md) for field semantics.
