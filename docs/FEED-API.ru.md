@@ -344,6 +344,19 @@ serial selection, actual completion accounting и source-epoch fences. Span де
 `deadlineExpired`, `hadGap` и `diagnostic`. Результат не подтверждает ACK источника,
 полноту ещё не прочитанных сетевых данных или непрерывность истории upstream.
 
+## Локальный файл записи
+
+Создайте endpoint с нужным `DeliveryContract`, настройте обычные
+типизированные подписки и слушателей, затем вызовите `endpoint->connectTape(path)`.
+Runtime открывает и читает обычный файл на рабочем потоке. Для успешного
+завершения дождитесь `EndpointState::CLOSED`, затем вызовите
+`closeAndAwaitTermination()`, чтобы дождаться освобождения ресурсов callback.
+Вызов `closeAndAwaitTermination()` до EOF запрашивает досрочную остановку.
+
+`TapeSourceOptions` задаёт пределы размера файла и числа конвертов. Для каждого
+проигрывания создавайте новый endpoint.
+[Форматы, доставка и ошибки локального файла](../spec/protocol/FEED-TAPE-SOURCE.ru.md).
+
 ## Наблюдатели состояния
 
 Зарегистрируйте наблюдателя endpoint или подписки до нужных переходов:

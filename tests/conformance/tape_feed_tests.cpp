@@ -1,0 +1,164 @@
+// Copyright (c) 2026 ttldtor.
+// SPDX-License-Identifier: BSL-1.0
+#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "qd/api/endpoint_configuration.hpp"
+#include "qd/api/feed.hpp"
+
+#include <algorithm>
+#include <chrono>
+#include <cstdint>
+#include <doctest/doctest.h>
+#include <filesystem>
+#include <memory>
+#include <optional>
+#include <vector>
+
+namespace {
+namespace q = org::ttldtor::qdcxx;
+namespace api = q::api;
+using namespace std::chrono_literals;
+
+const std::filesystem::path FIXTURES{ORG_TTLDTOR_QDCXX_TAPE_FEED_FIXTURES};
+const auto RAW_QUOTE = FIXTURES / "protocol/raw-tape/expected/raw-quote.qtp";
+const auto HISTORY_SALE = FIXTURES / "time-and-sale/wide/history.qtp";
+
+api::RuntimeOptions runtimeOptions() {
+    api::RuntimeOptions result;
+    result.maximumSubscriptionsPerEndpoint = 2;
+    result.dnsServers.push_back({{127, 0, 0, 1}});
+
+    return result;
+}
+
+void expectCleanEof(const std::shared_ptr<api::Endpoint> &endpoint) {
+    const auto state = endpoint->awaitState(api::EndpointState::CLOSED, std::chrono::steady_clock::now() + 8s);
+    const auto closed = endpoint->closeAndAwaitTermination();
+    INFO("state=", static_cast<int>(state.state), ", diagnostic=", closed.diagnostic.stage,
+         ", detail=", closed.diagnostic.detailCode);
+    REQUIRE(state.status == api::WaitStatus::REACHED);
+    CHECK(closed.drained);
+    CHECK_FALSE(closed.hadGap);
+    CHECK_FALSE(closed.deadlineExpired);
+    CHECK(closed.diagnostic.code == api::ErrorCode::NONE);
+    CHECK(endpoint->getStatistics().final);
+}
+
+TEST_CASE("real RAW tape routes IBM Quote through ordinary STREAM and TICKER subscriptions") {
+    for (const auto contract : {api::DeliveryContract::STREAM, api::DeliveryContract::TICKER}) {
+        CAPTURE(contract);
+        std::vector<q::events::Quote> received;
+        std::optional<std::uint64_t> observedSourceEpoch;
+        api::ApiRuntime runtime(runtimeOptions());
+        api::EndpointOptions options;
+        options.contract = contract;
+        const auto endpoint = runtime.createEndpoint(options);
+        const auto subscription = endpoint->getFeed()->createSubscription<q::events::Quote>();
+        subscription->addSymbols("IBM");
+        subscription->addEventListener(
+            [&received, &observedSourceEpoch, weak = std::weak_ptr(subscription)](auto batch) {
+                received.insert(received.end(), batch.begin(), batch.end());
+
+                if (const auto owner = weak.lock()) {
+                    observedSourceEpoch = owner->getStatistics().sourceEpoch;
+                }
+            });
+        endpoint->connectTape(RAW_QUOTE);
+        expectCleanEof(endpoint);
+
+        REQUIRE_FALSE(received.empty());
+        CHECK(std::ranges::all_of(received, [](const auto &value) {
+            return value.symbol == u"IBM";
+        }));
+        CHECK(received.back().bidPrice.raw == 2617730);
+
+        if (contract == api::DeliveryContract::STREAM) {
+            REQUIRE(received.size() == 2);
+            CHECK(received.front().bidPrice.raw == 2566530);
+        }
+
+        CHECK(subscription->getStatistics().final);
+        CHECK(observedSourceEpoch == 1);
+        CHECK_FALSE(subscription->getStatistics().sourceEpoch);
+        CHECK_FALSE(endpoint->getEffectiveConfiguration().acceptedAddress);
+        CHECK_FALSE(endpoint->getAggregationPeriodInfo());
+        const auto connection = endpoint->getStatistics().connection;
+        CHECK(connection.readBytes.availability == q::core::StatisticAvailability::UNSUPPORTED);
+        CHECK(connection.writtenSubscriptionRecords.availability == q::core::StatisticAvailability::UNSUPPORTED);
+        CHECK(connection.connectionAttempts.availability == q::core::StatisticAvailability::UNSUPPORTED);
+        CHECK_FALSE(connection.sourceEpoch);
+        CHECK(connection.activeConnections == 0);
+    }
+}
+
+TEST_CASE("explicit HISTORY tape preserves typed trades and does not produce STREAM events") {
+    for (const auto contract : {api::DeliveryContract::HISTORY, api::DeliveryContract::STREAM}) {
+        CAPTURE(contract);
+        std::vector<q::events::TimeAndSale> received;
+        api::ApiRuntime runtime(runtimeOptions());
+        api::EndpointOptions options;
+        options.contract = contract;
+        const auto endpoint = runtime.createEndpoint(options);
+        const auto feed = endpoint->getFeed();
+        const auto subscription = contract == api::DeliveryContract::HISTORY
+                                      ? feed->createTimeSeriesSubscription<q::events::TimeAndSale>()
+                                      : feed->createSubscription<q::events::TimeAndSale>();
+
+        if (contract == api::DeliveryContract::HISTORY) {
+            subscription->setFromTime(0);
+        }
+
+        subscription->addSymbols("AAPL");
+        subscription->addEventListener([&received](auto batch) {
+            received.insert(received.end(), batch.begin(), batch.end());
+        });
+        endpoint->connectTape(HISTORY_SALE);
+        expectCleanEof(endpoint);
+
+        if (contract == api::DeliveryContract::HISTORY) {
+            REQUIRE(received.size() == 3);
+            CHECK(std::ranges::any_of(received, [](const auto &sale) {
+                return sale.symbol == u"AAPL" && sale.tradeId == 9007199254740993LL && sale.getTime() == 2001;
+            }));
+        } else {
+            CHECK(received.empty());
+        }
+    }
+}
+
+TEST_CASE("local tape path and quotas reject cleanly and malformed input is not clean EOF") {
+    struct Refusal {
+        std::filesystem::path path;
+        api::TapeSourceOptions options;
+        api::ErrorCode expected;
+    };
+
+    const Refusal refusals[] = {
+        {FIXTURES / "nonexistent-tape-feed-file.qtp", {}, api::ErrorCode::TAPE_IO_FAILURE},
+        {FIXTURES, {}, api::ErrorCode::TAPE_IO_FAILURE},
+        {RAW_QUOTE, {1, 65'536}, api::ErrorCode::RESOURCE_LIMIT},
+        {RAW_QUOTE, {64 * 1024 * 1024, 1}, api::ErrorCode::RESOURCE_LIMIT},
+        {FIXTURES / "protocol/raw-tape/expected/timestamp-truncated-1.qtp", {}, api::ErrorCode::PROTOCOL_FAILURE}};
+
+    for (const auto &refusal : refusals) {
+        api::ApiRuntime runtime(runtimeOptions());
+        const auto endpoint = runtime.createEndpoint();
+        const auto subscription = endpoint->getFeed()->createSubscription<q::events::Quote>();
+        subscription->addSymbols("IBM");
+        endpoint->connectTape(refusal.path, refusal.options);
+        const auto state = endpoint->awaitState(api::EndpointState::FAILED, std::chrono::steady_clock::now() + 8s);
+        const auto closed = endpoint->closeAndAwaitTermination();
+        INFO("state=", static_cast<int>(state.state), ", stage=", closed.diagnostic.stage,
+             ", code=", static_cast<int>(closed.diagnostic.code));
+        REQUIRE(state.status == api::WaitStatus::REACHED);
+        CHECK_FALSE(closed.drained);
+        CHECK(closed.diagnostic.code == refusal.expected);
+        CHECK(endpoint->getStatistics().final);
+    }
+
+    api::ApiRuntime runtime(runtimeOptions());
+    const auto endpoint = runtime.createEndpoint();
+    CHECK_THROWS_AS(endpoint->connectTape({}, {}), api::Error);
+    CHECK_THROWS_AS(endpoint->connectTape(RAW_QUOTE, {0, 1}), api::Error);
+    CHECK(endpoint->getState() == api::EndpointState::NOT_CONNECTED);
+}
+} // namespace
