@@ -1,0 +1,6 @@
+reject	Time	IllegalArgumentException
+reject	Sequence	IllegalArgumentException
+reject	Open	IllegalArgumentException
+reject	High	IllegalArgumentException
+reject	Low	IllegalArgumentException
+reject	Close	IllegalArgumentException

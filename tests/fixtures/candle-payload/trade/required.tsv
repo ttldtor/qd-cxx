@@ -1,0 +1,4 @@
+reject	Time	IllegalArgumentException
+reject	Sequence	IllegalArgumentException
+reject	Price	IllegalArgumentException
+reject	Size	IllegalArgumentException
