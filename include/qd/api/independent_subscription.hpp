@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <limits>
 #include <memory>
 #include <mutex>
@@ -19,7 +20,7 @@
 namespace org::ttldtor::qdcxx::api {
 /** Finite independent subscription capacities. Each attached feed applies its own runtime limits as well. */
 struct IndependentSubscriptionLimits {
-    std::size_t maximumAttachments = 4;   ///< Active attachments and still-selected deliveries together.
+    std::size_t maximumAttachments = 4;   ///< Active and callback-retiring attachment generations together.
     std::size_t maximumSelectors = 16;    ///< Raw selector arguments and retained identities per replacement.
     std::size_t maximumSymbolUnits = 128; ///< UTF-16 units retained per selector.
 };
@@ -33,6 +34,11 @@ template <class Event> class IndependentSubscription final {
     public:
     using Listener = typename Subscription<Event>::Listener; ///< Listener shared by all attachments.
     using AttachmentId = std::uint64_t;                      ///< Identity local to this subscription, never reused.
+    using AttachmentListener = std::function<void(AttachmentId, std::span<const Event>)>;
+    ///< Event batches tagged with the exact delivering attachment.
+    using ClearListener = std::move_only_function<void(AttachmentId) const noexcept>;
+
+    ///< Invalidate one attachment's view without publishing market data.
 
     /** Synchronous refusal applying an accepted desired set to one attachment. */
     struct AttachmentFailure {
@@ -41,14 +47,32 @@ template <class Event> class IndependentSubscription final {
     };
 
     private:
+    struct Handlers {
+        Listener untagged;
+        AttachmentListener tagged;
+        ClearListener clear;
+
+        void deliver(AttachmentId id, std::span<const Event> events) const {
+            if (tagged) {
+                tagged(id, events);
+            } else {
+                untagged(events);
+            }
+        }
+    };
+
     /** Bridge native listener selection without retaining the logical subscription or its endpoint. */
     struct DeliveryGate {
-        explicit DeliveryGate(std::shared_ptr<const Listener> listener) : listener(std::move(listener)) {
+        DeliveryGate(AttachmentId id, std::shared_ptr<const Handlers> handlers)
+            : id(id), handlers(std::move(handlers)) {
         }
 
         std::mutex mutex;
         bool active = false;
-        const std::shared_ptr<const Listener> listener;
+        bool clearPending = false;
+        std::size_t selected = 0;
+        const AttachmentId id;
+        const std::shared_ptr<const Handlers> handlers;
 
         void deliver(std::span<const Event> events) {
             {
@@ -57,14 +81,53 @@ template <class Event> class IndependentSubscription final {
                 if (!active) {
                     return;
                 }
+
+                ++selected;
             }
 
-            (*listener)(events);
+            struct Completion {
+                DeliveryGate &gate;
+
+                ~Completion() {
+                    gate.finishDelivery();
+                }
+            } completion{*this};
+
+            handlers->deliver(id, events);
         }
 
         void disable() noexcept {
             std::lock_guard lock(mutex);
             active = false;
+        }
+
+        void requestClear() noexcept {
+            {
+                std::lock_guard lock(mutex);
+
+                if (selected != 0) {
+                    clearPending = true;
+
+                    return;
+                }
+            }
+
+            handlers->clear(id);
+        }
+
+        void finishDelivery() noexcept {
+            {
+                std::lock_guard lock(mutex);
+                --selected;
+
+                if (selected != 0 || !clearPending) {
+                    return;
+                }
+
+                clearPending = false;
+            }
+
+            handlers->clear(id);
         }
     };
 
@@ -82,15 +145,56 @@ template <class Event> class IndependentSubscription final {
 
     const IndependentSubscriptionLimits limits_;
     mutable std::mutex mutex_;
-    std::shared_ptr<const Listener> listener_;
+    std::shared_ptr<const Handlers> handlers_;
     std::vector<SubscriptionSelector> selectors_;
     std::vector<Attachment> attachments_;
     AttachmentId nextId_ = 1;
 
     void requireOpen() const {
-        if (!listener_) {
+        if (!handlers_) {
             throw Error({ErrorCode::CLOSED, "independent-subscription-closed"});
         }
+    }
+
+    explicit IndependentSubscription(Handlers handlers, IndependentSubscriptionLimits limits) : limits_(limits) {
+        if ((!handlers.untagged && (!handlers.tagged || !handlers.clear)) || !limits_.maximumAttachments ||
+            !limits_.maximumSelectors || !limits_.maximumSymbolUnits) {
+            throw Error({ErrorCode::INVALID_ARGUMENT, "independent-subscription-options"});
+        }
+
+        if (limits_.maximumAttachments > attachments_.max_size() || limits_.maximumSelectors > selectors_.max_size()) {
+            throw Error({ErrorCode::RESOURCE_LIMIT, "independent-subscription-options"});
+        }
+
+        attachments_.reserve(limits_.maximumAttachments);
+        handlers_ = std::make_shared<const Handlers>(std::move(handlers));
+    }
+
+    /** Remove one gate before native retirement or invoking any application code. */
+    std::shared_ptr<DeliveryGate> detachGate(const Feed &feed, bool clear) {
+        std::shared_ptr<Subscription<Event>> native;
+        std::shared_ptr<DeliveryGate> gate;
+        {
+            std::lock_guard lock(mutex_);
+            const auto attachment = std::ranges::find_if(attachments_, [&](const Attachment &entry) {
+                return entry.matches(feed.port_);
+            });
+
+            if (attachment == attachments_.end()) {
+                return {};
+            }
+
+            if (clear && !handlers_->clear) {
+                throw Error({ErrorCode::UNSUPPORTED_PROFILE, "independent-subscription-clear-listener"});
+            }
+
+            gate = std::move(attachment->activeGate);
+            gate->disable();
+            native = std::move(attachment->native);
+        }
+        native->close();
+
+        return gate;
     }
 
     public:
@@ -100,17 +204,23 @@ template <class Event> class IndependentSubscription final {
      * @throws Error Invalid arguments or logical capacity refused.
      * @throws std::bad_alloc Owned storage could not be allocated.
      */
-    explicit IndependentSubscription(Listener listener, IndependentSubscriptionLimits limits = {}) : limits_(limits) {
-        if (!listener || !limits_.maximumAttachments || !limits_.maximumSelectors || !limits_.maximumSymbolUnits) {
-            throw Error({ErrorCode::INVALID_ARGUMENT, "independent-subscription-options"});
-        }
+    explicit IndependentSubscription(Listener listener, IndependentSubscriptionLimits limits = {})
+        : IndependentSubscription(Handlers{std::move(listener), {}, {}}, limits) {
+    }
 
-        if (limits_.maximumAttachments > attachments_.max_size() || limits_.maximumSelectors > selectors_.max_size()) {
-            throw Error({ErrorCode::RESOURCE_LIMIT, "independent-subscription-options"});
-        }
-
-        attachments_.reserve(limits_.maximumAttachments);
-        listener_ = std::make_shared<const Listener>(std::move(listener));
+    /** Construct an unattached subscription with attachment-scoped data and invalidation callbacks.
+     * @param listener Nonempty owning callback receiving the exact attachment ID with each data batch.
+     * @param clear Nonempty owning nonthrowing callback to invalidate the view keyed by its attachment ID.
+     * Different attachments can invoke these callbacks concurrently.
+     * @param limits Positive capacities for retained selectors and active or retiring attachments.
+     * @return New subscription with an empty desired set.
+     * @throws Error Invalid arguments or logical capacity refused.
+     * @throws std::bad_alloc Owned storage could not be allocated.
+     */
+    [[nodiscard]] static IndependentSubscription withAttachmentListener(AttachmentListener listener,
+                                                                        ClearListener clear,
+                                                                        IndependentSubscriptionLimits limits = {}) {
+        return IndependentSubscription(Handlers{{}, std::move(listener), std::move(clear)}, limits);
     }
 
     /** Fence new event selection and request retirement of all attachments. */
@@ -148,9 +258,10 @@ template <class Event> class IndependentSubscription final {
             throw Error({ErrorCode::RESOURCE_LIMIT, "independent-subscription-attachments"});
         }
 
-        gate = std::make_shared<DeliveryGate>(listener_);
+        const auto id = nextId_;
+        gate = std::make_shared<DeliveryGate>(id, handlers_);
         std::lock_guard deliveryLock(gate->mutex);
-        const auto id = nextId_++;
+        ++nextId_;
         auto &attachment = attachments_.emplace_back(Attachment{id, feed.port_, gate, {}, {}});
         native = feed.template createSubscription<Event>();
         // A native registration may await retirement before the runtime has started its worker.
@@ -174,25 +285,26 @@ template <class Event> class IndependentSubscription final {
      * @return Whether an active attachment was removed.
      */
     bool detach(const Feed &feed) noexcept {
-        std::shared_ptr<Subscription<Event>> native;
-        std::shared_ptr<DeliveryGate> gate;
-        {
-            std::lock_guard lock(mutex_);
-            const auto attachment = std::ranges::find_if(attachments_, [&](const Attachment &entry) {
-                return entry.matches(feed.port_);
-            });
+        return detachGate(feed, false) != nullptr;
+    }
 
-            if (attachment == attachments_.end()) {
-                return false;
-            }
+    /** Detach one feed and invalidate the view associated with its retired attachment ID.
+     * The clear listener runs once after all data callbacks already selected for that attachment return.
+     * With no selected callback it runs inline. Otherwise the last selected callback invokes it on exit,
+     * including after reentrant detachment or a data callback exception. This operation does not wait.
+     * A concurrent close or reattachment does not cancel a clear already accepted.
+     * @param feed Feed identity borrowed during this call.
+     * @return Whether an active attachment was removed and its clear accepted.
+     * @throws Error An active value-only subscription has no attachment-scoped clear listener.
+     */
+    bool detachAndClear(const Feed &feed) {
+        if (const auto gate = detachGate(feed, true)) {
+            gate->requestClear();
 
-            gate = std::move(attachment->activeGate);
-            gate->disable();
-            native = std::move(attachment->native);
+            return true;
         }
-        native->close();
 
-        return true;
+        return false;
     }
 
     /** Accept a bounded local desired replacement and submit it separately to each attached feed.
@@ -277,7 +389,7 @@ template <class Event> class IndependentSubscription final {
     /** Permanently close, fence new selection, and request native retirement without waiting for callbacks. */
     void close() noexcept {
         std::vector<Attachment> attachments;
-        std::shared_ptr<const Listener> listener;
+        std::shared_ptr<const Handlers> handlers;
         {
             std::lock_guard lock(mutex_);
 
@@ -288,7 +400,7 @@ template <class Event> class IndependentSubscription final {
             }
 
             attachments.swap(attachments_);
-            listener.swap(listener_);
+            handlers.swap(handlers_);
             selectors_.clear();
         }
 

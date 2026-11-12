@@ -1183,6 +1183,196 @@ TEST_CASE("independent subscription keeps a selected attachment charged until it
     CHECK(weakLifetime.expired());
 }
 
+TEST_CASE("independent subscription clears exactly one attachment generation") {
+    api::ApiRuntime runtime(runtimeOptions());
+    auto firstEndpoint = runtime.createEndpoint(endpointOptions());
+    auto secondEndpoint = runtime.createEndpoint(endpointOptions());
+    auto first = firstEndpoint->getFeed();
+    auto second = secondEndpoint->getFeed();
+    using Independent = api::IndependentSubscription<events::Quote>;
+    std::array<Independent::AttachmentId, 2> cleared{};
+    std::size_t clearCount = 0;
+    auto subscription = Independent::withAttachmentListener(
+        [](Independent::AttachmentId, std::span<const events::Quote>) {
+        },
+        [&](Independent::AttachmentId id) noexcept {
+            if (clearCount < cleared.size()) {
+                cleared[clearCount] = id;
+            }
+
+            ++clearCount;
+        });
+    const auto ibm = api::SubscriptionSelector::plain(u"IBM");
+    CHECK(subscription.setSelectors(std::span(&ibm, 1)).empty());
+    const auto firstId = subscription.attach(*first);
+    const auto secondId = subscription.attach(*second);
+    CHECK(subscription.detachAndClear(*first));
+    CHECK_FALSE(subscription.detachAndClear(*first));
+    CHECK(clearCount == 1);
+    CHECK(cleared[0] == firstId);
+    CHECK(subscription.getSelectors() == std::vector{ibm});
+    CHECK(subscription.attach(*second) == secondId);
+    const auto replacement = subscription.attach(*first);
+    CHECK(replacement != firstId);
+    CHECK(subscription.detachAndClear(*first));
+    CHECK(clearCount == 2);
+    CHECK(cleared[1] == replacement);
+    CHECK(subscription.detach(*second));
+    CHECK_FALSE(subscription.detachAndClear(*second));
+    CHECK(clearCount == 2);
+
+    Independent legacy([](std::span<const events::Quote>) {
+    });
+    CHECK_FALSE(legacy.detachAndClear(*first));
+    const auto legacyId = legacy.attach(*first);
+    CHECK(errorCode([&] {
+              legacy.detachAndClear(*first);
+          }) == api::ErrorCode::UNSUPPORTED_PROFILE);
+    CHECK(legacy.attach(*first) == legacyId);
+    CHECK(legacy.detach(*first));
+    runtime.closeAndAwaitTermination();
+}
+
+TEST_CASE("independent subscription clears after selected delivery without disturbing another feed") {
+    bool reentrant = false;
+    bool throwFromData = false;
+    bool reattachPending = false;
+    bool closePending = false;
+    SUBCASE("a competing caller detaches during delivery") {
+        SUBCASE("a new generation attaches while the old clear is pending") {
+            reattachPending = true;
+        }
+        SUBCASE("logical close leaves the accepted clear pending") {
+            closePending = true;
+        }
+    }
+    SUBCASE("the data callback detaches itself") {
+        reentrant = true;
+    }
+    SUBCASE("the self-detaching data callback throws") {
+        reentrant = true;
+        throwFromData = true;
+    }
+
+    api::ApiRuntime runtime(runtimeOptions());
+    auto schema = standardSchema();
+    const std::vector<std::u16string> symbols{u"IBM"};
+    const std::vector<peer::Record> records{{u"IBM", standardValues(schema)}};
+    peer::Peer firstSource(schema, records, symbols, 8192, peer::PeerMode::HOLD, script());
+    peer::Peer secondSource(schema, records, symbols, 8192, peer::PeerMode::HOLD, script());
+    auto firstEndpoint = runtime.createEndpoint(endpointOptions());
+    auto secondEndpoint = runtime.createEndpoint(endpointOptions());
+    auto first = firstEndpoint->getFeed();
+    auto second = secondEndpoint->getFeed();
+    using Independent = api::IndependentSubscription<events::Quote>;
+    Independent::AttachmentId firstId = 0;
+    Independent::AttachmentId secondId = 0;
+    std::mutex mutex;
+    std::condition_variable condition;
+    bool release = false;
+    std::atomic<bool> entered{false};
+    std::atomic<bool> returned{false};
+    std::atomic<bool> accepted{false};
+    std::atomic<bool> clearedBeforeReturn{false};
+    std::atomic<unsigned> clearCount{0};
+    std::atomic<Independent::AttachmentId> clearedId{0};
+    std::atomic<unsigned> firstCount{0};
+    std::atomic<unsigned> secondCount{0};
+    Independent *owner = nullptr;
+    auto subscription = Independent::withAttachmentListener(
+        [&](Independent::AttachmentId id, std::span<const events::Quote> events) {
+            if (id == firstId) {
+                firstCount += static_cast<unsigned>(events.size());
+                entered = true;
+
+                if (reentrant) {
+                    accepted = owner->detachAndClear(*first);
+                } else {
+                    std::unique_lock lock(mutex);
+                    condition.wait_for(lock, 5s, [&] {
+                        return release;
+                    });
+                }
+
+                returned = true;
+
+                if (throwFromData) {
+                    throw std::runtime_error("test data callback failure");
+                }
+            } else if (id == secondId) {
+                secondCount += static_cast<unsigned>(events.size());
+            }
+        },
+        [&](Independent::AttachmentId id) noexcept {
+            clearedBeforeReturn = !returned.load();
+            clearedId = id;
+            ++clearCount;
+        });
+    owner = &subscription;
+    const auto ibm = api::SubscriptionSelector::plain(u"IBM");
+    REQUIRE(subscription.setSelectors(std::span(&ibm, 1)).empty());
+    firstId = subscription.attach(*first);
+    secondId = subscription.attach(*second);
+    firstEndpoint->connect(address(firstSource));
+    CHECK(eventually([&] {
+        return entered.load();
+    }));
+
+    std::optional<Independent::AttachmentId> replacement;
+
+    if (!reentrant) {
+        accepted = subscription.detachAndClear(*first);
+
+        if (reattachPending) {
+            CHECK(subscription.setSelectors({}).empty());
+            replacement = subscription.attach(*first);
+            CHECK(replacement != firstId);
+        }
+
+        if (closePending) {
+            subscription.close();
+        }
+
+        CHECK(clearCount.load() == 0);
+        {
+            std::lock_guard lock(mutex);
+            release = true;
+        }
+        condition.notify_one();
+    }
+
+    CHECK(eventually([&] {
+        return clearCount.load() != 0;
+    }));
+    CHECK(accepted.load());
+    CHECK_FALSE(clearedBeforeReturn.load());
+    CHECK(clearedId.load() == firstId);
+
+    if (replacement) {
+        CHECK(subscription.attach(*first) == *replacement);
+        CHECK(subscription.detach(*first));
+        CHECK(subscription.setSelectors(std::span(&ibm, 1)).empty());
+    }
+
+    CHECK_FALSE(subscription.detachAndClear(*first));
+
+    if (closePending) {
+        CHECK_FALSE(subscription.getAttachmentDiagnostic(*second).has_value());
+    } else {
+        CHECK(subscription.attach(*second) == secondId);
+        secondEndpoint->connect(address(secondSource));
+        CHECK(eventually([&] {
+            return secondCount.load() != 0;
+        }));
+    }
+
+    subscription.close();
+    runtime.closeAndAwaitTermination();
+    CHECK(firstCount.load() == 1);
+    CHECK(secondCount.load() == (closePending ? 0 : 1));
+    CHECK(clearCount.load() == 1);
+}
+
 TEST_CASE("public feed close retains ownership while an application callback blocks") {
     api::ApiRuntime runtime(runtimeOptions());
     auto schema = standardSchema();
