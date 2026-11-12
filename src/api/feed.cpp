@@ -906,6 +906,7 @@ std::u16string exactSymbol(std::string_view symbol, std::size_t maximumUnits) {
 
 /** Accepted desired-state mutation kind; there is no producer command FIFO. */
 enum class SymbolMutation { ADD, REMOVE, REPLACE };
+enum class ChangeDispatch { ENABLED, NO_OBSERVERS };
 
 /** Validate a typed value before copying caller-owned text or publishing any desired state.
  * @param port Detached logical owner with immutable selector bounds.
@@ -967,10 +968,11 @@ void validateSelector(const detail::SubscriptionPort &port, const SubscriptionSe
  * @param inputs Borrowed inputs; each conversion validates before copying its text.
  * @param mutation Complete desired transformation.
  * @param parse Conversion invoked only while caller input is alive.
+ * @param dispatch Whether the caller can synchronously drive runtime-wide observer delivery.
  */
 template <class Input, class Parse>
 void mutateDesired(const std::shared_ptr<detail::SubscriptionPort> &port, std::span<const Input> inputs,
-                   SymbolMutation mutation, Parse parse) {
+                   SymbolMutation mutation, Parse parse, ChangeDispatch dispatch = ChangeDispatch::ENABLED) {
     producerAction([&] {
         std::vector<SubscriptionSelector> parsed;
         parsed.reserve(port->maximumSymbols);
@@ -1028,7 +1030,10 @@ void mutateDesired(const std::shared_ptr<detail::SubscriptionPort> &port, std::s
         }
 
         wake(port->control);
-        detail::dispatchSubscriptionChanges(port->changes);
+
+        if (dispatch == ChangeDispatch::ENABLED) {
+            detail::dispatchSubscriptionChanges(port->changes);
+        }
     });
 }
 
@@ -1048,18 +1053,23 @@ void mutateSymbols(const std::shared_ptr<detail::SubscriptionPort> &port, std::s
  * @param port Detached producer state.
  * @param inputs Borrowed selector batch, including duplicates.
  * @param mutation Complete desired transformation.
+ * @param dispatch Hidden attachments have no change observers and skip runtime-wide dispatch.
  */
 void mutateSelectors(const std::shared_ptr<detail::SubscriptionPort> &port,
-                     std::span<const SubscriptionSelector> inputs, SymbolMutation mutation) {
+                     std::span<const SubscriptionSelector> inputs, SymbolMutation mutation,
+                     ChangeDispatch dispatch = ChangeDispatch::ENABLED) {
     if (inputs.size() > port->maximumSymbols) {
         reject(ErrorCode::RESOURCE_LIMIT, "subscription-selector-arguments");
     }
 
-    mutateDesired(port, inputs, mutation, [&](const SubscriptionSelector &input) {
-        validateSelector(*port, input, mutation);
+    mutateDesired(
+        port, inputs, mutation,
+        [&](const SubscriptionSelector &input) {
+            validateSelector(*port, input, mutation);
 
-        return input;
-    });
+            return input;
+        },
+        dispatch);
 }
 
 /** Convert a bounded unique canonical object set before entering the existing atomic producer path.
@@ -1374,6 +1384,10 @@ template <class Event> void Subscription<Event>::addSelectors(std::span<const Su
 
 template <class Event> void Subscription<Event>::setSelectors(std::span<const SubscriptionSelector> selectors) {
     mutateSelectors(port_, selectors, SymbolMutation::REPLACE);
+}
+
+template <class Event> void Subscription<Event>::setAttachedSelectors(std::span<const SubscriptionSelector> selectors) {
+    mutateSelectors(port_, selectors, SymbolMutation::REPLACE, ChangeDispatch::NO_OBSERVERS);
 }
 
 template <class Event> void Subscription<Event>::removeSelector(const SubscriptionSelector &selector) {
