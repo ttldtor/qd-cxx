@@ -300,6 +300,14 @@ excluded from passive reads and has no live listeners. Deadline, cancellation,
 endpoint shutdown and source replacement settle the request once. Its slot
 stays charged until the private registration has retired.
 
+An endpoint admits up to `RuntimeOptions::maximumSubscriptionsPerEndpoint`
+outstanding snapshot requests, including requests whose private registrations
+are retiring. Private interests also use the endpoint's ordinary registration
+capacity. Requests for the same physical key share wire demand and retain
+independent results and cancellation. Cancelling one leaves the others'
+interest in place. Once a request observes a source epoch, an automatic
+recovery gap cancels it. A fresh request may select a later source epoch.
+
 Results own their events, carry the selected source epoch and use ascending
 signed event index with flags cleared. `TRUNCATED` reports the available
 values when a source snips above the requested lower bound. Set

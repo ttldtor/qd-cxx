@@ -722,14 +722,15 @@ void checkHistorySnapshotFence(const detail::EndpointPort &port, detail::History
 
 /** Close detached waiters before publishing endpoint retirement. */
 void retireHistorySnapshots(detail::EndpointPort &port, std::optional<Diagnostic> failure) noexcept {
-    std::array<std::shared_ptr<detail::HistorySnapshotOperation>, 2> operations;
+    std::shared_ptr<detail::HistorySnapshotOperation> read;
+    std::vector<std::shared_ptr<detail::HistorySnapshotOperation>> requests;
     {
         std::lock_guard lock(port.mutex);
-        operations[0] = std::move(port.historySnapshotRead);
-        operations[1] = std::move(port.historySnapshotRequest);
+        read = std::move(port.historySnapshotRead);
+        requests.swap(port.historySnapshotRequests);
     }
 
-    for (const auto &operation : operations) {
+    const auto retire = [&](const std::shared_ptr<detail::HistorySnapshotOperation> &operation) {
         if (operation) {
             std::lock_guard lock(operation->mutex);
             static_cast<void>(expireHistorySnapshot(*operation));
@@ -737,7 +738,11 @@ void retireHistorySnapshots(detail::EndpointPort &port, std::optional<Diagnostic
                                   failure.value_or(Diagnostic{ErrorCode::CLOSED, "history-snapshot-closed"}));
             operation->demand.reset();
         }
-    }
+    };
+    retire(read);
+
+    for (const auto &request : requests)
+        retire(request);
 }
 
 /** Retire all producer snapshots after the endpoint's native/receiver owners are gone.
@@ -3346,7 +3351,8 @@ CapturedHistorySnapshot captureIndexedSnapshot(NativeEndpoint &endpoint, const H
     auto work = endpoint.profile.historyObservationWork;
 
     for (const auto &registration : endpoint.subscriptions) {
-        if (!registration || registration->stopping || !registration->hasSubmitted || !registration->observationPlan)
+        if (!registration || registration->stopping || !registration->hasSubmitted || !registration->observationPlan ||
+            (registration->port->snapshotDemand && registration->port != operation.demand))
             continue;
 
         std::uint64_t revision;
@@ -3444,10 +3450,16 @@ retireHistorySnapshot(EndpointPort &port, const std::shared_ptr<HistorySnapshotO
 
     operation->demand.reset();
     std::lock_guard lock(port.mutex);
-    auto &slot = operation->passive ? port.historySnapshotRead : port.historySnapshotRequest;
 
-    if (slot == operation)
-        slot.reset();
+    if (operation->passive) {
+        if (port.historySnapshotRead == operation)
+            port.historySnapshotRead.reset();
+    } else {
+        const auto slot = std::ranges::find(port.historySnapshotRequests, operation);
+
+        if (slot != port.historySnapshotRequests.end())
+            slot->reset();
+    }
 
     return std::chrono::steady_clock::time_point::max();
 }
@@ -3458,15 +3470,30 @@ std::chrono::steady_clock::time_point serviceHistorySnapshot(EndpointPort &port,
                                                              const std::shared_ptr<HistorySnapshotOperation> &operation,
                                                              OpenDemand openDemand) noexcept {
     std::optional<std::uint64_t> sourceEpoch;
+    bool sourceGap = false;
 
-    if (endpoint && endpoint->recovery->status().phase == transport::RecoveryPhase::ACTIVE)
-        sourceEpoch = endpoint->recovery->statistics().sourceEpoch;
+    if (endpoint && endpoint->recovery) {
+        const auto status = endpoint->recovery->status();
+        using transport::RecoveryPhase;
+        sourceGap = status.sourceResetPending || status.phase == RecoveryPhase::RETIRING ||
+                    status.phase == RecoveryPhase::RESETTING || status.phase == RecoveryPhase::BACKOFF;
+
+        if (!sourceGap && status.phase == RecoveryPhase::ACTIVE) {
+            const auto connection = endpoint->recovery->statistics();
+
+            if (connection.activeConnections)
+                sourceEpoch = connection.sourceEpoch;
+        }
+    }
 
     bool done;
     {
         std::lock_guard endpointLock(port.mutex);
         std::lock_guard operationLock(operation->mutex);
         checkHistorySnapshotFence(port, *operation);
+
+        if (!operation->done && operation->sourceEpoch && sourceGap)
+            finishHistorySnapshot(*operation, {ErrorCode::REQUEST_CANCELLED, "history-snapshot-source-gap"});
 
         if (!operation->done && sourceEpoch && port.connectionIntent &&
             port.activeDeliveryRevision == port.connectionRevision && port.clearRevision == port.clearedRevision) {
@@ -4326,14 +4353,14 @@ void RuntimeImpl::run() noexcept {
                 std::shared_ptr<LatestEventRead> latestRead;
                 std::shared_ptr<LatestEventRequestState> latestRequest;
                 std::shared_ptr<HistorySnapshotOperation> historyRead;
-                std::shared_ptr<HistorySnapshotOperation> historyRequest;
+                std::size_t historyRequestSlots;
                 {
                     std::lock_guard lock(port->mutex);
                     connectRequested = port->connectRequested && port->connectionIntent;
                     latestRead = port->latestRead;
                     latestRequest = port->latestEventRequest;
                     historyRead = port->historySnapshotRead;
-                    historyRequest = port->historySnapshotRequest;
+                    historyRequestSlots = port->historySnapshotRequests.size();
                 }
 
                 if (latestRead)
@@ -4354,7 +4381,16 @@ void RuntimeImpl::run() noexcept {
                                         }));
                 }
 
-                if (historyRequest) {
+                for (std::size_t slot = 0; slot < historyRequestSlots; ++slot) {
+                    std::shared_ptr<HistorySnapshotOperation> historyRequest;
+                    {
+                        std::lock_guard lock(port->mutex);
+                        historyRequest = port->historySnapshotRequests[slot];
+                    }
+
+                    if (!historyRequest)
+                        continue;
+
                     const auto historyWake = serviceHistorySnapshot(*port, native[index].get(), historyRequest, [&] {
                         const auto &request = *historyRequest;
                         const events::IndexedEventSource source(request.sourceId, std::nullopt);
@@ -4738,7 +4774,11 @@ Feed::startIndexedSnapshot(EventType type, std::u16string_view symbol, std::int3
             if (port_->state == EndpointState::FAILED && port_->diagnostic.code != ErrorCode::NONE)
                 throw Error(port_->diagnostic);
 
-            if (port_->historySnapshotRequest)
+            const auto slot = std::ranges::find_if(port_->historySnapshotRequests, [](const auto &request) {
+                return !request;
+            });
+
+            if (slot == port_->historySnapshotRequests.end())
                 reject(ErrorCode::RESOURCE_LIMIT, "history-snapshot-request-busy");
 
             if (expireHistorySnapshot(*operation))
@@ -4748,7 +4788,7 @@ Feed::startIndexedSnapshot(EventType type, std::u16string_view symbol, std::int3
             operation->clearRevision = port_->clearRevision;
             operation->boundToConnection = port_->connectionIntent;
             control->runtime->startWorker();
-            port_->historySnapshotRequest = operation;
+            *slot = operation;
             ++control->wakeSequence;
         }
 
@@ -5035,6 +5075,10 @@ std::shared_ptr<Endpoint> ApiRuntime::createEndpoint(const EndpointConfiguration
         port->requestedAggregationPeriod = options.requestedAggregationPeriod;
         port->stateListeners = makeStateListeners(port, impl_->options.maximumStateListenersPerEndpoint);
         port->subscriptions.resize(impl_->options.maximumSubscriptionsPerEndpoint);
+
+        if (options.contract == DeliveryContract::HISTORY)
+            port->historySnapshotRequests.resize(impl_->options.maximumSubscriptionsPerEndpoint);
+
         port->stateChanges.resize(impl_->options.maximumPendingStateChangesPerEndpoint);
         auto endpoint = std::shared_ptr<Endpoint>(new Endpoint(port));
         {

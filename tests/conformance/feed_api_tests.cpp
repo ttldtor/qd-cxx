@@ -5205,6 +5205,189 @@ TEST_CASE("indexed HISTORY snapshot never completes across a source replacement"
     CHECK_FALSE(source.failed());
 }
 
+TEST_CASE("concurrent HISTORY snapshots share wire demand and isolate terminal outcomes") {
+    bool cancelFirst = false;
+    SUBCASE("cancellation leaves a sibling waiting for the same snapshot") {
+        cancelFirst = true;
+    }
+    SUBCASE("one result limit does not settle the sibling") {
+    }
+    namespace flags = events::indexed_event_flags;
+    auto [schema, fields] = history_test::orderInput();
+    const auto &lookups = schema.records().front().lookups;
+    const auto index = std::ranges::find_if(lookups, [](const auto &lookup) {
+        return lookup.name == u"Index";
+    });
+    REQUIRE(index != lookups.end());
+    auto newer = fields;
+    newer[index->fieldId].raw = 17;
+    fields[index->fieldId].raw = 11;
+    const std::array rows{peer::Record{u"IBM", std::move(newer), flags::SNAPSHOT_BEGIN},
+                          peer::Record{u"IBM", std::move(fields)},
+                          peer::Record{u"IBM", {}, flags::SNAPSHOT_END | flags::REMOVE_EVENT, 0}};
+    auto limits = runtimeOptions();
+    limits.maximumSubscriptionsPerEndpoint = 2;
+    api::ApiRuntime runtime(limits);
+    auto wire = script(core::SubscriptionFamily::HISTORY, true);
+    wire.historyBound = 0;
+    wire.afterRemove = std::vector<peer::Record>{};
+    const std::array<std::u16string, 1> symbols{u"IBM"};
+    peer::Peer source(schema, rows, symbols, 8192, peer::PeerMode::HOLD, wire);
+    auto endpoint = runtime.createEndpoint(endpointOptions(api::DeliveryContract::HISTORY));
+    auto feed = endpoint->getFeed();
+    const auto sourceId = events::OrderSource::DEFAULT.indexedSource();
+    const auto deadline = std::chrono::steady_clock::now() + 5s;
+    auto first = feed->requestIndexedEvents<events::Order>(u"IBM", sourceId, deadline, {1});
+    auto second = feed->requestIndexedEvents<events::Order>(u"IBM", sourceId, deadline, {2});
+    CHECK(errorCode([&] {
+              static_cast<void>(feed->requestIndexedEvents<events::Order>(u"IBM", sourceId, deadline));
+          }) == api::ErrorCode::RESOURCE_LIMIT);
+    endpoint->connect(address(source));
+    REQUIRE(eventually([&] {
+        return source.adds() == 1;
+    }));
+    CHECK(feed->getIndexedEventsIfSubscribed<events::Order>(u"IBM", sourceId).state ==
+          api::HistorySnapshotState::NOT_SUBSCRIBED);
+
+    if (cancelFirst) {
+        CHECK(first.cancel());
+        CHECK_FALSE(first.cancel());
+        CHECK(errorCode([&] {
+                  static_cast<void>(first.get());
+              }) == api::ErrorCode::REQUEST_CANCELLED);
+        CHECK_FALSE(second.isDone());
+        CHECK(source.removes() == 0);
+    }
+
+    source.releaseData();
+    const auto completed = second.get();
+    CHECK(completed.state == api::HistorySnapshotState::COMPLETE);
+    REQUIRE(completed.events.size() == 2);
+    CHECK(completed.events[0].getIndex() == 11);
+    CHECK(completed.events[1].getIndex() == 17);
+    CHECK_FALSE(second.cancel());
+
+    if (!cancelFirst)
+        CHECK(errorCode([&] {
+                  static_cast<void>(first.get());
+              }) == api::ErrorCode::RESOURCE_LIMIT);
+
+    CHECK(eventually([&] {
+        return source.removes() == 1;
+    }));
+    CHECK(source.adds() == 1);
+    CHECK(eventually([&] {
+        return errorCode([&] {
+                   const auto expired =
+                       feed->requestIndexedEvents<events::Order>(u"IBM", sourceId, std::chrono::steady_clock::now());
+                   static_cast<void>(expired.get());
+               }) == api::ErrorCode::REQUEST_TIMED_OUT;
+    }));
+    static_cast<void>(endpoint->closeAndAwaitTermination());
+    CHECK_FALSE(source.failed());
+}
+
+TEST_CASE("concurrent HISTORY snapshots fence an unfinished transaction during automatic recovery") {
+    namespace flags = events::indexed_event_flags;
+    auto [schema, oldFields] = history_test::orderInput();
+    const auto &lookups = schema.records().front().lookups;
+    const auto index = std::ranges::find_if(lookups, [](const auto &lookup) {
+        return lookup.name == u"Index";
+    });
+    REQUIRE(index != lookups.end());
+    auto freshFields = oldFields;
+    oldFields[index->fieldId].raw = 7;
+    freshFields[index->fieldId].raw = 23;
+    const std::array oldRows{peer::Record{u"IBM", std::move(oldFields), flags::SNAPSHOT_BEGIN | flags::TX_PENDING}};
+    const std::array newRows{peer::Record{u"MSFT", std::move(freshFields), flags::SNAPSHOT_BEGIN},
+                             peer::Record{u"MSFT", {}, flags::SNAPSHOT_END | flags::REMOVE_EVENT, 0}};
+    root::test::TcpPeerConfig wire;
+    wire.sessions.resize(2);
+
+    for (auto &session : wire.sessions) {
+        session.initialBytes = peer::fixturePeerPrefix(schema, core::SubscriptionFamily::HISTORY);
+        session.readThroughMessage = std::to_underlying(root::protocol::SubscriptionMessage::HISTORY_ADD);
+    }
+
+    wire.sessions[0].replyBytes = peer::fixturePeerData(oldRows, core::SubscriptionFamily::HISTORY, true);
+    wire.sessions[0].waitForControllerClose = true;
+    wire.sessions[1].replyBytes = peer::fixturePeerData(newRows, core::SubscriptionFamily::HISTORY, true);
+    wire.sessions[1].waitForClientClose = true;
+    api::ApiRuntime runtime(runtimeOptions());
+    root::test::OwnedTcpPeer source(std::move(wire));
+    REQUIRE(source.port() != 0);
+    auto options = endpointOptions(api::DeliveryContract::HISTORY);
+    options.maximumAttempts = 2;
+    options.retryDelay = 1ms;
+    auto endpoint = runtime.createEndpoint(options);
+    auto feed = endpoint->getFeed();
+    const auto sourceId = events::OrderSource::DEFAULT.indexedSource();
+    auto old = feed->requestIndexedEvents<events::Order>(u"IBM", sourceId, std::chrono::steady_clock::now() + 5s);
+    endpoint->connect("127.0.0.1:" + std::to_string(source.port()));
+    REQUIRE(eventually([&] {
+        return endpoint->getStatistics().connection.readDataRecords.value == 1;
+    }));
+    const auto oldEpoch = endpoint->getStatistics().connection.sourceEpoch;
+    REQUIRE(oldEpoch.has_value());
+    CHECK_FALSE(old.isDone());
+    source.allowClose(0);
+    try {
+        static_cast<void>(old.get());
+        FAIL_CHECK("a request bound to the lost source must fail");
+    } catch (const api::Error &error) {
+        CHECK(error.diagnostic().code == api::ErrorCode::REQUEST_CANCELLED);
+        CHECK(error.diagnostic().stage == "history-snapshot-source-gap");
+    }
+
+    auto fresh = feed->requestIndexedEvents<events::Order>(u"MSFT", sourceId, std::chrono::steady_clock::now() + 5s);
+    const auto snapshot = fresh.get();
+    CHECK(snapshot.state == api::HistorySnapshotState::COMPLETE);
+    REQUIRE(snapshot.sourceEpoch.has_value());
+    CHECK(*snapshot.sourceEpoch > *oldEpoch);
+    REQUIRE(snapshot.events.size() == 1);
+    CHECK(snapshot.events.front().getIndex() == 23);
+    CHECK(snapshot.events.front().symbol == u"MSFT");
+    CHECK(errorCode([&] {
+              static_cast<void>(old.get());
+          }) == api::ErrorCode::REQUEST_CANCELLED);
+    static_cast<void>(endpoint->closeAndAwaitTermination());
+    const auto observed = source.snapshot();
+    REQUIRE(observed.error == root::test::TcpPeerError::NONE);
+    REQUIRE(observed.sessions.size() == 2);
+    REQUIRE(observed.sessions[1].matched);
+
+    root::protocol::FrameReader frames({8192, 8201});
+    std::span<const std::byte> bytes(observed.sessions[1].received);
+    std::size_t adds = 0;
+
+    while (!bytes.empty()) {
+        const auto frame = frames.feed(bytes);
+        REQUIRE(frame.status != root::protocol::FrameStatus::FAILED);
+        REQUIRE(frame.accepted != 0);
+        bytes = bytes.subspan(frame.accepted);
+
+        if (!frame.frame || frame.frame->type != std::to_underlying(root::protocol::SubscriptionMessage::HISTORY_ADD))
+            continue;
+
+        root::encoding::SymbolReader reader({8192, 128, 128}, 0);
+        const auto symbol = reader.read(frame.frame->payload);
+        REQUIRE(symbol.status == root::encoding::SymbolStatus::OK);
+        CHECK(symbol.value->units == u"MSFT");
+        auto payload = std::span(frame.frame->payload).subspan(symbol.consumed);
+        const auto record = root::encoding::readCompactInt(payload);
+        REQUIRE(record.status == root::encoding::Status::OK);
+        CHECK(record.value == 0);
+        payload = payload.subspan(record.consumed);
+        const auto bound = root::encoding::readCompactLong(payload);
+        REQUIRE(bound.status == root::encoding::Status::OK);
+        CHECK(bound.value == 0);
+        CHECK(payload.subspan(bound.consumed).empty());
+        ++adds;
+    }
+
+    CHECK(adds == 1);
+}
+
 TEST_CASE("HISTORY early obsolete onBatch requests replay before any Invocation or BEGIN exists") {
     auto [schema, fields] = history_test::orderInput();
     api::ApiRuntime runtime(runtimeOptions());

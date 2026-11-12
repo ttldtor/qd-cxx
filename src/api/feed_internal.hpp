@@ -323,8 +323,9 @@ struct EndpointPort {
     std::vector<std::shared_ptr<SubscriptionPort>> subscriptions; ///< Fixed slots, including retiring registrations.
     std::shared_ptr<LatestEventRead> latestRead; ///< One pending/executing owner observation, protected by mutex.
     std::shared_ptr<LatestEventRequestState> latestEventRequest; ///< One charged one-event request, protected by mutex.
-    std::shared_ptr<HistorySnapshotOperation> historySnapshotRead;    ///< One passive observation, protected by mutex.
-    std::shared_ptr<HistorySnapshotOperation> historySnapshotRequest; ///< One request including native retirement.
+    std::shared_ptr<HistorySnapshotOperation> historySnapshotRead; ///< One passive observation, protected by mutex.
+    std::vector<std::shared_ptr<HistorySnapshotOperation>>
+        historySnapshotRequests;   ///< Fixed active request slots, including native retirement.
     StateListeners stateListeners; ///< Opt-in advisory lifecycle observations, retired after all subscriptions.
     std::vector<EndpointStateChange> stateChanges; ///< Fixed ring; selection lease remains charged through release.
     std::size_t stateChangeHead = 0;     ///< Oldest pending/executing entry, reused only after its lease release.
