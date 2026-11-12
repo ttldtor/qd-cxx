@@ -16,6 +16,7 @@
 #include "subscription_desired.hpp"
 #include "subscription_observer.hpp"
 #include "system_dns.hpp"
+#include "tape_file_source.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -305,6 +306,10 @@ void requestConnectionChange(const std::shared_ptr<detail::EndpointPort> &port, 
 
             if (port->closeRequested.load(std::memory_order_acquire)) {
                 reject(ErrorCode::CLOSED, "endpoint-closed");
+            }
+
+            if (port->tape) {
+                reject(ErrorCode::UNSUPPORTED_PROFILE, "tape-connection-control");
             }
 
             if (port->connectionRevision == std::numeric_limits<std::uint64_t>::max() ||
@@ -604,6 +609,9 @@ void retireLatestRead(detail::EndpointPort &port) noexcept {
     }
 }
 
+constexpr Diagnostic TAPE_LATEST_REQUEST_REFUSAL{ErrorCode::UNSUPPORTED_PROFILE, "latest-event-request-tape"};
+constexpr Diagnostic TAPE_HISTORY_SNAPSHOT_REFUSAL{ErrorCode::UNSUPPORTED_PROFILE, "history-snapshot-tape"};
+
 /** Publish exactly one terminal outcome while holding the request mutex. */
 bool finishLatestRequest(detail::LatestEventRequestState &request, Diagnostic failure,
                          std::optional<RegisteredEvent> result = std::nullopt) noexcept {
@@ -644,26 +652,34 @@ bool advanceLatestRequestEpoch(const detail::EndpointPort &port, detail::LatestE
 
 /** Complete an outstanding request before publishing endpoint retirement. */
 void retireLatestRequest(detail::EndpointPort &port, std::optional<Diagnostic> sourceFailure) noexcept {
-    std::shared_ptr<detail::LatestEventRequestState> request;
+    std::shared_ptr<detail::LatestEventRequestBatch> batch;
     {
         std::lock_guard endpointLock(port.mutex);
-        request = std::move(port.latestEventRequest);
+        batch = std::move(port.latestEventRequest);
 
-        if (!request)
+        if (!batch)
             return;
 
-        std::lock_guard requestLock(request->mutex);
         auto failure = sourceFailure.value_or(Diagnostic{ErrorCode::CLOSED, "latest-event-request-closed"});
 
-        if (!advanceLatestRequestEpoch(port, *request))
-            failure = {ErrorCode::REQUEST_CANCELLED, "latest-event-request-source-change"};
+        if (port.tape)
+            failure = TAPE_LATEST_REQUEST_REFUSAL;
         else if ((sourceFailure || port.state == EndpointState::FAILED) && port.diagnostic.code != ErrorCode::NONE)
             failure = port.diagnostic;
 
-        static_cast<void>(expireLatestRequest(*request));
-        static_cast<void>(finishLatestRequest(*request, failure));
+        for (const auto &request : batch->requests) {
+            std::lock_guard requestLock(request->mutex);
+
+            if (request->done || expireLatestRequest(*request))
+                continue;
+
+            const bool sameSource = port.tape || advanceLatestRequestEpoch(port, *request);
+            const auto current =
+                sameSource ? failure : Diagnostic{ErrorCode::REQUEST_CANCELLED, "latest-event-request-source-change"};
+            static_cast<void>(finishLatestRequest(*request, current));
+        }
     }
-    request->demand.reset();
+    batch->demand.reset();
 }
 
 /** Publish one terminal snapshot outcome under the operation's completion mutex. */
@@ -1071,6 +1087,7 @@ std::u16string exactSymbol(std::string_view symbol, std::size_t maximumUnits) {
 
 /** Accepted desired-state mutation kind; there is no producer command FIFO. */
 enum class SymbolMutation { ADD, REMOVE, REPLACE };
+enum class ChangeDispatch { ENABLED, NO_OBSERVERS };
 
 /** Validate a typed value before copying caller-owned text or publishing any desired state.
  * @param port Detached logical owner with immutable selector bounds.
@@ -1132,10 +1149,11 @@ void validateSelector(const detail::SubscriptionPort &port, const SubscriptionSe
  * @param inputs Borrowed inputs; each conversion validates before copying its text.
  * @param mutation Complete desired transformation.
  * @param parse Conversion invoked only while caller input is alive.
+ * @param dispatch Whether the caller can synchronously drive runtime-wide observer delivery.
  */
 template <class Input, class Parse>
 void mutateDesired(const std::shared_ptr<detail::SubscriptionPort> &port, std::span<const Input> inputs,
-                   SymbolMutation mutation, Parse parse) {
+                   SymbolMutation mutation, Parse parse, ChangeDispatch dispatch = ChangeDispatch::ENABLED) {
     producerAction([&] {
         std::vector<SubscriptionSelector> parsed;
         parsed.reserve(port->maximumSymbols);
@@ -1193,7 +1211,10 @@ void mutateDesired(const std::shared_ptr<detail::SubscriptionPort> &port, std::s
         }
 
         wake(port->control);
-        detail::dispatchSubscriptionChanges(port->changes);
+
+        if (dispatch == ChangeDispatch::ENABLED) {
+            detail::dispatchSubscriptionChanges(port->changes);
+        }
     });
 }
 
@@ -1213,18 +1234,23 @@ void mutateSymbols(const std::shared_ptr<detail::SubscriptionPort> &port, std::s
  * @param port Detached producer state.
  * @param inputs Borrowed selector batch, including duplicates.
  * @param mutation Complete desired transformation.
+ * @param dispatch Hidden attachments have no change observers and skip runtime-wide dispatch.
  */
 void mutateSelectors(const std::shared_ptr<detail::SubscriptionPort> &port,
-                     std::span<const SubscriptionSelector> inputs, SymbolMutation mutation) {
+                     std::span<const SubscriptionSelector> inputs, SymbolMutation mutation,
+                     ChangeDispatch dispatch = ChangeDispatch::ENABLED) {
     if (inputs.size() > port->maximumSymbols) {
         reject(ErrorCode::RESOURCE_LIMIT, "subscription-selector-arguments");
     }
 
-    mutateDesired(port, inputs, mutation, [&](const SubscriptionSelector &input) {
-        validateSelector(*port, input, mutation);
+    mutateDesired(
+        port, inputs, mutation,
+        [&](const SubscriptionSelector &input) {
+            validateSelector(*port, input, mutation);
 
-        return input;
-    });
+            return input;
+        },
+        dispatch);
 }
 
 /** Convert a bounded unique canonical object set before entering the existing atomic producer path.
@@ -1541,6 +1567,10 @@ template <class Event> void Subscription<Event>::setSelectors(std::span<const Su
     mutateSelectors(port_, selectors, SymbolMutation::REPLACE);
 }
 
+template <class Event> void Subscription<Event>::setAttachedSelectors(std::span<const SubscriptionSelector> selectors) {
+    mutateSelectors(port_, selectors, SymbolMutation::REPLACE, ChangeDispatch::NO_OBSERVERS);
+}
+
 template <class Event> void Subscription<Event>::removeSelector(const SubscriptionSelector &selector) {
     mutateSelectors(port_, std::span(&selector, 1), SymbolMutation::REMOVE);
 }
@@ -1642,6 +1672,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
         bool timeAndSale = false;
         bool optionSale = false;
         bool nuamTrade = false;
+        bool nuamTimeAndSale = false;
 
         for (const auto type : types) {
             switch (type) {
@@ -1708,6 +1739,9 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             case EventType::OPTION_SALE:
                 optionSale = true;
                 break;
+            case EventType::NUAM_TIME_AND_SALE:
+                nuamTimeAndSale = true;
+                break;
             case EventType::NUAM_TRADE:
                 nuamTrade = true;
                 break;
@@ -1726,7 +1760,8 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             (spreadOrder ? 1U << 11 : 0U) | (analyticOrder ? 1U << 12 : 0U) | (otcMarketsOrder ? 1U << 13 : 0U) |
             (orderImbalance ? 1U << 14 : 0U) | (series ? 1U << 15 : 0U) | (greeks ? 1U << 16 : 0U) |
             (underlying ? 1U << 17 : 0U) | (theoPrice ? 1U << 18 : 0U) | (candle ? 1U << 19 : 0U) |
-            (timeAndSale ? 1U << 20 : 0U) | (optionSale ? 1U << 21 : 0U) | (nuamTrade ? 1U << 22 : 0U));
+            (timeAndSale ? 1U << 20 : 0U) | (optionSale ? 1U << 21 : 0U) | (nuamTrade ? 1U << 22 : 0U) |
+            (nuamTimeAndSale ? 1U << 23 : 0U));
         const auto delivery = registeredDelivery  ? detail::EventDelivery::REGISTERED
                               : quote             ? detail::EventDelivery::QUOTE
                               : profile           ? detail::EventDelivery::PROFILE
@@ -1748,6 +1783,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                               : candle            ? detail::EventDelivery::CANDLE
                               : timeAndSale       ? detail::EventDelivery::TIME_AND_SALE
                               : optionSale        ? detail::EventDelivery::OPTION_SALE
+                              : nuamTimeAndSale   ? detail::EventDelivery::NUAM_TIME_AND_SALE
                               : nuamTrade         ? detail::EventDelivery::NUAM_TRADE
                               : order             ? detail::EventDelivery::ORDER
                                                   : detail::EventDelivery::CONFIGURATION;
@@ -1812,6 +1848,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                                           static_cast<unsigned>(detail::EventSelection::THEO_PRICE) |
                                           static_cast<unsigned>(detail::EventSelection::CANDLE) |
                                           static_cast<unsigned>(detail::EventSelection::TIME_AND_SALE) |
+                                          static_cast<unsigned>(detail::EventSelection::NUAM_TIME_AND_SALE) |
                                           static_cast<unsigned>(detail::EventSelection::OPTION_SALE);
 
             if (port_->options.contract == DeliveryContract::HISTORY &&
@@ -1880,6 +1917,8 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             bool registeredTimeAndSale = !port_->options.eventRegistry;
             bool registeredOptionSale = registeredMarketMaker;
             bool registeredNuamTrade = !port_->options.eventRegistry;
+            bool registeredNuamTimeAndSale =
+                !port_->options.eventRegistry && port_->options.contract != DeliveryContract::TICKER;
             bool registeredOrderImbalance =
                 !port_->options.eventRegistry && port_->options.contract == DeliveryContract::TICKER;
 
@@ -1903,6 +1942,8 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                     registeredTimeAndSale = registeredTimeAndSale || registration.type == EventType::TIME_AND_SALE;
                     registeredOptionSale = registeredOptionSale || registration.type == EventType::OPTION_SALE;
                     registeredNuamTrade = registeredNuamTrade || registration.type == EventType::NUAM_TRADE;
+                    registeredNuamTimeAndSale =
+                        registeredNuamTimeAndSale || registration.type == EventType::NUAM_TIME_AND_SALE;
                     registeredMessage = registeredMessage || registration.type == EventType::MESSAGE;
                     registeredConfiguration = registeredConfiguration || registration.type == EventType::CONFIGURATION;
                     registeredOrder = registeredOrder || registration.type == EventType::ORDER;
@@ -1929,7 +1970,8 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                 (orderImbalance && !registeredOrderImbalance) || (series && !registeredSeries) ||
                 (greeks && !registeredGreeks) || (underlying && !registeredUnderlying) ||
                 (theoPrice && !registeredTheoPrice) || (timeAndSale && !registeredTimeAndSale) ||
-                (optionSale && !registeredOptionSale) || (nuamTrade && !registeredNuamTrade)) {
+                (optionSale && !registeredOptionSale) || (nuamTrade && !registeredNuamTrade) ||
+                (nuamTimeAndSale && !registeredNuamTimeAndSale)) {
                 reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-unregistered-event");
             }
 
@@ -2085,6 +2127,7 @@ template class Subscription<events::Underlying>;
 template class Subscription<events::TheoPrice>;
 template class Subscription<events::Candle>;
 template class Subscription<events::TimeAndSale>;
+template class Subscription<events::NuamTimeAndSale>;
 template class Subscription<events::OptionSale>;
 template class Subscription<RegisteredEvent>;
 
@@ -2223,6 +2266,154 @@ void Endpoint::connect(std::string_view address) {
     });
 }
 
+void Endpoint::connectTape(const std::filesystem::path &path, TapeSourceOptions options) {
+    producerAction([&] {
+        constexpr std::size_t MAXIMUM_PATH_UNITS = 4096;
+        const auto &native = path.native();
+
+        if (native.empty() || native.size() > MAXIMUM_PATH_UNITS || options.maximumFileBytes == 0 ||
+            options.maximumFrames == 0 || !detail::validTapePlayback(options) ||
+            std::ranges::find(native, std::filesystem::path::value_type{}) != native.end()) {
+            reject(ErrorCode::INVALID_ARGUMENT, "tape-source-options");
+        }
+
+        detail::TapeSourceRequest request{path, options};
+        const auto control = port_->control.lock();
+
+        if (!control) {
+            reject(ErrorCode::CLOSED, "runtime-closed");
+        }
+
+        {
+            std::lock_guard gate(control->mutex);
+
+            if (!control->runtime || control->stopping) {
+                reject(ErrorCode::CLOSED, "runtime-closed");
+            }
+
+            std::lock_guard lock(port_->mutex);
+
+            if (port_->connectRequested || port_->closeRequested.load(std::memory_order_acquire) ||
+                port_->retired.load(std::memory_order_acquire)) {
+                reject(ErrorCode::INVALID_STATE, "tape-source-fixed");
+            }
+
+            if (port_->connectionRevision == std::numeric_limits<std::uint64_t>::max() ||
+                port_->stateChangeCount == port_->stateChanges.size()) {
+                reject(ErrorCode::RESOURCE_LIMIT, "endpoint-control-admission");
+            }
+
+            control->runtime->startWorker();
+            port_->tape.emplace(std::move(request));
+            port_->tapePaused = options.initiallyPaused;
+
+            if (const auto &latest = port_->latestEventRequest) {
+                for (const auto &child : latest->requests) {
+                    std::lock_guard requestLock(child->mutex);
+                    static_cast<void>(expireLatestRequest(*child));
+                    static_cast<void>(finishLatestRequest(*child, TAPE_LATEST_REQUEST_REFUSAL));
+                }
+            }
+
+            for (const auto &snapshot : port_->historySnapshotRequests) {
+                if (!snapshot)
+                    continue;
+
+                std::lock_guard requestLock(snapshot->mutex);
+                static_cast<void>(expireHistorySnapshot(*snapshot));
+                static_cast<void>(finishHistorySnapshot(*snapshot, TAPE_HISTORY_SNAPSHOT_REFUSAL));
+            }
+
+            port_->connectRequested = true;
+            port_->connectionIntent = true;
+            ++port_->connectionRevision;
+            auto &connection = port_->statistics.connection;
+
+            for (auto *counter :
+                 {&connection.readBytes, &connection.writtenBytes, &connection.readMessages,
+                  &connection.writtenMessages, &connection.readDataRecords, &connection.writtenSubscriptionRecords,
+                  &connection.connectionAttempts, &connection.establishedConnections, &connection.closedConnections}) {
+                counter->availability = core::StatisticAvailability::UNSUPPORTED;
+            }
+
+            queueStateChange(*port_, EndpointState::CONNECTING);
+            ++control->wakeSequence;
+        }
+        port_->stateCondition.notify_all();
+        control->condition.notify_one();
+    });
+}
+
+void Endpoint::setTapePaused(bool paused) {
+    {
+        std::lock_guard lock(port_->mutex);
+
+        if (!port_->tape || port_->closeRequested.load(std::memory_order_acquire) ||
+            port_->retired.load(std::memory_order_acquire)) {
+            reject(ErrorCode::INVALID_STATE, "tape-pause-source");
+        }
+
+        if (port_->tapePaused == paused) {
+            return;
+        }
+
+        port_->tapePaused = paused;
+    }
+
+    wake(port_->control);
+}
+
+void Endpoint::restartTape() {
+    {
+        std::lock_guard lock(port_->mutex);
+
+        if (!port_->tape || port_->closeRequested.load(std::memory_order_acquire) ||
+            port_->retired.load(std::memory_order_acquire)) {
+            reject(ErrorCode::INVALID_STATE, "tape-restart-source");
+        }
+
+        if (port_->clearRevision > port_->clearedRevision) {
+            return;
+        }
+
+        if (port_->state != EndpointState::CONNECTED) {
+            reject(ErrorCode::INVALID_STATE, "tape-restart-source");
+        }
+
+        if (port_->connectionRevision == std::numeric_limits<std::uint64_t>::max() ||
+            port_->stateChangeCount == port_->stateChanges.size()) {
+            reject(ErrorCode::RESOURCE_LIMIT, "endpoint-control-admission");
+        }
+
+        ++port_->connectionRevision;
+        port_->clearRevision = port_->connectionRevision;
+        port_->tapeRestartDeadline = std::chrono::steady_clock::now() + port_->options.drainTimeout;
+        queueStateChange(*port_, EndpointState::CONNECTING);
+    }
+
+    port_->stateCondition.notify_all();
+    wake(port_->control);
+}
+
+void Endpoint::stopTape(TapeStopMode mode) {
+    if (mode != TapeStopMode::DRAIN && mode != TapeStopMode::ABORT) {
+        reject(ErrorCode::INVALID_ARGUMENT, "tape-stop-mode");
+    }
+
+    {
+        std::lock_guard lock(port_->mutex);
+
+        if (!port_->tape || port_->state == EndpointState::CLOSED || port_->state == EndpointState::FAILED) {
+            reject(ErrorCode::INVALID_STATE, "tape-stop-source");
+        }
+
+        port_->tapeAbortRequested = port_->tapeAbortRequested || mode == TapeStopMode::ABORT;
+        requestEndpointClose(port_);
+    }
+
+    wake(port_->control);
+}
+
 std::optional<std::chrono::milliseconds> Endpoint::getRequestedAggregationPeriod() const noexcept {
     std::lock_guard lock(port_->mutex);
 
@@ -2285,7 +2476,7 @@ EndpointConfigurationSnapshot Endpoint::getEffectiveConfiguration() const {
         auto snapshot = port_->configuration->snapshot();
         std::lock_guard lock(port_->mutex);
 
-        if (port_->connectRequested) {
+        if (port_->connectRequested && !port_->tape) {
             snapshot.acceptedAddress = port_->address;
         }
 
@@ -2709,7 +2900,8 @@ class TypedConsumer final : public client::SubscriptionConsumer {
             const bool retainedCache =
                 !endpoint->connectionIntent && endpoint->pausedReplayFence == endpoint->connectionRevision;
 
-            if ((!currentSource && !retainedCache) || endpoint->clearRevision > endpoint->clearedRevision) {
+            if ((!currentSource && !retainedCache) || endpoint->clearRevision > endpoint->clearedRevision ||
+                endpoint->tapeAbortRequested) {
                 endpoint->terminal.hadGap = endpoint->terminal.hadGap || !batch.records().empty();
 
                 // Consume an obsolete offer without permanently pausing this still-live stable registration.
@@ -2800,6 +2992,8 @@ class TypedConsumer final : public client::SubscriptionConsumer {
                 return deliver<events::TheoPrice>(batch, listeners, executor, completion, historyRevision);
             case EventDelivery::CANDLE:
                 return deliver<events::Candle>(batch, listeners, executor, completion, historyRevision);
+            case EventDelivery::NUAM_TIME_AND_SALE:
+                return deliver<events::NuamTimeAndSale>(batch, listeners, executor, completion, historyRevision);
             case EventDelivery::TIME_AND_SALE:
                 return deliver<events::TimeAndSale>(batch, listeners, executor, completion, historyRevision);
             case EventDelivery::OPTION_SALE:
@@ -2849,11 +3043,30 @@ struct NativeSubscription {
     bool stopping = false;               ///< A reserved registration cutoff was already forwarded.
 };
 
+/** One real local source, without a recovery factory or wire subscription composer. */
+struct NativeTape {
+    std::optional<TapeFileSource> source;       ///< Worker-local parser/file, empty across a source reset.
+    mux::MuxQueue queue;                        ///< Ordinary typed subscription/collector owner.
+    std::optional<protocol::LiveEvent> pending; ///< Complete event retained until actual queue acceptance.
+    bool inputEnded = false;                    ///< EOF or input failure; admitted callback work is still drained.
+    bool deadlineExpired = false;               ///< Actual drain timeout requested abort.
+    bool restartResetRequested = false;         ///< This restart has published exactly one queue reset.
+    bool aborting = false;                      ///< An explicit or expired terminal abort was forwarded.
+
+    NativeTape(const TapeSourceRequest &request, const ReceivingProfile &profile, mux::MuxQueue value,
+               protocol::LiveWork &work)
+        : source(std::in_place, request.path, request.options, profile.schema,
+                 profile.endpoint.settings().budgets.session, profile.family, work),
+          queue(std::move(value)) {
+    }
+};
+
 /** Worker-local native endpoint. Member order keeps preparation alive beyond its recovery owners. */
 struct NativeEndpoint {
     std::shared_ptr<EndpointPort> port; ///< Detached producer state, independent of public facade destruction.
     ReceivingProfile profile;           ///< Complete immutable configuration and fixed work seeds.
     std::optional<transport::TcpRecovery> recovery; ///< Sole native/protocol/queue owner on this worker.
+    std::optional<NativeTape> tape; ///< Sole alternative local file/protocol/queue owner on this worker.
     std::vector<std::unique_ptr<NativeSubscription>> subscriptions; ///< Fixed native registration slots.
     bool draining = false;                                          ///< Actual admitted-prefix drain requested once.
     std::uint64_t appliedRevision = 0;            ///< Latest physical control captured/applied on this worker.
@@ -3035,25 +3248,45 @@ std::optional<RegisteredEvent> captureLatest(NativeEndpoint &endpoint, EventType
             };
             const auto id = endpoint.profile.bindings[index].localId;
             const auto &physical = receivingPhysicalSymbol(endpoint.profile, index, key);
-            auto visited = transport::detail::TcpRecoveryFactory::visitTickerLatest(
-                *endpoint.recovery, subscription->handle, {endpoint.profile.schema.recordContext(id), physical}, work,
-                &observation, visitor);
+            const core::SubscriptionKey cacheKey{endpoint.profile.schema.recordContext(id), physical};
+            mux::TickerLatestObservation observed;
 
-            if (!visited) {
-                const auto &failure = visited.error();
+            if (endpoint.tape) {
+                const auto visited =
+                    endpoint.tape->queue.visitTickerLatest(subscription->handle, cacheKey, work, &observation, visitor);
 
-                if (failure.error == transport::RecoveryError::INVALID_STATE &&
-                    (!failure.queue || failure.queue->error == mux::QueueError::INVALID_STATE ||
-                     failure.queue->error == mux::QueueError::INVALID_CLIENT))
-                    continue;
+                if (!visited) {
+                    const auto failure = visited.error().error;
 
-                throw Error(recoveryDiagnostic(failure));
+                    if (failure == mux::QueueError::INVALID_STATE || failure == mux::QueueError::INVALID_CLIENT)
+                        continue;
+
+                    throw Error(queueDiagnostic(failure, "tape-latest-event"));
+                }
+
+                observed = *visited;
+            } else {
+                const auto visited = transport::detail::TcpRecoveryFactory::visitTickerLatest(
+                    *endpoint.recovery, subscription->handle, cacheKey, work, &observation, visitor);
+
+                if (!visited) {
+                    const auto &failure = visited.error();
+
+                    if (failure.error == transport::RecoveryError::INVALID_STATE &&
+                        (!failure.queue || failure.queue->error == mux::QueueError::INVALID_STATE ||
+                         failure.queue->error == mux::QueueError::INVALID_CLIENT))
+                        continue;
+
+                    throw Error(recoveryDiagnostic(failure));
+                }
+
+                observed = *visited;
             }
 
-            if (*visited == mux::TickerLatestObservation::UNMAPPED)
+            if (observed == mux::TickerLatestObservation::UNMAPPED)
                 continue;
 
-            if (*visited == mux::TickerLatestObservation::ABSENT) {
+            if (observed == mux::TickerLatestObservation::ABSENT) {
                 // Every mapped registration reads the same committed cache for this key.
                 knownAbsent[index] = true;
 
@@ -3145,7 +3378,9 @@ void checkLatestRequestFence(const EndpointPort &port, LatestEventRequestState &
     if (request.done || expireLatestRequest(request))
         return;
 
-    if (!advanceLatestRequestEpoch(port, request))
+    if (port.tape)
+        finishLatestRequest(request, TAPE_LATEST_REQUEST_REFUSAL);
+    else if (!advanceLatestRequestEpoch(port, request))
         finishLatestRequest(request, {ErrorCode::REQUEST_CANCELLED, "latest-event-request-source-change"});
     else if (port.state == EndpointState::FAILED && port.diagnostic.code != ErrorCode::NONE)
         finishLatestRequest(request, port.diagnostic);
@@ -3164,88 +3399,133 @@ void publishLatestRequest(EndpointPort &port, LatestEventRequestState &request, 
         finishLatestRequest(request, failure, std::move(value));
 }
 
-/** Retain the charge until the worker has removed its temporary exact interest. */
+/** Retain the group charge until its one temporary registration has retired. */
 std::chrono::steady_clock::time_point
-retireCompletedLatestRequest(EndpointPort &port, const std::shared_ptr<LatestEventRequestState> &request) noexcept {
-    if (request->demand && !request->demand->retired.load(std::memory_order_acquire)) {
-        request->demand->closeRequested.store(true, std::memory_order_release);
+retireCompletedLatestRequestBatch(EndpointPort &port, const std::shared_ptr<LatestEventRequestBatch> &batch) noexcept {
+    if (batch->demand && !batch->demand->retired.load(std::memory_order_acquire)) {
+        batch->demand->closeRequested.store(true, std::memory_order_release);
 
         return std::chrono::steady_clock::now() + port.options.pollInterval;
     }
 
-    request->demand.reset();
+    batch->demand.reset();
     std::lock_guard lock(port.mutex);
 
-    if (port.latestEventRequest == request)
+    if (port.latestEventRequest == batch)
         port.latestEventRequest.reset();
 
     return std::chrono::steady_clock::time_point::max();
 }
 
-/** Service one pending request without invoking application listeners for its completion. */
-template <class OpenDemand>
-std::chrono::steady_clock::time_point serviceLatestRequest(EndpointPort &port, NativeEndpoint *endpoint,
-                                                           const std::shared_ptr<LatestEventRequestState> &request,
-                                                           OpenDemand openDemand) noexcept {
-    bool done;
-    bool online;
+/** Settle or observe one child without changing a sibling's outcome. */
+bool serviceLatestRequest(EndpointPort &port, NativeEndpoint *endpoint, LatestEventRequestState &request,
+                          Diagnostic demandFailure) noexcept {
     {
         std::lock_guard endpointLock(port.mutex);
-        std::lock_guard requestLock(request->mutex);
-        checkLatestRequestFence(port, *request);
-        done = request->done;
+        std::lock_guard requestLock(request.mutex);
+        checkLatestRequestFence(port, request);
+
+        if (request.done)
+            return false;
+    }
+
+    if (endpoint) {
+        std::optional<RegisteredEvent> value;
+
+        if (demandFailure.code == ErrorCode::NONE) {
+            try {
+                value = producerAction([&] {
+                    return captureLatest(*endpoint, request.type, request.symbol, false);
+                });
+            } catch (const Error &error) {
+                demandFailure = error.diagnostic();
+            } catch (...) {
+                demandFailure = {ErrorCode::INVALID_STATE, "latest-event-request-observation"};
+            }
+        }
+
+        publishLatestRequest(port, request, demandFailure, std::move(value));
+    }
+
+    std::lock_guard lock(request.mutex);
+
+    return !request.done;
+}
+
+/** Prefer an observed source loss over a subordinate desired-ticket refusal. */
+Diagnostic latestBatchDemandFailure(EndpointPort &port, const LatestEventRequestBatch &batch,
+                                    const transport::RecoveryStatus &source) noexcept {
+    Diagnostic failure;
+
+    if (batch.demand) {
+        std::lock_guard lock(batch.demand->mutex);
+        failure = batch.demand->diagnostic;
+    }
+
+    if (failure.code != ErrorCode::NONE && source.phase != transport::RecoveryPhase::ACTIVE &&
+        source.first.error != transport::RecoveryError::NONE) {
+        std::lock_guard lock(port.mutex);
+        failure = port.diagnostic.code == ErrorCode::NONE ? recoveryDiagnostic(source.first) : port.diagnostic;
+    }
+
+    return failure;
+}
+
+/** Keep one exact shared demand set for the still-pending unique identities. */
+template <class ReplaceDemand>
+std::chrono::steady_clock::time_point serviceLatestRequestBatch(EndpointPort &port, NativeEndpoint *endpoint,
+                                                                const std::shared_ptr<LatestEventRequestBatch> &batch,
+                                                                ReplaceDemand replaceDemand) noexcept {
+    auto *tcpEndpoint = endpoint && endpoint->recovery ? endpoint : nullptr;
+    const auto source = tcpEndpoint ? tcpEndpoint->recovery->status() : transport::RecoveryStatus{};
+    const auto demandFailure = latestBatchDemandFailure(port, *batch, source);
+    batch->pending.clear();
+    std::ranges::fill(batch->wanted, 0);
+
+    for (std::size_t index = 0; index < batch->requests.size(); ++index) {
+        if (serviceLatestRequest(port, tcpEndpoint, *batch->requests[index], demandFailure))
+            batch->wanted[batch->exactIdentity[index]] = 1;
+    }
+
+    for (std::size_t identity = 0; identity < batch->wanted.size(); ++identity) {
+        if (batch->wanted[identity])
+            batch->pending.push_back(identity);
+    }
+
+    if (batch->pending.empty())
+        return retireCompletedLatestRequestBatch(port, batch);
+
+    const auto deadline = batch->requests.front()->deadline;
+    bool online;
+    {
+        std::lock_guard lock(port.mutex);
         online = port.connectionIntent;
     }
 
-    if (done)
-        return retireCompletedLatestRequest(port, request);
+    if (!batch->demand && (!online || source.phase != transport::RecoveryPhase::ACTIVE))
+        return deadline;
 
-    if (!endpoint)
-        return request->deadline;
+    if (!tcpEndpoint || batch->pending == batch->submitted)
+        return deadline;
 
     Diagnostic failure;
-    std::optional<RegisteredEvent> value;
-
     try {
         producerAction([&] {
-            if (request->demand) {
-                std::lock_guard lock(request->demand->mutex);
-                failure = request->demand->diagnostic;
-            }
-
-            const auto source = endpoint->recovery->status();
-            const bool sourceActive = source.phase == transport::RecoveryPhase::ACTIVE;
-
-            if (failure.code != ErrorCode::NONE) {
-                // A pending desired ticket can be retired by source loss. Report the earlier source cause
-                // when the recovery owner has actually left its eligible phase.
-                if (!sourceActive && source.first.error != transport::RecoveryError::NONE) {
-                    std::lock_guard lock(port.mutex);
-                    failure =
-                        port.diagnostic.code == ErrorCode::NONE ? recoveryDiagnostic(source.first) : port.diagnostic;
-                }
-
-                return;
-            }
-
-            value = captureLatest(*endpoint, request->type, request->symbol, false);
-
-            if (!value && !request->demand && online && sourceActive)
-                openDemand();
+            replaceDemand();
         });
+        batch->pending.swap(batch->submitted);
+
+        return deadline;
     } catch (const Error &error) {
         failure = error.diagnostic();
     } catch (...) {
-        failure = {ErrorCode::INVALID_STATE, "latest-event-request-observation"};
+        failure = {ErrorCode::INVALID_STATE, "latest-event-request-demand"};
     }
 
-    publishLatestRequest(port, *request, failure, std::move(value));
-    {
-        std::lock_guard lock(request->mutex);
-        done = request->done;
-    }
+    for (const auto &request : batch->requests)
+        publishLatestRequest(port, *request, failure, {});
 
-    return done ? retireCompletedLatestRequest(port, request) : request->deadline;
+    return retireCompletedLatestRequestBatch(port, batch);
 }
 
 constexpr auto HISTORY_SNAPSHOT_READ_TIMEOUT = std::chrono::seconds{1};
@@ -3664,13 +3944,24 @@ RegisteredEvent defaultLatest(EventType type, std::u16string_view symbol) {
  */
 std::unique_ptr<NativeEndpoint> activate(const transport::detail::BootstrapLease &bootstrap,
                                          const std::shared_ptr<EndpointPort> &port) {
-    auto profile = prepareReceivingProfile(port->limits, port->options, port->host, port->port);
+    auto profile = prepareReceivingProfile(port->limits, port->options, port->host, port->port, port->tape.has_value());
     auto native = std::make_unique<NativeEndpoint>(port, std::move(profile));
     auto queueWork = native->profile.queueWork;
     auto queue = createReceivingQueue(native->profile, queueWork);
 
     if (!queue) {
         throw Error(queueDiagnostic(queue.error().error, "endpoint-queue"));
+    }
+
+    if (port->tape) {
+        auto work = native->profile.turnWork.session;
+        native->tape.emplace(*port->tape, native->profile, std::move(*queue), work);
+        std::lock_guard lock(port->mutex);
+        native->appliedRevision = port->connectionRevision;
+        port->activeDeliveryRevision = native->appliedRevision;
+        port->clearedRevision = port->clearRevision;
+
+        return native;
     }
 
     transport::RecoveryQueues queues;
@@ -3685,7 +3976,7 @@ std::unique_ptr<NativeEndpoint> activate(const transport::detail::BootstrapLease
 
     auto work = native->profile.preparationWork;
     auto recovery = transport::detail::TcpRecoveryFactory::create(
-        bootstrap, native->profile.endpoint, std::move(native->profile.blueprint), std::move(queues),
+        bootstrap, *native->profile.endpoint.network(), std::move(native->profile.blueprint), std::move(queues),
         native->profile.recoveryOptions, work);
 
     if (!recovery) {
@@ -3727,10 +4018,25 @@ std::unique_ptr<NativeSubscription> registerSubscription(NativeEndpoint &endpoin
         throw Error({ErrorCode::RESOURCE_LIMIT, "subscription-binding-copy"});
     }
 
-    auto handle = transport::detail::TcpRecoveryFactory::openObservedReceiver(
-        *endpoint.recovery, endpoint.profile.family, std::span(selectedBindings).first(plan.bindingCount),
-        result->consumer, plan.limits, endpoint.profile.clientLimits, receiverWork, queueWork,
-        &result->observationPlan);
+    const auto bindings = std::span(selectedBindings).first(plan.bindingCount);
+    auto handle = [&]() -> std::expected<mux::MuxHandle, transport::RecoveryReceiverFailure> {
+        if (!endpoint.tape) {
+            return transport::detail::TcpRecoveryFactory::openObservedReceiver(
+                *endpoint.recovery, endpoint.profile.family, bindings, result->consumer, plan.limits,
+                endpoint.profile.clientLimits, receiverWork, queueWork, &result->observationPlan);
+        }
+
+        auto opened = client::detail::openObservedSubscriptionReceiver(
+            endpoint.tape->queue, endpoint.profile.schema, endpoint.profile.family,
+            endpoint.profile.recoveryOptions.selectors, bindings, result->consumer, plan.limits,
+            endpoint.profile.clientLimits, receiverWork, queueWork, &result->observationPlan);
+
+        if (!opened) {
+            return std::unexpected(transport::RecoveryReceiverFailure(std::move(opened.error())));
+        }
+
+        return std::move(*opened);
+    }();
 
     if (!handle) {
         if (const auto *failure = std::get_if<transport::RecoveryDiagnostic>(&handle.error())) {
@@ -3741,7 +4047,7 @@ std::unique_ptr<NativeSubscription> registerSubscription(NativeEndpoint &endpoin
 
         if (const auto *queue = std::get_if<mux::QueueFailure>(&failure.cause)) {
             if (queue->error == mux::QueueError::BUSY ||
-                (queue->error == mux::QueueError::CLOSING &&
+                (queue->error == mux::QueueError::CLOSING && endpoint.recovery &&
                  endpoint.recovery->status().phase == transport::RecoveryPhase::RESETTING)) {
                 // A real reset temporarily fences registration; retry once on a later bounded owner turn.
                 return {};
@@ -3764,6 +4070,9 @@ std::unique_ptr<NativeSubscription> registerSubscription(NativeEndpoint &endpoin
 
     result->handle = std::move(*handle);
     port->statistics->update([&](auto &s) {
+        if (endpoint.tape)
+            s.sourceEpoch = endpoint.appliedRevision;
+
         s.queueCapacityEvents =
             endpoint.profile.clientLimits.dataItems +
             (endpoint.profile.family == core::SubscriptionFamily::TICKER ? endpoint.profile.tickerLimits.cacheKeys
@@ -3924,7 +4233,8 @@ void progressSubscriptions(NativeEndpoint &endpoint, mux::QueueSubmitWork &submi
 
         if (callbackPool) {
             if (port->closeRequested.load(std::memory_order_acquire) ||
-                endpoint.port->closeRequested.load(std::memory_order_acquire))
+                (endpoint.port->closeRequested.load(std::memory_order_acquire) &&
+                 (!endpoint.tape || !endpoint.tape->inputEnded)))
                 callbackPool->cancel(callbackSlot, {ErrorCode::CALLBACK_CANCELLED, "callback-close"});
             else if (obsoleteHistory)
                 // This worker is the sole packet publisher for the fixed slot: no newer packet can intervene.
@@ -4060,6 +4370,406 @@ enum class EndpointProgress {
     TURN_EXHAUSTED ///< A spent shared turn yielded; the next scheduled turn may admit more work.
 };
 
+/** Complete published desired commands before immediate file intake can pass their first records. */
+bool tapeDemandReady(const NativeEndpoint &endpoint) {
+    return std::ranges::all_of(endpoint.subscriptions, [](const auto &subscription) {
+        if (!subscription || subscription->stopping ||
+            subscription->port->closeRequested.load(std::memory_order_acquire)) {
+            return true;
+        }
+
+        const auto state = subscription->handle.state();
+
+        if (state != mux::QueueClientState::ACTIVE && state != mux::QueueClientState::PAUSED) {
+            return state == mux::QueueClientState::TERMINAL;
+        }
+
+        std::lock_guard lock(subscription->port->mutex);
+
+        return subscription->hasSubmitted && !subscription->ticket.id() &&
+               subscription->submittedRevision == subscription->port->revision;
+    });
+}
+
+/** Preserve the typed input failure while the already admitted prefix drains. */
+void failTapeInput(NativeEndpoint &endpoint, std::uint64_t revision, Diagnostic failure) {
+    std::lock_guard lock(endpoint.port->mutex);
+
+    if (endpoint.port->connectionRevision != revision ||
+        endpoint.port->closeRequested.load(std::memory_order_acquire)) {
+        return;
+    }
+
+    if (endpoint.port->diagnostic.code == ErrorCode::NONE) {
+        endpoint.port->diagnostic = failure;
+    }
+
+    endpoint.port->terminal.hadGap = true;
+    endpoint.tape->inputEnded = true;
+    requestEndpointClose(endpoint.port);
+}
+
+/** Fence and retire queued tape work once; already executing application code retains its normal fence. */
+void abortTapeDrain(NativeEndpoint &endpoint, std::string_view stage) noexcept {
+    auto &tape = *endpoint.tape;
+
+    if (!tape.aborting) {
+        tape.aborting = true;
+        tape.queue.requestStop(mux::StopMode::ABORT);
+        cancelEndpointCallbacks(endpoint.port, stage);
+    }
+}
+
+/** Publish actual file ownership to currently registered subscriptions. */
+void publishTapeEpoch(NativeEndpoint &endpoint, std::optional<std::uint64_t> epoch) {
+    for (const auto &subscription : endpoint.subscriptions) {
+        if (subscription && !subscription->port->closeRequested.load(std::memory_order_acquire)) {
+            subscription->port->statistics->update([epoch](auto &statistics) {
+                statistics.sourceEpoch = epoch;
+            });
+        }
+    }
+}
+
+/** End a failed restart without reusing the old source or opening another epoch. */
+EndpointProgress failTapeRestart(NativeEndpoint &endpoint, Diagnostic diagnostic) {
+    {
+        std::lock_guard lock(endpoint.port->mutex);
+
+        if (endpoint.port->closeRequested.load(std::memory_order_acquire)) {
+            return EndpointProgress::PENDING;
+        }
+
+        requestEndpointClose(endpoint.port);
+    }
+
+    auto &tape = *endpoint.tape;
+    tape.pending.reset();
+    tape.source.reset();
+    publishTapeEpoch(endpoint, std::nullopt);
+    endpoint.draining = true;
+    tape.deadlineExpired = diagnostic.code == ErrorCode::TAPE_RESTART_TIMEOUT;
+    abortTapeDrain(endpoint, "callback-tape-restart-failed");
+    failEndpoint(endpoint.port, diagnostic);
+
+    return EndpointProgress::PENDING;
+}
+
+/** Retire one active file generation, complete the existing mux reset, then reopen from byte zero. */
+EndpointProgress progressTapeRestart(NativeEndpoint &endpoint, transport::RecoveryTurnWork &work,
+                                     std::uint64_t revision, std::chrono::steady_clock::time_point deadline,
+                                     bool firstPoll) {
+    auto &tape = *endpoint.tape;
+    auto &queueWork = work.queues.front();
+
+    if (std::chrono::steady_clock::now() >= deadline) {
+        return failTapeRestart(endpoint, {ErrorCode::TAPE_RESTART_TIMEOUT, "tape-restart-deadline"});
+    }
+
+    if (tape.source) {
+        if (endpoint.subscriptions.size() > work.recovery.visits) {
+            return firstPoll ? failTapeRestart(endpoint, {ErrorCode::WORK_LIMIT, "tape-restart-subscriptions"})
+                             : EndpointProgress::TURN_EXHAUSTED;
+        }
+
+        work.recovery.visits -= endpoint.subscriptions.size();
+        tape.pending.reset();
+        tape.source.reset();
+        publishTapeEpoch(endpoint, std::nullopt);
+        cancelEndpointCallbacks(endpoint.port, "callback-tape-restart");
+    }
+
+    if (endpoint.port->callbackFence.outstanding.load(std::memory_order_acquire) != 0) {
+        return EndpointProgress::PENDING;
+    }
+
+    if (!tape.restartResetRequested) {
+        const auto accepted = tape.queue.resetSource(queueWork);
+
+        if (!accepted) {
+            if (!firstPoll && accepted.error().error == mux::QueueError::WORK_LIMIT) {
+                return EndpointProgress::TURN_EXHAUSTED;
+            }
+
+            return failTapeRestart(endpoint, queueDiagnostic(accepted.error().error, "tape-restart-reset"));
+        }
+
+        tape.restartResetRequested = true;
+    }
+
+    const auto reset = tape.queue.resetStatus();
+
+    if (reset.failure) {
+        return failTapeRestart(endpoint, queueDiagnostic(reset.failure->error, "tape-restart-reset"));
+    }
+
+    if (reset.phase != mux::ResetPhase::NONE || !reset.globalAcknowledged) {
+        const auto polled = tape.queue.progress(queueWork);
+
+        if (!polled) {
+            if (!firstPoll && polled.error().error == mux::QueueError::WORK_LIMIT) {
+                return EndpointProgress::TURN_EXHAUSTED;
+            }
+
+            return failTapeRestart(endpoint, queueDiagnostic(polled.error().error, "tape-restart-progress"));
+        }
+
+        return EndpointProgress::PENDING;
+    }
+
+    // Reopening receives a fresh turn allowance, independently of the discarded generation.
+    if (!firstPoll) {
+        return EndpointProgress::TURN_EXHAUSTED;
+    }
+
+    if (endpoint.subscriptions.size() > work.recovery.visits) {
+        return failTapeRestart(endpoint, {ErrorCode::WORK_LIMIT, "tape-restart-subscriptions"});
+    }
+
+    if (endpoint.port->closeRequested.load(std::memory_order_acquire)) {
+        return EndpointProgress::PENDING;
+    }
+
+    const auto &request = *endpoint.port->tape;
+    const auto &profile = endpoint.profile;
+
+    try {
+        tape.source.emplace(request.path, request.options, profile.schema, profile.endpoint.settings().budgets.session,
+                            profile.family, work.session);
+    } catch (const Error &error) {
+        return failTapeRestart(endpoint, error.diagnostic());
+    } catch (const std::bad_alloc &) {
+        return failTapeRestart(endpoint, {ErrorCode::ALLOCATION_FAILURE, "tape-restart-open"});
+    }
+
+    if (std::chrono::steady_clock::now() >= deadline) {
+        tape.source.reset();
+
+        return failTapeRestart(endpoint, {ErrorCode::TAPE_RESTART_TIMEOUT, "tape-restart-deadline"});
+    }
+
+    {
+        std::lock_guard lock(endpoint.port->mutex);
+
+        if (endpoint.port->closeRequested.load(std::memory_order_acquire)) {
+            return EndpointProgress::PENDING;
+        }
+
+        endpoint.appliedRevision = revision;
+        endpoint.port->activeDeliveryRevision = revision;
+        endpoint.port->clearedRevision = endpoint.port->clearRevision;
+    }
+
+    work.recovery.visits -= endpoint.subscriptions.size();
+    publishTapeEpoch(endpoint, revision);
+    tape.restartResetRequested = false;
+
+    return EndpointProgress::PENDING;
+}
+
+/** Give lifecycle deadlines precedence over the normal worker cadence and the tape's playback clock. */
+std::chrono::steady_clock::time_point tapeWakeAt(const NativeEndpoint &endpoint,
+                                                 std::chrono::steady_clock::time_point now,
+                                                 std::chrono::steady_clock::time_point regularWake) {
+    using Clock = std::chrono::steady_clock;
+    const auto &tape = *endpoint.tape;
+
+    if (endpoint.port->closeRequested.load(std::memory_order_acquire)) {
+        const auto close = endpoint.port->closeDeadline.load(std::memory_order_acquire);
+
+        return close && !tape.deadlineExpired ? std::min(regularWake, Clock::time_point{Clock::duration{close}})
+                                              : regularWake;
+    }
+
+    {
+        std::lock_guard lock(endpoint.port->mutex);
+
+        if (endpoint.appliedRevision != endpoint.port->connectionRevision) {
+            return endpoint.port->callbackFence.outstanding.load(std::memory_order_acquire) == 0
+                       ? now
+                       : std::min(regularWake, endpoint.port->tapeRestartDeadline);
+        }
+    }
+
+    if (tape.source) {
+        if (const auto due = tape.source->deadline(); due && *due > now) {
+            return std::min(regularWake, *due);
+        }
+    }
+
+    return regularWake;
+}
+
+/** Give a local reader and its existing queue one bounded owner turn, without wire or recovery steps. */
+EndpointProgress progressTape(NativeEndpoint &endpoint, transport::RecoveryTurnWork &work,
+                              mux::QueueSubmitWork &submitWork, std::uint64_t revision, bool firstPoll) {
+    auto &tape = *endpoint.tape;
+    auto &queueWork = work.queues.front();
+
+    if (endpoint.port->closeRequested.load(std::memory_order_acquire)) {
+        bool abort;
+        {
+            std::lock_guard lock(endpoint.port->mutex);
+            abort = endpoint.port->tapeAbortRequested;
+        }
+
+        if (!endpoint.draining) {
+            tape.pending.reset();
+
+            if (tape.source) {
+                tape.source->stop();
+            }
+
+            if (!abort) {
+                tape.queue.requestStop(mux::StopMode::GRACEFUL);
+            }
+
+            endpoint.draining = true;
+            observeState(endpoint.port, EndpointState::CLOSING);
+        }
+
+        if (abort) {
+            abortTapeDrain(endpoint, "callback-tape-abort");
+        }
+    } else if (endpoint.appliedRevision != revision) {
+        std::chrono::steady_clock::time_point deadline;
+        {
+            std::lock_guard lock(endpoint.port->mutex);
+            deadline = endpoint.port->tapeRestartDeadline;
+        }
+
+        return progressTapeRestart(endpoint, work, revision, deadline, firstPoll);
+    }
+
+    progressSubscriptions(endpoint, submitWork);
+
+    if (endpoint.draining && !tape.deadlineExpired) {
+        const auto deadline = endpoint.port->closeDeadline.load(std::memory_order_acquire);
+
+        if (deadline && std::chrono::steady_clock::now().time_since_epoch().count() >= deadline &&
+            (!tape.queue.terminal() || endpoint.port->callbackFence.outstanding.load(std::memory_order_acquire) != 0)) {
+            tape.deadlineExpired = true;
+            abortTapeDrain(endpoint, "callback-tape-drain-deadline");
+        }
+    }
+
+    const auto polled = tape.queue.progress(queueWork);
+
+    if (!polled) {
+        if (!firstPoll && polled.error().error == mux::QueueError::WORK_LIMIT) {
+            return EndpointProgress::TURN_EXHAUSTED;
+        }
+
+        failEndpoint(endpoint.port, queueDiagnostic(polled.error().error, "tape-queue-progress"));
+
+        return EndpointProgress::RETIRED;
+    }
+
+    if (const auto terminal = tape.queue.terminal()) {
+        if (terminal->primary) {
+            requestEndpointClose(endpoint.port);
+            failEndpoint(endpoint.port, queueDiagnostic(terminal->primary->error, "tape-queue-terminal"));
+        }
+
+        return endpoint.port->callbackFence.outstanding.load(std::memory_order_acquire) == 0
+                   ? EndpointProgress::RETIRED
+                   : EndpointProgress::PENDING;
+    }
+
+    if (endpoint.draining || endpoint.port->closeRequested.load(std::memory_order_acquire)) {
+        return EndpointProgress::PENDING;
+    }
+
+    observeState(endpoint.port, EndpointState::CONNECTED, revision);
+
+    if (polled->kind != mux::QueueProgressKind::IDLE ||
+        endpoint.port->callbackFence.outstanding.load(std::memory_order_acquire) != 0 ||
+        endpoint.port->closeRequested.load(std::memory_order_acquire)) {
+        return EndpointProgress::PENDING;
+    }
+
+    const auto now = std::chrono::steady_clock::now();
+    bool paused;
+    {
+        std::lock_guard lock(endpoint.port->mutex);
+        paused = endpoint.port->tapePaused;
+    }
+
+    if (!tape.source->setPaused(paused, now)) {
+        failTapeInput(endpoint, revision, {ErrorCode::TAPE_TIMING_RANGE, "tape-playback-resume"});
+
+        return EndpointProgress::PENDING;
+    }
+
+    if (!tape.source->ready(now)) {
+        return EndpointProgress::PENDING;
+    }
+
+    if (endpoint.subscriptions.size() > work.recovery.visits) {
+        return EndpointProgress::TURN_EXHAUSTED;
+    }
+
+    work.recovery.visits -= endpoint.subscriptions.size();
+
+    if (!tapeDemandReady(endpoint)) {
+        return EndpointProgress::PENDING;
+    }
+
+    if (!tape.pending) {
+        auto next = tape.source->next(work.session, now);
+
+        if (!next) {
+            if (!firstPoll && next.error().code == ErrorCode::WORK_LIMIT) {
+                return EndpointProgress::TURN_EXHAUSTED;
+            }
+
+            failTapeInput(endpoint, revision, next.error());
+
+            return EndpointProgress::PENDING;
+        }
+
+        if (tape.source->finished()) {
+            std::lock_guard lock(endpoint.port->mutex);
+
+            if (endpoint.port->connectionRevision == revision &&
+                !endpoint.port->closeRequested.load(std::memory_order_acquire)) {
+                tape.inputEnded = true;
+                requestEndpointClose(endpoint.port);
+            }
+
+            return EndpointProgress::PENDING;
+        }
+
+        if (!*next) {
+            return EndpointProgress::PENDING;
+        }
+
+        tape.pending.emplace(std::move(**next));
+    }
+
+    std::unique_lock lock(endpoint.port->mutex);
+
+    if (endpoint.port->connectionRevision != revision ||
+        endpoint.port->closeRequested.load(std::memory_order_acquire)) {
+        return EndpointProgress::PENDING;
+    }
+
+    const auto admitted = tape.queue.admit(std::move(*tape.pending), queueWork);
+    lock.unlock();
+
+    if (admitted) {
+        tape.pending.reset();
+    } else if (admitted.error().error == mux::QueueError::WORK_LIMIT && !firstPoll) {
+        return EndpointProgress::TURN_EXHAUSTED;
+    } else if (admitted.error().error != mux::QueueError::BUSY) {
+        failEndpoint(endpoint.port, queueDiagnostic(admitted.error().error, "tape-queue-admission"));
+
+        return EndpointProgress::RETIRED;
+    }
+
+    return EndpointProgress::PENDING;
+}
+
 /** Give one endpoint one native/queue/control poll from an unchanged finite owner-turn allowance.
  * @param endpoint Sole worker-owned endpoint.
  * @param work Remaining actual recovery/native/queue coordinates, shared across this whole burst.
@@ -4082,6 +4792,10 @@ EndpointProgress progressEndpoint(NativeEndpoint &endpoint, transport::RecoveryT
         revision = endpoint.port->connectionRevision;
         clearRevision = endpoint.port->clearRevision;
         online = endpoint.port->connectionIntent;
+    }
+
+    if (endpoint.tape) {
+        return progressTape(endpoint, work, submitWork, revision, firstPoll);
     }
 
     if (!endpoint.port->closeRequested.load(std::memory_order_acquire) && endpoint.appliedRevision != revision) {
@@ -4235,6 +4949,30 @@ EndpointProgress progressEndpoint(NativeEndpoint &endpoint, transport::RecoveryT
 void retireNative(std::unique_ptr<NativeEndpoint> &endpoint) noexcept {
     const auto port = endpoint->port;
     requestEndpointClose(port);
+
+    if (endpoint->tape) {
+        CloseResult result;
+        const auto terminal = endpoint->tape->queue.terminal();
+        {
+            std::lock_guard lock(port->mutex);
+            result = port->terminal;
+            port->statistics.observedAt = std::chrono::steady_clock::now();
+        }
+        result.deadlineExpired = endpoint->tape->deadlineExpired;
+
+        if (terminal) {
+            result.hadGap =
+                result.hadGap || terminal->hadGap || terminal->unknownEligibility || terminal->unknownUpstreamLoss;
+            result.drained =
+                terminal->outcome == mux::TerminalOutcome::DRAINED && !result.deadlineExpired && !result.hadGap;
+        }
+
+        endpoint.reset();
+        retireEndpoint(port, result);
+
+        return;
+    }
+
     const auto status = endpoint->recovery->status();
     std::optional<Diagnostic> latestSourceFailure;
 
@@ -4254,6 +4992,35 @@ void retireNative(std::unique_ptr<NativeEndpoint> &endpoint) noexcept {
     retireEndpoint(port, result, latestSourceFailure);
 }
 } // namespace
+
+LatestEventRequestBatch::LatestEventRequestBatch(const std::vector<std::shared_ptr<LatestEventRequestState>> &requests)
+    : requests(requests), exactIdentity(requests.size()), wanted(requests.size()) {
+    pending.reserve(requests.size());
+    submitted.reserve(requests.size());
+
+    for (std::size_t index = 0; index < requests.size(); ++index)
+        pending.push_back(index);
+
+    std::ranges::sort(pending, [&](std::size_t left, std::size_t right) {
+        const auto &leftSymbol = requests[left]->symbol;
+        const auto &rightSymbol = requests[right]->symbol;
+
+        return leftSymbol == rightSymbol ? left < right : leftSymbol < rightSymbol;
+    });
+
+    if (!pending.empty()) {
+        auto first = pending.front();
+
+        for (const auto index : pending) {
+            if (requests[index]->symbol != requests[first]->symbol)
+                first = index;
+
+            exactIdentity[index] = first;
+        }
+    }
+
+    pending.clear();
+}
 
 RuntimeImpl::RuntimeImpl(transport::RuntimeBootstrap owner, RuntimeOptions options)
     : RuntimeImpl(acquireOwnedBootstrap(owner), std::move(options)) {
@@ -4395,7 +5162,7 @@ void RuntimeImpl::run() noexcept {
 
                 bool connectRequested = false;
                 std::shared_ptr<LatestEventRead> latestRead;
-                std::shared_ptr<LatestEventRequestState> latestRequest;
+                std::shared_ptr<LatestEventRequestBatch> latestRequest;
                 std::shared_ptr<HistorySnapshotOperation> historyRead;
                 std::size_t historyRequestSlots;
                 {
@@ -4411,11 +5178,19 @@ void RuntimeImpl::run() noexcept {
                     completeLatestRead(*port, native[index].get(), latestRead);
 
                 if (latestRequest) {
-                    const auto requestWake = serviceLatestRequest(*port, native[index].get(), latestRequest, [&] {
-                        auto selector = SubscriptionSelector::plain(latestRequest->symbol);
-                        Feed feed(port);
-                        latestRequest->demand = feed.createSubscriptionPort(latestRequest->type);
-                        mutateSelectors(latestRequest->demand, std::span(&selector, 1), SymbolMutation::ADD);
+                    const auto requestWake = serviceLatestRequestBatch(*port, native[index].get(), latestRequest, [&] {
+                        std::vector<SubscriptionSelector> selectors;
+                        selectors.reserve(latestRequest->pending.size());
+
+                        for (const auto index : latestRequest->pending)
+                            selectors.push_back(SubscriptionSelector::plain(latestRequest->requests[index]->symbol));
+
+                        if (!latestRequest->demand) {
+                            Feed feed(port);
+                            latestRequest->demand = feed.createSubscriptionPort(latestRequest->requests.front()->type);
+                        }
+
+                        mutateSelectors(latestRequest->demand, selectors, SymbolMutation::REPLACE);
                     });
                     nextWake = std::min(nextWake, requestWake);
                 }
@@ -4526,16 +5301,31 @@ void RuntimeImpl::run() noexcept {
 
                     if (native[index]->profile.family == core::SubscriptionFamily::HISTORY) {
                         for (const auto &subscription : native[index]->subscriptions) {
-                            if (subscription && !subscription->stopping)
+                            if (!subscription || subscription->stopping)
+                                continue;
+
+                            if (native[index]->tape) {
+                                if (native[index]->tape->source) {
+                                    publishTapeHistorySnapshot(native[index]->tape->queue,
+                                                               native[index]->appliedRevision, subscription->handle,
+                                                               subscription->port, observationWork);
+                                }
+                            } else {
                                 publishHistorySnapshot(*native[index]->recovery, subscription->handle,
                                                        subscription->port, observationWork);
+                            }
                         }
                     }
 
-                    auto wakeAt = std::chrono::steady_clock::now() + port->options.pollInterval;
+                    const auto now = std::chrono::steady_clock::now();
+                    auto wakeAt = now + port->options.pollInterval;
 
-                    if (const auto hint = native[index]->recovery->nextWake()) {
-                        wakeAt = std::min(wakeAt, *hint);
+                    if (native[index]->recovery) {
+                        if (const auto hint = native[index]->recovery->nextWake()) {
+                            wakeAt = std::min(wakeAt, *hint);
+                        }
+                    } else {
+                        wakeAt = tapeWakeAt(*native[index], now, wakeAt);
                     }
 
                     nextWake = std::min(nextWake, wakeAt);
@@ -4692,6 +5482,10 @@ HistorySnapshot<RegisteredEvent> awaitHistorySnapshot(const std::shared_ptr<Hist
     });
 }
 
+std::u16string_view latestEventRequestSymbol(const std::shared_ptr<LatestEventRequestState> &request) noexcept {
+    return request ? std::u16string_view(request->symbol) : std::u16string_view{};
+}
+
 bool latestEventRequestDone(const std::shared_ptr<LatestEventRequestState> &request) noexcept {
     if (!request)
         return true;
@@ -4779,6 +5573,9 @@ Feed::readIndexedSnapshot(EventType type, std::u16string_view symbol, std::int32
         {
             std::lock_guard lock(port_->mutex);
 
+            if (port_->tape)
+                throw Error(TAPE_HISTORY_SNAPSHOT_REFUSAL);
+
             if (!detail::hasIndexedSnapshotDemand(*port_, type, symbol, sourceId, range.has_value()))
                 return {HistorySnapshotState::NOT_SUBSCRIBED, std::nullopt, {}};
 
@@ -4825,11 +5622,13 @@ Feed::startIndexedSnapshot(EventType type, std::u16string_view symbol, std::int3
         if (!control)
             reject(ErrorCode::CLOSED, "history-snapshot-closed");
 
-        auto operation = std::make_shared<detail::HistorySnapshotOperation>(type, symbol, sourceId, options, false,
-                                                                            deadline, control, policy);
+        std::shared_ptr<detail::HistorySnapshotOperation> operation;
         {
             std::lock_guard controlLock(control->mutex);
             std::lock_guard endpointLock(port_->mutex);
+
+            if (port_->tape)
+                throw Error(TAPE_HISTORY_SNAPSHOT_REFUSAL);
 
             if (!control->runtime || control->stopping || port_->closeRequested.load(std::memory_order_acquire) ||
                 port_->retired.load(std::memory_order_acquire))
@@ -4844,6 +5643,9 @@ Feed::startIndexedSnapshot(EventType type, std::u16string_view symbol, std::int3
 
             if (slot == port_->historySnapshotRequests.end())
                 reject(ErrorCode::RESOURCE_LIMIT, "history-snapshot-request-busy");
+
+            operation = std::make_shared<detail::HistorySnapshotOperation>(type, symbol, sourceId, options, false,
+                                                                           deadline, control, policy);
 
             if (expireHistorySnapshot(*operation))
                 return operation;
@@ -4969,9 +5771,122 @@ Feed::startLatestEventRequest(EventType type, std::u16string_view symbol,
             reject(ErrorCode::CLOSED, "latest-event-request-closed");
 
         auto request = std::make_shared<detail::LatestEventRequestState>(type, symbol, deadline, control);
+        admitLatestEventRequests({request});
+
+        return request;
+    });
+}
+
+std::shared_ptr<detail::LatestEventRequestState>
+Feed::startLatestEventRequest(EventType type, std::string_view symbol,
+                              std::chrono::steady_clock::time_point deadline) const {
+    return producerAction([&] {
+        return startLatestEventRequest(type, exactSymbol(symbol, port_->limits.maximumSymbolUnits), deadline);
+    });
+}
+
+namespace {
+/** Validate and own every raw argument before any group slot or worker admission. */
+template <class Symbol, class Convert>
+std::vector<std::shared_ptr<detail::LatestEventRequestState>>
+prepareLatestRequestGroup(const detail::EndpointPort &port, EventType type, std::span<const Symbol> symbols,
+                          std::chrono::steady_clock::time_point deadline, Convert convert) {
+    return producerAction([&] {
+        std::vector<std::shared_ptr<detail::LatestEventRequestState>> requests;
+
+        if (symbols.empty())
+            return requests;
+
+        if (symbols.size() > port.limits.maximumSymbolsPerSubscription)
+            reject(ErrorCode::RESOURCE_LIMIT, "latest-event-request-symbol-count");
+
+        const auto kind = static_cast<unsigned>(type);
+        const auto selection = static_cast<detail::EventSelection>(1U << kind);
+
+        if (port.options.contract != DeliveryContract::TICKER || !(detail::LASTING_EVENT_TYPES & (1U << kind)))
+            reject(ErrorCode::UNSUPPORTED_PROFILE, "latest-event-request-type");
+
+        const auto control = port.control.lock();
+
+        if (!control)
+            reject(ErrorCode::CLOSED, "latest-event-request-closed");
+
+        const auto *registry = port.options.eventRegistry ? &*port.options.eventRegistry : nullptr;
+
+        if (registry && std::ranges::none_of(registry->registrations(), [&](const auto &registration) {
+                return registration.type == type && registration.projection == events::EventProjection::NATIVE;
+            }))
+            reject(ErrorCode::UNSUPPORTED_PROFILE, "latest-event-request-type");
+
+        std::optional<events::PreparedCandleRoutes> candleRoutes;
+
+        if (type == EventType::CANDLE) {
+            candleRoutes = detail::prepareReceivingCandleRoutes(port.options, port.limits.maximumSymbolUnits);
+
+            if (!candleRoutes)
+                reject(ErrorCode::UNSUPPORTED_PROFILE, "latest-event-request-type");
+        }
+
+        requests.reserve(symbols.size());
+
+        for (const auto &input : symbols) {
+            const auto symbol = convert(input);
+            detail::validateLatestSymbol(symbol, port.limits.maximumSymbolUnits);
+            detail::validateReceivingSymbol(registry, selection, symbol);
+
+            if (candleRoutes)
+                static_cast<void>(detail::resolveReceivingCandle(*candleRoutes, symbol));
+
+            requests.push_back(std::make_shared<detail::LatestEventRequestState>(type, symbol, deadline, control));
+        }
+
+        return requests;
+    });
+}
+} // namespace
+
+std::vector<std::shared_ptr<detail::LatestEventRequestState>>
+Feed::prepareLatestEventRequests(EventType type, std::span<const std::u16string_view> symbols,
+                                 std::chrono::steady_clock::time_point deadline) const {
+    return prepareLatestRequestGroup(*port_, type, symbols, deadline, [](auto symbol) {
+        return symbol;
+    });
+}
+
+std::vector<std::shared_ptr<detail::LatestEventRequestState>>
+Feed::prepareLatestEventRequests(EventType type, std::span<const std::string_view> symbols,
+                                 std::chrono::steady_clock::time_point deadline) const {
+    return prepareLatestRequestGroup(*port_, type, symbols, deadline, [&](auto symbol) {
+        return exactSymbol(symbol, port_->limits.maximumSymbolUnits);
+    });
+}
+
+std::vector<std::shared_ptr<detail::LatestEventRequestState>>
+Feed::prepareLatestEventRequests(EventType type, std::span<const events::CandleSymbol> symbols,
+                                 std::chrono::steady_clock::time_point deadline) const {
+    return prepareLatestRequestGroup(*port_, type, symbols, deadline, [](const auto &symbol) {
+        return symbol.getSymbol().value_or(std::u16string_view{});
+    });
+}
+
+void Feed::admitLatestEventRequests(
+    const std::vector<std::shared_ptr<detail::LatestEventRequestState>> &requests) const {
+    if (requests.empty())
+        return;
+
+    producerAction([&] {
+        const auto control = port_->control.lock();
+
+        if (!control)
+            reject(ErrorCode::CLOSED, "latest-event-request-closed");
+
+        auto batch = std::make_shared<detail::LatestEventRequestBatch>(requests);
         {
             std::lock_guard gate(control->mutex);
             std::lock_guard lock(port_->mutex);
+
+            if (port_->tape)
+                throw Error(TAPE_LATEST_REQUEST_REFUSAL);
 
             if (!control->runtime || control->stopping || port_->retired.load(std::memory_order_acquire) ||
                 port_->closeRequested.load(std::memory_order_acquire))
@@ -4983,30 +5898,24 @@ Feed::startLatestEventRequest(EventType type, std::u16string_view symbol,
             if (port_->latestEventRequest)
                 reject(ErrorCode::RESOURCE_LIMIT, "latest-event-request-busy");
 
-            if (expireLatestRequest(*request))
-                return request;
+            if (std::chrono::steady_clock::now() >= requests.front()->deadline) {
+                for (const auto &request : requests)
+                    expireLatestRequest(*request);
 
-            request->connectionRevision = port_->connectionRevision;
-            request->clearRevision = port_->clearRevision;
-            request->boundToSource = port_->connectionIntent;
+                return;
+            }
 
-            // Only local deadline and logical-demand progress starts here. Connection intent stays unchanged.
+            for (const auto &request : requests) {
+                request->connectionRevision = port_->connectionRevision;
+                request->clearRevision = port_->clearRevision;
+                request->boundToSource = port_->connectionIntent;
+            }
+
             control->runtime->startWorker();
-            port_->latestEventRequest = request;
+            port_->latestEventRequest = std::move(batch);
             ++control->wakeSequence;
         }
-
         control->condition.notify_one();
-
-        return request;
-    });
-}
-
-std::shared_ptr<detail::LatestEventRequestState>
-Feed::startLatestEventRequest(EventType type, std::string_view symbol,
-                              std::chrono::steady_clock::time_point deadline) const {
-    return producerAction([&] {
-        return startLatestEventRequest(type, exactSymbol(symbol, port_->limits.maximumSymbolUnits), deadline);
     });
 }
 

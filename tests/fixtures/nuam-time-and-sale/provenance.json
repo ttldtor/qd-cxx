@@ -1,0 +1,62 @@
+{
+  "status": "PASS",
+  "revision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "timezoneByteIdentical": true,
+  "oracleSha256": "2ce605e19047081564271cb8b40f55e724cceaad9e60a1ce89b6beb092ae1dc4",
+  "sources": [
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/custom/NuamTimeAndSale.java",
+      "sha256": "f0639a6db3cc010e3872fd0cff1f2c2f0e41d849c9e6d4207727186803d56b38"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/custom/NuamTimeAndSaleDelegate.java",
+      "sha256": "ac344df9ef4792b680afeb42106d9323ee97d7d5e87afe5e3be3bb39c8b966a3"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/custom/impl/NuamTimeAndSaleMapping.java",
+      "sha256": "b30d450486f890f8eb8714156d2d0cbebdce0317eec20b9be96815604c93cde9"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/custom/CustomFactoryImpl.java",
+      "sha256": "71fec7eb870b63afeea7403e4aeb3a92069a11a67a3ba8acc0f9eb0a954bb730"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/TimeAndSale.java",
+      "sha256": "bf3cff336518c851c3f43c78fcb8782453a6d123b4d7e7fe19c03e48cc21b246"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "history.qtp",
+      "sha256": "a75f4194e8d364316c5c6577b0fb54eaeb496a42fd0c6fc933d75b21136e1834"
+    },
+    {
+      "path": "history.tsv",
+      "sha256": "68acd74de82875ebc9c1054f0b3f7f8e97a147ab28b6e2c03539ac6a4df58bcb"
+    },
+    {
+      "path": "regional-history.qtp",
+      "sha256": "d5ce12e7844d06960531b68bc473d1ecd46383cdbfc8fe39722fac8c7f4aa5f9"
+    },
+    {
+      "path": "regional-history.tsv",
+      "sha256": "216cb084f67fb27697a9b0902ecb28f007a25b5470bf43cca86aad8bcdcf055e"
+    },
+    {
+      "path": "regional-stream.qtp",
+      "sha256": "af520dcca03e8c8de37531fac1fe12a1d5452f86d396853595c78482d1ccf88d"
+    },
+    {
+      "path": "regional-stream.tsv",
+      "sha256": "e5a197f9e76e4006d572ab93181c991fcf88a9c88cabc8f3aacd5ac557a0ccca"
+    },
+    {
+      "path": "stream.qtp",
+      "sha256": "debbe20ba96d9ed085ffe92c79e48f46d4aca704fe979a9d15a4ac8acfa317b2"
+    },
+    {
+      "path": "stream.tsv",
+      "sha256": "db08d674027a711f68b1d8c3c4f202443e4da629d6fcb7737eb66f0c6e4a89b2"
+    }
+  ]
+}

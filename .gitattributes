@@ -894,3 +894,8 @@ tests/fixtures/nuam-trade/*.json text eol=lf
 tests/fixtures/time-series-query/*.tsv -text -whitespace
 tests/fixtures/time-series-query/*.json text eol=lf
 tools/upstream/time-series-query-oracle/*.java text eol=lf
+# Preserve exact NuamTimeAndSale QD oracle observations.
+tests/fixtures/nuam-time-and-sale/*.tsv -text -whitespace
+tests/fixtures/nuam-time-and-sale/*.qtp binary
+tools/upstream/nuam-time-and-sale-oracle/*.java text eol=lf
+tests/fixtures/nuam-time-and-sale/*.json text eol=lf

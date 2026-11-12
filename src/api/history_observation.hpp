@@ -39,4 +39,14 @@ struct HistoryCallbackRetirement {
 void publishHistorySnapshot(const transport::TcpRecovery &recovery, const mux::MuxHandle &handle,
                             const std::shared_ptr<SubscriptionPort> &port, mux::QueueWork &work) noexcept;
 
+/** Publish guarded range evidence from a real local HISTORY queue.
+ * @param queue Worker-owned local queue of this immutable tape epoch.
+ * @param epoch Actual owner-local opened tape ordinal.
+ * @param handle Exact receiver registration in that queue.
+ * @param port Detached publication target.
+ * @param work Aggregate observation credits.
+ */
+void publishTapeHistorySnapshot(const mux::MuxQueue &queue, std::uint64_t epoch, const mux::MuxHandle &handle,
+                                const std::shared_ptr<SubscriptionPort> &port, mux::QueueWork &work) noexcept;
+
 } // namespace org::ttldtor::qdcxx::api::detail
