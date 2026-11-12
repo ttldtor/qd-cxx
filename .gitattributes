@@ -895,3 +895,9 @@ tests/fixtures/nuam-time-and-sale/*.tsv -text -whitespace
 tests/fixtures/nuam-time-and-sale/*.qtp binary
 tools/upstream/nuam-time-and-sale-oracle/*.java text eol=lf
 tests/fixtures/nuam-time-and-sale/*.json text eol=lf
+
+# Preserve pinned NuamOrder QD observations.
+tests/fixtures/nuam-order/*.tsv -text -whitespace
+tests/fixtures/nuam-order/*.qtp binary
+tests/fixtures/nuam-order/*.json text eol=lf
+tools/upstream/nuam-order-oracle/*.java text eol=lf

@@ -71,18 +71,32 @@ constexpr core::SchemaLimits withNuamTimeAndSaleLimits(core::SchemaLimits limits
     return limits;
 }
 
+/** Reserve the three default NuamOrder source declarations. */
+constexpr core::SchemaLimits withNuamOrderLimits(core::SchemaLimits limits) noexcept {
+    constexpr std::size_t RECORDS = 3;
+    constexpr std::size_t FIELDS = 24;
+    limits.records += RECORDS;
+    limits.fields += RECORDS * FIELDS;
+    limits.lookups += RECORDS * FIELDS;
+
+    return limits;
+}
+
 constexpr std::size_t FRAME_RECORDS = 64; ///< Whole admitted DATA frame record ceiling.
 constexpr std::size_t CALLBACK_RECORDS = CallbackSlotPool::PHYSICAL_RECORDS; ///< Whole callback projection ceiling.
 constexpr std::size_t FIELD_TEXT_UNITS = 8192;             ///< Aggregate text copied from one complete record.
 constexpr std::size_t FIELD_BYTE_UNITS = 16384;            ///< Aggregate opaque payload copied from one record.
 constexpr std::size_t RECORD_ARENA_BYTES = 65536;          ///< Complete detached per-record arena request ceiling.
-constexpr std::size_t SESSION_SNAPSHOT_BYTES = 128 * 1024; ///< Maximum backing for a Feed snapshot.
-constexpr std::size_t RECORD_BYTES = 16 * MEBIBYTE;        ///< Per-registration detached backing ceiling.
-constexpr std::size_t BATCH_BYTES = MEBIBYTE;              ///< Per-registration composite backing ceiling.
-constexpr std::size_t CONTROL_OPERATIONS = 100000;         ///< Qualified finite one-client owner work seed.
-constexpr std::size_t CONTROL_VISITS = 100000000;          ///< Qualified finite metadata/equality work seed.
-constexpr std::size_t CONTROL_BYTES = 256 * MEBIBYTE;      ///< Qualified logical copy/disposal seed.
-constexpr std::size_t DNS_ENVELOPE_BYTES = 80 * MEBIBYTE;  ///< Separate documented DNS SDK envelope.
+constexpr std::size_t SESSION_SNAPSHOT_BYTES = 128 * 1024; ///< Baseline backing for a Feed snapshot.
+// Each Nuam source contributes a wide record with nullable text and associated binding metadata.
+constexpr std::size_t NUAM_ORDER_SNAPSHOT_BYTES_PER_ROUTE = 64 * 1024;
+constexpr std::size_t MAXIMUM_NUAM_ORDER_ROUTES = 20; ///< Keeps two snapshots within the existing resident allowance.
+constexpr std::size_t RECORD_BYTES = 16 * MEBIBYTE;   ///< Per-registration detached backing ceiling.
+constexpr std::size_t BATCH_BYTES = MEBIBYTE;         ///< Per-registration composite backing ceiling.
+constexpr std::size_t CONTROL_OPERATIONS = 100000;    ///< Qualified finite one-client owner work seed.
+constexpr std::size_t CONTROL_VISITS = 100000000;     ///< Qualified finite metadata/equality work seed.
+constexpr std::size_t CONTROL_BYTES = 256 * MEBIBYTE; ///< Qualified logical copy/disposal seed.
+constexpr std::size_t DNS_ENVELOPE_BYTES = 80 * MEBIBYTE;           ///< Separate documented DNS SDK envelope.
 constexpr std::uint64_t DNS_PROGRESS_UNITS = 351280142190671838ULL; ///< Complete documented DNS logical charge.
 constexpr std::size_t WRITER_CONFIGURATION_BYTES = 4 * MEBIBYTE;    ///< Retained complete writer reservation.
 
@@ -525,8 +539,9 @@ void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, s
             const auto units = candle ? multiply(values.symbolUnits, events::detail::CANDLE_SYMBOL_TEXT_PASSES)
                                : text ? values.totalUnits
                                       : values.symbolUnits;
-            const auto strings = timeAndSale   ? std::size_t{4}
-                                 : profileText ? std::size_t{3}
+            const auto strings = binding.kind == client::PreparedEventKind::NUAM_ORDER ? std::size_t{5}
+                                 : timeAndSale                                         ? std::size_t{4}
+                                 : profileText                                         ? std::size_t{3}
                                                : (text ? std::size_t{2} : std::size_t{1});
             const auto bytes =
                 add(add(sizeof(client::SubscriptionProjection), multiply(add(units, strings), sizeof(char16_t))),
@@ -552,7 +567,8 @@ void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, s
                 binding.kind == client::PreparedEventKind::ANALYTIC_ORDER ||
                 binding.kind == client::PreparedEventKind::OTC_MARKETS_ORDER ||
                 binding.kind == client::PreparedEventKind::SERIES ||
-                binding.kind == client::PreparedEventKind::OPTION_SALE) {
+                binding.kind == client::PreparedEventKind::OPTION_SALE ||
+                binding.kind == client::PreparedEventKind::NUAM_ORDER) {
                 plan.work.visits = add(plan.work.visits, mapping.lookups);
             }
 
@@ -581,7 +597,8 @@ std::expected<EventRegistry, EventRegistryFailure> defaultReceivingRegistry(Deli
     limits.schema = contract == DeliveryContract::STREAM
                         ? withNuamTimeAndSaleLimits(withNuamTradeLimits(withTimeAndSaleLimits(BASE_SCHEMA_LIMITS)))
                     : contract == DeliveryContract::HISTORY
-                        ? withNuamTimeAndSaleLimits(withOptionSaleLimits(withTimeAndSaleLimits(CANDLE_SCHEMA_LIMITS)))
+                        ? withNuamOrderLimits(withNuamTimeAndSaleLimits(
+                              withOptionSaleLimits(withTimeAndSaleLimits(CANDLE_SCHEMA_LIMITS))))
                         : withNuamTradeLimits(CANDLE_SCHEMA_LIMITS);
     // Both appended physical Candle routes fit in the existing maximum registration capacity.
     limits.registrations = 74;
@@ -746,7 +763,26 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
             return route.type == EventType::NUAM_TIME_AND_SALE &&
                    receivingRouteSupportsContract(route, options.contract);
         });
+    const auto nuamOrderRoutes = std::ranges::count_if(selected.registrations(), [&](const EventRegistration &route) {
+        return route.type == EventType::NUAM_ORDER && receivingRouteSupportsContract(route, options.contract);
+    });
+
+    if (static_cast<std::size_t>(nuamOrderRoutes) > MAXIMUM_NUAM_ORDER_ROUTES)
+        refuse(ErrorCode::UNSUPPORTED_PROFILE, "profile-nuam-order-routes");
+
     auto schemaLimits = hasCandle ? CANDLE_SCHEMA_LIMITS : BASE_SCHEMA_LIMITS;
+
+    if (nuamOrderRoutes > 0) {
+        for (const auto &route : selected.registrations()) {
+            if (route.type != EventType::NUAM_ORDER || !receivingRouteSupportsContract(route, options.contract))
+                continue;
+
+            const auto &record = selected.schema().records()[static_cast<std::size_t>(route.localRecordId)];
+            schemaLimits.records = std::min(MAXIMUM_RECEIVING_RECORDS, add(schemaLimits.records, 1));
+            schemaLimits.fields = add(schemaLimits.fields, record.fields.size());
+            schemaLimits.lookups = add(schemaLimits.lookups, record.lookups.size());
+        }
+    }
 
     if (nuamTimeAndSaleRoutes > 0) {
         for (const auto &route : selected.registrations()) {
@@ -806,6 +842,17 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
         maximumFields = std::max(maximumFields, record.fields.size());
     }
 
+    // A Nuam order wire declaration may add inherited optional fields and FIELD metadata.
+    constexpr std::size_t NUAM_ORDER_EXTRA_WIRE_FIELDS = 11;
+
+    for (const auto &route : selected.registrations()) {
+        if (route.type != EventType::NUAM_ORDER || !receivingRouteSupportsContract(route, options.contract))
+            continue;
+
+        const auto &record = schema.records()[static_cast<std::size_t>(route.localRecordId)];
+        maximumFields = std::max(maximumFields, add(record.fields.size(), NUAM_ORDER_EXTRA_WIRE_FIELDS));
+    }
+
     // A mixed subscription may be created after connect; reserve the complete immutable registered selection.
     std::size_t routeCount = 0;
 
@@ -842,7 +889,8 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
                       schemaLimits.totalNameUnits};
     budgets.session.context.schema = schemaLimits;
     budgets.session.context.descriptions = schemaLimits.records;
-    budgets.session.snapshotBytes = SESSION_SNAPSHOT_BYTES;
+    budgets.session.snapshotBytes = add(SESSION_SNAPSHOT_BYTES, multiply(static_cast<std::size_t>(nuamOrderRoutes),
+                                                                         NUAM_ORDER_SNAPSHOT_BYTES_PER_ROUTE));
     budgets.session.descriptions.descriptions = schemaLimits.records;
     budgets.session.descriptions.totalFields = schemaLimits.fields;
 
@@ -868,6 +916,18 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
         const auto routeCount = static_cast<std::size_t>(nuamTimeAndSaleRoutes);
         descriptions.totalFields = add(descriptions.totalFields, multiply(routeCount, EXTRA_WIRE_FIELDS));
         descriptions.totalNameUnits = add(descriptions.totalNameUnits, multiply(routeCount, EXTRA_WIRE_NAME_UNITS));
+        bindings.fields = std::max(bindings.fields, descriptions.totalFields);
+        bindings.totalNameUnits = std::max(bindings.totalNameUnits, descriptions.totalNameUnits);
+    }
+
+    if (nuamOrderRoutes > 0) {
+        constexpr std::size_t EXTRA_FIELDS_PER_ROUTE = 11;
+        constexpr std::size_t EXTRA_NAME_UNITS_PER_ROUTE = 176;
+        const auto count = static_cast<std::size_t>(nuamOrderRoutes);
+        auto &descriptions = budgets.session.descriptions;
+        auto &bindings = budgets.session.context.bindings;
+        descriptions.totalFields = add(descriptions.totalFields, multiply(count, EXTRA_FIELDS_PER_ROUTE));
+        descriptions.totalNameUnits = add(descriptions.totalNameUnits, multiply(count, EXTRA_NAME_UNITS_PER_ROUTE));
         bindings.fields = std::max(bindings.fields, descriptions.totalFields);
         bindings.totalNameUnits = std::max(bindings.totalNameUnits, descriptions.totalNameUnits);
     }

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "qd/events/event_flags.hpp"
+#include "qd/events/nuam_order.hpp"
 #include "qd/events/order.hpp"
 #include <algorithm>
 #include <array>
@@ -241,4 +242,67 @@ TEST_CASE("actual QD Order binary physical VOID and low index bind without a syn
     }
 
     CHECK(decodedCount > 1000);
+}
+
+TEST_CASE("NuamOrder owns optional strings and retains source, flags and bounded values") {
+    constexpr q::events::MappingLimits NUAM_MAPPING{128, 256, 40, 64, 256, 128, 32768, 1000000};
+    const auto standard = q::events::defaultNuamOrderSchema(SCHEMA);
+    REQUIRE(standard);
+    auto record = standard->records()[0];
+    record.name = u"NuamOrder#NUAM";
+    const auto schema =
+        q::core::LocalSchema::create(std::array{record}, SCHEMA, q::core::LocalProfile::BINARY_FIELDS_V1);
+    REQUIRE(schema);
+    const auto mapping = q::events::PreparedNuamOrder::prepare(*schema, 0, NUAM_MAPPING);
+    REQUIRE(mapping);
+    auto input = values(*schema);
+    set(*schema, input, u"Index", 7);
+    set(*schema, input, u"ActorId", -42);
+    set(*schema, input, u"NuamFlags", 0xf6);
+
+    for (const auto &lookup : schema->records()[0].lookups) {
+        if (lookup.name == u"ClientOrderId")
+            input[lookup.fieldId].units = u"owned";
+
+        if (lookup.name == u"CustomerAccount")
+            input[lookup.fieldId].units = u"";
+    }
+
+    const auto mapped = mapping->map(u"AAPL", {schema->recordContext(0), input}, VALUES, 123, 4);
+    REQUIRE(mapped);
+    CHECK(mapped->getSourceId() == 1314210125);
+    CHECK(static_cast<std::uint32_t>(mapped->index) == 7);
+    CHECK(mapped->eventFlags == 4);
+    CHECK(mapped->actorId == -42);
+    CHECK(mapped->getOrderType() == q::events::NuamOrderType::UNDEFINED);
+    CHECK(mapped->getTimeInForce() == q::events::NuamTimeInForceType::UNDEFINED);
+    CHECK(mapped->clientOrderId == std::optional<std::u16string>(u"owned"));
+    CHECK(mapped->customerAccount == std::optional<std::u16string>(u""));
+    CHECK_FALSE(mapped->customerInfo);
+
+    for (auto &field : input)
+        if (field.units)
+            field.units->clear();
+
+    CHECK(mapped->clientOrderId == std::optional<std::u16string>(u"owned"));
+    const q::events::EventValueLimits tooSmall{128, 3, 136};
+
+    for (const auto &lookup : schema->records()[0].lookups)
+        if (lookup.name == u"ClientOrderId")
+            input[lookup.fieldId].units = u"long";
+
+    CHECK(mapping->map(u"AAPL", {schema->recordContext(0), input}, tooSmall) ==
+          std::unexpected(q::events::MappingError::RESOURCE_LIMIT));
+    auto missing = record;
+
+    for (auto &lookup : missing.lookups)
+        if (lookup.name == u"ActorId")
+            lookup.name = u"OtherId";
+
+    const auto invalid =
+        q::core::LocalSchema::create(std::array{missing}, SCHEMA, q::core::LocalProfile::BINARY_FIELDS_V1);
+    REQUIRE(invalid);
+    const auto rejected = q::events::PreparedNuamOrder::prepare(*invalid, 0, NUAM_MAPPING);
+    REQUIRE_FALSE(rejected);
+    CHECK(rejected.error() == q::events::MappingError::MISSING_REQUIRED);
 }
