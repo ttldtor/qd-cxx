@@ -232,6 +232,12 @@ struct EndpointStateChange {
     std::shared_ptr<const ListenerSnapshot> listeners;     ///< Complete immutable selection, released outside locks.
 };
 
+/** Complete immutable local-source admission. The worker alone opens the file. */
+struct TapeSourceRequest {
+    std::filesystem::path path; ///< Independently owned stable regular file path.
+    TapeSourceOptions options;  ///< Explicit finite input allowances.
+};
+
 /** One charged passive request. Its private completion lock never guards native owner work. */
 struct LatestEventRead {
     EventType type;        ///< Exact LastingEvent identity.
@@ -284,8 +290,9 @@ struct EndpointPort {
     std::uint64_t clearedRevision = 0; ///< Latest actual applied reset/global-ACK completion, not inferred from state.
     std::string address;               ///< First accepted bounded spelling; immutable after connect publication.
     std::string host;                  ///< Validated bounded route, copied only once before worker publication.
-    std::uint16_t port = 0;            ///< Original nonzero route port.
-    bool connectRequested = false;     ///< Published once under the endpoint mutex.
+    std::optional<TapeSourceRequest> tape; ///< Fixed non-network source, absent for TCP.
+    std::uint16_t port = 0;                ///< Original nonzero route port.
+    bool connectRequested = false;         ///< Published once under the endpoint mutex.
     std::atomic<std::chrono::steady_clock::duration::rep> closeDeadline{0}; ///< First admitted absolute drain deadline.
     std::atomic<bool> closeRequested{false};                                ///< Reserved monotonic drain admission.
     std::atomic<bool> retired{false};           ///< Native owner and all captures have retired.

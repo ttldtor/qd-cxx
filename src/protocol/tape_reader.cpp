@@ -4,6 +4,7 @@
 #include "../core/schema_validation.hpp"
 #include "field_time_binding.hpp"
 #include "session_budget.hpp"
+#include "tape_data_limits.hpp"
 
 #include <algorithm>
 #include <array>
@@ -809,10 +810,12 @@ void validateTimePolicies(TapeMode mode, FieldTimePolicy fieldTimePolicy, TapeEx
  * @param mode Explicit protocol policy.
  * @param fieldTimePolicy Explicit prefix policy, validated before any owning allocation.
  * @param externalTimePolicy Explicit companion admission policy, validated before any owning allocation.
+ * @param preserveProvenance True when the collector shares this exact immutable configured schema.
  * @return Bounded owning schema; constructor exceptions occur before any input.
  */
 core::LocalSchema initializeSchema(const core::LocalSchema &schema, const TapeLimits &limits, TapeMode mode,
-                                   FieldTimePolicy fieldTimePolicy, TapeExternalTimePolicy externalTimePolicy) {
+                                   FieldTimePolicy fieldTimePolicy, TapeExternalTimePolicy externalTimePolicy,
+                                   bool preserveProvenance) {
     validateTimePolicies(mode, fieldTimePolicy, externalTimePolicy);
 
     if (mode != TapeMode::BINARY_CATALOG_V1) {
@@ -830,6 +833,11 @@ core::LocalSchema initializeSchema(const core::LocalSchema &schema, const TapeLi
     }
 
     static_cast<void>(initialSessionUnits(schema, limits));
+
+    if (preserveProvenance) {
+        return copySchema(schema, limits.context.schema);
+    }
+
     auto result = core::LocalSchema::create(schema.records(), limits.context.schema, schema.profile());
 
     if (!result) {
@@ -902,8 +910,17 @@ TapeReader::TapeReader(const core::LocalSchema &schema, TapeLimits limits, TapeM
 
 TapeReader::TapeReader(const core::LocalSchema &schema, TapeLimits limits, TapeMode mode,
                        FieldTimePolicy fieldTimePolicy, TapeExternalTimePolicy externalTimePolicy)
-    : limits_(limits), mode_(mode),
-      schema_(initializeSchema(schema, limits, mode, fieldTimePolicy, externalTimePolicy)), framer_(limits.frame) {
+    : TapeReader(schema, limits, mode, fieldTimePolicy, externalTimePolicy, SchemaProvenance::READER_GENERATION,
+                 std::nullopt) {
+}
+
+TapeReader::TapeReader(const core::LocalSchema &schema, TapeLimits limits, TapeMode mode,
+                       FieldTimePolicy fieldTimePolicy, TapeExternalTimePolicy externalTimePolicy,
+                       SchemaProvenance schemaProvenance, std::optional<StreamDataLimits> dataPerFrame)
+    : limits_(limits), dataPerFrame_(std::move(dataPerFrame)), mode_(mode),
+      schema_(initializeSchema(schema, limits, mode, fieldTimePolicy, externalTimePolicy,
+                               schemaProvenance == SchemaProvenance::CONFIGURED)),
+      schemaProvenance_(schemaProvenance), framer_(limits.frame) {
     fieldTimePolicy_ = fieldTimePolicy;
     externalTimePolicy_ = externalTimePolicy;
 
@@ -1372,9 +1389,11 @@ void TapeReader::replaceDescriptions(std::span<const std::byte> payload) {
         return;
     }
 
-    // create issues a fresh identity; boundedCopy deliberately retains an old generation instead.
+    // Collector bindings share an immutable local schema even as wire descriptions change.
     if (!nextSchema) {
-        auto copied = core::LocalSchema::create(schema_.records(), limits_.context.schema, schema_.profile());
+        auto copied = schemaProvenance_ == SchemaProvenance::CONFIGURED
+                          ? schema_.boundedCopy(limits_.context.schema)
+                          : core::LocalSchema::create(schema_.records(), limits_.context.schema, schema_.profile());
 
         if (!copied) {
             fail(copied.error() == core::SchemaError::ALLOCATION_FAILURE ? TapeError::ALLOCATION_FAILURE
@@ -1703,6 +1722,15 @@ void TapeReader::dispatch(TapeFeedResult &result) {
     budget.payloadWorkBytes -= payloadWorkBytes_;
     budget.ownedPayloadBytes -= ownedPayloadBytes_;
     budget.ownedFieldTimeRecords -= ownedFieldTimeRecords_;
+
+    if (dataPerFrame_) {
+        const auto &frameLimits = *dataPerFrame_;
+        budget.payloadBytes = std::min(budget.payloadBytes, frameLimits.payloadBytes);
+
+        for (const auto member : detail::TAPE_DATA_TOTALS) {
+            budget.*member = std::min(budget.*member, frameLimits.*member);
+        }
+    }
 
     if constexpr (sizeof(std::size_t) > sizeof(std::uint64_t)) {
         budget.processedRecords = std::min(

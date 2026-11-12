@@ -333,6 +333,21 @@ control locks. Awaiting endpoint closure establishes callback/capture quiescence
 `deadlineExpired`, `hadGap` and `diagnostic` as well. It does not establish peer
 acknowledgement, unread-wire completeness or an uninterrupted upstream history.
 
+## Local tape source
+
+Create an endpoint with the required `DeliveryContract`, configure its
+ordinary typed subscriptions and listeners, then call `endpoint->connectTape(path)`.
+The runtime opens and reads the regular file on its worker. Await
+`EndpointState::CLOSED` for clean playback completion, then call
+`closeAndAwaitTermination()` for actual capture retirement. Calling
+`closeAndAwaitTermination()` before EOF requests an early stop.
+
+While a TICKER tape is active, the latest-event API reads its committed
+values through ordinary subscriptions. EOF or explicit close fences these reads.
+
+`TapeSourceOptions` sets maximum file bytes and envelope count. Use a fresh
+endpoint for each playback. [Local tape formats, delivery and errors](../spec/protocol/FEED-TAPE-SOURCE.md).
+
 ## State observers
 
 Register endpoint and subscription state observers before the transitions you need:

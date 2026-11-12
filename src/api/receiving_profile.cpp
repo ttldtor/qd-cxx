@@ -739,12 +739,12 @@ events::CandlePhysicalRoute resolveReceivingCandle(const events::PreparedCandleR
     }
 }
 
-ReceivingProfile::ReceivingProfile(core::LocalSchema schema, client::EndpointOptions endpoint)
+ReceivingProfile::ReceivingProfile(core::LocalSchema schema, ReceivingSettings endpoint)
     : schema(std::move(schema)), endpoint(std::move(endpoint)) {
 }
 
 ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const EndpointOptions &options,
-                                         const std::string &host, std::uint16_t port) {
+                                         const std::string &host, std::uint16_t port, bool tape) {
     auto selected = selectRegistry(options);
     const auto hasCandle = std::ranges::any_of(selected.registrations(), [&](const EventRegistration &route) {
         return route.type == EventType::CANDLE && receivingRouteSupportsContract(route, options.contract);
@@ -956,27 +956,37 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
                        multiply(2, symbolUnits), entries};
     budgets.writer.operationEntries = std::max(budgets.writer.operationEntries, entries);
 
-    // A complete named-route preparation and progress allowance is independent of queue reservations.
-    const auto dns = transport::TcpRuntime::dnsPreparationWorkRequirement(runtime.dnsServers.size());
+    if (!tape) {
+        // A complete named-route preparation and progress allowance is independent of queue reservations.
+        const auto dns = transport::TcpRuntime::dnsPreparationWorkRequirement(runtime.dnsServers.size());
 
-    if (!dns) {
-        refuse(ErrorCode::DNS_CONFIGURATION, "profile-dns");
+        if (!dns) {
+            refuse(ErrorCode::DNS_CONFIGURATION, "profile-dns");
+        }
+
+        budgets.tcp.residentBytes = add(budgets.tcp.residentBytes, DNS_ENVELOPE_BYTES);
+        budgets.protocolTurn.operations = add(budgets.protocolTurn.operations, dns->operations);
+        budgets.protocolTurn.visits = add(budgets.protocolTurn.visits, dns->visits);
+        budgets.protocolTurn.textUnits = add(budgets.protocolTurn.textUnits, dns->textUnits);
+        budgets.protocolTurn.bytes = add(budgets.protocolTurn.bytes, dns->bytes);
+        budgets.runtimeTurn.dnsCalls = budgets.runtimeTurn.dnsPackets = 10000;
+        budgets.runtimeTurn.dnsBytes = 10000000;
+        budgets.runtimeTurn.dnsUnits = DNS_PROGRESS_UNITS;
     }
 
-    budgets.tcp.residentBytes = add(budgets.tcp.residentBytes, DNS_ENVELOPE_BYTES);
-    budgets.protocolTurn.operations = add(budgets.protocolTurn.operations, dns->operations);
-    budgets.protocolTurn.visits = add(budgets.protocolTurn.visits, dns->visits);
-    budgets.protocolTurn.textUnits = add(budgets.protocolTurn.textUnits, dns->textUnits);
-    budgets.protocolTurn.bytes = add(budgets.protocolTurn.bytes, dns->bytes);
-    budgets.runtimeTurn.dnsCalls = budgets.runtimeTurn.dnsPackets = 10000;
-    budgets.runtimeTurn.dnsBytes = 10000000;
-    budgets.runtimeTurn.dnsUnits = DNS_PROGRESS_UNITS;
-
     fundContextBindingText(settings, schema.records().size());
-    auto endpoint = client::EndpointOptions::create(schema, settings);
+    std::optional<ReceivingSettings> endpoint;
 
-    if (!endpoint) {
-        refuse(ErrorCode::UNSUPPORTED_PROFILE, "profile-endpoint");
+    if (tape) {
+        endpoint.emplace(settings);
+    } else {
+        auto validated = client::EndpointOptions::create(schema, settings);
+
+        if (!validated) {
+            refuse(ErrorCode::UNSUPPORTED_PROFILE, "profile-endpoint");
+        }
+
+        endpoint.emplace(std::move(*validated));
     }
 
     ReceivingProfile result(std::move(schema), std::move(*endpoint));
@@ -1062,8 +1072,11 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
                               add(options.history.maximumPoints, options.history.pendingUpdatesPerSubscription)));
     }
 
-    result.blueprint = prepareBlueprint(result.schema);
-    prepareCopies(result);
+    if (!tape) {
+        result.blueprint = prepareBlueprint(result.schema);
+        prepareCopies(result);
+    }
+
     prepareMappings(result, selected, runtime.maximumSymbolUnits);
     auto &routing = result.routing;
     routing.symbols = runtime.maximumSymbolsPerSubscription;

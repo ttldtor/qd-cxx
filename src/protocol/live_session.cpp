@@ -1,6 +1,7 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/protocol/live_session.hpp"
+#include "tape_event_bridge.hpp"
 
 #include "field_time_binding.hpp"
 #include "live_decode.hpp"
@@ -1362,6 +1363,112 @@ struct LiveEvent::State {
         }
     }
 };
+
+detail::TapeEventBridge::TapeEventBridge(LiveSnapshot epoch, std::size_t eventBytes) noexcept
+    : epoch_(std::move(epoch)), eventBytes_(eventBytes) {
+}
+
+TapeReader detail::TapeEventBridge::makeFixedSchemaReader(const core::LocalSchema &schema, TapeLimits limits,
+                                                          StreamDataLimits dataPerFrame, FieldTimePolicy fieldTime) {
+    return TapeReader(schema, limits, TapeMode::BINARY_CATALOG_V1, fieldTime, TapeExternalTimePolicy::DISABLED,
+                      TapeReader::SchemaProvenance::CONFIGURED, dataPerFrame);
+}
+
+std::expected<detail::TapeEventBridge, LiveError> detail::TapeEventBridge::create(LiveLimits limits, LiveWork &work) {
+    try {
+        debit(1, work.operations);
+        debit(sizeof(Storage) + sizeof(LiveSnapshot::State), work.bytes);
+
+        if (limits.residentBytes < sizeof(Storage)) {
+            return std::unexpected(Error::RESOURCE_LIMIT);
+        }
+
+        const auto release = [](Storage *value) {
+            value->release();
+        };
+        std::unique_ptr<Storage, decltype(release)> storage(new Storage(limits.residentBytes, 0, limits.owners),
+                                                            release);
+        auto snapshot = makeOwner<LiveSnapshot::State>(*storage, 0, core::LocalProfile::BINARY_FIELDS_V1, 0);
+
+        return TapeEventBridge(LiveSnapshot(snapshot.release()), limits.eventBytes);
+    } catch (Error error) {
+        return std::unexpected(error);
+    } catch (const LiveStorageLimit &) {
+        return std::unexpected(Error::RESOURCE_LIMIT);
+    } catch (const std::bad_alloc &) {
+        return std::unexpected(Error::ALLOCATION_FAILURE);
+    }
+}
+
+std::expected<LiveEvent, LiveError> detail::TapeEventBridge::copy(const TapeFeedResult &result,
+                                                                  std::int32_t messageType, LiveWork &work) const {
+    constexpr std::int32_t RAW_DATA = 5;
+
+    if (!epoch_.state_ || result.status != TapeStatus::EVENT || !result.frame ||
+        (messageType != TICKER_DATA && messageType != STREAM_DATA && messageType != HISTORY_DATA) ||
+        (result.frame->type != RAW_DATA && result.frame->type != messageType)) {
+        return std::unexpected(Error::INVALID_CONFIGURATION);
+    }
+
+    try {
+        debit(1, work.operations);
+        debit(result.records.size(), work.visits);
+        debit(sum(sizeof(LiveEvent::State), eventBytes_), work.bytes);
+        auto event =
+            makeOwner<LiveEvent::State>(*epoch_.state_->ledger.lease.get(), eventBytes_, epoch_, LiveEventKind::DATA);
+        event->messageType = messageType;
+        auto &records = event->decoded.records;
+        auto *resource = event->arena.resource();
+        records.reserve(result.records.size());
+
+        for (const auto &source : result.records) {
+            debit(sum(source.typedValues.size(), source.values.size()), work.visits);
+            debit(source.symbol.units.size(), work.textUnits);
+            detail::PmrStreamDataRecord record{source.localId,
+                                               encoding::PmrSymbolValue(*resource),
+                                               std::pmr::vector<std::int32_t>(resource),
+                                               std::pmr::vector<detail::PmrFieldValue>(resource),
+                                               source.context,
+                                               source.senderId,
+                                               source.removalTime,
+                                               source.fieldTime};
+            record.symbol.units.assign(source.symbol.units);
+            record.symbol.cipher = source.symbol.cipher;
+            record.symbol.eventFlags = source.symbol.eventFlags;
+            record.symbol.eventFlagsBytes = source.symbol.eventFlagsBytes;
+            record.values.assign(source.values.begin(), source.values.end());
+            record.typedValues.reserve(source.typedValues.size());
+
+            for (const auto &field : source.typedValues) {
+                auto &value = record.typedValues.emplace_back(field.type, field.raw);
+
+                if (field.units) {
+                    debit(field.units->size(), work.textUnits);
+                    value.units.emplace(field.units->data(), field.units->size(), resource);
+                }
+
+                if (field.bytes) {
+                    debit(field.bytes->size(), work.bytes);
+                    value.bytes.emplace(field.bytes->begin(), field.bytes->end(), resource);
+                }
+            }
+
+            records.push_back(std::move(record));
+        }
+
+        event->complete(work);
+
+        return LiveEvent(std::move(event));
+    } catch (Error error) {
+        return std::unexpected(error);
+    } catch (const LiveStorageLimit &) {
+        return std::unexpected(Error::RESOURCE_LIMIT);
+    } catch (const std::bad_alloc &) {
+        return std::unexpected(Error::ALLOCATION_FAILURE);
+    } catch (const std::length_error &) {
+        return std::unexpected(Error::RESOURCE_LIMIT);
+    }
+}
 
 struct LivePendingOutput::State {
     OwnerLedger ledger;                   ///< Retains epoch/object accounting until all backing is released.
