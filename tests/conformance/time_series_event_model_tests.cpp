@@ -226,3 +226,78 @@ TEST_CASE("Candle range keeps its exact canonical symbol and sorts valid retaine
 }
 
 } // namespace
+
+TEST_CASE("range recovery qualifies both selection revision and the originating source epoch") {
+    api::TimeSeriesEventModel<events::TimeAndSale> model;
+    REQUIRE(model.setSymbol(u"A"));
+    const auto revision = model.setFromTime(0);
+    REQUIRE(revision);
+    const auto old = model.beginSourceEpoch(12);
+    REQUIRE(old);
+    const std::array initial{sale(u"A", 100, 0, flags::SNAPSHOT_BEGIN | flags::SNAPSHOT_END, 1)};
+    REQUIRE(model.processSourceEvents(*old, *revision, initial));
+    REQUIRE(model.confirmSourceEpoch(*old, *revision));
+    const auto complete = model.getSnapshot();
+    REQUIRE(complete);
+    REQUIRE(complete->events.size() == 1);
+    CHECK(complete->events.front().tradeId == 1);
+
+    const std::array open{sale(u"A", 200, 0, flags::TX_PENDING, 2)};
+    REQUIRE(model.processSourceEvents(*old, *revision, open));
+    REQUIRE(model.markSourceGap(*old, api::ModelRetention::RETAIN_COMPLETED));
+    checkRefusal(model.getSnapshot(), api::TimeSeriesEventModelError::SOURCE_INACTIVE);
+    const auto gap = model.getSourceSnapshot();
+    REQUIRE(gap);
+    CHECK(gap->source.status == api::ModelSourceStatus::GAP);
+    REQUIRE(gap->snapshot.events.size() == 1);
+    CHECK(gap->snapshot.events.front().tradeId == 1);
+
+    const auto current = model.beginSourceEpoch(13);
+    REQUIRE(current);
+    CHECK(model.getRangeRevision() == *revision);
+    CHECK(model.getFromTime() == 0);
+    CHECK(model.getSymbol() == u"A");
+    checkRefusal(model.processEvents(*revision, initial), api::TimeSeriesEventModelError::SOURCE_EPOCH_REQUIRED);
+    checkRefusal(model.processSourceEvents(*old, *revision, initial),
+                 api::TimeSeriesEventModelError::SOURCE_EPOCH_MISMATCH);
+    const auto empty = model.getSourceSnapshot();
+    REQUIRE(empty);
+    CHECK(empty->source.status == api::ModelSourceStatus::RECOVERING);
+    CHECK(empty->snapshot.events.empty());
+
+    const std::array start{sale(u"A", 300, 0, flags::SNAPSHOT_BEGIN, 3)};
+    REQUIRE(model.processSourceEvents(*current, *revision, start));
+    const auto unfinished = model.confirmSourceEpoch(*current, *revision);
+    REQUIRE_FALSE(unfinished);
+    CHECK(unfinished.error() == api::ModelSourceError::REPLAY_INCOMPLETE);
+
+    const std::array end{sale(u"A", 350, 0, flags::SNAPSHOT_END, 4)};
+    REQUIRE(model.processSourceEvents(*current, *revision, end));
+    REQUIRE(model.confirmSourceEpoch(*current, *revision));
+
+    const auto revised = model.setFromTime(350);
+    REQUIRE(revised);
+    CHECK(model.getSourceState().status == api::ModelSourceStatus::RECOVERING);
+    checkRefusal(model.processSourceEvents(*current, *revision, end), api::TimeSeriesEventModelError::RANGE_CHANGED);
+    const auto staleReplay = model.confirmSourceEpoch(*current, *revision);
+    REQUIRE_FALSE(staleReplay);
+    CHECK(staleReplay.error() == api::ModelSourceError::STALE_SELECTION);
+    const auto overlap = model.getSourceSnapshot();
+    REQUIRE(overlap);
+    REQUIRE(overlap->snapshot.events.size() == 1);
+    CHECK(overlap->snapshot.events.front().tradeId == 4);
+
+    auto moved = std::move(model);
+    checkRefusal(model.processSourceEvents(*current, *revised, end),
+                 api::TimeSeriesEventModelError::SOURCE_EPOCH_MISMATCH);
+    REQUIRE(moved.processSourceEvents(*current, *revised, end));
+    REQUIRE(moved.confirmSourceEpoch(*current, *revised));
+    REQUIRE(moved.closeSource(*current, api::ModelRetention::RETAIN_COMPLETED));
+    checkRefusal(moved.setSymbol(u"B"), api::TimeSeriesEventModelError::SOURCE_INACTIVE);
+    const auto closed = moved.getSourceSnapshot();
+    REQUIRE(closed);
+    CHECK(closed->source.status == api::ModelSourceStatus::CLOSED);
+    REQUIRE(closed->snapshot.events.size() == 1);
+    CHECK(closed->snapshot.events.front().tradeId == 4);
+    CHECK(gap->snapshot.events.front().tradeId == 1);
+}

@@ -667,6 +667,11 @@ Use `getFilteredSnapshot` to select scopes, one source, depth or lot size.
 Enable aggregate correction explicitly when creating the model. Corrections
 use completed updates and business time. See [display and correction rules](../spec/events/ORDER-BOOK-MODEL.md).
 
+Use the [source epoch contract](../spec/events/MODEL-SOURCE-EPOCH.md) to
+fence delayed deliveries across a gap or reconnect and to distinguish a
+historical cut from a confirmed current one. Capture the originating token
+with each batch. The application drives these lifecycle transitions.
+
 ## Indexed option series
 
 Use `Feed::createSubscription<events::Series>()` on a HISTORY endpoint. The default

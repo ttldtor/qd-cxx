@@ -468,3 +468,121 @@ TEST_CASE("correction budget refusal rolls back indexed values and an existing u
     CHECK(indices(after->buyOrders) == std::vector<std::int64_t>{2});
     CHECK(after->sellOrders.empty());
 }
+
+TEST_CASE("book source gaps keep a historical cut and fresh replay cannot admit old queued tails") {
+    api::OrderBookModel book({}, {.policy = api::OrderBookCorrectionPolicy::SAME_SYMBOL});
+    const auto first = book.beginSourceEpoch(7);
+    REQUIRE(first);
+    CHECK(first->ordinal() == 7);
+    CHECK(book.getSourceState().status == api::ModelSourceStatus::RECOVERING);
+    const auto unconfirmed = book.getSnapshot(u"IBM");
+    REQUIRE_FALSE(unconfirmed);
+    CHECK(unconfirmed.error() == api::IndexedEventModelError::SOURCE_INACTIVE);
+
+    const auto original = order(1, 100, 1, events::Side::BUY, events::Scope::AGGREGATE);
+    const auto untagged = book.processEvents(u"IBM", 0, std::span(&original, 1));
+    REQUIRE_FALSE(untagged);
+    CHECK(untagged.error() == api::IndexedEventModelError::SOURCE_EPOCH_REQUIRED);
+    REQUIRE(book.processSourceEvents(*first, u"IBM", 0, std::span(&original, 1)));
+    REQUIRE(book.confirmSourceEpoch(*first));
+
+    const auto complete = book.getSourceSnapshot(u"IBM");
+    REQUIRE(complete);
+    CHECK(complete->source.status == api::ModelSourceStatus::CURRENT);
+    CHECK(indices(complete->snapshot.buyOrders) == std::vector<std::int64_t>{1});
+
+    auto oldOpen = order(2, 104, 1);
+    oldOpen.eventFlags = indexed::SNAPSHOT_BEGIN | indexed::TX_PENDING;
+    REQUIRE(book.processSourceEvents(*first, u"IBM", 0, std::span(&oldOpen, 1)));
+    const auto pending = book.confirmSourceEpoch(*first);
+    REQUIRE_FALSE(pending);
+    CHECK(pending.error() == api::ModelSourceError::REPLAY_INCOMPLETE);
+    const auto badPolicy = book.markSourceGap(*first, static_cast<api::ModelRetention>(99));
+    REQUIRE_FALSE(badPolicy);
+    CHECK(badPolicy.error() == api::ModelSourceError::INVALID_RETENTION);
+    CHECK(book.getSourceState().status == api::ModelSourceStatus::CURRENT);
+
+    REQUIRE(book.markSourceGap(*first, api::ModelRetention::RETAIN_COMPLETED));
+    const auto historical = book.getSourceSnapshot(u"IBM");
+    REQUIRE(historical);
+    CHECK(historical->source.status == api::ModelSourceStatus::GAP);
+    CHECK(indices(historical->snapshot.buyOrders) == std::vector<std::int64_t>{1});
+    REQUIRE_FALSE(book.getFilteredSnapshot(u"IBM", {}));
+    const auto refused = book.processSourceEvents(*first, u"IBM", 0, std::span(&oldOpen, 1));
+    REQUIRE_FALSE(refused);
+    CHECK(refused.error() == api::IndexedEventModelError::SOURCE_INACTIVE);
+
+    const auto oldOrdinal = book.beginSourceEpoch(7);
+    REQUIRE_FALSE(oldOrdinal);
+    CHECK(oldOrdinal.error() == api::ModelSourceError::INVALID_EPOCH);
+    const auto next = book.beginSourceEpoch(8);
+    REQUIRE(next);
+    CHECK(*next != *first);
+    const auto rebuilding = book.getSourceSnapshot(u"IBM");
+    REQUIRE(rebuilding);
+    CHECK(rebuilding->source.epochOrdinal == 8);
+    CHECK(rebuilding->source.status == api::ModelSourceStatus::RECOVERING);
+    CHECK(rebuilding->snapshot.buyOrders.empty());
+
+    const auto delayedGap = book.markSourceGap(*first, api::ModelRetention::DISCARD);
+    REQUIRE_FALSE(delayedGap);
+    CHECK(delayedGap.error() == api::ModelSourceError::STALE_EPOCH);
+
+    auto fresh = original;
+    fresh.eventFlags = indexed::SNAPSHOT_BEGIN;
+    REQUIRE(book.processSourceEvents(*next, u"IBM", 0, std::span(&fresh, 1)));
+    const auto incomplete = book.confirmSourceEpoch(*next);
+    REQUIRE_FALSE(incomplete);
+    CHECK(incomplete.error() == api::ModelSourceError::REPLAY_INCOMPLETE);
+
+    auto tail = order(3, 108, 1, events::Side::SELL);
+    tail.eventFlags = indexed::SNAPSHOT_END;
+    const auto stale = book.processSourceEvents(*first, u"IBM", 0, std::span(&tail, 1));
+    REQUIRE_FALSE(stale);
+    CHECK(stale.error() == api::IndexedEventModelError::SOURCE_EPOCH_MISMATCH);
+    REQUIRE(book.processSourceEvents(*next, u"IBM", 0, std::span(&tail, 1)));
+    REQUIRE(book.confirmSourceEpoch(*next));
+    REQUIRE(book.closeSource(*next, api::ModelRetention::RETAIN_COMPLETED));
+    const auto final = book.getSourceSnapshot(u"IBM");
+    REQUIRE(final);
+    CHECK(final->source.status == api::ModelSourceStatus::CLOSED);
+    CHECK(indices(final->snapshot.buyOrders) == std::vector<std::int64_t>{1});
+    CHECK(indices(final->snapshot.sellOrders) == std::vector<std::int64_t>{3});
+    REQUIRE_FALSE(book.beginSourceEpoch(9));
+    REQUIRE_FALSE(book.processSourceEvents(*next, u"IBM", 0, std::span(&tail, 1)));
+    REQUIRE(book.closeSource(*next, api::ModelRetention::DISCARD));
+    const auto discarded = book.getSourceSnapshot(u"IBM");
+    REQUIRE(discarded);
+    CHECK(discarded->snapshot.buyOrders.empty());
+    CHECK(discarded->snapshot.sellOrders.empty());
+    CHECK(complete->source.status == api::ModelSourceStatus::CURRENT);
+    CHECK(indices(historical->snapshot.buyOrders) == std::vector<std::int64_t>{1});
+}
+
+TEST_CASE("book move transfers source authority while rejecting equal ordinals from another owner") {
+    api::OrderBookModel source;
+    api::OrderBookModel destination;
+    const auto from = source.beginSourceEpoch(1);
+    const auto replaced = destination.beginSourceEpoch(1);
+    REQUIRE(from);
+    REQUIRE(replaced);
+    CHECK(*from != *replaced);
+    const auto data = order(5, 10, 2);
+    const auto wrongOwner = source.processSourceEvents(*replaced, u"IBM", 0, std::span(&data, 1));
+    REQUIRE_FALSE(wrongOwner);
+    CHECK(wrongOwner.error() == api::IndexedEventModelError::SOURCE_EPOCH_MISMATCH);
+
+    destination = std::move(source);
+    CHECK(source.getSourceState().status == api::ModelSourceStatus::GAP);
+    REQUIRE_FALSE(source.processSourceEvents(*from, u"IBM", 0, std::span(&data, 1)));
+    REQUIRE_FALSE(destination.processSourceEvents(*replaced, u"IBM", 0, std::span(&data, 1)));
+    REQUIRE(destination.processSourceEvents(*from, u"IBM", 0, std::span(&data, 1)));
+    REQUIRE(destination.confirmSourceEpoch(*from));
+    const auto result = destination.getSnapshot(u"IBM");
+    REQUIRE(result);
+    CHECK(indices(result->buyOrders) == std::vector<std::int64_t>{5});
+    destination.clear();
+    CHECK(destination.getSourceState().status == api::ModelSourceStatus::GAP);
+    REQUIRE_FALSE(destination.processSourceEvents(*from, u"IBM", 0, std::span(&data, 1)));
+    REQUIRE(destination.beginSourceEpoch(2));
+}

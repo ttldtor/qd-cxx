@@ -4,6 +4,7 @@
 
 #include "qd/events/event_flags.hpp"
 
+#include <algorithm>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
@@ -23,10 +24,13 @@ namespace org::ttldtor::qdcxx::api {
 
 /** Finite model refusal. A failed operation publishes no changes. */
 enum class IndexedEventModelError {
-    WRONG_KEY,          ///< The input symbol or source differs from the requested partition.
-    RESOURCE_LIMIT,     ///< A finite count or symbol limit would be exceeded.
-    ALLOCATION_FAILURE, ///< A required owning copy could not be allocated.
-    INVALID_OPTIONS     ///< A derived model operation received unsupported options.
+    WRONG_KEY,             ///< The input symbol or source differs from the requested partition.
+    RESOURCE_LIMIT,        ///< A finite count or symbol limit would be exceeded.
+    ALLOCATION_FAILURE,    ///< A required owning copy could not be allocated.
+    INVALID_OPTIONS,       ///< A derived model operation received unsupported options.
+    SOURCE_EPOCH_REQUIRED, ///< Untagged input is disabled after an explicit source epoch starts.
+    SOURCE_EPOCH_MISMATCH, ///< Input token does not name the active source epoch.
+    SOURCE_INACTIVE        ///< The source is fenced or its cut is not current.
 };
 
 /** Independent finite allowances. Zero disables the corresponding capacity. */
@@ -453,6 +457,28 @@ template <detail::IndexedModelEvent Event> class IndexedEventModel final {
             return std::unexpected(IndexedEventModelError::RESOURCE_LIMIT);
         } catch (const std::bad_alloc &) {
             return std::unexpected(IndexedEventModelError::ALLOCATION_FAILURE);
+        }
+    }
+
+    /** @return True while any admitted source transaction or snapshot is incomplete. */
+    [[nodiscard]] bool hasUnfinished() const noexcept {
+        return std::ranges::any_of(partitions_, [](const auto &entry) {
+            return !entry.second.pending.empty();
+        });
+    }
+
+    /** Discard incomplete source fragments without modifying completed indexed values. */
+    void discardUnfinished() noexcept {
+        for (auto entry = partitions_.begin(); entry != partitions_.end();) {
+            auto &partition = entry->second;
+            partition.pending.clear();
+            partition.snapshot = SnapshotProgress::NONE;
+
+            if (partition.active.empty()) {
+                entry = partitions_.erase(entry);
+            } else {
+                ++entry;
+            }
         }
     }
 

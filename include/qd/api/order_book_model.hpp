@@ -3,6 +3,7 @@
 #pragma once
 
 #include "qd/api/indexed_event_model.hpp"
+#include "qd/api/model_source_epoch.hpp"
 #include "qd/events/order.hpp"
 
 #include <chrono>
@@ -76,6 +77,29 @@ class OrderBookModel final {
     IndexedEventModel<events::Order> orders_;
     OrderBookCorrectionOptions correctionOptions_;
     Corrections corrections_;
+    detail::ModelSourceFence source_;
+
+    /** Apply validated-lifecycle indexed input and its dependent correction state.
+     * @param symbol Exact logical key.
+     * @param sourceId Exact source encoded in each order index.
+     * @param input Borrowed orders in arrival order.
+     * @return Atomic success or the typed refusal.
+     */
+    [[nodiscard]] std::expected<void, IndexedEventModelError>
+    applyEvents(std::u16string_view symbol, std::int32_t sourceId, std::span<const events::Order> input);
+
+    /** Copy a view after the caller has selected its qualification policy.
+     * @param symbol Exact logical key.
+     * @param options Borrowed display options.
+     * @return Detached view or a typed refusal.
+     */
+    [[nodiscard]] std::expected<OrderBookSnapshot, IndexedEventModelError>
+    buildSnapshot(std::u16string_view symbol, const OrderBookViewOptions &options) const;
+
+    /** Retire all unfinished values and optionally drop the committed cut.
+     * @param retention The accepted historical retention policy.
+     */
+    void retireData(ModelRetention retention) noexcept;
 
     /** Stage correction stamps from the final completed changes of a single source.
      * @param entries Scratch stamps for the exact symbol.
@@ -152,7 +176,59 @@ class OrderBookModel final {
     [[nodiscard]] std::expected<OrderBookSnapshot, IndexedEventModelError>
     getFilteredSnapshot(std::u16string_view symbol, const OrderBookViewOptions &options) const;
 
-    /** Drop retained and unfinished state. Previously returned snapshots remain valid. */
+    /** @return Detached qualification of the model's current source cut. */
+    [[nodiscard]] ModelSourceState getSourceState() const noexcept;
+
+    /** Start a distinct source epoch and clear committed data and correction stamps.
+     * @param ordinal Strictly increasing positive source ordinal known at the delivery boundary.
+     * @return Token to capture with fresh deliveries, or a typed refusal.
+     */
+    [[nodiscard]] std::expected<ModelSourceEpoch, ModelSourceError> beginSourceEpoch(std::uint64_t ordinal) noexcept;
+
+    /** Fence delivery for a matching gap and retire incomplete transactions.
+     * @param epoch Token for the affected source epoch.
+     * @param retention Whether the old complete cut stays available as historical data.
+     * @return Success or a typed refusal.
+     */
+    [[nodiscard]] std::expected<void, ModelSourceError> markSourceGap(const ModelSourceEpoch &epoch,
+                                                                      ModelRetention retention) noexcept;
+
+    /** Qualify a fresh epoch once the caller has observed complete replay for its selected book.
+     * @param epoch Token for the fresh receiving source.
+     * @return Success when no indexed transaction is unfinished, or a typed refusal.
+     */
+    [[nodiscard]] std::expected<void, ModelSourceError> confirmSourceEpoch(const ModelSourceEpoch &epoch) noexcept;
+
+    /** Terminally fence matching delivery and retire incomplete transactions.
+     * @param epoch Token for the affected source epoch.
+     * @param retention Whether the final complete cut stays available as historical data.
+     * @return Success or a typed refusal. A closed model admits no later source epoch.
+     */
+    [[nodiscard]] std::expected<void, ModelSourceError> closeSource(const ModelSourceEpoch &epoch,
+                                                                    ModelRetention retention) noexcept;
+
+    /** Apply orders associated with their original source activation.
+     * @param epoch Token captured with the originating batch.
+     * @param symbol Exact logical key.
+     * @param sourceId Exact signed order source, independent of the delivery epoch.
+     * @param input Borrowed owning orders in arrival order.
+     * @return Success or a typed refusal. A stale token changes neither data nor correction stamps.
+     */
+    [[nodiscard]] std::expected<void, IndexedEventModelError> processSourceEvents(const ModelSourceEpoch &epoch,
+                                                                                  std::u16string_view symbol,
+                                                                                  std::int32_t sourceId,
+                                                                                  std::span<const events::Order> input);
+
+    /** Copy a book cut together with its exact source qualification, including provisional and historical cuts.
+     * @param symbol Exact logical key.
+     * @param options Borrowed display options. By default the returned cut is unfiltered.
+     * @return Owning snapshot and source qualification, or a typed refusal.
+     */
+    [[nodiscard]] std::expected<ModelSourceSnapshot<OrderBookSnapshot>, IndexedEventModelError>
+    getSourceSnapshot(std::u16string_view symbol,
+                      const OrderBookViewOptions &options = {.filter = OrderBookModelFilter::UNFILTERED}) const;
+
+    /** Drop retained and unfinished state. This fences tracked input until a fresh source begins. */
     void clear() noexcept;
 };
 
