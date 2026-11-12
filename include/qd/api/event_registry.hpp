@@ -47,7 +47,7 @@ enum class EventType {
 /** Explicit source of optional event metadata, independent of indexed record identity. */
 enum class EventTimePolicy {
     UNSPECIFIED,   ///< Do not assert an event timestamp.
-    FIELD_METADATA ///< Use original FIELD metadata when present; otherwise remain unspecified.
+    FIELD_METADATA ///< Use original FIELD metadata, with inherited MESSAGE time as a tape fallback.
 };
 
 /** One explicit schema-bound route; several different records may project the same business type. */

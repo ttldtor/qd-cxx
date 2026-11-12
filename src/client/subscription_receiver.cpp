@@ -267,8 +267,14 @@ projectPrepared(const mux::MuxRecordView &record, const detail::ReceiverRoute &r
     const auto payloadBytes = attachment ? route.attachmentBytes : 0;
     std::optional<std::int64_t> eventTime;
 
-    if (route.timePolicy == ReceiverEventTimePolicy::FIELD_METADATA && record.source && record.source->fieldTime)
-        eventTime = record.versionDefault ? 0 : record.source->fieldTime->eventTimeMs();
+    if (route.timePolicy == ReceiverEventTimePolicy::FIELD_METADATA && record.source) {
+        eventTime = record.source->fieldTime ? std::optional{record.source->fieldTime->eventTimeMs()}
+                                             : record.source->tapeMessageTimeMs;
+
+        if (eventTime && record.versionDefault) {
+            eventTime = 0;
+        }
+    }
 
     const events::BorrowedRecordValueView values{record.context, record.typedValues};
     const auto indexedRemovalTime =
@@ -616,8 +622,9 @@ detail::projectTickerLatest(const ReceiverPlan &plan, const collectors::TickerVa
         record.context = source.context;
         record.symbol = source.symbol;
         record.typedValues = fields;
-        record.source = mux::RawSourceMetadata{raw.senderId,    raw.cipher,    raw.eventFlags,
-                                               raw.removalTime, raw.fieldTime, value.bindingGeneration};
+        record.source = mux::RawSourceMetadata{raw.senderId,         raw.cipher,    raw.eventFlags,
+                                               raw.removalTime,      raw.fieldTime, value.bindingGeneration,
+                                               raw.tapeMessageTimeMs};
         record.versionDefault = value.versionDefault;
 
         return projectPrepared(record, *selected, {});

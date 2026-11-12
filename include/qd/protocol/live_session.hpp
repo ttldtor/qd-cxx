@@ -262,6 +262,7 @@ struct LiveRecordView {
     std::span<const LiveFieldValueView> typedValues; ///< Exact generic tagged values.
     std::optional<std::int64_t> removalTime;         ///< Exact optional raw removal time.
     std::optional<FieldEventTime> fieldTime;         ///< Exact optional virtual-prefix metadata.
+    std::optional<std::int64_t> tapeMessageTimeMs{}; ///< Optional tape MESSAGE cursor time, separate from FIELD.
 };
 
 /** Whole admitted envelope kind; controls are never application records. */

@@ -16,6 +16,22 @@ constexpr std::int32_t STREAM_DATA = 15;
 constexpr std::int32_t HISTORY_DATA = 20;
 constexpr std::size_t SNAPSHOT_UNIT_FACTOR = 4;
 
+/** Keep envelope admission atomic. Its latest FIELD or inherited MESSAGE time sets its deadline. */
+std::optional<std::int64_t> playbackTimestamp(const protocol::TapeFeedResult &event) noexcept {
+    const auto message = event.timing ? event.timing->timestampMs : std::nullopt;
+    std::optional<std::int64_t> latest;
+
+    for (const auto &record : event.records) {
+        const auto time = record.fieldTime ? std::optional{record.fieldTime->eventTimeMs()} : message;
+
+        if (time && (!latest || *time > *latest)) {
+            latest = time;
+        }
+    }
+
+    return latest;
+}
+
 std::size_t checkedProduct(std::size_t count, std::size_t units) {
     if (units != 0 && count > std::numeric_limits<std::size_t>::max() / units) {
         throw Error({ErrorCode::RESOURCE_LIMIT, "tape-limit-product"});
@@ -103,7 +119,7 @@ TapeFileSource::TapeFileSource(const std::filesystem::path &path, TapeSourceOpti
     : file_(openFile(path, options.maximumFileBytes)),
       reader_(protocol::detail::TapeEventBridge::makeFixedSchemaReader(schema, readerLimits(limits, options),
                                                                        limits.data, limits.fieldTime)),
-      bridge_(makeBridge(limits, work)), maximumBytes_(options.maximumFileBytes),
+      bridge_(makeBridge(limits, work)), clock_(options), maximumBytes_(options.maximumFileBytes),
       familyMessage_(family == core::SubscriptionFamily::TICKER    ? TICKER_DATA
                      : family == core::SubscriptionFamily::HISTORY ? HISTORY_DATA
                                                                    : STREAM_DATA) {
@@ -143,8 +159,9 @@ std::expected<void, Diagnostic> TapeFileSource::read(protocol::LiveWork &work) {
     return {};
 }
 
-std::expected<std::optional<protocol::LiveEvent>, Diagnostic> TapeFileSource::next(protocol::LiveWork &work) {
-    if (finished_) {
+std::expected<std::optional<protocol::LiveEvent>, Diagnostic>
+TapeFileSource::next(protocol::LiveWork &work, std::chrono::steady_clock::time_point now) {
+    if (finished_ || !clock_.ready(now)) {
         return std::optional<protocol::LiveEvent>{};
     }
 
@@ -189,6 +206,24 @@ std::expected<std::optional<protocol::LiveEvent>, Diagnostic> TapeFileSource::ne
         pending_.emplace(std::move(decoded));
     }
 
+    if (clock_.paced() && !pendingTimingPlanned_) {
+        if (pending_->records.size() > work.visits) {
+            return std::unexpected(Diagnostic{ErrorCode::WORK_LIMIT, "tape-playback-time"});
+        }
+
+        work.visits -= pending_->records.size();
+
+        if (!clock_.schedule(playbackTimestamp(*pending_), now)) {
+            return std::unexpected(Diagnostic{ErrorCode::TAPE_TIMING_RANGE, "tape-playback-time"});
+        }
+
+        pendingTimingPlanned_ = true;
+    }
+
+    if (!clock_.ready(now)) {
+        return std::optional<protocol::LiveEvent>{};
+    }
+
     auto event = bridge_.copy(*pending_, familyMessage_, work);
 
     if (!event) {
@@ -196,8 +231,22 @@ std::expected<std::optional<protocol::LiveEvent>, Diagnostic> TapeFileSource::ne
     }
 
     pending_.reset();
+    pendingTimingPlanned_ = false;
+    clock_.delivered();
 
     return std::optional<protocol::LiveEvent>(std::move(*event));
+}
+
+bool TapeFileSource::setPaused(bool paused, std::chrono::steady_clock::time_point now) noexcept {
+    return clock_.setPaused(paused, now);
+}
+
+bool TapeFileSource::ready(std::chrono::steady_clock::time_point now) const noexcept {
+    return clock_.ready(now);
+}
+
+std::optional<std::chrono::steady_clock::time_point> TapeFileSource::deadline() const noexcept {
+    return clock_.deadline();
 }
 
 bool TapeFileSource::finished() const noexcept {

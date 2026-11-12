@@ -21,9 +21,11 @@ exact receiving schema and the existing typed subscription path.
 The qualified binary profiles accept supported header or self-described
 headerless input and inline NONE, MESSAGE or FIELD timing. Companion-time
 files, compressed containers, text and blob modes are outside this source
-profile. File timing does not schedule callbacks in this immediate mode.
-Existing FIELD metadata, indexed flags, complete payloads and exact schema
-provenance pass through the ordinary typed mappers.
+profile. Actual FIELD timing supplies each typed event's `eventTime` when
+available. Otherwise a preceding timestamped MESSAGE heartbeat supplies its
+Java cursor time. Untimed input keeps the event type's unspecified value.
+This metadata is independent of price, trade, candle and indexed time fields.
+Registry routes with `EventTimePolicy::NONE` keep their original behavior.
 
 Configure subscriptions before connecting. The worker applies their initial
 desired commands and synchronizes collector registrations before reading. It
@@ -39,14 +41,38 @@ work and event ownership have separate finite allowances. The worker retains
 at most one unadmitted tape result or qualified event, plus the existing
 collector and subscription reservations.
 
+## Pacing and pause
+
+`TapePlaybackPolicy::IMMEDIATE` is the default. For relative playback, select
+`TapePlaybackPolicy::SOURCE_TIME` and set `speedPercent` from 1 through 10,000
+(100 is normal speed). The first timed eligible envelope starts the runtime's
+monotonic clock. An envelope with multiple timestamps is due at its latest
+record time. The adapter uses physical FIELD time when present and the exact
+inherited MESSAGE milliseconds otherwise. Untimed envelopes add no delay.
+Backward timestamps use the elapsed-time high water mark and preserve file
+order. The scaled delay is rounded up to the next whole millisecond.
+
+`maximumSourceSpan` limits forward source time from the first timed envelope.
+It defaults to 24 hours and must be positive and at most 365 days in relative
+mode. An excessive span or unrepresentable deadline reports `TAPE_TIMING_RANGE`.
+The worker holds one future envelope and can wake for its deadline, source
+control or other active endpoints.
+
+Set `initiallyPaused` to open the file without reading envelopes. Use
+`Endpoint::setTapePaused(true)` and `Endpoint::setTapePaused(false)` to hold
+and resume intake on the same endpoint. The worker applies the latest intent,
+shifts the relative clock by its observed pause duration, and lets previously
+admitted work finish. Early close releases the pending envelope and does not
+wait for the playback deadline.
+
 The lifecycle moves through CONNECTING, CONNECTED when the local source is
 open, CLOSING while draining, and CLOSED after clean EOF and retirement.
 Unavailable/nonregular input or an I/O error reports `TAPE_IO_FAILURE`.
 Malformed input, unsupported profile, and capacity failures report
 `PROTOCOL_FAILURE`, `UNSUPPORTED_PROFILE`, or `RESOURCE_LIMIT`, respectively.
-A failed source finishes in FAILED. An explicit close cuts off new intake and
-drains admitted work under the endpoint drain policy. Use a fresh endpoint to
-play again.
+A malformed suffix ends in FAILED after previously admitted work drains under
+the endpoint drain policy. A clean EOF completes in CLOSED after that drain.
+Use a fresh endpoint to play again.
 
 The local collector has a real file-source epoch. No TCP/DNS attempt, peer
 descriptor, wire subscription or peer acknowledgement exists for it. Native
