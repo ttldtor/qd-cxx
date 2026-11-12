@@ -27,6 +27,38 @@ struct TcpRecoveryFactory {
     /** @param recovery Existing worker-owned recovery. @return Only actual current-source peer info. */
     [[nodiscard]] static std::optional<AggregationPeriodInfo>
     aggregationPeriodInfo(const TcpRecovery &recovery) noexcept;
+    /** Visit a current TICKER value synchronously on the recovery owner.
+     * @param recovery Existing worker-owned recovery.
+     * @param handle Exact adopted registration.
+     * @param key Borrowed exact source key.
+     * @param work Finite queue and collector lookup credits.
+     * @param context Caller-owned synchronous context.
+     * @param visitor Nonthrowing visitor which retains no borrowed data.
+     * @return True if visited, false if absent, or typed owner/refusal.
+     */
+    [[nodiscard]] static std::expected<mux::TickerLatestObservation, RecoveryDiagnostic>
+    visitTickerLatest(const TcpRecovery &recovery, const mux::MuxHandle &handle, core::SubscriptionKey key,
+                      mux::QueueWork &work, void *context,
+                      void (*visitor)(void *, const collectors::TickerValue &) noexcept);
+    /** Prepare a receiver and borrow its immutable plan while the returned registration is live.
+     * @param recovery Existing worker-owned recovery.
+     * @param family Existing queue family.
+     * @param bindings Explicit prepared routes.
+     * @param consumer Exact callback owner.
+     * @param receiverLimits Finite plan limits.
+     * @param clientLimits Finite queue limits.
+     * @param receiverWork Remaining preparation work.
+     * @param queueWork Remaining queue work.
+     * @param observationPlan Plan output, borrowed only while the handle is valid and queue is serialized.
+     * @return Existing registration or original refusal.
+     */
+    [[nodiscard]] static std::expected<mux::MuxHandle, RecoveryReceiverFailure>
+    openObservedReceiver(TcpRecovery &recovery, core::SubscriptionFamily family,
+                         std::span<const client::PreparedSubscriptionBinding> bindings,
+                         const std::shared_ptr<client::SubscriptionConsumer> &consumer,
+                         client::ReceiverLimits receiverLimits, mux::ClientLimits clientLimits,
+                         client::ReceiverWork &receiverWork, mux::QueueWork &queueWork,
+                         const client::detail::ReceiverPlan **observationPlan);
     /** Prepare from a counted outer lease; SDK progress and worker affinity remain caller driven.
      * @param bootstrap Outer lease retained across all native and callback retirement.
      * @param endpoint Original immutable route configuration.

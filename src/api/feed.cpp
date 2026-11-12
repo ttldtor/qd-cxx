@@ -5,6 +5,7 @@
 #include "qd/api/feed_filter.hpp"
 #include "qd/api/time_series_subscription.hpp"
 
+#include "../client/subscription_receiver_observation.hpp"
 #include "../transport/tcp_recovery_factory.hpp"
 #include "endpoint_configuration.hpp"
 #include "event_registry_defaults.hpp"
@@ -585,6 +586,23 @@ bool retireSubscription(const std::shared_ptr<detail::SubscriptionPort> &port) n
     return true;
 }
 
+/** Complete an unserved passive request at the owner retirement boundary. */
+void retireLatestRead(detail::EndpointPort &port) noexcept {
+    std::shared_ptr<detail::LatestEventRead> request;
+    {
+        std::lock_guard lock(port.mutex);
+        request = std::move(port.latestRead);
+    }
+
+    if (request) {
+        {
+            std::lock_guard lock(request->mutex);
+            request->completed = true;
+        }
+        request->condition.notify_one();
+    }
+}
+
 /** Retire all producer snapshots after the endpoint's native/receiver owners are gone.
  * @param port Detached endpoint.
  * @param result Actual detached local outcome.
@@ -604,6 +622,7 @@ bool retireEndpoint(const std::shared_ptr<detail::EndpointPort> &port, CloseResu
     }
 
     RetirementGuard guard(port.get());
+    retireLatestRead(*port);
     notifyConnecting(port);
     observeState(port, EndpointState::CLOSING);
 
@@ -2673,7 +2692,8 @@ class TypedConsumer final : public client::SubscriptionConsumer {
 /** Actual logical registration; created, mutated and destroyed only on the SDK worker. */
 struct NativeSubscription {
     std::shared_ptr<SubscriptionPort> port; ///< Detached producer state kept alive through callback return.
-    std::shared_ptr<client::SubscriptionConsumer> consumer; ///< Original complete receiver callable.
+    std::shared_ptr<client::SubscriptionConsumer> consumer;        ///< Original complete receiver callable.
+    const client::detail::ReceiverPlan *observationPlan = nullptr; ///< Borrowed while this exact handle stays live.
     mux::MuxHandle handle;               ///< Existing registration, not an ad hoc filtering callback.
     mux::MuxCommandTicket ticket;        ///< At most one pending real desired replacement.
     std::uint64_t submittedRevision = 0; ///< Frontend revision associated with the actual ticket.
@@ -2703,6 +2723,309 @@ struct NativeEndpoint {
           subscriptions(this->port->limits.maximumSubscriptionsPerEndpoint) {
     }
 };
+
+/** Fixed duration for one external caller waiting on an existing runtime owner. */
+constexpr auto LATEST_EVENT_READ_TIMEOUT = std::chrono::seconds{1};
+constexpr unsigned LASTING_EVENT_TYPES =
+    static_cast<unsigned>(EventSelection::QUOTE) | static_cast<unsigned>(EventSelection::PROFILE) |
+    static_cast<unsigned>(EventSelection::TRADE) | static_cast<unsigned>(EventSelection::TRADE_ETH) |
+    static_cast<unsigned>(EventSelection::SUMMARY) | static_cast<unsigned>(EventSelection::TEXT_CONFIGURATION) |
+    static_cast<unsigned>(EventSelection::CONFIGURATION) | static_cast<unsigned>(EventSelection::GREEKS) |
+    static_cast<unsigned>(EventSelection::UNDERLYING) | static_cast<unsigned>(EventSelection::THEO_PRICE) |
+    static_cast<unsigned>(EventSelection::CANDLE) | static_cast<unsigned>(EventSelection::NUAM_TRADE);
+
+/** Borrow this runtime's immutable native slot inventory for same-worker reads. */
+struct LatestEventOwner {
+    const RuntimeControl *control = nullptr;
+    const std::vector<std::unique_ptr<NativeEndpoint>> *endpoints = nullptr;
+};
+
+thread_local LatestEventOwner latestEventOwner;
+
+struct LatestEventOwnerScope {
+    LatestEventOwnerScope(const RuntimeControl &control,
+                          const std::vector<std::unique_ptr<NativeEndpoint>> &endpoints) {
+        latestEventOwner = {&control, &endpoints};
+    }
+
+    ~LatestEventOwnerScope() {
+        latestEventOwner = {};
+    }
+};
+
+/** Test one logical selector under its subscription mutex. */
+bool hasLatestDemand(const SubscriptionPort &port, EventType type, std::u16string_view symbol, bool ifSubscribed) {
+    if (!selectsEvent(port.eventSelection, type) || port.closeRequested.load(std::memory_order_acquire) ||
+        port.retired.load(std::memory_order_acquire) || port.state == SubscriptionState::FAILED) {
+        return false;
+    }
+
+    return std::ranges::any_of(port.symbols, [&](const auto &selector) {
+        if (selector.eventSymbol() != symbol)
+            return false;
+
+        if (selector.kind() == SubscriptionSymbolKind::PLAIN)
+            return true;
+
+        return selector.kind() == SubscriptionSymbolKind::INDEXED &&
+               (!ifSubscribed ||
+                ((type == EventType::CANDLE || isOptionTimeSeriesEvent(type)) && selector.sourceId().value_or(0) <= 0));
+    });
+}
+
+/** Check for exact local demand while the endpoint owns the current registration slots. */
+bool hasLatestDemand(const EndpointPort &port, EventType type, std::u16string_view symbol, bool ifSubscribed) {
+    if (port.closeRequested.load(std::memory_order_acquire) || port.retired.load(std::memory_order_acquire))
+        return false;
+
+    for (const auto &subscription : port.subscriptions) {
+        if (!subscription)
+            continue;
+
+        std::lock_guard lock(subscription->mutex);
+
+        if (hasLatestDemand(*subscription, type, symbol, ifSubscribed))
+            return true;
+    }
+
+    return false;
+}
+
+/** Check the detached source or quiescent pause fence under the endpoint mutex. */
+bool hasEligibleLatestSource(const EndpointPort &port) noexcept {
+    if (port.clearedRevision != port.clearRevision || port.closeRequested.load(std::memory_order_acquire))
+        return false;
+
+    if (port.connectionIntent)
+        return port.state == EndpointState::CONNECTED && port.activeDeliveryRevision == port.connectionRevision;
+
+    return port.state == EndpointState::NOT_CONNECTED && port.pausedReplayFence != 0 &&
+           port.pausedReplayFence == port.connectionRevision;
+}
+
+/** Translate exact projection refusals without failing the source for an observation. */
+Diagnostic latestProjectionDiagnostic(const client::ReceiverProjectionFailure &failure) noexcept {
+    if (const auto *receiver = std::get_if<client::ReceiverError>(&failure)) {
+        const auto code = *receiver == client::ReceiverError::ALLOCATION_FAILURE ? ErrorCode::ALLOCATION_FAILURE
+                          : *receiver == client::ReceiverError::RESOURCE_LIMIT   ? ErrorCode::RESOURCE_LIMIT
+                          : *receiver == client::ReceiverError::WORK_LIMIT       ? ErrorCode::WORK_LIMIT
+                                                                                 : ErrorCode::INVALID_STATE;
+
+        return {code, "latest-event-projection", 0, static_cast<std::uint32_t>(*receiver)};
+    }
+
+    const auto mapping = std::get<events::MappingError>(failure);
+    const auto code = mapping == events::MappingError::ALLOCATION_FAILURE ? ErrorCode::ALLOCATION_FAILURE
+                      : mapping == events::MappingError::RESOURCE_LIMIT   ? ErrorCode::RESOURCE_LIMIT
+                                                                          : ErrorCode::PROTOCOL_FAILURE;
+
+    return {code, "latest-event-projection", 0, static_cast<std::uint32_t>(mapping)};
+}
+
+/** Project one active TICKER value. Never retain a collector record or run user code. */
+std::optional<RegisteredEvent> captureLatest(NativeEndpoint &endpoint, EventType type, std::u16string_view symbol,
+                                             bool ifSubscribed) {
+    std::uint64_t connectionRevision;
+    {
+        std::lock_guard lock(endpoint.port->mutex);
+
+        if (!hasEligibleLatestSource(*endpoint.port))
+            return std::nullopt;
+
+        connectionRevision = endpoint.port->connectionRevision;
+    }
+
+    const auto selection = static_cast<EventSelection>(1U << static_cast<unsigned>(type));
+
+    if (!(endpoint.profile.boundKinds & static_cast<unsigned>(selection)))
+        return std::nullopt;
+
+    const auto &plan = receivingEventPlan(endpoint.profile, selection);
+    ReceivingSymbol key{std::u16string(symbol), {}, 0, {}, core::SubscriptionSelectorKind::EXACT, {}, {}, {}};
+    prepareReceivingSymbols(endpoint.profile, plan, std::span(&key, 1));
+
+    auto work = endpoint.profile.queueWork;
+    std::array<bool, MAXIMUM_RECEIVING_BINDINGS> knownAbsent{};
+
+    for (const auto &subscription : endpoint.subscriptions) {
+        if (!subscription || subscription->stopping || !subscription->hasSubmitted || !subscription->observationPlan)
+            continue;
+
+        std::uint64_t revision;
+        {
+            std::lock_guard lock(subscription->port->mutex);
+
+            if (!hasLatestDemand(*subscription->port, type, symbol, ifSubscribed) ||
+                subscription->submittedRevision != subscription->port->revision)
+                continue;
+
+            revision = subscription->port->revision;
+        }
+
+        for (const auto index : std::span(plan.bindingIndices).first(plan.bindingCount)) {
+            if (knownAbsent[index] || !receivingSymbolMatches(endpoint.profile, index, key))
+                continue;
+
+            struct Observation {
+                const client::detail::ReceiverPlan &plan;
+                client::ReceiverProjectionWork work;
+                std::optional<std::expected<client::SubscriptionProjection, client::ReceiverProjectionFailure>> result;
+            } observation{*subscription->observationPlan, plan.projectionWork, {}};
+
+            const auto visitor = [](void *context, const collectors::TickerValue &value) noexcept {
+                auto &selected = *static_cast<Observation *>(context);
+                selected.result.emplace(client::detail::projectTickerLatest(selected.plan, value, selected.work));
+            };
+            const auto id = endpoint.profile.bindings[index].localId;
+            const auto &physical = receivingPhysicalSymbol(endpoint.profile, index, key);
+            auto visited = transport::detail::TcpRecoveryFactory::visitTickerLatest(
+                *endpoint.recovery, subscription->handle, {endpoint.profile.schema.recordContext(id), physical}, work,
+                &observation, visitor);
+
+            if (!visited) {
+                const auto &failure = visited.error();
+
+                if (failure.error == transport::RecoveryError::INVALID_STATE &&
+                    (!failure.queue || failure.queue->error == mux::QueueError::INVALID_STATE ||
+                     failure.queue->error == mux::QueueError::INVALID_CLIENT))
+                    continue;
+
+                throw Error(recoveryDiagnostic(failure));
+            }
+
+            if (*visited == mux::TickerLatestObservation::UNMAPPED)
+                continue;
+
+            if (*visited == mux::TickerLatestObservation::ABSENT) {
+                // Every mapped registration reads the same committed cache for this key.
+                knownAbsent[index] = true;
+
+                continue;
+            }
+
+            if (!observation.result)
+                reject(ErrorCode::INVALID_STATE, "latest-event-observation");
+
+            auto &result = *observation.result;
+
+            if (!result)
+                throw Error(latestProjectionDiagnostic(result.error()));
+
+            // Producer changes may overlap the detached copy. Do not expose a copy
+            // invalidated by accepted removal, close, clear or explicit reconnect.
+            {
+                std::lock_guard endpointLock(endpoint.port->mutex);
+                std::lock_guard subscriptionLock(subscription->port->mutex);
+
+                if (!hasEligibleLatestSource(*endpoint.port) || endpoint.port->connectionRevision != connectionRevision)
+                    return std::nullopt;
+
+                if (subscription->port->revision != revision ||
+                    !hasLatestDemand(*subscription->port, type, symbol, ifSubscribed))
+                    continue;
+            }
+
+            return std::visit(
+                [](auto &&value) -> std::optional<RegisteredEvent> {
+                    if constexpr (std::is_same_v<std::remove_cvref_t<decltype(value)>, std::monostate>)
+                        return std::nullopt;
+                    else
+                        return RegisteredEvent{std::move(value)};
+                },
+                std::move(result->value));
+        }
+    }
+
+    return std::nullopt;
+}
+
+/** Service one bounded request outside all user callbacks and producer locks. */
+void completeLatestRead(EndpointPort &port, NativeEndpoint *endpoint,
+                        const std::shared_ptr<LatestEventRead> &request) noexcept {
+    bool cancelled;
+    {
+        std::lock_guard lock(request->mutex);
+        cancelled = request->cancelled || request->completed;
+    }
+
+    Diagnostic failure;
+    std::optional<RegisteredEvent> result;
+
+    if (!cancelled && endpoint) {
+        try {
+            result = producerAction([&] {
+                return captureLatest(*endpoint, request->type, request->symbol, request->ifSubscribed);
+            });
+        } catch (const Error &error) {
+            failure = error.diagnostic();
+        } catch (...) {
+            failure = {ErrorCode::INVALID_STATE, "latest-event-observation"};
+        }
+    }
+
+    {
+        std::lock_guard endpointLock(port.mutex);
+        std::lock_guard requestLock(request->mutex);
+
+        if (request->completed)
+            return;
+
+        if (!request->cancelled) {
+            request->result = std::move(result);
+            request->failure = failure;
+        }
+
+        request->completed = true;
+
+        if (port.latestRead == request)
+            port.latestRead.reset();
+    }
+    request->condition.notify_one();
+}
+
+/** Create one ordinary default event with independent symbol storage. */
+template <class Event> RegisteredEvent defaultLatest(std::u16string_view symbol) {
+    Event event{};
+
+    if constexpr (std::is_same_v<Event, events::Candle>)
+        event.eventSymbol = events::CandleSymbol::valueOf(symbol);
+    else
+        event.symbol = symbol;
+
+    return RegisteredEvent{std::move(event)};
+}
+
+/** Create the default for an eligible LastingEvent, or reject another registered type. */
+RegisteredEvent defaultLatest(EventType type, std::u16string_view symbol) {
+    switch (type) {
+    case EventType::QUOTE:
+        return defaultLatest<events::Quote>(symbol);
+    case EventType::PROFILE:
+        return defaultLatest<events::Profile>(symbol);
+    case EventType::TRADE:
+        return defaultLatest<events::Trade>(symbol);
+    case EventType::TRADE_ETH:
+        return defaultLatest<events::TradeETH>(symbol);
+    case EventType::SUMMARY:
+        return defaultLatest<events::Summary>(symbol);
+    case EventType::TEXT_CONFIGURATION:
+        return defaultLatest<events::TextConfiguration>(symbol);
+    case EventType::CONFIGURATION:
+        return defaultLatest<events::Configuration>(symbol);
+    case EventType::GREEKS:
+        return defaultLatest<events::Greeks>(symbol);
+    case EventType::UNDERLYING:
+        return defaultLatest<events::Underlying>(symbol);
+    case EventType::THEO_PRICE:
+        return defaultLatest<events::TheoPrice>(symbol);
+    case EventType::CANDLE:
+        return defaultLatest<events::Candle>(symbol);
+    case EventType::NUAM_TRADE:
+        return defaultLatest<events::NuamTrade>(symbol);
+    default:
+        reject(ErrorCode::UNSUPPORTED_PROFILE, "latest-event-type");
+    }
+}
 
 /** Create all low-level owners on the actual execution thread, then request explicit start.
  * @param bootstrap Main-owned lifetime, borrowed through all worker-native retirement.
@@ -2774,9 +3097,10 @@ std::unique_ptr<NativeSubscription> registerSubscription(NativeEndpoint &endpoin
         throw Error({ErrorCode::RESOURCE_LIMIT, "subscription-binding-copy"});
     }
 
-    auto handle = endpoint.recovery->openSubscriptionReceiver(
-        endpoint.profile.family, std::span(selectedBindings).first(plan.bindingCount), result->consumer, plan.limits,
-        endpoint.profile.clientLimits, receiverWork, queueWork);
+    auto handle = transport::detail::TcpRecoveryFactory::openObservedReceiver(
+        *endpoint.recovery, endpoint.profile.family, std::span(selectedBindings).first(plan.bindingCount),
+        result->consumer, plan.limits, endpoint.profile.clientLimits, receiverWork, queueWork,
+        &result->observationPlan);
 
     if (!handle) {
         if (const auto *failure = std::get_if<transport::RecoveryDiagnostic>(&handle.error())) {
@@ -3398,6 +3722,7 @@ void RuntimeImpl::shutdown() {
 
 void RuntimeImpl::run() noexcept {
     std::vector<std::unique_ptr<NativeEndpoint>> native;
+    LatestEventOwnerScope latestOwner(*control, native);
 
     try {
         native.resize(options.maximumEndpoints);
@@ -3432,10 +3757,15 @@ void RuntimeImpl::run() noexcept {
                 }
 
                 bool connectRequested = false;
+                std::shared_ptr<LatestEventRead> latestRead;
                 {
                     std::lock_guard lock(port->mutex);
                     connectRequested = port->connectRequested && port->connectionIntent;
+                    latestRead = port->latestRead;
                 }
+
+                if (latestRead)
+                    completeLatestRead(*port, native[index].get(), latestRead);
 
                 // Capture admission before draining its notification: a concurrent later connect must wait
                 // for the next turn instead of activating ahead of its deferred CONNECTING selection.
@@ -3603,6 +3933,96 @@ void RuntimeImpl::run() noexcept {
     }
 }
 } // namespace detail
+
+std::optional<RegisteredEvent> Feed::readLastEvent(EventType type, std::u16string_view symbol,
+                                                   bool ifSubscribed) const {
+    return producerAction([&]() -> std::optional<RegisteredEvent> {
+        const auto kind = static_cast<unsigned>(type);
+
+        if (!(detail::LASTING_EVENT_TYPES & (1U << kind)))
+            reject(ErrorCode::UNSUPPORTED_PROFILE, "latest-event-type");
+
+        if (port_->options.contract != DeliveryContract::TICKER || symbol.empty())
+            return std::nullopt;
+
+        if (symbol.size() > port_->limits.maximumSymbolUnits || symbol.front() == u'*' ||
+            !std::ranges::all_of(symbol, [](char16_t unit) {
+                return unit >= FIRST_PRINTABLE_ASCII && unit <= LAST_PRINTABLE_ASCII;
+            })) {
+            reject(ErrorCode::INVALID_ARGUMENT, "latest-event-symbol");
+        }
+
+        std::shared_ptr<detail::LatestEventRead> request;
+        const auto control = port_->control.lock();
+        const bool onOwner = control && detail::latestEventOwner.control == control.get();
+        {
+            std::lock_guard lock(port_->mutex);
+
+            if (!detail::hasLatestDemand(*port_, type, symbol, ifSubscribed))
+                return std::nullopt;
+
+            if (!control || !detail::hasEligibleLatestSource(*port_)) {
+                if (ifSubscribed)
+                    return detail::defaultLatest(type, symbol);
+
+                return std::nullopt;
+            }
+
+            if (!onOwner) {
+                if (port_->latestRead)
+                    reject(ErrorCode::RESOURCE_LIMIT, "latest-event-read-busy");
+
+                request = std::make_shared<detail::LatestEventRead>(type, symbol, ifSubscribed);
+                port_->latestRead = request;
+            }
+        }
+
+        if (onOwner) {
+            for (const auto &endpoint : *detail::latestEventOwner.endpoints) {
+                if (endpoint && endpoint->port.get() == port_.get()) {
+                    if (auto result = detail::captureLatest(*endpoint, type, symbol, ifSubscribed))
+                        return result;
+
+                    break;
+                }
+            }
+        } else {
+            wake(port_->control);
+            std::unique_lock lock(request->mutex);
+
+            if (!request->condition.wait_for(lock, detail::LATEST_EVENT_READ_TIMEOUT, [&] {
+                    return request->completed;
+                })) {
+                request->cancelled = true;
+                reject(ErrorCode::WORK_LIMIT, "latest-event-read-timeout");
+            }
+
+            if (request->failure.code != ErrorCode::NONE)
+                throw Error(request->failure);
+
+            if (request->result)
+                return std::move(request->result);
+        }
+
+        if (ifSubscribed) {
+            std::lock_guard lock(port_->mutex);
+
+            if (detail::hasLatestDemand(*port_, type, symbol, true))
+                return detail::defaultLatest(type, symbol);
+        }
+
+        return std::nullopt;
+    });
+}
+
+std::optional<RegisteredEvent> Feed::readLastEvent(EventType type, std::string_view symbol) const {
+    return producerAction([&] {
+        if (symbol.empty())
+            return readLastEvent(type, std::u16string_view{}, true);
+
+        return readLastEvent(type, exactSymbol(symbol, port_->limits.maximumSymbolUnits), true);
+    });
+}
 
 namespace {
 /** Validate and snapshot caller settings before publishing any runtime.
