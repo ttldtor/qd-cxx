@@ -1449,6 +1449,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
         bool timeAndSale = false;
         bool optionSale = false;
         bool nuamTrade = false;
+        bool nuamTimeAndSale = false;
 
         for (const auto type : types) {
             switch (type) {
@@ -1515,6 +1516,9 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             case EventType::OPTION_SALE:
                 optionSale = true;
                 break;
+            case EventType::NUAM_TIME_AND_SALE:
+                nuamTimeAndSale = true;
+                break;
             case EventType::NUAM_TRADE:
                 nuamTrade = true;
                 break;
@@ -1533,7 +1537,8 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             (spreadOrder ? 1U << 11 : 0U) | (analyticOrder ? 1U << 12 : 0U) | (otcMarketsOrder ? 1U << 13 : 0U) |
             (orderImbalance ? 1U << 14 : 0U) | (series ? 1U << 15 : 0U) | (greeks ? 1U << 16 : 0U) |
             (underlying ? 1U << 17 : 0U) | (theoPrice ? 1U << 18 : 0U) | (candle ? 1U << 19 : 0U) |
-            (timeAndSale ? 1U << 20 : 0U) | (optionSale ? 1U << 21 : 0U) | (nuamTrade ? 1U << 22 : 0U));
+            (timeAndSale ? 1U << 20 : 0U) | (optionSale ? 1U << 21 : 0U) | (nuamTrade ? 1U << 22 : 0U) |
+            (nuamTimeAndSale ? 1U << 23 : 0U));
         const auto delivery = registeredDelivery  ? detail::EventDelivery::REGISTERED
                               : quote             ? detail::EventDelivery::QUOTE
                               : profile           ? detail::EventDelivery::PROFILE
@@ -1555,6 +1560,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                               : candle            ? detail::EventDelivery::CANDLE
                               : timeAndSale       ? detail::EventDelivery::TIME_AND_SALE
                               : optionSale        ? detail::EventDelivery::OPTION_SALE
+                              : nuamTimeAndSale   ? detail::EventDelivery::NUAM_TIME_AND_SALE
                               : nuamTrade         ? detail::EventDelivery::NUAM_TRADE
                               : order             ? detail::EventDelivery::ORDER
                                                   : detail::EventDelivery::CONFIGURATION;
@@ -1617,6 +1623,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                                           static_cast<unsigned>(detail::EventSelection::THEO_PRICE) |
                                           static_cast<unsigned>(detail::EventSelection::CANDLE) |
                                           static_cast<unsigned>(detail::EventSelection::TIME_AND_SALE) |
+                                          static_cast<unsigned>(detail::EventSelection::NUAM_TIME_AND_SALE) |
                                           static_cast<unsigned>(detail::EventSelection::OPTION_SALE);
 
             if (port_->options.contract == DeliveryContract::HISTORY &&
@@ -1685,6 +1692,8 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             bool registeredTimeAndSale = !port_->options.eventRegistry;
             bool registeredOptionSale = registeredMarketMaker;
             bool registeredNuamTrade = !port_->options.eventRegistry;
+            bool registeredNuamTimeAndSale =
+                !port_->options.eventRegistry && port_->options.contract != DeliveryContract::TICKER;
             bool registeredOrderImbalance =
                 !port_->options.eventRegistry && port_->options.contract == DeliveryContract::TICKER;
 
@@ -1708,6 +1717,8 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                     registeredTimeAndSale = registeredTimeAndSale || registration.type == EventType::TIME_AND_SALE;
                     registeredOptionSale = registeredOptionSale || registration.type == EventType::OPTION_SALE;
                     registeredNuamTrade = registeredNuamTrade || registration.type == EventType::NUAM_TRADE;
+                    registeredNuamTimeAndSale =
+                        registeredNuamTimeAndSale || registration.type == EventType::NUAM_TIME_AND_SALE;
                     registeredMessage = registeredMessage || registration.type == EventType::MESSAGE;
                     registeredConfiguration = registeredConfiguration || registration.type == EventType::CONFIGURATION;
                     registeredOrder = registeredOrder || registration.type == EventType::ORDER;
@@ -1734,7 +1745,8 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                 (orderImbalance && !registeredOrderImbalance) || (series && !registeredSeries) ||
                 (greeks && !registeredGreeks) || (underlying && !registeredUnderlying) ||
                 (theoPrice && !registeredTheoPrice) || (timeAndSale && !registeredTimeAndSale) ||
-                (optionSale && !registeredOptionSale) || (nuamTrade && !registeredNuamTrade)) {
+                (optionSale && !registeredOptionSale) || (nuamTrade && !registeredNuamTrade) ||
+                (nuamTimeAndSale && !registeredNuamTimeAndSale)) {
                 reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-unregistered-event");
             }
 
@@ -1890,6 +1902,7 @@ template class Subscription<events::Underlying>;
 template class Subscription<events::TheoPrice>;
 template class Subscription<events::Candle>;
 template class Subscription<events::TimeAndSale>;
+template class Subscription<events::NuamTimeAndSale>;
 template class Subscription<events::OptionSale>;
 template class Subscription<RegisteredEvent>;
 
@@ -2592,6 +2605,8 @@ class TypedConsumer final : public client::SubscriptionConsumer {
                 return deliver<events::TheoPrice>(batch, listeners, executor, completion, historyRevision);
             case EventDelivery::CANDLE:
                 return deliver<events::Candle>(batch, listeners, executor, completion, historyRevision);
+            case EventDelivery::NUAM_TIME_AND_SALE:
+                return deliver<events::NuamTimeAndSale>(batch, listeners, executor, completion, historyRevision);
             case EventDelivery::TIME_AND_SALE:
                 return deliver<events::TimeAndSale>(batch, listeners, executor, completion, historyRevision);
             case EventDelivery::OPTION_SALE:

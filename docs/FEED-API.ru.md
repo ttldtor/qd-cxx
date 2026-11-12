@@ -685,3 +685,5 @@ SDK применяет demand и снимает устаревшую HISTORY д�
 Для получения NuamTrade используйте `createSubscription<events::NuamTrade>()` на TICKER или STREAM
 endpoint. Событие расширяет Trade независимо обновляемой статистикой биржи. См.
 [поля и маршрутизацию NuamTrade](../spec/events/NUAM-TRADE.ru.md).
+
+`NuamTimeAndSale` доступен через типизированный Feed на STREAM и HISTORY. Он дополняет `TimeAndSale` идентификатором сделки `matchId`; HISTORY сохраняет индекс, флаги транзакций и удаления. По умолчанию доступна составная запись; региональные маршруты задаются явным реестром.

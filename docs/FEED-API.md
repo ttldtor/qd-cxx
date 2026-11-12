@@ -663,3 +663,5 @@ Use `Feed::createSubscription<events::OptionSale>()` on a HISTORY endpoint. See 
 Receive NuamTrade using `createSubscription<events::NuamTrade>()` on a TICKER or STREAM endpoint.
 The event extends Trade with independently updated exchange statistics. See the
 [NuamTrade fields and routing](../spec/events/NUAM-TRADE.md).
+
+Receive `NuamTimeAndSale` on STREAM or HISTORY using the typed Feed API. It extends `TimeAndSale` with the matching engine `matchId`; HISTORY retains its indexed transaction and removal flags. The default route is composite; regional routes require an explicit registry.

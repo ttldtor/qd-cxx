@@ -17,10 +17,10 @@
 namespace org::ttldtor::qdcxx::api::detail {
 inline constexpr std::size_t RECEIVING_OWNER_POLLS_PER_TURN =
     64; ///< One shared finite protocol/queue seed across the existing worker burst.
-inline constexpr std::size_t MAXIMUM_RECEIVING_RECORDS = 45; ///< Complete bounded native record catalog.
+inline constexpr std::size_t MAXIMUM_RECEIVING_RECORDS = 46; ///< Complete bounded native record catalog.
 inline constexpr std::size_t MAXIMUM_RECEIVING_BINDINGS =
     2 * MAXIMUM_RECEIVING_RECORDS;                       ///< Native plus compatible derived family per physical record.
-inline constexpr std::size_t RECEIVING_EVENT_KINDS = 23; ///< Explicitly supported native event kinds.
+inline constexpr std::size_t RECEIVING_EVENT_KINDS = 24; ///< Explicitly supported native event kinds.
 
 /** Conservative stack initialization plus complete metadata read/write work; no dynamic allocation. */
 inline constexpr std::size_t RECEIVING_BINDING_COPY_WORK =
