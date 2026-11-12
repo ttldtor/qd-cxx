@@ -23,9 +23,10 @@ namespace org::ttldtor::qdcxx::api {
 
 /** Finite model refusal. A failed operation publishes no changes. */
 enum class IndexedEventModelError {
-    WRONG_KEY,         ///< The input symbol or source differs from the requested partition.
-    RESOURCE_LIMIT,    ///< A finite count or symbol limit would be exceeded.
-    ALLOCATION_FAILURE ///< A required owning copy could not be allocated.
+    WRONG_KEY,          ///< The input symbol or source differs from the requested partition.
+    RESOURCE_LIMIT,     ///< A finite count or symbol limit would be exceeded.
+    ALLOCATION_FAILURE, ///< A required owning copy could not be allocated.
+    INVALID_OPTIONS     ///< A derived model operation received unsupported options.
 };
 
 /** Independent finite allowances. Zero disables the corresponding capacity. */
@@ -269,6 +270,27 @@ template <detail::IndexedModelEvent Event> class IndexedEventModel final {
      */
     [[nodiscard]] std::expected<Changes, IndexedEventModelError>
     processEvents(std::u16string_view symbol, std::int32_t sourceId, std::span<const Event> input) {
+        return processEventsChecked(symbol, sourceId, input,
+                                    [](const Changes &) -> std::expected<void, IndexedEventModelError> {
+                                        return {};
+                                    });
+    }
+
+    private:
+    friend class OrderBookModel;
+
+    /** Prepare indexed data and dependent state before publishing either.
+     * @tparam Prepare Internal callable returning success or a typed refusal without publishing state.
+     * @param symbol Exact logical symbol.
+     * @param sourceId Exact signed source ID.
+     * @param input Borrowed events in arrival order.
+     * @param prepare Stages dependent data while completed changes remain valid.
+     * @return Owning completed changes, or a refusal leaving the indexed model unchanged.
+     */
+    template <class Prepare>
+    [[nodiscard]] std::expected<Changes, IndexedEventModelError>
+    processEventsChecked(std::u16string_view symbol, std::int32_t sourceId, std::span<const Event> input,
+                         Prepare &&prepare) {
         using namespace events::indexed_event_flags;
 
         if (symbol.size() > limits_.symbolUnits || input.size() > limits_.inputEvents) {
@@ -339,6 +361,12 @@ template <detail::IndexedModelEvent Event> class IndexedEventModel final {
                 }
             }
 
+            if (!changes.empty()) {
+                if (const auto prepared = prepare(changes); !prepared) {
+                    return std::unexpected(prepared.error());
+                }
+            }
+
             if (next.active.empty() && next.pending.empty()) {
                 if (current != partitions_.end()) {
                     partitions_.erase(current);
@@ -363,6 +391,7 @@ template <detail::IndexedModelEvent Event> class IndexedEventModel final {
         }
     }
 
+    public:
     /** Copy the currently retained view, independent of pending values.
      * @param symbol Exact UTF-16 logical symbol.
      * @param sourceId Exact signed source ID.

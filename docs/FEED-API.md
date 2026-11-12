@@ -650,6 +650,10 @@ at a time, then call `getSnapshot(symbol)` for owning bid and ask lists from
 the same cut. See the [order-book contract](../spec/events/ORDER-BOOK-MODEL.md)
 for ordering, snapshot completion and limits.
 
+Use `getFilteredSnapshot` to select scopes, one source, depth or lot size.
+Enable aggregate correction explicitly when creating the model. Corrections
+use completed updates and business time. See [display and correction rules](../spec/events/ORDER-BOOK-MODEL.md).
+
 ## Indexed option series
 
 Use `Feed::createSubscription<events::Series>()` on a HISTORY endpoint. The default
