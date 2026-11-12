@@ -49,6 +49,12 @@ enum class TickerDeliveryKind {
     LIVE     ///< Changed latest value after initial acknowledgment.
 };
 
+/** Selection policy for a prepared collector offer. */
+enum class TickerOfferPolicy {
+    NORMAL,      ///< Existing fair initial/live selection.
+    INITIAL_ONLY ///< Select an unacknowledged initial membership, preserving ordinary fairness credit.
+};
+
 /** Opaque fixed token backing; contains no collector pointer or protocol owner. */
 struct TickerIdentity;
 
@@ -326,6 +332,14 @@ class TickerCollector {
      */
     [[nodiscard]] std::expected<std::optional<TickerDelivery>, TickerError> front(const TickerViewToken &view,
                                                                                   TickerWork &work);
+    /** Prepare an offer under an explicit bounded selection policy.
+     * @param view Exact live view token.
+     * @param work Metadata/offer credits.
+     * @param policy Normal fair selection or an initial-only offer.
+     * @return Empty or a prepared value; the existing pop acknowledges either offer.
+     */
+    [[nodiscard]] std::expected<std::optional<TickerDelivery>, TickerError>
+    frontWithPolicy(const TickerViewToken &view, TickerWork &work, TickerOfferPolicy policy);
     /** Acknowledge exactly the current successful nonempty offer.
      * @param view Exact live view token.
      * @param work Queue/offer credits.

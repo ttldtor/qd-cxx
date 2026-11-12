@@ -1177,6 +1177,33 @@ template <class Event> SubscriptionStatistics Subscription<Event>::getStatistics
     return port_->statistics->snapshot();
 }
 
+template <class Event>
+std::optional<std::chrono::milliseconds> Subscription<Event>::getAggregationPeriod() const noexcept {
+    std::lock_guard lock(port_->statistics->mutex);
+
+    return port_->statistics->subscriptionAggregationPeriod;
+}
+
+template <class Event> void Subscription<Event>::setAggregationPeriod(std::optional<std::chrono::milliseconds> period) {
+    if (period && (period->count() < 0 || *period > MAXIMUM_LOCAL_AGGREGATION_PERIOD))
+        reject(ErrorCode::INVALID_ARGUMENT, "subscription-local-aggregation-period");
+
+    {
+        std::lock_guard lock(port_->mutex);
+        requireOpen(*port_);
+        std::lock_guard statisticsLock(port_->statistics->mutex);
+        port_->statistics->subscriptionAggregationPeriod = period;
+    }
+    wake(port_->control);
+}
+
+template <class Event>
+std::optional<std::chrono::milliseconds> Subscription<Event>::getAggregationPeriodInfo() const noexcept {
+    std::lock_guard lock(port_->statistics->mutex);
+
+    return port_->statistics->deliveredAggregationPeriod;
+}
+
 template <class Event> HistorySubscriptionSnapshot Subscription<Event>::getHistorySnapshot() const {
     return producerAction([&] {
         return detail::copyHistorySnapshot(port_);
@@ -1561,6 +1588,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
         std::unique_lock policyGate(control->callbackPolicyMutex);
         auto subscription = std::make_shared<detail::SubscriptionPort>();
         subscription->statistics = std::make_shared<core::detail::DeliveryStatisticsState>();
+        subscription->statistics->endpointAggregationPeriod = port_->options.aggregationPeriod;
         subscription->statistics->value.ownerIdentity = std::make_shared<const std::byte>();
         subscription->statistics->value.observedAt = std::chrono::steady_clock::now();
         subscription->history.ownerIdentity = subscription->statistics->value.ownerIdentity;
@@ -2277,10 +2305,23 @@ class TypedConsumer final : public client::SubscriptionConsumer {
         // One selection lasts through the whole underlying batch. Reentrant mutation affects a later batch.
         bool complete = true;
 
+        bool began = false;
+
         for (const auto &listener : *listeners) {
             if (port_->closeRequested.load(std::memory_order_acquire)) {
                 complete = false;
                 break;
+            }
+
+            if (!began) {
+                std::lock_guard lock(port_->statistics->mutex);
+                port_->statistics->deliveredAggregationPeriod = port_->statistics->selectedAggregationPeriod;
+
+                if (!port_->statistics->selectedAggregationSnapshotBypass)
+                    port_->statistics->nextAggregationDelivery =
+                        std::chrono::steady_clock::now() + port_->statistics->selectedAggregationPeriod;
+
+                began = true;
             }
 
             port_->statistics->update([](auto &s) {
