@@ -659,3 +659,7 @@ The default receiving registry supports the standard `Candle` and `TradeHistory`
 ## Receive OptionSale
 
 Use `Feed::createSubscription<events::OptionSale>()` on a HISTORY endpoint. See [OptionSale fields and indexed identity](OPTION-SALE-EVENT.md).
+
+Receive NuamTrade using `createSubscription<events::NuamTrade>()` on a TICKER or STREAM endpoint.
+The event extends Trade with independently updated exchange statistics. See the
+[NuamTrade fields and routing](../spec/events/NUAM-TRADE.md).

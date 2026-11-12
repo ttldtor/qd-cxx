@@ -83,7 +83,8 @@ bool validBinding(const PreparedSubscriptionBinding &binding) noexcept {
             binding.kind == PreparedEventKind::ORDER_IMBALANCE || binding.kind == PreparedEventKind::SERIES ||
             binding.kind == PreparedEventKind::GREEKS || binding.kind == PreparedEventKind::UNDERLYING ||
             binding.kind == PreparedEventKind::THEO_PRICE || binding.kind == PreparedEventKind::CANDLE ||
-            binding.kind == PreparedEventKind::TIME_AND_SALE || binding.kind == PreparedEventKind::OPTION_SALE) &&
+            binding.kind == PreparedEventKind::TIME_AND_SALE || binding.kind == PreparedEventKind::OPTION_SALE ||
+            binding.kind == PreparedEventKind::NUAM_TRADE) &&
            (binding.eventTimePolicy == ReceiverEventTimePolicy::UNSPECIFIED ||
             binding.eventTimePolicy == ReceiverEventTimePolicy::FIELD_METADATA) &&
            (binding.projection == events::EventProjection::NATIVE ||
@@ -124,7 +125,7 @@ struct ReceiverRoute {
                  events::PreparedOtcMarketsOrder, events::PreparedOrderImbalance, events::PreparedSeries,
                  events::PreparedGreeks, events::PreparedUnderlying, events::PreparedTheoPrice,
                  events::PreparedTimeAndSale, events::PreparedOptionSale, events::PreparedDerivedOrder,
-                 CandleReceiverMapping>
+                 CandleReceiverMapping, events::PreparedNuamTrade>
         mapping;                          ///< Existing owned immutable mapper.
     events::EventValueLimits valueLimits; ///< Per-result owned text bounds.
     ReceiverEventTimePolicy timePolicy;   ///< Explicit optional timestamp source.
@@ -344,6 +345,16 @@ projectPrepared(const mux::MuxRecordView &record, const detail::ReceiverRoute &r
 
         if (!mapped)
             return std::unexpected(ReceiverProjectionFailure{mapped.error()});
+
+        return SubscriptionProjection{std::move(*mapped), eventTime};
+    }
+
+    if (const auto *prepared = std::get_if<events::PreparedNuamTrade>(&route.mapping)) {
+        auto mapped = prepared->mapView(record.symbol, values, units, eventTime.value_or(0));
+
+        if (!mapped) {
+            return std::unexpected(ReceiverProjectionFailure{mapped.error()});
+        }
 
         return SubscriptionProjection{std::move(*mapped), eventTime};
     }
@@ -900,6 +911,15 @@ openSubscriptionReceiver(mux::MuxQueue &queue, const core::LocalSchema &schema, 
                                        binding.eventTimePolicy, fields, binding.mappingLimits.selections});
             } else if (binding.kind == PreparedEventKind::SERIES) {
                 auto prepared = events::PreparedSeries::prepare(schema, binding.localId, binding.mappingLimits);
+
+                if (!prepared) {
+                    return std::unexpected(ReceiverFailure{prepared.error(), i});
+                }
+
+                plan.routes.push_back({schema.recordContext(binding.localId), std::move(*prepared), binding.valueLimits,
+                                       binding.eventTimePolicy, fields, binding.mappingLimits.selections});
+            } else if (binding.kind == PreparedEventKind::NUAM_TRADE) {
+                auto prepared = events::PreparedNuamTrade::prepare(schema, binding.localId, binding.mappingLimits);
 
                 if (!prepared) {
                     return std::unexpected(ReceiverFailure{prepared.error(), i});

@@ -681,3 +681,7 @@ SDK применяет demand и снимает устаревшую HISTORY д�
 ## Получить OptionSale
 
 Используйте `Feed::createSubscription<events::OptionSale>()` на endpoint HISTORY. См. [поля OptionSale и индексную идентичность](OPTION-SALE-EVENT.ru.md).
+
+Для получения NuamTrade используйте `createSubscription<events::NuamTrade>()` на TICKER или STREAM
+endpoint. Событие расширяет Trade независимо обновляемой статистикой биржи. См.
+[поля и маршрутизацию NuamTrade](../spec/events/NUAM-TRADE.ru.md).

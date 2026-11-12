@@ -375,3 +375,5 @@ class/resource inventories.
 
 - [Oracle живого диапазона HISTORY](../upstream/live-history-range-oracle/README.ru.md): настоящие публичные Java-мутации диапазона, demand и удержанные callbacks, конечные Capture/Verify и EN/RU справка без входных путей.
 - [Оракул OptionSale](../upstream/option-sale-oracle/README.ru.md) записывает индексные события HISTORY для схем закреплённой версии Java QD.
+
+- [Oracle NuamTrade](../upstream/nuam-trade-oracle/README.ru.md) записывает ограниченный набор Java-наблюдений и предоставляет EN/RU справку без входов.

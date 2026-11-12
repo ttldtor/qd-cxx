@@ -38,7 +38,8 @@ enum class EventType {
     THEO_PRICE = 18,        ///< Owning option theoretical price, available on TICKER and HISTORY.
     CANDLE = 19,            ///< Owning Candle values from qualified TICKER or HISTORY records.
     TIME_AND_SALE = 20,     ///< Owning trade reports, available on STREAM and HISTORY.
-    OPTION_SALE = 21        ///< Owning indexed option sale.
+    OPTION_SALE = 21,       ///< Owning indexed option sale.
+    NUAM_TRADE = 22         ///< Owning Nuam Trade and statistics.
 };
 
 /** Explicit source of optional event metadata, independent of indexed record identity. */
