@@ -1422,6 +1422,7 @@ struct MuxQueue::State {
     std::size_t cursor = 0;                              ///< Bounded fair owner cursors.
     std::size_t phase = 0;                               ///< Bounded fair owner cursors.
     bool executing = false;                              ///< Reentrancy and derived-union gates.
+    bool observingTicker = false;                        ///< Prevent nested borrowed cache observations.
     bool unionDirty = false;                             ///< Reentrancy and derived-union gates.
     unsigned stopMode = 0;                               ///< Context reserved stop.
     std::optional<std::size_t> unionOrigin;              ///< Command responsible for a pending shared derived update.
@@ -4343,6 +4344,71 @@ std::expected<QueueProgress, QueueFailure> MuxQueue::progressImpl(QueueWork &wor
         return std::unexpected(QueueFailure{e, {}});
     } catch (const std::bad_alloc &) {
         return std::unexpected(QueueFailure{QueueError::ALLOCATION_FAILURE, {}});
+    }
+}
+
+std::expected<TickerLatestObservation, QueueFailure>
+MuxQueue::visitTickerLatest(const MuxHandle &handle, core::SubscriptionKey key, QueueWork &work, void *context,
+                            void (*visitor)(void *, const collectors::TickerValue &) noexcept) const {
+    try {
+        debit(work.operations, 1);
+
+        if (!state_ || !state_->ticker || !visitor)
+            throw QueueError::INVALID_STATE;
+
+        auto &s = *state_;
+
+        if (s.observingTicker)
+            throw QueueError::REENTRANT;
+
+        auto *client = s.client(handle);
+
+        if (!client || client->sourceClosed || !client->consumer)
+            throw QueueError::INVALID_CLIENT;
+
+        if (s.state != QueueState::OPEN || s.stopMode || client->port->stop.load() || client->sync || client->closing ||
+            s.reset.phase != ResetPhase::NONE || client->port->advertisedNotice.load() ||
+            client->mappingRevision != client->desiredRevision)
+            throw QueueError::INVALID_STATE;
+
+        auto *mapping = s.mapping(*client, key, work);
+
+        if (!mapping)
+            return TickerLatestObservation::UNMAPPED;
+
+        auto latest = s.ticker->latest(key, work.ticker);
+
+        if (!latest) {
+            if (latest.error() == collectors::TickerError::WORK_LIMIT)
+                throw QueueError::WORK_LIMIT;
+
+            throw sourceFailure(latest.error());
+        }
+
+        if (!*latest || !(**latest).current)
+            return TickerLatestObservation::ABSENT;
+
+        struct Guard {
+            State &state;
+            bool wasExecuting;
+
+            ~Guard() {
+                state.executing = wasExecuting;
+                state.observingTicker = false;
+            }
+        } guard{s, s.executing};
+
+        // A delivery callback may inspect the already committed cache. Keep its original
+        // execution gate active and deny any nested borrowed observation.
+        s.executing = true;
+        s.observingTicker = true;
+        visitor(context, **latest);
+
+        return TickerLatestObservation::VISITED;
+    } catch (QueueFailure error) {
+        return std::unexpected(error);
+    } catch (QueueError error) {
+        return std::unexpected(QueueFailure{error, {}});
     }
 }
 

@@ -3991,3 +3991,50 @@ TEST_CASE("MarketMaker HISTORY replay discards the remaining business projection
     CHECK(cut.inFlightEvents == 0);
     CHECK(cut.admittedEvents.value == cut.deliveredEvents.value + cut.discardedEvents.value);
 }
+
+TEST_CASE("owner TICKER observation reads only an applied exact registration without delivery progress") {
+    auto f = fixture(c::SubscriptionFamily::TICKER);
+    auto selected = std::make_shared<Recorder>();
+    auto other = std::make_shared<Recorder>();
+    auto handle = open(f, selected);
+    auto unrelated = open(f, other);
+    add(f, handle);
+
+    struct Observation {
+        unsigned visits = 0;
+        std::int64_t value = 0;
+    } observation;
+
+    const auto visit = +[](void *context, const s::TickerValue &value) noexcept {
+        auto &result = *static_cast<Observation *>(context);
+        ++result.visits;
+
+        if (value.sourceRecord && value.sourceRecord->typedValues.size() > 2)
+            result.value = value.sourceRecord->typedValues[2].raw;
+    };
+    const c::SubscriptionKey key{f.schema.recordContext(0), u"ALPHA"};
+    auto work = turn();
+    const auto absent = f.queue.visitTickerLatest(handle, key, work, &observation, visit);
+    REQUIRE(absent);
+    CHECK(*absent == m::TickerLatestObservation::ABSENT);
+    CHECK(observation.visits == 0);
+    send(f, {{0, u"ALPHA", 1, 41, 0}});
+    until(f, [&] {
+        return selected->values.size() == 1;
+    });
+    work = turn();
+    const auto found = f.queue.visitTickerLatest(handle, key, work, &observation, visit);
+    REQUIRE(found);
+    CHECK(*found == m::TickerLatestObservation::VISITED);
+    CHECK(observation.visits == 1);
+    CHECK(observation.value == 41);
+    work = turn();
+    const auto notSubscribed = f.queue.visitTickerLatest(unrelated, key, work, &observation, visit);
+    REQUIRE(notSubscribed);
+    CHECK(*notSubscribed == m::TickerLatestObservation::UNMAPPED);
+    CHECK(observation.visits == 1);
+    handle.requestStop(m::StopMode::ABORT);
+    work = turn();
+    CHECK(f.queue.visitTickerLatest(handle, key, work, &observation, visit).error().error ==
+          m::QueueError::INVALID_STATE);
+}

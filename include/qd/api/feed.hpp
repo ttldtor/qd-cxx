@@ -564,6 +564,21 @@ class Feed final {
     std::shared_ptr<detail::SubscriptionPort> createSubscriptionPort(std::span<const EventType> types,
                                                                      bool registeredDelivery, bool timeSeries = false);
 
+    /** Resolve one passive TICKER lookup through the endpoint's serialized owner.
+     * @param type Registered LastingEvent identity.
+     * @param symbol Borrowed exact logical symbol.
+     * @param ifSubscribed Select exact logical demand and allow a default event before data.
+     * @return Detached retained/default value or absence. Refused admission/lookup throws Error.
+     */
+    [[nodiscard]] std::optional<RegisteredEvent> readLastEvent(EventType type, std::u16string_view symbol,
+                                                               bool ifSubscribed) const;
+    /** Convert one bounded ASCII symbol and use the same exact logical read.
+     * @param type Registered LastingEvent identity.
+     * @param symbol Borrowed ASCII symbol.
+     * @return Detached retained/default value or absence.
+     */
+    [[nodiscard]] std::optional<RegisteredEvent> readLastEvent(EventType type, std::string_view symbol) const;
+
     /** @tparam Event Supported owning native business type. @return Its immutable registration identity. */
     template <class Event> static constexpr EventType eventTypeFor() {
         static_assert(std::is_same_v<Event, events::Quote> || std::is_same_v<Event, events::Profile> ||
@@ -630,6 +645,74 @@ class Feed final {
     }
 
     public:
+    /** Copy the latest committed TICKER value for the supplied event's exact logical symbol.
+     * The call does not connect, start a worker, subscribe or request data. The runtime owner reads the current
+     * collector state; calls from its own listener use the same serialized read directly. An external call can wait
+     * up to one second for the bounded local request. Busy or timed-out admission throws Error.
+     * @tparam Event Supported owning LastingEvent type.
+     * @param event Independently owned fallback, unchanged when no current value is retained.
+     * @return Detached retained event, or the supplied fallback on absence, stale source or another delivery family.
+     * @throws Error Unsupported event type, invalid symbol, or finite local admission or lookup refusal.
+     */
+    template <class Event> [[nodiscard]] Event getLastEvent(Event event) const {
+        std::u16string_view symbol;
+
+        if constexpr (std::is_same_v<Event, events::Candle>) {
+            if (event.eventSymbol)
+                symbol = event.eventSymbol->getSymbol().value_or(std::u16string_view{});
+        } else {
+            symbol = event.symbol;
+        }
+
+        if (auto found = readLastEvent(eventTypeFor<Event>(), symbol, false))
+            return std::get<Event>(std::move(*found));
+
+        return event;
+    }
+
+    /** Read an owning current TICKER value only for an exact accepted subscription.
+     * A subscribed symbol without current retained data yields its default event. Wildcard demand is excluded.
+     * The local request and refusal rules are the same as getLastEvent.
+     * @tparam Event Supported owning LastingEvent type.
+     * @param symbol Exact borrowed UTF-16 logical symbol, including a canonical Candle spelling if applicable.
+     * @return Current value, symbol-initialized default, or empty when exact demand is absent.
+     * @throws Error Same refusals as getLastEvent.
+     */
+    template <class Event>
+    [[nodiscard]] std::optional<Event> getLastEventIfSubscribed(std::u16string_view symbol) const {
+        if (auto found = readLastEvent(eventTypeFor<Event>(), symbol, true))
+            return std::get<Event>(std::move(*found));
+
+        return std::nullopt;
+    }
+
+    /** Read the current or default TICKER event using the same ASCII spelling as addSymbols.
+     * @tparam Event Supported owning LastingEvent type.
+     * @param symbol Exact borrowed ASCII logical symbol.
+     * @return Current value, symbol-initialized default, or empty when exact demand is absent.
+     * @throws Error Same refusals as getLastEvent.
+     */
+    template <class Event> [[nodiscard]] std::optional<Event> getLastEventIfSubscribed(std::string_view symbol) const {
+        if (auto found = readLastEvent(eventTypeFor<Event>(), symbol))
+            return std::get<Event>(std::move(*found));
+
+        return std::nullopt;
+    }
+
+    /** Read the current or default Candle using an already parsed exact symbol.
+     * @tparam Event The owning Candle type.
+     * @param symbol Exact Candle symbol; null spelling yields absence.
+     * @return Current or default Candle for accepted exact demand, otherwise empty.
+     * @throws Error Same refusals as getLastEvent.
+     */
+    template <class Event>
+        requires std::is_same_v<Event, events::Candle>
+    [[nodiscard]] std::optional<Event> getLastEventIfSubscribed(const events::CandleSymbol &symbol) const {
+        const auto text = symbol.getSymbol();
+
+        return text ? getLastEventIfSubscribed<Event>(*text) : std::nullopt;
+    }
+
     /** Create a bounded logical registration, before or after connect, without application polling.
      * An unregistered type rejects synchronously. A Candle selector uses exactly one qualified source record.
      * Ordinary Order, MarketMaker, SpreadOrder, AnalyticOrder and OtcMarketsOrder require HISTORY.
