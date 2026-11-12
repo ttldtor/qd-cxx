@@ -19,6 +19,7 @@
 #include "qd/events/summary.hpp"
 #include "qd/events/text_events.hpp"
 #include "qd/events/theo_price.hpp"
+#include "qd/events/time_and_sale.hpp"
 #include "qd/events/trade.hpp"
 #include "qd/events/trade_eth.hpp"
 #include "qd/events/underlying.hpp"
@@ -60,7 +61,8 @@ enum class PreparedEventKind {
     GREEKS = 16,            ///< Owning option risk sensitivities projection.
     UNDERLYING = 17,        ///< Owning underlying option activity projection.
     THEO_PRICE = 18,        ///< Owning option theoretical price projection.
-    CANDLE = 19             ///< Owning Candle projection with restored event symbol.
+    CANDLE = 19,            ///< Owning Candle projection with restored event symbol.
+    TIME_AND_SALE = 20      ///< Owning trade report with separate indexed and business flags.
 };
 
 /** Explicit source for optional event metadata; indexed identity is never a timestamp substitute. */
@@ -121,7 +123,7 @@ struct SubscriptionProjection {
                  events::TextMessage, events::TextConfiguration, events::Message, events::Configuration, events::Order,
                  events::MarketMaker, events::SpreadOrder, events::AnalyticOrder, events::OtcMarketsOrder,
                  events::OrderImbalance, events::Series, events::Greeks, events::Underlying, events::TheoPrice,
-                 events::Candle>
+                 events::Candle, events::TimeAndSale>
         value;                               ///< Owned event or explicit generic route.
     std::optional<std::int64_t> eventTimeMs; ///< Actual selected FIELD metadata only; rawTime stays independent.
 };

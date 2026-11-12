@@ -21,6 +21,7 @@
 #include "qd/events/summary.hpp"
 #include "qd/events/text_events.hpp"
 #include "qd/events/theo_price.hpp"
+#include "qd/events/time_and_sale.hpp"
 #include "qd/events/trade.hpp"
 #include "qd/events/trade_eth.hpp"
 #include "qd/events/underlying.hpp"
@@ -183,7 +184,8 @@ bool validRegistration(const EventRegistration &registration) noexcept {
             registration.type == EventType::TEXT_CONFIGURATION || registration.type == EventType::MESSAGE ||
             registration.type == EventType::CONFIGURATION || registration.type == EventType::MARKET_MAKER ||
             registration.type == EventType::SERIES || registration.type == EventType::CANDLE ||
-            detail::isOptionTimeSeriesEvent(registration.type) || detail::usesOrderSource(registration.type)) &&
+            registration.type == EventType::TIME_AND_SALE || detail::isOptionTimeSeriesEvent(registration.type) ||
+            detail::usesOrderSource(registration.type)) &&
            (registration.eventTimePolicy == EventTimePolicy::UNSPECIFIED ||
             registration.eventTimePolicy == EventTimePolicy::FIELD_METADATA) &&
            (registration.projection == events::EventProjection::NATIVE ||
@@ -191,6 +193,16 @@ bool validRegistration(const EventRegistration &registration) noexcept {
              (registration.projection == events::EventProjection::QUOTE_ORDERS ||
               registration.projection == events::EventProjection::MARKET_MAKER_ORDERS)));
 }
+
+constexpr std::array DEFAULT_NATIVE_REGISTRATIONS{EventRegistration{EventType::QUOTE, 0},
+                                                  EventRegistration{EventType::PROFILE, 1},
+                                                  EventRegistration{EventType::TRADE, 2},
+                                                  EventRegistration{EventType::TRADE_ETH, 3},
+                                                  EventRegistration{EventType::SUMMARY, 4},
+                                                  EventRegistration{EventType::TEXT_MESSAGE, 5},
+                                                  EventRegistration{EventType::TEXT_CONFIGURATION, 6},
+                                                  EventRegistration{EventType::MESSAGE, 7},
+                                                  EventRegistration{EventType::CONFIGURATION, 8}};
 
 /** Construct the fixed nine native declarations once, without preparing duplicate registry routes.
  * @param limits Complete schema and registry bounds.
@@ -452,6 +464,13 @@ EventRegistry::create(const core::LocalSchema &schema, std::span<const EventRegi
                 if (!mapping) {
                     return std::unexpected(EventRegistryFailure{mapping.error(), index});
                 }
+            } else if (registration.type == EventType::TIME_AND_SALE) {
+                const auto mapping = events::PreparedTimeAndSale::prepare(*ownedSchema, registration.localRecordId,
+                                                                          registration.mappingLimits);
+
+                if (!mapping) {
+                    return std::unexpected(EventRegistryFailure{mapping.error(), index});
+                }
             } else if (registration.type == EventType::CANDLE) {
                 const auto id = registration.localRecordId;
                 const auto candle = events::PreparedCandleRoutes::prepare(
@@ -585,17 +604,7 @@ std::expected<EventRegistry, EventRegistryFailure> EventRegistry::builtIn(EventR
             return std::unexpected(combined.error());
         }
 
-        const std::array registrations{EventRegistration{EventType::QUOTE, 0},
-                                       EventRegistration{EventType::PROFILE, 1},
-                                       EventRegistration{EventType::TRADE, 2},
-                                       EventRegistration{EventType::TRADE_ETH, 3},
-                                       EventRegistration{EventType::SUMMARY, 4},
-                                       EventRegistration{EventType::TEXT_MESSAGE, 5},
-                                       EventRegistration{EventType::TEXT_CONFIGURATION, 6},
-                                       EventRegistration{EventType::MESSAGE, 7},
-                                       EventRegistration{EventType::CONFIGURATION, 8}};
-
-        return create(*combined, registrations, limits, work);
+        return create(*combined, DEFAULT_NATIVE_REGISTRATIONS, limits, work);
     } catch (EventRegistryError error) {
         return std::unexpected(EventRegistryFailure{error, {}});
     } catch (const std::bad_alloc &) {
@@ -633,6 +642,54 @@ std::size_t EventRegistry::storageBytes() const noexcept {
 
 namespace detail {
 namespace {
+/** Append standard TimeAndSale records in physical composite and A..Z order.
+ * @param records Existing dense local declarations, followed by complete appended records on success.
+ * @param routes Existing routes, followed by one native delegate for each appended record.
+ * @param limits Complete schema and route allowances.
+ * @param work Remaining preparation credits, charged before appending records.
+ * @return Success or the original bounded schema/registry refusal.
+ */
+std::expected<void, EventRegistryFailure> appendStandardTimeAndSaleRecords(std::vector<core::LocalRecord> &records,
+                                                                           std::vector<EventRegistration> &routes,
+                                                                           EventRegistryLimits limits,
+                                                                           EventRegistryWork &work) {
+    if (add(records.size(), TIME_AND_SALE_DEFAULT_RECORDS) > limits.schema.records ||
+        add(routes.size(), TIME_AND_SALE_DEFAULT_RECORDS) > limits.registrations) {
+        return std::unexpected(EventRegistryFailure{EventRegistryError::RESOURCE_LIMIT, {}});
+    }
+
+    constexpr std::size_t CONSTRUCTION_WORK = 16384; // Fixed catalog and all copied aliases.
+    debit(work.visits, CONSTRUCTION_WORK);
+    const auto schema = events::defaultTimeAndSaleSchema(limits.schema);
+
+    if (!schema) {
+        return std::unexpected(EventRegistryFailure{schema.error(), {}});
+    }
+
+    records.reserve(records.size() + TIME_AND_SALE_DEFAULT_RECORDS);
+    routes.reserve(routes.size() + TIME_AND_SALE_DEFAULT_RECORDS);
+    const auto &composite = schema->records().front();
+    const auto append = [&](char16_t exchange) {
+        auto record = composite;
+        record.id = static_cast<std::int32_t>(records.size());
+
+        if (exchange) {
+            record.name += u'&';
+            record.name += exchange;
+        }
+
+        routes.push_back({EventType::TIME_AND_SALE, record.id});
+        records.push_back(std::move(record));
+    };
+    append(0);
+
+    for (auto exchange = FIRST_TIME_AND_SALE_EXCHANGE; exchange <= LAST_TIME_AND_SALE_EXCHANGE; ++exchange) {
+        append(exchange);
+    }
+
+    return {};
+}
+
 /** Append the two standard Candle delegates without moving existing local IDs. */
 std::expected<void, core::SchemaError> appendStandardCandleRecords(std::vector<core::LocalRecord> &records,
                                                                    std::vector<EventRegistration> &routes,
@@ -685,6 +742,38 @@ EventRegistration derivedRegistration(std::int32_t id, events::EventProjection f
     return result;
 }
 } // namespace
+
+std::expected<EventRegistry, EventRegistryFailure> defaultStreamEventRegistry(EventRegistryLimits limits,
+                                                                              EventRegistryWork &work) {
+    try {
+        const auto base = defaultNativeSchema(limits, work);
+
+        if (!base) {
+            return std::unexpected(base.error());
+        }
+
+        std::vector records(base->records().begin(), base->records().end());
+        std::vector routes(DEFAULT_NATIVE_REGISTRATIONS.begin(), DEFAULT_NATIVE_REGISTRATIONS.end());
+
+        if (const auto sales = appendStandardTimeAndSaleRecords(records, routes, limits, work); !sales) {
+            return std::unexpected(sales.error());
+        }
+
+        const auto schema = core::LocalSchema::create(records, limits.schema, core::LocalProfile::BINARY_FIELDS_V1);
+
+        if (!schema) {
+            return std::unexpected(EventRegistryFailure{schema.error(), {}});
+        }
+
+        return EventRegistry::create(*schema, routes, limits, work);
+    } catch (EventRegistryError error) {
+        return std::unexpected(EventRegistryFailure{error, {}});
+    } catch (const std::bad_alloc &) {
+        return std::unexpected(EventRegistryFailure{EventRegistryError::ALLOCATION_FAILURE, {}});
+    } catch (const std::length_error &) {
+        return std::unexpected(EventRegistryFailure{EventRegistryError::ALLOCATION_FAILURE, {}});
+    }
+}
 
 std::expected<EventRegistry, EventRegistryFailure> defaultTickerEventRegistry(EventRegistryLimits limits,
                                                                               EventRegistryWork &work) {
@@ -898,6 +987,10 @@ std::expected<EventRegistry, EventRegistryFailure> defaultHistoryEventRegistry(E
 
         if (const auto candle = appendStandardCandleRecords(records, routes, limits.schema); !candle)
             return std::unexpected(EventRegistryFailure{candle.error(), {}});
+
+        if (const auto sales = appendStandardTimeAndSaleRecords(records, routes, limits, work); !sales) {
+            return std::unexpected(sales.error());
+        }
 
         auto schema = core::LocalSchema::create(records, limits.schema, core::LocalProfile::BINARY_FIELDS_V1);
 

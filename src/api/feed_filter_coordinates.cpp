@@ -45,6 +45,7 @@ bool supported(const EventRegistry &registry, EventType type) noexcept {
     case EventType::UNDERLYING:
     case EventType::THEO_PRICE:
     case EventType::CANDLE:
+    case EventType::TIME_AND_SALE:
         return true;
     }
 
@@ -54,7 +55,7 @@ bool supported(const EventRegistry &registry, EventType type) noexcept {
 /** Only the existing market projections convert regional record/symbol suffixes. */
 bool usesRegionalCoordinates(EventType type) noexcept {
     return type == EventType::QUOTE || type == EventType::TRADE || type == EventType::TRADE_ETH ||
-           type == EventType::SUMMARY;
+           type == EventType::SUMMARY || type == EventType::TIME_AND_SALE;
 }
 
 /** Non-market projections use the generic source-selection rule, rather than MarketEventDelegateSet. */
@@ -113,7 +114,7 @@ bool matchesFilterRoute(const EventRegistry &registry, const EventRegistration &
         return false;
 
     if ((usesOrderSource(type) || type == EventType::MARKET_MAKER || type == EventType::SERIES ||
-         isOptionTimeSeriesEvent(type)) &&
+         isOptionTimeSeriesEvent(type) || type == EventType::TIME_AND_SALE) &&
         !receivingRouteSupportsContract(route, contract))
         return false;
 
@@ -255,6 +256,10 @@ std::vector<FilterCoordinate> filterSubscriptionCoordinates(const EventRegistry 
 
     const bool wildcard = selector.kind() == SubscriptionSymbolKind::ALL;
 
+    if (wildcard && type == EventType::TIME_AND_SALE && contract != DeliveryContract::STREAM) {
+        return {};
+    }
+
     if (!wildcard && selector.eventSymbol().starts_with(u'*')) {
         return {};
     }
@@ -311,6 +316,8 @@ std::vector<FilterCoordinate> filterEventCoordinates(const EventRegistry &regist
                     return EventType::THEO_PRICE;
                 } else if constexpr (std::is_same_v<Event, events::Candle>) {
                     return EventType::CANDLE;
+                } else if constexpr (std::is_same_v<Event, events::TimeAndSale>) {
+                    return EventType::TIME_AND_SALE;
                 } else if constexpr (std::is_same_v<Event, events::Order>) {
                     return EventType::ORDER;
                 } else {

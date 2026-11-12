@@ -1,0 +1,156 @@
+{
+  "status": "PASS",
+  "revision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "timezoneByteIdentical": true,
+  "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
+  "javacSha256": "633143e961aa18051c09112b85333f5cdbd845b54eb39678eb15b91ca8bbb527",
+  "oracleSha256": "ef43daed11a132b8c3b2060d7f85d9052e344ce9bc07cfb933a9df783abc5df4",
+  "sources": [
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/TimeAndSale.java",
+      "sha256": "bf3cff336518c851c3f43c78fcb8782453a6d123b4d7e7fe19c03e48cc21b246"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/TimeAndSaleDelegate.java",
+      "sha256": "20d0eae38d6fb4c53df4b55e923aa16c0109ffca493fb29dee3d4fbdf27150ff"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/impl/TimeAndSaleMapping.java",
+      "sha256": "88dc6d1591ee30cf6489b6325b155de0cd195770cf1addd42d32f5c4a7ef1f1a"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/MarketFactoryImpl.java",
+      "sha256": "c74b324b2f99d2a351963fead08419c2ba1d92573c633d30740295acc9d0bac4"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "wide/stream.qtp",
+      "sha256": "7b8368629dca309f5ee5470b33c5464067bbdea1fa425a0169491b8b6cc66c0f"
+    },
+    {
+      "path": "wide/stream.tsv",
+      "sha256": "b3eedb04f6b25f74fe387f87d4a2ddd70c013db2caf404546eaae40edc634244"
+    },
+    {
+      "path": "wide/history.qtp",
+      "sha256": "d64bb03c1e13ac0bfcf83920450fdeec88f684a0cf109e9fe6923968063cdd0c"
+    },
+    {
+      "path": "wide/history.tsv",
+      "sha256": "eca4cfa4b39bc6e78f6c59488ad51817f901c6fb4b9bf784fea845ab8a618434"
+    },
+    {
+      "path": "wide/regional-stream.qtp",
+      "sha256": "bdd33d7b1970793de0858497ae06f13d137a4dce63650a97ff99ff4cb292e242"
+    },
+    {
+      "path": "wide/regional-stream.tsv",
+      "sha256": "893ce5eb7e1e88256bb0650f75078b15d0418160c570b66ecf111e44cd8687de"
+    },
+    {
+      "path": "wide/regional-history.qtp",
+      "sha256": "41f5bacdd61777bc35fc3e7da3ae1496704d36d3a4f1e64375deb8f91ebb4ff9"
+    },
+    {
+      "path": "wide/regional-history.tsv",
+      "sha256": "60245b23985db55fc9821567c1087f2bab449659f7d12138c42703d521c5b844"
+    },
+    {
+      "path": "tiny/stream.qtp",
+      "sha256": "db76b70e5bf6f77d25c44c72f953129b0a4fcd3846166f050aa9cd99242382fc"
+    },
+    {
+      "path": "tiny/stream.tsv",
+      "sha256": "74295242d79ad1964e99bb711ab3124997b872c9c738cd3ca169f1019765aaa2"
+    },
+    {
+      "path": "tiny/history.qtp",
+      "sha256": "e022faa7f4fb5ff28f400c9f2196a2a581655d8034d037902b6c7494d8173e42"
+    },
+    {
+      "path": "tiny/history.tsv",
+      "sha256": "00d1665d69c9bdf64fde33cb00694b98da358896fe62b42e39905043685183cf"
+    },
+    {
+      "path": "tiny/regional-stream.qtp",
+      "sha256": "1bcb2cc80c572fbd0c79cd8a0155acc4f7b476d84a9c4f73e8aa0e9fb7327f94"
+    },
+    {
+      "path": "tiny/regional-stream.tsv",
+      "sha256": "18d0bfeeac1685d4805b1d354a31624e9dd34f5ec4ad20adb513db6e3ded880d"
+    },
+    {
+      "path": "tiny/regional-history.qtp",
+      "sha256": "c8c5e1ed45a25c2fcc1c81dacdae056e04c8c86a89b790855bc595a4d6e677ea"
+    },
+    {
+      "path": "tiny/regional-history.tsv",
+      "sha256": "07d51b56eeedad202a51a229638bf09668b892d171d0d866adf82c09086d32f1"
+    },
+    {
+      "path": "wide-optional/stream.qtp",
+      "sha256": "de3295c0ab9c92dc2ffa7914f4c88649d79a545c1ab192d773a21aca3235fc2f"
+    },
+    {
+      "path": "wide-optional/stream.tsv",
+      "sha256": "6603c1d0eea0dee14faceac7e863d2a90924fbdd7d9a44973aa73a7e30ac8e82"
+    },
+    {
+      "path": "wide-optional/history.qtp",
+      "sha256": "f9c2f6e4eb73c52bf2c155173dba529ad0daca50416e696449d409ad6b50e02e"
+    },
+    {
+      "path": "wide-optional/history.tsv",
+      "sha256": "e05caf48a244d4c79384fe64a3de377836c2878ddb03a57518509bd01fc426c5"
+    },
+    {
+      "path": "wide-optional/regional-stream.qtp",
+      "sha256": "90b45bd126d71b8d2aa5cf1cd8e54251bd5816ae72bca83c46703eaf9444bc90"
+    },
+    {
+      "path": "wide-optional/regional-stream.tsv",
+      "sha256": "34f336b6a57d637400b72413222033ffc40c11184d9760b819143615ca1b8c43"
+    },
+    {
+      "path": "wide-optional/regional-history.qtp",
+      "sha256": "ca1692f1a2f9ecf15e20c36a69362926953df232f4a887b72e7bd594210d1ca7"
+    },
+    {
+      "path": "wide-optional/regional-history.tsv",
+      "sha256": "c7dc2cf9b6407c4a2b38d0d5d90402b34cf4be610468b9477310698f304c309f"
+    },
+    {
+      "path": "tiny-optional/stream.qtp",
+      "sha256": "3b6f544dd25df68b532aa367e9d61db9f4b710fbe207f63fe9e296f6ea20bcdb"
+    },
+    {
+      "path": "tiny-optional/stream.tsv",
+      "sha256": "f32726e32c9c9471b7b1735668480445a875ac974c1b48073f00a6ed28998a2a"
+    },
+    {
+      "path": "tiny-optional/history.qtp",
+      "sha256": "215790bb82d1145b3f17aec9dd1e132e310af7a57626d5933bd712ef63ec7290"
+    },
+    {
+      "path": "tiny-optional/history.tsv",
+      "sha256": "f4061ec5375fb109552fefbba1e3cb1506eac1a5b7a9afd98afa53c782197240"
+    },
+    {
+      "path": "tiny-optional/regional-stream.qtp",
+      "sha256": "972ccc4cf7b8374835a3418abaa09764fd785e7a494c182c42040935c0692146"
+    },
+    {
+      "path": "tiny-optional/regional-stream.tsv",
+      "sha256": "5a9104341ebdd48f0858595b86dd15d99977caf93eb419da52a0a578d1cd9712"
+    },
+    {
+      "path": "tiny-optional/regional-history.qtp",
+      "sha256": "8c379f3d7603cbdbfb68f3e1dc895c74e77390f5fa06ce62b92e0cd991fe2826"
+    },
+    {
+      "path": "tiny-optional/regional-history.tsv",
+      "sha256": "8bee286d0191946a4ac8a99990447179f8c006a1bfc51c8ebdea99d0a3dc24ee"
+    }
+  ]
+}

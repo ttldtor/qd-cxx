@@ -36,7 +36,8 @@ enum class EventType {
     GREEKS = 16,            ///< Owning option risk sensitivities, available on TICKER and HISTORY.
     UNDERLYING = 17,        ///< Owning option activity for an underlying, available on TICKER and HISTORY.
     THEO_PRICE = 18,        ///< Owning option theoretical price, available on TICKER and HISTORY.
-    CANDLE = 19             ///< Owning Candle values from qualified TICKER or HISTORY records.
+    CANDLE = 19,            ///< Owning Candle values from qualified TICKER or HISTORY records.
+    TIME_AND_SALE = 20      ///< Owning trade reports, available on STREAM and HISTORY.
 };
 
 /** Explicit source of optional event metadata, independent of indexed record identity. */

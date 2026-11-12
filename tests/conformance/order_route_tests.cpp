@@ -55,11 +55,10 @@ TEST_CASE("Order HISTORY defaults preserve the existing ordinary built-in catalo
     auto ordinary = q::api::EventRegistry::builtIn({}, ordinaryWork);
     REQUIRE(ordinary);
     CHECK(ordinary->registrations().size() == 9);
-    q::api::EventRegistryWork historyWork;
-    auto history = d::defaultHistoryEventRegistry({}, historyWork);
+    auto history = d::defaultReceivingRegistry(q::api::DeliveryContract::HISTORY);
     REQUIRE(history);
-    REQUIRE(history->registrations().size() == 13);
-    REQUIRE(history->schema().records().size() == 12);
+    REQUIRE(history->registrations().size() == 40);
+    REQUIRE(history->schema().records().size() == 39);
     CHECK(history->registrations()[3].type == q::api::EventType::SPREAD_ORDER);
     CHECK(history->registrations()[4].type == q::api::EventType::ANALYTIC_ORDER);
     CHECK(history->registrations()[1].type == q::api::EventType::MARKET_MAKER);

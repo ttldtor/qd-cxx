@@ -22,6 +22,20 @@ constexpr std::size_t MEBIBYTE = 1024 * 1024; ///< Independent logical byte unit
 constexpr core::SchemaLimits BASE_SCHEMA_LIMITS{42, 284, 724, 128, 16384};
 // Reserve exactly the two records, 20 fields and 25 lookups of the Candle/TradeHistory declarations.
 constexpr core::SchemaLimits CANDLE_SCHEMA_LIMITS{MAXIMUM_RECEIVING_RECORDS, 284 + 20, 724 + 25, 128, 16384};
+
+/** Reserve the exact logical field and alias totals of the standard TimeAndSale declarations.
+ * @param limits Existing complete allowances, with enough record and name capacity.
+ * @return Complete allowances for the previous profile plus TimeAndSale.
+ */
+constexpr core::SchemaLimits withTimeAndSaleLimits(core::SchemaLimits limits) noexcept {
+    constexpr std::size_t FIELDS_PER_RECORD = 10;
+    constexpr std::size_t LOOKUPS_PER_RECORD = 14;
+    limits.fields += TIME_AND_SALE_DEFAULT_RECORDS * FIELDS_PER_RECORD;
+    limits.lookups += TIME_AND_SALE_DEFAULT_RECORDS * LOOKUPS_PER_RECORD;
+
+    return limits;
+}
+
 constexpr std::size_t FRAME_RECORDS = 64; ///< Whole admitted DATA frame record ceiling.
 constexpr std::size_t CALLBACK_RECORDS = CallbackSlotPool::PHYSICAL_RECORDS; ///< Whole callback projection ceiling.
 constexpr std::size_t FIELD_TEXT_UNITS = 8192;             ///< Aggregate text copied from one complete record.
@@ -370,14 +384,16 @@ void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, s
             const auto index = profile.bindings.size();
             const auto &record = profile.schema.records()[static_cast<std::size_t>(registration.localRecordId)];
 
-            if ((isOptionTimeSeriesEvent(registration.type) || registration.type == EventType::CANDLE) &&
+            if ((isOptionTimeSeriesEvent(registration.type) || registration.type == EventType::CANDLE ||
+                 registration.type == EventType::TIME_AND_SALE) &&
                 profile.family == core::SubscriptionFamily::HISTORY) {
                 if (!record.hasTime)
                     refuse(ErrorCode::UNSUPPORTED_PROFILE,
-                           registration.type == EventType::GREEKS       ? "profile-greeks-time"
-                           : registration.type == EventType::UNDERLYING ? "profile-underlying-time"
-                           : registration.type == EventType::THEO_PRICE ? "profile-theo-price-time"
-                                                                        : "profile-candle-time");
+                           registration.type == EventType::GREEKS          ? "profile-greeks-time"
+                           : registration.type == EventType::UNDERLYING    ? "profile-underlying-time"
+                           : registration.type == EventType::THEO_PRICE    ? "profile-theo-price-time"
+                           : registration.type == EventType::TIME_AND_SALE ? "profile-time-and-sale-time"
+                                                                           : "profile-candle-time");
 
                 profile.bindingTimeEncodings[index] = HistoryRangeEncoding::UNIX_MILLISECONDS_SEQUENCE;
             }
@@ -460,13 +476,16 @@ void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, s
             const auto fields = profile.schema.records()[static_cast<std::size_t>(binding.localId)].fields.size();
             const bool profileText = binding.kind == client::PreparedEventKind::PROFILE;
             const bool candle = binding.kind == client::PreparedEventKind::CANDLE;
+            const bool timeAndSale = binding.kind == client::PreparedEventKind::TIME_AND_SALE;
             const bool text = profileText || binding.kind == client::PreparedEventKind::TEXT_MESSAGE ||
-                              binding.kind == client::PreparedEventKind::TEXT_CONFIGURATION ||
+                              binding.kind == client::PreparedEventKind::TEXT_CONFIGURATION || timeAndSale ||
                               isOrderSourceEvent(static_cast<EventType>(binding.kind));
             const auto units = candle ? multiply(values.symbolUnits, events::detail::CANDLE_SYMBOL_TEXT_PASSES)
                                : text ? values.totalUnits
                                       : values.symbolUnits;
-            const auto strings = profileText ? std::size_t{3} : (text ? std::size_t{2} : std::size_t{1});
+            const auto strings = timeAndSale   ? std::size_t{4}
+                                 : profileText ? std::size_t{3}
+                                               : (text ? std::size_t{2} : std::size_t{1});
             const auto bytes =
                 add(add(sizeof(client::SubscriptionProjection), multiply(add(units, strings), sizeof(char16_t))),
                     binding.kind == client::PreparedEventKind::MESSAGE ||
@@ -516,7 +535,9 @@ std::expected<EventRegistry, EventRegistryFailure> defaultReceivingRegistry(Deli
 
     EventRegistryWork work;
     EventRegistryLimits limits;
-    limits.schema = contract == DeliveryContract::STREAM ? BASE_SCHEMA_LIMITS : CANDLE_SCHEMA_LIMITS;
+    limits.schema = contract == DeliveryContract::STREAM    ? withTimeAndSaleLimits(BASE_SCHEMA_LIMITS)
+                    : contract == DeliveryContract::HISTORY ? withTimeAndSaleLimits(CANDLE_SCHEMA_LIMITS)
+                                                            : CANDLE_SCHEMA_LIMITS;
     // Both appended physical Candle routes fit in the existing maximum registration capacity.
     limits.registrations = 73;
     constexpr auto defaultMapping = EventRegistration{EventType::QUOTE, 0}.mappingLimits;
@@ -528,7 +549,7 @@ std::expected<EventRegistry, EventRegistryFailure> defaultReceivingRegistry(Deli
 
     return contract == DeliveryContract::HISTORY  ? defaultHistoryEventRegistry(limits, work)
            : contract == DeliveryContract::TICKER ? defaultTickerEventRegistry(limits, work)
-                                                  : EventRegistry::builtIn(limits, work);
+                                                  : defaultStreamEventRegistry(limits, work);
 }
 
 bool receivingRouteSupportsContract(const EventRegistration &route, DeliveryContract contract) noexcept {
@@ -547,6 +568,10 @@ bool receivingRouteSupportsContract(const EventRegistration &route, DeliveryCont
 
     if (isOptionTimeSeriesEvent(route.type) || route.type == EventType::CANDLE) {
         return contract == DeliveryContract::TICKER || contract == DeliveryContract::HISTORY;
+    }
+
+    if (route.type == EventType::TIME_AND_SALE) {
+        return contract == DeliveryContract::STREAM || contract == DeliveryContract::HISTORY;
     }
 
     if (contract == DeliveryContract::HISTORY) {
@@ -661,7 +686,15 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
     const auto hasCandle = std::ranges::any_of(selected.registrations(), [&](const EventRegistration &route) {
         return route.type == EventType::CANDLE && receivingRouteSupportsContract(route, options.contract);
     });
-    const auto schemaLimits = hasCandle ? CANDLE_SCHEMA_LIMITS : BASE_SCHEMA_LIMITS;
+    const auto hasTimeAndSale = std::ranges::any_of(selected.registrations(), [&](const EventRegistration &route) {
+        return route.type == EventType::TIME_AND_SALE && receivingRouteSupportsContract(route, options.contract);
+    });
+    auto schemaLimits = hasCandle ? CANDLE_SCHEMA_LIMITS : BASE_SCHEMA_LIMITS;
+
+    if (hasTimeAndSale) {
+        schemaLimits = withTimeAndSaleLimits(schemaLimits);
+    }
+
     auto copied = selected.schema().boundedCopy(schemaLimits);
 
     if (!copied) {
@@ -722,6 +755,21 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
     budgets.session.snapshotBytes = SESSION_SNAPSHOT_BYTES;
     budgets.session.descriptions.descriptions = schemaLimits.records;
     budgets.session.descriptions.totalFields = schemaLimits.fields;
+
+    if (hasTimeAndSale) {
+        // A peer may describe nano-part, Buyer and Seller, plus both FIELD metadata values.
+        constexpr std::size_t EXTRA_WIRE_FIELDS = 5;
+        // Regional name and all 15 field names, using the longer declared spelling of each key.
+        constexpr std::size_t MAXIMUM_WIRE_NAME_UNITS = 143;
+        auto &descriptions = budgets.session.descriptions;
+        auto &bindings = budgets.session.context.bindings;
+        descriptions.totalFields = add(descriptions.totalFields, TIME_AND_SALE_DEFAULT_RECORDS * EXTRA_WIRE_FIELDS);
+        descriptions.totalNameUnits =
+            add(descriptions.totalNameUnits, TIME_AND_SALE_DEFAULT_RECORDS * MAXIMUM_WIRE_NAME_UNITS);
+        bindings.fields = std::max(bindings.fields, descriptions.totalFields);
+        bindings.totalNameUnits = std::max(bindings.totalNameUnits, descriptions.totalNameUnits);
+    }
+
     budgets.session.events = protocol::DataEventPolicy::BINARY_CATALOG_V1;
     budgets.session.historySnapshot = options.contract == DeliveryContract::HISTORY;
     budgets.session.fieldTime = protocol::FieldTimePolicy::READ;

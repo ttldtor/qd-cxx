@@ -20,7 +20,7 @@ inline constexpr std::size_t RECEIVING_OWNER_POLLS_PER_TURN =
 inline constexpr std::size_t MAXIMUM_RECEIVING_RECORDS = 44; ///< Prior 42 records plus Candle and TradeHistory.
 inline constexpr std::size_t MAXIMUM_RECEIVING_BINDINGS =
     2 * MAXIMUM_RECEIVING_RECORDS;                       ///< Native plus compatible derived family per physical record.
-inline constexpr std::size_t RECEIVING_EVENT_KINDS = 20; ///< Explicitly supported native event kinds.
+inline constexpr std::size_t RECEIVING_EVENT_KINDS = 21; ///< Explicitly supported native event kinds.
 
 /** Conservative stack initialization plus complete metadata read/write work; no dynamic allocation. */
 inline constexpr std::size_t RECEIVING_BINDING_COPY_WORK =
@@ -79,7 +79,7 @@ struct ReceivingProfile {
     std::vector<client::PreparedSubscriptionBinding> bindings; ///< Explicit routes grouped by business type.
     std::optional<events::PreparedCandleRoutes> candleRoutes;  ///< Complete catalog of eligible Candle bindings.
     std::array<char16_t, MAXIMUM_RECEIVING_BINDINGS> bindingExchanges{};
-    ///< Exact aligned Quote/Trade record suffixes; fixed backing is included in sizeof(ReceivingProfile).
+    ///< Exact aligned regional market record suffixes; fixed backing is included in sizeof(ReceivingProfile).
     std::array<std::optional<std::int32_t>, MAXIMUM_RECEIVING_BINDINGS> bindingSources{};
     ///< Exact aligned Order sources; absent for nonindexed business projections.
     std::array<HistoryRangeEncoding, MAXIMUM_RECEIVING_BINDINGS> bindingTimeEncodings{};
