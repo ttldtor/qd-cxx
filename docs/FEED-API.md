@@ -330,6 +330,30 @@ occupy independent capacity while a selected delivery retires. A feed's native
 registration slot can stay occupied until native retirement, including while
 the runtime is waiting for its first connection.
 
+### Clear one detached attachment
+
+Use `IndependentSubscription<Event>::withAttachmentListener(onData, onClear)`
+to maintain views keyed by attachment ID. `onData(id, batch)` receives the
+attachment's events. The nonthrowing `onClear(id)` handler can erase that
+attachment's entire view when `detachAndClear(feed)` succeeds. A new
+attachment to the same feed gets a new ID, so a delayed clear can safely run
+alongside data for the new attachment.
+
+`detachAndClear` prevents new data selection for the removed attachment and
+requests retirement of its native registration. If no callback was selected,
+the clear handler runs inline. Otherwise it runs once after the last selected
+data callback exits, including when that callback requested the detach or
+threw. The operation does not wait. A subsequent close leaves an already
+accepted clear in effect. Repeating the call on a detached feed returns false
+and emits no further clear.
+
+Java describes this operation in terms of empty events. The C++ handler marks
+invalidation with the exact attachment ID and leaves event values and source
+times intact. Other feeds, endpoint caches and the logical desired selectors
+continue independently. With the value-only listener constructor, attempting
+to clear an attached feed throws `UNSUPPORTED_PROFILE` before removing the
+attachment. Ordinary `detach` and `close` do not emit clear notifications.
+
 ## Runtime, callbacks and shutdown
 
 Create the owning `ApiRuntime(RuntimeOptions)` on main **before application threads**;
