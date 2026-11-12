@@ -1,0 +1,29 @@
+{
+  "status": "PASS",
+  "revision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "timezoneByteIdentical": true,
+  "oracleSha256": "e2fe41e045e0aa634b2a63bdf953b044e1e32cc377c6b19cf29066b268f34f04",
+  "sources": [
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/util/TimeSequenceUtil.java",
+      "sha256": "ee1fc453383b8b978693475e80fa22f89ef70b947db637a417e66895f70a8596"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/impl/AbstractIndexedList.java",
+      "sha256": "53d9f81e6cc7cbb7aaca7994cca0814fd3df2df6dc177f63501386a38ef2ce40"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/TimeAndSale.java",
+      "sha256": "bf3cff336518c851c3f43c78fcb8782453a6d123b4d7e7fe19c03e48cc21b246"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/api/impl/DXFeedImpl.java",
+      "sha256": "7402a8be3bb5deaa84fc907c6b69bc91d0ec58d1883bf3c97b8260b1d1017caf"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/api/impl/EventDelegate.java",
+      "sha256": "5e6c90ed4115f57708d01f697dedcdc6bc168e41d254b6e245516feb073f5593"
+    }
+  ],
+  "fixtureSha256": "4f1da687fe7b6c9fac1c5e03ac702a7af25516e3ac1268684358b95381e98d49"
+}

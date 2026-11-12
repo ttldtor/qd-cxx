@@ -1,0 +1,11 @@
+# Time-series snapshot range policy
+
+A bounded time-series request uses inclusive business-millisecond bounds. A reversed interval is rejected. An active request entirely outside representable event times completes with an empty result without a source epoch. A passive read reports no interest when absent and otherwise returns incomplete because it does not select a source for an empty range. The retained-history candidate interval is an inclusive range of signed packed time/sequence indices, but the final selection tests each event's business time against the original bounds before enforcing the output count.
+
+The packed millisecond field has ten bits. Values 1000–1023 overlap the first 24 milliseconds of the following second, so the smallest single raw interval covering an exact business range may contain extra records. Those records consume bounded scan work but do not consume the result count. The inclusive upper bound includes every sequence at the requested millisecond. Arithmetic clamps against representable event time without overflowing at signed 64-bit limits.
+
+Returned events are independent owning values, ordered by business time and then by raw index for ties, with event flags cleared. The result-count limit and independent scan/comparison budgets produce explicit failures rather than a partial successful result. Retained collector state is not modified. An upstream `SNAPSHOT_SNIP` above the requested lower coverage remains truncated; an incomplete or unsubscribed range is not a complete snapshot. Subscription ownership, asynchronous completion, cancellation and the collector's separate raw scan limit are provided by the snapshot query integration.
+
+The Java API documents both time bounds as inclusive. At the pinned revision, its upper conversion clears sequence bits, which can exclude a nonzero sequence at exactly `toTime`. The bounded policy follows the documented inclusive business-time contract. It does not use the upstream previous-day fetch heuristic.
+
+A temporary time-series selector uses the start of the raw lower-index second, which can be up to 1,023 milliseconds earlier than the requested business bound. An existing subscription whose applied raw coverage starts after the required lower index cannot establish a complete result; normally subscribed ranges with full raw coverage remain eligible.

@@ -268,6 +268,13 @@ void verify(const std::filesystem::path &root, bool history, bool regional, bool
 
         REQUIRE(complete());
         CHECK(snapshot.ranges.front().status.requestedFrom == e::withTimeSequenceTime(0, 0));
+
+        if (!regional && !custom) {
+            const auto observed = feed->getTimeSeriesIfSubscribed<e::TimeAndSale>(u"AAPL", 2001, 2001);
+            CHECK(observed.state == a::HistorySnapshotState::COMPLETE);
+            REQUIRE(observed.events.size() == 1);
+            CHECK(observed.events.front().getSequence() == 2);
+        }
     }
 
     const auto closed = endpoint->closeAndAwaitTermination();
@@ -330,6 +337,162 @@ TEST_CASE("Public TimeAndSale matches pinned QD STREAM and HISTORY reports") {
     }
 }
 
+TEST_CASE("Time-series request reads an inclusive nonzero sequence over HISTORY TCP") {
+    const auto root = std::filesystem::path(ORG_TTLDTOR_QDCXX_TIME_AND_SALE_FIXTURES) / "wide";
+    std::ifstream input(root / "history.qtp", std::ios::binary);
+    REQUIRE(input);
+    const std::vector<char> bytes((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
+    q::test::TcpPeerScript script;
+    script.initialBytes = r::ready();
+    const auto data = std::as_bytes(std::span(bytes));
+    script.replyBytes.assign(data.begin(), data.end());
+    script.readThroughMessage = std::to_underlying(p::SubscriptionMessage::HISTORY_ADD);
+    script.waitForClientClose = true;
+    q::test::OwnedTcpPeer peer({{std::move(script)}});
+    REQUIRE(peer.port() != 0);
+    a::RuntimeOptions limits;
+    limits.dnsServers.push_back({{127, 0, 0, 1}});
+    a::ApiRuntime runtime(limits);
+    a::EndpointOptions options;
+    options.maximumAttempts = 1;
+    options.contract = a::DeliveryContract::HISTORY;
+    auto endpoint = runtime.createEndpoint(options);
+    auto feed = endpoint->getFeed();
+    CHECK(feed->getTimeSeriesIfSubscribed<e::TimeAndSale>(u"AAPL", 2001, 2001).state ==
+          a::HistorySnapshotState::NOT_SUBSCRIBED);
+    CHECK_THROWS_AS(static_cast<void>(feed->requestTimeSeries<e::TimeAndSale>(u"AAPL", 2002, 2001,
+                                                                              std::chrono::steady_clock::now() + 5s)),
+                    a::Error);
+    auto empty =
+        feed->requestTimeSeries<e::TimeAndSale>(u"AAPL", INT64_MAX, INT64_MAX, std::chrono::steady_clock::now() + 5s);
+    const auto emptyResult = empty.get();
+    CHECK(emptyResult.state == a::HistorySnapshotState::COMPLETE);
+    CHECK_FALSE(emptyResult.sourceEpoch);
+    CHECK(emptyResult.events.empty());
+    auto request = feed->requestTimeSeries<e::TimeAndSale>(u"AAPL", 2001, 2001, std::chrono::steady_clock::now() + 5s);
+    endpoint->connect("127.0.0.1:" + std::to_string(peer.port()));
+    const auto snapshot = request.get();
+    CHECK(snapshot.state == a::HistorySnapshotState::COMPLETE);
+    REQUIRE(snapshot.sourceEpoch);
+    REQUIRE(snapshot.events.size() == 1);
+    CHECK(snapshot.events[0].getTime() == 2001);
+    CHECK(snapshot.events[0].getSequence() == 2);
+    CHECK(snapshot.events[0].eventFlags == 0);
+    static_cast<void>(endpoint->closeAndAwaitTermination());
+}
+
+TEST_CASE("Concurrent time-series snapshots preserve the narrower window after sibling cancellation") {
+    const auto root = std::filesystem::path(ORG_TTLDTOR_QDCXX_TIME_AND_SALE_FIXTURES) / "wide";
+    std::ifstream input(root / "history.qtp", std::ios::binary);
+    REQUIRE(input);
+    const std::vector<char> bytes((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
+    q::test::TcpPeerScript script;
+    script.initialBytes = r::ready();
+    const auto data = std::as_bytes(std::span(bytes));
+    script.replyBytes.assign(data.begin(), data.end());
+    script.readThroughMessage = std::to_underlying(p::SubscriptionMessage::HISTORY_ADD);
+    script.waitForControllerReply = true;
+    script.waitForClientClose = true;
+    a::RuntimeOptions limits;
+    limits.maximumSubscriptionsPerEndpoint = 2;
+    limits.dnsServers.push_back({{127, 0, 0, 1}});
+    a::ApiRuntime runtime(limits);
+    q::test::OwnedTcpPeer peer({{std::move(script)}});
+    REQUIRE(peer.port() != 0);
+    a::EndpointOptions options;
+    options.maximumAttempts = 1;
+    options.contract = a::DeliveryContract::HISTORY;
+    auto endpoint = runtime.createEndpoint(options);
+    auto feed = endpoint->getFeed();
+    const auto deadline = std::chrono::steady_clock::now() + 5s;
+    auto wider = feed->requestTimeSeries<e::TimeAndSale>(u"AAPL", 500, 2001, deadline);
+    auto narrower = feed->requestTimeSeries<e::TimeAndSale>(u"AAPL", 1005, 1005, deadline, {1});
+    endpoint->connect("127.0.0.1:" + std::to_string(peer.port()));
+    bool added = false;
+
+    while (std::chrono::steady_clock::now() < deadline) {
+        if (peer.snapshot().sessions.front().matched) {
+            added = true;
+            break;
+        }
+
+        std::this_thread::sleep_for(1ms);
+    }
+
+    REQUIRE(added);
+    CHECK(feed->getTimeSeriesIfSubscribed<e::TimeAndSale>(u"AAPL", 1005, 1005).state ==
+          a::HistorySnapshotState::NOT_SUBSCRIBED);
+    CHECK(wider.cancel());
+    CHECK_FALSE(wider.cancel());
+
+    try {
+        static_cast<void>(wider.get());
+        FAIL_CHECK("the cancelled wider request must fail");
+    } catch (const a::Error &error) {
+        CHECK(error.diagnostic().code == a::ErrorCode::REQUEST_CANCELLED);
+    }
+
+    CHECK_FALSE(narrower.isDone());
+    peer.allowReply(0);
+    const auto result = narrower.get();
+    CHECK(result.state == a::HistorySnapshotState::COMPLETE);
+    REQUIRE(result.sourceEpoch);
+    REQUIRE(result.events.size() == 1);
+    CHECK(result.events.front().getTime() == 1005);
+    CHECK(result.events.front().getSequence() == 7);
+    CHECK(result.events.front().eventFlags == 0);
+    static_cast<void>(endpoint->closeAndAwaitTermination());
+    const auto observed = peer.snapshot();
+    REQUIRE(observed.error == q::test::TcpPeerError::NONE);
+    checkAdd(observed.sessions.front().received, true, false, false);
+}
+
+TEST_CASE("Narrow passive HISTORY coverage does not claim the overlapping raw second") {
+    const auto root = std::filesystem::path(ORG_TTLDTOR_QDCXX_TIME_AND_SALE_FIXTURES) / "wide";
+    std::ifstream input(root / "history.qtp", std::ios::binary);
+    REQUIRE(input);
+    const std::vector<char> bytes((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
+    q::test::TcpPeerScript script;
+    script.initialBytes = r::ready();
+    const auto data = std::as_bytes(std::span(bytes));
+    script.replyBytes.assign(data.begin(), data.end());
+    script.readThroughMessage = std::to_underlying(p::SubscriptionMessage::HISTORY_ADD);
+    script.waitForClientClose = true;
+    q::test::OwnedTcpPeer peer({{std::move(script)}});
+    REQUIRE(peer.port() != 0);
+    a::RuntimeOptions limits;
+    limits.dnsServers.push_back({{127, 0, 0, 1}});
+    a::ApiRuntime runtime(limits);
+    a::EndpointOptions options;
+    options.maximumAttempts = 1;
+    options.contract = a::DeliveryContract::HISTORY;
+    auto endpoint = runtime.createEndpoint(options);
+    auto feed = endpoint->getFeed();
+    auto subscription = feed->createTimeSeriesSubscription<e::TimeAndSale>();
+    subscription->setFromTime(2001);
+    subscription->addSymbols("AAPL");
+    endpoint->connect("127.0.0.1:" + std::to_string(peer.port()));
+    const auto deadline = std::chrono::steady_clock::now() + 5s;
+    auto snapshot = subscription->getHistorySnapshot();
+
+    while ((snapshot.state != a::HistoryObservationState::CURRENT || snapshot.ranges.empty() ||
+            !snapshot.ranges.front().status.completeDeliveredRange) &&
+           std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(1ms);
+        snapshot = subscription->getHistorySnapshot();
+    }
+
+    REQUIRE(snapshot.state == a::HistoryObservationState::CURRENT);
+    REQUIRE(snapshot.ranges.size() == 1);
+    REQUIRE(snapshot.ranges.front().status.completeDeliveredRange);
+    CHECK(snapshot.ranges.front().status.requestedFrom == e::withTimeSequenceTime(0, 2001));
+    const auto result = feed->getTimeSeriesIfSubscribed<e::TimeAndSale>(u"AAPL", 2001, 2001);
+    CHECK(result.state == a::HistorySnapshotState::INCOMPLETE);
+    CHECK_FALSE(result.sourceEpoch);
+    CHECK(result.events.empty());
+    static_cast<void>(endpoint->closeAndAwaitTermination());
+}
+
 TEST_CASE("TimeAndSale default regional catalogs fit complete expanded peer descriptions") {
     a::RuntimeOptions runtime;
     runtime.dnsServers.push_back({{127, 0, 0, 1}});
@@ -345,11 +508,11 @@ TEST_CASE("TimeAndSale default regional catalogs fit complete expanded peer desc
         const auto firstRecord = history ? HISTORY_COMPOSITE_ID : STREAM_COMPOSITE_ID;
         constexpr std::size_t REGIONAL_AND_COMPOSITE_RECORDS = 27;
         const auto salesEnd = static_cast<std::size_t>(firstRecord) + REGIONAL_AND_COMPOSITE_RECORDS;
-        const auto expectedRecords = salesEnd + (history ? 1 : 0);
+        const auto expectedRecords = salesEnd + 1;
         REQUIRE(profile.schema.records().size() == expectedRecords);
         REQUIRE(profile.blueprint.size() == expectedRecords);
         REQUIRE(registry->registrations().size() == expectedRecords + (history ? 1 : 0));
-        CHECK(profile.eventPlans.size() == (history ? 4096 : 1024));
+        CHECK(profile.eventPlans.size() == (history ? 4096 : 2048));
 
         for (std::size_t offset = 0; offset < REGIONAL_AND_COMPOSITE_RECORDS; ++offset) {
             const auto recordIndex = static_cast<std::size_t>(firstRecord) + offset;
@@ -441,6 +604,8 @@ TEST_CASE("TimeAndSale default regional catalogs fit complete expanded peer desc
         if (history) {
             CHECK(snapshot.descriptions()[salesEnd].name == u"OptionSale");
             CHECK(snapshot.descriptions()[salesEnd].fields.size() == 17);
+        } else {
+            CHECK(snapshot.descriptions()[salesEnd].name == u"NuamTrade");
         }
 
         const auto regional = d::filterSubscriptionCoordinates(*registry, contract, a::EventType::TIME_AND_SALE,

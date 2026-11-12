@@ -377,3 +377,5 @@ class/resource inventories.
 - [Оракул OptionSale](../upstream/option-sale-oracle/README.ru.md) записывает индексные события HISTORY для схем закреплённой версии Java QD.
 
 - [Oracle NuamTrade](../upstream/nuam-trade-oracle/README.ru.md) записывает ограниченный набор Java-наблюдений и предоставляет EN/RU справку без входов.
+
+- [Генератор границ временного ряда](../upstream/time-series-query-oracle/README.ru.md) работает офлайн и содержит справку на двух языках.

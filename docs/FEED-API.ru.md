@@ -755,6 +755,10 @@ SDK применяет demand и снимает устаревшую HISTORY д�
 
 Выбирайте `DeliveryContract::HISTORY` явно. Worker владеет collector, независимыми views, replay и ACK reset. `Subscription<Event>::getHistorySnapshot()` возвращает пассивный владеющий срез AS-OF; getter не выполняет I/O и не ждёт callback. Current completion требует настоящих данных о доставленном диапазоне и соответствия принятым logical/source/clear/callback fences. Стандартный реестр HISTORY из SDK включает перечисленные выше индексируемые семейства событий. Подписки без маршрута HISTORY отклоняются до native-регистрации. См. [поля Order, source-селекторы и владение](ORDER.ru.md) и [MarketMaker и производный Order](MARKET-MAKER-ORDER.ru.md). Точные состояния, конечные storage limits и сырые индексируемые координаты описаны в [контракте HISTORY](../spec/subscriptions/HISTORY-RECEIVING.ru.md).
 
+## Снимки временного ряда
+
+На endpoint HISTORY метод `Feed::getTimeSeriesIfSubscribed<Event>(symbol, fromTime, toTime)` читает при существующем интересе, а `requestTimeSeries<Event>(symbol, fromTime, toTime, deadline)` может создать временный интерес. Обе границы включают Unix-миллисекунды; владеющие события упорядочены по времени и включают все последовательности верхней границы. Превышение лимита результата приводит к явной ошибке. Подробности покрытия, пустых диапазонов и отличия от Java приведены в [описании диапазонов](../spec/subscriptions/TIME-SERIES-QUERY.ru.md).
+
 ## Получение Candle
 
 Для последнего полученного значения используйте `createSubscription<Candle>()` на endpoint с контрактом TICKER. Для снимка за диапазон и последующих изменений используйте `createTimeSeriesSubscription<Candle>()` на endpoint с контрактом HISTORY. Передайте `CandleSymbol` в `addSymbols()` и задайте начало диапазона через `setFromTime()`. Обработчик получает копируемое значение Candle с логическим `CandleSymbol`, который запросило приложение.
