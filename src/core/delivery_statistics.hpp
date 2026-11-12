@@ -8,7 +8,7 @@
 
 namespace org::ttldtor::qdcxx::core::detail {
 
-/** Pure bounded accounting owner shared by actual delivery producers; never retains a callback or runtime. */
+/** Pure bounded delivery accounting and cadence state; never retains a callback or runtime. */
 struct DeliveryStatisticsState {
     mutable std::mutex mutex;     ///< Lock order: facade port before statistics; never call user code under either.
     SubscriptionStatistics value; ///< Every mutation and public cut uses this one mutex.
@@ -16,6 +16,12 @@ struct DeliveryStatisticsState {
 
     std::uint64_t submittedDesiredRevision = 0; ///< Logical revision belonging to the queued facade command.
     bool historyReplayRequired = false; ///< Private delivery intent after obsolete HISTORY loss; not a statistic.
+    std::chrono::milliseconds endpointAggregationPeriod{0};                 ///< Immutable endpoint-local floor.
+    std::optional<std::chrono::milliseconds> subscriptionAggregationPeriod; ///< Accepted subscription override.
+    std::optional<std::chrono::milliseconds> deliveredAggregationPeriod;    ///< Last period used by an invoked batch.
+    std::chrono::milliseconds selectedAggregationPeriod{0}; ///< Period captured for the currently selected batch.
+    bool selectedAggregationSnapshotBypass = false;         ///< Snapshot selected during an already running interval.
+    std::chrono::steady_clock::time_point nextAggregationDelivery{}; ///< End of the already running local interval.
 
     /** Apply one complete accounting transition without allocation or user code.
      * @param operation Library-only bounded mutation, required not to throw.

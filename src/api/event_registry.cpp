@@ -11,6 +11,7 @@
 #include "qd/events/derived_order.hpp"
 #include "qd/events/greeks.hpp"
 #include "qd/events/market_maker.hpp"
+#include "qd/events/nuam_trade.hpp"
 #include "qd/events/option_sale.hpp"
 #include "qd/events/order.hpp"
 #include "qd/events/order_imbalance.hpp"
@@ -186,7 +187,8 @@ bool validRegistration(const EventRegistration &registration) noexcept {
             registration.type == EventType::CONFIGURATION || registration.type == EventType::MARKET_MAKER ||
             registration.type == EventType::SERIES || registration.type == EventType::CANDLE ||
             registration.type == EventType::TIME_AND_SALE || registration.type == EventType::OPTION_SALE ||
-            detail::isOptionTimeSeriesEvent(registration.type) || detail::usesOrderSource(registration.type)) &&
+            registration.type == EventType::NUAM_TRADE || detail::isOptionTimeSeriesEvent(registration.type) ||
+            detail::usesOrderSource(registration.type)) &&
            (registration.eventTimePolicy == EventTimePolicy::UNSPECIFIED ||
             registration.eventTimePolicy == EventTimePolicy::FIELD_METADATA) &&
            (registration.projection == events::EventProjection::NATIVE ||
@@ -398,6 +400,13 @@ EventRegistry::create(const core::LocalSchema &schema, std::span<const EventRegi
             } else if (registration.type == EventType::TRADE) {
                 const auto mapping = events::PreparedTrade::prepare(*ownedSchema, registration.localRecordId,
                                                                     registration.mappingLimits);
+
+                if (!mapping) {
+                    return std::unexpected(EventRegistryFailure{mapping.error(), index});
+                }
+            } else if (registration.type == EventType::NUAM_TRADE) {
+                const auto mapping = events::PreparedNuamTrade::prepare(*ownedSchema, registration.localRecordId,
+                                                                        registration.mappingLimits);
 
                 if (!mapping) {
                     return std::unexpected(EventRegistryFailure{mapping.error(), index});
@@ -745,6 +754,32 @@ std::expected<void, core::SchemaError> appendStandardCandleRecords(std::vector<c
     return {};
 }
 
+/** Append the default composite NuamTrade record and route.
+ * @param records Owning candidate records, modified before publication.
+ * @param routes Owning candidate routes, modified before publication.
+ * @param limits Mandatory finite complete schema limits.
+ * @param work Caller-owned construction allowance.
+ * @return Success or original bounded schema failure.
+ */
+std::expected<void, EventRegistryFailure> appendNuamTradeRecord(std::vector<core::LocalRecord> &records,
+                                                                std::vector<EventRegistration> &routes,
+                                                                EventRegistryLimits limits, EventRegistryWork &work) {
+    constexpr std::size_t CONSTRUCTION_WORK = 1024;
+    debit(work.visits, CONSTRUCTION_WORK);
+    const auto schema = events::defaultNuamTradeSchema(limits.schema);
+
+    if (!schema) {
+        return std::unexpected(EventRegistryFailure{schema.error(), {}});
+    }
+
+    auto record = schema->records().front();
+    record.id = static_cast<std::int32_t>(records.size());
+    routes.push_back({EventType::NUAM_TRADE, record.id});
+    records.push_back(std::move(record));
+
+    return {};
+}
+
 /** Build an explicit derived route while retaining the ordinary finite mapper defaults.
  * @param id Exact physical local record ID.
  * @param family Verified physical-to-business delegate family.
@@ -772,6 +807,10 @@ std::expected<EventRegistry, EventRegistryFailure> defaultStreamEventRegistry(Ev
 
         if (const auto sales = appendStandardTimeAndSaleRecords(records, routes, limits, work); !sales) {
             return std::unexpected(sales.error());
+        }
+
+        if (const auto nuam = appendNuamTradeRecord(records, routes, limits, work); !nuam) {
+            return std::unexpected(nuam.error());
         }
 
         const auto schema = core::LocalSchema::create(records, limits.schema, core::LocalProfile::BINARY_FIELDS_V1);
@@ -818,8 +857,8 @@ std::expected<EventRegistry, EventRegistryFailure> defaultTickerEventRegistry(Ev
             return std::unexpected(EventRegistryFailure{imbalance.error(), {}});
         }
 
-        constexpr std::size_t DEFAULT_PHYSICAL_RECORDS = 44;
-        constexpr std::size_t DEFAULT_ROUTES = 71;
+        constexpr std::size_t DEFAULT_PHYSICAL_RECORDS = 45;
+        constexpr std::size_t DEFAULT_ROUTES = 72;
         records.reserve(DEFAULT_PHYSICAL_RECORDS);
         routes.reserve(DEFAULT_ROUTES);
         routes.push_back(derivedRegistration(0, events::EventProjection::QUOTE_ORDERS));
@@ -903,6 +942,10 @@ std::expected<EventRegistry, EventRegistryFailure> defaultTickerEventRegistry(Ev
 
         if (const auto candle = appendStandardCandleRecords(records, routes, limits.schema); !candle)
             return std::unexpected(EventRegistryFailure{candle.error(), {}});
+
+        if (const auto nuam = appendNuamTradeRecord(records, routes, limits, work); !nuam) {
+            return std::unexpected(nuam.error());
+        }
 
         auto schema = core::LocalSchema::create(records, limits.schema, core::LocalProfile::BINARY_FIELDS_V1);
 

@@ -13,6 +13,7 @@
 #include "qd/events/configuration.hpp"
 #include "qd/events/greeks.hpp"
 #include "qd/events/market_maker.hpp"
+#include "qd/events/nuam_trade.hpp"
 #include "qd/events/option_sale.hpp"
 #include "qd/events/order.hpp"
 #include "qd/events/order_imbalance.hpp"
@@ -147,6 +148,9 @@ struct HistoryReceivingOptions {
     std::size_t pendingBytesPerSubscription = 4 * 1024 * 1024; ///< Independent whole-source-owner backing per view.
 };
 
+/** Maximum endpoint and subscription local aggregation period. */
+inline constexpr std::chrono::milliseconds MAXIMUM_LOCAL_AGGREGATION_PERIOD{86400000};
+
 /** Endpoint policy; defaults need no caller-owned queue or turn-work objects. */
 struct EndpointOptions {
     static constexpr std::size_t MAXIMUM_BATCH_RECORDS = 4;     ///< Qualified physical callback record ceiling.
@@ -170,6 +174,7 @@ struct EndpointOptions {
                                       ///< explicit sources are independent.
     std::size_t batchRecords = MAXIMUM_BATCH_RECORDS;     ///< Maximum whole physical records per callback selection.
     std::size_t pendingRecords = MAXIMUM_PENDING_RECORDS; ///< Detached record slots per subscription.
+    std::chrono::milliseconds aggregationPeriod{0};       ///< Local delivery cadence; zero selects immediate delivery.
 };
 
 /** Last SDK-worker observation, never an upstream acknowledgement or a whole-network guarantee. */
@@ -228,7 +233,7 @@ using RegisteredEvent =
                  events::TextConfiguration, events::Message, events::Configuration, events::Order, events::MarketMaker,
                  events::SpreadOrder, events::AnalyticOrder, events::OtcMarketsOrder, events::OrderImbalance,
                  events::Series, events::Greeks, events::Underlying, events::TheoPrice, events::Candle,
-                 events::TimeAndSale, events::OptionSale>;
+                 events::TimeAndSale, events::OptionSale, events::NuamTrade>;
 
 /** Independently owned observation of one complete accepted local subscription revision. */
 struct SubscriptionSnapshot {
@@ -276,8 +281,8 @@ template <class Event> class Subscription final {
                   std::is_same_v<Event, events::Series> || std::is_same_v<Event, events::Greeks> ||
                   std::is_same_v<Event, events::Underlying> || std::is_same_v<Event, events::TheoPrice> ||
                   std::is_same_v<Event, events::Candle> || std::is_same_v<Event, events::TimeAndSale> ||
-                  std::is_same_v<Event, events::OptionSale> || std::is_same_v<Event, events::Order> ||
-                  std::is_same_v<Event, RegisteredEvent>);
+                  std::is_same_v<Event, events::OptionSale> || std::is_same_v<Event, events::NuamTrade> ||
+                  std::is_same_v<Event, events::Order> || std::is_same_v<Event, RegisteredEvent>);
     std::shared_ptr<detail::SubscriptionPort> port_;
     friend class Feed;
     explicit Subscription(std::shared_ptr<detail::SubscriptionPort> port) noexcept;
@@ -316,6 +321,18 @@ template <class Event> class Subscription final {
      * @return Owner identity, lifetime counters, bounded gauges and monotonic observation time.
      */
     [[nodiscard]] SubscriptionStatistics getStatistics() const noexcept;
+    /** Read the accepted subscription-local aggregation override.
+     * @return Override, or nullopt when the endpoint-local period is used.
+     */
+    [[nodiscard]] std::optional<std::chrono::milliseconds> getAggregationPeriod() const noexcept;
+    /** Set or clear the local aggregation override; the running interval retains its original deadline.
+     * @param period Nonnegative local period up to 24 hours, or nullopt to clear the override.
+     */
+    void setAggregationPeriod(std::optional<std::chrono::milliseconds> period);
+    /** Inspect the effective local period used for the most recent listener invocation.
+     * @return Maximum endpoint and subscription period at selection, or nullopt before the first invocation.
+     */
+    [[nodiscard]] std::optional<std::chrono::milliseconds> getAggregationPeriodInfo() const noexcept;
     /** Copy the last worker HISTORY observation and qualify it against current accepted facade fences.
      * Reads perform no native progress or callback waiting. A CURRENT cut is AS-OF, not a promise about
      * unread network input or future freshness; another contract reports UNSUPPORTED.
@@ -503,6 +520,7 @@ template <class Event> class Subscription final {
 extern template class Subscription<events::Quote>;
 extern template class Subscription<events::Profile>;
 extern template class Subscription<events::Trade>;
+extern template class Subscription<events::NuamTrade>;
 extern template class Subscription<events::TradeETH>;
 extern template class Subscription<events::Summary>;
 extern template class Subscription<events::TextMessage>;
@@ -555,7 +573,8 @@ class Feed final {
                       std::is_same_v<Event, events::Series> || std::is_same_v<Event, events::Greeks> ||
                       std::is_same_v<Event, events::Underlying> || std::is_same_v<Event, events::TheoPrice> ||
                       std::is_same_v<Event, events::Candle> || std::is_same_v<Event, events::TimeAndSale> ||
-                      std::is_same_v<Event, events::OptionSale> || std::is_same_v<Event, events::Order>);
+                      std::is_same_v<Event, events::OptionSale> || std::is_same_v<Event, events::NuamTrade> ||
+                      std::is_same_v<Event, events::Order>);
 
         if constexpr (std::is_same_v<Event, events::Quote>)
             return EventType::QUOTE;
@@ -599,6 +618,8 @@ class Feed final {
             return EventType::TIME_AND_SALE;
         else if constexpr (std::is_same_v<Event, events::OptionSale>)
             return EventType::OPTION_SALE;
+        else if constexpr (std::is_same_v<Event, events::NuamTrade>)
+            return EventType::NUAM_TRADE;
         else
             return EventType::ORDER;
     }

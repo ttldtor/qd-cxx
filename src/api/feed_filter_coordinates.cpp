@@ -46,6 +46,7 @@ bool supported(const EventRegistry &registry, EventType type) noexcept {
     case EventType::THEO_PRICE:
     case EventType::CANDLE:
     case EventType::TIME_AND_SALE:
+    case EventType::NUAM_TRADE:
     case EventType::OPTION_SALE:
         return true;
     }
@@ -56,7 +57,7 @@ bool supported(const EventRegistry &registry, EventType type) noexcept {
 /** Only the existing market projections convert regional record/symbol suffixes. */
 bool usesRegionalCoordinates(EventType type) noexcept {
     return type == EventType::QUOTE || type == EventType::TRADE || type == EventType::TRADE_ETH ||
-           type == EventType::SUMMARY || type == EventType::TIME_AND_SALE;
+           type == EventType::SUMMARY || type == EventType::TIME_AND_SALE || type == EventType::NUAM_TRADE;
 }
 
 /** Non-market projections use the generic source-selection rule, rather than MarketEventDelegateSet. */
@@ -321,6 +322,8 @@ std::vector<FilterCoordinate> filterEventCoordinates(const EventRegistry &regist
                     return EventType::TIME_AND_SALE;
                 } else if constexpr (std::is_same_v<Event, events::OptionSale>) {
                     return EventType::OPTION_SALE;
+                } else if constexpr (std::is_same_v<Event, events::NuamTrade>) {
+                    return EventType::NUAM_TRADE;
                 } else if constexpr (std::is_same_v<Event, events::Order>) {
                     return EventType::ORDER;
                 } else {
