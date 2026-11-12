@@ -46,6 +46,8 @@ bool supported(const EventRegistry &registry, EventType type) noexcept {
     case EventType::THEO_PRICE:
     case EventType::CANDLE:
     case EventType::TIME_AND_SALE:
+    case EventType::NUAM_TIME_AND_SALE:
+    case EventType::NUAM_TRADE:
     case EventType::OPTION_SALE:
         return true;
     }
@@ -56,14 +58,16 @@ bool supported(const EventRegistry &registry, EventType type) noexcept {
 /** Only the existing market projections convert regional record/symbol suffixes. */
 bool usesRegionalCoordinates(EventType type) noexcept {
     return type == EventType::QUOTE || type == EventType::TRADE || type == EventType::TRADE_ETH ||
-           type == EventType::SUMMARY || type == EventType::TIME_AND_SALE;
+           type == EventType::SUMMARY || type == EventType::TIME_AND_SALE || type == EventType::NUAM_TIME_AND_SALE ||
+           type == EventType::NUAM_TRADE;
 }
 
 /** Non-market projections use the generic source-selection rule, rather than MarketEventDelegateSet. */
 bool usesGenericSourceSelection(EventType type) noexcept {
     return type == EventType::TEXT_MESSAGE || type == EventType::TEXT_CONFIGURATION || type == EventType::MESSAGE ||
            type == EventType::CONFIGURATION || type == EventType::MARKET_MAKER || type == EventType::SERIES ||
-           isOptionTimeSeriesEvent(type) || type == EventType::CANDLE || type == EventType::OPTION_SALE;
+           isOptionTimeSeriesEvent(type) || type == EventType::CANDLE || type == EventType::OPTION_SALE ||
+           type == EventType::NUAM_TIME_AND_SALE;
 }
 
 /** Match explicit Order source identity using the already validated record qualification rules.
@@ -115,7 +119,8 @@ bool matchesFilterRoute(const EventRegistry &registry, const EventRegistration &
         return false;
 
     if ((usesOrderSource(type) || type == EventType::MARKET_MAKER || type == EventType::SERIES ||
-         isOptionTimeSeriesEvent(type) || type == EventType::TIME_AND_SALE || type == EventType::OPTION_SALE) &&
+         isOptionTimeSeriesEvent(type) || type == EventType::TIME_AND_SALE || type == EventType::NUAM_TIME_AND_SALE ||
+         type == EventType::OPTION_SALE) &&
         !receivingRouteSupportsContract(route, contract))
         return false;
 
@@ -257,7 +262,8 @@ std::vector<FilterCoordinate> filterSubscriptionCoordinates(const EventRegistry 
 
     const bool wildcard = selector.kind() == SubscriptionSymbolKind::ALL;
 
-    if (wildcard && type == EventType::TIME_AND_SALE && contract != DeliveryContract::STREAM) {
+    if (wildcard && (type == EventType::TIME_AND_SALE || type == EventType::NUAM_TIME_AND_SALE) &&
+        contract != DeliveryContract::STREAM) {
         return {};
     }
 
@@ -321,6 +327,10 @@ std::vector<FilterCoordinate> filterEventCoordinates(const EventRegistry &regist
                     return EventType::TIME_AND_SALE;
                 } else if constexpr (std::is_same_v<Event, events::OptionSale>) {
                     return EventType::OPTION_SALE;
+                } else if constexpr (std::is_same_v<Event, events::NuamTimeAndSale>) {
+                    return EventType::NUAM_TIME_AND_SALE;
+                } else if constexpr (std::is_same_v<Event, events::NuamTrade>) {
+                    return EventType::NUAM_TRADE;
                 } else if constexpr (std::is_same_v<Event, events::Order>) {
                     return EventType::ORDER;
                 } else {

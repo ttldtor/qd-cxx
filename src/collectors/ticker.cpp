@@ -296,6 +296,7 @@ struct TickerCollector::Impl {
         std::size_t offered = NONE;         ///< Current prepared cache index.
         std::size_t offeredQueue = INITIAL; ///< Queue traversed by the prepared single-record retrieval.
         std::size_t nextCredit = 0;         ///< Balance published only by successful pop.
+        bool initialOnlyOffer = false;      ///< Selected initial-only offer preserves ordinary fairness credit.
     };
 
     /** Independently bounded local desired owner and scalar queues. */
@@ -1657,6 +1658,11 @@ std::expected<TickerStage, TickerError> TickerCollector::stage(protocol::LiveEve
 
 std::expected<std::optional<TickerDelivery>, TickerError> TickerCollector::front(const TickerViewToken &view,
                                                                                  TickerWork &work) {
+    return frontWithPolicy(view, work, TickerOfferPolicy::NORMAL);
+}
+
+std::expected<std::optional<TickerDelivery>, TickerError>
+TickerCollector::frontWithPolicy(const TickerViewToken &view, TickerWork &work, TickerOfferPolicy policy) {
     try {
         spend(work, 1, 1);
 
@@ -1679,6 +1685,9 @@ std::expected<std::optional<TickerDelivery>, TickerError> TickerCollector::front
             return std::unexpected(TickerError::RESET_PENDING);
         }
 
+        if (policy != TickerOfferPolicy::NORMAL && policy != TickerOfferPolicy::INITIAL_ONLY)
+            return std::unexpected(TickerError::INVALID_CONFIGURATION);
+
         auto &q = s.views[*slot].queues;
 
         if (!q.pending) {
@@ -1688,7 +1697,24 @@ std::expected<std::optional<TickerDelivery>, TickerError> TickerCollector::front
         }
 
         spend(work, 0, sum(product(2, s.limits.cacheKeys), 2));
-        const auto selected = s.prepareOffer(q, s.rows(s.pending.get(), *slot));
+        const auto *data = s.rows(s.pending.get(), *slot);
+        auto selected =
+            policy == TickerOfferPolicy::NORMAL ? s.prepareOffer(q, data) : Impl::Selection{NONE, INITIAL, q.credit};
+
+        if (policy == TickerOfferPolicy::INITIAL_ONLY) {
+            auto index = q.head[INITIAL];
+
+            while (index != NONE && (!data[index].dirty || !data[index].first))
+                index = data[index].next[INITIAL];
+
+            selected = {index, INITIAL, q.credit};
+
+            if (index == NONE) {
+                q.offered = NONE;
+
+                return std::optional<TickerDelivery>{};
+            }
+        }
 
         if (selected.index == NONE) {
             std::terminate();
@@ -1697,6 +1723,7 @@ std::expected<std::optional<TickerDelivery>, TickerError> TickerCollector::front
         q.offeredQueue = selected.kind;
         q.offered = selected.index;
         q.nextCredit = selected.nextCredit;
+        q.initialOnlyOffer = policy == TickerOfferPolicy::INITIAL_ONLY;
         const auto &item = s.rows(s.pending.get(), *slot)[q.offered];
         const auto &entry = s.entries[q.offered];
         auto projections = item.projections;
@@ -1738,7 +1765,14 @@ std::expected<void, TickerError> TickerCollector::pop(const TickerViewToken &vie
         spend(work, 0, sum(product(4, s.limits.cacheKeys), sum(4, s.limits.viewSlots)));
         auto *data = s.rows(s.pending.get(), *slot);
         const auto index = q.offered;
-        const auto selected = s.select(q, data);
+        auto selected = INITIAL;
+
+        if (q.initialOnlyOffer) {
+            while (q.head[INITIAL] != NONE && (!data[q.head[INITIAL]].dirty || !data[q.head[INITIAL]].first))
+                s.unlink(q, data, q.head[INITIAL], INITIAL);
+        } else {
+            selected = s.select(q, data);
+        }
 
         if (selected != q.offeredQueue || q.head[selected] != index) {
             std::terminate();
@@ -1751,7 +1785,10 @@ std::expected<void, TickerError> TickerCollector::pop(const TickerViewToken &vie
         data[index].first = false;
         --q.pending;
         q.credit = q.nextCredit;
-        s.finishRetrieval(q, data, q.offeredQueue);
+
+        if (!q.initialOnlyOffer)
+            s.finishRetrieval(q, data, q.offeredQueue);
+
         s.invalidate();
         count(s.counts.delivered, 1, s.counts.saturated);
 

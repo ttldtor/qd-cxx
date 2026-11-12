@@ -368,6 +368,31 @@ detail::TcpRecoveryFactory::aggregationPeriodInfo(const TcpRecovery &recovery) n
     return recovery.impl_ ? recovery.impl_->core.aggregationPeriodInfo() : std::nullopt;
 }
 
+std::expected<mux::TickerLatestObservation, RecoveryDiagnostic>
+detail::TcpRecoveryFactory::visitTickerLatest(const TcpRecovery &recovery, const mux::MuxHandle &handle,
+                                              core::SubscriptionKey key, mux::QueueWork &work, void *context,
+                                              void (*visitor)(void *, const collectors::TickerValue &) noexcept) {
+    const auto lease = recovery.impl_;
+
+    return lease ? lease->core.visitTickerLatest(handle, key, work, context, visitor) : std::unexpected(moved());
+}
+
+std::expected<mux::MuxHandle, RecoveryReceiverFailure>
+detail::TcpRecoveryFactory::openObservedReceiver(TcpRecovery &recovery, core::SubscriptionFamily family,
+                                                 std::span<const client::PreparedSubscriptionBinding> bindings,
+                                                 const std::shared_ptr<client::SubscriptionConsumer> &consumer,
+                                                 client::ReceiverLimits receiverLimits, mux::ClientLimits clientLimits,
+                                                 client::ReceiverWork &receiverWork, mux::QueueWork &queueWork,
+                                                 const client::detail::ReceiverPlan **observationPlan) {
+    const auto lease = recovery.impl_;
+
+    if (!lease)
+        return std::unexpected(RecoveryReceiverFailure{moved()});
+
+    return lease->core.openSubscriptionReceiver(family, bindings, consumer, receiverLimits, clientLimits, receiverWork,
+                                                queueWork, observationPlan);
+}
+
 RecoveryCapacity TcpRecovery::capacity() const noexcept {
     return impl_ ? impl_->core.capacity() : RecoveryCapacity{};
 }
