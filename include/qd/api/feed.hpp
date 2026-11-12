@@ -13,6 +13,7 @@
 #include "qd/events/configuration.hpp"
 #include "qd/events/greeks.hpp"
 #include "qd/events/market_maker.hpp"
+#include "qd/events/nuam_time_and_sale.hpp"
 #include "qd/events/nuam_trade.hpp"
 #include "qd/events/option_sale.hpp"
 #include "qd/events/order.hpp"
@@ -35,6 +36,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <functional>
 #include <initializer_list>
 #include <memory>
@@ -81,6 +83,7 @@ enum class ErrorCode {
     EXECUTOR_DROPPED,    ///< Accepted task was destroyed without running.
     EXECUTOR_CONTRACT,   ///< Host refused or threw after actual execution began.
     CALLBACK_CANCELLED,  ///< Queued event selection cancelled by close or source reset; advisory.
+    TAPE_IO_FAILURE,     ///< The selected regular local file could not be opened or read.
     REQUEST_CANCELLED,   ///< A one-event request was cancelled or its accepted source epoch changed.
     REQUEST_TIMED_OUT    ///< A one-event request reached its absolute completion deadline.
 };
@@ -183,8 +186,8 @@ struct EndpointOptions {
 /** Last SDK-worker observation, never an upstream acknowledgement or a whole-network guarantee. */
 enum class EndpointState {
     NOT_CONNECTED, ///< Created without an accepted connection request.
-    CONNECTING,    ///< Connection, protocol negotiation or finite recovery is in progress.
-    CONNECTED,     ///< The existing recovery wrapper reports an active receiving session.
+    CONNECTING,    ///< Source opening, protocol negotiation or finite recovery is in progress.
+    CONNECTED,     ///< An active network receiving session or a ready local tape source.
     CLOSING,       ///< Reserved close is accepted; native and callback retirement may remain.
     CLOSED,        ///< Native state and event captures retired; opt-in state observers may still be retiring.
     FAILED         ///< A failure is retained; inspect the diagnostic and await actual retirement.
@@ -230,13 +233,19 @@ class FeedFilter;
 class FeedFilterContext;
 struct FeedFilterCategory;
 
+/** Explicit finite allowances for one immediate local tape read. */
+struct TapeSourceOptions {
+    std::size_t maximumFileBytes = 64 * 1024 * 1024; ///< Maximum physical input bytes.
+    std::size_t maximumFrames = 65'536;              ///< Maximum envelopes, including markers and controls.
+};
+
 /** Independently owning supported event value; inspect its actual class with std::visit or std::get_if. */
 using RegisteredEvent =
     std::variant<events::Quote, events::Profile, events::Trade, events::TradeETH, events::Summary, events::TextMessage,
                  events::TextConfiguration, events::Message, events::Configuration, events::Order, events::MarketMaker,
                  events::SpreadOrder, events::AnalyticOrder, events::OtcMarketsOrder, events::OrderImbalance,
                  events::Series, events::Greeks, events::Underlying, events::TheoPrice, events::Candle,
-                 events::TimeAndSale, events::OptionSale, events::NuamTrade>;
+                 events::TimeAndSale, events::OptionSale, events::NuamTrade, events::NuamTimeAndSale>;
 
 namespace detail {
 [[nodiscard]] bool latestEventRequestDone(const std::shared_ptr<LatestEventRequestState> &state) noexcept;
@@ -344,7 +353,8 @@ template <class Event> class Subscription final {
                   std::is_same_v<Event, events::Underlying> || std::is_same_v<Event, events::TheoPrice> ||
                   std::is_same_v<Event, events::Candle> || std::is_same_v<Event, events::TimeAndSale> ||
                   std::is_same_v<Event, events::OptionSale> || std::is_same_v<Event, events::NuamTrade> ||
-                  std::is_same_v<Event, events::Order> || std::is_same_v<Event, RegisteredEvent>);
+                  std::is_same_v<Event, events::NuamTimeAndSale> || std::is_same_v<Event, events::Order> ||
+                  std::is_same_v<Event, RegisteredEvent>);
     std::shared_ptr<detail::SubscriptionPort> port_;
     friend class Feed;
     explicit Subscription(std::shared_ptr<detail::SubscriptionPort> port) noexcept;
@@ -601,6 +611,7 @@ extern template class Subscription<events::Underlying>;
 extern template class Subscription<events::TheoPrice>;
 extern template class Subscription<events::Candle>;
 extern template class Subscription<events::TimeAndSale>;
+extern template class Subscription<events::NuamTimeAndSale>;
 extern template class Subscription<events::OptionSale>;
 extern template class Subscription<RegisteredEvent>;
 
@@ -659,7 +670,7 @@ class Feed final {
                       std::is_same_v<Event, events::Underlying> || std::is_same_v<Event, events::TheoPrice> ||
                       std::is_same_v<Event, events::Candle> || std::is_same_v<Event, events::TimeAndSale> ||
                       std::is_same_v<Event, events::OptionSale> || std::is_same_v<Event, events::NuamTrade> ||
-                      std::is_same_v<Event, events::Order>);
+                      std::is_same_v<Event, events::NuamTimeAndSale> || std::is_same_v<Event, events::Order>);
 
         if constexpr (std::is_same_v<Event, events::Quote>)
             return EventType::QUOTE;
@@ -703,6 +714,8 @@ class Feed final {
             return EventType::TIME_AND_SALE;
         else if constexpr (std::is_same_v<Event, events::OptionSale>)
             return EventType::OPTION_SALE;
+        else if constexpr (std::is_same_v<Event, events::NuamTimeAndSale>)
+            return EventType::NUAM_TIME_AND_SALE;
         else if constexpr (std::is_same_v<Event, events::NuamTrade>)
             return EventType::NUAM_TRADE;
         else
@@ -778,8 +791,10 @@ class Feed final {
         return text ? getLastEventIfSubscribed<Event>(*text) : std::nullopt;
     }
 
-    /** Request one real TICKER value. The runtime can open temporary exact demand on a cache miss.
+    /** Request one real TICKER value from TCP, opening temporary exact demand on a cache miss.
      * The endpoint connects only on explicit connect. One request per endpoint can be pending or retiring.
+     * A tape-fixed endpoint refuses admission. Selecting tape after admission completes the request with
+     * UNSUPPORTED_PROFILE.
      * @tparam Event Supported owning LastingEvent type.
      * @param symbol Exact borrowed UTF-16 logical symbol, copied before admission.
      * @param deadline Absolute steady-clock deadline for terminal completion.
@@ -946,6 +961,14 @@ class Endpoint final {
      * @param address ASCII host:port or [IPv6]:port; no TLS/URI/login/configuration extensions.
      */
     void connect(std::string_view address);
+    /** Start one asynchronous immediate read of a regular local binary tape.
+     * Configure desired subscriptions before calling. The worker opens and retires the file,
+     * and a clean EOF drains the admitted prefix before closing this endpoint.
+     * @param path Borrowed stable local path, copied at admission; maximum 4096 native path units.
+     * @param options Finite file and envelope allowances; both must be positive.
+     * @throws Error Invalid input, closed admission or an already fixed source.
+     */
+    void connectTape(const std::filesystem::path &path, TapeSourceOptions options = {});
     /** Inspect current local intent without progressing native work; absent means server default.
      * @return Owning millisecond value, including zero, independently of any peer-reported range.
      */

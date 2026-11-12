@@ -12,15 +12,17 @@
 
 #include <array>
 #include <string>
+#include <utility>
+#include <variant>
 #include <vector>
 
 namespace org::ttldtor::qdcxx::api::detail {
 inline constexpr std::size_t RECEIVING_OWNER_POLLS_PER_TURN =
     64; ///< One shared finite protocol/queue seed across the existing worker burst.
-inline constexpr std::size_t MAXIMUM_RECEIVING_RECORDS = 45; ///< Complete bounded native record catalog.
+inline constexpr std::size_t MAXIMUM_RECEIVING_RECORDS = 46; ///< Complete bounded native record catalog.
 inline constexpr std::size_t MAXIMUM_RECEIVING_BINDINGS =
     2 * MAXIMUM_RECEIVING_RECORDS;                       ///< Native plus compatible derived family per physical record.
-inline constexpr std::size_t RECEIVING_EVENT_KINDS = 23; ///< Explicitly supported native event kinds.
+inline constexpr std::size_t RECEIVING_EVENT_KINDS = 24; ///< Explicitly supported native event kinds.
 
 /** Conservative stack initialization plus complete metadata read/write work; no dynamic allocation. */
 inline constexpr std::size_t RECEIVING_BINDING_COPY_WORK =
@@ -61,10 +63,36 @@ struct ReceivingEventPlan {
     client::ReceiverProjectionWork projectionWork{}; ///< Complete callback projection allowance.
 };
 
+/** Validated TCP options or pure local receiving budgets, with a common immutable view. */
+class ReceivingSettings {
+    std::variant<client::EndpointOptions, client::EndpointSettings> value_;
+
+    public:
+    /** @param network Validated immutable TCP preparation. */
+    explicit ReceivingSettings(client::EndpointOptions network) : value_(std::move(network)) {
+    }
+
+    /** @param local Local-only budgets with no TCP route. */
+    explicit ReceivingSettings(client::EndpointSettings local) : value_(std::move(local)) {
+    }
+
+    /** @return Immutable common receiving settings, including local-only budgets when applicable. */
+    [[nodiscard]] const client::EndpointSettings &settings() const noexcept {
+        const auto *tcp = network();
+
+        return tcp ? tcp->settings() : std::get<client::EndpointSettings>(value_);
+    }
+
+    /** @return Validated network preparation, or null for a local source. */
+    [[nodiscard]] const client::EndpointOptions *network() const noexcept {
+        return std::get_if<client::EndpointOptions>(&value_);
+    }
+};
+
 /** Worker-owned immutable receiving configuration; it owns no native object or callback. */
 struct ReceivingProfile {
     core::LocalSchema schema;           ///< Complete selected declarations, preserving validated registry provenance.
-    client::EndpointOptions endpoint;   ///< Independently owned validated endpoint snapshot.
+    ReceivingSettings endpoint;         ///< Common settings and optional validated TCP preparation.
     bool unitaryOrderSources = false;   ///< Immutable SDK source-selection policy; not an ambient process property.
     std::size_t physicalRouteCount = 0; ///< Maximum distinct physical coordinate domains per logical selector,
                                         ///< including regional native/derived splits.
@@ -102,7 +130,7 @@ struct ReceivingProfile {
      * @param schema Complete binary declarations, transferred without changing provenance.
      * @param endpoint Independent immutable snapshot of those declarations and finite settings.
      */
-    ReceivingProfile(core::LocalSchema schema, client::EndpointOptions endpoint);
+    ReceivingProfile(core::LocalSchema schema, ReceivingSettings endpoint);
 };
 
 /** Prepare a catalog only when the endpoint has eligible registered Candle routes. */
@@ -130,10 +158,11 @@ struct ReceivingProfile {
  * @param options Explicit endpoint policy.
  * @param host Validated bounded endpoint host.
  * @param port Validated nonzero endpoint port.
+ * @param tape Whether to prepare local receiving budgets without a TCP route or DNS.
  * @return Complete worker-owned preparation; throws detached Error on incompatible capacity or profile.
  */
 [[nodiscard]] ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const EndpointOptions &options,
-                                                       const std::string &host, std::uint16_t port);
+                                                       const std::string &host, std::uint16_t port, bool tape = false);
 
 /** Select complete immutable preparation for a supported business projection, independently of local record IDs.
  * @param profile Worker-owned immutable receiving preparation.

@@ -27,12 +27,15 @@ TEST_CASE("typed selector routing has a finite measured workspace and exact one-
     REQUIRE(d::RECEIVING_EVENT_KINDS < std::numeric_limits<std::size_t>::digits);
     const auto nonemptyMasks = (std::size_t{1} << d::RECEIVING_EVENT_KINDS) - 1;
     CHECK(static_cast<std::size_t>(d::EventSelection::ALL) == nonemptyMasks);
-    CHECK(profile.eventPlans.size() == 2048);
+    CHECK(profile.eventPlans.size() == 4096);
     CHECK(profile.routing.symbols == 4);
     CHECK(profile.routing.temporaryTextUnits == 2 * 4 * 128);
     CHECK(profile.routing.frontendSelectorBytes == 4 * 4 * (sizeof(a::SubscriptionSelector) + 129 * sizeof(char16_t)));
-    std::cout << "SELECTOR_RESOURCE value=" << sizeof(a::SubscriptionSelector)
-              << " worker=" << sizeof(d::ReceivingSymbol) << " frontendBytes=" << profile.routing.frontendSelectorBytes
+    std::cout << "SELECTOR_RESOURCE planBytes=" << sizeof(d::ReceivingEventPlan)
+              << " planCount=" << profile.eventPlans.size()
+              << " retainedMetadataBytes=" << profile.routing.retainedMetadataBytes
+              << " value=" << sizeof(a::SubscriptionSelector) << " worker=" << sizeof(d::ReceivingSymbol)
+              << " frontendBytes=" << profile.routing.frontendSelectorBytes
               << " temporaryBytes=" << profile.routing.temporaryBytes << " visits=" << profile.routing.work.visits
               << " units=" << profile.routing.work.textUnits << " bytes=" << profile.routing.work.bytes << '\n';
     const auto grant = profile.routing.work;

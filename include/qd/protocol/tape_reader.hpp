@@ -6,6 +6,10 @@
 #include <string_view>
 
 namespace org::ttldtor::qdcxx::protocol {
+namespace detail {
+class TapeEventBridge;
+}
+
 /** Explicit container policy, independent of the caller's local field profile. */
 enum class TapeMode {
     LEGACY,           ///< Restricted untimed STREAM_DATA behavior.
@@ -58,6 +62,8 @@ struct TapeLimits {
     std::size_t timingEvents = 0; ///< RAW/broad metadata attempts: explicit heartbeats and data frames; zero is finite.
     std::size_t snapshotUnits =
         0; ///< Broad schema/description/context/descriptor/temporary peak units; zero is finite.
+    std::optional<StreamDataLimits>
+        dataPerFrame{}; ///< Optional tighter payload and aggregate data allowances per frame.
 };
 /** Terminal categories, independent of Java exception classes. */
 enum class TapeError {
@@ -125,10 +131,14 @@ struct TapeFeedResult {
 
 /** Bounded single-threaded reader; active replacement is explicit-mode only, with no reset or recovery API. */
 class TapeReader {
+    enum class SchemaProvenance { READER_GENERATION, CONFIGURED };
+    friend class detail::TapeEventBridge;
+
     TapeLimits limits_;
     TapeMode mode_;
     core::LocalSchema schema_;
     bool discoverSchema_ = false; ///< Explicit ordinary wire-schema policy, never inferred from input.
+    SchemaProvenance schemaProvenance_ = SchemaProvenance::READER_GENERATION;
     FrameReader framer_;
     std::vector<WireRecordDescription> descriptions_;
     std::optional<StreamDataContext> context_;
@@ -174,6 +184,10 @@ class TapeReader {
      * @param payload Complete borrowed description bytes; no publication occurs on any failure.
      */
     void replaceDescriptions(std::span<const std::byte> payload);
+
+    /** Create a fixed-schema reader for the collector adapter, or preserve ordinary generation provenance. */
+    TapeReader(const core::LocalSchema &schema, TapeLimits limits, TapeMode mode, FieldTimePolicy fieldTimePolicy,
+               TapeExternalTimePolicy externalTimePolicy, SchemaProvenance schemaProvenance);
 
     public:
     /** Copy a validated local schema within bounds and allocate framing storage.

@@ -333,6 +333,21 @@ control locks. Awaiting endpoint closure establishes callback/capture quiescence
 `deadlineExpired`, `hadGap` and `diagnostic` as well. It does not establish peer
 acknowledgement, unread-wire completeness or an uninterrupted upstream history.
 
+## Local tape source
+
+Create an endpoint with the required `DeliveryContract`, configure its
+ordinary typed subscriptions and listeners, then call `endpoint->connectTape(path)`.
+The runtime opens and reads the regular file on its worker. Await
+`EndpointState::CLOSED` for clean playback completion, then call
+`closeAndAwaitTermination()` for actual capture retirement. Calling
+`closeAndAwaitTermination()` before EOF requests an early stop.
+
+While a TICKER tape is active, the latest-event API reads its committed
+values through ordinary subscriptions. EOF or explicit close fences these reads.
+
+`TapeSourceOptions` sets maximum file bytes and envelope count. Use a fresh
+endpoint for each playback. [Local tape formats, delivery and errors](../spec/protocol/FEED-TAPE-SOURCE.md).
+
 ## State observers
 
 Register endpoint and subscription state observers before the transitions you need:
@@ -664,6 +679,8 @@ Receive NuamTrade using `createSubscription<events::NuamTrade>()` on a TICKER or
 The event extends Trade with independently updated exchange statistics. See the
 [NuamTrade fields and routing](../spec/events/NUAM-TRADE.md).
 
+Receive `NuamTimeAndSale` on STREAM or HISTORY using the typed Feed API. It extends `TimeAndSale` with the matching engine `matchId`; HISTORY retains its indexed transaction and removal flags. The default route is composite; regional routes require an explicit registry.
+
 ## Read the latest retained event
 
 `Feed::getLastEvent(quote)` returns an independent copy of the most recent committed
@@ -696,11 +713,14 @@ For an exact Candle subscription, pass its parsed `CandleSymbol` to the same
 ## Request one latest event
 
 Use `requestLastEvent<events::Quote>("IBM", deadline)` to await one real TICKER
-event. Pass an absolute `std::chrono::steady_clock::time_point`. The request
+event from TCP. Pass an absolute `std::chrono::steady_clock::time_point`. The request
 first checks the committed cache. On a miss, it can open temporary exact
 demand through an existing connection or an explicit `connect()`. An offline
 request can wait for the first subsequent explicit connection. Requesting
 an event starts local runtime progress and leaves connection intent unchanged.
+A tape-fixed endpoint refuses an explicit request with `UNSUPPORTED_PROFILE`.
+Selecting a tape as the first source completes any still-pending request with the
+same diagnostic. Passive TICKER cache reads remain available during playback.
 
 ```cpp
 auto request = feed->requestLastEvent<events::Quote>(
