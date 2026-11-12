@@ -26,6 +26,11 @@ remain separate receiving profiles. Wildcard selectors require the existing expl
 Schema loading is separate. The
 [lower-level receiving APIs](SUBSCRIPTIONS.md) expose separate profiles.
 
+Receive typed `events::TimeAndSale` with `createSubscription<events::TimeAndSale>()` on STREAM or
+`createTimeSeriesSubscription<events::TimeAndSale>()` on HISTORY. Both accept composite symbols
+such as `AAPL` and regional symbols such as `AAPL&Q`. See the [TimeAndSale contract](../spec/events/TIME-AND-SALE.md)
+for route selection, time and correction flags.
+
 ## Receive Quote
 
 First [build the enabled package](CPP-BUILD.md#public-feed-api-build). The

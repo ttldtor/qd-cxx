@@ -82,7 +82,8 @@ bool validBinding(const PreparedSubscriptionBinding &binding) noexcept {
             binding.kind == PreparedEventKind::ANALYTIC_ORDER || binding.kind == PreparedEventKind::OTC_MARKETS_ORDER ||
             binding.kind == PreparedEventKind::ORDER_IMBALANCE || binding.kind == PreparedEventKind::SERIES ||
             binding.kind == PreparedEventKind::GREEKS || binding.kind == PreparedEventKind::UNDERLYING ||
-            binding.kind == PreparedEventKind::THEO_PRICE || binding.kind == PreparedEventKind::CANDLE) &&
+            binding.kind == PreparedEventKind::THEO_PRICE || binding.kind == PreparedEventKind::CANDLE ||
+            binding.kind == PreparedEventKind::TIME_AND_SALE) &&
            (binding.eventTimePolicy == ReceiverEventTimePolicy::UNSPECIFIED ||
             binding.eventTimePolicy == ReceiverEventTimePolicy::FIELD_METADATA) &&
            (binding.projection == events::EventProjection::NATIVE ||
@@ -122,7 +123,7 @@ struct ReceiverRoute {
                  events::PreparedMarketMaker, events::PreparedSpreadOrder, events::PreparedAnalyticOrder,
                  events::PreparedOtcMarketsOrder, events::PreparedOrderImbalance, events::PreparedSeries,
                  events::PreparedGreeks, events::PreparedUnderlying, events::PreparedTheoPrice,
-                 events::PreparedDerivedOrder, CandleReceiverMapping>
+                 events::PreparedTimeAndSale, events::PreparedDerivedOrder, CandleReceiverMapping>
         mapping;                          ///< Existing owned immutable mapper.
     events::EventValueLimits valueLimits; ///< Per-result owned text bounds.
     ReceiverEventTimePolicy timePolicy;   ///< Explicit optional timestamp source.
@@ -194,6 +195,7 @@ ReceiverProjectionWork projectionAllowance(const detail::ReceiverRoute &route) {
     }
 
     const bool profile = std::holds_alternative<events::PreparedProfile>(route.mapping);
+    const bool timeAndSale = std::holds_alternative<events::PreparedTimeAndSale>(route.mapping);
     const bool text = std::holds_alternative<events::PreparedTextMessage>(route.mapping) ||
                       std::holds_alternative<events::PreparedTextConfiguration>(route.mapping);
     const bool order = std::holds_alternative<events::PreparedOrder>(route.mapping) ||
@@ -203,10 +205,12 @@ ReceiverProjectionWork projectionAllowance(const detail::ReceiverRoute &route) {
                        std::holds_alternative<events::PreparedOtcMarketsOrder>(route.mapping);
     const bool attachment = std::holds_alternative<events::PreparedMessage>(route.mapping) ||
                             std::holds_alternative<events::PreparedConfiguration>(route.mapping);
-    const bool symbolOnly = !profile && !text && !order;
+    const bool symbolOnly = !profile && !text && !order && !timeAndSale;
     const auto units = symbolOnly ? std::min(route.valueLimits.symbolUnits, route.valueLimits.totalUnits)
                                   : route.valueLimits.totalUnits;
-    const auto strings = symbolOnly ? std::size_t{1} : (profile ? std::size_t{3} : std::size_t{2});
+    const auto strings = symbolOnly    ? std::size_t{1}
+                         : timeAndSale ? std::size_t{4}
+                                       : (profile ? std::size_t{3} : std::size_t{2});
     const auto bytes = checkedSum(
         attachment ? route.attachmentBytes : 0,
         checkedSum(sizeof(SubscriptionProjection), checkedProduct(checkedSum(units, strings), sizeof(char16_t))));
@@ -420,6 +424,17 @@ projectPrepared(const mux::MuxRecordView &record, const detail::ReceiverRoute &r
     if (const auto *prepared = std::get_if<events::PreparedTheoPrice>(&route.mapping)) {
         auto mapped = prepared->mapView(record.symbol, values, units, eventTime.value_or(0), record.eventFlags,
                                         indexedRemovalTime);
+
+        if (!mapped) {
+            return std::unexpected(ReceiverProjectionFailure{mapped.error()});
+        }
+
+        return SubscriptionProjection{std::move(*mapped), eventTime};
+    }
+
+    if (const auto *prepared = std::get_if<events::PreparedTimeAndSale>(&route.mapping)) {
+        auto mapped = prepared->mapView(record.symbol, values, route.valueLimits, eventTime.value_or(0),
+                                        record.eventFlags, indexedRemovalTime);
 
         if (!mapped) {
             return std::unexpected(ReceiverProjectionFailure{mapped.error()});
@@ -721,6 +736,12 @@ openSubscriptionReceiver(mux::MuxQueue &queue, const core::LocalSchema &schema, 
                 return std::unexpected(ReceiverFailure{ReceiverError::INVALID_INPUT, i});
             }
 
+            if (binding.kind == PreparedEventKind::TIME_AND_SALE &&
+                (family == core::SubscriptionFamily::TICKER ||
+                 (family == core::SubscriptionFamily::HISTORY && !record.hasTime))) {
+                return std::unexpected(ReceiverFailure{ReceiverError::INVALID_INPUT, i});
+            }
+
             if (binding.kind == PreparedEventKind::SPREAD_ORDER || binding.kind == PreparedEventKind::ANALYTIC_ORDER ||
                 binding.kind == PreparedEventKind::OTC_MARKETS_ORDER || binding.kind == PreparedEventKind::SERIES) {
                 debit(receiverWork.visits, record.lookups.size());
@@ -891,6 +912,15 @@ openSubscriptionReceiver(mux::MuxQueue &queue, const core::LocalSchema &schema, 
                                        binding.eventTimePolicy, fields, binding.mappingLimits.selections});
             } else if (binding.kind == PreparedEventKind::THEO_PRICE) {
                 auto prepared = events::PreparedTheoPrice::prepare(schema, binding.localId, binding.mappingLimits);
+
+                if (!prepared) {
+                    return std::unexpected(ReceiverFailure{prepared.error(), i});
+                }
+
+                plan.routes.push_back({schema.recordContext(binding.localId), std::move(*prepared), binding.valueLimits,
+                                       binding.eventTimePolicy, fields, binding.mappingLimits.selections});
+            } else if (binding.kind == PreparedEventKind::TIME_AND_SALE) {
+                auto prepared = events::PreparedTimeAndSale::prepare(schema, binding.localId, binding.mappingLimits);
 
                 if (!prepared) {
                     return std::unexpected(ReceiverFailure{prepared.error(), i});

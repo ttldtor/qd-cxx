@@ -30,6 +30,12 @@ tests/fixtures/candle-payload/**/*.qtp -text
 tests/fixtures/candle-routes/provenance.json text eol=lf
 tests/fixtures/candle-routes/routes.tsv -text -whitespace
 
+# Preserve exact TimeAndSale observations and binary QTP fixtures.
+tests/fixtures/time-and-sale/**/*.qtp -text -whitespace
+tests/fixtures/time-and-sale/**/*.tsv -text -whitespace
+tests/fixtures/time-and-sale/*.json text eol=lf
+tools/upstream/time-and-sale-oracle/*.java text eol=lf
+
 # Order source capability observations retain exact bytes; launcher/provenance hashes use LF.
 tools/upstream/order-source-capability-oracle/*.ps1 text eol=lf
 tests/fixtures/order-source-capabilities/provenance.json text eol=lf

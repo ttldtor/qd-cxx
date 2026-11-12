@@ -30,6 +30,11 @@ Order принадлежит SDK и не требует схемы от прил
 требуют существующего явного разрешения STREAM. Загрузка схем является отдельной задачей.
 [Низкоуровневые API получения](SUBSCRIPTIONS.ru.md) предоставляют отдельные профили.
 
+Для типизированного приёма `events::TimeAndSale` используйте `createSubscription<events::TimeAndSale>()`
+в STREAM или `createTimeSeriesSubscription<events::TimeAndSale>()` в HISTORY. В обоих случаях
+доступны составные символы, например `AAPL`, и региональные, например `AAPL&Q`.
+[Контракт TimeAndSale](../spec/events/TIME-AND-SALE.ru.md) описывает маршрутизацию, время и флаги исправлений.
+
 ## Получить Quote
 
 Сначала [соберите пакет с включённым API](CPP-BUILD.ru.md#public-feed-api-build-ru).

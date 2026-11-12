@@ -60,6 +60,7 @@
 - [Приём индексного Order](ORDER.ru.md): явный HISTORY, полные владеющие поля и перекрывающиеся source selectors.
 - [Oracle MarketMaker/производного Order](../tools/upstream/market-maker-order-oracle/README.ru.md): полные типы, physical time, источники delegates и реальный binary parser.
 - [Oracle SpreadOrder и AnalyticOrder](../tools/upstream/order-variants-oracle/README.ru.md): записи конкретных источников, физическое время FIELD и исходные байты QTP.
+- [Oracle TimeAndSale](../tools/upstream/time-and-sale-oracle/README.ru.md) записывает составные и региональные записи STREAM и HISTORY в четырёх профилях схемы.
 - [Oracle parser/delegate Order](../tools/upstream/order-oracle/README.ru.md): исходные physical slots и ограниченные наблюдения стандартных схем.
 - [Оракул Series](../tools/upstream/series-oracle/README.ru.md): двоичная запись и чтение HISTORY закреплённой версией, варианты схем и значения опционных серий.
 - [Oracle Candle HISTORY](../tools/upstream/candle-lifecycle-oracle/README.ru.md) записывает точные снимки Java, локальное воспроизведение, коррекции того же индекса и исходный QTP.
