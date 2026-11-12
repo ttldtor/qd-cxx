@@ -333,7 +333,8 @@ if(ORG_TTLDTOR_QDCXX_BUILD_IPF_LIVE)
         DESTINATION "${CMAKE_INSTALL_DATADIR}/qdcxx/examples/ipf_live")
 endif()
 include(CMakePackageConfigHelpers)
-install(FILES include/qd/api/subscription_selector.hpp include/qd/api/time_series_subscription.hpp DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qd/api")
+install(FILES include/qd/api/subscription_selector.hpp include/qd/api/time_series_subscription.hpp
+    include/qd/api/indexed_event_model.hpp DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qd/api")
 install(TARGETS qdcxx_encoding qdcxx_core qdcxx_protocol qdcxx_collectors qdcxx_mux
     qdcxx_subscription_selectors qdcxx_event_values qdcxx_event_mapping qdcxx_quote qdcxx_profile qdcxx_trade qdcxx_trade_eth qdcxx_summary qdcxx_order qdcxx_series qdcxx_greeks qdcxx_underlying qdcxx_theo_price qdcxx_time_and_sale qdcxx_option_sale qdcxx_market_maker qdcxx_derived_order qdcxx_text_events qdcxx_attachments qdcxx_misc_events qdcxx_market_event_symbols qdcxx_event_sources qdcxx_order_index qdcxx_candle_values qdcxx_candle qdcxx_java_double qdcxx_event_text EXPORT qdcxxTargets
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
@@ -618,6 +619,12 @@ if(BUILD_TESTING)
     set_target_properties(qdcxx_time_series_subscription_tests PROPERTIES CXX_EXTENSIONS OFF)
     add_test(NAME time_series_subscription COMMAND qdcxx_time_series_subscription_tests)
     set_tests_properties(time_series_subscription PROPERTIES TIMEOUT 60)
+    add_executable(qdcxx_indexed_event_model_tests tests/conformance/indexed_event_model_tests.cpp)
+    target_link_libraries(qdcxx_indexed_event_model_tests PRIVATE
+        qdcxx_order qdcxx_derived_order qdcxx_candle doctest::doctest)
+    set_target_properties(qdcxx_indexed_event_model_tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME indexed_event_model COMMAND qdcxx_indexed_event_model_tests)
+    set_tests_properties(indexed_event_model PROPERTIES TIMEOUT 60)
     add_executable(qdcxx_delivery_projection_tests tests/conformance/delivery_projection_tests.cpp)
     target_link_libraries(qdcxx_delivery_projection_tests PRIVATE qdcxx_mux qdcxx_quote qdcxx_order doctest::doctest)
     set_target_properties(qdcxx_delivery_projection_tests PROPERTIES CXX_EXTENSIONS OFF)

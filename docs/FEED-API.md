@@ -630,6 +630,18 @@ existing sticky availability marker; reads and reconnect never reset totals.
 
 [Server aggregation](SERVER-AGGREGATION.md): separate local requests and current-peer reports, bounded descriptor updates and explicit unknown states.
 
+## Indexed event model
+
+Use `IndexedEventModel<events::Order>` from `qd/api/indexed_event_model.hpp` to
+assemble typed indexed updates after delivery. Pass one exact logical symbol,
+source ID and ordered event span to `processEvents`. Route input for different
+symbol/source pairs separately. The model returns completed changes by value
+and keeps the previous visible view while a transaction or snapshot is unfinished.
+Call `getSnapshot` for an independent copy ordered by signed index.
+
+Serialize calls on each model. It owns data only, so the application controls
+where it runs and when to clear it. [Snapshot and transaction contract](../spec/events/INDEXED-EVENT-MODEL.md).
+
 ## Indexed option series
 
 Use `Feed::createSubscription<events::Series>()` on a HISTORY endpoint. The default
