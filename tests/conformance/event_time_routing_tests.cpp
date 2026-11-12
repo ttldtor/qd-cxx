@@ -106,7 +106,8 @@ TEST_CASE("routing workspace is separate finite storage with an attainable exact
     CHECK(selected.eventPlans.size() == 4);
     CHECK(limits.retainedMetadataBytes ==
           sizeof(selected.bindingExchanges) + sizeof(selected.bindingSources) + sizeof(selected.bindingTimeEncodings) +
-              sizeof(selected.versionBindings) + selected.eventPlans.capacity() * sizeof(detail::ReceivingEventPlan) +
+              sizeof(selected.versionBindings) + sizeof(selected.snapshotRetransmitRecords) +
+              selected.eventPlans.capacity() * sizeof(detail::ReceivingEventPlan) +
               sizeof(std::array<q::client::PreparedSubscriptionBinding, detail::MAXIMUM_RECEIVING_BINDINGS>));
     CHECK(limits.symbols == 5);
     CHECK(limits.temporaryTextUnits == 2 * 5 * 128);
