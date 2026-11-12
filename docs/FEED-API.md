@@ -281,6 +281,55 @@ remaining exclusive interests. Callback batches follow queue delivery boundaries
 and need not combine all selected types. See the complete
 [mixed selection and delivery contract](../spec/events/MIXED-SUBSCRIPTIONS.md).
 
+## Attach one typed subscription to several feeds
+
+`qd/api/independent_subscription.hpp` provides an owning
+`api::IndependentSubscription<Event>`. Configure its typed selectors and listener
+before attaching it to a feed. One attachment consumes one native subscription
+slot on that feed. Attaching to the same feed again returns its existing ID.
+Detaching removes only that registration and keeps the desired set available for
+reattachment, which gets a new ID.
+
+```cpp
+#include "qd/api/independent_subscription.hpp"
+
+#include <array>
+#include <span>
+
+// firstFeed and secondFeed are feeds from existing receiving endpoints.
+api::IndependentSubscription<events::Quote> quotes(
+    [](std::span<const events::Quote> batch) {
+        // Process this batch before the callback returns.
+    });
+const std::array selectors{api::SubscriptionSelector::plain(u"IBM")};
+const auto initialRefusals = quotes.setSelectors(selectors);
+const auto first = quotes.attach(*firstFeed);
+const auto second = quotes.attach(*secondFeed);
+quotes.detach(*firstFeed);
+```
+
+Separate feeds can deliver concurrently, including equal events from different
+sources. Synchronize any shared state in the listener. Detach fences new
+selection for that attachment. An invocation already selected can finish,
+including when the listener detaches its own feed. Closing permanently fences
+every attachment and requests native retirement without waiting for callbacks.
+
+`setSelectors` first accepts the bounded desired set locally, then submits it
+to each current attachment. The last occurrence of a selector identity supplies
+its effective attributes. A synchronous refusal identifies the attachment by ID
+and leaves its previous producer demand intact. The latest local desired set
+remains available for subsequent attachments and retries. Each native producer
+applies its own capabilities and limits. Check `getAttachmentDiagnostic(feed)`
+for later native failure. Server-side application proceeds independently on
+each connection.
+
+The default independent capacities are four active or callback-retiring
+attachments, 16 selector arguments and 128 UTF-16 units per symbol. Configure
+them through `IndependentSubscriptionLimits`. A detached attachment can still
+occupy independent capacity while a selected delivery retires. A feed's native
+registration slot can stay occupied until native retirement, including while
+the runtime is waiting for its first connection.
+
 ## Runtime, callbacks and shutdown
 
 Create the owning `ApiRuntime(RuntimeOptions)` on main **before application threads**;

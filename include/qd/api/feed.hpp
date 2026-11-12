@@ -229,6 +229,7 @@ struct CloseResult {
 
 class Endpoint;
 class Feed;
+template <class Event> class IndependentSubscription;
 class FeedFilter;
 class FeedFilterContext;
 struct FeedFilterCategory;
@@ -316,7 +317,12 @@ template <class Event> class Subscription final {
                   std::is_same_v<Event, events::Order> || std::is_same_v<Event, RegisteredEvent>);
     std::shared_ptr<detail::SubscriptionPort> port_;
     friend class Feed;
+    template <class OtherEvent> friend class IndependentSubscription;
     explicit Subscription(std::shared_ptr<detail::SubscriptionPort> port) noexcept;
+    /** Replace desired selectors on an independent attachment that has no change observers.
+     * @param selectors Borrowed typed selector arguments; no runtime observer callbacks run inline.
+     */
+    void setAttachedSelectors(std::span<const SubscriptionSelector> selectors);
     /** @param symbols Complete borrowed canonical batch, validated before one atomic add. */
     void addCandleSymbols(std::span<const events::CandleSymbol> symbols);
     /** @param symbols Complete borrowed canonical batch, validated before one atomic replacement. */
@@ -579,6 +585,7 @@ extern template class Subscription<RegisteredEvent>;
 class Feed final {
     std::shared_ptr<detail::EndpointPort> port_;
     friend class Endpoint;
+    template <class Event> friend class IndependentSubscription;
     explicit Feed(std::shared_ptr<detail::EndpointPort> port);
     /** Preserve the existing single-class listener shape while selecting that class's registered routes.
      * @param type Existing supported projection.

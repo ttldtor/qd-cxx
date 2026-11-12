@@ -307,7 +307,7 @@ if(ORG_TTLDTOR_QDCXX_BUILD_FEED_API)
         target_link_libraries(qdcxx_feed PRIVATE iphlpapi)
     endif()
     install(TARGETS qdcxx_feed EXPORT qdcxxTargets ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
-    install(FILES include/qd/api/feed.hpp include/qd/api/history_snapshot.hpp include/qd/api/callback_execution.hpp include/qd/api/statistics.hpp include/qd/api/endpoint_configuration.hpp include/qd/api/feed_filter.hpp include/qd/api/event_registry.hpp DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qd/api")
+    install(FILES include/qd/api/feed.hpp include/qd/api/independent_subscription.hpp include/qd/api/history_snapshot.hpp include/qd/api/callback_execution.hpp include/qd/api/statistics.hpp include/qd/api/endpoint_configuration.hpp include/qd/api/feed_filter.hpp include/qd/api/event_registry.hpp DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qd/api")
 endif()
 
 if(ORG_TTLDTOR_QDCXX_BUILD_EXAMPLES)
