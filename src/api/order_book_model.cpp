@@ -266,6 +266,7 @@ OrderBookModel::OrderBookModel(IndexedEventModelLimits limits, OrderBookCorrecti
 OrderBookModel::OrderBookModel(OrderBookModel &&other) : OrderBookModel(other.limits_, other.correctionOptions_) {
     orders_ = std::move(other.orders_);
     corrections_.swap(other.corrections_);
+    source_ = std::move(other.source_);
 }
 
 OrderBookModel &OrderBookModel::operator=(OrderBookModel &&other) noexcept {
@@ -275,6 +276,7 @@ OrderBookModel &OrderBookModel::operator=(OrderBookModel &&other) noexcept {
         correctionOptions_ = other.correctionOptions_;
         corrections_.clear();
         corrections_.swap(other.corrections_);
+        source_ = std::move(other.source_);
     }
 
     return *this;
@@ -384,6 +386,15 @@ OrderBookModel::stageCorrections(CorrectionEntries &entries, std::int32_t source
 
 std::expected<void, IndexedEventModelError>
 OrderBookModel::processEvents(std::u16string_view symbol, std::int32_t sourceId, std::span<const events::Order> input) {
+    if (!source_.untracked()) {
+        return std::unexpected(IndexedEventModelError::SOURCE_EPOCH_REQUIRED);
+    }
+
+    return applyEvents(symbol, sourceId, input);
+}
+
+std::expected<void, IndexedEventModelError>
+OrderBookModel::applyEvents(std::u16string_view symbol, std::int32_t sourceId, std::span<const events::Order> input) {
     if (symbol.size() > limits_.symbolUnits || input.size() > limits_.inputEvents) {
         return std::unexpected(IndexedEventModelError::RESOURCE_LIMIT);
     }
@@ -468,6 +479,15 @@ std::expected<OrderBookSnapshot, IndexedEventModelError> OrderBookModel::getSnap
 
 std::expected<OrderBookSnapshot, IndexedEventModelError>
 OrderBookModel::getFilteredSnapshot(std::u16string_view symbol, const OrderBookViewOptions &options) const {
+    if (!source_.readable()) {
+        return std::unexpected(IndexedEventModelError::SOURCE_INACTIVE);
+    }
+
+    return buildSnapshot(symbol, options);
+}
+
+std::expected<OrderBookSnapshot, IndexedEventModelError>
+OrderBookModel::buildSnapshot(std::u16string_view symbol, const OrderBookViewOptions &options) const {
     const auto mask = scopeMask(options.filter);
 
     if (!mask || options.lotSize <= 0) {
@@ -532,9 +552,81 @@ OrderBookModel::getFilteredSnapshot(std::u16string_view symbol, const OrderBookV
     }
 }
 
+ModelSourceState OrderBookModel::getSourceState() const noexcept {
+    return source_.state();
+}
+
+std::expected<ModelSourceEpoch, ModelSourceError> OrderBookModel::beginSourceEpoch(std::uint64_t ordinal) noexcept {
+    auto epoch = source_.begin(ordinal);
+
+    if (epoch) {
+        retireData(ModelRetention::DISCARD);
+    }
+
+    return epoch;
+}
+
+std::expected<void, ModelSourceError> OrderBookModel::markSourceGap(const ModelSourceEpoch &epoch,
+                                                                    ModelRetention retention) noexcept {
+    const auto result = source_.stop(epoch, retention, false);
+
+    if (result) {
+        retireData(retention);
+    }
+
+    return result;
+}
+
+std::expected<void, ModelSourceError> OrderBookModel::confirmSourceEpoch(const ModelSourceEpoch &epoch) noexcept {
+    return source_.confirm(epoch, orders_.hasUnfinished());
+}
+
+std::expected<void, ModelSourceError> OrderBookModel::closeSource(const ModelSourceEpoch &epoch,
+                                                                  ModelRetention retention) noexcept {
+    const auto result = source_.stop(epoch, retention, true);
+
+    if (result) {
+        retireData(retention);
+    }
+
+    return result;
+}
+
+void OrderBookModel::retireData(ModelRetention retention) noexcept {
+    if (retention == ModelRetention::RETAIN_COMPLETED) {
+        orders_.discardUnfinished();
+    } else {
+        orders_.clear();
+        corrections_.clear();
+    }
+}
+
+std::expected<void, IndexedEventModelError> OrderBookModel::processSourceEvents(const ModelSourceEpoch &epoch,
+                                                                                std::u16string_view symbol,
+                                                                                std::int32_t sourceId,
+                                                                                std::span<const events::Order> input) {
+    if (const auto error = source_.inputError(epoch)) {
+        return std::unexpected(*error == ModelSourceError::STALE_EPOCH ? IndexedEventModelError::SOURCE_EPOCH_MISMATCH
+                                                                       : IndexedEventModelError::SOURCE_INACTIVE);
+    }
+
+    return applyEvents(symbol, sourceId, input);
+}
+
+std::expected<ModelSourceSnapshot<OrderBookSnapshot>, IndexedEventModelError>
+OrderBookModel::getSourceSnapshot(std::u16string_view symbol, const OrderBookViewOptions &options) const {
+    auto snapshot = buildSnapshot(symbol, options);
+
+    if (!snapshot) {
+        return std::unexpected(snapshot.error());
+    }
+
+    return ModelSourceSnapshot<OrderBookSnapshot>{source_.state(), std::move(*snapshot)};
+}
+
 void OrderBookModel::clear() noexcept {
-    orders_.clear();
-    corrections_.clear();
+    source_.invalidateInput();
+    retireData(ModelRetention::DISCARD);
 }
 
 } // namespace org::ttldtor::qdcxx::api
