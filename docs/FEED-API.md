@@ -701,3 +701,75 @@ The default receiving registry supports the standard `Candle` and `TradeHistory`
 ## Receive OptionSale
 
 Use `Feed::createSubscription<events::OptionSale>()` on a HISTORY endpoint. See [OptionSale fields and indexed identity](OPTION-SALE-EVENT.md).
+
+Receive NuamTrade using `createSubscription<events::NuamTrade>()` on a TICKER or STREAM endpoint.
+The event extends Trade with independently updated exchange statistics. See the
+[NuamTrade fields and routing](../spec/events/NUAM-TRADE.md).
+
+## Read the latest retained event
+
+`Feed::getLastEvent(quote)` returns an independent copy of the most recent committed
+TICKER value for the event type and symbol. The supplied event is returned unchanged
+when the cache has no current value. Use `getLastEventIfSubscribed<events::Quote>("IBM")`
+to distinguish absence of an exact subscription from a subscribed symbol awaiting
+data. In the latter case the result has the requested symbol and default-initialized
+C++ fields. For example, the regional Quote's bid and ask exchange fields are zero
+until a source value is retained. A wildcard does not count as an exact subscription.
+STREAM and HISTORY endpoints have no result for these reads.
+
+The read inspects the actual collector, even when there are no listeners or when
+aggregation or a custom executor delays delivery. A plain disconnect keeps the
+cache readable once the source has quiesced. Accepted clear, reconnect, removal
+or close immediately fence affected values. A returned copy remains usable after
+the cache or endpoint closes.
+
+Reads use the existing local runtime owner and never start a worker, connect,
+change demand or send a request to the source. A call from that runtime's worker
+listener reads directly without waiting. An external call reserves one bounded
+request per endpoint and waits at most one second for completion. Concurrent
+occupation of that slot reports `ErrorCode::RESOURCE_LIMIT`; an expired wait reports
+`ErrorCode::WORK_LIMIT`. A timed-out request stays charged until the owner retires it.
+
+The typed read accepts supported LastingEvent values, including regional symbols
+and Candle's canonical symbol. Other event types report `UNSUPPORTED_PROFILE`.
+For an exact Candle subscription, pass its parsed `CandleSymbol` to the same
+`getLastEventIfSubscribed<events::Candle>` method.
+
+## Request one latest event
+
+Use `requestLastEvent<events::Quote>("IBM", deadline)` to await one real TICKER
+event. Pass an absolute `std::chrono::steady_clock::time_point`. The request
+first checks the committed cache. On a miss, it can open temporary exact
+demand through an existing connection or an explicit `connect()`. An offline
+request can wait for the first subsequent explicit connection. Requesting
+an event starts local runtime progress and leaves connection intent unchanged.
+
+```cpp
+auto request = feed->requestLastEvent<events::Quote>(
+    "IBM", std::chrono::steady_clock::now() + std::chrono::seconds{2});
+auto quote = request.await();
+```
+
+`await()` returns an owning copy of the same terminal result on each successful
+call. Use `isDone()` to inspect completion and `cancel()` to compete for
+cancellation. The move-only handle also cancels a pending request on destruction.
+A pending wait from the request's SDK worker fails with `WRONG_THREAD`. A
+completed request can be read from that worker.
+
+The runtime publishes one terminal outcome. `await()` throws `Error` for source
+failure, endpoint closure, `REQUEST_CANCELLED` or `REQUEST_TIMED_OUT`.
+An accepted clear, or a disconnect or explicit reconnect after the request
+has bound to a source, cancels that request. A deadline reached before
+publication prevents a later value from becoming the result.
+
+An endpoint admits one request through completion and temporary-interest
+retirement. On a cache miss, the temporary interest also occupies a normal
+subscription slot until it retires. Capacity refusal reports `RESOURCE_LIMIT`.
+The temporary registration owns no application event listener and its retirement
+can proceed after the terminal result is available.
+
+## Local aggregation
+
+Set `EndpointOptions::aggregationPeriod` or the `dxfeed.aggregationPeriod` configuration property for a local endpoint floor. `Subscription::setAggregationPeriod` sets an optional per-subscription period. The effective local period is their maximum and takes effect after the running interval. `Subscription::getAggregationPeriodInfo` reports the local period selected for the last actual listener invocation, or no value before one. `Endpoint::getAggregationPeriodInfo` separately reports an upstream descriptor.
+
+A TICKER subscription retains waiting updates in its collector so repeated values of one key may conflate. STREAM and HISTORY use bounded ordered queues and can report their existing overflow outcome. During a running interval, TICKER initial collector values remain eligible ahead of pending live updates. Already detached queue entries retain their original order. Closing drains admitted events without waiting for the local interval. Zero preserves immediate delivery.

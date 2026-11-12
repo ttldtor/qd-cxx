@@ -361,3 +361,5 @@ cache replay. Input-free EN/RU/Get-Help, bounded JDK8 Capture/Verify with exact 
 
 - [Attached live HISTORY range oracle](../upstream/live-history-range-oracle/README.md): real public Java range mutations, underlying demand and held callbacks, bounded Capture/Verify and input-free EN/RU help.
 - The [OptionSale oracle](../upstream/option-sale-oracle/README.md) captures indexed HISTORY events for pinned Java QD schema variants.
+
+- [NuamTrade oracle](../upstream/nuam-trade-oracle/README.md) captures bounded Java observations with input-free EN/RU help.

@@ -67,7 +67,7 @@ TEST_CASE("configuration owns explicit layers and reports selected origins and c
     auto configuration = api::EndpointConfiguration::create({}, defaults, overrides);
     label.assign("changed");
     auto snapshot = configuration.snapshot();
-    CHECK(snapshot.properties.size() == 12);
+    CHECK(snapshot.properties.size() == 13);
     CHECK(snapshot.configuredAddress == "localhost:1234");
     CHECK_FALSE(snapshot.acceptedAddress);
     CHECK_FALSE(snapshot.activationRequested);
@@ -83,6 +83,22 @@ TEST_CASE("configuration owns explicit layers and reports selected origins and c
     const auto single = api::EndpointConfiguration::create({}, {}, one).snapshot();
     CHECK(property(single, "qdcxx.retryDelayMillis").requestedValue == "99");
     CHECK(property(single, "qdcxx.retryDelayMillis").effectiveValue == "0");
+}
+
+TEST_CASE("configuration accepts and bounds the local aggregation property independently") {
+    const std::array properties{api::EndpointProperty{"dxfeed.aggregationPeriod", "PT0.25S"}};
+    const auto config = api::EndpointConfiguration::create({}, {}, properties);
+    CHECK(config.options().aggregationPeriod == std::chrono::milliseconds{250});
+    CHECK(property(config.snapshot(), "dxfeed.aggregationPeriod").origin ==
+          api::EndpointPropertyOrigin::EXPLICIT_PROPERTIES);
+    CHECK_FALSE(config.options().requestedAggregationPeriod);
+
+    for (const auto *value : {"-1", "PT25H", "invalid"}) {
+        const std::array invalid{api::EndpointProperty{"dxfeed.aggregationPeriod", value}};
+        CHECK(error([&] {
+                  static_cast<void>(api::EndpointConfiguration::create({}, {}, invalid));
+              }) == api::ErrorCode::INVALID_ARGUMENT);
+    }
 }
 
 TEST_CASE("configuration validates complete decimal boolean profile and finite input before publication") {

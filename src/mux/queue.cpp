@@ -808,14 +808,16 @@ struct QueueRecord {
     std::size_t arenaSize = 0;                                  ///< Whole requested arena capacity.
     MuxRecordView view;                                         ///< Pure detached immutable projection.
     const bool retainedInitial; ///< Actual cached INITIAL built in retained progress; never changed after construction.
+    const bool aggregationSnapshot; ///< Initial collector value, eligible independently of a running interval.
 
     /** Bind the eventual arena deallocator without allocating data.
      * @param source Pure record accounting.
      * @param retainedInitial Immutable actual cached-INITIAL eligibility, assigned only at construction.
+     * @param aggregationSnapshot Initial collector projection eligible during a local aggregation interval.
      */
-    explicit QueueRecord(BudgetLease source, bool retainedInitial = false)
+    explicit QueueRecord(BudgetLease source, bool retainedInitial = false, bool aggregationSnapshot = false)
         : budget(source), arena(nullptr, BlockDelete<std::byte>{clientScope(source, AllocationTag::ARENA), 0, false}),
-          retainedInitial(retainedInitial) {
+          retainedInitial(retainedInitial), aggregationSnapshot(aggregationSnapshot) {
     }
 };
 
@@ -1334,6 +1336,7 @@ struct MuxQueue::State {
         bool historyReplayCommitted = false; ///< Source replay survives mapping-metadata WORK_LIMIT retries.
         bool sync = true;                    ///< Owner gates.
         bool paused = false;                 ///< A reserved pause gates later callbacks.
+        bool aggregationCollecting = false;  ///< TICKER batch is accumulating from its own collector.
         bool closing = false;                ///< Owner gates.
         bool sourceClosed = false;           ///< Owner gates.
         bool muxClosed = false;              ///< Owner gates.
@@ -1419,6 +1422,7 @@ struct MuxQueue::State {
     std::size_t cursor = 0;                              ///< Bounded fair owner cursors.
     std::size_t phase = 0;                               ///< Bounded fair owner cursors.
     bool executing = false;                              ///< Reentrancy and derived-union gates.
+    bool observingTicker = false;                        ///< Prevent nested borrowed cache observations.
     bool unionDirty = false;                             ///< Reentrancy and derived-union gates.
     unsigned stopMode = 0;                               ///< Context reserved stop.
     std::optional<std::size_t> unionOrigin;              ///< Command responsible for a pending shared derived update.
@@ -1843,6 +1847,8 @@ struct MuxQueue::State {
      * @param trigger Optional actual HISTORY trigger.
      * @param work Copy/initialization/disposal credits.
      * @param retainedInitial Actual cached INITIAL constructed in retained-cache progress, never a retagged FIFO.
+     * @param versionDefault Explicit TICKER version-default projection.
+     * @param aggregationSnapshot Initial collector projection eligible during a local aggregation interval.
      * @return Unpublished complete detached candidate.
      */
     template <class Field>
@@ -1851,7 +1857,8 @@ struct MuxQueue::State {
            std::span<const std::int32_t> legacy, std::span<const Field> fields,
            core::CapturedDeliveryProjections<MuxMembership> projections, std::uint64_t sourceRevision,
            std::optional<RawSourceMetadata> raw, std::optional<collectors::HistorySourceMetadata> trigger,
-           QueueWork &work, bool retainedInitial = false, bool versionDefault = false) {
+           QueueWork &work, bool retainedInitial = false, bool versionDefault = false,
+           bool aggregationSnapshot = false) {
         auto &l = c.port->budget->limits;
 
         if (!core::validDeliveryProjectionMask(projections.mask)) {
@@ -1899,8 +1906,9 @@ struct MuxQueue::State {
         bound(charge, l.recordBytes);
         spend(work, sum(fieldCount, 4), product(fieldCount, 2), product(sum(units, key.symbol.size()), 3),
               sum(product(charge, 3), product(bytes, 2)));
-        auto out = detail::shared<detail::QueueRecord>(
-            detail::clientScope(c.port->budget, detail::AllocationTag::RECORD), c.port->budget, retainedInitial);
+        auto out =
+            detail::shared<detail::QueueRecord>(detail::clientScope(c.port->budget, detail::AllocationTag::RECORD),
+                                                c.port->budget, retainedInitial, aggregationSnapshot);
         out->arenaSize = l.recordArenaBytes;
         const auto arenaScope = detail::clientScope(c.port->budget, detail::AllocationTag::ARENA);
         auto *memory = detail::QueueAllocator<std::byte>{arenaScope}.allocate(l.recordArenaBytes);
@@ -2717,7 +2725,28 @@ std::expected<bool, QueueFailure> MuxQueue::State::route(Client &c, QueueWork &w
         std::size_t offeredWeight = 0, businessWeight = 0;
 
         if (ticker) {
-            auto offer = ticker->front(c.ticker, work.ticker);
+            bool aggregating = false;
+            bool waiting = false;
+
+            if (c.statistics && !c.closing) {
+                std::lock_guard lock(c.statistics->mutex);
+                const auto requested =
+                    std::max(c.statistics->endpointAggregationPeriod,
+                             c.statistics->subscriptionAggregationPeriod.value_or(std::chrono::milliseconds{0}));
+                waiting = std::chrono::steady_clock::now() < c.statistics->nextAggregationDelivery;
+                aggregating = requested.count() != 0 || waiting ||
+                              (c.paused && c.statistics->selectedAggregationPeriod.count() != 0);
+            }
+
+            if (aggregating && (c.paused || c.size >= c.port->budget->limits.batchRecords)) {
+                c.aggregationCollecting = false;
+
+                return false;
+            }
+
+            auto offer =
+                waiting ? ticker->frontWithPolicy(c.ticker, work.ticker, collectors::TickerOfferPolicy::INITIAL_ONLY)
+                        : ticker->front(c.ticker, work.ticker);
 
             if (!offer) {
                 if (offer.error() == collectors::TickerError::WORK_LIMIT) {
@@ -2735,10 +2764,19 @@ std::expected<bool, QueueFailure> MuxQueue::State::route(Client &c, QueueWork &w
             }
 
             if (!*offer) {
+                c.aggregationCollecting = false;
+
                 return false;
             }
 
             const auto &o = **offer;
+
+            if (waiting && o.kind != collectors::TickerDeliveryKind::INITIAL) {
+                c.aggregationCollecting = false;
+
+                return false;
+            }
+
             const auto &r = *o.value.sourceRecord;
             offeredWeight = o.projections.count();
             auto *m = mapping(c, {r.context, r.symbol}, work);
@@ -2755,7 +2793,7 @@ std::expected<bool, QueueFailure> MuxQueue::State::route(Client &c, QueueWork &w
                     value = record(c, {r.context, r.symbol}, {}, o.deliveryFlags, r.values, r.typedValues,
                                    std::move(projections), o.revision, raw, {}, work,
                                    retainedOnly && o.kind == collectors::TickerDeliveryKind::INITIAL,
-                                   o.value.versionDefault);
+                                   o.value.versionDefault, o.kind == collectors::TickerDeliveryKind::INITIAL);
                 } catch (QueueError e) {
                     if (e != QueueError::RESOURCE_LIMIT) {
                         throw;
@@ -2821,7 +2859,8 @@ std::expected<bool, QueueFailure> MuxQueue::State::route(Client &c, QueueWork &w
                     businessWeight = m->projections.count();
                     value = record(c, {r.context, r.symbol}, r.rawTime, r.eventFlags, legacy, r.fields, m->projections,
                                    o.admissionRevision, raw, o.trigger, work,
-                                   retainedOnly && o.kind == collectors::HistoryDeliveryKind::INITIAL);
+                                   retainedOnly && o.kind == collectors::HistoryDeliveryKind::INITIAL, false,
+                                   o.kind == collectors::HistoryDeliveryKind::INITIAL);
                 } catch (QueueError e) {
                     if (e != QueueError::RESOURCE_LIMIT) {
                         throw;
@@ -2873,6 +2912,15 @@ std::expected<bool, QueueFailure> MuxQueue::State::route(Client &c, QueueWork &w
             count(counts.withdrawn, 1, counts.saturated);
         } else {
             enqueue(c, std::move(value));
+
+            if (ticker && c.statistics && !c.closing) {
+                std::lock_guard lock(c.statistics->mutex);
+                const auto requested =
+                    std::max(c.statistics->endpointAggregationPeriod,
+                             c.statistics->subscriptionAggregationPeriod.value_or(std::chrono::milliseconds{0}));
+                c.aggregationCollecting = requested.count() != 0 && c.size < c.port->budget->limits.batchRecords &&
+                                          !c.records[(c.head + c.size - 1) % c.records.size()]->aggregationSnapshot;
+            }
         }
 
         return true;
@@ -3030,6 +3078,17 @@ std::expected<bool, QueueFailure> MuxQueue::State::callback(Client &c, QueueWork
     }
 
     try {
+        bool snapshotDuringInterval = false;
+
+        if (c.statistics && !c.closing) {
+            std::lock_guard lock(c.statistics->mutex);
+            const bool waiting = std::chrono::steady_clock::now() < c.statistics->nextAggregationDelivery;
+            snapshotDuringInterval = waiting && c.records[c.head]->aggregationSnapshot;
+
+            if (!snapshotDuringInterval && (waiting || (ticker && c.aggregationCollecting)))
+                return false;
+        }
+
         debit(work.callbacks, 1);
         const auto maximum = std::min(c.port->budget->limits.batchRecords, c.size);
         spend(work, sum(product(c.size, 3), maximum), 0, 0,
@@ -3059,6 +3118,10 @@ std::expected<bool, QueueFailure> MuxQueue::State::callback(Client &c, QueueWork
         for (; prefix < c.size && selected < maximum; ++prefix) {
             const auto slot = (c.head + prefix) % c.records.size();
             const auto &r = c.records[slot];
+
+            if (snapshotDuringInterval && !r->aggregationSnapshot)
+                break;
+
             auto current = interest.currentProjectionMask(c.interest, r->view.projections, work.interest);
 
             if (!current) {
@@ -3149,6 +3212,17 @@ std::expected<bool, QueueFailure> MuxQueue::State::callback(Client &c, QueueWork
         auto guard = c.consumer;
         BorrowedMuxBatch borrowed;
         borrowed.state_ = batch;
+
+        if (c.statistics) {
+            std::lock_guard lock(c.statistics->mutex);
+            const auto period =
+                std::max(c.statistics->endpointAggregationPeriod,
+                         c.statistics->subscriptionAggregationPeriod.value_or(std::chrono::milliseconds{0}));
+            c.statistics->selectedAggregationPeriod = period;
+            c.statistics->selectedAggregationSnapshotBypass = c.closing || snapshotDuringInterval;
+        }
+
+        c.aggregationCollecting = false;
         c.port->resume.exchange(false, std::memory_order_acq_rel);
         executing = true;
         try {
@@ -4270,6 +4344,71 @@ std::expected<QueueProgress, QueueFailure> MuxQueue::progressImpl(QueueWork &wor
         return std::unexpected(QueueFailure{e, {}});
     } catch (const std::bad_alloc &) {
         return std::unexpected(QueueFailure{QueueError::ALLOCATION_FAILURE, {}});
+    }
+}
+
+std::expected<TickerLatestObservation, QueueFailure>
+MuxQueue::visitTickerLatest(const MuxHandle &handle, core::SubscriptionKey key, QueueWork &work, void *context,
+                            void (*visitor)(void *, const collectors::TickerValue &) noexcept) const {
+    try {
+        debit(work.operations, 1);
+
+        if (!state_ || !state_->ticker || !visitor)
+            throw QueueError::INVALID_STATE;
+
+        auto &s = *state_;
+
+        if (s.observingTicker)
+            throw QueueError::REENTRANT;
+
+        auto *client = s.client(handle);
+
+        if (!client || client->sourceClosed || !client->consumer)
+            throw QueueError::INVALID_CLIENT;
+
+        if (s.state != QueueState::OPEN || s.stopMode || client->port->stop.load() || client->sync || client->closing ||
+            s.reset.phase != ResetPhase::NONE || client->port->advertisedNotice.load() ||
+            client->mappingRevision != client->desiredRevision)
+            throw QueueError::INVALID_STATE;
+
+        auto *mapping = s.mapping(*client, key, work);
+
+        if (!mapping)
+            return TickerLatestObservation::UNMAPPED;
+
+        auto latest = s.ticker->latest(key, work.ticker);
+
+        if (!latest) {
+            if (latest.error() == collectors::TickerError::WORK_LIMIT)
+                throw QueueError::WORK_LIMIT;
+
+            throw sourceFailure(latest.error());
+        }
+
+        if (!*latest || !(**latest).current)
+            return TickerLatestObservation::ABSENT;
+
+        struct Guard {
+            State &state;
+            bool wasExecuting;
+
+            ~Guard() {
+                state.executing = wasExecuting;
+                state.observingTicker = false;
+            }
+        } guard{s, s.executing};
+
+        // A delivery callback may inspect the already committed cache. Keep its original
+        // execution gate active and deny any nested borrowed observation.
+        s.executing = true;
+        s.observingTicker = true;
+        visitor(context, **latest);
+
+        return TickerLatestObservation::VISITED;
+    } catch (QueueFailure error) {
+        return std::unexpected(error);
+    } catch (QueueError error) {
+        return std::unexpected(QueueFailure{error, {}});
     }
 }
 

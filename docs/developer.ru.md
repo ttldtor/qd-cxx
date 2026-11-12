@@ -66,3 +66,5 @@
 - [Oracle Candle HISTORY](../tools/upstream/candle-lifecycle-oracle/README.ru.md) записывает точные снимки Java, локальное воспроизведение, коррекции того же индекса и исходный QTP.
 - [Оракул OptionSale](../tools/upstream/option-sale-oracle/README.ru.md) записывает индексные события HISTORY для схем закреплённой версии Java QD.
 - [Oracle жизненного цикла продаж в HISTORY](../tools/upstream/sale-lifecycle-oracle/README.ru.md) записывает коррекции, отмены, удаления по индексу, снимки и потоки нового Java collector.
+
+- [Oracle NuamTrade](../tools/upstream/nuam-trade-oracle/README.ru.md) записывает значения mapper и delegate закреплённой Java-версии, региональные символы и отказы при отсутствии обязательных полей.
