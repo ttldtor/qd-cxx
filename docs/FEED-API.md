@@ -342,6 +342,9 @@ The runtime opens and reads the regular file on its worker. Await
 `closeAndAwaitTermination()` for actual capture retirement. Calling
 `closeAndAwaitTermination()` before EOF requests an early stop.
 
+While a TICKER tape is active, the latest-event API reads its committed
+values through ordinary subscriptions. EOF or explicit close fences these reads.
+
 `TapeSourceOptions` sets file limits, relative playback speed and initial
 pause. For twice normal speed, pass
 `{.playback = TapePlaybackPolicy::SOURCE_TIME, .speedPercent = 200}`. Use
@@ -675,3 +678,44 @@ The default receiving registry supports the standard `Candle` and `TradeHistory`
 ## Receive OptionSale
 
 Use `Feed::createSubscription<events::OptionSale>()` on a HISTORY endpoint. See [OptionSale fields and indexed identity](OPTION-SALE-EVENT.md).
+
+Receive NuamTrade using `createSubscription<events::NuamTrade>()` on a TICKER or STREAM endpoint.
+The event extends Trade with independently updated exchange statistics. See the
+[NuamTrade fields and routing](../spec/events/NUAM-TRADE.md).
+
+Receive `NuamTimeAndSale` on STREAM or HISTORY using the typed Feed API. It extends `TimeAndSale` with the matching engine `matchId`; HISTORY retains its indexed transaction and removal flags. The default route is composite; regional routes require an explicit registry.
+
+## Read the latest retained event
+
+`Feed::getLastEvent(quote)` returns an independent copy of the most recent committed
+TICKER value for the event type and symbol. The supplied event is returned unchanged
+when the cache has no current value. Use `getLastEventIfSubscribed<events::Quote>("IBM")`
+to distinguish absence of an exact subscription from a subscribed symbol awaiting
+data. In the latter case the result has the requested symbol and default-initialized
+C++ fields. For example, the regional Quote's bid and ask exchange fields are zero
+until a source value is retained. A wildcard does not count as an exact subscription.
+STREAM and HISTORY endpoints have no result for these reads.
+
+The read inspects the actual collector, even when there are no listeners or when
+aggregation or a custom executor delays delivery. A plain disconnect keeps the
+cache readable once the source has quiesced. Accepted clear, reconnect, removal
+or close immediately fence affected values. A returned copy remains usable after
+the cache or endpoint closes.
+
+Reads use the existing local runtime owner and never start a worker, connect,
+change demand or send a request to the source. A call from that runtime's worker
+listener reads directly without waiting. An external call reserves one bounded
+request per endpoint and waits at most one second for completion. Concurrent
+occupation of that slot reports `ErrorCode::RESOURCE_LIMIT`; an expired wait reports
+`ErrorCode::WORK_LIMIT`. A timed-out request stays charged until the owner retires it.
+
+The typed read accepts supported LastingEvent values, including regional symbols
+and Candle's canonical symbol. Other event types report `UNSUPPORTED_PROFILE`.
+For an exact Candle subscription, pass its parsed `CandleSymbol` to the same
+`getLastEventIfSubscribed<events::Candle>` method.
+
+## Local aggregation
+
+Set `EndpointOptions::aggregationPeriod` or the `dxfeed.aggregationPeriod` configuration property for a local endpoint floor. `Subscription::setAggregationPeriod` sets an optional per-subscription period. The effective local period is their maximum and takes effect after the running interval. `Subscription::getAggregationPeriodInfo` reports the local period selected for the last actual listener invocation, or no value before one. `Endpoint::getAggregationPeriodInfo` separately reports an upstream descriptor.
+
+A TICKER subscription retains waiting updates in its collector so repeated values of one key may conflate. STREAM and HISTORY use bounded ordered queues and can report their existing overflow outcome. During a running interval, TICKER initial collector values remain eligible ahead of pending live updates. Already detached queue entries retain their original order. Closing drains admitted events without waiting for the local interval. Zero preserves immediate delivery.
