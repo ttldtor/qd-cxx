@@ -16,6 +16,11 @@ tests/fixtures/underlying/provenance.json text eol=lf
 tests/fixtures/underlying/**/*.tsv -text -whitespace
 tests/fixtures/underlying/**/*.qtp -text
 
+# Preserve the pinned TheoPrice oracle captures and canonical provenance bytes.
+tests/fixtures/theo-price/provenance.json text eol=lf
+tests/fixtures/theo-price/**/*.tsv -text -whitespace
+tests/fixtures/theo-price/**/*.qtp -text
+
 # Order source capability observations retain exact bytes; launcher/provenance hashes use LF.
 tools/upstream/order-source-capability-oracle/*.ps1 text eol=lf
 tests/fixtures/order-source-capabilities/provenance.json text eol=lf

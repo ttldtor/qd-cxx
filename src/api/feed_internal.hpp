@@ -37,8 +37,9 @@ using ListenerFunction =
                  Subscription<events::AnalyticOrder>::Listener, Subscription<events::OtcMarketsOrder>::Listener,
                  Subscription<events::OrderImbalance>::Listener, Subscription<events::Series>::Listener,
                  Subscription<events::Greeks>::Listener, Subscription<events::Underlying>::Listener,
-                 Subscription<RegisteredEvent>::Listener, Endpoint::StateChangeListener,
-                 Subscription<events::Quote>::StateChangeListener, SubscriptionChangeListener>;
+                 Subscription<events::TheoPrice>::Listener, Subscription<RegisteredEvent>::Listener,
+                 Endpoint::StateChangeListener, Subscription<events::Quote>::StateChangeListener,
+                 SubscriptionChangeListener>;
 
 /** Shared application callable; its last release never occurs under a control mutex. */
 struct ListenerBox {

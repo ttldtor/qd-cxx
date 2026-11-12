@@ -1,0 +1,18 @@
+record	114	TheoPrice	true
+field	0	56	Theo.Time	Time
+field	1	72	Theo.Sequence	Sequence
+field	2	24	Theo.Price	Price
+field	3	24	Theo.UnderlyingPrice	UnderlyingPrice
+field	4	24	Theo.Delta	Delta
+field	5	24	Theo.Gamma	Gamma
+field	6	24	Theo.Dividend	Dividend
+field	7	24	Theo.Interest	Interest
+event	AAPL	7200	0	0	-100663297	-1	4194303	4623367229960880128	4642476742051627008	-4620693217682128896	9221120237041090560	4598175219545276416	-4629700416936869888
+raw	Theo.Time	-1
+raw	Theo.Sequence	-100663297
+raw	Theo.Price	20411
+raw	Theo.UnderlyingPrice	3762012
+raw	Theo.Delta	-70
+raw	Theo.Gamma	0
+raw	Theo.Dividend	411
+raw	Theo.Interest	-1988

@@ -19,6 +19,7 @@
 #include "qd/events/spread_order.hpp"
 #include "qd/events/summary.hpp"
 #include "qd/events/text_events.hpp"
+#include "qd/events/theo_price.hpp"
 #include "qd/events/trade.hpp"
 #include "qd/events/trade_eth.hpp"
 #include "qd/events/underlying.hpp"
@@ -450,6 +451,13 @@ EventRegistry::create(const core::LocalSchema &schema, std::span<const EventRegi
                 if (!mapping) {
                     return std::unexpected(EventRegistryFailure{mapping.error(), index});
                 }
+            } else if (registration.type == EventType::THEO_PRICE) {
+                const auto mapping = events::PreparedTheoPrice::prepare(*ownedSchema, registration.localRecordId,
+                                                                        registration.mappingLimits);
+
+                if (!mapping) {
+                    return std::unexpected(EventRegistryFailure{mapping.error(), index});
+                }
             } else if (registration.type == EventType::ORDER_IMBALANCE) {
                 const auto mapping = events::PreparedOrderImbalance::prepare(*ownedSchema, registration.localRecordId,
                                                                              registration.mappingLimits);
@@ -647,8 +655,8 @@ std::expected<EventRegistry, EventRegistryFailure> defaultTickerEventRegistry(Ev
             return std::unexpected(EventRegistryFailure{imbalance.error(), {}});
         }
 
-        constexpr std::size_t DEFAULT_PHYSICAL_RECORDS = 41;
-        constexpr std::size_t DEFAULT_ROUTES = 68;
+        constexpr std::size_t DEFAULT_PHYSICAL_RECORDS = 42;
+        constexpr std::size_t DEFAULT_ROUTES = 69;
         records.reserve(DEFAULT_PHYSICAL_RECORDS);
         routes.reserve(DEFAULT_ROUTES);
         routes.push_back(derivedRegistration(0, events::EventProjection::QUOTE_ORDERS));
@@ -719,6 +727,17 @@ std::expected<EventRegistry, EventRegistryFailure> defaultTickerEventRegistry(Ev
         routes.push_back({EventType::UNDERLYING, underlyingRecord.id});
         records.push_back(std::move(underlyingRecord));
 
+        const auto theoPrice = events::defaultTheoPriceSchema(limits.schema);
+
+        if (!theoPrice) {
+            return std::unexpected(EventRegistryFailure{theoPrice.error(), {}});
+        }
+
+        auto theoPriceRecord = theoPrice->records()[0];
+        theoPriceRecord.id = static_cast<std::int32_t>(records.size());
+        routes.push_back({EventType::THEO_PRICE, theoPriceRecord.id});
+        records.push_back(std::move(theoPriceRecord));
+
         auto schema = core::LocalSchema::create(records, limits.schema, core::LocalProfile::BINARY_FIELDS_V1);
 
         if (!schema) {
@@ -788,9 +807,16 @@ std::expected<EventRegistry, EventRegistryFailure> defaultHistoryEventRegistry(E
             return std::unexpected(EventRegistryFailure{underlying.error(), {}});
         }
 
+        const auto theoPrice = events::defaultTheoPriceSchema(limits.schema);
+
+        if (!theoPrice) {
+            return std::unexpected(EventRegistryFailure{theoPrice.error(), {}});
+        }
+
         std::array records{order->records()[0],    maker->records()[0],  spread->records()[0],
                            analytic->records()[0], otc->records()[0],    otc->records()[1],
-                           series->records()[0],   greeks->records()[0], underlying->records()[0]};
+                           series->records()[0],   greeks->records()[0], underlying->records()[0],
+                           theoPrice->records()[0]};
 
         for (std::size_t index = 0; index < records.size(); ++index) {
             records[index].id = static_cast<std::int32_t>(index);
@@ -811,7 +837,8 @@ std::expected<EventRegistry, EventRegistryFailure> defaultHistoryEventRegistry(E
                                 EventRegistration{EventType::OTC_MARKETS_ORDER, 5},
                                 EventRegistration{EventType::SERIES, 6},
                                 EventRegistration{EventType::GREEKS, 7},
-                                EventRegistration{EventType::UNDERLYING, 8}};
+                                EventRegistration{EventType::UNDERLYING, 8},
+                                EventRegistration{EventType::THEO_PRICE, 9}};
 
         return EventRegistry::create(*schema, routes, limits, work);
     } catch (EventRegistryError error) {

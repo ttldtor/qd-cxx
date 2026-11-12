@@ -78,6 +78,7 @@ struct BorrowedRecordValueView {
 class EventMapping {
     friend class PreparedGreeks;
     friend class PreparedUnderlying;
+    friend class PreparedTheoPrice;
     friend class PreparedMarketMaker;
     friend class PreparedDerivedOrder;
     /** Validate an actual indexed removal using the mapper's retained schema layout.
