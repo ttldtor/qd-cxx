@@ -64,3 +64,5 @@ The [event-value oracle](../tools/upstream/event-values-oracle/README.md) captur
 - The [Candle HISTORY oracle](../tools/upstream/candle-lifecycle-oracle/README.md) captures exact Java snapshots, local replay, same-index corrections and source QTP.
 - The [OptionSale oracle](../tools/upstream/option-sale-oracle/README.md) captures indexed HISTORY events for pinned Java QD schema variants.
 - The [Sale HISTORY lifecycle oracle](../tools/upstream/sale-lifecycle-oracle/README.md) captures Java corrections, cancellations, indexed removals, snapshots and fresh collector streams.
+
+- [NuamTrade oracle](../tools/upstream/nuam-trade-oracle/README.md) captures pinned Java mapper and delegate values, regional symbols and required-field refusals.

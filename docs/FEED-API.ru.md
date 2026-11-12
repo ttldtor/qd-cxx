@@ -724,6 +724,10 @@ SDK применяет demand и снимает устаревшую HISTORY д�
 
 Используйте `Feed::createSubscription<events::OptionSale>()` на endpoint HISTORY. См. [поля OptionSale и индексную идентичность](OPTION-SALE-EVENT.ru.md).
 
+Для получения NuamTrade используйте `createSubscription<events::NuamTrade>()` на TICKER или STREAM
+endpoint. Событие расширяет Trade независимо обновляемой статистикой биржи. См.
+[поля и маршрутизацию NuamTrade](../spec/events/NUAM-TRADE.ru.md).
+
 ## Локальная агрегация
 
 `EndpointOptions::aggregationPeriod` или свойство конфигурации `dxfeed.aggregationPeriod` задаёт минимальный локальный период endpoint. `Subscription::setAggregationPeriod` задаёт необязательный период подписки. Применяется максимум двух значений после завершения текущего интервала. `Subscription::getAggregationPeriodInfo` показывает локальный период, выбранный для последнего фактического вызова обработчика. До первого вызова значение отсутствует. `Endpoint::getAggregationPeriodInfo` отдельно возвращает данные upstream descriptor.

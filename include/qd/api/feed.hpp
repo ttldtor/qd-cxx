@@ -13,6 +13,7 @@
 #include "qd/events/configuration.hpp"
 #include "qd/events/greeks.hpp"
 #include "qd/events/market_maker.hpp"
+#include "qd/events/nuam_trade.hpp"
 #include "qd/events/option_sale.hpp"
 #include "qd/events/order.hpp"
 #include "qd/events/order_imbalance.hpp"
@@ -232,7 +233,7 @@ using RegisteredEvent =
                  events::TextConfiguration, events::Message, events::Configuration, events::Order, events::MarketMaker,
                  events::SpreadOrder, events::AnalyticOrder, events::OtcMarketsOrder, events::OrderImbalance,
                  events::Series, events::Greeks, events::Underlying, events::TheoPrice, events::Candle,
-                 events::TimeAndSale, events::OptionSale>;
+                 events::TimeAndSale, events::OptionSale, events::NuamTrade>;
 
 /** Independently owned observation of one complete accepted local subscription revision. */
 struct SubscriptionSnapshot {
@@ -280,8 +281,8 @@ template <class Event> class Subscription final {
                   std::is_same_v<Event, events::Series> || std::is_same_v<Event, events::Greeks> ||
                   std::is_same_v<Event, events::Underlying> || std::is_same_v<Event, events::TheoPrice> ||
                   std::is_same_v<Event, events::Candle> || std::is_same_v<Event, events::TimeAndSale> ||
-                  std::is_same_v<Event, events::OptionSale> || std::is_same_v<Event, events::Order> ||
-                  std::is_same_v<Event, RegisteredEvent>);
+                  std::is_same_v<Event, events::OptionSale> || std::is_same_v<Event, events::NuamTrade> ||
+                  std::is_same_v<Event, events::Order> || std::is_same_v<Event, RegisteredEvent>);
     std::shared_ptr<detail::SubscriptionPort> port_;
     friend class Feed;
     explicit Subscription(std::shared_ptr<detail::SubscriptionPort> port) noexcept;
@@ -519,6 +520,7 @@ template <class Event> class Subscription final {
 extern template class Subscription<events::Quote>;
 extern template class Subscription<events::Profile>;
 extern template class Subscription<events::Trade>;
+extern template class Subscription<events::NuamTrade>;
 extern template class Subscription<events::TradeETH>;
 extern template class Subscription<events::Summary>;
 extern template class Subscription<events::TextMessage>;
@@ -571,7 +573,8 @@ class Feed final {
                       std::is_same_v<Event, events::Series> || std::is_same_v<Event, events::Greeks> ||
                       std::is_same_v<Event, events::Underlying> || std::is_same_v<Event, events::TheoPrice> ||
                       std::is_same_v<Event, events::Candle> || std::is_same_v<Event, events::TimeAndSale> ||
-                      std::is_same_v<Event, events::OptionSale> || std::is_same_v<Event, events::Order>);
+                      std::is_same_v<Event, events::OptionSale> || std::is_same_v<Event, events::NuamTrade> ||
+                      std::is_same_v<Event, events::Order>);
 
         if constexpr (std::is_same_v<Event, events::Quote>)
             return EventType::QUOTE;
@@ -615,6 +618,8 @@ class Feed final {
             return EventType::TIME_AND_SALE;
         else if constexpr (std::is_same_v<Event, events::OptionSale>)
             return EventType::OPTION_SALE;
+        else if constexpr (std::is_same_v<Event, events::NuamTrade>)
+            return EventType::NUAM_TRADE;
         else
             return EventType::ORDER;
     }

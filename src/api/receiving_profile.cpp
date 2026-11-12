@@ -21,7 +21,21 @@ namespace {
 constexpr std::size_t MEBIBYTE = 1024 * 1024; ///< Independent logical byte unit.
 constexpr core::SchemaLimits BASE_SCHEMA_LIMITS{42, 284, 724, 128, 16384};
 // Reserve exactly the two records, 20 fields and 25 lookups of the Candle/TradeHistory declarations.
-constexpr core::SchemaLimits CANDLE_SCHEMA_LIMITS{MAXIMUM_RECEIVING_RECORDS, 284 + 20, 724 + 25, 128, 16384};
+constexpr core::SchemaLimits CANDLE_SCHEMA_LIMITS{44, 284 + 20, 724 + 25, 128, 16384};
+
+/** Reserve the default NuamTrade record, its fields and aliases.
+ * @param limits Existing complete schema allowances.
+ * @return Allowances including the composite NuamTrade record.
+ */
+constexpr core::SchemaLimits withNuamTradeLimits(core::SchemaLimits limits) noexcept {
+    constexpr std::size_t FIELDS = 18;
+    constexpr std::size_t LOOKUPS = 28;
+    ++limits.records;
+    limits.fields += FIELDS;
+    limits.lookups += LOOKUPS;
+
+    return limits;
+}
 
 /** Reserve the standard OptionSale logical fields and aliases.
  * @param limits Existing complete schema allowances.
@@ -553,12 +567,12 @@ std::expected<EventRegistry, EventRegistryFailure> defaultReceivingRegistry(Deli
 
     EventRegistryWork work;
     EventRegistryLimits limits;
-    limits.schema = contract == DeliveryContract::STREAM ? withTimeAndSaleLimits(BASE_SCHEMA_LIMITS)
-                    : contract == DeliveryContract::HISTORY
-                        ? withOptionSaleLimits(withTimeAndSaleLimits(CANDLE_SCHEMA_LIMITS))
-                        : CANDLE_SCHEMA_LIMITS;
+    limits.schema =
+        contract == DeliveryContract::STREAM    ? withNuamTradeLimits(withTimeAndSaleLimits(BASE_SCHEMA_LIMITS))
+        : contract == DeliveryContract::HISTORY ? withOptionSaleLimits(withTimeAndSaleLimits(CANDLE_SCHEMA_LIMITS))
+                                                : withNuamTradeLimits(CANDLE_SCHEMA_LIMITS);
     // Both appended physical Candle routes fit in the existing maximum registration capacity.
-    limits.registrations = 73;
+    limits.registrations = 74;
     constexpr auto defaultMapping = EventRegistration{EventType::QUOTE, 0}.mappingLimits;
     constexpr auto preparationPerRoute = defaultMapping.fields + defaultMapping.lookups + defaultMapping.selections +
                                          defaultMapping.keys + defaultMapping.typeAlternatives +
@@ -712,7 +726,23 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
     const auto hasOptionSale = std::ranges::any_of(selected.registrations(), [&](const EventRegistration &route) {
         return route.type == EventType::OPTION_SALE && receivingRouteSupportsContract(route, options.contract);
     });
+    const auto hasNuamTrade = std::ranges::any_of(selected.registrations(), [&](const EventRegistration &route) {
+        return route.type == EventType::NUAM_TRADE && receivingRouteSupportsContract(route, options.contract);
+    });
     auto schemaLimits = hasCandle ? CANDLE_SCHEMA_LIMITS : BASE_SCHEMA_LIMITS;
+
+    if (hasNuamTrade) {
+        for (const auto &route : selected.registrations()) {
+            if (route.type != EventType::NUAM_TRADE || !receivingRouteSupportsContract(route, options.contract)) {
+                continue;
+            }
+
+            const auto &record = selected.schema().records()[static_cast<std::size_t>(route.localRecordId)];
+            schemaLimits.records = std::min(MAXIMUM_RECEIVING_RECORDS, add(schemaLimits.records, 1));
+            schemaLimits.fields = add(schemaLimits.fields, record.fields.size());
+            schemaLimits.lookups = add(schemaLimits.lookups, record.lookups.size());
+        }
+    }
 
     if (hasOptionSale) {
         schemaLimits = withOptionSaleLimits(schemaLimits);
@@ -720,6 +750,10 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
 
     if (hasTimeAndSale) {
         schemaLimits = withTimeAndSaleLimits(schemaLimits);
+    }
+
+    if (selected.schema().records().size() > MAXIMUM_RECEIVING_RECORDS) {
+        refuse(ErrorCode::UNSUPPORTED_PROFILE, "profile-schema");
     }
 
     auto copied = selected.schema().boundedCopy(schemaLimits);
@@ -1089,7 +1123,7 @@ void validateReceivingSymbol(const EventRegistry *registry, EventSelection selec
         return;
     }
 
-    if (registry->schema().records().size() > CANDLE_SCHEMA_LIMITS.records) {
+    if (registry->schema().records().size() > MAXIMUM_RECEIVING_RECORDS) {
         refuse(ErrorCode::UNSUPPORTED_PROFILE, "profile-schema");
     }
 

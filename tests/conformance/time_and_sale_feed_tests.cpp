@@ -345,11 +345,11 @@ TEST_CASE("TimeAndSale default regional catalogs fit complete expanded peer desc
         const auto firstRecord = history ? HISTORY_COMPOSITE_ID : STREAM_COMPOSITE_ID;
         constexpr std::size_t REGIONAL_AND_COMPOSITE_RECORDS = 27;
         const auto salesEnd = static_cast<std::size_t>(firstRecord) + REGIONAL_AND_COMPOSITE_RECORDS;
-        const auto expectedRecords = salesEnd + (history ? 1 : 0);
+        const auto expectedRecords = salesEnd + 1;
         REQUIRE(profile.schema.records().size() == expectedRecords);
         REQUIRE(profile.blueprint.size() == expectedRecords);
         REQUIRE(registry->registrations().size() == expectedRecords + (history ? 1 : 0));
-        CHECK(profile.eventPlans.size() == (history ? 4096 : 1024));
+        CHECK(profile.eventPlans.size() == (history ? 4096 : 2048));
 
         for (std::size_t offset = 0; offset < REGIONAL_AND_COMPOSITE_RECORDS; ++offset) {
             const auto recordIndex = static_cast<std::size_t>(firstRecord) + offset;
@@ -441,6 +441,8 @@ TEST_CASE("TimeAndSale default regional catalogs fit complete expanded peer desc
         if (history) {
             CHECK(snapshot.descriptions()[salesEnd].name == u"OptionSale");
             CHECK(snapshot.descriptions()[salesEnd].fields.size() == 17);
+        } else {
+            CHECK(snapshot.descriptions()[salesEnd].name == u"NuamTrade");
         }
 
         const auto regional = d::filterSubscriptionCoordinates(*registry, contract, a::EventType::TIME_AND_SALE,
