@@ -1,0 +1,35 @@
+record	119	NuamOrder#NUAM	true
+int-field	0	0	Void	Void
+int-field	1	8	Index	Index
+int-field	2	56	Time	Time
+int-field	3	72	Sequence	Sequence
+int-field	4	120	Price	Price
+int-field	5	0	Price$VoidTail	Price$VoidTail
+int-field	6	120	Size	Size
+int-field	7	0	Size$VoidTail	Size$VoidTail
+int-field	8	8	Flags	Flags
+int-field	9	8	ActorId	ActorId
+int-field	10	8	ParticipantId	ParticipantId
+int-field	11	8	SubmitterId	SubmitterId
+int-field	12	8	OnBehalfOfSubmitterId	OnBehalfOfSubmitterId
+int-field	13	8	TimeInForceData	TimeInForceData
+int-field	14	8	TriggerOrderBookId	TriggerOrderBookId
+int-field	15	120	TriggerPrice	TriggerPrice
+int-field	16	0	TriggerPrice$VoidTail	TriggerPrice$VoidTail
+int-field	17	8	TriggerSessionType	TriggerSessionType
+int-field	18	120	OrderQuantity	OrderQuantity
+int-field	19	0	OrderQuantity$VoidTail	OrderQuantity$VoidTail
+int-field	20	120	DisplayQuantity	DisplayQuantity
+int-field	21	0	DisplayQuantity$VoidTail	DisplayQuantity$VoidTail
+int-field	22	120	RefreshQuantity	RefreshQuantity
+int-field	23	0	RefreshQuantity$VoidTail	RefreshQuantity$VoidTail
+int-field	24	120	LeavesQuantity	LeavesQuantity
+int-field	25	0	LeavesQuantity$VoidTail	LeavesQuantity$VoidTail
+int-field	26	120	MatchedQuantity	MatchedQuantity
+int-field	27	0	MatchedQuantity$VoidTail	MatchedQuantity$VoidTail
+int-field	28	8	NuamFlags	NuamFlags
+object-field	0	10	ClientOrderId	ClientOrderId
+object-field	1	10	CustomerAccount	CustomerAccount
+object-field	2	10	CustomerInfo	CustomerInfo
+object-field	3	10	ExchangeInfo	ExchangeInfo
+event	AAPL	0	5644489506947072007	1314210125	1701	9	-42	123	456	789	id		<null>	exchange	-17	314	271	246	0	0	-4609152743636992000	4624915342332788736	4620833955170484224	4616330355543113728	4615063718147915776	4622945017495814144

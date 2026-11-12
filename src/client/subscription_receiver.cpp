@@ -84,7 +84,8 @@ bool validBinding(const PreparedSubscriptionBinding &binding) noexcept {
             binding.kind == PreparedEventKind::GREEKS || binding.kind == PreparedEventKind::UNDERLYING ||
             binding.kind == PreparedEventKind::THEO_PRICE || binding.kind == PreparedEventKind::CANDLE ||
             binding.kind == PreparedEventKind::TIME_AND_SALE || binding.kind == PreparedEventKind::OPTION_SALE ||
-            (binding.kind == PreparedEventKind::NUAM_TRADE || binding.kind == PreparedEventKind::NUAM_TIME_AND_SALE)) &&
+            (binding.kind == PreparedEventKind::NUAM_TRADE || binding.kind == PreparedEventKind::NUAM_TIME_AND_SALE ||
+             binding.kind == PreparedEventKind::NUAM_ORDER)) &&
            (binding.eventTimePolicy == ReceiverEventTimePolicy::UNSPECIFIED ||
             binding.eventTimePolicy == ReceiverEventTimePolicy::FIELD_METADATA) &&
            (binding.projection == events::EventProjection::NATIVE ||
@@ -125,7 +126,8 @@ struct ReceiverRoute {
                  events::PreparedOtcMarketsOrder, events::PreparedOrderImbalance, events::PreparedSeries,
                  events::PreparedGreeks, events::PreparedUnderlying, events::PreparedTheoPrice,
                  events::PreparedTimeAndSale, events::PreparedOptionSale, events::PreparedDerivedOrder,
-                 CandleReceiverMapping, events::PreparedNuamTrade, events::PreparedNuamTimeAndSale>
+                 CandleReceiverMapping, events::PreparedNuamTrade, events::PreparedNuamTimeAndSale,
+                 events::PreparedNuamOrder>
         mapping;                          ///< Existing owned immutable mapper.
     events::EventValueLimits valueLimits; ///< Per-result owned text bounds.
     ReceiverEventTimePolicy timePolicy;   ///< Explicit optional timestamp source.
@@ -207,12 +209,14 @@ ReceiverProjectionWork projectionAllowance(const detail::ReceiverRoute &route) {
                        std::holds_alternative<events::PreparedSpreadOrder>(route.mapping) ||
                        std::holds_alternative<events::PreparedAnalyticOrder>(route.mapping) ||
                        std::holds_alternative<events::PreparedOtcMarketsOrder>(route.mapping);
+    const bool nuamOrder = std::holds_alternative<events::PreparedNuamOrder>(route.mapping);
     const bool attachment = std::holds_alternative<events::PreparedMessage>(route.mapping) ||
                             std::holds_alternative<events::PreparedConfiguration>(route.mapping);
-    const bool symbolOnly = !profile && !text && !order && !timeAndSale && !optionSale;
+    const bool symbolOnly = !profile && !text && !order && !nuamOrder && !timeAndSale && !optionSale;
     const auto units = symbolOnly ? std::min(route.valueLimits.symbolUnits, route.valueLimits.totalUnits)
                                   : route.valueLimits.totalUnits;
-    const auto strings = symbolOnly    ? std::size_t{1}
+    const auto strings = nuamOrder     ? std::size_t{5}
+                         : symbolOnly  ? std::size_t{1}
                          : timeAndSale ? std::size_t{4}
                                        : ((profile || optionSale) ? std::size_t{3} : std::size_t{2});
     const auto bytes = checkedSum(
@@ -249,6 +253,7 @@ projectPrepared(const mux::MuxRecordView &record, const detail::ReceiverRoute &r
     const bool textMessage = std::holds_alternative<events::PreparedTextMessage>(route.mapping);
     const bool textConfiguration = std::holds_alternative<events::PreparedTextConfiguration>(route.mapping);
     const bool order = std::holds_alternative<events::PreparedOrder>(route.mapping);
+    const bool nuamOrder = std::holds_alternative<events::PreparedNuamOrder>(route.mapping);
     const bool attachment = std::holds_alternative<events::PreparedMessage>(route.mapping) ||
                             std::holds_alternative<events::PreparedConfiguration>(route.mapping);
     const bool quote = std::holds_alternative<events::PreparedQuote>(route.mapping);
@@ -382,6 +387,17 @@ projectPrepared(const mux::MuxRecordView &record, const detail::ReceiverRoute &r
     }
 
     if (const auto *prepared = std::get_if<events::PreparedAnalyticOrder>(&route.mapping)) {
+        auto mapped =
+            prepared->mapView(record.symbol, values, route.valueLimits, eventTime.value_or(0), record.eventFlags);
+
+        if (!mapped) {
+            return std::unexpected(ReceiverProjectionFailure{mapped.error()});
+        }
+
+        return SubscriptionProjection{std::move(*mapped), eventTime};
+    }
+
+    if (const auto *prepared = std::get_if<events::PreparedNuamOrder>(&route.mapping)) {
         auto mapped =
             prepared->mapView(record.symbol, values, route.valueLimits, eventTime.value_or(0), record.eventFlags);
 
@@ -758,7 +774,7 @@ openSubscriptionReceiver(mux::MuxQueue &queue, const core::LocalSchema &schema, 
                   binding.kind == PreparedEventKind::MARKET_MAKER || binding.kind == PreparedEventKind::SPREAD_ORDER ||
                   binding.kind == PreparedEventKind::ANALYTIC_ORDER ||
                   binding.kind == PreparedEventKind::OTC_MARKETS_ORDER || binding.kind == PreparedEventKind::SERIES ||
-                  binding.kind == PreparedEventKind::OPTION_SALE) &&
+                  (binding.kind == PreparedEventKind::OPTION_SALE || binding.kind == PreparedEventKind::NUAM_ORDER)) &&
                  family != core::SubscriptionFamily::HISTORY) ||
                 (binding.kind == PreparedEventKind::ORDER_IMBALANCE && family != core::SubscriptionFamily::TICKER)) {
                 return std::unexpected(ReceiverFailure{ReceiverError::INVALID_INPUT, i});
@@ -782,7 +798,7 @@ openSubscriptionReceiver(mux::MuxQueue &queue, const core::LocalSchema &schema, 
 
             if (binding.kind == PreparedEventKind::SPREAD_ORDER || binding.kind == PreparedEventKind::ANALYTIC_ORDER ||
                 binding.kind == PreparedEventKind::OTC_MARKETS_ORDER || binding.kind == PreparedEventKind::SERIES ||
-                binding.kind == PreparedEventKind::OPTION_SALE) {
+                (binding.kind == PreparedEventKind::OPTION_SALE || binding.kind == PreparedEventKind::NUAM_ORDER)) {
                 debit(receiverWork.visits, record.lookups.size());
 
                 if (!events::detail::hasOrderIndexCoordinate(record)) {
@@ -905,6 +921,15 @@ openSubscriptionReceiver(mux::MuxQueue &queue, const core::LocalSchema &schema, 
                                        binding.eventTimePolicy, fields, binding.mappingLimits.selections});
             } else if (binding.kind == PreparedEventKind::ANALYTIC_ORDER) {
                 auto prepared = events::PreparedAnalyticOrder::prepare(schema, binding.localId, binding.mappingLimits);
+
+                if (!prepared) {
+                    return std::unexpected(ReceiverFailure{prepared.error(), i});
+                }
+
+                plan.routes.push_back({schema.recordContext(binding.localId), std::move(*prepared), binding.valueLimits,
+                                       binding.eventTimePolicy, fields, binding.mappingLimits.selections});
+            } else if (binding.kind == PreparedEventKind::NUAM_ORDER) {
+                auto prepared = events::PreparedNuamOrder::prepare(schema, binding.localId, binding.mappingLimits);
 
                 if (!prepared) {
                     return std::unexpected(ReceiverFailure{prepared.error(), i});

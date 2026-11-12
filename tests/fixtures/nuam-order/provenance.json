@@ -1,0 +1,62 @@
+{
+  "status": "PASS",
+  "revision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "timezoneByteIdentical": true,
+  "oracleSha256": "ea7afd6f03b206d3213f18b87b9c81df9ea838092a00a9465c5fad89b5e928d6",
+  "sources": [
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/custom/NuamOrder.java",
+      "sha256": "82618c9e9b5189af37c580cd204f5597edc678d3a4229c392c87fdd29825fda2"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/custom/NuamOrderType.java",
+      "sha256": "846cf786065f64e8fac3b2d3c00f96f7b83f0da27dfc2dd1dccd08cacc2175bb"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/custom/NuamTimeInForceType.java",
+      "sha256": "79af5afcb66b8507b0a1de13464c16b243f5b8d68edcc1a18734b8935d3b7bfd"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/OrderSource.java",
+      "sha256": "3b0d0b0e83f685efd688b87dba479003a76d9ad69097867326b74206dc3a2a45"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/custom/NuamOrderDelegate.java",
+      "sha256": "0847d13181b7fadd7ab82a93ef2862678b998f14a238746f99ea8baa4af8687e"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/custom/impl/NuamOrderMapping.java",
+      "sha256": "e54e9f6edfa0f183d14ef01da6936f80472f48d905934cfe0189cb8406609ae7"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/custom/CustomFactoryImpl.java",
+      "sha256": "71fec7eb870b63afeea7403e4aeb3a92069a11a67a3ba8acc0f9eb0a954bb730"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "default.qtp",
+      "sha256": "e0be0f95a7be62a276924c73dd5b71a05564414c5e97e2bbc639970cecb7c009"
+    },
+    {
+      "path": "default.tsv",
+      "sha256": "fe344a6e1a480f86a44f9a197f82cef6356864266981ce54daf0f675c6a83b52"
+    },
+    {
+      "path": "lower.qtp",
+      "sha256": "5a8e5b5409ab455a6671d5d2aa178b1fb075c35817f5322b9332f7ea22d0548c"
+    },
+    {
+      "path": "lower.tsv",
+      "sha256": "01607624cd2aeee51d2c82ebd48b82e092a3221b08c03b145fa06abfff8bbb9b"
+    },
+    {
+      "path": "upper.qtp",
+      "sha256": "6bd9e9821a6f75fa3fe46fd556e957a7b681cc5542ade60def97be40702dfb3b"
+    },
+    {
+      "path": "upper.tsv",
+      "sha256": "ff10fb196079444a2add5fab43c6a9414b88f89d35353e60c8a1c523e3d5874e"
+    }
+  ]
+}
