@@ -655,6 +655,14 @@ events again to populate the newly selected range.
 The application controls subscription demand and maps it to the local revision.
 [Time-series range and lifetime contract](../spec/events/TIME-SERIES-EVENT-MODEL.md).
 
+## Order-book snapshots
+
+Use `OrderBookModel` from `qd/api/order_book_model.hpp` to combine committed
+ordinary Order events from several sources. Pass one exact symbol/source batch
+at a time, then call `getSnapshot(symbol)` for owning bid and ask lists from
+the same cut. See the [order-book contract](../spec/events/ORDER-BOOK-MODEL.md)
+for ordering, snapshot completion and limits.
+
 ## Indexed option series
 
 Use `Feed::createSubscription<events::Series>()` on a HISTORY endpoint. The default
