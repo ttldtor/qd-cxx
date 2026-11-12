@@ -442,6 +442,8 @@ TEST_CASE("TimeAndSale default regional catalogs fit complete expanded peer desc
         if (history) {
             CHECK(snapshot.descriptions()[salesEnd].name == u"OptionSale");
             CHECK(snapshot.descriptions()[salesEnd].fields.size() == 17);
+        } else {
+            CHECK(snapshot.descriptions()[salesEnd].name == u"NuamTrade");
         }
 
         const auto regional = d::filterSubscriptionCoordinates(*registry, contract, a::EventType::TIME_AND_SALE,
