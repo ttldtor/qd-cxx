@@ -3529,6 +3529,9 @@ TEST_CASE("local aggregation composes periods and holds TICKER updates until the
     options.aggregationPeriod = 250ms;
     options.pendingRecords = 1;
     options.batchRecords = 1;
+    // The source stays quiet while the local aggregation interval runs.
+    options.readTimeout = api::EndpointOptions{}.readTimeout;
+    options.drainTimeout = api::EndpointOptions{}.drainTimeout;
     const auto schema = standardSchema();
     auto initial = standardValues(schema);
     auto second = initial;
@@ -3557,6 +3560,8 @@ TEST_CASE("local aggregation composes periods and holds TICKER updates until the
     wire.waitForClientClose = true;
     root::test::OwnedTcpPeer source(std::move(config));
     REQUIRE(source.port() != 0);
+    std::atomic<unsigned> seen{0};
+    std::atomic<std::int64_t> lastBid{0};
     api::ApiRuntime runtime(runtimeOptions());
     auto endpoint = runtime.createEndpoint(options);
     auto subscription = endpoint->getFeed()->createSubscription<events::Quote>();
@@ -3565,16 +3570,17 @@ TEST_CASE("local aggregation composes periods and holds TICKER updates until the
     CHECK(subscription->getAggregationPeriod() == 3s);
     CHECK_THROWS_AS(subscription->setAggregationPeriod(-1ms), api::Error);
     CHECK(subscription->getAggregationPeriod() == 3s);
-    std::atomic<unsigned> seen{0};
-    std::atomic<std::int64_t> lastBid{0};
-    subscription->addEventListener([&](std::span<const events::Quote> batch) {
-        lastBid.store(batch.front().bidTimeMs);
+    subscription->addEventListener(
+        [&seen, &lastBid, weak = std::weak_ptr(subscription)](std::span<const events::Quote> batch) {
+            lastBid.store(batch.front().bidTimeMs);
 
-        if (seen.load() == 0)
-            subscription->setAggregationPeriod(std::nullopt);
+            if (seen.load() == 0) {
+                if (const auto active = weak.lock())
+                    active->setAggregationPeriod(std::nullopt);
+            }
 
-        ++seen;
-    });
+            ++seen;
+        });
     subscription->addSymbols("IBM");
     endpoint->connect("127.0.0.1:" + std::to_string(source.port()));
     REQUIRE(eventually([&] {
@@ -3587,14 +3593,18 @@ TEST_CASE("local aggregation composes periods and holds TICKER updates until the
         return subscription->getStatistics().conflatedEvents.value >= 1;
     }));
     CHECK(seen.load() == 1);
-    REQUIRE(eventually(
+    const auto delivered = eventually(
         [&] {
             return seen.load() == 2;
         },
-        8s));
+        8s);
+    INFO("endpoint stage=", endpoint->getDiagnostic().stage);
+    REQUIRE(delivered);
     CHECK(lastBid.load() == 5000);
     CHECK(subscription->getAggregationPeriodInfo() == 250ms);
-    CHECK(endpoint->closeAndAwaitTermination().drained);
+    const auto closed = endpoint->closeAndAwaitTermination();
+    INFO("deadline=", closed.deadlineExpired, ", gap=", closed.hadGap, ", stage=", closed.diagnostic.stage);
+    CHECK(closed.drained);
 }
 
 TEST_CASE("local aggregation does not postpone graceful STREAM drain") {
