@@ -363,3 +363,5 @@ cache replay. Input-free EN/RU/Get-Help, bounded JDK8 Capture/Verify with exact 
 - The [OptionSale oracle](../upstream/option-sale-oracle/README.md) captures indexed HISTORY events for pinned Java QD schema variants.
 
 - [NuamTrade oracle](../upstream/nuam-trade-oracle/README.md) captures bounded Java observations with input-free EN/RU help.
+
+- [Time-series query oracle](../upstream/time-series-query-oracle/README.md) captures offline boundary observations with EN/RU help.

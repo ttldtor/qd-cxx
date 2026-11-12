@@ -37,3 +37,5 @@ The [serialized attachment oracle](attachment-oracle/README.md) witnesses real M
 - The [OptionSale oracle](option-sale-oracle/README.md) captures indexed HISTORY events for pinned Java QD schema variants.
 
 - [NuamTrade oracle](nuam-trade-oracle/README.md): actual pinned mapper/delegate statistics, physical variants and regional symbols.
+
+- [Time-series query oracle](time-series-query-oracle/README.md): time/index bounds and Java list ordering.

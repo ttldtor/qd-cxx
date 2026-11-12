@@ -889,3 +889,8 @@ tests/fixtures/sale-lifecycle/*.json text eol=lf
 tools/upstream/nuam-trade-oracle/*.java text eol=lf
 tests/fixtures/nuam-trade/*.tsv -text -whitespace
 tests/fixtures/nuam-trade/*.json text eol=lf
+
+# Preserve pinned time-series query observations.
+tests/fixtures/time-series-query/*.tsv -text -whitespace
+tests/fixtures/time-series-query/*.json text eol=lf
+tools/upstream/time-series-query-oracle/*.java text eol=lf

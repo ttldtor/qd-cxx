@@ -8,6 +8,7 @@
 #include "../transport/bootstrap_lease.hpp"
 #include "callback_execution.hpp"
 #include "event_selection.hpp"
+#include "time_series_query_policy.hpp"
 
 #include <array>
 #include <atomic>
@@ -280,6 +281,7 @@ struct HistorySnapshotOperation {
     const std::int32_t sourceId;
     const HistorySnapshotOptions options;
     const bool passive;
+    const std::optional<TimeSeriesQueryRange> timeSeriesRange;
     const std::chrono::steady_clock::time_point deadline;
     const std::weak_ptr<RuntimeControl> control;
     std::mutex mutex;
@@ -296,9 +298,10 @@ struct HistorySnapshotOperation {
     HistorySnapshotOperation(EventType type, std::u16string_view symbol, std::int32_t sourceId,
                              HistorySnapshotOptions options, bool passive,
                              std::chrono::steady_clock::time_point deadline,
-                             const std::shared_ptr<RuntimeControl> &control)
-        : type(type), symbol(symbol), sourceId(sourceId), options(options), passive(passive), deadline(deadline),
-          control(control) {
+                             const std::shared_ptr<RuntimeControl> &control,
+                             std::optional<TimeSeriesQueryRange> range = std::nullopt)
+        : type(type), symbol(symbol), sourceId(sourceId), options(options), passive(passive), timeSeriesRange(range),
+          deadline(deadline), control(control) {
     }
 };
 
