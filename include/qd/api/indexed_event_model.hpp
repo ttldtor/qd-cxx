@@ -55,6 +55,8 @@ template <class Event> struct IndexedEventChange {
 
 namespace detail {
 
+struct TimeSeriesEventModelStorage;
+
 template <class Event>
 concept IndexedModelFlatFlags = requires(Event &event) {
     { event.eventFlags } -> std::same_as<std::int32_t &>;
@@ -142,6 +144,8 @@ template <class Event> decltype(auto) indexedModelFlags(Event &event) noexcept {
  * @tparam Event Copyable owning indexed event with an exact logical symbol, signed source and index, and indexed flags.
  */
 template <detail::IndexedModelEvent Event> class IndexedEventModel final {
+    friend struct detail::TimeSeriesEventModelStorage;
+
     enum class SnapshotProgress { NONE, RECEIVING, COMPLETE, SNIPPED };
     using Key = std::pair<std::u16string, std::int32_t>;
     using Values = std::map<std::int64_t, Event>;
