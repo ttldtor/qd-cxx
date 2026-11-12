@@ -65,6 +65,29 @@ shifts the relative clock by its observed pause duration, and lets previously
 admitted work finish. Early close releases the pending envelope and does not
 wait for the playback deadline.
 
+## Restart and stop
+
+Call `Endpoint::restartTape()` while the tape is connected, including while
+paused. An accepted request publishes CONNECTING, fences new selections from
+the old source, and joins any restart already in progress. The worker cancels
+old not-started callbacks, waits for running callbacks to retire, then resets
+the collector and its HISTORY coverage. It reopens the same path at byte zero
+with a fresh playback clock and source epoch. Desired subscriptions, listeners
+and pause intent stay on the same endpoint. CONNECTED reports the new open.
+
+The endpoint's `drainTimeout` bounds the restart attempt. Expiry reports
+`TAPE_RESTART_TIMEOUT` in FAILED. A reopen error reports its own diagnostic.
+Actual callback and operating-system I/O quiescence can take longer. An old
+queued task cannot invoke a listener in the new epoch. A reset can leave a
+continuity gap in final accounting even if the new pass completes.
+
+`Endpoint::stopTape()` starts the normal terminal drain. The existing close
+policy cancels selected custom-executor callbacks that have yet to start.
+`stopTape(TapeStopMode::ABORT)` discards queued delivery and can escalate an
+unfinished drain. Stop or close takes precedence over a pending restart.
+Use `closeAndAwaitTermination()` to read the detached `CloseResult` after
+native and callback retirement.
+
 The lifecycle moves through CONNECTING, CONNECTED when the local source is
 open, CLOSING while draining, and CLOSED after clean EOF and retirement.
 Unavailable/nonregular input or an I/O error reports `TAPE_IO_FAILURE`.
@@ -72,7 +95,8 @@ Malformed input, unsupported profile, and capacity failures report
 `PROTOCOL_FAILURE`, `UNSUPPORTED_PROFILE`, or `RESOURCE_LIMIT`, respectively.
 A malformed suffix ends in FAILED after previously admitted work drains under
 the endpoint drain policy. A clean EOF completes in CLOSED after that drain.
-Use a fresh endpoint to play again.
+After CLOSED or FAILED, use a fresh endpoint to play again. Restart in this
+file profile always starts at byte zero. The profile offers no arbitrary seek.
 
 The local collector has a real file-source epoch. No TCP/DNS attempt, peer
 descriptor, wire subscription or peer acknowledgement exists for it. Native

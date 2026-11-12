@@ -349,7 +349,9 @@ values through ordinary subscriptions. EOF or explicit close fences these reads.
 pause. For twice normal speed, pass
 `{.playback = TapePlaybackPolicy::SOURCE_TIME, .speedPercent = 200}`. Use
 `endpoint->setTapePaused(true)` to hold intake and `setTapePaused(false)` to
-resume. Use a fresh endpoint for each playback.
+resume. While connected, `endpoint->restartTape()` reopens the same file at
+byte zero and keeps the subscriptions. `endpoint->stopTape()` requests a
+terminal drain. After terminal completion, create a fresh endpoint to play again.
 [Local tape formats, delivery and errors](../spec/protocol/FEED-TAPE-SOURCE.md).
 
 ## State observers
