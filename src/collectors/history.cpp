@@ -335,9 +335,13 @@ struct HistoryCollector::Impl {
         std::optional<Selection> offer;                 ///< Current prepared offer.
     };
 
-    core::LocalSchema schema;                     ///< Immutable local declarations and provenance.
-    HistoryLimits limits;                         ///< Finite requested capacities.
-    HistoryOptions options;                       ///< Explicit retention/scheduling.
+    core::LocalSchema schema;                                   ///< Immutable local declarations and provenance.
+    HistoryLimits limits;                                       ///< Finite requested capacities.
+    std::size_t retrievalQuantum;                               ///< Explicit global-snapshot/local-update balance.
+    std::size_t partitionSnapshotQuantum;                       ///< Explicit per-partition snapshot rotation.
+    core::SubscriptionSelectorPolicy selectorPolicy;            ///< Immutable exact symbol domain.
+    bool storeEverything;                                       ///< Explicit retention policy.
+    std::unique_ptr<const unsigned char[]> retransmitSnapshots; ///< Optional immutable flag per exact local ID.
     HistoryIdentity *identity;                    ///< Fixed detached marker; no protocol owner reaches it.
     Bank banks[2];                                ///< Published and scratch fixed metadata.
     std::size_t published = 0;                    ///< Active bank.
@@ -368,7 +372,9 @@ struct HistoryCollector::Impl {
      */
     Impl(core::LocalSchema &&sourceSchema, HistoryLimits configured, HistoryOptions selected,
          HistoryIdentity *marker) noexcept
-        : schema(std::move(sourceSchema)), limits(configured), options(selected), identity(marker) {
+        : schema(std::move(sourceSchema)), limits(configured), retrievalQuantum(selected.retrievalQuantum),
+          partitionSnapshotQuantum(selected.partitionSnapshotQuantum), selectorPolicy(selected.selectorPolicy),
+          storeEverything(selected.storeEverything), identity(marker) {
     }
 
     /** Clear all borrowed references before serialized source-owner fallback release. */
@@ -788,7 +794,7 @@ struct HistoryCollector::Impl {
             }
 
             m.queueOrder = ++vm.nextOrder;
-            m.snapshotRemaining = options.partitionSnapshotQuantum;
+            m.snapshotRemaining = partitionSnapshotQuantum;
         }
 
         m.queued = ready;
@@ -1091,7 +1097,7 @@ struct HistoryCollector::Impl {
      * @param b Candidate bank.
      */
     void trim(Bank &b) noexcept {
-        if (options.storeEverything) {
+        if (storeEverything) {
             return;
         }
 
@@ -1248,7 +1254,8 @@ struct HistoryCollector::Impl {
      */
     void process(Bank &b, const protocol::LiveRecordView &r, std::uint64_t generation, std::size_t ordinal,
                  std::size_t inputBytes, HistoryWork &work, HistoryStage &result) {
-        const auto &declaration = schema.records()[static_cast<std::size_t>(r.localId)];
+        const auto recordIndex = static_cast<std::size_t>(r.localId);
+        const auto &declaration = schema.records()[recordIndex];
 
         if (!declaration.indexedTimeLayout) {
             ++result.ignoredRecords;
@@ -1258,7 +1265,7 @@ struct HistoryCollector::Impl {
 
         auto k = find(b, r.localId, r.symbol);
 
-        if (!options.storeEverything && (k == NONE || !interested(b, k))) {
+        if (!storeEverything && (k == NONE || !interested(b, k))) {
             ++result.ignoredRecords;
 
             return;
@@ -1279,12 +1286,12 @@ struct HistoryCollector::Impl {
         const auto total = minimum(b, k);
         const HistorySourceMetadata metadata{r.senderId, r.cipher, flags, t, generation, r.fieldTime};
         p.trigger = metadata;
-        bool sendSnapshot = false;
+        const bool sendSnapshot =
+            (flags & (BEGIN | MODE)) != 0 && (!p.mode || (retransmitSnapshots && retransmitSnapshots[recordIndex]));
 
-        if ((flags & (BEGIN | MODE)) != 0 && !p.mode) {
+        if (sendSnapshot) {
             p.mode = true;
             p.began = true;
-            sendSnapshot = true;
         }
 
         bool txEnd = p.explicitTx && (flags & TX) == 0 && !p.sweepTx;
@@ -1346,7 +1353,7 @@ struct HistoryCollector::Impl {
             }
         }
 
-        const auto trimTo = p.mode && !p.began && !p.ended ? p.ever : (options.storeEverything ? LOW : total);
+        const auto trimTo = p.mode && !p.began && !p.ended ? p.ever : (storeEverything ? LOW : total);
         const auto previous = p.frontier;
         const auto trimmed = std::max(t, trimTo);
         bool updatedEver = false;
@@ -1486,10 +1493,10 @@ struct HistoryCollector::Impl {
         }
 
         Selection s;
-        s.balance = first == NONE ? options.retrievalQuantum : balance;
+        s.balance = first == NONE ? retrievalQuantum : balance;
         s.serial = serial;
 
-        if (local && (first == NONE || balance >= options.retrievalQuantum)) {
+        if (local && (first == NONE || balance >= retrievalQuantum)) {
             const auto &p = b.pending[v * limits.pendingItems];
             s.local = true;
             s.part = part(b, v, p.partition);
@@ -1815,6 +1822,30 @@ HistoryCollector::create(core::LocalSchema &&schema, HistoryLimits limits, Histo
         }
 
         const auto error = HistoryError::INVALID_CONFIGURATION;
+        const auto retransmitIds = options.retransmitSnapshotRecords;
+
+        if (retransmitIds.size() > schema.records().size()) {
+            throw error;
+        }
+
+        const auto retransmitSlots = retransmitIds.empty() ? 0 : schema.records().size();
+
+        if (retransmitSlots) {
+            spend(work, 0,
+                  sum(retransmitIds.size(), product(retransmitIds.size(), retransmitIds.size(), error), error));
+
+            for (std::size_t n = 0; n < retransmitIds.size(); ++n) {
+                const auto id = retransmitIds[n];
+                const auto earlier = retransmitIds.first(n);
+
+                if (id < 0 || static_cast<std::size_t>(id) >= schema.records().size() ||
+                    !schema.records()[static_cast<std::size_t>(id)].indexedTimeLayout ||
+                    std::ranges::find(earlier, id) != earlier.end()) {
+                    throw error;
+                }
+            }
+        }
+
         const auto slots =
             sum(sum(limits.cacheFrames, product(limits.viewSlots, limits.pendingFrames, error), error), 1, error);
         const auto cursors = product(limits.viewSlots, limits.viewSubscriptions.entries, error);
@@ -1851,9 +1882,21 @@ HistoryCollector::create(core::LocalSchema &&schema, HistoryLimits limits, Histo
         requestedFixed = sum(requestedFixed, product(limits.viewSlots, sizeof(Impl::View), error), error);
         requestedFixed = sum(requestedFixed, sum(slots, 1, error), error);
         requestedFixed = sum(requestedFixed, product(scratch, sizeof(HistoryFieldValueView), error), error);
+        requestedFixed = sum(requestedFixed, retransmitSlots, error);
 
         if (requestedFixed > limits.residentBytes || reserveBytes > limits.residentBytes - requestedFixed) {
             throw HistoryError::RESOURCE_LIMIT;
+        }
+
+        std::unique_ptr<unsigned char[]> retransmit;
+
+        if (retransmitSlots) {
+            spend(work, 0, sum(retransmitSlots, retransmitIds.size(), error), 0, retransmitSlots);
+            retransmit = std::make_unique<unsigned char[]>(retransmitSlots);
+
+            for (const auto id : retransmitIds) {
+                retransmit[static_cast<std::size_t>(id)] = 1;
+            }
         }
 
         Impl::Bank allocated[2];
@@ -1887,6 +1930,7 @@ HistoryCollector::create(core::LocalSchema &&schema, HistoryLimits limits, Histo
         fixed = sum(fixed, product(views.capacity(), sizeof(Impl::View), error), error);
         fixed = sum(fixed, marks.capacity(), error);
         fixed = sum(fixed, product(fields.capacity(), sizeof(HistoryFieldValueView), error), error);
+        fixed = sum(fixed, retransmitSlots, error);
 
         if (fixed > limits.residentBytes || reserveBytes > limits.residentBytes - fixed) {
             throw HistoryError::RESOURCE_LIMIT;
@@ -1901,6 +1945,7 @@ HistoryCollector::create(core::LocalSchema &&schema, HistoryLimits limits, Histo
         owned->views = std::move(views);
         owned->marks = std::move(marks);
         owned->fields = std::move(fields);
+        owned->retransmitSnapshots = std::move(retransmit);
         owned->maxFields = maxFields;
         owned->fixed = fixed;
 
@@ -1942,7 +1987,7 @@ std::expected<HistoryViewToken, HistoryFailure> HistoryCollector::openView(Histo
         }
 
         auto desired = core::SubscriptionState::create(s.schema, core::SubscriptionFamily::HISTORY,
-                                                       s.limits.viewSubscriptions, s.options.selectorPolicy);
+                                                       s.limits.viewSubscriptions, s.selectorPolicy);
 
         if (!desired) {
             return std::unexpected(HistoryFailure{HistoryError::CORE_REJECTED, desired.error()});
@@ -2132,7 +2177,7 @@ std::expected<HistoryStage, HistoryFailure> HistoryCollector::stage(protocol::Li
             throw HistoryError::INVALID_EPOCH;
         }
 
-        if (s.options.selectorPolicy != core::SubscriptionSelectorPolicy::EXACT_ONLY) {
+        if (s.selectorPolicy != core::SubscriptionSelectorPolicy::EXACT_ONLY) {
             // Guard arithmetic/work/domain failures return before the outer RESOURCE_LIMIT->STALE path.
             try {
                 const auto records = event.records().size();
@@ -2158,6 +2203,11 @@ std::expected<HistoryStage, HistoryFailure> HistoryCollector::stage(protocol::Li
                                                                     sum(sum(s.frames.size(), h), 4)))),
                         sum(s.maxFields, 8))));
         spend(work, 0, product(event.records().size(), rowCost));
+
+        if (s.retransmitSnapshots) {
+            spend(work, 0, event.records().size());
+        }
+
         std::size_t text = 0;
 
         for (const auto &r : event.records()) {
@@ -2360,7 +2410,7 @@ std::expected<void, HistoryFailure> HistoryCollector::pop(const HistoryViewToken
                 }
 
                 m.queueOrder = ++vm.nextOrder;
-                m.snapshotRemaining = s.options.partitionSnapshotQuantum;
+                m.snapshotRemaining = s.partitionSnapshotQuantum;
             }
         }
 

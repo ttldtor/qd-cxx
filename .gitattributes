@@ -878,3 +878,9 @@ tests/fixtures/option-sale/**/*.qtp -text -whitespace
 tests/fixtures/option-sale/**/*.tsv -text -whitespace
 tests/fixtures/option-sale/*.json text eol=lf
 tools/upstream/option-sale-oracle/*.java text eol=lf
+
+# Preserve exact Java sale lifecycle captures and generator sources.
+tools/upstream/sale-lifecycle-oracle/*.java text eol=lf
+tests/fixtures/sale-lifecycle/**/*.qtp -text -whitespace
+tests/fixtures/sale-lifecycle/**/*.tsv -text -whitespace
+tests/fixtures/sale-lifecycle/*.json text eol=lf

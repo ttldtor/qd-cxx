@@ -1,0 +1,47 @@
+schema	OptionSale	true	21	1
+bounds	0	2
+demand	demand-initial	1	OptionSale	IBM	0
+count	demand-initial	1
+input	begin	-1	-1	3000	0	0	4	4294967295
+input	partial	2	2	2000	0	0	0	2
+output	low-partial	1	4294967295	4	-1	12884901888	3000	0	0	4629207835727626240	0
+output	low-partial	2	2	0	2	8589934592	2000	0	0	4626393085960519680	0
+count	low-partial	2
+output	high-covered	1	4294967295	4	-1	12884901888	3000	0	0	4629207835727626240	0
+output	high-covered	2	2	8	2	8589934592	2000	0	0	4626393085960519680	0
+count	high-covered	2
+input	end	0	0	0	0	0	10	0
+output	low-completed	1	0	10	0	0	0	0	0	9221120237041090560	0
+count	low-completed	1
+count	high-after-end	0
+input	correction-pending	2	2	2000	1	1	1	2
+output	low-correction-pending	1	2	1	2	8589934593	2000	1	1	4626674560937230336	0
+count	low-correction-pending	1
+input	cancel-committed	2	2	2000	1	2	0	2
+output	low-cancel-committed	1	2	0	2	8589934593	2000	1	2	4626956035913940992	0
+count	low-cancel-committed	1
+input	remove	2	2	2000	1	0	2	2
+output	low-indexed-removal	1	2	2	2	8589934593	2000	1	0	0	0
+count	low-indexed-removal	1
+input	restart	-1	-1	3000	2	0	4	4294967295
+output	low-restarted	1	4294967295	5	-1	12884901890	3000	2	0	4629489310704336896	0
+count	low-restarted	1
+output	high-restarted	1	4294967295	5	-1	12884901890	3000	2	0	4629489310704336896	0
+count	high-restarted	1
+input	snip	2	2	2000	0	0	16	2
+output	low-truncated	1	2	16	2	8589934592	2000	0	0	4627237510890651648	0
+count	low-truncated	1
+output	high-truncated	1	2	8	2	8589934592	2000	0	0	4627237510890651648	0
+count	high-truncated	1
+output	reattached-agent	1	4294967295	4	-1	12884901890	3000	2	0	4629489310704336896	0
+output	reattached-agent	2	2	16	2	8589934592	2000	0	0	4627237510890651648	0
+count	reattached-agent	2
+demand	fresh-demand	1	OptionSale	IBM	0
+count	fresh-demand	1
+count	fresh-collector-before-data	0
+input	fresh-begin	-1	-1	3000	4	0	4	4294967295
+output	fresh-partial	1	4294967295	4	-1	12884901892	3000	4	0	4632409613587709952	0
+count	fresh-partial	1
+input	fresh-end	0	0	0	0	0	10	0
+output	fresh-completed	1	0	10	0	0	0	0	0	9221120237041090560	0
+count	fresh-completed	1

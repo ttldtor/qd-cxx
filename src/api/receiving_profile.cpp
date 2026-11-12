@@ -440,6 +440,10 @@ void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, s
                     profile.schema.recordContext(registration.localRecordId), registration.localRecordId, *version};
             }
 
+            if (registration.type == EventType::OPTION_SALE) {
+                profile.snapshotRetransmitRecords[profile.snapshotRetransmitCount++] = registration.localRecordId;
+            }
+
             profile.boundKinds |= 1U << kind;
             profile.bindings.push_back(
                 {registration.localRecordId, static_cast<client::PreparedEventKind>(registration.type),
@@ -945,7 +949,7 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
     routing.retainedMetadataBytes =
         add(add(add(add(sizeof(result.bindingExchanges), sizeof(result.bindingSources)),
                     sizeof(result.bindingTimeEncodings)),
-                sizeof(result.versionBindings)),
+                add(sizeof(result.versionBindings), sizeof(result.snapshotRetransmitRecords))),
             add(multiply(result.eventPlans.capacity(), sizeof(ReceivingEventPlan)),
                 sizeof(std::array<client::PreparedSubscriptionBinding, MAXIMUM_RECEIVING_BINDINGS>)));
 
@@ -1282,9 +1286,11 @@ std::expected<mux::MuxQueue, mux::QueueFailure> createReceivingQueue(const Recei
     }
 
     if (profile.family == core::SubscriptionFamily::HISTORY) {
-        return mux::MuxQueue::createHistory(profile.schema, profile.interests, profile.historyLimits,
-                                            {false, 100, 10000, profile.recoveryOptions.selectors}, profile.queueLimits,
-                                            work);
+        return mux::MuxQueue::createHistory(
+            profile.schema, profile.interests, profile.historyLimits,
+            {false, 100, 10000, profile.recoveryOptions.selectors,
+             std::span(profile.snapshotRetransmitRecords).first(profile.snapshotRetransmitCount)},
+            profile.queueLimits, work);
     }
 
     return mux::MuxQueue::createStream(profile.schema, profile.interests, profile.endpoint.settings().budgets.desired,

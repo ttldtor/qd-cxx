@@ -86,8 +86,10 @@ struct ReceivingProfile {
     ///< Explicit verified mapper policies; existing non-time-series bindings retain INDEX_DOMAIN.
     std::array<collectors::TickerVersionBinding, MAXIMUM_RECEIVING_RECORDS> versionBindings{};
     std::size_t versionBindingCount = 0; ///< Explicit schema-bound TICKER version gates.
-    ReceivingRoutingLimits routing;      ///< Explicit additional routing workspace and pre-allocation work charge.
-    unsigned boundKinds = 0;             ///< Native event-type bits actually used by this endpoint's bindings.
+    std::array<std::int32_t, MAXIMUM_RECEIVING_RECORDS> snapshotRetransmitRecords{};
+    std::size_t snapshotRetransmitCount = 0; ///< Unconflated HISTORY records that replay each source snapshot.
+    ReceivingRoutingLimits routing;          ///< Explicit additional routing workspace and pre-allocation work charge.
+    unsigned boundKinds = 0;                 ///< Native event-type bits actually used by this endpoint's bindings.
     std::vector<ReceivingEventPlan> eventPlans;
     ///< Prepaid plans indexed by dense subsets of boundKinds, including the empty subset.
     mux::QueueSubmitWork submitWork;         ///< One whole desired replacement admission.

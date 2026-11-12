@@ -1148,6 +1148,19 @@ if(BUILD_TESTING)
             add_test(NAME candle_feed COMMAND qdcxx_candle_feed_tests)
             set_tests_properties(candle_feed PROPERTIES TIMEOUT 45)
 
+            add_executable(qdcxx_sale_lifecycle_feed_tests tests/conformance/sale_lifecycle_feed_tests.cpp
+                tests/conformance/recovery_test_peer.cpp)
+            target_link_libraries(qdcxx_sale_lifecycle_feed_tests PRIVATE qdcxx_feed doctest::doctest)
+            target_compile_definitions(qdcxx_sale_lifecycle_feed_tests PRIVATE
+                QDCXX_SALE_LIFECYCLE_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/sale-lifecycle")
+            set_target_properties(qdcxx_sale_lifecycle_feed_tests PROPERTIES CXX_EXTENSIONS OFF)
+            if(WIN32)
+                target_compile_definitions(qdcxx_sale_lifecycle_feed_tests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+                target_link_libraries(qdcxx_sale_lifecycle_feed_tests PRIVATE ws2_32)
+            endif()
+            add_test(NAME sale_lifecycle_feed COMMAND qdcxx_sale_lifecycle_feed_tests)
+            set_tests_properties(sale_lifecycle_feed PROPERTIES TIMEOUT 90)
+
             add_executable(qdcxx_event_registry_tests tests/conformance/event_registry_tests.cpp)
             target_include_directories(qdcxx_event_registry_tests PRIVATE src/api)
             target_link_libraries(qdcxx_event_registry_tests PRIVATE qdcxx_feed doctest::doctest)
