@@ -40,3 +40,5 @@ The [serialized attachment oracle](attachment-oracle/README.md) witnesses real M
 
 - [Time-series query oracle](time-series-query-oracle/README.md): time/index bounds and Java list ordering.
 - [NuamTimeAndSale oracle](nuam-time-and-sale-oracle/README.md): indexed sale observations and native QTP.
+
+- [NuamOrder oracle](nuam-order-oracle/README.md): indexed source, flag and matching-engine observations.

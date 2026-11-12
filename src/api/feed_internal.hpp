@@ -42,8 +42,9 @@ using ListenerFunction =
                  Subscription<events::TheoPrice>::Listener, Subscription<events::Candle>::Listener,
                  Subscription<events::TimeAndSale>::Listener, Subscription<events::OptionSale>::Listener,
                  Subscription<events::NuamTrade>::Listener, Subscription<events::NuamTimeAndSale>::Listener,
-                 Subscription<RegisteredEvent>::Listener, Endpoint::StateChangeListener,
-                 Subscription<events::Quote>::StateChangeListener, SubscriptionChangeListener>;
+                 Subscription<events::NuamOrder>::Listener, Subscription<RegisteredEvent>::Listener,
+                 Endpoint::StateChangeListener, Subscription<events::Quote>::StateChangeListener,
+                 SubscriptionChangeListener>;
 
 /** Shared application callable; its last release never occurs under a control mutex. */
 struct ListenerBox {

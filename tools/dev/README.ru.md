@@ -380,3 +380,5 @@ class/resource inventories.
 
 - [Генератор границ временного ряда](../upstream/time-series-query-oracle/README.ru.md) работает офлайн и содержит справку на двух языках.
 - [Генератор NuamTimeAndSale](../upstream/nuam-time-and-sale-oracle/README.ru.md) записывает индексированные сделки; справка доступна без входных данных.
+
+- [Генератор NuamOrder](../upstream/nuam-order-oracle/README.ru.md) записывает индексированные заявки офлайн; справка доступна на двух языках.
