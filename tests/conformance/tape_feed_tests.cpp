@@ -138,21 +138,38 @@ TEST_CASE("real RAW tape routes IBM Quote through ordinary STREAM and TICKER sub
     for (const auto contract : {api::DeliveryContract::STREAM, api::DeliveryContract::TICKER}) {
         CAPTURE(contract);
         std::vector<q::events::Quote> received;
+        std::optional<q::events::Quote> latest;
+        bool observedLatestWhileClosing = false;
         std::optional<std::uint64_t> observedSourceEpoch;
         api::ApiRuntime runtime(runtimeOptions());
         api::EndpointOptions options;
         options.contract = contract;
         const auto endpoint = runtime.createEndpoint(options);
-        const auto subscription = endpoint->getFeed()->createSubscription<q::events::Quote>();
+        const auto feed = endpoint->getFeed();
+        const auto subscription = feed->createSubscription<q::events::Quote>();
         subscription->addSymbols("IBM");
-        subscription->addEventListener(
-            [&received, &observedSourceEpoch, weak = std::weak_ptr(subscription)](auto batch) {
-                received.insert(received.end(), batch.begin(), batch.end());
+        subscription->addEventListener([&received, &latest, &observedLatestWhileClosing, &observedSourceEpoch,
+                                        weak = std::weak_ptr(subscription), weakFeed = std::weak_ptr(feed),
+                                        weakEndpoint = std::weak_ptr(endpoint)](auto batch) {
+            received.insert(received.end(), batch.begin(), batch.end());
 
-                if (const auto owner = weak.lock()) {
-                    observedSourceEpoch = owner->getStatistics().sourceEpoch;
+            const auto active = weakEndpoint.lock();
+            const auto attachedFeed = weakFeed.lock();
+
+            if (active && attachedFeed) {
+                auto value = attachedFeed->getLastEventIfSubscribed<q::events::Quote>("IBM");
+
+                if (active->getState() == api::EndpointState::CONNECTED) {
+                    latest = std::move(value);
+                } else {
+                    observedLatestWhileClosing = observedLatestWhileClosing || value.has_value();
                 }
-            });
+            }
+
+            if (const auto owner = weak.lock()) {
+                observedSourceEpoch = owner->getStatistics().sourceEpoch;
+            }
+        });
         endpoint->connectTape(RAW_QUOTE);
         expectCleanEof(endpoint);
 
@@ -167,8 +184,16 @@ TEST_CASE("real RAW tape routes IBM Quote through ordinary STREAM and TICKER sub
             REQUIRE(received.size() == 2);
             CHECK(received.front().bidPrice.raw == 2566530);
             CHECK(received.front().eventTime == 1600000000123);
+            CHECK_FALSE(latest);
+        } else {
+            REQUIRE(latest);
+            CHECK(latest->symbol == u"IBM");
+            CHECK(latest->bidPrice.raw == received.front().bidPrice.raw);
+            CHECK(latest->eventTime == received.front().eventTime);
         }
 
+        CHECK_FALSE(observedLatestWhileClosing);
+        CHECK_FALSE(feed->getLastEventIfSubscribed<q::events::Quote>("IBM"));
         CHECK(subscription->getStatistics().final);
         CHECK(observedSourceEpoch == 1);
         CHECK_FALSE(subscription->getStatistics().sourceEpoch);

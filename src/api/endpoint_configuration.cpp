@@ -23,7 +23,7 @@ constexpr std::size_t MAXIMUM_ROUTE_BYTES =
 constexpr std::size_t MAXIMUM_LABEL_BYTES = 128; ///< Local diagnostic label, never a connector/thread name alias.
 constexpr unsigned char FIRST_ASCII = 0x20;
 constexpr unsigned char LAST_ASCII = 0x7e;
-constexpr std::array<std::string_view, 13> KEYS{"qdcxx.name",
+constexpr std::array<std::string_view, 14> KEYS{"qdcxx.name",
                                                 "dxfeed.wildcard.enable",
                                                 "qdcxx.connectTimeoutMillis",
                                                 "qdcxx.dnsTimeoutMillis",
@@ -34,6 +34,7 @@ constexpr std::array<std::string_view, 13> KEYS{"qdcxx.name",
                                                 "qdcxx.drainTimeoutMillis",
                                                 "qdcxx.maximumAttempts",
                                                 "qdcxx.deliveryContract",
+                                                "dxfeed.aggregationPeriod",
                                                 "dxfeed.requestedAggregationPeriod",
                                                 "dxfeed.address"};
 
@@ -49,6 +50,7 @@ enum Key : std::size_t {
     DRAIN,
     ATTEMPTS,
     CONTRACT,
+    AGGREGATION,
     REQUESTED,
     ADDRESS
 };
@@ -246,6 +248,7 @@ std::array<std::string, ADDRESS> values(const EndpointOptions &options, const st
             options.contract == DeliveryContract::STREAM    ? "stream"
             : options.contract == DeliveryContract::HISTORY ? "history"
                                                             : "ticker",
+            detail::aggregationPropertyValue(options.aggregationPeriod),
             detail::aggregationPropertyValue(options.requestedAggregationPeriod)};
 }
 } // namespace
@@ -263,6 +266,9 @@ std::string aggregationPropertyValue(std::optional<std::chrono::milliseconds> pe
 }
 
 void validateEndpointOptions(const EndpointOptions &options) {
+    if (options.aggregationPeriod.count() < 0 || options.aggregationPeriod > MAXIMUM_LOCAL_AGGREGATION_PERIOD)
+        reject(ErrorCode::INVALID_ARGUMENT, "endpoint-local-aggregation-period");
+
     if (options.requestedAggregationPeriod &&
         (options.requestedAggregationPeriod->count() < 0 ||
          *options.requestedAggregationPeriod > transport::MAXIMUM_REQUESTED_AGGREGATION_PERIOD))
@@ -388,6 +394,13 @@ EndpointConfiguration EndpointConfiguration::create(const EndpointOptions &fallb
                     options.contract = DeliveryContract::HISTORY;
                 else
                     reject(ErrorCode::INVALID_ARGUMENT, "endpoint-property-value");
+            } else if (key == AGGREGATION) {
+                const auto parsed = org::ttldtor::qdcxx::detail::parseQdTimePeriod(text);
+
+                if (!parsed || *parsed > MAXIMUM_LOCAL_AGGREGATION_PERIOD)
+                    reject(ErrorCode::INVALID_ARGUMENT, "endpoint-local-aggregation-period");
+
+                options.aggregationPeriod = *parsed;
             } else if (key == REQUESTED) {
                 if (text.empty() && selected[key].origin == EndpointPropertyOrigin::ADDRESS_PROPERTIES)
                     options.requestedAggregationPeriod.reset();

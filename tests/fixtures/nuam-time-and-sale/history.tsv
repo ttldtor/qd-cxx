@@ -1,0 +1,66 @@
+record	121	NuamTimeAndSale	true
+int-field	0	56	Time	Time
+int-field	1	72	Sequence	Sequence
+int-field	2	2	Exchange	ExchangeCode
+int-field	3	104	TradeId	TradeId
+int-field	4	0	TradeId$VoidTail	TradeId$VoidTail
+int-field	5	120	Price	Price
+int-field	6	0	Price$VoidTail	Price$VoidTail
+int-field	7	120	Size	Size
+int-field	8	0	Size$VoidTail	Size$VoidTail
+int-field	9	120	Bid.Price	BidPrice
+int-field	10	0	Bid.Price$VoidTail	BidPrice$VoidTail
+int-field	11	120	Ask.Price	AskPrice
+int-field	12	0	Ask.Price$VoidTail	AskPrice$VoidTail
+int-field	13	40	ExchangeSaleConditions	SaleConditions
+int-field	14	8	Flags	Flags
+int-field	15	104	MatchId	MatchId
+int-field	16	0	MatchId$VoidTail	MatchId$VoidTail
+event	0	AAPL	7200	4	0	8594128898	2001	2001000000	0	2	88	9007199254740993	4629207835727626240	4636772475726725120	100	4628996729495093248	4629454126332248064	AB	20828	81	2	true	true	true	0	true	false	false	<null>	<null>	9223372036854775800
+int	0	Time	2
+int	0	Sequence	4194306
+int	0	Exchange	88
+int	0	TradeId	9007199254740993
+int	0	Price	774530
+int	0	Size	2572930
+int	0	Bid.Price	755330
+int	0	Ask.Price	7968131
+int	0	ExchangeSaleConditions	16706
+int	0	Flags	20828
+int	0	MatchId	9223372036854775800
+event	1	AAPL	0	1	0	4315938823	1005	1005000000	0	7	88	9007199254740994	-4609152743636992000	4612248968380809216	2	4628996729495093248	4629454126332248064	<null>	16677	65	1	false	false	true	1	false	true	false	<null>	<null>	9223372036854775801
+int	1	Time	1
+int	1	Sequence	20971527
+int	1	Exchange	88
+int	1	TradeId	9007199254740994
+int	1	Price	-799869
+int	1	Size	57730
+int	1	Bid.Price	755330
+int	1	Ask.Price	7968131
+int	1	ExchangeSaleConditions	0
+int	1	Flags	16677
+int	1	MatchId	9223372036854775801
+event	2	AAPL	0	3	0	2097152003	500	500000000	0	3	0	0	9221120237041090560	9221120237041090560	0	9221120237041090560	9221120237041090560	<null>	0	0	0	false	false	false	0	true	false	false	<null>	<null>	0
+int	2	Time	0
+int	2	Sequence	2097152003
+int	2	Exchange	0
+int	2	TradeId	0
+int	2	Price	0
+int	2	Size	0
+int	2	Bid.Price	0
+int	2	Ask.Price	0
+int	2	ExchangeSaleConditions	0
+int	2	Flags	0
+int	2	MatchId	0
+event	3	AAPL	0	10	0	0	0	0	0	0	0	0	9221120237041090560	9221120237041090560	0	9221120237041090560	9221120237041090560	<null>	0	0	0	false	false	false	0	true	false	false	<null>	<null>	0
+int	3	Time	0
+int	3	Sequence	0
+int	3	Exchange	0
+int	3	TradeId	0
+int	3	Price	0
+int	3	Size	0
+int	3	Bid.Price	0
+int	3	Ask.Price	0
+int	3	ExchangeSaleConditions	0
+int	3	Flags	0
+int	3	MatchId	0
