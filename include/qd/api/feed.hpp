@@ -55,6 +55,7 @@ struct EndpointConfigurationSnapshot;
 namespace detail {
 struct RuntimeImpl;
 struct EndpointPort;
+struct LatestEventRequestState;
 struct SubscriptionPort;
 } // namespace detail
 
@@ -79,7 +80,9 @@ enum class ErrorCode {
     EXECUTOR_FAILURE,    ///< Host post threw before completion.
     EXECUTOR_DROPPED,    ///< Accepted task was destroyed without running.
     EXECUTOR_CONTRACT,   ///< Host refused or threw after actual execution began.
-    CALLBACK_CANCELLED   ///< Queued event selection cancelled by close or source reset; advisory.
+    CALLBACK_CANCELLED,  ///< Queued event selection cancelled by close or source reset; advisory.
+    REQUEST_CANCELLED,   ///< A one-event request was cancelled or its accepted source epoch changed.
+    REQUEST_TIMED_OUT    ///< A one-event request reached its absolute completion deadline.
 };
 
 /** Static/numeric failure snapshot, independent of runtime and native owners. */
@@ -234,6 +237,65 @@ using RegisteredEvent =
                  events::SpreadOrder, events::AnalyticOrder, events::OtcMarketsOrder, events::OrderImbalance,
                  events::Series, events::Greeks, events::Underlying, events::TheoPrice, events::Candle,
                  events::TimeAndSale, events::OptionSale, events::NuamTrade>;
+
+namespace detail {
+[[nodiscard]] bool latestEventRequestDone(const std::shared_ptr<LatestEventRequestState> &state) noexcept;
+bool cancelLatestEventRequest(const std::shared_ptr<LatestEventRequestState> &state) noexcept;
+[[nodiscard]] RegisteredEvent awaitLatestEventRequest(const std::shared_ptr<LatestEventRequestState> &state);
+} // namespace detail
+
+/** Move-only ownership of one pending or completed latest-event request.
+ * Destruction or replacement cancels a pending request. Concurrent operations require the same live handle.
+ * @tparam Event Owning LastingEvent type returned by the request.
+ */
+template <class Event> class LatestEventRequest final {
+    std::shared_ptr<detail::LatestEventRequestState> state_;
+    friend class Feed;
+
+    explicit LatestEventRequest(std::shared_ptr<detail::LatestEventRequestState> state) noexcept
+        : state_(std::move(state)) {
+    }
+
+    public:
+    /** Transfer sole cancellation ownership without changing the request. */
+    LatestEventRequest(LatestEventRequest &&) noexcept = default;
+
+    /** Cancel the current pending request and take ownership of the supplied handle.
+     * @param other Handle to transfer.
+     * @return This handle.
+     */
+    LatestEventRequest &operator=(LatestEventRequest &&other) noexcept {
+        if (this != &other) {
+            cancel();
+            state_ = std::move(other.state_);
+        }
+
+        return *this;
+    }
+
+    /** Cancel any pending request and release its detached result storage. */
+    ~LatestEventRequest() {
+        cancel();
+    }
+
+    /** @return Whether this live request has reached any terminal outcome. */
+    [[nodiscard]] bool isDone() const noexcept {
+        return detail::latestEventRequestDone(state_);
+    }
+
+    /** @return True only if this call won terminal completion by cancellation. */
+    bool cancel() const noexcept {
+        return detail::cancelLatestEventRequest(state_);
+    }
+
+    /** Wait until data, failure, cancellation or the admitted absolute deadline.
+     * @return Independently owned result. A completed result can be read repeatedly.
+     * @throws Error The terminal diagnostic, or WRONG_THREAD for a pending wait on its runtime owner.
+     */
+    [[nodiscard]] Event await() const {
+        return std::get<Event>(detail::awaitLatestEventRequest(state_));
+    }
+};
 
 /** Independently owned observation of one complete accepted local subscription revision. */
 struct SubscriptionSnapshot {
@@ -546,6 +608,7 @@ extern template class Subscription<RegisteredEvent>;
 class Feed final {
     std::shared_ptr<detail::EndpointPort> port_;
     friend class Endpoint;
+    friend struct detail::RuntimeImpl;
     explicit Feed(std::shared_ptr<detail::EndpointPort> port);
     /** Preserve the existing single-class listener shape while selecting that class's registered routes.
      * @param type Existing supported projection.
@@ -575,6 +638,13 @@ class Feed final {
      * @return Detached retained/default value or absence.
      */
     [[nodiscard]] std::optional<RegisteredEvent> readLastEvent(EventType type, std::string_view symbol) const;
+
+    [[nodiscard]] std::shared_ptr<detail::LatestEventRequestState>
+    startLatestEventRequest(EventType type, std::u16string_view symbol,
+                            std::chrono::steady_clock::time_point deadline) const;
+    [[nodiscard]] std::shared_ptr<detail::LatestEventRequestState>
+    startLatestEventRequest(EventType type, std::string_view symbol,
+                            std::chrono::steady_clock::time_point deadline) const;
 
     /** @tparam Event Supported owning native business type. @return Its immutable registration identity. */
     template <class Event> static constexpr EventType eventTypeFor() {
@@ -706,6 +776,47 @@ class Feed final {
         const auto text = symbol.getSymbol();
 
         return text ? getLastEventIfSubscribed<Event>(*text) : std::nullopt;
+    }
+
+    /** Request one real TICKER value. The runtime can open temporary exact demand on a cache miss.
+     * The endpoint connects only on explicit connect. One request per endpoint can be pending or retiring.
+     * @tparam Event Supported owning LastingEvent type.
+     * @param symbol Exact borrowed UTF-16 logical symbol, copied before admission.
+     * @param deadline Absolute steady-clock deadline for terminal completion.
+     * @return Move-only request with owning completion and explicit cancellation.
+     * @throws Error Invalid input or refused admission. Deferred failures are available from await().
+     */
+    template <class Event>
+    [[nodiscard]] LatestEventRequest<Event> requestLastEvent(std::u16string_view symbol,
+                                                             std::chrono::steady_clock::time_point deadline) const {
+        return LatestEventRequest<Event>(startLatestEventRequest(eventTypeFor<Event>(), symbol, deadline));
+    }
+
+    /** Request one real TICKER value using the same ASCII spelling as addSymbols.
+     * @tparam Event Supported owning LastingEvent type.
+     * @param symbol Exact borrowed ASCII logical symbol.
+     * @param deadline Absolute steady-clock deadline.
+     * @return Move-only request with owning completion and explicit cancellation.
+     * @throws Error Same refusals as the UTF-16 overload.
+     */
+    template <class Event>
+    [[nodiscard]] LatestEventRequest<Event> requestLastEvent(std::string_view symbol,
+                                                             std::chrono::steady_clock::time_point deadline) const {
+        return LatestEventRequest<Event>(startLatestEventRequest(eventTypeFor<Event>(), symbol, deadline));
+    }
+
+    /** Request one real TICKER Candle using its canonical symbol.
+     * @tparam Event The owning Candle type.
+     * @param symbol Parsed Candle symbol. Its spelling must be present.
+     * @param deadline Absolute steady-clock deadline.
+     * @return Move-only request with owning completion and explicit cancellation.
+     * @throws Error Same refusals as the UTF-16 overload.
+     */
+    template <class Event>
+        requires std::is_same_v<Event, events::Candle>
+    [[nodiscard]] LatestEventRequest<Event> requestLastEvent(const events::CandleSymbol &symbol,
+                                                             std::chrono::steady_clock::time_point deadline) const {
+        return requestLastEvent<Event>(symbol.getSymbol().value_or(std::u16string_view{}), deadline);
     }
 
     /** Create a bounded logical registration, before or after connect, without application polling.

@@ -603,12 +603,76 @@ void retireLatestRead(detail::EndpointPort &port) noexcept {
     }
 }
 
+/** Publish exactly one terminal outcome while holding the request mutex. */
+bool finishLatestRequest(detail::LatestEventRequestState &request, Diagnostic failure,
+                         std::optional<RegisteredEvent> result = std::nullopt) noexcept {
+    if (request.done)
+        return false;
+
+    request.failure = failure;
+    request.result = std::move(result);
+    request.done = true;
+    request.condition.notify_all();
+
+    return true;
+}
+
+/** Admit expiry before other terminal offers. */
+bool expireLatestRequest(detail::LatestEventRequestState &request) noexcept {
+    return std::chrono::steady_clock::now() >= request.deadline &&
+           finishLatestRequest(request, {ErrorCode::REQUEST_TIMED_OUT, "latest-event-request-deadline"});
+}
+
+/** Allow an initially offline request to bind only to the first subsequent explicit connection. */
+bool advanceLatestRequestEpoch(const detail::EndpointPort &port, detail::LatestEventRequestState &request) noexcept {
+    if (request.clearRevision != port.clearRevision)
+        return false;
+
+    if (request.connectionRevision == port.connectionRevision)
+        return true;
+
+    if (request.boundToSource || !port.connectionIntent || port.connectionRevision < request.connectionRevision ||
+        port.connectionRevision - request.connectionRevision != 1)
+        return false;
+
+    request.connectionRevision = port.connectionRevision;
+    request.boundToSource = true;
+
+    return true;
+}
+
+/** Complete an outstanding request before publishing endpoint retirement. */
+void retireLatestRequest(detail::EndpointPort &port, std::optional<Diagnostic> sourceFailure) noexcept {
+    std::shared_ptr<detail::LatestEventRequestState> request;
+    {
+        std::lock_guard endpointLock(port.mutex);
+        request = std::move(port.latestEventRequest);
+
+        if (!request)
+            return;
+
+        std::lock_guard requestLock(request->mutex);
+        auto failure = sourceFailure.value_or(Diagnostic{ErrorCode::CLOSED, "latest-event-request-closed"});
+
+        if (!advanceLatestRequestEpoch(port, *request))
+            failure = {ErrorCode::REQUEST_CANCELLED, "latest-event-request-source-change"};
+        else if ((sourceFailure || port.state == EndpointState::FAILED) && port.diagnostic.code != ErrorCode::NONE)
+            failure = port.diagnostic;
+
+        static_cast<void>(expireLatestRequest(*request));
+        static_cast<void>(finishLatestRequest(*request, failure));
+    }
+    request->demand.reset();
+}
+
 /** Retire all producer snapshots after the endpoint's native/receiver owners are gone.
  * @param port Detached endpoint.
  * @param result Actual detached local outcome.
+ * @param latestSourceFailure Actual terminal native cause for a still-pending latest-event request.
  * @return True only after every native, selected and producer-held callable capture has retired.
  */
-bool retireEndpoint(const std::shared_ptr<detail::EndpointPort> &port, CloseResult result) noexcept {
+bool retireEndpoint(const std::shared_ptr<detail::EndpointPort> &port, CloseResult result,
+                    std::optional<Diagnostic> latestSourceFailure = std::nullopt) noexcept {
     if (port->retired.load(std::memory_order_acquire)) {
         return true;
     }
@@ -623,6 +687,7 @@ bool retireEndpoint(const std::shared_ptr<detail::EndpointPort> &port, CloseResu
 
     RetirementGuard guard(port.get());
     retireLatestRead(*port);
+    retireLatestRequest(*port, latestSourceFailure);
     notifyConnecting(port);
     observeState(port, EndpointState::CLOSING);
 
@@ -2734,6 +2799,15 @@ constexpr unsigned LASTING_EVENT_TYPES =
     static_cast<unsigned>(EventSelection::UNDERLYING) | static_cast<unsigned>(EventSelection::THEO_PRICE) |
     static_cast<unsigned>(EventSelection::CANDLE) | static_cast<unsigned>(EventSelection::NUAM_TRADE);
 
+/** Check the native selector text before owning it or consulting the source. */
+void validateLatestSymbol(std::u16string_view symbol, std::size_t limit) {
+    if (symbol.empty() || symbol.size() > limit || symbol.front() == u'*' ||
+        !std::ranges::all_of(symbol, [](char16_t unit) {
+            return unit >= FIRST_PRINTABLE_ASCII && unit <= LAST_PRINTABLE_ASCII;
+        }))
+        reject(ErrorCode::INVALID_ARGUMENT, "latest-event-symbol");
+}
+
 /** Borrow this runtime's immutable native slot inventory for same-worker reads. */
 struct LatestEventOwner {
     const RuntimeControl *control = nullptr;
@@ -2981,6 +3055,114 @@ void completeLatestRead(EndpointPort &port, NativeEndpoint *endpoint,
             port.latestRead.reset();
     }
     request->condition.notify_one();
+}
+
+/** Advance the accepted source fence and settle already terminal conditions under both locks. */
+void checkLatestRequestFence(const EndpointPort &port, LatestEventRequestState &request) noexcept {
+    if (request.done || expireLatestRequest(request))
+        return;
+
+    if (!advanceLatestRequestEpoch(port, request))
+        finishLatestRequest(request, {ErrorCode::REQUEST_CANCELLED, "latest-event-request-source-change"});
+    else if (port.state == EndpointState::FAILED && port.diagnostic.code != ErrorCode::NONE)
+        finishLatestRequest(request, port.diagnostic);
+    else if (port.closeRequested.load(std::memory_order_acquire))
+        finishLatestRequest(request, {ErrorCode::CLOSED, "latest-event-request-closed"});
+}
+
+/** Confirm a selected result against producer lifecycle and request outcome before publication. */
+void publishLatestRequest(EndpointPort &port, LatestEventRequestState &request, Diagnostic failure,
+                          std::optional<RegisteredEvent> value) noexcept {
+    std::lock_guard endpointLock(port.mutex);
+    std::lock_guard requestLock(request.mutex);
+    checkLatestRequestFence(port, request);
+
+    if (failure.code != ErrorCode::NONE || value)
+        finishLatestRequest(request, failure, std::move(value));
+}
+
+/** Retain the charge until the worker has removed its temporary exact interest. */
+std::chrono::steady_clock::time_point
+retireCompletedLatestRequest(EndpointPort &port, const std::shared_ptr<LatestEventRequestState> &request) noexcept {
+    if (request->demand && !request->demand->retired.load(std::memory_order_acquire)) {
+        request->demand->closeRequested.store(true, std::memory_order_release);
+
+        return std::chrono::steady_clock::now() + port.options.pollInterval;
+    }
+
+    request->demand.reset();
+    std::lock_guard lock(port.mutex);
+
+    if (port.latestEventRequest == request)
+        port.latestEventRequest.reset();
+
+    return std::chrono::steady_clock::time_point::max();
+}
+
+/** Service one pending request without invoking application listeners for its completion. */
+template <class OpenDemand>
+std::chrono::steady_clock::time_point serviceLatestRequest(EndpointPort &port, NativeEndpoint *endpoint,
+                                                           const std::shared_ptr<LatestEventRequestState> &request,
+                                                           OpenDemand openDemand) noexcept {
+    bool done;
+    bool online;
+    {
+        std::lock_guard endpointLock(port.mutex);
+        std::lock_guard requestLock(request->mutex);
+        checkLatestRequestFence(port, *request);
+        done = request->done;
+        online = port.connectionIntent;
+    }
+
+    if (done)
+        return retireCompletedLatestRequest(port, request);
+
+    if (!endpoint)
+        return request->deadline;
+
+    Diagnostic failure;
+    std::optional<RegisteredEvent> value;
+
+    try {
+        producerAction([&] {
+            if (request->demand) {
+                std::lock_guard lock(request->demand->mutex);
+                failure = request->demand->diagnostic;
+            }
+
+            const auto source = endpoint->recovery->status();
+            const bool sourceActive = source.phase == transport::RecoveryPhase::ACTIVE;
+
+            if (failure.code != ErrorCode::NONE) {
+                // A pending desired ticket can be retired by source loss. Report the earlier source cause
+                // when the recovery owner has actually left its eligible phase.
+                if (!sourceActive && source.first.error != transport::RecoveryError::NONE) {
+                    std::lock_guard lock(port.mutex);
+                    failure =
+                        port.diagnostic.code == ErrorCode::NONE ? recoveryDiagnostic(source.first) : port.diagnostic;
+                }
+
+                return;
+            }
+
+            value = captureLatest(*endpoint, request->type, request->symbol, false);
+
+            if (!value && !request->demand && online && sourceActive)
+                openDemand();
+        });
+    } catch (const Error &error) {
+        failure = error.diagnostic();
+    } catch (...) {
+        failure = {ErrorCode::INVALID_STATE, "latest-event-request-observation"};
+    }
+
+    publishLatestRequest(port, *request, failure, std::move(value));
+    {
+        std::lock_guard lock(request->mutex);
+        done = request->done;
+    }
+
+    return done ? retireCompletedLatestRequest(port, request) : request->deadline;
 }
 
 /** Create one ordinary default event with independent symbol storage. */
@@ -3606,6 +3788,13 @@ void retireNative(std::unique_ptr<NativeEndpoint> &endpoint) noexcept {
     const auto port = endpoint->port;
     requestEndpointClose(port);
     const auto status = endpoint->recovery->status();
+    std::optional<Diagnostic> latestSourceFailure;
+
+    if (status.first.error != transport::RecoveryError::NONE &&
+        (status.phase == transport::RecoveryPhase::FAILED || status.phase == transport::RecoveryPhase::EXHAUSTED ||
+         (status.terminal && status.terminal->outcome == mux::TerminalOutcome::FAILED)))
+        latestSourceFailure = recoveryDiagnostic(status.first);
+
     auto result = closeResult(port, status);
     const auto statistics = transport::detail::TcpRecoveryFactory::retireStatistics(*endpoint->recovery);
     {
@@ -3614,7 +3803,7 @@ void retireNative(std::unique_ptr<NativeEndpoint> &endpoint) noexcept {
         port->statistics.observedAt = std::chrono::steady_clock::now();
     }
     endpoint.reset();
-    retireEndpoint(port, result);
+    retireEndpoint(port, result, latestSourceFailure);
 }
 } // namespace
 
@@ -3758,14 +3947,26 @@ void RuntimeImpl::run() noexcept {
 
                 bool connectRequested = false;
                 std::shared_ptr<LatestEventRead> latestRead;
+                std::shared_ptr<LatestEventRequestState> latestRequest;
                 {
                     std::lock_guard lock(port->mutex);
                     connectRequested = port->connectRequested && port->connectionIntent;
                     latestRead = port->latestRead;
+                    latestRequest = port->latestEventRequest;
                 }
 
                 if (latestRead)
                     completeLatestRead(*port, native[index].get(), latestRead);
+
+                if (latestRequest) {
+                    const auto requestWake = serviceLatestRequest(*port, native[index].get(), latestRequest, [&] {
+                        auto selector = SubscriptionSelector::plain(latestRequest->symbol);
+                        Feed feed(port);
+                        latestRequest->demand = feed.createSubscriptionPort(latestRequest->type);
+                        mutateSelectors(latestRequest->demand, std::span(&selector, 1), SymbolMutation::ADD);
+                    });
+                    nextWake = std::min(nextWake, requestWake);
+                }
 
                 // Capture admission before draining its notification: a concurrent later connect must wait
                 // for the next turn instead of activating ahead of its deferred CONNECTING selection.
@@ -3932,6 +4133,75 @@ void RuntimeImpl::run() noexcept {
         }
     }
 }
+
+bool latestEventRequestDone(const std::shared_ptr<LatestEventRequestState> &request) noexcept {
+    if (!request)
+        return true;
+
+    bool expired;
+    bool done;
+    {
+        std::lock_guard lock(request->mutex);
+        expired = expireLatestRequest(*request);
+        done = request->done;
+    }
+
+    if (expired)
+        wake(request->control);
+
+    return done;
+}
+
+bool cancelLatestEventRequest(const std::shared_ptr<LatestEventRequestState> &request) noexcept {
+    if (!request)
+        return false;
+
+    bool expired;
+    bool cancelled;
+    {
+        std::lock_guard lock(request->mutex);
+        expired = expireLatestRequest(*request);
+        cancelled = finishLatestRequest(*request, {ErrorCode::REQUEST_CANCELLED, "latest-event-request-cancelled"});
+    }
+
+    if (expired || cancelled)
+        wake(request->control);
+
+    return cancelled;
+}
+
+RegisteredEvent awaitLatestEventRequest(const std::shared_ptr<LatestEventRequestState> &request) {
+    return producerAction([&] {
+        if (!request)
+            reject(ErrorCode::INVALID_STATE, "latest-event-request-handle");
+
+        std::unique_lock lock(request->mutex);
+        bool expired = expireLatestRequest(*request);
+
+        if (!request->done) {
+            const auto control = request->control.lock();
+
+            if (control && latestEventOwner.control == control.get())
+                reject(ErrorCode::WRONG_THREAD, "latest-event-request-owner-wait");
+
+            if (!request->condition.wait_until(lock, request->deadline, [&] {
+                    return request->done;
+                }))
+                expired = expireLatestRequest(*request);
+        }
+
+        const auto failure = request->failure;
+        lock.unlock();
+
+        if (expired)
+            wake(request->control);
+
+        if (failure.code != ErrorCode::NONE)
+            throw Error(failure);
+
+        return *request->result;
+    });
+}
 } // namespace detail
 
 std::optional<RegisteredEvent> Feed::readLastEvent(EventType type, std::u16string_view symbol,
@@ -3945,12 +4215,7 @@ std::optional<RegisteredEvent> Feed::readLastEvent(EventType type, std::u16strin
         if (port_->options.contract != DeliveryContract::TICKER || symbol.empty())
             return std::nullopt;
 
-        if (symbol.size() > port_->limits.maximumSymbolUnits || symbol.front() == u'*' ||
-            !std::ranges::all_of(symbol, [](char16_t unit) {
-                return unit >= FIRST_PRINTABLE_ASCII && unit <= LAST_PRINTABLE_ASCII;
-            })) {
-            reject(ErrorCode::INVALID_ARGUMENT, "latest-event-symbol");
-        }
+        detail::validateLatestSymbol(symbol, port_->limits.maximumSymbolUnits);
 
         std::shared_ptr<detail::LatestEventRead> request;
         const auto control = port_->control.lock();
@@ -4021,6 +4286,63 @@ std::optional<RegisteredEvent> Feed::readLastEvent(EventType type, std::string_v
             return readLastEvent(type, std::u16string_view{}, true);
 
         return readLastEvent(type, exactSymbol(symbol, port_->limits.maximumSymbolUnits), true);
+    });
+}
+
+std::shared_ptr<detail::LatestEventRequestState>
+Feed::startLatestEventRequest(EventType type, std::u16string_view symbol,
+                              std::chrono::steady_clock::time_point deadline) const {
+    return producerAction([&] {
+        const auto kind = static_cast<unsigned>(type);
+
+        if (port_->options.contract != DeliveryContract::TICKER || !(detail::LASTING_EVENT_TYPES & (1U << kind)))
+            reject(ErrorCode::UNSUPPORTED_PROFILE, "latest-event-request-type");
+
+        detail::validateLatestSymbol(symbol, port_->limits.maximumSymbolUnits);
+        const auto control = port_->control.lock();
+
+        if (!control)
+            reject(ErrorCode::CLOSED, "latest-event-request-closed");
+
+        auto request = std::make_shared<detail::LatestEventRequestState>(type, symbol, deadline, control);
+        {
+            std::lock_guard gate(control->mutex);
+            std::lock_guard lock(port_->mutex);
+
+            if (!control->runtime || control->stopping || port_->retired.load(std::memory_order_acquire) ||
+                port_->closeRequested.load(std::memory_order_acquire))
+                reject(ErrorCode::CLOSED, "latest-event-request-closed");
+
+            if (port_->state == EndpointState::FAILED && port_->diagnostic.code != ErrorCode::NONE)
+                throw Error(port_->diagnostic);
+
+            if (port_->latestEventRequest)
+                reject(ErrorCode::RESOURCE_LIMIT, "latest-event-request-busy");
+
+            if (expireLatestRequest(*request))
+                return request;
+
+            request->connectionRevision = port_->connectionRevision;
+            request->clearRevision = port_->clearRevision;
+            request->boundToSource = port_->connectionIntent;
+
+            // Only local deadline and logical-demand progress starts here. Connection intent stays unchanged.
+            control->runtime->startWorker();
+            port_->latestEventRequest = request;
+            ++control->wakeSequence;
+        }
+
+        control->condition.notify_one();
+
+        return request;
+    });
+}
+
+std::shared_ptr<detail::LatestEventRequestState>
+Feed::startLatestEventRequest(EventType type, std::string_view symbol,
+                              std::chrono::steady_clock::time_point deadline) const {
+    return producerAction([&] {
+        return startLatestEventRequest(type, exactSymbol(symbol, port_->limits.maximumSymbolUnits), deadline);
     });
 }
 
