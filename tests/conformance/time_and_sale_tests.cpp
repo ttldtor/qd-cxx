@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: BSL-1.0
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "qd/events/event_flags.hpp"
+#include "qd/events/nuam_time_and_sale.hpp"
 #include "qd/events/time_and_sale.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -170,4 +172,43 @@ TEST_CASE("TimeAndSale validates exact indexed removals and borrowed field lifet
     CHECK(event->eventFlags == (e::indexed_event_flags::REMOVE_EVENT | e::indexed_event_flags::TX_PENDING));
     CHECK(event->getTime() == 23);
     CHECK(event->getSequence() == 0x3fffff);
+}
+
+TEST_CASE("Nuam sale requires matching identifiers and preserves indexed correction") {
+    const auto schema = e::defaultNuamTimeAndSaleSchema(SCHEMA);
+    REQUIRE(schema);
+    const auto mapper = e::PreparedNuamTimeAndSale::prepare(*schema, 0, MAPPING);
+    REQUIRE(mapper);
+    auto fields = emptyValues(*schema);
+    fields[0].raw = -1;
+    fields[1].raw = 0x00400005;
+    fields[3].raw = 9007199254740993LL;
+    fields[9].raw = 1;
+    fields[10].raw = std::numeric_limits<std::int64_t>::min();
+    const auto result = mapper->map(u"IBM", {schema->recordContext(0), fields}, VALUE_LIMITS, 7123,
+                                    e::indexed_event_flags::SNAPSHOT_BEGIN);
+    REQUIRE(result);
+    CHECK(result->getMatchId() == std::numeric_limits<std::int64_t>::min());
+    CHECK(result->getTradeId() == 9007199254740993LL);
+    CHECK(result->getTime() == -999);
+    CHECK(result->getSequence() == 5);
+    CHECK(result->getEventFlags() == e::indexed_event_flags::SNAPSHOT_BEGIN);
+    CHECK(result->getSource().id() == 0);
+    CHECK(result->isCorrection());
+
+    for (const auto required : {u"MatchId", u"TradeId"}) {
+        auto missing = schema->records()[0];
+
+        for (auto &lookup : missing.lookups) {
+            if (lookup.name == required)
+                lookup.name = u"UnrelatedId";
+        }
+
+        const auto missingSchema =
+            c::LocalSchema::create(std::array{missing}, SCHEMA, c::LocalProfile::BINARY_FIELDS_V1);
+        REQUIRE(missingSchema);
+        const auto absent = e::PreparedNuamTimeAndSale::prepare(*missingSchema, 0, MAPPING);
+        REQUIRE_FALSE(absent);
+        CHECK(absent.error() == e::MappingError::MISSING_REQUIRED);
+    }
 }

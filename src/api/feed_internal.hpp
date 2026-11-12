@@ -41,9 +41,9 @@ using ListenerFunction =
                  Subscription<events::Greeks>::Listener, Subscription<events::Underlying>::Listener,
                  Subscription<events::TheoPrice>::Listener, Subscription<events::Candle>::Listener,
                  Subscription<events::TimeAndSale>::Listener, Subscription<events::OptionSale>::Listener,
-                 Subscription<events::NuamTrade>::Listener, Subscription<RegisteredEvent>::Listener,
-                 Endpoint::StateChangeListener, Subscription<events::Quote>::StateChangeListener,
-                 SubscriptionChangeListener>;
+                 Subscription<events::NuamTrade>::Listener, Subscription<events::NuamTimeAndSale>::Listener,
+                 Subscription<RegisteredEvent>::Listener, Endpoint::StateChangeListener,
+                 Subscription<events::Quote>::StateChangeListener, SubscriptionChangeListener>;
 
 /** Shared application callable; its last release never occurs under a control mutex. */
 struct ListenerBox {
@@ -233,6 +233,12 @@ struct EndpointStateChange {
     std::shared_ptr<const ListenerSnapshot> listeners;     ///< Complete immutable selection, released outside locks.
 };
 
+/** Complete immutable local-source admission. The worker alone opens the file. */
+struct TapeSourceRequest {
+    std::filesystem::path path; ///< Independently owned stable regular file path.
+    TapeSourceOptions options;  ///< Explicit finite input allowances.
+};
+
 /** One charged passive request. Its private completion lock never guards native owner work. */
 struct LatestEventRead {
     EventType type;        ///< Exact LastingEvent identity.
@@ -266,12 +272,23 @@ struct LatestEventRequestState {
     std::uint64_t connectionRevision = 0; ///< Worker-only after producer admission.
     std::uint64_t clearRevision = 0;
     bool boundToSource = false;
-    std::shared_ptr<SubscriptionPort> demand; ///< Worker-only, charged until native and logical retirement.
 
     LatestEventRequestState(EventType type, std::u16string_view symbol, std::chrono::steady_clock::time_point deadline,
                             const std::shared_ptr<RuntimeControl> &control)
         : type(type), symbol(symbol), deadline(deadline), control(control) {
     }
+};
+
+/** One charged batch. The owner alone mutates its demand and bounded scratch buffers. */
+struct LatestEventRequestBatch {
+    std::vector<std::shared_ptr<LatestEventRequestState>> requests;
+    std::vector<std::size_t> exactIdentity; ///< First occurrence of each exact symbol.
+    std::vector<unsigned char> wanted;      ///< One bounded scratch marker per possible identity.
+    std::vector<std::size_t> pending;
+    std::vector<std::size_t> submitted;
+    std::shared_ptr<SubscriptionPort> demand;
+
+    explicit LatestEventRequestBatch(const std::vector<std::shared_ptr<LatestEventRequestState>> &requests);
 };
 
 /** Detached query inputs and one terminal result; native demand stays on the SDK owner. */
@@ -325,8 +342,8 @@ struct EndpointPort {
     std::uint64_t aggregationSourceRevision = 0; ///< Control fence for the report; never a request ACK.
     std::vector<std::shared_ptr<SubscriptionPort>> subscriptions; ///< Fixed slots, including retiring registrations.
     std::shared_ptr<LatestEventRead> latestRead; ///< One pending/executing owner observation, protected by mutex.
-    std::shared_ptr<LatestEventRequestState> latestEventRequest; ///< One charged one-event request, protected by mutex.
-    std::shared_ptr<HistorySnapshotOperation> historySnapshotRead;    ///< One passive observation, protected by mutex.
+    std::shared_ptr<LatestEventRequestBatch> latestEventRequest;   ///< One charged request group, protected by mutex.
+    std::shared_ptr<HistorySnapshotOperation> historySnapshotRead; ///< One passive observation, protected by mutex.
     std::shared_ptr<HistorySnapshotOperation> historySnapshotRequest; ///< One request including native retirement.
     StateListeners stateListeners; ///< Opt-in advisory lifecycle observations, retired after all subscriptions.
     std::vector<EndpointStateChange> stateChanges; ///< Fixed ring; selection lease remains charged through release.
@@ -342,8 +359,12 @@ struct EndpointPort {
     std::uint64_t clearedRevision = 0; ///< Latest actual applied reset/global-ACK completion, not inferred from state.
     std::string address;               ///< First accepted bounded spelling; immutable after connect publication.
     std::string host;                  ///< Validated bounded route, copied only once before worker publication.
-    std::uint16_t port = 0;            ///< Original nonzero route port.
-    bool connectRequested = false;     ///< Published once under the endpoint mutex.
+    std::optional<TapeSourceRequest> tape; ///< Fixed non-network source, absent for TCP.
+    bool tapePaused = false;               ///< Latest local pause intent under the endpoint mutex.
+    bool tapeAbortRequested = false;       ///< Monotonic explicit terminal abort for this tape endpoint.
+    std::chrono::steady_clock::time_point tapeRestartDeadline; ///< First deadline of the pending restart revision.
+    std::uint16_t port = 0;                                    ///< Original nonzero route port.
+    bool connectRequested = false;                             ///< Published once under the endpoint mutex.
     std::atomic<std::chrono::steady_clock::duration::rep> closeDeadline{0}; ///< First admitted absolute drain deadline.
     std::atomic<bool> closeRequested{false};                                ///< Reserved monotonic drain admission.
     std::atomic<bool> retired{false};           ///< Native owner and all captures have retired.
