@@ -41,6 +41,9 @@ namespace q = org::ttldtor::qdcxx::events;
 using Error = s::TickerError;
 using OriginalOpenView = std::expected<s::TickerViewToken, s::TickerError> (s::TickerCollector::*)(s::TickerWork &);
 static_assert(std::is_same_v<decltype(&s::TickerCollector::openView), OriginalOpenView>);
+using OriginalFront = std::expected<std::optional<s::TickerDelivery>, s::TickerError> (s::TickerCollector::*)(
+    const s::TickerViewToken &, s::TickerWork &);
+static_assert(std::is_same_v<decltype(&s::TickerCollector::front), OriginalFront>);
 bool failAllocations = false;         ///< Enabled only around an explicit production operation.
 std::size_t allocationsRemaining = 0; ///< Successful ordinary allocation requests allowed before failure.
 
@@ -1567,6 +1570,40 @@ TEST_CASE("TICKER quantum boundary orders a live update before a newly joined in
     CHECK(rest[3].symbol == u"F");
     CHECK(rest[2].kind == s::TickerDeliveryKind::LIVE);
     CHECK(rest[3].kind == s::TickerDeliveryKind::INITIAL);
+}
+
+TEST_CASE("TICKER initial-only offer bypasses a live frontier without consuming its fairness credit") {
+    auto f = fixture(true, limits(), 2);
+    auto view = open(f);
+    const Input seed[]{{0, u"A", 1, 1}, {0, u"B", 1, 2}, {0, u"C", 1, 3}, {0, u"D", 1, 4}, {0, u"F", 1, 6}};
+    stage(f, seed);
+
+    for (const auto symbol : {u"A", u"B", u"C", u"D"})
+        add(f, view, symbol);
+
+    REQUIRE(drain(f, view, 2).size() == 2);
+    const Input update[]{{0, u"A", 2, 10}};
+    stage(f, update);
+    add(f, view, u"F");
+    REQUIRE(drain(f, view, 2).size() == 2);
+    auto work = turn();
+    auto ordinary = f.ticker.front(view, work);
+    REQUIRE((ordinary && *ordinary));
+    CHECK(observe(**ordinary).symbol == u"A");
+    auto initial = f.ticker.frontWithPolicy(view, work, s::TickerOfferPolicy::INITIAL_ONLY);
+    REQUIRE((initial && *initial));
+    CHECK(observe(**initial).symbol == u"F");
+    CHECK(observe(**initial).kind == s::TickerDeliveryKind::INITIAL);
+    REQUIRE(f.ticker.pop(view, work));
+    auto onlyInitial = f.ticker.frontWithPolicy(view, work, s::TickerOfferPolicy::INITIAL_ONLY);
+    REQUIRE(onlyInitial);
+    CHECK_FALSE(*onlyInitial);
+    ordinary = f.ticker.front(view, work);
+    REQUIRE((ordinary && *ordinary));
+    CHECK(observe(**ordinary).symbol == u"A");
+    CHECK(observe(**ordinary).kind == s::TickerDeliveryKind::LIVE);
+    REQUIRE(f.ticker.pop(view, work));
+    CHECK(drain(f, view).empty());
 }
 
 TEST_CASE("TICKER whole failed frames and foreign schema never publish completed decoder prefixes") {

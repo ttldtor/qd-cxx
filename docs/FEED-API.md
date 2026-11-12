@@ -663,3 +663,9 @@ Use `Feed::createSubscription<events::OptionSale>()` on a HISTORY endpoint. See 
 Receive NuamTrade using `createSubscription<events::NuamTrade>()` on a TICKER or STREAM endpoint.
 The event extends Trade with independently updated exchange statistics. See the
 [NuamTrade fields and routing](../spec/events/NUAM-TRADE.md).
+
+## Local aggregation
+
+Set `EndpointOptions::aggregationPeriod` or the `dxfeed.aggregationPeriod` configuration property for a local endpoint floor. `Subscription::setAggregationPeriod` sets an optional per-subscription period. The effective local period is their maximum and takes effect after the running interval. `Subscription::getAggregationPeriodInfo` reports the local period selected for the last actual listener invocation, or no value before one. `Endpoint::getAggregationPeriodInfo` separately reports an upstream descriptor.
+
+A TICKER subscription retains waiting updates in its collector so repeated values of one key may conflate. STREAM and HISTORY use bounded ordered queues and can report their existing overflow outcome. During a running interval, TICKER initial collector values remain eligible ahead of pending live updates. Already detached queue entries retain their original order. Closing drains admitted events without waiting for the local interval. Zero preserves immediate delivery.
