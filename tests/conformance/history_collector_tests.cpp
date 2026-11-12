@@ -320,14 +320,16 @@ struct Fixture {
 /** Build one controlled source graph.
  * @param store Retention mode.
  * @param bounds Explicit finite logical capacities.
+ * @param retransmit Exact snapshot retransmission records, borrowed through construction.
  * @return Ready actual source and empty collector.
  */
-Fixture fixture(bool store = false, s::HistoryLimits bounds = limits()) {
+Fixture fixture(bool store = false, s::HistoryLimits bounds = limits(), std::span<const std::int32_t> retransmit = {}) {
     auto local = schema();
     auto live = session(local);
     auto copied = local;
     auto work = turn();
-    auto collector = s::HistoryCollector::create(std::move(copied), bounds, {store, 100, 10000}, work);
+    auto collector = s::HistoryCollector::create(
+        std::move(copied), bounds, {store, 100, 10000, c::SubscriptionSelectorPolicy::EXACT_ONLY, retransmit}, work);
     REQUIRE(collector);
 
     return {std::move(local), std::move(live), std::move(*collector)};
@@ -432,6 +434,26 @@ TEST_CASE("HISTORY empty and complete snapshots expose actual projected boundari
     CHECK(values[1].flags == 0);
     CHECK(values[2].time == 0);
     CHECK(values[2].flags == 10);
+}
+
+TEST_CASE("HISTORY retransmits only the configured snapshot records after input storage is reused") {
+    std::array<std::int32_t, 1> selected{0};
+    auto configured = fixture(false, limits(), selected);
+    selected.front() = 1;
+    auto standard = fixture();
+
+    for (auto *f : {&configured, &standard}) {
+        const auto view = open(*f);
+        add(*f, view);
+        send(*f, {{0, u"ALPHA", 3, 30, 4}, {0, u"ALPHA", 0, 0, 10}});
+        REQUIRE(drain(*f, view).size() == 2);
+        send(*f, {{0, u"ALPHA", 3, 31, 4}});
+        const auto replay = drain(*f, view);
+        REQUIRE(replay.size() == 1);
+        CHECK(replay[0].time == 3);
+        CHECK(replay[0].value == 31);
+        CHECK(((replay[0].flags & 4) != 0) == (f == &configured));
+    }
 }
 
 TEST_CASE("HISTORY pending transaction progress remains observable and explicitly incomplete") {
@@ -1097,6 +1119,25 @@ TEST_CASE("HISTORY factory rejects insufficient fixed resident backing before an
     CHECK(result.error().error == Error::RESOURCE_LIMIT);
     CHECK(local.recordContext(0).matches(identity));
     CHECK(local.records().size() == 2);
+}
+
+TEST_CASE("HISTORY refuses invalid snapshot retransmission IDs without consuming the schema") {
+    const auto refuse = [](std::span<const std::int32_t> records) {
+        auto local = schema();
+        const auto identity = local.recordContext(0);
+        auto work = turn();
+        const auto result = s::HistoryCollector::create(
+            std::move(local), limits(), {false, 100, 10000, c::SubscriptionSelectorPolicy::EXACT_ONLY, records}, work);
+        REQUIRE_FALSE(result);
+        CHECK(result.error().error == Error::INVALID_CONFIGURATION);
+        CHECK(local.recordContext(0).matches(identity));
+    };
+    constexpr std::array<std::int32_t, 1> negative{-1};
+    constexpr std::array<std::int32_t, 1> absent{2};
+    constexpr std::array<std::int32_t, 2> duplicate{0, 0};
+    refuse(negative);
+    refuse(absent);
+    refuse(duplicate);
 }
 
 TEST_CASE("HISTORY certifies only the covered clean requested range while a lower view remains incomplete") {

@@ -1,0 +1,119 @@
+{
+  "status": "PASS",
+  "revision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "timezoneByteIdentical": true,
+  "oracleSha256": "f9f38b1cc8639e1513c7ee2ca9944aa77155f92b8ca9ad5873d17b259e668f83",
+  "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
+  "sources": [
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/TimeAndSale.java",
+      "sha256": "bf3cff336518c851c3f43c78fcb8782453a6d123b4d7e7fe19c03e48cc21b246"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/OptionSale.java",
+      "sha256": "f821571f8b15b06b7b50418d47a65adf7e2903e9399664fbcb388f5ccb68287f"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/TimeAndSaleDelegate.java",
+      "sha256": "20d0eae38d6fb4c53df4b55e923aa16c0109ffca493fb29dee3d4fbdf27150ff"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/OptionSaleDelegate.java",
+      "sha256": "974239c053f89bd22beea3ef0500be000f7cccc5c7b0b95f0704f1dd46a65edd"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/impl/matrix/History.java",
+      "sha256": "462c4cf966c1db8bd6db4072c0512e5713454fd6165ad5b744113c629ac3a42d"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "TimeAndSale/oracle.tsv",
+      "sha256": "1d9f578415225cb19127eb1f985d7c72285f4dc7c2bd94aaa79647e9d13759aa"
+    },
+    {
+      "path": "TimeAndSale/wire-00.qtp",
+      "sha256": "adabf775048c8771b633a5ba04af0055ef67229bfac5048bfa33abed74de3883"
+    },
+    {
+      "path": "TimeAndSale/wire-01.qtp",
+      "sha256": "77bb779c9c0889e539c5110c0a6fd5921be3b0fba3d72559fc436fd223f997d2"
+    },
+    {
+      "path": "TimeAndSale/wire-02.qtp",
+      "sha256": "9358954a48e8e4c7f8dcdd591a530d60ab64a5ae3d99395498807f651c820f83"
+    },
+    {
+      "path": "TimeAndSale/wire-03.qtp",
+      "sha256": "3fa1219f086361cbbc6c6e2ca7d12ec12b68d26e579be6929da79ab170e261b2"
+    },
+    {
+      "path": "TimeAndSale/wire-04.qtp",
+      "sha256": "93a9d920700525b9fc527832546c9a1b61d1dad2aa0714fa1034c5aed1b351ff"
+    },
+    {
+      "path": "TimeAndSale/wire-05.qtp",
+      "sha256": "678801342c2840f4821a55f0ad911304ab170dffdec62d7b27480c3f55f86f94"
+    },
+    {
+      "path": "TimeAndSale/wire-06.qtp",
+      "sha256": "5548923c1d2d0753f0759d7057bff99e4b92b7a3926ea6d4bfcc14cd89ecbfd1"
+    },
+    {
+      "path": "TimeAndSale/wire-07.qtp",
+      "sha256": "aae2d128eda9183ef3a37c57c4399f80f5639bba82319df7d9fb7e9a18807414"
+    },
+    {
+      "path": "TimeAndSale/fresh/wire-00.qtp",
+      "sha256": "5d67ed46e0857206bc8922440a450c4f319109225490d652f3ec2d809559f1ca"
+    },
+    {
+      "path": "TimeAndSale/fresh/wire-01.qtp",
+      "sha256": "9358954a48e8e4c7f8dcdd591a530d60ab64a5ae3d99395498807f651c820f83"
+    },
+    {
+      "path": "OptionSale/oracle.tsv",
+      "sha256": "32a0ea43cc5bcac1bb7dccb12b34b6710ed0aa92d891ea380674685cfc2cc721"
+    },
+    {
+      "path": "OptionSale/wire-00.qtp",
+      "sha256": "3a05b6db1d5df9fb4bc6591f0a50b3ad5ee9c22b017d4199b1bd5f1f157fa095"
+    },
+    {
+      "path": "OptionSale/wire-01.qtp",
+      "sha256": "169beda49374c9544cfe291afd1f1ef4a1dc417a1b1e5821c778d80583ca7a73"
+    },
+    {
+      "path": "OptionSale/wire-02.qtp",
+      "sha256": "335566b775d2fb555302160ffb695f59591987dc0c223a03db61bc6521723a9d"
+    },
+    {
+      "path": "OptionSale/wire-03.qtp",
+      "sha256": "26e0395ea33239e756d19657f70980cb0af22f3193c95a5d906fe10f5b1c6d9b"
+    },
+    {
+      "path": "OptionSale/wire-04.qtp",
+      "sha256": "62fb4aa31599e997da23c5200db727766a700542773dff32855e2201392c0e4f"
+    },
+    {
+      "path": "OptionSale/wire-05.qtp",
+      "sha256": "c81aa4df8ff9302307d2d22de50b0b7022f327a1bbf6777a87c123ace7e90a29"
+    },
+    {
+      "path": "OptionSale/wire-06.qtp",
+      "sha256": "febe5c8ca9caf6fd7aa06a37275a8264633f2886e0ede0c1db00befaea72b53e"
+    },
+    {
+      "path": "OptionSale/wire-07.qtp",
+      "sha256": "cf3688f6922443274456af9a4d76c75acd14d10714de0c33d90a4a177837a2fd"
+    },
+    {
+      "path": "OptionSale/fresh/wire-00.qtp",
+      "sha256": "6b8bdbd6c0ea3bf1e4499e4eb33c77c5a022377f43201cf5f1fe591f56a776b2"
+    },
+    {
+      "path": "OptionSale/fresh/wire-01.qtp",
+      "sha256": "335566b775d2fb555302160ffb695f59591987dc0c223a03db61bc6521723a9d"
+    }
+  ]
+}

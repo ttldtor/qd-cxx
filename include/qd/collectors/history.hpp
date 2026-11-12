@@ -159,6 +159,8 @@ struct HistoryOptions {
     std::size_t partitionSnapshotQuantum; ///< Positive per-partition snapshot rotation, source default10000.
     core::SubscriptionSelectorPolicy selectorPolicy =
         core::SubscriptionSelectorPolicy::EXACT_ONLY; ///< Immutable symbol domain; no All.
+    std::span<const std::int32_t> retransmitSnapshotRecords = {};
+    ///< Exact indexed local IDs that restart snapshot views on every BEGIN or MODE. Borrowed through create only.
 };
 
 /** Explicit view projection; false emits legacy unflagged data while preserving raw provenance. */
@@ -313,7 +315,7 @@ class HistoryCollector {
     /** Allocate and validate fixed backing before consuming schema.
      * @param schema Owned immutable indexed/ordinary declarations; preserved on failure.
      * @param limits Finite logical capacities, including separately scoped core limits.
-     * @param options Explicit retention and positive scheduling quanta.
+     * @param options Explicit retention, positive scheduling quanta and optional borrowed retransmission IDs.
      * @param work Factory initialization and schema examination credits.
      * @return Empty collector or typed rejection; no I/O or user code.
      */
