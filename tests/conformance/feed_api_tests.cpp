@@ -5088,18 +5088,37 @@ TEST_CASE("indexed HISTORY snapshots keep same-symbol sources and private demand
         return callback->readIncomplete.load();
     }));
     CHECK_FALSE(callback->wrongSource.load());
-    const auto second = feed->getIndexedEventsIfSubscribed<events::Order>(u"IBM", bzx);
-    CHECK(second.state == api::HistorySnapshotState::COMPLETE);
+    REQUIRE(eventually([&] {
+        return source.removes() >= 1;
+    }));
+    api::HistorySnapshot<events::Order> second;
+    REQUIRE(eventually([&] {
+        try {
+            second = feed->getIndexedEventsIfSubscribed<events::Order>(u"IBM", bzx);
+        } catch (const api::Error &error) {
+            if (error.diagnostic().stage != "history-snapshot-read-busy")
+                throw;
+
+            return false;
+        }
+
+        return second.state == api::HistorySnapshotState::COMPLETE;
+    }));
     CHECK(second.sourceEpoch == first.sourceEpoch);
     REQUIRE(second.events.size() == 2);
     CHECK(second.events[0].getSourceId() == bzx.id());
     CHECK(second.events[1].getSourceId() == bzx.id());
     CHECK(second.events[0].getIndex() < second.events[1].getIndex());
-    CHECK(errorCode([&] {
-              static_cast<void>(feed->getIndexedEventsIfSubscribed<events::Order>(u"IBM", bzx, {1}));
-          }) == api::ErrorCode::RESOURCE_LIMIT);
     CHECK(eventually([&] {
-        return source.removes() >= 1;
+        try {
+            static_cast<void>(feed->getIndexedEventsIfSubscribed<events::Order>(u"IBM", bzx, {1}));
+        } catch (const api::Error &error) {
+            const auto diagnostic = error.diagnostic();
+
+            return diagnostic.code == api::ErrorCode::RESOURCE_LIMIT && diagnostic.stage == "recovery-queue";
+        }
+
+        return false;
     }));
     static_cast<void>(endpoint->closeAndAwaitTermination());
     CHECK_FALSE(source.failed());
