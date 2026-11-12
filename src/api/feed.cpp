@@ -1447,6 +1447,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
         bool theoPrice = false;
         bool candle = false;
         bool timeAndSale = false;
+        bool optionSale = false;
 
         for (const auto type : types) {
             switch (type) {
@@ -1510,6 +1511,9 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             case EventType::TIME_AND_SALE:
                 timeAndSale = true;
                 break;
+            case EventType::OPTION_SALE:
+                optionSale = true;
+                break;
             case EventType::ORDER_IMBALANCE:
                 orderImbalance = true;
                 break;
@@ -1525,7 +1529,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             (spreadOrder ? 1U << 11 : 0U) | (analyticOrder ? 1U << 12 : 0U) | (otcMarketsOrder ? 1U << 13 : 0U) |
             (orderImbalance ? 1U << 14 : 0U) | (series ? 1U << 15 : 0U) | (greeks ? 1U << 16 : 0U) |
             (underlying ? 1U << 17 : 0U) | (theoPrice ? 1U << 18 : 0U) | (candle ? 1U << 19 : 0U) |
-            (timeAndSale ? 1U << 20 : 0U));
+            (timeAndSale ? 1U << 20 : 0U) | (optionSale ? 1U << 21 : 0U));
         const auto delivery = registeredDelivery  ? detail::EventDelivery::REGISTERED
                               : quote             ? detail::EventDelivery::QUOTE
                               : profile           ? detail::EventDelivery::PROFILE
@@ -1546,6 +1550,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                               : theoPrice         ? detail::EventDelivery::THEO_PRICE
                               : candle            ? detail::EventDelivery::CANDLE
                               : timeAndSale       ? detail::EventDelivery::TIME_AND_SALE
+                              : optionSale        ? detail::EventDelivery::OPTION_SALE
                               : order             ? detail::EventDelivery::ORDER
                                                   : detail::EventDelivery::CONFIGURATION;
         const auto control = port_->control.lock();
@@ -1606,7 +1611,8 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                                           static_cast<unsigned>(detail::EventSelection::UNDERLYING) |
                                           static_cast<unsigned>(detail::EventSelection::THEO_PRICE) |
                                           static_cast<unsigned>(detail::EventSelection::CANDLE) |
-                                          static_cast<unsigned>(detail::EventSelection::TIME_AND_SALE);
+                                          static_cast<unsigned>(detail::EventSelection::TIME_AND_SALE) |
+                                          static_cast<unsigned>(detail::EventSelection::OPTION_SALE);
 
             if (port_->options.contract == DeliveryContract::HISTORY &&
                 (static_cast<unsigned>(selection) & ~historyTypes)) {
@@ -1617,6 +1623,10 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                 ((marketMaker || spreadOrder || analyticOrder || otcMarketsOrder) &&
                  port_->options.contract != DeliveryContract::HISTORY)) {
                 reject(ErrorCode::UNSUPPORTED_PROFILE, "order-requires-history");
+            }
+
+            if (optionSale && port_->options.contract != DeliveryContract::HISTORY) {
+                reject(ErrorCode::UNSUPPORTED_PROFILE, "option-sale-requires-history");
             }
 
             if (series && port_->options.contract != DeliveryContract::HISTORY) {
@@ -1668,6 +1678,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
             bool registeredUnderlying = registeredGreeks;
             bool registeredTheoPrice = registeredGreeks;
             bool registeredTimeAndSale = !port_->options.eventRegistry;
+            bool registeredOptionSale = registeredMarketMaker;
             bool registeredOrderImbalance =
                 !port_->options.eventRegistry && port_->options.contract == DeliveryContract::TICKER;
 
@@ -1689,6 +1700,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                     registeredUnderlying = registeredUnderlying || registration.type == EventType::UNDERLYING;
                     registeredTheoPrice = registeredTheoPrice || registration.type == EventType::THEO_PRICE;
                     registeredTimeAndSale = registeredTimeAndSale || registration.type == EventType::TIME_AND_SALE;
+                    registeredOptionSale = registeredOptionSale || registration.type == EventType::OPTION_SALE;
                     registeredMessage = registeredMessage || registration.type == EventType::MESSAGE;
                     registeredConfiguration = registeredConfiguration || registration.type == EventType::CONFIGURATION;
                     registeredOrder = registeredOrder || registration.type == EventType::ORDER;
@@ -1714,7 +1726,8 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                 (analyticOrder && !registeredAnalyticOrder) || (otcMarketsOrder && !registeredOtcMarketsOrder) ||
                 (orderImbalance && !registeredOrderImbalance) || (series && !registeredSeries) ||
                 (greeks && !registeredGreeks) || (underlying && !registeredUnderlying) ||
-                (theoPrice && !registeredTheoPrice) || (timeAndSale && !registeredTimeAndSale)) {
+                (theoPrice && !registeredTheoPrice) || (timeAndSale && !registeredTimeAndSale) ||
+                (optionSale && !registeredOptionSale)) {
                 reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-unregistered-event");
             }
 
@@ -1869,6 +1882,7 @@ template class Subscription<events::Underlying>;
 template class Subscription<events::TheoPrice>;
 template class Subscription<events::Candle>;
 template class Subscription<events::TimeAndSale>;
+template class Subscription<events::OptionSale>;
 template class Subscription<RegisteredEvent>;
 
 Feed::Feed(std::shared_ptr<detail::EndpointPort> port) : port_(std::move(port)) {
@@ -2572,6 +2586,8 @@ class TypedConsumer final : public client::SubscriptionConsumer {
                 return deliver<events::Candle>(batch, listeners, executor, completion, historyRevision);
             case EventDelivery::TIME_AND_SALE:
                 return deliver<events::TimeAndSale>(batch, listeners, executor, completion, historyRevision);
+            case EventDelivery::OPTION_SALE:
+                return deliver<events::OptionSale>(batch, listeners, executor, completion, historyRevision);
             case EventDelivery::ORDER_IMBALANCE:
                 return deliver<events::OrderImbalance>(batch, listeners, executor, completion, historyRevision);
             case EventDelivery::ORDER:

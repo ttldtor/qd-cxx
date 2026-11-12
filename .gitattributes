@@ -872,3 +872,9 @@ tools/upstream/candle-lifecycle-oracle/*.java text eol=lf
 tests/fixtures/candle-lifecycle/*.tsv -text -whitespace
 tests/fixtures/candle-lifecycle/*.qtp -text -whitespace
 tests/fixtures/candle-lifecycle/*.json text eol=lf
+
+# Preserve exact OptionSale oracle observations and binary captures.
+tests/fixtures/option-sale/**/*.qtp -text -whitespace
+tests/fixtures/option-sale/**/*.tsv -text -whitespace
+tests/fixtures/option-sale/*.json text eol=lf
+tools/upstream/option-sale-oracle/*.java text eol=lf

@@ -344,11 +344,12 @@ TEST_CASE("TimeAndSale default regional catalogs fit complete expanded peer desc
         const auto &budgets = profile.endpoint.settings().budgets;
         const auto firstRecord = history ? HISTORY_COMPOSITE_ID : STREAM_COMPOSITE_ID;
         constexpr std::size_t REGIONAL_AND_COMPOSITE_RECORDS = 27;
-        const auto expectedRecords = static_cast<std::size_t>(firstRecord) + REGIONAL_AND_COMPOSITE_RECORDS;
+        const auto salesEnd = static_cast<std::size_t>(firstRecord) + REGIONAL_AND_COMPOSITE_RECORDS;
+        const auto expectedRecords = salesEnd + (history ? 1 : 0);
         REQUIRE(profile.schema.records().size() == expectedRecords);
         REQUIRE(profile.blueprint.size() == expectedRecords);
         REQUIRE(registry->registrations().size() == expectedRecords + (history ? 1 : 0));
-        CHECK(profile.eventPlans.size() == (history ? 2048 : 1024));
+        CHECK(profile.eventPlans.size() == (history ? 4096 : 1024));
 
         for (std::size_t offset = 0; offset < REGIONAL_AND_COMPOSITE_RECORDS; ++offset) {
             const auto recordIndex = static_cast<std::size_t>(firstRecord) + offset;
@@ -393,13 +394,19 @@ TEST_CASE("TimeAndSale default regional catalogs fit complete expanded peer desc
 
             for (auto index = first; index < end; ++index) {
                 const auto &record = profile.blueprint[index];
-                const bool sale = index >= static_cast<std::size_t>(firstRecord);
+                const bool sale = index >= static_cast<std::size_t>(firstRecord) && index < salesEnd;
+                const bool optionSale = history && index == salesEnd;
+                const auto optional = std::span(OPTIONAL_FIELDS)
+                                          .first(sale         ? OPTIONAL_FIELDS.size()
+                                                 : optionSale ? 1
+                                                              : 0);
+                const bool hasFieldTime = sale || optionSale;
                 r::number(body, record.senderId);
                 r::text(body, record.wireName);
-                r::number(body, static_cast<std::int64_t>(record.fields.size() +
-                                                          (sale ? FIELD_TIME.size() + OPTIONAL_FIELDS.size() : 0)));
+                r::number(body, static_cast<std::int64_t>(record.fields.size() + optional.size() +
+                                                          (hasFieldTime ? FIELD_TIME.size() : 0)));
 
-                if (sale) {
+                if (hasFieldTime) {
                     for (const auto &[name, type] : FIELD_TIME) {
                         r::text(body, name);
                         r::number(body, std::to_underlying(type));
@@ -411,11 +418,9 @@ TEST_CASE("TimeAndSale default regional catalogs fit complete expanded peer desc
                     r::number(body, field.serialTypeId);
                 }
 
-                if (sale) {
-                    for (const auto &[name, type] : OPTIONAL_FIELDS) {
-                        r::text(body, name);
-                        r::number(body, std::to_underlying(type));
-                    }
+                for (const auto &[name, type] : optional) {
+                    r::text(body, name);
+                    r::number(body, std::to_underlying(type));
                 }
             }
 
@@ -430,8 +435,14 @@ TEST_CASE("TimeAndSale default regional catalogs fit complete expanded peer desc
         }
 
         REQUIRE(snapshot.descriptions().size() == expectedRecords);
-        CHECK(snapshot.descriptions().back().name == u"TimeAndSale&Z");
-        CHECK(snapshot.descriptions().back().fields.size() == 15);
+        CHECK(snapshot.descriptions()[salesEnd - 1].name == u"TimeAndSale&Z");
+        CHECK(snapshot.descriptions()[salesEnd - 1].fields.size() == 15);
+
+        if (history) {
+            CHECK(snapshot.descriptions()[salesEnd].name == u"OptionSale");
+            CHECK(snapshot.descriptions()[salesEnd].fields.size() == 17);
+        }
+
         const auto regional = d::filterSubscriptionCoordinates(*registry, contract, a::EventType::TIME_AND_SALE,
                                                                a::SubscriptionSelector::plain(u"AAPL&Q"), {});
         REQUIRE(regional.size() == 1);

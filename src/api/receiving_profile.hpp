@@ -20,7 +20,7 @@ inline constexpr std::size_t RECEIVING_OWNER_POLLS_PER_TURN =
 inline constexpr std::size_t MAXIMUM_RECEIVING_RECORDS = 44; ///< Prior 42 records plus Candle and TradeHistory.
 inline constexpr std::size_t MAXIMUM_RECEIVING_BINDINGS =
     2 * MAXIMUM_RECEIVING_RECORDS;                       ///< Native plus compatible derived family per physical record.
-inline constexpr std::size_t RECEIVING_EVENT_KINDS = 21; ///< Explicitly supported native event kinds.
+inline constexpr std::size_t RECEIVING_EVENT_KINDS = 22; ///< Explicitly supported native event kinds.
 
 /** Conservative stack initialization plus complete metadata read/write work; no dynamic allocation. */
 inline constexpr std::size_t RECEIVING_BINDING_COPY_WORK =

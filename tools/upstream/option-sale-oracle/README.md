@@ -1,0 +1,3 @@
+# OptionSale fixture generator
+
+`OptionSaleOracle.java` uses the QD schema, delegate, binary composer and parser from revision `0ddc0a09779fb61d74cc0b37c6449ff47dcb715f`. Compile it with the corresponding built QD modules on the classpath, then run its `--help` or `--help=ru` for invocation, profiles, outputs and failure behavior. The generator requires an output directory that does not already exist and is offline. `standard`, `tiny`, `nano` and `field` fixture captures contain eight observations and fourteen missing-field refusals each. `receipt.json` records hashes and timezone comparison results.

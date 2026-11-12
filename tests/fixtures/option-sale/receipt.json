@@ -1,0 +1,144 @@
+{
+  "status": "PASS",
+  "revision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "sourceFilesMatchHead": true,
+  "harnessSha256": "4785c44dbd383a84f294481d2814b10262da83735e4bf149293076083aba1f67",
+  "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
+  "javacSha256": "633143e961aa18051c09112b85333f5cdbd845b54eb39678eb15b91ca8bbb527",
+  "classInventorySha256": "90a478b5d3737246d8c897322c9f9db60887846e20117572588e05ae78fbc6d8",
+  "classEntries": 1317,
+  "upstreamSources": [
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/OptionSale.java",
+      "sha256": "f821571f8b15b06b7b50418d47a65adf7e2903e9399664fbcb388f5ccb68287f"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/TimeAndSale.java",
+      "sha256": "bf3cff336518c851c3f43c78fcb8782453a6d123b4d7e7fe19c03e48cc21b246"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/TimeAndSaleType.java",
+      "sha256": "68fcbdc5f8ba8cfad85f32c74abdd4d6c92c9c077906624dadd21761f13d2d48"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/market/Side.java",
+      "sha256": "f8bef7d85108494293b74315e2e5234036c162e428ee505d2aabe301d0a938d0"
+    },
+    {
+      "path": "dxfeed-api/src/main/java/com/dxfeed/event/impl/EventUtil.java",
+      "sha256": "25261155e73e31e349c07d76b55f0f158b87e86f67462870f7448196ba403010"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/OptionSaleDelegate.java",
+      "sha256": "974239c053f89bd22beea3ef0500be000f7cccc5c7b0b95f0704f1dd46a65edd"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/impl/OptionSaleMapping.java",
+      "sha256": "2ff4ef48f315867a2a9b306ca0c1efe5b8c7af49920fcc30d3bd654c658c31cd"
+    },
+    {
+      "path": "dxfeed-impl/src/main/java/com/dxfeed/event/market/MarketFactoryImpl.java",
+      "sha256": "c74b324b2f99d2a351963fead08419c2ba1d92573c633d30740295acc9d0bac4"
+    },
+    {
+      "path": "dxfeed-scheme/src/main/resources/dxfeed.xml",
+      "sha256": "b9328eb93080f34378ecec2ecd3ea117c056f1d03bcf83a404eb7005aee7ce4c"
+    }
+  ],
+  "profiles": [
+    {
+      "profile": "standard",
+      "events": 8,
+      "missingRefusals": 14,
+      "timezoneIdentical": true,
+      "fixtures": [
+        {
+          "name": "oracle.tsv",
+          "bytes": 6027,
+          "sha256": "e9e7aece44da24e881ff452b32f538d83de315d281af16acdaf23eecd0f463e5"
+        },
+        {
+          "name": "missing.tsv",
+          "bytes": 585,
+          "sha256": "55058caf89d20e43e032aad982dba9861a7018e43da33404c069021486667341"
+        },
+        {
+          "name": "option-sale.qtp",
+          "bytes": 445,
+          "sha256": "9b8ebeb66e012f19fe534c699b1574ea850a8ed96b373077cc75d9f5037a2a2c"
+        }
+      ]
+    },
+    {
+      "profile": "tiny",
+      "events": 8,
+      "missingRefusals": 14,
+      "timezoneIdentical": true,
+      "fixtures": [
+        {
+          "name": "oracle.tsv",
+          "bytes": 5743,
+          "sha256": "d3e1757117355baad2b62220d9ae563be8c9a82dae02f068438887555a7072ad"
+        },
+        {
+          "name": "missing.tsv",
+          "bytes": 585,
+          "sha256": "55058caf89d20e43e032aad982dba9861a7018e43da33404c069021486667341"
+        },
+        {
+          "name": "option-sale.qtp",
+          "bytes": 407,
+          "sha256": "b29d9eead59b66416b8340a55a527eed70bec168d04861b6d64138d447da6e75"
+        }
+      ]
+    },
+    {
+      "profile": "nano",
+      "events": 8,
+      "missingRefusals": 14,
+      "timezoneIdentical": true,
+      "fixtures": [
+        {
+          "name": "oracle.tsv",
+          "bytes": 6314,
+          "sha256": "61dae7a05fb4047f1c4554f754ccfda8bf6906da9650e9d1eb5c5f922696b356"
+        },
+        {
+          "name": "missing.tsv",
+          "bytes": 585,
+          "sha256": "55058caf89d20e43e032aad982dba9861a7018e43da33404c069021486667341"
+        },
+        {
+          "name": "option-sale.qtp",
+          "bytes": 473,
+          "sha256": "d9fa625f8c6f1cc9566d2648579e70d97429556551dfde3be1b201acc810edff"
+        }
+      ]
+    },
+    {
+      "profile": "field",
+      "events": 8,
+      "missingRefusals": 14,
+      "timezoneIdentical": true,
+      "fixtures": [
+        {
+          "name": "oracle.tsv",
+          "bytes": 6053,
+          "sha256": "4caf3d6140ec36919a655012827da961593e281eac136160203a65ea62f2d4bb"
+        },
+        {
+          "name": "missing.tsv",
+          "bytes": 585,
+          "sha256": "55058caf89d20e43e032aad982dba9861a7018e43da33404c069021486667341"
+        },
+        {
+          "name": "option-sale.qtp",
+          "bytes": 520,
+          "sha256": "1ac7745c72d514d73f016a94848355166426e923dc1ae9e9adba460a862655dd"
+        }
+      ]
+    }
+  ],
+  "javaVersion": "Zulu 8.80.0.17, OpenJDK 1.8.0_422-b05",
+  "captureScope": "Production Java schema, delegate, binary composer and parser observations. C++ Feed conformance is exercised separately."
+}
