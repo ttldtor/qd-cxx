@@ -6,15 +6,23 @@
 #include "tape_playback_clock.hpp"
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <cstdint>
 #include <doctest/doctest.h>
 #include <filesystem>
+#include <fstream>
 #include <future>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <optional>
+#include <string>
+#include <system_error>
+#include <thread>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -26,6 +34,84 @@ const std::filesystem::path FIXTURES{ORG_TTLDTOR_QDCXX_TAPE_FEED_FIXTURES};
 const auto RAW_QUOTE = FIXTURES / "protocol/raw-tape/expected/raw-quote.qtp";
 const auto HISTORY_SALE = FIXTURES / "time-and-sale/wide/history.qtp";
 const auto JAVA_QUOTE_TAPES = FIXTURES / "protocol/real-tape/producer/current/expected";
+
+/** Retain one host task so the test controls execution across a source cut. */
+class HeldTapeCallbacks final : public api::CallbackExecutor {
+    std::mutex mutex_;
+    std::condition_variable posted_;
+    std::optional<api::CallbackTask> task_;
+
+    public:
+    api::CallbackPostResult post(api::CallbackTask task) override {
+        {
+            std::lock_guard lock(mutex_);
+
+            if (task_) {
+                return api::CallbackPostResult::REJECTED;
+            }
+
+            task_.emplace(std::move(task));
+        }
+
+        posted_.notify_one();
+
+        return api::CallbackPostResult::ACCEPTED;
+    }
+
+    std::optional<api::CallbackTask> take() {
+        std::unique_lock lock(mutex_);
+
+        if (!posted_.wait_for(lock, 5s, [&] {
+                return task_.has_value();
+            })) {
+            return std::nullopt;
+        }
+
+        return std::exchange(task_, std::nullopt);
+    }
+};
+
+/** Keep the HISTORY source open past its first callback without changing the fixture's data. */
+class PaddedHistoryTape {
+    std::filesystem::path directory_;
+
+    public:
+    PaddedHistoryTape() {
+        static std::atomic<unsigned> sequence = 0;
+
+        for (unsigned attempt = 0; attempt < 32; ++attempt) {
+            auto candidate =
+                std::filesystem::temp_directory_path() / ("qdcxx-history-restart-" + std::to_string(sequence++));
+            std::error_code error;
+
+            if (std::filesystem::create_directory(candidate, error)) {
+                directory_ = std::move(candidate);
+
+                return;
+            }
+        }
+
+        FAIL("Could not exclusively reserve a tape fixture directory");
+    }
+
+    ~PaddedHistoryTape() {
+        std::error_code error;
+        std::filesystem::remove(directory_ / "history.qtp", error);
+        std::filesystem::remove(directory_, error);
+    }
+
+    std::filesystem::path write() const {
+        const auto path = directory_ / "history.qtp";
+        REQUIRE(std::filesystem::copy_file(HISTORY_SALE, path));
+        std::ofstream output(path, std::ios::binary | std::ios::app);
+        constexpr std::array<char, 256> emptyEnvelopes{};
+        output.write(emptyEnvelopes.data(), static_cast<std::streamsize>(emptyEnvelopes.size()));
+        output.close();
+        REQUIRE(output);
+
+        return path;
+    }
+};
 
 api::RuntimeOptions runtimeOptions() {
     api::RuntimeOptions result;
@@ -272,6 +358,169 @@ TEST_CASE("relative tape source span refusal preserves the admitted prefix") {
     CHECK(close.hadGap);
     REQUIRE(received.size() == 1);
     CHECK(received.front().eventTime == 1600000000123);
+}
+
+TEST_CASE("tape restart cancels a queued old callback and reopens from byte zero on the same subscription") {
+    using Clock = std::chrono::steady_clock;
+    std::vector<q::events::Quote> quotes;
+    std::optional<std::uint64_t> observedEpoch;
+    api::ApiRuntime runtime(runtimeOptions());
+    const auto endpoint =
+        runtime.createEndpoint({.contract = api::DeliveryContract::STREAM, .pollInterval = 2s, .drainTimeout = 1s});
+    const auto policy = std::make_shared<HeldTapeCallbacks>();
+    endpoint->setEventExecutor(policy);
+    const auto subscription = endpoint->getFeed()->createSubscription<q::events::Quote>();
+    subscription->addSymbols("IBM");
+    subscription->addEventListener([&quotes, &observedEpoch, owner = std::weak_ptr(subscription)](auto batch) {
+        quotes.insert(quotes.end(), batch.begin(), batch.end());
+
+        if (const auto current = owner.lock()) {
+            observedEpoch = current->getStatistics().sourceEpoch;
+        }
+    });
+    CHECK_THROWS_AS(endpoint->restartTape(), api::Error);
+    CHECK_THROWS_AS(endpoint->stopTape(), api::Error);
+    endpoint->connectTape(RAW_QUOTE, {.playback = api::TapePlaybackPolicy::SOURCE_TIME, .speedPercent = 1});
+    auto stale = policy->take();
+    REQUIRE(stale);
+    CHECK(subscription->getStatistics().sourceEpoch == 1);
+    endpoint->restartTape();
+    REQUIRE(endpoint->awaitState(api::EndpointState::CONNECTED, Clock::now() + 5s).status == api::WaitStatus::REACHED);
+    auto first = policy->take();
+    REQUIRE(first);
+    CHECK(stale->run() == api::CallbackTaskRunResult::CANCELLED);
+    CHECK(first->run() == api::CallbackTaskRunResult::COMPLETED);
+    REQUIRE(quotes.size() == 1);
+    CHECK(quotes.front().bidPrice.raw == 2566530);
+    CHECK(observedEpoch == 2);
+
+    endpoint->stopTape(api::TapeStopMode::ABORT);
+    const auto closed = endpoint->closeAndAwaitTermination();
+    CHECK_FALSE(closed.drained);
+    CHECK_FALSE(closed.deadlineExpired);
+    CHECK(closed.hadGap);
+    CHECK(endpoint->getState() == api::EndpointState::CLOSED);
+    CHECK(subscription->getStatistics().final);
+    CHECK_THROWS_AS(endpoint->restartTape(), api::Error);
+}
+
+TEST_CASE("tape restart invalidates old HISTORY coverage and rebuilds it on a new epoch") {
+    using Clock = std::chrono::steady_clock;
+    const PaddedHistoryTape tape;
+    const auto path = tape.write();
+    std::atomic<std::size_t> events = 0;
+    api::ApiRuntime runtime(runtimeOptions());
+    const auto endpoint = runtime.createEndpoint({.contract = api::DeliveryContract::HISTORY, .drainTimeout = 5s});
+    const auto subscription = endpoint->getFeed()->createTimeSeriesSubscription<q::events::TimeAndSale>();
+    subscription->setFromTime(0);
+    subscription->addSymbols("AAPL");
+    subscription->addEventListener([&events, owner = std::weak_ptr(endpoint)](auto batch) {
+        if (const auto current = owner.lock()) {
+            current->setTapePaused(true);
+        }
+
+        events += batch.size();
+    });
+
+    const auto complete = [](const api::HistorySubscriptionSnapshot &cut, std::uint64_t epoch) {
+        return cut.state == api::HistoryObservationState::CURRENT && cut.sourceEpoch == epoch &&
+               cut.ranges.size() == 1 && cut.ranges.front().status.completeDeliveredRange;
+    };
+    const auto awaitHistory = [&](std::uint64_t epoch) {
+        const auto deadline = Clock::now() + 5s;
+
+        do {
+            const auto snapshot = subscription->getHistorySnapshot();
+
+            if (complete(snapshot, epoch)) {
+                return true;
+            }
+
+            std::this_thread::sleep_for(1ms);
+        } while (Clock::now() < deadline);
+
+        return false;
+    };
+
+    endpoint->connectTape(path);
+    const auto firstComplete = awaitHistory(1);
+    INFO("first cut state=", static_cast<unsigned>(subscription->getHistorySnapshot().state),
+         ", endpoint=", static_cast<unsigned>(endpoint->getState()), ", events=", events.load());
+    REQUIRE(firstComplete);
+    CHECK(events.load() == 3);
+    endpoint->restartTape();
+    REQUIRE(endpoint->awaitState(api::EndpointState::CONNECTED, Clock::now() + 5s).status == api::WaitStatus::REACHED);
+    const auto between = subscription->getHistorySnapshot();
+    CHECK_FALSE(complete(between, 1));
+    CHECK_FALSE(complete(between, 2));
+    CHECK(events.load() == 3);
+    endpoint->setTapePaused(false);
+    REQUIRE(awaitHistory(2));
+    CHECK(events.load() == 6);
+
+    endpoint->stopTape();
+    const auto closed = endpoint->closeAndAwaitTermination();
+    CHECK_FALSE(closed.deadlineExpired);
+    CHECK(endpoint->getState() == api::EndpointState::CLOSED);
+    CHECK(subscription->getHistorySnapshot().final);
+}
+
+TEST_CASE("a terminal stop cancels a restart selected from the last delivered callback") {
+    std::vector<std::uint64_t> epochs;
+    api::ApiRuntime runtime(runtimeOptions());
+    const auto endpoint = runtime.createEndpoint({.contract = api::DeliveryContract::STREAM});
+    const auto subscription = endpoint->getFeed()->createSubscription<q::events::Quote>();
+    subscription->addSymbols("IBM");
+    subscription->addEventListener([&, owner = std::weak_ptr(endpoint), sub = std::weak_ptr(subscription)](auto) {
+        if (const auto current = sub.lock()) {
+            epochs.push_back(current->getStatistics().sourceEpoch.value_or(0));
+        }
+
+        if (const auto current = owner.lock()) {
+            current->restartTape();
+            current->stopTape();
+        }
+    });
+    endpoint->connectTape(RAW_QUOTE);
+    expectCleanEof(endpoint);
+    CHECK(epochs == std::vector<std::uint64_t>{1});
+}
+
+TEST_CASE("tape restart times out without overlapping a running old callback") {
+    using Clock = std::chrono::steady_clock;
+    std::promise<void> entered;
+    std::promise<void> release;
+    auto started = entered.get_future();
+    const auto proceed = release.get_future();
+    api::ApiRuntime runtime(runtimeOptions());
+    const auto endpoint =
+        runtime.createEndpoint({.contract = api::DeliveryContract::STREAM, .pollInterval = 2s, .drainTimeout = 250ms});
+    const auto policy = std::make_shared<HeldTapeCallbacks>();
+    endpoint->setEventExecutor(policy);
+    const auto subscription = endpoint->getFeed()->createSubscription<q::events::Quote>();
+    subscription->addSymbols("IBM");
+    subscription->addEventListener([&](auto) {
+        entered.set_value();
+        static_cast<void>(proceed.wait_for(5s));
+    });
+    endpoint->connectTape(RAW_QUOTE);
+    auto task = policy->take();
+    REQUIRE(task);
+    std::jthread host([&] {
+        static_cast<void>(task->run());
+    });
+    REQUIRE(started.wait_for(5s) == std::future_status::ready);
+    endpoint->restartTape();
+    const auto failed = endpoint->awaitState(api::EndpointState::FAILED, Clock::now() + 1500ms);
+    CHECK(failed.status == api::WaitStatus::REACHED);
+    CHECK_FALSE(subscription->getStatistics().sourceEpoch);
+    CHECK_FALSE(endpoint->getStatistics().final);
+    release.set_value();
+
+    const auto closed = endpoint->closeAndAwaitTermination();
+    CHECK(closed.diagnostic.code == api::ErrorCode::TAPE_RESTART_TIMEOUT);
+    CHECK(closed.deadlineExpired);
+    CHECK_FALSE(closed.drained);
 }
 
 TEST_CASE("local tape path and quotas reject cleanly and malformed input is not clean EOF") {

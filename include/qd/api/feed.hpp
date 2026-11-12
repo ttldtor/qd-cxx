@@ -81,7 +81,8 @@ enum class ErrorCode {
     EXECUTOR_CONTRACT,   ///< Host refused or threw after actual execution began.
     CALLBACK_CANCELLED,  ///< Queued event selection cancelled by close or source reset; advisory.
     TAPE_IO_FAILURE,     ///< The selected regular local file could not be opened or read.
-    TAPE_TIMING_RANGE    ///< The relative tape span or a monotonic playback deadline exceeded its bound.
+    TAPE_TIMING_RANGE,   ///< The relative tape span or a monotonic playback deadline exceeded its bound.
+    TAPE_RESTART_TIMEOUT ///< The old tape epoch could not retire and reset within the restart allowance.
 };
 
 /** Static/numeric failure snapshot, independent of runtime and native owners. */
@@ -229,6 +230,12 @@ struct FeedFilterCategory;
 enum class TapePlaybackPolicy {
     IMMEDIATE,  ///< Deliver eligible envelopes as soon as the Feed can accept them.
     SOURCE_TIME ///< Pace eligible envelopes by source time on the runtime's monotonic clock.
+};
+
+/** Terminal policy for a file-backed endpoint. */
+enum class TapeStopMode {
+    DRAIN, ///< Apply the endpoint's admitted-prefix close policy.
+    ABORT  ///< Discard queued delivery and cancel not-started callbacks without waiting for their execution.
 };
 
 /** Finite allowances and playback policy for one local tape read. */
@@ -765,6 +772,19 @@ class Endpoint final {
      * @throws Error The endpoint has no tape source or is already closing.
      */
     void setTapePaused(bool paused);
+    /** Reopen an active tape from byte zero on this endpoint, preserving subscriptions and pause intent.
+     * An accepted request enters CONNECTING and fences the old source. Queued old work is discarded.
+     * CONNECTED identifies an opened new epoch. A failure reaches FAILED with a retained diagnostic.
+     * Additional requests while this restart is pending join the same operation. Stop or close takes precedence.
+     * @throws Error The endpoint has no active tape, is closing, or cannot accept another revision.
+     */
+    void restartTape();
+    /** End the file-backed endpoint and apply the requested terminal policy.
+     * A later abort can escalate an unfinished drain. Use closeAndAwaitTermination for the actual result.
+     * @param mode Drain or abort; running callbacks remain subject to the existing quiescence contract.
+     * @throws Error Invalid mode, no tape source, or an already terminal endpoint.
+     */
+    void stopTape(TapeStopMode mode = TapeStopMode::DRAIN);
     /** Inspect current local intent without progressing native work; absent means server default.
      * @return Owning millisecond value, including zero, independently of any peer-reported range.
      */

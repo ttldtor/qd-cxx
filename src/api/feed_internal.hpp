@@ -271,8 +271,10 @@ struct EndpointPort {
     std::string host;                  ///< Validated bounded route, copied only once before worker publication.
     std::optional<TapeSourceRequest> tape; ///< Fixed non-network source, absent for TCP.
     bool tapePaused = false;               ///< Latest local pause intent under the endpoint mutex.
-    std::uint16_t port = 0;                ///< Original nonzero route port.
-    bool connectRequested = false;         ///< Published once under the endpoint mutex.
+    bool tapeAbortRequested = false;       ///< Monotonic explicit terminal abort for this tape endpoint.
+    std::chrono::steady_clock::time_point tapeRestartDeadline; ///< First deadline of the pending restart revision.
+    std::uint16_t port = 0;                                    ///< Original nonzero route port.
+    bool connectRequested = false;                             ///< Published once under the endpoint mutex.
     std::atomic<std::chrono::steady_clock::duration::rep> closeDeadline{0}; ///< First admitted absolute drain deadline.
     std::atomic<bool> closeRequested{false};                                ///< Reserved monotonic drain admission.
     std::atomic<bool> retired{false};           ///< Native owner and all captures have retired.
