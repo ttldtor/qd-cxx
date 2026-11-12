@@ -13,6 +13,7 @@
 #include "qd/events/configuration.hpp"
 #include "qd/events/greeks.hpp"
 #include "qd/events/market_maker.hpp"
+#include "qd/events/nuam_order.hpp"
 #include "qd/events/nuam_time_and_sale.hpp"
 #include "qd/events/nuam_trade.hpp"
 #include "qd/events/option_sale.hpp"
@@ -267,7 +268,8 @@ using RegisteredEvent =
                  events::TextConfiguration, events::Message, events::Configuration, events::Order, events::MarketMaker,
                  events::SpreadOrder, events::AnalyticOrder, events::OtcMarketsOrder, events::OrderImbalance,
                  events::Series, events::Greeks, events::Underlying, events::TheoPrice, events::Candle,
-                 events::TimeAndSale, events::OptionSale, events::NuamTrade, events::NuamTimeAndSale>;
+                 events::TimeAndSale, events::OptionSale, events::NuamTrade, events::NuamTimeAndSale,
+                 events::NuamOrder>;
 
 /** Qualification of a detached HISTORY snapshot. */
 enum class HistorySnapshotState {
@@ -478,8 +480,8 @@ template <class Event> class Subscription final {
                   std::is_same_v<Event, events::Underlying> || std::is_same_v<Event, events::TheoPrice> ||
                   std::is_same_v<Event, events::Candle> || std::is_same_v<Event, events::TimeAndSale> ||
                   std::is_same_v<Event, events::OptionSale> || std::is_same_v<Event, events::NuamTrade> ||
-                  std::is_same_v<Event, events::NuamTimeAndSale> || std::is_same_v<Event, events::Order> ||
-                  std::is_same_v<Event, RegisteredEvent>);
+                  std::is_same_v<Event, events::NuamTimeAndSale> || std::is_same_v<Event, events::NuamOrder> ||
+                  std::is_same_v<Event, events::Order> || std::is_same_v<Event, RegisteredEvent>);
     std::shared_ptr<detail::SubscriptionPort> port_;
     friend class Feed;
     template <class OtherEvent> friend class IndependentSubscription;
@@ -742,6 +744,7 @@ extern template class Subscription<events::TheoPrice>;
 extern template class Subscription<events::Candle>;
 extern template class Subscription<events::TimeAndSale>;
 extern template class Subscription<events::NuamTimeAndSale>;
+extern template class Subscription<events::NuamOrder>;
 extern template class Subscription<events::OptionSale>;
 extern template class Subscription<RegisteredEvent>;
 
@@ -845,7 +848,8 @@ class Feed final {
                       std::is_same_v<Event, events::Underlying> || std::is_same_v<Event, events::TheoPrice> ||
                       std::is_same_v<Event, events::Candle> || std::is_same_v<Event, events::TimeAndSale> ||
                       std::is_same_v<Event, events::OptionSale> || std::is_same_v<Event, events::NuamTrade> ||
-                      std::is_same_v<Event, events::NuamTimeAndSale> || std::is_same_v<Event, events::Order>);
+                      std::is_same_v<Event, events::NuamTimeAndSale> || std::is_same_v<Event, events::NuamOrder> ||
+                      std::is_same_v<Event, events::Order>);
 
         if constexpr (std::is_same_v<Event, events::Quote>)
             return EventType::QUOTE;
@@ -889,6 +893,8 @@ class Feed final {
             return EventType::TIME_AND_SALE;
         else if constexpr (std::is_same_v<Event, events::OptionSale>)
             return EventType::OPTION_SALE;
+        else if constexpr (std::is_same_v<Event, events::NuamOrder>)
+            return EventType::NUAM_ORDER;
         else if constexpr (std::is_same_v<Event, events::NuamTimeAndSale>)
             return EventType::NUAM_TIME_AND_SALE;
         else if constexpr (std::is_same_v<Event, events::NuamTrade>)
