@@ -8,8 +8,10 @@
 #include "connect_peer.hpp"
 #include "connect_process_support.hpp"
 
+#include <array>
 #include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <stop_token>
 #include <string>
@@ -182,11 +184,27 @@ void checkSample(const std::filesystem::path &demo, const std::filesystem::path 
     std::filesystem::create_directories(captures);
     const auto output = captures / "sample.stdout";
     const auto error = captures / "sample.stderr";
-    process::Child child(
-        demo,
-        {"--run", "--address", "127.0.0.1:" + std::to_string(peer.port()), "--symbol", "IBM", "--duration-ms", "500"},
-        output, error);
-    require(child.wait() == 0, "sample actual Quote and deadline drain");
+    constexpr std::chrono::milliseconds SAMPLE_ADMISSION_DURATION = 2s;
+    process::Child child(demo,
+                         {"--run", "--address", "127.0.0.1:" + std::to_string(peer.port()), "--symbol", "IBM",
+                          "--duration-ms", std::to_string(SAMPLE_ADMISSION_DURATION.count())},
+                         output, error);
+    const auto status = child.wait();
+
+    if (status != 0) {
+        constexpr std::size_t MAXIMUM_STDERR_BYTES = 2048;
+        std::array<char, MAXIMUM_STDERR_BYTES> prefix;
+        std::ifstream capturedError(error, std::ios::binary);
+        capturedError.read(prefix.data(), static_cast<std::streamsize>(prefix.size()));
+
+        std::cerr << "sample exit=" << status << " peerAdds=" << peer.adds()
+                  << " peerDataSent=" << peer.initialDataSent() << " peerFailed=" << peer.failed()
+                  << "\nsample stderr prefix:\n";
+        std::cerr.write(prefix.data(), capturedError.gcount());
+        std::cerr << '\n';
+    }
+
+    require(status == 0, "sample actual Quote and deadline drain");
     require(process::read(output).find("IBM bid=") != std::string::npos, "sample actual Quote output");
     require(peer.adds() == 1 && !peer.failed(), "sample actual wire ADD");
 }

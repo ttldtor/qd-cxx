@@ -3,6 +3,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "evidence_cells.hpp"
 #include "qd/api/feed.hpp"
+#include "qd/api/time_series_event_model.hpp"
 #include "qd/encoding/compact.hpp"
 #include "qd/encoding/symbol_reader.hpp"
 #include "qd/events/event_flags.hpp"
@@ -562,7 +563,7 @@ template <class Event> void verifyRemovePending(const std::filesystem::path &dir
 
     while (std::chrono::steady_clock::now() < retirementDeadline &&
            !(retired.state == a::HistoryObservationState::NOT_MAPPED && retired.ranges.empty() &&
-             retired.logicalRevision == removedRevision &&
+             retired.logicalRevision == removedRevision && retired.mappingLogicalRevision == removedRevision &&
              retired.callbackRetirementRevision > complete.callbackRetirementRevision)) {
         std::this_thread::sleep_for(1ms);
         retired = subscription->getHistorySnapshot();
@@ -570,13 +571,16 @@ template <class Event> void verifyRemovePending(const std::filesystem::path &dir
 
     CHECK(retired.state == a::HistoryObservationState::NOT_MAPPED);
     CHECK(retired.ranges.empty());
+    CHECK(retired.mappingLogicalRevision == removedRevision);
     CHECK(retired.logicalRevision == removedRevision);
     CHECK(retired.callbackRetirementRevision > complete.callbackRetirementRevision);
     {
         const std::lock_guard lock(gate->mutex);
         CHECK_FALSE(gate->timedOut);
     }
-    CHECK(endpoint->closeAndAwaitTermination().drained);
+    const auto closed = endpoint->closeAndAwaitTermination();
+    INFO("deadline=", closed.deadlineExpired, ", gap=", closed.hadGap, ", stage=", closed.diagnostic.stage);
+    CHECK(closed.drained);
     CHECK(peer.snapshot().error == q::test::TcpPeerError::NONE);
 }
 } // namespace
@@ -609,4 +613,116 @@ TEST_CASE("Closing either sale subscription with an open transaction retires cal
     SUBCASE("OptionSale") {
         verify<e::OptionSale>(std::filesystem::path(QDCXX_SALE_LIFECYCLE_FIXTURES) / "OptionSale", true);
     }
+}
+
+TEST_CASE("an explicit time-series model follows qualified HISTORY replay across a real reconnect") {
+    constexpr std::size_t OLD_COMPLETE_COUNT = 3;
+    constexpr std::size_t OLD_PENDING_COUNT = 4;
+    const auto directory = std::filesystem::path(QDCXX_SALE_LIFECYCLE_FIXTURES) / "TimeAndSale";
+    q::test::TcpPeerConfig config;
+    config.sessions.push_back(peerScript(directory, OLD_PENDING_COUNT));
+    config.sessions.push_back(peerScript(directory / "fresh", 2));
+    config.lifetime = 30s;
+    q::test::OwnedTcpPeer peer(std::move(config));
+    REQUIRE(peer.port() != 0);
+
+    const auto recorder = std::make_shared<Recorder<e::TimeAndSale>>();
+    a::RuntimeOptions limits;
+    limits.dnsServers.push_back({{127, 0, 0, 1}});
+    a::ApiRuntime runtime(limits);
+    a::EndpointOptions options;
+    options.contract = a::DeliveryContract::HISTORY;
+    options.maximumAttempts = 2;
+    const auto endpoint = runtime.createEndpoint(options);
+    const auto subscription = endpoint->getFeed()->createTimeSeriesSubscription<e::TimeAndSale>();
+    subscription->setFromTime(0);
+    subscription->addSymbols("IBM");
+    subscription->addEventListener([recorder](std::span<const e::TimeAndSale> batch) {
+        recorder->append(batch);
+    });
+
+    a::TimeSeriesEventModel<e::TimeAndSale> model;
+    REQUIRE(model.setSymbol(u"IBM"));
+    const auto range = model.setFromTime(0);
+    REQUIRE(range);
+    endpoint->connect("127.0.0.1:" + std::to_string(peer.port()));
+    peer.allowStages(0, OLD_COMPLETE_COUNT);
+    const auto oldValues = recorder->wait(OLD_COMPLETE_COUNT);
+    REQUIRE(oldValues.size() == OLD_COMPLETE_COUNT);
+    const auto oldSource = observe(subscription, [](const auto &cut) {
+        return cut.sourceEpoch && cut.ranges.front().status.completeDeliveredRange;
+    });
+    REQUIRE(oldSource.sourceEpoch);
+
+    // The staged peer keeps the old and fresh batches separate. Qualify each owned group
+    // with the epoch observed at its own delivery barrier, before releasing the next group.
+    const auto oldEpoch = model.beginSourceEpoch(*oldSource.sourceEpoch);
+    REQUIRE(oldEpoch);
+    REQUIRE(model.processSourceEvents(*oldEpoch, *range, oldValues));
+    REQUIRE(model.confirmSourceEpoch(*oldEpoch, *range));
+    const auto completedOld = model.getSourceSnapshot();
+    REQUIRE(completedOld);
+    REQUIRE_FALSE(completedOld->snapshot.events.empty());
+
+    peer.allowStages(0, OLD_PENDING_COUNT);
+    const auto pendingValues = recorder->wait(OLD_PENDING_COUNT);
+    REQUIRE(pendingValues.size() == OLD_PENDING_COUNT);
+    const auto pending = observe(subscription, [&](const auto &cut) {
+        return cut.sourceEpoch == oldSource.sourceEpoch && cut.ranges.front().status.source->sourceTransactionPending;
+    });
+    REQUIRE(pending.sourceEpoch == oldSource.sourceEpoch);
+    REQUIRE(model.processSourceEvents(*oldEpoch, *range, std::span(pendingValues).last(1)));
+
+    REQUIRE(model.markSourceGap(*oldEpoch, a::ModelRetention::RETAIN_COMPLETED));
+    const auto historical = model.getSourceSnapshot();
+    REQUIRE(historical);
+    CHECK(historical->source.status == a::ModelSourceStatus::GAP);
+    REQUIRE(historical->snapshot.events.size() == completedOld->snapshot.events.size());
+    CHECK(historical->snapshot.events.front().getIndex() == completedOld->snapshot.events.front().getIndex());
+    REQUIRE_FALSE(model.getSnapshot());
+
+    endpoint->reconnect();
+    peer.allowStages(1, 1);
+    const auto freshStart = recorder->wait(OLD_PENDING_COUNT + 1);
+    REQUIRE(freshStart.size() == OLD_PENDING_COUNT + 1);
+    const auto freshSource = observe(subscription, [&](const auto &cut) {
+        return cut.sourceEpoch && *cut.sourceEpoch > *oldSource.sourceEpoch &&
+               cut.ranges.front().status.source->snapshot == c::HistorySnapshotState::RECEIVING;
+    });
+    REQUIRE(freshSource.sourceEpoch);
+    const auto freshEpoch = model.beginSourceEpoch(*freshSource.sourceEpoch);
+    REQUIRE(freshEpoch);
+    REQUIRE(model.processSourceEvents(*freshEpoch, *range, std::span(freshStart).last(1)));
+    const auto premature = model.confirmSourceEpoch(*freshEpoch, *range);
+    REQUIRE_FALSE(premature);
+    CHECK(premature.error() == a::ModelSourceError::REPLAY_INCOMPLETE);
+    const auto delayedOld = model.processSourceEvents(*oldEpoch, *range, std::span(pendingValues).last(1));
+    REQUIRE_FALSE(delayedOld);
+    CHECK(delayedOld.error() == a::TimeSeriesEventModelError::SOURCE_EPOCH_MISMATCH);
+
+    peer.allowStages(1, 2);
+    const auto freshEnd = recorder->wait(OLD_PENDING_COUNT + 2);
+    const auto freshComplete = observe(subscription, [&](const auto &cut) {
+        return cut.sourceEpoch == freshSource.sourceEpoch && cut.ranges.front().status.completeDeliveredRange;
+    });
+    CHECK(freshComplete.sourceEpoch == freshSource.sourceEpoch);
+    REQUIRE(model.processSourceEvents(*freshEpoch, *range, std::span(freshEnd).last(1)));
+    REQUIRE(model.confirmSourceEpoch(*freshEpoch, *range));
+    const auto current = model.getSourceSnapshot();
+    REQUIRE(current);
+    CHECK(current->source.status == a::ModelSourceStatus::CURRENT);
+    CHECK(current->source.epochOrdinal == *freshSource.sourceEpoch);
+    REQUIRE(current->snapshot.events.size() == 1);
+    CHECK(current->snapshot.events.front().getIndex() == freshStart.back().getIndex());
+
+    const auto closed = endpoint->closeAndAwaitTermination();
+    CHECK_FALSE(closed.deadlineExpired);
+    CHECK(subscription->getHistorySnapshot().state == a::HistoryObservationState::RETIRED);
+    REQUIRE(model.closeSource(*freshEpoch, a::ModelRetention::RETAIN_COMPLETED));
+    const auto final = model.getSourceSnapshot();
+    REQUIRE(final);
+    CHECK(final->source.status == a::ModelSourceStatus::CLOSED);
+    CHECK(final->snapshot.events.size() == 1);
+    CHECK(current->source.status == a::ModelSourceStatus::CURRENT);
+    CHECK(peer.snapshot().error == q::test::TcpPeerError::NONE);
 }
