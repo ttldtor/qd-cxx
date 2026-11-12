@@ -173,8 +173,8 @@ set_target_properties(qdcxx_trade PROPERTIES CXX_EXTENSIONS OFF)
 add_library(qdcxx_trade_eth src/events/trade_eth.cpp)
 target_link_libraries(qdcxx_trade_eth PUBLIC qdcxx_event_mapping PRIVATE qdcxx_market_event_symbols)
 set_target_properties(qdcxx_trade_eth PROPERTIES CXX_EXTENSIONS OFF)
-add_library(qdcxx_order src/events/order.cpp src/events/spread_order.cpp src/events/analytic_order.cpp
-    src/events/otc_markets_order.cpp src/events/order_imbalance.cpp)
+add_library(qdcxx_order src/events/order.cpp src/events/nuam_order.cpp src/events/spread_order.cpp src/events/analytic_order.cpp
+    src/events/otc_markets_order.cpp src/events/order_imbalance.cpp src/api/order_book_model.cpp)
 target_link_libraries(qdcxx_order PUBLIC qdcxx_order_index qdcxx_event_values)
 set_target_properties(qdcxx_order PROPERTIES CXX_EXTENSIONS OFF)
 add_library(qdcxx_series src/events/series.cpp)
@@ -333,7 +333,9 @@ if(ORG_TTLDTOR_QDCXX_BUILD_IPF_LIVE)
         DESTINATION "${CMAKE_INSTALL_DATADIR}/qdcxx/examples/ipf_live")
 endif()
 include(CMakePackageConfigHelpers)
-install(FILES include/qd/api/subscription_selector.hpp include/qd/api/time_series_subscription.hpp DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qd/api")
+install(FILES include/qd/api/subscription_selector.hpp include/qd/api/time_series_subscription.hpp
+    include/qd/api/indexed_event_model.hpp include/qd/api/time_series_event_model.hpp
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qd/api")
 install(TARGETS qdcxx_encoding qdcxx_core qdcxx_protocol qdcxx_collectors qdcxx_mux
     qdcxx_subscription_selectors qdcxx_event_values qdcxx_event_mapping qdcxx_quote qdcxx_profile qdcxx_trade qdcxx_trade_eth qdcxx_summary qdcxx_order qdcxx_series qdcxx_greeks qdcxx_underlying qdcxx_theo_price qdcxx_time_and_sale qdcxx_option_sale qdcxx_market_maker qdcxx_derived_order qdcxx_text_events qdcxx_attachments qdcxx_misc_events qdcxx_market_event_symbols qdcxx_event_sources qdcxx_order_index qdcxx_candle_values qdcxx_candle qdcxx_java_double qdcxx_event_text EXPORT qdcxxTargets
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
@@ -618,6 +620,23 @@ if(BUILD_TESTING)
     set_target_properties(qdcxx_time_series_subscription_tests PROPERTIES CXX_EXTENSIONS OFF)
     add_test(NAME time_series_subscription COMMAND qdcxx_time_series_subscription_tests)
     set_tests_properties(time_series_subscription PROPERTIES TIMEOUT 60)
+    add_executable(qdcxx_indexed_event_model_tests tests/conformance/indexed_event_model_tests.cpp)
+    target_link_libraries(qdcxx_indexed_event_model_tests PRIVATE
+        qdcxx_order qdcxx_derived_order qdcxx_candle doctest::doctest)
+    set_target_properties(qdcxx_indexed_event_model_tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME indexed_event_model COMMAND qdcxx_indexed_event_model_tests)
+    set_tests_properties(indexed_event_model PROPERTIES TIMEOUT 60)
+    add_executable(qdcxx_time_series_event_model_tests tests/conformance/time_series_event_model_tests.cpp)
+    target_link_libraries(qdcxx_time_series_event_model_tests PRIVATE
+        qdcxx_time_and_sale qdcxx_candle doctest::doctest)
+    set_target_properties(qdcxx_time_series_event_model_tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME time_series_event_model COMMAND qdcxx_time_series_event_model_tests)
+    set_tests_properties(time_series_event_model PROPERTIES TIMEOUT 60)
+    add_executable(qdcxx_order_book_model_tests tests/conformance/order_book_model_tests.cpp)
+    target_link_libraries(qdcxx_order_book_model_tests PRIVATE qdcxx_order doctest::doctest)
+    set_target_properties(qdcxx_order_book_model_tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME order_book_model COMMAND qdcxx_order_book_model_tests)
+
     add_executable(qdcxx_delivery_projection_tests tests/conformance/delivery_projection_tests.cpp)
     target_link_libraries(qdcxx_delivery_projection_tests PRIVATE qdcxx_mux qdcxx_quote qdcxx_order doctest::doctest)
     set_target_properties(qdcxx_delivery_projection_tests PROPERTIES CXX_EXTENSIONS OFF)
@@ -1108,6 +1127,17 @@ if(BUILD_TESTING)
             endif()
             add_test(NAME nuam_time_and_sale_feed COMMAND qdcxx_nuam_time_and_sale_feed_tests)
             set_tests_properties(nuam_time_and_sale_feed PROPERTIES TIMEOUT 90)
+            add_executable(qdcxx_nuam_order_feed_tests tests/conformance/nuam_order_feed_tests.cpp tests/conformance/connect_peer.cpp tests/conformance/recovery_test_peer.cpp)
+            target_include_directories(qdcxx_nuam_order_feed_tests PRIVATE src/api)
+            target_link_libraries(qdcxx_nuam_order_feed_tests PRIVATE qdcxx_feed doctest::doctest)
+            target_compile_definitions(qdcxx_nuam_order_feed_tests PRIVATE ORG_TTLDTOR_QDCXX_NUAM_ORDER_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/nuam-order")
+            set_target_properties(qdcxx_nuam_order_feed_tests PROPERTIES CXX_EXTENSIONS OFF)
+            if(WIN32)
+                target_compile_definitions(qdcxx_nuam_order_feed_tests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+                target_link_libraries(qdcxx_nuam_order_feed_tests PRIVATE ws2_32)
+            endif()
+            add_test(NAME nuam_order_feed COMMAND qdcxx_nuam_order_feed_tests)
+            set_tests_properties(nuam_order_feed PROPERTIES TIMEOUT 90)
 
             add_executable(qdcxx_option_sale_feed_tests tests/conformance/option_sale_feed_tests.cpp
                 tests/conformance/recovery_test_peer.cpp)

@@ -651,6 +651,48 @@ existing sticky availability marker; reads and reconnect never reset totals.
 
 [Server aggregation](SERVER-AGGREGATION.md): separate local requests and current-peer reports, bounded descriptor updates and explicit unknown states.
 
+## Indexed event model
+
+Use `IndexedEventModel<events::Order>` from `qd/api/indexed_event_model.hpp` to
+assemble typed indexed updates after delivery. Pass one exact logical symbol,
+source ID and ordered event span to `processEvents`. Route input for different
+symbol/source pairs separately. The model returns completed changes by value
+and keeps the previous visible view while a transaction or snapshot is unfinished.
+Call `getSnapshot` for an independent copy ordered by signed index.
+
+Serialize calls on each model. It owns data only, so the application controls
+where it runs and when to clear it. [Snapshot and transaction contract](../spec/events/INDEXED-EVENT-MODEL.md).
+
+## Time-series event model
+
+Use `TimeSeriesEventModel<events::TimeAndSale>` from
+`qd/api/time_series_event_model.hpp` for a detached, time-ordered range view.
+Set the exact symbol and inclusive `fromTime`, then pass the range revision
+associated with the delivered batch to `processEvents`. `getSnapshot` returns
+an owning cut with the selected symbol, bound and completed events. Raising the
+bound drops old values and keeps the overlap. After widening, feed the older
+events again to populate the newly selected range.
+
+The application controls subscription demand and maps it to the local revision.
+[Time-series range and lifetime contract](../spec/events/TIME-SERIES-EVENT-MODEL.md).
+
+## Order-book snapshots
+
+Use `OrderBookModel` from `qd/api/order_book_model.hpp` to combine committed
+ordinary Order events from several sources. Pass one exact symbol/source batch
+at a time, then call `getSnapshot(symbol)` for owning bid and ask lists from
+the same cut. See the [order-book contract](../spec/events/ORDER-BOOK-MODEL.md)
+for ordering, snapshot completion and limits.
+
+Use `getFilteredSnapshot` to select scopes, one source, depth or lot size.
+Enable aggregate correction explicitly when creating the model. Corrections
+use completed updates and business time. See [display and correction rules](../spec/events/ORDER-BOOK-MODEL.md).
+
+Use the [source epoch contract](../spec/events/MODEL-SOURCE-EPOCH.md) to
+fence delayed deliveries across a gap or reconnect and to distinguish a
+historical cut from a confirmed current one. Capture the originating token
+with each batch. The application drives these lifecycle transitions.
+
 ## Indexed option series
 
 Use `Feed::createSubscription<events::Series>()` on a HISTORY endpoint. The default
@@ -721,3 +763,5 @@ For an exact Candle subscription, pass its parsed `CandleSymbol` to the same
 Set `EndpointOptions::aggregationPeriod` or the `dxfeed.aggregationPeriod` configuration property for a local endpoint floor. `Subscription::setAggregationPeriod` sets an optional per-subscription period. The effective local period is their maximum and takes effect after the running interval. `Subscription::getAggregationPeriodInfo` reports the local period selected for the last actual listener invocation, or no value before one. `Endpoint::getAggregationPeriodInfo` separately reports an upstream descriptor.
 
 A TICKER subscription retains waiting updates in its collector so repeated values of one key may conflate. STREAM and HISTORY use bounded ordered queues and can report their existing overflow outcome. During a running interval, TICKER initial collector values remain eligible ahead of pending live updates. Already detached queue entries retain their original order. Closing drains admitted events without waiting for the local interval. Zero preserves immediate delivery.
+
+Use `createSubscription<events::NuamOrder>()` on a HISTORY endpoint for indexed Nuam order updates. See [NuamOrder receiving](../spec/events/NUAM-ORDER.md).
