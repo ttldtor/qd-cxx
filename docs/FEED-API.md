@@ -642,6 +642,14 @@ Call `getSnapshot` for an independent copy ordered by signed index.
 Serialize calls on each model. It owns data only, so the application controls
 where it runs and when to clear it. [Snapshot and transaction contract](../spec/events/INDEXED-EVENT-MODEL.md).
 
+## Order-book snapshots
+
+Use `OrderBookModel` from `qd/api/order_book_model.hpp` to combine committed
+ordinary Order events from several sources. Pass one exact symbol/source batch
+at a time, then call `getSnapshot(symbol)` for owning bid and ask lists from
+the same cut. See the [order-book contract](../spec/events/ORDER-BOOK-MODEL.md)
+for ordering, snapshot completion and limits.
+
 ## Indexed option series
 
 Use `Feed::createSubscription<events::Series>()` on a HISTORY endpoint. The default

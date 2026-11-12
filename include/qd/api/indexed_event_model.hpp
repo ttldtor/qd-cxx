@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <limits>
 #include <map>
 #include <new>
 #include <optional>
@@ -382,6 +383,35 @@ template <detail::IndexedModelEvent Event> class IndexedEventModel final {
 
                 for (const auto &entry : current->second.active) {
                     snapshot.push_back(entry.second);
+                }
+            }
+
+            return snapshot;
+        } catch (const std::length_error &) {
+            return std::unexpected(IndexedEventModelError::RESOURCE_LIMIT);
+        } catch (const std::bad_alloc &) {
+            return std::unexpected(IndexedEventModelError::ALLOCATION_FAILURE);
+        }
+    }
+
+    /** Copy committed values of one symbol across all sources in a single serialized operation.
+     * @param symbol Exact UTF-16 logical symbol.
+     * @return Detached values ordered by signed source, then signed index, or a typed refusal.
+     */
+    [[nodiscard]] std::expected<std::vector<Event>, IndexedEventModelError>
+    getSnapshotForSymbol(std::u16string_view symbol) const {
+        if (symbol.size() > limits_.symbolUnits) {
+            return std::unexpected(IndexedEventModelError::RESOURCE_LIMIT);
+        }
+
+        try {
+            std::vector<Event> snapshot;
+            const Key first{std::u16string(symbol), std::numeric_limits<std::int32_t>::min()};
+
+            for (auto entry = partitions_.lower_bound(first);
+                 entry != partitions_.end() && entry->first.first == symbol; ++entry) {
+                for (const auto &value : entry->second.active) {
+                    snapshot.push_back(value.second);
                 }
             }
 
