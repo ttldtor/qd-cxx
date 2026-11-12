@@ -5,6 +5,7 @@
 #include "qd/api/feed.hpp"
 
 #include <string_view>
+#include <type_traits>
 #include <variant>
 
 namespace org::ttldtor::qdcxx::feed_tests {
@@ -17,6 +18,11 @@ inline std::u16string_view registeredEventSymbol(const api::RegisteredEvent &val
         [](const auto &event) -> std::u16string_view {
             if constexpr (requires { event.symbol; }) {
                 return event.symbol;
+            } else if constexpr (std::is_same_v<std::decay_t<decltype(event)>, events::Candle>) {
+                if (event.eventSymbol) {
+                    return event.eventSymbol->getSymbol().value_or(std::u16string_view{});
+                }
+                return {};
             } else {
                 return event.order.symbol;
             }
