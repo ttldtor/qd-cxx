@@ -365,3 +365,5 @@ cache replay. Input-free EN/RU/Get-Help, bounded JDK8 Capture/Verify with exact 
 - [NuamTrade oracle](../upstream/nuam-trade-oracle/README.md) captures bounded Java observations with input-free EN/RU help.
 
 - [NuamTimeAndSale oracle](../upstream/nuam-time-and-sale-oracle/README.md) captures indexed sale observations with input-free EN/RU help.
+
+- [NuamOrder oracle](../upstream/nuam-order-oracle/README.md) captures offline indexed-order observations with EN/RU help.

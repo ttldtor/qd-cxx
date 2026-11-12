@@ -46,6 +46,7 @@ bool supported(const EventRegistry &registry, EventType type) noexcept {
     case EventType::THEO_PRICE:
     case EventType::CANDLE:
     case EventType::TIME_AND_SALE:
+    case EventType::NUAM_ORDER:
     case EventType::NUAM_TIME_AND_SALE:
     case EventType::NUAM_TRADE:
     case EventType::OPTION_SALE:
@@ -329,6 +330,8 @@ std::vector<FilterCoordinate> filterEventCoordinates(const EventRegistry &regist
                     return EventType::OPTION_SALE;
                 } else if constexpr (std::is_same_v<Event, events::NuamTimeAndSale>) {
                     return EventType::NUAM_TIME_AND_SALE;
+                } else if constexpr (std::is_same_v<Event, events::NuamOrder>) {
+                    return EventType::NUAM_ORDER;
                 } else if constexpr (std::is_same_v<Event, events::NuamTrade>) {
                     return EventType::NUAM_TRADE;
                 } else if constexpr (std::is_same_v<Event, events::Order>) {

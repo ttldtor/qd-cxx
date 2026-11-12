@@ -62,8 +62,6 @@ struct TapeLimits {
     std::size_t timingEvents = 0; ///< RAW/broad metadata attempts: explicit heartbeats and data frames; zero is finite.
     std::size_t snapshotUnits =
         0; ///< Broad schema/description/context/descriptor/temporary peak units; zero is finite.
-    std::optional<StreamDataLimits>
-        dataPerFrame{}; ///< Optional tighter payload and aggregate data allowances per frame.
 };
 /** Terminal categories, independent of Java exception classes. */
 enum class TapeError {
@@ -135,6 +133,7 @@ class TapeReader {
     friend class detail::TapeEventBridge;
 
     TapeLimits limits_;
+    std::optional<StreamDataLimits> dataPerFrame_; ///< Tighter per-frame limits for the fixed-schema Feed adapter.
     TapeMode mode_;
     core::LocalSchema schema_;
     bool discoverSchema_ = false; ///< Explicit ordinary wire-schema policy, never inferred from input.
@@ -187,7 +186,8 @@ class TapeReader {
 
     /** Create a fixed-schema reader for the collector adapter, or preserve ordinary generation provenance. */
     TapeReader(const core::LocalSchema &schema, TapeLimits limits, TapeMode mode, FieldTimePolicy fieldTimePolicy,
-               TapeExternalTimePolicy externalTimePolicy, SchemaProvenance schemaProvenance);
+               TapeExternalTimePolicy externalTimePolicy, SchemaProvenance schemaProvenance,
+               std::optional<StreamDataLimits> dataPerFrame);
 
     public:
     /** Copy a validated local schema within bounds and allocate framing storage.

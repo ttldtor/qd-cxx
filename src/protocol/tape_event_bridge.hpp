@@ -17,12 +17,13 @@ class TapeEventBridge {
     public:
     /** Open a catalog parser sharing the exact fixed local schema used by the collector.
      * @param schema Validated receiving schema, copied with its original provenance.
-     * @param limits Finite parser allowances.
+     * @param limits Finite parser and cumulative allowances.
+     * @param dataPerFrame Additional decoding allowances for each individual frame.
      * @param fieldTime Selected FIELD decoding policy.
      * @return The owning reader; wire descriptions can change without replacing local schema identity.
      */
     static TapeReader makeFixedSchemaReader(const core::LocalSchema &schema, TapeLimits limits,
-                                            FieldTimePolicy fieldTime);
+                                            StreamDataLimits dataPerFrame, FieldTimePolicy fieldTime);
 
     /** Create a local epoch with an empty descriptor, no peer or network policy.
      * @param limits Exact shared event backing and ownership allowances.

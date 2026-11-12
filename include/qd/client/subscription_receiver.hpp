@@ -9,6 +9,7 @@
 #include "qd/events/event_projection.hpp"
 #include "qd/events/greeks.hpp"
 #include "qd/events/market_maker.hpp"
+#include "qd/events/nuam_order.hpp"
 #include "qd/events/nuam_time_and_sale.hpp"
 #include "qd/events/nuam_trade.hpp"
 #include "qd/events/option_sale.hpp"
@@ -45,30 +46,31 @@ struct ReceiverPlan;
 
 /** Existing prepared business projections; other records remain fully generic. */
 enum class PreparedEventKind {
-    QUOTE,                  ///< Existing schema-bound Quote projection.
-    PROFILE,                ///< Existing schema-bound Profile projection.
-    TRADE,                  ///< Complete owning Trade projection.
-    TRADE_ETH,              ///< Complete distinct owning extended-hours projection.
-    SUMMARY,                ///< Complete owning session-summary projection.
-    TEXT_MESSAGE,           ///< Owning text message projection.
-    TEXT_CONFIGURATION,     ///< Owning text configuration projection.
-    MESSAGE = 7,            ///< Owning serialized Message projection.
-    CONFIGURATION = 8,      ///< Owning serialized Configuration projection.
-    ORDER = 9,              ///< Owning ordinary or explicitly derived indexed Order projection.
-    MARKET_MAKER = 10,      ///< Owning indexed MarketMaker projection.
-    SPREAD_ORDER = 11,      ///< Owning indexed SpreadOrder projection.
-    ANALYTIC_ORDER = 12,    ///< Owning indexed AnalyticOrder projection.
-    OTC_MARKETS_ORDER = 13, ///< Owning indexed OtcMarketsOrder projection.
-    ORDER_IMBALANCE = 14,   ///< Owning source-specific TICKER OrderImbalance projection.
-    SERIES = 15,            ///< Owning indexed option Series projection.
-    GREEKS = 16,            ///< Owning option risk sensitivities projection.
-    UNDERLYING = 17,        ///< Owning underlying option activity projection.
-    THEO_PRICE = 18,        ///< Owning option theoretical price projection.
-    CANDLE = 19,            ///< Owning Candle projection with restored event symbol.
-    TIME_AND_SALE = 20,     ///< Owning trade report with separate indexed and business flags.
-    OPTION_SALE = 21,       ///< Owning indexed option sale.
-    NUAM_TRADE = 22,        ///< Owning Nuam Trade and statistics.
-    NUAM_TIME_AND_SALE = 23 ///< Owning Nuam indexed trade report.
+    QUOTE,                   ///< Existing schema-bound Quote projection.
+    PROFILE,                 ///< Existing schema-bound Profile projection.
+    TRADE,                   ///< Complete owning Trade projection.
+    TRADE_ETH,               ///< Complete distinct owning extended-hours projection.
+    SUMMARY,                 ///< Complete owning session-summary projection.
+    TEXT_MESSAGE,            ///< Owning text message projection.
+    TEXT_CONFIGURATION,      ///< Owning text configuration projection.
+    MESSAGE = 7,             ///< Owning serialized Message projection.
+    CONFIGURATION = 8,       ///< Owning serialized Configuration projection.
+    ORDER = 9,               ///< Owning ordinary or explicitly derived indexed Order projection.
+    MARKET_MAKER = 10,       ///< Owning indexed MarketMaker projection.
+    SPREAD_ORDER = 11,       ///< Owning indexed SpreadOrder projection.
+    ANALYTIC_ORDER = 12,     ///< Owning indexed AnalyticOrder projection.
+    OTC_MARKETS_ORDER = 13,  ///< Owning indexed OtcMarketsOrder projection.
+    ORDER_IMBALANCE = 14,    ///< Owning source-specific TICKER OrderImbalance projection.
+    SERIES = 15,             ///< Owning indexed option Series projection.
+    GREEKS = 16,             ///< Owning option risk sensitivities projection.
+    UNDERLYING = 17,         ///< Owning underlying option activity projection.
+    THEO_PRICE = 18,         ///< Owning option theoretical price projection.
+    CANDLE = 19,             ///< Owning Candle projection with restored event symbol.
+    TIME_AND_SALE = 20,      ///< Owning trade report with separate indexed and business flags.
+    OPTION_SALE = 21,        ///< Owning indexed option sale.
+    NUAM_TRADE = 22,         ///< Owning Nuam Trade and statistics.
+    NUAM_TIME_AND_SALE = 23, ///< Owning Nuam indexed trade report.
+    NUAM_ORDER = 24          ///< Owning Nuam indexed order.
 };
 
 /** Explicit source for optional event metadata; indexed identity is never a timestamp substitute. */
@@ -129,7 +131,8 @@ struct SubscriptionProjection {
                  events::TextMessage, events::TextConfiguration, events::Message, events::Configuration, events::Order,
                  events::MarketMaker, events::SpreadOrder, events::AnalyticOrder, events::OtcMarketsOrder,
                  events::OrderImbalance, events::Series, events::Greeks, events::Underlying, events::TheoPrice,
-                 events::Candle, events::TimeAndSale, events::OptionSale, events::NuamTrade, events::NuamTimeAndSale>
+                 events::Candle, events::TimeAndSale, events::OptionSale, events::NuamTrade, events::NuamTimeAndSale,
+                 events::NuamOrder>
         value;                               ///< Owned event or explicit generic route.
     std::optional<std::int64_t> eventTimeMs; ///< Actual selected FIELD metadata only; rawTime stays independent.
 };

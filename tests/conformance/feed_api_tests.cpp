@@ -4664,7 +4664,9 @@ TEST_CASE("public subscription observation preserves typed identities while dema
     script.waitForClientClose = true;
     root::test::OwnedTcpPeer source(std::move(config));
     REQUIRE(source.port() != 0);
-    auto endpoint = runtime.createEndpoint(endpointOptions());
+    auto options = endpointOptions();
+    options.drainTimeout = api::EndpointOptions{}.drainTimeout;
+    auto endpoint = runtime.createEndpoint(options);
     auto first = endpoint->getFeed()->createSubscription<events::Quote>();
     auto second = endpoint->getFeed()->createSubscription<events::Quote>();
     const auto indexed = api::SubscriptionSelector::indexed(u"IBM", {0, u"ignored"});
@@ -4698,7 +4700,9 @@ TEST_CASE("public subscription observation preserves typed identities while dema
     first->removeChangeListener(observerId);
     first->clearSymbols();
     CHECK(second->getSnapshot().symbols.size() == 1);
-    CHECK(endpoint->closeAndAwaitTermination().drained);
+    const auto closed = endpoint->closeAndAwaitTermination();
+    INFO("deadline=", closed.deadlineExpired, ", gap=", closed.hadGap, ", stage=", closed.diagnostic.stage);
+    CHECK(closed.drained);
     CHECK(source.snapshot().error == root::test::TcpPeerError::NONE);
 }
 
