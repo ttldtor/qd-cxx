@@ -55,7 +55,8 @@ enum class EventSelection {
     OPTION_SALE = 1 << 21,                ///< Selected indexed OptionSale routes.
     NUAM_TRADE = 1 << 22,                 ///< Selected native NuamTrade routes.
     NUAM_TIME_AND_SALE = 1 << 23,         ///< Selected native NuamTimeAndSale routes.
-    ALL = (1 << 24) - 1,                  ///< Every supported event route.
+    NUAM_ORDER = 1 << 24,                 ///< Selected Nuam indexed orders.
+    ALL = (1 << 25) - 1,                  ///< Every supported event route.
 };
 
 /** Test a finite supported-kind selection without depending on local record positions.
@@ -72,7 +73,7 @@ constexpr bool selectsEvent(EventSelection selection, EventType type) noexcept {
         type != EventType::ORDER_IMBALANCE && type != EventType::SERIES && type != EventType::GREEKS &&
         type != EventType::UNDERLYING && type != EventType::THEO_PRICE && type != EventType::CANDLE &&
         type != EventType::TIME_AND_SALE && type != EventType::OPTION_SALE && type != EventType::NUAM_TRADE &&
-        type != EventType::NUAM_TIME_AND_SALE) {
+        type != EventType::NUAM_TIME_AND_SALE && type != EventType::NUAM_ORDER) {
         return false;
     }
 
@@ -85,7 +86,7 @@ constexpr bool selectsEvent(EventSelection selection, EventType type) noexcept {
  */
 constexpr bool isOrderSourceEvent(EventType type) noexcept {
     return type == EventType::ORDER || type == EventType::SPREAD_ORDER || type == EventType::ANALYTIC_ORDER ||
-           type == EventType::OTC_MARKETS_ORDER;
+           type == EventType::OTC_MARKETS_ORDER || type == EventType::NUAM_ORDER;
 }
 
 /** @param type Business event type.
@@ -121,6 +122,7 @@ enum class EventDelivery {
     OPTION_SALE,        ///< Complete owning indexed option sales.
     NUAM_TRADE,         ///< Complete owning NuamTrade values.
     NUAM_TIME_AND_SALE, ///< Owning Nuam sale values.
+    NUAM_ORDER,         ///< Owning Nuam indexed orders.
     REGISTERED          ///< Owning public RegisteredEvent variants, restricted by EventSelection.
 };
 

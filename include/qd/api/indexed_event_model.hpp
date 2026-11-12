@@ -4,10 +4,12 @@
 
 #include "qd/events/event_flags.hpp"
 
+#include <algorithm>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <limits>
 #include <map>
 #include <new>
 #include <optional>
@@ -22,9 +24,13 @@ namespace org::ttldtor::qdcxx::api {
 
 /** Finite model refusal. A failed operation publishes no changes. */
 enum class IndexedEventModelError {
-    WRONG_KEY,         ///< The input symbol or source differs from the requested partition.
-    RESOURCE_LIMIT,    ///< A finite count or symbol limit would be exceeded.
-    ALLOCATION_FAILURE ///< A required owning copy could not be allocated.
+    WRONG_KEY,             ///< The input symbol or source differs from the requested partition.
+    RESOURCE_LIMIT,        ///< A finite count or symbol limit would be exceeded.
+    ALLOCATION_FAILURE,    ///< A required owning copy could not be allocated.
+    INVALID_OPTIONS,       ///< A derived model operation received unsupported options.
+    SOURCE_EPOCH_REQUIRED, ///< Untagged input is disabled after an explicit source epoch starts.
+    SOURCE_EPOCH_MISMATCH, ///< Input token does not name the active source epoch.
+    SOURCE_INACTIVE        ///< The source is fenced or its cut is not current.
 };
 
 /** Independent finite allowances. Zero disables the corresponding capacity. */
@@ -52,6 +58,8 @@ template <class Event> struct IndexedEventChange {
 };
 
 namespace detail {
+
+struct TimeSeriesEventModelStorage;
 
 template <class Event>
 concept IndexedModelFlatFlags = requires(Event &event) {
@@ -140,6 +148,8 @@ template <class Event> decltype(auto) indexedModelFlags(Event &event) noexcept {
  * @tparam Event Copyable owning indexed event with an exact logical symbol, signed source and index, and indexed flags.
  */
 template <detail::IndexedModelEvent Event> class IndexedEventModel final {
+    friend struct detail::TimeSeriesEventModelStorage;
+
     enum class SnapshotProgress { NONE, RECEIVING, COMPLETE, SNIPPED };
     using Key = std::pair<std::u16string, std::int32_t>;
     using Values = std::map<std::int64_t, Event>;
@@ -268,6 +278,27 @@ template <detail::IndexedModelEvent Event> class IndexedEventModel final {
      */
     [[nodiscard]] std::expected<Changes, IndexedEventModelError>
     processEvents(std::u16string_view symbol, std::int32_t sourceId, std::span<const Event> input) {
+        return processEventsChecked(symbol, sourceId, input,
+                                    [](const Changes &) -> std::expected<void, IndexedEventModelError> {
+                                        return {};
+                                    });
+    }
+
+    private:
+    friend class OrderBookModel;
+
+    /** Prepare indexed data and dependent state before publishing either.
+     * @tparam Prepare Internal callable returning success or a typed refusal without publishing state.
+     * @param symbol Exact logical symbol.
+     * @param sourceId Exact signed source ID.
+     * @param input Borrowed events in arrival order.
+     * @param prepare Stages dependent data while completed changes remain valid.
+     * @return Owning completed changes, or a refusal leaving the indexed model unchanged.
+     */
+    template <class Prepare>
+    [[nodiscard]] std::expected<Changes, IndexedEventModelError>
+    processEventsChecked(std::u16string_view symbol, std::int32_t sourceId, std::span<const Event> input,
+                         Prepare &&prepare) {
         using namespace events::indexed_event_flags;
 
         if (symbol.size() > limits_.symbolUnits || input.size() > limits_.inputEvents) {
@@ -338,6 +369,12 @@ template <detail::IndexedModelEvent Event> class IndexedEventModel final {
                 }
             }
 
+            if (!changes.empty()) {
+                if (const auto prepared = prepare(changes); !prepared) {
+                    return std::unexpected(prepared.error());
+                }
+            }
+
             if (next.active.empty() && next.pending.empty()) {
                 if (current != partitions_.end()) {
                     partitions_.erase(current);
@@ -362,6 +399,7 @@ template <detail::IndexedModelEvent Event> class IndexedEventModel final {
         }
     }
 
+    public:
     /** Copy the currently retained view, independent of pending values.
      * @param symbol Exact UTF-16 logical symbol.
      * @param sourceId Exact signed source ID.
@@ -390,6 +428,57 @@ template <detail::IndexedModelEvent Event> class IndexedEventModel final {
             return std::unexpected(IndexedEventModelError::RESOURCE_LIMIT);
         } catch (const std::bad_alloc &) {
             return std::unexpected(IndexedEventModelError::ALLOCATION_FAILURE);
+        }
+    }
+
+    /** Copy committed values of one symbol across all sources in a single serialized operation.
+     * @param symbol Exact UTF-16 logical symbol.
+     * @return Detached values ordered by signed source, then signed index, or a typed refusal.
+     */
+    [[nodiscard]] std::expected<std::vector<Event>, IndexedEventModelError>
+    getSnapshotForSymbol(std::u16string_view symbol) const {
+        if (symbol.size() > limits_.symbolUnits) {
+            return std::unexpected(IndexedEventModelError::RESOURCE_LIMIT);
+        }
+
+        try {
+            std::vector<Event> snapshot;
+            const Key first{std::u16string(symbol), std::numeric_limits<std::int32_t>::min()};
+
+            for (auto entry = partitions_.lower_bound(first);
+                 entry != partitions_.end() && entry->first.first == symbol; ++entry) {
+                for (const auto &value : entry->second.active) {
+                    snapshot.push_back(value.second);
+                }
+            }
+
+            return snapshot;
+        } catch (const std::length_error &) {
+            return std::unexpected(IndexedEventModelError::RESOURCE_LIMIT);
+        } catch (const std::bad_alloc &) {
+            return std::unexpected(IndexedEventModelError::ALLOCATION_FAILURE);
+        }
+    }
+
+    /** @return True while any admitted source transaction or snapshot is incomplete. */
+    [[nodiscard]] bool hasUnfinished() const noexcept {
+        return std::ranges::any_of(partitions_, [](const auto &entry) {
+            return !entry.second.pending.empty();
+        });
+    }
+
+    /** Discard incomplete source fragments without modifying completed indexed values. */
+    void discardUnfinished() noexcept {
+        for (auto entry = partitions_.begin(); entry != partitions_.end();) {
+            auto &partition = entry->second;
+            partition.pending.clear();
+            partition.snapshot = SnapshotProgress::NONE;
+
+            if (partition.active.empty()) {
+                entry = partitions_.erase(entry);
+            } else {
+                ++entry;
+            }
         }
     }
 

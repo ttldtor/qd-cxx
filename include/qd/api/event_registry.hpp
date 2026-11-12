@@ -17,30 +17,31 @@
 namespace org::ttldtor::qdcxx::api {
 /** Supported business projections; custom records remain part of the complete generic schema. */
 enum class EventType {
-    QUOTE,                  ///< Existing schema-bound Quote adapter.
-    PROFILE,                ///< Existing schema-bound Profile adapter.
-    TRADE,                  ///< Schema-bound composite or regional Trade adapter.
-    TRADE_ETH,              ///< Distinct extended-hours TradeETH adapter, including applicable regional records.
-    SUMMARY,                ///< Complete owning trading-session summary.
-    TEXT_MESSAGE,           ///< Owning message with nullable exact text.
-    TEXT_CONFIGURATION,     ///< Owning lasting configuration with nullable exact text.
-    MESSAGE = 7,            ///< Exact owning serialized Message attachment; STREAM only.
-    CONFIGURATION = 8,      ///< Owning serialized Configuration with independent signed version metadata.
-    ORDER = 9,              ///< Owning indexed Order with an explicit native or derived projection family.
-    MARKET_MAKER = 10,      ///< Owning indexed MarketMaker; ordinary reception requires HISTORY.
-    SPREAD_ORDER = 11,      ///< Owning indexed SpreadOrder; reception requires HISTORY.
-    ANALYTIC_ORDER = 12,    ///< Owning indexed AnalyticOrder; reception requires HISTORY.
-    OTC_MARKETS_ORDER = 13, ///< Owning indexed OtcMarketsOrder; reception requires HISTORY.
-    ORDER_IMBALANCE = 14,   ///< Owning source-specific OrderImbalance; reception requires TICKER.
-    SERIES = 15,            ///< Owning indexed option Series; reception requires HISTORY.
-    GREEKS = 16,            ///< Owning option risk sensitivities, available on TICKER and HISTORY.
-    UNDERLYING = 17,        ///< Owning option activity for an underlying, available on TICKER and HISTORY.
-    THEO_PRICE = 18,        ///< Owning option theoretical price, available on TICKER and HISTORY.
-    CANDLE = 19,            ///< Owning Candle values from qualified TICKER or HISTORY records.
-    TIME_AND_SALE = 20,     ///< Owning trade reports, available on STREAM and HISTORY.
-    OPTION_SALE = 21,       ///< Owning indexed option sale.
-    NUAM_TRADE = 22,        ///< Owning Nuam Trade and statistics.
-    NUAM_TIME_AND_SALE = 23 ///< Owning Nuam indexed trade report.
+    QUOTE,                   ///< Existing schema-bound Quote adapter.
+    PROFILE,                 ///< Existing schema-bound Profile adapter.
+    TRADE,                   ///< Schema-bound composite or regional Trade adapter.
+    TRADE_ETH,               ///< Distinct extended-hours TradeETH adapter, including applicable regional records.
+    SUMMARY,                 ///< Complete owning trading-session summary.
+    TEXT_MESSAGE,            ///< Owning message with nullable exact text.
+    TEXT_CONFIGURATION,      ///< Owning lasting configuration with nullable exact text.
+    MESSAGE = 7,             ///< Exact owning serialized Message attachment; STREAM only.
+    CONFIGURATION = 8,       ///< Owning serialized Configuration with independent signed version metadata.
+    ORDER = 9,               ///< Owning indexed Order with an explicit native or derived projection family.
+    MARKET_MAKER = 10,       ///< Owning indexed MarketMaker; ordinary reception requires HISTORY.
+    SPREAD_ORDER = 11,       ///< Owning indexed SpreadOrder; reception requires HISTORY.
+    ANALYTIC_ORDER = 12,     ///< Owning indexed AnalyticOrder; reception requires HISTORY.
+    OTC_MARKETS_ORDER = 13,  ///< Owning indexed OtcMarketsOrder; reception requires HISTORY.
+    ORDER_IMBALANCE = 14,    ///< Owning source-specific OrderImbalance; reception requires TICKER.
+    SERIES = 15,             ///< Owning indexed option Series; reception requires HISTORY.
+    GREEKS = 16,             ///< Owning option risk sensitivities, available on TICKER and HISTORY.
+    UNDERLYING = 17,         ///< Owning option activity for an underlying, available on TICKER and HISTORY.
+    THEO_PRICE = 18,         ///< Owning option theoretical price, available on TICKER and HISTORY.
+    CANDLE = 19,             ///< Owning Candle values from qualified TICKER or HISTORY records.
+    TIME_AND_SALE = 20,      ///< Owning trade reports, available on STREAM and HISTORY.
+    OPTION_SALE = 21,        ///< Owning indexed option sale.
+    NUAM_TRADE = 22,         ///< Owning Nuam Trade and statistics.
+    NUAM_TIME_AND_SALE = 23, ///< Owning Nuam indexed trade report.
+    NUAM_ORDER = 24          ///< Owning Nuam indexed order.
 };
 
 /** Explicit source of optional event metadata, independent of indexed record identity. */
@@ -53,7 +54,10 @@ enum class EventTimePolicy {
 struct EventRegistration {
     EventType type;             ///< Actual supported projection, never inferred from a record name.
     std::int32_t localRecordId; ///< Explicit dense record position in the supplied validated schema.
-    events::MappingLimits mappingLimits{128, 256, 32, 64, 160, 128, 20480, 256 * 64 * 129 + 32 * 128};
+    events::MappingLimits mappingLimits =
+        type == EventType::NUAM_ORDER
+            ? events::MappingLimits{128, 256, 40, 64, 256, 128, 20480, 256 * 64 * 129 + 40 * 128}
+            : events::MappingLimits{128, 256, 32, 64, 160, 128, 20480, 256 * 64 * 129 + 32 * 128};
     ///< Finite per-route preparation bounds for existing exact-key and exact-type validation.
     EventTimePolicy eventTimePolicy = EventTimePolicy::FIELD_METADATA;    ///< Source of optional event metadata.
     events::EventProjection projection = events::EventProjection::NATIVE; ///< Explicit physical-to-business family.

@@ -598,8 +598,8 @@ TEST_CASE("SDK defaults retain all real regional records and explicit physical d
 
     auto history = api::detail::defaultReceivingRegistry(api::DeliveryContract::HISTORY);
     REQUIRE(history);
-    REQUIRE(history->schema().records().size() == 41);
-    REQUIRE(history->registrations().size() == 42);
+    REQUIRE(history->schema().records().size() == 44);
+    REQUIRE(history->registrations().size() == 45);
     CHECK(history->schema().records()[2].name == u"SpreadOrder");
     CHECK(history->schema().records()[3].name == u"AnalyticOrder");
     CHECK(history->schema().records()[4].name == u"OtcMarketsOrder");
@@ -647,6 +647,18 @@ TEST_CASE("SDK defaults retain all real regional records and explicit physical d
     CHECK(history->schema().records()[40].name == u"NuamTimeAndSale");
     CHECK(history->registrations()[41].type == api::EventType::NUAM_TIME_AND_SALE);
     CHECK(history->registrations()[41].localRecordId == 40);
+    CHECK(history->schema().records()[41].name == u"NuamOrder");
+    CHECK(history->schema().records()[42].name == u"NuamOrder#NUAM");
+    CHECK(history->schema().records()[43].name == u"NuamOrder#nuam");
+
+    for (std::size_t index = 0; index < 3; ++index) {
+        const auto &route = history->registrations()[42 + index];
+        CHECK(route.type == api::EventType::NUAM_ORDER);
+        CHECK(route.localRecordId == static_cast<std::int32_t>(41 + index));
+        CHECK(route.mappingLimits.selections == 40);
+        CHECK(route.mappingLimits.typeAlternatives == 256);
+    }
+
     auto defaults = api::EventRegistryLimits{};
     api::EventRegistryWork work;
     auto unchanged = api::EventRegistry::builtIn(defaults, work);
@@ -800,4 +812,58 @@ TEST_CASE("NuamTimeAndSale custom regional routes reserve their complete schema 
     CHECK(profile.bindingExchanges[0] == u'A');
     CHECK(profile.bindingExchanges[REGIONS - 1] == u'T');
     CHECK(profile.endpoint.settings().budgets.schema.records == api::detail::MAXIMUM_RECEIVING_RECORDS);
+}
+
+TEST_CASE("NuamOrder custom source catalog retains finite route allowances") {
+    constexpr std::size_t SOURCES = 20;
+    core::SchemaLimits schemaLimits{49, 2048, 4096, 128, 65536};
+    const auto standard = events::defaultNuamOrderSchema(schemaLimits);
+    REQUIRE(standard);
+    std::vector<core::LocalRecord> records;
+    std::vector<api::EventRegistration> registrations;
+
+    for (std::size_t index = 0; index < SOURCES; ++index) {
+        auto record = standard->records().front();
+        record.id = static_cast<std::int32_t>(index);
+        record.name = u"NuamOrder#" + std::u16string(1, static_cast<char16_t>(u'A' + index));
+        registrations.push_back({api::EventType::NUAM_ORDER, record.id});
+        records.push_back(std::move(record));
+    }
+
+    const auto schema = core::LocalSchema::create(records, schemaLimits, core::LocalProfile::BINARY_FIELDS_V1);
+    REQUIRE(schema);
+    api::EventRegistryLimits limits;
+    limits.schema = schemaLimits;
+    limits.registrations = SOURCES;
+    api::EventRegistryWork work;
+    const auto registry = api::EventRegistry::create(*schema, registrations, limits, work);
+    REQUIRE(registry);
+    api::RuntimeOptions runtime;
+    runtime.dnsServers.push_back({{127, 0, 0, 1}});
+    api::EndpointOptions options;
+    options.contract = api::DeliveryContract::HISTORY;
+    options.eventRegistry = *registry;
+    const auto profile = api::detail::prepareReceivingProfile(runtime, options, "127.0.0.1", 12345);
+    CHECK(profile.schema.records().size() == SOURCES);
+    CHECK(profile.bindings.size() == SOURCES);
+    CHECK(profile.endpoint.settings().budgets.session.snapshotBytes == (128 + 64 * SOURCES) * 1024);
+    auto extra = standard->records().front();
+    extra.id = static_cast<std::int32_t>(records.size());
+    extra.name = u"NuamOrder#U";
+    registrations.push_back({api::EventType::NUAM_ORDER, extra.id});
+    records.push_back(std::move(extra));
+    const auto overSchema = core::LocalSchema::create(records, schemaLimits, core::LocalProfile::BINARY_FIELDS_V1);
+    REQUIRE(overSchema);
+    limits.registrations = SOURCES + 1;
+    api::EventRegistryWork overWork;
+    const auto over = api::EventRegistry::create(*overSchema, registrations, limits, overWork);
+    REQUIRE(over);
+    options.eventRegistry = *over;
+    try {
+        static_cast<void>(api::detail::prepareReceivingProfile(runtime, options, "127.0.0.1", 12345));
+        FAIL("Oversized NuamOrder catalog accepted");
+    } catch (const api::Error &error) {
+        CHECK(error.diagnostic().code == api::ErrorCode::UNSUPPORTED_PROFILE);
+        CHECK(error.diagnostic().stage == "profile-nuam-order-routes");
+    }
 }
