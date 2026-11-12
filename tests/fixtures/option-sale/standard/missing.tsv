@@ -1,0 +1,14 @@
+reject	Index	IllegalArgumentException
+reject	Time	IllegalArgumentException
+reject	Sequence	IllegalArgumentException
+reject	ExchangeCode	IllegalArgumentException
+reject	Price	IllegalArgumentException
+reject	Size	IllegalArgumentException
+reject	BidPrice	IllegalArgumentException
+reject	AskPrice	IllegalArgumentException
+reject	ExchangeSaleConditions	IllegalArgumentException
+reject	Flags	IllegalArgumentException
+reject	UnderlyingPrice	IllegalArgumentException
+reject	Volatility	IllegalArgumentException
+reject	Delta	IllegalArgumentException
+reject	OptionSymbol	IllegalArgumentException

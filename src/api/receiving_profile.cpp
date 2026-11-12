@@ -23,6 +23,18 @@ constexpr core::SchemaLimits BASE_SCHEMA_LIMITS{42, 284, 724, 128, 16384};
 // Reserve exactly the two records, 20 fields and 25 lookups of the Candle/TradeHistory declarations.
 constexpr core::SchemaLimits CANDLE_SCHEMA_LIMITS{MAXIMUM_RECEIVING_RECORDS, 284 + 20, 724 + 25, 128, 16384};
 
+/** Reserve the standard OptionSale logical fields and aliases.
+ * @param limits Existing complete schema allowances.
+ * @return Allowances including OptionSale.
+ */
+constexpr core::SchemaLimits withOptionSaleLimits(core::SchemaLimits limits) noexcept {
+    constexpr std::size_t FIELDS = 14;
+    limits.fields += FIELDS;
+    limits.lookups += FIELDS;
+
+    return limits;
+}
+
 /** Reserve the exact logical field and alias totals of the standard TimeAndSale declarations.
  * @param limits Existing complete allowances, with enough record and name capacity.
  * @return Complete allowances for the previous profile plus TimeAndSale.
@@ -401,9 +413,9 @@ void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, s
             profile.bindingExchanges[index] =
                 (registration.type == EventType::PROFILE || registration.type == EventType::MARKET_MAKER ||
                  registration.type == EventType::SERIES || isOptionTimeSeriesEvent(registration.type) ||
-                 registration.type == EventType::CANDLE || registration.type == EventType::TEXT_MESSAGE ||
-                 registration.type == EventType::TEXT_CONFIGURATION || registration.type == EventType::MESSAGE ||
-                 registration.type == EventType::CONFIGURATION ||
+                 registration.type == EventType::CANDLE || registration.type == EventType::OPTION_SALE ||
+                 registration.type == EventType::TEXT_MESSAGE || registration.type == EventType::TEXT_CONFIGURATION ||
+                 registration.type == EventType::MESSAGE || registration.type == EventType::CONFIGURATION ||
                  (usesOrderSource(registration.type) && registration.projection == events::EventProjection::NATIVE))
                     ? 0
                     : events::market_symbols::getExchangeCode(record.name);
@@ -474,7 +486,8 @@ void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, s
                     add(add(mapping.typeAlternatives, mapping.nameUnits),
                         add(mapping.totalNameUnits, mapping.comparisonWork)));
             const auto fields = profile.schema.records()[static_cast<std::size_t>(binding.localId)].fields.size();
-            const bool profileText = binding.kind == client::PreparedEventKind::PROFILE;
+            const bool profileText = binding.kind == client::PreparedEventKind::PROFILE ||
+                                     binding.kind == client::PreparedEventKind::OPTION_SALE;
             const bool candle = binding.kind == client::PreparedEventKind::CANDLE;
             const bool timeAndSale = binding.kind == client::PreparedEventKind::TIME_AND_SALE;
             const bool text = profileText || binding.kind == client::PreparedEventKind::TEXT_MESSAGE ||
@@ -509,7 +522,8 @@ void prepareMappings(ReceivingProfile &profile, const EventRegistry &registry, s
             if (binding.kind == client::PreparedEventKind::SPREAD_ORDER ||
                 binding.kind == client::PreparedEventKind::ANALYTIC_ORDER ||
                 binding.kind == client::PreparedEventKind::OTC_MARKETS_ORDER ||
-                binding.kind == client::PreparedEventKind::SERIES) {
+                binding.kind == client::PreparedEventKind::SERIES ||
+                binding.kind == client::PreparedEventKind::OPTION_SALE) {
                 plan.work.visits = add(plan.work.visits, mapping.lookups);
             }
 
@@ -535,9 +549,10 @@ std::expected<EventRegistry, EventRegistryFailure> defaultReceivingRegistry(Deli
 
     EventRegistryWork work;
     EventRegistryLimits limits;
-    limits.schema = contract == DeliveryContract::STREAM    ? withTimeAndSaleLimits(BASE_SCHEMA_LIMITS)
-                    : contract == DeliveryContract::HISTORY ? withTimeAndSaleLimits(CANDLE_SCHEMA_LIMITS)
-                                                            : CANDLE_SCHEMA_LIMITS;
+    limits.schema = contract == DeliveryContract::STREAM ? withTimeAndSaleLimits(BASE_SCHEMA_LIMITS)
+                    : contract == DeliveryContract::HISTORY
+                        ? withOptionSaleLimits(withTimeAndSaleLimits(CANDLE_SCHEMA_LIMITS))
+                        : CANDLE_SCHEMA_LIMITS;
     // Both appended physical Candle routes fit in the existing maximum registration capacity.
     limits.registrations = 73;
     constexpr auto defaultMapping = EventRegistration{EventType::QUOTE, 0}.mappingLimits;
@@ -558,7 +573,8 @@ bool receivingRouteSupportsContract(const EventRegistration &route, DeliveryCont
     }
 
     if (route.projection == events::EventProjection::MARKET_MAKER_ORDERS || isOrderSourceEvent(route.type) ||
-        (route.type == EventType::MARKET_MAKER || route.type == EventType::SERIES)) {
+        (route.type == EventType::MARKET_MAKER || route.type == EventType::SERIES ||
+         route.type == EventType::OPTION_SALE)) {
         return contract == DeliveryContract::HISTORY;
     }
 
@@ -689,7 +705,14 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
     const auto hasTimeAndSale = std::ranges::any_of(selected.registrations(), [&](const EventRegistration &route) {
         return route.type == EventType::TIME_AND_SALE && receivingRouteSupportsContract(route, options.contract);
     });
+    const auto hasOptionSale = std::ranges::any_of(selected.registrations(), [&](const EventRegistration &route) {
+        return route.type == EventType::OPTION_SALE && receivingRouteSupportsContract(route, options.contract);
+    });
     auto schemaLimits = hasCandle ? CANDLE_SCHEMA_LIMITS : BASE_SCHEMA_LIMITS;
+
+    if (hasOptionSale) {
+        schemaLimits = withOptionSaleLimits(schemaLimits);
+    }
 
     if (hasTimeAndSale) {
         schemaLimits = withTimeAndSaleLimits(schemaLimits);
@@ -776,6 +799,18 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
     budgets.session.data.processedRecords = budgets.session.data.emittedRecords = FRAME_RECORDS;
     budgets.session.data.wireFields = budgets.session.data.emittedValues = multiply(FRAME_RECORDS, maximumFields);
     budgets.session.data.symbol.codeUnits = budgets.session.data.symbol.stateUnits = runtime.maximumSymbolUnits;
+
+    if (hasOptionSale) {
+        constexpr std::size_t EXTRA_WIRE_FIELDS = 3;
+        constexpr std::size_t EXTRA_WIRE_NAME_UNITS = 128;
+        auto &descriptions = budgets.session.descriptions;
+        auto &bindings = budgets.session.context.bindings;
+        descriptions.totalFields = add(descriptions.totalFields, EXTRA_WIRE_FIELDS);
+        descriptions.totalNameUnits = add(descriptions.totalNameUnits, EXTRA_WIRE_NAME_UNITS);
+        bindings.fields = std::max(bindings.fields, descriptions.totalFields);
+        bindings.totalNameUnits = std::max(bindings.totalNameUnits, descriptions.totalNameUnits);
+    }
+
     budgets.session.data.ownedFieldUnits = FIELD_TEXT_UNITS;
     budgets.session.data.ownedPayloadBytes = FIELD_BYTE_UNITS;
     budgets.desired = {schemaLimits.records,     entries, runtime.maximumSymbolUnits, symbolUnits, multiply(2, entries),
@@ -1060,7 +1095,8 @@ void validateReceivingSymbol(const EventRegistry *registry, EventSelection selec
         if (route.type == EventType::PROFILE || route.type == EventType::TEXT_MESSAGE ||
             route.type == EventType::TEXT_CONFIGURATION || route.type == EventType::MESSAGE ||
             route.type == EventType::CONFIGURATION || route.type == EventType::SERIES ||
-            isOptionTimeSeriesEvent(route.type) || route.type == EventType::CANDLE || usesOrderSource(route.type) ||
+            isOptionTimeSeriesEvent(route.type) || route.type == EventType::CANDLE ||
+            route.type == EventType::OPTION_SALE || usesOrderSource(route.type) ||
             !selectsEvent(selection, route.type)) {
             continue;
         }
@@ -1171,7 +1207,8 @@ core::DeliveryProjectionMask receivingProjectionMask(const ReceivingProfile &pro
     }
 
     if (binding.kind == client::PreparedEventKind::MARKET_MAKER || binding.kind == client::PreparedEventKind::SERIES ||
-        isOptionTimeSeriesEvent(static_cast<EventType>(binding.kind))) {
+        isOptionTimeSeriesEvent(static_cast<EventType>(binding.kind)) ||
+        binding.kind == client::PreparedEventKind::OPTION_SALE) {
         return !symbol.sourceId || *symbol.sourceId <= 0 ? core::NATIVE_DELIVERY_PROJECTION : 0;
     }
 

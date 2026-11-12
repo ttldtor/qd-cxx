@@ -78,6 +78,7 @@ bool isTimeSeriesEventType(EventType type) noexcept {
     case EventType::CANDLE:
     case EventType::TIME_AND_SALE:
         return true;
+    case EventType::OPTION_SALE:
     case EventType::QUOTE:
     case EventType::PROFILE:
     case EventType::TRADE:

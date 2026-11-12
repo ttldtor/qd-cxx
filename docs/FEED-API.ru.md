@@ -677,3 +677,7 @@ SDK применяет demand и снимает устаревшую HISTORY д�
 Для последнего полученного значения используйте `createSubscription<Candle>()` на endpoint с контрактом TICKER. Для снимка за диапазон и последующих изменений используйте `createTimeSeriesSubscription<Candle>()` на endpoint с контрактом HISTORY. Передайте `CandleSymbol` в `addSymbols()` и задайте начало диапазона через `setFromTime()`. Обработчик получает копируемое значение Candle с логическим `CandleSymbol`, который запросило приложение.
 
 Стандартный реестр приёма поддерживает записи `Candle` и `TradeHistory`. В собственном реестре можно указать другие поддерживаемые физические варианты. Атрибуты символа определяют совместимую запись до изменения подписки. Клиент получает готовые свечи, без расчёта по сделкам и заполнения пропущенных периодов. См. [маршрутизацию Candle](../spec/events/CANDLE-ROUTES.ru.md) и [поля Candle](../spec/events/CANDLE-PAYLOAD.ru.md).
+
+## Получить OptionSale
+
+Используйте `Feed::createSubscription<events::OptionSale>()` на endpoint HISTORY. См. [поля OptionSale и индексную идентичность](OPTION-SALE-EVENT.ru.md).

@@ -13,6 +13,7 @@
 #include "qd/events/configuration.hpp"
 #include "qd/events/greeks.hpp"
 #include "qd/events/market_maker.hpp"
+#include "qd/events/option_sale.hpp"
 #include "qd/events/order.hpp"
 #include "qd/events/order_imbalance.hpp"
 #include "qd/events/otc_markets_order.hpp"
@@ -227,7 +228,7 @@ using RegisteredEvent =
                  events::TextConfiguration, events::Message, events::Configuration, events::Order, events::MarketMaker,
                  events::SpreadOrder, events::AnalyticOrder, events::OtcMarketsOrder, events::OrderImbalance,
                  events::Series, events::Greeks, events::Underlying, events::TheoPrice, events::Candle,
-                 events::TimeAndSale>;
+                 events::TimeAndSale, events::OptionSale>;
 
 /** Independently owned observation of one complete accepted local subscription revision. */
 struct SubscriptionSnapshot {
@@ -275,7 +276,8 @@ template <class Event> class Subscription final {
                   std::is_same_v<Event, events::Series> || std::is_same_v<Event, events::Greeks> ||
                   std::is_same_v<Event, events::Underlying> || std::is_same_v<Event, events::TheoPrice> ||
                   std::is_same_v<Event, events::Candle> || std::is_same_v<Event, events::TimeAndSale> ||
-                  std::is_same_v<Event, events::Order> || std::is_same_v<Event, RegisteredEvent>);
+                  std::is_same_v<Event, events::OptionSale> || std::is_same_v<Event, events::Order> ||
+                  std::is_same_v<Event, RegisteredEvent>);
     std::shared_ptr<detail::SubscriptionPort> port_;
     friend class Feed;
     explicit Subscription(std::shared_ptr<detail::SubscriptionPort> port) noexcept;
@@ -519,6 +521,7 @@ extern template class Subscription<events::Underlying>;
 extern template class Subscription<events::TheoPrice>;
 extern template class Subscription<events::Candle>;
 extern template class Subscription<events::TimeAndSale>;
+extern template class Subscription<events::OptionSale>;
 extern template class Subscription<RegisteredEvent>;
 
 /** Endpoint's typed registration entry point; owns no SDK thread or bootstrap. */
@@ -552,7 +555,7 @@ class Feed final {
                       std::is_same_v<Event, events::Series> || std::is_same_v<Event, events::Greeks> ||
                       std::is_same_v<Event, events::Underlying> || std::is_same_v<Event, events::TheoPrice> ||
                       std::is_same_v<Event, events::Candle> || std::is_same_v<Event, events::TimeAndSale> ||
-                      std::is_same_v<Event, events::Order>);
+                      std::is_same_v<Event, events::OptionSale> || std::is_same_v<Event, events::Order>);
 
         if constexpr (std::is_same_v<Event, events::Quote>)
             return EventType::QUOTE;
@@ -594,6 +597,8 @@ class Feed final {
             return EventType::CANDLE;
         else if constexpr (std::is_same_v<Event, events::TimeAndSale>)
             return EventType::TIME_AND_SALE;
+        else if constexpr (std::is_same_v<Event, events::OptionSale>)
+            return EventType::OPTION_SALE;
         else
             return EventType::ORDER;
     }

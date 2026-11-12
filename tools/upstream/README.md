@@ -34,3 +34,4 @@ The [schedule query oracle](schedule-query-oracle/README.md) captures actual Day
 The [serialized attachment oracle](attachment-oracle/README.md) witnesses real Message/Configuration delegates, serialized Object bytes and explicit Java getter failures, with input-free EN/RU help.
 
 - [Time-series oracle](time-series-oracle/README.md): pinned Java8 identity/range/capability and inheritance, bounded Capture/Verify and input-free EN/RU help.
+- The [OptionSale oracle](option-sale-oracle/README.md) captures indexed HISTORY events for pinned Java QD schema variants.

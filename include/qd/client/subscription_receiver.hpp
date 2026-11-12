@@ -9,6 +9,7 @@
 #include "qd/events/event_projection.hpp"
 #include "qd/events/greeks.hpp"
 #include "qd/events/market_maker.hpp"
+#include "qd/events/option_sale.hpp"
 #include "qd/events/order.hpp"
 #include "qd/events/order_imbalance.hpp"
 #include "qd/events/otc_markets_order.hpp"
@@ -62,7 +63,8 @@ enum class PreparedEventKind {
     UNDERLYING = 17,        ///< Owning underlying option activity projection.
     THEO_PRICE = 18,        ///< Owning option theoretical price projection.
     CANDLE = 19,            ///< Owning Candle projection with restored event symbol.
-    TIME_AND_SALE = 20      ///< Owning trade report with separate indexed and business flags.
+    TIME_AND_SALE = 20,     ///< Owning trade report with separate indexed and business flags.
+    OPTION_SALE = 21        ///< Owning indexed option sale.
 };
 
 /** Explicit source for optional event metadata; indexed identity is never a timestamp substitute. */
@@ -123,7 +125,7 @@ struct SubscriptionProjection {
                  events::TextMessage, events::TextConfiguration, events::Message, events::Configuration, events::Order,
                  events::MarketMaker, events::SpreadOrder, events::AnalyticOrder, events::OtcMarketsOrder,
                  events::OrderImbalance, events::Series, events::Greeks, events::Underlying, events::TheoPrice,
-                 events::Candle, events::TimeAndSale>
+                 events::Candle, events::TimeAndSale, events::OptionSale>
         value;                               ///< Owned event or explicit generic route.
     std::optional<std::int64_t> eventTimeMs; ///< Actual selected FIELD metadata only; rawTime stays independent.
 };

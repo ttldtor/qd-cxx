@@ -598,8 +598,8 @@ TEST_CASE("SDK defaults retain all real regional records and explicit physical d
 
     auto history = api::detail::defaultReceivingRegistry(api::DeliveryContract::HISTORY);
     REQUIRE(history);
-    REQUIRE(history->schema().records().size() == 39);
-    REQUIRE(history->registrations().size() == 40);
+    REQUIRE(history->schema().records().size() == 40);
+    REQUIRE(history->registrations().size() == 41);
     CHECK(history->schema().records()[2].name == u"SpreadOrder");
     CHECK(history->schema().records()[3].name == u"AnalyticOrder");
     CHECK(history->schema().records()[4].name == u"OtcMarketsOrder");
@@ -638,6 +638,9 @@ TEST_CASE("SDK defaults retain all real regional records and explicit physical d
     CHECK(history->registrations()[11].localRecordId == 10);
     CHECK(history->registrations()[12].type == api::EventType::CANDLE);
     CHECK(history->registrations()[12].localRecordId == 11);
+    CHECK(history->schema().records()[39].name == u"OptionSale");
+    CHECK(history->registrations()[40].type == api::EventType::OPTION_SALE);
+    CHECK(history->registrations()[40].localRecordId == 39);
     auto defaults = api::EventRegistryLimits{};
     api::EventRegistryWork work;
     auto unchanged = api::EventRegistry::builtIn(defaults, work);

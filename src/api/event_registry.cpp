@@ -11,6 +11,7 @@
 #include "qd/events/derived_order.hpp"
 #include "qd/events/greeks.hpp"
 #include "qd/events/market_maker.hpp"
+#include "qd/events/option_sale.hpp"
 #include "qd/events/order.hpp"
 #include "qd/events/order_imbalance.hpp"
 #include "qd/events/otc_markets_order.hpp"
@@ -184,8 +185,8 @@ bool validRegistration(const EventRegistration &registration) noexcept {
             registration.type == EventType::TEXT_CONFIGURATION || registration.type == EventType::MESSAGE ||
             registration.type == EventType::CONFIGURATION || registration.type == EventType::MARKET_MAKER ||
             registration.type == EventType::SERIES || registration.type == EventType::CANDLE ||
-            registration.type == EventType::TIME_AND_SALE || detail::isOptionTimeSeriesEvent(registration.type) ||
-            detail::usesOrderSource(registration.type)) &&
+            registration.type == EventType::TIME_AND_SALE || registration.type == EventType::OPTION_SALE ||
+            detail::isOptionTimeSeriesEvent(registration.type) || detail::usesOrderSource(registration.type)) &&
            (registration.eventTimePolicy == EventTimePolicy::UNSPECIFIED ||
             registration.eventTimePolicy == EventTimePolicy::FIELD_METADATA) &&
            (registration.projection == events::EventProjection::NATIVE ||
@@ -439,6 +440,20 @@ EventRegistry::create(const core::LocalSchema &schema, std::span<const EventRegi
             } else if (registration.type == EventType::SERIES) {
                 const auto mapping = events::PreparedSeries::prepare(*ownedSchema, registration.localRecordId,
                                                                      registration.mappingLimits);
+
+                if (!mapping) {
+                    return std::unexpected(EventRegistryFailure{mapping.error(), index});
+                }
+
+                const auto &record = ownedSchema->records()[static_cast<std::size_t>(registration.localRecordId)];
+                debit(work.visits, record.lookups.size());
+
+                if (!events::detail::hasOrderIndexCoordinate(record)) {
+                    return std::unexpected(EventRegistryFailure{EventRegistryError::INVALID_INPUT, index});
+                }
+            } else if (registration.type == EventType::OPTION_SALE) {
+                const auto mapping = events::PreparedOptionSale::prepare(*ownedSchema, registration.localRecordId,
+                                                                         registration.mappingLimits);
 
                 if (!mapping) {
                     return std::unexpected(EventRegistryFailure{mapping.error(), index});
@@ -991,6 +1006,16 @@ std::expected<EventRegistry, EventRegistryFailure> defaultHistoryEventRegistry(E
         if (const auto sales = appendStandardTimeAndSaleRecords(records, routes, limits, work); !sales) {
             return std::unexpected(sales.error());
         }
+
+        const auto optionSale = events::defaultOptionSaleSchema(limits.schema);
+
+        if (!optionSale)
+            return std::unexpected(EventRegistryFailure{optionSale.error(), {}});
+
+        auto optionSaleRecord = optionSale->records().front();
+        optionSaleRecord.id = static_cast<std::int32_t>(records.size());
+        routes.push_back({EventType::OPTION_SALE, optionSaleRecord.id});
+        records.push_back(std::move(optionSaleRecord));
 
         auto schema = core::LocalSchema::create(records, limits.schema, core::LocalProfile::BINARY_FIELDS_V1);
 

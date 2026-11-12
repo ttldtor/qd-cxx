@@ -655,3 +655,7 @@ Select `DeliveryContract::HISTORY` explicitly. The worker owns the collector, in
 Use `createSubscription<Candle>()` on a TICKER endpoint for the latest received value, or `createTimeSeriesSubscription<Candle>()` on a HISTORY endpoint for a ranged snapshot and subsequent changes. Pass a `CandleSymbol` to `addSymbols()` and set the HISTORY range with `setFromTime()`. The callback owns a copyable Candle value whose event symbol uses the logical `CandleSymbol` requested by the application.
 
 The default receiving registry supports the standard `Candle` and `TradeHistory` wire records. A custom registry can select other supported physical variants. Symbol attributes select a compatible record before the subscription changes. Receiving Candle does not compute candles from trades or fill missing periods. See [Candle routing](../spec/events/CANDLE-ROUTES.md) for the physical record rules and [Candle payload](../spec/events/CANDLE-PAYLOAD.md) for field semantics.
+
+## Receive OptionSale
+
+Use `Feed::createSubscription<events::OptionSale>()` on a HISTORY endpoint. See [OptionSale fields and indexed identity](OPTION-SALE-EVENT.md).

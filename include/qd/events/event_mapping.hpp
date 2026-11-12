@@ -81,6 +81,7 @@ class EventMapping {
     friend class PreparedUnderlying;
     friend class PreparedTheoPrice;
     friend class PreparedTimeAndSale;
+    friend class PreparedOptionSale;
     friend class PreparedMarketMaker;
     friend class PreparedDerivedOrder;
     /** Validate an actual indexed removal using the mapper's retained schema layout.
