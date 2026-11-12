@@ -642,6 +642,19 @@ Call `getSnapshot` for an independent copy ordered by signed index.
 Serialize calls on each model. It owns data only, so the application controls
 where it runs and when to clear it. [Snapshot and transaction contract](../spec/events/INDEXED-EVENT-MODEL.md).
 
+## Time-series event model
+
+Use `TimeSeriesEventModel<events::TimeAndSale>` from
+`qd/api/time_series_event_model.hpp` for a detached, time-ordered range view.
+Set the exact symbol and inclusive `fromTime`, then pass the range revision
+associated with the delivered batch to `processEvents`. `getSnapshot` returns
+an owning cut with the selected symbol, bound and completed events. Raising the
+bound drops old values and keeps the overlap. After widening, feed the older
+events again to populate the newly selected range.
+
+The application controls subscription demand and maps it to the local revision.
+[Time-series range and lifetime contract](../spec/events/TIME-SERIES-EVENT-MODEL.md).
+
 ## Indexed option series
 
 Use `Feed::createSubscription<events::Series>()` on a HISTORY endpoint. The default
