@@ -3748,6 +3748,172 @@ TEST_CASE("latest event request preserves the endpoint's terminal source diagnos
     CHECK_FALSE(endpoint->closeAndAwaitTermination().deadlineExpired);
 }
 
+TEST_CASE("latest event batch validates every argument before claiming its endpoint slot") {
+    auto limits = runtimeOptions();
+    limits.maximumSymbolsPerSubscription = 3;
+    api::ApiRuntime runtime(limits);
+    const auto endpoint = runtime.createEndpoint(endpointOptions());
+    const auto feed = endpoint->getFeed();
+    const auto deadline = std::chrono::steady_clock::now() + 3s;
+
+    CHECK(feed->requestLastEvents<events::Quote>(std::span<const std::string_view>{}, deadline).empty());
+    CHECK(errorCode([&] {
+              (void)feed->requestLastEvents<events::Quote>({"IBM", "*"}, deadline);
+          }) == api::ErrorCode::INVALID_ARGUMENT);
+    CHECK(errorCode([&] {
+              (void)feed->requestLastEvents<events::Quote>({"IBM", "IBM", "IBM", "IBM"}, deadline);
+          }) == api::ErrorCode::RESOURCE_LIMIT);
+    CHECK_FALSE(feed->getLastEventIfSubscribed<events::Quote>("IBM"));
+
+    const auto single = feed->requestLastEvent<events::Quote>("IBM", deadline);
+    CHECK(errorCode([&] {
+              (void)feed->requestLastEvents<events::Quote>({"IBM", "MSFT"}, deadline);
+          }) == api::ErrorCode::RESOURCE_LIMIT);
+    CHECK(single.cancel());
+    CHECK(endpoint->getStatistics().connection.connectionAttempts.value == 0);
+    CHECK(endpoint->closeAndAwaitTermination().drained);
+}
+
+TEST_CASE("latest event batch preserves duplicate outcomes and retires exact shared demand in parts") {
+    auto limits = runtimeOptions();
+    limits.maximumSubscriptionsPerEndpoint = 1;
+    api::ApiRuntime runtime(limits);
+    const auto schema = standardSchema();
+    const std::array records{peer::Record{u"IBM", standardValues(schema)}};
+    const std::array<std::u16string, 3> expected{u"IBM", u"MSFT", u"ORCL"};
+    auto options = script(core::SubscriptionFamily::TICKER, true);
+    options.unorderedAdds = true;
+    options.removeSequence =
+        std::vector<peer::ExpectedSubscription>{{{u"IBM"}, {0}}, {{u"MSFT"}, {0}}, {{u"ORCL"}, {0}}};
+    options.afterFinalRemove = std::vector<peer::Record>{};
+    peer::Peer source(schema, records, expected, 8192, peer::PeerMode::HOLD, options);
+    REQUIRE(source.port() != 0);
+
+    const auto endpoint = runtime.createEndpoint(endpointOptions());
+    const auto feed = endpoint->getFeed();
+    auto requests =
+        feed->requestLastEvents<events::Quote>({"IBM", "MSFT", "IBM", "ORCL"}, std::chrono::steady_clock::now() + 3s);
+    REQUIRE(requests.size() == 4);
+    CHECK(requests[0].getSymbol() == u"IBM");
+    CHECK(requests[1].getSymbol() == u"MSFT");
+    CHECK(requests[2].getSymbol() == u"IBM");
+    CHECK(requests[3].getSymbol() == u"ORCL");
+
+    endpoint->connect("127.0.0.1:" + std::to_string(source.port()));
+    REQUIRE(eventually([&] {
+        return source.adds() == 1;
+    }));
+    CHECK(requests[2].cancel());
+    CHECK_FALSE(requests[0].isDone());
+    CHECK(source.removes() == 0);
+    source.releaseData();
+
+    auto value = requests[0].await();
+    CHECK(value.symbol == u"IBM");
+    CHECK(value.bidTimeMs == 3000);
+    value.symbol = u"CHANGED";
+    CHECK(requests[0].await().symbol == u"IBM");
+    CHECK(errorCode([&] {
+              (void)requests[2].await();
+          }) == api::ErrorCode::REQUEST_CANCELLED);
+    REQUIRE(eventually([&] {
+        return source.removes() == 1;
+    }));
+
+    CHECK(requests[1].cancel());
+    REQUIRE(eventually([&] {
+        return source.removes() == 2;
+    }));
+    CHECK(errorCode([&] {
+              (void)requests[3].await();
+          }) == api::ErrorCode::REQUEST_TIMED_OUT);
+    REQUIRE(eventually([&] {
+        return source.removes() == 3;
+    }));
+    CHECK(source.adds() == 1);
+    CHECK_FALSE(source.failed());
+    CHECK_FALSE(feed->getLastEventIfSubscribed<events::Quote>("ORCL"));
+    CHECK_FALSE(endpoint->closeAndAwaitTermination().deadlineExpired);
+}
+
+TEST_CASE("latest event batch keeps cache hits when admission of shared miss demand fails") {
+    auto limits = runtimeOptions();
+    limits.maximumSubscriptionsPerEndpoint = 1;
+    api::ApiRuntime runtime(limits);
+    const auto schema = standardSchema();
+    const std::array records{peer::Record{u"IBM", standardValues(schema)}};
+    root::test::TcpPeerConfig config;
+    config.sessions.resize(1);
+    auto &wire = config.sessions[0];
+    wire.initialBytes = peer::fixturePeerPrefix(schema, core::SubscriptionFamily::TICKER);
+    wire.replyBytes = peer::fixturePeerData(records, core::SubscriptionFamily::TICKER, true);
+    wire.readThroughMessage = std::to_underlying(root::protocol::SubscriptionMessage::TICKER_ADD);
+    wire.waitForClientClose = true;
+    root::test::OwnedTcpPeer source(std::move(config));
+    REQUIRE(source.port() != 0);
+
+    const auto endpoint = runtime.createEndpoint(endpointOptions());
+    const auto feed = endpoint->getFeed();
+    const auto subscription = feed->createSubscription<events::Quote>();
+    subscription->addSymbols("IBM");
+    endpoint->connect("127.0.0.1:" + std::to_string(source.port()));
+    REQUIRE(eventually([&] {
+        const auto value = feed->getLastEventIfSubscribed<events::Quote>("IBM");
+
+        return value && value->bidTimeMs == 3000;
+    }));
+
+    const auto requests =
+        feed->requestLastEvents<events::Quote>({"MSFT", "IBM"}, std::chrono::steady_clock::now() + 3s);
+    REQUIRE(requests.size() == 2);
+    CHECK(errorCode([&] {
+              (void)requests[0].await();
+          }) == api::ErrorCode::RESOURCE_LIMIT);
+    CHECK(requests[1].await().bidTimeMs == 3000);
+    CHECK_FALSE(feed->getLastEventIfSubscribed<events::Quote>("MSFT"));
+    CHECK_FALSE(endpoint->closeAndAwaitTermination().deadlineExpired);
+    CHECK(requests[1].await().symbol == u"IBM");
+}
+
+TEST_CASE("latest event batch clear and reconnect fence only unfinished children") {
+    const auto schema = standardSchema();
+    const std::array records{peer::Record{u"IBM", standardValues(schema)}};
+    root::test::TcpPeerConfig config;
+    config.sessions.resize(1);
+    auto &wire = config.sessions[0];
+    wire.initialBytes = peer::fixturePeerPrefix(schema, core::SubscriptionFamily::TICKER);
+    wire.replyBytes = peer::fixturePeerData(records, core::SubscriptionFamily::TICKER, true);
+    wire.readThroughMessage = std::to_underlying(root::protocol::SubscriptionMessage::TICKER_ADD);
+    wire.waitForClientClose = true;
+    root::test::OwnedTcpPeer source(std::move(config));
+    REQUIRE(source.port() != 0);
+
+    api::ApiRuntime runtime(runtimeOptions());
+    auto options = endpointOptions();
+    options.maximumAttempts = 2;
+    const auto endpoint = runtime.createEndpoint(options);
+    const auto feed = endpoint->getFeed();
+    endpoint->connect("127.0.0.1:" + std::to_string(source.port()));
+    const std::array<std::u16string_view, 2> symbols{u"IBM", u"MSFT"};
+    const auto requests = feed->requestLastEvents<events::Quote>(symbols, std::chrono::steady_clock::now() + 5s);
+    REQUIRE(requests[0].await().bidTimeMs == 3000);
+    CHECK_FALSE(requests[1].isDone());
+
+    SUBCASE("clear") {
+        endpoint->disconnectAndClear();
+    }
+
+    SUBCASE("reconnect") {
+        endpoint->reconnect();
+    }
+
+    CHECK(errorCode([&] {
+              (void)requests[1].await();
+          }) == api::ErrorCode::REQUEST_CANCELLED);
+    CHECK_FALSE(endpoint->closeAndAwaitTermination().deadlineExpired);
+    CHECK(requests[0].await().symbol == u"IBM");
+}
+
 TEST_CASE("local aggregation composes periods and holds TICKER updates until the running interval ends") {
     auto options = endpointOptions();
     options.aggregationPeriod = 250ms;
