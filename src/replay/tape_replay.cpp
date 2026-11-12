@@ -1,6 +1,7 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/replay/tape_replay.hpp"
+#include "relative_time.hpp"
 #include <algorithm>
 #include <limits>
 #include <stdexcept>
@@ -134,9 +135,7 @@ class ReplaySession {
         }
 
         const auto timestamp = *timing.timestampMs;
-        // Unsigned subtraction is the exact positive mathematical difference, including signed extremes.
-        const auto elapsed =
-            timestamp > *anchorMs_ ? static_cast<std::uint64_t>(timestamp) - static_cast<std::uint64_t>(*anchorMs_) : 0;
+        const auto elapsed = detail::positiveElapsedMs(timestamp, *anchorMs_);
         constexpr std::uint64_t NS_PER_MS = 1000000;
         constexpr auto MAX_NS = std::numeric_limits<std::int64_t>::max();
 

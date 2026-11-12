@@ -202,6 +202,7 @@ struct HistorySourceMetadata {
     std::int64_t rawTime;                              ///< Actual source indexed time.
     std::uint64_t bindingGeneration;                   ///< Actual immutable source binding generation.
     std::optional<protocol::FieldEventTime> fieldTime; ///< Actual independent field-prefix metadata.
+    std::optional<std::int64_t> tapeMessageTimeMs{};   ///< Optional tape MESSAGE cursor time of the true source.
 };
 
 /** One borrowed prepared projection; pop acknowledges collector consumption only. */

@@ -2031,7 +2031,7 @@ void Endpoint::connectTape(const std::filesystem::path &path, TapeSourceOptions 
         const auto &native = path.native();
 
         if (native.empty() || native.size() > MAXIMUM_PATH_UNITS || options.maximumFileBytes == 0 ||
-            options.maximumFrames == 0 ||
+            options.maximumFrames == 0 || !detail::validTapePlayback(options) ||
             std::ranges::find(native, std::filesystem::path::value_type{}) != native.end()) {
             reject(ErrorCode::INVALID_ARGUMENT, "tape-source-options");
         }
@@ -2064,6 +2064,7 @@ void Endpoint::connectTape(const std::filesystem::path &path, TapeSourceOptions 
 
             control->runtime->startWorker();
             port_->tape.emplace(std::move(request));
+            port_->tapePaused = options.initiallyPaused;
             port_->connectRequested = true;
             port_->connectionIntent = true;
             ++port_->connectionRevision;
@@ -2082,6 +2083,25 @@ void Endpoint::connectTape(const std::filesystem::path &path, TapeSourceOptions 
         port_->stateCondition.notify_all();
         control->condition.notify_one();
     });
+}
+
+void Endpoint::setTapePaused(bool paused) {
+    {
+        std::lock_guard lock(port_->mutex);
+
+        if (!port_->tape || port_->closeRequested.load(std::memory_order_acquire) ||
+            port_->retired.load(std::memory_order_acquire)) {
+            reject(ErrorCode::INVALID_STATE, "tape-pause-source");
+        }
+
+        if (port_->tapePaused == paused) {
+            return;
+        }
+
+        port_->tapePaused = paused;
+    }
+
+    wake(port_->control);
 }
 
 std::optional<std::chrono::milliseconds> Endpoint::getRequestedAggregationPeriod() const noexcept {
@@ -3190,6 +3210,19 @@ bool tapeDemandReady(const NativeEndpoint &endpoint) {
     });
 }
 
+/** Preserve the typed input failure while the already admitted prefix drains. */
+void failTapeInput(NativeEndpoint &endpoint, Diagnostic failure) {
+    std::lock_guard lock(endpoint.port->mutex);
+
+    if (endpoint.port->diagnostic.code == ErrorCode::NONE) {
+        endpoint.port->diagnostic = failure;
+    }
+
+    endpoint.port->terminal.hadGap = true;
+    endpoint.tape->inputEnded = true;
+    requestEndpointClose(endpoint.port);
+}
+
 /** Give a local reader and its existing queue one bounded owner turn, without wire or recovery steps. */
 EndpointProgress progressTape(NativeEndpoint &endpoint, transport::RecoveryTurnWork &work,
                               mux::QueueSubmitWork &submitWork, std::uint64_t revision, bool firstPoll) {
@@ -3252,6 +3285,23 @@ EndpointProgress progressTape(NativeEndpoint &endpoint, transport::RecoveryTurnW
         return EndpointProgress::PENDING;
     }
 
+    const auto now = std::chrono::steady_clock::now();
+    bool paused;
+    {
+        std::lock_guard lock(endpoint.port->mutex);
+        paused = endpoint.port->tapePaused;
+    }
+
+    if (!tape.source.setPaused(paused, now)) {
+        failTapeInput(endpoint, {ErrorCode::TAPE_TIMING_RANGE, "tape-playback-resume"});
+
+        return EndpointProgress::PENDING;
+    }
+
+    if (!tape.source.ready(now)) {
+        return EndpointProgress::PENDING;
+    }
+
     if (endpoint.subscriptions.size() > work.recovery.visits) {
         return EndpointProgress::TURN_EXHAUSTED;
     }
@@ -3263,18 +3313,14 @@ EndpointProgress progressTape(NativeEndpoint &endpoint, transport::RecoveryTurnW
     }
 
     if (!tape.pending) {
-        auto next = tape.source.next(work.session);
+        auto next = tape.source.next(work.session, now);
 
         if (!next) {
             if (!firstPoll && next.error().code == ErrorCode::WORK_LIMIT) {
                 return EndpointProgress::TURN_EXHAUSTED;
             }
 
-            std::lock_guard lock(endpoint.port->mutex);
-            endpoint.port->diagnostic = next.error();
-            endpoint.port->terminal.hadGap = true;
-            tape.inputEnded = true;
-            requestEndpointClose(endpoint.port);
+            failTapeInput(endpoint, next.error());
 
             return EndpointProgress::PENDING;
         }
@@ -3753,12 +3799,15 @@ void RuntimeImpl::run() noexcept {
                         }
                     }
 
-                    auto wakeAt = std::chrono::steady_clock::now() + port->options.pollInterval;
+                    const auto now = std::chrono::steady_clock::now();
+                    auto wakeAt = now + port->options.pollInterval;
 
                     if (native[index]->recovery) {
                         if (const auto hint = native[index]->recovery->nextWake()) {
                             wakeAt = std::min(wakeAt, *hint);
                         }
+                    } else if (const auto hint = native[index]->tape->source.deadline(); hint && *hint > now) {
+                        wakeAt = std::min(wakeAt, *hint);
                     }
 
                     nextWake = std::min(nextWake, wakeAt);

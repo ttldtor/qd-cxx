@@ -70,7 +70,7 @@ enum class PreparedEventKind {
 /** Explicit source for optional event metadata; indexed identity is never a timestamp substitute. */
 enum class ReceiverEventTimePolicy {
     UNSPECIFIED,   ///< No event timestamp is asserted; the legacy event member remains zero.
-    FIELD_METADATA ///< Use actual original FIELD metadata when supplied, otherwise remain unspecified.
+    FIELD_METADATA ///< Use actual FIELD metadata, with inherited MESSAGE time as a tape fallback.
 };
 
 /** One exact local record route, prepared before a registration can become visible. */

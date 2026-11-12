@@ -2747,8 +2747,9 @@ std::expected<bool, QueueFailure> MuxQueue::State::route(Client &c, QueueWork &w
             if (m) {
                 try {
                     const auto &original = o.value.rawSourceRecord ? *o.value.rawSourceRecord : r;
-                    const RawSourceMetadata raw{original.senderId,    original.cipher,    original.eventFlags,
-                                                original.removalTime, original.fieldTime, o.value.bindingGeneration};
+                    const RawSourceMetadata raw{
+                        original.senderId,  original.cipher,           original.eventFlags,       original.removalTime,
+                        original.fieldTime, o.value.bindingGeneration, original.tapeMessageTimeMs};
                     auto projections = m->projections;
                     projections.mask &= o.projections.mask;
                     businessWeight = projections.count();
@@ -2812,9 +2813,10 @@ std::expected<bool, QueueFailure> MuxQueue::State::route(Client &c, QueueWork &w
                             throw QueueError::INVALID_STATE;
 
                         const auto &s = *o.sourceRecord;
-                        raw =
-                            RawSourceMetadata{s.senderId,    s.cipher,    s.eventFlags,
-                                              s.removalTime, s.fieldTime, o.trigger ? o.trigger->bindingGeneration : 0};
+                        raw = RawSourceMetadata{s.senderId,         s.cipher,
+                                                s.eventFlags,       s.removalTime,
+                                                s.fieldTime,        o.trigger ? o.trigger->bindingGeneration : 0,
+                                                s.tapeMessageTimeMs};
                         legacy = s.values;
                     }
 
@@ -2952,8 +2954,9 @@ std::expected<bool, QueueFailure> MuxQueue::State::routeStream(QueueWork &work) 
                 }
 
                 try {
-                    const RawSourceMetadata raw{r.senderId,    r.cipher,    r.eventFlags,
-                                                r.removalTime, r.fieldTime, offer.bindingGeneration};
+                    const RawSourceMetadata raw{r.senderId,         r.cipher,    r.eventFlags,
+                                                r.removalTime,      r.fieldTime, offer.bindingGeneration,
+                                                r.tapeMessageTimeMs};
                     candidates[v * limits.routeRecords + index] =
                         record(*c, {r.context, r.symbol}, {}, r.eventFlags, r.values, r.typedValues,
                                std::move(*selected), offer.revision, raw, {}, work);

@@ -80,7 +80,8 @@ enum class ErrorCode {
     EXECUTOR_DROPPED,    ///< Accepted task was destroyed without running.
     EXECUTOR_CONTRACT,   ///< Host refused or threw after actual execution began.
     CALLBACK_CANCELLED,  ///< Queued event selection cancelled by close or source reset; advisory.
-    TAPE_IO_FAILURE      ///< The selected regular local file could not be opened or read.
+    TAPE_IO_FAILURE,     ///< The selected regular local file could not be opened or read.
+    TAPE_TIMING_RANGE    ///< The relative tape span or a monotonic playback deadline exceeded its bound.
 };
 
 /** Static/numeric failure snapshot, independent of runtime and native owners. */
@@ -224,10 +225,21 @@ class FeedFilter;
 class FeedFilterContext;
 struct FeedFilterCategory;
 
-/** Explicit finite allowances for one immediate local tape read. */
+/** Select how source timestamps affect the delivery of a complete tape envelope. */
+enum class TapePlaybackPolicy {
+    IMMEDIATE,  ///< Deliver eligible envelopes as soon as the Feed can accept them.
+    SOURCE_TIME ///< Pace eligible envelopes by source time on the runtime's monotonic clock.
+};
+
+/** Finite allowances and playback policy for one local tape read. */
 struct TapeSourceOptions {
     std::size_t maximumFileBytes = 64 * 1024 * 1024; ///< Maximum physical input bytes.
     std::size_t maximumFrames = 65'536;              ///< Maximum envelopes, including markers and controls.
+    TapePlaybackPolicy playback = TapePlaybackPolicy::IMMEDIATE;
+    std::uint32_t speedPercent = 100; ///< Relative speed, from 1% to 10,000%; ignored by IMMEDIATE.
+    std::chrono::milliseconds maximumSourceSpan{std::chrono::hours{24}};
+    ///< Maximum forward span in SOURCE_TIME, positive and at most 365 days; ignored by IMMEDIATE.
+    bool initiallyPaused = false; ///< Open the file and wait for resume before reading the first envelope.
 };
 
 /** Independently owning supported event value; inspect its actual class with std::visit or std::get_if. */
@@ -739,14 +751,20 @@ class Endpoint final {
      * @param address ASCII host:port or [IPv6]:port; no TLS/URI/login/configuration extensions.
      */
     void connect(std::string_view address);
-    /** Start one asynchronous immediate read of a regular local binary tape.
+    /** Start one asynchronous read of a regular local binary tape.
      * Configure desired subscriptions before calling. The worker opens and retires the file,
      * and a clean EOF drains the admitted prefix before closing this endpoint.
      * @param path Borrowed stable local path, copied at admission; maximum 4096 native path units.
-     * @param options Finite file and envelope allowances; both must be positive.
+     * @param options Positive file/envelope allowances and optional relative playback and initial pause.
      * @throws Error Invalid input, closed admission or an already fixed source.
      */
     void connectTape(const std::filesystem::path &path, TapeSourceOptions options = {});
+    /** Publish tape pause or resume intent for the existing runtime worker.
+     * Pausing holds the next unadmitted envelope and freezes relative playback time. Admitted work may drain.
+     * @param paused True to pause intake; false to resume the same source and clock.
+     * @throws Error The endpoint has no tape source or is already closing.
+     */
+    void setTapePaused(bool paused);
     /** Inspect current local intent without progressing native work; absent means server default.
      * @return Owning millisecond value, including zero, independently of any peer-reported range.
      */

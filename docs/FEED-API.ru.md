@@ -353,8 +353,11 @@ Runtime открывает и читает обычный файл на рабо
 `closeAndAwaitTermination()`, чтобы дождаться освобождения ресурсов callback.
 Вызов `closeAndAwaitTermination()` до EOF запрашивает досрочную остановку.
 
-`TapeSourceOptions` задаёт пределы размера файла и числа конвертов. Для каждого
-проигрывания создавайте новый endpoint.
+`TapeSourceOptions` задаёт пределы файла, относительную скорость и начальную
+паузу. Для удвоенной скорости передайте
+`{.playback = TapePlaybackPolicy::SOURCE_TIME, .speedPercent = 200}`. Вызов
+`endpoint->setTapePaused(true)` приостанавливает приём, а `setTapePaused(false)`
+возобновляет его. Для каждого проигрывания создавайте новый endpoint.
 [Форматы, доставка и ошибки локального файла](../spec/protocol/FEED-TAPE-SOURCE.ru.md).
 
 ## Наблюдатели состояния

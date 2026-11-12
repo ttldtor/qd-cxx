@@ -991,6 +991,7 @@ if(BUILD_TESTING)
             set_tests_properties(feed_bootstrap feed_bootstrap_death feed_bootstrap_allocations PROPERTIES TIMEOUT 45)
             add_test(NAME feed_api COMMAND qdcxx_feed_api_tests)
             add_executable(qdcxx_tape_feed_tests tests/conformance/tape_feed_tests.cpp)
+            target_include_directories(qdcxx_tape_feed_tests PRIVATE src/api)
             target_link_libraries(qdcxx_tape_feed_tests PRIVATE qdcxx_feed doctest::doctest)
             target_compile_definitions(qdcxx_tape_feed_tests PRIVATE
                 ORG_TTLDTOR_QDCXX_TAPE_FEED_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")

@@ -1334,8 +1334,9 @@ struct LiveEvent::State {
 
     /** Build views only after the whole data decoder succeeds.
      * @param work Mutable turn credits.
+     * @param tapeMessageTimeMs Optional inherited tape MESSAGE cursor time, absent on network input.
      */
-    void complete(LiveWork &work) {
+    void complete(LiveWork &work, std::optional<std::int64_t> tapeMessageTimeMs = std::nullopt) {
         std::size_t count = 0;
 
         for (const auto &record : decoded.records) {
@@ -1359,7 +1360,7 @@ struct LiveEvent::State {
             records.push_back({record.localId, record.senderId, record.context, record.symbol.units,
                                record.symbol.cipher, record.symbol.eventFlags, record.values,
                                std::span(fields).subspan(start, record.typedValues.size()), record.removalTime,
-                               record.fieldTime});
+                               record.fieldTime, tapeMessageTimeMs});
         }
     }
 };
@@ -1456,7 +1457,9 @@ std::expected<LiveEvent, LiveError> detail::TapeEventBridge::copy(const TapeFeed
             records.push_back(std::move(record));
         }
 
-        event->complete(work);
+        const auto messageTime =
+            result.timing && result.timing->timestampMs ? std::optional{result.timing->eventTimeMs()} : std::nullopt;
+        event->complete(work, messageTime);
 
         return LiveEvent(std::move(event));
     } catch (Error error) {

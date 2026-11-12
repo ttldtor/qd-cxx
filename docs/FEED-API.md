@@ -342,8 +342,12 @@ The runtime opens and reads the regular file on its worker. Await
 `closeAndAwaitTermination()` for actual capture retirement. Calling
 `closeAndAwaitTermination()` before EOF requests an early stop.
 
-`TapeSourceOptions` sets maximum file bytes and envelope count. Use a fresh
-endpoint for each playback. [Local tape formats, delivery and errors](../spec/protocol/FEED-TAPE-SOURCE.md).
+`TapeSourceOptions` sets file limits, relative playback speed and initial
+pause. For twice normal speed, pass
+`{.playback = TapePlaybackPolicy::SOURCE_TIME, .speedPercent = 200}`. Use
+`endpoint->setTapePaused(true)` to hold intake and `setTapePaused(false)` to
+resume. Use a fresh endpoint for each playback.
+[Local tape formats, delivery and errors](../spec/protocol/FEED-TAPE-SOURCE.md).
 
 ## State observers
 

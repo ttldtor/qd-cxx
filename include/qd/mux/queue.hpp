@@ -253,6 +253,7 @@ struct RawSourceMetadata {
     std::optional<std::int64_t> removalTime;           ///< Actual optional raw removal time.
     std::optional<protocol::FieldEventTime> fieldTime; ///< Actual optional virtual metadata.
     std::uint64_t bindingGeneration;                   ///< Original snapshot generation within source epoch.
+    std::optional<std::int64_t> tapeMessageTimeMs{};   ///< Tape MESSAGE cursor time when the source supplied one.
 };
 
 /** Immutable detached projection; not an admitted protocol record. */
