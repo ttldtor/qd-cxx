@@ -14,6 +14,9 @@
 #include <string_view>
 
 namespace org::ttldtor::qdcxx::protocol {
+namespace detail {
+class TapeEventBridge;
+}
 
 /** Detached counters at framing and atomic DATA-commit boundaries, before projection or fan-out. */
 struct LiveInputStatistics {
@@ -187,6 +190,7 @@ class LiveSnapshot {
     State *state_ = nullptr; ///< Serialized intrusive owner; copies allocate no new storage.
     friend class LiveSession;
     friend class LiveEvent;
+    friend class detail::TapeEventBridge;
     /** Adopt an already counted snapshot owner.
      * @param state Complete immutable snapshot, or null.
      */
@@ -258,6 +262,7 @@ struct LiveRecordView {
     std::span<const LiveFieldValueView> typedValues; ///< Exact generic tagged values.
     std::optional<std::int64_t> removalTime;         ///< Exact optional raw removal time.
     std::optional<FieldEventTime> fieldTime;         ///< Exact optional virtual-prefix metadata.
+    std::optional<std::int64_t> tapeMessageTimeMs{}; ///< Optional tape MESSAGE cursor time, separate from FIELD.
 };
 
 /** Whole admitted envelope kind; controls are never application records. */
@@ -274,6 +279,7 @@ class LiveEvent {
     struct State;
     std::unique_ptr<State> state_; ///< Whole owned arena plus immutable generation lease.
     friend class LiveSession;
+    friend class detail::TapeEventBridge;
     /** Adopt a fully admitted event.
      * @param state Complete owned event.
      */

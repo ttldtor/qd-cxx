@@ -81,6 +81,7 @@ class EventMapping {
     friend class PreparedUnderlying;
     friend class PreparedTheoPrice;
     friend class PreparedTimeAndSale;
+    friend class PreparedNuamTimeAndSale;
     friend class PreparedOptionSale;
     friend class PreparedMarketMaker;
     friend class PreparedDerivedOrder;

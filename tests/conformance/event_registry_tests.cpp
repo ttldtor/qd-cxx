@@ -598,8 +598,8 @@ TEST_CASE("SDK defaults retain all real regional records and explicit physical d
 
     auto history = api::detail::defaultReceivingRegistry(api::DeliveryContract::HISTORY);
     REQUIRE(history);
-    REQUIRE(history->schema().records().size() == 40);
-    REQUIRE(history->registrations().size() == 41);
+    REQUIRE(history->schema().records().size() == 41);
+    REQUIRE(history->registrations().size() == 42);
     CHECK(history->schema().records()[2].name == u"SpreadOrder");
     CHECK(history->schema().records()[3].name == u"AnalyticOrder");
     CHECK(history->schema().records()[4].name == u"OtcMarketsOrder");
@@ -644,6 +644,9 @@ TEST_CASE("SDK defaults retain all real regional records and explicit physical d
     CHECK(history->schema().records()[39].name == u"OptionSale");
     CHECK(history->registrations()[40].type == api::EventType::OPTION_SALE);
     CHECK(history->registrations()[40].localRecordId == 39);
+    CHECK(history->schema().records()[40].name == u"NuamTimeAndSale");
+    CHECK(history->registrations()[41].type == api::EventType::NUAM_TIME_AND_SALE);
+    CHECK(history->registrations()[41].localRecordId == 40);
     auto defaults = api::EventRegistryLimits{};
     api::EventRegistryWork work;
     auto unchanged = api::EventRegistry::builtIn(defaults, work);
@@ -754,6 +757,43 @@ TEST_CASE("NuamTrade custom regional routes reserve their complete schema before
     runtime.dnsServers.push_back({{127, 0, 0, 1}});
     api::EndpointOptions options;
     options.eventRegistry = *registry;
+    const auto profile = api::detail::prepareReceivingProfile(runtime, options, "127.0.0.1", 12345);
+    CHECK(profile.schema.records().size() == REGIONS);
+    CHECK(profile.bindings.size() == REGIONS);
+    CHECK(profile.bindingExchanges[0] == u'A');
+    CHECK(profile.bindingExchanges[REGIONS - 1] == u'T');
+    CHECK(profile.endpoint.settings().budgets.schema.records == api::detail::MAXIMUM_RECEIVING_RECORDS);
+}
+
+TEST_CASE("NuamTimeAndSale custom regional routes reserve their complete schema before profile publication") {
+    constexpr std::size_t REGIONS = 20;
+    core::SchemaLimits schemaLimits{45, 1024, 2048, 128, 32768};
+    const auto single = events::defaultNuamTimeAndSaleSchema(schemaLimits);
+    REQUIRE(single);
+    std::vector<core::LocalRecord> records;
+    std::vector<api::EventRegistration> registrations;
+
+    for (std::size_t index = 0; index < REGIONS; ++index) {
+        auto record = single->records().front();
+        record.id = static_cast<std::int32_t>(index);
+        record.name = u"NuamTimeAndSale&" + std::u16string(1, static_cast<char16_t>(u'A' + index));
+        registrations.push_back({api::EventType::NUAM_TIME_AND_SALE, record.id});
+        records.push_back(std::move(record));
+    }
+
+    const auto schema = core::LocalSchema::create(records, schemaLimits, core::LocalProfile::BINARY_FIELDS_V1);
+    REQUIRE(schema);
+    api::EventRegistryLimits limits;
+    limits.schema = schemaLimits;
+    limits.registrations = REGIONS;
+    api::EventRegistryWork work;
+    const auto registry = api::EventRegistry::create(*schema, registrations, limits, work);
+    REQUIRE(registry);
+    api::RuntimeOptions runtime;
+    runtime.dnsServers.push_back({{127, 0, 0, 1}});
+    api::EndpointOptions options;
+    options.eventRegistry = *registry;
+    options.contract = api::DeliveryContract::HISTORY;
     const auto profile = api::detail::prepareReceivingProfile(runtime, options, "127.0.0.1", 12345);
     CHECK(profile.schema.records().size() == REGIONS);
     CHECK(profile.bindings.size() == REGIONS);

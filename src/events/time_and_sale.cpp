@@ -1,6 +1,7 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/events/time_and_sale.hpp"
+#include "qd/events/nuam_time_and_sale.hpp"
 
 #include "decimal_projection.hpp"
 #include "qd/events/event_flags.hpp"
@@ -381,5 +382,138 @@ PreparedTimeAndSale::mapView(std::u16string_view symbol, BorrowedRecordValueView
         return std::unexpected(valid.error());
 
     return project(symbol, values.values, mapping_.selections(), limits, eventTime, eventFlags, recordExchange_);
+}
+
+std::expected<core::LocalSchema, core::SchemaError> defaultNuamTimeAndSaleSchema(core::SchemaLimits limits) {
+    auto base = defaultTimeAndSaleSchema(limits);
+
+    if (!base)
+        return std::unexpected(base.error());
+
+    try {
+        auto record = base->records().front();
+        record.name = u"NuamTimeAndSale";
+        const auto index = record.fields.size();
+        record.fields.push_back({std::to_underlying(core::SerialFieldType::LONG)});
+        record.lookups.push_back({u"MatchId", index});
+
+        return core::LocalSchema::create(std::span(&record, 1), limits, core::LocalProfile::BINARY_FIELDS_V1);
+    } catch (const std::bad_alloc &) {
+        return std::unexpected(core::SchemaError::ALLOCATION_FAILURE);
+    } catch (const std::length_error &) {
+        return std::unexpected(core::SchemaError::ALLOCATION_FAILURE);
+    }
+}
+
+PreparedNuamTimeAndSale::PreparedNuamTimeAndSale(EventMapping mapping, std::optional<core::IndexedTimeLayout> layout,
+                                                 char16_t exchange) noexcept
+    : mapping_(std::move(mapping)), indexedTimeLayout_(std::move(layout)), recordExchange_(exchange) {
+}
+
+std::expected<PreparedNuamTimeAndSale, MappingError>
+PreparedNuamTimeAndSale::prepare(const core::LocalSchema &schema, std::int32_t localId, MappingLimits limits) {
+    if (!schema.recordContext(localId).valid())
+        return std::unexpected(MappingError::INVALID_INPUT);
+
+    const auto &record = schema.records()[static_cast<std::size_t>(localId)];
+    constexpr std::size_t NAME_SCANS = 3;
+
+    if (record.name.size() > limits.nameUnits || record.name.size() > limits.totalNameUnits ||
+        record.name.size() > limits.comparisonWork / NAME_SCANS)
+        return std::unexpected(MappingError::RESOURCE_LIMIT);
+
+    limits.totalNameUnits -= record.name.size();
+    limits.comparisonWork -= record.name.size() * NAME_SCANS;
+    std::array<FieldRequest, KEYS.size() + 1> requests{};
+
+    for (std::size_t index = 0; index < KEYS.size(); ++index)
+        requests[index] = {std::span(KEYS).subspan(index, 1), detail::RAW_INT_TYPES, true};
+
+    requests[position(Field::TIME_NANO_PART)].required = false;
+    requests[position(Field::EXCHANGE)].keys = EXCHANGE_KEYS;
+    requests[position(Field::TRADE_ID)] = {std::span(KEYS).subspan(position(Field::TRADE_ID), 1), LONG_TYPES, true};
+
+    for (const auto field : NUMERIC_FIELDS)
+        requests[position(field)].types = detail::NUMERIC_TYPES;
+
+    requests[position(Field::BID_PRICE)].keys = BID_KEYS;
+    requests[position(Field::ASK_PRICE)].keys = ASK_KEYS;
+    requests[position(Field::SALE_CONDITIONS)].keys = CONDITIONS_KEYS;
+    requests[position(Field::BUYER)] = {std::span(KEYS).subspan(position(Field::BUYER), 1), STRING_TYPES, false};
+    requests[position(Field::SELLER)] = {std::span(KEYS).subspan(position(Field::SELLER), 1), STRING_TYPES, false};
+    constexpr std::array<std::u16string_view, 1> MATCH_ID{u"MatchId"};
+    requests.back() = {MATCH_ID, LONG_TYPES, true};
+    auto mapping = EventMapping::prepare(schema, localId, requests, limits);
+
+    if (!mapping)
+        return std::unexpected(mapping.error());
+
+    if (record.indexedTimeLayout) {
+        const auto *pair = std::get_if<core::IndexedTimePairInt32>(&*record.indexedTimeLayout);
+        const auto selected = mapping->selections();
+
+        if (!pair || selected[position(Field::TIME)] != pair->firstField ||
+            selected[position(Field::SEQUENCE)] != pair->secondField)
+            return std::unexpected(MappingError::INVALID_INPUT);
+    }
+
+    return PreparedNuamTimeAndSale(std::move(*mapping), record.indexedTimeLayout,
+                                   market_symbols::getExchangeCode(record.name));
+}
+
+const core::RecordContext &PreparedNuamTimeAndSale::context() const noexcept {
+    return mapping_.context();
+}
+
+std::expected<NuamTimeAndSale, MappingError>
+PreparedNuamTimeAndSale::map(std::u16string_view symbol, RecordValueView values, EventValueLimits limits,
+                             std::int64_t eventTime, std::int32_t eventFlags,
+                             std::optional<std::int64_t> indexedRemovalTime) const {
+    if (indexedRemovalTime && (!(eventFlags & indexed_event_flags::REMOVE_EVENT) || !indexedTimeLayout_))
+        return std::unexpected(MappingError::INVALID_INPUT);
+
+    const auto valid = indexedRemovalTime
+                           ? mapping_.validateIndexedRemoval(values, *indexedTimeLayout_, *indexedRemovalTime)
+                           : mapping_.validate(values);
+
+    if (!valid)
+        return std::unexpected(valid.error());
+
+    auto base = project(symbol, values.values, mapping_.selections(), limits, eventTime, eventFlags, recordExchange_);
+
+    if (!base)
+        return std::unexpected(base.error());
+
+    NuamTimeAndSale result;
+    static_cast<TimeAndSale &>(result) = std::move(*base);
+    result.matchId = values.values[*mapping_.selections().back()].raw;
+
+    return result;
+}
+
+std::expected<NuamTimeAndSale, MappingError>
+PreparedNuamTimeAndSale::mapView(std::u16string_view symbol, BorrowedRecordValueView values, EventValueLimits limits,
+                                 std::int64_t eventTime, std::int32_t eventFlags,
+                                 std::optional<std::int64_t> indexedRemovalTime) const {
+    if (indexedRemovalTime && (!(eventFlags & indexed_event_flags::REMOVE_EVENT) || !indexedTimeLayout_))
+        return std::unexpected(MappingError::INVALID_INPUT);
+
+    const auto valid = indexedRemovalTime
+                           ? mapping_.validateIndexedRemoval(values, *indexedTimeLayout_, *indexedRemovalTime)
+                           : mapping_.validateView(values);
+
+    if (!valid)
+        return std::unexpected(valid.error());
+
+    auto base = project(symbol, values.values, mapping_.selections(), limits, eventTime, eventFlags, recordExchange_);
+
+    if (!base)
+        return std::unexpected(base.error());
+
+    NuamTimeAndSale result;
+    static_cast<TimeAndSale &>(result) = std::move(*base);
+    result.matchId = values.values[*mapping_.selections().back()].raw;
+
+    return result;
 }
 } // namespace org::ttldtor::qdcxx::events
