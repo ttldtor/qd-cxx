@@ -308,7 +308,7 @@ void requestConnectionChange(const std::shared_ptr<detail::EndpointPort> &port, 
             }
 
             if (port->tape) {
-                reject(ErrorCode::UNSUPPORTED_PROFILE, "tape-one-shot-control");
+                reject(ErrorCode::UNSUPPORTED_PROFILE, "tape-connection-control");
             }
 
             if (port->connectionRevision == std::numeric_limits<std::uint64_t>::max() ||
@@ -999,6 +999,7 @@ std::u16string exactSymbol(std::string_view symbol, std::size_t maximumUnits) {
 
 /** Accepted desired-state mutation kind; there is no producer command FIFO. */
 enum class SymbolMutation { ADD, REMOVE, REPLACE };
+enum class ChangeDispatch { ENABLED, NO_OBSERVERS };
 
 /** Validate a typed value before copying caller-owned text or publishing any desired state.
  * @param port Detached logical owner with immutable selector bounds.
@@ -1060,10 +1061,11 @@ void validateSelector(const detail::SubscriptionPort &port, const SubscriptionSe
  * @param inputs Borrowed inputs; each conversion validates before copying its text.
  * @param mutation Complete desired transformation.
  * @param parse Conversion invoked only while caller input is alive.
+ * @param dispatch Whether the caller can synchronously drive runtime-wide observer delivery.
  */
 template <class Input, class Parse>
 void mutateDesired(const std::shared_ptr<detail::SubscriptionPort> &port, std::span<const Input> inputs,
-                   SymbolMutation mutation, Parse parse) {
+                   SymbolMutation mutation, Parse parse, ChangeDispatch dispatch = ChangeDispatch::ENABLED) {
     producerAction([&] {
         std::vector<SubscriptionSelector> parsed;
         parsed.reserve(port->maximumSymbols);
@@ -1121,7 +1123,10 @@ void mutateDesired(const std::shared_ptr<detail::SubscriptionPort> &port, std::s
         }
 
         wake(port->control);
-        detail::dispatchSubscriptionChanges(port->changes);
+
+        if (dispatch == ChangeDispatch::ENABLED) {
+            detail::dispatchSubscriptionChanges(port->changes);
+        }
     });
 }
 
@@ -1141,18 +1146,23 @@ void mutateSymbols(const std::shared_ptr<detail::SubscriptionPort> &port, std::s
  * @param port Detached producer state.
  * @param inputs Borrowed selector batch, including duplicates.
  * @param mutation Complete desired transformation.
+ * @param dispatch Hidden attachments have no change observers and skip runtime-wide dispatch.
  */
 void mutateSelectors(const std::shared_ptr<detail::SubscriptionPort> &port,
-                     std::span<const SubscriptionSelector> inputs, SymbolMutation mutation) {
+                     std::span<const SubscriptionSelector> inputs, SymbolMutation mutation,
+                     ChangeDispatch dispatch = ChangeDispatch::ENABLED) {
     if (inputs.size() > port->maximumSymbols) {
         reject(ErrorCode::RESOURCE_LIMIT, "subscription-selector-arguments");
     }
 
-    mutateDesired(port, inputs, mutation, [&](const SubscriptionSelector &input) {
-        validateSelector(*port, input, mutation);
+    mutateDesired(
+        port, inputs, mutation,
+        [&](const SubscriptionSelector &input) {
+            validateSelector(*port, input, mutation);
 
-        return input;
-    });
+            return input;
+        },
+        dispatch);
 }
 
 /** Convert a bounded unique canonical object set before entering the existing atomic producer path.
@@ -1467,6 +1477,10 @@ template <class Event> void Subscription<Event>::addSelectors(std::span<const Su
 
 template <class Event> void Subscription<Event>::setSelectors(std::span<const SubscriptionSelector> selectors) {
     mutateSelectors(port_, selectors, SymbolMutation::REPLACE);
+}
+
+template <class Event> void Subscription<Event>::setAttachedSelectors(std::span<const SubscriptionSelector> selectors) {
+    mutateSelectors(port_, selectors, SymbolMutation::REPLACE, ChangeDispatch::NO_OBSERVERS);
 }
 
 template <class Event> void Subscription<Event>::removeSelector(const SubscriptionSelector &selector) {
@@ -2168,7 +2182,7 @@ void Endpoint::connectTape(const std::filesystem::path &path, TapeSourceOptions 
         const auto &native = path.native();
 
         if (native.empty() || native.size() > MAXIMUM_PATH_UNITS || options.maximumFileBytes == 0 ||
-            options.maximumFrames == 0 ||
+            options.maximumFrames == 0 || !detail::validTapePlayback(options) ||
             std::ranges::find(native, std::filesystem::path::value_type{}) != native.end()) {
             reject(ErrorCode::INVALID_ARGUMENT, "tape-source-options");
         }
@@ -2201,6 +2215,7 @@ void Endpoint::connectTape(const std::filesystem::path &path, TapeSourceOptions 
 
             control->runtime->startWorker();
             port_->tape.emplace(std::move(request));
+            port_->tapePaused = options.initiallyPaused;
 
             if (const auto &latest = port_->latestEventRequest) {
                 std::lock_guard requestLock(latest->mutex);
@@ -2226,6 +2241,76 @@ void Endpoint::connectTape(const std::filesystem::path &path, TapeSourceOptions 
         port_->stateCondition.notify_all();
         control->condition.notify_one();
     });
+}
+
+void Endpoint::setTapePaused(bool paused) {
+    {
+        std::lock_guard lock(port_->mutex);
+
+        if (!port_->tape || port_->closeRequested.load(std::memory_order_acquire) ||
+            port_->retired.load(std::memory_order_acquire)) {
+            reject(ErrorCode::INVALID_STATE, "tape-pause-source");
+        }
+
+        if (port_->tapePaused == paused) {
+            return;
+        }
+
+        port_->tapePaused = paused;
+    }
+
+    wake(port_->control);
+}
+
+void Endpoint::restartTape() {
+    {
+        std::lock_guard lock(port_->mutex);
+
+        if (!port_->tape || port_->closeRequested.load(std::memory_order_acquire) ||
+            port_->retired.load(std::memory_order_acquire)) {
+            reject(ErrorCode::INVALID_STATE, "tape-restart-source");
+        }
+
+        if (port_->clearRevision > port_->clearedRevision) {
+            return;
+        }
+
+        if (port_->state != EndpointState::CONNECTED) {
+            reject(ErrorCode::INVALID_STATE, "tape-restart-source");
+        }
+
+        if (port_->connectionRevision == std::numeric_limits<std::uint64_t>::max() ||
+            port_->stateChangeCount == port_->stateChanges.size()) {
+            reject(ErrorCode::RESOURCE_LIMIT, "endpoint-control-admission");
+        }
+
+        ++port_->connectionRevision;
+        port_->clearRevision = port_->connectionRevision;
+        port_->tapeRestartDeadline = std::chrono::steady_clock::now() + port_->options.drainTimeout;
+        queueStateChange(*port_, EndpointState::CONNECTING);
+    }
+
+    port_->stateCondition.notify_all();
+    wake(port_->control);
+}
+
+void Endpoint::stopTape(TapeStopMode mode) {
+    if (mode != TapeStopMode::DRAIN && mode != TapeStopMode::ABORT) {
+        reject(ErrorCode::INVALID_ARGUMENT, "tape-stop-mode");
+    }
+
+    {
+        std::lock_guard lock(port_->mutex);
+
+        if (!port_->tape || port_->state == EndpointState::CLOSED || port_->state == EndpointState::FAILED) {
+            reject(ErrorCode::INVALID_STATE, "tape-stop-source");
+        }
+
+        port_->tapeAbortRequested = port_->tapeAbortRequested || mode == TapeStopMode::ABORT;
+        requestEndpointClose(port_);
+    }
+
+    wake(port_->control);
 }
 
 std::optional<std::chrono::milliseconds> Endpoint::getRequestedAggregationPeriod() const noexcept {
@@ -2714,7 +2799,8 @@ class TypedConsumer final : public client::SubscriptionConsumer {
             const bool retainedCache =
                 !endpoint->connectionIntent && endpoint->pausedReplayFence == endpoint->connectionRevision;
 
-            if ((!currentSource && !retainedCache) || endpoint->clearRevision > endpoint->clearedRevision) {
+            if ((!currentSource && !retainedCache) || endpoint->clearRevision > endpoint->clearedRevision ||
+                endpoint->tapeAbortRequested) {
                 endpoint->terminal.hadGap = endpoint->terminal.hadGap || !batch.records().empty();
 
                 // Consume an obsolete offer without permanently pausing this still-live stable registration.
@@ -2858,18 +2944,18 @@ struct NativeSubscription {
 
 /** One real local source, without a recovery factory or wire subscription composer. */
 struct NativeTape {
-    static constexpr std::uint64_t SOURCE_EPOCH = 1; ///< One real opened tape epoch in this endpoint's lifetime.
-
-    TapeFileSource source;                      ///< Worker-local parser, file and opaque collector event epoch.
+    std::optional<TapeFileSource> source;       ///< Worker-local parser/file, empty across a source reset.
     mux::MuxQueue queue;                        ///< Ordinary typed subscription/collector owner.
     std::optional<protocol::LiveEvent> pending; ///< Complete event retained until actual queue acceptance.
     bool inputEnded = false;                    ///< EOF or input failure; admitted callback work is still drained.
     bool deadlineExpired = false;               ///< Actual drain timeout requested abort.
+    bool restartResetRequested = false;         ///< This restart has published exactly one queue reset.
+    bool aborting = false;                      ///< An explicit or expired terminal abort was forwarded.
 
     NativeTape(const TapeSourceRequest &request, const ReceivingProfile &profile, mux::MuxQueue value,
                protocol::LiveWork &work)
-        : source(request.path, request.options, profile.schema, profile.endpoint.settings().budgets.session,
-                 profile.family, work),
+        : source(std::in_place, request.path, request.options, profile.schema,
+                 profile.endpoint.settings().budgets.session, profile.family, work),
           queue(std::move(value)) {
     }
 };
@@ -3474,7 +3560,7 @@ std::unique_ptr<NativeSubscription> registerSubscription(NativeEndpoint &endpoin
     result->handle = std::move(*handle);
     port->statistics->update([&](auto &s) {
         if (endpoint.tape)
-            s.sourceEpoch = NativeTape::SOURCE_EPOCH;
+            s.sourceEpoch = endpoint.appliedRevision;
 
         s.queueCapacityEvents =
             endpoint.profile.clientLimits.dataItems +
@@ -3794,18 +3880,254 @@ bool tapeDemandReady(const NativeEndpoint &endpoint) {
     });
 }
 
+/** Preserve the typed input failure while the already admitted prefix drains. */
+void failTapeInput(NativeEndpoint &endpoint, std::uint64_t revision, Diagnostic failure) {
+    std::lock_guard lock(endpoint.port->mutex);
+
+    if (endpoint.port->connectionRevision != revision ||
+        endpoint.port->closeRequested.load(std::memory_order_acquire)) {
+        return;
+    }
+
+    if (endpoint.port->diagnostic.code == ErrorCode::NONE) {
+        endpoint.port->diagnostic = failure;
+    }
+
+    endpoint.port->terminal.hadGap = true;
+    endpoint.tape->inputEnded = true;
+    requestEndpointClose(endpoint.port);
+}
+
+/** Fence and retire queued tape work once; already executing application code retains its normal fence. */
+void abortTapeDrain(NativeEndpoint &endpoint, std::string_view stage) noexcept {
+    auto &tape = *endpoint.tape;
+
+    if (!tape.aborting) {
+        tape.aborting = true;
+        tape.queue.requestStop(mux::StopMode::ABORT);
+        cancelEndpointCallbacks(endpoint.port, stage);
+    }
+}
+
+/** Publish actual file ownership to currently registered subscriptions. */
+void publishTapeEpoch(NativeEndpoint &endpoint, std::optional<std::uint64_t> epoch) {
+    for (const auto &subscription : endpoint.subscriptions) {
+        if (subscription && !subscription->port->closeRequested.load(std::memory_order_acquire)) {
+            subscription->port->statistics->update([epoch](auto &statistics) {
+                statistics.sourceEpoch = epoch;
+            });
+        }
+    }
+}
+
+/** End a failed restart without reusing the old source or opening another epoch. */
+EndpointProgress failTapeRestart(NativeEndpoint &endpoint, Diagnostic diagnostic) {
+    {
+        std::lock_guard lock(endpoint.port->mutex);
+
+        if (endpoint.port->closeRequested.load(std::memory_order_acquire)) {
+            return EndpointProgress::PENDING;
+        }
+
+        requestEndpointClose(endpoint.port);
+    }
+
+    auto &tape = *endpoint.tape;
+    tape.pending.reset();
+    tape.source.reset();
+    publishTapeEpoch(endpoint, std::nullopt);
+    endpoint.draining = true;
+    tape.deadlineExpired = diagnostic.code == ErrorCode::TAPE_RESTART_TIMEOUT;
+    abortTapeDrain(endpoint, "callback-tape-restart-failed");
+    failEndpoint(endpoint.port, diagnostic);
+
+    return EndpointProgress::PENDING;
+}
+
+/** Retire one active file generation, complete the existing mux reset, then reopen from byte zero. */
+EndpointProgress progressTapeRestart(NativeEndpoint &endpoint, transport::RecoveryTurnWork &work,
+                                     std::uint64_t revision, std::chrono::steady_clock::time_point deadline,
+                                     bool firstPoll) {
+    auto &tape = *endpoint.tape;
+    auto &queueWork = work.queues.front();
+
+    if (std::chrono::steady_clock::now() >= deadline) {
+        return failTapeRestart(endpoint, {ErrorCode::TAPE_RESTART_TIMEOUT, "tape-restart-deadline"});
+    }
+
+    if (tape.source) {
+        if (endpoint.subscriptions.size() > work.recovery.visits) {
+            return firstPoll ? failTapeRestart(endpoint, {ErrorCode::WORK_LIMIT, "tape-restart-subscriptions"})
+                             : EndpointProgress::TURN_EXHAUSTED;
+        }
+
+        work.recovery.visits -= endpoint.subscriptions.size();
+        tape.pending.reset();
+        tape.source.reset();
+        publishTapeEpoch(endpoint, std::nullopt);
+        cancelEndpointCallbacks(endpoint.port, "callback-tape-restart");
+    }
+
+    if (endpoint.port->callbackFence.outstanding.load(std::memory_order_acquire) != 0) {
+        return EndpointProgress::PENDING;
+    }
+
+    if (!tape.restartResetRequested) {
+        const auto accepted = tape.queue.resetSource(queueWork);
+
+        if (!accepted) {
+            if (!firstPoll && accepted.error().error == mux::QueueError::WORK_LIMIT) {
+                return EndpointProgress::TURN_EXHAUSTED;
+            }
+
+            return failTapeRestart(endpoint, queueDiagnostic(accepted.error().error, "tape-restart-reset"));
+        }
+
+        tape.restartResetRequested = true;
+    }
+
+    const auto reset = tape.queue.resetStatus();
+
+    if (reset.failure) {
+        return failTapeRestart(endpoint, queueDiagnostic(reset.failure->error, "tape-restart-reset"));
+    }
+
+    if (reset.phase != mux::ResetPhase::NONE || !reset.globalAcknowledged) {
+        const auto polled = tape.queue.progress(queueWork);
+
+        if (!polled) {
+            if (!firstPoll && polled.error().error == mux::QueueError::WORK_LIMIT) {
+                return EndpointProgress::TURN_EXHAUSTED;
+            }
+
+            return failTapeRestart(endpoint, queueDiagnostic(polled.error().error, "tape-restart-progress"));
+        }
+
+        return EndpointProgress::PENDING;
+    }
+
+    // Reopening receives a fresh turn allowance, independently of the discarded generation.
+    if (!firstPoll) {
+        return EndpointProgress::TURN_EXHAUSTED;
+    }
+
+    if (endpoint.subscriptions.size() > work.recovery.visits) {
+        return failTapeRestart(endpoint, {ErrorCode::WORK_LIMIT, "tape-restart-subscriptions"});
+    }
+
+    if (endpoint.port->closeRequested.load(std::memory_order_acquire)) {
+        return EndpointProgress::PENDING;
+    }
+
+    const auto &request = *endpoint.port->tape;
+    const auto &profile = endpoint.profile;
+
+    try {
+        tape.source.emplace(request.path, request.options, profile.schema, profile.endpoint.settings().budgets.session,
+                            profile.family, work.session);
+    } catch (const Error &error) {
+        return failTapeRestart(endpoint, error.diagnostic());
+    } catch (const std::bad_alloc &) {
+        return failTapeRestart(endpoint, {ErrorCode::ALLOCATION_FAILURE, "tape-restart-open"});
+    }
+
+    if (std::chrono::steady_clock::now() >= deadline) {
+        tape.source.reset();
+
+        return failTapeRestart(endpoint, {ErrorCode::TAPE_RESTART_TIMEOUT, "tape-restart-deadline"});
+    }
+
+    {
+        std::lock_guard lock(endpoint.port->mutex);
+
+        if (endpoint.port->closeRequested.load(std::memory_order_acquire)) {
+            return EndpointProgress::PENDING;
+        }
+
+        endpoint.appliedRevision = revision;
+        endpoint.port->activeDeliveryRevision = revision;
+        endpoint.port->clearedRevision = endpoint.port->clearRevision;
+    }
+
+    work.recovery.visits -= endpoint.subscriptions.size();
+    publishTapeEpoch(endpoint, revision);
+    tape.restartResetRequested = false;
+
+    return EndpointProgress::PENDING;
+}
+
+/** Give lifecycle deadlines precedence over the normal worker cadence and the tape's playback clock. */
+std::chrono::steady_clock::time_point tapeWakeAt(const NativeEndpoint &endpoint,
+                                                 std::chrono::steady_clock::time_point now,
+                                                 std::chrono::steady_clock::time_point regularWake) {
+    using Clock = std::chrono::steady_clock;
+    const auto &tape = *endpoint.tape;
+
+    if (endpoint.port->closeRequested.load(std::memory_order_acquire)) {
+        const auto close = endpoint.port->closeDeadline.load(std::memory_order_acquire);
+
+        return close && !tape.deadlineExpired ? std::min(regularWake, Clock::time_point{Clock::duration{close}})
+                                              : regularWake;
+    }
+
+    {
+        std::lock_guard lock(endpoint.port->mutex);
+
+        if (endpoint.appliedRevision != endpoint.port->connectionRevision) {
+            return endpoint.port->callbackFence.outstanding.load(std::memory_order_acquire) == 0
+                       ? now
+                       : std::min(regularWake, endpoint.port->tapeRestartDeadline);
+        }
+    }
+
+    if (tape.source) {
+        if (const auto due = tape.source->deadline(); due && *due > now) {
+            return std::min(regularWake, *due);
+        }
+    }
+
+    return regularWake;
+}
+
 /** Give a local reader and its existing queue one bounded owner turn, without wire or recovery steps. */
 EndpointProgress progressTape(NativeEndpoint &endpoint, transport::RecoveryTurnWork &work,
                               mux::QueueSubmitWork &submitWork, std::uint64_t revision, bool firstPoll) {
     auto &tape = *endpoint.tape;
     auto &queueWork = work.queues.front();
 
-    if (endpoint.port->closeRequested.load(std::memory_order_acquire) && !endpoint.draining) {
-        tape.pending.reset();
-        tape.source.stop();
-        tape.queue.requestStop(mux::StopMode::GRACEFUL);
-        endpoint.draining = true;
-        observeState(endpoint.port, EndpointState::CLOSING);
+    if (endpoint.port->closeRequested.load(std::memory_order_acquire)) {
+        bool abort;
+        {
+            std::lock_guard lock(endpoint.port->mutex);
+            abort = endpoint.port->tapeAbortRequested;
+        }
+
+        if (!endpoint.draining) {
+            tape.pending.reset();
+
+            if (tape.source) {
+                tape.source->stop();
+            }
+
+            if (!abort) {
+                tape.queue.requestStop(mux::StopMode::GRACEFUL);
+            }
+
+            endpoint.draining = true;
+            observeState(endpoint.port, EndpointState::CLOSING);
+        }
+
+        if (abort) {
+            abortTapeDrain(endpoint, "callback-tape-abort");
+        }
+    } else if (endpoint.appliedRevision != revision) {
+        std::chrono::steady_clock::time_point deadline;
+        {
+            std::lock_guard lock(endpoint.port->mutex);
+            deadline = endpoint.port->tapeRestartDeadline;
+        }
+
+        return progressTapeRestart(endpoint, work, revision, deadline, firstPoll);
     }
 
     progressSubscriptions(endpoint, submitWork);
@@ -3816,8 +4138,7 @@ EndpointProgress progressTape(NativeEndpoint &endpoint, transport::RecoveryTurnW
         if (deadline && std::chrono::steady_clock::now().time_since_epoch().count() >= deadline &&
             (!tape.queue.terminal() || endpoint.port->callbackFence.outstanding.load(std::memory_order_acquire) != 0)) {
             tape.deadlineExpired = true;
-            tape.queue.requestStop(mux::StopMode::ABORT);
-            cancelEndpointCallbacks(endpoint.port, "callback-tape-drain-deadline");
+            abortTapeDrain(endpoint, "callback-tape-drain-deadline");
         }
     }
 
@@ -3856,6 +4177,23 @@ EndpointProgress progressTape(NativeEndpoint &endpoint, transport::RecoveryTurnW
         return EndpointProgress::PENDING;
     }
 
+    const auto now = std::chrono::steady_clock::now();
+    bool paused;
+    {
+        std::lock_guard lock(endpoint.port->mutex);
+        paused = endpoint.port->tapePaused;
+    }
+
+    if (!tape.source->setPaused(paused, now)) {
+        failTapeInput(endpoint, revision, {ErrorCode::TAPE_TIMING_RANGE, "tape-playback-resume"});
+
+        return EndpointProgress::PENDING;
+    }
+
+    if (!tape.source->ready(now)) {
+        return EndpointProgress::PENDING;
+    }
+
     if (endpoint.subscriptions.size() > work.recovery.visits) {
         return EndpointProgress::TURN_EXHAUSTED;
     }
@@ -3867,25 +4205,26 @@ EndpointProgress progressTape(NativeEndpoint &endpoint, transport::RecoveryTurnW
     }
 
     if (!tape.pending) {
-        auto next = tape.source.next(work.session);
+        auto next = tape.source->next(work.session, now);
 
         if (!next) {
             if (!firstPoll && next.error().code == ErrorCode::WORK_LIMIT) {
                 return EndpointProgress::TURN_EXHAUSTED;
             }
 
-            std::lock_guard lock(endpoint.port->mutex);
-            endpoint.port->diagnostic = next.error();
-            endpoint.port->terminal.hadGap = true;
-            tape.inputEnded = true;
-            requestEndpointClose(endpoint.port);
+            failTapeInput(endpoint, revision, next.error());
 
             return EndpointProgress::PENDING;
         }
 
-        if (tape.source.finished()) {
-            tape.inputEnded = true;
-            requestEndpointClose(endpoint.port);
+        if (tape.source->finished()) {
+            std::lock_guard lock(endpoint.port->mutex);
+
+            if (endpoint.port->connectionRevision == revision &&
+                !endpoint.port->closeRequested.load(std::memory_order_acquire)) {
+                tape.inputEnded = true;
+                requestEndpointClose(endpoint.port);
+            }
 
             return EndpointProgress::PENDING;
         }
@@ -3897,11 +4236,15 @@ EndpointProgress progressTape(NativeEndpoint &endpoint, transport::RecoveryTurnW
         tape.pending.emplace(std::move(**next));
     }
 
-    if (endpoint.port->closeRequested.load(std::memory_order_acquire)) {
+    std::unique_lock lock(endpoint.port->mutex);
+
+    if (endpoint.port->connectionRevision != revision ||
+        endpoint.port->closeRequested.load(std::memory_order_acquire)) {
         return EndpointProgress::PENDING;
     }
 
     const auto admitted = tape.queue.admit(std::move(*tape.pending), queueWork);
+    lock.unlock();
 
     if (admitted) {
         tape.pending.reset();
@@ -4373,8 +4716,11 @@ void RuntimeImpl::run() noexcept {
                                 continue;
 
                             if (native[index]->tape) {
-                                publishTapeHistorySnapshot(native[index]->tape->queue, NativeTape::SOURCE_EPOCH,
-                                                           subscription->handle, subscription->port, observationWork);
+                                if (native[index]->tape->source) {
+                                    publishTapeHistorySnapshot(native[index]->tape->queue,
+                                                               native[index]->appliedRevision, subscription->handle,
+                                                               subscription->port, observationWork);
+                                }
                             } else {
                                 publishHistorySnapshot(*native[index]->recovery, subscription->handle,
                                                        subscription->port, observationWork);
@@ -4382,12 +4728,15 @@ void RuntimeImpl::run() noexcept {
                         }
                     }
 
-                    auto wakeAt = std::chrono::steady_clock::now() + port->options.pollInterval;
+                    const auto now = std::chrono::steady_clock::now();
+                    auto wakeAt = now + port->options.pollInterval;
 
                     if (native[index]->recovery) {
                         if (const auto hint = native[index]->recovery->nextWake()) {
                             wakeAt = std::min(wakeAt, *hint);
                         }
+                    } else {
+                        wakeAt = tapeWakeAt(*native[index], now, wakeAt);
                     }
 
                     nextWake = std::min(nextWake, wakeAt);

@@ -281,6 +281,79 @@ remaining exclusive interests. Callback batches follow queue delivery boundaries
 and need not combine all selected types. See the complete
 [mixed selection and delivery contract](../spec/events/MIXED-SUBSCRIPTIONS.md).
 
+## Attach one typed subscription to several feeds
+
+`qd/api/independent_subscription.hpp` provides an owning
+`api::IndependentSubscription<Event>`. Configure its typed selectors and listener
+before attaching it to a feed. One attachment consumes one native subscription
+slot on that feed. Attaching to the same feed again returns its existing ID.
+Detaching removes only that registration and keeps the desired set available for
+reattachment, which gets a new ID.
+
+```cpp
+#include "qd/api/independent_subscription.hpp"
+
+#include <array>
+#include <span>
+
+// firstFeed and secondFeed are feeds from existing receiving endpoints.
+api::IndependentSubscription<events::Quote> quotes(
+    [](std::span<const events::Quote> batch) {
+        // Process this batch before the callback returns.
+    });
+const std::array selectors{api::SubscriptionSelector::plain(u"IBM")};
+const auto initialRefusals = quotes.setSelectors(selectors);
+const auto first = quotes.attach(*firstFeed);
+const auto second = quotes.attach(*secondFeed);
+quotes.detach(*firstFeed);
+```
+
+Separate feeds can deliver concurrently, including equal events from different
+sources. Synchronize any shared state in the listener. Detach fences new
+selection for that attachment. An invocation already selected can finish,
+including when the listener detaches its own feed. Closing permanently fences
+every attachment and requests native retirement without waiting for callbacks.
+
+`setSelectors` first accepts the bounded desired set locally, then submits it
+to each current attachment. The last occurrence of a selector identity supplies
+its effective attributes. A synchronous refusal identifies the attachment by ID
+and leaves its previous producer demand intact. The latest local desired set
+remains available for subsequent attachments and retries. Each native producer
+applies its own capabilities and limits. Check `getAttachmentDiagnostic(feed)`
+for later native failure. Server-side application proceeds independently on
+each connection.
+
+The default independent capacities are four active or callback-retiring
+attachments, 16 selector arguments and 128 UTF-16 units per symbol. Configure
+them through `IndependentSubscriptionLimits`. A detached attachment can still
+occupy independent capacity while a selected delivery retires. A feed's native
+registration slot can stay occupied until native retirement, including while
+the runtime is waiting for its first connection.
+
+### Clear one detached attachment
+
+Use `IndependentSubscription<Event>::withAttachmentListener(onData, onClear)`
+to maintain views keyed by attachment ID. `onData(id, batch)` receives the
+attachment's events. The nonthrowing `onClear(id)` handler can erase that
+attachment's entire view when `detachAndClear(feed)` succeeds. A new
+attachment to the same feed gets a new ID, so a delayed clear can safely run
+alongside data for the new attachment.
+
+`detachAndClear` prevents new data selection for the removed attachment and
+requests retirement of its native registration. If no callback was selected,
+the clear handler runs inline. Otherwise it runs once after the last selected
+data callback exits, including when that callback requested the detach or
+threw. The operation does not wait. A subsequent close leaves an already
+accepted clear in effect. Repeating the call on a detached feed returns false
+and emits no further clear.
+
+Java describes this operation in terms of empty events. The C++ handler marks
+invalidation with the exact attachment ID and leaves event values and source
+times intact. Other feeds, endpoint caches and the logical desired selectors
+continue independently. With the value-only listener constructor, attempting
+to clear an attached feed throws `UNSUPPORTED_PROFILE` before removing the
+attachment. Ordinary `detach` and `close` do not emit clear notifications.
+
 ## Runtime, callbacks and shutdown
 
 Create the owning `ApiRuntime(RuntimeOptions)` on main **before application threads**;
@@ -345,8 +418,14 @@ The runtime opens and reads the regular file on its worker. Await
 While a TICKER tape is active, the latest-event API reads its committed
 values through ordinary subscriptions. EOF or explicit close fences these reads.
 
-`TapeSourceOptions` sets maximum file bytes and envelope count. Use a fresh
-endpoint for each playback. [Local tape formats, delivery and errors](../spec/protocol/FEED-TAPE-SOURCE.md).
+`TapeSourceOptions` sets file limits, relative playback speed and initial
+pause. For twice normal speed, pass
+`{.playback = TapePlaybackPolicy::SOURCE_TIME, .speedPercent = 200}`. Use
+`endpoint->setTapePaused(true)` to hold intake and `setTapePaused(false)` to
+resume. While connected, `endpoint->restartTape()` reopens the same file at
+byte zero and keeps the subscriptions. `endpoint->stopTape()` requests a
+terminal drain. After terminal completion, create a fresh endpoint to play again.
+[Local tape formats, delivery and errors](../spec/protocol/FEED-TAPE-SOURCE.md).
 
 ## State observers
 
@@ -644,6 +723,18 @@ until the first call finishes. Count and sum overflow saturate per field with th
 existing sticky availability marker; reads and reconnect never reset totals.
 
 [Server aggregation](SERVER-AGGREGATION.md): separate local requests and current-peer reports, bounded descriptor updates and explicit unknown states.
+
+## Indexed event model
+
+Use `IndexedEventModel<events::Order>` from `qd/api/indexed_event_model.hpp` to
+assemble typed indexed updates after delivery. Pass one exact logical symbol,
+source ID and ordered event span to `processEvents`. Route input for different
+symbol/source pairs separately. The model returns completed changes by value
+and keeps the previous visible view while a transaction or snapshot is unfinished.
+Call `getSnapshot` for an independent copy ordered by signed index.
+
+Serialize calls on each model. It owns data only, so the application controls
+where it runs and when to clear it. [Snapshot and transaction contract](../spec/events/INDEXED-EVENT-MODEL.md).
 
 ## Indexed option series
 

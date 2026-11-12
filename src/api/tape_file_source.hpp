@@ -4,6 +4,7 @@
 
 #include "../protocol/tape_event_bridge.hpp"
 #include "qd/api/feed.hpp"
+#include "tape_playback_clock.hpp"
 
 #include <array>
 #include <fstream>
@@ -16,6 +17,7 @@ class TapeFileSource {
     std::ifstream file_;
     protocol::TapeReader reader_;
     protocol::detail::TapeEventBridge bridge_;
+    TapePlaybackClock clock_;
     std::array<std::byte, READ_BYTES> bytes_{};
     std::optional<protocol::TapeFeedResult> pending_;
     std::size_t first_ = 0;
@@ -24,6 +26,7 @@ class TapeFileSource {
     std::size_t maximumBytes_;
     std::int32_t familyMessage_;
     bool finished_ = false;
+    bool pendingTimingPlanned_ = false;
 
     /** Fill one bounded chunk when the previous buffer is exhausted.
      * @param work Mutable turn credits.
@@ -45,9 +48,20 @@ class TapeFileSource {
 
     /** Progress one bounded file read and at most one complete envelope.
      * @param work Remaining source credits for the worker turn.
+     * @param now Current monotonic worker sample, also used for the playback deadline.
      * @return At most one counted local event, or an explicit parse, work or I/O failure.
      */
-    [[nodiscard]] std::expected<std::optional<protocol::LiveEvent>, Diagnostic> next(protocol::LiveWork &work);
+    [[nodiscard]] std::expected<std::optional<protocol::LiveEvent>, Diagnostic>
+    next(protocol::LiveWork &work, std::chrono::steady_clock::time_point now);
+
+    /** @return False when a resumed deadline cannot be represented. */
+    bool setPaused(bool paused, std::chrono::steady_clock::time_point now) noexcept;
+
+    /** @return True when the current time and pause state permit a new intake. */
+    [[nodiscard]] bool ready(std::chrono::steady_clock::time_point now) const noexcept;
+
+    /** @return Next due source time for the worker wake, when a timed envelope is held. */
+    [[nodiscard]] std::optional<std::chrono::steady_clock::time_point> deadline() const noexcept;
 
     /** @return True after actual clean parser EOF. */
     [[nodiscard]] bool finished() const noexcept;
