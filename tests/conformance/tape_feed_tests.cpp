@@ -208,6 +208,96 @@ TEST_CASE("real RAW tape routes IBM Quote through ordinary STREAM and TICKER sub
     }
 }
 
+TEST_CASE("active latest requests refuse a selected tape while passive TICKER playback still reads the cache") {
+    std::optional<q::events::Quote> passive;
+    api::ApiRuntime runtime(runtimeOptions());
+    const auto endpoint = runtime.createEndpoint();
+    const auto feed = endpoint->getFeed();
+    const auto deadline = std::chrono::steady_clock::now() + 5s;
+    const auto pending = feed->requestLastEvent<q::events::Quote>("IBM", deadline);
+    CHECK_FALSE(pending.isDone());
+    CHECK(endpoint->getStatistics().connection.connectionAttempts.value == 0);
+
+    const auto subscription = feed->createSubscription<q::events::Quote>();
+    subscription->addSymbols("IBM");
+    subscription->addEventListener([&passive, weak = std::weak_ptr(feed)](std::span<const q::events::Quote>) {
+        if (const auto owner = weak.lock()) {
+            if (auto value = owner->getLastEventIfSubscribed<q::events::Quote>("IBM"))
+                passive = std::move(value);
+        }
+    });
+    const auto diagnostic = [](auto operation) {
+        try {
+            operation();
+        } catch (const api::Error &error) {
+            return error.diagnostic();
+        }
+
+        return api::Diagnostic{};
+    };
+
+    endpoint->connectTape(RAW_QUOTE);
+    CHECK(pending.isDone());
+    const auto selected = diagnostic([&] {
+        static_cast<void>(pending.await());
+    });
+    const auto fixed = diagnostic([&] {
+        static_cast<void>(feed->requestLastEvent<q::events::Quote>("IBM", deadline));
+    });
+    CHECK(selected.code == api::ErrorCode::UNSUPPORTED_PROFILE);
+    CHECK(fixed.code == api::ErrorCode::UNSUPPORTED_PROFILE);
+    CHECK(selected.stage == "latest-event-request-tape");
+    CHECK(fixed.stage == selected.stage);
+    CHECK_FALSE(pending.cancel());
+
+    expectCleanEof(endpoint);
+    REQUIRE(passive);
+    CHECK(passive->symbol == u"IBM");
+    CHECK(passive->bidPrice.raw > 0);
+    CHECK(diagnostic([&] {
+              static_cast<void>(pending.await());
+          }).code == api::ErrorCode::UNSUPPORTED_PROFILE);
+}
+
+TEST_CASE("active latest request keeps the tape refusal after a stop before file activation") {
+    std::atomic<bool> stopped{false};
+    api::ApiRuntime runtime(runtimeOptions());
+    const auto endpoint = runtime.createEndpoint();
+    const auto feed = endpoint->getFeed();
+    const auto deadline = std::chrono::steady_clock::now() + 5s;
+    const auto pending = feed->requestLastEvent<q::events::Quote>("IBM", deadline);
+
+    endpoint->addStateChangeListener([&stopped, weak = std::weak_ptr(endpoint)](auto, auto state) {
+        if (state == api::EndpointState::CONNECTING) {
+            if (const auto owner = weak.lock()) {
+                owner->stopTape(api::TapeStopMode::ABORT);
+                stopped = true;
+            }
+        }
+    });
+
+    // The worker drains CONNECTING before opening a source. This path must never be opened.
+    endpoint->connectTape(FIXTURES / "stopped-before-tape-activation.qtp");
+    REQUIRE(endpoint->awaitState(api::EndpointState::CLOSED, deadline).status == api::WaitStatus::REACHED);
+    REQUIRE(stopped.load());
+    const auto closed = endpoint->closeAndAwaitTermination();
+    CHECK(closed.diagnostic.code == api::ErrorCode::NONE);
+    CHECK_FALSE(closed.deadlineExpired);
+    CHECK(endpoint->getStateChangeDiagnostic().code == api::ErrorCode::NONE);
+
+    api::Diagnostic failure;
+    try {
+        static_cast<void>(pending.await());
+    } catch (const api::Error &error) {
+        failure = error.diagnostic();
+    }
+
+    CHECK(pending.isDone());
+    CHECK_FALSE(pending.cancel());
+    CHECK(failure.code == api::ErrorCode::UNSUPPORTED_PROFILE);
+    CHECK(failure.stage == "latest-event-request-tape");
+}
+
 TEST_CASE("explicit HISTORY tape preserves typed trades and does not produce STREAM events") {
     for (const auto contract : {api::DeliveryContract::HISTORY, api::DeliveryContract::STREAM}) {
         CAPTURE(contract);

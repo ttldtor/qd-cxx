@@ -831,6 +831,42 @@ and Candle's canonical symbol. Other event types report `UNSUPPORTED_PROFILE`.
 For an exact Candle subscription, pass its parsed `CandleSymbol` to the same
 `getLastEventIfSubscribed<events::Candle>` method.
 
+## Request one latest event
+
+Use `requestLastEvent<events::Quote>("IBM", deadline)` to await one real TICKER
+event from TCP. Pass an absolute `std::chrono::steady_clock::time_point`. The request
+first checks the committed cache. On a miss, it can open temporary exact
+demand through an existing connection or an explicit `connect()`. An offline
+request can wait for the first subsequent explicit connection. Requesting
+an event starts local runtime progress and leaves connection intent unchanged.
+A tape-fixed endpoint refuses an explicit request with `UNSUPPORTED_PROFILE`.
+Selecting a tape as the first source completes any still-pending request with the
+same diagnostic. Passive TICKER cache reads remain available during playback.
+
+```cpp
+auto request = feed->requestLastEvent<events::Quote>(
+    "IBM", std::chrono::steady_clock::now() + std::chrono::seconds{2});
+auto quote = request.await();
+```
+
+`await()` returns an owning copy of the same terminal result on each successful
+call. Use `isDone()` to inspect completion and `cancel()` to compete for
+cancellation. The move-only handle also cancels a pending request on destruction.
+A pending wait from the request's SDK worker fails with `WRONG_THREAD`. A
+completed request can be read from that worker.
+
+The runtime publishes one terminal outcome. `await()` throws `Error` for source
+failure, endpoint closure, `REQUEST_CANCELLED` or `REQUEST_TIMED_OUT`.
+An accepted clear, or a disconnect or explicit reconnect after the request
+has bound to a source, cancels that request. A deadline reached before
+publication prevents a later value from becoming the result.
+
+An endpoint admits one request through completion and temporary-interest
+retirement. On a cache miss, the temporary interest also occupies a normal
+subscription slot until it retires. Capacity refusal reports `RESOURCE_LIMIT`.
+The temporary registration owns no application event listener and its retirement
+can proceed after the terminal result is available.
+
 ## Local aggregation
 
 Set `EndpointOptions::aggregationPeriod` or the `dxfeed.aggregationPeriod` configuration property for a local endpoint floor. `Subscription::setAggregationPeriod` sets an optional per-subscription period. The effective local period is their maximum and takes effect after the running interval. `Subscription::getAggregationPeriodInfo` reports the local period selected for the last actual listener invocation, or no value before one. `Endpoint::getAggregationPeriodInfo` separately reports an upstream descriptor.

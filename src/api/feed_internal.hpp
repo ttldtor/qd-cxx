@@ -256,6 +256,29 @@ struct LatestEventRead {
     }
 };
 
+/** Shared terminal publication plus one worker-owned temporary logical registration. */
+struct LatestEventRequestState {
+    EventType type;
+    std::u16string symbol;
+    std::chrono::steady_clock::time_point deadline;
+    std::weak_ptr<RuntimeControl> control;
+    std::mutex mutex; ///< Guards terminal outcome only; never held across source progress or callback execution.
+    std::condition_variable condition;
+    bool done = false;
+    Diagnostic failure;
+    std::optional<RegisteredEvent> result;
+
+    std::uint64_t connectionRevision = 0; ///< Worker-only after producer admission.
+    std::uint64_t clearRevision = 0;
+    bool boundToSource = false;
+    std::shared_ptr<SubscriptionPort> demand; ///< Worker-only, charged until native and logical retirement.
+
+    LatestEventRequestState(EventType type, std::u16string_view symbol, std::chrono::steady_clock::time_point deadline,
+                            const std::shared_ptr<RuntimeControl> &control)
+        : type(type), symbol(symbol), deadline(deadline), control(control) {
+    }
+};
+
 /** Producer-only endpoint state; native lifetime is exclusively worker-owned. */
 struct EndpointPort {
     mutable std::mutex mutex;                 ///< Protects bounded registration/address and detached observation state.
@@ -276,6 +299,7 @@ struct EndpointPort {
     std::uint64_t aggregationSourceRevision = 0; ///< Control fence for the report; never a request ACK.
     std::vector<std::shared_ptr<SubscriptionPort>> subscriptions; ///< Fixed slots, including retiring registrations.
     std::shared_ptr<LatestEventRead> latestRead; ///< One pending/executing owner observation, protected by mutex.
+    std::shared_ptr<LatestEventRequestState> latestEventRequest; ///< One charged one-event request, protected by mutex.
     StateListeners stateListeners; ///< Opt-in advisory lifecycle observations, retired after all subscriptions.
     std::vector<EndpointStateChange> stateChanges; ///< Fixed ring; selection lease remains charged through release.
     std::size_t stateChangeHead = 0;     ///< Oldest pending/executing entry, reused only after its lease release.
