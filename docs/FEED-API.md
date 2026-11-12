@@ -706,6 +706,8 @@ Receive NuamTrade using `createSubscription<events::NuamTrade>()` on a TICKER or
 The event extends Trade with independently updated exchange statistics. See the
 [NuamTrade fields and routing](../spec/events/NUAM-TRADE.md).
 
+Receive `NuamTimeAndSale` on STREAM or HISTORY using the typed Feed API. It extends `TimeAndSale` with the matching engine `matchId`; HISTORY retains its indexed transaction and removal flags. The default route is composite; regional routes require an explicit registry.
+
 ## Read the latest retained event
 
 `Feed::getLastEvent(quote)` returns an independent copy of the most recent committed

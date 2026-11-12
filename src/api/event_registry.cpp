@@ -11,6 +11,7 @@
 #include "qd/events/derived_order.hpp"
 #include "qd/events/greeks.hpp"
 #include "qd/events/market_maker.hpp"
+#include "qd/events/nuam_time_and_sale.hpp"
 #include "qd/events/nuam_trade.hpp"
 #include "qd/events/option_sale.hpp"
 #include "qd/events/order.hpp"
@@ -187,8 +188,8 @@ bool validRegistration(const EventRegistration &registration) noexcept {
             registration.type == EventType::CONFIGURATION || registration.type == EventType::MARKET_MAKER ||
             registration.type == EventType::SERIES || registration.type == EventType::CANDLE ||
             registration.type == EventType::TIME_AND_SALE || registration.type == EventType::OPTION_SALE ||
-            registration.type == EventType::NUAM_TRADE || detail::isOptionTimeSeriesEvent(registration.type) ||
-            detail::usesOrderSource(registration.type)) &&
+            registration.type == EventType::NUAM_TRADE || registration.type == EventType::NUAM_TIME_AND_SALE ||
+            detail::isOptionTimeSeriesEvent(registration.type) || detail::usesOrderSource(registration.type)) &&
            (registration.eventTimePolicy == EventTimePolicy::UNSPECIFIED ||
             registration.eventTimePolicy == EventTimePolicy::FIELD_METADATA) &&
            (registration.projection == events::EventProjection::NATIVE ||
@@ -488,6 +489,13 @@ EventRegistry::create(const core::LocalSchema &schema, std::span<const EventRegi
                 if (!mapping) {
                     return std::unexpected(EventRegistryFailure{mapping.error(), index});
                 }
+            } else if (registration.type == EventType::NUAM_TIME_AND_SALE) {
+                const auto mapping = events::PreparedNuamTimeAndSale::prepare(*ownedSchema, registration.localRecordId,
+                                                                              registration.mappingLimits);
+
+                if (!mapping) {
+                    return std::unexpected(EventRegistryFailure{mapping.error(), index});
+                }
             } else if (registration.type == EventType::TIME_AND_SALE) {
                 const auto mapping = events::PreparedTimeAndSale::prepare(*ownedSchema, registration.localRecordId,
                                                                           registration.mappingLimits);
@@ -780,6 +788,26 @@ std::expected<void, EventRegistryFailure> appendNuamTradeRecord(std::vector<core
     return {};
 }
 
+/** Append the single default Nuam time-series record. */
+std::expected<void, EventRegistryFailure> appendNuamTimeAndSaleRecord(std::vector<core::LocalRecord> &records,
+                                                                      std::vector<EventRegistration> &routes,
+                                                                      EventRegistryLimits limits,
+                                                                      EventRegistryWork &work) {
+    constexpr std::size_t CONSTRUCTION_WORK = 1024;
+    debit(work.visits, CONSTRUCTION_WORK);
+    const auto schema = events::defaultNuamTimeAndSaleSchema(limits.schema);
+
+    if (!schema)
+        return std::unexpected(EventRegistryFailure{schema.error(), {}});
+
+    auto record = schema->records().front();
+    record.id = static_cast<std::int32_t>(records.size());
+    routes.push_back({EventType::NUAM_TIME_AND_SALE, record.id});
+    records.push_back(std::move(record));
+
+    return {};
+}
+
 /** Build an explicit derived route while retaining the ordinary finite mapper defaults.
  * @param id Exact physical local record ID.
  * @param family Verified physical-to-business delegate family.
@@ -812,6 +840,9 @@ std::expected<EventRegistry, EventRegistryFailure> defaultStreamEventRegistry(Ev
         if (const auto nuam = appendNuamTradeRecord(records, routes, limits, work); !nuam) {
             return std::unexpected(nuam.error());
         }
+
+        if (const auto nuam = appendNuamTimeAndSaleRecord(records, routes, limits, work); !nuam)
+            return std::unexpected(nuam.error());
 
         const auto schema = core::LocalSchema::create(records, limits.schema, core::LocalProfile::BINARY_FIELDS_V1);
 
@@ -1059,6 +1090,9 @@ std::expected<EventRegistry, EventRegistryFailure> defaultHistoryEventRegistry(E
         optionSaleRecord.id = static_cast<std::int32_t>(records.size());
         routes.push_back({EventType::OPTION_SALE, optionSaleRecord.id});
         records.push_back(std::move(optionSaleRecord));
+
+        if (const auto nuam = appendNuamTimeAndSaleRecord(records, routes, limits, work); !nuam)
+            return std::unexpected(nuam.error());
 
         auto schema = core::LocalSchema::create(records, limits.schema, core::LocalProfile::BINARY_FIELDS_V1);
 
