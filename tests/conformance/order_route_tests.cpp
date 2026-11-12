@@ -7,6 +7,7 @@
 #include "receiving_profile.hpp"
 #include <array>
 #include <doctest/doctest.h>
+#include <iostream>
 
 namespace {
 namespace q = org::ttldtor::qdcxx;
@@ -57,8 +58,8 @@ TEST_CASE("Order HISTORY defaults preserve the existing ordinary built-in catalo
     CHECK(ordinary->registrations().size() == 9);
     auto history = d::defaultReceivingRegistry(q::api::DeliveryContract::HISTORY);
     REQUIRE(history);
-    REQUIRE(history->registrations().size() == 41);
-    REQUIRE(history->schema().records().size() == 40);
+    REQUIRE(history->registrations().size() == 45);
+    REQUIRE(history->schema().records().size() == 44);
     CHECK(history->registrations()[3].type == q::api::EventType::SPREAD_ORDER);
     CHECK(history->registrations()[4].type == q::api::EventType::ANALYTIC_ORDER);
     CHECK(history->registrations()[1].type == q::api::EventType::MARKET_MAKER);
@@ -128,4 +129,37 @@ TEST_CASE("Order filter coordinates select the actual source for indexed demand 
     CHECK_FALSE(filter.acceptEvent(q::api::RegisteredEvent{event}));
     event.index = -1;
     CHECK_FALSE(filter.acceptEvent(q::api::RegisteredEvent{event}));
+}
+
+TEST_CASE("NuamOrder default sources route independently") {
+    q::api::RuntimeOptions limits;
+    limits.dnsServers.push_back({{127, 0, 0, 1}});
+    q::api::EndpointOptions options;
+    options.contract = q::api::DeliveryContract::HISTORY;
+    auto profile = d::prepareReceivingProfile(limits, options, "127.0.0.1", 1);
+    const auto &plan = d::receivingEventPlan(profile, d::EventSelection::NUAM_ORDER);
+    REQUIRE(plan.bindingCount == 3);
+    const std::array ids{0, q::events::OrderSource::NUAM.id(), q::events::OrderSource::NUAM_LOWER.id()};
+
+    for (const auto selected : std::array<std::optional<std::int32_t>, 5>{{{}, 0, ids[1], ids[2], -1}}) {
+        d::ReceivingSymbol symbol;
+        symbol.logical = u"AAPL";
+        symbol.sourceId = selected;
+        std::array symbols{symbol};
+        d::prepareReceivingSymbols(profile, plan, symbols);
+
+        for (std::size_t i = 0; i < plan.bindingCount; ++i) {
+            const auto binding = plan.bindingIndices[i];
+            CHECK(profile.bindingSources[binding] == ids[i]);
+            CHECK(d::receivingSymbolMatches(profile, binding, symbols[0]) ==
+                  (!selected || *selected < 0 || *selected == ids[i]));
+        }
+    }
+
+    CHECK(profile.endpoint.settings().budgets.session.snapshotBytes == 320 * 1024);
+    std::cout << "NUAM_HISTORY planBytes=" << sizeof(d::ReceivingEventPlan)
+              << " planCount=" << profile.eventPlans.size()
+              << " retainedMetadataBytes=" << profile.routing.retainedMetadataBytes
+              << " snapshotBytes=" << profile.endpoint.settings().budgets.session.snapshotBytes
+              << " residentBytes=" << profile.endpoint.settings().budgets.session.residentBytes << '\n';
 }

@@ -146,9 +146,9 @@ std::expected<Order, MappingError> projectOrder(std::u16string_view symbol, std:
  * @return Complete owning shape and selections, or original refusal.
  */
 template <std::size_t ExtraCount>
-std::expected<EventMapping, MappingError> prepare(const core::LocalSchema &schema, std::int32_t localId,
-                                                  MappingLimits limits,
-                                                  const std::array<FieldRequest, ExtraCount> &extra) {
+std::expected<EventMapping, MappingError>
+prepare(const core::LocalSchema &schema, std::int32_t localId, MappingLimits limits,
+        const std::array<FieldRequest, ExtraCount> &extra, bool includeMarketMaker = true) {
     using Type = core::SerialFieldType;
     constexpr std::array indexTypes{Type::COMPACT_INT};
     constexpr std::array longTypes{Type::LONG, Type::WIDE_DECIMAL, Type::TIME_MILLIS};
@@ -177,6 +177,10 @@ std::expected<EventMapping, MappingError> prepare(const core::LocalSchema &schem
         const bool maker = i == fieldIndex(OrderField::MARKET_MAKER);
         keys[i] = {KEYS[i], maker ? KEYS.back() : KEYS[i]};
         requests[i] = {std::span(keys[i]).first(maker ? 2 : 1), types[i], required[i]};
+
+        // Preserve the shared selection positions without binding an unrelated NuamOrder MMID field.
+        if (maker && !includeMarketMaker)
+            requests[i] = {std::span(KEYS).first(1), indexTypes, true};
     }
 
     std::ranges::copy(extra, requests.begin() + SELECTION_COUNT);

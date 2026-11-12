@@ -910,14 +910,16 @@ TapeReader::TapeReader(const core::LocalSchema &schema, TapeLimits limits, TapeM
 
 TapeReader::TapeReader(const core::LocalSchema &schema, TapeLimits limits, TapeMode mode,
                        FieldTimePolicy fieldTimePolicy, TapeExternalTimePolicy externalTimePolicy)
-    : TapeReader(schema, limits, mode, fieldTimePolicy, externalTimePolicy, SchemaProvenance::READER_GENERATION) {
+    : TapeReader(schema, limits, mode, fieldTimePolicy, externalTimePolicy, SchemaProvenance::READER_GENERATION,
+                 std::nullopt) {
 }
 
 TapeReader::TapeReader(const core::LocalSchema &schema, TapeLimits limits, TapeMode mode,
                        FieldTimePolicy fieldTimePolicy, TapeExternalTimePolicy externalTimePolicy,
-                       SchemaProvenance schemaProvenance)
-    : limits_(limits), mode_(mode), schema_(initializeSchema(schema, limits, mode, fieldTimePolicy, externalTimePolicy,
-                                                             schemaProvenance == SchemaProvenance::CONFIGURED)),
+                       SchemaProvenance schemaProvenance, std::optional<StreamDataLimits> dataPerFrame)
+    : limits_(limits), dataPerFrame_(std::move(dataPerFrame)), mode_(mode),
+      schema_(initializeSchema(schema, limits, mode, fieldTimePolicy, externalTimePolicy,
+                               schemaProvenance == SchemaProvenance::CONFIGURED)),
       schemaProvenance_(schemaProvenance), framer_(limits.frame) {
     fieldTimePolicy_ = fieldTimePolicy;
     externalTimePolicy_ = externalTimePolicy;
@@ -1721,8 +1723,8 @@ void TapeReader::dispatch(TapeFeedResult &result) {
     budget.ownedPayloadBytes -= ownedPayloadBytes_;
     budget.ownedFieldTimeRecords -= ownedFieldTimeRecords_;
 
-    if (limits_.dataPerFrame) {
-        const auto &frameLimits = *limits_.dataPerFrame;
+    if (dataPerFrame_) {
+        const auto &frameLimits = *dataPerFrame_;
         budget.payloadBytes = std::min(budget.payloadBytes, frameLimits.payloadBytes);
 
         for (const auto member : detail::TAPE_DATA_TOTALS) {

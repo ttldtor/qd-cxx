@@ -1369,9 +1369,9 @@ detail::TapeEventBridge::TapeEventBridge(LiveSnapshot epoch, std::size_t eventBy
 }
 
 TapeReader detail::TapeEventBridge::makeFixedSchemaReader(const core::LocalSchema &schema, TapeLimits limits,
-                                                          FieldTimePolicy fieldTime) {
+                                                          StreamDataLimits dataPerFrame, FieldTimePolicy fieldTime) {
     return TapeReader(schema, limits, TapeMode::BINARY_CATALOG_V1, fieldTime, TapeExternalTimePolicy::DISABLED,
-                      TapeReader::SchemaProvenance::CONFIGURED);
+                      TapeReader::SchemaProvenance::CONFIGURED, dataPerFrame);
 }
 
 std::expected<detail::TapeEventBridge, LiveError> detail::TapeEventBridge::create(LiveLimits limits, LiveWork &work) {
