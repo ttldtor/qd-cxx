@@ -4501,6 +4501,33 @@ std::expected<QueueRangeStatus, QueueFailure> MuxQueue::rangeStatus(const MuxHan
     }
 }
 
+std::expected<collectors::HistoryRetainedRange, QueueFailure>
+MuxQueue::retainedHistoryRange(const MuxHandle &handle, const collectors::HistoryRetainedQuery &query,
+                               QueueWork &work) const {
+    const auto status = rangeStatus(handle, query.key, work);
+
+    if (!status)
+        return std::unexpected(status.error());
+
+    if (!status->mappingCurrent || status->acceptedUnstagedData || status->requestedFrom > query.from)
+        return collectors::HistoryRetainedRange{};
+
+    auto cut = state_->history->retainedRange(query, work.history);
+
+    if (!cut) {
+        switch (cut.error().error) {
+        case collectors::HistoryError::RESOURCE_LIMIT:
+            return std::unexpected(QueueFailure{QueueError::RESOURCE_LIMIT, {}});
+        case collectors::HistoryError::ALLOCATION_FAILURE:
+            return std::unexpected(QueueFailure{QueueError::ALLOCATION_FAILURE, {}});
+        default:
+            return std::unexpected(sourceFailure(cut.error().error));
+        }
+    }
+
+    return std::move(*cut);
+}
+
 std::expected<std::vector<QueueRangeObservation>, QueueFailure> MuxQueue::rangeSnapshot(const MuxHandle &handle,
                                                                                         QueueWork &work) const {
     try {

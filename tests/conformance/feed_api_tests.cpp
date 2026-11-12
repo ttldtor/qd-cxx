@@ -18,6 +18,7 @@
 
 #include "qd/encoding/compact.hpp"
 #include "qd/encoding/symbol_reader.hpp"
+#include "qd/events/event_flags.hpp"
 #include "qd/protocol/subscription_writer.hpp"
 
 #include <doctest/doctest.h>
@@ -4981,6 +4982,227 @@ TEST_CASE("live fromTime observer allocation refusal preserves the accepted prop
     CHECK(port.observers.count == 0);
     CHECK_FALSE(port.observers.latest);
     CHECK(port.statistics->snapshot().desiredRevision == 0);
+}
+
+TEST_CASE("indexed HISTORY snapshots keep same-symbol sources and private demand separate") {
+    namespace flags = events::indexed_event_flags;
+    constexpr root::core::SchemaLimits schemaLimits{16, 128, 256, 128, 16384};
+    const auto logicalDefault = events::defaultOrderSchema(schemaLimits);
+    REQUIRE(logicalDefault.has_value());
+    const auto [physicalDefault, fields] = history_test::orderInput();
+    auto makeRecords = [](const root::core::LocalSchema &source) {
+        std::array records{source.records().front(), source.records().front()};
+        records[0].name = u"Order#NTV";
+        records[1].name = u"Order#BZX";
+        records[1].id = 1;
+
+        return records;
+    };
+    const auto logical = root::core::LocalSchema::create(makeRecords(*logicalDefault), schemaLimits,
+                                                         root::core::LocalProfile::BINARY_FIELDS_V1);
+    const auto physical = root::core::LocalSchema::create(makeRecords(physicalDefault), schemaLimits,
+                                                          root::core::LocalProfile::BINARY_FIELDS_V1);
+    REQUIRE(logical.has_value());
+    REQUIRE(physical.has_value());
+    const std::array routes{api::EventRegistration{api::EventType::ORDER, 0},
+                            api::EventRegistration{api::EventType::ORDER, 1}};
+    api::EventRegistryWork registryWork;
+    const auto registry = api::EventRegistry::create(*logical, routes, {}, registryWork);
+    REQUIRE(registry.has_value());
+    auto row = [&](std::int32_t index, std::int32_t record, std::int32_t eventFlags) {
+        auto values = fields;
+        const auto &lookups = physical->records()[record].lookups;
+        const auto found = std::ranges::find(lookups, u"Index", [](const auto &lookup) {
+            return lookup.name;
+        });
+        REQUIRE(found != lookups.end());
+        values[found->fieldId].raw = index;
+
+        return peer::Record{u"IBM", std::move(values), eventFlags, {}, record};
+    };
+    const std::array data{row(17, 0, flags::SNAPSHOT_BEGIN),
+                          row(5, 0, 0),
+                          peer::Record{u"IBM", {}, flags::REMOVE_EVENT | flags::SNAPSHOT_END, 0, 0},
+                          row(17, 1, flags::SNAPSHOT_BEGIN),
+                          row(9, 1, 0),
+                          peer::Record{u"IBM", {}, flags::REMOVE_EVENT | flags::SNAPSHOT_END, 0, 1}};
+    const std::array<std::u16string, 2> symbols{u"IBM", u"IBM"};
+    auto peerOptions = script(root::core::SubscriptionFamily::HISTORY, true);
+    peerOptions.historyBound = 0;
+    peerOptions.describeAllRecords = true;
+    peerOptions.unorderedAdds = true;
+    peerOptions.subscriptionRecordIds = {0, 1};
+    peerOptions.afterRemove = std::vector<peer::Record>{};
+    peerOptions.removeSequence =
+        std::vector{peer::ExpectedSubscription{{u"IBM"}, {0}, true}, peer::ExpectedSubscription{{u"IBM"}, {1}, true}};
+    api::ApiRuntime runtime(runtimeOptions());
+    peer::Peer source(*physical, data, symbols, 8192, peer::PeerMode::HOLD, peerOptions);
+    auto options = endpointOptions(api::DeliveryContract::HISTORY);
+    options.eventRegistry = *registry;
+    auto endpoint = runtime.createEndpoint(options);
+    auto feed = endpoint->getFeed();
+    auto live = feed->createSubscription<events::Order>();
+    const auto ntv = events::OrderSource::NTV.indexedSource();
+    const auto bzx = events::OrderSource::BZX.indexedSource();
+    live->setSelectors(std::array{api::SubscriptionSelector::indexed(u"IBM", bzx)});
+
+    struct CallbackObservation {
+        std::atomic<bool> readIncomplete{false};
+        std::atomic<bool> wrongSource{false};
+    };
+
+    const auto callback = std::make_shared<CallbackObservation>();
+    const std::weak_ptr<api::Feed> callbackFeed = feed;
+    live->addEventListener([callback, callbackFeed, bzx](std::span<const events::Order> batch) {
+        for (const auto &event : batch) {
+            if (event.getSourceId() != bzx.id())
+                callback->wrongSource = true;
+        }
+
+        if (const auto owner = callbackFeed.lock()) {
+            callback->readIncomplete = owner->getIndexedEventsIfSubscribed<events::Order>(u"IBM", bzx).state ==
+                                       api::HistorySnapshotState::INCOMPLETE;
+        }
+    });
+    auto request = feed->requestIndexedEvents<events::Order>(u"IBM", ntv, std::chrono::steady_clock::now() + 5s);
+    endpoint->connect(address(source));
+    const bool bothAdded = eventually([&] {
+        return source.adds() == 1;
+    });
+    CHECK(bothAdded);
+    CHECK(feed->getIndexedEventsIfSubscribed<events::Order>(u"IBM", ntv).state ==
+          api::HistorySnapshotState::NOT_SUBSCRIBED);
+    CHECK(feed->getIndexedEventsIfSubscribed<events::Order>(u"IBM", bzx).state ==
+          api::HistorySnapshotState::INCOMPLETE);
+    source.releaseData();
+    const auto first = request.get();
+    CHECK(first.state == api::HistorySnapshotState::COMPLETE);
+    CHECK(first.sourceEpoch.has_value());
+    REQUIRE(first.events.size() == 2);
+    CHECK(first.events[0].getSourceId() == ntv.id());
+    CHECK(first.events[1].getSourceId() == ntv.id());
+    CHECK(first.events[0].getIndex() < first.events[1].getIndex());
+    CHECK(first.events[0].eventFlags == 0);
+    CHECK(first.events[1].eventFlags == 0);
+    CHECK(eventually([&] {
+        return callback->readIncomplete.load();
+    }));
+    CHECK_FALSE(callback->wrongSource.load());
+    const auto second = feed->getIndexedEventsIfSubscribed<events::Order>(u"IBM", bzx);
+    CHECK(second.state == api::HistorySnapshotState::COMPLETE);
+    CHECK(second.sourceEpoch == first.sourceEpoch);
+    REQUIRE(second.events.size() == 2);
+    CHECK(second.events[0].getSourceId() == bzx.id());
+    CHECK(second.events[1].getSourceId() == bzx.id());
+    CHECK(second.events[0].getIndex() < second.events[1].getIndex());
+    CHECK(errorCode([&] {
+              static_cast<void>(feed->getIndexedEventsIfSubscribed<events::Order>(u"IBM", bzx, {1}));
+          }) == api::ErrorCode::RESOURCE_LIMIT);
+    CHECK(eventually([&] {
+        return source.removes() >= 1;
+    }));
+    static_cast<void>(endpoint->closeAndAwaitTermination());
+    CHECK_FALSE(source.failed());
+}
+
+TEST_CASE("indexed HISTORY snapshot cancellation fences late data and releases private interest") {
+    auto [schema, fields] = history_test::orderInput();
+    api::ApiRuntime runtime(runtimeOptions());
+    auto peerOptions = script(root::core::SubscriptionFamily::HISTORY, true);
+    peerOptions.historyBound = 0;
+    peerOptions.afterRemove = std::vector<peer::Record>{};
+    const std::array rows{
+        peer::Record{u"IBM", std::move(fields),
+                     events::indexed_event_flags::SNAPSHOT_BEGIN | events::indexed_event_flags::SNAPSHOT_END}};
+    const std::array<std::u16string, 1> symbols{u"IBM"};
+    peer::Peer source(schema, rows, symbols, 8192, peer::PeerMode::HOLD, peerOptions);
+    auto endpoint = runtime.createEndpoint(endpointOptions(api::DeliveryContract::HISTORY));
+    auto feed = endpoint->getFeed();
+    const auto sourceId = events::OrderSource::DEFAULT.indexedSource();
+    auto request = feed->requestIndexedEvents<events::Order>(u"IBM", sourceId, std::chrono::steady_clock::now() + 5s);
+    endpoint->connect(address(source));
+    CHECK(eventually([&] {
+        return source.adds() == 1;
+    }));
+    CHECK(feed->getIndexedEventsIfSubscribed<events::Order>(u"IBM", sourceId).state ==
+          api::HistorySnapshotState::NOT_SUBSCRIBED);
+    CHECK(request.cancel());
+    CHECK_FALSE(request.cancel());
+    source.releaseData();
+    CHECK(errorCode([&] {
+              static_cast<void>(request.get());
+          }) == api::ErrorCode::REQUEST_CANCELLED);
+    CHECK(eventually([&] {
+        return source.removes() == 1;
+    }));
+    CHECK(eventually([&] {
+        return errorCode([&] {
+                   auto expired =
+                       feed->requestIndexedEvents<events::Order>(u"IBM", sourceId, std::chrono::steady_clock::now());
+                   static_cast<void>(expired.get());
+               }) == api::ErrorCode::REQUEST_TIMED_OUT;
+    }));
+    static_cast<void>(endpoint->closeAndAwaitTermination());
+    CHECK_FALSE(source.failed());
+}
+
+TEST_CASE("indexed HISTORY snapshot never completes across a source replacement") {
+    auto [schema, firstFields] = history_test::orderInput();
+    namespace flags = events::indexed_event_flags;
+    auto freshFields = firstFields;
+    const auto &lookups = schema.records().front().lookups;
+    const auto index = std::ranges::find(lookups, u"Index", [](const auto &lookup) {
+        return lookup.name;
+    });
+    REQUIRE(index != lookups.end());
+    firstFields[index->fieldId].raw = 7;
+    freshFields[index->fieldId].raw = 11;
+    const std::array firstRows{peer::Record{u"IBM", std::move(firstFields), flags::SNAPSHOT_BEGIN | flags::TX_PENDING}};
+    auto peerOptions = script(root::core::SubscriptionFamily::HISTORY);
+    peerOptions.historyBound = 0;
+    peerOptions.afterRemove = std::vector<peer::Record>{};
+    peerOptions.removeSequence = std::vector{peer::ExpectedSubscription{{u"IBM"}, {0}, true}};
+    peerOptions.afterReconnect = std::vector{peer::Record{u"IBM", std::move(freshFields), flags::SNAPSHOT_BEGIN},
+                                             peer::Record{u"IBM", {}, flags::SNAPSHOT_END | flags::REMOVE_EVENT, 0}};
+    const std::array<std::u16string, 1> symbols{u"IBM"};
+    api::ApiRuntime runtime(runtimeOptions());
+    peer::Peer source(schema, firstRows, symbols, 8192, peer::PeerMode::HOLD, peerOptions);
+    auto options = endpointOptions(api::DeliveryContract::HISTORY);
+    options.maximumAttempts = 2;
+    auto endpoint = runtime.createEndpoint(options);
+    auto feed = endpoint->getFeed();
+    const auto sourceId = events::OrderSource::DEFAULT.indexedSource();
+    auto old = feed->requestIndexedEvents<events::Order>(u"IBM", sourceId, std::chrono::steady_clock::now() + 5s);
+    endpoint->connect(address(source));
+    REQUIRE(eventually([&] {
+        return endpoint->getStatistics().connection.readDataRecords.value == 1;
+    }));
+    const auto oldEpoch = endpoint->getStatistics().connection.sourceEpoch;
+    REQUIRE(oldEpoch.has_value());
+    CHECK_FALSE(old.isDone());
+    endpoint->reconnect();
+    CHECK(errorCode([&] {
+              static_cast<void>(old.get());
+          }) == api::ErrorCode::REQUEST_CANCELLED);
+
+    std::optional<api::HistorySnapshotRequest<events::Order>> fresh;
+    REQUIRE(eventually([&] {
+        return errorCode([&] {
+                   fresh.emplace(feed->requestIndexedEvents<events::Order>(u"IBM", sourceId,
+                                                                           std::chrono::steady_clock::now() + 5s));
+               }) == api::ErrorCode::NONE;
+    }));
+    const auto snapshot = fresh->get();
+    CHECK(snapshot.state == api::HistorySnapshotState::COMPLETE);
+    REQUIRE(snapshot.sourceEpoch.has_value());
+    CHECK(*snapshot.sourceEpoch > *oldEpoch);
+    REQUIRE(snapshot.events.size() == 1);
+    CHECK(snapshot.events.front().getIndex() == 11);
+    CHECK(errorCode([&] {
+              static_cast<void>(old.get());
+          }) == api::ErrorCode::REQUEST_CANCELLED);
+    static_cast<void>(endpoint->closeAndAwaitTermination());
+    CHECK_FALSE(source.failed());
 }
 
 TEST_CASE("HISTORY early obsolete onBatch requests replay before any Invocation or BEGIN exists") {

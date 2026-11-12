@@ -602,6 +602,56 @@ detail::projectTickerLatest(const ReceiverPlan &plan, const collectors::TickerVa
     }
 }
 
+std::expected<SubscriptionProjection, ReceiverProjectionFailure>
+detail::projectHistoryRetained(const ReceiverPlan &plan, const collectors::HistoryRetainedRecord &value,
+                               ReceiverProjectionWork &work) {
+    try {
+        const auto &source = value.record;
+        const ReceiverRoute *selected = nullptr;
+
+        for (const auto &route : plan.routes) {
+            debit(work.visits, 1);
+
+            if (route.context.matches(source.context) &&
+                !std::holds_alternative<events::PreparedDerivedOrder>(route.mapping)) {
+                selected = &route;
+                break;
+            }
+        }
+
+        if (!selected || source.typedValues.size() != selected->shapeFields)
+            return std::unexpected(ReceiverProjectionFailure{ReceiverError::INVALID_INPUT});
+
+        auto allowance = projectionAllowance(*selected);
+        allowance.visits = checkedSum(allowance.visits, source.typedValues.size());
+        allowance.bytes =
+            checkedSum(allowance.bytes, checkedProduct(source.typedValues.size(), sizeof(core::FieldValueView)));
+        prepayProjection(work, allowance);
+        std::vector<core::FieldValueView> fields;
+        fields.reserve(source.typedValues.size());
+
+        for (const auto &field : source.typedValues)
+            fields.push_back({field.type, field.raw, field.units, field.bytes});
+
+        mux::MuxRecordView record{};
+        record.family = core::SubscriptionFamily::HISTORY;
+        record.context = source.context;
+        record.symbol = source.symbol;
+        record.rawTime = value.rawTime;
+        record.typedValues = fields;
+        record.source = mux::RawSourceMetadata{source.senderId,    source.cipher,    source.eventFlags,
+                                               source.removalTime, source.fieldTime, value.bindingGeneration};
+
+        return projectPrepared(record, *selected, {});
+    } catch (ReceiverError error) {
+        return std::unexpected(ReceiverProjectionFailure{error});
+    } catch (const std::bad_alloc &) {
+        return std::unexpected(ReceiverProjectionFailure{ReceiverError::ALLOCATION_FAILURE});
+    } catch (const std::length_error &) {
+        return std::unexpected(ReceiverProjectionFailure{ReceiverError::RESOURCE_LIMIT});
+    }
+}
+
 std::size_t SubscriptionBatch::eventCount() const noexcept {
     std::size_t count = 0;
 

@@ -12,6 +12,7 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <vector>
 
 namespace org::ttldtor::qdcxx::collectors {
 namespace detail {
@@ -235,6 +236,34 @@ struct HistoryRangeStatus {
     bool completeRequestedRange;   ///< Only true for covered, consistent, fresh source and view.
 };
 
+/** Source coverage for a read of retained values. */
+enum class HistoryRetainedState {
+    INCOMPLETE, ///< Current transaction or snapshot coverage is not yet proved.
+    TRUNCATED,  ///< Source finished with a snip above the requested lower bound.
+    COMPLETE    ///< Current source covered the requested interval with a closed transaction.
+};
+
+/** Exact physical request; a borrowed key and inclusive raw coordinates. */
+struct HistoryRetainedQuery {
+    core::SubscriptionKey key;  ///< Exact physical record and symbol.
+    std::int64_t from;          ///< Inclusive lower bound.
+    std::int64_t to;            ///< Inclusive upper bound.
+    std::size_t maximumResults; ///< Refuse when the result would exceed this cap.
+};
+
+/** One retained source value; its payload is borrowed until the next collector mutation. */
+struct HistoryRetainedRecord {
+    protocol::LiveRecordView record; ///< Exact retained value.
+    std::int64_t rawTime;            ///< Physical indexed coordinate.
+    std::uint64_t bindingGeneration; ///< Actual source binding generation.
+};
+
+/** One serialized source cut; retained payload views expire on the next owner mutation. */
+struct HistoryRetainedRange {
+    HistoryRetainedState state = HistoryRetainedState::INCOMPLETE; ///< Actual coverage at selection.
+    std::vector<HistoryRetainedRecord> rows; ///< Retained values for a covered or terminally snipped interval.
+};
+
 /** Reserved local failure evidence, detached from all operation/protocol owners. */
 struct HistoryViewFailure {
     HistoryError cause;                ///< Local pending reservation failure.
@@ -403,6 +432,13 @@ class HistoryCollector {
      */
     [[nodiscard]] std::expected<HistoryRangeStatus, HistoryFailure>
     rangeStatus(const HistoryViewToken &view, const core::SubscriptionKey &key, HistoryWork &work) const;
+    /** Read retained values and source coverage together without consuming any view.
+     * @param query Exact source key and bounded inclusive raw interval.
+     * @param work Remaining bounded lookup, scan and result work.
+     * @return Borrowed rows valid until next collector mutation, or typed refusal.
+     */
+    [[nodiscard]] std::expected<HistoryRetainedRange, HistoryFailure> retainedRange(const HistoryRetainedQuery &query,
+                                                                                    HistoryWork &work) const;
     /** Explicitly forget empty metadata with no live interest or pending references.
      * @param work Full scan/release credits; no-op/failure preserves offers.
      * @return Synchronous continuity report with non-reused generation; no ACK or healthy reset.

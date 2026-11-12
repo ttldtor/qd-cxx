@@ -1555,6 +1555,22 @@ RecoveryCore::historyRangeSnapshot(const mux::MuxHandle &handle, mux::QueueWork 
     return std::move(*observed);
 }
 
+std::expected<collectors::HistoryRetainedRange, RecoveryDiagnostic>
+RecoveryCore::retainedHistoryRange(const mux::MuxHandle &handle, const collectors::HistoryRetainedQuery &query,
+                                   mux::QueueWork &work) const {
+    const auto history = historyObservationQueue();
+
+    if (!history)
+        return std::unexpected(history.error());
+
+    auto observed = (*history)->retainedHistoryRange(handle, query, work);
+
+    if (!observed)
+        return std::unexpected(queueFailure(observed.error()));
+
+    return std::move(*observed);
+}
+
 std::optional<RecoveryClock::time_point> RecoveryCore::nextWake() const noexcept {
     if (terminal_)
         return std::nullopt;

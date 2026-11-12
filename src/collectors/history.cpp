@@ -2512,6 +2512,71 @@ std::expected<HistoryRangeStatus, HistoryFailure> HistoryCollector::rangeStatus(
     }
 }
 
+std::expected<HistoryRetainedRange, HistoryFailure> HistoryCollector::retainedRange(const HistoryRetainedQuery &query,
+                                                                                    HistoryWork &work) const {
+    try {
+        spend(work, 1);
+
+        if (!impl_ || query.from > query.to || !query.maximumResults)
+            throw HistoryError::INVALID_STATE;
+
+        const auto &s = *impl_;
+        HistoryRetainedRange result;
+
+        if (s.freshness != HistoryState::CURRENT)
+            return result;
+
+        const auto &bank = s.current();
+        spend(work, 0, s.limits.partitions,
+              product(s.limits.partitions, sum(query.key.symbol.size(), s.limits.symbolUnitsPerPartition)));
+        const auto index = s.find(bank, s.record(query.key), query.key.symbol);
+
+        if (index == NONE)
+            return result;
+
+        const auto &partition = bank.partitions[index];
+
+        if (!partition.mode || !partition.began || Impl::tx(partition))
+            return result;
+
+        if (partition.ended && partition.snip != LOW && partition.snip > query.from) {
+            result.state = HistoryRetainedState::TRUNCATED;
+        } else if (partition.frontier <= query.from) {
+            result.state = HistoryRetainedState::COMPLETE;
+        } else {
+            return result;
+        }
+
+        const auto matches = [&](const Impl::Point &point) {
+            return point.used && point.partition == index && point.value.raw && point.value.time >= query.from &&
+                   point.value.time <= query.to;
+        };
+        spend(work, 0, product(bank.points.size(), 2));
+        const auto count = static_cast<std::size_t>(std::ranges::count_if(bank.points, matches));
+
+        if (count > query.maximumResults)
+            throw HistoryError::RESOURCE_LIMIT;
+
+        spend(work, 0, 0, 0, product(count, sizeof(HistoryRetainedRecord)));
+        result.rows.reserve(count);
+
+        for (const auto &point : bank.points) {
+            if (matches(point)) {
+                const auto &value = point.value;
+                result.rows.push_back({*value.raw, value.time, value.trigger ? value.trigger->bindingGeneration : 0});
+            }
+        }
+
+        return result;
+    } catch (HistoryError e) {
+        return std::unexpected(failure(e));
+    } catch (const std::bad_alloc &) {
+        return std::unexpected(failure(HistoryError::ALLOCATION_FAILURE));
+    } catch (const std::length_error &) {
+        return std::unexpected(failure(HistoryError::RESOURCE_LIMIT));
+    }
+}
+
 std::expected<HistoryRetentionReport, HistoryFailure> HistoryCollector::forgetUnobserved(HistoryWork &work) {
     try {
         spend(work, 1);

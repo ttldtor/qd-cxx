@@ -55,6 +55,7 @@ struct EndpointConfigurationSnapshot;
 namespace detail {
 struct RuntimeImpl;
 struct EndpointPort;
+struct HistorySnapshotOperation;
 struct LatestEventRequestState;
 struct SubscriptionPort;
 } // namespace detail
@@ -238,11 +239,107 @@ using RegisteredEvent =
                  events::Series, events::Greeks, events::Underlying, events::TheoPrice, events::Candle,
                  events::TimeAndSale, events::OptionSale, events::NuamTrade>;
 
+/** Qualification of a detached HISTORY snapshot. */
+enum class HistorySnapshotState {
+    NOT_SUBSCRIBED, ///< No matching application demand exists for an if-subscribed read.
+    INCOMPLETE,     ///< Current source coverage is unavailable or still pending.
+    TRUNCATED,      ///< The provider ended the snapshot above the requested lower bound.
+    COMPLETE        ///< The current source proved the requested coverage.
+};
+
+/** One bounded HISTORY query. */
+struct HistorySnapshotOptions {
+    std::size_t maximumResults = 128; ///< Maximum returned values; larger results fail explicitly.
+};
+
+/** Owning snapshot independent of the endpoint and all request, cache and callback owners.
+ * @tparam Event Owning registered indexed event type.
+ */
+template <class Event> struct HistorySnapshot {
+    HistorySnapshotState state = HistorySnapshotState::INCOMPLETE; ///< Qualification at selection.
+    std::optional<std::uint64_t> sourceEpoch; ///< Actual eligible source epoch for returned values.
+    std::vector<Event> events;                ///< Owning values in ascending signed index order.
+};
+
 namespace detail {
+[[nodiscard]] bool historySnapshotDone(const std::shared_ptr<HistorySnapshotOperation> &state) noexcept;
+bool cancelHistorySnapshot(const std::shared_ptr<HistorySnapshotOperation> &state) noexcept;
+[[nodiscard]] HistorySnapshot<RegisteredEvent>
+awaitHistorySnapshot(const std::shared_ptr<HistorySnapshotOperation> &state);
+
+template <class Event> HistorySnapshot<Event> typedHistorySnapshot(HistorySnapshot<RegisteredEvent> snapshot) {
+    HistorySnapshot<Event> result{snapshot.state, snapshot.sourceEpoch, {}};
+    result.events.reserve(snapshot.events.size());
+
+    for (auto &value : snapshot.events) {
+        auto *event = std::get_if<Event>(&value);
+
+        if (!event)
+            throw Error({ErrorCode::PROTOCOL_FAILURE, "history-snapshot-projection-type"});
+
+        result.events.push_back(std::move(*event));
+    }
+
+    return result;
+}
+
 [[nodiscard]] bool latestEventRequestDone(const std::shared_ptr<LatestEventRequestState> &state) noexcept;
 bool cancelLatestEventRequest(const std::shared_ptr<LatestEventRequestState> &state) noexcept;
 [[nodiscard]] RegisteredEvent awaitLatestEventRequest(const std::shared_ptr<LatestEventRequestState> &state);
 } // namespace detail
+
+/** Move-only cancellation owner for one one-shot HISTORY snapshot.
+ * @tparam Event Owning registered indexed event type.
+ */
+template <class Event> class HistorySnapshotRequest final {
+    std::shared_ptr<detail::HistorySnapshotOperation> state_;
+    friend class Feed;
+
+    explicit HistorySnapshotRequest(std::shared_ptr<detail::HistorySnapshotOperation> state) noexcept
+        : state_(std::move(state)) {
+    }
+
+    public:
+    /** Transfer cancellation ownership. */
+    HistorySnapshotRequest(HistorySnapshotRequest &&) noexcept = default;
+
+    /** Cancel current pending work and adopt another request.
+     * @param other Request handle to move.
+     * @return This handle.
+     */
+    HistorySnapshotRequest &operator=(HistorySnapshotRequest &&other) noexcept {
+        if (this != &other) {
+            cancel();
+            state_ = std::move(other.state_);
+        }
+
+        return *this;
+    }
+
+    /** Cancel pending work and release the detached handle. */
+    ~HistorySnapshotRequest() {
+        cancel();
+    }
+
+    /** @return Whether a terminal outcome exists, including failure or cancellation. */
+    [[nodiscard]] bool isDone() const noexcept {
+        return detail::historySnapshotDone(state_);
+    }
+
+    /** @return True if this call won cancellation before a terminal outcome. */
+    bool cancel() const noexcept {
+        return detail::cancelHistorySnapshot(state_);
+    }
+
+    /** Wait for the finite request deadline and copy the detached outcome.
+     * @return Owning complete or explicitly truncated snapshot.
+     * @throws Error Request failure, cancellation, timeout or a pending wait from the SDK owner.
+     * @throws std::bad_alloc Typed result storage could not be allocated.
+     */
+    [[nodiscard]] HistorySnapshot<Event> get() const {
+        return detail::typedHistorySnapshot<Event>(detail::awaitHistorySnapshot(state_));
+    }
+};
 
 /** Move-only ownership of one pending or completed latest-event request.
  * Destruction or replacement cancels a pending request. Concurrent operations require the same live handle.
@@ -622,7 +719,8 @@ class Feed final {
      * @return One port with its complete immutable selection and exact listener value shape.
      */
     std::shared_ptr<detail::SubscriptionPort> createSubscriptionPort(std::span<const EventType> types,
-                                                                     bool registeredDelivery, bool timeSeries = false);
+                                                                     bool registeredDelivery, bool timeSeries = false,
+                                                                     bool snapshotDemand = false);
 
     /** Resolve one passive TICKER lookup through the endpoint's serialized owner.
      * @param type Registered LastingEvent identity.
@@ -645,6 +743,13 @@ class Feed final {
     [[nodiscard]] std::shared_ptr<detail::LatestEventRequestState>
     startLatestEventRequest(EventType type, std::string_view symbol,
                             std::chrono::steady_clock::time_point deadline) const;
+
+    [[nodiscard]] HistorySnapshot<RegisteredEvent> readIndexedSnapshot(EventType type, std::u16string_view symbol,
+                                                                       std::int32_t sourceId,
+                                                                       HistorySnapshotOptions options) const;
+    [[nodiscard]] std::shared_ptr<detail::HistorySnapshotOperation>
+    startIndexedSnapshot(EventType type, std::u16string_view symbol, std::int32_t sourceId,
+                         std::chrono::steady_clock::time_point deadline, HistorySnapshotOptions options) const;
 
     /** @tparam Event Supported owning native business type. @return Its immutable registration identity. */
     template <class Event> static constexpr EventType eventTypeFor() {
@@ -817,6 +922,39 @@ class Feed final {
     [[nodiscard]] LatestEventRequest<Event> requestLastEvent(const events::CandleSymbol &symbol,
                                                              std::chrono::steady_clock::time_point deadline) const {
         return requestLastEvent<Event>(symbol.getSymbol().value_or(std::u16string_view{}), deadline);
+    }
+
+    /** Passively read one indexed symbol/source for which this Feed has application subscription demand.
+     * @tparam Event Owning registered indexed event type with one matching HISTORY route.
+     * @param symbol Exact logical UTF-16 event symbol.
+     * @param source Exact source identity; use DEFAULT for a single-source event.
+     * @param options Finite result limit.
+     * @return Owning ascending-index values or an explicit no-interest/incomplete result.
+     * @throws Error Invalid coordinates, unsupported profile, resource or owner lookup refusal.
+     */
+    template <class Event>
+    [[nodiscard]] HistorySnapshot<Event> getIndexedEventsIfSubscribed(std::u16string_view symbol,
+                                                                      const events::IndexedEventSource &source,
+                                                                      HistorySnapshotOptions options = {}) const {
+        return detail::typedHistorySnapshot<Event>(
+            readIndexedSnapshot(eventTypeFor<Event>(), symbol, source.id(), options));
+    }
+
+    /** Request one snapshot by exact indexed symbol/source, with an independent temporary interest if necessary.
+     * @tparam Event Owning registered indexed event type with one matching HISTORY route.
+     * @param symbol Exact logical UTF-16 event symbol.
+     * @param source Exact source identity; use DEFAULT for a single-source event.
+     * @param deadline Absolute monotonic deadline for the request.
+     * @param options Finite result limit.
+     * @return Move-only cancellation handle. No live listeners receive its result.
+     * @throws Error Invalid coordinates, unsupported profile, closed admission or bounded slot refusal.
+     */
+    template <class Event>
+    [[nodiscard]] HistorySnapshotRequest<Event>
+    requestIndexedEvents(std::u16string_view symbol, const events::IndexedEventSource &source,
+                         std::chrono::steady_clock::time_point deadline, HistorySnapshotOptions options = {}) const {
+        return HistorySnapshotRequest<Event>(
+            startIndexedSnapshot(eventTypeFor<Event>(), symbol, source.id(), deadline, options));
     }
 
     /** Create a bounded logical registration, before or after connect, without application polling.

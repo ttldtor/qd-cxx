@@ -38,4 +38,14 @@ openObservedSubscriptionReceiver(mux::MuxQueue &queue, const core::LocalSchema &
 [[nodiscard]] std::expected<SubscriptionProjection, ReceiverProjectionFailure>
 projectTickerLatest(const ReceiverPlan &plan, const collectors::TickerValue &value, ReceiverProjectionWork &work);
 
+/** Project one retained HISTORY row with the already prepared native mapper.
+ * @param plan Exact immutable adapter plan, borrowed for the call.
+ * @param value Borrowed retained source row.
+ * @param work Remaining aggregate result conversion and copy credits.
+ * @return One owning value without delivery flags or typed refusal.
+ */
+[[nodiscard]] std::expected<SubscriptionProjection, ReceiverProjectionFailure>
+projectHistoryRetained(const ReceiverPlan &plan, const collectors::HistoryRetainedRecord &value,
+                       ReceiverProjectionWork &work);
+
 } // namespace org::ttldtor::qdcxx::client::detail

@@ -281,6 +281,31 @@ remaining exclusive interests. Callback batches follow queue delivery boundaries
 and need not combine all selected types. See the complete
 [mixed selection and delivery contract](../spec/events/MIXED-SUBSCRIPTIONS.md).
 
+## Query an indexed HISTORY snapshot
+
+On a HISTORY endpoint, use `requestIndexedEvents<Event>(symbol, source, deadline)`
+for a cancellable snapshot of one exact event type, symbol and source. Use
+`IndexedEventSource::DEFAULT` for a single-source type. Ordinary native Order
+sources use their exact IDs. The query requires one applicable native HISTORY
+route. Synthetic orders and ambiguous routes are outside this profile.
+
+`getIndexedEventsIfSubscribed<Event>(symbol, source)` reads a current source
+cut for existing application demand. It opens no subscription. It distinguishes
+`NOT_SUBSCRIBED` from `INCOMPLETE` and a proved `COMPLETE` empty list. The
+passive read has a bounded owner rendezvous. Calls from the SDK owner return
+an incomplete cut when demand exists, so a callback never waits for itself.
+
+A request may open one private exact HISTORY interest. This interest is
+excluded from passive reads and has no live listeners. Deadline, cancellation,
+endpoint shutdown and source replacement settle the request once. Its slot
+stays charged until the private registration has retired.
+
+Results own their events, carry the selected source epoch and use ascending
+signed event index with flags cleared. `TRUNCATED` reports the available
+values when a source snips above the requested lower bound. Set
+`HistorySnapshotOptions::maximumResults` to cap the result. Exceeding the cap
+or bounded projection work yields an explicit error.
+
 ## Runtime, callbacks and shutdown
 
 Create the owning `ApiRuntime(RuntimeOptions)` on main **before application threads**;

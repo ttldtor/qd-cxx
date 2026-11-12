@@ -802,6 +802,14 @@ class MuxQueue {
      */
     [[nodiscard]] std::expected<std::vector<QueueRangeObservation>, QueueFailure> rangeSnapshot(const MuxHandle &client,
                                                                                                 QueueWork &work) const;
+    /** Read the retained HISTORY interval for a synchronized exact registration.
+     * @param client Current HISTORY registration.
+     * @param query Exact mapped key and bounded inclusive interval.
+     * @param work Remaining queue and collector observation work.
+     * @return A borrowed source cut, valid until the next owner mutation, or typed refusal.
+     */
+    [[nodiscard]] std::expected<collectors::HistoryRetainedRange, QueueFailure>
+    retainedHistoryRange(const MuxHandle &client, const collectors::HistoryRetainedQuery &query, QueueWork &work) const;
     /** Visit one current TICKER value for an applied exact registration.
      * The owner invokes the nonthrowing visitor synchronously. During the call, keep the queue alive and
      * stationary, do not retain the borrowed value, and do not reenter the queue.

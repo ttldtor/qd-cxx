@@ -365,6 +365,15 @@ class RecoveryCore {
      */
     std::expected<std::vector<mux::QueueRangeObservation>, RecoveryDiagnostic>
     historyRangeSnapshot(const mux::MuxHandle &handle, mux::QueueWork &work) const;
+    /** Read a bounded retained interval on the current HISTORY source owner.
+     * @param handle Exact applied registration.
+     * @param query Bounded exact physical interval.
+     * @param work Remaining lookup and copy-preparation credits.
+     * @return Borrowed source rows until the next recovery/queue mutation, or typed refusal.
+     */
+    [[nodiscard]] std::expected<collectors::HistoryRetainedRange, RecoveryDiagnostic>
+    retainedHistoryRange(const mux::MuxHandle &handle, const collectors::HistoryRetainedQuery &query,
+                         mux::QueueWork &work) const;
     /** Visit current TICKER cache only while the exact recovery owner remains eligible.
      * @param handle Current TICKER registration.
      * @param key Borrowed exact source key.
