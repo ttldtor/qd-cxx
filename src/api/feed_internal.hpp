@@ -271,12 +271,23 @@ struct LatestEventRequestState {
     std::uint64_t connectionRevision = 0; ///< Worker-only after producer admission.
     std::uint64_t clearRevision = 0;
     bool boundToSource = false;
-    std::shared_ptr<SubscriptionPort> demand; ///< Worker-only, charged until native and logical retirement.
 
     LatestEventRequestState(EventType type, std::u16string_view symbol, std::chrono::steady_clock::time_point deadline,
                             const std::shared_ptr<RuntimeControl> &control)
         : type(type), symbol(symbol), deadline(deadline), control(control) {
     }
+};
+
+/** One charged batch. The owner alone mutates its demand and bounded scratch buffers. */
+struct LatestEventRequestBatch {
+    std::vector<std::shared_ptr<LatestEventRequestState>> requests;
+    std::vector<std::size_t> exactIdentity; ///< First occurrence of each exact symbol.
+    std::vector<unsigned char> wanted;      ///< One bounded scratch marker per possible identity.
+    std::vector<std::size_t> pending;
+    std::vector<std::size_t> submitted;
+    std::shared_ptr<SubscriptionPort> demand;
+
+    explicit LatestEventRequestBatch(const std::vector<std::shared_ptr<LatestEventRequestState>> &requests);
 };
 
 /** Detached query inputs and one terminal result; native demand stays on the SDK owner. */
@@ -328,8 +339,8 @@ struct EndpointPort {
     std::uint64_t aggregationSourceRevision = 0; ///< Control fence for the report; never a request ACK.
     std::vector<std::shared_ptr<SubscriptionPort>> subscriptions; ///< Fixed slots, including retiring registrations.
     std::shared_ptr<LatestEventRead> latestRead; ///< One pending/executing owner observation, protected by mutex.
-    std::shared_ptr<LatestEventRequestState> latestEventRequest; ///< One charged one-event request, protected by mutex.
-    std::shared_ptr<HistorySnapshotOperation> historySnapshotRead;    ///< One passive observation, protected by mutex.
+    std::shared_ptr<LatestEventRequestBatch> latestEventRequest;   ///< One charged request group, protected by mutex.
+    std::shared_ptr<HistorySnapshotOperation> historySnapshotRead; ///< One passive observation, protected by mutex.
     std::shared_ptr<HistorySnapshotOperation> historySnapshotRequest; ///< One request including native retirement.
     StateListeners stateListeners; ///< Opt-in advisory lifecycle observations, retired after all subscriptions.
     std::vector<EndpointStateChange> stateChanges; ///< Fixed ring; selection lease remains charged through release.

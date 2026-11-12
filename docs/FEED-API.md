@@ -891,11 +891,35 @@ An accepted clear, or a disconnect or explicit reconnect after the request
 has bound to a source, cancels that request. A deadline reached before
 publication prevents a later value from becoming the result.
 
-An endpoint admits one request through completion and temporary-interest
-retirement. On a cache miss, the temporary interest also occupies a normal
+An endpoint admits one single request or group through completion and
+temporary-interest retirement. On a cache miss, the temporary interest also occupies a normal
 subscription slot until it retires. Capacity refusal reports `RESOURCE_LIMIT`.
 The temporary registration owns no application event listener and its retirement
 can proceed after the terminal result is available.
+
+## Request latest events for several symbols
+
+Use `requestLastEvents<events::Quote>({"IBM", "MSFT"}, deadline)` to obtain an
+independent request for each input position. The vector preserves order and
+duplicates. Each handle's `getSymbol()` gives its exact logical identity even
+when its outcome is an error. The view is borrowed from the live handle.
+
+The complete input is validated and copied before the group is admitted. The
+raw input count, including duplicates, is limited by
+`RuntimeOptions::maximumSymbolsPerSubscription`. Empty input returns an empty
+vector. A group and a single request compete for the same endpoint slot.
+Active requests use TCP. A tape-fixed endpoint refuses a nonempty group.
+If tape is selected after offline admission, each still-pending request
+completes with `UNSUPPORTED_PROFILE` and earlier outcomes remain available.
+
+Cache hits complete independently before the runtime opens temporary demand
+for misses. All still-pending exact identities share one temporary
+subscription. Completion or cancellation removes only the corresponding
+interest when no pending duplicate still needs it. A failure to admit that
+subscription affects the unfinished requests. Completed values remain owned
+and available after sibling failure, cancellation, a source change or close.
+The group shares an absolute deadline, and each handle can be cancelled
+independently.
 
 ## Local aggregation
 
