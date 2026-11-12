@@ -9,6 +9,7 @@
 #include "qd/events/event_projection.hpp"
 #include "qd/events/greeks.hpp"
 #include "qd/events/market_maker.hpp"
+#include "qd/events/nuam_time_and_sale.hpp"
 #include "qd/events/nuam_trade.hpp"
 #include "qd/events/option_sale.hpp"
 #include "qd/events/order.hpp"
@@ -66,13 +67,14 @@ enum class PreparedEventKind {
     CANDLE = 19,            ///< Owning Candle projection with restored event symbol.
     TIME_AND_SALE = 20,     ///< Owning trade report with separate indexed and business flags.
     OPTION_SALE = 21,       ///< Owning indexed option sale.
-    NUAM_TRADE = 22         ///< Owning Nuam Trade and statistics.
+    NUAM_TRADE = 22,        ///< Owning Nuam Trade and statistics.
+    NUAM_TIME_AND_SALE = 23 ///< Owning Nuam indexed trade report.
 };
 
 /** Explicit source for optional event metadata; indexed identity is never a timestamp substitute. */
 enum class ReceiverEventTimePolicy {
     UNSPECIFIED,   ///< No event timestamp is asserted; the legacy event member remains zero.
-    FIELD_METADATA ///< Use actual original FIELD metadata when supplied, otherwise remain unspecified.
+    FIELD_METADATA ///< Use actual FIELD metadata, with inherited MESSAGE time as a tape fallback.
 };
 
 /** One exact local record route, prepared before a registration can become visible. */
@@ -127,7 +129,7 @@ struct SubscriptionProjection {
                  events::TextMessage, events::TextConfiguration, events::Message, events::Configuration, events::Order,
                  events::MarketMaker, events::SpreadOrder, events::AnalyticOrder, events::OtcMarketsOrder,
                  events::OrderImbalance, events::Series, events::Greeks, events::Underlying, events::TheoPrice,
-                 events::Candle, events::TimeAndSale, events::OptionSale, events::NuamTrade>
+                 events::Candle, events::TimeAndSale, events::OptionSale, events::NuamTrade, events::NuamTimeAndSale>
         value;                               ///< Owned event or explicit generic route.
     std::optional<std::int64_t> eventTimeMs; ///< Actual selected FIELD metadata only; rawTime stays independent.
 };

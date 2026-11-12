@@ -13,6 +13,7 @@
 #include "qd/events/configuration.hpp"
 #include "qd/events/greeks.hpp"
 #include "qd/events/market_maker.hpp"
+#include "qd/events/nuam_time_and_sale.hpp"
 #include "qd/events/nuam_trade.hpp"
 #include "qd/events/option_sale.hpp"
 #include "qd/events/order.hpp"
@@ -35,6 +36,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <functional>
 #include <initializer_list>
 #include <memory>
@@ -62,28 +64,31 @@ struct SubscriptionPort;
 
 /** Detached high-level failures. No peer payload, credential or address is diagnostic text. */
 enum class ErrorCode {
-    NONE,                ///< No failure has been recorded.
-    INVALID_ARGUMENT,    ///< Caller input does not satisfy the public contract.
-    INVALID_STATE,       ///< Operation conflicts with the accepted lifecycle or fixed address.
-    RESOURCE_LIMIT,      ///< A finite configured capacity or native thread reservation was exhausted.
-    WORK_LIMIT,          ///< The derived bounded preparation or progress allowance was exhausted.
-    ALLOCATION_FAILURE,  ///< Required owned storage could not be allocated.
-    WRONG_THREAD,        ///< A checked operation used an incompatible creator thread.
-    CLOSED,              ///< Admission is fenced by endpoint, subscription or runtime retirement.
-    CALLBACK_FAILURE,    ///< Event listener failure closes its subscription; advisory state failure is recorded
-                         ///< separately.
-    TRANSPORT_FAILURE,   ///< Connection, recovery or native I/O failed; inspect the static stage and codes.
-    PROTOCOL_FAILURE,    ///< Peer input failed the existing bounded protocol profile.
-    BOOTSTRAP_FAILURE,   ///< The explicit process/main-thread runtime bootstrap could not be acquired.
-    DNS_CONFIGURATION,   ///< No supported bounded IPv4 resolver snapshot could be obtained.
-    UNSUPPORTED_PROFILE, ///< The requested combination is outside this public receiving profile.
-    EXECUTOR_REJECTED,   ///< Host explicitly refused an event task; no retry.
-    EXECUTOR_FAILURE,    ///< Host post threw before completion.
-    EXECUTOR_DROPPED,    ///< Accepted task was destroyed without running.
-    EXECUTOR_CONTRACT,   ///< Host refused or threw after actual execution began.
-    CALLBACK_CANCELLED,  ///< Queued event selection cancelled by close or source reset; advisory.
-    REQUEST_CANCELLED,   ///< A one-event request was cancelled or its accepted source epoch changed.
-    REQUEST_TIMED_OUT    ///< A one-event request reached its absolute completion deadline.
+    NONE,                 ///< No failure has been recorded.
+    INVALID_ARGUMENT,     ///< Caller input does not satisfy the public contract.
+    INVALID_STATE,        ///< Operation conflicts with the accepted lifecycle or fixed address.
+    RESOURCE_LIMIT,       ///< A finite configured capacity or native thread reservation was exhausted.
+    WORK_LIMIT,           ///< The derived bounded preparation or progress allowance was exhausted.
+    ALLOCATION_FAILURE,   ///< Required owned storage could not be allocated.
+    WRONG_THREAD,         ///< A checked operation used an incompatible creator thread.
+    CLOSED,               ///< Admission is fenced by endpoint, subscription or runtime retirement.
+    CALLBACK_FAILURE,     ///< Event listener failure closes its subscription; advisory state failure is recorded
+                          ///< separately.
+    TRANSPORT_FAILURE,    ///< Connection, recovery or native I/O failed; inspect the static stage and codes.
+    PROTOCOL_FAILURE,     ///< Peer input failed the existing bounded protocol profile.
+    BOOTSTRAP_FAILURE,    ///< The explicit process/main-thread runtime bootstrap could not be acquired.
+    DNS_CONFIGURATION,    ///< No supported bounded IPv4 resolver snapshot could be obtained.
+    UNSUPPORTED_PROFILE,  ///< The requested combination is outside this public receiving profile.
+    EXECUTOR_REJECTED,    ///< Host explicitly refused an event task; no retry.
+    EXECUTOR_FAILURE,     ///< Host post threw before completion.
+    EXECUTOR_DROPPED,     ///< Accepted task was destroyed without running.
+    EXECUTOR_CONTRACT,    ///< Host refused or threw after actual execution began.
+    CALLBACK_CANCELLED,   ///< Queued event selection cancelled by close or source reset; advisory.
+    TAPE_IO_FAILURE,      ///< The selected regular local file could not be opened or read.
+    TAPE_TIMING_RANGE,    ///< The relative tape span or a monotonic playback deadline exceeded its bound.
+    TAPE_RESTART_TIMEOUT, ///< The old tape epoch could not retire and reset within the restart allowance.
+    REQUEST_CANCELLED,    ///< A one-event request was cancelled or its accepted source epoch changed.
+    REQUEST_TIMED_OUT     ///< A one-event request reached its absolute completion deadline.
 };
 
 /** Static/numeric failure snapshot, independent of runtime and native owners. */
@@ -184,8 +189,8 @@ struct EndpointOptions {
 /** Last SDK-worker observation, never an upstream acknowledgement or a whole-network guarantee. */
 enum class EndpointState {
     NOT_CONNECTED, ///< Created without an accepted connection request.
-    CONNECTING,    ///< Connection, protocol negotiation or finite recovery is in progress.
-    CONNECTED,     ///< The existing recovery wrapper reports an active receiving session.
+    CONNECTING,    ///< Source opening, protocol negotiation or finite recovery is in progress.
+    CONNECTED,     ///< An active network receiving session or a ready local tape source.
     CLOSING,       ///< Reserved close is accepted; native and callback retirement may remain.
     CLOSED,        ///< Native state and event captures retired; opt-in state observers may still be retiring.
     FAILED         ///< A failure is retained; inspect the diagnostic and await actual retirement.
@@ -227,9 +232,33 @@ struct CloseResult {
 
 class Endpoint;
 class Feed;
+template <class Event> class IndependentSubscription;
 class FeedFilter;
 class FeedFilterContext;
 struct FeedFilterCategory;
+
+/** Select how source timestamps affect the delivery of a complete tape envelope. */
+enum class TapePlaybackPolicy {
+    IMMEDIATE,  ///< Deliver eligible envelopes as soon as the Feed can accept them.
+    SOURCE_TIME ///< Pace eligible envelopes by source time on the runtime's monotonic clock.
+};
+
+/** Terminal policy for a file-backed endpoint. */
+enum class TapeStopMode {
+    DRAIN, ///< Apply the endpoint's admitted-prefix close policy.
+    ABORT  ///< Discard queued delivery and cancel not-started callbacks without waiting for their execution.
+};
+
+/** Finite allowances and playback policy for one local tape read. */
+struct TapeSourceOptions {
+    std::size_t maximumFileBytes = 64 * 1024 * 1024; ///< Maximum physical input bytes.
+    std::size_t maximumFrames = 65'536;              ///< Maximum envelopes, including markers and controls.
+    TapePlaybackPolicy playback = TapePlaybackPolicy::IMMEDIATE;
+    std::uint32_t speedPercent = 100; ///< Relative speed, from 1% to 10,000%; ignored by IMMEDIATE.
+    std::chrono::milliseconds maximumSourceSpan{std::chrono::hours{24}};
+    ///< Maximum forward span in SOURCE_TIME, positive and at most 365 days; ignored by IMMEDIATE.
+    bool initiallyPaused = false; ///< Open the file and wait for resume before reading the first envelope.
+};
 
 /** Independently owning supported event value; inspect its actual class with std::visit or std::get_if. */
 using RegisteredEvent =
@@ -237,7 +266,7 @@ using RegisteredEvent =
                  events::TextConfiguration, events::Message, events::Configuration, events::Order, events::MarketMaker,
                  events::SpreadOrder, events::AnalyticOrder, events::OtcMarketsOrder, events::OrderImbalance,
                  events::Series, events::Greeks, events::Underlying, events::TheoPrice, events::Candle,
-                 events::TimeAndSale, events::OptionSale, events::NuamTrade>;
+                 events::TimeAndSale, events::OptionSale, events::NuamTrade, events::NuamTimeAndSale>;
 
 /** Qualification of a detached HISTORY snapshot. */
 enum class HistorySnapshotState {
@@ -441,10 +470,16 @@ template <class Event> class Subscription final {
                   std::is_same_v<Event, events::Underlying> || std::is_same_v<Event, events::TheoPrice> ||
                   std::is_same_v<Event, events::Candle> || std::is_same_v<Event, events::TimeAndSale> ||
                   std::is_same_v<Event, events::OptionSale> || std::is_same_v<Event, events::NuamTrade> ||
-                  std::is_same_v<Event, events::Order> || std::is_same_v<Event, RegisteredEvent>);
+                  std::is_same_v<Event, events::NuamTimeAndSale> || std::is_same_v<Event, events::Order> ||
+                  std::is_same_v<Event, RegisteredEvent>);
     std::shared_ptr<detail::SubscriptionPort> port_;
     friend class Feed;
+    template <class OtherEvent> friend class IndependentSubscription;
     explicit Subscription(std::shared_ptr<detail::SubscriptionPort> port) noexcept;
+    /** Replace desired selectors on an independent attachment that has no change observers.
+     * @param selectors Borrowed typed selector arguments; no runtime observer callbacks run inline.
+     */
+    void setAttachedSelectors(std::span<const SubscriptionSelector> selectors);
     /** @param symbols Complete borrowed canonical batch, validated before one atomic add. */
     void addCandleSymbols(std::span<const events::CandleSymbol> symbols);
     /** @param symbols Complete borrowed canonical batch, validated before one atomic replacement. */
@@ -698,6 +733,7 @@ extern template class Subscription<events::Underlying>;
 extern template class Subscription<events::TheoPrice>;
 extern template class Subscription<events::Candle>;
 extern template class Subscription<events::TimeAndSale>;
+extern template class Subscription<events::NuamTimeAndSale>;
 extern template class Subscription<events::OptionSale>;
 extern template class Subscription<RegisteredEvent>;
 
@@ -706,6 +742,7 @@ class Feed final {
     std::shared_ptr<detail::EndpointPort> port_;
     friend class Endpoint;
     friend struct detail::RuntimeImpl;
+    template <class Event> friend class IndependentSubscription;
     explicit Feed(std::shared_ptr<detail::EndpointPort> port);
     /** Preserve the existing single-class listener shape while selecting that class's registered routes.
      * @param type Existing supported projection.
@@ -764,7 +801,7 @@ class Feed final {
                       std::is_same_v<Event, events::Underlying> || std::is_same_v<Event, events::TheoPrice> ||
                       std::is_same_v<Event, events::Candle> || std::is_same_v<Event, events::TimeAndSale> ||
                       std::is_same_v<Event, events::OptionSale> || std::is_same_v<Event, events::NuamTrade> ||
-                      std::is_same_v<Event, events::Order>);
+                      std::is_same_v<Event, events::NuamTimeAndSale> || std::is_same_v<Event, events::Order>);
 
         if constexpr (std::is_same_v<Event, events::Quote>)
             return EventType::QUOTE;
@@ -808,6 +845,8 @@ class Feed final {
             return EventType::TIME_AND_SALE;
         else if constexpr (std::is_same_v<Event, events::OptionSale>)
             return EventType::OPTION_SALE;
+        else if constexpr (std::is_same_v<Event, events::NuamTimeAndSale>)
+            return EventType::NUAM_TIME_AND_SALE;
         else if constexpr (std::is_same_v<Event, events::NuamTrade>)
             return EventType::NUAM_TRADE;
         else
@@ -883,8 +922,10 @@ class Feed final {
         return text ? getLastEventIfSubscribed<Event>(*text) : std::nullopt;
     }
 
-    /** Request one real TICKER value. The runtime can open temporary exact demand on a cache miss.
+    /** Request one real TICKER value from TCP, opening temporary exact demand on a cache miss.
      * The endpoint connects only on explicit connect. One request per endpoint can be pending or retiring.
+     * A tape-fixed endpoint refuses admission. Selecting tape after admission completes the request with
+     * UNSUPPORTED_PROFILE.
      * @tparam Event Supported owning LastingEvent type.
      * @param symbol Exact borrowed UTF-16 logical symbol, copied before admission.
      * @param deadline Absolute steady-clock deadline for terminal completion.
@@ -1084,6 +1125,33 @@ class Endpoint final {
      * @param address ASCII host:port or [IPv6]:port; no TLS/URI/login/configuration extensions.
      */
     void connect(std::string_view address);
+    /** Start one asynchronous read of a regular local binary tape.
+     * Configure desired subscriptions before calling. The worker opens and retires the file,
+     * and a clean EOF drains the admitted prefix before closing this endpoint.
+     * @param path Borrowed stable local path, copied at admission; maximum 4096 native path units.
+     * @param options Positive file/envelope allowances and optional relative playback and initial pause.
+     * @throws Error Invalid input, closed admission or an already fixed source.
+     */
+    void connectTape(const std::filesystem::path &path, TapeSourceOptions options = {});
+    /** Publish tape pause or resume intent for the existing runtime worker.
+     * Pausing holds the next unadmitted envelope and freezes relative playback time. Admitted work may drain.
+     * @param paused True to pause intake; false to resume the same source and clock.
+     * @throws Error The endpoint has no tape source or is already closing.
+     */
+    void setTapePaused(bool paused);
+    /** Reopen an active tape from byte zero on this endpoint, preserving subscriptions and pause intent.
+     * An accepted request enters CONNECTING and fences the old source. Queued old work is discarded.
+     * CONNECTED identifies an opened new epoch. A failure reaches FAILED with a retained diagnostic.
+     * Additional requests while this restart is pending join the same operation. Stop or close takes precedence.
+     * @throws Error The endpoint has no active tape, is closing, or cannot accept another revision.
+     */
+    void restartTape();
+    /** End the file-backed endpoint and apply the requested terminal policy.
+     * A later abort can escalate an unfinished drain. Use closeAndAwaitTermination for the actual result.
+     * @param mode Drain or abort; running callbacks remain subject to the existing quiescence contract.
+     * @throws Error Invalid mode, no tape source, or an already terminal endpoint.
+     */
+    void stopTape(TapeStopMode mode = TapeStopMode::DRAIN);
     /** Inspect current local intent without progressing native work; absent means server default.
      * @return Owning millisecond value, including zero, independently of any peer-reported range.
      */

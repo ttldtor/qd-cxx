@@ -527,8 +527,10 @@ TEST_CASE("HISTORY worker receiver publishes actual standard Java wire ranges wi
     t::RecoveryQueues queues;
     queues.history = std::move(*queue);
     auto preparation = profile.preparationWork;
-    auto recovery = t::TcpRecovery::create(*bootstrap, profile.endpoint, std::move(profile.blueprint),
-                                           std::move(queues), profile.recoveryOptions, preparation);
+    const auto *network = profile.endpoint.network();
+    REQUIRE(network);
+    auto recovery = t::TcpRecovery::create(*bootstrap, *network, std::move(profile.blueprint), std::move(queues),
+                                           profile.recoveryOptions, preparation);
     REQUIRE(recovery);
     REQUIRE(recovery->start());
     std::atomic<unsigned> observations{0};
@@ -946,7 +948,9 @@ TEST_CASE("live HISTORY production ranges shrink expand disable remove and repla
     t::RecoveryQueues queues;
     queues.history = std::move(*queue);
     auto preparation = profile.preparationWork;
-    auto owner = t::TcpRecovery::create(*bootstrap, profile.endpoint, std::move(profile.blueprint), std::move(queues),
+    const auto *network = profile.endpoint.network();
+    REQUIRE(network);
+    auto owner = t::TcpRecovery::create(*bootstrap, *network, std::move(profile.blueprint), std::move(queues),
                                         profile.recoveryOptions, preparation);
     REQUIRE(owner);
     REQUIRE(owner->start());
