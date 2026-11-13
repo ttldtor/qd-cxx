@@ -209,7 +209,7 @@ struct EndpointOptions {
 enum class EndpointState {
     NOT_CONNECTED, ///< Created without an accepted connection request.
     CONNECTING,    ///< Source opening, protocol negotiation or finite recovery is in progress.
-    CONNECTED,     ///< An active network receiving session or a ready local tape source.
+    CONNECTED,     ///< An active network receiving session or a ready local source.
     CLOSING,       ///< Reserved close is accepted; native and callback retirement may remain.
     CLOSED,        ///< Native state and event captures retired; opt-in state observers may still be retiring.
     FAILED         ///< A failure is retained; inspect the diagnostic and await actual retirement.
@@ -1287,6 +1287,16 @@ class Endpoint final {
      * @param address ASCII host:port or [IPv6]:port; transport is fixed by endpoint options.
      */
     void connect(std::string_view address);
+    /** Start one bounded historical Quote window at normal speed using the IPv4 loopback replay profile.
+     * The endpoint must be unused, with default composite TICKER mapping and an exact Quote subscription.
+     * @param loopbackPort Explicit nonzero port on 127.0.0.1 for the local replay service.
+     * @param symbol Exact composite ASCII Quote symbol. The text is copied before admission.
+     * @param from Absolute UTC millisecond position in the positive signed 32-bit seconds range.
+     * @throws Error Synchronous argument or profile refusal. Response errors surface in getDiagnostic().
+     */
+    void connectOnDemand(std::uint16_t loopbackPort, std::u16string_view symbol,
+                         std::chrono::sys_time<std::chrono::milliseconds> from);
+
     /** Start one asynchronous read of a regular local binary tape.
      * Configure desired subscriptions before calling. The worker opens and retires the file,
      * and a clean EOF drains the admitted prefix before closing this endpoint.

@@ -1,11 +1,13 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/protocol/live_session.hpp"
+#include "local_event_owner.hpp"
 #include "tape_event_bridge.hpp"
 
 #include "field_time_binding.hpp"
 #include "live_decode.hpp"
 #include "qd/encoding/compact.hpp"
+#include "qd/encoding/penta_symbol.hpp"
 #include "qd/encoding/utf_string.hpp"
 
 #include <algorithm>
@@ -1460,6 +1462,81 @@ std::expected<LiveEvent, LiveError> detail::TapeEventBridge::copy(const TapeFeed
         const auto messageTime =
             result.timing && result.timing->timestampMs ? std::optional{result.timing->eventTimeMs()} : std::nullopt;
         event->complete(work, messageTime);
+
+        return LiveEvent(std::move(event));
+    } catch (Error error) {
+        return std::unexpected(error);
+    } catch (const LiveStorageLimit &) {
+        return std::unexpected(Error::RESOURCE_LIMIT);
+    } catch (const std::bad_alloc &) {
+        return std::unexpected(Error::ALLOCATION_FAILURE);
+    } catch (const std::length_error &) {
+        return std::unexpected(Error::RESOURCE_LIMIT);
+    }
+}
+
+detail::LocalEventOwner::LocalEventOwner(LiveSnapshot epoch, std::size_t eventBytes) noexcept
+    : epoch_(std::move(epoch)), eventBytes_(eventBytes) {
+}
+
+std::expected<detail::LocalEventOwner, LiveError> detail::LocalEventOwner::create(LiveLimits limits, LiveWork &work) {
+    try {
+        debit(1, work.operations);
+        debit(sizeof(Storage) + sizeof(LiveSnapshot::State), work.bytes);
+
+        if (limits.residentBytes < sizeof(Storage))
+            return std::unexpected(Error::RESOURCE_LIMIT);
+
+        const auto release = [](Storage *value) {
+            value->release();
+        };
+        std::unique_ptr<Storage, decltype(release)> storage(new Storage(limits.residentBytes, 0, limits.owners),
+                                                            release);
+        auto snapshot = makeOwner<LiveSnapshot::State>(*storage, 0, core::LocalProfile::BINARY_FIELDS_V1, 0);
+
+        return LocalEventOwner(LiveSnapshot(snapshot.release()), limits.eventBytes);
+    } catch (Error error) {
+        return std::unexpected(error);
+    } catch (const LiveStorageLimit &) {
+        return std::unexpected(Error::RESOURCE_LIMIT);
+    } catch (const std::bad_alloc &) {
+        return std::unexpected(Error::ALLOCATION_FAILURE);
+    }
+}
+
+std::expected<LiveEvent, LiveError> detail::LocalEventOwner::quote(const core::RecordContext &context,
+                                                                   std::u16string_view symbol,
+                                                                   std::span<const core::FieldValue, 8> fields,
+                                                                   FieldEventTime eventTime, LiveWork &work) const {
+    try {
+        debit(1, work.operations);
+        debit(fields.size() + 1, work.visits);
+        debit(symbol.size(), work.textUnits);
+        debit(sum(sizeof(LiveEvent::State), eventBytes_), work.bytes);
+        auto event =
+            makeOwner<LiveEvent::State>(*epoch_.state_->ledger.lease.get(), eventBytes_, epoch_, LiveEventKind::DATA);
+        event->messageType = TICKER_DATA;
+        auto *resource = event->arena.resource();
+        detail::PmrStreamDataRecord record{0,
+                                           encoding::PmrSymbolValue(*resource),
+                                           std::pmr::vector<std::int32_t>(resource),
+                                           std::pmr::vector<detail::PmrFieldValue>(resource),
+                                           context,
+                                           0,
+                                           std::nullopt,
+                                           eventTime};
+        record.symbol.units.assign(symbol);
+
+        if (const auto encoded = encoding::encodePentaSymbol(symbol))
+            record.symbol.cipher = encoded->cipher;
+
+        record.typedValues.reserve(fields.size());
+
+        for (const auto &field : fields)
+            record.typedValues.emplace_back(field.type, field.raw);
+
+        event->decoded.records.push_back(std::move(record));
+        event->complete(work);
 
         return LiveEvent(std::move(event));
     } catch (Error error) {

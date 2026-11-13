@@ -8,6 +8,7 @@
 #include "../transport/bootstrap_lease.hpp"
 #include "callback_execution.hpp"
 #include "event_selection.hpp"
+#include "on_demand_wire.hpp"
 #include "time_series_query_policy.hpp"
 
 #include <array>
@@ -361,9 +362,10 @@ struct EndpointPort {
     std::uint64_t clearedRevision = 0; ///< Latest actual applied reset/global-ACK completion, not inferred from state.
     std::string address;               ///< First accepted bounded spelling; immutable after connect publication.
     std::string host;                  ///< Validated bounded route, copied only once before worker publication.
-    std::optional<TapeSourceRequest> tape; ///< Fixed non-network source, absent for TCP.
-    bool tapePaused = false;               ///< Latest local pause intent under the endpoint mutex.
-    bool tapeAbortRequested = false;       ///< Monotonic explicit terminal abort for this tape endpoint.
+    std::optional<OnDemandRequest> onDemand; ///< Immutable local replay request.
+    std::optional<TapeSourceRequest> tape;   ///< Fixed non-network source, absent for TCP.
+    bool tapePaused = false;                 ///< Latest local pause intent under the endpoint mutex.
+    bool tapeAbortRequested = false;         ///< Monotonic explicit terminal abort for this tape endpoint.
     std::chrono::steady_clock::time_point tapeRestartDeadline; ///< First deadline of the pending restart revision.
     std::uint16_t port = 0;                                    ///< Original nonzero route port.
     bool connectRequested = false;                             ///< Published once under the endpoint mutex.

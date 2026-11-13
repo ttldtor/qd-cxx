@@ -155,3 +155,22 @@ TEST_CASE("Feed TLS refuses an insufficient whole-run allowance before native co
     CHECK_FALSE(server.stop().accepted);
     static_cast<void>(endpoint->closeAndAwaitTermination());
 }
+
+TEST_CASE("Feed TLS refuses the plaintext OnDemand profile without opening a connection") {
+    auto server = quotePeer();
+    api::ApiRuntime runtime(runtimeOptions());
+    const auto endpoint = runtime.createEndpoint(endpointOptions());
+    const auto initial = endpoint->getState();
+
+    try {
+        endpoint->connectOnDemand(server.port(), u"IBM", std::chrono::sys_days{std::chrono::year{2024} / 2 / 12});
+        FAIL("TLS endpoint accepted plaintext OnDemand");
+    } catch (const api::Error &failure) {
+        CHECK(failure.diagnostic().code == api::ErrorCode::UNSUPPORTED_PROFILE);
+        CHECK(failure.diagnostic().stage == "ondemand-profile");
+    }
+
+    CHECK(endpoint->getState() == initial);
+    static_cast<void>(endpoint->closeAndAwaitTermination());
+    CHECK_FALSE(server.stop().accepted);
+}

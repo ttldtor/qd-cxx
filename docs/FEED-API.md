@@ -465,7 +465,52 @@ the configured finite retry policy, and exposes failures through static
 diagnostics. There is no plaintext fallback, system-root lookup, or credential
 configuration in this profile. A TLS-disabled Feed build refuses the typed
 setting with `UNSUPPORTED_PROFILE`. The setting is unavailable through textual
-endpoint properties. An endpoint configured for TLS refuses a local tape.
+endpoint properties. An endpoint configured for TLS refuses local tape and
+plaintext OnDemand loopback sources.
+
+## Historical OnDemand loopback replay
+
+A fresh default TICKER endpoint can use one finite OnDemand response on IPv4
+loopback. Create an ordinary Quote subscription and add one exact composite
+symbol before connecting.
+
+```cpp
+using namespace std::chrono;
+auto endpoint = runtime.createEndpoint();
+auto quotes = endpoint->getFeed()->createSubscription<q::events::Quote>();
+quotes->addEventListener(onQuotes);
+quotes->addSymbols("MOCK");
+endpoint->connectOnDemand(mockPort, u"MOCK", sys_days{2024y / February / 12} + 14h + 30min + 5s);
+const auto completion = endpoint->awaitState(q::api::EndpointState::CLOSED, steady_clock::now() + 70s);
+const auto closed = endpoint->closeAndAwaitTermination();
+```
+
+`completion` reports `CLOSED`, a terminal `FAILED`, or expiration of the wait.
+`closed` reports actual retirement and includes any source failure diagnostic. The source only
+becomes `CONNECTED` after a complete validated response covering the requested
+point. The initial catch-up through that point uses ordinary TICKER
+conflation. Later records are paced at 1× from a monotonic anchor established when
+delivery is ready and preserve
+their recorded event times. After the finite response, the endpoint drains
+admitted work and closes. Close during an outstanding request retires the
+owned socket and fences subsequent delivery.
+
+The first profile accepts one uncompressed composite Quote block over a
+single HTTP/1.1 POST to `/MarketDataReplay` on the explicit loopback port.
+The symbol can have up to 16 ASCII letters, digits and dots, with at least
+one letter. The request uses the Java QD v2 binary envelope with synthetic
+access fields. The whole network request has a five-second deadline, with
+shorter endpoint timeouts still in effect. The local replay source services
+network and drain progress at least every 10 ms when scheduled. A response must have one
+`Content-Type: application/octet-stream` and one positive `Content-Length`,
+with at most 2 KiB of headers, 8 KiB of body, and 64 records. Coverage can
+extend at most 60 seconds past the requested point. The source rejects HTTP
+redirects and content/transfer coding, compressed blocks, unsupported
+mapping or symbols, malformed or oversized frames and uncovered time.
+HTTP 401 produces the static diagnostic `ondemand-access-refused`. This
+profile qualifies a synthetic local replay service. A deployed provider,
+entitlements, encrypted HTTP, further windows, speed changes, seek,
+and transition to a live source have separate qualification.
 
 ## Local tape source
 
@@ -848,6 +893,9 @@ BEGIN, finite work, overlap, output refusal and recovery boundaries.
 
 Select `DeliveryContract::HISTORY` explicitly. The worker owns the collector, independent views, replay and reset acknowledgements. `Subscription<Event>::getHistorySnapshot()` returns a passive owning AS-OF cut; reads perform no I/O or callback waiting. Current completion requires both actual delivered range evidence and matching accepted logical/source/clear/callback fences. The default SDK HISTORY registry includes the indexed event families documented above. Types without a HISTORY route are rejected before native registration. See [Order fields, source selectors and ownership](ORDER.md) and [MarketMaker and derived Order](MARKET-MAKER-ORDER.md). See the [HISTORY contract](../spec/subscriptions/HISTORY-RECEIVING.md) for exact states, finite storage limits and raw indexed range units.
 
+## Client examples
+
+Build the separate [snapshot-query consumer](../examples/client_queries/README.md) against the installed Feed package for Quote, Candle and indexed Order snapshots. The [model and instrument consumer](../examples/client_models/README.md) uses offline sample values and the optional IPF package. For actual profile updates, use the existing [live IPF consumer](../examples/ipf_live/README.md) with its explicit optional prerequisites.
 ## Time-series snapshots
 
 On a HISTORY endpoint, `Feed::getTimeSeriesIfSubscribed<Event>(symbol, fromTime, toTime)` observes existing interest, while `requestTimeSeries<Event>(symbol, fromTime, toTime, deadline)` can establish temporary interest. Both bounds are inclusive Unix milliseconds; returned owning events are sorted chronologically and include every sequence at the upper bound. Result limits fail explicitly. See [time-series snapshot ranges](../spec/subscriptions/TIME-SERIES-QUERY.md) for coverage, empty ranges, and the documented Java difference.
