@@ -488,6 +488,15 @@ received before acknowledgement fails the credentialed endpoint. Configuration,
 diagnostics and statistics expose no token text or provider exception text.
 Credentials use the existing TLS Basic path and have no secure-erasure guarantee.
 
+To rotate credentials, update the shared provider's state under the application's
+synchronization, then call `reconnect()` on the active endpoint. The existing
+finite attempt budget still applies. A new TLS attempt verifies the server and
+calls the provider again only on its own QTP challenge. Provider state changes
+alone do not alter an established session. If the server rejects a submitted
+authorization by issuing another nonempty challenge, the endpoint fails with
+`tls-authentication-denied` and does not retry. To try corrected credentials
+after terminal rejection, create a new endpoint.
+
 ## Historical OnDemand loopback replay
 
 A fresh default TICKER endpoint can use one finite OnDemand response on IPv4

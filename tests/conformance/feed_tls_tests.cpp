@@ -35,6 +35,7 @@ namespace tls = test::tls;
 using namespace std::chrono_literals;
 
 constexpr std::u16string_view SYNTHETIC_TOKEN = u"Basic dGVzdDpmaXh0dXJl";
+constexpr std::u16string_view ROTATED_TOKEN = u"Basic dGVzdDpyb3RhdGVk";
 
 class Provider final : public q::client::CredentialProvider {
     public:
@@ -47,6 +48,7 @@ class Provider final : public q::client::CredentialProvider {
     std::condition_variable changed;
     bool entered = false;
     bool released = false;
+    bool rotated = false;
 
     std::expected<std::size_t, q::client::CredentialError> basicToken(std::span<char16_t> output) override {
         const auto call = ++calls;
@@ -73,12 +75,15 @@ class Provider final : public q::client::CredentialProvider {
                 owner->reconnect();
         }
 
-        if (output.size() < SYNTHETIC_TOKEN.size())
+        std::lock_guard lock(mutex);
+        const auto token = rotated ? ROTATED_TOKEN : SYNTHETIC_TOKEN;
+
+        if (output.size() < token.size())
             return std::unexpected(q::client::CredentialError::REJECTED);
 
-        std::ranges::copy(SYNTHETIC_TOKEN, output.begin());
+        std::ranges::copy(token, output.begin());
 
-        return SYNTHETIC_TOKEN.size();
+        return token.size();
     }
 
     bool awaitEntry() {
@@ -93,6 +98,11 @@ class Provider final : public q::client::CredentialProvider {
         std::lock_guard lock(mutex);
         released = true;
         changed.notify_all();
+    }
+
+    void rotate() {
+        std::lock_guard lock(mutex);
+        rotated = true;
     }
 };
 
@@ -242,11 +252,12 @@ std::vector<std::uint8_t> feedNegotiation() {
 }
 
 /** Use the wire peer to prove the exact authorization is sent before the source can publish Quote. */
-test::TlsTestPeer authenticatedPeer(bool expectFirst, bool successor = false) {
+test::TlsTestPeer authenticatedPeer(bool expectFirst, std::u16string_view successorToken = {}, bool denied = false) {
     auto script = tls::peerOptions();
     script.captureUntilClose = true;
     script.readTimeout = 10s;
-    script.initialBytes = property(u"authentication", u"LOGIN synthetic-realm");
+    const auto challenge = property(u"authentication", u"LOGIN synthetic-realm");
+    script.initialBytes = challenge;
     const auto authorization = property(u"authorization", SYNTHETIC_TOKEN);
     auto ready = property(u"authentication", u"");
     const auto quotes = quoteBytes();
@@ -256,14 +267,14 @@ test::TlsTestPeer authenticatedPeer(bool expectFirst, bool successor = false) {
         script.expectedClientBytes = feedNegotiation();
         script.replyBytes = std::exchange(script.initialBytes, {});
         script.expectedReplyClientBytes = authorization;
-        script.finalBytes = ready;
+        script.finalBytes = denied ? property(u"authentication", u"LOGIN synthetic-denial") : ready;
     }
 
-    if (successor) {
+    if (!successorToken.empty()) {
         script.successor.emplace();
-        script.successor->replyBytes = script.initialBytes;
+        script.successor->replyBytes = challenge;
         script.successor->expectedClientBytes = feedNegotiation();
-        script.successor->expectedReplyClientBytes = authorization;
+        script.successor->expectedReplyClientBytes = property(u"authorization", successorToken);
         script.successor->finalBytes = std::move(ready);
     }
 
@@ -275,6 +286,12 @@ test::TlsTestPeer authenticatedPeer(bool expectFirst, bool successor = false) {
 
 bool containsAuthorization(const std::vector<std::uint8_t> &bytes) {
     return std::ranges::search(bytes, std::string_view("authorization")).begin() != bytes.end();
+}
+
+bool containsToken(const std::vector<std::uint8_t> &bytes, std::u16string_view token) {
+    const auto frame = property(u"authorization", token);
+
+    return std::ranges::search(bytes, frame).begin() != bytes.end();
 }
 
 void reportPeer(const test::PeerSnapshot &snapshot, const std::vector<std::uint8_t> &bytes) {
@@ -505,7 +522,7 @@ TEST_CASE("Feed Basic drops a held provider result when endpoint close is admitt
 }
 
 TEST_CASE("Feed Basic drops reentrant stale output and authenticates the fresh verified attempt") {
-    auto server = authenticatedPeer(false, true);
+    auto server = authenticatedPeer(false, SYNTHETIC_TOKEN);
     auto provider = std::make_shared<Provider>();
     provider->mode = Provider::Mode::RECONNECT;
     api::ApiRuntime runtime(runtimeOptions());
@@ -537,6 +554,72 @@ TEST_CASE("Feed Basic drops reentrant stale output and authenticates the fresh v
     CHECK(observed.successfulHandshakes == 2);
     CHECK_FALSE(containsAuthorization(observed.firstClientBytes));
     CHECK(containsAuthorization(observed.secondClientBytes));
+}
+
+TEST_CASE("Feed Basic reads changed provider state only on the next verified connection") {
+    auto server = authenticatedPeer(true, ROTATED_TOKEN);
+    auto provider = std::make_shared<Provider>();
+    api::ApiRuntime runtime(runtimeOptions());
+    auto options = endpointOptions();
+    options.eventRegistry = quoteRegistry();
+    options.maximumAttempts = 2;
+    options.retryDelay = 1ms;
+    options.tls->credentials = api::BasicTlsCredentials{provider};
+    auto endpoint = runtime.createEndpoint(options);
+    std::shared_ptr<api::Subscription<q::events::Quote>> subscription;
+    const auto received = observeQuote(*endpoint, subscription);
+    endpoint->connect("127.0.0.1:" + std::to_string(server.port()));
+    const auto firstDeadline = std::chrono::steady_clock::now() + 8s;
+    REQUIRE(endpoint->awaitState(api::EndpointState::CONNECTED, firstDeadline).status == api::WaitStatus::REACHED);
+    REQUIRE(awaitQuote(*received, firstDeadline));
+    REQUIRE(endpoint->getStatistics().connection.sourceEpoch == 1);
+    CHECK(provider->calls == 1);
+
+    provider->rotate();
+    CHECK(provider->calls == 1);
+    endpoint->reconnect();
+    const auto secondDeadline = std::chrono::steady_clock::now() + 8s;
+    const auto second = endpoint->awaitState(api::EndpointState::CONNECTED, secondDeadline);
+    INFO("endpoint stage=" << endpoint->getDiagnostic().stage);
+    REQUIRE(second.status == api::WaitStatus::REACHED);
+    CHECK(endpoint->getStatistics().connection.sourceEpoch == 2);
+    CHECK(provider->calls == 2);
+
+    static_cast<void>(endpoint->closeAndAwaitTermination());
+    const auto observed = server.stop();
+    CHECK(observed.successfulHandshakes == 2);
+    CHECK(containsToken(observed.firstClientBytes, SYNTHETIC_TOKEN));
+    CHECK_FALSE(containsToken(observed.firstClientBytes, ROTATED_TOKEN));
+    CHECK(containsToken(observed.secondClientBytes, ROTATED_TOKEN));
+    CHECK_FALSE(containsToken(observed.secondClientBytes, SYNTHETIC_TOKEN));
+}
+
+TEST_CASE("Feed Basic server rejection is terminal despite unused connection attempts") {
+    auto server = authenticatedPeer(true, ROTATED_TOKEN, true);
+    auto provider = std::make_shared<Provider>();
+    api::ApiRuntime runtime(runtimeOptions());
+    auto options = endpointOptions();
+    options.eventRegistry = quoteRegistry();
+    options.maximumAttempts = 3;
+    options.retryDelay = 1ms;
+    options.tls->credentials = api::BasicTlsCredentials{provider};
+    auto endpoint = runtime.createEndpoint(options);
+    std::shared_ptr<api::Subscription<q::events::Quote>> subscription;
+    const auto received = observeQuote(*endpoint, subscription);
+    endpoint->connect("127.0.0.1:" + std::to_string(server.port()));
+    REQUIRE(endpoint->awaitState(api::EndpointState::FAILED, std::chrono::steady_clock::now() + 8s).status ==
+            api::WaitStatus::REACHED);
+    const auto diagnostic = endpoint->getDiagnostic();
+    CHECK(diagnostic.code == api::ErrorCode::PROTOCOL_FAILURE);
+    CHECK(diagnostic.stage == "tls-authentication-denied");
+    CHECK_FALSE(received->load());
+    static_cast<void>(endpoint->closeAndAwaitTermination());
+    CHECK(endpoint->getStatistics().connection.connectionAttempts.value == 1);
+    CHECK(provider->calls == 1);
+    const auto observed = server.stop();
+    CHECK(observed.successfulHandshakes == 1);
+    CHECK(containsToken(observed.firstClientBytes, SYNTHETIC_TOKEN));
+    CHECK(observed.secondClientBytes.empty());
 }
 
 TEST_CASE("A late credential cutoff discards prepared bytes without committing protocol state") {
