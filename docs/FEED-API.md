@@ -945,7 +945,8 @@ time does not set a subscription range. See [Series fields and schema](SERIES-EV
 
 `Feed::createTimeSeriesSubscription<Event>()` uses the same owning subscription facade with
 `getFromTime()`/`setFromTime(ms)` and an initial signed64 MAX. A verified native time-series mapper
-and an explicit HISTORY endpoint are required. The current event types reject this operation before registration.
+and an explicit HISTORY endpoint are required. Supported types include Candle, TimeAndSale,
+NuamTimeAndSale, Greeks, Underlying and TheoPrice; unsupported types are rejected before registration.
 Ordinary subscriptions reject range operations. Accepted range/set/revision and observer snapshots
 change together; the SDK applies demand and withdraws obsolete not-started HISTORY delivery.
 See [live HISTORY ranges](../spec/subscriptions/LIVE-HISTORY-RANGES.md) for capability, callback
