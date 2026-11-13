@@ -96,7 +96,7 @@ inline std::optional<LifetimeStatisticRate> lifetimeRate(std::chrono::steady_clo
 
     const auto rate = static_cast<long double>(delta) / elapsed;
 
-    if (!std::isfinite(rate) || rate > std::numeric_limits<double>::max()) {
+    if (!std::isfinite(rate) || rate > (std::numeric_limits<double>::max)()) {
         return std::nullopt;
     }
 
@@ -199,7 +199,7 @@ statisticsEpochRate(const EndpointStatistics &first, const EndpointStatistics &l
                     core::StatisticCounter transport::ConnectionStatistics::*metric) noexcept {
     const auto epoch = first.connection.sourceEpoch;
 
-    if (!epoch || *epoch == 0 || *epoch == std::numeric_limits<std::uint64_t>::max() ||
+    if (!epoch || *epoch == 0 || *epoch == (std::numeric_limits<std::uint64_t>::max)() ||
         epoch != last.connection.sourceEpoch ||
         first.connection.establishedConnections.availability != core::StatisticAvailability::AVAILABLE ||
         last.connection.establishedConnections.availability != core::StatisticAvailability::AVAILABLE ||
@@ -228,7 +228,7 @@ statisticsEpochRate(const SubscriptionStatistics &first, const SubscriptionStati
                     core::StatisticCounter SubscriptionStatistics::*metric) noexcept {
     const auto epoch = first.sourceEpoch;
 
-    if (!epoch || *epoch == 0 || *epoch == std::numeric_limits<std::uint64_t>::max() || epoch != last.sourceEpoch) {
+    if (!epoch || *epoch == 0 || *epoch == (std::numeric_limits<std::uint64_t>::max)() || epoch != last.sourceEpoch) {
         return std::nullopt;
     }
 

@@ -36,8 +36,8 @@ struct StatisticCounter {
             return;
         }
 
-        if (amount > std::numeric_limits<std::uint64_t>::max() - value) {
-            value = std::numeric_limits<std::uint64_t>::max();
+        if (amount > (std::numeric_limits<std::uint64_t>::max)() - value) {
+            value = (std::numeric_limits<std::uint64_t>::max)();
             availability = StatisticAvailability::SATURATED;
 
             return;

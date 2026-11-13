@@ -254,7 +254,8 @@ template <class Event> class IndependentSubscription final {
             return !attachment.native && attachment.gate.expired();
         });
 
-        if (attachments_.size() == limits_.maximumAttachments || nextId_ == std::numeric_limits<AttachmentId>::max()) {
+        if (attachments_.size() == limits_.maximumAttachments ||
+            nextId_ == (std::numeric_limits<AttachmentId>::max)()) {
             throw Error({ErrorCode::RESOURCE_LIMIT, "independent-subscription-attachments"});
         }
 
