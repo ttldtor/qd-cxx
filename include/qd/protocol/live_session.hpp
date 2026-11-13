@@ -17,6 +17,7 @@ namespace org::ttldtor::qdcxx::protocol {
 namespace detail {
 class TapeEventBridge;
 struct LiveAuthorization;
+class LocalEventOwner;
 } // namespace detail
 
 /** Detached counters at framing and atomic DATA-commit boundaries, before projection or fan-out. */
@@ -192,6 +193,7 @@ class LiveSnapshot {
     friend class LiveSession;
     friend class LiveEvent;
     friend class detail::TapeEventBridge;
+    friend class detail::LocalEventOwner;
     /** Adopt an already counted snapshot owner.
      * @param state Complete immutable snapshot, or null.
      */
@@ -281,6 +283,7 @@ class LiveEvent {
     std::unique_ptr<State> state_; ///< Whole owned arena plus immutable generation lease.
     friend class LiveSession;
     friend class detail::TapeEventBridge;
+    friend class detail::LocalEventOwner;
     /** Adopt a fully admitted event.
      * @param state Complete owned event.
      */

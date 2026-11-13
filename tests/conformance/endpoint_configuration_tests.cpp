@@ -194,6 +194,22 @@ TEST_CASE("configuration rejects unsupported extensions and secret inputs withou
     CHECK_FALSE(configured("localhost:1").snapshot().acceptedAddress);
 }
 
+TEST_CASE("OnDemand connector addresses are rejected before Feed starts a connection") {
+    constexpr std::string_view address = "(ondemand:127.0.0.1:1234)";
+    CHECK(error([&] {
+              static_cast<void>(configured(address));
+          }) == api::ErrorCode::UNSUPPORTED_PROFILE);
+
+    api::ApiRuntime runtime(runtimeOptions());
+    auto endpoint = runtime.createEndpoint({});
+    const auto initial = endpoint->getState();
+    CHECK(error([&] {
+              endpoint->connect(address);
+          }) == api::ErrorCode::UNSUPPORTED_PROFILE);
+    CHECK(endpoint->getState() == initial);
+    CHECK(endpoint->getStatistics().connection.activeConnections == 0);
+}
+
 TEST_CASE("configuration snapshots remain isolated and readable through concurrent explicit connect and retirement") {
     api::ApiRuntime runtime(runtimeOptions());
     test::TcpPeerScript script;

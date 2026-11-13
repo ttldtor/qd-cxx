@@ -39,3 +39,6 @@ before choosing an integration.
 
 
 [Endpoint configuration](ENDPOINT-CONFIGURATION.md): explicit addresses/properties, immutable snapshots, effective local values and Java compatibility boundaries.
+[OnDemand replay capability and access](../spec/transport/ON-DEMAND-ACCESS.md)
+describes the Java connector, the current C++ refusal and the requirements for
+qualifying replay against a provider.
