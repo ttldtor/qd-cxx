@@ -9,8 +9,12 @@
 
 namespace org::ttldtor::qdcxx::transport::detail {
 
+class RecoveryCore;
+
 /** Private recovery assembly from stable process state, independent of its movable public facade. */
 struct TcpRecoveryFactory {
+    /** Borrow the worker-owned core until this stable facade is destroyed. */
+    [[nodiscard]] static RecoveryCore &core(TcpRecovery &recovery) noexcept;
     /** Bind actual high-level packet retirement before start; default low-level callers have no fence. */
     static void setCallbackRetirementFence(TcpRecovery &recovery, CallbackRetirementFence *fence) noexcept;
 

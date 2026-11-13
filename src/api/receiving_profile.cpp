@@ -392,8 +392,17 @@ void prepareCopies(ReceivingProfile &profile) {
         }
     }
 
-    const auto &host = profile.endpoint.settings().host;
-    limits.endpointCopyBytes = multiply(2, std::max(add(host.capacity(), 1), add(host.size(), 16)));
+    const auto &settings = profile.endpoint.settings();
+    const auto copyBytes = [](const auto &text) {
+        return std::max(add(text.capacity(), 1), add(text.size(), 16));
+    };
+    auto endpointBytes = copyBytes(settings.host);
+
+    if (const auto &tls = settings.tls) {
+        endpointBytes = add(endpointBytes, add(copyBytes(tls->referenceIdentity), copyBytes(tls->trustPem)));
+    }
+
+    limits.endpointCopyBytes = multiply(2, endpointBytes);
     limits.writerConfigurationBytes = WRITER_CONFIGURATION_BYTES;
     const auto family = static_cast<std::size_t>(
         profile.family == core::SubscriptionFamily::TICKER    ? transport::RecoveryFamily::TICKER
@@ -874,6 +883,13 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
     auto settings = std::move(*configured);
     settings.host = host;
     settings.port = port;
+
+    if (const auto &tls = options.tls) {
+        settings.security = client::EndpointSecurity::TLS;
+        settings.tls.emplace(client::EndpointTls{
+            tls->referenceIdentity, tls->trustPem, tls->handshakeTimeout, {}, tls->closeTimeout, {}, {}});
+    }
+
     settings.timeouts = {options.dnsTimeout, options.connectTimeout, options.readTimeout, options.writeTimeout,
                          options.pollInterval};
     settings.retry = {options.maximumAttempts,
@@ -1142,8 +1158,23 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
     result.submitWork = {16, add(multiply(scale, CONTROL_VISITS), multiply(clients, routing.work.visits)),
                          add(multiply(scale, CONTROL_VISITS), multiply(clients, routing.work.textUnits)),
                          add(multiply(scale, CONTROL_BYTES), multiply(clients, routing.work.bytes))};
-    const transport::RecoveryWork recovery{10000, multiply(scale, CONTROL_VISITS), multiply(scale, CONTROL_VISITS),
-                                           multiply(scale, CONTROL_BYTES)};
+    transport::RecoveryWork recovery{10000, multiply(scale, CONTROL_VISITS), multiply(scale, CONTROL_VISITS),
+                                     multiply(scale, CONTROL_BYTES)};
+
+    if (const auto &tls = result.endpoint.settings().tls) {
+        // The two detached settings copies are charged before the recovery candidate is adopted.
+        constexpr std::size_t TLS_VALIDATION_TEXT_PASSES = 16;
+        constexpr std::size_t TLS_COPY_TEXT_PASSES = 5;
+        const auto copyBytes = [](const auto &text) {
+            return std::max(add(text.capacity(), 1), add(text.size(), 16));
+        };
+        const auto identity = copyBytes(tls->referenceIdentity);
+        const auto trust = copyBytes(tls->trustPem);
+        const auto copy = multiply(TLS_COPY_TEXT_PASSES, add(identity, trust));
+        recovery.textUnits = add(recovery.textUnits, add(copy, multiply(TLS_VALIDATION_TEXT_PASSES, identity)));
+        recovery.bytes = add(recovery.bytes, copy);
+    }
+
     const protocol::SubscriptionWriterWork writer{10000, multiply(scale, CONTROL_VISITS),
                                                   multiply(scale, CONTROL_VISITS), multiply(scale, CONTROL_BYTES)};
     result.preparationWork = {recovery, writer, {result.queueWork, result.queueWork, result.queueWork}};

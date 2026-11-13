@@ -5,6 +5,7 @@
 #include "recovery_copy_profile.hpp"
 #include "recovery_core.hpp"
 #include "recovery_core_support.hpp"
+#include "tls_recovery_factory.hpp"
 #include "tls_runtime_factory.hpp"
 
 #include <exception>
@@ -270,6 +271,17 @@ class TlsRecoveryBackend final : public detail::RecoveryBackend {
         runtime_.reset();
     }
 
+    ConnectionStatistics statistics() const noexcept override {
+        return runtime_ ? detail::TlsRuntimeFactory::statistics(*runtime_) : detail::RecoveryBackend::statistics();
+    }
+
+    ConnectionStatistics retireStatistics() noexcept override {
+        const auto result = runtime_ ? detail::TlsRuntimeFactory::retireStatistics(*runtime_) : statistics();
+        dispose();
+
+        return result;
+    }
+
     detail::RecoveryAttemptFacts facts() const noexcept override {
         if (!runtime_)
             return {};
@@ -403,6 +415,22 @@ std::expected<TlsRecovery, RecoveryDiagnostic>
 TlsRecovery::create(RuntimeBootstrap &bootstrap, const client::EndpointOptions &endpoint,
                     std::vector<protocol::OutgoingRecord> &&blueprint, RecoveryQueues &&queues,
                     const RecoveryOptions &options, const TlsOptions &tls, RecoveryPreparationWork &work) {
+    return detail::TlsRecoveryFactory::create(&bootstrap, nullptr, endpoint, std::move(blueprint), std::move(queues),
+                                              options, tls, work);
+}
+
+std::expected<TlsRecovery, RecoveryDiagnostic>
+detail::TlsRecoveryFactory::create(const BootstrapLease &bootstrap, const client::EndpointOptions &endpoint,
+                                   std::vector<protocol::OutgoingRecord> &&blueprint, RecoveryQueues &&queues,
+                                   const RecoveryOptions &options, const TlsOptions &tls,
+                                   RecoveryPreparationWork &work) {
+    return create(nullptr, &bootstrap, endpoint, std::move(blueprint), std::move(queues), options, tls, work);
+}
+
+std::expected<TlsRecovery, RecoveryDiagnostic> detail::TlsRecoveryFactory::create(
+    RuntimeBootstrap *bootstrap, const BootstrapLease *lease, const client::EndpointOptions &endpoint,
+    std::vector<protocol::OutgoingRecord> &&blueprint, RecoveryQueues &&queues, const RecoveryOptions &options,
+    const TlsOptions &tls, RecoveryPreparationWork &work) {
     if (detail::recoveryCopyProfile() == 0) {
         return std::unexpected(RecoveryDiagnostic{RecoveryError::UNSUPPORTED_PROFILE, "recovery-copy-profile"});
     }
@@ -418,19 +446,20 @@ TlsRecovery::create(RuntimeBootstrap &bootstrap, const client::EndpointOptions &
     if (!candidate)
         return std::unexpected(candidate.error());
 
-    const auto retirement = detail::admitRecoveryOwner(*candidate, sizeof(Impl), work.recovery);
+    const auto retirement = detail::admitRecoveryOwner(*candidate, sizeof(TlsRecovery::Impl), work.recovery);
 
     if (!retirement)
         return std::unexpected(retirement.error());
 
-    auto bootstrapLease = detail::BootstrapLease::acquire(bootstrap);
+    auto bootstrapLease = lease ? BootstrapLease::acquire(*lease) : BootstrapLease::acquire(*bootstrap);
 
     if (!bootstrapLease) {
         return std::unexpected(detail::recoveryTransportDiagnostic(bootstrapLease.error()));
     }
 
     try {
-        auto impl = std::make_shared<Impl>(std::move(*bootstrapLease), tls, std::move(*candidate), *retirement);
+        auto impl =
+            std::make_shared<TlsRecovery::Impl>(std::move(*bootstrapLease), tls, std::move(*candidate), *retirement);
 
         if (!impl->core.adopt(std::move(blueprint), std::move(queues)))
             std::terminate();
@@ -439,6 +468,10 @@ TlsRecovery::create(RuntimeBootstrap &bootstrap, const client::EndpointOptions &
     } catch (const std::bad_alloc &) {
         return std::unexpected(RecoveryDiagnostic{RecoveryError::ALLOCATION_FAILURE, "tls-recovery-owner-storage"});
     }
+}
+
+detail::RecoveryCore &detail::TlsRecoveryFactory::core(TlsRecovery &recovery) noexcept {
+    return recovery.impl_->core;
 }
 
 std::expected<void, RecoveryDiagnostic> TlsRecovery::start() noexcept {

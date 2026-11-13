@@ -265,6 +265,36 @@ std::string aggregationPropertyValue(std::optional<std::chrono::milliseconds> pe
     return result;
 }
 
+void validateEndpointTls(const std::optional<VerifiedTlsOptions> &tls) {
+    if (!tls)
+        return;
+
+#if defined(ORG_TTLDTOR_QDCXX_FEED_HAS_TLS)
+    constexpr std::size_t MAXIMUM_TLS_TRUST_BYTES = 512 * 1024;
+    const auto durationValid = [](std::chrono::milliseconds value) {
+        return value.count() > 0 && value.count() <= INT_MAX;
+    };
+
+    if (!client::detail::validEndpointHost(tls->referenceIdentity) || tls->trustPem.empty() ||
+        tls->trustPem.size() > MAXIMUM_TLS_TRUST_BYTES || !durationValid(tls->handshakeTimeout) ||
+        !durationValid(tls->closeTimeout))
+        reject(ErrorCode::INVALID_ARGUMENT, "endpoint-tls-options");
+
+    const auto requirements = transport::tlsRequirements(tls->limits, tls->host);
+
+    if (!requirements)
+        reject(ErrorCode::UNSUPPORTED_PROFILE, requirements.error().stage);
+
+    if (tls->sdkInstanceBytes < requirements->sdk.instanceBytes ||
+        tls->sdkSharedBytes < requirements->sdk.sharedBytes || tls->residentBytes == 0 ||
+        tls->trustPem.size() > tls->limits.trustBytes || tls->referenceIdentity.size() > tls->limits.identityBytes)
+        reject(ErrorCode::RESOURCE_LIMIT, "endpoint-tls-allowance");
+
+#else
+    reject(ErrorCode::UNSUPPORTED_PROFILE, "endpoint-tls-unavailable");
+#endif
+}
+
 void validateEndpointOptions(const EndpointOptions &options) {
     if (options.aggregationPeriod.count() < 0 || options.aggregationPeriod > MAXIMUM_LOCAL_AGGREGATION_PERIOD)
         reject(ErrorCode::INVALID_ARGUMENT, "endpoint-local-aggregation-period");
@@ -369,6 +399,8 @@ EndpointConfiguration EndpointConfiguration::create(const EndpointOptions &fallb
             address = detail::parseEndpointAddress(route);
         }
 
+        // Reject unbounded or unsupported typed TLS input before copying its owned text.
+        detail::validateEndpointTls(fallback.tls);
         auto options = fallback;
         std::string name;
 

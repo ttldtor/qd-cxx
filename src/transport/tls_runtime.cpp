@@ -813,6 +813,26 @@ TlsResources TlsRuntime::resources() const noexcept {
     return result;
 }
 
+ConnectionStatistics detail::TlsRuntimeFactory::statistics(const TlsRuntime &runtime) noexcept {
+    const auto &owner = runtime.impl_;
+    auto result = owner->core->statistics();
+
+    if (!owner->verifiedObserved) {
+        result.establishedConnections.value = 0;
+        result.closedConnections.value = 0;
+        result.activeConnections = 0;
+        result.sourceEpoch.reset();
+    }
+
+    return result;
+}
+
+ConnectionStatistics detail::TlsRuntimeFactory::retireStatistics(TlsRuntime &runtime) noexcept {
+    runtime.impl_->core->retire();
+
+    return statistics(runtime);
+}
+
 TlsRequirements TlsRuntime::requirements() const noexcept {
     return impl_ ? impl_->requirements : TlsRequirements{};
 }

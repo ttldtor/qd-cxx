@@ -9,6 +9,11 @@ namespace org::ttldtor::qdcxx::transport::detail {
 
 /** Private TLS assembly path; plain recovery does not include or link this adapter. */
 struct TlsRuntimeFactory {
+    /** Read native ciphertext octets and verified source identities without progress. */
+    [[nodiscard]] static ConnectionStatistics statistics(const TlsRuntime &runtime) noexcept;
+    /** Quiesce this owner's native operations and return the final detached cut. */
+    [[nodiscard]] static ConnectionStatistics retireStatistics(TlsRuntime &runtime) noexcept;
+
     /** Create an independent TLS attempt while preserving existing TLS admission/failure ordering.
      * @param lease Stable process borrow retained by the outer owner through all attempts.
      * @param endpoint Immutable validated endpoint snapshot.

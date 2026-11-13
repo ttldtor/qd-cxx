@@ -21,8 +21,7 @@ with `SubscriptionSelector::indexed`. SpreadOrder selectors name the underlying 
 The same selector chooses a named OtcMarketsOrder or OrderImbalance source. A plain symbol
 selects all available sources for that event type.
 The existing nine nonindexed types retain their existing TICKER/STREAM profiles and reject HISTORY before native
-registration. TLS and credentials
-remain separate receiving profiles. Wildcard selectors require the existing explicit STREAM permission.
+registration. Wildcard selectors require the existing explicit STREAM permission.
 Schema loading is separate. The
 [lower-level receiving APIs](SUBSCRIPTIONS.md) expose separate profiles.
 
@@ -444,6 +443,30 @@ control locks. Awaiting endpoint closure establishes callback/capture quiescence
 `deadlineExpired`, `hadGap` and `diagnostic` as well. It does not establish peer
 acknowledgement, unread-wire completeness or an uninterrupted upstream history.
 
+## Connect with verified TLS
+
+Build `qdcxx_feed` with `ORG_TTLDTOR_QDCXX_BUILD_TLS=ON` and the qualified
+static SDK. Set `EndpointOptions::tls` to an owning `VerifiedTlsOptions` value
+before creating the endpoint. Supply the complete explicit PEM trust input,
+the DNS SAN or numeric IP SAN reference identity, finite handshake and close
+deadlines, and the resource and controlled-host declarations. The route passed
+to `connect` still uses `host:port` or `[IPv6]:port`. DNS SNI and verification
+use the reference identity, which may differ from the route. DNS resolution
+still uses the runtime's configured resolver snapshot.
+
+Use `transport::tlsRequirements` from the TLS target to size the two SDK byte
+allowances. `residentBytes` must also cover the adapter, retained configuration
+and native/session reservations. The application controls the same SDK image
+and its other users through final endpoint retirement, including the declared
+thread, context and failed-initialization history. See the [resource profile](../spec/transport/TLS-RESOURCES.md).
+
+The SDK copies the settings. It verifies the peer before QTP delivery, uses
+the configured finite retry policy, and exposes failures through static
+diagnostics. There is no plaintext fallback, system-root lookup, or credential
+configuration in this profile. A TLS-disabled Feed build refuses the typed
+setting with `UNSUPPORTED_PROFILE`. The setting is unavailable through textual
+endpoint properties. An endpoint configured for TLS refuses local tape and
+plaintext OnDemand loopback sources.
 
 ## Historical OnDemand loopback replay
 
@@ -769,8 +792,9 @@ Each `StatisticCounter` carries its own `availability`. Available idle counts ar
 zero; overflow saturates at `UINT64_MAX` with sticky `SATURATED`, disabling exact
 deltas for that field. Incoming subscriptions, outgoing DATA and QD lag/RTT currently
 report `UNSUPPORTED`. No event timestamp or callback duration substitutes for wire
-timing. This accessor instruments the existing plain Feed path; a future Feed TLS
-path must separately identify encrypted transport and plaintext QTP boundaries.
+timing. For verified TLS, byte counts are native ciphertext octets, including
+handshake traffic. QTP message and record counters report `UNSUPPORTED`.
+Established sources and source epochs count verified connections.
 
 Native totals are preserved after all owned completions return. `final` becomes true
 only after native, listener and callable-capture quiescence, including subscription-change

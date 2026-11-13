@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: BSL-1.0
 #include "history_observation.hpp"
 #include "../core/delivery_statistics.hpp"
+#include "../transport/recovery_core.hpp"
+#include "../transport/tcp_recovery_factory.hpp"
 #include "callback_execution.hpp"
 
 #include <limits>
@@ -175,8 +177,10 @@ void publishHistoryCut(std::optional<std::uint64_t> sourceEpoch, bool sourceRese
 }
 } // namespace
 
-void publishHistorySnapshot(const transport::TcpRecovery &recovery, const mux::MuxHandle &handle,
-                            const std::shared_ptr<SubscriptionPort> &port, mux::QueueWork &work) noexcept {
+namespace {
+template <class Recovery>
+void publishNetworkHistory(const Recovery &recovery, const mux::MuxHandle &handle,
+                           const std::shared_ptr<SubscriptionPort> &port, mux::QueueWork &work) noexcept {
     publishHistoryCut(recovery.statistics().sourceEpoch, recovery.status().sourceResetPending, port,
                       [&]() -> ObservedRanges {
                           auto ranges = recovery.historyRangeSnapshot(handle, work);
@@ -189,6 +193,17 @@ void publishHistorySnapshot(const transport::TcpRecovery &recovery, const mux::M
 
                           return std::move(*ranges);
                       });
+}
+} // namespace
+
+void publishHistorySnapshot(const transport::detail::RecoveryCore &recovery, const mux::MuxHandle &handle,
+                            const std::shared_ptr<SubscriptionPort> &port, mux::QueueWork &work) noexcept {
+    publishNetworkHistory(recovery, handle, port, work);
+}
+
+void publishHistorySnapshot(const transport::TcpRecovery &recovery, const mux::MuxHandle &handle,
+                            const std::shared_ptr<SubscriptionPort> &port, mux::QueueWork &work) noexcept {
+    publishNetworkHistory(recovery, handle, port, work);
 }
 
 void publishTapeHistorySnapshot(const mux::MuxQueue &queue, std::uint64_t epoch, const mux::MuxHandle &handle,
