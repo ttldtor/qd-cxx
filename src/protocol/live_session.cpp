@@ -999,6 +999,11 @@ Error writerError(SubscriptionWriterError error) noexcept {
         return Error::INVALID_STATE;
     }
 
+    if (error == SubscriptionWriterError::UNSUPPORTED_DATA_FLAGS ||
+        error == SubscriptionWriterError::UNSUPPORTED_DATA_REMOVAL) {
+        return Error::UNSUPPORTED;
+    }
+
     return Error::INVALID_CONFIGURATION;
 }
 
@@ -1554,7 +1559,7 @@ std::expected<LiveEvent, LiveError> detail::LocalEventOwner::quote(const core::R
 struct LivePendingOutput::State {
     OwnerLedger ledger;                   ///< Retains epoch/object accounting until all backing is released.
     std::unique_ptr<std::byte[]> backing; ///< Fixed requested control allocation, when not a composer owner.
-    std::optional<PendingSubscriptionOutput> subscription; ///< Existing exact subscription output.
+    std::optional<PendingSubscriptionOutput> subscription; ///< Whole writer-backed output.
     std::size_t capacity = 0;              ///< Globally charged full backing, including unused/consumed slots.
     std::size_t size = 0;                  ///< Exposed initialized envelope bytes.
     std::size_t consumed = 0;              ///< Local partial-write cursor, never peer acknowledgement.
@@ -1983,16 +1988,15 @@ struct LiveSession::Impl {
         return output;
     }
 
-    /** Compose through the existing writer after global maximum-operation backing reservation.
-     * @param message Subscription identity, absent for descriptions.
-     * @param requests Borrowed exact keys, unused for descriptions.
-     * @param ids Borrowed outgoing IDs, unused for subscriptions.
+    /** Compose through the writer after global maximum-operation backing reservation.
+     * @tparam Compose Synchronous operation borrowing this call's exact inputs.
+     * @param compose Operation invoked with the writer's mutable turn credits.
+     * @param subscriptionRecords Exact outgoing ADD/REMOVE occurrence count, zero for other frames.
      * @param work Mutable turn credits synchronized on every writer outcome.
      * @return Whole globally counted immutable output.
      */
-    LivePendingOutput writerOutput(std::optional<SubscriptionMessage> message,
-                                   std::span<const core::SubscriptionRequest> requests,
-                                   std::span<const std::int32_t> ids, LiveWork &work) {
+    template <typename Compose>
+    LivePendingOutput writerOutput(Compose compose, std::size_t subscriptionRecords, LiveWork &work) {
         auto output = makeOwner<LivePendingOutput::State>(*lease.get());
         const auto maximum = composer.maximumOutputBytes();
 
@@ -2002,7 +2006,7 @@ struct LiveSession::Impl {
 
         output->capacity = maximum;
         SubscriptionWriterWork credits{work.operations, work.visits, work.textUnits, work.bytes};
-        auto result = message ? composer.compose(*message, requests, credits) : composer.describe(ids, credits);
+        auto result = compose(credits);
         work.operations = credits.operations;
         work.visits = credits.visits;
         work.textUnits = credits.textUnits;
@@ -2022,7 +2026,7 @@ struct LiveSession::Impl {
         output->capacity = actual;
         output->size = actual;
         output->subscription.emplace(std::move(*result));
-        output->subscriptionRecords = message ? requests.size() : 0;
+        output->subscriptionRecords = subscriptionRecords;
 
         return LivePendingOutput(std::move(output));
     }
@@ -2418,10 +2422,10 @@ std::expected<LivePendingOutput, LiveError> LiveSession::composeProtocol(LivePro
                 const auto known = messageName(message.id);
                 const bool common =
                     message.id == HEARTBEAT || message.id == DESCRIBE_PROTOCOL || message.id == DESCRIBE_RECORDS;
-                const bool supported = send ? common || message.id == 11 || message.id == 12 || message.id == 16 ||
-                                                  message.id == 17 || message.id == 21 || message.id == 22
-                                            : common || message.id == TICKER_DATA || message.id == STREAM_DATA ||
-                                                  message.id == HISTORY_DATA;
+                const bool data = message.id == TICKER_DATA || message.id == STREAM_DATA || message.id == HISTORY_DATA;
+                const bool subscription = message.id == 11 || message.id == 12 || message.id == 16 ||
+                                          message.id == 17 || message.id == 21 || message.id == 22;
+                const bool supported = common || data || (send && subscription);
 
                 if (!supported || !message.name || !same(*message.name, known, work)) {
                     throw Error::UNSUPPORTED;
@@ -2582,7 +2586,11 @@ std::expected<LivePendingOutput, LiveError> LiveSession::describe(std::span<cons
 
         impl_->requireOpen();
 
-        return impl_->writerOutput({}, {}, senderIds, work);
+        return impl_->writerOutput(
+            [&](SubscriptionWriterWork &credits) {
+                return impl_->composer.describe(senderIds, credits);
+            },
+            0, work);
     } catch (Error error) {
         return std::unexpected(error);
     } catch (const LiveStorageLimit &) {
@@ -2624,7 +2632,55 @@ std::expected<LivePendingOutput, LiveError> LiveSession::subscribe(SubscriptionM
             throw Error::AUTHENTICATION_REQUIRED;
         }
 
-        return impl_->writerOutput(message, requests, {}, work);
+        return impl_->writerOutput(
+            [&](SubscriptionWriterWork &credits) {
+                return impl_->composer.compose(message, requests, credits);
+            },
+            requests.size(), work);
+    } catch (Error error) {
+        return std::unexpected(error);
+    } catch (const LiveStorageLimit &) {
+        return std::unexpected(Error::RESOURCE_LIMIT);
+    } catch (const std::bad_alloc &) {
+        return std::unexpected(Error::ALLOCATION_FAILURE);
+    } catch (const std::length_error &) {
+        return std::unexpected(Error::ALLOCATION_FAILURE);
+    }
+}
+
+std::expected<LivePendingOutput, LiveError>
+LiveSession::publishData(LiveDataMessage message, std::span<const LiveDataRecordView> records, LiveWork &work) {
+    try {
+        debit(1, work.operations);
+
+        if (!impl_) {
+            return std::unexpected(Error::INVALID_STATE);
+        }
+
+        impl_->requireOpen();
+        const auto id = std::to_underlying(message);
+
+        if (id != TICKER_DATA && id != STREAM_DATA && id != HISTORY_DATA) {
+            throw Error::INVALID_CONFIGURATION;
+        }
+
+        const auto &protocol = impl_->peer.state_->protocol;
+        debit(protocol.receive.size(), work.visits);
+
+        if (!protocol.received || !capability(protocol.receive, id, work)) {
+            throw Error::NOT_READY;
+        }
+
+        if (impl_->authentication == LiveAuthentication::REQUIRED ||
+            impl_->authentication == LiveAuthentication::AUTHORIZATION_EMITTED) {
+            throw Error::AUTHENTICATION_REQUIRED;
+        }
+
+        return impl_->writerOutput(
+            [&](SubscriptionWriterWork &credits) {
+                return impl_->composer.composeData(message, records, impl_->historySnapshot, credits);
+            },
+            0, work);
     } catch (Error error) {
         return std::unexpected(error);
     } catch (const LiveStorageLimit &) {

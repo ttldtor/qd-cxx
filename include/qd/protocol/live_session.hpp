@@ -393,7 +393,7 @@ struct LiveFeedResult {
     std::optional<LiveEvent> event;             ///< Present only for a whole successfully admitted frame.
 };
 
-/** Pure read-side bidirectional protocol driver; no sockets, clocks, callbacks or executor.
+/** Pure bidirectional protocol driver; no sockets, clocks, callbacks or executor.
  * All related operations, owner access/copies/destruction and partial-output progress are serialized
  * and non-reentrant. A new instance is a fresh connection epoch; no reconnect/reset reuse is provided.
  */
@@ -482,6 +482,15 @@ class LiveSession {
      */
     [[nodiscard]] std::expected<LivePendingOutput, LiveError>
     subscribe(SubscriptionMessage message, std::span<const core::SubscriptionRequest> requests, LiveWork &work);
+    /** Compose exact outgoing DATA after peer receive readiness and selected authentication completion.
+     * The caller orders matching outgoing descriptions before these bytes on the connection.
+     * @param message One of the three DATA messages.
+     * @param records Borrowed exact occurrences in transmission order.
+     * @param work Mutable caller-turn credits.
+     * @return Whole immutable output or nonterminal rejection without partial publication.
+     */
+    [[nodiscard]] std::expected<LivePendingOutput, LiveError>
+    publishData(LiveDataMessage message, std::span<const LiveDataRecordView> records, LiveWork &work);
     /** Retain the current immutable effective peer generation.
      * @return Owning snapshot, empty for a moved-from session.
      */

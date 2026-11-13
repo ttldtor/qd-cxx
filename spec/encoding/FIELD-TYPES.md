@@ -11,11 +11,12 @@ not a Profile event adapter or evidence of complete private-tape compatibility.
 
 ## Explicit binary field profile
 
-`LocalProfile::BINARY_FIELDS_V1` is an opt-in, ordinary, read-only subset of
+`LocalProfile::BINARY_FIELDS_V1` is an opt-in, ordinary subset of
 the [finite binary catalog](../protocol/BINARY-TAPE-COVERAGE.md). It accepts exactly
 0/1/2/3/4/8/9/10/24/40/56/72/88/104/120/137/152/233/249. Existing local profiles
 retain their exact sets below. No indexed layout, conversion, new tape mode or
 inspector profile is added. The broader catalog remains incomplete.
+These exact field types are also available to the [live DATA writer](../protocol/LIVE-DATA-WRITE.md).
 
 | Wire identity | C++ full identity | Physical read | Canonical `raw` |
 | --- | --- | --- | --- |

@@ -1786,6 +1786,9 @@ if(BUILD_TESTING)
     add_test(NAME core_subscription_state COMMAND qdcxx_subscription_state_tests)
     set_tests_properties(core_subscription_state PROPERTIES TIMEOUT 60)
     add_executable(qdcxx_subscription_writer_tests tests/conformance/subscription_writer_tests.cpp)
+    target_sources(qdcxx_subscription_writer_tests PRIVATE tests/conformance/live_data_writer_tests.cpp)
+    target_compile_definitions(qdcxx_subscription_writer_tests PRIVATE
+        "QDCXX_LIVE_DATA_FLAGS_FIXTURES=\"${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/encoding/field-types/expected/flags\"")
     target_link_libraries(qdcxx_subscription_writer_tests PRIVATE qdcxx_protocol doctest::doctest)
     target_compile_definitions(qdcxx_subscription_writer_tests PRIVATE
         QDCXX_SUBSCRIPTION_CAPTURE_DIR="${CMAKE_CURRENT_BINARY_DIR}/subscription-native-captures")
