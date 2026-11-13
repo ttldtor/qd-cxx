@@ -370,6 +370,10 @@ void RecoveryCore::observeShutdownCause() noexcept {
 void RecoveryCore::observeRetiringBackend(bool afterFence) noexcept {
     const auto failure = backend_.failure();
     const auto observe = [&](RecoveryDiagnostic diagnostic) {
+        // A refused compose against an occupied slot never changes the admitted prefix.
+        if (recoveryOutputBlocked(diagnostic))
+            return;
+
         const auto relevance = classifyRecoveryShutdown(diagnostic, afterFence);
 
         if (relevance == RecoveryShutdownFailure::NONE)
@@ -928,6 +932,8 @@ RecoveryObservation RecoveryCore::execute(RecoveryTicket ticket, RecoveryTurnWor
             connectionFenced_ = false;
             configuration_.firstWriter.reset();
             descriptor_ = false;
+            allContractsReady_ = false;
+            contractDeadline_.reset();
             aggregationInfo_.reset();
             aggregationPending_ = aggregationEnabled_;
             description_ = 0;
@@ -948,6 +954,76 @@ RecoveryObservation RecoveryCore::execute(RecoveryTicket ticket, RecoveryTurnWor
             return failure(started.error(), classified.cause, classified.retryable);
         }
         case RecoveryAction::POLL_ATTEMPT: {
+            if (configuration_.options.requireAllContracts && !allContractsReady_ && !cutoff_ && !connectionFenced_ &&
+                model.currentCause == RecoveryCause::NONE && backend_.facts().connected) {
+                const auto now = RecoveryClock::now();
+
+                if (!contractDeadline_) {
+                    const auto duration = configuration_.endpoint.settings().timeouts.read;
+
+                    if (now > (RecoveryClock::time_point::max)() - duration) {
+                        return failure({RecoveryError::IDENTITY_EXHAUSTED, "recovery-contract-clock-range"},
+                                       RecoveryCause::PROTOCOL);
+                    }
+
+                    contractDeadline_ = now + duration;
+                }
+
+                if (now >= *contractDeadline_) {
+                    return failure({RecoveryError::UNSUPPORTED_PROFILE, "recovery-peer-contracts"},
+                                   RecoveryCause::PROTOCOL);
+                }
+            }
+
+            const auto observePeerContracts = [&] {
+                if (!configuration_.options.requireAllContracts || !event_ ||
+                    event_->kind() != protocol::LiveEventKind::PROTOCOL) {
+                    return true;
+                }
+
+                const auto snapshot = event_->snapshot();
+                const auto peer = snapshot.protocol();
+                constexpr std::array<std::pair<std::int32_t, std::u16string_view>, 3> data{{
+                    {10, u"TICKER_DATA"},
+                    {15, u"STREAM_DATA"},
+                    {20, u"HISTORY_DATA"},
+                }};
+                constexpr std::array<std::pair<std::int32_t, std::u16string_view>, 6> subscriptions{{
+                    {11, u"TICKER_ADD_SUBSCRIPTION"},
+                    {12, u"TICKER_REMOVE_SUBSCRIPTION"},
+                    {16, u"STREAM_ADD_SUBSCRIPTION"},
+                    {17, u"STREAM_REMOVE_SUBSCRIPTION"},
+                    {21, u"HISTORY_ADD_SUBSCRIPTION"},
+                    {22, u"HISTORY_REMOVE_SUBSCRIPTION"},
+                }};
+
+                const auto has = [](const auto &messages, const auto &required) {
+                    return std::ranges::all_of(required, [&](const auto &capability) {
+                        return std::ranges::any_of(messages, [&](const auto &message) {
+                            return message.id == capability.first && message.name == capability.second;
+                        });
+                    });
+                };
+
+                const auto visits = recoverySum(recoveryProduct(peer.send.size(), data.size()),
+                                                recoveryProduct(peer.receive.size(), subscriptions.size()));
+                constexpr std::size_t MAX_NAME_UNITS = std::u16string_view{u"HISTORY_REMOVE_SUBSCRIPTION"}.size();
+                const auto textUnits = recoveryProduct(visits, MAX_NAME_UNITS);
+
+                if (visits > work.session.visits || textUnits > work.session.textUnits) {
+                    return false;
+                }
+
+                work.session.visits -= visits;
+                work.session.textUnits -= textUnits;
+                allContractsReady_ = has(peer.send, data) && has(peer.receive, subscriptions);
+
+                if (allContractsReady_) {
+                    contractDeadline_.reset();
+                }
+
+                return true;
+            };
             const auto observeAggregation = [&] {
                 if (!aggregationEnabled_ || !event_ || event_->kind() != protocol::LiveEventKind::PROTOCOL)
                     return true;
@@ -971,10 +1047,22 @@ RecoveryObservation RecoveryCore::execute(RecoveryTicket ticket, RecoveryTurnWor
             }
 
             if (event_ && event_->kind() != protocol::LiveEventKind::DATA) {
-                if (!observeAggregation())
+                if (!observePeerContracts() || !observeAggregation())
                     return recoveryResult(ticket, RecoveryCompletion::DEFERRED);
 
                 (void)releaseEvent(work.session);
+            }
+
+            if (event_ && event_->kind() == protocol::LiveEventKind::DATA &&
+                configuration_.options.requireAllContracts && !allContractsReady_ && !cutoff_ && !connectionFenced_ &&
+                model.currentCause == RecoveryCause::NONE) {
+                // Do not publish unsolicited data across an incomplete mixed capability barrier.
+                if (!releaseEvent(work.session)) {
+                    return recoveryResult(ticket, RecoveryCompletion::DEFERRED);
+                }
+
+                return failure({RecoveryError::UNSUPPORTED_PROFILE, "recovery-data-before-contracts"},
+                               RecoveryCause::PROTOCOL);
             }
 
             if (event_ && event_->kind() == protocol::LiveEventKind::DATA && !cutoff_ && !connectionFenced_ &&
@@ -1056,7 +1144,7 @@ RecoveryObservation RecoveryCore::execute(RecoveryTicket ticket, RecoveryTurnWor
             }
 
             if (event_ && (event_->kind() != protocol::LiveEventKind::DATA || cutoff_ || connectionFenced_)) {
-                if (!cutoff_ && !connectionFenced_ && !observeAggregation())
+                if (!cutoff_ && !connectionFenced_ && (!observePeerContracts() || !observeAggregation()))
                     return recoveryResult(ticket, RecoveryCompletion::DEFERRED);
 
                 (void)releaseEvent(work.session);
@@ -1579,7 +1667,11 @@ std::optional<RecoveryClock::time_point> RecoveryCore::nextWake() const noexcept
     const auto native = backend_.nextWake();
     auto earliest = drain_.nextWake();
 
-    for (const auto hint : {scheduled, native}) {
+    const auto negotiation = !cutoff_ && !connectionFenced_ && state_.status().currentCause == RecoveryCause::NONE
+                                 ? contractDeadline_
+                                 : std::nullopt;
+
+    for (const auto hint : {scheduled, native, negotiation}) {
         if (hint && (!earliest || *hint < *earliest))
             earliest = hint;
     }

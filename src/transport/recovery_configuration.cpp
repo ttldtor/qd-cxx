@@ -312,6 +312,11 @@ RecoveryConfiguration::prepare(const client::EndpointOptions &endpoint,
 
         auto capacity = *inspected;
         const auto families = inspectQueues(endpoint, queues, options, work, capacity);
+
+        if (options.requireAllContracts && (!queues.ticker || !queues.stream || !queues.history)) {
+            refuse(RecoveryError::INVALID_CONFIGURATION, "recovery-required-contract-queues");
+        }
+
         const auto retry = endpoint.settings().retry;
         const RecoveryConfig scheduler{retry.maximumAttempts, retry.delay, options.heartbeatInterval,
                                        options.protocolInactivity, families};
