@@ -16,6 +16,7 @@
 #include "event_registry_defaults.hpp"
 #include "history_order_input.hpp"
 #include "recovery_test_peer.hpp"
+#include "recovery_test_support.hpp"
 
 #include "qd/encoding/compact.hpp"
 #include "qd/encoding/symbol_reader.hpp"
@@ -5567,6 +5568,201 @@ TEST_CASE("live fromTime observer allocation refusal preserves the accepted prop
     CHECK(port.observers.count == 0);
     CHECK_FALSE(port.observers.latest);
     CHECK(port.statistics->snapshot().desiredRevision == 0);
+}
+
+TEST_CASE("mixed Feed publishes one full-catalog desired revision on one QTP connection") {
+    struct Executor final : api::CallbackExecutor {
+        std::mutex mutex;
+        std::optional<api::CallbackTask> task;
+
+        api::CallbackPostResult post(api::CallbackTask next) override {
+            std::lock_guard lock(mutex);
+
+            if (task)
+                return api::CallbackPostResult::REJECTED;
+
+            task.emplace(std::move(next));
+
+            return api::CallbackPostResult::ACCEPTED;
+        }
+
+        std::optional<api::CallbackTask> take() {
+            std::lock_guard lock(mutex);
+            auto result = std::move(task);
+            task.reset();
+
+            return result;
+        }
+
+        bool ready() {
+            std::lock_guard lock(mutex);
+
+            return task.has_value();
+        }
+    };
+    namespace wire = root::test::recovery;
+    root::test::TcpPeerConfig config;
+    config.lifetime = 20s;
+    auto &session = config.sessions.emplace_back();
+    session.initialBytes = wire::ready();
+    session.readThroughMessage = 21;
+    session.waitForClientClose = true;
+    const auto catalog = api::detail::defaultCombinedReceivingRegistries();
+    REQUIRE(catalog);
+    const auto &catalogSchema = catalog->ticker.schema();
+    std::vector<root::core::LocalRecord> selected;
+
+    for (const auto name : {u"Quote", u"TimeAndSale", u"Order"}) {
+        const auto record = std::ranges::find(catalogSchema.records(), name, &root::core::LocalRecord::name);
+        REQUIRE(record != catalogSchema.records().end());
+        selected.push_back(*record);
+        selected.back().id = static_cast<std::int32_t>(selected.size() - 1);
+    }
+
+    const auto schema = root::core::LocalSchema::create(selected, {3, 256, 512, 256, 16384},
+                                                        root::core::LocalProfile::BINARY_FIELDS_V1);
+    REQUIRE(schema);
+    auto declarations = peer::fixturePeerPrefix(*schema, root::core::SubscriptionFamily::TICKER, true);
+    root::protocol::FrameReader prefix({32768, 32777});
+    const auto first = prefix.feed(declarations);
+    REQUIRE(first.frame);
+    REQUIRE(first.frame->type == 1);
+    wire::append(session.initialBytes, std::span(declarations).subspan(first.accepted));
+    const auto row = [&](std::u16string_view name) {
+        const auto record = std::ranges::find(schema->records(), name, &root::core::LocalRecord::name);
+        REQUIRE(record != schema->records().end());
+        peer::Record value;
+        value.symbol = u"IBM";
+        value.localRecordId = record->id;
+
+        for (const auto &field : record->fields)
+            value.fields.push_back({static_cast<root::core::SerialFieldType>(field.serialTypeId), 0});
+
+        return value;
+    };
+    const auto quote = row(u"Quote");
+    const auto sale = row(u"TimeAndSale");
+    auto order = row(u"Order");
+    order.flags = events::indexed_event_flags::SNAPSHOT_BEGIN | events::indexed_event_flags::SNAPSHOT_END;
+    session.replyBytes = peer::fixturePeerData(std::span(&quote, 1), root::core::SubscriptionFamily::TICKER, true);
+    wire::append(session.replyBytes,
+                 peer::fixturePeerData(std::span(&sale, 1), root::core::SubscriptionFamily::STREAM, true));
+    wire::append(session.replyBytes,
+                 peer::fixturePeerData(std::span(&order, 1), root::core::SubscriptionFamily::HISTORY, true));
+    root::test::OwnedTcpPeer source(std::move(config));
+    REQUIRE(source.port() != 0);
+
+    api::ApiRuntime runtime(runtimeOptions());
+    auto options = endpointOptions(api::DeliveryContract::MIXED);
+    options.readTimeout = 10s;
+    auto endpoint = runtime.createEndpoint(options);
+    auto feed = endpoint->getFeed();
+    auto sub = feed->createCatalogSubscription();
+    const auto executor = std::make_shared<Executor>();
+    sub->setEventExecutor(executor);
+    const auto received = std::make_shared<std::atomic<unsigned>>(0);
+    sub->addEventListener([received](std::span<const api::RegisteredEvent> batch) {
+        for (const auto &event : batch) {
+            if (std::holds_alternative<events::Quote>(event))
+                received->fetch_or(1);
+            else if (std::holds_alternative<events::TimeAndSale>(event))
+                received->fetch_or(2);
+            else if (std::holds_alternative<events::Order>(event))
+                received->fetch_or(4);
+        }
+    });
+    CHECK(sub->getEventTypes().size() == 25);
+    sub->addSymbols("IBM");
+    endpoint->connect("127.0.0.1:" + std::to_string(source.port()));
+
+    constexpr std::array ids{11, 12, 16, 17, 21, 22};
+    const auto wireCounts = [&](std::span<const std::byte> bytes) {
+        root::protocol::FrameReader reader({8192, 8201});
+        std::array<std::size_t, 6> counts{};
+
+        while (!bytes.empty()) {
+            const auto frame = reader.feed(bytes);
+            REQUIRE(frame.status != root::protocol::FrameStatus::FAILED);
+            REQUIRE(frame.accepted > 0);
+            bytes = bytes.subspan(frame.accepted);
+
+            if (frame.frame) {
+                const auto id = std::ranges::find(ids, frame.frame->type);
+
+                if (id != ids.end())
+                    ++counts[static_cast<std::size_t>(id - ids.begin())];
+            }
+        }
+
+        return counts;
+    };
+    const auto published = [&] {
+        const auto stats = sub->getStatistics();
+        const auto captured = source.snapshot();
+        const auto counts = wireCounts(captured.sessions[0].received);
+
+        return stats.activeSelectors == 1 && stats.activeDesiredRevision == stats.desiredRevision && counts[0] > 0 &&
+               counts[2] > 0 && counts[4] > 0;
+    };
+    const auto ready = eventually(published, 6s);
+    const auto endpointFailure = endpoint->getDiagnostic();
+    const auto peerCut = source.snapshot();
+    INFO(endpointFailure.stage);
+    INFO(endpointFailure.detailCode);
+    INFO(static_cast<int>(peerCut.error));
+    INFO(peerCut.sessions[0].received.size());
+    INFO(peerCut.sessions[0].initialBytesWritten);
+    INFO(peerCut.sessions[0].replyBytesWritten);
+    INFO(sub->getStatistics().activeSelectors);
+    INFO(sub->getDiagnostic().stage);
+    INFO(sub->getDiagnostic().detailCode);
+    INFO(received->load());
+    REQUIRE(ready);
+    CHECK(endpoint->getStatistics().connection.activeConnections == 1);
+    REQUIRE(eventually([&] {
+        return executor->ready();
+    }));
+    REQUIRE(eventually([&] {
+        const auto stats = sub->getStatistics();
+
+        return stats.pendingEvents >= 1 || sub->getDiagnostic().code != api::ErrorCode::NONE;
+    }));
+    CHECK(sub->getDiagnostic().code == api::ErrorCode::NONE);
+    CHECK(received->load() == 0);
+    REQUIRE(eventually([&] {
+        if (auto task = executor->take())
+            CHECK(task->run() == api::CallbackTaskRunResult::COMPLETED);
+
+        return received->load() == 7;
+    }));
+    sub->clearSymbols();
+    REQUIRE(eventually([&] {
+        const auto stats = sub->getStatistics();
+        const auto captured = source.snapshot();
+        const auto counts = wireCounts(captured.sessions[0].received);
+
+        return stats.activeSelectors == 0 && stats.activeDesiredRevision == stats.desiredRevision && counts[1] > 0 &&
+               counts[3] > 0 && counts[5] > 0;
+    }));
+    REQUIRE(eventually([&] {
+        if (auto task = executor->take())
+            CHECK(task->run() == api::CallbackTaskRunResult::COMPLETED);
+        const auto stats = sub->getStatistics();
+        return stats.pendingEvents == 0 && stats.inFlightEvents == 0;
+    }));
+    const auto closed = endpoint->closeAndAwaitTermination();
+    CAPTURE(closed.diagnostic.stage);
+    CAPTURE(closed.hadGap);
+    CHECK(closed.drained);
+    CHECK_FALSE(closed.deadlineExpired);
+    REQUIRE(eventually([&] {
+        return source.snapshot().sessions[0].completed;
+    }));
+    const auto captured = source.snapshot();
+    REQUIRE(captured.error == root::test::TcpPeerError::NONE);
+
+    for (const auto count : wireCounts(captured.sessions[0].received))
+        CHECK(count > 0);
 }
 
 TEST_CASE("indexed HISTORY snapshots keep same-symbol sources and private demand separate") {
