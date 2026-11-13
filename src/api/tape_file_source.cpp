@@ -81,8 +81,7 @@ protocol::TapeLimits readerLimits(protocol::LiveLimits limits, TapeSourceOptions
             checkedProduct(limits.snapshotBytes, options.maximumFrames),
             data,
             options.maximumFrames,
-            checkedProduct(limits.snapshotBytes, SNAPSHOT_UNIT_FACTOR),
-            limits.data};
+            checkedProduct(limits.snapshotBytes, SNAPSHOT_UNIT_FACTOR)};
 }
 
 Diagnostic bridgeFailure(protocol::LiveError error) noexcept {
@@ -117,8 +116,9 @@ protocol::detail::TapeEventBridge makeBridge(protocol::LiveLimits limits, protoc
 TapeFileSource::TapeFileSource(const std::filesystem::path &path, TapeSourceOptions options,
                                const core::LocalSchema &schema, protocol::LiveLimits limits,
                                core::SubscriptionFamily family, protocol::LiveWork &work)
-    : file_(openFile(path, options.maximumFileBytes)), reader_(protocol::detail::TapeEventBridge::makeFixedSchemaReader(
-                                                           schema, readerLimits(limits, options), limits.fieldTime)),
+    : file_(openFile(path, options.maximumFileBytes)),
+      reader_(protocol::detail::TapeEventBridge::makeFixedSchemaReader(schema, readerLimits(limits, options),
+                                                                       limits.data, limits.fieldTime)),
       bridge_(makeBridge(limits, work)), clock_(options), maximumBytes_(options.maximumFileBytes),
       familyMessage_(family == core::SubscriptionFamily::TICKER    ? TICKER_DATA
                      : family == core::SubscriptionFamily::HISTORY ? HISTORY_DATA

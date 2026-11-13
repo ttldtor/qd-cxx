@@ -563,7 +563,7 @@ template <class Event> void verifyRemovePending(const std::filesystem::path &dir
 
     while (std::chrono::steady_clock::now() < retirementDeadline &&
            !(retired.state == a::HistoryObservationState::NOT_MAPPED && retired.ranges.empty() &&
-             retired.logicalRevision == removedRevision &&
+             retired.logicalRevision == removedRevision && retired.mappingLogicalRevision == removedRevision &&
              retired.callbackRetirementRevision > complete.callbackRetirementRevision)) {
         std::this_thread::sleep_for(1ms);
         retired = subscription->getHistorySnapshot();
@@ -571,13 +571,16 @@ template <class Event> void verifyRemovePending(const std::filesystem::path &dir
 
     CHECK(retired.state == a::HistoryObservationState::NOT_MAPPED);
     CHECK(retired.ranges.empty());
+    CHECK(retired.mappingLogicalRevision == removedRevision);
     CHECK(retired.logicalRevision == removedRevision);
     CHECK(retired.callbackRetirementRevision > complete.callbackRetirementRevision);
     {
         const std::lock_guard lock(gate->mutex);
         CHECK_FALSE(gate->timedOut);
     }
-    CHECK(endpoint->closeAndAwaitTermination().drained);
+    const auto closed = endpoint->closeAndAwaitTermination();
+    INFO("deadline=", closed.deadlineExpired, ", gap=", closed.hadGap, ", stage=", closed.diagnostic.stage);
+    CHECK(closed.drained);
     CHECK(peer.snapshot().error == q::test::TcpPeerError::NONE);
 }
 } // namespace
