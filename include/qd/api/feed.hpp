@@ -188,6 +188,25 @@ struct EndpointOptions {
     std::chrono::milliseconds aggregationPeriod{0};       ///< Local delivery cadence; zero selects immediate delivery.
 };
 
+/** Most recent owning observation of one fixed OnDemand source. */
+struct OnDemandPlayback {
+    double speed = 0; ///< Applied relative rate. Zero pauses or identifies retired replay.
+    std::chrono::sys_time<std::chrono::milliseconds> time{}; ///< Historical cursor, retained after retirement.
+    bool active = false;                                     ///< False after the replay cutoff, including finite EOF.
+    bool covered = false;                                    ///< True once this source has confirmed coverage.
+
+    friend bool operator==(const OnDemandPlayback &, const OnDemandPlayback &) = default;
+};
+
+/** One coherent advisory old/new replay observation. Inspect speed before time if both changed. */
+struct OnDemandPlaybackChange {
+    OnDemandPlayback previous;
+    OnDemandPlayback current;
+};
+
+/** Maximum supported OnDemand playback rate relative to real time. */
+inline constexpr double MAXIMUM_ON_DEMAND_SPEED = 100.0;
+
 /** Last SDK-worker observation, never an upstream acknowledgement or a whole-network guarantee. */
 enum class EndpointState {
     NOT_CONNECTED, ///< Created without an accepted connection request.
@@ -1219,6 +1238,8 @@ class Endpoint final {
     explicit Endpoint(std::shared_ptr<detail::EndpointPort> port);
 
     public:
+    using OnDemandPlaybackListener = std::function<void(const OnDemandPlaybackChange &)>;
+    using OnDemandPlaybackListenerId = std::uint64_t;
     using StateChangeListener = std::function<void(EndpointState, EndpointState)>; ///< Advisory old/new observation.
     using StateChangeListenerId = std::uint64_t; ///< Non-reused state-observer identity within this endpoint.
     /** Add an advisory state observer without an initial notification or inline invocation.
@@ -1279,6 +1300,36 @@ class Endpoint final {
      */
     void connectOnDemand(std::uint16_t loopbackPort, std::u16string_view symbol,
                          std::chrono::sys_time<std::chrono::milliseconds> from);
+
+    /** Start one local OnDemand replay with an explicit initial playback speed.
+     * @param loopbackPort Explicit nonzero IPv4 loopback port.
+     * @param symbol Exact composite ASCII Quote symbol, copied at admission.
+     * @param from Absolute UTC millisecond position.
+     * @param speed Finite rate from zero through MAXIMUM_ON_DEMAND_SPEED. Zero catches up at the cut and pauses.
+     * @throws Error Invalid input, closed admission or unsupported source profile.
+     */
+    void connectOnDemand(std::uint16_t loopbackPort, std::u16string_view symbol,
+                         std::chrono::sys_time<std::chrono::milliseconds> from, double speed);
+    /** Publish the latest desired replay rate. Applies on the worker without opening a new source.
+     * @param speed Finite rate from zero through MAXIMUM_ON_DEMAND_SPEED. Zero pauses and retains data.
+     * @throws Error Invalid rate, no accepted OnDemand source, or closed admission.
+     */
+    void setOnDemandSpeed(double speed);
+    /** Pause at the current historical cursor without clearing admitted data. */
+    void pauseOnDemand();
+    /** Return an owning snapshot, or no value before an OnDemand request is accepted. */
+    [[nodiscard]] std::optional<OnDemandPlayback> getOnDemandPlayback() const noexcept;
+    /** Add a bounded serial advisory listener on the SDK worker, including before connect.
+     * @param listener Owning nonempty callable. Called without control locks. The change is borrowed during the call.
+     * @return Identity for removal. Throws Error for invalid, exhausted or closed admission.
+     */
+    OnDemandPlaybackListenerId addOnDemandPlaybackListener(OnDemandPlaybackListener listener);
+    /** Remove an advisory listener; an already selected call may complete.
+     * @param id Identity returned by addOnDemandPlaybackListener.
+     */
+    void removeOnDemandPlaybackListener(OnDemandPlaybackListenerId id);
+    /** Return detached advisory failure without changing the replay or other listeners. */
+    [[nodiscard]] Diagnostic getOnDemandPlaybackDiagnostic() const noexcept;
 
     /** Start one asynchronous read of a regular local binary tape.
      * Configure desired subscriptions before calling. The worker opens and retires the file,

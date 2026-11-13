@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <charconv>
 #include <climits>
+#include <cmath>
 #include <exception>
 #include <limits>
 #include <new>
@@ -175,6 +176,52 @@ void notifyState(const std::shared_ptr<Port> &port, const std::shared_ptr<const 
                 port->stateListeners.diagnostic = {ErrorCode::CALLBACK_FAILURE, "state-change-listener"};
             }
         }
+    }
+}
+
+/** Publish one coherent replay observation and retain selected captures through the call. */
+void publishOnDemandPlayback(const std::shared_ptr<detail::EndpointPort> &port, OnDemandPlayback current) noexcept {
+    OnDemandPlaybackChange change;
+    std::shared_ptr<const detail::ListenerSnapshot> listeners;
+    {
+        std::lock_guard lock(port->mutex);
+
+        if (!port->onDemandPlayback || *port->onDemandPlayback == current)
+            return;
+
+        change = {*port->onDemandPlayback, current};
+        port->onDemandPlayback = current;
+        listeners = port->onDemandListeners.snapshot;
+    }
+
+    if (!listeners)
+        return;
+
+    for (const auto &entry : *listeners) {
+        try {
+            std::get<Endpoint::OnDemandPlaybackListener>(entry.callback->function)(change);
+        } catch (...) {
+            std::lock_guard lock(port->mutex);
+            auto &diagnostic = port->onDemandListeners.diagnostic;
+
+            if (diagnostic.code == ErrorCode::NONE)
+                diagnostic = {ErrorCode::CALLBACK_FAILURE, "ondemand-playback-listener"};
+        }
+    }
+}
+
+/** Publish the terminal rate and last applied cursor once. */
+void finishOnDemandPlayback(const std::shared_ptr<detail::EndpointPort> &port) noexcept {
+    std::optional<OnDemandPlayback> terminal;
+    {
+        std::lock_guard lock(port->mutex);
+        terminal = port->onDemandPlayback;
+    }
+
+    if (terminal) {
+        terminal->active = false;
+        terminal->speed = 0;
+        publishOnDemandPlayback(port, *terminal);
     }
 }
 
@@ -787,6 +834,7 @@ bool retireEndpoint(const std::shared_ptr<detail::EndpointPort> &port, CloseResu
     retireLatestRead(*port);
     retireLatestRequest(*port, latestSourceFailure);
     retireHistorySnapshots(*port, latestSourceFailure);
+    finishOnDemandPlayback(port);
     notifyConnecting(port);
     observeState(port, EndpointState::CLOSING);
 
@@ -830,16 +878,19 @@ bool retireEndpoint(const std::shared_ptr<detail::EndpointPort> &port, CloseResu
     observeState(port,
                  port->terminal.diagnostic.code == ErrorCode::NONE ? EndpointState::CLOSED : EndpointState::FAILED);
     std::shared_ptr<const detail::ListenerSnapshot> listeners;
+    std::shared_ptr<const detail::ListenerSnapshot> replayListeners;
     {
         std::lock_guard lock(port->mutex);
         listeners = std::move(port->stateListeners.snapshot);
+        replayListeners = std::move(port->onDemandListeners.snapshot);
     }
 
     listeners.reset();
+    replayListeners.reset();
 
-    if (port->stateListeners.ledger->count.load(std::memory_order_acquire) != 0) {
+    if (port->stateListeners.ledger->count.load(std::memory_order_acquire) != 0 ||
+        (port->onDemandListeners.ledger && port->onDemandListeners.ledger->count.load(std::memory_order_acquire) != 0))
         return false;
-    }
 
     {
         // Publish under the wait predicate's mutex so notification cannot fall between its check and wait.
@@ -862,6 +913,10 @@ bool capturesRetired(const detail::EndpointPort &port) noexcept {
     if (!port.stateListeners.snapshot && port.stateListeners.ledger->count.load(std::memory_order_acquire) != 0) {
         return false;
     }
+
+    if (!port.onDemandListeners.snapshot && port.onDemandListeners.ledger &&
+        port.onDemandListeners.ledger->count.load(std::memory_order_acquire) != 0)
+        return false;
 
     return std::ranges::all_of(port.subscriptions, [](const auto &subscription) {
         if (!subscription) {
@@ -986,13 +1041,14 @@ template <class Port> void requireStateOpen(const Port &port) {
  * @return Non-reused identity; throws Error for invalid input, closed admission or exhausted capacity.
  */
 template <class Port, class Function>
-std::uint64_t addStateListener(const std::shared_ptr<Port> &port, Function listener) {
+std::uint64_t addStateListener(const std::shared_ptr<Port> &port, Function listener,
+                               detail::StateListeners Port::*member = &Port::stateListeners) {
     return producerAction([&]() -> std::uint64_t {
         if (!listener) {
             reject(ErrorCode::INVALID_ARGUMENT, "state-change-listener");
         }
 
-        const auto ledger = port->stateListeners.ledger;
+        const auto ledger = (port.get()->*member).ledger;
         {
             std::lock_guard lock(port->mutex);
             requireStateOpen(*port);
@@ -1019,7 +1075,7 @@ std::uint64_t addStateListener(const std::shared_ptr<Port> &port, Function liste
         {
             std::lock_guard lock(port->mutex);
             requireStateOpen(*port);
-            auto &state = port->stateListeners;
+            auto &state = port.get()->*member;
 
             if (state.nextListener == std::numeric_limits<std::uint64_t>::max()) {
                 reject(ErrorCode::RESOURCE_LIMIT, "state-change-listener-identity");
@@ -1044,12 +1100,14 @@ std::uint64_t addStateListener(const std::shared_ptr<Port> &port, Function liste
  * @param port Owner of the accepted snapshot, possibly already closed.
  * @param id Non-reused state-observer identity; absence is an idempotent no-op.
  */
-template <class Port> void removeStateListener(const std::shared_ptr<Port> &port, std::uint64_t id) {
+template <class Port>
+void removeStateListener(const std::shared_ptr<Port> &port, std::uint64_t id,
+                         detail::StateListeners Port::*member = &Port::stateListeners) {
     producerAction([&] {
         std::shared_ptr<const detail::ListenerSnapshot> previous;
         {
             std::lock_guard lock(port->mutex);
-            auto &snapshot = port->stateListeners.snapshot;
+            auto &snapshot = (port.get()->*member).snapshot;
 
             if (!snapshot) {
                 return;
@@ -2163,6 +2221,37 @@ Diagnostic Endpoint::getStateChangeDiagnostic() const noexcept {
     return port_->stateListeners.diagnostic;
 }
 
+Endpoint::OnDemandPlaybackListenerId Endpoint::addOnDemandPlaybackListener(OnDemandPlaybackListener listener) {
+    producerAction([&] {
+        if (!listener)
+            reject(ErrorCode::INVALID_ARGUMENT, "ondemand-playback-listener");
+
+        std::lock_guard lock(port_->mutex);
+        requireStateOpen(*port_);
+
+        if (!port_->onDemandListeners.ledger)
+            port_->onDemandListeners = makeStateListeners(port_, port_->limits.maximumStateListenersPerEndpoint);
+    });
+
+    return addStateListener(port_, std::move(listener), &detail::EndpointPort::onDemandListeners);
+}
+
+void Endpoint::removeOnDemandPlaybackListener(OnDemandPlaybackListenerId id) {
+    removeStateListener(port_, id, &detail::EndpointPort::onDemandListeners);
+}
+
+std::optional<OnDemandPlayback> Endpoint::getOnDemandPlayback() const noexcept {
+    std::lock_guard lock(port_->mutex);
+
+    return port_->onDemandPlayback;
+}
+
+Diagnostic Endpoint::getOnDemandPlaybackDiagnostic() const noexcept {
+    std::lock_guard lock(port_->mutex);
+
+    return port_->onDemandListeners.diagnostic;
+}
+
 Endpoint::~Endpoint() {
     close();
 }
@@ -2280,6 +2369,43 @@ void Endpoint::connect(std::string_view address) {
 
 void Endpoint::connectOnDemand(std::uint16_t loopbackPort, std::u16string_view symbol,
                                std::chrono::sys_time<std::chrono::milliseconds> from) {
+    connectOnDemand(loopbackPort, symbol, from, 1);
+}
+
+namespace {
+double checkedOnDemandSpeed(double speed) {
+    if (!std::isfinite(speed) || speed < 0 || speed > MAXIMUM_ON_DEMAND_SPEED)
+        reject(ErrorCode::INVALID_ARGUMENT, "ondemand-speed");
+
+    return speed == 0 ? 0.0 : speed;
+}
+} // namespace
+
+void Endpoint::setOnDemandSpeed(double speed) {
+    speed = checkedOnDemandSpeed(speed);
+    {
+        std::lock_guard lock(port_->mutex);
+        requireStateOpen(*port_);
+
+        if (!port_->onDemand)
+            reject(ErrorCode::INVALID_STATE, "ondemand-replay-inactive");
+
+        if (port_->onDemandSpeed == speed)
+            return;
+
+        port_->onDemandSpeed = speed;
+    }
+
+    wake(port_->control);
+}
+
+void Endpoint::pauseOnDemand() {
+    setOnDemandSpeed(0);
+}
+
+void Endpoint::connectOnDemand(std::uint16_t loopbackPort, std::u16string_view symbol,
+                               std::chrono::sys_time<std::chrono::milliseconds> from, double speed) {
+    speed = checkedOnDemandSpeed(speed);
     producerAction([&] {
         if (symbol.size() > std::min(port_->limits.maximumSymbolUnits, detail::ON_DEMAND_MAXIMUM_SYMBOL))
             reject(ErrorCode::INVALID_ARGUMENT, "ondemand-request");
@@ -2330,6 +2456,8 @@ void Endpoint::connectOnDemand(std::uint16_t loopbackPort, std::u16string_view s
 
             control->runtime->startWorker();
             port_->onDemand.emplace(std::move(request));
+            port_->onDemandSpeed = speed;
+            port_->onDemandPlayback = OnDemandPlayback{0, from, true, false};
             port_->connectRequested = true;
             port_->connectionIntent = true;
             ++port_->connectionRevision;
@@ -3156,6 +3284,7 @@ struct NativeOnDemand {
     bool inputEnded = false;
     bool deadlineExpired = false;
     bool epochPublished = false;
+    std::chrono::steady_clock::time_point nextPlaybackObservation{};
 
     NativeOnDemand(const OnDemandRequest &request, const ReceivingProfile &profile, const EndpointOptions &options,
                    const transport::detail::BootstrapLease &bootstrap, mux::MuxQueue value, protocol::LiveWork &work)
@@ -4906,6 +5035,9 @@ EndpointProgress progressOnDemand(NativeEndpoint &endpoint, transport::RecoveryT
         replay.source.close(work.runtime, work.session);
 
         if (!endpoint.draining) {
+            auto terminal = replay.source.playback(0, now);
+            terminal.active = false;
+            publishOnDemandPlayback(endpoint.port, terminal);
             replay.pending.reset();
             replay.queue.requestStop(mux::StopMode::GRACEFUL);
             endpoint.draining = true;
@@ -4925,6 +5057,24 @@ EndpointProgress progressOnDemand(NativeEndpoint &endpoint, transport::RecoveryT
             failEndpoint(endpoint.port, network.error());
 
             return EndpointProgress::PENDING;
+        }
+    }
+
+    double desired = 0;
+
+    if (!endpoint.draining && !endpoint.port->closeRequested.load(std::memory_order_acquire)) {
+        double observed;
+        {
+            std::lock_guard lock(endpoint.port->mutex);
+            desired = endpoint.port->onDemandSpeed;
+            observed = endpoint.port->onDemandPlayback->speed;
+        }
+        const auto playback = replay.source.playback(desired, now);
+        constexpr auto OBSERVATION_CADENCE = std::chrono::milliseconds{20};
+
+        if (observed != playback.speed || now >= replay.nextPlaybackObservation) {
+            publishOnDemandPlayback(endpoint.port, playback);
+            replay.nextPlaybackObservation = now + OBSERVATION_CADENCE;
         }
     }
 
@@ -4995,7 +5145,11 @@ EndpointProgress progressOnDemand(NativeEndpoint &endpoint, transport::RecoveryT
         publishLocalEpoch(endpoint, revision);
         replay.epochPublished = true;
         replay.source.beginPlayback(now);
+        publishOnDemandPlayback(endpoint.port, replay.source.playback(desired, now));
     }
+
+    if (endpoint.port->closeRequested.load(std::memory_order_acquire))
+        return EndpointProgress::PENDING;
 
     observeState(endpoint.port, EndpointState::CONNECTED, revision);
 
@@ -5018,7 +5172,7 @@ EndpointProgress progressOnDemand(NativeEndpoint &endpoint, transport::RecoveryT
             return EndpointProgress::PENDING;
         }
 
-        auto next = replay.source.next(work.session, now);
+        auto next = replay.source.next(work.session);
 
         if (!next) {
             if (!firstPoll && next.error().code == ErrorCode::WORK_LIMIT)

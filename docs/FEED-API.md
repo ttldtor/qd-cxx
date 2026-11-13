@@ -466,9 +466,8 @@ const auto closed = endpoint->closeAndAwaitTermination();
 `closed` reports actual retirement and includes any source failure diagnostic. The source only
 becomes `CONNECTED` after a complete validated response covering the requested
 point. The initial catch-up through that point uses ordinary TICKER
-conflation. Later records are paced at 1× from a monotonic anchor established when
-delivery is ready and preserve
-their recorded event times. After the finite response, the endpoint drains
+conflation. Later records are paced at 1× by default from a monotonic clock that
+starts when delivery is ready. Every Quote keeps its recorded event time. After the finite response, the endpoint drains
 admitted work and closes. Close during an outstanding request retires the
 owned socket and fences subsequent delivery.
 
@@ -486,8 +485,28 @@ redirects and content/transfer coding, compressed blocks, unsupported
 mapping or symbols, malformed or oversized frames and uncovered time.
 HTTP 401 produces the static diagnostic `ondemand-access-refused`. This
 profile qualifies a synthetic local replay service. A deployed provider,
-entitlements, encrypted HTTP, further windows, speed changes, seek,
+entitlements, encrypted HTTP, further windows, seek,
 and transition to a live source have separate qualification.
+
+For speed control, pass the initial rate as the fourth argument to
+`connectOnDemand` or call `setOnDemandSpeed(rate)` on the open replay
+endpoint. Rates are finite from 0 to 100×, including fractional values.
+`pauseOnDemand()` requests zero speed. At zero, records through the
+current cursor can still catch up and the endpoint keeps its historical
+cache. Subsequent records wait for a positive rate. HTTP progress and
+close still run while paused. The worker settles the previous rate
+before applying the latest desired rate and keeps the same source epoch.
+
+`getOnDemandPlayback()` returns the latest applied rate and historical
+cursor, with flags for active replay and confirmed coverage. The rate may
+be applied while the response is pending, with time held at the requested
+cut. At terminal close the last cursor remains available with rate zero.
+A listener registered with `addOnDemandPlaybackListener` sees changed
+old/new snapshots serially on the SDK worker, independently of the event
+executor. Within one snapshot, inspect speed before time. Repeated equal
+observations are silent. Listeners may request pause or close and remove
+themselves. Use nonblocking `close()` from the listener. An exception is
+advisory through `getOnDemandPlaybackDiagnostic()`.
 
 ## Local tape source
 
