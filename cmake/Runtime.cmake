@@ -66,7 +66,8 @@ set(CARES_THREADS OFF CACHE BOOL "" FORCE)
 add_subdirectory("${ORG_TTLDTOR_QDCXX_CARES_SOURCE}" qdcxx-runtime-cares EXCLUDE_FROM_ALL)
 
 add_library(qdcxx_transport src/transport/runtime_bootstrap.cpp src/transport/dns_resolver.cpp
-    src/transport/runtime_core.cpp src/transport/tcp_runtime.cpp src/transport/raw_byte_owner.cpp)
+    src/transport/runtime_core.cpp src/transport/tcp_runtime.cpp src/transport/raw_byte_owner.cpp
+    src/transport/tcp_listener.cpp)
 target_compile_definitions(qdcxx_transport PRIVATE ASIO_STANDALONE ASIO_NO_DEPRECATED)
 target_include_directories(qdcxx_transport SYSTEM PRIVATE "${ORG_TTLDTOR_QDCXX_ASIO_INCLUDE}")
 target_link_libraries(qdcxx_transport PUBLIC qdcxx_protocol PRIVATE Threads::Threads
