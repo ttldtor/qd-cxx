@@ -290,7 +290,7 @@ struct HistorySnapshotOptions {
 template <class Event> struct HistorySnapshot {
     HistorySnapshotState state = HistorySnapshotState::INCOMPLETE; ///< Qualification at selection.
     std::optional<std::uint64_t> sourceEpoch; ///< Actual eligible source epoch for returned values.
-    std::vector<Event> events;                ///< Owning values in ascending signed index order.
+    std::vector<Event> events;                ///< Owning values ordered as documented by the query API.
 };
 
 namespace detail {
@@ -826,12 +826,14 @@ class Feed final {
         return result;
     }
 
-    [[nodiscard]] HistorySnapshot<RegisteredEvent> readIndexedSnapshot(EventType type, std::u16string_view symbol,
-                                                                       std::int32_t sourceId,
-                                                                       HistorySnapshotOptions options) const;
+    [[nodiscard]] HistorySnapshot<RegisteredEvent>
+    readIndexedSnapshot(EventType type, std::u16string_view symbol, std::int32_t sourceId,
+                        HistorySnapshotOptions options,
+                        std::optional<std::pair<std::int64_t, std::int64_t>> range = std::nullopt) const;
     [[nodiscard]] std::shared_ptr<detail::HistorySnapshotOperation>
     startIndexedSnapshot(EventType type, std::u16string_view symbol, std::int32_t sourceId,
-                         std::chrono::steady_clock::time_point deadline, HistorySnapshotOptions options) const;
+                         std::chrono::steady_clock::time_point deadline, HistorySnapshotOptions options,
+                         std::optional<std::pair<std::int64_t, std::int64_t>> range = std::nullopt) const;
 
     /** @tparam Event Supported owning native business type. @return Its immutable registration identity. */
     template <class Event> static constexpr EventType eventTypeFor() {
@@ -1104,6 +1106,41 @@ class Feed final {
                          std::chrono::steady_clock::time_point deadline, HistorySnapshotOptions options = {}) const {
         return HistorySnapshotRequest<Event>(
             startIndexedSnapshot(eventTypeFor<Event>(), symbol, source.id(), deadline, options));
+    }
+
+    /** Read a covered inclusive business-time range for existing application interest.
+     * @tparam Event Registered time-series event type.
+     * @param symbol Exact logical UTF-16 symbol.
+     * @param fromTime Inclusive lower time in Unix milliseconds.
+     * @param toTime Inclusive upper time in Unix milliseconds, including every sequence.
+     * @param options Finite selected-result limit.
+     * @return Owning chronological values or an explicit incomplete/no-interest state.
+     * @throws Error For inverted bounds, unsupported type, or bounded-work refusal.
+     */
+    template <class Event>
+    [[nodiscard]] HistorySnapshot<Event> getTimeSeriesIfSubscribed(std::u16string_view symbol, std::int64_t fromTime,
+                                                                   std::int64_t toTime,
+                                                                   HistorySnapshotOptions options = {}) const {
+        return detail::typedHistorySnapshot<Event>(
+            readIndexedSnapshot(eventTypeFor<Event>(), symbol, 0, options, std::pair{fromTime, toTime}));
+    }
+
+    /** Request an inclusive time-series range with independent temporary interest when needed.
+     * @tparam Event Registered time-series event type.
+     * @param symbol Exact logical UTF-16 symbol.
+     * @param fromTime Inclusive lower Unix millisecond.
+     * @param toTime Inclusive upper Unix millisecond.
+     * @param deadline Absolute steady-clock deadline.
+     * @param options Finite selected-result limit.
+     * @return Owning asynchronous request; result ordering is chronological.
+     * @throws Error For invalid bounds, unsupported type, closed admission, or resource limits.
+     */
+    template <class Event>
+    [[nodiscard]] HistorySnapshotRequest<Event>
+    requestTimeSeries(std::u16string_view symbol, std::int64_t fromTime, std::int64_t toTime,
+                      std::chrono::steady_clock::time_point deadline, HistorySnapshotOptions options = {}) const {
+        return HistorySnapshotRequest<Event>(
+            startIndexedSnapshot(eventTypeFor<Event>(), symbol, 0, deadline, options, std::pair{fromTime, toTime}));
     }
 
     /** Create a bounded logical registration, before or after connect, without application polling.

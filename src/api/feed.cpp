@@ -3555,7 +3555,7 @@ void validateIndexedSnapshot(const EndpointPort &port, EventType type, std::u16s
 
 /** A passive read sees application demand only. The native mapping is checked independently. */
 bool hasIndexedSnapshotDemand(const SubscriptionPort &port, EventType type, std::u16string_view symbol,
-                              std::int32_t sourceId, bool passive) {
+                              std::int32_t sourceId, bool passive, bool timeSeries = false) {
     if ((passive && port.snapshotDemand) || !selectsEvent(port.eventSelection, type) ||
         port.closeRequested.load(std::memory_order_acquire) || port.retired.load(std::memory_order_acquire) ||
         port.state == SubscriptionState::FAILED)
@@ -3571,7 +3571,8 @@ bool hasIndexedSnapshotDemand(const SubscriptionPort &port, EventType type, std:
         case SubscriptionSymbolKind::INDEXED:
             return selector.sourceId() == sourceId || selector.sourceId().value_or(0) < 0;
         case SubscriptionSymbolKind::TIME_SERIES:
-            return sourceId == 0 && selector.qdTime().value_or(INDEXED_SNAPSHOT_TO) <= INDEXED_SNAPSHOT_FROM;
+            return sourceId == 0 &&
+                   (timeSeries || selector.qdTime().value_or(INDEXED_SNAPSHOT_TO) <= INDEXED_SNAPSHOT_FROM);
         case SubscriptionSymbolKind::ALL:
             return false;
         }
@@ -3581,14 +3582,14 @@ bool hasIndexedSnapshotDemand(const SubscriptionPort &port, EventType type, std:
 }
 
 bool hasIndexedSnapshotDemand(const EndpointPort &port, EventType type, std::u16string_view symbol,
-                              std::int32_t sourceId) {
+                              std::int32_t sourceId, bool timeSeries = false) {
     return std::ranges::any_of(port.subscriptions, [&](const auto &registration) {
         if (!registration)
             return false;
 
         std::lock_guard lock(registration->mutex);
 
-        return hasIndexedSnapshotDemand(*registration, type, symbol, sourceId, true);
+        return hasIndexedSnapshotDemand(*registration, type, symbol, sourceId, true, timeSeries);
     });
 }
 
@@ -3628,10 +3629,11 @@ CapturedHistorySnapshot captureIndexedSnapshot(NativeEndpoint &endpoint, const H
         reject(ErrorCode::UNSUPPORTED_PROFILE, "indexed-snapshot-event-route");
 
     const auto context = endpoint.profile.schema.recordContext(endpoint.profile.bindings[*binding].localId);
-    const collectors::HistoryRetainedQuery query{{context, receivingPhysicalSymbol(endpoint.profile, *binding, key)},
-                                                 INDEXED_SNAPSHOT_FROM,
-                                                 INDEXED_SNAPSHOT_TO,
-                                                 operation.options.maximumResults};
+    const collectors::HistoryRetainedQuery query{
+        {context, receivingPhysicalSymbol(endpoint.profile, *binding, key)},
+        operation.timeSeriesRange ? operation.timeSeriesRange->fromIndex : INDEXED_SNAPSHOT_FROM,
+        operation.timeSeriesRange ? operation.timeSeriesRange->toIndex : INDEXED_SNAPSHOT_TO,
+        operation.timeSeriesRange ? endpoint.port->options.history.maximumPoints : operation.options.maximumResults};
     auto work = endpoint.profile.historyObservationWork;
 
     for (const auto &registration : endpoint.subscriptions) {
@@ -3643,7 +3645,7 @@ CapturedHistorySnapshot captureIndexedSnapshot(NativeEndpoint &endpoint, const H
             std::lock_guard lock(registration->port->mutex);
 
             if (!hasIndexedSnapshotDemand(*registration->port, operation.type, operation.symbol, operation.sourceId,
-                                          operation.passive) ||
+                                          operation.passive, operation.timeSeriesRange.has_value()) ||
                 registration->submittedRevision != registration->port->revision)
                 continue;
 
@@ -3675,9 +3677,26 @@ CapturedHistorySnapshot captureIndexedSnapshot(NativeEndpoint &endpoint, const H
                                     : HistorySnapshotState::TRUNCATED;
         captured.result.sourceEpoch = sourceEpoch;
         auto projectionWork = plan.projectionWork;
-        captured.result.events.reserve(retained->rows.size());
+        std::size_t selected = 0;
 
         for (const auto &row : retained->rows) {
+            if (!operation.timeSeriesRange || operation.timeSeriesRange->contains(row.rawTime))
+                ++selected;
+        }
+
+        if (selected > operation.options.maximumResults)
+            reject(ErrorCode::RESOURCE_LIMIT, "time-series-result-limit");
+
+        captured.result.events.reserve(selected);
+        std::size_t projected = 0;
+
+        for (const auto &row : retained->rows) {
+            if (operation.timeSeriesRange && !operation.timeSeriesRange->contains(row.rawTime))
+                continue;
+
+            if (operation.timeSeriesRange && projected++ % CallbackSlotPool::PHYSICAL_RECORDS == 0)
+                projectionWork = plan.projectionWork;
+
             auto value = client::detail::projectHistoryRetained(*registration->observationPlan, row, projectionWork);
 
             if (!value) {
@@ -3714,7 +3733,30 @@ CapturedHistorySnapshot captureIndexedSnapshot(NativeEndpoint &endpoint, const H
                 },
                 event);
         };
-        std::ranges::sort(captured.result.events, {}, signedIndex);
+
+        if (operation.timeSeriesRange) {
+            const auto count = captured.result.events.size();
+
+            if (count && count > std::numeric_limits<std::size_t>::max() / count)
+                reject(ErrorCode::WORK_LIMIT, "time-series-sort-budget");
+
+            TimeSeriesQueryWork sortWork{count, count * count};
+            auto ordered = selectTimeSeriesSnapshot(
+                std::move(captured.result.events), *operation.timeSeriesRange, operation.options.maximumResults,
+                sortWork, signedIndex,
+                [&](const RegisteredEvent &event) {
+                    return events::getTimeFromTimeSequence(signedIndex(event));
+                },
+                [](RegisteredEvent &) {
+                });
+
+            if (!ordered)
+                reject(ErrorCode::WORK_LIMIT, "time-series-sort-budget");
+
+            captured.result.events = std::move(*ordered);
+        } else {
+            std::ranges::sort(captured.result.events, {}, signedIndex);
+        }
 
         return captured;
     }
@@ -3808,14 +3850,16 @@ std::chrono::steady_clock::time_point serviceHistorySnapshot(EndpointPort &port,
 
             if (captured.registration->revision != captured.revision ||
                 !hasIndexedSnapshotDemand(*captured.registration, operation->type, operation->symbol,
-                                          operation->sourceId, operation->passive)) {
+                                          operation->sourceId, operation->passive,
+                                          operation->timeSeriesRange.has_value())) {
                 witness.unlock();
                 captured.result = {};
             }
         }
 
         if (operation->passive && !witness.owns_lock() &&
-            !hasIndexedSnapshotDemand(port, operation->type, operation->symbol, operation->sourceId))
+            !hasIndexedSnapshotDemand(port, operation->type, operation->symbol, operation->sourceId,
+                                      operation->timeSeriesRange.has_value()))
             captured.result = {HistorySnapshotState::NOT_SUBSCRIBED, std::nullopt, {}};
 
         std::lock_guard operationLock(operation->mutex);
@@ -5142,7 +5186,10 @@ void RuntimeImpl::run() noexcept {
                     const auto historyWake = serviceHistorySnapshot(*port, native[index].get(), historyRequest, [&] {
                         const auto &request = *historyRequest;
                         const events::IndexedEventSource source(request.sourceId, std::nullopt);
-                        auto selector = SubscriptionSelector::indexed(request.symbol, source);
+                        auto selector = request.timeSeriesRange
+                                            ? SubscriptionSelector::timeSeries(
+                                                  request.symbol, request.timeSeriesRange->subscriptionFromTime)
+                                            : SubscriptionSelector::indexed(request.symbol, source);
                         Feed feed(port);
                         auto &demand = historyRequest->demand;
                         demand = feed.createSubscriptionPort(std::span(&request.type, 1), false, false, true);
@@ -5482,11 +5529,18 @@ RegisteredEvent awaitLatestEventRequest(const std::shared_ptr<LatestEventRequest
 }
 } // namespace detail
 
-HistorySnapshot<RegisteredEvent> Feed::readIndexedSnapshot(EventType type, std::u16string_view symbol,
-                                                           std::int32_t sourceId,
-                                                           HistorySnapshotOptions options) const {
+HistorySnapshot<RegisteredEvent>
+Feed::readIndexedSnapshot(EventType type, std::u16string_view symbol, std::int32_t sourceId,
+                          HistorySnapshotOptions options,
+                          std::optional<std::pair<std::int64_t, std::int64_t>> range) const {
     return producerAction([&]() -> HistorySnapshot<RegisteredEvent> {
         detail::validateIndexedSnapshot(*port_, type, symbol, sourceId, options);
+
+        if (range && (!isTimeSeriesEventType(type) || range->first > range->second))
+            reject(ErrorCode::INVALID_ARGUMENT, "time-series-range");
+
+        const auto policy =
+            range ? std::optional(detail::makeTimeSeriesQueryRange(range->first, range->second)) : std::nullopt;
         const auto control = port_->control.lock();
         std::shared_ptr<detail::HistorySnapshotOperation> operation;
         {
@@ -5495,7 +5549,7 @@ HistorySnapshot<RegisteredEvent> Feed::readIndexedSnapshot(EventType type, std::
             if (port_->tape)
                 throw Error(TAPE_HISTORY_SNAPSHOT_REFUSAL);
 
-            if (!detail::hasIndexedSnapshotDemand(*port_, type, symbol, sourceId))
+            if (!detail::hasIndexedSnapshotDemand(*port_, type, symbol, sourceId, range.has_value()))
                 return {HistorySnapshotState::NOT_SUBSCRIBED, std::nullopt, {}};
 
             if (!control || detail::latestEventOwner.control == control.get() ||
@@ -5504,12 +5558,15 @@ HistorySnapshot<RegisteredEvent> Feed::readIndexedSnapshot(EventType type, std::
                 port_->clearRevision != port_->clearedRevision)
                 return {};
 
+            if (policy && policy->empty)
+                return {}; // No native witness was captured for a passive mathematical empty range.
+
             if (port_->historySnapshotRead)
                 reject(ErrorCode::RESOURCE_LIMIT, "history-snapshot-read-busy");
 
             operation = std::make_shared<detail::HistorySnapshotOperation>(
                 type, symbol, sourceId, options, true,
-                std::chrono::steady_clock::now() + detail::HISTORY_SNAPSHOT_READ_TIMEOUT, control);
+                std::chrono::steady_clock::now() + detail::HISTORY_SNAPSHOT_READ_TIMEOUT, control, policy);
             operation->connectionRevision = port_->connectionRevision;
             operation->clearRevision = port_->clearRevision;
             port_->historySnapshotRead = operation;
@@ -5523,9 +5580,16 @@ HistorySnapshot<RegisteredEvent> Feed::readIndexedSnapshot(EventType type, std::
 
 std::shared_ptr<detail::HistorySnapshotOperation>
 Feed::startIndexedSnapshot(EventType type, std::u16string_view symbol, std::int32_t sourceId,
-                           std::chrono::steady_clock::time_point deadline, HistorySnapshotOptions options) const {
+                           std::chrono::steady_clock::time_point deadline, HistorySnapshotOptions options,
+                           std::optional<std::pair<std::int64_t, std::int64_t>> range) const {
     return producerAction([&] {
         detail::validateIndexedSnapshot(*port_, type, symbol, sourceId, options);
+
+        if (range && (!isTimeSeriesEventType(type) || range->first > range->second))
+            reject(ErrorCode::INVALID_ARGUMENT, "time-series-range");
+
+        const auto policy =
+            range ? std::optional(detail::makeTimeSeriesQueryRange(range->first, range->second)) : std::nullopt;
         const auto control = port_->control.lock();
 
         if (!control)
@@ -5550,10 +5614,16 @@ Feed::startIndexedSnapshot(EventType type, std::u16string_view symbol, std::int3
                 reject(ErrorCode::RESOURCE_LIMIT, "history-snapshot-request-busy");
 
             operation = std::make_shared<detail::HistorySnapshotOperation>(type, symbol, sourceId, options, false,
-                                                                           deadline, control);
+                                                                           deadline, control, policy);
 
             if (expireHistorySnapshot(*operation))
                 return operation;
+
+            if (policy && policy->empty) {
+                finishHistorySnapshot(*operation, {}, {HistorySnapshotState::COMPLETE, std::nullopt, {}});
+
+                return operation;
+            }
 
             operation->connectionRevision = port_->connectionRevision;
             operation->clearRevision = port_->clearRevision;

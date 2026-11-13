@@ -340,6 +340,18 @@ TEST_CASE("indexed HISTORY snapshot requests refuse tape without affecting ordin
         checkTapeRefusal([&] {
             static_cast<void>(feed->requestIndexedEvents<q::events::TimeAndSale>(u"AAPL", source, deadline));
         });
+        constexpr auto OUTSIDE_EVENT_TIME = std::numeric_limits<std::int64_t>::max();
+
+        for (const auto time : {std::int64_t{2001}, OUTSIDE_EVENT_TIME}) {
+            checkTapeRefusal([&] {
+                static_cast<void>(feed->getTimeSeriesIfSubscribed<q::events::TimeAndSale>(u"AAPL", time, time));
+            });
+            checkTapeRefusal([&] {
+                static_cast<void>(feed->requestTimeSeries<q::events::TimeAndSale>(u"AAPL", time, time, deadline));
+            });
+        }
+
+        CHECK(received.load() == 0);
         endpoint->setTapePaused(false);
         expectCleanEof(endpoint);
         CHECK(received.load() == 3);

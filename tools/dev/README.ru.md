@@ -378,6 +378,7 @@ class/resource inventories.
 
 - [Oracle NuamTrade](../upstream/nuam-trade-oracle/README.ru.md) записывает ограниченный набор Java-наблюдений и предоставляет EN/RU справку без входов.
 
+- [Генератор границ временного ряда](../upstream/time-series-query-oracle/README.ru.md) работает офлайн и содержит справку на двух языках.
 - [Генератор NuamTimeAndSale](../upstream/nuam-time-and-sale-oracle/README.ru.md) записывает индексированные сделки; справка доступна без входных данных.
 
 - [Генератор NuamOrder](../upstream/nuam-order-oracle/README.ru.md) записывает индексированные заявки офлайн; справка доступна на двух языках.
