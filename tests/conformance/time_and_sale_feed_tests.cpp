@@ -381,6 +381,72 @@ TEST_CASE("Time-series request reads an inclusive nonzero sequence over HISTORY 
     static_cast<void>(endpoint->closeAndAwaitTermination());
 }
 
+TEST_CASE("Concurrent time-series snapshots preserve the narrower window after sibling cancellation") {
+    const auto root = std::filesystem::path(ORG_TTLDTOR_QDCXX_TIME_AND_SALE_FIXTURES) / "wide";
+    std::ifstream input(root / "history.qtp", std::ios::binary);
+    REQUIRE(input);
+    const std::vector<char> bytes((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
+    q::test::TcpPeerScript script;
+    script.initialBytes = r::ready();
+    const auto data = std::as_bytes(std::span(bytes));
+    script.replyBytes.assign(data.begin(), data.end());
+    script.readThroughMessage = std::to_underlying(p::SubscriptionMessage::HISTORY_ADD);
+    script.waitForControllerReply = true;
+    script.waitForClientClose = true;
+    a::RuntimeOptions limits;
+    limits.maximumSubscriptionsPerEndpoint = 2;
+    limits.dnsServers.push_back({{127, 0, 0, 1}});
+    a::ApiRuntime runtime(limits);
+    q::test::OwnedTcpPeer peer({{std::move(script)}});
+    REQUIRE(peer.port() != 0);
+    a::EndpointOptions options;
+    options.maximumAttempts = 1;
+    options.contract = a::DeliveryContract::HISTORY;
+    auto endpoint = runtime.createEndpoint(options);
+    auto feed = endpoint->getFeed();
+    const auto deadline = std::chrono::steady_clock::now() + 5s;
+    auto wider = feed->requestTimeSeries<e::TimeAndSale>(u"AAPL", 500, 2001, deadline);
+    auto narrower = feed->requestTimeSeries<e::TimeAndSale>(u"AAPL", 1005, 1005, deadline, {1});
+    endpoint->connect("127.0.0.1:" + std::to_string(peer.port()));
+    bool added = false;
+
+    while (std::chrono::steady_clock::now() < deadline) {
+        if (peer.snapshot().sessions.front().matched) {
+            added = true;
+            break;
+        }
+
+        std::this_thread::sleep_for(1ms);
+    }
+
+    REQUIRE(added);
+    CHECK(feed->getTimeSeriesIfSubscribed<e::TimeAndSale>(u"AAPL", 1005, 1005).state ==
+          a::HistorySnapshotState::NOT_SUBSCRIBED);
+    CHECK(wider.cancel());
+    CHECK_FALSE(wider.cancel());
+
+    try {
+        static_cast<void>(wider.get());
+        FAIL_CHECK("the cancelled wider request must fail");
+    } catch (const a::Error &error) {
+        CHECK(error.diagnostic().code == a::ErrorCode::REQUEST_CANCELLED);
+    }
+
+    CHECK_FALSE(narrower.isDone());
+    peer.allowReply(0);
+    const auto result = narrower.get();
+    CHECK(result.state == a::HistorySnapshotState::COMPLETE);
+    REQUIRE(result.sourceEpoch);
+    REQUIRE(result.events.size() == 1);
+    CHECK(result.events.front().getTime() == 1005);
+    CHECK(result.events.front().getSequence() == 7);
+    CHECK(result.events.front().eventFlags == 0);
+    static_cast<void>(endpoint->closeAndAwaitTermination());
+    const auto observed = peer.snapshot();
+    REQUIRE(observed.error == q::test::TcpPeerError::NONE);
+    checkAdd(observed.sessions.front().received, true, false, false);
+}
+
 TEST_CASE("Narrow passive HISTORY coverage does not claim the overlapping raw second") {
     const auto root = std::filesystem::path(ORG_TTLDTOR_QDCXX_TIME_AND_SALE_FIXTURES) / "wide";
     std::ifstream input(root / "history.qtp", std::ios::binary);

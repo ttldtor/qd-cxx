@@ -303,23 +303,32 @@ TEST_CASE("active latest request keeps the tape refusal after a stop before file
 TEST_CASE("indexed HISTORY snapshot requests refuse tape without affecting ordinary playback") {
     std::atomic<bool> stopped{false};
     std::atomic<std::size_t> received{0};
-    api::ApiRuntime runtime(runtimeOptions());
+    auto options = runtimeOptions();
+    options.maximumSubscriptionsPerEndpoint = 3;
+    api::ApiRuntime runtime(options);
     const auto endpoint = runtime.createEndpoint({.contract = api::DeliveryContract::HISTORY});
     const auto feed = endpoint->getFeed();
     const auto &source = q::events::IndexedEventSource::DEFAULT;
     const auto deadline = std::chrono::steady_clock::now() + 5s;
-    const auto pending = feed->requestIndexedEvents<q::events::TimeAndSale>(u"AAPL", source, deadline);
-    REQUIRE_FALSE(pending.isDone());
+    constexpr std::int64_t EVENT_TIME = 2001;
+    const auto indexed = feed->requestIndexedEvents<q::events::TimeAndSale>(u"AAPL", source, deadline);
+    const auto series = feed->requestTimeSeries<q::events::TimeAndSale>(u"AAPL", EVENT_TIME, EVENT_TIME, deadline);
+    const auto cancelled = feed->requestIndexedEvents<q::events::TimeAndSale>(u"IBM", source, deadline);
+    REQUIRE_FALSE(indexed.isDone());
+    REQUIRE_FALSE(series.isDone());
+    REQUIRE(cancelled.cancel());
 
-    const auto checkTapeRefusal = [](auto operation) {
-        api::Diagnostic diagnostic;
-
+    const auto getDiagnostic = [](auto operation) {
         try {
             operation();
         } catch (const api::Error &error) {
-            diagnostic = error.diagnostic();
+            return error.diagnostic();
         }
 
+        return api::Diagnostic{};
+    };
+    const auto checkTapeRefusal = [&getDiagnostic](auto operation) {
+        const auto diagnostic = getDiagnostic(operation);
         CHECK(diagnostic.code == api::ErrorCode::UNSUPPORTED_PROFILE);
         CHECK(diagnostic.stage == "history-snapshot-tape");
     };
@@ -333,7 +342,8 @@ TEST_CASE("indexed HISTORY snapshot requests refuse tape without affecting ordin
         });
 
         endpoint->connectTape(HISTORY_SALE, {.initiallyPaused = true});
-        REQUIRE(pending.isDone());
+        REQUIRE(indexed.isDone());
+        REQUIRE(series.isDone());
         checkTapeRefusal([&] {
             static_cast<void>(feed->getIndexedEventsIfSubscribed<q::events::TimeAndSale>(u"AAPL", source));
         });
@@ -342,7 +352,7 @@ TEST_CASE("indexed HISTORY snapshot requests refuse tape without affecting ordin
         });
         constexpr auto OUTSIDE_EVENT_TIME = std::numeric_limits<std::int64_t>::max();
 
-        for (const auto time : {std::int64_t{2001}, OUTSIDE_EVENT_TIME}) {
+        for (const auto time : {EVENT_TIME, OUTSIDE_EVENT_TIME}) {
             checkTapeRefusal([&] {
                 static_cast<void>(feed->getTimeSeriesIfSubscribed<q::events::TimeAndSale>(u"AAPL", time, time));
             });
@@ -368,18 +378,27 @@ TEST_CASE("indexed HISTORY snapshot requests refuse tape without affecting ordin
         });
 
         endpoint->connectTape(FIXTURES / "stopped-before-tape-activation.qtp");
+        REQUIRE(indexed.isDone());
+        REQUIRE(series.isDone());
         REQUIRE(endpoint->awaitState(api::EndpointState::CLOSED, deadline).status == api::WaitStatus::REACHED);
         REQUIRE(stopped.load());
         const auto closed = endpoint->closeAndAwaitTermination();
         CHECK(closed.diagnostic.code == api::ErrorCode::NONE);
         CHECK_FALSE(closed.deadlineExpired);
-        CHECK(pending.isDone());
     }
 
-    CHECK_FALSE(pending.cancel());
-    checkTapeRefusal([&] {
-        static_cast<void>(pending.get());
+    for (const auto *pending : {&indexed, &series}) {
+        CHECK_FALSE(pending->cancel());
+        checkTapeRefusal([&] {
+            static_cast<void>(pending->get());
+        });
+    }
+
+    const auto failure = getDiagnostic([&] {
+        static_cast<void>(cancelled.get());
     });
+    CHECK(failure.code == api::ErrorCode::REQUEST_CANCELLED);
+    CHECK(failure.stage == "history-snapshot-cancelled");
 }
 
 TEST_CASE("active latest request batch settles pending tape children and preserves duplicate cancellation") {
