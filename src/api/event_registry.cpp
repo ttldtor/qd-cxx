@@ -5,6 +5,7 @@
 #include "../events/order_index_coordinate.hpp"
 #include "event_registry_defaults.hpp"
 #include "event_selection.hpp"
+#include "qd/api/feed.hpp"
 #include "qd/events/analytic_order.hpp"
 #include "qd/events/candle_routes.hpp"
 #include "qd/events/configuration.hpp"
@@ -1140,6 +1141,244 @@ std::expected<EventRegistry, EventRegistryFailure> defaultHistoryEventRegistry(E
         return std::unexpected(EventRegistryFailure{EventRegistryError::ALLOCATION_FAILURE, {}});
     } catch (const std::length_error &) {
         return std::unexpected(EventRegistryFailure{EventRegistryError::ALLOCATION_FAILURE, {}});
+    }
+}
+
+namespace {
+/** Compare the exact indexed coordinates of two already validated record layouts.
+ * @param left First optional indexed layout.
+ * @param right Second optional indexed layout.
+ * @return True for matching encoding kind and logical field positions.
+ */
+bool sameIndexedLayout(const std::optional<core::IndexedTimeLayout> &left,
+                       const std::optional<core::IndexedTimeLayout> &right) {
+    if (left.has_value() != right.has_value())
+        return false;
+
+    if (!left)
+        return true;
+
+    if (left->index() != right->index())
+        return false;
+
+    if (const auto *pair = std::get_if<core::IndexedTimePairInt32>(&*left)) {
+        const auto &other = std::get<core::IndexedTimePairInt32>(*right);
+
+        return pair->firstField == other.firstField && pair->secondField == other.secondField;
+    }
+
+    if (const auto *single = std::get_if<core::IndexedTimeSingleInt64>(&*left))
+        return single->field == std::get<core::IndexedTimeSingleInt64>(*right).field;
+
+    return std::get<core::IndexedTimeLowInt32>(*left).field == std::get<core::IndexedTimeLowInt32>(*right).field;
+}
+
+/** Check that a physical name can safely bind to the same schema record for two contracts.
+ * @param left Earlier declaration in the union.
+ * @param right Same-name declaration from the next family.
+ * @param work Remaining attempted comparison credits.
+ * @return True for identical field ordering, lookup keys and indexed time semantics.
+ */
+bool sameRecordShape(const core::LocalRecord &left, const core::LocalRecord &right, EventRegistryWork &work) {
+    debit(work.visits, 1);
+
+    return left.hasTime == right.hasTime && sameIndexedLayout(left.indexedTimeLayout, right.indexedTimeLayout) &&
+           std::ranges::equal(left.fields, right.fields,
+                              [&](const auto &a, const auto &b) {
+                                  debit(work.visits, 1);
+
+                                  return a.serialTypeId == b.serialTypeId;
+                              }) &&
+           std::ranges::equal(left.lookups, right.lookups, [&](const auto &a, const auto &b) {
+               debit(work.visits, add(1, std::max(a.name.size(), b.name.size())));
+
+               return a.fieldId == b.fieldId && a.name == b.name;
+           });
+}
+
+/** Account for source declaration copies and validation of a new physical record.
+ * @param record Exact validated source declaration, borrowed during this call.
+ * @param precedingRecords Number of already selected unique names.
+ * @param remaining Remaining union logical counts and immutable per-name ceiling.
+ * @param work Remaining construction and validation credits.
+ */
+void chargeCombinedRecord(const core::LocalRecord &record, std::size_t precedingRecords, core::SchemaLimits &remaining,
+                          EventRegistryWork &work) {
+    const auto take = [](std::size_t amount, std::size_t &available) {
+        if (amount > available)
+            throw EventRegistryError::RESOURCE_LIMIT;
+
+        available -= amount;
+    };
+    std::size_t nameUnits = record.name.size();
+    std::size_t longestName = nameUnits;
+
+    for (const auto &lookup : record.lookups) {
+        debit(work.visits, 1);
+        nameUnits = add(nameUnits, lookup.name.size());
+        longestName = std::max(longestName, lookup.name.size());
+    }
+
+    if (longestName > remaining.nameUnits)
+        throw EventRegistryError::RESOURCE_LIMIT;
+
+    take(1, remaining.records);
+    take(record.fields.size(), remaining.fields);
+    take(record.lookups.size(), remaining.lookups);
+    take(nameUnits, remaining.totalNameUnits);
+
+    const auto declarations = add(add(record.fields.size(), record.lookups.size()), nameUnits);
+    const auto nameComparison = add(remaining.nameUnits, 1);
+    // LocalSchema::create scans preceding record names, earlier lookup names and all field/lookup pairs.
+    const auto keyComparisons = multiply(record.lookups.size(), record.lookups.size());
+    const auto fieldCoverage = multiply(record.fields.size(), record.lookups.size());
+    debit(work.visits, add(add(1, multiply(3, declarations)), fieldCoverage));
+    debit(work.visits, multiply(add(precedingRecords, keyComparisons), nameComparison));
+}
+} // namespace
+
+std::expected<ReceivingRegistries, EventRegistryFailure>
+combineReceivingRegistries(const ReceivingRegistries &source, EventRegistryLimits limits, EventRegistryWork &work) {
+    try {
+        std::vector<core::LocalRecord> records;
+        std::array<std::vector<EventRegistration>, 3> routes;
+        const std::array families{&source.ticker, &source.stream, &source.history};
+        auto remaining = limits.schema;
+
+        for (std::size_t family = 0; family < families.size(); ++family) {
+            debit(work.visits, 1);
+            const auto &registry = *families[family];
+
+            if (!registry.valid() || registry.schema().profile() != core::LocalProfile::BINARY_FIELDS_V1)
+                return std::unexpected(EventRegistryFailure{EventRegistryError::INVALID_INPUT, {}});
+
+            const auto sourceRecords = registry.schema().records();
+            const auto sourceRoutes = registry.registrations();
+
+            if (sourceRecords.size() > limits.schema.records || sourceRoutes.size() > limits.registrations)
+                return std::unexpected(EventRegistryFailure{EventRegistryError::RESOURCE_LIMIT, {}});
+
+            debit(work.visits, add(sourceRecords.size(), sourceRoutes.size()));
+            std::vector<std::int32_t> ids;
+            ids.reserve(sourceRecords.size());
+
+            for (const auto &record : sourceRecords) {
+                const auto existing = std::ranges::find_if(records, [&](const auto &candidate) {
+                    debit(work.visits, add(1, std::max(candidate.name.size(), record.name.size())));
+
+                    return candidate.name == record.name;
+                });
+
+                if (existing != records.end()) {
+                    if (!sameRecordShape(*existing, record, work))
+                        return std::unexpected(EventRegistryFailure{EventRegistryError::INVALID_INPUT, {}});
+
+                    ids.push_back(existing->id);
+                    continue;
+                }
+
+                if (records.size() > static_cast<std::size_t>(std::numeric_limits<std::int32_t>::max()))
+                    return std::unexpected(EventRegistryFailure{EventRegistryError::RESOURCE_LIMIT, {}});
+
+                chargeCombinedRecord(record, records.size(), remaining, work);
+                const auto id = static_cast<std::int32_t>(records.size());
+                records.push_back(record);
+                records.back().id = id;
+                ids.push_back(id);
+            }
+
+            routes[family].reserve(sourceRoutes.size());
+
+            for (auto route : sourceRoutes) {
+                route.localRecordId = ids[static_cast<std::size_t>(route.localRecordId)];
+                routes[family].push_back(route);
+            }
+        }
+
+        const auto schema = core::LocalSchema::create(records, limits.schema, core::LocalProfile::BINARY_FIELDS_V1);
+
+        if (!schema)
+            return std::unexpected(EventRegistryFailure{schema.error(), {}});
+
+        auto ticker = EventRegistry::create(*schema, routes[0], limits, work);
+
+        if (!ticker)
+            return std::unexpected(ticker.error());
+
+        limits.storageBytes -= ticker->storageBytes();
+        auto stream = EventRegistry::create(*schema, routes[1], limits, work);
+
+        if (!stream)
+            return std::unexpected(stream.error());
+
+        limits.storageBytes -= stream->storageBytes();
+        auto history = EventRegistry::create(*schema, routes[2], limits, work);
+
+        if (!history)
+            return std::unexpected(history.error());
+
+        return ReceivingRegistries{std::move(*ticker), std::move(*stream), std::move(*history)};
+    } catch (EventRegistryError error) {
+        return std::unexpected(EventRegistryFailure{error, {}});
+    } catch (const std::bad_alloc &) {
+        return std::unexpected(EventRegistryFailure{EventRegistryError::ALLOCATION_FAILURE, {}});
+    } catch (const std::length_error &) {
+        return std::unexpected(EventRegistryFailure{EventRegistryError::ALLOCATION_FAILURE, {}});
+    }
+}
+
+std::expected<ReceivingRegistries, EventRegistryFailure> defaultCombinedReceivingRegistries() {
+    try {
+        auto ticker = defaultReceivingRegistry(DeliveryContract::TICKER);
+
+        if (!ticker)
+            return std::unexpected(ticker.error());
+
+        auto stream = defaultReceivingRegistry(DeliveryContract::STREAM);
+
+        if (!stream)
+            return std::unexpected(stream.error());
+
+        auto history = defaultReceivingRegistry(DeliveryContract::HISTORY);
+
+        if (!history)
+            return std::unexpected(history.error());
+
+        const ReceivingRegistries defaults{std::move(*ticker), std::move(*stream), std::move(*history)};
+        const std::array families{&defaults.ticker, &defaults.stream, &defaults.history};
+        EventRegistryLimits limits;
+        // Sum the bounded input catalogs before deduplication to seed the union's worst-case size.
+        limits.schema = {};
+        limits.registrations = 0;
+        limits.storageBytes = multiply(limits.storageBytes, families.size());
+        EventRegistryWork work;
+        work.visits = multiply(work.visits, families.size());
+        work.preparation = 0;
+
+        for (const auto *family : families) {
+            const auto records = family->schema().records();
+            limits.schema.records = add(limits.schema.records, records.size());
+            limits.registrations = std::max(limits.registrations, family->registrations().size());
+
+            for (const auto &record : records) {
+                limits.schema.fields = add(limits.schema.fields, record.fields.size());
+                limits.schema.lookups = add(limits.schema.lookups, record.lookups.size());
+                limits.schema.nameUnits = std::max(limits.schema.nameUnits, record.name.size());
+                limits.schema.totalNameUnits = add(limits.schema.totalNameUnits, record.name.size());
+
+                for (const auto &lookup : record.lookups) {
+                    limits.schema.nameUnits = std::max(limits.schema.nameUnits, lookup.name.size());
+                    limits.schema.totalNameUnits = add(limits.schema.totalNameUnits, lookup.name.size());
+                }
+            }
+
+            for (const auto &route : family->registrations())
+                work.preparation = add(work.preparation, mappingWork(route.mappingLimits));
+        }
+
+        return combineReceivingRegistries(defaults, limits, work);
+    } catch (EventRegistryError error) {
+        return std::unexpected(EventRegistryFailure{error, {}});
     }
 }
 } // namespace detail

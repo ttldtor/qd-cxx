@@ -132,4 +132,39 @@ enum class EventDelivery {
 constexpr bool isOptionTimeSeriesEvent(EventType type) noexcept {
     return type == EventType::GREEKS || type == EventType::UNDERLYING || type == EventType::THEO_PRICE;
 }
+
+/** Partition a mixed live selection by the owning QTP contract.
+ * The two Order lanes provide different sources: TICKER projects Quote into unitary orders,
+ * while HISTORY supplies native indexed orders and MarketMaker-derived orders.
+ */
+struct MixedEventSelection {
+    EventSelection ticker;  ///< Lasting events and Quote-derived Order sources.
+    EventSelection stream;  ///< Ordinary sales and messages.
+    EventSelection history; ///< Indexed events and explicit time-series subscriptions.
+};
+
+/** @param selection Nonempty supported type mask.
+ * @param timeSeries Whether all selected kinds have been validated for time-series delivery.
+ * @return The subset to register with each collector.
+ */
+constexpr MixedEventSelection splitMixedEventSelection(EventSelection selection, bool timeSeries) noexcept {
+    constexpr auto bit = [](EventSelection kind) {
+        return static_cast<unsigned>(kind);
+    };
+
+    if (timeSeries)
+        return {static_cast<EventSelection>(0), static_cast<EventSelection>(0), selection};
+
+    constexpr auto stream = bit(EventSelection::TEXT_MESSAGE) | bit(EventSelection::MESSAGE) |
+                            bit(EventSelection::TIME_AND_SALE) | bit(EventSelection::NUAM_TIME_AND_SALE);
+    constexpr auto history = bit(EventSelection::ORDER) | bit(EventSelection::MARKET_MAKER) |
+                             bit(EventSelection::SPREAD_ORDER) | bit(EventSelection::ANALYTIC_ORDER) |
+                             bit(EventSelection::OTC_MARKETS_ORDER) | bit(EventSelection::SERIES) |
+                             bit(EventSelection::OPTION_SALE) | bit(EventSelection::NUAM_ORDER);
+    constexpr auto ticker = bit(EventSelection::ALL) & (~(stream | history) | bit(EventSelection::ORDER));
+    const auto selected = bit(selection);
+
+    return {static_cast<EventSelection>(selected & ticker), static_cast<EventSelection>(selected & stream),
+            static_cast<EventSelection>(selected & history)};
+}
 } // namespace org::ttldtor::qdcxx::api::detail

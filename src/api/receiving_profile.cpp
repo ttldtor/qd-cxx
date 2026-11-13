@@ -18,7 +18,8 @@
 
 namespace org::ttldtor::qdcxx::api::detail {
 namespace {
-constexpr std::size_t MEBIBYTE = 1024 * 1024; ///< Independent logical byte unit.
+constexpr std::size_t MEBIBYTE = 1024 * 1024;          ///< Independent logical byte unit.
+constexpr std::size_t COMBINED_RECEIVING_RECORDS = 84; ///< Exact union of the three qualified SDK catalogs.
 constexpr core::SchemaLimits BASE_SCHEMA_LIMITS{42, 284, 724, 128, 16384};
 // Reserve exactly the two records, 20 fields and 25 lookups of the Candle/TradeHistory declarations.
 constexpr core::SchemaLimits CANDLE_SCHEMA_LIMITS{44, 284 + 20, 724 + 25, 128, 16384};
@@ -179,10 +180,11 @@ std::size_t receivingCoordinateCapacity(const EventRegistry &registry, DeliveryC
         char16_t exchange = 0;
     };
 
-    std::array<Context, MAXIMUM_RECEIVING_RECORDS> contexts{};
+    std::array<Context, COMBINED_RECEIVING_RECORDS> storage{};
+    const auto recordCount = registry.schema().records().size();
+    auto contexts = std::span(storage).first(recordCount);
     // This complete bounded scan is paid before desired storage allocation or native publication.
-    auto visits =
-        add(MAXIMUM_RECEIVING_BINDINGS, multiply(MAXIMUM_RECEIVING_RECORDS, add(MAXIMUM_RECEIVING_RECORDS, 1)));
+    auto visits = add(MAXIMUM_RECEIVING_BINDINGS, multiply(recordCount, add(recordCount, 1)));
     const auto visit = [&] {
         if (visits == 0) {
             refuse(ErrorCode::RESOURCE_LIMIT, "profile-coordinate-work");
@@ -404,6 +406,12 @@ void prepareCopies(ReceivingProfile &profile) {
 
     limits.endpointCopyBytes = multiply(2, endpointBytes);
     limits.writerConfigurationBytes = WRITER_CONFIGURATION_BYTES;
+}
+
+/** Fund one family's retained replay banks from its actual queue owner and desired limits.
+ * @param profile Complete independent family preparation, modified before publication.
+ */
+void prepareReplay(ReceivingProfile &profile) {
     const auto family = static_cast<std::size_t>(
         profile.family == core::SubscriptionFamily::TICKER    ? transport::RecoveryFamily::TICKER
         : profile.family == core::SubscriptionFamily::HISTORY ? transport::RecoveryFamily::HISTORY
@@ -414,7 +422,8 @@ void prepareCopies(ReceivingProfile &profile) {
     const auto owners = profile.family == core::SubscriptionFamily::TICKER    ? profile.tickerLimits.viewSlots
                         : profile.family == core::SubscriptionFamily::HISTORY ? profile.historyLimits.viewSlots
                                                                               : 1;
-    limits.replay[family] = {multiply(owners, desired.entries), multiply(owners, desired.totalSymbolUnits)};
+    profile.recoveryOptions.limits.replay[family] = {multiply(owners, desired.entries),
+                                                     multiply(owners, desired.totalSymbolUnits)};
 }
 
 /** Prepare each existing mapping and exact whole-callback projection coordinates.
@@ -752,9 +761,20 @@ ReceivingProfile::ReceivingProfile(core::LocalSchema schema, ReceivingSettings e
     : schema(std::move(schema)), endpoint(std::move(endpoint)) {
 }
 
-ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const EndpointOptions &options,
-                                         const std::string &host, std::uint16_t port, bool tape) {
-    auto selected = selectRegistry(options);
+namespace {
+/** Prepare one lane, optionally from an explicit common schema already validated for all three families.
+ * @param runtime Immutable runtime bounds and DNS configuration.
+ * @param options Policy with the selected lane contract.
+ * @param host Validated endpoint host.
+ * @param port Validated endpoint port.
+ * @param local True for tape/local source or a lane without its own native owner.
+ * @param selected Immutable registrations for this lane.
+ * @param combinedSchema Qualified union bounds, or null for legacy schema limits.
+ * @return Complete lane configuration or detached Error.
+ */
+ReceivingProfile prepareReceivingLane(const RuntimeOptions &runtime, const EndpointOptions &options,
+                                      const std::string &host, std::uint16_t port, bool local,
+                                      const EventRegistry &selected, const core::SchemaLimits *combinedSchema) {
     const auto hasCandle = std::ranges::any_of(selected.registrations(), [&](const EventRegistration &route) {
         return route.type == EventType::CANDLE && receivingRouteSupportsContract(route, options.contract);
     });
@@ -826,7 +846,9 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
         schemaLimits = withTimeAndSaleLimits(schemaLimits);
     }
 
-    if (selected.schema().records().size() > MAXIMUM_RECEIVING_RECORDS) {
+    if (combinedSchema) {
+        schemaLimits = *combinedSchema;
+    } else if (selected.schema().records().size() > MAXIMUM_RECEIVING_RECORDS) {
         refuse(ErrorCode::UNSUPPORTED_PROFILE, "profile-schema");
     }
 
@@ -978,7 +1000,7 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
                        multiply(2, symbolUnits), entries};
     budgets.writer.operationEntries = std::max(budgets.writer.operationEntries, entries);
 
-    if (!tape) {
+    if (!local) {
         // A complete named-route preparation and progress allowance is independent of queue reservations.
         const auto dns = transport::TcpRuntime::dnsPreparationWorkRequirement(runtime.dnsServers.size());
 
@@ -1008,7 +1030,7 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
     fundContextBindingText(settings, schema.records().size());
     std::optional<ReceivingSettings> endpoint;
 
-    if (tape) {
+    if (local) {
         endpoint.emplace(settings);
     } else {
         auto validated = client::EndpointOptions::create(schema, settings);
@@ -1103,10 +1125,13 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
                               add(options.history.maximumPoints, options.history.pendingUpdatesPerSubscription)));
     }
 
-    if (!tape) {
+    if (!local) {
         result.blueprint = prepareBlueprint(result.schema);
         prepareCopies(result);
     }
+
+    if (!local || combinedSchema)
+        prepareReplay(result);
 
     prepareMappings(result, selected, runtime.maximumSymbolUnits);
     auto &routing = result.routing;
@@ -1202,6 +1227,106 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
                        {result.queueWork, result.queueWork, result.queueWork}};
 
     return result;
+}
+
+/** Derive the exact logical union bounds without counting independently copied declarations twice.
+ * @param schema Previously validated SDK union schema.
+ * @return Finite count and name envelope used by each lane and the one native session.
+ */
+core::SchemaLimits combinedSchemaLimits(const core::LocalSchema &schema) {
+    core::SchemaLimits limits{};
+    limits.records = schema.records().size();
+
+    for (const auto &record : schema.records()) {
+        limits.fields = add(limits.fields, record.fields.size());
+        limits.lookups = add(limits.lookups, record.lookups.size());
+        limits.nameUnits = std::max(limits.nameUnits, record.name.size());
+        limits.totalNameUnits = add(limits.totalNameUnits, record.name.size());
+
+        for (const auto &lookup : record.lookups) {
+            limits.nameUnits = std::max(limits.nameUnits, lookup.name.size());
+            limits.totalNameUnits = add(limits.totalNameUnits, lookup.name.size());
+        }
+    }
+
+    return limits;
+}
+
+/** Accumulate serialized recovery work from one additional family into the common owner.
+ * @param common Shared preparation or turn allowance.
+ * @param lane Independent source-family maximum in the same units.
+ */
+void addRecoveryWork(transport::RecoveryWork &common, const transport::RecoveryWork &lane) {
+    common.operations = add(common.operations, lane.operations);
+    common.visits = add(common.visits, lane.visits);
+    common.textUnits = add(common.textUnits, lane.textUnits);
+    common.bytes = add(common.bytes, lane.bytes);
+}
+
+/** Accumulate serialized writer work without merging independent retained output owners.
+ * @param common Shared preparation or turn allowance.
+ * @param lane Independent source-family maximum in the same units.
+ */
+void addWriterWork(protocol::SubscriptionWriterWork &common, const protocol::SubscriptionWriterWork &lane) {
+    common.operations = add(common.operations, lane.operations);
+    common.visits = add(common.visits, lane.visits);
+    common.textUnits = add(common.textUnits, lane.textUnits);
+    common.outputBytes = add(common.outputBytes, lane.outputBytes);
+}
+} // namespace
+
+ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const EndpointOptions &options,
+                                         const std::string &host, std::uint16_t port, bool tape) {
+    const auto selected = selectRegistry(options);
+
+    return prepareReceivingLane(runtime, options, host, port, tape, selected, nullptr);
+}
+
+CombinedReceivingProfiles prepareCombinedReceivingProfiles(const RuntimeOptions &runtime,
+                                                           const EndpointOptions &options, const std::string &host,
+                                                           std::uint16_t port, const ReceivingRegistries &registries) {
+    if (options.enableWildcard || options.eventRegistry)
+        refuse(ErrorCode::UNSUPPORTED_PROFILE, "profile-combined-registry-policy");
+
+    if (!registries.ticker.valid() || !registries.stream.valid() || !registries.history.valid())
+        refuse(ErrorCode::INVALID_ARGUMENT, "profile-combined-registry");
+
+    const auto &schema = registries.history.schema();
+
+    if (!schema.sharesIdentityWith(registries.ticker.schema()) ||
+        !schema.sharesIdentityWith(registries.stream.schema()) ||
+        schema.records().size() != COMBINED_RECEIVING_RECORDS) {
+        refuse(ErrorCode::INVALID_ARGUMENT, "profile-combined-registry");
+    }
+
+    const auto limits = combinedSchemaLimits(schema);
+    auto laneOptions = options;
+    laneOptions.contract = DeliveryContract::TICKER;
+    auto ticker = prepareReceivingLane(runtime, laneOptions, host, port, true, registries.ticker, &limits);
+    laneOptions.contract = DeliveryContract::STREAM;
+    auto stream = prepareReceivingLane(runtime, laneOptions, host, port, true, registries.stream, &limits);
+    laneOptions.contract = DeliveryContract::HISTORY;
+    // HISTORY includes all optional wire metadata allowances of the SDK union and the hs negotiation option.
+    auto history = prepareReceivingLane(runtime, laneOptions, host, port, false, registries.history, &limits);
+    const std::array families{&ticker, &stream, &history};
+
+    history.recoveryOptions.requireAllContracts = true;
+
+    for (std::size_t family = 0; family < families.size(); ++family) {
+        const auto &lane = *families[family];
+        history.preparationWork.queues[family] = lane.queueWork;
+        history.turnWork.queues[family] = lane.queueWork;
+
+        if (&lane != &history) {
+            history.recoveryOptions.limits.replay[family] = lane.recoveryOptions.limits.replay[family];
+            addRecoveryWork(history.preparationWork.recovery, lane.preparationWork.recovery);
+            addRecoveryWork(history.turnWork.recovery, lane.turnWork.recovery);
+            addWriterWork(history.preparationWork.writer, lane.preparationWork.writer);
+            addWriterWork(history.turnWork.writer, lane.turnWork.writer);
+        }
+    }
+
+    return {std::move(ticker), std::move(stream), std::move(history)};
 }
 
 const ReceivingEventPlan &receivingEventPlan(const ReceivingProfile &profile, EventSelection selection) {
@@ -1330,7 +1455,7 @@ void prepareReceivingSymbols(const ReceivingProfile &profile, const ReceivingEve
             continue;
         }
 
-        if (candleSelected)
+        if (candleSelected && symbol.sourceId.value_or(0) <= 0)
             symbol.candle = resolveReceivingCandle(*profile.candleRoutes, symbol.logical);
 
         symbol.exchange = events::market_symbols::getExchangeCode(symbol.logical);

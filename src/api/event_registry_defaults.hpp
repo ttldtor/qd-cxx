@@ -17,6 +17,28 @@ inline constexpr std::size_t TIME_AND_SALE_DEFAULT_RECORDS =
  * @return Complete independent owning registry or original atomic failure.
  */
 [[nodiscard]] std::expected<EventRegistry, EventRegistryFailure> defaultReceivingRegistry(DeliveryContract contract);
+
+/** Three owning route sets whose schema copies retain one exact immutable origin. */
+struct ReceivingRegistries {
+    EventRegistry ticker;  ///< TICKER routes in their original order.
+    EventRegistry stream;  ///< STREAM routes in their original order.
+    EventRegistry history; ///< HISTORY routes in their original order.
+};
+
+/** Remap three immutable route sets onto one complete BINARY_FIELDS_V1 schema identity.
+ * @param source Validated family registries; conflicting same-name declarations refuse.
+ * @param limits Complete union schema, routes per family and aggregate retained registry bytes.
+ * @param work Remaining construction and mapper credits, debited for attempted work.
+ * @return All three owning registries or the first atomic failure.
+ */
+[[nodiscard]] std::expected<ReceivingRegistries, EventRegistryFailure>
+combineReceivingRegistries(const ReceivingRegistries &source, EventRegistryLimits limits, EventRegistryWork &work);
+
+/** Prepare the three SDK default route sets with explicit aggregate construction and retention bounds.
+ * @return Complete owning default registry set or atomic failure.
+ */
+[[nodiscard]] std::expected<ReceivingRegistries, EventRegistryFailure> defaultCombinedReceivingRegistries();
+
 /** Prepare SDK-owned STREAM defaults, including composite and A..Z TimeAndSale.
  * @param limits Complete finite schema, route and storage bounds.
  * @param work Remaining preparation credits; failures consume attempted work.

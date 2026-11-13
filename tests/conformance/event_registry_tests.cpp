@@ -684,6 +684,175 @@ TEST_CASE("SDK defaults retain all real regional records and explicit physical d
               << " retained=" << profile.routing.retainedMetadataBytes << '\n';
 }
 
+TEST_CASE("combined SDK catalog remaps each family to one schema origin") {
+    const auto combined = api::detail::defaultCombinedReceivingRegistries();
+    REQUIRE(combined);
+
+    const auto &schema = combined->ticker.schema();
+    CHECK(schema.sharesIdentityWith(combined->stream.schema()));
+    CHECK(schema.sharesIdentityWith(combined->history.schema()));
+    CHECK(schema.records().size() == 84);
+    CHECK(combined->ticker.registrations().size() == 72);
+    CHECK(combined->stream.registrations().size() == 38);
+    CHECK(combined->history.registrations().size() == 45);
+
+    const std::array contracts{api::DeliveryContract::TICKER, api::DeliveryContract::STREAM,
+                               api::DeliveryContract::HISTORY};
+    const std::array families{&combined->ticker, &combined->stream, &combined->history};
+
+    for (std::size_t family = 0; family < families.size(); ++family) {
+        const auto original = api::detail::defaultReceivingRegistry(contracts[family]);
+        REQUIRE(original);
+        const auto remapped = families[family]->registrations();
+        REQUIRE(remapped.size() == original->registrations().size());
+
+        for (std::size_t position = 0; position < remapped.size(); ++position) {
+            const auto &route = remapped[position];
+            const auto &before = original->registrations()[position];
+            const auto &record = schema.records()[static_cast<std::size_t>(route.localRecordId)];
+            const auto &prior = original->schema().records()[static_cast<std::size_t>(before.localRecordId)];
+            CHECK(route.type == before.type);
+            CHECK(route.projection == before.projection);
+            CHECK(route.eventTimePolicy == before.eventTimePolicy);
+            CHECK(record.name == prior.name);
+            CHECK(record.hasTime == prior.hasTime);
+            REQUIRE(record.fields.size() == prior.fields.size());
+            CHECK(std::ranges::equal(record.fields, prior.fields, {}, &core::LocalField::serialTypeId,
+                                     &core::LocalField::serialTypeId));
+            CHECK(families[family]->versionField(route.localRecordId) == original->versionField(before.localRecordId));
+        }
+    }
+
+    const auto indexed = std::ranges::find(schema.records(), u"Series", &core::LocalRecord::name);
+    REQUIRE(indexed != schema.records().end());
+    REQUIRE(indexed->indexedTimeLayout);
+    const auto *position = std::get_if<core::IndexedTimeLowInt32>(&*indexed->indexedTimeLayout);
+    REQUIRE(position != nullptr);
+    CHECK(std::ranges::any_of(indexed->lookups, [&](const auto &lookup) {
+        return lookup.name == u"Index" && lookup.fieldId == position->field;
+    }));
+}
+
+TEST_CASE("combined catalog refuses incompatible same-name records and finite limits atomically") {
+    const core::LocalRecord compact{0, u"Generic", false, {{8}}, {{u"Value", 0}}};
+    const core::LocalRecord wide{
+        0,
+        u"Generic",
+        false,
+        {{core::composeSerialTypeId(core::SerialType::COMPACT_INT, core::FieldRepresentation::WIDE_DECIMAL)}},
+        {{u"Value", 0}}};
+    const auto first =
+        core::LocalSchema::create(std::span(&compact, 1), SCHEMA_LIMITS, core::LocalProfile::BINARY_FIELDS_V1);
+    const auto second =
+        core::LocalSchema::create(std::span(&wide, 1), SCHEMA_LIMITS, core::LocalProfile::BINARY_FIELDS_V1);
+    REQUIRE(first);
+    REQUIRE(second);
+    api::EventRegistryWork work;
+    const auto ticker = api::EventRegistry::create(*first, {}, {}, work);
+    const auto history = api::EventRegistry::create(*second, {}, {}, work);
+    REQUIRE(ticker);
+    REQUIRE(history);
+    const api::detail::ReceivingRegistries conflict{*ticker, *ticker, *history};
+    const auto refused = api::detail::combineReceivingRegistries(conflict, {}, work);
+    REQUIRE_FALSE(refused);
+    CHECK(std::get<api::EventRegistryError>(refused.error().cause) == api::EventRegistryError::INVALID_INPUT);
+    CHECK(conflict.ticker.schema().sharesIdentityWith(*first));
+    CHECK(conflict.history.schema().sharesIdentityWith(*second));
+
+    const api::detail::ReceivingRegistries compatible{*ticker, *ticker, *ticker};
+    work = {};
+    const auto accepted = api::detail::combineReceivingRegistries(compatible, {}, work);
+    REQUIRE(accepted);
+    CHECK(accepted->ticker.schema().records().size() == 1);
+    api::EventRegistryLimits exact;
+    exact.storageBytes =
+        accepted->ticker.storageBytes() + accepted->stream.storageBytes() + accepted->history.storageBytes();
+    work = {};
+    CHECK(api::detail::combineReceivingRegistries(compatible, exact, work));
+
+    --exact.storageBytes;
+    work = {};
+    const auto overBudget = api::detail::combineReceivingRegistries(compatible, exact, work);
+    REQUIRE_FALSE(overBudget);
+    CHECK(std::get<api::EventRegistryError>(overBudget.error().cause) == api::EventRegistryError::RESOURCE_LIMIT);
+
+    work = {.visits = 0};
+    const auto underfunded = api::detail::combineReceivingRegistries(compatible, {}, work);
+    REQUIRE_FALSE(underfunded);
+    CHECK(std::get<api::EventRegistryError>(underfunded.error().cause) == api::EventRegistryError::WORK_LIMIT);
+    CHECK(compatible.history.schema().sharesIdentityWith(*first));
+}
+
+TEST_CASE("combined SDK catalog prepares all three collectors under one recovery configuration") {
+    const auto combined = api::detail::defaultCombinedReceivingRegistries();
+    REQUIRE(combined);
+
+    api::RuntimeOptions runtime;
+    runtime.dnsServers.push_back({{127, 0, 0, 1}});
+    const auto profile = api::detail::prepareCombinedReceivingProfiles(runtime, {}, "127.0.0.1", 12345, *combined);
+    REQUIRE(profile.history.endpoint.network());
+    CHECK_FALSE(profile.ticker.endpoint.network());
+    CHECK_FALSE(profile.stream.endpoint.network());
+    CHECK(profile.history.schema.sharesIdentityWith(profile.ticker.schema));
+    CHECK(profile.history.schema.sharesIdentityWith(profile.stream.schema));
+    CHECK(profile.history.schema.sharesIdentityWith(profile.history.endpoint.network()->schema()));
+    CHECK(profile.history.blueprint.size() == 84);
+    CHECK(profile.ticker.blueprint.empty());
+    CHECK(profile.stream.blueprint.empty());
+    CHECK(profile.ticker.bindings.size() == 70);
+    CHECK(profile.stream.bindings.size() == 38);
+    CHECK(profile.history.bindings.size() == 45);
+    CHECK(profile.history.endpoint.settings().budgets.session.historySnapshot);
+    CHECK(profile.history.recoveryOptions.requireAllContracts);
+
+    const auto routed = api::detail::splitMixedEventSelection(api::detail::EventSelection::ALL, false);
+    const auto bits = [](auto selection) {
+        return static_cast<unsigned>(selection);
+    };
+    const auto ticker = bits(routed.ticker);
+    const auto stream = bits(routed.stream);
+    const auto history = bits(routed.history);
+    CHECK((ticker | stream | history) == bits(api::detail::EventSelection::ALL));
+    CHECK((ticker & ~profile.ticker.boundKinds) == 0);
+    CHECK((stream & ~profile.stream.boundKinds) == 0);
+    CHECK((history & ~profile.history.boundKinds) == 0);
+    CHECK((ticker & history) == bits(api::detail::EventSelection::ORDER));
+    CHECK((stream & (ticker | history)) == 0);
+
+    const std::array lanes{&profile.ticker, &profile.stream, &profile.history};
+    auto work = profile.history.preparationWork;
+    root::transport::RecoveryQueues queues;
+    const std::array slots{&queues.ticker, &queues.stream, &queues.history};
+
+    for (std::size_t family = 0; family < lanes.size(); ++family) {
+        CAPTURE(family);
+        auto laneWork = lanes[family]->queueWork;
+        auto queue = api::detail::createReceivingQueue(*lanes[family], laneWork);
+
+        if (!queue)
+            INFO(static_cast<int>(queue.error().error));
+
+        REQUIRE(queue);
+        slots[family]->emplace(std::move(*queue));
+        CHECK(profile.history.recoveryOptions.limits.replay[family].entries != 0);
+    }
+
+    auto bootstrap = root::transport::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    auto blueprint = profile.history.blueprint;
+    auto recovery =
+        root::transport::TcpRecovery::create(*bootstrap, *profile.history.endpoint.network(), std::move(blueprint),
+                                             std::move(queues), profile.history.recoveryOptions, work);
+
+    if (!recovery)
+        INFO(recovery.error().stage);
+
+    REQUIRE(recovery);
+    CHECK(recovery->capacity().queues[0].queueBytes > 0);
+    CHECK(recovery->capacity().queues[1].queueBytes > 0);
+    CHECK(recovery->capacity().queues[2].queueBytes > 0);
+}
+
 TEST_CASE("Candle receiving plans choose only the resolved physical record per logical symbol") {
     api::RuntimeOptions runtime;
     runtime.dnsServers.push_back({{127, 0, 0, 1}});
