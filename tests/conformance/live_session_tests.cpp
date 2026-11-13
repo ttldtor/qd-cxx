@@ -679,6 +679,71 @@ TEST_CASE("captured receive-add readiness and explicit protocol authentication s
     CHECK(forbidden.error() == Error::CREDENTIALS_FORBIDDEN);
 }
 
+TEST_CASE("one live session negotiates and carries all three subscription families") {
+    auto f = fixture();
+    const p::LiveMessageView onlyTicker[]{{11, u"TICKER_ADD_SUBSCRIPTION", {}}};
+    const auto epoch = admit(f.session, protocol({}, {}, onlyTicker)).snapshot().identity();
+    const c::SubscriptionRequest request{{f.context[0], u"IBM"}, {}};
+    auto earlyWork = turn();
+    CHECK(f.session.subscribe(p::SubscriptionMessage::TICKER_ADD, std::span(&request, 1), earlyWork));
+    const auto earlyStream = f.session.subscribe(p::SubscriptionMessage::STREAM_ADD, std::span(&request, 1), earlyWork);
+    REQUIRE_FALSE(earlyStream);
+    CHECK(earlyStream.error() == Error::NOT_READY);
+    (void)admit(f.session, ready());
+
+    const std::pair<std::u16string_view, std::int32_t> fields[]{{u"x", 8}};
+    (void)admit(f.session, description(90, u"Alpha", fields));
+    std::vector<std::byte> payload;
+    const std::int64_t values[]{17};
+    record(payload, 90, u"IBM", values);
+    auto work = turn();
+
+    struct Family {
+        p::SubscriptionMessage add;
+        p::SubscriptionMessage remove;
+        std::int32_t dataId;
+        std::int32_t addId;
+        std::int32_t removeId;
+        bool hasTime;
+    };
+
+    const Family families[]{
+        {p::SubscriptionMessage::TICKER_ADD, p::SubscriptionMessage::TICKER_REMOVE, 10, 11, 12, false},
+        {p::SubscriptionMessage::STREAM_ADD, p::SubscriptionMessage::STREAM_REMOVE, 15, 16, 17, false},
+        {p::SubscriptionMessage::HISTORY_ADD, p::SubscriptionMessage::HISTORY_REMOVE, 20, 21, 22, true},
+    };
+
+    for (const auto &family : families) {
+        const auto &context = f.context[family.hasTime ? 2 : 0];
+        const c::SubscriptionRequest add{{context, u"IBM"},
+                                         family.hasTime ? std::optional<std::int64_t>{42} : std::nullopt};
+        const c::SubscriptionRequest remove{{context, u"IBM"}, {}};
+
+        auto added = f.session.subscribe(family.add, std::span(&add, 1), work);
+        REQUIRE(added);
+        p::FrameReader addReader(limits().frame);
+        const auto addedFrame = addReader.feed(added->bytes());
+        REQUIRE(addedFrame.frame);
+        CHECK(addedFrame.frame->type == family.addId);
+        CHECK(added->subscriptionRecords() == 1);
+
+        const auto event = admit(f.session, frame(family.dataId, payload));
+        CHECK(event.kind() == p::LiveEventKind::DATA);
+        CHECK(event.messageType() == family.dataId);
+        CHECK(event.snapshot().identity().sameEpoch(epoch));
+        REQUIRE(event.records().size() == 1);
+        CHECK(event.records()[0].typedValues[0].raw == 17);
+
+        auto removed = f.session.subscribe(family.remove, std::span(&remove, 1), work);
+        REQUIRE(removed);
+        p::FrameReader removeReader(limits().frame);
+        const auto removedFrame = removeReader.feed(removed->bytes());
+        REQUIRE(removedFrame.frame);
+        CHECK(removedFrame.frame->type == family.removeId);
+        CHECK(removed->subscriptionRecords() == 1);
+    }
+}
+
 TEST_CASE("immutable replaced sender generations and returned records outlive the session") {
     std::optional<p::LiveEvent> retained;
     p::LiveSnapshot old;
