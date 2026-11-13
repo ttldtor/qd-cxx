@@ -5,8 +5,8 @@
 Include `qd/api/time_series_subscription.hpp` and link `qdcxx_subscription_selectors`.
 The header and target are available independently of the optional Feed and transport components.
 This component owns business identities, decorated symbol values and mutable logical ranges.
-It does not create a live HISTORY subscription. The current nine registered native event types
-have no TimeSeriesEvent business marker or Feed HISTORY receiver.
+It does not create a live HISTORY subscription. For the supported event types and receiving
+routes, see the [public feed API](FEED-API.md).
 
 ```cpp
 #include <qd/api/time_series_subscription.hpp>

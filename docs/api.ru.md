@@ -5,10 +5,11 @@
 Сгенерированный справочник описывает объявления в `org::ttldtor::qdcxx`, параметры, ошибки и владение.
 Для поиска отдельных объявлений используйте указатели пространств имён и типов рядом с этой страницей.
 [Начало работы](getting-started.ru.md) показывает поиск установленного пакета и линковку.
+[Возможности клиента и профили протокола](CLIENT-CAPABILITIES.ru.md) перечисляет маршруты приёма, ограничения источников и соответствующие проверки.
 
 | Компонент | Публичные заголовки | Цель линковки | Подробный контракт |
 | --- | --- | --- | --- |
-| Логические time-series значения | `qd/api/time_series_subscription.hpp` | `qdcxx_subscription_selectors` | [Идентичность, capability и диапазон](TIME-SERIES-SUBSCRIPTIONS.ru.md); без HISTORY-получателя Feed |
+| Логические time-series значения | `qd/api/time_series_subscription.hpp` | `qdcxx_subscription_selectors` | [Идентичность, capability и диапазон](TIME-SERIES-SUBSCRIPTIONS.ru.md); приём описан в [Feed HISTORY API](FEED-API.ru.md) |
 | Текст событий | qd/events/event_text.hpp | qdcxx_event_text | [Вывод UTF-16/UTF-8 с явным контекстом](EVENT-TEXT.ru.md) |
 | Правила расписаний | `qd/schedule/schedule.hpp` | `qdcxx_schedule` | [Владеющие идентичности и типизированные поколения календаря](SCHEDULE-RULES.ru.md); `ORG_TTLDTOR_QDCXX_BUILD_SCHEDULE=ON` (по умолчанию OFF); без Day/Session-запросов и фильтров |
 | Публичный типизированный feed | `qd/api/feed.hpp`, `qd/api/event_registry.hpp` | `qdcxx_feed` | [Endpoint, Feed и типизированные подписки](FEED-API.ru.md), [неизменяемый реестр](../spec/events/EVENT-REGISTRY.ru.md), [смешанные подписки](../spec/events/MIXED-SUBSCRIPTIONS.ru.md); `ORG_TTLDTOR_QDCXX_BUILD_FEED_API=ON` (по умолчанию OFF), требует CLIENT/RUNTIME/RECOVERY |
@@ -16,9 +17,9 @@
 | Схемы и идентичность записей | `qd/core/` | `qdcxx_core` | [Спецификации схем](../spec/README.ru.md#schema-contracts-ru) |
 | Кадры, привязка и tape | `qd/protocol/` | `qdcxx_protocol` | [Спецификации протокола](../spec/README.ru.md#protocol-contracts-ru) |
 | Стандартные события | `qd/events/` | `qdcxx_quote`, `qdcxx_profile`, `qdcxx_trade`, `qdcxx_trade_eth`, `qdcxx_summary`, `qdcxx_text_events`, `qdcxx_event_mapping` | [Конфигурация](CONFIGURATION.ru.md), [Trade](../spec/events/TRADE.ru.md), [TradeETH](../spec/events/TRADE-ETH.ru.md), [Summary](../spec/events/SUMMARY.ru.md), [текстовые события](../spec/events/TEXT-EVENTS.ru.md) |
-| Периоды Candle | `qd/events/candle_period.hpp` | `qdcxx_candle_values` | [Типы, текст и оценки интервала](../spec/events/CANDLE-PERIOD.ru.md); без приёма Candle |
+| Периоды Candle | `qd/events/candle_period.hpp` | `qdcxx_candle_values` | [Типы, текст и оценки интервала](../spec/events/CANDLE-PERIOD.ru.md); [приём Candle](FEED-API.ru.md) использует feed |
 | Атрибуты Candle | `qd/events/candle_attributes.hpp` | `qdcxx_candle_values` | [Значения и операции с символами](../spec/events/CANDLE-ATTRIBUTES.ru.md); без агрегации |
-| Символы Candle | `qd/events/candle_symbol.hpp` | `qdcxx_candle_values` | [Владеющие значения и object selectors](CANDLE-SYMBOLS.ru.md); без приёма Candle |
+| Символы Candle | `qd/events/candle_symbol.hpp` | `qdcxx_candle_values` | [Владеющие значения и object selectors](CANDLE-SYMBOLS.ru.md); [приём Candle](FEED-API.ru.md) использует feed |
 | Коллекторы и мультиплексирование | `qd/collectors/`, `qd/mux/` | `qdcxx_collectors`, `qdcxx_mux`, `qdcxx_mux_queue` | [Контракты подписок](../spec/subscriptions/CONTRACTS.ru.md) |
 | JSON-схемы | `qd/schema/json_schema.hpp` | `qdcxx_schema_json` | [Нативный JSON](../spec/schema/NATIVE-JSON.ru.md); устанавливается при `ORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON=ON` (по умолчанию ON) |
 | Автономный replay | `qd/replay/tape_replay.hpp` | `qdcxx_replay` — только дерево сборки | [Контракт replay](../spec/protocol/OFFLINE-REPLAY.ru.md); `ORG_TTLDTOR_QDCXX_BUILD_REPLAY=ON` (по умолчанию OFF), без установки/экспорта пакета |
