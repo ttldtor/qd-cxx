@@ -906,6 +906,9 @@ SDK применяет demand и снимает устаревшую HISTORY д�
 
 Выбирайте `DeliveryContract::HISTORY` явно. Worker владеет collector, независимыми views, replay и ACK reset. `Subscription<Event>::getHistorySnapshot()` возвращает пассивный владеющий срез AS-OF; getter не выполняет I/O и не ждёт callback. Current completion требует настоящих данных о доставленном диапазоне и соответствия принятым logical/source/clear/callback fences. Стандартный реестр HISTORY из SDK включает перечисленные выше индексируемые семейства событий. Подписки без маршрута HISTORY отклоняются до native-регистрации. См. [поля Order, source-селекторы и владение](ORDER.ru.md) и [MarketMaker и производный Order](MARKET-MAKER-ORDER.ru.md). Точные состояния, конечные storage limits и сырые индексируемые координаты описаны в [контракте HISTORY](../spec/subscriptions/HISTORY-RECEIVING.ru.md).
 
+## Примеры клиента
+
+[Отдельный пример запросов](../examples/client_queries/README.ru.md) собирается с установленным Feed и показывает снимки Quote, Candle и индексных Order. [Пример моделей и инструментов](../examples/client_models/README.ru.md) использует учебные данные и необязательный пакет IPF. Для настоящих обновлений профилей предназначен существующий [пример live IPF](../examples/ipf_live/README.ru.md) с его явными необязательными зависимостями.
 ## Снимки временного ряда
 
 На endpoint HISTORY метод `Feed::getTimeSeriesIfSubscribed<Event>(symbol, fromTime, toTime)` читает при существующем интересе, а `requestTimeSeries<Event>(symbol, fromTime, toTime, deadline)` может создать временный интерес. Обе границы включают Unix-миллисекунды; владеющие события упорядочены по времени и включают все последовательности верхней границы. Превышение лимита результата приводит к явной ошибке. Подробности покрытия, пустых диапазонов и отличия от Java приведены в [описании диапазонов](../spec/subscriptions/TIME-SERIES-QUERY.ru.md).
