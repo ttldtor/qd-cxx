@@ -142,5 +142,11 @@ class SymbolReader {
      * Allocation exceptions become ALLOCATION_FAILURE; earlier returned values remain unchanged.
      */
     [[nodiscard]] SymbolResult read(std::span<const std::byte> input);
+    /** Decode under an additional one-call bound while retaining the previous-symbol dictionary.
+     * @param input Caller-owned bytes borrowed only for this call, never across frames.
+     * @param unitLimit Additional limit on decoded units, including a repeated previous symbol.
+     * @return Owned exact units and metadata on success, or terminal failure without a value.
+     */
+    [[nodiscard]] SymbolResult readBounded(std::span<const std::byte> input, std::size_t unitLimit);
 };
 } // namespace org::ttldtor::qdcxx::encoding
