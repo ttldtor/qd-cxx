@@ -127,12 +127,25 @@ void reserveCallbackPolicy(detail::SubscriptionPort &port, const std::shared_ptr
  * A listener may block the SDK worker; that delay must not restart the admitted close allowance.
  * @param port Detached endpoint whose immutable drain policy remains available.
  */
-void requestEndpointClose(const std::shared_ptr<detail::EndpointPort> &port) noexcept {
-    const auto deadline = std::chrono::steady_clock::now() + port->options.drainTimeout;
-    std::chrono::steady_clock::duration::rep expected = 0;
-    port->closeDeadline.compare_exchange_strong(expected, deadline.time_since_epoch().count(),
-                                                std::memory_order_acq_rel);
+void publishEndpointCutoff(const std::shared_ptr<detail::EndpointPort> &port, bool drain) noexcept {
+    const auto admitted = drain ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
+    std::unique_lock fence(port->credentialCloseMutex, std::defer_lock);
+
+    if (port->options.tls && port->options.tls->credentials)
+        fence.lock();
+
+    if (drain) {
+        const auto deadline = admitted + port->options.drainTimeout;
+        std::chrono::steady_clock::duration::rep expected = 0;
+        port->closeDeadline.compare_exchange_strong(expected, deadline.time_since_epoch().count(),
+                                                    std::memory_order_acq_rel);
+    }
+
     port->closeRequested.store(true, std::memory_order_release);
+}
+
+void requestEndpointClose(const std::shared_ptr<detail::EndpointPort> &port) noexcept {
+    publishEndpointCutoff(port, true);
 }
 
 /** Release a charged callable slot only after its application captures have been destroyed.
@@ -391,7 +404,7 @@ void publishRequestedSubscriptionFailure(const std::shared_ptr<detail::Subscript
  * @param diagnostic Static/numeric failure snapshot.
  */
 void failEndpoint(const std::shared_ptr<detail::EndpointPort> &port, Diagnostic diagnostic) noexcept {
-    port->closeRequested.store(true, std::memory_order_release);
+    publishEndpointCutoff(port, false);
     notifyConnecting(port);
     {
         std::lock_guard lock(port->mutex);
@@ -777,7 +790,7 @@ bool retireEndpoint(const std::shared_ptr<detail::EndpointPort> &port, CloseResu
         return true;
     }
 
-    port->closeRequested.store(true, std::memory_order_release);
+    publishEndpointCutoff(port, false);
     bool expected = false;
     port->retirementClaimed.compare_exchange_strong(expected, true, std::memory_order_acq_rel);
 
@@ -3093,6 +3106,7 @@ struct NativeTape {
 struct NativeEndpoint {
     std::shared_ptr<EndpointPort> port;        ///< Detached producer state, independent of public facade destruction.
     ReceivingProfile profile;                  ///< Complete immutable configuration and fixed work seeds.
+    std::uint64_t appliedRevision = 0;         ///< Worker-only source identity; outlives any borrowing TLS attempt.
     std::optional<transport::TcpRecovery> tcp; ///< Owns the core for a plain source.
 #if defined(ORG_TTLDTOR_QDCXX_FEED_HAS_TLS)
     std::optional<transport::TlsRecovery> tls; ///< Owns the core for a verified TLS source.
@@ -3102,7 +3116,6 @@ struct NativeEndpoint {
     std::optional<NativeTape> tape; ///< Sole alternative local file/protocol/queue owner on this worker.
     std::vector<std::unique_ptr<NativeSubscription>> subscriptions; ///< Fixed native registration slots.
     bool draining = false;                                          ///< Actual admitted-prefix drain requested once.
-    std::uint64_t appliedRevision = 0;            ///< Latest physical control captured/applied on this worker.
     std::uint64_t appliedAggregationRevision = 0; ///< Latest intent copied into the fixed recovery slot.
     bool aggregationConfigured = false;           ///< Initial default/reset is also an actual protocol property.
     std::uint64_t appliedClearRevision = 0;       ///< Sticky clear included in that physical control.
@@ -3136,6 +3149,25 @@ struct NativeEndpoint {
         return tcp->poll(work);
     }
 };
+
+#if defined(ORG_TTLDTOR_QDCXX_FEED_HAS_TLS)
+/** Order the allocation-free TLS authorization commit with actual producer control admission. */
+bool admitCredentialAction(void *owner, std::uint64_t revision, void *context,
+                           transport::detail::TlsCredentialAttempt::Action action) noexcept {
+    auto &port = *static_cast<EndpointPort *>(owner);
+    std::lock_guard state(port.mutex);
+    std::lock_guard close(port.credentialCloseMutex);
+
+    if (revision == 0 || revision != port.connectionRevision || !port.connectionIntent ||
+        port.closeRequested.load(std::memory_order_acquire))
+        return false;
+
+    if (action)
+        action(context);
+
+    return true;
+}
+#endif
 
 /** Fixed duration for one external caller waiting on an existing runtime owner. */
 constexpr auto LATEST_EVENT_READ_TIMEOUT = std::chrono::seconds{1};
@@ -4044,9 +4076,13 @@ std::unique_ptr<NativeEndpoint> activate(const transport::detail::BootstrapLease
 
         const transport::TlsOptions options{tls->limits,           tls->host,           {},
                                             tls->sdkInstanceBytes, tls->sdkSharedBytes, tls->residentBytes};
+        const auto credentialGate =
+            tls->credentials
+                ? transport::detail::TlsCredentialGate{port.get(), &admitCredentialAction, &native->appliedRevision}
+                : transport::detail::TlsCredentialGate{};
         auto recovery = transport::detail::TlsRecoveryFactory::create(
             bootstrap, *native->profile.endpoint.network(), std::move(native->profile.blueprint), std::move(queues),
-            native->profile.recoveryOptions, options, work);
+            native->profile.recoveryOptions, options, work, credentialGate);
 
         if (!recovery)
             throw Error(recoveryDiagnostic(recovery.error()));

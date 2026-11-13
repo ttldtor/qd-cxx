@@ -280,6 +280,12 @@ void validateEndpointTls(const std::optional<VerifiedTlsOptions> &tls) {
         !durationValid(tls->closeTimeout))
         reject(ErrorCode::INVALID_ARGUMENT, "endpoint-tls-options");
 
+    if (const auto &credentials = tls->credentials;
+        credentials && (!credentials->provider || !durationValid(credentials->timeout) ||
+                        credentials->tokenUnits < BasicTlsCredentials::MINIMUM_TOKEN_UNITS ||
+                        credentials->tokenUnits > BasicTlsCredentials::MAXIMUM_TOKEN_UNITS))
+        reject(ErrorCode::INVALID_ARGUMENT, "endpoint-tls-credentials");
+
     const auto requirements = transport::tlsRequirements(tls->limits, tls->host);
 
     if (!requirements)

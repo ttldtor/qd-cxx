@@ -4,6 +4,7 @@
 
 #include "bootstrap_lease.hpp"
 #include "qd/transport/tls_runtime.hpp"
+#include "tls_credential_gate.hpp"
 
 namespace org::ttldtor::qdcxx::transport::detail {
 
@@ -21,13 +22,13 @@ struct TlsRuntimeFactory {
      * @param options Explicit TLS/native resource declarations.
      * @param tlsWork Caller-owned exact TLS preparation/disposal credits.
      * @param sessionWork Caller-owned pure-session/native preparation credits.
+     * @param credentials Optional Feed admission fence captured for this physical attempt.
      * @return Prepared TLS owner or detached refusal, without starting I/O or calling providers.
      */
-    [[nodiscard]] static std::expected<TlsRuntime, TlsDiagnostic> create(const BootstrapLease &lease,
-                                                                         const client::EndpointOptions &endpoint,
-                                                                         protocol::SubscriptionWriter &&composer,
-                                                                         TlsOptions options, TlsWork &tlsWork,
-                                                                         protocol::LiveWork &sessionWork);
+    [[nodiscard]] static std::expected<TlsRuntime, TlsDiagnostic>
+    create(const BootstrapLease &lease, const client::EndpointOptions &endpoint,
+           protocol::SubscriptionWriter &&composer, TlsOptions options, TlsWork &tlsWork,
+           protocol::LiveWork &sessionWork, TlsCredentialAttempt credentials = {});
 
     private:
     friend class transport::TlsRuntime;
@@ -38,13 +39,13 @@ struct TlsRuntimeFactory {
      * @param options Explicit resource declarations.
      * @param tlsWork Caller-owned exact TLS preparation/disposal credits.
      * @param sessionWork Caller-owned session/native preparation credits.
+     * @param credentials Optional Feed admission fence captured for this physical attempt.
      * @return Prepared owner or detached refusal in the original admission order.
      */
-    [[nodiscard]] static std::expected<TlsRuntime, TlsDiagnostic> create(RuntimeBootstrap::State *bootstrap,
-                                                                         const client::EndpointOptions &endpoint,
-                                                                         protocol::SubscriptionWriter &&composer,
-                                                                         TlsOptions options, TlsWork &tlsWork,
-                                                                         protocol::LiveWork &sessionWork);
+    [[nodiscard]] static std::expected<TlsRuntime, TlsDiagnostic>
+    create(RuntimeBootstrap::State *bootstrap, const client::EndpointOptions &endpoint,
+           protocol::SubscriptionWriter &&composer, TlsOptions options, TlsWork &tlsWork,
+           protocol::LiveWork &sessionWork, TlsCredentialAttempt credentials = {});
 };
 
 } // namespace org::ttldtor::qdcxx::transport::detail

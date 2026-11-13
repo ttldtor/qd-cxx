@@ -16,7 +16,8 @@
 namespace org::ttldtor::qdcxx::protocol {
 namespace detail {
 class TapeEventBridge;
-}
+struct LiveAuthorization;
+} // namespace detail
 
 /** Detached counters at framing and atomic DATA-commit boundaries, before projection or fan-out. */
 struct LiveInputStatistics {
@@ -337,6 +338,7 @@ class LivePendingOutput {
     struct State;
     std::unique_ptr<State> state_; ///< Counted whole byte backing and serialized epoch lease.
     friend class LiveSession;
+    friend struct detail::LiveAuthorization;
     /** Adopt one fully composed output.
      * @param state Counted immutable envelope and initial zero cursor.
      */
@@ -395,6 +397,7 @@ struct LiveFeedResult {
 class LiveSession {
     struct Impl;
     std::unique_ptr<Impl> impl_; ///< Owned configuration, framing, generation and accounting.
+    friend struct detail::LiveAuthorization;
     /** Adopt fully prepared owned state without allocating.
      * @param impl Complete session implementation.
      */

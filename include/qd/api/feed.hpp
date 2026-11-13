@@ -163,6 +163,15 @@ struct HistoryReceivingOptions {
 /** Maximum endpoint and subscription local aggregation period. */
 inline constexpr std::chrono::milliseconds MAXIMUM_LOCAL_AGGREGATION_PERIOD{86400000};
 
+/** Explicit QTP Basic authorization for a verified TLS endpoint. */
+struct BasicTlsCredentials {
+    static constexpr std::size_t MINIMUM_TOKEN_UNITS = 7;    ///< Scheme prefix plus a nonempty value.
+    static constexpr std::size_t MAXIMUM_TOKEN_UNITS = 1024; ///< Fits the qualified Feed control envelope.
+    std::shared_ptr<client::CredentialProvider> provider;    ///< Shared application owner retained with the policy.
+    std::chrono::milliseconds timeout{5000};      ///< Positive cooperative authentication deadline after verification.
+    std::size_t tokenUnits = MAXIMUM_TOKEN_UNITS; ///< UTF-16 capacity including the complete Basic scheme prefix.
+};
+
 /** Owned inputs for the controlled verified TLS profile. The route is still selected by Endpoint::connect.
  * The application controls the qualified SDK image and keeps all host declarations truthful through final retirement.
  */
@@ -176,6 +185,7 @@ struct VerifiedTlsOptions {
     std::size_t sdkInstanceBytes = 0; ///< Required finite private SDK backing allowance.
     std::size_t sdkSharedBytes = 0;   ///< Required finite same-image backing allowance.
     std::size_t residentBytes = 0;    ///< Required whole-run allowance checked by the TLS runtime.
+    std::optional<BasicTlsCredentials> credentials; ///< Opt-in Basic provider; called on the serialized worker.
 };
 
 /** Endpoint policy; defaults need no caller-owned queue or turn-work objects. */
