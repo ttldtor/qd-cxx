@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/transport/tls_runtime.hpp"
 
+#include "../protocol/live_authorization.hpp"
 #include "tls_engine.hpp"
 #include "tls_runtime_factory.hpp"
 
@@ -131,6 +132,7 @@ struct TlsRuntime::Impl {
     TlsRequirements requirements;     ///< Exact copied immutable proof shape and all phase vectors.
     TlsWorkVector disposal;           ///< Factory-prepaid owned retirement credit; never aliases caller work.
     TlsResources reservation;         ///< Conservative simultaneous requested backing, unchanged after close.
+    detail::TlsCredentialAttempt credentialAttempt;     ///< Optional Feed fence captured at this attempt's factory.
     std::thread::id owner = std::this_thread::get_id(); ///< Immutable serialized owner affinity.
     std::unique_ptr<char16_t[]> token;                  ///< Fresh per-attempt bounded credential backing.
     std::unique_ptr<detail::RuntimeCore> core;          ///< Sole DNS/socket/session/native completion owner.
@@ -146,6 +148,7 @@ struct TlsRuntime::Impl {
     bool explicitAbort = false;  ///< User request/public retirement, distinct from an internally observed failure.
     bool initialFunded = false;  ///< Once-only H was copied from a successful admission.
     bool authorizationAttempted = false; ///< Provider is never called again for this attempt.
+    bool credentialSuperseded = false;   ///< Feed will apply its newer logical cutoff before another native turn.
     bool verifiedObserved = false;       ///< Authentication deadline was installed exactly once.
     std::size_t pendingPlaintext = 0;    ///< Last known unaccepted application suffix before native retirement.
 
@@ -154,8 +157,10 @@ struct TlsRuntime::Impl {
      * @param need Recomputed qualified requirements.
      * @param resources Fully checked whole-run reservation.
      */
-    Impl(const client::EndpointOptions &source, TlsRequirements need, TlsResources resources)
-        : endpoint(source), requirements(need), disposal(need.retirement), reservation(resources) {
+    Impl(const client::EndpointOptions &source, TlsRequirements need, TlsResources resources,
+         detail::TlsCredentialAttempt attempt)
+        : endpoint(source), requirements(need), disposal(need.retirement), reservation(resources),
+          credentialAttempt(attempt) {
     }
 
     /** Drain native borrowers before the SDK or retained provider can be released. */
@@ -281,6 +286,12 @@ struct TlsRuntime::Impl {
             return {};
         }
 
+        if (!credentialAttempt.admit()) {
+            credentialSuperseded = true;
+
+            return {};
+        }
+
         const auto &tls = *endpoint.settings().tls;
 
         if (authorizationAttempted) {
@@ -328,32 +339,76 @@ struct TlsRuntime::Impl {
         } catch (...) {
             threw = true;
         }
-        observePhase();
 
         if (!publicOwnerLive || abortRequested) {
             return {};
         }
 
+        if (!credentialAttempt.admit()) {
+            credentialSuperseded = true;
+
+            return {};
+        }
+
+        if (!credentialAttempt.enter) {
+            observePhase();
+
+            if (abortRequested)
+                return {};
+        }
+
+        TlsDiagnostic failure{};
+        std::expected<protocol::LivePendingOutput, protocol::LiveError> prepared =
+            std::unexpected(protocol::LiveError::INVALID_STATE);
+
         if (threw || !supplied || *supplied == 0 || *supplied > capacity || !engine->verified() ||
             !originalIdentity.matches(core->peer().identity())) {
-            fail(diagnostic(TlsError::CREDENTIAL_FAILURE, "tls-credential-result"));
+            failure = diagnostic(TlsError::CREDENTIAL_FAILURE, "tls-credential-result");
+        } else {
+            const auto value = std::u16string_view(token.get(), *supplied);
+            admitted.textUnits -= value.size();
 
-            return {};
+            if (!value.starts_with(u"Basic ") || value.size() <= std::u16string_view(u"Basic ").size()) {
+                failure = diagnostic(TlsError::CREDENTIAL_FAILURE, "tls-credential-prefix");
+            } else {
+                prepared = protocol::detail::LiveAuthorization::prepare(*core->session, value, admitted);
+            }
         }
 
-        const auto value = std::u16string_view(token.get(), *supplied);
-        admitted.textUnits -= value.size();
+        struct Commit {
+            Impl &attempt;
+            decltype(prepared) &output;
+            TlsDiagnostic failure;
+            const decltype(originalIdentity) &identity;
+        } commit{*this, prepared, failure, originalIdentity};
 
-        if (!value.starts_with(u"Basic ") || value.size() <= std::u16string_view(u"Basic ").size()) {
-            fail(diagnostic(TlsError::CREDENTIAL_FAILURE, "tls-credential-prefix"));
+        const bool adopted = credentialAttempt.admit(&commit, [](void *context) noexcept {
+            auto &value = *static_cast<Commit *>(context);
+            auto &attempt = value.attempt;
+            attempt.observePhase();
 
-            return {};
-        }
+            if (attempt.abortRequested)
+                return;
 
-        const auto adopted = core->adoptOutput(core->session->authorize(value, admitted));
+            if (value.failure.error != TlsError::NONE) {
+                attempt.fail(value.failure);
+
+                return;
+            }
+
+            if (!attempt.publicOwnerLive || !attempt.engine->verified() ||
+                !value.identity.matches(attempt.core->peer().identity()))
+                return;
+
+            if (value.output)
+                protocol::detail::LiveAuthorization::commit(*attempt.core->session);
+
+            if (auto result = attempt.core->adoptOutput(std::move(value.output)); !result)
+                attempt.fail(fromTransport(result.error()));
+        });
 
         if (!adopted) {
-            fail(fromTransport(adopted.error()));
+            credentialSuperseded = true;
         }
 
         return {};
@@ -410,19 +465,17 @@ std::expected<TlsRuntime, TlsDiagnostic> TlsRuntime::create(RuntimeBootstrap &bo
                                              sessionWork);
 }
 
-std::expected<TlsRuntime, TlsDiagnostic> detail::TlsRuntimeFactory::create(const BootstrapLease &lease,
-                                                                           const client::EndpointOptions &endpoint,
-                                                                           protocol::SubscriptionWriter &&composer,
-                                                                           TlsOptions options, TlsWork &tlsWork,
-                                                                           protocol::LiveWork &sessionWork) {
-    return create(lease.state_, endpoint, std::move(composer), options, tlsWork, sessionWork);
+std::expected<TlsRuntime, TlsDiagnostic>
+detail::TlsRuntimeFactory::create(const BootstrapLease &lease, const client::EndpointOptions &endpoint,
+                                  protocol::SubscriptionWriter &&composer, TlsOptions options, TlsWork &tlsWork,
+                                  protocol::LiveWork &sessionWork, TlsCredentialAttempt credentials) {
+    return create(lease.state_, endpoint, std::move(composer), options, tlsWork, sessionWork, credentials);
 }
 
-std::expected<TlsRuntime, TlsDiagnostic> detail::TlsRuntimeFactory::create(RuntimeBootstrap::State *bootstrap,
-                                                                           const client::EndpointOptions &endpoint,
-                                                                           protocol::SubscriptionWriter &&composer,
-                                                                           TlsOptions options, TlsWork &tlsWork,
-                                                                           protocol::LiveWork &sessionWork) {
+std::expected<TlsRuntime, TlsDiagnostic>
+detail::TlsRuntimeFactory::create(RuntimeBootstrap::State *bootstrap, const client::EndpointOptions &endpoint,
+                                  protocol::SubscriptionWriter &&composer, TlsOptions options, TlsWork &tlsWork,
+                                  protocol::LiveWork &sessionWork, TlsCredentialAttempt credentials) {
     using Impl = TlsRuntime::Impl;
     const auto &settings = endpoint.settings();
 
@@ -485,7 +538,7 @@ std::expected<TlsRuntime, TlsDiagnostic> detail::TlsRuntimeFactory::create(Runti
     }
 
     try {
-        auto impl = std::make_shared<Impl>(endpoint, *requirements, reservation);
+        auto impl = std::make_shared<Impl>(endpoint, *requirements, reservation, credentials);
 
         if (tokenUnits != 0) {
             impl->token = std::make_unique<char16_t[]>(tokenUnits);
@@ -579,6 +632,9 @@ std::expected<TlsPollResult, TlsDiagnostic> TlsRuntime::poll(TcpWork &runtimeWor
         if (const auto auth = state.authenticate(sessionWork); !auth) {
             return std::unexpected(auth.error());
         }
+
+        if (state.credentialSuperseded)
+            return TlsPollResult{TcpPollStatus::IDLE, std::nullopt};
     }
 
     if (!state.abortRequested && state.core->state() == TcpState::CONNECTED &&
@@ -616,10 +672,21 @@ std::expected<TlsPollResult, TlsDiagnostic> TlsRuntime::poll(TcpWork &runtimeWor
     state.observeFailures();
     state.observePhase();
 
+    if (state.credentialAttempt.enter && result->event && result->event->kind() == protocol::LiveEventKind::DATA &&
+        state.core->authentication() != protocol::LiveAuthentication::ACKNOWLEDGED) {
+        const auto denied = diagnostic(TlsError::AUTHENTICATION_DENIED, "tls-authentication-ack-required");
+        state.fail(denied);
+
+        return std::unexpected(denied);
+    }
+
     if (!state.abortRequested && !result->event) {
         if (const auto auth = state.authenticate(sessionWork); !auth) {
             return std::unexpected(auth.error());
         }
+
+        if (state.credentialSuperseded)
+            return TlsPollResult{TcpPollStatus::IDLE, std::nullopt};
     }
 
     return TlsPollResult{result->status, std::move(result->event)};

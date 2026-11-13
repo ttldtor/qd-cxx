@@ -34,6 +34,11 @@ class RuntimeSessionSlot {
         return std::get_if<protocol::LiveSession>(&value_);
     }
 
+    /** Borrow the actual QTP session by reference after the caller has selected the QTP profile. */
+    [[nodiscard]] protocol::LiveSession &operator*() noexcept {
+        return *operator->();
+    }
+
     /** Inspect the installed immutable QTP session.
      * @return Stable session address, or null for an empty/raw slot.
      */

@@ -888,6 +888,12 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
         settings.security = client::EndpointSecurity::TLS;
         settings.tls.emplace(client::EndpointTls{
             tls->referenceIdentity, tls->trustPem, tls->handshakeTimeout, {}, tls->closeTimeout, {}, {}});
+
+        if (const auto &credentials = tls->credentials) {
+            settings.tls->authenticationTimeout = credentials->timeout;
+            settings.tls->tokenUnits = credentials->tokenUnits;
+            settings.tls->credentials = credentials->provider;
+        }
     }
 
     settings.timeouts = {options.dnsTimeout, options.connectTimeout, options.readTimeout, options.writeTimeout,
@@ -988,6 +994,15 @@ ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const En
         budgets.runtimeTurn.dnsCalls = budgets.runtimeTurn.dnsPackets = 10000;
         budgets.runtimeTurn.dnsBytes = 10000000;
         budgets.runtimeTurn.dnsUnits = DNS_PROGRESS_UNITS;
+    }
+
+    if (settings.tls && settings.tls->tokenUnits) {
+        // One qualified authorization composition per native attempt, within the shared owner turn.
+        const auto units = *settings.tls->tokenUnits;
+        budgets.protocolTurn.operations = add(budgets.protocolTurn.operations, 1);
+        budgets.protocolTurn.visits = add(budgets.protocolTurn.visits, 1);
+        budgets.protocolTurn.textUnits = add(budgets.protocolTurn.textUnits, add(multiply(4, units), 26));
+        budgets.protocolTurn.bytes = add(budgets.protocolTurn.bytes, add(multiply(8, units), 256));
     }
 
     fundContextBindingText(settings, schema.records().size());

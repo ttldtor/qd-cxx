@@ -43,8 +43,8 @@ enum class CredentialError {
     REJECTED     ///< Application declined this request.
 };
 
-/** Caller-owned Basic-token source for a future verified TLS adapter.
- * CONFIG never invokes this provider. The future adapter invokes only after actual TLS verification,
+/** Caller-owned Basic-token source for the verified TLS adapter.
+ * CONFIG never invokes this provider. The adapter invokes only after actual TLS verification and a QTP challenge,
  * on its serialized owner, with a fresh bounded buffer per authentication epoch. No callback duration
  * bound is possible. Synchronize mutable state when sharing providers between endpoints. Provider
  * state/captures/resources and destructor/callback work are outside configuration-owned bounds.
@@ -54,7 +54,7 @@ class CredentialProvider {
     /** Destroy on the thread releasing the last shared owner; the application must permit this. */
     virtual ~CredentialProvider() = default;
     /** Supply a complete Basic token, including the ASCII scheme prefix, without retaining the span.
-     * The future adapter validates the returned length/prefix and translates exceptions before use.
+     * The adapter validates the returned length/prefix and translates exceptions before use.
      * @param destination Borrowed bounded UTF-16 output, valid only during this call; never retain it.
      * @return Written units in 1..destination.size(), or a static rejection. No secure-erasure promise.
      */

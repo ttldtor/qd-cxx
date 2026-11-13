@@ -383,7 +383,8 @@ struct EndpointPort {
     std::uint16_t port = 0;                                    ///< Original nonzero route port.
     bool connectRequested = false;                             ///< Published once under the endpoint mutex.
     std::atomic<std::chrono::steady_clock::duration::rep> closeDeadline{0}; ///< First admitted absolute drain deadline.
-    std::atomic<bool> closeRequested{false};                                ///< Reserved monotonic drain admission.
+    std::mutex credentialCloseMutex;            ///< Orders TLS Basic output adoption with the monotonic close fence.
+    std::atomic<bool> closeRequested{false};    ///< Reserved monotonic drain admission.
     std::atomic<bool> retired{false};           ///< Native owner and all captures have retired.
     std::atomic<bool> retirementClaimed{false}; ///< One execution domain exclusively owns capture retirement.
     std::atomic<bool> retirementOnMain{false};  ///< Future workers skip an already claimed inactive main cleanup.

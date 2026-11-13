@@ -111,9 +111,10 @@ bool same(TlsDiagnostic left, TlsDiagnostic right) noexcept {
 
 /** Embedded real TLS adapter; no SDK operation occurs in its constructor. */
 class TlsRecoveryBackend final : public detail::RecoveryBackend {
-    detail::BootstrapLease bootstrap_;  ///< First member: stable process borrow released after native/SDK children.
-    TlsOptions options_;                ///< Fixed immutable qualification scalars; never retains caller DNS spans.
-    std::optional<TlsRuntime> runtime_; ///< At most one actual active-or-retiring private SDK owner.
+    detail::BootstrapLease bootstrap_;      ///< First member: stable process borrow released after native/SDK children.
+    TlsOptions options_;                    ///< Fixed immutable qualification scalars; never retains caller DNS spans.
+    detail::TlsCredentialGate credentials_; ///< Optional stable Feed credential fence and revision source.
+    std::optional<TlsRuntime> runtime_;     ///< At most one actual active-or-retiring private SDK owner.
     TlsWork *turn_ = nullptr;       ///< Borrowed only in a checked public poll scope; cleared before its lease ends.
     TlsDiagnostic last_{};          ///< Actual direct failure, without a fabricated SDK return value.
     mutable TlsDiagnostic first_{}; ///< First actual terminal failure, including failed entered factory.
@@ -160,8 +161,9 @@ class TlsRecoveryBackend final : public detail::RecoveryBackend {
      * @param bootstrap Counted process borrow spanning every attempt and idle gap.
      * @param options Qualified controlled-host/resource values.
      */
-    TlsRecoveryBackend(detail::BootstrapLease &&bootstrap, const TlsOptions &options) noexcept
-        : bootstrap_(std::move(bootstrap)), options_(options) {
+    TlsRecoveryBackend(detail::BootstrapLease &&bootstrap, const TlsOptions &options,
+                       detail::TlsCredentialGate credentials) noexcept
+        : bootstrap_(std::move(bootstrap)), options_(options), credentials_(credentials) {
         options_.dns = {};
     }
 
@@ -206,7 +208,7 @@ class TlsRecoveryBackend final : public detail::RecoveryBackend {
         const auto &dns = configuration.options.dns;
         options.dns = {{dns.servers.data(), dns.serverCount}, dns.port};
         auto prepared = detail::TlsRuntimeFactory::create(bootstrap_, configuration.endpoint, std::move(writer),
-                                                          options, *turn_, work.session);
+                                                          options, *turn_, work.session, credentials_.forAttempt());
 
         if (!prepared) {
             last_ = prepared.error();
@@ -289,8 +291,8 @@ class TlsRecoveryBackend final : public detail::RecoveryBackend {
         const auto state = runtime_->state();
         const auto auth = runtime_->authentication();
         const bool verified = state == TlsState::CONNECTED || state == TlsState::AUTHENTICATING;
-        const bool eligible =
-            auth == protocol::LiveAuthentication::UNCHALLENGED || auth == protocol::LiveAuthentication::ACKNOWLEDGED;
+        const bool eligible = auth == protocol::LiveAuthentication::ACKNOWLEDGED ||
+                              (!credentials_.enter && auth == protocol::LiveAuthentication::UNCHALLENGED);
 
         return {true,
                 verified,
@@ -384,8 +386,8 @@ struct TlsRecovery::Impl {
      * @param retirement Copied final Core/one-event reserve.
      */
     Impl(detail::BootstrapLease &&bootstrap, const TlsOptions &options, detail::RecoveryConfiguration &&configuration,
-         RecoveryWork retirement) noexcept
-        : backend(std::move(bootstrap), options), core(std::move(configuration), backend, retirement) {
+         RecoveryWork retirement, detail::TlsCredentialGate credentials) noexcept
+        : backend(std::move(bootstrap), options, credentials), core(std::move(configuration), backend, retirement) {
     }
 };
 
@@ -422,15 +424,16 @@ TlsRecovery::create(RuntimeBootstrap &bootstrap, const client::EndpointOptions &
 std::expected<TlsRecovery, RecoveryDiagnostic>
 detail::TlsRecoveryFactory::create(const BootstrapLease &bootstrap, const client::EndpointOptions &endpoint,
                                    std::vector<protocol::OutgoingRecord> &&blueprint, RecoveryQueues &&queues,
-                                   const RecoveryOptions &options, const TlsOptions &tls,
-                                   RecoveryPreparationWork &work) {
-    return create(nullptr, &bootstrap, endpoint, std::move(blueprint), std::move(queues), options, tls, work);
+                                   const RecoveryOptions &options, const TlsOptions &tls, RecoveryPreparationWork &work,
+                                   TlsCredentialGate credentials) {
+    return create(nullptr, &bootstrap, endpoint, std::move(blueprint), std::move(queues), options, tls, work,
+                  credentials);
 }
 
 std::expected<TlsRecovery, RecoveryDiagnostic> detail::TlsRecoveryFactory::create(
     RuntimeBootstrap *bootstrap, const BootstrapLease *lease, const client::EndpointOptions &endpoint,
     std::vector<protocol::OutgoingRecord> &&blueprint, RecoveryQueues &&queues, const RecoveryOptions &options,
-    const TlsOptions &tls, RecoveryPreparationWork &work) {
+    const TlsOptions &tls, RecoveryPreparationWork &work, TlsCredentialGate credentials) {
     if (detail::recoveryCopyProfile() == 0) {
         return std::unexpected(RecoveryDiagnostic{RecoveryError::UNSUPPORTED_PROFILE, "recovery-copy-profile"});
     }
@@ -458,8 +461,8 @@ std::expected<TlsRecovery, RecoveryDiagnostic> detail::TlsRecoveryFactory::creat
     }
 
     try {
-        auto impl =
-            std::make_shared<TlsRecovery::Impl>(std::move(*bootstrapLease), tls, std::move(*candidate), *retirement);
+        auto impl = std::make_shared<TlsRecovery::Impl>(std::move(*bootstrapLease), tls, std::move(*candidate),
+                                                        *retirement, credentials);
 
         if (!impl->core.adopt(std::move(blueprint), std::move(queues)))
             std::terminate();

@@ -5,6 +5,7 @@
 #include "tape_event_bridge.hpp"
 
 #include "field_time_binding.hpp"
+#include "live_authorization.hpp"
 #include "live_decode.hpp"
 #include "qd/encoding/compact.hpp"
 #include "qd/encoding/penta_symbol.hpp"
@@ -2514,16 +2515,27 @@ std::expected<LivePendingOutput, LiveError> LiveSession::composeHeartbeat(LiveHe
 }
 
 std::expected<LivePendingOutput, LiveError> LiveSession::authorize(std::u16string_view basicToken, LiveWork &work) {
+    auto result = detail::LiveAuthorization::prepare(*this, basicToken, work);
+
+    if (result)
+        detail::LiveAuthorization::commit(*this);
+
+    return result;
+}
+
+std::expected<LivePendingOutput, LiveError>
+detail::LiveAuthorization::prepare(LiveSession &session, std::u16string_view basicToken, LiveWork &work) {
     try {
         debit(1, work.operations);
+        const auto &impl = session.impl_;
 
-        if (!impl_) {
+        if (!impl) {
             return std::unexpected(Error::INVALID_STATE);
         }
 
-        impl_->requireOpen();
+        impl->requireOpen();
 
-        if (impl_->limits.credentials != LiveCredentialPolicy::VERIFIED_TLS_BASIC) {
+        if (impl->limits.credentials != LiveCredentialPolicy::VERIFIED_TLS_BASIC) {
             throw Error::CREDENTIALS_FORBIDDEN;
         }
 
@@ -2534,15 +2546,14 @@ std::expected<LivePendingOutput, LiveError> LiveSession::authorize(std::u16strin
         }
 
         const LivePropertyView property{u"authorization", basicToken};
-        auto output = impl_->controlOutput();
-        ControlWriter writer({output->backing.get(), output->capacity}, work, impl_->limits.protocol.text,
+        auto output = impl->controlOutput();
+        ControlWriter writer({output->backing.get(), output->capacity}, work, impl->limits.protocol.text,
                              DESCRIBE_PROTOCOL);
         writer.raw(MAGIC);
         writer.properties(std::span(&property, 1));
         writer.messages({});
         writer.messages({});
-        output->size = writer.finish(impl_->limits.frame.maximumBodyBytes, impl_->limits.outputBytes);
-        impl_->authentication = LiveAuthentication::AUTHORIZATION_EMITTED;
+        output->size = writer.finish(impl->limits.frame.maximumBodyBytes, impl->limits.outputBytes);
 
         return LivePendingOutput(std::move(output));
     } catch (Error error) {
@@ -2554,6 +2565,10 @@ std::expected<LivePendingOutput, LiveError> LiveSession::authorize(std::u16strin
     } catch (const std::length_error &) {
         return std::unexpected(Error::ALLOCATION_FAILURE);
     }
+}
+
+void detail::LiveAuthorization::commit(LiveSession &session) noexcept {
+    session.impl_->authentication = LiveAuthentication::AUTHORIZATION_EMITTED;
 }
 
 std::expected<LivePendingOutput, LiveError> LiveSession::describe(std::span<const std::int32_t> senderIds,

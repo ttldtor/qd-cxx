@@ -315,8 +315,8 @@ class Crypto {
 
 /** One serialized event-loop-owned connection; callbacks cannot outlive run() and this object. */
 class PeerSession {
-    asio::io_context io_;
-    Tcp::acceptor acceptor_;
+    asio::io_context &io_;    ///< Shared child loop, restarted only after all previous session callbacks drain.
+    Tcp::acceptor &acceptor_; ///< The listener and backlog survive between the two independent TLS sessions.
     asio::ssl::stream<Tcp::socket> stream_;
     asio::steady_timer overall_;
     asio::steady_timer operation_;
@@ -439,7 +439,7 @@ class PeerSession {
     /** Cancel owned operations without reporting or destroying their borrowed buffers. */
     void cancelOwned() noexcept {
         Error ignored;
-        acceptor_.close(ignored);
+        acceptor_.cancel(ignored);
         stream_.lowest_layer().cancel(ignored);
         stream_.lowest_layer().close(ignored);
         cancelTimer(overall_);
@@ -852,16 +852,17 @@ class PeerSession {
 
     public:
     /** Construct one ordinary listener, with no remote resolution or external endpoint.
+     * @param io Child-owned loop with no callbacks from any previous session.
+     * @param acceptor Stable child listener retained through both sessions.
      * @param context Child-owned SSL context, retained beyond run().
      * @param options Validated bounded owned script.
      * @param directory Exact parent-created directory holding control/report/stop files.
      */
-    PeerSession(asio::ssl::context &context, t::PeerOptions options, std::filesystem::path directory,
-                std::uint16_t port, unsigned ordinal, t::PeerSnapshot previous,
+    PeerSession(asio::io_context &io, Tcp::acceptor &acceptor, asio::ssl::context &context, t::PeerOptions options,
+                std::filesystem::path directory, unsigned ordinal, t::PeerSnapshot previous,
                 std::chrono::steady_clock::time_point absoluteDeadline)
-        : acceptor_(io_, {asio::ip::address_v4::loopback(), port}, options.captureUntilClose), stream_(io_, context),
-          overall_(io_), operation_(io_), pause_(io_), stopPoll_(io_), options_(std::move(options)),
-          directory_(std::move(directory)) {
+        : io_(io), acceptor_(acceptor), stream_(io_, context), overall_(io_), operation_(io_), pause_(io_),
+          stopPoll_(io_), options_(std::move(options)), directory_(std::move(directory)) {
         ordinal_ = ordinal;
         absoluteDeadline_ = absoluteDeadline;
         report_.completedSessions = previous.completedSessions;
@@ -980,10 +981,12 @@ int runControl(const std::filesystem::path &control) {
         Crypto crypto;
         auto next = std::move(options.successor);
         options.successor.reset();
+        asio::io_context io;
+        Tcp::acceptor acceptor(io, {asio::ip::address_v4::loopback(), 0}, options.captureUntilClose);
         t::PeerSnapshot first;
         {
             auto context = crypto.makeContext(options);
-            PeerSession session(context, options, control.parent_path(), 0, 1, {}, absoluteDeadline);
+            PeerSession session(io, acceptor, context, options, control.parent_path(), 1, {}, absoluteDeadline);
             const auto result = session.run();
             first = session.snapshot();
 
@@ -998,7 +1001,9 @@ int runControl(const std::filesystem::path &control) {
         options.expectedReplyClientBytes = std::move(next->expectedReplyClientBytes);
         options.finalBytes = std::move(next->finalBytes);
         auto context = crypto.makeContext(options);
-        PeerSession session(context, std::move(options), control.parent_path(), first.port, 2, first, absoluteDeadline);
+        io.restart();
+        PeerSession session(io, acceptor, context, std::move(options), control.parent_path(), 2, first,
+                            absoluteDeadline);
 
         return session.run();
     } catch (...) {

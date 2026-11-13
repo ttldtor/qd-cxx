@@ -462,11 +462,31 @@ thread, context and failed-initialization history. See the [resource profile](..
 
 The SDK copies the settings. It verifies the peer before QTP delivery, uses
 the configured finite retry policy, and exposes failures through static
-diagnostics. There is no plaintext fallback, system-root lookup, or credential
-configuration in this profile. A TLS-disabled Feed build refuses the typed
-setting with `UNSUPPORTED_PROFILE`. The setting is unavailable through textual
-endpoint properties. An endpoint configured for TLS refuses local tape and
-plaintext OnDemand loopback sources.
+diagnostics. There is no plaintext fallback or system-root lookup. A
+TLS-disabled Feed build refuses the typed setting with `UNSUPPORTED_PROFILE`.
+The setting is unavailable through textual endpoint properties. An endpoint
+configured for TLS refuses local tape and plaintext OnDemand loopback sources.
+
+### QTP Basic authorization
+
+Set `VerifiedTlsOptions::credentials` to `BasicTlsCredentials` with a shared
+`client::CredentialProvider`. The provider writes the complete `Basic ` value
+into the borrowed UTF-16 span and returns its written length. The configured
+capacity is 7–1024 code units, including the prefix. The positive authentication
+timeout starts at verification and is checked cooperatively. A provider must
+return promptly because its call runs on the serialized Feed worker. The same
+provider may be shared by endpoints, so protect mutable application state.
+
+Feed calls the provider at most once for each verified attempt that receives a
+QTP authentication challenge. The call runs outside Feed control locks. A
+concurrent or reentrant disconnect, reconnect, clear or close that supersedes
+the attempt before authorization admission discards its prepared output. Bytes
+already admitted on the old attempt may have reached the peer. Subscription
+delivery waits for the peer's explicit authentication acknowledgement. The
+deadline remains armed if the peer never challenges or acknowledges. Data
+received before acknowledgement fails the credentialed endpoint. Configuration,
+diagnostics and statistics expose no token text or provider exception text.
+Credentials use the existing TLS Basic path and have no secure-erasure guarantee.
 
 ## Historical OnDemand loopback replay
 
