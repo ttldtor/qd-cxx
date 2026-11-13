@@ -1,6 +1,6 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#define DOCTEST_CONFIG_IMPLEMENT
 #include "qd/api/endpoint_configuration.hpp"
 #include "qd/api/feed.hpp"
 #include "qd/encoding/compact.hpp"
@@ -17,11 +17,13 @@
 #include <condition_variable>
 #include <cstddef>
 #include <cstdint>
+#include <iostream>
 #include <memory>
 #include <mutex>
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -135,14 +137,34 @@ api::EventRegistry quoteRegistry() {
     return std::move(*registry);
 }
 
-std::vector<std::uint8_t> quoteBytes() {
-    const auto schema = tls::schema();
+q::core::LocalSchema fixtureQuoteSchema() {
+    constexpr q::core::SchemaLimits LIMITS{16, 128, 256, 128, 16384};
+    const auto defaults = q::events::defaultQuoteSchema(LIMITS);
+
+    if (!defaults)
+        throw std::logic_error("Installed TLS fixture Quote schema");
+
+    auto schema = q::core::LocalSchema::create(defaults->records(), LIMITS, q::core::LocalProfile::BINARY_FIELDS_V1);
+
+    if (!schema)
+        throw std::logic_error("Installed TLS fixture binary schema");
+
+    return std::move(*schema);
+}
+
+std::vector<std::uint8_t> quoteBytes(bool typedWitness = false) {
+    const auto schema = fixtureQuoteSchema();
     const auto family = q::core::SubscriptionFamily::TICKER;
     auto bytes = peer::fixturePeerPrefix(schema, family);
     peer::Record quote{u"IBM", {}};
 
     for (const auto &field : schema.records().front().fields)
         quote.fields.push_back({static_cast<q::core::SerialFieldType>(field.serialTypeId), 0});
+
+    if (typedWitness) {
+        quote.fields[1].raw = u'Q';
+        quote.fields[5].raw = u'Z';
+    }
 
     const auto data = peer::fixturePeerData(std::span(&quote, 1), family, true);
     bytes.insert(bytes.end(), data.begin(), data.end());
@@ -169,7 +191,9 @@ test::TlsTestPeer quotePeer() {
 void appendNumber(std::vector<std::uint8_t> &output, std::int32_t value) {
     std::array<std::byte, 5> encoded{};
     const auto count = q::encoding::writeCompactInt(value, encoded);
-    REQUIRE(count.status == q::encoding::Status::OK);
+
+    if (count.status != q::encoding::Status::OK)
+        throw std::logic_error("TLS fixture encoding");
 
     for (const auto byte : std::span(encoded).first(count.written))
         output.push_back(std::to_integer<std::uint8_t>(byte));
@@ -178,7 +202,9 @@ void appendNumber(std::vector<std::uint8_t> &output, std::int32_t value) {
 void appendText(std::vector<std::uint8_t> &output, std::u16string_view text) {
     std::array<std::byte, 1024> encoded{};
     const auto count = q::encoding::writeUtfString(text, encoded, {encoded.size(), 128});
-    REQUIRE(count.status == q::encoding::Status::OK);
+
+    if (count.status != q::encoding::Status::OK)
+        throw std::logic_error("TLS fixture encoding");
 
     for (const auto byte : std::span(encoded).first(count.written))
         output.push_back(std::to_integer<std::uint8_t>(byte));
@@ -229,7 +255,7 @@ std::vector<std::uint8_t> feedNegotiation() {
     appendText(body, u"");
 
     auto result = frame(1, std::move(body));
-    const auto schema = tls::schema();
+    const auto schema = fixtureQuoteSchema();
     const auto &quote = schema.records().front();
     body.clear();
     appendNumber(body, quote.id);
@@ -240,7 +266,10 @@ std::vector<std::uint8_t> feedNegotiation() {
         const auto field = std::ranges::find_if(quote.lookups, [i](const auto &value) {
             return value.fieldId == i;
         });
-        REQUIRE(field != quote.lookups.end());
+
+        if (field == quote.lookups.end())
+            throw std::logic_error("TLS fixture Quote field");
+
         appendText(body, field->name);
         appendNumber(body, quote.fields[i].serialTypeId);
     }
@@ -322,6 +351,65 @@ bool awaitQuote(const std::atomic<bool> &received, std::chrono::steady_clock::ti
         std::this_thread::sleep_for(2ms);
 
     return received.load();
+}
+
+int runInstalledPeer(std::string_view mode) {
+    const bool authenticated = mode == "authenticated";
+
+    if (!authenticated && mode != "wrong-ca" && mode != "wrong-san")
+        return 1;
+
+    auto script = tls::peerOptions();
+    script.captureUntilClose = authenticated;
+    script.readTimeout = 10s;
+    script.overallTimeout = 15s;
+
+    if (authenticated) {
+        script.expectedClientBytes = feedNegotiation();
+        script.replyBytes = property(u"authentication", u"LOGIN synthetic-realm");
+        script.expectedReplyClientBytes = property(u"authorization", SYNTHETIC_TOKEN);
+        script.finalBytes = property(u"authentication", u"");
+        const auto quotes = quoteBytes(true);
+        script.finalBytes.insert(script.finalBytes.end(), quotes.begin(), quotes.end());
+    }
+
+    auto peer = test::TlsTestPeer::start(std::move(script));
+
+    if (!peer) {
+        std::cerr << "Installed TLS peer failed to start\n";
+
+        return 1;
+    }
+
+    std::cout << peer->port() << std::endl;
+    const auto deadline = std::chrono::steady_clock::now() + 16s;
+    auto observed = peer->snapshot();
+
+    while (!observed.completed && std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(2ms);
+        observed = peer->snapshot();
+    }
+
+    const bool completedBeforeStop = observed.completed;
+    observed = peer->stop();
+    const bool finished = completedBeforeStop && observed.completed && observed.accepted && !observed.timedOut &&
+                          !observed.parentTerminationRequested;
+    const bool matches = authenticated
+                             ? !observed.failed && observed.successfulHandshakes == 1 && observed.sniLocalhost &&
+                                   observed.matchedSessions == 1 && observed.firstCaptureEnd != 0
+                             : observed.successfulHandshakes == 0 && observed.bytesRead == 0;
+
+    if (!finished || !matches) {
+        std::cerr << "Installed TLS peer " << mode << ": accepted=" << observed.accepted
+                  << ", completed=" << observed.completed << ", timed out=" << observed.timedOut
+                  << ", failed=" << observed.failed << ", handshakes=" << observed.successfulHandshakes
+                  << ", matched=" << observed.matchedSessions << ", application bytes=" << observed.bytesRead
+                  << ", capture end=" << observed.firstCaptureEnd << '\n';
+
+        return 1;
+    }
+
+    return 0;
 }
 } // namespace
 
@@ -663,4 +751,18 @@ TEST_CASE("A late credential cutoff discards prepared bytes without committing p
     const auto publicOutput = session->authorize(SYNTHETIC_TOKEN, work);
     REQUIRE(publicOutput);
     CHECK(session->authentication() == q::protocol::LiveAuthentication::AUTHORIZATION_EMITTED);
+}
+
+int main(int argc, char **argv) {
+    if (argc == 3 && std::string_view(argv[1]) == "--installed-peer") {
+        try {
+            return runInstalledPeer(argv[2]);
+        } catch (const std::exception &) {
+            std::cerr << "Installed TLS fixture preparation failed\n";
+
+            return 1;
+        }
+    }
+
+    return doctest::Context(argc, argv).run();
 }

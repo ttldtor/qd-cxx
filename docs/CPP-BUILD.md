@@ -142,11 +142,18 @@ installation during package discovery, even for a plain feed application; supply
 [qualified TLS SDK](#tls-source-profile-cpp-build-en) path. Asio/c-ares source roots
 remain unnecessary for installed consumers.
 
-Use compatible compiler/standard-library/CRT settings. See the [public API guide](FEED-API.md)
-and [standalone installed example](../examples/feed_quote/README.md) for application
-lifetime, system IPv4 DNS, typed subscriptions and EN/RU command help. This facade
-uses plain TCP and TICKER/STREAM; enabling lower-level TLS does not add TLS support
-to this high-level API.
+Use compatible compiler, standard library and CRT settings. The
+[Feed guide](FEED-API.md#connect-with-verified-tls) shows the explicit verified TLS
+policy and optional Basic credentials. The installed TLS qualification client
+uses only `qdcxx::feed` and public headers. Its loopback peer verifies the exact
+authorization exchange before delivering a typed Quote. The client checks
+untrusted CA and mismatched SAN refusals. On the successful route, it verifies
+that local close drains the admitted prefix and retires the native source and
+callback capture. The close result reports drain and any retained transport
+diagnostic separately. With TLS disabled, the same external project links without an
+OpenSSL installation and the secure configuration rejects with
+`UNSUPPORTED_PROFILE` at `endpoint-tls-unavailable`. The
+[standalone Quote example](../examples/feed_quote/README.md) uses plain TCP.
 
 <a id="installed-binary-json-loader"></a>
 
