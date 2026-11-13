@@ -356,7 +356,8 @@ void requestConnectionChange(const std::shared_ptr<detail::EndpointPort> &port, 
                 reject(ErrorCode::CLOSED, "endpoint-closed");
             }
 
-            if (port->tape || port->onDemand) {
+            if (port->tape || port->onDemand || port->onDemandTransition ||
+                (port->onDemandPlayback && port->address.empty())) {
                 reject(ErrorCode::UNSUPPORTED_PROFILE,
                        port->tape ? "tape-connection-control" : "ondemand-connection-control");
             }
@@ -843,6 +844,8 @@ bool retireEndpoint(const std::shared_ptr<detail::EndpointPort> &port, CloseResu
         std::lock_guard lock(port->mutex);
 
         if (!port->retirementResultPrepared) {
+            result.deadlineExpired = result.deadlineExpired || port->terminal.deadlineExpired;
+            result.drained = result.drained && !result.deadlineExpired;
             port->terminal = result;
             port->retirementResultPrepared = true;
         }
@@ -2387,7 +2390,7 @@ void Endpoint::setOnDemandSpeed(double speed) {
         std::lock_guard lock(port_->mutex);
         requireStateOpen(*port_);
 
-        if (!port_->onDemand)
+        if (!port_->onDemand || port_->onDemandTransition)
             reject(ErrorCode::INVALID_STATE, "ondemand-replay-inactive");
 
         if (port_->onDemandSpeed == speed)
@@ -2397,6 +2400,72 @@ void Endpoint::setOnDemandSpeed(double speed) {
     }
 
     wake(port_->control);
+}
+
+namespace {
+void requestOnDemandTransition(const std::shared_ptr<detail::EndpointPort> &port,
+                               std::optional<detail::EndpointAddress> live) {
+    const auto control = port->control.lock();
+
+    if (!control)
+        reject(ErrorCode::CLOSED, "runtime-closed");
+
+    {
+        std::lock_guard gate(control->mutex);
+
+        if (!control->runtime || control->stopping)
+            reject(ErrorCode::CLOSED, "runtime-closed");
+
+        std::lock_guard lock(port->mutex);
+        requireStateOpen(*port);
+
+        if (port->onDemandTransition) {
+            const auto &accepted = port->onDemandTransition->live;
+
+            if ((!accepted && !live) || (accepted && live && accepted->spelling == live->spelling))
+                return;
+
+            reject(ErrorCode::INVALID_STATE, "ondemand-transition-pending");
+        }
+
+        if (!port->onDemandPlayback || (!port->onDemand && !port->address.empty())) {
+            if (live && port->onDemandPlayback && port->address == live->spelling)
+                return;
+
+            reject(ErrorCode::INVALID_STATE, "ondemand-transition-mode");
+        }
+
+        if (!port->onDemand && !live)
+            return;
+
+        if (port->connectionRevision == std::numeric_limits<std::uint64_t>::max() ||
+            port->stateChangeCount == port->stateChanges.size())
+            reject(ErrorCode::RESOURCE_LIMIT, "ondemand-transition-identity");
+
+        const auto now = std::chrono::steady_clock::now();
+        port->onDemandTransition.emplace(detail::OnDemandTransition{std::move(live), now + port->options.drainTimeout});
+        ++port->connectionRevision;
+        port->clearRevision = port->connectionRevision;
+        port->connectionIntent = false;
+        port->pausedReplayFence = 0;
+        port->statistics.connection.sourceEpoch.reset();
+        ++control->wakeSequence;
+    }
+
+    control->condition.notify_one();
+}
+} // namespace
+
+void Endpoint::stopOnDemandAndClear() {
+    producerAction([&] {
+        requestOnDemandTransition(port_, std::nullopt);
+    });
+}
+
+void Endpoint::stopOnDemandAndResume(std::string_view liveAddress) {
+    producerAction([&] {
+        requestOnDemandTransition(port_, detail::parseEndpointAddress(liveAddress));
+    });
 }
 
 void Endpoint::pauseOnDemand() {
@@ -2984,6 +3053,21 @@ class TypedConsumer final : public client::SubscriptionConsumer {
         return HistoryBegin::CURRENT;
     }
 
+    /** Linearize historical callback BEGIN against the producer's replay cutoff. */
+    static bool claimReplayBegin(SubscriptionPort &port, std::optional<std::uint64_t> revision) noexcept {
+        if (!revision)
+            return true;
+
+        const auto endpoint = port.endpoint.lock();
+
+        if (!endpoint)
+            return false;
+
+        std::lock_guard lock(endpoint->mutex);
+
+        return endpoint->connectionRevision == *revision;
+    }
+
     template <class Event> struct Invocation final : CallbackInvocation {
         std::shared_ptr<SubscriptionPort> port;
         std::shared_ptr<const ListenerSnapshot> listeners;
@@ -2993,14 +3077,17 @@ class TypedConsumer final : public client::SubscriptionConsumer {
         std::vector<Event> events;
         DispatchCompletion completion;
         const std::optional<std::uint64_t> historyRevision;
+        const std::optional<std::uint64_t> replayRevision;
         bool obsolete = false;
+        bool obsoleteReplay = false;
 
         Invocation(std::shared_ptr<SubscriptionPort> port, std::shared_ptr<const ListenerSnapshot> listeners,
                    std::shared_ptr<CallbackExecutor> executor, const client::SubscriptionBatch &batch,
-                   client::ReceiverProjectionWork work, std::optional<std::uint64_t> historyRevision)
+                   client::ReceiverProjectionWork work, std::optional<std::uint64_t> historyRevision,
+                   std::optional<std::uint64_t> replayRevision)
             : port(std::move(port)), listeners(std::move(listeners)), executor(std::move(executor)), batch(&batch),
               projectionWork(work), completion{this->port->statistics, batch.eventCount()},
-              historyRevision(historyRevision) {
+              historyRevision(historyRevision), replayRevision(replayRevision) {
         }
 
         void prepare() override {
@@ -3013,6 +3100,11 @@ class TypedConsumer final : public client::SubscriptionConsumer {
         }
 
         void execute() noexcept override {
+            obsoleteReplay = !claimReplayBegin(*port, replayRevision);
+
+            if (obsoleteReplay)
+                return;
+
             const auto begin = claimHistoryBegin(*port, historyRevision);
             obsolete = begin == HistoryBegin::OBSOLETE;
 
@@ -3021,6 +3113,9 @@ class TypedConsumer final : public client::SubscriptionConsumer {
         }
 
         void finish(Diagnostic diagnostic) noexcept override {
+            if (obsoleteReplay && diagnostic.code == ErrorCode::NONE)
+                diagnostic = {ErrorCode::CALLBACK_CANCELLED, "callback-ondemand-transition"};
+
             if (obsolete && diagnostic.code == ErrorCode::NONE)
                 diagnostic = {ErrorCode::CALLBACK_CANCELLED, "callback-history-revision"};
 
@@ -3054,10 +3149,11 @@ class TypedConsumer final : public client::SubscriptionConsumer {
     template <class Event>
     mux::BatchAction deliver(const client::SubscriptionBatch &batch, std::shared_ptr<const ListenerSnapshot> &listeners,
                              std::shared_ptr<CallbackExecutor> &executor, DispatchCompletion &completion,
-                             std::optional<std::uint64_t> historyRevision) {
+                             std::optional<std::uint64_t> historyRevision,
+                             std::optional<std::uint64_t> replayRevision) {
         if (executor) {
             auto packet = std::make_unique<Invocation<Event>>(port_, std::move(listeners), std::move(executor), batch,
-                                                              projectionWork_, historyRevision);
+                                                              projectionWork_, historyRevision, replayRevision);
             completion.active = false; // The packet now owns the exact selected statistics completion.
             port_->callbackPool->submit(port_->callbackSlot, std::move(packet));
 
@@ -3066,7 +3162,8 @@ class TypedConsumer final : public client::SubscriptionConsumer {
 
         auto values = project<Event>(batch, projectionWork_);
 
-        if (claimHistoryBegin(*port_, historyRevision) != HistoryBegin::CURRENT)
+        if (!claimReplayBegin(*port_, replayRevision) ||
+            claimHistoryBegin(*port_, historyRevision) != HistoryBegin::CURRENT)
             return mux::BatchAction::CONTINUE;
 
         return invoke<Event>(port_, values, listeners, completion);
@@ -3101,6 +3198,7 @@ class TypedConsumer final : public client::SubscriptionConsumer {
 
         std::shared_ptr<const ListenerSnapshot> listeners;
         std::optional<std::uint64_t> historyRevision;
+        std::optional<std::uint64_t> replayRevision;
         std::shared_ptr<CallbackExecutor> executor;
         bool customPrepared = false;
         Diagnostic preparationDiagnostic;
@@ -3134,6 +3232,9 @@ class TypedConsumer final : public client::SubscriptionConsumer {
 
             if (endpoint->options.contract == DeliveryContract::HISTORY)
                 historyRevision = batch.appliedDesiredRevision();
+
+            if (endpoint->onDemand)
+                replayRevision = endpoint->connectionRevision;
 
             listeners = port_->listeners;
             executor = port_->eventExecutor ? port_->eventExecutor : endpoint->eventExecutor;
@@ -3174,57 +3275,77 @@ class TypedConsumer final : public client::SubscriptionConsumer {
         try {
             switch (port_->eventDelivery) {
             case EventDelivery::QUOTE:
-                return deliver<events::Quote>(batch, listeners, executor, completion, historyRevision);
+                return deliver<events::Quote>(batch, listeners, executor, completion, historyRevision, replayRevision);
             case EventDelivery::PROFILE:
-                return deliver<events::Profile>(batch, listeners, executor, completion, historyRevision);
+                return deliver<events::Profile>(batch, listeners, executor, completion, historyRevision,
+                                                replayRevision);
             case EventDelivery::TRADE:
-                return deliver<events::Trade>(batch, listeners, executor, completion, historyRevision);
+                return deliver<events::Trade>(batch, listeners, executor, completion, historyRevision, replayRevision);
             case EventDelivery::TRADE_ETH:
-                return deliver<events::TradeETH>(batch, listeners, executor, completion, historyRevision);
+                return deliver<events::TradeETH>(batch, listeners, executor, completion, historyRevision,
+                                                 replayRevision);
             case EventDelivery::MESSAGE:
-                return deliver<events::Message>(batch, listeners, executor, completion, historyRevision);
+                return deliver<events::Message>(batch, listeners, executor, completion, historyRevision,
+                                                replayRevision);
             case EventDelivery::CONFIGURATION:
-                return deliver<events::Configuration>(batch, listeners, executor, completion, historyRevision);
+                return deliver<events::Configuration>(batch, listeners, executor, completion, historyRevision,
+                                                      replayRevision);
             case EventDelivery::SUMMARY:
-                return deliver<events::Summary>(batch, listeners, executor, completion, historyRevision);
+                return deliver<events::Summary>(batch, listeners, executor, completion, historyRevision,
+                                                replayRevision);
             case EventDelivery::MARKET_MAKER:
-                return deliver<events::MarketMaker>(batch, listeners, executor, completion, historyRevision);
+                return deliver<events::MarketMaker>(batch, listeners, executor, completion, historyRevision,
+                                                    replayRevision);
             case EventDelivery::SPREAD_ORDER:
-                return deliver<events::SpreadOrder>(batch, listeners, executor, completion, historyRevision);
+                return deliver<events::SpreadOrder>(batch, listeners, executor, completion, historyRevision,
+                                                    replayRevision);
             case EventDelivery::ANALYTIC_ORDER:
-                return deliver<events::AnalyticOrder>(batch, listeners, executor, completion, historyRevision);
+                return deliver<events::AnalyticOrder>(batch, listeners, executor, completion, historyRevision,
+                                                      replayRevision);
             case EventDelivery::OTC_MARKETS_ORDER:
-                return deliver<events::OtcMarketsOrder>(batch, listeners, executor, completion, historyRevision);
+                return deliver<events::OtcMarketsOrder>(batch, listeners, executor, completion, historyRevision,
+                                                        replayRevision);
             case EventDelivery::SERIES:
-                return deliver<events::Series>(batch, listeners, executor, completion, historyRevision);
+                return deliver<events::Series>(batch, listeners, executor, completion, historyRevision, replayRevision);
             case EventDelivery::GREEKS:
-                return deliver<events::Greeks>(batch, listeners, executor, completion, historyRevision);
+                return deliver<events::Greeks>(batch, listeners, executor, completion, historyRevision, replayRevision);
             case EventDelivery::UNDERLYING:
-                return deliver<events::Underlying>(batch, listeners, executor, completion, historyRevision);
+                return deliver<events::Underlying>(batch, listeners, executor, completion, historyRevision,
+                                                   replayRevision);
             case EventDelivery::THEO_PRICE:
-                return deliver<events::TheoPrice>(batch, listeners, executor, completion, historyRevision);
+                return deliver<events::TheoPrice>(batch, listeners, executor, completion, historyRevision,
+                                                  replayRevision);
             case EventDelivery::CANDLE:
-                return deliver<events::Candle>(batch, listeners, executor, completion, historyRevision);
+                return deliver<events::Candle>(batch, listeners, executor, completion, historyRevision, replayRevision);
             case EventDelivery::NUAM_ORDER:
-                return deliver<events::NuamOrder>(batch, listeners, executor, completion, historyRevision);
+                return deliver<events::NuamOrder>(batch, listeners, executor, completion, historyRevision,
+                                                  replayRevision);
             case EventDelivery::NUAM_TIME_AND_SALE:
-                return deliver<events::NuamTimeAndSale>(batch, listeners, executor, completion, historyRevision);
+                return deliver<events::NuamTimeAndSale>(batch, listeners, executor, completion, historyRevision,
+                                                        replayRevision);
             case EventDelivery::TIME_AND_SALE:
-                return deliver<events::TimeAndSale>(batch, listeners, executor, completion, historyRevision);
+                return deliver<events::TimeAndSale>(batch, listeners, executor, completion, historyRevision,
+                                                    replayRevision);
             case EventDelivery::OPTION_SALE:
-                return deliver<events::OptionSale>(batch, listeners, executor, completion, historyRevision);
+                return deliver<events::OptionSale>(batch, listeners, executor, completion, historyRevision,
+                                                   replayRevision);
             case EventDelivery::NUAM_TRADE:
-                return deliver<events::NuamTrade>(batch, listeners, executor, completion, historyRevision);
+                return deliver<events::NuamTrade>(batch, listeners, executor, completion, historyRevision,
+                                                  replayRevision);
             case EventDelivery::ORDER_IMBALANCE:
-                return deliver<events::OrderImbalance>(batch, listeners, executor, completion, historyRevision);
+                return deliver<events::OrderImbalance>(batch, listeners, executor, completion, historyRevision,
+                                                       replayRevision);
             case EventDelivery::ORDER:
-                return deliver<events::Order>(batch, listeners, executor, completion, historyRevision);
+                return deliver<events::Order>(batch, listeners, executor, completion, historyRevision, replayRevision);
             case EventDelivery::TEXT_MESSAGE:
-                return deliver<events::TextMessage>(batch, listeners, executor, completion, historyRevision);
+                return deliver<events::TextMessage>(batch, listeners, executor, completion, historyRevision,
+                                                    replayRevision);
             case EventDelivery::TEXT_CONFIGURATION:
-                return deliver<events::TextConfiguration>(batch, listeners, executor, completion, historyRevision);
+                return deliver<events::TextConfiguration>(batch, listeners, executor, completion, historyRevision,
+                                                          replayRevision);
             case EventDelivery::REGISTERED:
-                return deliver<RegisteredEvent>(batch, listeners, executor, completion, historyRevision);
+                return deliver<RegisteredEvent>(batch, listeners, executor, completion, historyRevision,
+                                                replayRevision);
             default:
                 throw Error({ErrorCode::UNSUPPORTED_PROFILE, "subscription-event-type"});
             }
@@ -3284,6 +3405,7 @@ struct NativeOnDemand {
     bool inputEnded = false;
     bool deadlineExpired = false;
     bool epochPublished = false;
+    bool transitionRetirement = false;
     std::chrono::steady_clock::time_point nextPlaybackObservation{};
 
     NativeOnDemand(const OnDemandRequest &request, const ReceivingProfile &profile, const EndpointOptions &options,
@@ -3306,6 +3428,7 @@ struct NativeEndpoint {
     std::uint64_t appliedAggregationRevision = 0; ///< Latest intent copied into the fixed recovery slot.
     bool aggregationConfigured = false;           ///< Initial default/reset is also an actual protocol property.
     std::uint64_t appliedClearRevision = 0;       ///< Sticky clear included in that physical control.
+    std::uint64_t publicEpochBase = 0;            ///< Stable offset only for TCP selected after local replay.
     std::uint32_t actualAttempts = 0; ///< Last actual factory-entry count, never inferred from desired state.
 
     /** Adopt nonnative immutable preparation on the worker.
@@ -3601,7 +3724,8 @@ void completeLatestRead(EndpointPort &port, NativeEndpoint *endpoint,
         if (request->completed)
             return;
 
-        if (!request->cancelled) {
+        if (!request->cancelled && request->sourceRevision == port.connectionRevision &&
+            hasEligibleLatestSource(port)) {
             request->result = std::move(result);
             request->failure = failure;
         }
@@ -4188,6 +4312,7 @@ std::unique_ptr<NativeEndpoint> activate(const transport::detail::BootstrapLease
     auto profile = prepareReceivingProfile(port->limits, port->options, port->host, port->port,
                                            port->tape.has_value() || port->onDemand.has_value());
     auto native = std::make_unique<NativeEndpoint>(port, std::move(profile));
+    native->publicEpochBase = port->resumedLiveEpochBase;
     auto queueWork = native->profile.queueWork;
     auto queue = createReceivingQueue(native->profile, queueWork);
 
@@ -4621,6 +4746,7 @@ void cancelEndpointCallbacks(const std::shared_ptr<EndpointPort> &endpoint, std:
 enum class EndpointProgress {
     PENDING,       ///< More lower-level work may remain; no idle acknowledgement is inferred.
     RETIRED,       ///< Native retirement completed or a visible fixed-profile refusal requires fallback disposal.
+    HANDOVER,      ///< Old replay retired. Preserve detached Feed/subscriptions for the accepted transition.
     TURN_EXHAUSTED ///< A spent shared turn yielded; the next scheduled turn may admit more work.
 };
 
@@ -5024,6 +5150,84 @@ EndpointProgress progressTape(NativeEndpoint &endpoint, transport::RecoveryTurnW
     return EndpointProgress::PENDING;
 }
 
+/** Retire the old source without closing the detached endpoint or its subscriptions. */
+EndpointProgress progressOnDemandTransition(NativeEndpoint &endpoint, transport::RecoveryTurnWork &work,
+                                            std::chrono::steady_clock::time_point deadline) {
+    auto &replay = *endpoint.onDemand;
+    const auto now = std::chrono::steady_clock::now();
+
+    if (!replay.transitionRetirement) {
+        replay.transitionRetirement = true;
+        replay.pending.reset();
+        replay.queue.requestStop(mux::StopMode::ABORT);
+        cancelEndpointCallbacks(endpoint.port, "callback-ondemand-transition");
+        auto terminal = replay.source.playback(0, now);
+        terminal.active = false;
+        publishOnDemandPlayback(endpoint.port, terminal);
+    }
+
+    replay.source.close(work.runtime, work.session);
+
+    if (endpoint.port->closeRequested.load(std::memory_order_acquire))
+        return EndpointProgress::PENDING;
+
+    if (std::chrono::steady_clock::now() >= deadline) {
+        replay.deadlineExpired = true;
+        requestEndpointClose(endpoint.port);
+        failEndpoint(endpoint.port, {ErrorCode::ON_DEMAND_TRANSITION_TIMEOUT, "ondemand-transition-deadline"});
+
+        return EndpointProgress::PENDING;
+    }
+
+    if (replay.source.retired() && endpoint.port->callbackFence.outstanding.load(std::memory_order_acquire) == 0)
+        return EndpointProgress::HANDOVER;
+
+    return EndpointProgress::PENDING;
+}
+
+/** Settle one transition after any historical native owner has retired. */
+void completeOnDemandTransition(const std::shared_ptr<EndpointPort> &port) noexcept {
+    finishOnDemandPlayback(port);
+    std::unique_lock lock(port->mutex);
+
+    if (!port->onDemandTransition || port->closeRequested.load(std::memory_order_acquire))
+        return;
+
+    if (std::chrono::steady_clock::now() >= port->onDemandTransition->deadline) {
+        port->terminal.deadlineExpired = true;
+        lock.unlock();
+        requestEndpointClose(port);
+        failEndpoint(port, {ErrorCode::ON_DEMAND_TRANSITION_TIMEOUT, "ondemand-transition-deadline"});
+
+        return;
+    }
+
+    auto &route = port->onDemandTransition->live;
+    port->onDemand.reset();
+    port->statistics.connection.sourceEpoch.reset();
+
+    if (route)
+        port->statistics.connection = {};
+
+    port->statistics.observedAt = std::chrono::steady_clock::now();
+    port->clearedRevision = port->clearRevision;
+    port->activeDeliveryRevision = 0;
+
+    if (route) {
+        port->address = std::move(route->spelling);
+        port->host = std::move(route->host);
+        port->port = route->port;
+        port->resumedLiveEpochBase = port->connectionRevision;
+        port->connectionIntent = true;
+    }
+
+    port->onDemandTransition.reset();
+    const auto next = port->connectionIntent ? EndpointState::CONNECTING : EndpointState::NOT_CONNECTED;
+
+    if (port->state != next)
+        queueStateChange(*port, next);
+}
+
 /** Advance the finite local OnDemand window under the ordinary receiver and callback fences. */
 EndpointProgress progressOnDemand(NativeEndpoint &endpoint, transport::RecoveryTurnWork &work,
                                   mux::QueueSubmitWork &submitWork, std::uint64_t revision, bool firstPoll) {
@@ -5134,7 +5338,7 @@ EndpointProgress progressOnDemand(NativeEndpoint &endpoint, transport::RecoveryT
         {
             std::lock_guard lock(endpoint.port->mutex);
 
-            if (endpoint.port->connectionRevision != revision ||
+            if (endpoint.port->connectionRevision != revision || endpoint.port->onDemandTransition ||
                 endpoint.port->closeRequested.load(std::memory_order_acquire))
                 return EndpointProgress::PENDING;
 
@@ -5164,7 +5368,7 @@ EndpointProgress progressOnDemand(NativeEndpoint &endpoint, transport::RecoveryT
         if (replay.source.finished()) {
             std::lock_guard lock(endpoint.port->mutex);
 
-            if (!endpoint.port->closeRequested.load(std::memory_order_acquire)) {
+            if (!endpoint.port->onDemandTransition && !endpoint.port->closeRequested.load(std::memory_order_acquire)) {
                 replay.inputEnded = true;
                 requestEndpointClose(endpoint.port);
             }
@@ -5192,7 +5396,8 @@ EndpointProgress progressOnDemand(NativeEndpoint &endpoint, transport::RecoveryT
 
     std::unique_lock lock(endpoint.port->mutex);
 
-    if (endpoint.port->connectionRevision != revision || endpoint.port->closeRequested.load(std::memory_order_acquire))
+    if (endpoint.port->connectionRevision != revision || endpoint.port->onDemandTransition ||
+        endpoint.port->closeRequested.load(std::memory_order_acquire))
         return EndpointProgress::PENDING;
 
     const auto admitted = replay.queue.admit(std::move(*replay.pending), queueWork);
@@ -5210,6 +5415,22 @@ EndpointProgress progressOnDemand(NativeEndpoint &endpoint, transport::RecoveryT
     return EndpointProgress::PENDING;
 }
 
+/** Translate a resumed TCP epoch without modifying native accounting. */
+bool translateLiveEpoch(transport::ConnectionStatistics &statistics, std::uint64_t base) noexcept {
+    if (!statistics.sourceEpoch || base == 0)
+        return true;
+
+    if (*statistics.sourceEpoch > std::numeric_limits<std::uint64_t>::max() - base) {
+        statistics.sourceEpoch.reset();
+
+        return false;
+    }
+
+    *statistics.sourceEpoch += base;
+
+    return true;
+}
+
 /** Give one endpoint one native/queue/control poll from an unchanged finite owner-turn allowance.
  * @param endpoint Sole worker-owned endpoint.
  * @param work Remaining actual recovery/native/queue coordinates, shared across this whole burst.
@@ -5222,6 +5443,7 @@ EndpointProgress progressEndpoint(NativeEndpoint &endpoint, transport::RecoveryT
     std::uint64_t revision;
     std::uint64_t clearRevision;
     bool online;
+    std::optional<std::chrono::steady_clock::time_point> onDemandTransition;
     {
         std::lock_guard lock(endpoint.port->mutex);
 
@@ -5232,13 +5454,20 @@ EndpointProgress progressEndpoint(NativeEndpoint &endpoint, transport::RecoveryT
         revision = endpoint.port->connectionRevision;
         clearRevision = endpoint.port->clearRevision;
         online = endpoint.port->connectionIntent;
+
+        if (endpoint.port->onDemandTransition)
+            onDemandTransition = endpoint.port->onDemandTransition->deadline;
     }
 
     if (endpoint.tape)
         return progressTape(endpoint, work, submitWork, revision, firstPoll);
 
-    if (endpoint.onDemand)
+    if (endpoint.onDemand) {
+        if (onDemandTransition && !endpoint.port->closeRequested.load(std::memory_order_acquire))
+            return progressOnDemandTransition(endpoint, work, *onDemandTransition);
+
         return progressOnDemand(endpoint, work, submitWork, revision, firstPoll);
+    }
 
     if (!endpoint.port->closeRequested.load(std::memory_order_acquire) && endpoint.appliedRevision != revision) {
         cancelEndpointCallbacks(endpoint.port, "callback-source-change");
@@ -5314,7 +5543,12 @@ EndpointProgress progressEndpoint(NativeEndpoint &endpoint, transport::RecoveryT
     if (endpoint.port->callbackFence.cancelQueuedRequested.exchange(false, std::memory_order_acq_rel))
         cancelEndpointCallbacks(endpoint.port, "callback-source-reset");
 
-    const auto statistics = endpoint.recovery->statistics();
+    auto statistics = endpoint.recovery->statistics();
+
+    if (!translateLiveEpoch(statistics, endpoint.publicEpochBase) && !endpoint.draining) {
+        requestEndpointClose(endpoint.port);
+        failEndpoint(endpoint.port, {ErrorCode::RESOURCE_LIMIT, "ondemand-live-epoch"});
+    }
 
     for (const auto &subscription : endpoint.subscriptions) {
         if (subscription)
@@ -5375,7 +5609,8 @@ EndpointProgress progressEndpoint(NativeEndpoint &endpoint, transport::RecoveryT
         }
     }
 
-    if (!endpoint.draining && !status.terminal && online && endpoint.appliedRevision == revision) {
+    if (!endpoint.draining && !endpoint.port->closeRequested.load(std::memory_order_acquire) && !status.terminal &&
+        online && endpoint.appliedRevision == revision) {
         observeState(endpoint.port,
                      status.phase == transport::RecoveryPhase::ACTIVE ? EndpointState::CONNECTED
                                                                       : EndpointState::CONNECTING,
@@ -5424,7 +5659,8 @@ void retireNative(std::unique_ptr<NativeEndpoint> &endpoint) noexcept {
         latestSourceFailure = recoveryDiagnostic(status.first);
 
     auto result = closeResult(port, status);
-    const auto statistics = transport::detail::TcpRecoveryFactory::retireStatistics(*endpoint->recovery);
+    auto statistics = transport::detail::TcpRecoveryFactory::retireStatistics(*endpoint->recovery);
+    static_cast<void>(translateLiveEpoch(statistics, endpoint->publicEpochBase));
     {
         std::lock_guard lock(port->mutex);
         port->statistics.connection = statistics;
@@ -5696,6 +5932,20 @@ void RuntimeImpl::run() noexcept {
                             continue;
                         }
 
+                        bool hasDormantTransition;
+                        {
+                            std::lock_guard lock(port->mutex);
+                            hasDormantTransition = port->onDemandTransition.has_value();
+                        }
+
+                        if (hasDormantTransition) {
+                            completeOnDemandTransition(port);
+                            port->stateCondition.notify_all();
+                            nextWake = std::min(nextWake, std::chrono::steady_clock::now());
+
+                            continue;
+                        }
+
                         if (!connectRequested) {
                             // Close individual never-activated subscriptions without opening a queue.
                             for (std::size_t slot = 0; slot < port->subscriptions.size(); ++slot) {
@@ -5727,6 +5977,23 @@ void RuntimeImpl::run() noexcept {
 
                         if (progress == EndpointProgress::RETIRED) {
                             retireNative(native[index]);
+                            retired = true;
+
+                            break;
+                        }
+
+                        if (progress == EndpointProgress::HANDOVER) {
+                            for (const auto &subscription : native[index]->subscriptions) {
+                                if (subscription)
+                                    subscription->port->statistics->update([](auto &value) {
+                                        value.sourceEpoch.reset();
+                                    });
+                            }
+
+                            native[index].reset();
+                            completeOnDemandTransition(port);
+                            port->stateCondition.notify_all();
+                            nextWake = std::min(nextWake, std::chrono::steady_clock::now());
                             retired = true;
 
                             break;
@@ -5771,6 +6038,12 @@ void RuntimeImpl::run() noexcept {
                     } else {
                         const auto &replay = *native[index]->onDemand;
                         wakeAt = std::min(wakeAt, replay.source.nextWake(now));
+                        {
+                            std::lock_guard lock(port->mutex);
+
+                            if (port->onDemandTransition && !port->closeRequested.load(std::memory_order_acquire))
+                                wakeAt = std::min(wakeAt, port->onDemandTransition->deadline);
+                        }
                         const auto deadline = port->closeDeadline.load(std::memory_order_acquire);
 
                         if (deadline && !replay.deadlineExpired)
@@ -6153,7 +6426,8 @@ std::optional<RegisteredEvent> Feed::readLastEvent(EventType type, std::u16strin
                 if (port_->latestRead)
                     reject(ErrorCode::RESOURCE_LIMIT, "latest-event-read-busy");
 
-                request = std::make_shared<detail::LatestEventRead>(type, symbol, ifSubscribed);
+                request =
+                    std::make_shared<detail::LatestEventRead>(type, symbol, ifSubscribed, port_->connectionRevision);
                 port_->latestRead = request;
             }
         }
@@ -6338,7 +6612,7 @@ void Feed::admitLatestEventRequests(
             if (port_->tape)
                 throw Error(TAPE_LATEST_REQUEST_REFUSAL);
 
-            if (port_->onDemand)
+            if (port_->onDemand || port_->onDemandTransition || (port_->onDemandPlayback && port_->address.empty()))
                 reject(ErrorCode::UNSUPPORTED_PROFILE, "ondemand-latest-request");
 
             if (!control->runtime || control->stopping || port_->retired.load(std::memory_order_acquire) ||
