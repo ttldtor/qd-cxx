@@ -157,6 +157,10 @@ void candidate(RecoveryReplay &replay, std::optional<std::size_t> removed, const
 } // namespace
 
 RecoveryObservation RecoveryCore::replay(RecoveryTicket ticket, RecoveryTurnWork &work) {
+    if (configuration_.options.requireAllContracts && !allContractsReady_) {
+        return recoveryResult(ticket, RecoveryCompletion::READINESS_BLOCKED);
+    }
+
     auto result = recoveryResult(ticket);
 
     for (std::size_t visited = 0; visited != 3; ++visited) {

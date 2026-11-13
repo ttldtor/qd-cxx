@@ -99,7 +99,8 @@ struct RecoveryOptions {
     std::optional<std::chrono::milliseconds> heartbeatInterval;  ///< Local output-admission idle interval.
     std::optional<std::chrono::milliseconds> protocolInactivity; ///< Validated current-input inactivity.
     core::SubscriptionSelectorPolicy selectors = core::SubscriptionSelectorPolicy::EXACT_ONLY; ///< Exact profile.
-    RecoveryDns dns{}; ///< Explicit finite route; reference identity remains the endpoint TLS identity.
+    RecoveryDns dns{};                ///< Explicit finite route; reference identity remains the endpoint TLS identity.
+    bool requireAllContracts = false; ///< Require all three negotiated families before any subscription replay.
 };
 
 /** Caller delivery owners, borrowed until a successful factory's final nonthrowing transfer. */

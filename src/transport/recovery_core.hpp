@@ -170,10 +170,12 @@ class RecoveryCore {
     std::uint64_t readiness_ = 0;      ///< Checked readiness change identity, never inferred from schema shape.
     std::uint64_t peerGeneration_ = 0; ///< Last actual current generation.
     protocol::LiveAuthentication authentication_ = protocol::LiveAuthentication::UNCHALLENGED; ///< Last actual gate.
-    std::size_t description_ = 0;   ///< Next outgoing declaration in this fresh attempt.
-    std::size_t family_ = 0;        ///< Fixed fair family cursor.
-    std::size_t controlFamily_ = 0; ///< Independent bounded offline/control-progress cursor.
-    bool descriptor_ = false;       ///< The local initial descriptor was actually admitted in this attempt.
+    std::size_t description_ = 0;    ///< Next outgoing declaration in this fresh attempt.
+    std::size_t family_ = 0;         ///< Fixed fair family cursor.
+    std::size_t controlFamily_ = 0;  ///< Independent bounded offline/control-progress cursor.
+    bool descriptor_ = false;        ///< The local initial descriptor was actually admitted in this attempt.
+    bool allContractsReady_ = false; ///< The current peer has all required ADD, REMOVE and DATA capabilities.
+    std::optional<RecoveryClock::time_point> contractDeadline_;     ///< Absolute mixed negotiation deadline.
     std::optional<std::chrono::milliseconds> requestedAggregation_; ///< Worker-owned coalesced local request.
     std::optional<AggregationPeriodInfo> aggregationInfo_;          ///< Only actual current-source descriptor reports.
     bool aggregationEnabled_ = false; ///< Private high-level feature; legacy low-level output remains unchanged.

@@ -9,6 +9,7 @@
 #include "qd/events/quote.hpp"
 
 #include <algorithm>
+#include <exception>
 #include <iostream>
 
 namespace {
@@ -83,14 +84,23 @@ m::MuxQueue sourceQueue(const c::LocalSchema &local, c::SubscriptionFamily famil
     const m::QueueLimits delivery{
         4, 128, 16, 4, 16, 256, 4 * 1024 * 1024, 64, 1024 * 1024, 32, 64, 8, 16 * 1024 * 1024};
     auto work = r::queueWork();
-    auto created =
-        family == c::SubscriptionFamily::TICKER
-            ? m::MuxQueue::createTicker(local, interests, {4, 32, 64, 4 * 1024 * 1024, 16 * 1024 * 1024, desired},
-                                        {false, 100}, delivery, work)
-            : m::MuxQueue::createHistory(
-                  local, interests,
-                  {32, 256, 128, 64, 4 * 1024 * 1024, 4, 128, 64, 4 * 1024 * 1024, 32 * 1024 * 1024, desired},
-                  {false, 100, 10000}, delivery, work);
+    auto created = [&] {
+        switch (family) {
+        case c::SubscriptionFamily::TICKER:
+            return m::MuxQueue::createTicker(local, interests, {4, 32, 64, 4 * 1024 * 1024, 16 * 1024 * 1024, desired},
+                                             {false, 100}, delivery, work);
+        case c::SubscriptionFamily::STREAM:
+            return m::MuxQueue::createStream(local, interests, desired, {8, 256, 4 * 1024 * 1024, 8 * 1024 * 1024},
+                                             delivery, work);
+        case c::SubscriptionFamily::HISTORY:
+            return m::MuxQueue::createHistory(
+                local, interests,
+                {32, 256, 128, 64, 4 * 1024 * 1024, 4, 128, 64, 4 * 1024 * 1024, 32 * 1024 * 1024, desired},
+                {false, 100, 10000}, delivery, work);
+        }
+
+        std::terminate();
+    }();
     REQUIRE(created);
 
     return std::move(*created);
@@ -162,6 +172,7 @@ void until(t::TcpRecovery &owner, const root::test::OwnedTcpPeer &peer, Predicat
          " transportError=", static_cast<int>(status.first.transport.error),
          " protocolError=", static_cast<int>(status.first.transport.protocolError),
          " peerError=", static_cast<int>(snapshot.error), " nativeCode=", snapshot.nativeCode,
+         " first captured bytes=", snapshot.sessions.empty() ? 0 : snapshot.sessions[0].received.size(),
          " first matched=", !snapshot.sessions.empty() && snapshot.sessions[0].matched,
          " second accepted=", snapshot.sessions.size() > 1 && snapshot.sessions[1].accepted,
          " second matched=", snapshot.sessions.size() > 1 && snapshot.sessions[1].matched,
@@ -169,35 +180,78 @@ void until(t::TcpRecovery &owner, const root::test::OwnedTcpPeer &peer, Predicat
     REQUIRE(predicate());
 }
 
-/** Encode the selected single-family client declaration independently of recovery output.
- * @param history False selects TICKER; true selects HISTORY.
- * @return DXP3 common controls and precisely one enabled family's add/remove/data identities.
- */
-std::vector<std::byte> clientProtocol(bool history) {
-    std::vector<std::byte> payload{std::byte{'D'}, std::byte{'X'}, std::byte{'P'}, std::byte{'3'}};
-    r::number(payload, 0);
-    r::number(payload, 5);
-    const std::array<std::int32_t, 5> sendIds{0, 1, 2, history ? 21 : 11, history ? 22 : 12};
-    const std::array<std::u16string_view, 5> sendNames{
-        u"HEARTBEAT", u"DESCRIBE_PROTOCOL", u"DESCRIBE_RECORDS",
-        history ? u"HISTORY_ADD_SUBSCRIPTION" : u"TICKER_ADD_SUBSCRIPTION",
-        history ? u"HISTORY_REMOVE_SUBSCRIPTION" : u"TICKER_REMOVE_SUBSCRIPTION"};
+/** One actual QTP family in its numeric wire order. */
+struct WireFamily {
+    std::int32_t data;              ///< DATA wire identifier.
+    std::u16string_view dataName;   ///< Exact advertised DATA name.
+    std::u16string_view addName;    ///< Exact advertised ADD name; identifier is DATA + 1.
+    std::u16string_view removeName; ///< Exact advertised REMOVE name; identifier is DATA + 2.
+};
 
-    for (std::size_t index = 0; index != sendIds.size(); ++index) {
-        r::number(payload, sendIds[index]);
-        r::text(payload, sendNames[index]);
+constexpr std::array<WireFamily, 3> WIRE_FAMILIES{{
+    {10, u"TICKER_DATA", u"TICKER_ADD_SUBSCRIPTION", u"TICKER_REMOVE_SUBSCRIPTION"},
+    {15, u"STREAM_DATA", u"STREAM_ADD_SUBSCRIPTION", u"STREAM_REMOVE_SUBSCRIPTION"},
+    {20, u"HISTORY_DATA", u"HISTORY_ADD_SUBSCRIPTION", u"HISTORY_REMOVE_SUBSCRIPTION"},
+}};
+
+/** Encode the expected client declaration independently of recovery output.
+ * @param families Exact ordered families negotiated by this owner.
+ * @return DXP3 common controls and the selected families' add/remove/data identities.
+ */
+std::vector<std::byte> clientProtocol(std::span<const WireFamily> families) {
+    std::vector<std::byte> payload{std::byte{'D'}, std::byte{'X'}, std::byte{'P'}, std::byte{'3'}};
+    constexpr std::array<std::u16string_view, 3> COMMON{u"HEARTBEAT", u"DESCRIBE_PROTOCOL", u"DESCRIBE_RECORDS"};
+    const auto append = [&](std::int32_t id, std::u16string_view name) {
+        r::number(payload, id);
+        r::text(payload, name);
         r::number(payload, 0);
+    };
+
+    r::number(payload, 0);
+    r::number(payload, COMMON.size() + 2 * families.size());
+
+    for (std::size_t index = 0; index != COMMON.size(); ++index)
+        append(static_cast<std::int32_t>(index), COMMON[index]);
+
+    for (const auto &family : families) {
+        append(family.data + 1, family.addName);
+        append(family.data + 2, family.removeName);
     }
 
-    r::number(payload, 4);
-    const std::array<std::int32_t, 4> receiveIds{0, 1, 2, history ? 20 : 10};
-    const std::array<std::u16string_view, 4> receiveNames{u"HEARTBEAT", u"DESCRIBE_PROTOCOL", u"DESCRIBE_RECORDS",
-                                                          history ? u"HISTORY_DATA" : u"TICKER_DATA"};
+    r::number(payload, COMMON.size() + families.size());
 
-    for (std::size_t index = 0; index != receiveIds.size(); ++index) {
-        r::number(payload, receiveIds[index]);
-        r::text(payload, receiveNames[index]);
+    for (std::size_t index = 0; index != COMMON.size(); ++index)
+        append(static_cast<std::int32_t>(index), COMMON[index]);
+
+    for (const auto &family : families)
+        append(family.data, family.dataName);
+
+    return r::frame(1, payload);
+}
+
+/** Encode the supplied families as an ordinary peer descriptor or capability delta.
+ * @param families Exact subset to add to the peer's previously advertised capabilities.
+ * @return DXP3 peer SEND data and RECEIVE subscription identities.
+ */
+std::vector<std::byte> peerProtocol(std::span<const WireFamily> families) {
+    std::vector<std::byte> payload{std::byte{'D'}, std::byte{'X'}, std::byte{'P'}, std::byte{'3'}};
+    const auto append = [&](std::int32_t id, std::u16string_view name) {
+        r::number(payload, id);
+        r::text(payload, name);
         r::number(payload, 0);
+    };
+
+    r::number(payload, 0);
+    r::number(payload, families.size());
+
+    for (const auto &family : families)
+        append(family.data, family.dataName);
+
+    r::number(payload, 2 * families.size());
+
+    for (const auto &family : families) {
+        append(family.data + 1, family.addName);
+        append(family.data + 2, family.removeName);
     }
 
     return r::frame(1, payload);
@@ -273,7 +327,7 @@ std::vector<std::byte> quoteData(std::int32_t sender, std::u16string_view key, s
  */
 std::vector<std::byte> outgoing(bool history, std::initializer_list<std::u16string_view> symbols,
                                 std::optional<std::int64_t> bound = {}) {
-    auto bytes = clientProtocol(history);
+    auto bytes = clientProtocol(std::span(WIRE_FAMILIES).subspan(history ? 2 : 0, 1));
     r::append(bytes, history ? r::description(71) : quoteDescription(71));
 
     for (const auto key : symbols) {
@@ -290,6 +344,57 @@ std::vector<std::byte> outgoing(bool history, std::initializer_list<std::u16stri
     }
 
     return bytes;
+}
+
+/** Build one exact add frame independently of production replay.
+ * @param family QTP DATA identifier, followed by the corresponding ADD identity.
+ * @param key Requested symbol.
+ * @param bound Optional raw HISTORY lower bound.
+ * @return Complete raw-symbol ADD frame.
+ */
+std::vector<std::byte> addFrame(const WireFamily &family, std::u16string_view key,
+                                std::optional<std::int64_t> bound = {}) {
+    std::vector<std::byte> payload;
+    symbol(payload, key);
+    r::number(payload, 71);
+
+    if (bound)
+        r::number(payload, *bound);
+
+    return r::frame(family.data + 1, payload);
+}
+
+/** Verify complete peer bytes while allowing the scheduler to choose the first lane.
+ * @param received Actual prefix captured on one native connection.
+ * @param prefix Exact shared descriptor and schema bytes.
+ * @param adds Whole expected ADD frames, one per enabled contract.
+ */
+void checkMixedOutput(std::span<const std::byte> received, std::span<const std::byte> prefix,
+                      const std::array<std::vector<std::byte>, 3> &adds) {
+    REQUIRE(received.size() > prefix.size());
+    REQUIRE(std::ranges::equal(received.first(prefix.size()), prefix));
+    received = received.subspan(prefix.size());
+    p::FrameReader reader({256, 265});
+    std::array<bool, 3> seen{};
+
+    while (!received.empty()) {
+        const auto next = reader.feed(received);
+        REQUIRE(next.status == p::FrameStatus::FRAME_READY);
+        REQUIRE(next.accepted != 0);
+        const auto whole = received.first(next.accepted);
+        const auto expected = std::ranges::find_if(adds, [whole](const auto &add) {
+            return std::ranges::equal(whole, add);
+        });
+        REQUIRE(expected != adds.end());
+        const auto lane = static_cast<std::size_t>(expected - adds.begin());
+        CHECK_FALSE(seen[lane]);
+        seen[lane] = true;
+        received = received.subspan(next.accepted);
+    }
+
+    CHECK(std::ranges::all_of(seen, [](bool found) {
+        return found;
+    }));
 }
 
 /** Read only detached actual callback records after source reset or retirement.
@@ -548,6 +653,274 @@ TEST_CASE("HISTORY recovery exposes interruption and replays current signed raw 
     CHECK(retained.typedValues[2].raw == 101);
     CHECK(recorder->batches[0].epoch().matches(oldEpoch));
     CHECK(record(*recorder, 1, u"A", 7).typedValues[2].raw == 202);
+}
+
+TEST_CASE("TCP recovery replays three delivery families over one socket per attempt") {
+    constexpr std::int64_t FIRST_BOUND = -0x200000007LL;
+    constexpr std::int64_t CURRENT_BOUND = -0x100000007LL;
+    constexpr std::int64_t POINT_TIME = -3;
+    constexpr std::array families{c::SubscriptionFamily::TICKER, c::SubscriptionFamily::STREAM,
+                                  c::SubscriptionFamily::HISTORY};
+    constexpr std::array<std::u16string_view, 3> keys{u"PRICE", u"SALE", u"BOOK"};
+    constexpr std::array<std::int32_t, 2> senders{41, 7};
+    constexpr std::uint8_t ALL_FAMILIES = 0b111;
+    auto bootstrap = t::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+
+    auto prefix = clientProtocol(WIRE_FAMILIES);
+    r::append(prefix, r::description(71));
+    std::array<std::array<std::vector<std::byte>, 3>, 2> adds;
+    root::test::TcpPeerConfig script;
+    script.lifetime = 35s;
+    script.sessions.resize(senders.size());
+
+    for (std::size_t attempt = 0; attempt != senders.size(); ++attempt) {
+        auto &session = script.sessions[attempt];
+        session.initialBytes = r::ready();
+        r::append(session.initialBytes, r::description(senders[attempt]));
+        session.clientBytesToRead = prefix.size();
+        session.waitForControllerClose = true;
+
+        for (std::size_t lane = 0; lane != families.size(); ++lane) {
+            const auto bound = lane == 2 ? std::optional{attempt == 0 ? FIRST_BOUND : CURRENT_BOUND} : std::nullopt;
+            adds[attempt][lane] = addFrame(WIRE_FAMILIES[lane], keys[lane], bound);
+            session.clientBytesToRead += adds[attempt][lane].size();
+            r::append(session.replyBytes,
+                      r::data(senders[attempt], keys[lane], static_cast<std::int32_t>((attempt + 1) * 100 + lane),
+                              WIRE_FAMILIES[lane].data, POINT_TIME));
+        }
+    }
+
+    root::test::OwnedTcpPeer peer(std::move(script));
+    REQUIRE(peer.port() != 0);
+    auto local = r::schema();
+    t::RecoveryQueues queues;
+    const std::array lanes{&queues.ticker, &queues.stream, &queues.history};
+    std::array<std::shared_ptr<Recorder>, 3> recorders;
+    std::array<m::MuxHandle, 3> handles;
+    std::array<m::MuxCommandTicket, 3> desired;
+
+    for (std::size_t lane = 0; lane != families.size(); ++lane) {
+        auto &queue = lanes[lane]->emplace(sourceQueue(local, families[lane]));
+        recorders[lane] = std::make_shared<Recorder>();
+        handles[lane] = open(queue, recorders[lane]);
+        desired[lane] =
+            replace(handles[lane], local, {keys[lane]}, lane == 2 ? std::optional{FIRST_BOUND} : std::nullopt);
+    }
+
+    constexpr std::size_t WRITE_CHUNK_BYTES = 64;
+    REQUIRE(prefix.size() > WRITE_CHUNK_BYTES);
+    auto input = r::settings(peer.port(), 2, RETRY_DELAY);
+    input.budgets.tcp.writeBytes = WRITE_CHUNK_BYTES;
+    auto endpoint = r::endpoint(local, input);
+    auto preparation = r::preparation();
+    auto options = r::options();
+    options.requireAllContracts = true;
+    auto owner = t::TcpRecovery::create(*bootstrap, endpoint, r::blueprint(), std::move(queues), options, preparation);
+    REQUIRE(owner);
+    REQUIRE(owner->start());
+
+    const auto haveBatches = [&](std::size_t count) {
+        return std::ranges::all_of(recorders, [count](const auto &recorder) {
+            return recorder->batches.size() == count;
+        });
+    };
+    const auto checkAttempt = [&](std::size_t attempt) {
+        const auto status = owner->status();
+        CHECK(status.attempts == attempt + 1);
+        CHECK(status.demandedFamilies == ALL_FAMILIES);
+        CHECK(status.convergedFamilies == ALL_FAMILIES);
+        const auto statistics = owner->statistics();
+        CHECK(statistics.activeConnections == 1);
+        CHECK(statistics.sourceEpoch == attempt + 1);
+        CHECK(statistics.establishedConnections.value == attempt + 1);
+        CHECK(statistics.writtenSubscriptionRecords.value == (attempt + 1) * families.size());
+        const auto received = peer.snapshot();
+        CHECK(received.error == root::test::TcpPeerError::NONE);
+        CHECK(received.sessions[attempt].accepted);
+        CHECK(received.sessions[attempt].matched);
+        checkMixedOutput(received.sessions[attempt].received, prefix, adds[attempt]);
+
+        for (std::size_t lane = 0; lane != families.size(); ++lane) {
+            const auto &entry = record(*recorders[lane], attempt, keys[lane], senders[attempt]);
+            CHECK(entry.family == families[lane]);
+            REQUIRE(entry.typedValues.size() == 3);
+            CHECK(entry.typedValues[2].raw == static_cast<std::int32_t>((attempt + 1) * 100 + lane));
+
+            if (lane == 2)
+                CHECK(entry.rawTime == POINT_TIME);
+        }
+    };
+
+    until(*owner, peer, [&] {
+        return haveBatches(1) && owner->status().phase == t::RecoveryPhase::ACTIVE;
+    });
+    checkAttempt(0);
+    CHECK_FALSE(peer.snapshot().sessions[1].accepted);
+
+    for (const auto &ticket : desired) {
+        REQUIRE(ticket.result());
+        CHECK(ticket.result()->status == m::CommandStatus::APPLIED);
+    }
+
+    peer.allowClose(0);
+    until(*owner, peer, [&] {
+        return owner->status().phase == t::RecoveryPhase::BACKOFF;
+    });
+    auto changed = replace(handles[2], local, {keys[2]}, CURRENT_BOUND);
+    until(
+        *owner, peer,
+        [&] {
+            return changed.result().has_value();
+        },
+        COMMAND_DEADLINE);
+    REQUIRE(changed.result()->status == m::CommandStatus::APPLIED);
+    CHECK(changed.result()->changed);
+
+    std::array<m::QueueIdentity, 3> nextEpochs;
+
+    for (std::size_t lane = 0; lane != families.size(); ++lane) {
+        const auto notice = handles[lane].resetNotice();
+        REQUIRE(notice);
+        CHECK(notice->sourceCommitted);
+        CHECK(notice->fromEpoch.matches(recorders[lane]->batches[0].epoch()));
+        REQUIRE(notice->toEpoch);
+        CHECK_FALSE(notice->toEpoch->matches(notice->fromEpoch));
+        nextEpochs[lane] = *notice->toEpoch;
+        CHECK(handles[lane].acknowledgeReset(notice->sequence) == m::ControlAdmission::RECORDED);
+    }
+
+    until(*owner, peer, [&] {
+        return haveBatches(2) && owner->status().phase == t::RecoveryPhase::ACTIVE;
+    });
+    checkAttempt(1);
+
+    for (std::size_t lane = 0; lane != families.size(); ++lane) {
+        CHECK(recorders[lane]->batches[1].epoch().matches(nextEpochs[lane]));
+        CHECK_FALSE(handles[lane].resetNotice());
+    }
+
+    r::stop(*owner);
+    const auto closed = owner->status();
+    REQUIRE(closed.terminal);
+    CHECK(std::ranges::all_of(closed.terminal->queues, [](const auto &queue) {
+        return queue.has_value();
+    }));
+    CHECK(owner->statistics().activeConnections == 0);
+    CHECK(owner->statistics().closedConnections.value == senders.size());
+    peer.stop();
+    CHECK(record(*recorders[0], 0, keys[0], senders[0]).typedValues[2].raw == 100);
+}
+
+TEST_CASE("mixed recovery gates even TICKER demand until every peer contract is known") {
+    constexpr std::u16string_view KEY = u"PRICE";
+    constexpr std::int32_t SENDER = 41;
+    enum class Completion { CAPABILITY_DELTA, TIMEOUT, PAUSE, EARLY_DATA };
+
+    for (const auto completion :
+         {Completion::CAPABILITY_DELTA, Completion::TIMEOUT, Completion::PAUSE, Completion::EARLY_DATA}) {
+        CAPTURE(static_cast<int>(completion));
+        auto bootstrap = t::RuntimeBootstrap::create();
+        REQUIRE(bootstrap);
+        auto prefix = clientProtocol(WIRE_FAMILIES);
+        r::append(prefix, r::description(71));
+        root::test::TcpPeerConfig script;
+        script.sessions.resize(1);
+        auto &session = script.sessions.front();
+        session.initialBytes = peerProtocol(std::span(WIRE_FAMILIES).first(1));
+        session.expectedClientBytes = prefix;
+        session.waitForClientClose = true;
+
+        if (completion == Completion::CAPABILITY_DELTA)
+            session.stagedBytes.push_back(peerProtocol(std::span(WIRE_FAMILIES).subspan(1)));
+
+        if (completion == Completion::EARLY_DATA) {
+            auto early = r::description(SENDER);
+            r::append(early, r::data(SENDER, KEY, 101, WIRE_FAMILIES[0].data));
+            session.stagedBytes.push_back(std::move(early));
+        }
+
+        root::test::OwnedTcpPeer peer(std::move(script));
+        REQUIRE(peer.port() != 0);
+        auto local = r::schema();
+        t::RecoveryQueues queues;
+        queues.ticker.emplace(sourceQueue(local, c::SubscriptionFamily::TICKER));
+        queues.stream.emplace(sourceQueue(local, c::SubscriptionFamily::STREAM));
+        queues.history.emplace(sourceQueue(local, c::SubscriptionFamily::HISTORY));
+        auto recorder = std::make_shared<Recorder>();
+        auto handle = open(*queues.ticker, recorder);
+        auto desired = replace(handle, local, {KEY});
+        auto endpoint = r::endpoint(local, r::settings(peer.port(), 1, 0ms));
+        auto preparation = r::preparation();
+        auto options = r::options();
+        options.requireAllContracts = true;
+        auto owner =
+            t::TcpRecovery::create(*bootstrap, endpoint, r::blueprint(), std::move(queues), options, preparation);
+        REQUIRE(owner);
+        REQUIRE(owner->start());
+        until(*owner, peer, [&] {
+            return peer.snapshot().sessions[0].matched && desired.result().has_value() &&
+                   owner->statistics().readMessages.value != 0;
+        });
+        REQUIRE(desired.result()->status == m::CommandStatus::APPLIED);
+        const auto checkUntil = std::chrono::steady_clock::now() + 100ms;
+
+        while (std::chrono::steady_clock::now() < checkUntil) {
+            auto work = r::turn();
+            REQUIRE(owner->poll(work));
+            CHECK(owner->status().phase != t::RecoveryPhase::FAILED);
+            CHECK(owner->statistics().writtenSubscriptionRecords.value == 0);
+            std::this_thread::sleep_for(1ms);
+        }
+
+        if (completion == Completion::CAPABILITY_DELTA) {
+            peer.allowStages(0, 1);
+            until(*owner, peer, [&] {
+                return owner->status().phase == t::RecoveryPhase::ACTIVE &&
+                       owner->statistics().writtenSubscriptionRecords.value == 1;
+            });
+            r::stop(*owner);
+            r::append(prefix, addFrame(WIRE_FAMILIES[0], KEY));
+        } else if (completion == Completion::PAUSE) {
+            REQUIRE(owner->requestDisconnect());
+            until(*owner, peer, [&] {
+                return owner->status().phase == t::RecoveryPhase::SUSPENDED;
+            });
+            CHECK(owner->status().first.error == t::RecoveryError::NONE);
+            CHECK_FALSE(owner->nextWake());
+            CHECK(owner->statistics().activeConnections == 0);
+            r::stop(*owner);
+        } else {
+            const bool earlyData = completion == Completion::EARLY_DATA;
+
+            if (earlyData)
+                peer.allowStages(0, 1);
+
+            until(*owner, peer, [&] {
+                return owner->status().phase == t::RecoveryPhase::FAILED;
+            });
+            const auto status = owner->status();
+            CHECK(status.first.error == t::RecoveryError::UNSUPPORTED_PROFILE);
+            CHECK(status.first.stage == (earlyData ? "recovery-data-before-contracts" : "recovery-peer-contracts"));
+            CHECK(recorder->batches.empty());
+            CHECK(owner->statistics().writtenSubscriptionRecords.value == 0);
+            CHECK(status.attempts == 1);
+            REQUIRE(status.terminal);
+            CHECK(std::ranges::all_of(status.terminal->queues, [](const auto &queue) {
+                return queue.has_value();
+            }));
+        }
+
+        const auto peerDeadline = std::chrono::steady_clock::now() + OBSERVATION_DEADLINE;
+
+        while (!peer.snapshot().sessions[0].completed && std::chrono::steady_clock::now() < peerDeadline)
+            std::this_thread::sleep_for(1ms);
+
+        const auto captured = peer.snapshot();
+        REQUIRE(captured.sessions[0].completed);
+        CHECK(captured.error == root::test::TcpPeerError::NONE);
+        CHECK(captured.sessions[0].received == prefix);
+    }
 }
 
 TEST_CASE("TCP recovery public HISTORY observation preserves covered range reentry guards and detached lifetime") {

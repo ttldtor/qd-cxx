@@ -364,3 +364,15 @@ unit must use that same qualified standard-library profile and ABI. The compiled
 factory gate does not attest arbitrary consumer include paths, later target
 overrides or foreign template instantiations at runtime. Changing those premises
 requires fresh qualification rather than assuming the capacity proof transfers.
+
+## Required live contract capabilities
+
+A recovery owner configured with all three queues may require TICKER, STREAM and HISTORY
+as one negotiated set. Each connection attempt starts with a fresh capability set. Before
+replaying any subscription, recovery requires the standard peer DATA declarations and
+peer ADD and REMOVE declarations for every family. Descriptor deltas can complete the set.
+The configured read duration also bounds this capability negotiation from connection
+observation. On expiry, recovery reports `UNSUPPORTED_PROFILE` at `recovery-peer-contracts`.
+DATA offered before mixed capability readiness is refused at ecovery-data-before-contracts.
+Authentication continues to gate wire output independently. Explicit disconnect, shutdown and
+backoff exclude the prior attempt's negotiation wake. The option defaults to off.
