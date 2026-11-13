@@ -444,6 +444,51 @@ control locks. Awaiting endpoint closure establishes callback/capture quiescence
 `deadlineExpired`, `hadGap` and `diagnostic` as well. It does not establish peer
 acknowledgement, unread-wire completeness or an uninterrupted upstream history.
 
+
+## Historical OnDemand loopback replay
+
+A fresh default TICKER endpoint can use one finite OnDemand response on IPv4
+loopback. Create an ordinary Quote subscription and add one exact composite
+symbol before connecting.
+
+```cpp
+using namespace std::chrono;
+auto endpoint = runtime.createEndpoint();
+auto quotes = endpoint->getFeed()->createSubscription<q::events::Quote>();
+quotes->addEventListener(onQuotes);
+quotes->addSymbols("MOCK");
+endpoint->connectOnDemand(mockPort, u"MOCK", sys_days{2024y / February / 12} + 14h + 30min + 5s);
+const auto completion = endpoint->awaitState(q::api::EndpointState::CLOSED, steady_clock::now() + 70s);
+const auto closed = endpoint->closeAndAwaitTermination();
+```
+
+`completion` reports `CLOSED`, a terminal `FAILED`, or expiration of the wait.
+`closed` reports actual retirement and includes any source failure diagnostic. The source only
+becomes `CONNECTED` after a complete validated response covering the requested
+point. The initial catch-up through that point uses ordinary TICKER
+conflation. Later records are paced at 1× from a monotonic anchor established when
+delivery is ready and preserve
+their recorded event times. After the finite response, the endpoint drains
+admitted work and closes. Close during an outstanding request retires the
+owned socket and fences subsequent delivery.
+
+The first profile accepts one uncompressed composite Quote block over a
+single HTTP/1.1 POST to `/MarketDataReplay` on the explicit loopback port.
+The symbol can have up to 16 ASCII letters, digits and dots, with at least
+one letter. The request uses the Java QD v2 binary envelope with synthetic
+access fields. The whole network request has a five-second deadline, with
+shorter endpoint timeouts still in effect. The local replay source services
+network and drain progress at least every 10 ms when scheduled. A response must have one
+`Content-Type: application/octet-stream` and one positive `Content-Length`,
+with at most 2 KiB of headers, 8 KiB of body, and 64 records. Coverage can
+extend at most 60 seconds past the requested point. The source rejects HTTP
+redirects and content/transfer coding, compressed blocks, unsupported
+mapping or symbols, malformed or oversized frames and uncovered time.
+HTTP 401 produces the static diagnostic `ondemand-access-refused`. This
+profile qualifies a synthetic local replay service. A deployed provider,
+entitlements, encrypted HTTP, further windows, speed changes, seek,
+and transition to a live source have separate qualification.
+
 ## Local tape source
 
 Create an endpoint with the required `DeliveryContract`, configure its
