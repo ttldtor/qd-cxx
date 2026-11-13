@@ -21,6 +21,7 @@ struct TcpPeerScript {
     bool waitForControllerReply{};     ///< Gate reply bytes until allowReply(index), stop, or deadline.
     std::optional<std::int32_t> readThroughMessage; ///< Alternative bounded capture through one complete frame type.
     bool waitForClientClose = false; ///< Capture until client EOF/reset, without creating a server peer-end race.
+    bool finishWrites = false;       ///< Send FIN after the response; pair with waitForClientClose to drain input.
     std::vector<std::vector<std::byte>> stagedBytes;
     ///< At most 16 complete owned segments, each held until its numbered controller permit.
 };

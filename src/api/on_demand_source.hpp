@@ -22,6 +22,10 @@ class OnDemandSource {
     core::RecordContext context_;
     protocol::detail::LocalEventOwner owner_;
     std::unique_ptr<transport::detail::RawByteOwner> network_;
+    static constexpr auto MAXIMUM_RESPONSE_BYTES = ON_DEMAND_MAXIMUM_HEADER + ON_DEMAND_MAXIMUM_BODY;
+    using ResponseBytes = std::array<std::byte, MAXIMUM_RESPONSE_BYTES>;
+    std::unique_ptr<ResponseBytes> received_;
+    std::size_t receivedSize_ = 0;
     Clock::time_point deadline_;
     std::optional<OnDemandResponse> response_;
     OnDemandPlaybackClock playbackClock_;
