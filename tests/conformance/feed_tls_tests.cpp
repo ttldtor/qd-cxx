@@ -753,6 +753,25 @@ TEST_CASE("A late credential cutoff discards prepared bytes without committing p
     CHECK(session->authentication() == q::protocol::LiveAuthentication::AUTHORIZATION_EMITTED);
 }
 
+TEST_CASE("Feed TLS refuses the plaintext OnDemand profile without opening a connection") {
+    auto server = quotePeer();
+    api::ApiRuntime runtime(runtimeOptions());
+    const auto endpoint = runtime.createEndpoint(endpointOptions());
+    const auto initial = endpoint->getState();
+
+    try {
+        endpoint->connectOnDemand(server.port(), u"IBM", std::chrono::sys_days{std::chrono::year{2024} / 2 / 12});
+        FAIL("TLS endpoint accepted plaintext OnDemand");
+    } catch (const api::Error &failure) {
+        CHECK(failure.diagnostic().code == api::ErrorCode::UNSUPPORTED_PROFILE);
+        CHECK(failure.diagnostic().stage == "ondemand-profile");
+    }
+
+    CHECK(endpoint->getState() == initial);
+    static_cast<void>(endpoint->closeAndAwaitTermination());
+    CHECK_FALSE(server.stop().accepted);
+}
+
 int main(int argc, char **argv) {
     if (argc == 3 && std::string_view(argv[1]) == "--installed-peer") {
         try {

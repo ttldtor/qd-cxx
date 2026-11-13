@@ -474,6 +474,20 @@ struct OwnedTcpPeer::Impl {
                 return false;
         }
 
+        if (script.finishWrites) {
+#ifdef _WIN32
+            constexpr int SEND_ONLY = SD_SEND;
+#else
+            constexpr int SEND_ONLY = SHUT_WR;
+#endif
+
+            if (shutdown(connection.value, SEND_ONLY) != 0) {
+                fail(TcpPeerError::SOCKET, socketError());
+
+                return false;
+            }
+        }
+
         if (script.waitForClientClose) {
             std::array<std::byte, 16384> bytes{};
 

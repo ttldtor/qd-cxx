@@ -382,3 +382,5 @@ class/resource inventories.
 - [Генератор NuamTimeAndSale](../upstream/nuam-time-and-sale-oracle/README.ru.md) записывает индексированные сделки; справка доступна без входных данных.
 
 - [Генератор NuamOrder](../upstream/nuam-order-oracle/README.ru.md) записывает индексированные заявки офлайн; справка доступна на двух языках.
+
+- [Генератор фикстур OnDemand](../upstream/ondemand-oracle/README.ru.md) воспроизводит точные байты синтетических запросов и ответов закреплённого QD. Справка на двух языках доступна без входов.
