@@ -2,12 +2,12 @@
 
 [Русский](index.ru.md) · English
 
-Use qd-cxx as a C++23 library or through its offline inspection tools. The implemented subset covers
-selected QD encodings, records, tapes and controlled transport profiles. Start with a concrete task;
+Use qd-cxx as a C++23 library for market-data clients or through its offline inspection tools.
+Start with a concrete task;
 [capabilities and limits](CURRENT-STATE.md) identify the supported profiles.
 
 1. **[Getting started](getting-started.md)** — build, install and run a small library consumer.
-2. **[Practical guides](guides.md)** — inspect tapes, supply schemas and use controlled STREAM input.
+2. **[Practical guides](guides.md)** — receive market data, query snapshots, work with instruments and inspect tapes.
 3. **[API reference](api.md)** — find headers, link targets, ownership and error contracts.
 4. **[Architecture and protocols](../spec/README.md)** — understand components and wire behavior.
 

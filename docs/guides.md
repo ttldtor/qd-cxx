@@ -4,6 +4,10 @@
 
 | Task | Guide | Choose this when |
 | --- | --- | --- |
+| Build a market-data client | [Quote example](../examples/feed_quote/README.md) | Install `qdcxx_feed`, connect and receive typed events in an independent application |
+| Query current and historical data | [Client queries](../examples/client_queries/README.md) | Request an owning Quote, Candle history and an order-book snapshot |
+| Work with models and instruments | [Client models](../examples/client_models/README.md) | Offline Candle and order-book models, instrument profiles and option chains |
+| Choose event symbols and sources | [Market symbols](MARKET-SYMBOLS.md), [Candle symbols](CANDLE-SYMBOLS.md), [event sources](EVENT-SOURCES.md) | Construct and inspect supported symbol and source values |
 | Parse instrument trading hours | [Schedule rules](SCHEDULE-RULES.md) | Complete pinned grammar, named venues and typed defaults in explicit bounded contexts; [console example](../examples/schedule_rules/README.md) |
 | Mix market events and select an Order source | [Market console sample](../examples/feed_market/README.md) | Composite and regional Quote, Trade, a source-specific Order, symbol mutation and final statistics |
 | Receive typed live events | [Public feed API](FEED-API.md) | Library-owned progress, Quote/Profile subscriptions and plain TCP; [complete example](../examples/feed_quote/README.md) |

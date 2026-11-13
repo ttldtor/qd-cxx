@@ -8,7 +8,7 @@ and ownership. Use the namespace/type indexes beside this page to find individua
 
 | Component | Public headers | Link target | Detailed contract |
 | --- | --- | --- | --- |
-| Time-series logical values | `qd/api/time_series_subscription.hpp` | `qdcxx_subscription_selectors` | [Owned identity, capability and mutable range](TIME-SERIES-SUBSCRIPTIONS.md); no Feed HISTORY receiver |
+| Time-series logical values | `qd/api/time_series_subscription.hpp` | `qdcxx_subscription_selectors` | [Owned identity, capability and mutable range](TIME-SERIES-SUBSCRIPTIONS.md); see the [Feed HISTORY API](FEED-API.md) for receiving |
 | Event text | qd/events/event_text.hpp | qdcxx_event_text | [Explicit-context UTF-16/UTF-8 rendering](EVENT-TEXT.md) |
 | Schedule rules | `qd/schedule/schedule.hpp` | `qdcxx_schedule` | [Owned schedule identities and typed calendar generations](SCHEDULE-RULES.md); `ORG_TTLDTOR_QDCXX_BUILD_SCHEDULE=ON` (default OFF); no Day/Session queries or filters |
 | Public typed feed | `qd/api/feed.hpp`, `qd/api/event_registry.hpp` | `qdcxx_feed` | [Endpoint, Feed and typed subscriptions](FEED-API.md), [immutable registry](../spec/events/EVENT-REGISTRY.md), [mixed subscriptions](../spec/events/MIXED-SUBSCRIPTIONS.md); `ORG_TTLDTOR_QDCXX_BUILD_FEED_API=ON` (default OFF), requires CLIENT/RUNTIME/RECOVERY |
@@ -16,9 +16,9 @@ and ownership. Use the namespace/type indexes beside this page to find individua
 | Schemas and record identity | `qd/core/` | `qdcxx_core` | [Schema specifications](../spec/README.md#schema-contracts) |
 | Frames, binding and tapes | `qd/protocol/` | `qdcxx_protocol` | [Protocol specifications](../spec/README.md#protocol-contracts) |
 | Standard events | `qd/events/` | `qdcxx_quote`, `qdcxx_profile`, `qdcxx_trade`, `qdcxx_trade_eth`, `qdcxx_summary`, `qdcxx_text_events`, `qdcxx_event_mapping` | [Configuration](CONFIGURATION.md), [Trade](../spec/events/TRADE.md), [TradeETH](../spec/events/TRADE-ETH.md), [Summary](../spec/events/SUMMARY.md), [text events](../spec/events/TEXT-EVENTS.md) |
-| Candle periods | `qd/events/candle_period.hpp` | `qdcxx_candle_values` | [Types, text and interval estimates](../spec/events/CANDLE-PERIOD.md); no Candle receiving |
+| Candle periods | `qd/events/candle_period.hpp` | `qdcxx_candle_values` | [Types, text and interval estimates](../spec/events/CANDLE-PERIOD.md); [Candle receiving](FEED-API.md) uses the feed |
 | Candle attributes | `qd/events/candle_attributes.hpp` | `qdcxx_candle_values` | [Values and symbol operations](../spec/events/CANDLE-ATTRIBUTES.md); no aggregation |
-| Candle symbols | `qd/events/candle_symbol.hpp` | `qdcxx_candle_values` | [Owning values and object selectors](CANDLE-SYMBOLS.md); no Candle receiving |
+| Candle symbols | `qd/events/candle_symbol.hpp` | `qdcxx_candle_values` | [Owning values and object selectors](CANDLE-SYMBOLS.md); [Candle receiving](FEED-API.md) uses the feed |
 | Collectors and multiplexing | `qd/collectors/`, `qd/mux/` | `qdcxx_collectors`, `qdcxx_mux`, `qdcxx_mux_queue` | [Subscription contracts](../spec/subscriptions/CONTRACTS.md) |
 | JSON schemas | `qd/schema/json_schema.hpp` | `qdcxx_schema_json` | [Native JSON](../spec/schema/NATIVE-JSON.md); installed with `ORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON=ON` (default ON) |
 | Offline replay | `qd/replay/tape_replay.hpp` | `qdcxx_replay` — build tree only | [Replay contract](../spec/protocol/OFFLINE-REPLAY.md); `ORG_TTLDTOR_QDCXX_BUILD_REPLAY=ON` (default OFF), not installed/exported |

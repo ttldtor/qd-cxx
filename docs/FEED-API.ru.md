@@ -986,7 +986,8 @@ DEFAULT используют одну физическую подписку на
 
 `Feed::createTimeSeriesSubscription<Event>()` использует тот же владеющий facade подписки с
 `getFromTime()`/`setFromTime(ms)` и начальным знаковым64 MAX. Нужны проверенный native time-series
-mapper и явно выбранный HISTORY endpoint. Для текущих типов событий операция отклоняется до регистрации. Обычные подписки
+mapper и явно выбранный HISTORY endpoint. Поддерживаются Candle, TimeAndSale, NuamTimeAndSale,
+Greeks, Underlying и TheoPrice; неподдерживаемые типы отклоняются до регистрации. Обычные подписки
 отклоняют операции диапазона. Принятые range/set/revision и observer snapshots меняются вместе;
 SDK применяет demand и снимает устаревшую HISTORY доставку, которая ещё не началась.
 Границы capability, callback BEGIN, конечного work, пересечений, output refusal и recovery описаны
