@@ -1,6 +1,7 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "../../src/api/on_demand_playback_clock.hpp"
 #include "qd/api/feed.hpp"
 #include "recovery_test_peer.hpp"
 
@@ -9,6 +10,8 @@
 #include <atomic>
 #include <chrono>
 #include <doctest/doctest.h>
+#include <limits>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <vector>
@@ -286,4 +289,172 @@ TEST_CASE("OnDemand honors response deadline with a slow requested polling caden
     const auto snapshot = peer.snapshot();
     REQUIRE(snapshot.sessions.size() == 1);
     CHECK(snapshot.sessions.front().matched);
+}
+
+TEST_CASE("OnDemand clock preserves fractional progress and applies rates to elapsed intervals") {
+    q::api::detail::OnDemandPlaybackClock clock;
+    const auto origin = std::chrono::steady_clock::time_point{1s};
+    constexpr auto LIMIT = 2000;
+
+    clock.advance(0.5, origin, LIMIT);
+    clock.advance(0.5, origin + 10s, LIMIT);
+    CHECK(clock.position() == 0);
+    clock.start(origin + 10s);
+    clock.advance(0.5, origin + 10s + 1ms, LIMIT);
+    CHECK(clock.position() == 0);
+    clock.advance(0.5, origin + 10s + 2ms, LIMIT);
+    CHECK(clock.position() == 1);
+    clock.advance(0, origin + 10s + 200ms, LIMIT);
+    CHECK(clock.position() == 100);
+    clock.advance(2, origin + 11s, LIMIT);
+    CHECK(clock.position() == 100);
+    const auto wake = clock.wakeBefore(110, origin + 11s, origin + 11s + 10ms);
+    CHECK(wake >= origin + 11s + 5ms);
+    CHECK(wake <= origin + 11s + 5ms + 1us);
+    clock.advance(2, origin + 11s + 500ms, LIMIT);
+    CHECK(clock.position() == 1100);
+    clock.advance(0, origin + 14s, LIMIT);
+    CHECK(clock.position() == LIMIT);
+}
+
+TEST_CASE("OnDemand preserves its cursor through initial pause, rate changes and terminal EOF") {
+    constexpr std::string_view CONTROL_RESPONSE =
+        "31020106626c6f636b73272600044d4f434b0051f065ca2b6880419388ff058051c04c9b0a05805187da1487d022864080a0";
+    q::test::OwnedTcpPeer peer(peerConfig(binaryResponse(CONTROL_RESPONSE)));
+    REQUIRE(peer.port() != 0);
+    std::vector<api::OnDemandPlaybackChange> observed;
+    std::vector<std::int64_t> times;
+    std::atomic<unsigned> delivered{0};
+    api::ApiRuntime runtime(runtimeOptions());
+    const auto endpoint = runtime.createEndpoint();
+    const auto subscription = endpoint->getFeed()->createSubscription<q::events::Quote>();
+    subscription->addSymbols("MOCK");
+    subscription->addEventListener([&](auto quotes) {
+        for (const auto &quote : quotes) {
+            times.push_back(quote.eventTime);
+            ++delivered;
+        }
+    });
+    endpoint->addOnDemandPlaybackListener([&](const auto &change) {
+        observed.push_back(change);
+    });
+    CHECK_FALSE(endpoint->getOnDemandPlayback());
+    CHECK_THROWS_AS(endpoint->pauseOnDemand(), api::Error);
+    CHECK_THROWS_AS(endpoint->connectOnDemand(peer.port(), u"MOCK", START, -1), api::Error);
+    endpoint->connectOnDemand(peer.port(), u"MOCK", START, 0);
+    REQUIRE(eventually([&] {
+        return delivered.load() == 1;
+    }));
+    const auto initial = endpoint->getOnDemandPlayback();
+    REQUIRE(initial);
+    CHECK(initial->time == START);
+    CHECK(initial->speed == 0);
+    CHECK(initial->covered);
+    const auto epoch = endpoint->getStatistics().connection.sourceEpoch;
+    REQUIRE(epoch);
+
+    endpoint->setOnDemandSpeed(0.5);
+    REQUIRE(eventually([&] {
+        return endpoint->getOnDemandPlayback()->time >= START + 100ms;
+    }));
+    endpoint->pauseOnDemand();
+    REQUIRE(eventually([&] {
+        return endpoint->getOnDemandPlayback()->speed == 0;
+    }));
+    const auto paused = *endpoint->getOnDemandPlayback();
+    CHECK(paused.time < START + 2000ms);
+    std::this_thread::sleep_for(125ms);
+    CHECK(endpoint->getOnDemandPlayback() == paused);
+    CHECK(delivered.load() == 1);
+
+    for (double speed : {-1.0, std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity(),
+                         api::MAXIMUM_ON_DEMAND_SPEED + 1})
+        CHECK_THROWS_AS(endpoint->setOnDemandSpeed(speed), api::Error);
+
+    endpoint->pauseOnDemand();
+    endpoint->setOnDemandSpeed(2);
+    REQUIRE(endpoint->awaitState(api::EndpointState::CLOSED, std::chrono::steady_clock::now() + WAIT).status ==
+            api::WaitStatus::REACHED);
+    const auto closed = endpoint->closeAndAwaitTermination();
+    CHECK(closed.drained);
+    const std::vector<std::int64_t> expectedTimes{START.time_since_epoch().count(),
+                                                  (START + 2000ms).time_since_epoch().count()};
+    CHECK(times == expectedTimes);
+    CHECK(endpoint->getStatistics().connection.sourceEpoch == epoch);
+    CHECK(peer.snapshot().sessions.size() == 1);
+    const auto terminal = endpoint->getOnDemandPlayback();
+    REQUIRE(terminal);
+    CHECK_FALSE(terminal->active);
+    CHECK(terminal->speed == 0);
+    CHECK(terminal->time == START + 2000ms);
+    REQUIRE_FALSE(observed.empty());
+    CHECK(observed.back().current == *terminal);
+    std::vector<double> rates;
+
+    for (const auto &change : observed) {
+        CHECK(change.previous.time <= change.current.time);
+
+        if (change.previous.speed != change.current.speed)
+            rates.push_back(change.current.speed);
+    }
+
+    const std::vector<double> expectedRates{0.5, 0, 2, 0};
+    CHECK(rates == expectedRates);
+}
+
+TEST_CASE("OnDemand pre-coverage speed callbacks can remove themselves and close the owned request") {
+    q::test::OwnedTcpPeer peer(peerConfig({}, true));
+    REQUIRE(peer.port() != 0);
+    std::vector<api::OnDemandPlaybackChange> selected;
+    std::atomic<unsigned> quotes{0};
+    std::atomic<unsigned> retirementGuarded{0};
+    api::Endpoint::OnDemandPlaybackListenerId self{};
+    api::ApiRuntime runtime(runtimeOptions());
+    const auto endpoint = runtime.createEndpoint();
+    const auto subscription = endpoint->getFeed()->createSubscription<q::events::Quote>();
+    subscription->addSymbols("MOCK");
+    subscription->addEventListener([&](auto) {
+        ++quotes;
+    });
+    self = endpoint->addOnDemandPlaybackListener(
+        [&selected, &self, &retirementGuarded, weakEndpoint = std::weak_ptr(endpoint)](const auto &change) {
+            selected.push_back(change);
+            const auto owner = weakEndpoint.lock();
+
+            if (!owner)
+                return;
+
+            owner->removeOnDemandPlaybackListener(self);
+            try {
+                static_cast<void>(owner->closeAndAwaitTermination());
+            } catch (const api::Error &error) {
+                if (error.diagnostic().code == api::ErrorCode::WRONG_THREAD)
+                    ++retirementGuarded;
+            }
+            owner->close();
+            throw std::runtime_error("advisory failure");
+        });
+    endpoint->connectOnDemand(peer.port(), u"MOCK", START, 0);
+    REQUIRE(eventually([&] {
+        const auto snapshot = peer.snapshot();
+
+        return !snapshot.sessions.empty() && snapshot.sessions.front().matched;
+    }));
+    endpoint->setOnDemandSpeed(2);
+    REQUIRE(endpoint->awaitState(api::EndpointState::CLOSED, std::chrono::steady_clock::now() + WAIT).status ==
+            api::WaitStatus::REACHED);
+    const auto closed = endpoint->closeAndAwaitTermination();
+    CHECK(closed.diagnostic.code == api::ErrorCode::NONE);
+    CHECK(endpoint->getOnDemandPlaybackDiagnostic().code == api::ErrorCode::CALLBACK_FAILURE);
+    CHECK(retirementGuarded.load() == 1);
+    CHECK(quotes.load() == 0);
+    REQUIRE(selected.size() == 1);
+    CHECK(selected.front().current.time == START);
+    CHECK(selected.front().current.speed == 2);
+    CHECK_FALSE(selected.front().current.covered);
+    const auto terminal = endpoint->getOnDemandPlayback();
+    REQUIRE(terminal);
+    CHECK_FALSE(terminal->active);
+    CHECK(terminal->time == START);
+    CHECK(terminal->speed == 0);
 }

@@ -133,9 +133,6 @@ std::expected<void, Diagnostic> OnDemandSource::pollNetwork(transport::TcpWork &
         if (!decoded)
             return std::unexpected(decoded.error());
 
-        if (now > Clock::time_point::max() - ON_DEMAND_MAXIMUM_WINDOW)
-            return std::unexpected(Diagnostic{ErrorCode::RESOURCE_LIMIT, "ondemand-clock-range"});
-
         response_.emplace(std::move(*decoded));
         static_cast<void>(network_->requestClose());
 
@@ -166,13 +163,11 @@ std::expected<void, Diagnostic> OnDemandSource::progressNetwork(transport::TcpWo
 }
 
 void OnDemandSource::beginPlayback(Clock::time_point now) noexcept {
-    if (!anchor_)
-        anchor_ = now;
+    playbackClock_.start(now);
 }
 
-std::expected<std::optional<protocol::LiveEvent>, Diagnostic> OnDemandSource::next(protocol::LiveWork &work,
-                                                                                   Clock::time_point now) {
-    if (closing_ || !anchor_ || finished() || now < recordDue())
+std::expected<std::optional<protocol::LiveEvent>, Diagnostic> OnDemandSource::next(protocol::LiveWork &work) {
+    if (closing_ || !playbackClock_.started() || finished() || response_->records[next_].time > currentTime())
         return std::nullopt;
 
     using Type = core::SerialFieldType;
@@ -220,10 +215,17 @@ bool OnDemandSource::retired() const noexcept {
     return network_->core().state() == transport::TcpState::CLOSED;
 }
 
-OnDemandSource::Clock::time_point OnDemandSource::recordDue() const noexcept {
-    const auto delta = response_->records[next_].time - request_.from.time_since_epoch().count();
+std::int64_t OnDemandSource::currentTime() const noexcept {
+    return request_.from.time_since_epoch().count() + playbackClock_.position();
+}
 
-    return *anchor_ + std::chrono::milliseconds(std::max(std::int64_t{0}, delta));
+OnDemandPlayback OnDemandSource::playback(double speed, Clock::time_point now) noexcept {
+    const auto maximumOffset =
+        response_ ? response_->records[response_->size - 1].time - request_.from.time_since_epoch().count() : 0;
+    playbackClock_.advance(speed, now, std::max(std::int64_t{0}, maximumOffset));
+
+    return {playbackClock_.speed(), std::chrono::sys_time{std::chrono::milliseconds{currentTime()}}, true,
+            playbackClock_.started()};
 }
 
 OnDemandSource::Clock::time_point OnDemandSource::nextWake(Clock::time_point now) const noexcept {
@@ -235,11 +237,10 @@ OnDemandSource::Clock::time_point OnDemandSource::nextWake(Clock::time_point now
     if (!closing_ && !response_)
         wake = std::min(wake, deadline_);
 
-    if (!closing_ && anchor_ && !finished()) {
-        const auto due = recordDue();
+    if (!closing_ && playbackClock_.started() && !finished()) {
+        const auto offset = response_->records[next_].time - request_.from.time_since_epoch().count();
 
-        if (due > now)
-            wake = std::min(wake, due);
+        return playbackClock_.wakeBefore(offset, now, wake);
     }
 
     return wake;
