@@ -66,31 +66,32 @@ struct SubscriptionPort;
 
 /** Detached high-level failures. No peer payload, credential or address is diagnostic text. */
 enum class ErrorCode {
-    NONE,                 ///< No failure has been recorded.
-    INVALID_ARGUMENT,     ///< Caller input does not satisfy the public contract.
-    INVALID_STATE,        ///< Operation conflicts with the accepted lifecycle or fixed address.
-    RESOURCE_LIMIT,       ///< A finite configured capacity or native thread reservation was exhausted.
-    WORK_LIMIT,           ///< The derived bounded preparation or progress allowance was exhausted.
-    ALLOCATION_FAILURE,   ///< Required owned storage could not be allocated.
-    WRONG_THREAD,         ///< A checked operation used an incompatible creator thread.
-    CLOSED,               ///< Admission is fenced by endpoint, subscription or runtime retirement.
-    CALLBACK_FAILURE,     ///< Event listener failure closes its subscription; advisory state failure is recorded
-                          ///< separately.
-    TRANSPORT_FAILURE,    ///< Connection, recovery or native I/O failed; inspect the static stage and codes.
-    PROTOCOL_FAILURE,     ///< Peer input failed the existing bounded protocol profile.
-    BOOTSTRAP_FAILURE,    ///< The explicit process/main-thread runtime bootstrap could not be acquired.
-    DNS_CONFIGURATION,    ///< No supported bounded IPv4 resolver snapshot could be obtained.
-    UNSUPPORTED_PROFILE,  ///< The requested combination is outside this public receiving profile.
-    EXECUTOR_REJECTED,    ///< Host explicitly refused an event task; no retry.
-    EXECUTOR_FAILURE,     ///< Host post threw before completion.
-    EXECUTOR_DROPPED,     ///< Accepted task was destroyed without running.
-    EXECUTOR_CONTRACT,    ///< Host refused or threw after actual execution began.
-    CALLBACK_CANCELLED,   ///< Queued event selection cancelled by close or source reset; advisory.
-    TAPE_IO_FAILURE,      ///< The selected regular local file could not be opened or read.
-    TAPE_TIMING_RANGE,    ///< The relative tape span or a monotonic playback deadline exceeded its bound.
-    TAPE_RESTART_TIMEOUT, ///< The old tape epoch could not retire and reset within the restart allowance.
-    REQUEST_CANCELLED,    ///< A one-event request was cancelled or its accepted source epoch changed.
-    REQUEST_TIMED_OUT     ///< A one-event request reached its absolute completion deadline.
+    NONE,                        ///< No failure has been recorded.
+    INVALID_ARGUMENT,            ///< Caller input does not satisfy the public contract.
+    INVALID_STATE,               ///< Operation conflicts with the accepted lifecycle or fixed address.
+    RESOURCE_LIMIT,              ///< A finite configured capacity or native thread reservation was exhausted.
+    WORK_LIMIT,                  ///< The derived bounded preparation or progress allowance was exhausted.
+    ALLOCATION_FAILURE,          ///< Required owned storage could not be allocated.
+    WRONG_THREAD,                ///< A checked operation used an incompatible creator thread.
+    CLOSED,                      ///< Admission is fenced by endpoint, subscription or runtime retirement.
+    CALLBACK_FAILURE,            ///< Event listener failure closes its subscription; advisory state failure is recorded
+                                 ///< separately.
+    TRANSPORT_FAILURE,           ///< Connection, recovery or native I/O failed; inspect the static stage and codes.
+    PROTOCOL_FAILURE,            ///< Peer input failed the existing bounded protocol profile.
+    BOOTSTRAP_FAILURE,           ///< The explicit process/main-thread runtime bootstrap could not be acquired.
+    DNS_CONFIGURATION,           ///< No supported bounded IPv4 resolver snapshot could be obtained.
+    UNSUPPORTED_PROFILE,         ///< The requested combination is outside this public receiving profile.
+    EXECUTOR_REJECTED,           ///< Host explicitly refused an event task; no retry.
+    EXECUTOR_FAILURE,            ///< Host post threw before completion.
+    EXECUTOR_DROPPED,            ///< Accepted task was destroyed without running.
+    EXECUTOR_CONTRACT,           ///< Host refused or threw after actual execution began.
+    CALLBACK_CANCELLED,          ///< Queued event selection cancelled by close or source reset; advisory.
+    TAPE_IO_FAILURE,             ///< The selected regular local file could not be opened or read.
+    TAPE_TIMING_RANGE,           ///< The relative tape span or a monotonic playback deadline exceeded its bound.
+    TAPE_RESTART_TIMEOUT,        ///< The old tape epoch could not retire and reset within the restart allowance.
+    REQUEST_CANCELLED,           ///< A one-event request was cancelled or its accepted source epoch changed.
+    REQUEST_TIMED_OUT,           ///< A one-event request reached its absolute completion deadline.
+    ON_DEMAND_TRANSITION_TIMEOUT ///< Historical source ownership did not retire within the transition allowance.
 };
 
 /** Static/numeric failure snapshot, independent of runtime and native owners. */
@@ -1315,6 +1316,16 @@ class Endpoint final {
      * @throws Error Invalid rate, no accepted OnDemand source, or closed admission.
      */
     void setOnDemandSpeed(double speed);
+    /** Stop OnDemand replay, retire old deliveries and clear its retained values without opening a route.
+     * The existing Feed and subscriptions stay open. Observe NOT_CONNECTED for completed clear.
+     * @throws Error Invalid source mode, a different pending transition or closed admission.
+     */
+    void stopOnDemandAndClear();
+    /** Retire OnDemand and start an explicit ordinary plain QTP route with the existing subscriptions.
+     * @param liveAddress Owning copy of a validated plain host:port or [IPv6]:port is retained.
+     * @throws Error Invalid route, an incompatible pending transition or closed admission.
+     */
+    void stopOnDemandAndResume(std::string_view liveAddress);
     /** Pause at the current historical cursor without clearing admitted data. */
     void pauseOnDemand();
     /** Return an owning snapshot, or no value before an OnDemand request is accepted. */
