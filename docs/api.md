@@ -5,6 +5,7 @@
 The generated reference documents declarations in `org::ttldtor::qdcxx`, their parameters, errors
 and ownership. Use the namespace/type indexes beside this page to find individual declarations.
 [Getting started](getting-started.md) shows package discovery and linking.
+[Client capabilities and wire profiles](CLIENT-CAPABILITIES.md) lists the receiving routes, source boundaries and corresponding conformance checks.
 
 | Component | Public headers | Link target | Detailed contract |
 | --- | --- | --- | --- |
