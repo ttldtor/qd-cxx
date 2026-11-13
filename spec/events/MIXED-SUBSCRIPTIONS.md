@@ -86,6 +86,20 @@ per name and 16384 total name units. Larger generic registries can be valid and
 still receive explicit `UNSUPPORTED_PROFILE` before native activation. These
 ceilings do not assert that a future full event catalog fits simultaneously.
 
+## Mixed live endpoint
+
+`DeliveryContract::MIXED` selects one live QTP session with three existing
+collector families and the combined built-in catalog. `createCatalogSubscription()`
+selects all built-in event types under one logical subscription. Regular typed
+subscriptions and explicit type lists can share the same Feed.
+
+The worker prepares each participating queue's desired state before committing
+the logical revision. No network progress or callback runs between family
+commits. Interest messages retain the existing family IDs and are written
+sequentially. Recovery replays the committed desired state after reconnect.
+A peer must advertise all three families before demand is sent. Public batches
+remain per-family and carry no cross-family ordering guarantee.
+
 ## Primary compatibility reference
 
 Pinned QD3.355

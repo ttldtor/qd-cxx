@@ -10,6 +10,13 @@
 
 namespace org::ttldtor::qdcxx::api::detail {
 namespace {
+bool hasHistoryLane(const EndpointPort &endpoint, const SubscriptionPort &port) noexcept {
+    return endpoint.options.contract == DeliveryContract::HISTORY ||
+           (endpoint.options.contract == DeliveryContract::MIXED &&
+            static_cast<unsigned>(
+                splitMixedEventSelection(port.eventSelection, port.timeSeries || port.snapshotDemand).history) != 0);
+}
+
 /** Suppress current completion while retaining explicitly historical source diagnostics.
  * @param snapshot Independently owned publication or getter copy.
  * @param state Exact failed current qualification.
@@ -33,7 +40,7 @@ void qualify(const EndpointPort &endpoint, const SubscriptionPort &port,
     snapshot.acceptedConnectionRevision = endpoint.connectionRevision;
     snapshot.acceptedClearRevision = endpoint.clearRevision;
 
-    if (endpoint.options.contract != DeliveryContract::HISTORY) {
+    if (!hasHistoryLane(endpoint, port)) {
         invalidate(snapshot, HistoryObservationState::UNSUPPORTED);
     } else if (port.closeRequested.load(std::memory_order_acquire) || snapshot.final ||
                port.state == SubscriptionState::FAILED || endpoint.closeRequested.load(std::memory_order_acquire) ||
@@ -105,7 +112,7 @@ void publishHistoryCut(std::optional<std::uint64_t> sourceEpoch, bool sourceRese
             std::lock_guard endpointLock(endpoint->mutex);
             std::lock_guard lock(port->mutex);
 
-            if (endpoint->options.contract != DeliveryContract::HISTORY)
+            if (!hasHistoryLane(*endpoint, *port))
                 return;
 
             candidate.ownerIdentity = port->history.ownerIdentity;

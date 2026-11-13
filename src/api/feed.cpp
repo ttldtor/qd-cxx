@@ -24,6 +24,7 @@
 #include "tape_file_source.hpp"
 
 #include <algorithm>
+#include <bit>
 #include <charconv>
 #include <climits>
 #include <cmath>
@@ -1188,10 +1189,16 @@ void validateSelector(const detail::SubscriptionPort &port, const SubscriptionSe
     const auto endpoint = port.endpoint.lock();
 
     if (selector.kind() == SubscriptionSymbolKind::TIME_SERIES &&
-        (port.timeSeries || !endpoint || endpoint->options.contract != DeliveryContract::HISTORY ||
+        (port.timeSeries || !endpoint ||
+         (endpoint->options.contract != DeliveryContract::HISTORY &&
+          endpoint->options.contract != DeliveryContract::MIXED) ||
          !std::ranges::all_of(port.eventTypes, isTimeSeriesEventType))) {
         reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-time-series");
     }
+
+    if (selector.kind() == SubscriptionSymbolKind::TIME_SERIES && endpoint &&
+        endpoint->options.contract == DeliveryContract::MIXED && !port.snapshotDemand)
+        reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-mixed-use-time-series-subscription");
 
     if (port.timeSeries && selector.kind() != SubscriptionSymbolKind::PLAIN) {
         reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-time-series-nested-symbol");
@@ -1220,10 +1227,11 @@ void validateSelector(const detail::SubscriptionPort &port, const SubscriptionSe
 
     if (mutation != SymbolMutation::REMOVE && endpoint) {
         if (port.candleRoutes) {
-            if (selector.sourceId().value_or(0) > 0)
+            if (selector.sourceId().value_or(0) > 0 && endpoint->options.contract != DeliveryContract::MIXED)
                 reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-candle-source");
 
-            (void)detail::resolveReceivingCandle(*port.candleRoutes, text);
+            if (selector.sourceId().value_or(0) <= 0)
+                (void)detail::resolveReceivingCandle(*port.candleRoutes, text);
         }
 
         detail::validateReceivingSymbol(endpoint->options.eventRegistry ? &*endpoint->options.eventRegistry : nullptr,
@@ -1712,6 +1720,22 @@ std::shared_ptr<Subscription<RegisteredEvent>> Feed::createSubscription(std::ini
     return createSubscription(std::span(types.begin(), types.size()));
 }
 
+std::shared_ptr<Subscription<RegisteredEvent>> Feed::createCatalogSubscription() {
+    if (port_->options.contract != DeliveryContract::MIXED)
+        reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-mixed-catalog");
+
+    constexpr auto types = [] {
+        std::array<EventType, std::popcount(static_cast<unsigned>(detail::EventSelection::ALL))> result{};
+
+        for (std::size_t i = 0; i < result.size(); ++i)
+            result[i] = static_cast<EventType>(i);
+
+        return result;
+    }();
+
+    return createSubscription(types);
+}
+
 std::shared_ptr<Subscription<RegisteredEvent>> Feed::createTimeSeriesSubscription(std::span<const EventType> types) {
     return producerAction([&] {
         auto subscription = std::shared_ptr<Subscription<RegisteredEvent>>(new Subscription<RegisteredEvent>({}));
@@ -1925,157 +1949,170 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
                 reject(ErrorCode::CLOSED, "endpoint-closed");
             }
 
-            if (timeSeries && (port_->options.contract != DeliveryContract::HISTORY ||
+            const bool mixed = port_->options.contract == DeliveryContract::MIXED;
+
+            if (timeSeries && ((!mixed && port_->options.contract != DeliveryContract::HISTORY) ||
                                !std::ranges::all_of(subscription->eventTypes, isTimeSeriesEventType))) {
                 reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-time-series-event-type");
             }
 
-            // Business capability is explicit; an indexed layout alone does not make a TimeSeriesEvent.
-            constexpr auto historyTypes = static_cast<unsigned>(detail::EventSelection::ORDER) |
-                                          static_cast<unsigned>(detail::EventSelection::MARKET_MAKER) |
-                                          static_cast<unsigned>(detail::EventSelection::SPREAD_ORDER) |
-                                          static_cast<unsigned>(detail::EventSelection::ANALYTIC_ORDER) |
-                                          static_cast<unsigned>(detail::EventSelection::OTC_MARKETS_ORDER) |
-                                          static_cast<unsigned>(detail::EventSelection::SERIES) |
-                                          static_cast<unsigned>(detail::EventSelection::GREEKS) |
-                                          static_cast<unsigned>(detail::EventSelection::UNDERLYING) |
-                                          static_cast<unsigned>(detail::EventSelection::THEO_PRICE) |
-                                          static_cast<unsigned>(detail::EventSelection::CANDLE) |
-                                          static_cast<unsigned>(detail::EventSelection::TIME_AND_SALE) |
-                                          static_cast<unsigned>(detail::EventSelection::NUAM_TIME_AND_SALE) |
-                                          static_cast<unsigned>(detail::EventSelection::NUAM_ORDER) |
-                                          static_cast<unsigned>(detail::EventSelection::OPTION_SALE);
+            if (!mixed) {
+                // Business capability is explicit; an indexed layout alone does not make a TimeSeriesEvent.
+                constexpr auto historyTypes = static_cast<unsigned>(detail::EventSelection::ORDER) |
+                                              static_cast<unsigned>(detail::EventSelection::MARKET_MAKER) |
+                                              static_cast<unsigned>(detail::EventSelection::SPREAD_ORDER) |
+                                              static_cast<unsigned>(detail::EventSelection::ANALYTIC_ORDER) |
+                                              static_cast<unsigned>(detail::EventSelection::OTC_MARKETS_ORDER) |
+                                              static_cast<unsigned>(detail::EventSelection::SERIES) |
+                                              static_cast<unsigned>(detail::EventSelection::GREEKS) |
+                                              static_cast<unsigned>(detail::EventSelection::UNDERLYING) |
+                                              static_cast<unsigned>(detail::EventSelection::THEO_PRICE) |
+                                              static_cast<unsigned>(detail::EventSelection::CANDLE) |
+                                              static_cast<unsigned>(detail::EventSelection::TIME_AND_SALE) |
+                                              static_cast<unsigned>(detail::EventSelection::NUAM_TIME_AND_SALE) |
+                                              static_cast<unsigned>(detail::EventSelection::NUAM_ORDER) |
+                                              static_cast<unsigned>(detail::EventSelection::OPTION_SALE);
 
-            if (port_->options.contract == DeliveryContract::HISTORY &&
-                (static_cast<unsigned>(selection) & ~historyTypes)) {
-                reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-history-event-type");
-            }
+                if (port_->options.contract == DeliveryContract::HISTORY &&
+                    (static_cast<unsigned>(selection) & ~historyTypes)) {
+                    reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-history-event-type");
+                }
 
-            if ((order && port_->options.contract == DeliveryContract::STREAM) ||
-                ((marketMaker || spreadOrder || analyticOrder || otcMarketsOrder) &&
-                 port_->options.contract != DeliveryContract::HISTORY)) {
-                reject(ErrorCode::UNSUPPORTED_PROFILE, "order-requires-history");
-            }
+                if ((order && port_->options.contract == DeliveryContract::STREAM) ||
+                    ((marketMaker || spreadOrder || analyticOrder || otcMarketsOrder) &&
+                     port_->options.contract != DeliveryContract::HISTORY)) {
+                    reject(ErrorCode::UNSUPPORTED_PROFILE, "order-requires-history");
+                }
 
-            if (optionSale && port_->options.contract != DeliveryContract::HISTORY) {
-                reject(ErrorCode::UNSUPPORTED_PROFILE, "option-sale-requires-history");
-            }
+                if (optionSale && port_->options.contract != DeliveryContract::HISTORY) {
+                    reject(ErrorCode::UNSUPPORTED_PROFILE, "option-sale-requires-history");
+                }
 
-            if (series && port_->options.contract != DeliveryContract::HISTORY) {
-                reject(ErrorCode::UNSUPPORTED_PROFILE, "series-requires-history");
-            }
+                if (series && port_->options.contract != DeliveryContract::HISTORY) {
+                    reject(ErrorCode::UNSUPPORTED_PROFILE, "series-requires-history");
+                }
 
-            if ((greeks || underlying || theoPrice) && port_->options.contract == DeliveryContract::STREAM) {
-                reject(ErrorCode::UNSUPPORTED_PROFILE, greeks       ? "greeks-requires-ticker-or-history"
-                                                       : underlying ? "underlying-requires-ticker-or-history"
-                                                                    : "theo-price-requires-ticker-or-history");
-            }
+                if ((greeks || underlying || theoPrice) && port_->options.contract == DeliveryContract::STREAM) {
+                    reject(ErrorCode::UNSUPPORTED_PROFILE, greeks       ? "greeks-requires-ticker-or-history"
+                                                           : underlying ? "underlying-requires-ticker-or-history"
+                                                                        : "theo-price-requires-ticker-or-history");
+                }
 
-            if (candle && port_->options.contract == DeliveryContract::STREAM)
-                reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-candle-contract");
+                if (candle && port_->options.contract == DeliveryContract::STREAM)
+                    reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-candle-contract");
 
-            if (timeAndSale && port_->options.contract == DeliveryContract::TICKER)
-                reject(ErrorCode::UNSUPPORTED_PROFILE, "time-and-sale-requires-stream-or-history");
+                if (timeAndSale && port_->options.contract == DeliveryContract::TICKER)
+                    reject(ErrorCode::UNSUPPORTED_PROFILE, "time-and-sale-requires-stream-or-history");
 
-            if (orderImbalance && port_->options.contract != DeliveryContract::TICKER) {
-                reject(ErrorCode::UNSUPPORTED_PROFILE, "order-imbalance-requires-ticker");
-            }
+                if (orderImbalance && port_->options.contract != DeliveryContract::TICKER) {
+                    reject(ErrorCode::UNSUPPORTED_PROFILE, "order-imbalance-requires-ticker");
+                }
 
-            if (message && port_->options.contract != DeliveryContract::STREAM) {
-                reject(ErrorCode::UNSUPPORTED_PROFILE, "message-stream-contract");
-            }
+                if (message && port_->options.contract != DeliveryContract::STREAM) {
+                    reject(ErrorCode::UNSUPPORTED_PROFILE, "message-stream-contract");
+                }
 
-            if (textMessage && port_->options.contract != DeliveryContract::STREAM) {
-                reject(ErrorCode::UNSUPPORTED_PROFILE, "text-message-requires-stream");
-            }
+                if (textMessage && port_->options.contract != DeliveryContract::STREAM) {
+                    reject(ErrorCode::UNSUPPORTED_PROFILE, "text-message-requires-stream");
+                }
 
-            bool registeredQuote = !port_->options.eventRegistry;
-            bool registeredProfile = !port_->options.eventRegistry;
-            bool registeredTrade = !port_->options.eventRegistry;
-            bool registeredTradeETH = !port_->options.eventRegistry;
-            bool registeredSummary = !port_->options.eventRegistry;
-            bool registeredTextMessage = !port_->options.eventRegistry;
-            bool registeredTextConfiguration = !port_->options.eventRegistry;
-            bool registeredMessage = !port_->options.eventRegistry;
-            bool registeredConfiguration = !port_->options.eventRegistry;
-            bool registeredOrder = !port_->options.eventRegistry && port_->options.contract != DeliveryContract::STREAM;
-            bool registeredMarketMaker =
-                !port_->options.eventRegistry && port_->options.contract == DeliveryContract::HISTORY;
+                bool registeredQuote = !port_->options.eventRegistry;
+                bool registeredProfile = !port_->options.eventRegistry;
+                bool registeredTrade = !port_->options.eventRegistry;
+                bool registeredTradeETH = !port_->options.eventRegistry;
+                bool registeredSummary = !port_->options.eventRegistry;
+                bool registeredTextMessage = !port_->options.eventRegistry;
+                bool registeredTextConfiguration = !port_->options.eventRegistry;
+                bool registeredMessage = !port_->options.eventRegistry;
+                bool registeredConfiguration = !port_->options.eventRegistry;
+                bool registeredOrder =
+                    !port_->options.eventRegistry && port_->options.contract != DeliveryContract::STREAM;
+                bool registeredMarketMaker =
+                    !port_->options.eventRegistry && port_->options.contract == DeliveryContract::HISTORY;
 
-            bool registeredSpreadOrder = registeredMarketMaker;
-            bool registeredAnalyticOrder = registeredMarketMaker;
-            bool registeredOtcMarketsOrder = registeredMarketMaker;
-            bool registeredSeries = registeredMarketMaker;
-            bool registeredGreeks = !port_->options.eventRegistry;
-            bool registeredUnderlying = registeredGreeks;
-            bool registeredTheoPrice = registeredGreeks;
-            bool registeredTimeAndSale = !port_->options.eventRegistry;
-            bool registeredOptionSale = registeredMarketMaker;
-            bool registeredNuamTrade = !port_->options.eventRegistry;
-            bool registeredNuamOrder =
-                !port_->options.eventRegistry && port_->options.contract == DeliveryContract::HISTORY;
-            bool registeredNuamTimeAndSale =
-                !port_->options.eventRegistry && port_->options.contract != DeliveryContract::TICKER;
-            bool registeredOrderImbalance =
-                !port_->options.eventRegistry && port_->options.contract == DeliveryContract::TICKER;
+                bool registeredSpreadOrder = registeredMarketMaker;
+                bool registeredAnalyticOrder = registeredMarketMaker;
+                bool registeredOtcMarketsOrder = registeredMarketMaker;
+                bool registeredSeries = registeredMarketMaker;
+                bool registeredGreeks = !port_->options.eventRegistry;
+                bool registeredUnderlying = registeredGreeks;
+                bool registeredTheoPrice = registeredGreeks;
+                bool registeredTimeAndSale = !port_->options.eventRegistry;
+                bool registeredOptionSale = registeredMarketMaker;
+                bool registeredNuamTrade = !port_->options.eventRegistry;
+                bool registeredNuamOrder =
+                    !port_->options.eventRegistry && port_->options.contract == DeliveryContract::HISTORY;
+                bool registeredNuamTimeAndSale =
+                    !port_->options.eventRegistry && port_->options.contract != DeliveryContract::TICKER;
+                bool registeredOrderImbalance =
+                    !port_->options.eventRegistry && port_->options.contract == DeliveryContract::TICKER;
 
-            if (port_->options.eventRegistry) {
-                for (const auto &registration : port_->options.eventRegistry->registrations()) {
-                    if (!detail::receivingRouteSupportsContract(registration, port_->options.contract)) {
-                        continue;
+                if (port_->options.eventRegistry) {
+                    for (const auto &registration : port_->options.eventRegistry->registrations()) {
+                        if (!detail::receivingRouteSupportsContract(registration, port_->options.contract)) {
+                            continue;
+                        }
+
+                        registeredMarketMaker = registeredMarketMaker || registration.type == EventType::MARKET_MAKER;
+                        registeredSpreadOrder = registeredSpreadOrder || registration.type == EventType::SPREAD_ORDER;
+                        registeredAnalyticOrder =
+                            registeredAnalyticOrder || registration.type == EventType::ANALYTIC_ORDER;
+                        registeredOtcMarketsOrder =
+                            registeredOtcMarketsOrder || registration.type == EventType::OTC_MARKETS_ORDER;
+                        registeredOrderImbalance =
+                            registeredOrderImbalance || registration.type == EventType::ORDER_IMBALANCE;
+                        registeredSeries = registeredSeries || registration.type == EventType::SERIES;
+                        registeredGreeks = registeredGreeks || registration.type == EventType::GREEKS;
+                        registeredUnderlying = registeredUnderlying || registration.type == EventType::UNDERLYING;
+                        registeredTheoPrice = registeredTheoPrice || registration.type == EventType::THEO_PRICE;
+                        registeredTimeAndSale = registeredTimeAndSale || registration.type == EventType::TIME_AND_SALE;
+                        registeredOptionSale = registeredOptionSale || registration.type == EventType::OPTION_SALE;
+                        registeredNuamTrade = registeredNuamTrade || registration.type == EventType::NUAM_TRADE;
+                        registeredNuamOrder = registeredNuamOrder || registration.type == EventType::NUAM_ORDER;
+                        registeredNuamTimeAndSale =
+                            registeredNuamTimeAndSale || registration.type == EventType::NUAM_TIME_AND_SALE;
+                        registeredMessage = registeredMessage || registration.type == EventType::MESSAGE;
+                        registeredConfiguration =
+                            registeredConfiguration || registration.type == EventType::CONFIGURATION;
+                        registeredOrder = registeredOrder || registration.type == EventType::ORDER;
+                        registeredQuote = registeredQuote || registration.type == EventType::QUOTE;
+                        registeredProfile = registeredProfile || registration.type == EventType::PROFILE;
+                        registeredTrade = registeredTrade || registration.type == EventType::TRADE;
+                        registeredTradeETH = registeredTradeETH || registration.type == EventType::TRADE_ETH;
+                        registeredSummary = registeredSummary || registration.type == EventType::SUMMARY;
+                        registeredTextMessage = registeredTextMessage || registration.type == EventType::TEXT_MESSAGE;
+                        registeredTextConfiguration =
+                            registeredTextConfiguration || registration.type == EventType::TEXT_CONFIGURATION;
                     }
+                }
 
-                    registeredMarketMaker = registeredMarketMaker || registration.type == EventType::MARKET_MAKER;
-                    registeredSpreadOrder = registeredSpreadOrder || registration.type == EventType::SPREAD_ORDER;
-                    registeredAnalyticOrder = registeredAnalyticOrder || registration.type == EventType::ANALYTIC_ORDER;
-                    registeredOtcMarketsOrder =
-                        registeredOtcMarketsOrder || registration.type == EventType::OTC_MARKETS_ORDER;
-                    registeredOrderImbalance =
-                        registeredOrderImbalance || registration.type == EventType::ORDER_IMBALANCE;
-                    registeredSeries = registeredSeries || registration.type == EventType::SERIES;
-                    registeredGreeks = registeredGreeks || registration.type == EventType::GREEKS;
-                    registeredUnderlying = registeredUnderlying || registration.type == EventType::UNDERLYING;
-                    registeredTheoPrice = registeredTheoPrice || registration.type == EventType::THEO_PRICE;
-                    registeredTimeAndSale = registeredTimeAndSale || registration.type == EventType::TIME_AND_SALE;
-                    registeredOptionSale = registeredOptionSale || registration.type == EventType::OPTION_SALE;
-                    registeredNuamTrade = registeredNuamTrade || registration.type == EventType::NUAM_TRADE;
-                    registeredNuamOrder = registeredNuamOrder || registration.type == EventType::NUAM_ORDER;
-                    registeredNuamTimeAndSale =
-                        registeredNuamTimeAndSale || registration.type == EventType::NUAM_TIME_AND_SALE;
-                    registeredMessage = registeredMessage || registration.type == EventType::MESSAGE;
-                    registeredConfiguration = registeredConfiguration || registration.type == EventType::CONFIGURATION;
-                    registeredOrder = registeredOrder || registration.type == EventType::ORDER;
-                    registeredQuote = registeredQuote || registration.type == EventType::QUOTE;
-                    registeredProfile = registeredProfile || registration.type == EventType::PROFILE;
-                    registeredTrade = registeredTrade || registration.type == EventType::TRADE;
-                    registeredTradeETH = registeredTradeETH || registration.type == EventType::TRADE_ETH;
-                    registeredSummary = registeredSummary || registration.type == EventType::SUMMARY;
-                    registeredTextMessage = registeredTextMessage || registration.type == EventType::TEXT_MESSAGE;
-                    registeredTextConfiguration =
-                        registeredTextConfiguration || registration.type == EventType::TEXT_CONFIGURATION;
+                const auto missingQuote = quote && !registeredQuote;
+                const auto missingProfile = profile && !registeredProfile;
+
+                if (missingQuote || missingProfile || (trade && !registeredTrade) ||
+                    (tradeETH && !registeredTradeETH) || (summary && !registeredSummary) ||
+                    (textMessage && !registeredTextMessage) || (textConfiguration && !registeredTextConfiguration) ||
+                    (message && !registeredMessage) || (configuration && !registeredConfiguration) ||
+                    (order && !registeredOrder) || (marketMaker && !registeredMarketMaker) ||
+                    (spreadOrder && !registeredSpreadOrder) || (analyticOrder && !registeredAnalyticOrder) ||
+                    (otcMarketsOrder && !registeredOtcMarketsOrder) || (orderImbalance && !registeredOrderImbalance) ||
+                    (series && !registeredSeries) || (greeks && !registeredGreeks) ||
+                    (underlying && !registeredUnderlying) || (theoPrice && !registeredTheoPrice) ||
+                    (timeAndSale && !registeredTimeAndSale) || (optionSale && !registeredOptionSale) ||
+                    (nuamTrade && !registeredNuamTrade) || (nuamTimeAndSale && !registeredNuamTimeAndSale) ||
+                    (nuamOrder && !registeredNuamOrder)) {
+                    reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-unregistered-event");
                 }
             }
 
-            const auto missingQuote = quote && !registeredQuote;
-            const auto missingProfile = profile && !registeredProfile;
-
-            if (missingQuote || missingProfile || (trade && !registeredTrade) || (tradeETH && !registeredTradeETH) ||
-                (summary && !registeredSummary) || (textMessage && !registeredTextMessage) ||
-                (textConfiguration && !registeredTextConfiguration) || (message && !registeredMessage) ||
-                (configuration && !registeredConfiguration) || (order && !registeredOrder) ||
-                (marketMaker && !registeredMarketMaker) || (spreadOrder && !registeredSpreadOrder) ||
-                (analyticOrder && !registeredAnalyticOrder) || (otcMarketsOrder && !registeredOtcMarketsOrder) ||
-                (orderImbalance && !registeredOrderImbalance) || (series && !registeredSeries) ||
-                (greeks && !registeredGreeks) || (underlying && !registeredUnderlying) ||
-                (theoPrice && !registeredTheoPrice) || (timeAndSale && !registeredTimeAndSale) ||
-                (optionSale && !registeredOptionSale) || (nuamTrade && !registeredNuamTrade) ||
-                (nuamTimeAndSale && !registeredNuamTimeAndSale) || (nuamOrder && !registeredNuamOrder)) {
-                reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-unregistered-event");
-            }
-
             if (candle) {
+                auto options = port_->options;
+
+                if (mixed)
+                    options.contract = timeSeries ? DeliveryContract::HISTORY : DeliveryContract::TICKER;
+
                 subscription->candleRoutes =
-                    detail::prepareReceivingCandleRoutes(port_->options, subscription->maximumSymbolUnits);
+                    detail::prepareReceivingCandleRoutes(options, subscription->maximumSymbolUnits);
 
                 if (!subscription->candleRoutes)
                     reject(ErrorCode::UNSUPPORTED_PROFILE, "subscription-unregistered-event");
@@ -2301,6 +2338,9 @@ FeedFilter Endpoint::createFilter(std::span<const FeedFilterCategory> categories
         }
 
         if (!registry) {
+            if (contract == DeliveryContract::MIXED)
+                reject(ErrorCode::UNSUPPORTED_PROFILE, "endpoint-mixed-filter");
+
             auto prepared = detail::defaultReceivingRegistry(contract);
 
             if (!prepared) {
@@ -2576,6 +2616,9 @@ void Endpoint::connectOnDemand(std::uint16_t loopbackPort, std::u16string_view s
 
 void Endpoint::connectTape(const std::filesystem::path &path, TapeSourceOptions options) {
     producerAction([&] {
+        if (port_->options.contract == DeliveryContract::MIXED)
+            reject(ErrorCode::UNSUPPORTED_PROFILE, "endpoint-mixed-tape");
+
         if (port_->options.tls)
             reject(ErrorCode::UNSUPPORTED_PROFILE, "endpoint-tls-tape");
 
@@ -2895,6 +2938,7 @@ constexpr std::size_t MAXIMUM_RECOVERY_POLLS_PER_TURN = RECEIVING_OWNER_POLLS_PE
 class TypedConsumer final : public client::SubscriptionConsumer {
     std::shared_ptr<SubscriptionPort> port_; ///< Detached state; callback capture cycles end at runtime retirement.
     client::ReceiverProjectionWork projectionWork_; ///< Finite whole-callback seed, never shared with queue work.
+    core::SubscriptionFamily family_;
 
     enum class DispatchOutcome { DISCARDED, DELIVERED, CALLBACK_FAILED };
 
@@ -3203,8 +3247,10 @@ class TypedConsumer final : public client::SubscriptionConsumer {
      * @param port Detached logical subscription.
      * @param projectionWork Finite independently replenished callback-boundary seed.
      */
-    TypedConsumer(std::shared_ptr<SubscriptionPort> port, client::ReceiverProjectionWork projectionWork)
-        : SubscriptionConsumer(port->statistics), port_(std::move(port)), projectionWork_(projectionWork) {
+    TypedConsumer(std::shared_ptr<SubscriptionPort> port, client::ReceiverProjectionWork projectionWork,
+                  core::SubscriptionFamily family)
+        : SubscriptionConsumer(port->statistics), port_(std::move(port)), projectionWork_(projectionWork),
+          family_(family) {
     }
 
     /** Invoke ready owning values with no control mutex held.
@@ -3250,8 +3296,7 @@ class TypedConsumer final : public client::SubscriptionConsumer {
 
             std::lock_guard lock(port_->mutex);
 
-            if (endpoint->options.contract == DeliveryContract::HISTORY &&
-                batch.appliedDesiredRevision() != port_->revision) {
+            if (family_ == core::SubscriptionFamily::HISTORY && batch.appliedDesiredRevision() != port_->revision) {
                 if (!port_->closeRequested.load(std::memory_order_acquire) && port_->listeners &&
                     !port_->listeners->empty() && !batch.records().empty())
                     requireHistoryReplay(*port_);
@@ -3259,7 +3304,7 @@ class TypedConsumer final : public client::SubscriptionConsumer {
                 return mux::BatchAction::CONTINUE;
             }
 
-            if (endpoint->options.contract == DeliveryContract::HISTORY)
+            if (family_ == core::SubscriptionFamily::HISTORY)
                 historyRevision = batch.appliedDesiredRevision();
 
             if (endpoint->onDemand)
@@ -3276,6 +3321,10 @@ class TypedConsumer final : public client::SubscriptionConsumer {
                 try {
                     port_->callbackPool->begin(port_->callbackSlot,
                                                {port_->changes, &endpoint->callbackFence, port_->control});
+
+                    if (endpoint->options.contract == DeliveryContract::MIXED)
+                        port_->statistics->sharedCallbackInFlight.store(true, std::memory_order_release);
+
                     // Transfer one selected completion without a false-quiescent intermediate cut.
                     port_->callbackSynchronousExecuting = false;
                     completion.synchronousPort.reset();
@@ -3406,6 +3455,8 @@ struct NativeSubscription {
     std::uint64_t submittedRevision = 0; ///< Frontend revision associated with the actual ticket.
     bool hasSubmitted = false;           ///< Distinguishes initial empty desire from an unsubmitted registration.
     bool stopping = false;               ///< A reserved registration cutoff was already forwarded.
+    std::array<std::unique_ptr<NativeSubscription>, 3> lanes; ///< Mixed-only family registrations.
+    EventSelection selection{};
 };
 
 /** One real local source, without a recovery factory or wire subscription composer. */
@@ -3446,8 +3497,10 @@ struct NativeOnDemand {
 
 /** Worker-local native endpoint. Member order keeps preparation alive beyond its recovery owners. */
 struct NativeEndpoint {
-    std::shared_ptr<EndpointPort> port;        ///< Detached producer state, independent of public facade destruction.
-    ReceivingProfile profile;                  ///< Complete immutable configuration and fixed work seeds.
+    std::shared_ptr<EndpointPort> port; ///< Detached producer state, independent of public facade destruction.
+    ReceivingProfile profile;           ///< Complete immutable configuration and fixed work seeds.
+    std::optional<ReceivingProfile> tickerProfile;
+    std::optional<ReceivingProfile> streamProfile;
     std::uint64_t appliedRevision = 0;         ///< Worker-only source identity; outlives any borrowing TLS attempt.
     std::optional<transport::TcpRecovery> tcp; ///< Owns the core for a plain source.
 #if defined(ORG_TTLDTOR_QDCXX_FEED_HAS_TLS)
@@ -3641,19 +3694,25 @@ std::optional<RegisteredEvent> captureLatest(NativeEndpoint &endpoint, EventType
     }
 
     const auto selection = static_cast<EventSelection>(1U << static_cast<unsigned>(type));
+    const auto &profile = endpoint.tickerProfile ? *endpoint.tickerProfile : endpoint.profile;
 
-    if (!(endpoint.profile.boundKinds & static_cast<unsigned>(selection)))
+    if (!(profile.boundKinds & static_cast<unsigned>(selection)))
         return std::nullopt;
 
-    const auto &plan = receivingEventPlan(endpoint.profile, selection);
+    const auto &plan = receivingEventPlan(profile, selection);
     ReceivingSymbol key{std::u16string(symbol), {}, 0, {}, core::SubscriptionSelectorKind::EXACT, {}, {}, {}};
-    prepareReceivingSymbols(endpoint.profile, plan, std::span(&key, 1));
+    prepareReceivingSymbols(profile, plan, std::span(&key, 1));
 
-    auto work = endpoint.profile.queueWork;
+    auto work = profile.queueWork;
     std::array<bool, MAXIMUM_RECEIVING_BINDINGS> knownAbsent{};
 
-    for (const auto &subscription : endpoint.subscriptions) {
-        if (!subscription || subscription->stopping || !subscription->hasSubmitted || !subscription->observationPlan)
+    for (const auto &logical : endpoint.subscriptions) {
+        if (!logical || logical->stopping || !logical->hasSubmitted)
+            continue;
+
+        const auto *subscription = endpoint.tickerProfile ? logical->lanes[0].get() : logical.get();
+
+        if (!subscription || !subscription->observationPlan)
             continue;
 
         std::uint64_t revision;
@@ -3661,14 +3720,14 @@ std::optional<RegisteredEvent> captureLatest(NativeEndpoint &endpoint, EventType
             std::lock_guard lock(subscription->port->mutex);
 
             if (!hasLatestDemand(*subscription->port, type, symbol, ifSubscribed) ||
-                subscription->submittedRevision != subscription->port->revision)
+                logical->submittedRevision != subscription->port->revision)
                 continue;
 
             revision = subscription->port->revision;
         }
 
         for (const auto index : std::span(plan.bindingIndices).first(plan.bindingCount)) {
-            if (knownAbsent[index] || !receivingSymbolMatches(endpoint.profile, index, key))
+            if (knownAbsent[index] || !receivingSymbolMatches(profile, index, key))
                 continue;
 
             struct Observation {
@@ -3681,9 +3740,9 @@ std::optional<RegisteredEvent> captureLatest(NativeEndpoint &endpoint, EventType
                 auto &selected = *static_cast<Observation *>(context);
                 selected.result.emplace(client::detail::projectTickerLatest(selected.plan, value, selected.work));
             };
-            const auto id = endpoint.profile.bindings[index].localId;
-            const auto &physical = receivingPhysicalSymbol(endpoint.profile, index, key);
-            const core::SubscriptionKey cacheKey{endpoint.profile.schema.recordContext(id), physical};
+            const auto id = profile.bindings[index].localId;
+            const auto &physical = receivingPhysicalSymbol(profile, index, key);
+            const core::SubscriptionKey cacheKey{profile.schema.recordContext(id), physical};
             mux::TickerLatestObservation observed;
 
             if (auto *local = localSourceQueue(endpoint)) {
@@ -3975,8 +4034,8 @@ void validateIndexedSnapshot(const EndpointPort &port, EventType type, std::u16s
     const bool singleSource = isTimeSeriesEventType(type) || type == EventType::MARKET_MAKER ||
                               type == EventType::SERIES || type == EventType::OPTION_SALE;
 
-    if (port.options.contract != DeliveryContract::HISTORY || (!order && !singleSource) || sourceId < 0 ||
-        (!order && sourceId != 0))
+    if ((port.options.contract != DeliveryContract::HISTORY && port.options.contract != DeliveryContract::MIXED) ||
+        (!order && !singleSource) || sourceId < 0 || (!order && sourceId != 0))
         reject(ErrorCode::UNSUPPORTED_PROFILE, "indexed-snapshot-type-source");
 
     if (!options.maximumResults || symbol.empty() || symbol.size() > port.limits.maximumSymbolUnits ||
@@ -4069,8 +4128,13 @@ CapturedHistorySnapshot captureIndexedSnapshot(NativeEndpoint &endpoint, const H
         operation.timeSeriesRange ? endpoint.port->options.history.maximumPoints : operation.options.maximumResults};
     auto work = endpoint.profile.historyObservationWork;
 
-    for (const auto &registration : endpoint.subscriptions) {
-        if (!registration || registration->stopping || !registration->hasSubmitted || !registration->observationPlan ||
+    for (const auto &logical : endpoint.subscriptions) {
+        if (!logical || logical->stopping || !logical->hasSubmitted)
+            continue;
+
+        const auto *registration = endpoint.tickerProfile ? logical->lanes[2].get() : logical.get();
+
+        if (!registration || !registration->observationPlan ||
             (registration->port->snapshotDemand && registration->port != operation.demand))
             continue;
 
@@ -4080,7 +4144,7 @@ CapturedHistorySnapshot captureIndexedSnapshot(NativeEndpoint &endpoint, const H
 
             if (!hasIndexedSnapshotDemand(*registration->port, operation.type, operation.symbol, operation.sourceId,
                                           operation.passive, operation.timeSeriesRange.has_value()) ||
-                registration->submittedRevision != registration->port->revision)
+                logical->submittedRevision != registration->port->revision)
                 continue;
 
             revision = registration->port->revision;
@@ -4380,9 +4444,28 @@ RegisteredEvent defaultLatest(EventType type, std::u16string_view symbol) {
  */
 std::unique_ptr<NativeEndpoint> activate(const transport::detail::BootstrapLease &bootstrap,
                                          const std::shared_ptr<EndpointPort> &port) {
-    auto profile = prepareReceivingProfile(port->limits, port->options, port->host, port->port,
-                                           port->tape.has_value() || port->onDemand.has_value());
-    auto native = std::make_unique<NativeEndpoint>(port, std::move(profile));
+    const auto mixed = port->options.contract == DeliveryContract::MIXED;
+    auto native = [&] {
+        if (!mixed) {
+            auto profile = prepareReceivingProfile(port->limits, port->options, port->host, port->port,
+                                                   port->tape.has_value() || port->onDemand.has_value());
+
+            return std::make_unique<NativeEndpoint>(port, std::move(profile));
+        }
+
+        const auto registries = defaultCombinedReceivingRegistries();
+
+        if (!registries)
+            reject(ErrorCode::UNSUPPORTED_PROFILE, "endpoint-mixed-catalog");
+
+        auto profiles =
+            prepareCombinedReceivingProfiles(port->limits, port->options, port->host, port->port, *registries);
+        auto owner = std::make_unique<NativeEndpoint>(port, std::move(profiles.history));
+        owner->tickerProfile.emplace(std::move(profiles.ticker));
+        owner->streamProfile.emplace(std::move(profiles.stream));
+
+        return owner;
+    }();
     native->publicEpochBase = port->resumedLiveEpochBase;
     auto queueWork = native->profile.queueWork;
     auto queue = createReceivingQueue(native->profile, queueWork);
@@ -4419,6 +4502,20 @@ std::unique_ptr<NativeEndpoint> activate(const transport::detail::BootstrapLease
         queues.history.emplace(std::move(*queue));
     } else {
         queues.stream.emplace(std::move(*queue));
+    }
+
+    if (mixed) {
+        auto openQueue = [](const ReceivingProfile &profile) {
+            auto work = profile.queueWork;
+            auto value = createReceivingQueue(profile, work);
+
+            if (!value)
+                throw Error(queueDiagnostic(value.error().error, "endpoint-queue"));
+
+            return std::move(*value);
+        };
+        queues.ticker.emplace(openQueue(*native->tickerProfile));
+        queues.stream.emplace(openQueue(*native->streamProfile));
     }
 
     auto work = native->profile.preparationWork;
@@ -4483,8 +4580,9 @@ std::unique_ptr<NativeEndpoint> activate(const transport::detail::BootstrapLease
  * @return Actual registration, empty during a continuing source reset, or detached Error for permanent refusal.
  */
 std::unique_ptr<NativeSubscription> registerSubscription(NativeEndpoint &endpoint,
-                                                         const std::shared_ptr<SubscriptionPort> &port) {
-    const auto &plan = receivingEventPlan(endpoint.profile, port->eventSelection);
+                                                         const std::shared_ptr<SubscriptionPort> &port,
+                                                         const ReceivingProfile &profile, EventSelection selection) {
+    const auto &plan = receivingEventPlan(profile, selection);
 
     if (plan.bindingCount == 0) {
         throw Error({ErrorCode::UNSUPPORTED_PROFILE, "subscription-unregistered-event"});
@@ -4492,12 +4590,13 @@ std::unique_ptr<NativeSubscription> registerSubscription(NativeEndpoint &endpoin
 
     auto result = std::make_unique<NativeSubscription>();
     result->port = port;
-    result->consumer = std::make_shared<TypedConsumer>(port, plan.projectionWork);
+    result->selection = selection;
+    result->consumer = std::make_shared<TypedConsumer>(port, plan.projectionWork, profile.family);
     auto receiverWork = plan.work;
-    auto queueWork = endpoint.profile.queueWork;
+    auto queueWork = profile.queueWork;
     std::array<client::PreparedSubscriptionBinding, MAXIMUM_RECEIVING_BINDINGS> selectedBindings{};
 
-    if (!copyReceivingBindings(endpoint.profile, plan, selectedBindings, receiverWork)) {
+    if (!copyReceivingBindings(profile, plan, selectedBindings, receiverWork)) {
         throw Error({ErrorCode::RESOURCE_LIMIT, "subscription-binding-copy"});
     }
 
@@ -4506,15 +4605,14 @@ std::unique_ptr<NativeSubscription> registerSubscription(NativeEndpoint &endpoin
         auto *local = localSourceQueue(endpoint);
 
         if (!local) {
-            return endpoint.recovery->openSubscriptionReceiver(endpoint.profile.family, bindings, result->consumer,
-                                                               plan.limits, endpoint.profile.clientLimits, receiverWork,
-                                                               queueWork, &result->observationPlan);
+            return endpoint.recovery->openSubscriptionReceiver(profile.family, bindings, result->consumer, plan.limits,
+                                                               profile.clientLimits, receiverWork, queueWork,
+                                                               &result->observationPlan);
         }
 
         auto opened = client::detail::openObservedSubscriptionReceiver(
-            *local, endpoint.profile.schema, endpoint.profile.family, endpoint.profile.recoveryOptions.selectors,
-            bindings, result->consumer, plan.limits, endpoint.profile.clientLimits, receiverWork, queueWork,
-            &result->observationPlan);
+            *local, profile.schema, profile.family, profile.recoveryOptions.selectors, bindings, result->consumer,
+            plan.limits, profile.clientLimits, receiverWork, queueWork, &result->observationPlan);
 
         if (!opened) {
             return std::unexpected(transport::RecoveryReceiverFailure(std::move(opened.error())));
@@ -4554,16 +4652,54 @@ std::unique_ptr<NativeSubscription> registerSubscription(NativeEndpoint &endpoin
     }
 
     result->handle = std::move(*handle);
-    port->statistics->update([&](auto &s) {
-        if (endpoint.tape || (endpoint.onDemand && endpoint.onDemand->epochPublished))
-            s.sourceEpoch = endpoint.appliedRevision;
 
-        s.queueCapacityEvents =
-            endpoint.profile.clientLimits.dataItems +
-            (endpoint.profile.family == core::SubscriptionFamily::TICKER ? endpoint.profile.tickerLimits.cacheKeys
-             : endpoint.profile.family == core::SubscriptionFamily::HISTORY
-                 ? endpoint.profile.historyLimits.points + endpoint.profile.historyLimits.pendingItems
-                 : 0);
+    if (!endpoint.tickerProfile) {
+        port->statistics->update([&](auto &s) {
+            if (endpoint.tape || (endpoint.onDemand && endpoint.onDemand->epochPublished))
+                s.sourceEpoch = endpoint.appliedRevision;
+
+            const auto capacity = profile.clientLimits.dataItems +
+                                  (profile.family == core::SubscriptionFamily::TICKER ? profile.tickerLimits.cacheKeys
+                                   : profile.family == core::SubscriptionFamily::HISTORY
+                                       ? profile.historyLimits.points + profile.historyLimits.pendingItems
+                                       : 0);
+            s.queueCapacityEvents = capacity;
+        });
+        observeState(port, SubscriptionState::ACTIVE);
+    }
+
+    return result;
+}
+
+std::unique_ptr<NativeSubscription> registerMixedSubscription(NativeEndpoint &endpoint,
+                                                              const std::shared_ptr<SubscriptionPort> &port) {
+    const auto split = splitMixedEventSelection(port->eventSelection, port->timeSeries || port->snapshotDemand);
+    const std::array selections{split.ticker, split.stream, split.history};
+    const std::array profiles{&*endpoint.tickerProfile, &*endpoint.streamProfile, &endpoint.profile};
+    auto result = std::make_unique<NativeSubscription>();
+    result->port = port;
+    std::size_t capacity = 0;
+
+    for (std::size_t family = 0; family < selections.size(); ++family) {
+        if (static_cast<unsigned>(selections[family]) == 0)
+            continue;
+
+        result->lanes[family] = registerSubscription(endpoint, port, *profiles[family], selections[family]);
+
+        if (!result->lanes[family])
+            return {};
+
+        capacity += profiles[family]->clientLimits.dataItems;
+    }
+
+    if (result->lanes[0])
+        capacity += endpoint.tickerProfile->tickerLimits.cacheKeys;
+
+    if (result->lanes[2])
+        capacity += endpoint.profile.historyLimits.points + endpoint.profile.historyLimits.pendingItems;
+
+    port->statistics->update([&](auto &s) {
+        s.queueCapacityEvents = capacity;
     });
     observeState(port, SubscriptionState::ACTIVE);
 
@@ -4575,8 +4711,42 @@ std::unique_ptr<NativeSubscription> registerSubscription(NativeEndpoint &endpoin
  * @param subscription Existing independent receiver registration.
  * @param work Remaining desired submission coordinates for this whole bounded endpoint turn.
  */
-void applyDesired(NativeEndpoint &endpoint, NativeSubscription &subscription, mux::QueueSubmitWork &work) {
-    if (endpoint.profile.family == core::SubscriptionFamily::HISTORY &&
+std::vector<core::SubscriptionRequest> desiredRequests(const ReceivingProfile &profile, EventSelection selection,
+                                                       std::vector<ReceivingSymbol> &symbols) {
+    std::vector<core::SubscriptionRequest> requests;
+    const auto physicalRecords = profile.physicalRouteCount;
+
+    if (!physicalRecords || symbols.size() > profile.clientLimits.commandEntries / physicalRecords)
+        throw Error({ErrorCode::RESOURCE_LIMIT, "subscription-route-entries"});
+
+    requests.reserve(symbols.size() * physicalRecords);
+    const auto &plan = receivingEventPlan(profile, selection);
+    prepareReceivingSymbols(profile, plan, symbols);
+
+    for (std::size_t offset = 0; offset < plan.bindingCount; ++offset) {
+        const auto index = plan.bindingIndices[offset];
+        const auto &binding = profile.bindings[index];
+        const auto context = profile.schema.recordContext(binding.localId);
+
+        for (const auto &symbol : symbols) {
+            const auto projections = receivingProjectionMask(profile, index, symbol);
+
+            if (projections) {
+                const auto &physical = receivingPhysicalSymbol(profile, index, symbol);
+                appendReceivingDesiredRequest(requests, context, physical, symbol.selector, profile.family,
+                                              symbol.fromTime, profile.bindingTimeEncodings[index], projections);
+            }
+        }
+    }
+
+    return requests;
+}
+
+void applyDesired(NativeEndpoint &endpoint, NativeSubscription &subscription, mux::QueueSubmitWork &work,
+                  transport::RecoveryTurnWork *turn = nullptr) {
+    const auto mixed = endpoint.tickerProfile.has_value();
+
+    if ((mixed ? subscription.lanes[2] != nullptr : endpoint.profile.family == core::SubscriptionFamily::HISTORY) &&
         !historyCallbackRetirement(*subscription.port).quiescent)
         return;
 
@@ -4605,7 +4775,6 @@ void applyDesired(NativeEndpoint &endpoint, NativeSubscription &subscription, mu
         return;
     }
 
-    const auto &plan = receivingEventPlan(endpoint.profile, subscription.port->eventSelection);
     std::vector<ReceivingSymbol> symbols;
     std::uint64_t revision = 0;
     {
@@ -4616,8 +4785,19 @@ void applyDesired(NativeEndpoint &endpoint, NativeSubscription &subscription, mu
             return;
         }
 
-        if (!prepayReceivingRouting(endpoint.profile, work)) {
-            return;
+        if (!mixed) {
+            if (!prepayReceivingRouting(endpoint.profile, work))
+                return;
+        } else {
+            const std::array profiles{&*endpoint.tickerProfile, &*endpoint.streamProfile, &endpoint.profile};
+            --work.operations;
+
+            for (std::size_t family = 0; family < profiles.size(); ++family) {
+                if (subscription.lanes[family]) {
+                    if (!prepayReceivingRouting(*profiles[family], work))
+                        return;
+                }
+            }
         }
 
         if (subscription.port->symbols.size() > endpoint.profile.routing.symbols) {
@@ -4639,38 +4819,42 @@ void applyDesired(NativeEndpoint &endpoint, NativeSubscription &subscription, mu
         }
     }
 
-    std::vector<core::SubscriptionRequest> requests;
+    const auto selectors = symbols.size();
 
-    const auto physicalRecords = endpoint.profile.physicalRouteCount;
+    if (mixed) {
+        const std::array profiles{&*endpoint.tickerProfile, &*endpoint.streamProfile, &endpoint.profile};
+        std::array<std::vector<ReceivingSymbol>, 3> laneSymbols;
+        std::array<std::vector<core::SubscriptionRequest>, 3> requests;
+        std::array<transport::detail::RecoveryDesiredLane, 3> lanes{};
 
-    if (!physicalRecords || symbols.size() > endpoint.profile.clientLimits.commandEntries / physicalRecords) {
-        throw Error({ErrorCode::RESOURCE_LIMIT, "subscription-route-entries"});
-    }
-
-    requests.reserve(symbols.size() * physicalRecords);
-    prepareReceivingSymbols(endpoint.profile, plan, symbols);
-
-    for (std::size_t offset = 0; offset < plan.bindingCount; ++offset) {
-        const auto index = plan.bindingIndices[offset];
-        const auto &binding = endpoint.profile.bindings[index];
-        const auto context = endpoint.profile.schema.recordContext(binding.localId);
-
-        for (const auto &symbol : symbols) {
-            const auto projections = receivingProjectionMask(endpoint.profile, index, symbol);
-
-            if (!projections) {
-                continue;
+        for (std::size_t family = 0; family < lanes.size(); ++family) {
+            if (const auto &lane = subscription.lanes[family]) {
+                laneSymbols[family] = symbols;
+                requests[family] = desiredRequests(*profiles[family], lane->selection, laneSymbols[family]);
+                lanes[family] = {&lane->handle, requests[family]};
             }
-
-            const auto &physical = receivingPhysicalSymbol(endpoint.profile, index, symbol);
-            appendReceivingDesiredRequest(requests, context, physical, symbol.selector, endpoint.profile.family,
-                                          symbol.fromTime, endpoint.profile.bindingTimeEncodings[index], projections);
         }
+
+        const auto applied = endpoint.recovery->replaceDesired(lanes, selectors, revision, *turn);
+
+        if (!applied) {
+            if (applied.error().error != mux::QueueError::BUSY && applied.error().error != mux::QueueError::WORK_LIMIT)
+                failSubscription(subscription.port,
+                                 queueDiagnostic(applied.error().error, "subscription-mixed-desired"));
+
+            return;
+        }
+
+        subscription.submittedRevision = revision;
+        subscription.hasSubmitted = true;
+
+        return;
     }
 
+    auto requests = desiredRequests(endpoint.profile, subscription.selection, symbols);
     {
         std::lock_guard lock(subscription.port->statistics->mutex);
-        subscription.port->statistics->submittedSelectors = symbols.size();
+        subscription.port->statistics->submittedSelectors = selectors;
         subscription.port->statistics->submittedDesiredRevision = revision;
     }
     auto accepted = subscription.handle.replace(requests, work);
@@ -4690,7 +4874,8 @@ void applyDesired(NativeEndpoint &endpoint, NativeSubscription &subscription, mu
  * @param endpoint Sole worker-owned native endpoint.
  * @param submitWork Remaining submission coordinates, never refilled inside the bounded owner turn.
  */
-void progressSubscriptions(NativeEndpoint &endpoint, mux::QueueSubmitWork &submitWork) {
+void progressSubscriptions(NativeEndpoint &endpoint, mux::QueueSubmitWork &submitWork,
+                           transport::RecoveryTurnWork *turn = nullptr) {
     for (std::size_t index = 0; index < endpoint.subscriptions.size(); ++index) {
         std::shared_ptr<SubscriptionPort> port;
         {
@@ -4726,14 +4911,28 @@ void progressSubscriptions(NativeEndpoint &endpoint, mux::QueueSubmitWork &submi
                 // This worker is the sole packet publisher for the fixed slot: no newer packet can intervene.
                 callbackPool->cancel(callbackSlot, {ErrorCode::CALLBACK_CANCELLED, "callback-history-revision"});
 
-            if (native && callbackPool->snapshot(callbackSlot).quiescent)
-                static_cast<void>(native->handle.requestResume());
+            const auto quiescent = callbackPool->snapshot(callbackSlot).quiescent;
+
+            if (quiescent && endpoint.tickerProfile)
+                port->statistics->sharedCallbackInFlight.store(false, std::memory_order_release);
+
+            if (native && quiescent) {
+                if (endpoint.tickerProfile) {
+                    for (const auto &lane : native->lanes)
+                        if (lane)
+                            static_cast<void>(lane->handle.requestResume());
+                } else {
+                    static_cast<void>(native->handle.requestResume());
+                }
+            }
         }
 
         if (!native && !port->closeRequested.load(std::memory_order_acquire) &&
             !endpoint.port->closeRequested.load(std::memory_order_acquire)) {
             try {
-                native = registerSubscription(endpoint, port);
+                native = endpoint.tickerProfile
+                             ? registerMixedSubscription(endpoint, port)
+                             : registerSubscription(endpoint, port, endpoint.profile, port->eventSelection);
             } catch (const Error &failure) {
                 failSubscription(port, failure.diagnostic());
             } catch (const std::bad_alloc &) {
@@ -4749,6 +4948,74 @@ void progressSubscriptions(NativeEndpoint &endpoint, mux::QueueSubmitWork &submi
                 retireSubscription(port);
             }
 
+            continue;
+        }
+
+        if (endpoint.tickerProfile) {
+            bool allTerminal = true;
+
+            for (std::size_t family = 0; family < native->lanes.size(); ++family) {
+                const auto &lane = native->lanes[family];
+
+                if (!lane)
+                    continue;
+
+                const auto state = lane->handle.state();
+
+                if (state != mux::QueueClientState::TERMINAL) {
+                    allTerminal = false;
+                    continue;
+                }
+
+                const auto result = lane->handle.terminal();
+
+                if (result && result->primary) {
+                    constexpr std::array stages{"subscription-mixed-ticker", "subscription-mixed-stream",
+                                                "subscription-mixed-history"};
+                    failSubscription(port, queueDiagnostic(result->primary->error, stages[family]));
+                }
+            }
+
+            if (port->closeRequested.load(std::memory_order_acquire)) {
+                if (allTerminal) {
+                    native.reset();
+                    retireSubscription(port);
+                } else if (!native->stopping) {
+                    for (const auto &lane : native->lanes)
+                        if (lane)
+                            lane->handle.requestStop(mux::StopMode::ABORT);
+
+                    native->stopping = true;
+                }
+
+                continue;
+            }
+
+            for (const auto &lane : native->lanes) {
+                if (!lane)
+                    continue;
+
+                if (const auto notice = lane->handle.resetNotice()) {
+                    {
+                        std::lock_guard lock(endpoint.port->mutex);
+                        endpoint.port->terminal.hadGap = true;
+                    }
+                    lane->handle.acknowledgeReset(notice->sequence);
+                }
+            }
+
+            if (endpoint.port->closeRequested.load(std::memory_order_acquire))
+                continue;
+
+            try {
+                applyDesired(endpoint, *native, submitWork, turn);
+            } catch (const Error &failure) {
+                failSubscription(port, failure.diagnostic());
+            } catch (const std::bad_alloc &) {
+                failSubscription(port, {ErrorCode::ALLOCATION_FAILURE, "subscription-desired-copy"});
+            } catch (...) {
+                failSubscription(port, {ErrorCode::RESOURCE_LIMIT, "subscription-desired-copy"});
+            }
             continue;
         }
 
@@ -5626,7 +5893,7 @@ EndpointProgress progressEndpoint(NativeEndpoint &endpoint, transport::RecoveryT
         endpoint.aggregationConfigured = true;
     }
 
-    progressSubscriptions(endpoint, submitWork);
+    progressSubscriptions(endpoint, submitWork, &work);
 
     if (endpoint.port->closeRequested.load(std::memory_order_acquire) && !endpoint.draining) {
         const auto ticks = endpoint.port->closeDeadline.load(std::memory_order_acquire);
@@ -6082,6 +6349,16 @@ void RuntimeImpl::run() noexcept {
 
                     auto work = native[index]->profile.turnWork;
                     auto submitWork = native[index]->profile.submitWork;
+
+                    if (native[index]->tickerProfile) {
+                        for (const auto *profile : {&*native[index]->tickerProfile, &*native[index]->streamProfile}) {
+                            const auto lane = profile->submitWork;
+                            submitWork.visits += lane.visits;
+                            submitWork.textUnits += lane.textUnits;
+                            submitWork.bytes += lane.bytes;
+                        }
+                    }
+
                     auto observationWork = native[index]->profile.historyObservationWork;
                     bool retired = false;
 
@@ -6122,8 +6399,14 @@ void RuntimeImpl::run() noexcept {
                     }
 
                     if (native[index]->profile.family == core::SubscriptionFamily::HISTORY) {
-                        for (const auto &subscription : native[index]->subscriptions) {
-                            if (!subscription || subscription->stopping)
+                        for (const auto &logical : native[index]->subscriptions) {
+                            if (!logical || logical->stopping)
+                                continue;
+
+                            const auto *subscription =
+                                native[index]->tickerProfile ? logical->lanes[2].get() : logical.get();
+
+                            if (!subscription)
                                 continue;
 
                             if (native[index]->tape) {
@@ -6514,7 +6797,9 @@ std::optional<RegisteredEvent> Feed::readLastEvent(EventType type, std::u16strin
         if (!(detail::LASTING_EVENT_TYPES & (1U << kind)))
             reject(ErrorCode::UNSUPPORTED_PROFILE, "latest-event-type");
 
-        if (port_->options.contract != DeliveryContract::TICKER || symbol.empty())
+        if ((port_->options.contract != DeliveryContract::TICKER &&
+             port_->options.contract != DeliveryContract::MIXED) ||
+            symbol.empty())
             return std::nullopt;
 
         detail::validateLatestSymbol(symbol, port_->limits.maximumSymbolUnits);
@@ -6598,7 +6883,9 @@ Feed::startLatestEventRequest(EventType type, std::u16string_view symbol,
     return producerAction([&] {
         const auto kind = static_cast<unsigned>(type);
 
-        if (port_->options.contract != DeliveryContract::TICKER || !(detail::LASTING_EVENT_TYPES & (1U << kind)))
+        if ((port_->options.contract != DeliveryContract::TICKER &&
+             port_->options.contract != DeliveryContract::MIXED) ||
+            !(detail::LASTING_EVENT_TYPES & (1U << kind)))
             reject(ErrorCode::UNSUPPORTED_PROFILE, "latest-event-request-type");
 
         detail::validateLatestSymbol(symbol, port_->limits.maximumSymbolUnits);
@@ -6640,7 +6927,8 @@ prepareLatestRequestGroup(const detail::EndpointPort &port, EventType type, std:
         const auto kind = static_cast<unsigned>(type);
         const auto selection = static_cast<detail::EventSelection>(1U << kind);
 
-        if (port.options.contract != DeliveryContract::TICKER || !(detail::LASTING_EVENT_TYPES & (1U << kind)))
+        if ((port.options.contract != DeliveryContract::TICKER && port.options.contract != DeliveryContract::MIXED) ||
+            !(detail::LASTING_EVENT_TYPES & (1U << kind)))
             reject(ErrorCode::UNSUPPORTED_PROFILE, "latest-event-request-type");
 
         const auto control = port.control.lock();
@@ -6658,7 +6946,12 @@ prepareLatestRequestGroup(const detail::EndpointPort &port, EventType type, std:
         std::optional<events::PreparedCandleRoutes> candleRoutes;
 
         if (type == EventType::CANDLE) {
-            candleRoutes = detail::prepareReceivingCandleRoutes(port.options, port.limits.maximumSymbolUnits);
+            auto options = port.options;
+
+            if (options.contract == DeliveryContract::MIXED)
+                options.contract = DeliveryContract::TICKER;
+
+            candleRoutes = detail::prepareReceivingCandleRoutes(options, port.limits.maximumSymbolUnits);
 
             if (!candleRoutes)
                 reject(ErrorCode::UNSUPPORTED_PROFILE, "latest-event-request-type");
@@ -6899,7 +7192,7 @@ std::shared_ptr<Endpoint> ApiRuntime::createEndpoint(const EndpointConfiguration
         port->stateListeners = makeStateListeners(port, impl_->options.maximumStateListenersPerEndpoint);
         port->subscriptions.resize(impl_->options.maximumSubscriptionsPerEndpoint);
 
-        if (options.contract == DeliveryContract::HISTORY)
+        if (options.contract == DeliveryContract::HISTORY || options.contract == DeliveryContract::MIXED)
             port->historySnapshotRequests.resize(impl_->options.maximumSubscriptionsPerEndpoint);
 
         port->stateChanges.resize(impl_->options.maximumPendingStateChangesPerEndpoint);

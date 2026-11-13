@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 #include "recovery_core.hpp"
 #include "../client/subscription_receiver_observation.hpp"
+#include "../mux/queue_replace.hpp"
 
 #include "recovery_core_support.hpp"
 
@@ -1610,6 +1611,30 @@ RecoveryCore::visitTickerLatest(const mux::MuxHandle &handle, core::Subscription
         return std::unexpected(queueFailure(observed.error()));
 
     return *observed;
+}
+
+std::expected<void, mux::QueueFailure> RecoveryCore::replaceDesired(const std::array<RecoveryDesiredLane, 3> &lanes,
+                                                                    std::size_t selectors, std::uint64_t revision,
+                                                                    RecoveryTurnWork &work) {
+    if (rejection() || !configuration_.adopted || cutoff_ || finalRetirement_ || terminal_)
+        return std::unexpected(mux::QueueFailure{mux::QueueError::CLOSING, {}});
+
+    std::array<mux::detail::QueueReplacement, 3> replacements{};
+    std::size_t count = 0;
+
+    for (std::size_t family = 0; family < lanes.size(); ++family) {
+        if (!lanes[family].handle)
+            continue;
+
+        auto &queue = configuration_.queue(family);
+
+        if (!queue)
+            return std::unexpected(mux::QueueFailure{mux::QueueError::INVALID_STATE, {}});
+
+        replacements[count++] = {&*queue, lanes[family].handle, lanes[family].requests, &work.queues[family]};
+    }
+
+    return mux::detail::QueueReplaceAccess::replace(std::span(replacements).first(count), selectors, revision);
 }
 
 std::expected<mux::QueueRangeStatus, RecoveryDiagnostic>

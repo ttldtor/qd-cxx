@@ -10,11 +10,13 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <utility>
 
 namespace org::ttldtor::qdcxx::mux {
 namespace detail {
 struct Identity;
-}
+struct MuxStateAccess;
+} // namespace detail
 
 /** Synchronous local failures; rejection never publishes a partial client map or aggregate. */
 enum class MuxError {
@@ -109,6 +111,25 @@ struct MuxChange {
 class MuxState {
     struct State;
     enum class Command { ADD, REMOVE, REPLACE, CLEAR, REMOVE_CLIENT };
+
+    class PreparedChange {
+        friend class MuxState;
+        friend struct detail::MuxStateAccess;
+        std::shared_ptr<const detail::Identity> identity;
+        std::uint64_t baseRevision;
+        std::uint64_t preparation;
+        std::uint64_t membership;
+        std::optional<std::size_t> retiredSlot;
+        bool changed;
+
+        PreparedChange(std::shared_ptr<const detail::Identity> identity, std::uint64_t baseRevision,
+                       std::uint64_t preparation, std::uint64_t membership, std::optional<std::size_t> retiredSlot,
+                       bool changed) noexcept
+            : identity(std::move(identity)), baseRevision(baseRevision), preparation(preparation),
+              membership(membership), retiredSlot(retiredSlot), changed(changed) {
+        }
+    };
+    friend struct detail::MuxStateAccess;
     std::unique_ptr<State> state_;
 
     /** Adopt fully reserved backing.
@@ -126,6 +147,29 @@ class MuxState {
     [[nodiscard]] std::expected<MuxChange, MuxError> apply(Command command, const MuxClient &client,
                                                            std::span<const core::SubscriptionRequest> requests,
                                                            std::span<const core::SubscriptionKey> keys, MuxWork &work);
+
+    /** Prepare the inactive bank without publishing its membership or revision. */
+    [[nodiscard]] std::expected<PreparedChange, MuxError> prepare(Command command, const MuxClient &client,
+                                                                  std::span<const core::SubscriptionRequest> requests,
+                                                                  std::span<const core::SubscriptionKey> keys,
+                                                                  MuxWork &work);
+
+    /** Publish the exact current candidate without allocation, or refuse a stale token. */
+    [[nodiscard]] std::expected<MuxChange, MuxError> commit(const PreparedChange &candidate) noexcept;
+    /** Check that a serialized candidate still names the current owner and inactive bank. */
+    [[nodiscard]] bool current(const PreparedChange &candidate) const noexcept;
+    /** Borrow candidate entries until the next mutation or preparation on this owner. */
+    [[nodiscard]] std::expected<std::span<const MuxEntry>, MuxError>
+    preparedEntries(const PreparedChange &candidate, const MuxClient &client) const noexcept;
+    /** Borrow candidate aggregate interest until the next mutation or preparation. */
+    [[nodiscard]] std::expected<std::span<const core::SubscriptionRequest>, MuxError>
+    preparedAggregate(const PreparedChange &candidate) const noexcept;
+    [[nodiscard]] std::expected<bool, MuxError>
+    isCurrentInBank(const MuxClient &client, const MuxMembership &membership, MuxWork &work, bool inactive) const;
+    [[nodiscard]] std::expected<core::DeliveryProjectionMask, MuxError>
+    currentProjectionMaskInBank(const MuxClient &client,
+                                const core::CapturedDeliveryProjections<MuxMembership> &captured, MuxWork &work,
+                                bool inactive) const;
 
     public:
     /** Release fixed backing; copied opaque tokens retain only the fixed identity allocation.

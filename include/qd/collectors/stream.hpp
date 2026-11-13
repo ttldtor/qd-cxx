@@ -13,6 +13,9 @@
 #include <span>
 
 namespace org::ttldtor::qdcxx::collectors {
+namespace detail {
+struct StreamReplaceAccess;
+}
 
 /** Local staging failures, independent of connection and callback completion. */
 enum class StreamError {
@@ -103,6 +106,7 @@ struct StreamDiagnostic {
  * release bounded owners without caller credits; it never dispatches or reports delivery.
  */
 class StreamCollector {
+    friend struct detail::StreamReplaceAccess;
     struct Impl;
     std::unique_ptr<Impl> impl_; ///< Unique mutable owner; empty after move.
     /** Adopt fully allocated storage after all fallible preparation.

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/collectors/stream.hpp"
 #include "qd/encoding/penta_symbol.hpp"
+#include "stream_replace.hpp"
 
 #include <limits>
 #include <new>
@@ -322,6 +323,29 @@ StreamCollector::replace(std::span<const core::SubscriptionRequest> requests, co
     if (result && result->changed) {
         impl_->invalidate();
     }
+
+    return result;
+}
+
+std::expected<detail::StreamReplaceAccess::Candidate, core::SubscriptionError>
+detail::StreamReplaceAccess::prepare(StreamCollector &owner, std::span<const core::SubscriptionRequest> requests,
+                                     core::SubscriptionWork &work) {
+    if (!owner.impl_ || owner.impl_->diagnostic.error)
+        return std::unexpected(core::SubscriptionError::INVALID_STATE);
+
+    return core::detail::SubscriptionStateAccess::prepareReplace(owner.impl_->desired, requests, work);
+}
+
+std::expected<core::SubscriptionChange, core::SubscriptionError>
+detail::StreamReplaceAccess::commit(StreamCollector &owner, Candidate candidate) noexcept {
+    if (!owner.impl_ || owner.impl_->diagnostic.error)
+        return std::unexpected(core::SubscriptionError::INVALID_STATE);
+
+    const auto result =
+        core::detail::SubscriptionStateAccess::commitReplace(owner.impl_->desired, std::move(candidate));
+
+    if (result && result->changed)
+        owner.impl_->invalidate();
 
     return result;
 }

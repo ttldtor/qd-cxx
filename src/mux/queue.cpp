@@ -1,8 +1,13 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/mux/queue.hpp"
+#include "../collectors/history_replace.hpp"
 #include "../collectors/history_replay.hpp"
+#include "../collectors/stream_replace.hpp"
+#include "../collectors/ticker_transaction.hpp"
 #include "../core/delivery_statistics.hpp"
+#include "interest_transaction.hpp"
+#include "queue_replace.hpp"
 
 #include <algorithm>
 #include <array>
@@ -1362,6 +1367,23 @@ struct MuxQueue::State {
         }
     };
 
+    /** Candidate kept on the stack for the uninterrupted grouped owner operation. */
+    struct Replacement {
+        using Stream = collectors::detail::StreamReplaceAccess;
+        using Ticker = collectors::detail::TickerCollectorAccess;
+        using History = collectors::detail::HistoryReplaceAccess;
+        State *owner;
+        Client *client;
+        detail::MuxStateAccess::PreparedReplace interest;
+        std::variant<Stream::Candidate, Ticker::PreparedReplace, History::Candidate> source;
+        bool restartHistory;
+        std::size_t discarded;
+    };
+
+    std::expected<Replacement, QueueFailure>
+    prepareReplace(Client &client, std::span<const core::SubscriptionRequest> input, QueueWork &work);
+    static void publishReplace(Replacement replacement, std::size_t selectors, std::uint64_t revision) noexcept;
+
     /** Preserve fixed reservation until the actual serialized client object was deallocated. */
     struct DeleteClient {
         /** Dispose owner metadata after actual view/interest/callable retirement.
@@ -2392,6 +2414,275 @@ std::expected<MuxHandle, QueueFailure> MuxQueue::open(ClientLimits limits, const
     }
 }
 
+std::expected<MuxQueue::State::Replacement, QueueFailure>
+MuxQueue::State::prepareReplace(Client &c, std::span<const core::SubscriptionRequest> input, QueueWork &work) {
+    debit(work.operations, 1);
+    debit(work.commands, 1);
+    spend(work,
+          sum(sum(product(interestLimits.entries, interestLimits.entries), product(interestLimits.entries, 4)),
+              clients.size()),
+          0, product(product(interestLimits.entries, interestLimits.entries), interestLimits.symbolUnits),
+          sum(product(interestLimits.entries, product(sum(sizeof(Mapping), sizeof(core::SubscriptionRequest)), 2)),
+              product(clients.size(), sizeof(Client))));
+
+    auto next = detail::MuxStateAccess::prepareReplace(interest, c.interest, input, work.interest);
+
+    if (!next)
+        return std::unexpected(sourceFailure(next.error()));
+
+    using Stream = Replacement::Stream;
+    using Ticker = Replacement::Ticker;
+    using History = Replacement::History;
+    using Source = decltype(Replacement::source);
+    const auto desired = detail::MuxStateAccess::entries(interest, *next, c.interest);
+
+    if (!desired)
+        return std::unexpected(sourceFailure(desired.error()));
+
+    const bool restart = history && c.statistics && [&] {
+        std::lock_guard lock(c.statistics->mutex);
+
+        return c.statistics->historyReplayRequired;
+    }();
+
+    constexpr auto releaseBytes =
+        sizeof(std::shared_ptr<const detail::QueueRecord>) + 2 * sizeof(core::DeliveryProjectionMask);
+    const auto discarded = restart ? sum(c.size, history->pendingCount(c.history)) : 0;
+    spend(work, product(c.size, 2), 0, 0,
+          sum(product(c.size, restart ? releaseBytes : sizeof(core::DeliveryProjectionMask)),
+              restart && c.size ? c.port->budget->limits.recordBytes : 0));
+
+    for (std::size_t i = 0; i < c.size; ++i) {
+        const auto slot = (c.head + i) % c.records.size();
+
+        if (restart) {
+            c.selection[i] = 0;
+            continue;
+        }
+
+        const auto mask = detail::MuxStateAccess::projectionMask(interest, *next, c.interest,
+                                                                 c.records[slot]->view.projections, work.interest);
+
+        if (!mask)
+            return std::unexpected(sourceFailure(mask.error()));
+
+        c.selection[i] = static_cast<std::uint8_t>(*mask & c.remaining[slot]);
+    }
+
+    if (stream) {
+        const auto aggregate = detail::MuxStateAccess::aggregate(interest, *next);
+
+        if (!aggregate)
+            return std::unexpected(sourceFailure(aggregate.error()));
+
+        auto source = Stream::prepare(*stream, *aggregate, work.desired);
+
+        if (!source)
+            return std::unexpected(sourceFailure(source.error()));
+
+        return Replacement{this, &c, *next, Source(std::move(*source)), false, 0};
+    }
+
+    for (std::size_t i = 0; i < desired->size(); ++i) {
+        const auto &entry = (*desired)[i];
+        requests[i] = {entry.key, entry.historyBound, entry.projectionMask};
+    }
+
+    struct ResetRequests {
+        std::span<core::SubscriptionRequest> inputs;
+
+        ~ResetRequests() {
+            std::ranges::fill(inputs, core::SubscriptionRequest{});
+        }
+    } cleanup{std::span(requests).first(desired->size())};
+
+    auto matches = [&](std::span<const core::SubscriptionEntry> entries) {
+        return entries.size() <= c.mapping.size() && std::ranges::all_of(entries, [&](const auto &entry) {
+                   return std::ranges::any_of(*desired, [&](const auto &wanted) {
+                       return entry.key.selector == wanted.key.selector &&
+                              entry.key.context.matches(wanted.key.context) && entry.key.symbol == wanted.key.symbol;
+                   });
+               });
+    };
+
+    if (ticker) {
+        auto source = Ticker::prepareReplace(*ticker, c.ticker, cleanup.inputs, work.desired, work.ticker);
+
+        if (!source) {
+            return std::unexpected(source.error().subscription ? sourceFailure(*source.error().subscription)
+                                                               : sourceFailure(source.error().error));
+        }
+
+        if (!matches(Ticker::entries(*ticker, *source)))
+            return std::unexpected(QueueFailure{QueueError::INVALID_STATE, {}});
+
+        return Replacement{this, &c, *next, Source(std::move(*source)), false, 0};
+    }
+
+    auto source = History::prepare(*history, c.history, cleanup.inputs, work.desired, work.history, restart);
+
+    if (!source) {
+        return std::unexpected(source.error().subscriptionError ? sourceFailure(*source.error().subscriptionError)
+                                                                : sourceFailure(source.error().error));
+    }
+
+    if (!matches(History::entries(*source)))
+        return std::unexpected(QueueFailure{QueueError::INVALID_STATE, {}});
+
+    return Replacement{this, &c, *next, Source(std::move(*source)), restart, discarded};
+}
+
+void MuxQueue::State::publishReplace(Replacement replacement, std::size_t selectors, std::uint64_t revision) noexcept {
+    auto &s = *replacement.owner;
+    auto &c = *replacement.client;
+    using Stream = Replacement::Stream;
+    using Ticker = Replacement::Ticker;
+    using History = Replacement::History;
+    collectors::HistoryEpochToken epoch;
+
+    if (s.history)
+        epoch = History::epoch(std::get<History::Candidate>(replacement.source));
+
+    const auto applied = detail::MuxStateAccess::commitReplace(s.interest, replacement.interest);
+
+    if (!applied)
+        std::terminate();
+
+    const core::SubscriptionState *view = nullptr;
+
+    if (s.stream) {
+        if (!Stream::commit(*s.stream, std::move(std::get<Stream::Candidate>(replacement.source))))
+            std::terminate();
+    } else if (s.ticker) {
+        if (!Ticker::commitReplace(*s.ticker, std::move(std::get<Ticker::PreparedReplace>(replacement.source))))
+            std::terminate();
+
+        view = s.ticker->desired(c.ticker);
+    } else {
+        static_cast<void>(History::commit(*s.history, std::move(std::get<History::Candidate>(replacement.source))));
+        view = s.history->desired(c.history);
+    }
+
+    if (view) {
+        const auto desired = s.interest.clientEntries(c.interest);
+
+        for (auto &old : c.mapping)
+            old = {};
+
+        c.mappingCount = 0;
+
+        for (const auto &entry : view->entries()) {
+            const auto match = std::ranges::find_if(*desired, [&](const auto &wanted) {
+                return entry.key.selector == wanted.key.selector && entry.key.context.matches(wanted.key.context) &&
+                       entry.key.symbol == wanted.key.symbol;
+            });
+            c.mapping[c.mappingCount++] = {entry.key,
+                                           entry.membership,
+                                           match->membership,
+                                           entry.historyBound,
+                                           view->revision(),
+                                           epoch,
+                                           {match->membership, match->projectionMask, match->projectionMemberships}};
+        }
+    }
+
+    std::size_t removed = 0;
+
+    for (std::size_t i = 0; i < c.size; ++i) {
+        const auto slot = (c.head + i) % c.records.size();
+        removed +=
+            std::popcount(c.remaining[slot]) - std::popcount(static_cast<core::DeliveryProjectionMask>(c.selection[i]));
+        c.remaining[slot] = c.selection[i];
+
+        if (replacement.restartHistory)
+            c.records[slot].reset();
+    }
+
+    if (replacement.restartHistory) {
+        count(c.counts.discarded, replacement.discarded, c.counts.saturated);
+        count(s.counts.discarded, replacement.discarded, s.counts.saturated);
+        c.head = c.size = 0;
+    }
+
+    core::detail::updateDelivery(c.statistics, [&](auto &stats) {
+        stats.pendingEvents -= removed;
+        stats.discardedEvents.add(removed);
+    });
+
+    c.desiredRevision = c.mappingRevision = applied->revision;
+    c.candidateLogicalSelectors = selectors;
+    c.candidateLogicalRevision = revision;
+    c.historyReplay = c.historyReplayCommitted = replacement.restartHistory;
+    c.sync = false;
+    count(c.counts.commandsApplied, 1, c.counts.saturated);
+    count(s.counts.commandsApplied, 1, s.counts.saturated);
+    s.publishState(c);
+}
+
+std::expected<void, QueueFailure> detail::QueueReplaceAccess::replace(std::span<const QueueReplacement> replacements,
+                                                                      std::size_t selectors, std::uint64_t revision) {
+    using State = MuxQueue::State;
+
+    if (replacements.empty() || replacements.size() > 3)
+        return std::unexpected(QueueFailure{QueueError::INVALID_CONFIGURATION, {}});
+
+    std::array<std::optional<State::Replacement>, 3> prepared;
+    std::array<State *, 3> owners{};
+    std::array<State::Client *, 3> clients{};
+
+    try {
+        for (std::size_t i = 0; i < replacements.size(); ++i) {
+            const auto &input = replacements[i];
+
+            if (!input.queue || !input.handle || !input.work || !input.queue->state_)
+                throw QueueError::INVALID_CONFIGURATION;
+
+            auto &owner = *input.queue->state_;
+
+            if (std::ranges::find(owners, &owner) != owners.end())
+                throw QueueError::INVALID_CONFIGURATION;
+
+            if (owner.executing)
+                throw QueueError::REENTRANT;
+
+            if (owner.state != QueueState::OPEN || owner.stopMode)
+                throw QueueError::CLOSING;
+
+            auto *client = owner.client(*input.handle);
+
+            if (!client || client->closing || client->port->stop.load())
+                throw QueueError::CLOSING;
+
+            if (owner.reset.phase != ResetPhase::NONE || client->port->advertisedNotice.load() || client->sync ||
+                owner.unionDirty || owner.pendingPhase == State::Pending::ROUTING)
+                throw QueueError::BUSY;
+
+            owners[i] = &owner;
+            clients[i] = client;
+        }
+
+        for (std::size_t i = 0; i < replacements.size(); ++i) {
+            const auto &input = replacements[i];
+            auto candidate = owners[i]->prepareReplace(*clients[i], input.requests, *input.work);
+
+            if (!candidate)
+                return std::unexpected(candidate.error());
+
+            prepared[i].emplace(std::move(*candidate));
+        }
+
+        for (std::size_t i = 0; i < replacements.size(); ++i)
+            State::publishReplace(std::move(*prepared[i]), selectors, revision);
+
+        for (std::size_t i = 0; i < replacements.size(); ++i)
+            owners[i]->publishMapping(*clients[i]);
+
+        return {};
+    } catch (QueueError error) {
+        return std::unexpected(QueueFailure{error, {}});
+    }
+}
+
 std::expected<bool, QueueFailure> MuxQueue::State::sync(Client &c, QueueWork &work) {
     if (!c.sync || c.closing) {
         return false;
@@ -3076,7 +3367,8 @@ std::expected<bool, QueueFailure> MuxQueue::State::routeStream(QueueWork &work) 
 
 std::expected<bool, QueueFailure> MuxQueue::State::callback(Client &c, QueueWork &work, bool retainedOnly) {
     if (!c.size || c.sync || c.paused || !c.consumer || reset.phase != ResetPhase::NONE ||
-        c.port->advertisedNotice.load() || (c.closing && c.stopMode == 2) || c.port->stop.load() == 2) {
+        c.port->advertisedNotice.load() || (c.closing && c.stopMode == 2) || c.port->stop.load() == 2 ||
+        (c.statistics && c.statistics->sharedCallbackInFlight.load(std::memory_order_acquire))) {
         return false;
     }
 

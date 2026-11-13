@@ -1,6 +1,6 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
-#include "qd/mux/interest.hpp"
+#include "../../src/mux/interest_transaction.hpp"
 
 #include "qd/events/quote.hpp"
 #include "qd/protocol/subscription_writer.hpp"
@@ -215,6 +215,38 @@ void operator delete(void *storage, std::size_t count) noexcept {
 void operator delete[](void *storage, std::size_t count) noexcept {
     static_cast<void>(count);
     std::free(storage);
+}
+
+TEST_CASE("MUX staged replacement publishes only the current inactive bank") {
+    const auto source = schema();
+    auto state = owner(source);
+    auto other = owner(source);
+    const auto active = client(state);
+    auto work = turn();
+    const std::array oldEntries{request(source, u"OLD")};
+    const std::array discardedEntries{request(source, u"DISCARDED")};
+    const std::array nextEntries{request(source, u"NEXT")};
+    REQUIRE(state.add(active, oldEntries, work));
+    const auto revision = state.revision();
+
+    auto discarded = m::detail::MuxStateAccess::prepareReplace(state, active, discardedEntries, work);
+    REQUIRE(discarded);
+    CHECK(state.revision() == revision);
+    REQUIRE(state.aggregateEntries().size() == 1);
+    CHECK(state.aggregateEntries()[0].key.symbol == u"OLD");
+
+    auto next = m::detail::MuxStateAccess::prepareReplace(state, active, nextEntries, work);
+    REQUIRE(next);
+    CHECK_FALSE(m::detail::MuxStateAccess::commitReplace(other, *next));
+    CHECK_FALSE(m::detail::MuxStateAccess::commitReplace(state, *discarded));
+    CHECK(state.revision() == revision);
+
+    const auto committed = m::detail::MuxStateAccess::commitReplace(state, *next);
+    REQUIRE(committed);
+    CHECK(committed->revision == revision + 1);
+    REQUIRE(state.aggregateEntries().size() == 1);
+    CHECK(state.aggregateEntries()[0].key.symbol == u"NEXT");
+    CHECK_FALSE(m::detail::MuxStateAccess::commitReplace(state, *next));
 }
 
 TEST_CASE("MUX overlap preserves private filtering and last removal") {

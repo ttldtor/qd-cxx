@@ -3,6 +3,7 @@
 #pragma once
 
 #include "qd/core/statistics.hpp"
+#include <atomic>
 #include <mutex>
 #include <utility>
 
@@ -16,6 +17,7 @@ struct DeliveryStatisticsState {
 
     std::uint64_t submittedDesiredRevision = 0; ///< Logical revision belonging to the queued facade command.
     bool historyReplayRequired = false; ///< Private delivery intent after obsolete HISTORY loss; not a statistic.
+    std::atomic<bool> sharedCallbackInFlight{false}; ///< One mixed subscription's occupied custom-executor packet.
     std::chrono::milliseconds endpointAggregationPeriod{0};                 ///< Immutable endpoint-local floor.
     std::optional<std::chrono::milliseconds> subscriptionAggregationPeriod; ///< Accepted subscription override.
     std::optional<std::chrono::milliseconds> deliveredAggregationPeriod;    ///< Last period used by an invoked batch.

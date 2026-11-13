@@ -290,6 +290,33 @@ enum даёт `INVALID_ARGUMENT`; отсутствие поддержанног�
 содержать не все выбранные типы. См. полный
 [контракт смешанного выбора и доставки](../spec/events/MIXED-SUBSCRIPTIONS.ru.md).
 
+### Приём каталога SDK по одному соединению
+
+```cpp
+q::api::EndpointOptions options;
+options.contract = q::api::DeliveryContract::MIXED;
+auto endpoint = runtime.createEndpoint(options);
+auto subscription = endpoint->getFeed()->createCatalogSubscription();
+subscription->addEventListener([](std::span<const q::api::RegisteredEvent> events) {
+    // Consume owning events from any of the three contracts.
+    (void)events;
+});
+subscription->addSymbols("IBM");
+endpoint->connect(address);
+```
+
+Endpoint согласует TICKER, STREAM и HISTORY в одной QTP-сессии. Обычный Quote
+идёт через TICKER, обычный TimeAndSale через STREAM, нативный Order через HISTORY.
+Для временных рядов используйте `createTimeSeriesSubscription<Event>()` и
+`setFromTime()`. Такая подписка использует HISTORY. Обработчик может получать отдельные
+пакеты по каждому семейству. Статистика применения подписки показывает общую
+локальную ревизию. Отправка команд и обработка на стороне источника асинхронны.
+
+Для конфигурации через свойства задайте `qdcxx.deliveryContract=mixed`.
+Смешанный профиль использует встроенный каталог и точные селекторы.
+Пользовательские реестры, wildcard, создание фильтров через endpoint,
+проигрывание тейпов и OnDemand используют явные одноконтрактные профили.
+
 ## Запрос индексированного снимка HISTORY
 
 На endpoint с HISTORY используйте

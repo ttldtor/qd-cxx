@@ -1,7 +1,7 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 
-#include "qd/core/subscription.hpp"
+#include "subscription_state_access.hpp"
 
 #include <algorithm>
 #include <limits>
@@ -11,7 +11,50 @@
 namespace org::ttldtor::qdcxx::core {
 
 /** Fixed owner token retained independently of desired entries to prevent address-reuse ABA. */
-struct SubscriptionMembership::Identity {};
+struct SubscriptionMembership::Identity {
+    mutable bool candidateReserved = false; ///< Accessed only by the serialized desired-state owner and candidate.
+};
+
+SubscriptionState::Candidate::Candidate(const SubscriptionState &owner) noexcept
+    : identity_(owner.identity_), baseRevision_(owner.revision_) {
+    identity_->candidateReserved = true;
+}
+
+SubscriptionState::Candidate::~Candidate() {
+    if (identity_) {
+        entries_.reset();
+        symbols_.reset();
+        identity_->candidateReserved = false;
+    }
+}
+
+std::expected<SubscriptionChange, SubscriptionError>
+detail::SubscriptionStateAccess::commitReplace(SubscriptionState &owner, PreparedReplace candidate) noexcept {
+    return owner.publish(std::move(candidate));
+}
+
+std::span<const SubscriptionEntry> detail::SubscriptionStateAccess::entries(const SubscriptionState &owner,
+                                                                            const PreparedReplace &candidate) noexcept {
+    if (!owner.owns(candidate)) {
+        return {};
+    }
+
+    return candidate.changed_ ? std::span(candidate.entries_.get(), candidate.size_) : owner.entries();
+}
+
+std::optional<std::uint64_t> detail::SubscriptionStateAccess::revision(const SubscriptionState &owner,
+                                                                       const PreparedReplace &candidate) noexcept {
+    if (!owner.owns(candidate)) {
+        return {};
+    }
+
+    return candidate.baseRevision_ + candidate.changed_;
+}
+
+bool detail::SubscriptionStateAccess::isCurrent(const SubscriptionState &owner, const PreparedReplace &candidate,
+                                                const SubscriptionMembership &membership) noexcept {
+    return owner.isCurrentIn(entries(owner, candidate), membership);
+}
 
 /** Immutable schema facts retained without copying unrelated declaration storage. */
 struct SubscriptionState::Record {
@@ -203,13 +246,13 @@ std::expected<SubscriptionState, SubscriptionError> SubscriptionState::create(co
     }
 }
 
-std::expected<SubscriptionChange, SubscriptionError>
-SubscriptionState::apply(Command command, std::span<const SubscriptionRequest> requests,
-                         std::span<const SubscriptionKey> keys, SubscriptionWork &work) {
+std::expected<SubscriptionState::Candidate, SubscriptionError>
+SubscriptionState::prepare(Command command, std::span<const SubscriptionRequest> requests,
+                           std::span<const SubscriptionKey> keys, SubscriptionWork &work) {
     try {
         charge(work.commands, 1);
 
-        if (!identity_) {
+        if (!identity_ || identity_->candidateReserved) {
             throw Rejected{SubscriptionError::INVALID_STATE};
         }
 
@@ -219,7 +262,7 @@ SubscriptionState::apply(Command command, std::span<const SubscriptionRequest> r
             throw Rejected{SubscriptionError::RESOURCE_LIMIT};
         }
 
-        // Inputs remain borrowed until the final swap, including views into the current arena.
+        // Inputs may borrow the current arena and remain valid throughout preparation.
         for (std::size_t i = 0; i < inputSize; ++i) {
             const auto &key = command == Command::REMOVE ? keys[i] : requests[i].key;
 
@@ -398,7 +441,7 @@ SubscriptionState::apply(Command command, std::span<const SubscriptionRequest> r
         changed = changed || candidateSize != size_;
 
         if (!changed) {
-            return SubscriptionChange{revision_, false};
+            return Candidate(*this);
         }
 
         if (revision_ == std::numeric_limits<std::uint64_t>::max() ||
@@ -418,15 +461,14 @@ SubscriptionState::apply(Command command, std::span<const SubscriptionRequest> r
         charge(work.keyVisits, candidateSize);
         charge(work.keyVisits, candidateSize);
 
-        std::unique_ptr<SubscriptionEntry[]> candidateEntries;
-        std::unique_ptr<char16_t[]> candidateSymbols;
+        Candidate candidate(*this);
 
         if (candidateSize != 0) {
-            candidateEntries = std::make_unique<SubscriptionEntry[]>(candidateSize);
+            candidate.entries_ = std::make_unique<SubscriptionEntry[]>(candidateSize);
         }
 
         if (candidateUnits != 0) {
-            candidateSymbols = std::make_unique_for_overwrite<char16_t[]>(candidateUnits);
+            candidate.symbols_ = std::make_unique_for_overwrite<char16_t[]>(candidateUnits);
         }
 
         std::size_t entryOffset = 0;
@@ -440,11 +482,11 @@ SubscriptionState::apply(Command command, std::span<const SubscriptionRequest> r
             const auto *symbol = u"";
 
             if (!key.symbol.empty()) {
-                std::copy_n(key.symbol.data(), key.symbol.size(), candidateSymbols.get() + symbolOffset);
-                symbol = candidateSymbols.get() + symbolOffset;
+                std::copy_n(key.symbol.data(), key.symbol.size(), candidate.symbols_.get() + symbolOffset);
+                symbol = candidate.symbols_.get() + symbolOffset;
             }
 
-            auto &entry = candidateEntries[entryOffset++];
+            auto &entry = candidate.entries_[entryOffset++];
 
             entry.key = {key.context, std::u16string_view(symbol, key.symbol.size()), key.selector};
             entry.historyBound = bound;
@@ -478,19 +520,50 @@ SubscriptionState::apply(Command command, std::span<const SubscriptionRequest> r
         // Releasing old entry owners is also finite command work, reserved before publication.
         charge(work.keyVisits, size_);
 
-        entries_.swap(candidateEntries);
-        symbols_.swap(candidateSymbols);
-        size_ = candidateSize;
-        symbolUnits_ = candidateUnits;
-        lastActivation_ = lastActivation;
-        ++revision_;
+        candidate.size_ = candidateSize;
+        candidate.symbolUnits_ = candidateUnits;
+        candidate.lastActivation_ = lastActivation;
+        candidate.changed_ = true;
 
-        return SubscriptionChange{revision_, true};
+        return candidate;
     } catch (const Rejected &rejection) {
         return std::unexpected(rejection.error);
     } catch (const std::bad_alloc &) {
         return std::unexpected(SubscriptionError::ALLOCATION_FAILURE);
     }
+}
+
+bool SubscriptionState::owns(const Candidate &candidate) const noexcept {
+    return identity_ && candidate.identity_ == identity_ && candidate.baseRevision_ == revision_;
+}
+
+std::expected<SubscriptionChange, SubscriptionError> SubscriptionState::publish(Candidate &&candidate) noexcept {
+    if (!owns(candidate)) {
+        return std::unexpected(SubscriptionError::INVALID_STATE);
+    }
+
+    if (candidate.changed_) {
+        entries_.swap(candidate.entries_);
+        symbols_.swap(candidate.symbols_);
+        size_ = candidate.size_;
+        symbolUnits_ = candidate.symbolUnits_;
+        lastActivation_ = candidate.lastActivation_;
+        ++revision_;
+    }
+
+    return SubscriptionChange{revision_, candidate.changed_};
+}
+
+std::expected<SubscriptionChange, SubscriptionError>
+SubscriptionState::apply(Command command, std::span<const SubscriptionRequest> requests,
+                         std::span<const SubscriptionKey> keys, SubscriptionWork &work) {
+    auto candidate = prepare(command, requests, keys, work);
+
+    if (!candidate) {
+        return std::unexpected(candidate.error());
+    }
+
+    return publish(std::move(*candidate));
 }
 
 std::expected<SubscriptionChange, SubscriptionError>
@@ -516,12 +589,13 @@ std::span<const SubscriptionEntry> SubscriptionState::entries() const noexcept {
     return {entries_.get(), size_};
 }
 
-bool SubscriptionState::isCurrent(const SubscriptionMembership &membership) const noexcept {
+bool SubscriptionState::isCurrentIn(std::span<const SubscriptionEntry> selected,
+                                    const SubscriptionMembership &membership) const noexcept {
     if (!identity_ || membership.identity_ != identity_ || membership.activation_ == 0) {
         return false;
     }
 
-    for (const auto &entry : entries()) {
+    for (const auto &entry : selected) {
         if (entry.membership.activation_ == membership.activation_ ||
             (membership.alternateActivation_ != 0 && entry.membership.activation_ == membership.alternateActivation_)) {
             return true;
@@ -536,6 +610,10 @@ bool SubscriptionState::isCurrent(const SubscriptionMembership &membership) cons
     }
 
     return false;
+}
+
+bool SubscriptionState::isCurrent(const SubscriptionMembership &membership) const noexcept {
+    return isCurrentIn(entries(), membership);
 }
 
 DeliveryProjectionMask SubscriptionState::currentProjectionMask(

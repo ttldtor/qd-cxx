@@ -145,9 +145,10 @@ struct RuntimeOptions {
 
 /** Existing delivery semantics selected for one high-level endpoint. */
 enum class DeliveryContract {
-    TICKER, ///< Initial/latest delivery with possible conflation, as for ordinary Java FEED Quote subscriptions.
-    STREAM, ///< Every admitted selected source record, including equal consecutive records.
-    HISTORY ///< Indexed shared storage and per-subscription range delivery; only verified HISTORY routes qualify.
+    TICKER,  ///< Initial/latest delivery with possible conflation, as for ordinary Java FEED Quote subscriptions.
+    STREAM,  ///< Every admitted selected source record, including equal consecutive records.
+    HISTORY, ///< Indexed shared storage and per-subscription range delivery; only verified HISTORY routes qualify.
+    MIXED    ///< SDK catalog routed over TICKER, STREAM and HISTORY on one live QTP session.
 };
 
 /** Finite shared HISTORY storage policy, separate from per-subscription delivery FIFO reservations. */
@@ -1214,6 +1215,11 @@ class Feed final {
      * @return One variant-valued producer handle; throws Error on atomic validation/resource refusal.
      */
     [[nodiscard]] std::shared_ptr<Subscription<RegisteredEvent>> createSubscription(std::span<const EventType> types);
+    /** Subscribe to every built-in event type on a mixed live endpoint.
+     * @return One logical subscription with one shared symbol set.
+     * @throws Error If the endpoint is not configured for the built-in mixed catalog.
+     */
+    [[nodiscard]] std::shared_ptr<Subscription<RegisteredEvent>> createCatalogSubscription();
     /** Create the same immutable type selection from an inline argument list.
      * @param types Bounded raw list; duplicates count toward maximumEventTypeArgumentsPerSubscription then coalesce.
      * @return One owning variant subscription, or the same synchronous Error as the span overload.
