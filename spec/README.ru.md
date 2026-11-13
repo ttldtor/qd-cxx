@@ -28,9 +28,9 @@
 ## Контракты протокола {#protocol-contracts-ru}
 
 - [Кадры QTP](protocol/FRAMING.ru.md) и [чтение tape](protocol/TAPE-READER.ru.md)
-- [Контракты подписок](subscriptions/CONTRACTS.ru.md), [live session](subscriptions/LIVE-SESSION.ru.md)
+- [Контракты подписок](subscriptions/CONTRACTS.ru.md), [live session](subscriptions/LIVE-SESSION.ru.md), [входящие подписки](protocol/INCOMING-SUBSCRIPTIONS.ru.md), [запись DATA](protocol/LIVE-DATA-WRITE.ru.md)
   и [локальный STREAM dispatch](subscriptions/CLIENT-DISPATCH.ru.md)
-- [TCP runtime](transport/TCP-RUNTIME.ru.md), [TLS runtime](transport/TLS-RUNTIME.ru.md)
+- [TCP runtime](transport/TCP-RUNTIME.ru.md), [приём TCP-соединений](transport/TCP-LISTENER.ru.md), [TLS runtime](transport/TLS-RUNTIME.ru.md)
   и [ресурсные предпосылки TLS](transport/TLS-RESOURCES.ru.md)
 
 Причины решений и открытые вопросы дизайна QD/native собраны в [базе знаний](../docs/knowledge/README.ru.md).

@@ -28,9 +28,9 @@ supported types through one owning variant-valued logical subscription.
 ## Protocol contracts {#protocol-contracts}
 
 - [QTP framing](protocol/FRAMING.md) and [tape reading](protocol/TAPE-READER.md)
-- [Subscription contracts](subscriptions/CONTRACTS.md), [live session](subscriptions/LIVE-SESSION.md)
+- [Subscription contracts](subscriptions/CONTRACTS.md), [live session](subscriptions/LIVE-SESSION.md), [incoming subscriptions](protocol/INCOMING-SUBSCRIPTIONS.md), [live DATA writer](protocol/LIVE-DATA-WRITE.md)
   and [local STREAM dispatch](subscriptions/CLIENT-DISPATCH.md)
-- [TCP runtime](transport/TCP-RUNTIME.md), [TLS runtime](transport/TLS-RUNTIME.md)
+- [TCP runtime](transport/TCP-RUNTIME.md), [TCP listener](transport/TCP-LISTENER.md), [TLS runtime](transport/TLS-RUNTIME.md)
   and [TLS resource assumptions](transport/TLS-RESOURCES.md)
 
 For rationale and unresolved QD/native design questions, use the [knowledge base](../docs/knowledge/README.md).
