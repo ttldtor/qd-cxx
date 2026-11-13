@@ -33,6 +33,7 @@
 #include "qd/events/underlying.hpp"
 #include "qd/transport/aggregation.hpp"
 #include "qd/transport/tcp_runtime.hpp"
+#include "qd/transport/tls_resources.hpp"
 
 #include <chrono>
 #include <cstddef>
@@ -162,6 +163,21 @@ struct HistoryReceivingOptions {
 /** Maximum endpoint and subscription local aggregation period. */
 inline constexpr std::chrono::milliseconds MAXIMUM_LOCAL_AGGREGATION_PERIOD{86400000};
 
+/** Owned inputs for the controlled verified TLS profile. The route is still selected by Endpoint::connect.
+ * The application controls the qualified SDK image and keeps all host declarations truthful through final retirement.
+ */
+struct VerifiedTlsOptions {
+    std::string referenceIdentity; ///< Exact DNS SAN or numeric IP SAN identity, independent of the route.
+    std::string trustPem;          ///< Complete explicit PEM certificate input. System roots are excluded.
+    std::chrono::milliseconds handshakeTimeout{5000}; ///< Positive verified-handshake deadline.
+    std::chrono::milliseconds closeTimeout{1000};     ///< Positive TLS close phase deadline.
+    transport::TlsResourceLimits limits;              ///< Input and verification ceilings of the qualified profile.
+    transport::TlsHostLimits host;    ///< Finite same-image limits, including external users and failed prefixes.
+    std::size_t sdkInstanceBytes = 0; ///< Required finite private SDK backing allowance.
+    std::size_t sdkSharedBytes = 0;   ///< Required finite same-image backing allowance.
+    std::size_t residentBytes = 0;    ///< Required whole-run allowance checked by the TLS runtime.
+};
+
 /** Endpoint policy; defaults need no caller-owned queue or turn-work objects. */
 struct EndpointOptions {
     static constexpr std::size_t MAXIMUM_BATCH_RECORDS = 4;     ///< Qualified physical callback record ceiling.
@@ -186,6 +202,7 @@ struct EndpointOptions {
     std::size_t batchRecords = MAXIMUM_BATCH_RECORDS;     ///< Maximum whole physical records per callback selection.
     std::size_t pendingRecords = MAXIMUM_PENDING_RECORDS; ///< Detached record slots per subscription.
     std::chrono::milliseconds aggregationPeriod{0};       ///< Local delivery cadence; zero selects immediate delivery.
+    std::optional<VerifiedTlsOptions> tls; ///< Explicit verified network transport. Absence selects plain TCP.
 };
 
 /** Last SDK-worker observation, never an upstream acknowledgement or a whole-network guarantee. */
@@ -1267,7 +1284,7 @@ class Endpoint final {
      * The first accepted address is fixed. Repeating it while logically online is a no-op; after disconnect
      * the same address resumes with a fresh source epoch. Another address or
      * reconnecting a closed/failed endpoint rejects. Automatic finite recovery remains internal.
-     * @param address ASCII host:port or [IPv6]:port; no TLS/URI/login/configuration extensions.
+     * @param address ASCII host:port or [IPv6]:port; transport is fixed by endpoint options.
      */
     void connect(std::string_view address);
     /** Start one asynchronous read of a regular local binary tape.

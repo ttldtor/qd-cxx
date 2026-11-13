@@ -11,6 +11,10 @@
 
 namespace org::ttldtor::qdcxx::transport {
 
+namespace detail {
+struct TlsRecoveryFactory;
+}
+
 /** Detached common recovery state plus exact TLS numeric failure provenance. */
 struct TlsRecoveryStatus {
     RecoveryStatus recovery{}; ///< Actual scheduler/queue/native state.
@@ -30,6 +34,7 @@ struct TlsRecoveryStatus {
  * All methods, moves, inspection and destruction use the creating serialized owner thread.
  */
 class TlsRecovery {
+    friend struct detail::TlsRecoveryFactory;
     struct Impl;
     std::shared_ptr<Impl> impl_; ///< Stable outer operation lease, separate from unique public ownership.
     /** Adopt complete unactivated state without allocating.

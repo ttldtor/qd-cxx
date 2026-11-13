@@ -3821,7 +3821,10 @@ TEST_CASE("passive latest reads copy real regional TICKER data without a listene
     REQUIRE(source.port() != 0);
 
     api::ApiRuntime runtime(runtimeOptions());
-    const auto endpoint = runtime.createEndpoint(endpointOptions());
+    auto options = endpointOptions();
+    // The passive cache fence can precede physical clear and queue retirement.
+    options.drainTimeout = api::EndpointOptions{}.drainTimeout;
+    const auto endpoint = runtime.createEndpoint(options);
     const auto feed = endpoint->getFeed();
     const auto subscription = feed->createSubscription<events::Quote>();
     subscription->addSymbols("IBM&Q");

@@ -55,6 +55,21 @@ api::RuntimeOptions runtimeOptions() {
 }
 } // namespace
 
+TEST_CASE("typed TLS options are explicit and validate before activating the endpoint") {
+    api::EndpointOptions options;
+    options.tls.emplace();
+
+#if defined(ORG_TTLDTOR_QDCXX_TEST_FEED_TLS)
+    constexpr auto expected = api::ErrorCode::INVALID_ARGUMENT;
+#else
+    constexpr auto expected = api::ErrorCode::UNSUPPORTED_PROFILE;
+#endif
+    CHECK(error([&] {
+              static_cast<void>(api::EndpointConfiguration::create(options));
+          }) == expected);
+    CHECK_FALSE(api::EndpointConfiguration::create({}).options().tls);
+}
+
 TEST_CASE("configuration owns explicit layers and reports selected origins and consumer normalization") {
     std::string label = "first";
     const std::array defaults{api::EndpointProperty{"qdcxx.name", label},

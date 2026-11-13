@@ -3,7 +3,14 @@
 #pragma once
 
 #include "feed_internal.hpp"
-#include "qd/transport/tcp_recovery.hpp"
+
+namespace org::ttldtor::qdcxx::transport::detail {
+class RecoveryCore;
+}
+
+namespace org::ttldtor::qdcxx::transport {
+class TcpRecovery;
+}
 
 namespace org::ttldtor::qdcxx::api::detail {
 
@@ -36,6 +43,10 @@ struct HistoryCallbackRetirement {
  * @param port Detached publication target, with a weak endpoint link.
  * @param work Aggregate outer-turn observation credits, consumed without per-key replenishment.
  */
+void publishHistorySnapshot(const transport::detail::RecoveryCore &recovery, const mux::MuxHandle &handle,
+                            const std::shared_ptr<SubscriptionPort> &port, mux::QueueWork &work) noexcept;
+
+/** Publish the same guarded observation for an independently owned plain recovery facade. */
 void publishHistorySnapshot(const transport::TcpRecovery &recovery, const mux::MuxHandle &handle,
                             const std::shared_ptr<SubscriptionPort> &port, mux::QueueWork &work) noexcept;
 

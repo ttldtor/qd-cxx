@@ -7,7 +7,11 @@
 #include "qd/api/time_series_subscription.hpp"
 
 #include "../client/subscription_receiver_observation.hpp"
+#include "../transport/recovery_core.hpp"
 #include "../transport/tcp_recovery_factory.hpp"
+#if defined(ORG_TTLDTOR_QDCXX_FEED_HAS_TLS)
+#    include "../transport/tls_recovery_factory.hpp"
+#endif
 #include "endpoint_configuration.hpp"
 #include "event_registry_defaults.hpp"
 #include "feed_internal.hpp"
@@ -885,6 +889,15 @@ void finishInactiveRetirement(const std::shared_ptr<detail::EndpointPort> &port)
             return capturesRetired(*port);
         });
     }
+}
+
+/** TLS wire octets are observable, but the backend does not count plaintext QTP. */
+void markTlsProtocolCounters(transport::ConnectionStatistics &statistics) noexcept {
+    using core::StatisticAvailability;
+    statistics.readMessages.availability = StatisticAvailability::UNSUPPORTED;
+    statistics.writtenMessages.availability = StatisticAvailability::UNSUPPORTED;
+    statistics.readDataRecords.availability = StatisticAvailability::UNSUPPORTED;
+    statistics.writtenSubscriptionRecords.availability = StatisticAvailability::UNSUPPORTED;
 }
 
 /** Translate original recovery evidence without retaining its source owner.
@@ -2278,6 +2291,9 @@ void Endpoint::connect(std::string_view address) {
 
 void Endpoint::connectTape(const std::filesystem::path &path, TapeSourceOptions options) {
     producerAction([&] {
+        if (port_->options.tls)
+            reject(ErrorCode::UNSUPPORTED_PROFILE, "endpoint-tls-tape");
+
         constexpr std::size_t MAXIMUM_PATH_UNITS = 4096;
         const auto &native = path.native();
 
@@ -3075,9 +3091,14 @@ struct NativeTape {
 
 /** Worker-local native endpoint. Member order keeps preparation alive beyond its recovery owners. */
 struct NativeEndpoint {
-    std::shared_ptr<EndpointPort> port; ///< Detached producer state, independent of public facade destruction.
-    ReceivingProfile profile;           ///< Complete immutable configuration and fixed work seeds.
-    std::optional<transport::TcpRecovery> recovery; ///< Sole native/protocol/queue owner on this worker.
+    std::shared_ptr<EndpointPort> port;        ///< Detached producer state, independent of public facade destruction.
+    ReceivingProfile profile;                  ///< Complete immutable configuration and fixed work seeds.
+    std::optional<transport::TcpRecovery> tcp; ///< Owns the core for a plain source.
+#if defined(ORG_TTLDTOR_QDCXX_FEED_HAS_TLS)
+    std::optional<transport::TlsRecovery> tls; ///< Owns the core for a verified TLS source.
+    transport::TlsWork tlsTurn;                ///< Fixed maximum of one qualified operation per recovery poll.
+#endif
+    transport::detail::RecoveryCore *recovery = nullptr; ///< Borrowed from the selected stable worker owner.
     std::optional<NativeTape> tape; ///< Sole alternative local file/protocol/queue owner on this worker.
     std::vector<std::unique_ptr<NativeSubscription>> subscriptions; ///< Fixed native registration slots.
     bool draining = false;                                          ///< Actual admitted-prefix drain requested once.
@@ -3094,6 +3115,25 @@ struct NativeEndpoint {
     NativeEndpoint(std::shared_ptr<EndpointPort> port, ReceivingProfile profile)
         : port(std::move(port)), profile(std::move(profile)),
           subscriptions(this->port->limits.maximumSubscriptionsPerEndpoint) {
+    }
+
+    /** Advance the selected network owner, preserving the TLS wrapper's scoped work and operation lease. */
+    std::expected<transport::RecoveryStatus, transport::RecoveryDiagnostic> poll(transport::RecoveryTurnWork &work) {
+#if defined(ORG_TTLDTOR_QDCXX_FEED_HAS_TLS)
+
+        if (tls) {
+            auto tlsWork = tlsTurn;
+            auto result = tls->poll(work, tlsWork);
+
+            if (!result)
+                return std::unexpected(result.error());
+
+            return result->recovery;
+        }
+
+#endif
+
+        return tcp->poll(work);
     }
 };
 
@@ -3278,8 +3318,8 @@ std::optional<RegisteredEvent> captureLatest(NativeEndpoint &endpoint, EventType
 
                 observed = *visited;
             } else {
-                const auto visited = transport::detail::TcpRecoveryFactory::visitTickerLatest(
-                    *endpoint.recovery, subscription->handle, cacheKey, work, &observation, visitor);
+                const auto visited =
+                    endpoint.recovery->visitTickerLatest(subscription->handle, cacheKey, work, &observation, visitor);
 
                 if (!visited) {
                     const auto &failure = visited.error();
@@ -3661,8 +3701,7 @@ CapturedHistorySnapshot captureIndexedSnapshot(NativeEndpoint &endpoint, const H
             revision = registration->port->revision;
         }
 
-        auto retained = transport::detail::TcpRecoveryFactory::retainedHistoryRange(*endpoint.recovery,
-                                                                                    registration->handle, query, work);
+        auto retained = endpoint.recovery->retainedHistoryRange(registration->handle, query, work);
 
         if (!retained) {
             const auto &failure = retained.error();
@@ -3987,16 +4026,48 @@ std::unique_ptr<NativeEndpoint> activate(const transport::detail::BootstrapLease
     }
 
     auto work = native->profile.preparationWork;
-    auto recovery = transport::detail::TcpRecoveryFactory::create(
-        bootstrap, *native->profile.endpoint.network(), std::move(native->profile.blueprint), std::move(queues),
-        native->profile.recoveryOptions, work);
+#if defined(ORG_TTLDTOR_QDCXX_FEED_HAS_TLS)
 
-    if (!recovery) {
-        throw Error(recoveryDiagnostic(recovery.error()));
+    if (const auto &tls = port->options.tls) {
+        const auto requirements = transport::tlsRequirements(tls->limits, tls->host);
+
+        if (!requirements)
+            reject(ErrorCode::UNSUPPORTED_PROFILE, requirements.error().stage);
+
+        native->tlsTurn = {requirements->shape, requirements->factoryAdmission};
+
+        for (const auto *candidate : {&requirements->initialStart, &requirements->entry, &requirements->close}) {
+            for (std::size_t index = 0; index < candidate->units.size(); ++index)
+                native->tlsTurn.remaining.units[index] =
+                    std::max(native->tlsTurn.remaining.units[index], candidate->units[index]);
+        }
+
+        const transport::TlsOptions options{tls->limits,           tls->host,           {},
+                                            tls->sdkInstanceBytes, tls->sdkSharedBytes, tls->residentBytes};
+        auto recovery = transport::detail::TlsRecoveryFactory::create(
+            bootstrap, *native->profile.endpoint.network(), std::move(native->profile.blueprint), std::move(queues),
+            native->profile.recoveryOptions, options, work);
+
+        if (!recovery)
+            throw Error(recoveryDiagnostic(recovery.error()));
+
+        native->tls.emplace(std::move(*recovery));
+        native->recovery = &transport::detail::TlsRecoveryFactory::core(*native->tls);
+    } else
+#endif
+    {
+        auto recovery = transport::detail::TcpRecoveryFactory::create(
+            bootstrap, *native->profile.endpoint.network(), std::move(native->profile.blueprint), std::move(queues),
+            native->profile.recoveryOptions, work);
+
+        if (!recovery)
+            throw Error(recoveryDiagnostic(recovery.error()));
+
+        native->tcp.emplace(std::move(*recovery));
+        native->recovery = &transport::detail::TcpRecoveryFactory::core(*native->tcp);
     }
 
-    native->recovery.emplace(std::move(*recovery));
-    transport::detail::TcpRecoveryFactory::setCallbackRetirementFence(*native->recovery, &port->callbackFence);
+    native->recovery->setCallbackRetirementFence(&port->callbackFence);
     const auto started = native->recovery->start();
 
     if (!started) {
@@ -4033,9 +4104,9 @@ std::unique_ptr<NativeSubscription> registerSubscription(NativeEndpoint &endpoin
     const auto bindings = std::span(selectedBindings).first(plan.bindingCount);
     auto handle = [&]() -> std::expected<mux::MuxHandle, transport::RecoveryReceiverFailure> {
         if (!endpoint.tape) {
-            return transport::detail::TcpRecoveryFactory::openObservedReceiver(
-                *endpoint.recovery, endpoint.profile.family, bindings, result->consumer, plan.limits,
-                endpoint.profile.clientLimits, receiverWork, queueWork, &result->observationPlan);
+            return endpoint.recovery->openSubscriptionReceiver(endpoint.profile.family, bindings, result->consumer,
+                                                               plan.limits, endpoint.profile.clientLimits, receiverWork,
+                                                               queueWork, &result->observationPlan);
         }
 
         auto opened = client::detail::openObservedSubscriptionReceiver(
@@ -4848,8 +4919,7 @@ EndpointProgress progressEndpoint(NativeEndpoint &endpoint, transport::RecoveryT
 
     if (!endpoint.port->closeRequested.load(std::memory_order_acquire) &&
         (!endpoint.aggregationConfigured || endpoint.appliedAggregationRevision != aggregationRevision)) {
-        const auto accepted =
-            transport::detail::TcpRecoveryFactory::requestAggregationPeriod(*endpoint.recovery, aggregationPeriod);
+        const auto accepted = endpoint.recovery->requestAggregationPeriod(aggregationPeriod);
 
         if (!accepted) {
             failEndpoint(endpoint.port, recoveryDiagnostic(accepted.error()));
@@ -4879,12 +4949,15 @@ EndpointProgress progressEndpoint(NativeEndpoint &endpoint, transport::RecoveryT
         observeState(endpoint.port, EndpointState::CLOSING);
     }
 
-    const auto polled = endpoint.recovery->poll(work);
+    const auto polled = endpoint.poll(work);
 
     if (endpoint.port->callbackFence.cancelQueuedRequested.exchange(false, std::memory_order_acq_rel))
         cancelEndpointCallbacks(endpoint.port, "callback-source-reset");
 
-    const auto statistics = endpoint.recovery->statistics();
+    auto statistics = endpoint.recovery->statistics();
+
+    if (endpoint.port->options.tls)
+        markTlsProtocolCounters(statistics);
 
     for (const auto &subscription : endpoint.subscriptions) {
         if (subscription)
@@ -4893,7 +4966,7 @@ EndpointProgress progressEndpoint(NativeEndpoint &endpoint, transport::RecoveryT
             });
     }
 
-    const auto aggregationInfo = transport::detail::TcpRecoveryFactory::aggregationPeriodInfo(*endpoint.recovery);
+    const auto aggregationInfo = endpoint.recovery->aggregationPeriodInfo();
     {
         std::lock_guard lock(endpoint.port->mutex);
         endpoint.port->statistics.connection = statistics;
@@ -4994,7 +5067,11 @@ void retireNative(std::unique_ptr<NativeEndpoint> &endpoint) noexcept {
         latestSourceFailure = recoveryDiagnostic(status.first);
 
     auto result = closeResult(port, status);
-    const auto statistics = transport::detail::TcpRecoveryFactory::retireStatistics(*endpoint->recovery);
+    auto statistics = endpoint->recovery->retireStatistics();
+
+    if (port->options.tls)
+        markTlsProtocolCounters(statistics);
+
     {
         std::lock_guard lock(port->mutex);
         port->statistics.connection = statistics;
@@ -6062,6 +6139,10 @@ std::shared_ptr<Endpoint> ApiRuntime::createEndpoint(const EndpointConfiguration
         port->owner = control->owner;
         port->limits = impl_->options;
         port->options = options;
+
+        if (options.tls)
+            markTlsProtocolCounters(port->statistics.connection);
+
         port->configuration = configuration;
         port->requestedAggregationPeriod = options.requestedAggregationPeriod;
         port->stateListeners = makeStateListeners(port, impl_->options.maximumStateListenersPerEndpoint);
