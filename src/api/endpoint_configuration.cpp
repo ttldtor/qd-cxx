@@ -247,6 +247,7 @@ std::array<std::string, ADDRESS> values(const EndpointOptions &options, const st
             std::to_string(options.maximumAttempts),
             options.contract == DeliveryContract::STREAM    ? "stream"
             : options.contract == DeliveryContract::HISTORY ? "history"
+            : options.contract == DeliveryContract::MIXED   ? "mixed"
                                                             : "ticker",
             detail::aggregationPropertyValue(options.aggregationPeriod),
             detail::aggregationPropertyValue(options.requestedAggregationPeriod)};
@@ -316,12 +317,15 @@ void validateEndpointOptions(const EndpointOptions &options) {
     if (options.eventRegistry && !options.eventRegistry->valid())
         reject(ErrorCode::INVALID_ARGUMENT, "endpoint-registry");
 
+    if (options.contract == DeliveryContract::MIXED && options.eventRegistry)
+        reject(ErrorCode::UNSUPPORTED_PROFILE, "endpoint-mixed-registry");
+
     const auto durationValid = [](std::chrono::milliseconds value) {
         return value.count() > 0 && value.count() <= INT_MAX;
     };
 
     if ((options.contract != DeliveryContract::TICKER && options.contract != DeliveryContract::STREAM &&
-         options.contract != DeliveryContract::HISTORY) ||
+         options.contract != DeliveryContract::HISTORY && options.contract != DeliveryContract::MIXED) ||
         !durationValid(options.connectTimeout) || !durationValid(options.dnsTimeout) ||
         !durationValid(options.readTimeout) || !durationValid(options.writeTimeout) ||
         !durationValid(options.pollInterval) || !durationValid(options.drainTimeout) || options.maximumAttempts == 0 ||
@@ -430,6 +434,8 @@ EndpointConfiguration EndpointConfiguration::create(const EndpointOptions &fallb
                     options.contract = DeliveryContract::TICKER;
                 else if (text == "history")
                     options.contract = DeliveryContract::HISTORY;
+                else if (text == "mixed")
+                    options.contract = DeliveryContract::MIXED;
                 else
                     reject(ErrorCode::INVALID_ARGUMENT, "endpoint-property-value");
             } else if (key == AGGREGATION) {

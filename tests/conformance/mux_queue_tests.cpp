@@ -3,6 +3,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "../../src/core/delivery_statistics.hpp"
 #include "../../src/events/derived_order_sources.hpp"
+#include "../../src/mux/queue_replace.hpp"
 #include "qd/encoding/compact.hpp"
 #include "qd/encoding/utf_char.hpp"
 #include "qd/encoding/utf_string.hpp"
@@ -484,6 +485,65 @@ m::QueueRangeStatus range(Fixture &f, const m::MuxHandle &h) {
     return std::move(*r);
 }
 } // namespace
+
+TEST_CASE("grouped replacement leaves all queue revisions and mappings intact on late refusal") {
+    auto ticker = fixture(c::SubscriptionFamily::TICKER);
+    auto stream = fixture(c::SubscriptionFamily::STREAM);
+    auto history = fixture(c::SubscriptionFamily::HISTORY);
+    const auto statistics = std::make_shared<c::detail::DeliveryStatisticsState>();
+    const auto consumer = std::make_shared<Recorder>(statistics);
+    auto th = open(ticker, consumer);
+    auto sh = open(stream, consumer);
+    auto hh = open(history, consumer);
+    const std::array owners{&ticker, &stream, &history};
+    const std::array handles{&th, &sh, &hh};
+
+    for (std::size_t i = 0; i < owners.size(); ++i)
+        until(*owners[i], [&] {
+            return handles[i]->state() == m::QueueClientState::ACTIVE;
+        });
+
+    const c::SubscriptionRequest ts{{ticker.schema.recordContext(0), u"ALPHA"}, {}};
+    const c::SubscriptionRequest ss{{stream.schema.recordContext(0), u"ALPHA"}, {}};
+    const c::SubscriptionRequest hs{{history.schema.recordContext(0), u"ALPHA"}, 0};
+    const std::array before{ticker.queue.revision(), stream.queue.revision(), history.queue.revision()};
+    std::array work{turn(), turn(), turn()};
+    auto invalid = hs;
+    invalid.historyBound.reset();
+    std::array input{m::detail::QueueReplacement{&ticker.queue, &th, std::span(&ts, 1), &work[0]},
+                     m::detail::QueueReplacement{&stream.queue, &sh, std::span(&ss, 1), &work[1]},
+                     m::detail::QueueReplacement{&history.queue, &hh, std::span(&invalid, 1), &work[2]}};
+    REQUIRE_FALSE(m::detail::QueueReplaceAccess::replace(input, 1, 1));
+
+    for (std::size_t i = 0; i < owners.size(); ++i) {
+        CHECK(owners[i]->queue.revision() == before[i]);
+        CHECK(owners[i]->queue.aggregateEntries().empty());
+    }
+
+    CHECK(statistics->snapshot().activeSelectors == 0);
+
+    input[2].requests = std::span(&hs, 1);
+    work = {turn(), turn(), turn()};
+    work[2].history.operations = 0;
+    const auto limited = m::detail::QueueReplaceAccess::replace(input, 1, 1);
+    REQUIRE_FALSE(limited);
+    CHECK(limited.error().error == m::QueueError::WORK_LIMIT);
+
+    for (std::size_t i = 0; i < owners.size(); ++i)
+        CHECK(owners[i]->queue.revision() == before[i]);
+
+    CHECK_FALSE(statistics->snapshot().activeDesiredRevision);
+
+    work = {turn(), turn(), turn()};
+    REQUIRE(m::detail::QueueReplaceAccess::replace(input, 1, 1));
+
+    for (std::size_t i = 0; i < owners.size(); ++i) {
+        CHECK(owners[i]->queue.revision() > before[i]);
+        CHECK(owners[i]->queue.aggregateEntries().size() == 1);
+    }
+
+    CHECK(statistics->snapshot().activeDesiredRevision == 1);
+}
 
 TEST_CASE("delivery statistics publish command qualified selectors only after actual mapping commit") {
     for (const auto family : {c::SubscriptionFamily::STREAM, c::SubscriptionFamily::TICKER}) {

@@ -102,6 +102,7 @@ struct MuxState::State {
     std::uint64_t revision = 0;        ///< Global effective mutation barrier.
     std::uint64_t lastClient = 0;      ///< Last issued client activation, never reused.
     std::uint64_t lastMembership = 0;  ///< Last issued key activation, never reused.
+    std::uint64_t preparation = 0;     ///< Current inactive-bank write identity.
 
     /** Validate one client using only fixed metadata.
      * @param client Opaque token, possibly foreign or retired.
@@ -477,9 +478,10 @@ std::expected<MuxClient, MuxError> MuxState::createClient(MuxWork &work) {
     return std::unexpected(MuxError::RESOURCE_LIMIT);
 }
 
-std::expected<MuxChange, MuxError> MuxState::apply(Command command, const MuxClient &client,
-                                                   std::span<const core::SubscriptionRequest> requests,
-                                                   std::span<const core::SubscriptionKey> keys, MuxWork &work) {
+std::expected<MuxState::PreparedChange, MuxError> MuxState::prepare(Command command, const MuxClient &client,
+                                                                    std::span<const core::SubscriptionRequest> requests,
+                                                                    std::span<const core::SubscriptionKey> keys,
+                                                                    MuxWork &work) {
     if (!charge(work.operations, 1)) {
         return std::unexpected(MuxError::WORK_LIMIT);
     }
@@ -530,6 +532,11 @@ std::expected<MuxChange, MuxError> MuxState::apply(Command command, const MuxCli
         }
     }
 
+    if (state.preparation == std::numeric_limits<std::uint64_t>::max()) {
+        return std::unexpected(MuxError::IDENTITY_EXHAUSTED);
+    }
+
+    ++state.preparation;
     const auto &old = state.banks[state.published];
     auto &candidate = state.banks[1 - state.published];
     state.reset(candidate);
@@ -613,25 +620,81 @@ std::expected<MuxChange, MuxError> MuxState::apply(Command command, const MuxCli
         changed = !next || next->historyBound != entry.historyBound || next->projectionMask != entry.projectionMask;
     }
 
-    if (!changed) {
-        return MuxChange{state.revision, false};
+    if (changed && state.revision == std::numeric_limits<std::uint64_t>::max()) {
+        return std::unexpected(MuxError::IDENTITY_EXHAUSTED);
     }
 
-    if (state.revision == std::numeric_limits<std::uint64_t>::max()) {
-        return std::unexpected(MuxError::IDENTITY_EXHAUSTED);
+    return PreparedChange{state.identity,
+                          state.revision,
+                          state.preparation,
+                          nextMembership,
+                          command == Command::REMOVE_CLIENT ? std::optional{client.slot_} : std::nullopt,
+                          changed};
+}
+
+bool MuxState::current(const PreparedChange &candidate) const noexcept {
+    return state_ && state_->identity == candidate.identity && state_->revision == candidate.baseRevision &&
+           state_->preparation == candidate.preparation;
+}
+
+std::expected<std::span<const MuxEntry>, MuxError> MuxState::preparedEntries(const PreparedChange &candidate,
+                                                                             const MuxClient &client) const noexcept {
+    if (!current(candidate))
+        return std::unexpected(MuxError::INVALID_STATE);
+
+    if (!state_->valid(client))
+        return std::unexpected(MuxError::INVALID_CLIENT);
+
+    const auto &bank = state_->banks[candidate.changed ? 1 - state_->published : state_->published];
+    const auto range = bank.ranges[client.slot_];
+
+    return std::span<const MuxEntry>{bank.entries.get() + range.offset, range.count};
+}
+
+std::expected<std::span<const core::SubscriptionRequest>, MuxError>
+MuxState::preparedAggregate(const PreparedChange &candidate) const noexcept {
+    if (!current(candidate))
+        return std::unexpected(MuxError::INVALID_STATE);
+
+    const auto &bank = state_->banks[candidate.changed ? 1 - state_->published : state_->published];
+
+    return std::span<const core::SubscriptionRequest>{bank.aggregate.get(), bank.aggregateCount};
+}
+
+std::expected<MuxChange, MuxError> MuxState::commit(const PreparedChange &candidate) noexcept {
+    if (!current(candidate)) {
+        return std::unexpected(MuxError::INVALID_STATE);
+    }
+
+    auto &state = *state_;
+
+    if (!candidate.changed) {
+        return MuxChange{state.revision, false};
     }
 
     // All fallible work is complete. Publication changes only fixed metadata and the bank index.
     state.published = 1 - state.published;
-    state.lastMembership = nextMembership;
+    state.lastMembership = candidate.membership;
 
-    if (command == Command::REMOVE_CLIENT) {
-        state.clients[client.slot_].activation = 0;
+    if (candidate.retiredSlot) {
+        state.clients[*candidate.retiredSlot].activation = 0;
     }
 
     ++state.revision;
 
     return MuxChange{state.revision, true};
+}
+
+std::expected<MuxChange, MuxError> MuxState::apply(Command command, const MuxClient &client,
+                                                   std::span<const core::SubscriptionRequest> requests,
+                                                   std::span<const core::SubscriptionKey> keys, MuxWork &work) {
+    const auto candidate = prepare(command, client, requests, keys, work);
+
+    if (!candidate) {
+        return std::unexpected(candidate.error());
+    }
+
+    return commit(*candidate);
 }
 
 std::expected<MuxChange, MuxError> MuxState::removeClient(const MuxClient &client, MuxWork &work) {
@@ -759,6 +822,11 @@ std::expected<std::optional<MuxMembership>, MuxError> MuxState::select(const Mux
 
 std::expected<bool, MuxError> MuxState::isCurrent(const MuxClient &client, const MuxMembership &membership,
                                                   MuxWork &work) const {
+    return isCurrentInBank(client, membership, work, false);
+}
+
+std::expected<bool, MuxError> MuxState::isCurrentInBank(const MuxClient &client, const MuxMembership &membership,
+                                                        MuxWork &work, bool inactive) const {
     if (!charge(work.operations, 1)) {
         return std::unexpected(MuxError::WORK_LIMIT);
     }
@@ -771,7 +839,7 @@ std::expected<bool, MuxError> MuxState::isCurrent(const MuxClient &client, const
         return std::unexpected(MuxError::INVALID_CLIENT);
     }
 
-    const auto &bank = state_->banks[state_->published];
+    const auto &bank = state_->banks[inactive ? 1 - state_->published : state_->published];
     const auto range = bank.ranges[client.slot_];
 
     std::size_t visits = 1;
@@ -873,10 +941,17 @@ MuxState::selectProjections(const MuxClient &client, core::SubscriptionKey key, 
 std::expected<core::DeliveryProjectionMask, MuxError>
 MuxState::currentProjectionMask(const MuxClient &client,
                                 const core::CapturedDeliveryProjections<MuxMembership> &captured, MuxWork &work) const {
+    return currentProjectionMaskInBank(client, captured, work, false);
+}
+
+std::expected<core::DeliveryProjectionMask, MuxError>
+MuxState::currentProjectionMaskInBank(const MuxClient &client,
+                                      const core::CapturedDeliveryProjections<MuxMembership> &captured, MuxWork &work,
+                                      bool inactive) const {
     core::DeliveryProjectionMask result = 0;
 
     if (captured.mask == 0) {
-        const auto owner = isCurrent(client, {}, work);
+        const auto owner = isCurrentInBank(client, {}, work, inactive);
 
         if (!owner) {
             return std::unexpected(owner.error());
@@ -892,7 +967,7 @@ MuxState::currentProjectionMask(const MuxClient &client,
             continue;
         }
 
-        const auto current = isCurrent(client, captured.memberships[i], work);
+        const auto current = isCurrentInBank(client, captured.memberships[i], work, inactive);
 
         if (!current) {
             return std::unexpected(current.error());

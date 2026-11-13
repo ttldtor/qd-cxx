@@ -1,6 +1,7 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/collectors/history.hpp"
+#include "history_replace.hpp"
 #include "history_replay.hpp"
 #include "qd/encoding/penta_symbol.hpp"
 
@@ -1609,22 +1610,26 @@ struct HistoryCollector::Impl {
         return {out, declaration.fields.size()};
     }
 
-    /** Restore current core memberships after atomic desired publication.
+    /** Reconcile the inactive metadata against the selected core desired state.
      * Input symbols needed after core mutation were copied to candidate owned partitions beforehand.
      * @param b Candidate bank.
      * @param v Changed view.
+     * @param entries Complete view to publish.
+     * @param revision Exact desired revision for new metadata.
+     * @param isCurrent Test whether an existing membership survives in that view.
      */
-    void reconcile(Bank &b, std::size_t v) {
+    void reconcile(Bank &b, std::size_t v, std::span<const core::SubscriptionEntry> entries, std::uint64_t revision,
+                   const auto &isCurrent) {
         const auto base = v * limits.viewSubscriptions.entries;
 
         for (std::size_t i = base; i < base + limits.viewSubscriptions.entries; ++i) {
-            if (b.parts[i].used && !views[v].desired->isCurrent(b.parts[i].membership)) {
+            if (b.parts[i].used && !isCurrent(b.parts[i].membership)) {
                 dropPending(b, v, b.parts[i].partition);
                 b.parts[i] = ViewPart{};
             }
         }
 
-        for (const auto &entry : views[v].desired->entries()) {
+        for (const auto &entry : entries) {
             const auto k = partition(b, record(entry.key), entry.key.symbol);
             auto i = part(b, v, k);
 
@@ -1641,7 +1646,7 @@ struct HistoryCollector::Impl {
                 b.parts[i].partition = k;
                 b.parts[i].membership = entry.membership;
                 b.parts[i].bound = *entry.historyBound;
-                b.parts[i].revision = views[v].desired->revision();
+                b.parts[i].revision = revision;
             }
 
             queue(b, v, i);
@@ -1655,21 +1660,9 @@ struct HistoryCollector::Impl {
         CLEAR    ///< Retire every desired membership.
     };
 
-    /** Preflight collector maintenance before publishing authoritative core state.
-     * @param token Active view.
-     * @param command Exact desired operation.
-     * @param requests Complete borrowed add/replace inputs.
-     * @param keys Complete borrowed remove inputs.
-     * @param coreWork Independent authoritative command credits.
-     * @param work Collector scans/peak/disposal credits.
-     * @return Exact core barrier or typed error; failed/no-op commands preserve offers.
-     */
-    std::expected<core::SubscriptionChange, HistoryFailure> change(const HistoryViewToken &token, Command command,
-                                                                   std::span<const core::SubscriptionRequest> requests,
-                                                                   std::span<const core::SubscriptionKey> keys,
-                                                                   core::SubscriptionWork &coreWork, HistoryWork &work,
-                                                                   bool restartInitial = false) {
-        const auto v = view(token);
+    /** Charge maintenance and copy prospective partition keys into the inactive metadata bank. */
+    Bank &prepareChange(std::size_t v, std::span<const core::SubscriptionRequest> requests,
+                        std::span<const core::SubscriptionKey> keys, HistoryWork &work, bool restartInitial) {
         maintenance(work);
 
         if (restartInitial)
@@ -1720,6 +1713,42 @@ struct HistoryCollector::Impl {
             (void)partition(b, r, request.key.symbol);
         }
 
+        return b;
+    }
+
+    /** Discard admitted view deliveries and recreate initial cursors from desired state. */
+    void restartView(Bank &b, std::size_t v) noexcept {
+        const auto base = v * limits.viewSubscriptions.entries;
+
+        for (std::size_t index = 0; index < limits.viewSubscriptions.entries; ++index)
+            b.parts[base + index] = ViewPart{};
+
+        const auto pending = v * limits.pendingItems;
+
+        for (std::size_t index = 0; index < limits.pendingItems; ++index)
+            b.pending[pending + index] = Pending{};
+
+        b.views[v].size = 0;
+        b.views[v].balance = 0;
+    }
+
+    /** Preflight collector maintenance before publishing authoritative core state.
+     * @param token Active view.
+     * @param command Exact desired operation.
+     * @param requests Complete borrowed add/replace inputs.
+     * @param keys Complete borrowed remove inputs.
+     * @param coreWork Independent authoritative command credits.
+     * @param work Collector scans/peak/disposal credits.
+     * @param restartInitial Reset the initial snapshot cursors even for a no-op replacement.
+     * @return Exact core barrier or typed error; failed/no-op commands preserve offers.
+     */
+    std::expected<core::SubscriptionChange, HistoryFailure> change(const HistoryViewToken &token, Command command,
+                                                                   std::span<const core::SubscriptionRequest> requests,
+                                                                   std::span<const core::SubscriptionKey> keys,
+                                                                   core::SubscriptionWork &coreWork, HistoryWork &work,
+                                                                   bool restartInitial = false) {
+        const auto v = view(token);
+        auto &b = prepareChange(v, requests, keys, work, restartInitial);
         auto result = [&]() {
             switch (command) {
             case Command::ADD:
@@ -1748,22 +1777,13 @@ struct HistoryCollector::Impl {
         }
 
         // All storage/identity/release requirements were validated before this core publication.
-        if (restartInitial) {
-            const auto base = v * limits.viewSubscriptions.entries;
+        if (restartInitial)
+            restartView(b, v);
 
-            for (std::size_t index = 0; index < limits.viewSubscriptions.entries; ++index)
-                b.parts[base + index] = ViewPart{};
-
-            const auto pending = v * limits.pendingItems;
-
-            for (std::size_t index = 0; index < limits.pendingItems; ++index)
-                b.pending[pending + index] = Pending{};
-
-            b.views[v].size = 0;
-            b.views[v].balance = 0;
-        }
-
-        reconcile(b, v);
+        const auto &desired = *views[v].desired;
+        reconcile(b, v, desired.entries(), desired.revision(), [&](const auto &membership) {
+            return desired.isCurrent(membership);
+        });
         trim(b);
         commit();
 
@@ -2150,6 +2170,112 @@ detail::HistoryReplayAccess::replace(HistoryCollector &owner, const HistoryViewT
 
         return std::unexpected(failure(error));
     }
+}
+
+detail::HistoryReplaceAccess::Candidate::Candidate(HistoryCollector &owner, const HistoryViewToken &view,
+                                                   core::detail::SubscriptionStateAccess::PreparedReplace desired,
+                                                   bool publishBank) noexcept
+    : owner_(&owner), view_(view), desired_(std::move(desired)), publishBank_(publishBank) {
+}
+
+detail::HistoryReplaceAccess::Candidate::Candidate(Candidate &&other) noexcept
+    : owner_(std::exchange(other.owner_, nullptr)), view_(std::move(other.view_)), desired_(std::move(other.desired_)),
+      publishBank_(other.publishBank_) {
+}
+
+detail::HistoryReplaceAccess::Candidate::~Candidate() {
+    if (owner_)
+        owner_->impl_->abandon();
+}
+
+std::expected<detail::HistoryReplaceAccess::Candidate, HistoryFailure>
+detail::HistoryReplaceAccess::prepare(HistoryCollector &owner, const HistoryViewToken &view,
+                                      std::span<const core::SubscriptionRequest> requests,
+                                      core::SubscriptionWork &coreWork, HistoryWork &work, bool restartInitial) {
+    auto *s = owner.impl_.get();
+
+    if (!s || s->scratchActive)
+        return std::unexpected(failure(HistoryError::INVALID_STATE));
+
+    using Desired = core::detail::SubscriptionStateAccess;
+    try {
+        spend(work, 1);
+        const auto v = s->view(view);
+        auto &bank = s->prepareChange(v, requests, {}, work, restartInitial);
+        auto &state = *s->views[v].desired;
+        auto desired = Desired::prepareReplace(state, requests, coreWork);
+
+        if (!desired) {
+            s->abandon();
+
+            return std::unexpected(HistoryFailure{HistoryError::CORE_REJECTED, desired.error()});
+        }
+
+        const auto revision = Desired::revision(state, *desired);
+
+        if (!revision)
+            throw HistoryError::INVALID_STATE;
+
+        const auto publishBank = restartInitial || *revision != state.revision();
+
+        if (publishBank) {
+            if (restartInitial)
+                s->restartView(bank, v);
+
+            s->reconcile(bank, v, Desired::entries(state, *desired), *revision, [&](const auto &membership) {
+                return Desired::isCurrent(state, *desired, membership);
+            });
+            s->trim(bank);
+        }
+
+        return Candidate(owner, view, std::move(*desired), publishBank);
+    } catch (HistoryError error) {
+        s->abandon();
+
+        return std::unexpected(failure(error));
+    }
+}
+
+core::SubscriptionChange detail::HistoryReplaceAccess::commit(HistoryCollector &owner, Candidate candidate) noexcept {
+    if (candidate.owner_ != &owner)
+        std::terminate();
+
+    auto &s = *owner.impl_;
+    const auto v = s.view(candidate.view_);
+    auto result =
+        core::detail::SubscriptionStateAccess::commitReplace(*s.views[v].desired, std::move(candidate.desired_));
+
+    if (!result)
+        std::terminate();
+
+    candidate.owner_ = nullptr;
+
+    if (candidate.publishBank_)
+        s.commit();
+    else
+        s.abandon();
+
+    return *result;
+}
+
+std::span<const core::SubscriptionEntry> detail::HistoryReplaceAccess::entries(const Candidate &candidate) noexcept {
+    const auto &s = *candidate.owner_->impl_;
+    const auto v = s.view(candidate.view_);
+
+    return core::detail::SubscriptionStateAccess::entries(*s.views[v].desired, candidate.desired_);
+}
+
+HistoryEpochToken detail::HistoryReplaceAccess::epoch(const Candidate &candidate) noexcept {
+    const auto &s = *candidate.owner_->impl_;
+
+    return HistoryEpochToken(s.identity, NONE, s.epoch);
+}
+
+std::uint64_t detail::HistoryReplaceAccess::revision(const Candidate &candidate) noexcept {
+    const auto &s = *candidate.owner_->impl_;
+    const auto v = s.view(candidate.view_);
+
+    return *core::detail::SubscriptionStateAccess::revision(*s.views[v].desired, candidate.desired_);
 }
 
 std::expected<HistoryStage, HistoryFailure> HistoryCollector::stage(protocol::LiveEvent &&event, HistoryWork &work) {
@@ -2681,7 +2807,10 @@ std::expected<HistoryResetNotice, HistoryFailure> HistoryCollector::reset(Histor
             b.views[v].nextOrder = 0;
 
             if (b.views[v].state == HistoryViewState::ACTIVE) {
-                s.reconcile(b, v);
+                const auto &desired = *s.views[v].desired;
+                s.reconcile(b, v, desired.entries(), desired.revision(), [&](const auto &membership) {
+                    return desired.isCurrent(membership);
+                });
             }
         }
 

@@ -1,6 +1,7 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "../../src/collectors/history_replace.hpp"
 #include "../../src/collectors/history_replay.hpp"
 #include "qd/collectors/history.hpp"
 #include "qd/encoding/char_array.hpp"
@@ -1251,6 +1252,39 @@ TEST_CASE("HISTORY work and rejected or no-op mutations preserve the exact prepa
     work = turn();
     REQUIRE(f.history.pop(view, work));
     CHECK(drain(f, view).size() == 2);
+}
+
+TEST_CASE("HISTORY staged replacement preserves offers until the combined owner commits") {
+    using Access = s::detail::HistoryReplaceAccess;
+    auto f = fixture();
+    auto view = open(f);
+    add(f, view);
+    send(f, {{0, u"ALPHA", 3, 30, 4}, {0, u"ALPHA", 0, 0, 10}});
+    auto work = turn();
+    auto offer = f.history.front(view, work);
+    REQUIRE(offer);
+    REQUIRE(*offer);
+    const auto *fields = (**offer).record.fields.data();
+    const c::SubscriptionRequest next{{f.schema.recordContext(0), u"ALPHA"}, 2};
+    auto coreWork = command();
+    work = turn();
+    {
+        auto discarded = Access::prepare(f.history, view, std::span(&next, 1), coreWork, work, false);
+        REQUIRE(discarded);
+        REQUIRE(f.history.desired(view));
+        CHECK(f.history.desired(view)->entries()[0].historyBound == 0);
+        CHECK(fields[2].raw == 30);
+    }
+    CHECK(f.history.desired(view)->entries()[0].historyBound == 0);
+    CHECK(fields[2].raw == 30);
+
+    coreWork = command();
+    work = turn();
+    auto prepared = Access::prepare(f.history, view, std::span(&next, 1), coreWork, work, false);
+    REQUIRE(prepared);
+    const auto change = Access::commit(f.history, std::move(*prepared));
+    CHECK(change.changed);
+    CHECK(f.history.desired(view)->entries()[0].historyBound == 2);
 }
 
 TEST_CASE("HISTORY failed candidate source can die without retaining dangling spans or changing the offer") {

@@ -3,6 +3,8 @@
 
 #include "qd/core/subscription.hpp"
 
+#include "../../src/core/subscription_state_access.hpp"
+
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
 
@@ -509,6 +511,156 @@ TEST_CASE("subscription candidate may safely copy borrowed current symbols") {
     REQUIRE(owner.replace(aliased, work));
     CHECK(owner.entries()[0].key.symbol == u"retained");
     CHECK(owner.isCurrent(token));
+}
+
+TEST_CASE("staged subscription replacement owns inputs and publishes with no allocation") {
+    using Access = c::detail::SubscriptionStateAccess;
+    const auto source = schema();
+    auto owner = state(source);
+    auto work = turn();
+    const std::array initial{request(source, u"kept"), request(source, u"removed")};
+    REQUIRE(owner.add(initial, work));
+    const auto kept = owner.entries()[0].membership;
+    const auto removed = owner.entries()[1].membership;
+    const auto *published = owner.entries().data();
+    std::u16string incoming = u"added";
+    const std::array replacement{c::SubscriptionRequest{owner.entries()[0].key, {}}, request(source, incoming)};
+
+    auto candidate = Access::prepareReplace(owner, replacement, work);
+    REQUIRE(candidate);
+    incoming.assign(u"changed by caller");
+    CHECK(owner.revision() == 1);
+    CHECK(owner.entries().data() == published);
+    CHECK(owner.isCurrent(kept));
+    CHECK(owner.isCurrent(removed));
+    REQUIRE(Access::revision(owner, *candidate) == 2);
+    {
+        const auto staged = Access::entries(owner, *candidate);
+        REQUIRE(staged.size() == 2);
+        CHECK(staged[1].key.symbol == u"added");
+        CHECK(Access::isCurrent(owner, *candidate, kept));
+        CHECK_FALSE(Access::isCurrent(owner, *candidate, removed));
+        CHECK(Access::isCurrent(owner, *candidate, staged[1].membership));
+        CHECK_FALSE(owner.isCurrent(staged[1].membership));
+    }
+
+    const auto change = [&] {
+        AllocationFault fault(0);
+
+        return Access::commitReplace(owner, std::move(*candidate));
+    }();
+    REQUIRE(change);
+    CHECK(observedAllocations == 0);
+    CHECK(change->changed);
+    CHECK(change->revision == 2);
+    REQUIRE(owner.entries().size() == 2);
+    CHECK(owner.entries()[1].key.symbol == u"added");
+    CHECK(owner.isCurrent(kept));
+    CHECK_FALSE(owner.isCurrent(removed));
+
+    const auto reused = Access::commitReplace(owner, std::move(*candidate));
+    REQUIRE_FALSE(reused);
+    CHECK(reused.error() == c::SubscriptionError::INVALID_STATE);
+}
+
+TEST_CASE("staged subscription reservation is released on rejection and abandonment") {
+    using Access = c::detail::SubscriptionStateAccess;
+    const auto source = schema();
+    auto owner = state(source);
+    auto foreign = state(source);
+    auto work = turn();
+    const std::array initial{request(source, u"old")};
+    const std::array replacement{request(source, u"new")};
+    REQUIRE(owner.add(initial, work));
+    REQUIRE(foreign.add(initial, work));
+    const auto token = owner.entries()[0].membership;
+    const auto foreignToken = foreign.entries()[0].membership;
+
+    {
+        auto candidate = Access::prepareReplace(owner, replacement, work);
+        REQUIRE(candidate);
+        const auto competing = Access::prepareReplace(owner, replacement, work);
+        REQUIRE_FALSE(competing);
+        CHECK(competing.error() == c::SubscriptionError::INVALID_STATE);
+        const auto ordinary = owner.clear(work);
+        REQUIRE_FALSE(ordinary);
+        CHECK(ordinary.error() == c::SubscriptionError::INVALID_STATE);
+        unchanged(owner, token, 1, u"old");
+    }
+
+    auto candidate = Access::prepareReplace(owner, replacement, work);
+    REQUIRE(candidate);
+    CHECK_FALSE(Access::revision(foreign, *candidate));
+    CHECK(Access::entries(foreign, *candidate).empty());
+    CHECK_FALSE(Access::isCurrent(foreign, *candidate, foreignToken));
+    const auto wrong = Access::commitReplace(foreign, std::move(*candidate));
+    REQUIRE_FALSE(wrong);
+    CHECK(wrong.error() == c::SubscriptionError::INVALID_STATE);
+    unchanged(foreign, foreignToken, 1, u"old");
+    unchanged(owner, token, 1, u"old");
+    REQUIRE(owner.replace(replacement, work));
+    CHECK(owner.revision() == 2);
+}
+
+TEST_CASE("staged subscription replacement follows its logical owner through move") {
+    using Access = c::detail::SubscriptionStateAccess;
+    const auto source = schema();
+    auto owner = state(source);
+    auto work = turn();
+    const std::array original{request(source, u"old")};
+    const std::array replacement{request(source, u"new")};
+    REQUIRE(owner.add(original, work));
+    const auto token = owner.entries()[0].membership;
+
+    auto candidate = Access::prepareReplace(owner, replacement, work);
+    REQUIRE(candidate);
+    auto moved = std::move(owner);
+    CHECK(owner.entries().empty());
+    unchanged(moved, token, 1, u"old");
+    auto change = Access::commitReplace(moved, std::move(*candidate));
+    REQUIRE(change);
+    CHECK(change->revision == 2);
+    CHECK_FALSE(moved.isCurrent(token));
+
+    const auto *published = moved.entries().data();
+    auto noOp = Access::prepareReplace(moved, replacement, work);
+    REQUIRE(noOp);
+    CHECK(Access::revision(moved, *noOp) == 2);
+    CHECK(Access::entries(moved, *noOp).data() == published);
+    change = Access::commitReplace(moved, std::move(*noOp));
+    REQUIRE(change);
+    CHECK_FALSE(change->changed);
+    CHECK(change->revision == 2);
+    CHECK(moved.entries().data() == published);
+}
+
+TEST_CASE("staged subscription replacement cannot commit after owner identity is replaced") {
+    using Access = c::detail::SubscriptionStateAccess;
+    const auto source = schema();
+    auto owner = state(source);
+    auto incoming = state(source);
+    auto work = turn();
+    const std::array initial{request(source, u"old")};
+    const std::array replacement{request(source, u"new")};
+    REQUIRE(owner.add(initial, work));
+    REQUIRE(incoming.add(initial, work));
+    const auto incomingToken = incoming.entries()[0].membership;
+
+    auto retired = Access::prepareReplace(owner, replacement, work);
+    REQUIRE(retired);
+    auto transferred = Access::prepareReplace(incoming, replacement, work);
+    REQUIRE(transferred);
+    owner = std::move(incoming);
+
+    const auto stale = Access::commitReplace(owner, std::move(*retired));
+    REQUIRE_FALSE(stale);
+    CHECK(stale.error() == c::SubscriptionError::INVALID_STATE);
+    unchanged(owner, incomingToken, 1, u"old");
+    const auto competing = owner.clear(work);
+    REQUIRE_FALSE(competing);
+    CHECK(competing.error() == c::SubscriptionError::INVALID_STATE);
+    REQUIRE(Access::commitReplace(owner, std::move(*transferred)));
+    CHECK(owner.revision() == 2);
 }
 
 TEST_CASE("subscription work failure throughout candidate construction preserves every membership") {

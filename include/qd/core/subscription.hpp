@@ -16,6 +16,10 @@
 
 namespace org::ttldtor::qdcxx::core {
 
+namespace detail {
+struct SubscriptionStateAccess;
+} // namespace detail
+
 /** Immutable delivery contract selected for one desired-state owner. */
 enum class SubscriptionFamily {
     STREAM, ///< Every eligible record; no collector is implemented here.
@@ -158,7 +162,10 @@ struct SubscriptionChange {
  */
 class SubscriptionState {
     struct Record;
+    class Candidate;
     enum class Command { ADD, REMOVE, REPLACE, CLEAR };
+
+    friend struct detail::SubscriptionStateAccess;
 
     std::unique_ptr<Record[]> records_;
     std::size_t recordCount_ = 0;
@@ -174,6 +181,14 @@ class SubscriptionState {
     std::uint64_t lastActivation_ = 0;
 
     SubscriptionState() noexcept;
+    [[nodiscard]] bool owns(const Candidate &candidate) const noexcept;
+    [[nodiscard]] bool isCurrentIn(std::span<const SubscriptionEntry> entries,
+                                   const SubscriptionMembership &membership) const noexcept;
+    [[nodiscard]] std::expected<Candidate, SubscriptionError> prepare(Command command,
+                                                                      std::span<const SubscriptionRequest> requests,
+                                                                      std::span<const SubscriptionKey> keys,
+                                                                      SubscriptionWork &work);
+    [[nodiscard]] std::expected<SubscriptionChange, SubscriptionError> publish(Candidate &&candidate) noexcept;
     [[nodiscard]] std::expected<SubscriptionChange, SubscriptionError>
     apply(Command command, std::span<const SubscriptionRequest> requests, std::span<const SubscriptionKey> keys,
           SubscriptionWork &work);

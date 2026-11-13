@@ -16,9 +16,13 @@
 
 namespace org::ttldtor::qdcxx::collectors {
 
+namespace detail {
+struct TickerCollectorAccess;
+} // namespace detail
+
 /** Typed pure collector failures; no result implies wire or callback completion. */
 enum class TickerError {
-    INVALID_STATE,            ///< Moved-from collector.
+    INVALID_STATE,            ///< Moved-from collector or mutation blocked by an outstanding internal replacement.
     INVALID_CONFIGURATION,    ///< Invalid finite capacities or zero retrieval quantum.
     INVALID_VIEW,             ///< Default, foreign, closed or reused view token.
     INVALID_CONTEXT,          ///< Input belongs to another immutable local schema.
@@ -234,11 +238,20 @@ struct TickerResetNotice {
  */
 class TickerCollector {
     struct Impl;
+    class PreparedReplace;
+    friend struct detail::TickerCollectorAccess;
+
     std::unique_ptr<Impl> impl_; ///< Unique serialized owner; absent after move.
     /** Adopt complete preallocated ownership.
      * @param impl Prepared storage with no remaining fallible transfer.
      */
     explicit TickerCollector(std::unique_ptr<Impl> impl) noexcept;
+    [[nodiscard]] bool canMutate() const noexcept;
+    [[nodiscard]] std::expected<PreparedReplace, TickerCommandError>
+    prepareReplace(const TickerViewToken &view, std::span<const core::SubscriptionRequest> requests,
+                   core::SubscriptionWork &subscriptionWork, TickerWork &work);
+    [[nodiscard]] std::expected<core::SubscriptionChange, TickerCommandError>
+    publishReplace(PreparedReplace &candidate) noexcept;
 
     public:
     /** Transfer ownership and invalidate borrowed offers.

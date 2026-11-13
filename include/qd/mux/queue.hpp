@@ -21,6 +21,7 @@
 
 namespace org::ttldtor::qdcxx::mux {
 namespace detail {
+struct QueueReplaceAccess;
 /** Detached implementation type; no execution-owner access is exposed. */
 struct QueuePort;
 /** Detached implementation type; no execution-owner access is exposed. */
@@ -630,6 +631,7 @@ class MuxHandle {
  * and C++ runtime exception-transport infrastructure. Measured request profiles qualify the supported STL shape.
  */
 class MuxQueue {
+    friend struct detail::QueueReplaceAccess;
     /** Serialized concrete composition, defined out of line. */
     struct State;
 

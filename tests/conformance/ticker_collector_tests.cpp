@@ -1,6 +1,7 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "../../src/collectors/ticker_transaction.hpp"
 #include "../../src/core/delivery_statistics.hpp"
 #include "qd/collectors/ticker.hpp"
 #include "qd/encoding/char_array.hpp"
@@ -893,6 +894,113 @@ TEST_CASE("TICKER no-op rejected and aliased desired commands preserve exact pub
     auto remaining = drain(f, view);
     REQUIRE(remaining.size() == 1);
     CHECK(remaining[0].symbol == u"BETA");
+}
+
+TEST_CASE("TICKER staged replacement defers publication eviction and ordered initial delivery") {
+    using Access = s::detail::TickerCollectorAccess;
+    auto f = fixture();
+    auto view = open(f);
+    auto keeper = open(f);
+    add(f, view, u"ALPHA");
+    add(f, keeper, u"BETA");
+    add(f, keeper, u"GAMMA");
+    const Input input[]{{0, u"ALPHA", 1, 10}, {0, u"BETA", 1, 20}, {0, u"GAMMA", 1, 30}};
+    stage(f, input);
+    auto work = turn();
+    auto core = command();
+    auto offered = f.ticker.front(view, work);
+    REQUIRE(offered);
+    REQUIRE(*offered);
+    const auto old = f.ticker.desired(view)->entries()[0].membership;
+    const auto context = f.schema.recordContext(0);
+    std::u16string first = u"GAMMA";
+    const c::SubscriptionRequest requests[]{{{context, first}, {}}, {{context, u"BETA"}, {}}};
+
+    auto candidate = Access::prepareReplace(f.ticker, view, requests, core, work);
+    REQUIRE(candidate);
+    first.assign(u"changed by caller");
+    CHECK(Access::revision(f.ticker, *candidate) == 2);
+    {
+        const auto prepared = Access::entries(f.ticker, *candidate);
+        REQUIRE(prepared.size() == 2);
+        CHECK(prepared[0].key.symbol == u"GAMMA");
+        CHECK_FALSE(f.ticker.desired(view)->isCurrent(prepared[0].membership));
+    }
+    CHECK(f.ticker.desired(view)->revision() == 1);
+    CHECK(f.ticker.desired(view)->isCurrent(old));
+    CHECK(f.ticker.cachedKeys() == 3);
+    CHECK(f.ticker.pendingKeys(view) == 1);
+    CHECK(f.ticker.counts().evicted == 0);
+    CHECK((*offered)->value.sourceRecord->symbol == u"ALPHA");
+
+    const auto changed = [&] {
+        AllocationFault fault(0);
+
+        return Access::commitReplace(f.ticker, std::move(*candidate));
+    }();
+    REQUIRE(changed);
+    CHECK(changed->changed);
+    CHECK(changed->revision == 2);
+    CHECK_FALSE(f.ticker.desired(view)->isCurrent(old));
+    CHECK(f.ticker.cachedKeys() == 2);
+    CHECK(f.ticker.counts().evicted == 1);
+    const auto invalidated = f.ticker.pop(view, work);
+    REQUIRE_FALSE(invalidated);
+    CHECK(invalidated.error() == Error::NO_OFFER);
+    const auto output = drain(f, view);
+    REQUIRE(output.size() == 2);
+    CHECK(output[0].symbol == u"GAMMA");
+    CHECK(output[1].symbol == u"BETA");
+}
+
+TEST_CASE("TICKER abandoned replacement preserves the offer and releases the collector reservation") {
+    using Access = s::detail::TickerCollectorAccess;
+    auto f = fixture();
+    auto foreign = fixture();
+    auto view = open(f);
+    add(f, view, u"ALPHA");
+    const Input input[]{{0, u"ALPHA", 1, 10}};
+    stage(f, input);
+    auto work = turn();
+    auto core = command();
+    auto offered = f.ticker.front(view, work);
+    REQUIRE(offered);
+    REQUIRE(*offered);
+    const auto old = f.ticker.desired(view)->entries()[0].membership;
+
+    {
+        auto candidate = Access::prepareReplace(f.ticker, view, {}, core, work);
+        REQUIRE(candidate);
+        const Input update[]{{0, u"ALPHA", 2, 20}};
+        auto event = admit(f.live, data(update));
+        const auto staged = f.ticker.stage(std::move(event), work);
+        REQUIRE_FALSE(staged);
+        CHECK(staged.error() == Error::INVALID_STATE);
+        CHECK(event.residentBytes() > 0);
+        const auto closed = f.ticker.closeView(view, work);
+        REQUIRE_FALSE(closed);
+        CHECK(closed.error() == Error::INVALID_STATE);
+        const auto competing = f.ticker.replace(view, {}, core, work);
+        REQUIRE_FALSE(competing);
+        CHECK(competing.error().error == Error::INVALID_STATE);
+    }
+
+    auto candidate = Access::prepareReplace(f.ticker, view, {}, core, work);
+    REQUIRE(candidate);
+    CHECK_FALSE(Access::revision(foreign.ticker, *candidate));
+    CHECK(Access::entries(foreign.ticker, *candidate).empty());
+    const auto rejected = Access::commitReplace(foreign.ticker, std::move(*candidate));
+    REQUIRE_FALSE(rejected);
+    CHECK(rejected.error().error == Error::INVALID_STATE);
+    CHECK(f.ticker.desired(view)->isCurrent(old));
+    REQUIRE(f.ticker.pop(view, work));
+
+    auto transferred = Access::prepareReplace(f.ticker, view, {}, core, work);
+    REQUIRE(transferred);
+    auto moved = std::move(f.ticker);
+    REQUIRE(Access::commitReplace(moved, std::move(*transferred)));
+    CHECK(moved.desired(view)->entries().empty());
+    CHECK(moved.cachedKeys() == 0);
 }
 
 TEST_CASE("TICKER peak frame and byte failures are explicit shared failures rather than final-size eviction") {

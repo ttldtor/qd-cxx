@@ -280,6 +280,33 @@ remaining exclusive interests. Callback batches follow queue delivery boundaries
 and need not combine all selected types. See the complete
 [mixed selection and delivery contract](../spec/events/MIXED-SUBSCRIPTIONS.md).
 
+### Receive the SDK catalog on one live connection
+
+```cpp
+q::api::EndpointOptions options;
+options.contract = q::api::DeliveryContract::MIXED;
+auto endpoint = runtime.createEndpoint(options);
+auto subscription = endpoint->getFeed()->createCatalogSubscription();
+subscription->addEventListener([](std::span<const q::api::RegisteredEvent> events) {
+    // Consume owning events from any of the three contracts.
+    (void)events;
+});
+subscription->addSymbols("IBM");
+endpoint->connect(address);
+```
+
+The endpoint negotiates TICKER, STREAM and HISTORY on one QTP session. Ordinary
+Quote uses TICKER, ordinary TimeAndSale uses STREAM, and native Order uses HISTORY.
+Use `createTimeSeriesSubscription<Event>()` with `setFromTime()` for explicit
+time-series demand. It uses HISTORY. The listener may receive separate
+batches for each family. Applied subscription statistics describe the complete
+local logical revision. Wire delivery and peer processing remain asynchronous.
+
+Set `qdcxx.deliveryContract=mixed` when building from endpoint properties.
+The mixed profile uses the built-in catalog and exact selectors. Custom
+registries, wildcard subscriptions, endpoint filter construction, tape playback
+and OnDemand use the existing explicit single-contract profiles.
+
 ## Query an indexed HISTORY snapshot
 
 On a HISTORY endpoint, use `requestIndexedEvents<Event>(symbol, source, deadline)`

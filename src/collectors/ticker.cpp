@@ -1,6 +1,7 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
-#include "qd/collectors/ticker.hpp"
+#include "ticker_transaction.hpp"
+
 #include "../core/delivery_statistics.hpp"
 #include "qd/encoding/penta_symbol.hpp"
 
@@ -15,8 +16,22 @@ namespace org::ttldtor::qdcxx::collectors {
 /** Fixed detached identity; producer-safe final release cannot reach protocol state. */
 struct TickerIdentity {
     std::atomic<std::size_t> references{
-        1}; ///< Collector plus detached tokens; no reference is reused after retirement.
+        1};                           ///< Collector plus detached tokens; no reference is reused after retirement.
+    bool replacementReserved = false; ///< Accessed only by the serialized collector and candidate.
 };
+
+TickerCollector::PreparedReplace::PreparedReplace(const TickerViewToken &view, CoreReplace &&desired,
+                                                  std::size_t ordered) noexcept
+    : view_(view), desired_(std::move(desired)), ordered_(ordered) {
+    view_.origin_->replacementReserved = true;
+}
+
+TickerCollector::PreparedReplace::~PreparedReplace() {
+    if (view_.origin_) {
+        desired_.reset();
+        view_.origin_->replacementReserved = false;
+    }
+}
 
 namespace {
 constexpr auto NONE =
@@ -823,6 +838,33 @@ struct TickerCollector::Impl {
         spend(work, 0, 0, text, releaseBytes);
     }
 
+    /** Collect unique cached indices in request order while request text is still valid.
+     * @param requests Borrowed desired inputs, already covered by maintenance credits.
+     * @return Number of written scratch indices.
+     */
+    std::size_t planInitialOrder(std::span<const core::SubscriptionRequest> requests) noexcept {
+        std::size_t ordered = 0;
+
+        for (const auto &request : requests) {
+            if (!request.key.symbol.data() || request.key.symbol.size() > limits.viewSubscriptions.symbolUnits) {
+                continue;
+            }
+
+            for (std::size_t i = 0; i < limits.cacheKeys; ++i) {
+                if (!entries[i].record || !request.key.context.matches(entries[i].record->context)) {
+                    continue;
+                }
+
+                if (request.key.symbol == entries[i].record->symbol &&
+                    std::find(order.get(), order.get() + ordered, i) == order.get() + ordered) {
+                    order[ordered++] = i;
+                }
+            }
+        }
+
+        return ordered;
+    }
+
     /** Release event owners no active cache key references; full cost was preflighted. */
     void collectFrames() noexcept {
         for (std::size_t f = 0; f < limits.cachedFrames; ++f) {
@@ -969,6 +1011,10 @@ TickerCollector &TickerCollector::operator=(TickerCollector &&other) noexcept {
 }
 
 TickerCollector::~TickerCollector() = default;
+
+bool TickerCollector::canMutate() const noexcept {
+    return impl_ && !impl_->origin->replacementReserved;
+}
 
 std::expected<TickerCollector, TickerError> TickerCollector::create(core::LocalSchema &&schema, TickerLimits limits,
                                                                     TickerOptions options, TickerWork &work) {
@@ -1126,7 +1172,7 @@ TickerCollector::openObservedView(TickerWork &work, std::shared_ptr<core::detail
     try {
         spend(work, 1);
 
-        if (!impl_) {
+        if (!canMutate()) {
             return std::unexpected(TickerError::INVALID_STATE);
         }
 
@@ -1171,7 +1217,7 @@ std::expected<void, TickerError> TickerCollector::closeView(const TickerViewToke
     try {
         spend(work, 1);
 
-        if (!impl_) {
+        if (!canMutate()) {
             return std::unexpected(TickerError::INVALID_STATE);
         }
 
@@ -1218,7 +1264,7 @@ TickerCollector::add(const TickerViewToken &view, std::span<const core::Subscrip
     try {
         spend(work, 1);
 
-        if (!impl_) {
+        if (!canMutate()) {
             return std::unexpected(commandError(TickerError::INVALID_STATE));
         }
 
@@ -1230,25 +1276,8 @@ TickerCollector::add(const TickerViewToken &view, std::span<const core::Subscrip
         }
 
         s.maintenance(work, requests.size());
-        std::size_t ordered = 0;
-
         // Store indices before core publication: request text may borrow the old desired map.
-        for (const auto &request : requests) {
-            if (!request.key.symbol.data() || request.key.symbol.size() > s.limits.viewSubscriptions.symbolUnits) {
-                continue;
-            }
-
-            for (std::size_t i = 0; i < s.limits.cacheKeys; ++i) {
-                if (!s.entries[i].record || !request.key.context.matches(s.entries[i].record->context)) {
-                    continue;
-                }
-
-                if (request.key.symbol == s.entries[i].record->symbol &&
-                    std::find(s.order.get(), s.order.get() + ordered, i) == s.order.get() + ordered) {
-                    s.order[ordered++] = i;
-                }
-            }
-        }
+        const auto ordered = s.planInitialOrder(requests);
 
         auto changed = s.views[*slot].desired->add(requests, subscriptionWork);
 
@@ -1269,10 +1298,22 @@ TickerCollector::add(const TickerViewToken &view, std::span<const core::Subscrip
 std::expected<core::SubscriptionChange, TickerCommandError>
 TickerCollector::replace(const TickerViewToken &view, std::span<const core::SubscriptionRequest> requests,
                          core::SubscriptionWork &subscriptionWork, TickerWork &work) {
+    auto candidate = prepareReplace(view, requests, subscriptionWork, work);
+
+    if (!candidate) {
+        return std::unexpected(candidate.error());
+    }
+
+    return publishReplace(*candidate);
+}
+
+std::expected<TickerCollector::PreparedReplace, TickerCommandError>
+TickerCollector::prepareReplace(const TickerViewToken &view, std::span<const core::SubscriptionRequest> requests,
+                                core::SubscriptionWork &subscriptionWork, TickerWork &work) {
     try {
         spend(work, 1);
 
-        if (!impl_) {
+        if (!canMutate()) {
             return std::unexpected(commandError(TickerError::INVALID_STATE));
         }
 
@@ -1284,39 +1325,45 @@ TickerCollector::replace(const TickerViewToken &view, std::span<const core::Subs
         }
 
         s.maintenance(work, requests.size());
-        std::size_t ordered = 0;
+        const auto ordered = s.planInitialOrder(requests);
+        auto desired =
+            core::detail::SubscriptionStateAccess::prepareReplace(*s.views[*slot].desired, requests, subscriptionWork);
 
-        for (const auto &request : requests) {
-            if (!request.key.symbol.data() || request.key.symbol.size() > s.limits.viewSubscriptions.symbolUnits) {
-                continue;
-            }
-
-            for (std::size_t i = 0; i < s.limits.cacheKeys; ++i) {
-                if (!s.entries[i].record || !request.key.context.matches(s.entries[i].record->context)) {
-                    continue;
-                }
-
-                if (request.key.symbol == s.entries[i].record->symbol &&
-                    std::find(s.order.get(), s.order.get() + ordered, i) == s.order.get() + ordered) {
-                    s.order[ordered++] = i;
-                }
-            }
+        if (!desired) {
+            return std::unexpected(TickerCommandError{TickerError::INVALID_CONFIGURATION, desired.error()});
         }
 
-        auto changed = s.views[*slot].desired->replace(requests, subscriptionWork);
-
-        if (!changed) {
-            return std::unexpected(TickerCommandError{TickerError::INVALID_CONFIGURATION, changed.error()});
-        }
-
-        if (changed->changed) {
-            s.reconcile(*slot, ordered);
-        }
-
-        return *changed;
+        return PreparedReplace(view, std::move(*desired), ordered);
     } catch (TickerError error) {
         return std::unexpected(commandError(error));
     }
+}
+
+std::expected<core::SubscriptionChange, TickerCommandError>
+TickerCollector::publishReplace(PreparedReplace &candidate) noexcept {
+    if (!impl_ || impl_->origin != candidate.view_.origin_) {
+        return std::unexpected(commandError(TickerError::INVALID_STATE));
+    }
+
+    auto &s = *impl_;
+    const auto slot = s.view(candidate.view_);
+
+    if (!slot) {
+        return std::unexpected(commandError(TickerError::INVALID_VIEW));
+    }
+
+    auto changed =
+        core::detail::SubscriptionStateAccess::commitReplace(*s.views[*slot].desired, std::move(*candidate.desired_));
+
+    if (!changed) {
+        return std::unexpected(TickerCommandError{TickerError::INVALID_CONFIGURATION, changed.error()});
+    }
+
+    if (changed->changed) {
+        s.reconcile(*slot, candidate.ordered_);
+    }
+
+    return *changed;
 }
 
 std::expected<core::SubscriptionChange, TickerCommandError>
@@ -1325,7 +1372,7 @@ TickerCollector::remove(const TickerViewToken &view, std::span<const core::Subsc
     try {
         spend(work, 1);
 
-        if (!impl_) {
+        if (!canMutate()) {
             return std::unexpected(commandError(TickerError::INVALID_STATE));
         }
 
@@ -1358,7 +1405,7 @@ TickerCollector::clear(const TickerViewToken &view, core::SubscriptionWork &subs
     try {
         spend(work, 1);
 
-        if (!impl_) {
+        if (!canMutate()) {
             return std::unexpected(commandError(TickerError::INVALID_STATE));
         }
 
@@ -1390,7 +1437,7 @@ std::expected<TickerStage, TickerError> TickerCollector::stage(protocol::LiveEve
     try {
         spend(work, 1);
 
-        if (!impl_) {
+        if (!canMutate()) {
             return std::unexpected(TickerError::INVALID_STATE);
         }
 
@@ -1666,7 +1713,7 @@ TickerCollector::frontWithPolicy(const TickerViewToken &view, TickerWork &work, 
     try {
         spend(work, 1, 1);
 
-        if (!impl_) {
+        if (!canMutate()) {
             return std::unexpected(TickerError::INVALID_STATE);
         }
 
@@ -1745,7 +1792,7 @@ std::expected<void, TickerError> TickerCollector::pop(const TickerViewToken &vie
     try {
         spend(work, 1);
 
-        if (!impl_) {
+        if (!canMutate()) {
             return std::unexpected(TickerError::INVALID_STATE);
         }
 
@@ -1854,7 +1901,7 @@ std::expected<TickerResetNotice, TickerError> TickerCollector::reset(TickerWork 
     try {
         spend(work, 1);
 
-        if (!impl_) {
+        if (!canMutate()) {
             return std::unexpected(TickerError::INVALID_STATE);
         }
 
@@ -1926,7 +1973,7 @@ std::expected<void, TickerError> TickerCollector::acknowledgeReset(std::uint64_t
     try {
         spend(work, 1, 1);
 
-        if (!impl_) {
+        if (!canMutate()) {
             return std::unexpected(TickerError::INVALID_STATE);
         }
 

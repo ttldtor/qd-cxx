@@ -17,7 +17,8 @@
 namespace org::ttldtor::qdcxx::collectors {
 namespace detail {
 struct HistoryReplayAccess;
-}
+struct HistoryReplaceAccess;
+} // namespace detail
 
 /** Typed owner failures; no outcome implies callback, wire or peer completion. */
 enum class HistoryError {
@@ -92,6 +93,7 @@ class HistoryToken {
     std::size_t slot_ = 0;              ///< View slot, or reserved epoch discriminator.
     std::uint64_t generation_ = 0;      ///< Never-reused selection generation.
     friend class HistoryCollector;
+    friend struct detail::HistoryReplaceAccess;
     /** Retain fixed identity.
      * @param origin Marker, or null for invalid.
      * @param slot View slot or epoch discriminator.
@@ -314,6 +316,7 @@ struct HistoryRetentionReport {
  */
 class HistoryCollector {
     friend struct detail::HistoryReplayAccess;
+    friend struct detail::HistoryReplaceAccess;
     struct Impl;
     std::unique_ptr<Impl> impl_; ///< Serialized complete state.
     /** Adopt complete fixed storage.

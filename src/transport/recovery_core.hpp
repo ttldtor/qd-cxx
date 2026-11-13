@@ -16,6 +16,12 @@
 
 namespace org::ttldtor::qdcxx::transport::detail {
 
+/** Borrowed desired replacement for the corresponding TICKER, STREAM or HISTORY slot. */
+struct RecoveryDesiredLane {
+    const mux::MuxHandle *handle = nullptr;
+    std::span<const core::SubscriptionRequest> requests;
+};
+
 /** Actual bounded attempt facts; raw protocol ownership remains inside the recovery operation. */
 struct RecoveryAttemptFacts {
     bool present = false;         ///< One actual prepared/active/retiring native owner exists.
@@ -352,6 +358,10 @@ class RecoveryCore {
         const std::shared_ptr<client::SubscriptionConsumer> &consumer, client::ReceiverLimits receiverLimits,
         mux::ClientLimits clientLimits, client::ReceiverWork &receiverWork, mux::QueueWork &queueWork,
         const client::detail::ReceiverPlan **observationPlan = nullptr);
+    /** Publish a logical desired revision across its adopted receivers before the next recovery poll. */
+    [[nodiscard]] std::expected<void, mux::QueueFailure> replaceDesired(const std::array<RecoveryDesiredLane, 3> &lanes,
+                                                                        std::size_t selectors, std::uint64_t revision,
+                                                                        RecoveryTurnWork &work);
     /** Observe the adopted HISTORY queue only under current owner/backend eligibility.
      * @param handle Exact adopted HISTORY registration.
      * @param key Borrowed key used synchronously; nothing is retained.
