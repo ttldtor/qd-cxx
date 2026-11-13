@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "../../src/api/on_demand_playback_clock.hpp"
+#include "../fixtures/ondemand/fixture.hpp"
 #include "connect_peer.hpp"
 #include "qd/api/feed.hpp"
 #include "qd/protocol/subscription_writer.hpp"
@@ -23,15 +24,9 @@
 namespace {
 namespace q = org::ttldtor::qdcxx;
 namespace api = q::api;
+namespace fixture = q::test::ondemand;
 using namespace std::chrono_literals;
 
-// Emitted by the pinned QD 3.355 ReplayRequest and ReplayResponse codecs from synthetic input.
-constexpr std::string_view JAVA_REQUEST =
-    "8081020708636f6e7472616374000475736572000a65787069726174696f6e1339323233333732303336383534373735383037"
-    "066469676573742000000000000000000000000000000000000000000000000000000000000000000564656c617901300474"
-    "696d650d31373037373438323035303030046b65797307044d4f434b0051";
-constexpr std::string_view JAVA_RESPONSE =
-    "31020106626c6f636b73272600044d4f434b0051f065ca2b6880419388ff058051c04c9b0a05805187da1482ee22864080a0";
 constexpr std::string_view START_HEADER = "X-OnDemand-StartTime: 2024-02-12T14:30:05.000Z";
 constexpr auto START = std::chrono::sys_time{std::chrono::milliseconds{1707748205000}};
 constexpr auto WAIT = 8s;
@@ -75,7 +70,7 @@ std::size_t requestLength() {
         "Content-Type: application/octet-stream\r\nAccept: application/octet-stream\r\n"
         "X-OnDemand-StartTime: 2024-02-12T14:30:05.000Z\r\nContent-Length: 131\r\nConnection: close\r\n\r\n";
 
-    return HEADER.size() + JAVA_REQUEST.size() / 2;
+    return HEADER.size() + fixture::REQUEST.size() / 2;
 }
 
 q::test::TcpPeerConfig peerConfig(std::vector<std::byte> reply, bool hold = false) {
@@ -181,7 +176,7 @@ TEST_CASE("OnDemand fetches the exact Java request and delivers two historical Q
         std::chrono::steady_clock::time_point time;
     };
 
-    q::test::OwnedTcpPeer peer(peerConfig(binaryResponse(JAVA_RESPONSE)));
+    q::test::OwnedTcpPeer peer(peerConfig(binaryResponse(fixture::RESPONSE_750MS)));
     REQUIRE(peer.port() != 0);
     std::vector<Arrival> arrivals;
     api::ApiRuntime runtime(runtimeOptions());
@@ -229,7 +224,7 @@ TEST_CASE("OnDemand fetches the exact Java request and delivers two historical Q
     CHECK(text.contains(START_HEADER));
     const auto separator = text.find("\r\n\r\n");
     REQUIRE(separator != std::string_view::npos);
-    const auto expected = unhex(JAVA_REQUEST);
+    const auto expected = unhex(fixture::REQUEST);
     const auto body = std::span(received).subspan(separator + 4);
     CHECK(text.contains("Content-Length: 131\r\n"));
     const auto mismatch = std::ranges::mismatch(body, expected);
@@ -246,7 +241,7 @@ TEST_CASE("OnDemand fetches the exact Java request and delivers two historical Q
     CHECK(std::ranges::equal(body, expected));
 }
 
-TEST_CASE("OnDemand refuses access, ambiguous framing and compression before a historical epoch") {
+TEST_CASE("OnDemand refuses invalid HTTP and response framing before a historical epoch") {
     constexpr std::string_view COMPRESSED_RESPONSE =
         "34020109626c6f636b732e677a272600044d4f434b0051f065ca2b6880419388ff058051c04c9b0a05805187da1482ee22864080a0";
     const std::array cases{
@@ -279,8 +274,96 @@ TEST_CASE("OnDemand refuses access, ambiguous framing and compression before a h
     }
 }
 
+TEST_CASE("OnDemand completes HTTP framing across three peer-gated socket reads") {
+    const auto bytes = binaryResponse(fixture::RESPONSE_750MS);
+    const auto middle = bytes.size() - 25;
+    constexpr std::size_t HEADER_PREFIX = 22;
+    auto config = peerConfig({});
+    auto &wire = config.sessions.front();
+    wire.replyBytes.assign(bytes.begin(), bytes.begin() + HEADER_PREFIX);
+    wire.stagedBytes.emplace_back(bytes.begin() + HEADER_PREFIX, bytes.begin() + middle);
+    wire.stagedBytes.emplace_back(bytes.begin() + middle, bytes.end());
+    q::test::OwnedTcpPeer peer(std::move(config));
+    REQUIRE(peer.port() != 0);
+    std::atomic<unsigned> quotes{0};
+    api::ApiRuntime runtime(runtimeOptions());
+    const auto endpoint = runtime.createEndpoint();
+    const auto subscription = endpoint->getFeed()->createSubscription<q::events::Quote>();
+    subscription->addSymbols("MOCK");
+    subscription->addEventListener([&](auto batch) {
+        quotes.fetch_add(static_cast<unsigned>(batch.size()));
+    });
+    endpoint->connectOnDemand(peer.port(), u"MOCK", START);
+    REQUIRE(eventually([&] {
+        return peer.snapshot().sessions.front().replyBytesWritten == HEADER_PREFIX;
+    }));
+    CHECK(endpoint->getState() == api::EndpointState::CONNECTING);
+    std::this_thread::sleep_for(125ms);
+    peer.allowStages(0, 1);
+    REQUIRE(eventually([&] {
+        return peer.snapshot().sessions.front().stagedBytesWritten == middle - HEADER_PREFIX;
+    }));
+    CHECK_FALSE(endpoint->getStatistics().connection.sourceEpoch);
+    std::this_thread::sleep_for(125ms);
+    peer.allowStages(0, 2);
+    const auto result = endpoint->awaitState(api::EndpointState::CLOSED, std::chrono::steady_clock::now() + WAIT);
+    INFO(result.diagnostic.stage);
+    REQUIRE(result.status == api::WaitStatus::REACHED);
+    CHECK(endpoint->closeAndAwaitTermination().drained);
+    CHECK(quotes.load() == 2);
+}
+
+TEST_CASE("OnDemand refuses an EOF one byte before the declared HTTP body boundary") {
+    auto bytes = binaryResponse(fixture::RESPONSE_750MS);
+    bytes.pop_back();
+    auto config = peerConfig(std::move(bytes));
+    config.sessions.front().finishWrites = true;
+    q::test::OwnedTcpPeer peer(std::move(config));
+    REQUIRE(peer.port() != 0);
+    std::atomic<unsigned> callbacks{0};
+    api::ApiRuntime runtime(runtimeOptions());
+    const auto endpoint = runtime.createEndpoint();
+    const auto subscription = endpoint->getFeed()->createSubscription<q::events::Quote>();
+    subscription->addSymbols("MOCK");
+    subscription->addEventListener([&](auto) {
+        ++callbacks;
+    });
+    endpoint->connectOnDemand(peer.port(), u"MOCK", START);
+    const auto result = endpoint->awaitState(api::EndpointState::FAILED, std::chrono::steady_clock::now() + WAIT);
+    INFO(result.diagnostic.stage);
+    REQUIRE(result.status == api::WaitStatus::REACHED);
+    CHECK(result.diagnostic.code == api::ErrorCode::PROTOCOL_FAILURE);
+    CHECK(result.diagnostic.stage == "ondemand-response-truncated");
+    CHECK_FALSE(endpoint->getStatistics().connection.sourceEpoch);
+    static_cast<void>(endpoint->closeAndAwaitTermination());
+    CHECK(callbacks.load() == 0);
+}
+
+TEST_CASE("OnDemand refuses a complete response that does not cover the requested start") {
+    q::test::OwnedTcpPeer peer(peerConfig(binaryResponse(fixture::RESPONSE_750MS)));
+    REQUIRE(peer.port() != 0);
+    std::atomic<unsigned> callbacks{0};
+    api::ApiRuntime runtime(runtimeOptions());
+    const auto endpoint = runtime.createEndpoint();
+    const auto subscription = endpoint->getFeed()->createSubscription<q::events::Quote>();
+    subscription->addSymbols("MOCK");
+    subscription->addEventListener([&](auto) {
+        ++callbacks;
+    });
+    endpoint->connectOnDemand(peer.port(), u"MOCK", START + 60s);
+    const auto result = endpoint->awaitState(api::EndpointState::FAILED, std::chrono::steady_clock::now() + WAIT);
+    INFO(result.diagnostic.stage);
+    REQUIRE(result.status == api::WaitStatus::REACHED);
+    CHECK(result.diagnostic.code == api::ErrorCode::PROTOCOL_FAILURE);
+    CHECK(result.diagnostic.stage == "ondemand-response");
+    CHECK_FALSE(endpoint->getStatistics().connection.sourceEpoch);
+    CHECK_FALSE(endpoint->getOnDemandPlayback()->covered);
+    static_cast<void>(endpoint->closeAndAwaitTermination());
+    CHECK(callbacks.load() == 0);
+}
+
 TEST_CASE("OnDemand catches up a pre-cut Quote and fences the next Quote on callback close") {
-    q::test::OwnedTcpPeer peer(peerConfig(binaryResponse(JAVA_RESPONSE)));
+    q::test::OwnedTcpPeer peer(peerConfig(binaryResponse(fixture::RESPONSE_750MS)));
     REQUIRE(peer.port() != 0);
     std::vector<std::int64_t> times;
     api::ApiRuntime runtime(runtimeOptions());
@@ -385,9 +468,7 @@ TEST_CASE("OnDemand clock preserves fractional progress and applies rates to ela
 }
 
 TEST_CASE("OnDemand preserves its cursor through initial pause, rate changes and terminal EOF") {
-    constexpr std::string_view CONTROL_RESPONSE =
-        "31020106626c6f636b73272600044d4f434b0051f065ca2b6880419388ff058051c04c9b0a05805187da1487d022864080a0";
-    q::test::OwnedTcpPeer peer(peerConfig(binaryResponse(CONTROL_RESPONSE)));
+    q::test::OwnedTcpPeer peer(peerConfig(binaryResponse(fixture::RESPONSE_2000MS)));
     REQUIRE(peer.port() != 0);
     std::vector<api::OnDemandPlaybackChange> observed;
     std::vector<std::int64_t> times;
@@ -527,7 +608,7 @@ TEST_CASE("OnDemand pre-coverage speed callbacks can remove themselves and close
 }
 
 TEST_CASE("OnDemand clear drops historical values and resumes ordinary QTP with the same subscription") {
-    q::test::OwnedTcpPeer historical(peerConfig(binaryResponse(JAVA_RESPONSE)));
+    q::test::OwnedTcpPeer historical(peerConfig(binaryResponse(fixture::RESPONSE_750MS)));
     q::test::OwnedTcpPeer live(livePeerConfig());
     REQUIRE(historical.port() != 0);
     REQUIRE(live.port() != 0);
@@ -594,7 +675,7 @@ TEST_CASE("OnDemand clear drops historical values and resumes ordinary QTP with 
 }
 
 TEST_CASE("OnDemand handover cancels a host-held old task and runs only the fresh live callback") {
-    q::test::OwnedTcpPeer historical(peerConfig(binaryResponse(JAVA_RESPONSE)));
+    q::test::OwnedTcpPeer historical(peerConfig(binaryResponse(fixture::RESPONSE_750MS)));
     q::test::OwnedTcpPeer live(livePeerConfig());
     REQUIRE(historical.port() != 0);
     REQUIRE(live.port() != 0);
@@ -652,7 +733,7 @@ TEST_CASE("OnDemand clear retires a held HTTP response before coverage") {
 }
 
 TEST_CASE("OnDemand handover keeps the executing callback fenced and never opens live after timeout") {
-    q::test::OwnedTcpPeer historical(peerConfig(binaryResponse(JAVA_RESPONSE)));
+    q::test::OwnedTcpPeer historical(peerConfig(binaryResponse(fixture::RESPONSE_750MS)));
     q::test::OwnedTcpPeer live(livePeerConfig());
     REQUIRE(historical.port() != 0);
     REQUIRE(live.port() != 0);

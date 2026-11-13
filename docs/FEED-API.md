@@ -486,6 +486,8 @@ mapping or symbols, malformed or oversized frames and uncovered time.
 HTTP 401 produces the static diagnostic `ondemand-access-refused`. This
 profile qualifies a synthetic local replay service. A deployed provider,
 entitlements, encrypted HTTP, further windows and seek have separate qualification.
+The [synthetic fixture generator and local verification](../tools/upstream/ondemand-oracle/README.md)
+reproduce the qualified wire and lifecycle cases.
 
 For speed control, pass the initial rate as the fourth argument to
 `connectOnDemand` or call `setOnDemandSpeed(rate)` on the open replay
