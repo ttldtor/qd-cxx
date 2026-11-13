@@ -138,7 +138,7 @@ template <detail::TimeSeriesRangeEvent Event> class TimeSeriesEventModel final {
 
     /** @return Whether a distinct range revision can still be published. */
     [[nodiscard]] bool canAdvance() const noexcept {
-        return revision_ != std::numeric_limits<std::uint64_t>::max();
+        return revision_ != (std::numeric_limits<std::uint64_t>::max)();
     }
 
     public:

@@ -161,6 +161,15 @@ SAN. Для успешного подключения он проверяет о
 `endpoint-tls-unavailable`. [Самостоятельный пример Quote](../examples/feed_quote/README.ru.md)
 использует обычный TCP.
 
+Заголовки Feed можно подключать до или после `<Windows.h>`. Они сохраняют
+макросы SDK `min`, `max` и `CALLBACK`. Если Windows определяет `CALLBACK`,
+используйте `client::ProgressKind::CALLBACK_COMPLETED` и
+`mux::QueueProgressKind::CALLBACK_COMPLETED`. Исходные имена и числовые
+значения перечислителей доступны, когда макрос `CALLBACK` не определён.
+Внешняя проверка в двух единицах трансляции проверяет оба порядка подключения
+с установленным пакетом Feed. Для низкоуровневого API воспроизведения тейпов
+действуют отдельные требования к подключению заголовков.
+
 <a id="installed-binary-json-loader"></a>
 
 ## Устанавливаемый binary JSON loader

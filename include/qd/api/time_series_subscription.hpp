@@ -22,7 +22,7 @@ namespace org::ttldtor::qdcxx::api {
 
 enum class EventType; ///< Existing Feed registry enumeration; its definition remains in event_registry.hpp.
 
-inline constexpr std::int64_t TIME_SERIES_FROM_TIME_DISABLED = std::numeric_limits<std::int64_t>::max();
+inline constexpr std::int64_t TIME_SERIES_FROM_TIME_DISABLED = (std::numeric_limits<std::int64_t>::max)();
 ///< Initial Java fromTime sentinel: no requested time-series events, not a wall-clock time or wire flag.
 
 /** Value operations required by a time-series decorator.

@@ -760,7 +760,7 @@ template <class Event> class Subscription final {
      */
     [[nodiscard]] StateWaitResult<SubscriptionState>
     awaitState(SubscriptionState target,
-               std::chrono::steady_clock::time_point deadline = std::chrono::steady_clock::time_point::max(),
+               std::chrono::steady_clock::time_point deadline = (std::chrono::steady_clock::time_point::max)(),
                std::stop_token stop = {}) const;
     /** Inspect the first asynchronous failure.
      * @return Static/numeric detached diagnostic, or NONE.
@@ -1474,7 +1474,7 @@ class Endpoint final {
      */
     [[nodiscard]] StateWaitResult<EndpointState>
     awaitState(EndpointState target,
-               std::chrono::steady_clock::time_point deadline = std::chrono::steady_clock::time_point::max(),
+               std::chrono::steady_clock::time_point deadline = (std::chrono::steady_clock::time_point::max)(),
                std::stop_token stop = {}) const;
     /** Inspect first asynchronous failure.
      * @return Static/numeric detached diagnostic, or NONE.

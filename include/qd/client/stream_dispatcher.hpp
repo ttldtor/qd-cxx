@@ -65,15 +65,19 @@ enum class DispatchOutcome {
     FAILED   ///< First non-cancellation owner failure remains visible after cleanup.
 };
 /** At most one bounded owner action performed by progress(). */
+#pragma push_macro("CALLBACK")
+#undef CALLBACK
 enum class ProgressKind {
-    IDLE,     ///< No local bounded action is immediately required.
-    STAGED,   ///< Accepted whole data event entered the real collector.
-    RELEASED, ///< Control/zero-selection event or retired source prefix was released without callback.
-    COMMAND,  ///< One accepted ordinary command applied, rejected or cancelled.
-    CALLBACK, ///< One complete immutable batch invocation returned or threw.
-    CLOSING,  ///< Stop/failure barrier or bounded abort discard advanced.
-    TERMINAL  ///< Local owner quiescence was published, or had already been reached.
+    IDLE,               ///< No local bounded action is immediately required.
+    STAGED,             ///< Accepted whole data event entered the real collector.
+    RELEASED,           ///< Control/zero-selection event or retired source prefix was released without callback.
+    COMMAND,            ///< One accepted ordinary command applied, rejected or cancelled.
+    CALLBACK_COMPLETED, ///< One complete immutable batch invocation returned or threw.
+    CALLBACK = CALLBACK_COMPLETED, ///< Legacy spelling when the Windows SDK macro is inactive.
+    CLOSING,                       ///< Stop/failure barrier or bounded abort discard advanced.
+    TERMINAL                       ///< Local owner quiescence was published, or had already been reached.
 };
+#pragma pop_macro("CALLBACK")
 
 /** Explicit fixed-port and detached-batch limits; zero never means unlimited. */
 struct ClientLimits {

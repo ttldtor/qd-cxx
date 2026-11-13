@@ -443,7 +443,7 @@ template <detail::IndexedModelEvent Event> class IndexedEventModel final {
 
         try {
             std::vector<Event> snapshot;
-            const Key first{std::u16string(symbol), std::numeric_limits<std::int32_t>::min()};
+            const Key first{std::u16string(symbol), (std::numeric_limits<std::int32_t>::min)()};
 
             for (auto entry = partitions_.lower_bound(first);
                  entry != partitions_.end() && entry->first.first == symbol; ++entry) {

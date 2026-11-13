@@ -117,18 +117,22 @@ enum class AdmissionKind {
     RELEASE_ONLY, ///< A source control owner was accepted only for serialized disposal.
 };
 /** One finite owner action. */
+#pragma push_macro("CALLBACK")
+#undef CALLBACK
 enum class QueueProgressKind {
-    IDLE,         ///< One debited fair phase/slot made no externally visible action.
-    STAGED,       ///< The actual collector admitted the whole accepted source owner.
-    RELEASED,     ///< A pending owner was released in the serialized domain.
-    ROUTED,       ///< One family-specific atomic routing unit committed.
-    COMMAND,      ///< One ordinary command result was published.
-    SYNCHRONIZED, ///< A derived desired/view mapping synchronized.
-    CALLBACK,     ///< One callback invocation returned or failed.
-    CONTROL,      ///< One bounded reserved lifecycle/reset phase advanced.
-    CLEANUP,      ///< One finite retirement or discard unit advanced.
-    TERMINAL,     ///< The context reached local quiescence.
+    IDLE,                          ///< One debited fair phase/slot made no externally visible action.
+    STAGED,                        ///< The actual collector admitted the whole accepted source owner.
+    RELEASED,                      ///< A pending owner was released in the serialized domain.
+    ROUTED,                        ///< One family-specific atomic routing unit committed.
+    COMMAND,                       ///< One ordinary command result was published.
+    SYNCHRONIZED,                  ///< A derived desired/view mapping synchronized.
+    CALLBACK_COMPLETED,            ///< One callback invocation returned or failed.
+    CALLBACK = CALLBACK_COMPLETED, ///< Legacy spelling when the Windows SDK macro is inactive.
+    CONTROL,                       ///< One bounded reserved lifecycle/reset phase advanced.
+    CLEANUP,                       ///< One finite retirement or discard unit advanced.
+    TERMINAL,                      ///< The context reached local quiescence.
 };
+#pragma pop_macro("CALLBACK")
 /** Reset is a continuing owner operation, not a synchronous rollback transaction. */
 enum class ResetPhase {
     NONE,                       ///< No source reset owner operation is pending.

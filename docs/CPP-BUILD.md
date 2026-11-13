@@ -155,6 +155,16 @@ OpenSSL installation and the secure configuration rejects with
 `UNSUPPORTED_PROFILE` at `endpoint-tls-unavailable`. The
 [standalone Quote example](../examples/feed_quote/README.md) uses plain TCP.
 
+For the Feed headers, either include order with `<Windows.h>` is supported.
+The headers preserve the SDK's `min`, `max` and `CALLBACK` macros.
+Use `client::ProgressKind::CALLBACK_COMPLETED` and
+`mux::QueueProgressKind::CALLBACK_COMPLETED` when Windows defines `CALLBACK`.
+The original enum spellings and numeric values remain available when the
+`CALLBACK` macro is inactive. An external two-translation-unit check exercises
+both orders against the installed Feed package. The
+offline replay include requirements
+apply separately to the low-level replay API.
+
 <a id="installed-binary-json-loader"></a>
 
 ## Installed binary JSON loader
