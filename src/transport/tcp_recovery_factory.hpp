@@ -27,6 +27,16 @@ struct TcpRecoveryFactory {
     /** @param recovery Existing worker-owned recovery. @return Only actual current-source peer info. */
     [[nodiscard]] static std::optional<AggregationPeriodInfo>
     aggregationPeriodInfo(const TcpRecovery &recovery) noexcept;
+    /** Read a borrowed retained interval on the current HISTORY source owner.
+     * @param recovery Existing worker-owned recovery.
+     * @param handle Exact applied registration.
+     * @param query Bounded exact physical interval.
+     * @param work Remaining queue and collector observation credits.
+     * @return Borrowed source rows until the next recovery/queue mutation, or typed refusal.
+     */
+    [[nodiscard]] static std::expected<collectors::HistoryRetainedRange, RecoveryDiagnostic>
+    retainedHistoryRange(const TcpRecovery &recovery, const mux::MuxHandle &handle,
+                         const collectors::HistoryRetainedQuery &query, mux::QueueWork &work);
     /** Visit a current TICKER value synchronously on the recovery owner.
      * @param recovery Existing worker-owned recovery.
      * @param handle Exact adopted registration.

@@ -3,6 +3,7 @@
 #include "qd/api/feed.hpp"
 #include "../core/delivery_statistics.hpp"
 #include "qd/api/feed_filter.hpp"
+#include "qd/api/indexed_event_model.hpp"
 #include "qd/api/time_series_subscription.hpp"
 
 #include "../client/subscription_receiver_observation.hpp"
@@ -609,6 +610,7 @@ void retireLatestRead(detail::EndpointPort &port) noexcept {
 }
 
 constexpr Diagnostic TAPE_LATEST_REQUEST_REFUSAL{ErrorCode::UNSUPPORTED_PROFILE, "latest-event-request-tape"};
+constexpr Diagnostic TAPE_HISTORY_SNAPSHOT_REFUSAL{ErrorCode::UNSUPPORTED_PROFILE, "history-snapshot-tape"};
 
 /** Publish exactly one terminal outcome while holding the request mutex. */
 bool finishLatestRequest(detail::LatestEventRequestState &request, Diagnostic failure,
@@ -680,6 +682,80 @@ void retireLatestRequest(detail::EndpointPort &port, std::optional<Diagnostic> s
     batch->demand.reset();
 }
 
+/** Publish one terminal snapshot outcome under the operation's completion mutex. */
+bool finishHistorySnapshot(detail::HistorySnapshotOperation &operation, Diagnostic failure = {},
+                           HistorySnapshot<RegisteredEvent> result = {}) noexcept {
+    if (operation.done)
+        return false;
+
+    operation.failure = failure;
+    operation.result = std::move(result);
+    operation.done = true;
+    operation.condition.notify_all();
+
+    return true;
+}
+
+bool expireHistorySnapshot(detail::HistorySnapshotOperation &operation) noexcept {
+    if (std::chrono::steady_clock::now() < operation.deadline)
+        return false;
+
+    return finishHistorySnapshot(operation, {operation.passive ? ErrorCode::WORK_LIMIT : ErrorCode::REQUEST_TIMED_OUT,
+                                             "history-snapshot-deadline"});
+}
+
+/** Recheck accepted endpoint state under endpoint then completion locking. */
+void checkHistorySnapshotFence(const detail::EndpointPort &port, detail::HistorySnapshotOperation &operation) noexcept {
+    if (operation.done || expireHistorySnapshot(operation))
+        return;
+
+    if (port.closeRequested.load(std::memory_order_acquire)) {
+        finishHistorySnapshot(operation, {ErrorCode::CLOSED, "history-snapshot-closed"});
+
+        return;
+    }
+
+    if (port.state == EndpointState::FAILED) {
+        finishHistorySnapshot(operation, port.diagnostic);
+
+        return;
+    }
+
+    if (!operation.passive && !operation.boundToConnection && port.connectionIntent &&
+        port.connectionRevision > operation.connectionRevision &&
+        port.connectionRevision - operation.connectionRevision == 1) {
+        operation.connectionRevision = port.connectionRevision;
+        operation.boundToConnection = true;
+    }
+
+    if (operation.connectionRevision != port.connectionRevision || operation.clearRevision != port.clearRevision) {
+        const Diagnostic failure = operation.passive
+                                       ? Diagnostic{}
+                                       : Diagnostic{ErrorCode::REQUEST_CANCELLED, "history-snapshot-source-change"};
+        finishHistorySnapshot(operation, failure);
+    }
+}
+
+/** Close detached waiters before publishing endpoint retirement. */
+void retireHistorySnapshots(detail::EndpointPort &port, std::optional<Diagnostic> failure) noexcept {
+    std::array<std::shared_ptr<detail::HistorySnapshotOperation>, 2> operations;
+    {
+        std::lock_guard lock(port.mutex);
+        operations[0] = std::move(port.historySnapshotRead);
+        operations[1] = std::move(port.historySnapshotRequest);
+    }
+
+    for (const auto &operation : operations) {
+        if (operation) {
+            std::lock_guard lock(operation->mutex);
+            static_cast<void>(expireHistorySnapshot(*operation));
+            finishHistorySnapshot(*operation,
+                                  failure.value_or(Diagnostic{ErrorCode::CLOSED, "history-snapshot-closed"}));
+            operation->demand.reset();
+        }
+    }
+}
+
 /** Retire all producer snapshots after the endpoint's native/receiver owners are gone.
  * @param port Detached endpoint.
  * @param result Actual detached local outcome.
@@ -703,6 +779,7 @@ bool retireEndpoint(const std::shared_ptr<detail::EndpointPort> &port, CloseResu
     RetirementGuard guard(port.get());
     retireLatestRead(*port);
     retireLatestRequest(*port, latestSourceFailure);
+    retireHistorySnapshots(*port, latestSourceFailure);
     notifyConnecting(port);
     observeState(port, EndpointState::CLOSING);
 
@@ -1556,7 +1633,8 @@ Feed::createTimeSeriesSubscription(std::initializer_list<EventType> types) {
 }
 
 std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span<const EventType> types,
-                                                                       bool registeredDelivery, bool timeSeries) {
+                                                                       bool registeredDelivery, bool timeSeries,
+                                                                       bool snapshotDemand) {
     return producerAction([&] {
         if (types.size() > port_->limits.maximumEventTypeArgumentsPerSubscription) {
             reject(ErrorCode::RESOURCE_LIMIT, "subscription-event-type-arguments");
@@ -1731,6 +1809,7 @@ std::shared_ptr<detail::SubscriptionPort> Feed::createSubscriptionPort(std::span
         subscription->eventSelection = selection;
         subscription->eventDelivery = delivery;
         subscription->timeSeries = timeSeries;
+        subscription->snapshotDemand = snapshotDemand;
 
         if (timeSeries)
             subscription->fromTime = TIME_SERIES_FROM_TIME_DISABLED;
@@ -2239,6 +2318,12 @@ void Endpoint::connectTape(const std::filesystem::path &path, TapeSourceOptions 
                     static_cast<void>(expireLatestRequest(*child));
                     static_cast<void>(finishLatestRequest(*child, TAPE_LATEST_REQUEST_REFUSAL));
                 }
+            }
+
+            if (const auto &snapshot = port_->historySnapshotRequest) {
+                std::lock_guard requestLock(snapshot->mutex);
+                static_cast<void>(expireHistorySnapshot(*snapshot));
+                static_cast<void>(finishHistorySnapshot(*snapshot, TAPE_HISTORY_SNAPSHOT_REFUSAL));
             }
 
             port_->connectRequested = true;
@@ -3445,6 +3530,305 @@ std::chrono::steady_clock::time_point serviceLatestRequestBatch(EndpointPort &po
         publishLatestRequest(port, *request, failure, {});
 
     return retireCompletedLatestRequestBatch(port, batch);
+}
+
+constexpr auto HISTORY_SNAPSHOT_READ_TIMEOUT = std::chrono::seconds{1};
+constexpr auto INDEXED_SNAPSHOT_FROM = std::int64_t{0};
+constexpr auto INDEXED_SNAPSHOT_TO = std::numeric_limits<std::int64_t>::max();
+
+void validateIndexedSnapshot(const EndpointPort &port, EventType type, std::u16string_view symbol,
+                             std::int32_t sourceId, HistorySnapshotOptions options) {
+    const bool order = isOrderSourceEvent(type);
+    const bool singleSource = isTimeSeriesEventType(type) || type == EventType::MARKET_MAKER ||
+                              type == EventType::SERIES || type == EventType::OPTION_SALE;
+
+    if (port.options.contract != DeliveryContract::HISTORY || (!order && !singleSource) || sourceId < 0 ||
+        (!order && sourceId != 0))
+        reject(ErrorCode::UNSUPPORTED_PROFILE, "indexed-snapshot-type-source");
+
+    if (!options.maximumResults || symbol.empty() || symbol.size() > port.limits.maximumSymbolUnits ||
+        symbol.front() == u'*' || !std::ranges::all_of(symbol, [](char16_t unit) {
+            return unit >= FIRST_PRINTABLE_ASCII && unit <= LAST_PRINTABLE_ASCII;
+        }))
+        reject(ErrorCode::INVALID_ARGUMENT, "indexed-snapshot-options");
+}
+
+/** A passive read sees application demand only. The native mapping is checked independently. */
+bool hasIndexedSnapshotDemand(const SubscriptionPort &port, EventType type, std::u16string_view symbol,
+                              std::int32_t sourceId, bool passive) {
+    if ((passive && port.snapshotDemand) || !selectsEvent(port.eventSelection, type) ||
+        port.closeRequested.load(std::memory_order_acquire) || port.retired.load(std::memory_order_acquire) ||
+        port.state == SubscriptionState::FAILED)
+        return false;
+
+    return std::ranges::any_of(port.symbols, [&](const SubscriptionSelector &selector) {
+        if (selector.eventSymbol() != symbol)
+            return false;
+
+        switch (selector.kind()) {
+        case SubscriptionSymbolKind::PLAIN:
+            return true;
+        case SubscriptionSymbolKind::INDEXED:
+            return selector.sourceId() == sourceId || selector.sourceId().value_or(0) < 0;
+        case SubscriptionSymbolKind::TIME_SERIES:
+            return sourceId == 0 && selector.qdTime().value_or(INDEXED_SNAPSHOT_TO) <= INDEXED_SNAPSHOT_FROM;
+        case SubscriptionSymbolKind::ALL:
+            return false;
+        }
+
+        return false;
+    });
+}
+
+bool hasIndexedSnapshotDemand(const EndpointPort &port, EventType type, std::u16string_view symbol,
+                              std::int32_t sourceId) {
+    return std::ranges::any_of(port.subscriptions, [&](const auto &registration) {
+        if (!registration)
+            return false;
+
+        std::lock_guard lock(registration->mutex);
+
+        return hasIndexedSnapshotDemand(*registration, type, symbol, sourceId, true);
+    });
+}
+
+struct CapturedHistorySnapshot {
+    HistorySnapshot<RegisteredEvent> result;
+    std::shared_ptr<SubscriptionPort> registration;
+    std::uint64_t revision = 0;
+};
+
+/** Resolve one exact native binding and copy a single source cut on the runtime owner. */
+CapturedHistorySnapshot captureIndexedSnapshot(NativeEndpoint &endpoint, const HistorySnapshotOperation &operation,
+                                               std::uint64_t sourceEpoch) {
+    const auto selection = static_cast<EventSelection>(1U << static_cast<unsigned>(operation.type));
+
+    if (!(endpoint.profile.boundKinds & static_cast<unsigned>(selection)))
+        reject(ErrorCode::UNSUPPORTED_PROFILE, "indexed-snapshot-event-route");
+
+    const auto &plan = receivingEventPlan(endpoint.profile, selection);
+    ReceivingSymbol key;
+    key.logical = operation.symbol;
+    key.sourceId = operation.sourceId;
+    prepareReceivingSymbols(endpoint.profile, plan, std::span(&key, 1));
+    std::optional<std::size_t> binding;
+
+    for (const auto index : std::span(plan.bindingIndices).first(plan.bindingCount)) {
+        if (endpoint.profile.bindings[index].projection != events::EventProjection::NATIVE ||
+            !receivingSymbolMatches(endpoint.profile, index, key))
+            continue;
+
+        if (binding)
+            reject(ErrorCode::UNSUPPORTED_PROFILE, "indexed-snapshot-ambiguous-route");
+
+        binding = index;
+    }
+
+    if (!binding)
+        reject(ErrorCode::UNSUPPORTED_PROFILE, "indexed-snapshot-event-route");
+
+    const auto context = endpoint.profile.schema.recordContext(endpoint.profile.bindings[*binding].localId);
+    const collectors::HistoryRetainedQuery query{{context, receivingPhysicalSymbol(endpoint.profile, *binding, key)},
+                                                 INDEXED_SNAPSHOT_FROM,
+                                                 INDEXED_SNAPSHOT_TO,
+                                                 operation.options.maximumResults};
+    auto work = endpoint.profile.historyObservationWork;
+
+    for (const auto &registration : endpoint.subscriptions) {
+        if (!registration || registration->stopping || !registration->hasSubmitted || !registration->observationPlan)
+            continue;
+
+        std::uint64_t revision;
+        {
+            std::lock_guard lock(registration->port->mutex);
+
+            if (!hasIndexedSnapshotDemand(*registration->port, operation.type, operation.symbol, operation.sourceId,
+                                          operation.passive) ||
+                registration->submittedRevision != registration->port->revision)
+                continue;
+
+            revision = registration->port->revision;
+        }
+
+        auto retained = transport::detail::TcpRecoveryFactory::retainedHistoryRange(*endpoint.recovery,
+                                                                                    registration->handle, query, work);
+
+        if (!retained) {
+            const auto &failure = retained.error();
+
+            if (failure.error == transport::RecoveryError::INVALID_STATE ||
+                (failure.queue && (failure.queue->error == mux::QueueError::INVALID_CLIENT ||
+                                   failure.queue->error == mux::QueueError::INVALID_CONTEXT)))
+                continue;
+
+            throw Error(recoveryDiagnostic(failure));
+        }
+
+        if (retained->state == collectors::HistoryRetainedState::INCOMPLETE)
+            continue;
+
+        CapturedHistorySnapshot captured;
+        captured.registration = registration->port;
+        captured.revision = revision;
+        captured.result.state = retained->state == collectors::HistoryRetainedState::COMPLETE
+                                    ? HistorySnapshotState::COMPLETE
+                                    : HistorySnapshotState::TRUNCATED;
+        captured.result.sourceEpoch = sourceEpoch;
+        auto projectionWork = plan.projectionWork;
+        captured.result.events.reserve(retained->rows.size());
+
+        for (const auto &row : retained->rows) {
+            auto value = client::detail::projectHistoryRetained(*registration->observationPlan, row, projectionWork);
+
+            if (!value) {
+                auto diagnostic = latestProjectionDiagnostic(value.error());
+                diagnostic.stage = "history-snapshot-projection";
+                throw Error(diagnostic);
+            }
+
+            std::visit(
+                [&](auto &&event) {
+                    using Event = std::remove_cvref_t<decltype(event)>;
+
+                    if constexpr (IndexedModelEvent<Event>) {
+                        if (indexedModelSource(event) == operation.sourceId) {
+                            indexedModelFlags(event) = 0;
+                            captured.result.events.emplace_back(std::move(event));
+
+                            return;
+                        }
+                    }
+
+                    reject(ErrorCode::PROTOCOL_FAILURE, "indexed-snapshot-projection-source");
+                },
+                std::move(value->value));
+        }
+
+        const auto signedIndex = [](const RegisteredEvent &event) {
+            return std::visit(
+                [](const auto &value) -> std::int64_t {
+                    if constexpr (IndexedModelEvent<std::remove_cvref_t<decltype(value)>>)
+                        return value.getIndex();
+
+                    return 0;
+                },
+                event);
+        };
+        std::ranges::sort(captured.result.events, {}, signedIndex);
+
+        return captured;
+    }
+
+    return {};
+}
+
+/** Hold admission through the temporary logical and native retirement barrier. */
+std::chrono::steady_clock::time_point
+retireHistorySnapshot(EndpointPort &port, const std::shared_ptr<HistorySnapshotOperation> &operation) {
+    if (operation->demand && !operation->demand->retired.load(std::memory_order_acquire)) {
+        operation->demand->closeRequested.store(true, std::memory_order_release);
+
+        return std::chrono::steady_clock::now() + port.options.pollInterval;
+    }
+
+    operation->demand.reset();
+    std::lock_guard lock(port.mutex);
+    auto &slot = operation->passive ? port.historySnapshotRead : port.historySnapshotRequest;
+
+    if (slot == operation)
+        slot.reset();
+
+    return std::chrono::steady_clock::time_point::max();
+}
+
+/** Service one request without invoking any subscription's live delivery handler. */
+template <class OpenDemand>
+std::chrono::steady_clock::time_point serviceHistorySnapshot(EndpointPort &port, NativeEndpoint *endpoint,
+                                                             const std::shared_ptr<HistorySnapshotOperation> &operation,
+                                                             OpenDemand openDemand) noexcept {
+    std::optional<std::uint64_t> sourceEpoch;
+
+    if (endpoint && endpoint->recovery && endpoint->recovery->status().phase == transport::RecoveryPhase::ACTIVE)
+        sourceEpoch = endpoint->recovery->statistics().sourceEpoch;
+
+    bool done;
+    {
+        std::lock_guard endpointLock(port.mutex);
+        std::lock_guard operationLock(operation->mutex);
+        checkHistorySnapshotFence(port, *operation);
+
+        if (!operation->done && sourceEpoch && port.connectionIntent &&
+            port.activeDeliveryRevision == port.connectionRevision && port.clearRevision == port.clearedRevision) {
+            if (operation->sourceEpoch && *operation->sourceEpoch != *sourceEpoch)
+                finishHistorySnapshot(*operation, {ErrorCode::REQUEST_CANCELLED, "history-snapshot-epoch-change"});
+            else
+                operation->sourceEpoch = sourceEpoch;
+        } else {
+            sourceEpoch.reset();
+        }
+
+        done = operation->done;
+    }
+
+    if (done)
+        return retireHistorySnapshot(port, operation);
+
+    CapturedHistorySnapshot captured;
+    Diagnostic failure;
+
+    try {
+        producerAction([&] {
+            if (operation->demand) {
+                std::lock_guard lock(operation->demand->mutex);
+                failure = operation->demand->diagnostic;
+            }
+
+            if (!sourceEpoch || failure.code != ErrorCode::NONE)
+                return;
+
+            captured = captureIndexedSnapshot(*endpoint, *operation, *sourceEpoch);
+
+            if (!operation->passive && !captured.registration && !operation->demand)
+                openDemand();
+        });
+    } catch (const Error &error) {
+        failure = error.diagnostic();
+    } catch (const std::bad_alloc &) {
+        failure = {ErrorCode::ALLOCATION_FAILURE, "history-snapshot-copy"};
+    } catch (...) {
+        failure = {ErrorCode::INVALID_STATE, "history-snapshot-observation"};
+    }
+
+    {
+        std::lock_guard endpointLock(port.mutex);
+        std::unique_lock<std::mutex> witness;
+
+        if (captured.registration) {
+            witness = std::unique_lock(captured.registration->mutex);
+
+            if (captured.registration->revision != captured.revision ||
+                !hasIndexedSnapshotDemand(*captured.registration, operation->type, operation->symbol,
+                                          operation->sourceId, operation->passive)) {
+                witness.unlock();
+                captured.result = {};
+            }
+        }
+
+        if (operation->passive && !witness.owns_lock() &&
+            !hasIndexedSnapshotDemand(port, operation->type, operation->symbol, operation->sourceId))
+            captured.result = {HistorySnapshotState::NOT_SUBSCRIBED, std::nullopt, {}};
+
+        std::lock_guard operationLock(operation->mutex);
+        checkHistorySnapshotFence(port, *operation);
+
+        if (failure.code != ErrorCode::NONE || operation->passive ||
+            captured.result.state != HistorySnapshotState::INCOMPLETE)
+            finishHistorySnapshot(*operation, failure, std::move(captured.result));
+
+        done = operation->done;
+    }
+
+    return done ? retireHistorySnapshot(port, operation) : operation->deadline;
 }
 
 /** Create one ordinary default event with independent symbol storage. */
@@ -4717,11 +5101,15 @@ void RuntimeImpl::run() noexcept {
                 bool connectRequested = false;
                 std::shared_ptr<LatestEventRead> latestRead;
                 std::shared_ptr<LatestEventRequestBatch> latestRequest;
+                std::shared_ptr<HistorySnapshotOperation> historyRead;
+                std::shared_ptr<HistorySnapshotOperation> historyRequest;
                 {
                     std::lock_guard lock(port->mutex);
                     connectRequested = port->connectRequested && port->connectionIntent;
                     latestRead = port->latestRead;
                     latestRequest = port->latestEventRequest;
+                    historyRead = port->historySnapshotRead;
+                    historyRequest = port->historySnapshotRequest;
                 }
 
                 if (latestRead)
@@ -4743,6 +5131,31 @@ void RuntimeImpl::run() noexcept {
                         mutateSelectors(latestRequest->demand, selectors, SymbolMutation::REPLACE);
                     });
                     nextWake = std::min(nextWake, requestWake);
+                }
+
+                if (historyRead) {
+                    nextWake = std::min(nextWake, serviceHistorySnapshot(*port, native[index].get(), historyRead, [] {
+                                        }));
+                }
+
+                if (historyRequest) {
+                    const auto historyWake = serviceHistorySnapshot(*port, native[index].get(), historyRequest, [&] {
+                        const auto &request = *historyRequest;
+                        const events::IndexedEventSource source(request.sourceId, std::nullopt);
+                        auto selector = SubscriptionSelector::indexed(request.symbol, source);
+                        Feed feed(port);
+                        auto &demand = historyRequest->demand;
+                        demand = feed.createSubscriptionPort(std::span(&request.type, 1), false, false, true);
+                        validateSelector(*demand, selector, SymbolMutation::REPLACE);
+                        std::vector<SubscriptionSelector> desired;
+                        desired.push_back(std::move(selector));
+                        SubscriptionObserverAdmission admission(demand->changes);
+                        std::lock_guard lock(demand->mutex);
+                        requireOpen(*demand);
+                        // No application observer is attached to this private registration.
+                        commitSubscriptionDesiredLocked(*demand, std::move(desired), std::nullopt);
+                    });
+                    nextWake = std::min(nextWake, historyWake);
                 }
 
                 // Capture admission before draining its notification: a concurrent later connect must wait
@@ -4926,6 +5339,75 @@ void RuntimeImpl::run() noexcept {
     }
 }
 
+bool historySnapshotDone(const std::shared_ptr<HistorySnapshotOperation> &operation) noexcept {
+    if (!operation)
+        return true;
+
+    bool done;
+    bool expired;
+    {
+        std::lock_guard lock(operation->mutex);
+        expired = expireHistorySnapshot(*operation);
+        done = operation->done;
+    }
+
+    if (expired)
+        wake(operation->control);
+
+    return done;
+}
+
+bool cancelHistorySnapshot(const std::shared_ptr<HistorySnapshotOperation> &operation) noexcept {
+    if (!operation)
+        return false;
+
+    bool expired;
+    bool cancelled;
+    {
+        std::lock_guard lock(operation->mutex);
+        expired = expireHistorySnapshot(*operation);
+        cancelled = finishHistorySnapshot(*operation, {ErrorCode::REQUEST_CANCELLED, "history-snapshot-cancelled"});
+    }
+
+    if (expired || cancelled)
+        wake(operation->control);
+
+    return cancelled;
+}
+
+HistorySnapshot<RegisteredEvent> awaitHistorySnapshot(const std::shared_ptr<HistorySnapshotOperation> &operation) {
+    return producerAction([&] {
+        if (!operation)
+            reject(ErrorCode::INVALID_STATE, "history-snapshot-handle");
+
+        std::unique_lock lock(operation->mutex);
+        bool expired = expireHistorySnapshot(*operation);
+
+        if (!operation->done) {
+            const auto control = operation->control.lock();
+
+            if (control && latestEventOwner.control == control.get())
+                reject(ErrorCode::WRONG_THREAD, "history-snapshot-owner-wait");
+
+            if (!operation->condition.wait_until(lock, operation->deadline, [&] {
+                    return operation->done;
+                }))
+                expired = expireHistorySnapshot(*operation);
+        }
+
+        const auto failure = operation->failure;
+        lock.unlock();
+
+        if (expired)
+            wake(operation->control);
+
+        if (failure.code != ErrorCode::NONE)
+            throw Error(failure);
+
+        return operation->result;
+    });
+}
+
 std::u16string_view latestEventRequestSymbol(const std::shared_ptr<LatestEventRequestState> &request) noexcept {
     return request ? std::u16string_view(request->symbol) : std::u16string_view{};
 }
@@ -4999,6 +5481,93 @@ RegisteredEvent awaitLatestEventRequest(const std::shared_ptr<LatestEventRequest
     });
 }
 } // namespace detail
+
+HistorySnapshot<RegisteredEvent> Feed::readIndexedSnapshot(EventType type, std::u16string_view symbol,
+                                                           std::int32_t sourceId,
+                                                           HistorySnapshotOptions options) const {
+    return producerAction([&]() -> HistorySnapshot<RegisteredEvent> {
+        detail::validateIndexedSnapshot(*port_, type, symbol, sourceId, options);
+        const auto control = port_->control.lock();
+        std::shared_ptr<detail::HistorySnapshotOperation> operation;
+        {
+            std::lock_guard lock(port_->mutex);
+
+            if (port_->tape)
+                throw Error(TAPE_HISTORY_SNAPSHOT_REFUSAL);
+
+            if (!detail::hasIndexedSnapshotDemand(*port_, type, symbol, sourceId))
+                return {HistorySnapshotState::NOT_SUBSCRIBED, std::nullopt, {}};
+
+            if (!control || detail::latestEventOwner.control == control.get() ||
+                port_->state != EndpointState::CONNECTED || !port_->connectionIntent ||
+                port_->connectionRevision != port_->activeDeliveryRevision ||
+                port_->clearRevision != port_->clearedRevision)
+                return {};
+
+            if (port_->historySnapshotRead)
+                reject(ErrorCode::RESOURCE_LIMIT, "history-snapshot-read-busy");
+
+            operation = std::make_shared<detail::HistorySnapshotOperation>(
+                type, symbol, sourceId, options, true,
+                std::chrono::steady_clock::now() + detail::HISTORY_SNAPSHOT_READ_TIMEOUT, control);
+            operation->connectionRevision = port_->connectionRevision;
+            operation->clearRevision = port_->clearRevision;
+            port_->historySnapshotRead = operation;
+        }
+
+        wake(port_->control);
+
+        return detail::awaitHistorySnapshot(operation);
+    });
+}
+
+std::shared_ptr<detail::HistorySnapshotOperation>
+Feed::startIndexedSnapshot(EventType type, std::u16string_view symbol, std::int32_t sourceId,
+                           std::chrono::steady_clock::time_point deadline, HistorySnapshotOptions options) const {
+    return producerAction([&] {
+        detail::validateIndexedSnapshot(*port_, type, symbol, sourceId, options);
+        const auto control = port_->control.lock();
+
+        if (!control)
+            reject(ErrorCode::CLOSED, "history-snapshot-closed");
+
+        std::shared_ptr<detail::HistorySnapshotOperation> operation;
+        {
+            std::lock_guard controlLock(control->mutex);
+            std::lock_guard endpointLock(port_->mutex);
+
+            if (port_->tape)
+                throw Error(TAPE_HISTORY_SNAPSHOT_REFUSAL);
+
+            if (!control->runtime || control->stopping || port_->closeRequested.load(std::memory_order_acquire) ||
+                port_->retired.load(std::memory_order_acquire))
+                reject(ErrorCode::CLOSED, "history-snapshot-closed");
+
+            if (port_->state == EndpointState::FAILED && port_->diagnostic.code != ErrorCode::NONE)
+                throw Error(port_->diagnostic);
+
+            if (port_->historySnapshotRequest)
+                reject(ErrorCode::RESOURCE_LIMIT, "history-snapshot-request-busy");
+
+            operation = std::make_shared<detail::HistorySnapshotOperation>(type, symbol, sourceId, options, false,
+                                                                           deadline, control);
+
+            if (expireHistorySnapshot(*operation))
+                return operation;
+
+            operation->connectionRevision = port_->connectionRevision;
+            operation->clearRevision = port_->clearRevision;
+            operation->boundToConnection = port_->connectionIntent;
+            control->runtime->startWorker();
+            port_->historySnapshotRequest = operation;
+            ++control->wakeSequence;
+        }
+
+        control->condition.notify_one();
+
+        return operation;
+    });
+}
 
 std::optional<RegisteredEvent> Feed::readLastEvent(EventType type, std::u16string_view symbol,
                                                    bool ifSubscribed) const {

@@ -368,6 +368,14 @@ detail::TcpRecoveryFactory::aggregationPeriodInfo(const TcpRecovery &recovery) n
     return recovery.impl_ ? recovery.impl_->core.aggregationPeriodInfo() : std::nullopt;
 }
 
+std::expected<collectors::HistoryRetainedRange, RecoveryDiagnostic>
+detail::TcpRecoveryFactory::retainedHistoryRange(const TcpRecovery &recovery, const mux::MuxHandle &handle,
+                                                 const collectors::HistoryRetainedQuery &query, mux::QueueWork &work) {
+    const auto lease = recovery.impl_;
+
+    return lease ? lease->core.retainedHistoryRange(handle, query, work) : std::unexpected(moved());
+}
+
 std::expected<mux::TickerLatestObservation, RecoveryDiagnostic>
 detail::TcpRecoveryFactory::visitTickerLatest(const TcpRecovery &recovery, const mux::MuxHandle &handle,
                                               core::SubscriptionKey key, mux::QueueWork &work, void *context,

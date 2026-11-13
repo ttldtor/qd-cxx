@@ -210,6 +210,7 @@ struct SubscriptionPort {
     std::vector<SubscriptionSelector> symbols; ///< Complete accepted typed logical desired set.
     std::optional<std::int64_t> fromTime;      ///< Present only in SDK-owned time-series mode, protected by mutex.
     bool timeSeries = false;        ///< Immutable mode; never inferred from a caller descriptor or raw record layout.
+    bool snapshotDemand = false;    ///< Immutable private request interest, excluded from if-subscribed reads.
     std::size_t maximumSymbols;     ///< Original per-registration selector count.
     std::size_t maximumSymbolUnits; ///< Original per-selector capacity.
     std::uint64_t revision = 0;     ///< Accepted local desired revision, separate from queue tickets.
@@ -290,6 +291,35 @@ struct LatestEventRequestBatch {
     explicit LatestEventRequestBatch(const std::vector<std::shared_ptr<LatestEventRequestState>> &requests);
 };
 
+/** Detached query inputs and one terminal result; native demand stays on the SDK owner. */
+struct HistorySnapshotOperation {
+    const EventType type;
+    const std::u16string symbol;
+    const std::int32_t sourceId;
+    const HistorySnapshotOptions options;
+    const bool passive;
+    const std::chrono::steady_clock::time_point deadline;
+    const std::weak_ptr<RuntimeControl> control;
+    std::mutex mutex;
+    std::condition_variable condition;
+    bool done = false;
+    Diagnostic failure;
+    HistorySnapshot<RegisteredEvent> result;
+    std::uint64_t connectionRevision = 0;
+    std::uint64_t clearRevision = 0;
+    bool boundToConnection = false;
+    std::optional<std::uint64_t> sourceEpoch; ///< First actual source epoch observed by the worker.
+    std::shared_ptr<SubscriptionPort> demand; ///< Owner-only temporary registration, charged through retirement.
+
+    HistorySnapshotOperation(EventType type, std::u16string_view symbol, std::int32_t sourceId,
+                             HistorySnapshotOptions options, bool passive,
+                             std::chrono::steady_clock::time_point deadline,
+                             const std::shared_ptr<RuntimeControl> &control)
+        : type(type), symbol(symbol), sourceId(sourceId), options(options), passive(passive), deadline(deadline),
+          control(control) {
+    }
+};
+
 /** Producer-only endpoint state; native lifetime is exclusively worker-owned. */
 struct EndpointPort {
     mutable std::mutex mutex;                 ///< Protects bounded registration/address and detached observation state.
@@ -310,7 +340,9 @@ struct EndpointPort {
     std::uint64_t aggregationSourceRevision = 0; ///< Control fence for the report; never a request ACK.
     std::vector<std::shared_ptr<SubscriptionPort>> subscriptions; ///< Fixed slots, including retiring registrations.
     std::shared_ptr<LatestEventRead> latestRead; ///< One pending/executing owner observation, protected by mutex.
-    std::shared_ptr<LatestEventRequestBatch> latestEventRequest; ///< One charged request group, protected by mutex.
+    std::shared_ptr<LatestEventRequestBatch> latestEventRequest;   ///< One charged request group, protected by mutex.
+    std::shared_ptr<HistorySnapshotOperation> historySnapshotRead; ///< One passive observation, protected by mutex.
+    std::shared_ptr<HistorySnapshotOperation> historySnapshotRequest; ///< One request including native retirement.
     StateListeners stateListeners; ///< Opt-in advisory lifecycle observations, retired after all subscriptions.
     std::vector<EndpointStateChange> stateChanges; ///< Fixed ring; selection lease remains charged through release.
     std::size_t stateChangeHead = 0;     ///< Oldest pending/executing entry, reused only after its lease release.

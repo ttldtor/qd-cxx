@@ -3,6 +3,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "qd/api/endpoint_configuration.hpp"
 #include "qd/api/feed.hpp"
+#include "qd/events/indexed_event_source.hpp"
 #include "tape_playback_clock.hpp"
 
 #include <algorithm>
@@ -10,6 +11,7 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <cstddef>
 #include <cstdint>
 #include <doctest/doctest.h>
 #include <filesystem>
@@ -296,6 +298,76 @@ TEST_CASE("active latest request keeps the tape refusal after a stop before file
     CHECK_FALSE(pending.cancel());
     CHECK(failure.code == api::ErrorCode::UNSUPPORTED_PROFILE);
     CHECK(failure.stage == "latest-event-request-tape");
+}
+
+TEST_CASE("indexed HISTORY snapshot requests refuse tape without affecting ordinary playback") {
+    std::atomic<bool> stopped{false};
+    std::atomic<std::size_t> received{0};
+    api::ApiRuntime runtime(runtimeOptions());
+    const auto endpoint = runtime.createEndpoint({.contract = api::DeliveryContract::HISTORY});
+    const auto feed = endpoint->getFeed();
+    const auto &source = q::events::IndexedEventSource::DEFAULT;
+    const auto deadline = std::chrono::steady_clock::now() + 5s;
+    const auto pending = feed->requestIndexedEvents<q::events::TimeAndSale>(u"AAPL", source, deadline);
+    REQUIRE_FALSE(pending.isDone());
+
+    const auto checkTapeRefusal = [](auto operation) {
+        api::Diagnostic diagnostic;
+
+        try {
+            operation();
+        } catch (const api::Error &error) {
+            diagnostic = error.diagnostic();
+        }
+
+        CHECK(diagnostic.code == api::ErrorCode::UNSUPPORTED_PROFILE);
+        CHECK(diagnostic.stage == "history-snapshot-tape");
+    };
+
+    SUBCASE("Selected real HISTORY source rejects both admissions") {
+        const auto subscription = feed->createTimeSeriesSubscription<q::events::TimeAndSale>();
+        subscription->setFromTime(0);
+        subscription->addSymbols("AAPL");
+        subscription->addEventListener([&received](auto batch) {
+            received += batch.size();
+        });
+
+        endpoint->connectTape(HISTORY_SALE, {.initiallyPaused = true});
+        REQUIRE(pending.isDone());
+        checkTapeRefusal([&] {
+            static_cast<void>(feed->getIndexedEventsIfSubscribed<q::events::TimeAndSale>(u"AAPL", source));
+        });
+        checkTapeRefusal([&] {
+            static_cast<void>(feed->requestIndexedEvents<q::events::TimeAndSale>(u"AAPL", source, deadline));
+        });
+        endpoint->setTapePaused(false);
+        expectCleanEof(endpoint);
+        CHECK(received.load() == 3);
+    }
+
+    SUBCASE("Stop before source activation preserves the admission outcome") {
+        endpoint->addStateChangeListener([&stopped, weak = std::weak_ptr(endpoint)](auto, auto state) {
+            if (state == api::EndpointState::CONNECTING) {
+                if (const auto owner = weak.lock()) {
+                    owner->stopTape(api::TapeStopMode::ABORT);
+                    stopped = true;
+                }
+            }
+        });
+
+        endpoint->connectTape(FIXTURES / "stopped-before-tape-activation.qtp");
+        REQUIRE(endpoint->awaitState(api::EndpointState::CLOSED, deadline).status == api::WaitStatus::REACHED);
+        REQUIRE(stopped.load());
+        const auto closed = endpoint->closeAndAwaitTermination();
+        CHECK(closed.diagnostic.code == api::ErrorCode::NONE);
+        CHECK_FALSE(closed.deadlineExpired);
+        CHECK(pending.isDone());
+    }
+
+    CHECK_FALSE(pending.cancel());
+    checkTapeRefusal([&] {
+        static_cast<void>(pending.get());
+    });
 }
 
 TEST_CASE("active latest request batch settles pending tape children and preserves duplicate cancellation") {
