@@ -17,6 +17,8 @@
 #include <vector>
 
 namespace org::ttldtor::qdcxx::api::detail {
+struct ReceivingRegistries;
+
 inline constexpr std::size_t RECEIVING_OWNER_POLLS_PER_TURN =
     64; ///< One shared finite protocol/queue seed across the existing worker burst.
 inline constexpr std::size_t MAXIMUM_RECEIVING_RECORDS = 49; ///< Complete bounded native record catalog.
@@ -163,6 +165,26 @@ struct ReceivingProfile {
  */
 [[nodiscard]] ReceivingProfile prepareReceivingProfile(const RuntimeOptions &runtime, const EndpointOptions &options,
                                                        const std::string &host, std::uint16_t port, bool tape = false);
+
+/** Independent family routing/queue limits under one immutable receiving identity. */
+struct CombinedReceivingProfiles {
+    ReceivingProfile ticker;  ///< TICKER routes and collector preparation, with no native transport settings.
+    ReceivingProfile stream;  ///< STREAM routes and collector preparation, with no native transport settings.
+    ReceivingProfile history; ///< HISTORY routes plus the single shared native endpoint, writer and recovery seeds.
+};
+
+/** Prepare the three family profiles and their one qualified live QTP configuration.
+ * @param runtime Explicit finite client/symbol capacities and resolved DNS snapshot.
+ * @param options Explicit endpoint policy; the family choices come from the supplied catalog.
+ * @param host Validated bounded endpoint host.
+ * @param port Validated nonzero endpoint port.
+ * @param registries Three SDK catalog route sets sharing one exact validated schema origin.
+ * @return Complete preparation without native activation; throws detached Error on any refusal.
+ */
+[[nodiscard]] CombinedReceivingProfiles prepareCombinedReceivingProfiles(const RuntimeOptions &runtime,
+                                                                         const EndpointOptions &options,
+                                                                         const std::string &host, std::uint16_t port,
+                                                                         const ReceivingRegistries &registries);
 
 /** Select complete immutable preparation for a supported business projection, independently of local record IDs.
  * @param profile Worker-owned immutable receiving preparation.
