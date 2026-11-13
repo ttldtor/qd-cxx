@@ -62,6 +62,15 @@ OnDemandSource::OnDemandSource(const OnDemandRequest &request, const core::Local
                                const transport::detail::BootstrapLease &bootstrap, protocol::LiveWork &work)
     : request_(request), context_(schema.recordContext(0)), owner_(eventOwner(settings.budgets.session, work)) {
     const auto &limits = settings.budgets.tcp;
+
+    if (limits.residentBytes <= sizeof(ResponseBytes))
+        throw Error({ErrorCode::RESOURCE_LIMIT, "ondemand-response-reservation"});
+
+    if (work.bytes < sizeof(ResponseBytes))
+        throw Error({ErrorCode::WORK_LIMIT, "ondemand-response-preparation"});
+
+    work.bytes -= sizeof(ResponseBytes);
+    received_ = std::make_unique_for_overwrite<ResponseBytes>();
     const transport::TcpOptions tcp{"127.0.0.1",
                                     request.port,
                                     {},
@@ -72,9 +81,10 @@ OnDemandSource::OnDemandSource(const OnDemandRequest &request, const core::Local
                                     operationTimeout(options.writeTimeout),
                                     std::min(options.pollInterval, MAXIMUM_REPLAY_POLL_INTERVAL),
                                     {limits.inputBytes, limits.writeBytes, limits.addresses, limits.cnameDepth,
-                                     limits.contextBytes, limits.handlerBytes, limits.residentBytes}};
-    auto made = transport::detail::RawByteOwner::create(
-        bootstrap, tcp, {ON_DEMAND_MAXIMUM_HEADER + ON_DEMAND_MAXIMUM_BODY, ON_DEMAND_MAXIMUM_REQUEST}, work);
+                                     limits.contextBytes, limits.handlerBytes,
+                                     limits.residentBytes - sizeof(ResponseBytes)}};
+    auto made = transport::detail::RawByteOwner::create(bootstrap, tcp,
+                                                        {MAXIMUM_RESPONSE_BYTES, ON_DEMAND_MAXIMUM_REQUEST}, work);
 
     if (!made)
         throw Error(nativeError(made.error()));
@@ -114,32 +124,44 @@ std::expected<void, Diagnostic> OnDemandSource::pollNetwork(transport::TcpWork &
     if (!bytes)
         return std::unexpected(nativeError(bytes.error()));
 
-    // Charge a whole framing scan on each poll, plus the bounded one-time body decode.
-    const auto need = bytes->size() * 3;
+    if (!bytes->empty()) {
+        if (bytes->size() > received_->size() - receivedSize_)
+            return std::unexpected(Diagnostic{ErrorCode::PROTOCOL_FAILURE, "ondemand-http-framing"});
 
-    if (need > work.bytes || work.operations == 0)
-        return std::unexpected(Diagnostic{ErrorCode::WORK_LIMIT, "ondemand-response-work"});
+        const auto total = receivedSize_ + bytes->size();
+        // Charge the append, a bounded full framing scan, and the possible final body decode.
+        const auto need = bytes->size() + total * 3;
 
-    work.bytes -= need;
-    --work.operations;
-    const auto framed = readOnDemandHttp(*bytes);
+        if (need > work.bytes || work.operations == 0)
+            return std::unexpected(Diagnostic{ErrorCode::WORK_LIMIT, "ondemand-response-work"});
 
-    if (!framed)
-        return std::unexpected(framed.error());
+        work.bytes -= need;
+        --work.operations;
+        std::ranges::copy(*bytes, received_->begin() + receivedSize_);
+        receivedSize_ = total;
+        // Raw TCP cannot rearm while an old application prefix remains retained.
+        const auto consumed = network_->consumeInput(bytes->size());
 
-    if (*framed) {
-        auto decoded = decodeOnDemandResponse(**framed, request_);
+        if (!consumed)
+            return std::unexpected(nativeError(consumed.error()));
 
-        if (!decoded)
-            return std::unexpected(decoded.error());
+        const auto framed = readOnDemandHttp(std::span(*received_).first(receivedSize_));
 
-        if (now > Clock::time_point::max() - ON_DEMAND_MAXIMUM_WINDOW)
-            return std::unexpected(Diagnostic{ErrorCode::RESOURCE_LIMIT, "ondemand-clock-range"});
+        if (!framed)
+            return std::unexpected(framed.error());
 
-        response_.emplace(std::move(*decoded));
-        static_cast<void>(network_->requestClose());
+        if (*framed) {
+            auto decoded = decodeOnDemandResponse(**framed, request_);
 
-        return {};
+            if (!decoded)
+                return std::unexpected(decoded.error());
+
+            response_.emplace(std::move(*decoded));
+            received_.reset();
+            static_cast<void>(network_->requestClose());
+
+            return {};
+        }
     }
 
     if (progress->status == transport::TcpPollStatus::CLOSED) {
@@ -166,13 +188,11 @@ std::expected<void, Diagnostic> OnDemandSource::progressNetwork(transport::TcpWo
 }
 
 void OnDemandSource::beginPlayback(Clock::time_point now) noexcept {
-    if (!anchor_)
-        anchor_ = now;
+    playbackClock_.start(now);
 }
 
-std::expected<std::optional<protocol::LiveEvent>, Diagnostic> OnDemandSource::next(protocol::LiveWork &work,
-                                                                                   Clock::time_point now) {
-    if (closing_ || !anchor_ || finished() || now < recordDue())
+std::expected<std::optional<protocol::LiveEvent>, Diagnostic> OnDemandSource::next(protocol::LiveWork &work) {
+    if (closing_ || !playbackClock_.started() || finished() || response_->records[next_].time > currentTime())
         return std::nullopt;
 
     using Type = core::SerialFieldType;
@@ -220,10 +240,17 @@ bool OnDemandSource::retired() const noexcept {
     return network_->core().state() == transport::TcpState::CLOSED;
 }
 
-OnDemandSource::Clock::time_point OnDemandSource::recordDue() const noexcept {
-    const auto delta = response_->records[next_].time - request_.from.time_since_epoch().count();
+std::int64_t OnDemandSource::currentTime() const noexcept {
+    return request_.from.time_since_epoch().count() + playbackClock_.position();
+}
 
-    return *anchor_ + std::chrono::milliseconds(std::max(std::int64_t{0}, delta));
+OnDemandPlayback OnDemandSource::playback(double speed, Clock::time_point now) noexcept {
+    const auto maximumOffset =
+        response_ ? response_->records[response_->size - 1].time - request_.from.time_since_epoch().count() : 0;
+    playbackClock_.advance(speed, now, std::max(std::int64_t{0}, maximumOffset));
+
+    return {playbackClock_.speed(), std::chrono::sys_time{std::chrono::milliseconds{currentTime()}}, true,
+            playbackClock_.started()};
 }
 
 OnDemandSource::Clock::time_point OnDemandSource::nextWake(Clock::time_point now) const noexcept {
@@ -235,11 +262,10 @@ OnDemandSource::Clock::time_point OnDemandSource::nextWake(Clock::time_point now
     if (!closing_ && !response_)
         wake = std::min(wake, deadline_);
 
-    if (!closing_ && anchor_ && !finished()) {
-        const auto due = recordDue();
+    if (!closing_ && playbackClock_.started() && !finished()) {
+        const auto offset = response_->records[next_].time - request_.from.time_since_epoch().count();
 
-        if (due > now)
-            wake = std::min(wake, due);
+        return playbackClock_.wakeBefore(offset, now, wake);
     }
 
     return wake;

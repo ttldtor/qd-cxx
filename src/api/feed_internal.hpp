@@ -7,6 +7,7 @@
 
 #include "../transport/bootstrap_lease.hpp"
 #include "callback_execution.hpp"
+#include "endpoint_configuration.hpp"
 #include "event_selection.hpp"
 #include "on_demand_wire.hpp"
 #include "time_series_query_policy.hpp"
@@ -45,7 +46,7 @@ using ListenerFunction =
                  Subscription<events::NuamTrade>::Listener, Subscription<events::NuamTimeAndSale>::Listener,
                  Subscription<events::NuamOrder>::Listener, Subscription<RegisteredEvent>::Listener,
                  Endpoint::StateChangeListener, Subscription<events::Quote>::StateChangeListener,
-                 SubscriptionChangeListener>;
+                 SubscriptionChangeListener, Endpoint::OnDemandPlaybackListener>;
 
 /** Shared application callable; its last release never occurs under a control mutex. */
 struct ListenerBox {
@@ -243,10 +244,11 @@ struct TapeSourceRequest {
 
 /** One charged passive request. Its private completion lock never guards native owner work. */
 struct LatestEventRead {
-    EventType type;        ///< Exact LastingEvent identity.
-    std::u16string symbol; ///< Independently owned bounded logical symbol.
-    bool ifSubscribed;     ///< Exact-demand and default-event policy.
-    std::mutex mutex;      ///< Completion and timeout state only.
+    EventType type;               ///< Exact LastingEvent identity.
+    std::u16string symbol;        ///< Independently owned bounded logical symbol.
+    bool ifSubscribed;            ///< Exact-demand and default-event policy.
+    std::uint64_t sourceRevision; ///< Captured endpoint revision for final publication fencing.
+    std::mutex mutex;             ///< Completion and timeout state only.
     std::condition_variable condition;
     bool completed = false;
     bool cancelled = false;
@@ -254,8 +256,8 @@ struct LatestEventRead {
     std::optional<RegisteredEvent> result;
 
     /** Copy the admitted request input; no caller-owned text survives submission. */
-    LatestEventRead(EventType type, std::u16string_view symbol, bool ifSubscribed)
-        : type(type), symbol(symbol), ifSubscribed(ifSubscribed) {
+    LatestEventRead(EventType type, std::u16string_view symbol, bool ifSubscribed, std::uint64_t sourceRevision)
+        : type(type), symbol(symbol), ifSubscribed(ifSubscribed), sourceRevision(sourceRevision) {
     }
 };
 
@@ -324,6 +326,12 @@ struct HistorySnapshotOperation {
     }
 };
 
+/** One admitted replay cutoff. Absence of a route selects a dormant cleared endpoint. */
+struct OnDemandTransition {
+    std::optional<EndpointAddress> live;
+    std::chrono::steady_clock::time_point deadline;
+};
+
 /** Producer-only endpoint state; native lifetime is exclusively worker-owned. */
 struct EndpointPort {
     mutable std::mutex mutex;                 ///< Protects bounded registration/address and detached observation state.
@@ -362,10 +370,15 @@ struct EndpointPort {
     std::uint64_t clearedRevision = 0; ///< Latest actual applied reset/global-ACK completion, not inferred from state.
     std::string address;               ///< First accepted bounded spelling; immutable after connect publication.
     std::string host;                  ///< Validated bounded route, copied only once before worker publication.
-    std::optional<OnDemandRequest> onDemand; ///< Immutable local replay request.
-    std::optional<TapeSourceRequest> tape;   ///< Fixed non-network source, absent for TCP.
-    bool tapePaused = false;                 ///< Latest local pause intent under the endpoint mutex.
-    bool tapeAbortRequested = false;         ///< Monotonic explicit terminal abort for this tape endpoint.
+    std::optional<OnDemandRequest> onDemand;              ///< Immutable local replay request.
+    double onDemandSpeed = 1;                             ///< Latest coalesced rate for the fixed source revision.
+    std::optional<OnDemandTransition> onDemandTransition; ///< Pending retirement and optional live route.
+    std::uint64_t resumedLiveEpochBase = 0;               ///< Public identity offset for TCP after historical handover.
+    std::optional<OnDemandPlayback> onDemandPlayback;     ///< Detached worker-applied playback state.
+    StateListeners onDemandListeners;      ///< Lazy advisory callback ownership, separate from event/state listeners.
+    std::optional<TapeSourceRequest> tape; ///< Fixed non-network source, absent for TCP.
+    bool tapePaused = false;               ///< Latest local pause intent under the endpoint mutex.
+    bool tapeAbortRequested = false;       ///< Monotonic explicit terminal abort for this tape endpoint.
     std::chrono::steady_clock::time_point tapeRestartDeadline; ///< First deadline of the pending restart revision.
     std::uint16_t port = 0;                                    ///< Original nonzero route port.
     bool connectRequested = false;                             ///< Published once under the endpoint mutex.

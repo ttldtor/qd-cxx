@@ -368,3 +368,5 @@ cache replay. Input-free EN/RU/Get-Help, bounded JDK8 Capture/Verify with exact 
 - [NuamTimeAndSale oracle](../upstream/nuam-time-and-sale-oracle/README.md) captures indexed sale observations with input-free EN/RU help.
 
 - [NuamOrder oracle](../upstream/nuam-order-oracle/README.md) captures offline indexed-order observations with EN/RU help.
+
+- [OnDemand fixture generator](../upstream/ondemand-oracle/README.md) reproduces exact synthetic request and response bytes with pinned QD, with input-free help in English and Russian.

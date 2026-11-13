@@ -1061,7 +1061,7 @@ if(BUILD_TESTING)
             set_tests_properties(feed_bootstrap feed_bootstrap_death feed_bootstrap_allocations PROPERTIES TIMEOUT 45)
             add_test(NAME feed_api COMMAND qdcxx_feed_api_tests)
             add_executable(qdcxx_on_demand_feed_tests tests/conformance/on_demand_feed_tests.cpp
-                tests/conformance/recovery_test_peer.cpp)
+                tests/conformance/connect_peer.cpp tests/conformance/recovery_test_peer.cpp)
             target_link_libraries(qdcxx_on_demand_feed_tests PRIVATE qdcxx_feed doctest::doctest)
             set_target_properties(qdcxx_on_demand_feed_tests PROPERTIES CXX_EXTENSIONS OFF)
             if(WIN32)

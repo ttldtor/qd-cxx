@@ -67,31 +67,32 @@ struct SubscriptionPort;
 
 /** Detached high-level failures. No peer payload, credential or address is diagnostic text. */
 enum class ErrorCode {
-    NONE,                 ///< No failure has been recorded.
-    INVALID_ARGUMENT,     ///< Caller input does not satisfy the public contract.
-    INVALID_STATE,        ///< Operation conflicts with the accepted lifecycle or fixed address.
-    RESOURCE_LIMIT,       ///< A finite configured capacity or native thread reservation was exhausted.
-    WORK_LIMIT,           ///< The derived bounded preparation or progress allowance was exhausted.
-    ALLOCATION_FAILURE,   ///< Required owned storage could not be allocated.
-    WRONG_THREAD,         ///< A checked operation used an incompatible creator thread.
-    CLOSED,               ///< Admission is fenced by endpoint, subscription or runtime retirement.
-    CALLBACK_FAILURE,     ///< Event listener failure closes its subscription; advisory state failure is recorded
-                          ///< separately.
-    TRANSPORT_FAILURE,    ///< Connection, recovery or native I/O failed; inspect the static stage and codes.
-    PROTOCOL_FAILURE,     ///< Peer input failed the existing bounded protocol profile.
-    BOOTSTRAP_FAILURE,    ///< The explicit process/main-thread runtime bootstrap could not be acquired.
-    DNS_CONFIGURATION,    ///< No supported bounded IPv4 resolver snapshot could be obtained.
-    UNSUPPORTED_PROFILE,  ///< The requested combination is outside this public receiving profile.
-    EXECUTOR_REJECTED,    ///< Host explicitly refused an event task; no retry.
-    EXECUTOR_FAILURE,     ///< Host post threw before completion.
-    EXECUTOR_DROPPED,     ///< Accepted task was destroyed without running.
-    EXECUTOR_CONTRACT,    ///< Host refused or threw after actual execution began.
-    CALLBACK_CANCELLED,   ///< Queued event selection cancelled by close or source reset; advisory.
-    TAPE_IO_FAILURE,      ///< The selected regular local file could not be opened or read.
-    TAPE_TIMING_RANGE,    ///< The relative tape span or a monotonic playback deadline exceeded its bound.
-    TAPE_RESTART_TIMEOUT, ///< The old tape epoch could not retire and reset within the restart allowance.
-    REQUEST_CANCELLED,    ///< A one-event request was cancelled or its accepted source epoch changed.
-    REQUEST_TIMED_OUT     ///< A one-event request reached its absolute completion deadline.
+    NONE,                        ///< No failure has been recorded.
+    INVALID_ARGUMENT,            ///< Caller input does not satisfy the public contract.
+    INVALID_STATE,               ///< Operation conflicts with the accepted lifecycle or fixed address.
+    RESOURCE_LIMIT,              ///< A finite configured capacity or native thread reservation was exhausted.
+    WORK_LIMIT,                  ///< The derived bounded preparation or progress allowance was exhausted.
+    ALLOCATION_FAILURE,          ///< Required owned storage could not be allocated.
+    WRONG_THREAD,                ///< A checked operation used an incompatible creator thread.
+    CLOSED,                      ///< Admission is fenced by endpoint, subscription or runtime retirement.
+    CALLBACK_FAILURE,            ///< Event listener failure closes its subscription; advisory state failure is recorded
+                                 ///< separately.
+    TRANSPORT_FAILURE,           ///< Connection, recovery or native I/O failed; inspect the static stage and codes.
+    PROTOCOL_FAILURE,            ///< Peer input failed the existing bounded protocol profile.
+    BOOTSTRAP_FAILURE,           ///< The explicit process/main-thread runtime bootstrap could not be acquired.
+    DNS_CONFIGURATION,           ///< No supported bounded IPv4 resolver snapshot could be obtained.
+    UNSUPPORTED_PROFILE,         ///< The requested combination is outside this public receiving profile.
+    EXECUTOR_REJECTED,           ///< Host explicitly refused an event task; no retry.
+    EXECUTOR_FAILURE,            ///< Host post threw before completion.
+    EXECUTOR_DROPPED,            ///< Accepted task was destroyed without running.
+    EXECUTOR_CONTRACT,           ///< Host refused or threw after actual execution began.
+    CALLBACK_CANCELLED,          ///< Queued event selection cancelled by close or source reset; advisory.
+    TAPE_IO_FAILURE,             ///< The selected regular local file could not be opened or read.
+    TAPE_TIMING_RANGE,           ///< The relative tape span or a monotonic playback deadline exceeded its bound.
+    TAPE_RESTART_TIMEOUT,        ///< The old tape epoch could not retire and reset within the restart allowance.
+    REQUEST_CANCELLED,           ///< A one-event request was cancelled or its accepted source epoch changed.
+    REQUEST_TIMED_OUT,           ///< A one-event request reached its absolute completion deadline.
+    ON_DEMAND_TRANSITION_TIMEOUT ///< Historical source ownership did not retire within the transition allowance.
 };
 
 /** Static/numeric failure snapshot, independent of runtime and native owners. */
@@ -204,6 +205,25 @@ struct EndpointOptions {
     std::chrono::milliseconds aggregationPeriod{0};       ///< Local delivery cadence; zero selects immediate delivery.
     std::optional<VerifiedTlsOptions> tls; ///< Explicit verified network transport. Absence selects plain TCP.
 };
+
+/** Most recent owning observation of one fixed OnDemand source. */
+struct OnDemandPlayback {
+    double speed = 0; ///< Applied relative rate. Zero pauses or identifies retired replay.
+    std::chrono::sys_time<std::chrono::milliseconds> time{}; ///< Historical cursor, retained after retirement.
+    bool active = false;                                     ///< False after the replay cutoff, including finite EOF.
+    bool covered = false;                                    ///< True once this source has confirmed coverage.
+
+    friend bool operator==(const OnDemandPlayback &, const OnDemandPlayback &) = default;
+};
+
+/** One coherent advisory old/new replay observation. Inspect speed before time if both changed. */
+struct OnDemandPlaybackChange {
+    OnDemandPlayback previous;
+    OnDemandPlayback current;
+};
+
+/** Maximum supported OnDemand playback rate relative to real time. */
+inline constexpr double MAXIMUM_ON_DEMAND_SPEED = 100.0;
 
 /** Last SDK-worker observation, never an upstream acknowledgement or a whole-network guarantee. */
 enum class EndpointState {
@@ -1236,6 +1256,8 @@ class Endpoint final {
     explicit Endpoint(std::shared_ptr<detail::EndpointPort> port);
 
     public:
+    using OnDemandPlaybackListener = std::function<void(const OnDemandPlaybackChange &)>;
+    using OnDemandPlaybackListenerId = std::uint64_t;
     using StateChangeListener = std::function<void(EndpointState, EndpointState)>; ///< Advisory old/new observation.
     using StateChangeListenerId = std::uint64_t; ///< Non-reused state-observer identity within this endpoint.
     /** Add an advisory state observer without an initial notification or inline invocation.
@@ -1296,6 +1318,46 @@ class Endpoint final {
      */
     void connectOnDemand(std::uint16_t loopbackPort, std::u16string_view symbol,
                          std::chrono::sys_time<std::chrono::milliseconds> from);
+
+    /** Start one local OnDemand replay with an explicit initial playback speed.
+     * @param loopbackPort Explicit nonzero IPv4 loopback port.
+     * @param symbol Exact composite ASCII Quote symbol, copied at admission.
+     * @param from Absolute UTC millisecond position.
+     * @param speed Finite rate from zero through MAXIMUM_ON_DEMAND_SPEED. Zero catches up at the cut and pauses.
+     * @throws Error Invalid input, closed admission or unsupported source profile.
+     */
+    void connectOnDemand(std::uint16_t loopbackPort, std::u16string_view symbol,
+                         std::chrono::sys_time<std::chrono::milliseconds> from, double speed);
+    /** Publish the latest desired replay rate. Applies on the worker without opening a new source.
+     * @param speed Finite rate from zero through MAXIMUM_ON_DEMAND_SPEED. Zero pauses and retains data.
+     * @throws Error Invalid rate, no accepted OnDemand source, or closed admission.
+     */
+    void setOnDemandSpeed(double speed);
+    /** Stop OnDemand replay, retire old deliveries and clear its retained values without opening a route.
+     * The existing Feed and subscriptions stay open. Observe NOT_CONNECTED for completed clear.
+     * @throws Error Invalid source mode, a different pending transition or closed admission.
+     */
+    void stopOnDemandAndClear();
+    /** Retire OnDemand and start an explicit ordinary plain QTP route with the existing subscriptions.
+     * @param liveAddress Owning copy of a validated plain host:port or [IPv6]:port is retained.
+     * @throws Error Invalid route, an incompatible pending transition or closed admission.
+     */
+    void stopOnDemandAndResume(std::string_view liveAddress);
+    /** Pause at the current historical cursor without clearing admitted data. */
+    void pauseOnDemand();
+    /** Return an owning snapshot, or no value before an OnDemand request is accepted. */
+    [[nodiscard]] std::optional<OnDemandPlayback> getOnDemandPlayback() const noexcept;
+    /** Add a bounded serial advisory listener on the SDK worker, including before connect.
+     * @param listener Owning nonempty callable. Called without control locks. The change is borrowed during the call.
+     * @return Identity for removal. Throws Error for invalid, exhausted or closed admission.
+     */
+    OnDemandPlaybackListenerId addOnDemandPlaybackListener(OnDemandPlaybackListener listener);
+    /** Remove an advisory listener; an already selected call may complete.
+     * @param id Identity returned by addOnDemandPlaybackListener.
+     */
+    void removeOnDemandPlaybackListener(OnDemandPlaybackListenerId id);
+    /** Return detached advisory failure without changing the replay or other listeners. */
+    [[nodiscard]] Diagnostic getOnDemandPlaybackDiagnostic() const noexcept;
 
     /** Start one asynchronous read of a regular local binary tape.
      * Configure desired subscriptions before calling. The worker opens and retires the file,

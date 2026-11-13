@@ -1,14 +1,22 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "../../src/api/on_demand_playback_clock.hpp"
+#include "../fixtures/ondemand/fixture.hpp"
+#include "connect_peer.hpp"
 #include "qd/api/feed.hpp"
+#include "qd/protocol/subscription_writer.hpp"
 #include "recovery_test_peer.hpp"
 
 #include <algorithm>
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <doctest/doctest.h>
+#include <limits>
+#include <mutex>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <vector>
@@ -16,15 +24,9 @@
 namespace {
 namespace q = org::ttldtor::qdcxx;
 namespace api = q::api;
+namespace fixture = q::test::ondemand;
 using namespace std::chrono_literals;
 
-// Emitted by the pinned QD 3.355 ReplayRequest and ReplayResponse codecs from synthetic input.
-constexpr std::string_view JAVA_REQUEST =
-    "8081020708636f6e7472616374000475736572000a65787069726174696f6e1339323233333732303336383534373735383037"
-    "066469676573742000000000000000000000000000000000000000000000000000000000000000000564656c617901300474"
-    "696d650d31373037373438323035303030046b65797307044d4f434b0051";
-constexpr std::string_view JAVA_RESPONSE =
-    "31020106626c6f636b73272600044d4f434b0051f065ca2b6880419388ff058051c04c9b0a05805187da1482ee22864080a0";
 constexpr std::string_view START_HEADER = "X-OnDemand-StartTime: 2024-02-12T14:30:05.000Z";
 constexpr auto START = std::chrono::sys_time{std::chrono::milliseconds{1707748205000}};
 constexpr auto WAIT = 8s;
@@ -68,7 +70,7 @@ std::size_t requestLength() {
         "Content-Type: application/octet-stream\r\nAccept: application/octet-stream\r\n"
         "X-OnDemand-StartTime: 2024-02-12T14:30:05.000Z\r\nContent-Length: 131\r\nConnection: close\r\n\r\n";
 
-    return HEADER.size() + JAVA_REQUEST.size() / 2;
+    return HEADER.size() + fixture::REQUEST.size() / 2;
 }
 
 q::test::TcpPeerConfig peerConfig(std::vector<std::byte> reply, bool hold = false) {
@@ -83,6 +85,69 @@ q::test::TcpPeerConfig peerConfig(std::vector<std::byte> reply, bool hold = fals
 
     return config;
 }
+
+q::test::TcpPeerConfig livePeerConfig() {
+    constexpr q::core::SchemaLimits LIMITS{16, 128, 256, 128, 16384};
+    const auto schema = q::events::defaultQuoteSchema(LIMITS);
+    REQUIRE(schema);
+    constexpr auto FAMILY = q::core::SubscriptionFamily::TICKER;
+    q::test::TcpPeerConfig result;
+    result.lifetime = 20s;
+    result.sessions.resize(2);
+
+    for (std::size_t i = 0; i < result.sessions.size(); ++i) {
+        std::vector<q::core::FieldValue> values;
+
+        for (const auto &field : schema->records().front().fields) {
+            const auto type = static_cast<q::core::SerialFieldType>(field.serialTypeId);
+            std::int64_t raw = 0;
+
+            if (type == q::core::SerialFieldType::TIME_SECONDS)
+                raw = 42 + static_cast<std::int64_t>(i);
+
+            if (type == q::core::SerialFieldType::UTF_CHAR)
+                raw = u'Q';
+
+            values.push_back({type, raw});
+        }
+
+        auto &session = result.sessions[i];
+        session.initialBytes = q::connect_tests::fixturePeerPrefix(*schema, FAMILY);
+        const std::array<q::connect_tests::Record, 1> records{{{u"MOCK", std::move(values)}}};
+        session.replyBytes = q::connect_tests::fixturePeerData(records, FAMILY, true);
+        session.readThroughMessage = std::to_underlying(q::protocol::SubscriptionMessage::TICKER_ADD);
+        session.waitForClientClose = true;
+    }
+
+    return result;
+}
+
+class ManualExecutor final : public api::CallbackExecutor {
+    std::mutex mutex_;
+    std::optional<api::CallbackTask> task_;
+
+    public:
+    api::CallbackPostResult post(api::CallbackTask next) override {
+        std::lock_guard lock(mutex_);
+        task_.emplace(std::move(next));
+
+        return api::CallbackPostResult::ACCEPTED;
+    }
+
+    bool ready() {
+        std::lock_guard lock(mutex_);
+
+        return task_.has_value();
+    }
+
+    api::CallbackTask take() {
+        std::lock_guard lock(mutex_);
+        auto result = std::move(*task_);
+        task_.reset();
+
+        return result;
+    }
+};
 
 api::RuntimeOptions runtimeOptions() {
     api::RuntimeOptions options;
@@ -111,7 +176,7 @@ TEST_CASE("OnDemand fetches the exact Java request and delivers two historical Q
         std::chrono::steady_clock::time_point time;
     };
 
-    q::test::OwnedTcpPeer peer(peerConfig(binaryResponse(JAVA_RESPONSE)));
+    q::test::OwnedTcpPeer peer(peerConfig(binaryResponse(fixture::RESPONSE_750MS)));
     REQUIRE(peer.port() != 0);
     std::vector<Arrival> arrivals;
     api::ApiRuntime runtime(runtimeOptions());
@@ -159,7 +224,7 @@ TEST_CASE("OnDemand fetches the exact Java request and delivers two historical Q
     CHECK(text.contains(START_HEADER));
     const auto separator = text.find("\r\n\r\n");
     REQUIRE(separator != std::string_view::npos);
-    const auto expected = unhex(JAVA_REQUEST);
+    const auto expected = unhex(fixture::REQUEST);
     const auto body = std::span(received).subspan(separator + 4);
     CHECK(text.contains("Content-Length: 131\r\n"));
     const auto mismatch = std::ranges::mismatch(body, expected);
@@ -176,7 +241,7 @@ TEST_CASE("OnDemand fetches the exact Java request and delivers two historical Q
     CHECK(std::ranges::equal(body, expected));
 }
 
-TEST_CASE("OnDemand refuses access, ambiguous framing and compression before a historical epoch") {
+TEST_CASE("OnDemand refuses invalid HTTP and response framing before a historical epoch") {
     constexpr std::string_view COMPRESSED_RESPONSE =
         "34020109626c6f636b732e677a272600044d4f434b0051f065ca2b6880419388ff058051c04c9b0a05805187da1482ee22864080a0";
     const std::array cases{
@@ -209,8 +274,96 @@ TEST_CASE("OnDemand refuses access, ambiguous framing and compression before a h
     }
 }
 
+TEST_CASE("OnDemand completes HTTP framing across three peer-gated socket reads") {
+    const auto bytes = binaryResponse(fixture::RESPONSE_750MS);
+    const auto middle = bytes.size() - 25;
+    constexpr std::size_t HEADER_PREFIX = 22;
+    auto config = peerConfig({});
+    auto &wire = config.sessions.front();
+    wire.replyBytes.assign(bytes.begin(), bytes.begin() + HEADER_PREFIX);
+    wire.stagedBytes.emplace_back(bytes.begin() + HEADER_PREFIX, bytes.begin() + middle);
+    wire.stagedBytes.emplace_back(bytes.begin() + middle, bytes.end());
+    q::test::OwnedTcpPeer peer(std::move(config));
+    REQUIRE(peer.port() != 0);
+    std::atomic<unsigned> quotes{0};
+    api::ApiRuntime runtime(runtimeOptions());
+    const auto endpoint = runtime.createEndpoint();
+    const auto subscription = endpoint->getFeed()->createSubscription<q::events::Quote>();
+    subscription->addSymbols("MOCK");
+    subscription->addEventListener([&](auto batch) {
+        quotes.fetch_add(static_cast<unsigned>(batch.size()));
+    });
+    endpoint->connectOnDemand(peer.port(), u"MOCK", START);
+    REQUIRE(eventually([&] {
+        return peer.snapshot().sessions.front().replyBytesWritten == HEADER_PREFIX;
+    }));
+    CHECK(endpoint->getState() == api::EndpointState::CONNECTING);
+    std::this_thread::sleep_for(125ms);
+    peer.allowStages(0, 1);
+    REQUIRE(eventually([&] {
+        return peer.snapshot().sessions.front().stagedBytesWritten == middle - HEADER_PREFIX;
+    }));
+    CHECK_FALSE(endpoint->getStatistics().connection.sourceEpoch);
+    std::this_thread::sleep_for(125ms);
+    peer.allowStages(0, 2);
+    const auto result = endpoint->awaitState(api::EndpointState::CLOSED, std::chrono::steady_clock::now() + WAIT);
+    INFO(result.diagnostic.stage);
+    REQUIRE(result.status == api::WaitStatus::REACHED);
+    CHECK(endpoint->closeAndAwaitTermination().drained);
+    CHECK(quotes.load() == 2);
+}
+
+TEST_CASE("OnDemand refuses an EOF one byte before the declared HTTP body boundary") {
+    auto bytes = binaryResponse(fixture::RESPONSE_750MS);
+    bytes.pop_back();
+    auto config = peerConfig(std::move(bytes));
+    config.sessions.front().finishWrites = true;
+    q::test::OwnedTcpPeer peer(std::move(config));
+    REQUIRE(peer.port() != 0);
+    std::atomic<unsigned> callbacks{0};
+    api::ApiRuntime runtime(runtimeOptions());
+    const auto endpoint = runtime.createEndpoint();
+    const auto subscription = endpoint->getFeed()->createSubscription<q::events::Quote>();
+    subscription->addSymbols("MOCK");
+    subscription->addEventListener([&](auto) {
+        ++callbacks;
+    });
+    endpoint->connectOnDemand(peer.port(), u"MOCK", START);
+    const auto result = endpoint->awaitState(api::EndpointState::FAILED, std::chrono::steady_clock::now() + WAIT);
+    INFO(result.diagnostic.stage);
+    REQUIRE(result.status == api::WaitStatus::REACHED);
+    CHECK(result.diagnostic.code == api::ErrorCode::PROTOCOL_FAILURE);
+    CHECK(result.diagnostic.stage == "ondemand-response-truncated");
+    CHECK_FALSE(endpoint->getStatistics().connection.sourceEpoch);
+    static_cast<void>(endpoint->closeAndAwaitTermination());
+    CHECK(callbacks.load() == 0);
+}
+
+TEST_CASE("OnDemand refuses a complete response that does not cover the requested start") {
+    q::test::OwnedTcpPeer peer(peerConfig(binaryResponse(fixture::RESPONSE_750MS)));
+    REQUIRE(peer.port() != 0);
+    std::atomic<unsigned> callbacks{0};
+    api::ApiRuntime runtime(runtimeOptions());
+    const auto endpoint = runtime.createEndpoint();
+    const auto subscription = endpoint->getFeed()->createSubscription<q::events::Quote>();
+    subscription->addSymbols("MOCK");
+    subscription->addEventListener([&](auto) {
+        ++callbacks;
+    });
+    endpoint->connectOnDemand(peer.port(), u"MOCK", START + 60s);
+    const auto result = endpoint->awaitState(api::EndpointState::FAILED, std::chrono::steady_clock::now() + WAIT);
+    INFO(result.diagnostic.stage);
+    REQUIRE(result.status == api::WaitStatus::REACHED);
+    CHECK(result.diagnostic.code == api::ErrorCode::PROTOCOL_FAILURE);
+    CHECK(result.diagnostic.stage == "ondemand-response");
+    CHECK_FALSE(endpoint->getStatistics().connection.sourceEpoch);
+    CHECK_FALSE(endpoint->getOnDemandPlayback()->covered);
+    static_cast<void>(endpoint->closeAndAwaitTermination());
+    CHECK(callbacks.load() == 0);
+}
+
 TEST_CASE("OnDemand catches up a pre-cut Quote and fences the next Quote on callback close") {
-    q::test::OwnedTcpPeer peer(peerConfig(binaryResponse(JAVA_RESPONSE)));
+    q::test::OwnedTcpPeer peer(peerConfig(binaryResponse(fixture::RESPONSE_750MS)));
     REQUIRE(peer.port() != 0);
     std::vector<std::int64_t> times;
     api::ApiRuntime runtime(runtimeOptions());
@@ -286,4 +439,430 @@ TEST_CASE("OnDemand honors response deadline with a slow requested polling caden
     const auto snapshot = peer.snapshot();
     REQUIRE(snapshot.sessions.size() == 1);
     CHECK(snapshot.sessions.front().matched);
+}
+
+TEST_CASE("OnDemand clock preserves fractional progress and applies rates to elapsed intervals") {
+    q::api::detail::OnDemandPlaybackClock clock;
+    const auto origin = std::chrono::steady_clock::time_point{1s};
+    constexpr auto LIMIT = 2000;
+
+    clock.advance(0.5, origin, LIMIT);
+    clock.advance(0.5, origin + 10s, LIMIT);
+    CHECK(clock.position() == 0);
+    clock.start(origin + 10s);
+    clock.advance(0.5, origin + 10s + 1ms, LIMIT);
+    CHECK(clock.position() == 0);
+    clock.advance(0.5, origin + 10s + 2ms, LIMIT);
+    CHECK(clock.position() == 1);
+    clock.advance(0, origin + 10s + 200ms, LIMIT);
+    CHECK(clock.position() == 100);
+    clock.advance(2, origin + 11s, LIMIT);
+    CHECK(clock.position() == 100);
+    const auto wake = clock.wakeBefore(110, origin + 11s, origin + 11s + 10ms);
+    CHECK(wake >= origin + 11s + 5ms);
+    CHECK(wake <= origin + 11s + 5ms + 1us);
+    clock.advance(2, origin + 11s + 500ms, LIMIT);
+    CHECK(clock.position() == 1100);
+    clock.advance(0, origin + 14s, LIMIT);
+    CHECK(clock.position() == LIMIT);
+}
+
+TEST_CASE("OnDemand preserves its cursor through initial pause, rate changes and terminal EOF") {
+    q::test::OwnedTcpPeer peer(peerConfig(binaryResponse(fixture::RESPONSE_2000MS)));
+    REQUIRE(peer.port() != 0);
+    std::vector<api::OnDemandPlaybackChange> observed;
+    std::vector<std::int64_t> times;
+    std::atomic<unsigned> delivered{0};
+    api::ApiRuntime runtime(runtimeOptions());
+    const auto endpoint = runtime.createEndpoint();
+    const auto subscription = endpoint->getFeed()->createSubscription<q::events::Quote>();
+    subscription->addSymbols("MOCK");
+    subscription->addEventListener([&](auto quotes) {
+        for (const auto &quote : quotes) {
+            times.push_back(quote.eventTime);
+            ++delivered;
+        }
+    });
+    endpoint->addOnDemandPlaybackListener([&](const auto &change) {
+        observed.push_back(change);
+    });
+    CHECK_FALSE(endpoint->getOnDemandPlayback());
+    CHECK_THROWS_AS(endpoint->pauseOnDemand(), api::Error);
+    CHECK_THROWS_AS(endpoint->connectOnDemand(peer.port(), u"MOCK", START, -1), api::Error);
+    endpoint->connectOnDemand(peer.port(), u"MOCK", START, 0);
+    REQUIRE(eventually([&] {
+        return delivered.load() == 1;
+    }));
+    const auto initial = endpoint->getOnDemandPlayback();
+    REQUIRE(initial);
+    CHECK(initial->time == START);
+    CHECK(initial->speed == 0);
+    CHECK(initial->covered);
+    const auto epoch = endpoint->getStatistics().connection.sourceEpoch;
+    REQUIRE(epoch);
+
+    endpoint->setOnDemandSpeed(0.5);
+    REQUIRE(eventually([&] {
+        return endpoint->getOnDemandPlayback()->time >= START + 100ms;
+    }));
+    endpoint->pauseOnDemand();
+    REQUIRE(eventually([&] {
+        return endpoint->getOnDemandPlayback()->speed == 0;
+    }));
+    const auto paused = *endpoint->getOnDemandPlayback();
+    CHECK(paused.time < START + 2000ms);
+    std::this_thread::sleep_for(125ms);
+    CHECK(endpoint->getOnDemandPlayback() == paused);
+    CHECK(delivered.load() == 1);
+
+    for (double speed : {-1.0, std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity(),
+                         api::MAXIMUM_ON_DEMAND_SPEED + 1})
+        CHECK_THROWS_AS(endpoint->setOnDemandSpeed(speed), api::Error);
+
+    endpoint->pauseOnDemand();
+    endpoint->setOnDemandSpeed(2);
+    REQUIRE(endpoint->awaitState(api::EndpointState::CLOSED, std::chrono::steady_clock::now() + WAIT).status ==
+            api::WaitStatus::REACHED);
+    const auto closed = endpoint->closeAndAwaitTermination();
+    CHECK(closed.drained);
+    const std::vector<std::int64_t> expectedTimes{START.time_since_epoch().count(),
+                                                  (START + 2000ms).time_since_epoch().count()};
+    CHECK(times == expectedTimes);
+    CHECK(endpoint->getStatistics().connection.sourceEpoch == epoch);
+    CHECK(peer.snapshot().sessions.size() == 1);
+    const auto terminal = endpoint->getOnDemandPlayback();
+    REQUIRE(terminal);
+    CHECK_FALSE(terminal->active);
+    CHECK(terminal->speed == 0);
+    CHECK(terminal->time == START + 2000ms);
+    REQUIRE_FALSE(observed.empty());
+    CHECK(observed.back().current == *terminal);
+    std::vector<double> rates;
+
+    for (const auto &change : observed) {
+        CHECK(change.previous.time <= change.current.time);
+
+        if (change.previous.speed != change.current.speed)
+            rates.push_back(change.current.speed);
+    }
+
+    const std::vector<double> expectedRates{0.5, 0, 2, 0};
+    CHECK(rates == expectedRates);
+}
+
+TEST_CASE("OnDemand pre-coverage speed callbacks can remove themselves and close the owned request") {
+    q::test::OwnedTcpPeer peer(peerConfig({}, true));
+    REQUIRE(peer.port() != 0);
+    std::vector<api::OnDemandPlaybackChange> selected;
+    std::atomic<unsigned> quotes{0};
+    std::atomic<unsigned> retirementGuarded{0};
+    api::Endpoint::OnDemandPlaybackListenerId self{};
+    api::ApiRuntime runtime(runtimeOptions());
+    const auto endpoint = runtime.createEndpoint();
+    const auto subscription = endpoint->getFeed()->createSubscription<q::events::Quote>();
+    subscription->addSymbols("MOCK");
+    subscription->addEventListener([&](auto) {
+        ++quotes;
+    });
+    self = endpoint->addOnDemandPlaybackListener(
+        [&selected, &self, &retirementGuarded, weakEndpoint = std::weak_ptr(endpoint)](const auto &change) {
+            selected.push_back(change);
+            const auto owner = weakEndpoint.lock();
+
+            if (!owner)
+                return;
+
+            owner->removeOnDemandPlaybackListener(self);
+            try {
+                static_cast<void>(owner->closeAndAwaitTermination());
+            } catch (const api::Error &error) {
+                if (error.diagnostic().code == api::ErrorCode::WRONG_THREAD)
+                    ++retirementGuarded;
+            }
+            owner->close();
+            throw std::runtime_error("advisory failure");
+        });
+    endpoint->connectOnDemand(peer.port(), u"MOCK", START, 0);
+    REQUIRE(eventually([&] {
+        const auto snapshot = peer.snapshot();
+
+        return !snapshot.sessions.empty() && snapshot.sessions.front().matched;
+    }));
+    endpoint->setOnDemandSpeed(2);
+    REQUIRE(endpoint->awaitState(api::EndpointState::CLOSED, std::chrono::steady_clock::now() + WAIT).status ==
+            api::WaitStatus::REACHED);
+    const auto closed = endpoint->closeAndAwaitTermination();
+    CHECK(closed.diagnostic.code == api::ErrorCode::NONE);
+    CHECK(endpoint->getOnDemandPlaybackDiagnostic().code == api::ErrorCode::CALLBACK_FAILURE);
+    CHECK(retirementGuarded.load() == 1);
+    CHECK(quotes.load() == 0);
+    REQUIRE(selected.size() == 1);
+    CHECK(selected.front().current.time == START);
+    CHECK(selected.front().current.speed == 2);
+    CHECK_FALSE(selected.front().current.covered);
+    const auto terminal = endpoint->getOnDemandPlayback();
+    REQUIRE(terminal);
+    CHECK_FALSE(terminal->active);
+    CHECK(terminal->time == START);
+    CHECK(terminal->speed == 0);
+}
+
+TEST_CASE("OnDemand clear drops historical values and resumes ordinary QTP with the same subscription") {
+    q::test::OwnedTcpPeer historical(peerConfig(binaryResponse(fixture::RESPONSE_750MS)));
+    q::test::OwnedTcpPeer live(livePeerConfig());
+    REQUIRE(historical.port() != 0);
+    REQUIRE(live.port() != 0);
+    const auto liveAddress = "127.0.0.1:" + std::to_string(live.port());
+    std::atomic<std::int64_t> lastBidTime{0};
+    api::ApiRuntime runtime(runtimeOptions());
+    const auto endpoint = runtime.createEndpoint();
+    const auto feed = endpoint->getFeed();
+    const auto subscription = feed->createSubscription<q::events::Quote>();
+    subscription->addSymbols("MOCK");
+    subscription->addEventListener([&](auto quotes) {
+        for (const auto &quote : quotes)
+            lastBidTime.store(quote.bidTimeMs);
+    });
+    endpoint->connectOnDemand(historical.port(), u"MOCK", START, 0);
+    REQUIRE(eventually([&] {
+        return lastBidTime.load() != 0;
+    }));
+    const auto historyEpoch = endpoint->getStatistics().connection.sourceEpoch;
+    REQUIRE(historyEpoch);
+    const auto cached = feed->getLastEventIfSubscribed<q::events::Quote>("MOCK");
+    REQUIRE(cached);
+    CHECK(cached->getBidPrice() == 12.25);
+    CHECK_THROWS_AS(endpoint->stopOnDemandAndResume("malformed"), api::Error);
+    CHECK(endpoint->getOnDemandPlayback()->active);
+
+    endpoint->stopOnDemandAndClear();
+    const auto cleared = feed->getLastEventIfSubscribed<q::events::Quote>("MOCK");
+    REQUIRE(cleared);
+    CHECK(std::isnan(cleared->getBidPrice()));
+    REQUIRE(endpoint->awaitState(api::EndpointState::NOT_CONNECTED, std::chrono::steady_clock::now() + WAIT).status ==
+            api::WaitStatus::REACHED);
+    CHECK_FALSE(live.snapshot().sessions.front().accepted);
+    CHECK_FALSE(endpoint->getStatistics().connection.sourceEpoch);
+    CHECK_FALSE(subscription->getStatistics().sourceEpoch);
+    CHECK_FALSE(endpoint->getOnDemandPlayback()->active);
+    CHECK(endpoint->getOnDemandPlayback()->time == START);
+    CHECK(endpoint->getOnDemandPlayback()->speed == 0);
+    CHECK(subscription->getState() == api::SubscriptionState::ACTIVE);
+
+    endpoint->stopOnDemandAndResume(liveAddress);
+    REQUIRE(eventually([&] {
+        return lastBidTime.load() == 42000;
+    }));
+    const auto firstLive = endpoint->getStatistics().connection.sourceEpoch;
+    REQUIRE(firstLive);
+    CHECK(*firstLive > *historyEpoch);
+    CHECK(subscription->getStatistics().sourceEpoch == firstLive);
+    endpoint->stopOnDemandAndResume(liveAddress);
+    CHECK_THROWS_AS(endpoint->stopOnDemandAndResume("127.0.0.1:1"), api::Error);
+    endpoint->reconnect();
+    REQUIRE(eventually([&] {
+        return lastBidTime.load() == 43000;
+    }));
+    const auto secondLive = endpoint->getStatistics().connection.sourceEpoch;
+    REQUIRE(secondLive);
+    CHECK(*secondLive > *firstLive);
+    CHECK(subscription->getStatistics().sourceEpoch == secondLive);
+    const auto latest = feed->getLastEventIfSubscribed<q::events::Quote>("MOCK");
+    REQUIRE(latest);
+    CHECK(latest->bidTimeMs == 43000);
+    const auto closed = endpoint->closeAndAwaitTermination();
+    CHECK_FALSE(closed.deadlineExpired);
+}
+
+TEST_CASE("OnDemand handover cancels a host-held old task and runs only the fresh live callback") {
+    q::test::OwnedTcpPeer historical(peerConfig(binaryResponse(fixture::RESPONSE_750MS)));
+    q::test::OwnedTcpPeer live(livePeerConfig());
+    REQUIRE(historical.port() != 0);
+    REQUIRE(live.port() != 0);
+    std::atomic<std::int64_t> lastBidTime{0};
+    api::ApiRuntime runtime(runtimeOptions());
+    const auto endpoint = runtime.createEndpoint();
+    const auto subscription = endpoint->getFeed()->createSubscription<q::events::Quote>();
+    const auto executor = std::make_shared<ManualExecutor>();
+    subscription->setEventExecutor(executor);
+    subscription->addSymbols("MOCK");
+    subscription->addEventListener([&](auto quotes) {
+        for (const auto &quote : quotes)
+            lastBidTime.store(quote.bidTimeMs);
+    });
+    endpoint->connectOnDemand(historical.port(), u"MOCK", START, 0);
+    REQUIRE(eventually([&] {
+        return executor->ready();
+    }));
+    auto old = executor->take();
+
+    endpoint->stopOnDemandAndResume("127.0.0.1:" + std::to_string(live.port()));
+    REQUIRE(eventually([&] {
+        return executor->ready();
+    }));
+    CHECK(old.run() == api::CallbackTaskRunResult::CANCELLED);
+    CHECK(lastBidTime.load() == 0);
+    auto fresh = executor->take();
+    CHECK(fresh.run() == api::CallbackTaskRunResult::COMPLETED);
+    CHECK(lastBidTime.load() == 42000);
+    const auto closed = endpoint->closeAndAwaitTermination();
+    CHECK_FALSE(closed.deadlineExpired);
+}
+
+TEST_CASE("OnDemand clear retires a held HTTP response before coverage") {
+    q::test::OwnedTcpPeer historical(peerConfig({}, true));
+    REQUIRE(historical.port() != 0);
+    api::ApiRuntime runtime(runtimeOptions());
+    const auto endpoint = runtime.createEndpoint();
+    const auto subscription = endpoint->getFeed()->createSubscription<q::events::Quote>();
+    subscription->addSymbols("MOCK");
+    endpoint->connectOnDemand(historical.port(), u"MOCK", START, 0);
+    REQUIRE(eventually([&] {
+        const auto snapshot = historical.snapshot();
+
+        return !snapshot.sessions.empty() && snapshot.sessions.front().matched;
+    }));
+    endpoint->stopOnDemandAndClear();
+    REQUIRE(endpoint->awaitState(api::EndpointState::NOT_CONNECTED, std::chrono::steady_clock::now() + WAIT).status ==
+            api::WaitStatus::REACHED);
+    CHECK_FALSE(endpoint->getOnDemandPlayback()->covered);
+    CHECK_FALSE(endpoint->getOnDemandPlayback()->active);
+    CHECK_FALSE(endpoint->getStatistics().connection.sourceEpoch);
+    const auto closed = endpoint->closeAndAwaitTermination();
+    CHECK(closed.diagnostic.code == api::ErrorCode::NONE);
+}
+
+TEST_CASE("OnDemand handover keeps the executing callback fenced and never opens live after timeout") {
+    q::test::OwnedTcpPeer historical(peerConfig(binaryResponse(fixture::RESPONSE_750MS)));
+    q::test::OwnedTcpPeer live(livePeerConfig());
+    REQUIRE(historical.port() != 0);
+    REQUIRE(live.port() != 0);
+    std::atomic<bool> started{false};
+    std::atomic<bool> release{false};
+    api::ApiRuntime runtime(runtimeOptions());
+    api::EndpointOptions options;
+    options.drainTimeout = 250ms;
+    const auto endpoint = runtime.createEndpoint(options);
+    const auto subscription = endpoint->getFeed()->createSubscription<q::events::Quote>();
+    const auto executor = std::make_shared<ManualExecutor>();
+    subscription->setEventExecutor(executor);
+    subscription->addSymbols("MOCK");
+    subscription->addEventListener([&](auto) {
+        started.store(true);
+        const auto deadline = std::chrono::steady_clock::now() + WAIT;
+
+        while (!release.load() && std::chrono::steady_clock::now() < deadline)
+            std::this_thread::sleep_for(1ms);
+    });
+    endpoint->connectOnDemand(historical.port(), u"MOCK", START, 0);
+    REQUIRE(eventually([&] {
+        return executor->ready();
+    }));
+    auto task = executor->take();
+    std::jthread running([&](std::stop_token) {
+        static_cast<void>(task.run());
+    });
+
+    const struct Release {
+        std::atomic<bool> &value;
+
+        ~Release() {
+            value.store(true);
+        }
+    } onExit{release};
+
+    REQUIRE(eventually([&] {
+        return started.load();
+    }));
+
+    endpoint->stopOnDemandAndResume("127.0.0.1:" + std::to_string(live.port()));
+    const auto failed = endpoint->awaitState(api::EndpointState::FAILED, std::chrono::steady_clock::now() + WAIT);
+    REQUIRE(failed.status == api::WaitStatus::REACHED);
+    CHECK(failed.diagnostic.code == api::ErrorCode::ON_DEMAND_TRANSITION_TIMEOUT);
+    CHECK_FALSE(live.snapshot().sessions.front().accepted);
+    CHECK_FALSE(endpoint->getStatistics().connection.sourceEpoch);
+    release.store(true);
+    running.join();
+    const auto closed = endpoint->closeAndAwaitTermination();
+    CHECK(closed.deadlineExpired);
+    CHECK(closed.diagnostic.code == api::ErrorCode::ON_DEMAND_TRANSITION_TIMEOUT);
+    CHECK_FALSE(live.snapshot().sessions.front().accepted);
+}
+
+TEST_CASE("OnDemand pre-activation clear settles playback and an expired resume stays offline") {
+    bool expire = false;
+    SUBCASE("clear within deadline") {
+    }
+    SUBCASE("resume after deadline") {
+        expire = true;
+    }
+    q::test::OwnedTcpPeer historical(peerConfig({}, true));
+    q::test::OwnedTcpPeer live(livePeerConfig());
+    REQUIRE(historical.port() != 0);
+    REQUIRE(live.port() != 0);
+    std::atomic<bool> workerEntered{false};
+    std::atomic<bool> releaseWorker{false};
+    std::vector<api::OnDemandPlaybackChange> playback;
+    api::ApiRuntime runtime(runtimeOptions());
+    const auto blocker = runtime.createEndpoint();
+    blocker->addStateChangeListener([&](auto, auto next) {
+        if (next != api::EndpointState::CONNECTING)
+            return;
+
+        workerEntered.store(true);
+        const auto deadline = std::chrono::steady_clock::now() + WAIT;
+
+        while (!releaseWorker.load() && std::chrono::steady_clock::now() < deadline)
+            std::this_thread::sleep_for(1ms);
+    });
+
+    const struct ReleaseWorker {
+        std::atomic<bool> &value;
+
+        ~ReleaseWorker() {
+            value.store(true);
+        }
+    } onExit{releaseWorker};
+
+    blocker->connect("127.0.0.1:1");
+    REQUIRE(eventually([&] {
+        return workerEntered.load();
+    }));
+
+    api::EndpointOptions options;
+    options.drainTimeout = expire ? 100ms : 3s;
+    const auto endpoint = runtime.createEndpoint(options);
+    const auto subscription = endpoint->getFeed()->createSubscription<q::events::Quote>();
+    subscription->addSymbols("MOCK");
+    endpoint->addOnDemandPlaybackListener([&](const auto &change) {
+        playback.push_back(change);
+    });
+    endpoint->connectOnDemand(historical.port(), u"MOCK", START, 1);
+
+    if (expire) {
+        endpoint->stopOnDemandAndResume("127.0.0.1:" + std::to_string(live.port()));
+        std::this_thread::sleep_for(250ms);
+    } else {
+        endpoint->stopOnDemandAndClear();
+    }
+
+    releaseWorker.store(true);
+
+    const auto target = expire ? api::EndpointState::FAILED : api::EndpointState::NOT_CONNECTED;
+    const auto settled = endpoint->awaitState(target, std::chrono::steady_clock::now() + WAIT);
+    REQUIRE(settled.status == api::WaitStatus::REACHED);
+    CHECK_FALSE(historical.snapshot().sessions.front().accepted);
+    CHECK_FALSE(live.snapshot().sessions.front().accepted);
+    const auto snapshot = endpoint->getOnDemandPlayback();
+    REQUIRE(snapshot);
+    CHECK_FALSE(snapshot->active);
+    CHECK_FALSE(snapshot->covered);
+    CHECK(snapshot->speed == 0);
+    CHECK(snapshot->time == START);
+    const auto closed = endpoint->closeAndAwaitTermination();
+    CHECK(closed.diagnostic.code == (expire ? api::ErrorCode::ON_DEMAND_TRANSITION_TIMEOUT : api::ErrorCode::NONE));
+    CHECK(closed.deadlineExpired == expire);
+    REQUIRE(playback.size() == 1);
+    CHECK(playback.front().previous.active);
+    CHECK(playback.front().current == *snapshot);
 }
