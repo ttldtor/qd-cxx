@@ -10,6 +10,7 @@
 | Choose event symbols and sources | [Market symbols](MARKET-SYMBOLS.md), [Candle symbols](CANDLE-SYMBOLS.md), [event sources](EVENT-SOURCES.md) | Construct and inspect supported symbol and source values |
 | Parse instrument trading hours | [Schedule rules](SCHEDULE-RULES.md) | Complete pinned grammar, named venues and typed defaults in explicit bounded contexts; [console example](../examples/schedule_rules/README.md) |
 | Mix market events and select an Order source | [Market console sample](../examples/feed_market/README.md) | Composite and regional Quote, Trade, a source-specific Order, symbol mutation and final statistics |
+| Publish and relay market events | [Distribution example](../examples/feed_distribution/README.md) | Run a source, QTP relay and independent mixed Feed clients |
 | Receive typed live events | [Public feed API](FEED-API.md) | Library-owned progress, Quote/Profile subscriptions and plain TCP; [complete example](../examples/feed_quote/README.md) |
 | Embed in an existing host | [Runtime bootstrap ownership](../spec/transport/RUNTIME-EMBEDDING.md) | Startup requirements and explicit borrowed bootstrap lifetime |
 | Model instrument metadata | [Instrument-profile values](INSTRUMENT-PROFILES.md) | Owned standard/custom fields and typed conversions without I/O |

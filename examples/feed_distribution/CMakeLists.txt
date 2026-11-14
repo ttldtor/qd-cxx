@@ -1,0 +1,20 @@
+# Copyright (c) 2026 ttldtor.
+# SPDX-License-Identifier: BSL-1.0
+cmake_minimum_required(VERSION 3.25)
+if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+    project(qdcxx_distribution_example LANGUAGES CXX)
+    include(CTest)
+endif()
+if(NOT TARGET qdcxx::feed)
+    find_package(qdcxx CONFIG REQUIRED COMPONENTS feed)
+endif()
+find_package(Threads REQUIRED)
+add_executable(qdcxx_distribution main.cpp)
+target_link_libraries(qdcxx_distribution PRIVATE qdcxx::feed Threads::Threads)
+target_compile_options(qdcxx_distribution PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+set_target_properties(qdcxx_distribution PROPERTIES CXX_EXTENSIONS OFF OUTPUT_NAME qdcxx-distribution)
+if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR AND BUILD_TESTING)
+    add_test(NAME distribution_help COMMAND "${CMAKE_COMMAND}" "-DPROGRAM=$<TARGET_FILE:qdcxx_distribution>"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/help_test.cmake")
+    set_tests_properties(distribution_help PROPERTIES TIMEOUT 20)
+endif()

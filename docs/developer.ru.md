@@ -11,6 +11,7 @@
 - [Подробные параметры сборки и компоненты](CPP-BUILD.ru.md)
 - [Требования к изменениям](../CONTRIBUTING.md) (англ.), [соглашения C++](CPP-STYLE.ru.md) и [имена](NAMING.ru.md)
 - [Каталог инструментов разработчика](../tools/dev/README.ru.md): UTC-журналы, форматирование и автономные проверки совместимости
+- [Пример раздачи](../examples/feed_distribution/README.ru.md): воспроизводимый запуск источника, сервера и Feed на loopback
 - [Сборка этой документации](../tools/docs/README.ru.md)
 - [Эталон upstream](UPSTREAM.md) (англ.) и [политика совместимости](COMPATIBILITY.ru.md)
 

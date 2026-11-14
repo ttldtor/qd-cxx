@@ -236,6 +236,27 @@ TEST_CASE("publisher serves two typed TCP Feed connections with a late TICKER va
     REQUIRE(first.events->wait(next.bidPrice.raw));
     REQUIRE(late.events->wait(next.bidPrice.raw));
 
+    const auto deadline = Clock::now() + 5s;
+    q::api::PublisherStatistics stats;
+
+    do {
+        stats = (*server)->getStatistics();
+
+        if (stats.families[0].ingressRecords.value >= 2 && stats.families[0].sentFrames.value >= 3)
+            break;
+
+        std::this_thread::sleep_for(1ms);
+    } while (Clock::now() < deadline);
+
+    CHECK(stats.activePeers == 2);
+    CHECK(stats.families[0].desiredKeys == 1);
+    CHECK(stats.families[0].ingressFrames.value == 2);
+    CHECK(stats.families[0].ingressRecords.value == 2);
+    CHECK(stats.families[0].sentFrames.value >= 3);
+    CHECK(stats.families[0].knownDiscardedRecords.availability == q::core::StatisticAvailability::UNSUPPORTED);
+    CHECK(stats.families[0].ingressRecords.availability == q::core::StatisticAvailability::AVAILABLE);
+    CHECK(stats.families[1].ingressRecords.availability == q::core::StatisticAvailability::UNSUPPORTED);
+
     (void)first.endpoint->closeAndAwaitTermination();
     CHECK((*server)->awaitDemand(u"IBM", true, Clock::now() + 5s));
     (void)late.endpoint->closeAndAwaitTermination();
@@ -337,6 +358,22 @@ TEST_CASE("remote QTP publisher reconciles overlapping demand across source gene
     REQUIRE((*relay)->awaitSourceGeneration(initialGeneration, Clock::now() + 5s));
     CHECK((*relay)->getSourceStatus().generation > initialGeneration);
     REQUIRE(second.events->wait(current.bidPrice.raw));
+
+    const auto statisticsDeadline = Clock::now() + 5s;
+    q::api::PublisherStatistics sourceStats;
+
+    do {
+        sourceStats = (*relay)->getStatistics();
+
+        if (sourceStats.families[0].ingressRecords.value >= 3 && sourceStats.families[0].sentFrames.value >= 3)
+            break;
+
+        std::this_thread::sleep_for(1ms);
+    } while (Clock::now() < statisticsDeadline);
+
+    CHECK(sourceStats.families[0].ingressFrames.value == 3);
+    CHECK(sourceStats.families[0].ingressRecords.value == 3);
+    CHECK(sourceStats.families[0].sentFrames.value >= 3);
 
     (void)second.endpoint->closeAndAwaitTermination();
     const auto countDemand = [&](std::span<const std::byte> input, std::int32_t type) {
