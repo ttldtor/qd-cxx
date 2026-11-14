@@ -2,6 +2,13 @@
 
 [Русская версия](JAVA-EXPORT.ru.md). English is authoritative.
 
+Use `--profile binary-v2` for the complete pinned default and bundled
+`dxlink.xml` catalogs. The [binary schema](NATIVE-BINARY-JSON.md) holds
+logical fields and explicit indexed positions. The v2 provenance holds Java
+field names, lookup targets, physical slots and synthetic long tails.
+The Java record class is recorded for identification. Native loading
+does not execute Java update methods. The default export remains `native-v1`.
+
 This contract defines an opt-in developer bridge from the locked Java `DataScheme` to the existing
 [native JSON version 1](NATIVE-JSON.md), following [ADR-0003](../../docs/decisions/ADR-0003-configurable-schemas-and-event-mappings.md).
 Java constructs and exports the schema; ordinary C++ loading, inspection and prepared event APIs
@@ -94,7 +101,7 @@ once in the source; unknown/repeated names fail the whole operation. Exported ID
 array positions starting at zero. Provenance records original and exported IDs, including identity
 mappings. A supported empty scheme remains a valid empty export.
 
-Selected records must be the exact locked `DefaultRecord` implementation and have `hasTime:false`.
+For `native-v1`, selected records must be the exact locked `DefaultRecord` implementation and have `hasTime:false`.
 Subclasses, including XML's special `VersionedRecord`, are unsupported. Record IDs, names, field
 ownership and slot indices must be internally consistent. Selecting supported records from a larger
 scheme is an explicit scope choice; it is not evidence that the whole scheme is supported.
@@ -106,6 +113,8 @@ by exactly one physical `VoidIntField` with full type zero, the next integer ind
 identity and the exact name `ownerName + "$VoidTail"`. Only that verified tail is omitted. Standalone
 VOID, missing/malformed tails, unsupported full identities and inconsistent ownership fail.
 The sidecar records each retained source slot and the owning logical field of each omitted tail.
+For `binary-v2`, the exact locked `VersionedRecord` class and the binary JSON
+type catalog are also supported. Standalone VOID remains a logical field.
 
 Enumerate the actual private final `DefaultRecord.fieldsByName` map through a small read-only
 reflection adapter. Validate declaring class, member shape, accessible state, entry types and the
@@ -134,7 +143,8 @@ separate boundary.
 
 Output is UTF-8 without BOM, LF terminated, with fixed JSON member order. Root order is
 `formatVersion`, `profile`, `records`; profile order `id`, `version`; record order `id`, `name`,
-`hasTime`, `fields`, `lookups`; lookup order `name`, `fieldId`. Exact scalar names are neither
+`hasTime`, `fields`, `lookups`, then `indexedTimeLayout` for binary-v2. Lookup order is
+`name`, `fieldId`. Exact scalar names are neither
 normalized nor trimmed. Controls and punctuation are escaped deterministically. Supplementary
 scalars are preserved; unpaired name surrogates are rejected, never replaced. The existing native
 name/count/lookup invariants remain authoritative.

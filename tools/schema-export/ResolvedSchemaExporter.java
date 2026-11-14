@@ -5,6 +5,7 @@ import com.devexperts.qd.DataRecord;
 import com.devexperts.qd.DataScheme;
 import com.devexperts.qd.kit.DefaultRecord;
 import com.devexperts.qd.kit.VoidIntField;
+import com.dxfeed.api.impl.VersionedRecord;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.nio.charset.StandardCharsets;
@@ -60,6 +61,18 @@ public final class ResolvedSchemaExporter {
    */
   public static Snapshot export(DataScheme scheme, List<String> selection, Limits limits)
       throws ReflectiveOperationException {
+    return export(scheme, selection, limits, false);
+  }
+
+  /** Exports the opt-in binary catalog with explicit indexed layouts and physical slot metadata. */
+  public static Snapshot exportBinary(DataScheme scheme, List<String> selection, Limits limits)
+      throws ReflectiveOperationException {
+    return export(scheme, selection, limits, true);
+  }
+
+  private static Snapshot export(
+      DataScheme scheme, List<String> selection, Limits limits, boolean binary)
+      throws ReflectiveOperationException {
     limits.validate();
     require(scheme != null && selection != null, "INVALID_SCHEMA");
     Set<String> requested = new HashSet<>();
@@ -71,7 +84,9 @@ public final class ResolvedSchemaExporter {
     Writer json = new Writer(limits.bytes);
     Writer projection = new Writer(limits.sidecarBytes);
     json.add(
-        "{\"formatVersion\":1,\"profile\":{\"id\":\"qdcxx-native\",\"version\":1},\"records\":[");
+        binary
+            ? "{\"formatVersion\":1,\"profile\":{\"id\":\"qdcxx-native-binary\",\"version\":2},\"records\":["
+            : "{\"formatVersion\":1,\"profile\":{\"id\":\"qdcxx-native\",\"version\":1},\"records\":[");
     projection.add("[");
     int recordCount = 0;
     long fieldCount = 0;
@@ -84,11 +99,14 @@ public final class ResolvedSchemaExporter {
         continue;
       }
       require(recordCount < limits.records, "RESOURCE_LIMIT");
-      require(record.getClass() == DefaultRecord.class, "UNSUPPORTED_RECORD");
+      require(
+          record.getClass() == DefaultRecord.class
+              || (binary && record.getClass() == VersionedRecord.class),
+          "UNSUPPORTED_RECORD");
       require(
           record.getId() == sourceId && scheme.findRecordByName(record.getName()) == record,
           "INVALID_SCHEMA");
-      require(!record.hasTime(), "UNSUPPORTED_INDEXED");
+      require(binary || !record.hasTime(), "UNSUPPORTED_INDEXED");
       scalar(record.getName(), limits.nameUnits);
       nameCount += record.getName().length();
       require(nameCount <= limits.totalNameUnits, "RESOURCE_LIMIT");
@@ -104,7 +122,7 @@ public final class ResolvedSchemaExporter {
       for (int slot = 0; slot < record.getIntFieldCount(); slot++) {
         DataField field = record.getIntField(slot);
         require(field.getIndex() == slot && field.getRecord() == record, "INVALID_SCHEMA");
-        checkType(field, false);
+        checkType(field, false, binary);
         require(++fieldCount <= limits.fields, "RESOURCE_LIMIT");
         retained.put(field, fields.size());
         fields.add(field);
@@ -124,7 +142,7 @@ public final class ResolvedSchemaExporter {
       for (int slot = 0; slot < record.getObjFieldCount(); slot++) {
         DataField field = record.getObjField(slot);
         require(field.getIndex() == slot && field.getRecord() == record, "INVALID_SCHEMA");
-        checkType(field, true);
+        checkType(field, true, binary);
         require(++fieldCount <= limits.fields, "RESOURCE_LIMIT");
         retained.put(field, fields.size());
         fields.add(field);
@@ -158,9 +176,14 @@ public final class ResolvedSchemaExporter {
               + recordCount
               + ",\"name\":"
               + quote(record.getName())
-              + ",\"hasTime\":false,\"fields\":[");
-      projection.add(
-          "{\"sourceId\":" + sourceId + ",\"exportedId\":" + recordCount + ",\"slots\":[");
+              + ",\"hasTime\":"
+              + record.hasTime()
+              + ",\"fields\":[");
+      projection.add("{\"sourceId\":" + sourceId + ",\"exportedId\":" + recordCount);
+      if (binary) {
+        projection.add(",\"recordClass\":" + quote(record.getClass().getName()));
+      }
+      projection.add(",\"slots\":[");
       for (int id = 0; id < fields.size(); id++) {
         if (id != 0) {
           json.add(",");
@@ -176,8 +199,17 @@ public final class ResolvedSchemaExporter {
                 + ",\"slot\":"
                 + field.getIndex()
                 + ",\"tail\":"
-                + (field.getSerialType().isLong() ? Integer.toString(field.getIndex() + 1) : "null")
-                + "}");
+                + (field.getSerialType().isLong()
+                    ? Integer.toString(field.getIndex() + 1)
+                    : "null"));
+        if (binary) {
+          projection.add(",\"names\":" + fieldNames(field));
+          if (field.getSerialType().isLong()) {
+            projection.add(
+                ",\"tailNames\":" + fieldNames(record.getIntField(field.getIndex() + 1)));
+          }
+        }
+        projection.add("}");
       }
       json.add("],\"lookups\":[");
       projection.add("],\"omittedLookups\":[");
@@ -209,7 +241,10 @@ public final class ResolvedSchemaExporter {
       for (boolean found : referenced) {
         require(found, "UNSUPPORTED_LOOKUPS");
       }
-      json.add("]}");
+      json.add(
+          binary
+              ? "],\"indexedTimeLayout\":" + indexedLayout(record, retained, tails) + "}"
+              : "]}");
       projection.add("]}");
       recordCount++;
     }
@@ -219,10 +254,58 @@ public final class ResolvedSchemaExporter {
     return new Snapshot(json.toString(), projection.toString());
   }
 
-  private static void checkType(DataField field, boolean object) {
+  private static String indexedLayout(
+      DataRecord record, Map<DataField, Integer> retained, Map<DataField, Integer> tails) {
+    if (!record.hasTime()) {
+      return "null";
+    }
+    require(record.getIntFieldCount() >= 2, "UNSUPPORTED_INDEXED");
+    DataField first = record.getIntField(0);
+    DataField second = record.getIntField(1);
+    int high = retained.get(first);
+    if (first.getSerialType().isLong()) {
+      require(Integer.valueOf(high).equals(tails.get(second)), "UNSUPPORTED_INDEXED");
+      return "{\"kind\":\"single-int64\",\"fieldId\":" + high + "}";
+    }
+    int low = retained.get(second);
+    require(
+        indexWord(first)
+            && indexWord(second)
+            && (first.getSerialType().getId() != 0 || second.getSerialType().getId() != 0),
+        "UNSUPPORTED_INDEXED");
+    return "{\"kind\":\"pair-int32\",\"highFieldId\":" + high + ",\"lowFieldId\":" + low + "}";
+  }
+
+  private static boolean indexWord(DataField field) {
+    int id = field.getSerialType().getId();
+    return id == 0 || id == 2 || id == 4 || id == 8 || id == 24 || id == 40 || id == 56 || id == 72
+        || id == 88;
+  }
+
+  private static String fieldNames(DataField field) {
+    return "{\"name\":"
+        + quote(field.getName())
+        + ",\"localName\":"
+        + quote(field.getLocalName())
+        + ",\"propertyName\":"
+        + quote(field.getPropertyName())
+        + "}";
+  }
+
+  private static void checkType(DataField field, boolean object, boolean binary) {
     int id = field.getSerialType().getId();
     require(
-        id == 2 || id == 8 || id == 10 || id == 40 || id == 56 || id == 72 || id == 88 || id == 120,
+        id == 2
+            || id == 8
+            || id == 10
+            || id == 40
+            || id == 56
+            || id == 72
+            || id == 88
+            || id == 120
+            || (binary
+                && (id == 0 || id == 1 || id == 3 || id == 4 || id == 9 || id == 24 || id == 104
+                    || id == 137 || id == 152 || id == 233 || id == 249)),
         "UNSUPPORTED_TYPE");
     require(field.getSerialType().isObject() == object, "INVALID_SCHEMA");
   }
