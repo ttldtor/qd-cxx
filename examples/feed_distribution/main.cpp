@@ -6,11 +6,13 @@
 #include "qd/events/order_source.hpp"
 #include "qd/transport/tcp_runtime.hpp"
 
+#include <algorithm>
 #include <array>
 #include <charconv>
 #include <exception>
 #include <iostream>
 #include <optional>
+#include <span>
 #include <string>
 #include <syncstream>
 #include <thread>
@@ -25,7 +27,7 @@ constexpr std::string_view SYMBOL = "IBM";
 constexpr std::u16string_view SYMBOL16 = u"IBM";
 constexpr std::string_view USAGE = R"(Usage: qdcxx-distribution source [PORT]
        qdcxx-distribution server PORT SOURCE_PORT
-       qdcxx-distribution client PORT [SYMBOL]
+       qdcxx-distribution client PORT [SYMBOL...]
 
 Run a plain loopback QTP source, relay, or receiving application.
 Source and server accept port 0 and print the selected PORT. The source defaults to port 0.
@@ -40,7 +42,7 @@ Exit codes: 0 stopped or help, 1 runtime/I/O failure, 2 invalid arguments or com
 )";
 constexpr std::string_view USAGE_RU = R"(Использование: qdcxx-distribution source [PORT]
                qdcxx-distribution server PORT SOURCE_PORT
-               qdcxx-distribution client PORT [SYMBOL]
+               qdcxx-distribution client PORT [SYMBOL...]
 
 Запуск источника, сервера или клиента QTP на loopback.
 Источник и сервер принимают порт 0 и печатают выбранный PORT. У источника порт 0 по умолчанию.
@@ -289,7 +291,7 @@ int server(q::transport::RuntimeBootstrap &bootstrap, std::uint16_t listenPort, 
     return 0;
 }
 
-int client(q::transport::RuntimeBootstrap &bootstrap, std::uint16_t sourcePort, std::string_view symbol) {
+int client(q::transport::RuntimeBootstrap &bootstrap, std::uint16_t sourcePort, std::span<char *> symbols) {
     q::api::ApiRuntime runtime(bootstrap);
     q::api::EndpointOptions options;
     options.contract = q::api::DeliveryContract::MIXED;
@@ -308,7 +310,13 @@ int client(q::transport::RuntimeBootstrap &bootstrap, std::uint16_t sourcePort, 
                 emit("ORDER ", order->getIndex(), ' ', order->eventFlags);
         }
     });
-    subscription->addSymbols(symbol);
+
+    if (symbols.empty())
+        subscription->addSymbols(SYMBOL);
+
+    for (const auto *symbol : symbols)
+        subscription->addSymbols(symbol);
+
     endpoint->connect("127.0.0.1:" + std::to_string(sourcePort));
     emit("STARTED");
     int status = 0;
@@ -375,10 +383,13 @@ int main(int argc, char **argv) {
     const bool clientRole = role == "client";
     const auto first = argc >= 3 ? port(argv[2], !clientRole) : std::optional<std::uint16_t>{0};
     const auto upstream = serverRole && argc == 4 ? port(argv[3], false) : std::nullopt;
-    const std::string_view symbol = clientRole && argc == 4 ? argv[3] : SYMBOL;
+    const auto symbols = std::span(argv, static_cast<std::size_t>(argc)).subspan(std::min(argc, 3));
+    const auto validSymbol = [](std::string_view symbol) {
+        return !symbol.empty() && symbol.front() != '*';
+    };
 
     if (!first || !((sourceRole && argc <= 3) || (serverRole && upstream) ||
-                    (clientRole && argc >= 3 && argc <= 4 && !symbol.empty() && symbol.front() != '*'))) {
+                    (clientRole && argc >= 3 && std::ranges::all_of(symbols, validSymbol)))) {
         std::cerr << "Invalid arguments. Use --help.\n";
 
         return 2;
@@ -399,7 +410,7 @@ int main(int argc, char **argv) {
         if (serverRole)
             return server(*bootstrap, *first, *upstream);
 
-        return client(*bootstrap, *first, symbol);
+        return client(*bootstrap, *first, symbols);
     } catch (const std::exception &error) {
         std::cerr << error.what() << '\n';
 

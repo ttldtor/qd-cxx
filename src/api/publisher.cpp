@@ -31,6 +31,8 @@ constexpr std::size_t MAX_PEERS = 8;
 constexpr std::size_t MAX_PENDING_QUOTES = 1024;
 constexpr std::size_t SYMBOL_UNITS = 256;
 constexpr std::size_t CLIENT_KEYS = 32;
+// Java Feed expands Order into source-specific and derived Quote subscriptions.
+constexpr std::size_t MAX_SUBSCRIPTION_WIRE_TUPLES = 256;
 constexpr std::size_t CLIENT_PENDING_ITEMS = 32;
 constexpr std::size_t HISTORY_POINTS_PER_KEY = 16;
 constexpr std::size_t CLIENT_SYMBOL_UNITS = CLIENT_KEYS * SYMBOL_UNITS;
@@ -392,7 +394,9 @@ core::LocalSchema publisherSchema(bool mixed) {
     return std::move(*schema);
 }
 
-protocol::SubscriptionWriter publisherWriter(const core::LocalSchema &schema) {
+protocol::SubscriptionWriter
+publisherWriter(const core::LocalSchema &schema,
+                core::SubscriptionSelectorPolicy policy = core::SubscriptionSelectorPolicy::EXACT_ONLY) {
     std::vector<protocol::OutgoingRecord> outgoing;
 
     for (const auto &record : schema.records()) {
@@ -419,7 +423,7 @@ protocol::SubscriptionWriter publisherWriter(const core::LocalSchema &schema) {
                                                         256 * 1024,
                                                         256 * 1024,
                                                         4},
-                                                       writerWork);
+                                                       writerWork, policy);
 
     if (!writer)
         throw Error({ErrorCode::RESOURCE_LIMIT, "publisher-writer", 0, static_cast<std::uint32_t>(writer.error())});
@@ -432,7 +436,9 @@ protocol::LiveSession serverSession(const core::LocalSchema &schema, protocol::L
     auto local = schema;
     auto session = protocol::LiveSession::createServer(
         std::move(local), std::move(writer), liveLimits(schema.records().size() > 1),
-        {MAX_FRAME_BYTES, FAMILY_COUNT, 128, CLIENT_KEYS, SYMBOL_UNITS, CLIENT_SYMBOL_UNITS}, work);
+        {MAX_FRAME_BYTES, FAMILY_COUNT, 128, MAX_SUBSCRIPTION_WIRE_TUPLES, SYMBOL_UNITS,
+         MAX_SUBSCRIPTION_WIRE_TUPLES * SYMBOL_UNITS},
+        work);
 
     if (!session)
         throw Error(protocolDiagnostic(session.error(), "publisher-server-session"));
@@ -650,7 +656,7 @@ class SourceConnection {
     std::optional<protocol::LiveEvent> pendingEvent_;
 
     static protocol::LiveSession newSession(const core::LocalSchema &schema, protocol::LiveWork &work) {
-        auto writer = publisherWriter(schema);
+        auto writer = publisherWriter(schema, core::SubscriptionSelectorPolicy::CANONICAL_EXACT_V1);
         const bool mixed = schema.records().size() > 1;
         auto limits = liveLimits(mixed);
         limits.residentBytes = mixed ? MIXED_REMOTE_EPOCH_BYTES : REMOTE_EPOCH_BYTES;

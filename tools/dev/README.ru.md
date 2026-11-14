@@ -384,3 +384,5 @@ class/resource inventories.
 - [Генератор NuamOrder](../upstream/nuam-order-oracle/README.ru.md) записывает индексированные заявки офлайн; справка доступна на двух языках.
 
 - [Генератор фикстур OnDemand](../upstream/ondemand-oracle/README.ru.md) воспроизводит точные байты синтетических запросов и ответов закреплённого QD. Справка на двух языках доступна без входов.
+
+[Приёмочная проверка раздачи](../../tests/conformance/distribution/README.ru.md) запускает локальные процессы QTP на C++ и Java.

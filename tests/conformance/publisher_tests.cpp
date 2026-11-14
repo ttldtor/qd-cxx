@@ -390,6 +390,8 @@ TEST_CASE("remote QTP publisher reconciles overlapping demand across source gene
             input = input.subspan(framed.accepted);
 
             if (framed.frame && framed.frame->type == type) {
+                REQUIRE_FALSE(framed.frame->payload.empty());
+                CHECK(framed.frame->payload.front() == std::byte{0x24}); // First byte of the canonical IBM symbol.
                 const auto batch =
                     q::protocol::decodeIncomingSubscription(*framed.frame, *schema, mapping, limits, work);
                 REQUIRE(batch);

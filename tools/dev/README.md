@@ -370,3 +370,5 @@ cache replay. Input-free EN/RU/Get-Help, bounded JDK8 Capture/Verify with exact 
 - [NuamOrder oracle](../upstream/nuam-order-oracle/README.md) captures offline indexed-order observations with EN/RU help.
 
 - [OnDemand fixture generator](../upstream/ondemand-oracle/README.md) reproduces exact synthetic request and response bytes with pinned QD, with input-free help in English and Russian.
+
+The [distribution qualification](../../tests/conformance/distribution/README.md) runs native and Java QTP peers on local loopback.
