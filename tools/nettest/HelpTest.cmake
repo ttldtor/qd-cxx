@@ -1,0 +1,43 @@
+# Copyright (c) 2026 ttldtor.
+# SPDX-License-Identifier: BSL-1.0
+cmake_minimum_required(VERSION 3.25)
+
+if(NOT DEFINED PROGRAM)
+    message(FATAL_ERROR "PROGRAM is required")
+endif()
+
+function(run result expected)
+    execute_process(COMMAND "${PROGRAM}" ${ARGN}
+        RESULT_VARIABLE status OUTPUT_VARIABLE out ERROR_VARIABLE err TIMEOUT 4)
+    if(NOT "${status}" STREQUAL "${expected}")
+        message(FATAL_ERROR "Args '${ARGN}': expected ${expected}, got ${status}. ${err}")
+    endif()
+    set(${result} "${out}" PARENT_SCOPE)
+endfunction()
+
+run(noargs 0)
+run(english 0 --help)
+run(russian 0 --help-ru)
+if(NOT noargs STREQUAL english OR NOT english MATCHES "^Usage:" OR NOT russian MATCHES "^Использование:")
+    message(FATAL_ERROR "Unexpected offline help")
+endif()
+foreach(text IN ITEMS english russian)
+    foreach(option bundle record contract address port symbol instances duration startup rate batch history-bound qd-text)
+        if(NOT ${text} MATCHES "--${option}")
+            message(FATAL_ERROR "Help ${text} does not explain --${option}")
+        endif()
+    endforeach()
+endforeach()
+
+set(missing "${CMAKE_CURRENT_BINARY_DIR}/missing-nettest-bundle")
+run(result 2 p)
+run(result 2 c --bundle "${missing}" --port 0)
+run(result 2 p --bundle "${missing}" --port 0 --duration 0)
+run(result 2 p --bundle "${missing}" --port 0 --batch 129)
+run(result 2 p --bundle "${missing}" --port 0 --rate 1000001)
+run(result 2 c --bundle "${missing}" --port 1 --contract stream --history-bound -1)
+run(result 2 p --bundle "${missing}" --port 0 --instances 9)
+run(result 2 p --bundle "${missing}" --port 0 --address localhost)
+run(result 2 p --bundle "${missing}" --port 0 --symbol IBM --symbol IBM)
+run(result 2 p --bundle "${missing}" --port 0 --symbol "*")
+run(result 1 c --bundle "${missing}" --port 1)

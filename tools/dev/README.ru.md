@@ -4,6 +4,8 @@
 
 [Сравнение NetTest](../../docs/NETTEST-REFERENCE.ru.md) описывает публикацию записей Java QD и измерения событийных API dxFeed.
 
+[NetTest уровня записей](../nettest/README.ru.md) выполняет конечные прогоны производителя и потребителя QTP по экспортированным схемам.
+
 [Production oracle расписаний](../upstream/schedule-oracle/README.ru.md) захватывает/проверяет полную закреплённую грамматику конструктора, named/default rules и timezone IDs через Java 8. Без аргументов, EN/RU-справка и Get-Help не требуют входов и не запускают Java. [Консольный пример расписаний](../../examples/schedule_rules/README.ru.md) использует установленный публичный API; без аргументов и с `--help`/`--help-ru` контекст не инициализируется.
 
 [Production oracle Trade](../upstream/trade-oracle/README.ru.md) проверяет composite/regional fields, raw slots, time/flags/defaults и прямые business doubles. Noargs/ENRU/Get-Help не запускают Java; Capture/Verify используют четыре явных пути, finite subprocess limits и новые private run directories.
