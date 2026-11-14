@@ -365,8 +365,9 @@ if(ORG_TTLDTOR_QDCXX_BUILD_FEED_API)
     install(FILES examples/feed_distribution/main.cpp examples/feed_distribution/CMakeLists.txt
         examples/feed_distribution/help_test.cmake examples/feed_distribution/README.md examples/feed_distribution/README.ru.md
         DESTINATION "${CMAKE_INSTALL_DATADIR}/qdcxx/examples/feed_distribution")
-    install(FILES examples/client_queries/main.cpp examples/client_queries/CMakeLists.txt
-        examples/client_queries/check.cmake examples/client_queries/README.md examples/client_queries/README.ru.md
+    install(FILES examples/client_queries/main.cpp examples/client_queries/last_quote.cpp examples/client_queries/daily_candles.cpp
+        examples/client_queries/CMakeLists.txt
+        examples/client_queries/check.cmake examples/client_queries/check_request_help.cmake examples/client_queries/README.md examples/client_queries/README.ru.md
         DESTINATION "${CMAKE_INSTALL_DATADIR}/qdcxx/examples/client_queries")
     if(ORG_TTLDTOR_QDCXX_BUILD_IPF)
         install(FILES examples/client_models/main.cpp examples/client_models/CMakeLists.txt
@@ -513,6 +514,8 @@ endif()
 if(BUILD_TESTING)
     if(TARGET qdcxx_client_queries)
         add_test(NAME client_queries_help COMMAND "${CMAKE_COMMAND}" "-DPROGRAM=$<TARGET_FILE:qdcxx_client_queries>" -P "${CMAKE_CURRENT_SOURCE_DIR}/examples/client_queries/check.cmake")
+        add_test(NAME daily_candles_help COMMAND "${CMAKE_COMMAND}" "-DPROGRAM=$<TARGET_FILE:qdcxx_daily_candles>" -P "${CMAKE_CURRENT_SOURCE_DIR}/examples/client_queries/check_request_help.cmake")
+        add_test(NAME last_quote_help COMMAND "${CMAKE_COMMAND}" "-DPROGRAM=$<TARGET_FILE:qdcxx_last_quote>" -P "${CMAKE_CURRENT_SOURCE_DIR}/examples/client_queries/check_request_help.cmake")
         add_executable(qdcxx_client_queries_tests tests/conformance/client_queries_tests.cpp tests/conformance/connect_peer.cpp)
         target_link_libraries(qdcxx_client_queries_tests PRIVATE qdcxx_feed)
         set_target_properties(qdcxx_client_queries_tests PROPERTIES CXX_EXTENSIONS OFF)
