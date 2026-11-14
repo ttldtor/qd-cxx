@@ -8,13 +8,22 @@ is the compatibility reference. Supported profiles and limits are explicit; full
 
 ## Documentation
 
+[Open the generated documentation](https://ttldtor.github.io/qd-cxx/) for the guides and API reference.
+
 1. [Getting started](docs/getting-started.md) — install the library and run a small consumer.
 2. [Practical guides](docs/guides.md) — tapes, schemas, events and controlled STREAM use.
 3. [API reference](docs/api.md) — public headers, link targets and ownership contracts.
 4. [Architecture and protocols](spec/README.md) — component responsibilities and wire behavior.
 
-For a typed live application, start with the [public feed API](docs/FEED-API.md) and
-the [Quote console example](examples/feed_quote/README.md). The library owns connection and delivery progress.
+## Examples
+
+The [Feed API guide](docs/FEED-API.md) describes connection, delivery and shutdown.
+
+- [Subscribe to Quote](examples/feed_quote/README.md) from an independent client application.
+- [Query current and historical data](examples/client_queries/README.md) for the last Quote, Candle history and an order-book snapshot.
+- [Receive several event types](examples/feed_market/README.md) with regional symbols and an explicit Order source.
+- [Work with instruments](examples/ipf_live/README.md) or [build models offline](examples/client_models/README.md).
+- [Run a source, relay and clients](examples/feed_distribution/README.md) on a local QTP network.
 
 [Current capabilities](docs/CURRENT-STATE.md) identify implemented profiles.
 The independent [schedule-rules API](docs/SCHEDULE-RULES.md) parses trading hours with explicit calendar contexts.
