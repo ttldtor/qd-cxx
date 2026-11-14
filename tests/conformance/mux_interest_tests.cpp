@@ -250,6 +250,21 @@ TEST_CASE("MUX staged replacement publishes only the current inactive bank") {
     CHECK_FALSE(m::detail::MuxStateAccess::commitReplace(state, *next));
 }
 
+TEST_CASE("MUX exact lookup pays for validation even with no client entries") {
+    const auto source = schema();
+    auto state = owner(source);
+    const auto reader = client(state);
+    const auto key = request(source, u"IBM").key;
+    auto work = turn();
+    work.symbolUnits = 0;
+    CHECK(state.select(reader, key, {}, work).error() == m::MuxError::WORK_LIMIT);
+    work.symbolUnits = 1;
+    const auto selected = state.select(reader, key, {}, work);
+    REQUIRE(selected);
+    CHECK_FALSE(selected->has_value());
+    CHECK(work.symbolUnits == 0);
+}
+
 TEST_CASE("MUX overlap preserves private filtering and last removal") {
     const auto source = schema();
     auto state = owner(source);

@@ -434,6 +434,17 @@ TEST_CASE("mixed publisher preserves STREAM occurrences and indexed HISTORY on o
     subscription->addSymbols("IBM");
     endpoint->connect("127.0.0.1:" + std::to_string((*server)->port()));
 
+    auto second = runtime.createEndpoint(options);
+    auto secondSubscription = second->getFeed()->createSubscription(
+        {q::api::EventType::QUOTE, q::api::EventType::TIME_AND_SALE, q::api::EventType::ORDER});
+    auto secondEvents = std::make_shared<Events>();
+    secondSubscription->addEventListener([secondEvents](std::span<const q::api::RegisteredEvent> batch) {
+        const std::lock_guard lock(secondEvents->mutex);
+        secondEvents->values.insert(secondEvents->values.end(), batch.begin(), batch.end());
+        secondEvents->ready.notify_all();
+    });
+    secondSubscription->addSymbols({"IBM", "MSFT"});
+
     for (const auto family : {q::core::SubscriptionFamily::TICKER, q::core::SubscriptionFamily::STREAM,
                               q::core::SubscriptionFamily::HISTORY}) {
         INFO("contract ", static_cast<int>(family));
@@ -445,6 +456,13 @@ TEST_CASE("mixed publisher preserves STREAM occurrences and indexed HISTORY on o
              static_cast<int>(endpointDiagnostic.code), " detail ", endpointDiagnostic.detailCode);
         REQUIRE(observed);
         REQUIRE((*source)->awaitDemand(family, u"IBM", true, Clock::now() + 5s));
+    }
+
+    second->connect("127.0.0.1:" + std::to_string((*server)->port()));
+
+    for (const auto family : {q::core::SubscriptionFamily::TICKER, q::core::SubscriptionFamily::STREAM,
+                              q::core::SubscriptionFamily::HISTORY}) {
+        REQUIRE((*source)->awaitDemand(family, u"MSFT", true, Clock::now() + 5s));
     }
 
     auto publisher = (*source)->getPublisher();
@@ -519,6 +537,18 @@ TEST_CASE("mixed publisher preserves STREAM occurrences and indexed HISTORY on o
         CHECK((orders[1].eventFlags & flags::SNAPSHOT_END) != 0);
     }
     CHECK(endpoint->getStatistics().connection.establishedConnections.value == 1);
+    {
+        std::unique_lock lock(secondEvents->mutex);
+        REQUIRE(secondEvents->ready.wait_for(lock, 5s, [&] {
+            return std::ranges::count_if(secondEvents->values,
+                                         [](const auto &event) {
+                                             return std::holds_alternative<q::events::TimeAndSale>(event);
+                                         }) == 2 &&
+                   std::ranges::count_if(secondEvents->values, [&](const auto &event) {
+                       return defaultOrder(event) != nullptr;
+                   }) == 2;
+        }));
+    }
     order.index = 7;
     order.eventFlags = flags::REMOVE_EVENT;
     REQUIRE(publisher.publish(order));
@@ -533,6 +563,8 @@ TEST_CASE("mixed publisher preserves STREAM occurrences and indexed HISTORY on o
         CHECK((removed->eventFlags & flags::REMOVE_EVENT) != 0);
     }
     (void)endpoint->closeAndAwaitTermination();
+    REQUIRE((*source)->awaitDemand(q::core::SubscriptionFamily::HISTORY, u"MSFT", true, Clock::now() + 5s));
+    (void)second->closeAndAwaitTermination();
     REQUIRE((*source)->awaitDemand(q::core::SubscriptionFamily::HISTORY, u"IBM", false, Clock::now() + 5s));
     (*server)->closeAndAwaitTermination();
     CHECK((*server)->getDiagnostic().code == q::api::ErrorCode::NONE);
