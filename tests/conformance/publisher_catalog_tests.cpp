@@ -429,3 +429,67 @@ TEST_CASE("full catalog relay preserves record identities and demand over TCP") 
     (*relay)->closeAndAwaitTermination();
     CHECK((*relay)->getDiagnostic().code == q::api::ErrorCode::NONE);
 }
+
+TEST_CASE("catalog relay policy replaces physical record demand for one live peer") {
+    auto bootstrap = q::transport::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    auto schema = testSchema();
+    const auto names = fieldNames(schema);
+    q::test::TcpPeerConfig config;
+    config.lifetime = 20s;
+    auto &script = config.sessions.emplace_back();
+    script.initialBytes = sourcePrefix(schema);
+    script.readThroughMessage = 16;
+    script.waitForClientClose = true;
+    q::test::OwnedTcpPeer source(std::move(config));
+    q::api::EventRegistryWork work;
+    const auto registry = q::api::EventRegistry::builtIn({}, work);
+    REQUIRE(registry);
+    const auto filter = [&](std::u16string expression) {
+        return q::api::FeedFilter::Builder(*registry).withCategory(u"allow", std::move(expression)).build();
+    };
+    q::api::PublisherOptions options;
+    options.source = q::api::PublisherSourceOptions{"127.0.0.1", source.port(), 2s};
+    options.catalog.emplace(schema, names);
+    options.demand.ticker = filter(u":Alpha");
+    auto relay = q::api::PublisherEndpoint::create(*bootstrap, options);
+    REQUIRE(relay);
+    Downstream downstream(schema, (*relay)->port(), 100);
+    using enum c::SubscriptionFamily;
+    using enum p::SubscriptionMessage;
+    downstream.subscribe(TICKER_ADD, 0);
+    downstream.subscribe(TICKER_ADD, 1);
+    downstream.subscribe(STREAM_ADD, 1);
+    REQUIRE((*relay)->awaitDemand(TICKER, u"Alpha", u"IBM", true, Clock::now() + WAIT_TIME));
+    REQUIRE((*relay)->awaitDemand(STREAM, u"Beta", u"IBM", true, Clock::now() + WAIT_TIME));
+    CHECK((*relay)->getDemand(TICKER).size() == 1);
+    REQUIRE((*relay)->getPeers().size() == 1);
+    const auto id = (*relay)->getPeers().front().id;
+    const auto changed = (*relay)->replacePeerDemand(id, {filter(u":Beta"), {}, {}});
+    REQUIRE(changed);
+    const auto applied = changed->waitUntil(Clock::now() + WAIT_TIME);
+    REQUIRE(applied);
+    CHECK(applied->outcome == q::api::PublisherPolicyOutcome::APPLIED);
+    CHECK(applied->revision == 1);
+    const auto demand = (*relay)->getDemand(TICKER);
+    REQUIRE(demand.size() == 1);
+    CHECK(demand.front().recordName == u"Beta");
+    REQUIRE((*relay)->getDemand(STREAM).size() == 1);
+
+    const auto deadline = Clock::now() + WAIT_TIME;
+    bool observed = false;
+
+    while (Clock::now() < deadline) {
+        const auto captured = source.snapshot();
+        const auto upstream = sourceDemand(captured.sessions[0].received, schema);
+
+        if (hasDemand(upstream, 11, schema.recordContext(1))) {
+            observed = true;
+            break;
+        }
+
+        std::this_thread::sleep_for(1ms);
+    }
+
+    CHECK(observed);
+}
