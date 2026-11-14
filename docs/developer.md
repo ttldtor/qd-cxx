@@ -24,6 +24,7 @@ reruns are different evidence; none is a general security certification or an RS
 - [Recovery-owned HISTORY range observation](../tests/conformance/transport/HISTORY-STATUS-VALIDATION.md)
 - [Tape reader and supported inputs](../spec/protocol/TAPE-READER.md)
 - [Tape writer validation](../tests/conformance/protocol/tape-write/WRITER-VALIDATION.md)
+- [Full-schema distribution qualification](FULL-SCHEMA-QUALIFICATION.md)
 - [Schema export validation](../tests/conformance/schema-export/VALIDATION.md)
 - [Subscription compatibility](../tests/conformance/subscriptions/VALIDATION.md)
 - [Composed receiving profiles and CLI qualification](../tests/conformance/subscriptions/DELIVERY-VALIDATION.md)
