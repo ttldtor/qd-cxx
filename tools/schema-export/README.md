@@ -97,8 +97,15 @@ declaration and copied pinned XSD. This is a trusted-local-input bridge, not a h
 Input defaults/hard maxima are 64 files, 1048576 bytes and import depth 16, counting the properties
 file and pinned XSD; overrides may lower them. Output/count/name budgets are listed in the contract.
 
-Without `--record`, **all** records must be supported. Full default/dxlink schemes include unsupported
-records; selecting Quote/Profile is explicit scope. Unknown or repeated names fail. Requested order
+Without `--record`, **all** records must be supported. Use `--profile binary-v2`
+with `--source default`, or with `--source xml --resource dxlink`, to export both
+complete catalogs. Use `loadBinaryJsonSchema` for the resulting `schema.json`.
+To install both bundles with the schema-enabled C++ SDK, place them in
+`default/` and `dxlink/` under a common directory and configure
+`-DORG_TTLDTOR_QDCXX_SCHEMA_PROFILE_DIR=/path/to/bundles`. Installation places both
+JSON files per profile under the SDK data directory at `qdcxx/schemas/`.
+The following restrictions describe the default `native-v1` export.
+Selecting Quote/Profile is explicit scope. Unknown or repeated names fail. Requested order
 does not reorder source records; exported IDs are contiguous and recorded in the sidecar. Only exact
 ordinary `DefaultRecord`, full types 2/8/10/40/56/72/88/120 and verified physical VOID tails are supported.
 All actual retained-field lookup keys survive; omitted-tail keys are accounted for separately.

@@ -25,6 +25,7 @@ public final class SchemaExport {
       "qdcxx Java resolved schema export\n"
           + "Use tools/schema-export/Export.cmake with explicit JDK8 and classpath receipt.\n"
           + "--source default|endpoint|xml --output NEW_DIRECTORY [--record EXACT_NAME ...]\n"
+          + "Output profiles: --profile native-v1 (default) or binary-v2 (indexed catalog)\n"
           + "--startup KEY=VALUE ...  --properties FILE  --set KEY=VALUE ...\n"
           + "XML: --input-root DIR --xml RELATIVE_FILE ... --resource dxlink\n"
           + "     --xml-dxprops true|false --xml-sysprops true|false\n"
@@ -103,6 +104,7 @@ public final class SchemaExport {
                 "--properties",
                 "--input-root",
                 "--resource",
+                "--profile",
                 "--xml-dxprops",
                 "--xml-sysprops",
                 "--max-schema-bytes",
@@ -163,6 +165,9 @@ public final class SchemaExport {
     ResolvedSchemaExporter.require(
         !options.containsKey("--resource") || options.get("--resource").equals("dxlink"), "USAGE");
     String mode = options.get("--source");
+    String profile = options.getOrDefault("--profile", "native-v1");
+    ResolvedSchemaExporter.require(
+        profile.equals("native-v1") || profile.equals("binary-v2"), "USAGE");
     ResolvedSchemaExporter.require(
         mode.equals("xml")
             || (!options.containsKey("--input-root")
@@ -187,11 +192,16 @@ public final class SchemaExport {
             files,
             bytes,
             depth)) {
-      snapshot = ResolvedSchemaExporter.export(source.scheme, records, limits);
+      snapshot =
+          profile.equals("binary-v2")
+              ? ResolvedSchemaExporter.exportBinary(source.scheme, records, limits)
+              : ResolvedSchemaExporter.export(source.scheme, records, limits);
       ResolvedSchemaExporter.Writer sidecar =
           new ResolvedSchemaExporter.Writer(limits.sidecarBytes);
       sidecar.add(
-          "{\"format\":\"qdcxx-java-export-v1\",\"tool\":"
+          "{\"format\":\"qdcxx-java-export-"
+              + (profile.equals("binary-v2") ? "v2" : "v1")
+              + "\",\"tool\":"
               + provenance
               + ",\"source\":"
               + source.provenanceJson
