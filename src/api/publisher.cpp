@@ -594,6 +594,7 @@ struct PublisherPort {
     const bool remote;
     const bool mixed;
     PublisherSourceStatus source;
+    PublisherStatistics statistics;
     std::size_t head = 0;
     std::size_t size = 0;
     std::uint16_t boundPort = 0;
@@ -603,6 +604,14 @@ struct PublisherPort {
 
     PublisherPort(std::size_t count, bool remote, bool mixed)
         : pending(remote ? 0 : count), remote(remote), mixed(mixed) {
+        if (!mixed) {
+            for (std::size_t family = 1; family < FAMILY_COUNT; ++family) {
+                auto &stats = statistics.families[family];
+                stats.ingressFrames.availability = core::StatisticAvailability::UNSUPPORTED;
+                stats.ingressRecords.availability = core::StatisticAvailability::UNSUPPORTED;
+                stats.sentFrames.availability = core::StatisticAvailability::UNSUPPORTED;
+            }
+        }
     }
 };
 } // namespace detail
@@ -770,7 +779,7 @@ class SourceConnection {
     }
 
     void progress(QueueSet &queues, DemandSet &demand, Clock::time_point now, WorkSet &queueWork,
-                  mux::DemandWork &demandWork) {
+                  mux::DemandWork &demandWork, PublisherStatistics &statistics) {
         auto work = liveTurn();
         transport::TcpWork native{16, 16, INPUT_BYTES * 2, 0, 0, 0, 0};
         const auto polled = bytes_->poll(native, work);
@@ -800,12 +809,15 @@ class SourceConnection {
             const auto type = static_cast<DataMessage>(*pendingEvent_->messageType());
             const auto family =
                 static_cast<std::size_t>(std::ranges::find(DATA_MESSAGES, type) - DATA_MESSAGES.begin());
+            const auto records = pendingEvent_->records().size();
             const auto admitted = queues[family]->admit(std::move(*pendingEvent_), queueWork[family]);
 
-            if (admitted)
+            if (admitted) {
+                statistics.families[family].ingressFrames.add(1);
+                statistics.families[family].ingressRecords.add(records);
                 pendingEvent_.reset();
-            else if (admitted.error().error != mux::QueueError::BUSY &&
-                     admitted.error().error != mux::QueueError::WORK_LIMIT)
+            } else if (admitted.error().error != mux::QueueError::BUSY &&
+                       admitted.error().error != mux::QueueError::WORK_LIMIT)
                 throw Error(queueDiagnostic(admitted.error(), "publisher-upstream-admit"));
         }
 
@@ -872,6 +884,7 @@ class PublisherServer {
     bool resetPending_ = false;
     PublisherSourceStatus sourceStatus_;
     std::array<std::uint64_t, FAMILY_COUNT> publishedRevision_{};
+    PublisherStatistics statistics_;
     const std::size_t familyCount_;
 
     static transport::TcpListener listen(transport::RuntimeBootstrap &bootstrap,
@@ -928,6 +941,7 @@ class PublisherServer {
 
     void retire(Peer &peer) noexcept {
         if (!peer.closing) {
+            statistics_.retiredPeers.add(1);
             peer.closing = true;
             peer.output.reset();
             peer.command.reset();
@@ -1097,6 +1111,7 @@ class PublisherServer {
             peer.sentDescription = true;
             break;
         case OutputKind::DATA:
+            statistics_.families[peer.outputFamily].sentFrames.add(1);
             peer.delivery[peer.outputFamily]->batch = {};
             (void)peer.handles[peer.outputFamily].requestResume();
             break;
@@ -1199,12 +1214,15 @@ class PublisherServer {
 
         const auto message = static_cast<DataMessage>(*pendingSource_->messageType());
         const auto family = static_cast<std::size_t>(std::ranges::find(DATA_MESSAGES, message) - DATA_MESSAGES.begin());
+        const auto records = pendingSource_->records().size();
         const auto admitted = queues_[family]->admit(std::move(*pendingSource_), work[family]);
 
-        if (admitted)
+        if (admitted) {
+            statistics_.families[family].ingressFrames.add(1);
+            statistics_.families[family].ingressRecords.add(records);
             pendingSource_.reset();
-        else if (admitted.error().error != mux::QueueError::BUSY &&
-                 admitted.error().error != mux::QueueError::WORK_LIMIT)
+        } else if (admitted.error().error != mux::QueueError::BUSY &&
+                   admitted.error().error != mux::QueueError::WORK_LIMIT)
             throw Error(queueDiagnostic(admitted.error(), "publisher-admit"));
     }
 
@@ -1272,7 +1290,7 @@ class PublisherServer {
                 upstream_.emplace(schema_, *sourceBootstrap_, *sourceOptions_, now, liveWork);
             }
 
-            upstream_->progress(queues_, sourceDemand_, now, work, demandWork);
+            upstream_->progress(queues_, sourceDemand_, now, work, demandWork, statistics_);
         } catch (const Error &failure) {
             if (sourceStatus_.connected || (upstream_ && upstream_->ready())) {
                 fenceSource();
@@ -1320,6 +1338,13 @@ class PublisherServer {
     PublisherServer(transport::RuntimeBootstrap &bootstrap, PublisherOptions options)
         : schema_(publisherSchema(options.mixed)), listener_(listen(bootstrap, options.listener)),
           peers_(options.listener.maxConnections), familyCount_(schema_.records().size()) {
+        for (std::size_t family = familyCount_; family < FAMILY_COUNT; ++family) {
+            auto &stats = statistics_.families[family];
+            stats.ingressFrames.availability = core::StatisticAvailability::UNSUPPORTED;
+            stats.ingressRecords.availability = core::StatisticAvailability::UNSUPPORTED;
+            stats.sentFrames.availability = core::StatisticAvailability::UNSUPPORTED;
+        }
+
         for (std::size_t family = 0; family < familyCount_; ++family)
             queues_[family].emplace(
                 publisherQueue(schema_, peers_.size(), options.source.has_value(), FAMILIES[family]));
@@ -1388,6 +1413,37 @@ class PublisherServer {
             progressSource(port, work);
         else
             publishLocal(port, work);
+
+        statistics_.activePeers = 0;
+
+        for (std::size_t family = 0; family < familyCount_; ++family) {
+            auto &familyStats = statistics_.families[family];
+            const auto resources = queues_[family]->resources();
+            familyStats.desiredKeys = queues_[family]->aggregateEntries().size();
+            familyStats.pendingSourceRecords = resources.pendingRecords;
+            familyStats.deliveryRecordOwners = resources.dataItems;
+            familyStats.queuedDeliveryRecords = 0;
+            familyStats.retainedOutputRecords = 0;
+
+            for (const auto &peer : peers_) {
+                if (!peer)
+                    continue;
+
+                if (const auto client = queues_[family]->resources(peer->handles[family]))
+                    familyStats.queuedDeliveryRecords += client->queuedRecords;
+
+                familyStats.retainedOutputRecords += peer->delivery[family]->batch.records().size();
+            }
+        }
+
+        for (const auto &peer : peers_)
+            statistics_.activePeers += peer && !peer->closing;
+
+        {
+            const std::lock_guard lock(port.mutex);
+            statistics_.pendingPublications = port.size;
+            port.statistics = statistics_;
+        }
     }
 
     void stop() {
@@ -1607,6 +1663,14 @@ PublisherSourceStatus PublisherEndpoint::getSourceStatus() const noexcept {
     const std::lock_guard lock(impl_->port->mutex);
 
     return impl_->port->source;
+}
+
+PublisherStatistics PublisherEndpoint::getStatistics() const noexcept {
+    const std::lock_guard lock(impl_->port->mutex);
+    auto snapshot = impl_->port->statistics;
+    snapshot.pendingPublications = impl_->port->size;
+
+    return snapshot;
 }
 
 void PublisherEndpoint::closeAndAwaitTermination() noexcept {

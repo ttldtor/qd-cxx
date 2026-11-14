@@ -10,6 +10,7 @@ Application setup and usage start in [Getting started](getting-started.md) and [
 - [Detailed build options and component reference](CPP-BUILD.md)
 - [Contribution requirements](../CONTRIBUTING.md), [C++ conventions](CPP-STYLE.md) and [naming](NAMING.md)
 - [Developer-tool catalog](../tools/dev/README.md): UTC logging, formatting and offline compatibility tools
+- [Distribution example](../examples/feed_distribution/README.md): reproducible loopback source, relay and Feed processes
 - [Build this documentation](../tools/docs/README.md)
 - [Upstream reference](UPSTREAM.md) and [compatibility policy](COMPATIBILITY.md)
 

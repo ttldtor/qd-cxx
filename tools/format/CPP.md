@@ -36,7 +36,7 @@ CMake 3.25 path grammar treats that character as a separator. Windows path separ
 
 Default discovery includes tracked and nonignored new files under `include/` (`*.hpp`), `src/`
 (`*.cpp`), `tests/conformance/` (`*.cpp`), and `tools/qtp-inspect/`, `tools/tape-inspect/`, `tools/tape-write/`,
-`tools/dev/`, `tools/subscribe/`, `examples/subscriptions/`, `examples/feed_quote/`, `examples/feed_market/`, `examples/event_text/` and `examples/ipf_live/` (`*.cpp`, `*.hpp`).
+`tools/dev/`, `tools/subscribe/`, `examples/subscriptions/`, `examples/feed_quote/`, `examples/feed_market/`, `examples/feed_distribution/`, `examples/event_text/` and `examples/ipf_live/` (`*.cpp`, `*.hpp`).
 Git C-quoted filenames are decoded before selection.
 `upstream`, `generated` and `fixtures` directory segments are excluded. Explicit manifests admit
 `.cpp` and `.hpp` in those roots and `.work/` for deliberate controls; other roots/extensions fail.
