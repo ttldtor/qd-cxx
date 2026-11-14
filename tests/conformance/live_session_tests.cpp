@@ -723,6 +723,52 @@ TEST_CASE("live DATA output follows the peer receive direction and outgoing layo
     CHECK(f.session.residentBytes() == before);
 }
 
+TEST_CASE("server session admits complete subscription batches using the peer description direction") {
+    using enum p::LiveStatus;
+    auto local = schema();
+    const auto context = local.recordContext(0);
+    auto writer = composer(local, layouts());
+    auto work = turn();
+    auto server = p::LiveSession::createServer(std::move(local), std::move(writer), limits(),
+                                               {8192, 16, 32, 64, 1024, 4096}, work);
+    REQUIRE(server);
+    const p::LiveMessageView commands[]{{11, u"TICKER_ADD_SUBSCRIPTION", {}}, {12, u"TICKER_REMOVE_SUBSCRIPTION", {}}};
+    CHECK(server->composeProtocol({{}, {}, commands}, work));
+    CHECK_FALSE(server->composeProtocol({{}, commands, {}}, work));
+    auto client = fixture();
+    CHECK_FALSE(client.session.composeProtocol({{}, {}, commands}, work));
+    (void)admit(*server, protocol({}, commands, commands));
+    const auto outgoing = server->subscribe(p::SubscriptionMessage::TICKER_ADD, {}, work);
+    REQUIRE_FALSE(outgoing);
+    CHECK(outgoing.error() == Error::UNSUPPORTED);
+    const std::pair<std::u16string_view, std::int32_t> differentRepresentation[]{{u"x", 56}};
+    (void)admit(*server, description(90, u"Alpha", differentRepresentation));
+    (void)admit(*server, description(93, u"Unknown", {}));
+
+    std::vector<std::byte> payload;
+    record(payload, 90, u"IBM", {});
+    record(payload, 93, u"UNKNOWN", {});
+    const auto bytes = frame(11, payload);
+    const auto prefix = server->feedServer(std::span(bytes).first(bytes.size() - 1), work);
+    CHECK(prefix.status == NEED_INPUT);
+    REQUIRE_FALSE(prefix.subscription);
+    const auto suffix = server->feedServer(std::span(bytes).last(1), work);
+    CHECK(suffix.status == EVENT);
+    CHECK_FALSE(suffix.event);
+    REQUIRE(suffix.subscription);
+    REQUIRE(suffix.subscription->entries.size() == 1);
+    const auto &entry = suffix.subscription->entries.front();
+    CHECK(entry.senderId == 90);
+    CHECK(entry.context.matches(context));
+    CHECK(entry.symbol == u"IBM");
+
+    record(payload, 94, u"UNDECLARED", {});
+    const auto rejected = server->feedServer(frame(12, payload), work);
+    CHECK(rejected.status == FAILED);
+    CHECK_FALSE(rejected.subscription);
+    CHECK(server->diagnostic().detail == static_cast<std::size_t>(p::IncomingSubscriptionError::UNKNOWN_RECORD));
+}
+
 TEST_CASE("one live session negotiates and carries all three subscription families") {
     auto f = fixture();
     const p::LiveMessageView onlyTicker[]{{11, u"TICKER_ADD_SUBSCRIPTION", {}}};

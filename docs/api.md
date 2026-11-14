@@ -14,6 +14,7 @@ and ownership. Use the namespace/type indexes beside this page to find individua
 | Event text | qd/events/event_text.hpp | qdcxx_event_text | [Explicit-context UTF-16/UTF-8 rendering](EVENT-TEXT.md) |
 | Schedule rules | `qd/schedule/schedule.hpp` | `qdcxx_schedule` | [Owned schedule identities and typed calendar generations](SCHEDULE-RULES.md); `ORG_TTLDTOR_QDCXX_BUILD_SCHEDULE=ON` (default OFF); no Day/Session queries or filters |
 | Public typed feed | `qd/api/feed.hpp`, `qd/api/event_registry.hpp` | `qdcxx_feed` | [Endpoint, Feed and typed subscriptions](FEED-API.md), [immutable registry](../spec/events/EVENT-REGISTRY.md), [mixed subscriptions](../spec/events/MIXED-SUBSCRIPTIONS.md); `ORG_TTLDTOR_QDCXX_BUILD_FEED_API=ON` (default OFF), requires CLIENT/RUNTIME/RECOVERY |
+| Composite Quote publisher | `qd/api/publisher.hpp` | `qdcxx_feed` | [Publishing endpoint and plain QTP profile](../spec/subscriptions/PUBLISHER.md) |
 | Encodings | `qd/encoding/` | `qdcxx_encoding` | [Encoding specifications](../spec/README.md#encoding-contracts) |
 | Schemas and record identity | `qd/core/` | `qdcxx_core` | [Schema specifications](../spec/README.md#schema-contracts) |
 | Frames, binding and tapes | `qd/protocol/` | `qdcxx_protocol` | [Protocol specifications](../spec/README.md#protocol-contracts) |

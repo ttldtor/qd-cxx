@@ -2,6 +2,19 @@
 
 [Русская версия](LIVE-SESSION.ru.md). English is authoritative.
 
+`LiveSession::createServer` additionally admits the six incoming subscription message types
+through `feedServer` and the same incremental framer. The peer must advertise the exact type in its send
+direction and declare its sender record IDs. Record names in the current effective peer descriptions
+resolve those IDs in the local schema. Subscription tuples carry no DATA fields, so the server
+checks the limits of the declared fields without binding their types. Incoming DATA uses the separate
+client profile. DATA output continues to use the server's independent outgoing
+layouts. An EVENT result provides either a control/DATA event or a whole owning subscription
+batch. Subscription output uses `IncomingSubscriptionLimits`. The caller budgets any retained batches
+independently of the session's resident, owner and event limits. Unknown described records are consumed according to the
+[incoming subscription contract](../protocol/INCOMING-SUBSCRIPTIONS.md). A rejected batch
+publishes no prefix. The server may advertise these receive capabilities through `composeProtocol`.
+Sessions opened through `create` keep the receiving-client profile.
+
 `qd/protocol/live_session.hpp` defines a pure, incremental QTP session. The caller
 supplies bytes, work credits and an explicit transport security decision. The
 session owns protocol state and output bytes; it does not own sockets, clocks,

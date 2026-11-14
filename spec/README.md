@@ -30,7 +30,7 @@ supported types through one owning variant-valued logical subscription.
 - [QTP framing](protocol/FRAMING.md) and [tape reading](protocol/TAPE-READER.md)
 - [Subscription contracts](subscriptions/CONTRACTS.md), [live session](subscriptions/LIVE-SESSION.md), [incoming subscriptions](protocol/INCOMING-SUBSCRIPTIONS.md), [live DATA writer](protocol/LIVE-DATA-WRITE.md)
   and [local STREAM dispatch](subscriptions/CLIENT-DISPATCH.md)
-- [Server demand and client delivery](subscriptions/SERVER-DEMAND.md)
+- [Server demand and client delivery](subscriptions/SERVER-DEMAND.md) and [composite Quote publisher](subscriptions/PUBLISHER.md)
 - [TCP runtime](transport/TCP-RUNTIME.md), [TCP listener](transport/TCP-LISTENER.md), [TLS runtime](transport/TLS-RUNTIME.md)
   and [TLS resource assumptions](transport/TLS-RESOURCES.md)
 

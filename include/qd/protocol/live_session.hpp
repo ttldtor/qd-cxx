@@ -3,6 +3,7 @@
 #pragma once
 
 #include "qd/core/statistics.hpp"
+#include "qd/protocol/incoming_subscription.hpp"
 #include "qd/protocol/subscription_writer.hpp"
 
 #include <cstddef>
@@ -381,7 +382,7 @@ class LivePendingOutput {
 /** Incremental live input state; empty feed never means EOF. */
 enum class LiveStatus {
     NEED_INPUT, ///< No whole admitted envelope this call.
-    EVENT,      ///< Exactly one whole admitted event.
+    EVENT,      ///< Exactly one whole admitted event or server subscription batch.
     FAILED,     ///< First terminal input failure, with no failed-frame event.
     CLOSED      ///< Explicit clean input end.
 };
@@ -391,6 +392,11 @@ struct LiveFeedResult {
     std::size_t accepted = 0;                   ///< Input bytes copied this call; resubmit the unaccepted suffix.
     LiveStatus status = LiveStatus::NEED_INPUT; ///< State after this call.
     std::optional<LiveEvent> event;             ///< Present only for a whole successfully admitted frame.
+};
+
+/** One complete control/DATA event or subscription batch from a server input turn. */
+struct LiveServerFeedResult : LiveFeedResult {
+    std::optional<IncomingSubscriptionBatch> subscription{}; ///< Owning exact command, independent of this epoch.
 };
 
 /** Pure bidirectional protocol driver; no sockets, clocks, callbacks or executor.
@@ -405,6 +411,7 @@ class LiveSession {
      * @param impl Complete session implementation.
      */
     explicit LiveSession(std::unique_ptr<Impl> impl) noexcept;
+    [[nodiscard]] LiveServerFeedResult feedImpl(std::span<const std::byte> input, LiveWork &work, bool server);
 
     public:
     /** Inspect a detached serialized-owner cut without parsing or advancing the session.
@@ -434,6 +441,17 @@ class LiveSession {
      */
     [[nodiscard]] static std::expected<LiveSession, LiveError>
     create(core::LocalSchema &&schema, SubscriptionWriter &&composer, LiveLimits limits, LiveWork &work);
+    /** Open an exact-selector server session supporting incoming subscriptions.
+     * @param schema Validated immutable local declarations, transferred only on success.
+     * @param composer Directional outgoing DATA composer, transferred only on success.
+     * @param limits Existing finite backing and protocol allowances.
+     * @param subscriptions Finite logical bounds for incoming subscription frames.
+     * @param work Actual caller-turn credits.
+     * @return A server epoch with the same framing and control behavior as create().
+     */
+    [[nodiscard]] static std::expected<LiveSession, LiveError>
+    createServer(core::LocalSchema &&schema, SubscriptionWriter &&composer, LiveLimits limits,
+                 IncomingSubscriptionLimits subscriptions, LiveWork &work);
     /** Accept no more than one envelope and atomically admit its entire semantic result.
      * A failed data/description frame publishes no decoder prefix or candidate state. Previous
      * successful owners remain valid. Input must not alias any session-retained framing storage.
@@ -442,6 +460,14 @@ class LiveSession {
      * @return Exact accepted count and at most one immutable successful event.
      */
     [[nodiscard]] LiveFeedResult feed(std::span<const std::byte> input, LiveWork &work);
+    /** Admit a complete frame through the explicit server profile.
+     * A client-profile session returns FAILED without consuming input or changing state.
+     * Subscription output obeys IncomingSubscriptionLimits. Retention of returned batches is caller-owned.
+     * @param input Borrowed bytes; resubmit any unaccepted suffix.
+     * @param work Mutable caller-turn credits.
+     * @return Exact accepted count and at most one event or subscription batch.
+     */
+    [[nodiscard]] LiveServerFeedResult feedServer(std::span<const std::byte> input, LiveWork &work);
     /** End input explicitly; incomplete input is a terminal malformed failure.
      * @return CLOSED for a clean negotiated boundary, otherwise FAILED.
      */
