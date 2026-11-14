@@ -46,12 +46,15 @@ class LocalEventOwner {
      * @param context Owning provenance of that local record.
      * @param symbol Exact borrowed symbol.
      * @param fields Validated tagged fields in local order, borrowed through the call.
+     * @param flags Validated indexed control flags.
+     * @param removalTime Exact signed indexed removal key, if present.
      * @param work Mutable work allowance.
      * @return Owned local row or storage/work failure.
      */
     [[nodiscard]] std::expected<LiveEvent, LiveError>
     record(LiveDataMessage type, std::int32_t localId, const core::RecordContext &context, std::u16string_view symbol,
-           std::span<const core::FieldValueView> fields, LiveWork &work) const;
+           std::span<const core::FieldValueView> fields, std::int32_t flags, std::optional<std::int64_t> removalTime,
+           LiveWork &work) const;
 
     /** Own one local record with its selected contract and physical indexed controls. */
     [[nodiscard]] std::expected<LiveEvent, LiveError>

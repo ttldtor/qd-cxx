@@ -6,6 +6,7 @@
 #include "qd/events/event_flags.hpp"
 #include "qd/protocol/describe_records.hpp"
 #include "qd/protocol/incoming_subscription.hpp"
+#include "qd/protocol/live_session.hpp"
 #include "qd/protocol/stream_data.hpp"
 #include "qd/protocol/subscription_writer.hpp"
 #include "qd/transport/tcp_runtime.hpp"
@@ -21,6 +22,7 @@
 #include <bit>
 #include <chrono>
 #include <doctest/doctest.h>
+#include <limits>
 #include <thread>
 
 namespace {
@@ -537,7 +539,8 @@ void awaitRecords(Downstream &peer, std::size_t count, const q::api::PublisherEn
     INFO("publisher stage=", endpoint.getDiagnostic().stage, " active=", stats.activePeers,
          " retired=", stats.retiredPeers.value, " ticker in=", stats.families[0].ingressRecords.value,
          " ticker out=", stats.families[0].sentFrames.value, " stream in=", stats.families[1].ingressRecords.value,
-         " stream out=", stats.families[1].sentFrames.value);
+         " stream out=", stats.families[1].sentFrames.value, " history in=", stats.families[2].ingressRecords.value,
+         " history out=", stats.families[2].sentFrames.value);
     REQUIRE(peer.records().size() == count);
 }
 } // namespace
@@ -674,6 +677,116 @@ TEST_CASE("local catalog publishes exact copied records through TICKER and STREA
         REQUIRE_FALSE(closed);
         CHECK(closed.error().code == q::api::ErrorCode::CLOSED);
     }
+}
+
+TEST_CASE("local catalog publishes indexed snapshots and transactions to two QTP clients") {
+    using Family = c::SubscriptionFamily;
+    using Type = c::SerialFieldType;
+    namespace flags = q::events::indexed_event_flags;
+    constexpr auto SNAPSHOT_REMOVAL = flags::SNAPSHOT_END | flags::REMOVE_EVENT;
+    constexpr auto FIRST_INDEX = REMOVAL_TIME + 3;
+    constexpr auto NEXT_INDEX = REMOVAL_TIME + 2;
+    constexpr auto HISTORY_DATA = std::to_underlying(p::LiveDataMessage::HISTORY_DATA);
+    auto bootstrap = q::transport::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    const auto schema = publicationSchema();
+    const auto receiver = publicationSchema();
+    const auto names = fieldNames(schema);
+    q::api::PublisherOptions options;
+    options.catalog.emplace(schema, names);
+    auto created = q::api::PublisherEndpoint::create(*bootstrap, options);
+    REQUIRE(created);
+    const auto endpoint = std::move(*created);
+    const auto publisher = endpoint->getPublisher();
+    const auto indexed = schema.recordContext(2);
+    const auto unindexed = schema.recordContext(1);
+
+    Downstream first(receiver, endpoint->port(), 91);
+    Downstream second(receiver, endpoint->port(), 52);
+    first.subscribe(p::SubscriptionMessage::HISTORY_ADD, 2, REMOVAL_TIME);
+    REQUIRE(endpoint->awaitDemand(Family::HISTORY, u"Indexed", u"IBM", true, Clock::now() + WAIT_TIME));
+
+    second.subscribe(p::SubscriptionMessage::HISTORY_ADD, 2, REMOVAL_TIME);
+    second.subscribe(p::SubscriptionMessage::HISTORY_ADD, 2, REMOVAL_TIME, u"BARRIER");
+    REQUIRE(endpoint->awaitDemand(Family::HISTORY, u"Indexed", u"BARRIER", true, Clock::now() + WAIT_TIME));
+
+    const std::array initial{c::FieldValueView{Type::LONG, FIRST_INDEX}, c::FieldValueView{Type::COMPACT_INT, 303}};
+    const std::array update{c::FieldValueView{Type::LONG, NEXT_INDEX}, c::FieldValueView{Type::COMPACT_INT, 404}};
+    auto reserved = initial;
+    reserved[0].raw = std::numeric_limits<std::int64_t>::max();
+
+    CHECK_FALSE(publisher.publishRecord(Family::HISTORY, indexed, u"IBM", initial, {0x20}));
+    CHECK_FALSE(publisher.publishRecord(Family::HISTORY, indexed, u"IBM", initial, {0, REMOVAL_TIME}));
+    CHECK_FALSE(publisher.publishRecord(Family::HISTORY, indexed, u"IBM", {}, {flags::REMOVE_EVENT}));
+    CHECK_FALSE(publisher.publishRecord(Family::HISTORY, indexed, u"IBM", initial, {flags::REMOVE_EVENT, FIRST_INDEX}));
+    CHECK_FALSE(publisher.publishRecord(Family::HISTORY, indexed, u"IBM", reserved));
+    CHECK_FALSE(publisher.publishRecord(Family::HISTORY, unindexed, u"IBM", {}, {flags::REMOVE_EVENT, REMOVAL_TIME}));
+    CHECK_FALSE(publisher.publishRecord(Family::STREAM, indexed, u"IBM", initial, {flags::TX_PENDING}));
+    CHECK(endpoint->getStatistics().pendingPublications == 0);
+    CHECK(endpoint->getStatistics().families[2].ingressRecords.value == 0);
+
+    REQUIRE(publisher.publishRecord(Family::HISTORY, indexed, u"IBM", initial, {flags::SNAPSHOT_BEGIN}));
+    REQUIRE(publisher.publishRecord(Family::HISTORY, indexed, u"IBM", {}, {SNAPSHOT_REMOVAL, REMOVAL_TIME}));
+    awaitRecords(first, 2, *endpoint);
+    awaitRecords(second, 2, *endpoint);
+
+    REQUIRE(publisher.publishRecord(Family::HISTORY, indexed, u"IBM", update, {flags::TX_PENDING}));
+    CHECK_FALSE(publisher.publishRecord(Family::HISTORY, indexed, u"IBM", {}, {flags::REMOVE_EVENT}));
+    REQUIRE(publisher.publishRecord(Family::HISTORY, indexed, u"IBM", {}, {flags::REMOVE_EVENT, FIRST_INDEX}));
+    awaitRecords(first, 4, *endpoint);
+    awaitRecords(second, 4, *endpoint);
+
+    for (const auto *peer : {&first, &second}) {
+        const auto &rows = peer->records();
+
+        for (const auto &[contract, record] : rows) {
+            CHECK(contract == HISTORY_DATA);
+            CHECK(record.context.matches(receiver.recordContext(2)));
+            CHECK(record.symbol.units == u"IBM");
+        }
+
+        const auto verifyValue = [&](std::size_t at, std::int32_t flag, const auto &expected) {
+            const auto &record = rows[at].second;
+            CHECK(record.symbol.eventFlags == flag);
+            CHECK_FALSE(record.removalTime);
+            REQUIRE(record.typedValues.size() == expected.size());
+            CHECK(record.typedValues[0].raw == expected[0].raw);
+            CHECK(record.typedValues[1].raw == expected[1].raw);
+        };
+        verifyValue(0, flags::SNAPSHOT_BEGIN, initial);
+        CHECK(rows[1].second.symbol.eventFlags == SNAPSHOT_REMOVAL);
+        CHECK(rows[1].second.removalTime == REMOVAL_TIME);
+        verifyValue(2, flags::TX_PENDING, update);
+        CHECK(rows[3].second.symbol.eventFlags == flags::REMOVE_EVENT);
+        CHECK(rows[3].second.removalTime == FIRST_INDEX);
+    }
+
+    CHECK(endpoint->getStatistics().families[2].ingressRecords.value == 4);
+    endpoint->closeAndAwaitTermination();
+    CHECK(endpoint->getDiagnostic().code == q::api::ErrorCode::NONE);
+}
+
+TEST_CASE("local indexed catalog excludes outbound layouts that cannot encode HISTORY removals") {
+    using Family = c::SubscriptionFamily;
+    const auto base = publicationSchema();
+    std::vector<c::LocalRecord> records(base.records().begin(), base.records().end());
+    records[2].lookups[0].name = u"EventIndex";
+    auto schema = c::LocalSchema::create(records, SCHEMA_LIMITS, c::LocalProfile::BINARY_FIELDS_V1);
+    REQUIRE(schema);
+    const auto names = fieldNames(*schema);
+    q::api::PublisherOptions options;
+    options.catalog.emplace(*schema, names);
+    auto bootstrap = q::transport::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    auto created = q::api::PublisherEndpoint::create(*bootstrap, options);
+    REQUIRE(created);
+
+    const auto indexed = schema->recordContext(2);
+    const auto publisher = (*created)->getPublisher();
+    const std::array fields{c::FieldValueView{c::SerialFieldType::LONG, REMOVAL_TIME},
+                            c::FieldValueView{c::SerialFieldType::COMPACT_INT, 303}};
+    CHECK_FALSE(publisher.publishRecord(Family::HISTORY, indexed, u"IBM", fields));
+    CHECK(publisher.publishRecord(Family::STREAM, indexed, u"IBM", fields));
 }
 
 TEST_CASE("local record limits reject before admission and the producer linearizes with close") {

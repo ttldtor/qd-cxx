@@ -682,15 +682,15 @@ struct HistoryCollector::Impl {
      * @return Full signed64 bits.
      */
     std::int64_t time(const protocol::LiveRecordView &r) const {
+        if (r.removalTime)
+            return *r.removalTime;
+
         const auto &layout = *schema.records()[static_cast<std::size_t>(r.localId)].indexedTimeLayout;
         const auto raw = [&](std::size_t i) {
             return r.typedValues.empty() ? static_cast<std::int64_t>(r.values[i]) : r.typedValues[i].raw;
         };
 
         if (const auto *pair = std::get_if<core::IndexedTimePairInt32>(&layout)) {
-            if (pair->allowVoid && r.removalTime)
-                return *r.removalTime;
-
             const auto bits =
                 (static_cast<std::uint64_t>(static_cast<std::uint32_t>(raw(pair->firstField))) << TIME_WORD_BITS) |
                 static_cast<std::uint32_t>(raw(pair->secondField));
@@ -699,10 +699,7 @@ struct HistoryCollector::Impl {
         }
 
         if (const auto *low = std::get_if<core::IndexedTimeLowInt32>(&layout)) {
-            // Physical VOID storage can contain a nonzero high word on a raw removal.
-            // Preserve that collector key independently of the public source/low-index projection.
-            return r.removalTime ? *r.removalTime
-                                 : static_cast<std::int64_t>(static_cast<std::uint32_t>(raw(low->field)));
+            return static_cast<std::int64_t>(static_cast<std::uint32_t>(raw(low->field)));
         }
 
         return raw(std::get<core::IndexedTimeSingleInt64>(layout).field);
@@ -1614,7 +1611,7 @@ struct HistoryCollector::Impl {
                 if (!value.raw->typedValues.empty()) {
                     const auto &f = value.raw->typedValues[n];
                     out[n] = HistoryFieldValueView{f.type, f.raw, f.units, f.bytes};
-                } else {
+                } else if (!value.raw->values.empty()) {
                     out[n].raw = value.raw->values[n];
                 }
             }

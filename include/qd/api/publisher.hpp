@@ -154,6 +154,12 @@ struct PublisherOptions {
     PublisherRecordLimits recordLimits;                ///< Pending storage limits for local record publication.
 };
 
+/** Raw controls for one indexed HISTORY publication. */
+struct PublisherHistoryMetadata {
+    std::int32_t eventFlags = 0;                   ///< Snapshot and transaction flags for this occurrence.
+    std::optional<std::int64_t> removalIndex = {}; ///< Exact signed64 index, present only with REMOVE_EVENT.
+};
+
 /** Detached producer port. Copies may be used from application threads and outlive the endpoint. */
 class Publisher {
     std::shared_ptr<detail::PublisherPort> port_;
@@ -172,8 +178,8 @@ class Publisher {
     /** Submit one ordinary default-source Order event in mixed mode. */
     [[nodiscard]] std::expected<void, Diagnostic> publish(const events::Order &order) const;
 
-    /** Submit an exact TICKER or STREAM record to a local catalog publisher.
-     * @param family TICKER or STREAM. The collector determines the corresponding delivery policy.
+    /** Submit a local catalog row with no indexed controls.
+     * @param family Collector whose delivery policy applies to the record.
      * @param context Owning record identity resolved against the configured catalog's immutable provenance.
      * @param symbol Exact nonempty symbol. Its storage is borrowed only through this call.
      * @param fields Exact tagged values in logical catalog order. Nullable field storage is copied before admission.
@@ -183,6 +189,18 @@ class Publisher {
                                                                 const core::RecordContext &context,
                                                                 std::u16string_view symbol,
                                                                 std::span<const core::FieldValueView> fields) const;
+
+    /** Submit a local catalog row with explicit HISTORY controls.
+     * @param family Collector family. Nondefault metadata requires HISTORY.
+     * @param context Owning provenance from the configured immutable catalog.
+     * @param symbol Exact nonempty symbol, borrowed through this call.
+     * @param fields Complete logical values for data, or empty with REMOVE_EVENT. Borrowed through this call.
+     * @param history Raw supported control flags and exact signed removal index when indicated.
+     * @return Local admission or detached refusal. Coordinate writes forming one transaction on the same key.
+     */
+    [[nodiscard]] std::expected<void, Diagnostic>
+    publishRecord(core::SubscriptionFamily family, const core::RecordContext &context, std::u16string_view symbol,
+                  std::span<const core::FieldValueView> fields, PublisherHistoryMetadata history) const;
 };
 
 /** One worker-owned plain QTP publishing endpoint. Destroy after application users have retired.
