@@ -204,6 +204,12 @@ class LocalSchema {
      */
     [[nodiscard]] RecordContext recordContext(std::int32_t localId) const noexcept;
 
+    /** Resolve an owning record context within this schema's immutable provenance in constant time.
+     * @param context Context from this schema, a provenance-preserving copy, or an unrelated owner.
+     * @return Local record position, or empty for an invalid or foreign context or a moved-from schema.
+     */
+    [[nodiscard]] std::optional<std::int32_t> recordId(const RecordContext &context) const noexcept;
+
     /** Inspect the immutable exact-type policy.
      * @return The profile selected during validation.
      */

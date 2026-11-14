@@ -891,6 +891,131 @@ TEST_CASE("MUX queue reserved resume restarts a paused TICKER registration") {
     CHECK(h.state() == m::QueueClientState::ACTIVE);
 }
 
+TEST_CASE("same-symbol HISTORY demand stays independent for distinct physical records through source reset") {
+    auto f = fixture(c::SubscriptionFamily::HISTORY);
+    auto first = open(f, std::make_shared<Recorder>());
+    auto second = open(f, std::make_shared<Recorder>());
+    const auto one = f.schema.recordContext(0);
+    const auto two = f.schema.recordContext(1);
+    constexpr auto symbol = u"IBM";
+    constexpr std::int64_t firstBound = 32;
+    constexpr std::int64_t secondBound = -4;
+    constexpr auto earlierBound = std::numeric_limits<std::int64_t>::min();
+    constexpr auto laterBound = std::numeric_limits<std::int64_t>::max();
+    const p::IncomingSubscriptionRecord mapping[]{{7, 1}, {41, 0}};
+    const p::OutgoingRecord declarations[]{
+        {41, 0, u"Oracle#ONE", {{u"TimeHigh", 8, 0}, {u"TimeLow", 8, 1}, {u"Value", 8, 2}}},
+        {7, 1, u"Oracle#TWO", {{u"TimeHigh", 8, 0}, {u"TimeLow", 8, 1}, {u"Value", 8, 2}}}};
+    p::SubscriptionWriterWork writerWork{10000, 1000000, 1000000, 1000000};
+    auto writer =
+        p::SubscriptionWriter::create(f.schema, declarations, {{16, 128, 256, 128, 16384}, 16, 128, 128, 16384},
+                                      {8192, 8201, 512, 1024, {8192, 1024}, 65536, 65536, 128}, writerWork);
+    REQUIRE(writer);
+
+    const auto command = [&](p::SubscriptionMessage message, const c::SubscriptionRequest &request) {
+        auto output = writer->compose(message, std::span(&request, 1), writerWork);
+        REQUIRE(output);
+        p::FrameReader reader({8192, 8201});
+        auto framed = reader.feed(output->bytes());
+        REQUIRE(framed.frame);
+        p::IncomingSubscriptionWork work{1, 8192, 1024, 4096};
+        auto result = p::decodeIncomingSubscription(*framed.frame, f.schema, mapping, {8192, 2, 2, 4, 128, 512}, work);
+        REQUIRE(result);
+
+        return std::move(*result);
+    };
+    const auto apply = [&](const m::MuxHandle &who, const c::RecordContext &record, std::optional<std::int64_t> bound) {
+        const auto message = bound ? p::SubscriptionMessage::HISTORY_ADD : p::SubscriptionMessage::HISTORY_REMOVE;
+        auto batch = command(message, {{record, symbol}, bound});
+        auto work = submitTurn();
+        auto ticket = f.queue.submitIncomingSubscription(who, batch, work);
+        REQUIRE(ticket);
+        applyBeforeSourceSync(f, *ticket);
+    };
+
+    auto tracker = m::DemandTracker::create(f.family, {8, 32});
+    REQUIRE(tracker);
+    m::DemandWork demandWork{64, 8192, 8192};
+    const auto poll = [&] {
+        auto result = tracker->next(f.queue.aggregateEntries(), demandWork);
+        REQUIRE(result);
+
+        return *result;
+    };
+    const auto acknowledge = [&](m::DemandAction action, const c::RecordContext &record,
+                                 std::optional<std::int64_t> bound, std::int32_t sender) {
+        auto change = poll();
+        REQUIRE(change);
+        CHECK(change->action == action);
+        CHECK(change->request.key.context.matches(record));
+        CHECK(change->request.key.symbol == symbol);
+        CHECK(change->request.historyBound == bound);
+        const auto message = action == m::DemandAction::ADD ? p::SubscriptionMessage::HISTORY_ADD
+                                                            : p::SubscriptionMessage::HISTORY_REMOVE;
+        const auto batch = command(message, change->request);
+        REQUIRE(batch.entries.size() == 1);
+        CHECK(batch.entries.front().senderId == sender);
+        CHECK(batch.entries.front().historyBound == bound);
+        REQUIRE(tracker->acknowledge(change->sequence));
+    };
+
+    apply(first, one, firstBound);
+    acknowledge(m::DemandAction::ADD, one, firstBound, 41);
+    apply(first, two, secondBound);
+    acknowledge(m::DemandAction::ADD, two, secondBound, 7);
+    CHECK_FALSE(poll());
+
+    apply(second, one, laterBound);
+    CHECK_FALSE(poll());
+    apply(second, two, earlierBound);
+    acknowledge(m::DemandAction::ADD, two, earlierBound, 7);
+    CHECK_FALSE(poll());
+
+    apply(first, one, std::nullopt);
+    auto stale = poll();
+    REQUIRE(stale);
+    CHECK(stale->request.historyBound == laterBound);
+    const auto oldSequence = stale->sequence;
+    REQUIRE(tracker->reset(demandWork));
+    CHECK_FALSE(tracker->acknowledge(oldSequence));
+
+    auto resetWork = turn();
+    REQUIRE(f.queue.resetSource(resetWork));
+    until(f, [&] {
+        return first.resetNotice() && second.resetNotice();
+    });
+    REQUIRE(first.acknowledgeReset(first.resetNotice()->sequence) == m::ControlAdmission::RECORDED);
+    REQUIRE(second.acknowledgeReset(second.resetNotice()->sequence) == m::ControlAdmission::RECORDED);
+    until(f, [&] {
+        return f.queue.resetStatus().phase == m::ResetPhase::NONE && first.state() == m::QueueClientState::ACTIVE &&
+               second.state() == m::QueueClientState::ACTIVE;
+    });
+
+    const auto replay = poll();
+    REQUIRE(replay);
+    CHECK(replay->sequence > oldSequence);
+    const auto firstReplayIsOne = replay->request.key.context.matches(one);
+
+    if (firstReplayIsOne) {
+        acknowledge(m::DemandAction::ADD, one, laterBound, 41);
+        acknowledge(m::DemandAction::ADD, two, earlierBound, 7);
+    } else {
+        acknowledge(m::DemandAction::ADD, two, earlierBound, 7);
+        acknowledge(m::DemandAction::ADD, one, laterBound, 41);
+    }
+
+    CHECK_FALSE(poll());
+
+    apply(second, one, std::nullopt);
+    acknowledge(m::DemandAction::REMOVE, one, std::nullopt, 41);
+    CHECK_FALSE(poll());
+    apply(second, two, std::nullopt);
+    acknowledge(m::DemandAction::ADD, two, secondBound, 7);
+    apply(first, two, std::nullopt);
+    acknowledge(m::DemandAction::REMOVE, two, std::nullopt, 7);
+    CHECK_FALSE(poll());
+}
+
 TEST_CASE("decoded peer commands aggregate first and last demand while ticker clients progress independently") {
     auto f = fixture(c::SubscriptionFamily::TICKER);
     auto slow = std::make_shared<Recorder>();

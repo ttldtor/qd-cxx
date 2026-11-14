@@ -6,6 +6,17 @@
 
 `getPublisher()` returns a detached producer handle. `publish(quote)` copies one validated composite Quote into the finite FIFO or returns a detached diagnostic. Handles can be used on other application threads. `awaitDemand` waits for presence or absence of the aggregate exact symbol. A symbol currently requested by at least one client is present. A late subscriber receives the latest value retained while another client was interested. The last withdrawal removes the value. A local submission does not guarantee socket or application receipt. Closing stops the worker and releases pending work and sockets. Any remaining producer handle observes the closed admission fence.
 
+Demand identity includes the contract, physical record name and exact symbol.
+`awaitDemand(family, recordName, symbol, ...)` observes one key. A nonempty name
+that is never admitted to that contract's union is always absent while the endpoint serves it.
+The symbol-only overload observes presence in any record of the specified contract. `getDemand(family)`
+copies the latest published union for that contract, including the minimum signed
+raw HISTORY bound for each key. The snapshot owns its names and symbols and may be
+retained after subsequent changes or endpoint shutdown. The number of rows is bounded
+by the configured downstream connection count times the maximum keys per client.
+This observes applied downstream subscriptions. A relay publishes the same local demand
+while the upstream connection is unavailable, and replays current keys after reconnect.
+
 Each peer sends `DESCRIBE_PROTOCOL` and describes its own records before subscribing. The endpoint resolves the peer's record ID to the local composite `Quote` and sends its own `DESCRIBE_RECORDS` before DATA. Unsupported described record names are ignored while decoding subscription tuples. The profile uses ordinary TCP and QTP with exact symbols and composite Quote. The listener defaults to numeric IPv4 loopback and an ephemeral port. There are at most eight active or retiring client slots, 32 applied keys per family and client, 256 decoded wire tuples per subscription frame, and 1024 queued publication requests. The configured slot and publication counts may be smaller. A bounded queue admission failure, invalid peer input or blocked write for ten seconds retires the corresponding connection. The other clients retain their subscriptions and independent progress. TICKER may conflate pending updates for the same symbol.
 
 Use a nonempty exact symbol of at most 256 UTF-16 units. Bid and ask times use signed 32-bit whole seconds on the wire and must be exact multiples of 1000 milliseconds. `timeMs` lies within the second of the later bid or ask time. The low 22 sequence bits and the signed nano part are sent in the optional `Sequence` and `TimeNanoPart` fields. The endpoint transfers the four wide decimal raw values and both exchange codes. Snapshot-derived business numerics, nonzero `eventTime` and other values outside the wire profile are rejected at admission. The built-in Feed registry supports the eight default Quote fields. Add the two optional fields to its explicit registry to receive the full time and sequence precision of this profile.
