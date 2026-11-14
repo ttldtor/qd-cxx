@@ -65,3 +65,5 @@ Exact conformance results belong to the [developer reading path](../docs/develop
 [Event callback execution](subscriptions/CALLBACK-EXECUTION.md): owned packets, borrowed schedulers, finite reentry and source retirement.
 
 - [Live HISTORY ranges](subscriptions/LIVE-HISTORY-RANGES.md): accepted fromTime/set transactions, applied delivery fences and convergent wire demand.
+
+[Proposed local record publication contract](subscriptions/RECORD-PUBLICATION.md).
