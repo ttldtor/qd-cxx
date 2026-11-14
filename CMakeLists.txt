@@ -24,7 +24,7 @@ target_include_directories(qdcxx_core PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_
 target_compile_features(qdcxx_core PUBLIC cxx_std_23)
 set_target_properties(qdcxx_core PROPERTIES CXX_EXTENSIONS OFF)
 
-add_library(qdcxx_mux src/mux/interest.cpp)
+add_library(qdcxx_mux src/mux/interest.cpp src/mux/demand.cpp)
 target_link_libraries(qdcxx_mux PUBLIC qdcxx_core)
 set_target_properties(qdcxx_mux PROPERTIES CXX_EXTENSIONS OFF)
 

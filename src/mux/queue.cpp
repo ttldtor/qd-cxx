@@ -7,6 +7,7 @@
 #include "../collectors/ticker_transaction.hpp"
 #include "../core/delivery_statistics.hpp"
 #include "interest_transaction.hpp"
+#include "qd/protocol/incoming_subscription.hpp"
 #include "queue_replace.hpp"
 
 #include <algorithm>
@@ -933,18 +934,16 @@ void releasePublic(const std::shared_ptr<detail::QueuePort> &port) noexcept {
 /** Copy one producer command into fully reserved buffers.
  * @param port Detached producer port.
  * @param kind Actual desired action.
- * @param requests Borrowed add/replace inputs.
- * @param keys Borrowed removal inputs.
+ * @param size Number of borrowed inputs.
+ * @param requestAt Accessor returning one borrowed command input without allocation.
  * @param work Producer-local credits.
  * @return Independent accepted result slot or immediate refusal.
  */
+template <class RequestAt>
 std::expected<std::shared_ptr<detail::QueueCompletion>, QueueError>
-submit(const std::shared_ptr<detail::QueuePort> &port, detail::QueueCommandKind kind,
-       std::span<const core::SubscriptionRequest> requests, std::span<const core::SubscriptionKey> keys,
-       QueueSubmitWork &work) {
+submitRequests(const std::shared_ptr<detail::QueuePort> &port, detail::QueueCommandKind kind, std::size_t size,
+               RequestAt requestAt, QueueSubmitWork &work) {
     try {
-        debit(work.operations, 1);
-
         if (!port) {
             return std::unexpected(QueueError::INVALID_STATE);
         }
@@ -954,7 +953,6 @@ submit(const std::shared_ptr<detail::QueuePort> &port, detail::QueueCommandKind 
             return std::unexpected(QueueError::CLOSING);
         }
 
-        const auto size = kind == detail::QueueCommandKind::REMOVE ? keys.size() : requests.size();
         const auto &l = port->budget->limits;
         debit(work.visits,
               sum(sum(l.commandSlots, l.resultSlots), sum(product(size, sum(port->contexts.size(), 2)), 1)));
@@ -968,7 +966,7 @@ submit(const std::shared_ptr<detail::QueuePort> &port, detail::QueueCommandKind 
         std::size_t units = 0;
 
         for (std::size_t i = 0; i < size; ++i) {
-            const auto key = kind == detail::QueueCommandKind::REMOVE ? keys[i] : requests[i].key;
+            const auto key = requestAt(i).key;
             bool match = false;
 
             for (const auto &context : port->contexts) {
@@ -1025,18 +1023,16 @@ submit(const std::shared_ptr<detail::QueuePort> &port, detail::QueueCommandKind 
         std::size_t offset = 0;
 
         for (std::size_t i = 0; i < size; ++i) {
-            const auto key = kind == detail::QueueCommandKind::REMOVE ? keys[i] : requests[i].key;
+            auto request = requestAt(i);
+            const auto &key = request.key;
             auto *destination = command.text.data() + offset;
             std::copy(key.symbol.begin(), key.symbol.end(), destination);
             destination[key.symbol.size()] = 0;
             const core::SubscriptionKey copied{key.context, std::u16string_view(destination, key.symbol.size()),
                                                key.selector};
             command.keys[i] = copied;
-            command.requests[i] = {copied,
-                                   kind == detail::QueueCommandKind::REMOVE ? std::optional<std::int64_t>{}
-                                                                            : requests[i].historyBound,
-                                   kind == detail::QueueCommandKind::REMOVE ? core::NATIVE_DELIVERY_PROJECTION
-                                                                            : requests[i].projectionMask};
+            request.key = copied;
+            command.requests[i] = std::move(request);
             offset += key.symbol.size() + 1;
         }
 
@@ -1056,6 +1052,25 @@ submit(const std::shared_ptr<detail::QueuePort> &port, detail::QueueCommandKind 
     } catch (QueueError error) {
         return std::unexpected(error);
     }
+}
+
+/** Charge an ordinary producer attempt and submit its copied input. */
+std::expected<std::shared_ptr<detail::QueueCompletion>, QueueError>
+submit(const std::shared_ptr<detail::QueuePort> &port, detail::QueueCommandKind kind,
+       std::span<const core::SubscriptionRequest> requests, std::span<const core::SubscriptionKey> keys,
+       QueueSubmitWork &work) {
+    if (work.operations == 0)
+        return std::unexpected(QueueError::WORK_LIMIT);
+
+    --work.operations;
+    const bool remove = kind == detail::QueueCommandKind::REMOVE;
+
+    return submitRequests(
+        port, kind, remove ? keys.size() : requests.size(),
+        [&](std::size_t i) {
+            return remove ? core::SubscriptionRequest{keys[i], {}} : requests[i];
+        },
+        work);
 }
 } // namespace
 
@@ -3859,6 +3874,75 @@ std::expected<void, QueueFailure> MuxQueue::validateReceiverBinding(const core::
 
 QueueCapacity MuxQueue::capacity() const noexcept {
     return state_ ? state_->capacity : QueueCapacity{};
+}
+
+std::expected<MuxCommandTicket, QueueError>
+MuxQueue::submitIncomingSubscription(const MuxHandle &client, const protocol::IncomingSubscriptionBatch &batch,
+                                     QueueSubmitWork &work) {
+    if (work.operations == 0)
+        return std::unexpected(QueueError::WORK_LIMIT);
+
+    --work.operations;
+
+    if (!state_)
+        return std::unexpected(QueueError::INVALID_STATE);
+
+    if (state_->executing)
+        return std::unexpected(QueueError::REENTRANT);
+
+    if (!state_->client(client) || client.state() == QueueClientState::TERMINAL)
+        return std::unexpected(QueueError::INVALID_CLIENT);
+
+    using enum core::SubscriptionFamily;
+    using enum protocol::SubscriptionMessage;
+    auto family = TICKER;
+    auto kind = detail::QueueCommandKind::ADD;
+
+    switch (batch.message) {
+    case TICKER_REMOVE:
+        kind = detail::QueueCommandKind::REMOVE;
+        [[fallthrough]];
+    case TICKER_ADD:
+        break;
+    case STREAM_REMOVE:
+        kind = detail::QueueCommandKind::REMOVE;
+        [[fallthrough]];
+    case STREAM_ADD:
+        family = STREAM;
+        break;
+    case HISTORY_REMOVE:
+        kind = detail::QueueCommandKind::REMOVE;
+        [[fallthrough]];
+    case HISTORY_ADD:
+        family = HISTORY;
+        break;
+    default:
+        return std::unexpected(QueueError::INVALID_SUBSCRIPTION);
+    }
+
+    if (family != state_->family)
+        return std::unexpected(QueueError::INVALID_SUBSCRIPTION);
+
+    const bool boundRequired = family == HISTORY && kind == detail::QueueCommandKind::ADD;
+    auto result = submitRequests(
+        client.port_, kind, batch.entries.size(),
+        [&](std::size_t i) {
+            const auto &entry = batch.entries[i];
+
+            if (entry.historyBound.has_value() != boundRequired)
+                throw QueueError::INVALID_SUBSCRIPTION;
+
+            return core::SubscriptionRequest{{entry.context, entry.symbol}, entry.historyBound};
+        },
+        work);
+
+    if (!result)
+        return std::unexpected(result.error());
+
+    MuxCommandTicket ticket;
+    ticket.state_ = std::move(*result);
+
+    return ticket;
 }
 
 std::expected<ResetAdmission, QueueFailure> MuxQueue::resetSource(QueueWork &work) {

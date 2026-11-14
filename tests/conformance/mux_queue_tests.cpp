@@ -10,7 +10,9 @@
 #include "qd/events/market_maker.hpp"
 #include "qd/events/profile.hpp"
 #include "qd/events/quote.hpp"
+#include "qd/mux/demand.hpp"
 #include "qd/mux/queue.hpp"
+#include "qd/protocol/incoming_subscription.hpp"
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -887,6 +889,139 @@ TEST_CASE("MUX queue reserved resume restarts a paused TICKER registration") {
     });
     CHECK(consumer->values == std::vector<std::int64_t>{10, 20});
     CHECK(h.state() == m::QueueClientState::ACTIVE);
+}
+
+TEST_CASE("decoded peer commands aggregate first and last demand while ticker clients progress independently") {
+    auto f = fixture(c::SubscriptionFamily::TICKER);
+    auto slow = std::make_shared<Recorder>();
+    auto fast = std::make_shared<Recorder>();
+    slow->pause = true;
+    slow->retain = true;
+    auto first = open(f, slow);
+    auto second = open(f, fast);
+    auto foreign = fixture(c::SubscriptionFamily::TICKER);
+    auto third = open(foreign, fast);
+    const auto context = f.schema.recordContext(0);
+    const p::IncomingSubscriptionRecord mapping[]{{41, 0}};
+    const p::OutgoingRecord declarations[]{
+        {41, 0, u"Oracle#ONE", {{u"TimeHigh", 8, 0}, {u"TimeLow", 8, 1}, {u"Value", 8, 2}}}};
+    p::SubscriptionWriterWork writerWork{10000, 1000000, 1000000, 1000000};
+    auto writer =
+        p::SubscriptionWriter::create(f.schema, declarations, {{16, 128, 256, 128, 16384}, 16, 128, 128, 16384},
+                                      {8192, 8201, 512, 1024, {8192, 1024}, 65536, 65536, 128}, writerWork);
+    REQUIRE(writer);
+
+    const auto decode = [&](p::SubscriptionMessage message, std::u16string_view symbol) {
+        const c::SubscriptionRequest request{{context, symbol}, {}};
+        auto output = writer->compose(message, std::span(&request, 1), writerWork);
+        REQUIRE(output);
+        p::FrameReader reader({8192, 8201});
+        auto framed = reader.feed(output->bytes());
+        REQUIRE(framed.frame);
+        p::IncomingSubscriptionWork work{1, 8192, 1024, 4096};
+        auto result = p::decodeIncomingSubscription(*framed.frame, f.schema, mapping, {8192, 2, 1, 4, 128, 512}, work);
+        REQUIRE(result);
+
+        return std::move(*result);
+    };
+
+    auto add = decode(p::SubscriptionMessage::TICKER_ADD, u"ALPHA");
+    const auto remove = decode(p::SubscriptionMessage::TICKER_REMOVE, u"ALPHA");
+    const auto submit = [&](const m::MuxHandle &client, const p::IncomingSubscriptionBatch &batch) {
+        auto work = submitTurn();
+
+        return f.queue.submitIncomingSubscription(client, batch, work);
+    };
+
+    const auto wrongFamily = decode(p::SubscriptionMessage::STREAM_ADD, u"ALPHA");
+    CHECK(submit(first, wrongFamily).error() == m::QueueError::INVALID_SUBSCRIPTION);
+    CHECK(submit(third, add).error() == m::QueueError::INVALID_CLIENT);
+    auto wrongContext = add;
+    wrongContext.entries.push_back({41, foreign.schema.recordContext(0), u"BETA", {}});
+    CHECK(submit(first, wrongContext).error() == m::QueueError::INVALID_CONTEXT);
+    CHECK(f.queue.aggregateEntries().empty());
+
+    auto tracker = m::DemandTracker::create(f.family, {32, 4096});
+    REQUIRE(tracker);
+    m::DemandWork demandWork{64, 8192, 8192};
+    const auto next = [&] {
+        return tracker->next(f.queue.aggregateEntries(), demandWork).value();
+    };
+
+    auto firstAdd = submit(first, add);
+    REQUIRE(firstAdd);
+    CHECK_FALSE(firstAdd->result());
+    CHECK_FALSE(next());
+    add.entries[0].symbol = u"REUSED FRAME STORAGE";
+    applyBeforeSourceSync(f, *firstAdd);
+
+    auto change = next();
+    REQUIRE(change);
+    CHECK(change->action == m::DemandAction::ADD);
+    CHECK(change->request.key.symbol == u"ALPHA");
+    REQUIRE(tracker->acknowledge(change->sequence));
+    CHECK_FALSE(next());
+
+    send(f, {{0, u"ALPHA", 1, 10, 0}});
+    {
+        INFO("slow client pauses after its first quote");
+        until(f, [&] {
+            return first.state() == m::QueueClientState::PAUSED;
+        });
+    }
+    REQUIRE(slow->retained.size() == 1);
+
+    auto secondAdd = submit(second, decode(p::SubscriptionMessage::TICKER_ADD, u"ALPHA"));
+    REQUIRE(secondAdd);
+    applyBeforeSourceSync(f, *secondAdd);
+    CHECK_FALSE(next());
+    {
+        INFO("late client receives the retained quote");
+        until(f, [&] {
+            return fast->values.size() == 1;
+        });
+    }
+    CHECK(fast->values == std::vector<std::int64_t>{10});
+
+    send(f, {{0, u"ALPHA", 2, 20, 0}});
+    {
+        INFO("fast client receives the second quote");
+        until(f, [&] {
+            return fast->values.size() == 2;
+        });
+    }
+    send(f, {{0, u"ALPHA", 3, 30, 0}});
+    {
+        INFO("fast client receives the third quote");
+        until(f, [&] {
+            return fast->values.size() == 3;
+        });
+    }
+    CHECK(fast->values == std::vector<std::int64_t>{10, 20, 30});
+    CHECK(slow->values == std::vector<std::int64_t>{10});
+    REQUIRE(slow->retained[0].records().size() == 1);
+    CHECK(slow->retained[0].records()[0].typedValues[2].raw == 10);
+
+    slow->retained.clear();
+    CHECK(first.requestStop(m::StopMode::ABORT) == m::ControlAdmission::RECORDED);
+    {
+        INFO("only the disconnected registration terminates");
+        until(f, [&] {
+            return first.terminal().has_value();
+        });
+    }
+    CHECK_FALSE(next());
+    CHECK(submit(first, remove).error() == m::QueueError::INVALID_CLIENT);
+    auto lastRemove = submit(second, remove);
+    REQUIRE(lastRemove);
+    applyBeforeSourceSync(f, *lastRemove);
+
+    change = next();
+    REQUIRE(change);
+    CHECK(change->action == m::DemandAction::REMOVE);
+    CHECK(change->request.key.symbol == u"ALPHA");
+    REQUIRE(tracker->acknowledge(change->sequence));
+    CHECK_FALSE(next());
 }
 
 TEST_CASE("MUX queue retained composite quota and retired generation keep their reservations") {
