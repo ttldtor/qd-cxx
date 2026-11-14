@@ -299,6 +299,21 @@ using Storage = LiveStorage;
 constexpr std::size_t PREFIX_BYTES = 9;
 constexpr std::int32_t HEARTBEAT = 0, DESCRIBE_PROTOCOL = 1, DESCRIBE_RECORDS = 2;
 constexpr std::int32_t TICKER_DATA = 10, STREAM_DATA = 15, HISTORY_DATA = 20;
+
+bool isSubscription(std::int32_t type) noexcept {
+    switch (static_cast<SubscriptionMessage>(type)) {
+    case SubscriptionMessage::TICKER_ADD:
+    case SubscriptionMessage::TICKER_REMOVE:
+    case SubscriptionMessage::STREAM_ADD:
+    case SubscriptionMessage::STREAM_REMOVE:
+    case SubscriptionMessage::HISTORY_ADD:
+    case SubscriptionMessage::HISTORY_REMOVE:
+        return true;
+    }
+
+    return false;
+}
+
 constexpr std::uint32_t TIME_BIT = 1, MARK_BIT = 2, DELTA_BIT = 4, LAG_BIT = 8;
 constexpr std::uint32_t HEARTBEAT_MASK = TIME_BIT | MARK_BIT | DELTA_BIT | LAG_BIT;
 constexpr std::size_t MAX_WIRE_COUNT = static_cast<std::size_t>(std::numeric_limits<std::int32_t>::max());
@@ -1121,7 +1136,7 @@ struct LiveSnapshot::State {
      * @param work Mutable turn credits.
      */
     void complete(const core::LocalSchema &schema, ContextLimits limits, FieldTimePolicy policy,
-                  TapeDescriptorLimits protocolLimits, LiveWork &work) {
+                  TapeDescriptorLimits protocolLimits, LiveWork &work, bool subscriptionOnly = false) {
         if (descriptions.size() > limits.descriptions) {
             throw Error::RESOURCE_LIMIT;
         }
@@ -1235,6 +1250,30 @@ struct LiveSnapshot::State {
             }
 
             debit(product(sum(names, schemaNames), sum(sum(fields, schema.records().size()), 1)), work.textUnits);
+
+            if (subscriptionOnly) {
+                if (fields > limits.bindings.fields || names > limits.bindings.totalNameUnits ||
+                    description.name.size() > limits.bindings.nameUnits ||
+                    std::ranges::any_of(description.fields, [&](const auto &field) {
+                        return field.name.size() > limits.bindings.nameUnits;
+                    }))
+                    throw Error::RESOURCE_LIMIT;
+
+                limits.bindings.fields -= fields;
+                limits.bindings.totalNameUnits -= names;
+                detail::PmrRecordBinding binding(description.senderId, *arena.resource());
+                const auto local =
+                    std::ranges::find(schema.records(), std::u16string_view(description.name), [](const auto &record) {
+                        return std::u16string_view(record.name);
+                    });
+
+                if (local != schema.records().end())
+                    binding.localRecordId = local->id;
+
+                context.plans.push_back(detail::PmrStreamRecordPlan{std::move(binding)});
+                continue;
+            }
+
             const auto prefix = policy == FieldTimePolicy::READ ? detail::eventTimeFieldCount(description) : 0;
             auto binding = detail::bindPmrRecord(description, schema, limits.bindings, prefix, *arena.resource());
 
@@ -1512,8 +1551,9 @@ std::expected<detail::LocalEventOwner, LiveError> detail::LocalEventOwner::creat
 
 std::expected<LiveEvent, LiveError> detail::LocalEventOwner::quote(const core::RecordContext &context,
                                                                    std::u16string_view symbol,
-                                                                   std::span<const core::FieldValue, 8> fields,
-                                                                   FieldEventTime eventTime, LiveWork &work) const {
+                                                                   std::span<const core::FieldValue> fields,
+                                                                   std::optional<FieldEventTime> eventTime,
+                                                                   LiveWork &work) const {
     try {
         debit(1, work.operations);
         debit(fields.size() + 1, work.visits);
@@ -1809,6 +1849,7 @@ struct LiveSession::Impl {
     LiveInputStatistics statistics;             ///< Serialized framing/commit totals, independent of event retention.
     LiveAuthentication authentication = LiveAuthentication::UNCHALLENGED; ///< Protocol-derived auth state.
     bool historySnapshot = false;                                         ///< Cached exact negotiated hs intersection.
+    std::optional<IncomingSubscriptionLimits> subscriptions; ///< Enabled only for an explicit server session.
 
     /** Commit noexcept ownership transfers after all prior allocations succeed.
      * @param storage Ledger retained by the first member.
@@ -1839,6 +1880,62 @@ struct LiveSession::Impl {
     void requireOpen() const {
         if (status == LiveStatus::FAILED || status == LiveStatus::CLOSED) {
             throw Error::INVALID_STATE;
+        }
+    }
+
+    IncomingSubscriptionBatch receiveSubscription(const Frame &frame, LiveWork &work) {
+        diagnostic.frameStart = frame.startOffset;
+        diagnostic.stage = "subscription";
+        diagnostic.consumed = 0;
+        diagnostic.detail = 0;
+        const auto &protocol = peer.state_->protocol;
+
+        if (!protocol.received || !capability(protocol.send, *frame.type, work))
+            throw Error::NOT_READY;
+
+        if (authentication == LiveAuthentication::REQUIRED ||
+            authentication == LiveAuthentication::AUTHORIZATION_EMITTED)
+            throw Error::AUTHENTICATION_REQUIRED;
+
+        const auto &plans = peer.state_->context.plans;
+
+        if (plans.size() > subscriptions->senderRecords)
+            throw Error::RESOURCE_LIMIT;
+
+        const auto mappingBytes = product(plans.size(), sizeof(IncomingSubscriptionRecord));
+        debit(mappingBytes, work.bytes);
+        TemporaryReservation reservation(*lease.get(), mappingBytes);
+        std::vector<IncomingSubscriptionRecord> mapping;
+        mapping.reserve(plans.size());
+
+        debit(plans.size(), work.visits);
+
+        for (const auto &plan : plans)
+            mapping.push_back({plan.binding.senderId, plan.binding.localRecordId});
+
+        std::ranges::sort(mapping, [&](const auto &left, const auto &right) {
+            debit(1, work.visits);
+
+            return left.senderId < right.senderId;
+        });
+        IncomingSubscriptionWork input{work.operations, work.bytes, work.visits, work.textUnits};
+        auto result = decodeIncomingSubscription(frame, schema, mapping, *subscriptions, input);
+        work = {input.frames, input.visits, input.textUnits, input.inputBytes};
+
+        if (result)
+            return std::move(*result);
+
+        diagnostic.detail = static_cast<std::size_t>(result.error());
+
+        switch (result.error()) {
+        case IncomingSubscriptionError::ALLOCATION_FAILURE:
+            throw Error::ALLOCATION_FAILURE;
+        case IncomingSubscriptionError::WORK_LIMIT:
+            throw Error::WORK_LIMIT;
+        case IncomingSubscriptionError::RESOURCE_LIMIT:
+            throw Error::RESOURCE_LIMIT;
+        default:
+            throw Error::MALFORMED;
         }
     }
 
@@ -1889,7 +1986,7 @@ struct LiveSession::Impl {
             mergeMessages(next->protocol.send, incoming.send, *next->arena.resource(), work);
             mergeMessages(next->protocol.receive, incoming.receive, *next->arena.resource(), work);
             next->protocol.received = true;
-            next->complete(schema, limits.context, limits.fieldTime, limits.protocol, work);
+            next->complete(schema, limits.context, limits.fieldTime, limits.protocol, work, subscriptions.has_value());
             kind = LiveEventKind::PROTOCOL;
         } else if (frame.type == DESCRIBE_RECORDS) {
             diagnostic.stage = "descriptions";
@@ -1905,9 +2002,12 @@ struct LiveSession::Impl {
 
             next = candidate(work);
             next->mergeDescriptions(incoming.descriptions, work);
-            next->complete(schema, limits.context, limits.fieldTime, limits.protocol, work);
+            next->complete(schema, limits.context, limits.fieldTime, limits.protocol, work, subscriptions.has_value());
             kind = LiveEventKind::DESCRIPTIONS;
         } else if (frame.type == TICKER_DATA || frame.type == STREAM_DATA || frame.type == HISTORY_DATA) {
+            if (subscriptions)
+                throw Error::UNSUPPORTED;
+
             debit(peer.state_->protocol.send.size(), work.visits);
 
             if (!peer.state_->protocol.received || !capability(peer.state_->protocol.send, *frame.type, work)) {
@@ -2276,8 +2376,31 @@ std::expected<LiveSession, LiveError> LiveSession::create(core::LocalSchema &&sc
     }
 }
 
+std::expected<LiveSession, LiveError> LiveSession::createServer(core::LocalSchema &&schema,
+                                                                SubscriptionWriter &&composer, LiveLimits limits,
+                                                                IncomingSubscriptionLimits subscriptions,
+                                                                LiveWork &work) {
+    auto created = create(std::move(schema), std::move(composer), limits, work);
+
+    if (created)
+        created->impl_->subscriptions = subscriptions;
+
+    return created;
+}
+
 LiveFeedResult LiveSession::feed(std::span<const std::byte> input, LiveWork &work) {
-    LiveFeedResult result;
+    return feedImpl(input, work, false);
+}
+
+LiveServerFeedResult LiveSession::feedServer(std::span<const std::byte> input, LiveWork &work) {
+    if (!impl_ || !impl_->subscriptions)
+        return {{0, LiveStatus::FAILED, {}}, {}};
+
+    return feedImpl(input, work, true);
+}
+
+LiveServerFeedResult LiveSession::feedImpl(std::span<const std::byte> input, LiveWork &work, bool server) {
+    LiveServerFeedResult result;
 
     if (!impl_) {
         result.status = LiveStatus::FAILED;
@@ -2308,7 +2431,13 @@ LiveFeedResult LiveSession::feed(std::span<const std::byte> input, LiveWork &wor
                                                                                  : Error::MALFORMED);
         } else if (framed.status == FrameStatus::FRAME_READY) {
             impl_->statistics.messages.add(1);
-            result.event.emplace(impl_->dispatch(*framed.frame, work));
+            const auto type = framed.frame->type;
+
+            if (server && type && isSubscription(*type))
+                result.subscription.emplace(impl_->receiveSubscription(*framed.frame, work));
+            else
+                result.event.emplace(impl_->dispatch(*framed.frame, work));
+
             result.status = LiveStatus::EVENT;
 
             return result;
@@ -2423,9 +2552,9 @@ std::expected<LivePendingOutput, LiveError> LiveSession::composeProtocol(LivePro
                 const bool common =
                     message.id == HEARTBEAT || message.id == DESCRIBE_PROTOCOL || message.id == DESCRIBE_RECORDS;
                 const bool data = message.id == TICKER_DATA || message.id == STREAM_DATA || message.id == HISTORY_DATA;
-                const bool subscription = message.id == 11 || message.id == 12 || message.id == 16 ||
-                                          message.id == 17 || message.id == 21 || message.id == 22;
-                const bool supported = common || data || (send && subscription);
+                const bool subscription = isSubscription(message.id);
+                const bool supported = common || (data && (send || !impl_->subscriptions)) ||
+                                       (subscription && (send != impl_->subscriptions.has_value()));
 
                 if (!supported || !message.name || !same(*message.name, known, work)) {
                     throw Error::UNSUPPORTED;
@@ -2613,6 +2742,10 @@ std::expected<LivePendingOutput, LiveError> LiveSession::subscribe(SubscriptionM
         }
 
         impl_->requireOpen();
+
+        if (impl_->subscriptions)
+            throw Error::UNSUPPORTED;
+
         const auto id = static_cast<std::int32_t>(message);
         const auto add = id == 11 || id == 12 ? 11 : id == 16 || id == 17 ? 16 : id == 21 || id == 22 ? 21 : -1;
 

@@ -16,11 +16,10 @@ class LocalEventOwner {
     public:
     [[nodiscard]] static std::expected<LocalEventOwner, LiveError> create(LiveLimits limits, LiveWork &work);
 
-    /** Own one local TICKER record and its historical event timestamp. */
-    [[nodiscard]] std::expected<LiveEvent, LiveError> quote(const core::RecordContext &context,
-                                                            std::u16string_view symbol,
-                                                            std::span<const core::FieldValue, 8> fields,
-                                                            FieldEventTime eventTime, LiveWork &work) const;
+    /** Own one local TICKER record and optional explicit event-time metadata. */
+    [[nodiscard]] std::expected<LiveEvent, LiveError>
+    quote(const core::RecordContext &context, std::u16string_view symbol, std::span<const core::FieldValue> fields,
+          std::optional<FieldEventTime> eventTime, LiveWork &work) const;
 };
 
 } // namespace org::ttldtor::qdcxx::protocol::detail
