@@ -153,6 +153,21 @@ cmake "-DJAVA_HOME=$jdk8" "-DUPSTREAM=$upstream" "-DCLASSPATH_RECEIPT=$receipt" 
   "-DRUN=$repo/.work/schema-export/launcher" -P tools/schema-export/tests/LauncherTests.cmake
 ```
 
+Build the optional native harness with JSON schema support and testing enabled, then compare
+the full default and dxlink catalogs with pinned Java QD. Pass the path to the executable
+produced by the build, including its configuration subdirectory and platform suffix if applicable.
+
+```powershell
+cmake --build $build --config Release --target qdcxx_full_catalog_wire
+cmake "-DJAVA_HOME=$jdk8" "-DUPSTREAM=$upstream" "-DCLASSPATH_RECEIPT=$receipt" `
+  "-DNATIVE=$native" "-DRUN=$repo/.work/schema-export/full-catalog-wire" `
+  -P tools/schema-export/tests/FullCatalogWire.cmake
+```
+
+The comparison covers field descriptions, distinct sender and local record identities,
+byte-for-byte DATA bodies and their decoding on both sides. It checks null, empty and
+non-empty object values, scalar boundaries and signed indexed removals.
+
 Capture uses a separate 120-second JVM budget for production writer/reader observations; it does
 not change the export command's 30-second budget. Git source verification has a 180-second timeout.
 On WSL, use a native Linux checkout/classpath if mounted Windows storage exceeds process budgets.

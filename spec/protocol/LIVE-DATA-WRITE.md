@@ -2,6 +2,11 @@
 
 [Русская версия](LIVE-DATA-WRITE.ru.md).
 
+Set `SubscriptionWriterLimits::omitVoidDescriptions` for Java-compatible type-2
+descriptions that omit zero-width VOID fields and retain the order of all other
+fields. Outgoing layouts and DATA inputs still include every logical field.
+The default retains explicit VOID entries in descriptions.
+
 `SubscriptionWriter::composeData` composes one nonempty, uncompressed plain binary
 `TICKER_DATA` (10), `STREAM_DATA` (15) or `HISTORY_DATA` (20) envelope.
 `LiveSession::publishData` requires the peer's matching receive capability and

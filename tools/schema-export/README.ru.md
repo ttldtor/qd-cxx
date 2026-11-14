@@ -157,6 +157,21 @@ cmake "-DJAVA_HOME=$jdk8" "-DUPSTREAM=$upstream" "-DCLASSPATH_RECEIPT=$receipt" 
   "-DRUN=$repo/.work/schema-export/launcher" -P tools/schema-export/tests/LauncherTests.cmake
 ```
 
+Соберите необязательную нативную программу проверки при включённых тестах и поддержке JSON-схем.
+Затем сравните полные каталоги default и dxlink с закреплённой Java QD. В параметре `NATIVE`
+укажите путь к собранному файлу с учётом конфигурации и расширения платформы.
+
+```powershell
+cmake --build $build --config Release --target qdcxx_full_catalog_wire
+cmake "-DJAVA_HOME=$jdk8" "-DUPSTREAM=$upstream" "-DCLASSPATH_RECEIPT=$receipt" `
+  "-DNATIVE=$native" "-DRUN=$repo/.work/schema-export/full-catalog-wire" `
+  -P tools/schema-export/tests/FullCatalogWire.cmake
+```
+
+Проверка сверяет описания полей, раздельные ID отправителя и локальной записи, побайтовое
+содержимое DATA и его декодирование с обеих сторон. Она охватывает null, пустые и непустые
+объектные значения, граничные скаляры и индексные удаления со знаковым ключом.
+
 Capture использует отдельный бюджет JVM 120 секунд для production writer/reader observations;
 бюджет команды экспорта 30 секунд не меняется. Проверка исходников Git ограничена 180 секундами.
 В WSL используйте checkout/classpath на Linux filesystem, если Windows mount превышает бюджеты процессов.

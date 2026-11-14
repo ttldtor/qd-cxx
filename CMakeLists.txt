@@ -2018,6 +2018,10 @@ if(BUILD_TESTING)
     add_test(NAME encoding_char_array_writer COMMAND qdcxx_char_array_writer_tests
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/protocol/tape-write/contracts")
     if(ORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON)
+        # Invoked by tools/schema-export/tests/FullCatalogWire.cmake with the pinned Java oracle.
+        add_executable(qdcxx_full_catalog_wire EXCLUDE_FROM_ALL tests/conformance/full_catalog_wire.cpp)
+        target_link_libraries(qdcxx_full_catalog_wire PRIVATE qdcxx_protocol qdcxx_schema_json)
+        set_target_properties(qdcxx_full_catalog_wire PROPERTIES CXX_EXTENSIONS OFF)
         add_executable(qdcxx_schema_json_tests tests/conformance/schema_json_tests.cpp)
         target_link_libraries(qdcxx_schema_json_tests PRIVATE qdcxx_schema_json qdcxx_simdjson doctest::doctest)
         set_target_properties(qdcxx_schema_json_tests PROPERTIES CXX_EXTENSIONS OFF)
