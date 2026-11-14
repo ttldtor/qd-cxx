@@ -4,8 +4,11 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "qd/api/publisher.hpp"
 
+#include "connect_peer.hpp"
+#include "qd/protocol/incoming_subscription.hpp"
 #include "qd/protocol/live_session.hpp"
 #include "qd/transport/tcp_runtime.hpp"
+#include "recovery_test_peer.hpp"
 
 #include <array>
 #include <asio/io_context.hpp>
@@ -15,6 +18,7 @@
 #include <doctest/doctest.h>
 #include <limits>
 #include <mutex>
+#include <thread>
 
 namespace {
 namespace q = org::ttldtor::qdcxx;
@@ -272,4 +276,124 @@ TEST_CASE("non-reading peer with a different record ID does not block a typed cl
     REQUIRE(publisher.publish(target));
     REQUIRE(fast.events->wait(target.bidPrice.raw));
     CHECK((*server)->awaitDemand(u"SLOW", true, Clock::now() + 5s));
+}
+
+TEST_CASE("remote QTP publisher reconciles overlapping demand across source generations") {
+    auto bootstrap = q::transport::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    auto schema = q::events::defaultQuoteSchema(QUOTE_SCHEMA_LIMITS);
+    REQUIRE(schema);
+    constexpr auto family = q::core::SubscriptionFamily::TICKER;
+    constexpr auto add = std::to_underlying(q::protocol::SubscriptionMessage::TICKER_ADD);
+    constexpr auto remove = std::to_underlying(q::protocol::SubscriptionMessage::TICKER_REMOVE);
+    const auto initial = makeQuote(100);
+    const auto current = makeQuote(300);
+    const auto makeData = [&](const q::events::Quote &quote) {
+        const std::array<std::int64_t, 8> raw{quote.bidTimeMs / 1000, quote.bidExchangeCode,  quote.bidPrice.raw,
+                                              quote.bidSize.raw,      quote.askTimeMs / 1000, quote.askExchangeCode,
+                                              quote.askPrice.raw,     quote.askSize.raw};
+        q::connect_tests::Record record{u"IBM", {}};
+
+        for (std::size_t i = 0; i < raw.size(); ++i)
+            record.fields.push_back({q::events::QUOTE_FIELD_TYPES[i], raw[i]});
+
+        return q::connect_tests::fixturePeerData(std::span(&record, 1), family);
+    };
+    q::test::TcpPeerConfig script;
+    script.lifetime = 20s;
+    script.sessions.resize(2);
+
+    for (auto &connection : script.sessions) {
+        connection.initialBytes = q::connect_tests::fixturePeerPrefix(*schema, family);
+        connection.readThroughMessage = add;
+    }
+
+    script.sessions[0].replyBytes = makeData(initial);
+    script.sessions[0].stagedBytes.push_back(makeData(makeQuote(200)));
+    script.sessions[0].waitForControllerClose = true;
+    script.sessions[1].replyBytes = makeData(current);
+    script.sessions[1].waitForClientClose = true;
+    q::test::OwnedTcpPeer source(std::move(script));
+    REQUIRE(source.port() != 0);
+    q::api::PublisherOptions relayOptions;
+    relayOptions.source = q::api::PublisherSourceOptions{"127.0.0.1", source.port(), 20ms};
+    auto relay = q::api::PublisherEndpoint::create(*bootstrap, relayOptions);
+    requireServer(relay);
+    q::api::ApiRuntime runtime(*bootstrap);
+    Client first(runtime, (*relay)->port());
+    REQUIRE((*relay)->awaitSourceGeneration(0, Clock::now() + 5s));
+    const auto initialGeneration = (*relay)->getSourceStatus().generation;
+    REQUIRE(initialGeneration > 0);
+    REQUIRE(first.events->wait(initial.bidPrice.raw));
+    Client second(runtime, (*relay)->port());
+    REQUIRE(second.events->wait(initial.bidPrice.raw));
+
+    (void)first.endpoint->closeAndAwaitTermination();
+    source.allowStages(0, 1);
+    REQUIRE(second.events->wait(makeQuote(200).bidPrice.raw));
+    source.allowClose(0);
+    REQUIRE((*relay)->awaitSourceGeneration(initialGeneration, Clock::now() + 5s));
+    CHECK((*relay)->getSourceStatus().generation > initialGeneration);
+    REQUIRE(second.events->wait(current.bidPrice.raw));
+
+    (void)second.endpoint->closeAndAwaitTermination();
+    const auto countDemand = [&](std::span<const std::byte> input, std::int32_t type) {
+        std::size_t count = 0;
+        q::protocol::FrameReader frames({8192, 8201});
+        const std::array mapping{q::protocol::IncomingSubscriptionRecord{0, 0}};
+        const q::protocol::IncomingSubscriptionLimits limits{8192, 1, 1, 32, 256, 8192};
+        q::protocol::IncomingSubscriptionWork work{32, 65536, 65536, 65536};
+
+        while (!input.empty()) {
+            const auto framed = frames.feed(input);
+            REQUIRE(framed.status != q::protocol::FrameStatus::FAILED);
+            REQUIRE(framed.accepted > 0);
+            input = input.subspan(framed.accepted);
+
+            if (framed.frame && framed.frame->type == type) {
+                const auto batch =
+                    q::protocol::decodeIncomingSubscription(*framed.frame, *schema, mapping, limits, work);
+                REQUIRE(batch);
+
+                for (const auto &entry : batch->entries) {
+                    CHECK(entry.symbol == u"IBM");
+                    ++count;
+                }
+            }
+        }
+
+        return count;
+    };
+    const auto deadline = Clock::now() + 5s;
+
+    while (Clock::now() < deadline && countDemand(source.snapshot().sessions[1].received, remove) == 0)
+        std::this_thread::sleep_for(1ms);
+
+    const auto captured = source.snapshot();
+    CHECK(captured.error == q::test::TcpPeerError::NONE);
+    CHECK(countDemand(captured.sessions[0].received, add) == 1);
+    CHECK(countDemand(captured.sessions[1].received, add) == 1);
+    CHECK(countDemand(captured.sessions[1].received, remove) == 1);
+
+    for (const auto &connection : captured.sessions) {
+        auto bytes = std::span(connection.received);
+        q::protocol::FrameReader frames({8192, 8201});
+        bool described = false;
+
+        while (!bytes.empty()) {
+            const auto framed = frames.feed(bytes);
+            REQUIRE(framed.status != q::protocol::FrameStatus::FAILED);
+            REQUIRE(framed.accepted > 0);
+            bytes = bytes.subspan(framed.accepted);
+
+            if (framed.frame && framed.frame->type == 2)
+                described = true;
+
+            if (framed.frame && framed.frame->type == add)
+                CHECK(described);
+        }
+    }
+
+    (*relay)->closeAndAwaitTermination();
+    CHECK((*relay)->getDiagnostic().code == q::api::ErrorCode::NONE);
 }

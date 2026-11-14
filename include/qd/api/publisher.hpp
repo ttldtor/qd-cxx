@@ -5,16 +5,36 @@
 #include "qd/api/feed.hpp"
 #include "qd/transport/tcp_listener.hpp"
 
+#include <chrono>
+#include <cstdint>
+#include <optional>
+#include <string_view>
+
 namespace org::ttldtor::qdcxx::api {
 namespace detail {
 struct PublisherPort;
 } // namespace detail
 
-/** Finite local publishing profile for composite Quote. */
+/** One numeric TCP publisher whose TICKER data is distributed to local clients. */
+struct PublisherSourceOptions {
+    std::string_view address = "127.0.0.1";    ///< Numeric IPv4 or IPv6, borrowed through create.
+    std::uint16_t port = 0;                    ///< Remote port, required when a source is selected.
+    std::chrono::milliseconds retryDelay{100}; ///< Delay before a fresh connection, between 1 ms and 60 s.
+};
+
+/** Detached observation of the current upstream generation. */
+struct PublisherSourceStatus {
+    std::uint64_t generation = 0; ///< Latest negotiated generation, zero before the first connection.
+    bool connected = false;       ///< Bidirectional TICKER capabilities negotiated on a current connection.
+    Diagnostic diagnostic;        ///< Last source failure until a fresh generation negotiates.
+};
+
+/** Finite local or remote publishing profile for composite Quote. */
 struct PublisherOptions {
     transport::TcpListenerOptions listener{"127.0.0.1", 0, 16,
                                            4}; ///< Plain numeric bind; address is borrowed at create.
     std::size_t pendingQuotes = 64;            ///< Maximum queued publication requests before the owner takes them.
+    std::optional<PublisherSourceOptions> source{}; ///< Remote upstream in place of local publication.
 };
 
 /** Detached producer port. Copies may be used from application threads and outlive the endpoint. */
@@ -67,6 +87,14 @@ class PublisherEndpoint final {
      */
     [[nodiscard]] bool awaitDemand(std::u16string_view symbol, bool subscribed,
                                    std::chrono::steady_clock::time_point deadline) const;
+    /** Observe a fresh negotiated remote source generation within a finite deadline.
+     * @param after Previously observed generation, or zero for the first connection.
+     * @param deadline Monotonic observation deadline.
+     * @return True while a connected generation greater than after is observed. Local mode returns false.
+     */
+    [[nodiscard]] bool awaitSourceGeneration(std::uint64_t after, std::chrono::steady_clock::time_point deadline) const;
+    /** @return Detached upstream evidence. Local mode reports generation zero and disconnected. */
+    [[nodiscard]] PublisherSourceStatus getSourceStatus() const noexcept;
     /** Fence publication, stop socket and queue work, and join the worker. Safe to repeat. */
     void closeAndAwaitTermination() noexcept;
     /** @return First server terminal failure, or NONE. Individual peer failures remain isolated. */
