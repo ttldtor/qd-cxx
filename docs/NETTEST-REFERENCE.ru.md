@@ -4,6 +4,8 @@
 
 Эти инструменты сравнивают публикацию на разных уровнях. Результат имеет смысл, когда совпадают тип записи или события, контракт коллектора, символы, размер пакета, предложенная скорость, число соединений, длительность и нагрузка потребителя. По умолчанию инструменты измеряют разную работу.
 
+Число доставленных записей, скорость и задержка приведены в [результатах проверки нагрузки](RECORD-WORKLOAD.ru.md).
+
 ## QD NetTest
 
 QD NetTest публикует физические записи QD. Производитель заполняет `RecordBuffer` сгенерированными записями и передаёт буфер коллекторам через `QDDistributor.processData`. Тип записи задаётся свойством `com.devexperts.qd.tools.NetTest.record`, по умолчанию это `TimeAndSale`. Это эталон совместимости для пути записей. Один запуск проверяет один тип записи, а не весь каталог схемы. [Производитель QD 3.355](https://github.com/devexperts/QD/blob/0ddc0a09779fb61d74cc0b37c6449ff47dcb715f/qd-tools/src/main/java/com/devexperts/qd/tools/NetTestProducerDistributorThread.java), [производитель QD 3.357](https://github.com/devexperts/QD/blob/052e916c842026cf23a8dcf2067b83cbcc929b88/qd-tools/src/main/java/com/devexperts/qd/tools/NetTestProducerDistributorThread.java), [выбор записи в QD 3.357](https://github.com/devexperts/QD/blob/052e916c842026cf23a8dcf2067b83cbcc929b88/qd-tools/src/main/java/com/devexperts/qd/tools/NetTestSide.java)

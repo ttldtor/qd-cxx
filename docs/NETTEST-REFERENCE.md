@@ -4,6 +4,8 @@
 
 Use these tools to compare publication paths at distinct layers. A result is meaningful only when the record or event type, collector contract, symbols, batch size, offered rate, connection count, duration, and consumer load are aligned. The tools do not measure the same work by default.
 
+See the measured delivery, rate and latency for the finite [record workloads](RECORD-WORKLOAD.md).
+
 ## QD NetTest
 
 QD NetTest publishes physical QD records. Its producer fills a `RecordBuffer` with generated records and passes the buffer to each selected collector's `QDDistributor.processData`. It selects one record for a run through the `com.devexperts.qd.tools.NetTest.record` system property, which defaults to `TimeAndSale`. This is the record-level compatibility reference. A run covers one record type, not the full schema catalog. [QD 3.355 producer source](https://github.com/devexperts/QD/blob/0ddc0a09779fb61d74cc0b37c6449ff47dcb715f/qd-tools/src/main/java/com/devexperts/qd/tools/NetTestProducerDistributorThread.java), [QD 3.357 producer source](https://github.com/devexperts/QD/blob/052e916c842026cf23a8dcf2067b83cbcc929b88/qd-tools/src/main/java/com/devexperts/qd/tools/NetTestProducerDistributorThread.java), [QD 3.357 record selection](https://github.com/devexperts/QD/blob/052e916c842026cf23a8dcf2067b83cbcc929b88/qd-tools/src/main/java/com/devexperts/qd/tools/NetTestSide.java)
