@@ -17,6 +17,7 @@
 #include <asio/io_context.hpp>
 #include <asio/ip/tcp.hpp>
 #include <asio/write.hpp>
+#include <atomic>
 #include <bit>
 #include <chrono>
 #include <doctest/doctest.h>
@@ -492,4 +493,251 @@ TEST_CASE("catalog relay policy replaces physical record demand for one live pee
     }
 
     CHECK(observed);
+}
+
+namespace {
+/** Build a catalog using the standard Quote layout and a custom record with nullable fields. */
+c::LocalSchema publicationSchema() {
+    const auto defaults = q::events::defaultQuoteSchema(SCHEMA_LIMITS);
+    REQUIRE(defaults);
+
+    auto quote = defaults->records().front();
+    std::erase_if(quote.lookups, [](const auto &entry) {
+        const auto name = q::events::QUOTE_FIELD_NAMES[entry.fieldId];
+
+        return !std::equal(entry.name.begin(), entry.name.end(), name.begin(), name.end());
+    });
+    auto indexed = testSchema();
+    using Type = c::SerialFieldType;
+    const std::array records{std::move(quote),
+                             c::LocalRecord{1,
+                                            u"CustomFlow",
+                                            false,
+                                            {{std::to_underlying(Type::UTF_CHAR_ARRAY)},
+                                             {std::to_underlying(Type::BYTE_ARRAY)},
+                                             {std::to_underlying(Type::LONG)}},
+                                            {{u"Text", 0}, {u"Payload", 1}, {u"Sequence", 2}}},
+                             indexed.records()[2]};
+    auto schema = c::LocalSchema::create(records, SCHEMA_LIMITS, c::LocalProfile::BINARY_FIELDS_V1);
+    REQUIRE(schema);
+
+    return std::move(*schema);
+}
+
+/** Read until the expected detached records have arrived or a finite deadline elapses. */
+void awaitRecords(Downstream &peer, std::size_t count, const q::api::PublisherEndpoint &endpoint) {
+    const auto deadline = Clock::now() + WAIT_TIME;
+
+    while (peer.records().size() < count && Clock::now() < deadline) {
+        peer.poll();
+        std::this_thread::sleep_for(1ms);
+    }
+
+    const auto stats = endpoint.getStatistics();
+    INFO("publisher stage=", endpoint.getDiagnostic().stage, " active=", stats.activePeers,
+         " retired=", stats.retiredPeers.value, " ticker in=", stats.families[0].ingressRecords.value,
+         " ticker out=", stats.families[0].sentFrames.value, " stream in=", stats.families[1].ingressRecords.value,
+         " stream out=", stats.families[1].sentFrames.value);
+    REQUIRE(peer.records().size() == count);
+}
+} // namespace
+
+TEST_CASE("local catalog publishes exact copied records through TICKER and STREAM") {
+    auto bootstrap = q::transport::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+
+    auto schema = publicationSchema();
+    const auto quoteContext = schema.recordContext(0);
+    const auto customContext = schema.recordContext(1);
+    const auto receiver = publicationSchema();
+    q::api::PublisherOptions options;
+    {
+        auto names = fieldNames(schema);
+        options.catalog.emplace(schema, names);
+        auto created = q::api::PublisherEndpoint::create(*bootstrap, options);
+        INFO((created ? std::string_view{} : created.error().stage));
+        REQUIRE(created);
+        auto endpoint = std::move(*created);
+        options.catalog.reset();
+        // The local catalog, names and each submitted payload may be destroyed by the caller.
+        schema = publicationSchema();
+        names.clear();
+
+        const auto publisher = endpoint->getPublisher();
+        Downstream first(receiver, endpoint->port(), 91);
+        first.subscribe(p::SubscriptionMessage::TICKER_ADD, 0);
+        first.subscribe(p::SubscriptionMessage::STREAM_ADD, 1);
+        const auto demandDeadline = Clock::now() + WAIT_TIME;
+        REQUIRE(endpoint->awaitDemand(c::SubscriptionFamily::TICKER, u"Quote", u"IBM", true, demandDeadline));
+        REQUIRE(endpoint->awaitDemand(c::SubscriptionFamily::STREAM, u"CustomFlow", u"IBM", true, demandDeadline));
+
+        std::vector<c::FieldValueView> quote;
+
+        for (const auto &field : receiver.records()[0].fields)
+            quote.push_back({static_cast<c::SerialFieldType>(field.serialTypeId), 0, {}, {}});
+
+        for (const auto bid : {501, -907, 1201}) {
+            quote[2].raw = bid;
+            REQUIRE(publisher.publishRecord(c::SubscriptionFamily::TICKER, quoteContext, u"IBM", quote));
+        }
+
+        {
+            std::u16string symbol = u"IBM";
+            std::u16string units{u'Q', 0, 0xd800};
+            std::array bytes{std::byte{0}, std::byte{0xff}};
+            using Type = c::SerialFieldType;
+            const std::array fields{c::FieldValueView{Type::UTF_CHAR_ARRAY, 0, units, {}},
+                                    c::FieldValueView{Type::BYTE_ARRAY, 0, {}, std::span<const std::byte>(bytes)},
+                                    c::FieldValueView{Type::LONG, -42, {}, {}}};
+            REQUIRE(publisher.publishRecord(c::SubscriptionFamily::STREAM, customContext, symbol, fields));
+            REQUIRE(publisher.publishRecord(c::SubscriptionFamily::STREAM, customContext, symbol, fields));
+            symbol.assign(u"BAD");
+            units.clear();
+            bytes.fill(std::byte{0x17});
+        }
+        using Type = c::SerialFieldType;
+        const std::array empty{c::FieldValueView{Type::UTF_CHAR_ARRAY, 0, std::u16string_view{}, {}},
+                               c::FieldValueView{Type::BYTE_ARRAY, 0, {}, std::span<const std::byte>{}},
+                               c::FieldValueView{Type::LONG, 99, {}, {}}};
+        const std::array null{c::FieldValueView{Type::UTF_CHAR_ARRAY, 0, {}, {}},
+                              c::FieldValueView{Type::BYTE_ARRAY, 0, {}, {}},
+                              c::FieldValueView{Type::LONG, 100, {}, {}}};
+        REQUIRE(publisher.publishRecord(c::SubscriptionFamily::STREAM, customContext, u"IBM", empty));
+        REQUIRE(publisher.publishRecord(c::SubscriptionFamily::STREAM, customContext, u"IBM", null));
+
+        const auto deadline = Clock::now() + WAIT_TIME;
+
+        while (endpoint->getStatistics().pendingPublications != 0 && Clock::now() < deadline)
+            std::this_thread::sleep_for(1ms);
+
+        REQUIRE(endpoint->getStatistics().pendingPublications == 0);
+
+        Downstream later(receiver, endpoint->port(), 52);
+        later.subscribe(p::SubscriptionMessage::TICKER_ADD, 0);
+        first.poll();
+        awaitRecords(later, 1, *endpoint);
+        CHECK(later.records().front().first == 10);
+        REQUIRE(later.records().front().second.typedValues.size() == quote.size());
+        CHECK(later.records().front().second.typedValues[2].raw == 1201);
+
+        const auto streamDeadline = Clock::now() + WAIT_TIME;
+
+        while (Clock::now() < streamDeadline) {
+            first.poll();
+
+            if (std::ranges::count(first.records(), 15, &std::pair<int, p::StreamDataRecord>::first) == 4)
+                break;
+
+            std::this_thread::sleep_for(1ms);
+        }
+
+        std::vector<const p::StreamDataRecord *> stream;
+
+        for (const auto &[message, record] : first.records()) {
+            if (message == 15)
+                stream.push_back(&record);
+        }
+
+        REQUIRE(stream.size() == 4);
+
+        for (const auto *row : stream) {
+            CHECK(row->symbol.units == u"IBM");
+            CHECK(row->localId == 1);
+            REQUIRE(row->typedValues.size() == 3);
+        }
+
+        const std::u16string expectedUnits{u'Q', 0, 0xd800};
+        const std::vector expectedBytes{std::byte{0}, std::byte{0xff}};
+        CHECK(stream[0]->typedValues[0].units == expectedUnits);
+        CHECK(stream[0]->typedValues[1].bytes == expectedBytes);
+        CHECK(stream[0]->typedValues[2].raw == -42);
+        CHECK(stream[0]->typedValues == stream[1]->typedValues);
+        CHECK(stream[2]->typedValues[0].units == std::u16string{});
+        CHECK(stream[2]->typedValues[1].bytes == std::vector<std::byte>{});
+        CHECK(stream[2]->typedValues[2].raw == 99);
+        CHECK_FALSE(stream[3]->typedValues[0].units);
+        CHECK_FALSE(stream[3]->typedValues[1].bytes);
+        CHECK(stream[3]->typedValues[2].raw == 100);
+
+        REQUIRE_FALSE(publisher.publishRecord(c::SubscriptionFamily::HISTORY, customContext, u"IBM", null));
+        REQUIRE_FALSE(publisher.publishRecord(c::SubscriptionFamily::STREAM, schema.recordContext(1), u"IBM", null));
+        REQUIRE_FALSE(publisher.publishRecord(c::SubscriptionFamily::STREAM, customContext, u"*", null));
+        REQUIRE_FALSE(
+            publisher.publishRecord(c::SubscriptionFamily::STREAM, customContext, u"IBM", std::span(null).first(1)));
+        auto malformed = null;
+        malformed[2].type = Type::COMPACT_INT;
+        REQUIRE_FALSE(publisher.publishRecord(c::SubscriptionFamily::STREAM, customContext, u"IBM", malformed));
+        CHECK(endpoint->getStatistics().pendingPublications == 0);
+
+        endpoint.reset();
+        const auto closed = publisher.publishRecord(c::SubscriptionFamily::STREAM, customContext, u"IBM", null);
+        REQUIRE_FALSE(closed);
+        CHECK(closed.error().code == q::api::ErrorCode::CLOSED);
+    }
+}
+
+TEST_CASE("local record limits reject before admission and the producer linearizes with close") {
+    auto bootstrap = q::transport::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    const auto schema = publicationSchema();
+    const auto names = fieldNames(schema);
+    const auto context = schema.recordContext(1);
+    using Type = c::SerialFieldType;
+    const std::array empty{c::FieldValueView{Type::UTF_CHAR_ARRAY, 0, {}, {}},
+                           c::FieldValueView{Type::BYTE_ARRAY, 0, {}, {}}, c::FieldValueView{Type::LONG, 15, {}, {}}};
+    using enum c::SubscriptionFamily;
+    q::api::PublisherOptions options;
+    options.catalog.emplace(schema, names);
+    constexpr auto BASE_BYTES = sizeof(c::FieldValueView) * empty.size() + sizeof(char16_t) * 3;
+    options.recordLimits = {BASE_BYTES + 8, BASE_BYTES};
+    auto endpoint = q::api::PublisherEndpoint::create(*bootstrap, options);
+    INFO((endpoint ? std::string_view{} : endpoint.error().stage));
+    REQUIRE(endpoint);
+    const auto publisher = (*endpoint)->getPublisher();
+
+    std::array<std::byte, 8> bytes{};
+    auto canFitRow = empty;
+    canFitRow[1].bytes = bytes;
+    const auto full = publisher.publishRecord(STREAM, context, u"IBM", canFitRow);
+    REQUIRE_FALSE(full);
+    CHECK(full.error().stage == "publisher-pending-records");
+
+    std::array<std::byte, 9> oversized{};
+    auto overLimit = empty;
+    overLimit[1].bytes = oversized;
+    const auto large = publisher.publishRecord(STREAM, context, u"IBM", overLimit);
+    REQUIRE_FALSE(large);
+    CHECK(large.error().stage == "publisher-record-limit");
+    CHECK((*endpoint)->getStatistics().pendingPublications == 0);
+    REQUIRE(publisher.publishRecord(STREAM, context, u"IBM", empty));
+
+    std::atomic<bool> started{false};
+    std::atomic<bool> closed{false};
+    std::jthread producer([&](std::stop_token stop) {
+        started.store(true, std::memory_order_release);
+
+        while (!stop.stop_requested()) {
+            const auto result = publisher.publishRecord(STREAM, context, u"IBM", empty);
+
+            if (!result && result.error().code == q::api::ErrorCode::CLOSED) {
+                closed.store(true, std::memory_order_release);
+
+                return;
+            }
+
+            std::this_thread::yield();
+        }
+    });
+    const auto deadline = Clock::now() + WAIT_TIME;
+
+    while (!started.load(std::memory_order_acquire) && Clock::now() < deadline)
+        std::this_thread::yield();
+
+    REQUIRE(started.load(std::memory_order_acquire));
+    endpoint->reset();
+
+    while (!closed.load(std::memory_order_acquire) && Clock::now() < deadline)
+        std::this_thread::yield();
+
+    CHECK(closed.load(std::memory_order_acquire));
 }

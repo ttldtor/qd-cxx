@@ -21,3 +21,27 @@ Admission means the publisher has accepted the work for processing. The STREAM c
 Use the existing collectors, subscriber filters and field encoders. Generic local publication does not require JSON or a provider-specific event type. Keep existing typed publish overloads and their supported profiles and preserve the compact and upstream relay modes.
 
 Verify exact standard and custom records through TCP, including null and empty values, STREAM duplicates and order, TICKER conflation, HISTORY snapshots and signed removal. Exercise invalid identity, malformed fields, resource exhaustion and shutdown with rejected input.
+
+## TICKER and STREAM profile
+
+Set `PublisherOptions::catalog` to a binary schema and its ordered outbound names. Leave
+`source` unset and `mixed` false. This endpoint advertises TICKER and STREAM. The
+`Publisher::publishRecord` method accepts those two families and no indexed flags or
+removal metadata. Local HISTORY is described above as a separate contract. Typed
+`publish` overloads continue to use the existing compact and mixed profiles.
+
+Pass a `RecordContext` from the same schema used to configure the endpoint and one
+`FieldValueView` for each logical field in catalog order. Only the caller's storage
+for the duration of the call is required. The endpoint validates the outgoing
+description before accepting clients. Each subscriber can assign its own record IDs.
+
+The profile accepts up to 128 logical fields and a nonempty exact symbol of up to
+256 UTF-16 units. A STRING field has the existing wire limit of 1,024 UTF-16 units.
+`PublisherRecordLimits::rowBytes` defaults to 16 KiB and
+`PublisherRecordLimits::pendingBytes` defaults to 256 KiB. Per row, the charge is the
+array of field views, UTF-16 text including the symbol, and opaque payload bytes.
+Fixed FIFO entries and allocator bookkeeping are outside that charge. The shared
+`pendingQuotes` option caps the number of admitted rows, including the worker's
+current unapplied row. A separate bounded source arena and the existing collector
+limits cover work after copying. `PublisherStatistics::pendingPublications` includes
+the current unapplied row in this profile.

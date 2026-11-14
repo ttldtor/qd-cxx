@@ -1559,11 +1559,28 @@ std::expected<LiveEvent, LiveError> detail::LocalEventOwner::quote(const core::R
     return record(LiveDataMessage::TICKER_DATA, 0, context, symbol, fields, 0, {}, eventTime, work);
 }
 
+std::expected<LiveEvent, LiveError> detail::LocalEventOwner::record(LiveDataMessage type, std::int32_t localId,
+                                                                    const core::RecordContext &context,
+                                                                    std::u16string_view symbol,
+                                                                    std::span<const core::FieldValueView> fields,
+                                                                    LiveWork &work) const {
+    return copyRecord(type, localId, context, symbol, fields, 0, {}, {}, work);
+}
+
 std::expected<LiveEvent, LiveError>
 detail::LocalEventOwner::record(LiveDataMessage type, std::int32_t localId, const core::RecordContext &context,
                                 std::u16string_view symbol, std::span<const core::FieldValue> fields,
                                 std::int32_t flags, std::optional<std::int64_t> removalTime,
                                 std::optional<FieldEventTime> eventTime, LiveWork &work) const {
+    return copyRecord(type, localId, context, symbol, fields, flags, removalTime, eventTime, work);
+}
+
+template <typename Field>
+std::expected<LiveEvent, LiveError>
+detail::LocalEventOwner::copyRecord(LiveDataMessage type, std::int32_t localId, const core::RecordContext &context,
+                                    std::u16string_view symbol, std::span<const Field> fields, std::int32_t flags,
+                                    std::optional<std::int64_t> removalTime, std::optional<FieldEventTime> eventTime,
+                                    LiveWork &work) const {
     try {
         debit(1, work.operations);
         debit(fields.size() + 1, work.visits);
@@ -1589,8 +1606,24 @@ detail::LocalEventOwner::record(LiveDataMessage type, std::int32_t localId, cons
 
         record.typedValues.reserve(fields.size());
 
-        for (const auto &field : fields)
-            record.typedValues.emplace_back(field.type, field.raw);
+        for (const auto &field : fields) {
+            auto &value = record.typedValues.emplace_back(field.type, field.raw);
+
+            if (field.units) {
+                debit(field.units->size(), work.textUnits);
+                value.units.emplace(resource);
+
+                if (!field.units->empty())
+                    value.units->assign(field.units->data(), field.units->size());
+            }
+
+            if (field.bytes) {
+                value.bytes.emplace(resource);
+
+                if (!field.bytes->empty())
+                    value.bytes->assign(field.bytes->begin(), field.bytes->end());
+            }
+        }
 
         event->decoded.records.push_back(std::move(record));
         event->complete(work);
