@@ -127,7 +127,7 @@ enum class LocalProfile {
     COMPACT_INT_V1,     ///< Only ordinary full type 8.
     QUOTE_FIELDS_V1,    ///< Exactly 2, 8, 56 and 120; no representation conversions.
     EXTENDED_FIELDS_V1, ///< Exactly 2, 8, 10, 40, 56, 72, 88 and 120; ordinary fields only.
-    BINARY_FIELDS_V1    ///< Read-only ordinary exact fields of the finite binary catalog; explicit opt-in.
+    BINARY_FIELDS_V1    ///< Ordinary exact fields of the finite binary catalog; explicit opt-in.
 };
 
 /** Test an exact full identity against a selected local policy.

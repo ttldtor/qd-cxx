@@ -18,19 +18,38 @@ enum class SubscriptionMessage : std::int32_t {
     HISTORY_REMOVE = 22 ///< Remove indexed interest without a wire time.
 };
 
+/** Outgoing plain binary DATA message identities. */
+enum class LiveDataMessage : std::int32_t {
+    TICKER_DATA = 10, ///< Ticker data.
+    STREAM_DATA = 15, ///< Stream data.
+    HISTORY_DATA = 20 ///< History data.
+};
+
+/** One exact outgoing DATA occurrence, borrowed only during composition. */
+struct LiveDataRecordView {
+    std::int32_t senderId;                        ///< Sender ID from this writer's outgoing type-2 layout.
+    std::u16string_view symbol;                   ///< Nonnull, exact UTF-16 units.
+    std::span<const core::FieldValueView> values; ///< Exact tagged values in local logical order.
+    std::int32_t eventFlags = 0;                  ///< Raw flags allowed by the selected option.
+    std::optional<std::int64_t> removalTime{};    ///< Required only for REMOVE_EVENT, with empty values.
+};
+
 /** Rejections publish no output and do not poison the composer. */
 enum class SubscriptionWriterError {
-    INVALID_STATE,       ///< Moved-from composer.
-    INVALID_LAYOUT,      ///< Invalid sender/local identity, name, type or incomplete field mapping.
-    INVALID_CONTEXT,     ///< Key provenance has no explicit outgoing record.
-    INVALID_SELECTOR,    ///< Null selector or reserved leading asterisk.
-    INVALID_HISTORY,     ///< Unexpected/missing bound or absent explicit indexed-time metadata.
-    INVALID_MESSAGE,     ///< Unsupported message identity.
-    INVALID_CONSUMPTION, ///< Requested suffix consumption exceeds remaining bytes.
-    RESOURCE_LIMIT,      ///< Finite storage, input or wire-domain allowance exceeded.
-    WORK_LIMIT,          ///< Caller turn credits exhausted; previous charges are not refunded.
-    ALLOCATION_FAILURE,  ///< Owned storage allocation failed before publication.
-    UNSUPPORTED_SELECTOR ///< Explicit profile/family does not permit All; no output is published.
+    INVALID_STATE,           ///< Moved-from composer.
+    INVALID_LAYOUT,          ///< Invalid sender/local identity, name, type or incomplete field mapping.
+    INVALID_CONTEXT,         ///< Key provenance has no explicit outgoing record.
+    INVALID_SELECTOR,        ///< Null selector or reserved leading asterisk.
+    INVALID_HISTORY,         ///< Unexpected/missing bound or absent explicit indexed-time metadata.
+    INVALID_MESSAGE,         ///< Unsupported message identity.
+    INVALID_CONSUMPTION,     ///< Requested suffix consumption exceeds remaining bytes.
+    RESOURCE_LIMIT,          ///< Finite storage, input or wire-domain allowance exceeded.
+    WORK_LIMIT,              ///< Caller turn credits exhausted; previous charges are not refunded.
+    ALLOCATION_FAILURE,      ///< Owned storage allocation failed before publication.
+    UNSUPPORTED_SELECTOR,    ///< Explicit profile/family does not permit All; no output is published.
+    INVALID_DATA,            ///< Invalid DATA symbol, tagged values, or removal shape.
+    UNSUPPORTED_DATA_FLAGS,  ///< Raw flags outside the selected outgoing option.
+    UNSUPPORTED_DATA_REMOVAL ///< Outgoing layout has a leading effective Event field.
 };
 
 /** Explicit caller-turn credits; reuse across calls, replenish only at the next chosen turn. */
@@ -134,12 +153,16 @@ class SubscriptionWriter {
      * @param message Subscription identity, or absent for descriptions.
      * @param requests Borrowed ordered keys; unused for descriptions.
      * @param ids Borrowed sender IDs; unused for subscriptions.
+     * @param dataMessage DATA identity, absent for descriptions and subscriptions.
+     * @param data Borrowed DATA records; unused for descriptions and subscriptions.
+     * @param historySnapshot Whether the caller enabled the hs option for outgoing DATA.
      * @param work Mutable caller-turn credits, never refunded.
      * @return Independent complete output or typed rejection.
      */
     std::expected<PendingSubscriptionOutput, SubscriptionWriterError>
     execute(std::optional<SubscriptionMessage> message, std::span<const core::SubscriptionRequest> requests,
-            std::span<const std::int32_t> ids, SubscriptionWriterWork &work);
+            std::span<const std::int32_t> ids, std::optional<LiveDataMessage> dataMessage,
+            std::span<const LiveDataRecordView> data, bool historySnapshot, SubscriptionWriterWork &work);
 
     public:
     /** Transfer configuration and shared credits; source rejects subsequent operations.
@@ -173,6 +196,17 @@ class SubscriptionWriter {
     [[nodiscard]] std::expected<PendingSubscriptionOutput, SubscriptionWriterError>
     compose(SubscriptionMessage message, std::span<const core::SubscriptionRequest> requests,
             SubscriptionWriterWork &work);
+    /** Encode a nonempty DATA envelope in outgoing layout order with fresh symbol and flag state.
+     * The caller orders the matching descriptions before these bytes on the connection.
+     * @param message One of the three supported DATA identities.
+     * @param records Borrowed occurrences, including exact values or removal times.
+     * @param historySnapshot Whether hs is enabled for this direction. Unsupported flags are rejected.
+     * @param work Mutable caller-turn credits, including failures.
+     * @return Immutable whole envelope or typed rejection without partial output.
+     */
+    [[nodiscard]] std::expected<PendingSubscriptionOutput, SubscriptionWriterError>
+    composeData(LiveDataMessage message, std::span<const LiveDataRecordView> records, bool historySnapshot,
+                SubscriptionWriterWork &work);
     /** Encode explicit descriptions, without claiming they were sent or acknowledged.
      * @param senderIds Ordered known sender IDs, borrowed only during the call; repeats are preserved.
      * @param work Mutable explicit caller-turn credits.

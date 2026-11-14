@@ -84,6 +84,10 @@ constexpr std::size_t COMPACT_BYTES = 9;
 constexpr std::size_t MAX_WIRE_COUNT = static_cast<std::size_t>(std::numeric_limits<std::int32_t>::max());
 constexpr std::byte RAW_SYMBOL{0xfd};
 constexpr std::byte REPEAT_SYMBOL{0xff};
+constexpr std::byte MRU_FLAGS{0xf8};
+constexpr std::byte NEW_FLAGS{0xf9};
+constexpr std::int32_t DATA_FLAGS = 0x5f;
+constexpr std::int32_t REMOVE_EVENT = 0x02;
 constexpr std::int32_t DESCRIBE_RECORDS = 2;
 constexpr char16_t HIGH_FIRST = 0xd800;
 constexpr char16_t HIGH_LAST = 0xdbff;
@@ -380,6 +384,9 @@ struct SubscriptionWriter::Operation {
     std::optional<SubscriptionMessage> message;          ///< Absent for descriptions.
     std::span<const core::SubscriptionRequest> requests; ///< Borrowed exact ordered inputs.
     std::span<const std::int32_t> ids;                   ///< Borrowed ordered description sender IDs.
+    std::optional<LiveDataMessage> dataMessage;          ///< DATA identity, when composing data.
+    std::span<const LiveDataRecordView> data;            ///< Borrowed ordered data occurrences.
+    bool historySnapshot;                                ///< Explicit hs allowance.
     std::span<std::byte> output{};                       ///< Candidate body, empty during sizing.
     bool encoding = false;                               ///< Whether output bytes are being filled.
     std::size_t size = 0;                                ///< Current body byte position.
@@ -420,6 +427,18 @@ struct SubscriptionWriter::Operation {
         }
     }
 
+    /** Append exact borrowed bytes with no intermediate storage.
+     * @param bytes Exact bytes to append.
+     */
+    void raw(std::span<const std::byte> bytes) {
+        const auto offset = size;
+        admit(bytes.size());
+
+        if (encoding) {
+            std::ranges::copy(bytes, output.begin() + static_cast<std::ptrdiff_t>(offset));
+        }
+    }
+
     /** Size canonical UTFChar bytes using the existing primitive.
      * @param value Exact unit or supplementary scalar.
      * @return Encoded size.
@@ -431,17 +450,29 @@ struct SubscriptionWriter::Operation {
     }
 
     /** Size or encode exact text through the existing atomic UTFString/CharArray writers.
-     * @param value Borrowed non-null units.
-     * @param symbol Whether to preserve individual UTF-16 units as a character array.
+     * @param nullable Borrowed UTF-16 units or Java null.
+     * @param charArray Whether to preserve individual UTF-16 units as a character array.
      */
-    void text(std::u16string_view value, bool symbol) {
+    void text(std::optional<std::u16string_view> nullable, bool charArray) {
+        if (!nullable) {
+            number(-1);
+
+            return;
+        }
+
+        const auto value = *nullable;
+
+        if (value.size() > MAX_WIRE_COUNT) {
+            throw Error::RESOURCE_LIMIT;
+        }
+
         debit(value.size(), work.textUnits);
         std::size_t body = 0;
 
         for (std::size_t i = 0; i < value.size(); ++i) {
             auto point = static_cast<std::uint32_t>(value[i]);
 
-            if (!symbol && value[i] >= HIGH_FIRST && value[i] <= HIGH_LAST && i + 1 < value.size() &&
+            if (!charArray && value[i] >= HIGH_FIRST && value[i] <= HIGH_LAST && i + 1 < value.size() &&
                 value[i + 1] >= LOW_FIRST && value[i + 1] <= LOW_LAST) {
                 point = SUPPLEMENTARY + ((point - HIGH_FIRST) << SURROGATE_BITS) + (value[++i] - LOW_FIRST);
             }
@@ -449,13 +480,14 @@ struct SubscriptionWriter::Operation {
             add(charSize(point), body, MAX_WIRE_COUNT);
         }
 
-        if (!symbol && (body > writer.limits_.text.bodyBytes || value.size() > writer.limits_.text.codeUnits)) {
+        if (!charArray && (body > writer.limits_.text.bodyBytes || value.size() > writer.limits_.text.codeUnits)) {
             throw Error::RESOURCE_LIMIT;
         }
 
         std::array<std::byte, COMPACT_BYTES> prefix{};
-        const auto count = symbol ? encoding::writeCompactInt(static_cast<std::int32_t>(value.size()), prefix).written
-                                  : encoding::writeCompactLong(static_cast<std::int64_t>(body), prefix).written;
+        const auto count = charArray
+                               ? encoding::writeCompactInt(static_cast<std::int32_t>(value.size()), prefix).written
+                               : encoding::writeCompactLong(static_cast<std::int64_t>(body), prefix).written;
         std::size_t encoded = body;
         const auto offset = size;
 
@@ -467,8 +499,8 @@ struct SubscriptionWriter::Operation {
             debit(value.size(), work.textUnits);
             debit(value.size(), work.textUnits);
             const auto target = output.subspan(offset, encoded);
-            const auto result = symbol ? encoding::writeCharArray(value, target, {encoded, writer.limits_.symbolUnits})
-                                       : encoding::writeUtfString(value, target, writer.limits_.text);
+            const auto result = charArray ? encoding::writeCharArray(value, target, {encoded, MAX_WIRE_COUNT})
+                                          : encoding::writeUtfString(value, target, writer.limits_.text);
 
             if (result.status != encoding::Status::OK || result.written != encoded) {
                 throw Error::RESOURCE_LIMIT;
@@ -508,8 +540,185 @@ struct SubscriptionWriter::Operation {
         throw Error::INVALID_CONTEXT;
     }
 
+    /** Append a canonical new symbol or the raw UTF-16 fallback.
+     * @param symbol Exact symbol, already validated for size and nullness.
+     */
+    void canonicalSymbol(std::u16string_view symbol) {
+        debit(1, work.visits);
+        debit(symbol.size(), work.textUnits);
+        const auto encoded = encoding::encodePentaSymbol(symbol);
+
+        if (encoded) {
+            for (std::size_t i = 0; i < encoded->size; ++i) {
+                byte(encoded->bytes[i]);
+            }
+        } else {
+            byte(RAW_SYMBOL);
+            text(symbol, true);
+        }
+    }
+
+    /** Append one validated exact field without converting its representation.
+     * @param value Borrowed field of the outgoing full type.
+     */
+    void fieldValue(const core::FieldValueView &value) {
+        using core::SerialType;
+        const auto primitive = static_cast<SerialType>(core::serialTypeBits(std::to_underlying(value.type)));
+
+        switch (primitive) {
+        case SerialType::VOID_FIELD:
+            return;
+        case SerialType::COMPACT_INT:
+            number(value.raw);
+
+            return;
+        case SerialType::UTF_CHAR: {
+            std::array<std::byte, 4> encoded{};
+            const auto result = encoding::writeUtfChar(static_cast<std::int32_t>(value.raw), encoded);
+            raw(std::span(encoded).first(result.written));
+
+            return;
+        }
+        case SerialType::UTF_CHAR_ARRAY:
+            text(value.units, true);
+
+            return;
+        case SerialType::BYTE_ARRAY:
+
+            if (value.type == core::SerialFieldType::STRING) {
+                text(value.units, false);
+            } else if (!value.bytes) {
+                number(-1);
+            } else {
+                if (value.bytes->size() > MAX_WIRE_COUNT) {
+                    throw Error::RESOURCE_LIMIT;
+                }
+
+                number(static_cast<std::int64_t>(value.bytes->size()));
+                raw(*value.bytes);
+            }
+
+            return;
+        case SerialType::BYTE:
+        case SerialType::SHORT:
+        case SerialType::INT: {
+            const unsigned width = primitive == SerialType::INT ? 4 : primitive == SerialType::SHORT ? 2 : 1;
+            const auto bits = static_cast<std::uint32_t>(value.raw);
+
+            for (unsigned remaining = width; remaining > 0; --remaining) {
+                byte(static_cast<std::byte>((bits >> (8 * (remaining - 1))) & 0xff));
+            }
+
+            return;
+        }
+        }
+
+        throw Error::INVALID_DATA;
+    }
+
+    /** Refuse removal layouts whose receiver would read a leading Event field before the raw time.
+     * @param layout Exact outgoing field order; VOID entries have zero width and are elided by Java.
+     */
+    void validateRemovalLayout(const OutgoingRecord &layout) {
+        constexpr std::u16string_view EVENT_PREFIX = u"Event";
+
+        for (const auto &field : layout.fields) {
+            debit(1, work.visits);
+
+            if (field.serialTypeId == std::to_underlying(core::SerialFieldType::VOID_FIELD)) {
+                continue;
+            }
+
+            debit(std::min(field.wireName.size(), EVENT_PREFIX.size()), work.textUnits);
+
+            if (field.wireName.starts_with(EVENT_PREFIX)) {
+                throw Error::UNSUPPORTED_DATA_REMOVAL;
+            }
+
+            return;
+        }
+    }
+
+    /** Traverse one full DATA body with fresh symbol and event-flag state. */
+    void walkData() {
+        number(std::to_underlying(*dataMessage));
+        std::optional<std::u16string_view> previous;
+        std::int32_t mruFlags = 1;
+
+        for (const auto &record : data) {
+            debit(1, work.visits);
+
+            if ((record.eventFlags & ~(historySnapshot ? DATA_FLAGS : 0)) != 0) {
+                throw Error::UNSUPPORTED_DATA_FLAGS;
+            }
+
+            if (record.symbol.data() == nullptr) {
+                throw Error::INVALID_DATA;
+            }
+
+            if (record.symbol.size() > MAX_WIRE_COUNT || record.symbol.size() > writer.limits_.symbolUnits) {
+                throw Error::RESOURCE_LIMIT;
+            }
+
+            const auto &layout = byId(record.senderId);
+            const auto &local = writer.schema_.records()[static_cast<std::size_t>(layout.localRecordId)];
+            const bool removal = (record.eventFlags & REMOVE_EVENT) != 0;
+
+            if (removal != record.removalTime.has_value() ||
+                (removal && (!record.values.empty() || (!local.hasTime && *record.removalTime != 0))) ||
+                (!removal && record.values.size() != local.fields.size())) {
+                throw Error::INVALID_DATA;
+            }
+
+            if (removal) {
+                validateRemovalLayout(layout);
+            }
+
+            if (record.eventFlags != 0) {
+                if (record.eventFlags == mruFlags) {
+                    byte(MRU_FLAGS);
+                } else {
+                    byte(NEW_FLAGS);
+                    number(record.eventFlags);
+                    mruFlags = record.eventFlags;
+                }
+            }
+
+            if (previous && same(*previous, record.symbol, work)) {
+                byte(REPEAT_SYMBOL);
+            } else {
+                canonicalSymbol(record.symbol);
+            }
+
+            previous = record.symbol;
+            number(record.senderId);
+
+            if (removal) {
+                number(*record.removalTime);
+                continue;
+            }
+
+            for (const auto &field : layout.fields) {
+                debit(1, work.visits);
+                const auto &value = record.values[static_cast<std::size_t>(field.localFieldId)];
+
+                if (std::to_underlying(value.type) != field.serialTypeId || !core::validFieldValueView(value)) {
+                    throw Error::INVALID_DATA;
+                }
+
+                fieldValue(value);
+            }
+        }
+    }
+
     /** Traverse one complete body with fresh message-local symbol state. */
     void walk() {
+        if (dataMessage) {
+            walkData();
+
+            return;
+        }
+
         number(message ? static_cast<std::int32_t>(*message) : DESCRIBE_RECORDS);
 
         if (!message) {
@@ -586,18 +795,7 @@ struct SubscriptionWriter::Operation {
             if (repeated) {
                 byte(REPEAT_SYMBOL);
             } else if (canonical) {
-                debit(1, work.visits);
-                debit(wireSymbol.size(), work.textUnits);
-                const auto encoded = encoding::encodePentaSymbol(wireSymbol);
-
-                if (encoded) {
-                    for (std::size_t i = 0; i < encoded->size; ++i) {
-                        byte(encoded->bytes[i]);
-                    }
-                } else {
-                    byte(RAW_SYMBOL);
-                    text(wireSymbol, true);
-                }
+                canonicalSymbol(wireSymbol);
             } else {
                 byte(RAW_SYMBOL);
                 text(symbol, true);
@@ -617,7 +815,8 @@ struct SubscriptionWriter::Operation {
 std::expected<PendingSubscriptionOutput, Error>
 SubscriptionWriter::execute(std::optional<SubscriptionMessage> message,
                             std::span<const core::SubscriptionRequest> requests, std::span<const std::int32_t> ids,
-                            SubscriptionWriterWork &work) {
+                            std::optional<LiveDataMessage> dataMessage, std::span<const LiveDataRecordView> data,
+                            bool historySnapshot, SubscriptionWriterWork &work) {
     try {
         debit(1, work.operations);
 
@@ -639,11 +838,27 @@ SubscriptionWriter::execute(std::optional<SubscriptionMessage> message,
             }
         }
 
-        if (requests.size() > limits_.operationEntries || ids.size() > limits_.operationEntries) {
+        if (dataMessage) {
+            switch (*dataMessage) {
+            case LiveDataMessage::TICKER_DATA:
+            case LiveDataMessage::STREAM_DATA:
+            case LiveDataMessage::HISTORY_DATA:
+                break;
+            default:
+                throw Error::INVALID_MESSAGE;
+            }
+
+            if (data.empty()) {
+                throw Error::INVALID_DATA;
+            }
+        }
+
+        if (requests.size() > limits_.operationEntries || ids.size() > limits_.operationEntries ||
+            data.size() > limits_.operationEntries) {
             throw Error::RESOURCE_LIMIT;
         }
 
-        Operation operation{*this, work, message, requests, ids};
+        Operation operation{*this, work, message, requests, ids, dataMessage, data, historySnapshot};
 
         operation.walk();
         std::array<std::byte, COMPACT_BYTES> prefix{};
@@ -701,12 +916,18 @@ SubscriptionWriter::execute(std::optional<SubscriptionMessage> message,
 std::expected<PendingSubscriptionOutput, Error>
 SubscriptionWriter::compose(SubscriptionMessage message, std::span<const core::SubscriptionRequest> requests,
                             SubscriptionWriterWork &work) {
-    return execute(message, requests, {}, work);
+    return execute(message, requests, {}, {}, {}, false, work);
+}
+
+std::expected<PendingSubscriptionOutput, Error>
+SubscriptionWriter::composeData(LiveDataMessage message, std::span<const LiveDataRecordView> records,
+                                bool historySnapshot, SubscriptionWriterWork &work) {
+    return execute({}, {}, {}, message, records, historySnapshot, work);
 }
 
 std::expected<PendingSubscriptionOutput, Error> SubscriptionWriter::describe(std::span<const std::int32_t> senderIds,
                                                                              SubscriptionWriterWork &work) {
-    return execute(std::nullopt, {}, senderIds, work);
+    return execute({}, {}, senderIds, {}, {}, false, work);
 }
 
 std::size_t SubscriptionWriter::retainedBytes() const noexcept {

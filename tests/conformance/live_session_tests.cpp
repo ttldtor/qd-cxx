@@ -679,6 +679,50 @@ TEST_CASE("captured receive-add readiness and explicit protocol authentication s
     CHECK(forbidden.error() == Error::CREDENTIALS_FORBIDDEN);
 }
 
+TEST_CASE("live DATA output follows the peer receive direction and outgoing layout") {
+    auto f = fixture();
+    auto work = turn();
+    constexpr auto TICKER = p::LiveDataMessage::TICKER_DATA;
+    constexpr auto STREAM = p::LiveDataMessage::STREAM_DATA;
+    const p::LiveMessageView ticker[]{{10, u"TICKER_DATA", {}}};
+    const p::LiveMessageView stream[]{{15, u"STREAM_DATA", {}}};
+    const c::FieldValueView values[]{{c::SerialFieldType::COMPACT_INT, 17, {}, {}},
+                                     {c::SerialFieldType::COMPACT_INT, 29, {}, {}}};
+    const p::LiveDataRecordView record{3, u"A", values};
+    const auto records = std::span(&record, 1);
+    (void)admit(f.session, protocol({}, ticker, stream));
+    auto blocked = f.session.publishData(TICKER, records, work);
+    REQUIRE_FALSE(blocked);
+    CHECK(blocked.error() == Error::NOT_READY);
+
+    const p::LivePropertyView challenge[]{{u"authentication", u"LOGIN synthetic-realm"}};
+    (void)admit(f.session, protocol(challenge));
+    blocked = f.session.publishData(STREAM, records, work);
+    REQUIRE_FALSE(blocked);
+    CHECK(blocked.error() == Error::AUTHENTICATION_REQUIRED);
+
+    const p::LivePropertyView accepted[]{{u"authentication", u""}, {u"opt", u"hs"}};
+    (void)admit(f.session, protocol(accepted));
+    const auto localProtocol = f.session.composeProtocol({{}, stream, {}}, work);
+    REQUIRE(localProtocol);
+    const auto before = f.session.residentBytes();
+    auto output = f.session.publishData(STREAM, records, work);
+    REQUIRE(output);
+    CHECK(output->subscriptionRecords() == 0);
+    CHECK(f.session.residentBytes() > before);
+    auto outputFrame = p::FrameReader({8192, 8201}).feed(output->bytes());
+    REQUIRE(outputFrame.frame);
+    CHECK(outputFrame.frame->type == 15);
+    const std::byte expected[]{std::byte{0}, std::byte{1}, std::byte{3}, std::byte{29}, std::byte{17}};
+    CHECK(std::ranges::equal(outputFrame.frame->payload, expected));
+    const auto retained = f.session.residentBytes();
+    REQUIRE(output->consume(output->bytes().size()));
+    CHECK(output->pendingBytes().empty());
+    CHECK(f.session.residentBytes() == retained);
+    output = std::unexpected(Error::NONE);
+    CHECK(f.session.residentBytes() == before);
+}
+
 TEST_CASE("one live session negotiates and carries all three subscription families") {
     auto f = fixture();
     const p::LiveMessageView onlyTicker[]{{11, u"TICKER_ADD_SUBSCRIPTION", {}}};
