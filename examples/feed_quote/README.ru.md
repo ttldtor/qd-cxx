@@ -62,8 +62,10 @@ cmake --build build/feed-quote --config Release --parallel 2
 
 ```cmake
 find_package(qdcxx CONFIG REQUIRED COMPONENTS feed)
-add_executable(qdcxx_feed_demo main.cpp)
-target_link_libraries(qdcxx_feed_demo PRIVATE qdcxx_feed)
+find_package(Threads REQUIRED)
+add_executable(qdcxx_feed_demo main.cpp signal_stop.cpp)
+target_link_libraries(qdcxx_feed_demo PRIVATE qdcxx_feed Threads::Threads)
+target_compile_options(qdcxx_feed_demo PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
 ```
 
 Обязательный компонент `feed` даёт раннюю понятную ошибку поиска пакета, если
