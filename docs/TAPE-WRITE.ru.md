@@ -221,7 +221,15 @@ qdcxx-tape-write --input tests/fixtures/protocol/tape-write/expected/extras/quot
 qdcxx-tape-write --input tests/fixtures/encoding/field-types/expected/mixed-raw.qtp --output fields-normalized.qtp --schema spec/schema/examples/native/field-types.json --tape-mode raw-message-v1
 ```
 
-Выходной файл заранее не существует. [full24/full137](../tests/fixtures/protocol/tape-write/expected/extras/unsupported-full-identities.qtp)
+Запустите команды из корня репозитория. Собранные инструменты должны быть в PATH, выходные файлы ещё не должны существовать. Для просмотра первого результата:
+
+```text
+qdcxx-tape-inspect --input quote-normalized.qtp --profile default-quote-v1 --tape-mode raw-message-v1 --output-format human
+```
+
+Цикл на публичной фикстуре даёт восемь записей Quote. Сравните строки Record, Quote и Timing с выводом для входного файла при тех же параметрах. Записи и значения времени совпадают. Размеры кадров и смещения могут меняться при нормализации.
+
+[full24/full137](../tests/fixtures/protocol/tape-write/expected/extras/unsupported-full-identities.qtp)
 остаются отказами. Отсутствующие/повторные/неизвестные описания требуют явно сконструированных отрицательных
 примеров, отмеченных как синтетические, не наблюдения FileWriter;
 [пакет примеров](../tests/fixtures/protocol/tape-write/contracts/README.md).

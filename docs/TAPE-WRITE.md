@@ -235,7 +235,15 @@ qdcxx-tape-write --input tests/fixtures/protocol/tape-write/expected/extras/quot
 qdcxx-tape-write --input tests/fixtures/encoding/field-types/expected/mixed-raw.qtp --output fields-normalized.qtp --schema spec/schema/examples/native/field-types.json --tape-mode raw-message-v1
 ```
 
-The first output must not already exist. Unsupported witnesses such as
+Run these commands from the repository root, with the built tape tools on PATH and fresh output paths. To inspect the first result:
+
+```text
+qdcxx-tape-inspect --input quote-normalized.qtp --profile default-quote-v1 --tape-mode raw-message-v1 --output-format human
+```
+
+The public fixture round trip yields eight Quote records. Compare the Record, Quote and Timing rows with those from inspecting the input using the same options. The records and timing values match. Frame sizes and byte offsets may change during normalization.
+
+Unsupported witnesses such as
 [full24/full137](../tests/fixtures/protocol/tape-write/expected/extras/unsupported-full-identities.qtp)
 remain refusals. Omitted/repeated/unknown-field descriptions need explicitly constructed
 negative admission cases, labelled synthetic rather than production FileWriter observations.

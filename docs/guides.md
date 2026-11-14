@@ -16,7 +16,10 @@
 | Model instrument metadata | [Instrument-profile values](INSTRUMENT-PROFILES.md) | Owned standard/custom fields and typed conversions without I/O |
 | Parse regional market symbols | [Market-symbol helpers](MARKET-SYMBOLS.md) | Exact UTF-16 base/exchange composition without subscription routing |
 | Read binary tapes | [Tape inspection](TAPE-INSPECT.md) | Input is an existing file; select a supported finite source profile |
-| Write a tape | [Tape writing](TAPE-WRITE.md) | You already own validated records and an explicit schema |
+| Rewrite a tape offline | [Tape writing](TAPE-WRITE.md) | Convert an existing supported binary tape into a new destination using an explicit schema |
+| Replay a historical Quote | [OnDemand loopback example](../examples/on_demand/README.md) | Connect to the local finite fixture for speed, pause and return to live |
+| Receive an instrument profile | [Live IPF example](../examples/ipf_live/README.md) | Connect to an IPF source and print owning revisions |
+| Build an option chain from a file | [Offline IPF example](../examples/ipf_option_chain/README.md) | Read complete instrument profiles and group calls and puts by underlying and strike |
 | Inspect protocol frames | [QTP inspection](QTP-INSPECT.md) | You need framing and record diagnostics offline |
 | Inspect Profile events | [Profile inspection](PROFILE-INSPECT.md) | You need the selected Profile mapping |
 | Configure records | [Schemas and settings](CONFIGURATION.md) | Built-in Quote/Profile defaults do not describe your input |
@@ -44,6 +47,4 @@ before choosing an integration.
 
 
 [Endpoint configuration](ENDPOINT-CONFIGURATION.md): explicit addresses/properties, immutable snapshots, effective local values and Java compatibility boundaries.
-[OnDemand replay capability and access](../spec/transport/ON-DEMAND-ACCESS.md)
-describes the Java connector, the current C++ refusal and the requirements for
-qualifying replay against a provider.
+The OnDemand example uses the qualified local fixture. [Provider access requirements](../spec/transport/ON-DEMAND-ACCESS.md) describe service qualification for a deployed provider.
