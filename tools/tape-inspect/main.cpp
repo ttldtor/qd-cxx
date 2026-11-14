@@ -72,7 +72,9 @@ int validateBinarySchema(const std::string &path, org::ttldtor::qdcxx::schema::B
                                                                                : "ALLOCATION_FAILURE");
         }
 
-        auto schema = loader::loadBinaryJsonSchema(*document, limits);
+        auto profileLimits = limits;
+        profileLimits.allowProfileV2 = false;
+        auto schema = loader::loadBinaryJsonSchema(*document, profileLimits);
 
         if (!schema) {
             const auto error = schema.error();

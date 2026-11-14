@@ -2432,6 +2432,88 @@ TEST_CASE("HISTORY physical VOID high slot preserves full removal identity separ
     }
 }
 
+TEST_CASE("HISTORY explicit VOID pair keeps zero-width projection and the complete removal key") {
+    for (const bool firstVoid : {true, false}) {
+        CAPTURE(firstVoid);
+        const auto recordName = firstVoid ? u"Order#NTV" : u"Book&I";
+        const auto highName = firstVoid ? u"Void" : u"ID";
+        const auto lowName = firstVoid ? u"Index" : u"Void";
+        const c::LocalRecord record{0,
+                                    recordName,
+                                    true,
+                                    firstVoid ? std::vector<c::LocalField>{{0}, {8}}
+                                              : std::vector<c::LocalField>{{8}, {0}},
+                                    {{highName, 0}, {lowName, 1}},
+                                    c::IndexedTimePairInt32{0, 1, true}};
+        const std::array declarations{record};
+        auto local = c::LocalSchema::create(declarations, {1, 2, 2, 32, 128}, c::LocalProfile::BINARY_FIELDS_V1);
+        REQUIRE(local);
+        auto live = genericSession(*local);
+        std::vector<std::byte> describe;
+        number(describe, 17);
+        text(describe, recordName);
+        number(describe, 2);
+        text(describe, highName);
+        number(describe, firstVoid ? 0 : 8);
+        text(describe, lowName);
+        number(describe, firstVoid ? 8 : 0);
+        (void)admit(live, frame(2, describe));
+        auto work = turn();
+        auto copied = *local;
+        auto history = s::HistoryCollector::create(std::move(copied), limits(), {false, 100, 10000}, work);
+        REQUIRE(history);
+        auto view = history->openView({false}, work);
+        REQUIRE(view);
+        const c::SubscriptionRequest request{{local->recordContext(0), u"AAPL"},
+                                             std::numeric_limits<std::int64_t>::min()};
+        auto coreWork = command();
+        REQUIRE(history->add(*view, std::span(&request, 1), coreWork, work));
+
+        const std::int64_t key = firstVoid ? 4294967295LL : -4294967296LL;
+
+        for (const std::int32_t flags : {0, 2}) {
+            if (flags) {
+                const auto other = firstVoid ? key | (std::int64_t{1} << 32) : key | 1;
+                std::vector<std::byte> unmatched;
+                prefix(unmatched, flags, u"AAPL", 17);
+                number(unmatched, other);
+                auto event = admit(live, frame(20, unmatched));
+                REQUIRE(event.records().front().removalTime);
+                CHECK(*event.records().front().removalTime == other);
+                CHECK(event.records().front().typedValues[firstVoid ? 0 : 1].raw == 0);
+                auto credits = turn();
+                REQUIRE(history->stage(std::move(event), credits));
+                CHECK(history->pointCount() == 1);
+            }
+
+            std::vector<std::byte> body;
+            prefix(body, flags, u"AAPL", 17);
+            number(body, flags ? key : -1);
+            auto event = admit(live, frame(20, body));
+            REQUIRE(event.records().size() == 1);
+            const auto &input = event.records().front();
+            CHECK(input.typedValues[firstVoid ? 0 : 1].raw == 0);
+
+            if (flags) {
+                REQUIRE(input.removalTime);
+                CHECK(*input.removalTime == key);
+            }
+
+            auto credits = turn();
+            REQUIRE(history->stage(std::move(event), credits));
+            auto front = history->front(*view, credits);
+            REQUIRE(front);
+            REQUIRE(*front);
+            CHECK((**front).record.rawTime == key);
+            CHECK((**front).record.fields[firstVoid ? 0 : 1].raw == 0);
+            CHECK((**front).record.fields[firstVoid ? 1 : 0].raw == -1);
+            REQUIRE(history->pop(*view, credits));
+        }
+
+        CHECK(history->pointCount() == 0);
+    }
+}
+
 TEST_CASE("HISTORY private replay prepays exact work and preserves sibling view epoch and failed cuts") {
     auto f = fixture();
     auto view = open(f);

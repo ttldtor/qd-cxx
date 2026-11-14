@@ -520,9 +520,36 @@ TEST_CASE("binary JSON selects independent identity and owns all forty-nine pair
     binaryError(document(), JsonSchemaError::UNSUPPORTED_PROFILE);
     checkError(binaryDocument(), JsonSchemaError::UNSUPPORTED_PROFILE);
     checkError(replace(document(), "\"formatVersion\":1", "\"formatVersion\":2"), JsonSchemaError::UNSUPPORTED_VERSION);
-    binaryError(replace(binaryDocument(), "\"version\":1", "\"version\":2"), JsonSchemaError::UNSUPPORTED_VERSION);
+    binaryError(replace(binaryDocument(), "\"version\":1", "\"version\":3"), JsonSchemaError::UNSUPPORTED_VERSION);
     binaryError(replace(binaryDocument("[null]"), "qdcxx-native-binary", "unknown"),
                 JsonSchemaError::UNSUPPORTED_PROFILE);
+}
+
+TEST_CASE("binary JSON version two admits exactly one zero-width indexed half") {
+    BinaryJsonSchemaLimits legacy;
+    legacy.allowProfileV2 = false;
+    const auto rejected = loadBinaryJsonSchema(replace(binaryDocument(), "\"version\":1", "\"version\":2"), legacy);
+    REQUIRE_FALSE(rejected);
+    CHECK(rejected.error() == JsonSchemaError::UNSUPPORTED_VERSION);
+
+    for (const auto types : {std::array{0, 8}, std::array{8, 0}}) {
+        const auto versionOne = binaryRecord(types);
+        binaryError(versionOne, JsonSchemaError::UNSUPPORTED_INDEXED);
+        const auto versionTwo = replace(versionOne, "\"version\":1", "\"version\":2");
+        const auto loaded = loadBinaryJsonSchema(versionTwo);
+        REQUIRE(loaded);
+        const auto &pair = std::get<core::IndexedTimePairInt32>(*loaded->records()[0].indexedTimeLayout);
+        CHECK(pair.allowVoid);
+        CHECK(pair.firstField == 0);
+        CHECK(pair.secondField == 1);
+    }
+
+    const auto bothVoid = replace(binaryRecord(std::array{0, 0}), "\"version\":1", "\"version\":2");
+    binaryError(bothVoid, JsonSchemaError::UNSUPPORTED_INDEXED);
+    const auto ordinaryPair = replace(binaryRecord(std::array{56, 72}), "\"version\":1", "\"version\":2");
+    const auto loaded = loadBinaryJsonSchema(ordinaryPair);
+    REQUIRE(loaded);
+    CHECK_FALSE(std::get<core::IndexedTimePairInt32>(*loaded->records()[0].indexedTimeLayout).allowVoid);
 }
 
 TEST_CASE("binary JSON single64 and ordinary records retain the complete exact field catalog") {
@@ -565,7 +592,7 @@ TEST_CASE("binary JSON rejects partial duplicate mismatched and unsupported inde
                     JsonSchemaError::INVALID_SCHEMA);
     }
 
-    for (const auto type : {0, 1, 2, 3, 9, 10, 104, 120, 137, 152, 233, 249}) {
+    for (const auto type : {0, 1, 3, 9, 10, 104, 120, 137, 152, 233, 249}) {
         const std::array wrong{type, 8};
         binaryError(binaryRecord(wrong), JsonSchemaError::UNSUPPORTED_INDEXED);
     }

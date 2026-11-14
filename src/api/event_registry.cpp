@@ -1164,7 +1164,8 @@ bool sameIndexedLayout(const std::optional<core::IndexedTimeLayout> &left,
     if (const auto *pair = std::get_if<core::IndexedTimePairInt32>(&*left)) {
         const auto &other = std::get<core::IndexedTimePairInt32>(*right);
 
-        return pair->firstField == other.firstField && pair->secondField == other.secondField;
+        return pair->firstField == other.firstField && pair->secondField == other.secondField &&
+               pair->allowVoid == other.allowVoid;
     }
 
     if (const auto *single = std::get_if<core::IndexedTimeSingleInt64>(&*left))

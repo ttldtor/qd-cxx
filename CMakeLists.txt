@@ -59,6 +59,20 @@ if(ORG_TTLDTOR_QDCXX_BUILD_SCHEMA_JSON)
         RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
     install(DIRECTORY include/qd/schema DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qd"
         FILES_MATCHING PATTERN "*.hpp")
+    set(ORG_TTLDTOR_QDCXX_SCHEMA_PROFILE_DIR "" CACHE PATH
+        "Directory containing generated default and dxlink schema bundles for installation")
+    if(ORG_TTLDTOR_QDCXX_SCHEMA_PROFILE_DIR)
+        foreach(profile IN ITEMS default dxlink)
+            foreach(artifact IN ITEMS schema.json provenance.json)
+                set(source "${ORG_TTLDTOR_QDCXX_SCHEMA_PROFILE_DIR}/${profile}/${artifact}")
+                if(NOT EXISTS "${source}" OR IS_DIRECTORY "${source}")
+                    message(FATAL_ERROR "Missing generated schema bundle file: ${source}")
+                endif()
+                install(FILES "${source}"
+                    DESTINATION "${CMAKE_INSTALL_DATADIR}/qdcxx/schemas/${profile}")
+            endforeach()
+        endforeach()
+    endif()
     install(FILES licenses/simdjson-4.6.4/LICENSE licenses/simdjson-4.6.4/LICENSE-MIT
         DESTINATION "${CMAKE_INSTALL_DATADIR}/qdcxx/licenses/simdjson-4.6.4")
 endif()

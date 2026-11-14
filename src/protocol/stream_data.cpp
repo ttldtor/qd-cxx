@@ -141,7 +141,9 @@ StreamDataContext::createWithFieldTimePolicy(const core::LocalSchema &schema,
                 if (local.indexedTimeLayout) {
                     // Current validated field IDs equal dense positions; make this resolution explicit.
                     if (const auto *pair = std::get_if<core::IndexedTimePairInt32>(&*local.indexedTimeLayout)) {
-                        indexedLayout = ResolvedIndexedTimePairInt32{pair->firstField, pair->secondField};
+                        indexedLayout = ResolvedIndexedTimePairInt32{pair->firstField, pair->secondField,
+                                                                     local.fields[pair->firstField].serialTypeId == 0,
+                                                                     local.fields[pair->secondField].serialTypeId == 0};
                     } else if (const auto *low = std::get_if<core::IndexedTimeLowInt32>(&*local.indexedTimeLayout)) {
                         indexedLayout = ResolvedIndexedTimeLowInt32{low->field};
                     } else {
@@ -487,8 +489,13 @@ void applyRemovalTime(Values &values, const std::optional<ResolvedIndexedTimeLay
     if (const auto *pair = std::get_if<ResolvedIndexedTimePairInt32>(&*layout)) {
         constexpr unsigned WORD_BITS = 32;
         const auto bits = std::bit_cast<std::uint64_t>(time);
-        values[pair->firstValueIndex].raw = std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(bits >> WORD_BITS));
-        values[pair->secondValueIndex].raw = std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(bits));
+
+        if (!pair->firstVoid)
+            values[pair->firstValueIndex].raw =
+                std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(bits >> WORD_BITS));
+
+        if (!pair->secondVoid)
+            values[pair->secondValueIndex].raw = std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(bits));
     } else if (const auto *low = std::get_if<ResolvedIndexedTimeLowInt32>(&*layout)) {
         values[low->valueIndex].raw = std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(time));
     } else {

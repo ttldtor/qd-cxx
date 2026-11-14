@@ -73,8 +73,11 @@ validateRemovalValues(const core::RecordContext &context, std::span<const core::
 
     if (pair) {
         if (pair->firstField >= shape.size() || pair->secondField >= shape.size() ||
-            pair->firstField == pair->secondField || record.values[pair->firstField].raw != high ||
-            record.values[pair->secondField].raw != low) {
+            pair->firstField == pair->secondField ||
+            record.values[pair->firstField].raw !=
+                (shape[pair->firstField] == core::SerialFieldType::VOID_FIELD ? 0 : high) ||
+            record.values[pair->secondField].raw !=
+                (shape[pair->secondField] == core::SerialFieldType::VOID_FIELD ? 0 : low)) {
             return std::unexpected(MappingError::INVALID_VALUES);
         }
     } else if (const auto *single = std::get_if<core::IndexedTimeSingleInt64>(&layout)) {

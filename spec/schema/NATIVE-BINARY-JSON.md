@@ -26,7 +26,7 @@ order is irrelevant; array order is preserved.
 | Pair layout | `kind`: `"pair-int32"`; `highFieldId`: integer; `lowFieldId`: integer |
 | Single layout | `kind`: `"single-int64"`; `fieldId`: integer |
 
-`formatVersion` is `1`; profile is exactly `{"id":"qdcxx-native-binary","version":1}`.
+`formatVersion` is `1`; profile ID is `qdcxx-native-binary` and profile version is `1` or `2`.
 Other well-typed versions yield `UNSUPPORTED_VERSION`; other IDs yield `UNSUPPORTED_PROFILE`.
 Identity precedes record interpretation. Numeric members require integer JSON spelling in
 `0..2147483647`; `-0` is zero. Fractions, exponent spellings, wrong kinds and out-of-range parsed
@@ -50,7 +50,7 @@ payload semantics. No Java slots, synthetic VOID tails, units, conversion or eve
 | `hasTime` | `indexedTimeLayout` | Contributor full IDs |
 | --- | --- | --- |
 | `false` | `null` | No contributors |
-| `true` | Pair object | Each of **4/8/24/40/56/72/88** |
+| `true` | Pair object | Each of **2/4/8/24/40/56/72/88**; version 2 also permits exactly one **0** |
 | `true` | Single object | One of **104/120/152** |
 
 Pair IDs must be distinct and refer to logical fields. `highFieldId` maps to the core layout's
@@ -59,6 +59,11 @@ names or Java slots. A single contributor supplies the signed 64-bit layout. Par
 dangling or mismatched declarations yield `INVALID_SCHEMA`. Unknown layout kinds and supported
 types in unsupported contributor roles yield `UNSUPPORTED_INDEXED`; full field identities outside
 the catalog yield `UNSUPPORTED_TYPE`. No layout is inferred from names.
+
+Version 2 represents a physical zero-width time word with an explicit VOID contributor in the
+pair. Ordinary DATA supplies zero for that word. REMOVE retains the complete signed 64-bit time
+in removal metadata, while its projected VOID value remains zero. A pair with two VOID fields is
+unsupported. Version 1 continues to reject either VOID contributor.
 
 The [pair](examples/native-binary/pair.json), [single](examples/native-binary/single.json) and
 [ordinary](examples/native-binary/ordinary.json) files are complete JSON declaration examples. Even an empty or

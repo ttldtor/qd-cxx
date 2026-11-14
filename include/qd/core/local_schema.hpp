@@ -40,6 +40,7 @@ struct FieldLookup {
 struct IndexedTimePairInt32 {
     std::size_t firstField;  ///< Logical high-word field ID, independent of wire order.
     std::size_t secondField; ///< Distinct logical low-word field ID.
+    bool allowVoid = false;  ///< Explicitly allow one zero-width contributor; full removal time remains metadata.
 };
 
 /** One logical signed64 field proven to occupy both source time slots. */

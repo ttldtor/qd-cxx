@@ -99,8 +99,15 @@ std::optional<SchemaError> validateIndexedLayout(const LocalRecord &record, Loca
             return SchemaError::INVALID_SCHEMA;
         }
 
+        std::size_t voidCount = 0;
+
         for (const auto fieldId : {pair->firstField, pair->secondField}) {
             const auto type = record.fields[fieldId].serialTypeId;
+
+            if (pair->allowVoid && type == std::to_underlying(SerialFieldType::VOID_FIELD)) {
+                ++voidCount;
+                continue;
+            }
 
             if (type != std::to_underlying(SerialFieldType::UTF_CHAR) &&
                 type != std::to_underlying(SerialFieldType::INT) &&
@@ -113,6 +120,9 @@ std::optional<SchemaError> validateIndexedLayout(const LocalRecord &record, Loca
                 return SchemaError::UNSUPPORTED_PROFILE;
             }
         }
+
+        if (pair->allowVoid && voidCount != 1)
+            return SchemaError::UNSUPPORTED_PROFILE;
     } else if (const auto *low = std::get_if<IndexedTimeLowInt32>(&*record.indexedTimeLayout)) {
         if (low->field >= record.fields.size()) {
             return SchemaError::INVALID_SCHEMA;
