@@ -2,6 +2,8 @@
 
 [English version](README.md). Английская версия нормативная.
 
+[Декодер Kraken ticker](../kraken/README.ru.md) описывает необязательный декодер шлюза.
+
 [Сравнение NetTest](../../docs/NETTEST-REFERENCE.ru.md) описывает публикацию записей Java QD и измерения событийных API dxFeed.
 
 [NetTest уровня записей](../nettest/README.ru.md) выполняет конечные прогоны производителя и потребителя QTP по экспортированным схемам.
