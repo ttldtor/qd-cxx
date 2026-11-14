@@ -9,3 +9,5 @@ The manifest contains 940 files, including the original Boost Software License 1
 The target uses header-only Beast and Boost.Asio, with Boost library auto-linking disabled. Windows selects Windows 10 SDK API definitions, avoids Win32 min/max macros and links Winsock. Both platforms link the project-qualified static OpenSSL 3.5.9 SDK selected by the consumer. The SDK is verified before linking. Boost include paths and definitions apply to targets linked against the private package. The QTP targets continue to use their existing standalone Asio source profile. [OpenSSL profile](../tls-profile/openssl-3.5.9.json)
 
 Configure, build, install and test a relocated copy with the commands in the [provisioning guide](../../tools/deps/BEAST-WSS.md).
+
+[The local TLS boundary and qualification](../../spec/transport/BEAST-WSS-TLS.md) cover ownership, certificate verification, bounded backing and cancellation.
