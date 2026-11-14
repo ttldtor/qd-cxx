@@ -5,6 +5,8 @@
 #include "qd/api/publisher.hpp"
 
 #include "connect_peer.hpp"
+#include "qd/events/event_flags.hpp"
+#include "qd/events/order_source.hpp"
 #include "qd/protocol/incoming_subscription.hpp"
 #include "qd/protocol/live_session.hpp"
 #include "qd/transport/tcp_runtime.hpp"
@@ -396,4 +398,174 @@ TEST_CASE("remote QTP publisher reconciles overlapping demand across source gene
 
     (*relay)->closeAndAwaitTermination();
     CHECK((*relay)->getDiagnostic().code == q::api::ErrorCode::NONE);
+}
+
+TEST_CASE("mixed publisher preserves STREAM occurrences and indexed HISTORY on one connection") {
+    auto bootstrap = q::transport::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    q::api::PublisherOptions serverOptions;
+    serverOptions.mixed = true;
+    serverOptions.listener.maxWriteBytes = 11;
+    auto source = q::api::PublisherEndpoint::create(*bootstrap, serverOptions);
+    requireServer(source);
+    serverOptions.source = q::api::PublisherSourceOptions{"127.0.0.1", (*source)->port(), 20ms};
+    auto server = q::api::PublisherEndpoint::create(*bootstrap, serverOptions);
+    requireServer(server);
+    q::api::ApiRuntime runtime(*bootstrap);
+    q::api::EndpointOptions options;
+    options.contract = q::api::DeliveryContract::MIXED;
+    options.maximumAttempts = 1;
+    auto endpoint = runtime.createEndpoint(options);
+    auto subscription = endpoint->getFeed()->createSubscription(
+        {q::api::EventType::QUOTE, q::api::EventType::TIME_AND_SALE, q::api::EventType::ORDER});
+
+    struct Events {
+        std::mutex mutex;
+        std::condition_variable ready;
+        std::vector<q::api::RegisteredEvent> values;
+    };
+
+    auto events = std::make_shared<Events>();
+    subscription->addEventListener([events](std::span<const q::api::RegisteredEvent> batch) {
+        const std::lock_guard lock(events->mutex);
+        events->values.insert(events->values.end(), batch.begin(), batch.end());
+        events->ready.notify_all();
+    });
+    subscription->addSymbols("IBM");
+    endpoint->connect("127.0.0.1:" + std::to_string((*server)->port()));
+
+    auto second = runtime.createEndpoint(options);
+    auto secondSubscription = second->getFeed()->createSubscription(
+        {q::api::EventType::QUOTE, q::api::EventType::TIME_AND_SALE, q::api::EventType::ORDER});
+    auto secondEvents = std::make_shared<Events>();
+    secondSubscription->addEventListener([secondEvents](std::span<const q::api::RegisteredEvent> batch) {
+        const std::lock_guard lock(secondEvents->mutex);
+        secondEvents->values.insert(secondEvents->values.end(), batch.begin(), batch.end());
+        secondEvents->ready.notify_all();
+    });
+    secondSubscription->addSymbols({"IBM", "MSFT"});
+
+    for (const auto family : {q::core::SubscriptionFamily::TICKER, q::core::SubscriptionFamily::STREAM,
+                              q::core::SubscriptionFamily::HISTORY}) {
+        INFO("contract ", static_cast<int>(family));
+        const auto observed = (*server)->awaitDemand(family, u"IBM", true, Clock::now() + 5s);
+        const auto serverDiagnostic = (*server)->getDiagnostic();
+        const auto endpointDiagnostic = endpoint->getDiagnostic();
+        INFO("publisher ", serverDiagnostic.stage, " category ", static_cast<int>(serverDiagnostic.code), " detail ",
+             serverDiagnostic.detailCode, " feed ", endpointDiagnostic.stage, " category ",
+             static_cast<int>(endpointDiagnostic.code), " detail ", endpointDiagnostic.detailCode);
+        REQUIRE(observed);
+        REQUIRE((*source)->awaitDemand(family, u"IBM", true, Clock::now() + 5s));
+    }
+
+    second->connect("127.0.0.1:" + std::to_string((*server)->port()));
+
+    for (const auto family : {q::core::SubscriptionFamily::TICKER, q::core::SubscriptionFamily::STREAM,
+                              q::core::SubscriptionFamily::HISTORY}) {
+        REQUIRE((*source)->awaitDemand(family, u"MSFT", true, Clock::now() + 5s));
+    }
+
+    auto publisher = (*source)->getPublisher();
+    REQUIRE(publisher.publish(makeQuote()));
+    q::events::TimeAndSale sale;
+    sale.symbol = u"IBM";
+    sale.index = (std::int64_t{7} << 32) + 42;
+    sale.exchangeCode = u'Q';
+    sale.price.raw = (103 << 8) | 128;
+    sale.size.raw = (4 << 8) | 128;
+    REQUIRE(publisher.publish(sale));
+    REQUIRE(publisher.publish(sale));
+
+    namespace flags = q::events::indexed_event_flags;
+    q::events::Order order;
+    order.symbol = u"IBM";
+    order.index = 7;
+    order.price.raw = (105 << 8) | 128;
+    order.size.raw = (4 << 8) | 128;
+    order.flags = 4; // BUY in the native Order wire flag word.
+    order.eventFlags = flags::SNAPSHOT_BEGIN | flags::TX_PENDING;
+    REQUIRE(publisher.publish(order));
+    order.index = 0;
+    order.eventFlags = flags::SNAPSHOT_END | flags::REMOVE_EVENT;
+    REQUIRE(publisher.publish(order));
+
+    const auto defaultOrder = [](const q::api::RegisteredEvent &event) {
+        const auto *order = std::get_if<q::events::Order>(&event);
+
+        return order && order->getSourceId() == q::events::OrderSource::DEFAULT.id() ? order : nullptr;
+    };
+    const auto counts = [&] {
+        std::array<unsigned, 3> result{};
+
+        for (const auto &event : events->values) {
+            result[0] += std::holds_alternative<q::events::Quote>(event);
+            result[1] += std::holds_alternative<q::events::TimeAndSale>(event);
+            result[2] += defaultOrder(event) != nullptr;
+        }
+
+        return result;
+    };
+    {
+        std::unique_lock lock(events->mutex);
+        const auto complete = events->ready.wait_for(lock, 5s, [&] {
+            const auto observed = counts();
+
+            return observed[0] >= 1 && observed[1] >= 2 && observed[2] >= 2;
+        });
+        const auto observed = counts();
+        const auto diagnostic = (*server)->getDiagnostic();
+        INFO("counts ", observed[0], " ", observed[1], " ", observed[2], " publisher ", diagnostic.stage, " category ",
+             static_cast<int>(diagnostic.code), " detail ", diagnostic.detailCode);
+        REQUIRE(complete);
+        CHECK(counts() == std::array<unsigned, 3>{1, 2, 2});
+        std::vector<q::events::Order> orders;
+
+        for (const auto &event : events->values) {
+            if (const auto *observed = std::get_if<q::events::TimeAndSale>(&event)) {
+                CHECK(observed->getIndex() == sale.index);
+                CHECK(observed->price.raw == sale.price.raw);
+            }
+
+            if (const auto *observed = defaultOrder(event))
+                orders.push_back(*observed);
+        }
+
+        REQUIRE(orders.size() == 2);
+        CHECK(orders[0].index == 7);
+        CHECK((orders[0].eventFlags & flags::SNAPSHOT_BEGIN) != 0);
+        CHECK(orders[1].index == 0);
+        CHECK((orders[1].eventFlags & flags::SNAPSHOT_END) != 0);
+    }
+    CHECK(endpoint->getStatistics().connection.establishedConnections.value == 1);
+    {
+        std::unique_lock lock(secondEvents->mutex);
+        REQUIRE(secondEvents->ready.wait_for(lock, 5s, [&] {
+            return std::ranges::count_if(secondEvents->values,
+                                         [](const auto &event) {
+                                             return std::holds_alternative<q::events::TimeAndSale>(event);
+                                         }) == 2 &&
+                   std::ranges::count_if(secondEvents->values, [&](const auto &event) {
+                       return defaultOrder(event) != nullptr;
+                   }) == 2;
+        }));
+    }
+    order.index = 7;
+    order.eventFlags = flags::REMOVE_EVENT;
+    REQUIRE(publisher.publish(order));
+    {
+        std::unique_lock lock(events->mutex);
+        REQUIRE(events->ready.wait_for(lock, 5s, [&] {
+            return counts()[2] >= 3;
+        }));
+        const auto *removed = defaultOrder(events->values.back());
+        REQUIRE(removed);
+        CHECK(removed->index == 7);
+        CHECK((removed->eventFlags & flags::REMOVE_EVENT) != 0);
+    }
+    (void)endpoint->closeAndAwaitTermination();
+    REQUIRE((*source)->awaitDemand(q::core::SubscriptionFamily::HISTORY, u"MSFT", true, Clock::now() + 5s));
+    (void)second->closeAndAwaitTermination();
+    REQUIRE((*source)->awaitDemand(q::core::SubscriptionFamily::HISTORY, u"IBM", false, Clock::now() + 5s));
+    (*server)->closeAndAwaitTermination();
+    CHECK((*server)->getDiagnostic().code == q::api::ErrorCode::NONE);
 }

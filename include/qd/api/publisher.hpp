@@ -15,7 +15,7 @@ namespace detail {
 struct PublisherPort;
 } // namespace detail
 
-/** One numeric TCP publisher whose TICKER data is distributed to local clients. */
+/** One numeric TCP publisher whose data is distributed to downstream clients. */
 struct PublisherSourceOptions {
     std::string_view address = "127.0.0.1";    ///< Numeric IPv4 or IPv6, borrowed through create.
     std::uint16_t port = 0;                    ///< Remote port, required when a source is selected.
@@ -25,16 +25,17 @@ struct PublisherSourceOptions {
 /** Detached observation of the current upstream generation. */
 struct PublisherSourceStatus {
     std::uint64_t generation = 0; ///< Latest negotiated generation, zero before the first connection.
-    bool connected = false;       ///< Bidirectional TICKER capabilities negotiated on a current connection.
+    bool connected = false;       ///< Bidirectional configured capabilities negotiated on a current connection.
     Diagnostic diagnostic;        ///< Last source failure until a fresh generation negotiates.
 };
 
-/** Finite local or remote publishing profile for composite Quote. */
+/** Finite local or remote publishing profile. */
 struct PublisherOptions {
     transport::TcpListenerOptions listener{"127.0.0.1", 0, 16,
-                                           4}; ///< Plain numeric bind; address is borrowed at create.
-    std::size_t pendingQuotes = 64;            ///< Maximum queued publication requests before the owner takes them.
+                                           4};      ///< Plain numeric bind; address is borrowed at create.
+    std::size_t pendingQuotes = 64;                 ///< Maximum queued publication requests across enabled contracts.
     std::optional<PublisherSourceOptions> source{}; ///< Remote upstream in place of local publication.
+    bool mixed = false; ///< Enable Quote/TICKER, TimeAndSale/STREAM and default Order/HISTORY on each connection.
 };
 
 /** Detached producer port. Copies may be used from application threads and outlive the endpoint. */
@@ -50,11 +51,16 @@ class Publisher {
      * @return Local admission or a detached refusal. Admission does not establish application receipt.
      */
     [[nodiscard]] std::expected<void, Diagnostic> publish(const events::Quote &quote) const;
+    /** Submit one composite TimeAndSale occurrence in mixed mode. */
+    [[nodiscard]] std::expected<void, Diagnostic> publish(const events::TimeAndSale &sale) const;
+    /** Submit one ordinary default-source Order event in mixed mode. */
+    [[nodiscard]] std::expected<void, Diagnostic> publish(const events::Order &order) const;
 };
 
 /** One worker-owned plain QTP publishing endpoint. Destroy after application users have retired.
- * Operations on the endpoint facade are serialized by its creating application thread. The Publisher port
- * has an independent lifetime. Keep the original process bootstrap owner alive through endpoint destruction.
+ * Read-only endpoint queries and waits may run concurrently while the caller keeps the facade alive.
+ * The creating application thread owns shutdown. The Publisher port has an independent lifetime.
+ * Keep the original process bootstrap owner alive through endpoint destruction.
  */
 class PublisherEndpoint final {
     struct Impl;
@@ -86,6 +92,9 @@ class PublisherEndpoint final {
      * @return True if observed before closing or expiration; malformed input returns false.
      */
     [[nodiscard]] bool awaitDemand(std::u16string_view symbol, bool subscribed,
+                                   std::chrono::steady_clock::time_point deadline) const;
+    /** Wait for presence or absence of an exact symbol in the selected family's desired union. */
+    [[nodiscard]] bool awaitDemand(core::SubscriptionFamily family, std::u16string_view symbol, bool subscribed,
                                    std::chrono::steady_clock::time_point deadline) const;
     /** Observe a fresh negotiated remote source generation within a finite deadline.
      * @param after Previously observed generation, or zero for the first connection.

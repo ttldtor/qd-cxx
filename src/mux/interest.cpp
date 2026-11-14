@@ -122,10 +122,9 @@ struct MuxState::State {
      * symbolUnits each. Byte work includes complete scratch reset and old-bank retirement.
      * @param inputCount Borrowed input slots, already bounded by commandEntries.
      * @param work Remaining caller credits; successful earlier charges are not refunded.
-     * @param rewrite Whether complete candidate backing may be rewritten.
      * @return Success or typed representability/work rejection.
      */
-    std::expected<void, MuxError> reserve(std::size_t inputCount, MuxWork &work, bool rewrite) const noexcept {
+    std::expected<void, MuxError> reserve(std::size_t inputCount, MuxWork &work) const noexcept {
         constexpr std::size_t WORK_PASSES = 32;
         constexpr std::size_t REWRITE_PASSES = 8;
         std::size_t outer = 1;
@@ -145,8 +144,8 @@ struct MuxState::State {
 
         std::size_t rewriteBytes = sizeof(State);
 
-        if (!accumulate(text, visits, limits.symbolUnits) ||
-            (rewrite && (!accumulate(rewriteBytes, bankBytes) || !accumulate(bytes, rewriteBytes, REWRITE_PASSES)))) {
+        if (!accumulate(text, visits, limits.symbolUnits) || !accumulate(rewriteBytes, bankBytes) ||
+            !accumulate(bytes, rewriteBytes, REWRITE_PASSES)) {
             return std::unexpected(MuxError::RESOURCE_LIMIT);
         }
 
@@ -502,7 +501,7 @@ std::expected<MuxState::PreparedChange, MuxError> MuxState::prepare(Command comm
         return std::unexpected(MuxError::RESOURCE_LIMIT);
     }
 
-    if (const auto reserved = state.reserve(inputCount, work, true); !reserved) {
+    if (const auto reserved = state.reserve(inputCount, work); !reserved) {
         return std::unexpected(reserved.error());
     }
 
@@ -765,8 +764,14 @@ std::expected<std::optional<MuxMembership>, MuxError> MuxState::select(const Mux
         return std::unexpected(MuxError::INVALID_CLIENT);
     }
 
-    if (auto result = state_->reserve(1, work, false); !result) {
-        return std::unexpected(result.error());
+    if (!charge(work.visits, state_->recordCount)) {
+        return std::unexpected(MuxError::WORK_LIMIT);
+    }
+
+    // Exact concrete-key validation can inspect the leading UTF-16 unit.
+    if (state_->policy != core::SubscriptionSelectorPolicy::CANONICAL_STREAM_ALL_V1 && !key.symbol.empty() &&
+        !charge(work.symbolUnits, 1)) {
+        return std::unexpected(MuxError::WORK_LIMIT);
     }
 
     if (const auto error = state_->validateKey(key, true)) {
@@ -811,7 +816,18 @@ std::expected<std::optional<MuxMembership>, MuxError> MuxState::select(const Mux
         return selected.activation_ == 0 ? std::optional<MuxMembership>{} : std::optional<MuxMembership>{selected};
     }
 
-    const auto *entry = state_->find(bank, bank.ranges[client.slot_], key);
+    const auto range = bank.ranges[client.slot_];
+    std::size_t units = 0;
+
+    if (!accumulate(units, range.count, key.symbol.size())) {
+        return std::unexpected(MuxError::RESOURCE_LIMIT);
+    }
+
+    if (!charge(work.visits, range.count) || !charge(work.symbolUnits, units)) {
+        return std::unexpected(MuxError::WORK_LIMIT);
+    }
+
+    const auto *entry = state_->find(bank, range, key);
 
     if (!entry || (rawTime && *rawTime < *entry->historyBound)) {
         return std::optional<MuxMembership>{};
