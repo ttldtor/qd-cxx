@@ -670,8 +670,27 @@ FeedFilter::FeedFilter(std::shared_ptr<const State> state, std::shared_ptr<FeedF
     : state_(std::move(state)), tracker_(std::move(tracker)) {
 }
 
+bool FeedFilter::valid() const noexcept {
+    return state_ != nullptr;
+}
+
 bool FeedFilter::accept(EventType type, const SubscriptionSelector &symbol) const {
     return getCategory(type, symbol).has_value();
+}
+
+bool FeedFilter::acceptRecord(std::u16string_view recordName, std::u16string_view symbol) const {
+    if (!valid())
+        refuse(ErrorCode::INVALID_STATE, "filter-record-handle");
+
+    if (recordName.empty() || !symbol.data() || (!symbol.empty() && symbol.front() == u'*'))
+        refuse(ErrorCode::INVALID_ARGUMENT, "filter-record-coordinate");
+
+    if (recordName.size() > state_->limits.recordNameUnits || symbol.size() > state_->limits.symbolUnits)
+        refuse(ErrorCode::RESOURCE_LIMIT, "filter-record-limit");
+
+    return std::ranges::any_of(state_->expressions, [&](const auto &expression) {
+        return expression.accepts(recordName, symbol, false);
+    });
 }
 
 bool FeedFilter::acceptEvent(const RegisteredEvent &event) const {

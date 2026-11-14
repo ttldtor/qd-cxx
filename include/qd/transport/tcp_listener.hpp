@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 #pragma once
 
+#include <array>
 #include <compare>
 #include <cstddef>
 #include <cstdint>
@@ -87,6 +88,9 @@ struct TcpIoResult {
     std::size_t bytes;  ///< Exact prefix; zero for WOULD_BLOCK and PEER_EOF.
 };
 
+/** Detached numeric peer address. IPv4 uses the equivalent IPv4-mapped IPv6 bytes. */
+using TcpPeerAddress = std::array<unsigned char, 16>;
+
 /** Owner-driven TCP listener with exclusive accepted sockets and no queued application bytes.
  * Calls are serialized on the creating thread. Checked calls reject a wrong thread.
  * Queries, moves and destruction require the owner thread. The application retains its bootstrap
@@ -142,6 +146,13 @@ class TcpListener {
      * @return Accepted identity, empty if no peer was ready, or detached failure.
      */
     [[nodiscard]] std::expected<std::optional<TcpConnectionId>, TcpListenerDiagnostic> accept() noexcept;
+
+    /** Inspect the remote numeric address of an active socket without resolving a host name.
+     * @param connection Accepted identity of this listener.
+     * @return Detached address bytes, excluding port and interface scope, or detached failure.
+     */
+    [[nodiscard]] std::expected<TcpPeerAddress, TcpListenerDiagnostic>
+    peerAddress(TcpConnectionId connection) const noexcept;
 
     /** Read at most one capped prefix. EOF is sticky for reads.
      * @param connection Active accepted identity of this listener.

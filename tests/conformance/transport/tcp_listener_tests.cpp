@@ -146,6 +146,8 @@ TEST_CASE("accepted TCP streams keep independent partial QTP input and exact wri
 
     Peer first(listener->port());
     const auto firstId = accept(*listener);
+    const t::TcpPeerAddress loopback{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 255, 127, 0, 0, 1};
+    CHECK(listener->peerAddress(firstId) == loopback);
     Peer second(listener->port());
     const auto secondId = accept(*listener);
     CHECK(firstId != secondId);
@@ -235,6 +237,12 @@ TEST_CASE("capacity preserves backlog and retired or alien identities cannot acc
 
     const auto next = accept(*listener);
     CHECK(next != old);
+    const auto staleAddress = listener->peerAddress(old);
+    REQUIRE_FALSE(staleAddress);
+    CHECK(staleAddress.error().error == t::TcpListenerError::INVALID_STATE);
+    const auto foreignAddress = listener->peerAddress(alienId);
+    REQUIRE_FALSE(foreignAddress);
+    CHECK(foreignAddress.error().error == t::TcpListenerError::INVALID_STATE);
     const auto stale = listener->read(old, bytes);
     REQUIRE_FALSE(stale);
     CHECK(stale.error().error == t::TcpListenerError::INVALID_STATE);
