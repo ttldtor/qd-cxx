@@ -1,0 +1,20 @@
+if(NOT DEFINED PROGRAM)
+    message(FATAL_ERROR "PROGRAM is required")
+endif()
+execute_process(COMMAND "${PROGRAM}" RESULT_VARIABLE empty_code OUTPUT_VARIABLE empty ERROR_VARIABLE empty_error TIMEOUT 5)
+execute_process(COMMAND "${PROGRAM}" --help RESULT_VARIABLE help_code OUTPUT_VARIABLE help ERROR_VARIABLE help_error TIMEOUT 5)
+execute_process(COMMAND "${PROGRAM}" --help-ru RESULT_VARIABLE ru_code OUTPUT_VARIABLE ru ERROR_VARIABLE ru_error TIMEOUT 5)
+if(NOT empty_code STREQUAL "0" OR NOT help_code STREQUAL "0" OR NOT ru_code STREQUAL "0" OR NOT empty STREQUAL help
+    OR NOT empty_error STREQUAL "" OR NOT help_error STREQUAL "" OR NOT ru_error STREQUAL "")
+    message(FATAL_ERROR "Offline help failed")
+endif()
+execute_process(COMMAND "${PROGRAM}" invalid RESULT_VARIABLE invalid_code OUTPUT_VARIABLE invalid ERROR_VARIABLE invalid_error TIMEOUT 5)
+if(NOT invalid_code STREQUAL "2" OR NOT invalid STREQUAL "" OR NOT invalid_error MATCHES "Invalid arguments")
+    message(FATAL_ERROR "Invalid arguments were not rejected")
+endif()
+execute_process(COMMAND "${PROGRAM}" --run RESULT_VARIABLE run_code OUTPUT_VARIABLE output ERROR_VARIABLE error TIMEOUT 15)
+if(NOT run_code STREQUAL "0" OR NOT error STREQUAL "" OR
+    NOT output MATCHES "MOCK bid=12[.]25 ask=12[.]5 eventTime=1707748205000" OR
+    NOT output MATCHES "MOCK bid=13[.]25 ask=13[.]5 eventTime=1707748207000")
+    message(FATAL_ERROR "Synthetic replay failed (${run_code}): ${output} ${error}")
+endif()

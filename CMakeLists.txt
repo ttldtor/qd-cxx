@@ -352,6 +352,7 @@ if(ORG_TTLDTOR_QDCXX_BUILD_EXAMPLES AND ORG_TTLDTOR_QDCXX_BUILD_FEED_API)
     add_subdirectory(examples/feed_quote)
     add_subdirectory(examples/feed_market)
     add_subdirectory(examples/feed_distribution)
+    add_subdirectory(examples/on_demand)
     add_subdirectory(examples/client_queries)
     if(ORG_TTLDTOR_QDCXX_BUILD_IPF)
         add_subdirectory(examples/client_models)
@@ -362,6 +363,16 @@ if(ORG_TTLDTOR_QDCXX_BUILD_EXAMPLES AND ORG_TTLDTOR_QDCXX_BUILD_SCHEDULE)
     add_subdirectory(examples/schedule_queries)
 endif()
 
+
+if(ORG_TTLDTOR_QDCXX_BUILD_IPF)
+    if(ORG_TTLDTOR_QDCXX_BUILD_EXAMPLES)
+        add_subdirectory(examples/ipf_option_chain)
+    endif()
+    install(FILES examples/ipf_option_chain/main.cpp examples/ipf_option_chain/CMakeLists.txt
+        examples/ipf_option_chain/check.cmake examples/ipf_option_chain/example.ipf
+        examples/ipf_option_chain/README.md examples/ipf_option_chain/README.ru.md
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/qdcxx/examples/ipf_option_chain")
+endif()
 
 if(ORG_TTLDTOR_QDCXX_BUILD_IPF_LIVE)
     if(ORG_TTLDTOR_QDCXX_BUILD_EXAMPLES)
@@ -376,6 +387,10 @@ if(ORG_TTLDTOR_QDCXX_BUILD_FEED_API)
     install(FILES examples/feed_distribution/main.cpp examples/feed_distribution/CMakeLists.txt
         examples/feed_distribution/help_test.cmake examples/feed_distribution/README.md examples/feed_distribution/README.ru.md
         DESTINATION "${CMAKE_INSTALL_DATADIR}/qdcxx/examples/feed_distribution")
+    install(FILES examples/on_demand/main.cpp examples/on_demand/fixture_peer.cpp examples/on_demand/fixture_peer.hpp
+        examples/on_demand/CMakeLists.txt examples/on_demand/check.cmake examples/on_demand/README.md examples/on_demand/README.ru.md
+        tests/conformance/recovery_test_peer.cpp tests/conformance/recovery_test_peer.hpp tests/fixtures/ondemand/fixture.hpp
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/qdcxx/examples/on_demand")
     install(FILES examples/client_queries/main.cpp examples/client_queries/last_quote.cpp examples/client_queries/daily_candles.cpp
         examples/client_queries/CMakeLists.txt
         examples/client_queries/check.cmake examples/client_queries/check_request_help.cmake examples/client_queries/README.md examples/client_queries/README.ru.md
@@ -523,6 +538,11 @@ if(ORG_TTLDTOR_QDCXX_BUILD_TAPE_INSPECT OR BUILD_TESTING)
     endif()
 endif()
 if(BUILD_TESTING)
+    if(TARGET qdcxx_on_demand_example)
+        add_test(NAME on_demand_example COMMAND "${CMAKE_COMMAND}" "-DPROGRAM=$<TARGET_FILE:qdcxx_on_demand_example>"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/examples/on_demand/check.cmake")
+        set_tests_properties(on_demand_example PROPERTIES TIMEOUT 20)
+    endif()
     if(TARGET qdcxx_client_queries)
         add_test(NAME client_queries_help COMMAND "${CMAKE_COMMAND}" "-DPROGRAM=$<TARGET_FILE:qdcxx_client_queries>" -P "${CMAKE_CURRENT_SOURCE_DIR}/examples/client_queries/check.cmake")
         add_test(NAME daily_candles_help COMMAND "${CMAKE_COMMAND}" "-DPROGRAM=$<TARGET_FILE:qdcxx_daily_candles>" -P "${CMAKE_CURRENT_SOURCE_DIR}/examples/client_queries/check_request_help.cmake")
