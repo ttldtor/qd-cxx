@@ -104,3 +104,5 @@ cmake -DTEST_ROOT=.work/deps-cli-tests -P tools/deps/Tests.cmake
 Артефакты и per-case команды/вывод сохраняются, удаления и загрузок нет.
 [Квалификация runtime](../../cmake/runtime-profile/README.ru.md) остаётся основанием
 контракта SDK; helper предоставляет воспроизводимые входные данные.
+
+[Зависимость Beast WSS](BEAST-WSS.ru.md) описывает необязательные внутренние заголовки Boost и явно выбираемый SDK OpenSSL.
