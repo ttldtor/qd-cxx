@@ -135,4 +135,4 @@ The complete description must fit in one 64 KiB QTP frame. The current endpoint 
 keys per client per contract and 256 subscription tuples per frame also apply in this profile.
 An upstream DATA frame may contain up to 32 mapped record occurrences, even if they share one key. A frame exceeding this allowance fails the upstream generation and current demand is replayed on reconnect. Operate the relay with a source that advertises the three QTP contracts and supports `hs`.
 
-For a local catalog and TICKER or STREAM, see [publication of physical records](RECORD-PUBLICATION.md).
+For the local catalog profile, see [publication of physical records](RECORD-PUBLICATION.md).

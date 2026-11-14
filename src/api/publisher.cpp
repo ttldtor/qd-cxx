@@ -44,16 +44,13 @@ constexpr std::size_t EVENT_BYTES = 8192;
 constexpr std::size_t EVENT_OWNER_ALLOWANCE = 1024;
 constexpr std::size_t SOURCE_EPOCH_BYTES = 4 * 1024 * 1024;
 constexpr std::size_t LOCAL_RECORD_EVENT_BYTES = 64 * 1024;
-constexpr std::size_t LOCAL_RECORD_OWNERS = 2 * MAX_PEERS * (CLIENT_KEYS + CLIENT_PENDING_ITEMS + 1) + 12;
-constexpr std::size_t LOCAL_RECORD_EPOCH_BYTES =
-    LOCAL_RECORD_OWNERS * (LOCAL_RECORD_EVENT_BYTES + EVENT_OWNER_ALLOWANCE);
-constexpr std::size_t LOCAL_RECORD_FAMILIES = 2;
 constexpr encoding::UtfStringLimits PUBLISHER_TEXT_LIMITS{8192, 1024};
 constexpr std::size_t REMOTE_EPOCH_BYTES = 20 * 1024 * 1024;
 constexpr std::size_t REMOTE_EVENT_BYTES = 64 * 1024;
 constexpr std::size_t REMOTE_DATA_RECORDS = 32;
 constexpr std::size_t MIXED_OWNERS =
     MAX_PEERS * (CLIENT_KEYS * (HISTORY_POINTS_PER_KEY + 2) + CLIENT_PENDING_ITEMS + 1) + 12;
+constexpr std::size_t LOCAL_RECORD_EPOCH_BYTES = MIXED_OWNERS * (LOCAL_RECORD_EVENT_BYTES + EVENT_OWNER_ALLOWANCE);
 constexpr std::size_t MIXED_LOCAL_EPOCH_BYTES = MIXED_OWNERS * (EVENT_BYTES + EVENT_OWNER_ALLOWANCE);
 constexpr std::size_t MIXED_REMOTE_EPOCH_BYTES = MIXED_OWNERS * (REMOTE_EVENT_BYTES + EVENT_OWNER_ALLOWANCE);
 constexpr std::size_t QUOTE_FIELDS = 10;
@@ -98,6 +95,7 @@ constexpr Diagnostic ALLOCATION{ErrorCode::ALLOCATION_FAILURE, "publisher-storag
 constexpr Diagnostic CLOSED{ErrorCode::CLOSED, "publisher-closed"};
 constexpr Diagnostic RECORD_MODE{ErrorCode::INVALID_STATE, "publisher-record-mode"};
 constexpr Diagnostic RECORD_SHAPE{ErrorCode::INVALID_ARGUMENT, "publisher-record-shape"};
+constexpr Diagnostic HISTORY_SHAPE{ErrorCode::INVALID_ARGUMENT, "publisher-history-shape"};
 constexpr Diagnostic RECORD_LIMIT{ErrorCode::RESOURCE_LIMIT, "publisher-record-limit"};
 constexpr Diagnostic PENDING_RECORD_LIMIT{ErrorCode::RESOURCE_LIMIT, "publisher-pending-records"};
 constexpr Diagnostic LOCAL_SOURCE_DISABLED{ErrorCode::INVALID_STATE, "publisher-remote-source"};
@@ -140,6 +138,7 @@ struct RecordRow {
     std::size_t charge = 0;
     std::size_t family = 0;
     std::int32_t id = 0;
+    PublisherHistoryMetadata history;
 };
 
 /** Requested lengths for one exact backing allocation of each pending array. */
@@ -180,21 +179,44 @@ std::int64_t floorSeconds(std::int64_t milliseconds) noexcept {
 }
 
 std::size_t enabledFamilies(const PublisherOptions &options) noexcept {
-    if (options.catalog)
-        return options.source ? FAMILY_COUNT : LOCAL_RECORD_FAMILIES;
-
-    return options.mixed ? FAMILY_COUNT : 1;
+    return options.catalog || options.mixed ? FAMILY_COUNT : 1;
 }
 
 bool exactSymbol(std::u16string_view symbol) noexcept {
     return !symbol.empty() && symbol.size() <= SYMBOL_UNITS && symbol.front() != u'*';
 }
 
-/** Check the complete record and size its backing without touching or copying any variable payload. */
+bool validHistoryMetadata(Family family, const PublisherHistoryMetadata &metadata) noexcept {
+    using namespace events::indexed_event_flags;
+    constexpr auto SUPPORTED_FLAGS =
+        TX_PENDING | REMOVE_EVENT | SNAPSHOT_BEGIN | SNAPSHOT_END | SNAPSHOT_SNIP | SNAPSHOT_MODE;
+
+    if (family != Family::HISTORY)
+        return metadata.eventFlags == 0 && !metadata.removalIndex;
+
+    return (metadata.eventFlags & ~SUPPORTED_FLAGS) == 0 &&
+           ((metadata.eventFlags & REMOVE_EVENT) != 0) == metadata.removalIndex.has_value();
+}
+
+/** HISTORY reserves the largest signed index for a virtual snapshot boundary. */
+bool reservedHistoryIndex(const core::IndexedTimeLayout &layout,
+                          std::span<const core::FieldValueView> fields) noexcept {
+    constexpr auto RESERVED = std::numeric_limits<std::int64_t>::max();
+
+    if (const auto *pair = std::get_if<core::IndexedTimePairInt32>(&layout))
+        return fields[pair->firstField].raw == highWord(RESERVED) && fields[pair->secondField].raw == lowWord(RESERVED);
+
+    if (const auto *single = std::get_if<core::IndexedTimeSingleInt64>(&layout))
+        return fields[single->field].raw == RESERVED;
+
+    return false;
+}
+
+/** Check the applicable fields and size their backing without copying variable payload. */
 std::expected<RecordStorage, Diagnostic> recordStorage(const core::LocalRecord &layout, std::u16string_view symbol,
-                                                       std::span<const core::FieldValueView> fields,
-                                                       std::size_t limit) noexcept {
-    if (layout.fields.size() != fields.size() || !exactSymbol(symbol))
+                                                       std::span<const core::FieldValueView> fields, std::size_t limit,
+                                                       bool removal) noexcept {
+    if (fields.size() != (removal ? 0 : layout.fields.size()) || !exactSymbol(symbol))
         return std::unexpected(RECORD_SHAPE);
 
     if (fields.size() > PublisherRecordLimits::MAX_FIELDS)
@@ -240,7 +262,8 @@ std::expected<RecordStorage, Diagnostic> recordStorage(const core::LocalRecord &
 
 /** Copy validated borrowed data only after the caller has checked available FIFO and byte capacity. */
 RecordRow copyRecordRow(std::size_t family, std::int32_t id, std::u16string_view symbol,
-                        std::span<const core::FieldValueView> fields, RecordStorage storage) {
+                        std::span<const core::FieldValueView> fields, RecordStorage storage,
+                        PublisherHistoryMetadata history) {
     RecordRow row{std::make_unique_for_overwrite<char16_t[]>(storage.textUnits),
                   storage.opaqueBytes ? std::make_unique_for_overwrite<std::byte[]>(storage.opaqueBytes) : nullptr,
                   fields.empty() ? nullptr : std::make_unique<core::FieldValueView[]>(fields.size()),
@@ -248,7 +271,8 @@ RecordRow copyRecordRow(std::size_t family, std::int32_t id, std::u16string_view
                   fields.size(),
                   storage.charge,
                   family,
-                  id};
+                  id,
+                  history};
     auto *text = std::ranges::copy(symbol, row.text.get()).out;
     auto *opaque = row.opaque.get();
 
@@ -604,6 +628,27 @@ std::vector<std::vector<std::u16string>> catalogNames(PublisherOptions options, 
     return {names.begin(), names.end()};
 }
 
+/** Local HISTORY must be able to encode removals and synthetic snapshot boundaries. */
+std::vector<std::uint8_t> localHistoryRecords(const core::LocalSchema &schema, CatalogNames names) {
+    std::vector<std::uint8_t> supported(schema.records().size());
+
+    for (const auto &record : schema.records()) {
+        if (!record.indexedTimeLayout || record.fields.size() > PublisherRecordLimits::MAX_FIELDS)
+            continue;
+
+        const auto first = std::ranges::find_if(record.fields, [](const auto &field) {
+            return field.serialTypeId != std::to_underlying(FieldType::VOID_FIELD);
+        });
+
+        if (first != record.fields.end()) {
+            const auto field = static_cast<std::size_t>(first - record.fields.begin());
+            supported[record.id] = !names[record.id][field].starts_with(u"Event");
+        }
+    }
+
+    return supported;
+}
+
 protocol::SubscriptionWriter
 publisherWriter(const core::LocalSchema &schema, CatalogNames names,
                 core::SubscriptionSelectorPolicy policy = core::SubscriptionSelectorPolicy::EXACT_ONLY) {
@@ -674,7 +719,10 @@ mux::ClientLimits recordClientLimits(std::size_t rowBytes) {
     result.recordFields = PublisherRecordLimits::MAX_FIELDS;
     result.recordFieldUnits = rowBytes / sizeof(char16_t);
     result.recordByteUnits = rowBytes;
-    result.recordArenaBytes = rowBytes + MAX_TEXT_PADDING + alignof(core::FieldValueView);
+    // HISTORY may materialize the full default layout from a removal containing only the symbol and index.
+    constexpr auto MAX_DEFAULT_ROW =
+        PublisherRecordLimits::MAX_FIELDS * sizeof(core::FieldValueView) + SYMBOL_UNITS * sizeof(char16_t);
+    result.recordArenaBytes = std::max(rowBytes, MAX_DEFAULT_ROW) + MAX_TEXT_PADDING + alignof(core::FieldValueView);
     result.recordBytes = result.dataItems * (result.recordArenaBytes + EVENT_OWNER_ALLOWANCE);
 
     return result;
@@ -752,7 +800,7 @@ protocol::detail::LocalEventOwner localOwner(bool catalog, std::size_t families)
 
     if (catalog) {
         limits.residentBytes = LOCAL_RECORD_EPOCH_BYTES;
-        limits.owners = LOCAL_RECORD_OWNERS;
+        limits.owners = MIXED_OWNERS;
         limits.eventBytes = LOCAL_RECORD_EVENT_BYTES;
     } else if (families == FAMILY_COUNT) {
         limits.residentBytes = MIXED_LOCAL_EPOCH_BYTES;
@@ -954,6 +1002,7 @@ struct PublisherPort {
     std::vector<SourceRow> pending;
     std::vector<RecordRow> pendingRecords;
     std::optional<core::LocalSchema> localCatalog;
+    std::vector<std::uint8_t> localHistory;
     const PublisherRecordLimits recordLimits;
     std::size_t recordBytes = 0;
     std::size_t activeRecords = 0;
@@ -1030,9 +1079,8 @@ using QueueSet = std::array<std::optional<mux::MuxQueue>, FAMILY_COUNT>;
 using DemandSet = std::array<std::optional<mux::DemandTracker>, FAMILY_COUNT>;
 using WorkSet = std::array<mux::QueueWork, FAMILY_COUNT>;
 
-/** One upstream connection. Its raw output slot copies and owns the whole frame through the local write barrier. */
-bool supportsRecord(const core::LocalSchema &schema, std::size_t family, core::RecordContext context,
-                    bool catalog) noexcept {
+bool supportsRecord(const core::LocalSchema &schema, std::size_t family, core::RecordContext context, bool catalog,
+                    std::span<const std::uint8_t> localHistory = {}) noexcept {
     const auto id = schema.recordId(context);
 
     if (!id)
@@ -1041,9 +1089,11 @@ bool supportsRecord(const core::LocalSchema &schema, std::size_t family, core::R
     if (!catalog)
         return *id == RECORD_IDS[family];
 
-    return FAMILIES[family] != Family::HISTORY || schema.records()[*id].hasTime;
+    return FAMILIES[family] != Family::HISTORY ||
+           (schema.records()[*id].hasTime && (localHistory.empty() || localHistory[*id] != 0));
 }
 
+/** One upstream connection. Its raw output slot copies and owns the whole frame through the local write barrier. */
 class SourceConnection {
     const core::LocalSchema &schema_;
     const std::span<const std::int32_t> recordIds_;
@@ -1281,6 +1331,7 @@ class PublisherServer {
     core::LocalSchema schema_;
     const std::vector<std::int32_t> recordIds_;
     const std::vector<std::vector<std::u16string>> catalogNames_;
+    std::vector<std::uint8_t> localHistory_;
     std::optional<protocol::detail::LocalEventOwner> source_;
     const mux::ClientLimits clientLimits_;
     QueueSet queues_;
@@ -1487,7 +1538,7 @@ class PublisherServer {
             // The QTP record map covers every enabled family. A command cannot install a key from another family.
             const auto catalog = !catalogNames_.empty();
             std::erase_if(result.subscription->entries, [&](const auto &entry) {
-                return !supportsRecord(schema_, *family, entry.context, catalog);
+                return !supportsRecord(schema_, *family, entry.context, catalog, localHistory_);
             });
 
             RequestedEntries requested;
@@ -1985,7 +2036,8 @@ class PublisherServer {
         recordApplication_.emplace(row.family, row.charge);
         auto turn = liveTurn(true);
         auto event = source_->record(DATA_MESSAGES[row.family], row.id, schema_.recordContext(row.id),
-                                     {row.text.get(), row.symbolSize}, {row.fields.get(), row.fieldCount}, turn);
+                                     {row.text.get(), row.symbolSize}, {row.fields.get(), row.fieldCount},
+                                     row.history.eventFlags, row.history.removalIndex, turn);
 
         if (!event)
             throw Error(protocolDiagnostic(event.error(), "publisher-local-record"));
@@ -2173,6 +2225,9 @@ class PublisherServer {
         if (options.catalog)
             validateCatalog();
 
+        if (options.catalog && !options.source)
+            localHistory_ = localHistoryRecords(schema_, catalogNames_);
+
         for (std::size_t family = familyCount_; family < FAMILY_COUNT; ++family) {
             auto &stats = statistics_.families[family];
             stats.ingressFrames.availability = core::StatisticAvailability::UNSUPPORTED;
@@ -2209,6 +2264,10 @@ class PublisherServer {
 
             sourceDemand_[family].emplace(std::move(*demand));
         }
+    }
+
+    [[nodiscard]] std::span<const std::uint8_t> localHistory() const noexcept {
+        return localHistory_;
     }
 
     [[nodiscard]] std::uint16_t port() const noexcept {
@@ -2300,6 +2359,8 @@ void runPublisher(detail::PublisherPort &port, transport::RuntimeBootstrap &boot
         PublisherServer server(bootstrap, options, std::move(demand));
         {
             const std::lock_guard lock(port.mutex);
+            const auto localHistory = server.localHistory();
+            port.localHistory.assign(localHistory.begin(), localHistory.end());
             port.boundPort = server.port();
             port.started = true;
         }
@@ -2328,6 +2389,7 @@ void runPublisher(detail::PublisherPort &port, transport::RuntimeBootstrap &boot
         std::vector<SourceRow>().swap(port.pending);
         std::vector<RecordRow>().swap(port.pendingRecords);
         port.localCatalog.reset();
+        std::vector<std::uint8_t>().swap(port.localHistory);
         port.recordBytes = 0;
         port.activeRecords = 0;
 
@@ -2408,6 +2470,13 @@ std::expected<void, Diagnostic> Publisher::publish(const events::Order &order) c
 std::expected<void, Diagnostic> Publisher::publishRecord(Family family, const core::RecordContext &context,
                                                          std::u16string_view symbol,
                                                          std::span<const core::FieldValueView> fields) const {
+    return publishRecord(family, context, symbol, fields, {});
+}
+
+std::expected<void, Diagnostic> Publisher::publishRecord(Family family, const core::RecordContext &context,
+                                                         std::u16string_view symbol,
+                                                         std::span<const core::FieldValueView> fields,
+                                                         PublisherHistoryMetadata history) const {
     if (!port_)
         return std::unexpected(CLOSED);
 
@@ -2424,14 +2493,21 @@ std::expected<void, Diagnostic> Publisher::publishRecord(Family family, const co
         const auto lane = familyIndex(family);
         const auto id = port.localCatalog->recordId(context);
 
-        if (!lane || *lane >= LOCAL_RECORD_FAMILIES || !id)
+        if (!lane || !id)
             return std::unexpected(RECORD_SHAPE);
 
+        if (!validHistoryMetadata(family, history) || (family == Family::HISTORY && port.localHistory[*id] == 0))
+            return std::unexpected(HISTORY_SHAPE);
+
         const auto &layout = port.localCatalog->records()[static_cast<std::size_t>(*id)];
-        const auto storage = recordStorage(layout, symbol, fields, port.recordLimits.rowBytes);
+        const auto removal = history.removalIndex.has_value();
+        const auto storage = recordStorage(layout, symbol, fields, port.recordLimits.rowBytes, removal);
 
         if (!storage)
             return std::unexpected(storage.error());
+
+        if (family == Family::HISTORY && !removal && reservedHistoryIndex(*layout.indexedTimeLayout, fields))
+            return std::unexpected(HISTORY_SHAPE);
 
         if (port.activeRecords == port.pendingRecords.size() ||
             storage->charge > port.recordLimits.pendingBytes - port.recordBytes)
@@ -2440,7 +2516,7 @@ std::expected<void, Diagnostic> Publisher::publishRecord(Family family, const co
         // Hold the admission fence through copying so close and other producers cannot consume this reservation.
         try {
             const auto index = (port.head + port.size) % port.pendingRecords.size();
-            port.pendingRecords[index] = copyRecordRow(*lane, *id, symbol, fields, *storage);
+            port.pendingRecords[index] = copyRecordRow(*lane, *id, symbol, fields, *storage, history);
             ++port.size;
             ++port.activeRecords;
             port.recordBytes += storage->charge;

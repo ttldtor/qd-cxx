@@ -1559,12 +1559,11 @@ std::expected<LiveEvent, LiveError> detail::LocalEventOwner::quote(const core::R
     return record(LiveDataMessage::TICKER_DATA, 0, context, symbol, fields, 0, {}, eventTime, work);
 }
 
-std::expected<LiveEvent, LiveError> detail::LocalEventOwner::record(LiveDataMessage type, std::int32_t localId,
-                                                                    const core::RecordContext &context,
-                                                                    std::u16string_view symbol,
-                                                                    std::span<const core::FieldValueView> fields,
-                                                                    LiveWork &work) const {
-    return copyRecord(type, localId, context, symbol, fields, 0, {}, {}, work);
+std::expected<LiveEvent, LiveError>
+detail::LocalEventOwner::record(LiveDataMessage type, std::int32_t localId, const core::RecordContext &context,
+                                std::u16string_view symbol, std::span<const core::FieldValueView> fields,
+                                std::int32_t flags, std::optional<std::int64_t> removalTime, LiveWork &work) const {
+    return copyRecord(type, localId, context, symbol, fields, flags, removalTime, {}, work);
 }
 
 std::expected<LiveEvent, LiveError>
