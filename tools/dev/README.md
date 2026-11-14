@@ -2,6 +2,8 @@
 
 [Русская версия](README.ru.md). English is authoritative.
 
+[Kraken ticker decoder](../kraken/README.md) describes the optional gateway decoder.
+
 See the [NetTest comparison](../../docs/NETTEST-REFERENCE.md) for Java QD record publication and dxFeed event API benchmarks.
 
 The [record NetTest](../nettest/README.md) runs finite QTP producer and consumer benchmarks against exported schema bundles.
