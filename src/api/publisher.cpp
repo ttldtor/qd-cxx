@@ -3,6 +3,7 @@
 
 #include "qd/api/publisher.hpp"
 
+#include "../mux/queue_replace.hpp"
 #include "../protocol/local_event_owner.hpp"
 #include "../transport/raw_byte_owner.hpp"
 #include "qd/events/event_flags.hpp"
@@ -642,11 +643,11 @@ struct DemandPolicies {
     std::vector<PeerDemandPolicy> peers;
 };
 
-DemandPolicy staticDemandPolicy(const PublisherDemandPolicy &policy) {
+DemandPolicy validatedDemandPolicy(const PublisherDemandPolicy &policy, bool allowDynamic = false) {
     const DemandPolicy result{policy.ticker, policy.stream, policy.history};
 
-    if (std::ranges::any_of(result, [](const auto &filter) {
-            return filter && (!filter->valid() || filter->isDynamic());
+    if (std::ranges::any_of(result, [allowDynamic](const auto &filter) {
+            return filter && (!filter->valid() || (!allowDynamic && filter->isDynamic()));
         }))
         throw Error({ErrorCode::INVALID_ARGUMENT, "publisher-demand-filter"});
 
@@ -657,7 +658,7 @@ DemandPolicies configuredDemandPolicies(const PublisherOptions &options) {
     if (options.peerDemand.size() > PublisherOptions::MAX_PEER_DEMAND_POLICIES)
         throw Error({ErrorCode::RESOURCE_LIMIT, "publisher-demand-policy-count"});
 
-    DemandPolicies result{staticDemandPolicy(options.demand), {}};
+    DemandPolicies result{validatedDemandPolicy(options.demand), {}};
     result.peers.reserve(options.peerDemand.size());
 
     for (const auto &peer : options.peerDemand) {
@@ -679,19 +680,38 @@ DemandPolicies configuredDemandPolicies(const PublisherOptions &options) {
         if (std::ranges::find(result.peers, bytes, &PeerDemandPolicy::address) != result.peers.end())
             throw Error({ErrorCode::INVALID_ARGUMENT, "publisher-duplicate-demand-peer"});
 
-        result.peers.push_back({bytes, staticDemandPolicy(peer.demand)});
+        result.peers.push_back({bytes, validatedDemandPolicy(peer.demand)});
     }
 
     return result;
 }
 
+using RequestedEntries = std::vector<protocol::IncomingSubscriptionEntry>;
+
+struct PendingSubscription {
+    mux::MuxCommandTicket ticket;
+    std::size_t family;
+    RequestedEntries requested;
+};
+
+struct HistoryContinuity {
+    core::RecordContext context;
+    std::u16string symbol;
+    bool snapshot = false;
+    bool transaction = false;
+};
+
 struct Peer {
     transport::TcpConnectionId id;
     protocol::LiveSession session;
     DemandPolicy demand;
+    transport::TcpPeerAddress address;
+    std::uint64_t policyRevision = 0;
+    std::array<RequestedEntries, FAMILY_COUNT> requested;
+    std::vector<HistoryContinuity> openHistory;
     std::array<std::shared_ptr<Delivery>, FAMILY_COUNT> delivery;
     std::array<mux::MuxHandle, FAMILY_COUNT> handles;
-    std::optional<mux::MuxCommandTicket> command;
+    std::optional<PendingSubscription> command;
     std::optional<protocol::LivePendingOutput> output;
     Clock::time_point acceptedAt;
     Clock::time_point lastWrite;
@@ -745,12 +765,47 @@ composeDelivery(Peer &peer, std::size_t family, const core::LocalSchema &schema,
 } // namespace
 
 namespace detail {
+struct PublisherPeerIdentityAccess {
+    static PublisherPeerId make(transport::TcpConnectionId value) noexcept {
+        PublisherPeerId result;
+        result.connection_ = value;
+
+        return result;
+    }
+
+    static transport::TcpConnectionId get(PublisherPeerId value) noexcept {
+        return value.connection_;
+    }
+};
+
+struct PublisherPolicyCompletion {
+    mutable std::mutex mutex;
+    mutable std::condition_variable changed;
+    std::optional<PublisherPolicyResult> result;
+
+    void complete(PublisherPolicyResult outcome) noexcept {
+        const std::lock_guard lock(mutex);
+        result = outcome;
+        changed.notify_all();
+    }
+};
+
+struct PublisherPolicyCommand {
+    transport::TcpConnectionId id;
+    DemandPolicy demand;
+    std::shared_ptr<PublisherPolicyCompletion> completion;
+    Clock::time_point deadline;
+};
+
 /** Detached bounded producer state. It contains no worker or native owner. */
 struct PublisherPort {
     std::mutex mutex;
     std::condition_variable changed;
     std::vector<SourceRow> pending;
     std::array<std::vector<PublisherDemand>, FAMILY_COUNT> demand;
+    std::array<PublisherPeer, MAX_PEERS> peers;
+    std::size_t peerCount = 0;
+    std::optional<PublisherPolicyCommand> policyCommand;
     const bool remote;
     const bool mixed;
     PublisherSourceStatus source;
@@ -1120,25 +1175,28 @@ class PublisherServer {
             return;
 
         try {
+            const auto address = listener_.peerAddress(**accepted);
+
+            if (!address)
+                throw Error(nativeDiagnostic(address.error()));
+
             auto demand = demandPolicies_.defaults;
+            const auto found = std::ranges::find(demandPolicies_.peers, *address, &PeerDemandPolicy::address);
 
-            if (!demandPolicies_.peers.empty()) {
-                const auto address = listener_.peerAddress(**accepted);
-
-                if (!address)
-                    throw Error(nativeDiagnostic(address.error()));
-
-                const auto found = std::ranges::find(demandPolicies_.peers, *address, &PeerDemandPolicy::address);
-
-                if (found != demandPolicies_.peers.end())
-                    demand = found->demand;
-            }
+            if (found != demandPolicies_.peers.end())
+                demand = found->demand;
 
             auto liveWork = liveTurn(!catalogNames_.empty());
             auto session = serverSession(schema_, catalogNames_, liveWork);
             const auto now = Clock::now();
-            Peer peer{**accepted, std::move(session),    std::move(demand), {}, {}, {}, {}, now,
-                      now,        now + HEARTBEAT_PERIOD};
+            Peer peer{.id = **accepted,
+                      .session = std::move(session),
+                      .demand = std::move(demand),
+                      .address = *address,
+                      .acceptedAt = now,
+                      .lastWrite = now,
+                      .heartbeatAt = now + HEARTBEAT_PERIOD};
+            peer.openHistory.reserve(CLIENT_KEYS);
 
             for (std::size_t family = 0; family < familyCount_; ++family) {
                 auto work =
@@ -1172,15 +1230,32 @@ class PublisherServer {
                 peer.delivery[family]->batch = {};
                 (void)peer.handles[family].requestStop(mux::StopMode::ABORT);
             }
+
+            peer.openHistory.clear();
         }
 
         if (!peer.socketClosed)
             peer.socketClosed = listener_.retire(peer.id).has_value();
     }
 
-    bool receive(Peer &peer, protocol::LiveWork &work) {
+    static bool sameRequested(const protocol::IncomingSubscriptionEntry &left,
+                              const protocol::IncomingSubscriptionEntry &right) noexcept {
+        return left.context.matches(right.context) && left.symbol == right.symbol;
+    }
+
+    bool allowed(const DemandPolicy &policy, std::size_t family, const core::RecordContext &context,
+                 std::u16string_view symbol) const {
+        if (!policy[family])
+            return true;
+
+        const auto id = schema_.recordId(context);
+
+        return id && policy[family]->acceptRecord(schema_.records()[static_cast<std::size_t>(*id)].name, symbol);
+    }
+
+    bool finishSubscription(Peer &peer) noexcept {
         if (peer.command) {
-            const auto applied = peer.command->result();
+            const auto applied = peer.command->ticket.result();
 
             if (!applied)
                 return true;
@@ -1188,8 +1263,19 @@ class PublisherServer {
             if (applied->status != mux::CommandStatus::APPLIED)
                 return false;
 
+            peer.requested[peer.command->family] = std::move(peer.command->requested);
             peer.command.reset();
         }
+
+        return true;
+    }
+
+    bool receive(Peer &peer, protocol::LiveWork &work) {
+        if (!finishSubscription(peer))
+            return false;
+
+        if (peer.command)
+            return true;
 
         if (peer.inputStart == peer.inputEnd) {
             const auto read = listener_.read(peer.id, peer.input);
@@ -1236,20 +1322,52 @@ class PublisherServer {
                 return !supportsRecord(schema_, *family, entry.context, catalog);
             });
 
-            // Removal acts on this client's applied keys, independent of admission policy.
-            if (const auto &filter = peer.demand[*family];
-                filter && result.subscription->message == ADD_MESSAGES[*family]) {
-                const auto records = schema_.records();
+            RequestedEntries requested;
+            const bool adding = result.subscription->message == ADD_MESSAGES[*family];
+            const auto &removals = result.subscription->entries;
 
-                try {
-                    std::erase_if(result.subscription->entries, [&](const auto &entry) {
-                        const auto id = schema_.recordId(entry.context);
+            try {
+                requested = peer.requested[*family];
 
-                        return !id || !filter->acceptRecord(records[static_cast<std::size_t>(*id)].name, entry.symbol);
+                if (adding) {
+                    auto &entries = result.subscription->entries;
+
+                    for (auto current = entries.begin(); current != entries.end(); ++current) {
+                        const auto duplicate = std::find_if(entries.begin(), current, [&](const auto &earlier) {
+                            return sameRequested(earlier, *current);
+                        });
+
+                        if (duplicate != current && duplicate->historyBound != current->historyBound)
+                            return false;
+
+                        const auto previous = std::ranges::find_if(requested, [&](const auto &entry) {
+                            return sameRequested(entry, *current);
+                        });
+
+                        if (previous == requested.end()) {
+                            if (requested.size() == CLIENT_KEYS)
+                                return false;
+
+                            requested.push_back(*current);
+                        } else {
+                            previous->historyBound = current->historyBound;
+                        }
+                    }
+
+                    std::erase_if(entries, [&](const auto &entry) {
+                        return !allowed(peer.demand, *family, entry.context, entry.symbol);
                     });
-                } catch (const Error &) {
-                    return false;
+                } else {
+                    std::erase_if(requested, [&](const auto &entry) {
+                        return std::ranges::any_of(removals, [&](const auto &removal) {
+                            return sameRequested(entry, removal);
+                        });
+                    });
                 }
+            } catch (const Error &) {
+                return false;
+            } catch (const std::bad_alloc &) {
+                return false;
             }
 
             mux::QueueSubmitWork submit{8, 65536, 65536, 1024 * 1024};
@@ -1259,7 +1377,15 @@ class PublisherServer {
             if (!ticket)
                 return false;
 
-            peer.command = std::move(*ticket);
+            if (!adding && FAMILIES[*family] == Family::HISTORY) {
+                std::erase_if(peer.openHistory, [&](const auto &entry) {
+                    return std::ranges::any_of(removals, [&](const auto &removal) {
+                        return removal.context.matches(entry.context) && removal.symbol == entry.symbol;
+                    });
+                });
+            }
+
+            peer.command.emplace(std::move(*ticket), *family, std::move(requested));
         }
 
         return true;
@@ -1287,8 +1413,23 @@ class PublisherServer {
             if (peer.sentDescription) {
                 for (std::size_t i = 0; i < familyCount_; ++i) {
                     const auto family = (peer.nextFamily + i) % familyCount_;
+                    const auto records = peer.delivery[family]->batch.records();
 
-                    if (!peer.delivery[family]->batch.records().empty()) {
+                    if (!records.empty()) {
+                        bool allowedData;
+
+                        try {
+                            allowedData = allowed(peer.demand, family, records.front().context, records.front().symbol);
+                        } catch (const Error &) {
+                            return false;
+                        }
+
+                        if (!allowedData) {
+                            peer.delivery[family]->batch = {};
+                            (void)peer.handles[family].requestResume();
+                            continue;
+                        }
+
                         kind = OutputKind::DATA;
                         peer.outputFamily = family;
                         peer.nextFamily = (family + 1) % familyCount_;
@@ -1312,6 +1453,34 @@ class PublisherServer {
         peer.outputKind = kind;
         peer.output = std::move(*output);
         peer.lastWrite = now;
+
+        return true;
+    }
+
+    bool trackHistory(Peer &peer, const mux::MuxRecordView &record) {
+        using namespace events::indexed_event_flags;
+        auto previous = std::ranges::find_if(peer.openHistory, [&](const auto &entry) {
+            return entry.context.matches(record.context) && entry.symbol == record.symbol;
+        });
+        const auto flags = record.eventFlags;
+        const bool hasPrevious = previous != peer.openHistory.end();
+        const bool snapshot = (flags & (SNAPSHOT_END | SNAPSHOT_SNIP)) == 0 &&
+                              ((flags & SNAPSHOT_BEGIN) != 0 || (hasPrevious && previous->snapshot));
+        const bool transaction = (flags & TX_PENDING) != 0;
+
+        if (hasPrevious) {
+            if (snapshot || transaction) {
+                previous->snapshot = snapshot;
+                previous->transaction = transaction;
+            } else {
+                peer.openHistory.erase(previous);
+            }
+        } else if (snapshot || transaction) {
+            if (peer.openHistory.size() == CLIENT_KEYS)
+                return false;
+
+            peer.openHistory.emplace_back(record.context, std::u16string(record.symbol), snapshot, transaction);
+        }
 
         return true;
     }
@@ -1350,6 +1519,16 @@ class PublisherServer {
             break;
         case OutputKind::DATA:
             statistics_.families[peer.outputFamily].sentFrames.add(1);
+
+            if (FAMILIES[peer.outputFamily] == Family::HISTORY) {
+                try {
+                    if (!trackHistory(peer, peer.delivery[peer.outputFamily]->batch.records().front()))
+                        return false;
+                } catch (const std::bad_alloc &) {
+                    return false;
+                }
+            }
+
             peer.delivery[peer.outputFamily]->batch = {};
             (void)peer.handles[peer.outputFamily].requestResume();
             break;
@@ -1396,14 +1575,7 @@ class PublisherServer {
         }
     }
 
-    void publishDemand(detail::PublisherPort &port, std::size_t family) {
-        const auto &queue = *queues_[family];
-        const auto revision = queue.revision();
-
-        if (publishedRevision_[family] == revision)
-            return;
-
-        const auto entries = queue.aggregateEntries();
+    std::vector<PublisherDemand> demandSnapshot(std::span<const core::SubscriptionRequest> entries) const {
         const auto records = schema_.records();
         std::vector<PublisherDemand> demand;
         demand.reserve(entries.size());
@@ -1418,6 +1590,17 @@ class PublisherServer {
                                 entry.historyBound);
         }
 
+        return demand;
+    }
+
+    void publishDemand(detail::PublisherPort &port, std::size_t family) {
+        const auto &queue = *queues_[family];
+        const auto revision = queue.revision();
+
+        if (publishedRevision_[family] == revision)
+            return;
+
+        auto demand = demandSnapshot(queue.aggregateEntries());
         {
             const std::lock_guard lock(port.mutex);
             port.demand[family] = std::move(demand);
@@ -1425,6 +1608,186 @@ class PublisherServer {
 
         publishedRevision_[family] = revision;
         port.changed.notify_all();
+    }
+
+    struct PreparedPolicy {
+        const PublisherServer &server;
+        Clock::time_point deadline;
+        std::array<std::vector<PublisherDemand>, FAMILY_COUNT> demand;
+
+        static std::expected<void, mux::QueueFailure> stage(void *argument, std::size_t family,
+                                                            std::span<const core::SubscriptionRequest> aggregate) {
+            auto &prepared = *static_cast<PreparedPolicy *>(argument);
+
+            if (Clock::now() >= prepared.deadline)
+                return std::unexpected(mux::QueueFailure{mux::QueueError::BUSY, {}});
+
+            try {
+                prepared.demand[family] = prepared.server.demandSnapshot(aggregate);
+            } catch (const std::bad_alloc &) {
+                return std::unexpected(mux::QueueFailure{mux::QueueError::ALLOCATION_FAILURE, {}});
+            } catch (const Error &) {
+                return std::unexpected(mux::QueueFailure{mux::QueueError::INVALID_STATE, {}});
+            }
+
+            return {};
+        }
+    };
+
+    // Caller holds the port mutex, including when publishing a completed replacement.
+    void snapshotPeers(detail::PublisherPort &port) const noexcept {
+        port.peerCount = 0;
+
+        for (const auto &peer : peers_) {
+            if (peer && !peer->closing) {
+                port.peers[port.peerCount++] = {detail::PublisherPeerIdentityAccess::make(peer->id), peer->address,
+                                                peer->policyRevision};
+            }
+        }
+    }
+
+    void completePolicy(detail::PublisherPort &port, PublisherPolicyResult outcome) noexcept {
+        port.policyCommand->completion->complete(outcome);
+        port.policyCommand.reset();
+        port.changed.notify_all();
+    }
+
+    void progressPolicy(detail::PublisherPort &port) {
+        auto input = [&] {
+            const std::lock_guard lock(port.mutex);
+
+            return port.closed ? std::optional<detail::PublisherPolicyCommand>{} : port.policyCommand;
+        }();
+
+        if (!input)
+            return;
+
+        auto found = std::ranges::find_if(peers_, [&](const auto &peer) {
+            return peer && !peer->closing && peer->id == input->id;
+        });
+        const auto reject = [&](PublisherPolicyOutcome outcome, Diagnostic diagnostic) {
+            const std::lock_guard lock(port.mutex);
+            snapshotPeers(port);
+            completePolicy(port, port.closed ? PublisherPolicyResult{PublisherPolicyOutcome::PEER_CLOSED, 0, CLOSED}
+                                             : PublisherPolicyResult{outcome, 0, diagnostic});
+        };
+
+        if (found == peers_.end()) {
+            reject(PublisherPolicyOutcome::PEER_CLOSED, CLOSED);
+
+            return;
+        }
+
+        auto &peer = **found;
+
+        if (!finishSubscription(peer)) {
+            retire(peer);
+            reject(PublisherPolicyOutcome::PEER_CLOSED, CLOSED);
+
+            return;
+        }
+
+        if (Clock::now() >= input->deadline) {
+            reject(PublisherPolicyOutcome::REJECTED, {ErrorCode::REQUEST_TIMED_OUT, "publisher-policy-timeout"});
+
+            return;
+        }
+
+        if (peer.command)
+            return;
+
+        if (peer.policyRevision == std::numeric_limits<std::uint64_t>::max()) {
+            reject(PublisherPolicyOutcome::REJECTED, {ErrorCode::RESOURCE_LIMIT, "publisher-policy-revision"});
+
+            return;
+        }
+
+        std::array<bool, FAMILY_COUNT> discardHeld{};
+        std::array<std::array<core::SubscriptionRequest, CLIENT_KEYS>, FAMILY_COUNT> requests;
+        std::array<mux::detail::QueueReplacement, FAMILY_COUNT> replacements{};
+        WorkSet work{};
+        std::size_t selectors = 0;
+
+        try {
+            for (std::size_t family = 0; family < familyCount_; ++family) {
+                auto &lane = requests[family];
+                std::size_t count = 0;
+
+                for (const auto &entry : peer.requested[family]) {
+                    if (allowed(input->demand, family, entry.context, entry.symbol))
+                        lane[count++] = {{entry.context, entry.symbol}, entry.historyBound};
+                }
+
+                work[family] =
+                    serverQueueTurn(peers_.size(), sourceOptions_.has_value(), familyCount_ > 1, recordIds_.size());
+                replacements[family] = {&*queues_[family], &peer.handles[family], std::span(lane).first(count),
+                                        &work[family]};
+                selectors += count;
+                const auto held = peer.delivery[family]->batch.records();
+                discardHeld[family] =
+                    !held.empty() && !allowed(input->demand, family, held.front().context, held.front().symbol);
+            }
+
+            constexpr std::size_t history = 2;
+            const auto losesHistory = std::ranges::any_of(peer.openHistory, [&](const auto &entry) {
+                return !allowed(input->demand, history, entry.context, entry.symbol);
+            });
+            const auto losesPartialFrame = peer.output && peer.outputKind == OutputKind::DATA &&
+                                           discardHeld[peer.outputFamily] &&
+                                           peer.output->pendingBytes().size() != peer.output->bytes().size();
+
+            if (losesHistory || losesPartialFrame) {
+                retire(peer);
+                reject(PublisherPolicyOutcome::PEER_CLOSED, {ErrorCode::CLOSED, "publisher-policy-wire-boundary"});
+
+                return;
+            }
+        } catch (const Error &failure) {
+            reject(PublisherPolicyOutcome::REJECTED, failure.diagnostic());
+
+            return;
+        }
+
+        const std::lock_guard lock(port.mutex);
+
+        if (port.closed) {
+            completePolicy(port, {PublisherPolicyOutcome::PEER_CLOSED, 0, CLOSED});
+
+            return;
+        }
+
+        PreparedPolicy prepared{*this, input->deadline, {}};
+        const auto revision = peer.policyRevision + 1;
+        const auto replaced = mux::detail::QueueReplaceAccess::replace(
+            std::span(replacements).first(familyCount_), selectors, revision, PreparedPolicy::stage, &prepared);
+
+        if (!replaced) {
+            if (replaced.error().error != mux::QueueError::BUSY) {
+                completePolicy(
+                    port, {PublisherPolicyOutcome::REJECTED, 0, queueDiagnostic(replaced.error(), "publisher-policy")});
+            }
+
+            return;
+        }
+
+        peer.demand = std::move(input->demand);
+        peer.policyRevision = revision;
+
+        for (std::size_t family = 0; family < familyCount_; ++family) {
+            if (discardHeld[family]) {
+                if (peer.output && peer.outputKind == OutputKind::DATA && peer.outputFamily == family)
+                    peer.output.reset();
+
+                peer.delivery[family]->batch = {};
+                (void)peer.handles[family].requestResume();
+            }
+
+            publishedRevision_[family] = queues_[family]->revision();
+        }
+
+        port.demand = std::move(prepared.demand);
+        snapshotPeers(port);
+        completePolicy(port, {PublisherPolicyOutcome::APPLIED, revision, {}});
     }
 
     void publishLocal(detail::PublisherPort &port, WorkSet &work) {
@@ -1486,6 +1849,11 @@ class PublisherServer {
                 continue;
 
             auto &peer = *entry;
+
+            if (!peer.openHistory.empty()) {
+                retire(peer);
+                continue;
+            }
 
             if (peer.output && peer.outputKind == OutputKind::DATA) {
                 if (peer.output->pendingBytes().size() != peer.output->bytes().size()) {
@@ -1633,6 +2001,7 @@ class PublisherServer {
 
     void progress(detail::PublisherPort &port) {
         acceptPeer();
+        progressPolicy(port);
         progressPeers();
         WorkSet work{};
         constexpr std::size_t QUEUE_ACTIONS = 16;
@@ -1694,6 +2063,7 @@ class PublisherServer {
             const std::lock_guard lock(port.mutex);
             statistics_.pendingPublications = port.size;
             port.statistics = statistics_;
+            snapshotPeers(port);
         }
     }
 
@@ -1736,6 +2106,7 @@ void runPublisher(detail::PublisherPort &port, transport::RuntimeBootstrap &boot
         const std::lock_guard lock(port.mutex);
         port.closed = true;
         port.source.connected = false;
+        port.peerCount = 0;
         port.diagnostic = diagnostic;
         std::vector<SourceRow>().swap(port.pending);
 
@@ -1743,6 +2114,11 @@ void runPublisher(detail::PublisherPort &port, transport::RuntimeBootstrap &boot
             std::vector<PublisherDemand>().swap(demand);
 
         port.size = 0;
+
+        if (port.policyCommand) {
+            port.policyCommand->completion->complete({PublisherPolicyOutcome::PEER_CLOSED, 0, CLOSED});
+            port.policyCommand.reset();
+        }
     }
     port.changed.notify_all();
 }
@@ -1916,6 +2292,59 @@ std::vector<PublisherDemand> PublisherEndpoint::getDemand(Family family) const {
         return {};
 
     return port.demand[*index];
+}
+
+PublisherPolicyChange::PublisherPolicyChange(std::shared_ptr<detail::PublisherPolicyCompletion> completion) noexcept
+    : completion_(std::move(completion)) {
+}
+
+std::optional<PublisherPolicyResult> PublisherPolicyChange::waitUntil(Clock::time_point deadline) const {
+    if (!completion_)
+        return std::nullopt;
+
+    std::unique_lock lock(completion_->mutex);
+    (void)completion_->changed.wait_until(lock, deadline, [&] {
+        return completion_->result.has_value();
+    });
+
+    return completion_->result;
+}
+
+std::vector<PublisherPeer> PublisherEndpoint::getPeers() const {
+    auto &port = *impl_->port;
+    const std::lock_guard lock(port.mutex);
+
+    if (port.closed)
+        return {};
+
+    return {port.peers.begin(), port.peers.begin() + static_cast<std::ptrdiff_t>(port.peerCount)};
+}
+
+std::expected<PublisherPolicyChange, Diagnostic> PublisherEndpoint::replacePeerDemand(PublisherPeerId id,
+                                                                                      PublisherDemandPolicy policy) {
+    try {
+        auto demand = validatedDemandPolicy(policy, true);
+        auto completion = std::make_shared<detail::PublisherPolicyCompletion>();
+        auto &port = *impl_->port;
+        const std::lock_guard lock(port.mutex);
+
+        if (port.closed)
+            return std::unexpected(CLOSED);
+
+        if (port.policyCommand)
+            return std::unexpected(Diagnostic{ErrorCode::RESOURCE_LIMIT, "publisher-policy-pending"});
+
+        constexpr auto policyTimeout = 5s;
+        port.policyCommand.emplace(detail::PublisherPeerIdentityAccess::get(id), std::move(demand), completion,
+                                   Clock::now() + policyTimeout);
+        port.changed.notify_all();
+
+        return PublisherPolicyChange(std::move(completion));
+    } catch (const Error &failure) {
+        return std::unexpected(failure.diagnostic());
+    } catch (const std::bad_alloc &) {
+        return std::unexpected(ALLOCATION);
+    }
 }
 
 bool PublisherEndpoint::awaitSourceGeneration(std::uint64_t after, Clock::time_point deadline) const {

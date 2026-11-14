@@ -5,6 +5,7 @@
 #include "qd/api/publisher.hpp"
 
 #include "connect_peer.hpp"
+#include "qd/encoding/compact.hpp"
 #include "qd/events/event_flags.hpp"
 #include "qd/events/order_source.hpp"
 #include "qd/protocol/incoming_subscription.hpp"
@@ -127,6 +128,7 @@ class DemandPeer {
     tcp::socket socket_{context_};
     q::core::LocalSchema schema_;
     q::protocol::SubscriptionWriter writer_;
+    q::protocol::FrameReader reader_{{8192, 8201}};
 
     static q::core::LocalSchema schema() {
         constexpr q::core::SchemaLimits bounds{3, 128, 256, 64, 4096};
@@ -226,6 +228,38 @@ class DemandPeer {
         subscribe(message, requests);
     }
 
+    std::optional<q::protocol::Frame> waitForFrame(std::int32_t type, Clock::time_point deadline) {
+        socket_.non_blocking(true);
+
+        while (Clock::now() < deadline) {
+            asio::error_code error;
+            std::array<std::byte, 1> bytes{};
+            const auto size = socket_.read_some(asio::buffer(bytes), error);
+
+            if (error == asio::error::eof || error == asio::error::connection_reset)
+                return std::nullopt;
+
+            REQUIRE((!error || error == asio::error::would_block || error == asio::error::try_again));
+
+            if (size) {
+                auto next = reader_.feed(bytes);
+                REQUIRE(next.status != q::protocol::FrameStatus::FAILED);
+
+                if (next.frame && next.frame->type == type) {
+                    socket_.non_blocking(false);
+
+                    return std::move(next.frame);
+                }
+            } else {
+                std::this_thread::sleep_for(1ms);
+            }
+        }
+
+        socket_.non_blocking(false);
+
+        return std::nullopt;
+    }
+
     private:
     void subscribe(q::protocol::SubscriptionMessage message, std::span<const q::core::SubscriptionRequest> requests) {
         q::protocol::SubscriptionWriterWork work{100, 65536, 65536, 65536};
@@ -314,6 +348,199 @@ class NonReadingPeer {
 };
 
 } // namespace
+
+TEST_CASE("publisher replaces one policy atomically across families and replays denied requested keys") {
+    auto bootstrap = q::transport::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    q::api::EventRegistryWork work;
+    const auto registry = q::api::EventRegistry::builtIn({}, work);
+    REQUIRE(registry);
+    const auto filter = [&](std::u16string expression, q::api::FeedFilterLimits limits = {}) {
+        return q::api::FeedFilter::Builder(*registry, q::api::DeliveryContract::TICKER, limits)
+            .withCategory(u"allow", std::move(expression))
+            .build();
+    };
+
+    q::api::PublisherOptions options;
+    options.mixed = true;
+    const auto deny = filter(u":Other");
+    const auto sentinel = filter(u":Quote&READY");
+    options.peerDemand.push_back({"127.0.0.1", {sentinel, deny, deny}});
+    auto server = q::api::PublisherEndpoint::create(*bootstrap, options);
+    requireServer(server);
+    DemandPeer first((*server)->port(), asio::ip::make_address_v4("127.0.0.1"));
+    DemandPeer second((*server)->port(), asio::ip::make_address_v4("127.0.0.2"));
+    using enum q::core::SubscriptionFamily;
+    using enum q::protocol::SubscriptionMessage;
+    first.subscribe(TICKER_ADD, 0, u"IBM");
+    first.subscribe(STREAM_ADD, 1, u"IBM");
+    first.subscribe(HISTORY_ADD, 2, u"IBM", -40);
+    first.subscribe(STREAM_ADD, 1, u"DISMISSED");
+    first.subscribe(STREAM_REMOVE, 1, u"DISMISSED");
+    first.subscribe(TICKER_ADD, 0, u"READY");
+    second.subscribe(TICKER_ADD, 0, u"IBM");
+    second.subscribe(HISTORY_ADD, 2, u"IBM", -10);
+    REQUIRE((*server)->awaitDemand(HISTORY, u"Order", u"IBM", true, Clock::now() + 5s));
+    REQUIRE((*server)->awaitDemand(TICKER, u"Quote", u"READY", true, Clock::now() + 5s));
+
+    const auto peers = (*server)->getPeers();
+    REQUIRE(peers.size() == 2);
+    const auto firstPeer = std::ranges::find_if(peers, [](const auto &p) {
+        return p.address.back() == 1;
+    });
+    REQUIRE(firstPeer != peers.end());
+    const auto replace = [&](q::api::PublisherDemandPolicy policy) {
+        auto change = (*server)->replacePeerDemand(firstPeer->id, std::move(policy));
+        REQUIRE(change);
+        const auto result = change->waitUntil(Clock::now() + 5s);
+        REQUIRE(result);
+
+        return *result;
+    };
+
+    q::api::FeedFilterLimits small;
+    small.symbolUnits = 1;
+    const auto limited = filter(u":Order", small);
+    const auto rejected = replace({{}, {}, limited});
+    CHECK(rejected.outcome == q::api::PublisherPolicyOutcome::REJECTED);
+    CHECK(rejected.diagnostic.code == q::api::ErrorCode::RESOURCE_LIMIT);
+    CHECK((*server)->getDemand(STREAM).empty());
+    REQUIRE((*server)->getDemand(HISTORY).size() == 1);
+    CHECK((*server)->getDemand(HISTORY).front().historyBound == -10);
+
+    auto context = q::api::FeedFilterContext::create();
+    const std::u16string resource = u"ipf[file:/symbols.ipf,update=1m]";
+    const std::u16string allowedSymbols[]{u"IBM"};
+    context->replaceSymbols(resource, allowedSymbols, true);
+    const auto generation = q::api::FeedFilter::Builder(*registry)
+                                .withResourceContext(context)
+                                .withCategory(u"stream symbols", resource)
+                                .build();
+    REQUIRE(generation.isDynamic());
+    const auto admitted = replace({{}, generation, {}});
+    CHECK(admitted.outcome == q::api::PublisherPolicyOutcome::APPLIED);
+    CHECK(admitted.revision == 1);
+    CHECK((*server)->getDemand(TICKER).size() == 2);
+    CHECK((*server)->getDemand(STREAM).size() == 1);
+    CHECK((*server)->getDemand(STREAM).front().symbol == u"IBM");
+    REQUIRE((*server)->getDemand(HISTORY).size() == 1);
+    CHECK((*server)->getDemand(HISTORY).front().historyBound == -40);
+
+    const std::u16string nextSymbols[]{u"MSFT"};
+    context->replaceSymbols(resource, nextSymbols, true);
+    CHECK((*server)->getDemand(STREAM).size() == 1);
+
+    const auto withdrawn = replace({deny, deny, deny});
+    CHECK(withdrawn.outcome == q::api::PublisherPolicyOutcome::APPLIED);
+    CHECK(withdrawn.revision == 2);
+    CHECK((*server)->getDemand(TICKER).size() == 1);
+    CHECK((*server)->getDemand(STREAM).empty());
+    REQUIRE((*server)->getDemand(HISTORY).size() == 1);
+    CHECK((*server)->getDemand(HISTORY).front().historyBound == -10);
+
+    const auto active = (*server)->getPeers();
+    CHECK(active.size() == 2);
+    const auto selected = std::ranges::find_if(active, [](const auto &p) {
+        return p.address.back() == 1;
+    });
+    REQUIRE(selected != active.end());
+    CHECK(selected->policyRevision == 2);
+}
+
+TEST_CASE("revoking a physical key after the first open HISTORY frame closes only that peer") {
+    auto bootstrap = q::transport::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    q::api::PublisherOptions options;
+    options.mixed = true;
+    auto server = q::api::PublisherEndpoint::create(*bootstrap, options);
+    requireServer(server);
+    DemandPeer first((*server)->port(), asio::ip::make_address_v4("127.0.0.1"));
+    DemandPeer second((*server)->port(), asio::ip::make_address_v4("127.0.0.2"));
+    constexpr auto history = q::core::SubscriptionFamily::HISTORY;
+    constexpr auto add = q::protocol::SubscriptionMessage::HISTORY_ADD;
+    first.subscribe(add, 2, u"IBM", 0);
+    second.subscribe(add, 2, u"MSFT", 0);
+    REQUIRE((*server)->awaitDemand(history, u"Order", u"IBM", true, Clock::now() + 5s));
+    REQUIRE((*server)->awaitDemand(history, u"Order", u"MSFT", true, Clock::now() + 5s));
+
+    q::events::Order order;
+    order.symbol = u"IBM";
+    order.index = 8;
+    order.flags = 4;
+    order.eventFlags = q::events::indexed_event_flags::SNAPSHOT_BEGIN | q::events::indexed_event_flags::TX_PENDING;
+    REQUIRE((*server)->getPublisher().publish(order));
+    const auto begin =
+        first.waitForFrame(std::to_underlying(q::protocol::LiveDataMessage::HISTORY_DATA), Clock::now() + 5s);
+    REQUIRE(begin);
+    REQUIRE(begin->payload.size() > 2);
+    REQUIRE(begin->payload.front() == std::byte{0xf9});
+    const auto flags = q::encoding::readCompactInt(std::span(begin->payload).subspan(1));
+    CHECK((flags.value & q::events::indexed_event_flags::SNAPSHOT_BEGIN) != 0);
+    CHECK((flags.value &
+           (q::events::indexed_event_flags::SNAPSHOT_END | q::events::indexed_event_flags::SNAPSHOT_SNIP)) == 0);
+    const auto peers = (*server)->getPeers();
+    const auto firstPeer = std::ranges::find_if(peers, [](const auto &p) {
+        return p.address.back() == 1;
+    });
+    REQUIRE(firstPeer != peers.end());
+    q::api::EventRegistryWork work;
+    const auto registry = q::api::EventRegistry::builtIn({}, work);
+    REQUIRE(registry);
+    const auto deny = q::api::FeedFilter::Builder(*registry).withCategory(u"no history", u":Other").build();
+    const auto change = (*server)->replacePeerDemand(firstPeer->id, {{}, {}, deny});
+    REQUIRE(change);
+    const auto outcome = change->waitUntil(Clock::now() + 5s);
+    REQUIRE(outcome);
+    CHECK(outcome->outcome == q::api::PublisherPolicyOutcome::PEER_CLOSED);
+    CHECK(outcome->revision == 0);
+    REQUIRE((*server)->awaitDemand(history, u"Order", u"IBM", false, Clock::now() + 5s));
+    CHECK((*server)->awaitDemand(history, u"Order", u"MSFT", true, Clock::now()));
+    CHECK((*server)->getDiagnostic().code == q::api::ErrorCode::NONE);
+}
+
+TEST_CASE("policy ticket keeps its terminal outcome after closing and destroying the publisher") {
+    auto bootstrap = q::transport::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    constexpr auto family = q::core::SubscriptionFamily::TICKER;
+    constexpr auto add = q::protocol::SubscriptionMessage::TICKER_ADD;
+
+    for (unsigned attempt = 0; attempt < 4; ++attempt) {
+        q::api::PublisherOptions options;
+        options.mixed = true;
+        auto publisher = q::api::PublisherEndpoint::create(*bootstrap, options);
+        requireServer(publisher);
+        DemandPeer peer((*publisher)->port(), asio::ip::address_v4::loopback());
+        peer.subscribe(add, 0, u"IBM");
+        REQUIRE((*publisher)->awaitDemand(family, u"Quote", u"IBM", true, Clock::now() + 5s));
+        const auto peers = (*publisher)->getPeers();
+        REQUIRE(peers.size() == 1);
+        const auto ticket = (*publisher)->replacePeerDemand(peers.front().id, {});
+        REQUIRE(ticket);
+        (*publisher)->closeAndAwaitTermination();
+        CHECK((*publisher)->getPeers().empty());
+        CHECK((*publisher)->getDemand(family).empty());
+        publisher->reset();
+
+        const auto result = ticket->waitUntil(Clock::now());
+        REQUIRE(result);
+        REQUIRE(result->outcome != q::api::PublisherPolicyOutcome::REJECTED);
+
+        if (result->outcome == q::api::PublisherPolicyOutcome::APPLIED) {
+            CHECK(result->revision == 1);
+            CHECK(result->diagnostic.code == q::api::ErrorCode::NONE);
+        } else {
+            CHECK(result->outcome == q::api::PublisherPolicyOutcome::PEER_CLOSED);
+            CHECK(result->revision == 0);
+            CHECK(result->diagnostic.code == q::api::ErrorCode::CLOSED);
+        }
+
+        const auto same = ticket->waitUntil(Clock::now());
+        REQUIRE(same);
+        CHECK(same->outcome == result->outcome);
+        CHECK(same->revision == result->revision);
+        CHECK(same->diagnostic.code == result->diagnostic.code);
+    }
+}
 
 TEST_CASE("publisher serves two typed TCP Feed connections with a late TICKER value and local admission") {
     auto bootstrap = q::transport::RuntimeBootstrap::create();

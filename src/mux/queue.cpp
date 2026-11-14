@@ -2635,7 +2635,9 @@ void MuxQueue::State::publishReplace(Replacement replacement, std::size_t select
 }
 
 std::expected<void, QueueFailure> detail::QueueReplaceAccess::replace(std::span<const QueueReplacement> replacements,
-                                                                      std::size_t selectors, std::uint64_t revision) {
+                                                                      std::size_t selectors, std::uint64_t revision,
+                                                                      PrepareAggregate prepareAggregate,
+                                                                      void *argument) {
     using State = MuxQueue::State;
 
     if (replacements.empty() || replacements.size() > 3)
@@ -2684,6 +2686,20 @@ std::expected<void, QueueFailure> detail::QueueReplaceAccess::replace(std::span<
                 return std::unexpected(candidate.error());
 
             prepared[i].emplace(std::move(*candidate));
+        }
+
+        if (prepareAggregate) {
+            for (std::size_t i = 0; i < replacements.size(); ++i) {
+                const auto candidate = detail::MuxStateAccess::aggregate(owners[i]->interest, prepared[i]->interest);
+
+                if (!candidate)
+                    return std::unexpected(sourceFailure(candidate.error()));
+
+                const auto staged = prepareAggregate(argument, i, *candidate);
+
+                if (!staged)
+                    return staged;
+            }
         }
 
         for (std::size_t i = 0; i < replacements.size(); ++i)

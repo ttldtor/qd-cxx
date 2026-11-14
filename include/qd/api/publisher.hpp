@@ -8,6 +8,7 @@
 
 #include <array>
 #include <chrono>
+#include <compare>
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -18,6 +19,8 @@
 namespace org::ttldtor::qdcxx::api {
 namespace detail {
 struct PublisherPort;
+struct PublisherPolicyCompletion;
+struct PublisherPeerIdentityAccess;
 } // namespace detail
 
 /** One numeric TCP publisher whose data is distributed to downstream clients. */
@@ -80,6 +83,49 @@ struct PublisherDemandPolicy {
 struct PublisherPeerDemandPolicy {
     std::string address; ///< Unscoped numeric IPv4 or IPv6; IPv4-mapped IPv6 matches the same IPv4 address.
     PublisherDemandPolicy demand;
+};
+
+/** Detached connection identity. Reconnects and different endpoints have distinct identities. */
+class PublisherPeerId {
+    transport::TcpConnectionId connection_;
+    friend struct detail::PublisherPeerIdentityAccess;
+
+    public:
+    /** Identity comparison includes the listener and exact accepted socket generation. */
+    auto operator<=>(const PublisherPeerId &) const noexcept = default;
+};
+
+/** Latest observed active connection and the revision of its configured demand policy. */
+struct PublisherPeer {
+    PublisherPeerId id;
+    transport::TcpPeerAddress address;
+    std::uint64_t policyRevision = 0;
+};
+
+/** Terminal outcome for an accepted policy replacement ticket. */
+enum class PublisherPolicyOutcome {
+    APPLIED,    ///< Replacement and its aggregate demand are published.
+    REJECTED,   ///< The previous policy remains in effect.
+    PEER_CLOSED ///< The connection is no longer eligible for policy replacement.
+};
+
+/** Terminal result, independent of publisher and connection lifetime. */
+struct PublisherPolicyResult {
+    PublisherPolicyOutcome outcome;
+    std::uint64_t revision = 0; ///< Nonzero revision only when the replacement was applied.
+    Diagnostic diagnostic;
+};
+
+/** Detached handle for one bounded outstanding replacement. */
+class PublisherPolicyChange {
+    std::shared_ptr<detail::PublisherPolicyCompletion> completion_;
+    friend class PublisherEndpoint;
+
+    explicit PublisherPolicyChange(std::shared_ptr<detail::PublisherPolicyCompletion> completion) noexcept;
+
+    public:
+    /** Wait for a terminal result. Timeout returns empty while the same ticket remains observable. */
+    [[nodiscard]] std::optional<PublisherPolicyResult> waitUntil(std::chrono::steady_clock::time_point deadline) const;
 };
 
 /** Finite local or remote publishing profile. */
@@ -172,6 +218,14 @@ class PublisherEndpoint final {
      * upstream acknowledgment, and persists across an upstream reconnect while downstream peers remain active.
      */
     [[nodiscard]] std::vector<PublisherDemand> getDemand(core::SubscriptionFamily family) const;
+    /** Copy the latest active peer list. The result owns its address and identity values. */
+    [[nodiscard]] std::vector<PublisherPeer> getPeers() const;
+    /** Submit a replacement for one peer's complete policy. Immutable dynamic snapshots are accepted by value.
+     * A busy slot returns a diagnostic without accepting the new request. Other peers keep their own policy.
+     * If revocation would interrupt a partially sent DATA frame or an open HISTORY sequence, the peer is closed.
+     */
+    [[nodiscard]] std::expected<PublisherPolicyChange, Diagnostic> replacePeerDemand(PublisherPeerId id,
+                                                                                     PublisherDemandPolicy policy);
     /** Observe a fresh negotiated remote source generation within a finite deadline.
      * @param after Previously observed generation, or zero for the first connection.
      * @param deadline Monotonic observation deadline.

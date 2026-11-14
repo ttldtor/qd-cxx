@@ -536,6 +536,34 @@ TEST_CASE("grouped replacement leaves all queue revisions and mappings intact on
 
     CHECK_FALSE(statistics->snapshot().activeDesiredRevision);
 
+    struct StagedAggregates {
+        unsigned visits = 0;
+
+        static std::expected<void, m::QueueFailure> inspect(void *state, std::size_t family,
+                                                            std::span<const c::SubscriptionRequest> entries) {
+            auto &seen = *static_cast<StagedAggregates *>(state);
+            ++seen.visits;
+            REQUIRE(entries.size() == 1);
+            CHECK(entries.front().key.symbol == u"ALPHA");
+
+            if (family == 2)
+                return std::unexpected(m::QueueFailure{m::QueueError::ALLOCATION_FAILURE, {}});
+
+            return {};
+        }
+    } staged;
+
+    work = {turn(), turn(), turn()};
+    const auto rejected = m::detail::QueueReplaceAccess::replace(input, 1, 1, StagedAggregates::inspect, &staged);
+    REQUIRE_FALSE(rejected);
+    CHECK(rejected.error().error == m::QueueError::ALLOCATION_FAILURE);
+    CHECK(staged.visits == owners.size());
+
+    for (std::size_t i = 0; i < owners.size(); ++i) {
+        CHECK(owners[i]->queue.revision() == before[i]);
+        CHECK(owners[i]->queue.aggregateEntries().empty());
+    }
+
     work = {turn(), turn(), turn()};
     REQUIRE(m::detail::QueueReplaceAccess::replace(input, 1, 1));
 
