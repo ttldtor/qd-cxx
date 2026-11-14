@@ -21,3 +21,18 @@ The executable is `qdcxx-distribution` on Linux and `qdcxx-distribution.exe` on 
 5. Enter `CLEAR` on a client to withdraw its subscriptions. The source reports REMOVE when the last client withdraws a symbol. Enter `STOP` or send EOF in each terminal to close that role.
 
 `SENT` means local publication admission. Event lines at the clients confirm actual callbacks. The sample shows DEFAULT-source Order. Feed can also derive Order events from Quote. Enter `STATS` in any role for a local observation of connections, demand and pending work. `sentFrames` counts complete DATA frames accepted by the local socket. The server also reports upstream connection state and its last diagnostic stage. Use `--help` or `--help-ru` for the full command and exit-code list. See the [publisher profile](https://github.com/ttldtor/qd-cxx/blob/master/spec/subscriptions/PUBLISHER.md) for supported layouts and bounds.
+
+## Relay a full schema
+
+When the SDK includes its JSON schema target, pass both files from one binary-v2 schema
+bundle to the server:
+
+```sh
+qdcxx-distribution server 0 SOURCE_PORT /path/to/schema.json /path/to/provenance.json
+```
+
+Use a source that serves the same record catalog and advertises TICKER, STREAM and
+HISTORY with `hs`. The full server relays physical records. The example's `source` and
+`client` commands still use the typed events shown above. Use a record-level QTP tool
+to subscribe to additional physical records. Each supplied file is read once at startup.
+See the [schema exporter](../../tools/schema-export/README.md).

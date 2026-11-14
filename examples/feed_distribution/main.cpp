@@ -6,10 +6,15 @@
 #include "qd/events/order_source.hpp"
 #include "qd/transport/tcp_runtime.hpp"
 
+#ifdef QDCXX_DISTRIBUTION_CATALOG
+#    include "qd/schema/json_schema.hpp"
+#endif
+
 #include <algorithm>
 #include <array>
 #include <charconv>
 #include <exception>
+#include <fstream>
 #include <iostream>
 #include <optional>
 #include <span>
@@ -17,6 +22,7 @@
 #include <syncstream>
 #include <thread>
 #include <utility>
+#include <vector>
 
 namespace {
 namespace q = org::ttldtor::qdcxx;
@@ -26,11 +32,12 @@ using Clock = std::chrono::steady_clock;
 constexpr std::string_view SYMBOL = "IBM";
 constexpr std::u16string_view SYMBOL16 = u"IBM";
 constexpr std::string_view USAGE = R"(Usage: qdcxx-distribution source [PORT]
-       qdcxx-distribution server PORT SOURCE_PORT
+       qdcxx-distribution server PORT SOURCE_PORT [SCHEMA_JSON PROVENANCE_JSON]
        qdcxx-distribution client PORT [SYMBOL...]
 
 Run a plain loopback QTP source, relay, or receiving application.
 Source and server accept port 0 and print the selected PORT. The source defaults to port 0.
+With JSON support, server can relay a full catalog using the two files of a binary-v2 export.
 The client defaults to IBM and prints Quote, TimeAndSale and Order on one mixed session.
 
 Commands on stdin:
@@ -41,11 +48,12 @@ EOF stops the selected role. The source publishes synthetic data and reports IBM
 Exit codes: 0 stopped or help, 1 runtime/I/O failure, 2 invalid arguments or command.
 )";
 constexpr std::string_view USAGE_RU = R"(Использование: qdcxx-distribution source [PORT]
-               qdcxx-distribution server PORT SOURCE_PORT
+               qdcxx-distribution server PORT SOURCE_PORT [SCHEMA_JSON PROVENANCE_JSON]
                qdcxx-distribution client PORT [SYMBOL...]
 
 Запуск источника, сервера или клиента QTP на loopback.
 Источник и сервер принимают порт 0 и печатают выбранный PORT. У источника порт 0 по умолчанию.
+С поддержкой JSON сервер ретранслирует полный каталог из двух файлов экспорта binary-v2.
 Клиент по умолчанию подписывается на IBM и печатает Quote, TimeAndSale и Order из одной сессии.
 
 Команды stdin:
@@ -233,11 +241,74 @@ int source(q::transport::RuntimeBootstrap &bootstrap, std::uint16_t listenPort) 
     return status;
 }
 
-int server(q::transport::RuntimeBootstrap &bootstrap, std::uint16_t listenPort, std::uint16_t sourcePort) {
+#ifdef QDCXX_DISTRIBUTION_CATALOG
+std::optional<std::string> readCatalogFile(const char *path, std::size_t limit) {
+    std::ifstream input(path, std::ios::binary);
+
+    if (!input)
+        return {};
+
+    std::string bytes(limit + 1, '\0');
+    input.read(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+
+    if (input.bad() || static_cast<std::size_t>(input.gcount()) > limit)
+        return {};
+
+    bytes.resize(static_cast<std::size_t>(input.gcount()));
+
+    return bytes;
+}
+#endif
+
+int server(q::transport::RuntimeBootstrap &bootstrap, std::uint16_t listenPort, std::uint16_t sourcePort,
+           std::span<char *> catalog) {
     q::api::PublisherOptions options;
     options.listener.port = listenPort;
     options.mixed = true;
     options.source = q::api::PublisherSourceOptions{"127.0.0.1", sourcePort};
+#ifdef QDCXX_DISTRIBUTION_CATALOG
+    std::optional<q::core::LocalSchema> schema;
+    std::vector<std::vector<std::u16string>> wireNames;
+
+    if (!catalog.empty()) {
+        constexpr std::size_t SCHEMA_BYTES = 1024 * 1024;
+        constexpr std::size_t PROVENANCE_BYTES = 4 * SCHEMA_BYTES;
+        const auto schemaJson = readCatalogFile(catalog[0], SCHEMA_BYTES);
+        const auto provenance = readCatalogFile(catalog[1], PROVENANCE_BYTES);
+
+        if (!schemaJson || !provenance) {
+            std::cerr << "Cannot read bounded catalog files\n";
+
+            return 1;
+        }
+
+        auto loaded = q::schema::loadBinaryJsonSchema(*schemaJson);
+
+        if (!loaded) {
+            std::cerr << q::schema::jsonSchemaErrorName(loaded.error()) << '\n';
+
+            return 1;
+        }
+
+        q::schema::BinaryJsonSchemaLimits limits;
+        limits.loading.documentBytes = PROVENANCE_BYTES;
+        auto names = q::schema::loadBinaryJsonWireNames(*provenance, *loaded, limits);
+
+        if (!names) {
+            std::cerr << q::schema::jsonSchemaErrorName(names.error()) << '\n';
+
+            return 1;
+        }
+
+        schema.emplace(std::move(*loaded));
+        wireNames = std::move(*names);
+        options.mixed = false;
+        options.catalog.emplace(*schema, wireNames);
+    }
+
+#else
+    (void)catalog;
+#endif
     auto created = q::api::PublisherEndpoint::create(bootstrap, options);
 
     if (!created) {
@@ -382,7 +453,12 @@ int main(int argc, char **argv) {
     const bool serverRole = role == "server";
     const bool clientRole = role == "client";
     const auto first = argc >= 3 ? port(argv[2], !clientRole) : std::optional<std::uint16_t>{0};
-    const auto upstream = serverRole && argc == 4 ? port(argv[3], false) : std::nullopt;
+#ifdef QDCXX_DISTRIBUTION_CATALOG
+    const bool catalog = serverRole && argc == 6;
+#else
+    const bool catalog = false;
+#endif
+    const auto upstream = serverRole && (argc == 4 || catalog) ? port(argv[3], false) : std::nullopt;
     const auto symbols = std::span(argv, static_cast<std::size_t>(argc)).subspan(std::min(argc, 3));
     const auto validSymbol = [](std::string_view symbol) {
         return !symbol.empty() && symbol.front() != '*';
@@ -408,7 +484,7 @@ int main(int argc, char **argv) {
             return source(*bootstrap, *first);
 
         if (serverRole)
-            return server(*bootstrap, *first, *upstream);
+            return server(*bootstrap, *first, *upstream, catalog ? std::span(argv + 4, 2) : std::span<char *>{});
 
         return client(*bootstrap, *first, symbols);
     } catch (const std::exception &error) {

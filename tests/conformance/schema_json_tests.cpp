@@ -804,4 +804,93 @@ TEST_CASE("binary JSON STL capacities and small-string transitions are qualified
     }
 }
 
+TEST_CASE("binary wire names preserve exact record and field coverage") {
+    const auto catalog = loadBinaryJsonSchema(binaryRecord(std::array{8, 120}, "null"));
+    REQUIRE(catalog);
+
+    const std::string provenance = R"({"format":"qdcxx-java-export-v2","tool":{},"projection":[)"
+                                   R"({"sourceId":7,"exportedId":0,"slots":[)"
+                                   R"({"fieldId":0,"names":{"propertyName":"F0"}},)"
+                                   R"({"fieldId":1,"names":{"propertyName":"F1"}}]}]})";
+
+    auto names = loadBinaryJsonWireNames(provenance, *catalog);
+    REQUIRE(names);
+    REQUIRE(names->size() == 1);
+    REQUIRE(names->front().size() == 2);
+    CHECK((*names)[0][0] == u"F0");
+    CHECK((*names)[0][1] == u"F1");
+
+    const auto reject = [&](const std::string &input, JsonSchemaError error) {
+        auto result = loadBinaryJsonWireNames(input, *catalog);
+        REQUIRE_FALSE(result);
+        CHECK(result.error() == error);
+    };
+
+    reject(replace(provenance, "qdcxx-java-export-v2", "qdcxx-java-export-v1"), JsonSchemaError::UNSUPPORTED_VERSION);
+    reject(replace(provenance, R"("exportedId":0)", R"("exportedId":1)"), JsonSchemaError::INVALID_SCHEMA);
+    reject(replace(provenance, R"("fieldId":1)", R"("fieldId":0)"), JsonSchemaError::INVALID_SCHEMA);
+    reject(replace(provenance, R"("propertyName":"F1")", R"("propertyName":"F0")"), JsonSchemaError::INVALID_SCHEMA);
+    reject(replace(provenance, R"("propertyName":"F1")", R"("propertyName":"Missing")"),
+           JsonSchemaError::INVALID_SCHEMA);
+    reject(replace(provenance, R"("propertyName":"F1")", R"("propertyName":"F1","propertyName":"F1")"),
+           JsonSchemaError::INVALID_SCHEMA);
+    reject(replace(provenance, R"("projection":[)", R"("projection":[],"duplicate":[)"),
+           JsonSchemaError::INVALID_SCHEMA);
+    reject("{", JsonSchemaError::MALFORMED_JSON);
+
+    BinaryJsonSchemaLimits limits;
+    limits.loading.documentBytes = provenance.size() - 1;
+    CHECK(loadBinaryJsonWireNames(provenance, *catalog, limits).error() == JsonSchemaError::RESOURCE_LIMIT);
+    limits = {};
+    limits.parserBytes = 0;
+    CHECK(loadBinaryJsonWireNames(provenance, *catalog, limits).error() == JsonSchemaError::RESOURCE_LIMIT);
+    limits = {};
+    limits.workUnits = provenance.size() * 32;
+    CHECK(loadBinaryJsonWireNames(provenance, *catalog, limits).error() == JsonSchemaError::RESOURCE_LIMIT);
+    limits = {};
+    limits.schemaModelBytes = 0;
+    CHECK(loadBinaryJsonWireNames(provenance, *catalog, limits).error() == JsonSchemaError::RESOURCE_LIMIT);
+    limits = {};
+    limits.loading.schema.fields = 1;
+    CHECK(loadBinaryJsonWireNames(provenance, *catalog, limits).error() == JsonSchemaError::RESOURCE_LIMIT);
+
+    auto consumed = loadBinaryJsonSchema(binaryRecord(std::array{8}, "null"));
+    REQUIRE(consumed);
+    auto moved = std::move(*consumed);
+    CHECK(loadBinaryJsonWireNames(provenance, *consumed).error() == JsonSchemaError::INVALID_SCHEMA);
+    CHECK(moved.identity().valid());
+    auto legacy = loadJsonSchema(oneRecord());
+    REQUIRE(legacy);
+    CHECK(loadBinaryJsonWireNames(provenance, *legacy).error() == JsonSchemaError::UNSUPPORTED_PROFILE);
+}
+
+TEST_CASE("binary wire names translate allocation failures and own their output") {
+    const auto catalog = loadBinaryJsonSchema(binaryRecord(std::array{8}, "null"));
+    REQUIRE(catalog);
+    std::string provenance = R"({"format":"qdcxx-java-export-v2","projection":[{"sourceId":0,"exportedId":0,)"
+                             R"("slots":[{"fieldId":0,"names":{"propertyName":"F0"}}]}]})";
+    const auto expected = loadBinaryJsonWireNames(provenance, *catalog);
+    REQUIRE(expected);
+    provenance.clear();
+    CHECK((*expected)[0][0] == u"F0");
+
+    provenance = R"({"format":"qdcxx-java-export-v2","projection":[{"sourceId":0,"exportedId":0,)"
+                 R"("slots":[{"fieldId":0,"names":{"propertyName":"F0"}}]}]})";
+    bool success = false;
+
+    for (std::size_t allowed = 0; allowed != 32 && !success; ++allowed) {
+        allowedAllocations = allowed;
+        allocationFault = true;
+        auto result = loadBinaryJsonWireNames(provenance, *catalog);
+        allocationFault = false;
+
+        if (result) {
+            success = true;
+        } else {
+            CHECK(result.error() == JsonSchemaError::ALLOCATION_FAILURE);
+        }
+    }
+
+    CHECK(success);
+}
 } // namespace org::ttldtor::qdcxx::schema

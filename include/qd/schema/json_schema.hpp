@@ -62,6 +62,19 @@ struct BinaryJsonSchemaLimits {
 [[nodiscard]] std::expected<core::LocalSchema, JsonSchemaError>
 loadBinaryJsonSchema(std::string_view input, BinaryJsonSchemaLimits limits = {});
 
+/** Load Java binary-v2 property names for a validated binary catalog.
+ * Each result row and field follows the local schema order. Each property name must resolve
+ * to the same field in that record; missing, duplicated or mismatched projection entries fail.
+ * The caller supplies provenance paired with its schema. Structural validation cannot establish
+ * the provenance of independently substituted files. No DOM or input views escape this call.
+ * Resource limits use the same parser, work and logical storage budgets as the binary loader.
+ * @param input Borrowed UTF-8 provenance document.
+ * @param schema Validated binary-profile catalog; unchanged throughout this synchronous call.
+ * @param limits Finite parser, output, name and work limits.
+ * @return Owned property names or a typed failure without partial output.
+ */
+[[nodiscard]] std::expected<std::vector<std::vector<std::u16string>>, JsonSchemaError>
+loadBinaryJsonWireNames(std::string_view input, const core::LocalSchema &schema, BinaryJsonSchemaLimits limits = {});
 /** Load the complete native version-1 document without file IO or ambient configuration.
  * @param input Borrowed UTF-8 bytes, unchanged for the call; no padding requirement.
  * @param limits Finite loading budgets, checked before proportional owned allocations.

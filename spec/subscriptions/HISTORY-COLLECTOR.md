@@ -252,3 +252,8 @@ unsupported. The whole-event domain/work/arithmetic guard runs before ownership,
 stale and maintenance mutations; its refusal preserves input/state/offers. A guard resource failure
 must not become shared STALE. Existing capacity-overflow, snapshot, AS-OF and reset semantics remain.
 Selected parser/projection comparisons do not establish full native Java HISTORY producer equivalence.
+
+A collector with `storeEverything=false` can opt into `HistoryOptions::reclaimInactive`.
+After the last admitted view withdraws a key, the collector reuses its partition slot
+when no cached point or pending delivery still refers to it. Other views retain their
+state and epoch. The default preserves empty gating metadata until explicit reclamation.

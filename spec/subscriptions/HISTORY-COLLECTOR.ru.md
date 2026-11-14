@@ -252,3 +252,9 @@ int runHistoryExample(p::LiveSession &source, const c::LocalSchema &schema, std:
 epoch, stale и maintenance mutations; отказ сохраняет input/state/offers. Guard resource failure
 не превращается в shared STALE. Прежние capacity-overflow, snapshot, AS-OF и reset semantics сохранены.
 Выбранные parser/projection comparisons не доказывают full native Java HISTORY producer equivalence.
+
+При `storeEverything=false` можно включить `HistoryOptions::reclaimInactive`.
+Когда последняя принятая подписка на ключ снята, коллектор повторно использует слот
+раздела, если на него больше не ссылаются сохранённые точки или ожидающие доставки.
+Другие подписчики сохраняют состояние и эпоху. По умолчанию пустые метаданные
+сохраняются до явного освобождения.

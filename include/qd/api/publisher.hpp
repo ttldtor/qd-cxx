@@ -10,6 +10,7 @@
 #include <chrono>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -62,6 +63,12 @@ struct PublisherStatistics {
     std::size_t pendingPublications = 0;                 ///< Accepted local publication rows still in the input FIFO.
 };
 
+/** Borrowed full record profile, copied before endpoint creation returns. */
+struct PublisherCatalogOptions {
+    const core::LocalSchema &schema;                             ///< Validated binary record catalog.
+    std::span<const std::vector<std::u16string>> wireFieldNames; ///< Record/field order, exact QTP names.
+};
+
 /** One immutable connection policy. An omitted filter admits all exact keys for that contract. */
 struct PublisherDemandPolicy {
     std::optional<FeedFilter> ticker;
@@ -84,6 +91,7 @@ struct PublisherOptions {
     std::size_t pendingQuotes = 64;                 ///< Maximum queued publication requests across enabled contracts.
     std::optional<PublisherSourceOptions> source{}; ///< Remote upstream in place of local publication.
     bool mixed = false; ///< Enable Quote/TICKER, TimeAndSale/STREAM and default Order/HISTORY on each connection.
+    std::optional<PublisherCatalogOptions> catalog{}; ///< Full record relay profile; requires source and mixed=false.
     PublisherDemandPolicy demand; ///< Default policy. Filters must be static and built before create.
     std::vector<PublisherPeerDemandPolicy> peerDemand; ///< Owned overrides, matched by numeric IP on connection.
 };

@@ -65,6 +65,8 @@ constexpr std::array REMOVE_MESSAGES{protocol::SubscriptionMessage::TICKER_REMOV
                                      protocol::SubscriptionMessage::HISTORY_REMOVE};
 constexpr std::array RECORD_IDS{QUOTE_ID, SALE_ID, ORDER_ID};
 constexpr std::size_t FAMILY_COUNT = FAMILIES.size();
+constexpr std::size_t CATALOG_RECORDS = 1024;
+constexpr core::SchemaLimits CATALOG_LIMITS{CATALOG_RECORDS, 16384, 32768, 1024, 1048576};
 constexpr std::int32_t SEQUENCE_BITS = 22;
 constexpr std::int32_t SEQUENCE_MASK = (1 << SEQUENCE_BITS) - 1;
 constexpr std::int64_t MILLIS_PER_SECOND = 1000;
@@ -228,7 +230,18 @@ std::expected<SourceRow, Diagnostic> orderRow(const events::Order &order) {
     return sourceRow(2, order.symbol, raw, order.eventFlags, removalTime);
 }
 
-protocol::LiveWork liveTurn() noexcept {
+protocol::LiveWork liveTurn(bool catalog = false) noexcept {
+    if (catalog) {
+        // Binding reserves configured lookup/name bounds for each effective peer description.
+        // Cover a complete replacement plus the framing, cloning, and sorting around it.
+        constexpr auto names = CATALOG_LIMITS.totalNameUnits + MAX_FRAME_BYTES;
+        constexpr auto scans = CATALOG_LIMITS.fields + CATALOG_RECORDS * (CATALOG_RECORDS + 1);
+        constexpr auto comparisons =
+            CATALOG_LIMITS.fields * (CATALOG_LIMITS.lookups + 3) + CATALOG_RECORDS * CATALOG_RECORDS;
+
+        return {128, 2 * comparisons, 2 * names * scans, 64 * 1024 * 1024};
+    }
+
     return {128, 8 * 1024 * 1024, 8 * 1024 * 1024, 16 * 1024 * 1024};
 }
 
@@ -250,12 +263,13 @@ mux::QueueWork queueTurn() noexcept {
             {512, VISITS, VISITS, BYTES}};
 }
 
-mux::QueueWork serverQueueTurn(std::size_t peers, bool remote, bool mixed = false) noexcept {
+mux::QueueWork serverQueueTurn(std::size_t peers, bool remote, bool mixed, std::size_t records) noexcept {
     auto work = queueTurn();
     const auto keys = peers * CLIENT_KEYS;
     // MuxState reserves against both possible maps and all input rows before a command.
     constexpr std::size_t INTEREST_PASSES = 32;
-    const auto interestVisits = INTEREST_PASSES * (2 + peers + 2 * keys + CLIENT_KEYS) * (1 + keys + CLIENT_KEYS);
+    const auto interestVisits =
+        INTEREST_PASSES * (1 + records + peers + 2 * keys + CLIENT_KEYS) * (1 + keys + CLIENT_KEYS);
     work.interest.visits += interestVisits;
     work.interest.symbolUnits += interestVisits * SYMBOL_UNITS;
     // Cover TICKER maintenance, staging and cache owner release for every supported configuration.
@@ -292,7 +306,7 @@ mux::QueueWork serverQueueTurn(std::size_t peers, bool remote, bool mixed = fals
     return work;
 }
 
-protocol::LiveLimits liveLimits(bool mixed = false) noexcept {
+protocol::LiveLimits liveLimits(bool mixed = false, bool catalog = false) noexcept {
     protocol::LiveLimits result{};
     result.frame = {MAX_FRAME_BYTES, MAX_FRAME_BYTES + FRAME_PREFIX_BYTES};
     result.protocol = {128, 64, {8192, 1024}, 16384};
@@ -308,6 +322,14 @@ protocol::LiveLimits liveLimits(bool mixed = false) noexcept {
     result.eventBytes = EVENT_BYTES;
     result.outputBytes = MAX_FRAME_BYTES;
     result.credentials = protocol::LiveCredentialPolicy::CREDENTIAL_FREE_PLAIN;
+
+    if (catalog) {
+        result.context = {CATALOG_LIMITS, CATALOG_RECORDS, {16384, 1024, 1048576}};
+        result.descriptions = {MAX_FRAME_BYTES, CATALOG_RECORDS, 256, 16384, {8192, 1024}, MAX_FRAME_BYTES};
+        result.snapshotBytes = 8 * 1024 * 1024;
+        result.scratchBytes = 2 * 1024 * 1024;
+        result.residentBytes = 32 * 1024 * 1024;
+    }
 
     if (mixed) {
         result.events = protocol::DataEventPolicy::BINARY_CATALOG_V1;
@@ -394,35 +416,104 @@ core::LocalSchema publisherSchema(bool mixed) {
     return std::move(*schema);
 }
 
+using CatalogNames = std::span<const std::vector<std::u16string>>;
+
+core::LocalSchema createSchema(PublisherOptions options) {
+    if (!options.catalog)
+        return publisherSchema(options.mixed);
+
+    const auto &source = options.catalog->schema;
+
+    if (source.profile() != core::LocalProfile::BINARY_FIELDS_V1 || source.records().empty())
+        throw Error({ErrorCode::INVALID_ARGUMENT, "publisher-catalog-profile"});
+
+    auto schema = source.boundedCopy(CATALOG_LIMITS);
+
+    if (!schema) {
+        const auto code = schema.error() == core::SchemaError::ALLOCATION_FAILURE ? ErrorCode::ALLOCATION_FAILURE
+                                                                                  : ErrorCode::RESOURCE_LIMIT;
+        throw Error({code, "publisher-catalog-schema"});
+    }
+
+    return std::move(*schema);
+}
+
+std::vector<std::int32_t> recordIds(const core::LocalSchema &schema) {
+    std::vector<std::int32_t> ids;
+    ids.reserve(schema.records().size());
+
+    for (const auto &record : schema.records())
+        ids.push_back(record.id);
+
+    return ids;
+}
+
+std::vector<std::vector<std::u16string>> catalogNames(PublisherOptions options, const core::LocalSchema &schema) {
+    if (!options.catalog)
+        return {};
+
+    const auto names = options.catalog->wireFieldNames;
+
+    if (names.size() != schema.records().size())
+        throw Error({ErrorCode::INVALID_ARGUMENT, "publisher-catalog-records"});
+
+    std::size_t remaining = CATALOG_LIMITS.totalNameUnits;
+
+    for (std::size_t i = 0; i < names.size(); ++i) {
+        if (names[i].size() != schema.records()[i].fields.size())
+            throw Error({ErrorCode::INVALID_ARGUMENT, "publisher-catalog-fields"});
+
+        for (const auto &name : names[i]) {
+            if (name.size() > CATALOG_LIMITS.nameUnits || name.size() > remaining)
+                throw Error({ErrorCode::RESOURCE_LIMIT, "publisher-catalog-names"});
+
+            remaining -= name.size();
+        }
+    }
+
+    return {names.begin(), names.end()};
+}
+
 protocol::SubscriptionWriter
-publisherWriter(const core::LocalSchema &schema,
+publisherWriter(const core::LocalSchema &schema, CatalogNames names,
                 core::SubscriptionSelectorPolicy policy = core::SubscriptionSelectorPolicy::EXACT_ONLY) {
     std::vector<protocol::OutgoingRecord> outgoing;
+    outgoing.reserve(schema.records().size());
 
     for (const auto &record : schema.records()) {
         auto &layout = outgoing.emplace_back(record.id, record.id, record.name, std::vector<protocol::OutgoingField>{});
 
+        const auto fieldNames =
+            names.empty() ? std::span<const std::u16string>{} : std::span<const std::u16string>(names[record.id]);
+        layout.fields.reserve(record.fields.size());
+
         for (std::size_t i = 0; i < record.fields.size(); ++i) {
-            const auto key = std::ranges::find(record.lookups, i, &core::FieldLookup::fieldId);
+            const auto key = std::ranges::find_if(record.lookups, [&](const auto &lookup) {
+                return lookup.fieldId == i && (names.empty() || fieldNames[i] == lookup.name);
+            });
 
             if (key == record.lookups.end())
-                throw Error({ErrorCode::INVALID_STATE, "publisher-writer-field"});
+                throw Error({ErrorCode::INVALID_ARGUMENT, "publisher-writer-field"});
 
             layout.fields.push_back({key->name, record.fields[i].serialTypeId, static_cast<std::int32_t>(i)});
         }
     }
 
-    protocol::SubscriptionWriterWork writerWork{64, 65536, 65536, 256 * 1024};
-    auto writer = protocol::SubscriptionWriter::create(schema, outgoing,
-                                                       {SCHEMA_LIMITS, FAMILY_COUNT, 3 * MAX_DATA_FIELDS, 64, 2048},
+    const auto catalog = !names.empty();
+    const protocol::LayoutLimits layouts =
+        catalog ? protocol::LayoutLimits{CATALOG_LIMITS, CATALOG_RECORDS, 16384, 1024, 1048576}
+                : protocol::LayoutLimits{SCHEMA_LIMITS, FAMILY_COUNT, 3 * MAX_DATA_FIELDS, 64, 2048};
+    protocol::SubscriptionWriterWork writerWork{64, 8 * 1024 * 1024, 8 * 1024 * 1024, 256 * 1024};
+    auto writer = protocol::SubscriptionWriter::create(schema, outgoing, layouts,
                                                        {MAX_FRAME_BYTES,
                                                         MAX_FRAME_BYTES + FRAME_PREFIX_BYTES,
-                                                        128,
+                                                        catalog ? CATALOG_RECORDS : 128,
                                                         SYMBOL_UNITS,
                                                         {8192, 1024},
                                                         256 * 1024,
                                                         256 * 1024,
-                                                        4},
+                                                        4,
+                                                        catalog},
                                                        writerWork, policy);
 
     if (!writer)
@@ -431,13 +522,14 @@ publisherWriter(const core::LocalSchema &schema,
     return std::move(*writer);
 }
 
-protocol::LiveSession serverSession(const core::LocalSchema &schema, protocol::LiveWork &work) {
-    auto writer = publisherWriter(schema);
+protocol::LiveSession serverSession(const core::LocalSchema &schema, CatalogNames names, protocol::LiveWork &work) {
+    auto writer = publisherWriter(schema, names);
     auto local = schema;
+    const bool catalog = !names.empty();
     auto session = protocol::LiveSession::createServer(
-        std::move(local), std::move(writer), liveLimits(schema.records().size() > 1),
-        {MAX_FRAME_BYTES, FAMILY_COUNT, 128, MAX_SUBSCRIPTION_WIRE_TUPLES, SYMBOL_UNITS,
-         MAX_SUBSCRIPTION_WIRE_TUPLES * SYMBOL_UNITS},
+        std::move(local), std::move(writer), liveLimits(catalog || schema.records().size() > 1, catalog),
+        {MAX_FRAME_BYTES, catalog ? CATALOG_RECORDS : FAMILY_COUNT, catalog ? CATALOG_RECORDS : 128,
+         MAX_SUBSCRIPTION_WIRE_TUPLES, SYMBOL_UNITS, MAX_SUBSCRIPTION_WIRE_TUPLES * SYMBOL_UNITS},
         work);
 
     if (!session)
@@ -450,7 +542,8 @@ constexpr mux::ClientLimits CLIENT_LIMITS{
     CLIENT_PENDING_ITEMS, 512 * 1024,         8, 128 * 1024, 1, 32, SYMBOL_UNITS, 0, 0, 4096, 2, 4,
     CLIENT_KEYS,          CLIENT_SYMBOL_UNITS};
 
-mux::MuxQueue publisherQueue(const core::LocalSchema &schema, std::size_t peers, bool remote, Family family) {
+mux::MuxQueue publisherQueue(const core::LocalSchema &schema, std::size_t peers, bool remote, Family family,
+                             bool catalog) {
     const auto allKeys = peers * CLIENT_KEYS;
     const auto allUnits = peers * CLIENT_LIMITS.commandSymbolUnits;
     const auto records = schema.records().size();
@@ -492,7 +585,11 @@ mux::MuxQueue publisherQueue(const core::LocalSchema &schema, std::size_t peers,
                 {allKeys, allKeys * HISTORY_POINTS_PER_KEY, SYMBOL_UNITS, cacheFrames, cacheBytes, peers,
                  CLIENT_LIMITS.dataItems, CLIENT_LIMITS.dataItems + 1, (CLIENT_LIMITS.dataItems + 1) * eventBytes,
                  cacheBytes + peers * (CLIENT_LIMITS.dataItems + 1) * eventBytes + 32 * 1024 * 1024, desired},
-                {false, 100, 10000}, limits, work);
+                {.storeEverything = false,
+                 .retrievalQuantum = 100,
+                 .partitionSnapshotQuantum = 10000,
+                 .reclaimInactive = catalog},
+                limits, work);
         }
 
         return std::expected<mux::MuxQueue, mux::QueueFailure>{
@@ -629,15 +726,16 @@ constexpr std::array<protocol::LiveMessageView, 9> SERVER_RECEIVE{{{0, u"HEARTBE
                                                                    {22, u"HISTORY_REMOVE_SUBSCRIPTION", {}}}};
 constexpr protocol::LivePropertyView HISTORY_OPTIONS[]{{u"opt", u"hs"}};
 
-std::expected<protocol::LivePendingOutput, protocol::LiveError> composeDelivery(Peer &peer, std::size_t family,
-                                                                                protocol::LiveWork &work) {
+std::expected<protocol::LivePendingOutput, protocol::LiveError>
+composeDelivery(Peer &peer, std::size_t family, const core::LocalSchema &schema, protocol::LiveWork &work) {
     const auto &record = peer.delivery[family]->batch.records().front();
+    const auto id = schema.recordId(record.context);
 
-    if (record.typedValues.size() > MAX_DATA_FIELDS)
+    if (!id)
         return std::unexpected(protocol::LiveError::INVALID_CONFIGURATION);
 
     const bool removed = (record.eventFlags & events::indexed_event_flags::REMOVE_EVENT) != 0;
-    const protocol::LiveDataRecordView outgoing{RECORD_IDS[family], record.symbol,
+    const protocol::LiveDataRecordView outgoing{*id, record.symbol,
                                                 removed ? std::span<const core::FieldValueView>{} : record.typedValues,
                                                 record.eventFlags, removed ? record.rawTime : std::nullopt};
 
@@ -718,8 +816,23 @@ using DemandSet = std::array<std::optional<mux::DemandTracker>, FAMILY_COUNT>;
 using WorkSet = std::array<mux::QueueWork, FAMILY_COUNT>;
 
 /** One upstream connection. Its raw output slot copies and owns the whole frame through the local write barrier. */
+bool supportsRecord(const core::LocalSchema &schema, std::size_t family, core::RecordContext context,
+                    bool catalog) noexcept {
+    const auto id = schema.recordId(context);
+
+    if (!id)
+        return false;
+
+    if (!catalog)
+        return *id == RECORD_IDS[family];
+
+    return FAMILIES[family] != Family::HISTORY || schema.records()[*id].hasTime;
+}
+
 class SourceConnection {
-    std::array<core::RecordContext, FAMILY_COUNT> contexts_;
+    const core::LocalSchema &schema_;
+    const std::span<const std::int32_t> recordIds_;
+    const bool catalog_;
     protocol::LiveSession session_;
     std::unique_ptr<transport::detail::RawByteOwner> bytes_;
     Clock::time_point handshakeDeadline_;
@@ -731,10 +844,11 @@ class SourceConnection {
     bool ready_ = false;
     std::optional<protocol::LiveEvent> pendingEvent_;
 
-    static protocol::LiveSession newSession(const core::LocalSchema &schema, protocol::LiveWork &work) {
-        auto writer = publisherWriter(schema, core::SubscriptionSelectorPolicy::CANONICAL_EXACT_V1);
-        const bool mixed = schema.records().size() > 1;
-        auto limits = liveLimits(mixed);
+    static protocol::LiveSession newSession(const core::LocalSchema &schema, CatalogNames names,
+                                            protocol::LiveWork &work) {
+        auto writer = publisherWriter(schema, names, core::SubscriptionSelectorPolicy::CANONICAL_EXACT_V1);
+        const bool mixed = !names.empty() || schema.records().size() > 1;
+        auto limits = liveLimits(mixed, !names.empty());
         limits.residentBytes = mixed ? MIXED_REMOTE_EPOCH_BYTES : REMOTE_EPOCH_BYTES;
         limits.eventBytes = REMOTE_EVENT_BYTES;
         limits.owners = mixed ? MIXED_OWNERS : MAX_PEERS * CLIENT_KEYS + 12;
@@ -824,7 +938,7 @@ class SourceConnection {
             const auto records = incoming.event->records();
 
             if (std::ranges::any_of(records, [&](const auto &record) {
-                    return !record.context.matches(contexts_[family]);
+                    return !supportsRecord(schema_, family, record.context, catalog_);
                 }))
                 throw Error({ErrorCode::PROTOCOL_FAILURE, "publisher-upstream-record-family"});
 
@@ -834,14 +948,12 @@ class SourceConnection {
     }
 
     public:
-    SourceConnection(const core::LocalSchema &schema, const transport::detail::BootstrapLease &bootstrap,
+    SourceConnection(const core::LocalSchema &schema, CatalogNames names, std::span<const std::int32_t> recordIds,
+                     std::size_t familyCount, const transport::detail::BootstrapLease &bootstrap,
                      PublisherSourceOptions options, Clock::time_point now, protocol::LiveWork &work)
-        : session_(newSession(schema, work)), bytes_(newTransport(bootstrap, options, work)),
-          handshakeDeadline_(now + HANDSHAKE_TIMEOUT), heartbeatAt_(now + HEARTBEAT_PERIOD),
-          familyCount_(schema.records().size()) {
-        for (std::size_t family = 0; family < familyCount_; ++family)
-            contexts_[family] = schema.recordContext(RECORD_IDS[family]);
-
+        : schema_(schema), recordIds_(recordIds), catalog_(!names.empty()), session_(newSession(schema, names, work)),
+          bytes_(newTransport(bootstrap, options, work)), handshakeDeadline_(now + HANDSHAKE_TIMEOUT),
+          heartbeatAt_(now + HEARTBEAT_PERIOD), familyCount_(familyCount) {
         const auto started = bytes_->start();
 
         if (!started)
@@ -862,7 +974,7 @@ class SourceConnection {
 
     void progress(QueueSet &queues, DemandSet &demand, Clock::time_point now, WorkSet &queueWork,
                   mux::DemandWork &demandWork, PublisherStatistics &statistics) {
-        auto work = liveTurn();
+        auto work = liveTurn(catalog_);
         transport::TcpWork native{16, 16, INPUT_BYTES * 2, 0, 0, 0, 0};
         const auto polled = bytes_->poll(native, work);
 
@@ -916,7 +1028,7 @@ class SourceConnection {
         }
 
         if (ready_ && !described_) {
-            send(session_.describe(std::span(RECORD_IDS).first(familyCount_), work), work);
+            send(session_.describe(recordIds_, work), work);
             described_ = true;
 
             return;
@@ -952,6 +1064,8 @@ class SourceConnection {
 
 class PublisherServer {
     core::LocalSchema schema_;
+    const std::vector<std::int32_t> recordIds_;
+    const std::vector<std::vector<std::u16string>> catalogNames_;
     std::optional<protocol::detail::LocalEventOwner> source_;
     QueueSet queues_;
     transport::TcpListener listener_;
@@ -978,6 +1092,15 @@ class PublisherServer {
             throw Error(nativeDiagnostic(listener.error()));
 
         return std::move(*listener);
+    }
+
+    void validateCatalog() const {
+        auto work = liveTurn(!catalogNames_.empty());
+        auto session = serverSession(schema_, catalogNames_, work);
+        const auto description = session.describe(recordIds_, work);
+
+        if (!description)
+            throw Error(protocolDiagnostic(description.error(), "publisher-catalog-description"));
     }
 
     void acceptPeer() {
@@ -1011,14 +1134,15 @@ class PublisherServer {
                     demand = found->demand;
             }
 
-            auto liveWork = liveTurn();
-            auto session = serverSession(schema_, liveWork);
+            auto liveWork = liveTurn(!catalogNames_.empty());
+            auto session = serverSession(schema_, catalogNames_, liveWork);
             const auto now = Clock::now();
             Peer peer{**accepted, std::move(session),    std::move(demand), {}, {}, {}, {}, now,
                       now,        now + HEARTBEAT_PERIOD};
 
             for (std::size_t family = 0; family < familyCount_; ++family) {
-                auto work = serverQueueTurn(peers_.size(), sourceOptions_.has_value(), familyCount_ > 1);
+                auto work =
+                    serverQueueTurn(peers_.size(), sourceOptions_.has_value(), familyCount_ > 1, recordIds_.size());
                 peer.delivery[family] = std::make_shared<Delivery>();
                 auto handle = queues_[family]->open(CLIENT_LIMITS, peer.delivery[family], work);
 
@@ -1107,9 +1231,9 @@ class PublisherServer {
                 return false;
 
             // The QTP record map covers every enabled family. A command cannot install a key from another family.
-            const auto context = schema_.recordContext(RECORD_IDS[*family]);
+            const auto catalog = !catalogNames_.empty();
             std::erase_if(result.subscription->entries, [&](const auto &entry) {
-                return !entry.context.matches(context);
+                return !supportsRecord(schema_, *family, entry.context, catalog);
             });
 
             // Removal acts on this client's applied keys, independent of admission policy.
@@ -1158,7 +1282,7 @@ class PublisherServer {
                                                   work);
         } else if (!peer.sentDescription && std::ranges::any_of(peer.ready, std::identity{})) {
             kind = OutputKind::DESCRIPTION;
-            output = peer.session.describe(std::span(RECORD_IDS).first(familyCount_), work);
+            output = peer.session.describe(recordIds_, work);
         } else {
             if (peer.sentDescription) {
                 for (std::size_t i = 0; i < familyCount_; ++i) {
@@ -1168,7 +1292,7 @@ class PublisherServer {
                         kind = OutputKind::DATA;
                         peer.outputFamily = family;
                         peer.nextFamily = (family + 1) % familyCount_;
-                        output = composeDelivery(peer, family, work);
+                        output = composeDelivery(peer, family, schema_, work);
                         break;
                     }
                 }
@@ -1246,7 +1370,7 @@ class PublisherServer {
                 continue;
 
             auto &peer = *entry;
-            auto work = liveTurn();
+            auto work = liveTurn(!catalogNames_.empty());
 
             const auto handles = std::span(peer.handles).first(familyCount_);
 
@@ -1316,7 +1440,7 @@ class PublisherServer {
                 port.head = (port.head + 1) % port.pending.size();
                 --port.size;
             }
-            auto liveWork = liveTurn();
+            auto liveWork = liveTurn(!catalogNames_.empty());
             const auto id = RECORD_IDS[row.family];
             const auto layout = schema_.records()[static_cast<std::size_t>(id)].fields;
             std::array<core::FieldValue, MAX_DATA_FIELDS> fields{};
@@ -1408,8 +1532,9 @@ class PublisherServer {
                 if (now < retryAt_)
                     return;
 
-                auto liveWork = liveTurn();
-                upstream_.emplace(schema_, *sourceBootstrap_, *sourceOptions_, now, liveWork);
+                auto liveWork = liveTurn(!catalogNames_.empty());
+                upstream_.emplace(schema_, catalogNames_, recordIds_, familyCount_, *sourceBootstrap_, *sourceOptions_,
+                                  now, liveWork);
             }
 
             upstream_->progress(queues_, sourceDemand_, now, work, demandWork, statistics_);
@@ -1418,7 +1543,7 @@ class PublisherServer {
                 fenceSource();
 
                 for (std::size_t family = 0; family < familyCount_; ++family) {
-                    auto resetWork = serverQueueTurn(peers_.size(), true, familyCount_ > 1);
+                    auto resetWork = serverQueueTurn(peers_.size(), true, familyCount_ > 1, recordIds_.size());
                     const auto reset = queues_[family]->resetSource(resetWork);
 
                     if (!reset)
@@ -1458,9 +1583,12 @@ class PublisherServer {
 
     public:
     PublisherServer(transport::RuntimeBootstrap &bootstrap, const PublisherOptions &options, DemandPolicies demand)
-        : schema_(publisherSchema(options.mixed)), listener_(listen(bootstrap, options.listener)),
-          peers_(options.listener.maxConnections), demandPolicies_(std::move(demand)),
-          familyCount_(schema_.records().size()) {
+        : schema_(createSchema(options)), recordIds_(recordIds(schema_)), catalogNames_(catalogNames(options, schema_)),
+          listener_(listen(bootstrap, options.listener)), peers_(options.listener.maxConnections),
+          demandPolicies_(std::move(demand)), familyCount_(options.catalog || options.mixed ? FAMILY_COUNT : 1) {
+        if (options.catalog)
+            validateCatalog();
+
         for (std::size_t family = familyCount_; family < FAMILY_COUNT; ++family) {
             auto &stats = statistics_.families[family];
             stats.ingressFrames.availability = core::StatisticAvailability::UNSUPPORTED;
@@ -1469,8 +1597,8 @@ class PublisherServer {
         }
 
         for (std::size_t family = 0; family < familyCount_; ++family)
-            queues_[family].emplace(
-                publisherQueue(schema_, peers_.size(), options.source.has_value(), FAMILIES[family]));
+            queues_[family].emplace(publisherQueue(schema_, peers_.size(), options.source.has_value(), FAMILIES[family],
+                                                   !catalogNames_.empty()));
 
         if (!options.source) {
             source_.emplace(localOwner(options.mixed));
@@ -1512,7 +1640,7 @@ class PublisherServer {
         for (std::size_t family = 0; family < familyCount_; ++family) {
             auto &queue = *queues_[family];
             auto &turn = work[family];
-            turn = serverQueueTurn(peers_.size(), sourceOptions_.has_value(), familyCount_ > 1);
+            turn = serverQueueTurn(peers_.size(), sourceOptions_.has_value(), familyCount_ > 1, recordIds_.size());
 
             for (std::size_t i = 0; i < QUEUE_ACTIONS; ++i) {
                 const auto moved = queue.progress(turn);
@@ -1688,6 +1816,9 @@ PublisherEndpoint::create(transport::RuntimeBootstrap &bootstrap, PublisherOptio
         return std::unexpected(Diagnostic{ErrorCode::INVALID_ARGUMENT, "publisher-limits"});
     }
 
+    if (options.catalog && (!options.source || options.mixed))
+        return std::unexpected(Diagnostic{ErrorCode::INVALID_ARGUMENT, "publisher-catalog-options"});
+
     try {
         if (options.source) {
             const auto &source = *options.source;
@@ -1712,8 +1843,8 @@ PublisherEndpoint::create(transport::RuntimeBootstrap &bootstrap, PublisherOptio
         options.demand = {};
         std::vector<PublisherPeerDemandPolicy>().swap(options.peerDemand);
         auto impl = std::make_unique<Impl>();
-        impl->port =
-            std::make_shared<detail::PublisherPort>(options.pendingQuotes, options.source.has_value(), options.mixed);
+        impl->port = std::make_shared<detail::PublisherPort>(options.pendingQuotes, options.source.has_value(),
+                                                             options.mixed || options.catalog.has_value());
         const auto port = impl->port;
         auto endpoint = std::unique_ptr<PublisherEndpoint>(new PublisherEndpoint(std::move(impl)));
         endpoint->impl_->worker = std::jthread(
