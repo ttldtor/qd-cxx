@@ -65,3 +65,5 @@
 [Исполнение event callback](subscriptions/CALLBACK-EXECUTION.ru.md): owning packets, borrowed schedulers, конечные reentry и source retirement.
 
 - [Живые диапазоны HISTORY](subscriptions/LIVE-HISTORY-RANGES.ru.md): транзакции fromTime/set, applied fences доставки и сходимость wire demand.
+
+[Проект контракта локальной публикации записей](subscriptions/RECORD-PUBLICATION.ru.md).
