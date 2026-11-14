@@ -687,6 +687,9 @@ struct HistoryCollector::Impl {
         };
 
         if (const auto *pair = std::get_if<core::IndexedTimePairInt32>(&layout)) {
+            if (pair->allowVoid && r.removalTime)
+                return *r.removalTime;
+
             const auto bits =
                 (static_cast<std::uint64_t>(static_cast<std::uint32_t>(raw(pair->firstField))) << TIME_WORD_BITS) |
                 static_cast<std::uint32_t>(raw(pair->secondField));
@@ -1599,8 +1602,13 @@ struct HistoryCollector::Impl {
 
         if (const auto *pair = std::get_if<core::IndexedTimePairInt32>(&layout)) {
             const auto bits = std::bit_cast<std::uint64_t>(value.time);
-            out[pair->firstField].raw = std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(bits >> TIME_WORD_BITS));
-            out[pair->secondField].raw = std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(bits));
+
+            if (out[pair->firstField].type != core::SerialFieldType::VOID_FIELD)
+                out[pair->firstField].raw =
+                    std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(bits >> TIME_WORD_BITS));
+
+            if (out[pair->secondField].type != core::SerialFieldType::VOID_FIELD)
+                out[pair->secondField].raw = std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(bits));
         } else if (const auto *low = std::get_if<core::IndexedTimeLowInt32>(&layout)) {
             out[low->field].raw = std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(value.time));
         } else {

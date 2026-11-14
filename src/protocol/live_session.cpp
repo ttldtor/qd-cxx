@@ -1295,7 +1295,9 @@ struct LiveSnapshot::State {
 
                 if (record.indexedTimeLayout) {
                     if (const auto *pair = std::get_if<core::IndexedTimePairInt32>(&*record.indexedTimeLayout)) {
-                        plan.indexedTimeLayout = ResolvedIndexedTimePairInt32{pair->firstField, pair->secondField};
+                        plan.indexedTimeLayout = ResolvedIndexedTimePairInt32{
+                            pair->firstField, pair->secondField, record.fields[pair->firstField].serialTypeId == 0,
+                            record.fields[pair->secondField].serialTypeId == 0};
                     } else if (const auto *low = std::get_if<core::IndexedTimeLowInt32>(&*record.indexedTimeLayout)) {
                         plan.indexedTimeLayout = ResolvedIndexedTimeLowInt32{low->field};
                     } else {

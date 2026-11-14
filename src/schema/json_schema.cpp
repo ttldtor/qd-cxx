@@ -523,7 +523,8 @@ std::expected<std::size_t, JsonSchemaError> nameLength(simdjson::dom::element va
  * @param root Parsed root, borrowed while the parser lives.
  * @return Borrowed record array, or stable identity/shape error.
  */
-std::expected<simdjson::dom::array, JsonSchemaError> binaryRecords(simdjson::dom::element root) {
+std::expected<simdjson::dom::array, JsonSchemaError> binaryRecords(simdjson::dom::element root, bool allowProfileV2,
+                                                                   bool &allowVoidPair) {
     constexpr std::array<std::string_view, 3> ROOT_KEYS{"formatVersion", "profile", "records"};
     constexpr std::array<std::string_view, 2> PROFILE_KEYS{"id", "version"};
     const auto members = readObject(root, ROOT_KEYS, true);
@@ -559,9 +560,15 @@ std::expected<simdjson::dom::array, JsonSchemaError> binaryRecords(simdjson::dom
         return std::unexpected(JsonSchemaError::UNSUPPORTED_PROFILE);
     }
 
-    if (*profileVersion != 1) {
+    if (*profileVersion != 1 && *profileVersion != 2) {
         return std::unexpected(JsonSchemaError::UNSUPPORTED_VERSION);
     }
+
+    if (*profileVersion == 2 && !allowProfileV2) {
+        return std::unexpected(JsonSchemaError::UNSUPPORTED_VERSION);
+    }
+
+    allowVoidPair = *profileVersion == 2;
 
     simdjson::dom::array records;
 
@@ -730,7 +737,7 @@ std::expected<std::optional<core::IndexedTimeLayout>, JsonSchemaError> readLayou
  * @return Owned staging record; all DOM views expire before publication.
  */
 std::expected<core::LocalRecord, JsonSchemaError> readBinaryRecord(simdjson::dom::element value,
-                                                                   core::SchemaLimits &remaining) {
+                                                                   core::SchemaLimits &remaining, bool allowVoidPair) {
     const auto members = readObject(value, BINARY_RECORD_KEYS);
 
     if (!members) {
@@ -785,6 +792,15 @@ std::expected<core::LocalRecord, JsonSchemaError> readBinaryRecord(simdjson::dom
         }
 
         record.fields.push_back({*type});
+    }
+
+    if (allowVoidPair && record.indexedTimeLayout) {
+        if (auto *pair = std::get_if<core::IndexedTimePairInt32>(&*record.indexedTimeLayout);
+            pair && pair->firstField < record.fields.size() && pair->secondField < record.fields.size()) {
+            const auto firstVoid = record.fields[pair->firstField].serialTypeId == 0;
+            const auto secondVoid = record.fields[pair->secondField].serialTypeId == 0;
+            pair->allowVoid = firstVoid || secondVoid;
+        }
     }
 
     constexpr std::array<std::string_view, 2> LOOKUP_KEYS{"name", "fieldId"};
@@ -891,7 +907,8 @@ std::expected<core::LocalSchema, JsonSchemaError> loadBinaryJsonSchema(std::stri
             return std::unexpected(parserError(error));
         }
 
-        const auto records = binaryRecords(root);
+        bool allowVoidPair = false;
+        const auto records = binaryRecords(root, limits.allowProfileV2, allowVoidPair);
 
         if (!records) {
             return std::unexpected(records.error());
@@ -906,7 +923,7 @@ std::expected<core::LocalSchema, JsonSchemaError> loadBinaryJsonSchema(std::stri
         auto remaining = limits.loading.schema;
 
         for (const auto record : *records) {
-            auto loaded = readBinaryRecord(record, remaining);
+            auto loaded = readBinaryRecord(record, remaining, allowVoidPair);
 
             if (!loaded) {
                 return std::unexpected(loaded.error());

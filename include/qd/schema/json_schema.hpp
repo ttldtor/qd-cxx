@@ -16,7 +16,7 @@ enum class JsonSchemaError {
     MALFORMED_JSON,      ///< Invalid JSON syntax, encoding, escapes, BOM or trailing document.
     INVALID_SCHEMA,      ///< Invalid native object members, numeric range or local invariants.
     UNSUPPORTED_PROFILE, ///< Profile identity outside the explicitly selected loader entry.
-    UNSUPPORTED_VERSION, ///< Format or native profile version outside version 1.
+    UNSUPPORTED_VERSION, ///< Format or selected native profile version outside the supported set.
     UNSUPPORTED_TYPE,    ///< Full field identity outside the selected exact-type subset.
     UNSUPPORTED_INDEXED, ///< Unsupported indexed layout/type, or legacy hasTime:true.
     RESOURCE_LIMIT,      ///< Input, nesting, logical schema or parser-size budget exceeded.
@@ -43,9 +43,10 @@ struct BinaryJsonSchemaLimits {
         DEFAULT_BINARY_JSON_PARSER_BYTES;                   ///< Fresh-parser requests, excluding allocator overhead.
     std::size_t workUnits = DEFAULT_BINARY_JSON_WORK_UNITS; ///< Logical byte/visit/comparison credits, not CPU/bytes.
     std::size_t schemaModelBytes = DEFAULT_BINARY_JSON_MODEL_BYTES; ///< Logical staging/result, not STL capacities.
+    bool allowProfileV2 = true; ///< Select false when the caller promises only binary profile 1.
 };
 
-/** Load only format 1, qdcxx-native-binary profile 1, from supplied bytes and explicit limits.
+/** Load format 1, qdcxx-native-binary profile 1 or 2, from supplied bytes and explicit limits.
  * The loader performs no file IO or application property/source resolution. Parser-request
  * qualification covers the pinned SDK's built-in backends and ordinary SDK selection, including
  * SIMDJSON_FORCE_IMPLEMENTATION selecting a built-in backend. Foreign active-implementation

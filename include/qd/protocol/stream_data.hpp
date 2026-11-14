@@ -40,6 +40,8 @@ struct ContextLimits {
 struct ResolvedIndexedTimePairInt32 {
     std::size_t firstValueIndex;  ///< High-word position, never a sender ID or source slot.
     std::size_t secondValueIndex; ///< Low-word position in the same local values vector.
+    bool firstVoid = false;       ///< High contributor is zero-width in ordinary and projected removal values.
+    bool secondVoid = false;      ///< Low contributor is zero-width in ordinary and projected removal values.
 };
 
 /** Resolved dense output position for a signed64 indexed value. */
