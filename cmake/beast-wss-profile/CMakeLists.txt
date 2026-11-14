@@ -36,7 +36,17 @@ endif()
 add_executable(qdcxx_beast_wss_probe "../../tests/conformance/beast-wss-dependency/probe.cpp")
 set_target_properties(qdcxx_beast_wss_probe PROPERTIES CXX_EXTENSIONS OFF)
 target_link_libraries(qdcxx_beast_wss_probe PRIVATE qdcxx_beast_wss)
+add_executable(qdcxx_beast_wss_tls_qualification "../../tests/conformance/beast-wss-dependency/tls_qualification.cpp"
+    "../../tests/conformance/beast-wss-dependency/allocation_receipt.cpp")
+set_target_properties(qdcxx_beast_wss_tls_qualification PROPERTIES CXX_EXTENSIONS OFF)
+target_link_libraries(qdcxx_beast_wss_tls_qualification PRIVATE qdcxx_beast_wss)
+
 enable_testing()
+add_test(NAME beast_wss_tls_qualification COMMAND qdcxx_beast_wss_tls_qualification
+    "${CMAKE_CURRENT_LIST_DIR}/../../tests/fixtures/transport/tls")
+add_test(NAME beast_wss_tls_allocator_receipt COMMAND qdcxx_beast_wss_tls_qualification
+    "${CMAKE_CURRENT_LIST_DIR}/../../tests/fixtures/transport/tls" --measure-allocator)
+set_tests_properties(beast_wss_tls_qualification beast_wss_tls_allocator_receipt PROPERTIES TIMEOUT 30)
 add_test(NAME beast_wss_provision_cli COMMAND "${CMAKE_COMMAND}"
     "-DPROVISION=${CMAKE_CURRENT_LIST_DIR}/../../tools/deps/ProvisionBeastWss.cmake"
     "-DDESTINATION=${CMAKE_CURRENT_BINARY_DIR}/provision-cli-unused"
