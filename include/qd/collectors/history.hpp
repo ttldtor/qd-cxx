@@ -164,6 +164,8 @@ struct HistoryOptions {
         core::SubscriptionSelectorPolicy::EXACT_ONLY; ///< Immutable symbol domain; no All.
     std::span<const std::int32_t> retransmitSnapshotRecords = {};
     ///< Exact indexed local IDs that restart snapshot views on every BEGIN or MODE. Borrowed through create only.
+    bool reclaimInactive =
+        false; ///< Release empty partitions after the last view withdraws. Requires storeEverything=false.
 };
 
 /** Explicit view projection; false emits legacy unflagged data while preserving raw provenance. */

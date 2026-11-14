@@ -341,6 +341,7 @@ struct HistoryCollector::Impl {
     std::size_t retrievalQuantum;                               ///< Explicit global-snapshot/local-update balance.
     std::size_t partitionSnapshotQuantum;                       ///< Explicit per-partition snapshot rotation.
     core::SubscriptionSelectorPolicy selectorPolicy;            ///< Immutable exact symbol domain.
+    bool reclaimInactive;                                       ///< Reclaim empty inactive partitions at trim.
     bool storeEverything;                                       ///< Explicit retention policy.
     std::unique_ptr<const unsigned char[]> retransmitSnapshots; ///< Optional immutable flag per exact local ID.
     HistoryIdentity *identity;                    ///< Fixed detached marker; no protocol owner reaches it.
@@ -375,7 +376,7 @@ struct HistoryCollector::Impl {
          HistoryIdentity *marker) noexcept
         : schema(std::move(sourceSchema)), limits(configured), retrievalQuantum(selected.retrievalQuantum),
           partitionSnapshotQuantum(selected.partitionSnapshotQuantum), selectorPolicy(selected.selectorPolicy),
-          storeEverything(selected.storeEverything), identity(marker) {
+          reclaimInactive(selected.reclaimInactive), storeEverything(selected.storeEverything), identity(marker) {
     }
 
     /** Clear all borrowed references before serialized source-owner fallback release. */
@@ -1097,6 +1098,22 @@ struct HistoryCollector::Impl {
         }
     }
 
+    bool referenced(const Bank &b, std::size_t partitionId) const noexcept {
+        for (const auto &point : b.points) {
+            if (point.used && point.partition == partitionId)
+                return true;
+        }
+
+        for (std::size_t view = 0; view < views.size(); ++view) {
+            for (std::size_t i = 0; i < b.views[view].size; ++i) {
+                if (b.pending[view * limits.pendingItems + i].partition == partitionId)
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
     /** Trim cache after the stable final failed-view set or a desired mutation.
      * @param b Candidate bank.
      */
@@ -1128,6 +1145,11 @@ struct HistoryCollector::Impl {
             }
 
             if (!active) {
+                if (reclaimInactive && !referenced(b, k)) {
+                    p = Partition{};
+                    continue;
+                }
+
                 p.frontier = HIGH;
                 p.ever = HIGH;
                 p.began = false;
@@ -1846,7 +1868,8 @@ HistoryCollector::create(core::LocalSchema &&schema, HistoryLimits limits, Histo
             throw HistoryError::UNSUPPORTED_SELECTOR;
         }
 
-        if (!schema.sharesIdentityWith(schema) || !options.retrievalQuantum || !options.partitionSnapshotQuantum) {
+        if (!schema.sharesIdentityWith(schema) || !options.retrievalQuantum || !options.partitionSnapshotQuantum ||
+            (options.storeEverything && options.reclaimInactive)) {
             throw HistoryError::INVALID_CONFIGURATION;
         }
 
@@ -2732,19 +2755,7 @@ std::expected<HistoryRetentionReport, HistoryFailure> HistoryCollector::forgetUn
                 continue;
             }
 
-            bool referenced = false;
-
-            for (const auto &p : b.points) {
-                referenced |= p.used && p.partition == k;
-            }
-
-            for (std::size_t v = 0; v < s.views.size(); ++v) {
-                for (std::size_t n = 0; n < b.views[v].size; ++n) {
-                    referenced |= b.pending[v * s.limits.pendingItems + n].partition == k;
-                }
-            }
-
-            if (!referenced) {
+            if (!s.referenced(b, k)) {
                 b.partitions[k] = Impl::Partition{};
                 ++forgotten;
             }

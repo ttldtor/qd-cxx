@@ -322,15 +322,18 @@ struct Fixture {
  * @param store Retention mode.
  * @param bounds Explicit finite logical capacities.
  * @param retransmit Exact snapshot retransmission records, borrowed through construction.
+ * @param reclaimInactive Reuse empty partition slots when the last view withdraws.
  * @return Ready actual source and empty collector.
  */
-Fixture fixture(bool store = false, s::HistoryLimits bounds = limits(), std::span<const std::int32_t> retransmit = {}) {
+Fixture fixture(bool store = false, s::HistoryLimits bounds = limits(), std::span<const std::int32_t> retransmit = {},
+                bool reclaimInactive = false) {
     auto local = schema();
     auto live = session(local);
     auto copied = local;
     auto work = turn();
     auto collector = s::HistoryCollector::create(
-        std::move(copied), bounds, {store, 100, 10000, c::SubscriptionSelectorPolicy::EXACT_ONLY, retransmit}, work);
+        std::move(copied), bounds,
+        {store, 100, 10000, c::SubscriptionSelectorPolicy::EXACT_ONLY, retransmit, reclaimInactive}, work);
     REQUIRE(collector);
 
     return {std::move(local), std::move(live), std::move(*collector)};
@@ -1441,6 +1444,36 @@ TEST_CASE("HISTORY explicit empty-metadata forgetting permits sustained churn wi
         send(f, {{0, u"ALPHA", 3, 100 + n, 0}});
         (void)drain(f, healthy);
         CHECK(f.history.pointCount() == 2);
+    }
+}
+
+TEST_CASE("HISTORY can reclaim the last withdrawn key without disturbing another view") {
+    auto bounds = limits();
+    bounds.partitions = 2;
+    auto f = fixture(false, bounds, {}, true);
+    const auto healthy = open(f);
+    const auto changing = open(f);
+    add(f, healthy);
+    send(f, {{0, u"ALPHA", 3, 30, 4}, {0, u"ALPHA", 0, 0, 10}});
+    (void)drain(f, healthy);
+    const auto epoch = range(f, healthy).epoch;
+    std::uint64_t previousActivation = 0;
+
+    for (std::int32_t index = 0; index < 12; ++index) {
+        std::u16string symbol{u'K', static_cast<char16_t>(u'A' + index)};
+        add(f, changing, 0, 0, symbol);
+        const auto status = range(f, changing, symbol);
+        CHECK(status.partitionActivation > previousActivation);
+        previousActivation = status.partitionActivation;
+        send(f, {{0, symbol, 0, 0, 14}});
+        // Withdrawal also drops any unconsumed collector deliveries for that view.
+        removeKey(f, changing, symbol);
+        CHECK(f.history.partitionCount() == 1);
+        CHECK(f.history.pendingCount(changing) == 0);
+        const auto remaining = range(f, healthy);
+        CHECK(remaining.epoch.matches(epoch));
+        CHECK(remaining.completeRequestedRange);
+        CHECK_FALSE(f.history.resetNotice());
     }
 }
 

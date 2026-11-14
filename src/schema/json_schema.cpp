@@ -955,6 +955,180 @@ std::expected<core::LocalSchema, JsonSchemaError> loadBinaryJsonSchema(std::stri
     }
 }
 
+std::expected<std::vector<std::vector<std::u16string>>, JsonSchemaError>
+loadBinaryJsonWireNames(std::string_view input, const core::LocalSchema &schema, BinaryJsonSchemaLimits limits) {
+    constexpr std::size_t BYTE_PASS_CREDITS = 32;
+    BudgetModel work;
+
+    if (!schema.identity().valid()) {
+        return std::unexpected(JsonSchemaError::INVALID_SCHEMA);
+    }
+
+    if (schema.profile() != core::LocalProfile::BINARY_FIELDS_V1) {
+        return std::unexpected(JsonSchemaError::UNSUPPORTED_PROFILE);
+    }
+
+    if (input.size() > limits.loading.documentBytes || input.size() > simdjson::SIMDJSON_MAXSIZE_BYTES ||
+        !work.add(input.size(), BYTE_PASS_CREDITS) || work.value > limits.workUnits ||
+        !depthFits(input, limits.loading.depth)) {
+        return std::unexpected(JsonSchemaError::RESOURCE_LIMIT);
+    }
+
+    if (input.empty() || input.starts_with("\xef\xbb\xbf")) {
+        return std::unexpected(JsonSchemaError::MALFORMED_JSON);
+    }
+
+    const auto parserDepth = std::min(limits.loading.depth, input.size()) + 1;
+    const auto requests = parserRequestBytes(input.size(), parserDepth);
+
+    if (!requests || *requests > limits.parserBytes) {
+        return std::unexpected(JsonSchemaError::RESOURCE_LIMIT);
+    }
+
+    try {
+        const auto capacity = std::max(input.size(), simdjson::dom::MINIMAL_DOCUMENT_CAPACITY);
+        simdjson::dom::parser parser(capacity);
+
+        if (const auto error = parser.allocate(capacity, parserDepth)) {
+            return std::unexpected(parserError(error));
+        }
+
+        simdjson::dom::element root;
+
+        if (const auto error = parser.parse(input.data(), input.size()).get(root)) {
+            return std::unexpected(parserError(error));
+        }
+
+        constexpr std::array<std::string_view, 2> ROOT_KEYS{"format", "projection"};
+        const auto rootMembers = readObject(root, ROOT_KEYS, true);
+        std::string_view format;
+        simdjson::dom::array projections;
+
+        if (!rootMembers || rootMembers->seen != 3 || rootMembers->values[0].get_string().get(format) ||
+            rootMembers->values[1].get_array().get(projections)) {
+            return std::unexpected(JsonSchemaError::INVALID_SCHEMA);
+        }
+
+        if (format != "qdcxx-java-export-v2") {
+            return std::unexpected(JsonSchemaError::UNSUPPORTED_VERSION);
+        }
+
+        const auto records = schema.records();
+
+        if (projections.size() != records.size()) {
+            return std::unexpected(JsonSchemaError::INVALID_SCHEMA);
+        }
+
+        if (records.size() > limits.loading.schema.records) {
+            return std::unexpected(JsonSchemaError::RESOURCE_LIMIT);
+        }
+
+        BudgetModel model;
+
+        if (!model.add(records.size(), sizeof(std::vector<std::u16string>)) || model.value > limits.schemaModelBytes) {
+            return std::unexpected(JsonSchemaError::RESOURCE_LIMIT);
+        }
+
+        std::vector<std::vector<std::u16string>> names;
+        names.reserve(records.size());
+        auto remaining = limits.loading.schema;
+        std::int32_t previousSourceId = -1;
+        std::size_t recordIndex = 0;
+        constexpr std::array<std::string_view, 3> RECORD_KEYS{"sourceId", "exportedId", "slots"};
+        constexpr std::array<std::string_view, 2> SLOT_KEYS{"fieldId", "names"};
+        constexpr std::array<std::string_view, 1> NAME_KEYS{"propertyName"};
+
+        for (const auto projection : projections) {
+            const auto record = readObject(projection, RECORD_KEYS, true);
+            simdjson::dom::array slots;
+
+            if (!record || record->seen != 7 || record->values[2].get_array().get(slots)) {
+                return std::unexpected(JsonSchemaError::INVALID_SCHEMA);
+            }
+
+            const auto sourceId = readInteger(record->values[0]);
+            const auto exportedId = readInteger(record->values[1]);
+            const auto &local = records[recordIndex];
+
+            if (!sourceId || !exportedId || *sourceId <= previousSourceId ||
+                static_cast<std::size_t>(*exportedId) != recordIndex ||
+                static_cast<std::size_t>(local.id) != recordIndex || slots.size() != local.fields.size()) {
+                return std::unexpected(JsonSchemaError::INVALID_SCHEMA);
+            }
+
+            previousSourceId = *sourceId;
+
+            if (!charge(slots.size(), remaining.fields) || !model.add(slots.size(), sizeof(std::u16string)) ||
+                model.value > limits.schemaModelBytes) {
+                return std::unexpected(JsonSchemaError::RESOURCE_LIMIT);
+            }
+
+            auto &row = names.emplace_back();
+            row.reserve(slots.size());
+            std::size_t fieldIndex = 0;
+
+            for (const auto slot : slots) {
+                const auto entry = readObject(slot, SLOT_KEYS, true);
+
+                if (!entry || entry->seen != 3) {
+                    return std::unexpected(JsonSchemaError::INVALID_SCHEMA);
+                }
+
+                const auto field = readInteger(entry->values[0]);
+                const auto entryNames = readObject(entry->values[1], NAME_KEYS, true);
+
+                if (!field || static_cast<std::size_t>(*field) != fieldIndex || !entryNames || entryNames->seen != 1) {
+                    return std::unexpected(JsonSchemaError::INVALID_SCHEMA);
+                }
+
+                const auto length = nameLength(entryNames->values[0]);
+
+                if (!length) {
+                    return std::unexpected(length.error());
+                }
+
+                if (!model.add(*length, sizeof(char16_t)) || model.value > limits.schemaModelBytes) {
+                    return std::unexpected(JsonSchemaError::RESOURCE_LIMIT);
+                }
+
+                auto name = readName(entryNames->values[0], remaining);
+
+                if (!name) {
+                    return std::unexpected(name.error());
+                }
+
+                bool found = false;
+
+                for (const auto &lookup : local.lookups) {
+                    if (!work.add(name->size() + 1) || work.value > limits.workUnits) {
+                        return std::unexpected(JsonSchemaError::RESOURCE_LIMIT);
+                    }
+
+                    if (lookup.name == *name) {
+                        found = lookup.fieldId == fieldIndex;
+                        break;
+                    }
+                }
+
+                if (!found) {
+                    return std::unexpected(JsonSchemaError::INVALID_SCHEMA);
+                }
+
+                row.push_back(std::move(*name));
+                ++fieldIndex;
+            }
+
+            ++recordIndex;
+        }
+
+        return names;
+    } catch (const std::bad_alloc &) {
+        return std::unexpected(JsonSchemaError::ALLOCATION_FAILURE);
+    } catch (const std::length_error &) {
+        return std::unexpected(JsonSchemaError::ALLOCATION_FAILURE);
+    }
+}
+
 std::string_view jsonSchemaErrorName(JsonSchemaError error) noexcept {
     switch (error) {
     case JsonSchemaError::MALFORMED_JSON:

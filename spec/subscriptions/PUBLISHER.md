@@ -72,3 +72,23 @@ socket already accepted a prefix of a stale DATA frame, the relay closes that
 connection to preserve framing. Fully accepted bytes can still reach the
 client. The source generation is local diagnostic state and carries no
 guarantee of delivery continuity.
+
+## Full record relay profile
+
+Set `PublisherOptions::catalog` to a binary schema and its ordered QTP wire names. Set
+`source` and leave `mixed` false. The endpoint validates the complete outgoing description
+before reporting it has started, then owns its copy of the schema and field names. Use
+`loadBinaryJsonSchema` and `loadBinaryJsonWireNames` with the paired files from the same
+[default or dxlink export](../../tools/schema-export/README.md). The C++ publisher consumes
+typed values and works without the JSON library.
+
+Every physical record can be requested from TICKER and STREAM. HISTORY additionally requires
+an indexed layout and negotiated `hs`. Each direction maps the peer's sender IDs to the
+catalog's physical record identities. Received DATA is decoded as records, routed by contract
+and subscription, then encoded with the relay's own description. Nullable fields, distinct
+source-specific names, and signed HISTORY removal indices are preserved. Each collector retains
+its usual snapshot, conflation, transaction and queue semantics.
+
+The complete description must fit in one 64 KiB QTP frame. The current endpoint limits of 32
+keys per client per contract and 256 subscription tuples per frame also apply in this profile.
+An upstream DATA frame may contain up to 32 mapped record occurrences, even if they share one key. A frame exceeding this allowance fails the upstream generation and current demand is replayed on reconnect. Operate the relay with a source that advertises the three QTP contracts and supports `hs`.
