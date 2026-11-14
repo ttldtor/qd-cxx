@@ -105,3 +105,5 @@ archive extraction, cumulative patch and complete idempotent source readback too
 Tests retain their artifacts and per-case command/output receipts; nothing is
 removed or downloaded. [Runtime qualification](../../cmake/runtime-profile/README.md)
 remains the authority for SDK behavior; this helper provides the reproducible inputs.
+
+[Beast WSS dependency](BEAST-WSS.md) covers the optional private Boost headers and explicit OpenSSL SDK.

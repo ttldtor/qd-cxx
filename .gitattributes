@@ -905,3 +905,6 @@ tests/fixtures/nuam-order/*.tsv -text -whitespace
 tests/fixtures/nuam-order/*.qtp binary
 tests/fixtures/nuam-order/*.json text eol=lf
 tools/upstream/nuam-order-oracle/*.java text eol=lf
+
+# The private Beast WSS profile checks the exact inventory digest on both hosts.
+/cmake/beast-wss-profile/boost-1.92.0-sources.sha256.tsv text eol=lf

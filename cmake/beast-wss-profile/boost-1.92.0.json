@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "version": "1.92.0",
+  "archiveUrl": "https://archives.boost.io/release/1.92.0/source/boost_1_92_0.tar.gz",
+  "archiveSha256": "c4a3b310ddd2472416e091067166b0713be97c63f38c212c484ada022fd296ce",
+  "releaseCommit": "afdfa32505af73e3d208144b3f623f0096cb62b6",
+  "beastCommit": "7c1e061f91e2ef542217b76286c314d006c0c8fc",
+  "license": "BSL-1.0",
+  "sourceManifest": {
+    "file": "boost-1.92.0-sources.sha256.tsv",
+    "sha256": "17351df9b3ec9b162829c49e2729cf2451069428beabe474c5ab6964cd51416e",
+    "regularFileCount": 940
+  }
+}
