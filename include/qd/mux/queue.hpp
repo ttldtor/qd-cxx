@@ -19,6 +19,10 @@
 #include <variant>
 #include <vector>
 
+namespace org::ttldtor::qdcxx::protocol {
+struct IncomingSubscriptionBatch;
+}
+
 namespace org::ttldtor::qdcxx::mux {
 namespace detail {
 struct QueueReplaceAccess;
@@ -50,7 +54,8 @@ enum class QueueError {
     ALLOCATION_FAILURE,    ///< Allocation failed before the relevant transaction published.
     IDENTITY_EXHAUSTED,    ///< Non-reused scalar identity cannot advance.
     CALLBACK_FAILURE,      ///< Consumer threw; side effects are never retried.
-    SOURCE_FAILURE         ///< Actual interest/collector component failed.
+    SOURCE_FAILURE,        ///< Actual interest/collector component failed.
+    INVALID_SUBSCRIPTION   ///< Incoming batch action or family is incompatible with this queue.
 };
 /** Exact nested pure-component cause. */
 using QueueSourceError = std::variant<MuxError, core::SubscriptionError, collectors::StreamError,
@@ -240,6 +245,7 @@ struct MuxCommandResult {
 class MuxCommandTicket {
     std::shared_ptr<detail::QueueCompletion> state_; ///< Detached finite immutable completion lease.
     friend class MuxHandle;
+    friend class MuxQueue;
 
     public:
     /** Construct an empty completion lease. */
@@ -745,6 +751,18 @@ class MuxQueue {
      */
     std::expected<MuxHandle, QueueFailure> open(ClientLimits limits, const std::shared_ptr<MuxConsumer> &consumer,
                                                 QueueWork &work);
+    /** Submit one decoded subscription batch to a current client in this exact family.
+     * The same bounded command slot and owner application path as local add/remove are used.
+     * Every key and signed HISTORY boundary is copied before return. Earlier tuples in a
+     * rejected batch are never submitted separately. Call only in the serialized owner domain.
+     * @param client Client registered on this queue.
+     * @param batch Borrowed complete output of the incoming subscription decoder.
+     * @param work Actual producer-local credits, consumed by this attempt.
+     * @return Accepted ticket, or typed refusal. Owner progress applies the ticket before demand is visible.
+     */
+    [[nodiscard]] std::expected<MuxCommandTicket, QueueError>
+    submitIncomingSubscription(const MuxHandle &client, const protocol::IncomingSubscriptionBatch &batch,
+                               QueueSubmitWork &work);
     /** Accept one whole compatible source event; stage precedes later commands.
      * @param event Owner transferred only on success.
      * @param work Admission credits.

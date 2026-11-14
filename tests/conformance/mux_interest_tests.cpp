@@ -3,6 +3,7 @@
 #include "../../src/mux/interest_transaction.hpp"
 
 #include "qd/events/quote.hpp"
+#include "qd/mux/demand.hpp"
 #include "qd/protocol/subscription_writer.hpp"
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
@@ -800,6 +801,133 @@ TEST_CASE("MUX factory charges captured-record fill and allocation-failure clean
     CHECK(source->records().size() == RECORDS);
     CHECK(source->recordContext(0).matches(context));
     REQUIRE(m::MuxState::create(*source, c::SubscriptionFamily::STREAM, bounds, work));
+}
+
+TEST_CASE("upstream demand acknowledges exactly one change and replays current history after reset") {
+    auto source = schema();
+    auto state = owner(source, c::SubscriptionFamily::HISTORY);
+    auto first = client(state);
+    auto second = client(state);
+    auto tracker = m::DemandTracker::create(c::SubscriptionFamily::HISTORY, {4, 16});
+    REQUIRE(tracker);
+    auto muxWork = turn();
+    m::DemandWork demandWork{100, 1000, 1000};
+    const auto wanted = [&](const m::MuxClient &who, std::int64_t bound) {
+        const auto key = request(source, u"IBM", bound, 1);
+        REQUIRE(state.add(who, std::span(&key, 1), muxWork));
+    };
+    const auto poll = [&] {
+        return tracker->next(state.aggregateEntries(), demandWork).value();
+    };
+
+    wanted(first, 32);
+    auto change = poll();
+    REQUIRE(change);
+    CHECK(change->action == m::DemandAction::ADD);
+    CHECK(change->request.historyBound == 32);
+    const auto firstSequence = change->sequence;
+    wanted(second, std::numeric_limits<std::int64_t>::min());
+    auto retry = poll();
+    REQUIRE(retry);
+    CHECK(retry->sequence == firstSequence);
+    CHECK(retry->request.key.symbol == u"IBM");
+    CHECK(retry->request.historyBound == 32);
+    const auto wrongSequence = tracker->acknowledge(firstSequence + 1);
+    REQUIRE_FALSE(wrongSequence);
+    CHECK(wrongSequence.error() == m::DemandError::INVALID_SEQUENCE);
+    REQUIRE(tracker->acknowledge(firstSequence));
+
+    m::DemandWork shortTurn{1, 0, 0};
+    const auto shortPoll = tracker->next(state.aggregateEntries(), shortTurn);
+    REQUIRE_FALSE(shortPoll);
+    CHECK(shortPoll.error() == m::DemandError::WORK_LIMIT);
+    CHECK(shortTurn.operations == 0);
+    change = poll();
+    REQUIRE(change);
+    CHECK(change->action == m::DemandAction::ADD);
+    CHECK(change->sequence > firstSequence);
+    CHECK(change->request.historyBound == std::numeric_limits<std::int64_t>::min());
+    REQUIRE(tracker->acknowledge(change->sequence));
+    CHECK_FALSE(poll());
+
+    REQUIRE(state.removeClient(second, muxWork));
+    change = poll();
+    REQUIRE(change);
+    CHECK(change->action == m::DemandAction::ADD);
+    CHECK(change->request.historyBound == 32);
+    const auto oldGeneration = change->sequence;
+    m::DemandWork shortReset{1, 0, 0};
+    const auto refusedReset = tracker->reset(shortReset);
+    REQUIRE_FALSE(refusedReset);
+    CHECK(refusedReset.error() == m::DemandError::WORK_LIMIT);
+    retry = poll();
+    REQUIRE(retry);
+    CHECK(retry->sequence == oldGeneration);
+    REQUIRE(tracker->reset(demandWork));
+    REQUIRE_FALSE(tracker->acknowledge(oldGeneration));
+    change = poll();
+    REQUIRE(change);
+    CHECK(change->action == m::DemandAction::ADD);
+    CHECK(change->sequence > oldGeneration);
+    CHECK(change->request.historyBound == 32);
+    REQUIRE(tracker->acknowledge(change->sequence));
+
+    REQUIRE(state.removeClient(first, muxWork));
+    change = poll();
+    REQUIRE(change);
+    CHECK(change->action == m::DemandAction::REMOVE);
+    CHECK(change->request.key.symbol == u"IBM");
+    CHECK_FALSE(change->request.historyBound);
+    REQUIRE(tracker->acknowledge(change->sequence));
+    CHECK_FALSE(poll());
+}
+
+TEST_CASE("upstream demand bounds exact snapshots and does not allocate on poll or acknowledgment") {
+    const auto source = schema();
+    auto tracker = m::DemandTracker::create(c::SubscriptionFamily::TICKER, {1, 0});
+    REQUIRE(tracker);
+    auto oversized = request(source, u"A");
+    m::DemandWork work{20, 200, 200};
+    const auto refused = tracker->next(std::span(&oversized, 1), work);
+    REQUIRE_FALSE(refused);
+    CHECK(refused.error() == m::DemandError::RESOURCE_LIMIT);
+
+    auto empty = request(source, u"");
+    auto duplicateTracker = m::DemandTracker::create(c::SubscriptionFamily::TICKER, {2, 0});
+    REQUIRE(duplicateTracker);
+    const std::array duplicates{empty, empty};
+    const auto duplicatePoll = duplicateTracker->next(duplicates, work);
+    REQUIRE_FALSE(duplicatePoll);
+    CHECK(duplicatePoll.error() == m::DemandError::INVALID_DESIRED);
+
+    std::expected<std::optional<m::DemandChange>, m::DemandError> add;
+    std::expected<std::optional<m::DemandChange>, m::DemandError> remove;
+    std::expected<void, m::DemandError> addAcknowledged = std::unexpected(m::DemandError::INVALID_STATE);
+    std::expected<void, m::DemandError> removeAcknowledged = std::unexpected(m::DemandError::INVALID_STATE);
+    {
+        AllocationFault fault(0);
+        add = tracker->next(std::span(&empty, 1), work);
+
+        if (add && *add)
+            addAcknowledged = tracker->acknowledge((*add)->sequence);
+
+        remove = tracker->next({}, work);
+
+        if (remove && *remove)
+            removeAcknowledged = tracker->acknowledge((*remove)->sequence);
+    }
+
+    REQUIRE(add);
+    REQUIRE(*add);
+    CHECK((*add)->action == m::DemandAction::ADD);
+    CHECK((*add)->request.key.symbol.data());
+    CHECK(addAcknowledged);
+    REQUIRE(remove);
+    REQUIRE(*remove);
+    CHECK((*remove)->action == m::DemandAction::REMOVE);
+    CHECK((*remove)->request.key.symbol.data());
+    CHECK(removeAcknowledged);
+    CHECK(allocationCount == 0);
 }
 
 TEST_CASE("MUX real core differential effective replace and HISTORY bound upserts") {
