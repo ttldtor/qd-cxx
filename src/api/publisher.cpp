@@ -4,15 +4,19 @@
 #include "qd/api/publisher.hpp"
 
 #include "../protocol/local_event_owner.hpp"
+#include "../transport/raw_byte_owner.hpp"
+#include "qd/mux/demand.hpp"
 #include "qd/mux/queue.hpp"
 #include "qd/transport/tcp_runtime.hpp"
 
 #include <algorithm>
 #include <array>
+#include <asio/ip/address.hpp>
 #include <bit>
 #include <condition_variable>
 #include <limits>
 #include <mutex>
+#include <string>
 #include <thread>
 
 namespace org::ttldtor::qdcxx::api {
@@ -32,6 +36,9 @@ constexpr std::size_t FRAME_PREFIX_BYTES = 9;
 constexpr std::size_t EVENT_BYTES = 8192;
 constexpr std::size_t EVENT_OWNER_ALLOWANCE = 1024;
 constexpr std::size_t SOURCE_EPOCH_BYTES = 4 * 1024 * 1024;
+constexpr std::size_t REMOTE_EPOCH_BYTES = 20 * 1024 * 1024;
+constexpr std::size_t REMOTE_EVENT_BYTES = 64 * 1024;
+constexpr std::size_t REMOTE_DATA_RECORDS = 32;
 constexpr std::size_t DATA_FIELDS = 10;
 constexpr std::int32_t QUOTE_ID = 0;
 constexpr std::int32_t SEQUENCE_BITS = 22;
@@ -54,6 +61,7 @@ constexpr core::SchemaLimits SCHEMA_LIMITS{1, DATA_FIELDS, DATA_FIELDS, 32, 256}
 constexpr Diagnostic QUOTE_SHAPE{ErrorCode::INVALID_ARGUMENT, "publisher-quote-shape"};
 constexpr Diagnostic ALLOCATION{ErrorCode::ALLOCATION_FAILURE, "publisher-storage"};
 constexpr Diagnostic CLOSED{ErrorCode::CLOSED, "publisher-closed"};
+constexpr Diagnostic LOCAL_SOURCE_DISABLED{ErrorCode::INVALID_STATE, "publisher-remote-source"};
 
 /** Copied input with bounded text and an exact ordered local field representation. */
 struct QuoteRow {
@@ -136,7 +144,7 @@ mux::QueueWork queueTurn() noexcept {
             {512, VISITS, VISITS, BYTES}};
 }
 
-mux::QueueWork serverQueueTurn(std::size_t peers) noexcept {
+mux::QueueWork serverQueueTurn(std::size_t peers, bool remote) noexcept {
     auto work = queueTurn();
     const auto keys = peers * CLIENT_KEYS;
     // MuxState reserves against both possible maps and all input rows before a command.
@@ -152,7 +160,10 @@ mux::QueueWork serverQueueTurn(std::size_t peers) noexcept {
     work.ticker.visits += cacheScan + membershipScan + 2 * keys * (keys + 1) + 8 * (keys + 1);
     work.ticker.textUnits += keys * (2 * SYMBOL_UNITS) * ((peers + 1) * keys + keys);
     // Each retained owner conservatively charges the whole shared source epoch on release.
-    work.ticker.bytes += (keys + 2) * SOURCE_EPOCH_BYTES;
+    const auto epochBytes = remote ? REMOTE_EPOCH_BYTES : SOURCE_EPOCH_BYTES;
+    const auto maximum = std::numeric_limits<std::size_t>::max();
+    work.ticker.bytes =
+        keys + 2 > (maximum - work.ticker.bytes) / epochBytes ? maximum : work.ticker.bytes + (keys + 2) * epochBytes;
 
     return work;
 }
@@ -234,7 +245,7 @@ core::LocalSchema quoteSchema() {
     return std::move(*schema);
 }
 
-protocol::LiveSession serverSession(const core::LocalSchema &schema, protocol::LiveWork &work) {
+protocol::SubscriptionWriter quoteWriter(const core::LocalSchema &schema) {
     protocol::OutgoingRecord outgoing{QUOTE_ID, QUOTE_ID, u"Quote", {}};
 
     for (std::size_t i = 0; i < QUOTE_FIELD_NAMES.size(); ++i)
@@ -257,9 +268,14 @@ protocol::LiveSession serverSession(const core::LocalSchema &schema, protocol::L
     if (!writer)
         throw Error({ErrorCode::RESOURCE_LIMIT, "publisher-writer", 0, static_cast<std::uint32_t>(writer.error())});
 
+    return std::move(*writer);
+}
+
+protocol::LiveSession serverSession(const core::LocalSchema &schema, protocol::LiveWork &work) {
+    auto writer = quoteWriter(schema);
     auto local = schema;
     auto session = protocol::LiveSession::createServer(
-        std::move(local), std::move(*writer), liveLimits(),
+        std::move(local), std::move(writer), liveLimits(),
         {MAX_FRAME_BYTES, 1, 128, CLIENT_KEYS, SYMBOL_UNITS, CLIENT_SYMBOL_UNITS}, work);
 
     if (!session)
@@ -271,13 +287,13 @@ protocol::LiveSession serverSession(const core::LocalSchema &schema, protocol::L
 constexpr mux::ClientLimits CLIENT_LIMITS{32, 512 * 1024, 8,    128 * 1024, 1, 32,          SYMBOL_UNITS,
                                           0,  0,          4096, 2,          4, CLIENT_KEYS, CLIENT_SYMBOL_UNITS};
 
-mux::MuxQueue tickerQueue(const core::LocalSchema &schema, std::size_t peers) {
+mux::MuxQueue tickerQueue(const core::LocalSchema &schema, std::size_t peers, bool remote) {
     const auto allKeys = peers * CLIENT_KEYS;
     const auto allUnits = peers * CLIENT_LIMITS.commandSymbolUnits;
     const core::SubscriptionLimits desired{1, allKeys, SYMBOL_UNITS, allUnits, allKeys * 2, allUnits * 2, allKeys};
     const mux::MuxLimits interests{1, peers, allKeys, allKeys, SYMBOL_UNITS, allUnits, CLIENT_KEYS, 8 * 1024 * 1024};
     const mux::QueueLimits limits{peers,
-                                  1,
+                                  remote ? REMOTE_DATA_RECORDS : 1,
                                   1,
                                   1,
                                   8,
@@ -290,7 +306,7 @@ mux::MuxQueue tickerQueue(const core::LocalSchema &schema, std::size_t peers) {
                                   peers * 2,
                                   32 * 1024 * 1024};
     const auto cacheFrames = allKeys + 1;
-    const auto cacheBytes = cacheFrames * (EVENT_BYTES + EVENT_OWNER_ALLOWANCE);
+    const auto cacheBytes = cacheFrames * ((remote ? REMOTE_EVENT_BYTES : EVENT_BYTES) + EVENT_OWNER_ALLOWANCE);
     const collectors::TickerLimits ticker{peers,  allKeys, cacheFrames, cacheBytes, cacheBytes + 32 * 1024 * 1024,
                                           desired};
     auto work = queueTurn();
@@ -393,6 +409,8 @@ struct PublisherPort {
     std::condition_variable changed;
     std::vector<QuoteRow> pending;
     std::vector<std::u16string> demand;
+    const bool remote;
+    PublisherSourceStatus source;
     std::size_t head = 0;
     std::size_t size = 0;
     std::uint16_t boundPort = 0;
@@ -400,19 +418,237 @@ struct PublisherPort {
     bool closed = false;
     Diagnostic diagnostic;
 
-    explicit PublisherPort(std::size_t count) : pending(count) {
+    PublisherPort(std::size_t count, bool remote) : pending(remote ? 0 : count), remote(remote) {
     }
 };
 } // namespace detail
 
 namespace {
+constexpr std::array<protocol::LiveMessageView, 5> SOURCE_SEND{{{0, u"HEARTBEAT", {}},
+                                                                {1, u"DESCRIBE_PROTOCOL", {}},
+                                                                {2, u"DESCRIBE_RECORDS", {}},
+                                                                {11, u"TICKER_ADD_SUBSCRIPTION", {}},
+                                                                {12, u"TICKER_REMOVE_SUBSCRIPTION", {}}}};
+constexpr std::array<protocol::LiveMessageView, 4> SOURCE_RECEIVE{
+    {{0, u"HEARTBEAT", {}}, {1, u"DESCRIBE_PROTOCOL", {}}, {2, u"DESCRIBE_RECORDS", {}}, {10, u"TICKER_DATA", {}}}};
+constexpr protocol::LivePropertyView SOURCE_PROPERTIES[]{{u"type", u"qtp"}};
+
+Diagnostic sourceDiagnostic(transport::TcpDiagnostic diagnostic) noexcept {
+    return {ErrorCode::TRANSPORT_FAILURE, diagnostic.stage, diagnostic.nativeCode,
+            static_cast<std::uint32_t>(diagnostic.error)};
+}
+
+bool hasCapability(std::span<const protocol::LiveMessageView> messages, const protocol::LiveMessageView &expected) {
+    return std::ranges::any_of(messages, [&](const auto &message) {
+        return message.id == expected.id && message.name == expected.name;
+    });
+}
+
+/** One upstream connection. Its raw output slot copies and owns the whole frame through the local write barrier. */
+class SourceConnection {
+    protocol::LiveSession session_;
+    std::unique_ptr<transport::detail::RawByteOwner> bytes_;
+    Clock::time_point handshakeDeadline_;
+    Clock::time_point heartbeatAt_;
+    std::optional<std::uint64_t> pendingDemand_;
+    bool described_ = false;
+    bool ready_ = false;
+    std::optional<protocol::LiveEvent> pendingEvent_;
+
+    static protocol::LiveSession newSession(const core::LocalSchema &schema, protocol::LiveWork &work) {
+        auto writer = quoteWriter(schema);
+        auto limits = liveLimits();
+        limits.residentBytes = REMOTE_EPOCH_BYTES;
+        limits.eventBytes = REMOTE_EVENT_BYTES;
+        limits.owners = MAX_PEERS * CLIENT_KEYS + 12;
+        limits.data.emittedRecords = REMOTE_DATA_RECORDS;
+        auto local = schema;
+        auto session = protocol::LiveSession::create(std::move(local), std::move(writer), limits, work);
+
+        if (!session)
+            throw Error(protocolDiagnostic(session.error(), "publisher-upstream-session"));
+
+        return std::move(*session);
+    }
+
+    static std::unique_ptr<transport::detail::RawByteOwner>
+    newTransport(const transport::detail::BootstrapLease &bootstrap, PublisherSourceOptions options,
+                 protocol::LiveWork &work) {
+        constexpr transport::TcpLimits LIMITS{INPUT_BYTES, INPUT_BYTES, 1, 1, 65536, 8192, 8 * 1024 * 1024};
+        const transport::TcpOptions tcp{
+            options.address,      options.port,  {},         53,    HANDSHAKE_TIMEOUT, HANDSHAKE_TIMEOUT,
+            HEARTBEAT_PERIOD * 6, WRITE_TIMEOUT, IO_CADENCE, LIMITS};
+        auto owner = transport::detail::RawByteOwner::create(bootstrap, tcp,
+                                                             {INPUT_BYTES, MAX_FRAME_BYTES + FRAME_PREFIX_BYTES}, work);
+
+        if (!owner)
+            throw Error(sourceDiagnostic(owner.error()));
+
+        return std::move(*owner);
+    }
+
+    void send(std::expected<protocol::LivePendingOutput, protocol::LiveError> output, protocol::LiveWork &work) {
+        if (!output)
+            throw Error(protocolDiagnostic(output.error(), "publisher-upstream-output"));
+
+        const auto written = bytes_->write(output->bytes(), work);
+
+        if (!written)
+            throw Error(sourceDiagnostic(written.error()));
+    }
+
+    void receive(protocol::LiveWork &work) {
+        const auto input = bytes_->input();
+
+        if (!input)
+            throw Error(sourceDiagnostic(input.error()));
+
+        if (input->empty())
+            return;
+
+        auto incoming = session_.feed(*input, work);
+        const auto consumed = bytes_->consumeInput(incoming.accepted);
+
+        if (!consumed)
+            throw Error(sourceDiagnostic(consumed.error()));
+
+        if (incoming.status == protocol::LiveStatus::FAILED || !incoming.accepted)
+            throw Error(protocolDiagnostic(session_.diagnostic().error, session_.diagnostic().stage));
+
+        if (!incoming.event)
+            return;
+
+        if (incoming.event->kind() == protocol::LiveEventKind::PROTOCOL) {
+            const auto peer = incoming.event->snapshot();
+            const auto descriptor = peer.protocol();
+            ready_ = session_.authentication() != protocol::LiveAuthentication::REQUIRED &&
+                     hasCapability(descriptor.send, SOURCE_RECEIVE.back()) &&
+                     hasCapability(descriptor.receive, SOURCE_SEND[3]) &&
+                     hasCapability(descriptor.receive, SOURCE_SEND[4]);
+
+            return;
+        }
+
+        if (incoming.event->kind() == protocol::LiveEventKind::DATA) {
+            if (!ready_ || incoming.event->messageType() != std::to_underlying(protocol::LiveDataMessage::TICKER_DATA))
+                throw Error({ErrorCode::PROTOCOL_FAILURE, "publisher-upstream-data"});
+
+            if (!incoming.event->records().empty())
+                pendingEvent_ = std::move(incoming.event);
+        }
+    }
+
+    public:
+    SourceConnection(const core::LocalSchema &schema, const transport::detail::BootstrapLease &bootstrap,
+                     PublisherSourceOptions options, Clock::time_point now, protocol::LiveWork &work)
+        : session_(newSession(schema, work)), bytes_(newTransport(bootstrap, options, work)),
+          handshakeDeadline_(now + HANDSHAKE_TIMEOUT), heartbeatAt_(now + HEARTBEAT_PERIOD) {
+        const auto started = bytes_->start();
+
+        if (!started)
+            throw Error(sourceDiagnostic(started.error()));
+
+        send(session_.composeProtocol({SOURCE_PROPERTIES, SOURCE_SEND, SOURCE_RECEIVE}, work), work);
+    }
+
+    [[nodiscard]] bool ready() const noexcept {
+        return ready_;
+    }
+
+    void progress(mux::MuxQueue &queue, mux::DemandTracker &demand, Clock::time_point now, mux::QueueWork &queueWork,
+                  mux::DemandWork &demandWork) {
+        auto work = liveTurn();
+        transport::TcpWork native{16, 16, INPUT_BYTES * 2, 0, 0, 0, 0};
+        const auto polled = bytes_->poll(native, work);
+
+        if (!polled)
+            throw Error(sourceDiagnostic(polled.error()));
+
+        if (const auto terminal = bytes_->core().terminal()) {
+            if (terminal->primary.error != transport::TcpError::NONE)
+                throw Error(sourceDiagnostic(terminal->primary));
+
+            throw Error({ErrorCode::TRANSPORT_FAILURE, "publisher-upstream-peer-end"});
+        }
+
+        if (bytes_->core().state() == transport::TcpState::CLOSING)
+            return;
+
+        const auto wasReady = ready_;
+
+        if (!pendingEvent_)
+            receive(work);
+
+        if (!ready_ && (wasReady || now >= handshakeDeadline_))
+            throw Error({ErrorCode::PROTOCOL_FAILURE, "publisher-upstream-negotiation"});
+
+        if (pendingEvent_) {
+            const auto admitted = queue.admit(std::move(*pendingEvent_), queueWork);
+
+            if (admitted)
+                pendingEvent_.reset();
+            else if (admitted.error().error != mux::QueueError::BUSY &&
+                     admitted.error().error != mux::QueueError::WORK_LIMIT)
+                throw Error(queueDiagnostic(admitted.error(), "publisher-upstream-admit"));
+        }
+
+        if (bytes_->pendingOutput())
+            return;
+
+        if (pendingDemand_) {
+            if (!demand.acknowledge(*pendingDemand_))
+                throw Error({ErrorCode::INVALID_STATE, "publisher-upstream-demand-ack"});
+
+            pendingDemand_.reset();
+        }
+
+        if (ready_ && !described_) {
+            send(session_.describe(std::span(&QUOTE_ID, 1), work), work);
+            described_ = true;
+
+            return;
+        }
+
+        if (ready_) {
+            const auto next = demand.next(queue.aggregateEntries(), demandWork);
+
+            if (!next)
+                throw Error({ErrorCode::RESOURCE_LIMIT, "publisher-upstream-demand", 0,
+                             static_cast<std::uint32_t>(next.error())});
+
+            if (*next) {
+                const auto message = (*next)->action == mux::DemandAction::ADD
+                                         ? protocol::SubscriptionMessage::TICKER_ADD
+                                         : protocol::SubscriptionMessage::TICKER_REMOVE;
+                send(session_.subscribe(message, std::span(&(*next)->request, 1), work), work);
+                pendingDemand_ = (*next)->sequence;
+
+                return;
+            }
+        }
+
+        if (now >= heartbeatAt_) {
+            send(session_.composeHeartbeat({false, {}, {}, {}, {}}, work), work);
+            heartbeatAt_ = now + HEARTBEAT_PERIOD;
+        }
+    }
+};
+
 class QuoteServer {
     core::LocalSchema schema_;
-    protocol::detail::LocalEventOwner source_;
+    std::optional<protocol::detail::LocalEventOwner> source_;
     mux::MuxQueue queue_;
     transport::TcpListener listener_;
     std::vector<std::optional<Peer>> peers_;
     std::optional<protocol::LiveEvent> pendingSource_;
+    std::string sourceAddress_;
+    std::optional<PublisherSourceOptions> sourceOptions_;
+    std::optional<transport::detail::BootstrapLease> sourceBootstrap_;
+    std::optional<mux::DemandTracker> sourceDemand_;
+    std::optional<SourceConnection> upstream_;
+    Clock::time_point retryAt_{};
+    bool resetPending_ = false;
+    PublisherSourceStatus sourceStatus_;
     std::uint64_t publishedRevision_ = 0;
 
     static transport::TcpListener listen(transport::RuntimeBootstrap &bootstrap,
@@ -627,6 +863,9 @@ class QuoteServer {
             auto &peer = *entry;
             auto work = liveTurn();
 
+            if (const auto notice = peer.handle.resetNotice(); notice && !notice->globalAckPending)
+                (void)peer.handle.acknowledgeReset(notice->sequence);
+
             if (peer.closing || peer.handle.terminal() || (!peer.ready && now - peer.acceptedAt >= HANDSHAKE_TIMEOUT) ||
                 !receive(peer, work) || !send(peer, now, work)) {
                 retire(peer);
@@ -673,7 +912,7 @@ class QuoteServer {
                 --port.size;
             }
             auto liveWork = liveTurn();
-            auto event = source_.quote(schema_.recordContext(QUOTE_ID), quote->text(), quote->fields, {}, liveWork);
+            auto event = source_->quote(schema_.recordContext(QUOTE_ID), quote->text(), quote->fields, {}, liveWork);
 
             if (!event)
                 throw Error(protocolDiagnostic(event.error(), "publisher-local-event"));
@@ -689,10 +928,130 @@ class QuoteServer {
             throw Error(queueDiagnostic(admitted.error(), "publisher-admit"));
     }
 
+    void publishSourceStatus(detail::PublisherPort &port) {
+        {
+            const std::lock_guard lock(port.mutex);
+            port.source = sourceStatus_;
+        }
+        port.changed.notify_all();
+    }
+
+    void fenceSource() noexcept {
+        for (auto &entry : peers_) {
+            if (!entry || entry->closing)
+                continue;
+
+            auto &peer = *entry;
+
+            if (peer.output && peer.outputKind == OutputKind::DATA) {
+                if (peer.output->pendingBytes().size() != peer.output->bytes().size()) {
+                    // The accepted prefix cannot be recalled or followed by a different envelope.
+                    retire(peer);
+                    continue;
+                }
+
+                peer.output.reset();
+            }
+
+            if (!peer.delivery->batch.records().empty()) {
+                peer.delivery->batch = {};
+                (void)peer.handle.requestResume();
+            }
+        }
+    }
+
+    void progressSource(detail::PublisherPort &port, mux::QueueWork &work) {
+        const auto now = Clock::now();
+        const auto keys = peers_.size() * CLIENT_KEYS;
+        // One validation and search pass over every pair in each of the two finite demand maps.
+        const auto comparisons = 4 * (keys + 1) * (keys + 1);
+        mux::DemandWork demandWork{4, comparisons, comparisons * SYMBOL_UNITS};
+
+        if (resetPending_) {
+            const auto reset = queue_.resetStatus();
+
+            if (reset.failure)
+                throw Error(queueDiagnostic(*reset.failure, "publisher-upstream-reset"));
+
+            if (reset.phase != mux::ResetPhase::NONE || !reset.globalAcknowledged)
+                return;
+
+            resetPending_ = false;
+        }
+
+        try {
+            if (!upstream_) {
+                if (now < retryAt_)
+                    return;
+
+                auto liveWork = liveTurn();
+                upstream_.emplace(schema_, *sourceBootstrap_, *sourceOptions_, now, liveWork);
+            }
+
+            upstream_->progress(queue_, *sourceDemand_, now, work, demandWork);
+        } catch (const Error &failure) {
+            if (sourceStatus_.connected || (upstream_ && upstream_->ready())) {
+                fenceSource();
+                auto resetWork = serverQueueTurn(peers_.size(), true);
+                const auto reset = queue_.resetSource(resetWork);
+
+                if (!reset)
+                    throw Error(queueDiagnostic(reset.error(), "publisher-upstream-reset"));
+
+                resetPending_ = true;
+            }
+
+            upstream_.reset();
+
+            if (!sourceDemand_->reset(demandWork))
+                throw Error({ErrorCode::INVALID_STATE, "publisher-upstream-demand-reset"});
+
+            retryAt_ = now + sourceOptions_->retryDelay;
+            sourceStatus_.connected = false;
+            sourceStatus_.diagnostic = failure.diagnostic();
+            publishSourceStatus(port);
+
+            return;
+        }
+
+        if (upstream_->ready() && !sourceStatus_.connected) {
+            if (sourceStatus_.generation == std::numeric_limits<std::uint64_t>::max())
+                throw Error({ErrorCode::RESOURCE_LIMIT, "publisher-upstream-generation"});
+
+            ++sourceStatus_.generation;
+            sourceStatus_.connected = true;
+            sourceStatus_.diagnostic = {};
+            publishSourceStatus(port);
+        }
+    }
+
     public:
-    QuoteServer(transport::RuntimeBootstrap &bootstrap, transport::TcpListenerOptions options)
-        : schema_(quoteSchema()), source_(localOwner()), queue_(tickerQueue(schema_, options.maxConnections)),
-          listener_(listen(bootstrap, options)), peers_(options.maxConnections) {
+    QuoteServer(transport::RuntimeBootstrap &bootstrap, PublisherOptions options)
+        : schema_(quoteSchema()),
+          queue_(tickerQueue(schema_, options.listener.maxConnections, options.source.has_value())),
+          listener_(listen(bootstrap, options.listener)), peers_(options.listener.maxConnections) {
+        if (!options.source) {
+            source_.emplace(localOwner());
+
+            return;
+        }
+
+        sourceAddress_ = options.source->address;
+        sourceOptions_ = *options.source;
+        sourceOptions_->address = sourceAddress_;
+        auto lease = transport::detail::BootstrapLease::acquire(bootstrap);
+
+        if (!lease)
+            throw Error(sourceDiagnostic(lease.error()));
+
+        sourceBootstrap_.emplace(std::move(*lease));
+        auto demand = mux::DemandTracker::create(core::SubscriptionFamily::TICKER,
+                                                 {peers_.size() * CLIENT_KEYS, peers_.size() * CLIENT_SYMBOL_UNITS});
+
+        if (!demand)
+            throw Error({ErrorCode::RESOURCE_LIMIT, "publisher-upstream-demand-storage"});
+
+        sourceDemand_.emplace(std::move(*demand));
     }
 
     [[nodiscard]] std::uint16_t port() const noexcept {
@@ -702,7 +1061,7 @@ class QuoteServer {
     void progress(detail::PublisherPort &port) {
         acceptPeer();
         progressPeers();
-        auto work = serverQueueTurn(peers_.size());
+        auto work = serverQueueTurn(peers_.size(), sourceOptions_.has_value());
         constexpr std::size_t QUEUE_ACTIONS = 16;
 
         for (std::size_t i = 0; i < QUEUE_ACTIONS; ++i) {
@@ -721,7 +1080,11 @@ class QuoteServer {
                          static_cast<std::uint32_t>(terminal->outcome)});
 
         publishDemand(port);
-        publishQuote(port, work);
+
+        if (sourceOptions_)
+            progressSource(port, work);
+        else
+            publishQuote(port, work);
     }
 
     void stop() {
@@ -732,8 +1095,8 @@ class QuoteServer {
     }
 };
 
-void runPublisher(detail::PublisherPort &port, transport::RuntimeBootstrap &bootstrap,
-                  transport::TcpListenerOptions options, std::stop_token stop) noexcept {
+void runPublisher(detail::PublisherPort &port, transport::RuntimeBootstrap &bootstrap, PublisherOptions options,
+                  std::stop_token stop) noexcept {
     Diagnostic diagnostic;
 
     try {
@@ -762,6 +1125,7 @@ void runPublisher(detail::PublisherPort &port, transport::RuntimeBootstrap &boot
     {
         const std::lock_guard lock(port.mutex);
         port.closed = true;
+        port.source.connected = false;
         port.diagnostic = diagnostic;
         std::vector<QuoteRow>().swap(port.pending);
         std::vector<std::u16string>().swap(port.demand);
@@ -780,6 +1144,12 @@ Publisher::Publisher(std::shared_ptr<detail::PublisherPort> port) noexcept : por
 }
 
 std::expected<void, Diagnostic> Publisher::publish(const events::Quote &quote) const {
+    if (port_ && port_->remote) {
+        const std::lock_guard lock(port_->mutex);
+
+        return std::unexpected(port_->closed ? CLOSED : LOCAL_SOURCE_DISABLED);
+    }
+
     auto row = quoteRow(quote);
 
     if (!row)
@@ -818,12 +1188,31 @@ PublisherEndpoint::create(transport::RuntimeBootstrap &bootstrap, PublisherOptio
     }
 
     try {
+        if (options.source) {
+            const auto &source = *options.source;
+            // Longest presentation is IPv6 with an embedded dotted IPv4 address.
+            constexpr std::size_t MAX_NUMERIC_ADDRESS = 45;
+            std::array<char, MAX_NUMERIC_ADDRESS + 1> address{};
+
+            if (source.port == 0 || source.retryDelay < 1ms || source.retryDelay > 60s || source.address.empty() ||
+                source.address.size() > MAX_NUMERIC_ADDRESS ||
+                source.address.find_first_of(std::string_view("\0%", 2)) != std::string_view::npos)
+                return std::unexpected(Diagnostic{ErrorCode::INVALID_ARGUMENT, "publisher-source-options"});
+
+            std::ranges::copy(source.address, address.begin());
+            asio::error_code error;
+            (void)asio::ip::make_address(address.data(), error);
+
+            if (error)
+                return std::unexpected(Diagnostic{ErrorCode::INVALID_ARGUMENT, "publisher-source-address"});
+        }
+
         auto impl = std::make_unique<Impl>();
-        impl->port = std::make_shared<detail::PublisherPort>(options.pendingQuotes);
+        impl->port = std::make_shared<detail::PublisherPort>(options.pendingQuotes, options.source.has_value());
         const auto port = impl->port;
         auto endpoint = std::unique_ptr<PublisherEndpoint>(new PublisherEndpoint(std::move(impl)));
         endpoint->impl_->worker = std::jthread([port, &bootstrap, options](std::stop_token stop) {
-            runPublisher(*port, bootstrap, options.listener, stop);
+            runPublisher(*port, bootstrap, options, stop);
         });
         std::unique_lock lock(port->mutex);
         port->changed.wait(lock, [&] {
@@ -868,6 +1257,25 @@ bool PublisherEndpoint::awaitDemand(std::u16string_view symbol, bool subscribed,
     return port.changed.wait_until(lock, deadline, [&] {
         return port.closed || matches();
     }) && !port.closed;
+}
+
+bool PublisherEndpoint::awaitSourceGeneration(std::uint64_t after, Clock::time_point deadline) const {
+    auto &port = *impl_->port;
+
+    if (!port.remote)
+        return false;
+
+    std::unique_lock lock(port.mutex);
+
+    return port.changed.wait_until(lock, deadline, [&] {
+        return port.closed || (port.source.connected && port.source.generation > after);
+    }) && !port.closed;
+}
+
+PublisherSourceStatus PublisherEndpoint::getSourceStatus() const noexcept {
+    const std::lock_guard lock(impl_->port->mutex);
+
+    return impl_->port->source;
 }
 
 void PublisherEndpoint::closeAndAwaitTermination() noexcept {
