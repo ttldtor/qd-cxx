@@ -213,6 +213,19 @@ TEST_CASE("publisher serves two typed TCP Feed connections with a late TICKER va
     const auto registry = quoteRegistry();
     Client first(runtime, port, &registry);
     REQUIRE((*server)->awaitDemand(u"IBM", true, Clock::now() + 5s));
+    constexpr auto ticker = q::core::SubscriptionFamily::TICKER;
+    constexpr auto stream = q::core::SubscriptionFamily::STREAM;
+    CHECK((*server)->awaitDemand(ticker, u"Quote", u"IBM", true, Clock::now()));
+    CHECK_FALSE((*server)->awaitDemand(ticker, u"Order", u"IBM", true, Clock::now()));
+    CHECK((*server)->awaitDemand(ticker, u"Order", u"IBM", false, Clock::now()));
+    CHECK_FALSE((*server)->awaitDemand(ticker, u"", u"IBM", true, Clock::now()));
+    CHECK_FALSE((*server)->awaitDemand(stream, u"TimeAndSale", u"IBM", false, Clock::now()));
+    CHECK((*server)->getDemand(stream).empty());
+    const auto originalDemand = (*server)->getDemand(ticker);
+    REQUIRE(originalDemand.size() == 1);
+    CHECK(originalDemand.front().recordName == u"Quote");
+    CHECK(originalDemand.front().symbol == u"IBM");
+    CHECK_FALSE(originalDemand.front().historyBound);
 
     auto value = makeQuote();
     const auto earlyPrice = value.bidPrice.raw;
@@ -261,6 +274,9 @@ TEST_CASE("publisher serves two typed TCP Feed connections with a late TICKER va
     CHECK((*server)->awaitDemand(u"IBM", true, Clock::now() + 5s));
     (void)late.endpoint->closeAndAwaitTermination();
     CHECK((*server)->awaitDemand(u"IBM", false, Clock::now() + 5s));
+    CHECK((*server)->awaitDemand(ticker, u"Quote", u"IBM", false, Clock::now()));
+    CHECK((*server)->getDemand(ticker).empty());
+    CHECK(originalDemand.front().symbol == u"IBM");
 
     auto wrong = makeQuote();
     wrong.timeMs = (std::numeric_limits<std::int64_t>::min)();
@@ -269,7 +285,10 @@ TEST_CASE("publisher serves two typed TCP Feed connections with a late TICKER va
     CHECK(refused.error().code == q::api::ErrorCode::INVALID_ARGUMENT);
     (*server)->closeAndAwaitTermination();
     CHECK((*server)->getDiagnostic().code == q::api::ErrorCode::NONE);
+    CHECK((*server)->getDemand(ticker).empty());
+    CHECK_FALSE((*server)->awaitDemand(ticker, u"Quote", u"IBM", false, Clock::now()));
     server->reset();
+    CHECK(originalDemand.front().recordName == u"Quote");
     const auto closed = publisher.publish(next);
     REQUIRE_FALSE(closed);
     CHECK(closed.error().code == q::api::ErrorCode::CLOSED);
@@ -358,6 +377,10 @@ TEST_CASE("remote QTP publisher reconciles overlapping demand across source gene
     REQUIRE((*relay)->awaitSourceGeneration(initialGeneration, Clock::now() + 5s));
     CHECK((*relay)->getSourceStatus().generation > initialGeneration);
     REQUIRE(second.events->wait(current.bidPrice.raw));
+    const auto recoveredDemand = (*relay)->getDemand(family);
+    REQUIRE(recoveredDemand.size() == 1);
+    CHECK(recoveredDemand.front().recordName == u"Quote");
+    CHECK(recoveredDemand.front().symbol == u"IBM");
 
     const auto statisticsDeadline = Clock::now() + 5s;
     q::api::PublisherStatistics sourceStats;
@@ -502,6 +525,18 @@ TEST_CASE("mixed publisher preserves STREAM occurrences and indexed HISTORY on o
     for (const auto family : {q::core::SubscriptionFamily::TICKER, q::core::SubscriptionFamily::STREAM,
                               q::core::SubscriptionFamily::HISTORY}) {
         REQUIRE((*source)->awaitDemand(family, u"MSFT", true, Clock::now() + 5s));
+    }
+
+    using enum q::core::SubscriptionFamily;
+    CHECK((*source)->awaitDemand(TICKER, u"Quote", u"IBM", true, Clock::now()));
+    CHECK((*source)->awaitDemand(STREAM, u"TimeAndSale", u"IBM", true, Clock::now()));
+    CHECK((*source)->awaitDemand(HISTORY, u"Order", u"IBM", true, Clock::now()));
+    const auto indexedDemand = (*source)->getDemand(HISTORY);
+    REQUIRE(indexedDemand.size() == 2);
+
+    for (const auto &entry : indexedDemand) {
+        CHECK(entry.recordName == u"Order");
+        CHECK(entry.historyBound.has_value());
     }
 
     auto publisher = (*source)->getPublisher();

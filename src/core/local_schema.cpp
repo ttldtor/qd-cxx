@@ -267,6 +267,15 @@ RecordContext LocalSchema::recordContext(std::int32_t localId) const noexcept {
     return RecordContext(identity_, localId);
 }
 
+std::optional<std::int32_t> LocalSchema::recordId(const RecordContext &context) const noexcept {
+    if (!context.valid() || context.identity_ != identity_ ||
+        static_cast<std::size_t>(context.localId_) >= records_.size()) {
+        return std::nullopt;
+    }
+
+    return context.localId_;
+}
+
 std::expected<LocalSchema, SchemaError> LocalSchema::boundedCopy(SchemaLimits limits) const {
     if (records_.size() > limits.records) {
         return std::unexpected(SchemaError::RESOURCE_LIMIT);

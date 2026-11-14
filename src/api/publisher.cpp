@@ -596,7 +596,7 @@ struct PublisherPort {
     std::mutex mutex;
     std::condition_variable changed;
     std::vector<SourceRow> pending;
-    std::array<std::vector<std::u16string>, FAMILY_COUNT> demand;
+    std::array<std::vector<PublisherDemand>, FAMILY_COUNT> demand;
     const bool remote;
     const bool mixed;
     PublisherSourceStatus source;
@@ -623,6 +623,26 @@ struct PublisherPort {
 } // namespace detail
 
 namespace {
+bool awaitPublishedDemand(detail::PublisherPort &port, Family family, std::u16string_view recordName,
+                          std::u16string_view symbol, bool subscribed, Clock::time_point deadline) {
+    const auto index = familyIndex(family);
+
+    if (!index || (*index != 0 && !port.mixed))
+        return false;
+
+    std::unique_lock lock(port.mutex);
+    const auto &demand = port.demand[*index];
+
+    return port.changed.wait_until(lock, deadline, [&] {
+        if (port.closed)
+            return true;
+
+        return std::ranges::any_of(demand, [&](const auto &entry) {
+                   return entry.symbol == symbol && (recordName.empty() || entry.recordName == recordName);
+               }) == subscribed;
+    }) && !port.closed;
+}
+
 constexpr protocol::LivePropertyView SOURCE_PROPERTIES[]{{u"type", u"qtp"}};
 constexpr protocol::LivePropertyView MIXED_SOURCE_PROPERTIES[]{{u"type", u"qtp"}, {u"opt", u"hs"}};
 
@@ -1172,15 +1192,23 @@ class PublisherServer {
             return;
 
         const auto entries = queue.aggregateEntries();
-        std::vector<std::u16string> symbols;
-        symbols.reserve(entries.size());
+        const auto records = schema_.records();
+        std::vector<PublisherDemand> demand;
+        demand.reserve(entries.size());
 
-        for (const auto &entry : entries)
-            symbols.emplace_back(entry.key.symbol);
+        for (const auto &entry : entries) {
+            const auto id = schema_.recordId(entry.key.context);
+
+            if (!id)
+                throw Error({ErrorCode::INVALID_STATE, "publisher-demand-record"});
+
+            demand.emplace_back(records[static_cast<std::size_t>(*id)].name, std::u16string(entry.key.symbol),
+                                entry.historyBound);
+        }
 
         {
             const std::lock_guard lock(port.mutex);
-            port.demand[family] = std::move(symbols);
+            port.demand[family] = std::move(demand);
         }
 
         publishedRevision_[family] = revision;
@@ -1495,7 +1523,7 @@ void runPublisher(detail::PublisherPort &port, transport::RuntimeBootstrap &boot
         std::vector<SourceRow>().swap(port.pending);
 
         for (auto &demand : port.demand)
-            std::vector<std::u16string>().swap(demand);
+            std::vector<PublisherDemand>().swap(demand);
 
         port.size = 0;
     }
@@ -1635,21 +1663,33 @@ bool PublisherEndpoint::awaitDemand(std::u16string_view symbol, bool subscribed,
 
 bool PublisherEndpoint::awaitDemand(Family family, std::u16string_view symbol, bool subscribed,
                                     Clock::time_point deadline) const {
+    if (!exactSymbol(symbol))
+        return false;
+
+    return awaitPublishedDemand(*impl_->port, family, {}, symbol, subscribed, deadline);
+}
+
+bool PublisherEndpoint::awaitDemand(Family family, std::u16string_view recordName, std::u16string_view symbol,
+                                    bool subscribed, Clock::time_point deadline) const {
+    if (recordName.empty() || !symbol.data() || (!symbol.empty() && !exactSymbol(symbol)))
+        return false;
+
+    return awaitPublishedDemand(*impl_->port, family, recordName, symbol, subscribed, deadline);
+}
+
+std::vector<PublisherDemand> PublisherEndpoint::getDemand(Family family) const {
     const auto index = familyIndex(family);
     auto &port = *impl_->port;
 
-    if (!exactSymbol(symbol) || !index || (*index != 0 && !port.mixed))
-        return false;
+    if (!index)
+        return {};
 
-    std::unique_lock lock(port.mutex);
-    const auto &demand = port.demand[*index];
-    const auto matches = [&] {
-        return (std::ranges::find(demand, symbol) != demand.end()) == subscribed;
-    };
+    const std::lock_guard lock(port.mutex);
 
-    return port.changed.wait_until(lock, deadline, [&] {
-        return port.closed || matches();
-    }) && !port.closed;
+    if (port.closed)
+        return {};
+
+    return port.demand[*index];
 }
 
 bool PublisherEndpoint::awaitSourceGeneration(std::uint64_t after, Clock::time_point deadline) const {

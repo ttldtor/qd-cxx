@@ -9,7 +9,9 @@
 #include <chrono>
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <string_view>
+#include <vector>
 
 namespace org::ttldtor::qdcxx::api {
 namespace detail {
@@ -28,6 +30,13 @@ struct PublisherSourceStatus {
     std::uint64_t generation = 0; ///< Latest negotiated generation, zero before the first connection.
     bool connected = false;       ///< Bidirectional configured capabilities negotiated on a current connection.
     Diagnostic diagnostic;        ///< Last source failure until a fresh generation negotiates.
+};
+
+/** Owned exact source demand for a physical record in one selected contract. */
+struct PublisherDemand {
+    std::u16string recordName;                ///< Exact local schema record name.
+    std::u16string symbol;                    ///< Exact symbol, with all UTF-16 units preserved.
+    std::optional<std::int64_t> historyBound; ///< Minimum raw indexed lower bound, present only for HISTORY.
 };
 
 /** Detached observations for one local collector family. */
@@ -116,9 +125,27 @@ class PublisherEndpoint final {
      */
     [[nodiscard]] bool awaitDemand(std::u16string_view symbol, bool subscribed,
                                    std::chrono::steady_clock::time_point deadline) const;
-    /** Wait for presence or absence of an exact symbol in the selected family's desired union. */
+    /** Wait for presence in any record, or absence from all records, in the selected family. */
     [[nodiscard]] bool awaitDemand(core::SubscriptionFamily family, std::u16string_view symbol, bool subscribed,
                                    std::chrono::steady_clock::time_point deadline) const;
+    /** Wait for an exact record and symbol in the selected family's last published desired union.
+     * @param family Selected contract.
+     * @param recordName Nonempty exact physical record name. Names outside this contract's union count as absent.
+     * @param symbol Borrowed exact symbol, including a non-null empty symbol.
+     * @param subscribed True waits for presence; false waits for absence.
+     * @param deadline Finite monotonic wait deadline.
+     * @return True if observed before shutdown or expiration. Invalid selector text or disabled families return false.
+     */
+    [[nodiscard]] bool awaitDemand(core::SubscriptionFamily family, std::u16string_view recordName,
+                                   std::u16string_view symbol, bool subscribed,
+                                   std::chrono::steady_clock::time_point deadline) const;
+    /** Copy one family's latest published desired union. Order is unspecified.
+     * @param family Selected contract.
+     * @return Detached snapshot, empty for a disabled or invalid family or a closed endpoint. The number of
+     * entries is bounded by downstream capacity. Allocation failure may throw. Demand does not imply an
+     * upstream acknowledgment, and persists across an upstream reconnect while downstream peers remain active.
+     */
+    [[nodiscard]] std::vector<PublisherDemand> getDemand(core::SubscriptionFamily family) const;
     /** Observe a fresh negotiated remote source generation within a finite deadline.
      * @param after Previously observed generation, or zero for the first connection.
      * @param deadline Monotonic observation deadline.

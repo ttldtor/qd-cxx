@@ -152,6 +152,29 @@ TEST_CASE("production Java description projections preserve ordered binding deci
     CHECK(caseIndex == names.size());
 }
 
+TEST_CASE("local record identity resolves within provenance-preserving copies and moves") {
+    auto source = LocalSchema::create(localRecords(), SCHEMA_LIMITS);
+    auto independentlyCreated = LocalSchema::create(localRecords(), SCHEMA_LIMITS);
+    REQUIRE(source);
+    REQUIRE(independentlyCreated);
+    const auto context = source->recordContext(1);
+    CHECK(source->recordId(context) == 1);
+    CHECK_FALSE(source->recordId({}));
+    CHECK_FALSE(source->recordId(source->recordContext(-1)));
+    CHECK_FALSE(source->recordId(source->recordContext(3)));
+    CHECK_FALSE(independentlyCreated->recordId(context));
+
+    const auto copy = *source;
+    const auto bounded = source->boundedCopy(SCHEMA_LIMITS);
+    REQUIRE(bounded);
+    CHECK(copy.recordId(context) == 1);
+    CHECK(bounded->recordId(context) == 1);
+
+    const auto moved = std::move(*source);
+    CHECK_FALSE(source->recordId(context));
+    CHECK(moved.recordId(context) == 1);
+}
+
 TEST_CASE("local schema rejects unsupported and ambiguous input before ownership") {
     auto records = localRecords();
     CHECK(LocalSchema::create({}, {0, 0, 0, 0, 0}).has_value());
