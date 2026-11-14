@@ -2,6 +2,11 @@
 
 [English version](LIVE-DATA-WRITE.md).
 
+`SubscriptionWriterLimits::omitVoidDescriptions` исключает нулевые по ширине
+поля VOID из описания типа 2, как в Java, и сохраняет порядок остальных полей.
+Исходящая раскладка и вход DATA по-прежнему включают все логические поля.
+По умолчанию описание сохраняет явные записи VOID.
+
 `SubscriptionWriter::composeData` составляет один непустой двоичный кадр без сжатия
 `TICKER_DATA` (10), `STREAM_DATA` (15) или `HISTORY_DATA` (20).
 `LiveSession::publishData` проверяет соответствующую возможность приёма у пира

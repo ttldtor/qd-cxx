@@ -68,6 +68,36 @@ std::vector<std::byte> oracle(std::int32_t type, bool hs) {
     return result;
 }
 
+TEST_CASE("Java description omits logical VOID while DATA keeps the same bytes") {
+    const c::LocalRecord local{0, u"R", false, {{0}, {8}}, {{u"V", 0}, {u"I", 1}}, {}};
+    const p::OutgoingRecord layout{7, 0, u"R", {{u"V", 0, 0}, {u"I", 8, 1}}};
+    auto options = OUTPUT_LIMITS;
+    options.omitVoidDescriptions = true;
+    auto java = writer(std::span(&local, 1), std::span(&layout, 1), options);
+    auto legacy = writer(std::span(&local, 1), std::span(&layout, 1));
+    const std::int32_t id = 7;
+    auto work = turn();
+    auto description = java.describe(std::span(&id, 1), work);
+    const std::array expected{std::byte{8}, std::byte{2}, std::byte{7},   std::byte{1}, std::byte{'R'},
+                              std::byte{1}, std::byte{1}, std::byte{'I'}, std::byte{8}};
+    REQUIRE(description);
+    CHECK(std::ranges::equal(description->bytes(), expected));
+    auto legacyDescription = legacy.describe(std::span(&id, 1), work);
+    const std::array legacyExpected{std::byte{11},  std::byte{2}, std::byte{7},   std::byte{1},
+                                    std::byte{'R'}, std::byte{2}, std::byte{1},   std::byte{'V'},
+                                    std::byte{0},   std::byte{1}, std::byte{'I'}, std::byte{8}};
+    REQUIRE(legacyDescription);
+    CHECK(std::ranges::equal(legacyDescription->bytes(), legacyExpected));
+
+    const c::FieldValueView values[]{{Type::VOID_FIELD, 0, {}, {}}, {Type::COMPACT_INT, 42, {}, {}}};
+    const p::LiveDataRecordView row{id, u"IBM", values};
+    auto javaData = java.composeData(p::LiveDataMessage::STREAM_DATA, std::span(&row, 1), false, work);
+    auto legacyData = legacy.composeData(p::LiveDataMessage::STREAM_DATA, std::span(&row, 1), false, work);
+    REQUIRE(javaData);
+    REQUIRE(legacyData);
+    CHECK(std::ranges::equal(javaData->bytes(), legacyData->bytes()));
+}
+
 TEST_CASE("outgoing DATA and type-2 are byte-exact for all Java live families and 64 flag combinations") {
     const c::LocalRecord local{
         0, u"Pair", true, {{8}, {8}, {8}}, {{u"F0", 0}, {u"F1", 1}, {u"F2", 2}}, c::IndexedTimePairInt32{0, 1}};

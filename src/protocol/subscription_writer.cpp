@@ -728,10 +728,24 @@ struct SubscriptionWriter::Operation {
 
                 number(record.senderId);
                 text(record.wireName, false);
-                number(static_cast<std::int32_t>(record.fields.size()));
+                auto fieldCount = record.fields.size();
+                constexpr auto VOID_TYPE = std::to_underlying(core::SerialFieldType::VOID_FIELD);
+
+                if (writer.limits_.omitVoidDescriptions) {
+                    debit(fieldCount, work.visits);
+                    fieldCount -= static_cast<std::size_t>(
+                        std::ranges::count(record.fields, VOID_TYPE, &OutgoingField::serialTypeId));
+                }
+
+                number(static_cast<std::int32_t>(fieldCount));
 
                 for (const auto &field : record.fields) {
                     debit(1, work.visits);
+
+                    if (writer.limits_.omitVoidDescriptions && field.serialTypeId == VOID_TYPE) {
+                        continue;
+                    }
+
                     text(field.wireName, false);
                     number(field.serialTypeId);
                 }

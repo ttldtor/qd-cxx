@@ -62,14 +62,15 @@ struct SubscriptionWriterWork {
 
 /** Required logical bounds; zero means zero. Allocator and exception bookkeeping are excluded. */
 struct SubscriptionWriterLimits {
-    std::size_t frameBytes;         ///< Body bytes including message identity; at most Java INT_MAX.
-    std::size_t operationBytes;     ///< Complete envelope bytes per successful operation.
-    std::size_t operationEntries;   ///< Borrowed input tuples or description IDs, counting duplicates.
-    std::size_t symbolUnits;        ///< Units in one exact non-null symbol.
-    encoding::UtfStringLimits text; ///< One description name's UTFString body bytes and units.
-    std::size_t residentBytes;      ///< Aggregate backing bytes of all outputs from this composer, consumed or not.
-    std::size_t peakBytes;          ///< Old outstanding output backing plus the new candidate backing.
-    std::size_t outputs;            ///< Maximum simultaneously retained output owners, including the candidate.
+    std::size_t frameBytes;            ///< Body bytes including message identity; at most Java INT_MAX.
+    std::size_t operationBytes;        ///< Complete envelope bytes per successful operation.
+    std::size_t operationEntries;      ///< Borrowed input tuples or description IDs, counting duplicates.
+    std::size_t symbolUnits;           ///< Units in one exact non-null symbol.
+    encoding::UtfStringLimits text;    ///< One description name's UTFString body bytes and units.
+    std::size_t residentBytes;         ///< Aggregate backing bytes of all outputs from this composer, consumed or not.
+    std::size_t peakBytes;             ///< Old outstanding output backing plus the new candidate backing.
+    std::size_t outputs;               ///< Maximum simultaneously retained output owners, including the candidate.
+    bool omitVoidDescriptions = false; ///< Emit Java-compatible descriptions while retaining logical VOID fields.
 };
 
 /** Move-only whole envelope and partial-write cursor, independent of composer/input lifetime.
