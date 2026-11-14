@@ -341,7 +341,15 @@ Result readSymbol(std::span<const std::byte> input, SymbolLimits limits, std::op
 } // namespace
 
 SymbolResult SymbolReader::read(std::span<const std::byte> input) {
-    return readSymbol<SymbolValue, SymbolResult>(input, limits_, previous_, mruFlags_, state_, {{}, 0, 0, 0});
+    return readBounded(input, limits_.codeUnits);
+}
+
+SymbolResult SymbolReader::readBounded(std::span<const std::byte> input, std::size_t unitLimit) {
+    auto limits = limits_;
+
+    limits.codeUnits = std::min(limits.codeUnits, unitLimit);
+
+    return readSymbol<SymbolValue, SymbolResult>(input, limits, previous_, mruFlags_, state_, {{}, 0, 0, 0});
 }
 
 PmrSymbolReader::PmrSymbolReader(SymbolLimits limits, std::uint32_t optionMask,

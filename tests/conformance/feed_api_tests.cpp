@@ -5655,6 +5655,7 @@ TEST_CASE("mixed Feed publishes one full-catalog desired revision on one QTP con
     api::ApiRuntime runtime(runtimeOptions());
     auto options = endpointOptions(api::DeliveryContract::MIXED);
     options.readTimeout = 10s;
+    options.drainTimeout = api::EndpointOptions{}.drainTimeout;
     auto endpoint = runtime.createEndpoint(options);
     auto feed = endpoint->getFeed();
     auto sub = feed->createCatalogSubscription();
