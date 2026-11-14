@@ -3,6 +3,7 @@
 #pragma once
 
 #include "qd/api/feed.hpp"
+#include "qd/api/feed_filter.hpp"
 #include "qd/transport/tcp_listener.hpp"
 
 #include <array>
@@ -61,13 +62,30 @@ struct PublisherStatistics {
     std::size_t pendingPublications = 0;                 ///< Accepted local publication rows still in the input FIFO.
 };
 
+/** One immutable connection policy. An omitted filter admits all exact keys for that contract. */
+struct PublisherDemandPolicy {
+    std::optional<FeedFilter> ticker;
+    std::optional<FeedFilter> stream;
+    std::optional<FeedFilter> history;
+};
+
+/** Use this policy in place of the default when the transport observes this exact remote IP address. */
+struct PublisherPeerDemandPolicy {
+    std::string address; ///< Unscoped numeric IPv4 or IPv6; IPv4-mapped IPv6 matches the same IPv4 address.
+    PublisherDemandPolicy demand;
+};
+
 /** Finite local or remote publishing profile. */
 struct PublisherOptions {
+    static constexpr std::size_t MAX_PEER_DEMAND_POLICIES = 32; ///< Maximum address overrides per endpoint.
+
     transport::TcpListenerOptions listener{"127.0.0.1", 0, 16,
                                            4};      ///< Plain numeric bind; address is borrowed at create.
     std::size_t pendingQuotes = 64;                 ///< Maximum queued publication requests across enabled contracts.
     std::optional<PublisherSourceOptions> source{}; ///< Remote upstream in place of local publication.
     bool mixed = false; ///< Enable Quote/TICKER, TimeAndSale/STREAM and default Order/HISTORY on each connection.
+    PublisherDemandPolicy demand; ///< Default policy. Filters must be static and built before create.
+    std::vector<PublisherPeerDemandPolicy> peerDemand; ///< Owned overrides, matched by numeric IP on connection.
 };
 
 /** Detached producer port. Copies may be used from application threads and outlive the endpoint. */

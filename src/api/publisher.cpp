@@ -533,9 +533,65 @@ struct Delivery final : mux::MuxConsumer {
 // Front-loading control frames avoids consuming data queue reservations during negotiation.
 enum class OutputKind { PROTOCOL, DESCRIPTION, HEARTBEAT, DATA };
 
+using DemandPolicy = std::array<std::optional<FeedFilter>, FAMILY_COUNT>;
+
+struct PeerDemandPolicy {
+    transport::TcpPeerAddress address;
+    DemandPolicy demand;
+};
+
+struct DemandPolicies {
+    DemandPolicy defaults;
+    std::vector<PeerDemandPolicy> peers;
+};
+
+DemandPolicy staticDemandPolicy(const PublisherDemandPolicy &policy) {
+    const DemandPolicy result{policy.ticker, policy.stream, policy.history};
+
+    if (std::ranges::any_of(result, [](const auto &filter) {
+            return filter && (!filter->valid() || filter->isDynamic());
+        }))
+        throw Error({ErrorCode::INVALID_ARGUMENT, "publisher-demand-filter"});
+
+    return result;
+}
+
+DemandPolicies configuredDemandPolicies(const PublisherOptions &options) {
+    if (options.peerDemand.size() > PublisherOptions::MAX_PEER_DEMAND_POLICIES)
+        throw Error({ErrorCode::RESOURCE_LIMIT, "publisher-demand-policy-count"});
+
+    DemandPolicies result{staticDemandPolicy(options.demand), {}};
+    result.peers.reserve(options.peerDemand.size());
+
+    for (const auto &peer : options.peerDemand) {
+        constexpr std::size_t maximumNumericAddress = 45;
+
+        if (peer.address.empty() || peer.address.size() > maximumNumericAddress ||
+            peer.address.find_first_of(std::string_view("\0%", 2)) != std::string::npos)
+            throw Error({ErrorCode::INVALID_ARGUMENT, "publisher-demand-peer-address"});
+
+        asio::error_code error;
+        const auto address = asio::ip::make_address(peer.address, error);
+
+        if (error)
+            throw Error({ErrorCode::INVALID_ARGUMENT, "publisher-demand-peer-address"});
+
+        const auto bytes = address.is_v4() ? asio::ip::make_address_v6(asio::ip::v4_mapped, address.to_v4()).to_bytes()
+                                           : address.to_v6().to_bytes();
+
+        if (std::ranges::find(result.peers, bytes, &PeerDemandPolicy::address) != result.peers.end())
+            throw Error({ErrorCode::INVALID_ARGUMENT, "publisher-duplicate-demand-peer"});
+
+        result.peers.push_back({bytes, staticDemandPolicy(peer.demand)});
+    }
+
+    return result;
+}
+
 struct Peer {
     transport::TcpConnectionId id;
     protocol::LiveSession session;
+    DemandPolicy demand;
     std::array<std::shared_ptr<Delivery>, FAMILY_COUNT> delivery;
     std::array<mux::MuxHandle, FAMILY_COUNT> handles;
     std::optional<mux::MuxCommandTicket> command;
@@ -900,6 +956,7 @@ class PublisherServer {
     QueueSet queues_;
     transport::TcpListener listener_;
     std::vector<std::optional<Peer>> peers_;
+    const DemandPolicies demandPolicies_;
     std::optional<protocol::LiveEvent> pendingSource_;
     std::string sourceAddress_;
     std::optional<PublisherSourceOptions> sourceOptions_;
@@ -940,10 +997,25 @@ class PublisherServer {
             return;
 
         try {
+            auto demand = demandPolicies_.defaults;
+
+            if (!demandPolicies_.peers.empty()) {
+                const auto address = listener_.peerAddress(**accepted);
+
+                if (!address)
+                    throw Error(nativeDiagnostic(address.error()));
+
+                const auto found = std::ranges::find(demandPolicies_.peers, *address, &PeerDemandPolicy::address);
+
+                if (found != demandPolicies_.peers.end())
+                    demand = found->demand;
+            }
+
             auto liveWork = liveTurn();
             auto session = serverSession(schema_, liveWork);
             const auto now = Clock::now();
-            Peer peer{**accepted, std::move(session), {}, {}, {}, {}, now, now, now + HEARTBEAT_PERIOD};
+            Peer peer{**accepted, std::move(session),    std::move(demand), {}, {}, {}, {}, now,
+                      now,        now + HEARTBEAT_PERIOD};
 
             for (std::size_t family = 0; family < familyCount_; ++family) {
                 auto work = serverQueueTurn(peers_.size(), sourceOptions_.has_value(), familyCount_ > 1);
@@ -1039,6 +1111,22 @@ class PublisherServer {
             std::erase_if(result.subscription->entries, [&](const auto &entry) {
                 return !entry.context.matches(context);
             });
+
+            // Removal acts on this client's applied keys, independent of admission policy.
+            if (const auto &filter = peer.demand[*family];
+                filter && result.subscription->message == ADD_MESSAGES[*family]) {
+                const auto records = schema_.records();
+
+                try {
+                    std::erase_if(result.subscription->entries, [&](const auto &entry) {
+                        const auto id = schema_.recordId(entry.context);
+
+                        return !id || !filter->acceptRecord(records[static_cast<std::size_t>(*id)].name, entry.symbol);
+                    });
+                } catch (const Error &) {
+                    return false;
+                }
+            }
 
             mux::QueueSubmitWork submit{8, 65536, 65536, 1024 * 1024};
             auto ticket =
@@ -1369,9 +1457,10 @@ class PublisherServer {
     }
 
     public:
-    PublisherServer(transport::RuntimeBootstrap &bootstrap, PublisherOptions options)
+    PublisherServer(transport::RuntimeBootstrap &bootstrap, const PublisherOptions &options, DemandPolicies demand)
         : schema_(publisherSchema(options.mixed)), listener_(listen(bootstrap, options.listener)),
-          peers_(options.listener.maxConnections), familyCount_(schema_.records().size()) {
+          peers_(options.listener.maxConnections), demandPolicies_(std::move(demand)),
+          familyCount_(schema_.records().size()) {
         for (std::size_t family = familyCount_; family < FAMILY_COUNT; ++family) {
             auto &stats = statistics_.families[family];
             stats.ingressFrames.availability = core::StatisticAvailability::UNSUPPORTED;
@@ -1488,12 +1577,12 @@ class PublisherServer {
     }
 };
 
-void runPublisher(detail::PublisherPort &port, transport::RuntimeBootstrap &bootstrap, PublisherOptions options,
-                  std::stop_token stop) noexcept {
+void runPublisher(detail::PublisherPort &port, transport::RuntimeBootstrap &bootstrap, const PublisherOptions &options,
+                  DemandPolicies demand, std::stop_token stop) noexcept {
     Diagnostic diagnostic;
 
     try {
-        PublisherServer server(bootstrap, options);
+        PublisherServer server(bootstrap, options, std::move(demand));
         {
             const std::lock_guard lock(port.mutex);
             port.boundPort = server.port();
@@ -1619,14 +1708,18 @@ PublisherEndpoint::create(transport::RuntimeBootstrap &bootstrap, PublisherOptio
                 return std::unexpected(Diagnostic{ErrorCode::INVALID_ARGUMENT, "publisher-source-address"});
         }
 
+        auto demand = configuredDemandPolicies(options);
+        options.demand = {};
+        std::vector<PublisherPeerDemandPolicy>().swap(options.peerDemand);
         auto impl = std::make_unique<Impl>();
         impl->port =
             std::make_shared<detail::PublisherPort>(options.pendingQuotes, options.source.has_value(), options.mixed);
         const auto port = impl->port;
         auto endpoint = std::unique_ptr<PublisherEndpoint>(new PublisherEndpoint(std::move(impl)));
-        endpoint->impl_->worker = std::jthread([port, &bootstrap, options](std::stop_token stop) {
-            runPublisher(*port, bootstrap, options, stop);
-        });
+        endpoint->impl_->worker = std::jthread(
+            [port, &bootstrap, options = std::move(options), demand = std::move(demand)](std::stop_token stop) mutable {
+                runPublisher(*port, bootstrap, options, std::move(demand), stop);
+            });
         std::unique_lock lock(port->mutex);
         port->changed.wait(lock, [&] {
             return port->started || port->closed;
@@ -1636,6 +1729,8 @@ PublisherEndpoint::create(transport::RuntimeBootstrap &bootstrap, PublisherOptio
             return std::unexpected(port->diagnostic);
 
         return endpoint;
+    } catch (const Error &failure) {
+        return std::unexpected(failure.diagnostic());
     } catch (const std::bad_alloc &) {
         return std::unexpected(ALLOCATION);
     } catch (const std::system_error &) {

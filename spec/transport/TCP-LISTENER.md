@@ -27,6 +27,11 @@ identities. When the kernel has no connection ready, `accept()` returns an
 empty optional. Interrupted syscalls yield to the caller and other native
 accept failures report a detached diagnostic.
 
+`peerAddress(connection)` reports a detached 16-byte numeric remote address for an
+active accepted connection. IPv4 occupies the equivalent IPv4-mapped IPv6 bytes.
+The observation contains neither port nor IPv6 scope and performs no name resolution.
+A retired or foreign connection identity is rejected.
+
 ## Per-connection byte I/O and retirement
 
 `read()` and `write()` each attempt at most one native nonblocking operation

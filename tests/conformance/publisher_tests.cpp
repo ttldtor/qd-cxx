@@ -12,6 +12,7 @@
 #include "qd/transport/tcp_runtime.hpp"
 #include "recovery_test_peer.hpp"
 
+#include <algorithm>
 #include <array>
 #include <asio/io_context.hpp>
 #include <asio/ip/tcp.hpp>
@@ -118,6 +119,119 @@ struct Client {
         });
         subscription->addSymbols("IBM");
         endpoint->connect("127.0.0.1:" + std::to_string(port));
+    }
+};
+
+class DemandPeer {
+    asio::io_context context_;
+    tcp::socket socket_{context_};
+    q::core::LocalSchema schema_;
+    q::protocol::SubscriptionWriter writer_;
+
+    static q::core::LocalSchema schema() {
+        constexpr q::core::SchemaLimits bounds{3, 128, 256, 64, 4096};
+        const auto quote = q::events::defaultQuoteSchema(bounds);
+        const auto sale = q::events::defaultTimeAndSaleSchema(bounds);
+        const auto order = q::events::defaultOrderSchema(bounds);
+        REQUIRE(quote);
+        REQUIRE(sale);
+        REQUIRE(order);
+        std::array records{quote->records().front(), sale->records().front(), order->records().front()};
+        records[1].id = 1;
+        records[2].id = 2;
+        auto local = q::core::LocalSchema::create(records, bounds, q::core::LocalProfile::BINARY_FIELDS_V1);
+        REQUIRE(local);
+
+        return std::move(*local);
+    }
+
+    static q::protocol::SubscriptionWriter writer(const q::core::LocalSchema &local) {
+        std::vector<q::protocol::OutgoingRecord> layouts;
+
+        for (const auto &record : local.records()) {
+            auto &layout = layouts.emplace_back(200 + record.id, record.id, record.name,
+                                                std::vector<q::protocol::OutgoingField>{});
+
+            for (std::size_t i = 0; i < record.fields.size(); ++i) {
+                const auto field = std::ranges::find(record.lookups, i, &q::core::FieldLookup::fieldId);
+                REQUIRE(field != record.lookups.end());
+                layout.fields.push_back({field->name, record.fields[i].serialTypeId, static_cast<std::int32_t>(i)});
+            }
+        }
+
+        q::protocol::SubscriptionWriterWork work{100, 65536, 65536, 65536};
+        auto result =
+            q::protocol::SubscriptionWriter::create(local, layouts, {{3, 128, 256, 64, 4096}, 3, 128, 64, 4096},
+                                                    {8192, 8201, 128, 256, {8192, 1024}, 65536, 65536, 4}, work);
+        REQUIRE(result);
+
+        return std::move(*result);
+    }
+
+    void send(std::span<const std::byte> bytes) {
+        asio::error_code error;
+        const auto count = asio::write(socket_, asio::buffer(bytes.data(), bytes.size()), error);
+        REQUIRE_FALSE(error);
+        REQUIRE(count == bytes.size());
+    }
+
+    public:
+    DemandPeer(std::uint16_t port, asio::ip::address_v4 remoteSource) : schema_(schema()), writer_(writer(schema_)) {
+        namespace p = q::protocol;
+        socket_.open(tcp::v4());
+        socket_.bind({remoteSource, 0});
+        socket_.connect({asio::ip::address_v4::loopback(), port});
+
+        p::LiveLimits limits{};
+        limits.frame = {8192, 8201};
+        limits.protocol = {64, 16, {8192, 1024}, 8192};
+        limits.descriptions = {8192, 16, 16, 128, {8192, 1024}, 8192};
+        limits.context = {{3, 128, 256, 64, 4096}, 16, {128, 1024, 8192}};
+        limits.residentBytes = 1024 * 1024;
+        limits.owners = 8;
+        limits.snapshotBytes = 65536;
+        limits.scratchBytes = 65536;
+        limits.eventBytes = 8192;
+        limits.outputBytes = 8192;
+        limits.historySnapshot = true;
+        p::LiveWork work{100, 65536, 65536, 1024 * 1024};
+        auto session = p::LiveSession::create(q::core::LocalSchema(schema_), writer(schema_), limits, work);
+        REQUIRE(session);
+        const p::LivePropertyView properties[]{{u"type", u"qtp"}, {u"opt", u"hs"}};
+        const p::LiveMessageView receives[]{
+            {10, u"TICKER_DATA", {}}, {15, u"STREAM_DATA", {}}, {20, u"HISTORY_DATA", {}}};
+        const p::LiveMessageView sends[]{
+            {11, u"TICKER_ADD_SUBSCRIPTION", {}},  {12, u"TICKER_REMOVE_SUBSCRIPTION", {}},
+            {16, u"STREAM_ADD_SUBSCRIPTION", {}},  {17, u"STREAM_REMOVE_SUBSCRIPTION", {}},
+            {21, u"HISTORY_ADD_SUBSCRIPTION", {}}, {22, u"HISTORY_REMOVE_SUBSCRIPTION", {}}};
+        auto protocol = session->composeProtocol({properties, sends, receives}, work);
+        REQUIRE(protocol);
+        send(protocol->pendingBytes());
+        const std::int32_t records[]{200, 201, 202};
+        auto description = session->describe(records, work);
+        REQUIRE(description);
+        send(description->pendingBytes());
+    }
+
+    void subscribe(q::protocol::SubscriptionMessage message, std::int32_t record, std::u16string_view symbol,
+                   std::optional<std::int64_t> bound = {}) {
+        const q::core::SubscriptionRequest request{{schema_.recordContext(record), symbol}, bound};
+        subscribe(message, std::span(&request, 1));
+    }
+
+    void subscribeBoth(q::protocol::SubscriptionMessage message, std::int32_t record, std::u16string_view first,
+                       std::u16string_view second, std::optional<std::int64_t> bound = {}) {
+        const auto context = schema_.recordContext(record);
+        const q::core::SubscriptionRequest requests[]{{{context, first}, bound}, {{context, second}, bound}};
+        subscribe(message, requests);
+    }
+
+    private:
+    void subscribe(q::protocol::SubscriptionMessage message, std::span<const q::core::SubscriptionRequest> requests) {
+        q::protocol::SubscriptionWriterWork work{100, 65536, 65536, 65536};
+        auto output = writer_.compose(message, requests, work);
+        REQUIRE(output);
+        send(output->bytes());
     }
 };
 
@@ -318,6 +432,118 @@ TEST_CASE("non-reading peer with a different record ID does not block a typed cl
     REQUIRE(publisher.publish(target));
     REQUIRE(fast.events->wait(target.bidPrice.raw));
     CHECK((*server)->awaitDemand(u"SLOW", true, Clock::now() + 5s));
+}
+
+TEST_CASE("publisher applies per-address physical demand policy before upstream reconciliation") {
+    auto bootstrap = q::transport::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    q::api::EventRegistryWork work;
+    const auto registry = q::api::EventRegistry::builtIn({}, work);
+    REQUIRE(registry);
+    const auto filter = [&](std::u16string expression) {
+        return q::api::FeedFilter::Builder(*registry).withCategory(u"allow", std::move(expression)).build();
+    };
+
+    q::api::PublisherOptions sourceOptions;
+    sourceOptions.mixed = true;
+    auto source = q::api::PublisherEndpoint::create(*bootstrap, sourceOptions);
+    requireServer(source);
+    q::api::PublisherOptions relayOptions;
+    relayOptions.mixed = true;
+    relayOptions.source = q::api::PublisherSourceOptions{"127.0.0.1", (*source)->port()};
+    relayOptions.demand = {filter(u":Quote&IBM"), filter(u":Other"), filter(u":Order&IBM")};
+    relayOptions.peerDemand.push_back(
+        {"::ffff:127.0.0.2", {filter(u":Quote&MSFT"), filter(u":TimeAndSale&IBM"), filter(u":Order&MSFT")}});
+    auto relay = q::api::PublisherEndpoint::create(*bootstrap, relayOptions);
+    requireServer(relay);
+    DemandPeer first((*relay)->port(), asio::ip::make_address_v4("127.0.0.1"));
+    DemandPeer second((*relay)->port(), asio::ip::make_address_v4("127.0.0.2"));
+    using enum q::core::SubscriptionFamily;
+    using enum q::protocol::SubscriptionMessage;
+    first.subscribeBoth(TICKER_ADD, 0, u"BLOCKED", u"IBM");
+    second.subscribeBoth(TICKER_ADD, 0, u"IBM", u"MSFT");
+    first.subscribe(STREAM_ADD, 1, u"BLOCKED");
+    second.subscribe(STREAM_ADD, 1, u"MSFT");
+    second.subscribe(STREAM_ADD, 1, u"IBM");
+    first.subscribe(HISTORY_ADD, 2, u"BLOCKED", -100);
+    first.subscribe(HISTORY_ADD, 2, u"IBM", -5);
+    second.subscribe(HISTORY_ADD, 2, u"IBM", -20);
+    second.subscribe(HISTORY_ADD, 2, u"MSFT", 6);
+
+    const auto deadline = Clock::now() + 5s;
+    REQUIRE((*source)->awaitDemand(TICKER, u"Quote", u"IBM", true, deadline));
+    REQUIRE((*source)->awaitDemand(TICKER, u"Quote", u"MSFT", true, deadline));
+    REQUIRE((*source)->awaitDemand(STREAM, u"TimeAndSale", u"IBM", true, deadline));
+    REQUIRE((*source)->awaitDemand(HISTORY, u"Order", u"IBM", true, deadline));
+    REQUIRE((*source)->awaitDemand(HISTORY, u"Order", u"MSFT", true, deadline));
+
+    for (const auto &observed : {relay->get(), source->get()}) {
+        CHECK(observed->getDemand(TICKER).size() == 2);
+        CHECK(observed->getDemand(STREAM).size() == 1);
+        const auto history = observed->getDemand(HISTORY);
+        REQUIRE(history.size() == 2);
+        const auto ibm = std::ranges::find(history, std::u16string_view(u"IBM"), &q::api::PublisherDemand::symbol);
+        REQUIRE(ibm != history.end());
+        CHECK(ibm->historyBound == -5);
+    }
+
+    second.subscribeBoth(TICKER_REMOVE, 0, u"IBM", u"MSFT");
+    REQUIRE((*source)->awaitDemand(TICKER, u"Quote", u"MSFT", false, Clock::now() + 5s));
+    CHECK((*source)->awaitDemand(TICKER, u"Quote", u"IBM", true, Clock::now()));
+    first.subscribe(TICKER_REMOVE, 0, u"IBM");
+    REQUIRE((*source)->awaitDemand(TICKER, u"Quote", u"IBM", false, Clock::now() + 5s));
+    CHECK((*relay)->getDiagnostic().code == q::api::ErrorCode::NONE);
+
+    relayOptions.peerDemand.push_back({"127.0.0.2", {}});
+    const auto duplicate = q::api::PublisherEndpoint::create(*bootstrap, std::move(relayOptions));
+    REQUIRE_FALSE(duplicate);
+    CHECK(duplicate.error().code == q::api::ErrorCode::INVALID_ARGUMENT);
+}
+
+TEST_CASE("publisher rejects an entire over-bound filter batch without retiring other peers") {
+    auto bootstrap = q::transport::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    q::api::EventRegistryWork work;
+    const auto registry = q::api::EventRegistry::builtIn({}, work);
+    REQUIRE(registry);
+    q::api::FeedFilterLimits limits;
+    limits.symbolUnits = 3;
+    const auto bounded = q::api::FeedFilter::Builder(*registry, q::api::DeliveryContract::TICKER, limits)
+                             .withCategory(u"allow", u":Quote")
+                             .build();
+    q::api::PublisherOptions options;
+    options.mixed = true;
+    options.peerDemand.push_back({"127.0.0.2", {bounded, {}, {}}});
+    auto relay = q::api::PublisherEndpoint::create(*bootstrap, options);
+    requireServer(relay);
+    DemandPeer keeper((*relay)->port(), asio::ip::make_address_v4("127.0.0.1"));
+    DemandPeer refused((*relay)->port(), asio::ip::make_address_v4("127.0.0.2"));
+    constexpr auto ticker = q::core::SubscriptionFamily::TICKER;
+    constexpr auto add = q::protocol::SubscriptionMessage::TICKER_ADD;
+    keeper.subscribe(add, 0, u"KEEP");
+    REQUIRE((*relay)->awaitDemand(ticker, u"Quote", u"KEEP", true, Clock::now() + 5s));
+    refused.subscribeBoth(add, 0, u"IBM", u"MSFT");
+
+    const auto deadline = Clock::now() + 5s;
+
+    while ((*relay)->getStatistics().retiredPeers.value == 0 && Clock::now() < deadline)
+        std::this_thread::sleep_for(1ms);
+
+    REQUIRE((*relay)->getStatistics().retiredPeers.value == 1);
+    const auto demand = (*relay)->getDemand(ticker);
+    REQUIRE(demand.size() == 1);
+    CHECK(demand.front().symbol == u"KEEP");
+    CHECK((*relay)->getDiagnostic().code == q::api::ErrorCode::NONE);
+
+    auto context = q::api::FeedFilterContext::create();
+    const std::u16string resource = u"ipf[file:/symbols.ipf,update=1m]";
+    const std::u16string symbols[]{u"IBM"};
+    context->replaceSymbols(resource, symbols, true);
+    options.demand.ticker =
+        q::api::FeedFilter::Builder(*registry).withResourceContext(context).withCategory(u"dynamic", resource).build();
+    const auto dynamic = q::api::PublisherEndpoint::create(*bootstrap, std::move(options));
+    REQUIRE_FALSE(dynamic);
+    CHECK(dynamic.error().code == q::api::ErrorCode::INVALID_ARGUMENT);
 }
 
 TEST_CASE("remote QTP publisher reconciles overlapping demand across source generations") {
