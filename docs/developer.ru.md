@@ -26,6 +26,7 @@
 - [Наблюдение диапазона HISTORY в recovery](../tests/conformance/transport/HISTORY-STATUS-VALIDATION.ru.md)
 - [Чтение tape и поддержанные входы](../spec/protocol/TAPE-READER.ru.md)
 - [Проверки записи tape](../tests/conformance/protocol/tape-write/WRITER-VALIDATION.ru.md)
+- [Проверка поставки полной схемы](FULL-SCHEMA-QUALIFICATION.ru.md)
 - [Проверки экспорта схем](../tests/conformance/schema-export/VALIDATION.ru.md)
 - [Совместимость подписок](../tests/conformance/subscriptions/VALIDATION.ru.md)
 - [Составные профили получения и проверки CLI](../tests/conformance/subscriptions/DELIVERY-VALIDATION.ru.md)
