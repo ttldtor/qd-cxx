@@ -5,6 +5,8 @@
 
 #include "../protocol/local_event_owner.hpp"
 #include "../transport/raw_byte_owner.hpp"
+#include "qd/events/event_flags.hpp"
+#include "qd/events/short_string.hpp"
 #include "qd/mux/demand.hpp"
 #include "qd/mux/queue.hpp"
 #include "qd/transport/tcp_runtime.hpp"
@@ -29,6 +31,8 @@ constexpr std::size_t MAX_PEERS = 8;
 constexpr std::size_t MAX_PENDING_QUOTES = 1024;
 constexpr std::size_t SYMBOL_UNITS = 256;
 constexpr std::size_t CLIENT_KEYS = 32;
+constexpr std::size_t CLIENT_PENDING_ITEMS = 32;
+constexpr std::size_t HISTORY_POINTS_PER_KEY = 16;
 constexpr std::size_t CLIENT_SYMBOL_UNITS = CLIENT_KEYS * SYMBOL_UNITS;
 constexpr std::size_t INPUT_BYTES = 8192;
 constexpr std::size_t MAX_FRAME_BYTES = 65536;
@@ -39,8 +43,26 @@ constexpr std::size_t SOURCE_EPOCH_BYTES = 4 * 1024 * 1024;
 constexpr std::size_t REMOTE_EPOCH_BYTES = 20 * 1024 * 1024;
 constexpr std::size_t REMOTE_EVENT_BYTES = 64 * 1024;
 constexpr std::size_t REMOTE_DATA_RECORDS = 32;
-constexpr std::size_t DATA_FIELDS = 10;
+constexpr std::size_t MIXED_OWNERS =
+    MAX_PEERS * (CLIENT_KEYS * (HISTORY_POINTS_PER_KEY + 2) + CLIENT_PENDING_ITEMS + 1) + 12;
+constexpr std::size_t MIXED_LOCAL_EPOCH_BYTES = MIXED_OWNERS * (EVENT_BYTES + EVENT_OWNER_ALLOWANCE);
+constexpr std::size_t MIXED_REMOTE_EPOCH_BYTES = MIXED_OWNERS * (REMOTE_EVENT_BYTES + EVENT_OWNER_ALLOWANCE);
+constexpr std::size_t QUOTE_FIELDS = 10;
+constexpr std::size_t MAX_DATA_FIELDS = 16;
 constexpr std::int32_t QUOTE_ID = 0;
+constexpr std::int32_t SALE_ID = 1;
+constexpr std::int32_t ORDER_ID = 2;
+using Family = core::SubscriptionFamily;
+using DataMessage = protocol::LiveDataMessage;
+constexpr std::array FAMILIES{Family::TICKER, Family::STREAM, Family::HISTORY};
+constexpr std::array DATA_MESSAGES{DataMessage::TICKER_DATA, DataMessage::STREAM_DATA, DataMessage::HISTORY_DATA};
+constexpr std::array ADD_MESSAGES{protocol::SubscriptionMessage::TICKER_ADD, protocol::SubscriptionMessage::STREAM_ADD,
+                                  protocol::SubscriptionMessage::HISTORY_ADD};
+constexpr std::array REMOVE_MESSAGES{protocol::SubscriptionMessage::TICKER_REMOVE,
+                                     protocol::SubscriptionMessage::STREAM_REMOVE,
+                                     protocol::SubscriptionMessage::HISTORY_REMOVE};
+constexpr std::array RECORD_IDS{QUOTE_ID, SALE_ID, ORDER_ID};
+constexpr std::size_t FAMILY_COUNT = FAMILIES.size();
 constexpr std::int32_t SEQUENCE_BITS = 22;
 constexpr std::int32_t SEQUENCE_MASK = (1 << SEQUENCE_BITS) - 1;
 constexpr std::int64_t MILLIS_PER_SECOND = 1000;
@@ -49,30 +71,75 @@ constexpr std::chrono::seconds HEARTBEAT_PERIOD{5};
 constexpr std::chrono::seconds HANDSHAKE_TIMEOUT{10};
 constexpr std::chrono::seconds WRITE_TIMEOUT{10};
 
-constexpr std::array<std::u16string_view, DATA_FIELDS> QUOTE_FIELD_NAMES{
+constexpr std::array<std::u16string_view, QUOTE_FIELDS> QUOTE_FIELD_NAMES{
     u"Bid.Time",     u"Bid.Exchange", u"Bid.Price", u"Bid.Size", u"Ask.Time",
     u"Ask.Exchange", u"Ask.Price",    u"Ask.Size",  u"Sequence", u"TimeNanoPart"};
-constexpr std::array<FieldType, DATA_FIELDS> QUOTE_FIELD_TYPES{
+constexpr std::array<FieldType, QUOTE_FIELDS> QUOTE_FIELD_TYPES{
     FieldType::TIME_SECONDS, FieldType::UTF_CHAR,   FieldType::WIDE_DECIMAL, FieldType::WIDE_DECIMAL,
     FieldType::TIME_SECONDS, FieldType::UTF_CHAR,   FieldType::WIDE_DECIMAL, FieldType::WIDE_DECIMAL,
     FieldType::SEQUENCE,     FieldType::COMPACT_INT};
 
-constexpr core::SchemaLimits SCHEMA_LIMITS{1, DATA_FIELDS, DATA_FIELDS, 32, 256};
+constexpr core::SchemaLimits SCHEMA_LIMITS{FAMILY_COUNT, 3 * MAX_DATA_FIELDS, 64, 64, 2048};
 constexpr Diagnostic QUOTE_SHAPE{ErrorCode::INVALID_ARGUMENT, "publisher-quote-shape"};
+constexpr Diagnostic SALE_SHAPE{ErrorCode::INVALID_ARGUMENT, "publisher-sale-shape"};
+constexpr Diagnostic ORDER_SHAPE{ErrorCode::INVALID_ARGUMENT, "publisher-order-shape"};
 constexpr Diagnostic ALLOCATION{ErrorCode::ALLOCATION_FAILURE, "publisher-storage"};
 constexpr Diagnostic CLOSED{ErrorCode::CLOSED, "publisher-closed"};
 constexpr Diagnostic LOCAL_SOURCE_DISABLED{ErrorCode::INVALID_STATE, "publisher-remote-source"};
+constexpr Diagnostic MIXED_DISABLED{ErrorCode::INVALID_STATE, "publisher-mixed-disabled"};
 
 /** Copied input with bounded text and an exact ordered local field representation. */
-struct QuoteRow {
+struct SourceRow {
     std::array<char16_t, SYMBOL_UNITS> symbol;
     std::size_t length;
-    std::array<core::FieldValue, DATA_FIELDS> fields;
+    std::array<std::int64_t, MAX_DATA_FIELDS> raw;
+    std::size_t family;
+    std::int32_t flags;
+    std::optional<std::int64_t> removalTime;
 
     [[nodiscard]] std::u16string_view text() const noexcept {
         return {symbol.data(), length};
     }
 };
+
+SourceRow sourceRow(std::size_t family, std::u16string_view symbol, std::span<const std::int64_t> raw,
+                    std::int32_t flags = 0, std::optional<std::int64_t> removalTime = {}) {
+    SourceRow row{};
+    row.family = family;
+    row.length = symbol.size();
+    row.flags = flags;
+    row.removalTime = removalTime;
+    std::ranges::copy(symbol, row.symbol.begin());
+    std::ranges::copy(raw, row.raw.begin());
+
+    return row;
+}
+
+std::optional<std::size_t> familyIndex(Family family) noexcept {
+    const auto found = std::ranges::find(FAMILIES, family);
+
+    if (found == FAMILIES.end())
+        return {};
+
+    return static_cast<std::size_t>(found - FAMILIES.begin());
+}
+
+std::optional<std::size_t> familyIndex(protocol::SubscriptionMessage message) noexcept {
+    for (std::size_t index = 0; index < FAMILY_COUNT; ++index) {
+        if (ADD_MESSAGES[index] == message || REMOVE_MESSAGES[index] == message)
+            return index;
+    }
+
+    return {};
+}
+
+std::int32_t lowWord(std::int64_t value) noexcept {
+    return std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(value));
+}
+
+std::int32_t highWord(std::int64_t value) noexcept {
+    return std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(std::bit_cast<std::uint64_t>(value) >> 32));
+}
 
 std::int64_t floorSeconds(std::int64_t milliseconds) noexcept {
     return milliseconds / MILLIS_PER_SECOND - (milliseconds % MILLIS_PER_SECOND < 0);
@@ -82,7 +149,7 @@ bool exactSymbol(std::u16string_view symbol) noexcept {
     return !symbol.empty() && symbol.size() <= SYMBOL_UNITS && symbol.front() != u'*';
 }
 
-std::expected<QuoteRow, Diagnostic> quoteRow(const events::Quote &quote) {
+std::expected<SourceRow, Diagnostic> quoteRow(const events::Quote &quote) {
     if (!exactSymbol(quote.symbol) || quote.eventTime != 0 || quote.businessNumericSnapshot || quote.sequence < 0 ||
         quote.sequence > SEQUENCE_MASK || quote.bidTimeMs % MILLIS_PER_SECOND || quote.askTimeMs % MILLIS_PER_SECOND) {
         return std::unexpected(QUOTE_SHAPE);
@@ -102,24 +169,61 @@ std::expected<QuoteRow, Diagnostic> quoteRow(const events::Quote &quote) {
     const auto millis = quote.timeMs - whole;
     const auto sequence =
         (static_cast<std::uint32_t>(millis) << SEQUENCE_BITS) | static_cast<std::uint32_t>(quote.sequence);
-    const std::array<std::int64_t, DATA_FIELDS> raw{bid,
-                                                    quote.bidExchangeCode,
-                                                    quote.bidPrice.raw,
-                                                    quote.bidSize.raw,
-                                                    ask,
-                                                    quote.askExchangeCode,
-                                                    quote.askPrice.raw,
-                                                    quote.askSize.raw,
-                                                    std::bit_cast<std::int32_t>(sequence),
-                                                    quote.timeNanoPart};
-    QuoteRow row{};
-    row.length = quote.symbol.size();
-    std::ranges::copy(quote.symbol, row.symbol.begin());
+    const std::array<std::int64_t, QUOTE_FIELDS> raw{bid,
+                                                     quote.bidExchangeCode,
+                                                     quote.bidPrice.raw,
+                                                     quote.bidSize.raw,
+                                                     ask,
+                                                     quote.askExchangeCode,
+                                                     quote.askPrice.raw,
+                                                     quote.askSize.raw,
+                                                     std::bit_cast<std::int32_t>(sequence),
+                                                     quote.timeNanoPart};
 
-    for (std::size_t i = 0; i < row.fields.size(); ++i)
-        row.fields[i] = {QUOTE_FIELD_TYPES[i], raw[i]};
+    return sourceRow(0, quote.symbol, raw);
+}
 
-    return row;
+std::expected<SourceRow, Diagnostic> saleRow(const events::TimeAndSale &sale) {
+    const auto conditions = events::encodeShortString(sale.exchangeSaleConditions);
+
+    if (!exactSymbol(sale.symbol) || !conditions || sale.eventTime || sale.eventFlags || sale.buyer || sale.seller ||
+        sale.businessNumericSnapshot)
+        return std::unexpected(SALE_SHAPE);
+
+    const std::array<std::int64_t, 11> raw{
+        highWord(sale.index), lowWord(sale.index), sale.exchangeCode, sale.tradeId, sale.price.raw,   sale.size.raw,
+        sale.bidPrice.raw,    sale.askPrice.raw,   *conditions,       sale.flags,   sale.timeNanoPart};
+
+    return sourceRow(1, sale.symbol, raw);
+}
+
+std::expected<SourceRow, Diagnostic> orderRow(const events::Order &order) {
+    using namespace events::indexed_event_flags;
+    constexpr auto FLAGS = TX_PENDING | REMOVE_EVENT | SNAPSHOT_BEGIN | SNAPSHOT_END | SNAPSHOT_SNIP | SNAPSHOT_MODE;
+    const auto maker = events::encodeShortString(order.marketMaker);
+
+    if (!exactSymbol(order.symbol) || !maker || highWord(order.index) != 0 || lowWord(order.index) < 0 ||
+        ((order.eventFlags & (SNAPSHOT_END | SNAPSHOT_SNIP)) != 0 && order.index != 0) ||
+        !std::in_range<std::int32_t>(order.count) || order.eventTime || order.actionTime || order.orderId ||
+        order.auxOrderId || order.tradeId || order.tradePrice.raw || order.tradeSize.raw || order.executedSize.raw ||
+        order.businessNumericSnapshot || (order.eventFlags & ~FLAGS))
+        return std::unexpected(ORDER_SHAPE);
+
+    // A WideDecimal rank of 128 stores the signed integer without scaling.
+    constexpr std::int64_t WIDE_DECIMAL_UNIT = 256;
+    constexpr std::int64_t WIDE_DECIMAL_INTEGER_RANK = 128;
+    const std::array<std::int64_t, 9> raw{lowWord(order.index),
+                                          highWord(order.timeSequence),
+                                          lowWord(order.timeSequence),
+                                          order.price.raw,
+                                          order.size.raw,
+                                          order.count * WIDE_DECIMAL_UNIT + WIDE_DECIMAL_INTEGER_RANK,
+                                          order.flags,
+                                          *maker,
+                                          order.timeNanoPart};
+    const auto removalTime = (order.eventFlags & REMOVE_EVENT) != 0 ? std::optional{order.index} : std::nullopt;
+
+    return sourceRow(2, order.symbol, raw, order.eventFlags, removalTime);
 }
 
 protocol::LiveWork liveTurn() noexcept {
@@ -144,7 +248,7 @@ mux::QueueWork queueTurn() noexcept {
             {512, VISITS, VISITS, BYTES}};
 }
 
-mux::QueueWork serverQueueTurn(std::size_t peers, bool remote) noexcept {
+mux::QueueWork serverQueueTurn(std::size_t peers, bool remote, bool mixed = false) noexcept {
     auto work = queueTurn();
     const auto keys = peers * CLIENT_KEYS;
     // MuxState reserves against both possible maps and all input rows before a command.
@@ -160,15 +264,33 @@ mux::QueueWork serverQueueTurn(std::size_t peers, bool remote) noexcept {
     work.ticker.visits += cacheScan + membershipScan + 2 * keys * (keys + 1) + 8 * (keys + 1);
     work.ticker.textUnits += keys * (2 * SYMBOL_UNITS) * ((peers + 1) * keys + keys);
     // Each retained owner conservatively charges the whole shared source epoch on release.
-    const auto epochBytes = remote ? REMOTE_EPOCH_BYTES : SOURCE_EPOCH_BYTES;
+    const auto epochBytes = mixed ? (remote ? MIXED_REMOTE_EPOCH_BYTES : MIXED_LOCAL_EPOCH_BYTES)
+                                  : (remote ? REMOTE_EPOCH_BYTES : SOURCE_EPOCH_BYTES);
     const auto maximum = std::numeric_limits<std::size_t>::max();
     work.ticker.bytes =
         keys + 2 > (maximum - work.ticker.bytes) / epochBytes ? maximum : work.ticker.bytes + (keys + 2) * epochBytes;
 
+    if (mixed) {
+        const auto historyPoints = keys * HISTORY_POINTS_PER_KEY;
+        const auto frames = historyPoints + peers * (CLIENT_PENDING_ITEMS + 1) + 2;
+        const auto rows = remote ? REMOTE_DATA_RECORDS : 1;
+        const auto rowScan = std::uint64_t{64} * (keys + std::uint64_t{historyPoints} * historyPoints +
+                                                  std::uint64_t{historyPoints + 1} * peers *
+                                                      (keys + CLIENT_PENDING_ITEMS + frames + historyPoints + 4) +
+                                                  MAX_DATA_FIELDS + 8);
+        work.history.visits += 32 * (keys + 1) * (historyPoints + peers * (keys + CLIENT_PENDING_ITEMS) + 1);
+        work.history.visits +=
+            static_cast<std::size_t>(std::min(rowScan * rows, std::uint64_t{maximum - work.history.visits}));
+        work.history.textUnits += 16 * (keys + 1) * (peers + 1) * keys * SYMBOL_UNITS;
+        work.history.bytes =
+            frames > (maximum - work.history.bytes) / epochBytes ? maximum : work.history.bytes + frames * epochBytes;
+        work.stream.bytes = work.ticker.bytes;
+    }
+
     return work;
 }
 
-protocol::LiveLimits liveLimits() noexcept {
+protocol::LiveLimits liveLimits(bool mixed = false) noexcept {
     protocol::LiveLimits result{};
     result.frame = {MAX_FRAME_BYTES, MAX_FRAME_BYTES + FRAME_PREFIX_BYTES};
     result.protocol = {128, 64, {8192, 1024}, 16384};
@@ -184,6 +306,11 @@ protocol::LiveLimits liveLimits() noexcept {
     result.eventBytes = EVENT_BYTES;
     result.outputBytes = MAX_FRAME_BYTES;
     result.credentials = protocol::LiveCredentialPolicy::CREDENTIAL_FREE_PLAIN;
+
+    if (mixed) {
+        result.events = protocol::DataEventPolicy::BINARY_CATALOG_V1;
+        result.historySnapshot = true;
+    }
 
     return result;
 }
@@ -227,7 +354,7 @@ Diagnostic protocolDiagnostic(protocol::LiveError error, std::string_view stage)
     return {code, stage, 0, static_cast<std::uint32_t>(error)};
 }
 
-core::LocalSchema quoteSchema() {
+core::LocalSchema publisherSchema(bool mixed) {
     core::LocalRecord record{QUOTE_ID, u"Quote", false, {}, {}};
 
     for (std::size_t i = 0; i < QUOTE_FIELD_NAMES.size(); ++i) {
@@ -235,7 +362,27 @@ core::LocalSchema quoteSchema() {
         record.lookups.push_back({std::u16string(QUOTE_FIELD_NAMES[i]), i});
     }
 
-    auto schema = core::LocalSchema::create(std::span(&record, 1), SCHEMA_LIMITS, core::LocalProfile::BINARY_FIELDS_V1);
+    std::vector records{std::move(record)};
+
+    if (mixed) {
+        auto sale = events::defaultTimeAndSaleSchema(SCHEMA_LIMITS);
+        auto order = events::defaultOrderSchema(SCHEMA_LIMITS);
+
+        if (!sale || !order)
+            throw Error({ErrorCode::ALLOCATION_FAILURE, "publisher-indexed-schema"});
+
+        records.push_back(sale->records().front());
+        records.push_back(order->records().front());
+
+        for (std::size_t i = 1; i < records.size(); ++i) {
+            auto &indexed = records[i];
+            indexed.id = RECORD_IDS[i];
+            indexed.lookups.push_back({u"TimeNanoPart", indexed.fields.size()});
+            indexed.fields.push_back({std::to_underlying(FieldType::COMPACT_INT)});
+        }
+    }
+
+    auto schema = core::LocalSchema::create(records, SCHEMA_LIMITS, core::LocalProfile::BINARY_FIELDS_V1);
 
     if (!schema)
         throw Error({schema.error() == core::SchemaError::ALLOCATION_FAILURE ? ErrorCode::ALLOCATION_FAILURE
@@ -245,25 +392,34 @@ core::LocalSchema quoteSchema() {
     return std::move(*schema);
 }
 
-protocol::SubscriptionWriter quoteWriter(const core::LocalSchema &schema) {
-    protocol::OutgoingRecord outgoing{QUOTE_ID, QUOTE_ID, u"Quote", {}};
+protocol::SubscriptionWriter publisherWriter(const core::LocalSchema &schema) {
+    std::vector<protocol::OutgoingRecord> outgoing;
 
-    for (std::size_t i = 0; i < QUOTE_FIELD_NAMES.size(); ++i)
-        outgoing.fields.push_back({std::u16string(QUOTE_FIELD_NAMES[i]), std::to_underlying(QUOTE_FIELD_TYPES[i]),
-                                   static_cast<std::int32_t>(i)});
+    for (const auto &record : schema.records()) {
+        auto &layout = outgoing.emplace_back(record.id, record.id, record.name, std::vector<protocol::OutgoingField>{});
+
+        for (std::size_t i = 0; i < record.fields.size(); ++i) {
+            const auto key = std::ranges::find(record.lookups, i, &core::FieldLookup::fieldId);
+
+            if (key == record.lookups.end())
+                throw Error({ErrorCode::INVALID_STATE, "publisher-writer-field"});
+
+            layout.fields.push_back({key->name, record.fields[i].serialTypeId, static_cast<std::int32_t>(i)});
+        }
+    }
 
     protocol::SubscriptionWriterWork writerWork{64, 65536, 65536, 256 * 1024};
-    auto writer =
-        protocol::SubscriptionWriter::create(schema, std::span(&outgoing, 1), {SCHEMA_LIMITS, 1, DATA_FIELDS, 32, 256},
-                                             {MAX_FRAME_BYTES,
-                                              MAX_FRAME_BYTES + FRAME_PREFIX_BYTES,
-                                              128,
-                                              SYMBOL_UNITS,
-                                              {8192, 1024},
-                                              256 * 1024,
-                                              256 * 1024,
-                                              4},
-                                             writerWork);
+    auto writer = protocol::SubscriptionWriter::create(schema, outgoing,
+                                                       {SCHEMA_LIMITS, FAMILY_COUNT, 3 * MAX_DATA_FIELDS, 64, 2048},
+                                                       {MAX_FRAME_BYTES,
+                                                        MAX_FRAME_BYTES + FRAME_PREFIX_BYTES,
+                                                        128,
+                                                        SYMBOL_UNITS,
+                                                        {8192, 1024},
+                                                        256 * 1024,
+                                                        256 * 1024,
+                                                        4},
+                                                       writerWork);
 
     if (!writer)
         throw Error({ErrorCode::RESOURCE_LIMIT, "publisher-writer", 0, static_cast<std::uint32_t>(writer.error())});
@@ -272,11 +428,11 @@ protocol::SubscriptionWriter quoteWriter(const core::LocalSchema &schema) {
 }
 
 protocol::LiveSession serverSession(const core::LocalSchema &schema, protocol::LiveWork &work) {
-    auto writer = quoteWriter(schema);
+    auto writer = publisherWriter(schema);
     auto local = schema;
     auto session = protocol::LiveSession::createServer(
-        std::move(local), std::move(writer), liveLimits(),
-        {MAX_FRAME_BYTES, 1, 128, CLIENT_KEYS, SYMBOL_UNITS, CLIENT_SYMBOL_UNITS}, work);
+        std::move(local), std::move(writer), liveLimits(schema.records().size() > 1),
+        {MAX_FRAME_BYTES, FAMILY_COUNT, 128, CLIENT_KEYS, SYMBOL_UNITS, CLIENT_SYMBOL_UNITS}, work);
 
     if (!session)
         throw Error(protocolDiagnostic(session.error(), "publisher-server-session"));
@@ -284,14 +440,18 @@ protocol::LiveSession serverSession(const core::LocalSchema &schema, protocol::L
     return std::move(*session);
 }
 
-constexpr mux::ClientLimits CLIENT_LIMITS{32, 512 * 1024, 8,    128 * 1024, 1, 32,          SYMBOL_UNITS,
-                                          0,  0,          4096, 2,          4, CLIENT_KEYS, CLIENT_SYMBOL_UNITS};
+constexpr mux::ClientLimits CLIENT_LIMITS{
+    CLIENT_PENDING_ITEMS, 512 * 1024,         8, 128 * 1024, 1, 32, SYMBOL_UNITS, 0, 0, 4096, 2, 4,
+    CLIENT_KEYS,          CLIENT_SYMBOL_UNITS};
 
-mux::MuxQueue tickerQueue(const core::LocalSchema &schema, std::size_t peers, bool remote) {
+mux::MuxQueue publisherQueue(const core::LocalSchema &schema, std::size_t peers, bool remote, Family family) {
     const auto allKeys = peers * CLIENT_KEYS;
     const auto allUnits = peers * CLIENT_LIMITS.commandSymbolUnits;
-    const core::SubscriptionLimits desired{1, allKeys, SYMBOL_UNITS, allUnits, allKeys * 2, allUnits * 2, allKeys};
-    const mux::MuxLimits interests{1, peers, allKeys, allKeys, SYMBOL_UNITS, allUnits, CLIENT_KEYS, 8 * 1024 * 1024};
+    const auto records = schema.records().size();
+    const core::SubscriptionLimits desired{records,     allKeys,      SYMBOL_UNITS, allUnits,
+                                           allKeys * 2, allUnits * 2, allKeys};
+    const mux::MuxLimits interests{records,      peers,    allKeys,     allKeys,
+                                   SYMBOL_UNITS, allUnits, CLIENT_KEYS, 8 * 1024 * 1024};
     const mux::QueueLimits limits{peers,
                                   remote ? REMOTE_DATA_RECORDS : 1,
                                   1,
@@ -305,24 +465,45 @@ mux::MuxQueue tickerQueue(const core::LocalSchema &schema, std::size_t peers, bo
                                   peers * CLIENT_LIMITS.resultSlots,
                                   peers * 2,
                                   32 * 1024 * 1024};
-    const auto cacheFrames = allKeys + 1;
-    const auto cacheBytes = cacheFrames * ((remote ? REMOTE_EVENT_BYTES : EVENT_BYTES) + EVENT_OWNER_ALLOWANCE);
+    const auto cacheFrames = family == Family::HISTORY ? allKeys * HISTORY_POINTS_PER_KEY + 1 : allKeys + 1;
+    const auto eventBytes = (remote ? REMOTE_EVENT_BYTES : EVENT_BYTES) + EVENT_OWNER_ALLOWANCE;
+    const auto cacheBytes = cacheFrames * eventBytes;
     const collectors::TickerLimits ticker{peers,  allKeys, cacheFrames, cacheBytes, cacheBytes + 32 * 1024 * 1024,
                                           desired};
     auto work = queueTurn();
-    auto queue = mux::MuxQueue::createTicker(schema, interests, ticker, {false, 100}, limits, work);
+    auto queue = [&] {
+        switch (family) {
+        case Family::TICKER:
+            return mux::MuxQueue::createTicker(schema, interests, ticker, {false, 100}, limits, work);
+        case Family::STREAM:
+            return mux::MuxQueue::createStream(
+                schema, interests, desired,
+                {cacheFrames, cacheFrames * REMOTE_DATA_RECORDS, cacheBytes, cacheBytes + 32 * 1024 * 1024}, limits,
+                work);
+        case Family::HISTORY:
+            return mux::MuxQueue::createHistory(
+                schema, interests,
+                {allKeys, allKeys * HISTORY_POINTS_PER_KEY, SYMBOL_UNITS, cacheFrames, cacheBytes, peers,
+                 CLIENT_LIMITS.dataItems, CLIENT_LIMITS.dataItems + 1, (CLIENT_LIMITS.dataItems + 1) * eventBytes,
+                 cacheBytes + peers * (CLIENT_LIMITS.dataItems + 1) * eventBytes + 32 * 1024 * 1024, desired},
+                {false, 100, 10000}, limits, work);
+        }
+
+        return std::expected<mux::MuxQueue, mux::QueueFailure>{
+            std::unexpected(mux::QueueFailure{mux::QueueError::INVALID_CONFIGURATION, {}})};
+    }();
 
     if (!queue)
-        throw Error(queueDiagnostic(queue.error(), "publisher-ticker"));
+        throw Error(queueDiagnostic(queue.error(), "publisher-collector"));
 
     return std::move(*queue);
 }
 
-protocol::detail::LocalEventOwner localOwner() {
+protocol::detail::LocalEventOwner localOwner(bool mixed) {
     auto work = liveTurn();
     protocol::LiveLimits limits{};
-    limits.residentBytes = SOURCE_EPOCH_BYTES;
-    limits.owners = MAX_PEERS * CLIENT_KEYS + 4;
+    limits.residentBytes = mixed ? MIXED_LOCAL_EPOCH_BYTES : SOURCE_EPOCH_BYTES;
+    limits.owners = mixed ? MIXED_OWNERS : MAX_PEERS * CLIENT_KEYS + 4;
     limits.eventBytes = EVENT_BYTES;
     auto owner = protocol::detail::LocalEventOwner::create(limits, work);
 
@@ -349,17 +530,19 @@ enum class OutputKind { PROTOCOL, DESCRIPTION, HEARTBEAT, DATA };
 struct Peer {
     transport::TcpConnectionId id;
     protocol::LiveSession session;
-    std::shared_ptr<Delivery> delivery;
-    mux::MuxHandle handle;
+    std::array<std::shared_ptr<Delivery>, FAMILY_COUNT> delivery;
+    std::array<mux::MuxHandle, FAMILY_COUNT> handles;
     std::optional<mux::MuxCommandTicket> command;
     std::optional<protocol::LivePendingOutput> output;
     Clock::time_point acceptedAt;
     Clock::time_point lastWrite;
     Clock::time_point heartbeatAt;
     OutputKind outputKind = OutputKind::PROTOCOL;
+    std::size_t outputFamily = 0;
+    std::size_t nextFamily = 0;
     bool sentProtocol = false;
     bool sentDescription = false;
-    bool ready = false;
+    std::array<bool, FAMILY_COUNT> ready{};
     bool closing = false;
     bool socketClosed = false;
     std::array<std::byte, INPUT_BYTES> input;
@@ -367,37 +550,36 @@ struct Peer {
     std::size_t inputEnd = 0;
 };
 
-constexpr std::array<protocol::LiveMessageView, 4> SERVER_SEND{
-    {{0, u"HEARTBEAT", {}}, {1, u"DESCRIBE_PROTOCOL", {}}, {2, u"DESCRIBE_RECORDS", {}}, {10, u"TICKER_DATA", {}}}};
-constexpr std::array<protocol::LiveMessageView, 5> SERVER_RECEIVE{{{0, u"HEARTBEAT", {}},
+constexpr std::array<protocol::LiveMessageView, 6> SERVER_SEND{{{0, u"HEARTBEAT", {}},
+                                                                {1, u"DESCRIBE_PROTOCOL", {}},
+                                                                {2, u"DESCRIBE_RECORDS", {}},
+                                                                {10, u"TICKER_DATA", {}},
+                                                                {15, u"STREAM_DATA", {}},
+                                                                {20, u"HISTORY_DATA", {}}}};
+constexpr std::array<protocol::LiveMessageView, 9> SERVER_RECEIVE{{{0, u"HEARTBEAT", {}},
                                                                    {1, u"DESCRIBE_PROTOCOL", {}},
                                                                    {2, u"DESCRIBE_RECORDS", {}},
                                                                    {11, u"TICKER_ADD_SUBSCRIPTION", {}},
-                                                                   {12, u"TICKER_REMOVE_SUBSCRIPTION", {}}}};
+                                                                   {12, u"TICKER_REMOVE_SUBSCRIPTION", {}},
+                                                                   {16, u"STREAM_ADD_SUBSCRIPTION", {}},
+                                                                   {17, u"STREAM_REMOVE_SUBSCRIPTION", {}},
+                                                                   {21, u"HISTORY_ADD_SUBSCRIPTION", {}},
+                                                                   {22, u"HISTORY_REMOVE_SUBSCRIPTION", {}}}};
+constexpr protocol::LivePropertyView HISTORY_OPTIONS[]{{u"opt", u"hs"}};
 
-bool canReceiveTicker(const protocol::LiveSession &session) noexcept {
-    const auto peer = session.peer();
+std::expected<protocol::LivePendingOutput, protocol::LiveError> composeDelivery(Peer &peer, std::size_t family,
+                                                                                protocol::LiveWork &work) {
+    const auto &record = peer.delivery[family]->batch.records().front();
 
-    return std::ranges::any_of(peer.protocol().receive, [](const protocol::LiveMessageView &message) {
-        return message.id == 10 && message.name == u"TICKER_DATA";
-    });
-}
-
-std::expected<protocol::LivePendingOutput, protocol::LiveError> composeQuote(Peer &peer, protocol::LiveWork &work) {
-    const auto &record = peer.delivery->batch.records().front();
-    std::array<core::FieldValueView, DATA_FIELDS> fields{};
-
-    if (record.typedValues.size() != fields.size())
+    if (record.typedValues.size() > MAX_DATA_FIELDS)
         return std::unexpected(protocol::LiveError::INVALID_CONFIGURATION);
 
-    for (std::size_t i = 0; i < fields.size(); ++i) {
-        const auto &field = record.typedValues[i];
-        fields[i] = {field.type, field.raw, field.units, field.bytes};
-    }
+    const bool removed = (record.eventFlags & events::indexed_event_flags::REMOVE_EVENT) != 0;
+    const protocol::LiveDataRecordView outgoing{RECORD_IDS[family], record.symbol,
+                                                removed ? std::span<const core::FieldValueView>{} : record.typedValues,
+                                                record.eventFlags, removed ? record.rawTime : std::nullopt};
 
-    const protocol::LiveDataRecordView outgoing{QUOTE_ID, record.symbol, fields};
-
-    return peer.session.publishData(protocol::LiveDataMessage::TICKER_DATA, std::span(&outgoing, 1), work);
+    return peer.session.publishData(DATA_MESSAGES[family], std::span(&outgoing, 1), work);
 }
 
 } // namespace
@@ -407,9 +589,10 @@ namespace detail {
 struct PublisherPort {
     std::mutex mutex;
     std::condition_variable changed;
-    std::vector<QuoteRow> pending;
-    std::vector<std::u16string> demand;
+    std::vector<SourceRow> pending;
+    std::array<std::vector<std::u16string>, FAMILY_COUNT> demand;
     const bool remote;
+    const bool mixed;
     PublisherSourceStatus source;
     std::size_t head = 0;
     std::size_t size = 0;
@@ -418,20 +601,15 @@ struct PublisherPort {
     bool closed = false;
     Diagnostic diagnostic;
 
-    PublisherPort(std::size_t count, bool remote) : pending(remote ? 0 : count), remote(remote) {
+    PublisherPort(std::size_t count, bool remote, bool mixed)
+        : pending(remote ? 0 : count), remote(remote), mixed(mixed) {
     }
 };
 } // namespace detail
 
 namespace {
-constexpr std::array<protocol::LiveMessageView, 5> SOURCE_SEND{{{0, u"HEARTBEAT", {}},
-                                                                {1, u"DESCRIBE_PROTOCOL", {}},
-                                                                {2, u"DESCRIBE_RECORDS", {}},
-                                                                {11, u"TICKER_ADD_SUBSCRIPTION", {}},
-                                                                {12, u"TICKER_REMOVE_SUBSCRIPTION", {}}}};
-constexpr std::array<protocol::LiveMessageView, 4> SOURCE_RECEIVE{
-    {{0, u"HEARTBEAT", {}}, {1, u"DESCRIBE_PROTOCOL", {}}, {2, u"DESCRIBE_RECORDS", {}}, {10, u"TICKER_DATA", {}}}};
 constexpr protocol::LivePropertyView SOURCE_PROPERTIES[]{{u"type", u"qtp"}};
+constexpr protocol::LivePropertyView MIXED_SOURCE_PROPERTIES[]{{u"type", u"qtp"}, {u"opt", u"hs"}};
 
 Diagnostic sourceDiagnostic(transport::TcpDiagnostic diagnostic) noexcept {
     return {ErrorCode::TRANSPORT_FAILURE, diagnostic.stage, diagnostic.nativeCode,
@@ -444,23 +622,31 @@ bool hasCapability(std::span<const protocol::LiveMessageView> messages, const pr
     });
 }
 
+using QueueSet = std::array<std::optional<mux::MuxQueue>, FAMILY_COUNT>;
+using DemandSet = std::array<std::optional<mux::DemandTracker>, FAMILY_COUNT>;
+using WorkSet = std::array<mux::QueueWork, FAMILY_COUNT>;
+
 /** One upstream connection. Its raw output slot copies and owns the whole frame through the local write barrier. */
 class SourceConnection {
+    std::array<core::RecordContext, FAMILY_COUNT> contexts_;
     protocol::LiveSession session_;
     std::unique_ptr<transport::detail::RawByteOwner> bytes_;
     Clock::time_point handshakeDeadline_;
     Clock::time_point heartbeatAt_;
-    std::optional<std::uint64_t> pendingDemand_;
+    std::optional<std::pair<std::size_t, std::uint64_t>> pendingDemand_;
+    std::size_t familyCount_;
+    std::size_t nextFamily_ = 0;
     bool described_ = false;
     bool ready_ = false;
     std::optional<protocol::LiveEvent> pendingEvent_;
 
     static protocol::LiveSession newSession(const core::LocalSchema &schema, protocol::LiveWork &work) {
-        auto writer = quoteWriter(schema);
-        auto limits = liveLimits();
-        limits.residentBytes = REMOTE_EPOCH_BYTES;
+        auto writer = publisherWriter(schema);
+        const bool mixed = schema.records().size() > 1;
+        auto limits = liveLimits(mixed);
+        limits.residentBytes = mixed ? MIXED_REMOTE_EPOCH_BYTES : REMOTE_EPOCH_BYTES;
         limits.eventBytes = REMOTE_EVENT_BYTES;
-        limits.owners = MAX_PEERS * CLIENT_KEYS + 12;
+        limits.owners = mixed ? MIXED_OWNERS : MAX_PEERS * CLIENT_KEYS + 12;
         limits.data.emittedRecords = REMOTE_DATA_RECORDS;
         auto local = schema;
         auto session = protocol::LiveSession::create(std::move(local), std::move(writer), limits, work);
@@ -521,19 +707,37 @@ class SourceConnection {
         if (incoming.event->kind() == protocol::LiveEventKind::PROTOCOL) {
             const auto peer = incoming.event->snapshot();
             const auto descriptor = peer.protocol();
-            ready_ = session_.authentication() != protocol::LiveAuthentication::REQUIRED &&
-                     hasCapability(descriptor.send, SOURCE_RECEIVE.back()) &&
-                     hasCapability(descriptor.receive, SOURCE_SEND[3]) &&
-                     hasCapability(descriptor.receive, SOURCE_SEND[4]);
+            ready_ = session_.authentication() != protocol::LiveAuthentication::REQUIRED;
+
+            for (std::size_t family = 0; ready_ && family < familyCount_; ++family) {
+                const auto capability = 3 + family;
+                ready_ = hasCapability(descriptor.send, SERVER_SEND[capability]) &&
+                         hasCapability(descriptor.receive, SERVER_RECEIVE[3 + family * 2]) &&
+                         hasCapability(descriptor.receive, SERVER_RECEIVE[4 + family * 2]);
+            }
+
+            ready_ = ready_ && (familyCount_ == 1 || session_.historySnapshotEnabled());
 
             return;
         }
 
         if (incoming.event->kind() == protocol::LiveEventKind::DATA) {
-            if (!ready_ || incoming.event->messageType() != std::to_underlying(protocol::LiveDataMessage::TICKER_DATA))
+            const auto id = incoming.event->messageType();
+            const auto messages = std::span(DATA_MESSAGES).first(familyCount_);
+            const auto selected = id ? std::ranges::find(messages, static_cast<DataMessage>(*id)) : messages.end();
+
+            if (!ready_ || selected == messages.end())
                 throw Error({ErrorCode::PROTOCOL_FAILURE, "publisher-upstream-data"});
 
-            if (!incoming.event->records().empty())
+            const auto family = static_cast<std::size_t>(selected - messages.begin());
+            const auto records = incoming.event->records();
+
+            if (std::ranges::any_of(records, [&](const auto &record) {
+                    return !record.context.matches(contexts_[family]);
+                }))
+                throw Error({ErrorCode::PROTOCOL_FAILURE, "publisher-upstream-record-family"});
+
+            if (!records.empty())
                 pendingEvent_ = std::move(incoming.event);
         }
     }
@@ -542,20 +746,30 @@ class SourceConnection {
     SourceConnection(const core::LocalSchema &schema, const transport::detail::BootstrapLease &bootstrap,
                      PublisherSourceOptions options, Clock::time_point now, protocol::LiveWork &work)
         : session_(newSession(schema, work)), bytes_(newTransport(bootstrap, options, work)),
-          handshakeDeadline_(now + HANDSHAKE_TIMEOUT), heartbeatAt_(now + HEARTBEAT_PERIOD) {
+          handshakeDeadline_(now + HANDSHAKE_TIMEOUT), heartbeatAt_(now + HEARTBEAT_PERIOD),
+          familyCount_(schema.records().size()) {
+        for (std::size_t family = 0; family < familyCount_; ++family)
+            contexts_[family] = schema.recordContext(RECORD_IDS[family]);
+
         const auto started = bytes_->start();
 
         if (!started)
             throw Error(sourceDiagnostic(started.error()));
 
-        send(session_.composeProtocol({SOURCE_PROPERTIES, SOURCE_SEND, SOURCE_RECEIVE}, work), work);
+        const auto properties = familyCount_ == 1
+                                    ? std::span<const protocol::LivePropertyView>(SOURCE_PROPERTIES)
+                                    : std::span<const protocol::LivePropertyView>(MIXED_SOURCE_PROPERTIES);
+        send(session_.composeProtocol({properties, std::span(SERVER_RECEIVE).first(3 + 2 * familyCount_),
+                                       std::span(SERVER_SEND).first(3 + familyCount_)},
+                                      work),
+             work);
     }
 
     [[nodiscard]] bool ready() const noexcept {
         return ready_;
     }
 
-    void progress(mux::MuxQueue &queue, mux::DemandTracker &demand, Clock::time_point now, mux::QueueWork &queueWork,
+    void progress(QueueSet &queues, DemandSet &demand, Clock::time_point now, WorkSet &queueWork,
                   mux::DemandWork &demandWork) {
         auto work = liveTurn();
         transport::TcpWork native{16, 16, INPUT_BYTES * 2, 0, 0, 0, 0};
@@ -583,7 +797,10 @@ class SourceConnection {
             throw Error({ErrorCode::PROTOCOL_FAILURE, "publisher-upstream-negotiation"});
 
         if (pendingEvent_) {
-            const auto admitted = queue.admit(std::move(*pendingEvent_), queueWork);
+            const auto type = static_cast<DataMessage>(*pendingEvent_->messageType());
+            const auto family =
+                static_cast<std::size_t>(std::ranges::find(DATA_MESSAGES, type) - DATA_MESSAGES.begin());
+            const auto admitted = queues[family]->admit(std::move(*pendingEvent_), queueWork[family]);
 
             if (admitted)
                 pendingEvent_.reset();
@@ -596,34 +813,39 @@ class SourceConnection {
             return;
 
         if (pendingDemand_) {
-            if (!demand.acknowledge(*pendingDemand_))
+            const auto [family, sequence] = *pendingDemand_;
+
+            if (!demand[family]->acknowledge(sequence))
                 throw Error({ErrorCode::INVALID_STATE, "publisher-upstream-demand-ack"});
 
             pendingDemand_.reset();
         }
 
         if (ready_ && !described_) {
-            send(session_.describe(std::span(&QUOTE_ID, 1), work), work);
+            send(session_.describe(std::span(RECORD_IDS).first(familyCount_), work), work);
             described_ = true;
 
             return;
         }
 
         if (ready_) {
-            const auto next = demand.next(queue.aggregateEntries(), demandWork);
+            for (std::size_t i = 0; i < familyCount_; ++i) {
+                const auto family = (nextFamily_ + i) % familyCount_;
+                const auto next = demand[family]->next(queues[family]->aggregateEntries(), demandWork);
 
-            if (!next)
-                throw Error({ErrorCode::RESOURCE_LIMIT, "publisher-upstream-demand", 0,
-                             static_cast<std::uint32_t>(next.error())});
+                if (!next)
+                    throw Error({ErrorCode::RESOURCE_LIMIT, "publisher-upstream-demand", 0,
+                                 static_cast<std::uint32_t>(next.error())});
 
-            if (*next) {
-                const auto message = (*next)->action == mux::DemandAction::ADD
-                                         ? protocol::SubscriptionMessage::TICKER_ADD
-                                         : protocol::SubscriptionMessage::TICKER_REMOVE;
-                send(session_.subscribe(message, std::span(&(*next)->request, 1), work), work);
-                pendingDemand_ = (*next)->sequence;
+                if (*next) {
+                    const auto message =
+                        (*next)->action == mux::DemandAction::ADD ? ADD_MESSAGES[family] : REMOVE_MESSAGES[family];
+                    send(session_.subscribe(message, std::span(&(*next)->request, 1), work), work);
+                    pendingDemand_.emplace(family, (*next)->sequence);
+                    nextFamily_ = (family + 1) % familyCount_;
 
-                return;
+                    return;
+                }
             }
         }
 
@@ -634,22 +856,23 @@ class SourceConnection {
     }
 };
 
-class QuoteServer {
+class PublisherServer {
     core::LocalSchema schema_;
     std::optional<protocol::detail::LocalEventOwner> source_;
-    mux::MuxQueue queue_;
+    QueueSet queues_;
     transport::TcpListener listener_;
     std::vector<std::optional<Peer>> peers_;
     std::optional<protocol::LiveEvent> pendingSource_;
     std::string sourceAddress_;
     std::optional<PublisherSourceOptions> sourceOptions_;
     std::optional<transport::detail::BootstrapLease> sourceBootstrap_;
-    std::optional<mux::DemandTracker> sourceDemand_;
+    DemandSet sourceDemand_;
     std::optional<SourceConnection> upstream_;
     Clock::time_point retryAt_{};
     bool resetPending_ = false;
     PublisherSourceStatus sourceStatus_;
-    std::uint64_t publishedRevision_ = 0;
+    std::array<std::uint64_t, FAMILY_COUNT> publishedRevision_{};
+    const std::size_t familyCount_;
 
     static transport::TcpListener listen(transport::RuntimeBootstrap &bootstrap,
                                          transport::TcpListenerOptions options) {
@@ -680,23 +903,21 @@ class QuoteServer {
         try {
             auto liveWork = liveTurn();
             auto session = serverSession(schema_, liveWork);
-            auto delivery = std::make_shared<Delivery>();
-            auto work = queueTurn();
-            auto handle = queue_.open(CLIENT_LIMITS, delivery, work);
-
-            if (!handle)
-                throw Error(queueDiagnostic(handle.error(), "publisher-open-client"));
-
             const auto now = Clock::now();
-            vacant->emplace(Peer{**accepted,
-                                 std::move(session),
-                                 std::move(delivery),
-                                 std::move(*handle),
-                                 {},
-                                 {},
-                                 now,
-                                 now,
-                                 now + HEARTBEAT_PERIOD});
+            Peer peer{**accepted, std::move(session), {}, {}, {}, {}, now, now, now + HEARTBEAT_PERIOD};
+
+            for (std::size_t family = 0; family < familyCount_; ++family) {
+                auto work = serverQueueTurn(peers_.size(), sourceOptions_.has_value(), familyCount_ > 1);
+                peer.delivery[family] = std::make_shared<Delivery>();
+                auto handle = queues_[family]->open(CLIENT_LIMITS, peer.delivery[family], work);
+
+                if (!handle)
+                    throw Error(queueDiagnostic(handle.error(), "publisher-open-client"));
+
+                peer.handles[family] = std::move(*handle);
+            }
+
+            vacant->emplace(std::move(peer));
         } catch (...) {
             const auto result = listener_.retire(**accepted);
 
@@ -709,9 +930,12 @@ class QuoteServer {
         if (!peer.closing) {
             peer.closing = true;
             peer.output.reset();
-            peer.delivery->batch = {};
             peer.command.reset();
-            (void)peer.handle.requestStop(mux::StopMode::ABORT);
+
+            for (std::size_t family = 0; family < familyCount_; ++family) {
+                peer.delivery[family]->batch = {};
+                (void)peer.handles[family].requestStop(mux::StopMode::ABORT);
+            }
         }
 
         if (!peer.socketClosed)
@@ -755,16 +979,30 @@ class QuoteServer {
             if (result.event->kind() == protocol::LiveEventKind::DATA)
                 return false;
 
-            if (result.event->kind() == protocol::LiveEventKind::PROTOCOL)
-                peer.ready = canReceiveTicker(peer.session);
+            if (result.event->kind() == protocol::LiveEventKind::PROTOCOL) {
+                const auto descriptor = result.event->snapshot();
+
+                for (std::size_t family = 0; family < familyCount_; ++family)
+                    peer.ready[family] = hasCapability(descriptor.protocol().receive, SERVER_SEND[3 + family]);
+            }
         }
 
         if (result.subscription) {
-            if (!peer.ready)
+            const auto family = familyIndex(result.subscription->message);
+
+            if (!family || *family >= familyCount_ || !peer.ready[*family] ||
+                (*family == 2 && !peer.session.historySnapshotEnabled()))
                 return false;
 
+            // The QTP record map covers every enabled family. A command cannot install a key from another family.
+            const auto context = schema_.recordContext(RECORD_IDS[*family]);
+            std::erase_if(result.subscription->entries, [&](const auto &entry) {
+                return !entry.context.matches(context);
+            });
+
             mux::QueueSubmitWork submit{8, 65536, 65536, 1024 * 1024};
-            auto ticket = queue_.submitIncomingSubscription(peer.handle, *result.subscription, submit);
+            auto ticket =
+                queues_[*family]->submitIncomingSubscription(peer.handles[*family], *result.subscription, submit);
 
             if (!ticket)
                 return false;
@@ -785,17 +1023,35 @@ class QuoteServer {
 
         if (!peer.sentProtocol) {
             kind = OutputKind::PROTOCOL;
-            output = peer.session.composeProtocol({{}, SERVER_SEND, SERVER_RECEIVE}, work);
-        } else if (peer.ready && !peer.sentDescription) {
+            const auto properties = familyCount_ == 1 ? std::span<const protocol::LivePropertyView>{}
+                                                      : std::span<const protocol::LivePropertyView>(HISTORY_OPTIONS);
+            output = peer.session.composeProtocol({properties, std::span(SERVER_SEND).first(3 + familyCount_),
+                                                   std::span(SERVER_RECEIVE).first(3 + 2 * familyCount_)},
+                                                  work);
+        } else if (!peer.sentDescription && std::ranges::any_of(peer.ready, std::identity{})) {
             kind = OutputKind::DESCRIPTION;
-            output = peer.session.describe(std::span(&QUOTE_ID, 1), work);
-        } else if (peer.sentDescription && !peer.delivery->batch.records().empty()) {
-            kind = OutputKind::DATA;
-            output = composeQuote(peer, work);
-        } else if (now >= peer.heartbeatAt) {
-            output = peer.session.composeHeartbeat({false, {}, {}, {}, {}}, work);
+            output = peer.session.describe(std::span(RECORD_IDS).first(familyCount_), work);
         } else {
-            return true;
+            if (peer.sentDescription) {
+                for (std::size_t i = 0; i < familyCount_; ++i) {
+                    const auto family = (peer.nextFamily + i) % familyCount_;
+
+                    if (!peer.delivery[family]->batch.records().empty()) {
+                        kind = OutputKind::DATA;
+                        peer.outputFamily = family;
+                        peer.nextFamily = (family + 1) % familyCount_;
+                        output = composeDelivery(peer, family, work);
+                        break;
+                    }
+                }
+            }
+
+            if (kind == OutputKind::HEARTBEAT) {
+                if (now < peer.heartbeatAt)
+                    return true;
+
+                output = peer.session.composeHeartbeat({false, {}, {}, {}, {}}, work);
+            }
         }
 
         if (!output)
@@ -841,8 +1097,8 @@ class QuoteServer {
             peer.sentDescription = true;
             break;
         case OutputKind::DATA:
-            peer.delivery->batch = {};
-            (void)peer.handle.requestResume();
+            peer.delivery[peer.outputFamily]->batch = {};
+            (void)peer.handles[peer.outputFamily].requestResume();
             break;
         case OutputKind::HEARTBEAT:
             break;
@@ -863,26 +1119,38 @@ class QuoteServer {
             auto &peer = *entry;
             auto work = liveTurn();
 
-            if (const auto notice = peer.handle.resetNotice(); notice && !notice->globalAckPending)
-                (void)peer.handle.acknowledgeReset(notice->sequence);
+            const auto handles = std::span(peer.handles).first(familyCount_);
 
-            if (peer.closing || peer.handle.terminal() || (!peer.ready && now - peer.acceptedAt >= HANDSHAKE_TIMEOUT) ||
+            for (auto &handle : handles) {
+                if (const auto notice = handle.resetNotice(); notice && !notice->globalAckPending)
+                    (void)handle.acknowledgeReset(notice->sequence);
+            }
+
+            if (peer.closing ||
+                std::ranges::any_of(handles,
+                                    [](const auto &handle) {
+                                        return handle.terminal().has_value();
+                                    }) ||
+                (!std::ranges::any_of(peer.ready, std::identity{}) && now - peer.acceptedAt >= HANDSHAKE_TIMEOUT) ||
                 !receive(peer, work) || !send(peer, now, work)) {
                 retire(peer);
 
-                if (peer.socketClosed && peer.handle.terminal())
+                if (peer.socketClosed && std::ranges::all_of(handles, [](const auto &handle) {
+                        return handle.terminal().has_value();
+                    }))
                     entry.reset();
             }
         }
     }
 
-    void publishDemand(detail::PublisherPort &port) {
-        const auto revision = queue_.revision();
+    void publishDemand(detail::PublisherPort &port, std::size_t family) {
+        const auto &queue = *queues_[family];
+        const auto revision = queue.revision();
 
-        if (publishedRevision_ == revision)
+        if (publishedRevision_[family] == revision)
             return;
 
-        const auto entries = queue_.aggregateEntries();
+        const auto entries = queue.aggregateEntries();
         std::vector<std::u16string> symbols;
         symbols.reserve(entries.size());
 
@@ -891,28 +1159,37 @@ class QuoteServer {
 
         {
             const std::lock_guard lock(port.mutex);
-            port.demand = std::move(symbols);
+            port.demand[family] = std::move(symbols);
         }
 
-        publishedRevision_ = revision;
+        publishedRevision_[family] = revision;
         port.changed.notify_all();
     }
 
-    void publishQuote(detail::PublisherPort &port, mux::QueueWork &work) {
+    void publishLocal(detail::PublisherPort &port, WorkSet &work) {
         if (!pendingSource_) {
-            std::optional<QuoteRow> quote;
+            SourceRow row;
             {
                 const std::lock_guard lock(port.mutex);
 
                 if (port.size == 0 || port.closed)
                     return;
 
-                quote = port.pending[port.head];
+                row = port.pending[port.head];
                 port.head = (port.head + 1) % port.pending.size();
                 --port.size;
             }
             auto liveWork = liveTurn();
-            auto event = source_->quote(schema_.recordContext(QUOTE_ID), quote->text(), quote->fields, {}, liveWork);
+            const auto id = RECORD_IDS[row.family];
+            const auto layout = schema_.records()[static_cast<std::size_t>(id)].fields;
+            std::array<core::FieldValue, MAX_DATA_FIELDS> fields{};
+
+            for (std::size_t i = 0; i < layout.size(); ++i)
+                fields[i] = {static_cast<FieldType>(layout[i].serialTypeId), row.raw[i]};
+
+            auto event =
+                source_->record(DATA_MESSAGES[row.family], id, schema_.recordContext(id), row.text(),
+                                std::span(fields).first(layout.size()), row.flags, row.removalTime, {}, liveWork);
 
             if (!event)
                 throw Error(protocolDiagnostic(event.error(), "publisher-local-event"));
@@ -920,11 +1197,14 @@ class QuoteServer {
             pendingSource_ = std::move(*event);
         }
 
-        const auto admitted = queue_.admit(std::move(*pendingSource_), work);
+        const auto message = static_cast<DataMessage>(*pendingSource_->messageType());
+        const auto family = static_cast<std::size_t>(std::ranges::find(DATA_MESSAGES, message) - DATA_MESSAGES.begin());
+        const auto admitted = queues_[family]->admit(std::move(*pendingSource_), work[family]);
 
         if (admitted)
             pendingSource_.reset();
-        else if (admitted.error().error != mux::QueueError::BUSY)
+        else if (admitted.error().error != mux::QueueError::BUSY &&
+                 admitted.error().error != mux::QueueError::WORK_LIMIT)
             throw Error(queueDiagnostic(admitted.error(), "publisher-admit"));
     }
 
@@ -953,28 +1233,32 @@ class QuoteServer {
                 peer.output.reset();
             }
 
-            if (!peer.delivery->batch.records().empty()) {
-                peer.delivery->batch = {};
-                (void)peer.handle.requestResume();
+            for (std::size_t family = 0; family < familyCount_; ++family) {
+                if (!peer.delivery[family]->batch.records().empty()) {
+                    peer.delivery[family]->batch = {};
+                    (void)peer.handles[family].requestResume();
+                }
             }
         }
     }
 
-    void progressSource(detail::PublisherPort &port, mux::QueueWork &work) {
+    void progressSource(detail::PublisherPort &port, WorkSet &work) {
         const auto now = Clock::now();
         const auto keys = peers_.size() * CLIENT_KEYS;
         // One validation and search pass over every pair in each of the two finite demand maps.
-        const auto comparisons = 4 * (keys + 1) * (keys + 1);
-        mux::DemandWork demandWork{4, comparisons, comparisons * SYMBOL_UNITS};
+        const auto comparisons = 4 * familyCount_ * (keys + 1) * (keys + 1);
+        mux::DemandWork demandWork{2 * familyCount_, comparisons, comparisons * SYMBOL_UNITS};
 
         if (resetPending_) {
-            const auto reset = queue_.resetStatus();
+            for (std::size_t family = 0; family < familyCount_; ++family) {
+                const auto reset = queues_[family]->resetStatus();
 
-            if (reset.failure)
-                throw Error(queueDiagnostic(*reset.failure, "publisher-upstream-reset"));
+                if (reset.failure)
+                    throw Error(queueDiagnostic(*reset.failure, "publisher-upstream-reset"));
 
-            if (reset.phase != mux::ResetPhase::NONE || !reset.globalAcknowledged)
-                return;
+                if (reset.phase != mux::ResetPhase::NONE || !reset.globalAcknowledged)
+                    return;
+            }
 
             resetPending_ = false;
         }
@@ -988,23 +1272,30 @@ class QuoteServer {
                 upstream_.emplace(schema_, *sourceBootstrap_, *sourceOptions_, now, liveWork);
             }
 
-            upstream_->progress(queue_, *sourceDemand_, now, work, demandWork);
+            upstream_->progress(queues_, sourceDemand_, now, work, demandWork);
         } catch (const Error &failure) {
             if (sourceStatus_.connected || (upstream_ && upstream_->ready())) {
                 fenceSource();
-                auto resetWork = serverQueueTurn(peers_.size(), true);
-                const auto reset = queue_.resetSource(resetWork);
 
-                if (!reset)
-                    throw Error(queueDiagnostic(reset.error(), "publisher-upstream-reset"));
+                for (std::size_t family = 0; family < familyCount_; ++family) {
+                    auto resetWork = serverQueueTurn(peers_.size(), true, familyCount_ > 1);
+                    const auto reset = queues_[family]->resetSource(resetWork);
+
+                    if (!reset)
+                        throw Error(queueDiagnostic(reset.error(), "publisher-upstream-reset"));
+                }
 
                 resetPending_ = true;
             }
 
             upstream_.reset();
 
-            if (!sourceDemand_->reset(demandWork))
-                throw Error({ErrorCode::INVALID_STATE, "publisher-upstream-demand-reset"});
+            for (std::size_t family = 0; family < familyCount_; ++family) {
+                auto resetWork = mux::DemandWork{1, 2 * keys, 0};
+
+                if (!sourceDemand_[family]->reset(resetWork))
+                    throw Error({ErrorCode::INVALID_STATE, "publisher-upstream-demand-reset"});
+            }
 
             retryAt_ = now + sourceOptions_->retryDelay;
             sourceStatus_.connected = false;
@@ -1026,12 +1317,15 @@ class QuoteServer {
     }
 
     public:
-    QuoteServer(transport::RuntimeBootstrap &bootstrap, PublisherOptions options)
-        : schema_(quoteSchema()),
-          queue_(tickerQueue(schema_, options.listener.maxConnections, options.source.has_value())),
-          listener_(listen(bootstrap, options.listener)), peers_(options.listener.maxConnections) {
+    PublisherServer(transport::RuntimeBootstrap &bootstrap, PublisherOptions options)
+        : schema_(publisherSchema(options.mixed)), listener_(listen(bootstrap, options.listener)),
+          peers_(options.listener.maxConnections), familyCount_(schema_.records().size()) {
+        for (std::size_t family = 0; family < familyCount_; ++family)
+            queues_[family].emplace(
+                publisherQueue(schema_, peers_.size(), options.source.has_value(), FAMILIES[family]));
+
         if (!options.source) {
-            source_.emplace(localOwner());
+            source_.emplace(localOwner(options.mixed));
 
             return;
         }
@@ -1045,13 +1339,16 @@ class QuoteServer {
             throw Error(sourceDiagnostic(lease.error()));
 
         sourceBootstrap_.emplace(std::move(*lease));
-        auto demand = mux::DemandTracker::create(core::SubscriptionFamily::TICKER,
-                                                 {peers_.size() * CLIENT_KEYS, peers_.size() * CLIENT_SYMBOL_UNITS});
 
-        if (!demand)
-            throw Error({ErrorCode::RESOURCE_LIMIT, "publisher-upstream-demand-storage"});
+        for (std::size_t family = 0; family < familyCount_; ++family) {
+            auto demand = mux::DemandTracker::create(
+                FAMILIES[family], {peers_.size() * CLIENT_KEYS, peers_.size() * CLIENT_SYMBOL_UNITS});
 
-        sourceDemand_.emplace(std::move(*demand));
+            if (!demand)
+                throw Error({ErrorCode::RESOURCE_LIMIT, "publisher-upstream-demand-storage"});
+
+            sourceDemand_[family].emplace(std::move(*demand));
+        }
     }
 
     [[nodiscard]] std::uint16_t port() const noexcept {
@@ -1061,30 +1358,36 @@ class QuoteServer {
     void progress(detail::PublisherPort &port) {
         acceptPeer();
         progressPeers();
-        auto work = serverQueueTurn(peers_.size(), sourceOptions_.has_value());
+        WorkSet work{};
         constexpr std::size_t QUEUE_ACTIONS = 16;
 
-        for (std::size_t i = 0; i < QUEUE_ACTIONS; ++i) {
-            const auto moved = queue_.progress(work);
+        for (std::size_t family = 0; family < familyCount_; ++family) {
+            auto &queue = *queues_[family];
+            auto &turn = work[family];
+            turn = serverQueueTurn(peers_.size(), sourceOptions_.has_value(), familyCount_ > 1);
 
-            if (!moved) {
-                if (moved.error().error == mux::QueueError::WORK_LIMIT)
-                    break;
+            for (std::size_t i = 0; i < QUEUE_ACTIONS; ++i) {
+                const auto moved = queue.progress(turn);
 
-                throw Error(queueDiagnostic(moved.error(), "publisher-progress"));
+                if (!moved) {
+                    if (moved.error().error == mux::QueueError::WORK_LIMIT)
+                        break;
+
+                    throw Error(queueDiagnostic(moved.error(), "publisher-progress"));
+                }
             }
+
+            if (const auto terminal = queue.terminal())
+                throw Error({ErrorCode::INVALID_STATE, "publisher-queue-terminal", 0,
+                             static_cast<std::uint32_t>(terminal->outcome)});
+
+            publishDemand(port, family);
         }
-
-        if (const auto terminal = queue_.terminal())
-            throw Error({ErrorCode::INVALID_STATE, "publisher-queue-terminal", 0,
-                         static_cast<std::uint32_t>(terminal->outcome)});
-
-        publishDemand(port);
 
         if (sourceOptions_)
             progressSource(port, work);
         else
-            publishQuote(port, work);
+            publishLocal(port, work);
     }
 
     void stop() {
@@ -1100,7 +1403,7 @@ void runPublisher(detail::PublisherPort &port, transport::RuntimeBootstrap &boot
     Diagnostic diagnostic;
 
     try {
-        QuoteServer server(bootstrap, options);
+        PublisherServer server(bootstrap, options);
         {
             const std::lock_guard lock(port.mutex);
             port.boundPort = server.port();
@@ -1127,8 +1430,11 @@ void runPublisher(detail::PublisherPort &port, transport::RuntimeBootstrap &boot
         port.closed = true;
         port.source.connected = false;
         port.diagnostic = diagnostic;
-        std::vector<QuoteRow>().swap(port.pending);
-        std::vector<std::u16string>().swap(port.demand);
+        std::vector<SourceRow>().swap(port.pending);
+
+        for (auto &demand : port.demand)
+            std::vector<std::u16string>().swap(demand);
+
         port.size = 0;
     }
     port.changed.notify_all();
@@ -1143,38 +1449,54 @@ struct PublisherEndpoint::Impl {
 Publisher::Publisher(std::shared_ptr<detail::PublisherPort> port) noexcept : port_(std::move(port)) {
 }
 
-std::expected<void, Diagnostic> Publisher::publish(const events::Quote &quote) const {
-    if (port_ && port_->remote) {
-        const std::lock_guard lock(port_->mutex);
+namespace {
+template <typename Event, typename Convert>
+std::expected<void, Diagnostic> publishEvent(const std::shared_ptr<detail::PublisherPort> &port, const Event &event,
+                                             Convert convert, bool indexed) {
+    if (port && (port->remote || (indexed && !port->mixed))) {
+        const std::lock_guard lock(port->mutex);
 
-        return std::unexpected(port_->closed ? CLOSED : LOCAL_SOURCE_DISABLED);
+        return std::unexpected(port->closed ? CLOSED : (port->remote ? LOCAL_SOURCE_DISABLED : MIXED_DISABLED));
     }
 
-    auto row = quoteRow(quote);
+    auto row = convert(event);
 
     if (!row)
         return std::unexpected(row.error());
 
-    if (!port_)
+    if (!port)
         return std::unexpected(CLOSED);
 
     {
-        const std::lock_guard lock(port_->mutex);
+        const std::lock_guard lock(port->mutex);
 
-        if (port_->closed)
+        if (port->closed)
             return std::unexpected(CLOSED);
 
-        if (port_->size == port_->pending.size())
+        if (port->size == port->pending.size())
             return std::unexpected(Diagnostic{ErrorCode::RESOURCE_LIMIT, "publisher-pending-quotes"});
 
-        const auto index = (port_->head + port_->size) % port_->pending.size();
-        port_->pending[index] = std::move(*row);
-        ++port_->size;
+        const auto index = (port->head + port->size) % port->pending.size();
+        port->pending[index] = std::move(*row);
+        ++port->size;
     }
 
-    port_->changed.notify_all();
+    port->changed.notify_all();
 
     return {};
+}
+} // namespace
+
+std::expected<void, Diagnostic> Publisher::publish(const events::Quote &quote) const {
+    return publishEvent(port_, quote, quoteRow, false);
+}
+
+std::expected<void, Diagnostic> Publisher::publish(const events::TimeAndSale &sale) const {
+    return publishEvent(port_, sale, saleRow, true);
+}
+
+std::expected<void, Diagnostic> Publisher::publish(const events::Order &order) const {
+    return publishEvent(port_, order, orderRow, true);
 }
 
 PublisherEndpoint::PublisherEndpoint(std::unique_ptr<Impl> impl) noexcept : impl_(std::move(impl)) {
@@ -1208,7 +1530,8 @@ PublisherEndpoint::create(transport::RuntimeBootstrap &bootstrap, PublisherOptio
         }
 
         auto impl = std::make_unique<Impl>();
-        impl->port = std::make_shared<detail::PublisherPort>(options.pendingQuotes, options.source.has_value());
+        impl->port =
+            std::make_shared<detail::PublisherPort>(options.pendingQuotes, options.source.has_value(), options.mixed);
         const auto port = impl->port;
         auto endpoint = std::unique_ptr<PublisherEndpoint>(new PublisherEndpoint(std::move(impl)));
         endpoint->impl_->worker = std::jthread([port, &bootstrap, options](std::stop_token stop) {
@@ -1245,13 +1568,21 @@ Publisher PublisherEndpoint::getPublisher() const noexcept {
 }
 
 bool PublisherEndpoint::awaitDemand(std::u16string_view symbol, bool subscribed, Clock::time_point deadline) const {
-    if (!exactSymbol(symbol))
+    return awaitDemand(Family::TICKER, symbol, subscribed, deadline);
+}
+
+bool PublisherEndpoint::awaitDemand(Family family, std::u16string_view symbol, bool subscribed,
+                                    Clock::time_point deadline) const {
+    const auto index = familyIndex(family);
+    auto &port = *impl_->port;
+
+    if (!exactSymbol(symbol) || !index || (*index != 0 && !port.mixed))
         return false;
 
-    auto &port = *impl_->port;
     std::unique_lock lock(port.mutex);
+    const auto &demand = port.demand[*index];
     const auto matches = [&] {
-        return (std::ranges::find(port.demand, symbol) != port.demand.end()) == subscribed;
+        return (std::ranges::find(demand, symbol) != demand.end()) == subscribed;
     };
 
     return port.changed.wait_until(lock, deadline, [&] {

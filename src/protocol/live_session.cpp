@@ -1554,6 +1554,14 @@ std::expected<LiveEvent, LiveError> detail::LocalEventOwner::quote(const core::R
                                                                    std::span<const core::FieldValue> fields,
                                                                    std::optional<FieldEventTime> eventTime,
                                                                    LiveWork &work) const {
+    return record(LiveDataMessage::TICKER_DATA, 0, context, symbol, fields, 0, {}, eventTime, work);
+}
+
+std::expected<LiveEvent, LiveError>
+detail::LocalEventOwner::record(LiveDataMessage type, std::int32_t localId, const core::RecordContext &context,
+                                std::u16string_view symbol, std::span<const core::FieldValue> fields,
+                                std::int32_t flags, std::optional<std::int64_t> removalTime,
+                                std::optional<FieldEventTime> eventTime, LiveWork &work) const {
     try {
         debit(1, work.operations);
         debit(fields.size() + 1, work.visits);
@@ -1561,17 +1569,18 @@ std::expected<LiveEvent, LiveError> detail::LocalEventOwner::quote(const core::R
         debit(sum(sizeof(LiveEvent::State), eventBytes_), work.bytes);
         auto event =
             makeOwner<LiveEvent::State>(*epoch_.state_->ledger.lease.get(), eventBytes_, epoch_, LiveEventKind::DATA);
-        event->messageType = TICKER_DATA;
+        event->messageType = std::to_underlying(type);
         auto *resource = event->arena.resource();
-        detail::PmrStreamDataRecord record{0,
+        detail::PmrStreamDataRecord record{localId,
                                            encoding::PmrSymbolValue(*resource),
                                            std::pmr::vector<std::int32_t>(resource),
                                            std::pmr::vector<detail::PmrFieldValue>(resource),
                                            context,
-                                           0,
-                                           std::nullopt,
+                                           localId,
+                                           removalTime,
                                            eventTime};
         record.symbol.units.assign(symbol);
+        record.symbol.eventFlags = flags;
 
         if (const auto encoded = encoding::encodePentaSymbol(symbol))
             record.symbol.cipher = encoded->cipher;

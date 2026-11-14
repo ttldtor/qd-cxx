@@ -20,6 +20,12 @@ class LocalEventOwner {
     [[nodiscard]] std::expected<LiveEvent, LiveError>
     quote(const core::RecordContext &context, std::u16string_view symbol, std::span<const core::FieldValue> fields,
           std::optional<FieldEventTime> eventTime, LiveWork &work) const;
+
+    /** Own one local record with its selected contract and physical indexed controls. */
+    [[nodiscard]] std::expected<LiveEvent, LiveError>
+    record(LiveDataMessage type, std::int32_t localId, const core::RecordContext &context, std::u16string_view symbol,
+           std::span<const core::FieldValue> fields, std::int32_t flags, std::optional<std::int64_t> removalTime,
+           std::optional<FieldEventTime> eventTime, LiveWork &work) const;
 };
 
 } // namespace org::ttldtor::qdcxx::protocol::detail

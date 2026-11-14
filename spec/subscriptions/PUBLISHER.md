@@ -1,4 +1,4 @@
-# Composite Quote publisher
+# QTP publishing and relay
 
 [Русская версия](PUBLISHER.ru.md). English is authoritative.
 
@@ -22,6 +22,28 @@ TICKER DATA in its receive direction, ADD/REMOVE in its send direction, and
 sends the local Quote description before the first subscription. The source
 independently declares its own DATA record ID and fields. Relay frames admit up
 to 32 mapped composite Quotes with the supported exact field representations.
+
+## Mixed profile
+
+Set `PublisherOptions::mixed` to `true` before creating the source or relay. The
+endpoint advertises TICKER Quote, STREAM TimeAndSale and HISTORY default-source
+Order on the same QTP connection. The three contracts keep independent desired
+maps and delivery capacity. Every accepted peer owns its own registrations and
+partial output. A negotiated HISTORY snapshot option (`hs`) is required for
+the HISTORY direction.
+
+`Publisher::publish` has typed overloads for all three records. STREAM admits
+separate ordered occurrences even when their fields are identical. HISTORY
+uses signed raw bounds, presents collector-projected snapshots and transactions,
+and carries the raw indexed identity for removals. The default Order source has
+indices from zero to `INT32_MAX` and no source suffix. END and SNIP use index zero.
+Use `awaitDemand(family, ...)`
+to observe the exact symbol union for one contract. Local publication follows
+the bounded default physical layouts. The source rejects fields and metadata
+that cannot be represented by those layouts. Local TimeAndSale accepts zero event flags
+and the optional nano field. A remote DATA envelope admits at most 32 mapped rows. Each
+peer reserves 32 delivery entries per family. The HISTORY collector shares up to
+`16 * maxConnections * 32` indexed points between peers and keys.
 
 The first interested client adds the key upstream and the last client withdrawal
 removes it. The relay marks a change locally written only after the complete
