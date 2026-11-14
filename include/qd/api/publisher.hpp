@@ -63,10 +63,11 @@ struct PublisherStatistics {
     std::array<PublisherFamilyStatistics, 3> families{}; ///< TICKER, STREAM and HISTORY, in that order.
     core::StatisticCounter retiredPeers;                 ///< Downstream peer retirements observed by the worker.
     std::size_t activePeers = 0;                         ///< Peers not yet fenced by the worker.
-    std::size_t pendingPublications = 0;                 ///< Accepted local publication rows still in the input FIFO.
+    std::size_t pendingPublications =
+        0; ///< Accepted local rows in the input FIFO or pending application in local catalog mode.
 };
 
-/** Borrowed full record profile, copied before endpoint creation returns. */
+/** Borrowed binary record profile, copied before endpoint creation returns. */
 struct PublisherCatalogOptions {
     const core::LocalSchema &schema;                             ///< Validated binary record catalog.
     std::span<const std::vector<std::u16string>> wireFieldNames; ///< Record/field order, exact QTP names.
@@ -128,6 +129,16 @@ class PublisherPolicyChange {
     [[nodiscard]] std::optional<PublisherPolicyResult> waitUntil(std::chrono::steady_clock::time_point deadline) const;
 };
 
+/** Requested local record backing, excluding the fixed FIFO entries and allocator bookkeeping. */
+struct PublisherRecordLimits {
+    static constexpr std::size_t MAX_FIELDS = 128;                    ///< Supported logical fields per submitted row.
+    static constexpr std::size_t MAX_ROW_BYTES = 16 * 1024;           ///< Largest configurable row reservation.
+    static constexpr std::size_t MAX_PENDING_BYTES = 8 * 1024 * 1024; ///< Largest configurable aggregate reservation.
+
+    std::size_t rowBytes = MAX_ROW_BYTES;  ///< Maximum one row's field views, UTF-16 units and opaque bytes.
+    std::size_t pendingBytes = 256 * 1024; ///< Maximum total while queued or awaiting collector processing.
+};
+
 /** Finite local or remote publishing profile. */
 struct PublisherOptions {
     static constexpr std::size_t MAX_PEER_DEMAND_POLICIES = 32; ///< Maximum address overrides per endpoint.
@@ -137,9 +148,10 @@ struct PublisherOptions {
     std::size_t pendingQuotes = 64;                 ///< Maximum queued publication requests across enabled contracts.
     std::optional<PublisherSourceOptions> source{}; ///< Remote upstream in place of local publication.
     bool mixed = false; ///< Enable Quote/TICKER, TimeAndSale/STREAM and default Order/HISTORY on each connection.
-    std::optional<PublisherCatalogOptions> catalog{}; ///< Full record relay profile; requires source and mixed=false.
+    std::optional<PublisherCatalogOptions> catalog{}; ///< Local record publisher or full relay. Requires mixed=false.
     PublisherDemandPolicy demand; ///< Default policy. Filters must be static and built before create.
     std::vector<PublisherPeerDemandPolicy> peerDemand; ///< Owned overrides, matched by numeric IP on connection.
+    PublisherRecordLimits recordLimits;                ///< Pending storage limits for local record publication.
 };
 
 /** Detached producer port. Copies may be used from application threads and outlive the endpoint. */
@@ -159,6 +171,18 @@ class Publisher {
     [[nodiscard]] std::expected<void, Diagnostic> publish(const events::TimeAndSale &sale) const;
     /** Submit one ordinary default-source Order event in mixed mode. */
     [[nodiscard]] std::expected<void, Diagnostic> publish(const events::Order &order) const;
+
+    /** Submit an exact TICKER or STREAM record to a local catalog publisher.
+     * @param family TICKER or STREAM. The collector determines the corresponding delivery policy.
+     * @param context Owning record identity resolved against the configured catalog's immutable provenance.
+     * @param symbol Exact nonempty symbol. Its storage is borrowed only through this call.
+     * @param fields Exact tagged values in logical catalog order. Nullable field storage is copied before admission.
+     * @return Local admission or detached refusal. A successful call does not establish application receipt.
+     */
+    [[nodiscard]] std::expected<void, Diagnostic> publishRecord(core::SubscriptionFamily family,
+                                                                const core::RecordContext &context,
+                                                                std::u16string_view symbol,
+                                                                std::span<const core::FieldValueView> fields) const;
 };
 
 /** One worker-owned plain QTP publishing endpoint. Destroy after application users have retired.

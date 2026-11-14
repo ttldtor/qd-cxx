@@ -43,6 +43,12 @@ constexpr std::size_t FRAME_PREFIX_BYTES = 9;
 constexpr std::size_t EVENT_BYTES = 8192;
 constexpr std::size_t EVENT_OWNER_ALLOWANCE = 1024;
 constexpr std::size_t SOURCE_EPOCH_BYTES = 4 * 1024 * 1024;
+constexpr std::size_t LOCAL_RECORD_EVENT_BYTES = 64 * 1024;
+constexpr std::size_t LOCAL_RECORD_OWNERS = 2 * MAX_PEERS * (CLIENT_KEYS + CLIENT_PENDING_ITEMS + 1) + 12;
+constexpr std::size_t LOCAL_RECORD_EPOCH_BYTES =
+    LOCAL_RECORD_OWNERS * (LOCAL_RECORD_EVENT_BYTES + EVENT_OWNER_ALLOWANCE);
+constexpr std::size_t LOCAL_RECORD_FAMILIES = 2;
+constexpr encoding::UtfStringLimits PUBLISHER_TEXT_LIMITS{8192, 1024};
 constexpr std::size_t REMOTE_EPOCH_BYTES = 20 * 1024 * 1024;
 constexpr std::size_t REMOTE_EVENT_BYTES = 64 * 1024;
 constexpr std::size_t REMOTE_DATA_RECORDS = 32;
@@ -90,6 +96,10 @@ constexpr Diagnostic SALE_SHAPE{ErrorCode::INVALID_ARGUMENT, "publisher-sale-sha
 constexpr Diagnostic ORDER_SHAPE{ErrorCode::INVALID_ARGUMENT, "publisher-order-shape"};
 constexpr Diagnostic ALLOCATION{ErrorCode::ALLOCATION_FAILURE, "publisher-storage"};
 constexpr Diagnostic CLOSED{ErrorCode::CLOSED, "publisher-closed"};
+constexpr Diagnostic RECORD_MODE{ErrorCode::INVALID_STATE, "publisher-record-mode"};
+constexpr Diagnostic RECORD_SHAPE{ErrorCode::INVALID_ARGUMENT, "publisher-record-shape"};
+constexpr Diagnostic RECORD_LIMIT{ErrorCode::RESOURCE_LIMIT, "publisher-record-limit"};
+constexpr Diagnostic PENDING_RECORD_LIMIT{ErrorCode::RESOURCE_LIMIT, "publisher-pending-records"};
 constexpr Diagnostic LOCAL_SOURCE_DISABLED{ErrorCode::INVALID_STATE, "publisher-remote-source"};
 constexpr Diagnostic MIXED_DISABLED{ErrorCode::INVALID_STATE, "publisher-mixed-disabled"};
 
@@ -119,6 +129,25 @@ SourceRow sourceRow(std::size_t family, std::u16string_view symbol, std::span<co
 
     return row;
 }
+
+/** One pending local row. Every pointer in fields refers into this row's independent arrays. */
+struct RecordRow {
+    std::unique_ptr<char16_t[]> text;
+    std::unique_ptr<std::byte[]> opaque;
+    std::unique_ptr<core::FieldValueView[]> fields;
+    std::size_t symbolSize = 0;
+    std::size_t fieldCount = 0;
+    std::size_t charge = 0;
+    std::size_t family = 0;
+    std::int32_t id = 0;
+};
+
+/** Requested lengths for one exact backing allocation of each pending array. */
+struct RecordStorage {
+    std::size_t textUnits;
+    std::size_t opaqueBytes;
+    std::size_t charge;
+};
 
 std::optional<std::size_t> familyIndex(Family family) noexcept {
     const auto found = std::ranges::find(FAMILIES, family);
@@ -150,8 +179,104 @@ std::int64_t floorSeconds(std::int64_t milliseconds) noexcept {
     return milliseconds / MILLIS_PER_SECOND - (milliseconds % MILLIS_PER_SECOND < 0);
 }
 
+std::size_t enabledFamilies(const PublisherOptions &options) noexcept {
+    if (options.catalog)
+        return options.source ? FAMILY_COUNT : LOCAL_RECORD_FAMILIES;
+
+    return options.mixed ? FAMILY_COUNT : 1;
+}
+
 bool exactSymbol(std::u16string_view symbol) noexcept {
     return !symbol.empty() && symbol.size() <= SYMBOL_UNITS && symbol.front() != u'*';
+}
+
+/** Check the complete record and size its backing without touching or copying any variable payload. */
+std::expected<RecordStorage, Diagnostic> recordStorage(const core::LocalRecord &layout, std::u16string_view symbol,
+                                                       std::span<const core::FieldValueView> fields,
+                                                       std::size_t limit) noexcept {
+    if (layout.fields.size() != fields.size() || !exactSymbol(symbol))
+        return std::unexpected(RECORD_SHAPE);
+
+    if (fields.size() > PublisherRecordLimits::MAX_FIELDS)
+        return std::unexpected(RECORD_LIMIT);
+
+    const auto fieldBytes = fields.size() * sizeof(core::FieldValueView);
+
+    if (fieldBytes > limit || symbol.size() > (limit - fieldBytes) / sizeof(char16_t))
+        return std::unexpected(RECORD_LIMIT);
+
+    RecordStorage storage{symbol.size(), 0, fieldBytes + symbol.size() * sizeof(char16_t)};
+
+    for (std::size_t index = 0; index < fields.size(); ++index) {
+        const auto &field = fields[index];
+
+        if (std::to_underlying(field.type) != layout.fields[index].serialTypeId || !core::validFieldValueView(field))
+            return std::unexpected(RECORD_SHAPE);
+
+        if (field.units) {
+            const auto units = field.units->size();
+
+            if (units > (limit - storage.charge) / sizeof(char16_t) ||
+                (field.type == FieldType::STRING && units > PUBLISHER_TEXT_LIMITS.codeUnits))
+                return std::unexpected(RECORD_LIMIT);
+
+            storage.textUnits += units;
+            storage.charge += units * sizeof(char16_t);
+        }
+
+        if (field.bytes) {
+            const auto bytes = field.bytes->size();
+
+            if (bytes > limit - storage.charge)
+                return std::unexpected(RECORD_LIMIT);
+
+            storage.opaqueBytes += bytes;
+            storage.charge += bytes;
+        }
+    }
+
+    return storage;
+}
+
+/** Copy validated borrowed data only after the caller has checked available FIFO and byte capacity. */
+RecordRow copyRecordRow(std::size_t family, std::int32_t id, std::u16string_view symbol,
+                        std::span<const core::FieldValueView> fields, RecordStorage storage) {
+    RecordRow row{std::make_unique_for_overwrite<char16_t[]>(storage.textUnits),
+                  storage.opaqueBytes ? std::make_unique_for_overwrite<std::byte[]>(storage.opaqueBytes) : nullptr,
+                  fields.empty() ? nullptr : std::make_unique<core::FieldValueView[]>(fields.size()),
+                  symbol.size(),
+                  fields.size(),
+                  storage.charge,
+                  family,
+                  id};
+    auto *text = std::ranges::copy(symbol, row.text.get()).out;
+    auto *opaque = row.opaque.get();
+
+    for (std::size_t index = 0; index < fields.size(); ++index) {
+        const auto &field = fields[index];
+        auto &target = row.fields[index];
+        target = {field.type, field.raw, {}, {}};
+
+        if (field.units) {
+            target.units.emplace();
+
+            if (!field.units->empty()) {
+                target.units.emplace(text, field.units->size());
+                text = std::ranges::copy(*field.units, text).out;
+            }
+        }
+
+        if (field.bytes) {
+            target.bytes.emplace();
+
+            if (!field.bytes->empty()) {
+                target.bytes.emplace(opaque, field.bytes->size());
+                opaque = std::ranges::copy(*field.bytes, opaque).out;
+            }
+        }
+    }
+
+    return row;
 }
 
 std::expected<SourceRow, Diagnostic> quoteRow(const events::Quote &quote) {
@@ -264,7 +389,8 @@ mux::QueueWork queueTurn() noexcept {
             {512, VISITS, VISITS, BYTES}};
 }
 
-mux::QueueWork serverQueueTurn(std::size_t peers, bool remote, bool mixed, std::size_t records) noexcept {
+mux::QueueWork serverQueueTurn(std::size_t peers, bool remote, bool catalog, std::size_t families,
+                               std::size_t records) noexcept {
     auto work = queueTurn();
     const auto keys = peers * CLIENT_KEYS;
     // MuxState reserves against both possible maps and all input rows before a command.
@@ -281,13 +407,17 @@ mux::QueueWork serverQueueTurn(std::size_t peers, bool remote, bool mixed, std::
     work.ticker.visits += cacheScan + membershipScan + 2 * keys * (keys + 1) + 8 * (keys + 1);
     work.ticker.textUnits += keys * (2 * SYMBOL_UNITS) * ((peers + 1) * keys + keys);
     // Each retained owner conservatively charges the whole shared source epoch on release.
-    const auto epochBytes = mixed ? (remote ? MIXED_REMOTE_EPOCH_BYTES : MIXED_LOCAL_EPOCH_BYTES)
-                                  : (remote ? REMOTE_EPOCH_BYTES : SOURCE_EPOCH_BYTES);
+    const auto epochBytes = !remote && catalog         ? LOCAL_RECORD_EPOCH_BYTES
+                            : families == FAMILY_COUNT ? (remote ? MIXED_REMOTE_EPOCH_BYTES : MIXED_LOCAL_EPOCH_BYTES)
+                                                       : (remote ? REMOTE_EPOCH_BYTES : SOURCE_EPOCH_BYTES);
     const auto maximum = std::numeric_limits<std::size_t>::max();
     work.ticker.bytes =
         keys + 2 > (maximum - work.ticker.bytes) / epochBytes ? maximum : work.ticker.bytes + (keys + 2) * epochBytes;
 
-    if (mixed) {
+    if (families > 1)
+        work.stream.bytes = work.ticker.bytes;
+
+    if (families == FAMILY_COUNT) {
         const auto historyPoints = keys * HISTORY_POINTS_PER_KEY;
         const auto frames = historyPoints + peers * (CLIENT_PENDING_ITEMS + 1) + 2;
         const auto rows = remote ? REMOTE_DATA_RECORDS : 1;
@@ -301,7 +431,6 @@ mux::QueueWork serverQueueTurn(std::size_t peers, bool remote, bool mixed, std::
         work.history.textUnits += 16 * (keys + 1) * (peers + 1) * keys * SYMBOL_UNITS;
         work.history.bytes =
             frames > (maximum - work.history.bytes) / epochBytes ? maximum : work.history.bytes + frames * epochBytes;
-        work.stream.bytes = work.ticker.bytes;
     }
 
     return work;
@@ -506,15 +635,9 @@ publisherWriter(const core::LocalSchema &schema, CatalogNames names,
                 : protocol::LayoutLimits{SCHEMA_LIMITS, FAMILY_COUNT, 3 * MAX_DATA_FIELDS, 64, 2048};
     protocol::SubscriptionWriterWork writerWork{64, 8 * 1024 * 1024, 8 * 1024 * 1024, 256 * 1024};
     auto writer = protocol::SubscriptionWriter::create(schema, outgoing, layouts,
-                                                       {MAX_FRAME_BYTES,
-                                                        MAX_FRAME_BYTES + FRAME_PREFIX_BYTES,
-                                                        catalog ? CATALOG_RECORDS : 128,
-                                                        SYMBOL_UNITS,
-                                                        {8192, 1024},
-                                                        256 * 1024,
-                                                        256 * 1024,
-                                                        4,
-                                                        catalog},
+                                                       {MAX_FRAME_BYTES, MAX_FRAME_BYTES + FRAME_PREFIX_BYTES,
+                                                        catalog ? CATALOG_RECORDS : 128, SYMBOL_UNITS,
+                                                        PUBLISHER_TEXT_LIMITS, 256 * 1024, 256 * 1024, 4, catalog},
                                                        writerWork, policy);
 
     if (!writer)
@@ -543,10 +666,24 @@ constexpr mux::ClientLimits CLIENT_LIMITS{
     CLIENT_PENDING_ITEMS, 512 * 1024,         8, 128 * 1024, 1, 32, SYMBOL_UNITS, 0, 0, 4096, 2, 4,
     CLIENT_KEYS,          CLIENT_SYMBOL_UNITS};
 
+/** Account for explicit detached copies of all admitted field views and variable bytes. */
+mux::ClientLimits recordClientLimits(std::size_t rowBytes) {
+    auto result = CLIENT_LIMITS;
+    // A terminator and one byte of alignment may precede or follow each copied UTF-16 value.
+    constexpr auto MAX_TEXT_PADDING = (PublisherRecordLimits::MAX_FIELDS + 1) * (sizeof(char16_t) + 1);
+    result.recordFields = PublisherRecordLimits::MAX_FIELDS;
+    result.recordFieldUnits = rowBytes / sizeof(char16_t);
+    result.recordByteUnits = rowBytes;
+    result.recordArenaBytes = rowBytes + MAX_TEXT_PADDING + alignof(core::FieldValueView);
+    result.recordBytes = result.dataItems * (result.recordArenaBytes + EVENT_OWNER_ALLOWANCE);
+
+    return result;
+}
+
 mux::MuxQueue publisherQueue(const core::LocalSchema &schema, std::size_t peers, bool remote, Family family,
-                             bool catalog) {
+                             bool catalog, const mux::ClientLimits &clientLimits) {
     const auto allKeys = peers * CLIENT_KEYS;
-    const auto allUnits = peers * CLIENT_LIMITS.commandSymbolUnits;
+    const auto allUnits = peers * clientLimits.commandSymbolUnits;
     const auto records = schema.records().size();
     const core::SubscriptionLimits desired{records,     allKeys,      SYMBOL_UNITS, allUnits,
                                            allKeys * 2, allUnits * 2, allKeys};
@@ -557,16 +694,19 @@ mux::MuxQueue publisherQueue(const core::LocalSchema &schema, std::size_t peers,
                                   1,
                                   1,
                                   8,
-                                  peers * CLIENT_LIMITS.dataItems,
-                                  peers * CLIENT_LIMITS.recordBytes,
-                                  peers * CLIENT_LIMITS.batchOwners,
-                                  peers * CLIENT_LIMITS.batchBytes,
-                                  peers * CLIENT_LIMITS.commandSlots,
-                                  peers * CLIENT_LIMITS.resultSlots,
+                                  peers * clientLimits.dataItems,
+                                  peers * clientLimits.recordBytes,
+                                  peers * clientLimits.batchOwners,
+                                  peers * clientLimits.batchBytes,
+                                  peers * clientLimits.commandSlots,
+                                  peers * clientLimits.resultSlots,
                                   peers * 2,
                                   32 * 1024 * 1024};
     const auto cacheFrames = family == Family::HISTORY ? allKeys * HISTORY_POINTS_PER_KEY + 1 : allKeys + 1;
-    const auto eventBytes = (remote ? REMOTE_EVENT_BYTES : EVENT_BYTES) + EVENT_OWNER_ALLOWANCE;
+    const auto eventBytes = (remote    ? REMOTE_EVENT_BYTES
+                             : catalog ? LOCAL_RECORD_EVENT_BYTES
+                                       : EVENT_BYTES) +
+                            EVENT_OWNER_ALLOWANCE;
     const auto cacheBytes = cacheFrames * eventBytes;
     const collectors::TickerLimits ticker{peers,  allKeys, cacheFrames, cacheBytes, cacheBytes + 32 * 1024 * 1024,
                                           desired};
@@ -584,8 +724,8 @@ mux::MuxQueue publisherQueue(const core::LocalSchema &schema, std::size_t peers,
             return mux::MuxQueue::createHistory(
                 schema, interests,
                 {allKeys, allKeys * HISTORY_POINTS_PER_KEY, SYMBOL_UNITS, cacheFrames, cacheBytes, peers,
-                 CLIENT_LIMITS.dataItems, CLIENT_LIMITS.dataItems + 1, (CLIENT_LIMITS.dataItems + 1) * eventBytes,
-                 cacheBytes + peers * (CLIENT_LIMITS.dataItems + 1) * eventBytes + 32 * 1024 * 1024, desired},
+                 clientLimits.dataItems, clientLimits.dataItems + 1, (clientLimits.dataItems + 1) * eventBytes,
+                 cacheBytes + peers * (clientLimits.dataItems + 1) * eventBytes + 32 * 1024 * 1024, desired},
                 {.storeEverything = false,
                  .retrievalQuantum = 100,
                  .partitionSnapshotQuantum = 10000,
@@ -603,12 +743,22 @@ mux::MuxQueue publisherQueue(const core::LocalSchema &schema, std::size_t peers,
     return std::move(*queue);
 }
 
-protocol::detail::LocalEventOwner localOwner(bool mixed) {
+protocol::detail::LocalEventOwner localOwner(bool catalog, std::size_t families) {
     auto work = liveTurn();
     protocol::LiveLimits limits{};
-    limits.residentBytes = mixed ? MIXED_LOCAL_EPOCH_BYTES : SOURCE_EPOCH_BYTES;
-    limits.owners = mixed ? MIXED_OWNERS : MAX_PEERS * CLIENT_KEYS + 4;
+    limits.residentBytes = SOURCE_EPOCH_BYTES;
+    limits.owners = MAX_PEERS * CLIENT_KEYS + 4;
     limits.eventBytes = EVENT_BYTES;
+
+    if (catalog) {
+        limits.residentBytes = LOCAL_RECORD_EPOCH_BYTES;
+        limits.owners = LOCAL_RECORD_OWNERS;
+        limits.eventBytes = LOCAL_RECORD_EVENT_BYTES;
+    } else if (families == FAMILY_COUNT) {
+        limits.residentBytes = MIXED_LOCAL_EPOCH_BYTES;
+        limits.owners = MIXED_OWNERS;
+    }
+
     auto owner = protocol::detail::LocalEventOwner::create(limits, work);
 
     if (!owner)
@@ -802,12 +952,18 @@ struct PublisherPort {
     std::mutex mutex;
     std::condition_variable changed;
     std::vector<SourceRow> pending;
+    std::vector<RecordRow> pendingRecords;
+    std::optional<core::LocalSchema> localCatalog;
+    const PublisherRecordLimits recordLimits;
+    std::size_t recordBytes = 0;
+    std::size_t activeRecords = 0;
     std::array<std::vector<PublisherDemand>, FAMILY_COUNT> demand;
     std::array<PublisherPeer, MAX_PEERS> peers;
     std::size_t peerCount = 0;
     std::optional<PublisherPolicyCommand> policyCommand;
     const bool remote;
-    const bool mixed;
+    const bool localRecords;
+    const std::size_t families;
     PublisherSourceStatus source;
     PublisherStatistics statistics;
     std::size_t head = 0;
@@ -817,15 +973,19 @@ struct PublisherPort {
     bool closed = false;
     Diagnostic diagnostic;
 
-    PublisherPort(std::size_t count, bool remote, bool mixed)
-        : pending(remote ? 0 : count), remote(remote), mixed(mixed) {
-        if (!mixed) {
-            for (std::size_t family = 1; family < FAMILY_COUNT; ++family) {
-                auto &stats = statistics.families[family];
-                stats.ingressFrames.availability = core::StatisticAvailability::UNSUPPORTED;
-                stats.ingressRecords.availability = core::StatisticAvailability::UNSUPPORTED;
-                stats.sentFrames.availability = core::StatisticAvailability::UNSUPPORTED;
-            }
+    explicit PublisherPort(const PublisherOptions &options)
+        : pending(options.source || options.catalog ? 0 : options.pendingQuotes),
+          pendingRecords(!options.source && options.catalog ? options.pendingQuotes : 0),
+          recordLimits(options.recordLimits), remote(options.source.has_value()),
+          localRecords(!options.source && options.catalog), families(enabledFamilies(options)) {
+        if (!pendingRecords.empty())
+            localCatalog.emplace(createSchema(options));
+
+        for (std::size_t family = families; family < FAMILY_COUNT; ++family) {
+            auto &stats = statistics.families[family];
+            stats.ingressFrames.availability = core::StatisticAvailability::UNSUPPORTED;
+            stats.ingressRecords.availability = core::StatisticAvailability::UNSUPPORTED;
+            stats.sentFrames.availability = core::StatisticAvailability::UNSUPPORTED;
         }
     }
 };
@@ -836,7 +996,7 @@ bool awaitPublishedDemand(detail::PublisherPort &port, Family family, std::u16st
                           std::u16string_view symbol, bool subscribed, Clock::time_point deadline) {
     const auto index = familyIndex(family);
 
-    if (!index || (*index != 0 && !port.mixed))
+    if (!index || *index >= port.families)
         return false;
 
     std::unique_lock lock(port.mutex);
@@ -1122,11 +1282,19 @@ class PublisherServer {
     const std::vector<std::int32_t> recordIds_;
     const std::vector<std::vector<std::u16string>> catalogNames_;
     std::optional<protocol::detail::LocalEventOwner> source_;
+    const mux::ClientLimits clientLimits_;
     QueueSet queues_;
     transport::TcpListener listener_;
     std::vector<std::optional<Peer>> peers_;
     const DemandPolicies demandPolicies_;
     std::optional<protocol::LiveEvent> pendingSource_;
+
+    struct RecordApplication {
+        std::size_t family;
+        std::size_t charge;
+    };
+
+    std::optional<RecordApplication> recordApplication_;
     std::string sourceAddress_;
     std::optional<PublisherSourceOptions> sourceOptions_;
     std::optional<transport::detail::BootstrapLease> sourceBootstrap_;
@@ -1199,10 +1367,10 @@ class PublisherServer {
             peer.openHistory.reserve(CLIENT_KEYS);
 
             for (std::size_t family = 0; family < familyCount_; ++family) {
-                auto work =
-                    serverQueueTurn(peers_.size(), sourceOptions_.has_value(), familyCount_ > 1, recordIds_.size());
+                auto work = serverQueueTurn(peers_.size(), sourceOptions_.has_value(), !catalogNames_.empty(),
+                                            familyCount_, recordIds_.size());
                 peer.delivery[family] = std::make_shared<Delivery>();
-                auto handle = queues_[family]->open(CLIENT_LIMITS, peer.delivery[family], work);
+                auto handle = queues_[family]->open(clientLimits_, peer.delivery[family], work);
 
                 if (!handle)
                     throw Error(queueDiagnostic(handle.error(), "publisher-open-client"));
@@ -1401,8 +1569,9 @@ class PublisherServer {
 
         if (!peer.sentProtocol) {
             kind = OutputKind::PROTOCOL;
-            const auto properties = familyCount_ == 1 ? std::span<const protocol::LivePropertyView>{}
-                                                      : std::span<const protocol::LivePropertyView>(HISTORY_OPTIONS);
+            const auto properties = familyCount_ == FAMILY_COUNT
+                                        ? std::span<const protocol::LivePropertyView>(HISTORY_OPTIONS)
+                                        : std::span<const protocol::LivePropertyView>{};
             output = peer.session.composeProtocol({properties, std::span(SERVER_SEND).first(3 + familyCount_),
                                                    std::span(SERVER_RECEIVE).first(3 + 2 * familyCount_)},
                                                   work);
@@ -1718,8 +1887,8 @@ class PublisherServer {
                         lane[count++] = {{entry.context, entry.symbol}, entry.historyBound};
                 }
 
-                work[family] =
-                    serverQueueTurn(peers_.size(), sourceOptions_.has_value(), familyCount_ > 1, recordIds_.size());
+                work[family] = serverQueueTurn(peers_.size(), sourceOptions_.has_value(), !catalogNames_.empty(),
+                                               familyCount_, recordIds_.size());
                 replacements[family] = {&*queues_[family], &peer.handles[family], std::span(lane).first(count),
                                         &work[family]};
                 selectors += count;
@@ -1790,35 +1959,79 @@ class PublisherServer {
         completePolicy(port, {PublisherPolicyOutcome::APPLIED, revision, {}});
     }
 
+    /** Move one retained row onto the worker's ordinary local event owner and keep its original budget charged. */
+    void takeLocalRecord(detail::PublisherPort &port) {
+        if (recordApplication_) {
+            if (queues_[recordApplication_->family]->resources().pendingRecords != 0)
+                return;
+
+            const std::lock_guard lock(port.mutex);
+            port.recordBytes -= recordApplication_->charge;
+            --port.activeRecords;
+            recordApplication_.reset();
+        }
+
+        RecordRow row;
+        {
+            const std::lock_guard lock(port.mutex);
+
+            if (port.size == 0 || port.closed)
+                return;
+
+            row = std::move(port.pendingRecords[port.head]);
+            port.head = (port.head + 1) % port.pendingRecords.size();
+            --port.size;
+        }
+        recordApplication_.emplace(row.family, row.charge);
+        auto turn = liveTurn(true);
+        auto event = source_->record(DATA_MESSAGES[row.family], row.id, schema_.recordContext(row.id),
+                                     {row.text.get(), row.symbolSize}, {row.fields.get(), row.fieldCount}, turn);
+
+        if (!event)
+            throw Error(protocolDiagnostic(event.error(), "publisher-local-record"));
+
+        pendingSource_ = std::move(*event);
+    }
+
+    /** Adopt a typed publication through its existing fixed physical layout. */
+    void takeTypedRecord(detail::PublisherPort &port) {
+        SourceRow row;
+        {
+            const std::lock_guard lock(port.mutex);
+
+            if (port.size == 0 || port.closed)
+                return;
+
+            row = port.pending[port.head];
+            port.head = (port.head + 1) % port.pending.size();
+            --port.size;
+        }
+        auto liveWork = liveTurn(!catalogNames_.empty());
+        const auto id = RECORD_IDS[row.family];
+        const auto layout = schema_.records()[static_cast<std::size_t>(id)].fields;
+        std::array<core::FieldValue, MAX_DATA_FIELDS> fields{};
+
+        for (std::size_t i = 0; i < layout.size(); ++i)
+            fields[i] = {static_cast<FieldType>(layout[i].serialTypeId), row.raw[i]};
+
+        auto event = source_->record(DATA_MESSAGES[row.family], id, schema_.recordContext(id), row.text(),
+                                     std::span(fields).first(layout.size()), row.flags, row.removalTime, {}, liveWork);
+
+        if (!event)
+            throw Error(protocolDiagnostic(event.error(), "publisher-local-event"));
+
+        pendingSource_ = std::move(*event);
+    }
+
     void publishLocal(detail::PublisherPort &port, WorkSet &work) {
         if (!pendingSource_) {
-            SourceRow row;
-            {
-                const std::lock_guard lock(port.mutex);
+            if (port.localRecords)
+                takeLocalRecord(port);
+            else
+                takeTypedRecord(port);
 
-                if (port.size == 0 || port.closed)
-                    return;
-
-                row = port.pending[port.head];
-                port.head = (port.head + 1) % port.pending.size();
-                --port.size;
-            }
-            auto liveWork = liveTurn(!catalogNames_.empty());
-            const auto id = RECORD_IDS[row.family];
-            const auto layout = schema_.records()[static_cast<std::size_t>(id)].fields;
-            std::array<core::FieldValue, MAX_DATA_FIELDS> fields{};
-
-            for (std::size_t i = 0; i < layout.size(); ++i)
-                fields[i] = {static_cast<FieldType>(layout[i].serialTypeId), row.raw[i]};
-
-            auto event =
-                source_->record(DATA_MESSAGES[row.family], id, schema_.recordContext(id), row.text(),
-                                std::span(fields).first(layout.size()), row.flags, row.removalTime, {}, liveWork);
-
-            if (!event)
-                throw Error(protocolDiagnostic(event.error(), "publisher-local-event"));
-
-            pendingSource_ = std::move(*event);
+            if (!pendingSource_)
+                return;
         }
 
         const auto message = static_cast<DataMessage>(*pendingSource_->messageType());
@@ -1911,7 +2124,8 @@ class PublisherServer {
                 fenceSource();
 
                 for (std::size_t family = 0; family < familyCount_; ++family) {
-                    auto resetWork = serverQueueTurn(peers_.size(), true, familyCount_ > 1, recordIds_.size());
+                    auto resetWork =
+                        serverQueueTurn(peers_.size(), true, !catalogNames_.empty(), familyCount_, recordIds_.size());
                     const auto reset = queues_[family]->resetSource(resetWork);
 
                     if (!reset)
@@ -1952,8 +2166,10 @@ class PublisherServer {
     public:
     PublisherServer(transport::RuntimeBootstrap &bootstrap, const PublisherOptions &options, DemandPolicies demand)
         : schema_(createSchema(options)), recordIds_(recordIds(schema_)), catalogNames_(catalogNames(options, schema_)),
+          clientLimits_(options.catalog && !options.source ? recordClientLimits(options.recordLimits.rowBytes)
+                                                           : CLIENT_LIMITS),
           listener_(listen(bootstrap, options.listener)), peers_(options.listener.maxConnections),
-          demandPolicies_(std::move(demand)), familyCount_(options.catalog || options.mixed ? FAMILY_COUNT : 1) {
+          demandPolicies_(std::move(demand)), familyCount_(enabledFamilies(options)) {
         if (options.catalog)
             validateCatalog();
 
@@ -1966,10 +2182,10 @@ class PublisherServer {
 
         for (std::size_t family = 0; family < familyCount_; ++family)
             queues_[family].emplace(publisherQueue(schema_, peers_.size(), options.source.has_value(), FAMILIES[family],
-                                                   !catalogNames_.empty()));
+                                                   !catalogNames_.empty(), clientLimits_));
 
         if (!options.source) {
-            source_.emplace(localOwner(options.mixed));
+            source_.emplace(localOwner(!catalogNames_.empty(), familyCount_));
 
             return;
         }
@@ -2009,7 +2225,8 @@ class PublisherServer {
         for (std::size_t family = 0; family < familyCount_; ++family) {
             auto &queue = *queues_[family];
             auto &turn = work[family];
-            turn = serverQueueTurn(peers_.size(), sourceOptions_.has_value(), familyCount_ > 1, recordIds_.size());
+            turn = serverQueueTurn(peers_.size(), sourceOptions_.has_value(), !catalogNames_.empty(), familyCount_,
+                                   recordIds_.size());
 
             for (std::size_t i = 0; i < QUEUE_ACTIONS; ++i) {
                 const auto moved = queue.progress(turn);
@@ -2109,6 +2326,10 @@ void runPublisher(detail::PublisherPort &port, transport::RuntimeBootstrap &boot
         port.peerCount = 0;
         port.diagnostic = diagnostic;
         std::vector<SourceRow>().swap(port.pending);
+        std::vector<RecordRow>().swap(port.pendingRecords);
+        port.localCatalog.reset();
+        port.recordBytes = 0;
+        port.activeRecords = 0;
 
         for (auto &demand : port.demand)
             std::vector<PublisherDemand>().swap(demand);
@@ -2136,10 +2357,12 @@ namespace {
 template <typename Event, typename Convert>
 std::expected<void, Diagnostic> publishEvent(const std::shared_ptr<detail::PublisherPort> &port, const Event &event,
                                              Convert convert, bool indexed) {
-    if (port && (port->remote || (indexed && !port->mixed))) {
+    if (port && (port->remote || port->localRecords || (indexed && port->families != FAMILY_COUNT))) {
         const std::lock_guard lock(port->mutex);
 
-        return std::unexpected(port->closed ? CLOSED : (port->remote ? LOCAL_SOURCE_DISABLED : MIXED_DISABLED));
+        const auto refusal = port->remote ? LOCAL_SOURCE_DISABLED : port->localRecords ? RECORD_MODE : MIXED_DISABLED;
+
+        return std::unexpected(port->closed ? CLOSED : refusal);
     }
 
     auto row = convert(event);
@@ -2182,6 +2405,55 @@ std::expected<void, Diagnostic> Publisher::publish(const events::Order &order) c
     return publishEvent(port_, order, orderRow, true);
 }
 
+std::expected<void, Diagnostic> Publisher::publishRecord(Family family, const core::RecordContext &context,
+                                                         std::u16string_view symbol,
+                                                         std::span<const core::FieldValueView> fields) const {
+    if (!port_)
+        return std::unexpected(CLOSED);
+
+    auto &port = *port_;
+    {
+        const std::lock_guard lock(port.mutex);
+
+        if (port.closed)
+            return std::unexpected(CLOSED);
+
+        if (!port.localCatalog)
+            return std::unexpected(port.remote ? LOCAL_SOURCE_DISABLED : RECORD_MODE);
+
+        const auto lane = familyIndex(family);
+        const auto id = port.localCatalog->recordId(context);
+
+        if (!lane || *lane >= LOCAL_RECORD_FAMILIES || !id)
+            return std::unexpected(RECORD_SHAPE);
+
+        const auto &layout = port.localCatalog->records()[static_cast<std::size_t>(*id)];
+        const auto storage = recordStorage(layout, symbol, fields, port.recordLimits.rowBytes);
+
+        if (!storage)
+            return std::unexpected(storage.error());
+
+        if (port.activeRecords == port.pendingRecords.size() ||
+            storage->charge > port.recordLimits.pendingBytes - port.recordBytes)
+            return std::unexpected(PENDING_RECORD_LIMIT);
+
+        // Hold the admission fence through copying so close and other producers cannot consume this reservation.
+        try {
+            const auto index = (port.head + port.size) % port.pendingRecords.size();
+            port.pendingRecords[index] = copyRecordRow(*lane, *id, symbol, fields, *storage);
+            ++port.size;
+            ++port.activeRecords;
+            port.recordBytes += storage->charge;
+        } catch (const std::bad_alloc &) {
+            return std::unexpected(ALLOCATION);
+        }
+    }
+
+    port.changed.notify_all();
+
+    return {};
+}
+
 PublisherEndpoint::PublisherEndpoint(std::unique_ptr<Impl> impl) noexcept : impl_(std::move(impl)) {
 }
 
@@ -2192,8 +2464,15 @@ PublisherEndpoint::create(transport::RuntimeBootstrap &bootstrap, PublisherOptio
         return std::unexpected(Diagnostic{ErrorCode::INVALID_ARGUMENT, "publisher-limits"});
     }
 
-    if (options.catalog && (!options.source || options.mixed))
+    if (options.catalog && options.mixed)
         return std::unexpected(Diagnostic{ErrorCode::INVALID_ARGUMENT, "publisher-catalog-options"});
+
+    const auto &limits = options.recordLimits;
+
+    if (options.catalog && !options.source &&
+        (limits.rowBytes == 0 || limits.rowBytes > PublisherRecordLimits::MAX_ROW_BYTES || limits.pendingBytes == 0 ||
+         limits.pendingBytes > PublisherRecordLimits::MAX_PENDING_BYTES))
+        return std::unexpected(Diagnostic{ErrorCode::INVALID_ARGUMENT, "publisher-record-limits"});
 
     try {
         if (options.source) {
@@ -2219,8 +2498,7 @@ PublisherEndpoint::create(transport::RuntimeBootstrap &bootstrap, PublisherOptio
         options.demand = {};
         std::vector<PublisherPeerDemandPolicy>().swap(options.peerDemand);
         auto impl = std::make_unique<Impl>();
-        impl->port = std::make_shared<detail::PublisherPort>(options.pendingQuotes, options.source.has_value(),
-                                                             options.mixed || options.catalog.has_value());
+        impl->port = std::make_shared<detail::PublisherPort>(options);
         const auto port = impl->port;
         auto endpoint = std::unique_ptr<PublisherEndpoint>(new PublisherEndpoint(std::move(impl)));
         endpoint->impl_->worker = std::jthread(
@@ -2369,7 +2647,7 @@ PublisherSourceStatus PublisherEndpoint::getSourceStatus() const noexcept {
 PublisherStatistics PublisherEndpoint::getStatistics() const noexcept {
     const std::lock_guard lock(impl_->port->mutex);
     auto snapshot = impl_->port->statistics;
-    snapshot.pendingPublications = impl_->port->size;
+    snapshot.pendingPublications = impl_->port->localRecords ? impl_->port->activeRecords : impl_->port->size;
 
     return snapshot;
 }
