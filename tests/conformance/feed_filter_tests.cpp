@@ -123,6 +123,25 @@ TEST_CASE("Compiled expressions match raw pinned Java ordinary and wildcard obse
     CHECK(rows == 1342);
 }
 
+TEST_CASE("Physical filter queries preserve record and exact symbol without an event mapping") {
+    const auto filter =
+        api::FeedFilter::Builder(registry()).withCategory(u"physical", u":CustomRoute[&]Q&IBM[&]Q").build();
+    CHECK(filter.acceptRecord(u"CustomRoute&Q", u"IBM&Q"));
+    CHECK_FALSE(filter.acceptRecord(u"CustomRoute", u"IBM&Q"));
+    CHECK_FALSE(filter.acceptRecord(u"CustomRoute&Q", u"IBM"));
+    CHECK_THROWS_AS(filter.acceptRecord(u"CustomRoute&Q", u"*"), api::Error);
+    CHECK_THROWS_AS(filter.acceptRecord(u"", u"IBM&Q"), api::Error);
+
+    api::FeedFilterLimits limits;
+    limits.symbolUnits = 0;
+    const auto limited = api::FeedFilter::Builder(registry(), api::DeliveryContract::TICKER, limits)
+                             .withCategory(u"physical", u":CustomRoute")
+                             .build();
+    CHECK(limited.acceptRecord(u"CustomRoute", u""));
+    CHECK_THROWS_AS(limited.acceptRecord(u"CustomRoute", {}), api::Error);
+    CHECK_THROWS_AS(limited.acceptRecord(u"CustomRoute", u"X"), api::Error);
+}
+
 TEST_CASE("First category is global across actual selected delegates and owns caller inputs") {
     auto filter = [&] {
         api::FeedFilter::Builder builder(registry(true));

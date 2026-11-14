@@ -17,6 +17,7 @@
 #include <array>
 #include <atomic>
 #include <cerrno>
+#include <cstring>
 #include <exception>
 #include <limits>
 #include <new>
@@ -402,6 +403,43 @@ std::expected<std::optional<TcpConnectionId>, TcpListenerDiagnostic> TcpListener
     }
 
     return fail(TcpListenerError::RESOURCE_LIMIT, "listener-capacity");
+}
+
+std::expected<TcpPeerAddress, TcpListenerDiagnostic>
+TcpListener::peerAddress(TcpConnectionId connection) const noexcept {
+    const auto checked = find(connection);
+
+    if (!checked)
+        return std::unexpected(checked.error());
+
+    const auto &slot = state_->slots[*checked];
+
+    if (slot.retiring || state_->stopped)
+        return fail(TcpListenerError::INVALID_STATE, "connection-stopped");
+
+    sockaddr_storage endpoint{};
+    auto length = static_cast<AddressSize>(sizeof(endpoint));
+
+    if (::getpeername(slot.socket.handle, reinterpret_cast<sockaddr *>(&endpoint), &length) != 0)
+        return fail(TcpListenerError::SOCKET_FAILURE, "accepted-peer-address", socketError());
+
+    TcpPeerAddress bytes{};
+
+    if (endpoint.ss_family == AF_INET && length >= static_cast<AddressSize>(sizeof(sockaddr_in))) {
+        sockaddr_in ipv4{};
+        std::memcpy(&ipv4, &endpoint, sizeof(ipv4));
+        constexpr std::size_t ipv4Offset = bytes.size() - 4;
+        bytes[ipv4Offset - 2] = bytes[ipv4Offset - 1] = 0xff;
+        std::memcpy(bytes.data() + ipv4Offset, &ipv4.sin_addr, sizeof(ipv4.sin_addr));
+    } else if (endpoint.ss_family == AF_INET6 && length >= static_cast<AddressSize>(sizeof(sockaddr_in6))) {
+        sockaddr_in6 ipv6{};
+        std::memcpy(&ipv6, &endpoint, sizeof(ipv6));
+        std::memcpy(bytes.data(), &ipv6.sin6_addr, sizeof(ipv6.sin6_addr));
+    } else {
+        return fail(TcpListenerError::SOCKET_FAILURE, "accepted-peer-family");
+    }
+
+    return bytes;
 }
 
 std::expected<TcpIoResult, TcpListenerDiagnostic> TcpListener::read(TcpConnectionId connection,

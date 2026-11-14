@@ -40,6 +40,7 @@ struct FeedFilterLimits {
     std::size_t coordinates = 64;              ///< Maximum selected registered routes in one query.
     std::size_t storageBytes =
         16 * 1024 * 1024; ///< Conservative complete immutable generation backing, not builder inputs or RSS.
+    std::size_t recordNameUnits = 1024; ///< Maximum physical name units in one direct record query.
 };
 
 /** Immutable ordered query classifier, independent of subscriptions and native runtime ownership.
@@ -59,12 +60,21 @@ class FeedFilter final {
 
     public:
     class Builder;
+    /** @return Whether this handle retains an immutable classifier. Moved-from handles are invalid. */
+    [[nodiscard]] bool valid() const noexcept;
     /** @param type Existing registered business projection.
      * @param symbol Explicit plain/indexed/time-series/ALL query, borrowed only during this call.
      * @return True if any selected subscription delegate matches any category.
      * @throws Error for an invalid enum or a finite query capacity refusal.
      */
     [[nodiscard]] bool accept(EventType type, const SubscriptionSelector &symbol) const;
+    /** Match a physical record and exact wire symbol without event delegate or symbol projection lookup.
+     * @param recordName Nonempty physical record name borrowed during the query.
+     * @param symbol Exact UTF-16 symbol, including a non-null empty symbol.
+     * @return True if at least one category matches the supplied coordinates.
+     * @throws Error for an invalid handle, empty name, null or wildcard symbol, or an exceeded query bound.
+     */
+    [[nodiscard]] bool acceptRecord(std::u16string_view recordName, std::u16string_view symbol) const;
     /** @param event Existing owning registered event, borrowed only during this call.
      * @return True if any publisher delegate matches any category; uses data routing, not subscription routing.
      * @throws Error if a finite query capacity is exceeded.

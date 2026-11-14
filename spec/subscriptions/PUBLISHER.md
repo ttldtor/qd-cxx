@@ -17,6 +17,22 @@ by the configured downstream connection count times the maximum keys per client.
 This observes applied downstream subscriptions. A relay publishes the same local demand
 while the upstream connection is unavailable, and replays current keys after reconnect.
 
+## Connection demand filters
+
+Set `PublisherOptions::demand` to the default policy, with optional `ticker`, `stream`
+and `history` classifiers. `peerDemand` may replace that entire policy for up to 32 distinct
+numeric remote IP addresses. IPv4-mapped IPv6 and IPv4 spellings of the same address compare equal.
+The transport selects one immutable policy at connection acceptance. Scope IDs, duplicate addresses,
+DNS names and dynamic filters are configuration errors. A filter slot left empty admits all keys for its contract.
+Peers behind the same address share the same policy, so address selection does not establish a peer identity.
+
+`FeedFilter::acceptRecord` evaluates the existing QD filter expression against the physical record name
+and original exact UTF-16 symbol. For example, `:Quote&IBM` admits the physical `Quote` record for `IBM`.
+Matching does not use event conversion or register a listener. Rejected ADD tuples are omitted before
+registering client interest and never contribute to the upstream union. A filter query bound refusal
+retires only that peer without applying the batch. REMOVE goes straight to removal of previously
+admitted matching keys for that connection. Repeated or denied-key removals do not alter other clients' demand.
+
 Each peer sends `DESCRIBE_PROTOCOL` and describes its own records before subscribing. The endpoint resolves the peer's record ID to the local composite `Quote` and sends its own `DESCRIBE_RECORDS` before DATA. Unsupported described record names are ignored while decoding subscription tuples. The profile uses ordinary TCP and QTP with exact symbols and composite Quote. The listener defaults to numeric IPv4 loopback and an ephemeral port. There are at most eight active or retiring client slots, 32 applied keys per family and client, 256 decoded wire tuples per subscription frame, and 1024 queued publication requests. The configured slot and publication counts may be smaller. A bounded queue admission failure, invalid peer input or blocked write for ten seconds retires the corresponding connection. The other clients retain their subscriptions and independent progress. TICKER may conflate pending updates for the same symbol.
 
 Use a nonempty exact symbol of at most 256 UTF-16 units. Bid and ask times use signed 32-bit whole seconds on the wire and must be exact multiples of 1000 milliseconds. `timeMs` lies within the second of the later bid or ask time. The low 22 sequence bits and the signed nano part are sent in the optional `Sequence` and `TimeNanoPart` fields. The endpoint transfers the four wide decimal raw values and both exchange codes. Snapshot-derived business numerics, nonzero `eventTime` and other values outside the wire profile are rejected at admission. The built-in Feed registry supports the eight default Quote fields. Add the two optional fields to its explicit registry to receive the full time and sequence precision of this profile.
