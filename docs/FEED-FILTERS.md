@@ -37,6 +37,10 @@ and add categories with `withCategory(name, expression)`. The registry owns comp
 validated record declarations, so custom record names and regional routes are used as
 configured. There is no ambient process registry or filter setter on a subscription.
 
+`acceptRecord(recordName, symbol)` evaluates a physical QD record and exact symbol directly,
+including records without an event mapping. Use the original record name and symbol as received.
+To install record filters for incoming QTP demand, see the [publisher policies](../spec/subscriptions/PUBLISHER.md).
+
 ## Expressions
 
 Use `!`, `&`, `,` and parentheses for NOT, AND, OR and grouping. A leading `:` matches
