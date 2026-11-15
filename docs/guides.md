@@ -26,6 +26,7 @@
 | Export a Java schema | [Schema exporter](../tools/schema-export/README.md) | You need an exported schema from locked Java QD |
 | Receive controlled STREAM data | [STREAM subscriptions](SUBSCRIPTIONS.md) | A controlled plain-TCP peer and exact selectors meet your needs |
 | Compose a STREAM application | [Programmatic example](../examples/subscriptions/README.md) | Your application owns runtime progress and callbacks |
+| Run the Kraken gateway | [Kraken Quote gateway](KRAKEN-GATEWAY.md) | Publish the public BTC/USD best bid and offer to QTP Feed clients |
 
 The STREAM program has a finite cutoff and uses plain TCP. The separate TLS runtime has its own
 [trust, identity, credentials and lifetime contract](../spec/transport/TLS-RUNTIME.md); selecting TLS

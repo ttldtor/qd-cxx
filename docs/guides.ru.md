@@ -26,6 +26,7 @@
 | Экспортировать схему Java | [Экспорт схем](../tools/schema-export/README.ru.md) | Нужна экспортированная схема из закреплённого Java QD |
 | Получать контролируемый STREAM | [Подписки STREAM](SUBSCRIPTIONS.ru.md) | Достаточно контролируемого plain-TCP peer и точных селекторов |
 | Собрать приложение STREAM | [Программный пример](../examples/subscriptions/README.ru.md) | Приложение само продвигает runtime и вызывает callbacks |
+| Запустить шлюз Kraken | [Шлюз котировок Kraken](KRAKEN-GATEWAY.ru.md) | Передавать публичные лучшие цены и объёмы BTC/USD клиентам QTP Feed |
 
 STREAM-программа имеет конечную границу остановки и использует обычный TCP. Отдельный TLS runtime
 имеет собственный [контракт доверия, идентичности, учётных данных и времени жизни](../spec/transport/TLS-RUNTIME.ru.md);
