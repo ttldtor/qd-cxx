@@ -36,7 +36,7 @@ CMake 3.25 трактует этот символ как разделитель.
 
 Автоматический поиск включает tracked и nonignored new файлы из `include/` (`*.hpp`), `src/`
 (`*.cpp`), `tests/conformance/` (`*.cpp`), а также `tools/qtp-inspect/`, `tools/tape-inspect/`, `tools/tape-write/`,
-`tools/dev/`, `tools/subscribe/`, `tools/kraken/`, `examples/subscriptions/`, `examples/feed_quote/`, `examples/feed_option_quotes/`, `examples/feed_market_depth/`, `examples/feed_token_refresh/`, `examples/feed_reconnect/`, `examples/feed_candle/`, `examples/feed_market/`, `examples/feed_distribution/`, `examples/on_demand/`, `examples/ipf_option_chain/`, `examples/event_text/` и `examples/ipf_live/` (`*.cpp`, `*.hpp`).
+`tools/dev/`, `tools/subscribe/`, `tools/kraken/`, `examples/subscriptions/`, `examples/feed_quote/`, `examples/feed_option_quotes/`, `examples/feed_market_depth/`, `examples/feed_token_refresh/`, `examples/feed_reconnect/`, `examples/feed_candle/`, `examples/feed_common/`, `examples/feed_market/`, `examples/feed_distribution/`, `examples/on_demand/`, `examples/ipf_option_chain/`, `examples/event_text/` и `examples/ipf_live/` (`*.cpp`, `*.hpp`).
 Git C-quoted имена декодируются до отбора.
 Сегменты каталогов `upstream`, `generated` и `fixtures` исключаются. Явный manifest допускает
 `.cpp` и `.hpp` в этих корнях и `.work/` для намеренных контрольных примеров; другие корни/расширения отклоняются.

@@ -545,6 +545,7 @@ if(TARGET qdcxx_feed)
         add_subdirectory(examples/feed_reconnect)
     endif()
     install(FILES examples/feed_reconnect/main.cpp examples/feed_reconnect/CMakeLists.txt
+        examples/feed_common/session.hpp
         examples/feed_reconnect/README.md examples/feed_reconnect/README.ru.md
         DESTINATION "${CMAKE_INSTALL_DATADIR}/qdcxx/examples/feed_reconnect")
 endif()
@@ -553,6 +554,7 @@ if(ORG_TTLDTOR_QDCXX_BUILD_EXAMPLES AND TARGET qdcxx_feed)
 endif()
 if(TARGET qdcxx_feed)
     install(FILES examples/feed_candle/main.cpp examples/feed_candle/CMakeLists.txt
+        examples/feed_common/session.hpp
         examples/feed_candle/README.md examples/feed_candle/README.ru.md
         DESTINATION "${CMAKE_INSTALL_DATADIR}/qdcxx/examples/feed_candle")
 endif()

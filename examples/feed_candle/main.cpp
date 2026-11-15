@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/api/feed.hpp"
 #include "qd/events/event_flags.hpp"
+#include "session.hpp"
 
 #include <atomic>
 #include <charconv>
@@ -14,7 +15,7 @@ namespace q = org::ttldtor::qdcxx;
 using namespace std::chrono_literals;
 
 int main(int argc, char **argv) {
-    if (argc == 2 && std::string_view(argv[1]) == "--help") {
+    if (argc == 1 || (argc == 2 && std::string_view(argv[1]) == "--help")) {
         std::cout << "Usage: qdcxx-feed-candle HOST:PORT CANDLE_SYMBOL FROM_MS\n"
                      "Receive QTP HISTORY candles for ten seconds. Use a canonical symbol such as SPY{=m}.\n"
                      "FROM_MS is the inclusive Unix millisecond bound, 0..2147483647999. Prints time and OHLC.\n"
@@ -65,14 +66,9 @@ int main(int argc, char **argv) {
         candles->addSymbols(argv[2]);
         endpoint->connect(argv[1]);
 
-        static_cast<void>(endpoint->awaitState(q::api::EndpointState::CLOSED, std::chrono::steady_clock::now() + 10s));
-        const auto result = endpoint->closeAndAwaitTermination();
-        runtime.closeAndAwaitTermination();
+        q::examples::receiveFor(*endpoint, 10s);
+        const auto result = q::examples::finish(*endpoint);
         std::cout.flush();
-
-        if (result.diagnostic.code != q::api::ErrorCode::NONE) {
-            std::cerr << "Endpoint diagnostic: " << result.diagnostic.stage << '\n';
-        }
 
         if (!received || !result.drained || result.deadlineExpired || result.hadGap || !std::cout ||
             candles->getDiagnostic().code != q::api::ErrorCode::NONE) {
