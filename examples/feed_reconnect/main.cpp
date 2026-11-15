@@ -1,6 +1,7 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/api/feed.hpp"
+#include "session.hpp"
 
 #include <chrono>
 #include <exception>
@@ -46,18 +47,12 @@ int main(int argc, char **argv) {
         subscription->addSymbols(symbol);
         endpoint->connect(address);
 
-        static_cast<void>(endpoint->awaitState(q::api::EndpointState::CLOSED, std::chrono::steady_clock::now() + 10s));
+        q::examples::receiveFor(*endpoint, 10s);
         endpoint->reconnect();
-        static_cast<void>(endpoint->awaitState(q::api::EndpointState::CLOSED, std::chrono::steady_clock::now() + 10s));
+        q::examples::receiveFor(*endpoint, 10s);
 
         const auto state = endpoint->getState();
-        const auto result = endpoint->closeAndAwaitTermination();
-        runtime.closeAndAwaitTermination();
-
-        if (result.diagnostic.code != q::api::ErrorCode::NONE) {
-            std::cerr << "Endpoint diagnostic: " << static_cast<int>(result.diagnostic.code) << ' '
-                      << result.diagnostic.stage << '\n';
-        }
+        const auto result = q::examples::finish(*endpoint);
 
         if (result.deadlineExpired || (!result.drained && !result.hadGap) ||
             state != q::api::EndpointState::CONNECTED ||
