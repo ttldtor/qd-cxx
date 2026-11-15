@@ -1,0 +1,20 @@
+# Copyright (c) 2026 ttldtor.
+# SPDX-License-Identifier: BSL-1.0
+cmake_minimum_required(VERSION 3.25)
+if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+    project(qdcxx_feed_option_quotes_example LANGUAGES CXX)
+    include(CTest)
+endif()
+if(NOT TARGET qdcxx_feed OR NOT TARGET qdcxx_ipf)
+    find_package(qdcxx CONFIG REQUIRED COMPONENTS feed)
+endif()
+if(NOT TARGET qdcxx_feed OR NOT TARGET qdcxx_ipf)
+    message(FATAL_ERROR "The package requires BUILD_FEED_API=ON and BUILD_IPF=ON")
+endif()
+add_executable(qdcxx_option_quotes main.cpp)
+target_link_libraries(qdcxx_option_quotes PRIVATE qdcxx_feed qdcxx_ipf)
+set_target_properties(qdcxx_option_quotes PROPERTIES CXX_EXTENSIONS OFF OUTPUT_NAME qdcxx-option-quotes)
+if(BUILD_TESTING)
+    add_test(NAME option_quotes_example COMMAND "${CMAKE_COMMAND}" "-DPROGRAM=$<TARGET_FILE:qdcxx_option_quotes>"
+        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/example.ipf" -P "${CMAKE_CURRENT_SOURCE_DIR}/check.cmake")
+endif()
