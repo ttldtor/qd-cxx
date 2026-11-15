@@ -58,3 +58,5 @@ Ctrl+C запрашивает остановку. Итоговая строка
 `STATS observed=N published=N sent_frames=N retired_peers=N pending_publications=N`.
 Код 0 требует хотя бы одну принятую публикацию, 1 означает ошибку или
 отсутствие публикаций, 2 ошибку аргументов, 130 остановку сигналом.
+
+Для проверки используйте [детерминированный стенд на loopback](../../tests/conformance/kraken/README.ru.md) или [живой прогон с двумя клиентами](../../tests/conformance/kraken/LIVE.ru.md).
