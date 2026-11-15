@@ -2075,7 +2075,12 @@ class PublisherServer {
         pendingSource_ = std::move(*event);
     }
 
-    void publishLocal(detail::PublisherPort &port, WorkSet &work) {
+    /** Admit the next local owner if its queue can accept it.
+     * @param port Bounded producer mailbox.
+     * @param work Remaining queue credits for this turn.
+     * @return Whether a source owner entered its queue.
+     */
+    bool publishLocal(detail::PublisherPort &port, WorkSet &work) {
         if (!pendingSource_) {
             if (port.localRecords)
                 takeLocalRecord(port);
@@ -2083,7 +2088,7 @@ class PublisherServer {
                 takeTypedRecord(port);
 
             if (!pendingSource_)
-                return;
+                return false;
         }
 
         const auto message = static_cast<DataMessage>(*pendingSource_->messageType());
@@ -2091,13 +2096,19 @@ class PublisherServer {
         const auto records = pendingSource_->records().size();
         const auto admitted = queues_[family]->admit(std::move(*pendingSource_), work[family]);
 
-        if (admitted) {
-            statistics_.families[family].ingressFrames.add(1);
-            statistics_.families[family].ingressRecords.add(records);
-            pendingSource_.reset();
-        } else if (admitted.error().error != mux::QueueError::BUSY &&
-                   admitted.error().error != mux::QueueError::WORK_LIMIT)
+        if (!admitted) {
+            if (admitted.error().error == mux::QueueError::BUSY ||
+                admitted.error().error == mux::QueueError::WORK_LIMIT)
+                return false;
+
             throw Error(queueDiagnostic(admitted.error(), "publisher-admit"));
+        }
+
+        statistics_.families[family].ingressFrames.add(1);
+        statistics_.families[family].ingressRecords.add(records);
+        pendingSource_.reset();
+
+        return true;
     }
 
     void publishSourceStatus(detail::PublisherPort &port) {
@@ -2274,12 +2285,17 @@ class PublisherServer {
         return listener_.port();
     }
 
-    void progress(detail::PublisherPort &port) {
+    /** Run one bounded turn across sockets and queues.
+     * @param port Shared publisher mailbox and status snapshots.
+     * @return Whether typed local publication or routing advanced and merits another turn before polling.
+     */
+    bool progress(detail::PublisherPort &port) {
         acceptPeer();
         progressPolicy(port);
         progressPeers();
         WorkSet work{};
         constexpr std::size_t QUEUE_ACTIONS = 16;
+        bool advanced = false;
 
         for (std::size_t family = 0; family < familyCount_; ++family) {
             auto &queue = *queues_[family];
@@ -2296,6 +2312,8 @@ class PublisherServer {
 
                     throw Error(queueDiagnostic(moved.error(), "publisher-progress"));
                 }
+
+                advanced |= moved->kind != mux::QueueProgressKind::IDLE;
             }
 
             if (const auto terminal = queue.terminal())
@@ -2307,8 +2325,8 @@ class PublisherServer {
 
         if (sourceOptions_)
             progressSource(port, work);
-        else
-            publishLocal(port, work);
+        else if (publishLocal(port, work))
+            advanced = true;
 
         statistics_.activePeers = 0;
 
@@ -2341,6 +2359,23 @@ class PublisherServer {
             port.statistics = statistics_;
             snapshotPeers(port);
         }
+
+        // Peer output runs before queue routing. Give newly routed records a send turn without a timer wait.
+        return !port.remote && !port.localRecords && advanced;
+    }
+
+    /** Poll socket readiness on the existing cadence when a typed publication cannot advance locally.
+     * @param port Shared mailbox checked under its producer mutex before sleeping.
+     */
+    void waitForWork(detail::PublisherPort &port) const {
+        std::unique_lock lock(port.mutex);
+
+        // An admission can arrive after progress() releases the mailbox and before we enter the wait.
+        // An already held source owner must make queue progress before another admission can be taken.
+        if (port.closed || (!port.remote && !port.localRecords && !pendingSource_ && port.size != 0))
+            return;
+
+        port.changed.wait_for(lock, IO_CADENCE);
     }
 
     void stop() {
@@ -2367,9 +2402,8 @@ void runPublisher(detail::PublisherPort &port, transport::RuntimeBootstrap &boot
         port.changed.notify_all();
 
         while (!stop.stop_requested()) {
-            server.progress(port);
-            std::unique_lock lock(port.mutex);
-            port.changed.wait_for(lock, IO_CADENCE);
+            if (!server.progress(port))
+                server.waitForWork(port);
         }
 
         server.stop();

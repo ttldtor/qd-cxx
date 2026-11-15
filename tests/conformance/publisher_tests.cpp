@@ -915,6 +915,41 @@ TEST_CASE("remote QTP publisher reconciles overlapping demand across source gene
     CHECK((*relay)->getDiagnostic().code == q::api::ErrorCode::NONE);
 }
 
+TEST_CASE("typed publisher drains a STREAM burst without one timed wait per record") {
+    constexpr auto count = 384;
+    auto bootstrap = q::transport::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    q::api::PublisherOptions options;
+    options.mixed = true;
+    options.pendingQuotes = count;
+    auto server = q::api::PublisherEndpoint::create(*bootstrap, options);
+    requireServer(server);
+    DemandPeer peer((*server)->port(), asio::ip::address_v4::loopback());
+    peer.subscribe(q::protocol::SubscriptionMessage::STREAM_ADD, 1, u"IBM");
+    REQUIRE(
+        (*server)->awaitDemand(q::core::SubscriptionFamily::STREAM, u"TimeAndSale", u"IBM", true, Clock::now() + 5s));
+
+    auto publisher = (*server)->getPublisher();
+    q::events::TimeAndSale sale;
+    sale.symbol = u"IBM";
+    const auto deadline = Clock::now() + 3s;
+
+    for (auto sequence = 0; sequence < count; ++sequence) {
+        sale.index = (std::int64_t{7} << 32) + sequence;
+        REQUIRE(publisher.publish(sale));
+    }
+
+    constexpr auto streamData = static_cast<std::int32_t>(q::protocol::LiveDataMessage::STREAM_DATA);
+
+    for (auto received = 0; received < count; ++received) {
+        INFO("Delivered STREAM frames: ", received);
+        REQUIRE(peer.waitForFrame(streamData, deadline));
+    }
+
+    (*server)->closeAndAwaitTermination();
+    CHECK((*server)->getDiagnostic().code == q::api::ErrorCode::NONE);
+}
+
 TEST_CASE("mixed publisher preserves STREAM occurrences and indexed HISTORY on one connection") {
     auto bootstrap = q::transport::RuntimeBootstrap::create();
     REQUIRE(bootstrap);
