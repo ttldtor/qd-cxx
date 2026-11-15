@@ -41,10 +41,16 @@ add_library(qdcxx_kraken_wss STATIC "../../src/kraken/wss_session.cpp")
 set_target_properties(qdcxx_kraken_wss PROPERTIES CXX_EXTENSIONS OFF)
 target_include_directories(qdcxx_kraken_wss PUBLIC "../../src/kraken")
 target_link_libraries(qdcxx_kraken_wss PUBLIC qdcxx_beast_wss)
+target_compile_options(qdcxx_kraken_wss PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/bigobj>)
 
 add_executable(qdcxx_beast_wss_qualification "../../tests/conformance/beast-wss-dependency/wss_qualification.cpp")
 set_target_properties(qdcxx_beast_wss_qualification PROPERTIES CXX_EXTENSIONS OFF)
 target_link_libraries(qdcxx_beast_wss_qualification PRIVATE qdcxx_kraken_wss)
+
+add_executable(qdcxx_beast_wss_io_qualification "../../tests/conformance/beast-wss-dependency/wss_io_qualification.cpp")
+set_target_properties(qdcxx_beast_wss_io_qualification PROPERTIES CXX_EXTENSIONS OFF)
+target_link_libraries(qdcxx_beast_wss_io_qualification PRIVATE qdcxx_kraken_wss)
+target_compile_options(qdcxx_beast_wss_io_qualification PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/bigobj>)
 
 add_executable(qdcxx_beast_wss_tls_qualification "../../tests/conformance/beast-wss-dependency/tls_qualification.cpp"
     "../../tests/conformance/beast-wss-dependency/allocation_receipt.cpp")
@@ -55,6 +61,9 @@ enable_testing()
 add_test(NAME beast_wss_qualification COMMAND qdcxx_beast_wss_qualification
     "${CMAKE_CURRENT_LIST_DIR}/../../tests/fixtures/transport/tls")
 set_tests_properties(beast_wss_qualification PROPERTIES TIMEOUT 30)
+add_test(NAME beast_wss_io_qualification COMMAND qdcxx_beast_wss_io_qualification
+    "${CMAKE_CURRENT_LIST_DIR}/../../tests/fixtures/transport/tls")
+set_tests_properties(beast_wss_io_qualification PROPERTIES TIMEOUT 30)
 add_test(NAME beast_wss_tls_qualification COMMAND qdcxx_beast_wss_tls_qualification
     "${CMAKE_CURRENT_LIST_DIR}/../../tests/fixtures/transport/tls")
 add_test(NAME beast_wss_tls_allocator_receipt COMMAND qdcxx_beast_wss_tls_qualification

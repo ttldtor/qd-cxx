@@ -6,7 +6,9 @@
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/ssl/context.hpp>
 #include <boost/asio/ssl/stream.hpp>
+#include <boost/beast/core/flat_buffer.hpp>
 #include <boost/beast/core/tcp_stream.hpp>
+#include <boost/beast/websocket/detail/utf8_checker.hpp>
 #include <boost/beast/websocket/ssl.hpp>
 #include <boost/beast/websocket/stream.hpp>
 #include <openssl/core_names.h>
@@ -33,6 +35,7 @@ using Clock = std::chrono::steady_clock;
 using WebSocket = beast::websocket::stream<ssl::stream<beast::tcp_stream>, false>;
 
 constexpr std::size_t WIRE_WINDOW = 17 * 1024;
+constexpr std::size_t WRITE_WINDOW = 4 * 1024;
 constexpr std::size_t MAX_PEM_BYTES = 512 * 1024;
 constexpr std::size_t MAX_ANCHORS = 256;
 constexpr int MAX_CHAIN_ENTRIES = 6;
@@ -111,7 +114,8 @@ bool settingsValid(const WssSettings &settings) noexcept {
            std::ranges::all_of(settings.target, targetByte) && settings.port != 0 && settings.maxMessageBytes > 0 &&
            settings.maxMessageBytes <= MAX_MESSAGE_BYTES && deadlineValid(settings.resolveTimeout) &&
            deadlineValid(settings.connectTimeout) && deadlineValid(settings.tlsTimeout) &&
-           deadlineValid(settings.upgradeTimeout);
+           deadlineValid(settings.upgradeTimeout) && deadlineValid(settings.receiveTimeout) &&
+           deadlineValid(settings.sendTimeout) && deadlineValid(settings.closeTimeout);
 }
 
 /** Scan the complete trust text and bound the number of decodes before entering OpenSSL.
@@ -380,9 +384,12 @@ class TlsContext final {
 class WssSession::Impl final {
     asio::io_context io_;
     std::optional<Tcp::resolver> resolver_{std::in_place, io_};
-    TlsContext context_;
+    std::optional<TlsContext> context_;
     std::optional<WebSocket> websocket_;
     std::optional<beast::websocket::response_type> response_;
+    std::optional<beast::flat_buffer> input_;
+    std::optional<WssMessage> message_;
+    std::optional<std::string> output_;
     std::array<Tcp::endpoint, MAX_ENDPOINTS> endpoints_{};
     Tcp::resolver::results_type resolved_;
     std::string route_;
@@ -392,11 +399,20 @@ class WssSession::Impl final {
     std::chrono::milliseconds connectTimeout_;
     std::chrono::milliseconds tlsTimeout_;
     std::chrono::milliseconds upgradeTimeout_;
+    std::chrono::milliseconds receiveTimeout_;
+    std::chrono::milliseconds sendTimeout_;
+    std::chrono::milliseconds closeTimeout_;
+    std::size_t maxMessageBytes_;
     Clock::time_point deadline_{};
     WssStage stage_ = WssStage::CONFIGURATION;
     bool pending_ = false;
     Error result_{};
     std::optional<WssDiagnostic> diagnostic_;
+
+    /** @return True after a terminal diagnostic and native backing retirement. */
+    bool terminal() const noexcept {
+        return stage_ == WssStage::FAILED || stage_ == WssStage::CLOSED;
+    }
 
     /** Enter a subsequent active phase before initiating its sole operation.
      * @param stage New active phase.
@@ -413,6 +429,17 @@ class WssSession::Impl final {
     void complete(Error error) noexcept {
         result_ = error;
         pending_ = false;
+    }
+
+    /** Release native and operation ownership after the top-level handler retires. */
+    void retireTerminal() noexcept {
+        response_.reset();
+        input_.reset();
+        message_.reset();
+        output_.reset();
+        websocket_.reset();
+        context_.reset();
+        stage_ = diagnostic_->reason == WssError::GRACEFUL_CLOSE ? WssStage::CLOSED : WssStage::FAILED;
     }
 
     /** Install a terminal receipt and cut off further native I/O.
@@ -432,12 +459,41 @@ class WssSession::Impl final {
         if (pending_) {
             stage_ = WssStage::STOPPING;
         } else {
-            response_.reset();
-            stage_ = WssStage::FAILED;
+            retireTerminal();
         }
     }
 
-    /** Start the next connect, TLS or upgrade phase, or report verified readiness. */
+    /** Admit the peer close receipt after Beast completes the WebSocket and transport handshake. */
+    void finishClose() noexcept {
+        WssDiagnostic receipt{stage_, WssError::GRACEFUL_CLOSE, result_};
+        receipt.closeCode = static_cast<std::uint16_t>(websocket_->reason().code);
+        cutoff(receipt);
+    }
+
+    /** Stage one complete valid text message or drop an empty text message. */
+    void finishReceive() {
+        if (input_->size() > maxMessageBytes_) {
+            cutoff({stage_, WssError::MESSAGE_LIMIT});
+
+            return;
+        }
+
+        if (!websocket_->got_text()) {
+            cutoff({stage_, WssError::UNSUPPORTED_BINARY});
+
+            return;
+        }
+
+        if (input_->size() != 0) {
+            const auto bytes = input_->data();
+            message_.emplace(WssMessage{std::string_view{static_cast<const char *>(bytes.data()), bytes.size()}});
+        }
+
+        input_.reset();
+        stage_ = WssStage::READY;
+    }
+
+    /** Advance the establishment chain or admit a completed post-upgrade operation. */
     void advance() {
         switch (stage_) {
         case WssStage::RESOLVE: {
@@ -478,8 +534,28 @@ class WssSession::Impl final {
 
             return;
         case WssStage::UPGRADE:
+
+            if (response_->count(beast::http::field::sec_websocket_extensions) != 0) {
+                cutoff({stage_, WssError::UNSUPPORTED_EXTENSION});
+
+                return;
+            }
+
             response_.reset();
             stage_ = WssStage::READY;
+
+            return;
+        case WssStage::RECEIVING:
+            finishReceive();
+
+            return;
+        case WssStage::SENDING:
+            output_.reset();
+            stage_ = WssStage::READY;
+
+            return;
+        case WssStage::CLOSING:
+            finishClose();
 
             return;
         default:
@@ -504,6 +580,24 @@ class WssSession::Impl final {
             receipt.httpStatus = response_->result_int();
         }
 
+        if (stage_ == WssStage::RECEIVING || stage_ == WssStage::SENDING || stage_ == WssStage::CLOSING) {
+            namespace ws = beast::websocket;
+
+            if (result_ == ws::error::closed) {
+                finishClose();
+
+                return;
+            }
+
+            if (result_ == ws::error::message_too_big || result_ == ws::error::buffer_overflow) {
+                receipt.reason = WssError::MESSAGE_LIMIT;
+            } else if (result_ == ws::condition::protocol_violation) {
+                receipt.reason = WssError::PROTOCOL;
+            } else if (result_ == asio::error::eof || result_ == ssl::error::stream_truncated) {
+                receipt.reason = WssError::PEER_EOF;
+            }
+        }
+
         cutoff(receipt);
     }
 
@@ -514,7 +608,9 @@ class WssSession::Impl final {
     explicit Impl(const WssSettings &settings)
         : route_(settings.routeHost), service_(std::to_string(settings.port)), authority_(settings.identity),
           target_(settings.target), connectTimeout_(settings.connectTimeout), tlsTimeout_(settings.tlsTimeout),
-          upgradeTimeout_(settings.upgradeTimeout) {
+          upgradeTimeout_(settings.upgradeTimeout), receiveTimeout_(settings.receiveTimeout),
+          sendTimeout_(settings.sendTimeout), closeTimeout_(settings.closeTimeout),
+          maxMessageBytes_(settings.maxMessageBytes) {
         if (settings.port != 443) {
             authority_.append(":").append(service_);
         }
@@ -525,11 +621,13 @@ class WssSession::Impl final {
      * @return No diagnostic on successful synchronous admission.
      */
     std::optional<WssError> start(const WssSettings &settings) {
-        if (const auto failure = context_.initialize(settings.trustPem)) {
+        context_.emplace();
+
+        if (const auto failure = context_->initialize(settings.trustPem)) {
             return failure;
         }
 
-        websocket_.emplace(io_, context_.nativeContext(), WIRE_WINDOW, WIRE_WINDOW);
+        websocket_.emplace(io_, context_->nativeContext(), WIRE_WINDOW, WIRE_WINDOW);
         auto *native = websocket_->next_layer().native_handle();
         auto *bio = SSL_get_wbio(native);
         constexpr auto WRITE_MODES = SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER | SSL_MODE_ENABLE_PARTIAL_WRITE;
@@ -538,13 +636,15 @@ class WssSession::Impl final {
         SSL_set_hostflags(native, X509_CHECK_FLAG_NEVER_CHECK_SUBJECT | X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
 
         if (bio == nullptr || bio != SSL_get_rbio(native) || BIO_get_write_guarantee(bio) != WIRE_WINDOW ||
-            SSL_get_SSL_CTX(native) != context_.nativeContext().native_handle() ||
+            SSL_get_SSL_CTX(native) != context_->nativeContext().native_handle() ||
             SSL_get_app_data(native) != nullptr || (SSL_clear_mode(native, WRITE_MODES) & WRITE_MODES) != 0 ||
             SSL_set1_host(native, identity.c_str()) != 1 || SSL_set_tlsext_host_name(native, identity.c_str()) != 1) {
             return WssError::TLS_POLICY;
         }
 
-        websocket_->read_message_max(settings.maxMessageBytes);
+        websocket_->read_message_max(maxMessageBytes_);
+        websocket_->write_buffer_bytes(WRITE_WINDOW);
+        websocket_->auto_fragment(true);
         enter(WssStage::RESOLVE, settings.resolveTimeout);
         resolver_->async_resolve(route_, service_, Tcp::resolver::numeric_service,
                                  [this](Error error, Tcp::resolver::results_type endpoints) {
@@ -573,7 +673,7 @@ class WssSession::Impl final {
      * @return Stage after progress.
      */
     WssStage run(std::chrono::milliseconds wait) {
-        if (stage_ == WssStage::READY || stage_ == WssStage::FAILED) {
+        if (stage_ == WssStage::READY || terminal()) {
             return stage_;
         }
 
@@ -602,8 +702,7 @@ class WssSession::Impl final {
 
         if (stage_ == WssStage::STOPPING) {
             if (!pending_) {
-                response_.reset();
-                stage_ = WssStage::FAILED;
+                retireTerminal();
             }
         } else if (Clock::now() >= deadline_) {
             cutoff({stage_, WssError::TIMEOUT});
@@ -624,9 +723,73 @@ class WssSession::Impl final {
         return stage_;
     }
 
+    /** Arm one operation after admitting its backing and a caller-work slot.
+     * @param operation Receiving, sending or closing phase selected by the entry point.
+     * @param text Borrowed UTF-8 output considered only for SENDING.
+     * @return Exact admission outcome.
+     */
+    WssAdmission startIo(WssStage operation, std::string_view text = {}) {
+        if (stage_ == WssStage::RECEIVING || stage_ == WssStage::SENDING || stage_ == WssStage::CLOSING || message_) {
+            return WssAdmission::BUSY;
+        }
+
+        if (stage_ != WssStage::READY) {
+            return WssAdmission::NOT_READY;
+        }
+
+        if (operation == WssStage::SENDING && (text.empty() || text.size() > maxMessageBytes_ ||
+                                               !beast::websocket::detail::check_utf8(text.data(), text.size()))) {
+            return WssAdmission::INVALID_PAYLOAD;
+        }
+
+        try {
+            switch (operation) {
+            case WssStage::RECEIVING:
+                enter(operation, receiveTimeout_);
+                // At the exact message limit, Beast still needs a writable byte to process an empty final fragment.
+                input_.emplace(maxMessageBytes_ + 1);
+                websocket_->async_read(*input_, [this](Error error, std::size_t) {
+                    complete(error);
+                });
+                break;
+            case WssStage::SENDING:
+                enter(operation, sendTimeout_);
+                output_.emplace(text);
+                websocket_->text(true);
+                websocket_->async_write(asio::buffer(*output_), [this](Error error, std::size_t) {
+                    complete(error);
+                });
+                break;
+            case WssStage::CLOSING:
+                enter(operation, closeTimeout_);
+                websocket_->async_close(beast::websocket::close_code::normal, [this](Error error) {
+                    complete(error);
+                });
+                break;
+            default:
+                return WssAdmission::NOT_READY;
+            }
+
+            pending_ = true;
+
+            return WssAdmission::ACCEPTED;
+        } catch (const std::bad_alloc &) {
+            cutoff({stage_, WssError::RESOURCE});
+        } catch (const boost::system::system_error &error) {
+            cutoff({stage_, WssError::NATIVE, error.code()});
+        }
+
+        return WssAdmission::FAILED;
+    }
+
+    /** @return Move the held text result out and free the next caller-work slot. */
+    std::optional<WssMessage> takeMessage() noexcept {
+        return std::exchange(message_, std::nullopt);
+    }
+
     /** Impose owner cutoff no later than this call. */
     void stop() noexcept {
-        if (stage_ != WssStage::FAILED && stage_ != WssStage::STOPPING) {
+        if (!terminal() && stage_ != WssStage::STOPPING) {
             cutoff({stage_, WssError::CANCELLED});
         }
     }
@@ -643,7 +806,7 @@ class WssSession::Impl final {
 
     /** @return Positive Beast parser message limit in bytes. */
     std::size_t readMessageLimit() const noexcept {
-        return websocket_->read_message_max();
+        return websocket_ ? websocket_->read_message_max() : maxMessageBytes_;
     }
 };
 
@@ -672,8 +835,31 @@ std::expected<std::unique_ptr<WssSession>, WssDiagnostic> WssSession::begin(cons
 
 WssSession::~WssSession() = default;
 
+WssMessage::WssMessage(std::string_view text) : bytes_(text) {
+}
+
+std::string_view WssMessage::text() const noexcept {
+    return bytes_;
+}
+
 WssStage WssSession::runOneFor(std::chrono::milliseconds wait) {
     return impl_->run(wait);
+}
+
+WssAdmission WssSession::startReceive() {
+    return impl_->startIo(WssStage::RECEIVING);
+}
+
+std::optional<WssMessage> WssSession::takeMessage() noexcept {
+    return impl_->takeMessage();
+}
+
+WssAdmission WssSession::startSend(std::string_view text) {
+    return impl_->startIo(WssStage::SENDING, text);
+}
+
+WssAdmission WssSession::startClose() {
+    return impl_->startIo(WssStage::CLOSING);
 }
 
 void WssSession::requestStop() noexcept {
