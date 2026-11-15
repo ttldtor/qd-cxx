@@ -34,7 +34,7 @@ for route selection, time and correction flags.
 
 First [build the enabled package](CPP-BUILD.md#public-feed-api-build). The
 [complete console example](../examples/feed_quote/main.cpp) includes argument
-validation, interruption, output errors, a finite duration and a no-data exit.
+validation, output errors, a finite duration and a no-data exit.
 Its [build and usage guide](../examples/feed_quote/README.md) uses an installed package.
 
 The central application sequence is:

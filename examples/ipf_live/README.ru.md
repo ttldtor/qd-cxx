@@ -5,7 +5,7 @@
 Конечное приложение использует только публичные connection/runtime/collector API установленного
 пакета. Оно сохраняет owning-префикс неизменяемых revisions, закрывает connection, выполняет join
 runtime на creator thread и лишь затем печатает TSV. Transport polling в приложении нет.
-Без аргументов, --help и --help-ru справка доступна до SDK, source I/O и создания потоков.
+Без аргументов, --help справка доступна до SDK, source I/O и создания потоков.
 
 Пакет собирается с ORG_TTLDTOR_QDCXX_BUILD_IPF_LIVE=ON и явными transfer prerequisites.
 ORG_TTLDTOR_QDCXX_BUILD_EXAMPLES=ON включает qdcxx-ipf-live. Исходники примера устанавливаются
@@ -15,7 +15,6 @@ ORG_TTLDTOR_QDCXX_BUILD_EXAMPLES=ON включает qdcxx-ipf-live. Исход�
 ~~~powershell
 cmake -S "$prefix/share/qdcxx/examples/ipf_live" -B "$sampleBuild" -G Ninja "-DCMAKE_PREFIX_PATH=$prefix" "-DORG_TTLDTOR_QDCXX_OPENSSL_ROOT=$opensslPrefix" "-DORG_TTLDTOR_QDCXX_IPF_TRANSFER_SDK=$transferSdk"
 cmake --build "$sampleBuild" --parallel 1
-& "$sampleBuild/qdcxx-ipf-live.exe" --help-ru
 & "$sampleBuild/qdcxx-ipf-live.exe" --run --source "http://127.0.0.1:8080/profiles.ipf" --duration-ms 10000 --max-updates 1000
 ~~~
 

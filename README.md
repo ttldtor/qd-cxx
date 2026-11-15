@@ -23,7 +23,7 @@ The [Feed API guide](docs/FEED-API.md) describes connection, delivery and shutdo
 - [Query current and historical data](examples/client_queries/README.md) for the last Quote, Candle history and an order-book snapshot.
 - [Receive several event types](examples/feed_market/README.md) with regional symbols and an explicit Order source.
 - [Work with instruments](examples/ipf_live/README.md) or [build models offline](examples/client_models/README.md).
-- [Run a source, relay and clients](examples/feed_distribution/README.md) on a local QTP network.
+- [Run the integration harness](examples/feed_distribution/README.md) with a source, relay and clients on a local QTP network.
 
 [Current capabilities](docs/CURRENT-STATE.md) identify implemented profiles.
 The independent [schedule-rules API](docs/SCHEDULE-RULES.md) parses trading hours with explicit calendar contexts.

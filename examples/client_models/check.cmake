@@ -1,7 +1,7 @@
 if(NOT DEFINED PROGRAM)
     message(FATAL_ERROR "PROGRAM is required")
 endif()
-foreach(arg IN ITEMS "" "--help" "--help-ru")
+foreach(arg IN ITEMS "" "--help")
     if(arg STREQUAL "")
         execute_process(COMMAND "${PROGRAM}" RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE error TIMEOUT 5)
     else()

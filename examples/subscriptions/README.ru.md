@@ -24,7 +24,6 @@ cmake --build build/quote-subscriber --config Release
 
 ```powershell
 ./build/quote-subscriber/Release/qdcxx-quote-subscription.exe --help
-./build/quote-subscriber/Release/qdcxx-quote-subscription.exe --help-ru
 ./build/quote-subscriber/Release/qdcxx-quote-subscription.exe --host 127.0.0.1 --port 19123 --symbol IBM --duration-ms 5000
 ```
 

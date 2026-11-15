@@ -3,9 +3,8 @@ if(NOT DEFINED PROGRAM)
 endif()
 execute_process(COMMAND "${PROGRAM}" RESULT_VARIABLE empty_code OUTPUT_VARIABLE empty ERROR_VARIABLE empty_error TIMEOUT 5)
 execute_process(COMMAND "${PROGRAM}" --help RESULT_VARIABLE help_code OUTPUT_VARIABLE help ERROR_VARIABLE help_error TIMEOUT 5)
-execute_process(COMMAND "${PROGRAM}" --help-ru RESULT_VARIABLE ru_code OUTPUT_VARIABLE ru ERROR_VARIABLE ru_error TIMEOUT 5)
-if(NOT empty_code STREQUAL "0" OR NOT help_code STREQUAL "0" OR NOT ru_code STREQUAL "0" OR NOT empty STREQUAL help
-    OR NOT empty_error STREQUAL "" OR NOT help_error STREQUAL "" OR NOT ru_error STREQUAL "")
+if(NOT empty_code STREQUAL "0" OR NOT help_code STREQUAL "0" OR NOT empty STREQUAL help
+    OR NOT empty_error STREQUAL "" OR NOT help_error STREQUAL "")
     message(FATAL_ERROR "Offline help failed")
 endif()
 execute_process(COMMAND "${PROGRAM}" invalid RESULT_VARIABLE invalid_code OUTPUT_VARIABLE invalid ERROR_VARIABLE invalid_error TIMEOUT 5)

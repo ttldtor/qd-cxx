@@ -58,8 +58,6 @@ int main(int argc, char **argv) {
         const auto defaultHelp = run(executable, root, "noargs", {}, 0);
         require(defaultHelp == run(executable, root, "help", {"--help"}, 0), "noargs equals English help");
         require(defaultHelp.find("--duration-ms") != defaultHelp.npos, "complete English help");
-        const auto russian = run(executable, root, "help-ru", {"--help-ru"}, 0);
-        require(russian.find("--max-updates") != russian.npos && russian != defaultHelp, "translated input-free help");
         {
             const auto output = root / "invalid.out", error = root / "invalid.err";
             process::Child child(executable,

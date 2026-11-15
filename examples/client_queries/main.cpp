@@ -28,31 +28,20 @@ const char *stateName(q::api::HistorySnapshotState state) {
     return "UNKNOWN";
 }
 
-int help(bool russian) {
-    if (russian)
-        std::cout << "Использование: qdcxx-client-queries --run HOST:PORT [HISTORY_HOST:PORT [FROM_MS TO_MS]]\n"
-                     "Запрашивает Quote, дневные Candle за последние 24 часа и снимок Order#DEFAULT для AAPL.\n"
-                     "Адрес HISTORY по умолчанию совпадает с первым; диапазон задан включительно в миллисекундах.\n"
-                     "--help и --help-ru показывают справку без сети. Таймаут 10 секунд, TCP без TLS.\n"
-                     "Коды: 0 — результаты и завершение без таймаута; 1 — отказ или ошибка; 2 — аргументы.\n"
-                     "Признаки drain, gap и диагностика показываются; потери не исключаются.\n";
-    else
-        std::cout << "Usage: qdcxx-client-queries --run HOST:PORT [HISTORY_HOST:PORT [FROM_MS TO_MS]]\n"
-                     "Requests Quote, daily Candle for the last 24 hours and an Order#DEFAULT snapshot for AAPL.\n"
-                     "HISTORY address defaults to the first; optional bounds are inclusive Unix milliseconds.\n"
-                     "--help and --help-ru are offline. Timeout is 10 seconds; plain TCP without TLS.\n"
-                     "Exit 0: results and retirement without timeout; 1: refusal or failure; 2: invalid arguments.\n"
-                     "Drain, gap and diagnostics are reported; lossless streaming is not promised.\n";
+int help() {
+    std::cout << "Usage: qdcxx-client-queries --run HOST:PORT [HISTORY_HOST:PORT [FROM_MS TO_MS]]\n"
+                 "Requests Quote, daily Candle for the last 24 hours and an Order#DEFAULT snapshot for AAPL.\n"
+                 "HISTORY address defaults to the first; optional bounds are inclusive Unix milliseconds.\n"
+                 "--help are offline. Timeout is 10 seconds; plain TCP without TLS.\n"
+                 "Exit 0: results and retirement without timeout; 1: refusal or failure; 2: invalid arguments.\n"
+                 "Drain, gap and diagnostics are reported; lossless streaming is not promised.\n";
 
     return std::cout ? 0 : 1;
 }
 
 int main(int argc, char **argv) {
     if (argc == 1 || (argc == 2 && std::string_view(argv[1]) == "--help"))
-        return help(false);
-
-    if (argc == 2 && std::string_view(argv[1]) == "--help-ru")
-        return help(true);
+        return help();
 
     if ((argc != 3 && argc != 4 && argc != 6) || std::string_view(argv[1]) != "--run" ||
         std::string_view(argv[2]).empty() || (argc >= 4 && std::string_view(argv[3]).empty())) {

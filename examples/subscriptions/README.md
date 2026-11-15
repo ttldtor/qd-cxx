@@ -24,7 +24,6 @@ generators normally put it directly in the build directory. For Visual Studio, r
 
 ```powershell
 ./build/quote-subscriber/Release/qdcxx-quote-subscription.exe --help
-./build/quote-subscriber/Release/qdcxx-quote-subscription.exe --help-ru
 ./build/quote-subscriber/Release/qdcxx-quote-subscription.exe --host 127.0.0.1 --port 19123 --symbol IBM --duration-ms 5000
 ```
 

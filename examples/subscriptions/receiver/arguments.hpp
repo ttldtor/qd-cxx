@@ -30,52 +30,27 @@ struct Arguments {
 };
 
 /** Print complete help before schema/bootstrap/native work.
- * @param russian Select the explicit Russian help variant.
  * @return Zero on successful stdout output, one on an output failure.
  */
-inline int help(bool russian) {
-    if (russian) {
-        std::cout
-            << "Использование: qdcxx-quote-subscription --host HOST --port PORT --symbol SYMBOL [параметры]\n"
-               "Консольная Quote-подписка: plain TCP, STREAM, canonical Exact, один поток опроса.\n"
-               "  --host HOST         IPv4/IPv6 или ASCII/A-label DNS-имя без URI.\n"
-               "  --dns-server IPv4   Один явный DNS-сервер; обязателен для DNS-имени. Системный DNS не читается.\n"
-               "  --dns-port PORT     DNS-порт 1..65535 с --dns-server; по умолчанию 53.\n"
-               "  --port PORT         TCP-порт 1..65535, обязателен.\n"
-               "  --symbol SYMBOL     Один символ: 1..128 печатных ASCII-символов; первый не '*'.\n"
-               "  --duration-ms N     Интервал приёма 1..600000 мс, по умолчанию 5000.\n"
-               "  --maximum-records N Предел напечатанных записей 1..1000000; по умолчанию только время.\n"
-               "  --drain-ms N        Конечный локальный drain 1..60000 мс, по умолчанию 1000.\n"
-               "  --help              Эта справка на английском; без параметров выводится та же справка.\n"
-               "  --help-ru           Эта справка на русском; сеть и схема не создаются.\n"
-               "Вывод: symbol и точные raw bits bid/ask price/size в stdout; диагностика в stderr.\n"
-               "По времени/числу строк запрашивается drain; SIGINT/SIGTERM и ошибки вызывают abort.\n"
-               "Не более 3 попыток соединения; фиксированная пауза 250 мс. Числовые адреса обходят DNS.\n"
-               "DNS добавляет 80 MiB логической резервации запрошенной памяти; это не измерение RSS.\n"
-               "Предел — 1000000 ходов владельца, включая shutdown; бюджеты при остановке не увеличиваются.\n"
-               "Коды: 0 — справка/завершённый локальный drain, 1 — ошибка, 2 — неверные параметры, 130 — сигнал.\n"
-               "Drain не подтверждает отправку на сервер или его ACK; пример использует полный Quote из 8 полей.\n";
-    } else {
-        std::cout << "Usage: qdcxx-quote-subscription --host HOST --port PORT --symbol SYMBOL [options]\n"
-                     "Console Quote subscription: plain TCP, STREAM, canonical Exact, one caller-driven thread.\n"
-                     "  --host HOST         Numeric IPv4/IPv6 or ASCII/A-label DNS name, without a URI.\n"
-                     "  --dns-server IPv4   One explicit DNS server, required for names; system DNS is not read.\n"
-                     "  --dns-port PORT     DNS port in 1..65535 with --dns-server; default 53.\n"
-                     "  --port PORT         Required TCP port in 1..65535.\n"
-                     "  --symbol SYMBOL     One selector: 1..128 printable ASCII characters, not starting with '*'.\n"
-                     "  --duration-ms N     Admission interval in 1..600000 ms; default 5000.\n"
-                     "  --maximum-records N Printed-row limit in 1..1000000; default is the duration alone.\n"
-                     "  --drain-ms N        Finite local drain allowance in 1..60000 ms; default 1000.\n"
-                     "  --help              This help; no arguments produces the identical output.\n"
-                     "  --help-ru           Russian help, without schema/bootstrap/network work.\n"
-                     "Output: symbol and exact bid/ask price/size raw bits on stdout; diagnostics on stderr.\n"
-                     "Time/row cutoffs request drain; SIGINT/SIGTERM and failures request immediate abort.\n"
-                     "At most 3 connection attempts use a fixed 250 ms delay; numeric addresses bypass DNS.\n"
-                     "DNS adds an 80 MiB logical requested-payload reservation, not measured process RSS.\n"
-                     "At most 1000000 owner turns include shutdown; stop uses the same finite work profile.\n"
-                     "Exit: 0 help/completed local drain, 1 failure, 2 invalid arguments, 130 interruption.\n"
-                     "Drain does not certify server output/ACK; the example uses the complete eight-field Quote.\n";
-    }
+inline int help() {
+    std::cout << "Usage: qdcxx-quote-subscription --host HOST --port PORT --symbol SYMBOL [options]\n"
+                 "Console Quote subscription: plain TCP, STREAM, canonical Exact, one caller-driven thread.\n"
+                 "  --host HOST         Numeric IPv4/IPv6 or ASCII/A-label DNS name, without a URI.\n"
+                 "  --dns-server IPv4   One explicit DNS server, required for names; system DNS is not read.\n"
+                 "  --dns-port PORT     DNS port in 1..65535 with --dns-server; default 53.\n"
+                 "  --port PORT         Required TCP port in 1..65535.\n"
+                 "  --symbol SYMBOL     One selector: 1..128 printable ASCII characters, not starting with '*'.\n"
+                 "  --duration-ms N     Admission interval in 1..600000 ms; default 5000.\n"
+                 "  --maximum-records N Printed-row limit in 1..1000000; default is the duration alone.\n"
+                 "  --drain-ms N        Finite local drain allowance in 1..60000 ms; default 1000.\n"
+                 "  --help              This help; no arguments produces the identical output.\n"
+                 "Output: symbol and exact bid/ask price/size raw bits on stdout; diagnostics on stderr.\n"
+                 "Time/row cutoffs request drain; SIGINT/SIGTERM and failures request immediate abort.\n"
+                 "At most 3 connection attempts use a fixed 250 ms delay; numeric addresses bypass DNS.\n"
+                 "DNS adds an 80 MiB logical requested-payload reservation, not measured process RSS.\n"
+                 "At most 1000000 owner turns include shutdown; stop uses the same finite work profile.\n"
+                 "Exit: 0 help/completed local drain, 1 failure, 2 invalid arguments, 130 interruption.\n"
+                 "Drain does not certify server output/ACK; the example uses the complete eight-field Quote.\n";
 
     std::cout.flush();
 

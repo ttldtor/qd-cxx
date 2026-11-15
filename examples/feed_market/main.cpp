@@ -77,28 +77,16 @@ void printEvent(const q::api::RegisteredEvent &event) {
         event);
 }
 
-int help(bool russian) {
-    if (russian) {
-        std::cout << "Использование: qdcxx-feed-market --run [--address HOST:PORT] [--duration-ms N]\n"
-                     "Quote, Trade и производные Order для AAPL, AAPL&Q; затем добавляется MSFT.\n"
-                     "Адрес по умолчанию demo.dxfeed.com:7300, длительность 10000 мс (2..600000).\n"
-                     "REGIONAL_BID Order зависит от доступности региональных Quote у источника.\n"
-                     "Данные demo могут быть задержаны или недоступны из-за прав и расписания.\n"
-                     "--help / --help-ru показывают справку без сети; Ctrl+C запрашивает завершение.\n"
-                     "TCP без TLS и credentials. Выводятся события и итоговая статистика.\n"
-                     "Коды: 0 получены события и выполнен drain; 1 ошибка или нет событий;\n"
-                     "2 неверные аргументы; 130 прерывание. Создаются поток SDK и соединение.\n";
-    } else {
-        std::cout << "Usage: qdcxx-feed-market --run [--address HOST:PORT] [--duration-ms N]\n"
-                     "Quote, Trade and derived Order for AAPL, AAPL&Q; then MSFT is added.\n"
-                     "Default address demo.dxfeed.com:7300, duration 10000 ms (2..600000).\n"
-                     "REGIONAL_BID Order depends on regional Quote availability from the source.\n"
-                     "Demo data may be delayed or unavailable due to entitlement and schedule.\n"
-                     "--help / --help-ru show offline help; Ctrl+C requests shutdown.\n"
-                     "Plain TCP without TLS or credentials. Prints events and final statistics.\n"
-                     "Exits: 0 events received and drained; 1 failure or no events;\n"
-                     "2 invalid arguments; 130 interruption. Starts an SDK worker and connection.\n";
-    }
+int help() {
+    std::cout << "Usage: qdcxx-feed-market --run [--address HOST:PORT] [--duration-ms N]\n"
+                 "Quote, Trade and derived Order for AAPL, AAPL&Q; then MSFT is added.\n"
+                 "Default address demo.dxfeed.com:7300, duration 10000 ms (2..600000).\n"
+                 "REGIONAL_BID Order depends on regional Quote availability from the source.\n"
+                 "Demo data may be delayed or unavailable due to entitlement and schedule.\n"
+                 "--help shows offline help; Ctrl+C requests shutdown.\n"
+                 "Plain TCP without TLS or credentials. Prints events and final statistics.\n"
+                 "Exits: 0 events received and drained; 1 failure or no events;\n"
+                 "2 invalid arguments; 130 interruption. Starts an SDK worker and connection.\n";
 
     std::cout.flush();
 
@@ -108,11 +96,7 @@ int help(bool russian) {
 
 int main(int argc, char **argv) {
     if (argc == 1 || (argc == 2 && std::string_view(argv[1]) == "--help")) {
-        return help(false);
-    }
-
-    if (argc == 2 && std::string_view(argv[1]) == "--help-ru") {
-        return help(true);
+        return help();
     }
 
     std::string address = "demo.dxfeed.com:7300";

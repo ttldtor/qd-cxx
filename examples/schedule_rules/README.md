@@ -19,7 +19,7 @@ An installed application links `qdcxx_schedule` after
 `find_package(qdcxx CONFIG REQUIRED COMPONENTS schedule)`.
 
 Run `qdcxx-schedule-example --run` to execute. No arguments and standalone `--help` print identical
-English help; `--help-ru` prints Russian help. Help creates no context and starts no parsing work.
+English help. Help creates no context and starts no parsing work.
 The executable accepts no external data/credentials. `--run` uses embedded defaults and the normal
 `ScheduleLimits`, allocates only owned in-memory objects, and performs no file/network activity.
 Exit 0 means success/help, 1 means operational/output failure, and 2 means invalid arguments.

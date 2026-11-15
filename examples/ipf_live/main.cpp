@@ -110,40 +110,22 @@ std::optional<Arguments> arguments(int argc, char **argv) {
 }
 
 /** Print input-free help; no runtime, file, signal policy or worker is constructed.
- * @param russian Select translated descriptions.
  * @return Zero for successful output, one if output fails.
  */
-int help(bool russian) {
-    if (russian) {
-        std::cout << "Использование: qdcxx-ipf-live --run --source SOURCE [параметры]\n"
-                     "Live IPF через публичные runtime/connection/collector API.\n"
-                     "  --source SOURCE       Обязательный URL или regular file; до 4096 байт.\n"
-                     "  --duration-ms N       Интервал приложения 1..600000 мс, по умолчанию 10000.\n"
-                     "  --max-updates N       Owning revisions для вывода 1..100000, по умолчанию 1000.\n"
-                     "  --help / --help-ru    Справка без SDK, source I/O, сети или потоков.\n"
-                     "Остановка по времени, числу revisions или закрытию connection; transport polling нет.\n"
-                     "Сначала creator close/join, затем TSV revision/type/symbol/removed и summary.\n"
-                     "UTF-16 значения escaped; prefix/initial snapshot и HTTP/container/native outcomes раздельны.\n"
-                     "Коды: 0 первый snapshot завершён и stop/drain успешен; 3 snapshot неполный;\n"
-                     "1 ошибка source/callback/preparation/output; 2 неверные аргументы.\n"
-                     "Public transfer/model defaults остаются конечными; custom trust/auth флагов здесь нет.\n"
-                     "Создаёт один SDK worker и source handles; файлы/settings/signals не меняет.\n";
-    } else {
-        std::cout
-            << "Usage: qdcxx-ipf-live --run --source SOURCE [options]\n"
-               "Live IPF through public runtime/connection/collector APIs.\n"
-               "  --source SOURCE       Required URL or regular file; at most 4096 bytes.\n"
-               "  --duration-ms N       Application interval 1..600000 ms; default 10000.\n"
-               "  --max-updates N       Owning revisions to print 1..100000; default 1000.\n"
-               "  --help / --help-ru    Help without SDK, source I/O, network or threads.\n"
-               "Stops at duration, revision count or connection close; no transport polling.\n"
-               "Creator close/join precedes TSV revision/type/symbol/removed and summary output.\n"
-               "UTF-16 values are escaped; prefix/initial snapshot and HTTP/container/native outcomes are separate.\n"
-               "Exits: 0 first snapshot completed and stop/drain succeeded; 3 incomplete snapshot;\n"
-               "1 source/callback/preparation/output failure; 2 invalid arguments.\n"
-               "Finite public transfer/model defaults apply; no custom trust/auth flags here.\n"
-               "Creates one SDK worker and source handles; changes no files/settings/signal policy.\n";
-    }
+int help() {
+    std::cout << "Usage: qdcxx-ipf-live --run --source SOURCE [options]\n"
+                 "Live IPF through public runtime/connection/collector APIs.\n"
+                 "  --source SOURCE       Required URL or regular file; at most 4096 bytes.\n"
+                 "  --duration-ms N       Application interval 1..600000 ms; default 10000.\n"
+                 "  --max-updates N       Owning revisions to print 1..100000; default 1000.\n"
+                 "  --help    Help without SDK, source I/O, network or threads.\n"
+                 "Stops at duration, revision count or connection close; no transport polling.\n"
+                 "Creator close/join precedes TSV revision/type/symbol/removed and summary output.\n"
+                 "UTF-16 values are escaped; prefix/initial snapshot and HTTP/container/native outcomes are separate.\n"
+                 "Exits: 0 first snapshot completed and stop/drain succeeded; 3 incomplete snapshot;\n"
+                 "1 source/callback/preparation/output failure; 2 invalid arguments.\n"
+                 "Finite public transfer/model defaults apply; no custom trust/auth flags here.\n"
+                 "Creates one SDK worker and source handles; changes no files/settings/signal policy.\n";
 
     std::cout.flush();
 
@@ -283,11 +265,7 @@ bool print(const Capture &capture, const i::IpfConnectionObservation &observed, 
  */
 int main(int argc, char **argv) {
     if (argc == 1 || (argc == 2 && std::string_view(argv[1]) == "--help")) {
-        return help(false);
-    }
-
-    if (argc == 2 && std::string_view(argv[1]) == "--help-ru") {
-        return help(true);
+        return help();
     }
 
     const auto configured = arguments(argc, argv);

@@ -458,11 +458,7 @@ int subscribe(const Arguments &input) {
  */
 int run(int count, char **values) {
     if (count == 1 || (count == 2 && std::string_view(values[1]) == "--help")) {
-        return cli::help(false);
-    }
-
-    if (count == 2 && std::string_view(values[1]) == "--help-ru") {
-        return cli::help(true);
+        return cli::help();
     }
 
     const auto input = cli::arguments(count, values);

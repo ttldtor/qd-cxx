@@ -29,7 +29,7 @@ Regional Quote and Trade availability depends on the source. A successful connec
 does not promise that every selected family or source will publish an event.
 
 No arguments and `--help` print English help without connecting or creating an SDK
-runtime. `--help-ru` prints Russian help. The application exits with 0 after receiving
+runtime. The application exits with 0 after receiving
 at least one event and draining the local admitted prefix, 1 on failure or no events,
 2 for invalid arguments, or 130 on interruption. The interval accepts 2–600000 ms,
 with 10000 ms as the default. Ctrl+C requests shutdown. The process starts SDK and

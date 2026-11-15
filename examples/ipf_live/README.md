@@ -5,7 +5,7 @@
 This finite application uses only the installed public connection/runtime/collector APIs.
 It retains an owning prefix of immutable revisions, closes the connection, joins its runtime
 on the creator thread, and only then prints TSV. It does not drive transport polling.
-No arguments, --help and --help-ru print input-free help before SDK, source I/O or threads.
+No arguments and --help print input-free help before SDK, source I/O or threads.
 
 Build the package with ORG_TTLDTOR_QDCXX_BUILD_IPF_LIVE=ON and its explicit transfer prerequisites.
 ORG_TTLDTOR_QDCXX_BUILD_EXAMPLES=ON builds qdcxx-ipf-live. The package also installs this directory

@@ -25,27 +25,16 @@ std::string asciiMetadata(std::u16string_view value) {
     return result;
 }
 
-/** @param russian Select translated input-free help. */
-void help(bool russian) {
-    if (russian) {
-        std::cout
-            << "Разбор правил именованного торгового расписания.\n"
-               "Вызов: qdcxx-schedule-example --run | --help | --help-ru\n"
-               "Без аргументов/--help: справка EN; --help-ru: справка RU. Рабочие входы не нужны.\n"
-               "--run: создаёт явный контекст со встроенными defaults и стандартными ScheduleLimits, читает XNYS().\n"
-               "Результат: имя и timezone ID; побочные действия: только собственные объекты в памяти.\n"
-               "Справка не создаёт контекст и не запускает работу. Файлы/сеть не используются.\n"
-               "Коды: 0 успех/справка, 1 ошибка данных/ресурсов/вывода, 2 неверные аргументы.\n";
-    } else {
-        std::cout
-            << "Parse a named trading schedule's rules.\n"
-               "Usage: qdcxx-schedule-example --run | --help | --help-ru\n"
-               "No arguments/--help: English help; --help-ru: Russian help. No working inputs required.\n"
-               "--run: creates an explicit context with embedded defaults and standard ScheduleLimits, reads XNYS().\n"
-               "Output: name and timezone ID; side effects: owned in-memory objects only.\n"
-               "Help creates no context and starts no work. No file or network access.\n"
-               "Exit: 0 success/help, 1 data/resource/output failure, 2 invalid arguments.\n";
-    }
+/** Print input-free help. */
+void help() {
+    std::cout
+        << "Parse a named trading schedule's rules.\n"
+           "Usage: qdcxx-schedule-example --run | --help\n"
+           "No arguments and --help show help without working inputs.\n"
+           "--run: creates an explicit context with embedded defaults and standard ScheduleLimits, reads XNYS().\n"
+           "Output: name and timezone ID; side effects: owned in-memory objects only.\n"
+           "Help creates no context and starts no work. No file or network access.\n"
+           "Exit: 0 success/help, 1 data/resource/output failure, 2 invalid arguments.\n";
 }
 
 /** @return Zero after the complete finite library example; nonzero on typed refusal. */
@@ -84,13 +73,7 @@ int runExample() {
 int main(int argc, char **argv) {
     try {
         if (argc == 1 || (argc == 2 && std::string_view(argv[1]) == "--help")) {
-            help(false);
-
-            return std::cout.good() ? 0 : 1;
-        }
-
-        if (argc == 2 && std::string_view(argv[1]) == "--help-ru") {
-            help(true);
+            help();
 
             return std::cout.good() ? 0 : 1;
         }

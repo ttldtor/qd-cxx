@@ -25,25 +25,17 @@ template <class Result> bool admitted(const Result &result, std::string_view ope
     return false;
 }
 
-int help(bool russian) {
-    if (russian)
-        std::cout << "Использование: qdcxx-client-models --run\n"
-                     "Локальные учебные Candle, стакан и IPF-профиль: без сети и чтения файлов.\n"
-                     "--help и --help-ru показывают справку. Коды: 0 — успех, 1 — отказ, 2 — аргументы.\n";
-    else
-        std::cout << "Usage: qdcxx-client-models --run\n"
-                     "Local example Candle, order book and IPF profile; no network or file access.\n"
-                     "--help and --help-ru show help. Exit 0: success, 1: refusal, 2: invalid arguments.\n";
+int help() {
+    std::cout << "Usage: qdcxx-client-models --run\n"
+                 "Local example Candle, order book and IPF profile; no network or file access.\n"
+                 "--help shows help. Exit 0: success, 1: refusal, 2: invalid arguments.\n";
 
     return std::cout ? 0 : 1;
 }
 
 int main(int argc, char **argv) {
     if (argc == 1 || (argc == 2 && std::string_view(argv[1]) == "--help"))
-        return help(false);
-
-    if (argc == 2 && std::string_view(argv[1]) == "--help-ru")
-        return help(true);
+        return help();
 
     if (argc != 2 || std::string_view(argv[1]) != "--run") {
         std::cerr << "Invalid arguments; use --help.\n";

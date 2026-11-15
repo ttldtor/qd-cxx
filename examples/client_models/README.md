@@ -11,4 +11,4 @@ ctest --test-dir build --output-on-failure
 ./build/qdcxx-client-models --run
 ```
 
-No arguments, `--help` and `--help-ru` print input-free help. `--run` makes no network or file access and creates no worker. Exit 0 indicates successful model operations, 1 a refusal or failure, and 2 invalid arguments. Model values and snapshots own their retained data; model mutation must be serialized by the application.
+No arguments, `--help` print input-free help. `--run` makes no network or file access and creates no worker. Exit 0 indicates successful model operations, 1 a refusal or failure, and 2 invalid arguments. Model values and snapshots own their retained data; model mutation must be serialized by the application.

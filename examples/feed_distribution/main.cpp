@@ -47,22 +47,6 @@ Commands on stdin:
 EOF stops the selected role. The source publishes synthetic data and reports IBM demand.
 Exit codes: 0 stopped or help, 1 runtime/I/O failure, 2 invalid arguments or command.
 )";
-constexpr std::string_view USAGE_RU = R"(Использование: qdcxx-distribution source [PORT]
-               qdcxx-distribution server PORT SOURCE_PORT [SCHEMA_JSON PROVENANCE_JSON]
-               qdcxx-distribution client PORT [SYMBOL...]
-
-Запуск источника, сервера или клиента QTP на loopback.
-Источник и сервер принимают порт 0 и печатают выбранный PORT. У источника порт 0 по умолчанию.
-С поддержкой JSON сервер ретранслирует полный каталог из двух файлов экспорта binary-v2.
-Клиент по умолчанию подписывается на IBM и печатает Quote, TimeAndSale и Order из одной сессии.
-
-Команды stdin:
-  source  QUOTE, EVENTS, REMOVE, STATS, STOP
-  server  STATS, STOP
-  client  CLEAR, STATS, STOP
-EOF останавливает выбранную роль. Источник публикует синтетические данные и показывает спрос IBM.
-Коды выхода: 0 остановка или справка, 1 ошибка выполнения или ввода-вывода, 2 ошибочные аргументы или команда.
-)";
 
 template <class... T> void emit(T &&...parts) {
     std::osyncstream line(std::cout);
@@ -438,12 +422,6 @@ int client(q::transport::RuntimeBootstrap &bootstrap, std::uint16_t sourcePort, 
 int main(int argc, char **argv) {
     if (argc == 1 || (argc == 2 && std::string_view(argv[1]) == "--help")) {
         std::cout << USAGE;
-
-        return !std::cout;
-    }
-
-    if (argc == 2 && std::string_view(argv[1]) == "--help-ru") {
-        std::cout << USAGE_RU;
 
         return !std::cout;
     }

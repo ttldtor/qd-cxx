@@ -42,7 +42,7 @@ cmake --build build/quote-subscriber --config Release
 `./qdcxx-quote-subscription.exe` в Windows либо `./qdcxx-quote-subscription` в Linux.
 
 `qdcxx-quote-subscription --help` и отсутствие аргументов показывают одинаковую английскую
-справку без загрузки схемы, bootstrap процесса и сети. `--help-ru` показывает русскую справку.
+справку без загрузки схемы, bootstrap процесса и сети.
 Для получения данных от уже запущенного контролируемого QTP-источника:
 
 ```text
