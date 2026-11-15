@@ -2413,3 +2413,8 @@ if(BUILD_TESTING)
         add_test(NAME human_inspection_injected_io COMMAND qdcxx_human_io_tests)
     endif()
 endif()
+
+option(ORG_TTLDTOR_QDCXX_BUILD_KRAKEN_GATEWAY "Build the optional Kraken Quote gateway" OFF)
+if(ORG_TTLDTOR_QDCXX_BUILD_KRAKEN_GATEWAY)
+    add_subdirectory(tools/kraken)
+endif()
