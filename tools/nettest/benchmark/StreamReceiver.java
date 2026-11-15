@@ -3,6 +3,7 @@
 
 import com.devexperts.qd.DataField;
 import com.devexperts.qd.DataIntField;
+import com.devexperts.qd.DataIterator;
 import com.devexperts.qd.DataRecord;
 import com.devexperts.qd.QDAgent;
 import com.devexperts.qd.QDContract;
@@ -12,10 +13,13 @@ import com.devexperts.qd.ng.RecordBuffer;
 import com.devexperts.qd.ng.RecordCursor;
 import com.devexperts.qd.ng.RecordMode;
 import com.devexperts.qd.qtp.DistributorAdapter;
+import com.devexperts.qd.qtp.MessageAdapter;
 import com.devexperts.qd.qtp.MessageConnector;
 import com.devexperts.qd.qtp.MessageConnectorState;
 import com.devexperts.qd.qtp.MessageConnectors;
+import com.devexperts.qd.qtp.MessageType;
 import com.devexperts.qd.qtp.QDEndpoint;
+import com.devexperts.qd.stats.QDStats;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
@@ -81,15 +85,20 @@ public final class StreamReceiver {
       }
       DataRecord record = endpoint.getScheme().findRecordByName(ticker ? "Quote" : "TimeAndSale");
       int cipher = endpoint.getScheme().getCodec().encode(args[1]);
-      Observation observation = new Observation(record, cipher, args[1], ticker, nanos, probe);
+      Object tickerLock = new Object();
+      Observation observation =
+          new Observation(record, cipher, args[1], ticker, nanos, probe, tickerLock);
       QDAgent agent = (ticker ? endpoint.getTicker() : endpoint.getStream()).agentBuilder().build();
       try {
         subscribe(agent, record, cipher, args[1]);
         Thread receiver = Thread.currentThread();
         agent.setRecordListener(provider -> LockSupport.unpark(receiver));
+        DistributorAdapter.Factory factory =
+            ticker
+                ? new LockedTickerFactory(endpoint, tickerLock)
+                : new DistributorAdapter.Factory(endpoint, null);
         List<MessageConnector> connectors =
-            MessageConnectors.createMessageConnectors(
-                new DistributorAdapter.Factory(endpoint, null), args[0], endpoint.getRootStats());
+            MessageConnectors.createMessageConnectors(factory, args[0], endpoint.getRootStats());
         if (connectors.size() != 1) {
           throw new IllegalStateException("Expected one loopback connector");
         }
@@ -209,6 +218,29 @@ public final class StreamReceiver {
     return field.getIndex();
   }
 
+  /** Serialize ticker updates with reads of QD's shared matrix-backed cursors. */
+  private static final class LockedTickerFactory extends DistributorAdapter.Factory {
+    private final Object lock;
+
+    LockedTickerFactory(QDEndpoint endpoint, Object lock) {
+      super(endpoint, null);
+      this.lock = lock;
+    }
+
+    @Override
+    public MessageAdapter createAdapter(QDStats stats) {
+      return new DistributorAdapter(
+          endpoint, ticker, stream, history, getFilter(), getStripe(), stats, null) {
+        @Override
+        protected void processData(DataIterator iterator, MessageType message) {
+          synchronized (lock) {
+            super.processData(iterator, message);
+          }
+        }
+      };
+    }
+  }
+
   private static final class Observation extends AbstractRecordSink {
     private final DataRecord record;
     private final int cipher;
@@ -216,6 +248,7 @@ public final class StreamReceiver {
     private final boolean ticker;
     private final boolean nanos;
     private final boolean probeEnabled;
+    private final Object tickerLock;
     private boolean expectingProbe;
     private final int time,
         sequence,
@@ -246,7 +279,8 @@ public final class StreamReceiver {
         String symbol,
         boolean ticker,
         boolean nanos,
-        boolean probe) {
+        boolean probe,
+        Object tickerLock) {
       if (record == null) {
         throw new IllegalStateException("QD scheme is missing TimeAndSale");
       }
@@ -256,6 +290,7 @@ public final class StreamReceiver {
       this.ticker = ticker;
       this.nanos = nanos;
       this.probeEnabled = probe;
+      this.tickerLock = tickerLock;
       this.expectingProbe = probe;
       time = findInt(record, ticker ? "Bid.Time" : "Time", false);
       sequence = findInt(record, "Sequence", false);
@@ -276,6 +311,11 @@ public final class StreamReceiver {
 
     boolean retrieve(QDAgent agent) {
       chunkRecords = 0;
+      if (ticker) {
+        synchronized (tickerLock) {
+          return agent.retrieve(this);
+        }
+      }
       return agent.retrieve(this);
     }
 

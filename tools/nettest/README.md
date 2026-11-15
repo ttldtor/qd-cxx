@@ -139,6 +139,9 @@ starts. STREAM requires exact sequence and count at each receiver. Add
 `-Contract ticker` for `Quote/TICKER`. This mode verifies increasing observed
 sequences, validates fields, and requires the last admitted generation to
 reach every receiver. It reports how many intermediate updates were observed.
+The verifier serializes its TICKER ingress and observation calls because the
+Java collector exposes a cursor over mutable record storage. TICKER age
+includes this synchronization.
 
 Event uses epoch timestamps with `TimeNanoPart` by default. The output includes
 signed record age in nanoseconds and the histogram's 1 µs central bucket width.
