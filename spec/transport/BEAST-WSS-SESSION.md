@@ -89,3 +89,6 @@ observing client bytes. The [message and control fixture](../../tests/conformanc
 covers the exact message limit, fragmented UTF-8, interleaved ping and pong, oversize, malformed
 and unsupported input, both close directions, EOF and reset, blocked write, deadlines and
 cancellation. Provider subscription recovery and live interoperability are subsequent integration steps.
+
+See the [composed qualification and reproduction commands](BEAST-WSS-VALIDATION.md) for the
+tested install boundary, repeated attempts and existing transport regressions.
