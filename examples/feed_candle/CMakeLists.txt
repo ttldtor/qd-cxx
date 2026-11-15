@@ -10,7 +10,6 @@ if(NOT TARGET qdcxx::feed)
 endif()
 
 add_executable(qdcxx_feed_candle main.cpp)
-target_include_directories(qdcxx_feed_candle PRIVATE ../feed_common)
 target_link_libraries(qdcxx_feed_candle PRIVATE qdcxx::feed)
 set_target_properties(qdcxx_feed_candle PROPERTIES CXX_EXTENSIONS OFF OUTPUT_NAME qdcxx-feed-candle)
 

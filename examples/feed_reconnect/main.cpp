@@ -1,7 +1,6 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/api/feed.hpp"
-#include "session.hpp"
 
 #include <chrono>
 #include <exception>
@@ -52,7 +51,11 @@ int main(int argc, char **argv) {
         std::this_thread::sleep_for(10s);
 
         const auto state = endpoint->getState();
-        const auto result = q::examples::finish(*endpoint);
+        const auto result = endpoint->closeAndAwaitTermination();
+
+        if (result.diagnostic.code != q::api::ErrorCode::NONE) {
+            std::cerr << "Endpoint diagnostic: " << result.diagnostic.stage << '\n';
+        }
 
         if (result.deadlineExpired || (!result.drained && !result.hadGap) ||
             state != q::api::EndpointState::CONNECTED ||

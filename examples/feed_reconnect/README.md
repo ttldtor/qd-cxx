@@ -20,8 +20,7 @@ build/feed-reconnect/qdcxx-feed-reconnect --run demo.dxfeed.com:7300 AAPL
 ```
 
 From the installed sample directory, run `cmake -S . -B build -G Ninja
--DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/path/to/qdcxx`. If copying only the
-source example directory, copy `examples/feed_common/session.hpp` into it as well.
+-DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/path/to/qdcxx`.
 
 The service may be unavailable, delayed or require entitlements. A successful
 connection does not guarantee quotes, and this example does not verify delivery

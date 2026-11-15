@@ -86,8 +86,7 @@ int main() {
                       << " expired=" << closed.deadlineExpired << " gap=" << closed.hadGap << '\n';
         }
 
-        return closed.drained && !closed.deadlineExpired && !closed.hadGap &&
-                       quotes->getDiagnostic().code == q::api::ErrorCode::NONE
+        return closed.drained && quotes->getDiagnostic().code == q::api::ErrorCode::NONE
                    ? 0 : 1;
     } catch (const q::api::Error &error) {
         std::cerr << error.diagnostic().stage << '\n';
@@ -500,9 +499,14 @@ serial selection, actual completion accounting и source-epoch fences. Span де
 обработчиков освобождаются вне управляющих блокировок. Ожидание закрытия endpoint
 подтверждает завершение вызовов и освобождение захватов.
 
-`CloseResult::drained` описывает реально принятый локальный префикс. Проверяйте также
-`deadlineExpired`, `hadGap` и `diagnostic`. Результат не подтверждает ACK источника,
-полноту ещё не прочитанных сетевых данных или непрерывность истории upstream.
+`CloseResult::drained` достаточно, чтобы проверить, завершилась ли обработка
+принятого локального префикса без истечения срока ожидания и сохранённого
+пропуска. Проверяйте `deadlineExpired` и `hadGap`, чтобы объяснить сбой при
+завершении или применить политику, допускающую пропуск. `diagnostic` может
+хранить более раннюю ошибку после восстановления. Ошибки подписки, число событий
+и ошибки вывода проверяются отдельно по требованиям приложения. Локальное
+завершение не гарантирует подтверждения источника, полноты ещё не прочитанных
+сетевых данных или непрерывности истории источника.
 
 ## Подключение с проверкой TLS
 

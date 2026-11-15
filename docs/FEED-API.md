@@ -81,8 +81,7 @@ int main() {
                       << " expired=" << closed.deadlineExpired << " gap=" << closed.hadGap << '\n';
         }
 
-        return closed.drained && !closed.deadlineExpired && !closed.hadGap &&
-                       quotes->getDiagnostic().code == q::api::ErrorCode::NONE
+        return closed.drained && quotes->getDiagnostic().code == q::api::ErrorCode::NONE
                    ? 0 : 1;
     } catch (const q::api::Error &error) {
         std::cerr << error.diagnostic().stage << '\n';
@@ -477,9 +476,13 @@ retried and does not fail other subscriptions. Removing a listener prevents futu
 selection; a callback already selected may finish. Listener captures retire outside
 control locks. Awaiting endpoint closure establishes callback/capture quiescence.
 
-`CloseResult::drained` describes the actual admitted local prefix. Inspect
-`deadlineExpired`, `hadGap` and `diagnostic` as well. It does not establish peer
-acknowledgement, unread-wire completeness or an uninterrupted upstream history.
+`CloseResult::drained` is enough to check whether the admitted local prefix drained
+without an expired deadline or a retained gap. Use `deadlineExpired` and `hadGap`
+to explain an unsuccessful drain or apply a policy that tolerates a gap.
+`diagnostic` can retain an earlier failure after recovery. Subscription failures,
+event counts and output errors are separate application checks. A local drain
+provides no guarantee of peer acknowledgement, unread-wire completeness or
+uninterrupted upstream history.
 
 ## Connect with verified TLS
 
