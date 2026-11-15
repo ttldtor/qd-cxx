@@ -6,6 +6,7 @@
 param(
     [ValidateSet('Event','Record')][string]$ProducerKind = 'Event',
     [ValidateSet('stream','ticker')][string]$Contract = 'stream',
+    [ValidateSet('sleep','yield')][string]$Pacing = 'sleep',
     [ValidateRange(1,8)][int]$Clients = 1,
     [ValidateRange(1,300)][int]$Duration = 10,
     [ValidateRange(1,10)][int]$Repeats = 1,
@@ -22,7 +23,7 @@ if ($Help -or !$PSBoundParameters.Count) {
     Write-Output 'Run serial synthetic QTP throughput and delivery measurements on Windows.'
     Write-Output 'Usage: run.cmd -OutputDirectory NEW_DIR [-ProducerKind Event|Record] [-Contract stream|ticker]'
     Write-Output '  [-Clients 1..8] [-Rates 1000,10000,100000] [-Duration 1..300] [-Repeats 1..10]'
-    Write-Output '  [-ListenAddress NUMERIC_IP] [-PushgatewayUrl URL]'
+    Write-Output '  [-ListenAddress NUMERIC_IP] [-Pacing sleep|yield] [-PushgatewayUrl URL]'
     Write-Output 'Default: Event, STREAM, one client, 10 s per run, one repeat, 127.0.0.1.'
     Write-Output 'Writes system baseline, per-run JSON and process CSV, and summary.csv to a new directory.'
     Write-Output 'The optional Pushgateway receives one snapshot after each completed run.'
@@ -31,9 +32,11 @@ if ($Help -or !$PSBoundParameters.Count) {
     exit 0
 }
 if (!$OutputDirectory) { throw 'Supply -OutputDirectory. Use -Help for usage.' }
+$Contract = $Contract.ToLowerInvariant()
+$Pacing = $Pacing.ToLowerInvariant()
 if (Test-Path -LiteralPath $OutputDirectory) { throw 'OutputDirectory must be new.' }
-if ($ProducerKind -eq 'Record' -and ($Clients -ne 1 -or $Contract -ne 'stream')) {
-    throw 'Record mode currently supports one STREAM receiver.'
+if ($ProducerKind -eq 'Record' -and ($Clients -ne 1 -or $Contract -ne 'stream' -or $Pacing -ne 'sleep')) {
+    throw 'Record mode supports one STREAM receiver and default pacing.'
 }
 $rateValues = @($Rates.Split(',') | ForEach-Object {
     $value = 0
@@ -92,6 +95,7 @@ foreach ($rate in $rateValues) {
             Clients = $Clients
             Contract = $Contract
             ListenAddress = $ListenAddress
+            Pacing = $Pacing
         }
         if ($ProducerKind -eq 'Record') { $parameters.Bundle = Join-Path $PSScriptRoot 'schema' }
         & $runner @parameters
@@ -110,12 +114,14 @@ foreach ($rate in $rateValues) {
             producerPeakWorkingSetBytes = $j.processes.producer.sampledPeakWorkingSetBytes
             producerPeakPrivateBytes = $j.processes.producer.sampledPeakPrivateBytes
             precision = $j.precision
+            pacing = $j.pacing
         }
         $rows.Add($row)
         $rows | Export-Csv -NoTypeInformation -LiteralPath (Join-Path $output 'summary.csv')
 
         if ($PushgatewayUrl) {
-            $labels = 'producer="' + $ProducerKind + '",contract="' + $Contract + '",clients="' + $Clients + '"'
+            $labels = 'producer="' + $ProducerKind + '",contract="' + $Contract + '",clients="' + $Clients +
+                '",pacing="' + $Pacing + '"'
             $culture = [Globalization.CultureInfo]::InvariantCulture
             $metrics = [Collections.Generic.List[string]]::new()
             $metrics.AddRange([string[]]@(

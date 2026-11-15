@@ -13,8 +13,8 @@
       "gridPos": {"h": 10, "w": 24, "x": 0, "y": 0},
       "fieldConfig": {"defaults": {"unit": "ops"}},
       "targets": [
-        {"expr": "qdcxx_nettest_offered_records_per_second", "legendFormat": "offered {{producer}} {{contract}} {{clients}} clients"},
-        {"expr": "qdcxx_nettest_delivered_records_per_second", "legendFormat": "deliveries {{producer}} {{contract}} {{clients}} clients"}
+        {"expr": "qdcxx_nettest_offered_records_per_second", "legendFormat": "offered {{producer}} {{contract}} {{clients}} clients {{pacing}}"},
+        {"expr": "qdcxx_nettest_delivered_records_per_second", "legendFormat": "deliveries {{producer}} {{contract}} {{clients}} clients {{pacing}}"}
       ]
     },
     {
@@ -23,7 +23,7 @@
       "id": 2,
       "gridPos": {"h": 8, "w": 12, "x": 0, "y": 10},
       "fieldConfig": {"defaults": {"unit": "s"}},
-      "targets": [{"expr": "qdcxx_nettest_producer_cpu_seconds", "legendFormat": "{{producer}} {{contract}} {{clients}} clients"}]
+      "targets": [{"expr": "qdcxx_nettest_producer_cpu_seconds", "legendFormat": "{{producer}} {{contract}} {{clients}} clients {{pacing}}"}]
     },
     {
       "title": "Producer sampled peak working set",
@@ -31,7 +31,7 @@
       "id": 3,
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 10},
       "fieldConfig": {"defaults": {"unit": "bytes"}},
-      "targets": [{"expr": "qdcxx_nettest_producer_peak_working_set_bytes", "legendFormat": "{{producer}} {{contract}} {{clients}} clients"}]
+      "targets": [{"expr": "qdcxx_nettest_producer_peak_working_set_bytes", "legendFormat": "{{producer}} {{contract}} {{clients}} clients {{pacing}}"}]
     },
     {
       "title": "Receiver p95 record age",
@@ -39,7 +39,7 @@
       "id": 4,
       "gridPos": {"h": 8, "w": 12, "x": 0, "y": 18},
       "fieldConfig": {"defaults": {"unit": "s"}},
-      "targets": [{"expr": "qdcxx_nettest_receiver_latency_p95_seconds", "legendFormat": "client {{client}} {{contract}}"}]
+      "targets": [{"expr": "qdcxx_nettest_receiver_latency_p95_seconds", "legendFormat": "client {{client}} {{contract}} {{pacing}}"}]
     },
     {
       "title": "Receiver sampled peak working set",
@@ -47,7 +47,7 @@
       "id": 5,
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 18},
       "fieldConfig": {"defaults": {"unit": "bytes"}},
-      "targets": [{"expr": "qdcxx_nettest_receiver_peak_working_set_bytes", "legendFormat": "client {{client}} {{contract}}"}]
+      "targets": [{"expr": "qdcxx_nettest_receiver_peak_working_set_bytes", "legendFormat": "client {{client}} {{contract}} {{pacing}}"}]
     }
   ]
 }

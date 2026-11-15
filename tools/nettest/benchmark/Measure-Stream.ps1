@@ -17,6 +17,7 @@ param(
     [ValidateSet('stream', 'ticker')][string]$Contract = 'stream',
     [string]$ListenAddress = '127.0.0.1',
     [ValidateSet('Auto', 'ms', 'ns')][string]$Precision = 'Auto',
+    [ValidateSet('sleep', 'yield')][string]$Pacing = 'sleep',
     [switch]$Help,
     [switch]$HelpRu
 )
@@ -26,7 +27,7 @@ if ($HelpRu) {
     Write-Output 'Использование: Measure-Stream.ps1 -Program ФАЙЛ -Bundle КАТАЛОГ -Java ФАЙЛ -Classpath QD357 -OutputDirectory НОВЫЙ_КАТАЛОГ'
     Write-Output 'Сверяет IBM TimeAndSale/STREAM с QD 3.357 на IPv4 loopback. Нужен JDK с javac.'
     Write-Output 'Для qdcxx-event-nettest укажите -ProducerKind Event, без -Bundle и с -Batch 1.'
-    Write-Output 'Event: -Clients 1..8, -Contract stream|ticker, -ListenAddress IPv4, -Precision Auto|ms|ns.'
+    Write-Output 'Event: -Clients 1..8, -Contract stream|ticker, -ListenAddress IPv4, -Precision Auto|ms|ns, -Pacing sleep|yield (sleep по умолчанию).'
     Write-Output 'Параметры: -Duration 10 (1..300 с), -Rate 1000 (записей/с), -Batch 1 (1..32). Нагрузка должна укладываться в 22 бит.'
     Write-Output 'Сохраняет JSON, замеры процессов и журналы в новом каталоге. Завершает только свои дочерние процессы.'
     Write-Output 'Код 0 — доставка и сверка успешны, 1 — ошибка аргументов, сборки, замера или доставки.'
@@ -36,7 +37,7 @@ if ($Help -or !$PSBoundParameters.Count) {
     Write-Output 'Usage: Measure-Stream.ps1 -Program FILE -Bundle DIR -Java FILE -Classpath QD357 -OutputDirectory NEW_DIR'
     Write-Output 'Verify IBM TimeAndSale/STREAM on IPv4 loopback with Java QD 3.357. Requires a JDK with javac.'
     Write-Output 'For qdcxx-event-nettest, pass -ProducerKind Event with -Batch 1 and omit -Bundle.'
-    Write-Output 'Event: -Clients 1..8, -Contract stream|ticker, -ListenAddress IPv4, -Precision Auto|ms|ns.'
+    Write-Output 'Event: -Clients 1..8, -Contract stream|ticker, -ListenAddress IPv4, -Precision Auto|ms|ns, -Pacing sleep|yield (default sleep).'
     Write-Output 'Options: -Duration 10 (1..300 seconds), -Rate 1000 (records/sec), -Batch 1 (1..32).'
     Write-Output 'Offered records plus one batch must fit the 22-bit sequence range.'
     Write-Output 'Writes JSON, process samples and logs to a new directory. Stops its own child processes.'
@@ -56,8 +57,11 @@ if (![Net.IPAddress]::TryParse($ListenAddress, [ref]$address) -or $address.Addre
     throw 'ListenAddress must be a concrete numeric IPv4 address.'
 }
 if ($Precision -eq 'Auto') { $Precision = if ($ProducerKind -eq 'Event') { 'ns' } else { 'ms' } }
-if ($ProducerKind -eq 'Record' -and ($Clients -ne 1 -or $Contract -ne 'stream' -or $ListenAddress -ne '127.0.0.1' -or $Precision -ne 'ms')) {
-    throw 'Record uses one loopback STREAM client and ms timestamps.'
+$Precision = $Precision.ToLowerInvariant()
+$Contract = $Contract.ToLowerInvariant()
+$Pacing = $Pacing.ToLowerInvariant()
+if ($ProducerKind -eq 'Record' -and ($Clients -ne 1 -or $Contract -ne 'stream' -or $ListenAddress -ne '127.0.0.1' -or $Precision -ne 'ms' -or $Pacing -ne 'sleep')) {
+    throw 'Record uses one loopback STREAM client, ms timestamps and default pacing.'
 }
 $sequenceLimit = 1 -shl 22
 if ($ProducerKind -eq 'Event' -and [long]$Duration * $Rate -lt 2) {
@@ -88,6 +92,7 @@ if ($ProducerKind -eq 'Record') {
     $provenanceHash = (Get-FileHash -LiteralPath (Join-Path $Bundle 'provenance.json')).Hash
 } else {
     $producerArgs += @('--clients', "$Clients", '--address', $ListenAddress, '--start-signal', 'stdin')
+    if ($Pacing -eq 'yield') { $producerArgs += @('--pacing', $Pacing) }
 }
 $PSNativeCommandUseErrorActionPreference = $false
 & $javac -cp $Classpath -d $classes (Join-Path $PSScriptRoot 'StreamReceiver.java') *> (Join-Path $output 'javac.log')
@@ -334,6 +339,7 @@ try {
         contract = $Contract.ToUpperInvariant()
         clients = $Clients
         precision = $Precision
+        pacing = $Pacing
         listenAddress = $ListenAddress
         symbol = 'IBM'
         receiverRole = 'QD record verifier'

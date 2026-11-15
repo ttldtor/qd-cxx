@@ -27,6 +27,12 @@ sequence space. At high offered rates the source can report fewer admissions
 than the nominal rate. Check individual producer and receiver fields alongside
 the aggregate delivery rate.
 
+For a capacity sweep use `-Pacing yield` in Event mode. It yields to the
+scheduler while waiting for the next publication or retry.
+It can consume an additional CPU core. Use the default `sleep` mode for
+comparisons with paced baseline runs.
+The retry count depends on how frequently the producer checks for capacity.
+
 Every output directory must be new. It contains `baseline.json` with CPU load
 sampled before the runs, available memory and adapter link speeds, one folder
 per run, and `summary.csv`. Each run retains `result.json`, raw process

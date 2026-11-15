@@ -47,6 +47,7 @@ Serves 1..8 clients over plain TCP.
   --duration SECONDS Publication window (1..300), default 10
   --startup SECONDS  Wait for matching demand (1..120), default 10
   --rate EVENTS      Offered events per second (1..1000000), default 1000
+  --pacing MODE      sleep (default) or yield for capacity tests with extra CPU use
   --batch 1          Fixed to one event per public API call
   --record NAME      TimeAndSale (default) or Quote
   --symbol IBM       Fixed symbol
@@ -73,6 +74,7 @@ constexpr std::string_view HELP_RU = R"(Использование: qdcxx-event-
   --duration СЕКУНДЫ Окно публикации (1..300), по умолчанию 10
   --startup СЕКУНДЫ  Ожидание подписки (1..120), по умолчанию 10
   --rate СОБЫТИЯ     Предложено событий в секунду (1..1000000), по умолчанию 1000
+  --pacing РЕЖИМ     sleep (по умолчанию) или yield для замера с повышенным расходом CPU
   --batch 1          Одно событие на вызов публичного API
   --record ИМЯ       TimeAndSale (по умолчанию) или Quote
   --symbol IBM       Фиксированный символ
@@ -99,6 +101,7 @@ struct Options {
     std::size_t clients = 1;
     bool ticker = false;
     bool startSignal = false;
+    bool yieldPacing = false;
 };
 
 unsigned number(std::string_view key, std::string_view value, unsigned minimum, unsigned maximum) {
@@ -112,9 +115,9 @@ unsigned number(std::string_view key, std::string_view value, unsigned minimum, 
 }
 
 Options parse(std::span<char *> arguments) {
-    constexpr std::array<std::string_view, 11> KEYS{"--port",    "--duration", "--startup",     "--rate",
-                                                    "--batch",   "--record",   "--symbol",      "--contract",
-                                                    "--clients", "--address",  "--start-signal"};
+    constexpr std::array<std::string_view, 12> KEYS{"--port",    "--duration", "--startup",      "--rate",
+                                                    "--batch",   "--record",   "--symbol",       "--contract",
+                                                    "--clients", "--address",  "--start-signal", "--pacing"};
 
     if (std::string_view(arguments.front()) != "p" || arguments.size() % 2 == 0)
         throw std::invalid_argument("Expected p followed by option/value pairs");
@@ -155,7 +158,10 @@ Options parse(std::span<char *> arguments) {
             contract = value;
         else if (key == "--start-signal" && value == "stdin")
             options.startSignal = true;
-        else if ((key == "--batch" && value != "1") || (key == "--symbol" && value != "IBM") || key == "--start-signal")
+        else if (key == "--pacing" && (value == "sleep" || value == "yield"))
+            options.yieldPacing = value == "yield";
+        else if ((key == "--batch" && value != "1") || (key == "--symbol" && value != "IBM") ||
+                 key == "--start-signal" || key == "--pacing")
             throw std::invalid_argument("Unsupported value for " + std::string(key));
     }
 
@@ -247,10 +253,20 @@ q::events::Quote makeQuote(std::uint64_t sequence) {
     return quote;
 }
 
+/** Wait before the next scheduled publication or admission attempt.
+ * @param yieldPacing Yield to a runnable thread, or sleep on the normal benchmark cadence.
+ */
+void pauseProducer(bool yieldPacing) {
+    if (yieldPacing)
+        std::this_thread::yield();
+    else
+        std::this_thread::sleep_for(IDLE_CADENCE);
+}
+
 /** Retry the same event only when the typed publisher's input FIFO is full. */
 template <typename Event>
 void admit(const q::api::Publisher &publisher, const Event &event, std::uint64_t sequence, Clock::time_point deadline,
-           std::uint64_t &admissionRetries) {
+           std::uint64_t &admissionRetries, bool yieldPacing = false) {
     do {
         const auto accepted = publisher.publish(event);
 
@@ -264,7 +280,7 @@ void admit(const q::api::Publisher &publisher, const Event &event, std::uint64_t
                                      std::string(error.stage));
 
         ++admissionRetries;
-        std::this_thread::sleep_for(IDLE_CADENCE);
+        pauseProducer(yieldPacing);
     } while (Clock::now() < deadline);
 
     throw std::runtime_error("Timed out admitting event " + std::to_string(sequence));
@@ -379,16 +395,16 @@ void produce(const Options &options) {
         const auto offered = static_cast<std::uint64_t>(elapsed) * options.rate / NANOSECONDS_PER_SECOND;
 
         if (generated == offered) {
-            std::this_thread::sleep_for(IDLE_CADENCE);
+            pauseProducer(options.yieldPacing);
             continue;
         }
 
         ++generated;
 
         if (options.ticker)
-            admit(publisher, makeQuote(generated), generated, drainDeadline, admissionRetries);
+            admit(publisher, makeQuote(generated), generated, drainDeadline, admissionRetries, options.yieldPacing);
         else
-            admit(publisher, makeSale(generated), generated, drainDeadline, admissionRetries);
+            admit(publisher, makeSale(generated), generated, drainDeadline, admissionRetries, options.yieldPacing);
 
         ++admitted;
     }
