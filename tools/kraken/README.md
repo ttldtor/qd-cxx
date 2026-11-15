@@ -58,3 +58,5 @@ and may wait for an outstanding native DNS worker. Ctrl+C requests interruption.
 The final line is `STATS observed=N published=N sent_frames=N retired_peers=N pending_publications=N`.
 Exit status 0 requires at least one admitted publication. Status 1 indicates a
 diagnostic or no publications, 2 invalid arguments and 130 interruption.
+
+For verification, use the [deterministic loopback qualification](../../tests/conformance/kraken/README.md) or the [live two-client check](../../tests/conformance/kraken/LIVE.md).
