@@ -2,6 +2,8 @@
 
 [Русская версия](BEAST-WSS-TLS.ru.md). English is authoritative.
 
+The [private WSS connection](BEAST-WSS-SESSION.md) applies this profile to source connection setup.
+
 ## Supported integration boundary
 
 The first public-source gateway can use the pinned [Beast dependency profile](../../cmake/beast-wss-profile/README.md) in a dedicated process. One executor thread owns the TLS work for one live source attempt. An attempt retains its context, provider, socket and buffers through native completion. It finishes teardown before opening another attempt. Sharing the OpenSSL image with additional application TLS users requires a separately qualified shared-host profile. The [QTP TLS resource contract](TLS-RESOURCES.md) remains the authority for its own backend.
