@@ -7,6 +7,7 @@
 | Build a market-data client | [Quote example](../examples/feed_quote/README.md) | Install `qdcxx_feed`, connect and receive typed events in an independent application |
 | Query current and historical data | [Client queries](../examples/client_queries/README.md) | Request an owning Quote, Candle history and an order-book snapshot |
 | Subscribe to live Candle updates | [Candle example](../examples/feed_candle/README.md) | Receive an initial HISTORY range and later updates through the same listener |
+| Reconnect an existing Feed | [Reconnect example](../examples/feed_reconnect/README.md) | Reopen the source connection and keep the existing subscription |
 | Work with models and instruments | [Client models](../examples/client_models/README.md) | Offline Candle and order-book models, instrument profiles and option chains |
 | Choose event symbols and sources | [Market symbols](MARKET-SYMBOLS.md), [Candle symbols](CANDLE-SYMBOLS.md), [event sources](EVENT-SOURCES.md) | Construct and inspect supported symbol and source values |
 | Parse instrument trading hours | [Schedule rules](SCHEDULE-RULES.md) | Complete pinned grammar, named venues and typed defaults in explicit bounded contexts; [console example](../examples/schedule_rules/README.md) |
