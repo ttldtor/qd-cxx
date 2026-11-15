@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/api/feed.hpp"
 #include "qd/events/event_flags.hpp"
-#include "session.hpp"
 
 #include <atomic>
 #include <charconv>
@@ -68,10 +67,14 @@ int main(int argc, char **argv) {
         endpoint->connect(argv[1]);
 
         std::this_thread::sleep_for(10s);
-        const auto result = q::examples::finish(*endpoint);
+        const auto result = endpoint->closeAndAwaitTermination();
         std::cout.flush();
 
-        if (!received->load() || !result.drained || result.deadlineExpired || result.hadGap || !std::cout ||
+        if (result.diagnostic.code != q::api::ErrorCode::NONE) {
+            std::cerr << "Endpoint diagnostic: " << result.diagnostic.stage << '\n';
+        }
+
+        if (!received->load() || !result.drained || !std::cout ||
             candles->getDiagnostic().code != q::api::ErrorCode::NONE) {
             std::cerr << "Candle subscription failed or received no candles.\n";
 
