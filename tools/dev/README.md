@@ -6,7 +6,7 @@
 
 See the [NetTest comparison](../../docs/NETTEST-REFERENCE.md) for Java QD record publication and dxFeed event API benchmarks.
 
-The [record NetTest](../nettest/README.md) runs finite QTP producer and consumer benchmarks against exported schema bundles.
+The [record NetTest](../nettest/README.md) runs finite QTP producer and consumer benchmarks against exported schema bundles. Its STREAM measurement runner checks delivery with Java QD and captures per-process resource samples.
 
 The [schedule production oracle](../upstream/schedule-oracle/README.md) captures/verifies the complete pinned constructor grammar, named/default rules and timezone identities against Java 8. No arguments, EN/RU help and Get-Help require no inputs and start no Java. The [schedule console example](../../examples/schedule_rules/README.md) demonstrates installed public API use; no arguments and `--help`/`--help-ru` perform no context initialization.
 

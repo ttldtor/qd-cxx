@@ -71,5 +71,39 @@ and batch size 10. Java's consumer reports observation rates, while local C++
 producer counts remain exact frame-boundary counts. Full catalog wire round trips
 are covered independently by [the schema exporter comparison](../schema-export/README.md).
 
-Run `--help` or `--help-ru` for all limits, defaults and exit codes. Help does
+## Measure verified STREAM delivery
+
+`benchmark/Measure-Stream.ps1` runs the Record NetTest producer and a Java
+QD 3.357 record consumer on IPv4 loopback. Build the producer in Release and
+provide a [QD 3.357 classpath](https://github.com/devexperts/QD/tree/qd-qds-3.357)
+with `qds.jar`, `dxlib.jar` and `dxfeed-api.jar`. Use a JDK with `javac` next to
+`java`. The runner disables QD's monitoring endpoint builder, so measurement
+uses the ordinary STREAM collector.
+
+```powershell
+pwsh -NoProfile -File tools/nettest/benchmark/Measure-Stream.ps1 -Program $nettest `
+  -Bundle $defaultBundle -Java $java -Classpath $qd357Classpath -OutputDirectory $newLogDirectory
+```
+
+The fixed workload is one IBM `TimeAndSale` STREAM subscription. Defaults
+are ten seconds, 1,000 offered records/s and one record per batch. The
+receiver checks the physical record and generated sequence. The run succeeds
+when the generated, composed, fully written and independently delivered
+counts agree and the receiver reports no validation errors. Workloads must
+fit the 22-bit sequence range so each record has a unique sequence number.
+
+`result.json` includes counts, records delivered including drain divided by the producer window,
+receiver latency quantiles and CPU and memory summaries for each process.
+`process-samples.csv` includes the raw periodic samples. Latency is the
+signed same-host wall-clock difference from the timestamp in the generated
+record to its read by the QD verifier, at millisecond resolution. It includes
+the QD decoding and delivery path. CPU is the
+delta between the first and last live samples in the active window.
+Memory peaks are sampled working set and private bytes. On Windows, private
+bytes measure private committed memory and working set measures resident pages.
+The report gives separate CPU and memory figures for the Record NetTest source
+and the QD verifier.
+
+The measurement runner accepts `-Help` and `-HelpRu` without starting a run.
+For `qdcxx-nettest`, run `--help` or `--help-ru` for all limits, defaults and exit codes. Help does
 not read the schema bundle or start the runtime.
