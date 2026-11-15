@@ -33,15 +33,36 @@ if(WIN32)
     target_link_libraries(qdcxx_beast_wss INTERFACE ws2_32 mswsock)
 endif()
 
-add_executable(qdcxx_beast_wss_probe "../../tests/conformance/beast-wss-dependency/probe.cpp")
-set_target_properties(qdcxx_beast_wss_probe PROPERTIES CXX_EXTENSIONS OFF)
-target_link_libraries(qdcxx_beast_wss_probe PRIVATE qdcxx_beast_wss)
-
 add_library(qdcxx_kraken_wss STATIC "../../src/kraken/wss_session.cpp")
 set_target_properties(qdcxx_kraken_wss PROPERTIES CXX_EXTENSIONS OFF)
 target_include_directories(qdcxx_kraken_wss PUBLIC "../../src/kraken")
 target_link_libraries(qdcxx_kraken_wss PUBLIC qdcxx_beast_wss)
 target_compile_options(qdcxx_kraken_wss PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/bigobj>)
+
+if(ORG_TTLDTOR_QDCXX_BUILD_KRAKEN_SOURCE AND TARGET qdcxx_kraken_decoder)
+    add_library(qdcxx_kraken_source STATIC "../../src/kraken/subscription.cpp")
+    set_target_properties(qdcxx_kraken_source PROPERTIES CXX_EXTENSIONS OFF)
+    target_link_libraries(qdcxx_kraken_source PUBLIC qdcxx_kraken_wss qdcxx_kraken_decoder)
+
+    if(BUILD_TESTING)
+        add_executable(qdcxx_kraken_subscription_tests
+            "../../tests/conformance/beast-wss-dependency/subscription_qualification.cpp")
+        set_target_properties(qdcxx_kraken_subscription_tests PROPERTIES CXX_EXTENSIONS OFF)
+        target_compile_options(qdcxx_kraken_subscription_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/bigobj>)
+        target_link_libraries(qdcxx_kraken_subscription_tests PRIVATE qdcxx_kraken_source)
+        add_test(NAME kraken_subscription COMMAND qdcxx_kraken_subscription_tests
+            "${CMAKE_CURRENT_LIST_DIR}/../../tests/fixtures/transport/tls")
+        set_tests_properties(kraken_subscription PROPERTIES TIMEOUT 30)
+    endif()
+
+    # The root build uses the private source target. The independent dependency package
+    # remains configured and installed separately.
+    return()
+endif()
+
+add_executable(qdcxx_beast_wss_probe "../../tests/conformance/beast-wss-dependency/probe.cpp")
+set_target_properties(qdcxx_beast_wss_probe PROPERTIES CXX_EXTENSIONS OFF)
+target_link_libraries(qdcxx_beast_wss_probe PRIVATE qdcxx_beast_wss)
 
 add_executable(qdcxx_beast_wss_qualification "../../tests/conformance/beast-wss-dependency/wss_qualification.cpp")
 set_target_properties(qdcxx_beast_wss_qualification PROPERTIES CXX_EXTENSIONS OFF)

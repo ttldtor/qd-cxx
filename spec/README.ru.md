@@ -33,6 +33,7 @@
 - [Спрос к источнику и доставка клиентам](subscriptions/SERVER-DEMAND.ru.md) и [публикация композитного Quote](subscriptions/PUBLISHER.ru.md)
 - [TCP runtime](transport/TCP-RUNTIME.ru.md), [приём TCP-соединений](transport/TCP-LISTENER.ru.md), [TLS runtime](transport/TLS-RUNTIME.ru.md)
   и [ресурсные предпосылки TLS](transport/TLS-RESOURCES.ru.md)
+- [Подписка на источник Kraken](transport/KRAKEN-SUBSCRIPTION.ru.md)
 
 Причины решений и открытые вопросы дизайна QD/native собраны в [базе знаний](../docs/knowledge/README.ru.md).
 Точные результаты conformance-проверок находятся в [разделе разработчика](../docs/developer.ru.md).

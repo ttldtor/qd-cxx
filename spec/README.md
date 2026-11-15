@@ -33,6 +33,7 @@ supported types through one owning variant-valued logical subscription.
 - [Server demand and client delivery](subscriptions/SERVER-DEMAND.md) and [composite Quote publisher](subscriptions/PUBLISHER.md)
 - [TCP runtime](transport/TCP-RUNTIME.md), [TCP listener](transport/TCP-LISTENER.md), [TLS runtime](transport/TLS-RUNTIME.md)
   and [TLS resource assumptions](transport/TLS-RESOURCES.md)
+- [Kraken source subscription](transport/KRAKEN-SUBSCRIPTION.md)
 
 For rationale and unresolved QD/native design questions, use the [knowledge base](../docs/knowledge/README.md).
 Exact conformance results belong to the [developer reading path](../docs/developer.md).
