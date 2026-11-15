@@ -11,6 +11,7 @@
 #include <expected>
 #include <memory>
 #include <optional>
+#include <string>
 #include <string_view>
 
 namespace org::ttldtor::qdcxx::kraken {
@@ -22,11 +23,14 @@ struct WssSettings {
     std::string_view target = "/v2"; ///< Explicit HTTP request target, including optional query.
     std::string_view trustPem;       ///< Explicit, ordinary CERTIFICATE blocks. System trust is not loaded.
     std::uint16_t port = 443;        ///< Numeric connect port; included in the HTTP authority when non-default.
-    std::chrono::milliseconds resolveTimeout{5000}; ///< Time available for admitting the resolver result.
-    std::chrono::milliseconds connectTimeout{5000}; ///< Shared budget across all admitted endpoints.
-    std::chrono::milliseconds tlsTimeout{5000};     ///< Verified TLS handshake budget.
-    std::chrono::milliseconds upgradeTimeout{5000}; ///< HTTP/WebSocket handshake budget.
-    std::size_t maxMessageBytes = 64 * 1024;        ///< Positive maximum configured in the WebSocket parser.
+    std::chrono::milliseconds resolveTimeout{5000};  ///< Time available for admitting the resolver result.
+    std::chrono::milliseconds connectTimeout{5000};  ///< Shared budget across all admitted endpoints.
+    std::chrono::milliseconds tlsTimeout{5000};      ///< Verified TLS handshake budget.
+    std::chrono::milliseconds upgradeTimeout{5000};  ///< HTTP/WebSocket handshake budget.
+    std::chrono::milliseconds receiveTimeout{30000}; ///< Budget for a complete admitted receive operation.
+    std::chrono::milliseconds sendTimeout{5000};     ///< Budget for writing one admitted text message.
+    std::chrono::milliseconds closeTimeout{5000};    ///< Budget for local close and transport teardown.
+    std::size_t maxMessageBytes = 64 * 1024;         ///< Positive inbound and outbound text payload limit.
 };
 
 /** Current owner-thread state, or the phase associated with a failure. */
@@ -36,12 +40,16 @@ enum class WssStage {
     CONNECT,       ///< Native TCP connect outstanding.
     TLS,           ///< TLS handshake outstanding.
     UPGRADE,       ///< Beast WebSocket upgrade outstanding.
-    READY,         ///< Verified TLS and validated WebSocket response.
+    READY,         ///< Verified upgraded connection with no active operation and at most one result.
+    RECEIVING,     ///< One read, including Beast's automatic control traffic, is outstanding.
+    SENDING,       ///< One owned text write is outstanding.
+    CLOSING,       ///< A local WebSocket close and its transport teardown are outstanding.
     STOPPING,      ///< Cutoff imposed, waiting for an outstanding completion.
+    CLOSED,        ///< An orderly WebSocket close completed and native backing was retired.
     FAILED,        ///< Terminal failure or cancellation with native handlers retired.
 };
 
-/** Reason an attempt could not reach or retain READY. */
+/** Reason an attempt did not reach or retain READY, including orderly closure. */
 enum class WssError {
     INVALID_CONFIGURATION, ///< A finite setting or input syntax check failed.
     TRUST,                 ///< Explicit trust admission or loading failed.
@@ -49,6 +57,12 @@ enum class WssError {
     TLS_VERIFICATION,      ///< OpenSSL refused the peer certificate, chain or reference identity.
     RESOURCE,              ///< An application resource limit or ordinary allocation failed.
     NATIVE,                ///< The network, TLS stack or HTTP/WebSocket parser failed.
+    MESSAGE_LIMIT,         ///< The peer exceeded the admitted WebSocket message budget.
+    PROTOCOL,              ///< Beast rejected a WebSocket protocol violation.
+    UNSUPPORTED_EXTENSION, ///< The peer advertised an extension the client did not offer.
+    UNSUPPORTED_BINARY,    ///< An otherwise valid binary message is outside the text profile.
+    PEER_EOF,              ///< The transport ended without a completed WebSocket close.
+    GRACEFUL_CLOSE,        ///< An orderly WebSocket close completed.
     TIMEOUT,               ///< A phase deadline expired before the result was admitted.
     CANCELLED,             ///< The owner cut off the attempt.
 };
@@ -60,6 +74,34 @@ struct WssDiagnostic {
     boost::system::error_code native{}; ///< Optional exact library error code.
     long verifyError = 0;               ///< OpenSSL verification code for TLS_VERIFICATION.
     unsigned httpStatus = 0;            ///< HTTP status reported for a completed upgrade refusal.
+    std::uint16_t closeCode = 0;        ///< Validated peer WebSocket close code when available.
+};
+
+/** Outcome of attempting to start one post-upgrade operation. */
+enum class WssAdmission {
+    ACCEPTED,        ///< The operation is armed against the stable owner.
+    NOT_READY,       ///< The connection has not upgraded or is terminal.
+    BUSY,            ///< An operation or an unread result occupies the one available slot.
+    INVALID_PAYLOAD, ///< Output is empty, exceeds the limit or is not UTF-8.
+    FAILED,          ///< Native initiation failed and the attempt is stopping or terminal.
+};
+
+/** Immutable text bytes owned independently of the session and the provider decoder. */
+class WssMessage final {
+    friend class WssSession;
+
+    std::string bytes_;
+
+    /** Copy the exact bytes of a verified complete text message.
+     * @param text Borrowed admitted payload.
+     */
+    explicit WssMessage(std::string_view text);
+
+    public:
+    /** View the message without transferring its storage.
+     * @return UTF-8 bytes held by this value until moved from or destroyed.
+     */
+    std::string_view text() const noexcept;
 };
 
 /** One private, single-thread-driven connection attempt in the dedicated WSS process.
@@ -97,7 +139,28 @@ class WssSession final {
      */
     WssStage runOneFor(std::chrono::milliseconds wait);
 
-    /** Cut off further progress and request resolver cancellation and socket close. */
+    /** Arm one bounded Beast read. An empty message completes without creating a result.
+     * @return Admission, including BUSY while an unread message occupies the slot.
+     */
+    WssAdmission startReceive();
+
+    /** Transfer the one completed nonempty text message, if any.
+     * @return Owning payload independent of this session, or no value.
+     */
+    std::optional<WssMessage> takeMessage() noexcept;
+
+    /** Copy one complete output message and arm a bounded Beast write.
+     * @param text Borrowed nonempty UTF-8, which may be released when this call returns.
+     * @return Admission or refusal. Completion does not acknowledge receipt by the peer.
+     */
+    WssAdmission startSend(std::string_view text);
+
+    /** Start an orderly normal close from an idle ready connection.
+     * @return Admission. Drive the owner to CLOSED or FAILED for the actual receipt.
+     */
+    WssAdmission startClose();
+
+    /** Cut off further operations and delivery, cancel resolution and close the native socket. */
     void requestStop() noexcept;
 
     /** Inspect the current phase without driving the executor.
@@ -110,7 +173,7 @@ class WssSession final {
      */
     const std::optional<WssDiagnostic> &diagnostic() const noexcept;
 
-    /** Read back the Beast message limit for this attempt.
+    /** Read back the Beast message limit while native state is live, or the retained setting after retirement.
      * @return The configured positive receive-message limit in bytes.
      */
     std::size_t readMessageLimit() const noexcept;
