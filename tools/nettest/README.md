@@ -105,5 +105,33 @@ The report gives separate CPU and memory figures for the Record NetTest source
 and the QD verifier.
 
 The measurement runner accepts `-Help` and `-HelpRu` without starting a run.
+
+### Run the event producer
+
+Build `qdcxx_event_nettest` with the public Feed API enabled. The executable
+`qdcxx-event-nettest` uses the built-in mixed publisher profile and sends one
+`TimeAndSale` per `Publisher::publish()` call. The Java verifier checks
+the same sequence and ten common record fields in both modes. The built-in
+event profile also advertises an optional `TimeNanoPart` field with zero
+values. The wire schemas therefore differ.
+
+```powershell
+pwsh -NoProfile -File tools/nettest/benchmark/Measure-Stream.ps1 -Program $eventNettest `
+  -ProducerKind Event -Java $java -Classpath $qd357Classpath -OutputDirectory $newLogDirectory
+```
+
+Event mode uses batch 1 and the built-in schema. The producer waits for exact
+demand and reports local admissions and public publisher drain observations.
+The `drainMs` counter measures queue drain after the last admission.
+The Java verifier reconciles received records against the admission count.
+Record mode reconciles against fully written records. Use `-Batch 1` for both
+runs when comparing one publication per call.
+
+When the publisher's input queue is full, the event producer retries the same
+event with its original timestamp, through a bounded completion deadline.
+No new events are generated after the configured window. The report shows
+admission retries and the difference between nominal load and completed
+publications separately from the receiver's exact-delivery check.
+
 For `qdcxx-nettest`, run `--help` or `--help-ru` for all limits, defaults and exit codes. Help does
 not read the schema bundle or start the runtime.
