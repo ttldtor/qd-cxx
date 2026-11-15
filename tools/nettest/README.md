@@ -112,8 +112,8 @@ Build `qdcxx_event_nettest` with the public Feed API enabled. The executable
 `qdcxx-event-nettest` uses the built-in mixed publisher profile and sends one
 `TimeAndSale` per `Publisher::publish()` call. The Java verifier checks
 the same sequence and ten common record fields in both modes. The built-in
-event profile also advertises an optional `TimeNanoPart` field with zero
-values. The wire schemas therefore differ.
+event profile also sends the sub-millisecond part in `TimeNanoPart`.
+The wire schemas therefore differ.
 
 ```powershell
 pwsh -NoProfile -File tools/nettest/benchmark/Measure-Stream.ps1 -Program $eventNettest `
@@ -132,6 +132,25 @@ event with its original timestamp, through a bounded completion deadline.
 No new events are generated after the configured window. The report shows
 admission retries and the difference between nominal load and completed
 publications separately from the receiver's exact-delivery check.
+
+Pass `-Clients 2`, `-Clients 4`, or `-Clients 8` to start separate Java QD
+receivers. A sequence-zero probe confirms each subscription before timing
+starts. STREAM requires exact sequence and count at each receiver. Add
+`-Contract ticker` for `Quote/TICKER`. This mode verifies increasing observed
+sequences, validates fields, and requires the last admitted generation to
+reach every receiver. It reports how many intermediate updates were observed.
+The verifier serializes its TICKER ingress and observation calls because the
+Java collector exposes a cursor over mutable record storage. TICKER age
+includes this synchronization.
+
+Event uses epoch timestamps with `TimeNanoPart` by default. The output includes
+signed record age in nanoseconds and the histogram's 1 µs central bucket width.
+Clock precision depends on the host. Record mode uses millisecond timestamps.
+The multi-receiver result lists latency, CPU and memory per process and
+distinguishes source records/s from aggregate delivered records/s.
+
+For a portable Windows sweep, per-process receipts, and a separate physical
+link test, see the [Windows NetTest bundle](benchmark/windows/README.md).
 
 For `qdcxx-nettest`, run `--help` or `--help-ru` for all limits, defaults and exit codes. Help does
 not read the schema bundle or start the runtime.

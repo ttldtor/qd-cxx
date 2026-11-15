@@ -9,6 +9,7 @@
 #include "interest_transaction.hpp"
 #include "qd/protocol/incoming_subscription.hpp"
 #include "queue_replace.hpp"
+#include "queue_schedule.hpp"
 
 #include <algorithm>
 #include <array>
@@ -4513,7 +4514,7 @@ std::expected<QueueProgress, QueueFailure> MuxQueue::progressImpl(QueueWork &wor
             if (++s.cursor >= std::max<std::size_t>(slots, 1)) {
                 s.cursor = 0;
 
-                if (++s.phase == 5) {
+                if (++s.phase == detail::QUEUE_PHASES) {
                     s.phase = 0;
 
                     if (s.pendingPhase == State::Pending::NONE && s.reset.phase == ResetPhase::NONE)
