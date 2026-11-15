@@ -23,6 +23,11 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
+
+#if defined(_WIN32)
+#    include <windows.h>
+#endif
 
 namespace {
 
@@ -43,6 +48,7 @@ constexpr std::size_t MESSAGE_LIMIT = 32;
 constexpr std::size_t LARGE_MESSAGE_LIMIT = 256 * 1024;
 constexpr int PEER_RECEIVE_WINDOW = 1024;
 constexpr int MAX_BACKPRESSURE_WRITES = 64;
+constexpr int REOPEN_ATTEMPTS = 8;
 
 /** Stop the fixture on a failed check.
  * @param ok Condition required by the scenario.
@@ -659,6 +665,107 @@ void cancelAndTimeOutWrite(const std::filesystem::path &files, std::string_view 
     (void)delayed.terminal(wss::WssStage::SENDING, wss::WssError::TIMEOUT);
 }
 
+/** Observe one warmed process's native resources between fully destroyed attempts.
+ * @return Windows handle count or Linux open descriptor count, including the enumeration descriptor.
+ */
+std::size_t nativeOpenCount() {
+#if defined(_WIN32)
+    DWORD count = 0;
+    require(GetProcessHandleCount(GetCurrentProcess(), &count) != 0, "fixture-handle-count");
+
+    return count;
+#else
+    const auto entries = std::filesystem::directory_iterator{"/proc/self/fd"};
+
+    return static_cast<std::size_t>(std::distance(entries, std::filesystem::directory_iterator{}));
+#endif
+}
+
+/** Reopen independently after each canceled attempt and verify warmed native resource quiescence.
+ * @param files Directory of local synthetic TLS inputs.
+ * @param ca Explicit trusted CA.
+ */
+void reopenAfterRetirement(const std::filesystem::path &files, std::string_view ca) {
+    const auto initial = nativeOpenCount();
+    std::optional<wss::WssMessage> firstMessage;
+
+    for (int attempt = 0; attempt < REOPEN_ATTEMPTS; ++attempt) {
+        const bool blockWrite = attempt % 2 != 0;
+        Fixture fixture{files, ca, LARGE_MESSAGE_LIMIT, blockWrite};
+        auto &client = fixture.client();
+
+        if (blockWrite) {
+            stallWrite(fixture);
+        } else {
+            const auto expected = "attempt-" + std::to_string(attempt);
+            require(client.startReceive() == wss::WssAdmission::ACCEPTED, "reopen-receive-arm");
+            fixture.peer().frame(true, expected);
+            fixture.finishPeerWrite();
+            fixture.drive(
+                [&] {
+                    return client.stage() == wss::WssStage::READY;
+                },
+                "reopen-message");
+            auto message = client.takeMessage();
+            require(message && message->text() == expected, "reopen-fresh-text");
+
+            if (!firstMessage) {
+                firstMessage = std::move(message);
+            }
+
+            require(client.startReceive() == wss::WssAdmission::ACCEPTED, "reopen-idle-read-arm");
+            fixture.step();
+        }
+
+        require(client.stage() == (blockWrite ? wss::WssStage::SENDING : wss::WssStage::RECEIVING),
+                "reopen-outstanding-io");
+        client.requestStop();
+        require(client.stage() == wss::WssStage::STOPPING, "reopen-cutoff-before-retirement");
+        (void)fixture.terminal(blockWrite ? wss::WssStage::SENDING : wss::WssStage::RECEIVING,
+                               wss::WssError::CANCELLED);
+        fixture.releaseClient();
+    }
+
+    const auto final = nativeOpenCount();
+    require(firstMessage && firstMessage->text() == "attempt-0", "reopen-retained-text");
+    std::cout << "Independent attempts=" << REOPEN_ATTEMPTS << " native_handles_or_fds_before=" << initial
+              << " after=" << final << '\n';
+    require(initial == final, "reopen-native-quiescence");
+}
+
+/** Verify a missing trust configuration and a TCP endpoint with no listening provider.
+ * @param ca Explicit trusted CA used only for the connection-refusal case.
+ */
+void missingTrustAndPeer(std::string_view ca) {
+    asio::io_context io;
+    Tcp::acceptor port{io};
+
+    port.open(Tcp::v4());
+    port.bind(Tcp::endpoint{asio::ip::address_v4::loopback(), 0});
+    wss::WssSettings settings{.routeHost = "127.0.0.1", .identity = "localhost", .port = port.local_endpoint().port()};
+    const auto noTrust = wss::WssSession::begin(settings);
+    require(!noTrust && noTrust.error().stage == wss::WssStage::CONFIGURATION &&
+                noTrust.error().reason == wss::WssError::TRUST,
+            "missing-explicit-trust");
+
+    settings.trustPem = ca;
+    const auto missingPeer = wss::WssSession::begin(settings);
+    require(missingPeer.has_value(), "missing-peer-admitted-config");
+
+    auto &client = **missingPeer;
+    const auto end = Clock::now() + DRIVER_LIMIT;
+
+    while (client.stage() != wss::WssStage::FAILED && Clock::now() < end) {
+        require(client.runOneFor(POLL_SLICE) != wss::WssStage::READY, "missing-peer-never-ready");
+    }
+
+    const auto &diagnostic = client.diagnostic();
+    require(client.stage() == wss::WssStage::FAILED && diagnostic && diagnostic->stage == wss::WssStage::CONNECT &&
+                diagnostic->reason == wss::WssError::NATIVE && diagnostic->native == asio::error::connection_refused &&
+                !client.takeMessage(),
+            "missing-peer-connection-refused");
+}
+
 } // namespace
 
 /** Run the established connection's finite message, control and cancellation matrix.
@@ -690,6 +797,8 @@ int main(int argc, char **argv) {
         transportEnd(files, ca, true);
         cancelAndTimeOutRead(files, ca);
         cancelAndTimeOutWrite(files, ca);
+        reopenAfterRetirement(files, ca);
+        missingTrustAndPeer(ca);
         std::cout << "Bounded WSS I/O: fragments, pong, limits, close, EOF/reset, delayed write and retirement\n";
 
         return 0;
