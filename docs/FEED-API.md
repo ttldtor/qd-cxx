@@ -420,6 +420,17 @@ attachment. Ordinary `detach` and `close` do not emit clear notifications.
 
 ## Runtime, callbacks and shutdown
 
+For a standalone application, call `Endpoint::create()` on main before starting
+other application threads. Each call creates an independent endpoint in the same
+library-owned runtime with the default runtime limits and DNS configuration.
+The worker starts lazily on the first accepted connection. Closing one endpoint
+leaves the others active. Use `closeAndAwaitTermination()` on main to finish its
+delivery and wait for its callbacks before releasing anything they borrow.
+The library joins its common worker when the process shuts down normally on main,
+after application threads have joined. See the [runtime contract](../spec/transport/RUNTIME-EMBEDDING.md#default-endpoint-factory).
+
+For control over runtime limits, DNS or host-owned embedding, use `ApiRuntime`.
+
 Create the owning `ApiRuntime(RuntimeOptions)` on main **before application threads**;
 those threads must retire before its destruction. A host that already created
 `RuntimeBootstrap` on main before starting threads may later use the explicit

@@ -7,6 +7,7 @@
 #include <exception>
 #include <iostream>
 #include <string_view>
+#include <thread>
 
 namespace q = org::ttldtor::qdcxx;
 using namespace std::chrono_literals;
@@ -33,8 +34,7 @@ int main(int argc, char **argv) {
     const std::string_view symbol = argc > 3 ? argv[3] : "AAPL";
 
     try {
-        q::api::ApiRuntime runtime;
-        auto endpoint = runtime.createEndpoint();
+        auto endpoint = q::api::Endpoint::create();
         auto subscription = endpoint->getFeed()->createSubscription<q::events::Quote>();
 
         subscription->addEventListener([symbol](std::span<const q::events::Quote> quotes) {
@@ -47,9 +47,9 @@ int main(int argc, char **argv) {
         subscription->addSymbols(symbol);
         endpoint->connect(address);
 
-        q::examples::receiveFor(*endpoint, 10s);
+        std::this_thread::sleep_for(10s);
         endpoint->reconnect();
-        q::examples::receiveFor(*endpoint, 10s);
+        std::this_thread::sleep_for(10s);
 
         const auto state = endpoint->getState();
         const auto result = q::examples::finish(*endpoint);

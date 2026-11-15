@@ -9,7 +9,9 @@
 #include <chrono>
 #include <iostream>
 #include <limits>
+#include <memory>
 #include <string_view>
+#include <thread>
 
 namespace q = org::ttldtor::qdcxx;
 using namespace std::chrono_literals;
@@ -44,15 +46,14 @@ int main(int argc, char **argv) {
     }
 
     try {
-        std::atomic<bool> received{false};
-        q::api::ApiRuntime runtime;
+        auto received = std::make_shared<std::atomic<bool>>(false);
         q::api::EndpointOptions options;
         options.contract = q::api::DeliveryContract::HISTORY;
-        auto endpoint = runtime.createEndpoint(options);
+        auto endpoint = q::api::Endpoint::create(options);
         auto candles = endpoint->getFeed()->createTimeSeriesSubscription<q::events::Candle>();
 
         candles->setFromTime(fromTime);
-        candles->addEventListener([&received](std::span<const q::events::Candle> batch) {
+        candles->addEventListener([received](std::span<const q::events::Candle> batch) {
             for (const auto &candle : batch) {
                 if (candle.eventFlags & q::events::indexed_event_flags::REMOVE_EVENT) {
                     continue;
@@ -60,17 +61,17 @@ int main(int argc, char **argv) {
 
                 std::cout << candle.getTime() << " open=" << candle.getOpen() << " high=" << candle.getHigh()
                           << " low=" << candle.getLow() << " close=" << candle.getClose() << '\n';
-                received = true;
+                received->store(true);
             }
         });
         candles->addSymbols(argv[2]);
         endpoint->connect(argv[1]);
 
-        q::examples::receiveFor(*endpoint, 10s);
+        std::this_thread::sleep_for(10s);
         const auto result = q::examples::finish(*endpoint);
         std::cout.flush();
 
-        if (!received || !result.drained || result.deadlineExpired || result.hadGap || !std::cout ||
+        if (!received->load() || !result.drained || result.deadlineExpired || result.hadGap || !std::cout ||
             candles->getDiagnostic().code != q::api::ErrorCode::NONE) {
             std::cerr << "Candle subscription failed or received no candles.\n";
 
