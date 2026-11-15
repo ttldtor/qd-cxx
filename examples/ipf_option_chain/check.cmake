@@ -2,7 +2,7 @@ execute_process(COMMAND "${PROGRAM}" RESULT_VARIABLE result OUTPUT_VARIABLE defa
 if(NOT result STREQUAL "0" OR default_help STREQUAL "" OR NOT error STREQUAL "")
     message(FATAL_ERROR "Input-free help failed")
 endif()
-foreach(argument IN ITEMS --help --help-ru)
+foreach(argument IN ITEMS --help)
     execute_process(COMMAND "${PROGRAM}" "${argument}" RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE error
         TIMEOUT 5)
     if(NOT result STREQUAL "0" OR output STREQUAL "" OR NOT error STREQUAL "")

@@ -20,7 +20,7 @@ The executable is `qdcxx-distribution` on Linux and `qdcxx-distribution.exe` on 
 4. Wait for `ADD Quote`, `ADD TimeAndSale` and `ADD Order` in the source terminal. Enter `QUOTE`, then `EVENTS` and `REMOVE`. The clients print the bid price, each sale occurrence, and the order index and event flags.
 5. Enter `CLEAR` on a client to withdraw its subscriptions. The source reports REMOVE when the last client withdraws a symbol. Enter `STOP` or send EOF in each terminal to close that role.
 
-`SENT` means local publication admission. Event lines at the clients confirm actual callbacks. The sample shows DEFAULT-source Order. Feed can also derive Order events from Quote. Enter `STATS` in any role for a local observation of connections, demand and pending work. `sentFrames` counts complete DATA frames accepted by the local socket. The server also reports upstream connection state and its last diagnostic stage. Use `--help` or `--help-ru` for the full command and exit-code list. See the [publisher profile](https://github.com/ttldtor/qd-cxx/blob/master/spec/subscriptions/PUBLISHER.md) for supported layouts and bounds.
+`SENT` means local publication admission. Event lines at the clients confirm actual callbacks. The sample shows DEFAULT-source Order. Feed can also derive Order events from Quote. Enter `STATS` in any role for a local observation of connections, demand and pending work. `sentFrames` counts complete DATA frames accepted by the local socket. The server also reports upstream connection state and its last diagnostic stage. Use `--help` for the full command and exit-code list. See the [publisher profile](https://github.com/ttldtor/qd-cxx/blob/master/spec/subscriptions/PUBLISHER.md) for supported layouts and bounds.
 
 ## Relay a full schema
 

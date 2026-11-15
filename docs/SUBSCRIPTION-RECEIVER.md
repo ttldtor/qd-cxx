@@ -41,7 +41,7 @@ Short executable names below assume the executable is on `PATH`. From its direct
 `./qdcxx-quote-subscription.exe` on Windows or `./qdcxx-quote-subscription` on Linux.
 
 `qdcxx-quote-subscription --help` and no arguments show identical English help without
-schema loading, process bootstrap or networking. `--help-ru` shows Russian help.
+schema loading, process bootstrap or networking.
 To receive from an already running controlled QTP source:
 
 ```text

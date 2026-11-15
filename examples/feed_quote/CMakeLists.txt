@@ -14,7 +14,7 @@ if(NOT CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR AND NOT DEFINED CMAKE_
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
 endif()
 find_package(Threads REQUIRED)
-add_executable(qdcxx_feed_demo main.cpp signal_stop.cpp)
+add_executable(qdcxx_feed_demo main.cpp)
 target_link_libraries(qdcxx_feed_demo PRIVATE qdcxx_feed Threads::Threads)
 target_compile_options(qdcxx_feed_demo PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
 set_target_properties(qdcxx_feed_demo PROPERTIES CXX_EXTENSIONS OFF OUTPUT_NAME qdcxx-feed-demo)

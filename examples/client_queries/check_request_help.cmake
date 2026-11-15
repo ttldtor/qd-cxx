@@ -2,7 +2,7 @@ if(NOT DEFINED PROGRAM)
     message(FATAL_ERROR "PROGRAM is required")
 endif()
 
-foreach(argument IN ITEMS none --help --help-ru)
+foreach(argument IN ITEMS none --help)
     set(command "${PROGRAM}")
     if(NOT argument STREQUAL "none")
         list(APPEND command "${argument}")

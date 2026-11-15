@@ -26,16 +26,6 @@ int main(int argc, char **argv) {
         return std::cout ? 0 : 1;
     }
 
-    if (argc == 2 && std::string_view(argv[1]) == "--help-ru") {
-        std::cout
-            << "Использование: qdcxx-last-quote АДРЕС СИМВОЛ\n"
-               "Запрашивает одну котировку Quote по QTP/TCP за десять секунд и выводит bid и ask.\n"
-               "Справка не открывает соединение. Запрос открывает одно соединение и закрывает его после ответа.\n"
-               "Коды: 0 справка или готовый запрос, 1 ошибка запроса, таймаута или вывода, 2 неверные аргументы.\n";
-
-        return std::cout ? 0 : 1;
-    }
-
     if (argc != 3) {
         std::cerr << "Expected an address and a symbol.\n";
 

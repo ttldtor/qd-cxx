@@ -13,7 +13,7 @@ Day boundaries and ordered Session records. It terminates without a worker or ma
 ```
 
 On Linux use `./build/examples/schedule_queries/qdcxx-schedule-queries --run --data /opt/sdk/share/qdcxx/time-zone-data/tzdb-2026f`.
-No arguments, `--help` and `--help-ru` perform no file/native work. The only workload syntax is
+No arguments, `--help` perform no file/native work. The only workload syntax is
 `--run --data ABSOLUTE_DIRECTORY`; the fixed date/venue and raw-reference instant are deterministic
 example inputs. The exact versioned installed data subtree can be copied beside an application or
 relocated with its SDK prefix; pass the resulting absolute directory explicitly. Windows uses wide

@@ -17,6 +17,6 @@ build/on-demand/qdcxx-on-demand --run
 
 On Windows use a qualified compiler terminal and qdcxx-on-demand.exe. On Linux use the same compiler, runtime and build configuration as the installed SDK. A TLS-enabled SDK can require its qualified OpenSSL root at configure time.
 
-The program prints MOCK bid=12.25 ask=12.5, followed by MOCK bid=13.25 ask=13.5, with the corresponding event times. No arguments or --help print English help without SDK or socket work. --help-ru prints Russian help. Exit code 0 requires two Quotes and a drained endpoint, 1 indicates a source or output failure, and 2 indicates invalid arguments. The 10-second wait and fixture lifetime bound the run. Fixture and SDK workers and their loopback sockets retire before process exit.
+The program prints MOCK bid=12.25 ask=12.5, followed by MOCK bid=13.25 ask=13.5, with the corresponding event times. No arguments or --help print English help without SDK or socket work. Exit code 0 requires two Quotes and a drained endpoint, 1 indicates a source or output failure, and 2 indicates invalid arguments. The 10-second wait and fixture lifetime bound the run. Fixture and SDK workers and their loopback sockets retire before process exit.
 
 This is the finite synthetic IPv4 loopback profile. Provider service access, authentication, encryption and production replay windows have separate qualification. [Feed API guide](https://github.com/ttldtor/qd-cxx/blob/master/docs/FEED-API.md) · [Synthetic fixture details](https://github.com/ttldtor/qd-cxx/blob/master/tools/upstream/ondemand-oracle/README.md)

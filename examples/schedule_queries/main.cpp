@@ -38,17 +38,8 @@ template <class Character> int run(int argc, Character **argv) {
         std::cout
             << "Usage: qdcxx-schedule-queries --run --data ABSOLUTE_TZDB_DIRECTORY\n"
                "Print XNYS day/session values for 2024-11-04 using the pinned installed TZDB profile.\n"
-               "Default: help, no file/native work. --help-ru: Russian help. No downloads or workers.\n"
+               "Default: help, no file/native work. No downloads or workers.\n"
                "Data must be the exact installed tzdb-2026f directory. Exit0 help/success,1 failure,2 arguments.\n";
-
-        return 0;
-    }
-
-    if (argc == 2 && option(argv[1], "--help-ru")) {
-        std::cout << "Использование: qdcxx-schedule-queries --run --data АБСОЛЮТНЫЙ_КАТАЛОГ_TZDB\n"
-                     "Печатает Day/Session XNYS за 2024-11-04 из закреплённого установленного TZDB2026f.\n"
-                     "По умолчанию: справка без файлов и нативной инициализации. Загрузок и фоновых потоков нет.\n"
-                     "Коды:0 справка/успех,1 ошибка данных/запроса,2 неверные параметры.\n";
 
         return 0;
     }

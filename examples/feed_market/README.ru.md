@@ -17,7 +17,6 @@ feed и совместимая конфигурация компилятора �
 ```text
 cmake -S examples/feed_market -B build/feed-market -G Ninja -DCMAKE_PREFIX_PATH=/path/to/qdcxx -DCMAKE_BUILD_TYPE=Release
 cmake --build build/feed-market
-build/feed-market/qdcxx-feed-market --help-ru
 build/feed-market/qdcxx-feed-market --run --duration-ms 10000
 ```
 
@@ -31,7 +30,7 @@ TCP. Параметр `--address HOST:PORT` выбирает совместим�
 соединение не гарантирует события каждого выбранного типа и источника.
 
 Без аргументов и при `--help` программа выводит английскую справку без создания
-SDK runtime и сетевого подключения. `--help-ru` выводит русскую справку. Код 0
+SDK runtime и сетевого подключения. Код 0
 означает получение хотя бы одного события и завершение локального drain, 1 — ошибку
 или отсутствие событий, 2 — неверные аргументы, 130 — прерывание. Интервал задаётся
 в пределах 2–600000 мс, по умолчанию 10000 мс. Ctrl+C инициирует завершение.

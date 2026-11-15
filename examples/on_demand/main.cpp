@@ -18,25 +18,15 @@ constexpr auto START = std::chrono::sys_time{std::chrono::milliseconds{170774820
 constexpr auto WAIT = 10s;
 
 /** Show help without creating the SDK or a socket.
- * @param russian Select the Russian translation.
  * @return Zero on successful output, otherwise one.
  */
-int help(bool russian) {
-    if (russian) {
-        std::cout << "Использование: qdcxx-on-demand --run\n"
-                     "Локальный синтетический OnDemand replay для MOCK с паузой и возобновлением.\n"
-                     "--help и --help-ru показывают справку без запуска SDK и сети.\n"
-                     "Создаёт локальный IPv4 loopback-сервер и SDK worker; данные вымышленные.\n"
-                     "Аккаунт не нужен, ожидание ограничено 10 секундами.\n"
-                     "Коды: 0 — две котировки и штатное завершение; 1 — ошибка; 2 — аргументы.\n";
-    } else {
-        std::cout << "Usage: qdcxx-on-demand --run\n"
-                     "Replay synthetic MOCK quotes from a local OnDemand fixture with pause and resume.\n"
-                     "--help and --help-ru print help without starting the SDK or networking.\n"
-                     "Creates an IPv4 loopback fixture server and SDK worker; all data is synthetic.\n"
-                     "No account is required; the wait is limited to 10 seconds.\n"
-                     "Exit codes: 0 — two quotes and clean retirement; 1 — failure; 2 — invalid arguments.\n";
-    }
+int help() {
+    std::cout << "Usage: qdcxx-on-demand --run\n"
+                 "Replay synthetic MOCK quotes from a local OnDemand fixture with pause and resume.\n"
+                 "--help prints help without starting the SDK or networking.\n"
+                 "Creates an IPv4 loopback fixture server and SDK worker; all data is synthetic.\n"
+                 "No account is required; the wait is limited to 10 seconds.\n"
+                 "Exit codes: 0 — two quotes and clean retirement; 1 — failure; 2 — invalid arguments.\n";
 
     std::cout.flush();
 
@@ -51,11 +41,7 @@ int help(bool russian) {
  */
 int main(int argc, char **argv) {
     if (argc == 1 || (argc == 2 && std::string_view(argv[1]) == "--help")) {
-        return help(false);
-    }
-
-    if (argc == 2 && std::string_view(argv[1]) == "--help-ru") {
-        return help(true);
+        return help();
     }
 
     if (argc != 2 || std::string_view(argv[1]) != "--run") {

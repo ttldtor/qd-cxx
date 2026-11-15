@@ -24,7 +24,7 @@
 - [Запросить текущие и исторические данные](examples/client_queries/README.ru.md): последний Quote, историю Candle и снимок книги заявок.
 - [Получать несколько типов событий](examples/feed_market/README.ru.md) с региональными символами и явным источником Order.
 - [Получать профили инструментов](examples/ipf_live/README.ru.md) или [построить модели офлайн](examples/client_models/README.ru.md).
-- [Запустить источник, ретранслятор и клиенты](examples/feed_distribution/README.ru.md) в локальной сети QTP.
+- [Запустить интеграционный стенд](examples/feed_distribution/README.ru.md) с источником, ретранслятором и клиентами в локальной сети QTP.
 
 [Текущие возможности](docs/CURRENT-STATE.ru.md) определяют реализованные профили.
 Независимый [API правил расписаний](docs/SCHEDULE-RULES.ru.md) разбирает trading hours с явными календарными контекстами.

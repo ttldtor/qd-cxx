@@ -10,21 +10,14 @@
 
 namespace {
 
-/** Print input-free help in the selected language.
- * @param russian True for Russian output.
+/** Print input-free help.
  * @return Zero on successful output, one on output failure.
  */
-int printHelp(bool russian) {
-    if (russian)
-        std::cout << "Использование: qdcxx-ipf-option-chain ФАЙЛ БАЗОВЫЙ_АКТИВ\n"
-                     "Читает локальный IPF в UTF-8 с ##COMPLETE и выводит серии опционов и страйки.\n"
-                     "Базовый актив задаётся точным ASCII-символом. Справка не читает файл.\n"
-                     "Коды: 0 успех, 1 ошибка чтения, построения или вывода, 2 неверные аргументы.\n";
-    else
-        std::cout << "Usage: qdcxx-ipf-option-chain FILE UNDERLYING\n"
-                     "Read a local UTF-8 IPF file with ##COMPLETE and print option series and strikes.\n"
-                     "Use an exact ASCII underlying symbol. Help does not open an input file.\n"
-                     "Exit codes: 0 success, 1 read, build or output failure, 2 invalid arguments.\n";
+int printHelp() {
+    std::cout << "Usage: qdcxx-ipf-option-chain FILE UNDERLYING\n"
+                 "Read a local UTF-8 IPF file with ##COMPLETE and print option series and strikes.\n"
+                 "Use an exact ASCII underlying symbol. Help does not open an input file.\n"
+                 "Exit codes: 0 success, 1 read, build or output failure, 2 invalid arguments.\n";
 
     return std::cout ? 0 : 1;
 }
@@ -40,10 +33,7 @@ int main(int argc, char **argv) {
     namespace ipf = org::ttldtor::qdcxx::ipf;
 
     if (argc == 1 || (argc == 2 && std::string_view(argv[1]) == "--help"))
-        return printHelp(false);
-
-    if (argc == 2 && std::string_view(argv[1]) == "--help-ru")
-        return printHelp(true);
+        return printHelp();
 
     if (argc != 3) {
         std::cerr << "Expected a file path and an underlying symbol.\n";
