@@ -109,7 +109,7 @@ else()
         if(line MATCHES "[\r\n]")
             fail("CR/LF-containing filenames are unsupported")
         endif()
-        if(line MATCHES "^(include/.*\\.hpp|src/.*\\.cpp|src/(api/(callback_execution|endpoint_configuration|feed_internal|subscription_observer|feed_filter_(coordinates|expression|ipf_config))|transport/(aggregation|callback_retirement)|client/endpoint_host|detail/qd_time_period)\\.hpp|tests/conformance/.*\\.cpp|examples/(subscriptions|feed_quote|feed_option_quotes|feed_market_depth|feed_token_refresh|feed_reconnect|feed_candle|feed_market|feed_distribution|on_demand|ipf_option_chain|event_text|ipf_live)/.*\\.(cpp|hpp)|tools/nettest/event_main[.]cpp|tools/(qtp-inspect|tape-inspect|tape-write|subscribe|dev|kraken)/.*\\.(cpp|hpp))$"
+        if(line MATCHES "^(include/.*\\.hpp|src/.*\\.cpp|src/(api/(callback_execution|endpoint_configuration|feed_internal|subscription_observer|feed_filter_(coordinates|expression|ipf_config))|transport/(aggregation|callback_retirement)|client/endpoint_host|detail/qd_time_period|mux/queue_schedule)\\.hpp|tests/conformance/.*\\.cpp|examples/(subscriptions|feed_quote|feed_option_quotes|feed_market_depth|feed_token_refresh|feed_reconnect|feed_candle|feed_market|feed_distribution|on_demand|ipf_option_chain|event_text|ipf_live)/.*\\.(cpp|hpp)|tools/nettest/event_main[.]cpp|tools/(qtp-inspect|tape-inspect|tape-write|subscribe|dev|kraken)/.*\\.(cpp|hpp))$"
             AND NOT line MATCHES "(^|/)(upstream|generated|fixtures)/")
             jsonString(quoted "${line}")
             string(JSON selected SET "${selected}" ${index} "${quoted}")

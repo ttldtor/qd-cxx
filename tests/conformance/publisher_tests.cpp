@@ -915,12 +915,33 @@ TEST_CASE("remote QTP publisher reconciles overlapping demand across source gene
     CHECK((*relay)->getDiagnostic().code == q::api::ErrorCode::NONE);
 }
 
+TEST_CASE("typed publisher funds TICKER mapping at the maximum peer capacity") {
+    auto bootstrap = q::transport::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    q::api::PublisherOptions options;
+    options.mixed = true;
+    options.listener.maxConnections = 8;
+    auto server = q::api::PublisherEndpoint::create(*bootstrap, options);
+    requireServer(server);
+    DemandPeer peer((*server)->port(), asio::ip::address_v4::loopback());
+    peer.subscribe(q::protocol::SubscriptionMessage::TICKER_ADD, 0, u"IBM");
+    REQUIRE((*server)->awaitDemand(q::core::SubscriptionFamily::TICKER, u"Quote", u"IBM", true, Clock::now() + 5s));
+
+    REQUIRE((*server)->getPublisher().publish(makeQuote()));
+    constexpr auto tickerData = static_cast<std::int32_t>(q::protocol::LiveDataMessage::TICKER_DATA);
+    REQUIRE(peer.waitForFrame(tickerData, Clock::now() + 3s));
+
+    (*server)->closeAndAwaitTermination();
+    CHECK((*server)->getDiagnostic().code == q::api::ErrorCode::NONE);
+}
+
 TEST_CASE("typed publisher drains a STREAM burst without one timed wait per record") {
     constexpr auto count = 384;
     auto bootstrap = q::transport::RuntimeBootstrap::create();
     REQUIRE(bootstrap);
     q::api::PublisherOptions options;
     options.mixed = true;
+    options.listener.maxConnections = 8;
     options.pendingQuotes = count;
     auto server = q::api::PublisherEndpoint::create(*bootstrap, options);
     requireServer(server);

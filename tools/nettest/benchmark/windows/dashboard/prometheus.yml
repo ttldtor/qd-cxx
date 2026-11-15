@@ -1,0 +1,7 @@
+global:
+  scrape_interval: 5s
+scrape_configs:
+  - job_name: nettest
+    honor_labels: true
+    static_configs:
+      - targets: ['pushgateway:9091']

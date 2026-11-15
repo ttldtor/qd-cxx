@@ -29,6 +29,7 @@ import java.util.concurrent.locks.LockSupport;
 public final class StreamReceiver {
   private static final String QD_VERSION = "QDS-3.357";
   private static final long IDLE_NANOS = TimeUnit.SECONDS.toNanos(15);
+  private static final long PROBE_STARTUP_NANOS = TimeUnit.SECONDS.toNanos(75);
   private static final long FINAL_DRAIN_NANOS = TimeUnit.SECONDS.toNanos(5);
   private static final long POLL_NANOS = TimeUnit.MILLISECONDS.toNanos(20);
   private static final int MAX_CHUNK = 4096;
@@ -36,8 +37,18 @@ public final class StreamReceiver {
   private static final int SEQUENCE_MASK = (1 << SEQUENCE_BITS) - 1;
   private static final int FIELD_SPREAD = 120;
   private static final int WIDE_DECIMAL_INTEGER_RANK = 128;
-  private static final int MIN_BUCKET_MS = -1000;
-  private static final int MAX_BUCKET_MS = 30_000;
+  private static final long NANOS_PER_MILLI = 1_000_000L;
+  private static final long NANOS_PER_SECOND = 1_000_000_000L;
+  private static final long FINE_MIN_NANOS = -10_000_000L;
+  private static final long FINE_MAX_NANOS = 100_000_000L;
+  private static final long FINE_STEP_NANOS = 1_000L;
+  private static final long MIN_NANOS = -NANOS_PER_SECOND;
+  private static final long MAX_NANOS = 30 * NANOS_PER_SECOND;
+  private static final int LOWER_BUCKETS = (int) ((FINE_MIN_NANOS - MIN_NANOS) / NANOS_PER_MILLI);
+  private static final int FINE_BUCKETS =
+      (int) ((FINE_MAX_NANOS - FINE_MIN_NANOS) / FINE_STEP_NANOS);
+  private static final int UPPER_BUCKETS =
+      (int) ((MAX_NANOS - FINE_MAX_NANOS) / NANOS_PER_MILLI) + 1;
 
   private StreamReceiver() {}
 
@@ -46,22 +57,32 @@ public final class StreamReceiver {
    * on stdin after the producer exits.
    */
   public static void main(String[] args) throws IOException, InterruptedException {
-    if (args.length != 2 || !args[0].matches("127\\.0\\.0\\.1:[0-9]{1,5}") || args[1].isEmpty()) {
-      throw new IllegalArgumentException("Usage: StreamReceiver 127.0.0.1:PORT SYMBOL");
+    if ((args.length != 2 && args.length != 4 && args.length != 5)
+        || !args[0].matches("[0-9]{1,3}(\\.[0-9]{1,3}){3}:[0-9]{1,5}")
+        || args[1].isEmpty()
+        || (args.length >= 4 && !args[2].equals("stream") && !args[2].equals("ticker"))
+        || (args.length >= 4 && !args[3].equals("ns") && !args[3].equals("ms"))
+        || (args.length == 5 && !args[4].equals("probe"))) {
+      throw new IllegalArgumentException(
+          "Usage: StreamReceiver HOST:PORT SYMBOL [stream|ticker ns|ms [probe]]");
     }
+    boolean ticker = args.length >= 4 && args[2].equals("ticker");
+    boolean nanos = args.length >= 4 && args[3].equals("ns");
+    boolean probe = args.length == 5;
+    QDContract contract = ticker ? QDContract.TICKER : QDContract.STREAM;
     try (QDEndpoint endpoint =
         QDEndpoint.newBuilder()
             .withName("stream-benchmark")
-            .withCollectors(Collections.singletonList(QDContract.STREAM))
+            .withCollectors(Collections.singletonList(contract))
             .build()) {
       String version = QDFactory.getVersion();
       if (!QD_VERSION.equals(version)) {
         throw new IllegalStateException("Expected Java QD " + QD_VERSION + ", got " + version);
       }
-      DataRecord record = endpoint.getScheme().findRecordByName("TimeAndSale");
+      DataRecord record = endpoint.getScheme().findRecordByName(ticker ? "Quote" : "TimeAndSale");
       int cipher = endpoint.getScheme().getCodec().encode(args[1]);
-      Observation observation = new Observation(record, cipher, args[1]);
-      QDAgent agent = endpoint.getStream().agentBuilder().build();
+      Observation observation = new Observation(record, cipher, args[1], ticker, nanos, probe);
+      QDAgent agent = (ticker ? endpoint.getTicker() : endpoint.getStream()).agentBuilder().build();
       try {
         subscribe(agent, record, cipher, args[1]);
         Thread receiver = Thread.currentThread();
@@ -81,7 +102,8 @@ public final class StreamReceiver {
           // Drain any records queued before connector shutdown.
         }
         observation.writeResult(version, expected);
-        if (observation.count != expected
+        if ((!ticker && observation.count != expected)
+            || (ticker && observation.lastSequence != expected)
             || observation.sequenceErrors != 0
             || observation.fieldErrors != 0
             || observation.latency.samples != observation.count) {
@@ -144,9 +166,15 @@ public final class StreamReceiver {
     long expected = 0;
     long controlStart = 0;
     long start = System.nanoTime();
+    long startupLimit = observation.probeEnabled ? PROBE_STARTUP_NANOS : IDLE_NANOS;
+    boolean connected = false;
     while (true) {
       boolean pending = observation.retrieve(agent);
       long now = System.nanoTime();
+      if (!connected && connector.getState() == MessageConnectorState.CONNECTED) {
+        connected = true;
+        System.out.println("CONNECTED");
+      }
       if (expected == 0 && expectedInput.isDone()) {
         expected = expectedInput.join();
         controlStart = now;
@@ -158,7 +186,9 @@ public final class StreamReceiver {
         if (now - controlStart >= FINAL_DRAIN_NANOS) {
           throw new IllegalStateException("Source connection or pending records did not drain");
         }
-      } else if (now - (observation.count == 0 ? start : observation.lastArrival) >= IDLE_NANOS) {
+      } else if (observation.count == 0
+          ? now - start >= startupLimit
+          : now - observation.lastArrival >= IDLE_NANOS) {
         throw new IllegalStateException("Timed out waiting for data or the producer's final count");
       }
       if (!pending) {
@@ -183,33 +213,65 @@ public final class StreamReceiver {
     private final DataRecord record;
     private final int cipher;
     private final String symbol;
-    private final int time, sequence, exchange, tradeId, price, size, bid, ask, conditions, flags;
+    private final boolean ticker;
+    private final boolean nanos;
+    private final boolean probeEnabled;
+    private boolean expectingProbe;
+    private final int time,
+        sequence,
+        nano,
+        exchange,
+        tradeId,
+        price,
+        size,
+        bid,
+        ask,
+        conditions,
+        flags;
+    private final int askTime, askExchange, bidSize, askSize;
     private final Latency latency = new Latency();
     private long count;
+    private long lastSequence;
     private long sequenceErrors;
     private long fieldErrors;
+    private long nonzeroNanoParts;
     private long firstArrival;
     private long lastArrival;
     private long chunkArrival;
     private int chunkRecords;
 
-    Observation(DataRecord record, int cipher, String symbol) {
+    Observation(
+        DataRecord record,
+        int cipher,
+        String symbol,
+        boolean ticker,
+        boolean nanos,
+        boolean probe) {
       if (record == null) {
         throw new IllegalStateException("QD scheme is missing TimeAndSale");
       }
       this.record = record;
       this.cipher = cipher;
       this.symbol = symbol;
-      time = findInt(record, "Time", false);
+      this.ticker = ticker;
+      this.nanos = nanos;
+      this.probeEnabled = probe;
+      this.expectingProbe = probe;
+      time = findInt(record, ticker ? "Bid.Time" : "Time", false);
       sequence = findInt(record, "Sequence", false);
-      exchange = findInt(record, "Exchange", false);
-      tradeId = findInt(record, "TradeId", true);
-      price = findInt(record, "Price", true);
-      size = findInt(record, "Size", true);
+      nano = nanos ? findInt(record, "TimeNanoPart", false) : -1;
+      exchange = findInt(record, ticker ? "Bid.Exchange" : "Exchange", false);
+      tradeId = ticker ? -1 : findInt(record, "TradeId", true);
+      price = ticker ? -1 : findInt(record, "Price", true);
+      size = ticker ? -1 : findInt(record, "Size", true);
       bid = findInt(record, "Bid.Price", true);
       ask = findInt(record, "Ask.Price", true);
-      conditions = findInt(record, "ExchangeSaleConditions", false);
-      flags = findInt(record, "Flags", false);
+      conditions = ticker ? -1 : findInt(record, "ExchangeSaleConditions", false);
+      flags = ticker ? -1 : findInt(record, "Flags", false);
+      askTime = ticker ? findInt(record, "Ask.Time", false) : -1;
+      askExchange = ticker ? findInt(record, "Ask.Exchange", false) : -1;
+      bidSize = ticker ? findInt(record, "Bid.Size", true) : -1;
+      askSize = ticker ? findInt(record, "Ask.Size", true) : -1;
     }
 
     boolean retrieve(QDAgent agent) {
@@ -227,11 +289,6 @@ public final class StreamReceiver {
       if (chunkRecords++ == 0) {
         chunkArrival = System.nanoTime();
       }
-      if (++count == 1) {
-        firstArrival = chunkArrival;
-        System.out.println("ACTIVE");
-      }
-      lastArrival = chunkArrival;
       if (cursor.getRecord() != record
           || cursor.getCipher() != cipher
           || (cipher == 0 && !symbol.equals(cursor.getSymbol()))) {
@@ -239,65 +296,113 @@ public final class StreamReceiver {
         return;
       }
       int wireSequence = cursor.getInt(sequence);
-      if ((wireSequence & SEQUENCE_MASK) != (count & SEQUENCE_MASK)) {
+      long generation = wireSequence & SEQUENCE_MASK;
+      if (probeEnabled && generation == 0 && count == 0) {
+        if (expectingProbe) {
+          expectingProbe = false;
+          System.out.println("PROBE_RECEIVED");
+        }
+        return;
+      }
+      if (expectingProbe) {
+        throw new IllegalStateException("Received workload before probe");
+      }
+      if (++count == 1) {
+        firstArrival = chunkArrival;
+        System.out.println("ACTIVE");
+      }
+      lastArrival = chunkArrival;
+      if ((ticker && generation <= lastSequence) || (!ticker && generation != count)) {
         sequenceErrors++;
       }
+      lastSequence = generation;
       int millis = wireSequence >>> SEQUENCE_BITS;
-      if (millis < 1000) {
-        latency.add(Instant.now().toEpochMilli() - (cursor.getInt(time) * 1000L + millis));
+      int subMilli = nanos ? cursor.getInt(nano) : 0;
+      if (nanos && subMilli != 0) {
+        nonzeroNanoParts++;
       }
-      if (millis >= 1000
-          || cursor.getInt(exchange) != 'A' + generated(2) % 26
-          || cursor.getLong(tradeId) != generated(3)
-          || cursor.getLong(price) != wideDecimal(4)
-          || cursor.getLong(size) != wideDecimal(5)
-          || cursor.getLong(bid) != wideDecimal(6)
-          || cursor.getLong(ask) != wideDecimal(7)
-          || cursor.getInt(conditions) != generated(8)
-          || cursor.getInt(flags) != generated(9)) {
+      if (millis < 1000 && subMilli >= 0 && subMilli < NANOS_PER_MILLI) {
+        Instant now = Instant.now();
+        long arrivalNanos = now.getEpochSecond() * NANOS_PER_SECOND + now.getNano();
+        long sourceNanos =
+            cursor.getInt(time) * NANOS_PER_SECOND + millis * NANOS_PER_MILLI + subMilli;
+        latency.add(arrivalNanos - sourceNanos);
+      }
+      boolean badFields =
+          ticker
+              ? cursor.getInt(askTime) != cursor.getInt(time)
+                  || cursor.getInt(exchange) != 'A' + generated(generation, 1) % 26
+                  || cursor.getInt(askExchange) != 'A' + generated(generation, 5) % 26
+                  || cursor.getLong(bid) != wideDecimal(generation, 2)
+                  || cursor.getLong(bidSize) != wideDecimal(generation, 3)
+                  || cursor.getLong(ask) != wideDecimal(generation, 6)
+                  || cursor.getLong(askSize) != wideDecimal(generation, 7)
+              : cursor.getInt(exchange) != 'A' + generated(generation, 2) % 26
+                  || cursor.getLong(tradeId) != generated(generation, 3)
+                  || cursor.getLong(price) != wideDecimal(generation, 4)
+                  || cursor.getLong(size) != wideDecimal(generation, 5)
+                  || cursor.getLong(bid) != wideDecimal(generation, 6)
+                  || cursor.getLong(ask) != wideDecimal(generation, 7)
+                  || cursor.getInt(conditions) != generated(generation, 8)
+                  || cursor.getInt(flags) != generated(generation, 9);
+      if (millis >= 1000 || subMilli < 0 || subMilli >= NANOS_PER_MILLI || badFields) {
         fieldErrors++;
       }
     }
 
-    private int generated(int index) {
+    private int generated(long generation, int index) {
       // The producer uses physical wire-field order, which excludes QD's long-field placeholders.
-      return (int) ((count + index) % FIELD_SPREAD) + 1;
+      return (int) ((generation + index) % FIELD_SPREAD) + 1;
     }
 
-    private int wideDecimal(int index) {
-      return (generated(index) << 8) | WIDE_DECIMAL_INTEGER_RANK;
+    private int wideDecimal(long generation, int index) {
+      return (generated(generation, index) << 8) | WIDE_DECIMAL_INTEGER_RANK;
     }
 
     void writeResult(String version, long expected) {
       double elapsed = (lastArrival - firstArrival) / (double) TimeUnit.SECONDS.toNanos(1);
       System.out.printf(
           Locale.ROOT,
-          "RESULT {\"qdVersion\":\"%s\",\"expected\":%d,\"delivered\":%d,"
+          "RESULT {\"qdVersion\":\"%s\",\"expected\":%d,\"delivered\":%d,\"lastSequence\":%d,"
+              + "\"precision\":\"%s\",\"latencyFineResolutionNs\":1000,\"nonzeroNanoParts\":%d,"
               + "\"sequenceErrors\":%d,\"fieldErrors\":%d,\"elapsedSeconds\":%.9f,"
               + "\"latencySamples\":%d,\"latencyMinMs\":%s,\"latencyP50Ms\":%s,"
               + "\"latencyP95Ms\":%s,\"latencyP99Ms\":%s,\"latencyMaxMs\":%s,"
               + "\"negativeLatencySamples\":%d,\"latencyBelowRange\":%d,"
-              + "\"latencyAboveRange\":%d}%n",
+              + "\"latencyAboveRange\":%d,\"latencyMinNs\":%s,\"latencyP50Ns\":%s,"
+              + "\"latencyP95Ns\":%s,\"latencyP99Ns\":%s,\"latencyMaxNs\":%s}%n",
           version,
           expected,
           count,
+          lastSequence,
+          nanos ? "ns" : "ms",
+          nonzeroNanoParts,
           sequenceErrors,
           fieldErrors,
           elapsed,
           latency.samples,
+          latency.samples == 0
+              ? "null"
+              : Long.toString(Math.floorDiv(latency.min, NANOS_PER_MILLI)),
+          latency.percentileMillis(50),
+          latency.percentileMillis(95),
+          latency.percentileMillis(99),
+          latency.samples == 0
+              ? "null"
+              : Long.toString(Math.floorDiv(latency.max, NANOS_PER_MILLI)),
+          latency.negative,
+          latency.below,
+          latency.above,
           latency.samples == 0 ? "null" : Long.toString(latency.min),
           latency.percentile(50),
           latency.percentile(95),
           latency.percentile(99),
-          latency.samples == 0 ? "null" : Long.toString(latency.max),
-          latency.negative,
-          latency.below,
-          latency.above);
+          latency.samples == 0 ? "null" : Long.toString(latency.max));
     }
   }
 
   private static final class Latency {
-    private final long[] histogram = new long[MAX_BUCKET_MS - MIN_BUCKET_MS + 1];
+    private final long[] histogram = new long[LOWER_BUCKETS + FINE_BUCKETS + UPPER_BUCKETS];
     private long samples;
     private long min = Long.MAX_VALUE;
     private long max = Long.MIN_VALUE;
@@ -312,13 +417,28 @@ public final class StreamReceiver {
       if (value < 0) {
         negative++;
       }
-      if (value < MIN_BUCKET_MS) {
+      if (value < MIN_NANOS) {
         below++;
-      } else if (value > MAX_BUCKET_MS) {
+      } else if (value > MAX_NANOS) {
         above++;
       } else {
-        histogram[(int) value - MIN_BUCKET_MS]++;
+        int index;
+        if (value < FINE_MIN_NANOS) {
+          index = (int) ((value - MIN_NANOS) / NANOS_PER_MILLI);
+        } else if (value < FINE_MAX_NANOS) {
+          index = LOWER_BUCKETS + (int) ((value - FINE_MIN_NANOS) / FINE_STEP_NANOS);
+        } else {
+          index = LOWER_BUCKETS + FINE_BUCKETS + (int) ((value - FINE_MAX_NANOS) / NANOS_PER_MILLI);
+        }
+        histogram[index]++;
       }
+    }
+
+    String percentileMillis(int percent) {
+      String value = percentile(percent);
+      return value.equals("null")
+          ? value
+          : Long.toString(Math.floorDiv(Long.parseLong(value), NANOS_PER_MILLI));
     }
 
     String percentile(int percent) {
@@ -330,7 +450,15 @@ public final class StreamReceiver {
       for (int index = 0; index < histogram.length; index++) {
         cumulative += histogram[index];
         if (cumulative >= rank) {
-          return Integer.toString(index + MIN_BUCKET_MS);
+          long value;
+          if (index < LOWER_BUCKETS) {
+            value = MIN_NANOS + index * NANOS_PER_MILLI;
+          } else if (index < LOWER_BUCKETS + FINE_BUCKETS) {
+            value = FINE_MIN_NANOS + (index - LOWER_BUCKETS) * FINE_STEP_NANOS;
+          } else {
+            value = FINE_MAX_NANOS + (index - LOWER_BUCKETS - FINE_BUCKETS) * NANOS_PER_MILLI;
+          }
+          return Long.toString(value);
         }
       }
       throw new IllegalStateException("Latency histogram did not reconcile");

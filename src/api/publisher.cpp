@@ -4,6 +4,7 @@
 #include "qd/api/publisher.hpp"
 
 #include "../mux/queue_replace.hpp"
+#include "../mux/queue_schedule.hpp"
 #include "../protocol/local_event_owner.hpp"
 #include "../transport/raw_byte_owner.hpp"
 #include "qd/events/event_flags.hpp"
@@ -417,6 +418,8 @@ mux::QueueWork serverQueueTurn(std::size_t peers, bool remote, bool catalog, std
                                std::size_t records) noexcept {
     auto work = queueTurn();
     const auto keys = peers * CLIENT_KEYS;
+    // A mapping rebuild prepays the full key-pair comparison bound in QueueWork, not MuxWork.
+    work.textUnits += keys * keys * SYMBOL_UNITS;
     // MuxState reserves against both possible maps and all input rows before a command.
     constexpr std::size_t INTEREST_PASSES = 32;
     const auto interestVisits =
@@ -2294,7 +2297,11 @@ class PublisherServer {
         progressPolicy(port);
         progressPeers();
         WorkSet work{};
-        constexpr std::size_t QUEUE_ACTIONS = 16;
+        constexpr std::size_t DEFAULT_QUEUE_ACTIONS = 16;
+        const bool typed = !port.remote && !port.localRecords;
+        // A sequence of IDLE visits may end before the next runnable slot, or before source admission reopens.
+        const auto queueActions =
+            typed ? std::max(DEFAULT_QUEUE_ACTIONS, mux::detail::QUEUE_PHASES * peers_.size()) : DEFAULT_QUEUE_ACTIONS;
         bool advanced = false;
 
         for (std::size_t family = 0; family < familyCount_; ++family) {
@@ -2303,7 +2310,7 @@ class PublisherServer {
             turn = serverQueueTurn(peers_.size(), sourceOptions_.has_value(), !catalogNames_.empty(), familyCount_,
                                    recordIds_.size());
 
-            for (std::size_t i = 0; i < QUEUE_ACTIONS; ++i) {
+            for (std::size_t i = 0; i < queueActions; ++i) {
                 const auto moved = queue.progress(turn);
 
                 if (!moved) {
@@ -2361,7 +2368,7 @@ class PublisherServer {
         }
 
         // Peer output runs before queue routing. Give newly routed records a send turn without a timer wait.
-        return !port.remote && !port.localRecords && advanced;
+        return typed && advanced;
     }
 
     /** Poll socket readiness on the existing cadence when a typed publication cannot advance locally.
