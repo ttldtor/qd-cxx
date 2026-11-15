@@ -6,6 +6,7 @@
 param(
     [string]$Program,
     [string]$Bundle,
+    [ValidateSet('Record', 'Event')][string]$ProducerKind = 'Record',
     [string]$Java,
     [string]$Classpath,
     [string]$OutputDirectory,
@@ -20,6 +21,7 @@ $ErrorActionPreference = 'Stop'
 if ($HelpRu) {
     Write-Output 'Использование: Measure-Stream.ps1 -Program ФАЙЛ -Bundle КАТАЛОГ -Java ФАЙЛ -Classpath QD357 -OutputDirectory НОВЫЙ_КАТАЛОГ'
     Write-Output 'Сверяет IBM TimeAndSale/STREAM с QD 3.357 на IPv4 loopback. Нужен JDK с javac.'
+    Write-Output 'Для qdcxx-event-nettest укажите -ProducerKind Event, без -Bundle и с -Batch 1.'
     Write-Output 'Параметры: -Duration 10 (1..300 с), -Rate 1000 (записей/с), -Batch 1 (1..32). Нагрузка должна укладываться в 22 бит.'
     Write-Output 'Сохраняет JSON, замеры процессов и журналы в новом каталоге. Завершает только свои дочерние процессы.'
     Write-Output 'Код 0 — доставка и сверка успешны, 1 — ошибка аргументов, сборки, замера или доставки.'
@@ -28,6 +30,7 @@ if ($HelpRu) {
 if ($Help -or !$PSBoundParameters.Count) {
     Write-Output 'Usage: Measure-Stream.ps1 -Program FILE -Bundle DIR -Java FILE -Classpath QD357 -OutputDirectory NEW_DIR'
     Write-Output 'Verify IBM TimeAndSale/STREAM on IPv4 loopback with Java QD 3.357. Requires a JDK with javac.'
+    Write-Output 'For qdcxx-event-nettest, pass -ProducerKind Event with -Batch 1 and omit -Bundle.'
     Write-Output 'Options: -Duration 10 (1..300 seconds), -Rate 1000 (records/sec), -Batch 1 (1..32).'
     Write-Output 'Offered records plus one batch must fit the 22-bit sequence range.'
     Write-Output 'Writes JSON, process samples and logs to a new directory. Stops its own child processes.'
@@ -35,8 +38,11 @@ if ($Help -or !$PSBoundParameters.Count) {
     exit 0
 }
 
-if (!$Program -or !$Bundle -or !$Java -or !$Classpath -or !$OutputDirectory) {
-    throw 'Supply Program, Bundle, Java, Classpath and OutputDirectory. Use -Help for details.'
+if (!$Program -or !$Java -or !$Classpath -or !$OutputDirectory) {
+    throw 'Supply Program, Java, Classpath and OutputDirectory. Use -Help for details.'
+}
+if (($ProducerKind -eq 'Record' -and !$Bundle) -or ($ProducerKind -eq 'Event' -and ($Bundle -or $Batch -ne 1))) {
+    throw 'Record mode requires a bundle. Event mode requires batch 1 and uses the built-in schema.'
 }
 $sequenceLimit = 1 -shl 22
 if ([long]$Duration * $Rate + $Batch -ge $sequenceLimit) {
@@ -44,17 +50,24 @@ if ([long]$Duration * $Rate + $Batch -ge $sequenceLimit) {
 }
 
 $Program = (Resolve-Path -LiteralPath $Program).Path
-$Bundle = (Resolve-Path -LiteralPath $Bundle).Path
 $Java = (Resolve-Path -LiteralPath $Java).Path
+if ($ProducerKind -eq 'Record') {
+    $Bundle = (Resolve-Path -LiteralPath $Bundle).Path
+}
 $javacName = if ($IsWindows) { 'javac.exe' } else { 'javac' }
 $javac = (Resolve-Path -LiteralPath (Join-Path (Split-Path $Java) $javacName)).Path
 if (Test-Path -LiteralPath $OutputDirectory) { throw 'OutputDirectory must be new.' }
 $output = (New-Item -Path $OutputDirectory -ItemType Directory).FullName
 $classes = (New-Item -Path (Join-Path $output 'classes') -ItemType Directory).FullName
-$schema = Join-Path $Bundle 'schema.json'
-$provenance = Join-Path $Bundle 'provenance.json'
-$schemaHash = (Get-FileHash -LiteralPath $schema).Hash
-$provenanceHash = (Get-FileHash -LiteralPath $provenance).Hash
+$producerArgs = @('p', '--port', '0', '--duration', "$Duration", '--rate', "$Rate",
+    '--batch', "$Batch", '--startup', '25', '--record', 'TimeAndSale', '--symbol', 'IBM', '--contract', 'stream')
+$schemaHash = $null
+$provenanceHash = $null
+if ($ProducerKind -eq 'Record') {
+    $producerArgs += @('--bundle', $Bundle)
+    $schemaHash = (Get-FileHash -LiteralPath (Join-Path $Bundle 'schema.json')).Hash
+    $provenanceHash = (Get-FileHash -LiteralPath (Join-Path $Bundle 'provenance.json')).Hash
+}
 $PSNativeCommandUseErrorActionPreference = $false
 & $javac -cp $Classpath -d $classes (Join-Path $PSScriptRoot 'StreamReceiver.java') *> (Join-Path $output 'javac.log')
 if ($LASTEXITCODE -ne 0) { throw "Receiver compilation failed. See $output/javac.log." }
@@ -199,9 +212,7 @@ $producer = $null
 $receiver = $null
 $summary = $null
 try {
-    $producer = Start-Child $Program @('p', '--bundle', $Bundle, '--port', '0',
-        '--duration', "$Duration", '--rate', "$Rate", '--batch', "$Batch", '--startup', '25',
-        '--record', 'TimeAndSale', '--symbol', 'IBM', '--contract', 'stream') producer
+    $producer = Start-Child $Program $producerArgs producer
     $ready = Wait-Marker $producer '^PORT [1-9][0-9]*$' 10000
     $port = $ready.Substring(5)
     $receiverClasspath = $classes + [IO.Path]::PathSeparator + $Classpath
@@ -209,7 +220,7 @@ try {
         'StreamReceiver', "127.0.0.1:$port", 'IBM')) receiver
     $null = Wait-Marker $receiver '^ACTIVE$' 20000 $producer
     Wait-Child $producer (($Duration + 8) * 1000) active $receiver
-    if ($producer.Process.ExitCode -ne 0) { throw "Record NetTest exited $($producer.Process.ExitCode)." }
+    if ($producer.Process.ExitCode -ne 0) { throw "$ProducerKind NetTest exited $($producer.Process.ExitCode)." }
 
     $native = @{}
     foreach ($field in (Get-ResultLine (Read-Text $producer.Output)).Split(' ')) {
@@ -217,20 +228,23 @@ try {
         if ($parts.Count -ne 2) { throw 'Malformed native RESULT field.' }
         $native[$parts[0]] = [double]::Parse($parts[1], [Globalization.CultureInfo]::InvariantCulture)
     }
-    $written = [long]$native.written
-    if ($written -le 0 -or $written -ge $sequenceLimit -or $native.connections -ne 1 -or $native.generated -ne $written -or
-        $native.composed -ne $written -or $native.seconds -le 0) {
+    $expected = if ($ProducerKind -eq 'Record') { $native.written } else { $native.admitted }
+    $nominalRecords = [long]$Duration * $Rate
+    if ($expected -le 0 -or $expected -gt $nominalRecords -or $expected -ge $sequenceLimit -or $native.connections -ne 1 -or
+        $native.generated -ne $expected -or $native.seconds -ne $Duration -or
+        ($ProducerKind -eq 'Record' -and $native.composed -ne $expected) -or
+        ($ProducerKind -eq 'Event' -and $native.ingressRecords -ne $expected)) {
         throw 'Producer count, connection or measurement-window check failed.'
     }
 
-    $receiver.Process.StandardInput.WriteLine([string]$written)
+    $receiver.Process.StandardInput.WriteLine([string][long]$expected)
     $receiver.Process.StandardInput.Close()
     Wait-Child $receiver 10000 drain
     if ($receiver.Process.ExitCode -ne 0) { throw "Java receiver exited $($receiver.Process.ExitCode)." }
     $observed = Get-ResultLine (Read-Text $receiver.Output) | ConvertFrom-Json
-    if ($observed.qdVersion -cne 'QDS-3.357' -or $observed.expected -ne $written -or $observed.delivered -ne $written -or
+    if ($observed.qdVersion -cne 'QDS-3.357' -or $observed.expected -ne $expected -or $observed.delivered -ne $expected -or
         $observed.sequenceErrors -ne 0 -or $observed.fieldErrors -ne 0 -or
-        $observed.latencySamples -ne $written) {
+        $observed.latencySamples -ne $expected) {
         throw 'Java delivery, sequence, fields or latency sample counts did not reconcile.'
     }
     $summary = [ordered]@{
@@ -241,6 +255,7 @@ try {
         architecture = [string][Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture
         logicalProcessors = [Environment]::ProcessorCount
         producerSha256 = (Get-FileHash -LiteralPath $Program).Hash
+        producerKind = $ProducerKind
         schemaSha256 = $schemaHash
         provenanceSha256 = $provenanceHash
         record = 'TimeAndSale'
@@ -248,10 +263,12 @@ try {
         symbol = 'IBM'
         receiverRole = 'QD record verifier'
         offeredRps = $Rate
+        nominalRecords = $nominalRecords
+        nominalShortfall = $nominalRecords - $expected
         configuredBatch = $Batch
         sender = $native
         receiver = $observed
-        deliveredIncludingDrainPerProducerSecond = $written / $native.seconds
+        deliveredIncludingDrainPerProducerSecond = $expected / $native.seconds
         processes = @{
             producer = Get-ProcessSummary producer
             receiver = Get-ProcessSummary receiver
@@ -267,4 +284,4 @@ try {
     }
 }
 $summary | ConvertTo-Json -Depth 7 | Set-Content -LiteralPath (Join-Path $output 'result.json')
-Write-Output "Verified $written records. Report: $output/result.json"
+Write-Output "Verified $expected records. Report: $output/result.json"
