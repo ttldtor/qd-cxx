@@ -1,0 +1,22 @@
+# Copyright (c) 2026 ttldtor.
+# SPDX-License-Identifier: BSL-1.0
+cmake_minimum_required(VERSION 3.25)
+if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+    project(qdcxx_feed_token_refresh_example LANGUAGES CXX)
+    include(CTest)
+endif()
+if(NOT TARGET qdcxx::feed)
+    find_package(qdcxx CONFIG REQUIRED COMPONENTS feed)
+endif()
+if(NOT TARGET qdcxx_tls)
+    message(FATAL_ERROR "The credentials refresh example requires a qd-cxx package built with ORG_TTLDTOR_QDCXX_BUILD_TLS=ON")
+endif()
+add_executable(qdcxx_feed_token_refresh main.cpp)
+target_link_libraries(qdcxx_feed_token_refresh PRIVATE qdcxx::feed qdcxx_tls)
+target_compile_options(qdcxx_feed_token_refresh PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+set_target_properties(qdcxx_feed_token_refresh PROPERTIES CXX_EXTENSIONS OFF OUTPUT_NAME qdcxx-feed-token-refresh)
+if(BUILD_TESTING)
+    add_test(NAME feed_token_refresh_usage COMMAND "${CMAKE_COMMAND}" "-DPROGRAM=$<TARGET_FILE:qdcxx_feed_token_refresh>"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/usage_test.cmake")
+    set_tests_properties(feed_token_refresh_usage PROPERTIES TIMEOUT 10)
+endif()
