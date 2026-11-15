@@ -102,20 +102,45 @@ std::wstring quote(const std::wstring &value) {
 }
 #endif
 
-/** Save the probe PID for externally verified lifetime checks.
+/** Publish the complete probe PID for externally verified lifetime checks.
  * @param filename Exact UTF-8 destination path.
  */
 void savePid(const std::string &filename) {
-    std::ofstream output(std::filesystem::path(std::u8string(filename.begin(), filename.end())));
 #ifdef _WIN32
-    output << GetCurrentProcessId();
+    const auto pid = GetCurrentProcessId();
 #else
-    output << getpid();
+    const auto pid = getpid();
 #endif
-    output.flush();
+    const std::filesystem::path destination(std::u8string(filename.begin(), filename.end()));
+    auto temporary = destination;
+
+    temporary += "." + std::to_string(pid) + ".tmp";
+
+    std::ofstream output(temporary, std::ios::noreplace);
 
     if (!output) {
-        throw std::runtime_error("cannot write pid file");
+        throw std::runtime_error("cannot create temporary pid file");
+    }
+
+    try {
+        output << pid;
+        output.close();
+
+        if (!output) {
+            throw std::runtime_error("cannot write pid file");
+        }
+
+        // Observers may read the PID as soon as the destination appears.
+        std::filesystem::rename(temporary, destination);
+    } catch (...) {
+        if (output.is_open()) {
+            output.close();
+        }
+
+        std::error_code ignored;
+
+        std::filesystem::remove(temporary, ignored);
+        throw;
     }
 }
 
