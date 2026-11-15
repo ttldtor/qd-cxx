@@ -1276,6 +1276,16 @@ class Endpoint final {
     using OnDemandPlaybackListenerId = std::uint64_t;
     using StateChangeListener = std::function<void(EndpointState, EndpointState)>; ///< Advisory old/new observation.
     using StateChangeListenerId = std::uint64_t; ///< Non-reused state-observer identity within this endpoint.
+    /** Create an inactive endpoint with the library-owned default runtime.
+     * Call on application main, first before starting application threads. Each call creates an independent
+     * endpoint in the same bounded runtime. Return from main after all application threads have joined;
+     * the runtime then joins its worker and releases the bootstrap on its creating thread.
+     * Use closeAndAwaitTermination() to finish an individual endpoint while the process continues.
+     * @param options Endpoint policy and registry; runtime limits and DNS selection are defaults.
+     * @return Independent endpoint. Call connect() explicitly to start delivery.
+     * @throws Error If configuration, bootstrap or capacity fails, on a later foreign-thread call or at teardown.
+     */
+    [[nodiscard]] static std::shared_ptr<Endpoint> create(EndpointOptions options = {});
     /** Add an advisory state observer without an initial notification or inline invocation.
      * Selection is atomic with each distinct transition; selected observers run in registration order outside locks.
      * Calls use the SDK worker, or creator-thread retirement if this runtime has never started its worker.

@@ -55,6 +55,25 @@ string or shared-library name does not qualify cross-DSO, cross-SDK-image or plu
 interoperability. Binary/plugin arrangements without an explicitly supported
 provenance contract remain unsupported. The marker is a same-instance guard, not an ABI compatibility or security attestation.
 
+### Default endpoint factory {#default-endpoint-factory}
+
+`Endpoint::create(options)` uses one library-owned runtime per linked instance.
+Endpoint options apply to the new endpoint. The common runtime uses default DNS
+discovery and limits, including its shared endpoint capacity. The first
+factory call must occur on application main before other application threads are
+started. Later calls on another thread fail with `WRONG_THREAD`.
+
+Endpoint handles use the ordinary asynchronous destructor.
+`closeAndAwaitTermination()` on main waits for an individual endpoint and its
+callbacks. The common worker and bootstrap remain until normal process teardown
+on the creating main thread, after the application's other threads have retired.
+Factory calls during runtime teardown fail with `CLOSED`. Keep anything borrowed
+by callbacks alive until their endpoint has finished. The existing foreign c-ares
+coordination and Windows `DllMain` restrictions apply. Initialize this runtime
+before other same-instance workers can use c-ares, and coordinate each owner's
+initialization and cleanup. Use explicit ownership when an embedding host must
+control runtime or bootstrap retirement.
+
 ## Borrowed lifetime and failure boundaries
 
 1. The host creates the bootstrap during its main-thread, pre-thread startup and

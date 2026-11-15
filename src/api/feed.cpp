@@ -7225,4 +7225,35 @@ std::shared_ptr<Endpoint> ApiRuntime::createEndpoint(const EndpointConfiguration
 void ApiRuntime::closeAndAwaitTermination() {
     impl_->shutdown();
 }
+
+namespace {
+// This flag may be read by callback captures destroyed during static runtime teardown.
+constinit std::atomic<bool> defaultEndpointRuntimeStopping{false};
+
+/** Main-thread owner of the process-default endpoint runtime. */
+struct DefaultEndpointRuntime {
+    const std::thread::id owner = std::this_thread::get_id();
+    ApiRuntime runtime;
+
+    ~DefaultEndpointRuntime() {
+        defaultEndpointRuntimeStopping.store(true, std::memory_order_release);
+    }
+};
+} // namespace
+
+std::shared_ptr<Endpoint> Endpoint::create(EndpointOptions options) {
+    return producerAction([&] {
+        if (defaultEndpointRuntimeStopping.load(std::memory_order_acquire)) {
+            reject(ErrorCode::CLOSED, "default-endpoint-runtime-stopping");
+        }
+
+        static DefaultEndpointRuntime context;
+
+        if (context.owner != std::this_thread::get_id()) {
+            reject(ErrorCode::WRONG_THREAD, "default-endpoint-create-thread");
+        }
+
+        return context.runtime.createEndpoint(std::move(options));
+    });
+}
 } // namespace org::ttldtor::qdcxx::api

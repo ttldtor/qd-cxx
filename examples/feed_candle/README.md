@@ -16,6 +16,6 @@ Use a QTP source that offers HISTORY Candle for the chosen symbol and range. The
 
 Run the build commands from the checkout root. From the installed sample directory use `cmake -S .` with the same options. If copying only the source example directory, copy `examples/feed_common/session.hpp` into it as well.
 
-The shared sample helper handles the receive window and waits for endpoint closure. `ApiRuntime` joins its worker on scope exit.
+The main thread sleeps for the receive window while the Feed worker delivers events. `Endpoint::create(options)` uses the library's default runtime. The sample waits for its endpoint to close, and the library joins the worker at process teardown.
 
 This sample accepts 0 to 2147483647999 Unix milliseconds.
