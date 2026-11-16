@@ -137,7 +137,8 @@ void send(t::TcpListener &listener, t::TcpConnectionId connection, std::span<con
 TEST_CASE("accepted TCP streams keep independent partial QTP input and exact write suffixes") {
     auto bootstrap = t::RuntimeBootstrap::create();
     REQUIRE(bootstrap);
-    auto listener = t::TcpListener::create(*bootstrap, {.maxConnections = 2, .maxReadBytes = 1, .maxWriteBytes = 2});
+    auto listener = t::TcpListener::create(
+        *bootstrap, {.maxConnections = 2, .maxReadBytes = 1, .maxWriteBytes = 2, .noDelay = true});
     REQUIRE(listener);
     REQUIRE(listener->port() != 0);
     const auto emptyAccept = listener->accept();

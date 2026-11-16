@@ -57,3 +57,7 @@ permission to execute `ip netns exec` and leaves the namespaces in place.
 Each Java client runs in the receiver namespace. The JSON records the two
 namespace names, and CPU and memory are sampled for the actual child
 processes on the shared Linux host.
+
+Use `-TcpNoDelay` in a separate run to measure small writes with Nagle disabled.
+It leaves the default comparison available and can increase TCP packet
+count and CPU use at high rates. The JSON records the selected mode.
