@@ -84,6 +84,7 @@ struct LiveLimits {
     FieldTimePolicy fieldTime;        ///< Explicit virtual-prefix policy, never inferred from peer text.
     DataEventPolicy events;           ///< Explicit zero-flags or finite binary metadata policy.
     bool historySnapshot;             ///< Whether local negotiation advertises the selected hs capability.
+    std::size_t dataEventBytes = 0;   ///< Optional elastic DATA arena cap; zero uses fixed eventBytes.
 };
 
 /** Static numeric first-error evidence; input credentials never enter this value. */

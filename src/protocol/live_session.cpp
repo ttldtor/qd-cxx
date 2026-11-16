@@ -28,39 +28,6 @@ namespace {
 /** Configured backing exhaustion, distinct from an allocator failure. */
 struct LiveStorageLimit {};
 
-/** Failing arena upstream which preserves configured-exhaustion classification. */
-class LiveExhaustedResource final : public std::pmr::memory_resource {
-    /** Refuse every upstream request without acquiring storage.
-     * @param bytes Requested upstream bytes.
-     * @param alignment Requested alignment.
-     * @return No value; throws LiveStorageLimit.
-     */
-    void *do_allocate(std::size_t bytes, std::size_t alignment) override {
-        static_cast<void>(bytes);
-        static_cast<void>(alignment);
-        throw LiveStorageLimit{};
-    }
-
-    /** No successful allocation exists to release.
-     * @param pointer Unused pointer.
-     * @param bytes Unused size.
-     * @param alignment Unused alignment.
-     */
-    void do_deallocate(void *pointer, std::size_t bytes, std::size_t alignment) override {
-        static_cast<void>(pointer);
-        static_cast<void>(bytes);
-        static_cast<void>(alignment);
-    }
-
-    /** Compare resource identity.
-     * @param other Resource to compare.
-     * @return True only for this resource instance.
-     */
-    bool do_is_equal(const std::pmr::memory_resource &other) const noexcept override {
-        return this == &other;
-    }
-};
-
 /** Single serialized domain's requested backing ledger; allocation overhead is excluded. */
 class LiveStorage {
     std::size_t references_ = 1; ///< Session and independent owners retain this epoch identity.
@@ -159,6 +126,53 @@ class LiveStorage {
     }
 };
 
+/** Charge each monotonic upstream block, with zero growth for fixed arenas. */
+class LiveArenaUpstream final : public std::pmr::memory_resource {
+    LiveStorage &storage_;
+    const std::size_t limit_;
+    std::size_t resident_ = 0;
+
+    void *do_allocate(std::size_t bytes, std::size_t alignment) override {
+        if (bytes > limit_ - resident_ || !storage_.reserve(bytes))
+            throw LiveStorageLimit{};
+
+        try {
+            auto *block = std::pmr::new_delete_resource()->allocate(bytes, alignment);
+            resident_ += bytes;
+
+            return block;
+        } catch (...) {
+            storage_.relinquish(bytes);
+            throw;
+        }
+    }
+
+    void do_deallocate(void *pointer, std::size_t bytes, std::size_t alignment) override {
+        std::pmr::new_delete_resource()->deallocate(pointer, bytes, alignment);
+        resident_ -= bytes;
+        storage_.relinquish(bytes);
+    }
+
+    bool do_is_equal(const std::pmr::memory_resource &other) const noexcept override {
+        return this == &other;
+    }
+
+    public:
+    /** Use the arena's epoch ledger and a separate finite growth allowance.
+     * @param storage Borrowed ledger kept alive by the containing arena.
+     * @param limit Maximum simultaneous upstream block bytes.
+     */
+    LiveArenaUpstream(LiveStorage &storage, std::size_t limit) noexcept : storage_(storage), limit_(limit) {
+    }
+
+    /** Inspect the currently admitted complete upstream blocks.
+     * @return Present byte charge including unused space in retained blocks.
+     */
+    [[nodiscard]] std::size_t resident() const noexcept {
+        return resident_;
+    }
+};
+
 /** Intrusive serialized epoch lease without an additional allocator control block. */
 class LiveStorageLease {
     LiveStorage *storage_ = nullptr; ///< Null only for an empty or moved-from lease.
@@ -241,8 +255,8 @@ class LiveArena {
     LiveStorageLease lease_;               ///< Outlives both owned backing and the resource using it.
     std::size_t bytes_;                    ///< Entire requested arena backing, including unused and abandoned slots.
     std::unique_ptr<std::byte[]> backing_; ///< Exactly bytes_ elements, admitted before construction.
-    LiveExhaustedResource exhausted_;      ///< Rejects fallback allocation with a resource-limit classification.
-    std::pmr::monotonic_buffer_resource resource_; ///< Fixed backing with a failing upstream resource.
+    LiveArenaUpstream upstream_;           ///< Accounts optional growth under the same epoch ledger.
+    std::pmr::monotonic_buffer_resource resource_; ///< Requested backing until the entire owner retires.
 
     /** Allocate a complete admitted block, rolling back storage admission on allocation failure.
      * @param storage Shared serialized epoch ledger.
@@ -265,11 +279,12 @@ class LiveArena {
     public:
     /** Reserve one fixed arena while old owners remain accounted.
      * @param storage Epoch ledger, retained by this arena.
-     * @param bytes Full requested arena capacity; zero is finite.
+     * @param bytes Initial arena backing; zero is finite.
+     * @param growth Additional requested backing allowed through the upstream.
      */
-    LiveArena(LiveStorage &storage, std::size_t bytes)
-        : lease_(&storage), bytes_(bytes), backing_(allocate(storage, bytes)),
-          resource_(backing_.get(), bytes, &exhausted_) {
+    LiveArena(LiveStorage &storage, std::size_t bytes, std::size_t growth = 0)
+        : lease_(&storage), bytes_(bytes), backing_(allocate(storage, bytes)), upstream_(storage, growth),
+          resource_(backing_.get(), bytes, &upstream_) {
     }
 
     /** Release the arena after every container using resource() has been destroyed. */
@@ -280,17 +295,17 @@ class LiveArena {
     }
 
     /** Borrow the arena's allocator; its objects must die before this arena.
-     * @return Fixed-capacity resource with no external allocation fallback.
+     * @return Resource with owner- and epoch-bounded backing.
      */
     [[nodiscard]] std::pmr::memory_resource *resource() noexcept {
         return &resource_;
     }
 
     /** Inspect the complete requested block, including spare and abandoned monotonic slots.
-     * @return Fixed arena capacity admitted against the epoch ledger.
+     * @return Complete block bytes admitted against the epoch ledger.
      */
     [[nodiscard]] std::size_t capacityBytes() const noexcept {
-        return bytes_;
+        return bytes_ + upstream_.resident();
     }
 };
 
@@ -1026,6 +1041,7 @@ Error writerError(SubscriptionWriterError error) noexcept {
  * @param limits Finite per-batch allowances.
  * @param payload Complete payload bytes.
  * @param work Mutable turn credits.
+ * @param variableArena Whether the byte-derived profile uses actual payload bounds.
  */
 void chargeDescriptions(DescriptionLimits limits, std::size_t payload, LiveWork &work) {
     debit(sum(limits.descriptions, limits.totalFields), work.visits);
@@ -1039,7 +1055,16 @@ void chargeDescriptions(DescriptionLimits limits, std::size_t payload, LiveWork 
  * @param payload Complete payload bytes.
  * @param work Mutable turn credits.
  */
-void chargeData(StreamDataLimits limits, std::size_t descriptions, std::size_t payload, LiveWork &work) {
+void chargeData(StreamDataLimits limits, std::size_t descriptions, std::size_t payload, LiveWork &work,
+                bool variableArena) {
+    if (variableArena) {
+        // Each attempted row needs at least a symbol and a compact record ID. A trailing byte can
+        // still start an unsuccessful attempt.
+        const auto rows = payload / 2 + payload % 2;
+        limits.processedRecords = std::min(limits.processedRecords, rows);
+        limits.emittedRecords = std::min(limits.emittedRecords, rows);
+    }
+
     const auto lookups = product(limits.processedRecords, sum(descriptions, 1));
     debit(sum(sum(lookups, limits.wireFields), sum(limits.emittedValues, limits.emittedRecords)), work.visits);
     const auto symbols = product(product(limits.processedRecords, limits.symbol.codeUnits), 3);
@@ -1375,9 +1400,10 @@ struct LiveEvent::State {
      * @param bytes Complete arena capacity.
      * @param peer Immutable peer-generation handle.
      * @param value Whole-frame kind.
+     * @param growth Optional additional backing allowance for DATA.
      */
-    State(Storage &storage, std::size_t bytes, LiveSnapshot peer, LiveEventKind value)
-        : ledger(storage, sizeof(State)), arena(storage, bytes), snapshot(std::move(peer)), kind(value),
+    State(Storage &storage, std::size_t bytes, LiveSnapshot peer, LiveEventKind value, std::size_t growth = 0)
+        : ledger(storage, sizeof(State)), arena(storage, bytes, growth), snapshot(std::move(peer)), kind(value),
           decoded(*arena.resource()), fields(arena.resource()), records(arena.resource()) {
     }
 
@@ -1620,13 +1646,38 @@ void detail::LocalEventOwner::appendRecord(LiveEvent::State &event, std::int32_t
 }
 
 std::expected<LiveEvent, LiveError> detail::LocalEventOwner::stream(std::span<const LocalStreamRow> rows,
-                                                                    LiveWork &work) const {
+                                                                    LiveWork &work, bool compact) const {
     if (rows.empty())
         return std::unexpected(Error::INVALID_CONFIGURATION);
 
     try {
         debit(1, work.operations);
-        const auto bytes = product(eventBytes_, rows.size());
+        auto bytes = product(eventBytes_, rows.size());
+
+        if (compact) {
+            constexpr auto perRow =
+                sizeof(PmrStreamDataRecord) + sizeof(LiveRecordView) + 2 * alignof(std::max_align_t);
+            constexpr auto perField = sizeof(PmrFieldValue) + sizeof(LiveFieldValueView) + alignof(std::max_align_t);
+            const auto textStorage = [](std::size_t units) {
+                // Allow space for the string terminator, growth from inline storage and alignment.
+                return sum(product(sum(units, 1), 2 * sizeof(char16_t)), alignof(std::max_align_t));
+            };
+            bytes = product(perRow, rows.size());
+
+            for (const auto &row : rows) {
+                debit(row.fields.size() + 1, work.visits);
+                bytes = sum(bytes, sum(product(perField, row.fields.size()), textStorage(row.symbol.size())));
+
+                for (const auto &field : row.fields) {
+                    if (field.units)
+                        bytes = sum(bytes, textStorage(field.units->size()));
+
+                    if (field.bytes)
+                        bytes = sum(bytes, field.bytes->size());
+                }
+            }
+        }
+
         debit(sum(sizeof(LiveEvent::State), bytes), work.bytes);
         auto event =
             makeOwner<LiveEvent::State>(*epoch_.state_->ledger.lease.get(), bytes, epoch_, LiveEventKind::DATA);
@@ -2111,15 +2162,20 @@ struct LiveSession::Impl {
         }
 
         LiveSnapshot selected = next ? LiveSnapshot(next.release()) : peer;
-        auto event = makeOwner<LiveEvent::State>(*lease.get(), limits.eventBytes, selected, kind);
+        const bool variableArena = kind == LiveEventKind::DATA && limits.dataEventBytes != 0;
+        constexpr std::size_t DATA_INITIAL_BLOCK_BYTES = 4096;
+        const auto bytes =
+            variableArena ? std::min(limits.dataEventBytes, DATA_INITIAL_BLOCK_BYTES) : limits.eventBytes;
+        const auto growth = variableArena ? limits.dataEventBytes - bytes : 0;
+        auto event = makeOwner<LiveEvent::State>(*lease.get(), bytes, selected, kind, growth);
         event->messageType = frame.type;
         event->heartbeat = beat;
 
         if (kind == LiveEventKind::DATA) {
             diagnostic.stage = "data";
-            chargeData(limits.data, selected.state_->descriptions.size(), frame.payload.size(), work);
+            chargeData(limits.data, selected.state_->descriptions.size(), frame.payload.size(), work, variableArena);
             event->decoded = detail::decodePmrStreamData(frame.payload, selected.state_->context, limits.data,
-                                                         limits.events, *event->arena.resource());
+                                                         limits.events, *event->arena.resource(), variableArena);
             diagnostic.consumed = event->decoded.consumed;
             diagnostic.detail = static_cast<std::size_t>(event->decoded.stage);
 

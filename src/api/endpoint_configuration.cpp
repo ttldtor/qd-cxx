@@ -332,7 +332,9 @@ void validateEndpointOptions(const EndpointOptions &options) {
         (options.maximumAttempts > 1 && !durationValid(options.retryDelay)) || options.batchRecords == 0 ||
         options.batchRecords > EndpointOptions::MAXIMUM_BATCH_RECORDS || options.pendingRecords == 0 ||
         options.pendingRecords > EndpointOptions::MAXIMUM_PENDING_RECORDS ||
-        options.batchRecords > options.pendingRecords) {
+        options.batchRecords > options.pendingRecords ||
+        options.maximumReceiveMessageBytes < EndpointOptions::DEFAULT_RECEIVE_MESSAGE_BYTES ||
+        options.maximumReceiveMessageBytes > EndpointOptions::MAXIMUM_RECEIVE_MESSAGE_BYTES) {
         reject(ErrorCode::INVALID_ARGUMENT, "endpoint-options");
     }
 }

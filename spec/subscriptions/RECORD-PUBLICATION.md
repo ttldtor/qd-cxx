@@ -65,18 +65,21 @@ bounds the complete QTP frame including its length prefix, with a default of
 65,536 bytes. A row that exceeds the hard frame limit is a resource failure.
 The input API call and the outgoing frame need not contain the same rows.
 In this profile `streamBatchRecords` does not limit publication or output.
-The publisher also bounds one worker copy to 64 KiB of charged row storage
-and one retained peer delivery to 128 records. A frame carries at most 64 records
-to match the existing Feed decoder budget. Fixed queue slots remain independently
-bounded. Per-peer STREAM arenas are charged at their measured allocation size.
-These guards can cause a frame below the soft threshold. A frame composition
-failure retires the affected peer and increments STREAM `failedFrames`.
+Fixed queue slots and charged memory remain bounded independently. Per-peer
+STREAM arenas are charged at their measured allocation size. The bytes of
+complete rows and the available queue data determine frame size. Small
+publication queues can leave too few ready rows to reach the threshold. A frame
+composition failure retires the affected peer and increments STREAM
+`failedFrames`.
 When all subscribed peers lack room for the next source window, accepted
 STREAM input stays in the publisher FIFO while sockets progress. Peers with
 available capacity can keep receiving. The existing finite per-peer overflow
 and socket timeout policies still apply.
 
 When this profile is absent, `streamBatchRecords` keeps its existing behavior.
+For older receivers with a restrictive frame record limit, use this count-based
+mode. Current Feed receivers can set `EndpointOptions::maximumReceiveMessageBytes`
+for the expected maximum QTP message body.
 Partial writes retain the frame and its source records until completion. Demand
 replacement preserves the existing policy for a revoked record in a partially
 sent frame.

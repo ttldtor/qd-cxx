@@ -83,7 +83,8 @@ constexpr core::SchemaLimits withNuamOrderLimits(core::SchemaLimits limits) noex
     return limits;
 }
 
-constexpr std::size_t FRAME_RECORDS = 64; ///< Whole admitted DATA frame record ceiling.
+constexpr std::size_t TAPE_FRAME_RECORDS = 64;   ///< Existing local tape receiving profile.
+constexpr std::size_t STREAM_ROUTE_RECORDS = 16; ///< Bounded STREAM fan-out work per queue progress step.
 constexpr std::size_t CALLBACK_RECORDS = CallbackSlotPool::PHYSICAL_RECORDS; ///< Whole callback projection ceiling.
 constexpr std::size_t FIELD_TEXT_UNITS = 8192;             ///< Aggregate text copied from one complete record.
 constexpr std::size_t FIELD_BYTE_UNITS = 16384;            ///< Aggregate opaque payload copied from one record.
@@ -327,7 +328,7 @@ void fundHistoryWork(ReceivingProfile &profile, std::size_t maximumFields) {
     constexpr std::size_t MAINTENANCE_SCAN_PASSES = 128;
     const auto maintenanceVisits = multiply(MAINTENANCE_SCAN_PASSES, multiply(dimensions, dimensions));
     auto &work = profile.queueWork.history;
-    work.visits = add(work.visits, add(multiply(FRAME_RECORDS, rowVisits), maintenanceVisits));
+    work.visits = add(work.visits, add(multiply(profile.queueLimits.sourceRecords, rowVisits), maintenanceVisits));
     constexpr std::size_t TEXT_SCAN_PASSES = 8;
     const auto maintenanceText = multiply(
         TEXT_SCAN_PASSES,
@@ -335,11 +336,12 @@ void fundHistoryWork(ReceivingProfile &profile, std::size_t maximumFields) {
                  multiply(add(limits.viewSlots, 1), add(limits.viewSubscriptions.totalSymbolUnits,
                                                         multiply(limits.partitions, limits.symbolUnitsPerPartition)))));
     const auto inputText = multiply(
-        TEXT_SCAN_PASSES,
-        multiply(FRAME_RECORDS, multiply(add(limits.partitions, 1), multiply(2, limits.symbolUnitsPerPartition))));
+        TEXT_SCAN_PASSES, multiply(profile.queueLimits.sourceRecords,
+                                   multiply(add(limits.partitions, 1), multiply(2, limits.symbolUnitsPerPartition))));
     work.textUnits = add(work.textUnits, add(maintenanceText, inputText));
+    const auto &session = profile.endpoint.settings().budgets.session;
     work.bytes =
-        add(work.bytes, add(multiply(2, limits.residentBytes), profile.endpoint.settings().budgets.session.eventBytes));
+        add(work.bytes, add(multiply(2, limits.residentBytes), std::max(session.eventBytes, session.dataEventBytes)));
 }
 
 /** Fund the existing complete snapshot binding scans from this profile's finite schema/descriptor bounds.
@@ -356,6 +358,57 @@ void fundContextBindingText(client::EndpointSettings &settings, std::size_t reco
     const auto wholeFrame = multiply(session.context.descriptions, perDescription);
     settings.budgets.protocolTurn.textUnits =
         add(settings.budgets.protocolTurn.textUnits, multiply(RECEIVING_OWNER_POLLS_PER_TURN, wholeFrame));
+}
+
+/** Size the network DATA owner and work from the encoded byte envelope.
+ * @param budgets Selected complete endpoint budgets, modified before publication.
+ * @param messageBytes Maximum type-plus-payload length admitted by the framer.
+ * @param maximumFields Largest retained local field shape.
+ * @return Conservative number of complete rows one valid DATA message can contain.
+ */
+std::size_t sizeNetworkData(client::EndpointBudgets &budgets, std::size_t messageBytes, std::size_t maximumFields) {
+    auto &session = budgets.session;
+    auto &data = session.data;
+    session.frame = {messageBytes, add(messageBytes, 9)};
+    data.payloadBytes = data.symbol.inputBytes = messageBytes - 1;
+    // The DATA type uses one byte, and even repeat-symbol plus compact-ID uses two bytes per complete row.
+    const auto rows = data.payloadBytes / 2;
+    const auto attempts = add(rows, 1);
+    data.processedRecords = attempts; // An incomplete suffix may still begin one final row.
+    data.emittedRecords = data.ownedFieldTimeRecords = rows;
+    data.wireFields = multiply(attempts, session.descriptions.fieldsPerDescription);
+    data.emittedValues = multiply(rows, maximumFields);
+    data.ownedSymbolUnits = multiply(rows, data.symbol.codeUnits);
+    data.fieldBytes = data.fieldUnits = data.payloadEncodedBytes = data.payloadWorkBytes = data.payloadBytes;
+    data.ownedFieldUnits = std::max(data.ownedFieldUnits, data.payloadBytes);
+    data.ownedPayloadBytes = std::max(data.ownedPayloadBytes, data.payloadBytes);
+
+    // Local default fields, repeated symbols and owning views can expand compact wire data.
+    // Blocks are allocated as needed and charged against both the event and epoch byte budgets.
+    constexpr std::size_t DATA_STORAGE_EXPANSION = 512;
+    session.dataEventBytes = multiply(messageBytes, DATA_STORAGE_EXPANSION);
+    session.residentBytes = add(session.residentBytes, multiply(2, session.dataEventBytes));
+    budgets.tcp.residentBytes = add(budgets.tcp.residentBytes, multiply(2, session.dataEventBytes));
+
+    auto &collector = budgets.collector;
+    collector.records = std::max(collector.records, rows);
+    collector.stagedBytes = std::max(collector.stagedBytes, session.dataEventBytes);
+    collector.residentBytes = add(collector.residentBytes, multiply(2, session.dataEventBytes));
+    auto &dispatch = budgets.dispatchTurn;
+    const auto retirementRows =
+        add(add(collector.records, collector.frames), add(budgets.desired.entries, budgets.schema.records));
+    dispatch.records = std::max(dispatch.records, retirementRows);
+    dispatch.bytes = std::max({dispatch.bytes, collector.residentBytes, session.residentBytes});
+    dispatch.collector.bytes = std::max(dispatch.collector.bytes, multiply(collector.frames, session.residentBytes));
+
+    const auto visits = add(add(multiply(attempts, add(session.context.descriptions, 1)), data.wireFields),
+                            multiply(2, add(data.emittedValues, data.emittedRecords)));
+    const auto text = add(multiply(multiply(attempts, data.symbol.codeUnits), 3), multiply(data.fieldUnits, 2));
+    auto &turn = budgets.protocolTurn;
+    turn.visits = add(turn.visits, multiply(RECEIVING_OWNER_POLLS_PER_TURN, visits));
+    turn.textUnits = add(turn.textUnits, multiply(RECEIVING_OWNER_POLLS_PER_TURN, text));
+
+    return rows;
 }
 
 /** Reserve actual complete schema/blueprint copies and three replay banks.
@@ -979,8 +1032,8 @@ ReceivingProfile prepareReceivingLane(const RuntimeOptions &runtime, const Endpo
     budgets.session.events = protocol::DataEventPolicy::BINARY_CATALOG_V1;
     budgets.session.historySnapshot = options.contract == DeliveryContract::HISTORY;
     budgets.session.fieldTime = protocol::FieldTimePolicy::READ;
-    budgets.session.data.processedRecords = budgets.session.data.emittedRecords = FRAME_RECORDS;
-    budgets.session.data.wireFields = budgets.session.data.emittedValues = multiply(FRAME_RECORDS, maximumFields);
+    budgets.session.data.processedRecords = budgets.session.data.emittedRecords = TAPE_FRAME_RECORDS;
+    budgets.session.data.wireFields = budgets.session.data.emittedValues = multiply(TAPE_FRAME_RECORDS, maximumFields);
     budgets.session.data.symbol.codeUnits = budgets.session.data.symbol.stateUnits = runtime.maximumSymbolUnits;
 
     if (hasOptionSale) {
@@ -999,6 +1052,9 @@ ReceivingProfile prepareReceivingLane(const RuntimeOptions &runtime, const Endpo
     budgets.desired = {schemaLimits.records,     entries, runtime.maximumSymbolUnits, symbolUnits, multiply(2, entries),
                        multiply(2, symbolUnits), entries};
     budgets.writer.operationEntries = std::max(budgets.writer.operationEntries, entries);
+    const auto network = !local || combinedSchema;
+    const auto sourceRows =
+        network ? sizeNetworkData(budgets, options.maximumReceiveMessageBytes, maximumFields) : TAPE_FRAME_RECORDS;
 
     if (!local) {
         // A complete named-route preparation and progress allowance is independent of queue reservations.
@@ -1082,9 +1138,13 @@ ReceivingProfile prepareReceivingLane(const RuntimeOptions &runtime, const Endpo
                            8,
                            subscriptionEntries,
                            multiply(subscriptionEntries, add(runtime.maximumSymbolUnits, 1))};
+    // Every STREAM routing rotation grants a listener one selection. Pace decoded source
+    // prefixes to that selection so frame length alone cannot exhaust a healthy listener's slots.
+    const auto routeRows =
+        network && result.family == core::SubscriptionFamily::STREAM ? options.batchRecords : STREAM_ROUTE_RECORDS;
     result.queueLimits = {clients,
-                          FRAME_RECORDS,
-                          16,
+                          sourceRows,
+                          routeRows,
                           options.batchRecords,
                           16,
                           multiply(clients, options.pendingRecords),
@@ -1098,7 +1158,8 @@ ReceivingProfile prepareReceivingLane(const RuntimeOptions &runtime, const Endpo
     // One retained frame per exact cached key, plus an incoming candidate, covers fragmented updates.
     // Twice the event arena also covers its fixed owner/control backing in the qualified STL profiles.
     const auto tickerFrames = add(entries, 1);
-    const auto tickerBytes = multiply(tickerFrames, multiply(2, budgets.session.eventBytes));
+    const auto tickerBytes =
+        multiply(tickerFrames, multiply(2, std::max(budgets.session.eventBytes, budgets.session.dataEventBytes)));
     result.tickerLimits = {
         clients, entries, tickerFrames, tickerBytes, add(tickerBytes, multiply(scale, 8 * MEBIBYTE)), budgets.desired};
     result.historyLimits = {entries,
@@ -1180,6 +1241,16 @@ ReceivingProfile prepareReceivingLane(const RuntimeOptions &runtime, const Endpo
         add(routing.work.textUnits, multiply(multiply(2, runtime.maximumSymbolUnits), comparisons));
     result.queueWork =
         queueWork(scale, result.interests, result.schema.records().size(), result.queueLimits.routeRecords);
+
+    if (network && result.family == core::SubscriptionFamily::STREAM) {
+        // A complete frame is staged before the queue routes its bounded prefixes.
+        auto &stream = result.queueWork.stream;
+        const auto rowsPerTurn = multiply(RECEIVING_OWNER_POLLS_PER_TURN, sourceRows);
+        stream.visits = add(stream.visits, multiply(rowsPerTurn, add(multiply(2, entries), 9)));
+        const auto matchText = multiply(multiply(4, runtime.maximumSymbolUnits), entries);
+        stream.textUnits = add(stream.textUnits, multiply(rowsPerTurn, add(matchText, 7)));
+        stream.bytes = add(stream.bytes, multiply(RECEIVING_OWNER_POLLS_PER_TURN, budgets.session.dataEventBytes));
+    }
 
     if (result.family == core::SubscriptionFamily::HISTORY) {
         fundHistoryWork(result, maximumFields);

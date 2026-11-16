@@ -176,7 +176,7 @@ class Downstream {
                 streamFrames_.emplace_back(frame.payload.size(), frame.endOffset - frame.startOffset);
 
             const p::StreamDataLimits limits{
-                MESSAGE_LIMIT, 256,          1024, 256,  1024,          4096,          {MESSAGE_LIMIT, 256, 256},
+                MESSAGE_LIMIT, 1024,         8192, 1024, 8192,          4096,          {MESSAGE_LIMIT, 256, 256},
                 {8192, 1024},  8192,         8192, 8192, MESSAGE_LIMIT, MESSAGE_LIMIT, MESSAGE_LIMIT,
                 MESSAGE_LIMIT, MESSAGE_LIMIT};
             auto decoded = p::decodeStreamDataWithEventPolicy(frame.payload, *context_, limits,
@@ -792,24 +792,26 @@ TEST_CASE("catalog STREAM oversized wire record retires only its peer and counts
     CHECK((*endpoint)->getDiagnostic().code == q::api::ErrorCode::NONE);
 }
 
-TEST_CASE("catalog STREAM drains consecutive full ready chunks through partial writes") {
+TEST_CASE("catalog STREAM sends more than 512 compact records per byte-bounded frame with partial writes") {
     auto bootstrap = q::transport::RuntimeBootstrap::create();
     REQUIRE(bootstrap);
     const auto schema = testSchema();
     const auto names = fieldNames(schema);
     q::api::PublisherOptions options;
     options.catalog.emplace(schema, names);
-    options.pendingQuotes = 512;
+    constexpr std::size_t ROW_COUNT = 1024;
+    options.pendingQuotes = ROW_COUNT;
     options.listener.maxConnections = 1;
     options.listener.maxWriteBytes = 128;
-    options.streamBytes.emplace(8000, 65536);
+    constexpr std::size_t TARGET_PAYLOAD = 2500;
+    constexpr std::size_t MAX_FRAME = 2560;
+    options.streamBytes.emplace(TARGET_PAYLOAD, MAX_FRAME);
     auto endpoint = q::api::PublisherEndpoint::create(*bootstrap, options);
     REQUIRE(endpoint);
     Downstream peer(schema, (*endpoint)->port(), 100);
     peer.subscribe(p::SubscriptionMessage::STREAM_ADD, 0);
     REQUIRE((*endpoint)->awaitDemand(c::SubscriptionFamily::STREAM, u"Alpha", u"IBM", true, Clock::now() + WAIT_TIME));
 
-    constexpr std::size_t ROW_COUNT = 512;
     std::array<c::FieldValueView, ROW_COUNT> values;
     std::array<q::api::PublisherStreamRecordView, ROW_COUNT> rows;
 
@@ -831,9 +833,14 @@ TEST_CASE("catalog STREAM drains consecutive full ready chunks through partial w
     (*endpoint)->closeAndAwaitTermination();
     const auto stats = (*endpoint)->getStatistics();
     CHECK(stats.retiredPeers.value == 0);
-    CHECK(stats.families[1].ingressFrames.value == 4);
+    CHECK(stats.families[1].ingressFrames.value == 1);
     CHECK(stats.families[1].ingressRecords.value == ROW_COUNT);
     CHECK(stats.families[1].failedFrames.value == 0);
+    CHECK(stats.families[1].maxSentFrameRecords > 512);
+    CHECK(stats.families[1].maxSentFrameBytes <= MAX_FRAME);
+    REQUIRE_FALSE(peer.streamFrames().empty());
+    CHECK(peer.streamFrames().front().first >= TARGET_PAYLOAD);
+    CHECK(peer.streamFrames().front().second <= MAX_FRAME);
 }
 
 TEST_CASE("revocation of a non-first row in a partial STREAM frame closes only its peer") {
