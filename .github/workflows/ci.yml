@@ -101,6 +101,19 @@ jobs:
         shell: pwsh
         run: '& ./tools/nettest/benchmark/multicast/Test-Multicast.ps1 -OutputDirectory (Join-Path $env:RUNNER_TEMP "nettest-multicast")'
 
+      - name: Verify multicast acceptance receipt
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP "nettest-multicast"
+          $check = Join-Path $out "rejected.json"
+          $PSNativeCommandUseErrorActionPreference = $false
+          pwsh -NoProfile -File ./tools/nettest/benchmark/multicast/Test-BurstReceipts.ps1 -Directory "$out/input" -SendReceipt "$out/send.json" -ReceiveReceipt "$out/altered.json" -Output $check
+          if ($LASTEXITCODE -ne 1 -or !(Test-Path -LiteralPath $check)) { throw 'Altered receipt did not produce rejection evidence.' }
+          $result = Get-Content -LiteralPath $check -Raw | ConvertFrom-Json
+          if ($result.passed -or $result.checks.receiverIntegrity -or $result.physicalNetworkCertified) { throw 'Altered receipt accepted.' }
+          exit 0
+
       - name: Report known contract failures
         if: ${{ !cancelled() && (steps.tests.outcome == 'success' || steps.tests.outcome == 'failure') }}
         continue-on-error: true
