@@ -34,3 +34,28 @@ The receiver's `--self-test-quote-stream` checks positive and damaged records
 through a local Java QD STREAM collector. Count only exact deliveries when
 estimating capacity. Compare both the publisher's active rate and the received
 rate, and record the batch size and per-process CPU and memory.
+
+## Java QD reference publisher
+
+Compile the publisher and use the same receiver with Java QD 3.357 on the
+classpath. Run the two commands in separate terminals.
+
+~~~sh
+javac -cp "$QD_CLASSPATH" -d classes tools/nettest/benchmark/QuoteStreamPublisher.java tools/nettest/benchmark/StreamReceiver.java
+java -cp "classes:$QD_CLASSPATH" QuoteStreamPublisher 7300 250000 50000 8
+java -cp "classes:$QD_CLASSPATH" StreamReceiver 127.0.0.1:7300 IBM quote-stream ns probe
+~~~
+
+The Java publisher binds loopback, waits for the exact Quote subscription,
+and submits physical records with a reused `RecordBuffer` through
+`QDDistributor.process`. After `READY` and `PROBE_RECEIVED`, send `GO`
+to the publisher. Send the expected count to the receiver after `RESULT`.
+After `COUNT_REACHED N`, send `CLOSE` to the publisher. Wait for both
+processes to exit and check the receiver's final result.
+
+For a comparison, alternate the publisher order and keep the receiver build,
+record count, symbol, pacing and API batch size fixed in each round. An API
+batch limits a submission. The STREAM collector and QTP writer can use
+different outbound frame sizes. At rate zero report the observed exact-delivery
+throughput. At a specified rate verify whether the publisher sustained that
+rate in addition to checking delivery.
