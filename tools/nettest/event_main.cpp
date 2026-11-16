@@ -36,6 +36,7 @@ constexpr auto MAX_RATE = 1000000u;
 constexpr auto SEQUENCE_BITS = 22u;
 constexpr auto SEQUENCE_LIMIT = std::uint64_t{1} << SEQUENCE_BITS;
 constexpr std::uint64_t NANOSECONDS_PER_SECOND = 1000000000;
+constexpr std::size_t MAX_STREAM_BATCH = 8;
 
 constexpr std::string_view HELP = R"(Usage: qdcxx-event-nettest p --port PORT [OPTIONS]
 Publish synthetic IBM TimeAndSale/STREAM or Quote/TICKER events through the public API.
@@ -48,7 +49,7 @@ Serves 1..8 clients over plain TCP.
   --startup SECONDS  Wait for matching demand (1..120), default 10
   --rate EVENTS      Offered events per second (1..1000000), default 1000
   --pacing MODE      sleep (default) or yield for capacity tests with extra CPU use
-  --batch 1          Fixed to one event per public API call
+  --batch N          Maximum events per call (STREAM 1..8, TICKER 1), default 1
   --record NAME      TimeAndSale (default) or Quote
   --symbol IBM       Fixed symbol
   --contract NAME    stream (default) for TimeAndSale, ticker for Quote
@@ -75,7 +76,7 @@ constexpr std::string_view HELP_RU = R"(Использование: qdcxx-event-
   --startup СЕКУНДЫ  Ожидание подписки (1..120), по умолчанию 10
   --rate СОБЫТИЯ     Предложено событий в секунду (1..1000000), по умолчанию 1000
   --pacing РЕЖИМ     sleep (по умолчанию) или yield для замера с повышенным расходом CPU
-  --batch 1          Одно событие на вызов публичного API
+  --batch N          Предел событий на вызов (STREAM 1..8, TICKER 1), по умолчанию 1
   --record ИМЯ       TimeAndSale (по умолчанию) или Quote
   --symbol IBM       Фиксированный символ
   --contract ИМЯ     stream для TimeAndSale, ticker для Quote
@@ -99,6 +100,7 @@ struct Options {
     std::chrono::seconds startup{10};
     std::uint32_t rate = 1000;
     std::size_t clients = 1;
+    std::size_t batch = 1;
     bool ticker = false;
     bool startSignal = false;
     bool yieldPacing = false;
@@ -150,6 +152,8 @@ Options parse(std::span<char *> arguments) {
             options.rate = number(key, value, 1, MAX_RATE);
         else if (key == "--clients")
             options.clients = number(key, value, 1, 8);
+        else if (key == "--batch")
+            options.batch = number(key, value, 1, MAX_STREAM_BATCH);
         else if (key == "--address")
             options.address = value;
         else if (key == "--record")
@@ -160,8 +164,7 @@ Options parse(std::span<char *> arguments) {
             options.startSignal = true;
         else if (key == "--pacing" && (value == "sleep" || value == "yield"))
             options.yieldPacing = value == "yield";
-        else if ((key == "--batch" && value != "1") || (key == "--symbol" && value != "IBM") ||
-                 key == "--start-signal" || key == "--pacing")
+        else if ((key == "--symbol" && value != "IBM") || key == "--start-signal" || key == "--pacing")
             throw std::invalid_argument("Unsupported value for " + std::string(key));
     }
 
@@ -172,6 +175,9 @@ Options parse(std::span<char *> arguments) {
         options.ticker = true;
     else if (record != "TimeAndSale" || contract != "stream")
         throw std::invalid_argument("Unsupported record and contract combination");
+
+    if (options.ticker && options.batch != 1)
+        throw std::invalid_argument("TICKER requires --batch 1");
 
     const auto offered = static_cast<std::uint64_t>(options.duration.count()) * options.rate;
 
@@ -331,6 +337,7 @@ void produce(const Options &options) {
     publisherOptions.listener.address = options.address;
     publisherOptions.listener.port = options.port;
     publisherOptions.listener.maxConnections = options.clients;
+    publisherOptions.streamBatchRecords = options.batch;
     publisherOptions.mixed = true;
     auto endpoint = q::api::PublisherEndpoint::create(*bootstrap, publisherOptions);
 
@@ -389,6 +396,7 @@ void produce(const Options &options) {
     const auto drainDeadline = end + DRAIN_TIMEOUT;
     std::uint64_t generated = 0;
     std::uint64_t admitted = 0;
+    std::array<q::events::TimeAndSale, MAX_STREAM_BATCH> sales;
 
     for (auto now = start; now < end; now = Clock::now()) {
         const auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(now - start).count();
@@ -399,14 +407,24 @@ void produce(const Options &options) {
             continue;
         }
 
-        ++generated;
+        const auto count = std::min<std::uint64_t>(options.batch, offered - generated);
 
-        if (options.ticker)
-            admit(publisher, makeQuote(generated), generated, drainDeadline, admissionRetries, options.yieldPacing);
-        else
-            admit(publisher, makeSale(generated), generated, drainDeadline, admissionRetries, options.yieldPacing);
+        if (options.ticker) {
+            const auto sequence = generated + 1;
+            admit(publisher, makeQuote(sequence), sequence, drainDeadline, admissionRetries, options.yieldPacing);
+        } else if (options.batch == 1) {
+            const auto sequence = generated + 1;
+            admit(publisher, makeSale(sequence), sequence, drainDeadline, admissionRetries, options.yieldPacing);
+        } else {
+            for (std::size_t i = 0; i < count; ++i)
+                sales[i] = makeSale(generated + i + 1);
 
-        ++admitted;
+            admit(publisher, std::span<const q::events::TimeAndSale>(sales).first(count), generated + 1, drainDeadline,
+                  admissionRetries, options.yieldPacing);
+        }
+
+        generated += count;
+        admitted += count;
     }
 
     if (admitted == 0)

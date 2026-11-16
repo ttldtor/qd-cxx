@@ -1575,6 +1575,85 @@ detail::LocalEventOwner::record(LiveDataMessage type, std::int32_t localId, cons
 }
 
 template <typename Field>
+void detail::LocalEventOwner::appendRecord(LiveEvent::State &event, std::int32_t localId,
+                                           const core::RecordContext &context, std::u16string_view symbol,
+                                           std::span<const Field> fields, std::int32_t flags,
+                                           std::optional<std::int64_t> removalTime,
+                                           std::optional<FieldEventTime> eventTime, LiveWork &work) {
+    auto *resource = event.arena.resource();
+    detail::PmrStreamDataRecord record{localId,
+                                       encoding::PmrSymbolValue(*resource),
+                                       std::pmr::vector<std::int32_t>(resource),
+                                       std::pmr::vector<detail::PmrFieldValue>(resource),
+                                       context,
+                                       localId,
+                                       removalTime,
+                                       eventTime};
+    record.symbol.units.assign(symbol);
+    record.symbol.eventFlags = flags;
+
+    if (const auto encoded = encoding::encodePentaSymbol(symbol))
+        record.symbol.cipher = encoded->cipher;
+
+    record.typedValues.reserve(fields.size());
+
+    for (const auto &field : fields) {
+        auto &value = record.typedValues.emplace_back(field.type, field.raw);
+
+        if (field.units) {
+            debit(field.units->size(), work.textUnits);
+            value.units.emplace(resource);
+
+            if (!field.units->empty())
+                value.units->assign(field.units->data(), field.units->size());
+        }
+
+        if (field.bytes) {
+            value.bytes.emplace(resource);
+
+            if (!field.bytes->empty())
+                value.bytes->assign(field.bytes->begin(), field.bytes->end());
+        }
+    }
+
+    event.decoded.records.push_back(std::move(record));
+}
+
+std::expected<LiveEvent, LiveError> detail::LocalEventOwner::stream(std::span<const LocalStreamRow> rows,
+                                                                    LiveWork &work) const {
+    if (rows.empty())
+        return std::unexpected(Error::INVALID_CONFIGURATION);
+
+    try {
+        debit(1, work.operations);
+        const auto bytes = product(eventBytes_, rows.size());
+        debit(sum(sizeof(LiveEvent::State), bytes), work.bytes);
+        auto event =
+            makeOwner<LiveEvent::State>(*epoch_.state_->ledger.lease.get(), bytes, epoch_, LiveEventKind::DATA);
+        event->messageType = STREAM_DATA;
+        event->decoded.records.reserve(rows.size());
+
+        for (const auto &row : rows) {
+            debit(row.fields.size() + 1, work.visits);
+            debit(row.symbol.size(), work.textUnits);
+            appendRecord(*event, row.localId, row.context, row.symbol, row.fields, 0, {}, {}, work);
+        }
+
+        event->complete(work);
+
+        return LiveEvent(std::move(event));
+    } catch (Error error) {
+        return std::unexpected(error);
+    } catch (const LiveStorageLimit &) {
+        return std::unexpected(Error::RESOURCE_LIMIT);
+    } catch (const std::bad_alloc &) {
+        return std::unexpected(Error::ALLOCATION_FAILURE);
+    } catch (const std::length_error &) {
+        return std::unexpected(Error::RESOURCE_LIMIT);
+    }
+}
+
+template <typename Field>
 std::expected<LiveEvent, LiveError>
 detail::LocalEventOwner::copyRecord(LiveDataMessage type, std::int32_t localId, const core::RecordContext &context,
                                     std::u16string_view symbol, std::span<const Field> fields, std::int32_t flags,
@@ -1588,43 +1667,7 @@ detail::LocalEventOwner::copyRecord(LiveDataMessage type, std::int32_t localId, 
         auto event =
             makeOwner<LiveEvent::State>(*epoch_.state_->ledger.lease.get(), eventBytes_, epoch_, LiveEventKind::DATA);
         event->messageType = std::to_underlying(type);
-        auto *resource = event->arena.resource();
-        detail::PmrStreamDataRecord record{localId,
-                                           encoding::PmrSymbolValue(*resource),
-                                           std::pmr::vector<std::int32_t>(resource),
-                                           std::pmr::vector<detail::PmrFieldValue>(resource),
-                                           context,
-                                           localId,
-                                           removalTime,
-                                           eventTime};
-        record.symbol.units.assign(symbol);
-        record.symbol.eventFlags = flags;
-
-        if (const auto encoded = encoding::encodePentaSymbol(symbol))
-            record.symbol.cipher = encoded->cipher;
-
-        record.typedValues.reserve(fields.size());
-
-        for (const auto &field : fields) {
-            auto &value = record.typedValues.emplace_back(field.type, field.raw);
-
-            if (field.units) {
-                debit(field.units->size(), work.textUnits);
-                value.units.emplace(resource);
-
-                if (!field.units->empty())
-                    value.units->assign(field.units->data(), field.units->size());
-            }
-
-            if (field.bytes) {
-                value.bytes.emplace(resource);
-
-                if (!field.bytes->empty())
-                    value.bytes->assign(field.bytes->begin(), field.bytes->end());
-            }
-        }
-
-        event->decoded.records.push_back(std::move(record));
+        appendRecord(*event, localId, context, symbol, fields, flags, removalTime, eventTime, work);
         event->complete(work);
 
         return LiveEvent(std::move(event));
