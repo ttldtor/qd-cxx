@@ -19,7 +19,9 @@ param(
     [ValidateSet('Auto', 'ms', 'ns')][string]$Precision = 'Auto',
     [ValidateSet('sleep', 'yield')][string]$Pacing = 'sleep',
     [switch]$Help,
-    [switch]$HelpRu
+    [switch]$HelpRu,
+    [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$')][string]$ProducerNamespace,
+    [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$')][string]$ReceiverNamespace
 )
 
 $ErrorActionPreference = 'Stop'
@@ -28,6 +30,7 @@ if ($HelpRu) {
     Write-Output 'Сверяет IBM TimeAndSale/STREAM с QD 3.357 на IPv4 loopback. Нужен JDK с javac.'
     Write-Output 'Для qdcxx-event-nettest укажите -ProducerKind Event, без -Bundle. Batch 1..8 для STREAM, 1 для TICKER.'
     Write-Output 'Event: -Clients 1..8, -Contract stream|ticker, -ListenAddress IPv4, -Precision Auto|ms|ns, -Pacing sleep|yield (sleep по умолчанию).'
+    Write-Output 'На Linux Event: -ProducerNamespace ИМЯ -ReceiverNamespace ИМЯ используют настроенные сетевые пространства и требуют доступа к ip netns exec.'
     Write-Output 'Параметры: -Duration 10 (1..300 с), -Rate 1000 (записей/с), -Batch 1 (1..32). Нагрузка должна укладываться в 22 бит.'
     Write-Output 'Сохраняет JSON, замеры процессов и журналы в новом каталоге. Завершает только свои дочерние процессы.'
     Write-Output 'Код 0 — доставка и сверка успешны, 1 — ошибка аргументов, сборки, замера или доставки.'
@@ -38,6 +41,7 @@ if ($Help -or !$PSBoundParameters.Count) {
     Write-Output 'Verify IBM TimeAndSale/STREAM on IPv4 loopback with Java QD 3.357. Requires a JDK with javac.'
     Write-Output 'For qdcxx-event-nettest, pass -ProducerKind Event and omit -Bundle. Batch 1..8 for STREAM, 1 for TICKER.'
     Write-Output 'Event: -Clients 1..8, -Contract stream|ticker, -ListenAddress IPv4, -Precision Auto|ms|ns, -Pacing sleep|yield (default sleep).'
+    Write-Output 'On Linux Event: -ProducerNamespace NAME -ReceiverNamespace NAME use existing network namespaces and require access to ip netns exec.'
     Write-Output 'Options: -Duration 10 (1..300 seconds), -Rate 1000 (records/sec), -Batch 1 (1..32).'
     Write-Output 'Offered records plus one batch must fit the 22-bit sequence range.'
     Write-Output 'Writes JSON, process samples and logs to a new directory. Stops its own child processes.'
@@ -56,6 +60,14 @@ $address = $null
 if (![Net.IPAddress]::TryParse($ListenAddress, [ref]$address) -or $address.AddressFamily -ne 'InterNetwork' -or
     $address.ToString() -cne $ListenAddress -or $address.Equals([Net.IPAddress]::Any)) {
     throw 'ListenAddress must be a concrete numeric IPv4 address.'
+}
+$ipCommand = $null
+if ($ProducerNamespace -or $ReceiverNamespace) {
+    if (!$IsLinux -or $ProducerKind -ne 'Event' -or !$ProducerNamespace -or !$ReceiverNamespace -or
+        $ProducerNamespace -ceq $ReceiverNamespace -or [Net.IPAddress]::IsLoopback($address)) {
+        throw 'Network namespaces require Linux Event mode, two distinct names and a non-loopback IPv4 listen address.'
+    }
+    $ipCommand = (Get-Command ip -CommandType Application -ErrorAction Stop | Select-Object -First 1).Path
 }
 if ($Precision -eq 'Auto') { $Precision = if ($ProducerKind -eq 'Event') { 'ns' } else { 'ms' } }
 $Precision = $Precision.ToLowerInvariant()
@@ -108,7 +120,12 @@ if ($Precision -eq 'ns') { $jdkOptions += '-Ddxscheme.nanoTime=true' }
 
 # Own redirected pipes and a bounded stdout prefix until the readiness marker.
 function Start-Child([string]$File, [string[]]$Arguments, [string]$Name) {
-    $info = [Diagnostics.ProcessStartInfo]::new($File)
+    $executable = if ($ipCommand) { $ipCommand } else { $File }
+    $info = [Diagnostics.ProcessStartInfo]::new($executable)
+    if ($ipCommand) {
+        $network = if ($Name -eq 'producer') { $ProducerNamespace } else { $ReceiverNamespace }
+        foreach ($argument in @('netns','exec',$network,$File)) { $info.ArgumentList.Add($argument) }
+    }
     $info.UseShellExecute = $false
     $info.CreateNoWindow = $true
     $info.RedirectStandardInput = $true
@@ -344,6 +361,8 @@ try {
         precision = $Precision
         pacing = $Pacing
         listenAddress = $ListenAddress
+        producerNamespace = $ProducerNamespace
+        receiverNamespace = $ReceiverNamespace
         symbol = 'IBM'
         receiverRole = 'QD record verifier'
         offeredRps = $Rate
