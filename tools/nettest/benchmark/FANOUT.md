@@ -47,3 +47,13 @@ nonzero. The underlying runner terminates its child processes. The output
 directory and its evidence remain available after errors.
 
 Source throughput counts admitted source records per configured producer second. Delivery throughput includes drain deliveries and uses the same producer window as its denominator.
+
+## Separate Linux network namespaces
+
+Pass `-ProducerNamespace` and `-ReceiverNamespace` together with
+`-ListenAddress` set to the publisher's non-loopback IPv4 address. Create
+and route the namespaces before running the benchmark. The runner needs
+permission to execute `ip netns exec` and leaves the namespaces in place.
+Each Java client runs in the receiver namespace. The JSON records the two
+namespace names, and CPU and memory are sampled for the actual child
+processes on the shared Linux host.

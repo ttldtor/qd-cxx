@@ -16,7 +16,9 @@ param(
     [string[]]$Pacing = @('sleep'),
     [string]$ListenAddress = '127.0.0.1',
     [switch]$Help,
-    [switch]$HelpRu
+    [switch]$HelpRu,
+    [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$')][string]$ProducerNamespace,
+    [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$')][string]$ReceiverNamespace
 )
 
 $ErrorActionPreference = 'Stop'
@@ -26,6 +28,7 @@ if ($HelpRu) {
     Write-Output 'Параметры: -Clients 1,2,4,8 (каждое 1..8), -Batches 1,8, -Rate 1000 (1..1000000 записей/с),'
     Write-Output ' -Duration 10 (1..300 с), -Repeats 1 (1..10), -Pacing sleep или yield (по умолчанию sleep),'
     Write-Output ' -ListenAddress 127.0.0.1 (конкретный числовой IPv4). Несколько режимов Pacing передаются массивом.'
+    Write-Output ' На Linux можно указать -ProducerNamespace ИМЯ -ReceiverNamespace ИМЯ и IPv4 интерфейса издателя.'
     Write-Output 'Rate * Duration и пакет должны помещаться в 22-битную последовательность. Нужны JDK с javac и QD 3.357.'
     Write-Output 'Создаёт каталог с summary.csv, JSON, процессными замерами и журналами каждого прогона. Создаёт процессы и TCP-сокеты.'
     Write-Output 'Код 0 — все доставки сверены, 1 — ошибка параметров, запуска, проверки или записи.'
@@ -37,6 +40,7 @@ if ($Help -or !$PSBoundParameters.Count) {
     Write-Output 'Options: -Clients 1,2,4,8 (each 1..8), -Batches 1,8, -Rate 1000 (1..1000000 records/s),'
     Write-Output ' -Duration 10 (1..300 s), -Repeats 1 (1..10), -Pacing sleep or yield (default sleep),'
     Write-Output ' -ListenAddress 127.0.0.1 (concrete numeric IPv4). Multiple Pacing values may be passed as an array.'
+    Write-Output ' On Linux, supply -ProducerNamespace NAME -ReceiverNamespace NAME and the publisher interface IPv4 address.'
     Write-Output 'Rate * Duration and batch must fit the 22-bit sequence range. A JDK with javac and QD 3.357 are required.'
     Write-Output 'Creates a directory containing summary.csv and each run''s JSON, process samples and logs. Starts processes and TCP sockets.'
     Write-Output 'Exit 0 when every delivery is verified, 1 for argument, launch, validation or output failure.'
@@ -71,6 +75,11 @@ if (![Net.IPAddress]::TryParse($ListenAddress, [ref]$address) -or
     $address.AddressFamily -ne [Net.Sockets.AddressFamily]::InterNetwork -or
     $address.ToString() -cne $ListenAddress -or $address.Equals([Net.IPAddress]::Any)) {
     throw 'ListenAddress must be a concrete numeric IPv4 address.'
+}
+if (($ProducerNamespace -or $ReceiverNamespace) -and
+    (!$IsLinux -or !$ProducerNamespace -or !$ReceiverNamespace -or
+        $ProducerNamespace -ceq $ReceiverNamespace -or [Net.IPAddress]::IsLoopback($address))) {
+    throw 'Network namespaces require Linux, two distinct names and a non-loopback IPv4 listen address.'
 }
 $Program = (Resolve-Path -LiteralPath $Program).Path
 $Java = (Resolve-Path -LiteralPath $Java).Path
@@ -111,6 +120,10 @@ foreach ($repeat in 1..$Repeats) {
                     ListenAddress = $ListenAddress
                     Precision = 'ns'
                     Pacing = $mode
+                }
+                if ($ProducerNamespace) {
+                    $arguments.ProducerNamespace = $ProducerNamespace
+                    $arguments.ReceiverNamespace = $ReceiverNamespace
                 }
                 & $runner @arguments
                 $result = Get-Content -LiteralPath (Join-Path $dir 'result.json') -Raw | ConvertFrom-Json
