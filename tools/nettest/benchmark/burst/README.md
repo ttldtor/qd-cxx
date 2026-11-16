@@ -53,3 +53,5 @@ of messages. All messages in that datagram have the same offered send time.
 The final datagram can be shorter. The corpus contains one burst. A replayer
 can repeat it with a separately specified period and must report actual send
 times and delayed or unsent datagrams.
+
+For network runs, see [synthetic multicast burst replay](../multicast/README.md).

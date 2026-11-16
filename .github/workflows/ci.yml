@@ -96,6 +96,11 @@ jobs:
         shell: pwsh
         run: '& ./tools/nettest/benchmark/burst/Test-Corpus.ps1 -OutputDirectory (Join-Path $env:RUNNER_TEMP "nettest-burst")'
 
+      - name: Verify local multicast burst replay
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: '& ./tools/nettest/benchmark/multicast/Test-Multicast.ps1 -OutputDirectory (Join-Path $env:RUNNER_TEMP "nettest-multicast")'
+
       - name: Report known contract failures
         if: ${{ !cancelled() && (steps.tests.outcome == 'success' || steps.tests.outcome == 'failure') }}
         continue-on-error: true
