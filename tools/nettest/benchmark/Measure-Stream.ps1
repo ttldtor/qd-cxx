@@ -21,7 +21,8 @@ param(
     [switch]$Help,
     [switch]$HelpRu,
     [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$')][string]$ProducerNamespace,
-    [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$')][string]$ReceiverNamespace
+    [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$')][string]$ReceiverNamespace,
+    [switch]$TcpNoDelay
 )
 
 $ErrorActionPreference = 'Stop'
@@ -31,6 +32,7 @@ if ($HelpRu) {
     Write-Output 'Для qdcxx-event-nettest укажите -ProducerKind Event, без -Bundle. Batch 1..8 для STREAM, 1 для TICKER.'
     Write-Output 'Event: -Clients 1..8, -Contract stream|ticker, -ListenAddress IPv4, -Precision Auto|ms|ns, -Pacing sleep|yield (sleep по умолчанию).'
     Write-Output 'На Linux Event: -ProducerNamespace ИМЯ -ReceiverNamespace ИМЯ используют настроенные сетевые пространства и требуют доступа к ip netns exec.'
+    Write-Output '-TcpNoDelay включает TCP_NODELAY у издателя Event.'
     Write-Output 'Параметры: -Duration 10 (1..300 с), -Rate 1000 (записей/с), -Batch 1 (1..32). Нагрузка должна укладываться в 22 бит.'
     Write-Output 'Сохраняет JSON, замеры процессов и журналы в новом каталоге. Завершает только свои дочерние процессы.'
     Write-Output 'Код 0 — доставка и сверка успешны, 1 — ошибка аргументов, сборки, замера или доставки.'
@@ -42,6 +44,7 @@ if ($Help -or !$PSBoundParameters.Count) {
     Write-Output 'For qdcxx-event-nettest, pass -ProducerKind Event and omit -Bundle. Batch 1..8 for STREAM, 1 for TICKER.'
     Write-Output 'Event: -Clients 1..8, -Contract stream|ticker, -ListenAddress IPv4, -Precision Auto|ms|ns, -Pacing sleep|yield (default sleep).'
     Write-Output 'On Linux Event: -ProducerNamespace NAME -ReceiverNamespace NAME use existing network namespaces and require access to ip netns exec.'
+    Write-Output '-TcpNoDelay enables TCP_NODELAY on the Event publisher.'
     Write-Output 'Options: -Duration 10 (1..300 seconds), -Rate 1000 (records/sec), -Batch 1 (1..32).'
     Write-Output 'Offered records plus one batch must fit the 22-bit sequence range.'
     Write-Output 'Writes JSON, process samples and logs to a new directory. Stops its own child processes.'
@@ -56,6 +59,7 @@ if (($ProducerKind -eq 'Record' -and !$Bundle) -or
     ($ProducerKind -eq 'Event' -and ($Bundle -or $Batch -gt 8 -or ($Contract -eq 'ticker' -and $Batch -ne 1)))) {
     throw 'Record mode requires a bundle. Event uses the built-in schema and batch 1..8 for STREAM or 1 for TICKER.'
 }
+if ($ProducerKind -eq 'Record' -and $TcpNoDelay) { throw 'TcpNoDelay requires Event mode.' }
 $address = $null
 if (![Net.IPAddress]::TryParse($ListenAddress, [ref]$address) -or $address.AddressFamily -ne 'InterNetwork' -or
     $address.ToString() -cne $ListenAddress -or $address.Equals([Net.IPAddress]::Any)) {
@@ -106,6 +110,7 @@ if ($ProducerKind -eq 'Record') {
 } else {
     $producerArgs += @('--clients', "$Clients", '--address', $ListenAddress, '--start-signal', 'stdin')
     if ($Pacing -eq 'yield') { $producerArgs += @('--pacing', $Pacing) }
+    if ($TcpNoDelay) { $producerArgs += @('--tcp-no-delay', '1') }
 }
 $PSNativeCommandUseErrorActionPreference = $false
 & $javac -cp $Classpath -d $classes (Join-Path $PSScriptRoot 'StreamReceiver.java') *> (Join-Path $output 'javac.log')
@@ -363,6 +368,7 @@ try {
         listenAddress = $ListenAddress
         producerNamespace = $ProducerNamespace
         receiverNamespace = $ReceiverNamespace
+        tcpNoDelay = [bool]$TcpNoDelay
         symbol = 'IBM'
         receiverRole = 'QD record verifier'
         offeredRps = $Rate

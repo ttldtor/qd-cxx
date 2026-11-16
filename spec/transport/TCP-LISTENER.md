@@ -20,6 +20,11 @@ descriptors in the listener itself, with a fixed table allocated at creation,
 from 1 through `TcpListenerOptions::MAX_CONNECTIONS`. At capacity, `accept()`
 returns `RESOURCE_LIMIT` before dequeuing any native connection.
 
+`noDelay` configures `TCP_NODELAY` on the listener before binding so accepted
+sockets inherit it. The low-level listener uses the operating system default
+unless this option is enabled. A QTP publisher can enable it through
+`PublisherOptions::listener` to reduce the delay of small writes.
+
 Each accepted socket has a distinct `TcpConnectionId`. It identifies one live
 slot generation within one listener and cannot address another listener or a
 replacement peer. Moving the listener on its owner thread preserves its active

@@ -9,6 +9,7 @@
 #    include <ws2tcpip.h>
 #else
 #    include <arpa/inet.h>
+#    include <netinet/tcp.h>
 #    include <sys/socket.h>
 #    include <unistd.h>
 #endif
@@ -292,6 +293,16 @@ std::expected<TcpListener, TcpListenerDiagnostic> TcpListener::create(RuntimeBoo
 
     if (socket == INVALID_HANDLE) {
         return fail(TcpListenerError::SOCKET_FAILURE, "listener-open", socketError());
+    }
+
+    if (options.noDelay) {
+        // Accepted TCP sockets inherit this option from the listener.
+        const int enabled = 1;
+
+        if (::setsockopt(socket, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<const char *>(&enabled), sizeof(enabled)) !=
+            0) {
+            return fail(TcpListenerError::SOCKET_FAILURE, "listener-no-delay", socketError());
+        }
     }
 
 #ifdef _WIN32

@@ -49,6 +49,7 @@ Serves 1..8 clients over plain TCP.
   --startup SECONDS  Wait for matching demand (1..120), default 10
   --rate EVENTS      Offered events per second (1..1000000), default 1000
   --pacing MODE      sleep (default) or yield for capacity tests with extra CPU use
+  --tcp-no-delay N   1 enables TCP_NODELAY; 0 uses the default TCP behavior
   --batch N          Maximum events per call (STREAM 1..8, TICKER 1), default 1
   --record NAME      TimeAndSale (default) or Quote
   --symbol IBM       Fixed symbol
@@ -76,6 +77,7 @@ constexpr std::string_view HELP_RU = R"(Использование: qdcxx-event-
   --startup СЕКУНДЫ  Ожидание подписки (1..120), по умолчанию 10
   --rate СОБЫТИЯ     Предложено событий в секунду (1..1000000), по умолчанию 1000
   --pacing РЕЖИМ     sleep (по умолчанию) или yield для замера с повышенным расходом CPU
+  --tcp-no-delay N   1 включает TCP_NODELAY; 0 оставляет настройку TCP по умолчанию
   --batch N          Предел событий на вызов (STREAM 1..8, TICKER 1), по умолчанию 1
   --record ИМЯ       TimeAndSale (по умолчанию) или Quote
   --symbol IBM       Фиксированный символ
@@ -104,6 +106,7 @@ struct Options {
     bool ticker = false;
     bool startSignal = false;
     bool yieldPacing = false;
+    bool tcpNoDelay = false;
 };
 
 unsigned number(std::string_view key, std::string_view value, unsigned minimum, unsigned maximum) {
@@ -117,9 +120,9 @@ unsigned number(std::string_view key, std::string_view value, unsigned minimum, 
 }
 
 Options parse(std::span<char *> arguments) {
-    constexpr std::array<std::string_view, 12> KEYS{"--port",    "--duration", "--startup",      "--rate",
-                                                    "--batch",   "--record",   "--symbol",       "--contract",
-                                                    "--clients", "--address",  "--start-signal", "--pacing"};
+    constexpr std::array<std::string_view, 13> KEYS{
+        "--port",     "--duration", "--startup", "--rate",         "--batch",  "--record",      "--symbol",
+        "--contract", "--clients",  "--address", "--start-signal", "--pacing", "--tcp-no-delay"};
 
     if (std::string_view(arguments.front()) != "p" || arguments.size() % 2 == 0)
         throw std::invalid_argument("Expected p followed by option/value pairs");
@@ -154,6 +157,8 @@ Options parse(std::span<char *> arguments) {
             options.clients = number(key, value, 1, 8);
         else if (key == "--batch")
             options.batch = number(key, value, 1, MAX_STREAM_BATCH);
+        else if (key == "--tcp-no-delay")
+            options.tcpNoDelay = number(key, value, 0, 1) != 0;
         else if (key == "--address")
             options.address = value;
         else if (key == "--record")
@@ -337,6 +342,7 @@ void produce(const Options &options) {
     publisherOptions.listener.address = options.address;
     publisherOptions.listener.port = options.port;
     publisherOptions.listener.maxConnections = options.clients;
+    publisherOptions.listener.noDelay = options.tcpNoDelay;
     publisherOptions.streamBatchRecords = options.batch;
     publisherOptions.mixed = true;
     auto endpoint = q::api::PublisherEndpoint::create(*bootstrap, publisherOptions);

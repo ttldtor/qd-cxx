@@ -50,6 +50,7 @@ struct TcpListenerOptions {
     std::size_t maxConnections = 16;        ///< Accepted socket slots allocated at creation, in 1..MAX_CONNECTIONS.
     std::size_t maxReadBytes = 64 * 1024;   ///< Positive per-call receive cap, at most INT_MAX.
     std::size_t maxWriteBytes = 64 * 1024;  ///< Positive per-call send cap, at most INT_MAX.
+    bool noDelay = false;                   ///< Disable Nagle for accepted connections.
 };
 
 /** Comparable, non-reusable identity scoped to one listener, valid until retirement. */
