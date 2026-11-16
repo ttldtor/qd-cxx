@@ -155,6 +155,7 @@ class SubscriptionWriter {
         std::size_t targetPayloadBytes;
         std::size_t maxFrameBytes;
         std::size_t &writtenRecords;
+        std::span<std::byte> scratch;
     };
 
     /** Compose one atomic operation after validation and exact sizing.

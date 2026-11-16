@@ -19,6 +19,7 @@ namespace detail {
 class TapeEventBridge;
 struct LiveAuthorization;
 class LocalEventOwner;
+struct SharedRecordAccess;
 } // namespace detail
 
 /** Detached counters at framing and atomic DATA-commit boundaries, before projection or fan-out. */
@@ -286,6 +287,7 @@ class LiveEvent {
     friend class LiveSession;
     friend class detail::TapeEventBridge;
     friend class detail::LocalEventOwner;
+    friend struct detail::SharedRecordAccess;
     /** Adopt a fully admitted event.
      * @param state Complete owned event.
      */

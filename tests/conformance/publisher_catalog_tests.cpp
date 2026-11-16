@@ -573,6 +573,13 @@ TEST_CASE("local catalog STREAM batches deliver ordered owned records to two sho
     options.streamBatchRecords = 8;
     options.listener.maxConnections = 2;
     options.listener.maxWriteBytes = 7;
+    bool byteMode = false;
+    SUBCASE("legacy independent records") {
+    }
+    SUBCASE("private flat byte-mode batches") {
+        options.streamBytes.emplace(8000, MESSAGE_LIMIT);
+        byteMode = true;
+    }
     auto endpoint = q::api::PublisherEndpoint::create(*bootstrap, options);
     REQUIRE(endpoint);
     Downstream first(schema, (*endpoint)->port(), 100);
@@ -627,9 +634,15 @@ TEST_CASE("local catalog STREAM batches deliver ordered owned records to two sho
 
     (*endpoint)->closeAndAwaitTermination();
     const auto stats = (*endpoint)->getStatistics().families[1];
-    CHECK(stats.ingressFrames.value == 2);
+
+    if (!byteMode)
+        CHECK(stats.ingressFrames.value == 2);
+
     CHECK(stats.ingressRecords.value == delivered);
-    CHECK(stats.sentFrames.value == 4);
+
+    if (!byteMode)
+        CHECK(stats.sentFrames.value == 4);
+
     const auto closed = publisher.publishStreamRecords(rows);
     REQUIRE_FALSE(closed);
     CHECK(closed.error().code == q::api::ErrorCode::CLOSED);
@@ -791,6 +804,68 @@ TEST_CASE("catalog STREAM oversized wire record retires only its peer and counts
     REQUIRE(publisher.publishRecord(STREAM, context, u"FAST", small));
     awaitRecords(second, 1, **endpoint);
     CHECK((*endpoint)->getDiagnostic().code == q::api::ErrorCode::NONE);
+}
+
+TEST_CASE("flat STREAM delivery window counts a whole batch before its first row") {
+    auto bootstrap = q::transport::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    const auto schema = publicationSchema();
+    const auto names = fieldNames(schema);
+    q::api::PublisherOptions options;
+    options.catalog.emplace(schema, names);
+    options.pendingQuotes = 32;
+    options.listener.maxConnections = 1;
+    options.listener.maxWriteBytes = 1024;
+    options.recordLimits.rowBytes = 16 * 1024;
+    options.recordLimits.pendingBytes = 256 * 1024;
+    options.streamBytes.emplace(8000, MESSAGE_LIMIT, 64 * 1024);
+    auto endpoint = q::api::PublisherEndpoint::create(*bootstrap, options);
+    INFO((endpoint ? std::string_view{} : endpoint.error().stage));
+    REQUIRE(endpoint);
+    Downstream peer(schema, (*endpoint)->port(), 100);
+    peer.subscribe(p::SubscriptionMessage::STREAM_ADD, 1);
+    REQUIRE(
+        (*endpoint)->awaitDemand(c::SubscriptionFamily::STREAM, u"CustomFlow", u"IBM", true, Clock::now() + WAIT_TIME));
+    constexpr std::size_t ROWS = 4;
+    constexpr std::size_t BATCHES = 4;
+    const std::vector<std::byte> bytes(12 * 1024, std::byte{0x37});
+    std::array<std::array<c::FieldValueView, 3>, ROWS> fields;
+    std::array<q::api::PublisherStreamRecordView, ROWS> rows;
+    const auto publisher = (*endpoint)->getPublisher();
+
+    for (std::size_t batch = 0; batch < BATCHES; ++batch) {
+        for (std::size_t i = 0; i < ROWS; ++i) {
+            fields[i] = {
+                c::FieldValueView{c::SerialFieldType::UTF_CHAR_ARRAY, 0, {}, {}},
+                c::FieldValueView{c::SerialFieldType::BYTE_ARRAY, 0, {}, bytes},
+                c::FieldValueView{c::SerialFieldType::LONG, static_cast<std::int64_t>(batch * ROWS + i), {}, {}}};
+            rows[i] = {schema.recordContext(1), u"IBM", fields[i]};
+        }
+
+        REQUIRE(publisher.publishStreamRecords(rows));
+
+        if (batch == 0) {
+            const auto deadline = Clock::now() + WAIT_TIME;
+
+            while ((*endpoint)->getStatistics().families[1].deliveryRecordOwners < ROWS && Clock::now() < deadline)
+                std::this_thread::yield();
+
+            REQUIRE((*endpoint)->getStatistics().families[1].deliveryRecordOwners >= ROWS);
+        }
+    }
+
+    awaitRecords(peer, ROWS * BATCHES, **endpoint);
+
+    for (std::size_t i = 0; i < peer.records().size(); ++i) {
+        const auto &values = peer.records()[i].second.typedValues;
+        CHECK(values[2].raw == static_cast<std::int64_t>(i));
+        REQUIRE(values[1].bytes);
+        CHECK(*values[1].bytes == bytes);
+    }
+
+    CHECK((*endpoint)->getStatistics().retiredPeers.value == 0);
+    CHECK((*endpoint)->getStatistics().families[1].failedFrames.value == 0);
+    (*endpoint)->closeAndAwaitTermination();
 }
 
 TEST_CASE("catalog STREAM sends more than 512 compact records per byte-bounded frame with partial writes") {

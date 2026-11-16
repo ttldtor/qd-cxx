@@ -4,6 +4,7 @@
 #include "../../src/core/delivery_statistics.hpp"
 #include "../../src/events/derived_order_sources.hpp"
 #include "../../src/mux/queue_replace.hpp"
+#include "../../src/protocol/local_event_owner.hpp"
 #include "qd/encoding/compact.hpp"
 #include "qd/encoding/utf_char.hpp"
 #include "qd/encoding/utf_string.hpp"
@@ -475,6 +476,35 @@ void send(Fixture &f, std::initializer_list<Input> records, bool deferCallbacks 
     FAIL("source admission never became ready");
 }
 
+/** Build a real private flat source batch with the fixture's three compact fields. */
+p::LiveEvent flatEvent(const c::LocalSchema &schema) {
+    const std::array fields{c::FieldValueView{c::SerialFieldType::COMPACT_INT, 0, {}, {}},
+                            c::FieldValueView{c::SerialFieldType::COMPACT_INT, 1, {}, {}},
+                            c::FieldValueView{c::SerialFieldType::COMPACT_INT, 10, {}, {}}};
+
+    struct Row {
+        std::u16string_view symbol;
+        std::span<const c::FieldValueView> fields;
+    };
+
+    const std::array input{Row{u"ALPHA", fields}, Row{u"ALPHA", fields}};
+    const auto batch = c::detail::SharedRecordPayload::copyBatch(std::span<const Row>(input));
+    auto liveWork = liveTurn();
+    auto source = p::detail::LocalEventOwner::create(liveLimits(), liveWork);
+    REQUIRE(source);
+    std::array<p::detail::LocalStreamRow, 2> rows;
+
+    for (std::size_t i = 0; i < rows.size(); ++i) {
+        auto payload = c::detail::SharedRecordPayload::row(batch, i);
+        rows[i] = {0, schema.recordContext(0), payload->symbol(), payload->fields(), std::move(payload)};
+    }
+
+    auto event = source->stream(rows, liveWork, true);
+    REQUIRE(event);
+
+    return std::move(*event);
+}
+
 /** Observe a scoped actual HISTORY range.
  * @param f Graph.
  * @param h Current registration.
@@ -782,6 +812,198 @@ TEST_CASE("deferred STREAM callback selects ordered records from successive sour
     CHECK(recorder->values == std::vector<std::int64_t>{10, 11});
     REQUIRE(recorder->retained.size() == (split ? 2 : 1));
     CHECK(recorder->retained.front().records().size() == (split ? 1 : 2));
+}
+
+TEST_CASE("compact STREAM keeps independent per-record backing") {
+    auto f = fixture(c::SubscriptionFamily::STREAM);
+    auto recorder = std::make_shared<Recorder>();
+    recorder->retain = true;
+    auto limits = clientLimits();
+    limits.compactRecordArena = true;
+    limits.batchRecordBytes = 1;
+    auto handle = open(f, recorder, limits);
+    add(f, handle);
+    send(f, {{0, u"ALPHA", 1, 10, 0}, {0, u"ALPHA", 2, 11, 0}});
+    until(f, [&] {
+        return recorder->retained.size() == 2;
+    });
+
+    const auto complete = f.queue.resources(handle);
+    REQUIRE(complete);
+    CHECK(complete->recordOwners == 2);
+    REQUIRE(complete->recordBytes != 0);
+    recorder->retained.front() = {};
+    const auto suffix = f.queue.resources(handle);
+    REQUIRE(suffix);
+    CHECK(suffix->recordOwners == 1);
+    CHECK(suffix->recordBytes < complete->recordBytes);
+
+    std::atomic<bool> valid{false};
+    std::thread release([batch = std::move(recorder->retained.back()), &valid]() mutable {
+        valid = batch.records().size() == 1 && batch.records().front().symbol == u"ALPHA" &&
+                batch.records().front().typedValues[2].raw == 11;
+        batch = {};
+    });
+    release.join();
+    CHECK(valid.load());
+    const auto released = f.queue.resources(handle);
+    REQUIRE(released);
+    CHECK(released->recordOwners == 0);
+    CHECK(released->recordBytes == 0);
+}
+
+TEST_CASE("shared local STREAM payload survives independent clients and serialized source destruction") {
+    auto f = fixture(c::SubscriptionFamily::STREAM);
+    auto first = std::make_shared<Recorder>();
+    auto second = std::make_shared<Recorder>();
+    first->retain = second->retain = true;
+    auto limits = clientLimits();
+    limits.compactRecordArena = true;
+    auto a = open(f, first, limits);
+    auto b = open(f, second, limits);
+    add(f, a);
+    add(f, b);
+
+    constexpr std::u16string_view SYMBOL = u"ALPHA";
+    constexpr std::size_t FIELDS = 3;
+    constexpr auto BYTES = FIELDS * sizeof(c::FieldValueView) + SYMBOL.size() * sizeof(char16_t);
+    auto backing = std::make_unique_for_overwrite<std::byte[]>(BYTES);
+    auto *values = reinterpret_cast<c::FieldValueView *>(backing.get());
+
+    for (std::size_t i = 0; i < FIELDS; ++i)
+        std::construct_at(values + i, c::FieldValueView{static_cast<c::SerialFieldType>(8), i == 2 ? 42 : 0, {}, {}});
+
+    auto *symbol = reinterpret_cast<char16_t *>(backing.get() + FIELDS * sizeof(c::FieldValueView));
+    std::copy(SYMBOL.begin(), SYMBOL.end(), symbol);
+    auto payload = c::detail::SharedRecordPayload::adopt(std::move(backing), SYMBOL.size(), FIELDS, BYTES);
+    std::weak_ptr<const c::detail::SharedRecordPayload> lifetime = payload;
+
+    {
+        auto work = liveTurn();
+        auto source = p::detail::LocalEventOwner::create(liveLimits(), work);
+        REQUIRE(source);
+        const p::detail::LocalStreamRow row{0, f.schema.recordContext(0), payload->symbol(), payload->fields(),
+                                            payload};
+        auto event = source->stream(std::span(&row, 1), work, true);
+        REQUIRE(event);
+        auto queueWork = turn();
+        REQUIRE(f.queue.admit(std::move(*event), queueWork));
+    }
+
+    payload.reset();
+    until(f, [&] {
+        return first->retained.size() == 1 && second->retained.size() == 1;
+    });
+    CHECK(first->retained.front().records().front().typedValues.data() == values);
+    CHECK(second->retained.front().records().front().typedValues.data() == values);
+    const auto aBytes = f.queue.resources(a)->recordBytes;
+    const auto bBytes = f.queue.resources(b)->recordBytes;
+    CHECK(f.queue.resources().recordBytes < aBytes + bBytes);
+    first->retained.clear();
+    CHECK(f.queue.resources(a)->recordOwners == 0);
+    CHECK(f.queue.resources(a)->recordBytes == 0);
+    CHECK(f.queue.resources().recordBytes == bBytes);
+    CHECK_FALSE(lifetime.expired());
+
+    SUBCASE("last client returns all physical backing") {
+        second->retained.clear();
+        CHECK(f.queue.resources().recordBytes == 0);
+        CHECK(lifetime.expired());
+    }
+    SUBCASE("last client releases on another thread after queue destruction") {
+        std::optional<m::MuxQueue> owner(std::move(f.queue));
+        owner.reset();
+        std::atomic<bool> valid{false};
+        std::thread release([batch = std::move(second->retained.front()), &valid]() mutable {
+            valid = batch.records().front().symbol == u"ALPHA" && batch.records().front().typedValues[2].raw == 42;
+            batch = {};
+        });
+        release.join();
+        CHECK(valid.load());
+        CHECK(lifetime.expired());
+    }
+}
+
+TEST_CASE("flat local STREAM batch shares backing across split route groups and clients") {
+    auto bounds = queueLimits();
+    bounds.routeRecords = 1;
+    auto f = fixture(c::SubscriptionFamily::STREAM, bounds);
+    auto first = std::make_shared<Recorder>();
+    auto second = std::make_shared<Recorder>();
+    first->retain = second->retain = true;
+    auto limits = clientLimits();
+    limits.compactRecordArena = true;
+    limits.batchRecords = 1;
+    auto a = open(f, first, limits);
+    auto b = open(f, second, limits);
+    add(f, a);
+    add(f, b);
+
+    struct Row {
+        std::u16string_view symbol;
+        std::span<const c::FieldValueView> fields;
+    };
+
+    std::array<std::array<c::FieldValueView, 3>, 2> values;
+    std::array<Row, 2> input;
+
+    for (std::size_t i = 0; i < input.size(); ++i) {
+        values[i] = {c::FieldValueView{c::SerialFieldType::COMPACT_INT, 0, {}, {}},
+                     c::FieldValueView{c::SerialFieldType::COMPACT_INT, static_cast<std::int64_t>(i), {}, {}},
+                     c::FieldValueView{c::SerialFieldType::COMPACT_INT, 40 + static_cast<std::int64_t>(i), {}, {}}};
+        input[i] = {u"ALPHA", values[i]};
+    }
+
+    auto batch = c::detail::SharedRecordPayload::copyBatch(std::span<const Row>(input));
+    std::weak_ptr<c::detail::SharedRecordPayload::Batch> lifetime = batch;
+    std::array<const c::FieldValueView *, 2> original;
+    {
+        auto work = liveTurn();
+        auto source = p::detail::LocalEventOwner::create(liveLimits(), work);
+        REQUIRE(source);
+        std::array<p::detail::LocalStreamRow, 2> rows;
+
+        for (std::size_t i = 0; i < rows.size(); ++i) {
+            auto payload = c::detail::SharedRecordPayload::row(batch, i);
+            original[i] = payload->fields().data();
+            rows[i] = {0, f.schema.recordContext(0), payload->symbol(), payload->fields(), std::move(payload)};
+            values[i][2].raw = -1;
+        }
+
+        auto event = source->stream(rows, work, true);
+        REQUIRE(event);
+        auto queueWork = turn();
+        REQUIRE(f.queue.admit(std::move(*event), queueWork));
+    }
+    batch.reset();
+    until(f, [&] {
+        return first->retained.size() == 2 && second->retained.size() == 2;
+    });
+
+    for (std::size_t i = 0; i < original.size(); ++i) {
+        CHECK(first->retained[i].records().front().typedValues.data() == original[i]);
+        CHECK(second->retained[i].records().front().typedValues.data() == original[i]);
+        CHECK(first->retained[i].records().front().typedValues[2].raw == 40 + static_cast<std::int64_t>(i));
+    }
+
+    CHECK(f.queue.resources().recordBytes < f.queue.resources(a)->recordBytes + f.queue.resources(b)->recordBytes);
+    first->retained.front() = {};
+    CHECK(f.queue.resources(a)->recordOwners == 1);
+    CHECK_FALSE(lifetime.expired());
+    first->retained.clear();
+    CHECK(f.queue.resources(a)->recordBytes == 0);
+    CHECK(f.queue.resources().recordBytes == f.queue.resources(b)->recordBytes);
+    second->retained.front() = {};
+    std::atomic<bool> valid{false};
+    std::optional<m::MuxQueue> owner(std::move(f.queue));
+    owner.reset();
+    std::thread release([held = std::move(second->retained.back()), &valid]() mutable {
+        valid = held.records().front().typedValues[2].raw == 41;
+        held = {};
+    });
+    release.join();
+    CHECK(valid.load());
+    CHECK(lifetime.expired());
 }
 
 TEST_CASE("MUX queue HISTORY complete cannot use old source bound before synchronization or unstaged TX") {
@@ -1220,6 +1442,11 @@ TEST_CASE("MUX queue retained composite quota and retired generation keep their 
     auto consumer = std::make_shared<Recorder>();
     consumer->retain = true;
     auto small = clientLimits();
+    SUBCASE("independent record allocations") {
+    }
+    SUBCASE("compact independent arenas") {
+        small.compactRecordArena = true;
+    }
     small.batchOwners = 1;
     auto h = open(f, consumer, small);
     add(f, h);
@@ -2758,6 +2985,8 @@ namespace {
 thread_local bool allocationFault = false;        ///< Narrow current-thread C++ allocation interception only.
 thread_local std::size_t allocationAllowance = 0; ///< Successful requests before injected failure.
 thread_local std::size_t allocationRequests = 0;  ///< Observed requests inside the explicitly armed operation.
+thread_local const m::MuxQueue *recordQuotaProbe = nullptr;
+thread_local std::size_t observedRecordPeak = 0;
 std::atomic<void *> heldDeletePointer{
     nullptr}; ///< One actual publicly observed arena address under the narrow release probe.
 std::atomic<bool> deleteEntered{false}, deleteContinue{true}; ///< Deterministic producer-delete handshake.
@@ -2768,6 +2997,9 @@ std::atomic<bool> deleteEntered{false}, deleteContinue{true}; ///< Deterministic
  * @return Ordinary owned backing, or bad_alloc before publication.
  */
 void *operator new(std::size_t size) {
+    if (recordQuotaProbe)
+        observedRecordPeak = std::max(observedRecordPeak, recordQuotaProbe->resources().recordBytes);
+
     if (allocationFault) {
         ++allocationRequests;
 
@@ -2837,18 +3069,89 @@ void operator delete[](void *value, std::size_t size) noexcept {
     ::operator delete[](value);
 }
 
+TEST_CASE("flat batch transient allocations respect the aggregate record hard ceiling") {
+    constexpr std::size_t MINIMUM = 1024;
+    constexpr std::size_t MAXIMUM = 8192;
+    constexpr std::size_t STEP = 128;
+    bool admitted = false, rejected = false;
+
+    for (std::size_t cap = MINIMUM; cap <= MAXIMUM; cap += STEP) {
+        auto bounds = queueLimits();
+        bounds.clients = 1;
+        bounds.recordBytes = cap;
+        auto f = fixture(c::SubscriptionFamily::STREAM, bounds);
+        auto receiver = std::make_shared<Recorder>();
+        receiver->retain = true;
+        auto limits = clientLimits();
+        limits.compactRecordArena = true;
+        limits.recordBytes = cap;
+        auto handle = open(f, receiver, limits);
+        add(f, handle);
+        auto event = flatEvent(f.schema);
+        auto work = turn();
+        REQUIRE(f.queue.admit(std::move(event), work));
+        observedRecordPeak = 0;
+        recordQuotaProbe = &f.queue;
+
+        for (unsigned turnIndex = 0; turnIndex < 200 && receiver->values.empty() && !handle.terminal(); ++turnIndex) {
+            work = turn();
+            const auto progress = f.queue.progress(work);
+
+            if (!progress)
+                break;
+        }
+
+        recordQuotaProbe = nullptr;
+        INFO("record cap=", cap, " peak=", observedRecordPeak);
+        CHECK(observedRecordPeak <= cap);
+        CHECK(f.queue.resources().recordBytes <= cap);
+
+        if (receiver->values.empty()) {
+            rejected = true;
+            CHECK(f.queue.resources().recordBytes == 0);
+            CHECK(f.queue.resources().dataItems == 0);
+        } else {
+            admitted = true;
+            CHECK(receiver->values == std::vector<std::int64_t>{10, 10});
+        }
+    }
+
+    CHECK(admitted);
+    CHECK(rejected);
+}
+
 TEST_CASE("MUX queue failed STREAM fanout allocations preserve every client queue and the real source prefix") {
     bool reachedCompleteAllocation = false;
+    auto limits = clientLimits();
+    bool flat = false;
+    SUBCASE("independent record allocations") {
+    }
+    SUBCASE("compact independent arenas") {
+        limits.compactRecordArena = true;
+    }
+
+    SUBCASE("flat local batch rollback releases both shared accounting domains") {
+        limits.compactRecordArena = true;
+        flat = true;
+    }
 
     for (std::size_t failure = 0; failure < 32; ++failure) {
         auto f = fixture(c::SubscriptionFamily::STREAM);
         auto a = std::make_shared<Recorder>();
         auto b = std::make_shared<Recorder>();
-        auto ha = open(f, a);
-        auto hb = open(f, b);
+        auto ha = open(f, a, limits);
+        auto hb = open(f, b, limits);
         add(f, ha);
         add(f, hb);
-        send(f, {{0, u"ALPHA", 1, 10, 0}, {0, u"ALPHA", 1, 10, 0}});
+
+        if (flat) {
+            auto event = flatEvent(f.schema);
+            auto queueWork = turn();
+            REQUIRE(f.queue.admit(std::move(event), queueWork));
+        } else {
+            send(f, {{0, u"ALPHA", 1, 10, 0}, {0, u"ALPHA", 1, 10, 0}});
+        }
+
         auto work = turn();
         auto staged = f.queue.progress(work);
         REQUIRE(staged);

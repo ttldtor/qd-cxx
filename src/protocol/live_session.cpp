@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/protocol/live_session.hpp"
 #include "local_event_owner.hpp"
+#include "shared_record_access.hpp"
 #include "tape_event_bridge.hpp"
 
 #include "field_time_binding.hpp"
@@ -1385,15 +1386,17 @@ struct LiveSnapshot::State {
 };
 
 struct LiveEvent::State {
-    OwnerLedger ledger;                          ///< Released after every later member.
-    LiveArena arena;                             ///< Full fixed data/view backing.
-    LiveSnapshot snapshot;                       ///< Independently retained immutable peer generation.
-    LiveEventKind kind;                          ///< Whole-envelope kind.
+    OwnerLedger ledger;                                    ///< Released after every later member.
+    LiveArena arena;                                       ///< Full fixed data/view backing.
+    std::optional<TemporaryReservation> sharedReservation; ///< Serialized charge while external bytes remain retained.
+    LiveSnapshot snapshot;                                 ///< Independently retained immutable peer generation.
+    LiveEventKind kind;                                    ///< Whole-envelope kind.
     std::optional<std::int32_t> messageType;     ///< Original message type, absent only for an empty envelope.
     std::optional<LiveHeartbeat> heartbeat;      ///< Selected explicit type0 fields.
     detail::PmrStreamDataResult decoded;         ///< Complete decoded owner, unpublished on failure.
     std::pmr::vector<LiveFieldValueView> fields; ///< Flattened stable value views.
     std::pmr::vector<LiveRecordView> records;    ///< Stable whole-frame local record views.
+    std::pmr::vector<std::shared_ptr<const core::detail::SharedRecordPayload>> sharedRows;
 
     /** Initialize a counted event arena without user-code execution.
      * @param storage Serialized epoch ledger.
@@ -1404,7 +1407,8 @@ struct LiveEvent::State {
      */
     State(Storage &storage, std::size_t bytes, LiveSnapshot peer, LiveEventKind value, std::size_t growth = 0)
         : ledger(storage, sizeof(State)), arena(storage, bytes, growth), snapshot(std::move(peer)), kind(value),
-          decoded(*arena.resource()), fields(arena.resource()), records(arena.resource()) {
+          decoded(*arena.resource()), fields(arena.resource()), records(arena.resource()),
+          sharedRows(arena.resource()) {
     }
 
     /** Build views only after the whole data decoder succeeds.
@@ -1652,32 +1656,121 @@ std::expected<LiveEvent, LiveError> detail::LocalEventOwner::stream(std::span<co
 
     try {
         debit(1, work.operations);
-        auto bytes = product(eventBytes_, rows.size());
 
         if (compact) {
-            constexpr auto perRow =
-                sizeof(PmrStreamDataRecord) + sizeof(LiveRecordView) + 2 * alignof(std::max_align_t);
-            constexpr auto perField = sizeof(PmrFieldValue) + sizeof(LiveFieldValueView) + alignof(std::max_align_t);
-            const auto textStorage = [](std::size_t units) {
-                // Allow space for the string terminator, growth from inline storage and alignment.
-                return sum(product(sum(units, 1), 2 * sizeof(char16_t)), alignof(std::max_align_t));
-            };
-            bytes = product(perRow, rows.size());
+            std::size_t fields = 0, units = 0, opaque = 0, retained = 0;
+            const void *previousBatch = nullptr;
 
             for (const auto &row : rows) {
                 debit(row.fields.size() + 1, work.visits);
-                bytes = sum(bytes, sum(product(perField, row.fields.size()), textStorage(row.symbol.size())));
+                fields = sum(fields, row.fields.size());
+
+                if (row.shared) {
+                    if (row.fields.data() != row.shared->fields().data() ||
+                        row.fields.size() != row.shared->fields().size() || row.symbol != row.shared->symbol())
+                        throw Error::INVALID_CONFIGURATION;
+
+                    if (previousBatch != row.shared->batchIdentity()) {
+                        retained = sum(retained, row.shared->residentBytes());
+                        previousBatch = row.shared->batchIdentity();
+                    }
+
+                    continue;
+                }
+
+                units = sum(units, row.symbol.size());
 
                 for (const auto &field : row.fields) {
                     if (field.units)
-                        bytes = sum(bytes, textStorage(field.units->size()));
+                        units = sum(units, field.units->size());
 
                     if (field.bytes)
-                        bytes = sum(bytes, field.bytes->size());
+                        opaque = sum(opaque, field.bytes->size());
                 }
             }
+
+            // The arena contains exactly two view arrays and two payload ranges.
+            constexpr auto padding = alignof(LiveRecordView) + alignof(LiveFieldValueView) + alignof(char16_t) - 3;
+            auto bytes =
+                sum(sum(product(rows.size(), sizeof(LiveRecordView)), product(fields, sizeof(LiveFieldValueView))),
+                    sum(sum(product(units, sizeof(char16_t)), opaque), padding));
+
+            if (retained)
+                bytes = sum(bytes,
+                            sum(product(rows.size(), sizeof(std::shared_ptr<const core::detail::SharedRecordPayload>)),
+                                alignof(std::shared_ptr<const core::detail::SharedRecordPayload>) - 1));
+
+            debit(sum(sizeof(LiveEvent::State), bytes), work.bytes);
+            debit(sum(fields, rows.size()), work.visits);
+            debit(units, work.textUnits);
+            auto event =
+                makeOwner<LiveEvent::State>(*epoch_.state_->ledger.lease.get(), bytes, epoch_, LiveEventKind::DATA);
+            event->messageType = STREAM_DATA;
+            event->fields.reserve(fields);
+            event->records.reserve(rows.size());
+
+            if (retained) {
+                event->sharedReservation.emplace(*epoch_.state_->ledger.lease.get(), retained);
+                event->sharedRows.reserve(rows.size());
+            }
+
+            auto *resource = event->arena.resource();
+            auto *text = units
+                             ? static_cast<char16_t *>(resource->allocate(units * sizeof(char16_t), alignof(char16_t)))
+                             : nullptr;
+            auto *binary = opaque ? static_cast<std::byte *>(resource->allocate(opaque, alignof(std::byte))) : nullptr;
+            const auto copyText = [&text](std::u16string_view source) {
+                if (source.empty())
+                    return std::u16string_view(u"");
+
+                const std::u16string_view result(text, source.size());
+                text = std::uninitialized_copy(source.begin(), source.end(), text);
+
+                return result;
+            };
+            const auto copyBytes = [&binary](std::span<const std::byte> source) {
+                if (source.empty())
+                    return std::span<const std::byte>{};
+
+                const std::span<const std::byte> result(binary, source.size());
+                binary = std::uninitialized_copy(source.begin(), source.end(), binary);
+
+                return result;
+            };
+
+            for (const auto &row : rows) {
+                const auto start = event->fields.size();
+
+                if (retained)
+                    event->sharedRows.push_back(row.shared);
+
+                for (const auto &field : row.fields) {
+                    auto &value = event->fields.emplace_back(field.type, field.raw, std::nullopt, std::nullopt);
+
+                    if (field.units)
+                        value.units = row.shared ? *field.units : copyText(*field.units);
+
+                    if (field.bytes)
+                        value.bytes = row.shared ? *field.bytes : copyBytes(*field.bytes);
+                }
+
+                const auto cipher = encoding::encodePentaSymbol(row.symbol);
+                event->records.push_back({row.localId,
+                                          row.localId,
+                                          row.context,
+                                          row.shared ? row.symbol : copyText(row.symbol),
+                                          cipher ? cipher->cipher : 0,
+                                          0,
+                                          {},
+                                          std::span(event->fields).subspan(start, row.fields.size()),
+                                          {},
+                                          {}});
+            }
+
+            return LiveEvent(std::move(event));
         }
 
+        const auto bytes = product(eventBytes_, rows.size());
         debit(sum(sizeof(LiveEvent::State), bytes), work.bytes);
         auto event =
             makeOwner<LiveEvent::State>(*epoch_.state_->ledger.lease.get(), bytes, epoch_, LiveEventKind::DATA);
@@ -2408,7 +2501,20 @@ LiveSnapshot LiveEvent::snapshot() const noexcept {
 
 std::size_t LiveEvent::residentBytes() const noexcept {
     // Both reservations coexist in one finite ledger, so their sum is representable.
-    return state_ ? sizeof(State) + state_->arena.capacityBytes() : 0;
+    return state_ ? sizeof(State) + state_->arena.capacityBytes() +
+                        (state_->sharedReservation ? state_->sharedReservation->bytes : 0)
+                  : 0;
+}
+
+std::shared_ptr<const core::detail::SharedRecordPayload>
+detail::SharedRecordAccess::retain(const LiveEvent &event, const LiveRecordView &record) noexcept {
+    if (!event.state_ || event.state_->sharedRows.empty())
+        return {};
+
+    // The collector passes only an item from this exact event's immutable record array.
+    const auto index = static_cast<std::size_t>(&record - event.state_->records.data());
+
+    return event.state_->sharedRows[index];
 }
 
 std::size_t LiveEvent::releaseBytes() const noexcept {

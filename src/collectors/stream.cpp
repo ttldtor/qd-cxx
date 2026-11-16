@@ -1,8 +1,10 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #include "qd/collectors/stream.hpp"
+#include "../protocol/shared_record_access.hpp"
 #include "qd/encoding/penta_symbol.hpp"
 #include "stream_replace.hpp"
+#include "stream_retention.hpp"
 
 #include <limits>
 #include <new>
@@ -612,6 +614,21 @@ StreamCollector::prepareBatch(std::span<StreamDelivery> storage, StreamWork &wor
         return std::span<const StreamDelivery>(storage.data(), selected);
     } catch (Error error) {
         return std::unexpected(error);
+    }
+}
+
+void detail::StreamRetentionAccess::retainPrepared(
+    const StreamCollector &collector, std::span<const StreamDelivery> offers,
+    std::span<std::shared_ptr<const core::detail::SharedRecordPayload>> storage) noexcept {
+    const auto &state = *collector.impl_;
+    std::size_t output = 0;
+
+    for (std::size_t offset = 0; offset < state.batchPrefix && output < offers.size(); ++offset) {
+        const auto &item = state.items[state.index(offset)];
+
+        if (item.record == offers[output].record)
+            storage[output++] =
+                protocol::detail::SharedRecordAccess::retain(*state.frames[item.frame].event, *item.record);
     }
 }
 

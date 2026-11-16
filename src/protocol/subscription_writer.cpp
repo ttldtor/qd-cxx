@@ -950,11 +950,17 @@ SubscriptionWriter::execute(std::optional<SubscriptionMessage> message,
         }
 
         Operation operation{*this, work, message, requests, ids, dataMessage, data, historySnapshot};
+        const bool encodePrefixOnce = prefixLimits && !prefixLimits->scratch.empty();
 
         if (prefixLimits) {
             if (prefixLimits->targetPayloadBytes == 0 ||
                 prefixLimits->targetPayloadBytes > prefixLimits->maxFrameBytes) {
                 throw Error::INVALID_DATA;
+            }
+
+            if (encodePrefixOnce) {
+                operation.output = prefixLimits->scratch;
+                operation.encoding = true;
             }
 
             operation.data = data.first(operation.walkStreamPrefix(*prefixLimits));
@@ -993,15 +999,21 @@ SubscriptionWriter::execute(std::optional<SubscriptionMessage> message,
         Reservation reservation{*budget_, total};
         budget_->retained = resident;
         budget_->outputs = outputs;
-        auto candidate = std::make_unique<std::byte[]>(total);
+        auto candidate = std::make_unique_for_overwrite<std::byte[]>(total);
 
         std::copy_n(prefix.begin(), prefixSize, candidate.get());
         debit(prefixSize, work.outputBytes);
-        operation.output = {candidate.get() + prefixSize, operation.size};
-        operation.encoding = true;
-        operation.size = 0;
 
-        operation.walk();
+        if (encodePrefixOnce) {
+            debit(operation.size, work.outputBytes);
+            std::copy_n(prefixLimits->scratch.begin(), operation.size, candidate.get() + prefixSize);
+        } else {
+            operation.output = {candidate.get() + prefixSize, operation.size};
+            operation.encoding = true;
+            operation.size = 0;
+            operation.walk();
+        }
+
         reservation.committed = true;
 
         if (prefixLimits) {
@@ -1034,7 +1046,14 @@ std::expected<PendingSubscriptionOutput, Error>
 SubscriptionWriter::composeStreamPrefix(std::span<const LiveDataRecordView> records, bool historySnapshot,
                                         std::size_t targetPayloadBytes, std::size_t maxFrameBytes,
                                         std::size_t &writtenRecords, SubscriptionWriterWork &work) {
-    const StreamPrefix limits{targetPayloadBytes, maxFrameBytes, writtenRecords};
+    // Encode only once when the exact-sized output can be built from bounded scratch.
+    // Larger low-level frames retain the sizing pass and the same ownership contract.
+    constexpr std::size_t STREAM_SCRATCH_BYTES = 64 * 1024;
+    std::array<std::byte, STREAM_SCRATCH_BYTES> scratch;
+    const auto storage = std::min(maxFrameBytes, limits_.operationBytes) <= scratch.size()
+                             ? std::span<std::byte>(scratch)
+                             : std::span<std::byte>{};
+    const StreamPrefix limits{targetPayloadBytes, maxFrameBytes, writtenRecords, storage};
 
     return execute({}, {}, {}, LiveDataMessage::STREAM_DATA, records, historySnapshot, work, &limits);
 }
