@@ -41,6 +41,7 @@ struct Options {
     std::int64_t historyBound = 0;
     bool qdText = false;
     bool verifyStream = false;
+    bool profileProducer = false;
 };
 
 struct Catalog {
@@ -54,7 +55,20 @@ struct Messages {
     protocol::LiveMessageView remove;
 };
 
+/** Elapsed producer work on DATA calls, measured with the monotonic clock. */
+struct ProducerProfile {
+    std::uint64_t generationNs = 0;
+    std::uint64_t generatedBatches = 0;
+    std::uint64_t composeNs = 0;
+    std::uint64_t composedFrames = 0;
+    std::uint64_t writeNs = 0;
+    std::uint64_t writeAttempts = 0;
+    std::uint64_t wouldBlock = 0;
+    std::uint64_t partialWrites = 0;
+};
+
 struct Report {
+    ProducerProfile profile;
     std::uint64_t connections = 0;
     std::uint64_t generated = 0;
     std::uint64_t composed = 0;

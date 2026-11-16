@@ -138,7 +138,7 @@ foreach ($contract in 'stream', 'ticker', 'history') {
 
 $port = New-Port
 $common = @('--bundle', $Bundle, '--port', $port, '--contract', 'stream', '--symbol', 'IBM')
-$p = Start-CaseProcess $Program (@('p', '--duration', '2', '--rate', '1000', '--batch', '8') + $common) 'verified-p'
+$p = Start-CaseProcess $Program (@('p', '--duration', '2', '--rate', '1000', '--batch', '8', '--profile-producer') + $common) 'verified-p'
 $c = $null
 try {
     Wait-Listener $p $port
@@ -156,6 +156,19 @@ $checksum = [regex]::Match($receiver, '(?m)^CHECKSUM [0-9]+\r?$')
 if (!$sent.Success -or !$received.Success -or !$checksum.Success -or
     [long]$sent.Groups['count'].Value -lt 100 -or $sent.Groups['count'].Value -cne $received.Groups['count'].Value) {
     throw "Verified STREAM did not reconcile: source $($sent.Groups['count'].Value), receiver $($received.Groups['count'].Value)"
+}
+$profileLine = [regex]::Match($sender, '(?m)^PROFILE (?<values>[^\r\n]+)\r?$')
+if (!$profileLine.Success) { throw 'Missing producer profile.' }
+$profile = @{}
+foreach ($part in $profileLine.Groups['values'].Value.Split(' ')) {
+    $fields = $part.Split('=', 2)
+    if ($fields.Count -ne 2) { throw 'Malformed producer profile.' }
+    $profile[$fields[0]] = [long]$fields[1]
+}
+if ($profile.composedFrames -le 0 -or $profile.generatedBatches -ne $profile.composedFrames -or
+    $profile.writeAttempts -lt $profile.composedFrames -or
+    $profile.partialWrites + $profile.wouldBlock -gt $profile.writeAttempts) {
+    throw 'Producer stage counters did not reconcile.'
 }
 Write-Output "Verified exact STREAM delivery: $($received.Groups['count'].Value) records."
 

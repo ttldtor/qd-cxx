@@ -33,3 +33,15 @@ RESULT window have different meanings from one-way transport latency.
 The verifier follows the 22-bit sequence across wrap using the full record
 ordinal, with a limit of 3,600,000,000 records per run. Verified mode omits
 consumer heartbeats and targets the synthetic Record NetTest source.
+
+## Producer stage measurements
+
+Add --profile-producer to print a separate PROFILE line. generationNs,
+composeNs and writeNs are monotonic elapsed nanoseconds summed over DATA
+batch generation, frame composition and individual socket write calls.
+The line counts generated batches, composed frames, write attempts,
+would-block results and partial writes. The timers include call overhead
+and may influence throughput at small batch sizes. For absolute throughput,
+repeat the same offer with the default producer and compare both exact
+delivery receipts. Idle time, subscription traffic and time in the receiver
+are outside the producer stage totals.
