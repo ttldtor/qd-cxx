@@ -49,8 +49,9 @@ class LocalEventOwner {
     public:
     [[nodiscard]] static std::expected<LocalEventOwner, LiveError> create(LiveLimits limits, LiveWork &work);
 
-    /** Copy an ordered batch into one ordinary STREAM owner. */
-    [[nodiscard]] std::expected<LiveEvent, LiveError> stream(std::span<const LocalStreamRow> rows, LiveWork &work) const;
+    /** Copy an ordered batch into one STREAM owner. Compact mode sizes the arena from the actual rows. */
+    [[nodiscard]] std::expected<LiveEvent, LiveError> stream(std::span<const LocalStreamRow> rows, LiveWork &work,
+                                                             bool compact = false) const;
 
     /** Own one local TICKER record and optional explicit event-time metadata. */
     [[nodiscard]] std::expected<LiveEvent, LiveError>

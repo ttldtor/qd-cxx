@@ -58,6 +58,8 @@ struct PublisherFamilyStatistics {
     ///< Live discarded-record observations are not currently exposed by the queue.
     core::StatisticCounter failedFrames{0, core::StatisticAvailability::UNSUPPORTED};
     ///< Byte-mode STREAM frame composition failures that retire the affected peer.
+    std::size_t maxSentFrameRecords = 0; ///< Largest completed DATA frame by record count.
+    std::size_t maxSentFrameBytes = 0;   ///< Largest completed DATA frame including its length prefix.
 };
 
 /** Publisher-local lifetime counters and the most recent completed worker-turn state. */

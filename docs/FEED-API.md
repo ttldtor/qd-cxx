@@ -106,6 +106,12 @@ Set the typed `EndpointOptions::batchRecords` to cap whole physical records per 
 maximum 128), including records selected for a callback. Both limits must be positive and
 `batchRecords` cannot exceed `pendingRecords`. HISTORY source storage has its own limits.
 
+`EndpointOptions::maximumReceiveMessageBytes` bounds the network QTP message body
+(type and payload) independently of callback and queue limits. It ranges from
+8,192 (the default) to 65,536 bytes. The compact length prefix is outside
+this budget. Control decoding and storage for decoded records have their own
+limits.
+
 STREAM preserves order and duplicates while capacity is available. If staging the next prefix
 exhausts a subscription's reservation, the SDK rejects that prefix for the affected subscription and
 reports the overflow through its state and statistics. TICKER can conflate pending values for the

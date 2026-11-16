@@ -247,10 +247,12 @@ bindPmrRecord(const PmrWireRecordDescription &description, const core::LocalSche
  * @param limits Required finite per-message allowances.
  * @param policy Explicit event metadata policy.
  * @param resource Resource outliving the decoded output.
+ * @param growRecords Whether to reserve a small initial decoded prefix and grow within the arena.
  * @return Complete prefix and ordinary diagnostics; custom resource exceptions propagate.
  */
 [[nodiscard]] PmrStreamDataResult decodePmrStreamData(std::span<const std::byte> payload,
                                                       const PmrStreamDataContext &context, StreamDataLimits limits,
-                                                      DataEventPolicy policy, std::pmr::memory_resource &resource);
+                                                      DataEventPolicy policy, std::pmr::memory_resource &resource,
+                                                      bool growRecords);
 
 } // namespace org::ttldtor::qdcxx::protocol::detail

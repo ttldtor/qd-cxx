@@ -192,13 +192,15 @@ struct VerifiedTlsOptions {
 
 /** Endpoint policy; defaults need no caller-owned queue or turn-work objects. */
 struct EndpointOptions {
-    static constexpr std::size_t MAXIMUM_BATCH_RECORDS = 4;     ///< Qualified physical callback record ceiling.
-    static constexpr std::size_t MAXIMUM_PENDING_RECORDS = 128; ///< Qualified detached record slot ceiling.
-    DeliveryContract contract = DeliveryContract::TICKER;       ///< Selected source contract for this endpoint.
-    std::chrono::milliseconds connectTimeout{5000};             ///< Whole native connection attempt deadline.
-    std::chrono::milliseconds dnsTimeout{5000};                 ///< Whole two-family lookup deadline.
-    std::chrono::milliseconds readTimeout{30000};               ///< Connected input inactivity deadline.
-    std::chrono::milliseconds writeTimeout{5000};               ///< Pending-output inactivity deadline.
+    static constexpr std::size_t MAXIMUM_BATCH_RECORDS = 4;             ///< Qualified physical callback record ceiling.
+    static constexpr std::size_t MAXIMUM_PENDING_RECORDS = 128;         ///< Qualified detached record slot ceiling.
+    static constexpr std::size_t DEFAULT_RECEIVE_MESSAGE_BYTES = 8192;  ///< Standard incoming QTP body budget.
+    static constexpr std::size_t MAXIMUM_RECEIVE_MESSAGE_BYTES = 65536; ///< Largest supported incoming QTP body budget.
+    DeliveryContract contract = DeliveryContract::TICKER;               ///< Selected source contract for this endpoint.
+    std::chrono::milliseconds connectTimeout{5000};                     ///< Whole native connection attempt deadline.
+    std::chrono::milliseconds dnsTimeout{5000};                         ///< Whole two-family lookup deadline.
+    std::chrono::milliseconds readTimeout{30000};                       ///< Connected input inactivity deadline.
+    std::chrono::milliseconds writeTimeout{5000};                       ///< Pending-output inactivity deadline.
     std::chrono::milliseconds pollInterval{1};    ///< SDK worker progress cadence; not a thread per subscription.
     std::chrono::milliseconds retryDelay{250};    ///< Delay between finite fresh recovery attempts.
     std::chrono::milliseconds drainTimeout{1000}; ///< Local admitted-prefix retirement allowance.
@@ -215,6 +217,8 @@ struct EndpointOptions {
     std::size_t pendingRecords = MAXIMUM_PENDING_RECORDS; ///< Detached record slots per subscription.
     std::chrono::milliseconds aggregationPeriod{0};       ///< Local delivery cadence; zero selects immediate delivery.
     std::optional<VerifiedTlsOptions> tls; ///< Explicit verified network transport. Absence selects plain TCP.
+    std::size_t maximumReceiveMessageBytes =
+        DEFAULT_RECEIVE_MESSAGE_BYTES; ///< Incoming QTP type and payload bytes, 8192..65536, excluding length prefix.
 };
 
 /** Most recent owning observation of one fixed OnDemand source. */

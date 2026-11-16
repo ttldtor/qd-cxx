@@ -3659,8 +3659,12 @@ TEST_CASE("Feed batch and record limits preserve STREAM records and expose overl
 
     SUBCASE("STREAM bounds each callback without splitting or dropping records") {
     }
-    SUBCASE("STREAM refuses the complete staged prefix when its reservation is exhausted") {
+    SUBCASE("STREAM drains a staged prefix through one detached slot") {
         options.pendingRecords = 1;
+    }
+    SUBCASE("STREAM reports overflow when aggregation holds the prior detached record") {
+        options.pendingRecords = 1;
+        options.aggregationPeriod = 5s;
         overflow = true;
     }
     SUBCASE("TICKER conflates one key within the source frame even with one detached slot") {
@@ -3708,7 +3712,7 @@ TEST_CASE("Feed batch and record limits preserve STREAM records and expose overl
     if (overflow) {
         const bool failed = eventually([&] {
             return subscription->getState() == api::SubscriptionState::FAILED &&
-                   subscription->getStatistics().rejectedOverflowEvents.value == records.size();
+                   subscription->getStatistics().rejectedOverflowEvents.value == 1;
         });
         const auto rejected = subscription->getStatistics();
         INFO("state=", static_cast<int>(subscription->getState()), " diagnostic=", subscription->getDiagnostic().stage,
@@ -3716,7 +3720,8 @@ TEST_CASE("Feed batch and record limits preserve STREAM records and expose overl
              " dropped=", rejected.droppedEvents.value, " callbacks=", seen.load());
         REQUIRE(failed);
         CHECK(subscription->getDiagnostic().code == api::ErrorCode::RESOURCE_LIMIT);
-        CHECK(seen.load() == 0);
+        CHECK(seen.load() == 1);
+        CHECK(rejected.rejectedOverflowEvents.value == 1);
     } else {
         const std::size_t expected = ticker ? 1 : records.size();
         REQUIRE(eventually([&] {
@@ -3726,7 +3731,7 @@ TEST_CASE("Feed batch and record limits preserve STREAM records and expose overl
     }
 
     const auto statistics = subscription->getStatistics();
-    CHECK(statistics.droppedEvents.value == (overflow ? records.size() : 0));
+    CHECK(statistics.droppedEvents.value == (overflow ? 1 : 0));
     CHECK(statistics.conflatedEvents.value == (ticker ? records.size() - 1 : 0));
     static_cast<void>(endpoint->closeAndAwaitTermination());
     runtime.closeAndAwaitTermination();
@@ -3745,6 +3750,10 @@ TEST_CASE("Feed rejects unqualified batch and pending record limits before endpo
     CHECK_THROWS_AS(static_cast<void>(api::EndpointConfiguration::create(options)), api::Error);
     options.pendingRecords = options.batchRecords;
     CHECK(api::EndpointConfiguration::create(options).options().pendingRecords == options.pendingRecords);
+    options.maximumReceiveMessageBytes = api::EndpointOptions::DEFAULT_RECEIVE_MESSAGE_BYTES - 1;
+    CHECK_THROWS_AS(static_cast<void>(api::EndpointConfiguration::create(options)), api::Error);
+    options.maximumReceiveMessageBytes = api::EndpointOptions::MAXIMUM_RECEIVE_MESSAGE_BYTES + 1;
+    CHECK_THROWS_AS(static_cast<void>(api::EndpointConfiguration::create(options)), api::Error);
 }
 
 TEST_CASE("passive latest reads distinguish exact demand, defaults and absent values without starting transport") {
@@ -4402,6 +4411,122 @@ TEST_CASE("local aggregation composes periods and holds TICKER updates until the
     const auto closed = endpoint->closeAndAwaitTermination();
     INFO("deadline=", closed.deadlineExpired, ", gap=", closed.hadGap, ", stage=", closed.diagnostic.stage);
     CHECK(closed.drained);
+}
+
+TEST_CASE("network STREAM admits complete large DATA frames and rejects a malformed tail atomically") {
+    struct Scenario {
+        api::DeliveryContract contract;
+        std::size_t messageBytes;
+        std::size_t rows;
+        bool malformed;
+        bool accepted;
+    };
+    using enum api::DeliveryContract;
+    constexpr auto standard = api::EndpointOptions::DEFAULT_RECEIVE_MESSAGE_BYTES;
+    constexpr auto expanded = api::EndpointOptions::MAXIMUM_RECEIVE_MESSAGE_BYTES;
+    constexpr std::array scenarios{
+        Scenario{STREAM, standard, 320, false, true}, Scenario{MIXED, expanded, 768, false, true},
+        Scenario{STREAM, standard, 768, false, false}, Scenario{STREAM, standard, 96, true, false}};
+    const auto schema = events::defaultTimeAndSaleSchema({1, 32, 64, 128, 8192});
+    REQUIRE(schema);
+
+    for (const auto &scenario : scenarios) {
+        CAPTURE(scenario.rows);
+        CAPTURE(scenario.messageBytes);
+        CAPTURE(scenario.malformed);
+        const auto schemaFields = schema->records().front().fields;
+        peer::Record row;
+        row.symbol = u"IBM";
+
+        for (const auto &field : schemaFields)
+            row.fields.push_back({static_cast<core::SerialFieldType>(field.serialTypeId), 0});
+
+        row.fields[0].raw = 7;
+        std::vector<peer::Record> rows;
+        rows.reserve(scenario.rows);
+
+        for (std::size_t index = 0; index < scenario.rows; ++index) {
+            row.fields[1].raw = static_cast<std::int64_t>(index);
+            rows.push_back(row);
+        }
+
+        namespace wire = root::test::recovery;
+        auto prefixBytes = peer::fixturePeerPrefix(*schema, core::SubscriptionFamily::STREAM);
+        auto data = peer::fixturePeerData(rows, core::SubscriptionFamily::STREAM, true);
+        root::protocol::FrameReader reader({expanded, expanded + 9});
+        auto frame = reader.feed(data);
+        REQUIRE(frame.frame);
+        REQUIRE(frame.frame->type == 15);
+        REQUIRE(frame.accepted == data.size());
+        CHECK((frame.frame->payload.size() + 1 <= scenario.messageBytes) == (scenario.accepted || scenario.malformed));
+
+        if (scenario.malformed) {
+            auto &payload = frame.frame->payload;
+            payload.push_back(std::byte{0xfd}); // String-symbol marker with no following length.
+            data = wire::frame(15, payload);
+        }
+
+        root::test::TcpPeerConfig config;
+        auto &session = config.sessions.emplace_back();
+
+        if (scenario.contract == MIXED) {
+            const auto protocol = reader.feed(prefixBytes);
+            REQUIRE(protocol.frame);
+            session.initialBytes = wire::ready();
+            wire::append(session.initialBytes, std::span(prefixBytes).subspan(protocol.accepted));
+        } else {
+            session.initialBytes = std::move(prefixBytes);
+        }
+
+        session.readThroughMessage = std::to_underlying(root::protocol::SubscriptionMessage::STREAM_ADD);
+        session.waitForClientClose = true;
+        session.replyBytes = std::move(data);
+        root::test::OwnedTcpPeer source(std::move(config));
+        REQUIRE(source.port());
+
+        const auto observation = std::make_shared<std::vector<std::int64_t>>();
+        const auto received = std::make_shared<std::atomic<std::size_t>>(0);
+        auto options = endpointOptions(scenario.contract);
+        options.maximumReceiveMessageBytes = scenario.messageBytes;
+        options.readTimeout = 8s;
+        api::ApiRuntime runtime(runtimeOptions());
+        auto endpoint = runtime.createEndpoint(options);
+        auto subscription = endpoint->getFeed()->createSubscription<events::TimeAndSale>();
+        subscription->addEventListener([observation, received](std::span<const events::TimeAndSale> batch) {
+            for (const auto &sale : batch)
+                observation->push_back(sale.getIndex());
+
+            received->store(observation->size());
+        });
+        subscription->addSymbols("IBM");
+        endpoint->connect("127.0.0.1:" + std::to_string(source.port()));
+        const auto finished = eventually(
+            [&] {
+                return received->load() >= rows.size() || endpoint->getState() == api::EndpointState::FAILED ||
+                       subscription->getDiagnostic().code != api::ErrorCode::NONE;
+            },
+            6s);
+        INFO("endpoint ", endpoint->getDiagnostic().stage, " ", endpoint->getDiagnostic().detailCode);
+        INFO("subscription ", subscription->getDiagnostic().stage, " ", subscription->getDiagnostic().detailCode);
+        INFO("delivered ", received->load(), " read rows ", endpoint->getStatistics().connection.readDataRecords.value,
+             " peer wrote ", source.snapshot().sessions.front().replyBytesWritten, " selectors ",
+             subscription->getStatistics().activeSelectors);
+        REQUIRE(finished);
+        const auto state = endpoint->getState();
+        const auto closed = endpoint->closeAndAwaitTermination();
+
+        if (!scenario.accepted) {
+            CHECK(state == api::EndpointState::FAILED);
+            CHECK(observation->empty());
+            continue;
+        }
+
+        CHECK(closed.drained);
+        REQUIRE(observation->size() == rows.size());
+
+        for (std::size_t index = 0; index < rows.size(); ++index)
+            CHECK((*observation)[index] == ((std::int64_t{7} << 32) + static_cast<std::int64_t>(index)));
+    }
 }
 
 TEST_CASE("local aggregation does not postpone graceful STREAM drain") {
@@ -5748,7 +5873,9 @@ TEST_CASE("mixed Feed publishes one full-catalog desired revision on one QTP con
     REQUIRE(eventually([&] {
         if (auto task = executor->take())
             CHECK(task->run() == api::CallbackTaskRunResult::COMPLETED);
+
         const auto stats = sub->getStatistics();
+
         return stats.pendingEvents == 0 && stats.inFlightEvents == 0;
     }));
     const auto closed = endpoint->closeAndAwaitTermination();

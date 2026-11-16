@@ -242,7 +242,8 @@ void run(std::uint16_t port, std::uint64_t count, std::uint64_t rate, std::size_
               << " streamFrames=" << stream.sentFrames.value;
 
     if (streamBytes)
-        std::cout << " failedFrames=" << stream.failedFrames.value;
+        std::cout << " failedFrames=" << stream.failedFrames.value << " maxFrameRecords=" << stream.maxSentFrameRecords
+                  << " maxFrameBytes=" << stream.maxSentFrameBytes;
 
     std::cout << std::endl;
 

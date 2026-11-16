@@ -39,7 +39,8 @@ Record negative samples and verify the clock domain before comparing p99.
 The receiver verifies all eight Quote fields and the exact order.
 The publisher's `streamFrames` result counts completely sent STREAM DATA
 frames, including the startup probe frame. Byte mode also reports
-`failedFrames`, counting frame composition failures that retire a peer.
+`maxFrameRecords` and `maxFrameBytes` for completed STREAM DATA frames, and
+`failedFrames` for frame composition failures that retire a peer.
 These publisher counters are separate from the receiver's delivery checks.
 
 The receiver's `--self-test-quote-stream` checks positive and damaged records

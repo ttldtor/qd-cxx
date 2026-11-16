@@ -310,6 +310,7 @@ static_assert(!hasStringUnitRoom(0, std::numeric_limits<std::size_t>::max(), 0))
  * @param currentUnits Existing current-record strings that coexist with the temporary.
  * @param currentBytes Existing current-record new payload storage that coexists with the temporary.
  * @param resource Explicit allocator for the allocator-aware specialization; otherwise unused.
+ * @param growRecords Whether to reserve a small initial decoded prefix and grow within the arena.
  * @return Owned temporary or first error with all examined/admitted work retained.
  */
 template <bool Pmr>
@@ -515,7 +516,7 @@ void applyRemovalTime(Values &values, const std::optional<ResolvedIndexedTimeLay
  */
 template <bool Pmr, typename Context>
 auto decodeDataPayload(std::span<const std::byte> payload, const Context &context, StreamDataLimits limits,
-                       DataEventPolicy policy, std::pmr::memory_resource *resource) {
+                       DataEventPolicy policy, std::pmr::memory_resource *resource, bool growRecords = false) {
     using Result = std::conditional_t<Pmr, detail::PmrStreamDataResult, StreamDataResult>;
     using String = std::conditional_t<Pmr, std::pmr::u16string, std::u16string>;
     using Bytes = std::conditional_t<Pmr, std::pmr::vector<std::byte>, std::vector<std::byte>>;
@@ -545,7 +546,9 @@ auto decodeDataPayload(std::span<const std::byte> payload, const Context &contex
     }();
     try {
         if constexpr (Pmr) {
-            result.records.reserve(std::min(limits.emittedRecords, payload.size()));
+            constexpr std::size_t INITIAL_GROWING_RECORDS = 16;
+            const auto estimate = growRecords ? std::min(payload.size(), INITIAL_GROWING_RECORDS) : payload.size();
+            result.records.reserve(std::min(limits.emittedRecords, estimate));
         }
 
         while (result.consumed < payload.size()) {
@@ -877,7 +880,8 @@ StreamDataResult decodeRawData(std::span<const std::byte> payload, const StreamD
 
 detail::PmrStreamDataResult detail::decodePmrStreamData(std::span<const std::byte> payload,
                                                         const PmrStreamDataContext &context, StreamDataLimits limits,
-                                                        DataEventPolicy policy, std::pmr::memory_resource &resource) {
-    return decodeDataPayload<true>(payload, context, limits, policy, &resource);
+                                                        DataEventPolicy policy, std::pmr::memory_resource &resource,
+                                                        bool growRecords) {
+    return decodeDataPayload<true>(payload, context, limits, policy, &resource, growRecords);
 }
 } // namespace org::ttldtor::qdcxx::protocol
