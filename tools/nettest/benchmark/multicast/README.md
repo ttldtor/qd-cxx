@@ -36,3 +36,5 @@ separate link-capacity baseline and retain both receipts. This synthetic
 format contains neither OPRA packets nor QTP data.
 Use a dedicated UDP port for the run. The receiver binds the port on all local addresses and compares any datagram delivered to that socket.
 The receiver window begins when it validates its first unique datagram. Its in-window counts therefore use a receiver-local anchor independent of the sender clock. ReceiveSpanNanoseconds covers the first through last valid unique datagrams. SendTimeout is 100 ms per call and failed calls increment SendErrors.
+
+Use the [acceptance checks](../acceptance/README.md) to reconcile paired receipts.
