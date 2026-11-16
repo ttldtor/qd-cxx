@@ -405,6 +405,7 @@ struct LiveServerFeedResult : LiveFeedResult {
  */
 class LiveSession {
     struct Impl;
+    struct StreamPrefix;
     std::unique_ptr<Impl> impl_; ///< Owned configuration, framing, generation and accounting.
     friend struct detail::LiveAuthorization;
     /** Adopt fully prepared owned state without allocating.
@@ -412,6 +413,9 @@ class LiveSession {
      */
     explicit LiveSession(std::unique_ptr<Impl> impl) noexcept;
     [[nodiscard]] LiveServerFeedResult feedImpl(std::span<const std::byte> input, LiveWork &work, bool server);
+    [[nodiscard]] std::expected<LivePendingOutput, LiveError>
+    publishDataImpl(LiveDataMessage message, std::span<const LiveDataRecordView> records, LiveWork &work,
+                    const StreamPrefix *prefix);
 
     public:
     /** Inspect a detached serialized-owner cut without parsing or advancing the session.
@@ -517,6 +521,17 @@ class LiveSession {
      */
     [[nodiscard]] std::expected<LivePendingOutput, LiveError>
     publishData(LiveDataMessage message, std::span<const LiveDataRecordView> records, LiveWork &work);
+    /** Compose one STREAM frame from the ready prefix, subject to negotiated receive readiness.
+     * @param records Borrowed occurrences in transmission order.
+     * @param targetPayloadBytes Positive soft threshold excluding length and message identity.
+     * @param maxFrameBytes Positive hard total envelope limit, including its length prefix.
+     * @param writtenRecords Exact selected prefix length, assigned only on success.
+     * @param work Mutable caller-turn credits.
+     * @return Whole immutable output or nonterminal rejection without partial publication.
+     */
+    [[nodiscard]] std::expected<LivePendingOutput, LiveError>
+    publishStreamPrefix(std::span<const LiveDataRecordView> records, std::size_t targetPayloadBytes,
+                        std::size_t maxFrameBytes, std::size_t &writtenRecords, LiveWork &work);
     /** Retain the current immutable effective peer generation.
      * @return Owning snapshot, empty for a moved-from session.
      */

@@ -204,7 +204,8 @@ struct ClientLimits {
     std::size_t commandSlots;      ///< Ordinary command slots, including an executing command.
     std::size_t resultSlots;       ///< Independently retained completion slots.
     std::size_t commandEntries;    ///< Borrowed input entries including duplicates per submission.
-    std::size_t commandSymbolUnits; ///< Fixed UTF16 capacity in each command slot.
+    std::size_t commandSymbolUnits;  ///< Fixed UTF16 capacity in each command slot.
+    bool compactRecordArena = false; ///< Charge and allocate each record's measured arena instead of its maximum.
 };
 
 /** Producer-local finite submit credits. */

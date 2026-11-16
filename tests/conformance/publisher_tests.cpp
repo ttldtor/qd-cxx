@@ -1011,6 +1011,36 @@ TEST_CASE("typed publisher atomically admits bounded STREAM batches") {
     CHECK(closed.error().code == q::api::ErrorCode::CLOSED);
 }
 
+TEST_CASE("typed publisher admits more than eight STREAM occurrences under byte limits") {
+    using enum q::core::SubscriptionFamily;
+    auto bootstrap = q::transport::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    q::api::PublisherOptions options;
+    options.mixed = true;
+    options.pendingQuotes = 32;
+    options.streamBytes.emplace(8000, 65536);
+    auto endpoint = q::api::PublisherEndpoint::create(*bootstrap, options);
+    requireServer(endpoint);
+    DemandPeer peer((*endpoint)->port(), asio::ip::address_v4::loopback());
+    peer.subscribe(q::protocol::SubscriptionMessage::STREAM_ADD, 1, u"IBM");
+    REQUIRE((*endpoint)->awaitDemand(STREAM, u"TimeAndSale", u"IBM", true, Clock::now() + 5s));
+    std::array<q::events::TimeAndSale, 12> sales;
+
+    for (std::size_t i = 0; i < sales.size(); ++i) {
+        sales[i].symbol = u"IBM";
+        sales[i].index = (std::int64_t{7} << 32) + static_cast<std::int64_t>(i);
+    }
+
+    REQUIRE((*endpoint)->getPublisher().publish(std::span(sales)));
+    constexpr auto streamData = static_cast<std::int32_t>(q::protocol::LiveDataMessage::STREAM_DATA);
+    REQUIRE(peer.waitForFrame(streamData, Clock::now() + 5s));
+    (*endpoint)->closeAndAwaitTermination();
+    const auto stats = (*endpoint)->getStatistics();
+    CHECK(stats.families[1].ingressRecords.value == sales.size());
+    CHECK(stats.families[1].failedFrames.value == 0);
+    CHECK((*endpoint)->getDiagnostic().code == q::api::ErrorCode::NONE);
+}
+
 TEST_CASE("mixed publisher preserves STREAM occurrences and indexed HISTORY on one connection") {
     auto bootstrap = q::transport::RuntimeBootstrap::create();
     REQUIRE(bootstrap);

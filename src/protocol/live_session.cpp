@@ -2867,8 +2867,15 @@ std::expected<LivePendingOutput, LiveError> LiveSession::subscribe(SubscriptionM
     }
 }
 
-std::expected<LivePendingOutput, LiveError>
-LiveSession::publishData(LiveDataMessage message, std::span<const LiveDataRecordView> records, LiveWork &work) {
+struct LiveSession::StreamPrefix {
+    std::size_t targetPayloadBytes;
+    std::size_t maxFrameBytes;
+    std::size_t &writtenRecords;
+};
+
+std::expected<LivePendingOutput, LiveError> LiveSession::publishDataImpl(LiveDataMessage message,
+                                                                         std::span<const LiveDataRecordView> records,
+                                                                         LiveWork &work, const StreamPrefix *prefix) {
     try {
         debit(1, work.operations);
 
@@ -2895,11 +2902,24 @@ LiveSession::publishData(LiveDataMessage message, std::span<const LiveDataRecord
             throw Error::AUTHENTICATION_REQUIRED;
         }
 
-        return impl_->writerOutput(
+        std::size_t writtenRecords = 0;
+        auto output = impl_->writerOutput(
             [&](SubscriptionWriterWork &credits) {
+                if (prefix) {
+                    return impl_->composer.composeStreamPrefix(records, impl_->historySnapshot,
+                                                               prefix->targetPayloadBytes, prefix->maxFrameBytes,
+                                                               writtenRecords, credits);
+                }
+
                 return impl_->composer.composeData(message, records, impl_->historySnapshot, credits);
             },
             0, work);
+
+        if (prefix) {
+            prefix->writtenRecords = writtenRecords;
+        }
+
+        return output;
     } catch (Error error) {
         return std::unexpected(error);
     } catch (const LiveStorageLimit &) {
@@ -2909,6 +2929,19 @@ LiveSession::publishData(LiveDataMessage message, std::span<const LiveDataRecord
     } catch (const std::length_error &) {
         return std::unexpected(Error::ALLOCATION_FAILURE);
     }
+}
+
+std::expected<LivePendingOutput, LiveError>
+LiveSession::publishData(LiveDataMessage message, std::span<const LiveDataRecordView> records, LiveWork &work) {
+    return publishDataImpl(message, records, work, nullptr);
+}
+
+std::expected<LivePendingOutput, LiveError>
+LiveSession::publishStreamPrefix(std::span<const LiveDataRecordView> records, std::size_t targetPayloadBytes,
+                                 std::size_t maxFrameBytes, std::size_t &writtenRecords, LiveWork &work) {
+    const StreamPrefix prefix{targetPayloadBytes, maxFrameBytes, writtenRecords};
+
+    return publishDataImpl(LiveDataMessage::STREAM_DATA, records, work, &prefix);
 }
 
 LiveSnapshot LiveSession::peer() const noexcept {
