@@ -106,6 +106,8 @@ and the QD verifier.
 
 The measurement runner accepts `-Help` and `-HelpRu` without starting a run.
 
+For exact STREAM receipt checks with the native consumer, see the [native verifier](benchmark/NATIVE-VERIFIER.md).
+
 ### Run the event producer
 
 Build `qdcxx_event_nettest` with the public Feed API enabled. The executable

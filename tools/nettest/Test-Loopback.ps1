@@ -136,6 +136,29 @@ foreach ($contract in 'stream', 'ticker', 'history') {
     Assert-Result "$contract-c" delivered 100 ([int]$instances)
 }
 
+$port = New-Port
+$common = @('--bundle', $Bundle, '--port', $port, '--contract', 'stream', '--symbol', 'IBM')
+$p = Start-CaseProcess $Program (@('p', '--duration', '2', '--rate', '1000', '--batch', '8') + $common) 'verified-p'
+$c = $null
+try {
+    Wait-Listener $p $port
+    $c = Start-CaseProcess $Program (@('c', '--duration', '10', '--verify-stream') + $common) 'verified-c'
+    Wait-CaseSuccess $p
+    Wait-CaseSuccess $c
+} finally {
+    try { Save-CaseProcess $c } finally { Save-CaseProcess $p }
+}
+$sender = Get-Content -LiteralPath "$OutputDirectory/verified-p.stdout" -Raw
+$receiver = Get-Content -LiteralPath "$OutputDirectory/verified-c.stdout" -Raw
+$sent = [regex]::Match($sender, '(?m)^RESULT .*\bwritten=(?<count>[0-9]+)\b')
+$received = [regex]::Match($receiver, '(?m)^RESULT .*\bdelivered=(?<count>[0-9]+)\b')
+$checksum = [regex]::Match($receiver, '(?m)^CHECKSUM [0-9]+\r?$')
+if (!$sent.Success -or !$received.Success -or !$checksum.Success -or
+    [long]$sent.Groups['count'].Value -lt 100 -or $sent.Groups['count'].Value -cne $received.Groups['count'].Value) {
+    throw "Verified STREAM did not reconcile: source $($sent.Groups['count'].Value), receiver $($received.Groups['count'].Value)"
+}
+Write-Output "Verified exact STREAM delivery: $($received.Groups['count'].Value) records."
+
 if ($Java) {
     $ipf = Join-Path $OutputDirectory 'symbols.ipf'
     @('#STOCK::=TYPE,SYMBOL', 'STOCK,IBM', '##COMPLETE') | Set-Content -Encoding ascii -LiteralPath $ipf
