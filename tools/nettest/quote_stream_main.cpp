@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <iostream>
 #include <limits>
+#include <optional>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -38,25 +39,33 @@ constexpr auto POLL_INTERVAL = 1ms;
 constexpr std::int64_t DECIMAL_UNIT = 256;
 constexpr std::int64_t DECIMAL_RANK = 128;
 
-constexpr std::string_view HELP = "Usage: qdcxx-quote-stream-nettest PORT COUNT RATE BATCH\n"
-                                  "Publish synthetic IBM Quote/STREAM records over TCP to one QD consumer.\n"
-                                  "PORT is 0..65535 (0 chooses an ephemeral port), COUNT is 1..10000000,\n"
-                                  "RATE is 0..10000000 records/s (0 is unpaced), BATCH is 1..8.\n"
-                                  "Prints PORT, waits for matching subscription, publishes a sequence-0 probe,\n"
-                                  "prints READY and waits for GO on stdin. Verify probe receipt before GO.\n"
-                                  "Prints RESULT with admitted records, publication time in ns and admission retries.\n"
-                                  "Bid.Time and Bid.Size carry a monotonic timestamp for same-host measurement.\n"
-                                  "The producer opens a TCP listener and creates a runtime worker.\n"
-                                  "Exit 0 on success, 1 on runtime failure, 2 on invalid arguments.\n";
+constexpr std::string_view HELP =
+    "Usage: qdcxx-quote-stream-nettest PORT COUNT RATE BATCH [--stream-bytes TARGET HARD]\n"
+    "Publish synthetic IBM Quote/STREAM records over TCP to one QD consumer.\n"
+    "PORT is 0..65535 (0 chooses an ephemeral port), COUNT is 1..10000000,\n"
+    "RATE is 0..10000000 records/s (0 is unpaced), BATCH is 1..8.\n"
+    "--stream-bytes enables byte limits for STREAM output; TARGET is the\n"
+    "payload threshold and HARD is the maximum complete frame size in bytes.\n"
+    "Without this option the existing batch-based mode is used.\n"
+    "Prints PORT, waits for matching subscription, publishes a sequence-0 probe,\n"
+    "prints READY and waits for GO on stdin. Verify probe receipt before GO.\n"
+    "Prints RESULT with admitted records, time, retries and completed STREAM frames.\n"
+    "Frame count includes the startup probe; byte mode also reports failed frames.\n"
+    "Bid.Time and Bid.Size carry a monotonic timestamp for same-host measurement.\n"
+    "The producer opens a TCP listener and creates a runtime worker.\n"
+    "Exit 0 on success, 1 on runtime failure, 2 on invalid arguments.\n";
 
 constexpr std::string_view HELP_RU =
-    "Использование: qdcxx-quote-stream-nettest ПОРТ КОЛИЧЕСТВО СКОРОСТЬ ПАКЕТ\n"
+    "Использование: qdcxx-quote-stream-nettest ПОРТ КОЛИЧЕСТВО СКОРОСТЬ ПАКЕТ [--stream-bytes ЦЕЛЬ ПРЕДЕЛ]\n"
     "Публикует записи IBM Quote/STREAM по TCP одному приёмнику QD.\n"
     "ПОРТ 0..65535 (0 выбирает свободный), КОЛИЧЕСТВО 1..10000000,\n"
     "СКОРОСТЬ 0..10000000 записей/с (0 без ограничителя), ПАКЕТ 1..8.\n"
+    "--stream-bytes включает байтовые лимиты STREAM: ЦЕЛЬ для полезных данных\n"
+    "и ПРЕДЕЛ размера полного кадра. Без параметра используется прежний режим.\n"
     "Печатает PORT, ждёт подписку и отправляет пробную запись с номером 0,\n"
     "печатает READY и ждёт GO в stdin. Перед GO проверьте приём пробной записи.\n"
-    "RESULT содержит число записей, время публикации в нс и число повторов приёма.\n"
+    "RESULT содержит число записей, время в нс, повторы и число завершённых кадров STREAM.\n"
+    "Число кадров включает пробную запись; байтовый режим также сообщает об ошибках кадров.\n"
     "Bid.Time и Bid.Size содержат монотонную метку времени для измерения на одной машине.\n"
     "Процесс открывает TCP-слушатель и создаёт поток runtime.\n"
     "Код 0 означает успех, 1 ошибку исполнения, 2 неверные параметры.\n";
@@ -92,7 +101,8 @@ Fields makeFields(std::uint64_t ordinal) {
     return result;
 }
 
-void run(std::uint16_t port, std::uint64_t count, std::uint64_t rate, std::size_t batch) {
+void run(std::uint16_t port, std::uint64_t count, std::uint64_t rate, std::size_t batch,
+         std::optional<api::PublisherStreamByteLimits> streamBytes) {
     core::LocalRecord record{0, u"Quote", false, {}, {}};
     std::vector<std::u16string> names;
     names.reserve(events::QUOTE_FIELD_NAMES.size());
@@ -122,6 +132,7 @@ void run(std::uint16_t port, std::uint64_t count, std::uint64_t rate, std::size_
     options.pendingQuotes = 1024;
     options.recordLimits.pendingBytes = api::PublisherRecordLimits::MAX_PENDING_BYTES;
     options.streamBatchRecords = batch;
+    options.streamBytes = streamBytes;
     options.catalog.emplace(*schema, wireNames);
     auto endpoint = api::PublisherEndpoint::create(*bootstrap, options);
 
@@ -221,12 +232,19 @@ void run(std::uint16_t port, std::uint64_t count, std::uint64_t rate, std::size_
     if (!drained)
         throw std::runtime_error("Timed out draining publisher");
 
+    const auto stream = (*endpoint)->getStatistics().families[1];
     (*endpoint)->closeAndAwaitTermination();
 
     if ((*endpoint)->getDiagnostic().code != api::ErrorCode::NONE)
         throw std::runtime_error(std::string((*endpoint)->getDiagnostic().stage));
 
-    std::cout << "RESULT count=" << count << " publishNs=" << publishNs << " retries=" << retries << std::endl;
+    std::cout << "RESULT count=" << count << " publishNs=" << publishNs << " retries=" << retries
+              << " streamFrames=" << stream.sentFrames.value;
+
+    if (streamBytes)
+        std::cout << " failedFrames=" << stream.failedFrames.value;
+
+    std::cout << std::endl;
 
     if (!std::cout)
         throw std::runtime_error("Cannot report publication result");
@@ -238,23 +256,34 @@ int main(int argc, char **argv) {
     if (argc == 1 ||
         (argc == 2 && (std::string_view(argv[1]) == "--help" || std::string_view(argv[1]) == "--help-ru"))) {
         std::cout << (argc == 2 && std::string_view(argv[1]) == "--help-ru" ? HELP_RU : HELP);
+
         return std::cout ? 0 : 1;
     }
 
     try {
-        if (argc != 5)
-            throw std::invalid_argument("Expected PORT COUNT RATE BATCH");
+        if (argc != 5 && (argc != 8 || std::string_view(argv[5]) != "--stream-bytes"))
+            throw std::invalid_argument("Expected PORT COUNT RATE BATCH [--stream-bytes TARGET HARD]");
 
         const auto port = parseNumber(argv[1], 0, std::numeric_limits<std::uint16_t>::max());
         const auto count = parseNumber(argv[2], 1, MAX_COUNT);
         const auto rate = parseNumber(argv[3], 0, MAX_RATE);
         const auto batch = parseNumber(argv[4], 1, MAX_BATCH);
-        run(static_cast<std::uint16_t>(port), count, rate, static_cast<std::size_t>(batch));
+        std::optional<api::PublisherStreamByteLimits> streamBytes;
+
+        if (argc == 8) {
+            const auto target = parseNumber(argv[6], 1, 64 * 1024 - 1);
+            const auto hard = parseNumber(argv[7], target + 1, 64 * 1024);
+            streamBytes.emplace(static_cast<std::size_t>(target), static_cast<std::size_t>(hard));
+        }
+
+        run(static_cast<std::uint16_t>(port), count, rate, static_cast<std::size_t>(batch), streamBytes);
     } catch (const std::invalid_argument &error) {
         std::cerr << error.what() << '\n';
+
         return 2;
     } catch (const std::exception &error) {
         std::cerr << error.what() << '\n';
+
         return 1;
     }
 

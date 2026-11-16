@@ -56,6 +56,8 @@ struct PublisherFamilyStatistics {
     std::size_t deliveryRecordOwners = 0;  ///< Detached records owned by the queue or retained by a consumer.
     core::StatisticCounter knownDiscardedRecords{0, core::StatisticAvailability::UNSUPPORTED};
     ///< Live discarded-record observations are not currently exposed by the queue.
+    core::StatisticCounter failedFrames{0, core::StatisticAvailability::UNSUPPORTED};
+    ///< Byte-mode STREAM frame composition failures that retire the affected peer.
 };
 
 /** Publisher-local lifetime counters and the most recent completed worker-turn state. */
@@ -139,6 +141,12 @@ struct PublisherRecordLimits {
     std::size_t pendingBytes = 256 * 1024; ///< Maximum total while queued or awaiting collector processing.
 };
 
+/** Independent wire budgets for local STREAM. Input storage uses PublisherRecordLimits. */
+struct PublisherStreamByteLimits {
+    std::size_t targetPayloadBytes = 8000; ///< Soft encoded payload threshold before taking another record.
+    std::size_t maxFrameBytes = 64 * 1024; ///< Hard complete-frame limit including the length prefix.
+};
+
 /** Finite local or remote publishing profile. */
 struct PublisherOptions {
     static constexpr std::size_t MAX_PEER_DEMAND_POLICIES = 32; ///< Maximum address overrides per endpoint.
@@ -154,6 +162,7 @@ struct PublisherOptions {
     std::vector<PublisherPeerDemandPolicy> peerDemand; ///< Owned overrides, matched by numeric IP on connection.
     PublisherRecordLimits recordLimits;                ///< Pending storage limits for local record publication.
     std::size_t streamBatchRecords = 1; ///< Enable batching in local mixed or catalog mode by setting 2 through 8.
+    std::optional<PublisherStreamByteLimits> streamBytes{}; ///< Enable byte-bounded local STREAM publication.
 };
 
 /** Raw controls for one indexed HISTORY publication. */

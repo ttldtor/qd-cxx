@@ -14,7 +14,7 @@ Bound each row by field count and owned payload bytes, including symbol bytes, a
 
 A detached producer handle and an owned record context remain safe after endpoint destruction. Publication and close share an admission fence. An attempt ordered after the fence returns a closed diagnostic. Work admitted before the fence may be discarded during shutdown. See the [publisher contract](PUBLISHER.md).
 
-Admission means the publisher has accepted the work for processing. The STREAM collector preserves FIFO admission order, including across concurrent producers. TICKER may conflate values for the same key. HISTORY applies its bounded indexed, transaction and snapshot rules. Downstream delivery, peer shutdown and queue pressure follow the collector and publisher contracts. Admission provides no peer receipt guarantee. A caller-side multi-record batch API is outside this contract. Producers coordinate submissions for a multi-record HISTORY transaction on the same key.
+Admission means the publisher has accepted the work for processing. The STREAM collector preserves FIFO admission order, including across concurrent producers. TICKER may conflate values for the same key. HISTORY applies its bounded indexed, transaction and snapshot rules. Downstream delivery, peer shutdown and queue pressure follow the collector and publisher contracts. Admission provides no peer receipt guarantee. Producers coordinate submissions for a multi-record HISTORY transaction on the same key.
 
 ## Compatibility
 
@@ -45,6 +45,41 @@ Fixed FIFO entries and allocator bookkeeping are outside that charge. The shared
 current unapplied row. A separate bounded source arena and the existing collector
 limits cover work after copying. `PublisherStatistics::pendingPublications` includes
 the current unapplied row in this profile.
+
+### Byte-limited STREAM publication
+
+Setting `PublisherOptions::streamBytes` enables independent STREAM publication and
+output limits for a local catalog or mixed publisher. Local catalog admission uses
+`recordLimits.rowBytes` for each row and `recordLimits.pendingBytes` for the sum
+of retained row charges. Fixed queue entries remain separately bounded by
+`pendingQuotes`. A multi-record call is admitted atomically: an invalid row,
+exhausted capacity or allocation failure leaves the complete call unadmitted.
+The mixed typed profile charges each fixed-format FIFO slot against the same
+input byte budget and keeps worker-owned storage under a separate finite budget.
+
+`targetPayloadBytes` is the soft threshold for encoded STREAM payload, defaulting
+to 8,000 bytes. The publisher takes already available rows in order and sends
+without waiting for more rows. It checks the threshold before appending the next
+complete row. A single row may cross the threshold. `maxFrameBytes` separately
+bounds the complete QTP frame including its length prefix, with a default of
+65,536 bytes. A row that exceeds the hard frame limit is a resource failure.
+The input API call and the outgoing frame need not contain the same rows.
+In this profile `streamBatchRecords` does not limit publication or output.
+The publisher also bounds one worker copy to 64 KiB of charged row storage
+and one retained peer delivery to 128 records. A frame carries at most 64 records
+to match the existing Feed decoder budget. Fixed queue slots remain independently
+bounded. Per-peer STREAM arenas are charged at their measured allocation size.
+These guards can cause a frame below the soft threshold. A frame composition
+failure retires the affected peer and increments STREAM `failedFrames`.
+When all subscribed peers lack room for the next source window, accepted
+STREAM input stays in the publisher FIFO while sockets progress. Peers with
+available capacity can keep receiving. The existing finite per-peer overflow
+and socket timeout policies still apply.
+
+When this profile is absent, `streamBatchRecords` keeps its existing behavior.
+Partial writes retain the frame and its source records until completion. Demand
+replacement preserves the existing policy for a revoked record in a partially
+sent frame.
 
 ### Indexed HISTORY
 

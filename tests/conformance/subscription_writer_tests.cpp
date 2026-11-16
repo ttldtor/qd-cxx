@@ -821,6 +821,46 @@ TEST_CASE("live compact frame and symbol prefixes preserve every partial-write b
     }
 }
 
+TEST_CASE("STREAM prefixes honor payload target and complete compact frame size") {
+    const auto source = schema();
+    auto composer = writer(source);
+    auto work = turn();
+    const std::u16string longSymbol(59, u'x');
+    const std::array fields{c::FieldValueView{c::SerialFieldType::COMPACT_INT, 1, {}, {}}};
+    const std::array rows{p::LiveDataRecordView{41, longSymbol, fields}, p::LiveDataRecordView{41, u"IBM", fields}};
+    const auto first = std::span(rows).first(1);
+    const auto firstFrame = composer.composeData(p::LiveDataMessage::STREAM_DATA, first, false, work);
+    REQUIRE(firstFrame);
+    const auto length = e::readCompactInt(firstFrame->bytes());
+    REQUIRE(length.status == e::Status::OK);
+    REQUIRE(length.value == 64);
+    REQUIRE(length.consumed == 2);
+
+    std::size_t written = 0;
+    const auto soft = composer.composeStreamPrefix(rows, false, 1, 1024, written, work);
+    REQUIRE(soft);
+    CHECK(written == 1);
+    CHECK(std::ranges::equal(soft->bytes(), firstFrame->bytes()));
+
+    const auto exactBytes = firstFrame->bytes().size();
+    const auto hard = composer.composeStreamPrefix(rows, false, exactBytes, exactBytes, written, work);
+    REQUIRE(hard);
+    CHECK(written == 1);
+    CHECK(std::ranges::equal(hard->bytes(), firstFrame->bytes()));
+
+    written = rows.size();
+    const auto oversized = composer.composeStreamPrefix(rows, false, exactBytes - 1, exactBytes - 1, written, work);
+    REQUIRE_FALSE(oversized);
+    CHECK(oversized.error() == Error::RESOURCE_LIMIT);
+    CHECK(written == rows.size());
+
+    work.outputBytes = exactBytes;
+    const auto insufficient = composer.composeStreamPrefix(rows, false, exactBytes, exactBytes, written, work);
+    REQUIRE_FALSE(insufficient);
+    CHECK(insufficient.error() == Error::WORK_LIMIT);
+    CHECK(written == rows.size());
+}
+
 TEST_CASE("live composer retains schema provenance after source destruction and refuses unmapped context") {
     auto retained = [] {
         const auto source = schema();

@@ -379,6 +379,8 @@ SubscriptionWriter::create(const core::LocalSchema &schema, std::span<const Outg
 
 /** One call's borrowed inputs, sizing pass and candidate encoding; no persistent mutation. */
 struct SubscriptionWriter::Operation {
+    struct PrefixFrameLimit {};
+
     SubscriptionWriter &writer;                          ///< Composer configuration, borrowed for this call.
     SubscriptionWriterWork &work;                        ///< Caller credits, never refunded.
     std::optional<SubscriptionMessage> message;          ///< Absent for descriptions.
@@ -390,13 +392,26 @@ struct SubscriptionWriter::Operation {
     std::span<std::byte> output{};                       ///< Candidate body, empty during sizing.
     bool encoding = false;                               ///< Whether output bytes are being filled.
     std::size_t size = 0;                                ///< Current body byte position.
+    std::size_t bodyLimit = std::min(writer.limits_.frameBytes, MAX_WIRE_COUNT);
+    bool selectingPrefix = false; ///< Translate hard size refusal into a prefix boundary.
 
     /** Append a bounded byte count before touching output.
      * @param count Encoded bytes to admit.
      */
     void admit(std::size_t count) {
+        const bool fits = count <= bodyLimit - size;
+
+        if (!fits && selectingPrefix) {
+            throw PrefixFrameLimit{};
+        }
+
         debit(count, work.outputBytes);
-        add(count, size, std::min(writer.limits_.frameBytes, MAX_WIRE_COUNT));
+
+        if (!fits) {
+            throw Error::RESOURCE_LIMIT;
+        }
+
+        size += count;
     }
 
     /** Encode one compact scalar via the existing bounded primitive.
@@ -464,6 +479,11 @@ struct SubscriptionWriter::Operation {
 
         if (value.size() > MAX_WIRE_COUNT) {
             throw Error::RESOURCE_LIMIT;
+        }
+
+        // Each UTF-16 code unit costs at least one byte, plus the encoded length.
+        if (selectingPrefix && value.size() >= bodyLimit - size) {
+            throw PrefixFrameLimit{};
         }
 
         debit(value.size(), work.textUnits);
@@ -639,6 +659,74 @@ struct SubscriptionWriter::Operation {
         }
     }
 
+    /** Traverse one DATA occurrence, preserving the message-local symbol and event flags. */
+    void walkDataRecord(const LiveDataRecordView &record, std::optional<std::u16string_view> &previous,
+                        std::int32_t &mruFlags) {
+        debit(1, work.visits);
+
+        if ((record.eventFlags & ~(historySnapshot ? DATA_FLAGS : 0)) != 0) {
+            throw Error::UNSUPPORTED_DATA_FLAGS;
+        }
+
+        if (record.symbol.data() == nullptr) {
+            throw Error::INVALID_DATA;
+        }
+
+        if (record.symbol.size() > MAX_WIRE_COUNT || record.symbol.size() > writer.limits_.symbolUnits) {
+            throw Error::RESOURCE_LIMIT;
+        }
+
+        const auto &layout = byId(record.senderId);
+        const auto &local = writer.schema_.records()[static_cast<std::size_t>(layout.localRecordId)];
+        const bool removal = (record.eventFlags & REMOVE_EVENT) != 0;
+
+        if (removal != record.removalTime.has_value() ||
+            (removal && (!record.values.empty() || (!local.hasTime && *record.removalTime != 0))) ||
+            (!removal && record.values.size() != local.fields.size())) {
+            throw Error::INVALID_DATA;
+        }
+
+        if (removal) {
+            validateRemovalLayout(layout);
+        }
+
+        if (record.eventFlags != 0) {
+            if (record.eventFlags == mruFlags) {
+                byte(MRU_FLAGS);
+            } else {
+                byte(NEW_FLAGS);
+                number(record.eventFlags);
+                mruFlags = record.eventFlags;
+            }
+        }
+
+        if (previous && same(*previous, record.symbol, work)) {
+            byte(REPEAT_SYMBOL);
+        } else {
+            canonicalSymbol(record.symbol);
+        }
+
+        previous = record.symbol;
+        number(record.senderId);
+
+        if (removal) {
+            number(*record.removalTime);
+
+            return;
+        }
+
+        for (const auto &field : layout.fields) {
+            debit(1, work.visits);
+            const auto &value = record.values[static_cast<std::size_t>(field.localFieldId)];
+
+            if (std::to_underlying(value.type) != field.serialTypeId || !core::validFieldValueView(value)) {
+                throw Error::INVALID_DATA;
+            }
+
+            fieldValue(value);
+        }
+    }
+
     /** Traverse one full DATA body with fresh symbol and event-flag state. */
     void walkData() {
         number(std::to_underlying(*dataMessage));
@@ -646,69 +734,58 @@ struct SubscriptionWriter::Operation {
         std::int32_t mruFlags = 1;
 
         for (const auto &record : data) {
-            debit(1, work.visits);
-
-            if ((record.eventFlags & ~(historySnapshot ? DATA_FLAGS : 0)) != 0) {
-                throw Error::UNSUPPORTED_DATA_FLAGS;
-            }
-
-            if (record.symbol.data() == nullptr) {
-                throw Error::INVALID_DATA;
-            }
-
-            if (record.symbol.size() > MAX_WIRE_COUNT || record.symbol.size() > writer.limits_.symbolUnits) {
-                throw Error::RESOURCE_LIMIT;
-            }
-
-            const auto &layout = byId(record.senderId);
-            const auto &local = writer.schema_.records()[static_cast<std::size_t>(layout.localRecordId)];
-            const bool removal = (record.eventFlags & REMOVE_EVENT) != 0;
-
-            if (removal != record.removalTime.has_value() ||
-                (removal && (!record.values.empty() || (!local.hasTime && *record.removalTime != 0))) ||
-                (!removal && record.values.size() != local.fields.size())) {
-                throw Error::INVALID_DATA;
-            }
-
-            if (removal) {
-                validateRemovalLayout(layout);
-            }
-
-            if (record.eventFlags != 0) {
-                if (record.eventFlags == mruFlags) {
-                    byte(MRU_FLAGS);
-                } else {
-                    byte(NEW_FLAGS);
-                    number(record.eventFlags);
-                    mruFlags = record.eventFlags;
-                }
-            }
-
-            if (previous && same(*previous, record.symbol, work)) {
-                byte(REPEAT_SYMBOL);
-            } else {
-                canonicalSymbol(record.symbol);
-            }
-
-            previous = record.symbol;
-            number(record.senderId);
-
-            if (removal) {
-                number(*record.removalTime);
-                continue;
-            }
-
-            for (const auto &field : layout.fields) {
-                debit(1, work.visits);
-                const auto &value = record.values[static_cast<std::size_t>(field.localFieldId)];
-
-                if (std::to_underlying(value.type) != field.serialTypeId || !core::validFieldValueView(value)) {
-                    throw Error::INVALID_DATA;
-                }
-
-                fieldValue(value);
-            }
+            walkDataRecord(record, previous, mruFlags);
         }
+    }
+
+    /** Select a complete prefix during sizing, leaving the rejected suffix borrowed by the caller. */
+    std::size_t walkStreamPrefix(const StreamPrefix &prefix) {
+        const auto frameLimit = std::min(prefix.maxFrameBytes, writer.limits_.operationBytes);
+        auto candidateLimit = std::min(bodyLimit, frameLimit);
+        std::array<std::byte, COMPACT_BYTES> length{};
+
+        if (candidateLimit == 0) {
+            throw Error::RESOURCE_LIMIT;
+        }
+
+        // The compact prefix adds at most five bytes. Its width can fall as the body limit falls.
+        while (encoding::writeCompactInt(static_cast<std::int32_t>(candidateLimit), length).written >
+               frameLimit - candidateLimit) {
+            --candidateLimit;
+        }
+
+        if (candidateLimit == 0) {
+            throw Error::RESOURCE_LIMIT;
+        }
+
+        bodyLimit = candidateLimit;
+        selectingPrefix = true;
+        number(std::to_underlying(*dataMessage));
+        const auto payloadStart = size;
+        const auto maximum = std::min(data.size(), writer.limits_.operationEntries);
+        std::optional<std::u16string_view> previous;
+        std::int32_t mruFlags = 1;
+        std::size_t selected = 0;
+
+        while (selected < maximum && size - payloadStart < prefix.targetPayloadBytes) {
+            const auto before = size;
+            try {
+                walkDataRecord(data[selected], previous, mruFlags);
+            } catch (PrefixFrameLimit) {
+                size = before;
+                break;
+            }
+
+            ++selected;
+        }
+
+        if (selected == 0) {
+            throw Error::RESOURCE_LIMIT;
+        }
+
+        selectingPrefix = false;
+
+        return selected;
     }
 
     /** Traverse one complete body with fresh message-local symbol state. */
@@ -830,7 +907,7 @@ std::expected<PendingSubscriptionOutput, Error>
 SubscriptionWriter::execute(std::optional<SubscriptionMessage> message,
                             std::span<const core::SubscriptionRequest> requests, std::span<const std::int32_t> ids,
                             std::optional<LiveDataMessage> dataMessage, std::span<const LiveDataRecordView> data,
-                            bool historySnapshot, SubscriptionWriterWork &work) {
+                            bool historySnapshot, SubscriptionWriterWork &work, const StreamPrefix *prefixLimits) {
     try {
         debit(1, work.operations);
 
@@ -868,13 +945,23 @@ SubscriptionWriter::execute(std::optional<SubscriptionMessage> message,
         }
 
         if (requests.size() > limits_.operationEntries || ids.size() > limits_.operationEntries ||
-            data.size() > limits_.operationEntries) {
+            (!prefixLimits && data.size() > limits_.operationEntries)) {
             throw Error::RESOURCE_LIMIT;
         }
 
         Operation operation{*this, work, message, requests, ids, dataMessage, data, historySnapshot};
 
-        operation.walk();
+        if (prefixLimits) {
+            if (prefixLimits->targetPayloadBytes == 0 ||
+                prefixLimits->targetPayloadBytes > prefixLimits->maxFrameBytes) {
+                throw Error::INVALID_DATA;
+            }
+
+            operation.data = data.first(operation.walkStreamPrefix(*prefixLimits));
+        } else {
+            operation.walk();
+        }
+
         std::array<std::byte, COMPACT_BYTES> prefix{};
         const auto prefixSize = encoding::writeCompactInt(static_cast<std::int32_t>(operation.size), prefix).written;
         std::size_t total = operation.size;
@@ -917,6 +1004,10 @@ SubscriptionWriter::execute(std::optional<SubscriptionMessage> message,
         operation.walk();
         reservation.committed = true;
 
+        if (prefixLimits) {
+            prefixLimits->writtenRecords = operation.data.size();
+        }
+
         return PendingSubscriptionOutput(budget_, std::move(candidate), total);
     } catch (Error error) {
         return std::unexpected(error);
@@ -937,6 +1028,15 @@ std::expected<PendingSubscriptionOutput, Error>
 SubscriptionWriter::composeData(LiveDataMessage message, std::span<const LiveDataRecordView> records,
                                 bool historySnapshot, SubscriptionWriterWork &work) {
     return execute({}, {}, {}, message, records, historySnapshot, work);
+}
+
+std::expected<PendingSubscriptionOutput, Error>
+SubscriptionWriter::composeStreamPrefix(std::span<const LiveDataRecordView> records, bool historySnapshot,
+                                        std::size_t targetPayloadBytes, std::size_t maxFrameBytes,
+                                        std::size_t &writtenRecords, SubscriptionWriterWork &work) {
+    const StreamPrefix limits{targetPayloadBytes, maxFrameBytes, writtenRecords};
+
+    return execute({}, {}, {}, LiveDataMessage::STREAM_DATA, records, historySnapshot, work, &limits);
 }
 
 std::expected<PendingSubscriptionOutput, Error> SubscriptionWriter::describe(std::span<const std::int32_t> senderIds,

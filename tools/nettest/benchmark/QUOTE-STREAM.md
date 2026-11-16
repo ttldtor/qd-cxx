@@ -6,12 +6,20 @@ Build `qdcxx_quote_stream_nettest` with the public Feed API enabled. The tool
 publishes physical Quote records through the STREAM collector. Its inputs are
 port, total records, offered records per second, and batch size (1–8). Rate
 zero submits as fast as local admission permits. Start the publisher first.
+Pass `--stream-bytes TARGET HARD` after these four arguments to enable the
+byte-limited STREAM profile. TARGET is the encoded payload threshold and HARD
+is the complete QTP frame limit in bytes. Omitting the option retains the
+existing profile. The generator's BATCH remains independent of both limits.
 
 ~~~sh
 qdcxx-quote-stream-nettest 7300 250000 50000 8
 javac -cp "$QD_CLASSPATH" -d classes tools/nettest/benchmark/StreamReceiver.java
 java -cp "classes:$QD_CLASSPATH" StreamReceiver 127.0.0.1:7300 IBM quote-stream ns probe
 ~~~
+
+For example, use `qdcxx-quote-stream-nettest 7300 250000 50000 8
+--stream-bytes 8000 65536` to compare byte-limited output with the same
+eight-record generator calls.
 
 On Windows use a semicolon as the classpath separator. Supply the QD 3.357
 classpath. After `READY` from the publisher and `PROBE_RECEIVED` from the
@@ -29,6 +37,10 @@ This encoding requires a common machine clock, such as QPC with the verified
 Windows toolchains. The latency histogram measures generation to Java receipt.
 Record negative samples and verify the clock domain before comparing p99.
 The receiver verifies all eight Quote fields and the exact order.
+The publisher's `streamFrames` result counts completely sent STREAM DATA
+frames, including the startup probe frame. Byte mode also reports
+`failedFrames`, counting frame composition failures that retire a peer.
+These publisher counters are separate from the receiver's delivery checks.
 
 The receiver's `--self-test-quote-stream` checks positive and damaged records
 through a local Java QD STREAM collector. Count only exact deliveries when

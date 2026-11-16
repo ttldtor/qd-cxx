@@ -150,6 +150,13 @@ class SubscriptionWriter {
     SubscriptionWriter(core::LocalSchema schema, std::vector<OutgoingRecord> records, SubscriptionWriterLimits limits,
                        std::shared_ptr<PendingSubscriptionOutput::Budget> budget,
                        core::SubscriptionSelectorPolicy policy);
+
+    struct StreamPrefix {
+        std::size_t targetPayloadBytes;
+        std::size_t maxFrameBytes;
+        std::size_t &writtenRecords;
+    };
+
     /** Compose one atomic operation after validation and exact sizing.
      * @param message Subscription identity, or absent for descriptions.
      * @param requests Borrowed ordered keys; unused for descriptions.
@@ -158,12 +165,14 @@ class SubscriptionWriter {
      * @param data Borrowed DATA records; unused for descriptions and subscriptions.
      * @param historySnapshot Whether the caller enabled the hs option for outgoing DATA.
      * @param work Mutable caller-turn credits, never refunded.
+     * @param prefix Optional STREAM prefix limits and successful row count destination.
      * @return Independent complete output or typed rejection.
      */
     std::expected<PendingSubscriptionOutput, SubscriptionWriterError>
     execute(std::optional<SubscriptionMessage> message, std::span<const core::SubscriptionRequest> requests,
             std::span<const std::int32_t> ids, std::optional<LiveDataMessage> dataMessage,
-            std::span<const LiveDataRecordView> data, bool historySnapshot, SubscriptionWriterWork &work);
+            std::span<const LiveDataRecordView> data, bool historySnapshot, SubscriptionWriterWork &work,
+            const StreamPrefix *prefix = nullptr);
 
     public:
     /** Transfer configuration and shared credits; source rejects subsequent operations.
@@ -208,6 +217,19 @@ class SubscriptionWriter {
     [[nodiscard]] std::expected<PendingSubscriptionOutput, SubscriptionWriterError>
     composeData(LiveDataMessage message, std::span<const LiveDataRecordView> records, bool historySnapshot,
                 SubscriptionWriterWork &work);
+    /** Encode a ready nonempty STREAM prefix with fresh symbol and flag state.
+     * @param records Borrowed occurrences in transmission order.
+     * @param historySnapshot Whether hs is enabled for this direction.
+     * @param targetPayloadBytes Positive soft threshold, excluding length and message identity.
+     * @param maxFrameBytes Positive hard total envelope limit, including its length prefix.
+     * @param writtenRecords Exact selected prefix length, assigned only on success.
+     * @param work Mutable caller-turn credits, including candidate sizing that exceeds the hard limit.
+     * @return Immutable whole envelope or typed rejection without partial output.
+     */
+    [[nodiscard]] std::expected<PendingSubscriptionOutput, SubscriptionWriterError>
+    composeStreamPrefix(std::span<const LiveDataRecordView> records, bool historySnapshot,
+                        std::size_t targetPayloadBytes, std::size_t maxFrameBytes, std::size_t &writtenRecords,
+                        SubscriptionWriterWork &work);
     /** Encode explicit descriptions, without claiming they were sent or acknowledged.
      * @param senderIds Ordered known sender IDs, borrowed only during the call; repeats are preserved.
      * @param work Mutable explicit caller-turn credits.

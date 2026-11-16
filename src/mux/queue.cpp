@@ -1938,20 +1938,20 @@ struct MuxQueue::State {
         }
 
         bound(required, l.recordArenaBytes);
-        const auto charge =
-            sum(c.port->budget->context->controlBytes[static_cast<std::size_t>(detail::ControlKind::RECORD)],
-                l.recordArenaBytes);
+        const auto arenaBytes = l.compactRecordArena ? required : l.recordArenaBytes;
+        const auto charge = sum(
+            c.port->budget->context->controlBytes[static_cast<std::size_t>(detail::ControlKind::RECORD)], arenaBytes);
         bound(charge, l.recordBytes);
         spend(work, sum(fieldCount, 4), product(fieldCount, 2), product(sum(units, key.symbol.size()), 3),
               sum(product(charge, 3), product(bytes, 2)));
         auto out =
             detail::shared<detail::QueueRecord>(detail::clientScope(c.port->budget, detail::AllocationTag::RECORD),
                                                 c.port->budget, retainedInitial, aggregationSnapshot);
-        out->arenaSize = l.recordArenaBytes;
+        out->arenaSize = arenaBytes;
         const auto arenaScope = detail::clientScope(c.port->budget, detail::AllocationTag::ARENA);
-        auto *memory = detail::QueueAllocator<std::byte>{arenaScope}.allocate(l.recordArenaBytes);
-        out->arena = {memory, detail::BlockDelete<std::byte>{arenaScope, l.recordArenaBytes, false}};
-        RecordArena arena{out->arena.get(), l.recordArenaBytes};
+        auto *memory = detail::QueueAllocator<std::byte>{arenaScope}.allocate(arenaBytes);
+        out->arena = {memory, detail::BlockDelete<std::byte>{arenaScope, arenaBytes, false}};
+        RecordArena arena{out->arena.get(), arenaBytes};
         out->view.family = family;
         out->view.context = key.context;
         out->view.symbol = arena.text(key.symbol);
