@@ -574,6 +574,7 @@ TEST_CASE("local catalog STREAM batches deliver ordered owned records to two sho
     q::api::PublisherOptions options;
     options.catalog.emplace(schema, names);
     options.streamBatchRecords = 8;
+    options.listener.maxConnections = 2;
     options.listener.maxWriteBytes = 7;
     auto endpoint = q::api::PublisherEndpoint::create(*bootstrap, options);
     REQUIRE(endpoint);
@@ -606,28 +607,32 @@ TEST_CASE("local catalog STREAM batches deliver ordered owned records to two sho
     REQUIRE_FALSE(publisher.publishStreamRecords(rows));
     values.back().type = Type::COMPACT_INT;
     REQUIRE(publisher.publishStreamRecords(rows));
+    REQUIRE(publisher.publishStreamRecords(rows));
     alpha.assign(u"BAD");
     beta.assign(u"BAD");
     values.fill({Type::COMPACT_INT, -1, {}, {}});
 
-    for (auto *peer : {&first, &second}) {
-        awaitRecords(*peer, rows.size(), **endpoint);
+    const auto delivered = rows.size() * 2;
 
-        for (std::size_t i = 0; i < rows.size(); ++i) {
+    for (auto *peer : {&first, &second}) {
+        awaitRecords(*peer, delivered, **endpoint);
+
+        for (std::size_t i = 0; i < delivered; ++i) {
+            const auto rowIndex = i % rows.size();
             const auto &[family, record] = peer->records()[i];
             CHECK(family == 15);
-            CHECK(record.localId == static_cast<std::int32_t>(i % 2));
-            CHECK(record.symbol.units == (i % 2 == 0 ? u"IBM" : u"MSFT"));
+            CHECK(record.localId == static_cast<std::int32_t>(rowIndex % 2));
+            CHECK(record.symbol.units == (rowIndex % 2 == 0 ? u"IBM" : u"MSFT"));
             REQUIRE(record.typedValues.size() == 1);
-            CHECK(record.typedValues[0].raw == static_cast<std::int64_t>(100 + i));
+            CHECK(record.typedValues[0].raw == static_cast<std::int64_t>(100 + rowIndex));
         }
     }
 
     (*endpoint)->closeAndAwaitTermination();
     const auto stats = (*endpoint)->getStatistics().families[1];
-    CHECK(stats.ingressFrames.value == 1);
-    CHECK(stats.ingressRecords.value == 8);
-    CHECK(stats.sentFrames.value == 2);
+    CHECK(stats.ingressFrames.value == 2);
+    CHECK(stats.ingressRecords.value == delivered);
+    CHECK(stats.sentFrames.value == 4);
     const auto closed = publisher.publishStreamRecords(rows);
     REQUIRE_FALSE(closed);
     CHECK(closed.error().code == q::api::ErrorCode::CLOSED);
@@ -641,6 +646,7 @@ TEST_CASE("catalog STREAM splits an oversized frame and delivers its tail in ord
     q::api::PublisherOptions options;
     options.catalog.emplace(schema, names);
     options.streamBatchRecords = 8;
+    options.listener.maxConnections = 1;
     auto endpoint = q::api::PublisherEndpoint::create(*bootstrap, options);
     REQUIRE(endpoint);
     Downstream peer(schema, (*endpoint)->port(), 100);

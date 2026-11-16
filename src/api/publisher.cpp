@@ -2467,9 +2467,9 @@ class PublisherServer {
         constexpr std::size_t DEFAULT_QUEUE_ACTIONS = 16;
         const bool driveLocal = !port.remote && (!port.localRecords || streamBatchRecords_ > 1);
         // A sequence of IDLE visits may end before the next runnable slot, or before source admission reopens.
-        const auto queueActions = driveLocal
-                                      ? std::max(DEFAULT_QUEUE_ACTIONS, mux::detail::QUEUE_PHASES * peers_.size())
-                                      : DEFAULT_QUEUE_ACTIONS;
+        const auto idleRotation = mux::detail::QUEUE_PHASES * peers_.size();
+        const auto queueActions = driveLocal ? std::max(DEFAULT_QUEUE_ACTIONS, idleRotation) : DEFAULT_QUEUE_ACTIONS;
+        const auto idleLimit = port.localRecords && driveLocal ? idleRotation : queueActions;
         bool advanced = false;
 
         for (std::size_t family = 0; family < familyCount_; ++family) {
@@ -2477,6 +2477,8 @@ class PublisherServer {
             auto &turn = work[family];
             turn = serverQueueTurn(peers_.size(), sourceOptions_.has_value(), !catalogNames_.empty(), familyCount_,
                                    recordIds_.size());
+
+            std::size_t idleVisits = 0;
 
             for (std::size_t i = 0; i < queueActions; ++i) {
                 const auto moved = queue.progress(turn);
@@ -2488,7 +2490,14 @@ class PublisherServer {
                     throw Error(queueDiagnostic(moved.error(), "publisher-progress"));
                 }
 
-                advanced |= moved->kind != mux::QueueProgressKind::IDLE;
+                if (moved->kind == mux::QueueProgressKind::IDLE) {
+                    // Visit every configured slot in every phase before yielding an idle local queue.
+                    if (++idleVisits == idleLimit)
+                        break;
+                } else {
+                    idleVisits = 0;
+                    advanced = true;
+                }
             }
 
             if (const auto terminal = queue.terminal())
