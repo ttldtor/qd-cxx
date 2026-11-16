@@ -60,6 +60,24 @@ $sender = (Get-Content "$out/send.json" -Raw | ConvertFrom-Json).measurement
 if ($sender.SentDatagrams -ne 69 -or $sender.SendErrors -ne 0 -or $receiver.UniqueDatagrams -ne 69 -or
     $receiver.UniqueMessages -ne 137 -or !$receiver.Completed) { throw 'Loopback delivery mismatch.' }
 
+$p = Start-Receiver 'paced'
+try {
+    & $shell -NoProfile -File $multicast -Mode Send -Directory $corpus -Group $group -Port $port -Interface $hostAddress `
+        -Output "$out/paced-send.json" -PacingWindowMs 1
+    if ($LASTEXITCODE -ne 0) { throw 'Paced sender failed.' }
+    $receiverProcess = $p
+    $p = $null
+    $null = Finish-Receiver $receiverProcess 'paced'
+} finally { if ($p) { if (!$p.HasExited) { $p.Kill($true); $p.WaitForExit() }; $p.Dispose() } }
+$checker = Join-Path $PSScriptRoot 'Test-BurstReceipts.ps1'
+$inputs = @('-Directory',$corpus,'-SendReceipt',"$out/paced-send.json",'-ReceiveReceipt',"$out/paced.json")
+& $shell -NoProfile -File $checker @inputs -Output "$out/paced-check.json" -PacingWindowMs 1
+if ($LASTEXITCODE -ne 0) { throw 'Matching paced receipts did not pass.' }
+& $shell -NoProfile -File $checker @inputs -Output "$out/undeclared-pacing.json"
+if ($LASTEXITCODE -ne 1 -or (Get-Content "$out/undeclared-pacing.json" -Raw | ConvertFrom-Json).checks.offeredSchedule) {
+    throw 'Undeclared pacing schedule did not produce rejection evidence.'
+}
+
 $p = Start-Receiver 'altered'
 try {
     $file = [IO.File]::OpenRead((Join-Path $corpus 'corpus.bin'))
@@ -102,3 +120,4 @@ if ($receiver.UniqueDatagrams -ne 2 -or $receiver.MissingDatagrams -ne 67 -or
     throw 'Altered datagram counters differ from the injected sequence.'
 }
 Write-Output 'Multicast loopback and altered-datagram checks passed.'
+exit 0

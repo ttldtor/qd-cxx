@@ -8,6 +8,7 @@ param(
     [string]$SendReceipt,
     [string]$ReceiveReceipt,
     [string]$Output,
+    [ValidateRange(1,600000)][int]$PacingWindowMs,
     [ValidateRange(0,9223372036854775807)][long]$MaxSendP99Ns,
     [switch]$Help,
     [switch]$HelpRu
@@ -16,7 +17,8 @@ param(
 $ErrorActionPreference = 'Stop'
 if ($HelpRu) {
     Write-Output 'Сверяет корпус и отчёты отправителя и получателя синтетического UDP-всплеска.'
-    Write-Output 'Использование: Test-BurstReceipts.ps1 -Directory КОРПУС -SendReceipt JSON -ReceiveReceipt JSON -Output НОВЫЙ_JSON [-MaxSendP99Ns N]'
+    Write-Output 'Использование: Test-BurstReceipts.ps1 -Directory КОРПУС -SendReceipt JSON -ReceiveReceipt JSON -Output НОВЫЙ_JSON [-PacingWindowMs N] [-MaxSendP99Ns N]'
+    Write-Output 'Укажите PacingWindowMs отправителя, если он использовал сокращённый график. Дедлайн берётся из корпуса.'
     Write-Output 'Проверяет совместимость, доставку, потери, порядок, байты, оба локальных окна и необязательный предел p99.'
     Write-Output 'Выход 0 означает прохождение всех проверок, 1 — их невыполнение или ошибку входных данных. При корректных отчётах результат записывается и при отрицательном исходе.'
     Write-Output 'Результат не подтверждает физический канал или межмашинную одностороннюю задержку.'
@@ -24,7 +26,8 @@ if ($HelpRu) {
 }
 if ($Help -or !$PSBoundParameters.Count) {
     Write-Output 'Reconcile a synthetic UDP burst corpus and sender/receiver receipts.'
-    Write-Output 'Usage: Test-BurstReceipts.ps1 -Directory CORPUS -SendReceipt JSON -ReceiveReceipt JSON -Output NEW_JSON [-MaxSendP99Ns N]'
+    Write-Output 'Usage: Test-BurstReceipts.ps1 -Directory CORPUS -SendReceipt JSON -ReceiveReceipt JSON -Output NEW_JSON [-PacingWindowMs N] [-MaxSendP99Ns N]'
+    Write-Output 'Supply the sender PacingWindowMs when it used a shorter schedule. The corpus still sets the deadline.'
     Write-Output 'Checks compatibility, delivery, loss, ordering, bytes, both local windows and an optional p99 bound.'
     Write-Output 'Exit 0 when every check passes, 1 for failed checks or invalid input. Valid rejecting comparisons also write evidence.'
     Write-Output 'The result does not certify a physical network or cross-host one-way latency.'
@@ -45,6 +48,9 @@ foreach ($path in $sendPath, $receivePath) {
 }
 & (Join-Path $PSScriptRoot '../burst/Corpus.ps1') -Mode Validate -Directory $directoryPath | Out-Null
 $manifest = Get-Content -LiteralPath (Join-Path $directoryPath 'manifest.json') -Raw | ConvertFrom-Json
+if ($PacingWindowMs -gt $manifest.windowMs) { throw 'PacingWindowMs must not exceed the corpus window.' }
+$expectedPacingNs = [long]$manifest.windowMs * 1000000
+if ($PacingWindowMs) { $expectedPacingNs = [long]$PacingWindowMs * 1000000 }
 $send = Get-Content -LiteralPath $sendPath -Raw | ConvertFrom-Json
 $receive = Get-Content -LiteralPath $receivePath -Raw | ConvertFrom-Json
 foreach ($receipt in $send, $receive) {
@@ -87,6 +93,12 @@ foreach ($name in $receiverFields) {
 if ($receive.measurement.Completed -isnot [bool]) { throw 'Invalid receiver Completed field.' }
 $s = $send.measurement
 $r = $receive.measurement
+$pacing = $s.PSObject.Properties['PacingWindowNanoseconds']
+$pacingNs = $s.WindowNanoseconds
+if ($pacing) { $pacingNs = $pacing.Value }
+if ($pacingNs -isnot [long] -or $pacingNs -lt 1 -or $pacingNs -gt $s.WindowNanoseconds) {
+    throw 'Invalid sender pacing window.'
+}
 if ($s.ClockFrequencyHz -eq 0 -or $s.LatenessP99Nanoseconds -gt $s.LatenessMaxNanoseconds -or
     $s.SentDatagrams -gt $s.AttemptedDatagrams -or $s.AttemptedDatagrams -gt $s.ScheduledDatagrams -or
     $s.SentMessages -gt $s.ScheduledMessages -or $s.SentDatagramsInWindow -gt $s.SentDatagrams -or
@@ -99,7 +111,7 @@ if ($s.ClockFrequencyHz -eq 0 -or $s.LatenessP99Nanoseconds -gt $s.LatenessMaxNa
 $checks = [ordered]@{
     corpusIdentity = $send.corpusSha256 -ceq $manifest.sha256 -and $receive.corpusSha256 -ceq $manifest.sha256
     multicastEndpoint = $send.group -ceq $receive.group -and $send.port -eq $receive.port
-    offeredSchedule = $s.WindowNanoseconds -eq $manifest.windowMs * 1000000 -and
+    offeredSchedule = $s.WindowNanoseconds -eq $manifest.windowMs * 1000000 -and $pacingNs -eq $expectedPacingNs -and
         $s.ScheduledDatagrams -eq $manifest.datagrams -and $s.ScheduledMessages -eq $manifest.messages -and
         $r.ExpectedDatagrams -eq $manifest.datagrams -and $r.ExpectedMessages -eq $manifest.messages
     senderIntegrity = $s.AttemptedDatagrams -eq $manifest.datagrams -and $s.SentDatagrams -eq $manifest.datagrams -and
@@ -122,6 +134,8 @@ $result = [ordered]@{
     messages = $manifest.messages
     datagrams = $manifest.datagrams
     windowNanoseconds = $manifest.windowMs * 1000000
+    pacingWindowNanoseconds = $pacingNs
+    expectedPacingWindowNanoseconds = $expectedPacingNs
     maxSendP99Nanoseconds = if ($PSBoundParameters.ContainsKey('MaxSendP99Ns')) { $MaxSendP99Ns } else { $null }
     observed = [ordered]@{
         sender = [ordered]@{

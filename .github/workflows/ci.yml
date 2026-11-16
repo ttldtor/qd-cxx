@@ -101,6 +101,18 @@ jobs:
         shell: pwsh
         run: '& ./tools/nettest/benchmark/multicast/Test-Multicast.ps1 -OutputDirectory (Join-Path $env:RUNNER_TEMP "nettest-multicast")'
 
+      - name: Verify Linux multicast batching
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          ns="nettest-multicast-$BASHPID"
+          sudo ip netns add "$ns"
+          trap 'sudo ip netns del "$ns"' EXIT
+          sudo ip -n "$ns" link set lo up
+          sudo ip -n "$ns" route add 239.255.88.7/32 dev lo
+          sudo ip netns exec "$ns" "$(command -v pwsh)" -NoProfile -File \
+            ./tools/nettest/benchmark/multicast/Test-Multicast.ps1 -OutputDirectory "$RUNNER_TEMP/nettest-multicast"
+
       - name: Verify multicast acceptance receipt
         if: runner.os == 'Windows'
         shell: pwsh

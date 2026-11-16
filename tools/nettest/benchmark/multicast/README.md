@@ -20,6 +20,16 @@ counts a datagram only after the OS accepts the complete payload. P99 and
 maximum lateness measure scheduled time to completion of the local send call.
 They do not measure receiver delivery or physical-wire transmission time.
 
+The sender can use `-PacingWindowMs` to compress the release schedule while
+keeping the same corpus, datagram order and acceptance window. For example,
+`-PacingWindowMs 70` releases a 100 ms corpus on a 70 ms schedule. Send lateness
+is then relative to the compressed schedule. The sender receipt records both
+windows. Supply the same option when checking the receipts.
+On 64-bit Linux x64 and Arm64 this mode groups up to 32 consecutive datagrams
+whose scheduled send times span at most 100 microseconds. Each group starts
+at its last scheduled send time. The receipt uses the completion time of the
+system call for every datagram it accepted.
+
 The receiver verifies each complete datagram against its preloaded corpus.
 Its receipt distinguishes unique messages and datagrams, missing, duplicates,
 out-of-order, unknown and corrupt datagrams. It listens for the full timeout

@@ -9,6 +9,7 @@ param(
     [ValidateRange(1,65535)][int]$Port,
     [string]$Interface,
     [string]$Output,
+    [ValidateRange(1,600000)][int]$PacingWindowMs,
     [ValidateRange(100,600000)][int]$TimeoutMs = 30000,
     [switch]$Help,
     [switch]$HelpRu
@@ -16,7 +17,8 @@ param(
 $ErrorActionPreference = 'Stop'
 if ($HelpRu) {
     Write-Output 'Передаёт или принимает один синтетический всплеск по IPv4 multicast.'
-    Write-Output 'Использование: Multicast.ps1 -Mode Send|Receive -Directory КОРПУС -Group 239.X.X.X -Port N -Interface IPV4 -Output НОВЫЙ_JSON [-TimeoutMs 30000]'
+    Write-Output 'Использование: Multicast.ps1 -Mode Send|Receive -Directory КОРПУС -Group 239.X.X.X -Port N -Interface IPV4 -Output НОВЫЙ_JSON [-TimeoutMs 30000] [-PacingWindowMs N]'
+    Write-Output 'PacingWindowMs только для отправителя. Сжимает график выпуска до заданного окна, по умолчанию берёт окно корпуса.'
     Write-Output 'Сначала проверяет корпус и загружает его в память. TTL=1. Получатель печатает READY после вступления в группу.'
     Write-Output 'Отчёт содержит фактические отправки в окне, опоздание, доставку, пропуски, дубли, перестановки и ошибки данных.'
     Write-Output 'Для измерения физической сети необходимы отдельные машины. Код 0 означает выполнение, ненулевой код означает ошибку.'
@@ -24,7 +26,8 @@ if ($HelpRu) {
 }
 if ($Help -or !$PSBoundParameters.Count) {
     Write-Output 'Send or receive one synthetic burst using IPv4 multicast.'
-    Write-Output 'Usage: Multicast.ps1 -Mode Send|Receive -Directory CORPUS -Group 239.X.X.X -Port N -Interface IPV4 -Output NEW_JSON [-TimeoutMs 30000]'
+    Write-Output 'Usage: Multicast.ps1 -Mode Send|Receive -Directory CORPUS -Group 239.X.X.X -Port N -Interface IPV4 -Output NEW_JSON [-TimeoutMs 30000] [-PacingWindowMs N]'
+    Write-Output 'PacingWindowMs is sender-only. Compresses the release schedule to the specified window, defaulting to the corpus window.'
     Write-Output 'Validates and preloads the corpus. TTL=1. The receiver prints READY after joining the group.'
     Write-Output 'The receipt includes actual in-window sends, lateness, delivery, gaps, duplicates, reordering and content errors.'
     Write-Output 'Separate hosts are required to measure a physical network. Exit 0 means the operation ran; nonzero means an error.'
@@ -32,6 +35,9 @@ if ($Help -or !$PSBoundParameters.Count) {
 }
 if (!$Mode -or !$Directory -or !$Group -or !$Port -or !$Interface -or !$Output) {
     throw 'Supply all required parameters. Use -Help for usage.'
+}
+if ($Mode -eq 'Receive' -and $PSBoundParameters.ContainsKey('PacingWindowMs')) {
+    throw 'PacingWindowMs applies only to the sender.'
 }
 $groupIp = $null
 $interfaceIp = $null
@@ -52,13 +58,16 @@ if (!(Test-Path -LiteralPath ([IO.Path]::GetDirectoryName($outputPath)) -PathTyp
 }
 & (Join-Path $PSScriptRoot '../burst/Corpus.ps1') -Mode Validate -Directory $corpusDirectory | Out-Null
 $manifest = Get-Content -LiteralPath (Join-Path $corpusDirectory 'manifest.json') -Raw | ConvertFrom-Json
+if ($PacingWindowMs -gt $manifest.windowMs) {
+    throw 'PacingWindowMs must not exceed the corpus window.'
+}
 if (-not ('BurstMulticastV1' -as [type])) { Add-Type -Path (Join-Path $PSScriptRoot 'Multicast.cs') }
 $inputPath = Join-Path $corpusDirectory 'corpus.bin'
 $loaded = [BurstMulticastV1]::Load($inputPath, [int]$manifest.datagrams, [int]$manifest.messages, [int]$manifest.windowMs, [string]$manifest.sha256)
 if ($Mode -eq 'Receive') {
     $result = [BurstMulticastV1]::Receive($loaded, $groupIp, $interfaceIp, $Port, $TimeoutMs)
 } else {
-    $result = [BurstMulticastV1]::Send($loaded, $groupIp, $interfaceIp, $Port)
+    $result = [BurstMulticastV1]::Send($loaded, $groupIp, $interfaceIp, $Port, $PacingWindowMs)
 }
 $receipt = [ordered]@{
     format = 'qdcxx-burst-multicast-v1'

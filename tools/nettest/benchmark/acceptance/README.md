@@ -12,6 +12,8 @@ pwsh -File tools/nettest/benchmark/multicast/Test-BurstReceipts.ps1 -Directory C
 Supply a new output path. The optional p99 bound is in nanoseconds and applies
 to sender-local scheduled-to-send-completion lateness. Omit it when no
 threshold has been selected. It does not describe end-to-end delivery latency.
+When the sender used `-PacingWindowMs`, pass the same value to the checker.
+Both measured windows still use the deadline in the corpus manifest.
 The command validates the corpus and checks receipt formats, roles, identity,
 multicast group and port, counts, payload bytes, loss, duplicates, ordering
 and corruption. Sender and receiver must each account for all scheduled

@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Threading;
 
@@ -16,6 +17,11 @@ public static class BurstMulticastV1
     private const int HeaderBytes = 16;
     private const int MaximumPayloadBytes = 1472;
     private const int MaximumMessages = 2000000;
+    private const int LinuxBatchSize = 32;
+    private const ulong LinuxBatchDueSpanNanoseconds = 100000;
+    private const int LinuxDontWait = 0x40;
+    private const int LinuxInterrupted = 4;
+    private const int LinuxWouldBlock = 11;
     private const long NanosPerSecond = 1000000000L;
     private static readonly byte[] CorpusMagic = { 81, 66, 85, 82, 83, 84, 48, 49 };
     private static readonly byte[] DatagramMagic = { 81, 68, 80, 49 };
@@ -39,6 +45,7 @@ public static class BurstMulticastV1
     {
         public long ClockFrequencyHz { get; set; }
         public long WindowNanoseconds { get; set; }
+        public long PacingWindowNanoseconds { get; set; }
         public int ScheduledDatagrams { get; set; }
         public int ScheduledMessages { get; set; }
         public int AttemptedDatagrams { get; set; }
@@ -137,12 +144,155 @@ public static class BurstMulticastV1
         return result;
     }
 
-    /// <summary>Send preloaded datagrams and record kernel send completion times on a monotonic clock.</summary>
-    public static SenderResult Send(Corpus corpus, IPAddress group, IPAddress local, int port)
+    private static void AwaitDue(long start, long due)
     {
+        while (Stopwatch.GetTimestamp() - start < due)
+            Thread.SpinWait(32);
+    }
+
+    private static void RecordSend(Corpus corpus, SenderResult result, Entry entry, int sent, long elapsed)
+    {
+        ++result.AttemptedDatagrams;
+        if (sent != entry.Payload.Length) {
+            ++result.SendErrors;
+            return;
+        }
+
+        ++result.SentDatagrams;
+        result.SentMessages += entry.Messages;
+        result.PayloadBytesSent += sent;
+        if (elapsed < corpus.WindowTicks) {
+            ++result.SentDatagramsInWindow;
+            result.SentMessagesInWindow += entry.Messages;
+        }
+    }
+
+    private static int SendOne(Socket socket, Entry entry)
+    {
+        try { return socket.Send(entry.Payload); }
+        catch (SocketException) { return -1; }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct LinuxIoVector
+    {
+        public IntPtr Base;
+        public UIntPtr Length;
+    }
+
+    // Separate msghdr from msg_len so native tail padding remains part of msghdr.
+    [StructLayout(LayoutKind.Sequential)]
+    private struct LinuxMessageHeader
+    {
+        public IntPtr Name;
+        public uint NameLength;
+        public IntPtr Vectors;
+        public UIntPtr VectorCount;
+        public IntPtr Control;
+        public UIntPtr ControlLength;
+        public int Flags;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct LinuxMessage
+    {
+        public LinuxMessageHeader Header;
+        public uint Length;
+    }
+
+    [DllImport("libc", EntryPoint = "sendmmsg", SetLastError = true)]
+    private static extern int SendMessages(SafeSocketHandle socket, IntPtr messages, uint count, int flags);
+
+    private static long SendLinuxBatches(Socket socket, Corpus corpus, long[] due, long[] lateness, SenderResult result)
+    {
+        var storage = new byte[LinuxBatchSize * MaximumPayloadBytes];
+        var vectors = new LinuxIoVector[LinuxBatchSize];
+        var messages = new LinuxMessage[LinuxBatchSize];
+        GCHandle storagePin = default;
+        GCHandle vectorPin = default;
+        GCHandle messagePin = default;
+        try {
+            storagePin = GCHandle.Alloc(storage, GCHandleType.Pinned);
+            vectorPin = GCHandle.Alloc(vectors, GCHandleType.Pinned);
+            messagePin = GCHandle.Alloc(messages, GCHandleType.Pinned);
+            IntPtr messageBase = messagePin.AddrOfPinnedObject();
+            int messageSize = Marshal.SizeOf<LinuxMessage>();
+            int vectorSize = Marshal.SizeOf<LinuxIoVector>();
+            for (int i = 0; i < LinuxBatchSize; ++i) {
+                vectors[i].Base = IntPtr.Add(storagePin.AddrOfPinnedObject(), i * MaximumPayloadBytes);
+                messages[i].Header.Vectors = IntPtr.Add(vectorPin.AddrOfPinnedObject(), i * vectorSize);
+                messages[i].Header.VectorCount = (UIntPtr)1;
+            }
+
+            long batchDueSpan = ToTicks(LinuxBatchDueSpanNanoseconds);
+            SafeSocketHandle handle = socket.SafeHandle;
+            long start = Stopwatch.GetTimestamp();
+            for (int first = 0; first < corpus.Entries.Length;) {
+                int limit = Math.Min(LinuxBatchSize, corpus.Entries.Length - first);
+                int count = 1;
+                while (count < limit && due[first + count] - due[first] <= batchDueSpan)
+                    ++count;
+                for (int i = 0; i < count; ++i) {
+                    byte[] payload = corpus.Entries[first + i].Payload;
+                    Buffer.BlockCopy(payload, 0, storage, i * MaximumPayloadBytes, payload.Length);
+                    vectors[i].Length = (UIntPtr)payload.Length;
+                }
+
+                // Submit after the last datagram becomes due. Timestamp the batch at return.
+                AwaitDue(start, due[first + count - 1]);
+                int offset = 0;
+                while (offset < count) {
+                    int sent = SendMessages(handle, IntPtr.Add(messageBase, offset * messageSize),
+                        (uint)(count - offset), LinuxDontWait);
+                    if (sent <= 0) {
+                        int error = Marshal.GetLastPInvokeError();
+                        Entry entry = corpus.Entries[first + offset];
+                        int length = error is LinuxInterrupted or LinuxWouldBlock ? SendOne(socket, entry) : -1;
+                        long elapsed = Stopwatch.GetTimestamp() - start;
+                        RecordSend(corpus, result, entry, length, elapsed);
+                        lateness[first + offset] = Math.Max(0, elapsed - due[first + offset]);
+                        ++offset;
+                        continue;
+                    }
+
+                    long completed = Stopwatch.GetTimestamp() - start;
+                    // A partial return owns only the prefix. Submit the remaining suffix on the next call.
+                    for (int i = offset; i < offset + sent; ++i) {
+                        int index = first + i;
+                        RecordSend(corpus, result, corpus.Entries[index], (int)messages[i].Length, completed);
+                        lateness[index] = Math.Max(0, completed - due[index]);
+                    }
+                    offset += sent;
+                }
+                first += count;
+            }
+            return Stopwatch.GetTimestamp() - start;
+        } finally {
+            if (messagePin.IsAllocated) messagePin.Free();
+            if (vectorPin.IsAllocated) vectorPin.Free();
+            if (storagePin.IsAllocated) storagePin.Free();
+        }
+    }
+
+    /// <summary>Send preloaded datagrams and record kernel send completion times on a monotonic clock.</summary>
+    public static SenderResult Send(Corpus corpus, IPAddress group, IPAddress local, int port, int pacingWindowMs = 0)
+    {
+        long pacingWindowNanoseconds = pacingWindowMs == 0 ? corpus.WindowNanoseconds : pacingWindowMs * 1000000L;
+        if (pacingWindowNanoseconds <= 0 || pacingWindowNanoseconds > corpus.WindowNanoseconds)
+            throw new ArgumentOutOfRangeException(nameof(pacingWindowMs));
+
+        long[] due = null;
+        if (pacingWindowNanoseconds < corpus.WindowNanoseconds) {
+            due = new long[corpus.Entries.Length];
+            decimal scale = (decimal)pacingWindowNanoseconds / corpus.WindowNanoseconds;
+            for (int i = 0; i < due.Length; ++i)
+                due[i] = (long)Math.Ceiling(corpus.Entries[i].DueTicks * scale);
+        }
+
         var result = new SenderResult {
             ClockFrequencyHz = Stopwatch.Frequency,
             WindowNanoseconds = corpus.WindowNanoseconds,
+            PacingWindowNanoseconds = pacingWindowNanoseconds,
             ScheduledDatagrams = corpus.Entries.Length,
             ScheduledMessages = corpus.Messages
         };
@@ -154,38 +304,22 @@ public static class BurstMulticastV1
             socket.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastLoopback, true);
             socket.SendTimeout = 100;
             socket.Connect(new IPEndPoint(group, port));
-            long start = Stopwatch.GetTimestamp();
-            for (int i = 0; i < corpus.Entries.Length; ++i)
-            {
-                Entry entry = corpus.Entries[i];
-                long elapsed;
-                do {
-                    elapsed = Stopwatch.GetTimestamp() - start;
-                    if (elapsed < entry.DueTicks) Thread.SpinWait(32);
-                } while (elapsed < entry.DueTicks);
-
-                ++result.AttemptedDatagrams;
-                try {
-                    int sent = socket.Send(entry.Payload);
-                    if (sent != entry.Payload.Length) {
-                        ++result.SendErrors;
-                    } else {
-                        ++result.SentDatagrams;
-                        result.SentMessages += entry.Messages;
-                        result.PayloadBytesSent += sent;
-                        elapsed = Stopwatch.GetTimestamp() - start;
-                        if (elapsed < corpus.WindowTicks) {
-                            ++result.SentDatagramsInWindow;
-                            result.SentMessagesInWindow += entry.Messages;
-                        }
-                    }
-                } catch (SocketException) {
-                    ++result.SendErrors;
+            if (due != null && OperatingSystem.IsLinux() && BitConverter.IsLittleEndian &&
+                RuntimeInformation.ProcessArchitecture is Architecture.X64 or Architecture.Arm64) {
+                result.ElapsedNanoseconds = ToNanos(SendLinuxBatches(socket, corpus, due, lateness, result));
+            } else {
+                long start = Stopwatch.GetTimestamp();
+                for (int i = 0; i < corpus.Entries.Length; ++i) {
+                    Entry entry = corpus.Entries[i];
+                    long deadline = due == null ? entry.DueTicks : due[i];
+                    AwaitDue(start, deadline);
+                    int sent = SendOne(socket, entry);
+                    long completed = Stopwatch.GetTimestamp() - start;
+                    RecordSend(corpus, result, entry, sent, completed);
+                    lateness[i] = Math.Max(0, completed - deadline);
                 }
-                elapsed = Stopwatch.GetTimestamp() - start;
-                lateness[i] = Math.Max(0, elapsed - entry.DueTicks);
+                result.ElapsedNanoseconds = ToNanos(Stopwatch.GetTimestamp() - start);
             }
-            result.ElapsedNanoseconds = ToNanos(Stopwatch.GetTimestamp() - start);
         }
         Array.Sort(lateness);
         int p99 = checked((int)(((long)lateness.Length * 99 + 99) / 100) - 1);
