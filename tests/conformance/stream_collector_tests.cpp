@@ -1,6 +1,8 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "../../src/collectors/stream_retention.hpp"
+#include "../../src/protocol/local_event_owner.hpp"
 #include "qd/collectors/stream.hpp"
 #include "qd/encoding/compact.hpp"
 #include "qd/encoding/utf_char.hpp"
@@ -378,6 +380,41 @@ std::vector<std::int32_t> drain(s::StreamCollector &stream) {
     }
 
     return values;
+}
+
+/** Build an immutable flat batch with distinguishable rows and optional mixed symbols. */
+p::LiveEvent flatEvent(Fixture &f, const p::detail::LocalEventOwner &source, bool mixed = false,
+                       bool separateBatches = false) {
+    std::array<std::array<c::FieldValueView, 3>, 4> fields{};
+    std::array<p::detail::LocalStreamRow, 4> rows{};
+
+    for (std::size_t i = 0; i < rows.size(); ++i) {
+        fields[i] = {c::FieldValueView{c::SerialFieldType::COMPACT_INT, 0, {}, {}},
+                     c::FieldValueView{c::SerialFieldType::COMPACT_INT, 1, {}, {}},
+                     c::FieldValueView{c::SerialFieldType::COMPACT_INT, static_cast<std::int64_t>(10 + i), {}, {}}};
+        rows[i] = {0, f.schema.recordContext(0), mixed && i == 2 ? u"BETA" : u"ALPHA", fields[i]};
+    }
+
+    const auto batch = c::detail::SharedRecordPayload::copyBatch(std::span<const p::detail::LocalStreamRow>(rows));
+
+    for (std::size_t i = 0; i < rows.size(); ++i) {
+        rows[i].shared = c::detail::SharedRecordPayload::row(batch, i);
+
+        if (separateBatches) {
+            const auto single = c::detail::SharedRecordPayload::copyBatch(
+                std::span<const p::detail::LocalStreamRow>(rows).subspan(i, 1));
+            rows[i].shared = c::detail::SharedRecordPayload::row(single, 0);
+        }
+
+        rows[i].symbol = rows[i].shared->symbol();
+        rows[i].fields = rows[i].shared->fields();
+    }
+
+    auto work = liveTurn();
+    auto event = source.stream(rows, work, true);
+    REQUIRE(event);
+
+    return std::move(*event);
 }
 } // namespace
 
@@ -1512,4 +1549,120 @@ TEST_CASE("STREAM empty resets release a last old epoch pin and never revive ter
     auto secondReset = moved.resetSource(work);
     REQUIRE(secondReset);
     CHECK(secondReset->sequence == 2);
+}
+
+TEST_CASE("STREAM flat ranges interoperate with single offers and wrap the logical ring") {
+    auto bounds = limits();
+    bounds.records = 5;
+    auto f = fixture(bounds);
+    add(f, u"ALPHA");
+    auto liveWork = liveTurn();
+    auto source = p::detail::LocalEventOwner::create(liveLimits(), liveWork);
+    REQUIRE(source);
+
+    for (unsigned iteration = 0; iteration < 8; ++iteration) {
+        auto event = flatEvent(f, *source);
+        auto work = turn();
+        REQUIRE(f.collector.stage(std::move(event), work));
+        auto first = f.collector.front(work);
+        REQUIRE(first);
+        REQUIRE(*first);
+        CHECK((**first).record->typedValues[2].raw == 10);
+        REQUIRE(f.collector.pop(work));
+        auto range = s::detail::StreamRetentionAccess::prepareRange(f.collector, 2, work);
+        REQUIRE(range);
+        REQUIRE(*range);
+        CHECK((**range).records.size() == 2);
+        CHECK((**range).payloads.front()->fields()[2].raw == 11);
+        const auto retained = (**range).payloads.front();
+        auto insufficient = turn();
+        insufficient.visits = 0;
+        CHECK(f.collector.acknowledgeBatch(insufficient).error() == Error::WORK_LIMIT);
+        CHECK(f.collector.queuedRecords() == 3);
+        REQUIRE(f.collector.acknowledgeBatch(work));
+        CHECK(f.collector.queuedRecords() == 1);
+        CHECK(drain(f.collector) == std::vector<std::int32_t>{13});
+        CHECK(retained->fields()[2].raw == 11);
+    }
+}
+
+TEST_CASE("STREAM flat range withdrawal cannot revive old rows and mixed frames use public fallback") {
+    auto f = fixture();
+    add(f, u"ALPHA");
+    auto liveWork = liveTurn();
+    auto source = p::detail::LocalEventOwner::create(liveLimits(), liveWork);
+    REQUIRE(source);
+    auto event = flatEvent(f, *source);
+    auto work = turn();
+    REQUIRE(f.collector.stage(std::move(event), work));
+    auto range = s::detail::StreamRetentionAccess::prepareRange(f.collector, 2, work);
+    REQUIRE(range);
+    REQUIRE(*range);
+    REQUIRE(f.collector.acknowledgeBatch(work));
+    remove(f, u"ALPHA");
+    add(f, u"ALPHA");
+    range = s::detail::StreamRetentionAccess::prepareRange(f.collector, 4, work);
+    REQUIRE(range);
+    CHECK_FALSE(*range);
+    std::array<s::StreamDelivery, 4> offers{};
+    auto prepared = f.collector.prepareBatch(offers, work);
+    REQUIRE(prepared);
+    CHECK(prepared->empty());
+    auto acknowledged = f.collector.acknowledgeBatch(work);
+    REQUIRE(acknowledged);
+    CHECK(acknowledged->withdrawn == 2);
+    CHECK(f.collector.queuedRecords() == 0);
+    event = flatEvent(f, *source, true);
+    REQUIRE(f.collector.stage(std::move(event), work));
+    range = s::detail::StreamRetentionAccess::prepareRange(f.collector, 4, work);
+    REQUIRE(range);
+    CHECK_FALSE(*range);
+    CHECK(drain(f.collector) == std::vector<std::int32_t>{10, 11, 13});
+}
+
+TEST_CASE("STREAM flat stage and range preparation reserve work before transferring owners") {
+    auto f = fixture();
+    add(f, u"ALPHA");
+    auto liveWork = liveTurn();
+    auto source = p::detail::LocalEventOwner::create(liveLimits(), liveWork);
+    REQUIRE(source);
+    auto event = flatEvent(f, *source);
+    auto work = turn();
+    work.visits = 4;
+    CHECK(f.collector.stage(std::move(event), work).error() == Error::WORK_LIMIT);
+    CHECK(f.collector.queuedRecords() == 0);
+    CHECK(event.records().size() == 4);
+    work = turn();
+    REQUIRE(f.collector.stage(std::move(event), work));
+    auto first = f.collector.front(work);
+    REQUIRE(first);
+    REQUIRE(*first);
+    auto insufficient = turn();
+    insufficient.operations = 0;
+    CHECK(s::detail::StreamRetentionAccess::prepareRange(f.collector, 4, insufficient).error() == Error::WORK_LIMIT);
+    REQUIRE(f.collector.pop(work));
+    CHECK(drain(f.collector) == std::vector<std::int32_t>{11, 12, 13});
+}
+
+TEST_CASE("STREAM one private offer spans separate immutable publisher batches without per-row retention") {
+    auto f = fixture();
+    add(f, u"ALPHA");
+    auto liveWork = liveTurn();
+    auto source = p::detail::LocalEventOwner::create(liveLimits(), liveWork);
+    REQUIRE(source);
+    auto event = flatEvent(f, *source, false, true);
+    auto work = turn();
+    REQUIRE(f.collector.stage(std::move(event), work));
+    auto range = s::detail::StreamRetentionAccess::prepareRange(f.collector, 4, work);
+    REQUIRE(range);
+    REQUIRE(*range);
+    REQUIRE((**range).records.size() == 4);
+    REQUIRE((**range).payloads.size() == 4);
+    CHECK((**range).payloads[0]->batchIdentity() != (**range).payloads[1]->batchIdentity());
+
+    for (std::size_t i = 0; i < 4; ++i)
+        CHECK((**range).payloads[i]->fields()[2].raw == 10 + i);
+
+    REQUIRE(f.collector.acknowledgeBatch(work));
+    CHECK(f.collector.queuedRecords() == 0);
 }

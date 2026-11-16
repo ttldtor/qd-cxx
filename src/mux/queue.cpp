@@ -134,6 +134,7 @@ enum class ControlKind : std::size_t {
     SLAB,           ///< Shared STREAM allocation backing, without a logical record owner.
     SHARED_RECORD,  ///< Pure shared local payload accounting owner.
     CLIENT_PAYLOAD, ///< One per-client batch retention scope.
+    STREAM_RUN,     ///< One homogeneous private STREAM range backing.
     COUNT,          ///< Finite numeric layout array extent.
 };
 /** Exact allocation resource domain, never an execution-owner pointer. */
@@ -151,6 +152,7 @@ enum class AllocationTag {
     SHARED_RECORD,       ///< Unique shared payload bytes in the aggregate record domain.
     SHARED_RECORD_ARRAY, ///< Pure aggregate batch cache backing.
     CLIENT_PAYLOAD,      ///< Per-client batch scope control bytes without a record count.
+    STREAM_RUN,          ///< Private range metadata without a logical record count.
 };
 
 /** Fixed numeric request transport; no backing/object construction has occurred. */
@@ -490,6 +492,8 @@ std::optional<ControlKind> controlKind(AllocationTag tag) noexcept {
         return ControlKind::SHARED_RECORD;
     case AllocationTag::CLIENT_PAYLOAD:
         return ControlKind::CLIENT_PAYLOAD;
+    case AllocationTag::STREAM_RUN:
+        return ControlKind::STREAM_RUN;
     default:
         return {};
     }
@@ -593,7 +597,8 @@ template <class T> struct QueueAllocator {
             context->clientFixed.fetch_add(bytes);
         } else {
             const bool record = scope.tag == AllocationTag::RECORD || scope.tag == AllocationTag::ARENA ||
-                                scope.tag == AllocationTag::SLAB || scope.tag == AllocationTag::CLIENT_PAYLOAD;
+                                scope.tag == AllocationTag::SLAB || scope.tag == AllocationTag::CLIENT_PAYLOAD ||
+                                scope.tag == AllocationTag::STREAM_RUN;
             ownerCount = scope.tag == AllocationTag::RECORD || scope.tag == AllocationTag::BATCH;
             auto &owners = record ? budget->records : budget->batches;
             auto &charge = record ? budget->recordBytes : budget->batchBytes;
@@ -694,7 +699,8 @@ template <class T> struct QueueAllocator {
             context->clientFixed.fetch_sub(bytes);
         } else {
             const bool record = retained.tag == AllocationTag::RECORD || retained.tag == AllocationTag::ARENA ||
-                                retained.tag == AllocationTag::SLAB || retained.tag == AllocationTag::CLIENT_PAYLOAD;
+                                retained.tag == AllocationTag::SLAB || retained.tag == AllocationTag::CLIENT_PAYLOAD ||
+                                retained.tag == AllocationTag::STREAM_RUN;
             (record ? budget->recordBytes : budget->batchBytes).fetch_sub(bytes);
             (record ? context->recordBytes : context->batchBytes).fetch_sub(bytes);
 
@@ -998,11 +1004,138 @@ struct QueueRecord {
     }
 };
 
+/** Private local STREAM metadata, shared only by disjoint logical row ranges. */
+struct StreamRun {
+    struct Row {
+        const core::detail::SharedRecordPayload *payload;
+        RawSourceMetadata source;
+    };
+
+    BudgetLease budget;
+    MuxRecordView common{};
+    Vector<Row> rows;
+    Vector<std::shared_ptr<ClientPayloadLease>> payloads;
+
+    explicit StreamRun(BudgetLease source)
+        : budget(source), rows(QueueAllocator<Row>{clientScope(source, AllocationTag::ARENA)}),
+          payloads(QueueAllocator<std::shared_ptr<ClientPayloadLease>>{clientScope(source, AllocationTag::ARENA)}) {
+    }
+
+    MuxRecordView view(std::size_t index) const {
+        auto result = common;
+        const auto &row = rows[index];
+        result.symbol = row.payload->symbol();
+        result.typedValues = row.payload->fields();
+        result.source = row.source;
+        result.eventFlags = row.source.flags;
+
+        return result;
+    }
+};
+
+/** Exclusive logical count lease; splitting transfers rows without changing reservation totals. */
+struct StreamRange {
+    std::shared_ptr<const StreamRun> owner;
+    std::size_t first = 0;
+    std::size_t count = 0;
+    core::DeliveryProjectionMask remaining = 0;
+    core::DeliveryProjectionMask selection = 0;
+
+    StreamRange() = default;
+
+    StreamRange(std::shared_ptr<const StreamRun> backing, std::size_t offset, std::size_t size) noexcept
+        : owner(std::move(backing)), first(offset), count(size), remaining(owner->common.projections.mask) {
+    }
+
+    StreamRange(const StreamRange &) = delete;
+    StreamRange &operator=(const StreamRange &) = delete;
+
+    StreamRange(StreamRange &&other) noexcept
+        : owner(std::move(other.owner)), first(other.first), count(std::exchange(other.count, 0)),
+          remaining(other.remaining), selection(other.selection) {
+    }
+
+    StreamRange &operator=(StreamRange &&other) noexcept {
+        if (this != &other) {
+            reset();
+            owner = std::move(other.owner);
+            first = other.first;
+            count = std::exchange(other.count, 0);
+            remaining = other.remaining;
+            selection = other.selection;
+        }
+
+        return *this;
+    }
+
+    ~StreamRange() {
+        reset();
+    }
+
+    void reset() noexcept {
+        if (!owner)
+            return;
+
+        auto budget = owner->budget;
+        owner.reset();
+        budget->records.fetch_sub(count);
+        budget->context->records.fetch_sub(count);
+        count = 0;
+    }
+
+    StreamRange take(std::size_t size) noexcept {
+        StreamRange result(owner, first, size);
+        result.remaining = remaining;
+        first += size;
+        count -= size;
+
+        if (!count)
+            owner.reset();
+
+        return result;
+    }
+};
+
+/** Fixed FIFO of independently owned windows, preceding any ordinary record links. */
+struct StreamQueue {
+    Vector<StreamRange> ranges;
+    std::size_t head = 0, size = 0, count = 0;
+
+    explicit StreamQueue(BudgetLease budget) : ranges(QueueAllocator<StreamRange>{clientScope(budget)}) {
+    }
+
+    StreamRange &at(std::size_t offset) noexcept {
+        return ranges[(head + offset) % ranges.size()];
+    }
+
+    const StreamRange &at(std::size_t offset) const noexcept {
+        return ranges[(head + offset) % ranges.size()];
+    }
+
+    void push(StreamRange range) noexcept {
+        count += range.count;
+        at(size++) = std::move(range);
+    }
+
+    StreamRange take(std::size_t rows) noexcept {
+        auto result = at(0).take(rows);
+        count -= rows;
+
+        if (!at(0).count) {
+            head = (head + 1) % ranges.size();
+            --size;
+        }
+
+        return result;
+    }
+};
+
 /** Composite immutable backing; records are shared without payload recopying. */
 struct QueueBatch {
     BudgetLease budget;                                  ///< Pure generation resource scope.
     Vector<std::shared_ptr<const QueueRecord>> roots;    ///< Exact accounted record references.
     Vector<MuxRecordView> views;                         ///< Exact accounted immutable callback metadata.
+    Vector<StreamRange> streamRanges;                    ///< Private logical ranges transferred from the FIFO.
     std::optional<std::uint64_t> appliedDesiredRevision; ///< Actual mapping candidate identity, never submitted state.
 
     /** Bind empty arrays to the batch byte domain.
@@ -1011,7 +1144,8 @@ struct QueueBatch {
     explicit QueueBatch(BudgetLease source)
         : budget(source),
           roots(QueueAllocator<std::shared_ptr<const QueueRecord>>{clientScope(source, AllocationTag::BATCH_ARRAY)}),
-          views(QueueAllocator<MuxRecordView>{clientScope(source, AllocationTag::BATCH_ARRAY)}) {
+          views(QueueAllocator<MuxRecordView>{clientScope(source, AllocationTag::BATCH_ARRAY)}),
+          streamRanges(QueueAllocator<StreamRange>{clientScope(source, AllocationTag::BATCH_ARRAY)}) {
     }
 };
 
@@ -1035,7 +1169,8 @@ auto controlLayout() {
         measureShared<QueueBatch>(empty),
         measureShared<RecordSlab>(empty, 0),
         measureShared<SharedQueuePayload>(ContextLease{}, std::shared_ptr<const core::detail::SharedRecordPayload>{}),
-        measureShared<ClientPayloadLease>(empty, std::shared_ptr<SharedQueuePayload>{}, 0)};
+        measureShared<ClientPayloadLease>(empty, std::shared_ptr<SharedQueuePayload>{}, 0),
+        measureShared<StreamRun>(empty)};
 }
 } // namespace detail
 
@@ -1541,6 +1676,8 @@ struct MuxQueue::State {
         collectors::TickerViewToken ticker;                                 ///< Actual shared-cache view.
         collectors::HistoryViewToken history;                               ///< Actual history view.
         detail::Vector<std::shared_ptr<const detail::QueueRecord>> records; ///< Fixed queue links.
+        detail::StreamQueue streamRange;  ///< Homogeneous ready windows preceding ordinary queue links.
+        detail::StreamRange candidateRun; ///< Unpublished all-client routing preparation.
         detail::Vector<core::DeliveryProjectionMask>
             remaining;                              ///< Mutable queue-link weight; detached records stay immutable.
         detail::Vector<std::uint8_t> selection;     ///< Fixed owner eligibility/cleanup scratch.
@@ -1576,6 +1713,7 @@ struct MuxQueue::State {
         explicit Client(detail::BudgetLease source)
             : budget(source),
               records(detail::QueueAllocator<std::shared_ptr<const detail::QueueRecord>>{detail::clientScope(source)}),
+              streamRange(source),
               remaining(detail::QueueAllocator<core::DeliveryProjectionMask>{detail::clientScope(source)}),
               selection(detail::QueueAllocator<std::uint8_t>{detail::clientScope(source)}),
               mapping(detail::QueueAllocator<Mapping>{detail::clientScope(source)}) {
@@ -1628,7 +1766,6 @@ struct MuxQueue::State {
     detail::Vector<ClientOwner> clients;    ///< Fixed generation slots.
     detail::Vector<collectors::StreamDelivery> offers; ///< Fixed source-chunk metadata.
     detail::Vector<std::shared_ptr<const core::detail::SharedRecordPayload>> sourcePayloads;
-    detail::Vector<std::shared_ptr<detail::SharedQueuePayload>> sharedPayloads;
     detail::Vector<core::SubscriptionRequest> requests;                    ///< Fixed owner desired snapshot scratch.
     detail::Vector<std::shared_ptr<const detail::QueueRecord>> candidates; ///< Fixed unpublished fanout slots.
     detail::Vector<std::size_t> candidateWeights;  ///< Per-client business occurrences in the atomic routing candidate.
@@ -1689,8 +1826,6 @@ struct MuxQueue::State {
           offers(detail::QueueAllocator<collectors::StreamDelivery>{detail::ownerScope(context)}),
           sourcePayloads(detail::QueueAllocator<std::shared_ptr<const core::detail::SharedRecordPayload>>{
               detail::ownerScope(context)}),
-          sharedPayloads(
-              detail::QueueAllocator<std::shared_ptr<detail::SharedQueuePayload>>{detail::ownerScope(context)}),
           requests(detail::QueueAllocator<core::SubscriptionRequest>{detail::ownerScope(context)}),
           candidates(detail::QueueAllocator<std::shared_ptr<const detail::QueueRecord>>{detail::ownerScope(context)}),
           candidateWeights(detail::QueueAllocator<std::size_t>{detail::ownerScope(context)}),
@@ -1734,8 +1869,7 @@ struct MuxQueue::State {
         fixed = sum(fixed, product(ql.clients, sum(sum(sizeof(ClientOwner), product(sizeof(std::size_t), 3)),
                                                    sum(sizeof(std::uint8_t), sizeof(MuxClient)))));
         fixed = sum(fixed, product(ql.routeRecords, sizeof(collectors::StreamDelivery)));
-        fixed = sum(fixed, product(ql.routeRecords, sizeof(std::shared_ptr<const core::detail::SharedRecordPayload>) +
-                                                        sizeof(std::shared_ptr<detail::SharedQueuePayload>)));
+        fixed = sum(fixed, product(ql.routeRecords, sizeof(std::shared_ptr<const core::detail::SharedRecordPayload>)));
         fixed = sum(fixed, product(ml.entries, sizeof(core::SubscriptionRequest)));
         fixed = sum(fixed, product(cells, sizeof(std::shared_ptr<const detail::QueueRecord>)));
         fixed = sum(fixed, contract == core::SubscriptionFamily::STREAM
@@ -1785,7 +1919,6 @@ struct MuxQueue::State {
 
         result->offers.resize(ql.routeRecords);
         result->sourcePayloads.resize(ql.routeRecords);
-        result->sharedPayloads.resize(ql.routeRecords);
         result->requests.resize(ml.entries);
         result->candidates.resize(cells);
         result->candidateCounts.resize(ql.clients);
@@ -1834,7 +1967,7 @@ struct MuxQueue::State {
         r.state = p.state.load();
         r.paused = c.paused;
         r.fixedReservationBytes = b.fixedReservation;
-        r.queuedRecords = c.size;
+        r.queuedRecords = c.size + c.streamRange.count;
         r.recordOwners = b.records.load();
         r.recordBytes = b.recordBytes.load();
         r.batchOwners = b.batches.load();
@@ -1978,7 +2111,21 @@ struct MuxQueue::State {
      * @return Success or typed refusal before any weight is retired.
      */
     std::expected<void, QueueFailure> pruneQueuedProjections(Client &c, QueueWork &work) {
-        spend(work, product(c.size, 2), 0, 0, product(c.size, sizeof(core::DeliveryProjectionMask)));
+        // Prepay both the scratch-selection pass and its later commit before touching either FIFO.
+        spend(work, product(sum(c.size, c.streamRange.size), 2), 0, 0,
+              sum(product(c.size, sizeof(core::DeliveryProjectionMask)),
+                  product(c.streamRange.size, product(sizeof(detail::StreamRange), 2))));
+
+        for (std::size_t i = 0; i < c.streamRange.size; ++i) {
+            auto &range = c.streamRange.at(i);
+            const auto current =
+                interest.currentProjectionMask(c.interest, range.owner->common.projections, work.interest);
+
+            if (!current)
+                return std::unexpected(sourceFailure(current.error()));
+
+            range.selection = *current & range.remaining;
+        }
 
         for (std::size_t i = 0; i < c.size; ++i) {
             const auto slot = (c.head + i) % c.records.size();
@@ -1993,6 +2140,12 @@ struct MuxQueue::State {
         }
 
         std::size_t removed = 0;
+
+        for (std::size_t i = 0; i < c.streamRange.size; ++i) {
+            auto &range = c.streamRange.at(i);
+            removed += range.count * (std::popcount(range.remaining) - std::popcount(range.selection));
+            range.remaining = range.selection;
+        }
 
         for (std::size_t i = 0; i < c.size; ++i) {
             const auto slot = (c.head + i) % c.records.size();
@@ -2255,6 +2408,109 @@ struct MuxQueue::State {
                                                   client.port->budget, bytes);
     }
 
+    /** Retain one whole private input batch in the aggregate and client accounting domains. */
+    std::shared_ptr<detail::ClientPayloadLease>
+    streamPayload(Client &c, const std::shared_ptr<const core::detail::SharedRecordPayload> &input, QueueWork &work) {
+        std::shared_ptr<detail::SharedQueuePayload> shared;
+
+        if (!input)
+            return {};
+
+        if (!shared) {
+            auto &cache = input->queueAccounting();
+            shared = std::static_pointer_cast<detail::SharedQueuePayload>(cache.load().lock());
+
+            if (!shared || shared->context != ledger) {
+                spend(work, 1, 0, 0, input->residentBytes());
+                shared = detail::shared<detail::SharedQueuePayload>(
+                    detail::ownerScope(ledger, detail::AllocationTag::SHARED_RECORD), ledger, input);
+                shared->identity = shared;
+                cache.store(shared);
+            }
+        }
+
+        const auto slot = c.port->slot;
+        auto result = shared->clients[slot].load().lock();
+
+        if (!result || result->budget != c.port->budget) {
+            result = detail::shared<detail::ClientPayloadLease>(
+                detail::clientScope(c.port->budget, detail::AllocationTag::CLIENT_PAYLOAD), c.port->budget, shared,
+                slot);
+            result->identity = result;
+            shared->clients[slot].store(result);
+        }
+
+        return result;
+    }
+
+    /** Build one homogeneous private run; no logical row reservation escapes on failure. */
+    detail::StreamRange streamRun(Client &c, const collectors::detail::StreamRangeDelivery &input,
+                                  const core::CapturedDeliveryProjections<MuxMembership> &selected, QueueWork &work) {
+        const auto rows = input.records;
+        const auto &l = c.port->budget->limits;
+        auto run = detail::shared<detail::StreamRun>(
+            detail::clientScope(c.port->budget, detail::AllocationTag::STREAM_RUN), c.port->budget);
+        run->rows.reserve(rows.size());
+        std::size_t payloadCount = 0;
+        const void *previous = nullptr;
+
+        spend(work, rows.size(), 0, 0, product(rows.size(), sizeof(void *)));
+
+        for (const auto &payload : input.payloads) {
+            payloadCount += payload->batchIdentity() != previous;
+            previous = payload->batchIdentity();
+        }
+
+        run->payloads.reserve(payloadCount);
+        previous = nullptr;
+        const auto &first = rows.front();
+        run->common.family = family;
+        run->common.context = first.context;
+        run->common.symbol = input.payloads.front()->symbol();
+        run->common.membership = selected.physical;
+        run->common.projections = selected;
+        run->common.revision = c.desiredRevision;
+        run->common.admissionRevision = input.revision;
+        run->common.epoch = epoch();
+
+        for (std::size_t i = 0; i < rows.size(); ++i) {
+            const auto &r = rows[i];
+            const auto &payload = input.payloads[i];
+            std::size_t units = 0, bytes = 0;
+            spend(work, 1, r.typedValues.size());
+
+            for (const auto &field : r.typedValues) {
+                units = sum(units, field.units ? field.units->size() : 0);
+                bytes = sum(bytes, field.bytes ? field.bytes->size() : 0);
+            }
+
+            bound(r.typedValues.size(), l.recordFields);
+            bound(r.symbol.size(), l.recordSymbolUnits);
+            bound(units, l.recordFieldUnits);
+            bound(bytes, l.recordByteUnits);
+            bound(recordArenaBytes(r.symbol, r.values, r.typedValues), l.recordArenaBytes);
+            spend(work, 4, 0, r.symbol.size(), sizeof(detail::StreamRun::Row));
+
+            if (payload->batchIdentity() != previous) {
+                run->payloads.push_back(streamPayload(c, payload, work));
+                previous = payload->batchIdentity();
+            }
+
+            run->rows.push_back({payload.get(),
+                                 {r.senderId, r.cipher, r.eventFlags, r.removalTime, r.fieldTime,
+                                  input.bindingGeneration, r.tapeMessageTimeMs}});
+        }
+
+        auto &budget = *c.port->budget;
+
+        if (!reserve(budget.records, rows.size(), l.dataItems))
+            throw QueueError::RESOURCE_LIMIT;
+
+        budget.context->records.fetch_add(rows.size());
+
+        return {std::move(run), 0, rows.size()};
+    }
+
     /** Publish one fully prepared queue link without allocation.
      * @param c Target client.
      * @param value Complete detached candidate.
@@ -2297,6 +2553,32 @@ struct MuxQueue::State {
         } else {
             count(c.counts.discarded, 1, c.counts.saturated);
             count(counts.discarded, 1, counts.saturated);
+        }
+    }
+
+    /** Retire a private prefix after the same selection/disposal preflight as ordinary links. */
+    void dropRun(Client &c, std::size_t rows, bool withdrawn) noexcept {
+        std::size_t weight = 0;
+
+        for (std::size_t remaining = rows; remaining;) {
+            const auto &range = c.streamRange.at(0);
+            const auto count = std::min(remaining, range.count);
+            weight += count * static_cast<std::size_t>(std::popcount(range.remaining));
+            c.streamRange.take(count).reset();
+            remaining -= count;
+        }
+
+        core::detail::updateDelivery(c.statistics, [&](auto &s) {
+            s.pendingEvents -= weight;
+            s.discardedEvents.add(weight);
+        });
+
+        if (withdrawn) {
+            count(c.counts.withdrawn, rows, c.counts.saturated);
+            count(counts.withdrawn, rows, counts.saturated);
+        } else {
+            count(c.counts.discarded, rows, c.counts.saturated);
+            count(counts.discarded, rows, counts.saturated);
         }
     }
 
@@ -2531,6 +2813,8 @@ std::expected<MuxHandle, QueueFailure> MuxQueue::open(ClientLimits limits, const
         auto fixed = sum(sizeof(State::Client), sum(sizeof(detail::ClientBudget),
                                                     layout[static_cast<std::size_t>(detail::ControlKind::PORT)]));
         fixed = sum(fixed, product(s.contexts.size(), sizeof(core::RecordContext)));
+        const auto streamSlots = s.stream && limits.compactRecordArena ? limits.dataItems : 0;
+        fixed = sum(fixed, product(streamSlots, sizeof(detail::StreamRange)));
         fixed =
             sum(fixed, product(limits.dataItems, sum(sizeof(std::shared_ptr<const detail::QueueRecord>),
                                                      sum(sizeof(std::uint8_t), sizeof(core::DeliveryProjectionMask)))));
@@ -2545,7 +2829,7 @@ std::expected<MuxHandle, QueueFailure> MuxQueue::open(ClientLimits limits, const
                                                     sizeof(std::shared_ptr<detail::QueueCompletion>))));
         const auto reservation = sum(fixed, sum(limits.recordBytes, limits.batchBytes));
         const auto initializedSlots = sum(
-            sum(s.interestLimits.entries, product(limits.dataItems, 3)),
+            sum(sum(s.interestLimits.entries, product(limits.dataItems, 3)), streamSlots),
             sum(product(limits.commandSlots, sum(product(limits.commandEntries, 2), sum(limits.commandSymbolUnits, 1))),
                 sum(product(limits.resultSlots, 2), s.contexts.size())));
         constexpr std::size_t fixedPortObjects = 3; ///< Client, budget and port object initialization/disposal.
@@ -2641,6 +2925,7 @@ std::expected<MuxHandle, QueueFailure> MuxQueue::open(ClientLimits limits, const
         c->statistics = consumer->deliveryStatistics();
         c->interest = s.fixedClients[slot];
         c->records.resize(limits.dataItems);
+        c->streamRange.ranges.resize(streamSlots);
         c->selection.resize(limits.dataItems);
         c->remaining.resize(limits.dataItems);
         c->mapping.resize(s.interestLimits.entries);
@@ -2726,9 +3011,23 @@ MuxQueue::State::prepareReplace(Client &c, std::span<const core::SubscriptionReq
     constexpr auto releaseBytes =
         sizeof(std::shared_ptr<const detail::QueueRecord>) + 2 * sizeof(core::DeliveryProjectionMask);
     const auto discarded = restart ? sum(c.size, history->pendingCount(c.history)) : 0;
-    spend(work, product(c.size, 2), 0, 0,
-          sum(product(c.size, restart ? releaseBytes : sizeof(core::DeliveryProjectionMask)),
-              restart && c.size ? c.port->budget->limits.recordBytes : 0));
+
+    // publishReplace consumes the range selections without further fallible work charges.
+    spend(work, product(sum(c.size, c.streamRange.size), 2), 0, 0,
+          sum(sum(product(c.size, restart ? releaseBytes : sizeof(core::DeliveryProjectionMask)),
+                  restart && c.size ? c.port->budget->limits.recordBytes : 0),
+              product(c.streamRange.size, product(sizeof(detail::StreamRange), 2))));
+
+    for (std::size_t i = 0; i < c.streamRange.size; ++i) {
+        auto &range = c.streamRange.at(i);
+        const auto mask = detail::MuxStateAccess::projectionMask(interest, *next, c.interest,
+                                                                 range.owner->common.projections, work.interest);
+
+        if (!mask)
+            return std::unexpected(sourceFailure(mask.error()));
+
+        range.selection = *mask & range.remaining;
+    }
 
     for (std::size_t i = 0; i < c.size; ++i) {
         const auto slot = (c.head + i) % c.records.size();
@@ -2865,6 +3164,12 @@ void MuxQueue::State::publishReplace(Replacement replacement, std::size_t select
     }
 
     std::size_t removed = 0;
+
+    for (std::size_t i = 0; i < c.streamRange.size; ++i) {
+        auto &range = c.streamRange.at(i);
+        removed += range.count * (std::popcount(range.remaining) - std::popcount(range.selection));
+        range.remaining = range.selection;
+    }
 
     for (std::size_t i = 0; i < c.size; ++i) {
         const auto slot = (c.head + i) % c.records.size();
@@ -3528,9 +3833,18 @@ std::expected<bool, QueueFailure> MuxQueue::State::routeStream(QueueWork &work) 
     struct Clear {
         State &s;
         bool active = false;
+        bool rangeOnly = false;
 
         ~Clear() {
             if (active) {
+                for (auto &client : s.clients)
+                    if (client)
+                        client->candidateRun.reset();
+
+                if (rangeOnly) {
+                    return;
+                }
+
                 for (auto &record : s.candidates)
                     record.reset();
 
@@ -3538,9 +3852,6 @@ std::expected<bool, QueueFailure> MuxQueue::State::routeStream(QueueWork &work) 
                     offer = {};
 
                 for (auto &payload : s.sourcePayloads)
-                    payload.reset();
-
-                for (auto &payload : s.sharedPayloads)
                     payload.reset();
             }
         }
@@ -3557,27 +3868,73 @@ std::expected<bool, QueueFailure> MuxQueue::State::routeStream(QueueWork &work) 
         std::fill(candidateCounts.begin(), candidateCounts.end(), 0);
         std::fill(candidateWeights.begin(), candidateWeights.end(), 0);
         std::fill(candidateFailure.begin(), candidateFailure.end(), 0);
-        auto prepared = stream->prepareBatch(offers, work.stream);
+        const bool rangeReady = std::ranges::all_of(clients, [](const auto &client) {
+            return !client || client->sourceClosed || (client->closing && client->stopMode == 2) ||
+                   client->port->stop.load() == 2 || (client->port->budget->limits.compactRecordArena && !client->size);
+        });
+        std::optional<collectors::detail::StreamRangeDelivery> range;
 
-        if (!prepared) {
-            if (prepared.error() == collectors::StreamError::WORK_LIMIT)
-                return std::unexpected(QueueFailure{QueueError::WORK_LIMIT, {}});
+        if (rangeReady) {
+            auto result =
+                collectors::detail::StreamRetentionAccess::prepareRange(*stream, limits.routeRecords, work.stream);
 
-            return std::unexpected(sourceFailure(prepared.error()));
+            if (!result)
+                return std::unexpected(result.error() == collectors::StreamError::WORK_LIMIT
+                                           ? QueueFailure{QueueError::WORK_LIMIT, {}}
+                                           : sourceFailure(result.error()));
+
+            range = std::move(*result);
         }
 
-        spend(work, limits.routeRecords + prepared->size(), 0, 0,
-              product(prepared->size(), sizeof(std::shared_ptr<const core::detail::SharedRecordPayload>)));
-        collectors::detail::StreamRetentionAccess::retainPrepared(*stream, *prepared, sourcePayloads);
-        const bool sharedInput =
-            std::ranges::any_of(std::span(sourcePayloads).first(prepared->size()), [](const auto &owner) {
+        std::expected<std::span<const collectors::StreamDelivery>, collectors::StreamError> prepared;
+        bool sharedInput = false;
+
+        if (range) {
+            clear.rangeOnly = true;
+        } else {
+            prepared = stream->prepareBatch(offers, work.stream);
+
+            if (!prepared)
+                return std::unexpected(prepared.error() == collectors::StreamError::WORK_LIMIT
+                                           ? QueueFailure{QueueError::WORK_LIMIT, {}}
+                                           : sourceFailure(prepared.error()));
+
+            spend(work, limits.routeRecords + prepared->size(), 0, 0,
+                  product(prepared->size(), sizeof(std::shared_ptr<const core::detail::SharedRecordPayload>)));
+            collectors::detail::StreamRetentionAccess::retainPrepared(*stream, *prepared, sourcePayloads);
+            sharedInput = std::ranges::any_of(std::span(sourcePayloads).first(prepared->size()), [](const auto &owner) {
                 return bool(owner);
             });
+        }
 
         for (std::size_t v = 0; v < clients.size(); ++v) {
             auto *c = clients[v].get();
 
             if (!c || c->sourceClosed || (c->closing && c->stopMode == 2) || c->port->stop.load() == 2) {
+                continue;
+            }
+
+            if (range) {
+                const auto &first = range->records.front();
+                auto selected =
+                    interest.selectProjections(c->interest, {first.context, first.symbol}, {}, work.interest);
+
+                if (!selected)
+                    return std::unexpected(sourceFailure(selected.error()));
+
+                if (!selected->mask)
+                    continue;
+
+                candidateCounts[v] = range->records.size();
+                candidateWeights[v] = product(range->records.size(), selected->count());
+                try {
+                    c->candidateRun = streamRun(*c, *range, *selected, work);
+                } catch (QueueError error) {
+                    if (error != QueueError::RESOURCE_LIMIT)
+                        throw;
+
+                    candidateFailure[v] = 1;
+                }
                 continue;
             }
 
@@ -3622,35 +3979,7 @@ std::expected<bool, QueueFailure> MuxQueue::State::routeStream(QueueWork &work) 
                     if (index == 0 && sharedInput)
                         slab = streamSlab(*c, *prepared, work, sharedInput);
 
-                    auto &shared = sharedPayloads[offerIndex];
-
-                    if (sourcePayloads[offerIndex] && !shared) {
-                        auto &cache = sourcePayloads[offerIndex]->queueAccounting();
-                        shared = std::static_pointer_cast<detail::SharedQueuePayload>(cache.load().lock());
-
-                        if (!shared || shared->context != ledger) {
-                            spend(work, 1, 0, 0, sourcePayloads[offerIndex]->residentBytes());
-                            shared = detail::shared<detail::SharedQueuePayload>(
-                                detail::ownerScope(ledger, detail::AllocationTag::SHARED_RECORD), ledger,
-                                sourcePayloads[offerIndex]);
-                            shared->identity = shared;
-                            cache.store(shared);
-                        }
-                    }
-
-                    std::shared_ptr<detail::ClientPayloadLease> clientPayload;
-
-                    if (shared) {
-                        clientPayload = shared->clients[v].load().lock();
-
-                        if (!clientPayload || clientPayload->budget != c->port->budget) {
-                            clientPayload = detail::shared<detail::ClientPayloadLease>(
-                                detail::clientScope(c->port->budget, detail::AllocationTag::CLIENT_PAYLOAD),
-                                c->port->budget, shared, v);
-                            clientPayload->identity = clientPayload;
-                            shared->clients[v].store(clientPayload);
-                        }
-                    }
+                    auto clientPayload = streamPayload(*c, sourcePayloads[offerIndex], work);
 
                     const RawSourceMetadata raw{r.senderId,         r.cipher,    r.eventFlags,
                                                 r.removalTime,      r.fieldTime, offer.bindingGeneration,
@@ -3700,6 +4029,14 @@ std::expected<bool, QueueFailure> MuxQueue::State::routeStream(QueueWork &work) 
                 });
                 count(c->counts.discarded, candidateCounts[v], c->counts.saturated);
                 count(counts.discarded, candidateCounts[v], counts.saturated);
+            } else if (c->candidateRun.count) {
+                c->streamRange.push(std::move(c->candidateRun));
+                count(c->counts.queueAdmitted, candidateCounts[v], c->counts.saturated);
+                count(counts.queueAdmitted, candidateCounts[v], counts.saturated);
+                core::detail::updateDelivery(c->statistics, [&](auto &s) {
+                    s.admittedEvents.add(candidateWeights[v]);
+                    s.pendingEvents += candidateWeights[v];
+                });
             } else {
                 for (std::size_t i = 0; i < candidateCounts[v]; ++i) {
                     enqueue(*c, std::move(candidates[v * limits.routeRecords + i]));
@@ -3725,7 +4062,7 @@ std::expected<bool, QueueFailure> MuxQueue::State::routeStream(QueueWork &work) 
 }
 
 std::expected<bool, QueueFailure> MuxQueue::State::callback(Client &c, QueueWork &work, bool retainedOnly) {
-    if (!c.size || c.sync || c.paused || !c.consumer || reset.phase != ResetPhase::NONE ||
+    if ((!c.size && !c.streamRange.count) || c.sync || c.paused || !c.consumer || reset.phase != ResetPhase::NONE ||
         c.port->advertisedNotice.load() || (c.closing && c.stopMode == 2) || c.port->stop.load() == 2 ||
         (c.statistics && c.statistics->sharedCallbackInFlight.load(std::memory_order_acquire))) {
         return false;
@@ -3733,138 +4070,245 @@ std::expected<bool, QueueFailure> MuxQueue::State::callback(Client &c, QueueWork
 
     try {
         bool snapshotDuringInterval = false;
+        std::size_t selected = 0, selectedWeight = 0;
+        std::shared_ptr<detail::QueueBatch> batch;
 
-        if (c.statistics && !c.closing) {
-            std::lock_guard lock(c.statistics->mutex);
-            const bool waiting = std::chrono::steady_clock::now() < c.statistics->nextAggregationDelivery;
-            snapshotDuringInterval = waiting && c.records[c.head]->aggregationSnapshot;
+        if (c.streamRange.count) {
+            if (c.statistics && !c.closing) {
+                std::lock_guard lock(c.statistics->mutex);
 
-            if (!snapshotDuringInterval && (waiting || (ticker && c.aggregationCollecting)))
-                return false;
-        }
-
-        debit(work.callbacks, 1);
-        const auto maximum = std::min(c.port->budget->limits.batchRecords, c.size);
-        spend(work, sum(product(c.size, 3), maximum), 0, 0,
-              sum(sum(sizeof(Client), product(sizeof(QueueCounts), 2)),
-                  product(product(c.size, 3), sum(sizeof(std::shared_ptr<const detail::QueueRecord>),
-                                                  sum(sizeof(std::uint8_t), sizeof(core::DeliveryProjectionMask))))));
-        constexpr std::uint8_t WITHDRAWN = 0;
-
-        constexpr std::uint8_t FENCED = static_cast<std::uint8_t>(core::ALL_DELIVERY_PROJECTIONS + 1);
-        const auto selectedMask = [&](std::uint8_t value) {
-            return value != WITHDRAWN && value != FENCED;
-        };
-        auto dropUnselected = [&](std::uint8_t selection) {
-            const bool fenced = selection == FENCED;
-
-            if (fenced) {
-                c.hadGap = true;
-                c.epochGap = true;
-                hadGap = true;
+                if (std::chrono::steady_clock::now() < c.statistics->nextAggregationDelivery)
+                    return false;
             }
 
-            drop(c, !fenced);
-        };
-        const auto &clientBudget = *c.port->budget;
-        const auto selectionBytes = clientBudget.limits.batchRecordBytes;
-        const auto recordControlBytes =
-            clientBudget.context->controlBytes[static_cast<std::size_t>(detail::ControlKind::RECORD)];
-        std::size_t prefix = 0, selected = 0, selectedWeight = 0, selectedBytes = 0;
+            debit(work.callbacks, 1);
+            const auto &limits = c.port->budget->limits;
+            spend(work, c.streamRange.count, 0, 0, limits.recordBytes);
+            const auto maximum = std::min(limits.batchRecords, c.streamRange.count);
+            const auto control = ledger->controlBytes[static_cast<std::size_t>(detail::ControlKind::RECORD)];
+            std::size_t bytes = 0, prefix = 0, selectedRanges = 0;
 
-        // Read-only selection first: work failure cannot withdraw an earlier queue prefix.
-        for (; prefix < c.size && selected < maximum; ++prefix) {
-            const auto slot = (c.head + prefix) % c.records.size();
-            const auto &r = c.records[slot];
+            for (std::size_t index = 0; index < c.streamRange.size && selected < maximum; ++index) {
+                auto &range = c.streamRange.at(index);
+                const auto current =
+                    interest.currentProjectionMask(c.interest, range.owner->common.projections, work.interest);
 
-            if (snapshotDuringInterval && !r->aggregationSnapshot)
-                break;
+                if (!current)
+                    return std::unexpected(sourceFailure(current.error()));
 
-            auto current = interest.currentProjectionMask(c.interest, r->view.projections, work.interest);
+                range.selection = *current & range.remaining;
 
-            if (!current) {
-                return std::unexpected(sourceFailure(current.error()));
-            }
-
-            const auto surviving = *current & c.remaining[slot];
-            c.selection[prefix] = !surviving                            ? WITHDRAWN
-                                  : retainedOnly && !r->retainedInitial ? FENCED
-                                                                        : static_cast<std::uint8_t>(surviving);
-
-            if (selectedMask(c.selection[prefix])) {
-                if (selectionBytes) {
-                    const auto next = sum(selectedBytes, sum(recordControlBytes, r->arenaSize));
-
-                    if (selected && next > selectionBytes)
-                        break;
-
-                    selectedBytes = next;
+                if (!range.selection || retainedOnly) {
+                    prefix += range.count;
+                    continue;
                 }
 
-                ++selected;
-                selectedWeight = sum(selectedWeight, static_cast<std::size_t>(std::popcount(surviving)));
-            }
-        }
+                std::size_t rows = 0;
 
-        if (!selected) {
+                for (; rows < range.count && selected < maximum; ++rows) {
+                    const auto &row = range.owner->rows[range.first + rows];
+                    const auto next = sum(bytes, sum(control, row.payload->payloadBytes()));
+
+                    if (selected && limits.batchRecordBytes && next > limits.batchRecordBytes)
+                        break;
+
+                    bytes = next;
+                    ++selected;
+                }
+
+                prefix += rows;
+                selectedRanges += rows != 0;
+
+                if (rows != range.count)
+                    break;
+            }
+
+            if (selected) {
+                spend(work, product(selected, 3), 0, 0, product(limits.batchBytes, 2));
+                batch = detail::shared<detail::QueueBatch>(
+                    detail::clientScope(c.port->budget, detail::AllocationTag::BATCH), c.port->budget);
+
+                if (c.statistics)
+                    batch->appliedDesiredRevision = c.candidateLogicalRevision;
+
+                batch->views.reserve(selected);
+                batch->streamRanges.reserve(selectedRanges);
+
+                for (std::size_t index = 0, remaining = prefix; remaining; ++index) {
+                    const auto &range = c.streamRange.at(index);
+                    const auto rows = std::min(remaining, range.count);
+
+                    if (range.selection && !retainedOnly) {
+                        for (std::size_t i = 0; i < rows; ++i) {
+                            batch->views.push_back(range.owner->view(range.first + i));
+                            batch->views.back().projections.mask = range.selection;
+                        }
+                    }
+
+                    remaining -= rows;
+                }
+            }
+
+            // All allocation and work debits precede logical ownership transfers and withdrawals.
+            for (std::size_t remaining = prefix; remaining;) {
+                const auto &range = c.streamRange.at(0);
+                const auto rows = std::min(remaining, range.count);
+
+                if (range.selection && !retainedOnly) {
+                    const auto weight = product(rows, static_cast<std::size_t>(std::popcount(range.selection)));
+                    const auto oldWeight = rows * static_cast<std::size_t>(std::popcount(range.remaining));
+                    selectedWeight += weight;
+                    batch->streamRanges.push_back(c.streamRange.take(rows));
+                    core::detail::updateDelivery(c.statistics, [&](auto &s) {
+                        s.pendingEvents -= oldWeight - weight;
+                        s.discardedEvents.add(oldWeight - weight);
+                    });
+                } else {
+                    if (range.selection)
+                        c.hadGap = c.epochGap = hadGap = true;
+
+                    dropRun(c, rows, !range.selection);
+                }
+
+                remaining -= rows;
+            }
+
+            if (!selected)
+                return prefix != 0;
+        } else {
+            if (c.statistics && !c.closing) {
+                std::lock_guard lock(c.statistics->mutex);
+                const bool waiting = std::chrono::steady_clock::now() < c.statistics->nextAggregationDelivery;
+                snapshotDuringInterval = waiting && c.records[c.head]->aggregationSnapshot;
+
+                if (!snapshotDuringInterval && (waiting || (ticker && c.aggregationCollecting)))
+                    return false;
+            }
+
+            debit(work.callbacks, 1);
+            const auto maximum = std::min(c.port->budget->limits.batchRecords, c.size);
+            spend(
+                work, sum(product(c.size, 3), maximum), 0, 0,
+                sum(sum(sizeof(Client), product(sizeof(QueueCounts), 2)),
+                    product(product(c.size, 3), sum(sizeof(std::shared_ptr<const detail::QueueRecord>),
+                                                    sum(sizeof(std::uint8_t), sizeof(core::DeliveryProjectionMask))))));
+            constexpr std::uint8_t WITHDRAWN = 0;
+
+            constexpr std::uint8_t FENCED = static_cast<std::uint8_t>(core::ALL_DELIVERY_PROJECTIONS + 1);
+            const auto selectedMask = [&](std::uint8_t value) {
+                return value != WITHDRAWN && value != FENCED;
+            };
+            auto dropUnselected = [&](std::uint8_t selection) {
+                const bool fenced = selection == FENCED;
+
+                if (fenced) {
+                    c.hadGap = true;
+                    c.epochGap = true;
+                    hadGap = true;
+                }
+
+                drop(c, !fenced);
+            };
+            const auto &clientBudget = *c.port->budget;
+            const auto selectionBytes = clientBudget.limits.batchRecordBytes;
+            const auto recordControlBytes =
+                clientBudget.context->controlBytes[static_cast<std::size_t>(detail::ControlKind::RECORD)];
+            std::size_t prefix = 0, selectedBytes = 0;
+
+            // Read-only selection first: work failure cannot withdraw an earlier queue prefix.
+            for (; prefix < c.size && selected < maximum; ++prefix) {
+                const auto slot = (c.head + prefix) % c.records.size();
+                const auto &r = c.records[slot];
+
+                if (snapshotDuringInterval && !r->aggregationSnapshot)
+                    break;
+
+                auto current = interest.currentProjectionMask(c.interest, r->view.projections, work.interest);
+
+                if (!current) {
+                    return std::unexpected(sourceFailure(current.error()));
+                }
+
+                const auto surviving = *current & c.remaining[slot];
+                c.selection[prefix] = !surviving                            ? WITHDRAWN
+                                      : retainedOnly && !r->retainedInitial ? FENCED
+                                                                            : static_cast<std::uint8_t>(surviving);
+
+                if (selectedMask(c.selection[prefix])) {
+                    if (selectionBytes) {
+                        const auto next = sum(selectedBytes, sum(recordControlBytes, r->arenaSize));
+
+                        if (selected && next > selectionBytes)
+                            break;
+
+                        selectedBytes = next;
+                    }
+
+                    ++selected;
+                    selectedWeight = sum(selectedWeight, static_cast<std::size_t>(std::popcount(surviving)));
+                }
+            }
+
+            if (!selected) {
+                for (std::size_t i = 0; i < prefix; ++i) {
+                    dropUnselected(c.selection[i]);
+                }
+
+                return prefix != 0;
+            }
+
+            const auto bytes =
+                sum(c.port->budget->context->controlBytes[static_cast<std::size_t>(detail::ControlKind::BATCH)],
+                    product(selected, sum(sizeof(std::shared_ptr<const detail::QueueRecord>), sizeof(MuxRecordView))));
+            auto &budget = *c.port->budget;
+            const auto &l = budget.limits;
+            bound(bytes, l.batchBytes);
+            // The enforced byte ceiling covers actual vector requests and their eventual disposal without an escaping
+            // work pointer.
+            spend(work, product(selected, 3), 0, 0, l.batchBytes);
+            spend(work, 0, 0, 0, l.batchBytes);
+            batch = detail::shared<detail::QueueBatch>(
+                detail::clientScope(c.port->budget, detail::AllocationTag::BATCH), c.port->budget);
+
+            if (c.statistics)
+                batch->appliedDesiredRevision = c.candidateLogicalRevision;
+
+            batch->roots.reserve(selected);
+            batch->views.reserve(selected); // Reuse the complete preflight selection; no fallible matching remains.
+
             for (std::size_t i = 0; i < prefix; ++i) {
-                dropUnselected(c.selection[i]);
+                const auto &r = c.records[(c.head + i) % c.records.size()];
+
+                if (selectedMask(c.selection[i])) {
+                    batch->roots.push_back(r);
+                    batch->views.push_back(r->view);
+                    batch->views.back().projections.mask = c.selection[i];
+                }
             }
 
-            return prefix != 0;
-        }
+            // No fallible action remains before queue consumption and invocation.
+            std::size_t index = 0;
 
-        const auto bytes =
-            sum(c.port->budget->context->controlBytes[static_cast<std::size_t>(detail::ControlKind::BATCH)],
-                product(selected, sum(sizeof(std::shared_ptr<const detail::QueueRecord>), sizeof(MuxRecordView))));
-        auto &budget = *c.port->budget;
-        const auto &l = budget.limits;
-        bound(bytes, l.batchBytes);
-        // The enforced byte ceiling covers actual vector requests and their eventual disposal without an escaping work
-        // pointer.
-        spend(work, product(selected, 3), 0, 0, l.batchBytes);
-        spend(work, 0, 0, 0, l.batchBytes);
-        auto batch = detail::shared<detail::QueueBatch>(
-            detail::clientScope(c.port->budget, detail::AllocationTag::BATCH), c.port->budget);
+            for (std::size_t i = 0; i < prefix; ++i) {
+                const auto &r = c.records[c.head];
+                const bool eligible = index < batch->roots.size() && r == batch->roots[index];
 
-        if (c.statistics)
-            batch->appliedDesiredRevision = c.candidateLogicalRevision;
-
-        batch->roots.reserve(selected);
-        batch->views.reserve(selected); // Reuse the complete preflight selection; no fallible matching remains.
-
-        for (std::size_t i = 0; i < prefix; ++i) {
-            const auto &r = c.records[(c.head + i) % c.records.size()];
-
-            if (selectedMask(c.selection[i])) {
-                batch->roots.push_back(r);
-                batch->views.push_back(r->view);
-                batch->views.back().projections.mask = c.selection[i];
-            }
-        }
-
-        // No fallible action remains before queue consumption and invocation.
-        std::size_t index = 0;
-
-        for (std::size_t i = 0; i < prefix; ++i) {
-            const auto &r = c.records[c.head];
-            const bool eligible = index < batch->roots.size() && r == batch->roots[index];
-
-            if (eligible) {
-                ++index;
-                const auto oldWeight = static_cast<std::size_t>(std::popcount(c.remaining[c.head]));
-                const auto nextWeight =
-                    static_cast<std::size_t>(std::popcount(static_cast<core::DeliveryProjectionMask>(c.selection[i])));
-                core::detail::updateDelivery(c.statistics, [&](auto &s) {
-                    s.pendingEvents -= oldWeight - nextWeight;
-                    s.discardedEvents.add(oldWeight - nextWeight);
-                });
-                c.records[c.head].reset();
-                c.remaining[c.head] = 0;
-                c.head = (c.head + 1) % c.records.size();
-                --c.size;
-            } else {
-                dropUnselected(c.selection[i]);
+                if (eligible) {
+                    ++index;
+                    const auto oldWeight = static_cast<std::size_t>(std::popcount(c.remaining[c.head]));
+                    const auto nextWeight = static_cast<std::size_t>(
+                        std::popcount(static_cast<core::DeliveryProjectionMask>(c.selection[i])));
+                    core::detail::updateDelivery(c.statistics, [&](auto &s) {
+                        s.pendingEvents -= oldWeight - nextWeight;
+                        s.discardedEvents.add(oldWeight - nextWeight);
+                    });
+                    c.records[c.head].reset();
+                    c.remaining[c.head] = 0;
+                    c.head = (c.head + 1) % c.records.size();
+                    --c.size;
+                } else {
+                    dropUnselected(c.selection[i]);
+                }
             }
         }
 
@@ -4076,6 +4520,18 @@ std::expected<bool, QueueFailure> MuxQueue::State::close(Client &c, QueueWork &w
         }
 
         clearMappingStatistics(c);
+
+        return true;
+    }
+
+    if (c.streamRange.count) {
+        if (c.stopMode == 1)
+            return false;
+
+        const auto rows = std::min(c.streamRange.count, limits.cleanupRecords);
+        spend(work, rows, 0, 0, c.port->budget->limits.recordBytes);
+        c.hadGap = true;
+        dropRun(c, rows, false);
 
         return true;
     }
@@ -4417,6 +4873,21 @@ std::expected<QueueProgress, QueueFailure> MuxQueue::State::resetStep(QueueWork 
 
         if (resetCursor < clients.size()) {
             auto &c = clients[resetCursor];
+
+            if (c && c->streamRange.count) {
+                const auto rows = std::min(c->streamRange.at(0).count, limits.cleanupRecords);
+                spend(work, rows, 0, 0, c->port->budget->limits.recordBytes);
+                const auto current = interest.currentProjectionMask(
+                    c->interest, c->streamRange.at(0).owner->common.projections, work.interest);
+
+                if (!current)
+                    return std::unexpected(sourceFailure(current.error()));
+
+                dropRun(*c, rows, !*current);
+                resetDiscards[resetCursor] = sum(resetDiscards[resetCursor], rows);
+
+                return progress(QueueProgressKind::CLEANUP);
+            }
 
             if (c && c->size) {
                 const auto n = std::min(c->size, limits.cleanupRecords);
@@ -5467,9 +5938,12 @@ MuxQueue::State::~State() {
 
         c->closing = true;
         stop(*c->port, 2);
-        c->hadGap = c->hadGap || c->size != 0;
+        c->hadGap = c->hadGap || c->size != 0 || c->streamRange.count != 0;
 
         std::size_t discardedWeight = 0;
+
+        if (c->streamRange.count)
+            dropRun(*c, c->streamRange.count, false);
 
         for (std::size_t i = 0; i < c->size; ++i) {
             const auto slot = (c->head + i) % c->records.size();

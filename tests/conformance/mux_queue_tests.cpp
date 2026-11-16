@@ -477,10 +477,11 @@ void send(Fixture &f, std::initializer_list<Input> records, bool deferCallbacks 
 }
 
 /** Build a real private flat source batch with the fixture's three compact fields. */
-p::LiveEvent flatEvent(const c::LocalSchema &schema) {
+p::LiveEvent flatEvent(const c::LocalSchema &schema, p::detail::LocalEventOwner &source, std::int64_t value = 10,
+                       bool separateBatches = false) {
     const std::array fields{c::FieldValueView{c::SerialFieldType::COMPACT_INT, 0, {}, {}},
                             c::FieldValueView{c::SerialFieldType::COMPACT_INT, 1, {}, {}},
-                            c::FieldValueView{c::SerialFieldType::COMPACT_INT, 10, {}, {}}};
+                            c::FieldValueView{c::SerialFieldType::COMPACT_INT, value, {}, {}}};
 
     struct Row {
         std::u16string_view symbol;
@@ -490,19 +491,31 @@ p::LiveEvent flatEvent(const c::LocalSchema &schema) {
     const std::array input{Row{u"ALPHA", fields}, Row{u"ALPHA", fields}};
     const auto batch = c::detail::SharedRecordPayload::copyBatch(std::span<const Row>(input));
     auto liveWork = liveTurn();
-    auto source = p::detail::LocalEventOwner::create(liveLimits(), liveWork);
-    REQUIRE(source);
     std::array<p::detail::LocalStreamRow, 2> rows;
 
     for (std::size_t i = 0; i < rows.size(); ++i) {
         auto payload = c::detail::SharedRecordPayload::row(batch, i);
+
+        if (separateBatches) {
+            const auto single = c::detail::SharedRecordPayload::copyBatch(std::span<const Row>(input).subspan(i, 1));
+            payload = c::detail::SharedRecordPayload::row(single, 0);
+        }
+
         rows[i] = {0, schema.recordContext(0), payload->symbol(), payload->fields(), std::move(payload)};
     }
 
-    auto event = source->stream(rows, liveWork, true);
+    auto event = source.stream(rows, liveWork, true);
     REQUIRE(event);
 
     return std::move(*event);
+}
+
+p::LiveEvent flatEvent(const c::LocalSchema &schema) {
+    auto work = liveTurn();
+    auto source = p::detail::LocalEventOwner::create(liveLimits(), work);
+    REQUIRE(source);
+
+    return flatEvent(schema, *source);
 }
 
 /** Observe a scoped actual HISTORY range.
@@ -926,7 +939,12 @@ TEST_CASE("shared local STREAM payload survives independent clients and serializ
 
 TEST_CASE("flat local STREAM batch shares backing across split route groups and clients") {
     auto bounds = queueLimits();
-    bounds.routeRecords = 1;
+    SUBCASE("independent route groups") {
+        bounds.routeRecords = 1;
+    }
+    SUBCASE("one private run split into independent callback ranges") {
+        bounds.routeRecords = 2;
+    }
     auto f = fixture(c::SubscriptionFamily::STREAM, bounds);
     auto first = std::make_shared<Recorder>();
     auto second = std::make_shared<Recorder>();
@@ -1004,6 +1022,127 @@ TEST_CASE("flat local STREAM batch shares backing across split route groups and 
     release.join();
     CHECK(valid.load());
     CHECK(lifetime.expired());
+}
+
+TEST_CASE("private STREAM run retains its delivered prefix across withdrawal reset and abort") {
+    auto f = fixture(c::SubscriptionFamily::STREAM);
+    auto receiver = std::make_shared<Recorder>();
+    receiver->retain = receiver->pause = true;
+    auto limits = clientLimits();
+    limits.compactRecordArena = true;
+    limits.batchRecords = 1;
+    auto handle = open(f, receiver, limits);
+    add(f, handle);
+    auto event = flatEvent(f.schema);
+    auto work = turn();
+    REQUIRE(f.queue.admit(std::move(event), work));
+    until(f, [&] {
+        return receiver->retained.size() == 1;
+    });
+    REQUIRE(f.queue.resources(handle)->queuedRecords == 1);
+    REQUIRE(f.queue.resources(handle)->recordOwners == 2);
+    REQUIRE(receiver->flags == std::vector<std::int32_t>{0});
+    CHECK_FALSE(receiver->retained.front().records().front().versionDefault);
+    const auto physical = f.queue.resources(handle)->recordBytes;
+    const auto originalEpoch = receiver->retained.front().epoch();
+
+    SUBCASE("withdrawal and re-add cannot revive the old range") {
+        const c::SubscriptionKey key{f.schema.recordContext(0), u"ALPHA"};
+        auto submit = submitTurn();
+        auto removed = handle.remove(std::span(&key, 1), submit);
+        REQUIRE(removed);
+        until(f, [&] {
+            return removed->result().has_value();
+        });
+        REQUIRE(removed->result()->status == m::CommandStatus::APPLIED);
+        const c::SubscriptionRequest request{key, {}};
+        submit = submitTurn();
+        auto added = handle.add(std::span(&request, 1), submit);
+        REQUIRE(added);
+        until(f, [&] {
+            return added->result().has_value();
+        });
+        REQUIRE(added->result()->status == m::CommandStatus::APPLIED);
+        receiver->pause = false;
+        REQUIRE(handle.requestResume() == m::ControlAdmission::RECORDED);
+        until(f, [&] {
+            return f.queue.resources(handle)->queuedRecords == 0;
+        });
+        CHECK(receiver->values == std::vector<std::int64_t>{10});
+        CHECK(f.queue.resources(handle)->recordOwners == 1);
+        CHECK(f.queue.resources(handle)->recordBytes == physical);
+    }
+    SUBCASE("reset discards only the queued suffix") {
+        work = turn();
+        REQUIRE(f.queue.resetSource(work));
+        until(f, [&] {
+            return handle.resetNotice().has_value();
+        });
+        CHECK(f.queue.resources(handle)->queuedRecords == 0);
+        CHECK(f.queue.resources(handle)->recordOwners == 1);
+        CHECK(handle.resetNotice()->knownDiscardedQueueRecords == 1);
+        CHECK(receiver->retained.front().epoch().matches(originalEpoch));
+    }
+    SUBCASE("abort releases only the queued suffix") {
+        REQUIRE(handle.requestStop(m::StopMode::ABORT) == m::ControlAdmission::RECORDED);
+        until(f, [&] {
+            return handle.terminal().has_value();
+        });
+        CHECK(handle.terminal()->outcome == m::TerminalOutcome::ABORTED);
+        CHECK(f.queue.resources().dataItems == 1);
+    }
+    CHECK(receiver->retained.front().records().front().typedValues[2].raw == 10);
+    receiver->retained.clear();
+    CHECK(f.queue.resources().dataItems == 0);
+    CHECK(f.queue.resources().recordBytes == 0);
+}
+
+TEST_CASE("private STREAM windows preserve order when admitted behind a paused suffix") {
+    auto f = fixture(c::SubscriptionFamily::STREAM);
+    auto receiver = std::make_shared<Recorder>();
+    receiver->pause = true;
+    auto limits = clientLimits();
+    limits.compactRecordArena = true;
+    limits.batchRecords = 1;
+    auto handle = open(f, receiver, limits);
+    add(f, handle);
+    auto liveWork = liveTurn();
+    auto source = p::detail::LocalEventOwner::create(liveLimits(), liveWork);
+    REQUIRE(source);
+    auto first = flatEvent(f.schema, *source, 10);
+    auto work = turn();
+    REQUIRE(f.queue.admit(std::move(first), work));
+    until(f, [&] {
+        return receiver->values.size() == 1;
+    });
+    auto second = flatEvent(f.schema, *source, 20);
+    bool admitted = false;
+
+    for (unsigned attempt = 0; attempt < 100 && !admitted; ++attempt) {
+        work = turn();
+        const auto result = f.queue.admit(std::move(second), work);
+        admitted = result.has_value();
+
+        if (!admitted) {
+            REQUIRE(result.error().error == m::QueueError::BUSY);
+            work = turn();
+            REQUIRE(f.queue.progressWithoutCallbacks(work));
+        }
+    }
+
+    REQUIRE(admitted);
+    until(f, [&] {
+        return f.queue.resources(handle)->queuedRecords == 3;
+    });
+    CHECK(f.queue.resources(handle)->recordOwners == 3);
+    receiver->pause = false;
+    REQUIRE(handle.requestResume() == m::ControlAdmission::RECORDED);
+    until(f, [&] {
+        return receiver->values.size() == 4;
+    });
+    CHECK(receiver->values == std::vector<std::int64_t>{10, 10, 20, 20});
+    CHECK(f.queue.resources(handle)->queuedRecords == 0);
+    CHECK(f.queue.resources().recordBytes == 0);
 }
 
 TEST_CASE("MUX queue HISTORY complete cannot use old source bound before synchronization or unstaged TX") {
@@ -3120,6 +3259,61 @@ TEST_CASE("flat batch transient allocations respect the aggregate record hard ce
     CHECK(rejected);
 }
 
+TEST_CASE("private STREAM range transfer rolls back callback allocation failures") {
+    for (std::size_t failure = 0; failure < 3; ++failure) {
+        auto f = fixture(c::SubscriptionFamily::STREAM);
+        auto receiver = std::make_shared<Recorder>();
+        receiver->retain = true;
+        auto limits = clientLimits();
+        limits.compactRecordArena = true;
+        limits.batchRecords = 1;
+        auto handle = open(f, receiver, limits);
+        add(f, handle);
+        auto event = flatEvent(f.schema);
+        auto work = turn();
+        REQUIRE(f.queue.admit(std::move(event), work));
+
+        for (unsigned attempt = 0; attempt < 100 && f.queue.resources(handle)->queuedRecords != 2; ++attempt) {
+            work = turn();
+            REQUIRE(f.queue.progressWithoutCallbacks(work));
+        }
+
+        REQUIRE(f.queue.resources(handle)->queuedRecords == 2);
+        const auto bytes = f.queue.resources(handle)->recordBytes;
+        allocationAllowance = failure;
+        allocationRequests = 0;
+        bool rejected = false;
+
+        for (unsigned attempt = 0; attempt < 100 && !rejected; ++attempt) {
+            work = turn();
+            allocationFault = true;
+            const auto step = f.queue.progress(work);
+            allocationFault = false;
+
+            if (!step) {
+                REQUIRE(step.error().error == m::QueueError::ALLOCATION_FAILURE);
+                rejected = true;
+            }
+        }
+
+        REQUIRE(rejected);
+        CHECK(receiver->values.empty());
+        CHECK(f.queue.resources(handle)->queuedRecords == 2);
+        CHECK(f.queue.resources(handle)->recordOwners == 2);
+        CHECK(f.queue.resources(handle)->recordBytes == bytes);
+        CHECK(f.queue.resources(handle)->batchBytes == 0);
+        until(f, [&] {
+            return receiver->values.size() == 2;
+        });
+        CHECK(receiver->values == std::vector<std::int64_t>{10, 10});
+        receiver->retained.front() = {};
+        CHECK(f.queue.resources(handle)->recordOwners == 1);
+        receiver->retained.clear();
+        CHECK(f.queue.resources().dataItems == 0);
+        CHECK(f.queue.resources().recordBytes == 0);
+    }
+}
+
 TEST_CASE("MUX queue failed STREAM fanout allocations preserve every client queue and the real source prefix") {
     bool reachedCompleteAllocation = false;
     auto limits = clientLimits();
@@ -4724,4 +4918,164 @@ TEST_CASE("owner TICKER observation reads only an applied exact registration wit
     work = turn();
     CHECK(f.queue.visitTickerLatest(handle, key, work, &observation, visit).error().error ==
           m::QueueError::INVALID_STATE);
+}
+
+TEST_CASE("private STREAM delivery combines several source windows and allocation batches") {
+    auto f = fixture(c::SubscriptionFamily::STREAM);
+    auto receiver = std::make_shared<Recorder>();
+    receiver->retain = receiver->pause = true;
+    auto limits = clientLimits();
+    limits.compactRecordArena = true;
+    limits.batchRecords = 3;
+    auto handle = open(f, receiver, limits);
+    add(f, handle);
+    auto liveWork = liveTurn();
+    auto source = p::detail::LocalEventOwner::create(liveLimits(), liveWork);
+    REQUIRE(source);
+
+    for (std::size_t window = 0; window < 2; ++window) {
+        auto event = flatEvent(f.schema, *source, window ? 20 : 10, true);
+        auto work = turn();
+        bool admitted = false;
+
+        for (unsigned attempt = 0; attempt < 100 && !admitted; ++attempt) {
+            work = turn();
+            const auto result = f.queue.admit(std::move(event), work);
+            admitted = result.has_value();
+
+            if (!admitted) {
+                REQUIRE(result.error().error == m::QueueError::BUSY);
+                work = turn();
+                REQUIRE(f.queue.progressWithoutCallbacks(work));
+            }
+        }
+
+        REQUIRE(admitted);
+
+        for (unsigned attempt = 0; attempt < 100 && f.queue.resources(handle)->queuedRecords < (window + 1) * 2;
+             ++attempt) {
+            work = turn();
+            REQUIRE(f.queue.progressWithoutCallbacks(work));
+        }
+
+        REQUIRE(f.queue.resources(handle)->queuedRecords == (window + 1) * 2);
+    }
+
+    until(f, [&] {
+        return receiver->retained.size() == 1;
+    });
+    REQUIRE(receiver->retained.front().records().size() == 3);
+    CHECK(receiver->values == std::vector<std::int64_t>{10, 10, 20});
+    CHECK(f.queue.resources(handle)->queuedRecords == 1);
+    CHECK(f.queue.resources(handle)->recordOwners == 4);
+    const auto bytes = f.queue.resources(handle)->recordBytes;
+    receiver->retained.clear();
+    CHECK(f.queue.resources(handle)->recordOwners == 1);
+    CHECK(f.queue.resources(handle)->recordBytes < bytes);
+    receiver->pause = false;
+    REQUIRE(handle.requestResume() == m::ControlAdmission::RECORDED);
+    until(f, [&] {
+        return receiver->values.size() == 4;
+    });
+    CHECK(receiver->values == std::vector<std::int64_t>{10, 10, 20, 20});
+    receiver->retained.clear();
+    CHECK(f.queue.resources().recordBytes == 0);
+    CHECK(f.queue.resources().dataItems == 0);
+}
+
+TEST_CASE("private STREAM range replacement prepays metadata work before retiring queued eligibility") {
+    auto f = fixture(c::SubscriptionFamily::STREAM);
+    auto statistics = std::make_shared<c::detail::DeliveryStatisticsState>();
+    auto receiver = std::make_shared<Recorder>(statistics);
+    auto limits = clientLimits();
+    limits.compactRecordArena = true;
+    auto handle = open(f, receiver, limits);
+    add(f, handle);
+    auto liveWork = liveTurn();
+    auto source = p::detail::LocalEventOwner::create(liveLimits(), liveWork);
+    REQUIRE(source);
+    const auto initial = turn();
+    const auto replace = [&](m::QueueWork &work, bool probe) {
+        const m::detail::QueueReplacement replacement{&f.queue, &handle, {}, &work};
+        const auto refuse =
+            +[](void *, std::size_t, std::span<const c::SubscriptionRequest>) -> std::expected<void, m::QueueFailure> {
+            return std::unexpected(m::QueueFailure{m::QueueError::INVALID_CONFIGURATION, {}});
+        };
+
+        return m::detail::QueueReplaceAccess::replace(std::span(&replacement, 1), 0, 2, probe ? refuse : nullptr);
+    };
+    const auto measure = [&] {
+        auto work = turn();
+        const auto result = replace(work, true);
+        REQUIRE_FALSE(result);
+        REQUIRE(result.error().error == m::QueueError::INVALID_CONFIGURATION);
+
+        return std::pair{initial.visits - work.visits, initial.bytes - work.bytes};
+    };
+    const auto empty = measure();
+    std::array<std::pair<std::size_t, std::size_t>, 2> charged{};
+
+    for (std::size_t window = 0; window < charged.size(); ++window) {
+        auto event = flatEvent(f.schema, *source, 10 + window);
+        bool admitted = false;
+
+        for (unsigned attempt = 0; attempt < 100 && !admitted; ++attempt) {
+            auto work = turn();
+            const auto result = f.queue.admit(std::move(event), work);
+            admitted = result.has_value();
+
+            if (!admitted) {
+                REQUIRE(result.error().error == m::QueueError::BUSY);
+                work = turn();
+                REQUIRE(f.queue.progressWithoutCallbacks(work));
+            }
+        }
+
+        REQUIRE(admitted);
+
+        for (unsigned attempt = 0; attempt < 100; ++attempt) {
+            auto work = turn();
+            REQUIRE(f.queue.progressWithoutCallbacks(work));
+        }
+
+        REQUIRE(f.queue.resources(handle)->queuedRecords == (window + 1) * 2);
+        charged[window] = measure();
+    }
+
+    CHECK(charged[0].first > empty.first);
+    CHECK(charged[0].second > empty.second);
+    CHECK(charged[1].first - empty.first == 2 * (charged[0].first - empty.first));
+    CHECK(charged[1].second - empty.second == 2 * (charged[0].second - empty.second));
+    const auto before = *f.queue.resources(handle);
+    const auto revision = f.queue.revision();
+    const auto pending = statistics->snapshot().pendingEvents;
+
+    for (const bool visits : {true, false}) {
+        auto work = turn();
+
+        if (visits)
+            work.visits = charged.back().first - 1;
+        else
+            work.bytes = charged.back().second - 1;
+
+        const auto result = replace(work, false);
+        REQUIRE_FALSE(result);
+        CHECK(result.error().error == m::QueueError::WORK_LIMIT);
+        CHECK(f.queue.revision() == revision);
+        CHECK(f.queue.resources(handle)->queuedRecords == before.queuedRecords);
+        CHECK(f.queue.resources(handle)->recordOwners == before.recordOwners);
+        CHECK(f.queue.resources(handle)->recordBytes == before.recordBytes);
+        CHECK(statistics->snapshot().pendingEvents == pending);
+    }
+
+    auto work = turn();
+    work.visits = charged.back().first;
+    work.bytes = charged.back().second;
+    REQUIRE(replace(work, false));
+    CHECK(statistics->snapshot().pendingEvents == 0);
+    until(f, [&] {
+        return f.queue.resources(handle)->queuedRecords == 0;
+    });
+    CHECK(receiver->values.empty());
+    CHECK(f.queue.resources().recordBytes == 0);
 }
