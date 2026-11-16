@@ -2296,6 +2296,10 @@ class PublisherServer {
             if (!canTakeLocal(port))
                 return;
 
+            // A STREAM publication may have arrived between the batch probe and this lock.
+            if (streamBatchRecords_ > 1 && port.pendingRecords[port.head].family == STREAM_FAMILY)
+                return;
+
             row = std::move(port.pendingRecords[port.head]);
             port.head = (port.head + 1) % port.pendingRecords.size();
             --port.size;
@@ -2353,6 +2357,9 @@ class PublisherServer {
             const std::lock_guard lock(port.mutex);
 
             if (!canTakeLocal(port))
+                return;
+
+            if (streamBatchRecords_ > 1 && port.pending[port.head].family == STREAM_FAMILY)
                 return;
 
             row = port.pending[port.head];
