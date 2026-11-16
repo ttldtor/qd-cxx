@@ -21,9 +21,11 @@
 #include <concepts>
 #include <condition_variable>
 #include <limits>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
+#include <type_traits>
 
 namespace org::ttldtor::qdcxx::api {
 namespace {
@@ -138,23 +140,32 @@ SourceRow sourceRow(std::size_t family, std::u16string_view symbol, std::span<co
     return row;
 }
 
-/** One pending local row. Every pointer in fields refers into this row's independent arrays. */
+/** One pending local row. Field views and their variable payload share one stable backing block. */
 struct RecordRow {
-    std::unique_ptr<char16_t[]> text;
-    std::unique_ptr<std::byte[]> opaque;
-    std::unique_ptr<core::FieldValueView[]> fields;
+    std::unique_ptr<std::byte[]> backing;
     std::size_t symbolSize = 0;
     std::size_t fieldCount = 0;
     std::size_t charge = 0;
     std::size_t family = 0;
     std::int32_t id = 0;
     PublisherHistoryMetadata history;
+    std::shared_ptr<const core::detail::SharedRecordPayload> shared;
+
+    [[nodiscard]] std::u16string_view symbol() const noexcept {
+        const auto *text = reinterpret_cast<const char16_t *>((shared ? shared->data() : backing.get()) +
+                                                              fieldCount * sizeof(core::FieldValueView));
+
+        return {text, symbolSize};
+    }
+
+    [[nodiscard]] std::span<const core::FieldValueView> fields() const noexcept {
+        return {reinterpret_cast<const core::FieldValueView *>(shared ? shared->data() : backing.get()), fieldCount};
+    }
 };
 
-/** Requested lengths for one exact backing allocation of each pending array. */
+/** Requested component lengths of the exact pending record backing. */
 struct RecordStorage {
     std::size_t textUnits;
-    std::size_t opaqueBytes;
     std::size_t charge;
 };
 
@@ -261,7 +272,7 @@ std::expected<RecordStorage, Diagnostic> recordStorage(const core::LocalRecord &
     if (fieldBytes > limit || symbol.size() > (limit - fieldBytes) / sizeof(char16_t))
         return std::unexpected(RECORD_LIMIT);
 
-    RecordStorage storage{symbol.size(), 0, fieldBytes + symbol.size() * sizeof(char16_t)};
+    RecordStorage storage{symbol.size(), fieldBytes + symbol.size() * sizeof(char16_t)};
 
     for (std::size_t index = 0; index < fields.size(); ++index) {
         const auto &field = fields[index];
@@ -286,7 +297,6 @@ std::expected<RecordStorage, Diagnostic> recordStorage(const core::LocalRecord &
             if (bytes > limit - storage.charge)
                 return std::unexpected(RECORD_LIMIT);
 
-            storage.opaqueBytes += bytes;
             storage.charge += bytes;
         }
     }
@@ -297,23 +307,24 @@ std::expected<RecordStorage, Diagnostic> recordStorage(const core::LocalRecord &
 /** Copy validated borrowed data only after the caller has checked available FIFO and byte capacity. */
 RecordRow copyRecordRow(std::size_t family, std::int32_t id, std::u16string_view symbol,
                         std::span<const core::FieldValueView> fields, RecordStorage storage,
-                        PublisherHistoryMetadata history) {
-    RecordRow row{std::make_unique_for_overwrite<char16_t[]>(storage.textUnits),
-                  storage.opaqueBytes ? std::make_unique_for_overwrite<std::byte[]>(storage.opaqueBytes) : nullptr,
-                  fields.empty() ? nullptr : std::make_unique<core::FieldValueView[]>(fields.size()),
+                        PublisherHistoryMetadata history, bool share = false) {
+    static_assert(std::is_trivially_destructible_v<core::FieldValueView>);
+    static_assert(sizeof(core::FieldValueView) % alignof(char16_t) == 0);
+    RecordRow row{std::make_unique_for_overwrite<std::byte[]>(storage.charge),
                   symbol.size(),
                   fields.size(),
                   storage.charge,
                   family,
                   id,
                   history};
-    auto *text = std::ranges::copy(symbol, row.text.get()).out;
-    auto *opaque = row.opaque.get();
+    auto *values = reinterpret_cast<core::FieldValueView *>(row.backing.get());
+    auto *textStart = reinterpret_cast<char16_t *>(row.backing.get() + fields.size() * sizeof(core::FieldValueView));
+    auto *text = std::ranges::copy(symbol, textStart).out;
+    auto *opaque = reinterpret_cast<std::byte *>(textStart + storage.textUnits);
 
     for (std::size_t index = 0; index < fields.size(); ++index) {
         const auto &field = fields[index];
-        auto &target = row.fields[index];
-        target = {field.type, field.raw, {}, {}};
+        auto &target = *std::construct_at(values + index, core::FieldValueView{field.type, field.raw, {}, {}});
 
         if (field.units) {
             target.units.emplace();
@@ -332,6 +343,12 @@ RecordRow copyRecordRow(std::size_t family, std::int32_t id, std::u16string_view
                 opaque = std::ranges::copy(*field.bytes, opaque).out;
             }
         }
+    }
+
+    if (share) {
+        row.shared = core::detail::SharedRecordPayload::adopt(std::move(row.backing), row.symbolSize, row.fieldCount,
+                                                              storage.charge);
+        row.charge = row.shared->residentBytes();
     }
 
     return row;
@@ -1161,6 +1178,7 @@ struct PublisherPort {
     const std::size_t families;
     const std::size_t streamBatchRecords;
     const bool byteStream;
+    const std::size_t sharedBatchBudget;
     PublisherSourceStatus source;
     PublisherStatistics statistics;
     std::size_t head = 0;
@@ -1178,7 +1196,8 @@ struct PublisherPort {
           pendingRecords(!options.source && options.catalog ? options.pendingQuotes : 0),
           recordLimits(options.recordLimits), remote(options.source.has_value()),
           localRecords(!options.source && options.catalog), families(enabledFamilies(options)),
-          streamBatchRecords(options.streamBatchRecords), byteStream(options.streamBytes.has_value()) {
+          streamBatchRecords(options.streamBatchRecords), byteStream(options.streamBytes.has_value()),
+          sharedBatchBudget(options.streamBytes ? publisherClientLimits(options, true).recordBytes / 2 : 0) {
         if (!pendingRecords.empty())
             localCatalog.emplace(createSchema(options));
 
@@ -2261,6 +2280,7 @@ class PublisherServer {
         const std::lock_guard lock(port.mutex);
         std::size_t count = 0;
         std::size_t copied = 0;
+        [[maybe_unused]] const void *previousBatch = nullptr;
 
         if (!canTakeLocal(port))
             return 0;
@@ -2270,13 +2290,22 @@ class PublisherServer {
                 const auto &row = pending[port.head];
                 std::size_t charge;
 
-                if constexpr (std::same_as<Row, RecordRow>)
-                    charge = row.charge + RECORD_COPY_PADDING + EVENT_OWNER_ALLOWANCE;
-                else
+                if constexpr (std::same_as<Row, RecordRow>) {
+                    const auto identity = row.shared ? row.shared->batchIdentity() : nullptr;
+                    // Port reservation stays on the final FIFO row. A delivery window must instead
+                    // reserve the whole shared batch before taking even its first or remaining row.
+                    const auto retained =
+                        row.shared ? (identity != previousBatch ? row.shared->residentBytes() : 0) : row.charge;
+                    charge = retained + RECORD_COPY_PADDING + EVENT_OWNER_ALLOWANCE;
+                    previousBatch = identity;
+                } else {
                     charge = MAX_DATA_FIELDS * sizeof(core::FieldValueView) + (row.length + 1) * sizeof(char16_t) +
                              alignof(core::FieldValueView) + EVENT_OWNER_ALLOWANCE;
+                }
 
-                if (count && charge > streamClientLimits_.recordBytes / 2 - copied)
+                const auto window = streamClientLimits_.recordBytes / 2;
+
+                if (count && (copied >= window || charge > window - copied))
                     break;
 
                 copied += charge;
@@ -2320,10 +2349,8 @@ class PublisherServer {
 
         for (std::size_t i = 0; i < count; ++i) {
             const auto &record = recordScratch_[i];
-            sourceViews_[i] = {record.id,
-                               schema_.recordContext(record.id),
-                               {record.text.get(), record.symbolSize},
-                               {record.fields.get(), record.fieldCount}};
+            sourceViews_[i] = {record.id, schema_.recordContext(record.id), record.symbol(), record.fields(),
+                               record.shared};
             charge += record.charge;
         }
 
@@ -2331,8 +2358,10 @@ class PublisherServer {
         auto work = liveTurn(true);
         auto event = source_->stream(std::span(sourceViews_).first(count), work, streamBytes_.has_value());
 
-        for (std::size_t i = 0; i < count; ++i)
+        for (std::size_t i = 0; i < count; ++i) {
+            sourceViews_[i] = {};
             recordScratch_[i] = {};
+        }
 
         if (!event)
             throw Error(protocolDiagnostic(event.error(), "publisher-local-record-batch"));
@@ -2377,9 +2406,8 @@ class PublisherServer {
         }
         recordApplication_.emplace(row.family, row.charge, 1);
         auto turn = liveTurn(true);
-        auto event = source_->record(DATA_MESSAGES[row.family], row.id, schema_.recordContext(row.id),
-                                     {row.text.get(), row.symbolSize}, {row.fields.get(), row.fieldCount},
-                                     row.history.eventFlags, row.history.removalIndex, turn);
+        auto event = source_->record(DATA_MESSAGES[row.family], row.id, schema_.recordContext(row.id), row.symbol(),
+                                     row.fields(), row.history.eventFlags, row.history.removalIndex, turn);
 
         if (!event)
             throw Error(protocolDiagnostic(event.error(), "publisher-local-record"));
@@ -3084,9 +3112,44 @@ Publisher::publishStreamRecords(std::span<const PublisherStreamRecordView> recor
                 if (storage->charge > port.recordLimits.pendingBytes - port.recordBytes - charge)
                     return std::unexpected(PENDING_RECORD_LIMIT);
 
-                staged.slot(i) = copyRecordRow(STREAM_FAMILY, *id, row.symbol, row.fields, *storage, {});
+                auto &target = staged.slot(i);
+                target = {};
+                target.symbolSize = row.symbol.size();
+                target.fieldCount = row.fields.size();
+                target.id = *id;
+                target.family = STREAM_FAMILY;
+                target.charge = storage->charge;
                 ++staged.count;
                 charge += storage->charge;
+            }
+
+            const auto batchBytes = port.byteStream && records.size() > 1
+                                        ? core::detail::SharedRecordPayload::batchBytes(records)
+                                        : std::size_t{0};
+
+            const auto deliveryBytes =
+                batchBytes + records.size() * (RECORD_COPY_PADDING + EVENT_OWNER_ALLOWANCE) + 2 * EVENT_OWNER_ALLOWANCE;
+
+            if (batchBytes && batchBytes <= port.recordLimits.pendingBytes - port.recordBytes &&
+                deliveryBytes <= port.sharedBatchBudget) {
+                const auto batch = core::detail::SharedRecordPayload::copyBatch(records);
+                charge = batchBytes;
+
+                for (std::size_t i = 0; i < records.size(); ++i) {
+                    auto &target = staged.slot(i);
+                    target.shared = core::detail::SharedRecordPayload::row(batch, i);
+                    // The FIFO owns the complete batch charge until its last row reaches the collector.
+                    target.charge = i + 1 == records.size() ? batchBytes : 0;
+                }
+            } else {
+                for (std::size_t i = 0; i < records.size(); ++i) {
+                    const auto &row = records[i];
+                    const auto id = staged.slot(i).id;
+                    const auto &layout = port.localCatalog->records()[static_cast<std::size_t>(id)];
+                    const auto storage =
+                        recordStorage(layout, row.symbol, row.fields, port.recordLimits.rowBytes, false);
+                    staged.slot(i) = copyRecordRow(STREAM_FAMILY, id, row.symbol, row.fields, *storage, {});
+                }
             }
         } catch (const std::bad_alloc &) {
             return std::unexpected(ALLOCATION);
@@ -3145,17 +3208,20 @@ std::expected<void, Diagnostic> Publisher::publishRecord(Family family, const co
         if (family == Family::HISTORY && !removal && reservedHistoryIndex(*layout.indexedTimeLayout, fields))
             return std::unexpected(HISTORY_SHAPE);
 
+        const bool share = false;
+        const auto ownedCharge = storage->charge + (share ? core::detail::SharedRecordPayload::controlBytes() : 0);
+
         if (port.activeRecords == port.pendingRecords.size() ||
-            storage->charge > port.recordLimits.pendingBytes - port.recordBytes)
+            ownedCharge > port.recordLimits.pendingBytes - port.recordBytes)
             return std::unexpected(PENDING_RECORD_LIMIT);
 
         // Hold the admission fence through copying so close and other producers cannot consume this reservation.
         try {
             const auto index = (port.head + port.size) % port.pendingRecords.size();
-            port.pendingRecords[index] = copyRecordRow(*lane, *id, symbol, fields, *storage, history);
+            port.pendingRecords[index] = copyRecordRow(*lane, *id, symbol, fields, *storage, history, share);
             ++port.size;
             ++port.activeRecords;
-            port.recordBytes += storage->charge;
+            port.recordBytes += ownedCharge;
         } catch (const std::bad_alloc &) {
             return std::unexpected(ALLOCATION);
         }

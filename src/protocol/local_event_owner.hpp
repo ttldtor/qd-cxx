@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 #pragma once
 
+#include "../core/shared_record_payload.hpp"
 #include "qd/protocol/live_session.hpp"
 
 namespace org::ttldtor::qdcxx::protocol::detail {
@@ -12,6 +13,7 @@ struct LocalStreamRow {
     core::RecordContext context;
     std::u16string_view symbol;
     std::span<const core::FieldValueView> fields;
+    std::shared_ptr<const core::detail::SharedRecordPayload> shared{};
 };
 
 /** One private synthetic source epoch with the usual counted event backing. */

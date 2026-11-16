@@ -4,6 +4,7 @@
 #include "../collectors/history_replace.hpp"
 #include "../collectors/history_replay.hpp"
 #include "../collectors/stream_replace.hpp"
+#include "../collectors/stream_retention.hpp"
 #include "../collectors/ticker_transaction.hpp"
 #include "../core/delivery_statistics.hpp"
 #include "interest_transaction.hpp"
@@ -125,24 +126,31 @@ bool reserve(std::atomic<std::size_t> &value, std::size_t amount, std::size_t ma
 namespace detail {
 /** Shared allocation shape, measured through the actual rebound allocator. */
 enum class ControlKind : std::size_t {
-    ORIGIN,     ///< Opaque origin control/object request.
-    PORT,       ///< Finite producer port control/object request.
-    COMPLETION, ///< Pure result control/object request.
-    RECORD,     ///< Immutable record control/object request.
-    BATCH,      ///< Immutable composite control/object request.
-    COUNT,      ///< Finite numeric layout array extent.
+    ORIGIN,         ///< Opaque origin control/object request.
+    PORT,           ///< Finite producer port control/object request.
+    COMPLETION,     ///< Pure result control/object request.
+    RECORD,         ///< Immutable record control/object request.
+    BATCH,          ///< Immutable composite control/object request.
+    SLAB,           ///< Shared STREAM allocation backing, without a logical record owner.
+    SHARED_RECORD,  ///< Pure shared local payload accounting owner.
+    CLIENT_PAYLOAD, ///< One per-client batch retention scope.
+    COUNT,          ///< Finite numeric layout array extent.
 };
 /** Exact allocation resource domain, never an execution-owner pointer. */
 enum class AllocationTag {
-    OWNER,       ///< Queue owner fixed metadata/object/array request.
-    CLIENT,      ///< Generation fixed metadata/object/array request.
-    ORIGIN,      ///< Opaque origin shared request.
-    PORT,        ///< Producer port shared request.
-    COMPLETION,  ///< Detached completion shared request.
-    RECORD,      ///< One record owner plus its control/object bytes.
-    ARENA,       ///< Record arena bytes without a second owner count.
-    BATCH,       ///< One composite owner plus its control/object bytes.
-    BATCH_ARRAY, ///< Composite root/view bytes without a second owner count.
+    OWNER,               ///< Queue owner fixed metadata/object/array request.
+    CLIENT,              ///< Generation fixed metadata/object/array request.
+    ORIGIN,              ///< Opaque origin shared request.
+    PORT,                ///< Producer port shared request.
+    COMPLETION,          ///< Detached completion shared request.
+    RECORD,              ///< One record owner plus its control/object bytes.
+    ARENA,               ///< Record arena bytes without a second owner count.
+    BATCH,               ///< One composite owner plus its control/object bytes.
+    BATCH_ARRAY,         ///< Composite root/view bytes without a second owner count.
+    SLAB,                ///< Shared STREAM backing control bytes without a logical record owner.
+    SHARED_RECORD,       ///< Unique shared payload bytes in the aggregate record domain.
+    SHARED_RECORD_ARRAY, ///< Pure aggregate batch cache backing.
+    CLIENT_PAYLOAD,      ///< Per-client batch scope control bytes without a record count.
 };
 
 /** Fixed numeric request transport; no backing/object construction has occurred. */
@@ -418,11 +426,39 @@ class BudgetLease {
     }
 };
 
-/** Immutable allocator provenance, containing only pure metadata leases. */
+/** Prepaid immutable-record backing; allocation is serialized, release may occur on another thread. */
+struct RecordSlab {
+    BudgetLease budget;          ///< Pure counters retained through the actual backing release.
+    std::byte *memory = nullptr; ///< One bounded backing allocation.
+    std::size_t capacity = 0;    ///< Complete charged backing, including alignment gaps.
+    std::size_t used = 0;        ///< Owner-thread-only allocation cursor.
+
+    RecordSlab(BudgetLease source, std::size_t bytes);
+    ~RecordSlab();
+
+    /** Reserve a suballocation without publishing partially constructed records. */
+    void *allocate(std::size_t bytes, std::size_t alignment) {
+        if (alignment > alignof(std::max_align_t))
+            throw QueueError::RESOURCE_LIMIT;
+
+        constexpr auto ALIGNMENT = alignof(std::max_align_t);
+        const auto offset = sum(used, ALIGNMENT - 1) & ~(ALIGNMENT - 1);
+
+        if (offset > capacity || bytes > capacity - offset)
+            throw QueueError::RESOURCE_LIMIT;
+
+        used = offset + bytes;
+
+        return memory + offset;
+    }
+};
+
+/** Immutable allocator provenance, containing only pure metadata and optional prepaid backing. */
 struct AllocationScope {
     ContextLease owner;                       ///< Used for owner-only fixed blocks.
     BudgetLease client;                       ///< Used for generation/data blocks.
     AllocationTag tag = AllocationTag::OWNER; ///< Exact requested-block domain.
+    std::shared_ptr<RecordSlab> slab;         ///< Optional backing; never a source, callback, or execution owner.
 
     /** Inspect the retained aggregate counter domain.
      * @return Existing pure context.
@@ -448,6 +484,12 @@ std::optional<ControlKind> controlKind(AllocationTag tag) noexcept {
         return ControlKind::RECORD;
     case AllocationTag::BATCH:
         return ControlKind::BATCH;
+    case AllocationTag::SLAB:
+        return ControlKind::SLAB;
+    case AllocationTag::SHARED_RECORD:
+        return ControlKind::SHARED_RECORD;
+    case AllocationTag::CLIENT_PAYLOAD:
+        return ControlKind::CLIENT_PAYLOAD;
     default:
         return {};
     }
@@ -504,7 +546,35 @@ template <class T> struct QueueAllocator {
         auto *budget = scope.client ? &*scope.client : nullptr;
         bool ownerCount = false;
 
-        if (scope.tag == AllocationTag::OWNER || scope.tag == AllocationTag::ORIGIN) {
+        if (scope.slab) {
+            if (!budget || scope.slab->budget != scope.client ||
+                (scope.tag != AllocationTag::RECORD && scope.tag != AllocationTag::ARENA))
+                throw QueueError::INVALID_CONFIGURATION;
+
+            ownerCount = scope.tag == AllocationTag::RECORD;
+
+            if (ownerCount && !reserve(budget->records, 1, budget->limits.dataItems))
+                throw QueueError::RESOURCE_LIMIT;
+
+            try {
+                auto *memory = static_cast<T *>(scope.slab->allocate(bytes, alignof(T)));
+
+                if (ownerCount)
+                    context->records.fetch_add(1);
+
+                return memory;
+            } catch (...) {
+                if (ownerCount)
+                    budget->records.fetch_sub(1);
+
+                throw;
+            }
+        }
+
+        if (scope.tag == AllocationTag::SHARED_RECORD || scope.tag == AllocationTag::SHARED_RECORD_ARRAY) {
+            if (!reserve(context->recordBytes, bytes, context->limits.recordBytes))
+                throw QueueError::RESOURCE_LIMIT;
+        } else if (scope.tag == AllocationTag::OWNER || scope.tag == AllocationTag::ORIGIN) {
             if (sum(context->fixed.load(), bytes) > context->fixedCapacity)
                 throw QueueError::RESOURCE_LIMIT;
 
@@ -522,7 +592,8 @@ template <class T> struct QueueAllocator {
             budget->fixedLive.fetch_add(bytes);
             context->clientFixed.fetch_add(bytes);
         } else {
-            const bool record = scope.tag == AllocationTag::RECORD || scope.tag == AllocationTag::ARENA;
+            const bool record = scope.tag == AllocationTag::RECORD || scope.tag == AllocationTag::ARENA ||
+                                scope.tag == AllocationTag::SLAB || scope.tag == AllocationTag::CLIENT_PAYLOAD;
             ownerCount = scope.tag == AllocationTag::RECORD || scope.tag == AllocationTag::BATCH;
             auto &owners = record ? budget->records : budget->batches;
             auto &charge = record ? budget->recordBytes : budget->batchBytes;
@@ -539,7 +610,18 @@ template <class T> struct QueueAllocator {
                 throw QueueError::RESOURCE_LIMIT;
             }
 
-            (record ? context->recordBytes : context->batchBytes).fetch_add(bytes);
+            if (record) {
+                if (!reserve(context->recordBytes, bytes, context->limits.recordBytes)) {
+                    charge.fetch_sub(bytes);
+
+                    if (ownerCount)
+                        owners.fetch_sub(1);
+
+                    throw QueueError::RESOURCE_LIMIT;
+                }
+            } else {
+                context->batchBytes.fetch_add(bytes);
+            }
 
             if (ownerCount)
                 (record ? context->records : context->batches).fetch_add(1);
@@ -564,6 +646,15 @@ template <class T> struct QueueAllocator {
         auto retained = scope;
         const auto bytes = count * sizeof(T);
 
+        if (retained.slab) {
+            if (retained.tag == AllocationTag::RECORD) {
+                retained.client->records.fetch_sub(1);
+                retained.context()->records.fetch_sub(1);
+            }
+
+            return;
+        }
+
         if constexpr (alignof(T) > __STDCPP_DEFAULT_NEW_ALIGNMENT__)
             ::operator delete(pointer, std::align_val_t{alignof(T)});
         else
@@ -579,7 +670,7 @@ template <class T> struct QueueAllocator {
      */
     template <class U> bool operator==(const QueueAllocator<U> &other) const noexcept {
         return scope.tag == other.scope.tag && scope.owner == other.scope.owner && scope.client == other.scope.client &&
-               measuring == other.measuring;
+               scope.slab == other.scope.slab && measuring == other.measuring;
     }
 
     private:
@@ -592,7 +683,9 @@ template <class T> struct QueueAllocator {
         auto context = retained.context();
         auto *budget = retained.client ? &*retained.client : nullptr;
 
-        if (retained.tag == AllocationTag::OWNER || retained.tag == AllocationTag::ORIGIN) {
+        if (retained.tag == AllocationTag::SHARED_RECORD || retained.tag == AllocationTag::SHARED_RECORD_ARRAY) {
+            context->recordBytes.fetch_sub(bytes);
+        } else if (retained.tag == AllocationTag::OWNER || retained.tag == AllocationTag::ORIGIN) {
             context->fixed.fetch_sub(bytes);
             context->reservedBytes.fetch_sub(bytes);
         } else if (retained.tag == AllocationTag::CLIENT || retained.tag == AllocationTag::PORT ||
@@ -600,7 +693,8 @@ template <class T> struct QueueAllocator {
             budget->fixedLive.fetch_sub(bytes);
             context->clientFixed.fetch_sub(bytes);
         } else {
-            const bool record = retained.tag == AllocationTag::RECORD || retained.tag == AllocationTag::ARENA;
+            const bool record = retained.tag == AllocationTag::RECORD || retained.tag == AllocationTag::ARENA ||
+                                retained.tag == AllocationTag::SLAB || retained.tag == AllocationTag::CLIENT_PAYLOAD;
             (record ? budget->recordBytes : budget->batchBytes).fetch_sub(bytes);
             (record ? context->recordBytes : context->batchBytes).fetch_sub(bytes);
 
@@ -630,8 +724,17 @@ AllocationScope ownerScope(ContextLease context, AllocationTag tag = AllocationT
  * @param tag Exact request domain.
  * @return Allocation provenance without callback/protocol pointers.
  */
-AllocationScope clientScope(BudgetLease budget, AllocationTag tag = AllocationTag::CLIENT) noexcept {
-    return {{}, std::move(budget), tag};
+AllocationScope clientScope(BudgetLease budget, AllocationTag tag = AllocationTag::CLIENT,
+                            std::shared_ptr<RecordSlab> slab = {}) noexcept {
+    return {{}, std::move(budget), tag, std::move(slab)};
+}
+
+RecordSlab::RecordSlab(BudgetLease source, std::size_t bytes) : budget(std::move(source)), capacity(bytes) {
+    memory = QueueAllocator<std::byte>{clientScope(budget, AllocationTag::ARENA)}.allocate(capacity);
+}
+
+RecordSlab::~RecordSlab() {
+    QueueAllocator<std::byte>{clientScope(budget, AllocationTag::ARENA)}.deallocate(memory, capacity);
 }
 
 /** Construct one shared allocation with a qualified single actual request.
@@ -808,12 +911,79 @@ struct QueuePort {
     }
 };
 
-/** Immutable detached record; no source field span escapes. */
+struct ClientPayloadLease;
+
+/** One aggregate charge for a complete immutable batch and its bounded client cache. */
+struct SharedQueuePayload {
+    using ClientSlot = std::atomic<std::weak_ptr<ClientPayloadLease>>;
+    ContextLease context;
+    std::shared_ptr<const core::detail::SharedRecordPayload> payload;
+    std::unique_ptr<ClientSlot[], BlockDelete<ClientSlot>> clients;
+    std::size_t bytes;
+    std::size_t clientBytes;
+    std::weak_ptr<void> identity;
+
+    SharedQueuePayload(ContextLease source, std::shared_ptr<const core::detail::SharedRecordPayload> value)
+        : context(std::move(source)), payload(std::move(value)),
+          clients(nullptr, BlockDelete<ClientSlot>{ownerScope(context, AllocationTag::SHARED_RECORD_ARRAY), 0, true}),
+          bytes(payload->residentBytes()), clientBytes(product(context->limits.clients, sizeof(ClientSlot))) {
+        const auto scope = ownerScope(context, AllocationTag::SHARED_RECORD_ARRAY);
+        auto *slots = QueueAllocator<ClientSlot>{scope}.allocate(context->limits.clients);
+
+        for (std::size_t i = 0; i < context->limits.clients; ++i)
+            std::construct_at(slots + i);
+
+        clients = {slots, BlockDelete<ClientSlot>{scope, context->limits.clients, true}};
+
+        if (!reserve(context->recordBytes, bytes, context->limits.recordBytes))
+            throw QueueError::RESOURCE_LIMIT;
+    }
+
+    ~SharedQueuePayload() {
+        auto expected = identity;
+        (void)payload->queueAccounting().compare_exchange_strong(expected, {});
+        payload.reset();
+        context->recordBytes.fetch_sub(bytes);
+    }
+
+    [[nodiscard]] std::size_t retainedBytes() const noexcept {
+        return bytes + clientBytes + context->controlBytes[static_cast<std::size_t>(ControlKind::SHARED_RECORD)];
+    }
+};
+
+/** One client charge per retained input batch, shared by its independently released record controls. */
+struct ClientPayloadLease {
+    BudgetLease budget;
+    std::shared_ptr<SharedQueuePayload> owner;
+    std::size_t bytes;
+    std::size_t slot;
+    std::weak_ptr<ClientPayloadLease> identity;
+
+    ClientPayloadLease(BudgetLease source, std::shared_ptr<SharedQueuePayload> value, std::size_t index)
+        : budget(std::move(source)), owner(std::move(value)), bytes(owner->retainedBytes()), slot(index) {
+        if (!reserve(budget->recordBytes, bytes, budget->limits.recordBytes))
+            throw QueueError::RESOURCE_LIMIT;
+    }
+
+    ClientPayloadLease(const ClientPayloadLease &) = delete;
+    ClientPayloadLease &operator=(const ClientPayloadLease &) = delete;
+
+    ~ClientPayloadLease() {
+        // The worker may concurrently inspect this weak slot when the last public batch is released.
+        auto expected = identity;
+        (void)owner->clients[slot].compare_exchange_strong(expected, {});
+        owner.reset();
+        budget->recordBytes.fetch_sub(bytes);
+    }
+};
+
+/** Immutable record; payload is independently copied or retained through a pure shared owner. */
 struct QueueRecord {
     BudgetLease budget;                                         ///< Pure scope, never protocol/callable ownership.
     std::unique_ptr<std::byte[], BlockDelete<std::byte>> arena; ///< Full exact accounted requested arena.
     std::size_t arenaSize = 0;                                  ///< Whole requested arena capacity.
     MuxRecordView view;                                         ///< Pure detached immutable projection.
+    std::shared_ptr<ClientPayloadLease> sharedPayload;          ///< No serialized protocol owner may escape here.
     const bool retainedInitial; ///< Actual cached INITIAL built in retained progress; never changed after construction.
     const bool aggregationSnapshot; ///< Initial collector value, eligible independently of a running interval.
 
@@ -858,8 +1028,14 @@ auto controlLayout() {
     BudgetLease empty;
 
     return std::array<std::size_t, static_cast<std::size_t>(ControlKind::COUNT)>{
-        measureShared<QueueOrigin>(), measureShared<QueuePort>(empty), measureShared<QueueCompletion>(empty),
-        measureShared<QueueRecord>(empty), measureShared<QueueBatch>(empty)};
+        measureShared<QueueOrigin>(),
+        measureShared<QueuePort>(empty),
+        measureShared<QueueCompletion>(empty),
+        measureShared<QueueRecord>(empty),
+        measureShared<QueueBatch>(empty),
+        measureShared<RecordSlab>(empty, 0),
+        measureShared<SharedQueuePayload>(ContextLease{}, std::shared_ptr<const core::detail::SharedRecordPayload>{}),
+        measureShared<ClientPayloadLease>(empty, std::shared_ptr<SharedQueuePayload>{}, 0)};
 }
 } // namespace detail
 
@@ -1317,6 +1493,29 @@ void bound(std::size_t value, std::size_t maximum) {
         throw QueueError::RESOURCE_LIMIT;
     }
 }
+
+/** Size the exact aligned payload used by both independent records and STREAM slabs. */
+template <class Field>
+std::size_t recordArenaBytes(std::u16string_view symbol, std::span<const std::int32_t> legacy,
+                             std::span<const Field> fields) {
+    std::size_t required = 0;
+    const auto need = [&required](std::size_t count, std::size_t bytes, std::size_t alignment) {
+        required = sum(sum(required, alignment - 1) & ~(alignment - 1), product(count, bytes));
+    };
+    need(sum(symbol.size(), 1), sizeof(char16_t), alignof(char16_t));
+    need(legacy.size(), sizeof(std::int32_t), alignof(std::int32_t));
+    need(fields.size(), sizeof(MuxFieldValueView), alignof(MuxFieldValueView));
+
+    for (const auto &field : fields) {
+        if (field.units)
+            need(sum(field.units->size(), 1), sizeof(char16_t), alignof(char16_t));
+
+        if (field.bytes)
+            need(field.bytes->size(), 1, 1);
+    }
+
+    return required;
+}
 } // namespace
 
 /** Unique execution state; every actual collector/protocol owner remains in this serialization domain. */
@@ -1427,7 +1626,9 @@ struct MuxQueue::State {
     detail::Object<collectors::HistoryCollector> history; ///< One actual shared indexed source.
     detail::Vector<MuxClient> fixedClients; ///< Empty authoritative slots reused only after clear/retirement.
     detail::Vector<ClientOwner> clients;    ///< Fixed generation slots.
-    detail::Vector<collectors::StreamDelivery> offers;                     ///< Fixed source-chunk metadata.
+    detail::Vector<collectors::StreamDelivery> offers; ///< Fixed source-chunk metadata.
+    detail::Vector<std::shared_ptr<const core::detail::SharedRecordPayload>> sourcePayloads;
+    detail::Vector<std::shared_ptr<detail::SharedQueuePayload>> sharedPayloads;
     detail::Vector<core::SubscriptionRequest> requests;                    ///< Fixed owner desired snapshot scratch.
     detail::Vector<std::shared_ptr<const detail::QueueRecord>> candidates; ///< Fixed unpublished fanout slots.
     detail::Vector<std::size_t> candidateWeights;  ///< Per-client business occurrences in the atomic routing candidate.
@@ -1486,6 +1687,10 @@ struct MuxQueue::State {
           interestLimits(ml), limits(ql), fixedClients(detail::QueueAllocator<MuxClient>{detail::ownerScope(context)}),
           clients(detail::QueueAllocator<ClientOwner>{detail::ownerScope(context)}),
           offers(detail::QueueAllocator<collectors::StreamDelivery>{detail::ownerScope(context)}),
+          sourcePayloads(detail::QueueAllocator<std::shared_ptr<const core::detail::SharedRecordPayload>>{
+              detail::ownerScope(context)}),
+          sharedPayloads(
+              detail::QueueAllocator<std::shared_ptr<detail::SharedQueuePayload>>{detail::ownerScope(context)}),
           requests(detail::QueueAllocator<core::SubscriptionRequest>{detail::ownerScope(context)}),
           candidates(detail::QueueAllocator<std::shared_ptr<const detail::QueueRecord>>{detail::ownerScope(context)}),
           candidateWeights(detail::QueueAllocator<std::size_t>{detail::ownerScope(context)}),
@@ -1529,6 +1734,8 @@ struct MuxQueue::State {
         fixed = sum(fixed, product(ql.clients, sum(sum(sizeof(ClientOwner), product(sizeof(std::size_t), 3)),
                                                    sum(sizeof(std::uint8_t), sizeof(MuxClient)))));
         fixed = sum(fixed, product(ql.routeRecords, sizeof(collectors::StreamDelivery)));
+        fixed = sum(fixed, product(ql.routeRecords, sizeof(std::shared_ptr<const core::detail::SharedRecordPayload>) +
+                                                        sizeof(std::shared_ptr<detail::SharedQueuePayload>)));
         fixed = sum(fixed, product(ml.entries, sizeof(core::SubscriptionRequest)));
         fixed = sum(fixed, product(cells, sizeof(std::shared_ptr<const detail::QueueRecord>)));
         fixed = sum(fixed, contract == core::SubscriptionFamily::STREAM
@@ -1577,6 +1784,8 @@ struct MuxQueue::State {
         }
 
         result->offers.resize(ql.routeRecords);
+        result->sourcePayloads.resize(ql.routeRecords);
+        result->sharedPayloads.resize(ql.routeRecords);
         result->requests.resize(ml.entries);
         result->candidates.resize(cells);
         result->candidateCounts.resize(ql.clients);
@@ -1895,8 +2104,9 @@ struct MuxQueue::State {
            std::span<const std::int32_t> legacy, std::span<const Field> fields,
            core::CapturedDeliveryProjections<MuxMembership> projections, std::uint64_t sourceRevision,
            std::optional<RawSourceMetadata> raw, std::optional<collectors::HistorySourceMetadata> trigger,
-           QueueWork &work, bool retainedInitial = false, bool versionDefault = false,
-           bool aggregationSnapshot = false) {
+           QueueWork &work, bool retainedInitial = false, bool versionDefault = false, bool aggregationSnapshot = false,
+           std::shared_ptr<detail::RecordSlab> slab = {}, std::shared_ptr<detail::ClientPayloadLease> shared = {},
+           const core::detail::SharedRecordPayload *sharedRow = nullptr) {
         auto &l = c.port->budget->limits;
 
         if (!core::validDeliveryProjectionMask(projections.mask)) {
@@ -1921,40 +2131,36 @@ struct MuxQueue::State {
         bound(key.symbol.size(), l.recordSymbolUnits);
         bound(units, l.recordFieldUnits);
         bound(bytes, l.recordByteUnits);
-        std::size_t required = 0;
-        auto need = [&required](std::size_t n, std::size_t size, std::size_t alignment) {
-            required = sum((sum(required, alignment - 1) & ~(alignment - 1)), product(n, size));
-        };
-        need(sum(key.symbol.size(), 1), sizeof(char16_t), alignof(char16_t));
-        need(legacy.size(), sizeof(std::int32_t), alignof(std::int32_t));
-        need(fields.size(), sizeof(MuxFieldValueView), alignof(MuxFieldValueView));
-
-        for (const auto &f : fields) {
-            if (f.units)
-                need(sum(f.units->size(), 1), sizeof(char16_t), alignof(char16_t));
-
-            if (f.bytes)
-                need(f.bytes->size(), 1, 1);
-        }
-
+        const auto required = recordArenaBytes(key.symbol, legacy, fields);
         bound(required, l.recordArenaBytes);
-        const auto arenaBytes = l.compactRecordArena ? required : l.recordArenaBytes;
+        const auto arenaBytes = shared                 ? sharedRow->payloadBytes()
+                                : l.compactRecordArena ? required
+                                                       : l.recordArenaBytes;
         const auto charge = sum(
             c.port->budget->context->controlBytes[static_cast<std::size_t>(detail::ControlKind::RECORD)], arenaBytes);
         bound(charge, l.recordBytes);
         spend(work, sum(fieldCount, 4), product(fieldCount, 2), product(sum(units, key.symbol.size()), 3),
               sum(product(charge, 3), product(bytes, 2)));
-        auto out =
-            detail::shared<detail::QueueRecord>(detail::clientScope(c.port->budget, detail::AllocationTag::RECORD),
-                                                c.port->budget, retainedInitial, aggregationSnapshot);
+        auto out = detail::shared<detail::QueueRecord>(
+            detail::clientScope(c.port->budget, detail::AllocationTag::RECORD, slab), c.port->budget, retainedInitial,
+            aggregationSnapshot);
         out->arenaSize = arenaBytes;
-        const auto arenaScope = detail::clientScope(c.port->budget, detail::AllocationTag::ARENA);
-        auto *memory = detail::QueueAllocator<std::byte>{arenaScope}.allocate(arenaBytes);
-        out->arena = {memory, detail::BlockDelete<std::byte>{arenaScope, arenaBytes, false}};
+
+        if (shared) {
+            if (!legacy.empty())
+                throw QueueError::INVALID_CONFIGURATION;
+
+            out->sharedPayload = shared;
+        } else {
+            const auto arenaScope = detail::clientScope(c.port->budget, detail::AllocationTag::ARENA, std::move(slab));
+            auto *memory = detail::QueueAllocator<std::byte>{arenaScope}.allocate(arenaBytes);
+            out->arena = {memory, detail::BlockDelete<std::byte>{arenaScope, arenaBytes, false}};
+        }
+
         RecordArena arena{out->arena.get(), arenaBytes};
         out->view.family = family;
         out->view.context = key.context;
-        out->view.symbol = arena.text(key.symbol);
+        out->view.symbol = shared ? sharedRow->symbol() : arena.text(key.symbol);
         out->view.rawTime = time;
         out->view.eventFlags = flags;
         out->view.membership = projections.physical;
@@ -1965,6 +2171,14 @@ struct MuxQueue::State {
         out->view.source = raw;
         out->view.trigger = trigger;
         out->view.versionDefault = versionDefault;
+
+        if (shared) {
+            out->view.values = {};
+            out->view.typedValues = sharedRow->fields();
+
+            return out;
+        }
+
         auto *scalars = arena.take<std::int32_t>(legacy.size());
         std::copy(legacy.begin(), legacy.end(), scalars);
         out->view.values = {scalars, legacy.size()};
@@ -1991,6 +2205,54 @@ struct MuxQueue::State {
         out->view.typedValues = {values, fields.size()};
 
         return out;
+    }
+
+    /** Pool a homogeneous compact STREAM group without changing per-record reference counts.
+     * A group with different keys keeps independent allocations: it may select only a small suffix.
+     * Tight quotas likewise keep the old path instead of failing due to slab alignment overhead.
+     */
+    std::shared_ptr<detail::RecordSlab> streamSlab(Client &client, std::span<const collectors::StreamDelivery> rows,
+                                                   QueueWork &work, bool metadataOnly = false) {
+        const auto &budget = *client.port->budget;
+        const auto &limits = budget.limits;
+
+        if (!limits.compactRecordArena || rows.size() < 2 || rows.size() > limits.dataItems - budget.records.load())
+            return {};
+
+        std::size_t bytes = 0;
+        const auto &first = *rows.front().record;
+        const auto control = budget.context->controlBytes[static_cast<std::size_t>(detail::ControlKind::RECORD)];
+        constexpr auto ALIGNMENT = alignof(std::max_align_t);
+
+        for (const auto &offer : rows) {
+            const auto &row = *offer.record;
+            spend(work, 1, row.typedValues.size(), sum(first.symbol.size(), row.symbol.size()));
+
+            if (!row.context.matches(first.context) || row.symbol != first.symbol)
+                return {};
+
+            const auto arena =
+                metadataOnly ? std::size_t{0} : recordArenaBytes(row.symbol, row.values, row.typedValues);
+
+            if (arena > limits.recordArenaBytes)
+                return {};
+
+            bytes = sum(sum(bytes, ALIGNMENT - 1) & ~(ALIGNMENT - 1), control);
+
+            // Every payload arena must itself start at maximal alignment for its typed views.
+            if (!metadataOnly)
+                bytes = sum(sum(bytes, ALIGNMENT - 1) & ~(ALIGNMENT - 1), arena);
+        }
+
+        const auto overhead = budget.context->controlBytes[static_cast<std::size_t>(detail::ControlKind::SLAB)];
+
+        if (sum(bytes, overhead) > limits.recordBytes - budget.recordBytes.load())
+            return {};
+
+        spend(work, 1, 0, 0, sum(bytes, overhead));
+
+        return detail::shared<detail::RecordSlab>(detail::clientScope(client.port->budget, detail::AllocationTag::SLAB),
+                                                  client.port->budget, bytes);
     }
 
     /** Publish one fully prepared queue link without allocation.
@@ -3274,6 +3536,12 @@ std::expected<bool, QueueFailure> MuxQueue::State::routeStream(QueueWork &work) 
 
                 for (auto &offer : s.offers)
                     offer = {};
+
+                for (auto &payload : s.sourcePayloads)
+                    payload.reset();
+
+                for (auto &payload : s.sharedPayloads)
+                    payload.reset();
             }
         }
     } clear{*this};
@@ -3298,6 +3566,14 @@ std::expected<bool, QueueFailure> MuxQueue::State::routeStream(QueueWork &work) 
             return std::unexpected(sourceFailure(prepared.error()));
         }
 
+        spend(work, limits.routeRecords + prepared->size(), 0, 0,
+              product(prepared->size(), sizeof(std::shared_ptr<const core::detail::SharedRecordPayload>)));
+        collectors::detail::StreamRetentionAccess::retainPrepared(*stream, *prepared, sourcePayloads);
+        const bool sharedInput =
+            std::ranges::any_of(std::span(sourcePayloads).first(prepared->size()), [](const auto &owner) {
+                return bool(owner);
+            });
+
         for (std::size_t v = 0; v < clients.size(); ++v) {
             auto *c = clients[v].get();
 
@@ -3305,32 +3581,83 @@ std::expected<bool, QueueFailure> MuxQueue::State::routeStream(QueueWork &work) 
                 continue;
             }
 
-            for (const auto &offer : *prepared) {
-                const auto &r = *offer.record;
-                auto selected = interest.selectProjections(c->interest, {r.context, r.symbol}, {}, work.interest);
+            std::shared_ptr<detail::RecordSlab> slab;
+            const bool cacheSelections = c->port->budget->limits.compactRecordArena;
+            const protocol::LiveRecordView *previous = nullptr;
+            core::CapturedDeliveryProjections<MuxMembership> selected;
 
-                if (!selected) {
-                    return std::unexpected(sourceFailure(selected.error()));
+            for (std::size_t offerIndex = 0; offerIndex < prepared->size(); ++offerIndex) {
+                const auto &offer = (*prepared)[offerIndex];
+                const auto &r = *offer.record;
+                bool reuse = false;
+
+                if (previous && r.localId == previous->localId && r.context.matches(previous->context) &&
+                    r.symbol.size() == previous->symbol.size()) {
+                    spend(work, 1, 0, r.symbol.size());
+                    reuse = r.symbol == previous->symbol;
                 }
 
-                if (!selected->mask) {
+                if (!reuse) {
+                    auto current = interest.selectProjections(c->interest, {r.context, r.symbol}, {}, work.interest);
+
+                    if (!current)
+                        return std::unexpected(sourceFailure(current.error()));
+
+                    selected = std::move(*current);
+                    previous = cacheSelections ? &r : nullptr;
+                }
+
+                if (!selected.mask) {
                     continue;
                 }
 
                 const auto index = candidateCounts[v]++;
-                candidateWeights[v] = sum(candidateWeights[v], selected->count());
+                candidateWeights[v] = sum(candidateWeights[v], selected.count());
 
                 if (candidateFailure[v]) {
                     continue;
                 }
 
                 try {
+                    if (index == 0 && sharedInput)
+                        slab = streamSlab(*c, *prepared, work, sharedInput);
+
+                    auto &shared = sharedPayloads[offerIndex];
+
+                    if (sourcePayloads[offerIndex] && !shared) {
+                        auto &cache = sourcePayloads[offerIndex]->queueAccounting();
+                        shared = std::static_pointer_cast<detail::SharedQueuePayload>(cache.load().lock());
+
+                        if (!shared || shared->context != ledger) {
+                            spend(work, 1, 0, 0, sourcePayloads[offerIndex]->residentBytes());
+                            shared = detail::shared<detail::SharedQueuePayload>(
+                                detail::ownerScope(ledger, detail::AllocationTag::SHARED_RECORD), ledger,
+                                sourcePayloads[offerIndex]);
+                            shared->identity = shared;
+                            cache.store(shared);
+                        }
+                    }
+
+                    std::shared_ptr<detail::ClientPayloadLease> clientPayload;
+
+                    if (shared) {
+                        clientPayload = shared->clients[v].load().lock();
+
+                        if (!clientPayload || clientPayload->budget != c->port->budget) {
+                            clientPayload = detail::shared<detail::ClientPayloadLease>(
+                                detail::clientScope(c->port->budget, detail::AllocationTag::CLIENT_PAYLOAD),
+                                c->port->budget, shared, v);
+                            clientPayload->identity = clientPayload;
+                            shared->clients[v].store(clientPayload);
+                        }
+                    }
+
                     const RawSourceMetadata raw{r.senderId,         r.cipher,    r.eventFlags,
                                                 r.removalTime,      r.fieldTime, offer.bindingGeneration,
                                                 r.tapeMessageTimeMs};
-                    candidates[v * limits.routeRecords + index] =
-                        record(*c, {r.context, r.symbol}, {}, r.eventFlags, r.values, r.typedValues,
-                               std::move(*selected), offer.revision, raw, {}, work);
+                    candidates[v * limits.routeRecords + index] = record(
+                        *c, {r.context, r.symbol}, {}, r.eventFlags, r.values, r.typedValues, selected, offer.revision,
+                        raw, {}, work, false, false, false, slab, clientPayload, sourcePayloads[offerIndex].get());
                 } catch (QueueError e) {
                     if (e != QueueError::RESOURCE_LIMIT) {
                         throw;
