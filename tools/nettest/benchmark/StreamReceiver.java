@@ -7,6 +7,7 @@ import com.devexperts.qd.DataIterator;
 import com.devexperts.qd.DataRecord;
 import com.devexperts.qd.QDAgent;
 import com.devexperts.qd.QDContract;
+import com.devexperts.qd.QDDistributor;
 import com.devexperts.qd.QDFactory;
 import com.devexperts.qd.ng.AbstractRecordSink;
 import com.devexperts.qd.ng.RecordBuffer;
@@ -20,6 +21,7 @@ import com.devexperts.qd.qtp.MessageConnectors;
 import com.devexperts.qd.qtp.MessageType;
 import com.devexperts.qd.qtp.QDEndpoint;
 import com.devexperts.qd.stats.QDStats;
+import com.devexperts.util.WideDecimal;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
@@ -61,16 +63,24 @@ public final class StreamReceiver {
    * on stdin after the producer exits.
    */
   public static void main(String[] args) throws IOException, InterruptedException {
+    if (args.length == 1 && args[0].equals("--self-test-quote-stream")) {
+      selfTestQuoteStream();
+      return;
+    }
     if ((args.length != 2 && args.length != 4 && args.length != 5)
         || !args[0].matches("[0-9]{1,3}(\\.[0-9]{1,3}){3}:[0-9]{1,5}")
         || args[1].isEmpty()
-        || (args.length >= 4 && !args[2].equals("stream") && !args[2].equals("ticker"))
+        || (args.length >= 4
+            && !args[2].equals("stream")
+            && !args[2].equals("ticker")
+            && !args[2].equals("quote-stream"))
         || (args.length >= 4 && !args[3].equals("ns") && !args[3].equals("ms"))
         || (args.length == 5 && !args[4].equals("probe"))) {
       throw new IllegalArgumentException(
-          "Usage: StreamReceiver HOST:PORT SYMBOL [stream|ticker ns|ms [probe]]");
+          "Usage: StreamReceiver HOST:PORT SYMBOL [stream|ticker|quote-stream ns|ms [probe]]");
     }
     boolean ticker = args.length >= 4 && args[2].equals("ticker");
+    boolean quoteStream = args.length >= 4 && args[2].equals("quote-stream");
     boolean nanos = args.length >= 4 && args[3].equals("ns");
     boolean probe = args.length == 5;
     QDContract contract = ticker ? QDContract.TICKER : QDContract.STREAM;
@@ -83,11 +93,12 @@ public final class StreamReceiver {
       if (!QD_VERSION.equals(version)) {
         throw new IllegalStateException("Expected Java QD " + QD_VERSION + ", got " + version);
       }
-      DataRecord record = endpoint.getScheme().findRecordByName(ticker ? "Quote" : "TimeAndSale");
+      DataRecord record =
+          endpoint.getScheme().findRecordByName(ticker || quoteStream ? "Quote" : "TimeAndSale");
       int cipher = endpoint.getScheme().getCodec().encode(args[1]);
       Object tickerLock = new Object();
       Observation observation =
-          new Observation(record, cipher, args[1], ticker, nanos, probe, tickerLock);
+          new Observation(record, cipher, args[1], ticker, quoteStream, nanos, probe, tickerLock);
       QDAgent agent = (ticker ? endpoint.getTicker() : endpoint.getStream()).agentBuilder().build();
       try {
         subscribe(agent, record, cipher, args[1]);
@@ -122,6 +133,64 @@ public final class StreamReceiver {
         agent.close();
       }
     }
+  }
+
+  private static void selfTestQuoteStream() {
+    try (QDEndpoint endpoint =
+        QDEndpoint.newBuilder()
+            .withName("quote-stream-self-test")
+            .withCollectors(Collections.singletonList(QDContract.STREAM))
+            .build()) {
+      DataRecord record = endpoint.getScheme().findRecordByName("Quote");
+      int cipher = endpoint.getScheme().getCodec().encode("IBM");
+      Observation observation =
+          new Observation(record, cipher, "IBM", false, true, false, false, new Object());
+      QDAgent agent = endpoint.getStream().agentBuilder().build();
+      QDDistributor distributor = endpoint.getStream().distributorBuilder().build();
+      try {
+        subscribe(agent, record, cipher, "IBM");
+        RecordBuffer records = new RecordBuffer(RecordMode.DATA);
+        for (int i = 1; i <= 2; ++i) {
+          RecordCursor cursor = records.add(record, cipher, null);
+          long micros = System.nanoTime() / 1000;
+          int seconds = Math.toIntExact(micros / 1_000_000);
+          cursor.setInt(observation.time, seconds);
+          cursor.setInt(observation.askTime, seconds);
+          cursor.setInt(observation.exchange, 'B');
+          cursor.setInt(observation.askExchange, 'A');
+          cursor.setLong(observation.bid, WideDecimal.composeWide(i));
+          cursor.setLong(observation.ask, WideDecimal.composeWide(i + 1));
+          cursor.setLong(observation.bidSize, WideDecimal.composeWide(micros % 1_000_000 + 1));
+          cursor.setLong(observation.askSize, WideDecimal.composeWide(2));
+        }
+        distributor.process(records);
+        while (observation.retrieve(agent)) {
+          // Drain every offered record.
+        }
+        if (observation.count != 2
+            || observation.lastSequence != 2
+            || observation.sequenceErrors != 0
+            || observation.fieldErrors != 0
+            || observation.latency.samples != 2
+            || observation.latency.negative != 0) {
+          throw new IllegalStateException("Quote STREAM positive self-test failed");
+        }
+        RecordBuffer duplicate = new RecordBuffer(RecordMode.DATA);
+        RecordCursor cursor = duplicate.add(record, cipher, null);
+        cursor.setLong(observation.bid, WideDecimal.composeWide(2));
+        distributor.process(duplicate);
+        while (observation.retrieve(agent)) {
+          // Drain the invalid record.
+        }
+        if (observation.sequenceErrors != 1 || observation.fieldErrors != 1) {
+          throw new IllegalStateException("Quote STREAM negative self-test failed");
+        }
+      } finally {
+        distributor.close();
+        agent.close();
+      }
+    }
+    System.out.println("Quote STREAM positive and corrupted-record checks passed.");
   }
 
   private static void subscribe(QDAgent agent, DataRecord record, int cipher, String symbol) {
@@ -177,6 +246,7 @@ public final class StreamReceiver {
     long start = System.nanoTime();
     long startupLimit = observation.probeEnabled ? PROBE_STARTUP_NANOS : IDLE_NANOS;
     boolean connected = false;
+    boolean countReached = false;
     while (true) {
       boolean pending = observation.retrieve(agent);
       long now = System.nanoTime();
@@ -189,10 +259,16 @@ public final class StreamReceiver {
         controlStart = now;
       }
       if (expected > 0) {
+        if (observation.quoteStream && !countReached && observation.count >= expected) {
+          countReached = true;
+          System.out.println("COUNT_REACHED " + observation.count);
+        }
         if (!pending && connector.getState() != MessageConnectorState.CONNECTED) {
           return expected;
         }
-        if (now - controlStart >= FINAL_DRAIN_NANOS) {
+        long drainLimit =
+            observation.quoteStream ? TimeUnit.SECONDS.toNanos(30) : FINAL_DRAIN_NANOS;
+        if (now - controlStart >= drainLimit) {
           throw new IllegalStateException("Source connection or pending records did not drain");
         }
       } else if (observation.count == 0
@@ -246,6 +322,7 @@ public final class StreamReceiver {
     private final int cipher;
     private final String symbol;
     private final boolean ticker;
+    private final boolean quoteStream;
     private final boolean nanos;
     private final boolean probeEnabled;
     private final Object tickerLock;
@@ -278,6 +355,7 @@ public final class StreamReceiver {
         int cipher,
         String symbol,
         boolean ticker,
+        boolean quoteStream,
         boolean nanos,
         boolean probe,
         Object tickerLock) {
@@ -288,25 +366,27 @@ public final class StreamReceiver {
       this.cipher = cipher;
       this.symbol = symbol;
       this.ticker = ticker;
+      this.quoteStream = quoteStream;
       this.nanos = nanos;
       this.probeEnabled = probe;
       this.tickerLock = tickerLock;
       this.expectingProbe = probe;
-      time = findInt(record, ticker ? "Bid.Time" : "Time", false);
-      sequence = findInt(record, "Sequence", false);
-      nano = nanos ? findInt(record, "TimeNanoPart", false) : -1;
-      exchange = findInt(record, ticker ? "Bid.Exchange" : "Exchange", false);
-      tradeId = ticker ? -1 : findInt(record, "TradeId", true);
-      price = ticker ? -1 : findInt(record, "Price", true);
-      size = ticker ? -1 : findInt(record, "Size", true);
+      boolean quote = ticker || quoteStream;
+      time = findInt(record, quote ? "Bid.Time" : "Time", false);
+      sequence = quoteStream ? -1 : findInt(record, "Sequence", false);
+      nano = nanos && !quoteStream ? findInt(record, "TimeNanoPart", false) : -1;
+      exchange = findInt(record, quote ? "Bid.Exchange" : "Exchange", false);
+      tradeId = quote ? -1 : findInt(record, "TradeId", true);
+      price = quote ? -1 : findInt(record, "Price", true);
+      size = quote ? -1 : findInt(record, "Size", true);
       bid = findInt(record, "Bid.Price", true);
       ask = findInt(record, "Ask.Price", true);
-      conditions = ticker ? -1 : findInt(record, "ExchangeSaleConditions", false);
-      flags = ticker ? -1 : findInt(record, "Flags", false);
-      askTime = ticker ? findInt(record, "Ask.Time", false) : -1;
-      askExchange = ticker ? findInt(record, "Ask.Exchange", false) : -1;
-      bidSize = ticker ? findInt(record, "Bid.Size", true) : -1;
-      askSize = ticker ? findInt(record, "Ask.Size", true) : -1;
+      conditions = quote ? -1 : findInt(record, "ExchangeSaleConditions", false);
+      flags = quote ? -1 : findInt(record, "Flags", false);
+      askTime = quote ? findInt(record, "Ask.Time", false) : -1;
+      askExchange = quote ? findInt(record, "Ask.Exchange", false) : -1;
+      bidSize = quote ? findInt(record, "Bid.Size", true) : -1;
+      askSize = quote ? findInt(record, "Ask.Size", true) : -1;
     }
 
     boolean retrieve(QDAgent agent) {
@@ -335,8 +415,9 @@ public final class StreamReceiver {
         fieldErrors++;
         return;
       }
-      int wireSequence = cursor.getInt(sequence);
-      long generation = wireSequence & SEQUENCE_MASK;
+      int wireSequence = quoteStream ? 0 : cursor.getInt(sequence);
+      long generation =
+          quoteStream ? WideDecimal.toLong(cursor.getLong(bid)) : wireSequence & SEQUENCE_MASK;
       if (probeEnabled && generation == 0 && count == 0) {
         if (expectingProbe) {
           expectingProbe = false;
@@ -356,6 +437,10 @@ public final class StreamReceiver {
         sequenceErrors++;
       }
       lastSequence = generation;
+      if (quoteStream) {
+        verifyQuoteStream(cursor, generation);
+        return;
+      }
       int millis = wireSequence >>> SEQUENCE_BITS;
       int subMilli = nanos ? cursor.getInt(nano) : 0;
       if (nanos && subMilli != 0) {
@@ -390,6 +475,27 @@ public final class StreamReceiver {
       }
     }
 
+    private void verifyQuoteStream(RecordCursor cursor, long generation) {
+      long micros = WideDecimal.toLong(cursor.getLong(bidSize)) - 1;
+      long seconds = cursor.getInt(time);
+      boolean badFields =
+          cursor.getInt(askTime) != seconds
+              || cursor.getInt(exchange) != 'B'
+              || cursor.getInt(askExchange) != 'A'
+              || generation < 1
+              || WideDecimal.toDouble(cursor.getLong(bid)) != generation
+              || WideDecimal.toDouble(cursor.getLong(ask)) != generation + 1
+              || WideDecimal.toDouble(cursor.getLong(askSize)) != 2
+              || micros < 0
+              || micros >= 1_000_000
+              || WideDecimal.toDouble(cursor.getLong(bidSize)) != micros + 1;
+      if (badFields) {
+        fieldErrors++;
+        return;
+      }
+      latency.add(System.nanoTime() - (seconds * NANOS_PER_SECOND + micros * 1000));
+    }
+
     private int generated(long generation, int index) {
       // The producer uses physical wire-field order, which excludes QD's long-field placeholders.
       return (int) ((generation + index) % FIELD_SPREAD) + 1;
@@ -415,7 +521,7 @@ public final class StreamReceiver {
           expected,
           count,
           lastSequence,
-          nanos ? "ns" : "ms",
+          quoteStream ? "us" : nanos ? "ns" : "ms",
           nonzeroNanoParts,
           sequenceErrors,
           fieldErrors,

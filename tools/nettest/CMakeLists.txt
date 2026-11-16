@@ -22,6 +22,11 @@ if(TARGET qdcxx_transport AND TARGET qdcxx_schema_json)
 endif()
 
 if(TARGET qdcxx_feed)
+    add_executable(qdcxx_quote_stream_nettest quote_stream_main.cpp)
+    target_link_libraries(qdcxx_quote_stream_nettest PRIVATE qdcxx_feed)
+    target_compile_options(qdcxx_quote_stream_nettest PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+    set_target_properties(qdcxx_quote_stream_nettest PROPERTIES CXX_EXTENSIONS OFF OUTPUT_NAME qdcxx-quote-stream-nettest)
+
     add_executable(qdcxx_event_nettest event_main.cpp)
     target_link_libraries(qdcxx_event_nettest PRIVATE qdcxx_feed)
     target_compile_options(qdcxx_event_nettest PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
@@ -29,6 +34,9 @@ if(TARGET qdcxx_feed)
     install(TARGETS qdcxx_event_nettest RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 
     if(BUILD_TESTING)
+        add_test(NAME quote_stream_nettest_help COMMAND qdcxx_quote_stream_nettest --help)
+        add_test(NAME quote_stream_nettest_help_ru COMMAND qdcxx_quote_stream_nettest --help-ru)
+        set_tests_properties(quote_stream_nettest_help quote_stream_nettest_help_ru PROPERTIES TIMEOUT 20)
         add_test(NAME event_nettest_help COMMAND "${CMAKE_COMMAND}" "-DPROGRAM=$<TARGET_FILE:qdcxx_event_nettest>"
             "-DEVENT_MODE=ON" -P "${CMAKE_CURRENT_SOURCE_DIR}/HelpTest.cmake")
         set_tests_properties(event_nettest_help PROPERTIES TIMEOUT 20)
