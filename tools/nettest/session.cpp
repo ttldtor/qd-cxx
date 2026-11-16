@@ -408,14 +408,34 @@ bool readPeer(t::TcpListener &listener, Peer &peer, const Options &options, cons
     return true;
 }
 
-bool writePeer(t::TcpListener &listener, Peer &peer, Report &report, Clock::time_point now, bool &activity) {
+bool writePeer(t::TcpListener &listener, Peer &peer, const Options &options, Report &report, Clock::time_point now,
+               bool &activity) {
     if (!peer.output)
         return true;
 
     if (now >= peer.writeDeadline)
         return false;
 
-    const auto written = listener.write(peer.id, peer.output->pendingBytes());
+    const auto pending = peer.output->pendingBytes();
+    const bool profiled = options.profileProducer && peer.outputRecords != 0;
+    Clock::time_point started;
+
+    if (profiled)
+        started = Clock::now();
+
+    const auto written = listener.write(peer.id, pending);
+
+    if (profiled) {
+        auto &profile = report.profile;
+        profile.writeNs += static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - started).count());
+        ++profile.writeAttempts;
+
+        if (written && written->status == t::TcpIoStatus::WOULD_BLOCK)
+            ++profile.wouldBlock;
+        else if (written && written->status == t::TcpIoStatus::PROGRESS && written->bytes < pending.size())
+            ++profile.partialWrites;
+    }
 
     if (!written)
         return false;
@@ -464,13 +484,34 @@ bool enqueue(Peer &peer, const Options &options, const Catalog &catalog, const M
 
         if (count != 0) {
             const auto &record = catalog.schema.records().front();
+            Clock::time_point started;
+
+            if (options.profileProducer)
+                started = Clock::now();
+
             const auto rows =
                 generator.build(options, record, peer.demand,
                                 peer.session.historySnapshotEnabled() && options.family == SubscriptionFamily::HISTORY,
                                 peer.ordinal, count, report.generated);
 
+            if (options.profileProducer) {
+                report.profile.generationNs += static_cast<std::uint64_t>(
+                    std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - started).count());
+                ++report.profile.generatedBatches;
+            }
+
             if (!rows.empty()) {
+                if (options.profileProducer)
+                    started = Clock::now();
+
                 auto data = peer.session.publishData(static_cast<p::LiveDataMessage>(wire.data.id), rows, work);
+
+                if (options.profileProducer) {
+                    report.profile.composeNs += static_cast<std::uint64_t>(
+                        std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - started).count());
+                    ++report.profile.composedFrames;
+                }
+
                 peer.submit(require(std::move(data), "Cannot compose record batch"), rows.size(), now);
                 report.composed += rows.size();
                 generator.accept(peer.demand);
@@ -722,7 +763,7 @@ Report produce(const Options &options, const Catalog &catalog) {
             const auto usable = draining || readPeer(listener, *peer, options, catalog, wire, report, activity);
             const auto timedOut = !peer->described && now >= peer->accepted + options.startup;
 
-            if (!usable || timedOut || !writePeer(listener, *peer, report, now, activity)) {
+            if (!usable || timedOut || !writePeer(listener, *peer, options, report, now, activity)) {
                 require(listener.retire(peer->id));
                 peer.reset();
                 continue;
