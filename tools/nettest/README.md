@@ -152,5 +152,8 @@ distinguishes source records/s from aggregate delivered records/s.
 For a portable Windows sweep, per-process receipts, and a separate physical
 link test, see the [Windows NetTest bundle](benchmark/windows/README.md).
 
+The [synthetic burst corpus](benchmark/burst/README.md) provides deterministic
+payloads and a precomputed release schedule for burst measurements.
+
 For `qdcxx-nettest`, run `--help` or `--help-ru` for all limits, defaults and exit codes. Help does
 not read the schema bundle or start the runtime.

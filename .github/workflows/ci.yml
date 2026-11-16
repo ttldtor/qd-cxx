@@ -92,6 +92,10 @@ jobs:
           BUILD_DIR: ${{ matrix.build_dir }}
         run: ctest --test-dir "$BUILD_DIR" --no-tests=error --output-on-failure --timeout 180 -E "$KNOWN_FAILURES"
 
+      - name: Verify NetTest burst corpus
+        shell: pwsh
+        run: '& ./tools/nettest/benchmark/burst/Test-Corpus.ps1 -OutputDirectory (Join-Path $env:RUNNER_TEMP "nettest-burst")'
+
       - name: Report known contract failures
         if: ${{ !cancelled() && (steps.tests.outcome == 'success' || steps.tests.outcome == 'failure') }}
         continue-on-error: true
