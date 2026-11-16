@@ -36,7 +36,11 @@ if(TARGET qdcxx_feed)
     if(BUILD_TESTING)
         add_test(NAME quote_stream_nettest_help COMMAND qdcxx_quote_stream_nettest --help)
         add_test(NAME quote_stream_nettest_help_ru COMMAND qdcxx_quote_stream_nettest --help-ru)
-        set_tests_properties(quote_stream_nettest_help quote_stream_nettest_help_ru PROPERTIES TIMEOUT 20)
+        add_test(NAME quote_stream_nettest_options COMMAND "${CMAKE_COMMAND}"
+            "-DPROGRAM=$<TARGET_FILE:qdcxx_quote_stream_nettest>"
+            "-DQUOTE_STREAM_MODE=ON" -P "${CMAKE_CURRENT_SOURCE_DIR}/HelpTest.cmake")
+        set_tests_properties(quote_stream_nettest_help quote_stream_nettest_help_ru quote_stream_nettest_options
+            PROPERTIES TIMEOUT 20)
         add_test(NAME event_nettest_help COMMAND "${CMAKE_COMMAND}" "-DPROGRAM=$<TARGET_FILE:qdcxx_event_nettest>"
             "-DEVENT_MODE=ON" -P "${CMAKE_CURRENT_SOURCE_DIR}/HelpTest.cmake")
         set_tests_properties(event_nettest_help PROPERTIES TIMEOUT 20)

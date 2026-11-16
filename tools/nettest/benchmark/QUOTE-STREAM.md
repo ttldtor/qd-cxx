@@ -10,6 +10,8 @@ Pass `--stream-bytes TARGET HARD` after these four arguments to enable the
 byte-limited STREAM profile. TARGET is the encoded payload threshold and HARD
 is the complete QTP frame limit in bytes. Omitting the option retains the
 existing profile. The generator's BATCH remains independent of both limits.
+`--clients N` selects 1 to 8 consumers. `--pending-records N` sets the input
+slots and `--delivery-bytes N` sets the per-peer byte-mode delivery window.
 
 ~~~sh
 qdcxx-quote-stream-nettest 7300 250000 50000 8
@@ -22,9 +24,10 @@ For example, use `qdcxx-quote-stream-nettest 7300 250000 50000 8
 eight-record generator calls.
 
 On Windows use a semicolon as the classpath separator. Supply the QD 3.357
-classpath. After `READY` from the publisher and `PROBE_RECEIVED` from the
-receiver, send `GO` to the publisher on stdin. After the publisher prints
-`RESULT`, write the decimal expected count followed by a newline to the
+classpath. After `READY` from the publisher, wait for `PROBE_RECEIVED` from
+every receiver. Send `PROBE` to repeat the probe if one has yet to confirm
+demand. Send one `GO` to start measurement. After the publisher prints
+`RESULT`, write the expected count, followed by a newline, to each
 receiver's stdin. Another publisher can stay connected until
 `COUNT_REACHED N` and then close. The receiver checks the final count after
 disconnect, including any extra deliveries.
@@ -38,7 +41,9 @@ Windows toolchains. The latency histogram measures generation to Java receipt.
 Record negative samples and verify the clock domain before comparing p99.
 The receiver verifies all eight Quote fields and the exact order.
 The publisher's `streamFrames` result counts completely sent STREAM DATA
-frames, including the startup probe frame. Byte mode also reports
+frames across clients, including startup probe frames. Subtract the reported
+`probeFrames` for the measured stream. `probeRecords` counts probe records
+published before `GO`. Byte mode also reports
 `maxFrameRecords` and `maxFrameBytes` for completed STREAM DATA frames, and
 `failedFrames` for frame composition failures that retire a peer.
 These publisher counters are separate from the receiver's delivery checks.
@@ -46,7 +51,8 @@ These publisher counters are separate from the receiver's delivery checks.
 The receiver's `--self-test-quote-stream` checks positive and damaged records
 through a local Java QD STREAM collector. Count only exact deliveries when
 estimating capacity. Compare both the publisher's active rate and the received
-rate, and record the batch size and per-process CPU and memory.
+rate, and record the batch size and per-process CPU and memory. Verify each
+receiver's count, fields, order and p99 before comparing fan-out rates.
 
 ## Java QD reference publisher
 

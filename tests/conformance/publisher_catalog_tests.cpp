@@ -761,7 +761,8 @@ TEST_CASE("catalog STREAM oversized wire record retires only its peer and counts
     q::api::PublisherOptions options;
     options.catalog.emplace(schema, names);
     options.listener.maxConnections = 2;
-    options.streamBytes.emplace(64, 128);
+    // The first row may exceed the detached selection target and still reach the wire size check.
+    options.streamBytes.emplace(64, 128, 64);
     auto endpoint = q::api::PublisherEndpoint::create(*bootstrap, options);
     REQUIRE(endpoint);
     Downstream first(schema, (*endpoint)->port(), 100);
@@ -805,7 +806,7 @@ TEST_CASE("catalog STREAM sends more than 512 compact records per byte-bounded f
     options.listener.maxWriteBytes = 128;
     constexpr std::size_t TARGET_PAYLOAD = 2500;
     constexpr std::size_t MAX_FRAME = 2560;
-    options.streamBytes.emplace(TARGET_PAYLOAD, MAX_FRAME);
+    options.streamBytes.emplace(TARGET_PAYLOAD, MAX_FRAME, 2 * 1024 * 1024);
     auto endpoint = q::api::PublisherEndpoint::create(*bootstrap, options);
     REQUIRE(endpoint);
     Downstream peer(schema, (*endpoint)->port(), 100);
@@ -841,6 +842,77 @@ TEST_CASE("catalog STREAM sends more than 512 compact records per byte-bounded f
     REQUIRE_FALSE(peer.streamFrames().empty());
     CHECK(peer.streamFrames().front().first >= TARGET_PAYLOAD);
     CHECK(peer.streamFrames().front().second <= MAX_FRAME);
+}
+
+TEST_CASE("catalog STREAM combines input windows after a partially written frame") {
+    using enum c::SubscriptionFamily;
+    using Type = c::SerialFieldType;
+    auto bootstrap = q::transport::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    const auto schema = publicationSchema();
+    const auto names = fieldNames(schema);
+    constexpr std::size_t INPUT_SLOTS = 8;
+    constexpr std::size_t INPUT_GROUPS = 4;
+    q::api::PublisherOptions options;
+    options.catalog.emplace(schema, names);
+    options.pendingQuotes = INPUT_SLOTS;
+    options.listener.maxConnections = 1;
+    options.listener.maxWriteBytes = 64;
+    options.streamBytes.emplace(512, 16 * 1024);
+    auto endpoint = q::api::PublisherEndpoint::create(*bootstrap, options);
+    REQUIRE(endpoint);
+    Downstream peer(schema, (*endpoint)->port(), 100);
+    peer.subscribe(p::SubscriptionMessage::STREAM_ADD, 1);
+    const auto deadline = Clock::now() + WAIT_TIME;
+    REQUIRE((*endpoint)->awaitDemand(STREAM, u"CustomFlow", u"IBM", true, deadline));
+
+    const auto publisher = (*endpoint)->getPublisher();
+    const auto context = schema.recordContext(1);
+    const std::vector<std::byte> payload(8192, std::byte{0x53});
+    const std::array first{c::FieldValueView{Type::UTF_CHAR_ARRAY, 0, {}, {}},
+                           c::FieldValueView{Type::BYTE_ARRAY, 0, {}, payload},
+                           c::FieldValueView{Type::LONG, 0, {}, {}}};
+    REQUIRE(publisher.publishRecord(STREAM, context, u"IBM", first));
+
+    while (!peer.receivingData() && Clock::now() < deadline) {
+        peer.poll();
+        std::this_thread::sleep_for(1ms);
+    }
+
+    REQUIRE(peer.receivingData());
+    std::array<std::array<c::FieldValueView, 3>, INPUT_SLOTS> values;
+    std::array<q::api::PublisherStreamRecordView, INPUT_SLOTS> rows;
+
+    for (std::size_t group = 0; group < INPUT_GROUPS; ++group) {
+        for (std::size_t row = 0; row < rows.size(); ++row) {
+            const auto sequence = static_cast<std::int64_t>(group * rows.size() + row + 1);
+            values[row] = {first[0], c::FieldValueView{Type::BYTE_ARRAY, 0, {}, {}},
+                           c::FieldValueView{Type::LONG, sequence, {}, {}}};
+            rows[row] = {context, u"IBM", values[row]};
+        }
+
+        for (;;) {
+            const auto admitted = publisher.publishStreamRecords(rows);
+
+            if (admitted)
+                break;
+
+            REQUIRE(admitted.error().stage == "publisher-pending-records");
+            REQUIRE(Clock::now() < deadline);
+            std::this_thread::yield();
+        }
+    }
+
+    awaitRecords(peer, INPUT_GROUPS * INPUT_SLOTS + 1, **endpoint);
+
+    for (std::size_t row = 0; row < peer.records().size(); ++row)
+        CHECK(peer.records()[row].second.typedValues[2].raw == static_cast<std::int64_t>(row));
+
+    (*endpoint)->closeAndAwaitTermination();
+    const auto stats = (*endpoint)->getStatistics();
+    CHECK(stats.families[1].maxSentFrameRecords > INPUT_SLOTS);
+    CHECK(stats.families[1].failedFrames.value == 0);
+    CHECK(stats.retiredPeers.value == 0);
 }
 
 TEST_CASE("revocation of a non-first row in a partial STREAM frame closes only its peer") {
