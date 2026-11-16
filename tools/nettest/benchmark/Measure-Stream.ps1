@@ -26,7 +26,7 @@ $ErrorActionPreference = 'Stop'
 if ($HelpRu) {
     Write-Output 'Использование: Measure-Stream.ps1 -Program ФАЙЛ -Bundle КАТАЛОГ -Java ФАЙЛ -Classpath QD357 -OutputDirectory НОВЫЙ_КАТАЛОГ'
     Write-Output 'Сверяет IBM TimeAndSale/STREAM с QD 3.357 на IPv4 loopback. Нужен JDK с javac.'
-    Write-Output 'Для qdcxx-event-nettest укажите -ProducerKind Event, без -Bundle и с -Batch 1.'
+    Write-Output 'Для qdcxx-event-nettest укажите -ProducerKind Event, без -Bundle. Batch 1..8 для STREAM, 1 для TICKER.'
     Write-Output 'Event: -Clients 1..8, -Contract stream|ticker, -ListenAddress IPv4, -Precision Auto|ms|ns, -Pacing sleep|yield (sleep по умолчанию).'
     Write-Output 'Параметры: -Duration 10 (1..300 с), -Rate 1000 (записей/с), -Batch 1 (1..32). Нагрузка должна укладываться в 22 бит.'
     Write-Output 'Сохраняет JSON, замеры процессов и журналы в новом каталоге. Завершает только свои дочерние процессы.'
@@ -36,7 +36,7 @@ if ($HelpRu) {
 if ($Help -or !$PSBoundParameters.Count) {
     Write-Output 'Usage: Measure-Stream.ps1 -Program FILE -Bundle DIR -Java FILE -Classpath QD357 -OutputDirectory NEW_DIR'
     Write-Output 'Verify IBM TimeAndSale/STREAM on IPv4 loopback with Java QD 3.357. Requires a JDK with javac.'
-    Write-Output 'For qdcxx-event-nettest, pass -ProducerKind Event with -Batch 1 and omit -Bundle.'
+    Write-Output 'For qdcxx-event-nettest, pass -ProducerKind Event and omit -Bundle. Batch 1..8 for STREAM, 1 for TICKER.'
     Write-Output 'Event: -Clients 1..8, -Contract stream|ticker, -ListenAddress IPv4, -Precision Auto|ms|ns, -Pacing sleep|yield (default sleep).'
     Write-Output 'Options: -Duration 10 (1..300 seconds), -Rate 1000 (records/sec), -Batch 1 (1..32).'
     Write-Output 'Offered records plus one batch must fit the 22-bit sequence range.'
@@ -48,8 +48,9 @@ if ($Help -or !$PSBoundParameters.Count) {
 if (!$Program -or !$Java -or !$Classpath -or !$OutputDirectory) {
     throw 'Supply Program, Java, Classpath and OutputDirectory. Use -Help for details.'
 }
-if (($ProducerKind -eq 'Record' -and !$Bundle) -or ($ProducerKind -eq 'Event' -and ($Bundle -or $Batch -ne 1))) {
-    throw 'Record mode requires a bundle. Event mode requires batch 1 and uses the built-in schema.'
+if (($ProducerKind -eq 'Record' -and !$Bundle) -or
+    ($ProducerKind -eq 'Event' -and ($Bundle -or $Batch -gt 8 -or ($Contract -eq 'ticker' -and $Batch -ne 1)))) {
+    throw 'Record mode requires a bundle. Event uses the built-in schema and batch 1..8 for STREAM or 1 for TICKER.'
 }
 $address = $null
 if (![Net.IPAddress]::TryParse($ListenAddress, [ref]$address) -or $address.AddressFamily -ne 'InterNetwork' -or
@@ -295,11 +296,13 @@ try {
     }
     $expected = if ($ProducerKind -eq 'Record') { $native.written } else { $native.admitted }
     $nominalRecords = [long]$Duration * $Rate
+    $minStreamFrames = [Math]::Ceiling($expected / $Batch) * $Clients
     if ($expected -le 0 -or $expected -gt $nominalRecords -or $expected -ge $sequenceLimit -or $native.connections -ne $Clients -or
         $native.generated -ne $expected -or $native.seconds -ne $Duration -or
         ($ProducerKind -eq 'Record' -and $native.composed -ne $expected) -or
         ($isEvent -and $native.ingressRecords -ne $expected) -or
-        ($isEvent -and $Contract -eq 'stream' -and $native.sentFrames -ne $expected * $Clients)) {
+        ($isEvent -and $Contract -eq 'stream' -and
+            ($native.sentFrames -lt $minStreamFrames -or $native.sentFrames -gt $expected * $Clients))) {
         throw 'Producer count, connection or measurement-window check failed.'
     }
 

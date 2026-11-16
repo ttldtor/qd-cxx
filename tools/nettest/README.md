@@ -120,12 +120,20 @@ pwsh -NoProfile -File tools/nettest/benchmark/Measure-Stream.ps1 -Program $event
   -ProducerKind Event -Java $java -Classpath $qd357Classpath -OutputDirectory $newLogDirectory
 ```
 
-Event mode uses batch 1 and the built-in schema. The producer waits for exact
+Event mode defaults to batch 1 and uses the built-in schema. The producer waits for exact
 demand and reports local admissions and public publisher drain observations.
 The `drainMs` counter measures queue drain after the last admission.
 The Java verifier reconciles received records against the admission count.
 Record mode reconciles against fully written records. Use `-Batch 1` for both
 runs when comparing one publication per call.
+
+For local `TimeAndSale/STREAM`, `-Batch 2` through `-Batch 8` exercise atomic
+batch admission through the public typed publisher. The endpoint sets
+`PublisherOptions::streamBatchRecords` to the same limit. Available rows can
+share a QTP DATA frame. The publisher does not delay an available row in order
+to fill a batch. The Java verifier still checks every record at every client.
+The reported DATA frame count can be smaller than the number of deliveries.
+TICKER uses batch 1.
 
 When the publisher's input queue is full, the event producer retries the same
 event with its original timestamp, through a bounded completion deadline.

@@ -142,6 +142,7 @@ struct PublisherRecordLimits {
 /** Finite local or remote publishing profile. */
 struct PublisherOptions {
     static constexpr std::size_t MAX_PEER_DEMAND_POLICIES = 32; ///< Maximum address overrides per endpoint.
+    static constexpr std::size_t MAX_STREAM_BATCH_RECORDS = 8;  ///< Maximum local STREAM rows in one batch.
 
     transport::TcpListenerOptions listener{"127.0.0.1", 0, 16,
                                            4};      ///< Plain numeric bind; address is borrowed at create.
@@ -152,12 +153,20 @@ struct PublisherOptions {
     PublisherDemandPolicy demand; ///< Default policy. Filters must be static and built before create.
     std::vector<PublisherPeerDemandPolicy> peerDemand; ///< Owned overrides, matched by numeric IP on connection.
     PublisherRecordLimits recordLimits;                ///< Pending storage limits for local record publication.
+    std::size_t streamBatchRecords = 1; ///< Enable batching in local mixed or catalog mode by setting 2 through 8.
 };
 
 /** Raw controls for one indexed HISTORY publication. */
 struct PublisherHistoryMetadata {
     std::int32_t eventFlags = 0;                   ///< Snapshot and transaction flags for this occurrence.
     std::optional<std::int64_t> removalIndex = {}; ///< Exact signed64 index, present only with REMOVE_EVENT.
+};
+
+/** Borrowed catalog row for an atomic local STREAM admission. */
+struct PublisherStreamRecordView {
+    core::RecordContext context;                  ///< Record identity from the configured local catalog.
+    std::u16string_view symbol;                   ///< Exact nonempty symbol.
+    std::span<const core::FieldValueView> fields; ///< Logical values in catalog order, without indexed controls.
 };
 
 /** Detached producer port. Copies may be used from application threads and outlive the endpoint. */
@@ -175,6 +184,11 @@ class Publisher {
     [[nodiscard]] std::expected<void, Diagnostic> publish(const events::Quote &quote) const;
     /** Submit one composite TimeAndSale occurrence in mixed mode. */
     [[nodiscard]] std::expected<void, Diagnostic> publish(const events::TimeAndSale &sale) const;
+    /** Submit an ordered batch of TimeAndSale occurrences in local mixed mode.
+     * @param sales Nonempty borrowed batch within the configured STREAM batch limit.
+     * @return Admission of every copied occurrence, or a refusal with no occurrence admitted.
+     */
+    [[nodiscard]] std::expected<void, Diagnostic> publish(std::span<const events::TimeAndSale> sales) const;
     /** Submit one ordinary default-source Order event in mixed mode. */
     [[nodiscard]] std::expected<void, Diagnostic> publish(const events::Order &order) const;
 
@@ -201,6 +215,13 @@ class Publisher {
     [[nodiscard]] std::expected<void, Diagnostic>
     publishRecord(core::SubscriptionFamily family, const core::RecordContext &context, std::u16string_view symbol,
                   std::span<const core::FieldValueView> fields, PublisherHistoryMetadata history) const;
+
+    /** Submit an ordered batch of physical records in local catalog mode.
+     * @param records Nonempty borrowed batch within the configured STREAM batch limit. All backing is copied.
+     * @return Admission of every copied row, or a refusal with no row admitted.
+     */
+    [[nodiscard]] std::expected<void, Diagnostic>
+    publishStreamRecords(std::span<const PublisherStreamRecordView> records) const;
 };
 
 /** One worker-owned plain QTP publishing endpoint. Destroy after application users have retired.

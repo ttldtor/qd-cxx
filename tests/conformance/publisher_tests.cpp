@@ -971,6 +971,46 @@ TEST_CASE("typed publisher drains a STREAM burst without one timed wait per reco
     CHECK((*server)->getDiagnostic().code == q::api::ErrorCode::NONE);
 }
 
+TEST_CASE("typed publisher atomically admits bounded STREAM batches") {
+    using enum q::core::SubscriptionFamily;
+    auto bootstrap = q::transport::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    q::api::PublisherOptions options;
+    options.mixed = true;
+    options.streamBatchRecords = 8;
+    options.pendingQuotes = 4;
+    options.listener.maxWriteBytes = 11;
+    auto endpoint = q::api::PublisherEndpoint::create(*bootstrap, options);
+    requireServer(endpoint);
+    DemandPeer peer((*endpoint)->port(), asio::ip::address_v4::loopback());
+    peer.subscribe(q::protocol::SubscriptionMessage::STREAM_ADD, 1, u"IBM");
+    REQUIRE((*endpoint)->awaitDemand(STREAM, u"TimeAndSale", u"IBM", true, Clock::now() + 5s));
+    const auto publisher = (*endpoint)->getPublisher();
+    std::array<q::events::TimeAndSale, 5> sales;
+
+    for (std::size_t i = 0; i < sales.size(); ++i) {
+        sales[i].symbol = u"IBM";
+        sales[i].index = (std::int64_t{7} << 32) + static_cast<std::int64_t>(i);
+    }
+
+    const auto full = publisher.publish(std::span(sales));
+    REQUIRE_FALSE(full);
+    CHECK(full.error().stage == "publisher-pending-quotes");
+    sales[3].symbol.clear();
+    REQUIRE_FALSE(publisher.publish(std::span(sales).first(4)));
+    sales[3].symbol = u"IBM";
+    REQUIRE(publisher.publish(std::span(sales).first(4)));
+    constexpr auto streamData = static_cast<std::int32_t>(q::protocol::LiveDataMessage::STREAM_DATA);
+    REQUIRE(peer.waitForFrame(streamData, Clock::now() + 5s));
+    const auto stats = (*endpoint)->getStatistics().families[1];
+    CHECK(stats.ingressFrames.value == 1);
+    CHECK(stats.ingressRecords.value == 4);
+    (*endpoint)->closeAndAwaitTermination();
+    const auto closed = publisher.publish(std::span(sales).first(4));
+    REQUIRE_FALSE(closed);
+    CHECK(closed.error().code == q::api::ErrorCode::CLOSED);
+}
+
 TEST_CASE("mixed publisher preserves STREAM occurrences and indexed HISTORY on one connection") {
     auto bootstrap = q::transport::RuntimeBootstrap::create();
     REQUIRE(bootstrap);

@@ -6,12 +6,26 @@
 
 namespace org::ttldtor::qdcxx::protocol::detail {
 
+/** Borrowed local STREAM row for one bounded event owner. */
+struct LocalStreamRow {
+    std::int32_t localId;
+    core::RecordContext context;
+    std::u16string_view symbol;
+    std::span<const core::FieldValueView> fields;
+};
+
 /** One private synthetic source epoch with the usual counted event backing. */
 class LocalEventOwner {
     LiveSnapshot epoch_;
     std::size_t eventBytes_;
 
     LocalEventOwner(LiveSnapshot epoch, std::size_t eventBytes) noexcept;
+
+    template <typename Field>
+    static void appendRecord(LiveEvent::State &event, std::int32_t localId, const core::RecordContext &context,
+                             std::u16string_view symbol, std::span<const Field> fields, std::int32_t flags,
+                             std::optional<std::int64_t> removalTime, std::optional<FieldEventTime> eventTime,
+                             LiveWork &work);
 
     /** Adopt validated values into an ordinary local owner.
      * @tparam Field Borrowed or owned tagged representation.
@@ -34,6 +48,9 @@ class LocalEventOwner {
 
     public:
     [[nodiscard]] static std::expected<LocalEventOwner, LiveError> create(LiveLimits limits, LiveWork &work);
+
+    /** Copy an ordered batch into one ordinary STREAM owner. */
+    [[nodiscard]] std::expected<LiveEvent, LiveError> stream(std::span<const LocalStreamRow> rows, LiveWork &work) const;
 
     /** Own one local TICKER record and optional explicit event-time metadata. */
     [[nodiscard]] std::expected<LiveEvent, LiveError>

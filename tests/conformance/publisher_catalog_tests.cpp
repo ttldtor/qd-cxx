@@ -170,11 +170,26 @@ class Downstream {
             context_ = std::move(*context);
         } else if (frame.type == 10 || frame.type == 15 || frame.type == 20) {
             REQUIRE(context_);
-            const p::StreamDataLimits limits{MESSAGE_LIMIT, 16,   64,   16,   64,   1024, {8192, 256, 256},
-                                             {8192, 1024},  8192, 8192, 8192, 8192, 8192, 8192,
-                                             8192,          8192};
+            const p::StreamDataLimits limits{MESSAGE_LIMIT,
+                                             16,
+                                             64,
+                                             16,
+                                             64,
+                                             1024,
+                                             {MESSAGE_LIMIT, 256, 256},
+                                             {8192, 1024},
+                                             8192,
+                                             8192,
+                                             8192,
+                                             MESSAGE_LIMIT,
+                                             MESSAGE_LIMIT,
+                                             MESSAGE_LIMIT,
+                                             MESSAGE_LIMIT,
+                                             MESSAGE_LIMIT};
             auto decoded = p::decodeStreamDataWithEventPolicy(frame.payload, *context_, limits,
                                                               p::DataEventPolicy::BINARY_CATALOG_V1);
+            INFO("frame payload ", frame.payload.size(), " stage ", static_cast<int>(decoded.stage), " payload bytes ",
+                 decoded.payloadEncodedBytes, " decoded records ", decoded.records.size());
             REQUIRE(decoded.status == p::StreamDataStatus::OK);
 
             for (auto &record : decoded.records)
@@ -231,6 +246,10 @@ class Downstream {
 
     const auto &records() const noexcept {
         return observed_;
+    }
+
+    bool receivingData() const noexcept {
+        return context_.has_value() && frames_.pending().size() > 32;
     }
 };
 
@@ -544,6 +563,181 @@ void awaitRecords(Downstream &peer, std::size_t count, const q::api::PublisherEn
     REQUIRE(peer.records().size() == count);
 }
 } // namespace
+
+TEST_CASE("local catalog STREAM batches deliver ordered owned records to two short-write peers") {
+    using enum c::SubscriptionFamily;
+    using enum p::SubscriptionMessage;
+    auto bootstrap = q::transport::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    const auto schema = testSchema();
+    const auto names = fieldNames(schema);
+    q::api::PublisherOptions options;
+    options.catalog.emplace(schema, names);
+    options.streamBatchRecords = 8;
+    options.listener.maxWriteBytes = 7;
+    auto endpoint = q::api::PublisherEndpoint::create(*bootstrap, options);
+    REQUIRE(endpoint);
+    Downstream first(schema, (*endpoint)->port(), 100);
+    Downstream second(schema, (*endpoint)->port(), 200);
+    const auto deadline = Clock::now() + WAIT_TIME;
+
+    for (auto *peer : {&first, &second}) {
+        peer->subscribe(STREAM_ADD, 0);
+        peer->subscribe(STREAM_ADD, 1, {}, u"MSFT");
+        peer->subscribe(STREAM_ADD, 0, {}, peer == &first ? u"READY1" : u"READY2");
+    }
+
+    REQUIRE((*endpoint)->awaitDemand(STREAM, u"Alpha", u"READY1", true, deadline));
+    REQUIRE((*endpoint)->awaitDemand(STREAM, u"Alpha", u"READY2", true, deadline));
+    const auto publisher = (*endpoint)->getPublisher();
+    using Type = c::SerialFieldType;
+    std::array<c::FieldValueView, 8> values;
+    std::vector<q::api::PublisherStreamRecordView> rows;
+    std::u16string alpha = u"IBM";
+    std::u16string beta = u"MSFT";
+
+    for (std::size_t i = 0; i < values.size(); ++i) {
+        values[i] = {Type::COMPACT_INT, static_cast<std::int64_t>(100 + i), {}, {}};
+        rows.push_back({schema.recordContext(static_cast<std::int32_t>(i % 2)), i % 2 == 0 ? alpha : beta,
+                        std::span(&values[i], 1)});
+    }
+
+    values.back().type = Type::LONG;
+    REQUIRE_FALSE(publisher.publishStreamRecords(rows));
+    values.back().type = Type::COMPACT_INT;
+    REQUIRE(publisher.publishStreamRecords(rows));
+    alpha.assign(u"BAD");
+    beta.assign(u"BAD");
+    values.fill({Type::COMPACT_INT, -1, {}, {}});
+
+    for (auto *peer : {&first, &second}) {
+        awaitRecords(*peer, rows.size(), **endpoint);
+
+        for (std::size_t i = 0; i < rows.size(); ++i) {
+            const auto &[family, record] = peer->records()[i];
+            CHECK(family == 15);
+            CHECK(record.localId == static_cast<std::int32_t>(i % 2));
+            CHECK(record.symbol.units == (i % 2 == 0 ? u"IBM" : u"MSFT"));
+            REQUIRE(record.typedValues.size() == 1);
+            CHECK(record.typedValues[0].raw == static_cast<std::int64_t>(100 + i));
+        }
+    }
+
+    (*endpoint)->closeAndAwaitTermination();
+    const auto stats = (*endpoint)->getStatistics().families[1];
+    CHECK(stats.ingressFrames.value == 1);
+    CHECK(stats.ingressRecords.value == 8);
+    CHECK(stats.sentFrames.value == 2);
+    const auto closed = publisher.publishStreamRecords(rows);
+    REQUIRE_FALSE(closed);
+    CHECK(closed.error().code == q::api::ErrorCode::CLOSED);
+}
+
+TEST_CASE("catalog STREAM splits an oversized frame and delivers its tail in order") {
+    auto bootstrap = q::transport::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    const auto schema = publicationSchema();
+    const auto names = fieldNames(schema);
+    q::api::PublisherOptions options;
+    options.catalog.emplace(schema, names);
+    options.streamBatchRecords = 8;
+    auto endpoint = q::api::PublisherEndpoint::create(*bootstrap, options);
+    REQUIRE(endpoint);
+    Downstream peer(schema, (*endpoint)->port(), 100);
+    peer.subscribe(p::SubscriptionMessage::STREAM_ADD, 1);
+    REQUIRE(
+        (*endpoint)->awaitDemand(c::SubscriptionFamily::STREAM, u"CustomFlow", u"IBM", true, Clock::now() + WAIT_TIME));
+
+    constexpr std::size_t PAYLOAD = MESSAGE_LIMIT / 8;
+    const std::vector<std::byte> bytes(PAYLOAD, std::byte{0x53});
+    using Type = c::SerialFieldType;
+    std::array<std::array<c::FieldValueView, 3>, 8> values;
+    std::array<q::api::PublisherStreamRecordView, 8> rows;
+
+    for (std::size_t i = 0; i < rows.size(); ++i) {
+        values[i] = {c::FieldValueView{Type::UTF_CHAR_ARRAY, 0, {}, {}},
+                     c::FieldValueView{Type::BYTE_ARRAY, 0, {}, bytes},
+                     c::FieldValueView{Type::LONG, static_cast<std::int64_t>(i), {}, {}}};
+        rows[i] = {schema.recordContext(1), u"IBM", values[i]};
+    }
+
+    const auto publisher = (*endpoint)->getPublisher();
+    REQUIRE(publisher.publishStreamRecords(rows));
+    awaitRecords(peer, rows.size(), **endpoint);
+    (*endpoint)->closeAndAwaitTermination();
+
+    for (std::size_t i = 0; i < rows.size(); ++i) {
+        const auto &fields = peer.records()[i].second.typedValues;
+        REQUIRE(fields.size() == 3);
+        REQUIRE(fields[1].bytes);
+        CHECK(*fields[1].bytes == bytes);
+        CHECK(fields[2].raw == static_cast<std::int64_t>(i));
+    }
+
+    const auto stats = (*endpoint)->getStatistics().families[1];
+    CHECK(stats.ingressFrames.value == 1);
+    CHECK(stats.ingressRecords.value == 8);
+    CHECK(stats.sentFrames.value == 2);
+}
+
+TEST_CASE("revocation of a non-first row in a partial STREAM frame closes only its peer") {
+    using enum c::SubscriptionFamily;
+    auto bootstrap = q::transport::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    const auto schema = publicationSchema();
+    const auto names = fieldNames(schema);
+    q::api::PublisherOptions options;
+    options.catalog.emplace(schema, names);
+    options.streamBatchRecords = 8;
+    options.listener.maxWriteBytes = 64;
+    auto endpoint = q::api::PublisherEndpoint::create(*bootstrap, options);
+    REQUIRE(endpoint);
+    Downstream slow(schema, (*endpoint)->port(), 100);
+    slow.subscribe(p::SubscriptionMessage::STREAM_ADD, 1);
+    slow.subscribe(p::SubscriptionMessage::STREAM_ADD, 1, {}, u"MSFT");
+    REQUIRE((*endpoint)->awaitDemand(STREAM, u"CustomFlow", u"MSFT", true, Clock::now() + WAIT_TIME));
+    const auto peers = (*endpoint)->getPeers();
+    REQUIRE(peers.size() == 1);
+    Downstream fast(schema, (*endpoint)->port(), 200);
+    fast.subscribe(p::SubscriptionMessage::STREAM_ADD, 1, {}, u"FAST");
+    REQUIRE((*endpoint)->awaitDemand(STREAM, u"CustomFlow", u"FAST", true, Clock::now() + WAIT_TIME));
+
+    const std::vector<std::byte> bytes(8192, std::byte{0x53});
+    using Type = c::SerialFieldType;
+    const std::array large{c::FieldValueView{Type::UTF_CHAR_ARRAY, 0, {}, {}},
+                           c::FieldValueView{Type::BYTE_ARRAY, 0, {}, bytes}, c::FieldValueView{Type::LONG, 0, {}, {}}};
+    const std::array small{large[0], c::FieldValueView{Type::BYTE_ARRAY, 0, {}, {}}, large[2]};
+    const auto context = schema.recordContext(1);
+    const std::array rows{q::api::PublisherStreamRecordView{context, u"IBM", large},
+                          q::api::PublisherStreamRecordView{context, u"MSFT", large}};
+    const auto publisher = (*endpoint)->getPublisher();
+    REQUIRE(publisher.publishStreamRecords(rows));
+    const auto deadline = Clock::now() + WAIT_TIME;
+
+    while (!slow.receivingData() && Clock::now() < deadline) {
+        slow.poll();
+        std::this_thread::sleep_for(1ms);
+    }
+
+    REQUIRE(slow.receivingData());
+    REQUIRE(slow.records().empty());
+    REQUIRE(publisher.publishRecord(STREAM, context, u"FAST", small));
+    awaitRecords(fast, 1, **endpoint);
+
+    q::api::EventRegistryWork work;
+    const auto registry = q::api::EventRegistry::builtIn({}, work);
+    REQUIRE(registry);
+    const auto policy = q::api::FeedFilter::Builder(*registry).withCategory(u"IBM", u"IBM").build();
+    const auto command = (*endpoint)->replacePeerDemand(peers.front().id, {{}, policy, {}});
+    REQUIRE(command);
+    const auto result = command->waitUntil(Clock::now() + WAIT_TIME);
+    REQUIRE(result);
+    CHECK(result->outcome == q::api::PublisherPolicyOutcome::PEER_CLOSED);
+    CHECK(result->diagnostic.stage == "publisher-policy-wire-boundary");
+    REQUIRE(publisher.publishRecord(STREAM, context, u"FAST", small));
+    awaitRecords(fast, 2, **endpoint);
+    CHECK((*endpoint)->getDiagnostic().code == q::api::ErrorCode::NONE);
+}
 
 TEST_CASE("local catalog publishes exact copied records through TICKER and STREAM") {
     auto bootstrap = q::transport::RuntimeBootstrap::create();
