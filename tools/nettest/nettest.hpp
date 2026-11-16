@@ -40,6 +40,7 @@ struct Options {
     std::vector<std::u16string> symbols;
     std::int64_t historyBound = 0;
     bool qdText = false;
+    bool verifyStream = false;
 };
 
 struct Catalog {
@@ -60,6 +61,7 @@ struct Report {
     std::uint64_t written = 0;
     std::uint64_t wireRecords = 0;
     std::uint64_t delivered = 0;
+    std::uint64_t checksum = 0;
     std::uint64_t bytesRead = 0;
     std::uint64_t bytesWritten = 0;
     std::chrono::nanoseconds measured{};

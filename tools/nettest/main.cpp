@@ -47,12 +47,15 @@ export, for example the installed default or dxlink directory.
   --rate RECORDS_PER_SEC  Offered producer rate per peer (1..1000000), default 1000
   --batch COUNT           Maximum producer records per DATA frame (1..128), default 100
   --history-bound VALUE   Signed raw HISTORY lower bound for the consumer, default 0
+  --verify-stream         Verify deterministic IBM TimeAndSale STREAM until clean source close
   --qd-text               Also print QD-style aggregate data rate (lag unavailable)
   --help / --help-ru      Print help without opening files or sockets
 
 The producer prints PORT, waits for eligible demand, then runs for the measurement
 window. The consumer connects, subscribes and counts decoded selected records.
 Both print RESULT with boundary-specific counts. Shutdown has a separate finite deadline.
+The verification consumer prints ACTIVE at its first record and CHECKSUM after clean EOF.
+Its duration is the deadline for source close, with a maximum of 3,600,000,000 records. Periodic consumer heartbeats are disabled in this mode.
 Exit status: 0 completed or help, 1 input/network/protocol failure, 2 invalid arguments.
 )";
 
@@ -73,12 +76,15 @@ constexpr std::string_view HELP_RU = R"(Использование: qdcxx-nettes
   --rate ЗАПИСЕЙ_В_С     Нагрузка источника на клиента (1..1000000), по умолчанию 1000
   --batch ЧИСЛО           Максимум записей в кадре DATA (1..128), по умолчанию 100
   --history-bound ЧИСЛО   Знаковая сырая нижняя граница HISTORY потребителя, по умолчанию 0
+  --verify-stream         Проверять IBM TimeAndSale STREAM до закрытия источника
   --qd-text               Дополнительно выводить скорость в форме QD (lag недоступен)
   --help / --help-ru      Показать справку без открытия файлов и сокетов
 
 Источник выводит PORT, ждёт подходящую подписку и публикует записи. Потребитель
 подключается и считает декодированные записи. RESULT разделяет метрики по границам
 измерения. Остановка ограничена отдельным сроком.
+Проверяющий потребитель выводит ACTIVE при первой записи, CHECKSUM после корректного EOF.
+Его duration задаёт срок закрытия источника, предел составляет 3 600 000 000 записей. Периодические heartbeat потребителя отключены.
 Коды выхода: 0 прогон или справка, 1 ошибка входа/сети/протокола, 2 неверные параметры.
 )";
 
@@ -168,6 +174,11 @@ Options parse(std::span<const std::string_view> arguments) {
         if (key != "--symbol")
             used.push_back(key);
 
+        if (key == "--verify-stream" && !producer) {
+            options.verifyStream = true;
+            continue;
+        }
+
         if (key == "--qd-text") {
             options.qdText = true;
             continue;
@@ -236,6 +247,10 @@ Options parse(std::span<const std::string_view> arguments) {
     if (options.symbols.empty())
         options.symbols.emplace_back(u"IBM");
 
+    if (options.verifyStream && (options.family != SubscriptionFamily::STREAM || options.record != u"TimeAndSale" ||
+                                 options.instances != 1 || options.symbols.size() != 1 || options.symbols[0] != u"IBM"))
+        throw std::invalid_argument("--verify-stream requires one IBM TimeAndSale STREAM consumer");
+
     return options;
 }
 
@@ -266,6 +281,9 @@ void print(const Options &options, const Report &report) {
               << " written=" << report.written << " wireRecords=" << report.wireRecords
               << " delivered=" << report.delivered << " bytesRead=" << report.bytesRead
               << " bytesWritten=" << report.bytesWritten << " rps=" << rate << '\n';
+
+    if (options.verifyStream)
+        std::cout << "CHECKSUM " << report.checksum << '\n';
 
     if (options.qdText)
         std::cout << "data " << rate << " rps, lag unavailable, instances " << options.instances << ", connections "

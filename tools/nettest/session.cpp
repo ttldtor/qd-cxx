@@ -504,6 +504,7 @@ struct Consumer {
     std::uint64_t readBytesBaseline = 0;
     std::uint64_t writtenBytesBaseline = 0;
     std::uint64_t delivered = 0;
+    std::uint64_t checksum = 14695981039346656037ULL;
     Clock::time_point heartbeatAt{};
 
     Consumer(t::RuntimeBootstrap &bootstrap, const Options &options, const Catalog &catalog)
@@ -511,9 +512,72 @@ struct Consumer {
     }
 };
 
+/** Match the producer's 22-bit wire sequence against its full-width generated ordinal. */
+constexpr bool matchesStreamSequence(std::uint32_t sequence, std::uint64_t ordinal) {
+    constexpr std::uint64_t SEQUENCE_MASK = (std::uint64_t{1} << 22) - 1;
+
+    return (sequence & SEQUENCE_MASK) == (ordinal & SEQUENCE_MASK);
+}
+
+static_assert(matchesStreamSequence(0x003fffff, 0x003fffff));
+static_assert(matchesStreamSequence(0, 0x00400000));
+static_assert(matchesStreamSequence(1, 0x00400001));
+static_assert(!matchesStreamSequence(1, 0x00400000));
+
+/** Check one deterministic record and update the time-independent FNV-1a checksum. */
+void verifyStreamRecord(Consumer &connection, const p::LiveRecordView &record, const core::LocalRecord &schema) {
+    constexpr std::uint64_t MAX_RECORDS = 3600ULL * 1000000ULL;
+    constexpr std::uint64_t FNV_PRIME = 1099511628211ULL;
+    const auto values = record.typedValues;
+
+    if (record.localId != SENDER_ID || record.symbol != u"IBM" || record.eventFlags != 0 ||
+        values.size() != schema.fields.size() || values.size() != 10 || connection.delivered >= MAX_RECORDS)
+        throw std::runtime_error("Unexpected verification record, symbol, flags or sequence range");
+
+    const auto sequence = static_cast<std::uint32_t>(values[1].raw);
+    const auto ordinal = connection.delivered + 1;
+
+    if (!matchesStreamSequence(sequence, ordinal) || (sequence >> 22) >= 1000)
+        throw std::runtime_error("TimeAndSale sequence is missing, repeated or out of order");
+
+    const auto high = static_cast<std::uint32_t>(values[0].raw);
+    const auto timeBits = (static_cast<std::uint64_t>(high) << 32) | sequence;
+    const PureRowTime time{std::bit_cast<std::int64_t>(timeBits), sequence >> 22};
+    std::array<core::FieldValueView, 10> expected{};
+    generate(expected, schema, ordinal, time);
+
+    for (std::size_t field = 0; field < values.size(); ++field) {
+        const auto &actual = values[field];
+        const auto &want = expected[field];
+
+        if (actual.type != want.type || actual.raw != want.raw || actual.units || actual.bytes)
+            throw std::runtime_error("TimeAndSale field differs at record " + std::to_string(ordinal) + ", field " +
+                                     std::to_string(field));
+
+        // Time seconds and the millisecond bits vary between producer runs.
+        const auto normalized = field == 0   ? std::uint64_t{0}
+                                : field == 1 ? ordinal
+                                             : static_cast<std::uint64_t>(actual.raw);
+
+        for (unsigned byte = 0; byte < 8; ++byte) {
+            connection.checksum ^= (normalized >> (byte * 8)) & 0xff;
+            connection.checksum *= FNV_PRIME;
+        }
+    }
+
+    ++connection.delivered;
+
+    if (connection.delivered == 1) {
+        std::cout << "ACTIVE" << std::endl;
+
+        if (!std::cout)
+            throw std::runtime_error("Cannot report verifier activation");
+    }
+}
+
 bool pumpConsumer(Consumer &connection, const Options &options, const Descriptor &descriptor, const Messages &wire,
-                  std::span<const core::SubscriptionRequest> requests, bool measuring, bool stopping,
-                  Clock::time_point now) {
+                  std::span<const core::SubscriptionRequest> requests, const core::LocalRecord &schema, bool measuring,
+                  bool stopping, Clock::time_point now) {
     auto &runtime = connection.runtime;
     auto work = protocolWork();
     t::TcpWork native{8, 8, 2 * IO_BYTES, 0, 0, 0, 0};
@@ -532,11 +596,17 @@ bool pumpConsumer(Consumer &connection, const Options &options, const Descriptor
         return true;
     }
 
+    if (options.verifyStream && progress.event && progress.event->kind() == p::LiveEventKind::DATA &&
+        progress.event->messageType() != wire.data.id)
+        throw std::runtime_error("Verifier received an unexpected data contract");
+
     if (progress.event && progress.event->kind() == p::LiveEventKind::DATA &&
-        progress.event->messageType() == wire.data.id && measuring) {
+        progress.event->messageType() == wire.data.id && (measuring || options.verifyStream)) {
         for (const auto &record : progress.event->records()) {
-            if (record.localId == SENDER_ID &&
-                std::ranges::find(options.symbols, record.symbol) != options.symbols.end())
+            if (options.verifyStream)
+                verifyStreamRecord(connection, record, schema);
+            else if (record.localId == SENDER_ID &&
+                     std::ranges::find(options.symbols, record.symbol) != options.symbols.end())
                 ++connection.delivered;
         }
     }
@@ -589,7 +659,7 @@ bool pumpConsumer(Consumer &connection, const Options &options, const Descriptor
         break;
     case Consumer::State::ACTIVE:
 
-        if (sent && now >= connection.heartbeatAt) {
+        if (!options.verifyStream && sent && now >= connection.heartbeatAt) {
             connection.heartbeatAt = now + HEARTBEAT_PERIOD;
 
             return queue(runtime.composeHeartbeat({false, {}, {}, {}, {}}, work), Consumer::State::ACTIVE);
@@ -680,6 +750,28 @@ Report produce(const Options &options, const Catalog &catalog) {
 }
 
 Report consume(const Options &options, const Catalog &catalog) {
+    const auto &schema = catalog.schema.records().front();
+
+    if (options.verifyStream) {
+        constexpr std::array<std::int32_t, 10> TYPES{56, 72, 2, 104, 120, 120, 120, 120, 40, 8};
+
+        if (schema.fields.size() != TYPES.size())
+            throw std::invalid_argument("--verify-stream requires the default TimeAndSale layout");
+
+        constexpr std::array<std::u16string_view, 10> NAMES{u"Time",      u"Sequence",  u"Exchange",
+                                                            u"TradeId",   u"Price",     u"Size",
+                                                            u"Bid.Price", u"Ask.Price", u"ExchangeSaleConditions",
+                                                            u"Flags"};
+
+        for (std::size_t field = 0; field < TYPES.size(); ++field) {
+            const auto lookup = std::ranges::find(schema.lookups, NAMES[field], &core::FieldLookup::name);
+
+            if (schema.fields[field].serialTypeId != TYPES[field] || lookup == schema.lookups.end() ||
+                lookup->fieldId != field)
+                throw std::invalid_argument("--verify-stream requires the default TimeAndSale field layout");
+        }
+    }
+
     auto bootstrap = require(t::RuntimeBootstrap::create());
     const auto wire = messages(options.family);
     const Descriptor descriptor(wire);
@@ -706,8 +798,8 @@ Report consume(const Options &options, const Catalog &catalog) {
 
         for (auto &connection : connections)
             if (connection.state != Consumer::State::CLOSED)
-                activity |=
-                    pumpConsumer(connection, options, descriptor, wire, requests, started.has_value(), false, now);
+                activity |= pumpConsumer(connection, options, descriptor, wire, requests, schema, started.has_value(),
+                                         false, now);
 
         if (!started) {
             const bool active = std::ranges::all_of(connections, [](const auto &connection) {
@@ -719,7 +811,7 @@ Report consume(const Options &options, const Catalog &catalog) {
 
                 for (auto &connection : connections) {
                     const auto stats = connection.runtime.statistics();
-                    connection.readBaseline = stats.readDataRecords.value;
+                    connection.readBaseline = options.verifyStream ? 0 : stats.readDataRecords.value;
                     connection.readBytesBaseline = stats.readBytes.value;
                     connection.writtenBytesBaseline = stats.writtenBytes.value;
                 }
@@ -734,6 +826,11 @@ Report consume(const Options &options, const Catalog &catalog) {
             (now >= *started + options.duration || std::ranges::all_of(connections, [](const auto &connection) {
                  return connection.state == Consumer::State::CLOSED;
              }))) {
+            if (options.verifyStream && std::ranges::any_of(connections, [](const auto &connection) {
+                    return connection.state != Consumer::State::CLOSED;
+                }))
+                throw std::runtime_error("Verifier deadline expired before source closed");
+
             ended = now;
             break;
         }
@@ -747,7 +844,12 @@ Report consume(const Options &options, const Catalog &catalog) {
 
     for (auto &connection : connections) {
         const auto stats = connection.runtime.statistics();
+
+        if (options.verifyStream && connection.delivered == 0)
+            throw std::runtime_error("Verifier received no records");
+
         report.delivered += connection.delivered;
+        report.checksum = connection.checksum;
         report.wireRecords += stats.readDataRecords.value - connection.readBaseline;
         report.bytesRead += stats.readBytes.value - connection.readBytesBaseline;
         report.bytesWritten += stats.writtenBytes.value - connection.writtenBytesBaseline;
@@ -771,7 +873,7 @@ Report consume(const Options &options, const Catalog &catalog) {
 
         for (auto &connection : connections)
             if (connection.state != Consumer::State::CLOSED)
-                activity |= pumpConsumer(connection, options, descriptor, wire, requests, false, true, now);
+                activity |= pumpConsumer(connection, options, descriptor, wire, requests, schema, false, true, now);
 
         if (!activity)
             std::this_thread::sleep_for(IDLE_CADENCE);
