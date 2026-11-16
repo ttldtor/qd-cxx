@@ -80,7 +80,9 @@ composition failure retires the affected peer and increments STREAM
 `failedFrames`.
 When all subscribed peers lack room for the next source window, accepted
 STREAM input stays in the publisher FIFO while sockets progress. Peers with
-available capacity can keep receiving. The existing finite per-peer overflow
+available capacity can keep receiving. Before collecting extra groups in the
+same turn, the publisher gives sockets a chance to advance if a subscribed
+peer lacks the next group's headroom. The existing finite per-peer overflow
 and socket timeout policies still apply.
 
 When this profile is absent, `streamBatchRecords` keeps its existing behavior.

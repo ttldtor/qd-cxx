@@ -2205,16 +2205,18 @@ class PublisherServer {
         completePolicy(port, {PublisherPolicyOutcome::APPLIED, revision, {}});
     }
 
-    /** Guard the next STREAM source window against detached record pressure. A ready peer can
-     * still advance delivery when another peer exhausts its individual finite budget.
+    /** Guard the next STREAM source window against detached record pressure.
+     * @param allPeers Require headroom at every subscribed peer before collecting another group without socket
+     * progress.
+     * @return Whether the selected peer readiness condition allows source progress.
      */
-    bool canAdvanceStream() const noexcept {
+    bool canAdvanceStream(bool allPeers = false) const noexcept {
         const auto &queue = *queues_[STREAM_FAMILY];
 
         if (queue.resources().pendingRecords != 0)
             return false;
 
-        bool hasSubscribers = false;
+        bool blocked = false;
 
         for (const auto &peer : peers_) {
             if (!peer || peer->closing || peer->requested[STREAM_FAMILY].empty())
@@ -2225,14 +2227,19 @@ class PublisherServer {
             if (!resources || resources->state == mux::QueueClientState::TERMINAL)
                 continue;
 
-            hasSubscribers = true;
+            const bool ready = resources->recordOwners <= streamDeliveryRows_ &&
+                               resources->recordBytes <= streamClientLimits_.recordBytes / 2;
 
-            if (resources->recordOwners <= streamDeliveryRows_ &&
-                resources->recordBytes <= streamClientLimits_.recordBytes / 2)
+            if (allPeers && !ready)
+                return false;
+
+            if (!allPeers && ready)
                 return true;
+
+            blocked |= !ready;
         }
 
-        return !hasSubscribers;
+        return !blocked;
     }
 
     /** Check the next FIFO row under the port mutex. */
@@ -2501,9 +2508,14 @@ class PublisherServer {
         auto &credits = work[STREAM_FAMILY];
         auto remaining = streamDeliveryRows_;
         bool advanced = false;
+        bool collectedGroup = queue.resources().pendingRecords != 0;
 
         while (remaining && credits.operations > callbackSteps) {
             if (queue.resources().pendingRecords == 0) {
+                // Flush ready selections before collecting more for a peer that needs another socket turn.
+                if (collectedGroup && !canAdvanceStream(true))
+                    break;
+
                 const auto admitted = publishLocal(port, work, true);
 
                 if (!admitted &&
@@ -2512,6 +2524,7 @@ class PublisherServer {
 
                 remaining -= std::min(remaining, admitted);
                 advanced |= admitted != 0;
+                collectedGroup |= admitted != 0;
             }
 
             const auto moved = queue.progressWithoutCallbacks(credits);
