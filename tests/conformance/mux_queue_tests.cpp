@@ -453,8 +453,9 @@ void add(Fixture &f, m::MuxHandle &h, std::int64_t bound = 0) {
 /** Admit one complete actual source frame after fair owner readiness.
  * @param f Actual graph.
  * @param records Ordered source tuples.
+ * @param deferCallbacks Keep ready records queued while waiting for source readiness.
  */
-void send(Fixture &f, std::initializer_list<Input> records) {
+void send(Fixture &f, std::initializer_list<Input> records, bool deferCallbacks = false) {
     const auto type =
         f.family == c::SubscriptionFamily::STREAM ? 15 : (f.family == c::SubscriptionFamily::TICKER ? 10 : 20);
     auto event = admit(f.live, data(std::span<const Input>(records.begin(), records.size()), type));
@@ -467,7 +468,7 @@ void send(Fixture &f, std::initializer_list<Input> records) {
             return;
 
         REQUIRE(result.error().error == m::QueueError::BUSY);
-        auto next = f.queue.progress(w);
+        auto next = deferCallbacks ? f.queue.progressWithoutCallbacks(w) : f.queue.progress(w);
         REQUIRE(next);
     }
 
@@ -746,6 +747,41 @@ TEST_CASE("MUX queue STREAM duplicates reach both clients and public generation 
     CHECK(a->values == std::vector<std::int64_t>{10, 10, 11});
     CHECK(b->values == a->values);
     CHECK(f.queue.resources().generations == 2);
+}
+
+TEST_CASE("deferred STREAM callback selects ordered records from successive source admissions") {
+    auto f = fixture(c::SubscriptionFamily::STREAM);
+    auto recorder = std::make_shared<Recorder>();
+    recorder->retain = true;
+    auto limits = clientLimits();
+    limits.compactRecordArena = true;
+    bool split = false;
+    SUBCASE("both records fit the byte window") {
+        limits.batchRecordBytes = limits.recordBytes;
+    }
+    SUBCASE("one record may exceed the window") {
+        limits.batchRecordBytes = 1;
+        split = true;
+    }
+    auto handle = open(f, recorder, limits);
+    add(f, handle);
+    send(f, {{0, u"ALPHA", 1, 10, 0}}, true);
+    send(f, {{0, u"ALPHA", 2, 11, 0}}, true);
+    constexpr std::size_t STEPS = 100;
+
+    for (std::size_t i = 0; i < STEPS && f.queue.resources(handle)->queuedRecords < 2; ++i) {
+        auto work = turn();
+        REQUIRE(f.queue.progressWithoutCallbacks(work));
+    }
+
+    REQUIRE(f.queue.resources(handle)->queuedRecords == 2);
+    CHECK(recorder->values.empty());
+    until(f, [&] {
+        return recorder->values.size() == 2;
+    });
+    CHECK(recorder->values == std::vector<std::int64_t>{10, 11});
+    REQUIRE(recorder->retained.size() == (split ? 2 : 1));
+    CHECK(recorder->retained.front().records().size() == (split ? 1 : 2));
 }
 
 TEST_CASE("MUX queue HISTORY complete cannot use old source bound before synchronization or unstaged TX") {

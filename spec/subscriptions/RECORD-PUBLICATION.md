@@ -65,15 +65,24 @@ bounds the complete QTP frame including its length prefix, with a default of
 65,536 bytes. A row that exceeds the hard frame limit is a resource failure.
 The input API call and the outgoing frame need not contain the same rows.
 In this profile `streamBatchRecords` does not limit publication or output.
+The per-peer `deliveryWindowBytes` budget governs how much detached record
+storage the next ordered selection retains. The default is 256 KiB and the
+configured range is 1 byte through 8 MiB. The selection can take one larger
+record so that the queue can advance. The full encoded frame must still fit
+in `maxFrameBytes`. The publisher can combine records from several ready
+input groups in one delivery window. It leaves promptly when there are no
+ready records or the current work budget is exhausted.
+
 Fixed queue slots and charged memory remain bounded independently. Per-peer
 STREAM arenas are charged at their measured allocation size. The bytes of
-complete rows and the available queue data determine frame size. Small
-publication queues can leave too few ready rows to reach the threshold. A frame
+complete rows and the available queue data determine frame size. A frame
 composition failure retires the affected peer and increments STREAM
 `failedFrames`.
 When all subscribed peers lack room for the next source window, accepted
 STREAM input stays in the publisher FIFO while sockets progress. Peers with
-available capacity can keep receiving. The existing finite per-peer overflow
+available capacity can keep receiving. Before collecting extra groups in the
+same turn, the publisher gives sockets a chance to advance if a subscribed
+peer lacks the next group's headroom. The existing finite per-peer overflow
 and socket timeout policies still apply.
 
 When this profile is absent, `streamBatchRecords` keeps its existing behavior.

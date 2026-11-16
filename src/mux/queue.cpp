@@ -3439,7 +3439,11 @@ std::expected<bool, QueueFailure> MuxQueue::State::callback(Client &c, QueueWork
 
             drop(c, !fenced);
         };
-        std::size_t prefix = 0, selected = 0, selectedWeight = 0;
+        const auto &clientBudget = *c.port->budget;
+        const auto selectionBytes = clientBudget.limits.batchRecordBytes;
+        const auto recordControlBytes =
+            clientBudget.context->controlBytes[static_cast<std::size_t>(detail::ControlKind::RECORD)];
+        std::size_t prefix = 0, selected = 0, selectedWeight = 0, selectedBytes = 0;
 
         // Read-only selection first: work failure cannot withdraw an earlier queue prefix.
         for (; prefix < c.size && selected < maximum; ++prefix) {
@@ -3461,6 +3465,15 @@ std::expected<bool, QueueFailure> MuxQueue::State::callback(Client &c, QueueWork
                                                                         : static_cast<std::uint8_t>(surviving);
 
             if (selectedMask(c.selection[prefix])) {
+                if (selectionBytes) {
+                    const auto next = sum(selectedBytes, sum(recordControlBytes, r->arenaSize));
+
+                    if (selected && next > selectionBytes)
+                        break;
+
+                    selectedBytes = next;
+                }
+
                 ++selected;
                 selectedWeight = sum(selectedWeight, static_cast<std::size_t>(std::popcount(surviving)));
             }
@@ -4381,14 +4394,18 @@ void MuxQueue::requestStop(StopMode mode) noexcept {
 }
 
 std::expected<QueueProgress, QueueFailure> MuxQueue::progress(QueueWork &work) {
-    return progressImpl(work, false);
+    return progressImpl(work, ProgressMode::NORMAL);
+}
+
+std::expected<QueueProgress, QueueFailure> MuxQueue::progressWithoutCallbacks(QueueWork &work) {
+    return progressImpl(work, ProgressMode::DEFER_CALLBACKS);
 }
 
 std::expected<QueueProgress, QueueFailure> MuxQueue::progressRetainedCache(QueueWork &work) {
-    return progressImpl(work, true);
+    return progressImpl(work, ProgressMode::RETAINED);
 }
 
-std::expected<QueueProgress, QueueFailure> MuxQueue::progressImpl(QueueWork &work, bool retainedOnly) {
+std::expected<QueueProgress, QueueFailure> MuxQueue::progressImpl(QueueWork &work, ProgressMode mode) {
     try {
         debit(work.operations, 1);
 
@@ -4576,6 +4593,7 @@ std::expected<QueueProgress, QueueFailure> MuxQueue::progressImpl(QueueWork &wor
             s.publishState(*c);
         }
 
+        const bool retainedOnly = mode == ProgressMode::RETAINED;
         std::expected<bool, QueueFailure> action = false;
         QueueProgressKind kind = QueueProgressKind::IDLE;
 
@@ -4593,7 +4611,7 @@ std::expected<QueueProgress, QueueFailure> MuxQueue::progressImpl(QueueWork &wor
 
             kind = QueueProgressKind::COMMAND;
         } else if (activePhase == 2) {
-            if (c)
+            if (c && mode != ProgressMode::DEFER_CALLBACKS)
                 action = s.callback(*c, work, retainedOnly);
 
             kind = QueueProgressKind::CALLBACK;

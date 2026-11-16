@@ -204,8 +204,9 @@ struct ClientLimits {
     std::size_t commandSlots;      ///< Ordinary command slots, including an executing command.
     std::size_t resultSlots;       ///< Independently retained completion slots.
     std::size_t commandEntries;    ///< Borrowed input entries including duplicates per submission.
-    std::size_t commandSymbolUnits;  ///< Fixed UTF16 capacity in each command slot.
-    bool compactRecordArena = false; ///< Charge and allocate each record's measured arena instead of its maximum.
+    std::size_t commandSymbolUnits;   ///< Fixed UTF16 capacity in each command slot.
+    bool compactRecordArena = false;  ///< Charge and allocate each record's measured arena instead of its maximum.
+    std::size_t batchRecordBytes = 0; ///< Selected record backing per batch; zero disables, first row always fits.
 };
 
 /** Producer-local finite submit credits. */
@@ -659,10 +660,11 @@ class MuxQueue {
 
     /** Share one finite scheduler with explicit callback-origin eligibility.
      * @param work Actual caller credits, never replenished.
-     * @param retainedOnly Admit only newly projected cached INITIAL records to callbacks.
+     * @param mode Delivery eligibility for this owner step.
      * @return Existing fair progress result or unchanged typed error.
      */
-    std::expected<QueueProgress, QueueFailure> progressImpl(QueueWork &work, bool retainedOnly);
+    enum class ProgressMode { NORMAL, RETAINED, DEFER_CALLBACKS };
+    std::expected<QueueProgress, QueueFailure> progressImpl(QueueWork &work, ProgressMode mode);
 
     public:
     /** Transfer serialized ownership.
@@ -775,6 +777,12 @@ class MuxQueue {
      * @return Actual progress or nonterminal typed rejection.
      */
     std::expected<QueueProgress, QueueFailure> progress(QueueWork &work);
+
+    /** Advance admission, routing and controls without selecting a new callback batch.
+     * @param work Actual finite credits for this step.
+     * @return Progress observation or unchanged typed failure.
+     */
+    std::expected<QueueProgress, QueueFailure> progressWithoutCallbacks(QueueWork &work);
     /** Progress retained cache while the composing owner fences fresh source input.
      * Only actual cached INITIAL projections constructed by this mode can start callbacks. Previously queued
      * source/live/initial records are discarded with genuine work/gap accounting, never relabelled as replay.

@@ -18,6 +18,7 @@
 #include <asio/ip/address.hpp>
 #include <bit>
 #include <bitset>
+#include <concepts>
 #include <condition_variable>
 #include <limits>
 #include <mutex>
@@ -42,9 +43,14 @@ constexpr std::size_t HISTORY_POINTS_PER_KEY = 16;
 constexpr std::size_t CLIENT_SYMBOL_UNITS = CLIENT_KEYS * SYMBOL_UNITS;
 constexpr std::size_t INPUT_BYTES = 8192;
 constexpr std::size_t MAX_FRAME_BYTES = 65536;
+// A DATA row occupies at least a symbol marker and a compact record ID.
+constexpr std::size_t MINIMUM_WIRE_ROW_BYTES = 2;
+constexpr std::size_t MAX_STREAM_WINDOW_ROWS = MAX_FRAME_BYTES / MINIMUM_WIRE_ROW_BYTES;
 constexpr std::size_t FRAME_PREFIX_BYTES = 9;
 constexpr std::size_t EVENT_BYTES = 8192;
 constexpr std::size_t EVENT_OWNER_ALLOWANCE = 1024;
+constexpr std::size_t RECORD_COPY_PADDING =
+    (PublisherRecordLimits::MAX_FIELDS + 1) * (sizeof(char16_t) + 1) + alignof(core::FieldValueView);
 constexpr std::size_t SOURCE_EPOCH_BYTES = 4 * 1024 * 1024;
 constexpr std::size_t LOCAL_RECORD_EVENT_BYTES = 64 * 1024;
 constexpr encoding::UtfStringLimits PUBLISHER_TEXT_LIMITS{8192, 1024};
@@ -152,18 +158,28 @@ struct RecordStorage {
     std::size_t charge;
 };
 
-std::size_t streamWindow(const PublisherOptions &options) noexcept {
+/** Derive a finite view-index capacity from the independent egress and wire budgets. */
+std::size_t deliveryWindowRows(const PublisherOptions &options) noexcept {
     if (!options.streamBytes)
         return options.streamBatchRecords;
 
-    // Even a fieldless occurrence needs a symbol marker and a compact record ID.
-    constexpr std::size_t minimumWireRecord = 2;
-    const auto threshold = options.streamBytes->targetPayloadBytes;
-    const auto candidates = (threshold + minimumWireRecord - 1) / minimumWireRecord;
+    const auto &limits = *options.streamBytes;
+    const auto candidates = (limits.targetPayloadBytes + MINIMUM_WIRE_ROW_BYTES - 1) / MINIMUM_WIRE_ROW_BYTES;
+    // The immutable control block includes a complete MuxRecordView. The byte check uses its actual request.
+    const auto detached = std::max<std::size_t>(1, limits.deliveryWindowBytes / sizeof(mux::MuxRecordView));
+
+    return std::min(candidates, detached);
+}
+
+/** Bound each temporary source copy by its mailbox and by the room provable at a ready peer. */
+std::size_t sourceWindowRows(const PublisherOptions &options) noexcept {
+    if (!options.streamBytes)
+        return options.streamBatchRecords;
+
     const auto minimumInput = options.catalog ? sizeof(char16_t) : sizeof(SourceRow);
     const auto available = std::max<std::size_t>(1, options.recordLimits.pendingBytes / minimumInput);
 
-    return std::min({candidates, options.pendingQuotes, available});
+    return std::min({deliveryWindowRows(options), options.pendingQuotes, available});
 }
 
 std::optional<std::size_t> familyIndex(Family family) noexcept {
@@ -738,14 +754,13 @@ constexpr mux::ClientLimits CLIENT_LIMITS{
 mux::ClientLimits recordClientLimits(std::size_t rowBytes) {
     auto result = CLIENT_LIMITS;
     // A terminator and one byte of alignment may precede or follow each copied UTF-16 value.
-    constexpr auto MAX_TEXT_PADDING = (PublisherRecordLimits::MAX_FIELDS + 1) * (sizeof(char16_t) + 1);
     result.recordFields = PublisherRecordLimits::MAX_FIELDS;
     result.recordFieldUnits = rowBytes / sizeof(char16_t);
     result.recordByteUnits = rowBytes;
     // HISTORY may materialize the full default layout from a removal containing only the symbol and index.
     constexpr auto MAX_DEFAULT_ROW =
         PublisherRecordLimits::MAX_FIELDS * sizeof(core::FieldValueView) + SYMBOL_UNITS * sizeof(char16_t);
-    result.recordArenaBytes = std::max(rowBytes, MAX_DEFAULT_ROW) + MAX_TEXT_PADDING + alignof(core::FieldValueView);
+    result.recordArenaBytes = std::max(rowBytes, MAX_DEFAULT_ROW) + RECORD_COPY_PADDING;
 
     result.recordBytes = result.dataItems * (result.recordArenaBytes + EVENT_OWNER_ALLOWANCE);
 
@@ -759,15 +774,10 @@ mux::ClientLimits publisherClientLimits(const PublisherOptions &options, bool by
     if (!byteStream)
         return limits;
 
-    const auto window = streamWindow(options);
-    constexpr auto copyOverhead = EVENT_OWNER_ALLOWANCE +
-                                  (PublisherRecordLimits::MAX_FIELDS + 1) * (sizeof(char16_t) + 1) +
-                                  alignof(core::FieldValueView);
-    const auto payload = options.catalog
-                             ? std::min(options.recordLimits.pendingBytes, window * options.recordLimits.rowBytes)
-                             : window * limits.recordArenaBytes;
+    const auto window = deliveryWindowRows(options);
+    limits.batchRecordBytes = options.streamBytes->deliveryWindowBytes;
     // One retained delivery and one additional ready window can coexist for a healthy peer.
-    limits.recordBytes = 2 * (payload + window * copyOverhead);
+    limits.recordBytes = 2 * std::max(limits.batchRecordBytes, limits.recordArenaBytes + EVENT_OWNER_ALLOWANCE);
     limits.dataItems = 2 * window;
     limits.batchBytes =
         std::max(limits.batchBytes,
@@ -778,7 +788,8 @@ mux::ClientLimits publisherClientLimits(const PublisherOptions &options, bool by
 }
 
 mux::MuxQueue publisherQueue(const core::LocalSchema &schema, std::size_t peers, bool remote, Family family,
-                             bool catalog, const mux::ClientLimits &clientLimits, std::size_t streamBatchRecords) {
+                             bool catalog, const mux::ClientLimits &clientLimits, std::size_t streamSourceRows,
+                             std::size_t streamDeliveryRows) {
     const auto allKeys = peers * CLIENT_KEYS;
     const auto allUnits = peers * clientLimits.commandSymbolUnits;
     const auto records = schema.records().size();
@@ -786,10 +797,11 @@ mux::MuxQueue publisherQueue(const core::LocalSchema &schema, std::size_t peers,
                                            allKeys * 2, allUnits * 2, allKeys};
     const mux::MuxLimits interests{records,      peers,    allKeys,     allKeys,
                                    SYMBOL_UNITS, allUnits, CLIENT_KEYS, 8 * 1024 * 1024};
-    const auto batch = family == Family::STREAM ? streamBatchRecords : 1;
+    const auto source = family == Family::STREAM ? streamSourceRows : 1;
+    const auto batch = family == Family::STREAM ? streamDeliveryRows : 1;
     const mux::QueueLimits limits{peers,
-                                  remote ? REMOTE_DATA_RECORDS : batch,
-                                  batch,
+                                  remote ? REMOTE_DATA_RECORDS : source,
+                                  source,
                                   batch,
                                   8,
                                   peers * clientLimits.dataItems,
@@ -807,7 +819,7 @@ mux::MuxQueue publisherQueue(const core::LocalSchema &schema, std::size_t peers,
                              : catalog ? LOCAL_RECORD_EVENT_BYTES
                                        : EVENT_BYTES) +
                             EVENT_OWNER_ALLOWANCE;
-    const auto cacheBytes = cacheFrames * eventBytes * batch;
+    const auto cacheBytes = cacheFrames * eventBytes * source;
     const collectors::TickerLimits ticker{peers,  allKeys, cacheFrames, cacheBytes, cacheBytes + 32 * 1024 * 1024,
                                           desired};
     auto work = queueTurn();
@@ -816,10 +828,10 @@ mux::MuxQueue publisherQueue(const core::LocalSchema &schema, std::size_t peers,
         case Family::TICKER:
             return mux::MuxQueue::createTicker(schema, interests, ticker, {false, 100}, limits, work);
         case Family::STREAM:
-            return mux::MuxQueue::createStream(
-                schema, interests, desired,
-                {cacheFrames, cacheFrames * REMOTE_DATA_RECORDS, cacheBytes, cacheBytes + 32 * 1024 * 1024}, limits,
-                work);
+            return mux::MuxQueue::createStream(schema, interests, desired,
+                                               {cacheFrames, std::max(source, cacheFrames * REMOTE_DATA_RECORDS),
+                                                cacheBytes, cacheBytes + 32 * 1024 * 1024},
+                                               limits, work);
         case Family::HISTORY:
             return mux::MuxQueue::createHistory(
                 schema, interests,
@@ -870,7 +882,7 @@ protocol::detail::LocalEventOwner localOwner(bool catalog, std::size_t families,
     return std::move(*owner);
 }
 
-using DeliveryMask = std::bitset<MAX_PENDING_QUOTES>;
+using DeliveryMask = std::bitset<MAX_STREAM_WINDOW_ROWS>;
 
 /** The worker retains one detached callback batch until every eligible row has completed writing. */
 struct Delivery final : mux::MuxConsumer {
@@ -984,6 +996,7 @@ struct Peer {
     OutputKind outputKind = OutputKind::PROTOCOL;
     std::size_t outputFamily = 0;
     std::size_t outputEnd = 0;
+    std::size_t outputRecordCount = 0;
     DeliveryMask outputRows;
     std::size_t nextFamily = 0;
     bool sentProtocol = false;
@@ -1043,6 +1056,7 @@ composeDelivery(Peer &peer, std::size_t family, const core::LocalSchema &schema,
 
     const auto rememberRows = [&](std::size_t written) {
         peer.outputEnd = indices[written - 1] + 1;
+        peer.outputRecordCount = written;
         peer.outputRows.reset();
 
         for (std::size_t i = 0; i < written; ++i)
@@ -1473,7 +1487,8 @@ class PublisherServer {
     std::optional<protocol::detail::LocalEventOwner> source_;
     const mux::ClientLimits clientLimits_;
     const mux::ClientLimits streamClientLimits_;
-    const std::size_t streamBatchRecords_;
+    const std::size_t streamSourceRows_;
+    const std::size_t streamDeliveryRows_;
     const std::optional<PublisherStreamByteLimits> streamBytes_;
     std::vector<RecordRow> recordScratch_;
     std::vector<SourceRow> typedScratch_;
@@ -1518,7 +1533,7 @@ class PublisherServer {
 
     void validateCatalog() const {
         auto work = liveTurn(!catalogNames_.empty());
-        auto session = serverSession(schema_, catalogNames_, work, streamBatchRecords_);
+        auto session = serverSession(schema_, catalogNames_, work, streamDeliveryRows_);
         const auto description = session.describe(recordIds_, work);
 
         if (!description)
@@ -1554,7 +1569,7 @@ class PublisherServer {
                 demand = found->demand;
 
             auto liveWork = liveTurn(!catalogNames_.empty());
-            auto session = serverSession(schema_, catalogNames_, liveWork, streamBatchRecords_);
+            auto session = serverSession(schema_, catalogNames_, liveWork, streamDeliveryRows_);
             const auto now = Clock::now();
             Peer peer{.id = **accepted,
                       .session = std::move(session),
@@ -1572,7 +1587,7 @@ class PublisherServer {
                 auto limits = family == STREAM_FAMILY ? streamClientLimits_ : clientLimits_;
 
                 if (family == STREAM_FAMILY)
-                    limits.batchRecords = streamBatchRecords_;
+                    limits.batchRecords = streamDeliveryRows_;
 
                 auto handle = queues_[family]->open(limits, peer.delivery[family], work);
 
@@ -1906,7 +1921,7 @@ class PublisherServer {
         case OutputKind::DATA: {
             auto &stats = statistics_.families[peer.outputFamily];
             stats.sentFrames.add(1);
-            stats.maxSentFrameRecords = std::max(stats.maxSentFrameRecords, peer.outputRows.count());
+            stats.maxSentFrameRecords = std::max(stats.maxSentFrameRecords, peer.outputRecordCount);
             stats.maxSentFrameBytes = std::max(stats.maxSentFrameBytes, frameBytes);
             streamAdvanced |= streamBytes_ && peer.outputFamily == STREAM_FAMILY;
 
@@ -2190,16 +2205,18 @@ class PublisherServer {
         completePolicy(port, {PublisherPolicyOutcome::APPLIED, revision, {}});
     }
 
-    /** Guard the next STREAM source window against detached record pressure. A ready peer can
-     * still advance delivery when another peer exhausts its individual finite budget.
+    /** Guard the next STREAM source window against detached record pressure.
+     * @param allPeers Require headroom at every subscribed peer before collecting another group without socket
+     * progress.
+     * @return Whether the selected peer readiness condition allows source progress.
      */
-    bool canAdvanceStream() const noexcept {
+    bool canAdvanceStream(bool allPeers = false) const noexcept {
         const auto &queue = *queues_[STREAM_FAMILY];
 
         if (queue.resources().pendingRecords != 0)
             return false;
 
-        bool hasSubscribers = false;
+        bool blocked = false;
 
         for (const auto &peer : peers_) {
             if (!peer || peer->closing || peer->requested[STREAM_FAMILY].empty())
@@ -2210,14 +2227,19 @@ class PublisherServer {
             if (!resources || resources->state == mux::QueueClientState::TERMINAL)
                 continue;
 
-            hasSubscribers = true;
+            const bool ready = resources->recordOwners <= streamDeliveryRows_ &&
+                               resources->recordBytes <= streamClientLimits_.recordBytes / 2;
 
-            if (resources->recordOwners <= streamBatchRecords_ &&
-                resources->recordBytes <= streamClientLimits_.recordBytes / 2)
+            if (allPeers && !ready)
+                return false;
+
+            if (!allPeers && ready)
                 return true;
+
+            blocked |= !ready;
         }
 
-        return !hasSubscribers;
+        return !blocked;
     }
 
     /** Check the next FIFO row under the port mutex. */
@@ -2238,11 +2260,28 @@ class PublisherServer {
     std::size_t popStreamRows(detail::PublisherPort &port, std::vector<Row> &pending, std::span<Row> rows) const {
         const std::lock_guard lock(port.mutex);
         std::size_t count = 0;
+        std::size_t copied = 0;
 
         if (!canTakeLocal(port))
             return 0;
 
         while (port.size != 0 && count < rows.size() && pending[port.head].family == STREAM_FAMILY) {
+            if (streamBytes_) {
+                const auto &row = pending[port.head];
+                std::size_t charge;
+
+                if constexpr (std::same_as<Row, RecordRow>)
+                    charge = row.charge + RECORD_COPY_PADDING + EVENT_OWNER_ALLOWANCE;
+                else
+                    charge = MAX_DATA_FIELDS * sizeof(core::FieldValueView) + (row.length + 1) * sizeof(char16_t) +
+                             alignof(core::FieldValueView) + EVENT_OWNER_ALLOWANCE;
+
+                if (count && charge > streamClientLimits_.recordBytes / 2 - copied)
+                    break;
+
+                copied += charge;
+            }
+
             rows[count++] = std::move(pending[port.head]);
             port.head = (port.head + 1) % pending.size();
             --port.size;
@@ -2252,12 +2291,12 @@ class PublisherServer {
     }
 
     bool batchesLocalStream() const noexcept {
-        return streamBytes_ || streamBatchRecords_ > 1;
+        return streamBytes_ || streamSourceRows_ > 1;
     }
 
     /** Fund one whole STREAM fan-out and the delivery eligibility checks for that window. */
     void fundStreamWindow(mux::QueueWork &work) const noexcept {
-        const auto copies = peers_.size() * streamBatchRecords_;
+        const auto copies = peers_.size() * (2 * streamDeliveryRows_ + streamSourceRows_);
         const auto fields = copies * streamClientLimits_.recordFields;
         const auto bytes = peers_.size() * streamClientLimits_.recordBytes;
         constexpr auto projectionPasses = 1 + core::MAX_DELIVERY_PROJECTIONS;
@@ -2304,7 +2343,7 @@ class PublisherServer {
     }
 
     /** Move retained rows onto the worker's ordinary local event owner and keep the original budget charged. */
-    void takeLocalRecord(detail::PublisherPort &port) {
+    void takeLocalRecord(detail::PublisherPort &port, bool streamOnly) {
         if (recordApplication_) {
             if (queues_[recordApplication_->family]->resources().pendingRecords != 0)
                 return;
@@ -2316,6 +2355,9 @@ class PublisherServer {
         }
 
         if (batchesLocalStream() && takeLocalStream(port))
+            return;
+
+        if (streamOnly)
             return;
 
         RecordRow row;
@@ -2376,8 +2418,11 @@ class PublisherServer {
     }
 
     /** Adopt a typed publication through its existing fixed physical layout. */
-    void takeTypedRecord(detail::PublisherPort &port) {
+    void takeTypedRecord(detail::PublisherPort &port, bool streamOnly) {
         if (batchesLocalStream() && takeTypedStream(port))
+            return;
+
+        if (streamOnly)
             return;
 
         SourceRow row;
@@ -2414,28 +2459,33 @@ class PublisherServer {
     /** Admit the next local owner if its queue can accept it.
      * @param port Bounded producer mailbox.
      * @param work Remaining queue credits for this turn.
-     * @return Whether a source owner entered its queue.
+     * @param streamOnly Leave other families in FIFO order for normal progress.
+     * @return Whole admitted record count, or zero if the source cannot advance.
      */
-    bool publishLocal(detail::PublisherPort &port, WorkSet &work) {
+    std::size_t publishLocal(detail::PublisherPort &port, WorkSet &work, bool streamOnly = false) {
         if (!pendingSource_) {
             if (port.localRecords)
-                takeLocalRecord(port);
+                takeLocalRecord(port, streamOnly);
             else
-                takeTypedRecord(port);
+                takeTypedRecord(port, streamOnly);
 
             if (!pendingSource_)
-                return false;
+                return 0;
         }
 
         const auto message = static_cast<DataMessage>(*pendingSource_->messageType());
         const auto family = static_cast<std::size_t>(std::ranges::find(DATA_MESSAGES, message) - DATA_MESSAGES.begin());
+
+        if (streamOnly && family != STREAM_FAMILY)
+            return 0;
+
         const auto records = pendingSource_->records().size();
         const auto admitted = queues_[family]->admit(std::move(*pendingSource_), work[family]);
 
         if (!admitted) {
             if (admitted.error().error == mux::QueueError::BUSY ||
                 admitted.error().error == mux::QueueError::WORK_LIMIT)
-                return false;
+                return 0;
 
             throw Error(queueDiagnostic(admitted.error(), "publisher-admit"));
         }
@@ -2444,7 +2494,55 @@ class PublisherServer {
         statistics_.families[family].ingressRecords.add(records);
         pendingSource_.reset();
 
-        return true;
+        return records;
+    }
+
+    /** Route ready source groups before detaching the next byte-bounded client batch.
+     * @param port Bounded producer mailbox; this method never waits for another admission.
+     * @param work Shared finite turn credits, including the regular callback rotation.
+     * @param callbackSteps Reserve at least this many attempts for the subsequent normal rotation.
+     * @return Whether source admission or queue work advanced.
+     */
+    bool collectStream(detail::PublisherPort &port, WorkSet &work, std::size_t callbackSteps) {
+        auto &queue = *queues_[STREAM_FAMILY];
+        auto &credits = work[STREAM_FAMILY];
+        auto remaining = streamDeliveryRows_;
+        bool advanced = false;
+        bool collectedGroup = queue.resources().pendingRecords != 0;
+
+        while (remaining && credits.operations > callbackSteps) {
+            if (queue.resources().pendingRecords == 0) {
+                // Flush ready selections before collecting more for a peer that needs another socket turn.
+                if (collectedGroup && !canAdvanceStream(true))
+                    break;
+
+                const auto admitted = publishLocal(port, work, true);
+
+                if (!admitted &&
+                    (!pendingSource_ || pendingSource_->messageType() != std::to_underlying(DataMessage::STREAM_DATA)))
+                    break;
+
+                remaining -= std::min(remaining, admitted);
+                advanced |= admitted != 0;
+                collectedGroup |= admitted != 0;
+            }
+
+            const auto moved = queue.progressWithoutCallbacks(credits);
+
+            if (!moved) {
+                if (moved.error().error == mux::QueueError::WORK_LIMIT)
+                    break;
+
+                throw Error(queueDiagnostic(moved.error(), "publisher-stream-collection"));
+            }
+
+            if (moved->kind == mux::QueueProgressKind::TERMINAL)
+                break;
+
+            advanced |= moved->kind != mux::QueueProgressKind::IDLE;
+        }
+
+        return advanced;
     }
 
     void publishSourceStatus(detail::PublisherPort &port) {
@@ -2567,11 +2665,11 @@ class PublisherServer {
         : schema_(createSchema(options)), recordIds_(recordIds(schema_)), catalogNames_(catalogNames(options, schema_)),
           clientLimits_(publisherClientLimits(options)),
           streamClientLimits_(publisherClientLimits(options, options.streamBytes.has_value())),
-          streamBatchRecords_(streamWindow(options)), streamBytes_(options.streamBytes),
-          recordScratch_(options.catalog && !options.source ? streamBatchRecords_ : 0),
-          typedScratch_(!options.catalog && !options.source ? streamBatchRecords_ : 0),
-          typedFieldScratch_(typedScratch_.size()), sourceViews_(options.source ? 0 : streamBatchRecords_),
-          outgoingViews_(streamBatchRecords_), outgoingIndices_(streamBatchRecords_),
+          streamSourceRows_(sourceWindowRows(options)), streamDeliveryRows_(deliveryWindowRows(options)),
+          streamBytes_(options.streamBytes), recordScratch_(options.catalog && !options.source ? streamSourceRows_ : 0),
+          typedScratch_(!options.catalog && !options.source ? streamSourceRows_ : 0),
+          typedFieldScratch_(typedScratch_.size()), sourceViews_(options.source ? 0 : streamSourceRows_),
+          outgoingViews_(streamDeliveryRows_), outgoingIndices_(streamDeliveryRows_),
           listener_(listen(bootstrap, options.listener)), peers_(options.listener.maxConnections),
           demandPolicies_(std::move(demand)), familyCount_(enabledFamilies(options)) {
         if (streamBytes_)
@@ -2593,10 +2691,10 @@ class PublisherServer {
         for (std::size_t family = 0; family < familyCount_; ++family)
             queues_[family].emplace(publisherQueue(
                 schema_, peers_.size(), options.source.has_value(), FAMILIES[family], !catalogNames_.empty(),
-                family == STREAM_FAMILY ? streamClientLimits_ : clientLimits_, streamBatchRecords_));
+                family == STREAM_FAMILY ? streamClientLimits_ : clientLimits_, streamSourceRows_, streamDeliveryRows_));
 
         if (!options.source) {
-            source_.emplace(localOwner(!catalogNames_.empty(), familyCount_, streamBatchRecords_));
+            source_.emplace(localOwner(!catalogNames_.empty(), familyCount_, streamSourceRows_));
 
             return;
         }
@@ -2652,8 +2750,10 @@ class PublisherServer {
             turn = serverQueueTurn(peers_.size(), sourceOptions_.has_value(), !catalogNames_.empty(), familyCount_,
                                    recordIds_.size());
 
-            if (family == STREAM_FAMILY && streamBytes_)
+            if (family == STREAM_FAMILY && streamBytes_) {
                 fundStreamWindow(turn);
+                advanced |= collectStream(port, work, queueActions);
+            }
 
             std::size_t idleVisits = 0;
 
@@ -3093,7 +3193,9 @@ PublisherEndpoint::create(transport::RuntimeBootstrap &bootstrap, PublisherOptio
 
     if (const auto &wire = options.streamBytes;
         wire && (options.source || (!options.mixed && !options.catalog) || !wire->targetPayloadBytes ||
-                 wire->targetPayloadBytes >= wire->maxFrameBytes || wire->maxFrameBytes > MAX_FRAME_BYTES))
+                 wire->targetPayloadBytes >= wire->maxFrameBytes || wire->maxFrameBytes > MAX_FRAME_BYTES ||
+                 !wire->deliveryWindowBytes ||
+                 wire->deliveryWindowBytes > PublisherStreamByteLimits::MAX_DELIVERY_WINDOW_BYTES))
         return std::unexpected(Diagnostic{ErrorCode::INVALID_ARGUMENT, "publisher-stream-bytes"});
 
     if (options.streamBytes && options.mixed &&

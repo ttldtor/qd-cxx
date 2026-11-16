@@ -143,10 +143,13 @@ struct PublisherRecordLimits {
     std::size_t pendingBytes = 256 * 1024; ///< Maximum total while queued or awaiting collector processing.
 };
 
-/** Independent wire budgets for local STREAM. Input storage uses PublisherRecordLimits. */
+/** Independent delivery and wire budgets for local STREAM. */
 struct PublisherStreamByteLimits {
-    std::size_t targetPayloadBytes = 8000; ///< Soft encoded payload threshold before taking another record.
-    std::size_t maxFrameBytes = 64 * 1024; ///< Hard complete-frame limit including the length prefix.
+    static constexpr std::size_t MAX_DELIVERY_WINDOW_BYTES = 8 * 1024 * 1024; ///< Maximum configured window.
+
+    std::size_t targetPayloadBytes = 8000;        ///< Soft encoded payload threshold before taking another record.
+    std::size_t maxFrameBytes = 64 * 1024;        ///< Hard complete-frame limit including the length prefix.
+    std::size_t deliveryWindowBytes = 256 * 1024; ///< Detached record bytes selected per peer; one large row may pass.
 };
 
 /** Finite local or remote publishing profile. */
