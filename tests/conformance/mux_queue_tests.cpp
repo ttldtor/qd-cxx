@@ -4,6 +4,7 @@
 #include "../../src/core/delivery_statistics.hpp"
 #include "../../src/events/derived_order_sources.hpp"
 #include "../../src/mux/queue_replace.hpp"
+#include "../../src/mux/queue_schedule.hpp"
 #include "../../src/protocol/local_event_owner.hpp"
 #include "qd/encoding/compact.hpp"
 #include "qd/encoding/utf_char.hpp"
@@ -1022,6 +1023,49 @@ TEST_CASE("flat local STREAM batch shares backing across split route groups and 
     release.join();
     CHECK(valid.load());
     CHECK(lifetime.expired());
+}
+
+TEST_CASE("scheduling observations follow pending routing retained delivery and invalid owners") {
+    using Access = m::detail::QueueScheduleAccess;
+    auto f = fixture(c::SubscriptionFamily::STREAM);
+    auto receiver = std::make_shared<Recorder>();
+    receiver->retain = receiver->pause = true;
+    auto limits = clientLimits();
+    limits.compactRecordArena = true;
+    limits.batchRecords = 1;
+    auto handle = open(f, receiver, limits);
+    add(f, handle);
+    auto event = flatEvent(f.schema);
+    auto work = turn();
+    REQUIRE(f.queue.admit(std::move(event), work));
+    CHECK(Access::pendingRecords(f.queue) == 2);
+    until(f, [&] {
+        return receiver->retained.size() == 1;
+    });
+
+    const auto current = Access::client(f.queue, handle);
+    REQUIRE(current);
+    CHECK(current->state == f.queue.resources(handle)->state);
+    CHECK(current->recordOwners == 2);
+    CHECK(current->recordBytes == f.queue.resources(handle)->recordBytes);
+    CHECK(current->queuedRecords == 1);
+    CHECK(Access::pendingRecords(f.queue) == f.queue.resources().pendingRecords);
+    CHECK(Access::dataItems(f.queue) == f.queue.resources().dataItems);
+    receiver->retained.clear();
+    CHECK(Access::client(f.queue, handle)->recordOwners == 1);
+
+    auto foreign = fixture(c::SubscriptionFamily::STREAM);
+    const auto wrongOwner = Access::client(foreign.queue, handle);
+    REQUIRE_FALSE(wrongOwner);
+    CHECK(wrongOwner.error().error == m::QueueError::INVALID_CLIENT);
+
+    auto moved = std::move(f.queue);
+    CHECK(Access::pendingRecords(f.queue) == 0);
+    CHECK(Access::dataItems(f.queue) == 0);
+    const auto emptyOwner = Access::client(f.queue, handle);
+    REQUIRE_FALSE(emptyOwner);
+    CHECK(emptyOwner.error().error == m::QueueError::INVALID_STATE);
+    CHECK(Access::client(moved, handle)->queuedRecords == 1);
 }
 
 TEST_CASE("private STREAM run retains its delivered prefix across withdrawal reset and abort") {

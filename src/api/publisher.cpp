@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <array>
 #include <asio/ip/address.hpp>
+#include <atomic>
 #include <bit>
 #include <bitset>
 #include <concepts>
@@ -1188,6 +1189,7 @@ struct PublisherPort {
     std::array<PublisherPeer, MAX_PEERS> peers;
     std::size_t peerCount = 0;
     std::optional<PublisherPolicyCommand> policyCommand;
+    std::atomic<bool> policyPending{false}; ///< Skip the mailbox lock when no policy work was submitted.
     const bool remote;
     const bool localRecords;
     const std::size_t families;
@@ -2092,10 +2094,14 @@ class PublisherServer {
     void completePolicy(detail::PublisherPort &port, PublisherPolicyResult outcome) noexcept {
         port.policyCommand->completion->complete(outcome);
         port.policyCommand.reset();
+        port.policyPending.store(false, std::memory_order_release);
         port.changed.notify_all();
     }
 
     void progressPolicy(detail::PublisherPort &port) {
+        if (!port.policyPending.load(std::memory_order_acquire))
+            return;
+
         auto input = [&] {
             const std::lock_guard lock(port.mutex);
 
@@ -2245,7 +2251,7 @@ class PublisherServer {
     bool canAdvanceStream(bool allPeers = false) const noexcept {
         const auto &queue = *queues_[STREAM_FAMILY];
 
-        if (queue.resources().pendingRecords != 0)
+        if (mux::detail::QueueScheduleAccess::pendingRecords(queue) != 0)
             return false;
 
         bool blocked = false;
@@ -2254,7 +2260,7 @@ class PublisherServer {
             if (!peer || peer->closing || peer->requested[STREAM_FAMILY].empty())
                 continue;
 
-            const auto resources = queue.resources(peer->handles[STREAM_FAMILY]);
+            const auto resources = mux::detail::QueueScheduleAccess::client(queue, peer->handles[STREAM_FAMILY]);
 
             if (!resources || resources->state == mux::QueueClientState::TERMINAL)
                 continue;
@@ -2387,7 +2393,7 @@ class PublisherServer {
     /** Move retained rows onto the worker's ordinary local event owner and keep the original budget charged. */
     void takeLocalRecord(detail::PublisherPort &port, bool streamOnly) {
         if (recordApplication_) {
-            if (queues_[recordApplication_->family]->resources().pendingRecords != 0)
+            if (mux::detail::QueueScheduleAccess::pendingRecords(*queues_[recordApplication_->family]) != 0)
                 return;
 
             const std::lock_guard lock(port.mutex);
@@ -2549,10 +2555,10 @@ class PublisherServer {
         auto &credits = work[STREAM_FAMILY];
         auto remaining = streamDeliveryRows_;
         bool advanced = false;
-        bool collectedGroup = queue.resources().pendingRecords != 0;
+        bool collectedGroup = mux::detail::QueueScheduleAccess::pendingRecords(queue) != 0;
 
         while (remaining && credits.operations > callbackSteps) {
-            if (queue.resources().pendingRecords == 0) {
+            if (mux::detail::QueueScheduleAccess::pendingRecords(queue) == 0) {
                 // Flush ready selections before collecting more for a peer that needs another socket turn.
                 if (collectedGroup && !canAdvanceStream(true))
                     break;
@@ -2834,10 +2840,10 @@ class PublisherServer {
 
         for (std::size_t family = 0; family < familyCount_; ++family) {
             auto &familyStats = statistics_.families[family];
-            const auto resources = queues_[family]->resources();
+            const auto &queue = *queues_[family];
             familyStats.desiredKeys = queues_[family]->aggregateEntries().size();
-            familyStats.pendingSourceRecords = resources.pendingRecords;
-            familyStats.deliveryRecordOwners = resources.dataItems;
+            familyStats.pendingSourceRecords = mux::detail::QueueScheduleAccess::pendingRecords(queue);
+            familyStats.deliveryRecordOwners = mux::detail::QueueScheduleAccess::dataItems(queue);
             familyStats.queuedDeliveryRecords = 0;
             familyStats.retainedOutputRecords = 0;
 
@@ -2845,7 +2851,7 @@ class PublisherServer {
                 if (!peer)
                     continue;
 
-                if (const auto client = queues_[family]->resources(peer->handles[family]))
+                if (const auto client = mux::detail::QueueScheduleAccess::client(queue, peer->handles[family]))
                     familyStats.queuedDeliveryRecords += client->queuedRecords;
 
                 familyStats.retainedOutputRecords += peer->delivery[family]->batch.records().size();
@@ -2874,8 +2880,8 @@ class PublisherServer {
 
         // An admission can arrive after progress() releases the mailbox and before we enter the wait.
         // An already held source owner must make queue progress before another admission can be taken.
-        const bool canApply =
-            !recordApplication_ || queues_[recordApplication_->family]->resources().pendingRecords == 0;
+        const bool canApply = !recordApplication_ || mux::detail::QueueScheduleAccess::pendingRecords(
+                                                         *queues_[recordApplication_->family]) == 0;
 
         if (port.closed || (!port.remote && (!port.localRecords || batchesLocalStream()) && canApply &&
                             !pendingSource_ && canTakeLocal(port)))
@@ -2942,6 +2948,8 @@ void runPublisher(detail::PublisherPort &port, transport::RuntimeBootstrap &boot
             port.policyCommand->completion->complete({PublisherPolicyOutcome::PEER_CLOSED, 0, CLOSED});
             port.policyCommand.reset();
         }
+
+        port.policyPending.store(false, std::memory_order_release);
     }
     port.changed.notify_all();
 }
@@ -3422,6 +3430,7 @@ std::expected<PublisherPolicyChange, Diagnostic> PublisherEndpoint::replacePeerD
         constexpr auto policyTimeout = 5s;
         port.policyCommand.emplace(detail::PublisherPeerIdentityAccess::get(id), std::move(demand), completion,
                                    Clock::now() + policyTimeout);
+        port.policyPending.store(true, std::memory_order_release);
         port.changed.notify_all();
 
         return PublisherPolicyChange(std::move(completion));
