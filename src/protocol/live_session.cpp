@@ -2506,6 +2506,20 @@ std::size_t LiveEvent::residentBytes() const noexcept {
                   : 0;
 }
 
+bool detail::SharedRecordAccess::hasSharedRecords(const LiveEvent &event) noexcept {
+    return event.state_ && !event.state_->sharedRows.empty();
+}
+
+std::span<const std::shared_ptr<const core::detail::SharedRecordPayload>>
+detail::SharedRecordAccess::payloads(const LiveEvent &event, std::span<const LiveRecordView> records) noexcept {
+    if (!event.state_ || event.state_->sharedRows.empty() || records.empty())
+        return {};
+
+    const auto index = static_cast<std::size_t>(records.data() - event.state_->records.data());
+
+    return std::span(event.state_->sharedRows).subspan(index, records.size());
+}
+
 std::shared_ptr<const core::detail::SharedRecordPayload>
 detail::SharedRecordAccess::retain(const LiveEvent &event, const LiveRecordView &record) noexcept {
     if (!event.state_ || event.state_->sharedRows.empty())

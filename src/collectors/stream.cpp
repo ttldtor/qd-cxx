@@ -6,6 +6,7 @@
 #include "stream_replace.hpp"
 #include "stream_retention.hpp"
 
+#include <algorithm>
 #include <limits>
 #include <new>
 #include <utility>
@@ -75,6 +76,7 @@ struct StreamCollector::Impl {
     /** One immutable frame and the selected items retaining it. */
     struct Frame {
         std::optional<protocol::LiveEvent> event; ///< Full owner, never a decoder prefix.
+        bool sharedRange = false;                 ///< Every row of the homogeneous frame owns a pure local payload.
         std::size_t remaining = 0;                ///< Number of selected items still queued.
         std::size_t bytes = 0;                    ///< Unique event backing reserved in this collector scope.
     };
@@ -85,6 +87,7 @@ struct StreamCollector::Impl {
         core::SubscriptionMembership membership; ///< Admission activation, independent of symbol-view lifetime.
         std::uint64_t revision = 0;              ///< Whole-frame desired revision.
         std::size_t frame = 0;                   ///< Fixed frame ring index.
+        std::size_t count = 1;                   ///< Contiguous rows sharing this exact admission activation.
     };
 
     protocol::LiveIdentity epoch;      ///< Retained through drain; destruction follows all frame releases.
@@ -167,19 +170,37 @@ struct StreamCollector::Impl {
     /** Remove one front item after all possible failures and work charges.
      * Counts are updated by the caller according to delivery/withdrawal/discard intent.
      */
-    void removeFront() noexcept {
-        auto &item = items[itemHead];
-        auto &frame = frames[item.frame];
-        item = Item{};
-        --itemCount;
-        itemHead = itemHead + 1 == limits.records ? 0 : itemHead + 1;
+    void removeFront(std::size_t count = 1) noexcept {
+        while (count) {
+            auto &item = items[itemHead];
+            auto &frame = frames[item.frame];
+            const auto removed = std::min(count, item.count);
+            item.count -= removed;
+            item.record += removed;
+            itemCount -= removed;
+            count -= removed;
 
-        if (--frame.remaining == 0) {
-            stagedBytes -= frame.bytes;
-            frame.event.reset();
-            frame.bytes = 0;
-            --frameCount;
-            frameHead = frameHead + 1 == limits.frames ? 0 : frameHead + 1;
+            if (item.count) {
+                // The sole range descriptor stays at the logical head until its last row is consumed.
+                const auto next = index(removed);
+                items[next] = std::move(item);
+                item = Item{};
+                itemHead = next;
+            } else {
+                item = Item{};
+                itemHead = index(removed);
+            }
+
+            frame.remaining -= removed;
+
+            if (frame.remaining == 0) {
+                stagedBytes -= frame.bytes;
+                frame.sharedRange = false;
+                frame.event.reset();
+                frame.bytes = 0;
+                --frameCount;
+                frameHead = frameHead + 1 == limits.frames ? 0 : frameHead + 1;
+            }
         }
     }
 
@@ -202,9 +223,7 @@ struct StreamCollector::Impl {
     std::size_t discardItems() noexcept {
         const auto count = itemCount;
 
-        while (itemCount != 0) {
-            removeFront();
-        }
+        removeFront(itemCount);
 
         invalidate();
         accumulate(counts.discarded, count, counts.saturated);
@@ -385,6 +404,24 @@ std::expected<StreamStage, StreamError> StreamCollector::stage(protocol::LiveEve
         }
 
         std::size_t selected = 0;
+        const bool sharedInput = protocol::detail::SharedRecordAccess::hasSharedRecords(event);
+        bool homogeneous = sharedInput && !event.records().empty();
+        bool previousRequested = false;
+
+        if (homogeneous) {
+            const auto &first = event.records().front();
+
+            for (const auto &record : event.records()) {
+                debit(1, work.visits);
+                debit(record.symbol.size(), work.textUnits);
+
+                if (!record.context.matches(first.context) || record.symbol != first.symbol) {
+                    homogeneous = false;
+
+                    break;
+                }
+            }
+        }
 
         // Reserve both matching passes before writing any free ring slot or transferring ownership.
         for (const auto &record : event.records()) {
@@ -402,22 +439,28 @@ std::expected<StreamStage, StreamError> StreamCollector::stage(protocol::LiveEve
 
             bool requested = false;
 
-            for (const auto &entry : impl_->desired.entries()) {
-                debit(2, work.visits);
-                debit(record.symbol.size(), work.textUnits);
-                debit(entry.key.symbol.size(), work.textUnits);
-                debit(record.symbol.size(), work.textUnits);
-                debit(entry.key.symbol.size(), work.textUnits);
+            if (homogeneous && &record != event.records().data()) {
+                requested = previousRequested;
+            } else
+                for (const auto &entry : impl_->desired.entries()) {
+                    debit(2, work.visits);
+                    debit(record.symbol.size(), work.textUnits);
+                    debit(entry.key.symbol.size(), work.textUnits);
+                    debit(record.symbol.size(), work.textUnits);
+                    debit(entry.key.symbol.size(), work.textUnits);
 
-                if (entry.key.context.matches(record.context) &&
-                    (entry.key.selector == core::SubscriptionSelectorKind::ALL || entry.key.symbol == record.symbol)) {
-                    requested = true;
+                    if (entry.key.context.matches(record.context) &&
+                        (entry.key.selector == core::SubscriptionSelectorKind::ALL ||
+                         entry.key.symbol == record.symbol)) {
+                        requested = true;
+                    }
                 }
-            }
 
             if (requested) {
                 ++selected;
             }
+
+            previousRequested = requested;
         }
 
         const auto ignored = event.records().size() - selected;
@@ -444,18 +487,33 @@ std::expected<StreamStage, StreamError> StreamCollector::stage(protocol::LiveEve
         const auto frameIndex =
             impl_->frameCount < frameSuffix ? impl_->frameHead + impl_->frameCount : impl_->frameCount - frameSuffix;
         std::size_t offset = impl_->itemCount;
+        bool sharedRange = false;
 
-        for (const auto &record : event.records()) {
-            if (const auto membership = impl_->match(record)) {
-                auto &item = impl_->items[impl_->index(offset++)];
-                item.record = &record;
-                item.membership = *membership;
-                item.revision = revision;
-                item.frame = frameIndex;
-            }
+        if (homogeneous) {
+            debit(selected, work.visits);
+            const auto payloads = protocol::detail::SharedRecordAccess::payloads(event, event.records());
+            sharedRange = std::ranges::all_of(payloads, [](const auto &payload) {
+                return bool(payload);
+            });
         }
 
+        if (homogeneous) {
+            auto &item = impl_->items[impl_->index(offset)];
+            item = {event.records().data(), *impl_->match(event.records().front()), revision, frameIndex, selected};
+        } else
+            for (const auto &record : event.records()) {
+                if (const auto membership = impl_->match(record)) {
+                    auto &item = impl_->items[impl_->index(offset++)];
+                    item.record = &record;
+                    item.membership = *membership;
+                    item.revision = revision;
+                    item.frame = frameIndex;
+                    item.count = 1;
+                }
+            }
+
         auto &frame = impl_->frames[frameIndex];
+        frame.sharedRange = sharedRange;
         frame.event.emplace(std::move(event));
         frame.remaining = selected;
         frame.bytes = bytes;
@@ -488,7 +546,7 @@ std::expected<std::optional<StreamDelivery>, StreamError> StreamCollector::front
 
         std::size_t withdrawn = 0;
 
-        for (; withdrawn < impl_->itemCount; ++withdrawn) {
+        for (; withdrawn < impl_->itemCount;) {
             const auto &item = impl_->items[impl_->index(withdrawn)];
             debit(1, work.visits);
             debit(impl_->desired.entries().size(), work.visits);
@@ -501,18 +559,18 @@ std::expected<std::optional<StreamDelivery>, StreamError> StreamCollector::front
                 break;
             }
 
-            const bool last =
-                withdrawn + 1 == impl_->itemCount || impl_->items[impl_->index(withdrawn + 1)].frame != item.frame;
+            const bool last = withdrawn + item.count == impl_->itemCount ||
+                              impl_->items[impl_->index(withdrawn + item.count)].frame != item.frame;
 
             if (last) {
                 debit(1, work.visits);
                 debit(impl_->frames[item.frame].event->releaseBytes(), work.bytes);
             }
+
+            withdrawn += item.count;
         }
 
-        for (std::size_t i = 0; i < withdrawn; ++i) {
-            impl_->removeFront();
-        }
+        impl_->removeFront(withdrawn);
 
         accumulate(impl_->counts.withdrawn, withdrawn, impl_->counts.saturated);
         impl_->invalidate();
@@ -586,10 +644,14 @@ StreamCollector::prepareBatch(std::span<StreamDelivery> storage, StreamWork &wor
                 debit(impl_->desired.entries().size(), work.visits);
             }
 
-            const auto &item = impl_->items[impl_->index(prefix++)];
+            const auto &item = impl_->items[impl_->index(prefix)];
 
             if (impl_->desired.isCurrent(item.membership)) {
-                ++selected;
+                const auto count = std::min(item.count, storage.size() - selected);
+                selected += count;
+                prefix += count;
+            } else {
+                prefix += item.count;
             }
         }
 
@@ -598,12 +660,18 @@ StreamCollector::prepareBatch(std::span<StreamDelivery> storage, StreamWork &wor
         debit(selected, work.visits);
         std::size_t output = 0;
 
-        for (std::size_t offset = 0; offset < prefix; ++offset) {
+        for (std::size_t offset = 0; offset < prefix;) {
             const auto &item = impl_->items[impl_->index(offset)];
+            const auto count = std::min(item.count, prefix - offset);
 
             if (impl_->desired.isCurrent(item.membership)) {
-                storage[output++] = impl_->delivery(item);
+                for (std::size_t i = 0; i < count; ++i) {
+                    storage[output] = impl_->delivery(item);
+                    storage[output++].record += i;
+                }
             }
+
+            offset += count;
         }
 
         impl_->invalidate();
@@ -617,18 +685,58 @@ StreamCollector::prepareBatch(std::span<StreamDelivery> storage, StreamWork &wor
     }
 }
 
+std::expected<std::optional<detail::StreamRangeDelivery>, StreamError>
+detail::StreamRetentionAccess::prepareRange(StreamCollector &collector, std::size_t maximum, StreamWork &work) {
+    try {
+        auto &state = *collector.impl_;
+
+        if (state.diagnostic.error || !state.itemCount || !maximum)
+            return std::optional<StreamRangeDelivery>{};
+
+        const auto &item = state.items[state.itemHead];
+        const auto count = std::min(item.count, maximum);
+        const auto &event = *state.frames[item.frame].event;
+
+        if (!state.frames[item.frame].sharedRange)
+            return std::optional<StreamRangeDelivery>{};
+
+        debit(1, work.operations);
+        debit(product(state.desired.entries().size(), 2), work.visits);
+
+        if (!state.desired.isCurrent(item.membership))
+            return std::optional<StreamRangeDelivery>{};
+
+        state.invalidate();
+        state.offer = StreamCollector::Impl::OfferKind::BATCH;
+        state.batchPrefix = count;
+        state.batchSelected = count;
+
+        return std::optional<StreamRangeDelivery>{
+            {{item.record, count},
+             protocol::detail::SharedRecordAccess::payloads(event, {item.record, count}),
+             item.revision,
+             event.snapshot().identity().generation()}};
+    } catch (Error error) {
+        return std::unexpected(error);
+    }
+}
+
 void detail::StreamRetentionAccess::retainPrepared(
     const StreamCollector &collector, std::span<const StreamDelivery> offers,
     std::span<std::shared_ptr<const core::detail::SharedRecordPayload>> storage) noexcept {
     const auto &state = *collector.impl_;
     std::size_t output = 0;
 
-    for (std::size_t offset = 0; offset < state.batchPrefix && output < offers.size(); ++offset) {
+    for (std::size_t offset = 0; offset < state.batchPrefix && output < offers.size();) {
         const auto &item = state.items[state.index(offset)];
 
-        if (item.record == offers[output].record)
-            storage[output++] =
-                protocol::detail::SharedRecordAccess::retain(*state.frames[item.frame].event, *item.record);
+        for (std::size_t i = 0; i < item.count && output < offers.size(); ++i) {
+            if (item.record + i == offers[output].record)
+                storage[output++] =
+                    protocol::detail::SharedRecordAccess::retain(*state.frames[item.frame].event, item.record[i]);
+        }
+
+        offset += item.count;
     }
 }
 
@@ -646,24 +754,25 @@ std::expected<StreamAcknowledged, StreamError> StreamCollector::acknowledgeBatch
 
         debit(impl_->batchPrefix, work.visits);
 
-        for (std::size_t offset = 0; offset < impl_->batchPrefix; ++offset) {
+        for (std::size_t offset = 0; offset < impl_->batchPrefix;) {
             const auto &item = impl_->items[impl_->index(offset)];
-            const bool last =
-                offset + 1 == impl_->itemCount || impl_->items[impl_->index(offset + 1)].frame != item.frame;
+            const auto count = std::min(item.count, impl_->batchPrefix - offset);
+            const bool last = count == item.count && (offset + count == impl_->itemCount ||
+                                                      impl_->items[impl_->index(offset + count)].frame != item.frame);
 
             if (last) {
                 debit(1, work.visits);
                 debit(impl_->frames[item.frame].event->releaseBytes(), work.bytes);
             }
+
+            offset += count;
         }
 
         const auto selected = impl_->batchSelected;
         const auto withdrawn = impl_->batchPrefix - selected;
         const auto prefix = impl_->batchPrefix;
 
-        for (std::size_t offset = 0; offset < prefix; ++offset) {
-            impl_->removeFront();
-        }
+        impl_->removeFront(prefix);
 
         impl_->invalidate();
         accumulate(impl_->counts.delivered, selected, impl_->counts.saturated);
