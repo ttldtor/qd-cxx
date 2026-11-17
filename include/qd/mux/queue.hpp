@@ -26,6 +26,7 @@ struct IncomingSubscriptionBatch;
 namespace org::ttldtor::qdcxx::mux {
 namespace detail {
 struct QueueReplaceAccess;
+struct QueueScheduleAccess;
 /** Detached implementation type; no execution-owner access is exposed. */
 struct QueuePort;
 /** Detached implementation type; no execution-owner access is exposed. */
@@ -640,6 +641,7 @@ class MuxHandle {
  */
 class MuxQueue {
     friend struct detail::QueueReplaceAccess;
+    friend struct detail::QueueScheduleAccess;
     /** Serialized concrete composition, defined out of line. */
     struct State;
 

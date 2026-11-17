@@ -5805,6 +5805,31 @@ std::expected<std::vector<QueueRangeObservation>, QueueFailure> MuxQueue::rangeS
     }
 }
 
+std::size_t detail::QueueScheduleAccess::pendingRecords(const MuxQueue &queue) noexcept {
+    return queue.state_ ? queue.state_->pendingRecords : 0;
+}
+
+std::size_t detail::QueueScheduleAccess::dataItems(const MuxQueue &queue) noexcept {
+    return queue.state_ ? queue.state_->ledger->records.load() : 0;
+}
+
+std::expected<detail::QueueScheduleClient, QueueFailure>
+detail::QueueScheduleAccess::client(const MuxQueue &queue, const MuxHandle &handle) noexcept {
+    if (!queue.state_)
+        return std::unexpected(QueueFailure{QueueError::INVALID_STATE, {}});
+
+    const auto *client = queue.state_->client(handle);
+
+    if (!client)
+        return std::unexpected(QueueFailure{QueueError::INVALID_CLIENT, {}});
+
+    const auto &port = *client->port;
+    const auto &budget = *port.budget;
+
+    return QueueScheduleClient{port.state.load(), budget.records.load(), budget.recordBytes.load(),
+                               client->size + client->streamRange.count};
+}
+
 QueueResources MuxQueue::resources() const noexcept {
     QueueResources r;
 
