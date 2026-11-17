@@ -1014,7 +1014,6 @@ struct Peer {
     std::size_t outputFamily = 0;
     std::size_t outputEnd = 0;
     std::size_t outputRecordCount = 0;
-    DeliveryMask outputRows;
     std::size_t nextFamily = 0;
     bool sentProtocol = false;
     bool sentDescription = false;
@@ -1046,8 +1045,7 @@ constexpr protocol::LivePropertyView HISTORY_OPTIONS[]{{u"opt", u"hs"}};
 std::expected<protocol::LivePendingOutput, protocol::LiveError>
 composeDelivery(Peer &peer, std::size_t family, const core::LocalSchema &schema,
                 const std::optional<PublisherStreamByteLimits> &streamBytes,
-                std::span<protocol::LiveDataRecordView> outgoing, std::span<std::size_t> indices,
-                protocol::LiveWork &work) {
+                std::span<protocol::LiveDataRecordView> outgoing, protocol::LiveWork &work) {
     const auto &delivery = *peer.delivery[family];
     const auto records = delivery.batch.records();
     std::size_t count = 0;
@@ -1066,18 +1064,22 @@ composeDelivery(Peer &peer, std::size_t family, const core::LocalSchema &schema,
             return std::unexpected(protocol::LiveError::INVALID_CONFIGURATION);
 
         const bool removed = (record.eventFlags & events::indexed_event_flags::REMOVE_EVENT) != 0;
-        indices[count] = i;
         outgoing[count++] = {*id, record.symbol, removed ? std::span<const core::FieldValueView>{} : record.typedValues,
                              record.eventFlags, removed ? record.rawTime : std::nullopt};
     }
 
     const auto rememberRows = [&](std::size_t written) {
-        peer.outputEnd = indices[written - 1] + 1;
         peer.outputRecordCount = written;
-        peer.outputRows.reset();
+        peer.outputEnd = delivery.cursor + written;
 
-        for (std::size_t i = 0; i < written; ++i)
-            peer.outputRows.set(indices[i]);
+        if (delivery.suppressed.any()) {
+            peer.outputEnd = delivery.cursor;
+
+            while (written != 0) {
+                if (!delivery.suppressed[peer.outputEnd++])
+                    --written;
+            }
+        }
     };
 
     if (family == STREAM_FAMILY && streamBytes) {
@@ -1108,6 +1110,19 @@ composeDelivery(Peer &peer, std::size_t family, const core::LocalSchema &schema,
     }
 
     return std::unexpected(protocol::LiveError::INVALID_CONFIGURATION);
+}
+
+/** Check a pending DATA frame against the newly revoked, previously unsuppressed rows. */
+bool revokesOutput(const Peer &peer, std::size_t family, const DeliveryMask &revoked) noexcept {
+    if (!peer.output || peer.outputKind != OutputKind::DATA || peer.outputFamily != family)
+        return false;
+
+    for (auto row = peer.delivery[family]->cursor; row < peer.outputEnd; ++row) {
+        if (revoked[row])
+            return true;
+    }
+
+    return false;
 }
 
 void releaseSuppressedPrefix(Peer &peer, std::size_t family) noexcept {
@@ -1514,7 +1529,6 @@ class PublisherServer {
     std::vector<std::array<core::FieldValueView, MAX_DATA_FIELDS>> typedFieldScratch_;
     std::vector<protocol::detail::LocalStreamRow> sourceViews_;
     std::vector<protocol::LiveDataRecordView> outgoingViews_;
-    std::vector<std::size_t> outgoingIndices_;
     QueueSet queues_;
     transport::TcpListener listener_;
     std::vector<std::optional<Peer>> peers_;
@@ -1824,14 +1838,16 @@ class PublisherServer {
                     const auto records = delivery.batch.records();
 
                     if (!records.empty()) {
-                        try {
-                            for (auto row = delivery.cursor; row < records.size(); ++row) {
-                                if (!delivery.suppressed[row] &&
-                                    !allowed(peer.demand, family, records[row].context, records[row].symbol))
-                                    delivery.suppressed.set(row);
+                        if (peer.demand[family]) {
+                            try {
+                                for (auto row = delivery.cursor; row < records.size(); ++row) {
+                                    if (!delivery.suppressed[row] &&
+                                        !allowed(peer.demand, family, records[row].context, records[row].symbol))
+                                        delivery.suppressed.set(row);
+                                }
+                            } catch (const Error &) {
+                                return false;
                             }
-                        } catch (const Error &) {
-                            return false;
                         }
 
                         releaseSuppressedPrefix(peer, family);
@@ -1844,13 +1860,12 @@ class PublisherServer {
                         peer.nextFamily = (family + 1) % familyCount_;
 
                         if (family == STREAM_FAMILY && streamBytes_) {
-                            output = composeDelivery(peer, family, schema_, streamBytes_, outgoingViews_,
-                                                     outgoingIndices_, work);
+                            output = composeDelivery(peer, family, schema_, streamBytes_, outgoingViews_, work);
 
                             if (!output)
                                 statistics_.families[family].failedFrames.add(1);
                         } else {
-                            output = composeDelivery(peer, family, schema_, {}, outgoingViews_, outgoingIndices_, work);
+                            output = composeDelivery(peer, family, schema_, {}, outgoingViews_, work);
                         }
 
                         break;
@@ -2165,8 +2180,7 @@ class PublisherServer {
             const auto losesHistory = std::ranges::any_of(peer.openHistory, [&](const auto &entry) {
                 return !allowed(input->demand, history, entry.context, entry.symbol);
             });
-            const auto losesPartialFrame = peer.output && peer.outputKind == OutputKind::DATA &&
-                                           (revoked[peer.outputFamily] & peer.outputRows).any() &&
+            const auto losesPartialFrame = revokesOutput(peer, peer.outputFamily, revoked[peer.outputFamily]) &&
                                            peer.output->pendingBytes().size() != peer.output->bytes().size();
 
             if (losesHistory || losesPartialFrame) {
@@ -2208,8 +2222,7 @@ class PublisherServer {
 
         for (std::size_t family = 0; family < familyCount_; ++family) {
             if (revoked[family].any()) {
-                if (peer.output && peer.outputKind == OutputKind::DATA && peer.outputFamily == family &&
-                    (revoked[family] & peer.outputRows).any())
+                if (revokesOutput(peer, family, revoked[family]))
                     peer.output.reset();
 
                 peer.delivery[family]->suppressed |= revoked[family];
@@ -2697,9 +2710,9 @@ class PublisherServer {
           streamBytes_(options.streamBytes), recordScratch_(options.catalog && !options.source ? streamSourceRows_ : 0),
           typedScratch_(!options.catalog && !options.source ? streamSourceRows_ : 0),
           typedFieldScratch_(typedScratch_.size()), sourceViews_(options.source ? 0 : streamSourceRows_),
-          outgoingViews_(streamDeliveryRows_), outgoingIndices_(streamDeliveryRows_),
-          listener_(listen(bootstrap, options.listener)), peers_(options.listener.maxConnections),
-          demandPolicies_(std::move(demand)), familyCount_(enabledFamilies(options)) {
+          outgoingViews_(streamDeliveryRows_), listener_(listen(bootstrap, options.listener)),
+          peers_(options.listener.maxConnections), demandPolicies_(std::move(demand)),
+          familyCount_(enabledFamilies(options)) {
         if (streamBytes_)
             statistics_.families[STREAM_FAMILY].failedFrames.availability = core::StatisticAvailability::AVAILABLE;
 
