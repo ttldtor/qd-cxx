@@ -2,6 +2,9 @@
 
 [Русская версия](FANOUT.ru.md).
 
+Use the [metric definitions](METRICS.md) to interpret source and client rates,
+per-client percentiles, CPU intervals and sampled memory peaks.
+
 `Measure-EventFanout.ps1` runs the Event producer and Java QD 3.357 receiver
 with one IBM TimeAndSale/STREAM subscription per client. By default it compares
 publication batches of one and eight with 1, 2, 4 and 8 clients. Runs are

@@ -2,6 +2,9 @@
 
 [Русская версия](README.ru.md).
 
+See [metric definitions](benchmark/METRICS.md) for observation boundaries,
+throughput denominators, latency rounding, CPU and memory measurements.
+
 `qdcxx-nettest` runs a finite synthetic QTP workload using a physical record from a
 binary-v2 schema bundle. It runs either a producer with a plain TCP listener or a
 consumer with outbound plain TCP connections.
