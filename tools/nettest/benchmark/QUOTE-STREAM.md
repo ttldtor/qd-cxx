@@ -2,6 +2,9 @@
 
 [Русская версия](QUOTE-STREAM.ru.md).
 
+The [metric definitions](METRICS.md) specify submission and delivery boundaries,
+clock requirements, histogram rounding and process resource measurements.
+
 Build `qdcxx_quote_stream_nettest` with the public Feed API enabled. The tool
 publishes physical Quote records through the STREAM collector. Its inputs are
 port, total records, offered records per second, and batch size (1–8). Rate
