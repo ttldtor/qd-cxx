@@ -75,7 +75,13 @@ struct SchemaLimits {
     std::size_t totalNameUnits; ///< Maximum aggregate record/key units, counting repeats across scopes.
 };
 
-/** Owned opaque provenance for one immutable local record; default contexts never match. */
+/** Owned opaque provenance for one immutable local record; default contexts never match.
+ * Copies share the fixed identity; moves transfer it and leave the source invalid. Tokens survive
+ * schema destruction but retain neither declarations nor record payloads. Separately created schemas
+ * have distinct provenance even when every declaration is equal. Independent token objects may be
+ * read/released on different threads; concurrent assignment to the same object requires synchronization.
+ * See spec/schema/RECORD-OWNERSHIP.md for the complete ownership and invalidation contract.
+ */
 class RecordContext {
     struct Identity;
     std::shared_ptr<const Identity> identity_;
@@ -126,7 +132,12 @@ class SchemaIdentity {
     [[nodiscard]] bool matches(const SchemaIdentity &other) const noexcept;
 };
 
-/** Validated owned immutable subset; no protocol or loading dependency. */
+/** Validated owned immutable subset; no protocol or loading dependency.
+ * Creation copies declarations; copies own independent declarations with the same provenance.
+ * Const access may be concurrent while no thread moves, assigns or destroys the same object.
+ * Borrowed declarations do not keep this owner alive; retaining a RecordContext is insufficient.
+ * See spec/schema/RECORD-OWNERSHIP.md for copy, move, thread and foreign-schema rules.
+ */
 class LocalSchema {
     std::vector<LocalRecord> records_;
     LocalProfile profile_;

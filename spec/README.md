@@ -12,6 +12,9 @@ See the [wire encoding specification](encoding/PRIMITIVES.md), including compact
 
 ## Schema contracts {#schema-contracts}
 
+[Record ownership and provenance](schema/RECORD-OWNERSHIP.md) defines schema/record lifetimes,
+copy/move rules and the separately identified future RecordFeed target.
+
 [Configuration](../docs/CONFIGURATION.md) describes explicit caller schemas and source precedence.
 The [schema model](schema/NORMALIZED-MODEL.md), [native JSON](schema/NATIVE-JSON.md) and
 [ordinary wire discovery](schema/WIRE-INVENTORY.md) specify the corresponding boundaries.
