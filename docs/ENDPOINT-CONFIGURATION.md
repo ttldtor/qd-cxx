@@ -2,9 +2,8 @@
 
 [Русская версия](ENDPOINT-CONFIGURATION.ru.md) · [Feed API](FEED-API.md) · [Configuration architecture](CONFIGURATION.md)
 
-Include qd/api/endpoint_configuration.hpp and link qdcxx_feed. This profile configures
-the existing plain binary-QTP receiving endpoint. Resolution copies explicit caller input,
-validates it and performs no DNS, file lookup, SDK activation or application callback.
+Include qd/api/endpoint_configuration.hpp and link qdcxx_feed. This resolver configures the existing binary-QTP receiving endpoint. Resolution copies explicit caller input,
+validates it and performs no DNS, file lookup, SDK activation or application callback. The text address profile is plain TCP; a typed fallback may select the qualified verified TLS profile described by the [Feed API](FEED-API.md). TLS-disabled builds reject that typed setting.
 
 ## Configure and connect
 
@@ -63,9 +62,10 @@ insensitive and means milliseconds, as in the pinned Java consumer.
 | Key | Default | Accepted value |
 | --- | --- | --- |
 | dxfeed.address | absent | Validated plain route, optionally followed by flat property blocks at construction |
+| dxfeed.aggregationPeriod | 0 milliseconds | QD TimePeriod text from zero through 24 hours; local callback cadence, independent of server requests |
 | dxfeed.requestedAggregationPeriod | absent | QD TimePeriod text from zero through 24 hours; see [server aggregation](SERVER-AGGREGATION.md) |
 | qdcxx.name | empty | Printable ASCII local metadata label, at most 128 bytes; does not rename SDK threads |
-| qdcxx.deliveryContract | ticker | ticker or stream |
+| qdcxx.deliveryContract | ticker | ticker, stream, history or mixed; a custom event registry is unsupported with mixed |
 | dxfeed.wildcard.enable | false | ASCII case insensitive true/false; true requires STREAM |
 | qdcxx.maximumAttempts | 3 | Complete unsigned decimal, 1 through 4294967295 |
 | qdcxx.connectTimeoutMillis | 5000 | Complete unsigned decimal, 1 through 2147483647 milliseconds |
@@ -96,21 +96,21 @@ localhost:7300[reconnectDelay=250,qdcxx.name=quotes][qdcxx.maximumAttempts=3]
 Blocks retain original order. Native name/timeouts/attempts and the verified reconnectDelay
 alias, and requestedAggregationPeriod (empty resets), are supported inside them. Address, delivery-contract and wildcard keys in these blocks
 reject. Nested blocks, parentheses, escaping, URI/codec prefixes, host lists, proxy/listen/file
-connectors and credentials reject. This profile adds no TLS or negotiated authentication.
+connectors and credentials reject. Text properties do not select TLS or authentication; use the typed Feed TLS policy for those capabilities.
 
 ## Inspection, errors and limits
 
-snapshot() returns twelve owning canonical policy rows and the optional stripped configured
+snapshot() returns thirteen owning canonical policy rows and the optional stripped configured
 address. getEffectiveConfiguration() additionally copies the first accepted route spelling,
 current admitted connect intent and control revision under the endpoint mutex. The explicit aggregation setter updates only its current local row and requestedAggregationRevision; the original EndpointConfiguration stays immutable. Local policy,
 metadata and accepted requests do not establish DNS resolution, peer delivery or negotiated
 server values. The snapshot remains readable after endpoint/runtime retirement.
 
-EndpointConfigurationLimits bounds combined entries (64), key bytes (96), value/address
+EndpointConfigurationLimits has configurable default bounds for combined entries (64), key bytes (96), value/address
 bytes (4096) and scanned key/value bytes (16384). Inline entries consume this same envelope
-in addition to their containing address value. Output has twelve policy rows and at most two
+in addition to their containing address value. Output has thirteen policy rows and at most two
 route strings. These are logical input/output limits, not an exact allocator/RSS cap. Ordinary
-runtime, registry, network and retained-copy limits continue independently.
+runtime, registry, network and retained-copy limits continue independently. The default property count is not a QTP cap; zero input limits reject.
 
 Unsupported keys/forms throw UNSUPPORTED_PROFILE; malformed supported values throw
 INVALID_ARGUMENT; input/storage capacities throw RESOURCE_LIMIT or ALLOCATION_FAILURE.
@@ -139,6 +139,6 @@ Java file defaults precede system defaults, with explicit builder values winning
 are supplied explicitly and perform no ambient discovery. These are explicit compatibility
 boundaries, not assertions that the Java behavior is erroneous.
 
-The broader configuration catalogue, TLS/authentication handoff, failover/multiple hosts,
+The [native settings reference](CONFIGURATION-REFERENCE.md) covers typed owner contracts. Textual TLS/authentication, failover/multiple hosts,
 proxy/listen/file connectors and server aggregation remain separate capabilities. This profile
 does not claim the complete receiving-client milestone.
