@@ -940,6 +940,12 @@ TEST_CASE("shared local STREAM payload survives independent clients and serializ
 }
 
 TEST_CASE("flat local STREAM batch shares backing across split route groups and clients") {
+    bool separateBinding = false;
+    SUBCASE("whole retained binding") {
+    }
+    SUBCASE("binding reserved once by detached context") {
+        separateBinding = true;
+    }
     auto bounds = queueLimits();
     SUBCASE("independent route groups") {
         bounds.routeRecords = 1;
@@ -954,10 +960,6 @@ TEST_CASE("flat local STREAM batch shares backing across split route groups and 
     auto limits = clientLimits();
     limits.compactRecordArena = true;
     limits.batchRecords = 1;
-    auto a = open(f, first, limits);
-    auto b = open(f, second, limits);
-    add(f, a);
-    add(f, b);
 
     struct Row {
         std::u16string_view symbol;
@@ -986,7 +988,21 @@ TEST_CASE("flat local STREAM batch shares backing across split route groups and 
         boundInput[i].metadata.fieldTime = c::detail::RecordFieldTime{-900, 0, i};
     }
 
-    auto prepared = c::detail::SharedRecordBlock::copy(*binding, boundInput, physical);
+    if (separateBinding) {
+        const auto before = f.queue.resources().residentBytes;
+        REQUIRE(m::detail::QueueScheduleAccess::bindPublicationSchema(f.queue, *binding,
+                                                                      (*binding)->retainedCapacityBytes()));
+        CHECK(f.queue.resources().residentBytes == before + (*binding)->retainedCapacityBytes());
+    }
+
+    auto a = open(f, first, limits);
+    auto b = open(f, second, limits);
+    add(f, a);
+    add(f, b);
+    auto prepared =
+        c::detail::SharedRecordBlock::copy(*binding, boundInput, physical,
+                                           separateBinding ? c::detail::RecordPayloadResidency::SEPARATE_BINDING
+                                                           : c::detail::RecordPayloadResidency::WHOLE_RETAINED);
     REQUIRE(prepared);
     auto batch = std::move(*prepared);
     std::weak_ptr<const c::detail::BoundRecordBatch> lifetime = batch;
@@ -995,7 +1011,8 @@ TEST_CASE("flat local STREAM batch shares backing across split route groups and 
     std::array<const c::FieldValueView *, 2> original;
     {
         auto work = liveTurn();
-        auto source = p::detail::LocalEventOwner::create(liveLimits(), work);
+        auto source =
+            p::detail::LocalEventOwner::create(liveLimits(), work, separateBinding ? batch->binding : nullptr);
         REQUIRE(source);
         std::array<p::detail::LocalStreamRow, 2> rows;
 
@@ -1047,6 +1064,8 @@ TEST_CASE("flat local STREAM batch shares backing across split route groups and 
     release.join();
     CHECK(valid.load());
     CHECK(lifetime.expired());
+    a = {};
+    b = {};
     CHECK(schemaLifetime.expired());
     lifetime.reset();
     schemaLifetime.reset();
@@ -5150,4 +5169,56 @@ TEST_CASE("private STREAM range replacement prepays metadata work before retirin
     });
     CHECK(receiver->values.empty());
     CHECK(f.queue.resources().recordBytes == 0);
+}
+
+TEST_CASE("payload-only residency rejects missing and different fixed binding before source or Mux admission") {
+    namespace d = c::detail;
+    auto f = fixture(c::SubscriptionFamily::STREAM);
+    d::RecordByteBudget physical(1024 * 1024);
+    auto catalog = f.schema;
+    auto bound = d::RecordBlockBinding::create(std::move(catalog), {}, physical);
+    REQUIRE(bound);
+    auto otherCatalog = f.schema;
+    auto other = d::RecordBlockBinding::create(std::move(otherCatalog), {}, physical);
+    REQUIRE(other);
+    const std::array fields{c::FieldValueView{c::SerialFieldType::COMPACT_INT, 0, {}, {}},
+                            c::FieldValueView{c::SerialFieldType::COMPACT_INT, 1, {}, {}},
+                            c::FieldValueView{c::SerialFieldType::COMPACT_INT, 42, {}, {}}};
+    const std::array input{d::RecordBlockInput{f.schema.recordContext(0), u"ALPHA", fields, {}}};
+    auto block = d::SharedRecordBlock::copy(*bound, input, physical, d::RecordPayloadResidency::SEPARATE_BINDING);
+    REQUIRE(block);
+    auto payload = d::SharedRecordPayload::row(*block, 0);
+    const std::array rows{
+        p::detail::LocalStreamRow{0, f.schema.recordContext(0), payload->symbol(), payload->fields(), payload}};
+    auto work = liveTurn();
+    auto absent = p::detail::LocalEventOwner::create(liveLimits(), work);
+    REQUIRE(absent);
+    auto denied = absent->stream(rows, work, true);
+    REQUIRE_FALSE(denied);
+    CHECK(denied.error() == p::LiveError::INVALID_CONFIGURATION);
+    auto mismatched = p::detail::LocalEventOwner::create(liveLimits(), work, *other);
+    REQUIRE(mismatched);
+    denied = mismatched->stream(rows, work, true);
+    REQUIRE_FALSE(denied);
+    CHECK(denied.error() == p::LiveError::INVALID_CONFIGURATION);
+    auto source = p::detail::LocalEventOwner::create(liveLimits(), work, *bound);
+    REQUIRE(source);
+    auto foreignSchema = schema();
+    auto foreignRows = rows;
+    foreignRows[0].context = foreignSchema.recordContext(0);
+    const auto foreign = source->stream(foreignRows, work, true);
+    REQUIRE_FALSE(foreign);
+    CHECK(foreign.error() == p::LiveError::INVALID_CONFIGURATION);
+    auto event = source->stream(rows, work, true);
+    REQUIRE(event);
+    auto queueWork = turn();
+    auto rejected = f.queue.admit(std::move(*event), queueWork);
+    REQUIRE_FALSE(rejected);
+    CHECK(rejected.error().error == m::QueueError::INVALID_CONFIGURATION);
+    REQUIRE(m::detail::QueueScheduleAccess::bindPublicationSchema(f.queue, *other, (*other)->retainedCapacityBytes()));
+    queueWork = turn();
+    rejected = f.queue.admit(std::move(*event), queueWork);
+    REQUIRE_FALSE(rejected);
+    CHECK(rejected.error().error == m::QueueError::INVALID_CONFIGURATION);
+    CHECK(m::detail::QueueScheduleAccess::pendingRecords(f.queue) == 0);
 }
