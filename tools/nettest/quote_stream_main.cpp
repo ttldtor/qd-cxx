@@ -41,26 +41,28 @@ constexpr auto POLL_INTERVAL = 1ms;
 constexpr std::int64_t DECIMAL_UNIT = 256;
 constexpr std::int64_t DECIMAL_RANK = 128;
 
-constexpr std::string_view HELP = "Usage: qdcxx-quote-stream-nettest PORT COUNT RATE BATCH [--stream-bytes TARGET "
-                                  "HARD] [--clients N] [--pending-records N] [--delivery-bytes N]\n"
-                                  "Publish synthetic IBM Quote/STREAM records over TCP to QD consumers.\n"
-                                  "PORT is 0..65535 (0 chooses an ephemeral port), COUNT is 1..10000000,\n"
-                                  "RATE is 0..10000000 records/s (0 is unpaced), BATCH is 1..8.\n"
-                                  "--stream-bytes enables byte limits for STREAM output; TARGET is the\n"
-                                  "payload threshold and HARD is the maximum complete frame size in bytes.\n"
-                                  "Without this option the existing batch-based mode is used.\n"
-                                  "--clients selects 1..8 receivers (default 1); --pending-records selects\n"
-                                  "1..1024 input slots (default 1024), at least as many as BATCH.\n"
-                                  "--delivery-bytes sets the per-peer delivery window in bytes and requires\n"
-                                  "--stream-bytes (default 262144, maximum 8388608).\n"
-                                  "Prints PORT, waits for matching subscription, publishes a sequence-0 probe,\n"
-                                  "prints READY and waits for GO on stdin. Send PROBE to repeat the probe.\n"
-                                  "Verify probe receipt by every receiver before GO.\n"
-                                  "Prints RESULT with admitted records, time, retries and completed STREAM frames.\n"
-                                  "Frame count includes the startup probe; byte mode also reports failed frames.\n"
-                                  "Bid.Time and Bid.Size carry a monotonic timestamp for same-host measurement.\n"
-                                  "The producer opens a TCP listener and creates a runtime worker.\n"
-                                  "Exit 0 on success, 1 on runtime failure, 2 on invalid arguments.\n";
+constexpr std::string_view HELP =
+    "Usage: qdcxx-quote-stream-nettest PORT COUNT RATE BATCH [--stream-bytes TARGET "
+    "HARD] [--clients N] [--pending-records N] [--delivery-bytes N]\n"
+    "Publish synthetic IBM Quote/STREAM records over TCP to QD consumers.\n"
+    "PORT is 0..65535 (0 chooses an ephemeral port), COUNT is 1..10000000,\n"
+    "RATE is 0..10000000 records/s (0 is unpaced), BATCH is 1..8.\n"
+    "--stream-bytes enables byte limits for STREAM output; TARGET is the\n"
+    "payload threshold and HARD is the maximum complete frame size in bytes.\n"
+    "Without this option the existing batch-based mode is used.\n"
+    "--clients selects 1..8 receivers (default 1); --pending-records selects\n"
+    "1..1024 input slots (default 1024), at least as many as BATCH.\n"
+    "--delivery-bytes sets the per-peer delivery window in bytes and requires\n"
+    "--stream-bytes (default 262144, maximum 8388608).\n"
+    "Prints PORT, waits for matching subscription, publishes a sequence-0 probe,\n"
+    "prints READY and waits for GO on stdin. Send PROBE to repeat the probe.\n"
+    "Verify probe receipt by every receiver before GO.\n"
+    "Prints RESULT with admitted records, time, retries and completed STREAM frames.\n"
+    "Frame count includes the startup probe; byte mode also reports failed frames.\n"
+    "sourceIngressFrames and sourceIngressRecords count collector input, including probes.\n"
+    "Bid.Time and Bid.Size carry a monotonic timestamp for same-host measurement.\n"
+    "The producer opens a TCP listener and creates a runtime worker.\n"
+    "Exit 0 on success, 1 on runtime failure, 2 on invalid arguments.\n";
 
 constexpr std::string_view HELP_RU =
     "Использование: qdcxx-quote-stream-nettest ПОРТ КОЛИЧЕСТВО СКОРОСТЬ ПАКЕТ [--stream-bytes ЦЕЛЬ ПРЕДЕЛ]\n"
@@ -79,6 +81,7 @@ constexpr std::string_view HELP_RU =
     "Перед GO проверьте приём пробной записи всеми получателями.\n"
     "RESULT содержит число записей, время в нс, повторы и число завершённых кадров STREAM.\n"
     "Число кадров включает пробную запись; байтовый режим также сообщает об ошибках кадров.\n"
+    "sourceIngressFrames и sourceIngressRecords считают вход коллектора, включая пробные записи.\n"
     "Bid.Time и Bid.Size содержат монотонную метку времени для измерения на одной машине.\n"
     "Процесс открывает TCP-слушатель и создаёт поток runtime.\n"
     "Код 0 означает успех, 1 ошибку исполнения, 2 неверные параметры.\n";
@@ -306,7 +309,8 @@ void run(std::uint16_t port, std::uint64_t count, std::uint64_t rate, std::size_
         throw std::runtime_error(std::string((*endpoint)->getDiagnostic().stage));
 
     std::cout << "RESULT count=" << count << " publishNs=" << publishNs << " retries=" << retries
-              << " streamFrames=" << stream.sentFrames.value;
+              << " streamFrames=" << stream.sentFrames.value << " sourceIngressFrames=" << stream.ingressFrames.value
+              << " sourceIngressRecords=" << stream.ingressRecords.value;
 
     if (streamBytes)
         std::cout << " failedFrames=" << stream.failedFrames.value << " maxFrameRecords=" << stream.maxSentFrameRecords

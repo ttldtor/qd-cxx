@@ -43,6 +43,12 @@ This encoding requires a common machine clock, such as QPC with the verified
 Windows toolchains. The latency histogram measures generation to Java receipt.
 Record negative samples and verify the clock domain before comparing p99.
 The receiver verifies all eight Quote fields and the exact order.
+The publisher's `sourceIngressFrames` and `sourceIngressRecords` count complete
+source events and records admitted to the STREAM collector, including probes.
+They are read after drain, outside the publication timer. Comparing their ratio
+with the generator batch size shows how ready publications are combined before
+collector processing; these counts describe input, independently of network frames.
+
 The publisher's `streamFrames` result counts completely sent STREAM DATA
 frames across clients, including startup probe frames. Subtract the reported
 `probeFrames` for the measured stream. `probeRecords` counts probe records
@@ -68,12 +74,15 @@ java -cp "classes:$QD_CLASSPATH" QuoteStreamPublisher 7300 250000 50000 8
 java -cp "classes:$QD_CLASSPATH" StreamReceiver 127.0.0.1:7300 IBM quote-stream ns probe
 ~~~
 
-The Java publisher binds loopback, waits for the exact Quote subscription,
+The optional `--clients N` sets the Java server maximum connections (default 1);
+N must be a positive integer. Start that many receivers. The Java publisher
+binds loopback, waits for the exact Quote subscription,
 and submits physical records with a reused `RecordBuffer` through
-`QDDistributor.process`. After `READY` and `PROBE_RECEIVED`, send `GO`
-to the publisher. Send the expected count to the receiver after `RESULT`.
-After `COUNT_REACHED N`, send `CLOSE` to the publisher. Wait for both
-processes to exit and check the receiver's final result.
+`QDDistributor.process`. After `READY`, send `PROBE` as needed until every
+receiver reports `PROBE_RECEIVED`, then send `GO` to the publisher. After
+`RESULT`, send the expected count to each receiver. After every receiver
+reports `COUNT_REACHED N`, send `CLOSE` to the publisher. Wait for all
+processes to exit and check every receiver's final result.
 
 For a comparison, alternate the publisher order and keep the receiver build,
 record count, symbol, pacing and API batch size fixed in each round. An API

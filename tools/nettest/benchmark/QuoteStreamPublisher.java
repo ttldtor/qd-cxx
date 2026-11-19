@@ -38,21 +38,24 @@ public final class QuoteStreamPublisher {
 
   public static void main(String[] args) throws IOException, InterruptedException {
     if (args.length == 0 || (args.length == 1 && "--help".equals(args[0]))) {
-      System.out.println("Usage: QuoteStreamPublisher PORT COUNT RATE BATCH");
+      System.out.println("Usage: QuoteStreamPublisher PORT COUNT RATE BATCH [--clients N]");
       System.out.println("Publishes physical IBM Quote records over a loopback QTP STREAM server.");
       System.out.println("PORT 1..65535, COUNT 2..10000000, RATE 0..10000000, BATCH 1..8.");
-      System.out.println("Rate 0 submits without pacing. Read GO after PROBE_RECEIVED, then CLOSE");
-      System.out.println("after the receiver reports COUNT_REACHED. The harness bounds the run.");
+      System.out.println("--clients N sets the maximum connections (default 1, N >= 1).");
+      System.out.println(
+          "Rate 0 submits without pacing. Send PROBE until every receiver confirms,");
+      System.out.println("then GO. Send CLOSE after all receivers report COUNT_REACHED.");
       System.out.println("Exit 0 on success, nonzero on invalid input or publication failure.");
       return;
     }
-    if (args.length != 4) {
-      throw new IllegalArgumentException("Expected PORT COUNT RATE BATCH");
+    if (args.length != 4 && (args.length != 6 || !"--clients".equals(args[4]))) {
+      throw new IllegalArgumentException("Expected PORT COUNT RATE BATCH [--clients N]");
     }
     int port = number(args[0], 1, 65535);
     int count = number(args[1], 2, MAX_COUNT);
     int rate = number(args[2], 0, MAX_RATE);
     int batch = number(args[3], 1, MAX_BATCH);
+    int clients = args.length == 6 ? number(args[5], 1, Integer.MAX_VALUE) : 1;
     String version = QDFactory.getVersion();
     if (!QD_VERSION.equals(version)) {
       throw new IllegalStateException("Expected Java QD " + QD_VERSION + ", got " + version);
@@ -76,7 +79,7 @@ public final class QuoteStreamPublisher {
         throw new IllegalStateException("Expected one QD socket server");
       }
       server.setBindAddr("127.0.0.1");
-      server.setMaxConnections(1);
+      server.setMaxConnections(clients);
       QDDistributor distributor = endpoint.getStream().distributorBuilder().build();
       RecordBuffer records = RecordBuffer.getInstance(RecordMode.DATA);
       try {
@@ -87,7 +90,15 @@ public final class QuoteStreamPublisher {
         distributor.process(records);
         records.clear();
         System.out.println("READY");
-        requireCommand(control, "GO");
+        String command;
+        while ("PROBE".equals(command = control.readLine())) {
+          fields.append(records, 0);
+          distributor.process(records);
+          records.clear();
+        }
+        if (!"GO".equals(command)) {
+          throw new IOException("Expected PROBE or GO on stdin");
+        }
         long started = System.nanoTime();
         for (int published = 0; published < count; ) {
           int size = Math.min(batch, count - published);
