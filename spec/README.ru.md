@@ -30,6 +30,7 @@
 
 ## Контракты протокола {#protocol-contracts-ru}
 
+- [Реестр сообщений и состояния QTP](protocol/MESSAGE-STATE-REGISTRY.ru.md): направления чтения/записи, согласуемые флаги, сроки жизни состояния и отказы при отсутствии поддержки.
 - [Кадры QTP](protocol/FRAMING.ru.md) и [чтение tape](protocol/TAPE-READER.ru.md)
 - [Контракты подписок](subscriptions/CONTRACTS.ru.md), [live session](subscriptions/LIVE-SESSION.ru.md), [входящие подписки](protocol/INCOMING-SUBSCRIPTIONS.ru.md), [запись DATA](protocol/LIVE-DATA-WRITE.ru.md)
   и [локальный STREAM dispatch](subscriptions/CLIENT-DISPATCH.ru.md)

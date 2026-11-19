@@ -2,6 +2,8 @@
 
 [Русская версия](BINARY-MESSAGES.ru.md). English is authoritative.
 
+The [message and state registry](MESSAGE-STATE-REGISTRY.md) compares this explicit recording profile with live sessions, standalone codecs and the preserved narrower tape modes.
+
 The additional required `FieldTimePolicy::READ` constructor argument selects the finite
 [FIELD contract](TAPE-TIME.md). Existing signatures stay DISABLED: none of the default descriptor,
 binding, output or removal behavior below implicitly enables FIELD. READ retains separate raw

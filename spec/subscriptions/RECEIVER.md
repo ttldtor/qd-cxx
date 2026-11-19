@@ -2,6 +2,8 @@
 
 [Русская версия](RECEIVER.ru.md). English is authoritative.
 
+The [message and state registry](../protocol/MESSAGE-STATE-REGISTRY.md) defines the preceding protocol admission boundary; a decoded family or flag does not establish local membership or completed delivery.
+
 Include `qd/client/subscription_receiver.hpp` and link `qdcxx_client` with
 `ORG_TTLDTOR_QDCXX_BUILD_CLIENT=ON`. The receiver composes the existing
 [queue](../mux/QUEUES.md) and [prepared event mappings](../events/EVENT-MAPPING.md).
