@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 
 #include "qd/api/publisher.hpp"
+#include "publisher_delivery.hpp"
 
 #include "../mux/queue_replace.hpp"
 #include "../mux/queue_schedule.hpp"
@@ -45,10 +46,9 @@ constexpr std::size_t CLIENT_PENDING_ITEMS = 32;
 constexpr std::size_t HISTORY_POINTS_PER_KEY = 16;
 constexpr std::size_t CLIENT_SYMBOL_UNITS = CLIENT_KEYS * SYMBOL_UNITS;
 constexpr std::size_t INPUT_BYTES = 8192;
-constexpr std::size_t MAX_FRAME_BYTES = 65536;
-// A DATA row occupies at least a symbol marker and a compact record ID.
-constexpr std::size_t MINIMUM_WIRE_ROW_BYTES = 2;
-constexpr std::size_t MAX_STREAM_WINDOW_ROWS = MAX_FRAME_BYTES / MINIMUM_WIRE_ROW_BYTES;
+using detail::MAX_FRAME_BYTES;
+using detail::MAX_STREAM_WINDOW_ROWS;
+using detail::MINIMUM_WIRE_ROW_BYTES;
 constexpr std::size_t FRAME_PREFIX_BYTES = 9;
 constexpr std::size_t EVENT_BYTES = 8192;
 constexpr std::size_t EVENT_OWNER_ALLOWANCE = 1024;
@@ -72,8 +72,9 @@ constexpr std::int32_t SALE_ID = 1;
 constexpr std::int32_t ORDER_ID = 2;
 using Family = core::SubscriptionFamily;
 using DataMessage = protocol::LiveDataMessage;
+using detail::DATA_MESSAGES;
 constexpr std::array FAMILIES{Family::TICKER, Family::STREAM, Family::HISTORY};
-constexpr std::array DATA_MESSAGES{DataMessage::TICKER_DATA, DataMessage::STREAM_DATA, DataMessage::HISTORY_DATA};
+
 constexpr std::array ADD_MESSAGES{protocol::SubscriptionMessage::TICKER_ADD, protocol::SubscriptionMessage::STREAM_ADD,
                                   protocol::SubscriptionMessage::HISTORY_ADD};
 constexpr std::array REMOVE_MESSAGES{protocol::SubscriptionMessage::TICKER_REMOVE,
@@ -81,7 +82,7 @@ constexpr std::array REMOVE_MESSAGES{protocol::SubscriptionMessage::TICKER_REMOV
                                      protocol::SubscriptionMessage::HISTORY_REMOVE};
 constexpr std::array RECORD_IDS{QUOTE_ID, SALE_ID, ORDER_ID};
 constexpr std::size_t FAMILY_COUNT = FAMILIES.size();
-constexpr std::size_t STREAM_FAMILY = 1;
+using detail::STREAM_FAMILY;
 constexpr std::size_t CATALOG_RECORDS = 1024;
 constexpr core::SchemaLimits CATALOG_LIMITS{CATALOG_RECORDS, 16384, 32768, 1024, 1048576};
 constexpr std::int32_t SEQUENCE_BITS = 22;
@@ -900,31 +901,9 @@ protocol::detail::LocalEventOwner localOwner(bool catalog, std::size_t families,
     return std::move(*owner);
 }
 
-using DeliveryMask = std::bitset<MAX_STREAM_WINDOW_ROWS>;
-
-/** The worker retains one detached callback batch until every eligible row has completed writing. */
-struct Delivery final : mux::MuxConsumer {
-    mux::OwnedMuxBatch batch;
-    std::size_t cursor = 0;
-    DeliveryMask suppressed;
-
-    mux::BatchAction onBatch(const mux::BorrowedMuxBatch &view) override {
-        batch = view.retain();
-        cursor = 0;
-        suppressed.reset();
-
-        return mux::BatchAction::PAUSE;
-    }
-
-    void clear() noexcept {
-        batch = {};
-        cursor = 0;
-        suppressed.reset();
-    }
-};
-
-// Front-loading control frames avoids consuming data queue reservations during negotiation.
-enum class OutputKind { PROTOCOL, DESCRIPTION, HEARTBEAT, DATA };
+using detail::Delivery;
+using detail::DeliveryMask;
+using detail::OutputKind;
 
 using DemandPolicy = std::array<std::optional<FeedFilter>, FAMILY_COUNT>;
 
@@ -1043,100 +1022,12 @@ constexpr std::array<protocol::LiveMessageView, 9> SERVER_RECEIVE{{{0, u"HEARTBE
                                                                    {22, u"HISTORY_REMOVE_SUBSCRIPTION", {}}}};
 constexpr protocol::LivePropertyView HISTORY_OPTIONS[]{{u"opt", u"hs"}};
 
-std::expected<protocol::LivePendingOutput, protocol::LiveError>
-composeDelivery(Peer &peer, std::size_t family, const core::LocalSchema &schema,
-                const std::optional<PublisherStreamByteLimits> &streamBytes,
-                std::span<protocol::LiveDataRecordView> outgoing, protocol::LiveWork &work) {
-    const auto &delivery = *peer.delivery[family];
-    const auto records = delivery.batch.records();
-    std::size_t count = 0;
-
-    for (auto i = delivery.cursor; i < records.size(); ++i) {
-        if (delivery.suppressed[i])
-            continue;
-
-        if (count == outgoing.size())
-            break;
-
-        const auto &record = records[i];
-        const auto id = schema.recordId(record.context);
-
-        if (!id)
-            return std::unexpected(protocol::LiveError::INVALID_CONFIGURATION);
-
-        const bool removed = (record.eventFlags & events::indexed_event_flags::REMOVE_EVENT) != 0;
-        outgoing[count++] = {*id, record.symbol, removed ? std::span<const core::FieldValueView>{} : record.typedValues,
-                             record.eventFlags, removed ? record.rawTime : std::nullopt};
-    }
-
-    const auto rememberRows = [&](std::size_t written) {
-        peer.outputRecordCount = written;
-        peer.outputEnd = delivery.cursor + written;
-
-        if (delivery.suppressed.any()) {
-            peer.outputEnd = delivery.cursor;
-
-            while (written != 0) {
-                if (!delivery.suppressed[peer.outputEnd++])
-                    --written;
-            }
-        }
-    };
-
-    if (family == STREAM_FAMILY && streamBytes) {
-        std::size_t written = 0;
-        auto output = peer.session.publishStreamPrefix(outgoing.first(count), streamBytes->targetPayloadBytes,
-                                                       streamBytes->maxFrameBytes, written, work);
-
-        if (output)
-            rememberRows(written);
-
-        return output;
-    }
-
-    // Legacy count-based mode retries a shorter prefix when a frame exceeds its byte limit.
-    while (count != 0) {
-        auto output = peer.session.publishData(DATA_MESSAGES[family], outgoing.first(count), work);
-
-        if (output) {
-            rememberRows(count);
-
-            return output;
-        }
-
-        if (output.error() != protocol::LiveError::RESOURCE_LIMIT || count == 1)
-            return output;
-
-        count /= 2;
-    }
-
-    return std::unexpected(protocol::LiveError::INVALID_CONFIGURATION);
-}
-
-/** Check a pending DATA frame against the newly revoked, previously unsuppressed rows. */
-bool revokesOutput(const Peer &peer, std::size_t family, const DeliveryMask &revoked) noexcept {
-    if (!peer.output || peer.outputKind != OutputKind::DATA || peer.outputFamily != family)
-        return false;
-
-    for (auto row = peer.delivery[family]->cursor; row < peer.outputEnd; ++row) {
-        if (revoked[row])
-            return true;
-    }
-
-    return false;
-}
-
-void releaseSuppressedPrefix(Peer &peer, std::size_t family) noexcept {
-    auto &delivery = *peer.delivery[family];
-    const auto records = delivery.batch.records();
-
-    while (delivery.cursor < records.size() && delivery.suppressed[delivery.cursor])
-        ++delivery.cursor;
-
-    if (!records.empty() && delivery.cursor == records.size()) {
-        delivery.clear();
-        (void)peer.handles[family].requestResume();
-    }
+/** Borrow the existing worker fields without changing their ownership or lifetime.
+ * @param peer Serialized connection owner, alive through the immediate delivery operation.
+ * @return Borrowed output references that must not outlive the peer or escape the worker turn.
+ */
+detail::DeliveryOutputView deliveryOutput(Peer &peer) noexcept {
+    return {peer.output, peer.outputKind, peer.outputFamily, peer.outputEnd, peer.outputRecordCount};
 }
 
 } // namespace
@@ -1667,12 +1558,7 @@ class PublisherServer {
 
     bool allowed(const DemandPolicy &policy, std::size_t family, const core::RecordContext &context,
                  std::u16string_view symbol) const {
-        if (!policy[family])
-            return true;
-
-        const auto id = schema_.recordId(context);
-
-        return id && policy[family]->acceptRecord(schema_.records()[static_cast<std::size_t>(*id)].name, symbol);
+        return detail::publisherRecordAllowed(policy[family], schema_, context, symbol);
     }
 
     bool finishSubscription(Peer &peer) noexcept {
@@ -1852,7 +1738,7 @@ class PublisherServer {
                             }
                         }
 
-                        releaseSuppressedPrefix(peer, family);
+                        detail::releaseSuppressedPrefix(*peer.delivery[family], peer.handles[family]);
 
                         if (delivery.batch.records().empty())
                             continue;
@@ -1862,12 +1748,14 @@ class PublisherServer {
                         peer.nextFamily = (family + 1) % familyCount_;
 
                         if (family == STREAM_FAMILY && streamBytes_) {
-                            output = composeDelivery(peer, family, schema_, streamBytes_, outgoingViews_, work);
+                            output = detail::composeDelivery(delivery, deliveryOutput(peer), peer.session, family,
+                                                             schema_, streamBytes_, outgoingViews_, work);
 
                             if (!output)
                                 statistics_.families[family].failedFrames.add(1);
                         } else {
-                            output = composeDelivery(peer, family, schema_, {}, outgoingViews_, work);
+                            output = detail::composeDelivery(delivery, deliveryOutput(peer), peer.session, family,
+                                                             schema_, {}, outgoingViews_, work);
                         }
 
                         break;
@@ -1971,7 +1859,7 @@ class PublisherServer {
             }
 
             peer.delivery[peer.outputFamily]->cursor = peer.outputEnd;
-            releaseSuppressedPrefix(peer, peer.outputFamily);
+            detail::releaseSuppressedPrefix(*peer.delivery[peer.outputFamily], peer.handles[peer.outputFamily]);
             break;
         }
         case OutputKind::HEARTBEAT:
@@ -2172,22 +2060,16 @@ class PublisherServer {
                 replacements[family] = {&*queues_[family], &peer.handles[family], std::span(lane).first(count),
                                         &work[family]};
                 selectors += count;
-                const auto &delivery = *peer.delivery[family];
-                const auto held = delivery.batch.records();
-
-                for (auto row = delivery.cursor; row < held.size(); ++row) {
-                    if (!delivery.suppressed[row] &&
-                        !allowed(input->demand, family, held[row].context, held[row].symbol))
-                        revoked[family].set(row);
-                }
+                detail::collectDeliveryRevocations(*peer.delivery[family], input->demand[family], schema_,
+                                                   revoked[family]);
             }
 
             constexpr std::size_t history = 2;
             const auto losesHistory = std::ranges::any_of(peer.openHistory, [&](const auto &entry) {
                 return !allowed(input->demand, history, entry.context, entry.symbol);
             });
-            const auto losesPartialFrame = revokesOutput(peer, peer.outputFamily, revoked[peer.outputFamily]) &&
-                                           peer.output->pendingBytes().size() != peer.output->bytes().size();
+            const auto losesPartialFrame = detail::revokesPartialOutput(
+                deliveryOutput(peer), *peer.delivery[peer.outputFamily], peer.outputFamily, revoked[peer.outputFamily]);
 
             if (losesHistory || losesPartialFrame) {
                 retire(peer);
@@ -2227,13 +2109,8 @@ class PublisherServer {
         peer.policyRevision = revision;
 
         for (std::size_t family = 0; family < familyCount_; ++family) {
-            if (revoked[family].any()) {
-                if (revokesOutput(peer, family, revoked[family]))
-                    peer.output.reset();
-
-                peer.delivery[family]->suppressed |= revoked[family];
-                releaseSuppressedPrefix(peer, family);
-            }
+            detail::applyDeliveryRevocation(*peer.delivery[family], peer.handles[family], deliveryOutput(peer), family,
+                                            revoked[family]);
 
             publishedRevision_[family] = queues_[family]->revision();
         }

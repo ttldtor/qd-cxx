@@ -59,6 +59,15 @@ withdraws that connection's applied keys. Other peers keep their own policies an
 On an upstream reset, an already opened HISTORY transaction or snapshot also requires closing
 that downstream connection before a new source generation can send DATA.
 
+For TICKER and STREAM, a held delivery batch keeps the relative order of its permitted rows.
+If an unstarted DATA frame contains a newly forbidden row, the whole frame is discarded and the
+permitted rows are composed again from that batch. An unaffected frame remains valid. A tracker
+notification or `getCurrentFilter()` call alone changes neither the peer policy nor upstream demand;
+the current immutable filter must be passed to `replacePeerDemand`. Upstream reconciliation uses
+the resulting effective union, including the earliest remaining HISTORY bound of other peers.
+This boundary applies to the supported exact-key publisher profiles and does not extend the
+[filter expression scope](FEED-FILTERS.md).
+
 Each peer sends `DESCRIBE_PROTOCOL` and describes its own records before subscribing. The endpoint resolves the peer's record ID to the local composite `Quote` and sends its own `DESCRIBE_RECORDS` before DATA. Unsupported described record names are ignored while decoding subscription tuples. The profile uses ordinary TCP and QTP with exact symbols and composite Quote. The listener defaults to numeric IPv4 loopback and an ephemeral port. There are at most eight active or retiring client slots, 32 applied keys per family and client, 256 decoded wire tuples per subscription frame, and 1024 queued publication requests. The configured slot and publication counts may be smaller. A bounded queue admission failure, invalid peer input or blocked write for ten seconds retires the corresponding connection. The other clients retain their subscriptions and independent progress. TICKER may conflate pending updates for the same symbol.
 
 Use a nonempty exact symbol of at most 256 UTF-16 units. Bid and ask times use signed 32-bit whole seconds on the wire and must be exact multiples of 1000 milliseconds. `timeMs` lies within the second of the later bid or ask time. The low 22 sequence bits and the signed nano part are sent in the optional `Sequence` and `TimeNanoPart` fields. The endpoint transfers the four wide decimal raw values and both exchange codes. Snapshot-derived business numerics, nonzero `eventTime` and other values outside the wire profile are rejected at admission. The built-in Feed registry supports the eight default Quote fields. Add the two optional fields to its explicit registry to receive the full time and sequence precision of this profile.
