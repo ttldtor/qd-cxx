@@ -675,9 +675,10 @@ State observers are advisory. If one throws, the complete selected snapshot stil
 runs. `getStateChangeDiagnostic()` retains the first static `CALLBACK_FAILURE`
 separately; owner state, `getDiagnostic()` and `CloseResult` do not change. `CLOSED`
 and `FAILED` remain absorbing. As before, `CLOSED` proves native/registration and
-all **event-listener** captures have retired. Only these new opt-in state observers
-can still be executing or releasing captures; endpoint await includes both event
-and state-observer retirement before returning or releasing a runtime slot.
+all **event-listener** captures have retired. Opt-in state observers can still be
+executing or releasing captures, and endpoint OnDemand observer captures may remain
+retained. Endpoint await includes all these categories before returning or releasing
+a runtime slot. See [close-result guarantees](../spec/subscriptions/FEED-LIFECYCLE.md#closing-an-endpoint-and-interpreting-the-result).
 
 Separate positive `maximumStateListenersPerEndpoint` and
 `maximumStateListenersPerSubscription` limits count accepted, selected and retiring

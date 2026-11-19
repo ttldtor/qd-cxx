@@ -98,6 +98,63 @@ Native state publication and event selection validate the exact control revision
 under the endpoint mutex. Selection takes endpoint then subscription mutex; no
 application invocation or capture destruction occurs under either lock.
 
+## Closing an endpoint and interpreting the result
+
+Choose the completion operation according to the resource being released:
+
+| Observation or operation | Guarantee |
+| --- | --- |
+| `close()` returns | Further ordinary admission is fenced and local drain is requested. Retirement continues asynchronously. |
+| `getState()` or `awaitState()` observes `CLOSED` | Native registrations and event callbacks/captures have retired. Terminal state observers and observer capture release can still be in progress. |
+| `closeAndAwaitTermination()` returns a `CloseResult` | This endpoint's native work and SDK-held callback/observer captures have retired, including selected state and OnDemand observers. The result describes the actual local close outcome. |
+| `getStatistics().final` is true | The endpoint's final statistics snapshot has been published after capture retirement. Its totals and observation time are frozen. |
+| `ApiRuntime::closeAndAwaitTermination()` returns | All endpoints belonging to that runtime have retired and its SDK worker has been joined. |
+
+Call the blocking close on the creating thread before destroying resources used by
+callbacks. The SDK worker and other foreign threads reject `WRONG_THREAD`. A
+creator-thread subscription-change observer, or reentry into retirement of this
+endpoint, rejects `INVALID_STATE`; see the [thread contract](../../docs/API-THREADS.md).
+Repeated endpoint waits return the
+same detached result. An inactive endpoint can finish on its creator without
+starting a worker. A retained lifecycle failure remains `FAILED` after retirement.
+
+Closing one endpoint leaves its runtime available to other endpoints. In the
+ordinary `Endpoint::create()` path the shared default runtime has process lifetime.
+An explicit `ApiRuntime` provides application-controlled worker shutdown. Its
+bootstrap ownership lasts until runtime destruction. Caller-owned event copies,
+snapshots and retained immutable data keep their own lifetimes; endpoint retirement
+does not invalidate them or promise that process memory returns to zero.
+
+### Meaning of the close fields
+
+| Field | Meaning |
+| --- | --- |
+| `drained` | The admitted local prefix reached `DRAINED`, without an expired drain allowance or unresolved gap. |
+| `deadlineExpired` | The local drain allowance expired and retirement escalated to abort. |
+| `hadGap` | Local recovery or queue evidence retained a data gap, discarded input or unknown upstream completeness/eligibility. |
+| `diagnostic` | The first retained endpoint failure. It can describe an earlier failure after recovery and is independent of subscription and advisory observer diagnostics. |
+
+For an application that requires a clean local drain, check `drained`. Its
+definition already includes the deadline and gap conditions. Preserve the other
+fields for diagnostics or an explicit application policy that tolerates a gap.
+Subscription errors and application output failures require their own handling.
+An application may also require data to have arrived; the close result itself
+does not establish that an event was received.
+
+A delivery benchmark additionally checks its expected record count, values,
+duplicates and order at every receiver. Local drain alone cannot establish peer
+acknowledgement, receipt of unread socket data or complete upstream history. A
+reconnect example may deliberately accept a reported gap while requiring a live
+connection, healthy subscription and usable output; that policy does not establish
+lossless delivery. See the existing [reconnect](../../examples/feed_reconnect/main.cpp)
+and [Candle](../../examples/feed_candle/main.cpp) examples for their explicit checks.
+
+The drain allowance bounds the attempt to drain local data. It cannot preempt
+application callbacks or impose a hard bound on OS resource retirement. A deadline
+or cancellation passed to `awaitState()` affects that observation wait only.
+The blocking close still waits for actual retirement. Advisory observer failures
+remain available through their separate diagnostic APIs after it returns.
+
 ## Java compatibility and lower control
 
 The pinned [Java implementation](https://github.com/devexperts/QD/blob/0ddc0a09779fb61d74cc0b37c6449ff47dcb715f/dxfeed-impl/src/main/java/com/dxfeed/api/impl/DXEndpointImpl.java#L378-L396)
