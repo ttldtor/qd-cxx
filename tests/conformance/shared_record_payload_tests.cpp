@@ -456,3 +456,30 @@ TEST_CASE("successful repeated copy and measurement reuse the qualified shared c
 
     CHECK(d::recordControlMeasurementCount.load() == probes);
 }
+
+TEST_CASE("separate binding residency preserves complete retained capacity and range policy") {
+    Fixture f;
+    auto block = d::SharedRecordBlock::copy(f.binding, f.rows, f.physical, d::RecordPayloadResidency::SEPARATE_BINDING);
+    REQUIRE(block);
+    const auto payload = d::SharedRecordPayload::row(*block, 0);
+    CHECK(payload->fixedOwnerIdentity() == f.binding.get());
+    CHECK(payload->fixedOwnerBytes() == f.binding->retainedCapacityBytes());
+    CHECK(payload->residentBytes() + payload->fixedOwnerBytes() ==
+          ((*block)->accounting.backingAllocationBytes + (*block)->accounting.controlAllocationBytes +
+           f.binding->retainedCapacityBytes()));
+    auto selection = d::SharedRecordBlock::copyRange(**block, 1, 1, f.physical);
+    REQUIRE(selection);
+    CHECK((*selection)->residency == d::RecordPayloadResidency::SEPARATE_BINDING);
+    CHECK((*selection)->rows[0].fixedOwnerIdentity() == f.binding.get());
+    CHECK((*selection)->metadata[0].source == f.rows[1].metadata);
+    CHECK((*selection)->rows[0].fields()[0].raw == f.rows[1].fields[0].raw);
+    const auto full = ((*selection)->accounting.backingAllocationBytes +
+                       (*selection)->accounting.controlAllocationBytes + f.binding->retainedCapacityBytes());
+    d::RecordByteBudget consumer(full);
+    auto retained = d::SharedRecordBlock::retain(*selection, 0, 1, consumer);
+    REQUIRE(retained);
+    CHECK(consumer.usedBytes() == full);
+    CHECK(consumer.usedBytes() > (*selection)->rows[0].residentBytes());
+    retained = std::unexpected(d::RecordBlockError::INVALID_RANGE);
+    CHECK(consumer.usedBytes() == 0);
+}

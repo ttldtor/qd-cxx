@@ -1,6 +1,7 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 
+#include "../../src/api/publication_queue.hpp"
 #include "connect_peer.hpp"
 #include "qd/api/publisher.hpp"
 #include "qd/events/event_flags.hpp"
@@ -121,7 +122,7 @@ std::vector<std::byte> sourcePrefix(const c::LocalSchema &schema) {
     return result;
 }
 
-p::SubscriptionWriter writer(const c::LocalSchema &schema, int senderBase) {
+p::SubscriptionWriter writer(const c::LocalSchema &schema, int senderBase, c::SchemaLimits limits = SCHEMA_LIMITS) {
     std::vector<p::OutgoingRecord> layouts;
 
     for (const auto &record : schema.records()) {
@@ -134,11 +135,11 @@ p::SubscriptionWriter writer(const c::LocalSchema &schema, int senderBase) {
         layouts.push_back(std::move(layout));
     }
 
-    p::SubscriptionWriterWork work{256, 1024 * 1024, 1024 * 1024, 1024 * 1024};
-    auto result =
-        p::SubscriptionWriter::create(schema, layouts, {SCHEMA_LIMITS, 8, 32, 64, 1024},
-                                      {MESSAGE_LIMIT, MESSAGE_LIMIT + 9, 32, 256, {8192, 1024}, 131072, 131072, 8},
-                                      work, c::SubscriptionSelectorPolicy::CANONICAL_EXACT_V1);
+    p::SubscriptionWriterWork work{256, 64 * 1024 * 1024, 64 * 1024 * 1024, 1024 * 1024};
+    auto result = p::SubscriptionWriter::create(
+        schema, layouts, {limits, limits.records, limits.fields, limits.lookups, limits.totalNameUnits},
+        {MESSAGE_LIMIT, MESSAGE_LIMIT + 9, 32, 256, {8192, 1024}, 131072, 131072, 8}, work,
+        c::SubscriptionSelectorPolicy::CANONICAL_EXACT_V1);
     REQUIRE(result);
 
     return std::move(*result);
@@ -148,6 +149,7 @@ class Downstream {
     asio::io_context io_;
     tcp::socket socket_{io_};
     const c::LocalSchema &schema_;
+    const c::SchemaLimits schemaLimits_;
     p::SubscriptionWriter writer_;
     p::FrameReader frames_{{MESSAGE_LIMIT, MESSAGE_LIMIT + 9}};
     std::optional<p::StreamDataContext> context_;
@@ -163,10 +165,18 @@ class Downstream {
 
     void consume(const p::Frame &frame) {
         if (frame.type == 2) {
-            auto parsed = p::parseDescribeRecords(frame.payload, {MESSAGE_LIMIT, 8, 16, 32, {8192, 1024}, 1024});
+            auto parsed = p::parseDescribeRecords(frame.payload, {MESSAGE_LIMIT,
+                                                                  schemaLimits_.records,
+                                                                  schemaLimits_.fields,
+                                                                  schemaLimits_.fields,
+                                                                  {8192, 1024},
+                                                                  schemaLimits_.totalNameUnits});
             REQUIRE(parsed.status == p::DescriptionStatus::OK);
-            auto context =
-                p::StreamDataContext::create(schema_, parsed.descriptions, {SCHEMA_LIMITS, 8, {64, 1024, 8192}});
+            auto context = p::StreamDataContext::create(
+                schema_, parsed.descriptions,
+                {schemaLimits_,
+                 schemaLimits_.records,
+                 {schemaLimits_.fields, schemaLimits_.nameUnits, schemaLimits_.totalNameUnits}});
             REQUIRE(context);
             context_ = std::move(*context);
         } else if (frame.type == 10 || frame.type == 15 || frame.type == 20) {
@@ -191,8 +201,8 @@ class Downstream {
     }
 
     public:
-    Downstream(const c::LocalSchema &schema, std::uint16_t port, int senderBase)
-        : schema_(schema), writer_(writer(schema, senderBase)) {
+    Downstream(const c::LocalSchema &schema, std::uint16_t port, int senderBase, c::SchemaLimits limits = SCHEMA_LIMITS)
+        : schema_(schema), schemaLimits_(limits), writer_(writer(schema, senderBase, limits)) {
         asio::error_code error;
         socket_.connect({asio::ip::address_v4::loopback(), port}, error);
         REQUIRE_FALSE(error);
@@ -741,7 +751,7 @@ TEST_CASE("catalog STREAM byte limits admit whole calls and preserve mixed recor
     const std::vector<q::api::PublisherStreamRecordView> tooMany(64, rows.back());
     const auto full = publisher.publishStreamRecords(tooMany);
     REQUIRE_FALSE(full);
-    CHECK(full.error().stage == "publisher-pending-records");
+    CHECK(full.error().stage == "publisher-publication-capacity");
     REQUIRE(publisher.publishStreamRecords(rows));
     awaitRecords(peer, ROW_COUNT, **endpoint);
     (*endpoint)->closeAndAwaitTermination();
@@ -1311,20 +1321,38 @@ TEST_CASE("local record limits reject before admission and the producer lineariz
     q::api::PublisherOptions options;
     options.catalog.emplace(schema, names);
     constexpr auto BASE_BYTES = sizeof(c::FieldValueView) * empty.size() + sizeof(char16_t) * 3;
-    options.recordLimits = {BASE_BYTES + 8, BASE_BYTES};
+    constexpr auto EXTRA_PAYLOAD_BYTES = 2 * alignof(std::max_align_t);
+    namespace d = c::detail;
+    d::RecordByteBudget physical(1024 * 1024);
+    auto catalog = schema;
+    auto binding = d::RecordBlockBinding::create(std::move(catalog), {}, physical);
+    REQUIRE(binding);
+    const std::array input{d::RecordBlockInput{context, u"IBM", empty, {}}};
+    const auto measured = d::SharedRecordBlock::measure(**binding, input);
+    REQUIRE(measured);
+    const auto nodeBytes =
+        d::recordControlBytes<q::api::detail::Publication>(d::RecordByteReservation{}, d::RecordByteReservation{},
+                                                           std::shared_ptr<const d::BoundRecordBatch>{}, std::size_t{});
+    options.recordLimits = {BASE_BYTES + EXTRA_PAYLOAD_BYTES, (*binding)->retainedCapacityBytes() +
+                                                                  measured->backingAllocationBytes +
+                                                                  measured->controlAllocationBytes + nodeBytes};
     auto endpoint = q::api::PublisherEndpoint::create(*bootstrap, options);
     INFO((endpoint ? std::string_view{} : endpoint.error().stage));
     REQUIRE(endpoint);
     const auto publisher = (*endpoint)->getPublisher();
 
-    std::array<std::byte, 8> bytes{};
+    std::array<std::byte, EXTRA_PAYLOAD_BYTES> bytes{};
     auto canFitRow = empty;
     canFitRow[1].bytes = bytes;
+    const std::array largerInput{d::RecordBlockInput{context, u"IBM", canFitRow, {}}};
+    const auto largerMeasured = d::SharedRecordBlock::measure(**binding, largerInput);
+    REQUIRE(largerMeasured);
+    REQUIRE(largerMeasured->backingAllocationBytes > measured->backingAllocationBytes);
     const auto full = publisher.publishRecord(STREAM, context, u"IBM", canFitRow);
     REQUIRE_FALSE(full);
-    CHECK(full.error().stage == "publisher-pending-records");
+    CHECK(full.error().stage == "publisher-publication-capacity");
 
-    std::array<std::byte, 9> oversized{};
+    std::array<std::byte, EXTRA_PAYLOAD_BYTES + 1> oversized{};
     auto overLimit = empty;
     overLimit[1].bytes = oversized;
     const auto large = publisher.publishRecord(STREAM, context, u"IBM", overLimit);
@@ -1362,4 +1390,282 @@ TEST_CASE("local record limits reject before admission and the producer lineariz
         std::this_thread::yield();
 
     CHECK(closed.load(std::memory_order_acquire));
+}
+
+TEST_CASE("concurrent catalog publications keep exact nullable fields FIFO and indivisible commit order") {
+    using enum c::SubscriptionFamily;
+    using Type = c::SerialFieldType;
+    auto bootstrap = q::transport::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    const auto schema = publicationSchema();
+    q::api::PublisherOptions options;
+    const auto names = fieldNames(schema);
+    options.catalog.emplace(schema, names);
+    options.pendingQuotes = 32;
+    options.streamBytes.emplace(1200, 16384);
+    options.listener.maxConnections = 1;
+    options.listener.maxWriteBytes = 37;
+    auto endpoint = q::api::PublisherEndpoint::create(*bootstrap, options);
+    REQUIRE(endpoint);
+    Downstream peer(schema, (*endpoint)->port(), 100);
+    peer.subscribe(p::SubscriptionMessage::STREAM_ADD, 1);
+    REQUIRE((*endpoint)->awaitDemand(STREAM, u"CustomFlow", u"IBM", true, Clock::now() + WAIT_TIME));
+    const auto publisher = (*endpoint)->getPublisher();
+    constexpr std::size_t PRODUCERS = 3;
+    constexpr std::size_t CALLS = 12;
+    constexpr std::size_t ROWS = 4;
+    constexpr std::int64_t PRODUCER_STRIDE = 100000;
+    constexpr std::int64_t CALL_STRIDE = 100;
+    const auto deadline = Clock::now() + WAIT_TIME;
+    std::atomic<bool> start{false};
+    std::atomic<std::size_t> finished{0};
+    std::atomic<bool> failed{false};
+    std::array<std::jthread, PRODUCERS> producers;
+
+    for (std::size_t producer = 0; producer < PRODUCERS; ++producer) {
+        producers[producer] = std::jthread([&, producer] {
+            while (!start.load(std::memory_order_acquire)) {
+                std::this_thread::yield();
+            }
+
+            for (std::size_t call = 0; call < CALLS; ++call) {
+                std::array<std::array<char16_t, 3>, ROWS> text;
+                std::array<std::array<std::byte, 4>, ROWS> bytes;
+                std::array<std::array<c::FieldValueView, 3>, ROWS> values;
+                std::array<q::api::PublisherStreamRecordView, ROWS> rows;
+
+                for (std::size_t row = 0; row < ROWS; ++row) {
+                    text[row] = {static_cast<char16_t>(producer + 1), 0, static_cast<char16_t>(0xd800 + call)};
+                    bytes[row] = {static_cast<std::byte>(producer), static_cast<std::byte>(call),
+                                  static_cast<std::byte>(row), std::byte{0xff}};
+                    const auto sequence = static_cast<std::int64_t>(producer) * PRODUCER_STRIDE +
+                                          static_cast<std::int64_t>(call) * CALL_STRIDE +
+                                          static_cast<std::int64_t>(row);
+                    values[row] = {c::FieldValueView{Type::UTF_CHAR_ARRAY, 0, {}, {}},
+                                   c::FieldValueView{Type::BYTE_ARRAY, 0, {}, {}},
+                                   c::FieldValueView{Type::LONG, sequence, {}, {}}};
+
+                    if (row != 2) {
+                        values[row][0].units = std::u16string_view(text[row].data(), row == 1 ? 0 : text[row].size());
+                        values[row][1].bytes =
+                            std::span<const std::byte>(bytes[row]).first(row == 1 ? 0 : bytes[row].size());
+                    }
+
+                    rows[row] = {schema.recordContext(1), u"IBM", values[row]};
+                }
+
+                for (;;) {
+                    const auto result = publisher.publishStreamRecords(rows);
+
+                    if (result) {
+                        break;
+                    }
+
+                    if (result.error().code != q::api::ErrorCode::RESOURCE_LIMIT || Clock::now() >= deadline) {
+                        failed.store(true, std::memory_order_release);
+                        finished.fetch_add(1, std::memory_order_release);
+
+                        return;
+                    }
+
+                    std::this_thread::yield();
+                }
+
+                for (auto &row : text) {
+                    row.fill(u'X');
+                }
+
+                for (auto &row : bytes) {
+                    row.fill(std::byte{0x11});
+                }
+            }
+
+            finished.fetch_add(1, std::memory_order_release);
+        });
+    }
+
+    start.store(true, std::memory_order_release);
+
+    while (
+        (finished.load(std::memory_order_acquire) != PRODUCERS || peer.records().size() < PRODUCERS * CALLS * ROWS) &&
+        Clock::now() < deadline) {
+        peer.poll();
+        std::this_thread::yield();
+    }
+
+    for (auto &producer : producers) {
+        producer.join();
+    }
+
+    REQUIRE_FALSE(failed.load());
+    awaitRecords(peer, PRODUCERS * CALLS * ROWS, **endpoint);
+    std::array<std::size_t, PRODUCERS> nextCall{};
+
+    for (std::size_t first = 0; first < peer.records().size(); first += ROWS) {
+        const auto sequence = peer.records()[first].second.typedValues[2].raw;
+        const auto producer = static_cast<std::size_t>(sequence / PRODUCER_STRIDE);
+        const auto call = static_cast<std::size_t>((sequence % PRODUCER_STRIDE) / CALL_STRIDE);
+        REQUIRE(producer < PRODUCERS);
+        CHECK(call == nextCall[producer]++);
+
+        for (std::size_t row = 0; row < ROWS; ++row) {
+            const auto &record = peer.records()[first + row].second;
+            CHECK(record.symbol.units == u"IBM");
+            REQUIRE(record.typedValues.size() == 3);
+            const auto &values = record.typedValues;
+            CHECK(values[2].raw == sequence + static_cast<std::int64_t>(row));
+            CHECK(values[0].units.has_value() == (row != 2));
+            CHECK(values[1].bytes.has_value() == (row != 2));
+
+            if (row == 1) {
+                CHECK(values[0].units->empty());
+                CHECK(values[1].bytes->empty());
+            } else if (row != 2) {
+                const std::u16string expected{static_cast<char16_t>(producer + 1), 0,
+                                              static_cast<char16_t>(0xd800 + call)};
+                CHECK(*values[0].units == expected);
+                const std::array expectedBytes{static_cast<std::byte>(producer), static_cast<std::byte>(call),
+                                               static_cast<std::byte>(row), std::byte{0xff}};
+                CHECK(std::ranges::equal(*values[1].bytes, expectedBytes));
+            }
+        }
+    }
+
+    for (const auto calls : nextCall) {
+        CHECK(calls == CALLS);
+    }
+
+    (*endpoint)->closeAndAwaitTermination();
+    CHECK((*endpoint)->getDiagnostic().code == q::api::ErrorCode::NONE);
+}
+
+TEST_CASE("large immutable catalog is reserved once while tiny STREAM publications use an independent window") {
+    using Type = c::SerialFieldType;
+    constexpr c::SchemaLimits limits{16, 1024, 1024, 64, 32768};
+    std::vector<c::LocalRecord> declarations;
+
+    for (std::int32_t id = 0; id < 16; ++id) {
+        auto name = std::u16string(u"Record") + static_cast<char16_t>(u'A' + id);
+        c::LocalRecord record{id, std::move(name), false, {}, {}};
+        const std::size_t fields = id == 0 ? 1 : 64;
+
+        for (std::size_t field = 0; field < fields; ++field) {
+            record.fields.push_back({std::to_underlying(Type::COMPACT_INT)});
+            auto fieldName = std::u16string(u"LongFieldName") + static_cast<char16_t>(u'A' + field);
+            record.lookups.push_back({std::move(fieldName), field});
+        }
+
+        declarations.push_back(std::move(record));
+    }
+
+    auto catalog = c::LocalSchema::create(declarations, limits, c::LocalProfile::BINARY_FIELDS_V1);
+    REQUIRE(catalog);
+    const auto schema = std::move(*catalog);
+    constexpr std::size_t WINDOW = 512;
+    REQUIRE(schema.storageBytes() > 32 * WINDOW);
+    auto bootstrap = q::transport::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    q::api::PublisherOptions options;
+    const auto names = fieldNames(schema);
+    options.catalog.emplace(schema, names);
+    options.pendingQuotes = 32;
+    options.recordLimits.rowBytes = 1024;
+    options.recordLimits.pendingBytes = schema.storageBytes() + 16 * 1024;
+    options.streamBytes.emplace(512, 16384, WINDOW);
+    options.listener.maxConnections = 1;
+    auto endpoint = q::api::PublisherEndpoint::create(*bootstrap, options);
+    INFO((endpoint ? std::string_view{} : endpoint.error().stage));
+    REQUIRE(endpoint);
+    Downstream peer(schema, (*endpoint)->port(), 100, limits);
+    peer.subscribe(p::SubscriptionMessage::STREAM_ADD, 0);
+    REQUIRE(
+        (*endpoint)->awaitDemand(c::SubscriptionFamily::STREAM, u"RecordA", u"IBM", true, Clock::now() + WAIT_TIME));
+    const auto publisher = (*endpoint)->getPublisher();
+    constexpr std::size_t CALLS = 80;
+
+    for (std::size_t call = 0; call < CALLS; ++call) {
+        const std::array fields{c::FieldValueView{Type::COMPACT_INT, static_cast<std::int64_t>(call), {}, {}}};
+        const std::array rows{q::api::PublisherStreamRecordView{schema.recordContext(0), u"IBM", fields}};
+        const auto deadline = Clock::now() + WAIT_TIME;
+
+        for (;;) {
+            const auto admitted = publisher.publishStreamRecords(rows);
+
+            if (admitted) {
+                break;
+            }
+
+            INFO(admitted.error().stage);
+            REQUIRE(admitted.error().stage == "publisher-pending-records");
+            REQUIRE(Clock::now() < deadline);
+            peer.poll();
+            std::this_thread::yield();
+        }
+
+        peer.poll();
+    }
+
+    awaitRecords(peer, CALLS, **endpoint);
+
+    for (std::size_t row = 0; row < CALLS; ++row) {
+        CHECK(peer.records()[row].second.typedValues[0].raw == static_cast<std::int64_t>(row));
+    }
+
+    (*endpoint)->closeAndAwaitTermination();
+    CHECK((*endpoint)->getDiagnostic().code == q::api::ErrorCode::NONE);
+    CHECK((*endpoint)->getStatistics().pendingPublications == 0);
+}
+
+TEST_CASE("whole input larger than a payload window is copied only at bounded collector selections") {
+    using Type = c::SerialFieldType;
+    auto bootstrap = q::transport::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    const auto schema = publicationSchema();
+    const auto names = fieldNames(schema);
+    q::api::PublisherOptions options;
+    options.catalog.emplace(schema, names);
+    options.pendingQuotes = 64;
+    options.recordLimits.rowBytes = 1024;
+    options.streamBytes.emplace(128, 1024, 128);
+    options.listener.maxConnections = 1;
+    options.listener.maxWriteBytes = 1024;
+    options.listener.noDelay = true;
+    auto endpoint = q::api::PublisherEndpoint::create(*bootstrap, options);
+    REQUIRE(endpoint);
+    Downstream peer(schema, (*endpoint)->port(), 100);
+    peer.subscribe(p::SubscriptionMessage::STREAM_ADD, 1);
+    REQUIRE(
+        (*endpoint)->awaitDemand(c::SubscriptionFamily::STREAM, u"CustomFlow", u"IBM", true, Clock::now() + WAIT_TIME));
+    constexpr std::size_t ROWS = 64;
+    std::vector<std::byte> payload(256, std::byte{0x5c});
+    std::array<std::array<c::FieldValueView, 3>, ROWS> values;
+    std::array<q::api::PublisherStreamRecordView, ROWS> rows;
+
+    for (std::size_t row = 0; row < ROWS; ++row) {
+        values[row] = {c::FieldValueView{Type::UTF_CHAR_ARRAY, 0, {}, {}},
+                       c::FieldValueView{Type::BYTE_ARRAY, 0, {}, payload},
+                       c::FieldValueView{Type::LONG, -static_cast<std::int64_t>(row), {}, {}}};
+        rows[row] = {schema.recordContext(1), u"IBM", values[row]};
+    }
+
+    REQUIRE((*endpoint)->getPublisher().publishStreamRecords(rows));
+    std::ranges::fill(payload, std::byte{0x44});
+    awaitRecords(peer, ROWS, **endpoint);
+
+    for (std::size_t row = 0; row < ROWS; ++row) {
+        const auto &fields = peer.records()[row].second.typedValues;
+        REQUIRE(fields.size() == 3);
+        CHECK_FALSE(fields[0].units);
+        REQUIRE(fields[1].bytes);
+        CHECK(fields[1].bytes->size() == payload.size());
+        CHECK(std::ranges::all_of(*fields[1].bytes, [](std::byte byte) {
+            return byte == std::byte{0x5c};
+        }));
+        CHECK(fields[2].raw == -static_cast<std::int64_t>(row));
+    }
+
+    (*endpoint)->closeAndAwaitTermination();
+    CHECK((*endpoint)->getDiagnostic().code == q::api::ErrorCode::NONE);
+    CHECK((*endpoint)->getStatistics().pendingPublications == 0);
+    CHECK((*endpoint)->getStatistics().retiredPeers.value == 0);
 }

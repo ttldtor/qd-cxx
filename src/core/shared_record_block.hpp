@@ -322,6 +322,12 @@ struct RecordBlockAccounting {
     std::size_t dataAllocationCount = 0; ///< Actual block backing plus shared control requests; excludes binding.
 };
 
+/** Payload accounting policy; complete block capacity/retains always include the binding. */
+enum class RecordPayloadResidency {
+    WHOLE_RETAINED,  ///< Each payload consumer pays for all capacity it can keep alive.
+    SEPARATE_BINDING ///< Payload-only quota requires an exact, separately reserved binding owner in its domain.
+};
+
 /** Extended Batch; row aliases retain this actual derived shared-control object and binding. */
 struct BoundRecordBatch : SharedRecordPayload::Batch {
     struct Metadata {
@@ -334,6 +340,8 @@ struct BoundRecordBatch : SharedRecordPayload::Batch {
     const RecordBlockAccounting accounting;
     Metadata *metadata = nullptr;
     const std::size_t count;
+    RecordPayloadResidency residency =
+        RecordPayloadResidency::WHOLE_RETAINED; ///< Payload-only mode requires a matching external fixed reservation.
 
     BoundRecordBatch(RecordByteReservation reservation, std::shared_ptr<const RecordBlockBinding> snapshot,
                      RecordBlockAccounting measured, std::size_t rows)
@@ -483,11 +491,14 @@ class SharedRecordBlock {
      * @param binding Reused immutable binding; no declaration copy is performed per block.
      * @param rows Source valid through this synchronous call.
      * @param physical Physical domain; both allocation requests reserve before constructing storage.
+     * @param residency Full retain by default; separate mode requires each payload consumer to own the binding
+     * reservation.
      * @return Complete immutable block; rejection publishes no owner and restores all reservations.
      */
     template <class Rows>
     static std::expected<std::shared_ptr<const BoundRecordBatch>, RecordBlockError>
-    copy(std::shared_ptr<const RecordBlockBinding> binding, const Rows &rows, const RecordByteBudget &physical) {
+    copy(std::shared_ptr<const RecordBlockBinding> binding, const Rows &rows, const RecordByteBudget &physical,
+         RecordPayloadResidency residency = RecordPayloadResidency::WHOLE_RETAINED) {
         if (!binding) {
             return std::unexpected(RecordBlockError::WRONG_CONTEXT);
         }
@@ -524,6 +535,12 @@ class SharedRecordBlock {
 
             // Existing collector/MUX accounting sees the complete retained capacity through the base row.
             block->bytes = retained - SharedRecordPayload::controlBytes();
+            block->residency = residency;
+
+            if (residency == RecordPayloadResidency::SEPARATE_BINDING) {
+                block->fixedOwnerIdentity = block->binding.get();
+                block->fixedOwnerBytes = block->binding->retainedCapacityBytes();
+            }
 
             return block;
         } catch (RecordBlockError error) {
@@ -538,7 +555,7 @@ class SharedRecordBlock {
      * @param first First selected record.
      * @param count Number of selected records.
      * @param physical Capacity domain for the new block and control allocation.
-     * @return Independent smaller backing, sharing only the immutable binding, or atomic failure.
+     * @return Independent smaller backing with the same residency policy and binding, or atomic failure.
      */
     static std::expected<std::shared_ptr<const BoundRecordBatch>, RecordBlockError>
     copyRange(const BoundRecordBatch &source, std::size_t first, std::size_t count, const RecordByteBudget &physical) {
@@ -565,7 +582,7 @@ class SharedRecordBlock {
             }
         };
 
-        return copy(source.binding, Selection{source, first, count}, physical);
+        return copy(source.binding, Selection{source, first, count}, physical, source.residency);
     }
 
     /** Retain a logical range, charging the actual whole block and associated binding to this consumer.
