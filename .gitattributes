@@ -908,3 +908,9 @@ tools/upstream/nuam-order-oracle/*.java text eol=lf
 
 # The private Beast WSS profile checks the exact inventory digest on both hosts.
 /cmake/beast-wss-profile/boost-1.92.0-sources.sha256.tsv text eol=lf
+
+# Preserve exact symbol stripe/collector observations and hash-bound generator sources.
+tools/upstream/stripe-oracle/*.java text eol=lf
+tools/upstream/stripe-oracle/*.ps1 text eol=lf
+tests/fixtures/stripes/*.json text eol=lf
+tests/fixtures/stripes/*.tsv -text -whitespace

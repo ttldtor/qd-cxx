@@ -91,6 +91,8 @@ production-библиотек. Корневой `BUILD_TESTING=OFF` не соб�
 
 [Явная подготовка зависимости IPF transfer](../deps/IPF-TRANSFER.ru.md) предоставляет pinned Boost1.92.0 sources, отдельную static URL сборку, EN/RU help helpers, offline/cache checks и sealed переносимый private SDK. Она не добавляет production transfer API и не получает зависимости при ordinary configure либо dependency OFF.
 
+[Production oracle полос символов](../upstream/stripe-oracle/README.ru.md) наблюдает закреплённую грамматику MONO/HASH/RANGE, выбор символов, все листья полос и пересечения фильтров с явно заданными JDK8/reference/logger/run. Вызовы без аргументов и отдельная EN/RU справка не запускают нагрузку.
+
 ## Первая сборка
 
 Запускать из корня репозитория. Bootstrap — явное исключение логирования первой сборки:

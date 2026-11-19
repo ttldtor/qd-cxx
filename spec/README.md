@@ -75,3 +75,5 @@ Exact conformance results belong to the [developer reading path](../docs/develop
 
 [Public record subscriptions](subscriptions/RECORD-FEED.md): selected RecordFeed contract,
 shared Endpoint, complete schema metadata, borrowing and byte-accounted ownership; implementation pending.
+
+- [Symbol striping](core/SYMBOL-STRIPES.md) and [striped local MUX composition](mux/STRIPES.md): exact partitions, native family children, partial progress and independent limits.

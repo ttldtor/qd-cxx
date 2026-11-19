@@ -75,3 +75,5 @@
 
 [Публичные подписки на записи](subscriptions/RECORD-FEED.ru.md): выбранный контракт RecordFeed,
 общий Endpoint, полные метаданные схемы, заимствование и владение с байтовым учётом; реализация впереди.
+
+- [Полосы символов](core/SYMBOL-STRIPES.ru.md) и [локальная MUX composition по полосам](mux/STRIPES.ru.md): точные разбиения, native children, partial progress и независимые limits.

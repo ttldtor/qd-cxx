@@ -1,0 +1,1263 @@
+striper		by1	1
+stripe	by1	0	*
+striper	0062,0079,0031	by1	1
+stripe	by1	0	*
+striper	0062,0079,0068,0061,0073,0068,0032	byhash2	2
+stripe	byhash2	0	hash0of2
+stripe	byhash2	1	hash1of2
+striper	0062,0079,0068,0061,0073,0068,0030,0030,0030,0034	byhash4	4
+stripe	byhash4	0	hash0of4
+stripe	byhash4	1	hash1of4
+stripe	byhash4	2	hash2of4
+stripe	byhash4	3	hash3of4
+striper	0062,0079,0068,0061,0073,0068,0031,0036	byhash16	16
+stripe	byhash16	0	hash00of16
+stripe	byhash16	1	hash01of16
+stripe	byhash16	2	hash02of16
+stripe	byhash16	3	hash03of16
+stripe	byhash16	4	hash04of16
+stripe	byhash16	5	hash05of16
+stripe	byhash16	6	hash06of16
+stripe	byhash16	7	hash07of16
+stripe	byhash16	8	hash08of16
+stripe	byhash16	9	hash09of16
+stripe	byhash16	10	hash10of16
+stripe	byhash16	11	hash11of16
+stripe	byhash16	12	hash12of16
+stripe	byhash16	13	hash13of16
+stripe	byhash16	14	hash14of16
+stripe	byhash16	15	hash15of16
+striper	0062,0079,0072,0061,006E,0067,0065,002D,0030,002D,0041,002D,004D,002D,005A,002D,0061,002D,007A,002D	byrange-0-A-M-Z-a-z-	7
+stripe	byrange-0-A-M-Z-a-z-	0	range--0-
+stripe	byrange-0-A-M-Z-a-z-	1	range-0-A-
+stripe	byrange-0-A-M-Z-a-z-	2	range-A-M-
+stripe	byrange-0-A-M-Z-a-z-	3	range-M-Z-
+stripe	byrange-0-A-M-Z-a-z-	4	range-Z-a-
+stripe	byrange-0-A-M-Z-a-z-	5	range-a-z-
+stripe	byrange-0-A-M-Z-a-z-	6	range-z--
+invalid	0062,0079,0068,0061,0073,0068
+invalid	0062,0079,0068,0061,0073,0068,0030
+invalid	0062,0079,0068,0061,0073,0068,0031
+invalid	0062,0079,0068,0061,0073,0068,0033
+invalid	0062,0079,0068,0061,0073,0068,002D,0032
+invalid	0062,0079,0068,0061,0073,0068,002B,0032
+invalid	0062,0079,0068,0061,0073,0068,0032,0031,0034,0037,0034,0038,0033,0036,0034,0038
+invalid	0062,0079,0068,0061,0073,0068,0032,0020
+invalid	0042,0059,0048,0041,0053,0048,0032
+invalid	0062,0079,0072,0061,006E,0067,0065
+invalid	0062,0079,0072,0061,006E,0067,0065,002D
+invalid	0062,0079,0072,0061,006E,0067,0065,002D,002D
+invalid	0062,0079,0072,0061,006E,0067,0065,002D,0041,002D,002D
+invalid	0062,0079,0072,0061,006E,0067,0065,002D,0041,002D,0041,002D
+invalid	0062,0079,0072,0061,006E,0067,0065,002D,005A,002D,0041,002D
+invalid	0062,0079,0072,0061,006E,0067,0065,002D,0031,0032,0033,0034,0035,0036,0037,0038,0039,002D
+invalid	0062,0079,0072,0061,006E,0067,0065,002D,0041,005F,0042,002D
+invalid	0062,0079,0072,0061,006E,0067,0065,002D,00C0,002D
+invalid	006F,0074,0068,0065,0072
+factory	hash-count-1	by1
+factory	empty-ranges	by1
+symbol	by1		1073741824	0	0	1	0
+symbol	by1	0041	1073741825	0	0	1	0
+symbol	by1	0041,0041,0050,004C	1073776140	0	0	1	0
+symbol	by1	0049,0042,004D	1073751117	0	0	1	0
+symbol	by1	004D,0053,0046,0054	1074187476	0	0	1	0
+symbol	by1	0053,0050,0059	1073761817	0	0	1	0
+symbol	by1	0061,0061,0070,006C	0	0	0	1	0
+symbol	by1	0031,0032,0033	2095004623	0	0	1	0
+symbol	by1	002A	1073742792	0	0	1	0
+symbol	by1	0041,0000,0042	0	0	0	1	0
+symbol	by1	0000	0	0	0	1	0
+symbol	by1	007F	0	0	0	1	0
+symbol	by1	0080	0	0	0	1	0
+symbol	by1	FFFF	0	0	0	1	0
+symbol	by1	D800	0	0	0	1	0
+symbol	by1	DC00	0	0	0	1	0
+symbol	by1	D83D,DE80	0	0	0	1	0
+symbol	by1	0041,0080	0	0	0	1	0
+symbol	by1	003D,0032,002A,0041,0041,0050,004C	0	0	0	1	0
+symbol	by1	003D,002D,0032,002E,0035,002A,0049,0042,004D	0	0	0	1	0
+symbol	by1	003D,002B,0033,002E,002A,004D,0053,0046,0054	0	0	0	1	0
+symbol	by1	003D,0030,002A,005A	0	0	0	1	0
+symbol	by1	003D,0031,002E,002E,0032,002A,0041	0	0	0	1	0
+symbol	by1	003D,002B,0041	1106049313	0	0	1	0
+symbol	by1	003D,002D,002D,0041	0	0	0	1	0
+symbol	by1	002F,0045,0053	1073770675	0	0	1	0
+symbol	by1	002E,002F,0041,0042,0043	1102971971	0	0	1	0
+symbol	by1	0041,0026,0051	1073805489	0	0	1	0
+symbol	by1	0041,007B,003D,0064,007D	0	0	0	1	0
+symbol	by1	0041,0042,0043,0044,0045,0046,0047,0048	0	0	0	1	0
+symbol	by1	0041,0042,0043,0044,0045,0046,0047,0048,0030	0	0	0	1	0
+symbol	by1	0041,0042,0043,0044,0045,0046,0047,0047,FFFF	0	0	0	1	0
+symbol	by1	0041,0042,0043,0044,0045,0046,0047,0049	0	0	0	1	0
+symbol	by1	005B,0041,005D	1106151391	0	0	1	0
+symbol	by1	00C0,004D	0	0	0	1	0
+symbol	by1	0001	0	0	0	1	0
+symbol	by1	0002	0	0	0	1	0
+symbol	by1	0003	0	0	0	1	0
+symbol	by1	0004	0	0	0	1	0
+symbol	by1	0005	0	0	0	1	0
+symbol	by1	0006	0	0	0	1	0
+symbol	by1	0007	0	0	0	1	0
+symbol	by1	0008	0	0	0	1	0
+symbol	by1	0009	0	0	0	1	0
+symbol	by1	000A	0	0	0	1	0
+symbol	by1	000B	0	0	0	1	0
+symbol	by1	000C	0	0	0	1	0
+symbol	by1	000D	0	0	0	1	0
+symbol	by1	000E	0	0	0	1	0
+symbol	by1	000F	0	0	0	1	0
+symbol	by1	0010	0	0	0	1	0
+symbol	by1	0011	0	0	0	1	0
+symbol	by1	0012	0	0	0	1	0
+symbol	by1	0013	0	0	0	1	0
+symbol	by1	0014	0	0	0	1	0
+symbol	by1	0015	0	0	0	1	0
+symbol	by1	0016	0	0	0	1	0
+symbol	by1	0017	0	0	0	1	0
+symbol	by1	0018	0	0	0	1	0
+symbol	by1	0019	0	0	0	1	0
+symbol	by1	001A	0	0	0	1	0
+symbol	by1	001B	0	0	0	1	0
+symbol	by1	001C	0	0	0	1	0
+symbol	by1	001D	0	0	0	1	0
+symbol	by1	001E	0	0	0	1	0
+symbol	by1	001F	0	0	0	1	0
+symbol	by1	0020	1073742784	0	0	1	0
+symbol	by1	0021	1073742785	0	0	1	0
+symbol	by1	0022	1073742786	0	0	1	0
+symbol	by1	0023	1073742787	0	0	1	0
+symbol	by1	0024	1073741853	0	0	1	0
+symbol	by1	0025	1073742788	0	0	1	0
+symbol	by1	0026	1073742789	0	0	1	0
+symbol	by1	0027	0	0	0	1	0
+symbol	by1	0028	1073742790	0	0	1	0
+symbol	by1	0029	1073742791	0	0	1	0
+symbol	by1	002A	1073742792	0	0	1	0
+symbol	by1	002B	1073742793	0	0	1	0
+symbol	by1	002C	1073742794	0	0	1	0
+symbol	by1	002D	1073742795	0	0	1	0
+symbol	by1	002E	1073741851	0	0	1	0
+symbol	by1	002F	1073741852	0	0	1	0
+symbol	by1	0030	1073742796	0	0	1	0
+symbol	by1	0031	1073742797	0	0	1	0
+symbol	by1	0032	1073742798	0	0	1	0
+symbol	by1	0033	1073742799	0	0	1	0
+symbol	by1	0034	1073742800	0	0	1	0
+symbol	by1	0035	1073742801	0	0	1	0
+symbol	by1	0036	1073742802	0	0	1	0
+symbol	by1	0037	1073742803	0	0	1	0
+symbol	by1	0038	1073742804	0	0	1	0
+symbol	by1	0039	1073742805	0	0	1	0
+symbol	by1	003A	1073742806	0	0	1	0
+symbol	by1	003B	1073742807	0	0	1	0
+symbol	by1	003C	1073742808	0	0	1	0
+symbol	by1	003D	1073742809	0	0	1	0
+symbol	by1	003E	1073742810	0	0	1	0
+symbol	by1	003F	1073742811	0	0	1	0
+symbol	by1	0040	1073742812	0	0	1	0
+symbol	by1	0041	1073741825	0	0	1	0
+symbol	by1	0042	1073741826	0	0	1	0
+symbol	by1	0043	1073741827	0	0	1	0
+symbol	by1	0044	1073741828	0	0	1	0
+symbol	by1	0045	1073741829	0	0	1	0
+symbol	by1	0046	1073741830	0	0	1	0
+symbol	by1	0047	1073741831	0	0	1	0
+symbol	by1	0048	1073741832	0	0	1	0
+symbol	by1	0049	1073741833	0	0	1	0
+symbol	by1	004A	1073741834	0	0	1	0
+symbol	by1	004B	1073741835	0	0	1	0
+symbol	by1	004C	1073741836	0	0	1	0
+symbol	by1	004D	1073741837	0	0	1	0
+symbol	by1	004E	1073741838	0	0	1	0
+symbol	by1	004F	1073741839	0	0	1	0
+symbol	by1	0050	1073741840	0	0	1	0
+symbol	by1	0051	1073741841	0	0	1	0
+symbol	by1	0052	1073741842	0	0	1	0
+symbol	by1	0053	1073741843	0	0	1	0
+symbol	by1	0054	1073741844	0	0	1	0
+symbol	by1	0055	1073741845	0	0	1	0
+symbol	by1	0056	1073741846	0	0	1	0
+symbol	by1	0057	1073741847	0	0	1	0
+symbol	by1	0058	1073741848	0	0	1	0
+symbol	by1	0059	1073741849	0	0	1	0
+symbol	by1	005A	1073741850	0	0	1	0
+symbol	by1	005B	1073742813	0	0	1	0
+symbol	by1	005C	1073742814	0	0	1	0
+symbol	by1	005D	1073742815	0	0	1	0
+symbol	by1	005E	1073742816	0	0	1	0
+symbol	by1	005F	1073742817	0	0	1	0
+symbol	by1	0060	0	0	0	1	0
+symbol	by1	0061	1073742818	0	0	1	0
+symbol	by1	0062	1073742819	0	0	1	0
+symbol	by1	0063	1073742820	0	0	1	0
+symbol	by1	0064	1073742821	0	0	1	0
+symbol	by1	0065	1073742822	0	0	1	0
+symbol	by1	0066	1073742823	0	0	1	0
+symbol	by1	0067	1073742824	0	0	1	0
+symbol	by1	0068	1073742825	0	0	1	0
+symbol	by1	0069	1073742826	0	0	1	0
+symbol	by1	006A	1073742827	0	0	1	0
+symbol	by1	006B	1073742828	0	0	1	0
+symbol	by1	006C	1073742829	0	0	1	0
+symbol	by1	006D	1073742830	0	0	1	0
+symbol	by1	006E	1073742831	0	0	1	0
+symbol	by1	006F	1073742832	0	0	1	0
+symbol	by1	0070	1073742833	0	0	1	0
+symbol	by1	0071	1073742834	0	0	1	0
+symbol	by1	0072	1073742835	0	0	1	0
+symbol	by1	0073	1073742836	0	0	1	0
+symbol	by1	0074	1073742837	0	0	1	0
+symbol	by1	0075	1073742838	0	0	1	0
+symbol	by1	0076	1073742839	0	0	1	0
+symbol	by1	0077	1073742840	0	0	1	0
+symbol	by1	0078	1073742841	0	0	1	0
+symbol	by1	0079	1073742842	0	0	1	0
+symbol	by1	007A	1073742843	0	0	1	0
+symbol	by1	007B	1073742844	0	0	1	0
+symbol	by1	007C	1073742845	0	0	1	0
+symbol	by1	007D	1073742846	0	0	1	0
+symbol	by1	007E	1073742847	0	0	1	0
+symbol	by1	007F	0	0	0	1	0
+symbol	by1	0030	1073742796	0	0	1	0
+symbol	by1	0030,0030	1074738124	0	0	1	0
+symbol	by1	0030,0000	0	0	0	1	0
+symbol	by1	003D,0032,002A,0030	0	0	0	1	0
+symbol	by1	0041	1073741825	0	0	1	0
+symbol	by1	0041,0030	1073743820	0	0	1	0
+symbol	by1	0041,0000	0	0	0	1	0
+symbol	by1	003D,0032,002A,0041	0	0	0	1	0
+symbol	by1	004D	1073741837	0	0	1	0
+symbol	by1	004D,0030	1073756108	0	0	1	0
+symbol	by1	004D,0000	0	0	0	1	0
+symbol	by1	003D,0032,002A,004D	0	0	0	1	0
+symbol	by1	005A	1073741850	0	0	1	0
+symbol	by1	005A,0030	1073769420	0	0	1	0
+symbol	by1	005A,0000	0	0	0	1	0
+symbol	by1	003D,0032,002A,005A	0	0	0	1	0
+symbol	by1	0061	1073742818	0	0	1	0
+symbol	by1	0061,0030	1074760652	0	0	1	0
+symbol	by1	0061,0000	0	0	0	1	0
+symbol	by1	003D,0032,002A,0061	0	0	0	1	0
+symbol	by1	007A	1073742843	0	0	1	0
+symbol	by1	007A,0030	1074786252	0	0	1	0
+symbol	by1	007A,0000	0	0	0	1	0
+symbol	by1	003D,0032,002A,007A	0	0	0	1	0
+symbol	by1	0041,0042,0043,0044,0045,0046,0047,0048	0	0	0	1	0
+symbol	by1	0041,0042,0043,0044,0045,0046,0047,0048,0030	0	0	0	1	0
+symbol	by1	0041,0042,0043,0044,0045,0046,0047,0048,0000	0	0	0	1	0
+symbol	by1	003D,0032,002A,0041,0042,0043,0044,0045,0046,0047,0048	0	0	0	1	0
+symbol	byhash2		1073741824	0	0	1	0
+symbol	byhash2	0041	1073741825	1	1	1	1
+symbol	byhash2	0041,0041,0050,004C	1073776140	1	1	1	1
+symbol	byhash2	0049,0042,004D	1073751117	1	1	1	1
+symbol	byhash2	004D,0053,0046,0054	1074187476	1	1	1	1
+symbol	byhash2	0053,0050,0059	1073761817	1	1	1	1
+symbol	byhash2	0061,0061,0070,006C	0	1	1	1	1
+symbol	byhash2	0031,0032,0033	2095004623	0	0	1	0
+symbol	byhash2	002A	1073742792	1	1	2	1
+symbol	byhash2	0041,0000,0042	0	0	0	1	0
+symbol	byhash2	0000	0	0	0	1	0
+symbol	byhash2	007F	0	0	0	1	0
+symbol	byhash2	0080	0	0	0	1	0
+symbol	byhash2	FFFF	0	1	1	1	1
+symbol	byhash2	D800	0	0	0	1	0
+symbol	byhash2	DC00	0	1	1	1	1
+symbol	byhash2	D83D,DE80	0	1	1	1	1
+symbol	byhash2	0041,0080	0	0	0	1	0
+symbol	byhash2	003D,0032,002A,0041,0041,0050,004C	0	0	0	1	0
+symbol	byhash2	003D,002D,0032,002E,0035,002A,0049,0042,004D	0	1	1	1	1
+symbol	byhash2	003D,002B,0033,002E,002A,004D,0053,0046,0054	0	1	1	1	1
+symbol	byhash2	003D,0030,002A,005A	0	1	1	1	1
+symbol	byhash2	003D,0031,002E,002E,0032,002A,0041	0	0	0	1	0
+symbol	byhash2	003D,002B,0041	1106049313	0	0	1	0
+symbol	byhash2	003D,002D,002D,0041	0	0	0	1	0
+symbol	byhash2	002F,0045,0053	1073770675	0	0	1	0
+symbol	byhash2	002E,002F,0041,0042,0043	1102971971	1	1	1	1
+symbol	byhash2	0041,0026,0051	1073805489	1	1	1	1
+symbol	byhash2	0041,007B,003D,0064,007D	0	0	0	1	0
+symbol	byhash2	0041,0042,0043,0044,0045,0046,0047,0048	0	1	1	1	1
+symbol	byhash2	0041,0042,0043,0044,0045,0046,0047,0048,0030	0	1	1	1	1
+symbol	byhash2	0041,0042,0043,0044,0045,0046,0047,0047,FFFF	0	0	0	1	0
+symbol	byhash2	0041,0042,0043,0044,0045,0046,0047,0049	0	0	0	1	0
+symbol	byhash2	005B,0041,005D	1106151391	0	0	1	0
+symbol	byhash2	00C0,004D	0	0	0	1	0
+symbol	byhash2	0001	0	1	1	1	1
+symbol	byhash2	0002	0	0	0	1	0
+symbol	byhash2	0003	0	0	0	1	0
+symbol	byhash2	0004	0	1	1	1	1
+symbol	byhash2	0005	0	1	1	1	1
+symbol	byhash2	0006	0	0	0	1	0
+symbol	byhash2	0007	0	1	1	1	1
+symbol	byhash2	0008	0	1	1	1	1
+symbol	byhash2	0009	0	0	0	1	0
+symbol	byhash2	000A	0	0	0	1	0
+symbol	byhash2	000B	0	1	1	1	1
+symbol	byhash2	000C	0	0	0	1	0
+symbol	byhash2	000D	0	0	0	1	0
+symbol	byhash2	000E	0	1	1	1	1
+symbol	byhash2	000F	0	1	1	1	1
+symbol	byhash2	0010	0	0	0	1	0
+symbol	byhash2	0011	0	1	1	1	1
+symbol	byhash2	0012	0	1	1	1	1
+symbol	byhash2	0013	0	0	0	1	0
+symbol	byhash2	0014	0	0	0	1	0
+symbol	byhash2	0015	0	1	1	1	1
+symbol	byhash2	0016	0	1	1	1	1
+symbol	byhash2	0017	0	0	0	1	0
+symbol	byhash2	0018	0	1	1	1	1
+symbol	byhash2	0019	0	1	1	1	1
+symbol	byhash2	001A	0	0	0	1	0
+symbol	byhash2	001B	0	0	0	1	0
+symbol	byhash2	001C	0	1	1	1	1
+symbol	byhash2	001D	0	0	0	1	0
+symbol	byhash2	001E	0	0	0	1	0
+symbol	byhash2	001F	0	1	1	1	1
+symbol	byhash2	0020	1073742784	1	1	1	1
+symbol	byhash2	0021	1073742785	0	0	1	0
+symbol	byhash2	0022	1073742786	1	1	1	1
+symbol	byhash2	0023	1073742787	1	1	1	1
+symbol	byhash2	0024	1073741853	0	0	1	0
+symbol	byhash2	0025	1073742788	0	0	1	0
+symbol	byhash2	0026	1073742789	1	1	1	1
+symbol	byhash2	0027	0	0	0	1	0
+symbol	byhash2	0028	1073742790	0	0	1	0
+symbol	byhash2	0029	1073742791	1	1	1	1
+symbol	byhash2	002A	1073742792	1	1	2	1
+symbol	byhash2	002B	1073742793	0	0	1	0
+symbol	byhash2	002C	1073742794	0	0	1	0
+symbol	byhash2	002D	1073742795	1	1	1	1
+symbol	byhash2	002E	1073741851	0	0	1	0
+symbol	byhash2	002F	1073741852	0	0	1	0
+symbol	byhash2	0030	1073742796	1	1	1	1
+symbol	byhash2	0031	1073742797	1	1	1	1
+symbol	byhash2	0032	1073742798	0	0	1	0
+symbol	byhash2	0033	1073742799	1	1	1	1
+symbol	byhash2	0034	1073742800	1	1	1	1
+symbol	byhash2	0035	1073742801	0	0	1	0
+symbol	byhash2	0036	1073742802	0	0	1	0
+symbol	byhash2	0037	1073742803	1	1	1	1
+symbol	byhash2	0038	1073742804	0	0	1	0
+symbol	byhash2	0039	1073742805	0	0	1	0
+symbol	byhash2	003A	1073742806	1	1	1	1
+symbol	byhash2	003B	1073742807	1	1	1	1
+symbol	byhash2	003C	1073742808	0	0	1	0
+symbol	byhash2	003D	1073742809	1	1	1	1
+symbol	byhash2	003E	1073742810	1	1	1	1
+symbol	byhash2	003F	1073742811	0	0	1	0
+symbol	byhash2	0040	1073742812	0	0	1	0
+symbol	byhash2	0041	1073741825	1	1	1	1
+symbol	byhash2	0042	1073741826	1	1	1	1
+symbol	byhash2	0043	1073741827	0	0	1	0
+symbol	byhash2	0044	1073741828	1	1	1	1
+symbol	byhash2	0045	1073741829	1	1	1	1
+symbol	byhash2	0046	1073741830	0	0	1	0
+symbol	byhash2	0047	1073741831	0	0	1	0
+symbol	byhash2	0048	1073741832	1	1	1	1
+symbol	byhash2	0049	1073741833	0	0	1	0
+symbol	byhash2	004A	1073741834	0	0	1	0
+symbol	byhash2	004B	1073741835	1	1	1	1
+symbol	byhash2	004C	1073741836	1	1	1	1
+symbol	byhash2	004D	1073741837	0	0	1	0
+symbol	byhash2	004E	1073741838	1	1	1	1
+symbol	byhash2	004F	1073741839	1	1	1	1
+symbol	byhash2	0050	1073741840	0	0	1	0
+symbol	byhash2	0051	1073741841	0	0	1	0
+symbol	byhash2	0052	1073741842	1	1	1	1
+symbol	byhash2	0053	1073741843	0	0	1	0
+symbol	byhash2	0054	1073741844	0	0	1	0
+symbol	byhash2	0055	1073741845	1	1	1	1
+symbol	byhash2	0056	1073741846	1	1	1	1
+symbol	byhash2	0057	1073741847	0	0	1	0
+symbol	byhash2	0058	1073741848	0	0	1	0
+symbol	byhash2	0059	1073741849	1	1	1	1
+symbol	byhash2	005A	1073741850	0	0	1	0
+symbol	byhash2	005B	1073742813	0	0	1	0
+symbol	byhash2	005C	1073742814	1	1	1	1
+symbol	byhash2	005D	1073742815	1	1	1	1
+symbol	byhash2	005E	1073742816	0	0	1	0
+symbol	byhash2	005F	1073742817	1	1	1	1
+symbol	byhash2	0060	0	1	1	1	1
+symbol	byhash2	0061	1073742818	0	0	1	0
+symbol	byhash2	0062	1073742819	0	0	1	0
+symbol	byhash2	0063	1073742820	1	1	1	1
+symbol	byhash2	0064	1073742821	0	0	1	0
+symbol	byhash2	0065	1073742822	0	0	1	0
+symbol	byhash2	0066	1073742823	1	1	1	1
+symbol	byhash2	0067	1073742824	1	1	1	1
+symbol	byhash2	0068	1073742825	0	0	1	0
+symbol	byhash2	0069	1073742826	1	1	1	1
+symbol	byhash2	006A	1073742827	1	1	1	1
+symbol	byhash2	006B	1073742828	0	0	1	0
+symbol	byhash2	006C	1073742829	0	0	1	0
+symbol	byhash2	006D	1073742830	1	1	1	1
+symbol	byhash2	006E	1073742831	1	1	1	1
+symbol	byhash2	006F	1073742832	0	0	1	0
+symbol	byhash2	0070	1073742833	1	1	1	1
+symbol	byhash2	0071	1073742834	1	1	1	1
+symbol	byhash2	0072	1073742835	0	0	1	0
+symbol	byhash2	0073	1073742836	0	0	1	0
+symbol	byhash2	0074	1073742837	1	1	1	1
+symbol	byhash2	0075	1073742838	0	0	1	0
+symbol	byhash2	0076	1073742839	0	0	1	0
+symbol	byhash2	0077	1073742840	1	1	1	1
+symbol	byhash2	0078	1073742841	1	1	1	1
+symbol	byhash2	0079	1073742842	0	0	1	0
+symbol	byhash2	007A	1073742843	1	1	1	1
+symbol	byhash2	007B	1073742844	1	1	1	1
+symbol	byhash2	007C	1073742845	0	0	1	0
+symbol	byhash2	007D	1073742846	0	0	1	0
+symbol	byhash2	007E	1073742847	1	1	1	1
+symbol	byhash2	007F	0	0	0	1	0
+symbol	byhash2	0030	1073742796	1	1	1	1
+symbol	byhash2	0030,0030	1074738124	0	0	1	0
+symbol	byhash2	0030,0000	0	1	1	1	1
+symbol	byhash2	003D,0032,002A,0030	0	0	0	1	0
+symbol	byhash2	0041	1073741825	1	1	1	1
+symbol	byhash2	0041,0030	1073743820	1	1	1	1
+symbol	byhash2	0041,0000	0	1	1	1	1
+symbol	byhash2	003D,0032,002A,0041	0	0	0	1	0
+symbol	byhash2	004D	1073741837	0	0	1	0
+symbol	byhash2	004D,0030	1073756108	1	1	1	1
+symbol	byhash2	004D,0000	0	1	1	1	1
+symbol	byhash2	003D,0032,002A,004D	0	1	1	1	1
+symbol	byhash2	005A	1073741850	0	0	1	0
+symbol	byhash2	005A,0030	1073769420	1	1	1	1
+symbol	byhash2	005A,0000	0	1	1	1	1
+symbol	byhash2	003D,0032,002A,005A	0	1	1	1	1
+symbol	byhash2	0061	1073742818	0	0	1	0
+symbol	byhash2	0061,0030	1074760652	1	1	1	1
+symbol	byhash2	0061,0000	0	1	1	1	1
+symbol	byhash2	003D,0032,002A,0061	0	1	1	1	1
+symbol	byhash2	007A	1073742843	1	1	1	1
+symbol	byhash2	007A,0030	1074786252	1	1	1	1
+symbol	byhash2	007A,0000	0	1	1	1	1
+symbol	byhash2	003D,0032,002A,007A	0	0	0	1	0
+symbol	byhash2	0041,0042,0043,0044,0045,0046,0047,0048	0	1	1	1	1
+symbol	byhash2	0041,0042,0043,0044,0045,0046,0047,0048,0030	0	1	1	1	1
+symbol	byhash2	0041,0042,0043,0044,0045,0046,0047,0048,0000	0	0	0	1	0
+symbol	byhash2	003D,0032,002A,0041,0042,0043,0044,0045,0046,0047,0048	0	1	1	1	1
+symbol	byhash4		1073741824	0	0	1	0
+symbol	byhash4	0041	1073741825	3	3	1	3
+symbol	byhash4	0041,0041,0050,004C	1073776140	3	3	1	3
+symbol	byhash4	0049,0042,004D	1073751117	3	3	1	3
+symbol	byhash4	004D,0053,0046,0054	1074187476	3	3	1	3
+symbol	byhash4	0053,0050,0059	1073761817	3	3	1	3
+symbol	byhash4	0061,0061,0070,006C	0	2	2	1	2
+symbol	byhash4	0031,0032,0033	2095004623	0	0	1	0
+symbol	byhash4	002A	1073742792	2	2	4	3
+symbol	byhash4	0041,0000,0042	0	0	0	1	0
+symbol	byhash4	0000	0	0	0	1	0
+symbol	byhash4	007F	0	1	1	1	1
+symbol	byhash4	0080	0	0	0	1	0
+symbol	byhash4	FFFF	0	3	3	1	3
+symbol	byhash4	D800	0	0	0	1	0
+symbol	byhash4	DC00	0	2	2	1	2
+symbol	byhash4	D83D,DE80	0	2	2	1	2
+symbol	byhash4	0041,0080	0	0	0	1	0
+symbol	byhash4	003D,0032,002A,0041,0041,0050,004C	0	1	1	1	1
+symbol	byhash4	003D,002D,0032,002E,0035,002A,0049,0042,004D	0	2	2	1	2
+symbol	byhash4	003D,002B,0033,002E,002A,004D,0053,0046,0054	0	3	3	1	3
+symbol	byhash4	003D,0030,002A,005A	0	2	2	1	2
+symbol	byhash4	003D,0031,002E,002E,0032,002A,0041	0	1	1	1	1
+symbol	byhash4	003D,002B,0041	1106049313	0	0	1	0
+symbol	byhash4	003D,002D,002D,0041	0	0	0	1	0
+symbol	byhash4	002F,0045,0053	1073770675	1	1	1	1
+symbol	byhash4	002E,002F,0041,0042,0043	1102971971	3	3	1	3
+symbol	byhash4	0041,0026,0051	1073805489	3	3	1	3
+symbol	byhash4	0041,007B,003D,0064,007D	0	0	0	1	0
+symbol	byhash4	0041,0042,0043,0044,0045,0046,0047,0048	0	2	2	1	2
+symbol	byhash4	0041,0042,0043,0044,0045,0046,0047,0048,0030	0	3	3	1	3
+symbol	byhash4	0041,0042,0043,0044,0045,0046,0047,0047,FFFF	0	0	0	1	0
+symbol	byhash4	0041,0042,0043,0044,0045,0046,0047,0049	0	1	1	1	1
+symbol	byhash4	005B,0041,005D	1106151391	1	1	1	1
+symbol	byhash4	00C0,004D	0	1	1	1	1
+symbol	byhash4	0001	0	2	2	1	2
+symbol	byhash4	0002	0	1	1	1	1
+symbol	byhash4	0003	0	0	0	1	0
+symbol	byhash4	0004	0	3	3	1	3
+symbol	byhash4	0005	0	2	2	1	2
+symbol	byhash4	0006	0	0	0	1	0
+symbol	byhash4	0007	0	3	3	1	3
+symbol	byhash4	0008	0	2	2	1	2
+symbol	byhash4	0009	0	1	1	1	1
+symbol	byhash4	000A	0	0	0	1	0
+symbol	byhash4	000B	0	3	3	1	3
+symbol	byhash4	000C	0	1	1	1	1
+symbol	byhash4	000D	0	0	0	1	0
+symbol	byhash4	000E	0	3	3	1	3
+symbol	byhash4	000F	0	2	2	1	2
+symbol	byhash4	0010	0	1	1	1	1
+symbol	byhash4	0011	0	3	3	1	3
+symbol	byhash4	0012	0	2	2	1	2
+symbol	byhash4	0013	0	1	1	1	1
+symbol	byhash4	0014	0	0	0	1	0
+symbol	byhash4	0015	0	3	3	1	3
+symbol	byhash4	0016	0	2	2	1	2
+symbol	byhash4	0017	0	0	0	1	0
+symbol	byhash4	0018	0	3	3	1	3
+symbol	byhash4	0019	0	2	2	1	2
+symbol	byhash4	001A	0	1	1	1	1
+symbol	byhash4	001B	0	0	0	1	0
+symbol	byhash4	001C	0	2	2	1	2
+symbol	byhash4	001D	0	1	1	1	1
+symbol	byhash4	001E	0	0	0	1	0
+symbol	byhash4	001F	0	3	3	1	3
+symbol	byhash4	0020	1073742784	2	2	1	2
+symbol	byhash4	0021	1073742785	1	1	1	1
+symbol	byhash4	0022	1073742786	3	3	1	3
+symbol	byhash4	0023	1073742787	2	2	1	2
+symbol	byhash4	0024	1073741853	1	1	1	1
+symbol	byhash4	0025	1073742788	0	0	1	0
+symbol	byhash4	0026	1073742789	3	3	1	3
+symbol	byhash4	0027	0	1	1	1	1
+symbol	byhash4	0028	1073742790	0	0	1	0
+symbol	byhash4	0029	1073742791	3	3	1	3
+symbol	byhash4	002A	1073742792	2	2	4	3
+symbol	byhash4	002B	1073742793	1	1	1	1
+symbol	byhash4	002C	1073742794	0	0	1	0
+symbol	byhash4	002D	1073742795	2	2	1	2
+symbol	byhash4	002E	1073741851	1	1	1	1
+symbol	byhash4	002F	1073741852	0	0	1	0
+symbol	byhash4	0030	1073742796	3	3	1	3
+symbol	byhash4	0031	1073742797	2	2	1	2
+symbol	byhash4	0032	1073742798	0	0	1	0
+symbol	byhash4	0033	1073742799	3	3	1	3
+symbol	byhash4	0034	1073742800	2	2	1	2
+symbol	byhash4	0035	1073742801	1	1	1	1
+symbol	byhash4	0036	1073742802	0	0	1	0
+symbol	byhash4	0037	1073742803	3	3	1	3
+symbol	byhash4	0038	1073742804	1	1	1	1
+symbol	byhash4	0039	1073742805	0	0	1	0
+symbol	byhash4	003A	1073742806	3	3	1	3
+symbol	byhash4	003B	1073742807	2	2	1	2
+symbol	byhash4	003C	1073742808	1	1	1	1
+symbol	byhash4	003D	1073742809	3	3	1	3
+symbol	byhash4	003E	1073742810	2	2	1	2
+symbol	byhash4	003F	1073742811	1	1	1	1
+symbol	byhash4	0040	1073742812	0	0	1	0
+symbol	byhash4	0041	1073741825	3	3	1	3
+symbol	byhash4	0042	1073741826	2	2	1	2
+symbol	byhash4	0043	1073741827	0	0	1	0
+symbol	byhash4	0044	1073741828	3	3	1	3
+symbol	byhash4	0045	1073741829	2	2	1	2
+symbol	byhash4	0046	1073741830	1	1	1	1
+symbol	byhash4	0047	1073741831	0	0	1	0
+symbol	byhash4	0048	1073741832	2	2	1	2
+symbol	byhash4	0049	1073741833	1	1	1	1
+symbol	byhash4	004A	1073741834	0	0	1	0
+symbol	byhash4	004B	1073741835	3	3	1	3
+symbol	byhash4	004C	1073741836	2	2	1	2
+symbol	byhash4	004D	1073741837	1	1	1	1
+symbol	byhash4	004E	1073741838	3	3	1	3
+symbol	byhash4	004F	1073741839	2	2	1	2
+symbol	byhash4	0050	1073741840	1	1	1	1
+symbol	byhash4	0051	1073741841	0	0	1	0
+symbol	byhash4	0052	1073741842	3	3	1	3
+symbol	byhash4	0053	1073741843	1	1	1	1
+symbol	byhash4	0054	1073741844	0	0	1	0
+symbol	byhash4	0055	1073741845	3	3	1	3
+symbol	byhash4	0056	1073741846	2	2	1	2
+symbol	byhash4	0057	1073741847	1	1	1	1
+symbol	byhash4	0058	1073741848	0	0	1	0
+symbol	byhash4	0059	1073741849	2	2	1	2
+symbol	byhash4	005A	1073741850	1	1	1	1
+symbol	byhash4	005B	1073742813	0	0	1	0
+symbol	byhash4	005C	1073742814	3	3	1	3
+symbol	byhash4	005D	1073742815	2	2	1	2
+symbol	byhash4	005E	1073742816	0	0	1	0
+symbol	byhash4	005F	1073742817	3	3	1	3
+symbol	byhash4	0060	0	2	2	1	2
+symbol	byhash4	0061	1073742818	1	1	1	1
+symbol	byhash4	0062	1073742819	0	0	1	0
+symbol	byhash4	0063	1073742820	3	3	1	3
+symbol	byhash4	0064	1073742821	1	1	1	1
+symbol	byhash4	0065	1073742822	0	0	1	0
+symbol	byhash4	0066	1073742823	3	3	1	3
+symbol	byhash4	0067	1073742824	2	2	1	2
+symbol	byhash4	0068	1073742825	1	1	1	1
+symbol	byhash4	0069	1073742826	3	3	1	3
+symbol	byhash4	006A	1073742827	2	2	1	2
+symbol	byhash4	006B	1073742828	1	1	1	1
+symbol	byhash4	006C	1073742829	0	0	1	0
+symbol	byhash4	006D	1073742830	3	3	1	3
+symbol	byhash4	006E	1073742831	2	2	1	2
+symbol	byhash4	006F	1073742832	0	0	1	0
+symbol	byhash4	0070	1073742833	3	3	1	3
+symbol	byhash4	0071	1073742834	2	2	1	2
+symbol	byhash4	0072	1073742835	1	1	1	1
+symbol	byhash4	0073	1073742836	0	0	1	0
+symbol	byhash4	0074	1073742837	2	2	1	2
+symbol	byhash4	0075	1073742838	1	1	1	1
+symbol	byhash4	0076	1073742839	0	0	1	0
+symbol	byhash4	0077	1073742840	3	3	1	3
+symbol	byhash4	0078	1073742841	2	2	1	2
+symbol	byhash4	0079	1073742842	1	1	1	1
+symbol	byhash4	007A	1073742843	3	3	1	3
+symbol	byhash4	007B	1073742844	2	2	1	2
+symbol	byhash4	007C	1073742845	1	1	1	1
+symbol	byhash4	007D	1073742846	0	0	1	0
+symbol	byhash4	007E	1073742847	3	3	1	3
+symbol	byhash4	007F	0	1	1	1	1
+symbol	byhash4	0030	1073742796	3	3	1	3
+symbol	byhash4	0030,0030	1074738124	1	1	1	1
+symbol	byhash4	0030,0000	0	2	2	1	2
+symbol	byhash4	003D,0032,002A,0030	0	1	1	1	1
+symbol	byhash4	0041	1073741825	3	3	1	3
+symbol	byhash4	0041,0030	1073743820	2	2	1	2
+symbol	byhash4	0041,0000	0	3	3	1	3
+symbol	byhash4	003D,0032,002A,0041	0	1	1	1	1
+symbol	byhash4	004D	1073741837	1	1	1	1
+symbol	byhash4	004D,0030	1073756108	3	3	1	3
+symbol	byhash4	004D,0000	0	3	3	1	3
+symbol	byhash4	003D,0032,002A,004D	0	3	3	1	3
+symbol	byhash4	005A	1073741850	1	1	1	1
+symbol	byhash4	005A,0030	1073769420	3	3	1	3
+symbol	byhash4	005A,0000	0	3	3	1	3
+symbol	byhash4	003D,0032,002A,005A	0	3	3	1	3
+symbol	byhash4	0061	1073742818	1	1	1	1
+symbol	byhash4	0061,0030	1074760652	2	2	1	2
+symbol	byhash4	0061,0000	0	3	3	1	3
+symbol	byhash4	003D,0032,002A,0061	0	3	3	1	3
+symbol	byhash4	007A	1073742843	3	3	1	3
+symbol	byhash4	007A,0030	1074786252	3	3	1	3
+symbol	byhash4	007A,0000	0	3	3	1	3
+symbol	byhash4	003D,0032,002A,007A	0	1	1	1	1
+symbol	byhash4	0041,0042,0043,0044,0045,0046,0047,0048	0	2	2	1	2
+symbol	byhash4	0041,0042,0043,0044,0045,0046,0047,0048,0030	0	3	3	1	3
+symbol	byhash4	0041,0042,0043,0044,0045,0046,0047,0048,0000	0	0	0	1	0
+symbol	byhash4	003D,0032,002A,0041,0042,0043,0044,0045,0046,0047,0048	0	2	2	1	2
+symbol	byhash16		1073741824	0	0	1	0
+symbol	byhash16	0041	1073741825	12	12	1	12
+symbol	byhash16	0041,0041,0050,004C	1073776140	13	13	1	13
+symbol	byhash16	0049,0042,004D	1073751117	14	14	1	14
+symbol	byhash16	004D,0053,0046,0054	1074187476	12	12	1	12
+symbol	byhash16	0053,0050,0059	1073761817	12	12	1	12
+symbol	byhash16	0061,0061,0070,006C	0	10	10	1	10
+symbol	byhash16	0031,0032,0033	2095004623	2	2	1	2
+symbol	byhash16	002A	1073742792	9	9	16	15
+symbol	byhash16	0041,0000,0042	0	1	1	1	1
+symbol	byhash16	0000	0	0	0	1	0
+symbol	byhash16	007F	0	7	7	1	7
+symbol	byhash16	0080	0	3	3	1	3
+symbol	byhash16	FFFF	0	14	14	1	14
+symbol	byhash16	D800	0	0	0	1	0
+symbol	byhash16	DC00	0	9	9	1	9
+symbol	byhash16	D83D,DE80	0	11	11	1	11
+symbol	byhash16	0041,0080	0	0	0	1	0
+symbol	byhash16	003D,0032,002A,0041,0041,0050,004C	0	6	6	1	6
+symbol	byhash16	003D,002D,0032,002E,0035,002A,0049,0042,004D	0	8	8	1	8
+symbol	byhash16	003D,002B,0033,002E,002A,004D,0053,0046,0054	0	15	15	1	15
+symbol	byhash16	003D,0030,002A,005A	0	9	9	1	9
+symbol	byhash16	003D,0031,002E,002E,0032,002A,0041	0	6	6	1	6
+symbol	byhash16	003D,002B,0041	1106049313	0	0	1	0
+symbol	byhash16	003D,002D,002D,0041	0	0	0	1	0
+symbol	byhash16	002F,0045,0053	1073770675	6	6	1	6
+symbol	byhash16	002E,002F,0041,0042,0043	1102971971	12	12	1	12
+symbol	byhash16	0041,0026,0051	1073805489	12	12	1	12
+symbol	byhash16	0041,007B,003D,0064,007D	0	3	3	1	3
+symbol	byhash16	0041,0042,0043,0044,0045,0046,0047,0048	0	11	11	1	11
+symbol	byhash16	0041,0042,0043,0044,0045,0046,0047,0048,0030	0	15	15	1	15
+symbol	byhash16	0041,0042,0043,0044,0045,0046,0047,0047,FFFF	0	2	2	1	2
+symbol	byhash16	0041,0042,0043,0044,0045,0046,0047,0049	0	6	6	1	6
+symbol	byhash16	005B,0041,005D	1106151391	4	4	1	4
+symbol	byhash16	00C0,004D	0	4	4	1	4
+symbol	byhash16	0001	0	11	11	1	11
+symbol	byhash16	0002	0	6	6	1	6
+symbol	byhash16	0003	0	1	1	1	1
+symbol	byhash16	0004	0	13	13	1	13
+symbol	byhash16	0005	0	8	8	1	8
+symbol	byhash16	0006	0	3	3	1	3
+symbol	byhash16	0007	0	14	14	1	14
+symbol	byhash16	0008	0	10	10	1	10
+symbol	byhash16	0009	0	5	5	1	5
+symbol	byhash16	000A	0	0	0	1	0
+symbol	byhash16	000B	0	12	12	1	12
+symbol	byhash16	000C	0	7	7	1	7
+symbol	byhash16	000D	0	2	2	1	2
+symbol	byhash16	000E	0	13	13	1	13
+symbol	byhash16	000F	0	9	9	1	9
+symbol	byhash16	0010	0	4	4	1	4
+symbol	byhash16	0011	0	15	15	1	15
+symbol	byhash16	0012	0	10	10	1	10
+symbol	byhash16	0013	0	6	6	1	6
+symbol	byhash16	0014	0	1	1	1	1
+symbol	byhash16	0015	0	12	12	1	12
+symbol	byhash16	0016	0	8	8	1	8
+symbol	byhash16	0017	0	3	3	1	3
+symbol	byhash16	0018	0	14	14	1	14
+symbol	byhash16	0019	0	9	9	1	9
+symbol	byhash16	001A	0	5	5	1	5
+symbol	byhash16	001B	0	0	0	1	0
+symbol	byhash16	001C	0	11	11	1	11
+symbol	byhash16	001D	0	6	6	1	6
+symbol	byhash16	001E	0	2	2	1	2
+symbol	byhash16	001F	0	13	13	1	13
+symbol	byhash16	0020	1073742784	8	8	1	8
+symbol	byhash16	0021	1073742785	4	4	1	4
+symbol	byhash16	0022	1073742786	15	15	1	15
+symbol	byhash16	0023	1073742787	10	10	1	10
+symbol	byhash16	0024	1073741853	5	5	1	5
+symbol	byhash16	0025	1073742788	1	1	1	1
+symbol	byhash16	0026	1073742789	12	12	1	12
+symbol	byhash16	0027	0	7	7	1	7
+symbol	byhash16	0028	1073742790	2	2	1	2
+symbol	byhash16	0029	1073742791	14	14	1	14
+symbol	byhash16	002A	1073742792	9	9	16	15
+symbol	byhash16	002B	1073742793	4	4	1	4
+symbol	byhash16	002C	1073742794	0	0	1	0
+symbol	byhash16	002D	1073742795	11	11	1	11
+symbol	byhash16	002E	1073741851	6	6	1	6
+symbol	byhash16	002F	1073741852	1	1	1	1
+symbol	byhash16	0030	1073742796	13	13	1	13
+symbol	byhash16	0031	1073742797	8	8	1	8
+symbol	byhash16	0032	1073742798	3	3	1	3
+symbol	byhash16	0033	1073742799	14	14	1	14
+symbol	byhash16	0034	1073742800	10	10	1	10
+symbol	byhash16	0035	1073742801	5	5	1	5
+symbol	byhash16	0036	1073742802	0	0	1	0
+symbol	byhash16	0037	1073742803	12	12	1	12
+symbol	byhash16	0038	1073742804	7	7	1	7
+symbol	byhash16	0039	1073742805	2	2	1	2
+symbol	byhash16	003A	1073742806	13	13	1	13
+symbol	byhash16	003B	1073742807	9	9	1	9
+symbol	byhash16	003C	1073742808	4	4	1	4
+symbol	byhash16	003D	1073742809	15	15	1	15
+symbol	byhash16	003E	1073742810	11	11	1	11
+symbol	byhash16	003F	1073742811	6	6	1	6
+symbol	byhash16	0040	1073742812	1	1	1	1
+symbol	byhash16	0041	1073741825	12	12	1	12
+symbol	byhash16	0042	1073741826	8	8	1	8
+symbol	byhash16	0043	1073741827	3	3	1	3
+symbol	byhash16	0044	1073741828	14	14	1	14
+symbol	byhash16	0045	1073741829	9	9	1	9
+symbol	byhash16	0046	1073741830	5	5	1	5
+symbol	byhash16	0047	1073741831	0	0	1	0
+symbol	byhash16	0048	1073741832	11	11	1	11
+symbol	byhash16	0049	1073741833	7	7	1	7
+symbol	byhash16	004A	1073741834	2	2	1	2
+symbol	byhash16	004B	1073741835	13	13	1	13
+symbol	byhash16	004C	1073741836	8	8	1	8
+symbol	byhash16	004D	1073741837	4	4	1	4
+symbol	byhash16	004E	1073741838	15	15	1	15
+symbol	byhash16	004F	1073741839	10	10	1	10
+symbol	byhash16	0050	1073741840	5	5	1	5
+symbol	byhash16	0051	1073741841	1	1	1	1
+symbol	byhash16	0052	1073741842	12	12	1	12
+symbol	byhash16	0053	1073741843	7	7	1	7
+symbol	byhash16	0054	1073741844	3	3	1	3
+symbol	byhash16	0055	1073741845	14	14	1	14
+symbol	byhash16	0056	1073741846	9	9	1	9
+symbol	byhash16	0057	1073741847	4	4	1	4
+symbol	byhash16	0058	1073741848	0	0	1	0
+symbol	byhash16	0059	1073741849	11	11	1	11
+symbol	byhash16	005A	1073741850	6	6	1	6
+symbol	byhash16	005B	1073742813	1	1	1	1
+symbol	byhash16	005C	1073742814	13	13	1	13
+symbol	byhash16	005D	1073742815	8	8	1	8
+symbol	byhash16	005E	1073742816	3	3	1	3
+symbol	byhash16	005F	1073742817	15	15	1	15
+symbol	byhash16	0060	0	10	10	1	10
+symbol	byhash16	0061	1073742818	5	5	1	5
+symbol	byhash16	0062	1073742819	0	0	1	0
+symbol	byhash16	0063	1073742820	12	12	1	12
+symbol	byhash16	0064	1073742821	7	7	1	7
+symbol	byhash16	0065	1073742822	2	2	1	2
+symbol	byhash16	0066	1073742823	13	13	1	13
+symbol	byhash16	0067	1073742824	9	9	1	9
+symbol	byhash16	0068	1073742825	4	4	1	4
+symbol	byhash16	0069	1073742826	15	15	1	15
+symbol	byhash16	006A	1073742827	11	11	1	11
+symbol	byhash16	006B	1073742828	6	6	1	6
+symbol	byhash16	006C	1073742829	1	1	1	1
+symbol	byhash16	006D	1073742830	12	12	1	12
+symbol	byhash16	006E	1073742831	8	8	1	8
+symbol	byhash16	006F	1073742832	3	3	1	3
+symbol	byhash16	0070	1073742833	14	14	1	14
+symbol	byhash16	0071	1073742834	9	9	1	9
+symbol	byhash16	0072	1073742835	5	5	1	5
+symbol	byhash16	0073	1073742836	0	0	1	0
+symbol	byhash16	0074	1073742837	11	11	1	11
+symbol	byhash16	0075	1073742838	7	7	1	7
+symbol	byhash16	0076	1073742839	2	2	1	2
+symbol	byhash16	0077	1073742840	13	13	1	13
+symbol	byhash16	0078	1073742841	8	8	1	8
+symbol	byhash16	0079	1073742842	4	4	1	4
+symbol	byhash16	007A	1073742843	15	15	1	15
+symbol	byhash16	007B	1073742844	10	10	1	10
+symbol	byhash16	007C	1073742845	6	6	1	6
+symbol	byhash16	007D	1073742846	1	1	1	1
+symbol	byhash16	007E	1073742847	12	12	1	12
+symbol	byhash16	007F	0	7	7	1	7
+symbol	byhash16	0030	1073742796	13	13	1	13
+symbol	byhash16	0030,0030	1074738124	5	5	1	5
+symbol	byhash16	0030,0000	0	8	8	1	8
+symbol	byhash16	003D,0032,002A,0030	0	5	5	1	5
+symbol	byhash16	0041	1073741825	12	12	1	12
+symbol	byhash16	0041,0030	1073743820	10	10	1	10
+symbol	byhash16	0041,0000	0	13	13	1	13
+symbol	byhash16	003D,0032,002A,0041	0	5	5	1	5
+symbol	byhash16	004D	1073741837	4	4	1	4
+symbol	byhash16	004D,0030	1073756108	12	12	1	12
+symbol	byhash16	004D,0000	0	15	15	1	15
+symbol	byhash16	003D,0032,002A,004D	0	12	12	1	12
+symbol	byhash16	005A	1073741850	6	6	1	6
+symbol	byhash16	005A,0030	1073769420	12	12	1	12
+symbol	byhash16	005A,0000	0	15	15	1	15
+symbol	byhash16	003D,0032,002A,005A	0	14	14	1	14
+symbol	byhash16	0061	1073742818	5	5	1	5
+symbol	byhash16	0061,0030	1074760652	11	11	1	11
+symbol	byhash16	0061,0000	0	13	13	1	13
+symbol	byhash16	003D,0032,002A,0061	0	13	13	1	13
+symbol	byhash16	007A	1073742843	15	15	1	15
+symbol	byhash16	007A,0030	1074786252	12	12	1	12
+symbol	byhash16	007A,0000	0	15	15	1	15
+symbol	byhash16	003D,0032,002A,007A	0	7	7	1	7
+symbol	byhash16	0041,0042,0043,0044,0045,0046,0047,0048	0	11	11	1	11
+symbol	byhash16	0041,0042,0043,0044,0045,0046,0047,0048,0030	0	15	15	1	15
+symbol	byhash16	0041,0042,0043,0044,0045,0046,0047,0048,0000	0	2	2	1	2
+symbol	byhash16	003D,0032,002A,0041,0042,0043,0044,0045,0046,0047,0048	0	8	8	1	8
+symbol	byrange-0-A-M-Z-a-z-		1073741824	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0041	1073741825	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	0041,0041,0050,004C	1073776140	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	0049,0042,004D	1073751117	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	004D,0053,0046,0054	1074187476	3	3	1	3
+symbol	byrange-0-A-M-Z-a-z-	0053,0050,0059	1073761817	3	3	1	3
+symbol	byrange-0-A-M-Z-a-z-	0061,0061,0070,006C	0	5	5	1	5
+symbol	byrange-0-A-M-Z-a-z-	0031,0032,0033	2095004623	1	1	1	1
+symbol	byrange-0-A-M-Z-a-z-	002A	1073742792	0	0	7	6
+symbol	byrange-0-A-M-Z-a-z-	0041,0000,0042	0	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	0000	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	007F	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0080	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	FFFF	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	D800	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	DC00	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	D83D,DE80	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0041,0080	0	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	003D,0032,002A,0041,0041,0050,004C	0	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	003D,002D,0032,002E,0035,002A,0049,0042,004D	0	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	003D,002B,0033,002E,002A,004D,0053,0046,0054	0	3	3	1	3
+symbol	byrange-0-A-M-Z-a-z-	003D,0030,002A,005A	0	4	4	1	4
+symbol	byrange-0-A-M-Z-a-z-	003D,0031,002E,002E,0032,002A,0041	0	1	1	1	1
+symbol	byrange-0-A-M-Z-a-z-	003D,002B,0041	1106049313	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	003D,002D,002D,0041	0	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	002F,0045,0053	1073770675	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	002E,002F,0041,0042,0043	1102971971	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	0041,0026,0051	1073805489	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	0041,007B,003D,0064,007D	0	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	0041,0042,0043,0044,0045,0046,0047,0048	0	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	0041,0042,0043,0044,0045,0046,0047,0048,0030	0	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	0041,0042,0043,0044,0045,0046,0047,0047,FFFF	0	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	0041,0042,0043,0044,0045,0046,0047,0049	0	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	005B,0041,005D	1106151391	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	00C0,004D	0	3	3	1	3
+symbol	byrange-0-A-M-Z-a-z-	0001	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0002	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0003	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0004	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0005	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0006	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0007	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0008	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0009	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	000A	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	000B	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	000C	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	000D	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	000E	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	000F	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0010	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0011	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0012	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0013	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0014	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0015	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0016	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0017	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0018	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0019	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	001A	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	001B	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	001C	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	001D	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	001E	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	001F	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0020	1073742784	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0021	1073742785	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0022	1073742786	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0023	1073742787	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0024	1073741853	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0025	1073742788	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0026	1073742789	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0027	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0028	1073742790	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0029	1073742791	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	002A	1073742792	0	0	7	6
+symbol	byrange-0-A-M-Z-a-z-	002B	1073742793	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	002C	1073742794	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	002D	1073742795	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	002E	1073741851	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	002F	1073741852	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0030	1073742796	1	1	1	1
+symbol	byrange-0-A-M-Z-a-z-	0031	1073742797	1	1	1	1
+symbol	byrange-0-A-M-Z-a-z-	0032	1073742798	1	1	1	1
+symbol	byrange-0-A-M-Z-a-z-	0033	1073742799	1	1	1	1
+symbol	byrange-0-A-M-Z-a-z-	0034	1073742800	1	1	1	1
+symbol	byrange-0-A-M-Z-a-z-	0035	1073742801	1	1	1	1
+symbol	byrange-0-A-M-Z-a-z-	0036	1073742802	1	1	1	1
+symbol	byrange-0-A-M-Z-a-z-	0037	1073742803	1	1	1	1
+symbol	byrange-0-A-M-Z-a-z-	0038	1073742804	1	1	1	1
+symbol	byrange-0-A-M-Z-a-z-	0039	1073742805	1	1	1	1
+symbol	byrange-0-A-M-Z-a-z-	003A	1073742806	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	003B	1073742807	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	003C	1073742808	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	003D	1073742809	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	003E	1073742810	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	003F	1073742811	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0040	1073742812	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0041	1073741825	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	0042	1073741826	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	0043	1073741827	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	0044	1073741828	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	0045	1073741829	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	0046	1073741830	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	0047	1073741831	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	0048	1073741832	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	0049	1073741833	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	004A	1073741834	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	004B	1073741835	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	004C	1073741836	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	004D	1073741837	3	3	1	3
+symbol	byrange-0-A-M-Z-a-z-	004E	1073741838	3	3	1	3
+symbol	byrange-0-A-M-Z-a-z-	004F	1073741839	3	3	1	3
+symbol	byrange-0-A-M-Z-a-z-	0050	1073741840	3	3	1	3
+symbol	byrange-0-A-M-Z-a-z-	0051	1073741841	3	3	1	3
+symbol	byrange-0-A-M-Z-a-z-	0052	1073741842	3	3	1	3
+symbol	byrange-0-A-M-Z-a-z-	0053	1073741843	3	3	1	3
+symbol	byrange-0-A-M-Z-a-z-	0054	1073741844	3	3	1	3
+symbol	byrange-0-A-M-Z-a-z-	0055	1073741845	3	3	1	3
+symbol	byrange-0-A-M-Z-a-z-	0056	1073741846	3	3	1	3
+symbol	byrange-0-A-M-Z-a-z-	0057	1073741847	3	3	1	3
+symbol	byrange-0-A-M-Z-a-z-	0058	1073741848	3	3	1	3
+symbol	byrange-0-A-M-Z-a-z-	0059	1073741849	3	3	1	3
+symbol	byrange-0-A-M-Z-a-z-	005A	1073741850	4	4	1	4
+symbol	byrange-0-A-M-Z-a-z-	005B	1073742813	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	005C	1073742814	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	005D	1073742815	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	005E	1073742816	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	005F	1073742817	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0060	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0061	1073742818	5	5	1	5
+symbol	byrange-0-A-M-Z-a-z-	0062	1073742819	5	5	1	5
+symbol	byrange-0-A-M-Z-a-z-	0063	1073742820	5	5	1	5
+symbol	byrange-0-A-M-Z-a-z-	0064	1073742821	5	5	1	5
+symbol	byrange-0-A-M-Z-a-z-	0065	1073742822	5	5	1	5
+symbol	byrange-0-A-M-Z-a-z-	0066	1073742823	5	5	1	5
+symbol	byrange-0-A-M-Z-a-z-	0067	1073742824	5	5	1	5
+symbol	byrange-0-A-M-Z-a-z-	0068	1073742825	5	5	1	5
+symbol	byrange-0-A-M-Z-a-z-	0069	1073742826	5	5	1	5
+symbol	byrange-0-A-M-Z-a-z-	006A	1073742827	5	5	1	5
+symbol	byrange-0-A-M-Z-a-z-	006B	1073742828	5	5	1	5
+symbol	byrange-0-A-M-Z-a-z-	006C	1073742829	5	5	1	5
+symbol	byrange-0-A-M-Z-a-z-	006D	1073742830	5	5	1	5
+symbol	byrange-0-A-M-Z-a-z-	006E	1073742831	5	5	1	5
+symbol	byrange-0-A-M-Z-a-z-	006F	1073742832	5	5	1	5
+symbol	byrange-0-A-M-Z-a-z-	0070	1073742833	5	5	1	5
+symbol	byrange-0-A-M-Z-a-z-	0071	1073742834	5	5	1	5
+symbol	byrange-0-A-M-Z-a-z-	0072	1073742835	5	5	1	5
+symbol	byrange-0-A-M-Z-a-z-	0073	1073742836	5	5	1	5
+symbol	byrange-0-A-M-Z-a-z-	0074	1073742837	5	5	1	5
+symbol	byrange-0-A-M-Z-a-z-	0075	1073742838	5	5	1	5
+symbol	byrange-0-A-M-Z-a-z-	0076	1073742839	5	5	1	5
+symbol	byrange-0-A-M-Z-a-z-	0077	1073742840	5	5	1	5
+symbol	byrange-0-A-M-Z-a-z-	0078	1073742841	5	5	1	5
+symbol	byrange-0-A-M-Z-a-z-	0079	1073742842	5	5	1	5
+symbol	byrange-0-A-M-Z-a-z-	007A	1073742843	6	6	1	6
+symbol	byrange-0-A-M-Z-a-z-	007B	1073742844	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	007C	1073742845	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	007D	1073742846	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	007E	1073742847	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	007F	0	0	0	1	0
+symbol	byrange-0-A-M-Z-a-z-	0030	1073742796	1	1	1	1
+symbol	byrange-0-A-M-Z-a-z-	0030,0030	1074738124	1	1	1	1
+symbol	byrange-0-A-M-Z-a-z-	0030,0000	0	1	1	1	1
+symbol	byrange-0-A-M-Z-a-z-	003D,0032,002A,0030	0	1	1	1	1
+symbol	byrange-0-A-M-Z-a-z-	0041	1073741825	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	0041,0030	1073743820	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	0041,0000	0	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	003D,0032,002A,0041	0	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	004D	1073741837	3	3	1	3
+symbol	byrange-0-A-M-Z-a-z-	004D,0030	1073756108	3	3	1	3
+symbol	byrange-0-A-M-Z-a-z-	004D,0000	0	3	3	1	3
+symbol	byrange-0-A-M-Z-a-z-	003D,0032,002A,004D	0	3	3	1	3
+symbol	byrange-0-A-M-Z-a-z-	005A	1073741850	4	4	1	4
+symbol	byrange-0-A-M-Z-a-z-	005A,0030	1073769420	4	4	1	4
+symbol	byrange-0-A-M-Z-a-z-	005A,0000	0	4	4	1	4
+symbol	byrange-0-A-M-Z-a-z-	003D,0032,002A,005A	0	4	4	1	4
+symbol	byrange-0-A-M-Z-a-z-	0061	1073742818	5	5	1	5
+symbol	byrange-0-A-M-Z-a-z-	0061,0030	1074760652	5	5	1	5
+symbol	byrange-0-A-M-Z-a-z-	0061,0000	0	5	5	1	5
+symbol	byrange-0-A-M-Z-a-z-	003D,0032,002A,0061	0	5	5	1	5
+symbol	byrange-0-A-M-Z-a-z-	007A	1073742843	6	6	1	6
+symbol	byrange-0-A-M-Z-a-z-	007A,0030	1074786252	6	6	1	6
+symbol	byrange-0-A-M-Z-a-z-	007A,0000	0	6	6	1	6
+symbol	byrange-0-A-M-Z-a-z-	003D,0032,002A,007A	0	6	6	1	6
+symbol	byrange-0-A-M-Z-a-z-	0041,0042,0043,0044,0045,0046,0047,0048	0	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	0041,0042,0043,0044,0045,0046,0047,0048,0030	0	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	0041,0042,0043,0044,0045,0046,0047,0048,0000	0	2	2	1	2
+symbol	byrange-0-A-M-Z-a-z-	003D,0032,002A,0041,0042,0043,0044,0045,0046,0047,0048	0	2	2	1	2
+symbol	byrange-ABCDEFGH-		1073741824	0	0	1	0
+symbol	byrange-ABCDEFGH-	0041	1073741825	0	0	1	0
+symbol	byrange-ABCDEFGH-	0041,0041,0050,004C	1073776140	0	0	1	0
+symbol	byrange-ABCDEFGH-	0049,0042,004D	1073751117	1	1	1	1
+symbol	byrange-ABCDEFGH-	004D,0053,0046,0054	1074187476	1	1	1	1
+symbol	byrange-ABCDEFGH-	0053,0050,0059	1073761817	1	1	1	1
+symbol	byrange-ABCDEFGH-	0061,0061,0070,006C	0	1	1	1	1
+symbol	byrange-ABCDEFGH-	0031,0032,0033	2095004623	0	0	1	0
+symbol	byrange-ABCDEFGH-	002A	1073742792	0	0	2	1
+symbol	byrange-ABCDEFGH-	0041,0000,0042	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	0000	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	007F	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	0080	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	FFFF	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	D800	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	DC00	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	D83D,DE80	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	0041,0080	0	1	1	1	1
+symbol	byrange-ABCDEFGH-	003D,0032,002A,0041,0041,0050,004C	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	003D,002D,0032,002E,0035,002A,0049,0042,004D	0	1	1	1	1
+symbol	byrange-ABCDEFGH-	003D,002B,0033,002E,002A,004D,0053,0046,0054	0	1	1	1	1
+symbol	byrange-ABCDEFGH-	003D,0030,002A,005A	0	1	1	1	1
+symbol	byrange-ABCDEFGH-	003D,0031,002E,002E,0032,002A,0041	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	003D,002B,0041	1106049313	0	0	1	0
+symbol	byrange-ABCDEFGH-	003D,002D,002D,0041	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	002F,0045,0053	1073770675	1	1	1	1
+symbol	byrange-ABCDEFGH-	002E,002F,0041,0042,0043	1102971971	0	0	1	0
+symbol	byrange-ABCDEFGH-	0041,0026,0051	1073805489	0	0	1	0
+symbol	byrange-ABCDEFGH-	0041,007B,003D,0064,007D	0	1	1	1	1
+symbol	byrange-ABCDEFGH-	0041,0042,0043,0044,0045,0046,0047,0048	0	1	1	1	1
+symbol	byrange-ABCDEFGH-	0041,0042,0043,0044,0045,0046,0047,0048,0030	0	1	1	1	1
+symbol	byrange-ABCDEFGH-	0041,0042,0043,0044,0045,0046,0047,0047,FFFF	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	0041,0042,0043,0044,0045,0046,0047,0049	0	1	1	1	1
+symbol	byrange-ABCDEFGH-	005B,0041,005D	1106151391	1	1	1	1
+symbol	byrange-ABCDEFGH-	00C0,004D	0	1	1	1	1
+symbol	byrange-ABCDEFGH-	0001	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	0002	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	0003	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	0004	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	0005	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	0006	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	0007	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	0008	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	0009	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	000A	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	000B	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	000C	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	000D	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	000E	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	000F	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	0010	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	0011	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	0012	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	0013	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	0014	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	0015	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	0016	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	0017	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	0018	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	0019	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	001A	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	001B	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	001C	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	001D	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	001E	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	001F	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	0020	1073742784	0	0	1	0
+symbol	byrange-ABCDEFGH-	0021	1073742785	0	0	1	0
+symbol	byrange-ABCDEFGH-	0022	1073742786	0	0	1	0
+symbol	byrange-ABCDEFGH-	0023	1073742787	0	0	1	0
+symbol	byrange-ABCDEFGH-	0024	1073741853	0	0	1	0
+symbol	byrange-ABCDEFGH-	0025	1073742788	0	0	1	0
+symbol	byrange-ABCDEFGH-	0026	1073742789	0	0	1	0
+symbol	byrange-ABCDEFGH-	0027	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	0028	1073742790	0	0	1	0
+symbol	byrange-ABCDEFGH-	0029	1073742791	0	0	1	0
+symbol	byrange-ABCDEFGH-	002A	1073742792	0	0	2	1
+symbol	byrange-ABCDEFGH-	002B	1073742793	0	0	1	0
+symbol	byrange-ABCDEFGH-	002C	1073742794	0	0	1	0
+symbol	byrange-ABCDEFGH-	002D	1073742795	0	0	1	0
+symbol	byrange-ABCDEFGH-	002E	1073741851	0	0	1	0
+symbol	byrange-ABCDEFGH-	002F	1073741852	0	0	1	0
+symbol	byrange-ABCDEFGH-	0030	1073742796	0	0	1	0
+symbol	byrange-ABCDEFGH-	0031	1073742797	0	0	1	0
+symbol	byrange-ABCDEFGH-	0032	1073742798	0	0	1	0
+symbol	byrange-ABCDEFGH-	0033	1073742799	0	0	1	0
+symbol	byrange-ABCDEFGH-	0034	1073742800	0	0	1	0
+symbol	byrange-ABCDEFGH-	0035	1073742801	0	0	1	0
+symbol	byrange-ABCDEFGH-	0036	1073742802	0	0	1	0
+symbol	byrange-ABCDEFGH-	0037	1073742803	0	0	1	0
+symbol	byrange-ABCDEFGH-	0038	1073742804	0	0	1	0
+symbol	byrange-ABCDEFGH-	0039	1073742805	0	0	1	0
+symbol	byrange-ABCDEFGH-	003A	1073742806	0	0	1	0
+symbol	byrange-ABCDEFGH-	003B	1073742807	0	0	1	0
+symbol	byrange-ABCDEFGH-	003C	1073742808	0	0	1	0
+symbol	byrange-ABCDEFGH-	003D	1073742809	0	0	1	0
+symbol	byrange-ABCDEFGH-	003E	1073742810	0	0	1	0
+symbol	byrange-ABCDEFGH-	003F	1073742811	0	0	1	0
+symbol	byrange-ABCDEFGH-	0040	1073742812	0	0	1	0
+symbol	byrange-ABCDEFGH-	0041	1073741825	0	0	1	0
+symbol	byrange-ABCDEFGH-	0042	1073741826	1	1	1	1
+symbol	byrange-ABCDEFGH-	0043	1073741827	1	1	1	1
+symbol	byrange-ABCDEFGH-	0044	1073741828	1	1	1	1
+symbol	byrange-ABCDEFGH-	0045	1073741829	1	1	1	1
+symbol	byrange-ABCDEFGH-	0046	1073741830	1	1	1	1
+symbol	byrange-ABCDEFGH-	0047	1073741831	1	1	1	1
+symbol	byrange-ABCDEFGH-	0048	1073741832	1	1	1	1
+symbol	byrange-ABCDEFGH-	0049	1073741833	1	1	1	1
+symbol	byrange-ABCDEFGH-	004A	1073741834	1	1	1	1
+symbol	byrange-ABCDEFGH-	004B	1073741835	1	1	1	1
+symbol	byrange-ABCDEFGH-	004C	1073741836	1	1	1	1
+symbol	byrange-ABCDEFGH-	004D	1073741837	1	1	1	1
+symbol	byrange-ABCDEFGH-	004E	1073741838	1	1	1	1
+symbol	byrange-ABCDEFGH-	004F	1073741839	1	1	1	1
+symbol	byrange-ABCDEFGH-	0050	1073741840	1	1	1	1
+symbol	byrange-ABCDEFGH-	0051	1073741841	1	1	1	1
+symbol	byrange-ABCDEFGH-	0052	1073741842	1	1	1	1
+symbol	byrange-ABCDEFGH-	0053	1073741843	1	1	1	1
+symbol	byrange-ABCDEFGH-	0054	1073741844	1	1	1	1
+symbol	byrange-ABCDEFGH-	0055	1073741845	1	1	1	1
+symbol	byrange-ABCDEFGH-	0056	1073741846	1	1	1	1
+symbol	byrange-ABCDEFGH-	0057	1073741847	1	1	1	1
+symbol	byrange-ABCDEFGH-	0058	1073741848	1	1	1	1
+symbol	byrange-ABCDEFGH-	0059	1073741849	1	1	1	1
+symbol	byrange-ABCDEFGH-	005A	1073741850	1	1	1	1
+symbol	byrange-ABCDEFGH-	005B	1073742813	0	0	1	0
+symbol	byrange-ABCDEFGH-	005C	1073742814	0	0	1	0
+symbol	byrange-ABCDEFGH-	005D	1073742815	0	0	1	0
+symbol	byrange-ABCDEFGH-	005E	1073742816	0	0	1	0
+symbol	byrange-ABCDEFGH-	005F	1073742817	0	0	1	0
+symbol	byrange-ABCDEFGH-	0060	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	0061	1073742818	1	1	1	1
+symbol	byrange-ABCDEFGH-	0062	1073742819	1	1	1	1
+symbol	byrange-ABCDEFGH-	0063	1073742820	1	1	1	1
+symbol	byrange-ABCDEFGH-	0064	1073742821	1	1	1	1
+symbol	byrange-ABCDEFGH-	0065	1073742822	1	1	1	1
+symbol	byrange-ABCDEFGH-	0066	1073742823	1	1	1	1
+symbol	byrange-ABCDEFGH-	0067	1073742824	1	1	1	1
+symbol	byrange-ABCDEFGH-	0068	1073742825	1	1	1	1
+symbol	byrange-ABCDEFGH-	0069	1073742826	1	1	1	1
+symbol	byrange-ABCDEFGH-	006A	1073742827	1	1	1	1
+symbol	byrange-ABCDEFGH-	006B	1073742828	1	1	1	1
+symbol	byrange-ABCDEFGH-	006C	1073742829	1	1	1	1
+symbol	byrange-ABCDEFGH-	006D	1073742830	1	1	1	1
+symbol	byrange-ABCDEFGH-	006E	1073742831	1	1	1	1
+symbol	byrange-ABCDEFGH-	006F	1073742832	1	1	1	1
+symbol	byrange-ABCDEFGH-	0070	1073742833	1	1	1	1
+symbol	byrange-ABCDEFGH-	0071	1073742834	1	1	1	1
+symbol	byrange-ABCDEFGH-	0072	1073742835	1	1	1	1
+symbol	byrange-ABCDEFGH-	0073	1073742836	1	1	1	1
+symbol	byrange-ABCDEFGH-	0074	1073742837	1	1	1	1
+symbol	byrange-ABCDEFGH-	0075	1073742838	1	1	1	1
+symbol	byrange-ABCDEFGH-	0076	1073742839	1	1	1	1
+symbol	byrange-ABCDEFGH-	0077	1073742840	1	1	1	1
+symbol	byrange-ABCDEFGH-	0078	1073742841	1	1	1	1
+symbol	byrange-ABCDEFGH-	0079	1073742842	1	1	1	1
+symbol	byrange-ABCDEFGH-	007A	1073742843	1	1	1	1
+symbol	byrange-ABCDEFGH-	007B	1073742844	0	0	1	0
+symbol	byrange-ABCDEFGH-	007C	1073742845	0	0	1	0
+symbol	byrange-ABCDEFGH-	007D	1073742846	0	0	1	0
+symbol	byrange-ABCDEFGH-	007E	1073742847	0	0	1	0
+symbol	byrange-ABCDEFGH-	007F	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	0030	1073742796	0	0	1	0
+symbol	byrange-ABCDEFGH-	0030,0030	1074738124	0	0	1	0
+symbol	byrange-ABCDEFGH-	0030,0000	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	003D,0032,002A,0030	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	0041	1073741825	0	0	1	0
+symbol	byrange-ABCDEFGH-	0041,0030	1073743820	0	0	1	0
+symbol	byrange-ABCDEFGH-	0041,0000	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	003D,0032,002A,0041	0	0	0	1	0
+symbol	byrange-ABCDEFGH-	004D	1073741837	1	1	1	1
+symbol	byrange-ABCDEFGH-	004D,0030	1073756108	1	1	1	1
+symbol	byrange-ABCDEFGH-	004D,0000	0	1	1	1	1
+symbol	byrange-ABCDEFGH-	003D,0032,002A,004D	0	1	1	1	1
+symbol	byrange-ABCDEFGH-	005A	1073741850	1	1	1	1
+symbol	byrange-ABCDEFGH-	005A,0030	1073769420	1	1	1	1
+symbol	byrange-ABCDEFGH-	005A,0000	0	1	1	1	1
+symbol	byrange-ABCDEFGH-	003D,0032,002A,005A	0	1	1	1	1
+symbol	byrange-ABCDEFGH-	0061	1073742818	1	1	1	1
+symbol	byrange-ABCDEFGH-	0061,0030	1074760652	1	1	1	1
+symbol	byrange-ABCDEFGH-	0061,0000	0	1	1	1	1
+symbol	byrange-ABCDEFGH-	003D,0032,002A,0061	0	1	1	1	1
+symbol	byrange-ABCDEFGH-	007A	1073742843	1	1	1	1
+symbol	byrange-ABCDEFGH-	007A,0030	1074786252	1	1	1	1
+symbol	byrange-ABCDEFGH-	007A,0000	0	1	1	1	1
+symbol	byrange-ABCDEFGH-	003D,0032,002A,007A	0	1	1	1	1
+symbol	byrange-ABCDEFGH-	0041,0042,0043,0044,0045,0046,0047,0048	0	1	1	1	1
+symbol	byrange-ABCDEFGH-	0041,0042,0043,0044,0045,0046,0047,0048,0030	0	1	1	1	1
+symbol	byrange-ABCDEFGH-	0041,0042,0043,0044,0045,0046,0047,0048,0000	0	1	1	1	1
+symbol	byrange-ABCDEFGH-	003D,0032,002A,0041,0042,0043,0044,0045,0046,0047,0048	0	1	1	1	1
+intersection	by1	*	*	unknown
+intersection	by1	hash0of2	hash0of2	unknown
+intersection	by1	hash1of2	hash1of2	unknown
+intersection	by1	hash1of4	hash1of4	unknown
+intersection	by1	hash03of16	hash03of16	unknown
+intersection	by1	range---	*	unknown
+intersection	by1	range--D-	range--D-	unknown
+intersection	by1	range-D-M-	range-D-M-	unknown
+intersection	by1	range-M--	range-M--	unknown
+intersection	by1	range-E-L-	range-E-L-	unknown
+intersection	by1	range-AB-ABCDEFGH-	range-AB-ABCDEFGH-	unknown
+intersection	by1	A*	A*	unknown
+intersection	by1	A,B	A,B	unknown
+intersection	byhash4	*	*	unknown
+intersection	byhash4	hash0of2	hash0of2	{0, 1}
+intersection	byhash4	hash1of2	hash1of2	{2, 3}
+intersection	byhash4	hash1of4	hash1of4	{1}
+intersection	byhash4	hash03of16	hash03of16	{0}
+intersection	byhash4	range---	*	unknown
+intersection	byhash4	range--D-	range--D-	unknown
+intersection	byhash4	range-D-M-	range-D-M-	unknown
+intersection	byhash4	range-M--	range-M--	unknown
+intersection	byhash4	range-E-L-	range-E-L-	unknown
+intersection	byhash4	range-AB-ABCDEFGH-	range-AB-ABCDEFGH-	unknown
+intersection	byhash4	A*	A*	unknown
+intersection	byhash4	A,B	A,B	unknown
+intersection	byhash16	*	*	unknown
+intersection	byhash16	hash0of2	hash0of2	{0, 1, 2, 3, 4, 5, 6, 7}
+intersection	byhash16	hash1of2	hash1of2	{8, 9, 10, 11, 12, 13, 14, 15}
+intersection	byhash16	hash1of4	hash1of4	{4, 5, 6, 7}
+intersection	byhash16	hash03of16	hash03of16	{3}
+intersection	byhash16	range---	*	unknown
+intersection	byhash16	range--D-	range--D-	unknown
+intersection	byhash16	range-D-M-	range-D-M-	unknown
+intersection	byhash16	range-M--	range-M--	unknown
+intersection	byhash16	range-E-L-	range-E-L-	unknown
+intersection	byhash16	range-AB-ABCDEFGH-	range-AB-ABCDEFGH-	unknown
+intersection	byhash16	A*	A*	unknown
+intersection	byhash16	A,B	A,B	unknown
+intersection	byrange-D-M-	*	*	unknown
+intersection	byrange-D-M-	hash0of2	hash0of2	unknown
+intersection	byrange-D-M-	hash1of2	hash1of2	unknown
+intersection	byrange-D-M-	hash1of4	hash1of4	unknown
+intersection	byrange-D-M-	hash03of16	hash03of16	unknown
+intersection	byrange-D-M-	range---	*	unknown
+intersection	byrange-D-M-	range--D-	range--D-	{0}
+intersection	byrange-D-M-	range-D-M-	range-D-M-	{1}
+intersection	byrange-D-M-	range-M--	range-M--	{2}
+intersection	byrange-D-M-	range-E-L-	range-E-L-	{1}
+intersection	byrange-D-M-	range-AB-ABCDEFGH-	range-AB-ABCDEFGH-	{0}
+intersection	byrange-D-M-	A*	A*	unknown
+intersection	byrange-D-M-	A,B	A,B	unknown
+intersection	byrange-A-AB-ABCDEFGH-Z-	*	*	unknown
+intersection	byrange-A-AB-ABCDEFGH-Z-	hash0of2	hash0of2	unknown
+intersection	byrange-A-AB-ABCDEFGH-Z-	hash1of2	hash1of2	unknown
+intersection	byrange-A-AB-ABCDEFGH-Z-	hash1of4	hash1of4	unknown
+intersection	byrange-A-AB-ABCDEFGH-Z-	hash03of16	hash03of16	unknown
+intersection	byrange-A-AB-ABCDEFGH-Z-	range---	*	unknown
+intersection	byrange-A-AB-ABCDEFGH-Z-	range--D-	range--D-	{0, 1, 2, 3}
+intersection	byrange-A-AB-ABCDEFGH-Z-	range-D-M-	range-D-M-	{3}
+intersection	byrange-A-AB-ABCDEFGH-Z-	range-M--	range-M--	{3, 4}
+intersection	byrange-A-AB-ABCDEFGH-Z-	range-E-L-	range-E-L-	{3}
+intersection	byrange-A-AB-ABCDEFGH-Z-	range-AB-ABCDEFGH-	range-AB-ABCDEFGH-	{2}
+intersection	byrange-A-AB-ABCDEFGH-Z-	A*	A*	unknown
+intersection	byrange-A-AB-ABCDEFGH-Z-	A,B	A,B	unknown
