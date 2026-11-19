@@ -176,7 +176,7 @@ remain unavailable until instrumentation supplies them.
 | `sourceRecordsPerSecond` | Record mode uses fully written occurrences; Event mode uses admitted source events. Both divide by the producer's reported `seconds`. The two fields therefore have different completion boundaries. |
 | `deliveredIncludingDrainPerProducerSecond` | Sum of verified client deliveries, including drain, divided by the producer's reported `seconds`. Receiver completion duration is not its denominator. |
 | `Measure-Stream.ps1` CPU | User/system CPU deltas between first and last active samples; `averageCpuCores` uses that interval. Per-process active intervals may differ. |
-| Memory from `Measure-Stream.ps1` | First and median working set, sampled peak working set and sampled peak private bytes. Sampling is nominally 100 ms and includes scheduling jitter. Final memory and OS peak are not exported. |
+| Memory from `Measure-Stream.ps1` | First and median working set, sampled peak working set and sampled peak private bytes. Sampling defaults to 100 ms with jitter. Last observed live active memory and OS lifetime peak are exported separately; Linux private bytes are unavailable. |
 
 The existing .NET comparison uses the same receiver and synthetic Quote payload.
 Record the exact SDK/native runtime versions, submission timer and acceptance
@@ -193,3 +193,67 @@ probe/warmup/drain accounting; and unavailable observations with reasons.
 Use the [fan-out procedure](FANOUT.md) or
 [Quote/STREAM procedure](QUOTE-STREAM.md) for execution commands. This contract
 adds no performance result by itself.
+
+## Portable process and thread resource samples
+
+`Measure-Stream.ps1` uses the same bundled reader on Windows and Linux, with
+PowerShell 7.2 or later and no additional runtime installation. Its
+`-SampleIntervalMs` defaults to 100 ms (10..10000). The wait loop and sequential
+sampling add jitter; use recorded times rather than the requested interval.
+`process-samples.csv` preserves its original columns and appends process ID,
+process creation identity, observation start/end, OS peak and availability.
+`thread-samples.csv` records each observed TID, creation identity, optional OS
+thread name, and cumulative user/system CPU milliseconds. Windows uses
+`GetThreadTimes` with a queried thread handle and checks the owning process;
+Linux uses `/proc/PID/task/TID/stat` with `sysconf(_SC_CLK_TCK)`. A reused TID
+starts a separate identity. OS names describe the threads only when the
+application supplies them; the reader does not infer publication or decoding roles.
+
+Both files use a common monotonic `Stopwatch` origin. `elapsedMs` is the midpoint
+of each process/thread observation's `sampleStartMs` and `sampleEndMs`; the counters within that span are read
+sequentially. CPU deltas and average cores use each identity's first and last
+successful `active` samples. Thread intervals can differ from process intervals.
+Threads that start and exit between samples are absent; CPU after the last live
+sample is unobserved. Summed thread deltas therefore need not equal process CPU.
+Fewer than two observations make CPU unavailable. Signed counter regressions
+are retained and marked `counter-regressed`. JSON uses null, CSV an empty field,
+and Prometheus `NaN` for unavailable numbers; zero means an observed zero. CSV numeric cells use invariant decimal formatting, independently of the host locale.
+
+Windows resident working set, private commitment and lifetime peak working set
+come from `System.Diagnostics.Process` (`GetProcessMemoryInfo`). Linux exports
+`VmRSS` and `VmHWM` from `/proc/PID/status`; private commitment has no matching
+counter here and remains unavailable. Sampled peaks cover the active samples;
+OS peaks cover the process lifetime through the last successful sample. Final
+memory is the last observed live active sample with its timestamp, rather than
+a claim that the process was drained. Raw rows retain startup and drain phases
+when observations at those boundaries are possible. Sampling misses intervening
+peaks. `sampling.json` records timing, counts and the measured reader overhead
+scope. Logical processor count describes the harness runtime; affinity is sampled as a Windows mask or Linux allowed-CPU list; quota limits remain explicitly unrecorded, and no host-normalized CPU percentage is
+exported.
+
+The Windows sweep always saves `metrics.prom`, including when no Pushgateway
+is configured. The posted snapshot is this same text. Grafana selects these
+numeric gauges directly, without applying `rate()` to already computed CPU
+deltas. Compare process CPU with the first/last active CSV rows and sampled
+memory peaks with the maximum raw observation; the snapshot timestamp is the
+run completion/publication time, not a continuous CPU series. Per-thread panels
+retain TID and creation identity. Different runs replace the Pushgateway job
+snapshot. The fan-out summary preserves unavailable private-memory totals;
+a sum of process peaks still does not establish a simultaneous aggregate peak.
+
+For a finite owned-child check on either platform:
+
+```powershell
+pwsh -NoProfile -File tools/nettest/benchmark/Test-ProcessMetrics.ps1 -OutputDirectory ./new-resource-check
+```
+
+`-Help` and `-HelpRu` describe purpose, inputs, outputs and exit codes without
+running the workload. The check verifies a busy and sleeping thread, final live
+memory, exceptional cleanup, and dashboard metric arithmetic against exported
+CSV. CTest registers it as `process_thread_metrics` when PowerShell is available.
+It exercises measurement and export; it does not run Docker, Prometheus scraping,
+or a capacity comparison.
+
+API references: [Windows thread times](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getthreadtimes),
+[Windows process memory](https://learn.microsoft.com/en-us/windows/win32/api/psapi/ns-psapi-process_memory_counters_ex),
+[Linux proc counters](https://docs.kernel.org/filesystems/proc.html).

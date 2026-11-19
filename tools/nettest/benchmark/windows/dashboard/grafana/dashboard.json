@@ -2,7 +2,7 @@
   "title": "qd-cxx NetTest",
   "uid": "qd-cxx-nettest",
   "schemaVersion": 40,
-  "version": 1,
+  "version": 2,
   "refresh": "5s",
   "time": {"from": "now-1h", "to": "now"},
   "panels": [
@@ -48,6 +48,34 @@
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 18},
       "fieldConfig": {"defaults": {"unit": "bytes"}},
       "targets": [{"expr": "qdcxx_nettest_receiver_peak_working_set_bytes", "legendFormat": "client {{client}} {{contract}} {{pacing}}"}]
+    },
+    {
+      "title": "Average process CPU cores (each sampled interval)",
+      "type": "timeseries", "id": 6,
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 26},
+      "fieldConfig": {"defaults": {"unit": "none"}},
+      "targets": [{"expr": "qdcxx_nettest_process_average_cpu_cores", "legendFormat": "{{role}} client {{client}} {{producer}}"}]
+    },
+    {
+      "title": "Last observed live working set (active phase)",
+      "type": "timeseries", "id": 7,
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 26},
+      "fieldConfig": {"defaults": {"unit": "bytes"}},
+      "targets": [{"expr": "qdcxx_nettest_process_final_working_set_bytes", "legendFormat": "{{role}} client {{client}} {{producer}}"}]
+    },
+    {
+      "title": "Observed thread CPU seconds (individual sampled intervals)",
+      "type": "timeseries", "id": 8,
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 34},
+      "fieldConfig": {"defaults": {"unit": "s"}},
+      "targets": [{"expr": "qdcxx_nettest_thread_cpu_seconds", "legendFormat": "{{role}} {{client}} TID {{tid}} {{thread_name}} {{thread_identity}}"}]
+    },
+    {
+      "title": "Observed thread average CPU cores",
+      "type": "timeseries", "id": 9,
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 34},
+      "fieldConfig": {"defaults": {"unit": "none"}},
+      "targets": [{"expr": "qdcxx_nettest_thread_average_cpu_cores", "legendFormat": "{{role}} {{client}} TID {{tid}} {{thread_name}} {{thread_identity}}"}]
     }
   ]
 }

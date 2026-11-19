@@ -53,7 +53,10 @@ $files = @(
     (Join-Path $CrtDirectory 'vcruntime140.dll'),
     (Join-Path $CrtDirectory 'vcruntime140_1.dll'),
     (Join-Path $bench 'Measure-Stream.ps1'),
-    (Join-Path $bench 'StreamReceiver.java')
+    (Join-Path $bench 'StreamReceiver.java'),
+    (Join-Path $bench 'ProcessMetrics.ps1'),
+    (Join-Path $bench 'ProcessMetrics.cs'),
+    (Join-Path $bench 'MetricsExport.ps1')
 ) + @('qds.jar','dxlib.jar','dxfeed-api.jar' | ForEach-Object { Join-Path $QdJarsDirectory $_ })
 foreach ($file in $files) {
     if (!(Test-Path -LiteralPath $file -PathType Leaf)) { throw "Missing input: $file" }
@@ -81,7 +84,7 @@ foreach ($name in 'qds.jar','dxlib.jar','dxfeed-api.jar') {
 foreach ($name in 'msvcp140.dll','msvcp140_atomic_wait.dll','vcruntime140.dll','vcruntime140_1.dll') {
     Copy-Item -LiteralPath (Join-Path $CrtDirectory $name) -Destination (Join-Path $output 'bin')
 }
-Copy-Item -LiteralPath (Join-Path $bench 'Measure-Stream.ps1'),(Join-Path $bench 'StreamReceiver.java') -Destination (Join-Path $output 'tools')
+Copy-Item -LiteralPath (Join-Path $bench 'Measure-Stream.ps1'),(Join-Path $bench 'StreamReceiver.java'),(Join-Path $bench 'ProcessMetrics.ps1'),(Join-Path $bench 'ProcessMetrics.cs'),(Join-Path $bench 'MetricsExport.ps1') -Destination (Join-Path $output 'tools')
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Run-Sweep.ps1'),(Join-Path $PSScriptRoot 'Test-Link.ps1'),(Join-Path $PSScriptRoot 'README.md'),(Join-Path $PSScriptRoot 'README.ru.md') -Destination $output
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'dashboard') -Destination $output -Recurse
 Copy-Item -LiteralPath (Join-Path $source 'LICENSE') -Destination (Join-Path $output 'licenses/qd-cxx.txt')
