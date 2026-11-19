@@ -175,6 +175,72 @@ TEST_CASE("local record identity resolves within provenance-preserving copies an
     CHECK(moved.recordId(context) == 1);
 }
 
+TEST_CASE("schema declarations are independent while retained contexts preserve their original origin") {
+    namespace c = org::ttldtor::qdcxx::core;
+
+    c::RecordContext retained;
+    c::SchemaIdentity origin;
+    auto destination = LocalSchema::create(localRecords(), SCHEMA_LIMITS);
+    REQUIRE(destination);
+    const auto replacedContext = destination->recordContext(1);
+
+    {
+        auto input = localRecords();
+        auto source = LocalSchema::create(input, SCHEMA_LIMITS);
+        REQUIRE(source);
+        retained = source->recordContext(1);
+        origin = source->identity();
+        input[1].name = u"Changed";
+        input[1].lookups[0].name = u"changed";
+        CHECK(source->records()[1].name == u"R");
+        CHECK(source->records()[1].lookups[0].name == u"y");
+
+        *destination = *source;
+        CHECK(destination->records().data() != source->records().data());
+        CHECK(destination->records()[1].fields.data() != source->records()[1].fields.data());
+        CHECK(destination->records()[1].lookups.data() != source->records()[1].lookups.data());
+        CHECK(destination->recordId(retained) == 1);
+        CHECK_FALSE(destination->recordId(replacedContext));
+    }
+
+    CHECK(retained.valid());
+    CHECK(origin.matches(destination->identity()));
+    CHECK(destination->recordId(retained) == 1);
+    CHECK(destination->records()[1].name == u"R");
+    CHECK(destination->records()[1].lookups[0].name == u"y");
+
+    const auto recreated = LocalSchema::create(destination->records(), SCHEMA_LIMITS);
+    REQUIRE(recreated);
+    CHECK_FALSE(recreated->identity().matches(origin));
+    CHECK_FALSE(recreated->recordId(retained));
+
+    *destination = *recreated;
+    CHECK_FALSE(destination->recordId(retained));
+    CHECK(retained.valid());
+    const auto copied = retained;
+    auto moved = std::move(retained);
+    CHECK_FALSE(retained.valid());
+    CHECK(moved.matches(copied));
+    CHECK_FALSE(moved.matches(c::RecordContext{}));
+}
+
+TEST_CASE("schema move assignment transfers origin without reviving a replaced context") {
+    auto source = LocalSchema::create(localRecords(), SCHEMA_LIMITS);
+    auto destination = LocalSchema::create(localRecords(), SCHEMA_LIMITS);
+    REQUIRE(source);
+    REQUIRE(destination);
+    const auto sourceContext = source->recordContext(1);
+    const auto replacedContext = destination->recordContext(1);
+
+    *destination = std::move(*source);
+    CHECK(destination->recordId(sourceContext) == 1);
+    CHECK_FALSE(destination->recordId(replacedContext));
+    CHECK_FALSE(source->recordId(sourceContext));
+    CHECK_FALSE(source->identity().valid());
+    CHECK(sourceContext.valid());
+    CHECK(replacedContext.valid());
+}
+
 TEST_CASE("local schema rejects unsupported and ambiguous input before ownership") {
     auto records = localRecords();
     CHECK(LocalSchema::create({}, {0, 0, 0, 0, 0}).has_value());

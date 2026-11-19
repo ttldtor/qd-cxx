@@ -256,7 +256,11 @@ struct LiveFieldValueView {
     std::optional<std::span<const std::byte>> bytes; ///< Null versus empty exact opaque payload.
 };
 
-/** Borrowed admitted local record; every span/text remains owned by the containing event. */
+/** Borrowed admitted local record; every span/text remains owned by the containing event.
+ * Copy/move preserves scalar metadata and owning context but does not retain the event payload.
+ * A context alone cannot extend symbol/field lifetime. Event access/release remains serialized;
+ * this view is not the cross-thread detached owner described in spec/schema/RECORD-OWNERSHIP.md.
+ */
 struct LiveRecordView {
     std::int32_t localId;                            ///< Immutable local record identity.
     std::int32_t senderId;                           ///< Directional peer identity, never delivery identity.

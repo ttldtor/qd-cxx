@@ -277,7 +277,10 @@ struct RawSourceMetadata {
     std::optional<std::int64_t> tapeMessageTimeMs{};   ///< Tape MESSAGE cursor time when the source supplied one.
 };
 
-/** Immutable detached projection; not an admitted protocol record. */
+/** Immutable detached projection; not an admitted protocol record.
+ * Copy/move retains provenance tokens but only copies symbol/field views. Keep an OwnedMuxBatch
+ * lease for payload access beyond the callback; retaining context alone is insufficient.
+ */
 struct MuxRecordView {
     core::SubscriptionFamily family;                          ///< Immutable registration family.
     core::RecordContext context;                              ///< Owning core provenance only.
@@ -298,7 +301,13 @@ struct MuxRecordView {
         projections{}; ///< Original business choices, detached from desired text.
 };
 
-/** Thread-safe immutable composite lease; final release reaches no protocol/callable owner. */
+/** Thread-safe immutable composite lease; final release reaches no protocol/callable owner.
+ * Copies share backing; moves transfer the lease and empty the source. Spans follow backing,
+ * not a particular handle, until the last owning lease is released. Separate handles support
+ * concurrent immutable access/final release; assignment to the same handle needs synchronization.
+ * Retention preserves existing detached payload/metadata, not a complete schema catalog.
+ * See spec/schema/RECORD-OWNERSHIP.md for the current batch and future RecordFeed distinction.
+ */
 class OwnedMuxBatch {
     std::shared_ptr<const detail::QueueBatch> state_; ///< Pure immutable backing and atomic reservation ledger.
     friend class BorrowedMuxBatch;

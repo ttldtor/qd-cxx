@@ -188,7 +188,15 @@ struct FieldValue {
     bool operator==(const FieldValue &other) const = default;
 };
 
-/** Exact non-owning logical field; payload views borrow their source storage. */
+/** Exact non-owning logical field; payload views borrow their source storage.
+ * Copying or moving copies scalar bits and payload addresses; neither operation retains storage or
+ * empties the source. Payload mutation, relocation or destruction can invalidate the view. A view
+ * carries no record/schema provenance and validation does not establish its lifetime or origin.
+ * For independent ownership, copy every engaged payload into FieldValue while the source is valid,
+ * preserving null versus empty. Cross-thread use requires immutable, independently kept-alive storage.
+ * Callback-scoped views cannot escape or cross suspension without the supplying API's owning lease.
+ * See spec/schema/RECORD-OWNERSHIP.md.
+ */
 struct FieldValueView {
     SerialFieldType type;                     ///< Full serial identity, never masked to its primitive type.
     std::int64_t raw;                         ///< Exact scalar bits; canonical arrays require zero.

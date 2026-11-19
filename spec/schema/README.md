@@ -4,6 +4,9 @@
 
 ## Native JSON schema entry point
 
+[Record ownership and provenance](RECORD-OWNERSHIP.md) specifies current schema/record lifetimes,
+copy/move behavior, foreign-schema rejection and the separately identified future RecordFeed target.
+
 [NATIVE-JSON](NATIVE-JSON.md) defines the separate `qdcxx-native` version-1 source format:
 ordinary records, ordered logical fields, exact full types 2/8/10/40/56/72/88/120 and explicit lookups.
 The optional `qdcxx_schema_json` loader publishes an owned immutable `LocalSchema` after bounded
