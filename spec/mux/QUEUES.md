@@ -139,6 +139,31 @@ debits twice the client batch-byte ceiling. Credits already spent are not refund
 increased. `WORK_LIMIT` requires an explicit caller-selected new turn; no latency/termination
 guarantee follows from repeatedly underfunded work or a callback that never returns.
 
+## Slow consumers and shared storage
+
+A consumer's queued, executing and caller-retained records consume its own immutable
+record and batch quotas. Shared immutable STREAM storage can back several consumers;
+physical backing is counted once in aggregate observations, while each consumer retains
+its own quota charge. Sharing does not permit a slow consumer to borrow another's reserved
+capacity or make retained data free.
+
+If a paused STREAM registration exhausts its delivery quota, it terminates with its
+resource failure and gap evidence. Healthy registrations continue receiving their eligible
+records in source order, including duplicates. TICKER may conflate only through its actual
+collector projection; it does not promise every raw update or unlimited delivery retention.
+HISTORY overflow preserves the affected registration's incomplete/gap evidence and does
+not invalidate an unaffected registration's synchronized complete range.
+
+Cleanup, ordinary commands and reserved resume/stop controls continue through finite fair
+owner turns. This requires adequate work credits and callbacks that return; it does not
+promise a wall-clock bound. Terminal publication releases library-held delivery, not the
+application's retained batches. Those batches remain readable and charged; after handles
+are released, their old generation can still prevent slot reuse until its actual backing
+is gone. A healthy registration can continue while that retired generation remains held.
+
+Shared source failure, aggregate physical allocation failure and context shutdown retain
+their documented common scope. Consumer isolation does not turn them into per-consumer
+success or provide a socket-write/peer-receipt guarantee.
 ## HISTORY range evidence
 
 `rangeStatus` returns actual optional AS-OF source diagnostics plus current registration demand,

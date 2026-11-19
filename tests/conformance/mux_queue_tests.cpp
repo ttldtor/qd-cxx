@@ -14,6 +14,7 @@
 #include "qd/encoding/compact.hpp"
 #include "qd/encoding/utf_char.hpp"
 #include "qd/encoding/utf_string.hpp"
+#include "qd/events/event_flags.hpp"
 #include "qd/events/market_maker.hpp"
 #include "qd/events/profile.hpp"
 #include "qd/events/quote.hpp"
@@ -1939,6 +1940,187 @@ TEST_CASE("MUX queue paused STREAM overflow retires only the slow client and res
     CHECK(slow->values == std::vector<std::int64_t>{1});
     CHECK(a.state() == m::QueueClientState::ACTIVE);
     CHECK(b.requestStop(m::StopMode::ABORT) == m::ControlAdmission::CLOSED);
+}
+
+TEST_CASE("shared decoded STREAM isolates paused quota exhaustion without releasing its retained generation") {
+    auto bounds = queueLimits();
+    bounds.clients = 2;
+    auto f = fixture(c::SubscriptionFamily::STREAM, bounds);
+    auto fast = std::make_shared<Recorder>();
+    auto slow = std::make_shared<Recorder>();
+    fast->retain = true;
+    slow->retain = slow->pause = true;
+    auto limits = clientLimits();
+    limits.compactRecordArena = true;
+    auto small = limits;
+    small.dataItems = 4;
+    auto healthy = open(f, fast, limits);
+    auto paused = open(f, slow, small);
+    add(f, healthy);
+    add(f, paused);
+
+    const Input firstRows[]{{0, u"ALPHA", 1, 1, 0}, {0, u"ALPHA", 2, 2, 0}};
+    auto event = admit(f.live, data(firstRows, 15));
+    REQUIRE(p::detail::SharedRecordAccess::hasSharedRecords(event));
+    auto original = p::detail::SharedRecordAccess::retain(event, event.records().front());
+    std::weak_ptr<const c::detail::SharedRecordPayload> lifetime = original;
+    auto work = turn();
+    REQUIRE(f.queue.admit(std::move(event), work));
+    until(f, [&] {
+        return fast->values.size() == 2 && paused.state() == m::QueueClientState::PAUSED;
+    });
+    REQUIRE(fast->retained.size() == 1);
+    REQUIRE(slow->retained.size() == 1);
+    CHECK(fast->retained.front().records().front().typedValues.data() == original->fields().data());
+    CHECK(slow->retained.front().records().front().typedValues.data() == original->fields().data());
+    CHECK(f.queue.resources().recordBytes <
+          f.queue.resources(healthy)->recordBytes + f.queue.resources(paused)->recordBytes);
+    original.reset();
+    fast->retained.clear();
+    fast->retain = false;
+    CHECK(f.queue.resources(healthy)->recordBytes == 0);
+    CHECK_FALSE(lifetime.expired());
+
+    send(f, {{0, u"ALPHA", 3, 3, 0}, {0, u"ALPHA", 4, 4, 0}});
+    until(f, [&] {
+        return fast->values.size() == 4 && f.queue.resources(paused)->queuedRecords == 2;
+    });
+    CHECK(f.queue.resources(paused)->recordOwners == small.dataItems);
+    send(f, {{0, u"ALPHA", 5, 5, 0}});
+    until(f, [&] {
+        return fast->values.size() == 5 && paused.terminal().has_value();
+    });
+    REQUIRE(paused.terminal()->primary);
+    CHECK(paused.terminal()->primary->error == m::QueueError::RESOURCE_LIMIT);
+    CHECK(paused.terminal()->outcome == m::TerminalOutcome::FAILED);
+    CHECK(paused.terminal()->hadGap);
+    CHECK(slow->values == std::vector<std::int64_t>{1, 2});
+    CHECK(f.queue.resources(paused)->queuedRecords == 0);
+    CHECK(f.queue.resources(paused)->recordOwners == 2);
+    CHECK(f.queue.resources(paused)->recordBytes > 0);
+    CHECK(f.queue.resources().recordBytes == f.queue.resources(paused)->recordBytes);
+    CHECK(healthy.state() == m::QueueClientState::ACTIVE);
+
+    auto submit = submitTurn();
+    auto cleared = healthy.clear(submit);
+    REQUIRE(cleared);
+    until(f, [&] {
+        return cleared->result().has_value() && f.queue.aggregateEntries().empty();
+    });
+    CHECK(cleared->result()->status == m::CommandStatus::APPLIED);
+    add(f, healthy);
+    send(f, {{0, u"ALPHA", 6, 6, 0}});
+    until(f, [&] {
+        return fast->values.size() == 6;
+    });
+    CHECK(fast->values == std::vector<std::int64_t>{1, 2, 3, 4, 5, 6});
+    CHECK(slow->retained.front().records()[1].typedValues[2].raw == 2);
+    paused = {};
+
+    auto replacement = std::make_shared<Recorder>();
+    work = turn();
+    auto blocked = f.queue.open(limits, replacement, work);
+    REQUIRE_FALSE(blocked);
+    CHECK(blocked.error().error == m::QueueError::RESOURCE_LIMIT);
+    CHECK(f.queue.resources().generations == 2);
+    std::atomic<bool> valid{false};
+    auto held = std::move(slow->retained.front());
+    slow->retained.clear();
+    std::thread release([batch = std::move(held), &valid]() mutable {
+        valid = batch.records().size() == 2 && batch.records()[0].typedValues[2].raw == 1 &&
+                batch.records()[1].typedValues[2].raw == 2;
+        batch = {};
+    });
+    release.join();
+    CHECK(valid.load());
+    CHECK(lifetime.expired());
+    until(f, [&] {
+        return f.queue.resources().generations == 1;
+    });
+    CHECK(f.queue.resources().recordBytes == 0);
+    auto next = open(f, replacement, limits);
+    add(f, next);
+    send(f, {{0, u"ALPHA", 7, 7, 0}});
+    until(f, [&] {
+        return fast->values.size() == 7 && replacement->values.size() == 1;
+    });
+    CHECK(fast->values == std::vector<std::int64_t>{1, 2, 3, 4, 5, 6, 7});
+    CHECK(replacement->values == std::vector<std::int64_t>{7});
+    CHECK(healthy.requestStop(m::StopMode::GRACEFUL) == m::ControlAdmission::RECORDED);
+    CHECK(next.requestStop(m::StopMode::GRACEFUL) == m::ControlAdmission::RECORDED);
+    until(f, [&] {
+        return healthy.terminal().has_value() && next.terminal().has_value();
+    });
+    CHECK(healthy.terminal()->outcome == m::TerminalOutcome::DRAINED);
+    CHECK(next.terminal()->outcome == m::TerminalOutcome::DRAINED);
+}
+
+TEST_CASE("paused TICKER keeps conflation and reserved controls independent of a healthy consumer") {
+    auto f = fixture(c::SubscriptionFamily::TICKER);
+    auto fast = std::make_shared<Recorder>();
+    auto slow = std::make_shared<Recorder>();
+    slow->pause = slow->retain = true;
+    auto small = clientLimits();
+    small.dataItems = 2;
+    small.commandSlots = 1;
+    small.resultSlots = 2;
+    auto healthy = open(f, fast);
+    auto paused = open(f, slow, small);
+    add(f, healthy);
+    add(f, paused);
+    send(f, {{0, u"ALPHA", 1, 10, 0}});
+    until(f, [&] {
+        return fast->values.size() == 1 && paused.state() == m::QueueClientState::PAUSED;
+    });
+    send(f, {{0, u"ALPHA", 2, 20, 0}, {0, u"ALPHA", 3, 30, 0}, {0, u"ALPHA", 4, 40, 0}});
+    until(f, [&] {
+        return fast->values.size() == 2 && f.queue.resources(paused)->queuedRecords == 1;
+    });
+    CHECK(fast->values == std::vector<std::int64_t>{10, 40});
+    CHECK(slow->values == std::vector<std::int64_t>{10});
+    CHECK(f.queue.resources(paused)->recordOwners == small.dataItems);
+    const c::SubscriptionRequest request{{f.schema.recordContext(0), u"ALPHA"}, {}};
+    auto submit = submitTurn();
+    auto pending = paused.add(std::span(&request, 1), submit);
+    REQUIRE(pending);
+    submit = submitTurn();
+    auto full = paused.add(std::span(&request, 1), submit);
+    REQUIRE_FALSE(full);
+    CHECK(full.error() == m::QueueError::COMMAND_LIMIT);
+    slow->pause = slow->retain = false;
+    CHECK(paused.requestResume() == m::ControlAdmission::RECORDED);
+    submit = submitTurn();
+    auto cleared = healthy.clear(submit);
+    REQUIRE(cleared);
+    until(f, [&] {
+        return slow->values.size() == 2 && pending->result().has_value() && cleared->result().has_value();
+    });
+    CHECK(pending->result()->status == m::CommandStatus::APPLIED);
+    CHECK(cleared->result()->status == m::CommandStatus::APPLIED);
+    CHECK(slow->values == std::vector<std::int64_t>{10, 40});
+    CHECK_FALSE(healthy.terminal());
+    CHECK_FALSE(paused.terminal());
+    CHECK(paused.requestStop(m::StopMode::ABORT) == m::ControlAdmission::RECORDED);
+    until(f, [&] {
+        return paused.terminal().has_value();
+    });
+    CHECK(paused.terminal()->outcome == m::TerminalOutcome::ABORTED);
+    REQUIRE(slow->retained.size() == 1);
+    CHECK(slow->retained.front().records().front().typedValues[2].raw == 10);
+    CHECK(f.queue.resources(paused)->recordOwners == 1);
+    slow->retained.clear();
+    CHECK(f.queue.resources(paused)->recordOwners == 0);
+    add(f, healthy);
+    send(f, {{0, u"ALPHA", 5, 50, 0}});
+    until(f, [&] {
+        return fast->values.size() == 3;
+    });
+    CHECK(fast->values == std::vector<std::int64_t>{10, 40, 50});
+    CHECK(healthy.requestStop(m::StopMode::GRACEFUL) == m::ControlAdmission::RECORDED);
+    until(f, [&] {
+        return healthy.terminal().has_value();
+    });
+    CHECK(healthy.terminal()->outcome == m::TerminalOutcome::DRAINED);
 }
 
 TEST_CASE("MUX queue reserved resume restarts a paused TICKER registration") {
@@ -4368,6 +4550,35 @@ TEST_CASE("MUX queue actual HISTORY pending overflow isolates the low view and r
     CHECK(after.source->epoch.matches(before.source->epoch));
     CHECK(after.mappingCurrent);
     CHECK(after.completeDeliveredRange);
+    CHECK(highBaseline == 1);
+    const std::vector<std::int64_t> expectedPrefix{0, 51, 0};
+    REQUIRE(highConsumer->values == expectedPrefix);
+    REQUIRE(highConsumer->times.size() == expectedPrefix.size());
+    REQUIRE(highConsumer->flags.size() == expectedPrefix.size());
+    CHECK(highConsumer->times[1] == 5);
+    CHECK(highConsumer->flags[1] == q::indexed_event_flags::TX_PENDING);
+    // Transaction end below the view bound emits a maximal-time removal boundary with a default value.
+    constexpr auto BOUNDARY_TIME = std::numeric_limits<std::int64_t>::max();
+    CHECK(highConsumer->times[2] == BOUNDARY_TIME);
+    CHECK(highConsumer->flags[2] == q::indexed_event_flags::REMOVE_EVENT);
+    const std::vector<std::int64_t> expectedValues{0, 51, 0, 52};
+    send(f, {{0, u"ALPHA", 5, 52, 0}});
+    until(f, [&] {
+        return highConsumer->values.size() >= expectedValues.size();
+    });
+    CHECK(highConsumer->values == expectedValues);
+    REQUIRE(highConsumer->times.size() == expectedValues.size());
+    REQUIRE(highConsumer->flags.size() == expectedValues.size());
+    CHECK(highConsumer->times.back() == 5);
+    CHECK(highConsumer->flags.back() == 0);
+    CHECK(range(f, high).completeDeliveredRange);
+    CHECK(high.requestStop(m::StopMode::GRACEFUL) == m::ControlAdmission::RECORDED);
+    until(f, [&] {
+        return high.terminal().has_value();
+    });
+    CHECK(high.terminal()->outcome == m::TerminalOutcome::DRAINED);
+    CHECK(low.terminal()->outcome == m::TerminalOutcome::FAILED);
+    CHECK(low.terminal()->hadGap);
 }
 
 TEST_CASE("MUX queue source ACK work and late-client detached copy work preserve all-client STREAM transaction") {
