@@ -21,8 +21,9 @@ applies policy work, services peers, advances the family queues and admits sourc
 input window, requested and admitted demand, family registrations, policy revision,
 retained delivery and partial output. Its `nextFamily` rotates DATA families.
 
-[Delivery](../../src/api/publisher_delivery.hpp) retains an `OwnedMuxBatch` inside its
-callback and returns `PAUSE`. The worker advances its cursor only after the complete
+[Delivery](../../src/api/publisher_delivery.hpp) retains the callback's owning batch
+and returns `PAUSE`. Eligible STREAM deliveries retain compact record ranges; other
+deliveries retain an `OwnedMuxBatch`. The worker advances its cursor only after the complete
 frame is locally written, or suppresses revoked rows. It releases the completed batch
 and requests resume. The borrowed callback view and temporary composition views do not
 escape their calls. Per-peer failure and retirement already exist; common worker,
