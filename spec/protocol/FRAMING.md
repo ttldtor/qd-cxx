@@ -60,6 +60,13 @@ less than body+9. Zero body budget is valid and permits empty heartbeats. Nine i
 compact-long prefix size. Validate signed lengths before conversion or body allocation. A length
 above the body budget fails BODY_LIMIT immediately after its prefix.
 
+The body limit measures encoded bytes. The number of records that fit depends on
+their encoded sizes; an independent record-count quota belongs to the decoder. One
+large record can exhaust the body budget on its own. The reader treats the body
+as opaque; record and payload limits belong to the selected decoder profile in the
+[message and state registry](MESSAGE-STATE-REGISTRY.md). An incomplete prefix or
+body remains pending until more input arrives or `finish()` declares EOF.
+
 The reader allocates exactly bodyBudget+9 byte elements once at construction, independent of the
 larger pending budget; allocator bookkeeping is additional. Pending bytes never exceed that
 storage. An emitted payload separately owns at most bodyBudget-1 bytes (zero when bodyBudget=0).

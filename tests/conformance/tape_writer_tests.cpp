@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 
 #define DOCTEST_CONFIG_IMPLEMENT
+#include "qd/encoding/compact.hpp"
 #include "qd/events/profile.hpp"
 #include "qd/events/quote.hpp"
 #include "qd/protocol/tape_writer.hpp"
@@ -1774,6 +1775,55 @@ TEST_CASE("failure precedence and completed output remain atomic across invalid 
     REQUIRE(!flags);
     CHECK(flags.error().error == p::WriterError::UNSUPPORTED);
     CHECK(flags.error().stage == "flags");
+}
+
+TEST_CASE("one large record observes the exact frame body limit atomically") {
+    const auto input = fixtureJson("writer-cases.json");
+    auto outgoing = contractLayouts(input);
+    REQUIRE(outgoing);
+    auto owned = records(input);
+    owned[0].symbol.assign(100, u'x');
+    const auto row = std::array{owned[0].view()};
+
+    auto baseline = p::TapeWriter::create(*outgoing, descriptor(input.at("descriptor")), writerLimits());
+    REQUIRE(baseline);
+    REQUIRE(baseline->begin());
+    REQUIRE(baseline->describe(std::array<std::int32_t, 1>{37}));
+    auto chunk = baseline->data(row);
+    REQUIRE(chunk);
+    const auto length = org::ttldtor::qdcxx::encoding::readCompactLong(chunk->bytes);
+    REQUIRE(length.status == org::ttldtor::qdcxx::encoding::Status::OK);
+    REQUIRE(length.value > 0);
+    const auto bodyBytes = static_cast<std::size_t>(length.value);
+    CHECK(bodyBytes + length.consumed == chunk->bytes.size());
+
+    for (const auto allowance : {bodyBytes, bodyBytes - 1}) {
+        auto limits = writerLimits();
+        limits.frameBytes = allowance;
+        auto writer = p::TapeWriter::create(*outgoing, descriptor(input.at("descriptor")), limits);
+        REQUIRE(writer);
+        REQUIRE(writer->begin());
+        REQUIRE(writer->describe(std::array<std::int32_t, 1>{37}));
+        const auto before = writer->counters();
+        const auto result = writer->data(row);
+
+        if (allowance == bodyBytes) {
+            REQUIRE(result);
+            CHECK(result->bytes == chunk->bytes);
+            CHECK(writer->counters().frames == before.frames + 1);
+            CHECK(writer->counters().outputBytes == before.outputBytes + chunk->bytes.size());
+        } else {
+            REQUIRE(!result);
+            CHECK(result.error().error == p::WriterError::RESOURCE_LIMIT);
+            CHECK(result.error().stage == "frame-bytes");
+            CHECK(writer->state() == p::WriterState::FAILED);
+            CHECK(writer->counters().frames == before.frames);
+            CHECK(writer->counters().outputBytes == before.outputBytes);
+            CHECK(writer->counters().records == before.records + 1);
+            CHECK(writer->counters().workUnits > before.workUnits);
+            CHECK(writer->finish().error() == result.error());
+        }
+    }
 }
 
 TEST_CASE("heartbeat invalid combinations fail before output and retain the first checkpoint") {
